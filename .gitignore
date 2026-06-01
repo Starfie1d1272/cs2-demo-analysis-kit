@@ -13,3 +13,5 @@ __pycache__/
 .DS_Store
 .env
 .env.local
+.codegraph/
+.omc/
