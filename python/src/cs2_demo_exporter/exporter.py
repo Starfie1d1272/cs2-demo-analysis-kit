@@ -16,6 +16,7 @@ import math
 import re
 import zipfile
 from datetime import datetime, timezone
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -1015,7 +1016,6 @@ def _build_replay(raw: dict, team_map: dict, round_model: _RoundModel,
         return f
 
     # ── group by (roundNumber, steamId64) ──
-    from collections import defaultdict
     round_ticks: dict[int, set[int]] = defaultdict(set)
     # player_frames[round][sid] = {tick: frame_data}
     player_frames: dict[int, dict[str, dict[int, dict]]] = defaultdict(
@@ -1031,12 +1031,12 @@ def _build_replay(raw: dict, team_map: dict, round_model: _RoundModel,
             continue
         round_ticks[n].add(tick)
         player_frames[n][sid][tick] = {
-            "x": round(_safe_float(r.get("X"), 0.0)),
-            "y": round(_safe_float(r.get("Y"), 0.0)),
-            "z": round(_safe_float(r.get("Z"), 0.0)),
-            "yaw": round(_safe_float(r.get("yaw"), 0.0)),
+            "x": int(_rnd(r.get("X"), 0)),
+            "y": int(_rnd(r.get("Y"), 0)),
+            "z": int(_rnd(r.get("Z"), 0)),
+            "yaw": int(_rnd(r.get("yaw"), 0)),
             "hp": int(r.get("health") or 0),
-            "weapon": _wi(str(r.get("active_weapon") or "") or None),
+            "weapon": _wi(str(r.get("active_weapon")) if r.get("active_weapon") is not None else ""),
             "flags": _flags(r),
         }
 

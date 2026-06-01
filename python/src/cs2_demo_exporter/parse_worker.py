@@ -216,39 +216,30 @@ def parse_for_rivalhub(dem_path: str) -> dict[str, Any]:
     except BaseException:
         player_info = []
 
-    # ── positions: ~1s sample during active play ─────────────────
-    sample_ticks = _build_sample_ticks(round_ends, round_freeze_ends, tickrate)
-    positions_raw: list[dict] = []
-    if sample_ticks:
+    # ── positions (~1 Hz) + replay (~8 Hz): single parse over replay ticks ──
+    replay_step = max(1, tickrate // 8)  # 8 Hz
+    replay_ticks = _build_sample_ticks(round_ends, round_freeze_ends, tickrate,
+                                       step=replay_step)
+    all_positions: list[dict] = []
+    sample_ticks: list[int] = []
+    if replay_ticks:
         try:
-            positions_raw = _rows(p.parse_ticks(
+            all_positions = _rows(p.parse_ticks(
                 [
                     "steamid", "team_num", "X", "Y", "Z", "yaw", "pitch",
                     "health", "armor", "active_weapon", "flash_duration",
                     "current_equip_value", "has_defuser", "has_c4",
                 ],
-                ticks=sample_ticks,
-            ))
-        except BaseException:
-            positions_raw = []
-
-    # ── replay: ~8 Hz sample for 2D replay viewer ─────────────────
-    replay_step = max(1, tickrate // 8)
-    replay_ticks = _build_sample_ticks(round_ends, round_freeze_ends, tickrate,
-                                       step=replay_step)
-    replay_raw: list[dict] = []
-    if replay_ticks:
-        try:
-            replay_raw = _rows(p.parse_ticks(
-                [
-                    "steamid", "team_num", "X", "Y", "Z", "yaw",
-                    "health", "active_weapon", "flash_duration",
-                    "has_defuser", "has_c4",
-                ],
                 ticks=replay_ticks,
             ))
+            # derive 1 Hz subset: every Nth = tickrate / replay_step
+            subsample = max(1, tickrate // replay_step)
+            sample_tick_set = {replay_ticks[i] for i in range(0, len(replay_ticks), subsample)}
+            sample_ticks = sorted(sample_tick_set)
         except BaseException:
-            replay_raw = []
+            all_positions = []
+    positions_raw = [r for r in all_positions if r.get("tick") in sample_tick_set]
+    replay_raw = all_positions
 
     # ── economy: player state at each freeze_end tick ────────────
     freeze_ticks = sorted({int(r["tick"]) for r in round_freeze_ends if r.get("tick")})
