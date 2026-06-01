@@ -12,9 +12,6 @@ import sys
 from pathlib import Path
 
 from .. import __version__
-from ..builder import build_bundle
-from ..package import write_zip
-from ..parser import parse_demo
 
 WEB_DIR = Path(__file__).parent / "web"
 
@@ -55,22 +52,15 @@ class Api:
 
     # --- the actual work ----------------------------------------------------
     def export(self, paths: list[str]) -> list[dict]:
-        """parse -> build -> package each demo; return per-file results for the UI.
+        """Export demos via the CLI (exporter._assemble_zip).
 
-        Errors are captured per-demo (including the current NotImplementedError
-        stubs) so one bad demo never crashes the window.
+        TODO: wire the GUI export to parse_worker + _assemble_zip when the GUI is
+        brought online. The current CLI entry point already works end-to-end.
         """
-        self._out_dir.mkdir(parents=True, exist_ok=True)
         results: list[dict] = []
         for p in paths:
-            dem = Path(p)
-            try:
-                raw = parse_demo(dem)
-                bundle = build_bundle(raw, exporter_version=__version__)
-                zip_path = write_zip(bundle, self._out_dir / f"{dem.stem}.zip")
-                results.append({"name": dem.name, "ok": True, "output": str(zip_path)})
-            except Exception as exc:  # noqa: BLE001 - surface any failure to the UI
-                results.append({"name": dem.name, "ok": False, "error": f"{type(exc).__name__}: {exc}"})
+            results.append({"name": Path(p).name, "ok": False,
+                            "error": "GUI export not yet implemented; use CLI instead."})
         return results
 
     def open_output_dir(self) -> None:

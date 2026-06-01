@@ -1,12 +1,12 @@
 """Raw extraction layer: .dem -> RawDemo via demoparser2.
 
 This module owns the ONLY dependency on demoparser2. Everything downstream
-(builder, rounds, stats) consumes the neutral `RawDemo` shape, so the parser
+(rounds, stats) consumes the neutral `RawDemo` shape, so the parser
 can be swapped without touching the v2 mapping logic.
 
 Keep this layer dumb: pull raw events and ticks, do NOT apply v2 semantics
 (no capping, no side normalization, no warmup filtering) — that belongs in
-`rounds.py` / `builder.py`.
+`rounds.py` / `exporter.py`.
 """
 
 from __future__ import annotations
