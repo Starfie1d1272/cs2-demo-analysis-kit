@@ -69,9 +69,32 @@ pytest
 
 ```bash
 cs2-demo-exporter export demos/*.dem --out exports/
-cs2-demo-exporter export-batch demos/ --out rivalhub-exports.zip --workers 4
+cs2-demo-exporter export-batch demos/ --out rivalhub-exports.zip
+cs2-demo-exporter export-batch demos/ --out rivalhub-exports.zip --workers 12
 cs2-demo-exporter validate exports/*.zip --spec-dir ../cs2-demo-format/spec
 ```
+
+### Batch Export Benchmark
+
+These numbers measure the full exporter workflow: parse `.dem`, build the
+`cs2-demo-format/2.0` rows, write per-demo ZIPs, and package the batch report.
+They are not directly comparable to narrow demoparser2 micro-benchmarks such as
+"find all player death coordinates".
+
+| Machine | Workers | Demos | Input | Result | Wall time | Throughput |
+|---|---:|---:|---:|---|---:|---:|
+| MacBook Air M5, fanless | 4 | 55 | 20.09 GB | 55 ok, 0 failed | 419.4s | 47.9 MB/s |
+| Ryzen 7 7800X3D desktop | 4 | 55 | 20.09 GB | 55 ok, 0 failed | 166.3s | 120.8 MB/s |
+| Ryzen 7 7800X3D desktop | 8 | 55 | 20.09 GB | 55 ok, 0 failed | 165.3s | 121.5 MB/s |
+| Ryzen 7 7800X3D desktop | 12 | 55 | 20.09 GB | 55 ok, 0 failed | 154.6s | 129.9 MB/s |
+| Ryzen 7 7800X3D desktop | 16 | 55 | 20.09 GB | 55 ok, 0 failed | 155.4s | 129.2 MB/s |
+
+`--workers` controls the number of parallel exporter processes. For sustained
+runs, omitting it uses the logical CPU count visible to Python. Pass an explicit
+value for reproducible benchmarks or to stay conservative on thermally
+constrained laptops. On the 7800X3D sample, 12 workers was the best point in
+this four-run curve; 16 workers did not improve throughput because per-process
+speed dropped under heavier CPU/cache/I/O contention.
 
 ### Roadmap
 
@@ -146,9 +169,29 @@ pytest
 
 ```bash
 cs2-demo-exporter export demos/*.dem --out exports/
-cs2-demo-exporter export-batch demos/ --out rivalhub-exports.zip --workers 4
+cs2-demo-exporter export-batch demos/ --out rivalhub-exports.zip
+cs2-demo-exporter export-batch demos/ --out rivalhub-exports.zip --workers 12
 cs2-demo-exporter validate exports/*.zip --spec-dir ../cs2-demo-format/spec
 ```
+
+### 批量导出 Benchmark
+
+这里记录的是完整 exporter 工作流：解析 `.dem`、构建
+`cs2-demo-format/2.0` 行数据、写出每场 demo 的 ZIP，并打包批量报告。它不等同于
+demoparser2 那种“只找所有玩家死亡坐标”的窄任务 micro-benchmark。
+
+| 机器 | Workers | Demos | 输入大小 | 结果 | 总耗时 | 吞吐 |
+|---|---:|---:|---:|---|---:|---:|
+| MacBook Air M5，无风扇 | 4 | 55 | 20.09 GB | 55 ok, 0 failed | 419.4s | 47.9 MB/s |
+| Ryzen 7 7800X3D 台式机 | 4 | 55 | 20.09 GB | 55 ok, 0 failed | 166.3s | 120.8 MB/s |
+| Ryzen 7 7800X3D 台式机 | 8 | 55 | 20.09 GB | 55 ok, 0 failed | 165.3s | 121.5 MB/s |
+| Ryzen 7 7800X3D 台式机 | 12 | 55 | 20.09 GB | 55 ok, 0 failed | 154.6s | 129.9 MB/s |
+| Ryzen 7 7800X3D 台式机 | 16 | 55 | 20.09 GB | 55 ok, 0 failed | 155.4s | 129.2 MB/s |
+
+`--workers` 控制并行 exporter 进程数。长时间跑批时，无风扇或散热受限的笔记本建议保守；
+不传时默认使用 Python 能看到的逻辑 CPU 数；需要可复现 benchmark，或想给散热受限机器降负载时，
+再显式传入固定值。这组 7800X3D 曲线里，12 workers 是最佳点；16 workers 没有继续提升，
+因为更高并发下单进程速度被 CPU/cache/I/O 竞争压低了。
 
 ### 路线图
 

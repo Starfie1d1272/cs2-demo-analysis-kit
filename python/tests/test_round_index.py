@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import math
 import zipfile
 from io import BytesIO
 from typing import Any
 
 from cs2_demo_exporter.exporter import _assemble_zip
+from cs2_demo_exporter.rounds import _event_steamid
 
 
 def _read_zip(raw: dict[str, Any]) -> dict[str, Any]:
@@ -110,3 +112,82 @@ def test_exported_events_stay_inside_their_round_windows():
     for bomb in pkg["bombs.json"]:
         round_row = rounds[bomb["roundNumber"]]
         assert round_row["freezeEndTick"] <= bomb["tick"] <= round_row["endTick"]
+
+
+def test_event_steamid_treats_nan_as_missing_and_uses_fallback():
+    assert _event_steamid({"user_steamid": math.nan, "steamid": 76561198000000001}) == "76561198000000001"
+
+
+def test_grenade_cleanup_before_freeze_end_is_not_exported():
+    raw = _base_raw()
+    team_a = "76561198000000001"
+    raw["grenade_throws"] = [
+        {
+            "tick": 5200,
+            "grenade": "molotov",
+            "destroy_tick": 5300,
+            "steamid": team_a,
+            "X": 1,
+            "Y": 2,
+            "Z": 3,
+        }
+    ]
+    raw["grenade_detonations"] = [
+        {
+            "tick": 5300,
+            "total_rounds_played": 1,
+            "_grenade_type": "molotov",
+            "user_steamid": team_a,
+            "user_X": 1,
+            "user_Y": 2,
+            "user_Z": 3,
+        }
+    ]
+
+    pkg = _read_zip(raw)
+
+    assert [g for g in pkg["grenades.json"] if g["effectTick"] == 5300] == []
+
+
+def test_bomb_events_before_freeze_end_are_not_exported():
+    raw = _base_raw()
+    team_a = "76561198000000001"
+    raw["bomb_dropped"] = [
+        {"tick": 5200, "total_rounds_played": 1, "user_steamid": team_a}
+    ]
+
+    pkg = _read_zip(raw)
+
+    assert [b for b in pkg["bombs.json"] if b["tick"] == 5200] == []
+
+
+def test_grenade_destroy_tick_after_round_end_is_cleared():
+    raw = _base_raw()
+    team_a = "76561198000000001"
+    raw["grenade_throws"] = [
+        {
+            "tick": 7000,
+            "grenade": "smoke",
+            "destroy_tick": 12000,
+            "steamid": team_a,
+            "X": 1,
+            "Y": 2,
+            "Z": 3,
+        }
+    ]
+    raw["grenade_detonations"] = [
+        {
+            "tick": 7100,
+            "total_rounds_played": 1,
+            "_grenade_type": "smoke",
+            "user_steamid": team_a,
+            "user_X": 4,
+            "user_Y": 5,
+            "user_Z": 6,
+        }
+    ]
+
+    pkg = _read_zip(raw)
+    grenade = next(g for g in pkg["grenades.json"] if g["effectTick"] == 7100)
+
+    assert grenade["destroyTick"] is None

@@ -11,6 +11,7 @@ never leak into kills/damages/positions etc.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from .enums import normalize_round_end_reason
@@ -21,6 +22,10 @@ from .enums import normalize_round_end_reason
 def _sid(val) -> str | None:
     """Parse 17-digit SteamID64 from any demoparser2 representation."""
     if val is None or val == 0:
+        return None
+    if isinstance(val, float) and math.isnan(val):
+        return None
+    if isinstance(val, str) and val.strip().lower() in {"", "0", "nan", "none"}:
         return None
     s = str(int(val))
     return s if len(s) == 17 and s.isdigit() else None
@@ -45,6 +50,12 @@ class _RoundModel:
     windows: list[_RoundWindow]
     side_map: dict[tuple[int, str], str]
 
+    def window_for_round(self, round_number: int) -> _RoundWindow | None:
+        for window in self.windows:
+            if window.round_number == round_number:
+                return window
+        return None
+
     def round_for_tick(self, tick: int) -> int | None:
         for window in self.windows:
             if window.start_tick <= tick <= window.end_tick:
@@ -62,11 +73,11 @@ class _RoundModel:
 
 def _event_steamid(row: dict) -> str | None:
     """Steam64 from demoparser2 player extras (not raw userid entity slot)."""
-    return _sid(
-        row.get("user_steamid")
-        or row.get("steamid")
-        or row.get("attacker_steamid")
-    )
+    for key in ("user_steamid", "steamid", "attacker_steamid"):
+        sid = _sid(row.get(key))
+        if sid is not None:
+            return sid
+    return None
 
 
 # ── round builder ──────────────────────────────────────────────────────────────

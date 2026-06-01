@@ -523,6 +523,10 @@ def _build_bombs(raw: dict, team_map: dict, round_model: _RoundModel) -> list[di
             n = round_model.round_for_event(r)
             if n is None:
                 continue
+            tick = int(r.get("tick") or 0)
+            window = round_model.window_for_round(n)
+            if window is None or tick < window.freeze_end_tick or tick > window.end_tick:
+                continue
             # v2: roundNumber >= 1 (already checked via n > 0)
             actor_sid = _sid(r.get("user_steamid") or r.get("steamid") or r.get("userid"))
             actor_key_raw = team_map.get(actor_sid or "", "unknown") if actor_sid else None
@@ -538,7 +542,7 @@ def _build_bombs(raw: dict, team_map: dict, round_model: _RoundModel) -> list[di
                 site = round_site.get(n)
             out.append({
                 "roundNumber": n,
-                "tick": int(r.get("tick") or 0),
+                "tick": tick,
                 "type": v2_type,
                 "site": site,
                 "siteId": site_id,
@@ -598,6 +602,9 @@ def _build_grenades(raw: dict, team_map: dict, round_model: _RoundModel) -> list
         if n is None:
             continue
         tick = int(r.get("tick") or 0)
+        window = round_model.window_for_round(n)
+        if window is None or tick < window.freeze_end_tick or tick > window.end_tick:
+            continue
         gtype = str(r.get("_grenade_type") or "")
 
         # v2: grenade type must be in enum
@@ -636,8 +643,10 @@ def _build_grenades(raw: dict, team_map: dict, round_model: _RoundModel) -> list
         if not _is_valid_side(thrower_side):
             continue
 
-        # destroyTick must be >= 1 and not precede the effect tick
-        if destroy_tick is not None and destroy_tick < tick:
+        # destroyTick is optional; clear parser cleanup ticks outside this round.
+        if destroy_tick is not None and (
+            destroy_tick < tick or window is None or destroy_tick > window.end_tick
+        ):
             destroy_tick = None
 
         out.append({
