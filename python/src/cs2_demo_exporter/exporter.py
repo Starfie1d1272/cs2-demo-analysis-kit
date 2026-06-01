@@ -131,6 +131,25 @@ def _raw(row: dict, k: str):
     return row.get(k) if row.get(k) is not None else row.get(k.lower())
 
 
+def _resolve_row(row: dict, round_model: _RoundModel, *,
+                  steamid_key: str = "steamid",
+                  use_event: bool = False,
+                  strict: bool = False) -> tuple[int | None, str | None]:
+    """Return (roundNumber, steamId64) or (None, None) if unresolvable."""
+    if use_event:
+        n = round_model.round_for_event(row)
+    else:
+        n = round_model.round_for_tick(int(row.get("tick") or 0))
+    if n is None:
+        return None, None
+    sid = _sid(row.get(steamid_key))
+    if not sid:
+        return None, None
+    if strict and not _is_valid_steamid(sid):
+        return None, None
+    return n, sid
+
+
 def _json_safe(obj):
     """Recursively replace float NaN/inf with None for JSON compliance."""
     if isinstance(obj, float):
@@ -554,13 +573,8 @@ def _build_match(raw: dict, rounds: list[dict]) -> dict:
 def _build_kills(raw: dict, team_map: dict, round_model: _RoundModel) -> list[dict]:
     out = []
     for r in raw.get("deaths", []):
-        n = round_model.round_for_event(r)
+        n, victim_sid = _resolve_row(r, round_model, steamid_key="user_steamid", use_event=True, strict=True)
         if n is None:
-            continue
-
-        victim_sid = _sid(r.get("user_steamid"))
-        # v2: victimSteamId64 must pass _is_valid_steamid
-        if not _is_valid_steamid(victim_sid):
             continue
 
         victim_key = team_map.get(victim_sid, "unknown")
@@ -646,12 +660,8 @@ def _annotate_trades(kills: list[dict], trade_window_ticks: int = 384) -> None:
 def _build_damages(raw: dict, team_map: dict, round_model: _RoundModel) -> list[dict]:
     out = []
     for r in raw.get("hurts", []):
-        n = round_model.round_for_event(r)
+        n, vic_sid = _resolve_row(r, round_model, steamid_key="user_steamid", use_event=True, strict=True)
         if n is None:
-            continue
-
-        vic_sid = _sid(r.get("user_steamid"))
-        if not _is_valid_steamid(vic_sid):
             continue
 
         vic_key = team_map.get(vic_sid, "unknown")
@@ -951,11 +961,8 @@ def _build_positions(raw: dict, team_map: dict, round_model: _RoundModel) -> lis
     out = []
     for r in raw.get("positions_raw", []):
         tick = int(r.get("tick") or 0)
-        n = round_model.round_for_tick(tick)
+        n, sid = _resolve_row(r, round_model)
         if n is None:
-            continue
-        sid = _sid(r.get("steamid"))
-        if not sid:
             continue
         key = team_map.get(sid, "unknown")
         side = round_model.side_map.get((n, key), "unknown")
@@ -1023,11 +1030,8 @@ def _build_replay(raw: dict, team_map: dict, round_model: _RoundModel,
 
     for r in rows:
         tick = int(r.get("tick") or 0)
-        n = round_model.round_for_tick(tick)
+        n, sid = _resolve_row(r, round_model)
         if n is None:
-            continue
-        sid = _sid(r.get("steamid"))
-        if not sid:
             continue
         round_ticks[n].add(tick)
         player_frames[n][sid][tick] = {
