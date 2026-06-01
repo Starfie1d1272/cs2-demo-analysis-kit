@@ -245,7 +245,7 @@ def parse_for_rivalhub(dem_path: str) -> dict[str, Any]:
         for row in team_rows:
             tn = row.get("CCSTeam.m_iTeamNum")
             name = str(row.get("CCSTeam.m_szClanTeamname") or "").strip()
-            if not name or name.lower() in ("ct", "terrorist", "t"):
+            if not name or name.lower() in ("ct", "terrorist", "t", "team a", "team b"):
                 continue
             if tn == 2:
                 team_a_name = name

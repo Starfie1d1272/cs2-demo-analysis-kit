@@ -12,6 +12,7 @@ the pipeline without the CLI.
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import tempfile
@@ -33,11 +34,47 @@ app = typer.Typer(
 )
 
 
+def _sanitize(s: str) -> str:
+    """Sanitize a string for safe filename use."""
+    for ch in r' <>:"/\|?*':
+        s = s.replace(ch, '_')
+    while '__' in s:
+        s = s.replace('__', '_')
+    return s.strip('_')
+
+
+def _build_zip_name(dem: Path, zip_bytes: bytes) -> str:
+    """Build a descriptive filename from demo metadata; fallback to stem."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+            match = json.loads(zf.read("match.json"))
+
+        mtime = os.path.getmtime(str(dem))
+        date = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d")
+        map_name = _sanitize(match.get("mapName", "unknown"))
+        team_a = _sanitize(match["teamA"].get("name") or "")
+        team_b = _sanitize(match["teamB"].get("name") or "")
+        score_a = match["teamA"]["score"]
+        score_b = match["teamB"]["score"]
+
+        if team_a and team_b:
+            # Tournament: team names available
+            stem = f"{date}_{map_name}_{team_a}-vs-{team_b}_{score_a}-{score_b}"
+        else:
+            # Ladder / no team names: include original stem for traceability
+            stem = f"{date}_{map_name}_{score_a}-{score_b}_{dem.stem}"
+
+        return f"{stem}.zip"
+    except Exception:
+        return f"{dem.stem}.zip"
+
+
 def _export_one(dem: Path, out_dir: Path) -> Path:
     """parse -> build -> package one demo; return the written ZIP path."""
     zip_bytes = export_demo(str(dem))
     out_dir.mkdir(parents=True, exist_ok=True)
-    zip_path = out_dir / f"{dem.stem}.zip"
+    name = _build_zip_name(dem, zip_bytes)
+    zip_path = out_dir / name
     zip_path.write_bytes(zip_bytes)
     return zip_path
 
