@@ -23,11 +23,14 @@ describe("analyzeDemoPackage", () => {
     expect(bundle.playerIndicators[0]?.indicators.totalRounds).toBe(35);
     expect(bundle.playerRoundFacts).toHaveLength(350);
     expect(bundle.economy).toHaveLength(35);
-    expect(bundle.timeline.filter((event) => event.type === "kill")).toHaveLength(233);
-    expect(bundle.heatmap.filter((point) => point.kind === "death")).toHaveLength(233);
+    expect(bundle.timeline.filter((event) => event.type === "kill")).toHaveLength(236);
+    expect(bundle.timeline.filter((event) => event.type === "bomb")).toHaveLength(38);
+    expect(bundle.heatmap.filter((point) => point.kind === "death")).toHaveLength(236);
     expect(bundle.timeline.some((event) => event.type === "kill")).toBe(true);
     expect(bundle.heatmap.some((point) => point.kind === "death")).toBe(true);
-    expect(viewModel.scoreline).toBe("20:15");
+    expect(bundle.timeline.find((event) => event.type === "round-end")?.clockPhase).toBe("round-end");
+    expect(bundle.timeline.find((event) => event.type === "kill")?.clockLabel).toMatch(/^\d:\d{2}$/);
+    expect(viewModel.scoreline).toBe("16:19");
     expect(viewModel.map.name).toBe("de_ancient");
     expect(viewModel.map.radarImageUrl).toBe("/maps/radars/de_ancient.png");
     expect(viewModel.qa.summary.errorCount).toBe(0);
@@ -42,8 +45,8 @@ describe("analyzeDemoPackage", () => {
     expect(signals).toHaveLength(10);
     expect(ratings).toHaveLength(10);
     expect(signals[0]?.rounds).toBe(35);
-    expect(signals[0]?.combat.killsByBuyDelta).toEqual({ disadvantage: 13, even: 10, advantage: 5 });
-    expect(signals[0]?.combat.killsByManState).toEqual({ manDown: 11, even: 7, manUp: 10 });
+    expect(signals[0]?.combat.killsByBuyDelta).toEqual({ disadvantage: 8, even: 16, advantage: 6 });
+    expect(signals[0]?.combat.killsByManState).toEqual({ manDown: 11, even: 8, manUp: 11 });
     expect(signals[0]?.trade.tradedOpeningDeaths).toBe(1);
     expect(ratings[0]?.rr.model).toBe("value-accounts-v2-lite");
     expect(ratings[0]?.rr.rr).toBeGreaterThan(0);

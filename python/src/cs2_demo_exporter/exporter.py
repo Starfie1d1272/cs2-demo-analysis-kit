@@ -16,6 +16,7 @@ import math
 import re
 import zipfile
 from datetime import datetime, timezone
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -50,18 +51,18 @@ def _sha256_hex(path: str) -> str:
 def _assemble_zip(raw: dict[str, Any], dem_path: str, demo_hash: str | None) -> bytes:
     players      = _build_players(raw)
     team_map     = _build_team_map(players)
-    rounds, side_map = _build_rounds(raw, team_map)
+    rounds, round_model = _build_rounds(raw, team_map)
     match_json   = _build_match(raw, rounds)
-    kills        = _build_kills(raw, team_map, side_map)
-    blinds_json  = _build_blinds(raw, team_map, side_map)
-    player_stats = _build_player_stats(raw, team_map, side_map, rounds,
+    kills        = _build_kills(raw, team_map, round_model)
+    blinds_json  = _build_blinds(raw, team_map, round_model)
+    player_stats = _build_player_stats(raw, team_map, round_model, rounds,
                                        kills_list=kills, blinds_list=blinds_json)
-    damages      = _build_damages(raw, team_map, side_map)
-    bombs        = _build_bombs(raw, team_map, side_map)
-    grenades     = _build_grenades(raw, team_map, side_map)
-    shots        = _build_shots(raw, team_map, side_map)
-    positions    = _build_positions(raw, team_map, side_map)
-    economies    = _build_economies(raw, team_map, side_map, rounds)
+    damages      = _build_damages(raw, team_map, round_model)
+    bombs        = _build_bombs(raw, team_map, round_model)
+    grenades     = _build_grenades(raw, team_map, round_model)
+    shots        = _build_shots(raw, team_map, round_model)
+    positions    = _build_positions(raw, team_map, round_model)
+    economies    = _build_economies(raw, team_map, round_model, rounds)
     clutches     = _build_clutches(kills, rounds, team_map)
     manifest     = _build_manifest(raw, dem_path, demo_hash, shots, positions)
 
@@ -179,6 +180,34 @@ def _b(val) -> bool:
 
 def _rn(row: dict) -> int:
     return int(row.get("total_rounds_played") or 0)
+
+
+@dataclass
+class _RoundWindow:
+    round_number: int
+    start_tick: int
+    freeze_end_tick: int
+    end_tick: int
+
+
+@dataclass
+class _RoundModel:
+    windows: list[_RoundWindow]
+    side_map: dict[tuple[int, str], str]
+
+    def round_for_tick(self, tick: int) -> int | None:
+        for window in self.windows:
+            if window.start_tick <= tick <= window.end_tick:
+                return window.round_number
+        return None
+
+    def round_for_event(self, row: dict) -> int | None:
+        tick = int(row.get("tick") or 0)
+        if tick > 0:
+            return self.round_for_tick(tick)
+        raw_round = _rn(row)
+        fallback = raw_round + 1
+        return fallback if fallback > 0 else None
 
 
 def _event_steamid(row: dict) -> str | None:
@@ -313,7 +342,7 @@ def _build_team_map(players: list[dict]) -> dict[str, str]:
 
 def _build_rounds(
     raw: dict, team_map: dict[str, str]
-) -> tuple[list[dict], dict[tuple[int, str], str]]:
+) -> tuple[list[dict], _RoundModel]:
     """
     Returns (rounds_list, side_map).
     side_map[(roundNumber, teamKey)] = "t" | "ct"
@@ -345,14 +374,12 @@ def _build_rounds(
     team_b_score = 0
     out: list[dict] = []
     side_map: dict[tuple[int, str], str] = {}
+    windows: list[_RoundWindow] = []
 
     round_ends_sorted = sorted(
         raw.get("round_ends", []),
         key=lambda r: _rn(r)
     )
-    all_round_nums = [_rn(r) for r in round_ends_sorted if _rn(r) > 0]
-    half = max(all_round_nums) // 2 if all_round_nums else 12
-
     for r in round_ends_sorted:
         n = _rn(r)
         if n <= 0:
@@ -362,19 +389,13 @@ def _build_rounds(
         s_tick = start_tick.get(n, 0)
         fz_tick = freeze_tick.get(n, 0)
 
+        team_a_side, team_b_side = _sides_for_round(raw, team_map, n)
+        side_map[(n, "teamA")] = team_a_side
+        side_map[(n, "teamB")] = team_b_side
+
         # v2: startTick, freezeEndTick, endTick must all be >= 1
         if s_tick <= 0 or fz_tick <= 0 or end_tick <= 0:
             # Still populate side_map so events can reference the round
-            team_a_side = "t" if n <= half else "ct"
-            team_b_side = "ct" if n <= half else "t"
-            if n > half * 2:
-                ot_round = n - half * 2
-                ot_half = ((ot_round - 1) // 3) % 2
-                team_a_side = "t" if ot_half == 0 else "ct"
-                team_b_side = "ct" if ot_half == 0 else "t"
-            side_map[(n, "teamA")] = team_a_side
-            side_map[(n, "teamB")] = team_b_side
-
             winner_raw = str(r.get("winner") or "").lower()
             if winner_raw in ("t", "2"):
                 winner_key = "teamA" if team_a_side == "t" else "teamB"
@@ -389,14 +410,6 @@ def _build_rounds(
                 team_b_score += 1
             continue
 
-        team_a_side = "t" if n <= half else "ct"
-        team_b_side = "ct" if n <= half else "t"
-        if n > half * 2:
-            ot_round = n - half * 2
-            ot_half = ((ot_round - 1) // 3) % 2
-            team_a_side = "t" if ot_half == 0 else "ct"
-            team_b_side = "ct" if ot_half == 0 else "t"
-
         winner_raw = str(r.get("winner") or "").lower()
         if winner_raw in ("t", "2"):
             winner_side = "t"
@@ -410,15 +423,10 @@ def _build_rounds(
 
         # v2: winnerTeamKey and winnerSide must be valid
         if not winner_key or not winner_side:
-            side_map[(n, "teamA")] = team_a_side
-            side_map[(n, "teamB")] = team_b_side
             # still track score even if we skip the round
             continue
 
         end_reason = _normalize_round_end_reason(r.get("reason"))
-
-        side_map[(n, "teamA")] = team_a_side
-        side_map[(n, "teamB")] = team_b_side
 
         out.append({
             "roundNumber": n,
@@ -435,6 +443,7 @@ def _build_rounds(
             "winnerSide": winner_side,
             "endReason": end_reason,
         })
+        windows.append(_RoundWindow(n, s_tick, fz_tick, end_tick))
 
         if winner_key == "teamA":
             team_a_score += 1
@@ -448,7 +457,47 @@ def _build_rounds(
         if rd["teamBEconomy"] is None:
             rd["teamBEconomy"] = "semi"
 
-    return out, side_map
+    return out, _RoundModel(windows=windows, side_map=side_map)
+
+
+def _sides_for_round(raw: dict, team_map: dict[str, str], round_number: int) -> tuple[str, str]:
+    """Infer teamA/teamB side for MR12 + OT from player_info, falling back to A=T."""
+    start_side_by_team = _starting_side_by_team(raw, team_map)
+    team_a_initial = start_side_by_team.get("teamA", "t")
+    team_b_initial = "ct" if team_a_initial == "t" else "t"
+    if round_number <= 12:
+        team_a_side = team_a_initial
+    elif round_number <= 24:
+        team_a_side = "ct" if team_a_initial == "t" else "t"
+    else:
+        ot_block = (round_number - 25) // 3
+        if ot_block % 2 == 0:
+            team_a_side = team_a_initial
+        else:
+            team_a_side = "ct" if team_a_initial == "t" else "t"
+    team_b_side = team_b_initial if team_a_side == team_a_initial else team_a_initial
+    return team_a_side, team_b_side
+
+
+def _starting_side_by_team(raw: dict, team_map: dict[str, str]) -> dict[str, str]:
+    counts: dict[str, dict[str, int]] = {"teamA": {"t": 0, "ct": 0}, "teamB": {"t": 0, "ct": 0}}
+    for row in raw.get("player_info", []):
+        sid = _sid(row.get("steamid"))
+        key = team_map.get(sid or "")
+        if key not in counts:
+            continue
+        try:
+            team_num = int(row.get("team_num") or 0)
+        except (TypeError, ValueError):
+            continue
+        side = "t" if team_num == 2 else "ct" if team_num == 3 else None
+        if side:
+            counts[key][side] += 1
+    out: dict[str, str] = {}
+    for key, side_counts in counts.items():
+        if side_counts["t"] or side_counts["ct"]:
+            out[key] = "t" if side_counts["t"] >= side_counts["ct"] else "ct"
+    return out
 
 
 # ── match ─────────────────────────────────────────────────────────────────────
@@ -487,11 +536,11 @@ def _build_match(raw: dict, rounds: list[dict]) -> dict:
 
 # ── kills ─────────────────────────────────────────────────────────────────────
 
-def _build_kills(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
+def _build_kills(raw: dict, team_map: dict, round_model: _RoundModel) -> list[dict]:
     out = []
     for r in raw.get("deaths", []):
-        n = _rn(r)
-        if n <= 0:
+        n = round_model.round_for_event(r)
+        if n is None:
             continue
 
         victim_sid = _sid(r.get("user_steamid"))
@@ -504,7 +553,7 @@ def _build_kills(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
         if not _is_valid_teamkey(victim_key):
             continue
 
-        victim_side = side_map.get((n, victim_key), "unknown")
+        victim_side = round_model.side_map.get((n, victim_key), "unknown")
         # v2: victimSide must be "t" or "ct"
         if not _is_valid_side(victim_side):
             continue
@@ -521,7 +570,7 @@ def _build_kills(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
         killer_key: str | None = killer_key_raw if _is_valid_teamkey(killer_key_raw or "") else None
         killer_sid = killer_sid if _is_valid_steamid(killer_sid) else None
 
-        killer_side_raw = side_map.get((n, killer_key), "unknown") if killer_key else None
+        killer_side_raw = round_model.side_map.get((n, killer_key), "unknown") if killer_key else None
         killer_side: str | None = killer_side_raw if _is_valid_side(killer_side_raw or "") else None
 
         assist_sid = assist_sid if _is_valid_steamid(assist_sid) else None
@@ -579,11 +628,11 @@ def _annotate_trades(kills: list[dict], trade_window_ticks: int = 384) -> None:
 
 # ── damages ───────────────────────────────────────────────────────────────────
 
-def _build_damages(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
+def _build_damages(raw: dict, team_map: dict, round_model: _RoundModel) -> list[dict]:
     out = []
     for r in raw.get("hurts", []):
-        n = _rn(r)
-        if n <= 0:
+        n = round_model.round_for_event(r)
+        if n is None:
             continue
 
         vic_sid = _sid(r.get("user_steamid"))
@@ -594,7 +643,7 @@ def _build_damages(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
         if not _is_valid_teamkey(vic_key):
             continue
 
-        vic_side = side_map.get((n, vic_key), "unknown")
+        vic_side = round_model.side_map.get((n, vic_key), "unknown")
         if not _is_valid_side(vic_side):
             continue
 
@@ -606,7 +655,7 @@ def _build_damages(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
         atk_key_raw = team_map.get(atk_sid or "", "unknown") if atk_sid else None
         atk_key: str | None = atk_key_raw if _is_valid_teamkey(atk_key_raw or "") else None
         atk_sid = atk_sid if _is_valid_steamid(atk_sid) else None
-        atk_side_raw = side_map.get((n, atk_key), "unknown") if atk_key else None
+        atk_side_raw = round_model.side_map.get((n, atk_key), "unknown") if atk_key else None
         atk_side: str | None = atk_side_raw if _is_valid_side(atk_side_raw or "") else None
 
         raw_dmg = int(r.get("dmg_health") or 0)
@@ -641,11 +690,11 @@ def _build_damages(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
 
 # ── blinds ────────────────────────────────────────────────────────────────────
 
-def _build_blinds(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
+def _build_blinds(raw: dict, team_map: dict, round_model: _RoundModel) -> list[dict]:
     out = []
     for r in raw.get("blinds", []):
-        n = _rn(r)
-        if n <= 0:
+        n = round_model.round_for_event(r)
+        if n is None:
             continue
 
         flasher_sid = _sid(r.get("attacker_steamid"))
@@ -664,11 +713,11 @@ def _build_blinds(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
         if not _is_valid_teamkey(flashed_key):
             continue
 
-        flasher_side = side_map.get((n, flasher_key), "unknown")
+        flasher_side = round_model.side_map.get((n, flasher_key), "unknown")
         if not _is_valid_side(flasher_side):
             continue
 
-        flashed_side = side_map.get((n, flashed_key), "unknown")
+        flashed_side = round_model.side_map.get((n, flashed_key), "unknown")
         if not _is_valid_side(flashed_side):
             continue
 
@@ -692,7 +741,7 @@ def _build_blinds(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
 
 # ── bombs ─────────────────────────────────────────────────────────────────────
 
-def _build_bombs(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
+def _build_bombs(raw: dict, team_map: dict, round_model: _RoundModel) -> list[dict]:
     out = []
     for ev_type, rows_key in [
         ("plant", "bomb_planted"),
@@ -716,15 +765,15 @@ def _build_bombs(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
         if v2_type is None:
             continue
         for r in raw.get(rows_key, []):
-            n = _rn(r)
-            if n <= 0:
+            n = round_model.round_for_event(r)
+            if n is None:
                 continue
             # v2: roundNumber >= 1 (already checked via n > 0)
             actor_sid = _sid(r.get("user_steamid") or r.get("steamid") or r.get("userid"))
             actor_key_raw = team_map.get(actor_sid or "", "unknown") if actor_sid else None
             actor_key: str | None = actor_key_raw if _is_valid_teamkey(actor_key_raw or "") else None
             actor_sid = actor_sid if _is_valid_steamid(actor_sid) else None
-            actor_side_raw = side_map.get((n, actor_key), "unknown") if actor_key else None
+            actor_side_raw = round_model.side_map.get((n, actor_key), "unknown") if actor_key else None
             actor_side: str | None = actor_side_raw if _is_valid_side(actor_side_raw or "") else None
             raw_site = r.get("site")
             site_id = str(raw_site).strip() if raw_site is not None else None
@@ -755,16 +804,17 @@ def _build_bombs(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
 
 # ── grenades ─────────────────────────────────────────────────────────────────
 
-def _build_grenades(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
+def _build_grenades(raw: dict, team_map: dict, round_model: _RoundModel) -> list[dict]:
     throws: list[dict] = []
     for r in raw.get("grenade_throws", []):
-        if _rn(r) <= 0:
+        n = round_model.round_for_event(r)
+        if n is None:
             continue
         gtype = _weapon_to_grenade_type(str(r.get("weapon") or ""))
         if not gtype:
             continue
         throws.append({
-            "rn": _rn(r),
+            "rn": n,
             "tick": int(r.get("tick") or 0),
             "gtype": gtype,
             "sid": _event_steamid(r),
@@ -786,8 +836,8 @@ def _build_grenades(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
 
     out = []
     for r in raw.get("grenade_detonations", []):
-        n = _rn(r)
-        if n <= 0:
+        n = round_model.round_for_event(r)
+        if n is None:
             continue
         tick = int(r.get("tick") or 0)
         gtype = str(r.get("_grenade_type") or "")
@@ -819,7 +869,7 @@ def _build_grenades(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
         if not _is_valid_teamkey(thrower_key):
             continue
 
-        thrower_side = side_map.get((n, thrower_key), "unknown")
+        thrower_side = round_model.side_map.get((n, thrower_key), "unknown")
         # v2: throwerSide must be "t" or "ct"
         if not _is_valid_side(thrower_side):
             continue
@@ -842,11 +892,11 @@ def _build_grenades(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
 
 # ── shots ─────────────────────────────────────────────────────────────────────
 
-def _build_shots(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
+def _build_shots(raw: dict, team_map: dict, round_model: _RoundModel) -> list[dict]:
     out = []
     for r in raw.get("fires", []):
-        n = _rn(r)
-        if n <= 0:
+        n = round_model.round_for_event(r)
+        if n is None:
             continue
 
         sid = _sid(r.get("user_steamid") or r.get("steamid") or r.get("userid"))
@@ -857,7 +907,7 @@ def _build_shots(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
         if not _is_valid_teamkey(key):
             continue
 
-        side = side_map.get((n, key), "unknown")
+        side = round_model.side_map.get((n, key), "unknown")
         if not _is_valid_side(side):
             continue
 
@@ -882,20 +932,18 @@ def _build_shots(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
 
 # ── positions-1s ─────────────────────────────────────────────────────────────
 
-def _build_positions(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
-    tick_to_round = _build_tick_to_round(raw)
-
+def _build_positions(raw: dict, team_map: dict, round_model: _RoundModel) -> list[dict]:
     out = []
     for r in raw.get("positions_raw", []):
         tick = int(r.get("tick") or 0)
-        n = tick_to_round.get(tick, 0)
-        if n <= 0:
+        n = round_model.round_for_tick(tick)
+        if n is None:
             continue
         sid = _sid(r.get("steamid"))
         if not sid:
             continue
         key = team_map.get(sid, "unknown")
-        side = side_map.get((n, key), "unknown")
+        side = round_model.side_map.get((n, key), "unknown")
         out.append({
             "roundNumber": n,
             "tick": tick,
@@ -915,35 +963,6 @@ def _build_positions(raw: dict, team_map: dict, side_map: dict) -> list[dict]:
             "hasDefuseKit": _b(r.get("has_defuser")),
         })
     return out
-
-
-def _build_tick_to_round(raw: dict) -> dict[int, int]:
-    """Map each sample tick to the round it belongs to."""
-    # total_rounds_played at round_freeze_end = N-1 for round N → store at actual_round = N
-    freeze_by_round: dict[int, int] = {}
-    for r in raw.get("round_freeze_ends", []):
-        n = _rn(r)
-        t = int(r.get("tick") or 0)
-        actual_round = n + 1
-        if actual_round > 0 and t > 0:
-            freeze_by_round[actual_round] = t
-
-    # total_rounds_played at round_end = N for round N → correct as-is
-    intervals: list[tuple[int, int, int]] = []
-    for r in raw.get("round_ends", []):
-        n = _rn(r)
-        end_t = int(r.get("tick") or 0)
-        start_t = freeze_by_round.get(n, 0)
-        if start_t > 0 and end_t > start_t:
-            intervals.append((start_t, end_t, n))
-
-    mapping: dict[int, int] = {}
-    for tick in raw.get("sample_ticks", []):
-        for start_t, end_t, n in intervals:
-            if start_t <= tick < end_t:
-                mapping[tick] = n
-                break
-    return mapping
 
 
 # ── economies ─────────────────────────────────────────────────────────────────
@@ -977,16 +996,9 @@ def _team_economy_vote(types: list[str]) -> str:
 
 
 def _build_economies(
-    raw: dict, team_map: dict, side_map: dict, rounds: list[dict]
+    raw: dict, team_map: dict, round_model: _RoundModel, rounds: list[dict]
 ) -> list[dict]:
-    # total_rounds_played at round_freeze_end = N-1 for round N → actual_round = N
-    freeze_tick_to_round: dict[int, int] = {}
-    for r in raw.get("round_freeze_ends", []):
-        n = _rn(r)
-        t = int(r.get("tick") or 0)
-        actual_round = n + 1
-        if actual_round > 0 and t > 0:
-            freeze_tick_to_round[t] = actual_round
+    freeze_tick_to_round = {window.freeze_end_tick: window.round_number for window in round_model.windows}
 
     total_rounds = len(rounds)
     out = []
@@ -1003,7 +1015,7 @@ def _build_economies(
         key = team_map.get(sid, "unknown")
         if not _is_valid_teamkey(key):
             continue
-        side = side_map.get((n, key), "unknown")
+        side = round_model.side_map.get((n, key), "unknown")
         if not _is_valid_side(side):
             continue
 
@@ -1058,12 +1070,12 @@ def _build_economies(
 # ── player-stats ──────────────────────────────────────────────────────────────
 
 def _build_player_stats(
-    raw: dict, team_map: dict, side_map: dict, rounds: list[dict],
+    raw: dict, team_map: dict, round_model: _RoundModel, rounds: list[dict],
     kills_list: list[dict] | None = None,
     blinds_list: list[dict] | None = None,
 ) -> list[dict]:
     total_rounds = len(rounds)
-    kills_by = _kills_per_round_per_player(raw.get("deaths", []))
+    kills_by = _kills_per_round_per_player(raw.get("deaths", []), round_model)
     stats: dict[str, dict] = {}
 
     def _get(sid: str) -> dict:
@@ -1105,8 +1117,8 @@ def _build_player_stats(
 
     # kills / deaths — official rounds only
     for r in raw.get("deaths", []):
-        n = _rn(r)
-        if n <= 0:
+        n = _event_round_number(round_model, r)
+        if n is None:
             continue
         killer = _sid(r.get("attacker_steamid"))
         victim = _sid(r.get("user_steamid"))
@@ -1136,7 +1148,7 @@ def _build_player_stats(
 
     # trade annotations + no-scope kills
     if kills_list is None:
-        kills_list = _build_kills(raw, team_map, side_map)
+        kills_list = _build_kills(raw, team_map, round_model)
     for k in kills_list:
         if k["tradeKill"] and k["killerSteamId64"]:
             _get(k["killerSteamId64"])["tradeKillCount"] += 1
@@ -1154,13 +1166,13 @@ def _build_player_stats(
 
     # bomb plant / defuse — official rounds only
     for r in raw.get("bomb_planted", []):
-        if _rn(r) <= 0:
+        if _event_round_number(round_model, r) is None:
             continue
         sid = _sid(r.get("user_steamid") or r.get("steamid") or r.get("userid"))
         if sid:
             _get(sid)["bombPlantCount"] += 1
     for r in raw.get("bomb_defused", []):
-        if _rn(r) <= 0:
+        if _event_round_number(round_model, r) is None:
             continue
         sid = _sid(r.get("user_steamid") or r.get("steamid") or r.get("userid"))
         if sid:
@@ -1170,8 +1182,8 @@ def _build_player_stats(
     first_kills: dict[int, str] = {}
     first_deaths: dict[int, str] = {}
     for r in sorted(raw.get("deaths", []), key=lambda x: int(x.get("tick") or 0)):
-        n = _rn(r)
-        if n <= 0:
+        n = _event_round_number(round_model, r)
+        if n is None:
             continue
         killer = _sid(r.get("attacker_steamid"))
         victim = _sid(r.get("user_steamid"))
@@ -1199,8 +1211,7 @@ def _build_player_stats(
     # playerStats.utilityDamage agrees with the canonical recomputation.
     util_weapons = {"hegrenade", "inferno", "molotov", "incendiary"}
     for r in raw.get("hurts", []):
-        n = _rn(r)
-        if n <= 0:
+        if _event_round_number(round_model, r) is None:
             continue
         atk = _sid(r.get("attacker_steamid"))
         vic = _sid(r.get("user_steamid"))
@@ -1288,12 +1299,21 @@ def _build_player_stats(
     return out
 
 
-def _kills_per_round_per_player(deaths: list[dict]) -> dict[str, dict[int, int]]:
+def _event_round_number(round_model: _RoundModel, row: dict) -> int | None:
+    n = round_model.round_for_event(row)
+    if n is None:
+        return None
+    return n if any(window.round_number == n for window in round_model.windows) else None
+
+
+def _kills_per_round_per_player(
+    deaths: list[dict], round_model: _RoundModel
+) -> dict[str, dict[int, int]]:
     """Returns {steamId64: {roundNumber: kill_count}} for official rounds only."""
     result: dict[str, dict[int, int]] = {}
     for r in deaths:
-        n = _rn(r)
-        if n <= 0:
+        n = _event_round_number(round_model, r)
+        if n is None:
             continue
         killer = _sid(r.get("attacker_steamid"))
         victim = _sid(r.get("user_steamid"))

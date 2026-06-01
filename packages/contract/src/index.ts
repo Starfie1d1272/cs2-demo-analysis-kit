@@ -247,6 +247,9 @@ export const timelineEventSchema = z.object({
   roundNumber: z.number().int().positive(),
   tick: z.number().int().positive(),
   timeSeconds: z.number().nonnegative(),
+  clockPhase: z.enum(["freeze", "round", "bomb", "round-end"]),
+  clockSeconds: z.number().nonnegative(),
+  clockLabel: z.string(),
   type: z.enum(["kill", "bomb", "grenade", "round-end"]),
   label: z.string(),
   teamKey: teamKeySchema.nullable()

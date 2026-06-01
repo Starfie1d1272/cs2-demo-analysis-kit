@@ -12,7 +12,7 @@ export function RoundTimeline({ events }: RoundTimelineProps) {
       {visibleEvents.map((event) => (
         <div className="dak-timeline-row" key={event.id}>
           <span className="dak-badge">R{event.roundNumber}</span>
-          <span className="dak-mono dak-muted">{event.timeSeconds.toFixed(1)}s</span>
+          <span className="dak-mono dak-muted">{event.clockLabel}</span>
           <span>{event.label}</span>
         </div>
       ))}

@@ -52,6 +52,7 @@ export async function loadDemoPackageFromZip(bytes: ArrayBuffer | Uint8Array): P
   const kills = await readJson<unknown>("kills.json").catch(() => []);
   const damages = await readJson<unknown>("damages.json").catch(() => []);
   const blinds = await readJson<unknown>("blinds.json").catch(() => []);
+  const bombs = await readJson<unknown>("bombs.json").catch(() => []);
   const grenades = await readJson<unknown>("grenades.json").catch(() => []);
   const clutches = await readJson<unknown>("clutches.json").catch(() => []);
 
@@ -65,6 +66,7 @@ export async function loadDemoPackageFromZip(bytes: ArrayBuffer | Uint8Array): P
     kills,
     damages,
     blinds,
+    bombs,
     grenades,
     clutches
   });
@@ -419,6 +421,7 @@ function normalizeV1Package(raw: Record<string, unknown>): Record<string, unknow
 function buildQaReport(pkg: DemoPackage): QaReport {
   const issues: QaIssue[] = [];
   const roundNumbers = pkg.rounds.map((round) => round.roundNumber).sort((a, b) => a - b);
+  const roundsByNumber = new Map(pkg.rounds.map((round) => [round.roundNumber, round]));
   const playerIds = new Set(pkg.players.map((player) => player.steamId64));
 
   for (let i = 0; i < roundNumbers.length; i += 1) {
@@ -433,6 +436,59 @@ function buildQaReport(pkg: DemoPackage): QaReport {
     }
   }
 
+  const teamAScore = pkg.rounds.filter((round) => round.winnerTeamKey === "teamA").length;
+  const teamBScore = pkg.rounds.filter((round) => round.winnerTeamKey === "teamB").length;
+  if (teamAScore !== pkg.match.teamA.score || teamBScore !== pkg.match.teamB.score) {
+    issues.push({
+      severity: "error",
+      code: "score.round_winners_mismatch",
+      message: `Match score is ${pkg.match.teamA.score}:${pkg.match.teamB.score}, but rounds imply ${teamAScore}:${teamBScore}.`,
+      path: "match"
+    });
+  }
+
+  for (const round of pkg.rounds) {
+    if (!(round.startTick <= round.freezeEndTick && round.freezeEndTick <= round.endTick)) {
+      issues.push({
+        severity: "error",
+        code: "rounds.invalid_tick_order",
+        message: `Round ${round.roundNumber} has invalid tick order.`,
+        path: "rounds"
+      });
+    }
+    const expectedWinnerSide = round.winnerTeamKey === "teamA" ? round.teamASide : round.teamBSide;
+    if (round.winnerSide !== expectedWinnerSide) {
+      issues.push({
+        severity: "error",
+        code: "rounds.winner_side_mismatch",
+        message: `Round ${round.roundNumber} winnerSide does not match winnerTeamKey side.`,
+        path: "rounds"
+      });
+    }
+  }
+
+  const checkEventTick = (kind: string, roundNumber: number, tick: number, index: number, allowFreeze = false) => {
+    const round = roundsByNumber.get(roundNumber);
+    if (!round) {
+      issues.push({
+        severity: "error",
+        code: `${kind}.unknown_round`,
+        message: `${kind} event ${index} references missing round ${roundNumber}.`,
+        path: kind
+      });
+      return;
+    }
+    const minTick = allowFreeze ? round.startTick : round.freezeEndTick;
+    if (tick < minTick || tick > round.endTick) {
+      issues.push({
+        severity: "error",
+        code: `${kind}.tick_outside_round`,
+        message: `${kind} event ${index} tick ${tick} is outside round ${roundNumber} active window.`,
+        path: kind
+      });
+    }
+  };
+
   const expectedEconomyRows = pkg.players.length * pkg.rounds.length;
   if (pkg.playerEconomies.length < expectedEconomyRows) {
     issues.push({
@@ -443,7 +499,8 @@ function buildQaReport(pkg: DemoPackage): QaReport {
     });
   }
 
-  for (const kill of pkg.kills) {
+  pkg.kills.forEach((kill, index) => {
+    checkEventTick("kills", kill.roundNumber, kill.tick, index);
     if (kill.killerSteamId64 && !playerIds.has(kill.killerSteamId64)) {
       issues.push({
         severity: "warning",
@@ -458,6 +515,43 @@ function buildQaReport(pkg: DemoPackage): QaReport {
         code: "kill.unknown_victim",
         message: `Victim ${kill.victimSteamId64} is not present in players.json.`,
         path: "kills"
+      });
+    }
+  });
+
+  pkg.damages.forEach((damage, index) => checkEventTick("damages", damage.roundNumber, damage.tick, index));
+  pkg.blinds.forEach((blind, index) => checkEventTick("blinds", blind.roundNumber, blind.tick, index));
+  pkg.grenades.forEach((grenade, index) => {
+    checkEventTick("grenades", grenade.roundNumber, grenade.throwTick, index);
+    checkEventTick("grenades", grenade.roundNumber, grenade.effectTick, index);
+  });
+
+  const bombEventsByRound = new Map<number, typeof pkg.bombs>();
+  pkg.bombs.forEach((bomb, index) => {
+    checkEventTick("bombs", bomb.roundNumber, bomb.tick, index);
+    const events = bombEventsByRound.get(bomb.roundNumber) ?? [];
+    events.push(bomb);
+    bombEventsByRound.set(bomb.roundNumber, events);
+    if (bomb.actorSteamId64 && !playerIds.has(bomb.actorSteamId64)) {
+      issues.push({
+        severity: "warning",
+        code: "bomb.unknown_actor",
+        message: `Bomb actor ${bomb.actorSteamId64} is not present in players.json.`,
+        path: "bombs"
+      });
+    }
+  });
+
+  for (const [roundNumber, bombs] of bombEventsByRound) {
+    const sorted = [...bombs].sort((a, b) => a.tick - b.tick);
+    const planted = sorted.find((bomb) => bomb.type === "planted");
+    const terminal = sorted.find((bomb) => bomb.type === "exploded" || bomb.type === "defused");
+    if (terminal && (!planted || planted.tick > terminal.tick)) {
+      issues.push({
+        severity: "error",
+        code: "bomb.lifecycle_without_plant",
+        message: `Round ${roundNumber} has ${terminal.type} before any planted event.`,
+        path: "bombs"
       });
     }
   }
@@ -699,9 +793,21 @@ function buildTimeline(pkg: DemoPackage): TimelineEvent[] {
     roundNumber: kill.roundNumber,
     tick: kill.tick,
     timeSeconds: tickToRoundSeconds(pkg, kill.roundNumber, kill.tick),
+    ...clockForTick(pkg, kill.roundNumber, kill.tick),
     type: "kill",
     label: `${nameForSteamId(pkg, kill.killerSteamId64) ?? "环境"} 击杀 ${nameForSteamId(pkg, kill.victimSteamId64)}`,
     teamKey: kill.killerTeamKey
+  }));
+
+  const bombEvents = pkg.bombs.map<TimelineEvent>((bomb, index) => ({
+    id: `bomb-${index}`,
+    roundNumber: bomb.roundNumber,
+    tick: bomb.tick,
+    timeSeconds: tickToRoundSeconds(pkg, bomb.roundNumber, bomb.tick),
+    ...clockForTick(pkg, bomb.roundNumber, bomb.tick),
+    type: "bomb",
+    label: bombLabel(pkg, bomb),
+    teamKey: bomb.actorTeamKey
   }));
 
   const grenadeEvents = pkg.grenades.map<TimelineEvent>((grenade, index) => ({
@@ -709,6 +815,7 @@ function buildTimeline(pkg: DemoPackage): TimelineEvent[] {
     roundNumber: grenade.roundNumber,
     tick: grenade.effectTick,
     timeSeconds: tickToRoundSeconds(pkg, grenade.roundNumber, grenade.effectTick),
+    ...clockForTick(pkg, grenade.roundNumber, grenade.effectTick),
     type: "grenade",
     label: `${nameForSteamId(pkg, grenade.throwerSteamId64) ?? "未知选手"} 投掷${grenadeLabel(grenade.grenade)}`,
     teamKey: grenade.throwerTeamKey
@@ -719,12 +826,16 @@ function buildTimeline(pkg: DemoPackage): TimelineEvent[] {
     roundNumber: roundRow.roundNumber,
     tick: roundRow.endTick,
     timeSeconds: tickToRoundSeconds(pkg, roundRow.roundNumber, roundRow.endTick),
+    clockPhase: "round-end",
+    clockSeconds: 0,
+    clockLabel: "结束",
     type: "round-end",
     label: `${sideLabel(roundRow.winnerSide)}获胜 · ${endReasonLabel(roundRow.endReason)}`,
     teamKey: roundRow.winnerTeamKey
   }));
 
-  return [...killEvents, ...grenadeEvents, ...roundEvents].sort((a, b) => a.roundNumber - b.roundNumber || a.tick - b.tick);
+  return [...killEvents, ...bombEvents, ...grenadeEvents, ...roundEvents]
+    .sort((a, b) => a.roundNumber - b.roundNumber || a.tick - b.tick || eventSortWeight(a.type) - eventSortWeight(b.type));
 }
 
 function buildEconomy(pkg: DemoPackage): EconomyPoint[] {
@@ -806,6 +917,57 @@ function tickToRoundSeconds(pkg: DemoPackage, roundNumber: number, tick: number)
     return 0;
   }
   return round(Math.max(0, tick - roundRow.freezeEndTick) / pkg.match.tickrate, 2);
+}
+
+function clockForTick(pkg: DemoPackage, roundNumber: number, tick: number): Pick<TimelineEvent, "clockPhase" | "clockSeconds" | "clockLabel"> {
+  const roundRow = pkg.rounds.find((row) => row.roundNumber === roundNumber);
+  if (!roundRow) {
+    return { clockPhase: "round", clockSeconds: 0, clockLabel: "0:00" };
+  }
+  if (tick < roundRow.freezeEndTick) {
+    return { clockPhase: "freeze", clockSeconds: 0, clockLabel: "冻结" };
+  }
+  const plant = [...pkg.bombs]
+    .filter((bomb) => bomb.roundNumber === roundNumber && bomb.type === "planted" && bomb.tick <= tick)
+    .sort((a, b) => b.tick - a.tick)[0];
+  if (plant) {
+    const remaining = clamp(40 - (tick - plant.tick) / pkg.match.tickrate, 0, 40);
+    return { clockPhase: "bomb", clockSeconds: round(remaining, 2), clockLabel: formatClock(remaining) };
+  }
+  const remaining = clamp(115 - (tick - roundRow.freezeEndTick) / pkg.match.tickrate, 0, 115);
+  return { clockPhase: "round", clockSeconds: round(remaining, 2), clockLabel: formatClock(remaining) };
+}
+
+function formatClock(seconds: number): string {
+  const clamped = Math.max(0, Math.ceil(seconds));
+  const minutes = Math.floor(clamped / 60);
+  const remainder = clamped % 60;
+  return `${minutes}:${remainder.toString().padStart(2, "0")}`;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function eventSortWeight(type: TimelineEvent["type"]): number {
+  if (type === "bomb") return 0;
+  if (type === "kill") return 1;
+  if (type === "grenade") return 2;
+  return 3;
+}
+
+function bombLabel(pkg: DemoPackage, bomb: DemoPackage["bombs"][number]): string {
+  const actor = nameForSteamId(pkg, bomb.actorSteamId64) ?? "未知选手";
+  const labels: Record<string, string> = {
+    planted: "下包",
+    defused: "拆包",
+    exploded: "爆炸",
+    dropped: "掉包",
+    picked_up: "捡包",
+    plant_begin: "开始下包",
+    defuse_begin: "开始拆包"
+  };
+  return `${actor} ${labels[bomb.type] ?? bomb.type}`;
 }
 
 function nameForSteamId(pkg: DemoPackage, steamId: string | null): string | null {
