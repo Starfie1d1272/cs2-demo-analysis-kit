@@ -1,0 +1,14 @@
+{
+  "name": "@cs2dak/core",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cs2dak/contract": "workspace:*",
+    "@rivalhub/rival-rating": "github:Starfie1d1272/rival-rating",
+    "jszip": "^3.10.1"
+  }
+}

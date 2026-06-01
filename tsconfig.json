@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/contract" },
+    { "path": "./packages/maps" },
+    { "path": "./packages/core" },
+    { "path": "./packages/react" },
+    { "path": "./packages/cli" },
+    { "path": "./apps/demo-lab" }
+  ]
+}

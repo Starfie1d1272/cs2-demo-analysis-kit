@@ -1,0 +1,18 @@
+{
+  "name": "@cs2dak/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "cs2dak": "./src/index.ts"
+  },
+  "scripts": {
+    "analyze": "tsx src/index.ts analyze"
+  },
+  "dependencies": {
+    "@cs2dak/core": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0"
+  }
+}

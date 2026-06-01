@@ -1,0 +1,19 @@
+{
+  "name": "@cs2dak/react",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts",
+    "./theme.css": "./src/theme.css"
+  },
+  "dependencies": {
+    "@cs2dak/contract": "workspace:*",
+    "@cs2dak/maps": "workspace:*",
+    "lucide-react": "^0.468.0"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  }
+}

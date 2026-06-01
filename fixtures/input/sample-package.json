@@ -1,0 +1,96 @@
+{
+  "manifest": {
+    "schemaVersion": "cs2-demo-format/2.0",
+    "mapName": "de_mirage",
+    "tickrate": 64,
+    "exporter": { "name": "fixture", "version": "0.1.0" },
+    "parser": { "name": "fixture", "version": "0.1.0" }
+  },
+  "match": {
+    "mapName": "de_mirage",
+    "tickrate": 64,
+    "durationSeconds": 680,
+    "teamA": { "teamKey": "teamA", "name": "Rival Red", "score": 4 },
+    "teamB": { "teamKey": "teamB", "name": "Insight Blue", "score": 2 }
+  },
+  "players": [
+    { "steamId64": "76561198000000001", "name": "Nova", "teamKey": "teamA" },
+    { "steamId64": "76561198000000002", "name": "Kite", "teamKey": "teamA" },
+    { "steamId64": "76561198000000003", "name": "Mako", "teamKey": "teamA" },
+    { "steamId64": "76561198000000004", "name": "Orbit", "teamKey": "teamA" },
+    { "steamId64": "76561198000000005", "name": "Vega", "teamKey": "teamA" },
+    { "steamId64": "76561198000000006", "name": "Cipher", "teamKey": "teamB" },
+    { "steamId64": "76561198000000007", "name": "Rook", "teamKey": "teamB" },
+    { "steamId64": "76561198000000008", "name": "Frost", "teamKey": "teamB" },
+    { "steamId64": "76561198000000009", "name": "Pulse", "teamKey": "teamB" },
+    { "steamId64": "76561198000000010", "name": "Axis", "teamKey": "teamB" }
+  ],
+  "rounds": [
+    { "roundNumber": 1, "startTick": 100, "freezeEndTick": 500, "endTick": 5400, "teamASide": "t", "teamBSide": "ct", "teamAScoreBefore": 0, "teamBScoreBefore": 0, "teamAEconomy": "pistol", "teamBEconomy": "pistol", "winnerTeamKey": "teamA", "winnerSide": "t", "endReason": "target_bombed" },
+    { "roundNumber": 2, "startTick": 5600, "freezeEndTick": 6100, "endTick": 10400, "teamASide": "t", "teamBSide": "ct", "teamAScoreBefore": 1, "teamBScoreBefore": 0, "teamAEconomy": "full", "teamBEconomy": "eco", "winnerTeamKey": "teamA", "winnerSide": "t", "endReason": "t_win" },
+    { "roundNumber": 3, "startTick": 10600, "freezeEndTick": 11100, "endTick": 15200, "teamASide": "t", "teamBSide": "ct", "teamAScoreBefore": 2, "teamBScoreBefore": 0, "teamAEconomy": "full", "teamBEconomy": "force", "winnerTeamKey": "teamB", "winnerSide": "ct", "endReason": "ct_win" },
+    { "roundNumber": 4, "startTick": 15400, "freezeEndTick": 15900, "endTick": 20100, "teamASide": "t", "teamBSide": "ct", "teamAScoreBefore": 2, "teamBScoreBefore": 1, "teamAEconomy": "semi", "teamBEconomy": "full", "winnerTeamKey": "teamA", "winnerSide": "t", "endReason": "target_bombed" },
+    { "roundNumber": 5, "startTick": 20300, "freezeEndTick": 20800, "endTick": 24800, "teamASide": "t", "teamBSide": "ct", "teamAScoreBefore": 3, "teamBScoreBefore": 1, "teamAEconomy": "full", "teamBEconomy": "semi", "winnerTeamKey": "teamB", "winnerSide": "ct", "endReason": "bomb_defused" },
+    { "roundNumber": 6, "startTick": 25000, "freezeEndTick": 25500, "endTick": 29900, "teamASide": "t", "teamBSide": "ct", "teamAScoreBefore": 3, "teamBScoreBefore": 2, "teamAEconomy": "force", "teamBEconomy": "full", "winnerTeamKey": "teamA", "winnerSide": "t", "endReason": "t_win" }
+  ],
+  "playerEconomies": [
+    { "roundNumber": 1, "steamId64": "76561198000000001", "teamKey": "teamA", "side": "t", "startMoney": 800, "moneySpent": 650, "equipmentValue": 900, "type": "pistol" },
+    { "roundNumber": 1, "steamId64": "76561198000000002", "teamKey": "teamA", "side": "t", "startMoney": 800, "moneySpent": 650, "equipmentValue": 900, "type": "pistol" },
+    { "roundNumber": 1, "steamId64": "76561198000000003", "teamKey": "teamA", "side": "t", "startMoney": 800, "moneySpent": 700, "equipmentValue": 950, "type": "pistol" },
+    { "roundNumber": 1, "steamId64": "76561198000000004", "teamKey": "teamA", "side": "t", "startMoney": 800, "moneySpent": 600, "equipmentValue": 850, "type": "pistol" },
+    { "roundNumber": 1, "steamId64": "76561198000000005", "teamKey": "teamA", "side": "t", "startMoney": 800, "moneySpent": 700, "equipmentValue": 950, "type": "pistol" },
+    { "roundNumber": 1, "steamId64": "76561198000000006", "teamKey": "teamB", "side": "ct", "startMoney": 800, "moneySpent": 650, "equipmentValue": 900, "type": "pistol" },
+    { "roundNumber": 1, "steamId64": "76561198000000007", "teamKey": "teamB", "side": "ct", "startMoney": 800, "moneySpent": 650, "equipmentValue": 900, "type": "pistol" },
+    { "roundNumber": 1, "steamId64": "76561198000000008", "teamKey": "teamB", "side": "ct", "startMoney": 800, "moneySpent": 650, "equipmentValue": 900, "type": "pistol" },
+    { "roundNumber": 1, "steamId64": "76561198000000009", "teamKey": "teamB", "side": "ct", "startMoney": 800, "moneySpent": 650, "equipmentValue": 900, "type": "pistol" },
+    { "roundNumber": 1, "steamId64": "76561198000000010", "teamKey": "teamB", "side": "ct", "startMoney": 800, "moneySpent": 650, "equipmentValue": 900, "type": "pistol" },
+    { "roundNumber": 2, "steamId64": "76561198000000001", "teamKey": "teamA", "side": "t", "startMoney": 3900, "moneySpent": 3600, "equipmentValue": 4850, "type": "full" },
+    { "roundNumber": 2, "steamId64": "76561198000000002", "teamKey": "teamA", "side": "t", "startMoney": 3600, "moneySpent": 3300, "equipmentValue": 4550, "type": "full" },
+    { "roundNumber": 2, "steamId64": "76561198000000003", "teamKey": "teamA", "side": "t", "startMoney": 3500, "moneySpent": 3200, "equipmentValue": 4300, "type": "full" },
+    { "roundNumber": 2, "steamId64": "76561198000000004", "teamKey": "teamA", "side": "t", "startMoney": 3300, "moneySpent": 3100, "equipmentValue": 4200, "type": "full" },
+    { "roundNumber": 2, "steamId64": "76561198000000005", "teamKey": "teamA", "side": "t", "startMoney": 3700, "moneySpent": 3500, "equipmentValue": 4700, "type": "full" },
+    { "roundNumber": 2, "steamId64": "76561198000000006", "teamKey": "teamB", "side": "ct", "startMoney": 1900, "moneySpent": 500, "equipmentValue": 1200, "type": "eco" },
+    { "roundNumber": 2, "steamId64": "76561198000000007", "teamKey": "teamB", "side": "ct", "startMoney": 1800, "moneySpent": 400, "equipmentValue": 1150, "type": "eco" },
+    { "roundNumber": 2, "steamId64": "76561198000000008", "teamKey": "teamB", "side": "ct", "startMoney": 1700, "moneySpent": 600, "equipmentValue": 1300, "type": "eco" },
+    { "roundNumber": 2, "steamId64": "76561198000000009", "teamKey": "teamB", "side": "ct", "startMoney": 1750, "moneySpent": 500, "equipmentValue": 1250, "type": "eco" },
+    { "roundNumber": 2, "steamId64": "76561198000000010", "teamKey": "teamB", "side": "ct", "startMoney": 1800, "moneySpent": 500, "equipmentValue": 1200, "type": "eco" },
+    { "roundNumber": 3, "steamId64": "76561198000000001", "teamKey": "teamA", "side": "t", "startMoney": 5200, "moneySpent": 4300, "equipmentValue": 5600, "type": "full" },
+    { "roundNumber": 3, "steamId64": "76561198000000002", "teamKey": "teamA", "side": "t", "startMoney": 5000, "moneySpent": 4100, "equipmentValue": 5400, "type": "full" },
+    { "roundNumber": 3, "steamId64": "76561198000000003", "teamKey": "teamA", "side": "t", "startMoney": 4800, "moneySpent": 4000, "equipmentValue": 5200, "type": "full" },
+    { "roundNumber": 3, "steamId64": "76561198000000004", "teamKey": "teamA", "side": "t", "startMoney": 4500, "moneySpent": 3900, "equipmentValue": 5100, "type": "full" },
+    { "roundNumber": 3, "steamId64": "76561198000000005", "teamKey": "teamA", "side": "t", "startMoney": 4900, "moneySpent": 4050, "equipmentValue": 5300, "type": "full" },
+    { "roundNumber": 3, "steamId64": "76561198000000006", "teamKey": "teamB", "side": "ct", "startMoney": 3400, "moneySpent": 3000, "equipmentValue": 3800, "type": "force" },
+    { "roundNumber": 3, "steamId64": "76561198000000007", "teamKey": "teamB", "side": "ct", "startMoney": 3300, "moneySpent": 3000, "equipmentValue": 3700, "type": "force" },
+    { "roundNumber": 3, "steamId64": "76561198000000008", "teamKey": "teamB", "side": "ct", "startMoney": 3200, "moneySpent": 2800, "equipmentValue": 3600, "type": "force" },
+    { "roundNumber": 3, "steamId64": "76561198000000009", "teamKey": "teamB", "side": "ct", "startMoney": 3300, "moneySpent": 2900, "equipmentValue": 3700, "type": "force" },
+    { "roundNumber": 3, "steamId64": "76561198000000010", "teamKey": "teamB", "side": "ct", "startMoney": 3400, "moneySpent": 3000, "equipmentValue": 3800, "type": "force" },
+    { "roundNumber": 4, "steamId64": "76561198000000001", "teamKey": "teamA", "side": "t", "startMoney": 1800, "moneySpent": 1500, "equipmentValue": 2600, "type": "semi" },
+    { "roundNumber": 4, "steamId64": "76561198000000006", "teamKey": "teamB", "side": "ct", "startMoney": 5200, "moneySpent": 4200, "equipmentValue": 5400, "type": "full" },
+    { "roundNumber": 5, "steamId64": "76561198000000001", "teamKey": "teamA", "side": "t", "startMoney": 4600, "moneySpent": 3800, "equipmentValue": 5000, "type": "full" },
+    { "roundNumber": 5, "steamId64": "76561198000000006", "teamKey": "teamB", "side": "ct", "startMoney": 2600, "moneySpent": 2100, "equipmentValue": 3100, "type": "semi" },
+    { "roundNumber": 6, "steamId64": "76561198000000001", "teamKey": "teamA", "side": "t", "startMoney": 2500, "moneySpent": 2400, "equipmentValue": 3600, "type": "force" },
+    { "roundNumber": 6, "steamId64": "76561198000000006", "teamKey": "teamB", "side": "ct", "startMoney": 5000, "moneySpent": 4000, "equipmentValue": 5300, "type": "full" }
+  ],
+  "kills": [
+    { "roundNumber": 1, "tick": 1450, "killerSteamId64": "76561198000000001", "victimSteamId64": "76561198000000006", "assisterSteamId64": null, "killerTeamKey": "teamA", "victimTeamKey": "teamB", "killerSide": "t", "victimSide": "ct", "weapon": "glock", "headshot": true, "tradeKill": false, "tradeDeath": false, "killerPosition": { "x": -350, "y": -1500, "z": 0 }, "victimPosition": { "x": -720, "y": -2130, "z": 0 } },
+    { "roundNumber": 1, "tick": 2600, "killerSteamId64": "76561198000000002", "victimSteamId64": "76561198000000007", "assisterSteamId64": "76561198000000001", "killerTeamKey": "teamA", "victimTeamKey": "teamB", "killerSide": "t", "victimSide": "ct", "weapon": "glock", "headshot": false, "tradeKill": false, "tradeDeath": false, "killerPosition": { "x": -500, "y": -2050, "z": 0 }, "victimPosition": { "x": -900, "y": -2400, "z": 0 } },
+    { "roundNumber": 2, "tick": 7000, "killerSteamId64": "76561198000000001", "victimSteamId64": "76561198000000008", "assisterSteamId64": null, "killerTeamKey": "teamA", "victimTeamKey": "teamB", "killerSide": "t", "victimSide": "ct", "weapon": "ak47", "headshot": true, "tradeKill": false, "tradeDeath": false, "killerPosition": { "x": 180, "y": -1320, "z": 0 }, "victimPosition": { "x": -640, "y": -1160, "z": 0 } },
+    { "roundNumber": 3, "tick": 11950, "killerSteamId64": "76561198000000006", "victimSteamId64": "76561198000000001", "assisterSteamId64": "76561198000000009", "killerTeamKey": "teamB", "victimTeamKey": "teamA", "killerSide": "ct", "victimSide": "t", "weapon": "m4a1_silencer", "headshot": false, "tradeKill": false, "tradeDeath": true, "killerPosition": { "x": -1100, "y": -600, "z": 0 }, "victimPosition": { "x": -400, "y": -940, "z": 0 } },
+    { "roundNumber": 4, "tick": 17200, "killerSteamId64": "76561198000000001", "victimSteamId64": "76561198000000009", "assisterSteamId64": null, "killerTeamKey": "teamA", "victimTeamKey": "teamB", "killerSide": "t", "victimSide": "ct", "weapon": "galilar", "headshot": false, "tradeKill": true, "tradeDeath": false, "killerPosition": { "x": -1180, "y": -240, "z": 0 }, "victimPosition": { "x": -1320, "y": -620, "z": 0 } },
+    { "roundNumber": 5, "tick": 22600, "killerSteamId64": "76561198000000007", "victimSteamId64": "76561198000000002", "assisterSteamId64": null, "killerTeamKey": "teamB", "victimTeamKey": "teamA", "killerSide": "ct", "victimSide": "t", "weapon": "awp", "headshot": false, "tradeKill": false, "tradeDeath": false, "killerPosition": { "x": -1300, "y": -840, "z": 0 }, "victimPosition": { "x": -90, "y": -650, "z": 0 } },
+    { "roundNumber": 6, "tick": 26600, "killerSteamId64": "76561198000000001", "victimSteamId64": "76561198000000010", "assisterSteamId64": null, "killerTeamKey": "teamA", "victimTeamKey": "teamB", "killerSide": "t", "victimSide": "ct", "weapon": "ak47", "headshot": true, "tradeKill": false, "tradeDeath": false, "killerPosition": { "x": -250, "y": -1320, "z": 0 }, "victimPosition": { "x": -700, "y": -2100, "z": 0 } }
+  ],
+  "damages": [
+    { "roundNumber": 1, "tick": 1400, "attackerSteamId64": "76561198000000001", "victimSteamId64": "76561198000000006", "attackerTeamKey": "teamA", "victimTeamKey": "teamB", "attackerSide": "t", "victimSide": "ct", "weapon": "glock", "healthDamage": 100 },
+    { "roundNumber": 1, "tick": 2560, "attackerSteamId64": "76561198000000002", "victimSteamId64": "76561198000000007", "attackerTeamKey": "teamA", "victimTeamKey": "teamB", "attackerSide": "t", "victimSide": "ct", "weapon": "glock", "healthDamage": 100 },
+    { "roundNumber": 2, "tick": 6990, "attackerSteamId64": "76561198000000001", "victimSteamId64": "76561198000000008", "attackerTeamKey": "teamA", "victimTeamKey": "teamB", "attackerSide": "t", "victimSide": "ct", "weapon": "ak47", "healthDamage": 100 },
+    { "roundNumber": 3, "tick": 11940, "attackerSteamId64": "76561198000000006", "victimSteamId64": "76561198000000001", "attackerTeamKey": "teamB", "victimTeamKey": "teamA", "attackerSide": "ct", "victimSide": "t", "weapon": "m4a1_silencer", "healthDamage": 100 },
+    { "roundNumber": 4, "tick": 17180, "attackerSteamId64": "76561198000000001", "victimSteamId64": "76561198000000009", "attackerTeamKey": "teamA", "victimTeamKey": "teamB", "attackerSide": "t", "victimSide": "ct", "weapon": "galilar", "healthDamage": 100 },
+    { "roundNumber": 5, "tick": 22580, "attackerSteamId64": "76561198000000007", "victimSteamId64": "76561198000000002", "attackerTeamKey": "teamB", "victimTeamKey": "teamA", "attackerSide": "ct", "victimSide": "t", "weapon": "awp", "healthDamage": 100 },
+    { "roundNumber": 6, "tick": 26590, "attackerSteamId64": "76561198000000001", "victimSteamId64": "76561198000000010", "attackerTeamKey": "teamA", "victimTeamKey": "teamB", "attackerSide": "t", "victimSide": "ct", "weapon": "ak47", "healthDamage": 100 }
+  ],
+  "grenades": [
+    { "roundNumber": 2, "tick": 6500, "steamId64": "76561198000000003", "teamKey": "teamA", "side": "t", "grenadeType": "smoke", "eventType": "detonate", "position": { "x": -900, "y": -620, "z": 0 } },
+    { "roundNumber": 3, "tick": 11300, "steamId64": "76561198000000006", "teamKey": "teamB", "side": "ct", "grenadeType": "flashbang", "eventType": "detonate", "position": { "x": -450, "y": -1250, "z": 0 } }
+  ]
+}
