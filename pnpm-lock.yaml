@@ -76,6 +76,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@cs2dak/cohort':
+        specifier: workspace:*
+        version: link:../cohort
       '@cs2dak/core':
         specifier: workspace:*
         version: link:../core
@@ -83,6 +86,18 @@ importers:
       tsx:
         specifier: ^4.20.0
         version: 4.22.3
+
+  packages/cohort:
+    dependencies:
+      '@cs2dak/contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@cs2dak/core':
+        specifier: workspace:*
+        version: link:../core
+      '@rivalhub/rival-rating':
+        specifier: github:Starfie1d1272/rival-rating#06be266
+        version: https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/06be2662932362292e6eb690f48e6e1eb9696aaa
 
   packages/contract:
     dependencies:

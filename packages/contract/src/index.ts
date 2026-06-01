@@ -269,6 +269,49 @@ export const playerScoreboardRowSchema = z.object({
   })
 });
 
+export const accountContextAvailabilitySchema = z.enum(["available", "partial", "missing"]);
+
+export const seasonPlayerRowSchema = z.object({
+  playerKey: z.string(),
+  steamIds: z.array(z.string()),
+  primarySteamId64: z.string(),
+  externalUserId: z.string().nullable(),
+  name: z.string(),
+  teamKeys: z.array(teamKeySchema),
+  mapCount: z.number().int().positive(),
+  rrV1: z.number().nonnegative(),
+  rrV1Percentile: z.number().min(0).max(100),
+  indicators: rrIndicatorsSchema,
+  accountRR: z.number().nonnegative(),
+  accountRRRaw: z.number(),
+  accountBreakdown: z.object({
+    combat: z.number(),
+    trade: z.number(),
+    clutch: z.number(),
+    objective: z.number(),
+    utility: z.number()
+  }),
+  accountContextStatus: z.object({
+    buyDelta: accountContextAvailabilitySchema,
+    manState: accountContextAvailabilitySchema
+  }),
+  prism: z.custom<PrismResult>().nullable(),
+  confidence: z.number().min(0).max(1),
+  perMatch: z.array(z.object({
+    matchId: z.string(),
+    steamId64: z.string(),
+    accountRR: z.number().nonnegative(),
+    rrV1: z.number().nonnegative()
+  }))
+});
+
+export const seasonCohortBundleSchema = z.object({
+  version: z.literal("cs2-demo-analysis-kit/season-0.1"),
+  matchCount: z.number().int().nonnegative(),
+  players: z.array(seasonPlayerRowSchema),
+  weightsVersion: z.string()
+});
+
 export const timelineEventSchema = z.object({
   id: z.string(),
   roundNumber: z.number().int().positive(),
@@ -363,6 +406,9 @@ export type QaReport = z.infer<typeof qaReportSchema>;
 export type PlayerRoundFact = z.infer<typeof playerRoundFactSchema>;
 export type PlayerIndicatorRow = z.infer<typeof playerIndicatorRowSchema>;
 export type PlayerScoreboardRow = z.infer<typeof playerScoreboardRowSchema>;
+export type AccountContextAvailability = z.infer<typeof accountContextAvailabilitySchema>;
+export type SeasonPlayerRow = z.infer<typeof seasonPlayerRowSchema>;
+export type SeasonCohortBundle = z.infer<typeof seasonCohortBundleSchema>;
 export type TimelineEvent = z.infer<typeof timelineEventSchema>;
 export type EconomyPoint = z.infer<typeof economyPointSchema>;
 export type HeatmapPoint = z.infer<typeof heatmapPointSchema>;

@@ -10,6 +10,7 @@
     "analyze": "tsx src/index.ts analyze"
   },
   "dependencies": {
+    "@cs2dak/cohort": "workspace:*",
     "@cs2dak/core": "workspace:*"
   },
   "devDependencies": {

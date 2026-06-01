@@ -208,6 +208,11 @@ export function deriveAccountSignalsV2(input: unknown): AccountSignalsV2[] {
   });
 }
 
+export function deriveRRIndicators(input: unknown): RRIndicators[] {
+  const pkg = normalizeDemoPackage(input);
+  return buildPlayerIndicators(pkg, buildPlayerRoundFacts(pkg)).map((row) => row.indicators);
+}
+
 export function computeAccountRatingsV2(input: unknown): Array<{ signals: AccountSignalsV2; rr: RRResultV2 }> {
   const weights = rrValueAccountsV2Lite as unknown as ValueAccountsWeights;
   const rated = deriveAccountSignalsV2(input).map((signals) => ({

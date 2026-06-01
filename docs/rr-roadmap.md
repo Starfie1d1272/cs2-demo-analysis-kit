@@ -49,13 +49,15 @@
 - **数据体检（导出器侧）**：当前 fixture（13:8 de_ancient）QA 报 2 个 `kills.tick_outside_round`
   （第 3 回合有 kill tick 落在回合窗口外）——疑似 `python/cs2_demo_exporter` 的回合边界归属问题，需排查。
 
-## 阶段 2 — 跨场聚合层（本次锦标赛的真正解锁点）
+## 阶段 2 — 跨场聚合层（当前最高优先级 / 进行中）
 
 攒 55 场 → cohort，**让数据真正有意义**。这是 PRISM 与赛季锚定的共同前置，是一个新层（不属于单场 `analyzeDemoPackage`）。
 
 - 跨场 cohort：把多场的选手信号汇总，做跨人 z-score（PRISM 才有意义）。
+- 身份主键：默认按 `steamId64`，但支持外部 `identityMap` 归并到同一 `playerKey`，给 RivalHub 的 userId / Steam alias 对接预留正确边界。
 - 把"per-match 锚定"升级为**赛季级锚定**（league mean 跨整季）。
 - 先做数据质量体检：各指标分布、极值、缺失率（顺带验证阶段 1 的导出器问题是否普遍）。
+- 设计入口：[cohort.md](design/cohort.md)。
 
 ## 阶段 3 — 富事件账户增强 + 包点目标
 

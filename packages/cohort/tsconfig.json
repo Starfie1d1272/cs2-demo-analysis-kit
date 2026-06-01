@@ -9,5 +9,5 @@
     "outDir": "dist"
   },
   "include": ["src"],
-  "references": [{ "path": "../core" }, { "path": "../cohort" }]
+  "references": [{ "path": "../contract" }, { "path": "../core" }]
 }

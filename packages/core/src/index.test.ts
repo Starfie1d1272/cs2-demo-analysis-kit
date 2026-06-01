@@ -6,6 +6,7 @@ import {
   buildDemoViewModel,
   computeAccountRatingsV2,
   deriveAccountSignalsV2,
+  deriveRRIndicators,
   loadDemoPackageFromZip
 } from "./index";
 
@@ -65,6 +66,16 @@ describe("analyzeDemoPackage", () => {
     // 锚定后必然有人高于、有人低于 1.0
     expect(accountRRs.some((v) => v > 1.0)).toBe(true);
     expect(accountRRs.some((v) => v < 1.0)).toBe(true);
+  });
+
+  it("exposes RRIndicators without rebuilding them in cohort callers", async () => {
+    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
+    const pkg = await loadDemoPackageFromZip(zip);
+    const indicators = deriveRRIndicators(pkg);
+    const bundle = analyzeDemoPackage(pkg);
+
+    expect(indicators).toHaveLength(10);
+    expect(indicators[0]).toEqual(bundle.playerIndicators[0]?.indicators);
   });
 
   it("surfaces account breakdown and context status on the scoreboard", async () => {
