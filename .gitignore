@@ -5,6 +5,10 @@ build/
 .vite/
 coverage/
 fixtures/output/
+# Demo binaries are large and live only locally (never committed)
+*.dem
+# Local scratch: benchmark demos, scripts, and golden baselines
+fixtures/_bench/
 *.tsbuildinfo
 __pycache__/
 .pytest_cache/

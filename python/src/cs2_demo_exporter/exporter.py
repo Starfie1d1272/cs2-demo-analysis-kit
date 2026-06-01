@@ -20,7 +20,10 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from .enums import normalize_hitgroup, normalize_round_end_reason, weapon_to_grenade_type, _BOMB_TYPE_MAP, _GRENADE_TYPE_ENUM
+from .enums import (
+    normalize_hitgroup, normalize_round_end_reason, classify_inventory,
+    bomb_site_from_place, _BOMB_TYPE_MAP, _GRENADE_TYPE_ENUM,
+)
 from .rounds import _RoundModel, _event_steamid, build_rounds
 
 SCHEMA_VERSION = "cs2-demo-format/2.0"
@@ -57,12 +60,18 @@ def _assemble_zip(raw: dict[str, Any], dem_path: str, demo_hash: str | None) -> 
     rounds, round_model = build_rounds(raw, team_map)
     match_json   = _build_match(raw, rounds)
     kills        = _build_kills(raw, team_map, round_model)
-    blinds_json  = _build_blinds(raw, team_map, round_model)
+    # grenades before blinds: each flash blind is linked to the flashbang that
+    # caused it via a (round, tick) -> grenadeId lookup.
+    grenades     = _build_grenades(raw, team_map, round_model)
+    flash_lookup = {
+        (g["roundNumber"], g["effectTick"]): g["grenadeId"]
+        for g in grenades if g["grenade"] == "flashbang" and g["grenadeId"]
+    }
+    blinds_json  = _build_blinds(raw, team_map, round_model, flash_lookup=flash_lookup)
     player_stats = _build_player_stats(raw, team_map, round_model, rounds,
                                        kills_list=kills, blinds_list=blinds_json)
     damages      = _build_damages(raw, team_map, round_model)
     bombs        = _build_bombs(raw, team_map, round_model)
-    grenades     = _build_grenades(raw, team_map, round_model)
     shots        = _build_shots(raw, team_map, round_model)
     positions    = _build_positions(raw, team_map, round_model)
     economies    = _build_economies(raw, team_map, round_model, rounds)
@@ -428,7 +437,9 @@ def _build_damages(raw: dict, team_map: dict, round_model: _RoundModel) -> list[
 
 # ── blinds ────────────────────────────────────────────────────────────────────
 
-def _build_blinds(raw: dict, team_map: dict, round_model: _RoundModel) -> list[dict]:
+def _build_blinds(raw: dict, team_map: dict, round_model: _RoundModel,
+                  flash_lookup: dict | None = None) -> list[dict]:
+    flash_lookup = flash_lookup or {}
     out = []
     for r in raw.get("blinds", []):
         n = round_model.round_for_event(r)
@@ -462,10 +473,11 @@ def _build_blinds(raw: dict, team_map: dict, round_model: _RoundModel) -> list[d
         dur = _safe_float(r.get("blind_duration") or r.get("duration"), default=0.0)
         dur = min(dur, 6.0)  # clamp to max 6.0
 
+        tick = int(r.get("tick") or 0)
         out.append({
             "roundNumber": n,
-            "tick": int(r.get("tick") or 0),
-            "flashId": None,
+            "tick": tick,
+            "flashId": flash_lookup.get((n, tick)),
             "flasherSteamId64": flasher_sid,
             "flashedSteamId64": flashed_sid,
             "flasherTeamKey": flasher_key,
@@ -481,11 +493,26 @@ def _build_blinds(raw: dict, team_map: dict, round_model: _RoundModel) -> list[d
 
 def _build_bombs(raw: dict, team_map: dict, round_model: _RoundModel) -> list[dict]:
     out = []
+    # A/B comes from the actor's `last_place_name` ("BombsiteA"/"BombsiteB").
+    # Each round's bomb sits on one site, so derive a per-round site from the
+    # plant and reuse it for defuse/explode (where the actor may be off-site).
+    round_site: dict[int, str] = {}
+    for r in raw.get("bomb_planted", []):
+        n = round_model.round_for_event(r)
+        site = bomb_site_from_place(r.get("user_last_place_name"))
+        if n is not None and site is not None:
+            round_site[n] = site
+    _ROUND_SITE_TYPES = {"planted", "defused", "exploded", "defuse_begin"}
+
     # Deduplicated event sources with canonical v2 types
     event_sources = [
-        ("bomb_planted",  "planted"),
-        ("bomb_defused",  "defused"),
-        ("bomb_exploded", "exploded"),
+        ("bomb_planted",     "planted"),
+        ("bomb_defused",     "defused"),
+        ("bomb_exploded",    "exploded"),
+        ("bomb_beginplant",  "plant"),     # -> plant_begin
+        ("bomb_begindefuse", "defuse"),    # -> defuse_begin
+        ("bomb_dropped",     "dropped"),
+        ("bomb_pickup",      "picked_up"),
     ]
 
     for rows_key, ev_type in event_sources:
@@ -505,16 +532,10 @@ def _build_bombs(raw: dict, team_map: dict, round_model: _RoundModel) -> list[di
             actor_side: str | None = actor_side_raw if _is_valid_side(actor_side_raw or "") else None
             raw_site = r.get("site")
             site_id = str(raw_site).strip() if raw_site is not None else None
-            # Normalize site to "a" or "b" if possible
-            site: str | None = None
-            if site_id:
-                sl = site_id.lower()
-                if sl == "a" or sl == "433":
-                    site = "b"  # CS2 site 433 is typically B
-                elif sl == "b" or sl == "434":
-                    site = "a"  # CS2 site 434 is typically A
-                elif sl in ("a", "b"):
-                    site = sl
+            # actor's own place first; fall back to the round's planted site
+            site = bomb_site_from_place(r.get("user_last_place_name"))
+            if site is None and v2_type in _ROUND_SITE_TYPES:
+                site = round_site.get(n)
             out.append({
                 "roundNumber": n,
                 "tick": int(r.get("tick") or 0),
@@ -524,7 +545,7 @@ def _build_bombs(raw: dict, team_map: dict, round_model: _RoundModel) -> list[di
                 "actorSteamId64": actor_sid,
                 "actorTeamKey": actor_key,
                 "actorSide": actor_side,
-                "position": _pos(r),
+                "position": _pos(r, "user_X", "user_Y", "user_Z"),
             })
     out.sort(key=lambda x: (x["roundNumber"], x["tick"]))
     return out
@@ -533,19 +554,28 @@ def _build_bombs(raw: dict, team_map: dict, round_model: _RoundModel) -> list[di
 # ── grenades ─────────────────────────────────────────────────────────────────
 
 def _build_grenades(raw: dict, team_map: dict, round_model: _RoundModel) -> list[dict]:
+    # Real throw origins from parse_grenades() projectile trajectories. Each row
+    # already carries its v2 grenade type, entity id, throw tick and destroy tick.
     throws: list[dict] = []
     for r in raw.get("grenade_throws", []):
-        n = round_model.round_for_event(r)
+        tick = int(r.get("tick") or 0)
+        n = round_model.round_for_tick(tick)
         if n is None:
             continue
-        gtype = weapon_to_grenade_type(str(r.get("weapon") or ""))
-        if not gtype:
+        gtype = str(r.get("grenade") or "")
+        if gtype not in _GRENADE_TYPE_ENUM:
             continue
+        destroy_tick = int(r.get("destroy_tick") or 0)
+        eid = r.get("grenade_entity_id")
+        # entity ids recycle, so combine with throw tick for a unique id
+        gid = f"{int(eid)}-{tick}" if eid is not None else None
         throws.append({
             "rn": n,
-            "tick": int(r.get("tick") or 0),
+            "tick": tick,
+            "destroy_tick": destroy_tick if destroy_tick > 0 else None,
             "gtype": gtype,
             "sid": _event_steamid(r),
+            "eid": gid,
             "pos": _pos(r),
         })
     throws.sort(key=lambda t: t["tick"])
@@ -580,9 +610,13 @@ def _build_grenades(raw: dict, team_map: dict, round_model: _RoundModel) -> list
             thrower_sid = thrower_sid or matched["sid"]
             throw_pos = matched["pos"]
             throw_tick = matched["tick"]
+            destroy_tick = matched["destroy_tick"]
+            grenade_id = matched["eid"]
         else:
             throw_pos = _pos(r)
             throw_tick = tick
+            destroy_tick = None
+            grenade_id = None
 
         # v2: throwTick and effectTick must be >= 1
         if throw_tick <= 0 or tick <= 0:
@@ -602,12 +636,16 @@ def _build_grenades(raw: dict, team_map: dict, round_model: _RoundModel) -> list
         if not _is_valid_side(thrower_side):
             continue
 
+        # destroyTick must be >= 1 and not precede the effect tick
+        if destroy_tick is not None and destroy_tick < tick:
+            destroy_tick = None
+
         out.append({
             "roundNumber": n,
-            "grenadeId": None,
+            "grenadeId": grenade_id,
             "throwTick": throw_tick,
             "effectTick": tick,
-            "destroyTick": None,
+            "destroyTick": destroy_tick,
             "grenade": gtype,
             "throwerSteamId64": thrower_sid,
             "throwerTeamKey": thrower_key,
@@ -652,8 +690,8 @@ def _build_shots(raw: dict, team_map: dict, round_model: _RoundModel) -> list[di
             "weapon": weapon,
             "position": _pos(r),
             "velocity": _pos(r, "user_vel_X", "user_vel_Y", "user_vel_Z"),
-            "yaw": _rnd(r.get("yaw"), 1),
-            "pitch": _rnd(r.get("pitch"), 1),
+            "yaw": _rnd(_raw(r, "user_yaw"), 1),
+            "pitch": _rnd(_raw(r, "user_pitch"), 1),
         })
     return out
 
@@ -684,6 +722,9 @@ def _build_positions(raw: dict, team_map: dict, round_model: _RoundModel) -> lis
             "money": int(r.get("current_equip_value") or 0),
             "activeWeapon": str(r.get("active_weapon") or "") or None,
             "flashDurationRemaining": _rnd(r.get("flash_duration"), 1),
+            # NOTE: has_c4/is_bomb_carrier tick props return None in this
+            # demoparser2 build, so hasBomb is always false. Deriving true C4
+            # ownership needs stateful bomb_pickup/dropped/planted tracking.
             "hasBomb": _b(r.get("has_c4")),
             "hasDefuseKit": _b(r.get("has_defuser")),
         })
@@ -862,8 +903,10 @@ def _build_economies(
         eco_type = _economy_type(spent, start_money, equip, n, total_rounds)
 
         has_armor = bool(int(r.get("armor") or 0) > 0)
-        has_helmet = bool(_b(r.get("helmet")))
+        has_helmet = bool(_b(r.get("has_helmet")))
         has_defuse = bool(_b(r.get("has_defuser")))
+
+        primary, secondary, grenade_count = classify_inventory(r.get("inventory"))
 
         out.append({
             "roundNumber": n,
@@ -877,9 +920,9 @@ def _build_economies(
             "hasArmor": has_armor,
             "hasHelmet": has_helmet,
             "hasDefuseKit": has_defuse,
-            "primaryWeapon": None,
-            "secondaryWeapon": None,
-            "grenadeCount": 0,
+            "primaryWeapon": primary,
+            "secondaryWeapon": secondary,
+            "grenadeCount": grenade_count,
         })
         team_round_types.setdefault((n, key), []).append(eco_type)
 
@@ -1000,6 +1043,22 @@ def _build_player_stats(
     for k in (kills_list or []):
         if k.get("flashAssist") and k.get("assisterSteamId64"):
             _get(k["assisterSteamId64"])["flashAssistCount"] += 1
+
+    # collateralKillCount: 2+ enemies killed by one attacker on the same tick
+    # (single-bullet penetration). Every kill in such a group counts.
+    collateral_groups: dict[tuple[str, int], int] = {}
+    for r in raw.get("deaths", []):
+        if _event_round_number(round_model, r) is None:
+            continue
+        killer = _sid(r.get("attacker_steamid"))
+        victim = _sid(r.get("user_steamid"))
+        if not killer or killer == victim:
+            continue
+        gkey = (killer, int(r.get("tick") or 0))
+        collateral_groups[gkey] = collateral_groups.get(gkey, 0) + 1
+    for (killer, _tick), cnt in collateral_groups.items():
+        if cnt >= 2:
+            _get(killer)["collateralKillCount"] += cnt
 
     # bomb plant / defuse — official rounds only
     for r in raw.get("bomb_planted", []):

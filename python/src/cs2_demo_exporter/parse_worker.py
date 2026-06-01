@@ -19,7 +19,6 @@ _GRENADE_EVENTS = [
     ("smokegrenade_detonate", "smoke"),
     ("flashbang_detonate", "flashbang"),
     ("hegrenade_detonate", "hegrenade"),
-    ("molotov_detonate", "molotov"),
     ("inferno_expire", "molotov"),
     ("decoy_detonate", "decoy"),
 ]
@@ -53,55 +52,91 @@ def _safe_event(
         return []
 
 
-# userid on grenade events is an entity slot — resolve thrower via player extras.
+def _safe_events(
+    parser: DemoParser,
+    names: list[str],
+    other: list[str] | None = None,
+    player: list[str] | None = None,
+) -> dict[str, list[dict]]:
+    """Batch-parse several events in ONE demo scan via parse_events.
+
+    `other`/`player` are shared across the batch (demoparser2 applies the same
+    extra props to every event; props an event lacks come back as NaN columns,
+    which the builders ignore). Falls back to per-event parse_event on failure.
+    Returns {event_name: rows}; events with no occurrences map to [].
+    """
+    kwargs: dict[str, list[str]] = {}
+    if other is not None:
+        kwargs["other"] = other
+    if player is not None:
+        kwargs["player"] = player
+    try:
+        pairs = parser.parse_events(names, **kwargs)
+        out = {name: _rows(df) for name, df in pairs}
+    except Exception:
+        out = {name: _safe_event(parser, name, other=other, player=player) for name in names}
+    for name in names:
+        out.setdefault(name, [])
+    return out
+
+
+# steamid/XYZ for grenade detonations — resolve thrower via player extras
+# (raw userid is an entity slot, not a Steam64).
 _GRENADE_PLAYER_FIELDS = ["steamid", "X", "Y", "Z"]
 
 
-def _steam_cell(val: Any) -> str:
-    s = str(val or "").strip()
-    return s if s and s not in ("0", "nan", "None") else ""
+def _extract_grenade_throws(parser: DemoParser) -> list[dict]:
+    """Real throw origins from parse_grenades() projectile trajectories.
 
+    Each thrown grenade is a *Projectile entity with a per-tick flight path.
+    The first tick with valid coords is the throw origin; the last is the
+    detonate/destroy point. Returns rows shaped for _build_grenades:
+    {grenade_entity_id, grenade, tick(throw), destroy_tick, steamid, X, Y, Z}.
+    """
+    from .enums import grenade_projectile_to_type
 
-def _enrich_grenade_throw_positions(parser: DemoParser, throws: list[dict]) -> None:
-    """Sample thrower XYZ at exact throw ticks; grenade_thrown events lack real coords."""
-    throw_ticks = sorted({
-        int(r["tick"])
-        for r in throws
-        if int(r.get("tick") or 0) > 0 and int(r.get("total_rounds_played") or 0) > 0
-    })
-    if not throw_ticks:
-        return
     try:
-        tick_rows = _rows(parser.parse_ticks(["steamid", "X", "Y", "Z"], ticks=throw_ticks))
-    except BaseException:
-        return
+        g = parser.parse_grenades()
+    except Exception:
+        return []
+    if g is None or not hasattr(g, "columns") or "grenade_entity_id" not in g.columns:
+        return []
+    try:
+        proj = g[g["grenade_type"].astype(str).str.endswith("Projectile")]
+        proj = proj.dropna(subset=["x", "y", "z"]).sort_values(
+            ["grenade_entity_id", "tick"])
+        if proj.empty:
+            return []
+        # Entity ids are recycled across the match, so the same id covers many
+        # different grenades. Start a new throw whenever the id changes or the
+        # per-tick flight path breaks (gap > ~1s), then take first/last per throw.
+        eid = proj["grenade_entity_id"]
+        tick = proj["tick"]
+        seg = ((eid != eid.shift()) | ((tick - tick.shift()) > 64)).cumsum()
+        proj = proj.assign(_seg=seg)
+        grouped = proj.groupby("_seg", sort=False)
+        first = grouped.first()
+        last_tick = grouped["tick"].last()
+    except Exception:
+        return []
 
-    index: dict[tuple[int, str], tuple[float, float, float]] = {}
-    for row in tick_rows:
-        t = int(row.get("tick") or 0)
-        sid = _steam_cell(row.get("steamid"))
-        if t <= 0 or not sid:
+    out: list[dict] = []
+    for seg_id, row in first.iterrows():
+        gtype = grenade_projectile_to_type(row.get("grenade_type"))
+        if gtype is None:
             continue
-        try:
-            index[(t, sid)] = (
-                float(row.get("X") or 0),
-                float(row.get("Y") or 0),
-                float(row.get("Z") or 0),
-            )
-        except (TypeError, ValueError):
-            continue
-
-    for r in throws:
-        if int(r.get("total_rounds_played") or 0) <= 0:
-            continue
-        t = int(r.get("tick") or 0)
-        sid = _steam_cell(r.get("user_steamid")) or _steam_cell(r.get("steamid"))
-        if t <= 0 or not sid:
-            continue
-        pos = index.get((t, sid))
-        if pos is None:
-            continue
-        r["X"], r["Y"], r["Z"] = pos[0], pos[1], pos[2]
+        eid_val = row.get("grenade_entity_id")
+        out.append({
+            "grenade_entity_id": int(eid_val) if eid_val is not None else None,
+            "grenade": gtype,
+            "tick": int(row["tick"]),
+            "destroy_tick": int(last_tick.loc[seg_id]),
+            "steamid": row.get("steamid"),
+            "X": float(row["x"]),
+            "Y": float(row["y"]),
+            "Z": float(row["z"]),
+        })
+    return out
 
 
 def parse_for_rivalhub(dem_path: str) -> dict[str, Any]:
@@ -121,10 +156,20 @@ def parse_for_rivalhub(dem_path: str) -> dict[str, Any]:
     except (TypeError, ValueError):
         tickrate = 64
 
-    # ── round boundaries ─────────────────────────────────────────
-    round_starts   = _safe_event(p, "round_start",       ["total_rounds_played"])
-    round_freeze_ends = _safe_event(p, "round_freeze_end", ["total_rounds_played"])
-    round_ends     = _safe_event(p, "round_end",          ["winner", "reason", "total_rounds_played", "legacy"])
+    # ── round boundaries + blinds + match-start announce ─────────
+    # One scan: events that need no player= props. The union `other` carries
+    # every field any of them reads; events lacking a field get NaN columns
+    # (ignored downstream). total_rounds_played anchors each event to a round.
+    g_round = _safe_events(p,
+        ["round_start", "round_freeze_end", "round_end", "player_blind",
+         "round_announce_match_start"],
+        other=["winner", "reason", "legacy", "blind_duration", "total_rounds_played"],
+    )
+    round_starts      = g_round["round_start"]
+    round_freeze_ends = g_round["round_freeze_end"]
+    round_ends        = g_round["round_end"]
+    blinds            = g_round["player_blind"]
+    announce_rows     = g_round["round_announce_match_start"]
 
     # ── player deaths ────────────────────────────────────────────
     # X/Y/Z are player entity props — pass via player= so demoparser2
@@ -147,40 +192,41 @@ def parse_for_rivalhub(dem_path: str) -> dict[str, Any]:
     ], player=["X", "Y", "Z"])
 
     # ── shots ────────────────────────────────────────────────────
-    # player= gives user_vel_X/Y/Z for shooter velocity.
+    # player= gives user_vel_X/Y/Z (velocity) and user_yaw/user_pitch (aim).
     fires = _safe_event(p, "weapon_fire", other=["weapon", "total_rounds_played"],
-                        player=["vel_X", "vel_Y", "vel_Z"])
-
-    # ── blinds ───────────────────────────────────────────────────
-    blinds = _safe_event(p, "player_blind", other=["blind_duration", "total_rounds_played"])
+                        player=["vel_X", "vel_Y", "vel_Z", "yaw", "pitch"])
 
     # ── bombs ────────────────────────────────────────────────────
-    # player=["steamid"] adds user_steamid to identify the actor (planter/defuser)
-    bomb_planted  = _safe_event(p, "bomb_planted",  other=["site", "total_rounds_played"], player=["steamid"])
-    bomb_defused  = _safe_event(p, "bomb_defused",  other=["site", "total_rounds_played"], player=["steamid"])
-    bomb_exploded = _safe_event(p, "bomb_exploded", other=["total_rounds_played"],          player=["steamid"])
+    # One scan for all 7 bomb lifecycle events; player=["steamid"] adds
+    # user_steamid to identify the actor. begin/dropped/pickup feed the v2
+    # plant_begin/defuse_begin/dropped/picked_up event types.
+    g_bomb = _safe_events(p,
+        ["bomb_planted", "bomb_defused", "bomb_exploded",
+         "bomb_beginplant", "bomb_begindefuse", "bomb_dropped", "bomb_pickup"],
+        other=["site", "total_rounds_played"],
+        player=["steamid", "X", "Y", "Z", "last_place_name"])
+    bomb_planted     = g_bomb["bomb_planted"]
+    bomb_defused     = g_bomb["bomb_defused"]
+    bomb_exploded    = g_bomb["bomb_exploded"]
+    bomb_beginplant  = g_bomb["bomb_beginplant"]
+    bomb_begindefuse = g_bomb["bomb_begindefuse"]
+    bomb_dropped     = g_bomb["bomb_dropped"]
+    bomb_pickup      = g_bomb["bomb_pickup"]
 
     # ── grenades ─────────────────────────────────────────────────
-    grenade_throws = _safe_event(
-        p,
-        "grenade_thrown",
-        other=["weapon", "total_rounds_played"],
-        player=_GRENADE_PLAYER_FIELDS,
-    )
+    # One scan for all detonation types; tag each row with its v2 grenade type.
+    g_nade = _safe_events(p, [name for name, _ in _GRENADE_EVENTS],
+                          other=["total_rounds_played"], player=_GRENADE_PLAYER_FIELDS)
     grenade_detonations: list[dict] = []
     for ev_name, gtype in _GRENADE_EVENTS:
-        rows = _safe_event(
-            p,
-            ev_name,
-            other=["total_rounds_played"],
-            player=_GRENADE_PLAYER_FIELDS,
+        grenade_detonations.extend(
+            {**r, "_grenade_type": gtype} for r in g_nade[ev_name]
         )
-        rows = [{**r, "_grenade_type": gtype} for r in rows]
-        grenade_detonations.extend(rows)
-    _enrich_grenade_throw_positions(p, grenade_throws)
+
+    # Real throw origins: parse_grenades() projectile trajectories (one scan).
+    grenade_throws = _extract_grenade_throws(p)
 
     # ── player info at match start ───────────────────────────────
-    announce_rows = _safe_event(p, "round_announce_match_start")
     if announce_rows:
         match_start_tick = int(announce_rows[0]["tick"])
     elif round_freeze_ends:
@@ -249,7 +295,7 @@ def parse_for_rivalhub(dem_path: str) -> dict[str, Any]:
             economy_raw = _rows(p.parse_ticks(
                 [
                     "steamid", "team_num", "cash_spent_this_round", "current_equip_value",
-                    "start_balance", "armor", "helmet", "has_defuser",
+                    "start_balance", "armor", "has_helmet", "has_defuser", "inventory",
                 ],
                 ticks=freeze_ticks,
             ))
@@ -273,8 +319,12 @@ def parse_for_rivalhub(dem_path: str) -> dict[str, Any]:
         "bomb_planted": bomb_planted,
         "bomb_defused": bomb_defused,
         "bomb_exploded": bomb_exploded,
-        "grenade_throws": grenade_throws,
+        "bomb_beginplant": bomb_beginplant,
+        "bomb_begindefuse": bomb_begindefuse,
+        "bomb_dropped": bomb_dropped,
+        "bomb_pickup": bomb_pickup,
         "grenade_detonations": grenade_detonations,
+        "grenade_throws": grenade_throws,
         "positions_raw": positions_raw,
         "sample_ticks": sample_ticks,
         "replay_raw": replay_raw,

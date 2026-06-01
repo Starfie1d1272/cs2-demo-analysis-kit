@@ -92,7 +92,92 @@ def weapon_to_grenade_type(weapon: str) -> str | None:
     return _GRENADE_WEAPON_TO_TYPE.get(str(weapon or "").strip().lower())
 
 
+# grenade trajectories: parse_grenades() entity class -> v2 grenade type.
+# Only the *Projectile classes carry a real in-flight trajectory; the held
+# weapon classes (e.g. CMolotovGrenade) sit on the player with NaN coords.
+# Incendiary and molotov both fly as CMolotovProjectile, so both map to
+# "molotov" here — matching how inferno_expire detonations are tagged.
+_GRENADE_PROJECTILE_TO_TYPE = {
+    "CSmokeGrenadeProjectile": "smoke",
+    "CFlashbangProjectile": "flashbang",
+    "CHEGrenadeProjectile": "hegrenade",
+    "CMolotovProjectile": "molotov",
+    "CDecoyProjectile": "decoy",
+}
+
+
+def grenade_projectile_to_type(class_name: str) -> str | None:
+    return _GRENADE_PROJECTILE_TO_TYPE.get(str(class_name or "").strip())
+
+
+# ── inventory classification (for player economies) ─────────────────────────────
+#
+# parse_ticks(["inventory"]) returns weapon *display names*. Knives carry skin
+# names (Karambit, M9 Bayonet, ...), so we classify by explicit primary/secondary/
+# grenade sets and ignore everything else (knives, C4, Zeus, unknown).
+
+_GRENADE_ITEMS = {
+    "Smoke Grenade", "Flashbang", "High Explosive Grenade",
+    "Incendiary Grenade", "Molotov", "Decoy Grenade",
+}
+_PISTOL_ITEMS = {
+    "Glock-18", "USP-S", "P2000", "Dual Berettas", "P250", "Five-SeveN",
+    "Tec-9", "CZ75-Auto", "Desert Eagle", "R8 Revolver",
+}
+_PRIMARY_ITEMS = {
+    # SMG
+    "MAC-10", "MP9", "MP7", "MP5-SD", "UMP-45", "P90", "PP-Bizon",
+    # Rifle / sniper
+    "Galil AR", "FAMAS", "AK-47", "M4A4", "M4A1-S", "SSG 08", "SG 553",
+    "AUG", "AWP", "G3SG1", "SCAR-20",
+    # Shotgun
+    "Nova", "XM1014", "Sawed-Off", "MAG-7",
+    # LMG
+    "M249", "Negev",
+}
+
+
+def classify_inventory(items: Any) -> tuple[str | None, str | None, int]:
+    """Return (primaryWeapon, secondaryWeapon, grenadeCount) from an inventory list.
+
+    primary/secondary are the first matching gun in each slot; grenadeCount counts
+    grenade items (max 4 per CS2 rules, not clamped here). Non-weapons (knife, C4,
+    Zeus) and unknown names are ignored.
+    """
+    if not isinstance(items, (list, tuple)):
+        return None, None, 0
+    primary: str | None = None
+    secondary: str | None = None
+    grenades = 0
+    for it in items:
+        name = str(it or "").strip()
+        if name in _GRENADE_ITEMS:
+            grenades += 1
+        elif primary is None and name in _PRIMARY_ITEMS:
+            primary = name
+        elif secondary is None and name in _PISTOL_ITEMS:
+            secondary = name
+    return primary, secondary, grenades
+
+
 # ── bombs ──────────────────────────────────────────────────────────────────────
+#
+# The bomb_planted `site` field is a per-map bombsite *entity index*, not an A/B
+# constant (dust2 430/431, inferno 81/429, ancient 433/434…), and its ordering
+# does NOT map to A/B (reversed on de_inferno / de_ancient). So A/B is read
+# straight from the demo: the CS2 engine tags each player's current named area
+# in `last_place_name`, which is "BombsiteA" / "BombsiteB" when on a site. This
+# is authoritative, map-agnostic, and needs no per-map calibration.
+
+def bomb_site_from_place(place: Any) -> str | None:
+    """Map a CS2 place name to "a"/"b"; None if it is not a bombsite area."""
+    p = str(place or "").strip().lower()
+    if p == "bombsitea":
+        return "a"
+    if p == "bombsiteb":
+        return "b"
+    return None
+
 
 _BOMB_TYPE_MAP = {
     "plant": "plant_begin", "plant_begin": "plant_begin",
