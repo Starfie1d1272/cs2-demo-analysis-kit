@@ -722,13 +722,13 @@ def _build_positions(raw: dict, team_map: dict, round_model: _RoundModel) -> lis
             "steamId64": sid,
             "teamKey": key,
             "side": side,
-            "alive": int(r.get("health") or 0) > 0,
+            "alive": int(_safe_float(r.get("health"), 0)) > 0,
             "position": _pos(r),
             "yaw": _rnd(r.get("yaw"), 1),
             "pitch": _rnd(r.get("pitch"), 1),
-            "health": int(r.get("health") or 0),
-            "armor": int(r.get("armor") or 0),
-            "money": int(r.get("current_equip_value") or 0),
+            "health": int(_safe_float(r.get("health"), 0)),
+            "armor": int(_safe_float(r.get("armor"), 0)),
+            "money": int(_safe_float(r.get("current_equip_value"), 0)),
             "activeWeapon": str(r.get("active_weapon") or "") or None,
             "flashDurationRemaining": _rnd(r.get("flash_duration"), 1),
             # NOTE: has_c4/is_bomb_carrier tick props return None in this
@@ -765,7 +765,7 @@ def _build_replay(raw: dict, team_map: dict, round_model: _RoundModel,
 
     def _flags(r: dict) -> int:
         f = 0
-        if int(r.get("health") or 0) > 0:
+        if int(_safe_float(r.get("health"), 0)) > 0:
             f |= 1  # alive
         if _b(r.get("has_c4")):
             f |= 2  # hasBomb
@@ -792,7 +792,7 @@ def _build_replay(raw: dict, team_map: dict, round_model: _RoundModel,
             "y": int(_rnd(r.get("Y"), 0)),
             "z": int(_rnd(r.get("Z"), 0)),
             "yaw": int(_rnd(r.get("yaw"), 0)),
-            "hp": int(r.get("health") or 0),
+            "hp": int(_safe_float(r.get("health"), 0)),
             "weapon": _wi(str(r.get("active_weapon")) if r.get("active_weapon") is not None else ""),
             "flags": _flags(r),
         }
@@ -906,12 +906,12 @@ def _build_economies(
         if not _is_valid_side(side):
             continue
 
-        spent = int(r.get("cash_spent_this_round") or 0)
-        equip = int(r.get("current_equip_value") or 0)
-        start_money = int(r.get("start_balance") or 0)
+        spent = int(_safe_float(r.get("cash_spent_this_round"), 0))
+        equip = int(_safe_float(r.get("current_equip_value"), 0))
+        start_money = int(_safe_float(r.get("start_balance"), 0))
         eco_type = _economy_type(spent, start_money, equip, n, total_rounds)
 
-        has_armor = bool(int(r.get("armor") or 0) > 0)
+        has_armor = bool(int(_safe_float(r.get("armor"), 0)) > 0)
         has_helmet = bool(_b(r.get("has_helmet")))
         has_defuse = bool(_b(r.get("has_defuser")))
 
