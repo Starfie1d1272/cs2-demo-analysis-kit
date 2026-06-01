@@ -33,8 +33,8 @@ The **validated** v2 producer (5 real demos pass `cs2-demo-format/tools/validate
 - [x] Reconcile the placeholder `python/cs2_demo_analysis/validate.py` with the
       exporter's own validate path (drop the duplicate).
 - [x] Keep CLI / GUI / PyInstaller packaging working from the new location.
-- [ ] **Archive `cs2-demo-exporter`** once the move lands (code lives here now).
-- [ ] **Push this repo to a GitHub remote** — it has none yet; the author
+- [x] **Archive `cs2-demo-exporter`** once the move lands (code lives here now).
+- [x] **Push this repo to a GitHub remote** — it has none yet; the author
       (DrEAmSs59) needs a URL to PR exporter refinements against.
 
 ### Stage 1 — dedupe the contract
