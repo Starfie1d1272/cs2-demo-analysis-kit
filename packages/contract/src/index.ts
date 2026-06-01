@@ -244,9 +244,29 @@ export const playerScoreboardRowSchema = z.object({
   ratingSeed: z.number().nonnegative(),
   rr: z.number().nonnegative(),
   rrPercentile: z.number().min(0).max(100),
+  /** RR v2 账户分。锚定后：1.00 = 本场联赛均值（per-match league mean）。 */
   accountRR: z.number().nonnegative(),
+  /** 锚定/clamp 前的原始账户分（调试用）。 */
   accountRRRaw: z.number(),
-  accountCombatContextFactor: z.number()
+  /** Combat 击杀项的 context 乘子（1.0 = context 未生效 / 已降级）。 */
+  accountCombatContextFactor: z.number(),
+  /** 五账户对 RR 的加权贡献（解释面板用；和为 accountRRRaw − intercept）。 */
+  accountBreakdown: z.object({
+    combat: z.number(),
+    trade: z.number(),
+    clutch: z.number(),
+    objective: z.number(),
+    utility: z.number()
+  }),
+  /**
+   * Combat context 分桶的可用性。
+   * "available" = 采集到数据源（即使无相关样本，分桶为 0 也算 available）；
+   * "missing" = 数据源缺失（parser 未产出），乘子已降级为 1.0，前端应显示"未启用"。
+   */
+  accountContextStatus: z.object({
+    buyDelta: z.enum(["available", "missing"]),
+    manState: z.enum(["available", "missing"])
+  })
 });
 
 export const timelineEventSchema = z.object({

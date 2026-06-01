@@ -19,6 +19,7 @@ import {
   type ValueAccountsWeights
 } from "@cs2dak/contract";
 import {
+  computeLeagueMeanV2,
   computePrism,
   computeRR,
   computeValueAccountsRR,
@@ -149,6 +150,11 @@ export function deriveAccountSignalsV2(input: unknown): AccountSignalsV2[] {
   const objective = buildObjectiveSignals(pkg);
   const utility = buildUtilitySignals(pkg);
 
+  // context 分桶的"数据源是否存在"。源缺失 → 发 null（模型降级为乘子 1.0），
+  // 而非零桶——零桶语义是"源在、但该选手无相关样本"。区分二者是 v2 可信展示的前提。
+  const buyDeltaAvailable = pkg.playerEconomies.length > 0;
+  const manStateAvailable = pkg.rounds.length > 0;
+
   return pkg.players.map((player) => {
     const stats = statsBySteamId.get(player.steamId64);
     const playerKills = pkg.kills.filter((kill) => kill.killerSteamId64 === player.steamId64);
@@ -175,8 +181,8 @@ export function deriveAccountSignalsV2(input: unknown): AccountSignalsV2[] {
         },
         headshotKills: stats?.headshotCount ?? playerKills.filter((kill) => kill.headshot).length,
         wallbangKills: stats?.wallbangKillCount ?? playerKills.filter((kill) => kill.penetratedObjects > 0).length,
-        killsByBuyDelta: killsByBuyDelta.get(player.steamId64) ?? zeroBuyDelta(),
-        killsByManState: killsByManState.get(player.steamId64) ?? zeroManState()
+        killsByBuyDelta: buyDeltaAvailable ? (killsByBuyDelta.get(player.steamId64) ?? zeroBuyDelta()) : null,
+        killsByManState: manStateAvailable ? (killsByManState.get(player.steamId64) ?? zeroManState()) : null
       },
       trade: {
         tradeKills: stats?.tradeKillCount ?? playerKills.filter((kill) => kill.tradeKill).length,
@@ -204,9 +210,19 @@ export function deriveAccountSignalsV2(input: unknown): AccountSignalsV2[] {
 
 export function computeAccountRatingsV2(input: unknown): Array<{ signals: AccountSignalsV2; rr: RRResultV2 }> {
   const weights = rrValueAccountsV2Lite as unknown as ValueAccountsWeights;
-  return deriveAccountSignalsV2(input).map((signals) => ({
+  const rated = deriveAccountSignalsV2(input).map((signals) => ({
     signals,
     rr: computeValueAccountsRR(signals, weights)
+  }));
+
+  // 联赛锚定（weights.anchor.mode === "league_mean"）：整体乘 (1.0 / mean)，
+  // 使 1.00 = 本场均值。本层一次只处理单场，故"联赛均值"= 本场均值（per-match）；
+  // 真正的赛季级锚定属于上游跨场聚合层，详见 docs/design/rr-v2-lite.md。
+  const mean = computeLeagueMeanV2(rated.map((row) => row.rr));
+  const factor = mean > 0 ? 1.0 / mean : 1.0;
+  return rated.map((row) => ({
+    signals: row.signals,
+    rr: { ...row.rr, rr: row.rr.rr * factor }
   }));
 }
 
@@ -769,8 +785,12 @@ function buildScoreboard(
   rows: PlayerIndicatorRow[],
   accountRatings: Array<{ signals: AccountSignalsV2; rr: RRResultV2 }>
 ): PlayerScoreboardRow[] {
-  const accountRatingBySteamId = new Map(accountRatings.map((row) => [row.signals.steamId64, row.rr]));
-  return rows.map((row) => ({
+  const accountBySteamId = new Map(accountRatings.map((row) => [row.signals.steamId64, row]));
+  return rows.map((row) => {
+    const account = accountBySteamId.get(row.steamId64);
+    const accountRr = account?.rr;
+    const combatSignals = account?.signals.combat;
+    return {
     steamId64: row.steamId64,
     name: row.name,
     teamKey: row.teamKey,
@@ -787,10 +807,22 @@ function buildScoreboard(
     ratingSeed: round(row.rr.rrBase, 2),
     rr: round(row.rr.rr, 2),
     rrPercentile: round(row.rrPercentile, 1),
-    accountRR: round(accountRatingBySteamId.get(row.steamId64)?.rr ?? 0, 3),
-    accountRRRaw: round(accountRatingBySteamId.get(row.steamId64)?.rrRaw ?? 0, 3),
-    accountCombatContextFactor: round(accountRatingBySteamId.get(row.steamId64)?.combatContextFactor ?? 1, 3)
-  })).sort((a, b) => b.accountRR - a.accountRR || b.rr - a.rr || b.adr - a.adr);
+    accountRR: round(accountRr?.rr ?? 0, 3),
+    accountRRRaw: round(accountRr?.rrRaw ?? 0, 3),
+    accountCombatContextFactor: round(accountRr?.combatContextFactor ?? 1, 3),
+    accountBreakdown: {
+      combat: round(accountRr?.accounts.combat ?? 0, 4),
+      trade: round(accountRr?.accounts.trade ?? 0, 4),
+      clutch: round(accountRr?.accounts.clutch ?? 0, 4),
+      objective: round(accountRr?.accounts.objective ?? 0, 4),
+      utility: round(accountRr?.accounts.utility ?? 0, 4)
+    },
+    accountContextStatus: {
+      buyDelta: (combatSignals?.killsByBuyDelta == null ? "missing" : "available") as "available" | "missing",
+      manState: (combatSignals?.killsByManState == null ? "missing" : "available") as "available" | "missing"
+    }
+    };
+  }).sort((a, b) => b.accountRR - a.accountRR || b.rr - a.rr || b.adr - a.adr);
 }
 
 function buildTimeline(pkg: DemoPackage): TimelineEvent[] {
