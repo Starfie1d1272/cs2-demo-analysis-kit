@@ -161,6 +161,29 @@ def test_bomb_events_before_freeze_end_are_not_exported():
     assert [b for b in pkg["bombs.json"] if b["tick"] == 5200] == []
 
 
+def test_world_self_deaths_before_freeze_end_are_not_exported_or_counted():
+    raw = _base_raw()
+    team_b = "76561198000000002"
+    raw["deaths"].insert(1, {
+        "tick": 5200,
+        "total_rounds_played": 1,
+        "user_steamid": team_b,
+        "attacker_steamid": team_b,
+        "weapon": "world",
+        "user_X": 10,
+        "user_Y": 11,
+        "user_Z": 12,
+    })
+
+    pkg = _read_zip(raw)
+    player_b = next(row for row in pkg["player-stats.json"] if row["steamId64"] == team_b)
+
+    assert [k for k in pkg["kills.json"] if k["tick"] == 5200] == []
+    assert player_b["deaths"] == 2
+    assert player_b["combatDeathCount"] == 2
+    assert player_b["bombDeathCount"] == 0
+
+
 def test_grenade_destroy_tick_after_round_end_is_cleared():
     raw = _base_raw()
     team_a = "76561198000000001"

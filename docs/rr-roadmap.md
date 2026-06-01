@@ -47,8 +47,9 @@
 - **表达去原创化**：v1 定位为兼容基线（box-score baseline），不承担原创叙事；v2 明确标 `lite / uncalibrated / per-match`。
 - **`confidence` 字段**：数据完整度 + 样本量，前端据此显示"未启用 / 无样本 / beta"。
 - 字段表达入口：[field-expression.md](design/field-expression.md)。
-- **数据体检（导出器侧）**：当前 fixture（13:8 de_ancient）QA 报 2 个 `kills.tick_outside_round`
-  （第 3 回合有 kill tick 落在回合窗口外）——疑似 `python/cs2_demo_exporter` 的回合边界归属问题，需排查。
+- **数据体检（导出器侧）**：已定位并修复当前 fixture（13:8 de_ancient）里的 2 个
+  `kills.tick_outside_round`：导出器曾把 freeze 期前的 `world` self-death 当作有效 death/kills 统计。
+  新 fixture 由修复后的导出器重导，QA error 为 0。
 
 ## 阶段 2 — 跨场聚合层（已完成骨架）
 
@@ -123,7 +124,7 @@
 | per-match 锚定 | ✅ 阶段 0 完成 |
 | 接线已有真值（combatDeath/bombDeath/wallbang/noScope 表达…） | ✅ 阶段 1 |
 | confidence 字段 | ✅ 阶段 1 |
-| 导出器回合边界体检 | ⬜ 阶段 1（QA 已报 tick_outside_round） |
+| 导出器回合边界体检 | ✅ 阶段 1（pre-freeze world self-death 已过滤，fixture QA=0） |
 | 跨场 cohort 层（PRISM 真 + 赛季锚定） | ✅ 阶段 2 |
 | damage-context / 包点目标 | ⬜ 阶段 3 |
 | 地图语义层 / Area / Utility delay / Aim | ⬜ 阶段 4 |

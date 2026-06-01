@@ -24,9 +24,9 @@ describe("analyzeDemoPackage", () => {
     expect(bundle.playerIndicators[0]?.indicators.totalRounds).toBe(21);
     expect(bundle.playerRoundFacts).toHaveLength(210);
     expect(bundle.economy).toHaveLength(21);
-    expect(bundle.timeline.filter((event) => event.type === "kill")).toHaveLength(144);
+    expect(bundle.timeline.filter((event) => event.type === "kill")).toHaveLength(142);
     expect(bundle.timeline.filter((event) => event.type === "bomb")).toHaveLength(94);
-    expect(bundle.heatmap.filter((point) => point.kind === "death")).toHaveLength(144);
+    expect(bundle.heatmap.filter((point) => point.kind === "death")).toHaveLength(142);
     expect(bundle.timeline.some((event) => event.type === "kill")).toBe(true);
     expect(bundle.heatmap.some((point) => point.kind === "death")).toBe(true);
     expect(bundle.timeline.find((event) => event.type === "round-end")?.clockPhase).toBe("round-end");
@@ -34,9 +34,7 @@ describe("analyzeDemoPackage", () => {
     expect(viewModel.scoreline).toBe("13:8");
     expect(viewModel.map.name).toBe("de_ancient");
     expect(viewModel.map.radarImageUrl).toBe("/maps/radars/de_ancient.png");
-    // 已知数据特征：本场第 3 回合有 2 个 kill tick 落在回合窗口外（QA 抓到的
-    // tick_outside_round）。疑似导出器侧回合边界归属问题，已列入 roadmap 阶段 0/2 排查。
-    expect(viewModel.qa.summary.errorCount).toBe(2);
+    expect(viewModel.qa.summary.errorCount).toBe(0);
   });
 
   it("derives value-account signals and computes v2 RR from the strict v2 fixture", async () => {
@@ -48,7 +46,7 @@ describe("analyzeDemoPackage", () => {
     expect(signals).toHaveLength(10);
     expect(ratings).toHaveLength(10);
     expect(signals[0]?.rounds).toBe(21);
-    expect(signals[0]?.combat.killsByBuyDelta).toEqual({ disadvantage: 0, even: 4, advantage: 5 });
+    expect(signals[0]?.combat.killsByBuyDelta).toEqual({ disadvantage: 0, even: 2, advantage: 5 });
     expect(signals[0]?.combat.killsByManState).toEqual({ manDown: 1, even: 5, manUp: 1 });
     expect(signals[0]?.trade.tradedOpeningDeaths).toBe(1);
     expect(ratings[0]?.rr.model).toBe("value-accounts-v2-lite");
@@ -81,8 +79,19 @@ describe("analyzeDemoPackage", () => {
   it("wires player-stats truth into RRIndicators instead of legacy approximations", async () => {
     const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
     const pkg = await loadDemoPackageFromZip(zip);
-    const indicators = deriveRRIndicators(pkg);
-    const bombDeathStats = pkg.playerStats.find((row) => row.bombDeathCount > 0)!;
+    const statsTruth = pkg.playerStats[0]!;
+    const patchedStats = {
+      ...statsTruth,
+      deaths: statsTruth.deaths + 2,
+      combatDeathCount: statsTruth.deaths,
+      bombDeathCount: 2
+    };
+    const patchedPkg = {
+      ...pkg,
+      playerStats: pkg.playerStats.map((row) => row.steamId64 === statsTruth.steamId64 ? patchedStats : row)
+    };
+    const indicators = deriveRRIndicators(patchedPkg);
+    const bombDeathStats = patchedStats;
     const wallbangStats = pkg.playerStats.find((row) => row.wallbangKillCount > 0)!;
 
     const bombDeathIndicators = indicators.find((row) => row.steamId64 === bombDeathStats.steamId64)!;
@@ -110,14 +119,13 @@ describe("analyzeDemoPackage", () => {
     const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
     const pkg = await loadDemoPackageFromZip(zip);
     const bundle = analyzeDemoPackage(pkg);
-    const bombDeathStats = pkg.playerStats.find((row) => row.bombDeathCount > 0)!;
-    const row = bundle.scoreboard.find((scoreboardRow) => scoreboardRow.steamId64 === bombDeathStats.steamId64)!;
+    const row = bundle.scoreboard[0]!;
 
-    expect(row.combatDeathCount).toBe(18);
-    expect(row.bombDeathCount).toBe(2);
-    expect(row.bombPlantCount).toBe(1);
+    expect(row.combatDeathCount).toBe(11);
+    expect(row.bombDeathCount).toBe(0);
+    expect(row.bombPlantCount).toBe(4);
     expect(row.noScopeKillCount).toBe(0);
-    expect(row.throughSmokeKillCount).toBe(1);
+    expect(row.throughSmokeKillCount).toBe(2);
     expect(row.fieldAvailability).toEqual({
       playerStats: "available",
       economy: "available",

@@ -66,4 +66,9 @@ available = 1, partial = 0.5, missing = 0
 ## 仍需上游确认
 
 - `killerActiveWeapon` 当前像实体 handle，而不是规范武器名。core 已做防御性回退；如果 exporter 后续能输出稳定武器名，AWP/sniper 判定会自动优先使用它。
-- `kills.tick_outside_round` 仍有 2 个 QA error，需单独判断是 exporter 回合边界归属问题还是 QA active window 过严。
+
+## 已修复的数据质量问题
+
+- `kills.tick_outside_round` 的 2 个 QA error 已定位为 exporter 问题：freeze 期前的 `world`
+  self-death 被写入 `kills.json` 并计入 `player-stats`。导出器现在只导出/统计
+  `[freezeEndTick, endTick]` 内的 death 事件；当前真实 fixture QA error 为 0。

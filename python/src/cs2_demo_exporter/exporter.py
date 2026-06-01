@@ -295,8 +295,11 @@ def _build_match(raw: dict, rounds: list[dict]) -> dict:
 def _build_kills(raw: dict, team_map: dict, round_model: _RoundModel) -> list[dict]:
     out = []
     for r in raw.get("deaths", []):
-        n, victim_sid = _resolve_row(r, round_model, steamid_key="user_steamid", use_event=True, strict=True)
+        n = _active_event_round_number(round_model, r)
         if n is None:
+            continue
+        victim_sid = _sid(r.get("user_steamid"))
+        if not victim_sid:
             continue
 
         victim_key = team_map.get(victim_sid, "unknown")
@@ -1006,7 +1009,7 @@ def _build_player_stats(
 
     # kills / deaths — official rounds only
     for r in raw.get("deaths", []):
-        n = _event_round_number(round_model, r)
+        n = _active_event_round_number(round_model, r)
         if n is None:
             continue
         killer = _sid(r.get("attacker_steamid"))
@@ -1057,7 +1060,7 @@ def _build_player_stats(
     # (single-bullet penetration). Every kill in such a group counts.
     collateral_groups: dict[tuple[str, int], int] = {}
     for r in raw.get("deaths", []):
-        if _event_round_number(round_model, r) is None:
+        if _active_event_round_number(round_model, r) is None:
             continue
         killer = _sid(r.get("attacker_steamid"))
         victim = _sid(r.get("user_steamid"))
@@ -1087,7 +1090,7 @@ def _build_player_stats(
     first_kills: dict[int, str] = {}
     first_deaths: dict[int, str] = {}
     for r in sorted(raw.get("deaths", []), key=lambda x: int(x.get("tick") or 0)):
-        n = _event_round_number(round_model, r)
+        n = _active_event_round_number(round_model, r)
         if n is None:
             continue
         killer = _sid(r.get("attacker_steamid"))
@@ -1211,13 +1214,24 @@ def _event_round_number(round_model: _RoundModel, row: dict) -> int | None:
     return n if any(window.round_number == n for window in round_model.windows) else None
 
 
+def _active_event_round_number(round_model: _RoundModel, row: dict) -> int | None:
+    n = _event_round_number(round_model, row)
+    if n is None:
+        return None
+    tick = int(row.get("tick") or 0)
+    window = round_model.window_for_round(n)
+    if window is None or tick < window.freeze_end_tick or tick > window.end_tick:
+        return None
+    return n
+
+
 def _kills_per_round_per_player(
     deaths: list[dict], round_model: _RoundModel
 ) -> dict[str, dict[int, int]]:
     """Returns {steamId64: {roundNumber: kill_count}} for official rounds only."""
     result: dict[str, dict[int, int]] = {}
     for r in deaths:
-        n = _event_round_number(round_model, r)
+        n = _active_event_round_number(round_model, r)
         if n is None:
             continue
         killer = _sid(r.get("attacker_steamid"))
