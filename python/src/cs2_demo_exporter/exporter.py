@@ -64,7 +64,8 @@ def _assemble_zip(raw: dict[str, Any], dem_path: str, demo_hash: str | None) -> 
     positions    = _build_positions(raw, team_map, round_model)
     economies    = _build_economies(raw, team_map, round_model, rounds)
     clutches     = _build_clutches(kills, rounds, team_map)
-    manifest     = _build_manifest(raw, dem_path, demo_hash, shots, positions)
+    replay       = _build_replay(raw, team_map, round_model, raw.get("tickrate", 64))
+    manifest     = _build_manifest(raw, dem_path, demo_hash, shots, positions, replay)
 
     files: dict[str, Any] = {
         "manifest.json":         manifest,
@@ -84,6 +85,8 @@ def _assemble_zip(raw: dict[str, Any], dem_path: str, demo_hash: str | None) -> 
         files["shots.json"] = shots
     if positions:
         files["positions-1s.json"] = positions
+    if replay:
+        files["replay.json"] = replay
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
@@ -976,6 +979,122 @@ def _build_positions(raw: dict, team_map: dict, round_model: _RoundModel) -> lis
     return out
 
 
+# ── replay (8 Hz columnar 2D-replay stream) ───────────────────────────────────
+
+def _build_replay(raw: dict, team_map: dict, round_model: _RoundModel,
+                  tickrate: int) -> dict | None:
+    rows = raw.get("replay_raw", [])
+    if not rows:
+        return None
+
+    tick_step = max(1, tickrate // 8)  # 8 Hz
+    sample_rate = tickrate // tick_step
+
+    # ── weapon dictionary ──
+    weapon_dict: list[str] = []
+    weapon_idx: dict[str, int] = {}
+
+    def _wi(name: str | None) -> int:
+        if not name:
+            return -1
+        if name not in weapon_idx:
+            weapon_idx[name] = len(weapon_dict)
+            weapon_dict.append(name)
+        return weapon_idx[name]
+
+    def _flags(r: dict) -> int:
+        f = 0
+        if int(r.get("health") or 0) > 0:
+            f |= 1  # alive
+        if _b(r.get("has_c4")):
+            f |= 2  # hasBomb
+        if _b(r.get("has_defuser")):
+            f |= 4  # hasDefuseKit
+        if _safe_float(r.get("flash_duration"), 0.0) > 0:
+            f |= 8  # flashed
+        return f
+
+    # ── group by (roundNumber, steamId64) ──
+    from collections import defaultdict
+    round_ticks: dict[int, set[int]] = defaultdict(set)
+    # player_frames[round][sid] = {tick: frame_data}
+    player_frames: dict[int, dict[str, dict[int, dict]]] = defaultdict(
+        lambda: defaultdict(dict))
+
+    for r in rows:
+        tick = int(r.get("tick") or 0)
+        n = round_model.round_for_tick(tick)
+        if n is None:
+            continue
+        sid = _sid(r.get("steamid"))
+        if not sid:
+            continue
+        round_ticks[n].add(tick)
+        player_frames[n][sid][tick] = {
+            "x": round(_safe_float(r.get("X"), 0.0)),
+            "y": round(_safe_float(r.get("Y"), 0.0)),
+            "z": round(_safe_float(r.get("Z"), 0.0)),
+            "yaw": round(_safe_float(r.get("yaw"), 0.0)),
+            "hp": int(r.get("health") or 0),
+            "weapon": _wi(str(r.get("active_weapon") or "") or None),
+            "flags": _flags(r),
+        }
+
+    # ── build per-round columnar output ──
+    round_list: list[dict] = []
+    for rn in sorted(round_ticks.keys()):
+        ticks = sorted(round_ticks[rn])
+        if not ticks:
+            continue
+        player_list: list[dict] = []
+        for sid, frames in player_frames[rn].items():
+            key = team_map.get(sid, "unknown")
+            side = round_model.side_map.get((rn, key), "unknown")
+            # align to round tick list; missing → dead sentinel
+            x_a: list[int] = []
+            y_a: list[int] = []
+            z_a: list[int] = []
+            yaw_a: list[int] = []
+            hp_a: list[int] = []
+            w_a: list[int] = []
+            f_a: list[int] = []
+            for t in ticks:
+                fd = frames.get(t)
+                if fd is not None:
+                    x_a.append(fd["x"]); y_a.append(fd["y"]); z_a.append(fd["z"])
+                    yaw_a.append(fd["yaw"]); hp_a.append(fd["hp"])
+                    w_a.append(fd["weapon"]); f_a.append(fd["flags"])
+                else:
+                    x_a.append(0); y_a.append(0); z_a.append(0)
+                    yaw_a.append(0); hp_a.append(0)
+                    w_a.append(-1); f_a.append(0)
+            player_list.append({
+                "steamId64": sid,
+                "teamKey": key,
+                "side": side,
+                "x": x_a, "y": y_a, "z": z_a,
+                "yaw": yaw_a, "hp": hp_a,
+                "weapon": w_a, "flags": f_a,
+            })
+        round_list.append({
+            "roundNumber": rn,
+            "startTick": ticks[0],
+            "tickStep": tick_step,
+            "frameCount": len(ticks),
+            "players": player_list,
+        })
+
+    return {
+        "meta": {
+            "sampleRate": sample_rate,
+            "tickrate": tickrate,
+            "coordScale": 1,
+        },
+        "weaponDict": weapon_dict,
+        "rounds": round_list,
+    }
+
+
 # ── economies ─────────────────────────────────────────────────────────────────
 
 _ECO_ORDER = ["pistol", "eco", "semi", "force", "full"]
@@ -1438,6 +1557,7 @@ def _build_clutches(
 def _build_manifest(
     raw: dict, dem_path: str, demo_hash: str | None,
     shots: list | None = None, positions: list | None = None,
+    replay: dict | None = None,
 ) -> dict:
     try:
         from . import __version__ as _ver
@@ -1464,6 +1584,8 @@ def _build_manifest(
         files_map["shots"] = "shots.json"
     if positions:
         files_map["positions1s"] = "positions-1s.json"
+    if replay:
+        files_map["replay"] = "replay.json"
 
     return {
         "schemaVersion": SCHEMA_VERSION,

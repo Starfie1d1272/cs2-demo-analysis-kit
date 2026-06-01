@@ -90,8 +90,8 @@ importers:
         specifier: github:Starfie1d1272/rival-rating#06be266
         version: https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/06be2662932362292e6eb690f48e6e1eb9696aaa
       cs2-demo-format:
-        specifier: github:Starfie1d1272/cs2-demo-format#v2.0.0
-        version: https://codeload.github.com/Starfie1d1272/cs2-demo-format/tar.gz/61981cfcd8fec8e3f1560c91544925981bbbc556(zod@3.25.76)
+        specifier: github:Starfie1d1272/cs2-demo-format#v2.2.0
+        version: https://codeload.github.com/Starfie1d1272/cs2-demo-format/tar.gz/56b3e50d0ba91a984789c10236f7265795938876(zod@3.25.76)
       zod:
         specifier: ^3.25.0
         version: 3.25.76
@@ -796,9 +796,9 @@ packages:
   core-util-is@1.0.3:
     resolution: {integrity: sha512-ZQBvi1DcpJ4GDqanjucZ2Hj3wEO5pZDS89BWbkcrvdxksJorwUDDZamX9ldFkp9aw2lmBDLgkObEA4DWNJ9FYQ==}
 
-  cs2-demo-format@https://codeload.github.com/Starfie1d1272/cs2-demo-format/tar.gz/61981cfcd8fec8e3f1560c91544925981bbbc556:
-    resolution: {gitHosted: true, integrity: sha512-HqYHGqVyMRvDF02uyXnY7gspxihql/VrB845G+chba59XN9ylh/rmCdgGL6OvyYGhHOweUUijSiWdQB2zHx5qQ==, tarball: https://codeload.github.com/Starfie1d1272/cs2-demo-format/tar.gz/61981cfcd8fec8e3f1560c91544925981bbbc556}
-    version: 2.0.0
+  cs2-demo-format@https://codeload.github.com/Starfie1d1272/cs2-demo-format/tar.gz/56b3e50d0ba91a984789c10236f7265795938876:
+    resolution: {gitHosted: true, integrity: sha512-XCZsXLztzAgddc+AllYuzfDqdviH14eDHUzLX3qHYeOQwyBnUB51vaCdfBPXrtd9EmMvXYjt6aarYKapgIIDJA==, tarball: https://codeload.github.com/Starfie1d1272/cs2-demo-format/tar.gz/56b3e50d0ba91a984789c10236f7265795938876}
+    version: 2.2.0
     peerDependencies:
       zod: '>=3.0.0'
 
@@ -1640,7 +1640,7 @@ snapshots:
 
   core-util-is@1.0.3: {}
 
-  cs2-demo-format@https://codeload.github.com/Starfie1d1272/cs2-demo-format/tar.gz/61981cfcd8fec8e3f1560c91544925981bbbc556(zod@3.25.76):
+  cs2-demo-format@https://codeload.github.com/Starfie1d1272/cs2-demo-format/tar.gz/56b3e50d0ba91a984789c10236f7265795938876(zod@3.25.76):
     dependencies:
       jszip: 3.10.1
       zod: 3.25.76

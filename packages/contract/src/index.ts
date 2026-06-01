@@ -31,6 +31,9 @@ import {
   playerStatsSchema,
   positionRowSchema,
   positionsSchema,
+  replaySchema,
+  replayPlayerTrackSchema,
+  replayRoundSchema,
   roundRowSchema,
   roundsSchema,
   shotRowSchema,
@@ -69,6 +72,9 @@ export {
   playerStatsSchema,
   positionRowSchema,
   positionsSchema,
+  replaySchema,
+  replayPlayerTrackSchema,
+  replayRoundSchema,
   roundRowSchema,
   roundsSchema,
   shotRowSchema,
@@ -94,7 +100,8 @@ export const demoPackageSchema = z.object({
   grenades: grenadesSchema.default([]),
   clutches: clutchesSchema.default([]),
   shots: shotsSchema.optional(),
-  positions1s: positionsSchema.optional()
+  positions1s: positionsSchema.optional(),
+  replay: replaySchema.optional(),
 });
 
 export const qaIssueSchema = z.object({
@@ -341,4 +348,7 @@ export type EconomyPoint = z.infer<typeof economyPointSchema>;
 export type HeatmapPoint = z.infer<typeof heatmapPointSchema>;
 export type AnalysisBundle = z.infer<typeof analysisBundleSchema>;
 export type DemoViewModel = z.infer<typeof demoViewModelSchema>;
+export type Replay = z.infer<typeof replaySchema>;
+export type ReplayRound = z.infer<typeof replayRoundSchema>;
+export type ReplayPlayerTrack = z.infer<typeof replayPlayerTrackSchema>;
 export type { AccountSignalsV2, RRIndicators, RRResult, RRResultV2, PrismResult, ValueAccountsWeights };

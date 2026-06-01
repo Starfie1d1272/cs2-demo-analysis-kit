@@ -232,6 +232,24 @@ def parse_for_rivalhub(dem_path: str) -> dict[str, Any]:
         except BaseException:
             positions_raw = []
 
+    # ── replay: ~8 Hz sample for 2D replay viewer ─────────────────
+    replay_step = max(1, tickrate // 8)
+    replay_ticks = _build_sample_ticks(round_ends, round_freeze_ends, tickrate,
+                                       step=replay_step)
+    replay_raw: list[dict] = []
+    if replay_ticks:
+        try:
+            replay_raw = _rows(p.parse_ticks(
+                [
+                    "steamid", "team_num", "X", "Y", "Z", "yaw",
+                    "health", "active_weapon", "flash_duration",
+                    "has_defuser", "has_c4",
+                ],
+                ticks=replay_ticks,
+            ))
+        except BaseException:
+            replay_raw = []
+
     # ── economy: player state at each freeze_end tick ────────────
     freeze_ticks = sorted({int(r["tick"]) for r in round_freeze_ends if r.get("tick")})
     economy_raw: list[dict] = []
@@ -268,6 +286,8 @@ def parse_for_rivalhub(dem_path: str) -> dict[str, Any]:
         "grenade_detonations": grenade_detonations,
         "positions_raw": positions_raw,
         "sample_ticks": sample_ticks,
+        "replay_raw": replay_raw,
+        "replay_ticks": replay_ticks,
         "economy_raw": economy_raw,
         "freeze_ticks": freeze_ticks,
     }
@@ -277,13 +297,16 @@ def _build_sample_ticks(
     round_ends: list[dict],
     round_freeze_ends: list[dict],
     tickrate: int,
+    step: int | None = None,
 ) -> list[int]:
-    """Return sorted unique sample ticks at ~1s intervals within active play.
+    """Return sorted unique sample ticks at interval `step` within active play.
 
     total_rounds_played at round_freeze_end = N-1 for round N, so store
     at actual_round = rn + 1. total_rounds_played at round_end = N, which
     then matches actual_round for the correct freeze tick lookup.
     """
+    if step is None:
+        step = tickrate  # default: ~1 Hz
     freeze_by_round: dict[int, int] = {}
     for r in round_freeze_ends:
         rn = int(r.get("total_rounds_played") or 0)
@@ -302,5 +325,5 @@ def _build_sample_ticks(
         t = start_t
         while t < end_t:
             ticks.append(t)
-            t += tickrate
+            t += step
     return sorted(set(ticks))
