@@ -116,6 +116,17 @@ def _safe_float_nullable(val) -> float | None:
         return None
 
 
+def _rnd(val, ndigits: int, default: float = 0.0) -> float:
+    """Safe float rounded to `ndigits` decimal places (trim precision waste)."""
+    f = _safe_float(val, default)
+    return round(f, ndigits)
+
+
+def _raw(row: dict, k: str):
+    """Get row[k] with case-insensitive fallback to row[k.lower()]."""
+    return row.get(k) if row.get(k) is not None else row.get(k.lower())
+
+
 def _json_safe(obj):
     """Recursively replace float NaN/inf with None for JSON compliance."""
     if isinstance(obj, float):
@@ -149,24 +160,24 @@ def _is_valid_teamkey(s) -> bool:
 
 
 def _pos(row: dict, xk="X", yk="Y", zk="Z") -> dict:
-    """Non-nullable vec3: NaN/missing → 0.0."""
+    """Non-nullable vec3: NaN/missing → 0.0. Coordinates rounded to trim parser precision noise."""
     return {
-        "x": _safe_float(row.get(xk) if row.get(xk) is not None else row.get(xk.lower())),
-        "y": _safe_float(row.get(yk) if row.get(yk) is not None else row.get(yk.lower())),
-        "z": _safe_float(row.get(zk) if row.get(zk) is not None else row.get(zk.lower())),
+        "x": _rnd(_raw(row, xk), 2),
+        "y": _rnd(_raw(row, yk), 2),
+        "z": _rnd(_raw(row, zk), 1),
     }
 
 
 def _pos_nullable(row: dict, xk="X", yk="Y", zk="Z") -> dict | None:
     """Nullable vec3: returns None if all three are NaN/missing."""
-    xv = _safe_float_nullable(row.get(xk) if row.get(xk) is not None else row.get(xk.lower()))
-    yv = _safe_float_nullable(row.get(yk) if row.get(yk) is not None else row.get(yk.lower()))
-    zv = _safe_float_nullable(row.get(zk) if row.get(zk) is not None else row.get(zk.lower()))
+    xv = _safe_float_nullable(_raw(row, xk))
+    yv = _safe_float_nullable(_raw(row, yk))
+    zv = _safe_float_nullable(_raw(row, zk))
     if xv is None and yv is None and zv is None:
         return None
-    return {"x": xv if xv is not None else 0.0,
-            "y": yv if yv is not None else 0.0,
-            "z": zv if zv is not None else 0.0}
+    return {"x": round(xv, 2) if xv is not None else 0.0,
+            "y": round(yv, 2) if yv is not None else 0.0,
+            "z": round(zv, 1) if zv is not None else 0.0}
 
 
 def _b(val) -> bool:
@@ -924,8 +935,8 @@ def _build_shots(raw: dict, team_map: dict, round_model: _RoundModel) -> list[di
             "weapon": weapon,
             "position": _pos(r),
             "velocity": _pos(r, "user_vel_X", "user_vel_Y", "user_vel_Z"),
-            "yaw": _safe_float(r.get("yaw"), default=0.0),
-            "pitch": _safe_float(r.get("pitch"), default=0.0),
+            "yaw": _rnd(r.get("yaw"), 1),
+            "pitch": _rnd(r.get("pitch"), 1),
         })
     return out
 
@@ -952,13 +963,13 @@ def _build_positions(raw: dict, team_map: dict, round_model: _RoundModel) -> lis
             "side": side,
             "alive": int(r.get("health") or 0) > 0,
             "position": _pos(r),
-            "yaw": _safe_float(r.get("yaw"), default=0.0),
-            "pitch": _safe_float(r.get("pitch"), default=0.0),
+            "yaw": _rnd(r.get("yaw"), 1),
+            "pitch": _rnd(r.get("pitch"), 1),
             "health": int(r.get("health") or 0),
             "armor": int(r.get("armor") or 0),
             "money": int(r.get("current_equip_value") or 0),
             "activeWeapon": str(r.get("active_weapon") or "") or None,
-            "flashDurationRemaining": _safe_float(r.get("flash_duration"), default=0.0),
+            "flashDurationRemaining": _rnd(r.get("flash_duration"), 1),
             "hasBomb": _b(r.get("has_c4")),
             "hasDefuseKit": _b(r.get("has_defuser")),
         })
