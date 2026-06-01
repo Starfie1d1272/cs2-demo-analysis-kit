@@ -78,6 +78,22 @@ describe("analyzeDemoPackage", () => {
     expect(indicators[0]).toEqual(bundle.playerIndicators[0]?.indicators);
   });
 
+  it("wires player-stats truth into RRIndicators instead of legacy approximations", async () => {
+    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
+    const pkg = await loadDemoPackageFromZip(zip);
+    const indicators = deriveRRIndicators(pkg);
+    const bombDeathStats = pkg.playerStats.find((row) => row.bombDeathCount > 0)!;
+    const wallbangStats = pkg.playerStats.find((row) => row.wallbangKillCount > 0)!;
+
+    const bombDeathIndicators = indicators.find((row) => row.steamId64 === bombDeathStats.steamId64)!;
+    const wallbangIndicators = indicators.find((row) => row.steamId64 === wallbangStats.steamId64)!;
+
+    expect(bombDeathStats.deaths).not.toBe(bombDeathStats.combatDeathCount);
+    expect(bombDeathIndicators.combatDeathCount).toBe(bombDeathStats.combatDeathCount);
+    expect(bombDeathIndicators.bombDeathCount).toBe(bombDeathStats.bombDeathCount);
+    expect(wallbangIndicators.wallbangKillCount).toBe(wallbangStats.wallbangKillCount);
+  });
+
   it("surfaces account breakdown and context status on the scoreboard", async () => {
     const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
     const pkg = await loadDemoPackageFromZip(zip);
@@ -88,6 +104,29 @@ describe("analyzeDemoPackage", () => {
     // 该 fixture 含经济与回合数据 → 两个 context 维度都 available
     expect(row.accountContextStatus.buyDelta).toBe("available");
     expect(row.accountContextStatus.manState).toBe("available");
+  });
+
+  it("surfaces rich v2 fields and confidence on the scoreboard", async () => {
+    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
+    const pkg = await loadDemoPackageFromZip(zip);
+    const bundle = analyzeDemoPackage(pkg);
+    const bombDeathStats = pkg.playerStats.find((row) => row.bombDeathCount > 0)!;
+    const row = bundle.scoreboard.find((scoreboardRow) => scoreboardRow.steamId64 === bombDeathStats.steamId64)!;
+
+    expect(row.combatDeathCount).toBe(18);
+    expect(row.bombDeathCount).toBe(2);
+    expect(row.bombPlantCount).toBe(1);
+    expect(row.noScopeKillCount).toBe(0);
+    expect(row.throughSmokeKillCount).toBe(1);
+    expect(row.fieldAvailability).toEqual({
+      playerStats: "available",
+      economy: "available",
+      rounds: "available",
+      richKills: "partial",
+      damages: "available",
+      bombs: "available"
+    });
+    expect(row.confidence).toBeCloseTo(0.917, 3);
   });
 
   it("emits null context buckets (not zero) when the data source is missing", async () => {

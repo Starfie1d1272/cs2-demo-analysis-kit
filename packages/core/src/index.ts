@@ -85,7 +85,7 @@ export function analyzeDemoPackage(input: unknown): AnalysisBundle {
   const playerRoundFacts = buildPlayerRoundFacts(pkg);
   const playerIndicators = buildPlayerIndicators(pkg, playerRoundFacts);
   const accountRatings = computeAccountRatingsV2(pkg);
-  const scoreboard = buildScoreboard(playerIndicators, accountRatings);
+  const scoreboard = buildScoreboard(pkg, playerIndicators, accountRatings);
   const timeline = buildTimeline(pkg);
   const economy = buildEconomy(pkg);
   const heatmap = buildHeatmap(pkg);
@@ -669,14 +669,14 @@ function buildPlayerIndicators(pkg: DemoPackage, facts: PlayerRoundFact[]): Play
     const firstKillCount = stats?.firstKillCount ?? playerFacts.filter((fact) => fact.openingDuel === "won").length;
     const firstDeathCount = stats?.firstDeathCount ?? playerFacts.filter((fact) => fact.openingDuel === "lost").length;
     const openingDuels = firstKillCount + firstDeathCount;
-    const awpKills = playerKills.filter((kill) => normalizeWeapon(kill.weapon) === "awp").length;
-    const sniperKills = playerKills.filter((kill) => ["awp", "ssg08", "scout"].includes(normalizeWeapon(kill.weapon))).length;
+    const awpKills = playerKills.filter((kill) => killWeaponName(kill) === "awp").length;
+    const sniperKills = playerKills.filter((kill) => ["awp", "ssg08", "scout"].includes(killWeaponName(kill))).length;
     const utilityDamage = stats?.utilityDamage ?? playerFacts.reduce((sum, fact) => sum + fact.utilityDamage, 0);
-    const flashAssistCount = playerFacts.reduce((sum, fact) => sum + fact.flashAssists, 0);
-    const enemyFlashDurationSeconds = playerBlinds
+    const flashAssistCount = stats?.flashAssistCount ?? playerFacts.reduce((sum, fact) => sum + fact.flashAssists, 0);
+    const enemyFlashDurationSeconds = stats?.enemyFlashDurationSeconds ?? playerBlinds
       .filter((blind) => blind.flashedTeamKey && blind.flashedTeamKey !== player.teamKey)
       .reduce((sum, blind) => sum + blind.durationSeconds, 0);
-    const teamFlashDurationSeconds = playerBlinds
+    const teamFlashDurationSeconds = stats?.teamFlashDurationSeconds ?? playerBlinds
       .filter((blind) => blind.flashedTeamKey === player.teamKey && blind.flashedSteamId64 !== player.steamId64)
       .reduce((sum, blind) => sum + blind.durationSeconds, 0);
     const grenadeCount = pkg.grenades.filter((grenade) => grenade.throwerSteamId64 === player.steamId64).length;
@@ -687,8 +687,12 @@ function buildPlayerIndicators(pkg: DemoPackage, facts: PlayerRoundFact[]): Play
     const tradeKillCount = stats?.tradeKillCount ?? playerFacts.reduce((sum, fact) => sum + fact.tradeKills, 0);
     const tradeDeathCount = stats?.tradeDeathCount ?? playerFacts.reduce((sum, fact) => sum + fact.tradedDeaths, 0);
     const playedRounds = Math.max(stats?.rounds ?? totalRounds, 1);
-    const clutchWins = playerClutches.filter((row) => row.won).length;
-    const clutchScore = playerClutches.reduce((sum, row) => sum + (row.won ? row.opponentCount : 0), 0);
+    const clutchWins = stats
+      ? stats.vsOneWonCount + stats.vsTwoWonCount + stats.vsThreeWonCount + stats.vsFourWonCount + stats.vsFiveWonCount
+      : playerClutches.filter((row) => row.won).length;
+    const clutchScore = stats
+      ? stats.vsOneWonCount + stats.vsTwoWonCount * 2 + stats.vsThreeWonCount * 3 + stats.vsFourWonCount * 4 + stats.vsFiveWonCount * 5
+      : playerClutches.reduce((sum, row) => sum + (row.won ? row.opponentCount : 0), 0);
 
     return {
       steamId64: player.steamId64,
@@ -753,9 +757,9 @@ function buildPlayerIndicators(pkg: DemoPackage, facts: PlayerRoundFact[]): Play
       fullBuyRoundCount: playerEconomies.filter((row) => row.type === "full").length,
       pistolRoundCount: playerEconomies.filter((row) => row.type === "pistol").length,
       avgEquipmentValue: playerEconomies.length > 0 ? round(playerEconomies.reduce((sum, row) => sum + row.equipmentValue, 0) / playerEconomies.length, 2) : 0,
-      combatDeathCount: deaths,
-      bombDeathCount: null,
-      wallbangKillCount: playerKills.filter((kill) => (kill.penetratedObjects ?? 0) > 0).length,
+      combatDeathCount: stats?.combatDeathCount ?? deaths,
+      bombDeathCount: stats?.bombDeathCount ?? null,
+      wallbangKillCount: stats?.wallbangKillCount ?? playerKills.filter((kill) => (kill.penetratedObjects ?? 0) > 0).length,
       roundSwingTotal: null,
       roundSwingPerKill: null
     } satisfies RRIndicators;
@@ -787,45 +791,61 @@ function buildPlayerIndicators(pkg: DemoPackage, facts: PlayerRoundFact[]): Play
 }
 
 function buildScoreboard(
+  pkg: DemoPackage,
   rows: PlayerIndicatorRow[],
   accountRatings: Array<{ signals: AccountSignalsV2; rr: RRResultV2 }>
 ): PlayerScoreboardRow[] {
   const accountBySteamId = new Map(accountRatings.map((row) => [row.signals.steamId64, row]));
+  const statsBySteamId = new Map(pkg.playerStats.map((row) => [row.steamId64, row]));
+  const availability = fieldAvailability(pkg);
+  const confidence = fieldConfidence(availability);
   return rows.map((row) => {
     const account = accountBySteamId.get(row.steamId64);
     const accountRr = account?.rr;
     const combatSignals = account?.signals.combat;
+    const stats = statsBySteamId.get(row.steamId64);
+    const playerKills = pkg.kills.filter((kill) => kill.killerSteamId64 === row.steamId64);
     return {
-    steamId64: row.steamId64,
-    name: row.name,
-    teamKey: row.teamKey,
-    kills: row.indicators.kills,
-    deaths: row.indicators.deaths,
-    assists: row.indicators.assists,
-    adr: round(row.indicators.adr, 1),
-    kast: round(row.indicators.kast, 1),
-    headshotPercent: round(row.indicators.hsPercent, 1),
-    entryKills: row.indicators.firstKillCount,
-    tradeKills: row.indicators.tradeKillCount,
-    awpKills: row.indicators.awpKills,
-    utilityDamage: row.indicators.utilityDamage,
-    ratingSeed: round(row.rr.rrBase, 2),
-    rr: round(row.rr.rr, 2),
-    rrPercentile: round(row.rrPercentile, 1),
-    accountRR: round(accountRr?.rr ?? 0, 3),
-    accountRRRaw: round(accountRr?.rrRaw ?? 0, 3),
-    accountCombatContextFactor: round(accountRr?.combatContextFactor ?? 1, 3),
-    accountBreakdown: {
-      combat: round(accountRr?.accounts.combat ?? 0, 4),
-      trade: round(accountRr?.accounts.trade ?? 0, 4),
-      clutch: round(accountRr?.accounts.clutch ?? 0, 4),
-      objective: round(accountRr?.accounts.objective ?? 0, 4),
-      utility: round(accountRr?.accounts.utility ?? 0, 4)
-    },
-    accountContextStatus: {
-      buyDelta: (combatSignals?.killsByBuyDelta == null ? "missing" : "available") as "available" | "missing",
-      manState: (combatSignals?.killsByManState == null ? "missing" : "available") as "available" | "missing"
-    }
+      steamId64: row.steamId64,
+      name: row.name,
+      teamKey: row.teamKey,
+      kills: row.indicators.kills,
+      deaths: row.indicators.deaths,
+      assists: row.indicators.assists,
+      adr: round(row.indicators.adr, 1),
+      kast: round(row.indicators.kast, 1),
+      headshotPercent: round(row.indicators.hsPercent, 1),
+      entryKills: row.indicators.firstKillCount,
+      tradeKills: row.indicators.tradeKillCount,
+      awpKills: row.indicators.awpKills,
+      utilityDamage: row.indicators.utilityDamage,
+      combatDeathCount: row.indicators.combatDeathCount,
+      bombDeathCount: row.indicators.bombDeathCount,
+      wallbangKillCount: row.indicators.wallbangKillCount,
+      noScopeKillCount: stats?.noScopeKillCount ?? playerKills.filter((kill) => kill.noScope).length,
+      throughSmokeKillCount: playerKills.filter((kill) => kill.throughSmoke).length,
+      collateralKillCount: stats?.collateralKillCount ?? null,
+      bombPlantCount: stats?.bombPlantCount ?? null,
+      bombDefuseCount: stats?.bombDefuseCount ?? null,
+      confidence,
+      fieldAvailability: availability,
+      ratingSeed: round(row.rr.rrBase, 2),
+      rr: round(row.rr.rr, 2),
+      rrPercentile: round(row.rrPercentile, 1),
+      accountRR: round(accountRr?.rr ?? 0, 3),
+      accountRRRaw: round(accountRr?.rrRaw ?? 0, 3),
+      accountCombatContextFactor: round(accountRr?.combatContextFactor ?? 1, 3),
+      accountBreakdown: {
+        combat: round(accountRr?.accounts.combat ?? 0, 4),
+        trade: round(accountRr?.accounts.trade ?? 0, 4),
+        clutch: round(accountRr?.accounts.clutch ?? 0, 4),
+        objective: round(accountRr?.accounts.objective ?? 0, 4),
+        utility: round(accountRr?.accounts.utility ?? 0, 4)
+      },
+      accountContextStatus: {
+        buyDelta: (combatSignals?.killsByBuyDelta == null ? "missing" : "available") as "available" | "missing",
+        manState: (combatSignals?.killsByManState == null ? "missing" : "available") as "available" | "missing"
+      }
     };
   }).sort((a, b) => b.accountRR - a.accountRR || b.rr - a.rr || b.adr - a.adr);
 }
@@ -1024,8 +1044,51 @@ function isUtilityWeapon(weapon: string): boolean {
   return ["hegrenade", "inferno", "molotov", "incgrenade"].includes(normalizeWeapon(weapon));
 }
 
+function killWeaponName(kill: DemoPackage["kills"][number]): string {
+  const active = kill.killerActiveWeapon ? normalizeWeapon(kill.killerActiveWeapon) : "";
+  return isNamedWeapon(active) ? active : normalizeWeapon(kill.weapon);
+}
+
+function isNamedWeapon(value: string): boolean {
+  return /^[a-z_][a-z0-9_]*$/.test(value);
+}
+
 function normalizeWeapon(weapon: string): string {
   return weapon.toLowerCase().replace(/^weapon_/, "");
+}
+
+type ScoreboardFieldAvailability = PlayerScoreboardRow["fieldAvailability"];
+
+function fieldAvailability(pkg: DemoPackage): ScoreboardFieldAvailability {
+  return {
+    playerStats: pkg.playerStats.length > 0 ? "available" : "missing",
+    economy: pkg.playerEconomies.length > 0 ? "available" : "missing",
+    rounds: pkg.rounds.length > 0 ? "available" : "missing",
+    richKills: richKillAvailability(pkg),
+    damages: pkg.damages.length > 0 ? "available" : "missing",
+    bombs: pkg.bombs.length > 0 ? "available" : "missing"
+  };
+}
+
+function richKillAvailability(pkg: DemoPackage): ScoreboardFieldAvailability["richKills"] {
+  if (pkg.kills.length === 0) return "missing";
+  const hasFlags = pkg.kills.some((kill) => "throughSmoke" in kill && "noScope" in kill && "penetratedObjects" in kill);
+  const activeWeaponsAreNames = pkg.kills.some((kill) => kill.killerActiveWeapon && isNamedWeapon(normalizeWeapon(kill.killerActiveWeapon)));
+  if (hasFlags && activeWeaponsAreNames) return "available";
+  if (hasFlags) return "partial";
+  return "missing";
+}
+
+function fieldConfidence(availability: ScoreboardFieldAvailability): number {
+  const values = [
+    availability.playerStats,
+    availability.economy,
+    availability.rounds,
+    availability.richKills,
+    availability.damages,
+    availability.bombs
+  ].map<number>((value) => value === "available" ? 1 : value === "partial" ? 0.5 : 0);
+  return round(values.reduce((sum, value) => sum + value, 0) / values.length, 3);
 }
 
 function grenadeLabel(type: string): string {

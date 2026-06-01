@@ -95,6 +95,8 @@ context 分桶区分两种状态，**这是 v2 可信展示的前提**：
 | `accountCombatContextFactor` | combat context 乘子（1.0 = 未生效/降级） |
 | `accountBreakdown` | 五账户加权贡献（和 = `accountRRRaw − intercept`），解释面板用 |
 | `accountContextStatus` | `{ buyDelta, manState }` 可用性 |
+| `confidence` / `fieldAvailability` | 单场数据源完整度；不参与 RR 公式 |
+| `combatDeathCount` / `bombDeathCount` / `wallbangKillCount` / `noScopeKillCount` / `throughSmokeKillCount` | v2 ZIP 真实字段表达；公式是否消费由后续权重阶段决定 |
 
 ## 校准状态（务必知情）
 
@@ -105,7 +107,7 @@ context 分桶区分两种状态，**这是 v2 可信展示的前提**：
 ## 现状与 TODO
 
 - ✅ 五账户、两个 context 乘子、clutch 超额、per-match 锚定、missing/zero 区分均已落地。
-- ⬜ `confidence` 字段（阶段 1）。
+- ✅ `confidence` 字段（阶段 1）：表达数据源完整度，不参与公式。
 - ⬜ 赛季级锚定（阶段 2）。
 - ⬜ **damage-context**：用 `damages.victimHealthBefore` / `armorDamage` / `hitgroup` 做
   damageByBuyDelta、overkill、有效 vs 浪费伤害（阶段 3）；优先于 Round Swing。

@@ -39,10 +39,11 @@ The `cs2-demo-format/2.0` ZIP carries far more than a scoreboard. 15 files in th
 - **Events**: `kills` `damages` `blinds` `bombs` `grenades` `clutches`
 - **Spatial / tick-level**: `shots` (per-shot yaw/pitch/velocity), `positions-1s` (1 Hz tracks), `replay` (~8 Hz tracks)
 
-Events carry context fields most analysis does not yet consume — e.g. `damages` has
+Events carry context fields beyond a scoreboard — e.g. `damages` has
 `victimHealthBefore/After` / `armorDamage` / `hitgroup`; `kills` has `throughSmoke` /
-`noScope` / `killerActiveWeapon`; `bombs` has an explicit `site: "a"|"b"`. See
-[rr-roadmap.md](rr-roadmap.md) for the plan to consume them.
+`noScope` / `killerActiveWeapon`; `bombs` has an explicit `site: "a"|"b"`. Current
+field expression is tracked in [design/field-expression.md](design/field-expression.md);
+longer-term consumption is tracked in [rr-roadmap.md](rr-roadmap.md).
 
 ### Rating layers
 
@@ -58,9 +59,9 @@ Formula ownership stays in `@rivalhub/rival-rating` (the only implementation of
 `computeRR` / `computeValueAccountsRR` / `computePrism`). This kit only derives
 signals, wires the models, anchors, and shapes output.
 
-> **Known structural gap**: `analyzeDemoPackage` processes **one demo at a time**.
-> PRISM's cross-player z-score and season-level RR anchoring both need a cohort layer
-> that aggregates many demos — it does not exist yet. See roadmap Phase 2.
+> `analyzeDemoPackage` processes **one demo at a time**. Season-level PRISM and RR
+> anchoring live in `@cs2dak/cohort`, which aggregates many demos and supports
+> external identity maps for RivalHub user/Steam alias binding.
 
 Consumers: RivalHub calls core/CLI, stores only the subset it needs, renders from
 `DemoViewModel`. Standalone tools can import the TS packages or consume the JSON.
@@ -103,9 +104,10 @@ Consumers: RivalHub calls core/CLI, stores only the subset it needs, renders fro
 - **事件**：`kills` `damages` `blinds` `bombs` `grenades` `clutches`
 - **时空 / tick 级**：`shots`（每发 yaw/pitch/velocity）、`positions-1s`（1 Hz 轨迹）、`replay`（~8 Hz 轨迹）
 
-事件里带着大量当前分析尚未消费的 context 字段——例如 `damages` 有
+事件里带着大量 context 字段——例如 `damages` 有
 `victimHealthBefore/After` / `armorDamage` / `hitgroup`；`kills` 有 `throughSmoke` /
-`noScope` / `killerActiveWeapon`；`bombs` 直接带 `site: "a"|"b"`。消费计划见
+`noScope` / `killerActiveWeapon`；`bombs` 直接带 `site: "a"|"b"`。当前字段表达见
+[design/field-expression.md](design/field-expression.md)，后续消费计划见
 [rr-roadmap.md](rr-roadmap.md)。
 
 ### 评分三层
@@ -121,8 +123,9 @@ Consumers: RivalHub calls core/CLI, stores only the subset it needs, renders fro
 公式所有权在 `@rivalhub/rival-rating`（`computeRR` / `computeValueAccountsRR` /
 `computePrism` 的唯一实现）。本 kit 只做信号派生、模型接线、锚定与输出整形。
 
-> **已知结构性缺口**：`analyzeDemoPackage` 一次只处理一场 demo。PRISM 的跨人 z-score
-> 和赛季级 RR 锚定都需要一个聚合多场的 cohort 层——目前不存在。见 roadmap 阶段 2。
+> `analyzeDemoPackage` 一次只处理一场 demo。PRISM 的跨人 z-score 和赛季级 RR 锚定由
+> `@cs2dak/cohort` 聚合多场 demo 完成；RivalHub 的 userId / Steam alias 绑定通过
+> 外部 identity map 接入。
 
 消费方：RivalHub 调 core/CLI，只存需要的子集，基于 `DemoViewModel` 渲染。独立工具可
 直接 import TS 包或消费 JSON。

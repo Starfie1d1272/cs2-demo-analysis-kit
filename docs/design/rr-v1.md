@@ -31,11 +31,9 @@ DemoPackage
 KPR / DPR / APR / ADR / KAST / 多杀 / 首杀首死 / 补枪 / 残局 1vX / 狙击 / 道具 / 经济回合分类。
 真正无法从当前格式精确计算的字段（`awpDuelWinRate`、`roundSwing*` 等）填 `null`，对应权重设 0，零成本留空。
 
-> ⚠️ 注意：部分字段**已能从 v2.2.0 取真值，但 core 仍在用近似/null**——
-> `combatDeathCount`（现用总 deaths 近似）、`bombDeathCount`（现硬写 null）、
-> `wallbangKillCount` / `noScopeKillCount` 在 `player-stats` 里都有真值。
-> 这些是 [roadmap](../rr-roadmap.md) 阶段 1 的"接线已有真值"项，代码里的
-> "等 cs2-demo-exporter v2 产出后填入"注释已过时。
+> ✅ v2.2.0 已有真值：`combatDeathCount`、`bombDeathCount`、`wallbangKillCount`
+> 已接入 `RRIndicators`；`noScopeKillCount` / `throughSmokeKillCount` 等先在 scoreboard
+> 表达。完整字段映射见 [field-expression.md](field-expression.md)。
 
 ### 公式三层（rival-rating 内，本文只述结构）
 
@@ -64,6 +62,6 @@ v1 **不做显式锚定**：HLTV 公式的 `intercept` 已校准到联赛均值 
 ## 现状与 TODO
 
 - ✅ Layer 1 可用，刻度对玩家直觉友好。
-- ⬜ 接线已有真值（combatDeathCount / bombDeathCount / wallbang / noScope / AWP via activeWeapon）——roadmap 阶段 1。
+- ✅ 接线已有真值（combatDeathCount / bombDeathCount / wallbang；noScope 等在 scoreboard 表达）——roadmap 阶段 1。
 - ⬜ 文案去原创化（roadmap 阶段 1）。
 - ⬜ eco 乘子、Layer 2 待数据量校准后启用（见 [roadmap](../rr-roadmap.md) 阶段 5）。

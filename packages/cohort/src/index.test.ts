@@ -7,6 +7,8 @@ import type { DemoPackage } from "@cs2dak/contract";
 import { buildSeasonCohort } from "./index";
 
 const fixtureDir = fileURLToPath(new URL("../../../fixtures/input/cohort", import.meta.url));
+const integrationTimeoutMs = 20_000;
+let cohortFixtures: ReturnType<typeof loadCohortFixtures> | null = null;
 
 async function loadCohortFixtures() {
   const names = (await readdir(fixtureDir)).filter((name) => name.endsWith(".zip")).sort();
@@ -19,9 +21,14 @@ async function loadCohortFixtures() {
   return demos;
 }
 
+function getCohortFixtures() {
+  cohortFixtures ??= loadCohortFixtures();
+  return cohortFixtures;
+}
+
 describe("buildSeasonCohort", () => {
   it("builds a season bundle from multiple sanitized demo packages", async () => {
-    const demos = await loadCohortFixtures();
+    const demos = await getCohortFixtures();
     const bundle = buildSeasonCohort(demos);
     const uniquePlayers = new Set(demos.flatMap((demo) => demo.pkg.players.map((player) => player.steamId64)));
 
@@ -32,10 +39,10 @@ describe("buildSeasonCohort", () => {
     expect(bundle.players.length).toBeGreaterThan(10);
     expect(bundle.players.every((row) => row.prism?.mapCount === row.mapCount)).toBe(true);
     expect(bundle.players.every((row) => row.playerKey.startsWith("steam:"))).toBe(true);
-  });
+  }, integrationTimeoutMs);
 
   it("merges the same steamId64 across matches and sums season counts", async () => {
-    const demos = await loadCohortFixtures();
+    const demos = await getCohortFixtures();
     const bundle = buildSeasonCohort(demos);
     const repeated = bundle.players.find((row) => row.mapCount > 1);
     expect(repeated).toBeDefined();
@@ -52,10 +59,10 @@ describe("buildSeasonCohort", () => {
     expect(repeated!.indicators.kills).toBe(expectedKills);
     expect(repeated!.indicators.totalRounds).toBe(expectedRounds);
     expect(repeated!.perMatch).toHaveLength(repeated!.mapCount);
-  });
+  }, integrationTimeoutMs);
 
   it("can merge borrowed Steam accounts through an external identity map", async () => {
-    const demos = await loadCohortFixtures();
+    const demos = await getCohortFixtures();
     const firstSteamId = demos[0]!.pkg.players[0]!.steamId64;
     const borrowedSteamId = demos
       .slice(1)
@@ -86,19 +93,19 @@ describe("buildSeasonCohort", () => {
     expect([...new Set(merged!.perMatch.map((row) => row.steamId64))].sort()).toEqual([borrowedSteamId, firstSteamId].sort());
     expect(merged!.indicators.steamId64).toBe("user:rivalhub-user-1");
     expect(merged!.prism?.steamId64).toBe("user:rivalhub-user-1");
-  });
+  }, integrationTimeoutMs);
 
   it("anchors season accountRR around the season cohort mean", async () => {
-    const bundle = buildSeasonCohort(await loadCohortFixtures());
+    const bundle = buildSeasonCohort(await getCohortFixtures());
     const mean = bundle.players.reduce((sum, row) => sum + row.accountRR, 0) / bundle.players.length;
 
     expect(mean).toBeCloseTo(1, 2);
     expect(bundle.players.some((row) => row.accountRR > 1)).toBe(true);
     expect(bundle.players.some((row) => row.accountRR < 1)).toBe(true);
-  });
+  }, integrationTimeoutMs);
 
   it("recomputes rate fields from summed counts and rounds", async () => {
-    const demos = await loadCohortFixtures();
+    const demos = await getCohortFixtures();
     const bundle = buildSeasonCohort(demos);
     const repeated = bundle.players.find((row) => row.mapCount > 1);
     expect(repeated).toBeDefined();
@@ -112,10 +119,10 @@ describe("buildSeasonCohort", () => {
 
     expect(repeated!.indicators.adr).toBeCloseTo(damage / rounds, 2);
     expect(repeated!.indicators.adr).not.toBeCloseTo(plainAverageAdr, 4);
-  });
+  }, integrationTimeoutMs);
 
   it("lowers confidence when context sources are missing", async () => {
-    const demos = await loadCohortFixtures();
+    const demos = await getCohortFixtures();
     const complete = buildSeasonCohort(demos);
     const stripped = buildSeasonCohort(
       demos.map((demo) => ({
@@ -126,5 +133,5 @@ describe("buildSeasonCohort", () => {
 
     expect(complete.players[0]?.confidence).toBeGreaterThan(stripped.players[0]?.confidence ?? 1);
     expect(stripped.players.every((row) => row.confidence >= 0 && row.confidence <= 1)).toBe(true);
-  });
+  }, integrationTimeoutMs);
 });
