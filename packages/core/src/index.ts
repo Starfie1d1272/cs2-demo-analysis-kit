@@ -55,6 +55,8 @@ export async function loadDemoPackageFromZip(bytes: ArrayBuffer | Uint8Array): P
   const bombs = await readJson<unknown>("bombs.json").catch(() => []);
   const grenades = await readJson<unknown>("grenades.json").catch(() => []);
   const clutches = await readJson<unknown>("clutches.json").catch(() => []);
+  const shots = await readJson<unknown>("shots.json").catch(() => undefined);
+  const positions1s = await readJson<unknown>("positions-1s.json").catch(() => undefined);
   const replay = await readJson<unknown>("replay.json").catch(() => undefined);
 
   return normalizeDemoPackage({
@@ -70,6 +72,8 @@ export async function loadDemoPackageFromZip(bytes: ArrayBuffer | Uint8Array): P
     bombs,
     grenades,
     clutches,
+    shots,
+    positions1s,
     replay
   });
 }

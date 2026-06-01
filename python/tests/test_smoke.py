@@ -22,7 +22,7 @@ def test_filenames_cover_all_manifest_logical_names():
         "grenades", "clutches",
     }
     assert required <= set(FILENAMES)
-    assert set(OPTIONAL) == {"shots", "positions1s"}
+    assert set(OPTIONAL) == {"shots", "positions1s", "replay"}
     assert set(OPTIONAL) <= set(FILENAMES)
 
 

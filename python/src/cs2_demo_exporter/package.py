@@ -30,10 +30,11 @@ FILENAMES: dict[str, str] = {
     "clutches": "clutches.json",
     "shots": "shots.json",            # optional
     "positions1s": "positions-1s.json",  # optional
+    "replay": "replay.json",           # optional
 }
 
 # Bundles that may be omitted entirely (optional in the manifest).
-OPTIONAL = ("shots", "positions1s")
+OPTIONAL = ("shots", "positions1s", "replay")
 
 
 def _dumps(obj) -> str:
@@ -61,6 +62,7 @@ def write_zip(bundle: ExportBundle, out_path: str | Path) -> Path:
         "clutches": bundle.clutches,
         "shots": bundle.shots,
         "positions1s": bundle.positions1s,
+        "replay": bundle.replay,
     }
 
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:

@@ -40,6 +40,7 @@ class ExportBundle:
     clutches: list[dict] = field(default_factory=list)
     shots: list[dict] | None = None          # optional in manifest
     positions1s: list[dict] | None = None    # optional in manifest
+    replay: dict | None = None              # optional in manifest
 
 
 def build_bundle(raw: RawDemo, *, exporter_version: str) -> ExportBundle:
