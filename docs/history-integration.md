@@ -1,4 +1,10 @@
-# Integration plan (for Codex)
+# Integration plan (historical / archived)
+
+> **Status: completed & archived.** This was the one-off migration plan that pulled the
+> standalone exporter into `python/` and wired up the rating connection. All stages below
+> are done; it is kept for history only. It does **not** describe the current visualization
+> state — the demo-lab / React layer is still a work in progress. See the README and
+> `docs/architecture.md` for the current picture.
 
 **This repo (`cs2-demo-analysis-kit`) is the home monorepo.** It already holds the
 TS analysis side; we pull the validated Python **exporter** into `python/`, then

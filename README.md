@@ -6,6 +6,8 @@ English | [简体中文](./README.zh-CN.md)
 
 It does **not** own tournament business logic. Tournament state belongs to products such as RivalHub. The ZIP contract stays in `cs2-demo-format`, and rating models stay in `rival-rating`.
 
+> **Status.** The exporter (`python/`), analysis (`@cs2dak/core`), contract, maps, and CLI are working and tested. The **visualization layer (`@cs2dak/react` + `apps/demo-lab`) is an early work in progress** — it currently renders a static analysis dashboard, not yet the full match workspace / 2D replay experience described under Design Direction.
+
 ## What This Repository Produces
 
 Given a `cs2-demo-format/2.0` package, the kit produces:
@@ -14,7 +16,7 @@ Given a `cs2-demo-format/2.0` package, the kit produces:
 - `analysis-bundle.json` - normalized match, round, player, economy, timeline, and spatial analysis.
 - `view-model.json` - UI-ready data for dashboards, match pages, and local tools.
 - `qa-report.json` - data quality checks for missing files, broken round continuity, missing economy coverage, unmapped players, and spatial data gaps.
-- Preview UI - a demo lab showing how every analysis module can be presented.
+- Preview UI - a demo lab showing how analysis modules can be presented (WIP: static dashboard today; match workspace and 2D replay are planned).
 
 ## Packages
 
