@@ -1,0 +1,145 @@
+/* Design tokens mirrored from RivalHub (src/app/globals.css) so the desktop app
+ * matches the web product: near-black tactical surface, 32px hairline grid,
+ * sharp 2-3px radii, orange accent, wide-tracked uppercase labels. */
+:root {
+  /* Surfaces */
+  --bg: #0a0c10;
+  --bg-mid: #12161e;
+  --panel: #10131a;
+  --panel-hi: #161a24;
+  --surface-raised: rgba(255, 255, 255, 0.03);
+
+  /* Borders */
+  --border: #1f2530;
+  --border-hi: #2c3340;
+
+  /* Text */
+  --fg: #e7ecf3;
+  --fg-mid: #8e96a3;
+  --fg-dim: #525a6a;
+
+  /* Accent (team A / primary) */
+  --accent: #ff6b1a;
+  --accent-soft: rgba(255, 107, 26, 0.12);
+  --accent-edge: rgba(255, 107, 26, 0.34);
+  --accent-fg: #0a0c10;
+
+  /* Status */
+  --ok: #4dd47a;
+  --warn: #ffc44d;
+  --danger: #ff5470;
+
+  /* Typography */
+  --font-sans: var(--font-geist), "Geist", -apple-system, "Segoe UI", system-ui,
+    "Noto Sans SC", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  /* Tracking */
+  --tracking-label: 0.12em;
+  --tracking-eyebrow: 0.18em;
+
+  /* Radii — intentionally sharp */
+  --radius-md: 2px;
+  --radius-lg: 3px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 22px;
+  background-color: var(--bg);
+  /* 32px hairline grid, same as RivalHub */
+  background-image:
+    linear-gradient(rgba(31, 37, 48, 0.4) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31, 37, 48, 0.4) 1px, transparent 1px);
+  background-size: 32px 32px;
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+header h1 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.sub { margin: 0; color: var(--fg-mid); font-size: 12px; }
+.eyebrow {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-eyebrow);
+}
+code { font-family: var(--font-mono); color: var(--accent); font-size: 11px; }
+
+.drop {
+  margin: 18px 0;
+  border: 1px dashed var(--border-hi);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  padding: 34px 16px;
+  text-align: center;
+  transition: border-color .15s, background .15s;
+}
+.drop.dragover { border-color: var(--accent); background: var(--accent-soft); }
+.drop-title { margin: 0 0 14px; color: var(--fg-mid); font-size: 13px; }
+
+.btn {
+  background: var(--panel-hi);
+  color: var(--fg);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  transition: border-color .12s, background .12s;
+}
+.btn:hover { border-color: var(--accent-edge); }
+.btn.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.btn.primary:disabled { opacity: .35; cursor: not-allowed; }
+.btn-link {
+  background: none; border: none; color: var(--accent);
+  cursor: pointer; font-size: 11px; letter-spacing: var(--tracking-label);
+  text-transform: uppercase; font-family: var(--font-sans);
+}
+
+.out {
+  font-size: 11px; color: var(--fg-dim);
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border: 1px solid var(--border);
+  border-radius: var(--radius-md); background: var(--panel-low, #0d1016);
+}
+.out span { letter-spacing: var(--tracking-label); text-transform: uppercase; }
+
+.results { list-style: none; padding: 0; margin: 14px 0; max-height: 280px; overflow: auto; }
+.results li {
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 6px;
+  background: var(--panel);
+  font-size: 12px;
+}
+.results li.ok { border-left: 2px solid var(--ok); }
+.results li.err { border-left: 2px solid var(--danger); }
+.results li code { color: var(--fg-mid); }
+.results .err-msg { color: var(--danger); font-size: 11px; font-family: var(--font-mono); }
+
+.actions { display: flex; gap: 10px; margin-top: 14px; }
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 0; }

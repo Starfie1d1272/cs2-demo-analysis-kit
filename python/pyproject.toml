@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cs2-demo-exporter"
+version = "0.1.0"
+description = "Parse CS2 .dem files into cs2-demo-format v2 ZIP exports"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "AGPL-3.0" }
+authors = [{ name = "Xinyu Du" }]
+dependencies = [
+    "demoparser2>=0.41.2", # native CS2 demo parser (raw events + ticks)
+    "typer>=0.12",         # CLI
+    "jsonschema>=4.21",    # validate output against cs2-demo-format/spec/*.schema.json
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.5"]
+gui = ["pywebview>=5.0"]    # native window + HTML/JS frontend
+build = ["pyinstaller>=6.0"] # bundle into a standalone .exe / .app
+
+[project.scripts]
+cs2-demo-exporter = "cs2_demo_exporter.cli:main"
+
+[project.gui-scripts]
+cs2-demo-exporter-gui = "cs2_demo_exporter.gui.app:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cs2_demo_exporter"]
+artifacts = ["src/cs2_demo_exporter/gui/web/*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

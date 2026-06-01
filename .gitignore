@@ -1,10 +1,15 @@
 node_modules/
 dist/
+build/
 .turbo/
 .vite/
 coverage/
 fixtures/output/
 *.tsbuildinfo
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.venv/
 .DS_Store
 .env
 .env.local

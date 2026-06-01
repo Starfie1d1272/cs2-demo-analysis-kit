@@ -3,6 +3,7 @@ import {
   analysisBundleSchema,
   demoPackageSchema,
   type AnalysisBundle,
+  type AccountSignalsV2,
   type DemoPackage,
   type EconomyPoint,
   type HeatmapPoint,
@@ -11,14 +12,18 @@ import {
   type PlayerScoreboardRow,
   type QaIssue,
   type QaReport,
+  type RRResultV2,
   type RRIndicators,
   type TeamKey,
-  type TimelineEvent
+  type TimelineEvent,
+  type ValueAccountsWeights
 } from "@cs2dak/contract";
 import {
   computePrism,
   computeRR,
+  computeValueAccountsRR,
   prismWeightsV1,
+  rrValueAccountsV2Lite,
   rrToPercentile,
   rrWeightsV1,
   type PrismComputeInput,
@@ -70,7 +75,8 @@ export function analyzeDemoPackage(input: unknown): AnalysisBundle {
   const qa = buildQaReport(pkg);
   const playerRoundFacts = buildPlayerRoundFacts(pkg);
   const playerIndicators = buildPlayerIndicators(pkg, playerRoundFacts);
-  const scoreboard = buildScoreboard(playerIndicators);
+  const accountRatings = computeAccountRatingsV2(pkg);
+  const scoreboard = buildScoreboard(playerIndicators, accountRatings);
   const timeline = buildTimeline(pkg);
   const economy = buildEconomy(pkg);
   const heatmap = buildHeatmap(pkg);
@@ -124,6 +130,256 @@ export function normalizeDemoPackage(input: unknown): DemoPackage {
   }
 
   return demoPackageSchema.parse(input);
+}
+
+export function deriveAccountSignalsV2(input: unknown): AccountSignalsV2[] {
+  const pkg = normalizeDemoPackage(input);
+  const statsBySteamId = new Map(pkg.playerStats.map((row) => [row.steamId64, row]));
+  const killsByBuyDelta = buildKillsByBuyDelta(pkg);
+  const killsByManState = buildKillsByManState(pkg);
+  const tradedOpeningDeaths = buildTradedOpeningDeaths(pkg);
+  const objective = buildObjectiveSignals(pkg);
+  const utility = buildUtilitySignals(pkg);
+
+  return pkg.players.map((player) => {
+    const stats = statsBySteamId.get(player.steamId64);
+    const playerKills = pkg.kills.filter((kill) => kill.killerSteamId64 === player.steamId64);
+    const playerDeaths = pkg.kills.filter((kill) => kill.victimSteamId64 === player.steamId64);
+    const playerClutches = pkg.clutches.filter((row) => row.clutcherSteamId64 === player.steamId64);
+    const rounds = Math.max(stats?.rounds ?? pkg.rounds.length, 0);
+
+    return {
+      steamId64: player.steamId64,
+      rounds,
+      sourceVersion: "cs2-demo-analysis-kit/0.3",
+      combat: {
+        kills: stats?.kills ?? playerKills.length,
+        deaths: stats?.deaths ?? playerDeaths.length,
+        assists: stats?.assists ?? 0,
+        effectiveDamage: stats?.damageHealth ?? sumDamageForPlayer(pkg, player.steamId64),
+        openingKills: stats?.firstKillCount ?? openingKillsForPlayer(pkg, player.steamId64),
+        openingDeaths: stats?.firstDeathCount ?? openingDeathsForPlayer(pkg, player.steamId64),
+        multiKills: {
+          two: stats?.twoKillCount ?? multiKillRounds(playerKills, 2),
+          three: stats?.threeKillCount ?? multiKillRounds(playerKills, 3),
+          four: stats?.fourKillCount ?? multiKillRounds(playerKills, 4),
+          five: stats?.fiveKillCount ?? multiKillRounds(playerKills, 5)
+        },
+        headshotKills: stats?.headshotCount ?? playerKills.filter((kill) => kill.headshot).length,
+        wallbangKills: stats?.wallbangKillCount ?? playerKills.filter((kill) => kill.penetratedObjects > 0).length,
+        killsByBuyDelta: killsByBuyDelta.get(player.steamId64) ?? zeroBuyDelta(),
+        killsByManState: killsByManState.get(player.steamId64) ?? zeroManState()
+      },
+      trade: {
+        tradeKills: stats?.tradeKillCount ?? playerKills.filter((kill) => kill.tradeKill).length,
+        tradedDeaths: stats?.tradeDeathCount ?? playerDeaths.filter((kill) => kill.tradeDeath).length,
+        deaths: stats?.deaths ?? playerDeaths.length,
+        tradedOpeningDeaths: tradedOpeningDeaths.get(player.steamId64) ?? 0
+      },
+      clutch: {
+        vsOne: clutchSplitV2(stats?.vsOneCount, stats?.vsOneWonCount, playerClutches, 1),
+        vsTwo: clutchSplitV2(stats?.vsTwoCount, stats?.vsTwoWonCount, playerClutches, 2),
+        vsThree: clutchSplitV2(stats?.vsThreeCount, stats?.vsThreeWonCount, playerClutches, 3),
+        vsFour: clutchSplitV2(stats?.vsFourCount, stats?.vsFourWonCount, playerClutches, 4),
+        vsFive: clutchSplitV2(stats?.vsFiveCount, stats?.vsFiveWonCount, playerClutches, 5)
+      },
+      objective: objective.get(player.steamId64) ?? { plants: 0, defuses: 0, plantsConverted: 0 },
+      utility: utility.get(player.steamId64) ?? {
+        flashAssists: stats?.flashAssistCount ?? 0,
+        enemyFlashDurationSeconds: stats?.enemyFlashDurationSeconds ?? 0,
+        teamFlashDurationSeconds: stats?.teamFlashDurationSeconds ?? 0,
+        utilityDamage: stats?.utilityDamage ?? 0
+      }
+    } satisfies AccountSignalsV2;
+  });
+}
+
+export function computeAccountRatingsV2(input: unknown): Array<{ signals: AccountSignalsV2; rr: RRResultV2 }> {
+  const weights = rrValueAccountsV2Lite as unknown as ValueAccountsWeights;
+  return deriveAccountSignalsV2(input).map((signals) => ({
+    signals,
+    rr: computeValueAccountsRR(signals, weights)
+  }));
+}
+
+type BuyDeltaBuckets = NonNullable<AccountSignalsV2["combat"]["killsByBuyDelta"]>;
+type ManStateBuckets = NonNullable<AccountSignalsV2["combat"]["killsByManState"]>;
+type ObjectiveBuckets = AccountSignalsV2["objective"];
+type UtilityBuckets = AccountSignalsV2["utility"];
+
+const BUY_DELTA_EVEN_THRESHOLD = 1000;
+
+function buildKillsByBuyDelta(pkg: DemoPackage): Map<string, BuyDeltaBuckets> {
+  const out = new Map<string, BuyDeltaBuckets>();
+  const economyByPlayerRound = new Map(pkg.playerEconomies.map((row) => [`${row.roundNumber}:${row.steamId64}`, row]));
+
+  for (const kill of pkg.kills) {
+    if (!kill.killerSteamId64) continue;
+    const killerEconomy = economyByPlayerRound.get(`${kill.roundNumber}:${kill.killerSteamId64}`);
+    const victimEconomy = economyByPlayerRound.get(`${kill.roundNumber}:${kill.victimSteamId64}`);
+    if (!killerEconomy || !victimEconomy) continue;
+
+    const buckets = getOrInit(out, kill.killerSteamId64, zeroBuyDelta);
+    const delta = killerEconomy.equipmentValue - victimEconomy.equipmentValue;
+    if (delta <= -BUY_DELTA_EVEN_THRESHOLD) {
+      buckets.disadvantage += 1;
+    } else if (delta >= BUY_DELTA_EVEN_THRESHOLD) {
+      buckets.advantage += 1;
+    } else {
+      buckets.even += 1;
+    }
+  }
+
+  return out;
+}
+
+function buildKillsByManState(pkg: DemoPackage): Map<string, ManStateBuckets> {
+  const out = new Map<string, ManStateBuckets>();
+  const playersByTeam = {
+    teamA: pkg.players.filter((player) => player.teamKey === "teamA").map((player) => player.steamId64),
+    teamB: pkg.players.filter((player) => player.teamKey === "teamB").map((player) => player.steamId64)
+  };
+
+  for (const roundRow of pkg.rounds) {
+    const alive = {
+      teamA: new Set(playersByTeam.teamA),
+      teamB: new Set(playersByTeam.teamB)
+    };
+    const roundKills = pkg.kills
+      .filter((kill) => kill.roundNumber === roundRow.roundNumber)
+      .sort((a, b) => a.tick - b.tick);
+
+    for (const kill of roundKills) {
+      if (kill.killerSteamId64 && kill.killerTeamKey && kill.killerTeamKey !== kill.victimTeamKey) {
+        const buckets = getOrInit(out, kill.killerSteamId64, zeroManState);
+        const killerAlive = alive[kill.killerTeamKey].size;
+        const victimAlive = alive[kill.victimTeamKey].size;
+        const diff = killerAlive - victimAlive;
+        if (diff < 0) {
+          buckets.manDown += 1;
+        } else if (diff > 0) {
+          buckets.manUp += 1;
+        } else {
+          buckets.even += 1;
+        }
+      }
+      alive[kill.victimTeamKey].delete(kill.victimSteamId64);
+    }
+  }
+
+  return out;
+}
+
+function buildTradedOpeningDeaths(pkg: DemoPackage): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const kill of firstKillMap(pkg).values()) {
+    if (kill.tradeDeath) {
+      out.set(kill.victimSteamId64, (out.get(kill.victimSteamId64) ?? 0) + 1);
+    }
+  }
+  return out;
+}
+
+function buildObjectiveSignals(pkg: DemoPackage): Map<string, ObjectiveBuckets> {
+  const out = new Map<string, ObjectiveBuckets>();
+  const roundWinner = new Map(pkg.rounds.map((round) => [round.roundNumber, round.winnerTeamKey]));
+
+  for (const bomb of pkg.bombs) {
+    if (!bomb.actorSteamId64) continue;
+    const buckets = getOrInit(out, bomb.actorSteamId64, () => ({ plants: 0, defuses: 0, plantsConverted: 0 }));
+    if (bomb.type === "planted") {
+      buckets.plants += 1;
+      if (bomb.actorTeamKey && roundWinner.get(bomb.roundNumber) === bomb.actorTeamKey) {
+        buckets.plantsConverted = (buckets.plantsConverted ?? 0) + 1;
+      }
+    } else if (bomb.type === "defused") {
+      buckets.defuses += 1;
+    }
+  }
+
+  return out;
+}
+
+function buildUtilitySignals(pkg: DemoPackage): Map<string, UtilityBuckets> {
+  const out = new Map<string, UtilityBuckets>();
+  const statsBySteamId = new Map(pkg.playerStats.map((row) => [row.steamId64, row]));
+
+  for (const player of pkg.players) {
+    const stats = statsBySteamId.get(player.steamId64);
+    out.set(player.steamId64, {
+      flashAssists: stats?.flashAssistCount ?? pkg.kills.filter((kill) => kill.flashAssisterSteamId64 === player.steamId64).length,
+      enemyFlashDurationSeconds: stats?.enemyFlashDurationSeconds ?? 0,
+      teamFlashDurationSeconds: stats?.teamFlashDurationSeconds ?? 0,
+      utilityDamage: stats?.utilityDamage ?? 0
+    });
+  }
+
+  for (const blind of pkg.blinds) {
+    const buckets = getOrInit(out, blind.flasherSteamId64, () => ({
+      flashAssists: 0,
+      enemyFlashDurationSeconds: 0,
+      teamFlashDurationSeconds: 0,
+      utilityDamage: 0
+    }));
+    if (blind.flasherTeamKey !== blind.flashedTeamKey) {
+      buckets.enemyFlashDurationSeconds = round(buckets.enemyFlashDurationSeconds + blind.durationSeconds, 3);
+    } else if (blind.flashedSteamId64 !== blind.flasherSteamId64) {
+      buckets.teamFlashDurationSeconds = round((buckets.teamFlashDurationSeconds ?? 0) + blind.durationSeconds, 3);
+    }
+  }
+
+  return out;
+}
+
+function sumDamageForPlayer(pkg: DemoPackage, steamId64: string): number {
+  return pkg.damages
+    .filter((damage) => damage.attackerSteamId64 === steamId64 && damage.attackerTeamKey !== damage.victimTeamKey)
+    .reduce((sum, damage) => sum + damage.healthDamage, 0);
+}
+
+function openingKillsForPlayer(pkg: DemoPackage, steamId64: string): number {
+  return [...firstKillMap(pkg).values()].filter((kill) => kill.killerSteamId64 === steamId64).length;
+}
+
+function openingDeathsForPlayer(pkg: DemoPackage, steamId64: string): number {
+  return [...firstKillMap(pkg).values()].filter((kill) => kill.victimSteamId64 === steamId64).length;
+}
+
+function multiKillRounds(kills: DemoPackage["kills"], target: number): number {
+  const counts = new Map<number, number>();
+  for (const kill of kills) {
+    counts.set(kill.roundNumber, (counts.get(kill.roundNumber) ?? 0) + 1);
+  }
+  return [...counts.values()].filter((count) => (target === 5 ? count >= 5 : count === target)).length;
+}
+
+function clutchSplitV2(
+  count: number | undefined,
+  won: number | undefined,
+  rows: DemoPackage["clutches"],
+  opponentCount: number
+) {
+  const filtered = rows.filter((row) => row.opponentCount === opponentCount);
+  return {
+    count: count ?? filtered.length,
+    won: won ?? filtered.filter((row) => row.won).length
+  };
+}
+
+function zeroBuyDelta(): BuyDeltaBuckets {
+  return { disadvantage: 0, even: 0, advantage: 0 };
+}
+
+function zeroManState(): ManStateBuckets {
+  return { manDown: 0, even: 0, manUp: 0 };
+}
+
+function getOrInit<K, V>(map: Map<K, V>, key: K, create: () => V): V {
+  const existing = map.get(key);
+  if (existing) return existing;
+  const next = create();
+  map.set(key, next);
+  return next;
 }
 
 function normalizeV1Package(raw: Record<string, unknown>): Record<string, unknown> {
@@ -302,7 +558,7 @@ function buildPlayerIndicators(pkg: DemoPackage, facts: PlayerRoundFact[]): Play
     const teamFlashDurationSeconds = playerBlinds
       .filter((blind) => blind.flashedTeamKey === player.teamKey && blind.flashedSteamId64 !== player.steamId64)
       .reduce((sum, blind) => sum + blind.durationSeconds, 0);
-    const grenadeCount = pkg.grenades.filter((grenade) => grenade.steamId64 === player.steamId64).length;
+    const grenadeCount = pkg.grenades.filter((grenade) => grenade.throwerSteamId64 === player.steamId64).length;
     const deaths = stats?.deaths ?? playerDeaths.length;
     const kills = stats?.kills ?? playerKills.length;
     const assists = stats?.assists ?? playerFacts.reduce((sum, fact) => sum + fact.assists, 0);
@@ -409,7 +665,11 @@ function buildPlayerIndicators(pkg: DemoPackage, facts: PlayerRoundFact[]): Play
   });
 }
 
-function buildScoreboard(rows: PlayerIndicatorRow[]): PlayerScoreboardRow[] {
+function buildScoreboard(
+  rows: PlayerIndicatorRow[],
+  accountRatings: Array<{ signals: AccountSignalsV2; rr: RRResultV2 }>
+): PlayerScoreboardRow[] {
+  const accountRatingBySteamId = new Map(accountRatings.map((row) => [row.signals.steamId64, row.rr]));
   return rows.map((row) => ({
     steamId64: row.steamId64,
     name: row.name,
@@ -426,8 +686,11 @@ function buildScoreboard(rows: PlayerIndicatorRow[]): PlayerScoreboardRow[] {
     utilityDamage: row.indicators.utilityDamage,
     ratingSeed: round(row.rr.rrBase, 2),
     rr: round(row.rr.rr, 2),
-    rrPercentile: round(row.rrPercentile, 1)
-  })).sort((a, b) => b.rr - a.rr || b.adr - a.adr);
+    rrPercentile: round(row.rrPercentile, 1),
+    accountRR: round(accountRatingBySteamId.get(row.steamId64)?.rr ?? 0, 3),
+    accountRRRaw: round(accountRatingBySteamId.get(row.steamId64)?.rrRaw ?? 0, 3),
+    accountCombatContextFactor: round(accountRatingBySteamId.get(row.steamId64)?.combatContextFactor ?? 1, 3)
+  })).sort((a, b) => b.accountRR - a.accountRR || b.rr - a.rr || b.adr - a.adr);
 }
 
 function buildTimeline(pkg: DemoPackage): TimelineEvent[] {
@@ -444,11 +707,11 @@ function buildTimeline(pkg: DemoPackage): TimelineEvent[] {
   const grenadeEvents = pkg.grenades.map<TimelineEvent>((grenade, index) => ({
     id: `grenade-${index}`,
     roundNumber: grenade.roundNumber,
-    tick: grenade.tick,
-    timeSeconds: tickToRoundSeconds(pkg, grenade.roundNumber, grenade.tick),
+    tick: grenade.effectTick,
+    timeSeconds: tickToRoundSeconds(pkg, grenade.roundNumber, grenade.effectTick),
     type: "grenade",
-    label: `${nameForSteamId(pkg, grenade.steamId64) ?? "未知选手"} 投掷${grenadeLabel(grenade.grenadeType)}`,
-    teamKey: grenade.teamKey
+    label: `${nameForSteamId(pkg, grenade.throwerSteamId64) ?? "未知选手"} 投掷${grenadeLabel(grenade.grenade)}`,
+    teamKey: grenade.throwerTeamKey
   }));
 
   const roundEvents = pkg.rounds.map<TimelineEvent>((roundRow) => ({
@@ -514,14 +777,13 @@ function buildHeatmap(pkg: DemoPackage): HeatmapPoint[] {
   });
 
   const grenades = pkg.grenades
-    .filter((grenade) => grenade.position)
     .map<HeatmapPoint>((grenade) => ({
-      x: grenade.position?.x ?? 0,
-      y: grenade.position?.y ?? 0,
-      z: grenade.position?.z ?? 0,
+      x: grenade.effectPosition.x,
+      y: grenade.effectPosition.y,
+      z: grenade.effectPosition.z,
       roundNumber: grenade.roundNumber,
-      teamKey: grenade.teamKey,
-      steamId64: grenade.steamId64,
+      teamKey: grenade.throwerTeamKey,
+      steamId64: grenade.throwerSteamId64,
       kind: "grenade"
     }));
 

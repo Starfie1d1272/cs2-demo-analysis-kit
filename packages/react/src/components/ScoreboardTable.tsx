@@ -14,6 +14,7 @@ export function ScoreboardTable({ rows }: ScoreboardTableProps) {
       <thead>
         <tr>
           <th>选手</th>
+          <th>V2 RR</th>
           <th>RR</th>
           <th>K</th>
           <th>D</th>
@@ -36,6 +37,7 @@ export function ScoreboardTable({ rows }: ScoreboardTableProps) {
                 <span>{row.name}</span>
               </span>
             </td>
+            <td className="dak-mono dak-rr">{row.accountRR.toFixed(3)}</td>
             <td className="dak-mono dak-rr">{row.rr.toFixed(2)}</td>
             <td className="dak-mono">{row.kills}</td>
             <td className="dak-mono">{row.deaths}</td>

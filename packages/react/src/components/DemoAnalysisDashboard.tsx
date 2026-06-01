@@ -37,7 +37,7 @@ export function DemoAnalysisDashboard({ model }: DemoAnalysisDashboardProps) {
         </header>
 
         <section className="dak-kpi-strip">
-          <Metric icon={<Gauge size={16} />} label="最高 RR" value={topPlayer ? topPlayer.rr.toFixed(2) : "0.00"} detail={topPlayer?.name ?? "暂无选手"} />
+          <Metric icon={<Gauge size={16} />} label="最高 V2 RR" value={topPlayer ? topPlayer.accountRR.toFixed(3) : "0.000"} detail={topPlayer?.name ?? "暂无选手"} />
           <Metric icon={<Crosshair size={16} />} label="最高 ADR" value={topPlayer ? topPlayer.adr.toFixed(1) : "0.0"} detail="来自伤害统计" />
           <Metric icon={<Activity size={16} />} label="最大装备差" value={`$${economySwing.toLocaleString()}`} detail={`${model.economy.length} 回合`} />
           <Metric icon={<ShieldAlert size={16} />} label="数据检查" value={model.qa.summary.issueCount.toString()} detail={model.qa.ok ? "通过" : "需要检查"} />

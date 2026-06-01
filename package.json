@@ -8,6 +8,8 @@
   "scripts": {
     "dev": "pnpm --filter @cs2dak/demo-lab dev",
     "analyze:sample": "pnpm --filter @cs2dak/cli analyze ../../fixtures/input/rivalhub-v1-de_mirage-2026-05-29.zip --out ../../fixtures/output/sample",
+    "python:test": "cd python && uv run --extra dev pytest",
+    "python:export:sample": "cd python && uv run cs2-demo-exporter export /Users/starfie1d/GitHub/CS2-insight-agent/demos/3671816592_1000003075.dem --out ../fixtures/output/exporter",
     "typecheck": "tsc -b --pretty",
     "test": "vitest run",
     "build": "pnpm -r --if-present build"

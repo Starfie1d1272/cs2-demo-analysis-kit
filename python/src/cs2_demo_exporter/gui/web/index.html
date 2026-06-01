@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>cs2-demo-exporter</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <span class="eyebrow">RivalHub · Demo Exporter</span>
+    <h1>CS2 Demo Exporter</h1>
+    <p class="sub">把 <code>.dem</code> 解析成 cs2-demo-format v2 ZIP · <span id="version">…</span></p>
+  </header>
+
+  <main>
+    <div id="drop" class="drop">
+      <p class="drop-title">拖入 .dem 文件，或</p>
+      <button id="pick" class="btn">选择 demo 文件</button>
+    </div>
+
+    <section class="out">
+      <span>输出目录：</span>
+      <code id="outdir">…</code>
+      <button id="change-out" class="btn-link">更改</button>
+    </section>
+
+    <ul id="results" class="results"></ul>
+
+    <div class="actions">
+      <button id="export" class="btn primary" disabled>开始导出</button>
+      <button id="open-out" class="btn">打开输出文件夹</button>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

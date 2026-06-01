@@ -2,14 +2,15 @@
 
 [English](./README.md) | 简体中文
 
-`cs2-demo-analysis-kit` 把 `cs2-demo-format/2.0` 导出包转换成可复用的分析结果、面向 UI 的展示模型、数据质量报告，以及可预览的 React 组件。目标消费者包括赛事网站、个人 demo 分析工具、CS2 Insight Agent、本地研究工作流。
+`cs2-demo-analysis-kit` 从 CS2 `.dem` 生成 `cs2-demo-format/2.0` 导出包，再把导出包转换成可复用的分析结果、面向 UI 的展示模型、数据质量报告，以及可预览的 React 组件。目标消费者包括赛事网站、个人 demo 分析工具、CS2 Insight Agent、本地研究工作流。
 
-它**不直接解析 `.dem` 文件**，也**不负责赛事业务逻辑**。`.dem` 解析应该留给 CS2 Insight Agent、AWPy、demoparser exporter 等工具；赛事、赛季、队伍、选手、比赛状态应该留给 RivalHub 这样的产品。
+它**不负责赛事业务逻辑**。赛事、赛季、队伍、选手、比赛状态应该留给 RivalHub 这样的产品。ZIP 合同继续由 `cs2-demo-format` 维护，评分模型继续由 `rival-rating` 维护。
 
 ## 这个仓库生成什么
 
 输入一份 `cs2-demo-format/2.0` 包后，本仓库生成：
 
+- Python exporter：`cs2-demo-exporter` 包，负责 `.dem -> cs2-demo-format/2.0 ZIP`。
 - `analysis-bundle.json`：标准化后的比赛、回合、选手、经济、时间线、空间点位分析。
 - `view-model.json`：可直接给 UI 消费的展示模型。
 - `qa-report.json`：数据质量检查，包括缺文件、回合不连续、经济覆盖不足、玩家未映射、空间数据缺失等。
@@ -25,11 +26,13 @@
 | `@cs2dak/react` | 只消费 `DemoViewModel` 的 React 预览组件。 |
 | `@cs2dak/cli` | 分析 JSON 或 ZIP 包，并输出 analysis/view-model/QA 文件。 |
 | `@cs2dak/demo-lab` | 用 fixtures 预览分析模块和统一设计语言的 Vite 应用。 |
+| `python/cs2_demo_exporter` | Python exporter、CLI、GUI 资源和打包配置，负责 `.dem -> v2 ZIP`。 |
 
 ## 快速开始
 
 ```bash
 pnpm install
+pnpm python:test
 pnpm analyze:sample
 pnpm dev
 ```
@@ -52,7 +55,7 @@ pnpm dev
 ## 边界
 
 - `cs2-demo-format` 定义导出包合同。
-- `cs2-demo-analysis-kit` 把导出包转换成分析模型和展示模型。
+- `cs2-demo-analysis-kit` 生成 v2 ZIP，并把导出包转换成分析模型和展示模型。
 - `rival-rating` 负责 RR/PRISM 评分公式与校准。
-- `CS2-insight-agent` 负责本地 `.dem` 解析和导出包生产。
+- `CS2-insight-agent` 可以消费或继续贡献 exporter refinements，但独立 exporter 的 home 已迁到本仓库。
 - `RivalHub` 负责赛事、赛季、队伍、选手、比赛业务流程。

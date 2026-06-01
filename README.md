@@ -2,14 +2,15 @@
 
 English | [简体中文](./README.zh-CN.md)
 
-`cs2-demo-analysis-kit` transforms `cs2-demo-format/2.0` packages into reusable analysis bundles, UI-ready view models, QA reports, and previewable React components for tournament websites, local demo tools, and research workflows.
+`cs2-demo-analysis-kit` produces `cs2-demo-format/2.0` packages from CS2 `.dem` files, then transforms those packages into reusable analysis bundles, UI-ready view models, QA reports, and previewable React components for tournament websites, local demo tools, and research workflows.
 
-It does **not** parse `.dem` files directly and does **not** own tournament business logic. Demo parsing belongs to tools such as CS2 Insight Agent, AWPy, or demoparser-based exporters. Tournament state belongs to products such as RivalHub.
+It does **not** own tournament business logic. Tournament state belongs to products such as RivalHub. The ZIP contract stays in `cs2-demo-format`, and rating models stay in `rival-rating`.
 
 ## What This Repository Produces
 
 Given a `cs2-demo-format/2.0` package, the kit produces:
 
+- Python exporter - a `cs2-demo-exporter` package for `.dem -> cs2-demo-format/2.0 ZIP`.
 - `analysis-bundle.json` - normalized match, round, player, economy, timeline, and spatial analysis.
 - `view-model.json` - UI-ready data for dashboards, match pages, and local tools.
 - `qa-report.json` - data quality checks for missing files, broken round continuity, missing economy coverage, unmapped players, and spatial data gaps.
@@ -25,11 +26,13 @@ Given a `cs2-demo-format/2.0` package, the kit produces:
 | `@cs2dak/react` | Previewable React components that consume `DemoViewModel` only. |
 | `@cs2dak/cli` | CLI for analyzing JSON or ZIP packages and writing analysis/view-model/QA artifacts. |
 | `@cs2dak/demo-lab` | Vite app for reviewing analysis modules and design language against fixtures. |
+| `python/cs2_demo_exporter` | Python exporter, CLI, GUI assets, and packaging for `.dem -> v2 ZIP`. |
 
 ## Quick Start
 
 ```bash
 pnpm install
+pnpm python:test
 pnpm analyze:sample
 pnpm dev
 ```
@@ -52,7 +55,7 @@ This repository is informed by, but does not copy, these projects:
 ## Boundaries
 
 - `cs2-demo-format` defines export package contracts.
-- `cs2-demo-analysis-kit` transforms packages into analysis and presentation models.
+- `cs2-demo-analysis-kit` produces v2 ZIPs and transforms packages into analysis and presentation models.
 - `rival-rating` owns RR/PRISM formulas and calibration.
-- `CS2-insight-agent` owns local `.dem` parsing and package production.
+- `CS2-insight-agent` can consume or contribute exporter refinements, but this repo is now the home for the standalone exporter.
 - `RivalHub` owns tournament, season, team, player, and match business workflows.

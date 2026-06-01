@@ -27,20 +27,20 @@ The **validated** v2 producer (5 real demos pass `cs2-demo-format/tools/validate
 ## Stages
 
 ### Stage 0 — absorb the exporter
-- [ ] Move `cs2-demo-exporter/src/cs2_demo_exporter/*` into `python/` (merge with the
+- [x] Move `cs2-demo-exporter/src/cs2_demo_exporter/*` into `python/` (merge with the
       existing `cs2_demo_analysis` placeholder; keep ONE package name — decide
       `cs2_demo_exporter` vs `cs2_demo_analysis`).
-- [ ] Reconcile the placeholder `python/cs2_demo_analysis/validate.py` with the
+- [x] Reconcile the placeholder `python/cs2_demo_analysis/validate.py` with the
       exporter's own validate path (drop the duplicate).
-- [ ] Keep CLI / GUI / PyInstaller packaging working from the new location.
+- [x] Keep CLI / GUI / PyInstaller packaging working from the new location.
 - [ ] **Archive `cs2-demo-exporter`** once the move lands (code lives here now).
 - [ ] **Push this repo to a GitHub remote** — it has none yet; the author
       (DrEAmSs59) needs a URL to PR exporter refinements against.
 
 ### Stage 1 — dedupe the contract
-- [ ] Decide `@cs2dak/contract` vs `cs2-demo-format`: `@cs2dak/contract` should
+- [x] Decide `@cs2dak/contract` vs `cs2-demo-format`: `@cs2dak/contract` should
       **depend on / re-export** `cs2-demo-format` (zod + JSON Schema), not fork it.
-- [ ] Verify `@cs2dak/core` builds against a real v2 ZIP produced by `python/`
+- [x] Verify `@cs2dak/core` builds against a real v2 ZIP produced by `python/`
       (pin one export as the shared fixture under `fixtures/`).
 
 ### Stage 2 — the rating connection (the open TODO)
@@ -52,16 +52,16 @@ References:
 - existing adapter: `packages/core/src/index.ts` → `buildPlayerIndicators`.
 
 Work:
-- [ ] From `kills`, rebuild `killsByBuyDelta` (equip-value diff at kill tick →
+- [x] From `kills`, rebuild `killsByBuyDelta` (equip-value diff at kill tick →
       advantage / even / disadvantage buckets).
-- [ ] From `kills`, rebuild `killsByManState` (alive-count diff at kill tick →
+- [x] From `kills`, rebuild `killsByManState` (alive-count diff at kill tick →
       manUp / even / manDown buckets).
-- [ ] Map existing stats / clutches into the 5 `AccountSignalsV2` sub-objects.
-- [ ] `null` fields stay `null` (do NOT coerce to 0).
-- [ ] Call `computeValueAccountsRR(signals, weights)` to run the v2 model.
+- [x] Map existing stats / clutches into the 5 `AccountSignalsV2` sub-objects.
+- [x] `null` fields stay `null` (do NOT coerce to 0).
+- [x] Call `computeValueAccountsRR(signals, weights)` to run the v2 model.
 
 ### Stage 3 — verify end-to-end
-- [ ] `python/ exporter → @cs2dak/core → rival-rating` runs on the pinned fixture
+- [x] `python/ exporter → @cs2dak/core → rival-rating` runs on the pinned fixture
       and produces stable signals; wire into `apps/demo-lab` for visualization.
 
 ## Repos after integration

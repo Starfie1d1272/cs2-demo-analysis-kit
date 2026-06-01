@@ -1,206 +1,100 @@
-import type { RRIndicators, RRResult, PrismResult } from "@rivalhub/rival-rating";
+import type {
+  AccountSignalsV2,
+  RRIndicators,
+  RRResult,
+  RRResultV2,
+  PrismResult,
+  ValueAccountsWeights
+} from "@rivalhub/rival-rating";
 import { z } from "zod";
+import {
+  blindRowSchema,
+  blindsSchema,
+  bombRowSchema,
+  bombsSchema,
+  clutchRowSchema,
+  clutchesSchema,
+  damageRowSchema,
+  damagesSchema,
+  economyTypeSchema,
+  grenadeRowSchema,
+  grenadesSchema,
+  killRowSchema,
+  killsSchema,
+  manifestSchema,
+  matchSchema,
+  playerEconomiesSchema,
+  playerEconomyRowSchema,
+  playerRowSchema,
+  playersSchema,
+  playerStatsRowSchema,
+  playerStatsSchema,
+  positionRowSchema,
+  positionsSchema,
+  roundRowSchema,
+  roundsSchema,
+  shotRowSchema,
+  shotsSchema,
+  sideSchema,
+  teamKeySchema,
+  vec3Schema
+} from "cs2-demo-format";
 
-export const sideSchema = z.enum(["t", "ct"]);
-export const teamKeySchema = z.enum(["teamA", "teamB"]);
-export const economyTypeSchema = z.enum(["pistol", "eco", "semi", "force", "full"]);
-
-export const vec3Schema = z.object({
-  x: z.number(),
-  y: z.number(),
-  z: z.number()
-});
-
-const steamIdSchema = z.string().regex(/^\d{17}$/);
-
-export const packageManifestSchema = z.object({
-  schemaVersion: z.literal("cs2-demo-format/2.0"),
-  mapName: z.string().min(1),
-  tickrate: z.number().int().positive(),
-  exporter: z.object({
-    name: z.string().min(1),
-    version: z.string().min(1)
-  }).optional(),
-  parser: z.object({
-    name: z.string().min(1),
-    version: z.string().min(1)
-  }).optional()
-});
-
-export const packageMatchSchema = z.object({
-  mapName: z.string().min(1),
-  tickrate: z.number().int().positive(),
-  durationSeconds: z.number().positive().optional(),
-  teamA: z.object({
-    teamKey: z.literal("teamA"),
-    name: z.string().nullable(),
-    score: z.number().int().nonnegative()
-  }),
-  teamB: z.object({
-    teamKey: z.literal("teamB"),
-    name: z.string().nullable(),
-    score: z.number().int().nonnegative()
-  })
-});
-
-export const packagePlayerSchema = z.object({
-  steamId64: steamIdSchema,
-  name: z.string().min(1),
-  teamKey: teamKeySchema
-});
-
-export const packageRoundSchema = z.object({
-  roundNumber: z.number().int().positive(),
-  startTick: z.number().int().positive(),
-  freezeEndTick: z.number().int().positive(),
-  endTick: z.number().int().positive(),
-  teamASide: sideSchema,
-  teamBSide: sideSchema,
-  teamAScoreBefore: z.number().int().nonnegative(),
-  teamBScoreBefore: z.number().int().nonnegative(),
-  teamAEconomy: economyTypeSchema,
-  teamBEconomy: economyTypeSchema,
-  winnerTeamKey: teamKeySchema,
-  winnerSide: sideSchema,
-  endReason: z.string().min(1)
-});
-
-export const packagePlayerEconomySchema = z.object({
-  roundNumber: z.number().int().positive(),
-  steamId64: steamIdSchema,
-  teamKey: teamKeySchema,
-  side: sideSchema,
-  startMoney: z.number().int().nonnegative(),
-  moneySpent: z.number().int().nonnegative(),
-  equipmentValue: z.number().int().nonnegative(),
-  type: economyTypeSchema,
-  hasArmor: z.boolean().optional(),
-  hasHelmet: z.boolean().optional(),
-  hasDefuseKit: z.boolean().optional(),
-  primaryWeapon: z.string().nullable().optional(),
-  secondaryWeapon: z.string().nullable().optional(),
-  grenadeCount: z.number().int().nonnegative().optional()
-});
-
-export const packageKillSchema = z.object({
-  roundNumber: z.number().int().positive(),
-  tick: z.number().int().positive(),
-  killerSteamId64: steamIdSchema.nullable(),
-  victimSteamId64: steamIdSchema,
-  assisterSteamId64: steamIdSchema.nullable().optional(),
-  flashAssisterSteamId64: steamIdSchema.nullable().optional(),
-  killerTeamKey: teamKeySchema.nullable(),
-  victimTeamKey: teamKeySchema,
-  killerSide: sideSchema.nullable(),
-  victimSide: sideSchema,
-  weapon: z.string().min(1),
-  headshot: z.boolean(),
-  flashAssist: z.boolean().optional(),
-  tradeKill: z.boolean().optional(),
-  tradeDeath: z.boolean().optional(),
-  throughSmoke: z.boolean().optional(),
-  noScope: z.boolean().optional(),
-  penetratedObjects: z.number().int().nonnegative().optional(),
-  killerPosition: vec3Schema.nullable().optional(),
-  victimPosition: vec3Schema
-});
-
-export const packageDamageSchema = z.object({
-  roundNumber: z.number().int().positive(),
-  tick: z.number().int().positive(),
-  attackerSteamId64: steamIdSchema.nullable(),
-  victimSteamId64: steamIdSchema,
-  attackerTeamKey: teamKeySchema.nullable(),
-  victimTeamKey: teamKeySchema,
-  attackerSide: sideSchema.nullable(),
-  victimSide: sideSchema,
-  weapon: z.string().min(1),
-  healthDamage: z.number().int().nonnegative(),
-  healthDamageRaw: z.number().int().nonnegative().optional(),
-  hitgroup: z.string().optional(),
-  attackerPosition: vec3Schema.nullable().optional(),
-  victimPosition: vec3Schema.optional()
-});
-
-export const packageGrenadeSchema = z.object({
-  roundNumber: z.number().int().positive(),
-  tick: z.number().int().positive(),
-  steamId64: steamIdSchema.nullable(),
-  teamKey: teamKeySchema.nullable(),
-  side: sideSchema.nullable(),
-  grenadeType: z.string().min(1),
-  eventType: z.string().min(1),
-  position: vec3Schema.nullable().optional()
-});
-
-export const packagePlayerStatsSchema = z.object({
-  steamId64: steamIdSchema,
-  teamKey: teamKeySchema,
-  rounds: z.number().int().nonnegative(),
-  kills: z.number().int().nonnegative(),
-  deaths: z.number().int().nonnegative(),
-  assists: z.number().int().nonnegative(),
-  damageHealth: z.number().int().nonnegative().default(0),
-  utilityDamage: z.number().int().nonnegative().default(0),
-  headshotCount: z.number().int().nonnegative().default(0),
-  firstKillCount: z.number().int().nonnegative().default(0),
-  firstDeathCount: z.number().int().nonnegative().default(0),
-  tradeKillCount: z.number().int().nonnegative().default(0),
-  tradeDeathCount: z.number().int().nonnegative().default(0),
-  oneKillCount: z.number().int().nonnegative().default(0),
-  twoKillCount: z.number().int().nonnegative().default(0),
-  threeKillCount: z.number().int().nonnegative().default(0),
-  fourKillCount: z.number().int().nonnegative().default(0),
-  fiveKillCount: z.number().int().nonnegative().default(0),
-  vsOneCount: z.number().int().nonnegative().default(0),
-  vsOneWonCount: z.number().int().nonnegative().default(0),
-  vsTwoCount: z.number().int().nonnegative().default(0),
-  vsTwoWonCount: z.number().int().nonnegative().default(0),
-  vsThreeCount: z.number().int().nonnegative().default(0),
-  vsThreeWonCount: z.number().int().nonnegative().default(0),
-  vsFourCount: z.number().int().nonnegative().default(0),
-  vsFourWonCount: z.number().int().nonnegative().default(0),
-  vsFiveCount: z.number().int().nonnegative().default(0),
-  vsFiveWonCount: z.number().int().nonnegative().default(0),
-  kast_rounds: z.number().int().nonnegative().optional(),
-  adr: z.number().nonnegative().optional(),
-  kast: z.number().min(0).max(100).optional(),
-  averageUtilityDamagePerRound: z.number().nonnegative().optional()
-}).passthrough();
-
-export const packageBlindSchema = z.object({
-  roundNumber: z.number().int().nonnegative(),
-  tick: z.number().int().nonnegative(),
-  flasherSteamId64: steamIdSchema.nullable(),
-  flashedSteamId64: steamIdSchema.nullable(),
-  flasherTeamKey: teamKeySchema.nullable(),
-  flashedTeamKey: teamKeySchema.nullable(),
-  durationSeconds: z.number().nonnegative()
-}).passthrough();
-
-export const packageClutchSchema = z.object({
-  roundNumber: z.number().int().positive(),
-  tick: z.number().int().nonnegative(),
-  clutcherSteamId64: steamIdSchema,
-  clutcherTeamKey: teamKeySchema,
-  opponentCount: z.number().int().min(1).max(5),
-  won: z.boolean(),
-  survived: z.boolean().optional(),
-  killCount: z.number().int().nonnegative().optional()
-}).passthrough();
+export {
+  SCHEMAS_BY_KEY,
+  blindRowSchema,
+  blindsSchema,
+  bombEventTypeSchema,
+  bombRowSchema,
+  bombsSchema,
+  clutchRowSchema,
+  clutchesSchema,
+  damageRowSchema,
+  damagesSchema,
+  economyTypeSchema,
+  endReasonSchema,
+  grenadeRowSchema,
+  grenadeTypeSchema,
+  grenadesSchema,
+  hitgroupSchema,
+  killRowSchema,
+  killsSchema,
+  manifestSchema,
+  matchSchema,
+  playerEconomiesSchema,
+  playerEconomyRowSchema,
+  playerRowSchema,
+  playersSchema,
+  playerStatsRowSchema,
+  playerStatsSchema,
+  positionRowSchema,
+  positionsSchema,
+  roundRowSchema,
+  roundsSchema,
+  shotRowSchema,
+  shotsSchema,
+  sideSchema,
+  steamId64Schema,
+  teamKeySchema,
+  teamSummarySchema,
+  vec3Schema
+} from "cs2-demo-format";
 
 export const demoPackageSchema = z.object({
-  manifest: packageManifestSchema,
-  match: packageMatchSchema,
-  players: z.array(packagePlayerSchema),
-  rounds: z.array(packageRoundSchema),
-  playerEconomies: z.array(packagePlayerEconomySchema).default([]),
-  playerStats: z.array(packagePlayerStatsSchema).default([]),
-  kills: z.array(packageKillSchema).default([]),
-  damages: z.array(packageDamageSchema).default([]),
-  grenades: z.array(packageGrenadeSchema).default([]),
-  blinds: z.array(packageBlindSchema).default([]),
-  clutches: z.array(packageClutchSchema).default([])
+  manifest: manifestSchema,
+  match: matchSchema,
+  players: playersSchema,
+  rounds: roundsSchema,
+  playerEconomies: playerEconomiesSchema.default([]),
+  playerStats: playerStatsSchema.default([]),
+  kills: killsSchema.default([]),
+  damages: damagesSchema.default([]),
+  blinds: blindsSchema.default([]),
+  bombs: bombsSchema.default([]),
+  grenades: grenadesSchema.default([]),
+  clutches: clutchesSchema.default([]),
+  shots: shotsSchema.optional(),
+  positions1s: positionsSchema.optional()
 });
 
 export const qaIssueSchema = z.object({
@@ -342,7 +236,10 @@ export const playerScoreboardRowSchema = z.object({
   utilityDamage: z.number().int().nonnegative(),
   ratingSeed: z.number().nonnegative(),
   rr: z.number().nonnegative(),
-  rrPercentile: z.number().min(0).max(100)
+  rrPercentile: z.number().min(0).max(100),
+  accountRR: z.number().nonnegative(),
+  accountRRRaw: z.number(),
+  accountCombatContextFactor: z.number()
 });
 
 export const timelineEventSchema = z.object({
@@ -419,14 +316,18 @@ export type TeamKey = z.infer<typeof teamKeySchema>;
 export type EconomyType = z.infer<typeof economyTypeSchema>;
 export type Vec3 = z.infer<typeof vec3Schema>;
 export type DemoPackage = z.infer<typeof demoPackageSchema>;
-export type PackagePlayer = z.infer<typeof packagePlayerSchema>;
-export type PackageRound = z.infer<typeof packageRoundSchema>;
-export type PackageKill = z.infer<typeof packageKillSchema>;
-export type PackageDamage = z.infer<typeof packageDamageSchema>;
-export type PackagePlayerEconomy = z.infer<typeof packagePlayerEconomySchema>;
-export type PackagePlayerStats = z.infer<typeof packagePlayerStatsSchema>;
-export type PackageBlind = z.infer<typeof packageBlindSchema>;
-export type PackageClutch = z.infer<typeof packageClutchSchema>;
+export type PackagePlayer = z.infer<typeof playerRowSchema>;
+export type PackageRound = z.infer<typeof roundRowSchema>;
+export type PackageKill = z.infer<typeof killRowSchema>;
+export type PackageDamage = z.infer<typeof damageRowSchema>;
+export type PackagePlayerEconomy = z.infer<typeof playerEconomyRowSchema>;
+export type PackagePlayerStats = z.infer<typeof playerStatsRowSchema>;
+export type PackageBlind = z.infer<typeof blindRowSchema>;
+export type PackageBomb = z.infer<typeof bombRowSchema>;
+export type PackageGrenade = z.infer<typeof grenadeRowSchema>;
+export type PackageClutch = z.infer<typeof clutchRowSchema>;
+export type PackageShot = z.infer<typeof shotRowSchema>;
+export type PackagePosition = z.infer<typeof positionRowSchema>;
 export type QaIssue = z.infer<typeof qaIssueSchema>;
 export type QaReport = z.infer<typeof qaReportSchema>;
 export type PlayerRoundFact = z.infer<typeof playerRoundFactSchema>;
@@ -437,4 +338,4 @@ export type EconomyPoint = z.infer<typeof economyPointSchema>;
 export type HeatmapPoint = z.infer<typeof heatmapPointSchema>;
 export type AnalysisBundle = z.infer<typeof analysisBundleSchema>;
 export type DemoViewModel = z.infer<typeof demoViewModelSchema>;
-export type { RRIndicators, RRResult, PrismResult };
+export type { AccountSignalsV2, RRIndicators, RRResult, RRResultV2, PrismResult, ValueAccountsWeights };

@@ -84,8 +84,11 @@ importers:
   packages/contract:
     dependencies:
       '@rivalhub/rival-rating':
-        specifier: github:Starfie1d1272/rival-rating
-        version: https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/cf0ed1df0787df652f5821ed62c3cac6cad52f3a
+        specifier: github:Starfie1d1272/rival-rating#06be266
+        version: https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/06be2662932362292e6eb690f48e6e1eb9696aaa
+      cs2-demo-format:
+        specifier: github:Starfie1d1272/cs2-demo-format#v2.0.0
+        version: https://codeload.github.com/Starfie1d1272/cs2-demo-format/tar.gz/61981cfcd8fec8e3f1560c91544925981bbbc556(zod@3.25.76)
       zod:
         specifier: ^3.25.0
         version: 3.25.76
@@ -96,8 +99,8 @@ importers:
         specifier: workspace:*
         version: link:../contract
       '@rivalhub/rival-rating':
-        specifier: github:Starfie1d1272/rival-rating
-        version: https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/cf0ed1df0787df652f5821ed62c3cac6cad52f3a
+        specifier: github:Starfie1d1272/rival-rating#06be266
+        version: https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/06be2662932362292e6eb690f48e6e1eb9696aaa
       jszip:
         specifier: ^3.10.1
         version: 3.10.1
@@ -535,8 +538,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@rivalhub/rival-rating@https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/cf0ed1df0787df652f5821ed62c3cac6cad52f3a':
-    resolution: {gitHosted: true, integrity: sha512-/EY+PI/ommqGxgG9tYyPAvQWG+WqlKoEARWeh3xHgNl6bNIgydTfUJF81U3Ccz+rw6oXGX7kJGfpb553wct/ug==, tarball: https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/cf0ed1df0787df652f5821ed62c3cac6cad52f3a}
+  '@rivalhub/rival-rating@https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/06be2662932362292e6eb690f48e6e1eb9696aaa':
+    resolution: {gitHosted: true, integrity: sha512-doyhf9bib39T8JoF2HeoMB8+xJIhkwwyvs1Kr9Jc2hKMhKOUorPC3/UnZjyvuVbThzvvy29te0KDmAKwx/W6Ew==, tarball: https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/06be2662932362292e6eb690f48e6e1eb9696aaa}
     version: 0.1.0
 
   '@rolldown/pluginutils@1.0.0-rc.3':
@@ -784,6 +787,12 @@ packages:
 
   core-util-is@1.0.3:
     resolution: {integrity: sha512-ZQBvi1DcpJ4GDqanjucZ2Hj3wEO5pZDS89BWbkcrvdxksJorwUDDZamX9ldFkp9aw2lmBDLgkObEA4DWNJ9FYQ==}
+
+  cs2-demo-format@https://codeload.github.com/Starfie1d1272/cs2-demo-format/tar.gz/61981cfcd8fec8e3f1560c91544925981bbbc556:
+    resolution: {gitHosted: true, integrity: sha512-HqYHGqVyMRvDF02uyXnY7gspxihql/VrB845G+chba59XN9ylh/rmCdgGL6OvyYGhHOweUUijSiWdQB2zHx5qQ==, tarball: https://codeload.github.com/Starfie1d1272/cs2-demo-format/tar.gz/61981cfcd8fec8e3f1560c91544925981bbbc556}
+    version: 2.0.0
+    peerDependencies:
+      zod: '>=3.0.0'
 
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
@@ -1397,7 +1406,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@rivalhub/rival-rating@https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/cf0ed1df0787df652f5821ed62c3cac6cad52f3a': {}
+  '@rivalhub/rival-rating@https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/06be2662932362292e6eb690f48e6e1eb9696aaa': {}
 
   '@rolldown/pluginutils@1.0.0-rc.3': {}
 
@@ -1603,6 +1612,11 @@ snapshots:
   convert-source-map@2.0.0: {}
 
   core-util-is@1.0.3: {}
+
+  cs2-demo-format@https://codeload.github.com/Starfie1d1272/cs2-demo-format/tar.gz/61981cfcd8fec8e3f1560c91544925981bbbc556(zod@3.25.76):
+    dependencies:
+      jszip: 3.10.1
+      zod: 3.25.76
 
   csstype@3.2.3: {}
 
