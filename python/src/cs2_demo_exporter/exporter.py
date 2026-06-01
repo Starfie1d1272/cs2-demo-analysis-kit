@@ -17,9 +17,11 @@ import re
 import zipfile
 from datetime import datetime, timezone
 from collections import defaultdict
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from .enums import normalize_hitgroup, normalize_round_end_reason, weapon_to_grenade_type, _BOMB_TYPE_MAP, _GRENADE_TYPE_ENUM
+from .rounds import _RoundModel, _event_steamid, build_rounds
 
 SCHEMA_VERSION = "cs2-demo-format/2.0"
 EXPORTER_NAME = "CS2 Insight Agent"
@@ -52,7 +54,7 @@ def _sha256_hex(path: str) -> str:
 def _assemble_zip(raw: dict[str, Any], dem_path: str, demo_hash: str | None) -> bytes:
     players      = _build_players(raw)
     team_map     = _build_team_map(players)
-    rounds, round_model = _build_rounds(raw, team_map)
+    rounds, round_model = build_rounds(raw, team_map)
     match_json   = _build_match(raw, rounds)
     kills        = _build_kills(raw, team_map, round_model)
     blinds_json  = _build_blinds(raw, team_map, round_model)
@@ -212,134 +214,6 @@ def _b(val) -> bool:
         return False
 
 
-def _rn(row: dict) -> int:
-    return int(row.get("total_rounds_played") or 0)
-
-
-@dataclass
-class _RoundWindow:
-    round_number: int
-    start_tick: int
-    freeze_end_tick: int
-    end_tick: int
-
-
-@dataclass
-class _RoundModel:
-    windows: list[_RoundWindow]
-    side_map: dict[tuple[int, str], str]
-
-    def round_for_tick(self, tick: int) -> int | None:
-        for window in self.windows:
-            if window.start_tick <= tick <= window.end_tick:
-                return window.round_number
-        return None
-
-    def round_for_event(self, row: dict) -> int | None:
-        tick = int(row.get("tick") or 0)
-        if tick > 0:
-            return self.round_for_tick(tick)
-        raw_round = _rn(row)
-        fallback = raw_round + 1
-        return fallback if fallback > 0 else None
-
-
-def _event_steamid(row: dict) -> str | None:
-    """Steam64 from demoparser2 player extras (not raw userid entity slot)."""
-    return _sid(
-        row.get("user_steamid")
-        or row.get("steamid")
-        or row.get("attacker_steamid")
-    )
-
-
-# ── Schema-strict enum mappings ───────────────────────────────────────────────
-
-_END_REASON_ENUM = {"t_win", "ct_win", "target_bombed", "bomb_defused", "time_ran_out"}
-
-_HITGROUP_ENUM = {"generic", "head", "chest", "stomach", "left_arm", "right_arm",
-                  "left_leg", "right_leg", "gear", "neck"}
-
-_HITGROUP_MAP = {
-    "head": "head", "chest": "chest", "stomach": "stomach",
-    "leftarm": "left_arm", "left arm": "left_arm", "left_arm": "left_arm",
-    "rightarm": "right_arm", "right arm": "right_arm", "right_arm": "right_arm",
-    "leftleg": "left_leg", "left leg": "left_leg", "left_leg": "left_leg",
-    "rightleg": "right_leg", "right leg": "right_leg", "right_leg": "right_leg",
-    "gear": "gear", "neck": "neck", "generic": "generic",
-}
-
-_BOMB_TYPE_MAP = {
-    "plant": "plant_begin", "plant_begin": "plant_begin",
-    "planted": "planted",
-    "defuse": "defuse_begin", "defuse_begin": "defuse_begin",
-    "defused": "defused", "defuse_complete": "defused",
-    "explode": "exploded", "exploded": "exploded",
-    "dropped": "dropped", "picked_up": "picked_up",
-}
-
-_GRENADE_TYPE_ENUM = {"flashbang", "smoke", "molotov", "incendiary", "hegrenade", "decoy"}
-_GRENADE_WEAPON_TO_TYPE = {
-    "smokegrenade": "smoke", "flashbang": "flashbang",
-    "hegrenade": "hegrenade", "molotov": "molotov",
-    "incgrenade": "incendiary", "decoy": "decoy",
-}
-
-
-def _normalize_hitgroup(raw: str) -> str:
-    """Map demoparser2 hitgroup string to hitgroupSchema enum value; fallback 'generic'."""
-    return _HITGROUP_MAP.get(str(raw or "").lower().strip(), "generic")
-
-
-_ROUND_END_REASON_MAP = {
-    1: "target_bombed",
-    7: "bomb_defused",
-    8: "ct_win",
-    9: "t_win",
-    12: "time_ran_out",
-}
-
-_ROUND_END_REASON_STR_MAP = {
-    "t_killed": "ct_win",
-    "ct_killed": "t_win",
-    "t_eliminated": "ct_win",
-    "ct_eliminated": "t_win",
-    "bomb_exploded": "target_bombed",
-    "target_bombed": "target_bombed",
-    "bomb_defused": "bomb_defused",
-    "draw": "time_ran_out",
-    "round_draw": "time_ran_out",
-}
-
-
-def _normalize_round_end_reason(raw: Any) -> str:
-    """Map demoparser2 round_end.reason (int or str) to v2 endReason enum; fallback 'time_ran_out'."""
-    if raw is None or raw == "":
-        return "time_ran_out"
-    if isinstance(raw, bool):
-        return "time_ran_out"
-    if isinstance(raw, (int, float)):
-        result = _ROUND_END_REASON_MAP.get(int(raw))
-        return result if result in _END_REASON_ENUM else "time_ran_out"
-    text = str(raw).strip()
-    if not text:
-        return "time_ran_out"
-    key = text.lower().replace(" ", "_")
-    if key in _ROUND_END_REASON_STR_MAP:
-        mapped = _ROUND_END_REASON_STR_MAP[key]
-        return mapped if mapped in _END_REASON_ENUM else "time_ran_out"
-    if key in _END_REASON_ENUM:
-        return key
-    try:
-        code = int(text)
-        result = _ROUND_END_REASON_MAP.get(code)
-        return result if result in _END_REASON_ENUM else "time_ran_out"
-    except ValueError:
-        return "time_ran_out"
-
-
-def _weapon_to_grenade_type(weapon: str) -> str | None:
-    return _GRENADE_WEAPON_TO_TYPE.get(str(weapon or "").strip().lower())
 
 
 # ── players ───────────────────────────────────────────────────────────────────
@@ -371,167 +245,6 @@ def _build_team_map(players: list[dict]) -> dict[str, str]:
     """steamId64 -> teamKey"""
     return {p["steamId64"]: p["teamKey"] for p in players}
 
-
-# ── rounds ────────────────────────────────────────────────────────────────────
-
-def _build_rounds(
-    raw: dict, team_map: dict[str, str]
-) -> tuple[list[dict], _RoundModel]:
-    """
-    Returns (rounds_list, side_map).
-    side_map[(roundNumber, teamKey)] = "t" | "ct"
-
-    Note: total_rounds_played at round_freeze_end/round_start equals N-1 for
-    round N (rounds completed so far), so we store at actual_round = n + 1.
-    total_rounds_played at round_end equals N (the round that just completed).
-    """
-    freeze_tick: dict[int, int] = {}
-    for r in raw.get("round_freeze_ends", []):
-        n = _rn(r)
-        t = int(r.get("tick") or 0)
-        actual_round = n + 1
-        if actual_round > 0 and t > 0:
-            freeze_tick[actual_round] = t
-
-    start_tick: dict[int, int] = {}
-    for r in raw.get("round_starts", []):
-        n = _rn(r)
-        t = int(r.get("tick") or 0)
-        actual_round = n + 1
-        # t > 0 guard: the first warmup round_start has tick=0 and maps to
-        # round 1; without this guard it claims start_tick[1]=0 (first-wins)
-        # and round 1 gets dropped by the s_tick<=0 check below.
-        if actual_round > 0 and t > 0 and actual_round not in start_tick:
-            start_tick[actual_round] = t
-
-    team_a_score = 0
-    team_b_score = 0
-    out: list[dict] = []
-    side_map: dict[tuple[int, str], str] = {}
-    windows: list[_RoundWindow] = []
-
-    round_ends_sorted = sorted(
-        raw.get("round_ends", []),
-        key=lambda r: _rn(r)
-    )
-    for r in round_ends_sorted:
-        n = _rn(r)
-        if n <= 0:
-            continue
-
-        end_tick = int(r.get("tick") or 0)
-        s_tick = start_tick.get(n, 0)
-        fz_tick = freeze_tick.get(n, 0)
-
-        team_a_side, team_b_side = _sides_for_round(raw, team_map, n)
-        side_map[(n, "teamA")] = team_a_side
-        side_map[(n, "teamB")] = team_b_side
-
-        # v2: startTick, freezeEndTick, endTick must all be >= 1
-        if s_tick <= 0 or fz_tick <= 0 or end_tick <= 0:
-            # Still populate side_map so events can reference the round
-            winner_raw = str(r.get("winner") or "").lower()
-            if winner_raw in ("t", "2"):
-                winner_key = "teamA" if team_a_side == "t" else "teamB"
-            elif winner_raw in ("ct", "3"):
-                winner_key = "teamA" if team_a_side == "ct" else "teamB"
-            else:
-                winner_key = None
-
-            if winner_key == "teamA":
-                team_a_score += 1
-            elif winner_key == "teamB":
-                team_b_score += 1
-            continue
-
-        winner_raw = str(r.get("winner") or "").lower()
-        if winner_raw in ("t", "2"):
-            winner_side = "t"
-            winner_key = "teamA" if team_a_side == "t" else "teamB"
-        elif winner_raw in ("ct", "3"):
-            winner_side = "ct"
-            winner_key = "teamA" if team_a_side == "ct" else "teamB"
-        else:
-            winner_side = None
-            winner_key = None
-
-        # v2: winnerTeamKey and winnerSide must be valid
-        if not winner_key or not winner_side:
-            # still track score even if we skip the round
-            continue
-
-        end_reason = _normalize_round_end_reason(r.get("reason"))
-
-        out.append({
-            "roundNumber": n,
-            "startTick": s_tick,
-            "freezeEndTick": fz_tick,
-            "endTick": end_tick,
-            "teamASide": team_a_side,
-            "teamBSide": team_b_side,
-            "teamAScoreBefore": team_a_score,
-            "teamBScoreBefore": team_b_score,
-            "teamAEconomy": None,   # filled by _build_economies
-            "teamBEconomy": None,
-            "winnerTeamKey": winner_key,
-            "winnerSide": winner_side,
-            "endReason": end_reason,
-        })
-        windows.append(_RoundWindow(n, s_tick, fz_tick, end_tick))
-
-        if winner_key == "teamA":
-            team_a_score += 1
-        elif winner_key == "teamB":
-            team_b_score += 1
-
-    # Final pass: replace any None economy with "semi"
-    for rd in out:
-        if rd["teamAEconomy"] is None:
-            rd["teamAEconomy"] = "semi"
-        if rd["teamBEconomy"] is None:
-            rd["teamBEconomy"] = "semi"
-
-    return out, _RoundModel(windows=windows, side_map=side_map)
-
-
-def _sides_for_round(raw: dict, team_map: dict[str, str], round_number: int) -> tuple[str, str]:
-    """Infer teamA/teamB side for MR12 + OT from player_info, falling back to A=T."""
-    start_side_by_team = _starting_side_by_team(raw, team_map)
-    team_a_initial = start_side_by_team.get("teamA", "t")
-    team_b_initial = "ct" if team_a_initial == "t" else "t"
-    if round_number <= 12:
-        team_a_side = team_a_initial
-    elif round_number <= 24:
-        team_a_side = "ct" if team_a_initial == "t" else "t"
-    else:
-        ot_block = (round_number - 25) // 3
-        if ot_block % 2 == 0:
-            team_a_side = team_a_initial
-        else:
-            team_a_side = "ct" if team_a_initial == "t" else "t"
-    team_b_side = team_b_initial if team_a_side == team_a_initial else team_a_initial
-    return team_a_side, team_b_side
-
-
-def _starting_side_by_team(raw: dict, team_map: dict[str, str]) -> dict[str, str]:
-    counts: dict[str, dict[str, int]] = {"teamA": {"t": 0, "ct": 0}, "teamB": {"t": 0, "ct": 0}}
-    for row in raw.get("player_info", []):
-        sid = _sid(row.get("steamid"))
-        key = team_map.get(sid or "")
-        if key not in counts:
-            continue
-        try:
-            team_num = int(row.get("team_num") or 0)
-        except (TypeError, ValueError):
-            continue
-        side = "t" if team_num == 2 else "ct" if team_num == 3 else None
-        if side:
-            counts[key][side] += 1
-    out: dict[str, str] = {}
-    for key, side_counts in counts.items():
-        if side_counts["t"] or side_counts["ct"]:
-            out[key] = "t" if side_counts["t"] >= side_counts["ct"] else "ct"
-    return out
 
 
 # ── match ─────────────────────────────────────────────────────────────────────
@@ -699,7 +412,7 @@ def _build_damages(raw: dict, team_map: dict, round_model: _RoundModel) -> list[
             "attackerSide": atk_side,
             "victimSide": vic_side,
             "weapon": weapon,
-            "hitgroup": _normalize_hitgroup(r.get("hitgroup")),
+            "hitgroup": normalize_hitgroup(r.get("hitgroup")),
             "healthDamage": min(raw_dmg, health_before),
             "healthDamageRaw": raw_dmg,
             "armorDamage": int(r.get("dmg_armor") or 0),
@@ -768,17 +481,7 @@ def _build_blinds(raw: dict, team_map: dict, round_model: _RoundModel) -> list[d
 
 def _build_bombs(raw: dict, team_map: dict, round_model: _RoundModel) -> list[dict]:
     out = []
-    for ev_type, rows_key in [
-        ("plant", "bomb_planted"),
-        ("planted", "bomb_planted"),   # map same events with both semantics
-        ("defuse", "bomb_defused"),
-        ("defused", "bomb_defused"),
-        ("explode", "bomb_exploded"),
-    ]:
-        # avoid double-processing — only process each event source once
-        pass
-
-    # Process each event source once with the correct v2 type
+    # Deduplicated event sources with canonical v2 types
     event_sources = [
         ("bomb_planted",  "planted"),
         ("bomb_defused",  "defused"),
@@ -835,7 +538,7 @@ def _build_grenades(raw: dict, team_map: dict, round_model: _RoundModel) -> list
         n = round_model.round_for_event(r)
         if n is None:
             continue
-        gtype = _weapon_to_grenade_type(str(r.get("weapon") or ""))
+        gtype = weapon_to_grenade_type(str(r.get("weapon") or ""))
         if not gtype:
             continue
         throws.append({
