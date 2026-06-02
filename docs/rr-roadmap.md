@@ -61,17 +61,39 @@
 - 先做数据质量体检：各指标分布、极值、缺失率（顺带验证阶段 1 的导出器问题是否普遍）。
 - 设计入口：[cohort.md](design/cohort.md)。
 
+## Phase D0 — Demo Lake 地基（阶段 R 前置）
+
+建立职业 demo 的存储与入库管线，是冻结职业基准曲线的数据前置。
+详见 [pro-baseline.md](design/pro-baseline.md)。
+
+- `manifest.sqlite`：记录每张 map-demo 的事件/赛事/队伍/解析状态/checksum。
+- `raw/dem/parsed` 三层目录：raw 存压缩档，dem 存解压后 .dem，parsed 存各事件 parquet。
+- ingestion pipeline：download → extract → demoparser2 smoke test → manifest → parse parquet。
+- **不做绕 Cloudflare 的全自动爬虫**；manifest URL 半自动维护（手动或 C9WIN/CS Demo Manager 辅助拉取）。
+
+## Phase D1 — 职业样本 v0
+
+采集第一批 100–200 张 map-demo，算出各账户分布，为 R1 提供数据。
+
+- 数据源：**HLTV 职业 GOTV demo**（CS2 MR12 时代，2025–2026）。
+- 赛事：Tier-1 LAN（Major、IEM、BLAST、ESL Pro League 等）；淘汰赛 > 小组赛 > 预选赛。
+- 队伍：覆盖 HLTV Top 5/10/20/30，避免"职业均值 = 冠军队均值"偏差。
+- 地图：优先 Mirage/Inferno/Nuke/Ancient/Anubis/Dust2/Train，补地图平衡再补队伍平衡。
+- 排除：加时异常、技术重赛、过旧 CS:GO demo。
+
 ## 阶段 R — 评分参照系重设计（固定职业基准）★ 下一步重点
 
 当前 RR v2 的归一化是**赛季相对**（在被分析这批人内部 z-score），导致分数不可移植、单 demo 无法绝对评分。
 目标：换成**固定职业基准**——从大量职业 demo 冻结一条标准曲线，1.0 = 职业平均，任意 demo 对同一把尺子量。
 玩家向整体方案见 [rating-model.md](design/rating-model.md)「当前方案 vs 未来方案」。
 
-- 把 cohort z-score 换成"冻结曲线"归一化（接口先用现有 55 场跑通，再换数据源）。
-- 搭职业 demo 语料（FACEIT 优先，约 30–50 场起步），算出并冻结每账户的标准曲线。
-- 曲线尾部天然饱和 → 自动包含"道具/全账户 σ 封顶"，无需单独做。
+- **R0**：把 cohort z-score 换成 normalizer strategy 接口（`cohort_normalizer` / `frozen_pro_baseline_normalizer`），接口先用现有 55 场跑通。
+- **R1**：用 Phase D1 职业样本算出五账户分布，percentile mapping / sigmoid 曲线，冻结进 `rr-v2-pro-baseline.json`。单 demo 即可出绝对 RR，不依赖 cohort。
+- 归一化形状：percentile mapping 或 sigmoid（非裸 z-score），尾部天然饱和；职业均值 1.0，优秀段 1.2–1.35，极端值饱和 ~1.5–1.6。
+- combat↔账户残差关系也从职业数据拟合、冻结（不再 per-cohort 拟合）。
 - 评分变绝对可移植：RATING 用职业基准，PRISM 仍 cohort 相对（风格本就相对）。
 - 天梯均值落 0.8–0.9 是有意为之（向职业看齐）；友好化放展示层，不污染模型。
+- 基准曲线加版本标签（`pro_baseline_cs2_2025H2_v1`），经济/地图/枪械大版本更新时重新冻结。
 
 边界：这是**权重校准（阶段 5）的前置**——在赛季相对模型上调权重会白费，先把参照系换成固定的。
 
@@ -84,14 +106,17 @@
 
 边界：先进**赛后复盘和 PRISM 风格轴**，不进 RR 总分。
 
-## 阶段 4 — 地图语义层 + 空间分析
+## 阶段 4 — 地图语义层 + 空间分析（设计见 [map-control.md](design/map-control.md)）
 
-`@cs2dak/maps` 当前只有标定常量 + world→radar。补区域语义后做空间分析。
+`@cs2dak/maps` 现已补上 zone 几何（`zoneAt` / `pointInPolygon` / `ACTIVE_DUTY_MAPS`）。
+24 场 spike 给出做这块的实证：被 v2 压低的是 Jame/sh1ro 这类「死亡不被换的独自控空间」选手，
+Trade 账户看不见他们的控图价值——地图控制账户正是补这个缺口。
 
-- `map-zones/de_ancient.json`（非包点区域：mid / ramp / donut / cave …）。
-- **Area v1**：区域占有 / 首控时间 / 丢失时间。
+- **区域多边形标定**（唯一人工步骤）：`packages/maps/map-zones/<map>.json`，7 图（train 已出池）。
+  格式 + 模板见 `packages/maps/map-zones/README.md` 与 `de_mirage.template.json`。
+- **Area v1**：区域占有 / 首控时间 / 丢失时间 + `soloSpaceSeconds`（Trade 盲区代理）。
 - **Utility Block v1**：smoke/molly 的封锁秒数（用 `grenades.destroyTick`）。
-- **Aim v1**：用 `shots` 的 yaw/pitch/velocity 做急停、扫射、preaim（重，最靠后）。
+- **Aim v1**：用 `shots` 的 yaw/pitch/velocity 做急停、扫射、preaim（重，最靠后，不依赖 zones）。
 
 ## 阶段 5 — 权重校准 + Round Swing（远期）
 
@@ -140,7 +165,11 @@
 | confidence 字段 | ✅ 阶段 1 |
 | 导出器回合边界体检 | ✅ 阶段 1（pre-freeze world self-death 已过滤，fixture QA=0） |
 | 跨场 cohort 层（PRISM 真 + 赛季锚定） | ✅ 阶段 2 |
-| **评分参照系：固定职业基准（可移植 RR）** | ⬜ **阶段 R（下一步重点）** |
+| Demo Lake（manifest + ingestion pipeline） | ⬜ Phase D0 |
+| 职业样本 v0（24 张 Tier-1 LAN map-demo spike） | ✅ 已采集（`fixtures/output/pro-spike/`，扩样中） |
+| **R0：FrozenProBaselineNormalizer（单 demo 绝对评分）** | ✅ rival-rating 实现 + 单测 + 端到端验证（待 re-pin 接线） |
+| **R1：冻结职业曲线（权威 v1）** | 🟡 v0 provisional 已冻结；待扩样 + 尾部饱和 |
 | damage-context / 包点目标 | ⬜ 阶段 3 |
-| 地图语义层 / Area / Utility delay / Aim | ⬜ 阶段 4 |
+| 地图语义层 zone 几何（zoneAt/pointInPolygon） | ✅ `@cs2dak/maps`（阶段 4 基础） |
+| 区域多边形标定 / Area / Utility delay / Aim | ⬜ 阶段 4（标定待人工，计算设计已定，见 map-control.md） |
 | 权重校准 / Round Swing | ⬜ 阶段 5 |

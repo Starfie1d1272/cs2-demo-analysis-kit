@@ -1,0 +1,25 @@
+{
+  "mapName": "de_mirage",
+  "version": "mirage-zones-0.1-template",
+  "_note": "模板：标准区域清单 + 占位空多边形。把每个 polygon 填成世界坐标 XY 顶点（≥3 点）。空多边形永不命中、安全。详见 README.md。窄区域排在大区域前（顺序=优先级）。",
+  "zones": [
+    { "id": "a_site", "name": "A 点", "role": "site", "bombsite": "a", "polygon": [] },
+    { "id": "a_ramp", "name": "A 斜坡", "role": "approach", "bombsite": "a", "polygon": [] },
+    { "id": "palace", "name": "Palace", "role": "approach", "bombsite": "a", "polygon": [] },
+    { "id": "stairs", "name": "Stairs", "role": "connector", "bombsite": "a", "polygon": [] },
+    { "id": "tetris", "name": "Tetris", "role": "backsite", "bombsite": "a", "polygon": [] },
+    { "id": "a_short", "name": "A Short / Catwalk", "role": "connector", "bombsite": "a", "polygon": [] },
+    { "id": "b_site", "name": "B 点", "role": "site", "bombsite": "b", "polygon": [] },
+    { "id": "apartments", "name": "Apartments", "role": "approach", "bombsite": "b", "polygon": [] },
+    { "id": "market", "name": "Market", "role": "connector", "bombsite": "b", "polygon": [] },
+    { "id": "b_short", "name": "B Short / Van", "role": "approach", "bombsite": "b", "polygon": [] },
+    { "id": "mid", "name": "Mid", "role": "mid", "bombsite": null, "polygon": [] },
+    { "id": "top_mid", "name": "Top Mid", "role": "mid", "bombsite": null, "polygon": [] },
+    { "id": "mid_window", "name": "Window", "role": "connector", "bombsite": null, "polygon": [] },
+    { "id": "connector", "name": "Connector / Short", "role": "connector", "bombsite": "a", "polygon": [] },
+    { "id": "underpass", "name": "Underpass / Tunnels", "role": "connector", "bombsite": "b", "polygon": [] },
+    { "id": "jungle", "name": "Jungle", "role": "connector", "bombsite": "a", "polygon": [] },
+    { "id": "t_spawn", "name": "T Spawn", "role": "spawn", "bombsite": null, "polygon": [] },
+    { "id": "ct_spawn", "name": "CT Spawn", "role": "spawn", "bombsite": null, "polygon": [] }
+  ]
+}

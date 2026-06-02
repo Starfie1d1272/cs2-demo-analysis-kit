@@ -1,3 +1,5 @@
+export * from "./zones.js";
+
 export interface MapCalibration {
   mapName: string;
   posX: number;
