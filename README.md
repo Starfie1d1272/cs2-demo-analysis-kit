@@ -6,7 +6,7 @@ English | [简体中文](./README.zh-CN.md)
 
 It does **not** own tournament business logic. Tournament state belongs to products such as RivalHub. The ZIP contract stays in `cs2-demo-format`, and rating models stay in `rival-rating`.
 
-> **Status.** The exporter (`python/`), analysis (`@cs2dak/core`), contract, maps, and CLI are working and tested. The **visualization layer (`@cs2dak/react` + `apps/demo-lab`) is an early work in progress** — it currently renders a static analysis dashboard, not yet the full match workspace / 2D replay experience described under Design Direction.
+> **Status.** The exporter (`python/`), analysis (`@cs2dak/core`), contract, maps, CLI, and preview workspace are working and tested. The **visualization layer (`@cs2dak/react` + `apps/demo-lab`) is still WIP**, but demo-lab now renders a tabbed match workspace with overview, rounds, players, economy, map, and 2D replay views.
 
 ## What This Repository Produces
 
@@ -16,7 +16,7 @@ Given a `cs2-demo-format/2.0` package, the kit produces:
 - `analysis-bundle.json` - normalized match, round, player, economy, timeline, and spatial analysis.
 - `view-model.json` - UI-ready data for dashboards, match pages, and local tools.
 - `qa-report.json` - data quality checks for missing files, broken round continuity, missing economy coverage, unmapped players, and spatial data gaps.
-- Preview UI - a demo lab showing how analysis modules can be presented (WIP: static dashboard today; match workspace and 2D replay are planned).
+- Preview UI - a demo lab showing a reusable match workspace with analysis modules, map layers, and 2D replay views.
 
 ## Packages
 
@@ -25,7 +25,7 @@ Given a `cs2-demo-format/2.0` package, the kit produces:
 | `@cs2dak/contract` | Shared TypeScript types and Zod schemas for domain input, analysis output, UI view models, and QA reports. |
 | `@cs2dak/maps` | Map calibration, world-to-radar transforms, and lightweight callout helpers. |
 | `@cs2dak/core` | Pure analysis logic: normalization, scoreboard, economy, timeline, heatmap points, and QA. |
-| `@cs2dak/react` | Previewable React components that consume `DemoViewModel` only. |
+| `@cs2dak/react` | Previewable React components that consume `DemoViewModel` / `MatchWorkspaceModel` only. |
 | `@cs2dak/cli` | CLI for analyzing JSON or ZIP packages and writing analysis/view-model/QA artifacts. |
 | `@cs2dak/demo-lab` | Vite app for reviewing analysis modules and design language against fixtures. |
 | `python/cs2_demo_exporter` | Python exporter, CLI, GUI assets, and packaging for `.dem -> v2 ZIP`. |

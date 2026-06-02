@@ -129,7 +129,7 @@ function economyLabel(type: string | null) {
     semi: "半起",
     force: "强起",
     full: "长枪",
-    conversion: "转换局"
+    conversion: "长枪"
   };
   return type ? labels[type] ?? type : "未知经济";
 }

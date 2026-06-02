@@ -6,7 +6,7 @@
 
 它**不负责赛事业务逻辑**。赛事、赛季、队伍、选手、比赛状态应该留给 RivalHub 这样的产品。ZIP 合同继续由 `cs2-demo-format` 维护，评分模型继续由 `rival-rating` 维护。
 
-> **当前状态。** exporter（`python/`）、分析（`@cs2dak/core`）、contract、maps、CLI 都已可用并通过测试。**可视化层（`@cs2dak/react` + `apps/demo-lab`）仍是早期 WIP** —— 目前只渲染一个静态分析 dashboard，尚未实现「设计语言」一节描述的完整比赛工作台 / 2D 回放体验。
+> **当前状态。** exporter（`python/`）、分析（`@cs2dak/core`）、contract、maps、CLI 和预览工作台都已可用并通过测试。**可视化层（`@cs2dak/react` + `apps/demo-lab`）仍是 WIP**，但 demo-lab 现在已经渲染带总览、回合、选手、经济、地图和 2D 回放的比赛工作台。
 
 ## 这个仓库生成什么
 
@@ -16,7 +16,7 @@
 - `analysis-bundle.json`：标准化后的比赛、回合、选手、经济、时间线、空间点位分析。
 - `view-model.json`：可直接给 UI 消费的展示模型。
 - `qa-report.json`：数据质量检查，包括缺文件、回合不连续、经济覆盖不足、玩家未映射、空间数据缺失等。
-- 预览 UI：用 demo-lab 展示分析模块如何呈现（WIP：当前是静态 dashboard；比赛工作台和 2D 回放仍在规划中）。
+- 预览 UI：用 demo-lab 展示可复用的比赛工作台、分析模块、地图图层和 2D 回放。
 
 ## 包结构
 
@@ -25,7 +25,7 @@
 | `@cs2dak/contract` | 共享 TypeScript 类型和 Zod schema，覆盖输入、分析输出、UI view model、QA report。 |
 | `@cs2dak/maps` | 地图标定、世界坐标到 radar 坐标转换、轻量 callout helper。 |
 | `@cs2dak/core` | 纯分析逻辑：标准化、scoreboard、经济、时间线、热力图点位、QA。 |
-| `@cs2dak/react` | 只消费 `DemoViewModel` 的 React 预览组件。 |
+| `@cs2dak/react` | 只消费 `DemoViewModel` / `MatchWorkspaceModel` 的 React 预览组件。 |
 | `@cs2dak/cli` | 分析 JSON 或 ZIP 包，并输出 analysis/view-model/QA 文件。 |
 | `@cs2dak/demo-lab` | 用 fixtures 预览分析模块和统一设计语言的 Vite 应用。 |
 | `python/cs2_demo_exporter` | Python exporter、CLI、GUI 资源和打包配置，负责 `.dem -> v2 ZIP`。 |

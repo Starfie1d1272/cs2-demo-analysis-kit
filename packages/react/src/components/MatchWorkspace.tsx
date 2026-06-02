@@ -63,7 +63,7 @@ export function MatchWorkspace({ model }: MatchWorkspaceProps) {
             {view === "rounds" && <RoundExplorer model={model} />}
             {view === "players" && <PlayerStoryPanel model={model} />}
             {view === "economy" && (
-              <Panel title="经济走势" eyebrow="CS Demo Manager economy pattern">
+              <Panel title="经济走势">
                 <EconomyPanel points={model.economy} teamAName={model.teams.teamA.name} teamBName={model.teams.teamB.name} />
               </Panel>
             )}
@@ -80,19 +80,19 @@ function OverviewView({ model, onNavigate }: MatchWorkspaceProps & { onNavigate:
   return (
     <div className="dak-grid">
       <section className="dak-stack">
-        <Panel title="比赛主线" eyebrow="pr1maly match breakdown pattern">
+        <Panel title="比赛主线">
           <div className="dak-story-list">
             {model.overview.story.map((line) => (
               <p key={line}>{line}</p>
             ))}
           </div>
         </Panel>
-        <Panel title="选手数据 / RR" eyebrow="AWPy stats as calculation reference">
+        <Panel title="选手数据 / RR">
           <ScoreboardTable rows={model.scoreboard} />
         </Panel>
       </section>
       <aside className="dak-stack">
-        <Panel title="模块入口" eyebrow="all rows are actionable">
+        <Panel title="模块入口">
           <div className="dak-module-actions">
             <ModuleAction icon={<ListChecks size={16} />} label="回合浏览" value={`${model.rounds.length} 回合`} detail="横向 timeline + selected round events" onClick={() => onNavigate("rounds")} />
             <ModuleAction icon={<Users size={16} />} label="选手视角" value={`${model.players.length} 名选手`} detail="RR breakdown + round facts" onClick={() => onNavigate("players")} />
@@ -100,7 +100,7 @@ function OverviewView({ model, onNavigate }: MatchWorkspaceProps & { onNavigate:
             <ModuleAction icon={<Film size={16} />} label="2D 回放" value={model.replay.available ? `${model.replay.sampleRate ?? 0} Hz` : "无回放"} detail={model.replay.capabilities.hasDefuseKit ? "含拆弹器状态" : "无拆弹器状态"} onClick={() => onNavigate("replay")} />
           </div>
         </Panel>
-        <Panel title="地图状态" eyebrow="data availability">
+        <Panel title="地图状态">
           <MapModeList model={model} />
         </Panel>
       </aside>
@@ -110,15 +110,24 @@ function OverviewView({ model, onNavigate }: MatchWorkspaceProps & { onNavigate:
 
 function RoundExplorer({ model }: MatchWorkspaceProps) {
   const [selectedRound, setSelectedRound] = useState(model.rounds[0]?.roundNumber ?? 1);
+  const [showAllEvents, setShowAllEvents] = useState(false);
   const round = model.rounds.find((row) => row.roundNumber === selectedRound) ?? model.rounds[0];
+
+  useEffect(() => {
+    setShowAllEvents(false);
+  }, [selectedRound]);
 
   if (!round) {
     return <Panel title="回合浏览"><p className="dak-muted">暂无回合数据</p></Panel>;
   }
 
+  const eventLimit = 28;
+  const visibleEvents = showAllEvents ? round.events : round.events.slice(0, eventLimit);
+  const hiddenEventCount = round.events.length - visibleEvents.length;
+
   return (
     <div className="dak-selection-layout">
-      <Panel title="回合时间线" eyebrow="RivalHub compact round strip pattern">
+      <Panel title="回合时间线">
         <div className="dak-round-pills">
           {model.rounds.map((row) => (
             <button
@@ -134,7 +143,7 @@ function RoundExplorer({ model }: MatchWorkspaceProps) {
           ))}
         </div>
       </Panel>
-      <Panel title={`R${round.roundNumber} 详情`} eyebrow="event stream">
+      <Panel title={`R${round.roundNumber} 详情`}>
         <div className="dak-round-detail">
           <div className="dak-fact-grid">
             <Fact label="比分" value={round.scoreBefore} />
@@ -143,14 +152,23 @@ function RoundExplorer({ model }: MatchWorkspaceProps) {
             <Fact label="B 队经济" value={round.teamBEconomy} />
           </div>
           <div className="dak-timeline">
-            {round.events.slice(0, 28).map((event) => (
+            {visibleEvents.map((event) => (
               <div className="dak-timeline-row" key={event.id}>
                 <span className="dak-mono dak-muted">{event.clockLabel}</span>
                 <span className="dak-badge">{event.type}</span>
                 <span>{event.label}</span>
               </div>
             ))}
-            {round.events.length > 28 && <div className="dak-timeline-more">还有 {round.events.length - 28} 条事件</div>}
+            {hiddenEventCount > 0 && (
+              <button className="dak-timeline-more" type="button" onClick={() => setShowAllEvents(true)}>
+                展开剩余 {hiddenEventCount} 条事件
+              </button>
+            )}
+            {showAllEvents && round.events.length > eventLimit && (
+              <button className="dak-timeline-more" type="button" onClick={() => setShowAllEvents(false)}>
+                收起到前 {eventLimit} 条
+              </button>
+            )}
           </div>
         </div>
       </Panel>
@@ -166,9 +184,11 @@ function PlayerStoryPanel({ model }: MatchWorkspaceProps) {
     return <Panel title="选手视角"><p className="dak-muted">暂无选手数据</p></Panel>;
   }
 
+  const roundSummary = summarizePlayerRoundFacts(selected.roundFacts);
+
   return (
     <div className="dak-selection-layout">
-      <Panel title="选手列表" eyebrow="CS Demo Manager player sidebar pattern">
+      <Panel title="选手列表">
         <div className="dak-player-list">
           {model.players.map((player) => (
             <button
@@ -183,9 +203,15 @@ function PlayerStoryPanel({ model }: MatchWorkspaceProps) {
           ))}
         </div>
       </Panel>
-      <Panel title={`${selected.row.name} 个人故事`} eyebrow="pr1maly narrative + RR accounts">
+      <Panel title={`${selected.row.name} 个人故事`}>
         <div className="dak-story-list">
           {selected.summary.map((line) => <p key={line}>{line}</p>)}
+        </div>
+        <div className="dak-player-round-summary">
+          <Fact label="回合" value={`${selected.roundFacts.length}`} />
+          <Fact label="存活" value={`${roundSummary.survived}`} />
+          <Fact label="首杀" value={`${roundSummary.openingKills}`} />
+          <Fact label="补枪" value={`${roundSummary.tradeKills}`} />
         </div>
         <div className="dak-breakdown">
           {selected.rrBreakdown.map((part) => (
@@ -197,15 +223,23 @@ function PlayerStoryPanel({ model }: MatchWorkspaceProps) {
           ))}
         </div>
         {selected.roundFacts.length > 0 && (
-          <div className="dak-roundfact-list dak-player-roundfacts">
-            {selected.roundFacts.slice(0, 14).map((fact) => (
-              <div className="dak-roundfact-row" key={`${fact.steamId64}-${fact.roundNumber}`}>
-                <span className="dak-badge">R{fact.roundNumber}</span>
-                <span>{fact.teamKey}</span>
-                <span>{fact.side.toUpperCase()}</span>
-                <span className="dak-mono">{fact.kills}/{fact.deaths}/{fact.assists}</span>
-                <span className="dak-tags">{roundFactSummary(fact)}</span>
-              </div>
+          <div className="dak-player-roundfacts">
+            {selected.roundFacts.slice(0, 18).map((fact) => (
+              <article className="dak-player-round-card" key={`${fact.steamId64}-${fact.roundNumber}`}>
+                <div className="dak-player-round-head">
+                  <span className="dak-badge">R{fact.roundNumber}</span>
+                  <span>{sideLabel(fact.side)}</span>
+                  <b className="dak-mono">{fact.kills}/{fact.deaths}/{fact.assists}</b>
+                </div>
+                <div className="dak-player-round-meta">
+                  <span>{economyLabel(fact.economyType)}</span>
+                  <span>{fact.survived ? "存活" : "阵亡"}</span>
+                  {fact.openingDuel !== "none" && <span>{openingDuelLabel(fact.openingDuel)}</span>}
+                </div>
+                <div className="dak-player-round-tags">
+                  {roundFactTags(fact).map((tag) => <span key={tag}>{tag}</span>)}
+                </div>
+              </article>
             ))}
           </div>
         )}
@@ -226,10 +260,10 @@ function MapWorkspace({ model }: MatchWorkspaceProps) {
 
   return (
     <div className="dak-grid dak-grid-even">
-      <Panel title="地图热力图" eyebrow="RivalHub canvas + CS Demo Manager heatmap renderer pattern">
+      <Panel title="地图热力图">
         <HeatmapCanvas map={model.map.view} points={heatmapPoints} mode={layer} onModeChange={setLayer} />
       </Panel>
-      <Panel title="空间图层" eyebrow="clickable layers only">
+      <Panel title="空间图层">
         <div className="dak-layer-controls" role="radiogroup" aria-label="地图图层">
           {renderableLayers.map((mode) => (
             <button
@@ -291,7 +325,7 @@ function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["replay"]; 
 
   return (
     <div className="dak-replay-layout">
-      <Panel title="回放控制" eyebrow="cs2-2d-demoviewer playback protocol pattern">
+      <Panel title="回放控制">
         <div className="dak-round-pills">
           {replay.rounds.map((row) => (
             <button
@@ -344,7 +378,7 @@ function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["replay"]; 
           <Fact label="C4 位置" value={replay.capabilities.hasBombPosition ? "可显示" : "暂不显示"} />
         </div>
       </Panel>
-      <Panel title={`R${round.roundNumber} 2D 回放`} eyebrow="current frame player state">
+      <Panel title={`R${round.roundNumber} 2D 回放`}>
         <div
           className="dak-replay-stage"
           style={map.radarImageUrl ? { backgroundImage: `url(${map.radarImageUrl})` } : undefined}
@@ -354,16 +388,16 @@ function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["replay"]; 
             <div
               key={player.steamId64}
               className={`dak-replay-token dak-replay-token-${player.teamKey}${!frame.alive ? " dak-replay-token-dead" : ""}${frame.flashed ? " dak-replay-token-flashed" : ""}`}
-              style={{ ...replayFramePosition(frame, map), transform: `translate(-50%, -50%) rotate(${frame.yaw}deg)` }}
+              style={{ ...replayFramePosition(frame, map), transform: `translate(-50%, -50%) rotate(${90 - frame.yaw}deg)` }}
               title={`${player.name} · ${frame.hp} HP${frame.hasDefuseKit ? " · 拆弹器" : ""}${frame.flashed ? " · flashed" : ""}`}
             >
-              <span style={{ transform: `rotate(${-frame.yaw}deg)` }}>{player.name.slice(0, 2)}</span>
-              {frame.hasDefuseKit && <i style={{ transform: `rotate(${-frame.yaw}deg)` }}>kit</i>}
+              <span style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>{player.name.slice(0, 2)}</span>
+              {frame.hasDefuseKit && <i style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>kit</i>}
             </div>
           ))}
         </div>
       </Panel>
-      <Panel title="当前帧选手" eyebrow="player state sidebar">
+      <Panel title="当前帧选手">
         <div className="dak-frame-player-list">
           {currentPlayers.map(({ player, frame }) => (
             <div className="dak-frame-player-row" key={player.steamId64}>
@@ -484,14 +518,51 @@ function detailForTab(key: WorkspaceView, model: MatchWorkspaceModel, replayDeta
   return replayDetail;
 }
 
-function roundFactSummary(fact: MatchWorkspaceModel["players"][number]["roundFacts"][number]) {
-  const tags: string[] = [...fact.kastTags];
-  if (fact.openingDuel !== "none") tags.push(`open:${fact.openingDuel}`);
-  if (fact.tradeKills > 0) tags.push(`trade+${fact.tradeKills}`);
-  if (fact.tradedDeaths > 0) tags.push("traded");
-  if (fact.flashAssists > 0) tags.push(`flash+${fact.flashAssists}`);
-  if (!fact.survived) tags.push("death");
-  return tags.join(", ") || fact.economyType || "standard";
+function summarizePlayerRoundFacts(facts: MatchWorkspaceModel["players"][number]["roundFacts"]) {
+  return facts.reduce(
+    (summary, fact) => ({
+      survived: summary.survived + (fact.survived ? 1 : 0),
+      openingKills: summary.openingKills + (fact.openingDuel === "won" ? 1 : 0),
+      tradeKills: summary.tradeKills + fact.tradeKills
+    }),
+    { survived: 0, openingKills: 0, tradeKills: 0 }
+  );
+}
+
+function sideLabel(side: string) {
+  return side === "t" ? "进攻方" : "防守方";
+}
+
+function economyLabel(type: string | null) {
+  const labels: Record<string, string> = {
+    pistol: "手枪局",
+    eco: "ECO",
+    semi: "半起",
+    force: "强起",
+    full: "长枪",
+    conversion: "长枪"
+  };
+  return type ? labels[type] ?? type : "未知经济";
+}
+
+function openingDuelLabel(openingDuel: string) {
+  if (openingDuel === "won") return "开局对枪胜";
+  if (openingDuel === "lost") return "开局对枪负";
+  return openingDuel;
+}
+
+function roundFactTags(fact: MatchWorkspaceModel["players"][number]["roundFacts"][number]) {
+  const labels: Record<string, string> = {
+    kill: "击杀",
+    assist: "助攻",
+    survive: "存活",
+    trade: "被补枪"
+  };
+  const tags = fact.kastTags.map((tag) => labels[tag] ?? tag);
+  if (fact.tradeKills > 0) tags.push(`补枪 +${fact.tradeKills}`);
+  if (fact.tradedDeaths > 0) tags.push("死亡被补");
+  if (fact.flashAssists > 0) tags.push(`闪助 +${fact.flashAssists}`);
+  return tags.length > 0 ? tags : ["无 KAST"];
 }
 
 function replayFramePosition(frame: WorkspaceReplayFrame, map: MatchWorkspaceModel["map"]["view"]) {

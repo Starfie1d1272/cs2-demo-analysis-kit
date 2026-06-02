@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { MatchWorkspaceModel } from "@cs2dak/contract";
 import { MatchWorkspace } from "./MatchWorkspace";
+import { RoundTimeline } from "./RoundTimeline";
 
 const model: MatchWorkspaceModel = {
   version: "cs2-demo-analysis-kit/workspace-0.1",
@@ -81,5 +82,28 @@ describe("MatchWorkspace", () => {
     expect(html).toContain("8 Hz");
     expect(html).toContain("拆弹器");
     expect(html).not.toContain("QA</span>");
+    expect(html).not.toContain("pr1maly");
+    expect(html).not.toContain("AWPy");
+    expect(html).not.toContain("CS Demo Manager");
+  });
+
+  it("renders truncated timelines with an explicit expand control", () => {
+    const events = Array.from({ length: 3 }, (_, index) => ({
+      id: `event-${index}`,
+      roundNumber: 1,
+      tick: 100 + index,
+      timeSeconds: index,
+      clockPhase: "round" as const,
+      clockSeconds: index,
+      clockLabel: `1:${index}`,
+      type: "kill" as const,
+      label: `event ${index}`,
+      teamKey: null
+    }));
+
+    const html = renderToStaticMarkup(React.createElement(RoundTimeline, { events, initialLimit: 2 }));
+
+    expect(html).toContain("展开剩余 1 条事件");
+    expect(html).toContain("<button");
   });
 });

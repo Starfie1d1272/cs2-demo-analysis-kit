@@ -1,11 +1,15 @@
 import type { TimelineEvent } from "@cs2dak/contract";
+import { useState } from "react";
 
 export interface RoundTimelineProps {
   events: TimelineEvent[];
+  initialLimit?: number;
 }
 
-export function RoundTimeline({ events }: RoundTimelineProps) {
-  const visibleEvents = events.slice(0, 120);
+export function RoundTimeline({ events, initialLimit = 120 }: RoundTimelineProps) {
+  const [expanded, setExpanded] = useState(false);
+  const visibleEvents = expanded ? events : events.slice(0, initialLimit);
+  const hiddenCount = events.length - visibleEvents.length;
 
   return (
     <div className="dak-timeline">
@@ -16,8 +20,15 @@ export function RoundTimeline({ events }: RoundTimelineProps) {
           <span>{event.label}</span>
         </div>
       ))}
-      {events.length > visibleEvents.length && (
-        <div className="dak-timeline-more">已显示前 {visibleEvents.length} 条，共 {events.length} 条事件</div>
+      {hiddenCount > 0 && (
+        <button className="dak-timeline-more" type="button" onClick={() => setExpanded(true)}>
+          展开剩余 {hiddenCount} 条事件
+        </button>
+      )}
+      {expanded && events.length > initialLimit && (
+        <button className="dak-timeline-more" type="button" onClick={() => setExpanded(false)}>
+          收起到前 {initialLimit} 条
+        </button>
       )}
     </div>
   );

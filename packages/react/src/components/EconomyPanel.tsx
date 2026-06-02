@@ -15,7 +15,7 @@ const economyLabels = {
   semi: "半起",
   force: "强起",
   full: "长枪",
-  conversion: "转换"
+  conversion: "长枪"
 } as const;
 const economyColors = {
   pistol: "rgba(255, 198, 77, 0.18)",
@@ -23,7 +23,7 @@ const economyColors = {
   semi: "rgba(73, 182, 255, 0.16)",
   force: "rgba(255, 122, 33, 0.18)",
   full: "rgba(83, 215, 126, 0.16)",
-  conversion: "rgba(178, 132, 255, 0.18)"
+  conversion: "rgba(83, 215, 126, 0.16)"
 } as const;
 
 export function EconomyPanel({ points, teamAName, teamBName }: EconomyPanelProps) {
