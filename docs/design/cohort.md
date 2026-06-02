@@ -145,7 +145,7 @@ rival-rating 的 `computeCohortAccountsRR`**（公式唯一真相源）；本 co
 相对 ratingPro 等同噪声，会把选手推离市场（ratingPro）排名。**信 v2 = 信"市场低估了团队价值"这个主张。**
 
 > ⚠️ 范围：本修复在 **cohort（赛季）** 层。`@cs2dak/core` 的 **per-match** v2 仍是旧线性相加，
-> 存在同样的 combat 碾压；per-match 残差化要用场内 10 人 cohort，留作后续（见 rr-v2-lite.md）。
+> 存在同样的 combat 碾压；per-match 残差化要用场内 10 人 cohort，留作后续（见 rating-model.md）。
 
 > ⚠️ 仍未做的：① 残差化只对 combat 正交，账户间残余共线（trade↔clutch 等）未消，完整版需 Gram-Schmidt；
 > ② 赛季级粒度 + 无 `match_id↔demo` 映射 → ratingPro 只能按 steam64 聚合；拿到 per-match 映射后可做更细校准。

@@ -1,7 +1,7 @@
 # 设计：RR v1（box-score 兼容基线）
 
 > 定位：**稳定、可解释、玩家熟悉**的赛后基线分。不承担原创主张——原创放在
-> [rr-v2-lite](rr-v2-lite.md) 和 [prism](prism.md)。
+> [rating-model](rating-model.md) 和 [prism](prism.md)。
 >
 > 公式所有权：[`@rivalhub/rival-rating`](https://github.com/Starfie1d1272/rival-rating)
 > 的 `computeRR`（model id `hltv-linear-v1`）。本 kit 只做信号派生 + 接线。
@@ -48,7 +48,7 @@ KPR / DPR / APR / ADR / KAST / 多杀 / 首杀首死 / 补枪 / 残局 1vX / 狙
 ## 锚定
 
 v1 **不做显式锚定**：HLTV 公式的 `intercept` 已校准到联赛均值 ≈ 1.0，靠公式自带刻度。
-（对比：[rr-v2-lite](rr-v2-lite.md) 的权重是未校准先验，所以必须显式 per-match 锚定。）
+（对比：[rating-model](rating-model.md) 的权重是未校准先验，所以必须显式 per-match 锚定。）
 
 ## 输出
 

@@ -52,7 +52,7 @@ Three rating layers answer three different questions and must never be merged in
 | Layer | Question | Granularity | Design doc |
 |---|---|---|---|
 | RR v1 | How did this match's stat line look? | per-match | [design/rr-v1.md](design/rr-v1.md) |
-| RR v2-lite | How much was your contribution worth (with context)? | per-match | [design/rr-v2-lite.md](design/rr-v2-lite.md) |
+| RR v2-lite | How much was your contribution worth (with context)? | per-match | [design/rating-model.md](design/rating-model.md) |
 | PRISM | What is your play style? | cross-match cohort | [design/prism.md](design/prism.md) |
 
 Formula ownership stays in `@rivalhub/rival-rating` (the only implementation of
@@ -117,7 +117,7 @@ Consumers: RivalHub calls core/CLI, stores only the subset it needs, renders fro
 | 层 | 回答的问题 | 粒度 | 设计文档 |
 |---|---|---|---|
 | RR v1 | 这场数据产出如何 | 单场 | [design/rr-v1.md](design/rr-v1.md) |
-| RR v2-lite | 这场里你的贡献值多少（含上下文） | 单场 | [design/rr-v2-lite.md](design/rr-v2-lite.md) |
+| RR v2-lite | 这场里你的贡献值多少（含上下文） | 单场 | [design/rating-model.md](design/rating-model.md) |
 | PRISM | 你是什么风格 | 跨场 cohort | [design/prism.md](design/prism.md) |
 
 公式所有权在 `@rivalhub/rival-rating`（`computeRR` / `computeValueAccountsRR` /

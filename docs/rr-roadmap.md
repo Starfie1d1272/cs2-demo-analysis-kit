@@ -8,7 +8,7 @@
 | 层 | 回答的问题 | 粒度 | 设计文档 |
 |---|---|---|---|
 | **RR v1** | 这场数据产出如何 | 单场 | [rr-v1.md](design/rr-v1.md) |
-| **RR v2-lite** | 这场里你的贡献值多少（含上下文） | 单场 | [rr-v2-lite.md](design/rr-v2-lite.md) |
+| **RR v2-lite** | 这场里你的贡献值多少（含上下文） | 单场 | [rating-model.md](design/rating-model.md) |
 | **PRISM** | 你是什么风格 | 跨场 cohort | [prism.md](design/prism.md) |
 
 铁律：**不让任何一个数同时承担「单场表现 / 长期实力 / 风格 / 胜负贡献」四件事。**
@@ -32,7 +32,7 @@
 - **per-match 联赛锚定**：`computeAccountRatingsV2` 跑完整场后整体归一，`accountRR` 的 1.00 = 本场均值。
 
 产出：`PlayerScoreboardRow` 新增 `accountBreakdown` / `accountContextStatus`；`accountRR` 语义变为锚定后。
-详见 [rr-v2-lite.md](design/rr-v2-lite.md)。
+详见 [rating-model.md](design/rating-model.md)。
 
 ## 阶段 1 — 接线已有真值 + 表达
 
@@ -60,6 +60,20 @@
 - 把"per-match 锚定"升级为**赛季级锚定**（league mean 跨整季）。
 - 先做数据质量体检：各指标分布、极值、缺失率（顺带验证阶段 1 的导出器问题是否普遍）。
 - 设计入口：[cohort.md](design/cohort.md)。
+
+## 阶段 R — 评分参照系重设计（固定职业基准）★ 下一步重点
+
+当前 RR v2 的归一化是**赛季相对**（在被分析这批人内部 z-score），导致分数不可移植、单 demo 无法绝对评分。
+目标：换成**固定职业基准**——从大量职业 demo 冻结一条标准曲线，1.0 = 职业平均，任意 demo 对同一把尺子量。
+玩家向整体方案见 [rating-model.md](design/rating-model.md)「当前方案 vs 未来方案」。
+
+- 把 cohort z-score 换成"冻结曲线"归一化（接口先用现有 55 场跑通，再换数据源）。
+- 搭职业 demo 语料（FACEIT 优先，约 30–50 场起步），算出并冻结每账户的标准曲线。
+- 曲线尾部天然饱和 → 自动包含"道具/全账户 σ 封顶"，无需单独做。
+- 评分变绝对可移植：RATING 用职业基准，PRISM 仍 cohort 相对（风格本就相对）。
+- 天梯均值落 0.8–0.9 是有意为之（向职业看齐）；友好化放展示层，不污染模型。
+
+边界：这是**权重校准（阶段 5）的前置**——在赛季相对模型上调权重会白费，先把参照系换成固定的。
 
 ## 阶段 3 — 富事件账户增强 + 包点目标
 
@@ -120,12 +134,13 @@
 | RR v1（box-score） | ✅ 可用 |
 | RR v2-lite 五账户 | ✅ 可用（权重为未校准先验） |
 | buyDelta / manState context | ✅ 已实现并接线（阶段 0 补了 null 语义） |
-| clutch 超额（实际−期望） | ✅ 已实现（无 shrinkage，见 rr-v2-lite.md） |
+| clutch 超额（实际−期望） | ✅ 已实现（无 shrinkage，见 rating-model.md） |
 | per-match 锚定 | ✅ 阶段 0 完成 |
 | 接线已有真值（combatDeath/bombDeath/wallbang/noScope 表达…） | ✅ 阶段 1 |
 | confidence 字段 | ✅ 阶段 1 |
 | 导出器回合边界体检 | ✅ 阶段 1（pre-freeze world self-death 已过滤，fixture QA=0） |
 | 跨场 cohort 层（PRISM 真 + 赛季锚定） | ✅ 阶段 2 |
+| **评分参照系：固定职业基准（可移植 RR）** | ⬜ **阶段 R（下一步重点）** |
 | damage-context / 包点目标 | ⬜ 阶段 3 |
 | 地图语义层 / Area / Utility delay / Aim | ⬜ 阶段 4 |
 | 权重校准 / Round Swing | ⬜ 阶段 5 |
