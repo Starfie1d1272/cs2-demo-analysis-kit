@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import {
   analyzeDemoPackage,
+  buildMatchWorkspaceModel,
   buildDemoViewModel,
   computeAccountRatingsV2,
   deriveAccountSignalsV2,
@@ -11,6 +12,29 @@ import {
 } from "./index";
 
 describe("analyzeDemoPackage", () => {
+  it("builds a match workspace model with replay and user-facing modules from a strict v2 export", async () => {
+    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
+    const pkg = await loadDemoPackageFromZip(zip);
+    const workspace = buildMatchWorkspaceModel(pkg);
+
+    expect(workspace.version).toBe("cs2-demo-analysis-kit/workspace-0.1");
+    expect(workspace.title).toBe("Team A vs Team B");
+    expect(workspace.tabs.map((tab) => tab.key)).toEqual(["overview", "rounds", "players", "economy", "map", "replay"]);
+    expect(workspace.overview.kpis.map((kpi) => kpi.key)).not.toContain("qa");
+    expect(workspace.overview.kpis.map((kpi) => kpi.key)).not.toContain("economySwing");
+    expect(workspace.rounds).toHaveLength(21);
+    expect(workspace.rounds[0]?.events.some((event) => event.type === "kill")).toBe(true);
+    expect(workspace.players).toHaveLength(10);
+    expect(workspace.players[0]?.rrBreakdown.length).toBe(5);
+    expect(workspace.map.modes.map((mode) => mode.key)).toEqual(["death", "kill", "grenade", "bomb", "position"]);
+    expect(workspace.replay.available).toBe(true);
+    expect(workspace.replay.rounds.length).toBeGreaterThan(0);
+    expect(workspace.replay.rounds[0]?.players[0]?.frames.length).toBeGreaterThan(0);
+    expect(workspace.replay.capabilities.hasDefuseKit).toBe(true);
+    expect(workspace.replay.capabilities.hasBombPosition).toBe(false);
+    expect(workspace.adminQa.summary.errorCount).toBe(0);
+  });
+
   it("builds reusable analysis and view-model artifacts from a strict v2 export", async () => {
     const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
     const pkg = await loadDemoPackageFromZip(zip);

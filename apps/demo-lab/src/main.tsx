@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { analyzeDemoPackage, buildDemoViewModel, loadDemoPackageFromZip } from "@cs2dak/core";
-import type { DemoViewModel } from "@cs2dak/contract";
-import { DemoAnalysisDashboard } from "@cs2dak/react";
+import { buildMatchWorkspaceModel, loadDemoPackageFromZip } from "@cs2dak/core";
+import type { MatchWorkspaceModel } from "@cs2dak/contract";
+import { MatchWorkspace } from "@cs2dak/react";
 import "@cs2dak/react/theme.css";
 import sampleZipUrl from "../../../fixtures/input/cs2dak-sanitized-de_ancient.zip?url";
 
 function DemoLab() {
-  const [model, setModel] = useState<DemoViewModel | null>(null);
+  const [model, setModel] = useState<MatchWorkspaceModel | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -16,8 +16,7 @@ function DemoLab() {
       try {
         const response = await fetch(sampleZipUrl);
         const pkg = await loadDemoPackageFromZip(await response.arrayBuffer());
-        const bundle = analyzeDemoPackage(pkg);
-        const nextModel = buildDemoViewModel(bundle);
+        const nextModel = buildMatchWorkspaceModel(pkg);
         if (!cancelled) {
           setModel(nextModel);
         }
@@ -42,7 +41,7 @@ function DemoLab() {
     return <div className="dak-shell"><div className="dak-workspace dak-loading">Loading strict v2 export...</div></div>;
   }
 
-  return <DemoAnalysisDashboard model={model} />;
+  return <MatchWorkspace model={model} />;
 }
 
 createRoot(document.getElementById("root") as HTMLElement).render(

@@ -1,3 +1,4 @@
+export { MatchWorkspace, AdminQaWorkspace } from "./components/MatchWorkspace";
 export { DemoAnalysisDashboard } from "./components/DemoAnalysisDashboard";
 export { ScoreboardTable } from "./components/ScoreboardTable";
 export { RoundTimeline } from "./components/RoundTimeline";
