@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file=$(echo \"$CLAUDE_TOOL_INPUT\" | python3 -c \"import sys,json; d=json.load(sys.stdin); print(d.get('file_path',''))\" 2>/dev/null); [[ \"$file\" == *.py ]] && cd /Users/starfie1d/GitHub/cs2-demo-analysis-kit/python && uv run ruff check --fix \"$file\" || true"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -9,6 +9,8 @@ fixtures/output/
 *.dem
 # Local scratch: benchmark demos, scripts, and golden baselines
 fixtures/_bench/
+# Redundant 57MB bundle (duplicates fixtures/input/nju-rivals-2026/zips/*); track only the individual zips
+fixtures/input/nju-rivals-2026/*-bundle.zip
 *.tsbuildinfo
 __pycache__/
 .pytest_cache/
