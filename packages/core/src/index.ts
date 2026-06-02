@@ -1069,19 +1069,64 @@ function buildWorkspaceKpis(bundle: AnalysisBundle) {
 function buildWorkspaceStory(bundle: AnalysisBundle): string[] {
   const topRR = bundle.scoreboard[0];
   const topAdr = [...bundle.scoreboard].sort((a, b) => b.adr - a.adr)[0];
-  const teamAWins = bundle.economy.filter((point) => point.winnerTeamKey === "teamA").length;
-  const teamBWins = bundle.economy.filter((point) => point.winnerTeamKey === "teamB").length;
+  const winnerKey: TeamKey = bundle.teams.teamA.score >= bundle.teams.teamB.score ? "teamA" : "teamB";
+  const loserKey: TeamKey = winnerKey === "teamA" ? "teamB" : "teamA";
+  const winner = bundle.teams[winnerKey];
+  const loser = bundle.teams[loserKey];
+  const openingHalf = bundle.economy.slice(0, 12);
+  const closingHalf = bundle.economy.slice(12);
+  const openingWins = countWins(openingHalf, winnerKey);
+  const closingWins = countWins(closingHalf, winnerKey);
+  const longestRun = longestWinRun(bundle.economy);
+  const lowBuySteals = bundle.economy.filter((round) => {
+    const winnerEconomy = winnerKey === "teamA" ? round.teamAEconomy : round.teamBEconomy;
+    const loserEconomy = winnerKey === "teamA" ? round.teamBEconomy : round.teamAEconomy;
+    return round.winnerTeamKey === winnerKey && ["eco", "semi", "force"].includes(winnerEconomy) && loserEconomy === "full";
+  });
+  const pistolRounds = bundle.economy.filter((round) => round.teamAEconomy === "pistol" || round.teamBEconomy === "pistol");
+  const pistolWins = pistolRounds.filter((round) => round.winnerTeamKey === winnerKey).length;
   const story = [
-    `${bundle.teams.teamA.name} 与 ${bundle.teams.teamB.name} 在 ${bundle.mapName} 打成 ${bundle.teams.teamA.score}:${bundle.teams.teamB.score}。`,
-    `回合走势：${bundle.teams.teamA.name} 赢下 ${teamAWins} 回合，${bundle.teams.teamB.name} 赢下 ${teamBWins} 回合。`
+    `在 ${bundle.mapName}，${winner.name} 以 ${winner.score}:${loser.score} 击败 ${loser.name}。${openingHalf.length > 0 ? `前半场他们拿到 ${openingWins} 分` : ""}${closingHalf.length > 0 ? `，易边后再收下 ${closingWins} 分` : ""}。`
   ];
-  if (topRR) {
-    story.push(`${topRR.name} 以 ${topRR.accountRR.toFixed(3)} 的 V2 RR 位列本图第一。`);
+
+  if (longestRun.length >= 4) {
+    story.push(`${teamNameForKey(bundle, longestRun.teamKey)} 在 R${longestRun.startRound}-R${longestRun.endRound} 打出 ${longestRun.length} 连胜，这是本图最明显的一段节奏转折。`);
   }
-  if (topAdr && topAdr.steamId64 !== topRR?.steamId64) {
-    story.push(`${topAdr.name} 打出全场最高 ADR ${topAdr.adr.toFixed(1)}。`);
+  if (pistolRounds.length > 0) {
+    story.push(`手枪局方面，${winner.name} 拿下 ${pistolWins}/${pistolRounds.length} 个手枪局；${pistolWins < pistolRounds.length && winner.score > loser.score ? "他们仍靠后续长枪局和经济转换把领先拿了回来。" : "这给后续经济滚动提供了起点。"}`);
+  }
+  if (lowBuySteals.length > 0) {
+    story.push(`${winner.name} 有 ${lowBuySteals.length} 个低经济回合打穿对手长枪局，典型回合是 R${lowBuySteals[0]?.roundNumber}，这类回合比单纯装备价值差更能解释胜负。`);
+  }
+  if (topRR) {
+    const topLine = `${topRR.name} 是本图最稳定的个人输出点，V2 RR ${topRR.accountRR.toFixed(3)}，${topRR.kills}/${topRR.deaths}/${topRR.assists}，ADR ${topRR.adr.toFixed(1)}`;
+    story.push(topAdr && topAdr.steamId64 !== topRR.steamId64 ? `${topLine}；同时 ${topAdr.name} 打出全场最高 ADR ${topAdr.adr.toFixed(1)}。` : `${topLine}。`);
   }
   return story;
+}
+
+function countWins(rounds: EconomyPoint[], teamKey: TeamKey): number {
+  return rounds.filter((round) => round.winnerTeamKey === teamKey).length;
+}
+
+function teamNameForKey(bundle: AnalysisBundle, teamKey: TeamKey): string {
+  return teamKey === "teamA" ? bundle.teams.teamA.name : bundle.teams.teamB.name;
+}
+
+function longestWinRun(rounds: EconomyPoint[]): { teamKey: TeamKey; startRound: number; endRound: number; length: number } {
+  let best = { teamKey: "teamA" as TeamKey, startRound: 0, endRound: 0, length: 0 };
+  let current = { teamKey: "teamA" as TeamKey, startRound: 0, endRound: 0, length: 0 };
+  for (const round of rounds) {
+    if (current.length > 0 && current.teamKey === round.winnerTeamKey) {
+      current = { ...current, endRound: round.roundNumber, length: current.length + 1 };
+    } else {
+      current = { teamKey: round.winnerTeamKey, startRound: round.roundNumber, endRound: round.roundNumber, length: 1 };
+    }
+    if (current.length > best.length) {
+      best = current;
+    }
+  }
+  return best;
 }
 
 function buildPlayerSummary(row: PlayerScoreboardRow): string[] {
@@ -1219,7 +1264,12 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
 }
 
 function weaponNameForIndex(weaponDict: string[], index: number): string | null {
-  return index >= 0 ? weaponDict[index] ?? null : null;
+  const raw = index >= 0 ? weaponDict[index] ?? null : null;
+  if (!raw) {
+    return null;
+  }
+  const normalized = normalizeWeapon(raw);
+  return isNamedWeapon(normalized) ? normalized : null;
 }
 
 function groupBy<T, K>(rows: T[], keyFor: (row: T) => K): Map<K, T[]> {

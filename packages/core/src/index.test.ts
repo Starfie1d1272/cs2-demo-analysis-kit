@@ -32,6 +32,9 @@ describe("analyzeDemoPackage", () => {
     expect(workspace.replay.rounds[0]?.players[0]?.frames.length).toBeGreaterThan(0);
     expect(workspace.replay.capabilities.hasDefuseKit).toBe(true);
     expect(workspace.replay.capabilities.hasBombPosition).toBe(false);
+    expect(workspace.replay.rounds.some((round) => round.players.some((player) => player.frames.some((frame) => frame.weapon && /^\d+$/.test(frame.weapon))))).toBe(false);
+    expect(workspace.overview.story.join("\n")).toContain("击败");
+    expect(workspace.overview.story.join("\n")).not.toContain("打成");
     expect(workspace.adminQa.summary.errorCount).toBe(0);
   });
 

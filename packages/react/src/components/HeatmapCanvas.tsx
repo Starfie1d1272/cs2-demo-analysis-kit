@@ -19,6 +19,9 @@ const MODE_LABELS: Record<HeatmapMode, string> = {
 
 export function HeatmapCanvas({ map, points, mode: controlledMode, onModeChange }: HeatmapCanvasProps) {
   const [internalMode, setInternalMode] = useState<HeatmapMode>("death");
+  const [radius, setRadius] = useState(52);
+  const [blur, setBlur] = useState(2);
+  const [opacity, setOpacity] = useState(54);
   const mode = controlledMode ?? internalMode;
   const setMode = (nextMode: HeatmapMode) => {
     setInternalMode(nextMode);
@@ -60,6 +63,11 @@ export function HeatmapCanvas({ map, points, mode: controlledMode, onModeChange 
           </button>
         ))}
       </div>
+      <div className="dak-heatmap-tuning" aria-label="热力图参数">
+        <label>半径 <input type="range" min="18" max="96" value={radius} onChange={(event) => setRadius(Number(event.target.value))} /></label>
+        <label>虚化 <input type="range" min="0" max="16" value={blur} onChange={(event) => setBlur(Number(event.target.value))} /></label>
+        <label>强度 <input type="range" min="18" max="90" value={opacity} onChange={(event) => setOpacity(Number(event.target.value))} /></label>
+      </div>
       {!map.radarImageUrl && <SchematicRadar mapName={map.name} />}
       {renderable.map((point, index) => (
         <span
@@ -68,12 +76,15 @@ export function HeatmapCanvas({ map, points, mode: controlledMode, onModeChange 
           style={{
             left: `${(point.radar.x / (calibration?.radarSize ?? 1024)) * 100}%`,
             top: `${(point.radar.y / (calibration?.radarSize ?? 1024)) * 100}%`,
+            width: `${radius}px`,
+            height: `${radius}px`,
+            filter: `blur(${blur}px)`,
             background:
               point.source.kind === "death"
-                ? "radial-gradient(circle, rgba(255,84,112,0.52), rgba(255,84,112,0))"
+                ? `radial-gradient(circle, rgba(255,84,112,${opacity / 100}), rgba(255,84,112,0))`
                 : point.source.kind === "grenade"
-                  ? "radial-gradient(circle, rgba(255,196,77,0.46), rgba(255,196,77,0))"
-                  : "radial-gradient(circle, rgba(77,212,122,0.46), rgba(77,212,122,0))"
+                  ? `radial-gradient(circle, rgba(255,196,77,${opacity / 100}), rgba(255,196,77,0))`
+                  : `radial-gradient(circle, rgba(77,212,122,${opacity / 100}), rgba(77,212,122,0))`
           }}
         />
       ))}

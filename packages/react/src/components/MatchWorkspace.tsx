@@ -1,4 +1,5 @@
 import type { MatchWorkspaceModel, WorkspaceReplayFrame, WorkspaceReplayRound, WorkspaceSpatialPoint } from "@cs2dak/contract";
+import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
 import { Activity, BarChart3, ChevronLeft, ChevronRight, Crosshair, Film, Gauge, ListChecks, Map, Pause, Play, ShieldCheck, Table2, Users } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { EconomyPanel } from "./EconomyPanel";
@@ -67,7 +68,7 @@ export function MatchWorkspace({ model }: MatchWorkspaceProps) {
               </Panel>
             )}
             {view === "map" && <MapWorkspace model={model} />}
-            {view === "replay" && <ReplayViewer replay={model.replay} />}
+            {view === "replay" && <ReplayViewer replay={model.replay} map={model.map.view} />}
           </section>
         </div>
       </div>
@@ -116,7 +117,7 @@ function RoundExplorer({ model }: MatchWorkspaceProps) {
   }
 
   return (
-    <div className="dak-grid">
+    <div className="dak-selection-layout">
       <Panel title="回合时间线" eyebrow="RivalHub compact round strip pattern">
         <div className="dak-round-pills">
           {model.rounds.map((row) => (
@@ -166,7 +167,7 @@ function PlayerStoryPanel({ model }: MatchWorkspaceProps) {
   }
 
   return (
-    <div className="dak-grid">
+    <div className="dak-selection-layout">
       <Panel title="选手列表" eyebrow="CS Demo Manager player sidebar pattern">
         <div className="dak-player-list">
           {model.players.map((player) => (
@@ -244,14 +245,14 @@ function MapWorkspace({ model }: MatchWorkspaceProps) {
             </button>
           ))}
         </div>
-        <MapModeList model={model} mutedKinds={["death", "kill", "grenade"]} />
+        <MapPendingList model={model} renderedKinds={["death", "kill", "grenade"]} />
         {model.map.status.message && <p className="dak-muted dak-note">{model.map.status.message}</p>}
       </Panel>
     </div>
   );
 }
 
-function ReplayViewer({ replay }: { replay: MatchWorkspaceModel["replay"] }) {
+function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["replay"]; map: MatchWorkspaceModel["map"]["view"] }) {
   const [roundNumber, setRoundNumber] = useState(replay.rounds[0]?.roundNumber ?? 1);
   const [frameIndex, setFrameIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -344,13 +345,16 @@ function ReplayViewer({ replay }: { replay: MatchWorkspaceModel["replay"] }) {
         </div>
       </Panel>
       <Panel title={`R${round.roundNumber} 2D 回放`} eyebrow="current frame player state">
-        <div className="dak-replay-stage">
+        <div
+          className="dak-replay-stage"
+          style={map.radarImageUrl ? { backgroundImage: `url(${map.radarImageUrl})` } : undefined}
+        >
           <div className="dak-replay-gridlines" aria-hidden="true" />
           {currentPlayers.map(({ player, frame }) => (
             <div
               key={player.steamId64}
               className={`dak-replay-token dak-replay-token-${player.teamKey}${!frame.alive ? " dak-replay-token-dead" : ""}${frame.flashed ? " dak-replay-token-flashed" : ""}`}
-              style={{ left: `${normalizeFrameCoord(frame.x)}%`, top: `${normalizeFrameCoord(-frame.y)}%`, transform: `translate(-50%, -50%) rotate(${frame.yaw}deg)` }}
+              style={{ ...replayFramePosition(frame, map), transform: `translate(-50%, -50%) rotate(${frame.yaw}deg)` }}
               title={`${player.name} · ${frame.hp} HP${frame.hasDefuseKit ? " · 拆弹器" : ""}${frame.flashed ? " · flashed" : ""}`}
             >
               <span style={{ transform: `rotate(${-frame.yaw}deg)` }}>{player.name.slice(0, 2)}</span>
@@ -366,7 +370,7 @@ function ReplayViewer({ replay }: { replay: MatchWorkspaceModel["replay"] }) {
               <span className={`dak-team-dot dak-team-dot-${player.teamKey}`} />
               <span>{player.name}</span>
               <b className="dak-mono">{frame.hp} HP</b>
-              <small>{frame.weapon ?? "unarmed"}{frame.hasDefuseKit ? " · kit" : ""}{frame.flashed ? " · flashed" : ""}</small>
+              <small>{frame.weapon ?? "未知武器"}{frame.hasDefuseKit ? " · kit" : ""}{frame.flashed ? " · flashed" : ""}</small>
             </div>
           ))}
         </div>
@@ -380,6 +384,24 @@ function MapModeList({ model, mutedKinds = [] }: MatchWorkspaceProps & { mutedKi
     <div className="dak-mode-list">
       {model.map.modes.map((mode) => (
         <div className={mutedKinds.includes(mode.key) ? "dak-mode-row dak-mode-row-muted" : "dak-mode-row"} key={mode.key}>
+          <span>{mode.label}</span>
+          <b className="dak-mono">{mode.count}</b>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MapPendingList({ model, renderedKinds }: MatchWorkspaceProps & { renderedKinds: WorkspaceSpatialPoint["kind"][] }) {
+  const pending = model.map.modes.filter((mode) => !renderedKinds.includes(mode.key));
+  if (pending.length === 0) {
+    return null;
+  }
+  return (
+    <div className="dak-pending-layers">
+      <div className="dak-panel-eyebrow">暂未渲染为交互图层</div>
+      {pending.map((mode) => (
+        <div className="dak-mode-row dak-mode-row-disabled" key={mode.key} aria-disabled="true">
           <span>{mode.label}</span>
           <b className="dak-mono">{mode.count}</b>
         </div>
@@ -472,8 +494,21 @@ function roundFactSummary(fact: MatchWorkspaceModel["players"][number]["roundFac
   return tags.join(", ") || fact.economyType || "standard";
 }
 
-function normalizeFrameCoord(value: number): number {
-  return Math.max(4, Math.min(96, 50 + value / 70));
+function replayFramePosition(frame: WorkspaceReplayFrame, map: MatchWorkspaceModel["map"]["view"]) {
+  const calibration = getMapCalibration(map.name);
+  if (calibration) {
+    const radar = worldToRadar(frame, calibration);
+    if (!radar.outOfBounds) {
+      return {
+        left: `${(radar.x / calibration.radarSize) * 100}%`,
+        top: `${(radar.y / calibration.radarSize) * 100}%`
+      };
+    }
+  }
+  return {
+    left: `${Math.max(4, Math.min(96, 50 + frame.x / 70))}%`,
+    top: `${Math.max(4, Math.min(96, 50 - frame.y / 70))}%`
+  };
 }
 
 export function AdminQaWorkspace({ model }: MatchWorkspaceProps) {

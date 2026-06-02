@@ -9,6 +9,20 @@ export interface EconomyPanelProps {
 const width = 760;
 const height = 260;
 const pad = { left: 48, right: 18, top: 24, bottom: 34 };
+const economyLabels = {
+  pistol: "手枪",
+  eco: "Eco",
+  semi: "半起",
+  force: "强起",
+  full: "长枪"
+} as const;
+const economyColors = {
+  pistol: "rgba(255, 198, 77, 0.18)",
+  eco: "rgba(104, 115, 129, 0.18)",
+  semi: "rgba(73, 182, 255, 0.16)",
+  force: "rgba(255, 122, 33, 0.18)",
+  full: "rgba(83, 215, 126, 0.16)"
+} as const;
 
 export function EconomyPanel({ points, teamAName, teamBName }: EconomyPanelProps) {
   const maxValue = Math.max(1, ...points.flatMap((point) => [point.teamA, point.teamB]));
@@ -26,8 +40,15 @@ export function EconomyPanel({ points, teamAName, teamBName }: EconomyPanelProps
               x={xFor(index) - 8}
               y={pad.top}
               width={16}
-              height={height - pad.top - pad.bottom}
-              fill={point.winnerTeamKey === "teamA" ? "var(--dak-accent-soft)" : "var(--dak-accent-b-soft)"}
+              height={(height - pad.top - pad.bottom) / 2}
+              fill={economyColors[point.teamAEconomy]}
+            />
+            <rect
+              x={xFor(index) - 8}
+              y={pad.top + (height - pad.top - pad.bottom) / 2}
+              width={16}
+              height={(height - pad.top - pad.bottom) / 2}
+              fill={economyColors[point.teamBEconomy]}
             />
             <text x={xFor(index)} y={height - 10} textAnchor="middle" fill="var(--dak-fg-dim)" fontSize="10">
               R{point.roundNumber}
@@ -55,7 +76,21 @@ export function EconomyPanel({ points, teamAName, teamBName }: EconomyPanelProps
         <span style={{ color: "var(--dak-accent)" }}>{teamAName}</span>
         {" / "}
         <span style={{ color: "var(--dak-accent-b)" }}>{teamBName}</span>
-        {" 每回合装备价值"}
+        {" 每回合装备价值；背景色为每队经济类型"}
+      </div>
+      <div className="dak-economy-legend" aria-label="经济类型图例">
+        {(Object.keys(economyLabels) as Array<keyof typeof economyLabels>).map((type) => (
+          <span key={type}><i style={{ background: economyColors[type] }} />{economyLabels[type]}</span>
+        ))}
+      </div>
+      <div className="dak-economy-rounds">
+        {points.map((point) => (
+          <div className="dak-economy-round" key={point.roundNumber}>
+            <b>R{point.roundNumber}</b>
+            <span className={point.winnerTeamKey === "teamA" ? "dak-economy-winner" : undefined}>{teamAName}: {economyLabels[point.teamAEconomy]}</span>
+            <span className={point.winnerTeamKey === "teamB" ? "dak-economy-winner" : undefined}>{teamBName}: {economyLabels[point.teamBEconomy]}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -161,6 +161,13 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
+.dak-selection-layout {
+  display: grid;
+  grid-template-columns: 270px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
 .dak-stack {
   display: grid;
   gap: 16px;
@@ -328,6 +335,35 @@
   max-width: calc(100% - 20px);
 }
 
+.dak-heatmap-tuning {
+  position: absolute;
+  z-index: 4;
+  left: 10px;
+  right: 10px;
+  bottom: 42px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px;
+  background: rgba(9, 11, 15, 0.78);
+  border: 1px solid var(--dak-border);
+  border-radius: 4px;
+}
+
+.dak-heatmap-tuning label {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  color: var(--dak-fg-mid);
+  font-size: 11px;
+  font-family: var(--dak-mono);
+}
+
+.dak-heatmap-tuning input {
+  min-width: 0;
+  accent-color: var(--dak-accent);
+}
+
 .dak-mode {
   display: inline-flex;
   align-items: center;
@@ -447,12 +483,9 @@
 .dak-heatmap-point {
   position: absolute;
   z-index: 2;
-  width: 52px;
-  height: 52px;
   border-radius: 999px;
   transform: translate(-50%, -50%);
   pointer-events: none;
-  filter: blur(1px);
   mix-blend-mode: screen;
 }
 
@@ -780,7 +813,9 @@
     linear-gradient(90deg, rgba(238, 243, 248, 0.04) 1px, transparent 1px),
     radial-gradient(circle at 50% 50%, rgba(73, 182, 255, 0.08), transparent 48%),
     #07090d;
-  background-size: 48px 48px, 48px 48px, auto, auto;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .dak-replay-token {
@@ -995,6 +1030,17 @@
   opacity: 0.48;
 }
 
+.dak-pending-layers {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.dak-mode-row-disabled {
+  opacity: 0.62;
+  background: rgba(13, 17, 23, 0.44);
+}
+
 .dak-replay-layout {
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr) 260px;
@@ -1148,10 +1194,68 @@
   margin-top: 14px;
 }
 
+.dak-economy-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 10px 0;
+  color: var(--dak-fg-mid);
+  font-size: 12px;
+}
+
+.dak-economy-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.dak-economy-legend i {
+  width: 12px;
+  height: 12px;
+  display: block;
+  border: 1px solid var(--dak-border);
+  border-radius: 3px;
+}
+
+.dak-economy-rounds {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.dak-economy-round {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid var(--dak-border);
+  border-radius: 4px;
+  background: var(--dak-bg-subtle);
+  font-size: 11px;
+}
+
+.dak-economy-round b {
+  color: var(--dak-fg);
+  font-family: var(--dak-mono);
+}
+
+.dak-economy-round span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dak-fg-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dak-economy-round .dak-economy-winner {
+  color: var(--dak-ok);
+}
+
 @media (max-width: 1080px) {
   .dak-header,
   .dak-grid,
   .dak-grid-even,
+  .dak-selection-layout,
   .dak-kpi-strip,
   .dak-fact-grid,
   .dak-workbench,
@@ -1193,7 +1297,8 @@
 
   .dak-tabs,
   .dak-kpi-strip,
-  .dak-speed-group {
+  .dak-speed-group,
+  .dak-heatmap-tuning {
     grid-template-columns: 1fr;
   }
 
