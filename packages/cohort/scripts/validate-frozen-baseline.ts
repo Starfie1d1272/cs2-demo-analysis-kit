@@ -14,8 +14,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { deriveAccountSignalsV2, loadDemoPackageFromZip } from "@cs2dak/core";
-import { computeFrozenProBaselineRR } from "/Users/starfie1d/GitHub/rival-rating/src/rr/models/frozen-pro-baseline.ts";
-import rrValueAccountsV2Lite from "/Users/starfie1d/GitHub/rival-rating/src/weights/rr-value-accounts-v2-lite.json" with { type: "json" };
+import { computeFrozenProBaselineRR, rrValueAccountsV2Lite } from "@rivalhub/rival-rating";
 
 function mean(xs: number[]) {
   return xs.reduce((a, b) => a + b, 0) / xs.length;

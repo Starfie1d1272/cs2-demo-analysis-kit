@@ -9,6 +9,6 @@
   "dependencies": {
     "@cs2dak/contract": "workspace:*",
     "@cs2dak/core": "workspace:*",
-    "@rivalhub/rival-rating": "github:Starfie1d1272/rival-rating#5d862eb"
+    "@rivalhub/rival-rating": "github:Starfie1d1272/rival-rating#163f90c3ea17e81a6fdc84b276820664362a2f60"
   }
 }

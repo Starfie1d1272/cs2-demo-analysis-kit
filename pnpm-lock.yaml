@@ -96,8 +96,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@rivalhub/rival-rating':
-        specifier: github:Starfie1d1272/rival-rating#5d862eb
-        version: https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/5d862eb1718df37651f6e0f45293125a2a7087a5
+        specifier: github:Starfie1d1272/rival-rating#163f90c3ea17e81a6fdc84b276820664362a2f60
+        version: https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/163f90c3ea17e81a6fdc84b276820664362a2f60
 
   packages/contract:
     dependencies:
@@ -117,8 +117,8 @@ importers:
         specifier: workspace:*
         version: link:../contract
       '@rivalhub/rival-rating':
-        specifier: github:Starfie1d1272/rival-rating#5d862eb
-        version: https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/5d862eb1718df37651f6e0f45293125a2a7087a5
+        specifier: github:Starfie1d1272/rival-rating#163f90c3ea17e81a6fdc84b276820664362a2f60
+        version: https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/163f90c3ea17e81a6fdc84b276820664362a2f60
       jszip:
         specifier: ^3.10.1
         version: 3.10.1
@@ -560,6 +560,10 @@ packages:
     resolution: {integrity: sha512-O71yZIbAh/PxDMNGns37GHBIfrVkEVyn+AXyIa5dOTfb4/xNvRWV+Vv/NMbNCtODB/pO7vLlF2OTmMVLhmr7Ag==}
     engines: {node: '>=18'}
     hasBin: true
+
+  '@rivalhub/rival-rating@https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/163f90c3ea17e81a6fdc84b276820664362a2f60':
+    resolution: {gitHosted: true, integrity: sha512-i8al7NXaKOrn89gQs4ifPzhG6ha6MGWw1L26QKsmNjG8FCI2E/nZdqr9mSxwedCRMt/iAJEe9Gn4wg1zlZEOKA==, tarball: https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/163f90c3ea17e81a6fdc84b276820664362a2f60}
+    version: 0.1.0
 
   '@rivalhub/rival-rating@https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/5d862eb1718df37651f6e0f45293125a2a7087a5':
     resolution: {gitHosted: true, integrity: sha512-BfBVsnL5mNsdY2F1mgrmsSQJeHfpAXLTl/7eiu/tMPn/amOKDUmOZZAm56H3T9tY+8S6XCRoKvLyhWiHpvDeUg==, tarball: https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/5d862eb1718df37651f6e0f45293125a2a7087a5}
@@ -1447,6 +1451,8 @@ snapshots:
   '@playwright/test@1.60.0':
     dependencies:
       playwright: 1.60.0
+
+  '@rivalhub/rival-rating@https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/163f90c3ea17e81a6fdc84b276820664362a2f60': {}
 
   '@rivalhub/rival-rating@https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/5d862eb1718df37651f6e0f45293125a2a7087a5': {}
 
