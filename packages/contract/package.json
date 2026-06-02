@@ -7,7 +7,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@rivalhub/rival-rating": "github:Starfie1d1272/rival-rating#06be266",
+    "@rivalhub/rival-rating": "github:Starfie1d1272/rival-rating#5d862eb",
     "cs2-demo-format": "github:Starfie1d1272/cs2-demo-format#v2.2.0",
     "zod": "^3.25.0"
   }

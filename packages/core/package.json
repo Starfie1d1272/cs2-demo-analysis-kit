@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@cs2dak/contract": "workspace:*",
-    "@rivalhub/rival-rating": "github:Starfie1d1272/rival-rating#06be266",
+    "@rivalhub/rival-rating": "github:Starfie1d1272/rival-rating#5d862eb",
     "jszip": "^3.10.1"
   }
 }

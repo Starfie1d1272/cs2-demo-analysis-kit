@@ -110,10 +110,11 @@ utility 0.3 / objective 0.1）形同虚设。
 `combat 0.172 / trade 0.016 / clutch 0.004 / objective 0.001 / utility 0.011`
 ——trade/clutch/utility/objective 近乎死信号，v2 退化成纯 combat ≈ v1。
 
-### 修复（`balanceSeasonAccounts`）：标准化 + 残差化
+### 修复：标准化 + 残差化（公式归属 `@rivalhub/rival-rating`）
 
-标准化与残差化本质都是 cohort 级操作（要有一群人才能定相对位置 / 拟合正交化），落在 cohort 层，
-不动 `@rivalhub/rival-rating` 的单场模型：
+标准化与残差化本质都是 cohort 级操作（要有一群人才能定相对位置 / 拟合正交化）。这套**数学已迁入
+rival-rating 的 `computeCohortAccountsRR`**（公式唯一真相源）；本 cohort 层只负责把
+`std(rrV1)` 作为 `targetStd` 传进去。逻辑如下：
 
 1. 反推每账户未加权 raw = `accountBreakdown[a] / accountWeight[a]`，跨选手 z-score → `z_a`。
 2. **combat 作主干**（`zc = z_combat`）。
