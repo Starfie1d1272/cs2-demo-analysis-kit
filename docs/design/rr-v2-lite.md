@@ -108,7 +108,10 @@ context 分桶区分两种状态，**这是 v2 可信展示的前提**：
 
 - ✅ 五账户、两个 context 乘子、clutch 超额、per-match 锚定、missing/zero 区分均已落地。
 - ✅ `confidence` 字段（阶段 1）：表达数据源完整度，不参与公式。
-- ⬜ 赛季级锚定（阶段 2）。
+- ✅ 赛季级锚定 + **账户归一化**（阶段 2，在 `@cs2dak/cohort`）：五账户跨选手 z-score 后按
+  accountWeight 加权，解决"非 combat 账户被 ÷回合 压成死信号"。详见 [cohort.md](cohort.md)。
+- ⬜ **per-match 同款归一化**：core 的 `computeAccountRatingsV2` 仍是线性相加、combat 碾压。
+  per-match 需用场内 10 人 cohort 做标准化（与 cohort 层一致），待办。
 - ⬜ **damage-context**：用 `damages.victimHealthBefore` / `armorDamage` / `hitgroup` 做
   damageByBuyDelta、overkill、有效 vs 浪费伤害（阶段 3）；优先于 Round Swing。
 - ⬜ **包点目标零成本**：`bombs.site` 已是 `"a"|"b"`，objective 账户可直接按包点细分，

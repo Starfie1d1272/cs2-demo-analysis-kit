@@ -96,3 +96,39 @@ cs2dak cohort <zip-dir> --out <season-cohort.json> [--identity-map <identity-map
 ```
 
 CLI 读取目录下所有 `.zip`，按文件名排序，`matchId` 使用文件名 stem，调用 `buildSeasonCohort` 后写 JSON。`identity-map.json` 是一个 `steamId64 -> playerKey | { playerKey, userId, displayName }` 的映射文件。
+
+## 账户归一化（z-score 标准化）
+
+### 问题
+
+五账户的 raw 量级天然差 ~20–40×：combat 每回合发生（÷rounds 后仍 O(0.4)），
+clutch/objective 是稀有事件（÷rounds 后 O(0.001)）。线性相加 `Σ accountWeight·raw`
+时 combat 碾压其余四账户，`accountWeight` 先验（combat 1.0 / trade 0.5 / clutch 0.4 /
+utility 0.3 / objective 0.1）形同虚设。
+
+实测（55 场、57 人，修复前 accountBreakdown 跨选手 std）：
+`combat 0.172 / trade 0.016 / clutch 0.004 / objective 0.001 / utility 0.011`
+——trade/clutch/utility/objective 近乎死信号，v2 退化成纯 combat ≈ v1。
+
+### 修复（`balanceSeasonAccounts`）
+
+标准化本质是 cohort 级操作（要有一群人才能定相对位置），所以落在 cohort 层，
+不动 `@rivalhub/rival-rating` 的单场模型：
+
+1. 反推每账户未加权 raw = `accountBreakdown[a] / accountWeight[a]`。
+2. 跨选手对每个账户做 z-score：`z_a = (raw_a − mean_a) / std_a`。
+3. `composite = Σ accountWeight[a] · z_a`。
+4. `scale = std(rrV1) / std(composite)`，使 composite 离散度对齐已被 HLTV 逆向验证的 rrV1。
+5. `accountRR = clamp(1.0 + scale · composite, ≥0.1)`；`accountBreakdown[a] = scale · accountWeight[a] · z_a`。
+
+效果：z 分单位方差 → 每账户贡献 std = `accountWeight · scale`，**恰好正比于先验权重**。
+修复后 std：`combat 0.148 / trade 0.074 / clutch 0.059 / utility 0.044 / objective 0.015`。
+corr(rrV1, accountRR) 从 0.98 降到 **0.91（spearman 0.87）**——combat/水平轴仍强相关，
+但 trade/clutch/utility 真正参与区分，v2 相对 v1 的增量价值复活。
+
+> ⚠️ 范围：本修复在 **cohort（赛季）** 层。`@cs2dak/core` 的 **per-match** v2（`computeAccountRatingsV2`）
+> 仍是旧的线性相加，存在同样的 combat 碾压问题。per-match 标准化要用场内 10 人 cohort，
+> 留作后续（见 rr-v2-lite.md）。
+
+> ⚠️ 这是**结构性归一化**，不是用 ground truth 做的权重校准。`accountWeight` 仍是未校准先验，
+> 只是现在能真正生效。真正的权重数值校准等 ratingPro/MVP（含团队信号）落地后再做。
