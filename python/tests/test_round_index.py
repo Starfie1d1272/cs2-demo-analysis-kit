@@ -161,6 +161,31 @@ def test_bomb_events_before_freeze_end_are_not_exported():
     assert [b for b in pkg["bombs.json"] if b["tick"] == 5200] == []
 
 
+def test_shots_before_freeze_end_are_not_exported():
+    raw = _base_raw()
+    team_a = "76561198000000001"
+    raw["fires"] = [
+        {
+            "tick": 5200,
+            "total_rounds_played": 1,
+            "user_steamid": team_a,
+            "weapon": "weapon_knife",
+        },
+        {
+            "tick": 6500,
+            "total_rounds_played": 1,
+            "user_steamid": team_a,
+            "weapon": "weapon_ak47",
+        },
+    ]
+
+    pkg = _read_zip(raw)
+
+    assert [(s["roundNumber"], s["tick"], s["weapon"]) for s in pkg["shots.json"]] == [
+        (2, 6500, "weapon_ak47"),
+    ]
+
+
 def test_world_self_deaths_before_freeze_end_are_not_exported_or_counted():
     raw = _base_raw()
     team_b = "76561198000000002"

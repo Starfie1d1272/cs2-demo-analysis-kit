@@ -382,9 +382,11 @@ def _annotate_trades(kills: list[dict], trade_window_ticks: int = 384) -> None:
 
 # ── damages ───────────────────────────────────────────────────────────────────
 
-def _build_damages(raw: dict, team_map: dict, round_model: _RoundModel) -> list[dict]:
-    out = []
-    for r in raw.get("hurts", []):
+def _iter_effective_damage_rows(raw: dict, team_map: dict, round_model: _RoundModel) -> list[dict]:
+    out: list[dict] = []
+    remaining_health: dict[tuple[int, str], int] = defaultdict(lambda: 100)
+
+    for r in sorted(raw.get("hurts", []), key=lambda row: int(row.get("tick") or 0)):
         n, vic_sid = _resolve_row(r, round_model, steamid_key="user_steamid", use_event=True, strict=True)
         if n is None:
             continue
@@ -409,8 +411,11 @@ def _build_damages(raw: dict, team_map: dict, round_model: _RoundModel) -> list[
         atk_side: str | None = atk_side_raw if _is_valid_side(atk_side_raw or "") else None
 
         raw_dmg = int(r.get("dmg_health") or 0)
-        health_after = min(int(r.get("health") or 0), 100)
-        health_before = min(health_after + raw_dmg, 100)
+        health_key = (n, vic_sid)
+        health_before = remaining_health[health_key]
+        health_dmg = min(max(raw_dmg, 0), health_before)
+        health_after = max(0, health_before - health_dmg)
+        remaining_health[health_key] = health_after
         armor_after = min(int(r.get("armor") or 0), 100)
         armor_before = min(armor_after + int(r.get("dmg_armor") or 0), 100)
 
@@ -425,7 +430,7 @@ def _build_damages(raw: dict, team_map: dict, round_model: _RoundModel) -> list[
             "victimSide": vic_side,
             "weapon": weapon,
             "hitgroup": normalize_hitgroup(r.get("hitgroup")),
-            "healthDamage": min(raw_dmg, health_before),
+            "healthDamage": health_dmg,
             "healthDamageRaw": raw_dmg,
             "armorDamage": int(r.get("dmg_armor") or 0),
             "victimHealthBefore": health_before,
@@ -436,6 +441,10 @@ def _build_damages(raw: dict, team_map: dict, round_model: _RoundModel) -> list[
             "victimPosition": _pos(r, "user_X", "user_Y", "user_Z"),
         })
     return out
+
+
+def _build_damages(raw: dict, team_map: dict, round_model: _RoundModel) -> list[dict]:
+    return _iter_effective_damage_rows(raw, team_map, round_model)
 
 
 # ── blinds ────────────────────────────────────────────────────────────────────
@@ -673,7 +682,7 @@ def _build_grenades(raw: dict, team_map: dict, round_model: _RoundModel) -> list
 def _build_shots(raw: dict, team_map: dict, round_model: _RoundModel) -> list[dict]:
     out = []
     for r in raw.get("fires", []):
-        n = round_model.round_for_event(r)
+        n = _active_event_round_number(round_model, r)
         if n is None:
             continue
 
@@ -718,7 +727,11 @@ def _build_positions(raw: dict, team_map: dict, round_model: _RoundModel) -> lis
         if n is None:
             continue
         key = team_map.get(sid, "unknown")
+        if not _is_valid_teamkey(key):
+            continue
         side = round_model.side_map.get((n, key), "unknown")
+        if not _is_valid_side(side):
+            continue
         out.append({
             "roundNumber": n,
             "tick": tick,
@@ -791,6 +804,8 @@ def _build_replay(raw: dict, team_map: dict, round_model: _RoundModel,
         n, sid = _resolve_row(r, round_model)
         if n is None:
             continue
+        if not _is_valid_teamkey(team_map.get(sid, "unknown")):
+            continue
         round_ticks[n].add(tick)
         player_frames[n][sid][tick] = {
             "x": int(_rnd(r.get("X"), 0)),
@@ -813,7 +828,11 @@ def _build_replay(raw: dict, team_map: dict, round_model: _RoundModel,
         player_list: list[dict] = []
         for sid, frames in player_frames[rn].items():
             key = team_map.get(sid, "unknown")
+            if not _is_valid_teamkey(key):
+                continue
             side = round_model.side_map.get((rn, key), "unknown")
+            if not _is_valid_side(side):
+                continue
             # align to round tick list; missing → dead sentinel
             x_a: list[int] = []
             y_a: list[int] = []
@@ -964,7 +983,7 @@ def _build_economies(
             continue
         vote = _team_economy_vote(types)
         if _is_pistol_conversion_round(rn, key, rounds):
-            vote = "conversion"
+            vote = "full"
         if key == "teamA":
             rd["teamAEconomy"] = vote
         elif key == "teamB":
@@ -1139,28 +1158,23 @@ def _build_player_stats(
     # Must match cs2-demo-format/tools/validate.py utility set exactly so
     # playerStats.utilityDamage agrees with the canonical recomputation.
     util_weapons = {"hegrenade", "inferno", "molotov", "incendiary"}
-    for r in raw.get("hurts", []):
-        if _event_round_number(round_model, r) is None:
-            continue
-        atk = _sid(r.get("attacker_steamid"))
-        vic = _sid(r.get("user_steamid"))
+    for r in _iter_effective_damage_rows(raw, team_map, round_model):
+        atk = r["attackerSteamId64"]
+        vic = r["victimSteamId64"]
         if not atk or atk == vic:
             continue
-        atk_team = team_map.get(atk, "unknown")
-        vic_team = team_map.get(vic or "", "unknown")
+        atk_team = r["attackerTeamKey"]
+        vic_team = r["victimTeamKey"]
         if atk_team == "unknown" or atk_team == vic_team:
             continue
         s = _get(atk)
-        # v2 contract: aggregate CAPPED effective damage (min(raw, healthBefore)),
+        # v2 contract: aggregate per-victim, per-round capped effective damage,
         # mirroring damages.healthDamage — not raw dmg_health.
-        raw_dmg = int(r.get("dmg_health") or 0)
-        health_after = min(int(r.get("health") or 0), 100)
-        health_before = min(health_after + raw_dmg, 100)
-        dmg_h = min(raw_dmg, health_before)
-        dmg_a = int(r.get("dmg_armor") or 0)
+        dmg_h = int(r["healthDamage"])
+        dmg_a = int(r["armorDamage"])
         s["damageHealth"] += dmg_h
         s["damageArmor"] += dmg_a
-        if str(r.get("weapon") or "").lower() in util_weapons:
+        if str(r["weapon"] or "").lower() in util_weapons:
             s["utilityDamage"] += dmg_h
 
     # flash duration from blinds_list
