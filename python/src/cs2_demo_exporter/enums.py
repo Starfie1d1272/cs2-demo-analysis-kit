@@ -5,6 +5,7 @@ Pure data tables — no imports from exporter or demoparser2.
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 # ── hit groups ────────────────────────────────────────────────────────────────
@@ -158,6 +159,82 @@ def classify_inventory(items: Any) -> tuple[str | None, str | None, int]:
         elif secondary is None and name in _PISTOL_ITEMS:
             secondary = name
     return primary, secondary, grenades
+
+
+# ── active weapon normalization ───────────────────────────────────────────────
+#
+# demoparser2 tick props expose `active_weapon_name` / `weapon_name` as display
+# names ("AK-47", "M4A1-S", ...). Replay consumers expect stable identifier-like
+# strings, not display text or entity handles.
+
+_WEAPON_DISPLAY_TO_CANONICAL = {
+    # Pistols
+    "glock-18": "glock",
+    "usp-s": "usp_silencer",
+    "p2000": "hkp2000",
+    "dual berettas": "elite",
+    "p250": "p250",
+    "five-seven": "fiveseven",
+    "tec-9": "tec9",
+    "cz75-auto": "cz75a",
+    "desert eagle": "deagle",
+    "r8 revolver": "revolver",
+    # SMG
+    "mac-10": "mac10",
+    "mp9": "mp9",
+    "mp7": "mp7",
+    "mp5-sd": "mp5sd",
+    "ump-45": "ump45",
+    "p90": "p90",
+    "pp-bizon": "bizon",
+    # Rifle / sniper
+    "galil ar": "galilar",
+    "famas": "famas",
+    "ak-47": "ak47",
+    "m4a4": "m4a1",
+    "m4a1-s": "m4a1_silencer",
+    "ssg 08": "ssg08",
+    "sg 553": "sg556",
+    "aug": "aug",
+    "awp": "awp",
+    "g3sg1": "g3sg1",
+    "scar-20": "scar20",
+    # Shotgun / LMG
+    "nova": "nova",
+    "xm1014": "xm1014",
+    "sawed-off": "sawedoff",
+    "mag-7": "mag7",
+    "m249": "m249",
+    "negev": "negev",
+    # Utility / equipment
+    "smoke grenade": "smokegrenade",
+    "flashbang": "flashbang",
+    "high explosive grenade": "hegrenade",
+    "incendiary grenade": "incgrenade",
+    "molotov": "molotov",
+    "decoy grenade": "decoy",
+    "zeus x27": "taser",
+    "c4 explosive": "c4",
+    "c4": "c4",
+    "knife": "knife",
+    "knife_t": "knife_t",
+}
+
+
+def normalize_weapon_name(raw: Any) -> str | None:
+    """Return a stable weapon identifier, or None for handles/unknown values."""
+    if isinstance(raw, float) and math.isnan(raw):
+        return None
+    text = str(raw or "").strip()
+    if not text or text.isdigit() or text.lower() in {"nan", "none", "null"}:
+        return None
+    lower = text.lower()
+    if lower.startswith("weapon_"):
+        lower = lower[7:]
+    if lower in _WEAPON_DISPLAY_TO_CANONICAL:
+        return _WEAPON_DISPLAY_TO_CANONICAL[lower]
+    ident = lower.replace("-", "_").replace(" ", "_")
+    return ident if ident and ident[0].isalpha() and all(c.isalnum() or c == "_" for c in ident) else None
 
 
 # ── bombs ──────────────────────────────────────────────────────────────────────

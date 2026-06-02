@@ -39,6 +39,7 @@ import {
   shotRowSchema,
   shotsSchema,
   sideSchema,
+  teamEconomySchema,
   teamKeySchema,
   vec3Schema
 } from "cs2-demo-format";
@@ -81,6 +82,8 @@ export {
   shotsSchema,
   sideSchema,
   steamId64Schema,
+  teamEconomySchema,
+  teamEconomyTypeSchema,
   teamKeySchema,
   teamSummarySchema,
   vec3Schema
@@ -347,8 +350,8 @@ export const economyPointSchema = z.object({
   teamA: z.number().int().nonnegative(),
   teamB: z.number().int().nonnegative(),
   advantage: z.number().int(),
-  teamAEconomy: economyTypeSchema,
-  teamBEconomy: economyTypeSchema,
+  teamAEconomy: teamEconomySchema,
+  teamBEconomy: teamEconomySchema,
   winnerTeamKey: teamKeySchema
 });
 
@@ -424,8 +427,8 @@ export const workspaceRoundSchema = z.object({
   winnerTeamKey: teamKeySchema,
   winnerSide: sideSchema,
   endReason: z.string(),
-  teamAEconomy: economyTypeSchema,
-  teamBEconomy: economyTypeSchema,
+  teamAEconomy: teamEconomySchema,
+  teamBEconomy: teamEconomySchema,
   events: z.array(timelineEventSchema),
   playerFacts: z.array(playerRoundFactSchema)
 });
@@ -531,6 +534,7 @@ export const matchWorkspaceModelSchema = z.object({
 export type Side = z.infer<typeof sideSchema>;
 export type TeamKey = z.infer<typeof teamKeySchema>;
 export type EconomyType = z.infer<typeof economyTypeSchema>;
+export type TeamEconomyType = z.infer<typeof teamEconomySchema>;
 export type Vec3 = z.infer<typeof vec3Schema>;
 export type DemoPackage = z.infer<typeof demoPackageSchema>;
 export type PackagePlayer = z.infer<typeof playerRowSchema>;

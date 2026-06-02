@@ -21,8 +21,8 @@ from pathlib import Path
 from typing import Any
 
 from .enums import (
-    normalize_hitgroup, normalize_round_end_reason, classify_inventory,
-    bomb_site_from_place, _BOMB_TYPE_MAP, _GRENADE_TYPE_ENUM,
+    normalize_hitgroup, classify_inventory,
+    normalize_weapon_name, bomb_site_from_place, _BOMB_TYPE_MAP, _GRENADE_TYPE_ENUM,
 )
 from .rounds import _RoundModel, _event_steamid, build_rounds
 
@@ -334,8 +334,8 @@ def _build_kills(raw: dict, team_map: dict, round_model: _RoundModel) -> list[di
             flash_assister_sid_raw if _is_valid_steamid(flash_assister_sid_raw) else None
         )
 
-        killer_active = str(r.get("attacker_active_weapon") or "") or None
-        victim_active = str(r.get("user_active_weapon") or "") or None
+        killer_active = normalize_weapon_name(r.get("attacker_active_weapon"))
+        victim_active = normalize_weapon_name(r.get("user_active_weapon"))
 
         out.append({
             "roundNumber": n,
@@ -732,7 +732,9 @@ def _build_positions(raw: dict, team_map: dict, round_model: _RoundModel) -> lis
             "health": int(_safe_float(r.get("health"), 0)),
             "armor": int(_safe_float(r.get("armor"), 0)),
             "money": int(_safe_float(r.get("current_equip_value"), 0)),
-            "activeWeapon": str(r.get("active_weapon") or "") or None,
+            "activeWeapon": normalize_weapon_name(
+                r.get("active_weapon_name") or r.get("weapon_name") or r.get("active_weapon")
+            ),
             "flashDurationRemaining": _rnd(r.get("flash_duration"), 1),
             # NOTE: has_c4/is_bomb_carrier tick props return None in this
             # demoparser2 build, so hasBomb is always false. Deriving true C4
@@ -796,7 +798,9 @@ def _build_replay(raw: dict, team_map: dict, round_model: _RoundModel,
             "z": int(_rnd(r.get("Z"), 0)),
             "yaw": int(_rnd(r.get("yaw"), 0)),
             "hp": int(_safe_float(r.get("health"), 0)),
-            "weapon": _wi(str(r.get("active_weapon")) if r.get("active_weapon") is not None else ""),
+            "weapon": _wi(normalize_weapon_name(
+                r.get("active_weapon_name") or r.get("weapon_name") or r.get("active_weapon")
+            )),
             "flags": _flags(r),
         }
 
@@ -860,16 +864,32 @@ def _build_replay(raw: dict, team_map: dict, round_model: _RoundModel,
 _ECO_ORDER = ["pistol", "eco", "semi", "force", "full"]
 
 
+def _is_pistol_round(round_number: int) -> bool:
+    # CS2 MR12 pistol rounds are R1 and R13. Overtime starts with high money,
+    # so OT halves are not pistol rounds.
+    return round_number == 1 or round_number == 13
+
+
+def _is_pistol_conversion_round(round_number: int, team_key: str, rounds: list[dict]) -> bool:
+    previous_pistol = round_number - 1
+    if previous_pistol not in (1, 13):
+        return False
+    previous_round = next(
+        (row for row in rounds if row.get("roundNumber") == previous_pistol),
+        None,
+    )
+    return previous_round is not None and previous_round.get("winnerTeamKey") == team_key
+
+
 def _economy_type(money_spent: int, start_money: int, equipment_value: int,
-                  round_number: int, total_rounds: int) -> str:
-    half = total_rounds // 2 + 1
-    if round_number == 1 or round_number == half:
+                  round_number: int) -> str:
+    if _is_pistol_round(round_number):
         return "pistol"
     if equipment_value >= 4000:
         return "full"
-    if money_spent < 1000 and equipment_value < 2000:
+    if money_spent < 1000 and equipment_value < 1000:
         return "eco"
-    if start_money > 0 and money_spent / start_money > 0.75:
+    if start_money > 0 and money_spent / start_money >= 0.80:
         return "force"
     return "semi"
 
@@ -890,7 +910,6 @@ def _build_economies(
 ) -> list[dict]:
     freeze_tick_to_round = {window.freeze_end_tick: window.round_number for window in round_model.windows}
 
-    total_rounds = len(rounds)
     out = []
     team_round_types: dict[tuple[int, str], list[str]] = {}
 
@@ -912,7 +931,7 @@ def _build_economies(
         spent = int(_safe_float(r.get("cash_spent_this_round"), 0))
         equip = int(_safe_float(r.get("current_equip_value"), 0))
         start_money = int(_safe_float(r.get("start_balance"), 0))
-        eco_type = _economy_type(spent, start_money, equip, n, total_rounds)
+        eco_type = _economy_type(spent, start_money, equip, n)
 
         has_armor = bool(int(_safe_float(r.get("armor"), 0)) > 0)
         has_helmet = bool(_b(r.get("has_helmet")))
@@ -944,6 +963,8 @@ def _build_economies(
         if rd is None:
             continue
         vote = _team_economy_vote(types)
+        if _is_pistol_conversion_round(rn, key, rounds):
+            vote = "conversion"
         if key == "teamA":
             rd["teamAEconomy"] = vote
         elif key == "teamB":

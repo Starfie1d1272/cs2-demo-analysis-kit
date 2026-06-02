@@ -128,7 +128,8 @@ function economyLabel(type: string | null) {
     eco: "ECO",
     semi: "半起",
     force: "强起",
-    full: "长枪"
+    full: "长枪",
+    conversion: "转换局"
   };
   return type ? labels[type] ?? type : "未知经济";
 }

@@ -273,7 +273,7 @@ def parse_for_rivalhub(dem_path: str) -> dict[str, Any]:
             all_positions = _rows(p.parse_ticks(
                 [
                     "steamid", "team_num", "X", "Y", "Z", "yaw", "pitch",
-                    "health", "armor", "active_weapon", "flash_duration",
+                    "health", "armor", "active_weapon", "active_weapon_name", "flash_duration",
                     "current_equip_value", "has_defuser", "has_c4",
                 ],
                 ticks=replay_ticks,

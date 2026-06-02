@@ -1516,8 +1516,8 @@ function normalizeSide(value: unknown): "t" | "ct" | null {
   return value === "t" || value === "ct" ? value : null;
 }
 
-function normalizeEconomyType(value: unknown): "pistol" | "eco" | "semi" | "force" | "full" {
-  return value === "pistol" || value === "eco" || value === "semi" || value === "force" || value === "full" ? value : "full";
+function normalizeEconomyType(value: unknown): "pistol" | "eco" | "semi" | "force" | "full" | "conversion" {
+  return value === "pistol" || value === "eco" || value === "semi" || value === "force" || value === "full" || value === "conversion" ? value : "full";
 }
 
 function numberValue(value: unknown): number {
