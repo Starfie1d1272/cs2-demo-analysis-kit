@@ -334,37 +334,47 @@ interface BalancedAccount {
 }
 
 /**
- * 跨选手标准化五账户：恢复每个账户的未加权 raw（= breakdown / accountWeight），
- * 对每个账户做 z-score，再按 accountWeight 加权求和得 composite。
- * accountRR = 1.0 + scale · composite，scale 使 composite 的离散度对齐 rrV1（已被 HLTV 逆向验证）。
- * 这样五账户量级可比、accountWeight 先验真正生效，trade/clutch/utility 不再被 combat 淹没。
+ * 残差化五账户（structure 经 55 场 ratingPro/WE 校准实证确定）：
+ *
+ * 1. 恢复每账户未加权 raw（= breakdown / accountWeight），跨选手 z-score。
+ * 2. combat 作主干（zc）。其余账户**残差化**：减去 combat 能解释的部分，只保留正交增量
+ *    `zr_a = standardize(z_a − corr(z_a, zc)·zc)`，度量"超出你 fragging 水平的团队贡献"，
+ *    避免与 combat 双重计分（clutch 与 combat 共线 0.56）。
+ * 3. composite = w_combat·zc + Σ w_a·zr_a；scale 使离散度对齐 rrV1；accountRR = 1 + scale·composite。
+ *
+ * 校准实证（55 场，target=ratingPro/WE）：剔除 combat 后，正交团队增量对两个 ground truth
+ * 的边际预测力 ≈ 0。故 combat 是数据强制的主干；非 combat 权重是**刻意的价值选择**
+ * （识别团队贡献），不是数据支持的。保留先验 accountWeight，但现在作用在正交残差上。
+ * 详见 docs/design/cohort.md。
  */
 function balanceSeasonAccounts(
   rows: Array<{ acc: { playerKey: string }; account: RRResultV2; rrV1: { rr: number } }>,
   weights: ValueAccountsWeights
 ): Map<string, BalancedAccount> {
   const w = weights.accountWeights as unknown as Record<AccountKey, number>;
-  const raw = {} as Record<AccountKey, number[]>;
-  const mean = {} as Record<AccountKey, number>;
-  const std = {} as Record<AccountKey, number>;
+  const z = {} as Record<AccountKey, number[]>;
   for (const k of ACCOUNT_KEYS) {
-    raw[k] = rows.map((r) => (w[k] !== 0 ? r.account.accounts[k] / w[k] : 0));
-    mean[k] = avg(raw[k]);
-    std[k] = pstd(raw[k], mean[k]);
+    z[k] = standardize(rows.map((r) => (w[k] !== 0 ? r.account.accounts[k] / w[k] : 0)));
   }
 
-  const zFor = (k: AccountKey, i: number) => (std[k] > 1e-9 ? (raw[k][i] - mean[k]) / std[k] : 0);
-  const composite = rows.map((_, i) => ACCOUNT_KEYS.reduce((s, k) => s + w[k] * zFor(k, i), 0));
+  // combat 主干；其余账户残差化（正交于 combat）
+  const zc = z.combat;
+  const n = Math.max(rows.length, 1);
+  const used = { combat: zc } as Record<AccountKey, number[]>;
+  for (const k of ACCOUNT_KEYS) {
+    if (k === "combat") continue;
+    const slope = z[k].reduce((acc, v, i) => acc + v * zc[i], 0) / n; // 两者已标准化 → 点积/n = 相关系数
+    used[k] = standardize(z[k].map((v, i) => v - slope * zc[i]));
+  }
 
+  const composite = rows.map((_, i) => ACCOUNT_KEYS.reduce((s, k) => s + w[k] * used[k][i], 0));
   const rrV1 = rows.map((r) => r.rrV1.rr);
-  const targetStd = pstd(rrV1, avg(rrV1));
-  const compStd = pstd(composite, avg(composite));
-  const scale = compStd > 1e-9 ? targetStd / compStd : 0;
+  const scale = pstd(composite) > 1e-9 ? pstd(rrV1) / pstd(composite) : 0;
 
   const out = new Map<string, BalancedAccount>();
   rows.forEach((r, i) => {
     const breakdown = {} as Record<AccountKey, number>;
-    for (const k of ACCOUNT_KEYS) breakdown[k] = round(scale * w[k] * zFor(k, i), 4);
+    for (const k of ACCOUNT_KEYS) breakdown[k] = round(scale * w[k] * used[k][i], 4);
     out.set(r.acc.playerKey, {
       rr: round(Math.max(0.1, 1 + scale * composite[i]), 3),
       rrRaw: round(composite[i], 3),
@@ -378,8 +388,15 @@ function avg(xs: number[]): number {
   return xs.length ? sum(xs, (x) => x) / xs.length : 0;
 }
 
-function pstd(xs: number[], m: number): number {
+function pstd(xs: number[]): number {
+  const m = avg(xs);
   return xs.length ? Math.sqrt(sum(xs, (x) => (x - m) ** 2) / xs.length) : 0;
+}
+
+function standardize(xs: number[]): number[] {
+  const m = avg(xs);
+  const s = pstd(xs);
+  return s > 1e-9 ? xs.map((x) => (x - m) / s) : xs.map(() => 0);
 }
 
 function accountContextStatus(rows: AccountSignalsV2[]): { buyDelta: AccountContextAvailability; manState: AccountContextAvailability } {

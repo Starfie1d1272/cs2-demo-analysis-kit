@@ -110,25 +110,41 @@ utility 0.3 / objective 0.1）形同虚设。
 `combat 0.172 / trade 0.016 / clutch 0.004 / objective 0.001 / utility 0.011`
 ——trade/clutch/utility/objective 近乎死信号，v2 退化成纯 combat ≈ v1。
 
-### 修复（`balanceSeasonAccounts`）
+### 修复（`balanceSeasonAccounts`）：标准化 + 残差化
 
-标准化本质是 cohort 级操作（要有一群人才能定相对位置），所以落在 cohort 层，
+标准化与残差化本质都是 cohort 级操作（要有一群人才能定相对位置 / 拟合正交化），落在 cohort 层，
 不动 `@rivalhub/rival-rating` 的单场模型：
 
-1. 反推每账户未加权 raw = `accountBreakdown[a] / accountWeight[a]`。
-2. 跨选手对每个账户做 z-score：`z_a = (raw_a − mean_a) / std_a`。
-3. `composite = Σ accountWeight[a] · z_a`。
-4. `scale = std(rrV1) / std(composite)`，使 composite 离散度对齐已被 HLTV 逆向验证的 rrV1。
-5. `accountRR = clamp(1.0 + scale · composite, ≥0.1)`；`accountBreakdown[a] = scale · accountWeight[a] · z_a`。
+1. 反推每账户未加权 raw = `accountBreakdown[a] / accountWeight[a]`，跨选手 z-score → `z_a`。
+2. **combat 作主干**（`zc = z_combat`）。
+3. **其余账户残差化**（消除与 combat 的共线，避免双重计分）：
+   `zr_a = standardize(z_a − corr(z_a, zc)·zc)`——只保留"超出你 fragging 水平的团队增量"。
+4. `composite = w_combat·zc + Σ_{a≠combat} w_a·zr_a`。
+5. `scale = std(rrV1)/std(composite)`；`accountRR = clamp(1.0 + scale·composite, ≥0.1)`；
+   `accountBreakdown[a] = scale·w_a·used_a`。
 
-效果：z 分单位方差 → 每账户贡献 std = `accountWeight · scale`，**恰好正比于先验权重**。
-修复后 std：`combat 0.148 / trade 0.074 / clutch 0.059 / utility 0.044 / objective 0.015`。
-corr(rrV1, accountRR) 从 0.98 降到 **0.91（spearman 0.87）**——combat/水平轴仍强相关，
-但 trade/clutch/utility 真正参与区分，v2 相对 v1 的增量价值复活。
+效果（55 场、57 人，残差化后 breakdown std）：
+`combat 0.186 / trade 0.093 / clutch 0.075 / utility 0.056 / objective 0.019`，
+非 combat 账户现在正交于 combat、各自携带独立的团队增量信号。
 
-> ⚠️ 范围：本修复在 **cohort（赛季）** 层。`@cs2dak/core` 的 **per-match** v2（`computeAccountRatingsV2`）
-> 仍是旧的线性相加，存在同样的 combat 碾压问题。per-match 标准化要用场内 10 人 cohort，
-> 留作后续（见 rr-v2-lite.md）。
+### 为什么是残差化（55 场 ratingPro/WE 校准实证）
 
-> ⚠️ 这是**结构性归一化**，不是用 ground truth 做的权重校准。`accountWeight` 仍是未校准先验，
-> 只是现在能真正生效。真正的权重数值校准等 ratingPro/MVP（含团队信号）落地后再做。
+用桌面 `rival_rating_calibration.csv`（480 行 / 55 名 steam64 / 37 场的 OCR ratingPro + WE）
+按 steam64 在赛季级做了真校准实验：
+
+- **整体评分 ≈ combat**：combat 单独 corr(ratingPro)=0.90；ratingPro/WE 本身就是 combat 主导。
+- **非 combat 账户信号弱且共线**：clutch 单独 corr 0.46 但与 combat 共线 0.56；trade 0.21 / utility 0.11 /
+  objective −0.02（噪声）。
+- **残差化后，正交团队增量对 ratingPro/WE 的边际预测力 ≈ 0**（残差 standalone corr 全部 ≈0）。
+
+结论：**combat 是数据强制的主干；非 combat 权重是刻意的价值选择（识别团队贡献），ground truth 给不出授权。**
+残差化保证这部分至少是"剔除 fragging 后的纯增量"、不双重计分，但它的大小由产品价值观决定，不是回归出来的。
+
+代价（须知情）：`corr(accountRR, ratingPro)=0.68` < `corr(rrV1, ratingPro)=0.90`——v2 刻意加入的团队增量
+相对 ratingPro 等同噪声，会把选手推离市场（ratingPro）排名。**信 v2 = 信"市场低估了团队价值"这个主张。**
+
+> ⚠️ 范围：本修复在 **cohort（赛季）** 层。`@cs2dak/core` 的 **per-match** v2 仍是旧线性相加，
+> 存在同样的 combat 碾压；per-match 残差化要用场内 10 人 cohort，留作后续（见 rr-v2-lite.md）。
+
+> ⚠️ 仍未做的：① 残差化只对 combat 正交，账户间残余共线（trade↔clutch 等）未消，完整版需 Gram-Schmidt；
+> ② 赛季级粒度 + 无 `match_id↔demo` 映射 → ratingPro 只能按 steam64 聚合；拿到 per-match 映射后可做更细校准。
