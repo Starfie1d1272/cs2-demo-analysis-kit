@@ -15,7 +15,7 @@
   --dak-ok: #53d77e;
   --dak-warn: #ffc64d;
   --dak-danger: #ff5a72;
-  --dak-font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --dak-font: "Avenir Next", "Segoe UI", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --dak-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
@@ -24,10 +24,9 @@
   background:
     linear-gradient(rgba(39, 49, 62, 0.34) 1px, transparent 1px),
     linear-gradient(90deg, rgba(39, 49, 62, 0.34) 1px, transparent 1px),
-    radial-gradient(circle at 14% 0%, rgba(255, 122, 33, 0.12), transparent 31%),
-    radial-gradient(circle at 88% 18%, rgba(73, 182, 255, 0.11), transparent 27%),
+    linear-gradient(180deg, rgba(15, 21, 30, 0.86), rgba(9, 11, 15, 0.96)),
     var(--dak-bg);
-  background-size: 32px 32px, 32px 32px, auto, auto, auto;
+  background-size: 32px 32px, 32px 32px, auto, auto;
   color: var(--dak-fg);
   font-family: var(--dak-font);
 }
@@ -58,7 +57,7 @@
 
 .dak-title {
   margin: 6px 0 0;
-  font-size: clamp(30px, 4vw, 58px);
+  font-size: 42px;
   line-height: 0.96;
   letter-spacing: 0;
 }
@@ -820,15 +819,352 @@
   text-transform: uppercase;
 }
 
+.dak-workbench {
+  display: grid;
+  grid-template-columns: 238px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.dak-workbench-sidebar {
+  position: sticky;
+  top: 12px;
+  min-width: 0;
+}
+
+.dak-workbench-main {
+  min-width: 0;
+}
+
+.dak-tabs {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  overflow: visible;
+}
+
+.dak-tab {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-areas:
+    "icon label"
+    "icon detail";
+  align-items: center;
+  gap: 1px 9px;
+  min-height: 54px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.dak-tab svg {
+  grid-area: icon;
+}
+
+.dak-tab span {
+  grid-area: label;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dak-fg);
+  font-weight: 800;
+}
+
+.dak-tab small {
+  grid-area: detail;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dak-fg-dim);
+  font-size: 10px;
+  font-family: var(--dak-mono);
+}
+
+.dak-tab:hover,
+.dak-player-button:hover,
+.dak-round-pill:hover,
+.dak-module-action:hover,
+.dak-layer-button:hover,
+.dak-speed:hover,
+.dak-icon-button:hover {
+  border-color: var(--dak-border-hi);
+  color: var(--dak-fg);
+}
+
+.dak-tab:focus-visible,
+.dak-player-button:focus-visible,
+.dak-round-pill:focus-visible,
+.dak-module-action:focus-visible,
+.dak-layer-button:focus-visible,
+.dak-speed:focus-visible,
+.dak-play-button:focus-visible,
+.dak-icon-button:focus-visible,
+.dak-scrubber:focus-visible {
+  outline: 2px solid var(--dak-accent-b);
+  outline-offset: 2px;
+}
+
+.dak-module-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.dak-module-action {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--dak-border);
+  border-radius: 4px;
+  background: var(--dak-bg-subtle);
+  color: var(--dak-fg-mid);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.dak-module-action b,
+.dak-module-action span,
+.dak-module-action small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dak-module-action b {
+  color: var(--dak-fg);
+  font-size: 13px;
+}
+
+.dak-module-action span {
+  margin-top: 1px;
+  font-family: var(--dak-mono);
+  font-size: 12px;
+}
+
+.dak-module-action small {
+  margin-top: 2px;
+  color: var(--dak-fg-dim);
+  font-size: 11px;
+}
+
+.dak-panel-eyebrow {
+  margin-bottom: 3px;
+  color: var(--dak-fg-dim);
+  font-size: 10px;
+  font-family: var(--dak-mono);
+}
+
+.dak-layer-controls {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.dak-layer-button {
+  width: 100%;
+  min-height: 38px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--dak-border);
+  border-radius: 4px;
+  background: var(--dak-bg-subtle);
+  color: var(--dak-fg-mid);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.dak-layer-button-active {
+  color: var(--dak-fg);
+  border-color: rgba(255, 122, 33, 0.64);
+  background: rgba(255, 122, 33, 0.12);
+}
+
+.dak-mode-row-muted {
+  opacity: 0.48;
+}
+
+.dak-replay-layout {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) 260px;
+  gap: 14px;
+  align-items: start;
+}
+
+.dak-playback {
+  display: grid;
+  grid-template-columns: 42px 34px minmax(0, 1fr) 34px;
+  gap: 8px;
+  align-items: center;
+  margin: 14px 0 10px;
+}
+
+.dak-play-button,
+.dak-icon-button {
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--dak-border);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--dak-fg);
+}
+
+.dak-play-button {
+  width: 42px;
+  height: 42px;
+  background: var(--dak-accent);
+  border-color: rgba(255, 122, 33, 0.78);
+}
+
+.dak-icon-button {
+  width: 34px;
+  height: 34px;
+  background: var(--dak-bg-subtle);
+}
+
+.dak-scrubber {
+  min-width: 0;
+  accent-color: var(--dak-accent);
+  cursor: pointer;
+}
+
+.dak-speed-group {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.dak-speed {
+  min-height: 30px;
+  border: 1px solid var(--dak-border);
+  border-radius: 4px;
+  background: var(--dak-bg-subtle);
+  color: var(--dak-fg-mid);
+  cursor: pointer;
+  font: inherit;
+  font-family: var(--dak-mono);
+  font-size: 12px;
+}
+
+.dak-speed-active {
+  color: var(--dak-fg);
+  border-color: rgba(73, 182, 255, 0.62);
+  background: rgba(73, 182, 255, 0.13);
+}
+
+.dak-replay-meta {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.dak-replay-gridlines {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(238, 243, 248, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(238, 243, 248, 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.dak-replay-token {
+  transition: left 80ms linear, top 80ms linear, opacity 120ms ease;
+}
+
+.dak-replay-token::after {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  width: 2px;
+  height: 10px;
+  background: rgba(238, 243, 248, 0.9);
+  transform: translateX(-50%);
+}
+
+.dak-replay-token-dead {
+  opacity: 0.28;
+  filter: grayscale(1);
+}
+
+.dak-replay-token-flashed {
+  box-shadow: 0 0 0 3px rgba(255, 198, 77, 0.45), 0 8px 18px rgba(0, 0, 0, 0.38);
+}
+
+.dak-frame-player-list {
+  display: grid;
+  gap: 7px;
+  max-height: 620px;
+  overflow: auto;
+}
+
+.dak-frame-player-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 9px;
+  border: 1px solid var(--dak-border);
+  border-radius: 4px;
+  background: var(--dak-bg-subtle);
+  font-size: 12px;
+}
+
+.dak-frame-player-row span:nth-child(2),
+.dak-frame-player-row small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dak-frame-player-row small {
+  grid-column: 2 / 4;
+  color: var(--dak-fg-dim);
+  font-family: var(--dak-mono);
+}
+
+.dak-team-dot-teamA {
+  background: var(--dak-accent);
+}
+
+.dak-team-dot-teamB {
+  background: var(--dak-accent-b);
+}
+
+.dak-player-roundfacts {
+  margin-top: 14px;
+}
+
 @media (max-width: 1080px) {
   .dak-header,
   .dak-grid,
   .dak-grid-even,
   .dak-kpi-strip,
-  .dak-module-strip,
   .dak-fact-grid,
-  .dak-replay-meta {
+  .dak-workbench,
+  .dak-replay-layout {
     grid-template-columns: 1fr;
+  }
+
+  .dak-workbench-sidebar {
+    position: static;
+  }
+
+  .dak-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .dak-scoreblock {
@@ -839,8 +1175,37 @@
     font-size: 34px;
   }
 
+  .dak-title {
+    font-size: 32px;
+  }
+
   .dak-qa-row,
   .dak-roundfact-row {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .dak-workspace {
+    width: min(100vw - 18px, 1480px);
+    padding-top: 14px;
+  }
+
+  .dak-tabs,
+  .dak-kpi-strip,
+  .dak-speed-group {
+    grid-template-columns: 1fr;
+  }
+
+  .dak-tab {
+    min-height: 46px;
+  }
+
+  .dak-title {
+    font-size: 28px;
+  }
+
+  .dak-replay-stage {
+    min-height: 380px;
   }
 }

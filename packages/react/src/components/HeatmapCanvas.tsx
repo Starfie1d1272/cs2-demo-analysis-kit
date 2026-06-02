@@ -5,6 +5,8 @@ import { useMemo, useState } from "react";
 export interface HeatmapCanvasProps {
   map: DemoViewModel["map"];
   points: HeatmapPoint[];
+  mode?: HeatmapMode;
+  onModeChange?: (mode: HeatmapMode) => void;
 }
 
 type HeatmapMode = HeatmapPoint["kind"];
@@ -15,8 +17,13 @@ const MODE_LABELS: Record<HeatmapMode, string> = {
   grenade: "道具落点"
 };
 
-export function HeatmapCanvas({ map, points }: HeatmapCanvasProps) {
-  const [mode, setMode] = useState<HeatmapMode>("death");
+export function HeatmapCanvas({ map, points, mode: controlledMode, onModeChange }: HeatmapCanvasProps) {
+  const [internalMode, setInternalMode] = useState<HeatmapMode>("death");
+  const mode = controlledMode ?? internalMode;
+  const setMode = (nextMode: HeatmapMode) => {
+    setInternalMode(nextMode);
+    onModeChange?.(nextMode);
+  };
   const calibration = getMapCalibration(map.name);
   const counts = useMemo(
     () => ({
