@@ -93,6 +93,7 @@ docs/                  # 架构与集成文档
 ## 5. Hard Constraints
 
 - **v2 ZIP 是唯一 seam**：Python ↔ TypeScript 只通过 ZIP 合同对接
+- **contract 不 fork**：`@cs2dak/contract` 依赖并 re-export `cs2-demo-format`，不在本仓库内 fork 类型定义
 - **Null 保持 null**：`AccountSignalsV2` 字段缺失时发 `null`，绝不 coerce 到 0
 - **Core 包不 import 产品代码**：RivalHub、CS2 Insight Agent、任何 app 都不得被 core 包引用
 - **React 组件不查数据库**：不跑分析逻辑，只消费 `DemoViewModel` / `MatchWorkspaceModel`
