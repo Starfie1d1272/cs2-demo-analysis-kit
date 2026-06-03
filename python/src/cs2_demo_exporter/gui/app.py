@@ -42,14 +42,20 @@ DEFAULT_OUT_DIR = Path.home() / "cs2-demo-exports"
 def _find_viewer_index() -> Path | None:
     """Locate the built demo-lab bundle's index.html.
 
-    Honours CS2DAK_VIEWER_DIST, otherwise falls back to the in-repo build
-    output at apps/demo-lab/dist (present after `pnpm --filter @cs2dak/demo-lab build`).
+    Resolution order:
+    1. CS2DAK_VIEWER_DIST env var (dev override).
+    2. PyInstaller bundle: `sys._MEIPASS / "demo-lab"` (frozen build).
+    3. In-repo build output at apps/demo-lab/dist (dev mode).
+
     Returns None when no build exists yet.
     """
     override = os.environ.get("CS2DAK_VIEWER_DIST")
     candidates = []
     if override:
         candidates.append(Path(override))
+    # PyInstaller onefile / onedir bundle
+    if getattr(sys, "frozen", False):
+        candidates.append(Path(sys._MEIPASS) / "demo-lab")
     # repo layout: python/src/cs2_demo_exporter/gui/app.py -> repo root is parents[4]
     candidates.append(Path(__file__).resolve().parents[4] / "apps" / "demo-lab" / "dist")
     for base in candidates:
