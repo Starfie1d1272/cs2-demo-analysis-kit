@@ -142,6 +142,7 @@ code { font-family: var(--font-mono); color: var(--accent); font-size: 11px; }
 .results li.pending::before { content: "[...] "; color: var(--warn); font-size: 10px; letter-spacing: var(--tracking-label); }
 .results li code { color: var(--fg-mid); }
 .results .err-msg { color: var(--danger); font-size: 11px; font-family: var(--font-mono); }
+.results .progress { color: var(--warn); font-size: 11px; }
 
 .actions { display: flex; gap: 10px; margin-top: 14px; }
 

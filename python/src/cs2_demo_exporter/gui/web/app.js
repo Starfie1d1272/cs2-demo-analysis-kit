@@ -5,22 +5,27 @@ let selectedPaths = [];
 
 const $ = (id) => document.getElementById(id);
 
-function renderResults(items, { pending = false } = {}) {
+function renderFileList(files) {
   const ul = $("results");
   ul.innerHTML = "";
-  for (const it of items) {
+  for (const name of files) {
     const li = document.createElement("li");
-    if (pending) {
-      li.className = "pending";
-      li.innerHTML = `<strong>${it}</strong>`;
-    } else if (it.ok) {
-      li.className = "ok";
-      li.innerHTML = `<strong>${it.name}</strong><br><code>${it.output}</code>`;
-    } else {
-      li.className = "err";
-      li.innerHTML = `<strong>${it.name}</strong><br><span class="err-msg">${it.error}</span>`;
-    }
+    li.className = "pending";
+    li.id = `item-${CSS.escape(name)}`;
+    li.innerHTML = `<strong>${name}</strong>`;
     ul.appendChild(li);
+  }
+}
+
+function updateItem(name, result) {
+  const li = document.getElementById(`item-${CSS.escape(name)}`);
+  if (!li) return;
+  if (result.ok) {
+    li.className = "ok";
+    li.innerHTML = `<strong>${result.name}</strong><br><code>${result.output}</code>`;
+  } else {
+    li.className = "err";
+    li.innerHTML = `<strong>${result.name}</strong><br><span class="err-msg">${result.error}</span>`;
   }
 }
 
@@ -28,7 +33,7 @@ function setSelected(paths) {
   selectedPaths = paths || [];
   $("export").disabled = selectedPaths.length === 0;
   if (selectedPaths.length) {
-    renderResults(selectedPaths.map((p) => p.split(/[/\\]/).pop()), { pending: true });
+    renderFileList(selectedPaths.map((p) => p.split(/[/\\]/).pop()));
   }
 }
 
@@ -48,11 +53,23 @@ function wire() {
 
   $("export").addEventListener("click", async () => {
     $("export").disabled = true;
-    const results = await window.pywebview.api.export(selectedPaths);
-    renderResults(results);
+    $("view").hidden = true;
+    let anyOk = false;
+    const total = selectedPaths.length;
+
+    for (let i = 0; i < selectedPaths.length; i++) {
+      const p = selectedPaths[i];
+      const name = p.split(/[/\\]/).pop();
+      // Show progress inline on the pending item.
+      const li = document.getElementById(`item-${CSS.escape(name)}`);
+      if (li) li.innerHTML = `<strong>${name}</strong><br><span class="progress">[${i + 1}/${total}] 正在解析…</span>`;
+
+      const result = await window.pywebview.api.export_one(p);
+      updateItem(name, result);
+      if (result.ok) anyOk = true;
+    }
+
     $("export").disabled = false;
-    // Reveal the viewer only when something exported and a viewer build exists.
-    const anyOk = results.some((r) => r.ok);
     if (anyOk && (await window.pywebview.api.can_view())) {
       $("view").hidden = false;
     }
