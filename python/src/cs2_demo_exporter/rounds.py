@@ -115,10 +115,19 @@ def build_rounds(
     side_map: dict[tuple[int, str], str] = {}
     windows: list[_RoundWindow] = []
 
-    round_ends_sorted = sorted(
-        raw.get("round_ends", []),
-        key=lambda r: _rn(r)
-    )
+    # A single round can emit multiple round_end events (e.g. a bogus warmup /
+    # restart end fired before the real one). Keep only the latest-tick end per
+    # round number so the same round is never counted twice.
+    best_by_round: dict[int, dict] = {}
+    for r in raw.get("round_ends", []):
+        n = _rn(r)
+        if n <= 0:
+            continue
+        prev = best_by_round.get(n)
+        if prev is None or int(r.get("tick") or 0) > int(prev.get("tick") or 0):
+            best_by_round[n] = r
+    round_ends_sorted = [best_by_round[n] for n in sorted(best_by_round)]
+
     for r in round_ends_sorted:
         n = _rn(r)
         if n <= 0:
@@ -127,6 +136,11 @@ def build_rounds(
         end_tick = int(r.get("tick") or 0)
         s_tick = start_tick.get(n, 0)
         fz_tick = freeze_tick.get(n, 0)
+
+        # A real round must end after its own freeze period; an end at or before
+        # freeze-end is a bogus warmup/restart event — drop it (don't score it).
+        if fz_tick > 0 and 0 < end_tick <= fz_tick:
+            continue
 
         team_a_side, team_b_side = _sides_for_round(raw, team_map, n)
         side_map[(n, "teamA")] = team_a_side

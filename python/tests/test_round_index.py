@@ -239,3 +239,42 @@ def test_grenade_destroy_tick_after_round_end_is_cleared():
     grenade = next(g for g in pkg["grenades.json"] if g["effectTick"] == 7100)
 
     assert grenade["destroyTick"] is None
+
+
+def test_phantom_round_end_before_freeze_is_dropped() -> None:
+    """A bogus round_end firing before its freeze ends must not become a real
+    round nor inflate the score (regression: 16:12 OT exported as 17:12)."""
+    from cs2_demo_exporter.rounds import build_rounds
+
+    team_a = "76561198000000001"
+    team_b = "76561198000000002"
+    team_map = {team_a: "teamA", team_b: "teamB"}
+    raw = {
+        "player_info": [
+            {"steamid": team_a, "name": "A", "team_num": 2},
+            {"steamid": team_b, "name": "B", "team_num": 3},
+        ],
+        "round_starts": [
+            {"tick": 1, "total_rounds_played": 0},
+            {"tick": 7988, "total_rounds_played": 1},
+        ],
+        "round_freeze_ends": [
+            {"tick": 2304, "total_rounds_played": 0},
+            {"tick": 9268, "total_rounds_played": 1},
+        ],
+        "round_ends": [
+            # Phantom: ends (576) before its own freeze-end (2304) — must be dropped.
+            {"tick": 576, "total_rounds_played": 1, "winner": "CT", "reason": "time_ran_out"},
+            # Real R1 conclusion.
+            {"tick": 7540, "total_rounds_played": 1, "winner": "CT", "reason": "ct_win"},
+            # Real R2 conclusion.
+            {"tick": 14140, "total_rounds_played": 2, "winner": "T", "reason": "t_win"},
+        ],
+    }
+
+    rounds, _ = build_rounds(raw, team_map)
+
+    # Exactly two real rounds, R1 kept once (the real ct_win, not the phantom).
+    assert [r["roundNumber"] for r in rounds] == [1, 2]
+    assert rounds[0]["endReason"] == "ct_win"
+    assert rounds[0]["endTick"] == 7540
