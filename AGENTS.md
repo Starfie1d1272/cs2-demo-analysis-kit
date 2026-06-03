@@ -1,77 +1,109 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+## 1. Project Overview
 
-## Commands
+CS2 比赛 demo 分析中间层。从 `.dem` 文件到产品级 view model 的完整管道——exporter、分析、可视化、GUI 桌面应用都在本仓库。
+
+- **技术栈**：TypeScript（pnpm monorepo）+ Python（uv 管理依赖）
+- **定位**：`.dem → v2 ZIP → @cs2dak/* 分析包 → RivalHub / CS2 Insight Agent`
+- **GUI**：pywebview 桌面应用——导出 ZIP 后内嵌 demo-lab 查看器渲染可视化
+
+## 2. Commands
 
 ```bash
-# Development
-pnpm dev                  # Start demo-lab (Vite preview app)
-pnpm build                # Build all packages
-pnpm typecheck            # tsc -b across workspace
+# 开发
+pnpm dev                  # 启动 demo-lab（Vite 预览）
+pnpm build                # 构建所有包
+pnpm typecheck            # tsc -b 全工作区类型检查
 
-# Testing
-pnpm test                 # Run vitest (packages/**/*.test.ts)
-pnpm python:test          # Run Python tests via uv
+# 测试
+pnpm test                 # vitest（packages/**/*.test.ts，node 环境）
+pnpm python:test          # Python 测试（uv run pytest）
 
-# Analysis
-pnpm analyze:sample       # Run CLI on fixture ZIP → fixtures/output/sample/
-pnpm python:export:sample # Export one NJU demo → fixtures/output/nju-rivals-2026/
+# 分析
+pnpm analyze:sample       # CLI 分析 fixtures/input/cs2dak-sanitized-de_ancient.zip → fixtures/output/sample/
+pnpm python:export:sample # 导出一场 NJU demo → fixtures/output/nju-rivals-2026/
+pnpm python:export:pro    # 批量导出所有职业 demo → fixtures/output/pro/
+pnpm python:export:nju    # 批量导出所有 NJU demo → fixtures/output/nju-rivals-2026/
 
-# GUI (rebuild viewer before running)
-pnpm --filter @cs2dak/demo-lab build   # Build the embedded viewer bundle
-cd python && uv run cs2-demo-exporter-gui  # Launch the pywebview desktop app
+# GUI（改过 demo-lab 后需要先构建）
+pnpm --filter @cs2dak/demo-lab build    # 构建嵌入式查看器
+cd python && uv run cs2-demo-exporter-gui   # 启动 pywebview 桌面应用
 
-# Run a single TS test file
+# 单测单文件
 pnpm vitest run packages/core/src/index.test.ts
 ```
 
-Python dependencies are managed with `uv` inside `python/`. Never install into system Python or conda base.
+Python `uv sync --extra gui` 装 pywebview（GUI 运行需要）。禁止向系统 python 和 conda base 安装包。
 
-## Architecture
-
-The repository is the middle layer between the CS2 demo exporter and downstream products (RivalHub, CS2 Insight Agent).
+## 3. Architecture
 
 ```
-.dem file
-  → python/cs2_demo_exporter  (produces cs2-demo-format/2.0 ZIP; CLI + GUI)
-  → @cs2dak/core              (loads ZIP → DemoPackage → AnalysisBundle)
-  → @rivalhub/rival-rating    (computes RR/PRISM scores)
-  → analysis-bundle.json / view-model.json / qa-report.json
-  → @cs2dak/react components  (consume DemoViewModel / MatchWorkspaceModel)
+.dem
+  → python/cs2_demo_exporter  （demoparser2 → cs2-demo-format/2.0 ZIP）
+       ├─ CLI：export / export-batch / validate
+       └─ GUI：pywebview 窗口 → 导出 ZIP → 内嵌 demo-lab 查看器渲染
+  → @cs2dak/core  （加载 ZIP → DemoPackage → AnalysisBundle）
+       ├─ normalize / economy / kills / clutches / timeline / heatmap / QA
+       ├─ box-score / RR v1 / RR v2-lite / PRISM（经 @rivalhub/rival-rating）
+       └─ → DemoViewModel / MatchWorkspaceModel
+  → @cs2dak/react 组件 或 产品适配层（RivalHub / CS2 Insight Agent）
 ```
 
-**Package responsibilities:**
+**跨语言 seam**：v2 ZIP 是 Python ↔ TypeScript 唯一耦合点。GUI 查看器中 ZIP 字节以 base64 经 pywebview 桥接传递，两边代码不互相 import。
 
-| Package | Role |
+| 包 | 职责 |
 |---|---|
-| `@cs2dak/contract` | Zod schemas + TS types for all domain objects. Single source of truth for shapes. |
-| `@cs2dak/core` | All analysis logic. Loads a v2 ZIP, runs normalization, economy, kills, clutches, timeline, heatmap, QA, and RR/PRISM signals. No side effects. |
-| `@cs2dak/maps` | Map calibration constants and world-to-radar coordinate transforms. |
-| `@cs2dak/react` | UI components that accept `DemoViewModel` / `MatchWorkspaceModel` props. No DB queries, no analysis logic. |
-| `@cs2dak/cli` | Thin CLI (via `tsx`) that wires `@cs2dak/core` to the filesystem. |
-| `apps/demo-lab` | Vite + React app: preview sandbox for components + embedded viewer in the pywebview GUI. |
-| `python/cs2_demo_exporter` | `.dem → v2 ZIP` pipeline using `demoparser2`. Also ships a GUI (`pywebview`) and PyInstaller packaging. |
-
-## Key Constraints
-
-- **Cross-language seam**: the v2 ZIP is the only coupling point between Python and TypeScript. Neither side imports the other's code.
-- **`@cs2dak/contract` vs `cs2-demo-format`**: contract depends on / re-exports `cs2-demo-format`; it does not fork it.
-- **`@rivalhub/rival-rating`** is pinned to a specific GitHub commit in `@cs2dak/core`'s `package.json`. It is the sole owner of RR/PRISM formulas and `AccountSignalsV2` types.
-- **Null fields stay null** in `AccountSignalsV2`; never coerce to 0.
-- Core packages must not import product code from RivalHub, CS2 Insight Agent, or any app.
-- React components must not query databases or run analysis — they consume `DemoViewModel` only.
-- Fixtures under `fixtures/` are the source of truth for cross-language behavior verification.
-
-## Workspace Layout
+| `@cs2dak/contract` | Zod schemas + TS 类型。re-export `cs2-demo-format`。 |
+| `@cs2dak/core` | 纯分析逻辑。加载 v2 ZIP → 标准化、信号派生、QA、RR/PRISM 接线。无副作用。 |
+| `@cs2dak/maps` | 地图标定、world→radar 坐标变换、zone 几何（`zoneAt` / `pointInPolygon`）。 |
+| `@cs2dak/react` | React 组件（MatchWorkspace、HeatmapCanvas、EconomyPanel、KillFeed、ScoreboardTable）。只消费 view model，不查数据库、不跑分析。 |
+| `@cs2dak/cli` | 薄 CLI（tsx），把 `@cs2dak/core` 接到文件系统。 |
+| `apps/demo-lab` | Vite + React 应用：组件预览沙盒 + pywebview GUI 的嵌入式查看器。 |
+| `python/cs2_demo_exporter` | Python exporter：`.dem → v2 ZIP`。CLI + pywebview GUI + PyInstaller 打包。 |
 
 ```
-packages/         # @cs2dak/* TypeScript libraries
-apps/demo-lab/    # Vite preview app (@cs2dak/demo-lab)
-python/           # cs2_demo_exporter Python package (uv-managed)
-fixtures/input/   # Sample v2 ZIPs used as test inputs
-fixtures/output/  # Generated artifacts (gitignored in practice)
-docs/             # Architecture and integration notes
+packages/              # @cs2dak/* TypeScript 库
+apps/demo-lab/         # Vite 预览 + GUI 嵌入式查看器
+python/                # cs2_demo_exporter（uv-managed）
+fixtures/
+  demos/               # 原始 .dem（gitignored）
+    nju-rivals-2026/   # 55 场 NJU 联赛
+    pro/               # 24 场职业比赛
+  input/               # 提交的测试输入
+    cs2dak-sanitized-de_ancient.zip   # 主 vitest fixture
+    cohort/            # 3 场 cohort/cli 测试
+    sample-match.zip   # demo-lab 单场样本
+  output/              # 生成的 v2 ZIP（gitignored）
+  baselines/           # 精选非再生产物（提交）
+  _bench/              # 本地 benchmark 与大文件（gitignored）
+docs/                  # 架构与集成文档
 ```
 
-TypeScript tests live alongside source as `*.test.ts` and are run by vitest (node environment, no browser).
+详细架构见 `docs/architecture.md`。
+
+## 4. Conventions
+
+- **Python**：uv 管理依赖，`ruff` lint。禁止装系统 python / conda base。`uv run` 跑脚本
+- **TypeScript**：pnpm workspace，vitest（node 环境），`tsc -b` 类型检查。测试与源码同目录 `*.test.ts`
+- **跨语言 seam**：v2 ZIP 是唯一耦合点。Python 和 TS 不互相 import
+- **组件导出**：公共组件从 `packages/react/src/index.ts` 统一导出
+- **Git commit**：中文，不加 `Co-Authored-By` trailer，语言跟随仓库现有约定
+
+## 5. Hard Constraints
+
+- **v2 ZIP 是唯一 seam**：Python ↔ TypeScript 只通过 ZIP 合同对接
+- **Null 保持 null**：`AccountSignalsV2` 字段缺失时发 `null`，绝不 coerce 到 0
+- **Core 包不 import 产品代码**：RivalHub、CS2 Insight Agent、任何 app 都不得被 core 包引用
+- **React 组件不查数据库**：不跑分析逻辑，只消费 `DemoViewModel` / `MatchWorkspaceModel`
+- **fixtures/ 是真相源**：跨语言行为验证以 fixtures 为准
+- **公式所有权**：RR/PRISM 公式在 `@rivalhub/rival-rating`（外部依赖），kit 只做信号派生和接线
+
+## 6. Gotchas
+
+- **WKWebView sandbox 警告**：macOS 上非 `.app` bundle 运行 GUI 时，WKWebView 会在 stderr 输出沙盒目录创建失败。无害，PyInstaller 打包后自动消失
+- **demo-lab 需先构建**：改过 `apps/demo-lab/` 或任何依赖包的源码后，必须重新 `pnpm --filter @cs2dak/demo-lab build`，否则 GUI 查看器看到旧构建
+- **ruff 路径**：`ruff` 不在全局 PATH，用 `uv run ruff check <path>` 跑 lint
+- **python:export 前置**：`uv sync --extra gui` 装 pywebview 后才能跑 GUI 或导出命令
+- **cwd 敏感**：pnpm 命令只在 workspace root 有效，不要在 `python/` 子目录下跑
+- **dist 被 gitignore**：`apps/demo-lab/dist/` 不提交，CI 或本地需先构建
