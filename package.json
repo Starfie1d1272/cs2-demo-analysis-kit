@@ -1,6 +1,6 @@
 {
   "name": "cs2-demo-analysis-kit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Reusable CS2 demo analysis models, QA reports, and previewable UI components.",
   "license": "MIT",
@@ -14,7 +14,9 @@
     "python:export:nju": "cd python && uv run cs2-demo-exporter export ../fixtures/demos/nju-rivals-2026/*.dem --out ../fixtures/output/nju-rivals-2026",
     "typecheck": "tsc -b --pretty",
     "test": "vitest run",
-    "build": "pnpm -r --if-present build"
+    "build": "pnpm -r --if-present build",
+    "sync-version": "node scripts/sync-version.mjs",
+    "package": "bash scripts/package.sh"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
