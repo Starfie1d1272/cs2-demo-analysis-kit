@@ -33,7 +33,11 @@ describe("analyzeDemoPackage", () => {
     expect(workspace.replay.capabilities.hasDefuseKit).toBe(true);
     expect(workspace.replay.capabilities.hasBombPosition).toBe(false);
     expect(workspace.replay.rounds.some((round) => round.players.some((player) => player.frames.some((frame) => frame.weapon && /^\d+$/.test(frame.weapon))))).toBe(false);
-    expect(workspace.overview.story.join("\n")).toContain("击败");
+    expect(workspace.overview.story.length).toBeGreaterThan(0);
+    // 开场 beat 必出：含地图显示名 + 比分，且用胜负动词之一描述结果。
+    expect(workspace.overview.story[0]).toContain("Ancient");
+    expect(workspace.overview.story[0]).toContain("13:8");
+    expect(workspace.overview.story[0]).toMatch(/碾压|险胜|拿下/);
     expect(workspace.overview.story.join("\n")).not.toContain("打成");
     expect(workspace.adminQa.summary.errorCount).toBe(0);
   });
