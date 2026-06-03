@@ -22,7 +22,8 @@ const ECONOMY_LABELS_CN: Record<string, string> = {
   semi: "半起",
   force: "强起",
   full: "全枪全弹",
-  conversion: "续航",
+  // 手枪局获胜方在次回合打的长枪局（把手枪优势"转换"为经济压制）。
+  conversion: "转换局",
 };
 
 /**
