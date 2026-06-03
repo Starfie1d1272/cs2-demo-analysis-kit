@@ -133,7 +133,8 @@ export function buildMatchWorkspaceModel(input: unknown): MatchWorkspaceModel {
 
 function radarImageUrlForMap(mapName: string): string | null {
   const knownMaps = new Set(["de_ancient", "de_anubis", "de_dust2", "de_inferno", "de_mirage", "de_nuke", "de_overpass"]);
-  return knownMaps.has(mapName) ? `/maps/radars/${mapName}.png` : null;
+  // Relative path so it resolves from both http:// dev server and file:// pywebview.
+  return knownMaps.has(mapName) ? `./maps/radars/${mapName}.png` : null;
 }
 
 function buildWorkspaceKpis(bundle: AnalysisBundle) {

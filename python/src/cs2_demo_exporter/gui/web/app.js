@@ -11,13 +11,14 @@ function renderResults(items, { pending = false } = {}) {
   for (const it of items) {
     const li = document.createElement("li");
     if (pending) {
-      li.textContent = `⏳ ${it}`;
+      li.className = "pending";
+      li.innerHTML = `<strong>${it}</strong>`;
     } else if (it.ok) {
       li.className = "ok";
-      li.innerHTML = `✅ <strong>${it.name}</strong><br><code>${it.output}</code>`;
+      li.innerHTML = `<strong>${it.name}</strong><br><code>${it.output}</code>`;
     } else {
       li.className = "err";
-      li.innerHTML = `❌ <strong>${it.name}</strong><br><span class="err-msg">${it.error}</span>`;
+      li.innerHTML = `<strong>${it.name}</strong><br><span class="err-msg">${it.error}</span>`;
     }
     ul.appendChild(li);
   }

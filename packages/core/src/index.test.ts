@@ -64,7 +64,7 @@ describe("analyzeDemoPackage", () => {
     expect(bundle.timeline.find((event) => event.type === "kill")?.clockLabel).toMatch(/^\d:\d{2}$/);
     expect(viewModel.scoreline).toBe("13:8");
     expect(viewModel.map.name).toBe("de_ancient");
-    expect(viewModel.map.radarImageUrl).toBe("/maps/radars/de_ancient.png");
+    expect(viewModel.map.radarImageUrl).toBe("./maps/radars/de_ancient.png");
     expect(viewModel.qa.summary.errorCount).toBe(0);
   });
 
