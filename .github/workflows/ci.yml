@@ -40,5 +40,8 @@ jobs:
         with:
           enable-cache: true
 
-      - run: pnpm python:test
-        working-directory: ${{ github.workspace }}
+      - run: uv sync --extra dev
+        working-directory: python
+
+      - run: uv run pytest
+        working-directory: python
