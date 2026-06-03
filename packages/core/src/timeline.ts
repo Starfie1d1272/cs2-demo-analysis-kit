@@ -75,6 +75,17 @@ export function buildEconomy(pkg: DemoPackage): EconomyPoint[] {
 }
 
 export function buildHeatmap(pkg: DemoPackage): HeatmapPoint[] {
+  // Pre-index sides per round to derive CT/T for any teamKey lookup.
+  const roundSides = new Map(
+    pkg.rounds.map((r) => [r.roundNumber, { teamA: r.teamASide, teamB: r.teamBSide }])
+  );
+  const sideFor = (teamKey: string | null, roundNumber: number): "ct" | "t" | null => {
+    if (!teamKey) return null;
+    const s = roundSides.get(roundNumber);
+    if (!s) return null;
+    return teamKey === "teamA" ? s.teamA : s.teamB;
+  };
+
   const kills = pkg.kills.flatMap<HeatmapPoint>((kill) => {
     const out: HeatmapPoint[] = [
       {
@@ -84,6 +95,7 @@ export function buildHeatmap(pkg: DemoPackage): HeatmapPoint[] {
         roundNumber: kill.roundNumber,
         teamKey: kill.victimTeamKey,
         steamId64: kill.victimSteamId64,
+        side: sideFor(kill.victimTeamKey, kill.roundNumber),
         kind: "death",
         grenadeType: null
       }
@@ -96,6 +108,7 @@ export function buildHeatmap(pkg: DemoPackage): HeatmapPoint[] {
         roundNumber: kill.roundNumber,
         teamKey: kill.killerTeamKey,
         steamId64: kill.killerSteamId64,
+        side: sideFor(kill.killerTeamKey, kill.roundNumber),
         kind: "kill",
         grenadeType: null
       });
@@ -111,6 +124,7 @@ export function buildHeatmap(pkg: DemoPackage): HeatmapPoint[] {
       roundNumber: grenade.roundNumber,
       teamKey: grenade.throwerTeamKey,
       steamId64: grenade.throwerSteamId64,
+      side: sideFor(grenade.throwerTeamKey, grenade.roundNumber),
       kind: "grenade",
       grenadeType: grenade.grenade
     }));

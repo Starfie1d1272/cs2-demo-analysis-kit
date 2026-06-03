@@ -363,6 +363,7 @@ export const heatmapPointSchema = z.object({
   roundNumber: z.number().int().positive(),
   teamKey: teamKeySchema.nullable(),
   steamId64: z.string().nullable(),
+  side: sideSchema.nullable(),
   kind: z.enum(["kill", "death", "grenade"]),
   grenadeType: grenadeTypeSchema.nullable()
 });
@@ -460,6 +461,7 @@ export const workspaceSpatialPointSchema = z.object({
   roundNumber: z.number().int().positive(),
   teamKey: teamKeySchema.nullable(),
   steamId64: z.string().nullable(),
+  side: sideSchema.nullable(),
   kind: z.enum(["kill", "death", "grenade", "bomb", "position"]),
   grenadeType: grenadeTypeSchema.nullable()
 });

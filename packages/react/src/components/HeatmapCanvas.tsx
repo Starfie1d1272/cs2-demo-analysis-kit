@@ -8,7 +8,7 @@
  *
  * This replaces the previous DOM-span approach which could not render true density.
  */
-import type { DemoViewModel, GrenadeType, HeatmapPoint, TeamKey } from "@cs2dak/contract";
+import type { DemoViewModel, GrenadeType, HeatmapPoint, Side, TeamKey } from "@cs2dak/contract";
 import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -151,6 +151,7 @@ export function HeatmapCanvas({ map, points, players, mode: controlledMode, onMo
   const [blur, setBlur]     = useState(15);
   const [opacity, setOpacity] = useState(0.72);
   const [grenadeFilter, setGrenadeFilter] = useState<GrenadeFilter>("all");
+  const [sideFilter, setSideFilter] = useState<Side | "all">("all");
   // Empty set = all players shown.
   const [selectedSteamIds, setSelectedSteamIds] = useState<ReadonlySet<string>>(new Set());
 
@@ -185,6 +186,7 @@ export function HeatmapCanvas({ map, points, players, mode: controlledMode, onMo
       .filter((p) => {
         if (p.x === 0 && p.y === 0) return false;
         if (p.kind !== mode) return false;
+        if (sideFilter !== "all" && p.side !== sideFilter) return false;
         if (mode === "grenade" && !matchesGrenadeFilter(p.grenadeType, grenadeFilter)) return false;
         if (selectedSteamIds.size > 0 && p.steamId64 && !selectedSteamIds.has(p.steamId64)) return false;
         return true;
@@ -197,7 +199,7 @@ export function HeatmapCanvas({ map, points, players, mode: controlledMode, onMo
           (radar.y / cal.radarSize) * CANVAS_SIZE,
         ] as [number, number]];
       });
-  }, [points, mode, grenadeFilter, selectedSteamIds, calibration]);
+  }, [points, mode, sideFilter, grenadeFilter, selectedSteamIds, calibration]);
 
   // Per-point stamp alpha following CS Demo Manager's approach: target ~10 overlapping
   // events to fully saturate a spot. Floor at 0.1 so isolated events are faintly visible.
@@ -225,91 +227,109 @@ export function HeatmapCanvas({ map, points, players, mode: controlledMode, onMo
   const hasData = scaledPoints.length > 0;
 
   return (
-    <div
-      className="dak-heatmap"
-      aria-label={`${map.name} heatmap — ${MODE_LABELS[mode]}`}
-      style={map.radarImageUrl ? { backgroundImage: `url(${map.radarImageUrl})` } : undefined}
-    >
-      {!map.radarImageUrl && <SchematicRadar mapName={map.name} />}
-
-      <div className="dak-heatmap-controls" role="radiogroup" aria-label="热力图类型">
-        {(Object.keys(MODE_LABELS) as HeatmapMode[]).map((kind) => (
-          <button
-            key={kind}
-            type="button"
-            role="radio"
-            aria-checked={mode === kind}
-            className={mode === kind ? "dak-mode dak-mode-active" : "dak-mode"}
-            onClick={() => setMode(kind)}
-          >
-            {MODE_LABELS[kind]} <span>{counts[kind]}</span>
-          </button>
-        ))}
-      </div>
-
-      {mode === "grenade" && (
-        <div className="dak-heatmap-grenade-filter" role="radiogroup" aria-label="道具类型">
-          {GRENADE_FILTER_OPTIONS.map(({ value, label }) => (
+    <div className="dak-heatmap-wrap" aria-label={`${map.name} heatmap`}>
+      {/* ── Filter toolbar (outside the radar image) ── */}
+      <div className="dak-heatmap-filters">
+        <div className="dak-heatmap-controls" role="radiogroup" aria-label="热力图类型">
+          {(Object.keys(MODE_LABELS) as HeatmapMode[]).map((kind) => (
             <button
-              key={value}
+              key={kind}
               type="button"
               role="radio"
-              aria-checked={grenadeFilter === value}
-              className={grenadeFilter === value ? "dak-gf-chip dak-gf-chip-active" : "dak-gf-chip"}
-              onClick={() => setGrenadeFilter(value)}
+              aria-checked={mode === kind}
+              className={mode === kind ? "dak-mode dak-mode-active" : "dak-mode"}
+              onClick={() => setMode(kind)}
             >
-              {label}
+              {MODE_LABELS[kind]} <span>{counts[kind]}</span>
             </button>
           ))}
+          <div className="dak-heatmap-side-filter" role="radiogroup" aria-label="阵营">
+            {(["all", "ct", "t"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                role="radio"
+                aria-checked={sideFilter === s}
+                className={sideFilter === s ? "dak-sf-chip dak-sf-chip-active" : "dak-sf-chip"}
+                onClick={() => setSideFilter(s)}
+              >
+                {s === "all" ? "全部" : s.toUpperCase()}
+              </button>
+            ))}
+          </div>
         </div>
-      )}
 
-      {players && players.length > 0 && (
-        <div className="dak-heatmap-player-filter" aria-label="按选手筛选">
-          <button
-            type="button"
-            className={selectedSteamIds.size === 0 ? "dak-pf-chip dak-pf-all dak-pf-chip-active" : "dak-pf-chip dak-pf-all"}
-            onClick={() => setSelectedSteamIds(new Set())}
-          >
-            全部
-          </button>
-          {players.map((p) => (
+        {mode === "grenade" && (
+          <div className="dak-heatmap-grenade-filter" role="radiogroup" aria-label="道具类型">
+            {GRENADE_FILTER_OPTIONS.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={grenadeFilter === value}
+                className={grenadeFilter === value ? "dak-gf-chip dak-gf-chip-active" : "dak-gf-chip"}
+                onClick={() => setGrenadeFilter(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {players && players.length > 0 && (
+          <div className="dak-heatmap-player-filter" aria-label="按选手筛选">
             <button
-              key={p.steamId64}
               type="button"
-              className={[
-                "dak-pf-chip",
-                `dak-pf-chip-${p.teamKey}`,
-                selectedSteamIds.has(p.steamId64) ? "dak-pf-chip-active" : "",
-              ].join(" ").trim()}
-              onClick={() => togglePlayer(p.steamId64)}
+              className={selectedSteamIds.size === 0 ? "dak-pf-chip dak-pf-all dak-pf-chip-active" : "dak-pf-chip dak-pf-all"}
+              onClick={() => setSelectedSteamIds(new Set())}
             >
-              {p.name}
+              全部选手
             </button>
-          ))}
+            {players.map((p) => (
+              <button
+                key={p.steamId64}
+                type="button"
+                className={[
+                  "dak-pf-chip",
+                  `dak-pf-chip-${p.teamKey}`,
+                  selectedSteamIds.has(p.steamId64) ? "dak-pf-chip-active" : "",
+                ].join(" ").trim()}
+                onClick={() => togglePlayer(p.steamId64)}
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Radar image + canvas ── */}
+      <div
+        className="dak-heatmap"
+        style={map.radarImageUrl ? { backgroundImage: `url(${map.radarImageUrl})` } : undefined}
+      >
+        {!map.radarImageUrl && <SchematicRadar mapName={map.name} />}
+        <canvas ref={canvasRef} className="dak-heatmap-canvas" aria-hidden="true" />
+        {!calibration && <div className="dak-heatmap-empty">该地图暂无雷达标定</div>}
+        {calibration && !hasData && <div className="dak-heatmap-empty">当前筛选条件下暂无位置数据</div>}
+        <div className="dak-heatmap-legend">
+          <span>
+            <i style={{ background: LEGEND_COLORS[mode] }} />
+            {MODE_LABELS[mode]}
+            {scaledPoints.length > 0 && <small> · {scaledPoints.length} 个事件</small>}
+          </span>
+          <span className="dak-heatmap-legend-scale">
+            <i className="dak-legend-cold" />冷
+            <i className="dak-legend-warm" />热
+          </span>
         </div>
-      )}
+      </div>
 
-      <canvas ref={canvasRef} className="dak-heatmap-canvas" aria-hidden="true" />
-      {!calibration && <div className="dak-heatmap-empty">该地图暂无雷达标定</div>}
-      {calibration && !hasData && <div className="dak-heatmap-empty">当前筛选条件下暂无位置数据</div>}
-
+      {/* ── Tuning sliders (outside the radar image) ── */}
       <div className="dak-heatmap-tuning" aria-label="热力图参数">
         <label>半径 <input type="range" min={10} max={60} value={radius} onChange={(e) => setRadius(Number(e.target.value))} /></label>
         <label>虚化 <input type="range" min={2}  max={30} value={blur}   onChange={(e) => setBlur(Number(e.target.value))} /></label>
         <label>强度 <input type="range" min={20} max={100} value={Math.round(opacity * 100)} onChange={(e) => setOpacity(Number(e.target.value) / 100)} /></label>
-      </div>
-
-      <div className="dak-heatmap-legend">
-        <span>
-          <i style={{ background: LEGEND_COLORS[mode] }} />
-          {MODE_LABELS[mode]}
-          {scaledPoints.length > 0 && <small> · {scaledPoints.length} 个事件</small>}
-        </span>
-        <span className="dak-heatmap-legend-scale">
-          <i className="dak-legend-cold" />冷
-          <i className="dak-legend-warm" />热
-        </span>
       </div>
     </div>
   );

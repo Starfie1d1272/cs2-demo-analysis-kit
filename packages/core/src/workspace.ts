@@ -261,6 +261,7 @@ function buildWorkspaceMap(pkg: DemoPackage, view: ReturnType<typeof buildDemoVi
       teamKey: bomb.actorTeamKey,
       steamId64: bomb.actorSteamId64,
       kind: "bomb",
+      side: null,
       grenadeType: null
     }));
   const positionPoints: WorkspaceSpatialPoint[] = (pkg.positions1s ?? [])
@@ -273,6 +274,7 @@ function buildWorkspaceMap(pkg: DemoPackage, view: ReturnType<typeof buildDemoVi
       teamKey: row.teamKey,
       steamId64: row.steamId64,
       kind: "position",
+      side: null,
       grenadeType: null
     }));
   const points: WorkspaceSpatialPoint[] = [
