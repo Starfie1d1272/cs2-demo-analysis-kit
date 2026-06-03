@@ -15,8 +15,10 @@ pnpm test                 # Run vitest (packages/**/*.test.ts)
 pnpm python:test          # Run Python tests via uv
 
 # Analysis
-pnpm analyze:sample       # Run CLI on fixture ZIP → fixtures/output/sample/
-pnpm python:export:sample # Export a .dem file to fixtures/output/exporter/
+pnpm analyze:sample       # Run CLI on fixtures/input/cs2dak-sanitized-de_ancient.zip → fixtures/output/sample/
+pnpm python:export:sample # Export one NJU demo → fixtures/output/nju-rivals-2026/
+pnpm python:export:pro    # Batch-export all pro demos → fixtures/output/pro/
+pnpm python:export:nju    # Batch-export all NJU demos → fixtures/output/nju-rivals-2026/
 
 # Run a single TS test file
 pnpm vitest run packages/core/src/index.test.ts
@@ -62,12 +64,23 @@ The repository is the middle layer between the CS2 demo exporter and downstream 
 ## Workspace Layout
 
 ```
-packages/         # @cs2dak/* TypeScript libraries
-apps/demo-lab/    # Vite preview app (@cs2dak/demo-lab)
-python/           # cs2_demo_exporter Python package (uv-managed)
-fixtures/input/   # Sample v2 ZIPs used as test inputs
-fixtures/output/  # Generated artifacts (gitignored in practice)
-docs/             # Architecture and integration notes
+packages/              # @cs2dak/* TypeScript libraries
+apps/demo-lab/         # Vite preview app (@cs2dak/demo-lab)
+python/                # cs2_demo_exporter Python package (uv-managed)
+fixtures/
+  demos/               # Raw .dem files (gitignored, ~27 GB)
+    nju-rivals-2026/   # 55 NJU league demos
+    pro/               # 24 professional match demos
+  input/               # Committed test inputs (small, stable)
+    cs2dak-sanitized-de_ancient.zip   # Primary vitest fixture
+    cohort/            # 3-match cohort for cohort/cli tests
+    sample-match.zip   # One-match sample for demo-lab
+  output/              # Generated v2 ZIPs (gitignored, re-export with python:export:*)
+    nju-rivals-2026/
+    pro/
+  baselines/           # Curated non-regenerable artifacts (committed)
+  _bench/              # Local benchmark scripts and large demo files (gitignored)
+docs/                  # Architecture and integration notes
 ```
 
 TypeScript tests live alongside source as `*.test.ts` and are run by vitest (node environment, no browser).
