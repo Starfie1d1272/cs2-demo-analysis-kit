@@ -1,9 +1,5 @@
 # cs2-demo-exporter
 
-> ⚠️ **WIP / 待办仓库** — 目前只有脚手架（scaffold only）。模块边界与 v2 文件布局已就位，但 `parser` / `builder` / `stats` / `economy` / `validate` 的实现体均为 `NotImplementedError` + TODO，待逐个填充。
->
-> ⚠️ **WIP / Placeholder repo** — scaffold only for now. Module boundaries and the v2 file layout are in place, but the `parser` / `builder` / `stats` / `economy` / `validate` bodies are `NotImplementedError` + TODO, to be filled in one at a time.
-
 [English](#english) · [中文](#中文)
 
 ---
@@ -98,13 +94,13 @@ speed dropped under heavier CPU/cache/I/O contention.
 
 ### Roadmap
 
-- [ ] `parser.py` — wire up demoparser2 raw extraction (events + ticks)
-- [ ] `rounds.py` — formal round model, side / team normalization, warmup drop
-- [ ] `builder.py` — implement the 13 per-file row builders
-- [ ] `economy.py` — port economyType thresholds
-- [ ] `stats.py` — capped damage / ADR / KAST / utility aggregation
-- [ ] `validate.py` — jsonschema checks against `cs2-demo-format/spec`
-- [ ] `export-batch` — parallel parsing + per-demo report
+- [x] `parser.py` — wire up demoparser2 raw extraction (events + ticks)
+- [x] `rounds.py` — formal round model, side / team normalization, warmup drop
+- [x] `builder.py` — implement the 13 per-file row builders
+- [x] `economy.py` — port economyType thresholds
+- [x] `stats.py` — capped damage / ADR / KAST / utility aggregation
+- [x] `validate.py` — jsonschema checks against `cs2-demo-format/spec`
+- [x] `export-batch` — parallel parsing + per-demo report
 - [ ] golden-fixture tests (tiny `.dem` → build → validate)
 - [ ] GUI polish (progress per demo, one-click upload to RivalHub)
 - [ ] code signing + notarization (macOS / Windows) for friction-free downloads
@@ -195,13 +191,13 @@ demoparser2 那种“只找所有玩家死亡坐标”的窄任务 micro-benchma
 
 ### 路线图
 
-- [ ] `parser.py` —— 接通 demoparser2 原始抽取（events + ticks）
-- [ ] `rounds.py` —— 正式回合模型、阵营/队伍归一、剔除热身
-- [ ] `builder.py` —— 实现 13 个 per-file row builder
-- [ ] `economy.py` —— 移植 economyType 阈值
-- [ ] `stats.py` —— capped 伤害 / ADR / KAST / 道具伤害聚合
-- [ ] `validate.py` —— 对照 `cs2-demo-format/spec` 做 jsonschema 校验
-- [ ] `export-batch` —— 并行解析 + 单 demo 报告
+- [x] `parser.py` —— 接通 demoparser2 原始抽取（events + ticks）
+- [x] `rounds.py` —— 正式回合模型、阵营/队伍归一、剔除热身
+- [x] `builder.py` —— 实现 13 个 per-file row builder
+- [x] `economy.py` —— 移植 economyType 阈值
+- [x] `stats.py` —— capped 伤害 / ADR / KAST / 道具伤害聚合
+- [x] `validate.py` —— 对照 `cs2-demo-format/spec` 做 jsonschema 校验
+- [x] `export-batch` —— 并行解析 + 单 demo 报告
 - [ ] golden fixture 测试（小 `.dem` → 构建 → 校验）
 - [ ] GUI 打磨（单 demo 进度、一键上传到 RivalHub）
 - [ ] 代码签名 + 公证（macOS / Windows），实现真·零摩擦下载
