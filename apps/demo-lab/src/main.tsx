@@ -4,7 +4,7 @@ import { buildMatchWorkspaceModel, loadDemoPackageFromZip } from "@cs2dak/core";
 import type { MatchWorkspaceModel } from "@cs2dak/contract";
 import { MatchWorkspace } from "@cs2dak/react";
 import "@cs2dak/react/theme.css";
-import sampleZipUrl from "../../../fixtures/input/nju-rivals-2026/zips/2026-06-01_de_overpass_暴躁南梁-vs-車一进一宝贝队_3-13.zip?url";
+import sampleZipUrl from "../../../fixtures/input/sample-match.zip?url";
 
 function DemoLab() {
   const [model, setModel] = useState<MatchWorkspaceModel | null>(null);
