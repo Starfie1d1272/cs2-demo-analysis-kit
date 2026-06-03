@@ -248,6 +248,36 @@
   font-weight: 800;
 }
 
+.dak-econ-conv {
+  overflow-x: auto;
+}
+
+.dak-econ-conv .dak-empty {
+  padding: 16px 0;
+  text-align: center;
+  font-style: italic;
+  color: var(--dak-fg-dim);
+}
+
+.dak-econ-conv-bar-col {
+  width: 33%;
+}
+
+.dak-winrate-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--dak-bg-subtle);
+  overflow: hidden;
+}
+
+.dak-winrate-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--dak-accent);
+  transition: width 0.2s ease;
+}
+
 .dak-team-chip {
   display: inline-flex;
   align-items: center;

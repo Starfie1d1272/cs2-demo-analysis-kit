@@ -11,6 +11,12 @@ export { deriveAccountSignalsV2, computeAccountRatingsV2 } from "./signals.js";
 export { deriveRRIndicators } from "./scoreboard.js";
 export { buildDemoViewModel, buildMatchWorkspaceModel } from "./workspace.js";
 export { displayWeaponName } from "./weapons.js";
+export { buildEconomyConversion, economyLabelCn } from "./economy.js";
+export type {
+  EconomyTypeStats,
+  EconomyConversion,
+  MatchEconomyConversion,
+} from "./economy.js";
 
 export function analyzeDemoPackage(input: unknown): AnalysisBundle {
   const pkg = normalizeDemoPackage(input);
