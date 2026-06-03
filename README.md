@@ -12,7 +12,7 @@ It does **not** own tournament business logic. Tournament state belongs to produ
 
 Given a `cs2-demo-format/2.0` package, the kit produces:
 
-- Python exporter - a `cs2-demo-exporter` package for `.dem -> cs2-demo-format/2.0 ZIP`.
+- Python exporter - a `cs2dak` package for `.dem -> cs2-demo-format/2.0 ZIP`.
 - `analysis-bundle.json` - normalized match, round, player, economy, timeline, and spatial analysis.
 - `view-model.json` - UI-ready data for dashboards, match pages, and local tools.
 - `qa-report.json` - data quality checks for missing files, broken round continuity, missing economy coverage, unmapped players, and spatial data gaps.
@@ -28,7 +28,7 @@ Given a `cs2-demo-format/2.0` package, the kit produces:
 | `@cs2dak/react` | Previewable React components that consume `DemoViewModel` / `MatchWorkspaceModel` only. |
 | `@cs2dak/cli` | CLI for analyzing JSON or ZIP packages and writing analysis/view-model/QA artifacts. |
 | `@cs2dak/demo-lab` | Vite app for reviewing analysis modules and design language against fixtures. |
-| `python/cs2_demo_exporter` | Python exporter, CLI, GUI assets, and packaging for `.dem -> v2 ZIP`. |
+| `python/src/cs2dak` | Python exporter, CLI, GUI assets, and packaging for `.dem -> v2 ZIP`. |
 
 ## Quick Start
 

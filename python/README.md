@@ -1,4 +1,4 @@
-# cs2-demo-exporter
+# cs2dak
 
 [English](#english) · [中文](#中文)
 
@@ -40,22 +40,22 @@ need no Python. The frontend mirrors **RivalHub's design system** (tokens from
 2–3px radii, `#ff6b1a` accent, wide-tracked uppercase labels).
 
 `.github/workflows/build.yml` builds and attaches to a GitHub Release:
-- **Windows → `cs2-demo-exporter.exe`** (onefile, double-click)
-- **macOS → `cs2-demo-exporter.dmg`** (from the `.app` bundle)
+- **Windows → `cs2dak.exe`** (onefile, double-click)
+- **macOS → `cs2dak.dmg`** (from the `.app` bundle)
 
 ```bash
-pip install -e ".[gui]" && cs2-demo-exporter gui   # run from source
-pyinstaller packaging/cs2-demo-exporter.spec        # bundle (needs [build] extra)
+pip install -e ".[gui]" && cs2dak gui   # run from source
+pyinstaller packaging/cs2dak.spec        # bundle (needs [build] extra)
 ```
 
 > **Unsigned builds.** macOS: right-click → Open (or `xattr -dr com.apple.quarantine
-> cs2-demo-exporter.app`). Windows: SmartScreen → "More info" → "Run anyway".
+> cs2dak.app`). Windows: SmartScreen → "More info" → "Run anyway".
 > Add code-signing + notarization later for friction-free downloads.
 
 ### Install (dev)
 
 ```bash
-cd cs2-demo-exporter
+cd cs2dak
 uv venv && source .venv/bin/activate    # or python -m venv .venv
 uv pip install -e ".[dev]"
 pytest
@@ -64,10 +64,10 @@ pytest
 ### Usage (target)
 
 ```bash
-cs2-demo-exporter export demos/*.dem --out exports/
-cs2-demo-exporter export-batch demos/ --out rivalhub-exports.zip
-cs2-demo-exporter export-batch demos/ --out rivalhub-exports.zip --workers 12
-cs2-demo-exporter validate exports/*.zip --spec-dir ../cs2-demo-format/spec
+cs2dak export demos/*.dem --out exports/
+cs2dak export-batch demos/ --out rivalhub-exports.zip
+cs2dak export-batch demos/ --out rivalhub-exports.zip --workers 12
+cs2dak validate exports/*.zip --spec-dir ../cs2-demo-format/spec
 ```
 
 ### Batch Export Benchmark
@@ -140,22 +140,22 @@ speed dropped under heavier CPU/cache/I/O contention.
 `#ff6b1a` 强调色、大写宽字距标签）。
 
 `.github/workflows/build.yml` 会构建并挂到 GitHub Release：
-- **Windows → `cs2-demo-exporter.exe`**（onefile，双击即用）
-- **macOS → `cs2-demo-exporter.dmg`**（由 `.app` 生成）
+- **Windows → `cs2dak.exe`**（onefile，双击即用）
+- **macOS → `cs2dak.dmg`**（由 `.app` 生成）
 
 ```bash
-pip install -e ".[gui]" && cs2-demo-exporter gui   # 源码运行
-pyinstaller packaging/cs2-demo-exporter.spec        # 打包（需 [build] 依赖）
+pip install -e ".[gui]" && cs2dak gui   # 源码运行
+pyinstaller packaging/cs2dak.spec        # 打包（需 [build] 依赖）
 ```
 
 > **未签名产物。** macOS：右键 → 打开（或 `xattr -dr com.apple.quarantine
-> cs2-demo-exporter.app`）；Windows：SmartScreen → 「更多信息」→「仍要运行」。
+> cs2dak.app`）；Windows：SmartScreen → 「更多信息」→「仍要运行」。
 > 之后再配代码签名 + 公证可实现零摩擦下载。
 
 ### 安装（开发）
 
 ```bash
-cd cs2-demo-exporter
+cd cs2dak
 uv venv && source .venv/bin/activate    # 或 python -m venv .venv
 uv pip install -e ".[dev]"
 pytest
@@ -164,10 +164,10 @@ pytest
 ### 用法（目标形态）
 
 ```bash
-cs2-demo-exporter export demos/*.dem --out exports/
-cs2-demo-exporter export-batch demos/ --out rivalhub-exports.zip
-cs2-demo-exporter export-batch demos/ --out rivalhub-exports.zip --workers 12
-cs2-demo-exporter validate exports/*.zip --spec-dir ../cs2-demo-format/spec
+cs2dak export demos/*.dem --out exports/
+cs2dak export-batch demos/ --out rivalhub-exports.zip
+cs2dak export-batch demos/ --out rivalhub-exports.zip --workers 12
+cs2dak validate exports/*.zip --spec-dir ../cs2-demo-format/spec
 ```
 
 ### 批量导出 Benchmark

@@ -56,7 +56,7 @@ def _find_viewer_index() -> Path | None:
     # PyInstaller onefile / onedir bundle
     if getattr(sys, "frozen", False):
         candidates.append(Path(sys._MEIPASS) / "demo-lab")
-    # repo layout: python/src/cs2_demo_exporter/gui/app.py -> repo root is parents[4]
+    # repo layout: python/src/cs2dak/gui/app.py -> repo root is parents[4]
     candidates.append(Path(__file__).resolve().parents[4] / "apps" / "demo-lab" / "dist")
     for base in candidates:
         index = base / "index.html"
@@ -180,7 +180,7 @@ def main() -> None:
 
     api = Api()
     window = webview.create_window(
-        title=f"cs2-demo-exporter {__version__}",
+        title=f"cs2dak {__version__}",
         url=str(WEB_DIR / "index.html"),
         js_api=api,
         width=560,

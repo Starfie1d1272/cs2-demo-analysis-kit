@@ -12,7 +12,7 @@
 
 输入一份 `cs2-demo-format/2.0` 包后，本仓库生成：
 
-- Python exporter：`cs2-demo-exporter` 包，负责 `.dem -> cs2-demo-format/2.0 ZIP`。
+- Python exporter：`cs2dak` 包，负责 `.dem -> cs2-demo-format/2.0 ZIP`。
 - `analysis-bundle.json`：标准化后的比赛、回合、选手、经济、时间线、空间点位分析。
 - `view-model.json`：可直接给 UI 消费的展示模型。
 - `qa-report.json`：数据质量检查，包括缺文件、回合不连续、经济覆盖不足、玩家未映射、空间数据缺失等。
@@ -28,7 +28,7 @@
 | `@cs2dak/react` | 只消费 `DemoViewModel` / `MatchWorkspaceModel` 的 React 预览组件。 |
 | `@cs2dak/cli` | 分析 JSON 或 ZIP 包，并输出 analysis/view-model/QA 文件。 |
 | `@cs2dak/demo-lab` | 用 fixtures 预览分析模块和统一设计语言的 Vite 应用。 |
-| `python/cs2_demo_exporter` | Python exporter、CLI、GUI 资源和打包配置，负责 `.dem -> v2 ZIP`。 |
+| `python/src/cs2dak` | Python exporter、CLI、GUI 资源和打包配置，负责 `.dem -> v2 ZIP`。 |
 
 ## 快速开始
 

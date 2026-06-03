@@ -1,4 +1,4 @@
-"""cs2-demo-exporter — CS2 .dem -> cs2-demo-format v2 ZIP.
+"""cs2dak — CS2 .dem -> cs2-demo-format v2 ZIP.
 
 Pipeline: .dem --(parse_worker via demoparser2)--> raw rows --(exporter)--> ZIP.
 """

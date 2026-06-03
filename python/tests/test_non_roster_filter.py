@@ -6,7 +6,7 @@ import zipfile
 from io import BytesIO
 from typing import Any
 
-from cs2_demo_exporter.exporter import _assemble_zip
+from cs2dak.exporter import _assemble_zip
 
 
 def _read_zip(raw: dict[str, Any]) -> dict[str, Any]:

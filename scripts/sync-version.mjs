@@ -56,7 +56,7 @@ for (const rel of workspacePackageJsons()) {
 
 // Python package (path moves under any future rename; keep this list in sync).
 const pyTargets = [
-  ["python/src/cs2_demo_exporter/__init__.py", /__version__\s*=\s*"[^"]*"/, `__version__ = "${version}"`],
+  ["python/src/cs2dak/__init__.py", /__version__\s*=\s*"[^"]*"/, `__version__ = "${version}"`],
   ["python/pyproject.toml", /^version\s*=\s*"[^"]*"/m, `version = "${version}"`],
 ];
 for (const [rel, re, replacement] of pyTargets) {

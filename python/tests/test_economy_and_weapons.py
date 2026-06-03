@@ -1,5 +1,5 @@
-from cs2_demo_exporter.enums import normalize_weapon_name
-from cs2_demo_exporter.exporter import (
+from cs2dak.enums import normalize_weapon_name
+from cs2dak.exporter import (
     _build_damages,
     _build_economies,
     _build_player_stats,
@@ -7,7 +7,7 @@ from cs2_demo_exporter.exporter import (
     _is_pistol_conversion_round,
     _is_pistol_round,
 )
-from cs2_demo_exporter.rounds import _RoundModel, _RoundWindow
+from cs2dak.rounds import _RoundModel, _RoundWindow
 
 
 def test_pistol_rounds_are_fixed_mr12_rounds_not_total_round_dependent():

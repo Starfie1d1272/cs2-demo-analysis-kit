@@ -6,7 +6,7 @@ import json
 import zipfile
 from pathlib import Path
 
-import cs2_demo_exporter as pkg
+import cs2dak as pkg
 
 
 def test_schema_version_matches_contract():
@@ -14,13 +14,13 @@ def test_schema_version_matches_contract():
 
 
 def test_cli_app_exposes_commands():
-    from cs2_demo_exporter.cli import app
+    from cs2dak.cli import app
 
     assert app is not None
 
 
 def test_batch_bundle_contains_exports_and_report(tmp_path):
-    from cs2_demo_exporter.cli import _write_batch_bundle
+    from cs2dak.cli import _write_batch_bundle
 
     export_dir = tmp_path / "exports"
     export_dir.mkdir()
@@ -47,7 +47,7 @@ def test_batch_bundle_contains_exports_and_report(tmp_path):
 
 
 def test_validate_zip_uses_format_validator():
-    from cs2_demo_exporter.validate import validate_zip
+    from cs2dak.validate import validate_zip
 
     fixture = Path(__file__).resolve().parents[2] / "fixtures/input/cs2dak-sanitized-de_ancient.zip"
     result = validate_zip(fixture)
@@ -56,7 +56,7 @@ def test_validate_zip_uses_format_validator():
 
 
 def test_default_workers_uses_available_cpu_count(monkeypatch):
-    from cs2_demo_exporter import cli
+    from cs2dak import cli
 
     monkeypatch.setattr(cli.os, "cpu_count", lambda: 16)
     if hasattr(cli.os, "process_cpu_count"):
@@ -67,7 +67,7 @@ def test_default_workers_uses_available_cpu_count(monkeypatch):
 
 
 def test_default_workers_falls_back_to_one(monkeypatch):
-    from cs2_demo_exporter import cli
+    from cs2dak import cli
 
     monkeypatch.setattr(cli.os, "cpu_count", lambda: None)
     if hasattr(cli.os, "process_cpu_count"):

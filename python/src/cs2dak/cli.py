@@ -1,8 +1,8 @@
 """Command-line interface.
 
-    cs2-demo-exporter export demos/*.dem --out exports/
-    cs2-demo-exporter export-batch demos/ --out rivalhub-exports.zip
-    cs2-demo-exporter validate exports/*.zip --spec-dir ../cs2-demo-format/spec
+    cs2dak export demos/*.dem --out exports/
+    cs2dak export-batch demos/ --out rivalhub-exports.zip
+    cs2dak validate exports/*.zip --spec-dir ../cs2-demo-format/spec
 
 The CLI is a thin shell: it resolves paths, drives the
 parse -> build -> package (-> validate) pipeline, and reports per-file results.
@@ -139,7 +139,7 @@ def export_batch(
     out.parent.mkdir(parents=True, exist_ok=True)
     report: list[dict] = []
     started = time.perf_counter()
-    with tempfile.TemporaryDirectory(prefix="cs2-demo-exporter-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="cs2dak-") as tmp:
         tmp_dir = Path(tmp)
         with ProcessPoolExecutor(max_workers=workers) as pool:
             futures = {pool.submit(_export_one_report, dem, tmp_dir): dem for dem in demos}
@@ -196,7 +196,7 @@ def gui() -> None:
         from .gui.app import main as gui_main
     except ImportError as exc:  # pragma: no cover - depends on optional extra
         raise typer.BadParameter(
-            "GUI deps missing. Install with: pip install 'cs2-demo-exporter[gui]'"
+            "GUI deps missing. Install with: pip install 'cs2dak[gui]'"
         ) from exc
     gui_main()
 

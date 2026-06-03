@@ -97,8 +97,8 @@ wheels = [
 ]
 
 [[package]]
-name = "cs2-demo-exporter"
-version = "0.1.0"
+name = "cs2dak"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "demoparser2" },

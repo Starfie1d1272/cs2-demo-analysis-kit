@@ -6,8 +6,8 @@ import zipfile
 from io import BytesIO
 from typing import Any
 
-from cs2_demo_exporter.exporter import _assemble_zip
-from cs2_demo_exporter.rounds import _event_steamid
+from cs2dak.exporter import _assemble_zip
+from cs2dak.rounds import _event_steamid
 
 
 def _read_zip(raw: dict[str, Any]) -> dict[str, Any]:
@@ -244,7 +244,7 @@ def test_grenade_destroy_tick_after_round_end_is_cleared():
 def test_phantom_round_end_before_freeze_is_dropped() -> None:
     """A bogus round_end firing before its freeze ends must not become a real
     round nor inflate the score (regression: 16:12 OT exported as 17:12)."""
-    from cs2_demo_exporter.rounds import build_rounds
+    from cs2dak.rounds import build_rounds
 
     team_a = "76561198000000001"
     team_b = "76561198000000002"

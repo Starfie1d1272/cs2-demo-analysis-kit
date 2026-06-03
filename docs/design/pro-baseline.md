@@ -40,7 +40,7 @@
 
 ## Demo Lake 目录结构
 
-本仓库已有完整的 `.dem → v2 ZIP` 管道（`python/cs2_demo_exporter`），v2 ZIP 内已包含所有事件文件（players / rounds / kills / damages / grenades / positions-1s 等）。Demo Lake 直接以 v2 ZIP 作为存储格式，**不另建 parquet 层**。
+本仓库已有完整的 `.dem → v2 ZIP` 管道（`python/src/cs2dak`），v2 ZIP 内已包含所有事件文件（players / rounds / kills / damages / grenades / positions-1s 等）。Demo Lake 直接以 v2 ZIP 作为存储格式，**不另建 parquet 层**。
 
 ```
 rr-demo-lake/
@@ -52,7 +52,7 @@ rr-demo-lake/
   export/
     hltv/
       2025_IEM_Cologne/
-        match_237xxxx_nuke.zip     ← cs2_demo_exporter 产出的 v2 ZIP
+        match_237xxxx_nuke.zip     ← cs2dak 产出的 v2 ZIP
 ```
 
 ### manifest.sqlite 字段
@@ -76,12 +76,12 @@ rr-demo-lake/
 ```
 download .dem
   → write manifest (export_status=pending)
-  → cs2-demo-exporter export <dem> --out export/hltv/<event>/
-  → validate v2 ZIP (cs2-demo-exporter validate)
+  → cs2dak export <dem> --out export/hltv/<event>/
+  → validate v2 ZIP (cs2dak validate)
   → update manifest (export_status=ok, export_path=...)
 ```
 
-核心解析由 `cs2_demo_exporter` 完成，ingestion 层只负责编排和 manifest 状态追踪。
+核心解析由 `cs2dak` 完成，ingestion 层只负责编排和 manifest 状态追踪。
 
 ---
 

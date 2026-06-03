@@ -7,7 +7,7 @@ view models — exporter included. It is no longer "just the middle layer".
 
 ```text
 .dem
-  -> python/cs2_demo_exporter         (in-repo; demoparser2 → cs2-demo-format/2.0 ZIP)
+  -> python/src/cs2dak         (in-repo; demoparser2 → cs2-demo-format/2.0 ZIP)
         ├─ CLI: export / export-batch / validate
         └─ GUI: pywebview window → export ZIP → open embedded @cs2dak/demo-lab viewer
   -> @cs2dak/core  (loads ZIP → DemoPackage)
@@ -21,14 +21,14 @@ view models — exporter included. It is no longer "just the middle layer".
 
 | Component | Role |
 |---|---|
-| `python/cs2_demo_exporter` | **In-repo** `.dem → v2 ZIP` pipeline (demoparser2 + GUI + PyInstaller). Owns the export side. |
+| `python/src/cs2dak` | **In-repo** `.dem → v2 ZIP` pipeline (demoparser2 + GUI + PyInstaller). Owns the export side. |
 | `@cs2dak/contract` | Zod schemas + types; single source of truth for shapes. Re-exports `cs2-demo-format`. |
 | `@cs2dak/core` | Deterministic analysis, RR/PRISM adapter, QA. No side effects. |
 | `@cs2dak/maps` | Map calibration + world→radar transform + zone geometry (`zoneAt` / `pointInPolygon` / `ACTIVE_DUTY_MAPS`). |
 | `@cs2dak/react` | Product-neutral preview components (consume `DemoViewModel` only). |
 | `@cs2dak/cli` | Language-neutral integration surface. |
 
-> ⚠️ Ownership note: the exporter lives **here**, in `python/cs2_demo_exporter`. The
+> ⚠️ Ownership note: the exporter lives **here**, in `python/src/cs2dak`. The
 > `EXPORTER_NAME = "CS2 Insight Agent"` string in the manifest is a legacy label, not
 > a statement of ownership. CS2 Insight Agent is a **downstream consumer** and the
 > source of raw `.dem` files — it does not own parsing anymore.
@@ -75,7 +75,7 @@ Consumers: RivalHub calls core/CLI, stores only the subset it needs, renders fro
 
 ```text
 .dem
-  -> python/cs2_demo_exporter         (本仓库内；demoparser2 → cs2-demo-format/2.0 ZIP)
+  -> python/src/cs2dak         (本仓库内；demoparser2 → cs2-demo-format/2.0 ZIP)
         ├─ CLI: export / export-batch / validate
         └─ GUI: pywebview 窗口 → 导出 ZIP → 打开嵌入式 @cs2dak/demo-lab 查看器
   -> @cs2dak/core  (加载 ZIP → DemoPackage)
@@ -89,14 +89,14 @@ Consumers: RivalHub calls core/CLI, stores only the subset it needs, renders fro
 
 | 组件 | 角色 |
 |---|---|
-| `python/cs2_demo_exporter` | **本仓库内**的 `.dem → v2 ZIP` 管道（demoparser2 + GUI + PyInstaller），拥有导出端。 |
+| `python/src/cs2dak` | **本仓库内**的 `.dem → v2 ZIP` 管道（demoparser2 + GUI + PyInstaller），拥有导出端。 |
 | `@cs2dak/contract` | Zod schema + 类型，形状的单一真相源；re-export `cs2-demo-format`。 |
 | `@cs2dak/core` | 确定性分析、RR/PRISM 适配、QA。无副作用。 |
 | `@cs2dak/maps` | 地图标定 + world→radar 转换 + zone 几何（`zoneAt` / `pointInPolygon` / `ACTIVE_DUTY_MAPS`）。 |
 | `@cs2dak/react` | 产品中立的预览组件（只消费 `DemoViewModel`）。 |
 | `@cs2dak/cli` | 跨语言集成入口。 |
 
-> ⚠️ 归属订正：导出器在**本仓库** `python/cs2_demo_exporter`。manifest 里的
+> ⚠️ 归属订正：导出器在**本仓库** `python/src/cs2dak`。manifest 里的
 > `EXPORTER_NAME = "CS2 Insight Agent"` 是遗留标签，不代表归属。CS2 Insight Agent 是
 > **下游消费方**和原始 `.dem` 的来源，已不再拥有解析。
 

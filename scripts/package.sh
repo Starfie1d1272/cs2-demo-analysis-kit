@@ -24,14 +24,14 @@ fi
 echo "==> [3/4] PyInstaller build"
 cd python
 uv sync --extra gui --extra build
-uv run pyinstaller packaging/cs2-demo-exporter.spec --noconfirm --distpath dist
+uv run pyinstaller packaging/cs2dak.spec --noconfirm --distpath dist
 cd "$ROOT"
 
-APP="python/dist/cs2-demo-exporter.app"
+APP="python/dist/cs2dak.app"
 if [[ "$OSTYPE" == darwin* ]]; then
   if [[ -d "$APP" ]]; then
     VERSION="$(node -p "require('./package.json').version")"
-    DMG="python/dist/cs2-demo-exporter-${VERSION}.dmg"
+    DMG="python/dist/cs2dak-${VERSION}.dmg"
     echo "==> [4/4] Creating DMG -> $DMG"
     rm -f "$DMG"
     hdiutil create -volname "CS2 Demo Exporter" -srcfolder "$APP" -ov -format UDZO "$DMG"
