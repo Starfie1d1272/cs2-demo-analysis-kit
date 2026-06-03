@@ -2,13 +2,19 @@ import type { PlayerScoreboardRow, TeamKey } from "@cs2dak/contract";
 
 export interface ScoreboardTableProps {
   rows: PlayerScoreboardRow[];
+  /**
+   * When provided, each player row becomes clickable (mouse + keyboard) and
+   * reports the clicked player's steamId64. Lets an embedding app (RivalHub,
+   * CS2-insight-agent) wire up navigation without forking this component.
+   */
+  onPlayerClick?: (steamId64: string) => void;
 }
 
 function teamColor(teamKey: TeamKey): string {
   return teamKey === "teamA" ? "var(--dak-accent)" : "var(--dak-accent-b)";
 }
 
-export function ScoreboardTable({ rows }: ScoreboardTableProps) {
+export function ScoreboardTable({ rows, onPlayerClick }: ScoreboardTableProps) {
   return (
     <table className="dak-table">
       <thead>
@@ -30,7 +36,24 @@ export function ScoreboardTable({ rows }: ScoreboardTableProps) {
       </thead>
       <tbody>
         {rows.map((row) => (
-          <tr key={row.steamId64}>
+          <tr
+            key={row.steamId64}
+            className={onPlayerClick ? "dak-row-clickable" : undefined}
+            onClick={onPlayerClick ? () => onPlayerClick(row.steamId64) : undefined}
+            onKeyDown={
+              onPlayerClick
+                ? (e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onPlayerClick(row.steamId64);
+                    }
+                  }
+                : undefined
+            }
+            tabIndex={onPlayerClick ? 0 : undefined}
+            role={onPlayerClick ? "button" : undefined}
+            aria-label={onPlayerClick ? `查看 ${row.name} 详情` : undefined}
+          >
             <td>
               <span className="dak-team-chip">
                 <span className="dak-team-dot" style={{ background: teamColor(row.teamKey) }} />
