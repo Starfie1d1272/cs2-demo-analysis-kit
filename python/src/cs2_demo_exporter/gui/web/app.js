@@ -50,6 +50,16 @@ function wire() {
     const results = await window.pywebview.api.export(selectedPaths);
     renderResults(results);
     $("export").disabled = false;
+    // Reveal the viewer only when something exported and a viewer build exists.
+    const anyOk = results.some((r) => r.ok);
+    if (anyOk && (await window.pywebview.api.can_view())) {
+      $("view").hidden = false;
+    }
+  });
+
+  $("view").addEventListener("click", async () => {
+    const res = await window.pywebview.api.open_viewer();
+    if (res && !res.ok) alert(res.error);
   });
 
   $("open-out").addEventListener("click", () => window.pywebview.api.open_output_dir());
