@@ -493,12 +493,27 @@ export const workspaceReplayPlayerSchema = z.object({
   frames: z.array(workspaceReplayFrameSchema)
 });
 
+export const workspaceKillEventSchema = z.object({
+  id: z.string(),
+  tick: z.number().int().positive(),
+  killerName: z.string().nullable(),
+  killerTeamKey: teamKeySchema.nullable(),
+  victimName: z.string(),
+  weapon: z.string(),
+  headshot: z.boolean(),
+  throughSmoke: z.boolean(),
+  noScope: z.boolean(),
+  flashAssist: z.boolean(),
+  tradeKill: z.boolean()
+});
+
 export const workspaceReplayRoundSchema = z.object({
   roundNumber: z.number().int().positive(),
   startTick: z.number().int().positive(),
   tickStep: z.number().int().positive(),
   frameCount: z.number().int().nonnegative(),
-  players: z.array(workspaceReplayPlayerSchema)
+  players: z.array(workspaceReplayPlayerSchema),
+  kills: z.array(workspaceKillEventSchema)
 });
 
 export const workspaceReplaySchema = z.object({
@@ -569,6 +584,7 @@ export type WorkspacePlayer = z.infer<typeof workspacePlayerSchema>;
 export type WorkspaceSpatialPoint = z.infer<typeof workspaceSpatialPointSchema>;
 export type WorkspaceReplayFrame = z.infer<typeof workspaceReplayFrameSchema>;
 export type WorkspaceReplayPlayer = z.infer<typeof workspaceReplayPlayerSchema>;
+export type WorkspaceKillEvent = z.infer<typeof workspaceKillEventSchema>;
 export type WorkspaceReplayRound = z.infer<typeof workspaceReplayRoundSchema>;
 export type MatchWorkspaceModel = z.infer<typeof matchWorkspaceModelSchema>;
 export type Replay = z.infer<typeof replaySchema>;

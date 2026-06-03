@@ -489,13 +489,24 @@
   transform: rotate(4deg);
 }
 
-.dak-heatmap-point {
+/* Canvas heatmap layer — fills the radar image area */
+.dak-heatmap-canvas {
   position: absolute;
-  z-index: 2;
-  border-radius: 999px;
-  transform: translate(-50%, -50%);
+  inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-  mix-blend-mode: screen;
+}
+
+.dak-heatmap-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--dak-fg-dim);
+  font-size: 12px;
+  text-align: center;
+  padding: 24px;
 }
 
 .dak-heatmap-legend {
@@ -527,17 +538,25 @@
   border-radius: 50%;
 }
 
-.dak-legend-kill {
-  background: var(--dak-ok);
+.dak-legend-kill    { background: var(--dak-ok); }
+.dak-legend-death   { background: var(--dak-danger); }
+.dak-legend-grenade { background: var(--dak-warn); }
+
+.dak-heatmap-legend-scale {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
-.dak-legend-death {
-  background: var(--dak-danger);
+.dak-legend-cold {
+  display: inline-block;
+  width: 40px;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, blue, cyan, lime, yellow, red);
 }
 
-.dak-legend-grenade {
-  background: var(--dak-warn);
-}
+.dak-legend-warm { display: none; }
 
 .dak-qa {
   display: grid;
@@ -829,17 +848,17 @@
 
 .dak-replay-token {
   position: absolute;
-  width: 38px;
-  height: 38px;
+  width: 26px;
+  height: 26px;
   transform: translate(-50%, -50%);
   display: grid;
   place-items: center;
   border: 2px solid rgba(238, 243, 248, 0.8);
   border-radius: 999px;
   color: #fff;
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 900;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.38);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.38);
 }
 
 .dak-replay-token-teamA {
@@ -1143,10 +1162,10 @@
 .dak-replay-token::after {
   content: "";
   position: absolute;
-  top: -8px;
+  top: -6px;
   left: 50%;
   width: 2px;
-  height: 10px;
+  height: 7px;
   background: rgba(238, 243, 248, 0.9);
   transform: translateX(-50%);
 }
@@ -1169,7 +1188,7 @@
 
 .dak-frame-player-row {
   display: grid;
-  grid-template-columns: 10px minmax(0, 1fr) auto;
+  grid-template-columns: 10px 18px minmax(0, 1fr) 52px;
   gap: 8px;
   align-items: center;
   padding: 8px 9px;
@@ -1179,7 +1198,7 @@
   font-size: 12px;
 }
 
-.dak-frame-player-row span:nth-child(2),
+.dak-frame-player-name,
 .dak-frame-player-row small {
   min-width: 0;
   overflow: hidden;
@@ -1187,10 +1206,35 @@
   white-space: nowrap;
 }
 
+.dak-frame-player-num {
+  font-family: var(--dak-mono);
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--dak-fg-dim);
+  text-align: center;
+}
+
 .dak-frame-player-row small {
-  grid-column: 2 / 4;
+  grid-column: 2 / 5;
   color: var(--dak-fg-dim);
   font-family: var(--dak-mono);
+}
+
+.dak-frame-player-row-dead {
+  opacity: 0.38;
+}
+
+.dak-hp-bar-wrap {
+  height: 6px;
+  background: rgba(238, 243, 248, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.dak-hp-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 80ms linear, background 200ms ease;
 }
 
 .dak-team-dot-teamA {
@@ -1327,6 +1371,126 @@
 .dak-economy-round .dak-economy-winner {
   color: var(--dak-ok);
 }
+
+.dak-economy-round-upset {
+  border-color: rgba(255, 198, 77, 0.4);
+  background: linear-gradient(135deg, rgba(255, 198, 77, 0.07), var(--dak-bg-subtle));
+}
+
+.dak-economy-upsets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+
+.dak-upset-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.dak-upset-chip-eco   { background: rgba(255,84,114,0.15); color: var(--dak-danger); border-color: rgba(255,84,114,0.3); }
+.dak-upset-chip-semi  { background: rgba(73,182,255,0.13); color: var(--dak-accent-b); border-color: rgba(73,182,255,0.28); }
+.dak-upset-chip-force { background: rgba(255,122,33,0.13); color: var(--dak-accent); border-color: rgba(255,122,33,0.28); }
+
+.dak-upset-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.dak-upset-badge-eco   { background: rgba(255,84,114,0.18); color: var(--dak-danger); }
+.dak-upset-badge-semi  { background: rgba(73,182,255,0.16); color: var(--dak-accent-b); }
+.dak-upset-badge-force { background: rgba(255,122,33,0.16); color: var(--dak-accent); }
+
+/* ── Kill feed overlay ──────────────────────────────────────────────────────── */
+
+.dak-killfeed {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  pointer-events: none;
+  min-width: 0;
+  max-width: 260px;
+}
+
+.dak-killfeed-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  background: rgba(9, 11, 15, 0.78);
+  border: 1px solid var(--dak-border);
+  border-radius: 3px;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.dak-killfeed-name {
+  font-weight: 700;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.dak-killfeed-name-teamA { color: var(--dak-accent); }
+.dak-killfeed-name-teamB { color: var(--dak-accent-b); }
+.dak-killfeed-name-none  { color: var(--dak-fg-dim); }
+
+.dak-killfeed-weapon {
+  color: var(--dak-fg-dim);
+  font-family: var(--dak-mono);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.dak-killfeed-victim {
+  color: var(--dak-fg-mid);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.dak-killfeed-badges {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.dak-kf-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-size: 9px;
+  font-weight: 800;
+  font-style: normal;
+  text-transform: uppercase;
+}
+
+.dak-kf-hs  { background: rgba(255, 84, 114, 0.22); color: var(--dak-danger); }
+.dak-kf-tr  { background: rgba(255, 122, 33, 0.18); color: var(--dak-accent); }
+.dak-kf-smk { background: rgba(162, 172, 184, 0.14); color: var(--dak-fg-mid); }
+.dak-kf-ns  { background: rgba(73, 182, 255, 0.16); color: var(--dak-accent-b); }
+.dak-kf-fa  { background: rgba(83, 215, 126, 0.18); color: var(--dak-ok); }
 
 @media (max-width: 1080px) {
   .dak-header,

@@ -50,6 +50,7 @@ const model: MatchWorkspaceModel = {
         startTick: 100,
         tickStep: 8,
         frameCount: 1,
+        kills: [],
         players: [
           {
             steamId64: "76561198000000001",

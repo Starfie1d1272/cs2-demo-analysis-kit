@@ -1,9 +1,11 @@
 import type { MatchWorkspaceModel, WorkspaceReplayFrame, WorkspaceReplayRound, WorkspaceSpatialPoint } from "@cs2dak/contract";
+import { displayWeaponName } from "@cs2dak/core";
 import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
 import { Activity, BarChart3, ChevronLeft, ChevronRight, Crosshair, Film, Gauge, ListChecks, Map, Pause, Play, ShieldCheck, Table2, Users } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { EconomyPanel } from "./EconomyPanel";
 import { HeatmapCanvas } from "./HeatmapCanvas";
+import { KillFeed } from "./KillFeed";
 import { ScoreboardTable } from "./ScoreboardTable";
 
 export interface MatchWorkspaceProps {
@@ -313,6 +315,16 @@ function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["replay"]; 
     return () => window.clearInterval(timer);
   }, [playing, replay.sampleRate, round?.frameCount, speed]);
 
+  // Stable per-player numbers: teamA → 1-5, teamB → 6-0.
+  // Computed from round.players order so the mapping is consistent across frames.
+  const playerNumbers = useMemo(() => {
+    const result: Record<string, string> = {};
+    if (!round) return result;
+    round.players.filter((p) => p.teamKey === "teamA").forEach((p, i) => { result[p.steamId64] = String(i + 1); });
+    round.players.filter((p) => p.teamKey === "teamB").forEach((p, i) => { result[p.steamId64] = String((i + 6) % 10); });
+    return result;
+  }, [round]);
+
   if (!replay.available || !round) {
     return <Panel title="2D 回放"><p className="dak-muted">该导出包不含回放流。</p></Panel>;
   }
@@ -384,14 +396,15 @@ function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["replay"]; 
           style={map.radarImageUrl ? { backgroundImage: `url(${map.radarImageUrl})` } : undefined}
         >
           <div className="dak-replay-gridlines" aria-hidden="true" />
+          <KillFeed kills={round.kills} currentTick={currentTick} tickrate={replay.tickrate} />
           {currentPlayers.map(({ player, frame }) => (
             <div
               key={player.steamId64}
               className={`dak-replay-token dak-replay-token-${player.teamKey}${!frame.alive ? " dak-replay-token-dead" : ""}${frame.flashed ? " dak-replay-token-flashed" : ""}`}
               style={{ ...replayFramePosition(frame, map), transform: `translate(-50%, -50%) rotate(${90 - frame.yaw}deg)` }}
-              title={`${player.name} · ${frame.hp} HP${frame.hasDefuseKit ? " · 拆弹器" : ""}${frame.flashed ? " · flashed" : ""}`}
+              title={`${playerNumbers[player.steamId64] ?? "?"} ${player.name} · ${frame.hp} HP${frame.hasDefuseKit ? " · 拆弹器" : ""}${frame.flashed ? " · flashed" : ""}`}
             >
-              <span style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>{player.name.slice(0, 2)}</span>
+              <span style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>{playerNumbers[player.steamId64] ?? "?"}</span>
               {frame.hasDefuseKit && <i style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>kit</i>}
             </div>
           ))}
@@ -399,14 +412,31 @@ function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["replay"]; 
       </Panel>
       <Panel title="当前帧选手">
         <div className="dak-frame-player-list">
-          {currentPlayers.map(({ player, frame }) => (
-            <div className="dak-frame-player-row" key={player.steamId64}>
-              <span className={`dak-team-dot dak-team-dot-${player.teamKey}`} />
-              <span>{player.name}</span>
-              <b className="dak-mono">{frame.hp} HP</b>
-              <small>{frame.weapon ?? "未知武器"}{frame.hasDefuseKit ? " · kit" : ""}{frame.flashed ? " · flashed" : ""}</small>
-            </div>
-          ))}
+          {[...currentPlayers]
+            .sort((a, b) => {
+              // Sort by assigned player number; treat 0 (teamB slot 5) as 10 so order is 1-9,0
+              const na = Number(playerNumbers[a.player.steamId64] ?? "99");
+              const nb = Number(playerNumbers[b.player.steamId64] ?? "99");
+              return (na === 0 ? 10 : na) - (nb === 0 ? 10 : nb);
+            })
+            .map(({ player, frame }) => (
+              <div
+                className={`dak-frame-player-row${!frame.alive ? " dak-frame-player-row-dead" : ""}`}
+                key={player.steamId64}
+              >
+                <span className={`dak-team-dot dak-team-dot-${player.teamKey}`} />
+                <span className="dak-frame-player-num">{playerNumbers[player.steamId64] ?? "?"}</span>
+                <span className="dak-frame-player-name">{player.name}</span>
+                <div className="dak-hp-bar-wrap" title={`${frame.hp} HP`}>
+                  <div className="dak-hp-bar" style={{ width: `${frame.hp}%`, background: hpBarColor(frame.hp) }} />
+                </div>
+                <small>
+                  {frame.alive
+                    ? `${frame.weapon ? displayWeaponName(frame.weapon) : "—"}${frame.hasDefuseKit ? " · kit" : ""}${frame.flashed ? " · flashed" : ""}`
+                    : "阵亡"}
+                </small>
+              </div>
+            ))}
         </div>
       </Panel>
     </div>
@@ -563,6 +593,12 @@ function roundFactTags(fact: MatchWorkspaceModel["players"][number]["roundFacts"
   if (fact.tradedDeaths > 0) tags.push("死亡被补");
   if (fact.flashAssists > 0) tags.push(`闪助 +${fact.flashAssists}`);
   return tags.length > 0 ? tags : ["无 KAST"];
+}
+
+function hpBarColor(hp: number): string {
+  if (hp > 60) return "var(--dak-ok)";
+  if (hp > 30) return "var(--dak-warn)";
+  return "var(--dak-danger)";
 }
 
 function replayFramePosition(frame: WorkspaceReplayFrame, map: MatchWorkspaceModel["map"]["view"]) {
