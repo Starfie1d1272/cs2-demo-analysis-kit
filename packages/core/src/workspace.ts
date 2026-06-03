@@ -260,7 +260,8 @@ function buildWorkspaceMap(pkg: DemoPackage, view: ReturnType<typeof buildDemoVi
       roundNumber: bomb.roundNumber,
       teamKey: bomb.actorTeamKey,
       steamId64: bomb.actorSteamId64,
-      kind: "bomb"
+      kind: "bomb",
+      grenadeType: null
     }));
   const positionPoints: WorkspaceSpatialPoint[] = (pkg.positions1s ?? [])
     .filter((row) => row.position && (row.position.x !== 0 || row.position.y !== 0))
@@ -271,7 +272,8 @@ function buildWorkspaceMap(pkg: DemoPackage, view: ReturnType<typeof buildDemoVi
       roundNumber: row.roundNumber,
       teamKey: row.teamKey,
       steamId64: row.steamId64,
-      kind: "position"
+      kind: "position",
+      grenadeType: null
     }));
   const points: WorkspaceSpatialPoint[] = [
     ...heatmap.map((point) => ({ ...point, kind: point.kind })),

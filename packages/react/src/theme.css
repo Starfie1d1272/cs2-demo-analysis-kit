@@ -399,6 +399,82 @@
   background: rgba(255, 122, 33, 0.18);
 }
 
+/* Grenade sub-type filter row */
+.dak-heatmap-grenade-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 8px 0;
+  z-index: 5;
+  position: relative;
+}
+
+.dak-gf-chip {
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  color: var(--dak-fg-dim);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms, color 120ms;
+}
+
+.dak-gf-chip:hover { color: var(--dak-fg); border-color: rgba(255,255,255,0.26); }
+
+.dak-gf-chip-active {
+  color: var(--dak-warn);
+  border-color: rgba(255,184,0,0.55);
+  background: rgba(255,184,0,0.12);
+}
+
+/* Player filter chip row */
+.dak-heatmap-player-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 8px 0;
+  z-index: 5;
+  position: relative;
+}
+
+.dak-pf-chip {
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  color: var(--dak-fg-dim);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms, color 120ms;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dak-pf-chip:hover { color: var(--dak-fg); border-color: rgba(255,255,255,0.24); }
+
+.dak-pf-all { font-weight: 600; }
+
+.dak-pf-chip-teamA.dak-pf-chip-active {
+  color: var(--dak-accent);
+  border-color: rgba(255, 122, 33, 0.6);
+  background: rgba(255, 122, 33, 0.14);
+}
+
+.dak-pf-chip-teamB.dak-pf-chip-active {
+  color: var(--dak-blue);
+  border-color: rgba(73, 182, 255, 0.6);
+  background: rgba(73, 182, 255, 0.14);
+}
+
+.dak-pf-all.dak-pf-chip-active {
+  color: var(--dak-fg);
+  border-color: rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.10);
+}
+
 .dak-radar-schematic {
   position: absolute;
   inset: 0;

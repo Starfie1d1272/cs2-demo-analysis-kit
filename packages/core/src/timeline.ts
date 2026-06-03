@@ -84,7 +84,8 @@ export function buildHeatmap(pkg: DemoPackage): HeatmapPoint[] {
         roundNumber: kill.roundNumber,
         teamKey: kill.victimTeamKey,
         steamId64: kill.victimSteamId64,
-        kind: "death"
+        kind: "death",
+        grenadeType: null
       }
     ];
     if (kill.killerPosition) {
@@ -95,7 +96,8 @@ export function buildHeatmap(pkg: DemoPackage): HeatmapPoint[] {
         roundNumber: kill.roundNumber,
         teamKey: kill.killerTeamKey,
         steamId64: kill.killerSteamId64,
-        kind: "kill"
+        kind: "kill",
+        grenadeType: null
       });
     }
     return out;
@@ -109,7 +111,8 @@ export function buildHeatmap(pkg: DemoPackage): HeatmapPoint[] {
       roundNumber: grenade.roundNumber,
       teamKey: grenade.throwerTeamKey,
       steamId64: grenade.throwerSteamId64,
-      kind: "grenade"
+      kind: "grenade",
+      grenadeType: grenade.grenade
     }));
 
   return [...kills, ...grenades].filter((point) => point.x !== 0 || point.y !== 0);

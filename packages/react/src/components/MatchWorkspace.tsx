@@ -263,7 +263,13 @@ function MapWorkspace({ model }: MatchWorkspaceProps) {
   return (
     <div className="dak-grid dak-grid-even">
       <Panel title="地图热力图">
-        <HeatmapCanvas map={model.map.view} points={heatmapPoints} mode={layer} onModeChange={setLayer} />
+        <HeatmapCanvas
+          map={model.map.view}
+          points={heatmapPoints}
+          players={model.players.map((p) => ({ steamId64: p.row.steamId64, name: p.row.name, teamKey: p.row.teamKey }))}
+          mode={layer}
+          onModeChange={setLayer}
+        />
       </Panel>
       <Panel title="空间图层">
         <div className="dak-layer-controls" role="radiogroup" aria-label="地图图层">

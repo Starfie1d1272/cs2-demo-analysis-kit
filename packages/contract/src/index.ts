@@ -37,6 +37,7 @@ import {
   roundRowSchema,
   roundsSchema,
   shotRowSchema,
+  grenadeTypeSchema,
   shotsSchema,
   sideSchema,
   teamEconomySchema,
@@ -362,7 +363,8 @@ export const heatmapPointSchema = z.object({
   roundNumber: z.number().int().positive(),
   teamKey: teamKeySchema.nullable(),
   steamId64: z.string().nullable(),
-  kind: z.enum(["kill", "death", "grenade"])
+  kind: z.enum(["kill", "death", "grenade"]),
+  grenadeType: grenadeTypeSchema.nullable()
 });
 
 export const mapViewSchema = z.object({
@@ -458,7 +460,8 @@ export const workspaceSpatialPointSchema = z.object({
   roundNumber: z.number().int().positive(),
   teamKey: teamKeySchema.nullable(),
   steamId64: z.string().nullable(),
-  kind: z.enum(["kill", "death", "grenade", "bomb", "position"])
+  kind: z.enum(["kill", "death", "grenade", "bomb", "position"]),
+  grenadeType: grenadeTypeSchema.nullable()
 });
 
 export const workspaceMapSchema = z.object({
@@ -574,6 +577,7 @@ export type SeasonPlayerRow = z.infer<typeof seasonPlayerRowSchema>;
 export type SeasonCohortBundle = z.infer<typeof seasonCohortBundleSchema>;
 export type TimelineEvent = z.infer<typeof timelineEventSchema>;
 export type EconomyPoint = z.infer<typeof economyPointSchema>;
+export type GrenadeType = z.infer<typeof grenadeTypeSchema>;
 export type HeatmapPoint = z.infer<typeof heatmapPointSchema>;
 export type AnalysisBundle = z.infer<typeof analysisBundleSchema>;
 export type DemoViewModel = z.infer<typeof demoViewModelSchema>;
