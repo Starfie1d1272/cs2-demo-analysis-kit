@@ -79,7 +79,8 @@ async function readInput(path: string): Promise<unknown> {
   if (extname(path).toLowerCase() === ".zip") {
     return loadDemoPackageFromZip(bytes);
   }
-  return JSON.parse(bytes.toString("utf-8"));
+  // NaN 在 CS2 导出数据中合法存在，JSON.parse 会抛错，需先替换为 null
+  return JSON.parse(bytes.toString("utf-8").replace(/\bNaN\b/g, "null"));
 }
 
 async function writeJson(path: string, value: unknown) {
