@@ -34,8 +34,6 @@ function DemoLab() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [inGui] = useState(() => typeof (window as any).pywebview?.api?.get_pending_zip === "function");
-
   const loadFromBuffer = useCallback(async (buffer: ArrayBuffer) => {
     setLoading(true);
     setError(null);
@@ -97,32 +95,30 @@ function DemoLab() {
 
   return (
     <div onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
-      {!inGui && (
-        <label
-          style={{
-            position: "fixed",
-            top: 10,
-            right: 10,
-            zIndex: 50,
-            display: "inline-flex",
-            alignItems: "center",
-            padding: "5px 10px",
-            fontSize: 11,
-            lineHeight: 1,
-            borderRadius: 2,
-            background: "var(--dak-panel, #10131a)",
-            color: "var(--dak-fg-dim, #525a6a)",
-            border: "1px solid var(--dak-border, #1f2530)",
-            cursor: "pointer",
-            textTransform: "uppercase",
-            letterSpacing: "0.12em",
-            fontFamily: "inherit",
-          }}
-        >
-          加载 ZIP
-          <input type="file" accept=".zip" onChange={onPick} hidden />
-        </label>
-      )}
+      <label
+        style={{
+          position: "fixed",
+          top: 10,
+          right: 10,
+          zIndex: 50,
+          display: "inline-flex",
+          alignItems: "center",
+          padding: "5px 10px",
+          fontSize: 11,
+          lineHeight: 1,
+          borderRadius: 2,
+          background: "var(--dak-panel, #10131a)",
+          color: "var(--dak-fg-dim, #525a6a)",
+          border: "1px solid var(--dak-border, #1f2530)",
+          cursor: "pointer",
+          textTransform: "uppercase",
+          letterSpacing: "0.12em",
+          fontFamily: "inherit",
+        }}
+      >
+        加载 ZIP
+        <input type="file" accept=".zip" onChange={onPick} hidden />
+      </label>
       {error ? (
         <div className="dak-shell">
           <div className="dak-workspace dak-loading">加载失败：{error}（可拖入 v2 ZIP 重试）</div>

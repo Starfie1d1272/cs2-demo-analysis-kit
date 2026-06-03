@@ -130,6 +130,9 @@ importers:
       '@cs2dak/contract':
         specifier: workspace:*
         version: link:../contract
+      '@cs2dak/core':
+        specifier: workspace:*
+        version: link:../core
       '@cs2dak/maps':
         specifier: workspace:*
         version: link:../maps
