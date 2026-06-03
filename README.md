@@ -6,7 +6,7 @@ English | [简体中文](./README.zh-CN.md)
 
 It does **not** own tournament business logic. Tournament state belongs to products such as RivalHub. The ZIP contract stays in `cs2-demo-format`, and rating models stay in `rival-rating`.
 
-> **Status.** The exporter (`python/`), analysis (`@cs2dak/core`), contract, maps, CLI, and preview workspace are working and tested. `@cs2dak/core` is modularized into focused sub-modules (normalize, signals, scoreboard, timeline, workspace). The `demo-lab` preview renders a full tabbed match workspace — overview, rounds, players, economy, map, and 2D replay. The **`@cs2dak/react` component library** is functional for preview purposes but still being refined for broader reuse.
+> **Status.** The exporter (`python/`), analysis (`@cs2dak/core`), contract, maps, CLI, and preview workspace are working and tested. `@cs2dak/core` is modularized into focused sub-modules (normalize, signals, scoreboard, timeline, workspace). The `demo-lab` renders a full tabbed match workspace — overview, rounds, players, economy, map, and 2D replay — and also serves as the embedded viewer inside the pywebview GUI desktop app. The **`@cs2dak/react` component library** (MatchWorkspace, HeatmapCanvas, EconomyPanel, KillFeed, ScoreboardTable) is functional and reusable.
 
 ## What This Repository Produces
 

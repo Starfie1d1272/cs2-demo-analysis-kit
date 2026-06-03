@@ -6,7 +6,7 @@
 
 它**不负责赛事业务逻辑**。赛事、赛季、队伍、选手、比赛状态应该留给 RivalHub 这样的产品。ZIP 合同继续由 `cs2-demo-format` 维护，评分模型继续由 `rival-rating` 维护。
 
-> **当前状态。** exporter（`python/`）、分析（`@cs2dak/core`）、contract、maps、CLI 和预览工作台都已可用并通过测试。**可视化层（`@cs2dak/react` + `apps/demo-lab`）仍是 WIP**，但 demo-lab 现在已经渲染带总览、回合、选手、经济、地图和 2D 回放的比赛工作台。
+> **当前状态。** exporter（`python/`）、分析（`@cs2dak/core`）、contract、maps、CLI 和预览工作台都已可用并通过测试。`demo-lab` 渲染带总览、回合、选手、经济、地图和 2D 回放的比赛工作台，并作为嵌入式查看器运行在 pywebview GUI 桌面应用中。**`@cs2dak/react` 组件库**（MatchWorkspace、HeatmapCanvas、EconomyPanel、KillFeed、ScoreboardTable）功能完备，可复用。
 
 ## 这个仓库生成什么
 
