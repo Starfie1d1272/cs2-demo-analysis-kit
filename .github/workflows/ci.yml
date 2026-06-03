@@ -36,6 +36,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check out cs2-demo-format (spec schemas)
+        run: git clone --depth 1 https://github.com/Starfie1d1272/cs2-demo-format.git ../cs2-demo-format
+
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -43,5 +46,8 @@ jobs:
       - run: uv sync --extra dev
         working-directory: python
 
-      - run: uv run pytest
+      - name: Run pytest
+        run: uv run pytest
         working-directory: python
+        env:
+          CS2DAK_SPEC_DIR: ${{ github.workspace }}/../cs2-demo-format

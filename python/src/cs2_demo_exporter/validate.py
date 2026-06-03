@@ -45,9 +45,18 @@ def validate_zip(zip_path: str | Path, spec_dir: str | Path | None = None) -> Va
 
 
 def _find_format_root(spec_dir: str | Path | None = None) -> Path:
+    import os
+
     if spec_dir is not None:
         spec_path = Path(spec_dir).resolve()
         return spec_path.parent if spec_path.name == "spec" else spec_path
+
+    # Honour CS2DAK_SPEC_DIR for CI/sandbox environments without pnpm.
+    env_spec = os.environ.get("CS2DAK_SPEC_DIR")
+    if env_spec:
+        candidate = Path(env_spec).resolve()
+        if (candidate / "tools" / "validate.py").exists() and (candidate / "spec").exists():
+            return candidate
 
     here = Path(__file__).resolve()
     repo_root = here.parents[3]
