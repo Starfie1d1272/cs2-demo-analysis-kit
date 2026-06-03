@@ -203,7 +203,7 @@ def gui() -> None:
 
 @app.command()
 def version() -> None:
-    """Print the exporter version."""
+    """Print the cs2dak version."""
     typer.echo(__version__)
 
 
