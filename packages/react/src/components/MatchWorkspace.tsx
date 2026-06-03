@@ -582,8 +582,8 @@ function economyLabel(type: string | null) {
 }
 
 function openingDuelLabel(openingDuel: string) {
-  if (openingDuel === "won") return "开局对枪胜";
-  if (openingDuel === "lost") return "开局对枪负";
+  if (openingDuel === "won") return "首杀";
+  if (openingDuel === "lost") return "首死";
   return openingDuel;
 }
 
