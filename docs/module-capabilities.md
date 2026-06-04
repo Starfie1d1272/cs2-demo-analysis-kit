@@ -60,9 +60,11 @@
 |---|---|
 | `core/workspace.ts` | presentation 与分析混合，应拆出 core |
 | `DemoAnalysisDashboard` | 已删除；由 Match Workspace 覆盖 |
-| `AdminQaWorkspace`、`EconomyConversionPanel` | 已公开但仓库内无消费者，需在重构时重新决定公共面 |
-| 多处 economy/side/weapon 展示标签 | 重复且归属分散，应由 presentation 统一 |
-| `contract/src/index.ts`、`cohort/src/index.ts`、`MatchWorkspace.tsx`、`theme.css` | 职责过多，应按领域拆分 |
+| `AdminQaWorkspace`、`EconomyConversionPanel` | 已从 `react/src/index.ts` 公共导出移除；源码保留，等待 DAK Studio 建设时重新决定公共面 |
+| 多处 economy/side/weapon 展示标签 | 已统一到 `@cs2dak/presentation`（`economyLabelCn`、`ECONOMY_LABEL_SHORT`、`sideLabel`）；`EconomyPanel` 和 `MatchWorkspace` 已迁入 |
+| `contract/src/index.ts` | 已拆分为 7 个领域文件（upstream/demo-package/qa/scoring/analysis/cohort/workspace） |
+| `cohort/src/index.ts` | 442 行单一内聚模块（5 个导出），现阶段拆分会制造人工 seam；保留整体 |
+| `MatchWorkspace.tsx`、`theme.css` | 仍待按领域拆分 |
 | `python/src/cs2dak/exporter.py` | 导出能力完整，但内部职责过度集中 |
 | Python GUI + `demo-lab` viewer | 产品入口重叠，未来由 Studio 收敛 |
 | `scripts/calibrate_value_accounts.py` | 已删除；评分校准归 `@rivalhub/rival-rating` |

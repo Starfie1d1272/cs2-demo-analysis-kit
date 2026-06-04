@@ -21,14 +21,12 @@ without depending on this tool or its language.
 
 | Module | Responsibility |
 |---|---|
-| `parser.py` | Only place that touches `demoparser2`; `.dem` → neutral `RawDemo` |
+| `exporter.py` | Main assembly pipeline: `.dem` data → v2 ZIP (players/match/kills/damages/blinds/bombs/grenades/shots/positions/replay/economies/clutches/manifest) |
+| `parse_worker.py` | Only place that touches `demoparser2`; `.dem` → neutral `RawDemo` |
 | `rounds.py` | Formal round model + `t/ct` side + `teamA/teamB` normalization |
-| `economy.py` | `economyType` classification + `player-economies` rows |
-| `builder.py` | `RawDemo` → `ExportBundle` (orchestrates per-file row builders) |
-| `stats.py` | `player-stats` aggregation (capped damage / ADR / KAST / utility) |
-| `package.py` | `ExportBundle` → ZIP; owns logical-name → filename map; rejects NaN/Inf |
+| `enums.py` | Economy types, hitgroups, weapon names, bomb site derivation, and other enumerations/mappings |
 | `validate.py` | Check a ZIP against `cs2-demo-format/spec/*.schema.json` |
-| `cli.py` | `export` / `export-batch` / `validate` / `gui` commands (thin shell) |
+| `cli.py` | `export` / `export-batch` / `validate` commands (thin shell) |
 | `gui/` | pywebview desktop frontend (drag-drop `.dem` → ZIP); another frontend on the same core |
 
 ### Desktop app
@@ -122,14 +120,12 @@ speed dropped under heavier CPU/cache/I/O contention.
 
 | 模块 | 职责 |
 |---|---|
-| `parser.py` | 唯一接触 `demoparser2` 的层；`.dem` → 中立的 `RawDemo` |
+| `exporter.py` | `.dem` 数据 → v2 ZIP 的主要组装管线（players/match/kills/damages/blinds/bombs/grenades/shots/positions/replay/economies/clutches/manifest） |
+| `parse_worker.py` | 唯一接触 `demoparser2` 的层；`.dem` → 中性 `RawDemo` |
 | `rounds.py` | 正式回合模型 + `t/ct` 阵营 + `teamA/teamB` 归一化 |
-| `economy.py` | `economyType` 分类 + `player-economies` 行 |
-| `builder.py` | `RawDemo` → `ExportBundle`（编排各文件的 row builder） |
-| `stats.py` | `player-stats` 聚合（capped 伤害 / ADR / KAST / 道具伤害） |
-| `package.py` | `ExportBundle` → ZIP；负责逻辑名→文件名映射；拒绝 NaN/Inf |
+| `enums.py` | 经济类型、hitgroup、武器名、bomb site 推导等枚举与映射 |
 | `validate.py` | 对照 `cs2-demo-format/spec/*.schema.json` 校验 ZIP |
-| `cli.py` | `export` / `export-batch` / `validate` / `gui` 命令（薄壳） |
+| `cli.py` | `export` / `export-batch` / `validate` 命令（薄壳） |
 | `gui/` | pywebview 桌面前端（拖入 `.dem` → ZIP）；与 CLI 共用同一核心库 |
 
 ### 桌面 App（核心目标）

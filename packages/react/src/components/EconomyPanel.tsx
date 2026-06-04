@@ -1,4 +1,5 @@
 import type { EconomyPoint } from "@cs2dak/contract";
+import { ECONOMY_LABEL_SHORT } from "@cs2dak/presentation";
 
 export interface EconomyPanelProps {
   points: EconomyPoint[];
@@ -9,14 +10,6 @@ export interface EconomyPanelProps {
 const width = 760;
 const height = 260;
 const pad = { left: 48, right: 18, top: 24, bottom: 34 };
-const economyLabels = {
-  pistol: "手枪",
-  eco: "Eco",
-  semi: "半起",
-  force: "强起",
-  full: "长枪",
-  conversion: "长枪"
-} as const;
 const economyColors = {
   pistol: "rgba(255, 198, 77, 0.18)",
   eco: "rgba(104, 115, 129, 0.18)",
@@ -111,8 +104,8 @@ export function EconomyPanel({ points, teamAName, teamBName }: EconomyPanelProps
         {" 每回合装备价值；背景色为每队经济类型"}
       </div>
       <div className="dak-economy-legend" aria-label="经济类型图例">
-        {(Object.keys(economyLabels) as Array<keyof typeof economyLabels>).map((type) => (
-          <span key={type}><i style={{ background: economyColors[type] }} />{economyLabels[type]}</span>
+        {Object.keys(ECONOMY_LABEL_SHORT).map((type) => (
+          <span key={type}><i style={{ background: economyColors[type as keyof typeof economyColors] }} />{ECONOMY_LABEL_SHORT[type]}</span>
         ))}
       </div>
       <div className="dak-economy-rounds">
@@ -129,8 +122,8 @@ export function EconomyPanel({ points, teamAName, teamBName }: EconomyPanelProps
                   {upsetLabels[upsetType]}
                 </span>
               )}
-              <span className={point.winnerTeamKey === "teamA" ? "dak-economy-winner" : undefined}>{teamAName}: {economyLabels[point.teamAEconomy]}</span>
-              <span className={point.winnerTeamKey === "teamB" ? "dak-economy-winner" : undefined}>{teamBName}: {economyLabels[point.teamBEconomy]}</span>
+              <span className={point.winnerTeamKey === "teamA" ? "dak-economy-winner" : undefined}>{teamAName}: {ECONOMY_LABEL_SHORT[point.teamAEconomy]}</span>
+              <span className={point.winnerTeamKey === "teamB" ? "dak-economy-winner" : undefined}>{teamBName}: {ECONOMY_LABEL_SHORT[point.teamBEconomy]}</span>
             </div>
           );
         })}

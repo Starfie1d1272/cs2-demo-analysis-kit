@@ -6,7 +6,7 @@
 
 它**不负责赛事业务逻辑**。赛事、赛季、队伍、选手、比赛状态应该留给 RivalHub 这样的产品。ZIP 合同继续由 `cs2-demo-format` 维护，评分模型继续由 `rival-rating` 维护。
 
-> **当前状态。** exporter（`python/`）、分析（`@cs2dak/core`）、contract、maps、CLI 和预览工作台都已可用并通过测试。`demo-lab` 渲染带总览、回合、选手、经济、地图和 2D 回放的比赛工作台，并作为嵌入式查看器运行在 pywebview GUI 桌面应用中。**`@cs2dak/react` 组件库**（MatchWorkspace、HeatmapCanvas、EconomyPanel、KillFeed、ScoreboardTable）功能完备，可复用。
+> **当前状态。** exporter（`python/`）、分析（`@cs2dak/core`）、跨场聚合（`@cs2dak/cohort`）、展示模型（`@cs2dak/presentation`）、contract、maps、CLI 都已可用并通过测试。**`@cs2dak/react` 组件库**（MatchWorkspace、HeatmapCanvas、EconomyPanel、KillFeed、ScoreboardTable）只消费 presentation 合同，功能完备，可复用。
 
 ## 这个仓库生成什么
 
@@ -25,7 +25,9 @@
 | `@cs2dak/contract` | 共享 TypeScript 类型和 Zod schema，覆盖输入、分析输出、UI view model、QA report。 |
 | `@cs2dak/maps` | 地图标定、世界坐标到 radar 坐标转换、轻量 callout helper。 |
 | `@cs2dak/core` | 纯分析逻辑：标准化、scoreboard、经济、时间线、热力图点位、QA。 |
-| `@cs2dak/react` | 只消费 `DemoViewModel` / `MatchWorkspaceModel` 的 React 预览组件。 |
+| `@cs2dak/cohort` | 跨场聚合、身份归并与赛季 RR/PRISM 整形。 |
+| `@cs2dak/presentation` | 产品中立 View Model、标签与 workspace 编排。 |
+| `@cs2dak/react` | 只消费 presentation 合同的 React 预览组件。 |
 | `@cs2dak/cli` | 分析 JSON 或 ZIP 包，并输出 analysis/view-model/QA 文件。 |
 | `@cs2dak/demo-lab` | 用 fixtures 预览分析模块和统一设计语言的 Vite 应用。 |
 | `python/src/cs2dak` | Python exporter、CLI、GUI 资源和打包配置，负责 `.dem -> v2 ZIP`。 |

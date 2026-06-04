@@ -1,5 +1,5 @@
 import type { MatchWorkspaceModel, WorkspaceReplayFrame, WorkspaceReplayRound, WorkspaceSpatialPoint } from "@cs2dak/contract";
-import { displayWeaponName } from "@cs2dak/presentation";
+import { displayWeaponName, sideLabel, economyLabelCn } from "@cs2dak/presentation";
 import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
 import { Activity, BarChart3, ChevronLeft, ChevronRight, Crosshair, Film, Gauge, ListChecks, Map, Pause, Play, ShieldCheck, Table2, Users } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -234,7 +234,7 @@ function PlayerStoryPanel({ model }: MatchWorkspaceProps) {
                   <b className="dak-mono">{fact.kills}/{fact.deaths}/{fact.assists}</b>
                 </div>
                 <div className="dak-player-round-meta">
-                  <span>{economyLabel(fact.economyType)}</span>
+                  <span>{economyLabelCn(fact.economyType) || "未知经济"}</span>
                   <span>{fact.survived ? "存活" : "阵亡"}</span>
                   {fact.openingDuel !== "none" && <span>{openingDuelLabel(fact.openingDuel)}</span>}
                 </div>
@@ -565,21 +565,6 @@ function summarizePlayerRoundFacts(facts: MatchWorkspaceModel["players"][number]
   );
 }
 
-function sideLabel(side: string) {
-  return side === "t" ? "进攻方" : "防守方";
-}
-
-function economyLabel(type: string | null) {
-  const labels: Record<string, string> = {
-    pistol: "手枪局",
-    eco: "ECO",
-    semi: "半起",
-    force: "强起",
-    full: "长枪",
-    conversion: "长枪"
-  };
-  return type ? labels[type] ?? type : "未知经济";
-}
 
 function openingDuelLabel(openingDuel: string) {
   if (openingDuel === "won") return "首杀";

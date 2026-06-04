@@ -18,6 +18,7 @@
 - [职业基准](design/pro-baseline.md)
 - [RR 评分模型](design/rating-model.md)
 - [RR v1](design/rr-v1.md)
+- [可视化发现](design/visualization-findings.md)
 
 ## 集成
 
