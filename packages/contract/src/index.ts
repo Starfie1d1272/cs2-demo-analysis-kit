@@ -6,4 +6,5 @@ export * from "./analysis.js";
 export * from "./cohort.js";
 export * from "./leaderboard.js";
 export * from "./player.js";
+export * from "./team.js";
 export * from "./workspace.js";
