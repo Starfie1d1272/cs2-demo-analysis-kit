@@ -145,6 +145,10 @@ importers:
       '@cs2dak/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      '@cs2dak/cohort':
+        specifier: workspace:*
+        version: link:../cohort
 
   packages/react:
     dependencies:

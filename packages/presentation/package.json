@@ -10,6 +10,9 @@
     "@cs2dak/contract": "workspace:*",
     "@cs2dak/core": "workspace:*"
   },
+  "devDependencies": {
+    "@cs2dak/cohort": "workspace:*"
+  },
   "files": ["src"],
   "publishConfig": {
     "access": "public"
