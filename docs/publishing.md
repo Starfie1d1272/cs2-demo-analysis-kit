@@ -27,3 +27,5 @@ pnpm release:npm         # build + test + typecheck + changeset publish
 
 `pnpm release:npm` 需要有效的 npm Automation/Granular Access Token。发布完成后再创建并推送
 仓库 tag 与 GitHub Release，避免 GitHub Release 指向未完成的 npm 发布。
+
+完整测试固定使用单 worker。真实 ZIP 集成测试包含较重的解析与 cohort 构建，并行执行会造成资源竞争和误报超时。

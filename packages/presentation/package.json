@@ -1,6 +1,6 @@
 {
   "name": "@cs2dak/presentation",
-  "version": "0.2.1",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "exports": {
@@ -14,7 +14,9 @@
   "devDependencies": {
     "@cs2dak/cohort": "workspace:*"
   },
-  "files": ["src"],
+  "files": [
+    "src"
+  ],
   "publishConfig": {
     "access": "public"
   }

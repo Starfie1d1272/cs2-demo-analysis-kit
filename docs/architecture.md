@@ -67,8 +67,9 @@ signals, wires the models, anchors, and shapes output.
 > anchoring live in `@cs2dak/cohort`, which aggregates many demos and supports
 > external identity maps for RivalHub user/Steam alias binding.
 
-Consumers: RivalHub calls core/CLI, stores only the subset it needs, renders from
-`DemoViewModel`. Standalone tools can import the TS packages or consume the JSON.
+Consumers: RivalHub stores immutable imports and versioned analysis runs, then renders
+product pages from DAK presentation models. Standalone tools can import the TS packages
+or consume the JSON.
 
 ## 简体中文
 
@@ -136,5 +137,5 @@ Consumers: RivalHub calls core/CLI, stores only the subset it needs, renders fro
 > `@cs2dak/cohort` 聚合多场 demo 完成；RivalHub 的 userId / Steam alias 绑定通过
 > 外部 identity map 接入。
 
-消费方：RivalHub 调 core/CLI，只存需要的子集，基于 `DemoViewModel` 渲染。独立工具可
-直接 import TS 包或消费 JSON。
+消费方：RivalHub 保存不可变导入记录与版本化 analysis run，并基于 DAK presentation
+模型渲染产品页面。独立工具可直接 import TS 包或消费 JSON。

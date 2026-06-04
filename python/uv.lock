@@ -98,7 +98,7 @@ wheels = [
 
 [[package]]
 name = "cs2dak"
-version = "0.2.1"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "demoparser2" },

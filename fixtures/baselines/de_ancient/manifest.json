@@ -2,7 +2,7 @@
   "schemaVersion": "cs2-demo-format/2.0",
   "exporter": {
     "name": "cs2-demo-analysis-kit",
-    "version": "0.2.1"
+    "version": "1.0.0"
   },
   "parser": {
     "name": "demoparser2",
