@@ -11,11 +11,10 @@
 # What it does:
 #   - rewrites the two github: deps to their npm semver ranges
 #   - pnpm install (so they resolve from npm)
-#   - pnpm publish contract -> maps -> core -> react (workspace:* auto-resolved)
+#   - pnpm publish contract -> maps -> core -> cohort -> react (workspace:* auto-resolved)
 #
-# Packages NOT published (intentionally): @cs2dak/cli, @cs2dak/cohort,
-# @cs2dak/demo-lab (private app). Consumers (RivalHub, CS2-insight-agent) only
-# need contract/core/maps/react.
+# Packages NOT published (intentionally): @cs2dak/cli and @cs2dak/demo-lab
+# (private apps). @cs2dak/cohort is published for season-level aggregation.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -39,13 +38,14 @@ function setDep(path, dep, version) {
 setDep("packages/contract/package.json", "cs2-demo-format", fmt);
 setDep("packages/contract/package.json", "@rivalhub/rival-rating", rating);
 setDep("packages/core/package.json", "@rivalhub/rival-rating", rating);
+setDep("packages/cohort/package.json", "@rivalhub/rival-rating", rating);
 JS
 
 echo "==> pnpm install (resolve from npm)"
 pnpm install
 
 echo "==> Publishing in dependency order"
-for pkg in contract maps core react; do
+for pkg in contract maps core cohort react; do
   echo "  --> @cs2dak/$pkg"
   pnpm --filter "@cs2dak/$pkg" publish --access public --no-git-checks $DRY_RUN
 done

@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/). The single source of
 truth for the version is the git tag (`vX.Y.Z`); `pnpm sync-version`
 propagates it into every manifest.
 
+## [0.2.1] — 2026-06-04
+
+### Fixed
+- Replaced the invalid published `@rivalhub/rival-rating` GitHub dependency
+  with npm `^0.1.0`; consumers must use `@cs2dak/*` 0.2.1 or newer.
+
+### Changed
+- Published `@cs2dak/cohort` for season-level RR/PRISM aggregation.
+- Synced all workspace and Python package versions to 0.2.1.
+
 ## [0.2.0] — 2026-06-04
 
 First consolidated release of the analysis kit as the shared middle layer
@@ -31,4 +41,5 @@ First consolidated release of the analysis kit as the shared middle layer
 - RR v2 account ratings wired through `@rivalhub/rival-rating`
   (`computeAccountRatingsV2`); PRISM eight-axis wired for single-match preview.
 
+[0.2.1]: https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/tag/v0.2.0
