@@ -145,6 +145,9 @@ importers:
       '@cs2dak/core':
         specifier: workspace:*
         version: link:../core
+      '@rivalhub/rival-rating':
+        specifier: ^0.1.0
+        version: 0.1.0
     devDependencies:
       '@cs2dak/cohort':
         specifier: workspace:*
