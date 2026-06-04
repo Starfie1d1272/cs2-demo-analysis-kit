@@ -151,6 +151,15 @@
   background: linear-gradient(180deg, rgba(255, 122, 33, 0.2), rgba(255, 122, 33, 0.08));
 }
 
+.dak-leaderboard .dak-col-sortable {
+  cursor: pointer;
+}
+
+.dak-leaderboard .dak-col-sorted {
+  color: var(--dak-fg);
+  background: rgba(255, 122, 33, 0.08);
+}
+
 .dak-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.24fr) minmax(380px, 0.76fr);

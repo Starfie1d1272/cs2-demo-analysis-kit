@@ -1,13 +1,23 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { loadDemoPackageFromZip } from "@cs2dak/core";
-import { buildMatchWorkspaceModel } from "@cs2dak/presentation";
-import type { MatchWorkspaceModel } from "@cs2dak/contract";
-import { MatchWorkspace } from "@cs2dak/react";
+import { buildSeasonCohort } from "@cs2dak/cohort";
+import { buildMatchWorkspaceModel, buildSeasonLeaderboardModel } from "@cs2dak/presentation";
+import type { MatchWorkspaceModel, SeasonLeaderboardModel } from "@cs2dak/contract";
+import { MatchWorkspace, SeasonLeaderboard } from "@cs2dak/react";
 import "@cs2dak/react/theme.css";
 import sampleZipUrl from "../../../fixtures/input/sample-match.zip?url";
 
-function DemoLab() {
+// 排行榜预览用 cohort fixtures（多场）构建，验收列/格式/排序。
+const cohortZipUrls = import.meta.glob("../../../fixtures/input/cohort/*.zip", {
+  query: "?url",
+  import: "default",
+  eager: true
+}) as Record<string, string>;
+
+type Mode = "match" | "leaderboard";
+
+function MatchView() {
   const [model, setModel] = useState<MatchWorkspaceModel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,7 +54,6 @@ function DemoLab() {
     };
   }, [loadFromBuffer]);
 
-  // Drag-drop / file picker lets a user load any v2 ZIP (standalone or to override).
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -81,7 +90,7 @@ function DemoLab() {
           cursor: "pointer",
           textTransform: "uppercase",
           letterSpacing: "0.12em",
-          fontFamily: "inherit",
+          fontFamily: "inherit"
         }}
       >
         加载 ZIP
@@ -98,6 +107,74 @@ function DemoLab() {
       ) : (
         <MatchWorkspace model={model} />
       )}
+    </div>
+  );
+}
+
+function LeaderboardView() {
+  const [model, setModel] = useState<SeasonLeaderboardModel | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const entries = Object.entries(cohortZipUrls).sort(([a], [b]) => a.localeCompare(b));
+        const demos = await Promise.all(
+          entries.map(async ([path, url]) => {
+            const buffer = await (await fetch(url)).arrayBuffer();
+            const matchId = path.split("/").pop()!.replace(/\.zip$/, "");
+            return { matchId, pkg: await loadDemoPackageFromZip(buffer) };
+          })
+        );
+        const bundle = buildSeasonCohort(demos);
+        if (!cancelled) setModel(buildSeasonLeaderboardModel(bundle));
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (error) {
+    return (
+      <div className="dak-shell">
+        <div className="dak-workspace dak-loading">排行榜构建失败：{error}</div>
+      </div>
+    );
+  }
+  if (!model) {
+    return (
+      <div className="dak-shell">
+        <div className="dak-workspace dak-loading">构建赛季 cohort 中…</div>
+      </div>
+    );
+  }
+  return (
+    <div className="dak-shell">
+      <div className="dak-workspace">
+        <SeasonLeaderboard model={model} onPlayerClick={(playerKey) => console.log("player:", playerKey)} />
+      </div>
+    </div>
+  );
+}
+
+function DemoLab() {
+  const [mode, setMode] = useState<Mode>("match");
+  return (
+    <div>
+      <div className="dak-tabs" style={{ position: "fixed", top: 10, left: 10, zIndex: 50, margin: 0 }}>
+        <button type="button" className={mode === "match" ? "dak-tab dak-tab-active" : "dak-tab"} onClick={() => setMode("match")}>
+          比赛
+        </button>
+        <button type="button" className={mode === "leaderboard" ? "dak-tab dak-tab-active" : "dak-tab"} onClick={() => setMode("leaderboard")}>
+          排行榜
+        </button>
+      </div>
+      {mode === "match" ? <MatchView /> : <LeaderboardView />}
     </div>
   );
 }

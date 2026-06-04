@@ -54,6 +54,9 @@ importers:
 
   apps/demo-lab:
     dependencies:
+      '@cs2dak/cohort':
+        specifier: workspace:*
+        version: link:../../packages/cohort
       '@cs2dak/contract':
         specifier: workspace:*
         version: link:../../packages/contract

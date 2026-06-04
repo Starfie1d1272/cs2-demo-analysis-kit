@@ -9,6 +9,7 @@
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
+    "@cs2dak/cohort": "workspace:*",
     "@cs2dak/contract": "workspace:*",
     "@cs2dak/core": "workspace:*",
     "@cs2dak/presentation": "workspace:*",
