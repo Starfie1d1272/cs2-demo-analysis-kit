@@ -1,4 +1,5 @@
 export * from "./zones.js";
+export * from "./routes.js";
 
 export interface MapCalibration {
   mapName: string;

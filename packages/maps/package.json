@@ -9,6 +9,9 @@
   "files": [
     "src"
   ],
+  "devDependencies": {
+    "@cs2dak/core": "workspace:*"
+  },
   "publishConfig": {
     "access": "public"
   }

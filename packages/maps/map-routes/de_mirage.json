@@ -1,0 +1,31 @@
+{
+  "mapName": "de_mirage",
+  "version": "mirage-routes-0.1",
+  "_note": "T 方进攻动线，zones = lastPlaceName 取值的推进顺序（无坐标）。由 scripts/extract-routes.ts 跑 5 场 pro demo 的开局转移挖出、人工确认。",
+  "routes": [
+    {
+      "id": "a_palace",
+      "name": "A 大厅",
+      "bombsite": "a",
+      "zones": ["TSpawn", "PalaceAlley", "TRamp", "PalaceInterior", "BombsiteA"]
+    },
+    {
+      "id": "a_mid",
+      "name": "A 中路/Connector",
+      "bombsite": "a",
+      "zones": ["TSpawn", "SideAlley", "TopofMid", "Middle", "Connector", "BombsiteA"]
+    },
+    {
+      "id": "b_apartments",
+      "name": "B 公寓",
+      "bombsite": "b",
+      "zones": ["TSpawn", "SideAlley", "House", "BackAlley", "Apartments", "BombsiteB"]
+    },
+    {
+      "id": "b_underpass",
+      "name": "B 中路/Underpass",
+      "bombsite": "b",
+      "zones": ["TSpawn", "SideAlley", "TopofMid", "Middle", "Underpass", "BombsiteB"]
+    }
+  ]
+}
