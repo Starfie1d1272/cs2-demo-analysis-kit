@@ -8,6 +8,7 @@ import {
   type SeasonPlayerRow
 } from "@cs2dak/contract";
 import { computeSeasonMetrics, round } from "./season-metrics.js";
+import { displayWeaponName } from "./weapons.js";
 
 /** RR 账户分解标签（与 Match Workspace 的 rrBreakdown 一致）。 */
 const RR_BREAKDOWN_LABEL: Record<RRBreakdownEntry["key"], string> = {
@@ -96,6 +97,15 @@ function profileFromRow(
       }))
     },
     metrics,
+    weapons: player.weaponHighlights.weapons.map((weapon) => ({
+      weapon: weapon.weapon,
+      label: displayWeaponName(weapon.weapon),
+      kills: weapon.kills,
+      killSharePercent: player.weaponHighlights.totalKills > 0
+        ? round((weapon.kills / player.weaponHighlights.totalKills) * 100, 1)
+        : 0
+    })),
+    highlights: player.weaponHighlights.highlights,
     style: buildStyle(player),
     perMatch: [...player.perMatch]
       .sort((a, b) => a.matchId.localeCompare(b.matchId))

@@ -1,5 +1,6 @@
 import {
   deriveAccountSignalsV2,
+  derivePlayerWeaponHighlights,
   deriveRRIndicators,
   computeAccountRatingsV2
 } from "@cs2dak/core";
@@ -9,6 +10,7 @@ import {
   type AccountSignalsV2,
   type DemoPackage,
   type RRIndicators,
+  type PlayerWeaponHighlightFacts,
   type SeasonCohortBundle,
   type TeamKey,
   type ValueAccountsWeights
@@ -57,6 +59,7 @@ interface PlayerAccumulator {
   mapCount: number;
   signals: AccountSignalsV2[];
   indicators: RRIndicators[];
+  weaponHighlights: PlayerWeaponHighlightFacts[];
   perMatch: Array<{ matchId: string; steamId64: string; accountRR: number; rrV1: number }>;
 }
 
@@ -73,6 +76,7 @@ export function buildSeasonCohort(
   for (const demo of demos) {
     const signals = deriveAccountSignalsV2(demo.pkg);
     const indicators = deriveRRIndicators(demo.pkg);
+    const weaponHighlights = derivePlayerWeaponHighlights(demo.pkg);
     const matchAccounts = computeAccountRatingsV2(demo.pkg);
     const matchAccountBySteamId = new Map(matchAccounts.map((row) => [row.signals.steamId64, row.rr]));
     const rrBySteamId = new Map(indicators.map((row) => [row.steamId64, computeRR(row, rrWeights)]));
@@ -94,6 +98,7 @@ export function buildSeasonCohort(
         mapCount: 0,
         signals: [],
         indicators: [],
+        weaponHighlights: [],
         perMatch: []
       }));
 
@@ -105,6 +110,8 @@ export function buildSeasonCohort(
       acc.mapCount += 1;
       acc.signals.push(signal);
       acc.indicators.push(indicator);
+      const weaponHighlight = weaponHighlights.find((row) => row.steamId64 === player.steamId64);
+      if (weaponHighlight) acc.weaponHighlights.push(weaponHighlight);
       acc.perMatch.push({
         matchId: demo.matchId,
         steamId64: player.steamId64,
@@ -167,6 +174,7 @@ export function buildSeasonCohort(
           rrV1: round(row.rrV1.rr, 3),
           rrV1Percentile: round(rrToPercentile(rrV1Scores, row.rrV1.rr), 1),
           indicators: row.indicators,
+          weaponHighlights: aggregateWeaponHighlights(row.acc.playerKey, row.acc.weaponHighlights),
           accountRR: round(balanced.rr, 3),
           accountRRRaw: round(balanced.rrRaw, 3),
           accountBreakdown: {
@@ -337,6 +345,31 @@ function aggregateRRIndicators(steamId64: string, rows: RRIndicators[]): RRIndic
     wallbangKillCount,
     roundSwingTotal: sumNullable(rows.map((row) => row.roundSwingTotal)),
     roundSwingPerKill: weightedNullableRate(rows, "roundSwingPerKill")
+  };
+}
+
+function aggregateWeaponHighlights(
+  steamId64: string,
+  rows: PlayerWeaponHighlightFacts[]
+): PlayerWeaponHighlightFacts {
+  const weapons = new Map<string, number>();
+  for (const row of rows) {
+    for (const weapon of row.weapons) {
+      weapons.set(weapon.weapon, (weapons.get(weapon.weapon) ?? 0) + weapon.kills);
+    }
+  }
+  return {
+    steamId64,
+    totalKills: sum(rows, (row) => row.totalKills),
+    weapons: [...weapons.entries()]
+      .map(([weapon, kills]) => ({ weapon, kills }))
+      .sort((a, b) => b.kills - a.kills || a.weapon.localeCompare(b.weapon)),
+    highlights: {
+      wallbangKills: sumNullable(rows.map((row) => row.highlights.wallbangKills)),
+      noScopeKills: sumNullable(rows.map((row) => row.highlights.noScopeKills)),
+      throughSmokeKills: sumNullable(rows.map((row) => row.highlights.throughSmokeKills)),
+      collateralKills: sumNullable(rows.map((row) => row.highlights.collateralKills))
+    }
   };
 }
 

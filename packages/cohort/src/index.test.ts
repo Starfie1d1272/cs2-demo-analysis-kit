@@ -2,7 +2,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { deriveRRIndicators, loadDemoPackageFromZip } from "@cs2dak/core";
+import { derivePlayerWeaponHighlights, deriveRRIndicators, loadDemoPackageFromZip } from "@cs2dak/core";
 import type { DemoPackage } from "@cs2dak/contract";
 import { buildSeasonCohort } from "./index";
 
@@ -134,5 +134,20 @@ describe("buildSeasonCohort", () => {
 
     expect(complete.players[0]?.confidence).toBeGreaterThan(stripped.players[0]?.confidence ?? 1);
     expect(stripped.players.every((row) => row.confidence >= 0 && row.confidence <= 1)).toBe(true);
+  }, integrationTimeoutMs);
+
+  it("sums weapon distributions and highlight counts across identities", async () => {
+    const demos = await getCohortFixtures();
+    const bundle = buildSeasonCohort(demos);
+    const repeated = bundle.players.find((row) => row.mapCount > 1)!;
+    const source = demos
+      .flatMap((demo) => derivePlayerWeaponHighlights(demo.pkg))
+      .filter((row) => repeated.steamIds.includes(row.steamId64));
+    const expectedTotalKills = source.reduce((sum, row) => sum + row.totalKills, 0);
+    const expectedNoScopes = source.reduce((sum, row) => sum + (row.highlights.noScopeKills ?? 0), 0);
+
+    expect(repeated.weaponHighlights.totalKills).toBe(expectedTotalKills);
+    expect(repeated.weaponHighlights.weapons.reduce((sum, row) => sum + row.kills, 0)).toBe(expectedTotalKills);
+    expect(repeated.weaponHighlights.highlights.noScopeKills).toBe(expectedNoScopes);
   }, integrationTimeoutMs);
 });

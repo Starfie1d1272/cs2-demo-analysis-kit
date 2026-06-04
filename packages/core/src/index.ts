@@ -4,11 +4,13 @@ import { buildQaReport } from "./qa.js";
 import { buildPlayerRoundFacts, buildPlayerIndicators, buildScoreboard } from "./scoreboard.js";
 import { computeAccountRatingsV2 } from "./signals.js";
 import { buildTimeline, buildEconomy, buildHeatmap } from "./timeline.js";
+import { buildPlayerWeaponHighlights } from "./weapon-highlights.js";
 
 export { loadDemoPackageFromZip } from "./loader.js";
 export { normalizeDemoPackage } from "./normalize.js";
 export { deriveAccountSignalsV2, computeAccountRatingsV2 } from "./signals.js";
 export { deriveRRIndicators } from "./scoreboard.js";
+export { derivePlayerWeaponHighlights } from "./weapon-highlights.js";
 export { buildEconomyConversion } from "./economy.js";
 export type {
   EconomyTypeStats,
@@ -23,6 +25,7 @@ export function analyzeDemoPackage(input: unknown): AnalysisBundle {
   const playerIndicators = buildPlayerIndicators(pkg, playerRoundFacts);
   const accountRatings = computeAccountRatingsV2(pkg);
   const scoreboard = buildScoreboard(pkg, playerIndicators, accountRatings);
+  const playerWeaponHighlights = buildPlayerWeaponHighlights(pkg);
   const timeline = buildTimeline(pkg);
   const economy = buildEconomy(pkg);
   const heatmap = buildHeatmap(pkg);
@@ -48,6 +51,7 @@ export function analyzeDemoPackage(input: unknown): AnalysisBundle {
       teamB: { name: pkg.match.teamB.name ?? "Team B", score: pkg.match.teamB.score }
     },
     scoreboard,
+    playerWeaponHighlights,
     playerIndicators,
     playerRoundFacts,
     timeline,

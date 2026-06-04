@@ -3,6 +3,7 @@ import { z } from "zod";
 import { teamKeySchema } from "cs2-demo-format";
 import { accountContextAvailabilitySchema } from "./analysis.js";
 import { rrIndicatorsSchema } from "./scoring.js";
+import { playerWeaponHighlightFactsSchema } from "./analysis.js";
 
 export const seasonPlayerRowSchema = z.object({
   playerKey: z.string(),
@@ -15,6 +16,7 @@ export const seasonPlayerRowSchema = z.object({
   rrV1: z.number().nonnegative(),
   rrV1Percentile: z.number().min(0).max(100),
   indicators: rrIndicatorsSchema,
+  weaponHighlights: playerWeaponHighlightFactsSchema,
   accountRR: z.number().nonnegative(),
   accountRRRaw: z.number(),
   accountBreakdown: z.object({

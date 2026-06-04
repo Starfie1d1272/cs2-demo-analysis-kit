@@ -48,6 +48,12 @@ describe("buildPlayerSeasonProfile", () => {
         "objective",
         "utility"
       ]);
+      expect(profile.weapons.reduce((sum, weapon) => sum + weapon.kills, 0)).toBe(source.weaponHighlights.totalKills);
+      expect(profile.weapons.map((weapon) => weapon.kills)).toEqual(
+        [...profile.weapons.map((weapon) => weapon.kills)].sort((a, b) => b - a)
+      );
+      expect(profile.highlights.noScopeKills).toBe(source.weaponHighlights.highlights.noScopeKills);
+      expect(profile.highlights.wallbangKills).toBe(source.weaponHighlights.highlights.wallbangKills);
 
       // 每场趋势条数 == 该选手参与场次，且按 matchId 升序
       expect(profile.perMatch).toHaveLength(source.perMatch.length);

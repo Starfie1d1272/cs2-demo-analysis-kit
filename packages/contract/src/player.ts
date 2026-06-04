@@ -37,6 +37,13 @@ export const playerSeasonTrendPointSchema = z.object({
   hltvRating: z.number().nonnegative()
 });
 
+export const playerWeaponProfileEntrySchema = z.object({
+  weapon: z.string(),
+  label: z.string(),
+  kills: z.number().int().nonnegative(),
+  killSharePercent: z.number().min(0).max(100)
+});
+
 export const playerSeasonProfileSchema = z.object({
   version: z.literal("cs2-demo-analysis-kit/player-profile-0.1"),
   weightsVersion: z.string(),
@@ -60,6 +67,13 @@ export const playerSeasonProfileSchema = z.object({
   }),
   /** 与排行榜同口径的展示指标（共享 SEASON_STAT_VIEWS 渲染列）。 */
   metrics: z.record(leaderboardMetricKeySchema, z.number().nullable()),
+  weapons: z.array(playerWeaponProfileEntrySchema),
+  highlights: z.object({
+    wallbangKills: z.number().int().nonnegative().nullable(),
+    noScopeKills: z.number().int().nonnegative().nullable(),
+    throughSmokeKills: z.number().int().nonnegative().nullable(),
+    collateralKills: z.number().int().nonnegative().nullable()
+  }),
   style: playerStyleSchema.nullable(),
   /** 每场 RR 趋势，按 matchId 升序。 */
   perMatch: z.array(playerSeasonTrendPointSchema),
@@ -72,4 +86,5 @@ export type RRBreakdownEntry = z.infer<typeof rrBreakdownEntrySchema>;
 export type PlayerStyleAxis = z.infer<typeof playerStyleAxisSchema>;
 export type PlayerStyle = z.infer<typeof playerStyleSchema>;
 export type PlayerSeasonTrendPoint = z.infer<typeof playerSeasonTrendPointSchema>;
+export type PlayerWeaponProfileEntry = z.infer<typeof playerWeaponProfileEntrySchema>;
 export type PlayerSeasonProfile = z.infer<typeof playerSeasonProfileSchema>;

@@ -94,6 +94,23 @@ export const playerScoreboardRowSchema = z.object({
   })
 });
 
+export const weaponKillRowSchema = z.object({
+  weapon: z.string(),
+  kills: z.number().int().nonnegative()
+});
+
+export const playerWeaponHighlightFactsSchema = z.object({
+  steamId64: z.string(),
+  totalKills: z.number().int().nonnegative(),
+  weapons: z.array(weaponKillRowSchema),
+  highlights: z.object({
+    wallbangKills: z.number().int().nonnegative().nullable(),
+    noScopeKills: z.number().int().nonnegative().nullable(),
+    throughSmokeKills: z.number().int().nonnegative().nullable(),
+    collateralKills: z.number().int().nonnegative().nullable()
+  })
+});
+
 export const accountContextAvailabilitySchema = z.enum(["available", "partial", "missing"]);
 
 export const timelineEventSchema = z.object({
@@ -160,6 +177,7 @@ export const analysisBundleSchema = z.object({
     teamB: z.object({ name: z.string(), score: z.number().int().nonnegative() })
   }),
   scoreboard: z.array(playerScoreboardRowSchema),
+  playerWeaponHighlights: z.array(playerWeaponHighlightFactsSchema),
   playerIndicators: z.array(playerIndicatorRowSchema),
   playerRoundFacts: z.array(playerRoundFactSchema),
   timeline: z.array(timelineEventSchema),
@@ -186,6 +204,8 @@ export const demoViewModelSchema = z.object({
 export type PlayerRoundFact = z.infer<typeof playerRoundFactSchema>;
 export type PlayerIndicatorRow = z.infer<typeof playerIndicatorRowSchema>;
 export type PlayerScoreboardRow = z.infer<typeof playerScoreboardRowSchema>;
+export type WeaponKillRow = z.infer<typeof weaponKillRowSchema>;
+export type PlayerWeaponHighlightFacts = z.infer<typeof playerWeaponHighlightFactsSchema>;
 export type AccountContextAvailability = z.infer<typeof accountContextAvailabilitySchema>;
 export type TimelineEvent = z.infer<typeof timelineEventSchema>;
 export type EconomyPoint = z.infer<typeof economyPointSchema>;

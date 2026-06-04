@@ -5,6 +5,7 @@ import {
   analyzeDemoPackage,
   computeAccountRatingsV2,
   deriveAccountSignalsV2,
+  derivePlayerWeaponHighlights,
   deriveRRIndicators,
   loadDemoPackageFromZip
 } from "./index";
@@ -130,6 +131,21 @@ describe("analyzeDemoPackage", () => {
       bombs: "available"
     });
     expect(row.confidence).toBeCloseTo(0.917, 3);
+  });
+
+  it("derives reusable per-player weapon kill distribution and highlight facts", async () => {
+    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
+    const pkg = await loadDemoPackageFromZip(zip);
+    const facts = derivePlayerWeaponHighlights(pkg);
+    const bundle = analyzeDemoPackage(pkg);
+
+    expect(facts).toHaveLength(pkg.players.length);
+    expect(bundle.playerWeaponHighlights).toEqual(facts);
+    expect(facts.every((row) => row.weapons.reduce((sum, weapon) => sum + weapon.kills, 0) === row.totalKills)).toBe(true);
+    expect(facts.flatMap((row) => row.weapons).some((weapon) => weapon.weapon === "ak47")).toBe(true);
+    expect(facts.every((row) => row.highlights.wallbangKills != null)).toBe(true);
+    expect(facts.every((row) => row.highlights.noScopeKills != null)).toBe(true);
+    expect(facts.every((row) => row.highlights.throughSmokeKills != null)).toBe(true);
   });
 
   it("emits null context buckets (not zero) when the data source is missing", async () => {

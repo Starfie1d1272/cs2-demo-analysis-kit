@@ -123,6 +123,7 @@ const minimalBundle = {
     teamB: { name: "Team B", score: 8 },
   },
   scoreboard: [],
+  playerWeaponHighlights: [],
   playerIndicators: [],
   playerRoundFacts: [],
   timeline: [],
