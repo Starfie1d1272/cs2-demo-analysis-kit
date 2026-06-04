@@ -120,8 +120,8 @@ importers:
         specifier: ^0.1.0
         version: 0.1.0
       cs2-demo-format:
-        specifier: ^2.2.0
-        version: 2.2.0(zod@3.25.76)
+        specifier: ^2.3.0
+        version: 2.3.0(zod@3.25.76)
       zod:
         specifier: ^3.25.0
         version: 3.25.76
@@ -966,8 +966,8 @@ packages:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
 
-  cs2-demo-format@2.2.0:
-    resolution: {integrity: sha512-f2+K4vToxOnB1Y1FsMYIckgVbG8zRTmOGut7FYcL1Xi8zdxjREVvbsJksTa4m+2cK/qpZ+Hhi6x7zDSteAWq5w==}
+  cs2-demo-format@2.3.0:
+    resolution: {integrity: sha512-Gu2+mJkJZhwdvXj+1NOC+0yCaXXC9Gh7kwOjS3mN2LS4LukyBhXnzfIki3psyWK1BjTa2rUCnxlzYov1Dohc7Q==}
     peerDependencies:
       zod: '>=3.0.0'
 
@@ -2265,7 +2265,7 @@ snapshots:
       shebang-command: 2.0.0
       which: 2.0.2
 
-  cs2-demo-format@2.2.0(zod@3.25.76):
+  cs2-demo-format@2.3.0(zod@3.25.76):
     dependencies:
       jszip: 3.10.1
       zod: 3.25.76

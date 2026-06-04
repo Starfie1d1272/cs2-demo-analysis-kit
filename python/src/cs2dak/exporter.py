@@ -220,6 +220,19 @@ def _b(val) -> bool:
         return False
 
 
+def _has_c4(row: dict) -> bool:
+    """True if the player holds the C4 this frame.
+
+    This demoparser2 build's has_c4/is_bomb_carrier tick props return None, so
+    ownership is read from the inventory ("C4 Explosive"), which is reliable and
+    covers the initial carrier plus every pickup/drop without a state machine.
+    """
+    inv = row.get("inventory")
+    if not inv:
+        return False
+    return any("C4" in str(item) for item in inv)
+
+
 
 
 # ── players ───────────────────────────────────────────────────────────────────
@@ -746,11 +759,12 @@ def _build_positions(raw: dict, team_map: dict, round_model: _RoundModel) -> lis
                 r.get("active_weapon_name") or r.get("weapon_name") or r.get("active_weapon")
             ),
             "flashDurationRemaining": _rnd(r.get("flash_duration"), 1),
-            # NOTE: has_c4/is_bomb_carrier tick props return None in this
-            # demoparser2 build, so hasBomb is always false. Deriving true C4
-            # ownership needs stateful bomb_pickup/dropped/planted tracking.
-            "hasBomb": _b(r.get("has_c4")),
+            # hasBomb from inventory ("C4 Explosive"); has_c4 tick prop is null
+            # in this demoparser2 build. See _has_c4.
+            "hasBomb": _has_c4(r),
             "hasDefuseKit": _b(r.get("has_defuser")),
+            # CS2 callout 区域名；两 callout 之间为空 → None（保持 null，不 coerce "")。
+            "lastPlaceName": (r.get("last_place_name") or None),
         })
     return out
 
@@ -782,13 +796,30 @@ def _build_replay(raw: dict, team_map: dict, round_model: _RoundModel,
         f = 0
         if int(_safe_float(r.get("health"), 0)) > 0:
             f |= 1  # alive
-        if _b(r.get("has_c4")):
-            f |= 2  # hasBomb
+        if _has_c4(r):
+            f |= 2  # hasBomb (from inventory; see _has_c4)
         if _b(r.get("has_defuser")):
             f |= 4  # hasDefuseKit
         if _safe_float(r.get("flash_duration"), 0.0) > 0:
             f |= 8  # flashed
         return f
+
+    # ── grenade flight paths → per-round projectiles ──
+    proj_by_round: dict[int, list[dict]] = defaultdict(list)
+    for tr in raw.get("grenade_trajectories", []):
+        start = int(tr.get("start_tick") or 0)
+        rn = round_model.round_for_tick(start)
+        if rn is None:
+            continue
+        tid = _sid(tr.get("steamid"))
+        proj_by_round[rn].append({
+            "grenade": tr["grenade"],
+            "throwerSteamId64": tid if _is_valid_steamid(tid) else None,
+            "startTick": start,
+            "x": [int(v) for v in tr["xs"]],
+            "y": [int(v) for v in tr["ys"]],
+            "z": [int(v) for v in tr["zs"]],
+        })
 
     # ── group by (roundNumber, steamId64) ──
     round_ticks: dict[int, set[int]] = defaultdict(set)
@@ -870,6 +901,7 @@ def _build_replay(raw: dict, team_map: dict, round_model: _RoundModel,
             "tickStep": tick_step,
             "frameCount": len(ticks),
             "players": player_list,
+            "projectiles": proj_by_round.get(rn, []),
         })
 
     return {

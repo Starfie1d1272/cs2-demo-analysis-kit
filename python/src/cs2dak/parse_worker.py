@@ -85,28 +85,42 @@ def _safe_events(
 _GRENADE_PLAYER_FIELDS = ["steamid", "X", "Y", "Z"]
 
 
-def _extract_grenade_throws(parser: DemoParser) -> list[dict]:
-    """Real throw origins from parse_grenades() projectile trajectories.
+def _nearest_path(path: dict[int, tuple], t: int) -> tuple:
+    """Position in `path` (tick→xyz) at the tick nearest to `t`."""
+    if not path:
+        return (0.0, 0.0, 0.0)
+    k = min(path.keys(), key=lambda kt: abs(kt - t))
+    return path[k]
+
+
+def _extract_grenade_paths(
+    parser: DemoParser, sample_ticks: list[int]
+) -> tuple[list[dict], list[dict]]:
+    """Throw origins + in-flight trajectories from parse_grenades().
 
     Each thrown grenade is a *Projectile entity with a per-tick flight path.
-    The first tick with valid coords is the throw origin; the last is the
-    detonate/destroy point. Returns rows shaped for _build_grenades:
-    {grenade_entity_id, grenade, tick(throw), destroy_tick, steamid, X, Y, Z}.
+    Returns (throws, trajectories):
+      throws       — first/last per throw, shaped for _build_grenades:
+                     {grenade_entity_id, grenade, tick, destroy_tick, steamid, X, Y, Z}.
+      trajectories — flight path sampled onto the replay grid (`sample_ticks`),
+                     for replay rendering: {grenade, steamid, start_tick, xs, ys, zs}.
+                     Flight phase only; the static smoke/fire effect afterwards
+                     lives in grenades.json (effectPosition + destroyTick).
     """
     from .enums import grenade_projectile_to_type
 
     try:
         g = parser.parse_grenades()
     except Exception:
-        return []
+        return [], []
     if g is None or not hasattr(g, "columns") or "grenade_entity_id" not in g.columns:
-        return []
+        return [], []
     try:
         proj = g[g["grenade_type"].astype(str).str.endswith("Projectile")]
         proj = proj.dropna(subset=["x", "y", "z"]).sort_values(
             ["grenade_entity_id", "tick"])
         if proj.empty:
-            return []
+            return [], []
         # Entity ids are recycled across the match, so the same id covers many
         # different grenades. Start a new throw whenever the id changes or the
         # per-tick flight path breaks (gap > ~1s), then take first/last per throw.
@@ -118,25 +132,74 @@ def _extract_grenade_throws(parser: DemoParser) -> list[dict]:
         first = grouped.first()
         last_tick = grouped["tick"].last()
     except Exception:
-        return []
+        return [], []
 
-    out: list[dict] = []
-    for seg_id, row in first.iterrows():
+    grid = sorted({int(t) for t in (sample_ticks or [])})
+
+    throws: list[dict] = []
+    trajectories: list[dict] = []
+    for seg_id, seg_rows in grouped:
+        row = first.loc[seg_id]
         gtype = grenade_projectile_to_type(row.get("grenade_type"))
         if gtype is None:
             continue
         eid_val = row.get("grenade_entity_id")
-        out.append({
+        throw_tick = int(row["tick"])
+        last = int(last_tick.loc[seg_id])
+        steamid = row.get("steamid")
+        throws.append({
             "grenade_entity_id": int(eid_val) if eid_val is not None else None,
             "grenade": gtype,
-            "tick": int(row["tick"]),
-            "destroy_tick": int(last_tick.loc[seg_id]),
-            "steamid": row.get("steamid"),
+            "tick": throw_tick,
+            "destroy_tick": last,
+            "steamid": steamid,
             "X": float(row["x"]),
             "Y": float(row["y"]),
             "Z": float(row["z"]),
         })
-    return out
+
+        # sample the flight path onto the replay grid ticks within [throw, last]
+        path = {
+            int(t): (x, y, z)
+            for t, x, y, z in zip(
+                seg_rows["tick"], seg_rows["x"], seg_rows["y"], seg_rows["z"]
+            )
+        }
+        gticks = [t for t in grid if throw_tick <= t <= last]
+        if not gticks:
+            # flight shorter than one grid step → single frame at the throw
+            gticks = [throw_tick]
+            path.setdefault(throw_tick, (row["x"], row["y"], row["z"]))
+        xs: list[int] = []
+        ys: list[int] = []
+        zs: list[int] = []
+        for t in gticks:
+            pos = path.get(t) or _nearest_path(path, t)
+            xs.append(int(round(pos[0])))
+            ys.append(int(round(pos[1])))
+            zs.append(int(round(pos[2])))
+        # Smoke/decoy *Projectile entities linger at rest for the whole effect,
+        # so the path has a stationary tail (per-frame motion ~0). Trim trailing
+        # at-rest frames (<10 u/frame ≈ jitter, well below a roll's ~16+); keep
+        # the flight arc + roll-to-rest. The static effect lives in grenades.json.
+        while len(xs) >= 2 and (
+            (xs[-1] - xs[-2]) ** 2
+            + (ys[-1] - ys[-2]) ** 2
+            + (zs[-1] - zs[-2]) ** 2
+        ) <= 100:
+            xs.pop()
+            ys.pop()
+            zs.pop()
+        trajectories.append({
+            "grenade": gtype,
+            "steamid": steamid,
+            "start_tick": gticks[0],
+            "xs": xs,
+            "ys": ys,
+            "zs": zs,
+        })
+
+    return throws, trajectories
 
 
 def parse_demo(dem_path: str) -> dict[str, Any]:
@@ -223,9 +286,6 @@ def parse_demo(dem_path: str) -> dict[str, Any]:
             {**r, "_grenade_type": gtype} for r in g_nade[ev_name]
         )
 
-    # Real throw origins: parse_grenades() projectile trajectories (one scan).
-    grenade_throws = _extract_grenade_throws(p)
-
     # ── player info at match start ───────────────────────────────
     if announce_rows:
         match_start_tick = int(announce_rows[0]["tick"])
@@ -274,7 +334,11 @@ def parse_demo(dem_path: str) -> dict[str, Any]:
                 [
                     "steamid", "team_num", "X", "Y", "Z", "yaw", "pitch",
                     "health", "armor", "active_weapon", "active_weapon_name", "flash_duration",
-                    "current_equip_value", "has_defuser", "has_c4",
+                    "current_equip_value", "has_defuser", "has_c4", "last_place_name",
+                    # inventory carries "C4 Explosive" for the bomb carrier; this
+                    # build's has_c4/is_bomb_carrier tick props return None, so the
+                    # inventory is the reliable per-frame C4-ownership signal.
+                    "inventory",
                 ],
                 ticks=replay_ticks,
             ))
@@ -286,6 +350,10 @@ def parse_demo(dem_path: str) -> dict[str, Any]:
             all_positions = []
     positions_raw = [r for r in all_positions if r.get("tick") in sample_tick_set]
     replay_raw = all_positions
+
+    # ── grenades: throw origins + flight paths sampled onto replay grid ──
+    # One parse_grenades() scan; trajectories align to the 8 Hz replay ticks.
+    grenade_throws, grenade_trajectories = _extract_grenade_paths(p, replay_ticks)
 
     # ── economy: player state at each freeze_end tick ────────────
     freeze_ticks = sorted({int(r["tick"]) for r in round_freeze_ends if r.get("tick")})
@@ -325,6 +393,7 @@ def parse_demo(dem_path: str) -> dict[str, Any]:
         "bomb_pickup": bomb_pickup,
         "grenade_detonations": grenade_detonations,
         "grenade_throws": grenade_throws,
+        "grenade_trajectories": grenade_trajectories,
         "positions_raw": positions_raw,
         "sample_ticks": sample_ticks,
         "replay_raw": replay_raw,
