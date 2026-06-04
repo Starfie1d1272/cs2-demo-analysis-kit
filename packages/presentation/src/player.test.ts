@@ -9,6 +9,7 @@ import { buildAllPlayerSeasonProfiles, buildPlayerSeasonProfile } from "./index"
 
 const fixtureDir = fileURLToPath(new URL("../../../fixtures/input/cohort", import.meta.url));
 const integrationTimeoutMs = 20_000;
+let cohortFixtures: ReturnType<typeof buildCohort> | null = null;
 
 async function buildCohort() {
   const names = (await readdir(fixtureDir)).filter((name) => name.endsWith(".zip")).sort();
@@ -21,11 +22,16 @@ async function buildCohort() {
   return buildSeasonCohort(demos);
 }
 
+function getCohort() {
+  cohortFixtures ??= buildCohort();
+  return cohortFixtures;
+}
+
 describe("buildPlayerSeasonProfile", () => {
   it(
     "derives a per-player profile covering rating, metrics, style and trend",
     async () => {
-      const bundle = await buildCohort();
+      const bundle = await getCohort();
       const profiles = buildAllPlayerSeasonProfiles(bundle);
 
       expect(profiles).toHaveLength(bundle.players.length);
@@ -69,7 +75,7 @@ describe("buildPlayerSeasonProfile", () => {
   it(
     "exposes PRISM style as 8 ordered axes, or null when PRISM is missing",
     async () => {
-      const bundle = await buildCohort();
+      const bundle = await getCohort();
       const profiles = buildAllPlayerSeasonProfiles(bundle);
 
       for (const profile of profiles) {
@@ -101,7 +107,7 @@ describe("buildPlayerSeasonProfile", () => {
   );
 
   it("throws for an unknown playerKey", async () => {
-    const bundle = await buildCohort();
+    const bundle = await getCohort();
     expect(() => buildPlayerSeasonProfile(bundle, "steam:does-not-exist")).toThrow(/not found/);
-  });
+  }, integrationTimeoutMs);
 });
