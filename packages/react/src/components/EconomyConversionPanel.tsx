@@ -1,5 +1,4 @@
-import type { EconomyConversion } from "@cs2dak/core";
-import { economyLabelCn } from "@cs2dak/core";
+import { economyLabelCn, type EconomyConversion } from "@cs2dak/presentation";
 
 export interface EconomyConversionPanelProps {
   /** One team's per-economy-type conversion (from buildEconomyConversion). */

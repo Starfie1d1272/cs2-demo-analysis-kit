@@ -1,5 +1,4 @@
 import {
-  analysisBundleSchema,
   matchWorkspaceModelSchema,
   type AnalysisBundle,
   type DemoPackage,
@@ -12,13 +11,9 @@ import {
   type WorkspaceReplayFrame,
   type WorkspaceSpatialPoint
 } from "@cs2dak/contract";
-import { groupBy, nameForSteamId, round, normalizeWeapon, isNamedWeapon } from "./utils.js";
+import { groupBy, nameForSteamId, round, normalizeWeapon, isNamedWeapon } from "./workspace-utils.js";
 import { displayWeaponName } from "./weapons.js";
-import { normalizeDemoPackage } from "./normalize.js";
-import { buildQaReport } from "./qa.js";
-import { buildPlayerRoundFacts, buildPlayerIndicators, buildScoreboard } from "./scoreboard.js";
-import { computeAccountRatingsV2 } from "./signals.js";
-import { buildTimeline, buildEconomy, buildHeatmap } from "./timeline.js";
+import { analyzeDemoPackage, normalizeDemoPackage } from "@cs2dak/core";
 
 export function buildDemoViewModel(bundle: AnalysisBundle) {
   return {
@@ -43,32 +38,7 @@ export function buildDemoViewModel(bundle: AnalysisBundle) {
 
 export function buildMatchWorkspaceModel(input: unknown): MatchWorkspaceModel {
   const pkg = normalizeDemoPackage(input);
-  const qa = buildQaReport(pkg);
-  const playerRoundFacts = buildPlayerRoundFacts(pkg);
-  const playerIndicators = buildPlayerIndicators(pkg, playerRoundFacts);
-  const accountRatings = computeAccountRatingsV2(pkg);
-  const scoreboard = buildScoreboard(pkg, playerIndicators, accountRatings);
-  const timeline = buildTimeline(pkg);
-  const economy = buildEconomy(pkg);
-  const heatmap = buildHeatmap(pkg);
-
-  const bundle: AnalysisBundle = analysisBundleSchema.parse({
-    version: "cs2-demo-analysis-kit/0.2",
-    sourceSchemaVersion: pkg.manifest.schemaVersion,
-    mapName: pkg.match.mapName,
-    tickrate: pkg.match.tickrate,
-    teams: {
-      teamA: { name: pkg.match.teamA.name ?? "Team A", score: pkg.match.teamA.score },
-      teamB: { name: pkg.match.teamB.name ?? "Team B", score: pkg.match.teamB.score }
-    },
-    scoreboard,
-    playerIndicators,
-    playerRoundFacts,
-    timeline,
-    economy,
-    heatmap,
-    qa
-  });
+  const bundle = analyzeDemoPackage(pkg);
 
   const view = buildDemoViewModel(bundle);
   const eventsByRound = groupBy(bundle.timeline, (event) => event.roundNumber);

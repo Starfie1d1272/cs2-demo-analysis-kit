@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@cs2dak/contract": "workspace:*",
-    "@cs2dak/core": "workspace:*",
+    "@cs2dak/presentation": "workspace:*",
     "@cs2dak/maps": "workspace:*",
     "lucide-react": "^0.468.0"
   },

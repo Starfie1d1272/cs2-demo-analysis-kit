@@ -5,6 +5,7 @@
     { "path": "./packages/maps" },
     { "path": "./packages/core" },
     { "path": "./packages/cohort" },
+    { "path": "./packages/presentation" },
     { "path": "./packages/react" },
     { "path": "./packages/cli" },
     { "path": "./apps/demo-lab" }

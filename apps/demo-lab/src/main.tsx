@@ -1,33 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { buildMatchWorkspaceModel, loadDemoPackageFromZip } from "@cs2dak/core";
+import { loadDemoPackageFromZip } from "@cs2dak/core";
+import { buildMatchWorkspaceModel } from "@cs2dak/presentation";
 import type { MatchWorkspaceModel } from "@cs2dak/contract";
 import { MatchWorkspace } from "@cs2dak/react";
 import "@cs2dak/react/theme.css";
 import sampleZipUrl from "../../../fixtures/input/sample-match.zip?url";
-
-// Minimal pywebview bridge surface this viewer relies on (see python gui/app.py).
-interface PyApi {
-  get_pending_zip?: () => Promise<string | null>;
-}
-function pyApi(): PyApi | undefined {
-  return (window as unknown as { pywebview?: { api?: PyApi } }).pywebview?.api;
-}
-
-function base64ToArrayBuffer(b64: string): ArrayBuffer {
-  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  return bytes.buffer;
-}
-
-/** Wait briefly for the pywebview bridge to be injected, if we're inside the GUI. */
-function waitForBridge(timeoutMs = 1500): Promise<PyApi | undefined> {
-  if (pyApi()) return Promise.resolve(pyApi());
-  return new Promise((resolve) => {
-    const done = () => resolve(pyApi());
-    window.addEventListener("pywebviewready", done, { once: true });
-    setTimeout(done, timeoutMs);
-  });
-}
 
 function DemoLab() {
   const [model, setModel] = useState<MatchWorkspaceModel | null>(null);
@@ -51,16 +29,6 @@ function DemoLab() {
     let cancelled = false;
     async function load() {
       try {
-        // 1. GUI viewer: render the just-exported ZIP handed over by Python.
-        const api = await waitForBridge();
-        if (api?.get_pending_zip) {
-          const b64 = await api.get_pending_zip();
-          if (b64) {
-            if (!cancelled) await loadFromBuffer(base64ToArrayBuffer(b64));
-            return;
-          }
-        }
-        // 2. Standalone: fall back to the bundled sample export.
         const response = await fetch(sampleZipUrl);
         if (!cancelled) await loadFromBuffer(await response.arrayBuffer());
       } catch (err) {

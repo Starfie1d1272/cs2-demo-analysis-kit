@@ -1,10 +1,7 @@
 """Assemble a cs2-demo-format v2 export zip from parsed event data.
 
-Provenance: ported from DrEAmSs59/CS2-insight-agent
-(backend/app/rivalhub_exporter.py) with the author's permission. Adapted for
-this standalone package: the FastAPI/subprocess-isolation and file_hash
-dependencies were dropped so it runs in-process from a CLI/GUI. Builder logic is
-kept close to upstream to ease future diffs / PRs back.
+Originally ported from DrEAmSs59/CS2-insight-agent with the author's permission,
+then adapted into the standalone DAK exporter.
 """
 
 from __future__ import annotations
@@ -27,20 +24,20 @@ from .enums import (
 from .rounds import _RoundModel, _event_steamid, build_rounds
 
 SCHEMA_VERSION = "cs2-demo-format/2.0"
-EXPORTER_NAME = "CS2 Insight Agent"
+EXPORTER_NAME = "cs2-demo-analysis-kit"
 
 
 # ── public API ───────────────────────────────────────────────────────────────
 
 def export_demo(dem_path: str) -> bytes:
     """Parse dem_path and return the cs2-demo-format v2 zip as bytes."""
-    from .parse_worker import parse_for_rivalhub
+    from .parse_worker import parse_demo
 
     try:
         demo_hash: str | None = _sha256_hex(dem_path)
     except Exception:
         demo_hash = None
-    raw: dict[str, Any] = parse_for_rivalhub(dem_path)
+    raw: dict[str, Any] = parse_demo(dem_path)
     return _assemble_zip(raw, dem_path, demo_hash)
 
 
@@ -844,13 +841,21 @@ def _build_replay(raw: dict, team_map: dict, round_model: _RoundModel,
             for t in ticks:
                 fd = frames.get(t)
                 if fd is not None:
-                    x_a.append(fd["x"]); y_a.append(fd["y"]); z_a.append(fd["z"])
-                    yaw_a.append(fd["yaw"]); hp_a.append(fd["hp"])
-                    w_a.append(fd["weapon"]); f_a.append(fd["flags"])
+                    x_a.append(fd["x"])
+                    y_a.append(fd["y"])
+                    z_a.append(fd["z"])
+                    yaw_a.append(fd["yaw"])
+                    hp_a.append(fd["hp"])
+                    w_a.append(fd["weapon"])
+                    f_a.append(fd["flags"])
                 else:
-                    x_a.append(0); y_a.append(0); z_a.append(0)
-                    yaw_a.append(0); hp_a.append(0)
-                    w_a.append(-1); f_a.append(0)
+                    x_a.append(0)
+                    y_a.append(0)
+                    z_a.append(0)
+                    yaw_a.append(0)
+                    hp_a.append(0)
+                    w_a.append(-1)
+                    f_a.append(0)
             player_list.append({
                 "steamId64": sid,
                 "teamKey": key,
@@ -1148,11 +1153,16 @@ def _build_player_stats(
     for sid, kpr in kills_by.items():
         for n, count in kpr.items():
             s = _get(sid)
-            if count == 1: s["oneKillCount"] += 1
-            elif count == 2: s["twoKillCount"] += 1
-            elif count == 3: s["threeKillCount"] += 1
-            elif count == 4: s["fourKillCount"] += 1
-            elif count >= 5: s["fiveKillCount"] += 1
+            if count == 1:
+                s["oneKillCount"] += 1
+            elif count == 2:
+                s["twoKillCount"] += 1
+            elif count == 3:
+                s["threeKillCount"] += 1
+            elif count == 4:
+                s["fourKillCount"] += 1
+            elif count >= 5:
+                s["fiveKillCount"] += 1
 
     # damages — official rounds, anti-enemy only (exclude self-damage and team damage)
     # Must match cs2-demo-format/tools/validate.py utility set exactly so

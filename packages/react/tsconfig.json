@@ -11,6 +11,7 @@
   "include": ["src"],
   "references": [
     { "path": "../contract" },
-    { "path": "../maps" }
+    { "path": "../maps" },
+    { "path": "../presentation" }
   ]
 }

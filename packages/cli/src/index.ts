@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, extname, join, parse } from "node:path";
-import { analyzeDemoPackage, buildDemoViewModel, loadDemoPackageFromZip } from "@cs2dak/core";
+import { analyzeDemoPackage, loadDemoPackageFromZip } from "@cs2dak/core";
+import { buildDemoViewModel } from "@cs2dak/presentation";
 import { buildSeasonCohort, type PlayerIdentityMap } from "@cs2dak/cohort";
 
 async function main() {

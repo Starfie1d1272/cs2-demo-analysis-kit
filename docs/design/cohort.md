@@ -58,7 +58,7 @@ PRISM 的 z-score 本质上要求 cohort；单场 `analyzeDemoPackage` 只能拿
 
 `SeasonCohortBundle` 由 `@cs2dak/contract` 定义：
 
-- `version`: `"cs2-demo-analysis-kit/season-0.1"`
+- `version`: `"cs2-demo-analysis-kit/cohort-1.0"`
 - `matchCount`
 - `players`: 按赛季 `accountRR` 降序排列
 - `weightsVersion`

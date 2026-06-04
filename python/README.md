@@ -102,7 +102,7 @@ speed dropped under heavier CPU/cache/I/O contention.
 - [x] `validate.py` — jsonschema checks against `cs2-demo-format/spec`
 - [x] `export-batch` — parallel parsing + per-demo report
 - [ ] golden-fixture tests (tiny `.dem` → build → validate)
-- [x] GUI polish — per-file progress, embedded demo-lab viewer, batch export
+- [x] GUI polish — per-file progress and batch export
 - [ ] code signing + notarization (macOS / Windows) for friction-free downloads
 
 ---
@@ -199,5 +199,5 @@ demoparser2 那种“只找所有玩家死亡坐标”的窄任务 micro-benchma
 - [x] `validate.py` —— 对照 `cs2-demo-format/spec` 做 jsonschema 校验
 - [x] `export-batch` —— 并行解析 + 单 demo 报告
 - [ ] golden fixture 测试（小 `.dem` → 构建 → 校验）
-- [x] GUI 打磨 — 逐文件进度、嵌入式 demo-lab 查看器、批量导出
+- [x] GUI 打磨 — 逐文件进度与批量导出
 - [ ] 代码签名 + 公证（macOS / Windows），实现真·零摩擦下载

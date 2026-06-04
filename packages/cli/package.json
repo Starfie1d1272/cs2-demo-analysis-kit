@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@cs2dak/cohort": "workspace:*",
-    "@cs2dak/core": "workspace:*"
+    "@cs2dak/core": "workspace:*",
+    "@cs2dak/presentation": "workspace:*"
   },
   "devDependencies": {
     "tsx": "^4.20.0"

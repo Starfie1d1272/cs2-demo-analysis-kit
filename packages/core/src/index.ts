@@ -9,9 +9,7 @@ export { loadDemoPackageFromZip } from "./loader.js";
 export { normalizeDemoPackage } from "./normalize.js";
 export { deriveAccountSignalsV2, computeAccountRatingsV2 } from "./signals.js";
 export { deriveRRIndicators } from "./scoreboard.js";
-export { buildDemoViewModel, buildMatchWorkspaceModel } from "./workspace.js";
-export { displayWeaponName } from "./weapons.js";
-export { buildEconomyConversion, economyLabelCn } from "./economy.js";
+export { buildEconomyConversion } from "./economy.js";
 export type {
   EconomyTypeStats,
   EconomyConversion,
@@ -30,8 +28,19 @@ export function analyzeDemoPackage(input: unknown): AnalysisBundle {
   const heatmap = buildHeatmap(pkg);
 
   return analysisBundleSchema.parse({
-    version: "cs2-demo-analysis-kit/0.2",
+    version: "cs2-demo-analysis-kit/1.0",
     sourceSchemaVersion: pkg.manifest.schemaVersion,
+    provenance: {
+      analysisVersion: "cs2-demo-analysis-kit/1.0",
+      sourceSchemaVersion: pkg.manifest.schemaVersion,
+      sourceDemoHash: pkg.manifest.demo?.hash ?? null,
+      exporter: pkg.manifest.exporter,
+      parser: pkg.manifest.parser,
+      ratingVersions: {
+        rr: playerIndicators[0]?.rr.weightsVersion ?? null,
+        valueAccounts: accountRatings[0]?.rr.weightsVersion ?? null
+      }
+    },
     mapName: pkg.match.mapName,
     tickrate: pkg.match.tickrate,
     teams: {

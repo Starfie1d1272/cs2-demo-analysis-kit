@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EconomyPoint } from "@cs2dak/contract";
-import { buildEconomyConversion, economyLabelCn } from "./economy";
+import { buildEconomyConversion } from "./economy";
 
 function pt(p: Partial<EconomyPoint> & Pick<EconomyPoint, "teamAEconomy" | "teamBEconomy" | "winnerTeamKey">): EconomyPoint {
   return {
@@ -33,19 +33,5 @@ describe("buildEconomyConversion", () => {
 
   it("returns empty conversions for no rounds", () => {
     expect(buildEconomyConversion([])).toEqual({ teamA: {}, teamB: {} });
-  });
-});
-
-describe("economyLabelCn", () => {
-  it("maps known economy types to Chinese labels", () => {
-    expect(economyLabelCn("full")).toBe("全枪全弹");
-    expect(economyLabelCn("ECO")).toBe("纯ECO");
-    // conversion 与 full 同义（长枪局），不单独区分。
-    expect(economyLabelCn("conversion")).toBe(economyLabelCn("full"));
-  });
-
-  it("passes through unknowns and empties", () => {
-    expect(economyLabelCn(null)).toBe("");
-    expect(economyLabelCn("mystery")).toBe("mystery");
   });
 });

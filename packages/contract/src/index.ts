@@ -327,10 +327,18 @@ export const seasonPlayerRowSchema = z.object({
 });
 
 export const seasonCohortBundleSchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/season-0.1"),
+  version: z.literal("cs2-demo-analysis-kit/cohort-1.0"),
   matchCount: z.number().int().nonnegative(),
   players: z.array(seasonPlayerRowSchema),
-  weightsVersion: z.string()
+  weightsVersion: z.string(),
+  provenance: z.object({
+    cohortVersion: z.literal("cs2-demo-analysis-kit/cohort-1.0"),
+    sourceSchemaVersion: z.literal("cs2-demo-format/2.0"),
+    matches: z.array(z.object({
+      matchId: z.string(),
+      sourceDemoHash: z.string().nullable()
+    }))
+  })
 });
 
 export const timelineEventSchema = z.object({
@@ -374,9 +382,22 @@ export const mapViewSchema = z.object({
   calibrated: z.boolean()
 });
 
-export const analysisBundleSchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/0.2"),
+export const analysisProvenanceSchema = z.object({
+  analysisVersion: z.string(),
   sourceSchemaVersion: z.literal("cs2-demo-format/2.0"),
+  sourceDemoHash: z.string().nullable(),
+  exporter: z.object({ name: z.string(), version: z.string() }),
+  parser: z.object({ name: z.string(), version: z.string() }),
+  ratingVersions: z.object({
+    rr: z.string().nullable(),
+    valueAccounts: z.string().nullable()
+  })
+});
+
+export const analysisBundleSchema = z.object({
+  version: z.literal("cs2-demo-analysis-kit/1.0"),
+  sourceSchemaVersion: z.literal("cs2-demo-format/2.0"),
+  provenance: analysisProvenanceSchema,
   mapName: z.string(),
   tickrate: z.number().int().positive(),
   teams: z.object({
@@ -582,6 +603,7 @@ export type EconomyPoint = z.infer<typeof economyPointSchema>;
 export type GrenadeType = z.infer<typeof grenadeTypeSchema>;
 export type HeatmapPoint = z.infer<typeof heatmapPointSchema>;
 export type AnalysisBundle = z.infer<typeof analysisBundleSchema>;
+export type AnalysisProvenance = z.infer<typeof analysisProvenanceSchema>;
 export type DemoViewModel = z.infer<typeof demoViewModelSchema>;
 export type WorkspaceTab = z.infer<typeof workspaceTabSchema>;
 export type WorkspaceKpi = z.infer<typeof workspaceKpiSchema>;

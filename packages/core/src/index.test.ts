@@ -3,8 +3,6 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import {
   analyzeDemoPackage,
-  buildMatchWorkspaceModel,
-  buildDemoViewModel,
   computeAccountRatingsV2,
   deriveAccountSignalsV2,
   deriveRRIndicators,
@@ -12,44 +10,14 @@ import {
 } from "./index";
 
 describe("analyzeDemoPackage", () => {
-  it("builds a match workspace model with replay and user-facing modules from a strict v2 export", async () => {
-    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
-    const pkg = await loadDemoPackageFromZip(zip);
-    const workspace = buildMatchWorkspaceModel(pkg);
-
-    expect(workspace.version).toBe("cs2-demo-analysis-kit/workspace-0.1");
-    expect(workspace.title).toBe("Team A vs Team B");
-    expect(workspace.tabs.map((tab) => tab.key)).toEqual(["overview", "rounds", "players", "economy", "map", "replay"]);
-    expect(workspace.overview.kpis.map((kpi) => kpi.key)).not.toContain("qa");
-    expect(workspace.overview.kpis.map((kpi) => kpi.key)).not.toContain("economySwing");
-    expect(workspace.rounds).toHaveLength(21);
-    expect(workspace.rounds[0]?.events.some((event) => event.type === "kill")).toBe(true);
-    expect(workspace.players).toHaveLength(10);
-    expect(workspace.players[0]?.rrBreakdown.length).toBe(5);
-    expect(workspace.map.modes.map((mode) => mode.key)).toEqual(["death", "kill", "grenade", "bomb", "position"]);
-    expect(workspace.replay.available).toBe(true);
-    expect(workspace.replay.rounds.length).toBeGreaterThan(0);
-    expect(workspace.replay.rounds[0]?.players[0]?.frames.length).toBeGreaterThan(0);
-    expect(workspace.replay.capabilities.hasDefuseKit).toBe(true);
-    expect(workspace.replay.capabilities.hasBombPosition).toBe(false);
-    expect(workspace.replay.rounds.some((round) => round.players.some((player) => player.frames.some((frame) => frame.weapon && /^\d+$/.test(frame.weapon))))).toBe(false);
-    expect(workspace.overview.story.length).toBeGreaterThan(0);
-    // 开场 beat 必出：含地图显示名 + 比分，且用胜负动词之一描述结果。
-    expect(workspace.overview.story[0]).toContain("Ancient");
-    expect(workspace.overview.story[0]).toContain("13:8");
-    expect(workspace.overview.story[0]).toMatch(/碾压|险胜|拿下/);
-    expect(workspace.overview.story.join("\n")).not.toContain("打成");
-    expect(workspace.adminQa.summary.errorCount).toBe(0);
-  });
-
   it("builds reusable analysis and view-model artifacts from a strict v2 export", async () => {
     const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
     const pkg = await loadDemoPackageFromZip(zip);
     const bundle = analyzeDemoPackage(pkg);
-    const viewModel = buildDemoViewModel(bundle);
-
     expect(bundle.sourceSchemaVersion).toBe("cs2-demo-format/2.0");
-    expect(bundle.version).toBe("cs2-demo-analysis-kit/0.2");
+    expect(bundle.version).toBe("cs2-demo-analysis-kit/1.0");
+    expect(bundle.provenance.sourceSchemaVersion).toBe("cs2-demo-format/2.0");
+    expect(bundle.provenance.ratingVersions.rr).toBeTruthy();
     expect(bundle.scoreboard).toHaveLength(10);
     expect(bundle.scoreboard[0]?.rr).toBeGreaterThan(0);
     expect(bundle.playerIndicators[0]?.indicators.totalRounds).toBe(21);
@@ -62,10 +30,6 @@ describe("analyzeDemoPackage", () => {
     expect(bundle.heatmap.some((point) => point.kind === "death")).toBe(true);
     expect(bundle.timeline.find((event) => event.type === "round-end")?.clockPhase).toBe("round-end");
     expect(bundle.timeline.find((event) => event.type === "kill")?.clockLabel).toMatch(/^\d:\d{2}$/);
-    expect(viewModel.scoreline).toBe("13:8");
-    expect(viewModel.map.name).toBe("de_ancient");
-    expect(viewModel.map.radarImageUrl).toBe("./maps/radars/de_ancient.png");
-    expect(viewModel.qa.summary.errorCount).toBe(0);
   });
 
   it("derives value-account signals and computes v2 RR from the strict v2 fixture", async () => {

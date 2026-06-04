@@ -1,0 +1,17 @@
+{
+  "name": "@cs2dak/presentation",
+  "version": "0.2.1",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@cs2dak/contract": "workspace:*",
+    "@cs2dak/core": "workspace:*"
+  },
+  "files": ["src"],
+  "publishConfig": {
+    "access": "public"
+  }
+}

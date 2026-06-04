@@ -11,6 +11,7 @@
   "dependencies": {
     "@cs2dak/contract": "workspace:*",
     "@cs2dak/core": "workspace:*",
+    "@cs2dak/presentation": "workspace:*",
     "@cs2dak/react": "workspace:*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

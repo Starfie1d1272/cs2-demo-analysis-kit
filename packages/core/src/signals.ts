@@ -48,7 +48,7 @@ export function deriveAccountSignalsV2(input: unknown): AccountSignalsV2[] {
     return {
       steamId64: player.steamId64,
       rounds,
-      sourceVersion: "cs2-demo-analysis-kit/0.3",
+      sourceVersion: "cs2-demo-analysis-kit/1.0",
       combat: {
         kills: stats?.kills ?? playerKills.length,
         deaths: stats?.deaths ?? playerDeaths.length,

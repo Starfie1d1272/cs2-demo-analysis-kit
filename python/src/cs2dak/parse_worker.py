@@ -2,7 +2,7 @@
 
 Provenance: ported from DrEAmSs59/CS2-insight-agent
 (backend/app/rivalhub_parse_worker.py) with the author's permission. The
-`demoparser2` import is lazy (inside parse_for_rivalhub) so this package can be
+`demoparser2` import is lazy (inside parse_demo) so this package can be
 imported — and the pure builders in exporter.py tested — without the native
 parser installed.
 """
@@ -139,7 +139,7 @@ def _extract_grenade_throws(parser: DemoParser) -> list[dict]:
     return out
 
 
-def parse_for_rivalhub(dem_path: str) -> dict[str, Any]:
+def parse_demo(dem_path: str) -> dict[str, Any]:
     """Full event extraction. Returns a plain dict — all values must be JSON-serializable."""
     from demoparser2 import DemoParser  # type: ignore  # lazy: native dep
 

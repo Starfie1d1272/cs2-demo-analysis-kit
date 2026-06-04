@@ -33,8 +33,9 @@ describe("buildSeasonCohort", () => {
     const uniquePlayers = new Set(demos.flatMap((demo) => demo.pkg.players.map((player) => player.steamId64)));
 
     expect(demos).toHaveLength(3);
-    expect(bundle.version).toBe("cs2-demo-analysis-kit/season-0.1");
     expect(bundle.matchCount).toBe(3);
+    expect(bundle.version).toBe("cs2-demo-analysis-kit/cohort-1.0");
+    expect(bundle.provenance.matches).toHaveLength(3);
     expect(bundle.players).toHaveLength(uniquePlayers.size);
     expect(bundle.players.length).toBeGreaterThan(10);
     expect(bundle.players.every((row) => row.prism?.mapCount === row.mapCount)).toBe(true);

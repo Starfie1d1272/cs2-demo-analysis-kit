@@ -6,7 +6,7 @@ English | [简体中文](./README.zh-CN.md)
 
 It does **not** own tournament business logic. Tournament state belongs to products such as RivalHub. The ZIP contract stays in `cs2-demo-format`, and rating models stay in `rival-rating`.
 
-> **Status.** The exporter (`python/`), analysis (`@cs2dak/core`), contract, maps, CLI, and preview workspace are working and tested. `@cs2dak/core` is modularized into focused sub-modules (normalize, signals, scoreboard, timeline, workspace). The `demo-lab` renders a full tabbed match workspace — overview, rounds, players, economy, map, and 2D replay — and also serves as the embedded viewer inside the pywebview GUI desktop app. The **`@cs2dak/react` component library** (MatchWorkspace, HeatmapCanvas, EconomyPanel, KillFeed, ScoreboardTable) is functional and reusable.
+> **Status.** The exporter (`python/`), strict v2 analysis (`@cs2dak/core`), cohort aggregation, presentation models, React components, CLI, and demo lab are working and tested. The Python GUI is a focused export tool; `demo-lab` is a development and fixture-review application.
 
 ## What This Repository Produces
 
@@ -25,7 +25,9 @@ Given a `cs2-demo-format/2.0` package, the kit produces:
 | `@cs2dak/contract` | Shared TypeScript types and Zod schemas for domain input, analysis output, UI view models, and QA reports. |
 | `@cs2dak/maps` | Map calibration, world-to-radar transforms, and lightweight callout helpers. |
 | `@cs2dak/core` | Pure analysis logic: normalization, scoreboard, economy, timeline, heatmap points, and QA. |
-| `@cs2dak/react` | Previewable React components that consume `DemoViewModel` / `MatchWorkspaceModel` only. |
+| `@cs2dak/cohort` | Cross-match aggregation, identity-map merging, and season RR/PRISM shaping. |
+| `@cs2dak/presentation` | Product-neutral match, workspace, and display models derived from core outputs. |
+| `@cs2dak/react` | Previewable React components that consume presentation contracts only. |
 | `@cs2dak/cli` | CLI for analyzing JSON or ZIP packages and writing analysis/view-model/QA artifacts. |
 | `@cs2dak/demo-lab` | Vite app for reviewing analysis modules and design language against fixtures. |
 | `python/src/cs2dak` | Python exporter, CLI, GUI assets, and packaging for `.dem -> v2 ZIP`. |

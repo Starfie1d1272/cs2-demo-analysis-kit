@@ -53,8 +53,6 @@ function wire() {
 
   $("export").addEventListener("click", async () => {
     $("export").disabled = true;
-    $("view").hidden = true;
-    let anyOk = false;
     const total = selectedPaths.length;
 
     for (let i = 0; i < selectedPaths.length; i++) {
@@ -66,18 +64,9 @@ function wire() {
 
       const result = await window.pywebview.api.export_one(p);
       updateItem(name, result);
-      if (result.ok) anyOk = true;
     }
 
     $("export").disabled = false;
-    if (anyOk && (await window.pywebview.api.can_view())) {
-      $("view").hidden = false;
-    }
-  });
-
-  $("view").addEventListener("click", async () => {
-    const res = await window.pywebview.api.open_viewer();
-    if (res && !res.ok) alert(res.error);
   });
 
   $("open-out").addEventListener("click", () => window.pywebview.api.open_output_dir());

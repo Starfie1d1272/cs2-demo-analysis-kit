@@ -140,9 +140,17 @@ export function buildSeasonCohort(
   const prismResults = new Map(computePrism(prismInputs, prismWeights).map((row) => [row.steamId64, row]));
 
   return seasonCohortBundleSchema.parse({
-    version: "cs2-demo-analysis-kit/season-0.1",
+    version: "cs2-demo-analysis-kit/cohort-1.0",
     matchCount: demos.length,
     weightsVersion: `${rrWeights.version}+${valueWeights.version}+${prismWeights.version}`,
+    provenance: {
+      cohortVersion: "cs2-demo-analysis-kit/cohort-1.0",
+      sourceSchemaVersion: "cs2-demo-format/2.0",
+      matches: demos.map((demo) => ({
+        matchId: demo.matchId,
+        sourceDemoHash: demo.pkg.manifest.demo?.hash ?? null
+      }))
+    },
     players: seasonRows
       .map((row) => {
         const balanced = balancedByKey.get(row.acc.playerKey)!;
@@ -174,7 +182,6 @@ export function buildSeasonCohort(
           perMatch: row.acc.perMatch.sort((a, b) => a.matchId.localeCompare(b.matchId))
         };
       })
-      .sort((a, b) => b.accountRR - a.accountRR || b.rrV1 - a.rrV1 || a.name.localeCompare(b.name))
   });
 }
 
@@ -189,7 +196,7 @@ function aggregateAccountSignals(steamId64: string, rows: AccountSignalsV2[]): A
   return {
     steamId64,
     rounds: sum(rows, (row) => row.rounds),
-    sourceVersion: "cs2-demo-analysis-kit/season-0.1",
+    sourceVersion: "cs2-demo-analysis-kit/cohort-1.0",
     combat: {
       kills: sum(rows, (row) => row.combat.kills),
       deaths: sum(rows, (row) => row.combat.deaths),

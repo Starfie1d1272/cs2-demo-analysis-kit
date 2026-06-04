@@ -1,4 +1,4 @@
-import { normalizeWeapon } from "./utils.js";
+import { normalizeWeapon } from "./workspace-utils.js";
 
 /**
  * Single source of truth for weapon display names.

@@ -15,10 +15,14 @@
     "typecheck": "tsc -b --pretty",
     "test": "vitest run",
     "build": "pnpm -r --if-present build",
+    "changeset": "changeset",
+    "version:packages": "changeset version && pnpm sync-version",
+    "release:npm": "pnpm build && pnpm test && pnpm typecheck && changeset publish",
     "sync-version": "node scripts/sync-version.mjs",
     "package": "bash scripts/package.sh"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
