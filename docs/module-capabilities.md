@@ -74,8 +74,8 @@
 
 ## 测试与验证缺口
 
-- `contract` 没有独立 schema 合同测试。
-- React 仅直接测试 Match Workspace 与 Scoreboard；多数公开组件没有独立测试。
-- Python 测试集中在回合边界、经济、武器和 roster 过滤；缺少完整真实 `.dem -> ZIP` golden 对比。
+- ~~`contract` 没有独立 schema 合同测试。~~ 已补：`packages/contract/src/contract.test.ts`（43 项）。
+- React 仅直接测试 Match Workspace 与 Scoreboard；多数公开组件没有独立测试。（暂缓：公开面未定稿前不补）
+- ~~Python 测试集中在回合边界、经济、武器和 roster 过滤；缺少完整真实 `.dem -> ZIP` golden 对比。~~ 已补：`python/tests/test_golden_de_ancient.py`（20 项），baseline 在 `fixtures/baselines/de_ancient/`。
 - maps 有几何测试，但没有正式 zone 数据与逐图验证。
 - 当前测试验证输出可用，但没有统一验证分析版本与 provenance 的确定性。
