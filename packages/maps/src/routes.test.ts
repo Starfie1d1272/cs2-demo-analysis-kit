@@ -5,7 +5,13 @@ const aPalace: MapRoute = {
   id: "a_palace",
   name: "A 大厅",
   bombsite: "a",
-  zones: ["TSpawn", "PalaceAlley", "TRamp", "PalaceInterior", "BombsiteA"],
+  zones: [
+    { id: "TSpawn", nameCn: "T 出生点" },
+    { id: "PalaceAlley", nameCn: "Palace 巷口" },
+    { id: "TRamp", nameCn: "T 坡道" },
+    { id: "PalaceInterior", nameCn: "Palace 内部" },
+    { id: "BombsiteA", nameCn: "A 包点" },
+  ],
 };
 
 describe("routeIndex", () => {

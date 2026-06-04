@@ -1,0 +1,100 @@
+{
+  "mapName": "de_overpass",
+  "version": "overpass-routes-0.1",
+  "_note": "T 方进攻动线初稿（由 extract-routes.ts 提取 + 人工确认）。中文名请核验。",
+  "routes": [
+    {
+      "id": "a_fountain",
+      "name": "A 喷泉",
+      "bombsite": "a",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "TStairs",
+          "nameCn": "T 楼梯"
+        },
+        {
+          "id": "Tunnels",
+          "nameCn": "隧道"
+        },
+        {
+          "id": "Fountain",
+          "nameCn": "喷泉"
+        },
+        {
+          "id": "UpperPark",
+          "nameCn": "上公园"
+        },
+        {
+          "id": "LowerPark",
+          "nameCn": "下公园"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A 包点"
+        }
+      ]
+    },
+    {
+      "id": "b_canal",
+      "name": "B 运河（快攻）",
+      "bombsite": "b",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "Alley",
+          "nameCn": "窄巷"
+        },
+        {
+          "id": "Canal",
+          "nameCn": "运河"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B 包点"
+        }
+      ]
+    },
+    {
+      "id": "b_construction",
+      "name": "B 工地",
+      "bombsite": "b",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "Alley",
+          "nameCn": "窄巷"
+        },
+        {
+          "id": "Canal",
+          "nameCn": "运河"
+        },
+        {
+          "id": "Pipe",
+          "nameCn": "管道"
+        },
+        {
+          "id": "Water",
+          "nameCn": "水下"
+        },
+        {
+          "id": "Construction",
+          "nameCn": "工地"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B 包点"
+        }
+      ]
+    }
+  ]
+}

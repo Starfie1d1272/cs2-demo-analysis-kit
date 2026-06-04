@@ -1,0 +1,108 @@
+{
+  "mapName": "de_inferno",
+  "version": "inferno-routes-0.1",
+  "_note": "T 方进攻动线初稿（由 extract-routes.ts 提取 + 人工确认）。中文名请核验。",
+  "routes": [
+    {
+      "id": "b_banana",
+      "name": "B 香蕉道",
+      "bombsite": "b",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "LowerMid",
+          "nameCn": "T 中路下层"
+        },
+        {
+          "id": "TRamp",
+          "nameCn": "T 坡"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "Banana",
+          "nameCn": "香蕉道"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B 包点"
+        }
+      ]
+    },
+    {
+      "id": "a_apartments",
+      "name": "A 二楼",
+      "bombsite": "a",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "LowerMid",
+          "nameCn": "T 中路下层"
+        },
+        {
+          "id": "SecondMid",
+          "nameCn": "T 中路上层"
+        },
+        {
+          "id": "BackAlley",
+          "nameCn": "后巷"
+        },
+        {
+          "id": "Apartments",
+          "nameCn": "二楼"
+        },
+        {
+          "id": "Balcony",
+          "nameCn": "阳台"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A 包点"
+        }
+      ]
+    },
+    {
+      "id": "a_mid",
+      "name": "A 中路",
+      "bombsite": "a",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "LowerMid",
+          "nameCn": "T 中路下层"
+        },
+        {
+          "id": "TRamp",
+          "nameCn": "T 坡"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "TopofMid",
+          "nameCn": "中路顶"
+        },
+        {
+          "id": "Arch",
+          "nameCn": "拱门"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A 包点"
+        }
+      ]
+    }
+  ]
+}

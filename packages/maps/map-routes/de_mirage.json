@@ -7,25 +7,52 @@
       "id": "a_palace",
       "name": "A 大厅",
       "bombsite": "a",
-      "zones": ["TSpawn", "PalaceAlley", "TRamp", "PalaceInterior", "BombsiteA"]
+      "zones": [
+        { "id": "TSpawn", "nameCn": "T 出生点" },
+        { "id": "PalaceAlley", "nameCn": "Palace 巷口" },
+        { "id": "TRamp", "nameCn": "T 坡道" },
+        { "id": "PalaceInterior", "nameCn": "Palace 内部" },
+        { "id": "BombsiteA", "nameCn": "A 包点" }
+      ]
     },
     {
       "id": "a_mid",
-      "name": "A 中路/Connector",
+      "name": "A 中路 / Connector",
       "bombsite": "a",
-      "zones": ["TSpawn", "SideAlley", "TopofMid", "Middle", "Connector", "BombsiteA"]
+      "zones": [
+        { "id": "TSpawn", "nameCn": "T 出生点" },
+        { "id": "SideAlley", "nameCn": "Side 巷" },
+        { "id": "TopofMid", "nameCn": "中路顶" },
+        { "id": "Middle", "nameCn": "中路" },
+        { "id": "Connector", "nameCn": "连接通道" },
+        { "id": "BombsiteA", "nameCn": "A 包点" }
+      ]
     },
     {
       "id": "b_apartments",
       "name": "B 公寓",
       "bombsite": "b",
-      "zones": ["TSpawn", "SideAlley", "House", "BackAlley", "Apartments", "BombsiteB"]
+      "zones": [
+        { "id": "TSpawn", "nameCn": "T 出生点" },
+        { "id": "SideAlley", "nameCn": "Side 巷" },
+        { "id": "House", "nameCn": "匪家房" },
+        { "id": "BackAlley", "nameCn": "后巷" },
+        { "id": "Apartments", "nameCn": "公寓" },
+        { "id": "BombsiteB", "nameCn": "B 包点" }
+      ]
     },
     {
       "id": "b_underpass",
-      "name": "B 中路/Underpass",
+      "name": "B 中路 / Underpass",
       "bombsite": "b",
-      "zones": ["TSpawn", "SideAlley", "TopofMid", "Middle", "Underpass", "BombsiteB"]
+      "zones": [
+        { "id": "TSpawn", "nameCn": "T 出生点" },
+        { "id": "SideAlley", "nameCn": "Side 巷" },
+        { "id": "TopofMid", "nameCn": "中路顶" },
+        { "id": "Middle", "nameCn": "中路" },
+        { "id": "Underpass", "nameCn": "地下通道" },
+        { "id": "BombsiteB", "nameCn": "B 包点" }
+      ]
     }
   ]
 }

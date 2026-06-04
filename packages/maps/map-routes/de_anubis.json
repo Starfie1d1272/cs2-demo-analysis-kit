@@ -1,0 +1,127 @@
+{
+  "mapName": "de_anubis",
+  "version": "anubis-routes-0.1",
+  "_note": "T 方进攻动线初稿（由 extract-routes.ts 提取 + 人工确认）。中文名请核验。",
+  "routes": [
+    {
+      "id": "a_canal",
+      "name": "A 运河",
+      "bombsite": "a",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "Street",
+          "nameCn": "大街"
+        },
+        {
+          "id": "TStairs",
+          "nameCn": "T 楼梯"
+        },
+        {
+          "id": "Canal",
+          "nameCn": "运河"
+        },
+        {
+          "id": "Main",
+          "nameCn": "正门"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A 包点"
+        }
+      ]
+    },
+    {
+      "id": "b_outside",
+      "name": "B 外场",
+      "bombsite": "b",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "Ruins",
+          "nameCn": "遗迹"
+        },
+        {
+          "id": "OutsideLong",
+          "nameCn": "B 外"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B 包点"
+        }
+      ]
+    },
+    {
+      "id": "a_mid",
+      "name": "A 中路",
+      "bombsite": "a",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "Ruins",
+          "nameCn": "遗迹"
+        },
+        {
+          "id": "Bridge",
+          "nameCn": "桥"
+        },
+        {
+          "id": "MidDoors",
+          "nameCn": "中门"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "PalaceInterior",
+          "nameCn": "宫殿内部"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A 包点"
+        }
+      ]
+    },
+    {
+      "id": "b_canal",
+      "name": "B 运河/Connector",
+      "bombsite": "b",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "Street",
+          "nameCn": "大街"
+        },
+        {
+          "id": "TStairs",
+          "nameCn": "T 楼梯"
+        },
+        {
+          "id": "Canal",
+          "nameCn": "运河"
+        },
+        {
+          "id": "Connector",
+          "nameCn": "连接通道"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B 包点"
+        }
+      ]
+    }
+  ]
+}

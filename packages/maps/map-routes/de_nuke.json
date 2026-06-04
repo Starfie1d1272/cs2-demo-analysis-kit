@@ -1,0 +1,127 @@
+{
+  "mapName": "de_nuke",
+  "version": "nuke-routes-0.1",
+  "_note": "T 方进攻动线初稿（由 extract-routes.ts 提取 + 人工确认）。中文名请核验。",
+  "routes": [
+    {
+      "id": "a_squeaky",
+      "name": "A 黄门",
+      "bombsite": "a",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "Outside",
+          "nameCn": "外场"
+        },
+        {
+          "id": "Lobby",
+          "nameCn": "大厅"
+        },
+        {
+          "id": "Squeaky",
+          "nameCn": "黄门"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A 包点"
+        }
+      ]
+    },
+    {
+      "id": "a_hut",
+      "name": "A 小屋",
+      "bombsite": "a",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "Outside",
+          "nameCn": "外场"
+        },
+        {
+          "id": "Lobby",
+          "nameCn": "大厅"
+        },
+        {
+          "id": "Hut",
+          "nameCn": "小屋"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A 包点"
+        }
+      ]
+    },
+    {
+      "id": "b_ramp",
+      "name": "B 坡道",
+      "bombsite": "b",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "Outside",
+          "nameCn": "外场"
+        },
+        {
+          "id": "Lobby",
+          "nameCn": "大厅"
+        },
+        {
+          "id": "Vending",
+          "nameCn": "售货机"
+        },
+        {
+          "id": "Trophy",
+          "nameCn": "奖杯房"
+        },
+        {
+          "id": "Control",
+          "nameCn": "控制室"
+        },
+        {
+          "id": "Ramp",
+          "nameCn": "坡道"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B 包点"
+        }
+      ]
+    },
+    {
+      "id": "b_secret",
+      "name": "B 暗道",
+      "bombsite": "b",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "Outside",
+          "nameCn": "外场"
+        },
+        {
+          "id": "Secret",
+          "nameCn": "暗道"
+        },
+        {
+          "id": "Tunnels",
+          "nameCn": "管道"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B 包点"
+        }
+      ]
+    }
+  ]
+}

@@ -13,6 +13,14 @@
  * 从真实 demo 的 T 方开局转移半自动挖出、人工确认。
  */
 
+/** 动线上的一个命名区域。 */
+export interface RouteZone {
+  /** `lastPlaceName` 原始取值（如 "TSpawn" / "PalaceAlley" / "BombsiteA"）。 */
+  id: string;
+  /** 中文名（如 "T 出生点" / "Palace 巷口"）。 */
+  nameCn: string;
+}
+
 /** 一条进攻动线：从 T 出生区到某包点的有序 callout 序列。 */
 export interface MapRoute {
   /** 稳定唯一 id（如 "a_palace" / "b_apartments"）。 */
@@ -22,10 +30,10 @@ export interface MapRoute {
   /** 该动线指向的包点。 */
   bombsite: "a" | "b";
   /**
-   * 推进顺序的 callout 名序列（T 出生区 → 包点）。
-   * 元素是 `lastPlaceName` 的原始取值（如 "TSpawn" / "PalaceAlley" / "BombsiteA"）。
+   * 推进顺序的 callout 序列（T 出生区 → 包点）。
+   * 第一个元素通常为 TSpawn、最后一个为 BombsiteA / BombsiteB。
    */
-  zones: string[];
+  zones: RouteZone[];
 }
 
 export interface MapRoutes {
@@ -36,13 +44,18 @@ export interface MapRoutes {
   routes: MapRoute[];
 }
 
+/** 提取动线上所有 zone id（供兼容字符串 API 使用）。 */
+function zoneIds(route: MapRoute): string[] {
+  return route.zones.map((z) => z.id);
+}
+
 /**
  * callout 在动线上的位置下标（0 = 起点/T 出生侧，越大越靠近包点），
  * 不在该动线上返回 -1。
  */
 export function routeIndex(route: MapRoute, placeName: string | null | undefined): number {
   if (!placeName) return -1;
-  return route.zones.indexOf(placeName);
+  return zoneIds(route).indexOf(placeName);
 }
 
 /**
@@ -54,8 +67,9 @@ export function furthestRouteIndex(
   controlledPlaceNames: Iterable<string>,
 ): number {
   let best = -1;
+  const ids = zoneIds(route);
   for (const pl of controlledPlaceNames) {
-    const i = route.zones.indexOf(pl);
+    const i = ids.indexOf(pl);
     if (i > best) best = i;
   }
   return best;

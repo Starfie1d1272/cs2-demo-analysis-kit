@@ -1,0 +1,123 @@
+{
+  "mapName": "de_dust2",
+  "version": "dust2-routes-0.1",
+  "_note": "T 方进攻动线初稿（由 extract-routes.ts 提取 + 人工确认）。中文名请核验。",
+  "routes": [
+    {
+      "id": "a_long",
+      "name": "A 大",
+      "bombsite": "a",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "OutsideLong",
+          "nameCn": "A 门外"
+        },
+        {
+          "id": "LongDoors",
+          "nameCn": "A 门"
+        },
+        {
+          "id": "LongA",
+          "nameCn": "A 大"
+        },
+        {
+          "id": "ARamp",
+          "nameCn": "A 坡"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A 包点"
+        }
+      ]
+    },
+    {
+      "id": "a_short",
+      "name": "A 小",
+      "bombsite": "a",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "TopofMid",
+          "nameCn": "中路顶"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "Catwalk",
+          "nameCn": "小道"
+        },
+        {
+          "id": "ShortStairs",
+          "nameCn": "小道楼梯"
+        },
+        {
+          "id": "ExtendedA",
+          "nameCn": "A 平台"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A 包点"
+        }
+      ]
+    },
+    {
+      "id": "b_tunnels",
+      "name": "B 洞",
+      "bombsite": "b",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "OutsideTunnel",
+          "nameCn": "B 洞外"
+        },
+        {
+          "id": "UpperTunnel",
+          "nameCn": "B 上层"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B 包点"
+        }
+      ]
+    },
+    {
+      "id": "b_mid",
+      "name": "B 中门",
+      "bombsite": "b",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "TopofMid",
+          "nameCn": "中路顶"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "MidDoors",
+          "nameCn": "中门"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B 包点"
+        }
+      ]
+    }
+  ]
+}

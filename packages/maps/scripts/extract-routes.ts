@@ -31,9 +31,9 @@ async function loadSamples(zipDir: string): Promise<Sample[]> {
   const names = (await readdir(zipDir)).filter((n) => extname(n).toLowerCase() === ".zip");
   if (names.length === 0) throw new Error(`No .zip in ${zipDir}`);
   const out: Sample[] = [];
-  // round 主键加偏移，避免不同 demo 的同号回合串台
   let roundBase = 0;
   for (const name of names) {
+    process.stderr.write(`  loading ${name}...`);
     const pkg = await loadDemoPackageFromZip(await readFile(join(zipDir, name)));
     const rows = pkg.positions1s ?? [];
     let maxRound = 0;
@@ -52,13 +52,12 @@ async function loadSamples(zipDir: string): Promise<Sample[]> {
       });
     }
     roundBase += maxRound;
-    process.stderr.write(`  loaded ${name} (${rows.length} samples)\n`);
+    process.stderr.write(` ${rows.length} samples\n`);
   }
   return out;
 }
 
 function main(samples: Sample[], windowSec: number, tickrate = 64): void {
-  // 每回合动作起始 tick（positions 是 freeze 后采样，min tick ≈ 回合开打）
   const minTick = new Map<number, number>();
   for (const s of samples) {
     minTick.set(s.round, Math.min(minTick.get(s.round) ?? Infinity, s.tick));
@@ -75,14 +74,14 @@ function main(samples: Sample[], windowSec: number, tickrate = 64): void {
     a.sy += s.y;
     agg.set(s.place, a);
   }
-  console.log(`=== callout 词表（${samples.length} 采样）===`);
-  console.log(`${"callout".padEnd(18)}${"count".padStart(7)}${"T%".padStart(5)}   centroid(x,y)`);
+  console.log(`# callout 词表（${samples.length} 采样）\n`);
+  console.log(`| callout | count | T% | centroid(x,y) |`);
+  console.log(`|---|---:|---:|---|`);
   for (const [pl, a] of [...agg].sort((x, y) => y[1].n - x[1].n)) {
     if (a.n < 30) continue;
     const tpct = Math.round((100 * a.t) / a.n);
     console.log(
-      `${pl.padEnd(18)}${String(a.n).padStart(7)}${String(tpct).padStart(4)}%   ` +
-        `(${(a.sx / a.n).toFixed(0).padStart(7)},${(a.sy / a.n).toFixed(0).padStart(7)})`,
+      `| ${pl} | ${a.n} | ${tpct}% | (${(a.sx / a.n).toFixed(0)},${(a.sy / a.n).toFixed(0)}) |`,
     );
   }
 
@@ -110,16 +109,16 @@ function main(samples: Sample[], windowSec: number, tickrate = 64): void {
       prev = s.place;
     }
   }
-  console.log(`\n=== T 方开局(≤${windowSec}s) 高频转移 ===`);
-  for (const [k, c] of [...trans].sort((a, b) => b[1] - a[1]).slice(0, 24)) {
-    console.log(`  ${k}  ${c}`);
+  console.log(`\n# T 方开局(≤${windowSec}s) 高频转移\n`);
+  for (const [k, c] of [...trans].sort((a, b) => b[1] - a[1]).slice(0, 30)) {
+    console.log(`  ${k} ×${c}`);
   }
 
-  // 3) 从 TSpawn 贪心展开候选链（每步取最高频后继，直到命中 Bombsite 或重复）
-  console.log(`\n=== 候选动线（从 TSpawn 贪心展开）===`);
+  // 3) 候选动线（贪心）
+  console.log("\n# 候选动线\n");
   const starts = [...(next.get("TSpawn")?.keys() ?? [])]
     .sort((a, b) => (next.get("TSpawn")!.get(b) ?? 0) - (next.get("TSpawn")!.get(a) ?? 0))
-    .slice(0, 4);
+    .slice(0, 5);
   for (const first of starts) {
     const chain = ["TSpawn", first];
     const seen = new Set(chain);
@@ -133,7 +132,19 @@ function main(samples: Sample[], windowSec: number, tickrate = 64): void {
       seen.add(nxt[0]);
       cur = nxt[0];
     }
-    console.log(`  ${chain.join(" → ")}`);
+    console.log(`  TSpawn → ${chain.slice(1).join(" → ")}`);
+  }
+
+  // 4) 参考：Bombsite 的前驱（哪些 callout 直接连到包点）
+  console.log("\n# 包点入度\n");
+  for (const site of ["BombsiteA", "BombsiteB"]) {
+    const incoming = [...trans].filter(([k]) => k.endsWith(`→${site}`)).sort((a, b) => b[1] - a[1]);
+    if (incoming.length === 0) continue;
+    console.log(`  ${site} ←`);
+    for (const [k, c] of incoming.slice(0, 5)) {
+      const src = k.split("→")[0];
+      console.log(`    ${src} ×${c}`);
+    }
   }
 }
 

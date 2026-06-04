@@ -1,0 +1,131 @@
+{
+  "mapName": "de_ancient",
+  "version": "ancient-routes-0.1",
+  "_note": "T 方进攻动线初稿（由 extract-routes.ts 提取 + 人工确认）。中文名请核验。",
+  "routes": [
+    {
+      "id": "a_mainhall",
+      "name": "A 正门",
+      "bombsite": "a",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "Outside",
+          "nameCn": "中路外"
+        },
+        {
+          "id": "MainHall",
+          "nameCn": "A 厅"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A 包点"
+        }
+      ]
+    },
+    {
+      "id": "a_mid",
+      "name": "A 中门",
+      "bombsite": "a",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "Outside",
+          "nameCn": "中路外"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "SideHall",
+          "nameCn": "侧道"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A 包点"
+        }
+      ]
+    },
+    {
+      "id": "b_ruins",
+      "name": "B 遗迹",
+      "bombsite": "b",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "Tunnel",
+          "nameCn": "隧道"
+        },
+        {
+          "id": "Water",
+          "nameCn": "水路"
+        },
+        {
+          "id": "Ruins",
+          "nameCn": "遗迹"
+        },
+        {
+          "id": "TSideLower",
+          "nameCn": "T 下层"
+        },
+        {
+          "id": "Ramp",
+          "nameCn": "坡道"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B 包点"
+        }
+      ]
+    },
+    {
+      "id": "b_donut",
+      "name": "B 甜甜圈",
+      "bombsite": "b",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "T 出生点"
+        },
+        {
+          "id": "Tunnel",
+          "nameCn": "隧道"
+        },
+        {
+          "id": "Water",
+          "nameCn": "水路"
+        },
+        {
+          "id": "Ruins",
+          "nameCn": "遗迹"
+        },
+        {
+          "id": "TSideLower",
+          "nameCn": "T 下层"
+        },
+        {
+          "id": "TSideUpper",
+          "nameCn": "T 上层"
+        },
+        {
+          "id": "SideEntrance",
+          "nameCn": "侧入口"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B 包点"
+        }
+      ]
+    }
+  ]
+}
