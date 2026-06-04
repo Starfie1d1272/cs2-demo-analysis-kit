@@ -1,0 +1,17 @@
+{
+  "mapName": "de_ancient",
+  "tickrate": 64,
+  "durationSeconds": 1531.6,
+  "serverName": "完美世界竞技平台赛事服务器",
+  "source": "demo",
+  "teamA": {
+    "teamKey": "teamA",
+    "name": "她还爱我对不 队",
+    "score": 3
+  },
+  "teamB": {
+    "teamKey": "teamB",
+    "name": "車一进一宝贝队",
+    "score": 13
+  }
+}

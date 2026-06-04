@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "cs2-demo-format/2.0",
+  "exporter": {
+    "name": "cs2-demo-analysis-kit",
+    "version": "0.2.1"
+  },
+  "parser": {
+    "name": "demoparser2",
+    "version": "unknown"
+  },
+  "demo": {
+    "hash": "602a433d7dc4361373138d895d439f1d765453892b915a92081d01666e530a10",
+    "sourceFileName": "3696714896_1000003075.dem"
+  },
+  "mapName": "de_ancient",
+  "tickrate": 64,
+  "exportedAt": "2026-06-04T07:31:18.004177+00:00",
+  "files": {
+    "match": "match.json",
+    "players": "players.json",
+    "rounds": "rounds.json",
+    "playerStats": "player-stats.json",
+    "playerEconomies": "player-economies.json",
+    "kills": "kills.json",
+    "damages": "damages.json",
+    "blinds": "blinds.json",
+    "bombs": "bombs.json",
+    "grenades": "grenades.json",
+    "clutches": "clutches.json",
+    "shots": "shots.json",
+    "positions1s": "positions-1s.json",
+    "replay": "replay.json"
+  }
+}

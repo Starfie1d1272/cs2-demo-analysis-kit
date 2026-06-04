@@ -1,0 +1,233 @@
+[
+  {
+    "roundNumber": 1,
+    "tick": 4372,
+    "clutcherSteamId64": "76561198985185500",
+    "clutcherTeamKey": "teamA",
+    "clutcherSide": "t",
+    "opponentCount": 3,
+    "won": false,
+    "survived": true,
+    "killCount": 2
+  },
+  {
+    "roundNumber": 1,
+    "tick": 4632,
+    "clutcherSteamId64": "76561199387165736",
+    "clutcherTeamKey": "teamB",
+    "clutcherSide": "ct",
+    "opponentCount": 1,
+    "won": true,
+    "survived": true,
+    "killCount": 1
+  },
+  {
+    "roundNumber": 2,
+    "tick": 7924,
+    "clutcherSteamId64": "76561198985185500",
+    "clutcherTeamKey": "teamA",
+    "clutcherSide": "t",
+    "opponentCount": 3,
+    "won": false,
+    "survived": true,
+    "killCount": 0
+  },
+  {
+    "roundNumber": 3,
+    "tick": 14992,
+    "clutcherSteamId64": "76561198408992583",
+    "clutcherTeamKey": "teamA",
+    "clutcherSide": "t",
+    "opponentCount": 5,
+    "won": false,
+    "survived": true,
+    "killCount": 0
+  },
+  {
+    "roundNumber": 4,
+    "tick": 17845,
+    "clutcherSteamId64": "76561198804455016",
+    "clutcherTeamKey": "teamA",
+    "clutcherSide": "t",
+    "opponentCount": 5,
+    "won": false,
+    "survived": true,
+    "killCount": 0
+  },
+  {
+    "roundNumber": 5,
+    "tick": 27394,
+    "clutcherSteamId64": "76561198985185500",
+    "clutcherTeamKey": "teamA",
+    "clutcherSide": "t",
+    "opponentCount": 3,
+    "won": false,
+    "survived": true,
+    "killCount": 1
+  },
+  {
+    "roundNumber": 6,
+    "tick": 33748,
+    "clutcherSteamId64": "76561199387165736",
+    "clutcherTeamKey": "teamB",
+    "clutcherSide": "ct",
+    "opponentCount": 2,
+    "won": false,
+    "survived": true,
+    "killCount": 0
+  },
+  {
+    "roundNumber": 6,
+    "tick": 34590,
+    "clutcherSteamId64": "76561198985185500",
+    "clutcherTeamKey": "teamA",
+    "clutcherSide": "t",
+    "opponentCount": 1,
+    "won": true,
+    "survived": true,
+    "killCount": 0
+  },
+  {
+    "roundNumber": 7,
+    "tick": 39983,
+    "clutcherSteamId64": "76561198985185500",
+    "clutcherTeamKey": "teamA",
+    "clutcherSide": "t",
+    "opponentCount": 3,
+    "won": false,
+    "survived": true,
+    "killCount": 1
+  },
+  {
+    "roundNumber": 8,
+    "tick": 46796,
+    "clutcherSteamId64": "76561199515668506",
+    "clutcherTeamKey": "teamB",
+    "clutcherSide": "ct",
+    "opponentCount": 2,
+    "won": false,
+    "survived": true,
+    "killCount": 1
+  },
+  {
+    "roundNumber": 8,
+    "tick": 47576,
+    "clutcherSteamId64": "76561199246734739",
+    "clutcherTeamKey": "teamA",
+    "clutcherSide": "t",
+    "opponentCount": 1,
+    "won": true,
+    "survived": true,
+    "killCount": 1
+  },
+  {
+    "roundNumber": 9,
+    "tick": 51956,
+    "clutcherSteamId64": "76561199387165736",
+    "clutcherTeamKey": "teamB",
+    "clutcherSide": "ct",
+    "opponentCount": 2,
+    "won": true,
+    "survived": true,
+    "killCount": 2
+  },
+  {
+    "roundNumber": 9,
+    "tick": 52038,
+    "clutcherSteamId64": "76561199079259274",
+    "clutcherTeamKey": "teamA",
+    "clutcherSide": "t",
+    "opponentCount": 1,
+    "won": false,
+    "survived": true,
+    "killCount": 0
+  },
+  {
+    "roundNumber": 10,
+    "tick": 58546,
+    "clutcherSteamId64": "76561199246734739",
+    "clutcherTeamKey": "teamA",
+    "clutcherSide": "t",
+    "opponentCount": 5,
+    "won": false,
+    "survived": true,
+    "killCount": 0
+  },
+  {
+    "roundNumber": 11,
+    "tick": 62963,
+    "clutcherSteamId64": "76561199079259274",
+    "clutcherTeamKey": "teamA",
+    "clutcherSide": "t",
+    "opponentCount": 3,
+    "won": false,
+    "survived": true,
+    "killCount": 1
+  },
+  {
+    "roundNumber": 12,
+    "tick": 68818,
+    "clutcherSteamId64": "76561199190512662",
+    "clutcherTeamKey": "teamB",
+    "clutcherSide": "ct",
+    "opponentCount": 2,
+    "won": false,
+    "survived": true,
+    "killCount": 0
+  },
+  {
+    "roundNumber": 13,
+    "tick": 76405,
+    "clutcherSteamId64": "76561199079259274",
+    "clutcherTeamKey": "teamA",
+    "clutcherSide": "ct",
+    "opponentCount": 4,
+    "won": false,
+    "survived": true,
+    "killCount": 1
+  },
+  {
+    "roundNumber": 14,
+    "tick": 84392,
+    "clutcherSteamId64": "76561199066210656",
+    "clutcherTeamKey": "teamB",
+    "clutcherSide": "t",
+    "opponentCount": 2,
+    "won": true,
+    "survived": true,
+    "killCount": 0
+  },
+  {
+    "roundNumber": 15,
+    "tick": 93002,
+    "clutcherSteamId64": "76561199190512662",
+    "clutcherTeamKey": "teamB",
+    "clutcherSide": "t",
+    "opponentCount": 2,
+    "won": true,
+    "survived": true,
+    "killCount": 2
+  },
+  {
+    "roundNumber": 15,
+    "tick": 93488,
+    "clutcherSteamId64": "76561198985185500",
+    "clutcherTeamKey": "teamA",
+    "clutcherSide": "ct",
+    "opponentCount": 1,
+    "won": false,
+    "survived": true,
+    "killCount": 0
+  },
+  {
+    "roundNumber": 16,
+    "tick": 97861,
+    "clutcherSteamId64": "76561198804455016",
+    "clutcherTeamKey": "teamA",
+    "clutcherSide": "ct",
+    "opponentCount": 3,
+    "won": false,
+    "survived": true,
+    "killCount": 0
+  }
+]

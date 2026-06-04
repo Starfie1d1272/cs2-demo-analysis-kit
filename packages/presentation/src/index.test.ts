@@ -11,9 +11,9 @@ describe("@cs2dak/presentation", () => {
     const view = buildDemoViewModel(analyzeDemoPackage(pkg));
     const workspace = buildMatchWorkspaceModel(pkg);
 
-    expect(view.scoreline).toBe("13:8");
-    expect(workspace.title).toBe("Team A vs Team B");
-    expect(workspace.rounds).toHaveLength(21);
+    expect(view.scoreline).toBe("3:13");
+    expect(workspace.title).toBe("她还爱我对不 队 vs 車一进一宝贝队");
+    expect(workspace.rounds).toHaveLength(16);
     expect(workspace.replay.available).toBe(true);
   });
 });

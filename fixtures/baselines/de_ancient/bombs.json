@@ -1,0 +1,767 @@
+[
+  {
+    "roundNumber": 1,
+    "tick": 4106,
+    "type": "dropped",
+    "site": "a",
+    "siteId": null,
+    "actorSteamId64": "76561198804455016",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -1250.43,
+      "y": 632.73,
+      "z": 72.1
+    }
+  },
+  {
+    "roundNumber": 1,
+    "tick": 4206,
+    "type": "picked_up",
+    "site": "a",
+    "siteId": null,
+    "actorSteamId64": "76561198408992583",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -1262.81,
+      "y": 661.12,
+      "z": 62.7
+    }
+  },
+  {
+    "roundNumber": 1,
+    "tick": 4372,
+    "type": "dropped",
+    "site": "a",
+    "siteId": null,
+    "actorSteamId64": "76561198408992583",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -1158.3,
+      "y": 681.45,
+      "z": 55.8
+    }
+  },
+  {
+    "roundNumber": 2,
+    "tick": 6786,
+    "type": "picked_up",
+    "site": null,
+    "siteId": null,
+    "actorSteamId64": "76561199079259274",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -697.11,
+      "y": -2160.4,
+      "z": -168.2
+    }
+  },
+  {
+    "roundNumber": 2,
+    "tick": 7924,
+    "type": "dropped",
+    "site": "b",
+    "siteId": null,
+    "actorSteamId64": "76561199079259274",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": 710.89,
+      "y": -114.13,
+      "z": 134.0
+    }
+  },
+  {
+    "roundNumber": 3,
+    "tick": 14985,
+    "type": "dropped",
+    "site": "a",
+    "siteId": null,
+    "actorSteamId64": "76561199246734739",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -1999.45,
+      "y": 391.58,
+      "z": 76.4
+    }
+  },
+  {
+    "roundNumber": 4,
+    "tick": 17764,
+    "type": "dropped",
+    "site": null,
+    "siteId": null,
+    "actorSteamId64": "76561199246734739",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -1061.26,
+      "y": -789.12,
+      "z": 37.2
+    }
+  },
+  {
+    "roundNumber": 5,
+    "tick": 24623,
+    "type": "dropped",
+    "site": null,
+    "siteId": null,
+    "actorSteamId64": "76561198804455016",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": 1143.18,
+      "y": -1287.99,
+      "z": 2.0
+    }
+  },
+  {
+    "roundNumber": 5,
+    "tick": 24632,
+    "type": "picked_up",
+    "site": null,
+    "siteId": null,
+    "actorSteamId64": "76561198408992583",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": 1247.34,
+      "y": -1242.91,
+      "z": 8.7
+    }
+  },
+  {
+    "roundNumber": 5,
+    "tick": 26445,
+    "type": "plant_begin",
+    "site": "b",
+    "siteId": "434",
+    "actorSteamId64": "76561198408992583",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": 795.98,
+      "y": 4.63,
+      "z": 130.9
+    }
+  },
+  {
+    "roundNumber": 5,
+    "tick": 26645,
+    "type": "planted",
+    "site": "b",
+    "siteId": "434",
+    "actorSteamId64": "76561198408992583",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": 796.55,
+      "y": 4.82,
+      "z": 130.9
+    }
+  },
+  {
+    "roundNumber": 5,
+    "tick": 28037,
+    "type": "defuse_begin",
+    "site": "b",
+    "siteId": null,
+    "actorSteamId64": "76561198099976471",
+    "actorTeamKey": "teamB",
+    "actorSide": "ct",
+    "position": {
+      "x": 802.73,
+      "y": 4.96,
+      "z": 130.9
+    }
+  },
+  {
+    "roundNumber": 5,
+    "tick": 28357,
+    "type": "defused",
+    "site": "b",
+    "siteId": "434",
+    "actorSteamId64": "76561198099976471",
+    "actorTeamKey": "teamB",
+    "actorSide": "ct",
+    "position": {
+      "x": 802.73,
+      "y": 4.96,
+      "z": 130.9
+    }
+  },
+  {
+    "roundNumber": 6,
+    "tick": 31515,
+    "type": "dropped",
+    "site": "a",
+    "siteId": null,
+    "actorSteamId64": "76561198985185500",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -1918.25,
+      "y": 410.34,
+      "z": 168.0
+    }
+  },
+  {
+    "roundNumber": 6,
+    "tick": 31522,
+    "type": "picked_up",
+    "site": "a",
+    "siteId": null,
+    "actorSteamId64": "76561198804455016",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -1934.85,
+      "y": 414.38,
+      "z": 76.9
+    }
+  },
+  {
+    "roundNumber": 6,
+    "tick": 31766,
+    "type": "plant_begin",
+    "site": "a",
+    "siteId": "433",
+    "actorSteamId64": "76561198804455016",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -1581.43,
+      "y": 700.37,
+      "z": 56.0
+    }
+  },
+  {
+    "roundNumber": 6,
+    "tick": 31966,
+    "type": "planted",
+    "site": "a",
+    "siteId": "433",
+    "actorSteamId64": "76561198804455016",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -1580.16,
+      "y": 700.6,
+      "z": 56.0
+    }
+  },
+  {
+    "roundNumber": 6,
+    "tick": 34590,
+    "type": "exploded",
+    "site": "a",
+    "siteId": "433",
+    "actorSteamId64": "76561198804455016",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -347.6,
+      "y": -877.88,
+      "z": 32.5
+    }
+  },
+  {
+    "roundNumber": 7,
+    "tick": 36816,
+    "type": "dropped",
+    "site": null,
+    "siteId": null,
+    "actorSteamId64": "76561199079259274",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": 697.62,
+      "y": -1484.39,
+      "z": -18.3
+    }
+  },
+  {
+    "roundNumber": 7,
+    "tick": 37100,
+    "type": "picked_up",
+    "site": null,
+    "siteId": null,
+    "actorSteamId64": "76561198408992583",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": 938.73,
+      "y": -1417.78,
+      "z": 4.8
+    }
+  },
+  {
+    "roundNumber": 7,
+    "tick": 39550,
+    "type": "plant_begin",
+    "site": "b",
+    "siteId": "434",
+    "actorSteamId64": "76561198408992583",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": 861.98,
+      "y": -16.51,
+      "z": 130.0
+    }
+  },
+  {
+    "roundNumber": 7,
+    "tick": 39750,
+    "type": "planted",
+    "site": "b",
+    "siteId": "434",
+    "actorSteamId64": "76561198408992583",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": 861.55,
+      "y": -14.48,
+      "z": 130.0
+    }
+  },
+  {
+    "roundNumber": 7,
+    "tick": 40338,
+    "type": "defuse_begin",
+    "site": "b",
+    "siteId": null,
+    "actorSteamId64": "76561199066210656",
+    "actorTeamKey": "teamB",
+    "actorSide": "ct",
+    "position": {
+      "x": 903.94,
+      "y": 28.05,
+      "z": 130.0
+    }
+  },
+  {
+    "roundNumber": 7,
+    "tick": 40658,
+    "type": "defused",
+    "site": "b",
+    "siteId": "434",
+    "actorSteamId64": "76561199066210656",
+    "actorTeamKey": "teamB",
+    "actorSide": "ct",
+    "position": {
+      "x": 903.94,
+      "y": 28.05,
+      "z": 130.0
+    }
+  },
+  {
+    "roundNumber": 8,
+    "tick": 45208,
+    "type": "dropped",
+    "site": null,
+    "siteId": null,
+    "actorSteamId64": "76561198985185500",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -1829.03,
+      "y": 7.52,
+      "z": 79.8
+    }
+  },
+  {
+    "roundNumber": 8,
+    "tick": 45215,
+    "type": "picked_up",
+    "site": null,
+    "siteId": null,
+    "actorSteamId64": "76561198408992583",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -1907.82,
+      "y": 81.53,
+      "z": 76.0
+    }
+  },
+  {
+    "roundNumber": 8,
+    "tick": 45949,
+    "type": "plant_begin",
+    "site": "a",
+    "siteId": "433",
+    "actorSteamId64": "76561198408992583",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -1568.49,
+      "y": 700.42,
+      "z": 56.0
+    }
+  },
+  {
+    "roundNumber": 8,
+    "tick": 46149,
+    "type": "planted",
+    "site": "a",
+    "siteId": "433",
+    "actorSteamId64": "76561198408992583",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -1568.1,
+      "y": 701.01,
+      "z": 56.0
+    }
+  },
+  {
+    "roundNumber": 8,
+    "tick": 47876,
+    "type": "defuse_begin",
+    "site": "a",
+    "siteId": null,
+    "actorSteamId64": "76561199515668506",
+    "actorTeamKey": "teamB",
+    "actorSide": "ct",
+    "position": {
+      "x": -1527.01,
+      "y": 712.1,
+      "z": 56.0
+    }
+  },
+  {
+    "roundNumber": 9,
+    "tick": 51440,
+    "type": "dropped",
+    "site": "a",
+    "siteId": null,
+    "actorSteamId64": "76561199246734739",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -2006.61,
+      "y": 658.69,
+      "z": 52.1
+    }
+  },
+  {
+    "roundNumber": 10,
+    "tick": 58758,
+    "type": "dropped",
+    "site": "b",
+    "siteId": null,
+    "actorSteamId64": "76561199246734739",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": 733.38,
+      "y": -8.58,
+      "z": 130.0
+    }
+  },
+  {
+    "roundNumber": 11,
+    "tick": 61976,
+    "type": "plant_begin",
+    "site": "b",
+    "siteId": "434",
+    "actorSteamId64": "76561199246734739",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": 833.17,
+      "y": 4.87,
+      "z": 130.9
+    }
+  },
+  {
+    "roundNumber": 11,
+    "tick": 62176,
+    "type": "planted",
+    "site": "b",
+    "siteId": "434",
+    "actorSteamId64": "76561199246734739",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": 832.61,
+      "y": 4.81,
+      "z": 130.9
+    }
+  },
+  {
+    "roundNumber": 11,
+    "tick": 63178,
+    "type": "defuse_begin",
+    "site": "b",
+    "siteId": null,
+    "actorSteamId64": "76561199066210656",
+    "actorTeamKey": "teamB",
+    "actorSide": "ct",
+    "position": {
+      "x": 783.68,
+      "y": 4.94,
+      "z": 130.9
+    }
+  },
+  {
+    "roundNumber": 11,
+    "tick": 63498,
+    "type": "defused",
+    "site": "b",
+    "siteId": "434",
+    "actorSteamId64": "76561199066210656",
+    "actorTeamKey": "teamB",
+    "actorSide": "ct",
+    "position": {
+      "x": 783.68,
+      "y": 4.94,
+      "z": 130.9
+    }
+  },
+  {
+    "roundNumber": 12,
+    "tick": 65660,
+    "type": "dropped",
+    "site": null,
+    "siteId": null,
+    "actorSteamId64": "76561199246734739",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -1684.28,
+      "y": -1129.18,
+      "z": -22.1
+    }
+  },
+  {
+    "roundNumber": 12,
+    "tick": 65829,
+    "type": "picked_up",
+    "site": null,
+    "siteId": null,
+    "actorSteamId64": "76561198985185500",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -1760.7,
+      "y": -875.8,
+      "z": -8.4
+    }
+  },
+  {
+    "roundNumber": 12,
+    "tick": 66980,
+    "type": "plant_begin",
+    "site": "a",
+    "siteId": "433",
+    "actorSteamId64": "76561198985185500",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -1578.6,
+      "y": 699.64,
+      "z": 56.0
+    }
+  },
+  {
+    "roundNumber": 12,
+    "tick": 67352,
+    "type": "plant_begin",
+    "site": "a",
+    "siteId": "433",
+    "actorSteamId64": "76561198985185500",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -1578.23,
+      "y": 699.66,
+      "z": 56.0
+    }
+  },
+  {
+    "roundNumber": 12,
+    "tick": 67732,
+    "type": "plant_begin",
+    "site": "a",
+    "siteId": "433",
+    "actorSteamId64": "76561198985185500",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -1577.55,
+      "y": 702.77,
+      "z": 56.0
+    }
+  },
+  {
+    "roundNumber": 12,
+    "tick": 67932,
+    "type": "planted",
+    "site": "a",
+    "siteId": "433",
+    "actorSteamId64": "76561198985185500",
+    "actorTeamKey": "teamA",
+    "actorSide": "t",
+    "position": {
+      "x": -1576.86,
+      "y": 702.96,
+      "z": 56.0
+    }
+  },
+  {
+    "roundNumber": 13,
+    "tick": 75624,
+    "type": "plant_begin",
+    "site": "b",
+    "siteId": "434",
+    "actorSteamId64": "76561199066210656",
+    "actorTeamKey": "teamB",
+    "actorSide": "t",
+    "position": {
+      "x": 814.06,
+      "y": 4.94,
+      "z": 130.9
+    }
+  },
+  {
+    "roundNumber": 13,
+    "tick": 75824,
+    "type": "planted",
+    "site": "b",
+    "siteId": "434",
+    "actorSteamId64": "76561199066210656",
+    "actorTeamKey": "teamB",
+    "actorSide": "t",
+    "position": {
+      "x": 813.71,
+      "y": 4.94,
+      "z": 130.9
+    }
+  },
+  {
+    "roundNumber": 14,
+    "tick": 81568,
+    "type": "plant_begin",
+    "site": "a",
+    "siteId": "433",
+    "actorSteamId64": "76561199515668506",
+    "actorTeamKey": "teamB",
+    "actorSide": "t",
+    "position": {
+      "x": -1579.07,
+      "y": 700.47,
+      "z": 56.0
+    }
+  },
+  {
+    "roundNumber": 14,
+    "tick": 81768,
+    "type": "planted",
+    "site": "a",
+    "siteId": "433",
+    "actorSteamId64": "76561199515668506",
+    "actorTeamKey": "teamB",
+    "actorSide": "t",
+    "position": {
+      "x": -1578.91,
+      "y": 700.75,
+      "z": 56.0
+    }
+  },
+  {
+    "roundNumber": 14,
+    "tick": 84392,
+    "type": "exploded",
+    "site": "a",
+    "siteId": "433",
+    "actorSteamId64": "76561199515668506",
+    "actorTeamKey": "teamB",
+    "actorSide": "t",
+    "position": {
+      "x": -1413.81,
+      "y": -320.83,
+      "z": 106.0
+    }
+  },
+  {
+    "roundNumber": 15,
+    "tick": 91349,
+    "type": "plant_begin",
+    "site": "a",
+    "siteId": "433",
+    "actorSteamId64": "76561199066210656",
+    "actorTeamKey": "teamB",
+    "actorSide": "t",
+    "position": {
+      "x": -1371.5,
+      "y": 701.43,
+      "z": 56.0
+    }
+  },
+  {
+    "roundNumber": 15,
+    "tick": 91549,
+    "type": "planted",
+    "site": "a",
+    "siteId": "433",
+    "actorSteamId64": "76561199066210656",
+    "actorTeamKey": "teamB",
+    "actorSide": "t",
+    "position": {
+      "x": -1371.42,
+      "y": 703.44,
+      "z": 56.0
+    }
+  },
+  {
+    "roundNumber": 15,
+    "tick": 93274,
+    "type": "defuse_begin",
+    "site": "a",
+    "siteId": null,
+    "actorSteamId64": "76561198985185500",
+    "actorTeamKey": "teamA",
+    "actorSide": "ct",
+    "position": {
+      "x": -1389.64,
+      "y": 762.64,
+      "z": 54.0
+    }
+  },
+  {
+    "roundNumber": 16,
+    "tick": 96321,
+    "type": "plant_begin",
+    "site": "b",
+    "siteId": "434",
+    "actorSteamId64": "76561199387165736",
+    "actorTeamKey": "teamB",
+    "actorSide": "t",
+    "position": {
+      "x": 908.02,
+      "y": -50.58,
+      "z": 130.0
+    }
+  },
+  {
+    "roundNumber": 16,
+    "tick": 96521,
+    "type": "planted",
+    "site": "b",
+    "siteId": "434",
+    "actorSteamId64": "76561199387165736",
+    "actorTeamKey": "teamB",
+    "actorSide": "t",
+    "position": {
+      "x": 907.74,
+      "y": -50.25,
+      "z": 130.0
+    }
+  }
+]
