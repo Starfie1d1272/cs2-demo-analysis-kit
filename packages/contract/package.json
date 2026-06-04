@@ -1,13 +1,13 @@
 {
   "name": "@cs2dak/contract",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "license": "MIT",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@rivalhub/rival-rating": "github:Starfie1d1272/rival-rating#5d862eb",
+    "@rivalhub/rival-rating": "^0.1.0",
     "cs2-demo-format": "^2.2.0",
     "zod": "^3.25.0"
   },

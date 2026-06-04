@@ -1,6 +1,6 @@
 {
   "name": "@cs2dak/cohort",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "license": "MIT",
   "exports": {
@@ -9,6 +9,6 @@
   "dependencies": {
     "@cs2dak/contract": "workspace:*",
     "@cs2dak/core": "workspace:*",
-    "@rivalhub/rival-rating": "github:Starfie1d1272/rival-rating#163f90c3ea17e81a6fdc84b276820664362a2f60"
+    "@rivalhub/rival-rating": "^0.1.0"
   }
 }

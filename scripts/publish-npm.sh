@@ -37,6 +37,7 @@ function setDep(path, dep, version) {
   }
 }
 setDep("packages/contract/package.json", "cs2-demo-format", fmt);
+setDep("packages/contract/package.json", "@rivalhub/rival-rating", rating);
 setDep("packages/core/package.json", "@rivalhub/rival-rating", rating);
 JS
 
