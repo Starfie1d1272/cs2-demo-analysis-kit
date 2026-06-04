@@ -19,3 +19,7 @@ __pycache__/
 .env.local
 .codegraph/
 .omc/
+# Claude Code system lock files
+.claude/scheduled_tasks.lock
+# Generated radar viz images (reproducible via generate-routes.py)
+packages/maps/viz/

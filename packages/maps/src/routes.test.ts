@@ -4,7 +4,9 @@ import { routeIndex, furthestRouteIndex, type MapRoute } from "./routes.js";
 const aPalace: MapRoute = {
   id: "a_palace",
   name: "A 大厅",
+  type: "primary_entry",
   bombsite: "a",
+  confidence: "high",
   zones: [
     { id: "TSpawn", nameCn: "T 出生点" },
     { id: "PalaceAlley", nameCn: "Palace 巷口" },

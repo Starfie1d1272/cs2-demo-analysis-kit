@@ -1,43 +1,34 @@
 {
   "mapName": "de_mirage",
-  "version": "mirage-routes-0.2",
-  "_note": "T 方进攻动线。基于 79 场 demo 的 lastPlaceName 词表（T% 梯度）核实 + CS 地图结构补全。\n_confidence: high=词表 T% 梯度明确支持 | medium=部分 callout 偏 CT 侧/转移数据弱 | low=转移数据不支撑,仅地图结构候选。\n中文名见 CALLOUT_NAME_CN。extract-routes.ts 仅做词表统计,动线不自动生成。",
+  "version": "mirage-routes-0.3",
   "routes": [
     {
       "id": "a_palace",
-      "name": "A 二楼/Palace",
+      "name": "A二楼",
+      "type": "primary_entry",
       "bombsite": "a",
-      "_confidence": "high",
-      "_note": "TSpawn(90%T)→PalaceAlley(87%T)→TRamp(85%T)→PalaceInterior(70%T)→BombsiteA(35%T,CT)",
+      "confidence": "high",
       "zones": [
         {
           "id": "TSpawn",
           "nameCn": "匪家"
         },
         {
-          "id": "PalaceAlley",
-          "nameCn": "二楼外/宫殿外"
-        },
-        {
-          "id": "TRamp",
-          "nameCn": "A1/A门"
-        },
-        {
           "id": "PalaceInterior",
-          "nameCn": "二楼/宫殿内"
+          "nameCn": "A二楼"
         },
         {
           "id": "BombsiteA",
-          "nameCn": "A包点"
+          "nameCn": "A包"
         }
       ]
     },
     {
-      "id": "a_mid",
-      "name": "A 中路/Connector",
+      "id": "a_mid_connector",
+      "name": "中路拱门",
+      "type": "mid_connector",
       "bombsite": "a",
-      "_confidence": "high",
-      "_note": "TSpawn→SideAlley(93%T)→TopofMid(87%T)→Middle(61%T)→Connector(35%T,CT)→BombsiteA",
+      "confidence": "high",
       "zones": [
         {
           "id": "TSpawn",
@@ -45,7 +36,7 @@
         },
         {
           "id": "SideAlley",
-          "nameCn": "侧巷/沙袋草车"
+          "nameCn": "匪口"
         },
         {
           "id": "TopofMid",
@@ -57,20 +48,20 @@
         },
         {
           "id": "Connector",
-          "nameCn": "拱门/连接"
+          "nameCn": "拱门"
         },
         {
           "id": "BombsiteA",
-          "nameCn": "A包点"
+          "nameCn": "A包"
         }
       ]
     },
     {
-      "id": "b_apartments",
-      "name": "B 二楼/公寓",
-      "bombsite": "b",
-      "_confidence": "high",
-      "_note": "TSpawn→SideAlley(93%T)→House(92%T)→BackAlley(91%T)→Apartments(68%T)→BombsiteB(32%T,CT)",
+      "id": "a_underpass_wrap",
+      "name": "下水道绕A",
+      "type": "secondary_entry",
+      "bombsite": "a",
+      "confidence": "medium",
       "zones": [
         {
           "id": "TSpawn",
@@ -78,15 +69,89 @@
         },
         {
           "id": "SideAlley",
-          "nameCn": "侧巷/沙袋草车"
+          "nameCn": "匪口"
         },
         {
           "id": "House",
-          "nameCn": "屋檐/匪二楼外"
+          "nameCn": "匪二楼"
         },
         {
           "id": "BackAlley",
-          "nameCn": "B二楼后巷"
+          "nameCn": "B二楼"
+        },
+        {
+          "id": "Underpass",
+          "nameCn": "下水道"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "Connector",
+          "nameCn": "拱门"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A包"
+        }
+      ]
+    },
+    {
+      "id": "a_scaffold",
+      "name": "A1跳台",
+      "type": "primary_entry",
+      "bombsite": "a",
+      "confidence": "low",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "PalaceAlley",
+          "nameCn": "A1"
+        },
+        {
+          "id": "TRamp",
+          "nameCn": "A1"
+        },
+        {
+          "id": "PalaceInterior",
+          "nameCn": "A二楼"
+        },
+        {
+          "id": "Scaffolding",
+          "nameCn": "A2上下"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A包"
+        }
+      ]
+    },
+    {
+      "id": "b_apartments",
+      "name": "B二楼",
+      "type": "primary_entry",
+      "bombsite": "b",
+      "confidence": "high",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "SideAlley",
+          "nameCn": "匪口"
+        },
+        {
+          "id": "House",
+          "nameCn": "匪二楼"
+        },
+        {
+          "id": "BackAlley",
+          "nameCn": "B二楼"
         },
         {
           "id": "Apartments",
@@ -94,16 +159,16 @@
         },
         {
           "id": "BombsiteB",
-          "nameCn": "B包点"
+          "nameCn": "B包"
         }
       ]
     },
     {
-      "id": "b_underpass",
-      "name": "B 中路/Underpass",
+      "id": "b_catwalk",
+      "name": "B小",
+      "type": "secondary_entry",
       "bombsite": "b",
-      "_confidence": "medium",
-      "_note": "Middle(61%T)→Underpass(55%T)→BombsiteB(32%T)；Underpass 为争夺区",
+      "confidence": "high",
       "zones": [
         {
           "id": "TSpawn",
@@ -111,23 +176,19 @@
         },
         {
           "id": "SideAlley",
-          "nameCn": "侧巷/沙袋草车"
+          "nameCn": "匪口"
         },
         {
           "id": "TopofMid",
           "nameCn": "中远/匪口"
         },
         {
-          "id": "Middle",
-          "nameCn": "中路"
-        },
-        {
-          "id": "Underpass",
-          "nameCn": "下水道"
+          "id": "Catwalk",
+          "nameCn": "B小"
         },
         {
           "id": "BombsiteB",
-          "nameCn": "B包点"
+          "nameCn": "B包"
         }
       ]
     }

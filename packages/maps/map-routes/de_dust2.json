@@ -1,14 +1,13 @@
 {
   "mapName": "de_dust2",
-  "version": "dust2-routes-0.2",
-  "_note": "T 方进攻动线。基于 79 场 demo 的 lastPlaceName 词表（T% 梯度）核实 + CS 地图结构补全。\n_confidence: high=词表 T% 梯度明确支持 | medium=部分 callout 偏 CT 侧/转移数据弱 | low=转移数据不支撑,仅地图结构候选。\n中文名见 CALLOUT_NAME_CN。extract-routes.ts 仅做词表统计,动线不自动生成。",
+  "version": "dust2-routes-0.3",
   "routes": [
     {
       "id": "a_long",
-      "name": "A 大",
+      "name": "A大",
+      "type": "primary_entry",
       "bombsite": "a",
-      "_confidence": "high",
-      "_note": "数据明确：TSpawn(93%T)→OutsideLong(92%T)→LongDoors(64%T)→LongA(24%T,CT)→ARamp(30%T,CT)→BombsiteA(45%T)",
+      "confidence": "high",
       "zones": [
         {
           "id": "TSpawn",
@@ -16,11 +15,11 @@
         },
         {
           "id": "OutsideLong",
-          "nameCn": "A门外/长门外"
+          "nameCn": "A门外"
         },
         {
           "id": "LongDoors",
-          "nameCn": "A门/长门"
+          "nameCn": "A门"
         },
         {
           "id": "LongA",
@@ -32,16 +31,16 @@
         },
         {
           "id": "BombsiteA",
-          "nameCn": "A包点"
+          "nameCn": "A包"
         }
       ]
     },
     {
       "id": "a_short",
-      "name": "A 小",
+      "name": "A小",
+      "type": "secondary_entry",
       "bombsite": "a",
-      "_confidence": "high",
-      "_note": "数据明确：TSpawn→TopofMid(87%T)→Middle(76%T)→Catwalk(68%T)→ShortStairs(50%T)→ExtendedA(55%T)→BombsiteA",
+      "confidence": "medium",
       "zones": [
         {
           "id": "TSpawn",
@@ -49,11 +48,7 @@
         },
         {
           "id": "TopofMid",
-          "nameCn": "中远/匪口"
-        },
-        {
-          "id": "Middle",
-          "nameCn": "中路"
+          "nameCn": "中远匪口"
         },
         {
           "id": "Catwalk",
@@ -65,20 +60,20 @@
         },
         {
           "id": "ExtendedA",
-          "nameCn": "A平台/警家过点"
+          "nameCn": "A小过点"
         },
         {
           "id": "BombsiteA",
-          "nameCn": "A包点"
+          "nameCn": "A包"
         }
       ]
     },
     {
       "id": "b_tunnels",
-      "name": "B 洞",
+      "name": "B洞",
+      "type": "primary_entry",
       "bombsite": "b",
-      "_confidence": "high",
-      "_note": "数据明确：TSpawn→OutsideTunnel(93%T)→UpperTunnel(85%T)→BombsiteB(30%T,CT)",
+      "confidence": "high",
       "zones": [
         {
           "id": "TSpawn",
@@ -90,20 +85,20 @@
         },
         {
           "id": "UpperTunnel",
-          "nameCn": "B洞/上层隧道"
+          "nameCn": "B洞"
         },
         {
           "id": "BombsiteB",
-          "nameCn": "B包点"
+          "nameCn": "B包"
         }
       ]
     },
     {
-      "id": "b_mid",
-      "name": "B 中门",
+      "id": "b_mid_lower",
+      "name": "中路下B",
+      "type": "mid_connector",
       "bombsite": "b",
-      "_confidence": "medium",
-      "_note": "Middle(76%T)→MidDoors(30%T,CT)→BombsiteB(30%T)；MidDoors 偏 CT 侧，T 方需争夺中门控制",
+      "confidence": "medium",
       "zones": [
         {
           "id": "TSpawn",
@@ -111,19 +106,27 @@
         },
         {
           "id": "TopofMid",
-          "nameCn": "中远/匪口"
+          "nameCn": "中远匪口"
         },
         {
           "id": "Middle",
           "nameCn": "中路"
         },
         {
-          "id": "MidDoors",
-          "nameCn": "中门"
+          "id": "LowerTunnel",
+          "nameCn": "B1"
+        },
+        {
+          "id": "TunnelStairs",
+          "nameCn": "B洞楼梯"
+        },
+        {
+          "id": "UpperTunnel",
+          "nameCn": "B洞"
         },
         {
           "id": "BombsiteB",
-          "nameCn": "B包点"
+          "nameCn": "B包"
         }
       ]
     }

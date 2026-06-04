@@ -133,10 +133,13 @@ shots        ┘        │
 
 | 项 | 状态 |
 |---|---|
+| 动线模型 v0.2（`MapRoute` schema / type+confidence / callout 中文映射 / 4 张图确认） | ✅ 已实现（`@cs2dak/maps` routes.ts + map-routes/*.json） |
+| 动线可视化（`generate-routes.py` → callout-review.md + 14 张雷达图） | ✅ 已实现 |
 | zone 几何（类型 / pointInPolygon / zoneAt / 测试） | ✅ 已实现（`@cs2dak/maps`） |
 | 7 图池常量（train 移除） | ✅ `ACTIVE_DUTY_MAPS` |
 | zone 文件格式 + 模板 + README | ✅ `packages/maps/map-zones/` |
-| **各图区域多边形标定** | ⬜ **人工**（唯一待人工步骤） |
-| Area v1 / Utility Block v1 计算 | ⬜ 待实现（zones 就绪后，设计已定） |
+| anubis / inferno / overpass 动线 | ⬜ 待补（数据薄或自动挖掘质量差，留空） |
+| **各图区域多边形标定** | ⬜ **人工**（zone 层唯一待人工步骤） |
+| Area v1 / Utility Block v1 计算 | ⬜ 待实现（动线 callout 层可先做区域占有，polygon zone 层再补精确几何） |
 | Aim v1 | ⬜ 待实现（最后，不依赖 zones） |
 | 进 PRISM 风格轴 | ⬜ 待实现 |

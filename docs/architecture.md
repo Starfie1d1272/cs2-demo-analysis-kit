@@ -27,7 +27,7 @@ view models — exporter included. It is no longer "just the middle layer".
 | `@cs2dak/contract` | Zod schemas + types; single source of truth for shapes. Re-exports `cs2-demo-format`. |
 | `@cs2dak/core` | Deterministic analysis, RR/PRISM adapter, QA. No side effects. |
 | `@cs2dak/cohort` | Cross-match aggregation and identity merging. No product ranking rules. |
-| `@cs2dak/maps` | Map calibration + world→radar transform + zone geometry (`zoneAt` / `pointInPolygon` / `ACTIVE_DUTY_MAPS`). |
+| `@cs2dak/maps` | Map calibration + world→radar transform + attack routes (`MapRoute`) + zone geometry (`zoneAt` / `pointInPolygon`) + callout name mappings. |
 | `@cs2dak/presentation` | Product-neutral view models, labels, stories, and workspace composition. |
 | `@cs2dak/react` | Product-neutral preview components (consume presentation contracts only). |
 | `@cs2dak/cli` | Language-neutral integration surface. |
@@ -98,7 +98,7 @@ or consume the JSON.
 | `@cs2dak/contract` | Zod schema + 类型，形状的单一真相源；re-export `cs2-demo-format`。 |
 | `@cs2dak/core` | 确定性分析、RR/PRISM 适配、QA。无副作用。 |
 | `@cs2dak/cohort` | 跨场聚合与身份归并，不拥有产品排行榜规则。 |
-| `@cs2dak/maps` | 地图标定 + world→radar 转换 + zone 几何（`zoneAt` / `pointInPolygon` / `ACTIVE_DUTY_MAPS`）。 |
+| `@cs2dak/maps` | 地图标定 + world→radar 转换 + 进攻动线（`MapRoute`）+ zone 几何（`zoneAt` / `pointInPolygon` / `ACTIVE_DUTY_MAPS`）+ callout 中文映射。 |
 | `@cs2dak/presentation` | 产品中立 View Model、标签、叙事与 workspace 编排。 |
 | `@cs2dak/react` | 产品中立的预览组件（只消费 presentation 合同）。 |
 | `@cs2dak/cli` | 跨语言集成入口。 |

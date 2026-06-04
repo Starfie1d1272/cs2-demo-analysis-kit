@@ -1,14 +1,13 @@
 {
   "mapName": "de_ancient",
-  "version": "ancient-routes-0.2",
-  "_note": "T 方进攻动线。基于 79 场 demo 的 lastPlaceName 词表（T% 梯度）核实 + CS 地图结构补全。\n_confidence: high=词表 T% 梯度明确支持 | medium=部分 callout 偏 CT 侧/转移数据弱 | low=转移数据不支撑,仅地图结构候选。\n中文名见 CALLOUT_NAME_CN。extract-routes.ts 仅做词表统计,动线不自动生成。",
+  "version": "ancient-routes-0.3",
   "routes": [
     {
       "id": "a_main",
-      "name": "A 厅",
+      "name": "A厅进攻",
+      "type": "primary_entry",
       "bombsite": "a",
-      "_confidence": "high",
-      "_note": "数据明确：TSpawn(95%T)→Outside(90%T)→MainHall(76%T)→BombsiteA(38%T)，T% 梯度清晰",
+      "confidence": "high",
       "zones": [
         {
           "id": "TSpawn",
@@ -16,7 +15,7 @@
         },
         {
           "id": "Outside",
-          "nameCn": "A外"
+          "nameCn": "匪口"
         },
         {
           "id": "MainHall",
@@ -24,53 +23,16 @@
         },
         {
           "id": "BombsiteA",
-          "nameCn": "A包点"
-        }
-      ]
-    },
-    {
-      "id": "b_ramp",
-      "name": "B 斜坡",
-      "bombsite": "b",
-      "_confidence": "high",
-      "_note": "数据明确：TSpawn→Tunnel(94%T)→Water(85%T)→Ruins(92%T)→TSideLower(86%T)→Ramp(69%T)→BombsiteB(37%T)",
-      "zones": [
-        {
-          "id": "TSpawn",
-          "nameCn": "匪家"
-        },
-        {
-          "id": "Tunnel",
-          "nameCn": "隧道"
-        },
-        {
-          "id": "Water",
-          "nameCn": "水路"
-        },
-        {
-          "id": "Ruins",
-          "nameCn": "遗迹"
-        },
-        {
-          "id": "TSideLower",
-          "nameCn": "B门外"
-        },
-        {
-          "id": "Ramp",
-          "nameCn": "B斜坡"
-        },
-        {
-          "id": "BombsiteB",
-          "nameCn": "B包点"
+          "nameCn": "A包"
         }
       ]
     },
     {
       "id": "a_donut",
-      "name": "A 小/甜甜圈",
+      "name": "中路甜甜圈夹A",
+      "type": "mid_connector",
       "bombsite": "a",
-      "_confidence": "medium",
-      "_note": "数据部分支撑：Middle(40%T)→SideHall(29%T,偏CT) 转移数据弱；SideHall→BombsiteA 基于地图结构推断",
+      "confidence": "high",
       "zones": [
         {
           "id": "TSpawn",
@@ -78,7 +40,7 @@
         },
         {
           "id": "Outside",
-          "nameCn": "A外"
+          "nameCn": "匪口"
         },
         {
           "id": "Middle",
@@ -86,20 +48,20 @@
         },
         {
           "id": "SideHall",
-          "nameCn": "A小/甜甜圈"
+          "nameCn": "甜甜圈"
         },
         {
           "id": "BombsiteA",
-          "nameCn": "A包点"
+          "nameCn": "A包"
         }
       ]
     },
     {
-      "id": "b_side",
-      "name": "B 侧入口/黑屋方向",
-      "bombsite": "b",
-      "_confidence": "low",
-      "_note": "转移数据不支撑；SideEntrance(39%T) 未出现在开局 Top 转移；基于地图结构候选",
+      "id": "a_rotate_b_to_a",
+      "name": "B区跳台转A",
+      "type": "secondary_entry",
+      "bombsite": "a",
+      "confidence": "medium",
       "zones": [
         {
           "id": "TSpawn",
@@ -115,11 +77,122 @@
         },
         {
           "id": "Ruins",
-          "nameCn": "遗迹"
+          "nameCn": "B外"
         },
         {
           "id": "TSideLower",
-          "nameCn": "B门外"
+          "nameCn": "B小"
+        },
+        {
+          "id": "TSideUpper",
+          "nameCn": "跳台"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "SideHall",
+          "nameCn": "甜甜圈"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A包"
+        }
+      ]
+    },
+    {
+      "id": "a_ct_invade",
+      "name": "入侵警家",
+      "type": "rotation_cut",
+      "bombsite": "a",
+      "confidence": "low",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "Outside",
+          "nameCn": "匪口"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "TopofMid",
+          "nameCn": "中远"
+        },
+        {
+          "id": "House",
+          "nameCn": "VIP"
+        },
+        {
+          "id": "CTSpawn",
+          "nameCn": "警家"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A包"
+        }
+      ]
+    },
+    {
+      "id": "b_ramp",
+      "name": "B坡进攻",
+      "type": "primary_entry",
+      "bombsite": "b",
+      "confidence": "high",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "Tunnel",
+          "nameCn": "隧道"
+        },
+        {
+          "id": "Water",
+          "nameCn": "水路"
+        },
+        {
+          "id": "Ruins",
+          "nameCn": "B外"
+        },
+        {
+          "id": "TSideLower",
+          "nameCn": "B小"
+        },
+        {
+          "id": "Ramp",
+          "nameCn": "B坡"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B包"
+        }
+      ]
+    },
+    {
+      "id": "b_jump_side",
+      "name": "跳台控黑屋",
+      "type": "secondary_entry",
+      "bombsite": "b",
+      "confidence": "medium",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "Outside",
+          "nameCn": "匪口"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
         },
         {
           "id": "TSideUpper",
@@ -127,11 +200,89 @@
         },
         {
           "id": "SideEntrance",
-          "nameCn": "B小/连接"
+          "nameCn": "黑屋"
         },
         {
           "id": "BombsiteB",
-          "nameCn": "B包点"
+          "nameCn": "B包"
+        }
+      ]
+    },
+    {
+      "id": "b_vip_lurk",
+      "name": "VIP入侵B",
+      "type": "lurk_lane",
+      "bombsite": "b",
+      "confidence": "low",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "Outside",
+          "nameCn": "匪口"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "TopofMid",
+          "nameCn": "中远"
+        },
+        {
+          "id": "House",
+          "nameCn": "VIP"
+        },
+        {
+          "id": "Alley",
+          "nameCn": "底线"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B包"
+        }
+      ]
+    },
+    {
+      "id": "b_jump_to_ramp",
+      "name": "跳台转B坡",
+      "type": "secondary_entry",
+      "bombsite": "b",
+      "confidence": "low",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "Outside",
+          "nameCn": "匪口"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "TSideUpper",
+          "nameCn": "跳台"
+        },
+        {
+          "id": "TSideLower",
+          "nameCn": "B小"
+        },
+        {
+          "id": "Ruins",
+          "nameCn": "B外"
+        },
+        {
+          "id": "Ramp",
+          "nameCn": "B坡"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B包"
         }
       ]
     }

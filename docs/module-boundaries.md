@@ -26,7 +26,7 @@
 | `@cs2dak/core`           | 单场 Demo 的标准化、事实派生、QA 和确定性分析                   | 跨场聚合、身份管理、页面叙事、React UI      | `AnalysisBundle`            |
 | `@cs2dak/cohort`         | 跨场聚合、身份归并、赛季级 RR/PRISM 输入与结果整形              | 单场解析、数据库、产品 UI                   | `CohortBundle`              |
 | `@rivalhub/rival-rating` | RR、PRISM 及相关评分公式                                        | Demo 信号提取、持久化、展示                 | 评分结果                    |
-| `@cs2dak/maps`           | 地图标定、坐标变换、区域几何                                    | 评分公式、产品 UI、战术结论                 | 地图与空间能力              |
+| `@cs2dak/maps`           | 地图标定、坐标变换、进攻动线、区域几何                          | 评分公式、产品 UI、战术结论                 | 地图与空间能力              |
 | `@cs2dak/presentation`   | 将 core/cohort 结果转换为比赛、选手、队伍、赛季和排行榜展示模型 | 解析、评分公式、数据库、React               | 产品中立 View Models        |
 | `@cs2dak/react`          | 渲染 presentation 合同和基础可视化组件                          | 数据库查询、分析、评分、产品业务规则        | React 组件与样式            |
 | Node CLI                 | 将 TypeScript 包接入本地文件系统和自动化流程                    | 复制核心分析逻辑                            | 命令行输出与文件产物        |
