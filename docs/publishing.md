@@ -67,9 +67,9 @@ pnpm view @cs2dak/core version
 RivalHub / CS2-insight-agent 的 `package.json`：
 ```jsonc
 "dependencies": {
-  "@cs2dak/core": "^0.2.0",
-  "@cs2dak/maps": "^0.2.0",
-  "@cs2dak/react": "^0.2.0"
+  "@cs2dak/core": "^0.2.1",
+  "@cs2dak/maps": "^0.2.1",
+  "@cs2dak/react": "^0.2.1"
 }
 ```
 `next.config.ts`（RivalHub）：
