@@ -108,8 +108,8 @@ importers:
         specifier: github:Starfie1d1272/rival-rating#5d862eb
         version: https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/5d862eb1718df37651f6e0f45293125a2a7087a5
       cs2-demo-format:
-        specifier: github:Starfie1d1272/cs2-demo-format#fe8260cac4a506bc58cb64dc5d21d908b98e17f1
-        version: https://codeload.github.com/Starfie1d1272/cs2-demo-format/tar.gz/fe8260cac4a506bc58cb64dc5d21d908b98e17f1(zod@3.25.76)
+        specifier: ^2.2.0
+        version: 2.2.0(zod@3.25.76)
       zod:
         specifier: ^3.25.0
         version: 3.25.76
@@ -120,8 +120,8 @@ importers:
         specifier: workspace:*
         version: link:../contract
       '@rivalhub/rival-rating':
-        specifier: github:Starfie1d1272/rival-rating#163f90c3ea17e81a6fdc84b276820664362a2f60
-        version: https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/163f90c3ea17e81a6fdc84b276820664362a2f60
+        specifier: ^0.1.0
+        version: 0.1.0
       jszip:
         specifier: ^3.10.1
         version: 3.10.1
@@ -567,6 +567,9 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
+  '@rivalhub/rival-rating@0.1.0':
+    resolution: {integrity: sha512-N7JAhJBAee5RHYJp8bDoBhn7PdAaYnAOEvBGk5ojVJO3Xq+6HYEZXOfKgRaBhsIr9BvE2edAMV3nthBENYJg1w==}
+
   '@rivalhub/rival-rating@https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/163f90c3ea17e81a6fdc84b276820664362a2f60':
     resolution: {gitHosted: true, integrity: sha512-i8al7NXaKOrn89gQs4ifPzhG6ha6MGWw1L26QKsmNjG8FCI2E/nZdqr9mSxwedCRMt/iAJEe9Gn4wg1zlZEOKA==, tarball: https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/163f90c3ea17e81a6fdc84b276820664362a2f60}
     version: 0.1.0
@@ -821,9 +824,8 @@ packages:
   core-util-is@1.0.3:
     resolution: {integrity: sha512-ZQBvi1DcpJ4GDqanjucZ2Hj3wEO5pZDS89BWbkcrvdxksJorwUDDZamX9ldFkp9aw2lmBDLgkObEA4DWNJ9FYQ==}
 
-  cs2-demo-format@https://codeload.github.com/Starfie1d1272/cs2-demo-format/tar.gz/fe8260cac4a506bc58cb64dc5d21d908b98e17f1:
-    resolution: {gitHosted: true, integrity: sha512-A4VUIe35NL25BwTKmADaMFQScRtPRUraM5BQ0rxyrRQHD2K6kafah+5CbyqA2WybI1+VcBvLFLP/n6w4e3+Q0w==, tarball: https://codeload.github.com/Starfie1d1272/cs2-demo-format/tar.gz/fe8260cac4a506bc58cb64dc5d21d908b98e17f1}
-    version: 2.2.0
+  cs2-demo-format@2.2.0:
+    resolution: {integrity: sha512-f2+K4vToxOnB1Y1FsMYIckgVbG8zRTmOGut7FYcL1Xi8zdxjREVvbsJksTa4m+2cK/qpZ+Hhi6x7zDSteAWq5w==}
     peerDependencies:
       zod: '>=3.0.0'
 
@@ -1458,6 +1460,8 @@ snapshots:
     dependencies:
       playwright: 1.60.0
 
+  '@rivalhub/rival-rating@0.1.0': {}
+
   '@rivalhub/rival-rating@https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/163f90c3ea17e81a6fdc84b276820664362a2f60': {}
 
   '@rivalhub/rival-rating@https://codeload.github.com/Starfie1d1272/rival-rating/tar.gz/5d862eb1718df37651f6e0f45293125a2a7087a5': {}
@@ -1667,7 +1671,7 @@ snapshots:
 
   core-util-is@1.0.3: {}
 
-  cs2-demo-format@https://codeload.github.com/Starfie1d1272/cs2-demo-format/tar.gz/fe8260cac4a506bc58cb64dc5d21d908b98e17f1(zod@3.25.76):
+  cs2-demo-format@2.2.0(zod@3.25.76):
     dependencies:
       jszip: 3.10.1
       zod: 3.25.76

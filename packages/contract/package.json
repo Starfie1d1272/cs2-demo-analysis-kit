@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@rivalhub/rival-rating": "github:Starfie1d1272/rival-rating#5d862eb",
-    "cs2-demo-format": "github:Starfie1d1272/cs2-demo-format#fe8260cac4a506bc58cb64dc5d21d908b98e17f1",
+    "cs2-demo-format": "^2.2.0",
     "zod": "^3.25.0"
   },
   "files": [

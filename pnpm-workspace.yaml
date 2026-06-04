@@ -5,3 +5,6 @@ onlyBuiltDependencies:
   - esbuild
 allowBuilds:
   esbuild: true
+minimumReleaseAgeExclude:
+  - '@rivalhub/rival-rating@0.1.0'
+  - cs2-demo-format@2.2.0
