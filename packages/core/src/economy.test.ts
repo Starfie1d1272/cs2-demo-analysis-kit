@@ -40,8 +40,8 @@ describe("economyLabelCn", () => {
   it("maps known economy types to Chinese labels", () => {
     expect(economyLabelCn("full")).toBe("全枪全弹");
     expect(economyLabelCn("ECO")).toBe("纯ECO");
-    // conversion = the pistol-winner's follow-up full buy.
-    expect(economyLabelCn("conversion")).toBe("转换局");
+    // conversion 与 full 同义（长枪局），不单独区分。
+    expect(economyLabelCn("conversion")).toBe(economyLabelCn("full"));
   });
 
   it("passes through unknowns and empties", () => {

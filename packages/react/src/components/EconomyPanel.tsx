@@ -15,7 +15,7 @@ const economyLabels = {
   semi: "半起",
   force: "强起",
   full: "长枪",
-  conversion: "转换局"
+  conversion: "长枪"
 } as const;
 const economyColors = {
   pistol: "rgba(255, 198, 77, 0.18)",
