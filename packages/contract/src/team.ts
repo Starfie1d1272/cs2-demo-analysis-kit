@@ -44,6 +44,14 @@ export const teamCohortSummarySchema = z.object({
     kast: z.number().min(0).max(100),
     confidence: z.number().min(0).max(1)
   }),
+  performance: z.object({
+    firstKills: z.number().int().nonnegative(),
+    firstDeaths: z.number().int().nonnegative(),
+    openingDuelWinRate: z.number().min(0).max(1).nullable(),
+    clutchAttempts: z.number().int().nonnegative(),
+    clutchWins: z.number().int().nonnegative(),
+    clutchWinRate: z.number().min(0).max(1).nullable()
+  }),
   /** 队伍 PRISM：成员各轴百分位的简单平均，不重算 PRISM。 */
   style: z.object({
     axes: z.array(playerStyleAxisSchema)

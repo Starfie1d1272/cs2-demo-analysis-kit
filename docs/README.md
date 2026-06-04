@@ -7,6 +7,7 @@
 - [架构](architecture.md)：数据流和主要技术结构。
 - [版本管理](versioning.md)：npm、Python 与桌面应用的版本和发布规则。
 - [发布手册](publishing.md)：发布操作。
+- [RivalHub 共享能力提炼](rivalhub-extraction.md)：已迁入 DAK 的逻辑与产品保留边界。
 
 ## 当前设计
 

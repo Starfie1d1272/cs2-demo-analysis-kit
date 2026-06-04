@@ -35,10 +35,10 @@
 | 模块 | 现有能力 | 目标新增 | 应删除或迁出 |
 |---|---|---|---|
 | `@cs2dak/contract` | 聚合上游 DemoPackage；定义 QA、单场分析、cohort、Workspace、replay、Player、Team、Leaderboard、Series 与 MVP 合同 | Season、完整 provenance 合同 | 重复字段；错误默认值；单文件集中定义 |
-| `@cs2dak/core` | ZIP 加载与标准化；QA；回合事实；RR 信号；scoreboard；时间线、经济、热图；单场 RR/PRISM 预览；逐武器击杀与高光事实 | damage context、包点目标、武器经济纪律、Area/Utility/Aim 事实、统一分析管线 | v1 兼容主路径；Workspace/View Model；中文标签和故事；重复分析编排 |
+| `@cs2dak/core` | ZIP 加载与标准化；QA；回合事实；RR 信号；scoreboard；时间线、经济、热图；单场 RR/PRISM 预览；逐武器击杀画像与高光事实；队伍 T/CT 胜率 | damage context、包点目标、武器经济纪律、Area/Utility/Aim 事实、统一分析管线 | v1 兼容主路径；Workspace/View Model；中文标签和故事；重复分析编排 |
 | `@cs2dak/cohort` | identity map；跨场 counts 汇总与 rate 重算；赛季 RR/PRISM；confidence；per-match 明细；武器与高光聚合 | 时间窗口、地图/对手拆分、分布与缺失率 QA、职业基准接线 | 展示排序规则；与外部评分包重复的数学逻辑 |
 | `@cs2dak/maps` | 7 图 radar 标定、world-to-radar、zone 类型与几何、Mirage 模板 | 正式 zone 数据集、地图版本、区域校验、空间查询能力 | UI 路径与产品文案；战术评分结论 |
-| `@cs2dak/presentation` | Match Workspace、展示标签、武器和经济文案；Season Leaderboard、Player Season Profile、Team Cohort Summary、Series Summary、MVP 推荐 | Season 总览、更多解释与故事模型 | 数据解析、评分公式、数据库与 React |
+| `@cs2dak/presentation` | Match Workspace、展示标签、武器和经济文案；Season Leaderboard、Player Season Profile、Team Cohort Summary、Series Summary、MVP 推荐；逐武器命中情境比例；队伍首杀与残局表现 | Season 总览、更多解释与故事模型 | 数据解析、评分公式、数据库与 React |
 | `@cs2dak/react` | Match Workspace、scoreboard、timeline、economy、heatmap、replay、kill feed、QA、Season Leaderboard 组件 | Match/Player/Team/Season 组件族；视觉回归；可组合基础组件 | 分析 helper；重复标签；直接依赖 `core` |
 
 ## 产品级能力

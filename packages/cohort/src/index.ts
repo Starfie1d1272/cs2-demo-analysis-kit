@@ -352,17 +352,33 @@ function aggregateWeaponHighlights(
   steamId64: string,
   rows: PlayerWeaponHighlightFacts[]
 ): PlayerWeaponHighlightFacts {
-  const weapons = new Map<string, number>();
+  const weapons = new Map<string, PlayerWeaponHighlightFacts["weapons"][number]>();
   for (const row of rows) {
     for (const weapon of row.weapons) {
-      weapons.set(weapon.weapon, (weapons.get(weapon.weapon) ?? 0) + weapon.kills);
+      const current = weapons.get(weapon.weapon) ?? {
+        weapon: weapon.weapon,
+        kills: 0,
+        headshotKills: 0,
+        tradeKills: 0,
+        noScopeKills: 0,
+        throughSmokeKills: 0,
+        wallbangKills: 0,
+        penetratedObjects: 0
+      };
+      current.kills += weapon.kills;
+      current.headshotKills += weapon.headshotKills;
+      current.tradeKills += weapon.tradeKills;
+      current.noScopeKills += weapon.noScopeKills;
+      current.throughSmokeKills += weapon.throughSmokeKills;
+      current.wallbangKills += weapon.wallbangKills;
+      current.penetratedObjects += weapon.penetratedObjects;
+      weapons.set(weapon.weapon, current);
     }
   }
   return {
     steamId64,
     totalKills: sum(rows, (row) => row.totalKills),
-    weapons: [...weapons.entries()]
-      .map(([weapon, kills]) => ({ weapon, kills }))
+    weapons: [...weapons.values()]
       .sort((a, b) => b.kills - a.kills || a.weapon.localeCompare(b.weapon)),
     highlights: {
       wallbangKills: sumNullable(rows.map((row) => row.highlights.wallbangKills)),

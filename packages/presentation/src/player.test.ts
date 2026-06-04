@@ -58,6 +58,9 @@ describe("buildPlayerSeasonProfile", () => {
       expect(profile.weapons.map((weapon) => weapon.kills)).toEqual(
         [...profile.weapons.map((weapon) => weapon.kills)].sort((a, b) => b - a)
       );
+      expect(profile.weapons.every((weapon) =>
+        weapon.headshotPercent == null || (weapon.headshotPercent >= 0 && weapon.headshotPercent <= 100)
+      )).toBe(true);
       expect(profile.highlights.noScopeKills).toBe(source.weaponHighlights.highlights.noScopeKills);
       expect(profile.highlights.wallbangKills).toBe(source.weaponHighlights.highlights.wallbangKills);
 

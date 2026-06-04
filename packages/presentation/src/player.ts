@@ -74,6 +74,9 @@ function profileFromRow(
   strengths: string[],
   weaknesses: string[]
 ): PlayerSeasonProfile {
+  const percent = (count: number, total: number): number | null =>
+    total > 0 ? round((count / total) * 100, 1) : null;
+
   return playerSeasonProfileSchema.parse({
     version: "cs2-demo-analysis-kit/player-profile-0.1",
     weightsVersion,
@@ -103,7 +106,15 @@ function profileFromRow(
       kills: weapon.kills,
       killSharePercent: player.weaponHighlights.totalKills > 0
         ? round((weapon.kills / player.weaponHighlights.totalKills) * 100, 1)
-        : 0
+        : 0,
+      headshotPercent: percent(weapon.headshotKills, weapon.kills),
+      tradeKillPercent: percent(weapon.tradeKills, weapon.kills),
+      noScopePercent: percent(weapon.noScopeKills, weapon.kills),
+      throughSmokePercent: percent(weapon.throughSmokeKills, weapon.kills),
+      wallbangPercent: percent(weapon.wallbangKills, weapon.kills),
+      averagePenetratedObjects: weapon.kills > 0
+        ? round(weapon.penetratedObjects / weapon.kills, 2)
+        : null
     })),
     highlights: player.weaponHighlights.highlights,
     style: buildStyle(player),

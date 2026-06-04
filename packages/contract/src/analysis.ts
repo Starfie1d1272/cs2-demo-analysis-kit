@@ -96,7 +96,13 @@ export const playerScoreboardRowSchema = z.object({
 
 export const weaponKillRowSchema = z.object({
   weapon: z.string(),
-  kills: z.number().int().nonnegative()
+  kills: z.number().int().nonnegative(),
+  headshotKills: z.number().int().nonnegative(),
+  tradeKills: z.number().int().nonnegative(),
+  noScopeKills: z.number().int().nonnegative(),
+  throughSmokeKills: z.number().int().nonnegative(),
+  wallbangKills: z.number().int().nonnegative(),
+  penetratedObjects: z.number().int().nonnegative()
 });
 
 export const playerWeaponHighlightFactsSchema = z.object({

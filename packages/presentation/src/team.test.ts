@@ -54,6 +54,10 @@ describe("buildTeamCohortSummary", () => {
         "kast",
         "firstKillPer100"
       ]);
+      expect(summary.performance.firstKills).toBeGreaterThanOrEqual(0);
+      expect(summary.performance.firstDeaths).toBeGreaterThanOrEqual(0);
+      expect(summary.performance.openingDuelWinRate).toBeGreaterThanOrEqual(0);
+      expect(summary.performance.clutchAttempts).toBeGreaterThanOrEqual(summary.performance.clutchWins);
       expect(summary.roleComplementarity.coverageScore).toBeGreaterThanOrEqual(0);
       expect(summary.roleComplementarity.coverageScore).toBeLessThanOrEqual(100);
       expect(summary).not.toHaveProperty("userId");

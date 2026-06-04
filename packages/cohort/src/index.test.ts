@@ -145,9 +145,13 @@ describe("buildSeasonCohort", () => {
       .filter((row) => repeated.steamIds.includes(row.steamId64));
     const expectedTotalKills = source.reduce((sum, row) => sum + row.totalKills, 0);
     const expectedNoScopes = source.reduce((sum, row) => sum + (row.highlights.noScopeKills ?? 0), 0);
+    const expectedWeaponHeadshots = source
+      .flatMap((row) => row.weapons)
+      .reduce((sum, weapon) => sum + weapon.headshotKills, 0);
 
     expect(repeated.weaponHighlights.totalKills).toBe(expectedTotalKills);
     expect(repeated.weaponHighlights.weapons.reduce((sum, row) => sum + row.kills, 0)).toBe(expectedTotalKills);
+    expect(repeated.weaponHighlights.weapons.reduce((sum, row) => sum + row.headshotKills, 0)).toBe(expectedWeaponHeadshots);
     expect(repeated.weaponHighlights.highlights.noScopeKills).toBe(expectedNoScopes);
   }, integrationTimeoutMs);
 });

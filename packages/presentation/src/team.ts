@@ -59,6 +59,10 @@ export function buildTeamCohortSummary(
     return player;
   });
   const members = players.map(memberSummary);
+  const firstKills = players.reduce((sum, player) => sum + player.indicators.firstKillCount, 0);
+  const firstDeaths = players.reduce((sum, player) => sum + player.indicators.firstDeathCount, 0);
+  const clutchAttempts = players.reduce((sum, player) => sum + player.indicators.clutchAttempts, 0);
+  const clutchWins = players.reduce((sum, player) => sum + player.indicators.clutchWins, 0);
   const profilesByKey = new Map(buildAllPlayerSeasonProfiles(bundle).map((profile) => [profile.playerKey, profile]));
   const styled = players
     .map((player) => profilesByKey.get(player.playerKey)!)
@@ -106,6 +110,16 @@ export function buildTeamCohortSummary(
       kd: metricValues(members, "kd").length > 0 ? average(metricValues(members, "kd")) : null,
       kast: average(metricValues(members, "kast")),
       confidence: average(members.map((member) => member.confidence))
+    },
+    performance: {
+      firstKills,
+      firstDeaths,
+      openingDuelWinRate: firstKills + firstDeaths > 0
+        ? round(firstKills / (firstKills + firstDeaths), 4)
+        : null,
+      clutchAttempts,
+      clutchWins,
+      clutchWinRate: clutchAttempts > 0 ? round(clutchWins / clutchAttempts, 4) : null
     },
     style: teamAxes == null ? null : { axes: teamAxes },
     leaders: LEADERS.map(({ metric, label }) => {

@@ -143,6 +143,13 @@ describe("analyzeDemoPackage", () => {
     expect(bundle.playerWeaponHighlights).toEqual(facts);
     expect(facts.every((row) => row.weapons.reduce((sum, weapon) => sum + weapon.kills, 0) === row.totalKills)).toBe(true);
     expect(facts.flatMap((row) => row.weapons).some((weapon) => weapon.weapon === "ak47")).toBe(true);
+    expect(facts.flatMap((row) => row.weapons).every((weapon) =>
+      weapon.headshotKills <= weapon.kills
+      && weapon.tradeKills <= weapon.kills
+      && weapon.noScopeKills <= weapon.kills
+      && weapon.throughSmokeKills <= weapon.kills
+      && weapon.wallbangKills <= weapon.kills
+    )).toBe(true);
     expect(facts.every((row) => row.highlights.wallbangKills != null)).toBe(true);
     expect(facts.every((row) => row.highlights.noScopeKills != null)).toBe(true);
     expect(facts.every((row) => row.highlights.throughSmokeKills != null)).toBe(true);

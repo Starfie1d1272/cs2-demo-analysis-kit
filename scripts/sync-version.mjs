@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// Single source of truth for the project version is the git tag (vX.Y.Z).
-// This script propagates that version into every package.json + the Python
-// package so nothing drifts. Run it as part of the release / packaging flow.
+// The repository release version follows the git tag (vX.Y.Z).
+// Public @cs2dak/* package versions are owned by Changesets and must not be
+// overwritten here. This script only synchronizes the root project, private
+// workspace apps, and the Python package.
 //
 //   node scripts/sync-version.mjs            # derive from latest git tag
 //   node scripts/sync-version.mjs 0.3.0      # set an explicit version
@@ -24,14 +25,17 @@ function resolveVersion() {
   return tag.replace(/^v/, "");
 }
 
-function workspacePackageJsons() {
+function privateWorkspacePackageJsons() {
   const out = ["package.json"];
-  for (const group of ["packages", "apps"]) {
+  for (const group of ["apps", "packages"]) {
     const base = join(repoRoot, group);
     if (!existsSync(base)) continue;
     for (const name of readdirSync(base)) {
       const pkg = join(group, name, "package.json");
-      if (existsSync(join(repoRoot, pkg))) out.push(pkg);
+      const path = join(repoRoot, pkg);
+      if (!existsSync(path)) continue;
+      const json = JSON.parse(readFileSync(path, "utf8"));
+      if (json.private === true || json.publishConfig == null) out.push(pkg);
     }
   }
   return out;
@@ -44,7 +48,7 @@ if (!/^\d+\.\d+\.\d+/.test(version)) {
 }
 
 let changed = 0;
-for (const rel of workspacePackageJsons()) {
+for (const rel of privateWorkspacePackageJsons()) {
   const path = join(repoRoot, rel);
   const json = JSON.parse(readFileSync(path, "utf8"));
   if (json.version === version) continue;

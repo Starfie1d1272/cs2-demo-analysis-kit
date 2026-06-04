@@ -16,7 +16,7 @@
     "test": "vitest run",
     "build": "pnpm -r --if-present build",
     "changeset": "changeset",
-    "version:packages": "changeset version && pnpm sync-version",
+    "version:packages": "changeset version",
     "release:npm": "pnpm build && pnpm test && pnpm typecheck && changeset publish",
     "sync-version": "node scripts/sync-version.mjs",
     "package": "bash scripts/package.sh"

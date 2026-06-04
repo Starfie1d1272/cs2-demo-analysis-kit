@@ -41,7 +41,13 @@ export const playerWeaponProfileEntrySchema = z.object({
   weapon: z.string(),
   label: z.string(),
   kills: z.number().int().nonnegative(),
-  killSharePercent: z.number().min(0).max(100)
+  killSharePercent: z.number().min(0).max(100),
+  headshotPercent: z.number().min(0).max(100).nullable(),
+  tradeKillPercent: z.number().min(0).max(100).nullable(),
+  noScopePercent: z.number().min(0).max(100).nullable(),
+  throughSmokePercent: z.number().min(0).max(100).nullable(),
+  wallbangPercent: z.number().min(0).max(100).nullable(),
+  averagePenetratedObjects: z.number().nonnegative().nullable()
 });
 
 export const playerSeasonProfileSchema = z.object({
