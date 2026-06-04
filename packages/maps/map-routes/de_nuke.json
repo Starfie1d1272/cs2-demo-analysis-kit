@@ -1,16 +1,18 @@
 {
   "mapName": "de_nuke",
-  "version": "nuke-routes-0.1",
-  "_note": "T 方进攻动线初稿（由 extract-routes.ts 提取 + 人工确认）。中文名请核验。",
+  "version": "nuke-routes-0.2",
+  "_note": "T 方进攻动线。基于 79 场 demo 的 lastPlaceName 词表（T% 梯度）核实 + CS 地图结构补全。\n_confidence: high=词表 T% 梯度明确支持 | medium=部分 callout 偏 CT 侧/转移数据弱 | low=转移数据不支撑,仅地图结构候选。\n中文名见 CALLOUT_NAME_CN。extract-routes.ts 仅做词表统计,动线不自动生成。",
   "routes": [
     {
       "id": "a_squeaky",
-      "name": "A 黄门",
+      "name": "A 铁门",
       "bombsite": "a",
+      "_confidence": "high",
+      "_note": "TSpawn(93%T)→Outside(61%T)→Lobby(84%T)→Squeaky(84%T)→BombsiteA(35%T,CT)",
       "zones": [
         {
           "id": "TSpawn",
-          "nameCn": "T 出生点"
+          "nameCn": "匪家"
         },
         {
           "id": "Outside",
@@ -18,26 +20,28 @@
         },
         {
           "id": "Lobby",
-          "nameCn": "大厅"
+          "nameCn": "匪厅"
         },
         {
           "id": "Squeaky",
-          "nameCn": "黄门"
+          "nameCn": "铁门"
         },
         {
           "id": "BombsiteA",
-          "nameCn": "A 包点"
+          "nameCn": "A包点"
         }
       ]
     },
     {
       "id": "a_hut",
-      "name": "A 小屋",
+      "name": "A 黄房",
       "bombsite": "a",
+      "_confidence": "high",
+      "_note": "Lobby(84%T)→Hut(61%T)→BombsiteA(35%T,CT)",
       "zones": [
         {
           "id": "TSpawn",
-          "nameCn": "T 出生点"
+          "nameCn": "匪家"
         },
         {
           "id": "Outside",
@@ -45,26 +49,28 @@
         },
         {
           "id": "Lobby",
-          "nameCn": "大厅"
+          "nameCn": "匪厅"
         },
         {
           "id": "Hut",
-          "nameCn": "小屋"
+          "nameCn": "黄房"
         },
         {
           "id": "BombsiteA",
-          "nameCn": "A 包点"
+          "nameCn": "A包点"
         }
       ]
     },
     {
       "id": "b_ramp",
-      "name": "B 坡道",
+      "name": "B 坡道/K1",
       "bombsite": "b",
+      "_confidence": "high",
+      "_note": "Lobby→Vending(77%T)→Trophy(77%T)→Control(66%T)→Ramp(24%T,CT)→BombsiteB(54%T)",
       "zones": [
         {
           "id": "TSpawn",
-          "nameCn": "T 出生点"
+          "nameCn": "匪家"
         },
         {
           "id": "Outside",
@@ -72,7 +78,7 @@
         },
         {
           "id": "Lobby",
-          "nameCn": "大厅"
+          "nameCn": "匪厅"
         },
         {
           "id": "Vending",
@@ -88,22 +94,24 @@
         },
         {
           "id": "Ramp",
-          "nameCn": "坡道"
+          "nameCn": "K1/斜坡"
         },
         {
           "id": "BombsiteB",
-          "nameCn": "B 包点"
+          "nameCn": "B包点"
         }
       ]
     },
     {
       "id": "b_secret",
-      "name": "B 暗道",
+      "name": "B 暗道/Secret",
       "bombsite": "b",
+      "_confidence": "high",
+      "_note": "Outside→Secret(64%T)→Tunnels(50%T,争夺)→BombsiteB(54%T)",
       "zones": [
         {
           "id": "TSpawn",
-          "nameCn": "T 出生点"
+          "nameCn": "匪家"
         },
         {
           "id": "Outside",
@@ -111,15 +119,15 @@
         },
         {
           "id": "Secret",
-          "nameCn": "暗道"
+          "nameCn": "山上/水箱/Secret"
         },
         {
           "id": "Tunnels",
-          "nameCn": "管道"
+          "nameCn": "管道/地下通道"
         },
         {
           "id": "BombsiteB",
-          "nameCn": "B 包点"
+          "nameCn": "B包点"
         }
       ]
     }

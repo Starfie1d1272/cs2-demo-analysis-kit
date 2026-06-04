@@ -1,24 +1,26 @@
 {
   "mapName": "de_inferno",
-  "version": "inferno-routes-0.1",
-  "_note": "T 方进攻动线初稿（由 extract-routes.ts 提取 + 人工确认）。中文名请核验。",
+  "version": "inferno-routes-0.2",
+  "_note": "T 方进攻动线。基于 79 场 demo 的 lastPlaceName 词表（T% 梯度）核实 + CS 地图结构补全。\n_confidence: high=词表 T% 梯度明确支持 | medium=部分 callout 偏 CT 侧/转移数据弱 | low=转移数据不支撑,仅地图结构候选。\n中文名见 CALLOUT_NAME_CN。extract-routes.ts 仅做词表统计,动线不自动生成。",
   "routes": [
     {
       "id": "b_banana",
       "name": "B 香蕉道",
       "bombsite": "b",
+      "_confidence": "high",
+      "_note": "数据明确：TSpawn(100%T)→LowerMid(100%T)→TRamp(99%T)→Middle(84%T)→Banana(62%T)→BombsiteB(36%T,CT)",
       "zones": [
         {
           "id": "TSpawn",
-          "nameCn": "T 出生点"
+          "nameCn": "匪家"
         },
         {
           "id": "LowerMid",
-          "nameCn": "T 中路下层"
+          "nameCn": "下中路"
         },
         {
           "id": "TRamp",
-          "nameCn": "T 坡"
+          "nameCn": "匪口斜坡"
         },
         {
           "id": "Middle",
@@ -30,7 +32,7 @@
         },
         {
           "id": "BombsiteB",
-          "nameCn": "B 包点"
+          "nameCn": "B包点"
         }
       ]
     },
@@ -38,26 +40,24 @@
       "id": "a_apartments",
       "name": "A 二楼",
       "bombsite": "a",
+      "_confidence": "high",
+      "_note": "SecondMid(96%T)→Apartments(75%T)→Balcony(29%T,CT)→BombsiteA(29%T,CT)；后半段 CT 区合理（已推入包点）",
       "zones": [
         {
           "id": "TSpawn",
-          "nameCn": "T 出生点"
+          "nameCn": "匪家"
         },
         {
           "id": "LowerMid",
-          "nameCn": "T 中路下层"
+          "nameCn": "下中路"
         },
         {
           "id": "SecondMid",
-          "nameCn": "T 中路上层"
-        },
-        {
-          "id": "BackAlley",
-          "nameCn": "后巷"
+          "nameCn": "侧道/二中"
         },
         {
           "id": "Apartments",
-          "nameCn": "二楼"
+          "nameCn": "二楼/公寓"
         },
         {
           "id": "Balcony",
@@ -65,26 +65,28 @@
         },
         {
           "id": "BombsiteA",
-          "nameCn": "A 包点"
+          "nameCn": "A包点"
         }
       ]
     },
     {
       "id": "a_mid",
-      "name": "A 中路",
+      "name": "A 中路/拱门",
       "bombsite": "a",
+      "_confidence": "medium",
+      "_note": "Middle(84%T)→TopofMid(48%T)→Arch(18%T,CT)→BombsiteA；Arch 为 CT 重兵把守区",
       "zones": [
         {
           "id": "TSpawn",
-          "nameCn": "T 出生点"
+          "nameCn": "匪家"
         },
         {
           "id": "LowerMid",
-          "nameCn": "T 中路下层"
+          "nameCn": "下中路"
         },
         {
           "id": "TRamp",
-          "nameCn": "T 坡"
+          "nameCn": "匪口斜坡"
         },
         {
           "id": "Middle",
@@ -92,7 +94,7 @@
         },
         {
           "id": "TopofMid",
-          "nameCn": "中路顶"
+          "nameCn": "中路顶/中路尽头"
         },
         {
           "id": "Arch",
@@ -100,7 +102,7 @@
         },
         {
           "id": "BombsiteA",
-          "nameCn": "A 包点"
+          "nameCn": "A包点"
         }
       ]
     }

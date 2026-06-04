@@ -1,5 +1,6 @@
 export * from "./zones.js";
 export * from "./routes.js";
+export { CALLOUT_NAME_CN, CALLOUT_MAPS } from "./callout-names.js";
 
 export interface MapCalibration {
   mapName: string;

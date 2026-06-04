@@ -1,43 +1,84 @@
 {
   "mapName": "de_ancient",
-  "version": "ancient-routes-0.1",
-  "_note": "T 方进攻动线初稿（由 extract-routes.ts 提取 + 人工确认）。中文名请核验。",
+  "version": "ancient-routes-0.2",
+  "_note": "T 方进攻动线。基于 79 场 demo 的 lastPlaceName 词表（T% 梯度）核实 + CS 地图结构补全。\n_confidence: high=词表 T% 梯度明确支持 | medium=部分 callout 偏 CT 侧/转移数据弱 | low=转移数据不支撑,仅地图结构候选。\n中文名见 CALLOUT_NAME_CN。extract-routes.ts 仅做词表统计,动线不自动生成。",
   "routes": [
     {
-      "id": "a_mainhall",
-      "name": "A 正门",
+      "id": "a_main",
+      "name": "A 厅",
       "bombsite": "a",
+      "_confidence": "high",
+      "_note": "数据明确：TSpawn(95%T)→Outside(90%T)→MainHall(76%T)→BombsiteA(38%T)，T% 梯度清晰",
       "zones": [
         {
           "id": "TSpawn",
-          "nameCn": "T 出生点"
+          "nameCn": "匪家"
         },
         {
           "id": "Outside",
-          "nameCn": "中路外"
+          "nameCn": "A外"
         },
         {
           "id": "MainHall",
-          "nameCn": "A 厅"
+          "nameCn": "A厅"
         },
         {
           "id": "BombsiteA",
-          "nameCn": "A 包点"
+          "nameCn": "A包点"
         }
       ]
     },
     {
-      "id": "a_mid",
-      "name": "A 中门",
-      "bombsite": "a",
+      "id": "b_ramp",
+      "name": "B 斜坡",
+      "bombsite": "b",
+      "_confidence": "high",
+      "_note": "数据明确：TSpawn→Tunnel(94%T)→Water(85%T)→Ruins(92%T)→TSideLower(86%T)→Ramp(69%T)→BombsiteB(37%T)",
       "zones": [
         {
           "id": "TSpawn",
-          "nameCn": "T 出生点"
+          "nameCn": "匪家"
+        },
+        {
+          "id": "Tunnel",
+          "nameCn": "隧道"
+        },
+        {
+          "id": "Water",
+          "nameCn": "水路"
+        },
+        {
+          "id": "Ruins",
+          "nameCn": "遗迹"
+        },
+        {
+          "id": "TSideLower",
+          "nameCn": "B门外"
+        },
+        {
+          "id": "Ramp",
+          "nameCn": "B斜坡"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B包点"
+        }
+      ]
+    },
+    {
+      "id": "a_donut",
+      "name": "A 小/甜甜圈",
+      "bombsite": "a",
+      "_confidence": "medium",
+      "_note": "数据部分支撑：Middle(40%T)→SideHall(29%T,偏CT) 转移数据弱；SideHall→BombsiteA 基于地图结构推断",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
         },
         {
           "id": "Outside",
-          "nameCn": "中路外"
+          "nameCn": "A外"
         },
         {
           "id": "Middle",
@@ -45,22 +86,24 @@
         },
         {
           "id": "SideHall",
-          "nameCn": "侧道"
+          "nameCn": "A小/甜甜圈"
         },
         {
           "id": "BombsiteA",
-          "nameCn": "A 包点"
+          "nameCn": "A包点"
         }
       ]
     },
     {
-      "id": "b_ruins",
-      "name": "B 遗迹",
+      "id": "b_side",
+      "name": "B 侧入口/黑屋方向",
       "bombsite": "b",
+      "_confidence": "low",
+      "_note": "转移数据不支撑；SideEntrance(39%T) 未出现在开局 Top 转移；基于地图结构候选",
       "zones": [
         {
           "id": "TSpawn",
-          "nameCn": "T 出生点"
+          "nameCn": "匪家"
         },
         {
           "id": "Tunnel",
@@ -76,54 +119,19 @@
         },
         {
           "id": "TSideLower",
-          "nameCn": "T 下层"
-        },
-        {
-          "id": "Ramp",
-          "nameCn": "坡道"
-        },
-        {
-          "id": "BombsiteB",
-          "nameCn": "B 包点"
-        }
-      ]
-    },
-    {
-      "id": "b_donut",
-      "name": "B 甜甜圈",
-      "bombsite": "b",
-      "zones": [
-        {
-          "id": "TSpawn",
-          "nameCn": "T 出生点"
-        },
-        {
-          "id": "Tunnel",
-          "nameCn": "隧道"
-        },
-        {
-          "id": "Water",
-          "nameCn": "水路"
-        },
-        {
-          "id": "Ruins",
-          "nameCn": "遗迹"
-        },
-        {
-          "id": "TSideLower",
-          "nameCn": "T 下层"
+          "nameCn": "B门外"
         },
         {
           "id": "TSideUpper",
-          "nameCn": "T 上层"
+          "nameCn": "跳台"
         },
         {
           "id": "SideEntrance",
-          "nameCn": "侧入口"
+          "nameCn": "B小/连接"
         },
         {
           "id": "BombsiteB",
-          "nameCn": "B 包点"
+          "nameCn": "B包点"
         }
       ]
     }

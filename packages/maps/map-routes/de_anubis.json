@@ -1,36 +1,38 @@
 {
   "mapName": "de_anubis",
-  "version": "anubis-routes-0.1",
-  "_note": "T 方进攻动线初稿（由 extract-routes.ts 提取 + 人工确认）。中文名请核验。",
+  "version": "anubis-routes-0.2",
+  "_note": "T 方进攻动线。基于 79 场 demo 的 lastPlaceName 词表（T% 梯度）核实 + CS 地图结构补全。\n_confidence: high=词表 T% 梯度明确支持 | medium=部分 callout 偏 CT 侧/转移数据弱 | low=转移数据不支撑,仅地图结构候选。\n中文名见 CALLOUT_NAME_CN。extract-routes.ts 仅做词表统计,动线不自动生成。",
   "routes": [
     {
       "id": "a_canal",
-      "name": "A 运河",
+      "name": "A 运河/正门",
       "bombsite": "a",
+      "_confidence": "high",
+      "_note": "数据明确：TSpawn(99%T)→Street(97%T)→TStairs(96%T)→Canal(69%T)→Main(59%T)→BombsiteA(31%T)",
       "zones": [
         {
           "id": "TSpawn",
-          "nameCn": "T 出生点"
+          "nameCn": "匪家"
         },
         {
           "id": "Street",
-          "nameCn": "大街"
+          "nameCn": "街道"
         },
         {
           "id": "TStairs",
-          "nameCn": "T 楼梯"
+          "nameCn": "匪楼梯"
         },
         {
           "id": "Canal",
-          "nameCn": "运河"
+          "nameCn": "水渠"
         },
         {
           "id": "Main",
-          "nameCn": "正门"
+          "nameCn": "A正门"
         },
         {
           "id": "BombsiteA",
-          "nameCn": "A 包点"
+          "nameCn": "A包点"
         }
       ]
     },
@@ -38,37 +40,41 @@
       "id": "b_outside",
       "name": "B 外场",
       "bombsite": "b",
+      "_confidence": "high",
+      "_note": "数据明确：TSpawn→Ruins(99%T)→OutsideLong(92%T)→BombsiteB(30%T)",
       "zones": [
         {
           "id": "TSpawn",
-          "nameCn": "T 出生点"
+          "nameCn": "匪家"
         },
         {
           "id": "Ruins",
-          "nameCn": "遗迹"
+          "nameCn": "废墟"
         },
         {
           "id": "OutsideLong",
-          "nameCn": "B 外"
+          "nameCn": "B门外/长廊外"
         },
         {
           "id": "BombsiteB",
-          "nameCn": "B 包点"
+          "nameCn": "B包点"
         }
       ]
     },
     {
       "id": "a_mid",
-      "name": "A 中路",
+      "name": "A 中路/宫殿",
       "bombsite": "a",
+      "_confidence": "medium",
+      "_note": "Bridge(86%T)→MidDoors(44%T)→Middle(24%T,偏CT)→PalaceInterior(18%T,CT) 中后段偏CT；Palace→BombsiteA 基于地图结构",
       "zones": [
         {
           "id": "TSpawn",
-          "nameCn": "T 出生点"
+          "nameCn": "匪家"
         },
         {
           "id": "Ruins",
-          "nameCn": "遗迹"
+          "nameCn": "废墟"
         },
         {
           "id": "Bridge",
@@ -84,42 +90,44 @@
         },
         {
           "id": "PalaceInterior",
-          "nameCn": "宫殿内部"
+          "nameCn": "殿内/宫殿"
         },
         {
           "id": "BombsiteA",
-          "nameCn": "A 包点"
+          "nameCn": "A包点"
         }
       ]
     },
     {
       "id": "b_canal",
-      "name": "B 运河/Connector",
+      "name": "B 水渠/Connector",
       "bombsite": "b",
+      "_confidence": "low",
+      "_note": "Canal(69%T)→Connector(21%T,CT)→BombsiteB 转移数据弱；基于地图结构候选",
       "zones": [
         {
           "id": "TSpawn",
-          "nameCn": "T 出生点"
+          "nameCn": "匪家"
         },
         {
           "id": "Street",
-          "nameCn": "大街"
+          "nameCn": "街道"
         },
         {
           "id": "TStairs",
-          "nameCn": "T 楼梯"
+          "nameCn": "匪楼梯"
         },
         {
           "id": "Canal",
-          "nameCn": "运河"
+          "nameCn": "水渠"
         },
         {
           "id": "Connector",
-          "nameCn": "连接通道"
+          "nameCn": "连接"
         },
         {
           "id": "BombsiteB",
-          "nameCn": "B 包点"
+          "nameCn": "B包点"
         }
       ]
     }

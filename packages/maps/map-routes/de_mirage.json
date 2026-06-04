@@ -1,57 +1,134 @@
 {
   "mapName": "de_mirage",
-  "version": "mirage-routes-0.1",
-  "_note": "T 方进攻动线，zones = lastPlaceName 取值的推进顺序（无坐标）。由 scripts/extract-routes.ts 跑 5 场 pro demo 的开局转移挖出、人工确认。",
+  "version": "mirage-routes-0.2",
+  "_note": "T 方进攻动线。基于 79 场 demo 的 lastPlaceName 词表（T% 梯度）核实 + CS 地图结构补全。\n_confidence: high=词表 T% 梯度明确支持 | medium=部分 callout 偏 CT 侧/转移数据弱 | low=转移数据不支撑,仅地图结构候选。\n中文名见 CALLOUT_NAME_CN。extract-routes.ts 仅做词表统计,动线不自动生成。",
   "routes": [
     {
       "id": "a_palace",
-      "name": "A 大厅",
+      "name": "A 二楼/Palace",
       "bombsite": "a",
+      "_confidence": "high",
+      "_note": "TSpawn(90%T)→PalaceAlley(87%T)→TRamp(85%T)→PalaceInterior(70%T)→BombsiteA(35%T,CT)",
       "zones": [
-        { "id": "TSpawn", "nameCn": "T 出生点" },
-        { "id": "PalaceAlley", "nameCn": "Palace 巷口" },
-        { "id": "TRamp", "nameCn": "T 坡道" },
-        { "id": "PalaceInterior", "nameCn": "Palace 内部" },
-        { "id": "BombsiteA", "nameCn": "A 包点" }
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "PalaceAlley",
+          "nameCn": "二楼外/宫殿外"
+        },
+        {
+          "id": "TRamp",
+          "nameCn": "A1/A门"
+        },
+        {
+          "id": "PalaceInterior",
+          "nameCn": "二楼/宫殿内"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A包点"
+        }
       ]
     },
     {
       "id": "a_mid",
-      "name": "A 中路 / Connector",
+      "name": "A 中路/Connector",
       "bombsite": "a",
+      "_confidence": "high",
+      "_note": "TSpawn→SideAlley(93%T)→TopofMid(87%T)→Middle(61%T)→Connector(35%T,CT)→BombsiteA",
       "zones": [
-        { "id": "TSpawn", "nameCn": "T 出生点" },
-        { "id": "SideAlley", "nameCn": "Side 巷" },
-        { "id": "TopofMid", "nameCn": "中路顶" },
-        { "id": "Middle", "nameCn": "中路" },
-        { "id": "Connector", "nameCn": "连接通道" },
-        { "id": "BombsiteA", "nameCn": "A 包点" }
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "SideAlley",
+          "nameCn": "侧巷/沙袋草车"
+        },
+        {
+          "id": "TopofMid",
+          "nameCn": "中远/匪口"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "Connector",
+          "nameCn": "拱门/连接"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A包点"
+        }
       ]
     },
     {
       "id": "b_apartments",
-      "name": "B 公寓",
+      "name": "B 二楼/公寓",
       "bombsite": "b",
+      "_confidence": "high",
+      "_note": "TSpawn→SideAlley(93%T)→House(92%T)→BackAlley(91%T)→Apartments(68%T)→BombsiteB(32%T,CT)",
       "zones": [
-        { "id": "TSpawn", "nameCn": "T 出生点" },
-        { "id": "SideAlley", "nameCn": "Side 巷" },
-        { "id": "House", "nameCn": "匪家房" },
-        { "id": "BackAlley", "nameCn": "后巷" },
-        { "id": "Apartments", "nameCn": "公寓" },
-        { "id": "BombsiteB", "nameCn": "B 包点" }
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "SideAlley",
+          "nameCn": "侧巷/沙袋草车"
+        },
+        {
+          "id": "House",
+          "nameCn": "屋檐/匪二楼外"
+        },
+        {
+          "id": "BackAlley",
+          "nameCn": "B二楼后巷"
+        },
+        {
+          "id": "Apartments",
+          "nameCn": "B二楼"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B包点"
+        }
       ]
     },
     {
       "id": "b_underpass",
-      "name": "B 中路 / Underpass",
+      "name": "B 中路/Underpass",
       "bombsite": "b",
+      "_confidence": "medium",
+      "_note": "Middle(61%T)→Underpass(55%T)→BombsiteB(32%T)；Underpass 为争夺区",
       "zones": [
-        { "id": "TSpawn", "nameCn": "T 出生点" },
-        { "id": "SideAlley", "nameCn": "Side 巷" },
-        { "id": "TopofMid", "nameCn": "中路顶" },
-        { "id": "Middle", "nameCn": "中路" },
-        { "id": "Underpass", "nameCn": "地下通道" },
-        { "id": "BombsiteB", "nameCn": "B 包点" }
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "SideAlley",
+          "nameCn": "侧巷/沙袋草车"
+        },
+        {
+          "id": "TopofMid",
+          "nameCn": "中远/匪口"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "Underpass",
+          "nameCn": "下水道"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B包点"
+        }
       ]
     }
   ]
