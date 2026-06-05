@@ -17,6 +17,12 @@ const MULTI_LEVEL: Record<string, { thresholdZ: number; lowerImg: string }> = {
   de_nuke: { thresholdZ: -495, lowerImg: "de_nuke_lower" },
 };
 type Level = "upper" | "lower";
+/** nuke 默认层归属：A 侧在上层（z >= -495），B 侧在下层（z <= -495）。从 CALLOUT_NAME_CN 词表派生。 */
+function nukeDefaultZ(id: string): {zMin?:number;zMax?:number} | null {
+  if (/BombsiteB|Ramp$|Tunnels|Secret|Hell|Vents/i.test(id)) return {zMax:-495};
+  if (/BombsiteA|Outside|Lobby|Hut|Heaven|Rafters|Mini|Squeaky|Garage|Control|Trophy|HutRoof|Roof|Silo|Catwalk|Decon|Crane|Observation|LockerRoom|Vending|Admin|Spawn/i.test(id)) return {zMin:-495};
+  return null;
+}
 
 // ── 坐标变换 ──────────────────────────────────────────────────────────────────
 function w2r(wx: number, wy: number, m: string): [number, number] {
@@ -99,10 +105,12 @@ function geomLevel(g:{zMin?:number;zMax?:number}|undefined,thresholdZ:number):Le
 // ════════════════════════════════════════════════════════════════════════════
 // ZoneTab
 // ════════════════════════════════════════════════════════════════════════════
-function ZoneTab({mapName,level,setLevel,vocab,store,setStore}:{mapName:string;level:Level;setLevel:(l:Level)=>void;vocab:Record<string,string>;store:ZoneStore;setStore:React.Dispatch<React.SetStateAction<ZoneStore>>}){
+function ZoneTab({mapName,level,setLevel,vocab,store,setStore,custom,setCustom}:{mapName:string;level:Level;setLevel:(l:Level)=>void;vocab:Record<string,string>;store:ZoneStore;setStore:React.Dispatch<React.SetStateAction<ZoneStore>>;custom:Record<string,string>;setCustom:React.Dispatch<React.SetStateAction<Record<string,string>>>}){
   const ml=MULTI_LEVEL[mapName];
   const [editId,setEditId]=useState<string|null>(null);const[draft,setDraft]=useState<[number,number][]>([]);const[cur,setCur]=useState<[number,number]|null>(null);const[dragIdx,setDragIdx]=useState<number|null>(null);const didDragRef=useRef(false);
   const[saving,setSaving]=useState(false);const[saveMsg,setSaveMsg]=useState("");
+  const[newId,setNewId]=useState("");const[newCn,setNewCn]=useState("");
+  const addCallout=()=>{const id=newId.trim();const cn=newCn.trim();if(!id||!cn||id in vocab)return;setCustom(p=>({...p,[id]:cn}));setNewId("");setNewCn("");};
   const[order,setOrder]=useState<string[]>(()=>{try{const v=localStorage.getItem(`cs2dak-zoneorder-${mapName}`);return v?JSON.parse(v):[];}catch{return[];}});
   const SNAP=16;
 
@@ -117,7 +125,7 @@ function ZoneTab({mapName,level,setLevel,vocab,store,setStore}:{mapName:string;l
 
   // 编辑控制
   const selectZone=(id:string)=>{if(id===editId){setEditId(null);setDraft([]);return;}setEditId(id);const g=store[id];setDraft(g?.polygon?.length?g.polygon.map(p=>[p[0],p[1]]as[number,number]):[]);setCur(null);
-    if(ml&&g){const zl=geomLevel(g,ml.thresholdZ);if(zl!=="both"&&zl!==level) setLevel(zl);}};
+    if(ml){const g2=g??nukeDefaultZ(id);if(g2){const zl=geomLevel(g2,ml.thresholdZ);if(zl!=="both"&&zl!==level) setLevel(zl);}}};
   const commit=useCallback((poly:[number,number][])=>{if(!editId||poly.length<3)return;const cat=calloutCat(editId);const g:MapZone={id:editId,name:vocab[editId]??editId,role:CAT_ROLE[cat]as MapZone["role"],bombsite:/BombsiteA/i.test(editId)?"a":/BombsiteB/i.test(editId)?"b":null,polygon:poly};if(ml){if(level==="lower") g.zMax=ml.thresholdZ;else g.zMin=ml.thresholdZ;}setStore(p=>({...p,[editId]:g}));setEditId(null);setDraft([]);setCur(null);},[editId,mapName,ml,level,setStore,vocab]);
   const onMapClick=(rx:number,ry:number)=>{if(!editId)return;if(didDragRef.current){didDragRef.current=false;return;}if(draft.length>=3){const[fx,fy]=w2r(draft[0][0],draft[0][1],mapName);if((fx-rx)**2+(fy-ry)**2<=SNAP*SNAP){commit(draft);return;}}setDraft(p=>[...p,r2w(rx,ry,mapName)]);};
   const onMapMove=(rx:number,ry:number)=>{if(dragIdx!==null){didDragRef.current=true;setDraft(p=>p.map((pt,i)=>i===dragIdx?r2w(rx,ry,mapName):pt));setCur([rx,ry]);}else if(editId)setCur([rx,ry]);};
@@ -155,6 +163,12 @@ function ZoneTab({mapName,level,setLevel,vocab,store,setStore}:{mapName:string;l
     </div>
     {/* 右侧列表 */}
     <div style={{flex:1,display:"flex",flexDirection:"column",gap:6,overflow:"hidden"}}>
+      {/* 新增 callout */}
+      <div style={{display:"flex",gap:4,alignItems:"center"}}>
+        <input value={newId} onChange={e=>setNewId(e.target.value)} placeholder="英文ID" style={{...S.inp,flex:1.2}} onKeyDown={e=>{if(e.key==="Enter")addCallout();}}/>
+        <input value={newCn} onChange={e=>setNewCn(e.target.value)} placeholder="中文名" style={{...S.inp,flex:1}} onKeyDown={e=>{if(e.key==="Enter")addCallout();}}/>
+        <Btn c="#3498db" disabled={!newId.trim()||!newCn.trim()||newId.trim()in vocab} onClick={addCallout}>＋</Btn>
+      </div>
       <div style={{display:"flex",alignItems:"center",gap:8}}>
         <span style={{fontSize:11,color:"#525a6a",textTransform:"uppercase",letterSpacing:"0.1em"}}>区域（callout）· {doneCount}/{ids.length} 已画 · 序号=优先级</span>
         <span style={{marginLeft:"auto"}}><Btn c="#9b59b6" onClick={autoSortByArea}>↕ 按面积排序（窄在前）</Btn></span>
@@ -170,13 +184,14 @@ function ZoneTab({mapName,level,setLevel,vocab,store,setStore}:{mapName:string;l
             <span style={{flex:1,fontSize:12}}>{vocab[id]} <span style={{fontSize:10,color:"#525a6a"}}>{id}</span></span>
             {ml&&zl!=="both"&&<span style={{fontSize:10,color:"#5ba0ff"}}>{zl==="upper"?"▲":"▼"}</span>}
             <span style={{fontSize:10,color:isDone?"#2ecc71":"#303840"}}>{isDone?`${area>0?`${(area/1000).toFixed(1)}k`:`${g!.polygon.length}pt`}`:"—"}</span>
-            {ml&&isEdit&&<span style={{display:"flex",gap:2,alignItems:"center"}} onClick={e=>e.stopPropagation()}><input style={S.numInp} placeholder="zMin" defaultValue={g?.zMin??""} onBlur={e=>updateZ(id,"zMin",e.target.value)}/><input style={S.numInp} placeholder="zMax" defaultValue={g?.zMax??""} onBlur={e=>updateZ(id,"zMax",e.target.value)}/></span>}
+            {isEdit&&<span style={{display:"flex",gap:2,alignItems:"center"}} onClick={e=>e.stopPropagation()}><input style={S.numInp} placeholder="zMin" defaultValue={g?.zMin??""} onBlur={e=>updateZ(id,"zMin",e.target.value)}/><input style={S.numInp} placeholder="zMax" defaultValue={g?.zMax??""} onBlur={e=>updateZ(id,"zMax",e.target.value)}/></span>}
             {isDone&&<button onClick={e=>{e.stopPropagation();clearPoly(id);if(order.includes(id))setOrder(order.filter(x=>x!==id));}} style={{fontSize:10,color:"#e74c3c",background:"none",border:"none",cursor:"pointer",padding:"0 2px"}}>✕</button>}
           </div>;})}
       </div>
       <div style={{borderTop:"1px solid #1f2530",paddingTop:8}}>
         <div style={{fontSize:11,color:"#525a6a",marginBottom:5}}>→ <code style={{fontSize:10}}>packages/maps/map-zones/{mapName}.json</code></div>
         <Btn c={saveMsg.startsWith("✓")?"#2ecc71":saveMsg?"#e74c3c":"#3498db"} wide onClick={save} disabled={saving}>{saveMsg||(saving?"保存中…":"保存到文件")}</Btn>
+        {Object.keys(custom).length>0&&<div style={{marginTop:4}}><Btn c="#9b59b6" wide onClick={async()=>{await navigator.clipboard.writeText(JSON.stringify(custom,null,2));}}>导出 {Object.keys(custom).length} 个新增 callout（→ callout-names.ts）</Btn></div>}
       </div>
     </div>
   </div>;
@@ -256,10 +271,11 @@ function RouteTab({mapName,level,setLevel,vocab,store}:{mapName:string;level:Lev
 type MainTab="zones"|"routes";
 export function MapAnnotator(){
   const[mapName,setMapName]=useState("de_mirage");const[tab,setTab]=useState<MainTab>("zones");const[level,setLevel]=useState<Level>("upper");
-  const[store,setStore]=useState<ZoneStore>({});
-  const[loading,setLoading]=useState(true);
-  useEffect(()=>{setLevel("upper");setLoading(true);let c=false;fetchZones(mapName).then(s=>{if(!c){setStore(s);setLoading(false);}});return()=>{c=true;};},[mapName]);
-  const vocab=useMemo(()=>((CALLOUT_NAME_CN as Record<string,Record<string,string>>)[mapName]??{}),[mapName]);
+  const[store,setStore]=useState<ZoneStore>({});const[loading,setLoading]=useState(true);
+  const[custom,setCustom]=useState<Record<string,string>>(()=>{try{const v=localStorage.getItem("cs2dak-customcallouts-"+mapName);return v?JSON.parse(v):{};}catch{return{};}});
+  useEffect(()=>{setLevel("upper");setLoading(true);let c=false;fetchZones(mapName).then(s=>{if(!c){if(mapName==="de_nuke"){const nukeCallouts=(CALLOUT_NAME_CN as Record<string,Record<string,string>>)["de_nuke"]??{};for(const id of Object.keys(nukeCallouts)){if(!s[id]){const dz=nukeDefaultZ(id);if(dz) s[id]=dz;}}}setStore(s);setLoading(false);}});try{setCustom(JSON.parse(localStorage.getItem("cs2dak-customcallouts-"+mapName)??"{}"));}catch{setCustom({});}return()=>{c=true;};},[mapName]);
+  useEffect(()=>{try{localStorage.setItem("cs2dak-customcallouts-"+mapName,JSON.stringify(custom));}catch{}},[custom,mapName]);
+  const vocab=useMemo(()=>({...((CALLOUT_NAME_CN as Record<string,Record<string,string>>)[mapName]??{}),...custom}),[mapName,custom]);
 
   return <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 44px)",background:"#0a0d13",color:"#c5cdd9",fontFamily:"ui-monospace, 'Cascadia Code', monospace",overflow:"hidden"}}>
     <div style={{display:"flex",gap:8,alignItems:"center",padding:"7px 12px",borderBottom:"1px solid #1f2530",flexShrink:0}}>
@@ -271,7 +287,7 @@ export function MapAnnotator(){
       <span style={{marginLeft:"auto",fontSize:10,color:"#1e2a38"}}>文件驱动 · 保存直接写 packages/maps/ · {Object.keys(vocab).length} callout · {Object.keys(store).filter(k=>(store[k]?.polygon?.length??0)>=3).length} 区已画{loading?" · 加载中…":""}</span>
     </div>
     <div style={{flex:1,display:"flex",padding:12,overflow:"hidden"}}>
-      {loading?<div style={{padding:40,color:"#525a6a"}}>加载 {mapName} zone 数据…</div>:tab==="zones"?<ZoneTab key={`z-${mapName}`} mapName={mapName} level={level} setLevel={setLevel} vocab={vocab} store={store} setStore={setStore}/>:<RouteTab key={`r-${mapName}`} mapName={mapName} level={level} setLevel={setLevel} vocab={vocab} store={store}/>}
+      {loading?<div style={{padding:40,color:"#525a6a"}}>加载 {mapName} zone 数据…</div>:tab==="zones"?<ZoneTab key={`z-${mapName}`} mapName={mapName} level={level} setLevel={setLevel} vocab={vocab} store={store} setStore={setStore} custom={custom} setCustom={setCustom}/>:<RouteTab key={`r-${mapName}`} mapName={mapName} level={level} setLevel={setLevel} vocab={vocab} store={store}/>}
     </div>
   </div>;
 }
