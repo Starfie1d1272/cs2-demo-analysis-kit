@@ -148,16 +148,21 @@ official scoring 排除 `save / exit / freeze`（仍可进 review 层）。
 
 ### 3.4 Official UtilitySpatial（5 指标，actual-effect）
 
-| 新指标 | 替换的旧 proxy | actual-effect 判定 |
-|---|---|---|
-| `actualSmokeProtectedCrossings` | `smokeProtectedCrossings` | 队友**确实借烟穿越**了原本暴露的枪线（无烟则 LOS clear，有烟则 blocked） |
-| `actualSmokeSightlineDenialSeconds` | `smokeSightlineDenialSeconds` | 烟切断关键静态枪线 × 敌方 holder 存在 × 队友利用 |
-| `actualSmokeIsolationSeconds` | `smokeIsolationSeconds` | 烟在敌-目标路径上，nav 绕路代价显著上升 |
-| `actualIncendiaryPathDelaySeconds` | `incendiaryPathDelayUnits` | 火在敌方实际路径上 × 绕路代价（非"火离敌人多远"） |
-| `actualIncendiaryDisplacementEvents` | `incendiaryDisplacementEvents` | 敌人火前在区内、火后 ~3s 离开（排除回合结束/死亡等无关原因） |
+> **状态（SP3，2026-06-06）**：zone 多边形标定完成 **4/7 图**（ancient/dust2/inferno/mirage，
+> 覆盖 43/55 NJU 场）→ `core/spatial/utility.ts` 落地 3 项 zone-based actual-effect，
+> 手雷归属率 94–98%。进 review/shadow，**未进 RR 评分**（待职业样本校准）。
+> 诊断：`pnpm analyze:spatial-coverage`。
 
-**手雷归属**：`effectPosition → zoneAt → nav/route`（不再用"700 单位内最近 player 的 lastPlaceName"，
-避免远投烟/最近的是敌人/多层 z 轴误归属）。一颗烟可影响多 route，权重归一 `Σ ≤ 1`。
+| 指标 | 状态 | actual-effect 判定 |
+|---|---|---|
+| `actualIncendiaryDisplacementEvents` | ✅ 4 图 | 敌人火前在该 zone、火后 ~3s 离开（× zone 角色权重） |
+| `actualSmokeIsolationSeconds` | ✅ 4 图 | 烟落 connector/mid/lane 要道且敌人在该 zone → 时长 × 角色权重 |
+| `actualIncendiaryPathDelaySeconds` | ✅ 4 图 | 火落通行要道且敌人在场 → 燃烧时长 × 角色权重（火焰缺 destroyTick 按 7s 兜底） |
+| `actualSmokeProtectedCrossings` | ⬜ 需 LOS | 队友确实借烟穿越原本暴露的枪线（无烟则 LOS clear） |
+| `actualSmokeSightlineDenialSeconds` | ⬜ 需 LOS | 烟切断关键静态枪线 × 敌方 holder × 队友利用 |
+
+**手雷归属（doc §18，已落地）**：`effectPosition → zoneAt`（不再用"最近 player 的 lastPlaceName" proxy，
+避免远投烟/最近是敌人/多层 z 轴误归属）。未标定 zone 的图 → 全 null。
 
 ### 3.5 Cap / 标准化 / 残差化 / Evidence Quality
 

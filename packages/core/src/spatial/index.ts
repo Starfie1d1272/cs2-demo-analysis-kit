@@ -12,3 +12,5 @@ export type { SpatialAssets, AnnotatedSample } from "./annotate.js";
 export { loadSpatialAssets, annotatePositions, groupSamplesByRoundTick } from "./annotate.js";
 export type { OfficialMapControl } from "./mapcontrol.js";
 export { buildOfficialMapControl } from "./mapcontrol.js";
+export type { OfficialUtilitySpatial, UtilityWindow, GrenadeType } from "./utility.js";
+export { buildOfficialUtilitySpatial, buildUtilityWindows } from "./utility.js";

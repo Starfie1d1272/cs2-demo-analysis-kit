@@ -12,6 +12,7 @@
     "python:export:sample": "cd python && uv run cs2dak export ../fixtures/demos/nju-rivals-2026/3671816592_1000003075.dem --out ../fixtures/output/nju-rivals-2026",
     "python:export:pro": "cd python && uv run cs2dak export ../fixtures/demos/pro/*.dem --out ../fixtures/output/pro",
     "python:export:nju": "cd python && uv run cs2dak export ../fixtures/demos/nju-rivals-2026/*.dem --out ../fixtures/output/nju-rivals-2026",
+    "analyze:spatial-coverage": "pnpm --filter @cs2dak/cli exec tsx scripts/spatial-coverage.ts",
     "typecheck": "tsc -b --pretty",
     "test": "vitest run --maxWorkers=1",
     "build": "pnpm -r --if-present build",

@@ -10,11 +10,15 @@ import type { DemoPackage } from "@cs2dak/contract";
 import {
   getMapNav,
   getMapRoutes,
+  getMapZones,
   nearestNavArea,
+  zoneAt,
   type CompactNav,
   type MapRoutes,
+  type MapZones,
   type TriangleBvh,
   type Vec3,
+  type ZoneRole,
 } from "@cs2dak/maps";
 
 type PositionRow = NonNullable<DemoPackage["positions1s"]>[number];
@@ -22,11 +26,13 @@ type PositionRow = NonNullable<DemoPackage["positions1s"]>[number];
 export interface SpatialAssets {
   mapName: string;
   routes: MapRoutes | null;
+  zones: MapZones | null;
   nav: CompactNav | null;
   /** 静态视线 BVH；Node 下经 tri-assets 装载，浏览器降级为 null。 */
   visibility: TriangleBvh | null;
   available: {
     routes: boolean;
+    zones: boolean;
     nav: boolean;
     visibility: boolean;
   };
@@ -34,15 +40,18 @@ export interface SpatialAssets {
 
 export function loadSpatialAssets(mapName: string, triBvh?: TriangleBvh | null): SpatialAssets {
   const routes = getMapRoutes(mapName);
+  const zones = getMapZones(mapName);
   const nav = getMapNav(mapName);
   const visibility = triBvh ?? null;
   return {
     mapName,
     routes,
+    zones,
     nav,
     visibility,
     available: {
       routes: routes != null,
+      zones: zones != null,
       nav: nav != null,
       visibility: visibility != null,
     },
@@ -59,6 +68,12 @@ export interface AnnotatedSample {
   position: Vec3;
   /** callout（positions 的 lastPlaceName）；缺失为 null。 */
   callout: string | null;
+  /** 标定 zone id（zone > callout，doc §2.2）；无 zone 资产或未命中为 null。 */
+  zoneId: string | null;
+  /** zone 语义角色（site/mid/connector/lane…）；无 zone 为 null。 */
+  zoneRole: ZoneRole | null;
+  /** zone 关联包点；无则 null。 */
+  zoneBombsite: "a" | "b" | null;
   /** 最近 nav area id；无 nav 资产为 null。 */
   navAreaId: number | null;
 }
@@ -72,6 +87,7 @@ export function annotatePositions(pkg: DemoPackage, assets: SpatialAssets): Anno
   const out: AnnotatedSample[] = [];
   for (const row of rows) {
     const position = toVec3(row);
+    const zone = assets.zones ? zoneAt(assets.zones, position.x, position.y, position.z) : null;
     out.push({
       roundNumber: row.roundNumber,
       tick: row.tick,
@@ -81,6 +97,9 @@ export function annotatePositions(pkg: DemoPackage, assets: SpatialAssets): Anno
       alive: (row as { alive?: boolean }).alive ?? true,
       position,
       callout: (row as { lastPlaceName?: string | null }).lastPlaceName ?? null,
+      zoneId: zone?.id ?? null,
+      zoneRole: zone?.role ?? null,
+      zoneBombsite: zone?.bombsite ?? null,
       navAreaId: assets.nav ? (nearestNavArea(assets.nav, position)?.id ?? null) : null,
     });
   }
