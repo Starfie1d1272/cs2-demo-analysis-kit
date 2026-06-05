@@ -1,4 +1,5 @@
 export * from "./zones.js";
+export * from "./zone-assets.js";
 export * from "./routes.js";
 export * from "./route-assets.js";
 export * from "./geometry-assets.js";

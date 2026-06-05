@@ -66,6 +66,9 @@ importers:
       '@cs2dak/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@cs2dak/maps':
+        specifier: workspace:*
+        version: link:../../packages/maps
       '@cs2dak/presentation':
         specifier: workspace:*
         version: link:../../packages/presentation

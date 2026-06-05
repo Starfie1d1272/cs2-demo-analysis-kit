@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { MapAnnotator } from "./MapAnnotator";
 import { loadDemoPackageFromZip } from "@cs2dak/core";
 import { buildSeasonCohort } from "@cs2dak/cohort";
 import { buildMatchWorkspaceModel, buildSeasonLeaderboardModel } from "@cs2dak/presentation";
@@ -15,7 +16,7 @@ const cohortZipUrls = import.meta.glob("../../../fixtures/input/cohort/*.zip", {
   eager: true
 }) as Record<string, string>;
 
-type Mode = "match" | "leaderboard";
+type Mode = "match" | "leaderboard" | "annotator";
 
 function MatchView() {
   const [model, setModel] = useState<MatchWorkspaceModel | null>(null);
@@ -173,8 +174,19 @@ function DemoLab() {
         <button type="button" className={mode === "leaderboard" ? "dak-tab dak-tab-active" : "dak-tab"} onClick={() => setMode("leaderboard")}>
           排行榜
         </button>
+        <button type="button" className={mode === "annotator" ? "dak-tab dak-tab-active" : "dak-tab"} onClick={() => setMode("annotator")}>
+          🗺 标注
+        </button>
       </div>
-      {mode === "match" ? <MatchView /> : <LeaderboardView />}
+      {mode === "annotator" ? (
+        <div style={{ paddingTop: 44 }}>
+          <MapAnnotator />
+        </div>
+      ) : mode === "match" ? (
+        <MatchView />
+      ) : (
+        <LeaderboardView />
+      )}
     </div>
   );
 }

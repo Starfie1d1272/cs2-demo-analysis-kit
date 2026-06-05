@@ -1,11 +1,11 @@
 {
   "mapName": "de_mirage",
-  "version": "mirage-routes-0.3",
+  "version": "de_mirage-routes-0.4",
   "routes": [
     {
       "id": "a_palace",
       "name": "A二楼",
-      "type": "primary_entry",
+      "type": "secondary_entry",
       "bombsite": "a",
       "confidence": "high",
       "zones": [
@@ -16,6 +16,10 @@
         {
           "id": "PalaceInterior",
           "nameCn": "A二楼"
+        },
+        {
+          "id": "Scaffolding",
+          "nameCn": "A2上下"
         },
         {
           "id": "BombsiteA",
@@ -51,6 +55,10 @@
           "nameCn": "拱门"
         },
         {
+          "id": "Stairs",
+          "nameCn": "跳台"
+        },
+        {
           "id": "BombsiteA",
           "nameCn": "A包"
         }
@@ -58,18 +66,14 @@
     },
     {
       "id": "a_underpass_wrap",
-      "name": "下水道绕A",
-      "type": "secondary_entry",
+      "name": "下水道控中夹A",
+      "type": "lurk_lane",
       "bombsite": "a",
       "confidence": "medium",
       "zones": [
         {
           "id": "TSpawn",
           "nameCn": "匪家"
-        },
-        {
-          "id": "SideAlley",
-          "nameCn": "匪口"
         },
         {
           "id": "House",
@@ -99,10 +103,10 @@
     },
     {
       "id": "a_scaffold",
-      "name": "A1跳台",
+      "name": "A1",
       "type": "primary_entry",
       "bombsite": "a",
-      "confidence": "low",
+      "confidence": "high",
       "zones": [
         {
           "id": "TSpawn",
@@ -115,14 +119,6 @@
         {
           "id": "TRamp",
           "nameCn": "A1"
-        },
-        {
-          "id": "PalaceInterior",
-          "nameCn": "A二楼"
-        },
-        {
-          "id": "Scaffolding",
-          "nameCn": "A2上下"
         },
         {
           "id": "BombsiteA",
@@ -140,10 +136,6 @@
         {
           "id": "TSpawn",
           "nameCn": "匪家"
-        },
-        {
-          "id": "SideAlley",
-          "nameCn": "匪口"
         },
         {
           "id": "House",
@@ -166,7 +158,7 @@
     {
       "id": "b_catwalk",
       "name": "B小",
-      "type": "secondary_entry",
+      "type": "mid_connector",
       "bombsite": "b",
       "confidence": "high",
       "zones": [
