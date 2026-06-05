@@ -34,12 +34,10 @@ describe("map route assets", () => {
   it("exposes confirmed Dust2 routes through the public route asset helper", () => {
     const dust2 = getMapRoutes("de_dust2");
     expect(dust2?.mapName).toBe("de_dust2");
-    expect(dust2?.routes.map((route) => route.id)).toEqual([
-      "a_long",
-      "a_short",
-      "b_tunnels",
-      "b_mid_lower",
-    ]);
+    // 标注工具可继续新增动线，故只断言 4 条已确认动线存在（不做精确等于，避免脆断）。
+    expect(dust2?.routes.map((route) => route.id)).toEqual(
+      expect.arrayContaining(["a_long", "a_short", "b_tunnels", "b_mid_lower"]),
+    );
     expect(getMapRoutes("de_cache")).toBeNull();
   });
 

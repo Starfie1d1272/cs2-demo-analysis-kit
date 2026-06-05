@@ -1,6 +1,6 @@
 {
   "mapName": "de_dust2",
-  "version": "dust2-routes-0.3",
+  "version": "de_dust2-routes-0.4",
   "routes": [
     {
       "id": "a_long",
@@ -38,9 +38,9 @@
     {
       "id": "a_short",
       "name": "A小",
-      "type": "secondary_entry",
+      "type": "mid_connector",
       "bombsite": "a",
-      "confidence": "medium",
+      "confidence": "high",
       "zones": [
         {
           "id": "TSpawn",
@@ -49,6 +49,10 @@
         {
           "id": "TopofMid",
           "nameCn": "中远匪口"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
         },
         {
           "id": "Catwalk",
@@ -80,6 +84,10 @@
           "nameCn": "匪家"
         },
         {
+          "id": "TRamp",
+          "nameCn": "后花"
+        },
+        {
           "id": "OutsideTunnel",
           "nameCn": "B洞外"
         },
@@ -95,10 +103,10 @@
     },
     {
       "id": "b_mid_lower",
-      "name": "中路下B",
+      "name": "中路夹B",
       "type": "mid_connector",
       "bombsite": "b",
-      "confidence": "medium",
+      "confidence": "high",
       "zones": [
         {
           "id": "TSpawn",
@@ -113,16 +121,61 @@
           "nameCn": "中路"
         },
         {
-          "id": "LowerTunnel",
-          "nameCn": "B1"
+          "id": "MidDoors",
+          "nameCn": "中门"
+        },
+        {
+          "id": "BDoors",
+          "nameCn": "B门"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B包"
+        }
+      ]
+    },
+    {
+      "id": "route_1780679582506",
+      "name": "B1夹B",
+      "type": "mid_connector",
+      "bombsite": "b",
+      "confidence": "high",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "TRamp",
+          "nameCn": "后花"
+        },
+        {
+          "id": "OutsideTunnel",
+          "nameCn": "B洞外"
+        },
+        {
+          "id": "UpperTunnel",
+          "nameCn": "B洞"
         },
         {
           "id": "TunnelStairs",
           "nameCn": "B洞楼梯"
         },
         {
-          "id": "UpperTunnel",
-          "nameCn": "B洞"
+          "id": "LowerTunnel",
+          "nameCn": "B1"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "MidDoors",
+          "nameCn": "中门"
+        },
+        {
+          "id": "BDoors",
+          "nameCn": "B门"
         },
         {
           "id": "BombsiteB",

@@ -167,7 +167,7 @@ function ZoneTab({mapName,level,setLevel,vocab,store,setStore}:{mapName:string;l
             <button onClick={e=>moveZone(id,-1,e)} disabled={i===0} style={{fontSize:9,color:i===0?"#1f2530":"#525a6a",background:"none",border:"none",cursor:i===0?"default":"pointer",padding:"0 1px"}}>▲</button>
             <button onClick={e=>moveZone(id,1,e)} disabled={i===ids.length-1} style={{fontSize:9,color:i===ids.length-1?"#1f2530":"#525a6a",background:"none",border:"none",cursor:i===ids.length-1?"default":"pointer",padding:"0 1px"}}>▼</button>
             <span style={{width:8,height:8,borderRadius:1,background:c,flexShrink:0}}/>
-            <span style={{flex:1,fontSize:12}}>{vocab[id]}</span>
+            <span style={{flex:1,fontSize:12}}>{vocab[id]} <span style={{fontSize:10,color:"#525a6a"}}>{id}</span></span>
             {ml&&zl!=="both"&&<span style={{fontSize:10,color:"#5ba0ff"}}>{zl==="upper"?"▲":"▼"}</span>}
             <span style={{fontSize:10,color:isDone?"#2ecc71":"#303840"}}>{isDone?`${area>0?`${(area/1000).toFixed(1)}k`:`${g!.polygon.length}pt`}`:"—"}</span>
             {ml&&isEdit&&<span style={{display:"flex",gap:2,alignItems:"center"}} onClick={e=>e.stopPropagation()}><input style={S.numInp} placeholder="zMin" defaultValue={g?.zMin??""} onBlur={e=>updateZ(id,"zMin",e.target.value)}/><input style={S.numInp} placeholder="zMax" defaultValue={g?.zMax??""} onBlur={e=>updateZ(id,"zMax",e.target.value)}/></span>}

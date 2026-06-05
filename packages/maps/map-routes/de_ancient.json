@@ -1,6 +1,6 @@
 {
   "mapName": "de_ancient",
-  "version": "ancient-routes-0.3",
+  "version": "de_ancient-routes-0.4",
   "routes": [
     {
       "id": "a_main",
@@ -59,9 +59,9 @@
     {
       "id": "a_rotate_b_to_a",
       "name": "B区跳台转A",
-      "type": "secondary_entry",
+      "type": "lurk_lane",
       "bombsite": "a",
-      "confidence": "medium",
+      "confidence": "high",
       "zones": [
         {
           "id": "TSpawn",
@@ -106,7 +106,7 @@
       "name": "入侵警家",
       "type": "rotation_cut",
       "bombsite": "a",
-      "confidence": "low",
+      "confidence": "high",
       "zones": [
         {
           "id": "TSpawn",
@@ -162,10 +162,6 @@
           "nameCn": "B外"
         },
         {
-          "id": "TSideLower",
-          "nameCn": "B小"
-        },
-        {
           "id": "Ramp",
           "nameCn": "B坡"
         },
@@ -178,9 +174,9 @@
     {
       "id": "b_jump_side",
       "name": "跳台控黑屋",
-      "type": "secondary_entry",
+      "type": "mid_connector",
       "bombsite": "b",
-      "confidence": "medium",
+      "confidence": "high",
       "zones": [
         {
           "id": "TSpawn",
@@ -211,9 +207,9 @@
     {
       "id": "b_vip_lurk",
       "name": "VIP入侵B",
-      "type": "lurk_lane",
+      "type": "rotation_cut",
       "bombsite": "b",
-      "confidence": "low",
+      "confidence": "high",
       "zones": [
         {
           "id": "TSpawn",
@@ -247,38 +243,34 @@
     },
     {
       "id": "b_jump_to_ramp",
-      "name": "跳台转B坡",
+      "name": "黑屋夹B",
       "type": "secondary_entry",
       "bombsite": "b",
-      "confidence": "low",
+      "confidence": "high",
       "zones": [
         {
           "id": "TSpawn",
           "nameCn": "匪家"
         },
         {
-          "id": "Outside",
-          "nameCn": "匪口"
+          "id": "Tunnel",
+          "nameCn": "隧道"
         },
         {
-          "id": "Middle",
-          "nameCn": "中路"
-        },
-        {
-          "id": "TSideUpper",
-          "nameCn": "跳台"
-        },
-        {
-          "id": "TSideLower",
-          "nameCn": "B小"
+          "id": "Water",
+          "nameCn": "水路"
         },
         {
           "id": "Ruins",
           "nameCn": "B外"
         },
         {
-          "id": "Ramp",
-          "nameCn": "B坡"
+          "id": "TSideLower",
+          "nameCn": "B小"
+        },
+        {
+          "id": "SideEntrance",
+          "nameCn": "黑屋"
         },
         {
           "id": "BombsiteB",

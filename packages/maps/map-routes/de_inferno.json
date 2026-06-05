@@ -1,51 +1,252 @@
 {
   "mapName": "de_inferno",
-  "version": "de_inferno-routes-0.3",
+  "version": "de_inferno-routes-0.4",
   "routes": [
     {
       "id": "a_mid",
-      "name": "中路进A",
+      "name": "中路A1强攻",
       "type": "primary_entry",
       "bombsite": "a",
       "confidence": "high",
       "zones": [
-        { "id": "TSpawn", "nameCn": "匪家" },
-        { "id": "LowerMid", "nameCn": "匪口" },
-        { "id": "TRamp", "nameCn": "匪口" },
-        { "id": "Middle", "nameCn": "中路" },
-        { "id": "TopofMid", "nameCn": "中路" },
-        { "id": "BombsiteA", "nameCn": "A包" }
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "TRamp",
+          "nameCn": "匪口"
+        },
+        {
+          "id": "LowerMid",
+          "nameCn": "匪口"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "TopofMid",
+          "nameCn": "中路"
+        },
+        {
+          "id": "Quad",
+          "nameCn": "马鹏"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A包"
+        }
       ]
     },
     {
       "id": "a_arch",
-      "name": "拱门夹A",
+      "name": "中路链接夹A",
       "type": "secondary_entry",
       "bombsite": "a",
-      "confidence": "medium",
+      "confidence": "high",
       "zones": [
-        { "id": "TSpawn", "nameCn": "匪家" },
-        { "id": "LowerMid", "nameCn": "匪口" },
-        { "id": "TRamp", "nameCn": "匪口" },
-        { "id": "Middle", "nameCn": "中路" },
-        { "id": "TopofMid", "nameCn": "中路" },
-        { "id": "Arch", "nameCn": "拱门" },
-        { "id": "BombsiteA", "nameCn": "A包" }
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "TRamp",
+          "nameCn": "匪口"
+        },
+        {
+          "id": "LowerMid",
+          "nameCn": "匪口"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "TopofMid",
+          "nameCn": "中路"
+        },
+        {
+          "id": "Arch",
+          "nameCn": "拱门"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A包"
+        }
       ]
     },
     {
       "id": "b_banana",
-      "name": "香蕉道进B",
+      "name": "B点正面",
       "type": "primary_entry",
       "bombsite": "b",
       "confidence": "high",
       "zones": [
-        { "id": "TSpawn", "nameCn": "匪家" },
-        { "id": "LowerMid", "nameCn": "匪口" },
-        { "id": "TRamp", "nameCn": "匪口" },
-        { "id": "Middle", "nameCn": "中路" },
-        { "id": "Banana", "nameCn": "香蕉道" },
-        { "id": "BombsiteB", "nameCn": "B包" }
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "TRamp",
+          "nameCn": "匪口"
+        },
+        {
+          "id": "LowerMid",
+          "nameCn": "匪口"
+        },
+        {
+          "id": "Banana",
+          "nameCn": "香蕉道"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B包"
+        }
+      ]
+    },
+    {
+      "id": "route_1780681085281",
+      "name": "侧道A1强攻",
+      "type": "primary_entry",
+      "bombsite": "a",
+      "confidence": "high",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "SecondMid",
+          "nameCn": "侧道"
+        },
+        {
+          "id": "TopofMid",
+          "nameCn": "中路"
+        },
+        {
+          "id": "Quad",
+          "nameCn": "马鹏"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A包"
+        }
+      ]
+    },
+    {
+      "id": "route_1780681126248",
+      "name": "匪2二楼控制",
+      "type": "secondary_entry",
+      "bombsite": "a",
+      "confidence": "high",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "TRamp",
+          "nameCn": "匪口"
+        },
+        {
+          "id": "Bridge",
+          "nameCn": "匪桥"
+        },
+        {
+          "id": "Upstairs",
+          "nameCn": "匪二楼"
+        },
+        {
+          "id": "BackAlley",
+          "nameCn": "匪二楼"
+        },
+        {
+          "id": "Apartments",
+          "nameCn": "二楼"
+        },
+        {
+          "id": "Balcony",
+          "nameCn": "阳台"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A包"
+        }
+      ]
+    },
+    {
+      "id": "route_1780681170948",
+      "name": "侧道二楼控制",
+      "type": "secondary_entry",
+      "bombsite": "a",
+      "confidence": "high",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "SecondMid",
+          "nameCn": "侧道"
+        },
+        {
+          "id": "Apartments",
+          "nameCn": "二楼"
+        },
+        {
+          "id": "Balcony",
+          "nameCn": "阳台"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A包"
+        }
+      ]
+    },
+    {
+      "id": "route_1780681203714",
+      "name": "中路警家夹B",
+      "type": "secondary_entry",
+      "bombsite": "b",
+      "confidence": "high",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "TRamp",
+          "nameCn": "匪口"
+        },
+        {
+          "id": "LowerMid",
+          "nameCn": "匪口"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "TopofMid",
+          "nameCn": "中路"
+        },
+        {
+          "id": "Arch",
+          "nameCn": "拱门"
+        },
+        {
+          "id": "CTSpawn",
+          "nameCn": "警家"
+        },
+        {
+          "id": "Ruins",
+          "nameCn": "警家教堂"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B包"
+        }
       ]
     }
   ]
