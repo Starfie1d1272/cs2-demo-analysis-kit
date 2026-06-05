@@ -294,7 +294,7 @@ function MapWorkspace({ model }: MatchWorkspaceProps) {
   );
 }
 
-function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["replay"]; map: MatchWorkspaceModel["map"]["view"] }) {
+export function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["replay"]; map: MatchWorkspaceModel["map"]["view"] }) {
   const [roundNumber, setRoundNumber] = useState(replay.rounds[0]?.roundNumber ?? 1);
   const [frameIndex, setFrameIndex] = useState(0);
   const [playing, setPlaying] = useState(false);

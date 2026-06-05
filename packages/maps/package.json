@@ -4,14 +4,14 @@
   "type": "module",
   "license": "MIT",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./tri-assets": "./src/tri-assets.ts"
   },
   "files": [
-    "src"
+    "src",
+    "map-routes",
+    "map-nav"
   ],
-  "devDependencies": {
-    "@cs2dak/core": "workspace:*"
-  },
   "publishConfig": {
     "access": "public"
   }

@@ -33,7 +33,7 @@ describe("analyzeDemoPackage", () => {
     expect(bundle.timeline.find((event) => event.type === "kill")?.clockLabel).toMatch(/^\d:\d{2}$/);
   });
 
-  it("derives value-account signals and computes v2 RR from the strict v2 fixture", async () => {
+  it("derives RR six-account signals and computes v2 RR from the strict v2 fixture", async () => {
     const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
     const pkg = await loadDemoPackageFromZip(zip);
     const signals = deriveAccountSignalsV2(pkg);
@@ -45,7 +45,7 @@ describe("analyzeDemoPackage", () => {
     expect(signals[0]?.combat.killsByBuyDelta).toEqual({ disadvantage: 2, even: 3, advantage: 8 });
     expect(signals[0]?.combat.killsByManState).toEqual({ manDown: 2, even: 5, manUp: 6 });
     expect(signals[0]?.trade.tradedOpeningDeaths).toBe(0);
-    expect(ratings[0]?.rr.model).toBe("value-accounts-v2-lite");
+    expect(ratings[0]?.rr.model).toBe("rr-six-accounts");
     expect(ratings[0]?.rr.rr).toBeGreaterThan(0);
   });
 
@@ -168,4 +168,5 @@ describe("analyzeDemoPackage", () => {
     const noRounds = deriveAccountSignalsV2({ ...pkg, rounds: [] });
     expect(noRounds[0]?.combat.killsByManState).toBeNull();
   });
+
 });

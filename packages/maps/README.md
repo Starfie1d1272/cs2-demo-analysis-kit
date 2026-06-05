@@ -2,19 +2,24 @@
 
 English | 简体中文
 
-Map calibration, world-to-radar transforms, attack routes, zone geometry, and callout name mappings. Initial constants are aligned with the RivalHub/AWPy-style radar formula and can be expanded per map as fixtures grow.
+Map calibration, world-to-radar transforms, seven-map attack routes, compact nav topology, zone geometry, and callout name mappings. Route assets express tactical semantics; compact nav assets express walkable topology. Static collision visibility is available through the BVH API and is wired as an optional geometry source when `.tri` assets are supplied.
 
 ## Contents
 
 | Directory / file | Purpose |
 |---|---|
 | `src/routes.ts` | `MapRoute` schema (type / confidence / zones) + `routeIndex` / `furthestRouteIndex` |
+| `src/route-assets.ts` | Public active-duty route asset registry + `getMapRoutes(mapName)` |
+| `src/geometry-assets.ts` | Public active-duty compact nav registry + `getMapNav(mapName)` / `getMapGeometry(mapName)` |
 | `src/zones.ts` | `MapZone` polygon geometry + `pointInPolygon` / `zoneAt` |
 | `src/callout-names.ts` | CS2 callout → 中文名 mapping (171 entries, 7 maps) |
 | `src/index.ts` | Public exports + `MAP_CALIBRATIONS` + `worldToRadar` |
 | `map-routes/*.json` | Confirmed attack routes per map (authoritative) |
+| `map-nav/*.nav.json` | Compact AWPy-derived nav graph per active-duty map |
 | `scripts/generate-routes.py` | Refresh `callout-review.md` + `viz/` radar images |
 | `viz/` | Callout and route overlay radar images (generated) |
+| `experimental/` | Historical awpy nav derivation and static-collision BVH spike |
+| `scripts/spike-awpy-spatial.ts` | Regenerate compact nav overlays and benchmark static line of sight |
 
 ## Refresh viz
 

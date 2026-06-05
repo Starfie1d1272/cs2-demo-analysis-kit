@@ -8,7 +8,8 @@
   },
   "dependencies": {
     "@cs2dak/contract": "workspace:*",
-    "@rivalhub/rival-rating": "^0.1.0",
+    "@cs2dak/maps": "workspace:*",
+    "@rivalhub/rival-rating": "^0.2.0",
     "jszip": "^3.10.1"
   },
   "files": [

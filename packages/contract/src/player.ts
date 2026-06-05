@@ -11,7 +11,7 @@ import { leaderboardMetricKeySchema } from "./leaderboard.js";
  */
 
 export const rrBreakdownEntrySchema = z.object({
-  key: z.enum(["combat", "trade", "clutch", "objective", "utility"]),
+  key: z.enum(["combat", "trade", "mapControl", "clutch", "objective", "utility"]),
   label: z.string(),
   value: z.number()
 });

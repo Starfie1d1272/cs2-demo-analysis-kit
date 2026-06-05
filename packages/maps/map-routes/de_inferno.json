@@ -1,5 +1,52 @@
 {
   "mapName": "de_inferno",
   "version": "de_inferno-routes-0.3",
-  "routes": []
+  "routes": [
+    {
+      "id": "a_mid",
+      "name": "中路进A",
+      "type": "primary_entry",
+      "bombsite": "a",
+      "confidence": "high",
+      "zones": [
+        { "id": "TSpawn", "nameCn": "匪家" },
+        { "id": "LowerMid", "nameCn": "匪口" },
+        { "id": "TRamp", "nameCn": "匪口" },
+        { "id": "Middle", "nameCn": "中路" },
+        { "id": "TopofMid", "nameCn": "中路" },
+        { "id": "BombsiteA", "nameCn": "A包" }
+      ]
+    },
+    {
+      "id": "a_arch",
+      "name": "拱门夹A",
+      "type": "secondary_entry",
+      "bombsite": "a",
+      "confidence": "medium",
+      "zones": [
+        { "id": "TSpawn", "nameCn": "匪家" },
+        { "id": "LowerMid", "nameCn": "匪口" },
+        { "id": "TRamp", "nameCn": "匪口" },
+        { "id": "Middle", "nameCn": "中路" },
+        { "id": "TopofMid", "nameCn": "中路" },
+        { "id": "Arch", "nameCn": "拱门" },
+        { "id": "BombsiteA", "nameCn": "A包" }
+      ]
+    },
+    {
+      "id": "b_banana",
+      "name": "香蕉道进B",
+      "type": "primary_entry",
+      "bombsite": "b",
+      "confidence": "high",
+      "zones": [
+        { "id": "TSpawn", "nameCn": "匪家" },
+        { "id": "LowerMid", "nameCn": "匪口" },
+        { "id": "TRamp", "nameCn": "匪口" },
+        { "id": "Middle", "nameCn": "中路" },
+        { "id": "Banana", "nameCn": "香蕉道" },
+        { "id": "BombsiteB", "nameCn": "B包" }
+      ]
+    }
+  ]
 }

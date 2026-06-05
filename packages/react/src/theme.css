@@ -564,6 +564,19 @@
   background: rgba(255,255,255,0.10);
 }
 
+.dak-empty-state {
+  display: grid;
+  gap: 8px;
+  min-height: 220px;
+  align-content: center;
+  text-align: center;
+}
+
+.dak-empty-state h2,
+.dak-empty-state p {
+  margin: 0;
+}
+
 .dak-radar-schematic {
   position: absolute;
   inset: 0;

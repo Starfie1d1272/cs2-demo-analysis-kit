@@ -22,6 +22,7 @@ export const seasonPlayerRowSchema = z.object({
   accountBreakdown: z.object({
     combat: z.number(),
     trade: z.number(),
+    mapControl: z.number(),
     clutch: z.number(),
     objective: z.number(),
     utility: z.number()

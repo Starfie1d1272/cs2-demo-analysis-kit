@@ -45,7 +45,7 @@ export const workspacePlayerSchema = z.object({
   teamName: z.string(),
   summary: z.array(z.string()),
   rrBreakdown: z.array(z.object({
-    key: z.enum(["combat", "trade", "clutch", "objective", "utility"]),
+    key: z.enum(["combat", "trade", "mapControl", "clutch", "objective", "utility"]),
     label: z.string(),
     value: z.number()
   })),

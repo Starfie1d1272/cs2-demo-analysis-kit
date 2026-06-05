@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@rivalhub/rival-rating':
+        specifier: ^0.2.0
+        version: 0.2.0
       jszip:
         specifier: ^3.10.1
         version: 3.10.1
@@ -94,6 +97,9 @@ importers:
       '@cs2dak/core':
         specifier: workspace:*
         version: link:../core
+      '@cs2dak/maps':
+        specifier: workspace:*
+        version: link:../maps
       '@cs2dak/presentation':
         specifier: workspace:*
         version: link:../presentation
@@ -111,14 +117,14 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@rivalhub/rival-rating':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.2.0
+        version: 0.2.0
 
   packages/contract:
     dependencies:
       '@rivalhub/rival-rating':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.2.0
+        version: 0.2.0
       cs2-demo-format:
         specifier: ^2.3.0
         version: 2.3.0(zod@3.25.76)
@@ -131,18 +137,17 @@ importers:
       '@cs2dak/contract':
         specifier: workspace:*
         version: link:../contract
+      '@cs2dak/maps':
+        specifier: workspace:*
+        version: link:../maps
       '@rivalhub/rival-rating':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.2.0
+        version: 0.2.0
       jszip:
         specifier: ^3.10.1
         version: 3.10.1
 
-  packages/maps:
-    devDependencies:
-      '@cs2dak/core':
-        specifier: workspace:*
-        version: link:../core
+  packages/maps: {}
 
   packages/presentation:
     dependencies:
@@ -153,8 +158,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@rivalhub/rival-rating':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.2.0
+        version: 0.2.0
     devDependencies:
       '@cs2dak/cohort':
         specifier: workspace:*
@@ -685,8 +690,8 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
-  '@rivalhub/rival-rating@0.1.0':
-    resolution: {integrity: sha512-N7JAhJBAee5RHYJp8bDoBhn7PdAaYnAOEvBGk5ojVJO3Xq+6HYEZXOfKgRaBhsIr9BvE2edAMV3nthBENYJg1w==}
+  '@rivalhub/rival-rating@0.2.0':
+    resolution: {integrity: sha512-U2gu9orDVknnuDch59IjCrfHggEvMLaS+n7VdlwsN6f7qJFUb7RsDa/3DJsfxIMSiNRslh1KqJUuQO/zRjaQCw==}
 
   '@rolldown/pluginutils@1.0.0-rc.3':
     resolution: {integrity: sha512-eybk3TjzzzV97Dlj5c+XrBFW57eTNhzod66y9HrBlzJ6NsCrWCp/2kaPS3K9wJmurBC0Tdw4yPjXKZqlznim3Q==}
@@ -2032,7 +2037,7 @@ snapshots:
     dependencies:
       playwright: 1.60.0
 
-  '@rivalhub/rival-rating@0.1.0': {}
+  '@rivalhub/rival-rating@0.2.0': {}
 
   '@rolldown/pluginutils@1.0.0-rc.3': {}
 

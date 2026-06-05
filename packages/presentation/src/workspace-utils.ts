@@ -1,6 +1,6 @@
 import type { DemoPackage } from "@cs2dak/contract";
 
-export function round(value: number, digits: number): number {
+export function round(value: number, digits = 3): number {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
 }

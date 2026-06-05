@@ -1,10 +1,10 @@
 import {
-  computeLeagueMeanV2,
-  computeValueAccountsRR,
-  rrValueAccountsV2Lite
+  computeCohortAccountsRR,
+  computeRRSixAccounts,
+  rrSixAccountWeightsV1
 } from "@rivalhub/rival-rating";
-import type { AccountSignalsV2, DemoPackage, ValueAccountsWeights } from "@cs2dak/contract";
-import type { RRResultV2 } from "@rivalhub/rival-rating";
+import type { DemoPackage, RRSignals, RRSixAccountWeights } from "@cs2dak/contract";
+import type { CohortAccountResult, RRSixAccountResult } from "@rivalhub/rival-rating";
 import { normalizeDemoPackage } from "./normalize.js";
 import {
   type BuyDeltaBuckets,
@@ -24,7 +24,9 @@ import {
   firstKillMap
 } from "./utils.js";
 
-export function deriveAccountSignalsV2(input: unknown): AccountSignalsV2[] {
+export type AccountRatingResult = CohortAccountResult & Pick<RRSixAccountResult, "combatContextFactor" | "weightsVersion" | "model">;
+
+export function deriveRRSignals(input: unknown): RRSignals[] {
   const pkg = normalizeDemoPackage(input);
   const statsBySteamId = new Map(pkg.playerStats.map((row) => [row.steamId64, row]));
   const killsByBuyDelta = buildKillsByBuyDelta(pkg);
@@ -71,7 +73,17 @@ export function deriveAccountSignalsV2(input: unknown): AccountSignalsV2[] {
         tradeKills: stats?.tradeKillCount ?? playerKills.filter((kill) => kill.tradeKill).length,
         tradedDeaths: stats?.tradeDeathCount ?? playerDeaths.filter((kill) => kill.tradeDeath).length,
         deaths: stats?.deaths ?? playerDeaths.length,
-        tradedOpeningDeaths: tradedOpeningDeaths.get(player.steamId64) ?? 0
+        tradedOpeningDeaths: tradedOpeningDeaths.get(player.steamId64) ?? 0,
+        strategicIsolationDeaths: null
+      },
+      // MapControl 空间派生退回 shadow（null）：proxy 实现已移除，
+      // 待 strict-gated 重建后接入（见 docs/design/rr-model.md「空间账户」）。
+      mapControl: {
+        uniqueStrategicControlSeconds: null,
+        contestedFrontierControlSeconds: null,
+        routeDenialSeconds: null,
+        teammateAdvanceUnits: null,
+        firstControlEvents: null
       },
       clutch: {
         vsOne: clutchSplitV2(stats?.vsOneCount, stats?.vsOneWonCount, playerClutches, 1),
@@ -81,32 +93,44 @@ export function deriveAccountSignalsV2(input: unknown): AccountSignalsV2[] {
         vsFive: clutchSplitV2(stats?.vsFiveCount, stats?.vsFiveWonCount, playerClutches, 5)
       },
       objective: objective.get(player.steamId64) ?? { plants: 0, defuses: 0, plantsConverted: 0 },
-      utility: utility.get(player.steamId64) ?? {
-        flashAssists: stats?.flashAssistCount ?? 0,
-        enemyFlashDurationSeconds: stats?.enemyFlashDurationSeconds ?? 0,
-        teamFlashDurationSeconds: stats?.teamFlashDurationSeconds ?? 0,
-        utilityDamage: stats?.utilityDamage ?? 0
+      utility: {
+        ...(utility.get(player.steamId64) ?? {
+          flashAssists: stats?.flashAssistCount ?? 0,
+          effectiveEnemyFlashSeconds: stats?.enemyFlashDurationSeconds ?? 0,
+          teamFlashSuppressionSeconds: stats?.teamFlashDurationSeconds ?? 0,
+          smokeProtectedCrossings: null,
+          smokeSightlineDenialSeconds: null,
+          smokeIsolationSeconds: null,
+          incendiaryPathDelayUnits: null,
+          incendiaryDisplacementEvents: null,
+          utilityDamage: stats?.utilityDamage ?? 0
+        })
       }
-    } satisfies AccountSignalsV2;
+    } satisfies RRSignals;
   });
 }
 
-export function computeAccountRatingsV2(input: unknown): Array<{ signals: AccountSignalsV2; rr: RRResultV2 }> {
-  const weights = rrValueAccountsV2Lite as unknown as ValueAccountsWeights;
-  const rated = deriveAccountSignalsV2(input).map((signals) => ({
-    signals,
-    rr: computeValueAccountsRR(signals, weights)
-  }));
+export const deriveAccountSignalsV2 = deriveRRSignals;
 
-  // 联赛锚定（weights.anchor.mode === "league_mean"）：整体乘 (1.0 / mean)，
-  // 使 1.00 = 本场均值。本层一次只处理单场，故"联赛均值"= 本场均值（per-match）；
-  // 真正的赛季级锚定属于上游跨场聚合层，详见 docs/design/rr-v2-lite.md。
-  const mean = computeLeagueMeanV2(rated.map((row) => row.rr));
-  const factor = mean > 0 ? 1.0 / mean : 1.0;
-  return rated.map((row) => ({
-    signals: row.signals,
-    rr: { ...row.rr, rr: row.rr.rr * factor }
-  }));
+export function computeAccountRatingsV2(input: unknown): Array<{ signals: RRSignals; rr: AccountRatingResult }> {
+  const weights = rrSixAccountWeightsV1 as unknown as RRSixAccountWeights;
+  const signals = deriveRRSignals(input);
+  const rawBySteamId = new Map(signals.map((row) => [row.steamId64, computeRRSixAccounts(row, weights)]));
+  const balanced = computeCohortAccountsRR(signals, weights);
+
+  return balanced.map((rr, index) => {
+    const signal = signals[index]!;
+    const raw = rawBySteamId.get(signal.steamId64);
+    return {
+      signals: signal,
+      rr: {
+        ...rr,
+        combatContextFactor: raw?.combatContextFactor ?? 1,
+        weightsVersion: raw?.weightsVersion ?? weights.version,
+        model: raw?.model ?? "rr-six-accounts"
+      }
+    };
+  });
 }
 
 function buildKillsByBuyDelta(pkg: DemoPackage): Map<string, BuyDeltaBuckets> {
@@ -208,8 +232,13 @@ function buildUtilitySignals(pkg: DemoPackage): Map<string, UtilityBuckets> {
     const stats = statsBySteamId.get(player.steamId64);
     out.set(player.steamId64, {
       flashAssists: stats?.flashAssistCount ?? pkg.kills.filter((kill) => kill.flashAssisterSteamId64 === player.steamId64).length,
-      enemyFlashDurationSeconds: stats?.enemyFlashDurationSeconds ?? 0,
-      teamFlashDurationSeconds: stats?.teamFlashDurationSeconds ?? 0,
+      effectiveEnemyFlashSeconds: stats?.enemyFlashDurationSeconds ?? 0,
+      teamFlashSuppressionSeconds: stats?.teamFlashDurationSeconds ?? 0,
+      smokeProtectedCrossings: null,
+      smokeSightlineDenialSeconds: null,
+      smokeIsolationSeconds: null,
+      incendiaryPathDelayUnits: null,
+      incendiaryDisplacementEvents: null,
       utilityDamage: stats?.utilityDamage ?? 0
     });
   }
@@ -217,14 +246,19 @@ function buildUtilitySignals(pkg: DemoPackage): Map<string, UtilityBuckets> {
   for (const blind of pkg.blinds) {
     const buckets = getOrInit(out, blind.flasherSteamId64, () => ({
       flashAssists: 0,
-      enemyFlashDurationSeconds: 0,
-      teamFlashDurationSeconds: 0,
+      effectiveEnemyFlashSeconds: 0,
+      teamFlashSuppressionSeconds: 0,
+      smokeProtectedCrossings: null,
+      smokeSightlineDenialSeconds: null,
+      smokeIsolationSeconds: null,
+      incendiaryPathDelayUnits: null,
+      incendiaryDisplacementEvents: null,
       utilityDamage: 0
     }));
     if (blind.flasherTeamKey !== blind.flashedTeamKey) {
-      buckets.enemyFlashDurationSeconds = round(buckets.enemyFlashDurationSeconds + blind.durationSeconds, 3);
+      buckets.effectiveEnemyFlashSeconds = round((buckets.effectiveEnemyFlashSeconds ?? 0) + blind.durationSeconds, 3);
     } else if (blind.flashedSteamId64 !== blind.flasherSteamId64) {
-      buckets.teamFlashDurationSeconds = round((buckets.teamFlashDurationSeconds ?? 0) + blind.durationSeconds, 3);
+      buckets.teamFlashSuppressionSeconds = round((buckets.teamFlashSuppressionSeconds ?? 0) + blind.durationSeconds, 3);
     }
   }
 

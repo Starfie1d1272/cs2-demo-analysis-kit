@@ -5,16 +5,13 @@
  * 用真实产出的 baseline JSON 喂 rival-rating 的 computeFrozenProBaselineRR，
  * 在职业样本上应复现 mean≈1.0；并演示「单张 demo 独立评分」（不需要 cohort）。
  *
- * 注意：本脚本从**本地 rival-rating 源码**按绝对路径导入 computeFrozenProBaselineRR，
- * 因为 core/cohort 仍 pin 在旧 github commit；正式接线需 re-pin（见 pro-baseline.md）。
- *
  * 用法：
  *   pnpm exec tsx scripts/validate-frozen-baseline.ts <zip-dir> <baseline.json>
  */
 import { readFile, readdir } from "node:fs/promises";
 import { extname, join } from "node:path";
-import { deriveAccountSignalsV2, loadDemoPackageFromZip } from "@cs2dak/core";
-import { computeFrozenProBaselineRR, rrValueAccountsV2Lite } from "@rivalhub/rival-rating";
+import { deriveRRSignals, loadDemoPackageFromZip } from "@cs2dak/core";
+import { computeFrozenProBaselineRR, rrSixAccountWeightsV1 } from "@rivalhub/rival-rating";
 
 function mean(xs: number[]) {
   return xs.reduce((a, b) => a + b, 0) / xs.length;
@@ -27,7 +24,7 @@ function pstd(xs: number[]) {
 async function main() {
   const [zipDir, baselinePath] = process.argv.slice(2);
   const baseline = JSON.parse(await readFile(baselinePath, "utf-8"));
-  const weights = rrValueAccountsV2Lite as never;
+  const weights = rrSixAccountWeightsV1 as never;
 
   const zipNames = (await readdir(zipDir)).filter((n) => extname(n).toLowerCase() === ".zip").sort();
   const all: number[] = [];
@@ -35,7 +32,7 @@ async function main() {
 
   for (const name of zipNames) {
     const pkg = await loadDemoPackageFromZip(await readFile(join(zipDir, name)));
-    const signals = deriveAccountSignalsV2(pkg);
+    const signals = deriveRRSignals(pkg);
     // 单张 demo 独立评分：只喂这张图的选手 signals，不构成任何 cohort
     const scored = signals.map((s) => computeFrozenProBaselineRR(s, weights, baseline).rr);
     all.push(...scored);

@@ -1,4 +1,4 @@
-export { MatchWorkspace } from "./components/MatchWorkspace";
+export { MatchWorkspace, ReplayViewer } from "./components/MatchWorkspace";
 export { ScoreboardTable } from "./components/ScoreboardTable";
 export { RoundTimeline } from "./components/RoundTimeline";
 export { EconomyPanel } from "./components/EconomyPanel";

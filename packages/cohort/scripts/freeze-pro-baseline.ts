@@ -2,7 +2,7 @@
 /**
  * freeze-pro-baseline — 从一批职业 demo 的 v2 ZIP 冻结固定职业基准曲线参数。
  *
- * 背景见 docs/design/pro-baseline.md。当前 cohort 归一化是「赛季相对」（在被分析这批人
+ * 背景见 docs/archive/2026-06/pro-baseline.md。当前 cohort 归一化是「赛季相对」（在被分析这批人
  * 内部 z-score + 残差化 + 按 std(rrV1) 缩放），分数不可移植、单 demo 无法绝对评分。
  * 本脚本把该归一化的**参数**从职业样本里固化下来，使任意单张 demo 可对同一把尺子量：
  *
@@ -32,12 +32,14 @@ import {
 } from "@cs2dak/core";
 import {
   computeRR,
-  rrValueAccountsV2Lite,
-  rrWeightsV1
+  hltv2BaselineWeightsV1,
+  rrSixAccountWeightsV1,
+  RR_ACCOUNTS
 } from "@rivalhub/rival-rating";
+import type { RRAccountKey, RRSixAccountWeights } from "@rivalhub/rival-rating";
 
-const ACCOUNTS = ["combat", "trade", "clutch", "objective", "utility"] as const;
-type Account = (typeof ACCOUNTS)[number];
+const ACCOUNTS = RR_ACCOUNTS;
+type Account = RRAccountKey;
 
 function mean(xs: number[]): number {
   return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
@@ -87,18 +89,14 @@ async function main() {
   const verIdx = rest.indexOf("--version");
   const version = verIdx >= 0 ? rest[verIdx + 1] : "pro_baseline_cs2_2026H1_v0_provisional";
 
-  const weights = rrValueAccountsV2Lite as unknown as {
-    version: string;
-    accountWeights: Record<Account, number>;
-    clamp: { min: number; max: number };
-  };
+  const weights = rrSixAccountWeightsV1 as unknown as RRSixAccountWeights;
   const w = weights.accountWeights;
 
   const zipNames = (await readdir(zipDir)).filter((n) => extname(n).toLowerCase() === ".zip").sort();
   if (zipNames.length === 0) throw new Error(`No .zip in ${zipDir}`);
 
   // ── 采集每个 player-map 的 raw 账户 + rrV1 ──────────────────────────────
-  const raw: Record<Account, number[]> = { combat: [], trade: [], clutch: [], objective: [], utility: [] };
+  const raw = Object.fromEntries(ACCOUNTS.map((account) => [account, []])) as Record<Account, number[]>;
   const rrV1: number[] = [];
   const mapsByName = new Map<string, number>();
 
@@ -106,7 +104,7 @@ async function main() {
     const pkg = await loadDemoPackageFromZip(await readFile(join(zipDir, name)));
     const ratings = computeAccountRatingsV2(pkg); // [{ signals, rr }]
     const indicators = deriveRRIndicators(pkg);
-    const rrBySt = new Map(indicators.map((row) => [row.steamId64, computeRR(row, rrWeightsV1 as never).rr]));
+    const rrBySt = new Map(indicators.map((row) => [row.steamId64, computeRR(row, hltv2BaselineWeightsV1 as never).rr]));
     const mapName = parse(name).name.split("_").slice(0, 3).join("_"); // date_de_map
     mapsByName.set(mapName, (mapsByName.get(mapName) ?? 0) + 1);
     for (const { signals, rr } of ratings) {
@@ -165,7 +163,7 @@ async function main() {
       playerMapRows: n,
       mapCoverage: Object.fromEntries([...mapsByName.entries()].sort()),
       weightsVersion: weights.version,
-      rrV1WeightsVersion: (rrWeightsV1 as { version: string }).version
+      rrV1WeightsVersion: (hltv2BaselineWeightsV1 as { version: string }).version
     },
     accountWeights: w,
     clamp: weights.clamp,

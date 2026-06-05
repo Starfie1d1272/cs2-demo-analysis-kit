@@ -35,7 +35,7 @@ afterAll(async () => {
 });
 
 describe("cs2dak analyze", () => {
-  it("writes analysis-bundle.json, view-model.json, qa-report.json from a ZIP", async () => {
+  it("writes analysis-bundle.json, view-model.json and qa-report.json from a ZIP", async () => {
     const outDir = join(tmpDir, "analyze-zip");
     const result = await runCli("analyze", FIXTURE_ZIP, "--out", outDir);
 

@@ -1,7 +1,7 @@
 import {
   computeRR,
   computePrism,
-  rrWeightsV1,
+  hltv2BaselineWeightsV1,
   prismWeightsV1,
   rrToPercentile,
   type RRResult,
@@ -10,14 +10,14 @@ import {
   type PrismComputeInput
 } from "@rivalhub/rival-rating";
 import type {
-  AccountSignalsV2,
   DemoPackage,
   PlayerIndicatorRow,
   PlayerRoundFact,
   PlayerScoreboardRow,
   RRIndicators
 } from "@cs2dak/contract";
-import type { RRResultV2 } from "@rivalhub/rival-rating";
+import type { RRSignals } from "@rivalhub/rival-rating";
+import type { AccountRatingResult } from "./signals.js";
 import { normalizeDemoPackage } from "./normalize.js";
 import { round, firstKillMap, clutchSplit, isUtilityWeapon, killWeaponName } from "./utils.js";
 import { fieldAvailability, fieldConfidence } from "./qa.js";
@@ -185,7 +185,7 @@ export function buildPlayerIndicators(pkg: DemoPackage, facts: PlayerRoundFact[]
     } satisfies RRIndicators;
   });
 
-  const rrWeights = rrWeightsV1 as unknown as RRWeights;
+  const rrWeights = hltv2BaselineWeightsV1 as unknown as RRWeights;
   const prismWeights = prismWeightsV1 as unknown as PrismWeights;
   const rrResults = indicators.map((indicator) => computeRR(indicator, rrWeights));
   const rrScores = rrResults.map((result) => result.rr);
@@ -213,7 +213,7 @@ export function buildPlayerIndicators(pkg: DemoPackage, facts: PlayerRoundFact[]
 export function buildScoreboard(
   pkg: DemoPackage,
   rows: PlayerIndicatorRow[],
-  accountRatings: Array<{ signals: AccountSignalsV2; rr: RRResultV2 }>
+  accountRatings: Array<{ signals: RRSignals; rr: AccountRatingResult }>
 ): PlayerScoreboardRow[] {
   const accountBySteamId = new Map(accountRatings.map((row) => [row.signals.steamId64, row]));
   const statsBySteamId = new Map(pkg.playerStats.map((row) => [row.steamId64, row]));
@@ -258,6 +258,7 @@ export function buildScoreboard(
       accountBreakdown: {
         combat: round(accountRr?.accounts.combat ?? 0, 4),
         trade: round(accountRr?.accounts.trade ?? 0, 4),
+        mapControl: round(accountRr?.accounts.mapControl ?? 0, 4),
         clutch: round(accountRr?.accounts.clutch ?? 0, 4),
         objective: round(accountRr?.accounts.objective ?? 0, 4),
         utility: round(accountRr?.accounts.utility ?? 0, 4)

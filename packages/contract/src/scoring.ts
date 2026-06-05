@@ -76,4 +76,12 @@ export const rrIndicatorsSchema: z.ZodType<RRIndicators> = z.object({
   roundSwingPerKill: z.number().nullable()
 });
 
-export type { AccountSignalsV2, RRIndicators, RRResult, RRResultV2, PrismResult, ValueAccountsWeights } from "@rivalhub/rival-rating";
+export type {
+  CohortAccountResult,
+  PrismResult,
+  RRIndicators,
+  RRResult,
+  RRSignals,
+  RRSixAccountResult,
+  RRSixAccountWeights
+} from "@rivalhub/rival-rating";

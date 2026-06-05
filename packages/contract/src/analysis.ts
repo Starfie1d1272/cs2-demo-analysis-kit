@@ -75,10 +75,11 @@ export const playerScoreboardRowSchema = z.object({
   accountRRRaw: z.number(),
   /** Combat 击杀项的 context 乘子（1.0 = context 未生效 / 已降级）。 */
   accountCombatContextFactor: z.number(),
-  /** 五账户对 RR 的加权贡献（解释面板用；和为 accountRRRaw − intercept）。 */
+  /** 六账户对 RR 的加权贡献（解释面板用）。 */
   accountBreakdown: z.object({
     combat: z.number(),
     trade: z.number(),
+    mapControl: z.number(),
     clutch: z.number(),
     objective: z.number(),
     utility: z.number()

@@ -14,6 +14,7 @@ import { displayWeaponName } from "./weapons.js";
 const RR_BREAKDOWN_LABEL: Record<RRBreakdownEntry["key"], string> = {
   combat: "Combat",
   trade: "Trade",
+  mapControl: "MapControl",
   clutch: "Clutch",
   objective: "Objective",
   utility: "Utility"

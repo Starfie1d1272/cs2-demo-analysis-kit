@@ -12,6 +12,7 @@
   "references": [
     { "path": "../core" },
     { "path": "../cohort" },
+    { "path": "../maps" },
     { "path": "../presentation" }
   ]
 }

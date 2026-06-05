@@ -8,7 +8,7 @@ import { buildPlayerWeaponHighlights } from "./weapon-highlights.js";
 
 export { loadDemoPackageFromZip } from "./loader.js";
 export { normalizeDemoPackage } from "./normalize.js";
-export { deriveAccountSignalsV2, computeAccountRatingsV2 } from "./signals.js";
+export { deriveRRSignals, deriveAccountSignalsV2, computeAccountRatingsV2 } from "./signals.js";
 export { deriveRRIndicators } from "./scoreboard.js";
 export { derivePlayerWeaponHighlights } from "./weapon-highlights.js";
 export { buildEconomyConversion } from "./economy.js";

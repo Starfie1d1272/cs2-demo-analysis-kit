@@ -8,5 +8,5 @@
     "emitDeclarationOnly": true,
     "outDir": "dist"
   },
-  "include": ["src"]
+  "include": ["src", "experimental", "map-routes/*.json", "map-nav/*.json"]
 }

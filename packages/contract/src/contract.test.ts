@@ -108,7 +108,7 @@ const minimalScoreboardRow = {
   rr: 1.05, rrPercentile: 55,
   accountRR: 1.1, accountRRRaw: 1.08,
   accountCombatContextFactor: 1.0,
-  accountBreakdown: { combat: 0.4, trade: 0.1, clutch: 0.05, objective: 0.05, utility: 0.1 },
+  accountBreakdown: { combat: 0.4, trade: 0.1, mapControl: 0, clutch: 0.05, objective: 0.05, utility: 0.1 },
   accountContextStatus: { buyDelta: "available" as const, manState: "available" as const },
 };
 
@@ -494,7 +494,7 @@ describe("seasonCohortBundleSchema", () => {
     version: "cs2-demo-analysis-kit/cohort-1.0" as const,
     matchCount: 3,
     players: [],
-    weightsVersion: "value-accounts-v2-lite@0.1.0",
+    weightsVersion: "rr-six-accounts-1.0",
     provenance: {
       cohortVersion: "cs2-demo-analysis-kit/cohort-1.0" as const,
       sourceSchemaVersion: "cs2-demo-format/2.0" as const,

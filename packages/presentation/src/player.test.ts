@@ -50,6 +50,7 @@ describe("buildPlayerSeasonProfile", () => {
       expect(profile.rating.breakdown.map((b) => b.key)).toEqual([
         "combat",
         "trade",
+        "mapControl",
         "clutch",
         "objective",
         "utility"

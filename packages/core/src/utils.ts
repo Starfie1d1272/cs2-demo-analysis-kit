@@ -1,9 +1,9 @@
-import type { AccountSignalsV2, DemoPackage } from "@cs2dak/contract";
+import type { DemoPackage, RRSignals } from "@cs2dak/contract";
 
-export type BuyDeltaBuckets = NonNullable<AccountSignalsV2["combat"]["killsByBuyDelta"]>;
-export type ManStateBuckets = NonNullable<AccountSignalsV2["combat"]["killsByManState"]>;
-export type ObjectiveBuckets = AccountSignalsV2["objective"];
-export type UtilityBuckets = AccountSignalsV2["utility"];
+export type BuyDeltaBuckets = NonNullable<RRSignals["combat"]["killsByBuyDelta"]>;
+export type ManStateBuckets = NonNullable<RRSignals["combat"]["killsByManState"]>;
+export type ObjectiveBuckets = RRSignals["objective"];
+export type UtilityBuckets = RRSignals["utility"];
 
 export const BUY_DELTA_EVEN_THRESHOLD = 1000;
 

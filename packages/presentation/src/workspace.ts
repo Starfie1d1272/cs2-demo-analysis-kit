@@ -88,6 +88,7 @@ export function buildMatchWorkspaceModel(input: unknown): MatchWorkspaceModel {
       rrBreakdown: [
         { key: "combat", label: "Combat", value: row.accountBreakdown.combat },
         { key: "trade", label: "Trade", value: row.accountBreakdown.trade },
+        { key: "mapControl", label: "MapControl", value: row.accountBreakdown.mapControl },
         { key: "clutch", label: "Clutch", value: row.accountBreakdown.clutch },
         { key: "objective", label: "Objective", value: row.accountBreakdown.objective },
         { key: "utility", label: "Utility", value: row.accountBreakdown.utility }
@@ -229,6 +230,7 @@ const STORY_COPY = {
     dom: {
       combat: "纯粹的枪法压制",
       trade: "默契的补枪联动",
+      mapControl: "地图空间的控制",
       clutch: "残局里的收割能力",
       objective: "对包点目标的推进",
       utility: "道具开路的支援"

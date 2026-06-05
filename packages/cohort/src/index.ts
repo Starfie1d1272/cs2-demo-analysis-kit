@@ -1,5 +1,5 @@
 import {
-  deriveAccountSignalsV2,
+  deriveRRSignals,
   derivePlayerWeaponHighlights,
   deriveRRIndicators,
   computeAccountRatingsV2
@@ -7,13 +7,13 @@ import {
 import {
   seasonCohortBundleSchema,
   type AccountContextAvailability,
-  type AccountSignalsV2,
   type DemoPackage,
   type RRIndicators,
+  type RRSignals,
   type PlayerWeaponHighlightFacts,
   type SeasonCohortBundle,
   type TeamKey,
-  type ValueAccountsWeights
+  type RRSixAccountWeights
 } from "@cs2dak/contract";
 import {
   computeCohortAccountsRR,
@@ -21,8 +21,8 @@ import {
   computeRR,
   prismWeightsV1,
   rrToPercentile,
-  rrValueAccountsV2Lite,
-  rrWeightsV1,
+  hltv2BaselineWeightsV1,
+  rrSixAccountWeightsV1,
   type PrismComputeInput,
   type PrismWeights,
   type RRWeights
@@ -35,7 +35,7 @@ export interface SeasonCohortInput {
 
 export interface SeasonCohortOptions {
   rrWeights?: RRWeights;
-  valueWeights?: ValueAccountsWeights;
+  valueWeights?: RRSixAccountWeights;
   prismWeights?: PrismWeights;
   identityMap?: PlayerIdentityMap;
 }
@@ -57,7 +57,7 @@ interface PlayerAccumulator {
   names: Map<string, number>;
   teamKeys: Set<TeamKey>;
   mapCount: number;
-  signals: AccountSignalsV2[];
+  signals: RRSignals[];
   indicators: RRIndicators[];
   weaponHighlights: PlayerWeaponHighlightFacts[];
   perMatch: Array<{ matchId: string; steamId64: string; accountRR: number; rrV1: number }>;
@@ -67,14 +67,14 @@ export function buildSeasonCohort(
   demos: SeasonCohortInput[],
   opts: SeasonCohortOptions = {}
 ): SeasonCohortBundle {
-  const rrWeights = opts.rrWeights ?? (rrWeightsV1 as unknown as RRWeights);
-  const valueWeights = opts.valueWeights ?? (rrValueAccountsV2Lite as unknown as ValueAccountsWeights);
+  const rrWeights = opts.rrWeights ?? (hltv2BaselineWeightsV1 as unknown as RRWeights);
+  const valueWeights = opts.valueWeights ?? (rrSixAccountWeightsV1 as unknown as RRSixAccountWeights);
   const prismWeights = opts.prismWeights ?? (prismWeightsV1 as unknown as PrismWeights);
   const identityMap = opts.identityMap ?? {};
   const players = new Map<string, PlayerAccumulator>();
 
   for (const demo of demos) {
-    const signals = deriveAccountSignalsV2(demo.pkg);
+    const signals = deriveRRSignals(demo.pkg);
     const indicators = deriveRRIndicators(demo.pkg);
     const weaponHighlights = derivePlayerWeaponHighlights(demo.pkg);
     const matchAccounts = computeAccountRatingsV2(demo.pkg);
@@ -180,6 +180,7 @@ export function buildSeasonCohort(
           accountBreakdown: {
             combat: round(balanced.accounts.combat, 4),
             trade: round(balanced.accounts.trade, 4),
+            mapControl: round(balanced.accounts.mapControl, 4),
             clutch: round(balanced.accounts.clutch, 4),
             objective: round(balanced.accounts.objective, 4),
             utility: round(balanced.accounts.utility, 4)
@@ -200,7 +201,7 @@ function resolveIdentity(steamId64: string, identityMap: PlayerIdentityMap): Pla
   return value;
 }
 
-function aggregateAccountSignals(steamId64: string, rows: AccountSignalsV2[]): AccountSignalsV2 {
+function aggregateAccountSignals(steamId64: string, rows: RRSignals[]): RRSignals {
   return {
     steamId64,
     rounds: sum(rows, (row) => row.rounds),
@@ -227,7 +228,15 @@ function aggregateAccountSignals(steamId64: string, rows: AccountSignalsV2[]): A
       tradeKills: sum(rows, (row) => row.trade.tradeKills),
       tradedDeaths: sum(rows, (row) => row.trade.tradedDeaths),
       deaths: sum(rows, (row) => row.trade.deaths),
-      tradedOpeningDeaths: sumNullable(rows.map((row) => row.trade.tradedOpeningDeaths))
+      tradedOpeningDeaths: sumNullable(rows.map((row) => row.trade.tradedOpeningDeaths)),
+      strategicIsolationDeaths: sumNullable(rows.map((row) => row.trade.strategicIsolationDeaths))
+    },
+    mapControl: {
+      uniqueStrategicControlSeconds: sumNullable(rows.map((row) => row.mapControl.uniqueStrategicControlSeconds)),
+      contestedFrontierControlSeconds: sumNullable(rows.map((row) => row.mapControl.contestedFrontierControlSeconds)),
+      routeDenialSeconds: sumNullable(rows.map((row) => row.mapControl.routeDenialSeconds)),
+      teammateAdvanceUnits: sumNullable(rows.map((row) => row.mapControl.teammateAdvanceUnits)),
+      firstControlEvents: sumNullable(rows.map((row) => row.mapControl.firstControlEvents))
     },
     clutch: {
       vsOne: sumSplit(rows, (row) => row.clutch.vsOne),
@@ -243,8 +252,13 @@ function aggregateAccountSignals(steamId64: string, rows: AccountSignalsV2[]): A
     },
     utility: {
       flashAssists: sum(rows, (row) => row.utility.flashAssists),
-      enemyFlashDurationSeconds: sum(rows, (row) => row.utility.enemyFlashDurationSeconds),
-      teamFlashDurationSeconds: sumNullable(rows.map((row) => row.utility.teamFlashDurationSeconds)),
+      effectiveEnemyFlashSeconds: sumNullable(rows.map((row) => row.utility.effectiveEnemyFlashSeconds)),
+      teamFlashSuppressionSeconds: sumNullable(rows.map((row) => row.utility.teamFlashSuppressionSeconds)),
+      smokeProtectedCrossings: sumNullable(rows.map((row) => row.utility.smokeProtectedCrossings)),
+      smokeSightlineDenialSeconds: sumNullable(rows.map((row) => row.utility.smokeSightlineDenialSeconds)),
+      smokeIsolationSeconds: sumNullable(rows.map((row) => row.utility.smokeIsolationSeconds)),
+      incendiaryPathDelayUnits: sumNullable(rows.map((row) => row.utility.incendiaryPathDelayUnits)),
+      incendiaryDisplacementEvents: sumNullable(rows.map((row) => row.utility.incendiaryDisplacementEvents)),
       utilityDamage: sum(rows, (row) => row.utility.utilityDamage)
     }
   };
@@ -397,7 +411,7 @@ function stdev(xs: number[]): number {
   return Math.sqrt(sum(xs, (x) => (x - m) ** 2) / xs.length);
 }
 
-function accountContextStatus(rows: AccountSignalsV2[]): { buyDelta: AccountContextAvailability; manState: AccountContextAvailability } {
+function accountContextStatus(rows: RRSignals[]): { buyDelta: AccountContextAvailability; manState: AccountContextAvailability } {
   return {
     buyDelta: availability(rows.map((row) => row.combat.killsByBuyDelta != null)),
     manState: availability(rows.map((row) => row.combat.killsByManState != null))
@@ -423,7 +437,7 @@ function availabilityScore(value: AccountContextAvailability): number {
   return 0;
 }
 
-function sumBuyDelta(values: AccountSignalsV2["combat"]["killsByBuyDelta"][]): AccountSignalsV2["combat"]["killsByBuyDelta"] {
+function sumBuyDelta(values: RRSignals["combat"]["killsByBuyDelta"][]): RRSignals["combat"]["killsByBuyDelta"] {
   const present = values.filter((value): value is NonNullable<typeof value> => value != null);
   if (present.length === 0) return null;
   return {
@@ -433,7 +447,7 @@ function sumBuyDelta(values: AccountSignalsV2["combat"]["killsByBuyDelta"][]): A
   };
 }
 
-function sumManState(values: AccountSignalsV2["combat"]["killsByManState"][]): AccountSignalsV2["combat"]["killsByManState"] {
+function sumManState(values: RRSignals["combat"]["killsByManState"][]): RRSignals["combat"]["killsByManState"] {
   const present = values.filter((value): value is NonNullable<typeof value> => value != null);
   if (present.length === 0) return null;
   return {

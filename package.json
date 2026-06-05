@@ -33,6 +33,7 @@
     "vitest": "^3.0.0"
   },
   "dependencies": {
+    "@rivalhub/rival-rating": "^0.2.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",

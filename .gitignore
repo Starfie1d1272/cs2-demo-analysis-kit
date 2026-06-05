@@ -5,6 +5,7 @@ build/
 .vite/
 coverage/
 fixtures/output/
+packages/maps/experimental-output/
 # Demo binaries are large and live only locally (never committed)
 *.dem
 # Local scratch: benchmark demos, scripts, and golden baselines
