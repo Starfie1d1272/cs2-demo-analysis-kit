@@ -6,6 +6,8 @@ import {
 import type { DemoPackage, RRSignals, RRSixAccountWeights } from "@cs2dak/contract";
 import type { CohortAccountResult, RRSixAccountResult } from "@rivalhub/rival-rating";
 import { normalizeDemoPackage } from "./normalize.js";
+import { loadSpatialAssets } from "./spatial/annotate.js";
+import { buildOfficialMapControl } from "./spatial/mapcontrol.js";
 import {
   type BuyDeltaBuckets,
   type ManStateBuckets,
@@ -39,6 +41,12 @@ export function deriveRRSignals(input: unknown): RRSignals[] {
   // 而非零桶——零桶语义是"源在、但该选手无相关样本"。区分二者是 v2 可信展示的前提。
   const buyDeltaAvailable = pkg.playerEconomies.length > 0;
   const manStateAvailable = pkg.rounds.length > 0;
+
+  // official MapControl 派生（SP2，rr-model.md §3.3）：当前只接 strategicIsolationDeaths
+  // 进 Trade 闭环（rival-rating 已就绪）；MapControl 评分账户仍为 shadow（proxy 字段发 null）。
+  const spatialAssets = loadSpatialAssets(pkg.match?.mapName ?? pkg.manifest?.mapName ?? "");
+  const officialMapControl = buildOfficialMapControl(pkg, spatialAssets);
+  const spatialObservable = spatialAssets.routes != null && (pkg.positions1s?.length ?? 0) > 0;
 
   return pkg.players.map((player) => {
     const stats = statsBySteamId.get(player.steamId64);
@@ -74,7 +82,10 @@ export function deriveRRSignals(input: unknown): RRSignals[] {
         tradedDeaths: stats?.tradeDeathCount ?? playerDeaths.filter((kill) => kill.tradeDeath).length,
         deaths: stats?.deaths ?? playerDeaths.length,
         tradedOpeningDeaths: tradedOpeningDeaths.get(player.steamId64) ?? 0,
-        strategicIsolationDeaths: null
+        // 可观测（有 positions + routes）→ 0 或正 credit；不可观测 → null（不抵扣）。
+        strategicIsolationDeaths: spatialObservable
+          ? (officialMapControl.get(player.steamId64)?.strategicIsolationDeaths ?? 0)
+          : null
       },
       // MapControl 空间派生退回 shadow（null）：proxy 实现已移除，
       // 待 strict-gated 重建后接入（见 docs/design/rr-model.md「空间账户」）。

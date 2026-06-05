@@ -10,3 +10,5 @@ export { OFFICIAL_EXCLUDED_PHASES, isOfficialScoringPhase } from "./types.js";
 export { inferRoundPhases, phaseAtTick } from "./phase.js";
 export type { SpatialAssets, AnnotatedSample } from "./annotate.js";
 export { loadSpatialAssets, annotatePositions, groupSamplesByRoundTick } from "./annotate.js";
+export type { OfficialMapControl } from "./mapcontrol.js";
+export { buildOfficialMapControl } from "./mapcontrol.js";

@@ -134,6 +134,13 @@ official scoring 排除 `save / exit / freeze`（仍可进 review 层）。
 
 ### 3.3 strategicIsolationDeathCredits（Trade 闭环，P2 最高优先）
 
+> **状态：✅ 已落地（in-repo，无需改 rival-rating）。** `core/spatial/mapcontrol.ts`
+> `buildOfficialMapControl` 派生 `activeSoloPressureSeconds`（callout-based MVP ablation +
+> 同线敌方施压 + official phase + per-round cap 8s）与 `strategicIsolationDeaths`；
+> `signals.ts` 接进 `trade.strategicIsolationDeaths`，rival-rating 的
+> `effectiveUntradedDeaths = deaths − tradedDeaths − strategicIsolationDeaths` 自动激活。
+> 可观测（有 positions+routes）→ 0 或正 credit；不可观测 → null。
+
 对每次**未被交易**的死亡，回看前 8–10s：若有 `activeSoloPressure` / `sidePhaseAwareDenial` /
 刚完成 `firstMeaningfulControl`，且非 save/exit、死亡位置 objective 相关 → 给 0~1 连续 credit
 （0 = 普通白给全额受罚；1 = 明确战略孤立基本不罚）。接入：`effectiveUntradedDeaths = deaths − tradedDeaths − credits`。
