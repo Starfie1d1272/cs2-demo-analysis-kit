@@ -42,6 +42,16 @@ describe("buildOfficialMapControl", () => {
     expect(mc.get("T2")?.activeSoloPressureSeconds ?? 0).toBe(0); // 始终在 TSpawn，未上线
   });
 
+  it("accumulates denial for the defending anchor and firstControl for the pusher", () => {
+    const mc = buildOfficialMapControl(makePkg(), loadSpatialAssets("de_dust2"));
+    // C1 守 BombsiteA（a_long 末端）、T1 同线施压、无 plant → CT 防守 → C1 计 denial
+    expect(mc.get("C1")!.sidePhaseAwareDenialSeconds).toBeGreaterThan(0);
+    // T1 推进到 a_long 关键段（LongA idx3 ≥ ceil(6×0.4)=3）→ firstControl 一次
+    expect(mc.get("T1")!.firstMeaningfulControlEvents).toBe(1);
+    // T1 是进攻方，非防守 → 无 denial
+    expect(mc.get("T1")!.sidePhaseAwareDenialSeconds).toBe(0);
+  });
+
   it("awards strategicIsolationDeaths credit for an untraded death after sustained solo pressure", () => {
     const mc = buildOfficialMapControl(makePkg({ kills: untradedDeath }), loadSpatialAssets("de_dust2"));
     // credit = clamp(0.25 + 0.10×4, 0, 1) = 0.65

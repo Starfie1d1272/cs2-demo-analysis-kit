@@ -1,131 +1,206 @@
 /**
  * Official MapControl 派生（严格重建 SP2）。设计见 docs/design/rr-model.md §3.2/§3.3。
  *
- * 本增量聚焦 doc 的 P2 闭环——`strategicIsolationDeaths`（Trade 盲区修正）：
- * rival-rating 的 Trade 已接好 `effectiveUntradedDeaths = deaths − tradedDeaths −
- * strategicIsolationDeaths`，只缺 core 提供非 null 的 credit。
+ * 已落地 official 指标（callout/index-based MVP gates，输入 positions+routes+kills+phase）：
+ * - activeSoloPressureSeconds   独占某动线 + 同线敌方施压 + official phase（cap 8s/round）
+ * - sidePhaseAwareDenialSeconds 防守方在敌方施压的动线上 holding × phaseFactor（cap 10s/round）
+ * - firstMeaningfulControlEvents T 首次推进到动线关键段（neutral/key index），每回合每动线一次
+ * - strategicIsolationDeaths    未交易死亡 × 死前窗口内 solo/denial/firstControl → 0~1 credit
  *
- * 两个 official 指标在此落地（其余 denial/advance/firstControl 留待后续增量）：
- * - activeSoloPressureSeconds：玩家**独自**承担一条动线/侧翼、且敌方在同线施压、
- *   处 official phase 的有效秒数（doc §6，callout-based MVP ablation，per-round cap 8s）。
- * - strategicIsolationDeaths：未被交易的死亡，若死前 W 秒内有足够 solo pressure 且
- *   死亡 objective 相关、非 save/exit，则给 0~1 连续 credit（doc §10）。
- *
- * 输入只用 positions（callout + 1Hz）+ routes + kills + phase，不依赖尚未标定的 zone。
+ * 这些 official 指标当前进 review/shadow 与 Trade 闭环（strategicIsolationDeaths），
+ * **不进 RR MapControl 评分账户**——后者需 rival-rating schema V2 + 权重（跨仓库 SP4）。
+ * 仍缺：denial 的 LOS/nav 距离精修、nonUtilityAssistedAdvanceUnits、UtilitySpatial
+ * actual-effect（需 zone 多边形标定）。
  */
 import type { DemoPackage } from "@cs2dak/contract";
-import { routeIndex, type MapRoutes } from "@cs2dak/maps";
+import { routeIndex, type MapRoute, type MapRoutes } from "@cs2dak/maps";
 import { annotatePositions, type SpatialAssets, type AnnotatedSample } from "./annotate.js";
 import { inferRoundPhases, phaseAtTick } from "./phase.js";
-import { isOfficialScoringPhase, type RoundPhaseModel } from "./types.js";
+import { isOfficialScoringPhase, type RoundPhase, type RoundPhaseModel } from "./types.js";
 
 export interface OfficialMapControl {
-  /** 有效独自施压秒数（capped per-round 8s，已汇总全场）。 */
   activeSoloPressureSeconds: number;
-  /** 战略孤立死亡抵扣（0~N，连续值；接入 Trade.strategicIsolationDeaths）。 */
+  sidePhaseAwareDenialSeconds: number;
+  firstMeaningfulControlEvents: number;
   strategicIsolationDeaths: number;
 }
 
-// —— gate 常数（doc §6/§10/§22）——
+// —— gate 常数（doc §6/§8/§10/§22）——
 const SOLO_PRESSURE_PER_ROUND_CAP = 8; // 秒
+const DENIAL_PER_ROUND_CAP = 10; // 秒（已乘 phaseFactor）
 const ISOLATION_WINDOW_SECONDS = 8; // 死前回看窗口 W
-const ISOLATION_MIN_PRESSURE_SECONDS = 3; // 触发阈值 S
-const SAMPLE_SECONDS = 1; // positions-1s 为 1Hz，每样本计 1 秒
+const ISOLATION_MIN_TRIGGER_SECONDS = 3; // 触发阈值 S
+const SAMPLE_SECONDS = 1; // positions-1s 为 1Hz
 
-/**
- * 派生 official MapControl 信号。无 positions / 无 routes → 返回空 Map（调用方按 null 处理）。
- */
+type Team = string;
+
+interface RoundEvidence {
+  /** tick → solo-pressure 玩家集合。 */
+  soloByTick: Map<number, Set<string>>;
+  /** tick → denial 玩家集合（用于 isolation 触发，未加权）。 */
+  denialByTick: Map<number, Set<string>>;
+}
+
 export function buildOfficialMapControl(
   pkg: DemoPackage,
   assets: SpatialAssets,
   phases?: Map<number, RoundPhaseModel>,
 ): Map<string, OfficialMapControl> {
   const out = new Map<string, OfficialMapControl>();
-  if (!assets.routes) return out; // callout-based，需要动线资产；缺失则全 null
+  if (!assets.routes) return out; // callout-based，需要动线资产
   const routes = assets.routes;
   const samples = annotatePositions(pkg, assets);
   if (samples.length === 0) return out;
   const phaseModels = phases ?? inferRoundPhases(pkg);
-
   const teamByPlayer = new Map(pkg.players.map((p) => [p.steamId64, p.teamKey]));
+  const sideByTeam = new Map<number, { defendPre: Team | null; t: Team | null; ct: Team | null }>();
+  for (const round of pkg.rounds) {
+    const t = round.teamASide === "t" ? "teamA" : round.teamBSide === "t" ? "teamB" : null;
+    const ct = round.teamASide === "ct" ? "teamA" : round.teamBSide === "ct" ? "teamB" : null;
+    sideByTeam.set(round.roundNumber, { defendPre: ct, t, ct });
+  }
+  const plantByRound = plantTicks(pkg);
 
-  // 每回合、每 tick 标记「solo pressure」玩家集合。
-  const soloByRoundTick = new Map<number, Map<number, Set<string>>>();
-  const byRound = groupByRound(samples);
+  const pressureSeconds = new Map<string, number>();
+  const denialSeconds = new Map<string, number>();
+  const firstControlEvents = new Map<string, number>();
+  const evidenceByRound = new Map<number, RoundEvidence>();
+
+  const byRound = groupBy(samples, (s) => s.roundNumber);
   for (const [roundNumber, rows] of byRound) {
     const phase = phaseModels.get(roundNumber);
-    const byTick = groupByTick(rows);
-    const tickMap = new Map<number, Set<string>>();
-    for (const [tick, tickRows] of byTick) {
-      if (phase && !isOfficialScoringPhase(phaseAtTick(phase, tick))) continue;
-      const solo = soloPressurePlayers(tickRows, routes, teamByPlayer);
-      if (solo.size > 0) tickMap.set(tick, solo);
+    const sides = sideByTeam.get(roundNumber) ?? { defendPre: null, t: null, ct: null };
+    const plantTick = plantByRound.get(roundNumber) ?? null;
+    const evidence: RoundEvidence = { soloByTick: new Map(), denialByTick: new Map() };
+
+    const perRoundSolo = new Map<string, number>();
+    const perRoundDenial = new Map<string, number>();
+    const takenRoutes = new Set<string>(); // firstControl 去重：每回合每动线一次
+
+    for (const [tick, tickRows] of groupBy(rows, (r) => r.tick)) {
+      const ph: RoundPhase = phase ? phaseAtTick(phase, tick) : "default";
+      if (!isOfficialScoringPhase(ph)) continue;
+      const presence = routePresence(tickRows, routes, teamByPlayer);
+      const defenderTeam = plantTick != null && tick >= plantTick ? sides.t : sides.ct;
+
+      const solo = new Set<string>();
+      const denial = new Set<string>();
+      for (const [route, byTeam] of presence) {
+        deriveSoloAndDenial(route, byTeam, defenderTeam, ph, solo, denial, perRoundSolo, perRoundDenial);
+        // firstMeaningfulControlEvents：T 首次到达关键段（neutral/key index）
+        recordFirstControl(route, byTeam, sides.t, takenRoutes, firstControlEvents, ph);
+      }
+      if (solo.size) evidence.soloByTick.set(tick, solo);
+      if (denial.size) evidence.denialByTick.set(tick, denial);
     }
-    soloByRoundTick.set(roundNumber, tickMap);
+
+    for (const [id, secs] of perRoundSolo) {
+      pressureSeconds.set(id, (pressureSeconds.get(id) ?? 0) + Math.min(secs, SOLO_PRESSURE_PER_ROUND_CAP));
+    }
+    for (const [id, secs] of perRoundDenial) {
+      denialSeconds.set(id, (denialSeconds.get(id) ?? 0) + Math.min(secs, DENIAL_PER_ROUND_CAP));
+    }
+    evidenceByRound.set(roundNumber, evidence);
   }
 
-  // activeSoloPressureSeconds：逐回合累加 solo tick × 1s，per-round cap 8s。
-  const pressureSeconds = new Map<string, number>();
-  for (const [, tickMap] of soloByRoundTick) {
-    const perRound = new Map<string, number>();
-    for (const [, solo] of tickMap) {
-      for (const id of solo) perRound.set(id, (perRound.get(id) ?? 0) + SAMPLE_SECONDS);
-    }
-    for (const [id, secs] of perRound) {
-      const capped = Math.min(secs, SOLO_PRESSURE_PER_ROUND_CAP);
-      pressureSeconds.set(id, (pressureSeconds.get(id) ?? 0) + capped);
-    }
-  }
+  const credits = buildIsolationCredits(pkg, evidenceByRound, phaseModels);
 
-  // strategicIsolationDeaths：未交易死亡 × 死前窗口内 solo pressure。
-  const credits = buildIsolationCredits(pkg, soloByRoundTick, phaseModels);
-
-  const playerIds = new Set<string>([...pressureSeconds.keys(), ...credits.keys()]);
-  for (const id of playerIds) {
+  const ids = new Set<string>([
+    ...pressureSeconds.keys(),
+    ...denialSeconds.keys(),
+    ...firstControlEvents.keys(),
+    ...credits.keys(),
+  ]);
+  for (const id of ids) {
     out.set(id, {
       activeSoloPressureSeconds: round3(pressureSeconds.get(id) ?? 0),
+      sidePhaseAwareDenialSeconds: round3(denialSeconds.get(id) ?? 0),
+      firstMeaningfulControlEvents: firstControlEvents.get(id) ?? 0,
       strategicIsolationDeaths: round3(credits.get(id) ?? 0),
     });
   }
   return out;
 }
 
-/**
- * 一个 tick 上「独自承担某条动线、且敌方在同线施压」的玩家（callout-based MVP ablation）。
- * 条件：玩家在动线 R 上 routeIndex≥1；本队在 R 上 routeIndex≥1 的仅此一人；
- * 敌方至少一人在 R 上 routeIndex≥1（同线施压）。
- */
-function soloPressurePlayers(
+/** 每动线 → 每队在线（routeIndex≥1）成员。 */
+function routePresence(
   tickRows: AnnotatedSample[],
   routes: MapRoutes,
   teamByPlayer: Map<string, string>,
-): Set<string> {
-  const solo = new Set<string>();
+): Map<MapRoute, Map<Team, { id: string; index: number }[]>> {
+  const out = new Map<MapRoute, Map<Team, { id: string; index: number }[]>>();
   for (const route of routes.routes) {
-    // 每队在该动线上的成员（index≥1）
-    const onLine = new Map<string, { id: string; index: number }[]>();
+    const byTeam = new Map<Team, { id: string; index: number }[]>();
     for (const row of tickRows) {
       if (!row.alive) continue;
       const idx = routeIndex(route, row.callout);
       if (idx < 1) continue;
       const team = teamByPlayer.get(row.steamId64) ?? row.teamKey;
-      const arr = onLine.get(team) ?? [];
+      const arr = byTeam.get(team) ?? [];
       arr.push({ id: row.steamId64, index: idx });
-      onLine.set(team, arr);
+      byTeam.set(team, arr);
     }
-    if (onLine.size < 2) continue; // 需要双方都在该线上（敌方施压）
-    for (const [team, members] of onLine) {
-      if (members.length !== 1) continue; // 本队仅此一人 = solo
-      const enemyPresent = [...onLine].some(([t, m]) => t !== team && m.length >= 1);
-      if (enemyPresent) solo.add(members[0]!.id);
+    if (byTeam.size > 0) out.set(route, byTeam);
+  }
+  return out;
+}
+
+function deriveSoloAndDenial(
+  route: MapRoute,
+  byTeam: Map<Team, { id: string; index: number }[]>,
+  defenderTeam: Team | null,
+  phase: RoundPhase,
+  solo: Set<string>,
+  denial: Set<string>,
+  perRoundSolo: Map<string, number>,
+  perRoundDenial: Map<string, number>,
+): void {
+  if (byTeam.size < 2) return; // 需双方都在该线（敌方施压）
+  for (const [team, members] of byTeam) {
+    const enemyPresent = [...byTeam].some(([t, m]) => t !== team && m.length >= 1);
+    if (!enemyPresent) continue;
+    // solo：本队仅此一人在该线
+    if (members.length === 1 && !solo.has(members[0]!.id)) {
+      solo.add(members[0]!.id);
+      perRoundSolo.set(members[0]!.id, (perRoundSolo.get(members[0]!.id) ?? 0) + SAMPLE_SECONDS);
+    }
+    // denial：防守方在敌方施压的动线上 holding（× phaseFactor）
+    if (defenderTeam != null && team === defenderTeam) {
+      const factor = phaseFactor(phase);
+      if (factor > 0) {
+        for (const m of members) {
+          if (denial.has(m.id)) continue;
+          denial.add(m.id);
+          perRoundDenial.set(m.id, (perRoundDenial.get(m.id) ?? 0) + SAMPLE_SECONDS * factor);
+        }
+      }
     }
   }
-  return solo;
+}
+
+/** T 首次推进到动线关键段：index ≥ max(1, ceil(len×0.4))，每回合每动线记一次，归 frontier T。 */
+function recordFirstControl(
+  route: MapRoute,
+  byTeam: Map<Team, { id: string; index: number }[]>,
+  tTeam: Team | null,
+  taken: Set<string>,
+  firstControlEvents: Map<string, number>,
+  phase: RoundPhase,
+): void {
+  if (tTeam == null || taken.has(route.id)) return;
+  if (phase !== "default" && phase !== "take" && phase !== "execute") return;
+  const tMembers = byTeam.get(tTeam);
+  if (!tMembers) return;
+  const threshold = Math.max(1, Math.ceil(route.zones.length * 0.4));
+  const frontier = tMembers.filter((m) => m.index >= threshold).sort((a, b) => b.index - a.index)[0];
+  if (!frontier) return;
+  taken.add(route.id);
+  firstControlEvents.set(frontier.id, (firstControlEvents.get(frontier.id) ?? 0) + 1);
 }
 
 function buildIsolationCredits(
   pkg: DemoPackage,
-  soloByRoundTick: Map<number, Map<number, Set<string>>>,
+  evidenceByRound: Map<number, RoundEvidence>,
   phases: Map<number, RoundPhaseModel>,
 ): Map<string, number> {
   const tickrate = pkg.match?.tickrate ?? pkg.manifest?.tickrate ?? 64;
@@ -133,47 +208,67 @@ function buildIsolationCredits(
   const credits = new Map<string, number>();
 
   for (const kill of pkg.kills) {
-    // 仅看「敌方击杀、未被交易」的死亡
     if (kill.killerTeamKey && kill.victimTeamKey && kill.killerTeamKey === kill.victimTeamKey) continue;
     if ((kill as { tradeDeath?: boolean }).tradeDeath) continue;
     const victim = kill.victimSteamId64;
     if (!victim) continue;
     const phase = phases.get(kill.roundNumber);
     if (phase && !isOfficialScoringPhase(phaseAtTick(phase, kill.tick))) continue;
+    const evidence = evidenceByRound.get(kill.roundNumber);
+    if (!evidence) continue;
 
-    const tickMap = soloByRoundTick.get(kill.roundNumber);
-    if (!tickMap) continue;
-    let pressureSecondsInWindow = 0;
-    for (const [tick, solo] of tickMap) {
-      if (tick > kill.tick) continue;
-      if (tick < kill.tick - windowTicks) continue;
-      if (solo.has(victim)) pressureSecondsInWindow += SAMPLE_SECONDS;
-    }
-    if (pressureSecondsInWindow < ISOLATION_MIN_PRESSURE_SECONDS) continue;
+    const lo = kill.tick - windowTicks;
+    const pressure = secondsInWindow(evidence.soloByTick, victim, lo, kill.tick);
+    const denial = secondsInWindow(evidence.denialByTick, victim, lo, kill.tick);
+    if (pressure < ISOLATION_MIN_TRIGGER_SECONDS && denial < ISOLATION_MIN_TRIGGER_SECONDS) continue;
 
-    // credit = clamp(0.25 + 0.10×窗口内 solo 秒数, 0, 1)（doc §10.3 的 MVP 子集）
-    const credit = clamp(0.25 + 0.1 * pressureSecondsInWindow, 0, 1);
+    // credit = clamp(0.25 + 0.10×pressure + 0.10×denial, 0, 1)（doc §10.3 子集）
+    const credit = clamp(0.25 + 0.1 * pressure + 0.1 * denial, 0, 1);
     credits.set(victim, (credits.get(victim) ?? 0) + credit);
   }
   return credits;
 }
 
-function groupByRound(samples: AnnotatedSample[]): Map<number, AnnotatedSample[]> {
-  const out = new Map<number, AnnotatedSample[]>();
-  for (const s of samples) {
-    const arr = out.get(s.roundNumber) ?? [];
-    arr.push(s);
-    out.set(s.roundNumber, arr);
+function secondsInWindow(byTick: Map<number, Set<string>>, id: string, lo: number, hi: number): number {
+  let secs = 0;
+  for (const [tick, set] of byTick) {
+    if (tick > hi || tick < lo) continue;
+    if (set.has(id)) secs += SAMPLE_SECONDS;
+  }
+  return secs;
+}
+
+function phaseFactor(phase: RoundPhase): number {
+  switch (phase) {
+    case "execute":
+    case "postPlant":
+    case "retake":
+    case "clutch":
+      return 1.2;
+    case "take":
+      return 1.0;
+    case "default":
+      return 0.5;
+    default:
+      return 0;
+  }
+}
+
+function plantTicks(pkg: DemoPackage): Map<number, number> {
+  const out = new Map<number, number>();
+  for (const bomb of pkg.bombs) {
+    if (bomb.type === "planted" && !out.has(bomb.roundNumber)) out.set(bomb.roundNumber, bomb.tick);
   }
   return out;
 }
 
-function groupByTick(rows: AnnotatedSample[]): Map<number, AnnotatedSample[]> {
-  const out = new Map<number, AnnotatedSample[]>();
-  for (const r of rows) {
-    const arr = out.get(r.tick) ?? [];
-    arr.push(r);
-    out.set(r.tick, arr);
+function groupBy<T>(items: readonly T[], key: (item: T) => number): Map<number, T[]> {
+  const out = new Map<number, T[]>();
+  for (const item of items) {
+    const k = key(item);
+    const arr = out.get(k) ?? [];
+    arr.push(item);
+    out.set(k, arr);
   }
   return out;
 }
