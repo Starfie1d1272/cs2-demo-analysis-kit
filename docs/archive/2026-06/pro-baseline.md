@@ -92,11 +92,11 @@ download .dem
 ```typescript
 interface AccountNormalizer {
   /**
-   * 把五账户 raw 值映射到 accountRR（1.0 = 该 normalizer 定义的均值）。
-   * @param signals  AccountSignalsV2（每回合计数）
+   * 把六账户 raw 值映射到 accountRR（1.0 = 该 normalizer 定义的均值）。
+   * @param signals  RRSignals（每回合事实信号）
    * @param cohort   可选：cohort 统计，cohort normalizer 必传，pro baseline 可忽略
    */
-  normalize(signals: AccountSignalsV2, cohort?: CohortStats): AccountRRResult;
+  normalize(signals: RRSignals, cohort?: CohortStats): AccountRRResult;
 }
 
 // 现有实现（保持不变）
@@ -105,11 +105,12 @@ class CohortNormalizer implements AccountNormalizer { ... }
 // 新增实现（阶段 R1 填充）
 class FrozenProBaselineNormalizer implements AccountNormalizer {
   constructor(private baseline: ProBaselineConfig) {}
-  normalize(signals: AccountSignalsV2): AccountRRResult { ... }
+  normalize(signals: RRSignals): AccountRRResult { ... }
 }
 ```
 
-`computeCohortAccountsRR`（`@rivalhub/rival-rating`）接收 `normalizer` 参数；调用方按需传入。
+`computeCohortAccountsRR` 和 `computeFrozenProBaselineRR`
+（`@rivalhub/rival-rating`）分别覆盖 cohort-relative 与 frozen-pro-baseline 两种归一化路径。
 
 ---
 
@@ -117,7 +118,7 @@ class FrozenProBaselineNormalizer implements AccountNormalizer {
 
 ### 原始账户分布统计
 
-对 D1 样本中每个 player-map 行，用现有公式算出五账户 raw（每回合）：
+对 D1 样本中每个 player-map 行，用现有公式算出六账户 raw（每回合）：
 
 ```
 combat_raw  trade_raw  clutch_raw  utility_raw  objective_raw
@@ -195,7 +196,7 @@ PRISM 风格维度**不用**冻结基准——风格本就是相对的，继续 
 Phase D0  建目录 + manifest.sqlite schema + ingestion CLI 骨架
 Phase D1  拉 100–200 张 map demo，全部入库并解析
 R0        抽 normalizer strategy 接口，现有 cohort normalizer 不变，接口跑通
-R1        用 D1 数据算五账户分布，生成 rr-v2-pro-baseline.json，
+R1        用 D1 数据算六账户分布，生成 rr-v2-pro-baseline.json，
           FrozenProBaselineNormalizer 实现 + 集成测试
 ```
 

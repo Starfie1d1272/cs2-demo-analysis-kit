@@ -11,7 +11,7 @@ view models — exporter included. It is no longer "just the middle layer".
         ├─ CLI: export / export-batch / validate
         └─ GUI: focused desktop export / batch export
   -> @cs2dak/core  (loads ZIP → DemoPackage)
-       ├─ box-score / RR v1 / RR v2-lite / PRISM  (via @rivalhub/rival-rating)
+       ├─ box-score / HLTV baseline / RR six-account / PRISM  (via @rivalhub/rival-rating)
        ├─ economy / kills / clutches / timeline / heatmap / QA
        └─ → AnalysisBundle
   -> @cs2dak/cohort       (cross-match aggregation + identity map)
@@ -45,23 +45,24 @@ The `cs2-demo-format/2.0` ZIP carries far more than a scoreboard. 15 files in th
 
 Events carry context fields beyond a scoreboard — e.g. `damages` has
 `victimHealthBefore/After` / `armorDamage` / `hitgroup`; `kills` has `throughSmoke` /
-`noScope` / `killerActiveWeapon`; `bombs` has an explicit `site: "a"|"b"`. Current
-field expression is tracked in [design/field-expression.md](design/field-expression.md);
-longer-term consumption is tracked in [rr-roadmap.md](rr-roadmap.md).
+`noScope` / `killerActiveWeapon`; `bombs` has an explicit `site: "a"|"b"`.
+Longer-term consumption is tracked in [rr-roadmap.md](rr-roadmap.md).
 
 ### Rating layers
 
 Three rating layers answer three different questions and must never be merged into one number:
 
-| Layer | Question | Granularity | Design doc |
-|---|---|---|---|
-| RR v1 | How did this match's stat line look? | per-match | [design/rr-v1.md](design/rr-v1.md) |
-| RR v2-lite | How much was your contribution worth (with context)? | per-match | [design/rating-model.md](design/rating-model.md) |
-| PRISM | What is your play style? | cross-match cohort | [design/prism.md](design/prism.md) |
+| Layer | Question | Granularity |
+|---|---|---|
+| RR v1 | How did this match's stat line look? | per-match |
+| RR six-account | How much was your contribution worth (with context)? | per-match / cohort |
+| PRISM | What is your play style? | cross-match cohort |
+
+All three are specified in the single design doc [design/rr-model.md](design/rr-model.md).
 
 Formula ownership stays in `@rivalhub/rival-rating` (the only implementation of
-`computeRR` / `computeValueAccountsRR` / `computePrism`). This kit only derives
-signals, wires the models, anchors, and shapes output.
+`computeRR` / `computeRRSixAccounts` / `computeCohortAccountsRR` / `computePrism`).
+This kit only derives signals, wires the models, anchors, and shapes output.
 
 > `analyzeDemoPackage` processes **one demo at a time**. Season-level PRISM and RR
 > anchoring live in `@cs2dak/cohort`, which aggregates many demos and supports
@@ -82,7 +83,7 @@ or consume the JSON.
         ├─ CLI: export / export-batch / validate
         └─ GUI: 专注于单场和批量导出
   -> @cs2dak/core  (加载 ZIP → DemoPackage)
-       ├─ box-score / RR v1 / RR v2-lite / PRISM  (经 @rivalhub/rival-rating)
+       ├─ box-score / HLTV baseline / RR 六账户 / PRISM  (经 @rivalhub/rival-rating)
        ├─ 经济 / 击杀 / 残局 / 时间线 / 热力图 / QA
        └─ → AnalysisBundle
   -> @cs2dak/cohort       （跨场聚合 + identity map）
@@ -116,22 +117,24 @@ or consume the JSON.
 
 事件里带着大量 context 字段——例如 `damages` 有
 `victimHealthBefore/After` / `armorDamage` / `hitgroup`；`kills` 有 `throughSmoke` /
-`noScope` / `killerActiveWeapon`；`bombs` 直接带 `site: "a"|"b"`。当前字段表达见
-[design/field-expression.md](design/field-expression.md)，后续消费计划见
+`noScope` / `killerActiveWeapon`；`bombs` 直接带 `site: "a"|"b"`。后续消费计划见
 [rr-roadmap.md](rr-roadmap.md)。
 
 ### 评分三层
 
 三层评分回答三个不同问题，**绝不能合并成一个数**：
 
-| 层 | 回答的问题 | 粒度 | 设计文档 |
-|---|---|---|---|
-| RR v1 | 这场数据产出如何 | 单场 | [design/rr-v1.md](design/rr-v1.md) |
-| RR v2-lite | 这场里你的贡献值多少（含上下文） | 单场 | [design/rating-model.md](design/rating-model.md) |
-| PRISM | 你是什么风格 | 跨场 cohort | [design/prism.md](design/prism.md) |
+| 层 | 回答的问题 | 粒度 |
+|---|---|---|
+| RR v1 | 这场数据产出如何 | 单场 |
+| RR 六账户 | 这场/赛季里你的贡献值多少（含上下文） | 单场 / cohort |
+| PRISM | 你是什么风格 | 跨场 cohort |
 
-公式所有权在 `@rivalhub/rival-rating`（`computeRR` / `computeValueAccountsRR` /
-`computePrism` 的唯一实现）。本 kit 只做信号派生、模型接线、锚定与输出整形。
+三层统一在单一设计文档 [design/rr-model.md](design/rr-model.md) 描述。
+
+公式所有权在 `@rivalhub/rival-rating`（`computeRR` / `computeRRSixAccounts` /
+`computeCohortAccountsRR` / `computePrism` 的唯一实现）。本 kit 只做信号派生、
+模型接线、锚定与输出整形。
 
 > `analyzeDemoPackage` 一次只处理一场 demo。PRISM 的跨人 z-score 和赛季级 RR 锚定由
 > `@cs2dak/cohort` 聚合多场 demo 完成；RivalHub 的 userId / Steam alias 绑定通过

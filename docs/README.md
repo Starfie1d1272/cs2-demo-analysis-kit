@@ -1,29 +1,17 @@
 # DAK 文档
 
+精简到一组标准文档；过程性/历史快照在 [`archive/`](archive/)，不得作为当前边界依据。
+
 ## 常青规则
 
-- [模块边界](module-boundaries.md)：模块做什么、不做什么。
-- [模块能力地图](module-capabilities.md)：当前能力、目标能力与清理对象。
-- [架构](architecture.md)：数据流和主要技术结构。
-- [版本管理](versioning.md)：npm、Python 与桌面应用的版本和发布规则。
-- [发布手册](publishing.md)：发布操作。
-- [RivalHub 共享能力提炼](rivalhub-extraction.md)：已迁入 DAK 的逻辑与产品保留边界。
+- [架构](architecture.md)：数据流、组件职责、v2 ZIP 富事件、评分三层。
+- [模块边界](module-boundaries.md)：每个模块做什么、不做什么、唯一 owner。
 
-## 当前设计
+## 设计
 
-- [跨场 cohort](design/cohort.md)
-- [真实 ZIP 字段表达](design/field-expression.md)
-- [地图语义与空间分析](design/map-control.md)
-- [Match Workspace](design/match-workspace.md)
-- [PRISM](design/prism.md)
-- [职业基准](design/pro-baseline.md)
-- [RR 评分模型](design/rating-model.md)
-- [RR v1](design/rr-v1.md)
-- [可视化发现](design/visualization-findings.md)
+- [RR 评分模型](design/rr-model.md)：RR v1 / 六账户 / PRISM 的唯一设计文档，含空间账户严格化目标。
+- [RR / PRISM Roadmap](rr-roadmap.md)：阶段顺序与现状速查。
 
 ## 集成
 
-- [RivalHub](integration-rivalhub.md)
-- [CS2 Insight Agent](integration-insight-agent.md)
-
-交接、已完成迁移和阶段性计划属于历史快照，重构时移入 `docs/archive/`，不得作为当前边界依据。
+- [产品集成](integration.md)：RivalHub、CS2 Insight Agent、未来统一工具的消费链路与边界。
