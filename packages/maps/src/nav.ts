@@ -106,6 +106,83 @@ export function nearestNavArea(nav: CompactNav, point: Vec3): CompactNavArea | u
   return nearest;
 }
 
+export interface NavZCluster {
+  min: number;
+  max: number;
+  median: number;
+  count: number;
+}
+
+export interface NavZSample {
+  /** 落在 polygon 内的 nav area Z 质心列表（已排序）。 */
+  zValues: number[];
+  min: number;
+  max: number;
+  median: number;
+  /**
+   * 按 Z 间距自动分组的簇（默认间距阈值 50 units）。
+   * 相邻簇之间的间隙就是 zMin/zMax 边界的自然分割点。
+   * 单层区域通常只有 1 个簇；Hut/HutRoof 这类重叠区域会出现 2 个簇。
+   */
+  clusters: NavZCluster[];
+}
+
+/**
+ * 采样 XY polygon 内所有 nav area 的 Z 质心，返回分布统计。
+ *
+ * polygon 使用世界坐标 XY（与 MapZone.polygon 同系）。
+ * 返回 null 表示 polygon 内无 nav area 覆盖（坐标系不匹配或地图未标定）。
+ *
+ * 用途：标定重叠 callout 的 zMin/zMax 时，查看 clusters 找到簇间间隙，
+ * 把间隙中点作为边界值填入 MapZone。不要用 median 直接作为 zMin/zMax。
+ */
+export function sampleNavZ(
+  nav: CompactNav,
+  polygon: Array<[number, number]>,
+  clusterGapThreshold = 50,
+): NavZSample | null {
+  const zValues: number[] = [];
+  for (const area of nav.areas) {
+    const { x, y, z } = area.centroid;
+    if (pointInPolygon2d(x, y, polygon)) zValues.push(z);
+  }
+  if (zValues.length === 0) return null;
+  zValues.sort((a, b) => a - b);
+
+  const min = zValues[0]!;
+  const max = zValues[zValues.length - 1]!;
+  const median = zValues[Math.floor(zValues.length / 2)]!;
+  return { zValues, min, max, median, clusters: detectClusters(zValues, clusterGapThreshold) };
+}
+
+function pointInPolygon2d(x: number, y: number, polygon: Array<[number, number]>): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const [xi, yi] = polygon[i]!;
+    const [xj, yj] = polygon[j]!;
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+function detectClusters(sortedZ: number[], gapThreshold: number): NavZCluster[] {
+  if (sortedZ.length === 0) return [];
+  const clusters: NavZCluster[] = [];
+  let start = 0;
+  for (let i = 1; i <= sortedZ.length; i += 1) {
+    if (i < sortedZ.length && sortedZ[i]! - sortedZ[i - 1]! <= gapThreshold) continue;
+    const slice = sortedZ.slice(start, i);
+    clusters.push({
+      min: slice[0]!,
+      max: slice[slice.length - 1]!,
+      median: slice[Math.floor(slice.length / 2)]!,
+      count: slice.length,
+    });
+    start = i;
+  }
+  return clusters;
+}
+
 function centroid(points: Vec3[]): Vec3 {
   if (points.length === 0) return { x: 0, y: 0, z: 0 };
   const total = points.reduce(
