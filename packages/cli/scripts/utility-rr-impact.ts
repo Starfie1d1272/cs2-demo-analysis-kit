@@ -17,6 +17,7 @@ import {
   loadSpatialAssets,
   buildOfficialUtilitySpatial,
 } from "@cs2dak/core";
+import { getMapTri } from "@cs2dak/maps/tri-assets";
 import { computeCohortAccountsRR, rrSixAccountWeightsV1 } from "@rivalhub/rival-rating";
 import type { RRSignals, RRSixAccountWeights } from "@rivalhub/rival-rating";
 
@@ -57,7 +58,8 @@ async function main() {
   for (const [m, list] of picked) {
     for (const file of list) {
       const pkg = await loadDemoPackageFromZip(await readFile(join(dir, file)));
-      const assets = loadSpatialAssets(pkg.match?.mapName ?? m);
+      const mapName = pkg.match?.mapName ?? m;
+      const assets = loadSpatialAssets(mapName, getMapTri(mapName));
       const signals = deriveRRSignals(pkg); // B（含 strategicIsolationDeaths）
       const util = buildOfficialUtilitySpatial(pkg, assets);
       const nadesByPlayer = countNades(pkg);
@@ -78,6 +80,8 @@ async function main() {
           c.utility.smokeIsolationSeconds = u.actualSmokeIsolationSeconds;
           c.utility.incendiaryPathDelayUnits = u.actualIncendiaryPathDelaySeconds;
           c.utility.incendiaryDisplacementEvents = u.actualIncendiaryDisplacementEvents;
+          c.utility.smokeSightlineDenialSeconds = u.actualSmokeSightlineDenialSeconds; // LOS（null 时保持 null）
+          c.utility.smokeProtectedCrossings = u.actualSmokeProtectedCrossings;
         }
         return c;
       });

@@ -76,6 +76,8 @@ export interface AnnotatedSample {
   zoneBombsite: "a" | "b" | null;
   /** 最近 nav area id；无 nav 资产为 null。 */
   navAreaId: number | null;
+  /** 当前血量（火焰逼退掉血判定用）；缺失为 100。 */
+  health: number;
 }
 
 /**
@@ -101,6 +103,7 @@ export function annotatePositions(pkg: DemoPackage, assets: SpatialAssets): Anno
       zoneRole: zone?.role ?? null,
       zoneBombsite: zone?.bombsite ?? null,
       navAreaId: assets.nav ? (nearestNavArea(assets.nav, position)?.id ?? null) : null,
+      health: (row as { health?: number }).health ?? 100,
     });
   }
   return out;

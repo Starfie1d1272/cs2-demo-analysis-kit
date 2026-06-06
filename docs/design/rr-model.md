@@ -148,21 +148,28 @@ official scoring 排除 `save / exit / freeze`（仍可进 review 层）。
 
 ### 3.4 Official UtilitySpatial（5 指标，actual-effect）
 
-> **状态（SP3，2026-06-06）**：zone 多边形标定完成 **4/7 图**（ancient/dust2/inferno/mirage，
-> 覆盖 43/55 NJU 场）→ `core/spatial/utility.ts` 落地 3 项 zone-based actual-effect，
+> **状态（SP3 v2，2026-06-06）**：zone 多边形 **4/7 图** + nav 拓扑 + tri-BVH 静态视线（4 图本机已下载）
+> → `core/spatial/{utility,utility-geometry}.ts` 落地**全部 5 项**几何 actual-effect。
 > 手雷归属率 94–98%。进 review/shadow，**未进 RR 评分**（待职业样本校准）。
-> 诊断：`pnpm analyze:spatial-coverage`。
+> 诊断：`pnpm analyze:spatial-coverage`（看覆盖）/ `analyze:utility-rr-impact`（看 RR 影响）。
+>
+> **tri 仅分析侧加载**（207MB，按需）：production `deriveRRSignals` 不传 tri → 两项 LOS 发 null。
 
 | 指标 | 状态 | actual-effect 判定 |
 |---|---|---|
-| `actualIncendiaryDisplacementEvents` | ✅ 4 图 | 敌人火前在该 zone、火后 ~3s 离开（× zone 角色权重） |
-| `actualSmokeIsolationSeconds` | ✅ 4 图 | 烟落 connector/mid/lane 要道且敌人在该 zone → 时长 × 角色权重 |
-| `actualIncendiaryPathDelaySeconds` | ✅ 4 图 | 火落通行要道且敌人在场 → 燃烧时长 × 角色权重（火焰缺 destroyTick 按 7s 兜底） |
-| `actualSmokeProtectedCrossings` | ⬜ 需 LOS | 队友确实借烟穿越原本暴露的枪线（无烟则 LOS clear） |
-| `actualSmokeSightlineDenialSeconds` | ⬜ 需 LOS | 烟切断关键静态枪线 × 敌方 holder × 队友利用 |
+| `actualIncendiaryPathDelaySeconds` | ✅ 强 | 火落通行要道且敌人在场 × 燃烧时长 × 角色权重（缺 destroyTick 按 7s 兜底）。分布最好（%zero 11%） |
+| `actualIncendiaryDisplacementEvents` | ✅ 改善 | 敌人火前在 zone、火后 4s 内离开**或掉血**（放宽 1Hz 采样窗口，%zero 74→47%） |
+| `actualSmokeSightlineDenialSeconds` | 🟡 LOS | tri-BVH：敌人对 site 静态可见且烟切断该枪线 × 队友利用。**dust2 偏低**（objective 选点被墙挡） |
+| `actualSmokeProtectedCrossings` | 🟡 LOS | 队友穿越时被烟挡住敌方原本可见枪线。信号偏弱（~1/场） |
+| `actualSmokeIsolationSeconds` | ⚠️ 拓扑敏感 | nav 绕路代价（屏蔽烟覆盖 nav 区后 enemy→site 多走多远）× 时长。**概念弱点：烟只挡视线不挡移动**，开阔图（mirage）绕路恒 0；仅 choke 图出值。候选改造：改为 vision-based 或与 sightline 合并 |
 
-**手雷归属（doc §18，已落地）**：`effectPosition → zoneAt`（不再用"最近 player 的 lastPlaceName" proxy，
-避免远投烟/最近是敌人/多层 z 轴误归属）。未标定 zone 的图 → 全 null。
+**手雷归属（doc §18，已落地）**：`effectPosition → zoneAt`（不再用"最近 player 的 lastPlaceName" proxy）。
+**几何地基**：`utility-geometry.ts`（segment-sphere 相交、nav Dijkstra 绕路、多边形质心），纯函数已单测。
+
+**RR 影响实测（4 图 16 场，shadow 实验性接入 utility 账户）**：道具空间净 ΔRR 很小（mean 0.011，
+p90 0.025，无人 >0.05）；远小于 Trade 闭环（孤立死亡，mean 0.033）。corr(ΔRR, 烟火数)=0.27——
+nav 绕路把"奖励投掷量"变成"奖励有效封锁"，方向对但被 isolation 拓扑缺陷拉低。结论：**道具空间是
+小幅精修，正式进 RR 价值有限，优先级低于 Trade 闭环与 MapControl**。
 
 ### 3.5 Cap / 标准化 / 残差化 / Evidence Quality
 
