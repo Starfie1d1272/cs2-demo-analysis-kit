@@ -154,6 +154,10 @@ official scoring 排除 `save / exit / freeze`（仍可进 review 层）。
 > 诊断：`pnpm analyze:spatial-coverage`（看覆盖）/ `analyze:utility-rr-impact`（看 RR 影响）。
 >
 > **tri 仅分析侧加载**（207MB，按需）：production `deriveRRSignals` 不传 tri → 两项 LOS 发 null。
+>
+> **冻结决定（2026-06-07）**：当前实现保持 shadow，**不再继续打磨**。实测净 ΔRR 极小（见下），
+> 正式进 RR 价值有限；vision-based 重构推迟到权重 ramp 阶段三（§3.6），届时连同 sightlineDenial
+> 一起重设计。下方两处「零值」为模型固有缺陷，已在 `utility.ts` 文件头与对应行钉注释（非 bug）。
 
 | 指标 | 状态 | actual-effect 判定 |
 |---|---|---|
@@ -161,7 +165,7 @@ official scoring 排除 `save / exit / freeze`（仍可进 review 层）。
 | `actualIncendiaryDisplacementEvents` | ✅ 改善 | 敌人火前在 zone、火后 4s 内离开**或掉血**（放宽 1Hz 采样窗口，%zero 74→47%） |
 | `actualSmokeSightlineDenialSeconds` | 🟡 LOS | tri-BVH：敌人对 site 静态可见且烟切断该枪线 × 队友利用。**dust2 偏低**（objective 选点被墙挡） |
 | `actualSmokeProtectedCrossings` | 🟡 LOS | 队友穿越时被烟挡住敌方原本可见枪线。信号偏弱（~1/场） |
-| `actualSmokeIsolationSeconds` | ⚠️ 拓扑敏感 | nav 绕路代价（屏蔽烟覆盖 nav 区后 enemy→site 多走多远）× 时长。**概念弱点：烟只挡视线不挡移动**，开阔图（mirage）绕路恒 0；仅 choke 图出值。候选改造：改为 vision-based 或与 sightline 合并 |
+| `actualSmokeIsolationSeconds` | ⚠️ 拓扑敏感 | nav 绕路代价（屏蔽烟覆盖 nav 区后 enemy→site 多走多远）× 时长。**概念弱点：烟只挡视线不挡移动**，开阔图（mirage）绕路恒 0；仅 choke 图出值。**已冻结**：改 vision-based / 并入 sightline 推迟到阶段三 |
 
 **手雷归属（doc §18，已落地）**：`effectPosition → zoneAt`（不再用"最近 player 的 lastPlaceName" proxy）。
 **几何地基**：`utility-geometry.ts`（segment-sphere 相交、nav Dijkstra 绕路、多边形质心），纯函数已单测。

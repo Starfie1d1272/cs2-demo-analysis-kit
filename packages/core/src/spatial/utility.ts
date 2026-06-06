@@ -13,6 +13,17 @@
  * - actualIncendiaryDisplacementEvents：敌人火前在区、火后离开或掉血（1Hz 采样放宽窗口）。
  *
  * 无 visibility（production 不加载 207MB tri）→ 两项 LOS 指标发 null。
+ *
+ * ⚠️ 冻结状态（2026-06-07，SP3 v2 收尾）：本实现保持 **shadow**（不进 RR 评分），不再继续打磨。
+ * 实测净 ΔRR 极小（mean 0.011 / p90 0.025 / 无人 >0.05），远小于 Trade 闭环（mean 0.033），
+ * 正式进 RR 价值有限。两处「零值」为模型/启发式固有缺陷，**非 bug，不在此修**：
+ *   - isolation（①）：nav 绕路假设「烟挡移动」，但烟只挡视线、人能走过去。开阔图（mirage）平行路多、
+ *     144 半径封不住唯一路径 → detour 恒 0；仅 choke 图（ancient/inferno）出值。是 nav 绕路模型的固有弱点。
+ *   - sightlineDenial（②）：objective 取 site 质心→最近 nav 区的 3D 点，dust2 该点常被墙挡 →
+ *     staticLOS 本就 false → 无枪线可封 → 偏低。是 objective 选点启发式脆弱，非视线判定错。
+ * vision-based 重构（isolation 改判「烟切断敌人对目标区的视线安全」，本质并入 sightlineDenial）
+ * 推迟到权重 ramp 阶段三——职业样本到位、有校准数据后，再连同 sightlineDenial 一起重设计。
+ * 见 rr-model.md §3.4 / §3.6。
  */
 import type { DemoPackage } from "@cs2dak/contract";
 import type { TriangleBvh, Vec3, ZoneRole } from "@cs2dak/maps";
@@ -151,7 +162,7 @@ export function buildOfficialUtilitySpatial(
 
     if (w.type === "smoke") {
       const objective = nearestSite(siteAreas, w.effectPosition, navIndex);
-      // ① 隔离：nav 绕路代价
+      // ① 隔离：nav 绕路代价（拓扑敏感 — 开阔图恒 0，已知模型缺陷，见文件头冻结说明，勿当 bug 修）
       if (navIndex && objective && enemies.length > 0) {
         const blocked = areasWithinRadius(navIndex, w.effectPosition, SMOKE_RADIUS);
         const enemyArea = nearestAreaId(navIndex, clusterCentroid(enemies));
@@ -205,6 +216,8 @@ function computeSiteAreas(assets: SpatialAssets, navIndex: NavIndex): SiteArea[]
   for (const z of assets.zones?.zones ?? []) {
     if (z.role !== "site") continue;
     const c = polygonCentroid(z);
+    // objective 选点启发式：site 质心 z=0 → 最近 nav 区。dust2 上该点常被墙挡，使 ② 视线封锁偏低。
+    // 已知缺陷（见文件头冻结说明），vision-based 重构时一并改。
     const point3: Vec3 = { x: c.x, y: c.y, z: 0 };
     const areaId = nearestAreaId(navIndex, point3);
     if (areaId == null) continue;
