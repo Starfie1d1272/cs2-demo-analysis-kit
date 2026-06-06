@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { CALLOUT_NAME_CN, getMapCalibration, worldToRadar, getMapNav, pointInPolygon } from "@cs2dak/maps";
+import { CALLOUT_NAME_CN, getMapCalibration, worldToRadar, getMapNav, pointInPolygon, sampleNavZ } from "@cs2dak/maps";
 import type { MapZone } from "@cs2dak/maps";
 
 // ── 地图列表 & 多层配置 ──────────────────────────────────────────────────────
@@ -96,29 +96,15 @@ function MapCanvas({mapName,level,cursor="default",onClick,onMouseMove,onMouseUp
 
 function geomLevel(g:{zMin?:number;zMax?:number}|undefined,thresholdZ:number):Level|"both"{if(!g||(g.zMin===undefined&&g.zMax===undefined))return"both";if(g.zMax!==undefined&&g.zMax<=thresholdZ)return"lower";if(g.zMin!==undefined&&g.zMin>=thresholdZ)return"upper";return"both";}
 
-/** 从 nav mesh 中采样多边形内的区域质心 z 值，自动计算 zMin/zMax（±10 容差）。多层地图按当前楼层阈值过滤。 */
-function computeNavZ(mapName:string,poly:[number,number][],level:Level):{zMin:number;zMax:number}|null{
-  const nav=getMapNav(mapName);if(!nav||poly.length<3)return null;
-  const ml=MULTI_LEVEL[mapName];const th=ml?.thresholdZ;
-  const zs:number[]=[];
-  for(const a of nav.areas){
-    if(!pointInPolygon(a.centroid.x,a.centroid.y,poly))continue;
-    // 多层地图：只取当前楼层的 nav 区域
-    if(th!==undefined&&level==="upper"&&a.centroid.z<th)continue;
-    if(th!==undefined&&level==="lower"&&a.centroid.z>th)continue;
-    zs.push(a.centroid.z);
-  }
-  if(zs.length===0)return null;
-  const zMin=Math.min(...zs),zMax=Math.max(...zs);
-  return{zMin:Math.round(zMin-10),zMax:Math.round(zMax+10)};
-}
 
 // ════════════════════════════════════════════════════════════════════════════
 // ZoneTab
 // ════════════════════════════════════════════════════════════════════════════
 function ZoneTab({mapName,level,setLevel,vocab,store,setStore,custom,setCustom}:{mapName:string;level:Level;setLevel:(l:Level)=>void;vocab:Record<string,string>;store:ZoneStore;setStore:React.Dispatch<React.SetStateAction<ZoneStore>>;custom:Record<string,string>;setCustom:React.Dispatch<React.SetStateAction<Record<string,string>>>}){
   const ml=MULTI_LEVEL[mapName];
+  const nav=useMemo(()=>getMapNav(mapName),[mapName]);
   const [editId,setEditId]=useState<string|null>(null);const[draft,setDraft]=useState<[number,number][]>([]);const[cur,setCur]=useState<[number,number]|null>(null);const[dragIdx,setDragIdx]=useState<number|null>(null);const didDragRef=useRef(false);
+  const navSample=useMemo(()=>{if(!nav||draft.length<3)return null;return sampleNavZ(nav,draft);},[nav,draft]);
   const[saving,setSaving]=useState(false);const[saveMsg,setSaveMsg]=useState("");
   const[newId,setNewId]=useState("");const[newCn,setNewCn]=useState("");
   const addCallout=()=>{const id=newId.trim();const cn=newCn.trim();if(!id||!cn||id in vocab)return;setCustom(p=>({...p,[id]:cn}));setNewId("");setNewCn("");};
@@ -137,7 +123,7 @@ function ZoneTab({mapName,level,setLevel,vocab,store,setStore,custom,setCustom}:
   // 编辑控制
   const selectZone=(id:string)=>{if(id===editId){setEditId(null);setDraft([]);return;}setEditId(id);const g=store[id];setDraft(g?.polygon?.length?g.polygon.map(p=>[p[0],p[1]]as[number,number]):[]);setCur(null);
     if(ml&&g){const zl=geomLevel(g,ml.thresholdZ);if(zl!=="both"&&zl!==level) setLevel(zl);}};
-  const commit=useCallback((poly:[number,number][])=>{if(!editId||poly.length<3)return;const cat=calloutCat(editId);const g:MapZone={id:editId,name:vocab[editId]??editId,role:CAT_ROLE[cat]as MapZone["role"],bombsite:/BombsiteA/i.test(editId)?"a":/BombsiteB/i.test(editId)?"b":null,polygon:poly};if(ml){if(level==="lower") g.zMax=ml.thresholdZ;else g.zMin=ml.thresholdZ;}const nz=computeNavZ(mapName,poly,level);if(nz){if(g.zMin===undefined)g.zMin=nz.zMin;if(g.zMax===undefined)g.zMax=nz.zMax;}setStore(p=>({...p,[editId]:g}));setEditId(null);setDraft([]);setCur(null);},[editId,mapName,ml,level,setStore,vocab]);
+  const commit=useCallback((poly:[number,number][])=>{if(!editId||poly.length<3)return;const cat=calloutCat(editId);const g:MapZone={id:editId,name:vocab[editId]??editId,role:CAT_ROLE[cat]as MapZone["role"],bombsite:/BombsiteA/i.test(editId)?"a":/BombsiteB/i.test(editId)?"b":null,polygon:poly};if(ml){if(level==="lower") g.zMax=ml.thresholdZ;else g.zMin=ml.thresholdZ;}setStore(p=>({...p,[editId]:g}));setEditId(null);setDraft([]);setCur(null);},[editId,mapName,ml,level,setStore,vocab]);
   const onMapClick=(rx:number,ry:number)=>{if(!editId)return;if(didDragRef.current){didDragRef.current=false;return;}if(draft.length>=3){const[fx,fy]=w2r(draft[0][0],draft[0][1],mapName);if((fx-rx)**2+(fy-ry)**2<=SNAP*SNAP){commit(draft);return;}}setDraft(p=>[...p,r2w(rx,ry,mapName)]);};
   const onMapMove=(rx:number,ry:number)=>{if(dragIdx!==null){didDragRef.current=true;setDraft(p=>p.map((pt,i)=>i===dragIdx?r2w(rx,ry,mapName):pt));setCur([rx,ry]);}else if(editId)setCur([rx,ry]);};
   const updateZ=(id:string,field:"zMin"|"zMax",val:string)=>{const n=val.trim()===""?undefined:Number(val);if(!Number.isNaN(n)) setStore(p=>({...p,[id]:{...p[id],polygon:p[id]?.polygon??[],[field]:n}}));};
@@ -169,6 +155,11 @@ function ZoneTab({mapName,level,setLevel,vocab,store,setStore,custom,setCustom}:
           <Btn c="#e67e22" disabled={!draft.length} onClick={()=>setDraft(d=>d.slice(0,-1))}>↩ 撤销</Btn>
           <Btn c="#e74c3c" onClick={()=>setDraft([])}>清空</Btn>
           <span style={{fontSize:12,color:"#8899aa"}}>编辑：<b style={{color:CAT_CLR[editCat]}}>{vocab[editId]}</b><span style={{color:closeable?"#2ecc71":"#525a6a",marginLeft:8}}>{closeable?"点击闭合":"点回起点(白圈)/按完成闭合 · 顶点可拖动"}</span></span>
+          {navSample&&navSample.clusters.length>0&&<span style={{fontSize:10,color:"#525a6a",display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
+            <span>Z:</span>
+            {navSample.clusters.map((c,i)=><span key={i} style={{color:navSample.clusters.length>1?"#f1c40f":"#2ecc71"}}>[{Math.round(c.min)}~{Math.round(c.max)}]×{c.count}</span>)}
+            {navSample.clusters.length>=2&&<span style={{color:"#5ba0ff"}}>→ 边界≈{Math.round((navSample.clusters[0]!.max+navSample.clusters[1]!.min)/2)}</span>}
+          </span>}
         </>:<span style={{fontSize:12,color:"#525a6a"}}>← 点击右侧列表选择 callout 画多边形 · 画完点回起点闭合或按「完成」</span>}
       </div>
     </div>
