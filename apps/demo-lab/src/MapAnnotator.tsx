@@ -123,7 +123,11 @@ function ZoneTab({mapName,level,setLevel,vocab,store,setStore,custom,setCustom}:
   // 编辑控制
   const selectZone=(id:string)=>{if(id===editId){setEditId(null);setDraft([]);return;}setEditId(id);const g=store[id];setDraft(g?.polygon?.length?g.polygon.map(p=>[p[0],p[1]]as[number,number]):[]);setCur(null);
     if(ml&&g){const zl=geomLevel(g,ml.thresholdZ);if(zl!=="both"&&zl!==level) setLevel(zl);}};
-  const commit=useCallback((poly:[number,number][])=>{if(!editId||poly.length<3)return;const cat=calloutCat(editId);const g:MapZone={id:editId,name:vocab[editId]??editId,role:CAT_ROLE[cat]as MapZone["role"],bombsite:/BombsiteA/i.test(editId)?"a":/BombsiteB/i.test(editId)?"b":null,polygon:poly};if(ml){if(level==="lower") g.zMax=ml.thresholdZ;else g.zMin=ml.thresholdZ;}setStore(p=>({...p,[editId]:g}));setEditId(null);setDraft([]);setCur(null);},[editId,mapName,ml,level,setStore,vocab]);
+  const commit=useCallback((poly:[number,number][])=>{if(!editId||poly.length<3)return;const cat=calloutCat(editId);const g:MapZone={id:editId,name:vocab[editId]??editId,role:CAT_ROLE[cat]as MapZone["role"],bombsite:/BombsiteA/i.test(editId)?"a":/BombsiteB/i.test(editId)?"b":null,polygon:poly};if(ml){if(level==="lower") g.zMax=ml.thresholdZ;else g.zMin=ml.thresholdZ;}
+    // 单簇（无歧义）→ 自动填；多簇（重叠区域）→ 不填，由用户看底部提示手动填
+    const sample=nav?sampleNavZ(nav,poly):null;
+    if(sample?.clusters.length===1){const c=sample.clusters[0]!;if(g.zMin===undefined)g.zMin=Math.round(c.min-10);if(g.zMax===undefined)g.zMax=Math.round(c.max+10);}
+    setStore(p=>({...p,[editId]:g}));setEditId(null);setDraft([]);setCur(null);},[editId,mapName,ml,level,setStore,vocab,nav]);
   const onMapClick=(rx:number,ry:number)=>{if(!editId)return;if(didDragRef.current){didDragRef.current=false;return;}if(draft.length>=3){const[fx,fy]=w2r(draft[0][0],draft[0][1],mapName);if((fx-rx)**2+(fy-ry)**2<=SNAP*SNAP){commit(draft);return;}}setDraft(p=>[...p,r2w(rx,ry,mapName)]);};
   const onMapMove=(rx:number,ry:number)=>{if(dragIdx!==null){didDragRef.current=true;setDraft(p=>p.map((pt,i)=>i===dragIdx?r2w(rx,ry,mapName):pt));setCur([rx,ry]);}else if(editId)setCur([rx,ry]);};
   const updateZ=(id:string,field:"zMin"|"zMax",val:string)=>{const n=val.trim()===""?undefined:Number(val);if(!Number.isNaN(n)) setStore(p=>({...p,[id]:{...p[id],polygon:p[id]?.polygon??[],[field]:n}}));};
