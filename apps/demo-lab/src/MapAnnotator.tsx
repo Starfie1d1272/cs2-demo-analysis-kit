@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { CALLOUT_NAME_CN, getMapCalibration, worldToRadar } from "@cs2dak/maps";
+import { CALLOUT_NAME_CN, getMapCalibration, worldToRadar, getMapNav, pointInPolygon } from "@cs2dak/maps";
 import type { MapZone } from "@cs2dak/maps";
 
 // ── 地图列表 & 多层配置 ──────────────────────────────────────────────────────
@@ -17,12 +17,6 @@ const MULTI_LEVEL: Record<string, { thresholdZ: number; lowerImg: string }> = {
   de_nuke: { thresholdZ: -495, lowerImg: "de_nuke_lower" },
 };
 type Level = "upper" | "lower";
-/** nuke 默认层归属：A 侧在上层（z >= -495），B 侧在下层（z <= -495）。从 CALLOUT_NAME_CN 词表派生。 */
-function nukeDefaultZ(id: string): {zMin?:number;zMax?:number} | null {
-  if (/BombsiteB|Ramp$|Tunnels|Secret|Hell|Vents/i.test(id)) return {zMax:-495};
-  if (/BombsiteA|Outside|Lobby|Hut|Heaven|Rafters|Mini|Squeaky|Garage|Control|Trophy|HutRoof|Roof|Silo|Catwalk|Decon|Crane|Observation|LockerRoom|Vending|Admin|Spawn/i.test(id)) return {zMin:-495};
-  return null;
-}
 
 // ── 坐标变换 ──────────────────────────────────────────────────────────────────
 function w2r(wx: number, wy: number, m: string): [number, number] {
@@ -102,6 +96,23 @@ function MapCanvas({mapName,level,cursor="default",onClick,onMouseMove,onMouseUp
 
 function geomLevel(g:{zMin?:number;zMax?:number}|undefined,thresholdZ:number):Level|"both"{if(!g||(g.zMin===undefined&&g.zMax===undefined))return"both";if(g.zMax!==undefined&&g.zMax<=thresholdZ)return"lower";if(g.zMin!==undefined&&g.zMin>=thresholdZ)return"upper";return"both";}
 
+/** 从 nav mesh 中采样多边形内的区域质心 z 值，自动计算 zMin/zMax（±10 容差）。多层地图按当前楼层阈值过滤。 */
+function computeNavZ(mapName:string,poly:[number,number][],level:Level):{zMin:number;zMax:number}|null{
+  const nav=getMapNav(mapName);if(!nav||poly.length<3)return null;
+  const ml=MULTI_LEVEL[mapName];const th=ml?.thresholdZ;
+  const zs:number[]=[];
+  for(const a of nav.areas){
+    if(!pointInPolygon(a.centroid.x,a.centroid.y,poly))continue;
+    // 多层地图：只取当前楼层的 nav 区域
+    if(th!==undefined&&level==="upper"&&a.centroid.z<th)continue;
+    if(th!==undefined&&level==="lower"&&a.centroid.z>th)continue;
+    zs.push(a.centroid.z);
+  }
+  if(zs.length===0)return null;
+  const zMin=Math.min(...zs),zMax=Math.max(...zs);
+  return{zMin:Math.round(zMin-10),zMax:Math.round(zMax+10)};
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // ZoneTab
 // ════════════════════════════════════════════════════════════════════════════
@@ -125,8 +136,8 @@ function ZoneTab({mapName,level,setLevel,vocab,store,setStore,custom,setCustom}:
 
   // 编辑控制
   const selectZone=(id:string)=>{if(id===editId){setEditId(null);setDraft([]);return;}setEditId(id);const g=store[id];setDraft(g?.polygon?.length?g.polygon.map(p=>[p[0],p[1]]as[number,number]):[]);setCur(null);
-    if(ml){const g2=g??nukeDefaultZ(id);if(g2){const zl=geomLevel(g2,ml.thresholdZ);if(zl!=="both"&&zl!==level) setLevel(zl);}}};
-  const commit=useCallback((poly:[number,number][])=>{if(!editId||poly.length<3)return;const cat=calloutCat(editId);const g:MapZone={id:editId,name:vocab[editId]??editId,role:CAT_ROLE[cat]as MapZone["role"],bombsite:/BombsiteA/i.test(editId)?"a":/BombsiteB/i.test(editId)?"b":null,polygon:poly};if(ml){if(level==="lower") g.zMax=ml.thresholdZ;else g.zMin=ml.thresholdZ;}setStore(p=>({...p,[editId]:g}));setEditId(null);setDraft([]);setCur(null);},[editId,mapName,ml,level,setStore,vocab]);
+    if(ml&&g){const zl=geomLevel(g,ml.thresholdZ);if(zl!=="both"&&zl!==level) setLevel(zl);}};
+  const commit=useCallback((poly:[number,number][])=>{if(!editId||poly.length<3)return;const cat=calloutCat(editId);const g:MapZone={id:editId,name:vocab[editId]??editId,role:CAT_ROLE[cat]as MapZone["role"],bombsite:/BombsiteA/i.test(editId)?"a":/BombsiteB/i.test(editId)?"b":null,polygon:poly};if(ml){if(level==="lower") g.zMax=ml.thresholdZ;else g.zMin=ml.thresholdZ;}const nz=computeNavZ(mapName,poly,level);if(nz){if(g.zMin===undefined)g.zMin=nz.zMin;if(g.zMax===undefined)g.zMax=nz.zMax;}setStore(p=>({...p,[editId]:g}));setEditId(null);setDraft([]);setCur(null);},[editId,mapName,ml,level,setStore,vocab]);
   const onMapClick=(rx:number,ry:number)=>{if(!editId)return;if(didDragRef.current){didDragRef.current=false;return;}if(draft.length>=3){const[fx,fy]=w2r(draft[0][0],draft[0][1],mapName);if((fx-rx)**2+(fy-ry)**2<=SNAP*SNAP){commit(draft);return;}}setDraft(p=>[...p,r2w(rx,ry,mapName)]);};
   const onMapMove=(rx:number,ry:number)=>{if(dragIdx!==null){didDragRef.current=true;setDraft(p=>p.map((pt,i)=>i===dragIdx?r2w(rx,ry,mapName):pt));setCur([rx,ry]);}else if(editId)setCur([rx,ry]);};
   const updateZ=(id:string,field:"zMin"|"zMax",val:string)=>{const n=val.trim()===""?undefined:Number(val);if(!Number.isNaN(n)) setStore(p=>({...p,[id]:{...p[id],polygon:p[id]?.polygon??[],[field]:n}}));};
@@ -273,7 +284,7 @@ export function MapAnnotator(){
   const[mapName,setMapName]=useState("de_mirage");const[tab,setTab]=useState<MainTab>("zones");const[level,setLevel]=useState<Level>("upper");
   const[store,setStore]=useState<ZoneStore>({});const[loading,setLoading]=useState(true);
   const[custom,setCustom]=useState<Record<string,string>>(()=>{try{const v=localStorage.getItem("cs2dak-customcallouts-"+mapName);return v?JSON.parse(v):{};}catch{return{};}});
-  useEffect(()=>{setLevel("upper");setLoading(true);let c=false;fetchZones(mapName).then(s=>{if(!c){if(mapName==="de_nuke"){const nukeCallouts=(CALLOUT_NAME_CN as Record<string,Record<string,string>>)["de_nuke"]??{};for(const id of Object.keys(nukeCallouts)){if(!s[id]){const dz=nukeDefaultZ(id);if(dz) s[id]=dz;}}}setStore(s);setLoading(false);}});try{setCustom(JSON.parse(localStorage.getItem("cs2dak-customcallouts-"+mapName)??"{}"));}catch{setCustom({});}return()=>{c=true;};},[mapName]);
+  useEffect(()=>{setLevel("upper");setLoading(true);let c=false;fetchZones(mapName).then(s=>{if(!c){setStore(s);setLoading(false);}});try{setCustom(JSON.parse(localStorage.getItem("cs2dak-customcallouts-"+mapName)??"{}"));}catch{setCustom({});}return()=>{c=true;};},[mapName]);
   useEffect(()=>{try{localStorage.setItem("cs2dak-customcallouts-"+mapName,JSON.stringify(custom));}catch{}},[custom,mapName]);
   const vocab=useMemo(()=>({...((CALLOUT_NAME_CN as Record<string,Record<string,string>>)[mapName]??{}),...custom}),[mapName,custom]);
 

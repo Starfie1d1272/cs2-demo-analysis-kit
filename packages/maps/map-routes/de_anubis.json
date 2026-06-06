@@ -1,20 +1,38 @@
 {
   "mapName": "de_anubis",
-  "version": "de_anubis-routes-0.3",
+  "version": "de_anubis-routes-0.4",
   "routes": [
     {
       "id": "a_main",
       "name": "水下A厅",
       "type": "primary_entry",
       "bombsite": "a",
-      "confidence": "medium",
+      "confidence": "high",
       "zones": [
-        { "id": "TSpawn", "nameCn": "匪家" },
-        { "id": "Street", "nameCn": "街道" },
-        { "id": "TStairs", "nameCn": "匪梯" },
-        { "id": "Canal", "nameCn": "水下" },
-        { "id": "Main", "nameCn": "A厅" },
-        { "id": "BombsiteA", "nameCn": "A包" }
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "Street",
+          "nameCn": "街道"
+        },
+        {
+          "id": "TStairs",
+          "nameCn": "匪梯"
+        },
+        {
+          "id": "Canal",
+          "nameCn": "水下"
+        },
+        {
+          "id": "Main",
+          "nameCn": "A厅"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A包"
+        }
       ]
     },
     {
@@ -22,15 +40,36 @@
       "name": "中路A连",
       "type": "mid_connector",
       "bombsite": "a",
-      "confidence": "medium",
+      "confidence": "high",
       "zones": [
-        { "id": "TSpawn", "nameCn": "匪家" },
-        { "id": "Ruins", "nameCn": "B外" },
-        { "id": "Bridge", "nameCn": "中桥" },
-        { "id": "MidDoors", "nameCn": "中门" },
-        { "id": "Middle", "nameCn": "中路" },
-        { "id": "Walkway", "nameCn": "A连" },
-        { "id": "BombsiteA", "nameCn": "A包" }
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "Ruins",
+          "nameCn": "B外"
+        },
+        {
+          "id": "Bridge",
+          "nameCn": "中桥"
+        },
+        {
+          "id": "MidDoors",
+          "nameCn": "中门"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "Walkway",
+          "nameCn": "A连"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A包"
+        }
       ]
     },
     {
@@ -38,12 +77,24 @@
       "name": "B外进攻",
       "type": "primary_entry",
       "bombsite": "b",
-      "confidence": "medium",
+      "confidence": "high",
       "zones": [
-        { "id": "TSpawn", "nameCn": "匪家" },
-        { "id": "Ruins", "nameCn": "B外" },
-        { "id": "OutsideLong", "nameCn": "B外" },
-        { "id": "BombsiteB", "nameCn": "B包" }
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "Ruins",
+          "nameCn": "B外"
+        },
+        {
+          "id": "OutsideLong",
+          "nameCn": "B外"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B包"
+        }
       ]
     },
     {
@@ -51,14 +102,147 @@
       "name": "水下黑屋夹B",
       "type": "secondary_entry",
       "bombsite": "b",
-      "confidence": "medium",
+      "confidence": "high",
       "zones": [
-        { "id": "TSpawn", "nameCn": "匪家" },
-        { "id": "Street", "nameCn": "街道" },
-        { "id": "TStairs", "nameCn": "匪梯" },
-        { "id": "Canal", "nameCn": "水下" },
-        { "id": "Connector", "nameCn": "黑屋" },
-        { "id": "BombsiteB", "nameCn": "B包" }
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "Street",
+          "nameCn": "街道"
+        },
+        {
+          "id": "TStairs",
+          "nameCn": "匪梯"
+        },
+        {
+          "id": "Canal",
+          "nameCn": "水下"
+        },
+        {
+          "id": "Connector",
+          "nameCn": "黑屋"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B包"
+        }
+      ]
+    },
+    {
+      "id": "route_1780686289028",
+      "name": "匪跳控 A",
+      "type": "lurk_lane",
+      "bombsite": "a",
+      "confidence": "high",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "Street",
+          "nameCn": "街道"
+        },
+        {
+          "id": "TSideUpper",
+          "nameCn": "匪跳"
+        },
+        {
+          "id": "Canal",
+          "nameCn": "水下"
+        },
+        {
+          "id": "Main",
+          "nameCn": "A厅"
+        },
+        {
+          "id": "BombsiteA",
+          "nameCn": "A包"
+        }
+      ]
+    },
+    {
+      "id": "route_1780686325710",
+      "name": "B 连夹 B",
+      "type": "mid_connector",
+      "bombsite": "b",
+      "confidence": "high",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "Bridge",
+          "nameCn": "中桥"
+        },
+        {
+          "id": "MidDoors",
+          "nameCn": "中门"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "PalaceInterior",
+          "nameCn": "B连"
+        },
+        {
+          "id": "Bricks",
+          "nameCn": "B连阳光房"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B包"
+        }
+      ]
+    },
+    {
+      "id": "route_1780686369208",
+      "name": "警家夹 B",
+      "type": "mid_connector",
+      "bombsite": "b",
+      "confidence": "high",
+      "zones": [
+        {
+          "id": "TSpawn",
+          "nameCn": "匪家"
+        },
+        {
+          "id": "Bridge",
+          "nameCn": "中桥"
+        },
+        {
+          "id": "MidDoors",
+          "nameCn": "中门"
+        },
+        {
+          "id": "Middle",
+          "nameCn": "中路"
+        },
+        {
+          "id": "PalaceInterior",
+          "nameCn": "B连"
+        },
+        {
+          "id": "CTSideUpper",
+          "nameCn": "警家"
+        },
+        {
+          "id": "SnipersNest",
+          "nameCn": "警家狙位"
+        },
+        {
+          "id": "Alley",
+          "nameCn": "警家"
+        },
+        {
+          "id": "BombsiteB",
+          "nameCn": "B包"
+        }
       ]
     }
   ]
