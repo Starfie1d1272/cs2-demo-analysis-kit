@@ -147,7 +147,7 @@ function ZoneTab({mapName,level,setLevel,vocab,store,setStore,custom,setCustom}:
   const doneCount=ids.filter(id=>(store[id]?.polygon?.length??0)>=3).length;
 
   return <div style={{display:"flex",gap:12,flex:1,overflow:"hidden"}}>
-    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+    <div style={{display:"flex",flexDirection:"column",gap:8,width:622,flexShrink:0}}>
       <MapCanvas mapName={mapName} level={level} cursor={dragIdx!==null?"grabbing":editId?"crosshair":"default"} onClick={onMapClick} onMouseMove={editId?onMapMove:undefined} onMouseUp={()=>setDragIdx(null)} onMouseLeave={()=>{setCur(null);setDragIdx(null);}}>
         {ids.map(id=>{const g=store[id];if(!g||g.polygon.length<3||id===editId)return null;const zl=ml?geomLevel(g,ml.thresholdZ):"both";if(zl!=="both"&&zl!==level)return null;const c=CAT_CLR[calloutCat(id)];const[lx,ly]=w2r(...centroid(g.polygon),mapName);
           return <g key={id}><polygon points={g.polygon.map(([wx,wy])=>w2r(wx,wy,mapName).join(",")).join(" ")} fill={c} fillOpacity={0.2} stroke={c} strokeWidth={2} strokeOpacity={0.8}/><text x={lx} y={ly} textAnchor="middle" fill="#fff" fontSize={11} style={{pointerEvents:"none",textShadow:"0 0 3px #000"}}>{vocab[id]}</text></g>;})}
