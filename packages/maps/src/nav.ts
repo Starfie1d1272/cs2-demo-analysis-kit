@@ -140,10 +140,13 @@ export function sampleNavZ(
   nav: CompactNav,
   polygon: Array<[number, number]>,
   clusterGapThreshold = 50,
+  zFilter?: { zMin?: number; zMax?: number },
 ): NavZSample | null {
   const zValues: number[] = [];
   for (const area of nav.areas) {
     const { x, y, z } = area.centroid;
+    if (zFilter?.zMin !== undefined && z < zFilter.zMin) continue;
+    if (zFilter?.zMax !== undefined && z > zFilter.zMax) continue;
     if (pointInPolygon2d(x, y, polygon)) zValues.push(z);
   }
   if (zValues.length === 0) return null;
