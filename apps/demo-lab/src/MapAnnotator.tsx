@@ -92,9 +92,34 @@ const S={
 function Btn({c,onClick,disabled=false,wide=false,children}:{c:string;onClick:()=>void;disabled?:boolean;wide?:boolean;children:React.ReactNode}){return <button onClick={onClick} disabled={disabled} style={{padding:wide?"6px 16px":"4px 11px",fontSize:12,background:c+"22",color:c,border:`1px solid ${c}55`,borderRadius:2,cursor:disabled?"not-allowed":"pointer",opacity:disabled?0.45:1,width:wide?"100%":undefined}}>{children}</button>;}
 function SubTab({active,onClick,children}:{active:boolean;onClick:()=>void;children:React.ReactNode}){return <button onClick={onClick} style={{padding:"3px 14px",fontSize:11,background:active?"#162035":"#10131a",color:active?"#5ba0ff":"#525a6a",border:`1px solid ${active?"#2d5a9e":"#1f2530"}`,borderRadius:2,cursor:"pointer"}}>{children}</button>;}
 function LevelSwitch({mapName,level,setLevel}:{mapName:string;level:Level;setLevel:(l:Level)=>void}){if(!MULTI_LEVEL[mapName])return null;return <div style={{display:"flex",gap:4,alignItems:"center"}}><span style={{fontSize:10,color:"#525a6a"}}>楼层</span><SubTab active={level==="upper"} onClick={()=>setLevel("upper")}>▲ 上层</SubTab><SubTab active={level==="lower"} onClick={()=>setLevel("lower")}>▼ 下层</SubTab></div>;}
-function MapCanvas({mapName,level,cursor="default",onClick,onMouseMove,onMouseUp,onMouseLeave,children}:{mapName:string;level:Level;cursor?:string;onClick?:(rx:number,ry:number)=>void;onMouseMove?:(rx:number,ry:number)=>void;onMouseUp?:()=>void;onMouseLeave?:()=>void;children?:React.ReactNode}){const ml=MULTI_LEVEL[mapName];const img=ml&&level==="lower"?ml.lowerImg:mapName;const toRxy=(e:React.MouseEvent<SVGSVGElement>):[number,number]=>{const rect=e.currentTarget.getBoundingClientRect();return[((e.clientX-rect.left)/rect.width)*1024,((e.clientY-rect.top)/rect.height)*1024];};const sz="min(620px, calc(100vh - 180px))";return <div style={{position:"relative",width:sz,height:sz,border:"1px solid #1f2530",flexShrink:0}}><img src={`/maps/radars/${img}.png`} style={{display:"block",width:"100%",height:"100%",userSelect:"none"}} draggable={false}/><svg viewBox="0 0 1024 1024" style={{position:"absolute",inset:0,width:"100%",height:"100%",cursor}} onClick={onClick?e=>{const[rx,ry]=toRxy(e);onClick(rx,ry)}:undefined} onMouseMove={onMouseMove?e=>{const[rx,ry]=toRxy(e);onMouseMove(rx,ry)}:undefined} onMouseUp={onMouseUp} onMouseLeave={onMouseLeave}>{children}</svg></div>;}
+function MapCanvas({mapName,level,cursor="default",onClick,onMouseMove,onMouseUp,onMouseLeave,children}:{mapName:string;level:Level;cursor?:string;onClick?:(rx:number,ry:number)=>void;onMouseMove?:(rx:number,ry:number)=>void;onMouseUp?:()=>void;onMouseLeave?:()=>void;children?:React.ReactNode}){const ml=MULTI_LEVEL[mapName];const img=ml&&level==="lower"?ml.lowerImg:mapName;const toRxy=(e:React.MouseEvent<SVGSVGElement>):[number,number]=>{const rect=e.currentTarget.getBoundingClientRect();return[((e.clientX-rect.left)/rect.width)*1024,((e.clientY-rect.top)/rect.height)*1024];};return <div style={{position:"relative",flex:1,minHeight:0,aspectRatio:"1",maxWidth:"100%",border:"1px solid #1f2530"}}><img src={`/maps/radars/${img}.png`} style={{display:"block",width:"100%",height:"100%",userSelect:"none"}} draggable={false}/><svg viewBox="0 0 1024 1024" style={{position:"absolute",inset:0,width:"100%",height:"100%",cursor}} onClick={onClick?e=>{const[rx,ry]=toRxy(e);onClick(rx,ry)}:undefined} onMouseMove={onMouseMove?e=>{const[rx,ry]=toRxy(e);onMouseMove(rx,ry)}:undefined} onMouseUp={onMouseUp} onMouseLeave={onMouseLeave}>{children}</svg></div>;}
 
 function geomLevel(g:{zMin?:number;zMax?:number}|undefined,thresholdZ:number):Level|"both"{if(!g||(g.zMin===undefined&&g.zMax===undefined))return"both";if(g.zMax!==undefined&&g.zMax<=thresholdZ)return"lower";if(g.zMin!==undefined&&g.zMin>=thresholdZ)return"upper";return"both";}
+
+// Z 分布直方图：把 polygon 内 nav 质心 Z 分桶，山谷（两峰间密度最低处）= 真正的楼层边界。
+// 比簇间隙更可靠——坡道会把簇间隙填满导致假单簇，但直方图仍能看出双峰。
+function zHistogram(zValues:number[],bins=24){
+  if(zValues.length===0)return{counts:[]as number[],min:0,max:0,valleyZ:null as number|null};
+  const min=zValues[0]!,max=zValues[zValues.length-1]!,span=(max-min)||1,binW=span/bins;
+  const counts=new Array(bins).fill(0);
+  for(const z of zValues){let b=Math.floor((z-min)/binW);if(b>=bins)b=bins-1;if(b<0)b=0;counts[b]++;}
+  let valley=-1,valleyCount=Infinity;
+  for(let i=1;i<bins-1;i++){const left=Math.max(...counts.slice(0,i)),right=Math.max(...counts.slice(i+1));if(counts[i]<left&&counts[i]<right&&counts[i]<valleyCount){valleyCount=counts[i];valley=i;}}
+  return{counts,min,max,valleyZ:valley>=0?Math.round(min+(valley+0.5)*binW):null};
+}
+function ZHist({zValues}:{zValues:number[]}){
+  const h=zHistogram(zValues,24);if(!h.counts.length)return null;
+  const peak=Math.max(...h.counts,1),W=168,H=26,bw=W/h.counts.length;
+  const span=(h.max-h.min)||1;const vx=h.valleyZ!==null?((h.valleyZ-h.min)/span)*W:null;
+  return <span style={{display:"inline-flex",alignItems:"center",gap:5}}>
+    <svg width={W} height={H} style={{display:"block",background:"#0d1119",borderRadius:2}}>
+      {h.counts.map((c,i)=>{const bh=(c/peak)*(H-2);return <rect key={i} x={i*bw} y={H-bh} width={Math.max(bw-1,1)} height={bh} fill="#3a6ea5"/>;})}
+      {vx!==null&&<line x1={vx} y1={0} x2={vx} y2={H} stroke="#f1c40f" strokeWidth={1.5}/>}
+    </svg>
+    <span style={{color:"#525a6a"}}>{Math.round(h.min)}~{Math.round(h.max)}</span>
+    {h.valleyZ!==null&&<span style={{color:"#f1c40f"}}>谷≈{h.valleyZ}</span>}
+  </span>;
+}
 
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -143,7 +168,7 @@ function ZoneTab({mapName,level,setLevel,vocab,store,setStore,custom,setCustom}:
   const doneCount=ids.filter(id=>(store[id]?.polygon?.length??0)>=3).length;
 
   return <div style={{display:"flex",gap:12,flex:1,overflow:"hidden"}}>
-    <div style={{display:"flex",flexDirection:"column",gap:8,width:"min(622px, calc(100vh - 178px))",flexShrink:0}}>
+    <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0,minHeight:0,maxWidth:622}}>
       <MapCanvas mapName={mapName} level={level} cursor={dragIdx!==null?"grabbing":editId?"crosshair":"default"} onClick={onMapClick} onMouseMove={editId?onMapMove:undefined} onMouseUp={()=>setDragIdx(null)} onMouseLeave={()=>{setCur(null);setDragIdx(null);}}>
         {ids.map(id=>{const g=store[id];if(!g||g.polygon.length<3||id===editId)return null;const zl=ml?geomLevel(g,ml.thresholdZ):"both";if(zl!=="both"&&zl!==level)return null;const c=CAT_CLR[calloutCat(id)];const[lx,ly]=w2r(...centroid(g.polygon),mapName);
           return <g key={id}><polygon points={g.polygon.map(([wx,wy])=>w2r(wx,wy,mapName).join(",")).join(" ")} fill={c} fillOpacity={0.2} stroke={c} strokeWidth={2} strokeOpacity={0.8}/><text x={lx} y={ly} textAnchor="middle" fill="#fff" fontSize={11} style={{pointerEvents:"none",textShadow:"0 0 3px #000"}}>{vocab[id]}</text></g>;})}
@@ -154,18 +179,17 @@ function ZoneTab({mapName,level,setLevel,vocab,store,setStore,custom,setCustom}:
         {closeable&&<circle cx={draftSvg[0][0]} cy={draftSvg[0][1]} r={11} fill="none" stroke="#2ecc71" strokeWidth={2.5}><animate attributeName="r" values="9;13;9" dur="1s" repeatCount="indefinite"/></circle>}
         {editId&&draftSvg.map(([sx,sy],i)=><circle key={i} cx={sx} cy={sy} r={i===0?6:4.5} fill={i===0?"#fff":CAT_CLR[editCat]} stroke="#000" strokeWidth={1.5} style={{cursor:"grab"}} onMouseDown={e=>{e.stopPropagation();didDragRef.current=false;setDragIdx(i);}}/>)}
       </MapCanvas>
-      <div style={{display:"flex",gap:8,alignItems:"center",minHeight:30,flexWrap:"wrap"}}>
+      <div style={{display:"flex",gap:8,alignItems:"center",minHeight:30,flexWrap:"wrap",flexShrink:0}}>
         <LevelSwitch mapName={mapName} level={level} setLevel={setLevel}/>
         {editId?<>
           <Btn c={draft.length>=3?"#2ecc71":"#444"} disabled={draft.length<3} onClick={()=>commit(draft)}>✓ 完成 ({draft.length}pt)</Btn>
           <Btn c="#e67e22" disabled={!draft.length} onClick={()=>{setDraft(d=>d.slice(0,-1));setClosed(false);}}>↩ 撤销</Btn>
           <Btn c="#e74c3c" onClick={()=>{setDraft([]);setClosed(false);}}>清空</Btn>
           <span style={{fontSize:12,color:"#8899aa"}}>编辑：<b style={{color:CAT_CLR[editCat]}}>{vocab[editId]}</b><span style={{color:closed?"#2ecc71":closeable?"#2ecc71":"#525a6a",marginLeft:8}}>{closed?"已闭合 · 查看 Z 分布填入高度，按「完成」提交":closeable?"点击闭合":"点回起点(白圈)/按完成闭合 · 顶点可拖动"}</span></span>
-          {draft.length>=3&&<span style={{fontSize:10,display:"inline-flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
-            {navSample&&navSample.clusters.length>0?<>
-              <span style={{color:"#525a6a"}}>Z ({navSample.clusters.length}簇):</span>
-              {navSample.clusters.map((c,i)=><span key={i} style={{color:navSample.clusters.length>1?"#f1c40f":"#2ecc71"}}>[{Math.round(c.min)}~{Math.round(c.max)}]×{c.count}</span>)}
-              {navSample.clusters.length>=2&&<span style={{color:"#5ba0ff"}}>→ 边界≈{Math.round((navSample.clusters[0]!.max+navSample.clusters[1]!.min)/2)}</span>}
+          {draft.length>=3&&<span style={{fontSize:10,display:"inline-flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
+            {navSample&&navSample.zValues.length>0?<>
+              <span style={{color:"#525a6a"}}>Z×{navSample.zValues.length}:</span>
+              <ZHist zValues={navSample.zValues}/>
             </>:<span style={{color:"#3d4555"}}>Z: 无 nav 数据</span>}
           </span>}
           {closed&&editId&&<><input key={`zmin-${editId}`} style={S.numInp} placeholder="zMin" defaultValue={store[editId]?.zMin??""} onBlur={e=>updateZ(editId,"zMin",e.target.value)}/><input key={`zmax-${editId}`} style={S.numInp} placeholder="zMax" defaultValue={store[editId]?.zMax??""} onBlur={e=>updateZ(editId,"zMax",e.target.value)}/></>}
@@ -240,8 +264,8 @@ function RouteTab({mapName,level,setLevel,vocab,store}:{mapName:string;level:Lev
   </>;
 
   return <div style={{display:"flex",gap:12,flex:1,overflow:"hidden"}}>
-    <div style={{display:"flex",flexDirection:"column",gap:8}}>
-      <div style={{display:"flex",gap:8,alignItems:"center"}}><LevelSwitch mapName={mapName} level={level} setLevel={setLevel}/></div>
+    <div style={{display:"flex",flexDirection:"column",gap:8,minHeight:0,maxWidth:622,flexShrink:0}}>
+      <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0}}><LevelSwitch mapName={mapName} level={level} setLevel={setLevel}/></div>
       <MapCanvas mapName={mapName} level={level} cursor={editRoute?"pointer":"default"} onClick={onMapClick}>{svgContent}</MapCanvas>
       <div style={{display:"flex",flexWrap:"wrap",gap:"2px 10px"}}>{(Object.keys(CAT_CLR)as CalloutCat[]).map(cat=><span key={cat} style={{fontSize:10,color:CAT_CLR[cat]}}>● {CAT_LBL[cat]}</span>)}</div>
       <div style={{fontSize:11,color:"#525a6a"}}>锚点来自 {doneZones} 个已画 zone 质心（先在多边形 tab 标定）{editRoute?`　·　${editRoute.name} · ${editRoute.zones.length} 节点`:"　← 从右侧选择动线，点击地图锚点追加节点"}</div>
