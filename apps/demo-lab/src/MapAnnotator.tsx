@@ -161,10 +161,12 @@ function ZoneTab({mapName,level,setLevel,vocab,store,setStore,custom,setCustom}:
           <Btn c="#e67e22" disabled={!draft.length} onClick={()=>{setDraft(d=>d.slice(0,-1));setClosed(false);}}>↩ 撤销</Btn>
           <Btn c="#e74c3c" onClick={()=>{setDraft([]);setClosed(false);}}>清空</Btn>
           <span style={{fontSize:12,color:"#8899aa"}}>编辑：<b style={{color:CAT_CLR[editCat]}}>{vocab[editId]}</b><span style={{color:closed?"#2ecc71":closeable?"#2ecc71":"#525a6a",marginLeft:8}}>{closed?"已闭合 · 查看 Z 分布填入高度，按「完成」提交":closeable?"点击闭合":"点回起点(白圈)/按完成闭合 · 顶点可拖动"}</span></span>
-          {navSample&&navSample.clusters.length>0&&<span style={{fontSize:10,color:"#525a6a",display:"inline-flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
-            <span>Z:</span>
-            {navSample.clusters.map((c,i)=><span key={i} style={{color:navSample.clusters.length>1?"#f1c40f":"#2ecc71"}}>[{Math.round(c.min)}~{Math.round(c.max)}]×{c.count}</span>)}
-            {navSample.clusters.length>=2&&<span style={{color:"#5ba0ff"}}>→ 边界≈{Math.round((navSample.clusters[0]!.max+navSample.clusters[1]!.min)/2)}</span>}
+          {draft.length>=3&&<span style={{fontSize:10,display:"inline-flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
+            {navSample&&navSample.clusters.length>0?<>
+              <span style={{color:"#525a6a"}}>Z ({navSample.clusters.length}簇):</span>
+              {navSample.clusters.map((c,i)=><span key={i} style={{color:navSample.clusters.length>1?"#f1c40f":"#2ecc71"}}>[{Math.round(c.min)}~{Math.round(c.max)}]×{c.count}</span>)}
+              {navSample.clusters.length>=2&&<span style={{color:"#5ba0ff"}}>→ 边界≈{Math.round((navSample.clusters[0]!.max+navSample.clusters[1]!.min)/2)}</span>}
+            </>:<span style={{color:"#3d4555"}}>Z: 无 nav 数据</span>}
           </span>}
           {closed&&editId&&<><input key={`zmin-${editId}`} style={S.numInp} placeholder="zMin" defaultValue={store[editId]?.zMin??""} onBlur={e=>updateZ(editId,"zMin",e.target.value)}/><input key={`zmax-${editId}`} style={S.numInp} placeholder="zMax" defaultValue={store[editId]?.zMax??""} onBlur={e=>updateZ(editId,"zMax",e.target.value)}/></>}
         </>:<span style={{fontSize:12,color:"#525a6a"}}>← 点击右侧列表选择 callout 画多边形 · 画完点回起点闭合或按「完成」</span>}
