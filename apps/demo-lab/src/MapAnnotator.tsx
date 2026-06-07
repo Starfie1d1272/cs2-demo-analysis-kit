@@ -103,7 +103,7 @@ function geomLevel(g:{zMin?:number;zMax?:number}|undefined,thresholdZ:number):Le
 function ZoneTab({mapName,level,setLevel,vocab,store,setStore,custom,setCustom}:{mapName:string;level:Level;setLevel:(l:Level)=>void;vocab:Record<string,string>;store:ZoneStore;setStore:React.Dispatch<React.SetStateAction<ZoneStore>>;custom:Record<string,string>;setCustom:React.Dispatch<React.SetStateAction<Record<string,string>>>}){
   const ml=MULTI_LEVEL[mapName];
   const nav=useMemo(()=>getMapNav(mapName),[mapName]);
-  const [editId,setEditId]=useState<string|null>(null);const[draft,setDraft]=useState<[number,number][]>([]);const[cur,setCur]=useState<[number,number]|null>(null);const[dragIdx,setDragIdx]=useState<number|null>(null);const didDragRef=useRef(false);
+  const [editId,setEditId]=useState<string|null>(null);const[draft,setDraft]=useState<[number,number][]>([]);const[cur,setCur]=useState<[number,number]|null>(null);const[dragIdx,setDragIdx]=useState<number|null>(null);const[closed,setClosed]=useState(false);const didDragRef=useRef(false);
   const navSample=useMemo(()=>{
     if(!nav||draft.length<3)return null;
     const zf=ml?level==="upper"?{zMin:ml.thresholdZ}:{zMax:ml.thresholdZ}:undefined;
@@ -115,7 +115,7 @@ function ZoneTab({mapName,level,setLevel,vocab,store,setStore,custom,setCustom}:
   const[order,setOrder]=useState<string[]>(()=>{try{const v=localStorage.getItem(`cs2dak-zoneorder-${mapName}`);return v?JSON.parse(v):[];}catch{return[];}});
   const SNAP=16;
 
-  useEffect(()=>{try{setOrder(JSON.parse(localStorage.getItem(`cs2dak-zoneorder-${mapName}`)??"[]"));}catch{setOrder([]);}setEditId(null);setDraft([]);setCur(null);},[mapName]);
+  useEffect(()=>{try{setOrder(JSON.parse(localStorage.getItem(`cs2dak-zoneorder-${mapName}`)??"[]"));}catch{setOrder([]);}setEditId(null);setDraft([]);setCur(null);setClosed(false);},[mapName]);
   useEffect(()=>{try{localStorage.setItem(`cs2dak-zoneorder-${mapName}`,JSON.stringify(order));}catch{/* quota */}},[order,mapName]);
 
   // 渲染/导出顺序 = 已存 order（合并 vocab：保留有效项，新 callout 追加到末尾）= 优先级
@@ -125,15 +125,15 @@ function ZoneTab({mapName,level,setLevel,vocab,store,setStore,custom,setCustom}:
   const autoSortByArea=()=>{const sorted=ids.map(id=>({id,a:polyArea(store[id]?.polygon??[])})).sort((x,y)=>{const ex=x.a===0,ey=y.a===0;if(ex!==ey)return ex?1:-1;return x.a-y.a;}).map(w=>w.id);setOrder(sorted);};
 
   // 编辑控制
-  const selectZone=(id:string)=>{if(id===editId){setEditId(null);setDraft([]);return;}setEditId(id);const g=store[id];setDraft(g?.polygon?.length?g.polygon.map(p=>[p[0],p[1]]as[number,number]):[]);setCur(null);
+  const selectZone=(id:string)=>{if(id===editId){setEditId(null);setDraft([]);setClosed(false);return;}setEditId(id);const g=store[id];const poly=g?.polygon?.length>=3?g.polygon.map(p=>[p[0],p[1]]as[number,number]):[];setDraft(poly);setClosed(poly.length>=3);setCur(null);
     if(ml&&g){const zl=geomLevel(g,ml.thresholdZ);if(zl!=="both"&&zl!==level) setLevel(zl);}};
-  const commit=useCallback((poly:[number,number][])=>{if(!editId||poly.length<3)return;const cat=calloutCat(editId);const g:MapZone={id:editId,name:vocab[editId]??editId,role:CAT_ROLE[cat]as MapZone["role"],bombsite:/BombsiteA/i.test(editId)?"a":/BombsiteB/i.test(editId)?"b":null,polygon:poly};if(ml){if(level==="lower") g.zMax=ml.thresholdZ;else g.zMin=ml.thresholdZ;}
+  const commit=useCallback((poly:[number,number][])=>{if(!editId||poly.length<3)return;const cat=calloutCat(editId);const prev=store[editId];const g:MapZone={id:editId,name:vocab[editId]??editId,role:CAT_ROLE[cat]as MapZone["role"],bombsite:/BombsiteA/i.test(editId)?"a":/BombsiteB/i.test(editId)?"b":null,polygon:poly,zMin:prev?.zMin,zMax:prev?.zMax};if(ml){if(level==="lower") g.zMax=ml.thresholdZ;else g.zMin=ml.thresholdZ;}
     // 单簇（无歧义）→ 自动填；多簇（重叠区域）→ 不填，由用户看底部提示手动填
     const zf=ml?level==="upper"?{zMin:ml.thresholdZ}:{zMax:ml.thresholdZ}:undefined;
     const sample=nav?sampleNavZ(nav,poly,50,zf):null;
     if(sample?.clusters.length===1){const c=sample.clusters[0]!;if(g.zMin===undefined)g.zMin=Math.round(c.min-10);if(g.zMax===undefined)g.zMax=Math.round(c.max+10);}
-    setStore(p=>({...p,[editId]:g}));setEditId(null);setDraft([]);setCur(null);},[editId,mapName,ml,level,setStore,vocab,nav]);
-  const onMapClick=(rx:number,ry:number)=>{if(!editId)return;if(didDragRef.current){didDragRef.current=false;return;}if(draft.length>=3){const[fx,fy]=w2r(draft[0][0],draft[0][1],mapName);if((fx-rx)**2+(fy-ry)**2<=SNAP*SNAP){commit(draft);return;}}setDraft(p=>[...p,r2w(rx,ry,mapName)]);};
+    setStore(p=>({...p,[editId]:g}));setEditId(null);setDraft([]);setCur(null);setClosed(false);},[editId,mapName,ml,level,setStore,vocab,nav,store]);
+  const onMapClick=(rx:number,ry:number)=>{if(!editId)return;if(didDragRef.current){didDragRef.current=false;return;}if(closed)return;if(draft.length>=3){const[fx,fy]=w2r(draft[0][0],draft[0][1],mapName);if((fx-rx)**2+(fy-ry)**2<=SNAP*SNAP){setClosed(true);return;}}setDraft(p=>[...p,r2w(rx,ry,mapName)]);};
   const onMapMove=(rx:number,ry:number)=>{if(dragIdx!==null){didDragRef.current=true;setDraft(p=>p.map((pt,i)=>i===dragIdx?r2w(rx,ry,mapName):pt));setCur([rx,ry]);}else if(editId)setCur([rx,ry]);};
   const updateZ=(id:string,field:"zMin"|"zMax",val:string)=>{const n=val.trim()===""?undefined:Number(val);if(!Number.isNaN(n)) setStore(p=>({...p,[id]:{...p[id],polygon:p[id]?.polygon??[],[field]:n}}));};
   const clearPoly=(id:string)=>{setStore(p=>{const n={...p};delete n[id];return n;});if(editId===id)setDraft([]);};
@@ -141,7 +141,7 @@ function ZoneTab({mapName,level,setLevel,vocab,store,setStore,custom,setCustom}:
 
   const draftSvg=draft.map(([wx,wy])=>w2r(wx,wy,mapName));
   const draftWithCur=cur?[...draftSvg,cur]:draftSvg;
-  const closeable=!!(editId&&draft.length>=3&&cur&&dragIdx===null&&(draftSvg[0][0]-cur[0])**2+(draftSvg[0][1]-cur[1])**2<=SNAP*SNAP);
+  const closeable=!!(editId&&!closed&&draft.length>=3&&cur&&dragIdx===null&&(draftSvg[0][0]-cur[0])**2+(draftSvg[0][1]-cur[1])**2<=SNAP*SNAP);
   const editCat=editId?calloutCat(editId):"area";
 
   const doneCount=ids.filter(id=>(store[id]?.polygon?.length??0)>=3).length;
@@ -152,8 +152,9 @@ function ZoneTab({mapName,level,setLevel,vocab,store,setStore,custom,setCustom}:
         {ids.map(id=>{const g=store[id];if(!g||g.polygon.length<3||id===editId)return null;const zl=ml?geomLevel(g,ml.thresholdZ):"both";if(zl!=="both"&&zl!==level)return null;const c=CAT_CLR[calloutCat(id)];const[lx,ly]=w2r(...centroid(g.polygon),mapName);
           return <g key={id}><polygon points={g.polygon.map(([wx,wy])=>w2r(wx,wy,mapName).join(",")).join(" ")} fill={c} fillOpacity={0.2} stroke={c} strokeWidth={2} strokeOpacity={0.8}/><text x={lx} y={ly} textAnchor="middle" fill="#fff" fontSize={11} style={{pointerEvents:"none",textShadow:"0 0 3px #000"}}>{vocab[id]}</text></g>;})}
         {editId&&draft.length>=3&&<polygon points={draft.map(([wx,wy])=>w2r(wx,wy,mapName).join(",")).join(" ")} fill={CAT_CLR[editCat]} fillOpacity={0.3} stroke="none"/>}
-        {editId&&draftWithCur.length>=2&&<polyline points={draftWithCur.map(p=>p.join(",")).join(" ")} fill="none" stroke="#fff" strokeWidth={1.5} strokeDasharray="5 3"/>}
-        {editId&&draft.length>=2&&cur&&<line x1={cur[0]} y1={cur[1]} x2={draftSvg[0][0]} y2={draftSvg[0][1]} stroke="#fff" strokeWidth={1} strokeDasharray="3 5" strokeOpacity={0.3}/>}
+        {editId&&closed&&draft.length>=3&&<polygon points={draft.map(([wx,wy])=>w2r(wx,wy,mapName).join(",")).join(" ")} fill="none" stroke="#2ecc71" strokeWidth={2}/>}
+        {editId&&!closed&&draftWithCur.length>=2&&<polyline points={draftWithCur.map(p=>p.join(",")).join(" ")} fill="none" stroke="#fff" strokeWidth={1.5} strokeDasharray="5 3"/>}
+        {editId&&!closed&&draft.length>=2&&cur&&<line x1={cur[0]} y1={cur[1]} x2={draftSvg[0][0]} y2={draftSvg[0][1]} stroke="#fff" strokeWidth={1} strokeDasharray="3 5" strokeOpacity={0.3}/>}
         {closeable&&<circle cx={draftSvg[0][0]} cy={draftSvg[0][1]} r={11} fill="none" stroke="#2ecc71" strokeWidth={2.5}><animate attributeName="r" values="9;13;9" dur="1s" repeatCount="indefinite"/></circle>}
         {editId&&draftSvg.map(([sx,sy],i)=><circle key={i} cx={sx} cy={sy} r={i===0?6:4.5} fill={i===0?"#fff":CAT_CLR[editCat]} stroke="#000" strokeWidth={1.5} style={{cursor:"grab"}} onMouseDown={e=>{e.stopPropagation();didDragRef.current=false;setDragIdx(i);}}/>)}
       </MapCanvas>
@@ -161,14 +162,15 @@ function ZoneTab({mapName,level,setLevel,vocab,store,setStore,custom,setCustom}:
         <LevelSwitch mapName={mapName} level={level} setLevel={setLevel}/>
         {editId?<>
           <Btn c={draft.length>=3?"#2ecc71":"#444"} disabled={draft.length<3} onClick={()=>commit(draft)}>✓ 完成 ({draft.length}pt)</Btn>
-          <Btn c="#e67e22" disabled={!draft.length} onClick={()=>setDraft(d=>d.slice(0,-1))}>↩ 撤销</Btn>
-          <Btn c="#e74c3c" onClick={()=>setDraft([])}>清空</Btn>
-          <span style={{fontSize:12,color:"#8899aa"}}>编辑：<b style={{color:CAT_CLR[editCat]}}>{vocab[editId]}</b><span style={{color:closeable?"#2ecc71":"#525a6a",marginLeft:8}}>{closeable?"点击闭合":"点回起点(白圈)/按完成闭合 · 顶点可拖动"}</span></span>
+          <Btn c="#e67e22" disabled={!draft.length} onClick={()=>{setDraft(d=>d.slice(0,-1));setClosed(false);}}>↩ 撤销</Btn>
+          <Btn c="#e74c3c" onClick={()=>{setDraft([]);setClosed(false);}}>清空</Btn>
+          <span style={{fontSize:12,color:"#8899aa"}}>编辑：<b style={{color:CAT_CLR[editCat]}}>{vocab[editId]}</b><span style={{color:closed?"#2ecc71":closeable?"#2ecc71":"#525a6a",marginLeft:8}}>{closed?"已闭合 · 查看 Z 分布填入高度，按「完成」提交":closeable?"点击闭合":"点回起点(白圈)/按完成闭合 · 顶点可拖动"}</span></span>
           {navSample&&navSample.clusters.length>0&&<span style={{fontSize:10,color:"#525a6a",display:"inline-flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
             <span>Z:</span>
             {navSample.clusters.map((c,i)=><span key={i} style={{color:navSample.clusters.length>1?"#f1c40f":"#2ecc71"}}>[{Math.round(c.min)}~{Math.round(c.max)}]×{c.count}</span>)}
             {navSample.clusters.length>=2&&<span style={{color:"#5ba0ff"}}>→ 边界≈{Math.round((navSample.clusters[0]!.max+navSample.clusters[1]!.min)/2)}</span>}
           </span>}
+          {closed&&editId&&<><input key={`zmin-${editId}`} style={S.numInp} placeholder="zMin" defaultValue={store[editId]?.zMin??""} onBlur={e=>updateZ(editId,"zMin",e.target.value)}/><input key={`zmax-${editId}`} style={S.numInp} placeholder="zMax" defaultValue={store[editId]?.zMax??""} onBlur={e=>updateZ(editId,"zMax",e.target.value)}/></>}
         </>:<span style={{fontSize:12,color:"#525a6a"}}>← 点击右侧列表选择 callout 画多边形 · 画完点回起点闭合或按「完成」</span>}
       </div>
     </div>
