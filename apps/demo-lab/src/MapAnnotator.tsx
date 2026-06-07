@@ -96,28 +96,37 @@ function MapCanvas({mapName,level,cursor="default",onClick,onMouseMove,onMouseUp
 
 function geomLevel(g:{zMin?:number;zMax?:number}|undefined,thresholdZ:number):Level|"both"{if(!g||(g.zMin===undefined&&g.zMax===undefined))return"both";if(g.zMax!==undefined&&g.zMax<=thresholdZ)return"lower";if(g.zMin!==undefined&&g.zMin>=thresholdZ)return"upper";return"both";}
 
-// Z 分布直方图：把 polygon 内 nav 质心 Z 分桶，山谷（两峰间密度最低处）= 真正的楼层边界。
-// 比簇间隙更可靠——坡道会把簇间隙填满导致假单簇，但直方图仍能看出双峰。
+// Z 分布直方图：把 polygon 内 nav 质心 Z 分桶。标最高峰（主层）+ 次高峰（若存在独立的第二层）。
+// 两峰都在时，约束在两峰之间找最低桶作为楼层边界，避免被长尾噪声带偏。
 function zHistogram(zValues:number[],bins=24){
-  if(zValues.length===0)return{counts:[]as number[],min:0,max:0,valleyZ:null as number|null};
+  const empty={counts:[]as number[],min:0,max:0,peak1Z:null as number|null,peak2Z:null as number|null,boundaryZ:null as number|null};
+  if(zValues.length===0)return empty;
   const min=zValues[0]!,max=zValues[zValues.length-1]!,span=(max-min)||1,binW=span/bins;
   const counts=new Array(bins).fill(0);
   for(const z of zValues){let b=Math.floor((z-min)/binW);if(b>=bins)b=bins-1;if(b<0)b=0;counts[b]++;}
-  let valley=-1,valleyCount=Infinity;
-  for(let i=1;i<bins-1;i++){const left=Math.max(...counts.slice(0,i)),right=Math.max(...counts.slice(i+1));if(counts[i]<left&&counts[i]<right&&counts[i]<valleyCount){valleyCount=counts[i];valley=i;}}
-  return{counts,min,max,valleyZ:valley>=0?Math.round(min+(valley+0.5)*binW):null};
+  const binZ=(i:number)=>Math.round(min+(i+0.5)*binW);
+  // 主峰 = 全局最高桶
+  let p1=0;for(let i=1;i<bins;i++)if(counts[i]>counts[p1])p1=i;
+  // 次峰 = 距主峰 ≥3 桶、且高度 ≥ 主峰 25% 的最高桶（独立第二层）
+  let p2=-1;for(let i=0;i<bins;i++){if(Math.abs(i-p1)<3)continue;if(counts[i]>=counts[p1]*0.25&&(p2<0||counts[i]>counts[p2]))p2=i;}
+  // 两峰之间的最低桶 = 楼层边界
+  let boundary=-1;if(p2>=0){const lo=Math.min(p1,p2),hi=Math.max(p1,p2);let bc=Infinity;for(let i=lo+1;i<hi;i++)if(counts[i]<bc){bc=counts[i];boundary=i;}}
+  return{counts,min,max,peak1Z:binZ(p1),peak2Z:p2>=0?binZ(p2):null,boundaryZ:boundary>=0?binZ(boundary):null};
 }
 function ZHist({zValues}:{zValues:number[]}){
   const h=zHistogram(zValues,24);if(!h.counts.length)return null;
   const peak=Math.max(...h.counts,1),W=168,H=26,bw=W/h.counts.length;
-  const span=(h.max-h.min)||1;const vx=h.valleyZ!==null?((h.valleyZ-h.min)/span)*W:null;
+  const span=(h.max-h.min)||1;const xOf=(z:number)=>((z-h.min)/span)*W;
   return <span style={{display:"inline-flex",alignItems:"center",gap:5}}>
     <svg width={W} height={H} style={{display:"block",background:"#0d1119",borderRadius:2}}>
       {h.counts.map((c,i)=>{const bh=(c/peak)*(H-2);return <rect key={i} x={i*bw} y={H-bh} width={Math.max(bw-1,1)} height={bh} fill="#3a6ea5"/>;})}
-      {vx!==null&&<line x1={vx} y1={0} x2={vx} y2={H} stroke="#f1c40f" strokeWidth={1.5}/>}
+      {h.peak1Z!==null&&<line x1={xOf(h.peak1Z)} y1={0} x2={xOf(h.peak1Z)} y2={H} stroke="#2ecc71" strokeWidth={1.5}/>}
+      {h.peak2Z!==null&&<line x1={xOf(h.peak2Z)} y1={0} x2={xOf(h.peak2Z)} y2={H} stroke="#2ecc71" strokeWidth={1.5}/>}
+      {h.boundaryZ!==null&&<line x1={xOf(h.boundaryZ)} y1={0} x2={xOf(h.boundaryZ)} y2={H} stroke="#f1c40f" strokeWidth={1.5}/>}
     </svg>
     <span style={{color:"#525a6a"}}>{Math.round(h.min)}~{Math.round(h.max)}</span>
-    {h.valleyZ!==null&&<span style={{color:"#f1c40f"}}>谷≈{h.valleyZ}</span>}
+    <span style={{color:"#2ecc71"}}>峰≈{h.peak1Z}{h.peak2Z!==null?`/${h.peak2Z}`:""}</span>
+    {h.boundaryZ!==null&&<span style={{color:"#f1c40f"}}>界≈{h.boundaryZ}</span>}
   </span>;
 }
 
