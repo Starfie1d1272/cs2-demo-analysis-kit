@@ -55,6 +55,43 @@ importers:
         specifier: ^3.0.0
         version: 3.2.4(@types/node@24.12.4)(tsx@4.22.3)
 
+  apps/dak-studio:
+    dependencies:
+      '@cs2dak/cohort':
+        specifier: workspace:*
+        version: link:../../packages/cohort
+      '@cs2dak/contract':
+        specifier: workspace:*
+        version: link:../../packages/contract
+      '@cs2dak/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@cs2dak/maps':
+        specifier: workspace:*
+        version: link:../../packages/maps
+      '@cs2dak/presentation':
+        specifier: workspace:*
+        version: link:../../packages/presentation
+      '@cs2dak/react':
+        specifier: workspace:*
+        version: link:../../packages/react
+      lucide-react:
+        specifier: ^0.468.0
+        version: 0.468.0(react@19.2.6)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.6
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.6(react@19.2.6)
+    devDependencies:
+      '@vitejs/plugin-react':
+        specifier: ^5.0.0
+        version: 5.2.0(vite@7.3.3(@types/node@24.12.4)(tsx@4.22.3))
+      vite:
+        specifier: ^7.0.0
+        version: 7.3.3(@types/node@24.12.4)(tsx@4.22.3)
+
   apps/demo-lab:
     dependencies:
       '@cs2dak/cohort':

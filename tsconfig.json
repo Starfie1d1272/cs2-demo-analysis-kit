@@ -8,6 +8,7 @@
     { "path": "./packages/presentation" },
     { "path": "./packages/react" },
     { "path": "./packages/cli" },
-    { "path": "./apps/demo-lab" }
+    { "path": "./apps/demo-lab" },
+    { "path": "./apps/dak-studio" }
   ]
 }

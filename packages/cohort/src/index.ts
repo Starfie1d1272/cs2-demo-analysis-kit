@@ -28,6 +28,11 @@ import {
   type RRWeights
 } from "@rivalhub/rival-rating";
 
+/**
+ * "Season" 是历史命名：cohort = 任意一组比赛的跨场聚合，不限于赛季。
+ * 同一 API 服务于赛季排行（RivalHub）、单赛事统计（主办方）、个人全量复盘（玩家）
+ * 与自选职业 demo 集（分析师）；范围筛选由调用方决定（如 DAK Studio 的聚合范围过滤）。
+ */
 export interface SeasonCohortInput {
   matchId: string;
   pkg: DemoPackage;

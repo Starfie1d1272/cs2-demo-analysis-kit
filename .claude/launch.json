@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "demo-lab",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev"],
+      "port": 5177
+    },
+    {
+      "name": "dak-studio",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev:studio"],
+      "port": 5178
+    }
+  ]
+}

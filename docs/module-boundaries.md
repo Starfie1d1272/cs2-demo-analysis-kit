@@ -32,11 +32,11 @@
 | Node CLI                 | 将 TypeScript 包接入本地文件系统和自动化流程                    | 复制核心分析逻辑                            | 命令行输出与文件产物        |
 | Python CLI / GUI         | 提供 exporter 的本地操作入口                                    | 维护独立分析或展示实现                      | 导出、校验、批处理入口      |
 | `apps/demo-lab`          | 组件开发、fixture 预览和人工验收                                | 个人 Demo 管理、共享逻辑所有权              | 开发测试应用                |
-| DAK Studio               | 本地 Demo 管理、导入、检索、比较和个人档案                      | RivalHub 赛事业务、共享分析公式             | 独立本地产品                |
+| DAK Studio（`apps/dak-studio`） | 本地 Demo 管理、导入、检索、比较和个人档案               | RivalHub 赛事业务、共享分析公式             | 独立本地产品                |
 | RivalHub                 | 赛事、赛季、身份、权限、持久化和公开展示                        | 复制 DAK 分析与评分逻辑                     | 赛事产品                    |
 | CS2 Insight Agent        | 高光录制软件，复用本仓库 demo 展示模块                          | 复制 Demo 解析与评分逻辑                    | 产品                        |
 
-`@cs2dak/presentation` 与 DAK Studio 是目标模块；创建前仍必须遵守其预定边界。
+DAK Studio 已落地为 `apps/dak-studio`（资料库 / 比赛工作台 / 选手档案 / 排行榜），仍须遵守上表边界：只做适配与编排，不拥有共享逻辑。
 
 ## 强制规则
 
