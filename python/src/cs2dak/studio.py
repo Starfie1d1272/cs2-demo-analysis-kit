@@ -32,13 +32,25 @@ from pathlib import Path
 from queue import Empty as QueueEmpty
 
 from cs2dak import __version__
-from webview.dom import _dnd_state
 
-# 强制在任意拖拽操作中捕获文件路径，即使前端使用标准浏览器
-# drop 事件（而非 pywebview DOM 事件系统）。默认为 0，只有
-# pywebview element.events.drop 注册监听器后才会计数；而我们
-# 使用 React onDrop，永远不会触发该计数。
-_dnd_state["num_listeners"] = max(_dnd_state["num_listeners"], 1)
+# _dnd_state 延迟导入：multiprocessing spawn 子进程会重新导入本模块，
+# 此时不应触碰 webview GUI 依赖。_get_dnd_state() 在首次访问时加载。
+_dnd_state: dict | None = None
+
+
+def _get_dnd_state() -> dict:
+    """Return the pywebview ``_dnd_state`` dict, importing it on first call."""
+    global _dnd_state
+    if _dnd_state is None:
+        from webview.dom import _dnd_state as _ds
+
+        _dnd_state = _ds
+        # 强制在任意拖拽操作中捕获文件路径，即使前端使用标准浏览器
+        # drop 事件（而非 pywebview DOM 事件系统）。默认为 0，只有
+        # pywebview element.events.drop 注册监听器后才会计数；而我们
+        # 使用 React onDrop，永远不会触发该计数。
+        _dnd_state["num_listeners"] = max(_dnd_state["num_listeners"], 1)
+    return _dnd_state
 
 # PyInstaller 打包后 __file__ 指向 Contents/Frameworks/（不含数据文件），
 # 实际资源在 sys._MEIPASS 临时目录。未打包时回退到源码目录。
@@ -368,9 +380,9 @@ class StudioApi:
         Returns the absolute path if found, or ``None`` if the file wasn't
         dropped in the current operation (e.g. selected via <input type="file">).
         """
-        for item in _dnd_state["paths"]:
+        for item in _get_dnd_state()["paths"]:
             if urllib.parse.unquote(item[0]) == filename:
-                _dnd_state["paths"].remove(item)
+                _get_dnd_state()["paths"].remove(item)
                 return urllib.parse.unquote(item[1])
         return None
 
