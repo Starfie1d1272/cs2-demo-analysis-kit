@@ -80,4 +80,13 @@ Informed by, but not copied from: [CS Demo Manager](https://github.com/akiver/cs
 
 ## License
 
-MIT（仓库整体，含 Python exporter）。第三方移植与改编代码的出处见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+双轨许可，按「生态 / 产品」划分：
+
+- **生态（MIT）**：`@cs2dak/*` 全部分析包、Python exporter（`python/`）、`apps/demo-lab`。
+  与 cs2-demo-format、@rivalhub/rival-rating 同侧——欢迎任何人基于格式与分析管道构建自己的工具。
+- **产品（AGPL-3.0-only）**：`apps/dak-studio`（DAK Studio 桌面应用，见
+  [apps/dak-studio/LICENSE](apps/dak-studio/LICENSE)）。自用与修改自由；分发或以
+  网络服务提供衍生版本时必须开源。
+
+边界纪律与模块边界规则一致：产品代码（AGPL）可以依赖生态包（MIT），生态包绝不
+回流引用产品代码。第三方移植与改编出处见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。

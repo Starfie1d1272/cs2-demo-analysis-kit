@@ -1,3 +1,10 @@
+Licensing note / 适用范围
+-------------------------
+The MIT License below applies to this repository EXCEPT apps/dak-studio/,
+which is licensed under the GNU AGPL-3.0-only (see apps/dak-studio/LICENSE).
+Ecosystem packages (@cs2dak/*, python exporter) are MIT; the DAK Studio
+product is AGPL. Third-party attributions: THIRD-PARTY-NOTICES.md.
+
 MIT License
 
 Copyright (c) 2026 Starfie1d

@@ -1,6 +1,8 @@
 # Third-Party Notices
 
-本仓库整体按 [MIT](LICENSE) 分发。以下代码/算法有外部出处，按各自条款致谢：
+本仓库按双轨许可分发：生态部分（`@cs2dak/*`、Python exporter、demo-lab）为
+[MIT](LICENSE)，DAK Studio 产品（`apps/dak-studio/`）为
+[AGPL-3.0-only](apps/dak-studio/LICENSE)。以下代码/算法有外部出处，按各自条款致谢：
 
 ## 移植代码
 

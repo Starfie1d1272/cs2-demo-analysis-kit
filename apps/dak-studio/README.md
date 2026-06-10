@@ -1,5 +1,8 @@
 # DAK Studio
 
+> **License: AGPL-3.0-only**（见本目录 [LICENSE](LICENSE)，Copyright (c) 2026 Starfie1d）。
+> 与仓库其余部分（MIT 生态包）不同：Studio 是产品，分发或以网络服务提供衍生版本时必须开源。
+
 本地 Demo 工作台：导入 `cs2-demo-format/2.0` ZIP，做战术分析与个人打法复盘。
 形态对标 CS Demo Manager，分析能力全部来自 `@cs2dak/*` 共享包——Studio 只做适配与编排（模块边界见 `docs/module-boundaries.md`）。
 
