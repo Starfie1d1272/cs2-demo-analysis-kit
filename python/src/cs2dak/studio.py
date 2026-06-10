@@ -20,7 +20,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from . import __version__
+from cs2dak import __version__
 
 WEB_DIR = Path(__file__).parent / "studio_web"
 
@@ -54,7 +54,7 @@ class StudioApi:
         ZIP stays small (columnar replay), so the base64 bridge transfer is cheap;
         the temp dir is removed afterwards either way.
         """
-        from .cli import _export_one
+        from cs2dak.cli import _export_one
 
         dem = Path(path)
         tmp_dir = Path(tempfile.mkdtemp(prefix="cs2dak-studio-"))

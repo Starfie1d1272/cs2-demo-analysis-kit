@@ -22,7 +22,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from .. import __version__
+from cs2dak import __version__
 
 WEB_DIR = Path(__file__).parent / "web"
 
