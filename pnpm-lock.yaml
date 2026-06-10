@@ -197,6 +197,9 @@ importers:
       '@cs2dak/core':
         specifier: workspace:*
         version: link:../core
+      '@cs2dak/maps':
+        specifier: workspace:*
+        version: link:../maps
       '@rivalhub/rival-rating':
         specifier: ^0.2.0
         version: 0.2.0

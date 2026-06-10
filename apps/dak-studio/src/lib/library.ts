@@ -24,11 +24,17 @@ export interface StudioDemoEntry {
   id: string;
   fileName: string;
   importedAt: number;
+  /** 用户标签（赛事、阶段等），导入时附加，可后续编辑。 */
+  tags: string[];
   meta: DemoMeta;
 }
 
 interface DemoRecord extends StudioDemoEntry {
   buffer: ArrayBuffer;
+}
+
+function normalizeTags(tags: string[]): string[] {
+  return [...new Set(tags.map((tag) => tag.trim()).filter(Boolean))];
 }
 
 const DB_NAME = "dak-studio";
@@ -94,7 +100,8 @@ export async function listDemoEntries(): Promise<StudioDemoEntry[]> {
   );
   db.close();
   return records
-    .map(({ id, fileName, importedAt, meta }) => ({ id, fileName, importedAt, meta }))
+    // tags 为后加字段：旧记录读出时补默认值
+    .map(({ id, fileName, importedAt, tags, meta }) => ({ id, fileName, importedAt, tags: tags ?? [], meta }))
     .sort((a, b) => b.importedAt - a.importedAt);
 }
 
@@ -103,8 +110,11 @@ export interface ImportResult {
   duplicate: boolean;
 }
 
-/** 导入一个 v2 ZIP；以内容哈希为 id，重复导入幂等。解析失败抛错（带文件名）。 */
-export async function importDemoFile(file: File): Promise<ImportResult> {
+/**
+ * 导入一个 v2 ZIP；以内容哈希为 id，重复导入幂等（标签做并集）。
+ * 解析失败抛错（带文件名）。
+ */
+export async function importDemoFile(file: File, tags: string[] = []): Promise<ImportResult> {
   const buffer = await file.arrayBuffer();
   let pkg: DemoPackage;
   try {
@@ -117,6 +127,7 @@ export async function importDemoFile(file: File): Promise<ImportResult> {
     id,
     fileName: file.name,
     importedAt: Date.now(),
+    tags: normalizeTags(tags),
     meta: metaFromPackage(pkg)
   };
 
@@ -124,13 +135,27 @@ export async function importDemoFile(file: File): Promise<ImportResult> {
   const store = db.transaction(STORE, "readwrite").objectStore(STORE);
   const existing = await requestAsPromise(store.get(id) as IDBRequest<DemoRecord | undefined>);
   if (existing) {
+    const mergedTags = normalizeTags([...(existing.tags ?? []), ...entry.tags]);
+    await requestAsPromise(store.put({ ...existing, tags: mergedTags }));
     db.close();
-    return { entry: { ...existing, meta: existing.meta }, duplicate: true };
+    const { buffer: _ignored, ...existingEntry } = existing;
+    return { entry: { ...existingEntry, tags: mergedTags }, duplicate: true };
   }
   await requestAsPromise(store.put({ ...entry, buffer } satisfies DemoRecord));
   db.close();
   pkgCache.set(id, Promise.resolve(pkg));
   return { entry, duplicate: false };
+}
+
+/** 更新某条 demo 的标签。 */
+export async function updateDemoTags(id: string, tags: string[]): Promise<void> {
+  const db = await openDb();
+  const store = db.transaction(STORE, "readwrite").objectStore(STORE);
+  const record = await requestAsPromise(store.get(id) as IDBRequest<DemoRecord | undefined>);
+  if (record) {
+    await requestAsPromise(store.put({ ...record, tags: normalizeTags(tags) }));
+  }
+  db.close();
 }
 
 export async function removeDemo(id: string): Promise<void> {

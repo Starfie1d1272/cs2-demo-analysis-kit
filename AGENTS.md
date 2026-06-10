@@ -29,6 +29,7 @@ pnpm python:export:nju    # 批量导出所有 NJU demo → fixtures/output/nju-
 
 # GUI
 cd python && uv run cs2dak-gui   # 启动 pywebview 桌面导出器
+bash scripts/package.sh          # 打包桌面应用（exporter + DAK Studio，PyInstaller）
 
 # 单测单文件
 pnpm vitest run packages/core/src/index.test.ts

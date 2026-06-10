@@ -1,19 +1,23 @@
-import { Crosshair, Film, LibraryBig, Trophy, UserRound } from "lucide-react";
+import { Crosshair, Film, LibraryBig, Route, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { importDemoFile, listDemoEntries, removeDemo, type StudioDemoEntry } from "./lib/library";
+import { importDemoFile, listDemoEntries, removeDemo, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { EMPTY_SCOPE, applyScope, type CohortScopeState } from "./components/CohortScope";
+import { detectDemBackend, exportDemToZip, isDemFile } from "./lib/dem";
+import { parseTags } from "./lib/tags";
 import { LibraryView } from "./views/LibraryView";
 import { MatchView } from "./views/MatchView";
 import { PlayersView } from "./views/PlayersView";
 import { LeaderboardView } from "./views/LeaderboardView";
+import { TrailsView } from "./views/TrailsView";
 import sampleZipUrl from "../../../fixtures/input/sample-match.zip?url";
 
-type StudioView = "library" | "match" | "players" | "leaderboard";
+type StudioView = "library" | "match" | "players" | "trails" | "leaderboard";
 
 const NAV: { key: StudioView; label: string; hint: string; icon: typeof LibraryBig }[] = [
   { key: "library", label: "资料库", hint: "导入与管理 Demo", icon: LibraryBig },
   { key: "match", label: "比赛工作台", hint: "回合 / 地图 / 回放", icon: Film },
   { key: "players", label: "选手档案", hint: "个人打法复盘", icon: UserRound },
+  { key: "trails", label: "开局动线", hint: "走位与道具习惯", icon: Route },
   { key: "leaderboard", label: "排行榜", hint: "跨场指标对比", icon: Trophy }
 ];
 
@@ -25,6 +29,8 @@ export function App() {
   const [importing, setImporting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [scope, setScope] = useState<CohortScopeState>(EMPTY_SCOPE);
+  // 导入标签输入放在 App：全窗口拖拽导入也要带上
+  const [importTagsRaw, setImportTagsRaw] = useState("");
   // 稳定数组标识：避免 App 无关重渲染触发档案/排行榜重新聚合
   const scopedEntries = useMemo(() => applyScope(entries, scope), [entries, scope]);
 
@@ -34,10 +40,12 @@ export function App() {
       .catch((err) => setNotice(`读取本地资料库失败：${err instanceof Error ? err.message : String(err)}`));
   }, []);
 
-  const importFiles = useCallback(async (files: Iterable<File>) => {
-    const zips = [...files].filter((file) => file.name.toLowerCase().endsWith(".zip"));
-    if (zips.length === 0) {
-      setNotice("请选择 cs2-demo-format/2.0 ZIP 文件");
+  const importFiles = useCallback(async (files: Iterable<File>, tags: string[] = []) => {
+    const fileList = [...files];
+    const zips = fileList.filter((file) => file.name.toLowerCase().endsWith(".zip"));
+    const dems = fileList.filter(isDemFile);
+    if (zips.length === 0 && dems.length === 0) {
+      setNotice("请选择 .dem 或 cs2-demo-format/2.0 ZIP 文件");
       return;
     }
     setImporting(true);
@@ -45,9 +53,23 @@ export function App() {
     let imported = 0;
     let duplicates = 0;
     const errors: string[] = [];
+
+    // .dem 先经 exporter 转 ZIP（数据库只存 ZIP）
+    if (dems.length > 0) {
+      const backend = await detectDemBackend();
+      for (const [index, dem] of dems.entries()) {
+        try {
+          setNotice(`正在导出 ${dem.name}…（${index + 1}/${dems.length}，demo 解析需要一点时间）`);
+          zips.push(await exportDemToZip(dem, backend));
+        } catch (err) {
+          errors.push(err instanceof Error ? err.message : String(err));
+        }
+      }
+    }
+
     for (const file of zips) {
       try {
-        const result = await importDemoFile(file);
+        const result = await importDemoFile(file, tags);
         if (result.duplicate) duplicates += 1;
         else imported += 1;
       } catch (err) {
@@ -95,13 +117,18 @@ export function App() {
     []
   );
 
+  const handleUpdateTags = useCallback(async (id: string, tags: string[]) => {
+    await updateDemoTags(id, tags);
+    setEntries(await listDemoEntries());
+  }, []);
+
   return (
     <div
       className="stu-app"
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault();
-        if (e.dataTransfer.files.length > 0) void importFiles(e.dataTransfer.files);
+        if (e.dataTransfer.files.length > 0) void importFiles(e.dataTransfer.files, parseTags(importTagsRaw));
       }}
     >
       <aside className="stu-sidebar">
@@ -149,10 +176,13 @@ export function App() {
           <LibraryView
             entries={entries}
             importing={importing}
+            importTagsRaw={importTagsRaw}
+            onImportTagsChange={setImportTagsRaw}
             onImportFiles={importFiles}
             onLoadSample={loadSample}
             onOpenDemo={openDemo}
             onRemoveDemo={handleRemove}
+            onUpdateTags={handleUpdateTags}
           />
         )}
         {view === "match" && (
@@ -167,6 +197,15 @@ export function App() {
             selectedPlayerKey={selectedPlayerKey}
             onSelectPlayer={setSelectedPlayerKey}
             onOpenMatch={openDemo}
+            onGoLibrary={() => setView("library")}
+          />
+        )}
+        {view === "trails" && (
+          <TrailsView
+            allEntries={entries}
+            entries={scopedEntries}
+            scope={scope}
+            onScopeChange={setScope}
             onGoLibrary={() => setView("library")}
           />
         )}

@@ -1,7 +1,7 @@
 import type { MatchWorkspaceModel, WorkspaceReplayFrame, WorkspaceReplayRound, WorkspaceSpatialPoint } from "@cs2dak/contract";
 import { displayWeaponName, sideLabel, economyLabelCn } from "@cs2dak/presentation";
 import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
-import { Activity, BarChart3, ChevronLeft, ChevronRight, Crosshair, Film, Gauge, ListChecks, Map, Pause, Play, ShieldCheck, Table2, Users } from "lucide-react";
+import { Activity, BarChart3, ChevronLeft, ChevronRight, Crosshair, Film, Gauge, ListChecks, Map, Pause, Play, ShieldCheck, Swords, Table2, Users } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { EconomyPanel } from "./EconomyPanel";
 import { HeatmapCanvas } from "./HeatmapCanvas";
@@ -69,6 +69,8 @@ export function MatchWorkspace({ model }: MatchWorkspaceProps) {
                 <EconomyPanel points={model.economy} teamAName={model.teams.teamA.name} teamBName={model.teams.teamB.name} />
               </Panel>
             )}
+            {view === "weapons" && <WeaponsView model={model} />}
+            {view === "duels" && <DuelsView model={model} />}
             {view === "map" && <MapWorkspace model={model} />}
             {view === "replay" && <ReplayViewer replay={model.replay} map={model.map.view} />}
           </section>
@@ -393,7 +395,6 @@ export function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["rep
           <Fact label="帧" value={`${currentFrameIndex + 1}/${round.frameCount}`} />
           <Fact label="采样率" value={`${replay.sampleRate ?? 0} Hz`} />
           <Fact label="拆弹器" value={replay.capabilities.hasDefuseKit ? "可显示" : "无状态"} />
-          <Fact label="C4 位置" value={replay.capabilities.hasBombPosition ? "可显示" : "暂不显示"} />
         </div>
       </Panel>
       <Panel title={`R${round.roundNumber} 2D 回放`}>
@@ -403,6 +404,8 @@ export function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["rep
         >
           <div className="dak-replay-gridlines" aria-hidden="true" />
           <KillFeed kills={round.kills} currentTick={currentTick} tickrate={replay.tickrate} />
+          <GrenadeEffectLayer round={round} currentTick={currentTick} tickrate={replay.tickrate ?? 64} map={map} />
+          <BombMarker bomb={round.bomb} currentTick={currentTick} tickrate={replay.tickrate ?? 64} map={map} />
           {currentPlayers.map(({ player, frame }) => (
             <div
               key={player.steamId64}
@@ -412,6 +415,7 @@ export function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["rep
             >
               <span style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>{playerNumbers[player.steamId64] ?? "?"}</span>
               {frame.hasDefuseKit && <i style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>kit</i>}
+              {frame.hasBomb && <i className="dak-replay-c4-tag" style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>c4</i>}
             </div>
           ))}
         </div>
@@ -444,6 +448,132 @@ export function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["rep
               </div>
             ))}
         </div>
+      </Panel>
+    </div>
+  );
+}
+
+function WeaponsView({ model }: MatchWorkspaceProps) {
+  if (model.weapons.length === 0) {
+    return <Panel title="武器统计"><p className="dak-muted">暂无武器击杀数据</p></Panel>;
+  }
+  const maxKills = Math.max(...model.weapons.map((row) => row.kills));
+  return (
+    <Panel title="武器统计">
+      <table className="dak-table">
+        <thead>
+          <tr>
+            <th>武器</th>
+            <th className="dak-num">击杀</th>
+            <th aria-label="击杀占比" />
+            <th className="dak-num">HS%</th>
+            <th className="dak-num">伤害</th>
+            <th className="dak-num">穿墙</th>
+            <th className="dak-num">穿烟</th>
+            <th className="dak-num">无镜</th>
+            <th>头号使用者</th>
+          </tr>
+        </thead>
+        <tbody>
+          {model.weapons.map((row) => (
+            <tr key={row.weapon}>
+              <td>{row.label}</td>
+              <td className="dak-num dak-mono">{row.kills}</td>
+              <td className="dak-weapon-bar-cell">
+                <div className="dak-weapon-bar" style={{ width: `${(row.kills / maxKills) * 100}%` }} />
+              </td>
+              <td className="dak-num dak-mono">{row.headshotPercent == null ? "—" : `${row.headshotPercent.toFixed(1)}%`}</td>
+              <td className="dak-num dak-mono">{row.damage}</td>
+              <td className="dak-num dak-mono">{row.wallbangKills || "—"}</td>
+              <td className="dak-num dak-mono">{row.throughSmokeKills || "—"}</td>
+              <td className="dak-num dak-mono">{row.noScopeKills || "—"}</td>
+              <td className="dak-muted">
+                {row.topKillerName ? `${row.topKillerName} (${row.topKillerKills})` : "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Panel>
+  );
+}
+
+function DuelsView({ model }: MatchWorkspaceProps) {
+  const { players, matrix, openings } = model.duels;
+  if (players.length === 0) {
+    return <Panel title="对位"><p className="dak-muted">暂无对位数据</p></Panel>;
+  }
+  const maxCell = Math.max(1, ...matrix.flat());
+  return (
+    <div className="dak-stack">
+      <Panel title="击杀矩阵" eyebrow="行 = 击杀者 · 列 = 被击杀者">
+        <div className="dak-duel-scroll">
+          <table className="dak-duel-matrix">
+            <thead>
+              <tr>
+                <th aria-label="击杀者 \ 被击杀者" />
+                {players.map((player) => (
+                  <th key={player.steamId64} className={`dak-duel-head dak-duel-${player.teamKey}`}>
+                    <span>{player.name}</span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {players.map((killer, killerIndex) => (
+                <tr key={killer.steamId64}>
+                  <th className={`dak-duel-rowhead dak-duel-${killer.teamKey}`}>{killer.name}</th>
+                  {players.map((victim, victimIndex) => {
+                    const kills = matrix[killerIndex][victimIndex];
+                    const sameTeam = killer.teamKey === victim.teamKey;
+                    return (
+                      <td
+                        key={victim.steamId64}
+                        className={sameTeam ? "dak-duel-cell dak-duel-cell-same" : "dak-duel-cell"}
+                        style={kills > 0 && !sameTeam ? { background: `rgba(255, 122, 33, ${0.08 + (kills / maxCell) * 0.45})` } : undefined}
+                        title={`${killer.name} 击杀 ${victim.name} ×${kills}`}
+                      >
+                        {kills > 0 ? kills : ""}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+      <Panel title="开局对枪">
+        <table className="dak-table">
+          <thead>
+            <tr>
+              <th>选手</th>
+              <th className="dak-num">首杀</th>
+              <th className="dak-num">首死</th>
+              <th className="dak-num">胜率</th>
+              <th aria-label="胜率条" />
+            </tr>
+          </thead>
+          <tbody>
+            {[...openings]
+              .sort((a, b) => (b.winRatePercent ?? -1) - (a.winRatePercent ?? -1))
+              .map((row) => (
+                <tr key={row.steamId64}>
+                  <td>
+                    <span className={`dak-team-dot dak-team-dot-${row.teamKey}`} /> {row.name}
+                  </td>
+                  <td className="dak-num dak-mono">{row.openingKills}</td>
+                  <td className="dak-num dak-mono">{row.openingDeaths}</td>
+                  <td className="dak-num dak-mono">{row.winRatePercent == null ? "—" : `${row.winRatePercent.toFixed(0)}%`}</td>
+                  <td className="dak-weapon-bar-cell">
+                    {row.winRatePercent != null && (
+                      <div className="dak-weapon-bar" style={{ width: `${row.winRatePercent}%` }} />
+                    )}
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
       </Panel>
     </div>
   );
@@ -541,6 +671,8 @@ function iconForTab(key: WorkspaceView) {
   if (key === "rounds") return <ListChecks size={16} />;
   if (key === "players") return <Users size={16} />;
   if (key === "economy") return <BarChart3 size={16} />;
+  if (key === "weapons") return <Crosshair size={16} />;
+  if (key === "duels") return <Swords size={16} />;
   if (key === "map") return <Map size={16} />;
   return <Film size={16} />;
 }
@@ -550,6 +682,8 @@ function detailForTab(key: WorkspaceView, model: MatchWorkspaceModel, replayDeta
   if (key === "rounds") return `${model.rounds.length} rounds`;
   if (key === "players") return `${model.players.length} players`;
   if (key === "economy") return `${model.economy.length} rows`;
+  if (key === "weapons") return `${model.weapons.length} weapons`;
+  if (key === "duels") return `${model.duels.players.length} players`;
   if (key === "map") return `${model.map.points.length} points`;
   return replayDetail;
 }
@@ -592,7 +726,7 @@ function hpBarColor(hp: number): string {
   return "var(--dak-danger)";
 }
 
-function replayFramePosition(frame: WorkspaceReplayFrame, map: MatchWorkspaceModel["map"]["view"]) {
+function replayFramePosition(frame: { x: number; y: number }, map: MatchWorkspaceModel["map"]["view"]) {
   const calibration = getMapCalibration(map.name);
   if (calibration) {
     const radar = worldToRadar(frame, calibration);
@@ -607,6 +741,84 @@ function replayFramePosition(frame: WorkspaceReplayFrame, map: MatchWorkspaceMod
     left: `${Math.max(4, Math.min(96, 50 + frame.x / 70))}%`,
     top: `${Math.max(4, Math.min(96, 50 - frame.y / 70))}%`
   };
+}
+
+/** world 半径 → 相对舞台宽度的百分比；无标定时给一个保底视觉尺寸。 */
+function replayRadiusPercent(radiusUnits: number, map: MatchWorkspaceModel["map"]["view"]): number {
+  const calibration = getMapCalibration(map.name);
+  if (!calibration) return 4;
+  return (radiusUnits / calibration.scale / calibration.radarSize) * 100;
+}
+
+// 效果消失 tick 缺失时的保底时长（秒）；半径为近似游戏单位，只服务视觉示意。
+const GRENADE_EFFECT_DEFAULTS: Record<string, { durationSeconds: number; radiusUnits: number; kind: "smoke" | "fire" | "he" | "flash" | "decoy" }> = {
+  smoke: { durationSeconds: 18, radiusUnits: 144, kind: "smoke" },
+  molotov: { durationSeconds: 7, radiusUnits: 120, kind: "fire" },
+  incendiary: { durationSeconds: 7, radiusUnits: 120, kind: "fire" },
+  hegrenade: { durationSeconds: 0.7, radiusUnits: 90, kind: "he" },
+  flashbang: { durationSeconds: 0.7, radiusUnits: 70, kind: "flash" },
+  decoy: { durationSeconds: 15, radiusUnits: 30, kind: "decoy" }
+};
+
+type ReplayRoundModel = MatchWorkspaceModel["replay"]["rounds"][number];
+
+/** 道具效果（烟/火/爆/闪）+ 飞行轨迹叠加层，按 currentTick 过滤生命周期。 */
+function GrenadeEffectLayer({ round, currentTick, tickrate, map }: {
+  round: ReplayRoundModel;
+  currentTick: number;
+  tickrate: number;
+  map: MatchWorkspaceModel["map"]["view"];
+}) {
+  return (
+    <>
+      {round.grenades.map((row, index) => {
+        const spec = GRENADE_EFFECT_DEFAULTS[row.grenade];
+        if (!spec) return null;
+        const endTick = row.destroyTick ?? row.effectTick + spec.durationSeconds * tickrate;
+        if (currentTick < row.effectTick || currentTick > endTick) return null;
+        const sizePercent = replayRadiusPercent(spec.radiusUnits, map) * 2;
+        return (
+          <span
+            key={`fx-${index}`}
+            className={`dak-replay-fx dak-replay-fx-${spec.kind}`}
+            style={{ ...replayFramePosition({ x: row.effectX, y: row.effectY }, map), width: `${sizePercent}%`, height: `${sizePercent}%` }}
+            aria-hidden="true"
+          />
+        );
+      })}
+      {round.projectiles.map((proj, index) => {
+        const frameIdx = Math.floor((currentTick - proj.startTick) / round.tickStep);
+        if (frameIdx < 0 || frameIdx >= proj.x.length) return null;
+        return (
+          <span
+            key={`proj-${index}`}
+            className={`dak-replay-projectile dak-replay-projectile-${proj.grenade}`}
+            style={replayFramePosition({ x: proj.x[frameIdx], y: proj.y[frameIdx] }, map)}
+            aria-hidden="true"
+          />
+        );
+      })}
+    </>
+  );
+}
+
+/** 下包后的 C4 定点标记：拆除转绿、爆炸先闪后熄。 */
+function BombMarker({ bomb, currentTick, tickrate, map }: {
+  bomb: ReplayRoundModel["bomb"];
+  currentTick: number;
+  tickrate: number;
+  map: MatchWorkspaceModel["map"]["view"];
+}) {
+  if (!bomb || currentTick < bomb.plantTick) return null;
+  const defused = bomb.defuseTick != null && currentTick >= bomb.defuseTick;
+  const exploded = !defused && bomb.explodeTick != null && currentTick >= bomb.explodeTick;
+  const exploding = exploded && bomb.explodeTick != null && currentTick <= bomb.explodeTick + 2 * tickrate;
+  const state = defused ? "defused" : exploded ? (exploding ? "exploding" : "exploded") : "armed";
+  return (
+    <span className={`dak-replay-bomb dak-replay-bomb-${state}`} style={replayFramePosition(bomb, map)} title={defused ? "C4 已拆除" : exploded ? "C4 已爆炸" : "C4 已安放"}>
+      c4
+    </span>
+  );
 }
 
 export function AdminQaWorkspace({ model }: MatchWorkspaceProps) {

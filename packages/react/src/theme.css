@@ -1741,3 +1741,174 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── 2D 回放：道具效果 / C4 ───────────────────────────────── */
+
+.dak-replay-fx {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.dak-replay-fx-smoke {
+  background: radial-gradient(circle, rgba(214, 222, 230, 0.55) 0%, rgba(214, 222, 230, 0.35) 65%, transparent 100%);
+}
+
+.dak-replay-fx-fire {
+  background: radial-gradient(circle, rgba(255, 138, 61, 0.7) 0%, rgba(255, 84, 38, 0.4) 60%, transparent 100%);
+  animation: dak-fx-flicker 0.5s ease-in-out infinite alternate;
+}
+
+.dak-replay-fx-he {
+  background: radial-gradient(circle, rgba(255, 233, 178, 0.9) 0%, rgba(255, 95, 110, 0.5) 55%, transparent 100%);
+  animation: dak-fx-burst 0.7s ease-out forwards;
+}
+
+.dak-replay-fx-flash {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0%, rgba(255, 246, 200, 0.4) 60%, transparent 100%);
+  animation: dak-fx-burst 0.7s ease-out forwards;
+}
+
+.dak-replay-fx-decoy {
+  background: radial-gradient(circle, rgba(111, 125, 138, 0.6) 0%, transparent 100%);
+}
+
+@keyframes dak-fx-flicker {
+  from { opacity: 0.75; }
+  to { opacity: 1; }
+}
+
+@keyframes dak-fx-burst {
+  from { opacity: 1; scale: 0.4; }
+  to { opacity: 0; scale: 1.15; }
+}
+
+.dak-replay-projectile {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px solid #0b0e10;
+  background: #eef3f8;
+  pointer-events: none;
+}
+
+.dak-replay-projectile-flashbang { background: #ffd84d; }
+.dak-replay-projectile-smoke { background: #9aa6b2; }
+.dak-replay-projectile-molotov,
+.dak-replay-projectile-incendiary { background: #ff8a3d; }
+.dak-replay-projectile-hegrenade { background: #ff5f6e; }
+.dak-replay-projectile-decoy { background: #6f7d8a; }
+
+.dak-replay-bomb {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #0b0e10;
+  background: var(--dak-warn, #f5a623);
+  border: 1px solid #0b0e10;
+  pointer-events: none;
+}
+
+.dak-replay-bomb-armed { animation: dak-bomb-pulse 1s ease-in-out infinite; }
+.dak-replay-bomb-defused { background: var(--dak-ok, #38c87d); animation: none; }
+.dak-replay-bomb-exploding { animation: dak-fx-burst 1.2s ease-out forwards; }
+.dak-replay-bomb-exploded { opacity: 0.35; }
+
+@keyframes dak-bomb-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 166, 35, 0.7); }
+  50% { box-shadow: 0 0 0 7px rgba(245, 166, 35, 0); }
+}
+
+.dak-replay-token .dak-replay-c4-tag {
+  background: var(--dak-warn, #f5a623);
+  color: #0b0e10;
+}
+
+/* ── 武器统计 / 对位 ─────────────────────────────────────── */
+
+.dak-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dak-weapon-bar-cell {
+  width: 120px;
+  min-width: 80px;
+}
+
+.dak-weapon-bar {
+  height: 7px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--dak-accent), rgba(255, 122, 33, 0.35));
+}
+
+.dak-duel-scroll {
+  overflow-x: auto;
+}
+
+.dak-duel-matrix {
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.dak-duel-matrix th,
+.dak-duel-matrix td {
+  border: 1px solid var(--dak-border);
+  padding: 0;
+}
+
+.dak-duel-head {
+  height: 110px;
+  min-width: 30px;
+  vertical-align: bottom;
+  padding: 6px 4px;
+}
+
+.dak-duel-head span {
+  display: inline-block;
+  max-height: 100px;
+  overflow: hidden;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dak-duel-rowhead {
+  max-width: 140px;
+  overflow: hidden;
+  padding: 5px 8px;
+  font-weight: 600;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dak-duel-teamA {
+  color: var(--dak-accent);
+}
+
+.dak-duel-teamB {
+  color: var(--dak-accent-b);
+}
+
+.dak-duel-cell {
+  width: 34px;
+  height: 30px;
+  text-align: center;
+  font-family: var(--dak-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.dak-duel-cell-same {
+  background: var(--dak-bg-subtle);
+  color: var(--dak-fg-dim);
+}

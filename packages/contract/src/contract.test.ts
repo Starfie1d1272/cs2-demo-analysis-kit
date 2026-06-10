@@ -146,6 +146,8 @@ const minimalWorkspaceModel = {
   rounds: [],
   players: [],
   economy: [],
+  weapons: [],
+  duels: { players: [], matrix: [], openings: [] },
   map: {
     view: { name: "de_ancient", radarImageUrl: null, calibrated: false },
     modes: [],
@@ -157,7 +159,7 @@ const minimalWorkspaceModel = {
     sampleRate: null,
     tickrate: null,
     rounds: [],
-    capabilities: { hasDefuseKit: false, hasBombPosition: false },
+    capabilities: { hasDefuseKit: false },
   },
   adminQa: qaReport,
 };

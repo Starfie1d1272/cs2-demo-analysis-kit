@@ -9,3 +9,4 @@ export * from "./player.js";
 export * from "./team.js";
 export * from "./series.js";
 export * from "./workspace.js";
+export * from "./trails.js";

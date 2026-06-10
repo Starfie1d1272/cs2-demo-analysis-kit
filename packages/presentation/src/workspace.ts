@@ -14,6 +14,7 @@ import {
 import { groupBy, nameForSteamId, round, normalizeWeapon, isNamedWeapon } from "./workspace-utils.js";
 import { displayWeaponName } from "./weapons.js";
 import { analyzeDemoPackage, normalizeDemoPackage } from "@cs2dak/core";
+import { getMapCalibration } from "@cs2dak/maps";
 
 export function buildDemoViewModel(bundle: AnalysisBundle) {
   return {
@@ -62,6 +63,8 @@ export function buildMatchWorkspaceModel(input: unknown): MatchWorkspaceModel {
       { key: "rounds", label: "回合" },
       { key: "players", label: "选手" },
       { key: "economy", label: "经济" },
+      { key: "weapons", label: "武器" },
+      { key: "duels", label: "对位" },
       { key: "map", label: "地图" },
       { key: "replay", label: "回放" }
     ],
@@ -96,16 +99,90 @@ export function buildMatchWorkspaceModel(input: unknown): MatchWorkspaceModel {
       roundFacts: factsByPlayer.get(row.steamId64) ?? []
     })),
     economy: bundle.economy,
+    weapons: buildWorkspaceWeapons(pkg),
+    duels: buildWorkspaceDuels(pkg, bundle),
     map: buildWorkspaceMap(pkg, view.map, bundle.heatmap),
     replay: buildWorkspaceReplay(pkg),
     adminQa: bundle.qa
   });
 }
 
+/** 比赛级武器统计：击杀来自 kills.json，伤害来自 damages.json（healthDamage 口径）。 */
+function buildWorkspaceWeapons(pkg: DemoPackage) {
+  const killsByWeapon = groupBy(
+    pkg.kills.filter((kill) => isNamedWeapon(kill.weapon)),
+    (kill) => normalizeWeapon(kill.weapon)
+  );
+  const damageByWeapon = new Map<string, number>();
+  for (const damage of pkg.damages) {
+    if (!isNamedWeapon(damage.weapon)) continue;
+    const key = normalizeWeapon(damage.weapon);
+    damageByWeapon.set(key, (damageByWeapon.get(key) ?? 0) + damage.healthDamage);
+  }
+
+  return [...killsByWeapon.entries()]
+    .map(([weapon, kills]) => {
+      const killerCounts = new Map<string, number>();
+      for (const kill of kills) {
+        if (kill.killerSteamId64) {
+          killerCounts.set(kill.killerSteamId64, (killerCounts.get(kill.killerSteamId64) ?? 0) + 1);
+        }
+      }
+      const topKiller = [...killerCounts.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
+      const headshots = kills.filter((kill) => kill.headshot).length;
+      return {
+        weapon,
+        label: displayWeaponName(weapon),
+        kills: kills.length,
+        headshotPercent: kills.length > 0 ? round((headshots / kills.length) * 100, 1) : null,
+        damage: damageByWeapon.get(weapon) ?? 0,
+        wallbangKills: kills.filter((kill) => kill.penetratedObjects > 0).length,
+        noScopeKills: kills.filter((kill) => kill.noScope).length,
+        throughSmokeKills: kills.filter((kill) => kill.throughSmoke).length,
+        topKillerName: topKiller ? nameForSteamId(pkg, topKiller[0]) : null,
+        topKillerKills: topKiller ? topKiller[1] : 0
+      };
+    })
+    .sort((a, b) => b.kills - a.kills);
+}
+
+/** 对位：10x10 击杀矩阵（teamA 在前）+ 开局对枪统计（来自 playerRoundFacts）。 */
+function buildWorkspaceDuels(pkg: DemoPackage, bundle: AnalysisBundle) {
+  const players = [...bundle.scoreboard]
+    .sort((a, b) => (a.teamKey === b.teamKey ? b.accountRR - a.accountRR : a.teamKey === "teamA" ? -1 : 1))
+    .map((row) => ({ steamId64: row.steamId64, name: row.name, teamKey: row.teamKey }));
+  const indexBySteamId = new Map(players.map((player, index) => [player.steamId64, index]));
+
+  const matrix = players.map(() => players.map(() => 0));
+  for (const kill of pkg.kills) {
+    if (!kill.killerSteamId64) continue;
+    const killerIndex = indexBySteamId.get(kill.killerSteamId64);
+    const victimIndex = indexBySteamId.get(kill.victimSteamId64);
+    if (killerIndex == null || victimIndex == null) continue;
+    matrix[killerIndex][victimIndex] += 1;
+  }
+
+  const factsByPlayer = groupBy(bundle.playerRoundFacts, (fact) => fact.steamId64);
+  const openings = players.map((player) => {
+    const facts = factsByPlayer.get(player.steamId64) ?? [];
+    const openingKills = facts.filter((fact) => fact.openingDuel === "won").length;
+    const openingDeaths = facts.filter((fact) => fact.openingDuel === "lost").length;
+    const total = openingKills + openingDeaths;
+    return {
+      ...player,
+      openingKills,
+      openingDeaths,
+      winRatePercent: total > 0 ? round((openingKills / total) * 100, 1) : null
+    };
+  });
+
+  return { players, matrix, openings };
+}
+
 function radarImageUrlForMap(mapName: string): string | null {
-  const knownMaps = new Set(["de_ancient", "de_anubis", "de_dust2", "de_inferno", "de_mirage", "de_nuke", "de_overpass"]);
+  // 有标定即有底图：apps 的 public/maps/radars/ 与 MAP_CALIBRATIONS 保持同套地图。
   // Relative path so it resolves from both http:// dev server and file:// pywebview.
-  return knownMaps.has(mapName) ? `./maps/radars/${mapName}.png` : null;
+  return getMapCalibration(mapName) ? `./maps/radars/${mapName}.png` : null;
 }
 
 function buildWorkspaceKpis(bundle: AnalysisBundle) {
@@ -607,13 +684,14 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
       tickrate: null,
       rounds: [],
       capabilities: {
-        hasDefuseKit: false,
-        hasBombPosition: false
+        hasDefuseKit: false
       }
     };
   }
 
   const killsByRound = groupBy(pkg.kills, (k) => k.roundNumber);
+  const grenadesByRound = groupBy(pkg.grenades, (g) => g.roundNumber);
+  const bombsByRound = groupBy(pkg.bombs, (b) => b.roundNumber);
 
   let hasDefuseKit = false;
   const rounds = replay.rounds.map((roundRow) => ({
@@ -622,6 +700,24 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
     tickStep: roundRow.tickStep,
     frameCount: roundRow.frameCount,
     kills: buildRoundKills(pkg, killsByRound.get(roundRow.roundNumber) ?? []),
+    grenades: (grenadesByRound.get(roundRow.roundNumber) ?? []).map((row) => ({
+      grenade: row.grenade,
+      throwTick: row.throwTick,
+      effectTick: row.effectTick,
+      destroyTick: row.destroyTick,
+      throwX: row.throwPosition.x,
+      throwY: row.throwPosition.y,
+      effectX: row.effectPosition.x,
+      effectY: row.effectPosition.y
+    })),
+    // v2.3+ 导出包才带飞行轨迹；旧包置空，渲染端按"无数据"处理
+    projectiles: (roundRow.projectiles ?? []).map((proj) => ({
+      grenade: proj.grenade,
+      startTick: proj.startTick,
+      x: proj.x,
+      y: proj.y
+    })),
+    bomb: buildRoundBomb(bombsByRound.get(roundRow.roundNumber) ?? []),
     players: roundRow.players.map((player) => {
       const frames: WorkspaceReplayFrame[] = [];
       for (let index = 0; index < roundRow.frameCount; index += 1) {
@@ -636,7 +732,8 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
           weapon: weaponNameForIndex(replay.weaponDict, player.weapon[index] ?? -1),
           alive: (flags & 1) !== 0,
           flashed: (flags & 8) !== 0,
-          hasDefuseKit: (flags & 4) !== 0
+          hasDefuseKit: (flags & 4) !== 0,
+          hasBomb: (flags & 2) !== 0
         };
         if (frame.hasDefuseKit) {
           hasDefuseKit = true;
@@ -659,9 +756,21 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
     tickrate: replay.meta.tickrate,
     rounds,
     capabilities: {
-      hasDefuseKit,
-      hasBombPosition: false
+      hasDefuseKit
     }
+  };
+}
+
+/** 从 bombs.json 取该回合 C4 锚点：plant 位置定格，defuse/explode 决定终态。 */
+function buildRoundBomb(events: DemoPackage["bombs"]) {
+  const plant = events.find((event) => event.type === "planted");
+  if (!plant) return null;
+  return {
+    plantTick: plant.tick,
+    x: plant.position.x,
+    y: plant.position.y,
+    defuseTick: events.find((event) => event.type === "defused")?.tick ?? null,
+    explodeTick: events.find((event) => event.type === "exploded")?.tick ?? null
   };
 }
 

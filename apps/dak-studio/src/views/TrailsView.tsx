@@ -1,0 +1,505 @@
+import { Pause, Play, RotateCcw } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { OpeningTrailsModel, OpeningTrailRound } from "@cs2dak/contract";
+import { buildOpeningTrails } from "@cs2dak/presentation";
+import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
+import { getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { getPinnedPlayer } from "../lib/pin";
+import { CohortScope, type CohortScopeState } from "../components/CohortScope";
+
+/**
+ * 开局动线：选手在长枪局开局前 N 秒的走位 + 道具投掷叠加动画。
+ * 数据由 @cs2dak/presentation buildOpeningTrails 派生，本视图只做投影与播放。
+ */
+
+export interface TrailsViewProps {
+  allEntries: StudioDemoEntry[];
+  entries: StudioDemoEntry[];
+  scope: CohortScopeState;
+  onScopeChange: (scope: CohortScopeState) => void;
+  onGoLibrary: () => void;
+}
+
+const WINDOW_SECONDS = 30;
+const RANGE_OPTIONS = [3, 5, 10, 0] as const; // 0 = 全部
+
+interface PlayerOption {
+  steamId64: string;
+  name: string;
+  matchCount: number;
+}
+
+const GRENADE_COLOR: Record<string, string> = {
+  flashbang: "#ffd84d",
+  smoke: "#9aa6b2",
+  molotov: "#ff8a3d",
+  incendiary: "#ff8a3d",
+  hegrenade: "#ff5f6e",
+  decoy: "#6f7d8a"
+};
+
+const GRENADE_LABEL: Record<string, string> = {
+  flashbang: "闪光",
+  smoke: "烟雾",
+  molotov: "燃烧瓶",
+  incendiary: "燃烧弹",
+  hegrenade: "高爆",
+  decoy: "诱饵"
+};
+
+function trailColor(index: number): string {
+  return `hsl(${(index * 47) % 360} 75% 60%)`;
+}
+
+/** 烟/火的近似作用半径（游戏单位），只服务视觉示意；其余道具不画范围圈。 */
+const EFFECT_RADIUS_UNITS: Partial<Record<string, number>> = {
+  smoke: 144,
+  molotov: 120,
+  incendiary: 120
+};
+
+/** destroyT 缺失时的保底效果时长（秒）。 */
+const EFFECT_DURATION_SECONDS: Partial<Record<string, number>> = {
+  smoke: 18,
+  molotov: 7,
+  incendiary: 7,
+  hegrenade: 0.7,
+  flashbang: 0.7,
+  decoy: 15
+};
+
+export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibrary }: TrailsViewProps) {
+  const [rangeN, setRangeN] = useState<number>(5);
+  const [steamId64, setSteamId64] = useState<string | null>(null);
+  const [players, setPlayers] = useState<PlayerOption[] | null>(null);
+  const [models, setModels] = useState<OpeningTrailsModel[] | null>(null);
+  const [mapName, setMapName] = useState<string | null>(null);
+  const [side, setSide] = useState<"t" | "ct">("t");
+  const [hiddenRounds, setHiddenRounds] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
+
+  // 范围：按 matchId（日期前缀）降序取最近 N 场
+  const rangeEntries = useMemo(() => {
+    const sorted = [...entries].sort((a, b) => matchIdForEntry(b).localeCompare(matchIdForEntry(a)));
+    return rangeN > 0 ? sorted.slice(0, rangeN) : sorted;
+  }, [entries, rangeN]);
+
+  // 加载范围内的 DemoPackage，统计候选选手
+  useEffect(() => {
+    if (rangeEntries.length === 0) {
+      setPlayers(null);
+      setModels(null);
+      return;
+    }
+    let cancelled = false;
+    setPlayers(null);
+    setError(null);
+    Promise.all(rangeEntries.map((entry) => getDemoPackage(entry.id)))
+      .then((pkgs) => {
+        if (cancelled) return;
+        const counts = new Map<string, PlayerOption>();
+        for (const pkg of pkgs) {
+          for (const player of pkg.players) {
+            const current = counts.get(player.steamId64);
+            if (current) current.matchCount += 1;
+            else counts.set(player.steamId64, { steamId64: player.steamId64, name: player.name, matchCount: 1 });
+          }
+        }
+        const options = [...counts.values()].sort((a, b) => b.matchCount - a.matchCount || a.name.localeCompare(b.name));
+        setPlayers(options);
+        setSteamId64((current) => {
+          if (current && options.some((option) => option.steamId64 === current)) return current;
+          const pinned = getPinnedPlayer();
+          const pinnedOption = pinned ? options.find((option) => pinned.steamIds.includes(option.steamId64)) : null;
+          return (pinnedOption ?? options[0])?.steamId64 ?? null;
+        });
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [rangeEntries]);
+
+  // 为选中选手构建各场动线
+  useEffect(() => {
+    if (!steamId64 || rangeEntries.length === 0) {
+      setModels(null);
+      return;
+    }
+    let cancelled = false;
+    setModels(null);
+    setError(null);
+    Promise.all(
+      rangeEntries.map(async (entry) =>
+        buildOpeningTrails(await getDemoPackage(entry.id), matchIdForEntry(entry), steamId64, {
+          windowSeconds: WINDOW_SECONDS
+        })
+      )
+    )
+      .then((result) => {
+        if (cancelled) return;
+        setModels(result);
+        const roundsByMap = new Map<string, number>();
+        for (const model of result) {
+          for (const round of model.rounds) {
+            roundsByMap.set(model.mapName, (roundsByMap.get(model.mapName) ?? 0) + 1);
+          }
+        }
+        const best = [...roundsByMap.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+        setMapName((current) => (current && roundsByMap.has(current) ? current : best));
+        setHiddenRounds(new Set());
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [rangeEntries, steamId64]);
+
+  const mapOptions = useMemo(() => {
+    if (!models) return [];
+    const counts = new Map<string, number>();
+    for (const model of models) {
+      for (const _round of model.rounds) {
+        counts.set(model.mapName, (counts.get(model.mapName) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [models]);
+
+  const visibleRounds = useMemo(() => {
+    if (!models || !mapName) return [];
+    return models
+      .filter((model) => model.mapName === mapName)
+      .flatMap((model) => model.rounds)
+      .filter((round) => round.side === side);
+  }, [models, mapName, side]);
+
+  const missingReplay = useMemo(
+    () => (models ?? []).filter((model) => !model.available).map((model) => model.matchId),
+    [models]
+  );
+
+  if (allEntries.length === 0) {
+    return (
+      <div className="stu-view">
+        <div className="stu-empty">
+          <div className="stu-empty-mark">⌖</div>
+          <h2>还没有动线数据</h2>
+          <p>开局动线需要含回放流的 v2 ZIP，先导入几场比赛。</p>
+          <button type="button" className="stu-button" onClick={onGoLibrary}>
+            去资料库
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const selectedPlayer = players?.find((option) => option.steamId64 === steamId64) ?? null;
+
+  return (
+    <div className="stu-view">
+      <header className="stu-view-header">
+        <div>
+          <h1>开局动线</h1>
+          <p>
+            选手在<b>长枪局</b>开局前 {WINDOW_SECONDS} 秒的走位与道具投掷叠加动画——直观看出默认位、出门路线和道具习惯，也可用于学习职业选手的 default。
+          </p>
+        </div>
+      </header>
+
+      <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} />
+
+      <div className="stu-trail-controls">
+        <label>
+          <span>选手</span>
+          <select className="stu-select" value={steamId64 ?? ""} onChange={(e) => setSteamId64(e.target.value || null)}>
+            {(players ?? []).map((option) => (
+              <option key={option.steamId64} value={option.steamId64}>
+                {option.name}（{option.matchCount} 场）
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>范围</span>
+          <select className="stu-select" value={rangeN} onChange={(e) => setRangeN(Number(e.target.value))}>
+            {RANGE_OPTIONS.map((n) => (
+              <option key={n} value={n}>
+                {n === 0 ? `全部（${entries.length} 场）` : `最近 ${n} 场`}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>地图</span>
+          <select className="stu-select" value={mapName ?? ""} onChange={(e) => setMapName(e.target.value || null)}>
+            {mapOptions.map(([map, count]) => (
+              <option key={map} value={map}>
+                {map}（{count} 回合）
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="stu-side-toggle" role="radiogroup" aria-label="阵营">
+          {(["t", "ct"] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={side === value}
+              className={side === value ? "stu-chip stu-chip-active" : "stu-chip"}
+              onClick={() => setSide(value)}
+            >
+              {value.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {error ? (
+        <div className="stu-empty">
+          <h2>构建失败</h2>
+          <p>{error}</p>
+        </div>
+      ) : !models || !players ? (
+        <div className="stu-loading">提取 {rangeEntries.length} 场回放轨迹…</div>
+      ) : visibleRounds.length === 0 ? (
+        <div className="stu-empty">
+          <h2>没有可叠加的回合</h2>
+          <p>
+            {mapName
+              ? `${selectedPlayer?.name ?? "该选手"} 在 ${mapName} 的 ${side.toUpperCase()} 方没有含回放的长枪局。试试切换阵营、地图或扩大范围。`
+              : "该范围内没有含回放流的长枪局。"}
+            {missingReplay.length > 0 && ` 注意：${missingReplay.join("、")} 不含回放流。`}
+          </p>
+        </div>
+      ) : (
+        <TrailStage
+          key={`${mapName}-${side}-${steamId64}-${visibleRounds.length}`}
+          mapName={mapName!}
+          rounds={visibleRounds}
+          hiddenRounds={hiddenRounds}
+          onToggleRound={(roundKey) =>
+            setHiddenRounds((current) => {
+              const next = new Set(current);
+              if (next.has(roundKey)) next.delete(roundKey);
+              else next.add(roundKey);
+              return next;
+            })
+          }
+          missingReplay={missingReplay}
+        />
+      )}
+    </div>
+  );
+}
+
+function roundKeyOf(round: OpeningTrailRound): string {
+  return `${round.matchId}#R${round.roundNumber}`;
+}
+
+interface TrailStageProps {
+  mapName: string;
+  rounds: OpeningTrailRound[];
+  hiddenRounds: Set<string>;
+  onToggleRound: (roundKey: string) => void;
+  missingReplay: string[];
+}
+
+function TrailStage({ mapName, rounds, hiddenRounds, onToggleRound, missingReplay }: TrailStageProps) {
+  const [time, setTime] = useState(WINDOW_SECONDS);
+  const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState(2);
+  const rafRef = useRef<number | null>(null);
+  const lastTsRef = useRef<number | null>(null);
+
+  const calibration = getMapCalibration(mapName);
+  const size = calibration?.radarSize ?? 1024;
+
+  // 预投影到 radar 坐标
+  const projected = useMemo(() => {
+    return rounds.map((round, index) => {
+      const project = (point: { x: number; y: number }) => {
+        if (!calibration) return { x: size / 2 + point.x / 10, y: size / 2 - point.y / 10 };
+        const radar = worldToRadar(point, calibration);
+        return { x: radar.x, y: radar.y };
+      };
+      return {
+        key: roundKeyOf(round),
+        color: trailColor(index),
+        round,
+        points: round.points.map((p) => ({ t: p.t, ...project(p) })),
+        grenades: round.grenades.map((g) => {
+          const effect = project({ x: g.effectX, y: g.effectY });
+          return {
+            t: g.t,
+            grenade: g.grenade,
+            effectT: g.effectT,
+            destroyT: g.destroyT,
+            ex: effect.x,
+            ey: effect.y,
+            ...project(g)
+          };
+        })
+      };
+    });
+  }, [rounds, calibration, size]);
+
+  useEffect(() => {
+    if (!playing) {
+      lastTsRef.current = null;
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+      return;
+    }
+    const step = (ts: number) => {
+      const last = lastTsRef.current;
+      lastTsRef.current = ts;
+      if (last != null) {
+        setTime((current) => {
+          const next = current + ((ts - last) / 1000) * speed;
+          if (next >= WINDOW_SECONDS) {
+            setPlaying(false);
+            return WINDOW_SECONDS;
+          }
+          return next;
+        });
+      }
+      rafRef.current = requestAnimationFrame(step);
+    };
+    rafRef.current = requestAnimationFrame(step);
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [playing, speed]);
+
+  const restart = () => {
+    setTime(0);
+    setPlaying(true);
+  };
+
+  const visible = projected.filter((item) => !hiddenRounds.has(item.key));
+
+  return (
+    <div className="stu-trail-layout">
+      <div className="stu-trail-stage-wrap">
+        <svg
+          className="stu-trail-stage"
+          viewBox={`0 0 ${size} ${size}`}
+          role="img"
+          aria-label={`${mapName} 开局动线`}
+        >
+          <image href={`./maps/radars/${mapName}.png`} width={size} height={size} opacity={0.85} />
+          {visible.map((item) => {
+            const pts = item.points.filter((p) => p.t <= time);
+            if (pts.length === 0) return null;
+            const head = pts[pts.length - 1];
+            return (
+              <g key={item.key}>
+                <polyline
+                  points={pts.map((p) => `${p.x},${p.y}`).join(" ")}
+                  fill="none"
+                  stroke={item.color}
+                  strokeWidth={size / 340}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  opacity={0.9}
+                />
+                <circle cx={head.x} cy={head.y} r={size / 110} fill={item.color} stroke="#0b0e10" strokeWidth={size / 512} />
+                {item.grenades
+                  .filter((g) => g.t <= time)
+                  .map((g, gi) => {
+                    const scale = calibration?.scale ?? 10;
+                    const effectRadius = EFFECT_RADIUS_UNITS[g.grenade];
+                    const effectEnd = g.destroyT ?? g.effectT + (EFFECT_DURATION_SECONDS[g.grenade] ?? 0);
+                    const effectVisible = time >= g.effectT;
+                    const effectActive = effectVisible && time <= effectEnd;
+                    return (
+                      <g key={`${item.key}-g${gi}`}>
+                        {effectVisible && (
+                          <line x1={g.x} y1={g.y} x2={g.ex} y2={g.ey} stroke={GRENADE_COLOR[g.grenade] ?? "#fff"} strokeWidth={size / 1024} strokeDasharray={`${size / 256} ${size / 256}`} opacity={0.55} />
+                        )}
+                        {effectActive && effectRadius != null && (
+                          <circle cx={g.ex} cy={g.ey} r={effectRadius / scale} fill={GRENADE_COLOR[g.grenade] ?? "#fff"} opacity={0.22} stroke={GRENADE_COLOR[g.grenade] ?? "#fff"} strokeOpacity={0.5} strokeWidth={size / 1024} />
+                        )}
+                        {effectVisible && (
+                          <circle cx={g.ex} cy={g.ey} r={size / 170} fill={GRENADE_COLOR[g.grenade] ?? "#fff"} opacity={0.95} stroke="#0b0e10" strokeWidth={size / 680} />
+                        )}
+                        <circle cx={g.x} cy={g.y} r={size / 240} fill="none" stroke={GRENADE_COLOR[g.grenade] ?? "#fff"} strokeWidth={size / 768} opacity={0.8} />
+                        <title>{`${GRENADE_LABEL[g.grenade] ?? g.grenade} · 出手 ${g.t.toFixed(1)}s → 生效 ${g.effectT.toFixed(1)}s（${item.round.matchId} R${item.round.roundNumber}）`}</title>
+                      </g>
+                    );
+                  })}
+              </g>
+            );
+          })}
+        </svg>
+        <div className="stu-trail-playbar">
+          <button type="button" className="stu-icon-button" onClick={() => (time >= WINDOW_SECONDS ? restart() : setPlaying((v) => !v))} aria-label={playing ? "暂停" : "播放"}>
+            {playing ? <Pause size={15} /> : <Play size={15} />}
+          </button>
+          <button type="button" className="stu-icon-button" onClick={restart} aria-label="重播">
+            <RotateCcw size={14} />
+          </button>
+          <input
+            className="stu-trail-scrubber"
+            type="range"
+            min={0}
+            max={WINDOW_SECONDS}
+            step={0.1}
+            value={time}
+            onChange={(e) => {
+              setPlaying(false);
+              setTime(Number(e.target.value));
+            }}
+          />
+          <span className="stu-trail-clock">{time.toFixed(1)}s / {WINDOW_SECONDS}s</span>
+          <div className="stu-speed-toggle" role="group" aria-label="播放速度">
+            {[1, 2, 4].map((value) => (
+              <button
+                key={value}
+                type="button"
+                className={speed === value ? "stu-chip stu-chip-active" : "stu-chip"}
+                onClick={() => setSpeed(value)}
+              >
+                {value}x
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <aside className="stu-trail-legend">
+        <h3>回合（{rounds.length}）</h3>
+        {projected.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            className={hiddenRounds.has(item.key) ? "stu-trail-chip stu-trail-chip-off" : "stu-trail-chip"}
+            onClick={() => onToggleRound(item.key)}
+            title={`${item.round.matchId} · R${item.round.roundNumber} · ${item.round.grenades.length} 颗道具`}
+          >
+            <span className="stu-trail-swatch" style={{ background: item.color }} />
+            <span className="stu-trail-chip-label">
+              R{item.round.roundNumber} · {item.round.matchId.length > 22 ? `${item.round.matchId.slice(0, 22)}…` : item.round.matchId}
+            </span>
+            <small>{item.round.grenades.length} 道具</small>
+          </button>
+        ))}
+        <div className="stu-trail-grenade-legend">
+          {Object.entries(GRENADE_LABEL).filter(([key]) => key !== "incendiary").map(([key, label]) => (
+            <span key={key}>
+              <i style={{ background: GRENADE_COLOR[key] }} />
+              {label}
+            </span>
+          ))}
+        </div>
+        {missingReplay.length > 0 && (
+          <p className="stu-dim stu-trail-note">无回放流：{missingReplay.join("、")}</p>
+        )}
+      </aside>
+    </div>
+  );
+}

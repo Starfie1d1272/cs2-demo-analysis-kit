@@ -10,16 +10,21 @@ import { matchDateFromFileName, type StudioDemoEntry } from "../lib/library";
 export interface CohortScopeState {
   /** 选中的地图；空数组 = 不按地图过滤。 */
   maps: string[];
+  /** 选中的标签（任一命中即可）；空数组 = 不按标签过滤。 */
+  tags: string[];
   /** 手动排除的 demo id。 */
   excludedIds: string[];
 }
 
-export const EMPTY_SCOPE: CohortScopeState = { maps: [], excludedIds: [] };
+export const EMPTY_SCOPE: CohortScopeState = { maps: [], tags: [], excludedIds: [] };
 
 export function applyScope(entries: StudioDemoEntry[], scope: CohortScopeState): StudioDemoEntry[] {
   const excluded = new Set(scope.excludedIds);
   return entries.filter(
-    (entry) => (scope.maps.length === 0 || scope.maps.includes(entry.meta.mapName)) && !excluded.has(entry.id)
+    (entry) =>
+      (scope.maps.length === 0 || scope.maps.includes(entry.meta.mapName)) &&
+      (scope.tags.length === 0 || entry.tags.some((tag) => scope.tags.includes(tag))) &&
+      !excluded.has(entry.id)
   );
 }
 
@@ -32,12 +37,17 @@ export interface CohortScopeProps {
 export function CohortScope({ entries, scope, onChange }: CohortScopeProps) {
   const [expanded, setExpanded] = useState(false);
   const maps = useMemo(() => [...new Set(entries.map((e) => e.meta.mapName))].sort(), [entries]);
+  const tags = useMemo(() => [...new Set(entries.flatMap((e) => e.tags))].sort(), [entries]);
   const effective = applyScope(entries, scope);
   const filtered = effective.length !== entries.length;
 
   const toggleMap = (map: string) => {
     const next = scope.maps.includes(map) ? scope.maps.filter((m) => m !== map) : [...scope.maps, map];
     onChange({ ...scope, maps: next });
+  };
+  const toggleTag = (tag: string) => {
+    const next = scope.tags.includes(tag) ? scope.tags.filter((t) => t !== tag) : [...scope.tags, tag];
+    onChange({ ...scope, tags: next });
   };
   const toggleEntry = (id: string) => {
     const next = scope.excludedIds.includes(id)
@@ -72,6 +82,20 @@ export function CohortScope({ entries, scope, onChange }: CohortScopeProps) {
             </button>
           ))}
         </div>
+        {tags.length > 0 && (
+          <div className="stu-chip-row">
+            {tags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                className={scope.tags.includes(tag) ? "stu-chip stu-chip-active" : "stu-chip"}
+                onClick={() => toggleTag(tag)}
+              >
+                #{tag}
+              </button>
+            ))}
+          </div>
+        )}
         <button type="button" className="stu-scope-toggle" onClick={() => setExpanded((v) => !v)}>
           按场次筛选 {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
         </button>

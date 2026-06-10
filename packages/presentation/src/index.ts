@@ -1,4 +1,5 @@
 export { buildDemoViewModel, buildMatchWorkspaceModel } from "./workspace.js";
+export { buildOpeningTrails, type OpeningTrailsOptions } from "./trails.js";
 export { buildSeasonLeaderboardModel } from "./leaderboard.js";
 export { buildPlayerSeasonProfile, buildAllPlayerSeasonProfiles } from "./player.js";
 export { buildTeamCohortSummary } from "./team.js";

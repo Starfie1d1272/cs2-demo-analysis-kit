@@ -24,3 +24,5 @@ __pycache__/
 .claude/scheduled_tasks.lock
 # Generated radar viz images (reproducible via generate-routes.py)
 packages/maps/viz/
+# DAK Studio 桌面壳的前端构建产物（package.sh 生成）
+python/src/cs2dak/studio_web/

@@ -21,6 +21,8 @@ const model: MatchWorkspaceModel = {
     { key: "rounds", label: "回合" },
     { key: "players", label: "选手" },
     { key: "economy", label: "经济" },
+    { key: "weapons", label: "武器" },
+    { key: "duels", label: "对位" },
     { key: "map", label: "地图" },
     { key: "replay", label: "回放" }
   ],
@@ -34,6 +36,34 @@ const model: MatchWorkspaceModel = {
   rounds: [],
   players: [],
   economy: [],
+  weapons: [
+    {
+      weapon: "ak47",
+      label: "AK-47",
+      kills: 12,
+      headshotPercent: 41.7,
+      damage: 1804,
+      wallbangKills: 1,
+      noScopeKills: 0,
+      throughSmokeKills: 2,
+      topKillerName: "Player A",
+      topKillerKills: 7
+    }
+  ],
+  duels: {
+    players: [
+      { steamId64: "76561198000000001", name: "Player A", teamKey: "teamA" },
+      { steamId64: "76561198000000002", name: "Player B", teamKey: "teamB" }
+    ],
+    matrix: [
+      [0, 3],
+      [1, 0]
+    ],
+    openings: [
+      { steamId64: "76561198000000001", name: "Player A", teamKey: "teamA", openingKills: 4, openingDeaths: 2, winRatePercent: 66.7 },
+      { steamId64: "76561198000000002", name: "Player B", teamKey: "teamB", openingKills: 2, openingDeaths: 4, winRatePercent: 33.3 }
+    ]
+  },
   map: {
     view: { name: "de_ancient", radarImageUrl: "/maps/radars/de_ancient.png", calibrated: true },
     modes: [],
@@ -51,6 +81,9 @@ const model: MatchWorkspaceModel = {
         tickStep: 8,
         frameCount: 1,
         kills: [],
+        grenades: [],
+        projectiles: [],
+        bomb: null,
         players: [
           {
             steamId64: "76561198000000001",
@@ -58,13 +91,13 @@ const model: MatchWorkspaceModel = {
             teamKey: "teamA",
             side: "ct",
             frames: [
-              { tick: 100, x: 1, y: 2, z: 3, yaw: 90, hp: 100, weapon: "ak47", alive: true, flashed: false, hasDefuseKit: true }
+              { tick: 100, x: 1, y: 2, z: 3, yaw: 90, hp: 100, weapon: "ak47", alive: true, flashed: false, hasDefuseKit: true, hasBomb: false }
             ]
           }
         ]
       }
     ],
-    capabilities: { hasDefuseKit: true, hasBombPosition: false }
+    capabilities: { hasDefuseKit: true }
   },
   adminQa: {
     ok: true,
