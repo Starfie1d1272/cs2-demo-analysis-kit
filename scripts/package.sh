@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # One-shot desktop packaging: sync version -> build Studio frontend -> PyInstaller -> DMG.
-# 产出两个应用：
-#   cs2dak.app / cs2dak.exe          纯导出器（pywebview exporter GUI）
+# 默认只产出 DAK Studio（Studio 自带 exporter bridge，独立导出器没有发布价值）：
 #   DAK Studio.app / dak-studio.exe  Studio 工作台（pywebview 托管前端 + exporter bridge）
+# PACKAGE_EXPORTER=1 时额外打纯导出器 cs2dak.app / cs2dak.exe（本地调试用，不进 Release）。
 #
 #   ./scripts/package.sh            # version derived from the latest git tag
 #   ./scripts/package.sh 0.3.0      # explicit version
@@ -27,10 +27,12 @@ STUDIO_WEB="python/src/cs2dak/studio_web"
 rm -rf "$STUDIO_WEB"
 cp -R apps/dak-studio/dist "$STUDIO_WEB"
 
-echo "==> [3/5] PyInstaller build (exporter + studio)"
+echo "==> [3/5] PyInstaller build (studio)"
 cd python
 uv sync --extra gui --extra build
-uv run pyinstaller packaging/cs2dak.spec --noconfirm --distpath dist
+if [[ "${PACKAGE_EXPORTER:-0}" == "1" ]]; then
+  uv run pyinstaller packaging/cs2dak.spec --noconfirm --distpath dist
+fi
 uv run pyinstaller packaging/cs2dak-studio.spec --noconfirm --distpath dist
 cd "$ROOT"
 
@@ -65,10 +67,8 @@ if [[ "$OSTYPE" == darwin* ]]; then
     rm -rf "$stage"
   }
 
-  if [[ -d python/dist/cs2dak.app ]]; then
+  if [[ "${PACKAGE_EXPORTER:-0}" == "1" && -d python/dist/cs2dak.app ]]; then
     make_dmg python/dist/cs2dak.app "python/dist/cs2dak-${VERSION}.dmg"
-  else
-    echo "    Skipped exporter DMG: python/dist/cs2dak.app not found"
   fi
   if [[ -d python/dist/DAK\ Studio.app ]]; then
     make_dmg "python/dist/DAK Studio.app" "python/dist/dak-studio-${VERSION}.dmg"

@@ -1,8 +1,9 @@
 name: Release
 
 # 打 vX.Y.Z tag 自动构建桌面应用（unsigned）并发布到 GitHub Release：
-#   macOS  → cs2dak-X.Y.Z.dmg + dak-studio-X.Y.Z.dmg
-#   Windows→ cs2dak.exe + dak-studio.exe（zip 直发）
+#   macOS  → dak-studio-X.Y.Z.dmg
+#   Windows→ dak-studio-windows-X.Y.Z.zip
+# 只发 DAK Studio（自带 exporter bridge）；纯导出器 cs2dak 不进 Release。
 # 首次打开需绕过 Gatekeeper / SmartScreen，见 Release 描述。
 
 on:
@@ -46,13 +47,12 @@ jobs:
         run: bash scripts/package.sh
         shell: bash
 
-      - name: Zip Windows executables
+      - name: Zip Windows executable
         if: runner.os == 'Windows'
         shell: bash
         run: |
           VERSION="$(node -p "require('./package.json').version")"
           cd python/dist
-          7z a "cs2dak-windows-${VERSION}.zip" cs2dak.exe
           7z a "dak-studio-windows-${VERSION}.zip" dak-studio.exe
 
       - uses: actions/upload-artifact@v7
@@ -82,7 +82,7 @@ jobs:
           body: |
             **安装说明**
 
-            1. 打开 DMG，把 **DAK Studio**（或 cs2dak exporter）拖到右侧的 **Applications** 文件夹。
+            1. 打开 DMG，把 **DAK Studio** 拖到右侧的 **Applications** 文件夹。
             2. 推出 DMG（桌面上右键 → 推出"DAK Studio"）。
             3. 从 **启动台** 或 `/Applications/DAK Studio.app` 打开。
             4. macOS 会提示「无法验证开发者」→ **系统设置 → 隐私与安全性 → 拉到底点「仍要打开」**。
