@@ -62,6 +62,7 @@
 
 ## 工程债与分发
 
+- [x] 应用内更新检测（启动查 GitHub releases/latest，侧栏提示新版本下载）
 - [ ] Windows 打包从 onefile 改 onedir + 安装器（启动更快、杀软误报更少）
 - [ ] macOS 签名与公证（$99/年 Developer ID，预算到位后做；当前 Release 附绕过说明）
 - [ ] cs2-demo-format 增加 optional `playedAt`（比赛时间进合同，摆脱文件名约定）

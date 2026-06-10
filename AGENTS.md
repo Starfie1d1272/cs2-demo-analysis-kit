@@ -101,6 +101,16 @@ docs/                  # 架构与集成文档
 - **组件导出**：公共组件从 `packages/react/src/index.ts` 统一导出
 - **Git commit**：中文，不加 `Co-Authored-By` trailer，语言跟随仓库现有约定
 
+### 版本与发布
+
+两条独立版本流，详见 [`docs/release.md`](docs/release.md)：
+
+- **桌面应用**（DAK Studio / exporter）：版本随 `vX.Y.Z` git tag，推 tag 触发
+  Release CI 出 DMG/zip。发版前 `node scripts/sync-version.mjs X.Y.Z` 同步
+  根 package.json / 私有 apps / python。Studio 启动时自查 releases/latest 提示更新。
+- **npm 包**（`@cs2dak/*`）：Changesets 管理（`pnpm changeset` → `version:packages`
+  → `release:npm`），tag 形如 `@cs2dak/core@1.0.0`。`sync-version.mjs` 不碰公共包。
+
 ## 5. Hard Constraints
 
 - **v2 ZIP 是唯一 seam**：Python ↔ TypeScript 只通过 ZIP 合同对接
