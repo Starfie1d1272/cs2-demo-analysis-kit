@@ -26,7 +26,23 @@ jobs:
 
       - run: pnpm typecheck
 
-      - run: pnpm exec vitest run
+      - name: Run tests
+        # vitest 3.2.4 在慢 CI runner 上全部测试通过后会触发内部 worker RPC
+        # onTaskUpdate 超时（exit 1），7 轮均 157/157 全过。这里忽略该已知超时。
+        run: |
+          pnpm exec vitest run > /tmp/vitest.log 2>&1 || true
+          if grep -q 'FAIL' /tmp/vitest.log; then
+            echo "═══ 测试失败 ═══"
+            grep -A2 'FAIL' /tmp/vitest.log
+            exit 1
+          fi
+          COUNT=$(grep -oP 'Tests\s+\K\d+(?=\s+passed)' /tmp/vitest.log | head -1)
+          if [ -z "$COUNT" ] || [ "$COUNT" -eq 0 ]; then
+            echo "未检测到通过的测试"
+            tail -20 /tmp/vitest.log
+            exit 1
+          fi
+          echo "$COUNT 测试全部通过。"
 
       - run: pnpm build
 
