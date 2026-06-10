@@ -38,6 +38,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+          python-version: "3.12"
 
       - run: pnpm install --frozen-lockfile
 
@@ -79,10 +80,23 @@ jobs:
             dist/*.dmg
             dist/*.zip
           body: |
-            桌面应用未签名（无证书预算），首次打开需要手动放行：
+            **安装说明**
 
-            - **macOS**：系统设置 → 隐私与安全性 → 拉到底点「仍要打开」；或终端执行
-              `xattr -dr com.apple.quarantine "/Applications/DAK Studio.app"`
-            - **Windows**：SmartScreen 警告 → 「更多信息」→「仍要运行」。
-              老版本 Win10 如启动后白屏，需安装 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)。
+            1. 打开 DMG，把 **DAK Studio**（或 cs2dak exporter）拖到右侧的 **Applications** 文件夹。
+            2. 推出 DMG（桌面上右键 → 推出"DAK Studio"）。
+            3. 从 **启动台** 或 `/Applications/DAK Studio.app` 打开。
+            4. macOS 会提示「无法验证开发者」→ **系统设置 → 隐私与安全性 → 拉到底点「仍要打开」**。
+               （不要直接从 DMG 挂载卷双击——Gatekeeper 会静默拒绝，没有任何提示。）
+
+            终端一键解除隔离（替代步骤 4）：
+            ```bash
+            xattr -dr com.apple.quarantine "/Applications/DAK Studio.app"
+            ```
+
+            ---
+
+            **Windows**
+            - 解压 zip，双击 `dak-studio.exe`。
+            - SmartScreen 警告 → 「更多信息」→「仍要运行」。
+            - 老版本 Win10 如启动后白屏，需安装 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)。
           generate_release_notes: true
