@@ -114,7 +114,7 @@ describe("MatchWorkspace", () => {
     expect(html).toContain("最高 V2 RR");
     expect(html).toContain("回放");
     expect(html).toContain("8 Hz");
-    expect(html).toContain("拆弹器");
+    expect(html).toContain("走位 / 道具 / C4 时间线");
     expect(html).not.toContain("QA</span>");
     expect(html).not.toContain("pr1maly");
     expect(html).not.toContain("AWPy");

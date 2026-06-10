@@ -101,7 +101,7 @@ function OverviewView({ model, onNavigate }: MatchWorkspaceProps & { onNavigate:
             <ModuleAction icon={<ListChecks size={16} />} label="回合浏览" value={`${model.rounds.length} 回合`} detail="横向 timeline + selected round events" onClick={() => onNavigate("rounds")} />
             <ModuleAction icon={<Users size={16} />} label="选手视角" value={`${model.players.length} 名选手`} detail="RR breakdown + round facts" onClick={() => onNavigate("players")} />
             <ModuleAction icon={<Map size={16} />} label="地图图层" value={`${model.map.points.length} 点`} detail={model.map.status.message ?? "kill/death/grenade layers"} onClick={() => onNavigate("map")} />
-            <ModuleAction icon={<Film size={16} />} label="2D 回放" value={model.replay.available ? `${model.replay.sampleRate ?? 0} Hz` : "无回放"} detail={model.replay.capabilities.hasDefuseKit ? "含拆弹器状态" : "无拆弹器状态"} onClick={() => onNavigate("replay")} />
+            <ModuleAction icon={<Film size={16} />} label="2D 回放" value={model.replay.available ? `${model.replay.sampleRate ?? 0} Hz` : "无回放"} detail={model.replay.available ? "走位 / 道具 / C4 时间线" : "导出时未附带回放流"} onClick={() => onNavigate("replay")} />
           </div>
         </Panel>
         <Panel title="地图状态">
@@ -394,7 +394,6 @@ export function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["rep
           <Fact label="Tick" value={`${currentTick}`} />
           <Fact label="帧" value={`${currentFrameIndex + 1}/${round.frameCount}`} />
           <Fact label="采样率" value={`${replay.sampleRate ?? 0} Hz`} />
-          <Fact label="拆弹器" value={replay.capabilities.hasDefuseKit ? "可显示" : "无状态"} />
         </div>
       </Panel>
       <Panel title={`R${round.roundNumber} 2D 回放`}>
@@ -726,21 +725,26 @@ function hpBarColor(hp: number): string {
   return "var(--dak-danger)";
 }
 
-function replayFramePosition(frame: { x: number; y: number }, map: MatchWorkspaceModel["map"]["view"]) {
+function replayPointPercent(frame: { x: number; y: number }, map: MatchWorkspaceModel["map"]["view"]) {
   const calibration = getMapCalibration(map.name);
   if (calibration) {
     const radar = worldToRadar(frame, calibration);
     if (!radar.outOfBounds) {
       return {
-        left: `${(radar.x / calibration.radarSize) * 100}%`,
-        top: `${(radar.y / calibration.radarSize) * 100}%`
+        x: (radar.x / calibration.radarSize) * 100,
+        y: (radar.y / calibration.radarSize) * 100
       };
     }
   }
   return {
-    left: `${Math.max(4, Math.min(96, 50 + frame.x / 70))}%`,
-    top: `${Math.max(4, Math.min(96, 50 - frame.y / 70))}%`
+    x: Math.max(4, Math.min(96, 50 + frame.x / 70)),
+    y: Math.max(4, Math.min(96, 50 - frame.y / 70))
   };
+}
+
+function replayFramePosition(frame: { x: number; y: number }, map: MatchWorkspaceModel["map"]["view"]) {
+  const pos = replayPointPercent(frame, map);
+  return { left: `${pos.x}%`, top: `${pos.y}%` };
 }
 
 /** world 半径 → 相对舞台宽度的百分比；无标定时给一个保底视觉尺寸。 */
@@ -786,6 +790,26 @@ function GrenadeEffectLayer({ round, currentTick, tickrate, map }: {
           />
         );
       })}
+      <svg className="dak-replay-trajectories" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        {round.projectiles.map((proj, index) => {
+          const frameIdx = Math.floor((currentTick - proj.startTick) / round.tickStep);
+          if (frameIdx < 0 || frameIdx >= proj.x.length) return null;
+          const points = proj.x
+            .slice(0, frameIdx + 1)
+            .map((x, i) => {
+              const pos = replayPointPercent({ x, y: proj.y[i] }, map);
+              return `${pos.x},${pos.y}`;
+            })
+            .join(" ");
+          return (
+            <polyline
+              key={`trail-${index}`}
+              className={`dak-replay-trail dak-replay-trail-${proj.grenade}`}
+              points={points}
+            />
+          );
+        })}
+      </svg>
       {round.projectiles.map((proj, index) => {
         const frameIdx = Math.floor((currentTick - proj.startTick) / round.tickStep);
         if (frameIdx < 0 || frameIdx >= proj.x.length) return null;

@@ -1802,6 +1802,33 @@
 .dak-replay-projectile-hegrenade { background: #ff5f6e; }
 .dak-replay-projectile-decoy { background: #6f7d8a; }
 
+/* 道具飞行尾迹：随播放逐帧延伸，颜色与落点标记一致 */
+.dak-replay-trajectories {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.dak-replay-trail {
+  fill: none;
+  stroke: #eef3f8;
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.65;
+  stroke-dasharray: 1.6 1.2;
+}
+
+.dak-replay-trail-flashbang { stroke: #ffd84d; }
+.dak-replay-trail-smoke { stroke: #9aa6b2; }
+.dak-replay-trail-molotov,
+.dak-replay-trail-incendiary { stroke: #ff8a3d; }
+.dak-replay-trail-hegrenade { stroke: #ff5f6e; }
+.dak-replay-trail-decoy { stroke: #6f7d8a; }
+
 .dak-replay-bomb {
   position: absolute;
   transform: translate(-50%, -50%);
