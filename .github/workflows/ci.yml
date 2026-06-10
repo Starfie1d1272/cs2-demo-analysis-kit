@@ -26,7 +26,7 @@ jobs:
 
       - run: pnpm typecheck
 
-      - run: pnpm test -- --maxWorkers=2
+      - run: pnpm exec vitest run
 
       - run: pnpm build
 
