@@ -17,6 +17,18 @@
 
 from __future__ import annotations
 
+# multiprocessing spawn 子进程在 PyInstaller --windowed 模式下无控制台，
+# sys.stdout/stderr 为 None。任何导入/运行时报错都会导致 AttributeError:
+# 'NoneType' object has no attribute 'write'，完全遮蔽原始错误。
+# 必须在所有其他 import 前修复。
+import os as _os
+import sys as _sys
+
+if _sys.stderr is None:
+    _sys.stderr = open(_os.devnull, "w")
+if _sys.stdout is None:
+    _sys.stdout = open(_os.devnull, "w")
+
 import base64
 import logging
 import multiprocessing

@@ -36,7 +36,7 @@ else:
 
 binaries = []
 hiddenimports = []
-for pkg in ("demoparser2",):
+for pkg in ("demoparser2", "pyarrow"):
     d, b, h = collect_all(pkg)
     datas += d
     binaries += b
