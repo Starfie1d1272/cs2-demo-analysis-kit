@@ -9,6 +9,8 @@ export interface LibraryViewProps {
   importTagsRaw: string;
   onImportTagsChange: (raw: string) => void;
   onImportFiles: (files: Iterable<File>, tags: string[]) => void;
+  /** 桌面壳（pywebview）下提供：用原生对话框代替浏览器 file input */
+  onNativeImport?: () => void;
   onLoadSample: () => void;
   onOpenDemo: (id: string) => void;
   onRemoveDemo: (id: string) => void;
@@ -31,6 +33,7 @@ export function LibraryView({
   importTagsRaw,
   onImportTagsChange,
   onImportFiles,
+  onNativeImport,
   onLoadSample,
   onOpenDemo,
   onRemoveDemo,
@@ -95,10 +98,16 @@ export function LibraryView({
           <button type="button" className="stu-button stu-button-ghost" onClick={onLoadSample} disabled={importing}>
             <Sparkles size={15} /> 加载示例
           </button>
-          <label className={importing ? "stu-button stu-button-disabled" : "stu-button"}>
-            <FolderOpen size={15} /> {importing ? "导入中…" : "导入 demo"}
-            <input type="file" accept=".zip,.dem" multiple hidden onChange={onPick} disabled={importing} />
-          </label>
+          {onNativeImport ? (
+            <button type="button" className="stu-button" onClick={onNativeImport} disabled={importing}>
+              <FolderOpen size={15} /> {importing ? "导入中…" : "导入 demo"}
+            </button>
+          ) : (
+            <label className={importing ? "stu-button stu-button-disabled" : "stu-button"}>
+              <FolderOpen size={15} /> {importing ? "导入中…" : "导入 demo"}
+              <input type="file" accept=".zip,.dem" multiple hidden onChange={onPick} disabled={importing} />
+            </label>
+          )}
         </div>
       </header>
 

@@ -43,13 +43,13 @@ class StudioApi:
 
     # --- .dem import ----------------------------------------------------
     def pick_dems(self) -> list[str]:
-        """Open a native file dialog and return chosen .dem paths."""
+        """Open a native file dialog and return chosen .dem / .zip paths."""
         import webview
 
         result = self._window.create_file_dialog(
             webview.FileDialog.OPEN,
             allow_multiple=True,
-            file_types=("Demo files (*.dem)", "All files (*.*)"),
+            file_types=("Demo / v2 ZIP (*.dem;*.zip)", "All files (*.*)"),
         )
         return list(result or [])
 
@@ -63,6 +63,16 @@ class StudioApi:
         from cs2dak.cli import _export_one
 
         dem = Path(path)
+        # 原生对话框也允许直接选 v2 ZIP：不经 exporter，原样回传字节。
+        if dem.suffix.lower() == ".zip":
+            try:
+                return {
+                    "ok": True,
+                    "fileName": dem.name,
+                    "dataBase64": base64.b64encode(dem.read_bytes()).decode("ascii"),
+                }
+            except OSError as exc:
+                return {"ok": False, "error": str(exc)}
         tmp_dir = Path(tempfile.mkdtemp(prefix="cs2dak-studio-"))
         try:
             zip_path = _export_one(dem, tmp_dir)

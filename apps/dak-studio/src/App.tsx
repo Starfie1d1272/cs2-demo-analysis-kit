@@ -2,7 +2,7 @@ import { Crosshair, Film, LibraryBig, Route, Trophy, UserRound } from "lucide-re
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { importDemoFile, listDemoEntries, removeDemo, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { EMPTY_SCOPE, applyScope, type CohortScopeState } from "./components/CohortScope";
-import { detectDemBackend, exportDemToZip, isDemFile } from "./lib/dem";
+import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems } from "./lib/dem";
 import { parseTags } from "./lib/tags";
 import { APP_VERSION, checkForUpdate, type UpdateInfo } from "./lib/update";
 import { LibraryView } from "./views/LibraryView";
@@ -33,6 +33,8 @@ export function App() {
   // 导入标签输入放在 App：全窗口拖拽导入也要带上
   const [importTagsRaw, setImportTagsRaw] = useState("");
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  // 桌面壳（pywebview）里浏览器 file input 拿不到本机路径，必须走原生对话框
+  const [nativeImportReady, setNativeImportReady] = useState(false);
   // 稳定数组标识：避免 App 无关重渲染触发档案/排行榜重新聚合
   const scopedEntries = useMemo(() => applyScope(entries, scope), [entries, scope]);
 
@@ -41,13 +43,20 @@ export function App() {
       .then(setEntries)
       .catch((err) => setNotice(`读取本地资料库失败：${err instanceof Error ? err.message : String(err)}`));
     void checkForUpdate().then(setUpdate);
+    // pywebview 的 js_api 注入可能晚于 React mount，靠 pywebviewready 事件兜底
+    const checkNative = () => {
+      if (typeof window.pywebview?.api?.pick_dems === "function") setNativeImportReady(true);
+    };
+    checkNative();
+    window.addEventListener("pywebviewready", checkNative);
+    return () => window.removeEventListener("pywebviewready", checkNative);
   }, []);
 
-  const importFiles = useCallback(async (files: Iterable<File>, tags: string[] = []) => {
+  const importFiles = useCallback(async (files: Iterable<File>, tags: string[] = [], initialErrors: string[] = []) => {
     const fileList = [...files];
     const zips = fileList.filter((file) => file.name.toLowerCase().endsWith(".zip"));
     const dems = fileList.filter(isDemFile);
-    if (zips.length === 0 && dems.length === 0) {
+    if (zips.length === 0 && dems.length === 0 && initialErrors.length === 0) {
       setNotice("请选择 .dem 或 cs2-demo-format/2.0 ZIP 文件");
       return;
     }
@@ -55,7 +64,7 @@ export function App() {
     setNotice(null);
     let imported = 0;
     let duplicates = 0;
-    const errors: string[] = [];
+    const errors: string[] = [...initialErrors];
 
     // .dem 先经 exporter 转 ZIP（数据库只存 ZIP）
     if (dems.length > 0) {
@@ -88,13 +97,29 @@ export function App() {
     setImporting(false);
   }, []);
 
+  // 桌面壳：原生文件对话框选 .dem/.zip → 本机 exporter 转 ZIP → 入库
+  const importViaNativeDialog = useCallback(async () => {
+    setImporting(true);
+    setNotice(null);
+    try {
+      const { files, errors } = await pickAndExportDems(setNotice);
+      if (files.length === 0 && errors.length === 0) {
+        setNotice(null); // 用户取消了对话框
+        return;
+      }
+      await importFiles(files, parseTags(importTagsRaw), errors);
+    } finally {
+      setImporting(false);
+    }
+  }, [importFiles, importTagsRaw]);
+
   const loadSample = useCallback(async () => {
     setImporting(true);
     setNotice(null);
     try {
       const response = await fetch(sampleZipUrl);
       const blob = await response.blob();
-      await importFiles([new File([blob], "sample-match.zip", { type: "application/zip" })]);
+      await importFiles([new File([blob], "2026-02-09_de_mirage_FURIA-vs-Team_Vitality_13-11.zip", { type: "application/zip" })]);
     } catch (err) {
       setNotice(`示例加载失败：${err instanceof Error ? err.message : String(err)}`);
       setImporting(false);
@@ -187,6 +212,7 @@ export function App() {
             importTagsRaw={importTagsRaw}
             onImportTagsChange={setImportTagsRaw}
             onImportFiles={importFiles}
+            onNativeImport={nativeImportReady ? importViaNativeDialog : undefined}
             onLoadSample={loadSample}
             onOpenDemo={openDemo}
             onRemoveDemo={handleRemove}
