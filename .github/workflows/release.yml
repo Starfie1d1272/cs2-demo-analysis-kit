@@ -1,0 +1,88 @@
+name: Release
+
+# 打 vX.Y.Z tag 自动构建桌面应用（unsigned）并发布到 GitHub Release：
+#   macOS  → cs2dak-X.Y.Z.dmg + dak-studio-X.Y.Z.dmg
+#   Windows→ cs2dak.exe + dak-studio.exe（zip 直发）
+# 首次打开需绕过 Gatekeeper / SmartScreen，见 Release 描述。
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Package (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # sync-version.mjs 需要 git tag
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 23
+          cache: pnpm
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build desktop packages
+        run: bash scripts/package.sh
+        shell: bash
+
+      - name: Zip Windows executables
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          cd python/dist
+          7z a "cs2dak-windows-${VERSION}.zip" cs2dak.exe
+          7z a "dak-studio-windows-${VERSION}.zip" dak-studio.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.os }}
+          path: |
+            python/dist/*.dmg
+            python/dist/*.zip
+          if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    needs: package
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.dmg
+            dist/*.zip
+          body: |
+            桌面应用未签名（无证书预算），首次打开需要手动放行：
+
+            - **macOS**：系统设置 → 隐私与安全性 → 拉到底点「仍要打开」；或终端执行
+              `xattr -dr com.apple.quarantine "/Applications/DAK Studio.app"`
+            - **Windows**：SmartScreen 警告 → 「更多信息」→「仍要运行」。
+              老版本 Win10 如启动后白屏，需安装 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)。
+          generate_release_notes: true
