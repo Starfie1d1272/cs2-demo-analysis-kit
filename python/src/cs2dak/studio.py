@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import base64
+import os
 import shutil
 import sys
 import tempfile
@@ -29,6 +30,24 @@ if getattr(sys, "frozen", False):
     WEB_DIR = Path(sys._MEIPASS) / "studio_web"
 else:
     WEB_DIR = Path(__file__).parent / "studio_web"
+
+
+def _studio_userdata() -> Path:
+    """Platform-appropriate persistent directory for cookies / IndexedDB / localStorage.
+
+    macOS   → ~/Library/Application Support/DAK Studio/userdata
+    Windows → %APPDATA%/DAK Studio/userdata
+    Other   → ~/.dak-studio/userdata
+    """
+    if sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support" / "DAK Studio"
+    elif sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming")) / "DAK Studio"
+    else:
+        base = Path.home() / ".dak-studio"
+    path = base / "userdata"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 class StudioApi:
@@ -137,7 +156,10 @@ def main() -> None:
     api._window = window
     # http_server=True：以 localhost HTTP 提供 studio_web，保证 IndexedDB
     # 持久化与相对资源（雷达图）在 WKWebView 下行为与浏览器一致。
-    webview.start(http_server=True)
+    # private_mode=False：Windows Edge Chromium 默认隐私模式会把
+    # IndexedDB 等数据存到临时目录，重启丢失；显式关掉后落盘到持久目录。
+    storage = _studio_userdata()
+    webview.start(http_server=True, private_mode=False, storage_path=str(storage))
 
 
 if __name__ == "__main__":
