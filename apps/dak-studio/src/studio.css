@@ -158,6 +158,18 @@ body {
   margin-top: 2px;
 }
 
+.stu-update-link {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--dak-accent);
+  text-decoration: none;
+}
+
+.stu-update-link:hover {
+  text-decoration: underline;
+}
+
 .stu-main {
   min-width: 0;
   padding: 22px 26px 40px;

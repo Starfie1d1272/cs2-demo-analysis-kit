@@ -1,4 +1,4 @@
-import { createReadStream, createWriteStream } from "node:fs";
+import { createReadStream, createWriteStream, readFileSync } from "node:fs";
 import { mkdtemp, readdir, rm, stat, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
@@ -81,6 +81,12 @@ function demExportPlugin(): Plugin {
 
 export default defineConfig({
   base: "./",
+  define: {
+    // 桌面应用版本随 vX.Y.Z tag（scripts/sync-version.mjs 写入 package.json）
+    __APP_VERSION__: JSON.stringify(
+      (JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")) as { version: string }).version
+    ),
+  },
   plugins: [react(), demExportPlugin()],
   server: {
     port: 5178,

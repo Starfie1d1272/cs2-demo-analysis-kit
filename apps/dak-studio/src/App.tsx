@@ -4,6 +4,7 @@ import { importDemoFile, listDemoEntries, removeDemo, updateDemoTags, type Studi
 import { EMPTY_SCOPE, applyScope, type CohortScopeState } from "./components/CohortScope";
 import { detectDemBackend, exportDemToZip, isDemFile } from "./lib/dem";
 import { parseTags } from "./lib/tags";
+import { APP_VERSION, checkForUpdate, type UpdateInfo } from "./lib/update";
 import { LibraryView } from "./views/LibraryView";
 import { MatchView } from "./views/MatchView";
 import { PlayersView } from "./views/PlayersView";
@@ -31,6 +32,7 @@ export function App() {
   const [scope, setScope] = useState<CohortScopeState>(EMPTY_SCOPE);
   // 导入标签输入放在 App：全窗口拖拽导入也要带上
   const [importTagsRaw, setImportTagsRaw] = useState("");
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
   // 稳定数组标识：避免 App 无关重渲染触发档案/排行榜重新聚合
   const scopedEntries = useMemo(() => applyScope(entries, scope), [entries, scope]);
 
@@ -38,6 +40,7 @@ export function App() {
     listDemoEntries()
       .then(setEntries)
       .catch((err) => setNotice(`读取本地资料库失败：${err instanceof Error ? err.message : String(err)}`));
+    void checkForUpdate().then(setUpdate);
   }, []);
 
   const importFiles = useCallback(async (files: Iterable<File>, tags: string[] = []) => {
@@ -159,7 +162,12 @@ export function App() {
         </nav>
         <div className="stu-sidebar-foot">
           <span>{entries.length} 场 demo</span>
-          <small>v2 ZIP · 本地存储</small>
+          <small>v{APP_VERSION} · v2 ZIP · 本地存储</small>
+          {update && (
+            <a className="stu-update-link" href={update.url} target="_blank" rel="noreferrer">
+              新版本 v{update.latest} 可下载
+            </a>
+          )}
         </div>
       </aside>
 
