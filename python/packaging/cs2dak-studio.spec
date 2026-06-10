@@ -36,7 +36,18 @@ else:
 
 binaries = []
 hiddenimports = []
-for pkg in ("demoparser2", "pyarrow"):
+for pkg in (
+    # demoparser2 及其运行时传递依赖（动态加载，静态分析易遗漏）
+    "demoparser2", "pyarrow", "polars", "polars-runtime-32",
+    "pandas", "numpy", "python-dateutil", "tqdm",
+    # jsonschema validate 依赖
+    "jsonschema", "attrs", "referencing", "rpds-py",
+    "jsonschema-specifications",
+    # typer CLI 依赖
+    "typer", "rich", "shellingham",
+    # 常用被动态 import 的标准补充
+    "typing_extensions",
+):
     d, b, h = collect_all(pkg)
     datas += d
     binaries += b
