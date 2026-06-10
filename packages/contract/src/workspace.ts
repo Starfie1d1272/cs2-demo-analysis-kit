@@ -28,6 +28,30 @@ export const workspaceOverviewSchema = z.object({
   story: z.array(z.string())
 });
 
+/** 回合筛选与时间轴用的派生事实（v0.2 query-first），由 presentation 从
+ *  kills/bombs/clutches 一次性算好，React 端只做谓词匹配。 */
+export const workspaceRoundFacetsSchema = z.object({
+  /** 下包点；该回合未下包为 null。 */
+  bombSite: z.enum(["a", "b"]).nullable(),
+  bombPlantTick: z.number().int().positive().nullable(),
+  bombDefuseTick: z.number().int().positive().nullable(),
+  firstKillTick: z.number().int().positive().nullable(),
+  firstKillSteamId64: z.string().nullable(),
+  firstKillTeamKey: teamKeySchema.nullable(),
+  /** 该回合的残局（若有）：clutch start tick 作时间轴锚点。 */
+  clutch: z.object({
+    steamId64: z.string(),
+    teamKey: teamKeySchema,
+    opponentCount: z.number().int().min(1).max(5),
+    won: z.boolean(),
+    tick: z.number().int().positive()
+  }).nullable(),
+  /** 单人单回合最高击杀数（≥3 即多杀回合）。 */
+  maxKillsByOnePlayer: z.number().int().nonnegative(),
+  wallbangKills: z.number().int().nonnegative(),
+  throughSmokeKills: z.number().int().nonnegative()
+});
+
 export const workspaceRoundSchema = z.object({
   roundNumber: z.number().int().positive(),
   scoreBefore: z.string(),
@@ -37,7 +61,9 @@ export const workspaceRoundSchema = z.object({
   teamAEconomy: teamEconomySchema,
   teamBEconomy: teamEconomySchema,
   events: z.array(timelineEventSchema),
-  playerFacts: z.array(playerRoundFactSchema)
+  playerFacts: z.array(playerRoundFactSchema),
+  /** 旧模型可缺省；缺省时回合筛选器自动隐藏对应维度。 */
+  facets: workspaceRoundFacetsSchema.optional()
 });
 
 export const workspacePlayerSchema = z.object({
@@ -151,7 +177,14 @@ export const workspaceKillEventSchema = z.object({
   throughSmoke: z.boolean(),
   noScope: z.boolean(),
   flashAssist: z.boolean(),
-  tradeKill: z.boolean()
+  tradeKill: z.boolean(),
+  /** 击杀连线图层用的 world 坐标；旧模型缺省 null（连线图层降级隐藏）。 */
+  killerX: z.number().nullable().optional().default(null),
+  killerY: z.number().nullable().optional().default(null),
+  killerZ: z.number().nullable().optional().default(null),
+  victimX: z.number().nullable().optional().default(null),
+  victimY: z.number().nullable().optional().default(null),
+  victimZ: z.number().nullable().optional().default(null)
 });
 
 /** 回合内一颗道具的完整生命周期（world 坐标），来自 grenades.json。 */
@@ -164,7 +197,9 @@ export const workspaceReplayGrenadeSchema = z.object({
   throwX: z.number(),
   throwY: z.number(),
   effectX: z.number(),
-  effectY: z.number()
+  effectY: z.number(),
+  /** 效果点 z 高度，双层地图按层过滤用；旧模型缺省 0（恒判上层兜底）。 */
+  effectZ: z.number().optional().default(0)
 });
 
 /** 道具飞行轨迹（v2.3+ 导出包才有），与玩家帧同一时间网格。 */
@@ -172,7 +207,9 @@ export const workspaceReplayProjectileSchema = z.object({
   grenade: grenadeTypeSchema,
   startTick: z.number().int().positive(),
   x: z.array(z.number()),
-  y: z.array(z.number())
+  y: z.array(z.number()),
+  /** 与 x/y 同长的 z 高度序列；旧模型缺省空数组。 */
+  z: z.array(z.number()).optional().default([])
 });
 
 /** C4 掉落期间（world 坐标）：从 dropped 到被捡起/安放之间的地面标记。 */
@@ -180,7 +217,8 @@ export const workspaceReplayGroundBombSchema = z.object({
   startTick: z.number().int().positive(),
   endTick: z.number().int().positive(),
   x: z.number(),
-  y: z.number()
+  y: z.number(),
+  z: z.number().optional().default(0)
 });
 
 /** C4 事件锚点（world 坐标）：plant 之后在落点定格显示。 */
@@ -188,6 +226,7 @@ export const workspaceReplayBombSchema = z.object({
   plantTick: z.number().int().positive(),
   x: z.number(),
   y: z.number(),
+  z: z.number().optional().default(0),
   defuseTick: z.number().int().positive().nullable(),
   explodeTick: z.number().int().positive().nullable()
 });
@@ -239,6 +278,7 @@ export const matchWorkspaceModelSchema = z.object({
 });
 
 export type WorkspaceTab = z.infer<typeof workspaceTabSchema>;
+export type WorkspaceRoundFacets = z.infer<typeof workspaceRoundFacetsSchema>;
 export type WorkspaceKpi = z.infer<typeof workspaceKpiSchema>;
 export type WorkspaceRound = z.infer<typeof workspaceRoundSchema>;
 export type WorkspaceWeaponRow = z.infer<typeof workspaceWeaponRowSchema>;

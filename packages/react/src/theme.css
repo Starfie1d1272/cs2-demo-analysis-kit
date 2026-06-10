@@ -1293,6 +1293,109 @@
   cursor: pointer;
 }
 
+/* v0.2：scrubber 上方的事件锚点（首杀/击杀/下包/拆包），点击跳帧 */
+.dak-scrubber-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.dak-scrubber-wrap .dak-scrubber {
+  width: 100%;
+}
+
+.dak-scrubber-anchors {
+  position: relative;
+  height: 10px;
+}
+
+.dak-scrubber-anchor {
+  position: absolute;
+  top: 0;
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  cursor: pointer;
+  background: var(--dak-text-dim);
+}
+
+.dak-scrubber-anchor-firstkill { background: var(--dak-ok); }
+.dak-scrubber-anchor-kill { background: var(--dak-danger); }
+.dak-scrubber-anchor-bomb { background: var(--dak-warn); }
+.dak-scrubber-anchor-defuse { background: #4db8ff; }
+
+/* v0.3：比赛报告导出按钮 */
+.dak-report-button {
+  margin-top: 8px;
+  background: transparent;
+  border: 1px solid var(--dak-border);
+  border-radius: 8px;
+  color: var(--dak-text-dim, #8b97a5);
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.dak-report-button:hover {
+  border-color: var(--dak-accent);
+  color: var(--dak-accent);
+}
+
+/* v0.2：回合筛选器 */
+.dak-round-filterbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.dak-round-filter-select {
+  background: var(--dak-bg-subtle);
+  color: var(--dak-text);
+  border: 1px solid var(--dak-border);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+/* v0.2：统计跳回放的可点击行/卡片 */
+.dak-timeline-row-link,
+.dak-player-round-card-link {
+  cursor: pointer;
+}
+
+.dak-timeline-row-link:hover,
+.dak-player-round-card-link:hover {
+  background: rgba(47, 224, 168, 0.08);
+}
+
+/* v0.2：走位轨迹与击杀连线图层 */
+.dak-replay-playertrace {
+  fill: none;
+  stroke-width: 0.35;
+  stroke-linejoin: round;
+  opacity: 0.55;
+}
+
+.dak-replay-playertrace-teamA { stroke: var(--dak-team-a, #4db8ff); }
+.dak-replay-playertrace-teamB { stroke: var(--dak-team-b, #ff7a21); }
+
+.dak-replay-killline {
+  stroke: rgba(255, 92, 92, 0.85);
+  stroke-width: 0.3;
+  stroke-dasharray: 1.4 0.9;
+}
+
+.dak-replay-killline-victim {
+  fill: rgba(255, 92, 92, 0.9);
+}
+
 .dak-speed-group {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1351,6 +1454,12 @@
 .dak-replay-token-dead {
   opacity: 0.28;
   filter: grayscale(1);
+}
+
+/* 双层地图：另一层的选手以幽灵态显示，可感知存在但不干扰当前层阅读 */
+.dak-replay-token-offlevel {
+  opacity: 0.22;
+  filter: grayscale(0.65);
 }
 
 .dak-replay-token-flashed {

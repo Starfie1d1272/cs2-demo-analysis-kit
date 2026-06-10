@@ -9,7 +9,7 @@
  * This replaces the previous DOM-span approach which could not render true density.
  */
 import type { DemoViewModel, GrenadeType, HeatmapPoint, Side, TeamKey } from "@cs2dak/contract";
-import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
+import { getMapCalibration, worldToRadar, hasLowerLevel, levelAt, type MapLevel } from "@cs2dak/maps";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 // ── HeatmapRenderer (adapted from simpleheat / CS Demo Manager, BSD-2-Clause) ─
@@ -172,6 +172,9 @@ export function HeatmapCanvas({ map, points, players, mode: controlledMode, onMo
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const calibration = getMapCalibration(map.name);
+  // de_nuke / de_vertigo 双层：按 z 高度把点位拆到上下层分别渲染
+  const dualLevel = !!(calibration && hasLowerLevel(calibration) && map.lowerRadarImageUrl);
+  const [level, setLevel] = useState<MapLevel>("upper");
 
   const counts = useMemo(() => ({
     death:   points.filter((p) => p.kind === "death").length,
@@ -189,6 +192,7 @@ export function HeatmapCanvas({ map, points, players, mode: controlledMode, onMo
         if (sideFilter !== "all" && p.side !== sideFilter) return false;
         if (mode === "grenade" && !matchesGrenadeFilter(p.grenadeType, grenadeFilter)) return false;
         if (selectedSteamIds.size > 0 && p.steamId64 && !selectedSteamIds.has(p.steamId64)) return false;
+        if (dualLevel && levelAt(p.z, cal) !== level) return false;
         return true;
       })
       .flatMap((p) => {
@@ -199,7 +203,7 @@ export function HeatmapCanvas({ map, points, players, mode: controlledMode, onMo
           (radar.y / cal.radarSize) * CANVAS_SIZE,
         ] as [number, number]];
       });
-  }, [points, mode, sideFilter, grenadeFilter, selectedSteamIds, calibration]);
+  }, [points, mode, sideFilter, grenadeFilter, selectedSteamIds, calibration, dualLevel, level]);
 
   // Per-point stamp alpha following CS Demo Manager's approach: target ~10 overlapping
   // events to fully saturate a spot. Floor at 0.1 so isolated events are faintly visible.
@@ -243,6 +247,22 @@ export function HeatmapCanvas({ map, points, players, mode: controlledMode, onMo
               {MODE_LABELS[kind]} <span>{counts[kind]}</span>
             </button>
           ))}
+          {dualLevel && (
+            <div className="dak-heatmap-side-filter" role="radiogroup" aria-label="地图层级">
+              {(["upper", "lower"] as const).map((nextLevel) => (
+                <button
+                  key={nextLevel}
+                  type="button"
+                  role="radio"
+                  aria-checked={level === nextLevel}
+                  className={level === nextLevel ? "dak-sf-chip dak-sf-chip-active" : "dak-sf-chip"}
+                  onClick={() => setLevel(nextLevel)}
+                >
+                  {nextLevel === "upper" ? "上层" : "下层"}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="dak-heatmap-side-filter" role="radiogroup" aria-label="阵营">
             {(["all", "ct", "t"] as const).map((s) => (
               <button
@@ -306,7 +326,10 @@ export function HeatmapCanvas({ map, points, players, mode: controlledMode, onMo
       {/* ── Radar image + canvas ── */}
       <div
         className="dak-heatmap"
-        style={map.radarImageUrl ? { backgroundImage: `url(${map.radarImageUrl})` } : undefined}
+        style={(() => {
+          const url = dualLevel && level === "lower" ? map.lowerRadarImageUrl : map.radarImageUrl;
+          return url ? { backgroundImage: `url(${url})` } : undefined;
+        })()}
       >
         {!map.radarImageUrl && <SchematicRadar mapName={map.name} />}
         <canvas ref={canvasRef} className="dak-heatmap-canvas" aria-hidden="true" />

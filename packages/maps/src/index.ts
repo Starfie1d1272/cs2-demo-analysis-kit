@@ -39,6 +39,19 @@ export function getMapCalibration(mapName: string): MapCalibration | null {
   return MAP_CALIBRATIONS[mapName] ?? null;
 }
 
+export type MapLevel = "upper" | "lower";
+
+/** 该地图是否有上下双层雷达（de_nuke / de_vertigo）。 */
+export function hasLowerLevel(calibration: MapCalibration): boolean {
+  return calibration.lowerLevelMaxUnits != null;
+}
+
+/** 按 z 高度判定实体属于上层还是下层；单层地图恒为 "upper"。 */
+export function levelAt(z: number, calibration: MapCalibration): MapLevel {
+  if (calibration.lowerLevelMaxUnits == null) return "upper";
+  return z < calibration.lowerLevelMaxUnits ? "lower" : "upper";
+}
+
 export function worldToRadar(
   point: { x: number; y: number },
   calibration: MapCalibration

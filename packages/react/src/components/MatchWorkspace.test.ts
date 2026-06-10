@@ -65,7 +65,7 @@ const model: MatchWorkspaceModel = {
     ]
   },
   map: {
-    view: { name: "de_ancient", radarImageUrl: "/maps/radars/de_ancient.png", calibrated: true },
+    view: { name: "de_ancient", radarImageUrl: "/maps/radars/de_ancient.png", lowerRadarImageUrl: null, calibrated: true },
     modes: [],
     points: [],
     status: { hasRadar: true, hasPositionData: false, message: "该导出包暂无可展示的位置数据" }

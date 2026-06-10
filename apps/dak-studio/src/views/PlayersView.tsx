@@ -1,7 +1,12 @@
 import { Star } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { PlayerSeasonProfile } from "@cs2dak/contract";
-import { SEASON_STAT_VIEWS } from "@cs2dak/presentation";
+import {
+  SEASON_STAT_VIEWS,
+  buildPlayerSeasonInsights,
+  type PlayerSeasonInsights,
+  type SeasonInsightsDemo
+} from "@cs2dak/presentation";
 import { getSeasonData } from "../lib/season";
 import { matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
@@ -40,6 +45,7 @@ export function PlayersView({
   onGoLibrary
 }: PlayersViewProps) {
   const [profiles, setProfiles] = useState<PlayerSeasonProfile[] | null>(null);
+  const [demos, setDemos] = useState<SeasonInsightsDemo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pinned, setPinned] = useState<PinnedPlayer | null>(() => getPinnedPlayer());
   const [compareKey, setCompareKey] = useState<string | null>(null);
@@ -56,6 +62,7 @@ export function PlayersView({
       .then((data) => {
         if (!cancelled) {
           setProfiles([...data.profiles].sort((a, b) => b.rating.rivalhubRR - a.rating.rivalhubRR));
+          setDemos(data.demos);
         }
       })
       .catch((err) => {
@@ -88,6 +95,12 @@ export function PlayersView({
   const entryByMatchId = useMemo(
     () => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])),
     [entries]
+  );
+
+  // v0.3 洞察：趋势 / Flash Value / Mistake Review（与档案同源的 demos 派生）
+  const insights = useMemo<PlayerSeasonInsights | null>(
+    () => (selected && demos.length > 0 ? buildPlayerSeasonInsights(demos, selected.steamIds) : null),
+    [demos, selected]
   );
 
   if (allEntries.length === 0) {
@@ -147,6 +160,21 @@ export function PlayersView({
 
   const trendMax = Math.max(...selected.perMatch.map((m) => m.rivalhubRR), 0.01);
   const playerMatches = [...selected.perMatch].reverse();
+  const openMatchById = (matchId: string) => {
+    const entry = entryByMatchId.get(matchId);
+    if (entry) onOpenMatch(entry.id);
+  };
+
+  const exportPlayerCard = () => {
+    const md = buildPlayerCardMarkdown(selected, insights);
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${selected.name}-选手图卡.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="stu-view">
@@ -198,6 +226,9 @@ export function PlayersView({
               <small className="stu-dim">
                 {selected.mapCount} 场 · 置信度 {(selected.confidence * 100).toFixed(0)}%
               </small>
+              <button type="button" className="stu-button stu-button-ghost" onClick={exportPlayerCard}>
+                导出选手图卡 (Markdown)
+              </button>
             </div>
             <div className="stu-rating-cards">
               <div className="stu-rating-card stu-rating-card-primary">
@@ -320,6 +351,92 @@ export function PlayersView({
               </table>
             </div>
 
+            {selected.style && (
+              <div className="stu-card">
+                <h3>Playstyle Fingerprint</h3>
+                <FingerprintRadar axes={selected.style.axes} />
+              </div>
+            )}
+
+            {insights && (
+              <div className="stu-card">
+                <h3>Flash Value</h3>
+                <div className="stu-metric-grid">
+                  <div className="stu-metric"><span>投掷闪光</span><b>{insights.flash.flashesThrown}</b></div>
+                  <div className="stu-metric"><span>致盲敌方</span><b>{insights.flash.enemyBlindSeconds.toFixed(1)}s</b></div>
+                  <div className="stu-metric"><span>致盲队友</span><b>{insights.flash.teamBlindSeconds.toFixed(1)}s</b></div>
+                  <div className="stu-metric" title="（敌方 - 友方）致盲秒数 / 投掷数">
+                    <span>净价值/颗</span>
+                    <b>{insights.flash.netSecondsPerFlash == null ? "—" : `${insights.flash.netSecondsPerFlash.toFixed(2)}s`}</b>
+                  </div>
+                  <div className="stu-metric"><span>闪光助攻</span><b>{insights.flash.flashAssists}</b></div>
+                </div>
+                {insights.flash.worstTeamFlashes.length > 0 && (
+                  <>
+                    <h4 className="stu-subhead">最严重队闪</h4>
+                    <div className="stu-evidence-list">
+                      {insights.flash.worstTeamFlashes.slice(0, 5).map((incident, i) => (
+                        <button
+                          key={`${incident.matchId}-${incident.roundNumber}-${i}`}
+                          type="button"
+                          className="stu-evidence"
+                          disabled={!entryByMatchId.get(incident.matchId)}
+                          onClick={() => openMatchById(incident.matchId)}
+                          title="打开该场比赛复盘"
+                        >
+                          R{incident.roundNumber} · 闪到 {incident.victimCount} 名队友 {incident.totalSeconds.toFixed(1)}s
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {insights && (
+              <div className="stu-card">
+                <h3>Mistake Review</h3>
+                <div className="stu-metric-grid">
+                  <div className="stu-metric" title="eco/半起/强起局中本队首死">
+                    <span>低买局首死</span>
+                    <b>{insights.mistakes.lowBuyFirstDeaths.count}/{insights.mistakes.lowBuyFirstDeaths.attempts} 局</b>
+                  </div>
+                  <div className="stu-metric"><span>残局失利</span><b>{insights.mistakes.clutchLosses.count}</b></div>
+                  <div className="stu-metric" title="开局 20 秒内 / 中段 / 50 秒后">
+                    <span>死亡分布</span>
+                    <b>
+                      {insights.mistakes.deathTiming.total > 0
+                        ? `${insights.mistakes.deathTiming.early}早/${insights.mistakes.deathTiming.mid}中/${insights.mistakes.deathTiming.late}晚`
+                        : "—"}
+                    </b>
+                  </div>
+                </div>
+                {[...insights.mistakes.lowBuyFirstDeaths.evidence, ...insights.mistakes.clutchLosses.evidence].length > 0 && (
+                  <div className="stu-evidence-list">
+                    {[...insights.mistakes.lowBuyFirstDeaths.evidence.slice(0, 4), ...insights.mistakes.clutchLosses.evidence.slice(0, 4)].map((evidence, i) => (
+                      <button
+                        key={`${evidence.matchId}-${evidence.roundNumber}-${i}`}
+                        type="button"
+                        className="stu-evidence"
+                        disabled={!entryByMatchId.get(evidence.matchId)}
+                        onClick={() => openMatchById(evidence.matchId)}
+                        title="打开该场比赛复盘"
+                      >
+                        R{evidence.roundNumber} · {evidence.detail}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {insights && insights.trend.length > 1 && (
+              <div className="stu-card stu-card-wide">
+                <h3>个人趋势</h3>
+                <TrendChart trend={insights.trend} />
+              </div>
+            )}
+
             <div className="stu-card stu-card-wide">
               <h3>每场 RR 走势</h3>
               <div className="stu-trend">
@@ -374,6 +491,126 @@ export function PlayersView({
       </div>
     </div>
   );
+}
+
+/** PRISM 八维风格雷达（SVG 八边形）。 */
+function FingerprintRadar({ axes }: { axes: { key: string; label: string; percentile: number }[] }) {
+  const size = 220;
+  const center = size / 2;
+  const radius = size / 2 - 34;
+  const point = (index: number, fraction: number) => {
+    const angle = (Math.PI * 2 * index) / axes.length - Math.PI / 2;
+    return [center + Math.cos(angle) * radius * fraction, center + Math.sin(angle) * radius * fraction] as const;
+  };
+  const ringPath = (fraction: number) =>
+    axes.map((_, i) => point(i, fraction).join(",")).join(" ");
+  const valuePath = axes.map((axis, i) => point(i, Math.max(0.04, axis.percentile / 100)).join(",")).join(" ");
+
+  return (
+    <svg viewBox={`0 0 ${size} ${size}`} className="stu-radar" role="img" aria-label="风格雷达">
+      {[0.25, 0.5, 0.75, 1].map((fraction) => (
+        <polygon key={fraction} className="stu-radar-ring" points={ringPath(fraction)} />
+      ))}
+      {axes.map((_, i) => {
+        const [x, y] = point(i, 1);
+        return <line key={i} className="stu-radar-spoke" x1={center} y1={center} x2={x} y2={y} />;
+      })}
+      <polygon className="stu-radar-value" points={valuePath} />
+      {axes.map((axis, i) => {
+        const [x, y] = point(i, 1.16);
+        return (
+          <text key={axis.key} className="stu-radar-label" x={x} y={y} textAnchor="middle" dominantBaseline="middle">
+            {axis.label} P{axis.percentile.toFixed(0)}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
+const TREND_METRICS = [
+  { key: "adr", label: "ADR", format: (v: number) => v.toFixed(1) },
+  { key: "kast", label: "KAST%", format: (v: number) => v.toFixed(1) },
+  { key: "fkMinusFd", label: "FK-FD", format: (v: number) => v.toFixed(0) },
+  { key: "utilityDamagePerRound", label: "Util/R", format: (v: number) => v.toFixed(2) }
+] as const;
+type TrendMetricKey = (typeof TREND_METRICS)[number]["key"];
+
+/** 个人趋势折线（SVG），指标可切换；按导入顺序（matchId 升序）排布。 */
+function TrendChart({ trend }: { trend: PlayerSeasonInsights["trend"] }) {
+  const [metric, setMetric] = useState<TrendMetricKey>("adr");
+  const spec = TREND_METRICS.find((m) => m.key === metric)!;
+  const values = trend.map((point) => point[metric]);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = Math.max(max - min, 0.0001);
+  const width = 100;
+  const height = 36;
+  const pad = 4;
+  const coords = values.map((value, i) => {
+    const x = trend.length > 1 ? pad + ((width - pad * 2) * i) / (trend.length - 1) : width / 2;
+    const y = height - pad - ((height - pad * 2) * (value - min)) / span;
+    return [x, y] as const;
+  });
+
+  return (
+    <div>
+      <div className="stu-trend-tabs" role="radiogroup" aria-label="趋势指标">
+        {TREND_METRICS.map((m) => (
+          <button
+            key={m.key}
+            type="button"
+            role="radio"
+            aria-checked={metric === m.key}
+            className={metric === m.key ? "stu-subtab stu-subtab-active" : "stu-subtab"}
+            onClick={() => setMetric(m.key)}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="stu-trend-chart" preserveAspectRatio="none" role="img" aria-label={`${spec.label} 趋势`}>
+        <polyline className="stu-trend-line" points={coords.map((c) => c.join(",")).join(" ")} />
+        {coords.map(([x, y], i) => (
+          <circle key={i} className="stu-trend-dot" cx={x} cy={y} r={1.1}>
+            <title>{`${trend[i].mapName} · ${spec.label} ${spec.format(values[i])}`}</title>
+          </circle>
+        ))}
+      </svg>
+      <div className="stu-trend-range stu-dim">
+        <small>{spec.label}：{spec.format(min)} – {spec.format(max)} · {trend.length} 场</small>
+      </div>
+    </div>
+  );
+}
+
+/** 选手图卡 Markdown（主办方发布用）。 */
+function buildPlayerCardMarkdown(profile: PlayerSeasonProfile, insights: PlayerSeasonInsights | null): string {
+  const lines: string[] = [];
+  lines.push(`# ${profile.name} · 选手图卡`);
+  lines.push("");
+  lines.push(`${profile.mapCount} 场 · RivalHub RR **${profile.rating.rivalhubRR.toFixed(2)}** · Rating 2.0 **${profile.rating.hltvRating.toFixed(2)}**（P${profile.rating.hltvPercentile.toFixed(0)}）`);
+  lines.push("");
+  if (profile.strengths.length > 0) lines.push(`**强项**：${profile.strengths.join("、")}`);
+  if (profile.weaknesses.length > 0) lines.push(`**弱项**：${profile.weaknesses.join("、")}`);
+  lines.push("");
+  lines.push("| 指标 | 数值 |");
+  lines.push("|---|---|");
+  for (const column of CORE_COLUMNS) {
+    lines.push(`| ${column.label} | ${formatMetric(profile.metrics[column.key] ?? null, column.format)} |`);
+  }
+  if (profile.style) {
+    lines.push("");
+    lines.push("**PRISM 风格**：" + profile.style.axes.map((axis) => `${axis.label} P${axis.percentile.toFixed(0)}`).join(" · "));
+  }
+  if (insights) {
+    lines.push("");
+    lines.push(`**Flash Value**：投 ${insights.flash.flashesThrown} 颗，致盲敌方 ${insights.flash.enemyBlindSeconds.toFixed(1)}s / 队友 ${insights.flash.teamBlindSeconds.toFixed(1)}s` +
+      (insights.flash.netSecondsPerFlash != null ? `，净价值 ${insights.flash.netSecondsPerFlash.toFixed(2)}s/颗` : ""));
+  }
+  lines.push("");
+  lines.push("---\n由 DAK Studio 生成");
+  return lines.join("\n");
 }
 
 /** 双选手并排对比：核心指标 + 六账户 + PRISM。条形以两人较大值归一。 */

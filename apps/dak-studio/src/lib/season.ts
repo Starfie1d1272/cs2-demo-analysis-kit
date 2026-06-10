@@ -19,6 +19,8 @@ export interface SeasonData {
   bundle: SeasonCohortBundle;
   leaderboard: SeasonLeaderboardModel;
   profiles: PlayerSeasonProfile[];
+  /** 与 cohort 同源的 {matchId, pkg} 列表，供 v0.3 insights 派生复用。 */
+  demos: { matchId: string; pkg: Awaited<ReturnType<typeof getDemoPackage>> }[];
 }
 
 let cacheKey = "";
@@ -44,7 +46,8 @@ export function getSeasonData(entries: StudioDemoEntry[]): Promise<SeasonData> {
     return {
       bundle,
       leaderboard: buildSeasonLeaderboardModel(bundle),
-      profiles: buildAllPlayerSeasonProfiles(bundle)
+      profiles: buildAllPlayerSeasonProfiles(bundle),
+      demos
     };
   })();
   cachePromise.catch(() => {

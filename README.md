@@ -77,3 +77,7 @@ See [docs/module-boundaries.md](docs/module-boundaries.md) for module ownership,
 ## Reference Inspirations
 
 Informed by, but not copied from: [CS Demo Manager](https://github.com/akiver/cs-demo-manager) (workspace structure), [AWPy](https://github.com/pnxenopoulos/awpy) (analysis rigor), [CS2 2D Demo Viewer](https://github.com/sparkoo/csgo-2d-demo-viewer) (replay frame models), [pr1maly](https://github.com/pr1malator/pr1maly) (local-first ideas; non-commercial license, product research only).
+
+## License
+
+MIT（仓库整体，含 Python exporter）。第三方移植与改编代码的出处见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。

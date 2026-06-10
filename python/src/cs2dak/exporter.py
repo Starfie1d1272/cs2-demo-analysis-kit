@@ -29,15 +29,22 @@ EXPORTER_NAME = "cs2-demo-analysis-kit"
 
 # ── public API ───────────────────────────────────────────────────────────────
 
-def export_demo(dem_path: str) -> bytes:
-    """Parse dem_path and return the cs2-demo-format v2 zip as bytes."""
+def export_demo(dem_path: str, progress=None) -> bytes:
+    """Parse dem_path and return the cs2-demo-format v2 zip as bytes.
+
+    progress: optional ``(stage: str, frac: float)`` callback. Parsing maps to
+    [0, 0.95]; ZIP assembly fills the tail.
+    """
     from .parse_worker import parse_demo
 
     try:
         demo_hash: str | None = _sha256_hex(dem_path)
     except Exception:
         demo_hash = None
-    raw: dict[str, Any] = parse_demo(dem_path)
+    scaled = (lambda stage, frac: progress(stage, frac * 0.95)) if progress else None
+    raw: dict[str, Any] = parse_demo(dem_path, progress=scaled)
+    if progress:
+        progress("生成 ZIP", 0.96)
     return _assemble_zip(raw, dem_path, demo_hash)
 
 

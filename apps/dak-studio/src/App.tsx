@@ -11,6 +11,7 @@ import { PlayersView } from "./views/PlayersView";
 import { LeaderboardView } from "./views/LeaderboardView";
 import { TrailsView } from "./views/TrailsView";
 import { ComingSoonView } from "./views/ComingSoonView";
+import { TournamentDashboardView } from "./views/TournamentDashboardView";
 import sampleZipUrl from "../../../fixtures/input/sample-match.zip?url";
 
 // 八模块信息架构（docs/roadmap.md），未实现的模块以「制作中」占位展示
@@ -41,10 +42,17 @@ const PLAYER_TABS = [
 ] as const;
 type PlayerTab = (typeof PLAYER_TABS)[number]["key"];
 
+const TOURNAMENT_TABS = [
+  { key: "leaderboard", label: "排行榜" },
+  { key: "dashboard", label: "赛事总览" }
+] as const;
+type TournamentTab = (typeof TOURNAMENT_TABS)[number]["key"];
+
 export function App() {
   const [entries, setEntries] = useState<StudioDemoEntry[]>([]);
   const [view, setView] = useState<StudioView>("library");
   const [playerTab, setPlayerTab] = useState<PlayerTab>("profile");
+  const [tournamentTab, setTournamentTab] = useState<TournamentTab>("leaderboard");
   const [selectedDemoId, setSelectedDemoId] = useState<string | null>(null);
   const [selectedPlayerKey, setSelectedPlayerKey] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
@@ -83,7 +91,7 @@ export function App() {
       for (const [index, dem] of dems.entries()) {
         try {
           setNotice(`正在导出 ${dem.name}…（${index + 1}/${dems.length}，demo 解析需要一点时间）`);
-          zips.push(await exportDemToZip(dem, backend));
+          zips.push(await exportDemToZip(dem, backend, setNotice));
         } catch (err) {
           errors.push(err instanceof Error ? err.message : String(err));
         }
@@ -337,14 +345,40 @@ export function App() {
           />
         )}
         {view === "tournament" && (
-          <LeaderboardView
-            allEntries={entries}
-            entries={scopedEntries}
-            scope={scope}
-            onScopeChange={setScope}
-            onPlayerClick={openPlayer}
-            onGoLibrary={() => setView("library")}
-          />
+          <>
+            <div className="stu-subtabs" role="tablist" aria-label="赛事中台">
+              {TOURNAMENT_TABS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={tournamentTab === key}
+                  className={tournamentTab === key ? "stu-subtab stu-subtab-active" : "stu-subtab"}
+                  onClick={() => setTournamentTab(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {tournamentTab === "leaderboard" ? (
+              <LeaderboardView
+                allEntries={entries}
+                entries={scopedEntries}
+                scope={scope}
+                onScopeChange={setScope}
+                onPlayerClick={openPlayer}
+                onGoLibrary={() => setView("library")}
+              />
+            ) : (
+              <TournamentDashboardView
+                allEntries={entries}
+                entries={scopedEntries}
+                scope={scope}
+                onScopeChange={setScope}
+                onGoLibrary={() => setView("library")}
+              />
+            )}
+          </>
         )}
       </main>
     </div>

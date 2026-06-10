@@ -16,38 +16,38 @@
 | # | 模块 | 状态 | 说明 |
 |---|------|------|------|
 | 1 | Ingest & Data QA | ✅ 基本完成 | .dem/ZIP 导入、hash 幂等、标签、QA badge、strict validator |
-| 2 | Demo Explorer（2D 回合浏览器） | 🟡 部分 | 回合/经济表、2D 回放、道具效果、C4 已有；缺回合筛选器与图层开关 |
-| 3 | Personal Lab（个人打法） | 🟡 部分 | 选手档案、开局动线已有；缺趋势曲线与 Mistake Review |
+| 2 | Demo Explorer（2D 回合浏览器） | ✅ 基本完成 | 回合筛选器、统计跳回放、时间轴锚点、图层开关、双层雷达（0.3.0） |
+| 3 | Personal Lab（个人打法） | ✅ 基本完成 | 档案、动线、趋势曲线、Fingerprint、Mistake Review（0.3.0） |
 | 4 | Duel & Mechanics Lab | ⬜ 未开始 | 依赖 shots.json（格式已支持，导出未接） |
-| 5 | Utility Lab | 🟡 部分 | 动线道具叠加已有；缺 flash value / 负收益道具分析 |
-| 6 | Economy & Round Flow | 🟡 部分 | 经济 timeline 已有；缺 buy quality 汇总与回合 swing |
-| 7 | Tournament Hub（高校赛事中台） | 🟡 部分 | 排行榜、season/cohort、RR 已有；缺赛事报表与图卡导出 |
+| 5 | Utility Lab | 🟡 部分 | Flash Value 已有（0.3.0）；缺 lineup library 与落点热力 |
+| 6 | Economy & Round Flow | 🟡 部分 | 经济 timeline + buy quality 已有（0.3.0）；缺回合 swing |
+| 7 | Tournament Hub（高校赛事中台） | ✅ 基本完成 | 排行榜、赛事总览、比赛报告与选手图卡导出（0.3.0） |
 | 8 | Coach / Analyst Workbench | ⬜ 远期 | pattern finder / playbook / anti-strat / veto lite |
 
 ## v0.2 — 单场证据闭环（下一个里程碑）
 
-- [ ] **回合筛选器**：地图 / side / 经济类型 / 胜负 / 首杀方 / 下包点 / endReason /
+- [x] **回合筛选器**：地图 / side / 经济类型 / 胜负 / 首杀方 / 下包点 / endReason /
       clutch / multi-kill / 穿烟穿墙 / 指定选手参与（模块 2 的 query-first 最小实现）
-- [ ] **统计跳回放**：选手档案与对位表中的数字（首死、补枪、残局…）可点击 →
+- [x] **统计跳回放**：选手档案与对位表中的数字（首死、补枪、残局…）可点击 →
       直接落到对应回合的 2D 回放并定位 tick
-- [ ] **2D 时间轴**：每回合 freeze end / 首次接触 / 首杀 / 下包拆包 / clutch start 锚点
-- [ ] **地图图层开关**：走位 trace / kill line / 道具 throw→effect / 热力图按需叠加
-- [ ] **de_nuke / de_vertigo 双层切换**（`*_lower.png` 资产已就位，calibration 有
+- [x] **2D 时间轴**：每回合 freeze end / 首次接触 / 首杀 / 下包拆包 / clutch start 锚点
+- [x] **地图图层开关**：走位 trace / kill line / 道具 throw→effect / 热力图按需叠加
+- [x] **de_nuke / de_vertigo 双层切换**（`*_lower.png` 资产已就位，calibration 有
       `lowerLevelMaxUnits`，渲染端未实现）
 
 ## v0.3 — 个人成长与赛事中台
 
-- [ ] **个人趋势**：ADR / KAST / FK-FD 差值 / utility 价值 / clutch 胜率按比赛时间序列
-- [ ] **Playstyle Fingerprint**：entry 倾向 / trade 参与 / 道具贡献 / 残局倾向 /
+- [x] **个人趋势**：ADR / KAST / FK-FD 差值 / utility 价值 / clutch 胜率按比赛时间序列
+- [x] **Playstyle Fingerprint**：entry 倾向 / trade 参与 / 道具贡献 / 残局倾向 /
       存活习惯雷达图（开局动线已是雏形）
-- [ ] **Mistake Review（证据化）**：队闪 Top10、负收益 flash、force buy 首死率、
+- [x] **Mistake Review（证据化）**：队闪 Top10、负收益 flash、force buy 首死率、
       死亡时间分布——每条结论附可点击回合列表
-- [ ] **Flash Value**：每颗闪 enemy/team flashed seconds、net value、是否转化击杀
+- [x] **Flash Value**：每颗闪 enemy/team flashed seconds、net value、是否转化击杀
       （`blinds.json` + `enemyFlashDuration` 字段已在合同）
-- [ ] **Buy Quality**：full/force/eco/conversion 胜率链、kit/helmet 覆盖率、经济断点
-- [ ] **赛事报表导出**：match report（half-by-half、momentum、key rounds）与
+- [x] **Buy Quality**：full/force/eco/conversion 胜率链、kit/helmet 覆盖率、经济断点
+- [x] **赛事报表导出**：match report（half-by-half、momentum、key rounds）与
       选手图卡（PNG / Markdown），服务高校赛事主办方发布
-- [ ] **Tournament Dashboard**：地图使用率、T/CT 胜率、pistol/conversion 胜率、
+- [x] **Tournament Dashboard**：地图使用率、T/CT 胜率、pistol/conversion 胜率、
       最佳选手榜（cohort 聚合已有，缺产品化页面）
 
 ## v0.4 — 硬核机制与模式识别

@@ -18,11 +18,15 @@
 from __future__ import annotations
 
 import base64
+import logging
 import os
 import shutil
 import sys
 import tempfile
+import threading
+import time
 import urllib.parse
+import uuid
 from pathlib import Path
 
 from cs2dak import __version__
@@ -85,11 +89,59 @@ def _studio_userdata() -> Path:
     return path
 
 
+log = logging.getLogger("cs2dak.studio")
+
+
+def _setup_logging(userdata: Path) -> None:
+    """File log in the userdata dir + stderr. The log is the user-facing
+    answer to "解析到底开始了没有" when the UI looks stuck."""
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+    try:
+        handlers.append(logging.FileHandler(userdata / "studio.log", encoding="utf-8"))
+    except OSError:
+        pass
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        handlers=handlers,
+    )
+
+
+class _ExportJob:
+    """One background .dem→ZIP export. Status is polled over the JS bridge
+    with tiny payloads; the resulting ZIP is fetched in bounded base64 chunks
+    so no single bridge message can grow with file size."""
+
+    def __init__(self, path: str) -> None:
+        self.id = uuid.uuid4().hex
+        self.path = path
+        self.started = time.monotonic()
+        self.state = "running"  # running | done | error
+        self.stage = "排队中"
+        self.progress = 0.0
+        self.error: str | None = None
+        self.file_name: str | None = None
+        self.result_b64: str | None = None
+
+    def status(self) -> dict:
+        return {
+            "id": self.id,
+            "state": self.state,
+            "stage": self.stage,
+            "progress": round(self.progress, 3),
+            "elapsedSeconds": round(time.monotonic() - self.started, 1),
+            "error": self.error,
+            "fileName": self.file_name,
+            "resultSize": len(self.result_b64) if self.result_b64 else 0,
+        }
+
+
 class StudioApi:
     """Bridge exposed to the Studio frontend as window.pywebview.api.*"""
 
     def __init__(self) -> None:
         self._window = None  # set in main() after window creation
+        self._jobs: dict[str, _ExportJob] = {}
 
     # --- info -----------------------------------------------------------
     def get_version(self) -> str:
@@ -115,7 +167,75 @@ class StudioApi:
             result = self._window.create_file_dialog(
                 webview.FileDialog.OPEN, allow_multiple=True
             )
-        return list(result or [])
+        paths = list(result or [])
+        log.info("pick_dems: %d 个文件 %s", len(paths), paths)
+        return paths
+
+    # --- async export jobs（0.3.0：避免长阻塞 bridge 调用与超大单条回传） ---
+    def start_export_job(self, path: str) -> dict:
+        """Start a background .dem→ZIP export; returns {jobId} immediately.
+
+        Poll get_export_status(jobId); when state == "done" pull the ZIP with
+        get_export_result_chunk. .zip files pass through without the exporter.
+        """
+        job = _ExportJob(path)
+        self._jobs[job.id] = job
+        log.info("export job %s start: %s", job.id, path)
+        threading.Thread(target=self._run_export_job, args=(job,), daemon=True).start()
+        return {"jobId": job.id}
+
+    def _run_export_job(self, job: _ExportJob) -> None:
+        from cs2dak.cli import _build_zip_name
+        from cs2dak.exporter import export_demo
+
+        dem = Path(job.path)
+        try:
+            if dem.suffix.lower() == ".zip":
+                job.stage = "读取 ZIP"
+                data = dem.read_bytes()
+                job.file_name = dem.name
+            else:
+                last_logged = [0.0]
+
+                def on_progress(stage: str, frac: float) -> None:
+                    job.stage = stage
+                    job.progress = frac
+                    if frac - last_logged[0] >= 0.1:
+                        last_logged[0] = frac
+                        log.info("export job %s %s %.0f%%", job.id, stage, frac * 100)
+
+                data = export_demo(str(dem), progress=on_progress)
+                job.file_name = _build_zip_name(dem, data)
+            job.result_b64 = base64.b64encode(data).decode("ascii")
+            job.progress = 1.0
+            job.state = "done"
+            job.stage = "完成"
+            log.info("export job %s done: %s (%.1fs, %d bytes)", job.id,
+                     job.file_name, time.monotonic() - job.started, len(data))
+        except Exception as exc:  # noqa: BLE001 - surface parse failures to the UI
+            job.state = "error"
+            job.error = str(exc)
+            log.exception("export job %s failed: %s", job.id, job.path)
+
+    def get_export_status(self, job_id: str) -> dict:
+        job = self._jobs.get(job_id)
+        if job is None:
+            return {"id": job_id, "state": "error", "error": "未知任务",
+                    "stage": "", "progress": 0, "elapsedSeconds": 0,
+                    "fileName": None, "resultSize": 0}
+        return job.status()
+
+    def get_export_result_chunk(self, job_id: str, offset: int, size: int) -> dict:
+        """Return base64 substring [offset, offset+size); chunked so each
+        bridge message stays small. The job is dropped after the last chunk."""
+        job = self._jobs.get(job_id)
+        if job is None or job.result_b64 is None:
+            return {"ok": False, "error": "任务结果不存在"}
+        chunk = job.result_b64[offset: offset + size]
+        done = offset + size >= len(job.result_b64)
+        if done:
+            self._jobs.pop(job_id, None)
+        return {"ok": True, "data": chunk, "done": done}
 
     def export_dem_path(self, path: str) -> dict:
         """Export one .dem to a v2 ZIP and return its bytes base64-encoded.
@@ -199,6 +319,10 @@ def main() -> None:
     """gui-script entry point (see pyproject [project.gui-scripts])."""
     import webview
 
+    storage = _studio_userdata()
+    _setup_logging(storage)
+    log.info("DAK Studio %s 启动，userdata=%s", __version__, storage)
+
     index = WEB_DIR / "index.html"
     if not index.exists():
         raise SystemExit(
@@ -221,7 +345,6 @@ def main() -> None:
     # 持久化与相对资源（雷达图）在 WKWebView 下行为与浏览器一致。
     # private_mode=False：Windows Edge Chromium 默认隐私模式会把
     # IndexedDB 等数据存到临时目录，重启丢失；显式关掉后落盘到持久目录。
-    storage = _studio_userdata()
     webview.start(http_server=True, private_mode=False, storage_path=str(storage))
 
 

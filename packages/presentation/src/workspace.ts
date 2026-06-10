@@ -15,7 +15,7 @@ import {
 import { groupBy, nameForSteamId, round, normalizeWeapon, isNamedWeapon } from "./workspace-utils.js";
 import { displayWeaponName } from "./weapons.js";
 import { analyzeDemoPackage, normalizeDemoPackage } from "@cs2dak/core";
-import { getMapCalibration } from "@cs2dak/maps";
+import { getMapCalibration, hasLowerLevel } from "@cs2dak/maps";
 
 export function buildDemoViewModel(bundle: AnalysisBundle) {
   return {
@@ -24,6 +24,7 @@ export function buildDemoViewModel(bundle: AnalysisBundle) {
     map: {
       name: bundle.mapName,
       radarImageUrl: radarImageUrlForMap(bundle.mapName),
+      lowerRadarImageUrl: lowerRadarImageUrlForMap(bundle.mapName),
       calibrated: bundle.heatmap.length > 0
     },
     scoreline: `${bundle.teams.teamA.score}:${bundle.teams.teamB.score}`,
@@ -83,7 +84,8 @@ export function buildMatchWorkspaceModel(input: unknown): MatchWorkspaceModel {
       teamAEconomy: roundRow.teamAEconomy,
       teamBEconomy: roundRow.teamBEconomy,
       events: eventsByRound.get(roundRow.roundNumber) ?? [],
-      playerFacts: factsByRound.get(roundRow.roundNumber) ?? []
+      playerFacts: factsByRound.get(roundRow.roundNumber) ?? [],
+      facets: buildRoundFacets(pkg, roundRow.roundNumber)
     })),
     players: bundle.scoreboard.map((row) => ({
       row,
@@ -106,6 +108,45 @@ export function buildMatchWorkspaceModel(input: unknown): MatchWorkspaceModel {
     replay: buildWorkspaceReplay(pkg),
     adminQa: bundle.qa
   });
+}
+
+/** 回合筛选与时间轴锚点的派生事实（v0.2 query-first）。 */
+function buildRoundFacets(pkg: DemoPackage, roundNumber: number) {
+  const kills = pkg.kills
+    .filter((kill) => kill.roundNumber === roundNumber)
+    .sort((a, b) => a.tick - b.tick);
+  const bombs = pkg.bombs.filter((bomb) => bomb.roundNumber === roundNumber);
+  const plant = bombs.find((bomb) => bomb.type === "planted") ?? null;
+  const defuse = bombs.find((bomb) => bomb.type === "defused") ?? null;
+  const clutch = pkg.clutches.find((row) => row.roundNumber === roundNumber) ?? null;
+  const firstKill = kills[0] ?? null;
+
+  const killsByPlayer = new Map<string, number>();
+  for (const kill of kills) {
+    if (!kill.killerSteamId64 || kill.killerTeamKey === kill.victimTeamKey) continue;
+    killsByPlayer.set(kill.killerSteamId64, (killsByPlayer.get(kill.killerSteamId64) ?? 0) + 1);
+  }
+
+  return {
+    bombSite: plant?.site ?? null,
+    bombPlantTick: plant?.tick ?? null,
+    bombDefuseTick: defuse?.tick ?? null,
+    firstKillTick: firstKill?.tick ?? null,
+    firstKillSteamId64: firstKill?.killerSteamId64 ?? null,
+    firstKillTeamKey: firstKill?.killerTeamKey ?? null,
+    clutch: clutch
+      ? {
+          steamId64: clutch.clutcherSteamId64,
+          teamKey: clutch.clutcherTeamKey,
+          opponentCount: clutch.opponentCount,
+          won: clutch.won,
+          tick: clutch.tick
+        }
+      : null,
+    maxKillsByOnePlayer: Math.max(0, ...killsByPlayer.values()),
+    wallbangKills: kills.filter((kill) => kill.penetratedObjects > 0).length,
+    throughSmokeKills: kills.filter((kill) => kill.throughSmoke).length
+  };
 }
 
 /** 比赛级武器统计：击杀来自 kills.json，伤害来自 damages.json（healthDamage 口径）。 */
@@ -184,6 +225,12 @@ function radarImageUrlForMap(mapName: string): string | null {
   // 有标定即有底图：apps 的 public/maps/radars/ 与 MAP_CALIBRATIONS 保持同套地图。
   // Relative path so it resolves from both http:// dev server and file:// pywebview.
   return getMapCalibration(mapName) ? `./maps/radars/${mapName}.png` : null;
+}
+
+/** 双层地图（标定带 lowerLevelMaxUnits）的下层底图（{map}_lower.png）。 */
+function lowerRadarImageUrlForMap(mapName: string): string | null {
+  const calibration = getMapCalibration(mapName);
+  return calibration && hasLowerLevel(calibration) ? `./maps/radars/${mapName}_lower.png` : null;
 }
 
 function buildWorkspaceKpis(bundle: AnalysisBundle) {
@@ -709,14 +756,16 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
       throwX: row.throwPosition.x,
       throwY: row.throwPosition.y,
       effectX: row.effectPosition.x,
-      effectY: row.effectPosition.y
+      effectY: row.effectPosition.y,
+      effectZ: row.effectPosition.z
     })),
     // v2.3+ 导出包才带飞行轨迹；旧包置空，渲染端按"无数据"处理
     projectiles: (roundRow.projectiles ?? []).map((proj) => ({
       grenade: proj.grenade,
       startTick: proj.startTick,
       x: proj.x,
-      y: proj.y
+      y: proj.y,
+      z: proj.z ?? []
     })),
     bomb: buildRoundBomb(bombsByRound.get(roundRow.roundNumber) ?? []),
     groundBombs: buildGroundBombs(
@@ -774,6 +823,7 @@ function buildRoundBomb(events: DemoPackage["bombs"]): WorkspaceReplayRound["bom
     plantTick: plant.tick,
     x: plant.position.x,
     y: plant.position.y,
+    z: plant.position.z,
     defuseTick: events.find((event) => event.type === "defused")?.tick ?? null,
     explodeTick: events.find((event) => event.type === "exploded")?.tick ?? null
   };
@@ -782,7 +832,7 @@ function buildRoundBomb(events: DemoPackage["bombs"]): WorkspaceReplayRound["bom
 /** dropped → 下一次 picked_up / planted / exploded / defused 构成一段地面区间。 */
 function buildGroundBombs(events: DemoPackage["bombs"], roundEndTick: number): WorkspaceReplayRound["groundBombs"] {
   const sorted = [...events].sort((a, b) => a.tick - b.tick);
-  const intervals: { startTick: number; endTick: number; x: number; y: number }[] = [];
+  const intervals: { startTick: number; endTick: number; x: number; y: number; z: number }[] = [];
   for (let i = 0; i < sorted.length; i += 1) {
     if (sorted[i].type !== "dropped") continue;
     const drop = sorted[i];
@@ -794,7 +844,8 @@ function buildGroundBombs(events: DemoPackage["bombs"], roundEndTick: number): W
       startTick: drop.tick,
       endTick: next?.tick ?? roundEndTick,
       x: drop.position.x,
-      y: drop.position.y
+      y: drop.position.y,
+      z: drop.position.z
     });
   }
   return intervals;
@@ -827,7 +878,13 @@ function buildRoundKills(pkg: DemoPackage, kills: DemoPackage["kills"]): Workspa
       throughSmoke: kill.throughSmoke,
       noScope: kill.noScope,
       flashAssist: kill.flashAssist,
-      tradeKill: kill.tradeKill
+      tradeKill: kill.tradeKill,
+      killerX: kill.killerPosition?.x ?? null,
+      killerY: kill.killerPosition?.y ?? null,
+      killerZ: kill.killerPosition?.z ?? null,
+      victimX: kill.victimPosition.x,
+      victimY: kill.victimPosition.y,
+      victimZ: kill.victimPosition.z
     };
   });
 }

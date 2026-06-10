@@ -158,6 +158,8 @@ export const heatmapPointSchema = z.object({
 export const mapViewSchema = z.object({
   name: z.string(),
   radarImageUrl: z.string().nullable(),
+  /** 双层地图（de_nuke / de_vertigo）的下层底图；单层地图为 null。 */
+  lowerRadarImageUrl: z.string().nullable().optional().default(null),
   calibrated: z.boolean()
 });
 

@@ -9,10 +9,14 @@ parser installed.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     from demoparser2 import DemoParser  # type: ignore
+
+# 进度回调：(阶段名, 0..1 完成度)。各阶段权重按实测耗时占比粗估，
+# 仅用于 UI 进度条，不要求精确。
+ProgressFn = Callable[[str, float], None]
 
 
 _GRENADE_EVENTS = [
@@ -202,10 +206,15 @@ def _extract_grenade_paths(
     return throws, trajectories
 
 
-def parse_demo(dem_path: str) -> dict[str, Any]:
+def parse_demo(dem_path: str, progress: ProgressFn | None = None) -> dict[str, Any]:
     """Full event extraction. Returns a plain dict — all values must be JSON-serializable."""
     from demoparser2 import DemoParser  # type: ignore  # lazy: native dep
 
+    def _p(stage: str, frac: float) -> None:
+        if progress is not None:
+            progress(stage, frac)
+
+    _p("打开 demo", 0.01)
     p = DemoParser(dem_path)
 
     # ── header ───────────────────────────────────────────────────
@@ -219,6 +228,7 @@ def parse_demo(dem_path: str) -> dict[str, Any]:
     except (TypeError, ValueError):
         tickrate = 64
 
+    _p("解析回合事件", 0.05)
     # ── round boundaries + blinds + match-start announce ─────────
     # One scan: events that need no player= props. The union `other` carries
     # every field any of them reads; events lacking a field get NaN columns
@@ -234,6 +244,7 @@ def parse_demo(dem_path: str) -> dict[str, Any]:
     blinds            = g_round["player_blind"]
     announce_rows     = g_round["round_announce_match_start"]
 
+    _p("解析击杀", 0.15)
     # ── player deaths ────────────────────────────────────────────
     # X/Y/Z are player entity props — pass via player= so demoparser2
     # prefixes them as attacker_X/Y/Z and user_X/Y/Z automatically.
@@ -247,6 +258,7 @@ def parse_demo(dem_path: str) -> dict[str, Any]:
         player=["X", "Y", "Z", "active_weapon"],
     )
 
+    _p("解析伤害", 0.25)
     # ── damages ──────────────────────────────────────────────────
     # player= gives attacker_X/Y/Z and user_X/Y/Z for attacker/victim positions.
     hurts = _safe_event(p, "player_hurt", other=[
@@ -254,11 +266,13 @@ def parse_demo(dem_path: str) -> dict[str, Any]:
         "total_rounds_played",
     ], player=["X", "Y", "Z"])
 
+    _p("解析开枪", 0.35)
     # ── shots ────────────────────────────────────────────────────
     # player= gives user_vel_X/Y/Z (velocity) and user_yaw/user_pitch (aim).
     fires = _safe_event(p, "weapon_fire", other=["weapon", "total_rounds_played"],
                         player=["vel_X", "vel_Y", "vel_Z", "yaw", "pitch"])
 
+    _p("解析炸弹事件", 0.45)
     # ── bombs ────────────────────────────────────────────────────
     # One scan for all 7 bomb lifecycle events; player=["steamid"] adds
     # user_steamid to identify the actor. begin/dropped/pickup feed the v2
@@ -276,6 +290,7 @@ def parse_demo(dem_path: str) -> dict[str, Any]:
     bomb_dropped     = g_bomb["bomb_dropped"]
     bomb_pickup      = g_bomb["bomb_pickup"]
 
+    _p("解析道具引爆", 0.52)
     # ── grenades ─────────────────────────────────────────────────
     # One scan for all detonation types; tag each row with its v2 grenade type.
     g_nade = _safe_events(p, [name for name, _ in _GRENADE_EVENTS],
@@ -323,6 +338,7 @@ def parse_demo(dem_path: str) -> dict[str, Any]:
         player_info = []
 
     # ── positions (~1 Hz) + replay (~8 Hz): single parse over replay ticks ──
+    _p("解析走位回放（最耗时）", 0.60)
     replay_step = max(1, tickrate // 8)  # 8 Hz
     replay_ticks = _build_sample_ticks(round_ends, round_freeze_ends, tickrate,
                                        step=replay_step)
@@ -351,10 +367,12 @@ def parse_demo(dem_path: str) -> dict[str, Any]:
     positions_raw = [r for r in all_positions if r.get("tick") in sample_tick_set]
     replay_raw = all_positions
 
+    _p("解析道具轨迹", 0.85)
     # ── grenades: throw origins + flight paths sampled onto replay grid ──
     # One parse_grenades() scan; trajectories align to the 8 Hz replay ticks.
     grenade_throws, grenade_trajectories = _extract_grenade_paths(p, replay_ticks)
 
+    _p("解析经济", 0.93)
     # ── economy: player state at each freeze_end tick ────────────
     freeze_ticks = sorted({int(r["tick"]) for r in round_freeze_ends if r.get("tick")})
     economy_raw: list[dict] = []

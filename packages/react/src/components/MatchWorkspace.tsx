@@ -1,6 +1,6 @@
 import type { MatchWorkspaceModel, WorkspaceReplayFrame, WorkspaceReplayRound, WorkspaceSpatialPoint } from "@cs2dak/contract";
-import { displayWeaponName, sideLabel, economyLabelCn } from "@cs2dak/presentation";
-import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
+import { displayWeaponName, sideLabel, economyLabelCn, buildMatchBuyQuality, buildMatchReportMarkdown } from "@cs2dak/presentation";
+import { getMapCalibration, worldToRadar, hasLowerLevel, levelAt, type MapLevel } from "@cs2dak/maps";
 import { Activity, BarChart3, ChevronLeft, ChevronRight, Crosshair, Film, Gauge, ListChecks, Map, Pause, Play, ShieldCheck, Swords, Table2, Users } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { EconomyPanel } from "./EconomyPanel";
@@ -15,8 +15,22 @@ export interface MatchWorkspaceProps {
 type WorkspaceView = MatchWorkspaceModel["tabs"][number]["key"];
 type HeatmapLayer = Extract<WorkspaceSpatialPoint["kind"], "death" | "kill" | "grenade">;
 
+/** 统计数字 → 2D 回放的跳转目标（v0.2 query-first）。 */
+export interface ReplayTarget {
+  roundNumber: number;
+  /** 落到该 tick 附近的帧；缺省从回合开头播。 */
+  tick?: number;
+  /** 同一目标重复点击也要触发跳转，用自增序列区分。 */
+  seq: number;
+}
+
 export function MatchWorkspace({ model }: MatchWorkspaceProps) {
   const [view, setView] = useState<WorkspaceView>("overview");
+  const [replayTarget, setReplayTarget] = useState<ReplayTarget | null>(null);
+  const openReplay = (roundNumber: number, tick?: number) => {
+    setReplayTarget((prev) => ({ roundNumber, tick, seq: (prev?.seq ?? 0) + 1 }));
+    setView("replay");
+  };
   const replayDetail = model.replay.available
     ? `${model.replay.sampleRate ?? 0} Hz · ${model.replay.rounds.length} 回合`
     : "无回放流";
@@ -33,6 +47,14 @@ export function MatchWorkspace({ model }: MatchWorkspaceProps) {
           <div className="dak-scoreblock">
             <div className="dak-scoreline">{model.scoreline}</div>
             <div className="dak-mapline">{model.mapName}</div>
+            <button
+              type="button"
+              className="dak-report-button"
+              onClick={() => downloadMatchReport(model)}
+              title="导出本场比赛报告（Markdown）"
+            >
+              导出报告
+            </button>
           </div>
         </header>
 
@@ -62,17 +84,20 @@ export function MatchWorkspace({ model }: MatchWorkspaceProps) {
 
           <section className="dak-workbench-main">
             {view === "overview" && <OverviewView model={model} onNavigate={setView} />}
-            {view === "rounds" && <RoundExplorer model={model} />}
-            {view === "players" && <PlayerStoryPanel model={model} />}
+            {view === "rounds" && <RoundExplorer model={model} onOpenReplay={model.replay.available ? openReplay : undefined} />}
+            {view === "players" && <PlayerStoryPanel model={model} onOpenReplay={model.replay.available ? openReplay : undefined} />}
             {view === "economy" && (
-              <Panel title="经济走势">
-                <EconomyPanel points={model.economy} teamAName={model.teams.teamA.name} teamBName={model.teams.teamB.name} />
-              </Panel>
+              <div className="dak-stack">
+                <Panel title="经济走势">
+                  <EconomyPanel points={model.economy} teamAName={model.teams.teamA.name} teamBName={model.teams.teamB.name} />
+                </Panel>
+                <BuyQualityPanel model={model} />
+              </div>
             )}
             {view === "weapons" && <WeaponsView model={model} />}
             {view === "duels" && <DuelsView model={model} />}
             {view === "map" && <MapWorkspace model={model} />}
-            {view === "replay" && <ReplayViewer replay={model.replay} map={model.map.view} />}
+            {view === "replay" && <ReplayViewer replay={model.replay} map={model.map.view} target={replayTarget} />}
           </section>
         </div>
       </div>
@@ -112,10 +137,79 @@ function OverviewView({ model, onNavigate }: MatchWorkspaceProps & { onNavigate:
   );
 }
 
-function RoundExplorer({ model }: MatchWorkspaceProps) {
+// ── 回合筛选器（v0.2 query-first 最小实现）────────────────────────────────
+type RoundModel = MatchWorkspaceModel["rounds"][number];
+
+interface RoundFilterState {
+  winnerSide: "all" | "ct" | "t";
+  economy: "all" | "pistol" | "eco" | "semi" | "force" | "full";
+  bombSite: "all" | "a" | "b" | "none";
+  endReason: string; // "all" 或具体 endReason
+  firstKill: "all" | "teamA" | "teamB";
+  special: { clutch: boolean; multiKill: boolean; wallbang: boolean; smoke: boolean };
+  playerSteamId64: string; // "" = 全部；匹配该选手有击杀/首杀/残局的回合
+}
+
+const ROUND_FILTER_DEFAULT: RoundFilterState = {
+  winnerSide: "all",
+  economy: "all",
+  bombSite: "all",
+  endReason: "all",
+  firstKill: "all",
+  special: { clutch: false, multiKill: false, wallbang: false, smoke: false },
+  playerSteamId64: ""
+};
+
+const END_REASON_LABELS: Record<string, string> = {
+  target_bombed: "爆弹",
+  bomb_defused: "拆弹",
+  t_win: "T 歼灭",
+  ct_win: "CT 歼灭",
+  target_saved: "守时"
+};
+
+function roundMatchesFilter(round: RoundModel, filter: RoundFilterState): boolean {
+  if (filter.winnerSide !== "all" && round.winnerSide !== filter.winnerSide) return false;
+  if (filter.economy !== "all" && round.teamAEconomy !== filter.economy && round.teamBEconomy !== filter.economy) return false;
+  if (filter.endReason !== "all" && round.endReason !== filter.endReason) return false;
+  const facets = round.facets;
+  if (filter.bombSite !== "all") {
+    if (!facets) return false;
+    if (filter.bombSite === "none" ? facets.bombSite !== null : facets.bombSite !== filter.bombSite) return false;
+  }
+  if (filter.firstKill !== "all" && facets?.firstKillTeamKey !== filter.firstKill) return false;
+  if (filter.special.clutch && !facets?.clutch) return false;
+  if (filter.special.multiKill && (facets?.maxKillsByOnePlayer ?? 0) < 3) return false;
+  if (filter.special.wallbang && (facets?.wallbangKills ?? 0) === 0) return false;
+  if (filter.special.smoke && (facets?.throughSmokeKills ?? 0) === 0) return false;
+  if (filter.playerSteamId64) {
+    const fact = round.playerFacts.find((f) => f.steamId64 === filter.playerSteamId64);
+    const involved = !!fact && (fact.kills > 0 || fact.openingDuel !== "none" || !fact.survived);
+    const isClutcher = facets?.clutch?.steamId64 === filter.playerSteamId64;
+    if (!involved && !isClutcher) return false;
+  }
+  return true;
+}
+
+function FilterChip({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+  return (
+    <button type="button" className={active ? "dak-sf-chip dak-sf-chip-active" : "dak-sf-chip"} onClick={onClick}>
+      {label}
+    </button>
+  );
+}
+
+function RoundExplorer({ model, onOpenReplay }: MatchWorkspaceProps & { onOpenReplay?: (roundNumber: number, tick?: number) => void }) {
   const [selectedRound, setSelectedRound] = useState(model.rounds[0]?.roundNumber ?? 1);
   const [showAllEvents, setShowAllEvents] = useState(false);
-  const round = model.rounds.find((row) => row.roundNumber === selectedRound) ?? model.rounds[0];
+  const [filter, setFilter] = useState<RoundFilterState>(ROUND_FILTER_DEFAULT);
+  const filteredRounds = useMemo(
+    () => model.rounds.filter((row) => roundMatchesFilter(row, filter)),
+    [model.rounds, filter]
+  );
+  const round = model.rounds.find((row) => row.roundNumber === selectedRound)
+    ?? filteredRounds[0]
+    ?? model.rounds[0];
 
   useEffect(() => {
     setShowAllEvents(false);
@@ -128,12 +222,76 @@ function RoundExplorer({ model }: MatchWorkspaceProps) {
   const eventLimit = 28;
   const visibleEvents = showAllEvents ? round.events : round.events.slice(0, eventLimit);
   const hiddenEventCount = round.events.length - visibleEvents.length;
+  const hasFacets = model.rounds.some((row) => row.facets);
+  const endReasons = [...new Set(model.rounds.map((row) => row.endReason))];
+  const filterActive = filteredRounds.length !== model.rounds.length;
+  const toggleSpecial = (key: keyof RoundFilterState["special"]) =>
+    setFilter((prev) => ({ ...prev, special: { ...prev.special, [key]: !prev.special[key] } }));
 
   return (
     <div className="dak-selection-layout">
-      <Panel title="回合时间线">
+      <Panel title="回合时间线" eyebrow={filterActive ? `筛选命中 ${filteredRounds.length}/${model.rounds.length} 回合` : undefined}>
+        <div className="dak-round-filterbar">
+          <div className="dak-heatmap-side-filter" role="radiogroup" aria-label="胜方阵营">
+            {(["all", "ct", "t"] as const).map((s) => (
+              <FilterChip key={s} active={filter.winnerSide === s} label={s === "all" ? "全部" : `${s.toUpperCase()} 胜`} onClick={() => setFilter((prev) => ({ ...prev, winnerSide: s }))} />
+            ))}
+          </div>
+          <div className="dak-heatmap-side-filter" role="radiogroup" aria-label="经济类型">
+            {(["all", "pistol", "eco", "force", "full"] as const).map((e) => (
+              <FilterChip key={e} active={filter.economy === e} label={e === "all" ? "全部经济" : economyLabelCn(e) || e} onClick={() => setFilter((prev) => ({ ...prev, economy: e }))} />
+            ))}
+          </div>
+          {hasFacets && (
+            <>
+              <div className="dak-heatmap-side-filter" role="radiogroup" aria-label="下包点">
+                {(["all", "a", "b", "none"] as const).map((s) => (
+                  <FilterChip key={s} active={filter.bombSite === s} label={s === "all" ? "全部包点" : s === "none" ? "未下包" : `${s.toUpperCase()} 点`} onClick={() => setFilter((prev) => ({ ...prev, bombSite: s }))} />
+                ))}
+              </div>
+              <div className="dak-heatmap-side-filter" role="radiogroup" aria-label="首杀方">
+                <FilterChip active={filter.firstKill === "all"} label="首杀不限" onClick={() => setFilter((prev) => ({ ...prev, firstKill: "all" }))} />
+                <FilterChip active={filter.firstKill === "teamA"} label={`${model.teams.teamA.name} 首杀`} onClick={() => setFilter((prev) => ({ ...prev, firstKill: "teamA" }))} />
+                <FilterChip active={filter.firstKill === "teamB"} label={`${model.teams.teamB.name} 首杀`} onClick={() => setFilter((prev) => ({ ...prev, firstKill: "teamB" }))} />
+              </div>
+              <div className="dak-heatmap-side-filter" role="group" aria-label="高光条件">
+                <FilterChip active={filter.special.clutch} label="残局" onClick={() => toggleSpecial("clutch")} />
+                <FilterChip active={filter.special.multiKill} label="多杀 3+" onClick={() => toggleSpecial("multiKill")} />
+                <FilterChip active={filter.special.wallbang} label="穿墙杀" onClick={() => toggleSpecial("wallbang")} />
+                <FilterChip active={filter.special.smoke} label="穿烟杀" onClick={() => toggleSpecial("smoke")} />
+              </div>
+            </>
+          )}
+          <div className="dak-heatmap-side-filter">
+            <select
+              className="dak-round-filter-select"
+              value={filter.endReason}
+              onChange={(event) => setFilter((prev) => ({ ...prev, endReason: event.target.value }))}
+              aria-label="结束方式"
+            >
+              <option value="all">全部结束方式</option>
+              {endReasons.map((reason) => (
+                <option key={reason} value={reason}>{END_REASON_LABELS[reason] ?? reason}</option>
+              ))}
+            </select>
+            <select
+              className="dak-round-filter-select"
+              value={filter.playerSteamId64}
+              onChange={(event) => setFilter((prev) => ({ ...prev, playerSteamId64: event.target.value }))}
+              aria-label="参与选手"
+            >
+              <option value="">全部选手</option>
+              {model.players.map((player) => (
+                <option key={player.row.steamId64} value={player.row.steamId64}>{player.row.name}</option>
+              ))}
+            </select>
+            {filterActive && (
+              <FilterChip active={false} label="清除筛选" onClick={() => setFilter(ROUND_FILTER_DEFAULT)} />
+            )}
+          </div>
+        </div>
         <div className="dak-round-pills">
-          {model.rounds.map((row) => (
+          {filteredRounds.map((row) => (
             <button
               key={row.roundNumber}
               className={row.roundNumber === round.roundNumber ? "dak-round-pill dak-round-pill-active" : "dak-round-pill"}
@@ -145,10 +303,16 @@ function RoundExplorer({ model }: MatchWorkspaceProps) {
               <small>{row.scoreBefore}</small>
             </button>
           ))}
+          {filteredRounds.length === 0 && <p className="dak-muted">没有匹配筛选条件的回合</p>}
         </div>
       </Panel>
       <Panel title={`R${round.roundNumber} 详情`}>
         <div className="dak-round-detail">
+          {onOpenReplay && (
+            <button className="dak-timeline-more" type="button" onClick={() => onOpenReplay(round.roundNumber)}>
+              ▶ 在 2D 回放中打开本回合
+            </button>
+          )}
           <div className="dak-fact-grid">
             <Fact label="比分" value={round.scoreBefore} />
             <Fact label="胜方" value={round.winnerSide.toUpperCase()} />
@@ -157,7 +321,13 @@ function RoundExplorer({ model }: MatchWorkspaceProps) {
           </div>
           <div className="dak-timeline">
             {visibleEvents.map((event) => (
-              <div className="dak-timeline-row" key={event.id}>
+              <div
+                className={onOpenReplay ? "dak-timeline-row dak-timeline-row-link" : "dak-timeline-row"}
+                key={event.id}
+                onClick={onOpenReplay ? () => onOpenReplay(round.roundNumber, event.tick) : undefined}
+                role={onOpenReplay ? "button" : undefined}
+                title={onOpenReplay ? "点击跳到 2D 回放对应时刻" : undefined}
+              >
                 <span className="dak-mono dak-muted">{event.clockLabel}</span>
                 <span className="dak-badge">{event.type}</span>
                 <span>{event.label}</span>
@@ -180,7 +350,7 @@ function RoundExplorer({ model }: MatchWorkspaceProps) {
   );
 }
 
-function PlayerStoryPanel({ model }: MatchWorkspaceProps) {
+function PlayerStoryPanel({ model, onOpenReplay }: MatchWorkspaceProps & { onOpenReplay?: (roundNumber: number, tick?: number) => void }) {
   const [selectedSteamId, setSelectedSteamId] = useState(model.players[0]?.row.steamId64 ?? "");
   const selected = model.players.find((player) => player.row.steamId64 === selectedSteamId) ?? model.players[0];
 
@@ -229,7 +399,13 @@ function PlayerStoryPanel({ model }: MatchWorkspaceProps) {
         {selected.roundFacts.length > 0 && (
           <div className="dak-player-roundfacts">
             {selected.roundFacts.slice(0, 18).map((fact) => (
-              <article className="dak-player-round-card" key={`${fact.steamId64}-${fact.roundNumber}`}>
+              <article
+                className={onOpenReplay ? "dak-player-round-card dak-player-round-card-link" : "dak-player-round-card"}
+                key={`${fact.steamId64}-${fact.roundNumber}`}
+                onClick={onOpenReplay ? () => onOpenReplay(fact.roundNumber) : undefined}
+                role={onOpenReplay ? "button" : undefined}
+                title={onOpenReplay ? "点击在 2D 回放中打开该回合" : undefined}
+              >
                 <div className="dak-player-round-head">
                   <span className="dak-badge">R{fact.roundNumber}</span>
                   <span>{sideLabel(fact.side)}</span>
@@ -296,17 +472,51 @@ function MapWorkspace({ model }: MatchWorkspaceProps) {
   );
 }
 
-export function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["replay"]; map: MatchWorkspaceModel["map"]["view"] }) {
-  const [roundNumber, setRoundNumber] = useState(replay.rounds[0]?.roundNumber ?? 1);
+/** 2D 回放叠加图层开关（v0.2）。 */
+interface ReplayLayerState {
+  trace: boolean;
+  killLines: boolean;
+  grenades: boolean;
+}
+
+export function ReplayViewer({ replay, map, target = null }: {
+  replay: MatchWorkspaceModel["replay"];
+  map: MatchWorkspaceModel["map"]["view"];
+  /** 统计跳回放：定位到某回合（可选定位 tick）。 */
+  target?: ReplayTarget | null;
+}) {
+  const [roundNumber, setRoundNumber] = useState(target?.roundNumber ?? replay.rounds[0]?.roundNumber ?? 1);
   const [frameIndex, setFrameIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
+  const [layers, setLayers] = useState<ReplayLayerState>({ trace: false, killLines: true, grenades: true });
+  // de_nuke / de_vertigo：上下双层雷达。当前层实心、另一层半透明幽灵显示，
+  // 道具效果与 C4 只画在所属层。
+  const calibration = getMapCalibration(map.name);
+  const dualLevel = !!(calibration && hasLowerLevel(calibration) && map.lowerRadarImageUrl);
+  const [level, setLevel] = useState<MapLevel>("upper");
+  const levelOf = (z: number): MapLevel => (calibration ? levelAt(z, calibration) : "upper");
   const round = replay.rounds.find((row) => row.roundNumber === roundNumber) ?? replay.rounds[0];
 
   useEffect(() => {
     setFrameIndex(0);
     setPlaying(false);
   }, [roundNumber]);
+
+  // 统计跳回放：target 变化时切回合并定位帧
+  useEffect(() => {
+    if (!target) return;
+    const targetRound = replay.rounds.find((row) => row.roundNumber === target.roundNumber);
+    if (!targetRound) return;
+    setRoundNumber(target.roundNumber);
+    setPlaying(false);
+    if (target.tick != null) {
+      const idx = Math.round((target.tick - targetRound.startTick) / targetRound.tickStep);
+      setFrameIndex(Math.max(0, Math.min(targetRound.frameCount - 1, idx)));
+    } else {
+      setFrameIndex(0);
+    }
+  }, [target?.seq]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!playing || !round || round.frameCount <= 1) return undefined;
@@ -339,6 +549,24 @@ export function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["rep
 
   const currentFrameIndex = Math.min(frameIndex, Math.max(round.frameCount - 1, 0));
   const currentTick = round.startTick + currentFrameIndex * round.tickStep;
+  const endTick = round.startTick + Math.max(round.frameCount - 1, 0) * round.tickStep;
+
+  // 2D 时间轴锚点：首杀 / 每次击杀 / 下包拆包（freeze end = 起点本身）
+  const anchors = useMemo(() => {
+    const list: { tick: number; kind: string; label: string }[] = [];
+    round.kills.forEach((kill, i) => {
+      list.push({ tick: kill.tick, kind: i === 0 ? "firstkill" : "kill", label: `${i === 0 ? "首杀" : "击杀"}：${kill.killerName ?? "?"} → ${kill.victimName}` });
+    });
+    if (round.bomb) {
+      list.push({ tick: round.bomb.plantTick, kind: "bomb", label: "下包" });
+      if (round.bomb.defuseTick != null) list.push({ tick: round.bomb.defuseTick, kind: "defuse", label: "拆包" });
+    }
+    return list.filter((a) => a.tick >= round.startTick && a.tick <= endTick);
+  }, [round, endTick]);
+  const seekTick = (tick: number) => {
+    setPlaying(false);
+    setFrameIndex(Math.max(0, Math.min(round.frameCount - 1, Math.round((tick - round.startTick) / round.tickStep))));
+  };
   const currentPlayers = round.players
     .map((player) => ({ player, frame: player.frames[currentFrameIndex] ?? player.frames.find((frame) => frame.alive) ?? player.frames[0] }))
     .filter((row): row is { player: WorkspaceReplayRound["players"][number]; frame: WorkspaceReplayFrame } => Boolean(row.frame));
@@ -366,18 +594,63 @@ export function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["rep
           <button className="dak-icon-button" type="button" onClick={() => setFrameIndex((value) => Math.max(0, value - Math.max(1, Math.round((replay.sampleRate ?? 8) / 2))))} aria-label="后退">
             <ChevronLeft size={17} />
           </button>
-          <input
-            className="dak-scrubber"
-            type="range"
-            min={0}
-            max={Math.max(round.frameCount - 1, 0)}
-            value={currentFrameIndex}
-            onChange={(event) => setFrameIndex(Number(event.target.value))}
-          />
+          <div className="dak-scrubber-wrap">
+            <div className="dak-scrubber-anchors" aria-hidden="true">
+              {anchors.map((anchor, i) => (
+                <button
+                  key={`${anchor.tick}-${i}`}
+                  type="button"
+                  className={`dak-scrubber-anchor dak-scrubber-anchor-${anchor.kind}`}
+                  style={{ left: `${endTick > round.startTick ? ((anchor.tick - round.startTick) / (endTick - round.startTick)) * 100 : 0}%` }}
+                  title={anchor.label}
+                  onClick={() => seekTick(anchor.tick)}
+                />
+              ))}
+            </div>
+            <input
+              className="dak-scrubber"
+              type="range"
+              min={0}
+              max={Math.max(round.frameCount - 1, 0)}
+              value={currentFrameIndex}
+              onChange={(event) => setFrameIndex(Number(event.target.value))}
+            />
+          </div>
           <button className="dak-icon-button" type="button" onClick={() => setFrameIndex((value) => Math.min(round.frameCount - 1, value + Math.max(1, Math.round((replay.sampleRate ?? 8) / 2))))} aria-label="前进">
             <ChevronRight size={17} />
           </button>
         </div>
+        <div className="dak-speed-group" role="group" aria-label="叠加图层">
+          {([
+            ["trace", "走位轨迹"],
+            ["killLines", "击杀连线"],
+            ["grenades", "道具"]
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              className={layers[key] ? "dak-speed dak-speed-active" : "dak-speed"}
+              aria-pressed={layers[key]}
+              onClick={() => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {dualLevel && (
+          <div className="dak-speed-group" role="group" aria-label="地图层级">
+            {(["upper", "lower"] as const).map((nextLevel) => (
+              <button
+                key={nextLevel}
+                type="button"
+                className={level === nextLevel ? "dak-speed dak-speed-active" : "dak-speed"}
+                onClick={() => setLevel(nextLevel)}
+              >
+                {nextLevel === "upper" ? "上层" : "下层"}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="dak-speed-group" role="group" aria-label="播放速度">
           {[0.5, 1, 2, 4].map((nextSpeed) => (
             <button
@@ -399,14 +672,52 @@ export function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["rep
       <Panel title={`R${round.roundNumber} 2D 回放`}>
         <div
           className="dak-replay-stage"
-          style={map.radarImageUrl ? { backgroundImage: `url(${map.radarImageUrl})` } : undefined}
+          style={(() => {
+            const url = dualLevel && level === "lower" ? map.lowerRadarImageUrl : map.radarImageUrl;
+            return url ? { backgroundImage: `url(${url})` } : undefined;
+          })()}
         >
           <div className="dak-replay-gridlines" aria-hidden="true" />
           <KillFeed kills={round.kills} currentTick={currentTick} tickrate={replay.tickrate} />
-          <GrenadeEffectLayer round={round} currentTick={currentTick} tickrate={replay.tickrate ?? 64} map={map} />
-          <BombMarker bomb={round.bomb} currentTick={currentTick} tickrate={replay.tickrate ?? 64} map={map} />
+          {layers.trace && (
+            <svg className="dak-replay-trajectories" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              {currentPlayers.map(({ player, frame }) => {
+                if (!frame.alive) return null;
+                if (dualLevel && levelOf(frame.z) !== level) return null;
+                // 最近 ~10 秒的走位轨迹（8 Hz × 80 帧）
+                const traceFrames = player.frames.slice(Math.max(0, currentFrameIndex - 80), currentFrameIndex + 1).filter((f) => f.alive);
+                if (traceFrames.length < 2) return null;
+                const points = traceFrames.map((f) => {
+                  const pos = replayPointPercent(f, map);
+                  return `${pos.x},${pos.y}`;
+                }).join(" ");
+                return <polyline key={`trace-${player.steamId64}`} className={`dak-replay-playertrace dak-replay-playertrace-${player.teamKey}`} points={points} />;
+              })}
+            </svg>
+          )}
+          {layers.killLines && (
+            <svg className="dak-replay-trajectories" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              {round.kills.map((kill, i) => {
+                // 击杀后保留 ~3 秒的连线
+                if (kill.killerX == null || kill.victimX == null) return null;
+                if (currentTick < kill.tick || currentTick > kill.tick + 3 * (replay.tickrate ?? 64)) return null;
+                if (dualLevel && kill.victimZ != null && levelOf(kill.victimZ) !== level) return null;
+                const from = replayPointPercent({ x: kill.killerX, y: kill.killerY ?? 0 }, map);
+                const to = replayPointPercent({ x: kill.victimX, y: kill.victimY ?? 0 }, map);
+                return (
+                  <g key={`killline-${i}`}>
+                    <line className="dak-replay-killline" x1={from.x} y1={from.y} x2={to.x} y2={to.y} />
+                    <circle className="dak-replay-killline-victim" cx={to.x} cy={to.y} r={0.7} />
+                  </g>
+                );
+              })}
+            </svg>
+          )}
+          {layers.grenades && <GrenadeEffectLayer round={round} currentTick={currentTick} tickrate={replay.tickrate ?? 64} map={map} level={dualLevel ? level : null} levelOf={levelOf} />}
+          <BombMarker bomb={round.bomb} currentTick={currentTick} tickrate={replay.tickrate ?? 64} map={map} offLevel={dualLevel && round.bomb != null && levelOf(round.bomb.z ?? 0) !== level} />
           {(round.groundBombs ?? []).map((gb, gbIdx) => {
             if (currentTick < gb.startTick || currentTick > gb.endTick) return null;
+            if (dualLevel && levelOf(gb.z ?? 0) !== level) return null;
             return (
               <span
                 key={`gb-${gbIdx}`}
@@ -422,7 +733,7 @@ export function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["rep
           {currentPlayers.map(({ player, frame }) => (
             <div
               key={player.steamId64}
-              className={`dak-replay-token dak-replay-token-${player.teamKey}${!frame.alive ? " dak-replay-token-dead" : ""}${frame.flashed ? " dak-replay-token-flashed" : ""}`}
+              className={`dak-replay-token dak-replay-token-${player.teamKey}${!frame.alive ? " dak-replay-token-dead" : ""}${frame.flashed ? " dak-replay-token-flashed" : ""}${dualLevel && levelOf(frame.z) !== level ? " dak-replay-token-offlevel" : ""}`}
               style={{ ...replayFramePosition(frame, map), transform: `translate(-50%, -50%) rotate(${90 - frame.yaw}deg)` }}
               title={`${playerNumbers[player.steamId64] ?? "?"} ${player.name} · ${frame.hp} HP${frame.hasDefuseKit ? " · 拆弹器" : ""}${frame.flashed ? " · flashed" : ""}`}
             >
@@ -463,6 +774,55 @@ export function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["rep
         </div>
       </Panel>
     </div>
+  );
+}
+
+/** 导出 Markdown 比赛报告（浏览器下载，无副作用依赖）。 */
+function downloadMatchReport(model: MatchWorkspaceModel) {
+  const md = buildMatchReportMarkdown(model);
+  const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${model.title.replace(/[\\/:*?"<>|]/g, "_")}-报告.md`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** v0.3 Buy Quality：full/force/eco 胜率链 + 手枪局转化。 */
+function BuyQualityPanel({ model }: MatchWorkspaceProps) {
+  const quality = useMemo(() => buildMatchBuyQuality(model.economy), [model.economy]);
+  const conversionLabel = (cell: { rounds: number; wins: number }) =>
+    cell.rounds > 0 ? `${cell.wins}/${cell.rounds}（${Math.round((cell.wins / cell.rounds) * 100)}%）` : "—";
+  return (
+    <Panel title="买局质量" eyebrow="各经济类型胜率 · 手枪局转化">
+      <div className="dak-grid dak-grid-even">
+        {([["teamA", model.teams.teamA.name, quality.teamA], ["teamB", model.teams.teamB.name, quality.teamB]] as const).map(([key, name, rows]) => (
+          <div key={key}>
+            <h4 className="dak-panel-eyebrow">{name}</h4>
+            <table className="dak-table">
+              <thead>
+                <tr><th>经济</th><th className="dak-num">回合</th><th className="dak-num">胜</th><th className="dak-num">胜率</th><th aria-label="胜率条" /></tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.economy}>
+                    <td>{row.label}</td>
+                    <td className="dak-num dak-mono">{row.rounds}</td>
+                    <td className="dak-num dak-mono">{row.wins}</td>
+                    <td className="dak-num dak-mono">{row.winRatePercent == null ? "—" : `${row.winRatePercent.toFixed(0)}%`}</td>
+                    <td className="dak-weapon-bar-cell">
+                      {row.winRatePercent != null && <div className="dak-weapon-bar" style={{ width: `${row.winRatePercent}%` }} />}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="dak-muted dak-note">手枪局转化（赢下手枪局后再下一城）：{conversionLabel(quality.conversion[key])}</p>
+          </div>
+        ))}
+      </div>
+    </Panel>
   );
 }
 
@@ -780,12 +1140,15 @@ const GRENADE_EFFECT_DEFAULTS: Record<string, { durationSeconds: number; radiusU
 
 type ReplayRoundModel = MatchWorkspaceModel["replay"]["rounds"][number];
 
-/** 道具效果（烟/火/爆/闪）+ 飞行轨迹叠加层，按 currentTick 过滤生命周期。 */
-function GrenadeEffectLayer({ round, currentTick, tickrate, map }: {
+/** 道具效果（烟/火/爆/闪）+ 飞行轨迹叠加层，按 currentTick 过滤生命周期。
+ *  level 非 null 时（双层地图）效果只画在所属层，飞行物按当前帧 z 过滤。 */
+function GrenadeEffectLayer({ round, currentTick, tickrate, map, level = null, levelOf }: {
   round: ReplayRoundModel;
   currentTick: number;
   tickrate: number;
   map: MatchWorkspaceModel["map"]["view"];
+  level?: MapLevel | null;
+  levelOf?: (z: number) => MapLevel;
 }) {
   return (
     <>
@@ -794,6 +1157,7 @@ function GrenadeEffectLayer({ round, currentTick, tickrate, map }: {
         if (!spec) return null;
         const endTick = row.destroyTick ?? row.effectTick + spec.durationSeconds * tickrate;
         if (currentTick < row.effectTick || currentTick > endTick) return null;
+        if (level && levelOf && levelOf(row.effectZ ?? 0) !== level) return null;
         const sizePercent = replayRadiusPercent(spec.radiusUnits, map) * 2;
         return (
           <span
@@ -827,6 +1191,8 @@ function GrenadeEffectLayer({ round, currentTick, tickrate, map }: {
       {round.projectiles.map((proj, index) => {
         const frameIdx = Math.floor((currentTick - proj.startTick) / round.tickStep);
         if (frameIdx < 0 || frameIdx >= proj.x.length) return null;
+        const projZ = proj.z?.[frameIdx];
+        if (level && levelOf && projZ != null && levelOf(projZ) !== level) return null;
         return (
           <span
             key={`proj-${index}`}
@@ -841,13 +1207,15 @@ function GrenadeEffectLayer({ round, currentTick, tickrate, map }: {
 }
 
 /** 下包后的 C4 定点标记：拆除转绿、爆炸先闪后熄。 */
-function BombMarker({ bomb, currentTick, tickrate, map }: {
+function BombMarker({ bomb, currentTick, tickrate, map, offLevel = false }: {
   bomb: ReplayRoundModel["bomb"];
   currentTick: number;
   tickrate: number;
   map: MatchWorkspaceModel["map"]["view"];
+  /** 双层地图且 C4 在另一层时隐藏。 */
+  offLevel?: boolean;
 }) {
-  if (!bomb || currentTick < bomb.plantTick) return null;
+  if (!bomb || currentTick < bomb.plantTick || offLevel) return null;
   const defused = bomb.defuseTick != null && currentTick >= bomb.defuseTick;
   const exploded = !defused && bomb.explodeTick != null && currentTick >= bomb.explodeTick;
   const exploding = exploded && bomb.explodeTick != null && currentTick <= bomb.explodeTick + 2 * tickrate;
