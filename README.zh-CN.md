@@ -1,65 +1,79 @@
-# CS2 Demo Analysis Kit
+# CS2 Demo Analysis Kit · DAK Studio
 
 [English](./README.md) | 简体中文
 
-`cs2-demo-analysis-kit` 从 CS2 `.dem` 生成 `cs2-demo-format/2.0` 导出包，再把导出包转换成可复用的分析结果、面向 UI 的展示模型、数据质量报告，以及可预览的 React 组件。目标消费者包括赛事网站、个人 demo 分析工具、CS2 Insight Agent、本地研究工作流。
+**DAK Studio** 是一个本地优先的 CS2 demo 分析工作台：把 `.dem` 拖进来，得到比赛工作台、2D 回放（走位 / 道具轨迹 / C4 时间线）、选手档案、开局动线和跨场排行榜。所有数据存在本机（IndexedDB），不依赖任何服务端。
 
-它**不负责赛事业务逻辑**。赛事、赛季、队伍、选手、比赛状态应该留给 RivalHub 这样的产品。ZIP 合同继续由 `cs2-demo-format` 维护，评分模型继续由 `rival-rating` 维护。
+本仓库同时是支撑 Studio 的共享数据与分析管道：`.dem → cs2-demo-format/2.0 ZIP → @cs2dak/* 分析包`，可被 RivalHub、CS2 Insight Agent 等产品复用。
 
-> **当前状态。** exporter（`python/`）、分析（`@cs2dak/core`）、跨场聚合（`@cs2dak/cohort`）、展示模型（`@cs2dak/presentation`）、contract、maps、CLI 都已可用并通过测试。**`@cs2dak/react` 组件库**（MatchWorkspace、HeatmapCanvas、EconomyPanel、KillFeed、ScoreboardTable）只消费 presentation 合同，功能完备，可复用。
+## 下载 DAK Studio
 
-## 这个仓库生成什么
+从 [GitHub Releases](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/latest) 下载：
 
-输入一份 `cs2-demo-format/2.0` 包后，本仓库生成：
+- **macOS**：`dak-studio-X.Y.Z.dmg`，拖入 Applications。首次打开需在「系统设置 → 隐私与安全性」点「仍要打开」（应用未签名）。
+- **Windows**：`dak-studio-windows-X.Y.Z.zip`，解压双击 `dak-studio.exe`。SmartScreen 警告选「仍要运行」。
 
-- Python exporter：`cs2dak` 包，负责 `.dem -> cs2-demo-format/2.0 ZIP`。
-- `analysis-bundle.json`：标准化后的比赛、回合、选手、经济、时间线、空间点位分析。
-- `view-model.json`：可直接给 UI 消费的展示模型。
-- `qa-report.json`：数据质量检查，包括缺文件、回合不连续、经济覆盖不足、玩家未映射、空间数据缺失等。
-- 预览 UI：用 demo-lab 展示可复用的比赛工作台、分析模块、地图图层和 2D 回放。
+应用内置 exporter：点「导入 demo」选 `.dem`（或 v2 ZIP），本机解析入库，无需其他工具。
 
-## 包结构
+## Studio 能做什么
+
+| 视图 | 内容 |
+|---|---|
+| 资料库 | 导入 / 标签 / 检索本地 demo，全窗口拖拽导入 |
+| 比赛工作台 | 回合浏览、经济、武器、对位矩阵、地图图层、2D 回放（8Hz 走位、道具落点与飞行轨迹、C4 安放/拆除/爆炸） |
+| 选手档案 | 个人打法复盘、RR 拆解、回合事实 |
+| 开局动线 | 跨场走位与道具习惯（按地图聚合） |
+| 排行榜 | 跨场指标对比、赛季 RR/PRISM |
+
+## 数据管道（开发者）
+
+```
+.dem
+  → python/src/cs2dak       exporter（demoparser2 → cs2-demo-format/2.0 ZIP）
+  → @cs2dak/core            加载 ZIP → 标准化 / 信号派生 / QA → AnalysisBundle
+  → @cs2dak/cohort          跨场聚合、身份归并、赛季 RR/PRISM 整形
+  → @cs2dak/presentation    产品中立 View Model
+  → @cs2dak/react           可复用 React 组件
+  → apps/dak-studio         Studio（pywebview 桌面壳 / 浏览器）
+```
+
+v2 ZIP 是 Python ↔ TypeScript 的唯一耦合点，两侧代码不互相 import。
 
 | 包 | 职责 |
 |---|---|
-| `@cs2dak/contract` | 共享 TypeScript 类型和 Zod schema，覆盖输入、分析输出、UI view model、QA report。 |
-| `@cs2dak/maps` | 地图标定、世界坐标到 radar 坐标转换、轻量 callout helper。 |
-| `@cs2dak/core` | 纯分析逻辑：标准化、scoreboard、经济、时间线、热力图点位、QA。 |
+| `@cs2dak/contract` | Zod schemas + TS 类型，re-export `cs2-demo-format`。 |
+| `@cs2dak/core` | 纯分析逻辑：标准化、经济、击杀、残局、时间线、热力图、QA、RR/PRISM 接线。 |
 | `@cs2dak/cohort` | 跨场聚合、身份归并与赛季 RR/PRISM 整形。 |
+| `@cs2dak/maps` | 地图标定、world→radar 坐标变换、进攻动线、zone 几何、callout 中文映射。 |
 | `@cs2dak/presentation` | 产品中立 View Model、标签与 workspace 编排。 |
-| `@cs2dak/react` | 只消费 presentation 合同的 React 预览组件。 |
-| `@cs2dak/cli` | 分析 JSON 或 ZIP 包，并输出 analysis/view-model/QA 文件。 |
-| `@cs2dak/demo-lab` | 用 fixtures 预览分析模块和统一设计语言的 Vite 应用。 |
-| `python/src/cs2dak` | Python exporter、CLI、GUI 资源和打包配置，负责 `.dem -> v2 ZIP`。 |
+| `@cs2dak/react` | React 组件，只消费 presentation 合同。 |
+| `@cs2dak/cli` | 薄 CLI，把 core 接到文件系统。 |
+| `apps/dak-studio` | DAK Studio：本地 demo 工作台（IndexedDB 资料库）。 |
+| `apps/demo-lab` | 组件预览与 fixture 验收应用（开发用）。 |
+| `python/src/cs2dak` | Python exporter：CLI + pywebview 桌面壳 + PyInstaller 打包。 |
 
-## 快速开始
+### 快速开始
 
 ```bash
 pnpm install
-pnpm python:test
-pnpm analyze:sample
-pnpm dev
+pnpm dev:studio        # DAK Studio（端口 5178，.dem 导入走本地 uv 环境）
+pnpm test              # vitest
+pnpm python:test       # pytest
+pnpm analyze:sample    # CLI 分析示例 ZIP → fixtures/output/sample/
+bash scripts/package.sh  # 打包桌面应用（DMG / exe）
 ```
 
-示例分析会输出到 `fixtures/output/sample/`，预览应用通过 `pnpm dev` 启动。
+Python 侧用 uv 管理：`cd python && uv sync --extra gui` 后即可 `uv run cs2dak export <demo.dem>`。
 
-## 设计语言
+## 下游消费者与边界
 
-默认主题参考 RivalHub 的克制型赛事运营界面：深色战术面板、细网格、低圆角、橙蓝双方对比、紧凑字体、信息密度高但可扫描。组件保持产品中立，方便 RivalHub、CS2 Insight Agent 和未来独立 demo 工具复用或重写。
+- **RivalHub**：消费 `@cs2dak/*` 的分析与展示模型，负责赛事 / 赛季 / 队伍 / 比赛业务。
+- **CS2 Insight Agent**：消费 v2 ZIP 与 AnalysisBundle 做对话式分析。
+- **rival-rating**：RR/PRISM 公式与校准的唯一 owner，kit 只做信号派生与接线。
+- **cs2-demo-format**：v2 ZIP 合同的唯一 owner，contract 包 re-export、不 fork。
+
+模块职责详见 [docs/module-boundaries.md](docs/module-boundaries.md)，架构详见 [docs/architecture.md](docs/architecture.md)，发布流程详见 [docs/release.md](docs/release.md)。
 
 ## 参考项目
 
-本仓库会参考但不直接复制这些项目：
-
-- [CS Demo Manager](https://github.com/akiver/cs-demo-manager)：成熟的比赛工作台、热力图、经济页、2D viewer 结构。
-- [AWPy](https://github.com/pnxenopoulos/awpy)：parser output、统计、绘图和数据分析严谨性。
-- [CS2 2D Demo Viewer](https://github.com/sparkoo/csgo-2d-demo-viewer)：面向回放的 frame model。
-- [pr1maly](https://github.com/pr1malator/pr1maly)：local-first 个人分析产品思路。它是非商业 license，只适合作产品研究。
-
-## 边界
-
-- `cs2-demo-format` 定义导出包合同。
-- `cs2-demo-analysis-kit` 生成 v2 ZIP，并把导出包转换成分析模型和展示模型。
-- `rival-rating` 负责 RR/PRISM 评分公式与校准。
-- `CS2-insight-agent` 可以消费或继续贡献 exporter refinements，但独立 exporter 的 home 已迁到本仓库。
-- `RivalHub` 负责赛事、赛季、队伍、选手、比赛业务流程。
+参考但不复制：[CS Demo Manager](https://github.com/akiver/cs-demo-manager)（工作台结构）、[AWPy](https://github.com/pnxenopoulos/awpy)（分析严谨性）、[CS2 2D Demo Viewer](https://github.com/sparkoo/csgo-2d-demo-viewer)（回放 frame model）、[pr1maly](https://github.com/pr1malator/pr1maly)（local-first 思路，非商业 license，仅产品研究）。

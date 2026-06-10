@@ -27,7 +27,8 @@ GOLDEN_DIR = REPO_ROOT / "fixtures/baselines/de_ancient"
 pytestmark = pytest.mark.skipif(not DEMO_PATH.exists(), reason="demo file not present (gitignored)")
 
 # 每次运行时间戳不同，从对比中排除
-_MANIFEST_EXCLUDE_KEYS = {"exportedAt"}
+# exporter.version 随发版变动（scripts/sync-version.mjs），不参与 golden 对比
+_MANIFEST_EXCLUDE_KEYS = {"exportedAt", "exporter"}
 
 # 超大文件：全字段对比但单独断言，方便快速定位问题
 _LARGE_FILES = {"positions-1s.json", "replay.json", "shots.json"}

@@ -78,7 +78,7 @@ fixtures/
   input/               # 提交的测试输入
     cs2dak-sanitized-de_ancient.zip   # 主 vitest fixture
     cohort/            # 3 场 cohort/cli 测试
-    sample-match.zip   # demo-lab 单场样本
+    sample-match.zip   # Studio/demo-lab 内置示例（FURIA vs Vitality, de_mirage 职业局）
   output/              # 生成的 v2 ZIP（gitignored）
   baselines/           # 精选非再生产物（提交）
   _bench/              # 本地 benchmark 与大文件（gitignored）

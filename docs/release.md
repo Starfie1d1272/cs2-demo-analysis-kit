@@ -28,9 +28,10 @@ Changesets 管理的公共包。
    git push origin main v0.2.0
    ```
 
-   `release.yml` 在 macOS / Windows runner 上跑 `scripts/package.sh`，产出
-   `dak-studio-X.Y.Z.dmg`、`cs2dak-X.Y.Z.dmg`、Windows zip，附安装说明发到
-   GitHub Release。
+   `release.yml` 在 macOS / Windows runner 上跑 `scripts/package.sh`，只产出
+   DAK Studio 两个产物：`dak-studio-X.Y.Z.dmg` 与 `dak-studio-windows-X.Y.Z.zip`，
+   附安装说明发到 GitHub Release。纯导出器 cs2dak 不进 Release（本地需要时
+   `PACKAGE_EXPORTER=1 bash scripts/package.sh`）。
 
 4. 发布后无需额外通知：DAK Studio 启动时会查
    `releases/latest`（`apps/dak-studio/src/lib/update.ts`），旧版本用户侧栏会
