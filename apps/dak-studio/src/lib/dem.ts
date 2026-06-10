@@ -12,6 +12,9 @@ interface PywebviewStudioApi {
   export_dem_path: (path: string) => Promise<
     { ok: true; fileName: string; dataBase64: string } | { ok: false; error: string }
   >;
+  export_dem_bytes: (name: string, data_b64: string) => Promise<
+    { ok: true; fileName: string; dataBase64: string } | { ok: false; error: string }
+  >;
 }
 
 declare global {
@@ -58,13 +61,22 @@ async function exportViaDev(file: File): Promise<File> {
   return new File([await res.blob()], zipName, { type: "application/zip" });
 }
 
-/** pywebview 模式：拖入的 File 带 pywebviewFullPath，按路径走本机导出。 */
+/** pywebview 模式：优先按路径导出；无路径时（如 Windows 拖入）回退到字节传输。 */
 async function exportViaPywebview(file: File): Promise<File> {
   const path = (file as File & { pywebviewFullPath?: string }).pywebviewFullPath;
-  if (!path) {
-    throw new Error(`${file.name}: 桌面版请通过「导入」按钮选择 .dem 文件`);
+  if (path) return exportPathViaPywebview(path, file.name);
+  // 无文件系统路径：读字节经 bridge 传给 exporter
+  const api = window.pywebview!.api;
+  if (typeof api.export_dem_bytes !== "function") {
+    throw new Error(
+      `${file.name}: 桌面壳版本过旧，不支持字节导入，请点右上角「导入 .dem」使用对话框`
+    );
   }
-  return exportPathViaPywebview(path, file.name);
+  const buf = await file.arrayBuffer();
+  const dataB64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const result = await api.export_dem_bytes(file.name, dataB64);
+  if (!result.ok) throw new Error(`${file.name}: ${result.error}`);
+  return new File([base64ToBytes(result.dataBase64) as BlobPart], result.fileName, { type: "application/zip" });
 }
 
 async function exportPathViaPywebview(path: string, displayName: string): Promise<File> {
@@ -82,11 +94,12 @@ export async function exportDemToZip(file: File, backend: DemBackend): Promise<F
   throw new Error(`${file.name}: 当前环境不支持 .dem 直接导入（开发模式跑 pnpm dev:studio，或使用打包版桌面应用）`);
 }
 
-/** pywebview 原生文件对话框：选多个 .dem 并逐个导出。 */
-export async function pickAndExportDems(onProgress: (message: string) => void): Promise<{ files: File[]; errors: string[] }> {
+/** pywebview 原生文件对话框：选多个 .dem/.zip 并逐个导出。paths 为空时 cancelled 为 true。 */
+export async function pickAndExportDems(onProgress: (message: string) => void): Promise<{ files: File[]; errors: string[]; cancelled: boolean }> {
   const api = window.pywebview?.api;
-  if (!api) return { files: [], errors: ["桌面壳不可用"] };
+  if (!api) return { files: [], errors: ["桌面壳不可用"], cancelled: false };
   const paths = await api.pick_dems();
+  if (paths.length === 0) return { files: [], errors: [], cancelled: true };
   const files: File[] = [];
   const errors: string[] = [];
   for (const path of paths) {
@@ -98,5 +111,5 @@ export async function pickAndExportDems(onProgress: (message: string) => void): 
       errors.push(err instanceof Error ? err.message : String(err));
     }
   }
-  return { files, errors };
+  return { files, errors, cancelled: false };
 }

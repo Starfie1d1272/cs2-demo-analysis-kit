@@ -33,8 +33,6 @@ export function App() {
   // 导入标签输入放在 App：全窗口拖拽导入也要带上
   const [importTagsRaw, setImportTagsRaw] = useState("");
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
-  // 桌面壳（pywebview）里浏览器 file input 拿不到本机路径，必须走原生对话框
-  const [nativeImportReady, setNativeImportReady] = useState(false);
   // 稳定数组标识：避免 App 无关重渲染触发档案/排行榜重新聚合
   const scopedEntries = useMemo(() => applyScope(entries, scope), [entries, scope]);
 
@@ -43,13 +41,6 @@ export function App() {
       .then(setEntries)
       .catch((err) => setNotice(`读取本地资料库失败：${err instanceof Error ? err.message : String(err)}`));
     void checkForUpdate().then(setUpdate);
-    // pywebview 的 js_api 注入可能晚于 React mount，靠 pywebviewready 事件兜底
-    const checkNative = () => {
-      if (typeof window.pywebview?.api?.pick_dems === "function") setNativeImportReady(true);
-    };
-    checkNative();
-    window.addEventListener("pywebviewready", checkNative);
-    return () => window.removeEventListener("pywebviewready", checkNative);
   }, []);
 
   const importFiles = useCallback(async (files: Iterable<File>, tags: string[] = [], initialErrors: string[] = []) => {
@@ -102,8 +93,8 @@ export function App() {
     setImporting(true);
     setNotice(null);
     try {
-      const { files, errors } = await pickAndExportDems(setNotice);
-      if (files.length === 0 && errors.length === 0) {
+      const { files, errors, cancelled } = await pickAndExportDems(setNotice);
+      if (cancelled) {
         setNotice(null); // 用户取消了对话框
         return;
       }
@@ -112,6 +103,9 @@ export function App() {
       setImporting(false);
     }
   }, [importFiles, importTagsRaw]);
+
+  /** pywebview 桌面壳提供原生对话框，由 LibraryView 条件展示。 */
+  const nativeImportAvailable = typeof window.pywebview?.api?.pick_dems === "function";
 
   const loadSample = useCallback(async () => {
     setImporting(true);
@@ -212,7 +206,7 @@ export function App() {
             importTagsRaw={importTagsRaw}
             onImportTagsChange={setImportTagsRaw}
             onImportFiles={importFiles}
-            onNativeImport={nativeImportReady ? importViaNativeDialog : undefined}
+            onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined}
             onLoadSample={loadSample}
             onOpenDemo={openDemo}
             onRemoveDemo={handleRemove}

@@ -87,6 +87,31 @@ class StudioApi:
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
+    def export_dem_bytes(self, name: str, data_b64: str) -> dict:
+        """Export .dem raw bytes (base64) to a v2 ZIP.
+
+        Used by the frontend when drag-and-drop cannot provide a filesystem path
+        (e.g. Windows pywebview). Writes the bytes to a temp file, runs the
+        exporter, and returns the ZIP the same way export_dem_path does.
+        """
+        from cs2dak.cli import _export_one
+
+        tmp_dir = Path(tempfile.mkdtemp(prefix="cs2dak-studio-"))
+        try:
+            dem_path = tmp_dir / name
+            dem_path.write_bytes(base64.b64decode(data_b64))
+            zip_path = _export_one(dem_path, tmp_dir)
+            data = zip_path.read_bytes()
+            return {
+                "ok": True,
+                "fileName": zip_path.name,
+                "dataBase64": base64.b64encode(data).decode("ascii"),
+            }
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
 
 def main() -> None:
     """gui-script entry point (see pyproject [project.gui-scripts])."""

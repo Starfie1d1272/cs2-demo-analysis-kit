@@ -98,16 +98,15 @@ export function LibraryView({
           <button type="button" className="stu-button stu-button-ghost" onClick={onLoadSample} disabled={importing}>
             <Sparkles size={15} /> 加载示例
           </button>
-          {onNativeImport ? (
+          {onNativeImport && (
             <button type="button" className="stu-button" onClick={onNativeImport} disabled={importing}>
-              <FolderOpen size={15} /> {importing ? "导入中…" : "导入 demo"}
+              <FolderOpen size={15} /> {importing ? "导入中…" : "导入 .dem"}
             </button>
-          ) : (
-            <label className={importing ? "stu-button stu-button-disabled" : "stu-button"}>
-              <FolderOpen size={15} /> {importing ? "导入中…" : "导入 demo"}
-              <input type="file" accept=".zip,.dem" multiple hidden onChange={onPick} disabled={importing} />
-            </label>
           )}
+          <label className={importing ? "stu-button stu-button-disabled" : "stu-button stu-button-ghost"}>
+            <FolderOpen size={15} /> {importing ? "导入中…" : "导入 ZIP"}
+            <input type="file" accept=".zip,.dem" multiple hidden onChange={onPick} disabled={importing} />
+          </label>
         </div>
       </header>
 
