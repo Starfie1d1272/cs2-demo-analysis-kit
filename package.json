@@ -16,7 +16,7 @@
     "analyze:spatial-coverage": "pnpm --filter @cs2dak/cli exec tsx scripts/spatial-coverage.ts",
     "analyze:utility-rr-impact": "pnpm --filter @cs2dak/cli exec tsx scripts/utility-rr-impact.ts",
     "typecheck": "tsc -b --pretty",
-    "test": "vitest run --maxWorkers=1",
+    "test": "vitest run --pool=forks",
     "build": "pnpm -r --if-present build",
     "changeset": "changeset",
     "version:packages": "changeset version",
