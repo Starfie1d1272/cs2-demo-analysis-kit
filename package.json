@@ -33,7 +33,7 @@
     "tsx": "^4.20.0",
     "typescript": "^5.9.0",
     "vite": "^7.0.0",
-    "vitest": "^3.0.0"
+    "vitest": "^4.1.8"
   },
   "dependencies": {
     "@rivalhub/rival-rating": "^0.2.0",

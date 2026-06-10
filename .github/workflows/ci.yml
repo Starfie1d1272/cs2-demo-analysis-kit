@@ -26,26 +26,9 @@ jobs:
 
       - run: pnpm typecheck
 
-      - name: Run tests
-        # vitest 3.2.4 在慢 CI runner 上全部测试通过后会触发内部 worker RPC
-        # onTaskUpdate 超时（exit 1），8 轮均 157/157 全过。这里忽略该已知超时。
-        run: |
-          pnpm exec vitest run > /tmp/vitest.log 2>&1 || true
-          # 去 ANSI 转义码再匹配
-          CLEAN=$(sed 's/\x1b\[[0-9;]*m//g' /tmp/vitest.log)
-          if echo "$CLEAN" | grep -q 'FAIL'; then
-            echo "═══ 测试失败 ═══"
-            echo "$CLEAN" | grep -A2 'FAIL'
-            exit 1
-          fi
-          if echo "$CLEAN" | grep -qP 'Tests\s+\d+\s+passed'; then
-            echo "$CLEAN" | grep -oP 'Tests\s+\d+\s+passed'
-            echo "CI 通过。"
-            exit 0
-          fi
-          echo "无法解析测试输出："
-          tail -15 /tmp/vitest.log
-          exit 1
+      # vitest 3.2.4 曾有 worker RPC onTaskUpdate 超时 bug（CI 全过仍 exit 1），
+      # 已通过升级 vitest 4 根治；这里保持直跑，不要再加输出解析的 workaround。
+      - run: pnpm test
 
       - run: pnpm build
 
