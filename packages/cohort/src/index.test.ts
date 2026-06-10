@@ -7,7 +7,7 @@ import type { DemoPackage } from "@cs2dak/contract";
 import { buildSeasonCohort } from "./index";
 
 const fixtureDir = fileURLToPath(new URL("../../../fixtures/input/cohort", import.meta.url));
-const integrationTimeoutMs = 20_000;
+const integrationTimeoutMs = 90_000; // CI 2-core runner 加载 3 场 ZIP + cohort 分析比本机慢 5–10×
 let cohortFixtures: ReturnType<typeof loadCohortFixtures> | null = null;
 
 async function loadCohortFixtures() {
