@@ -17,12 +17,18 @@ from __future__ import annotations
 
 import base64
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 
 from cs2dak import __version__
 
-WEB_DIR = Path(__file__).parent / "studio_web"
+# PyInstaller 打包后 __file__ 指向 Contents/Frameworks/（不含数据文件），
+# 实际资源在 sys._MEIPASS 临时目录。未打包时回退到源码目录。
+if getattr(sys, "frozen", False):
+    WEB_DIR = Path(sys._MEIPASS) / "studio_web"
+else:
+    WEB_DIR = Path(__file__).parent / "studio_web"
 
 
 class StudioApi:

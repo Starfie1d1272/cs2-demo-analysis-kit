@@ -24,7 +24,10 @@ from pathlib import Path
 
 from cs2dak import __version__
 
-WEB_DIR = Path(__file__).parent / "web"
+if getattr(sys, "frozen", False):
+    WEB_DIR = Path(sys._MEIPASS) / "web"
+else:
+    WEB_DIR = Path(__file__).parent / "web"
 
 # Default output directory works cross-platform:
 #   macOS  → /Users/<name>/cs2-demo-exports
