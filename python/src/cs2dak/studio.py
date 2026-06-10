@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import multiprocessing
 import os
 import shutil
 import sys
@@ -28,6 +29,7 @@ import time
 import urllib.parse
 import uuid
 from pathlib import Path
+from queue import Empty as QueueEmpty
 
 from cs2dak import __version__
 from webview.dom import _dnd_state
@@ -44,6 +46,30 @@ if getattr(sys, "frozen", False):
     WEB_DIR = Path(sys._MEIPASS) / "studio_web"
 else:
     WEB_DIR = Path(__file__).parent / "studio_web"
+
+
+def _export_demo_subprocess(dem_path: str, tmp_dir: str, queue: multiprocessing.Queue) -> None:  # type: ignore[type-arg]
+    """Run ``export_demo`` in a subprocess; writes ZIP to *tmp_dir*, reports
+    progress/result/error via *queue*.
+
+    This is the target for ``multiprocessing.Process`` so it must be a
+    module-level function (picklable on ``spawn`` platforms including
+    macOS ≥ 3.8 and Windows).
+    """
+    from pathlib import Path as _Path
+
+    from cs2dak.exporter import export_demo as _export_demo
+
+    def _report(stage: str, frac: float) -> None:
+        queue.put({"type": "progress", "stage": stage, "frac": frac})
+
+    try:
+        data = _export_demo(dem_path, progress=_report)
+        result_path = _Path(tmp_dir) / "result.zip"
+        result_path.write_bytes(data)
+        queue.put({"type": "result", "path": str(result_path)})
+    except Exception as exc:
+        queue.put({"type": "error", "error": str(exc)})
 
 
 def _appdata_userdata() -> Path:
@@ -186,36 +212,70 @@ class StudioApi:
 
     def _run_export_job(self, job: _ExportJob) -> None:
         from cs2dak.cli import _build_zip_name
-        from cs2dak.exporter import export_demo
 
         dem = Path(job.path)
+        process: multiprocessing.Process | None = None
+        queue: multiprocessing.Queue | None = None  # type: ignore[type-arg]
+        tmp_dir: str | None = None
         try:
             if dem.suffix.lower() == ".zip":
                 job.stage = "读取 ZIP"
                 data = dem.read_bytes()
                 job.file_name = dem.name
             else:
-                last_logged = [0.0]
+                tmp_dir = tempfile.mkdtemp(prefix="cs2dak-studio-")
+                ctx = multiprocessing.get_context("spawn")
+                queue = ctx.Queue()
+                process = ctx.Process(
+                    target=_export_demo_subprocess,
+                    args=(str(dem), tmp_dir, queue),
+                )
+                process.start()
+                log.info("export job %s subprocess started (pid=%d)", job.id, process.pid)
 
-                def on_progress(stage: str, frac: float) -> None:
-                    job.stage = stage
-                    job.progress = frac
-                    if frac - last_logged[0] >= 0.1:
-                        last_logged[0] = frac
-                        log.info("export job %s %s %.0f%%", job.id, stage, frac * 100)
+                while True:
+                    try:
+                        msg = queue.get(timeout=0.5)
+                    except QueueEmpty:
+                        if not process.is_alive():
+                            raise RuntimeError("导出进程意外退出")
+                        continue
 
-                data = export_demo(str(dem), progress=on_progress)
-                job.file_name = _build_zip_name(dem, data)
+                    msg_type = msg.get("type")
+                    if msg_type == "progress":
+                        job.stage = msg["stage"]
+                        job.progress = msg["frac"]
+                        log.info("export job %s %s %.0f%%", job.id,
+                                 msg["stage"], msg["frac"] * 100)
+                    elif msg_type == "result":
+                        data = Path(msg["path"]).read_bytes()
+                        job.file_name = _build_zip_name(dem, data)
+                        break
+                    elif msg_type == "error":
+                        raise RuntimeError(msg["error"])
+
             job.result_b64 = base64.b64encode(data).decode("ascii")
             job.progress = 1.0
             job.state = "done"
             job.stage = "完成"
             log.info("export job %s done: %s (%.1fs, %d bytes)", job.id,
-                     job.file_name, time.monotonic() - job.started, len(data))
-        except Exception as exc:  # noqa: BLE001 - surface parse failures to the UI
+                     job.file_name, time.monotonic() - job.started,
+                     len(data) if data else 0)
+        except Exception as exc:
             job.state = "error"
             job.error = str(exc)
             log.exception("export job %s failed: %s", job.id, job.path)
+        finally:
+            if process is not None:
+                process.join(timeout=5)
+                if process.is_alive():
+                    process.terminate()
+                    process.join(timeout=5)
+            if queue is not None:
+                queue.close()
+                queue.join_thread()
+            if tmp_dir is not None:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
 
     def get_export_status(self, job_id: str) -> dict:
         job = self._jobs.get(job_id)
@@ -349,4 +409,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     main()

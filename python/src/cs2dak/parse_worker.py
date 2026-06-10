@@ -9,10 +9,13 @@ parser installed.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     from demoparser2 import DemoParser  # type: ignore
+
+log = logging.getLogger(__name__)
 
 # 进度回调：(阶段名, 0..1 完成度)。各阶段权重按实测耗时占比粗估，
 # 仅用于 UI 进度条，不要求精确。
@@ -78,6 +81,7 @@ def _safe_events(
         pairs = parser.parse_events(names, **kwargs)
         out = {name: _rows(df) for name, df in pairs}
     except Exception:
+        log.warning("parse_events(%s) 失败，回退逐个 parse_event", names, exc_info=True)
         out = {name: _safe_event(parser, name, other=other, player=player) for name in names}
     for name in names:
         out.setdefault(name, [])
