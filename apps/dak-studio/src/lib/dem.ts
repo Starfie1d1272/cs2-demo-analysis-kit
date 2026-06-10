@@ -15,6 +15,8 @@ interface PywebviewStudioApi {
   export_dem_bytes: (name: string, data_b64: string) => Promise<
     { ok: true; fileName: string; dataBase64: string } | { ok: false; error: string }
   >;
+  /** 拖拽后按文件名解析本机路径（macOS WKWebView 下标准 drop 事件不走 pywebview DOM 系统） */
+  get_drop_path?: (filename: string) => Promise<string | null>;
 }
 
 declare global {
@@ -26,6 +28,27 @@ declare global {
 export type DemBackend = "pywebview" | "dev" | null;
 
 let devProbe: Promise<boolean> | null = null;
+
+/**
+ * Windows EdgeChromium：drop 事件使用标准浏览器 API（React onDrop），
+ * 不经过 pywebview DOM 事件系统，因此 `_jsApiCallback` 的
+ * `postMessageWithAdditionalObjects` 文件路径捕获不会触发。
+ *
+ * 在 drop 时调用此函数把 File 引用发送给 Python 的
+ * `on_script_notify` → `_dnd_state['paths']`，
+ * 后续 `get_drop_path` 即可按文件名解析本机路径。
+ */
+export function triggerWindowsDropCapture(files: FileList | File[]): void {
+  try {
+    if (
+      typeof (window as any).chrome?.webview?.postMessageWithAdditionalObjects === "function"
+    ) {
+      (window as any).chrome.webview.postMessageWithAdditionalObjects("FilesDropped", files);
+    }
+  } catch {
+    // best-effort: 路径捕获失败时回退到字节传输
+  }
+}
 
 export async function detectDemBackend(): Promise<DemBackend> {
   if (typeof window.pywebview?.api?.export_dem_path === "function") return "pywebview";
@@ -61,12 +84,22 @@ async function exportViaDev(file: File): Promise<File> {
   return new File([await res.blob()], zipName, { type: "application/zip" });
 }
 
-/** pywebview 模式：优先按路径导出；无路径时（如 Windows 拖入）回退到字节传输。 */
+/** pywebview 模式：优先按路径导出；无路径时（如 Windows/macOS 拖入）调用 get_drop_path
+ *  解析本机路径；再不行才走字节回退。前两级覆盖了绝大多数场景，
+ *  字节回退仅当桌面壳版本过旧且不提供 get_drop_path 时触发。 */
 async function exportViaPywebview(file: File): Promise<File> {
   const path = (file as File & { pywebviewFullPath?: string }).pywebviewFullPath;
   if (path) return exportPathViaPywebview(path, file.name);
-  // 无文件系统路径：读字节经 bridge 传给 exporter
+
+  // 拖拽时 pywebviewFullPath 可能缺失（标准浏览器 drop 事件，非 pywebview DOM 系统），
+  // 尝试通过 Python 端 _dnd_state 解析本机路径。
   const api = window.pywebview!.api;
+  const resolvedPath = await api.get_drop_path?.(file.name);
+  if (resolvedPath) return exportPathViaPywebview(resolvedPath, file.name);
+
+  // 无文件系统路径：仅剩字节传输。走到这里说明桌面壳版本过旧
+  // （不提供 get_drop_path），或文件来自浏览器 <input type="file">
+  // 而非拖拽/原生对话框——此时建议用户使用「导入 .dem」按钮。
   if (typeof api.export_dem_bytes !== "function") {
     throw new Error(
       `${file.name}: 桌面壳版本过旧，不支持字节导入，请点右上角「导入 .dem」使用对话框`

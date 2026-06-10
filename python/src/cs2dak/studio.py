@@ -6,8 +6,10 @@
   3. PyInstaller（packaging/cs2dak-studio.spec）连同 exporter 打成单一应用
 
 前端通过 window.pywebview.api 调用本桥：
-  - pick_dems():        原生文件对话框选 .dem
+  - pick_dems():        原生文件对话框选 .dem/.zip
   - export_dem_path():  按路径导出为 v2 ZIP，base64 回传（ZIP 仅 1–3MB）
+  - export_dem_bytes(): 按字节导出（Windows 拖拽无路径时的回退）
+  - get_drop_path():    拖拽后按文件名解析本机路径（macOS WKWebView）
 
 数据流向与 dev 模式一致：.dem → exporter → v2 ZIP → 前端 IndexedDB。
 .dem 本身不进库，导出的临时 ZIP 用完即删。
@@ -20,9 +22,17 @@ import os
 import shutil
 import sys
 import tempfile
+import urllib.parse
 from pathlib import Path
 
 from cs2dak import __version__
+from webview.dom import _dnd_state
+
+# 强制在任意拖拽操作中捕获文件路径，即使前端使用标准浏览器
+# drop 事件（而非 pywebview DOM 事件系统）。默认为 0，只有
+# pywebview element.events.drop 注册监听器后才会计数；而我们
+# 使用 React onDrop，永远不会触发该计数。
+_dnd_state["num_listeners"] = max(_dnd_state["num_listeners"], 1)
 
 # PyInstaller 打包后 __file__ 指向 Contents/Frameworks/（不含数据文件），
 # 实际资源在 sys._MEIPASS 临时目录。未打包时回退到源码目录。
@@ -130,6 +140,24 @@ class StudioApi:
             return {"ok": False, "error": str(exc)}
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    def get_drop_path(self, filename: str) -> str | None:
+        """Resolve the native filesystem path for a file dropped onto the webview.
+
+        When the frontend uses standard browser drop events (React onDrop),
+        pywebview's DOM event system doesn't inject ``pywebviewFullPath``.
+        This method lets the caller look up the path from ``_dnd_state``,
+        which is populated by ``performDragOperation_`` on every external
+        drop (Finder / Explorer → WKWebView / Edge Chromium).
+
+        Returns the absolute path if found, or ``None`` if the file wasn't
+        dropped in the current operation (e.g. selected via <input type="file">).
+        """
+        for item in _dnd_state["paths"]:
+            if urllib.parse.unquote(item[0]) == filename:
+                _dnd_state["paths"].remove(item)
+                return urllib.parse.unquote(item[1])
+        return None
 
 
 def main() -> None:

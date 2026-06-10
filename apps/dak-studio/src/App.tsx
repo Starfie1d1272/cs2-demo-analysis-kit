@@ -2,7 +2,7 @@ import { Crosshair, Film, LibraryBig, Route, Trophy, UserRound } from "lucide-re
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { importDemoFile, listDemoEntries, removeDemo, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { EMPTY_SCOPE, applyScope, type CohortScopeState } from "./components/CohortScope";
-import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems } from "./lib/dem";
+import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems, triggerWindowsDropCapture } from "./lib/dem";
 import { parseTags } from "./lib/tags";
 import { APP_VERSION, checkForUpdate, type UpdateInfo } from "./lib/update";
 import { LibraryView } from "./views/LibraryView";
@@ -99,6 +99,8 @@ export function App() {
         return;
       }
       await importFiles(files, parseTags(importTagsRaw), errors);
+    } catch (err) {
+      setNotice(`导入失败：${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setImporting(false);
     }
@@ -148,9 +150,14 @@ export function App() {
     <div
       className="stu-app"
       onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => {
+      onDrop={async (e) => {
         e.preventDefault();
-        if (e.dataTransfer.files.length > 0) void importFiles(e.dataTransfer.files, parseTags(importTagsRaw));
+        if (e.dataTransfer.files.length > 0) {
+          // Windows EdgeChromium：主动把 File 引用发给 Python
+          // 侧捕获本机路径，避免后续走字节回退 OOM。
+          triggerWindowsDropCapture(e.dataTransfer.files);
+          void importFiles(e.dataTransfer.files, parseTags(importTagsRaw));
+        }
       }}
     >
       <aside className="stu-sidebar">
