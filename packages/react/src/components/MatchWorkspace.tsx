@@ -405,6 +405,20 @@ export function ReplayViewer({ replay, map }: { replay: MatchWorkspaceModel["rep
           <KillFeed kills={round.kills} currentTick={currentTick} tickrate={replay.tickrate} />
           <GrenadeEffectLayer round={round} currentTick={currentTick} tickrate={replay.tickrate ?? 64} map={map} />
           <BombMarker bomb={round.bomb} currentTick={currentTick} tickrate={replay.tickrate ?? 64} map={map} />
+          {(round.groundBombs ?? []).map((gb, gbIdx) => {
+            if (currentTick < gb.startTick || currentTick > gb.endTick) return null;
+            return (
+              <span
+                key={`gb-${gbIdx}`}
+                className="dak-replay-bomb dak-replay-bomb-dropped"
+                style={{ left: `${replayPointPercent(gb, map).x}%`, top: `${replayPointPercent(gb, map).y}%` }}
+                title="C4 掉落"
+                aria-hidden="true"
+              >
+                c4
+              </span>
+            );
+          })}
           {currentPlayers.map(({ player, frame }) => (
             <div
               key={player.steamId64}

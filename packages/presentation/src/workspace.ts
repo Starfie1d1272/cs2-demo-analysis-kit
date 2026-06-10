@@ -9,6 +9,7 @@ import {
   type TeamKey,
   type WorkspaceKillEvent,
   type WorkspaceReplayFrame,
+  type WorkspaceReplayRound,
   type WorkspaceSpatialPoint
 } from "@cs2dak/contract";
 import { groupBy, nameForSteamId, round, normalizeWeapon, isNamedWeapon } from "./workspace-utils.js";
@@ -718,6 +719,10 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
       y: proj.y
     })),
     bomb: buildRoundBomb(bombsByRound.get(roundRow.roundNumber) ?? []),
+    groundBombs: buildGroundBombs(
+      bombsByRound.get(roundRow.roundNumber) ?? [],
+      roundRow.startTick + roundRow.frameCount * roundRow.tickStep
+    ),
     players: roundRow.players.map((player) => {
       const frames: WorkspaceReplayFrame[] = [];
       for (let index = 0; index < roundRow.frameCount; index += 1) {
@@ -762,7 +767,7 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
 }
 
 /** 从 bombs.json 取该回合 C4 锚点：plant 位置定格，defuse/explode 决定终态。 */
-function buildRoundBomb(events: DemoPackage["bombs"]) {
+function buildRoundBomb(events: DemoPackage["bombs"]): WorkspaceReplayRound["bomb"] {
   const plant = events.find((event) => event.type === "planted");
   if (!plant) return null;
   return {
@@ -772,6 +777,27 @@ function buildRoundBomb(events: DemoPackage["bombs"]) {
     defuseTick: events.find((event) => event.type === "defused")?.tick ?? null,
     explodeTick: events.find((event) => event.type === "exploded")?.tick ?? null
   };
+}
+
+/** dropped → 下一次 picked_up / planted / exploded / defused 构成一段地面区间。 */
+function buildGroundBombs(events: DemoPackage["bombs"], roundEndTick: number): WorkspaceReplayRound["groundBombs"] {
+  const sorted = [...events].sort((a, b) => a.tick - b.tick);
+  const intervals: { startTick: number; endTick: number; x: number; y: number }[] = [];
+  for (let i = 0; i < sorted.length; i += 1) {
+    if (sorted[i].type !== "dropped") continue;
+    const drop = sorted[i];
+    // 找下一个相关事件：picked_up / planted / defused / exploded
+    const next = sorted.slice(i + 1).find((e) =>
+      e.type === "picked_up" || e.type === "planted" || e.type === "defused" || e.type === "exploded"
+    );
+    intervals.push({
+      startTick: drop.tick,
+      endTick: next?.tick ?? roundEndTick,
+      x: drop.position.x,
+      y: drop.position.y
+    });
+  }
+  return intervals;
 }
 
 function weaponNameForIndex(weaponDict: string[], index: number): string | null {

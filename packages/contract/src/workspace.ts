@@ -175,6 +175,14 @@ export const workspaceReplayProjectileSchema = z.object({
   y: z.array(z.number())
 });
 
+/** C4 掉落期间（world 坐标）：从 dropped 到被捡起/安放之间的地面标记。 */
+export const workspaceReplayGroundBombSchema = z.object({
+  startTick: z.number().int().positive(),
+  endTick: z.number().int().positive(),
+  x: z.number(),
+  y: z.number()
+});
+
 /** C4 事件锚点（world 坐标）：plant 之后在落点定格显示。 */
 export const workspaceReplayBombSchema = z.object({
   plantTick: z.number().int().positive(),
@@ -194,7 +202,9 @@ export const workspaceReplayRoundSchema = z.object({
   grenades: z.array(workspaceReplayGrenadeSchema),
   projectiles: z.array(workspaceReplayProjectileSchema),
   /** 该回合未下包时 null。 */
-  bomb: workspaceReplayBombSchema.nullable()
+  bomb: workspaceReplayBombSchema.nullable(),
+  /** C4 掉落在地上的区间（掉落→捡起/安放）。数组可能为空。 */
+  groundBombs: z.array(workspaceReplayGroundBombSchema).default([])
 });
 
 export const workspaceReplaySchema = z.object({
@@ -240,6 +250,7 @@ export type WorkspaceReplayPlayer = z.infer<typeof workspaceReplayPlayerSchema>;
 export type WorkspaceKillEvent = z.infer<typeof workspaceKillEventSchema>;
 export type WorkspaceReplayGrenade = z.infer<typeof workspaceReplayGrenadeSchema>;
 export type WorkspaceReplayProjectile = z.infer<typeof workspaceReplayProjectileSchema>;
+export type WorkspaceReplayGroundBomb = z.infer<typeof workspaceReplayGroundBombSchema>;
 export type WorkspaceReplayBomb = z.infer<typeof workspaceReplayBombSchema>;
 export type WorkspaceReplayRound = z.infer<typeof workspaceReplayRoundSchema>;
 export type MatchWorkspaceModel = z.infer<typeof matchWorkspaceModelSchema>;

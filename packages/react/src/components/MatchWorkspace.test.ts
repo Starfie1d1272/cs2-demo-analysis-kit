@@ -83,6 +83,7 @@ const model: MatchWorkspaceModel = {
         kills: [],
         grenades: [],
         projectiles: [],
+        groundBombs: [],
         bomb: null,
         players: [
           {
