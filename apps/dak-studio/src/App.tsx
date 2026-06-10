@@ -1,4 +1,4 @@
-import { Crosshair, Film, LibraryBig, Route, Trophy, UserRound } from "lucide-react";
+import { Bomb, ClipboardList, Coins, Crosshair, Film, LibraryBig, Swords, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { importDemoFile, listDemoEntries, removeDemo, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { EMPTY_SCOPE, applyScope, type CohortScopeState } from "./components/CohortScope";
@@ -10,21 +10,41 @@ import { MatchView } from "./views/MatchView";
 import { PlayersView } from "./views/PlayersView";
 import { LeaderboardView } from "./views/LeaderboardView";
 import { TrailsView } from "./views/TrailsView";
+import { ComingSoonView } from "./views/ComingSoonView";
 import sampleZipUrl from "../../../fixtures/input/sample-match.zip?url";
 
-type StudioView = "library" | "match" | "players" | "trails" | "leaderboard";
+// 八模块信息架构（docs/roadmap.md），未实现的模块以「制作中」占位展示
+type StudioView =
+  | "library"
+  | "match"
+  | "players"
+  | "duel"
+  | "utility"
+  | "economy"
+  | "tournament"
+  | "coach";
 
-const NAV: { key: StudioView; label: string; hint: string; icon: typeof LibraryBig }[] = [
+const NAV: { key: StudioView; label: string; hint: string; icon: typeof LibraryBig; wip?: boolean }[] = [
   { key: "library", label: "资料库", hint: "导入与管理 Demo", icon: LibraryBig },
   { key: "match", label: "比赛工作台", hint: "回合 / 地图 / 回放", icon: Film },
-  { key: "players", label: "选手档案", hint: "个人打法复盘", icon: UserRound },
-  { key: "trails", label: "开局动线", hint: "走位与道具习惯", icon: Route },
-  { key: "leaderboard", label: "排行榜", hint: "跨场指标对比", icon: Trophy }
+  { key: "players", label: "个人实验室", hint: "档案 / 开局动线", icon: UserRound },
+  { key: "duel", label: "对枪实验室", hint: "对枪与机制分析", icon: Swords, wip: true },
+  { key: "utility", label: "道具实验室", hint: "道具价值与落点", icon: Bomb, wip: true },
+  { key: "economy", label: "经济与节奏", hint: "买局质量 / 回合 swing", icon: Coins, wip: true },
+  { key: "tournament", label: "赛事中台", hint: "排行榜 / 报表", icon: Trophy },
+  { key: "coach", label: "教练工作台", hint: "战术模式与 playbook", icon: ClipboardList, wip: true }
 ];
+
+const PLAYER_TABS = [
+  { key: "profile", label: "选手档案" },
+  { key: "trails", label: "开局动线" }
+] as const;
+type PlayerTab = (typeof PLAYER_TABS)[number]["key"];
 
 export function App() {
   const [entries, setEntries] = useState<StudioDemoEntry[]>([]);
   const [view, setView] = useState<StudioView>("library");
+  const [playerTab, setPlayerTab] = useState<PlayerTab>("profile");
   const [selectedDemoId, setSelectedDemoId] = useState<string | null>(null);
   const [selectedPlayerKey, setSelectedPlayerKey] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
@@ -129,6 +149,7 @@ export function App() {
 
   const openPlayer = useCallback((playerKey: string) => {
     setSelectedPlayerKey(playerKey);
+    setPlayerTab("profile");
     setView("players");
   }, []);
 
@@ -171,7 +192,7 @@ export function App() {
           </div>
         </div>
         <nav className="stu-nav">
-          {NAV.map(({ key, label, hint, icon: Icon }) => (
+          {NAV.map(({ key, label, hint, icon: Icon, wip }) => (
             <button
               key={key}
               type="button"
@@ -180,7 +201,10 @@ export function App() {
             >
               <Icon size={16} />
               <span>
-                <b>{label}</b>
+                <b>
+                  {label}
+                  {wip && <i className="stu-wip-dot" title="制作中" />}
+                </b>
                 <small>{hint}</small>
               </span>
             </button>
@@ -224,27 +248,95 @@ export function App() {
           <MatchView entries={entries} demoId={selectedDemoId} onSelectDemo={setSelectedDemoId} onGoLibrary={() => setView("library")} />
         )}
         {view === "players" && (
-          <PlayersView
-            allEntries={entries}
-            entries={scopedEntries}
-            scope={scope}
-            onScopeChange={setScope}
-            selectedPlayerKey={selectedPlayerKey}
-            onSelectPlayer={setSelectedPlayerKey}
-            onOpenMatch={openDemo}
-            onGoLibrary={() => setView("library")}
+          <>
+            <div className="stu-subtabs" role="tablist" aria-label="个人实验室">
+              {PLAYER_TABS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={playerTab === key}
+                  className={playerTab === key ? "stu-subtab stu-subtab-active" : "stu-subtab"}
+                  onClick={() => setPlayerTab(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {playerTab === "profile" ? (
+              <PlayersView
+                allEntries={entries}
+                entries={scopedEntries}
+                scope={scope}
+                onScopeChange={setScope}
+                selectedPlayerKey={selectedPlayerKey}
+                onSelectPlayer={setSelectedPlayerKey}
+                onOpenMatch={openDemo}
+                onGoLibrary={() => setView("library")}
+              />
+            ) : (
+              <TrailsView
+                allEntries={entries}
+                entries={scopedEntries}
+                scope={scope}
+                onScopeChange={setScope}
+                onGoLibrary={() => setView("library")}
+              />
+            )}
+          </>
+        )}
+        {view === "duel" && (
+          <ComingSoonView
+            title="对枪实验室"
+            description="对枪重构与射击机制分析——谁先开枪、TTK、武器对位、移动射击纪律。"
+            planned={[
+              "逐枪流（shots.json）接入 exporter",
+              "Duel Finder：按位置 / 武器 / 先手筛选对枪",
+              "Opening Duel 分析：首杀对位与 TTK 拆解",
+              "移动射击与压枪纪律统计"
+            ]}
+            availableNow="目前可在「比赛工作台」的对位矩阵与击杀列表中查看对枪结果。"
           />
         )}
-        {view === "trails" && (
-          <TrailsView
-            allEntries={entries}
-            entries={scopedEntries}
-            scope={scope}
-            onScopeChange={setScope}
-            onGoLibrary={() => setView("library")}
+        {view === "utility" && (
+          <ComingSoonView
+            title="道具实验室"
+            description="道具价值量化——每颗闪 / 烟 / 火的实际收益，与负收益道具证据化。"
+            planned={[
+              "Flash Value：enemy/team flashed 秒数与净价值",
+              "负收益道具（队闪、空爆烟）Top 列表",
+              "Lineup Library：成功道具自动沉淀",
+              "道具落点与时机热力图"
+            ]}
+            availableNow="目前可在「个人实验室 → 开局动线」查看走位叠加的道具投掷习惯。"
           />
         )}
-        {view === "leaderboard" && (
+        {view === "economy" && (
+          <ComingSoonView
+            title="经济与节奏"
+            description="买局质量与回合 momentum——经济决策对比赛节奏的影响。"
+            planned={[
+              "Buy Quality：full / force / eco / conversion 胜率链",
+              "kit / 头盔覆盖率与经济断点",
+              "回合 swing 与 momentum 时间线",
+              "手枪局与转化局专项分析"
+            ]}
+            availableNow="目前可在「比赛工作台」的经济面板查看逐回合经济。"
+          />
+        )}
+        {view === "coach" && (
+          <ComingSoonView
+            title="教练工作台"
+            description="战术模式识别与备战——pattern finder、playbook 沉淀与对手倾向分析。"
+            planned={[
+              "Rule-based 开局聚类与战术模式标注",
+              "Timing Heatmap：战术关键事件按回合秒数分布",
+              "Playbook / Anti-Strat 报告",
+              "Veto 辅助（地图池倾向）"
+            ]}
+          />
+        )}
+        {view === "tournament" && (
           <LeaderboardView
             allEntries={entries}
             entries={scopedEntries}

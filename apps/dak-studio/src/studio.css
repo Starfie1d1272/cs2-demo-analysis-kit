@@ -1168,6 +1168,107 @@ body {
   gap: 6px;
 }
 
+/* --- 模块子页签（个人实验室：档案 / 开局动线） --- */
+.stu-subtabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--dak-border);
+}
+
+.stu-subtab {
+  padding: 8px 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--dak-fg-mid);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.stu-subtab:hover {
+  color: var(--dak-fg);
+}
+
+.stu-subtab-active,
+.stu-subtab-active:hover {
+  color: var(--dak-accent);
+  border-bottom-color: var(--dak-accent);
+  font-weight: 600;
+}
+
+/* --- 制作中模块 --- */
+.stu-wip-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--dak-fg-dim);
+  vertical-align: middle;
+  opacity: 0.7;
+}
+
+.stu-wip-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--dak-border);
+  border-radius: 999px;
+  color: var(--dak-fg-dim);
+  font-size: 11px;
+  font-weight: 500;
+  vertical-align: middle;
+}
+
+.stu-coming {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 24px;
+  border: 1px dashed var(--dak-border);
+  border-radius: var(--stu-radius);
+  background: var(--dak-bg-subtle);
+  text-align: center;
+}
+
+.stu-coming-mark {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--dak-panel);
+  color: var(--dak-fg-dim);
+}
+
+.stu-coming h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.stu-coming-list {
+  margin-top: 12px;
+  text-align: left;
+}
+
+.stu-coming-list h3 {
+  margin: 0 0 6px;
+  color: var(--dak-fg-mid);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.stu-coming-list ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--dak-fg-dim);
+  font-size: 12.5px;
+  line-height: 1.9;
+}
+
 .stu-trail-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 250px;
@@ -1186,6 +1287,10 @@ body {
   display: block;
   width: 100%;
   aspect-ratio: 1;
+  /* 限高：保证筛选控件与播放条同屏可见，地图不独占视口 */
+  max-height: calc(100vh - 360px);
+  min-height: 320px;
+  margin: 0 auto;
   background: #07090b;
 }
 

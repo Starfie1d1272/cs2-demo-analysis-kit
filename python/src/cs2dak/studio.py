@@ -42,20 +42,45 @@ else:
     WEB_DIR = Path(__file__).parent / "studio_web"
 
 
-def _studio_userdata() -> Path:
-    """Platform-appropriate persistent directory for cookies / IndexedDB / localStorage.
-
-    macOS   → ~/Library/Application Support/DAK Studio/userdata
-    Windows → %APPDATA%/DAK Studio/userdata
-    Other   → ~/.dak-studio/userdata
-    """
+def _appdata_userdata() -> Path:
+    """系统级用户数据目录（0.1.4 引入的旧位置，现仅作迁移源与回退）。"""
     if sys.platform == "darwin":
         base = Path.home() / "Library" / "Application Support" / "DAK Studio"
     elif sys.platform == "win32":
         base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming")) / "DAK Studio"
     else:
         base = Path.home() / ".dak-studio"
-    path = base / "userdata"
+    return base / "userdata"
+
+
+def _studio_userdata() -> Path:
+    """Persistent directory for cookies / IndexedDB / localStorage.
+
+    Windows 打包版 → exe 同目录 userdata/（便携式：数据跟应用走，直观可见、
+                     换电脑拷目录即迁移）。目录不可写（如装进 Program Files）
+                     时回退 %APPDATA%/DAK Studio/userdata。
+    macOS   → ~/Library/Application Support/DAK Studio/userdata
+              （.app 内部不可写且受 translocation 影响，不做便携式）
+    其他/开发模式 → 沿用系统目录。
+
+    首次切换到便携目录时，自动把旧 %APPDATA% 数据整体拷贝过来，
+    避免 0.1.4/0.1.5 用户升级后资料库"清空"。
+    """
+    if sys.platform == "win32" and getattr(sys, "frozen", False):
+        portable = Path(sys.executable).parent / "userdata"
+        try:
+            legacy = _appdata_userdata()
+            if not portable.exists() and legacy.exists():
+                shutil.copytree(legacy, portable)
+            portable.mkdir(parents=True, exist_ok=True)
+            # 写权限探测：Program Files 下创建成功但写入会失败
+            probe = portable / ".write-probe"
+            probe.write_text("ok")
+            probe.unlink()
+            return portable
+        except OSError:
+            pass  # 不可写：回退系统目录
+    path = _appdata_userdata()
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -75,11 +100,21 @@ class StudioApi:
         """Open a native file dialog and return chosen .dem / .zip paths."""
         import webview
 
-        result = self._window.create_file_dialog(
-            webview.FileDialog.OPEN,
-            allow_multiple=True,
-            file_types=("Demo / v2 ZIP (*.dem;*.zip)", "All files (*.*)"),
-        )
+        try:
+            # 过滤器标签只能含字母数字与空格（pywebview Windows 端用
+            # ``([\w ]+)`` 正则校验，'/' 等符号会直接抛
+            # "... is not a valid file filter"）。
+            result = self._window.create_file_dialog(
+                webview.FileDialog.OPEN,
+                allow_multiple=True,
+                file_types=("CS2 Demo (*.dem;*.zip)", "All files (*.*)"),
+            )
+        except Exception:
+            # 兜底：过滤器在某后端不被接受时退化为无过滤对话框，
+            # 保证导入入口永远可用。
+            result = self._window.create_file_dialog(
+                webview.FileDialog.OPEN, allow_multiple=True
+            )
         return list(result or [])
 
     def export_dem_path(self, path: str) -> dict:
