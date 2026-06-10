@@ -37,21 +37,43 @@ cd "$ROOT"
 VERSION="$(node -p "require('./package.json').version")"
 if [[ "$OSTYPE" == darwin* ]]; then
   echo "==> [4/5] Creating DMGs"
-  APP="python/dist/cs2dak.app"
-  if [[ -d "$APP" ]]; then
-    DMG="python/dist/cs2dak-${VERSION}.dmg"
-    rm -f "$DMG"
-    hdiutil create -volname "CS2 Demo Exporter" -srcfolder "$APP" -ov -format UDZO "$DMG"
+
+  # macOS DMG 标准 UX：必须包含指向 /Applications 的快捷方式。
+  # 光秃秃的 .app 让用户不知道拖到哪；直接从挂载卷里双击会被 Gatekeeper
+  # 静默拒绝（仅第一次弹 System Settings，之后没有任何提示）。
+  make_dmg() {
+    local app_path="$1"
+    local dmg_path="$2"
+    local app_name vol_name stage
+
+    app_name="$(basename "$app_path")"
+    vol_name="${app_name%.app}"
+    stage="$(mktemp -d -t dak-dmg)"
+
+    cp -R "$app_path" "$stage/"
+    ln -s /Applications "$stage/Applications"
+
+    # hdiutil -srcfolder 保留 symlink；挂载后用户看到 .app + Applications alias，
+    # 拖到 Applications 就会完整解隔离。
+    hdiutil create \
+      -volname "$vol_name" \
+      -srcfolder "$stage" \
+      -ov \
+      -format UDZO \
+      "$dmg_path"
+
+    rm -rf "$stage"
+  }
+
+  if [[ -d python/dist/cs2dak.app ]]; then
+    make_dmg python/dist/cs2dak.app "python/dist/cs2dak-${VERSION}.dmg"
   else
-    echo "    Skipped exporter DMG: $APP not found"
+    echo "    Skipped exporter DMG: python/dist/cs2dak.app not found"
   fi
-  STUDIO_APP="python/dist/DAK Studio.app"
-  if [[ -d "$STUDIO_APP" ]]; then
-    STUDIO_DMG="python/dist/dak-studio-${VERSION}.dmg"
-    rm -f "$STUDIO_DMG"
-    hdiutil create -volname "DAK Studio" -srcfolder "$STUDIO_APP" -ov -format UDZO "$STUDIO_DMG"
+  if [[ -d python/dist/DAK\ Studio.app ]]; then
+    make_dmg "python/dist/DAK Studio.app" "python/dist/dak-studio-${VERSION}.dmg"
   else
-    echo "    Skipped studio DMG: $STUDIO_APP not found"
+    echo "    Skipped studio DMG: python/dist/DAK Studio.app not found"
   fi
 else
   echo "==> [4/5] Skipped DMG: not macOS (PyInstaller output in python/dist/)"
