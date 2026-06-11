@@ -8,7 +8,7 @@ on:
 
 jobs:
   typescript:
-    name: TypeScript (typecheck · test · build)
+    name: TypeScript (typecheck · fast tests · build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -26,11 +26,28 @@ jobs:
 
       - run: pnpm typecheck
 
-      # vitest 3.2.4 曾有 worker RPC onTaskUpdate 超时 bug（CI 全过仍 exit 1），
-      # 已通过升级 vitest 4 根治；这里保持直跑，不要再加输出解析的 workaround。
       - run: pnpm test
 
       - run: pnpm build
+
+  typescript-integration:
+    name: TypeScript (integration tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 23
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm test:integration
 
   python:
     name: Python (pytest)

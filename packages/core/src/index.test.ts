@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import type { DemoPackage } from "@cs2dak/contract";
 import {
   analyzeDemoPackage,
   computeAccountRatingsV2,
@@ -10,10 +11,15 @@ import {
   loadDemoPackageFromZip
 } from "./index";
 
+let pkg: DemoPackage;
+
+beforeAll(async () => {
+  const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
+  pkg = await loadDemoPackageFromZip(zip);
+}, 30_000);
+
 describe("analyzeDemoPackage", () => {
-  it("builds reusable analysis and view-model artifacts from a strict v2 export", async () => {
-    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
-    const pkg = await loadDemoPackageFromZip(zip);
+  it("builds reusable analysis and view-model artifacts from a strict v2 export", () => {
     const bundle = analyzeDemoPackage(pkg);
     expect(bundle.sourceSchemaVersion).toBe("cs2-demo-format/2.0");
     expect(bundle.version).toBe("cs2-demo-analysis-kit/1.0");
@@ -33,9 +39,7 @@ describe("analyzeDemoPackage", () => {
     expect(bundle.timeline.find((event) => event.type === "kill")?.clockLabel).toMatch(/^\d:\d{2}$/);
   });
 
-  it("derives RR six-account signals and computes v2 RR from the strict v2 fixture", async () => {
-    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
-    const pkg = await loadDemoPackageFromZip(zip);
+  it("derives RR six-account signals and computes v2 RR from the strict v2 fixture", () => {
     const signals = deriveAccountSignalsV2(pkg);
     const ratings = computeAccountRatingsV2(pkg);
 
@@ -49,9 +53,7 @@ describe("analyzeDemoPackage", () => {
     expect(ratings[0]?.rr.rr).toBeGreaterThan(0);
   });
 
-  it("scores accountRR against the frozen pro baseline instead of the match mean", async () => {
-    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
-    const pkg = await loadDemoPackageFromZip(zip);
+  it("scores accountRR against the frozen pro baseline instead of the match mean", () => {
     const bundle = analyzeDemoPackage(pkg);
 
     const accountRRs = bundle.scoreboard.map((row) => row.accountRR);
@@ -63,9 +65,7 @@ describe("analyzeDemoPackage", () => {
     expect(accountRRs.some((v) => v < 1.0)).toBe(true);
   });
 
-  it("exposes RRIndicators without rebuilding them in cohort callers", async () => {
-    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
-    const pkg = await loadDemoPackageFromZip(zip);
+  it("exposes RRIndicators without rebuilding them in cohort callers", () => {
     const indicators = deriveRRIndicators(pkg);
     const bundle = analyzeDemoPackage(pkg);
 
@@ -73,9 +73,7 @@ describe("analyzeDemoPackage", () => {
     expect(indicators[0]).toEqual(bundle.playerIndicators[0]?.indicators);
   });
 
-  it("wires player-stats truth into RRIndicators instead of legacy approximations", async () => {
-    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
-    const pkg = await loadDemoPackageFromZip(zip);
+  it("wires player-stats truth into RRIndicators instead of legacy approximations", () => {
     const statsTruth = pkg.playerStats[0]!;
     const patchedStats = {
       ...statsTruth,
@@ -100,9 +98,7 @@ describe("analyzeDemoPackage", () => {
     expect(wallbangIndicators.wallbangKillCount).toBe(wallbangStats.wallbangKillCount);
   });
 
-  it("surfaces account breakdown and context status on the scoreboard", async () => {
-    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
-    const pkg = await loadDemoPackageFromZip(zip);
+  it("surfaces account breakdown and context status on the scoreboard", () => {
     const bundle = analyzeDemoPackage(pkg);
     const row = bundle.scoreboard[0]!;
 
@@ -112,9 +108,7 @@ describe("analyzeDemoPackage", () => {
     expect(row.accountContextStatus.manState).toBe("available");
   });
 
-  it("surfaces rich v2 fields and confidence on the scoreboard", async () => {
-    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
-    const pkg = await loadDemoPackageFromZip(zip);
+  it("surfaces rich v2 fields and confidence on the scoreboard", () => {
     const bundle = analyzeDemoPackage(pkg);
     const row = bundle.scoreboard[0]!;
 
@@ -134,9 +128,7 @@ describe("analyzeDemoPackage", () => {
     expect(row.confidence).toBeCloseTo(0.917, 3);
   });
 
-  it("derives reusable per-player weapon kill distribution and highlight facts", async () => {
-    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
-    const pkg = await loadDemoPackageFromZip(zip);
+  it("derives reusable per-player weapon kill distribution and highlight facts", () => {
     const facts = derivePlayerWeaponHighlights(pkg);
     const bundle = analyzeDemoPackage(pkg);
 
@@ -156,10 +148,7 @@ describe("analyzeDemoPackage", () => {
     expect(facts.every((row) => row.highlights.throughSmokeKills != null)).toBe(true);
   });
 
-  it("emits null context buckets (not zero) when the data source is missing", async () => {
-    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
-    const pkg = await loadDemoPackageFromZip(zip);
-
+  it("emits null context buckets (not zero) when the data source is missing", () => {
     // 剥离经济源 → buyDelta 降级为 null（而非零桶）；manState 仍可用
     const noEconomy = deriveAccountSignalsV2({ ...pkg, playerEconomies: [] });
     expect(noEconomy[0]?.combat.killsByBuyDelta).toBeNull();

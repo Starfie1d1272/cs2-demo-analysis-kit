@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import type { DemoPackage } from "@cs2dak/contract";
@@ -7,6 +7,13 @@ import { getMapTri } from "@cs2dak/maps/tri-assets";
 import { loadDemoPackageFromZip } from "../loader.js";
 import { loadSpatialAssets, type SpatialAssets } from "./annotate.js";
 import { buildOfficialUtilitySpatial, buildUtilityWindows } from "./utility.js";
+
+let deAncientPkg: DemoPackage | null = null;
+
+beforeAll(async () => {
+  const zip = await readFile(fileURLToPath(new URL("../../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
+  deAncientPkg = await loadDemoPackageFromZip(zip);
+}, 30_000);
 
 // 合成 1 个方形 A 点 zone（无 nav/tri）——测归属 + 火焰逼退（zone-based，不需要 nav）。
 const SITE_ZONES: MapZones = {
@@ -61,9 +68,8 @@ describe("incendiary displacement / path delay (zone-based)", () => {
 });
 
 describe("UtilitySpatial end-to-end on de_ancient (nav-detour isolation, no tri)", () => {
-  it("attributes real grenades and derives nav-backed isolation; LOS null without tri", async () => {
-    const zip = await readFile(fileURLToPath(new URL("../../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
-    const pkg = await loadDemoPackageFromZip(zip);
+  it("attributes real grenades and derives nav-backed isolation; LOS null without tri", () => {
+    const pkg = deAncientPkg!;
     const assets = loadSpatialAssets("de_ancient"); // 不传 tri → visibility null
     expect(assets.available.zones).toBe(true);
     expect(assets.available.nav).toBe(true);
@@ -84,14 +90,13 @@ describe("UtilitySpatial end-to-end on de_ancient (nav-detour isolation, no tri)
 });
 
 describe("UtilitySpatial LOS metrics on de_ancient (tri-backed)", () => {
-  it("derives non-null sightline denial / protected crossings when tri-BVH is available", async () => {
+  it("derives non-null sightline denial / protected crossings when tri-BVH is available", () => {
     const tri = getMapTri("de_ancient");
     if (!tri) {
       // 本机未下载 ~/.awpy/tris/de_ancient.tri → 跳过（CI 无 tri）
       return;
     }
-    const zip = await readFile(fileURLToPath(new URL("../../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
-    const pkg = await loadDemoPackageFromZip(zip);
+    const pkg = deAncientPkg!;
     const assets = loadSpatialAssets("de_ancient", tri);
     expect(assets.available.visibility).toBe(true);
 

@@ -1,38 +1,37 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { derivePlayerWeaponHighlights, deriveRRIndicators, loadDemoPackageFromZip } from "@cs2dak/core";
 import type { DemoPackage } from "@cs2dak/contract";
 import { buildSeasonCohort } from "./index";
 
 const fixtureDir = fileURLToPath(new URL("../../../fixtures/input/cohort", import.meta.url));
 const integrationTimeoutMs = 90_000; // CI 2-core runner 加载 3 场 ZIP + cohort 分析比本机慢 5–10×
-let cohortFixtures: ReturnType<typeof loadCohortFixtures> | null = null;
+let demos: Awaited<ReturnType<typeof loadCohortFixtures>> | null = null;
+let baselineBundle: ReturnType<typeof buildSeasonCohort> | null = null;
 
 async function loadCohortFixtures() {
   const names = (await readdir(fixtureDir)).filter((name) => name.endsWith(".zip")).sort();
-  const demos = await Promise.all(
+  return Promise.all(
     names.map(async (name) => ({
       matchId: name.replace(/\.zip$/, ""),
       pkg: await loadDemoPackageFromZip(await readFile(join(fixtureDir, name)))
     }))
   );
-  return demos;
 }
 
-function getCohortFixtures() {
-  cohortFixtures ??= loadCohortFixtures();
-  return cohortFixtures;
-}
+beforeAll(async () => {
+  demos = await loadCohortFixtures();
+  baselineBundle = buildSeasonCohort(demos);
+}, integrationTimeoutMs);
 
 describe("buildSeasonCohort", () => {
-  it("builds a season bundle from multiple sanitized demo packages", async () => {
-    const demos = await getCohortFixtures();
-    const bundle = buildSeasonCohort(demos);
-    const uniquePlayers = new Set(demos.flatMap((demo) => demo.pkg.players.map((player) => player.steamId64)));
+  it("builds a season bundle from multiple sanitized demo packages", () => {
+    const bundle = baselineBundle!;
+    const uniquePlayers = new Set(demos!.flatMap((demo) => demo.pkg.players.map((player) => player.steamId64)));
 
-    expect(demos).toHaveLength(3);
+    expect(demos!).toHaveLength(3);
     expect(bundle.matchCount).toBe(3);
     expect(bundle.version).toBe("cs2-demo-analysis-kit/cohort-1.0");
     expect(bundle.provenance.matches).toHaveLength(3);
@@ -40,19 +39,18 @@ describe("buildSeasonCohort", () => {
     expect(bundle.players.length).toBeGreaterThan(10);
     expect(bundle.players.every((row) => row.prism?.mapCount === row.mapCount)).toBe(true);
     expect(bundle.players.every((row) => row.playerKey.startsWith("steam:"))).toBe(true);
-  }, integrationTimeoutMs);
+  });
 
-  it("merges the same steamId64 across matches and sums season counts", async () => {
-    const demos = await getCohortFixtures();
-    const bundle = buildSeasonCohort(demos);
+  it("merges the same steamId64 across matches and sums season counts", () => {
+    const bundle = baselineBundle!;
     const repeated = bundle.players.find((row) => row.mapCount > 1);
     expect(repeated).toBeDefined();
 
-    const expectedKills = demos.reduce((total, demo) => {
+    const expectedKills = demos!.reduce((total, demo) => {
       const row = deriveRRIndicators(demo.pkg).find((indicator) => repeated!.steamIds.includes(indicator.steamId64));
       return total + (row?.kills ?? 0);
     }, 0);
-    const expectedRounds = demos.reduce((total, demo) => {
+    const expectedRounds = demos!.reduce((total, demo) => {
       const row = deriveRRIndicators(demo.pkg).find((indicator) => repeated!.steamIds.includes(indicator.steamId64));
       return total + (row?.totalRounds ?? 0);
     }, 0);
@@ -60,17 +58,15 @@ describe("buildSeasonCohort", () => {
     expect(repeated!.indicators.kills).toBe(expectedKills);
     expect(repeated!.indicators.totalRounds).toBe(expectedRounds);
     expect(repeated!.perMatch).toHaveLength(repeated!.mapCount);
-  }, integrationTimeoutMs);
+  });
 
-  it("can merge borrowed Steam accounts through an external identity map", async () => {
-    const demos = await getCohortFixtures();
-    const firstSteamId = demos[0]!.pkg.players[0]!.steamId64;
-    const borrowedSteamId = demos
+  it("can merge borrowed Steam accounts through an external identity map", () => {
+    const firstSteamId = demos![0]!.pkg.players[0]!.steamId64;
+    const borrowedSteamId = demos!
       .slice(1)
       .flatMap((demo) => demo.pkg.players.map((player) => player.steamId64))
       .find((steamId) => steamId !== firstSteamId)!;
-    const baseline = buildSeasonCohort(demos);
-    const bundle = buildSeasonCohort(demos, {
+    const bundle = buildSeasonCohort(demos!, {
       identityMap: {
         [firstSteamId]: {
           playerKey: "user:rivalhub-user-1",
@@ -86,7 +82,7 @@ describe("buildSeasonCohort", () => {
     });
     const merged = bundle.players.find((row) => row.playerKey === "user:rivalhub-user-1");
 
-    expect(bundle.players).toHaveLength(baseline.players.length - 1);
+    expect(bundle.players).toHaveLength(baselineBundle!.players.length - 1);
     expect(merged).toBeDefined();
     expect(merged!.name).toBe("Unified Player");
     expect(merged!.externalUserId).toBe("rivalhub-user-1");
@@ -94,25 +90,23 @@ describe("buildSeasonCohort", () => {
     expect([...new Set(merged!.perMatch.map((row) => row.steamId64))].sort()).toEqual([borrowedSteamId, firstSteamId].sort());
     expect(merged!.indicators.steamId64).toBe("user:rivalhub-user-1");
     expect(merged!.prism?.steamId64).toBe("user:rivalhub-user-1");
-  }, integrationTimeoutMs);
+  });
 
-  it("scores season accountRR against the same frozen pro baseline as single matches", async () => {
-    const bundle = buildSeasonCohort(await getCohortFixtures());
-    const mean = bundle.players.reduce((sum, row) => sum + row.accountRR, 0) / bundle.players.length;
+  it("scores season accountRR against the same frozen pro baseline as single matches", () => {
+    const mean = baselineBundle!.players.reduce((sum, row) => sum + row.accountRR, 0) / baselineBundle!.players.length;
 
     expect(mean).toBeGreaterThan(0);
     expect(mean).not.toBeCloseTo(1, 2);
-    expect(bundle.players.some((row) => row.accountRR > 1)).toBe(true);
-    expect(bundle.players.some((row) => row.accountRR < 1)).toBe(true);
-  }, integrationTimeoutMs);
+    expect(baselineBundle!.players.some((row) => row.accountRR > 1)).toBe(true);
+    expect(baselineBundle!.players.some((row) => row.accountRR < 1)).toBe(true);
+  });
 
-  it("recomputes rate fields from summed counts and rounds", async () => {
-    const demos = await getCohortFixtures();
-    const bundle = buildSeasonCohort(demos);
+  it("recomputes rate fields from summed counts and rounds", () => {
+    const bundle = baselineBundle!;
     const repeated = bundle.players.find((row) => row.mapCount > 1);
     expect(repeated).toBeDefined();
 
-    const sourceRows = demos
+    const sourceRows = demos!
       .flatMap((demo) => deriveRRIndicators(demo.pkg))
       .filter((row) => repeated!.steamIds.includes(row.steamId64));
     const damage = sourceRows.reduce((sum, row) => sum + row.adr * row.totalRounds, 0);
@@ -121,13 +115,12 @@ describe("buildSeasonCohort", () => {
 
     expect(repeated!.indicators.adr).toBeCloseTo(damage / rounds, 2);
     expect(repeated!.indicators.adr).not.toBeCloseTo(plainAverageAdr, 4);
-  }, integrationTimeoutMs);
+  });
 
-  it("lowers confidence when context sources are missing", async () => {
-    const demos = await getCohortFixtures();
-    const complete = buildSeasonCohort(demos);
+  it("lowers confidence when context sources are missing", () => {
+    const complete = baselineBundle!;
     const stripped = buildSeasonCohort(
-      demos.map((demo) => ({
+      demos!.map((demo) => ({
         matchId: demo.matchId,
         pkg: { ...demo.pkg, playerEconomies: [], rounds: [] } satisfies DemoPackage
       }))
@@ -135,13 +128,12 @@ describe("buildSeasonCohort", () => {
 
     expect(complete.players[0]?.confidence).toBeGreaterThan(stripped.players[0]?.confidence ?? 1);
     expect(stripped.players.every((row) => row.confidence >= 0 && row.confidence <= 1)).toBe(true);
-  }, integrationTimeoutMs);
+  });
 
-  it("sums weapon distributions and highlight counts across identities", async () => {
-    const demos = await getCohortFixtures();
-    const bundle = buildSeasonCohort(demos);
+  it("sums weapon distributions and highlight counts across identities", () => {
+    const bundle = baselineBundle!;
     const repeated = bundle.players.find((row) => row.mapCount > 1)!;
-    const source = demos
+    const source = demos!
       .flatMap((demo) => derivePlayerWeaponHighlights(demo.pkg))
       .filter((row) => repeated.steamIds.includes(row.steamId64));
     const expectedTotalKills = source.reduce((sum, row) => sum + row.totalKills, 0);
@@ -154,5 +146,5 @@ describe("buildSeasonCohort", () => {
     expect(repeated.weaponHighlights.weapons.reduce((sum, row) => sum + row.kills, 0)).toBe(expectedTotalKills);
     expect(repeated.weaponHighlights.weapons.reduce((sum, row) => sum + row.headshotKills, 0)).toBe(expectedWeaponHeadshots);
     expect(repeated.weaponHighlights.highlights.noScopeKills).toBe(expectedNoScopes);
-  }, integrationTimeoutMs);
+  });
 });
