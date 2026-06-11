@@ -11,11 +11,10 @@ import {
 
 const EMPTY: IdentityStoreState = { version: 0, mappings: [], teamRenames: {} };
 
-function makeMapping(overrides: Partial<IdentityMapping> & { steamIds: string[] }): IdentityMapping {
+function makeMapping(overrides: Partial<Omit<IdentityMapping, "steamIds">> & { steamIds: string[] }): IdentityMapping {
   return {
     playerKey: `steam:${overrides.steamIds[0]}`,
     displayName: overrides.displayName ?? "Player",
-    steamIds: overrides.steamIds,
     updatedAt: overrides.updatedAt ?? 0,
     ...overrides
   };
