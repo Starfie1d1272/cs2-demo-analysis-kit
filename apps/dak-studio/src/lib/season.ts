@@ -11,12 +11,14 @@ import type {
   SeasonCohortBundle,
   SeasonLeaderboardModel
 } from "@cs2dak/contract";
-import { getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "./library";
+import { clearPkgCache, getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "./library";
 
 export interface IdentityOptions {
   /** 与 IdentityStoreState.version 一致；0 表示无自定义映射。 */
   version: number;
   map: PlayerIdentityMap;
+  /** 队伍原名 → 显示名；聚合时替换 pkg.match.teamA/B.name，同名队伍自动合并。 */
+  teamRenames?: Record<string, string>;
 }
 
 /**
@@ -134,19 +136,32 @@ async function prunePersisted(): Promise<void> {
 let demosKey = "";
 let demosPromise: Promise<SeasonInsightsDemo[]> | null = null;
 
+/** 逐场加载 DemoPackage 并应用队伍改名，返回 SeasonInsightsDemo[]。 */
+async function loadDemosWithRenames(
+  entries: StudioDemoEntry[],
+  teamRenames?: Record<string, string>
+): Promise<SeasonInsightsDemo[]> {
+  const sorted = [...entries].sort((a, b) => a.fileName.localeCompare(b.fileName));
+  const demos: SeasonInsightsDemo[] = [];
+  for (const entry of sorted) {
+    const pkg = await getDemoPackage(entry.id);
+    // 应用队伍改名：直接修改 match 对象（Zod parsed，非 frozen）
+    if (teamRenames && Object.keys(teamRenames).length > 0) {
+      const rename = (name: string | null) => name == null ? name : (teamRenames[name] ?? name);
+      pkg.match.teamA.name = rename(pkg.match.teamA.name);
+      pkg.match.teamB.name = rename(pkg.match.teamB.name);
+    }
+    demos.push({ matchId: matchIdForEntry(entry), pkg });
+  }
+  return demos;
+}
+
 /** 与 cohort 同源的 {matchId, pkg} 列表；只有逐场派生（个人洞察）才需要。 */
 export function getSeasonDemos(entries: StudioDemoEntry[]): Promise<SeasonInsightsDemo[]> {
   const key = keyOf(entries);
   if (demosPromise && key === demosKey) return demosPromise;
   demosKey = key;
-  demosPromise = Promise.all(
-    [...entries]
-      .sort((a, b) => a.fileName.localeCompare(b.fileName))
-      .map(async (entry) => ({
-        matchId: matchIdForEntry(entry),
-        pkg: await getDemoPackage(entry.id)
-      }))
-  );
+  demosPromise = loadDemosWithRenames(entries);
   demosPromise.catch(() => {
     demosKey = "";
     demosPromise = null;
@@ -158,7 +173,8 @@ let summaryKey = "";
 let summaryPromise: Promise<SeasonSummary> | null = null;
 
 /** 聚合摘要：优先持久缓存命中（不触碰 ZIP），未命中才全量解析并回写。
- *  传入 identity 时将其并入缓存 key，identityMap 作为归并参数传给 buildSeasonCohort。 */
+ *  传入 identity 时将其并入缓存 key，identityMap 作为归并参数传给 buildSeasonCohort。
+ *  teamRenames 在加载阶段应用，同名队伍自动合并。聚合后释放 pkgCache 降低峰值内存。 */
 export function getSeasonSummary(entries: StudioDemoEntry[], identity?: IdentityOptions): Promise<SeasonSummary> {
   const key = keyOf(entries, identity?.version);
   if (summaryPromise && key === summaryKey) return summaryPromise;
@@ -166,7 +182,7 @@ export function getSeasonSummary(entries: StudioDemoEntry[], identity?: Identity
   summaryPromise = (async () => {
     const persisted = await readPersisted(key);
     if (persisted) return persisted;
-    const demos = await getSeasonDemos(entries);
+    const demos = await loadDemosWithRenames(entries, identity?.teamRenames);
     const cohortOpts = identity?.version ? { identityMap: identity.map } : {};
     const bundle = buildSeasonCohort(demos, cohortOpts);
     const summary: SeasonSummary = {
@@ -175,6 +191,8 @@ export function getSeasonSummary(entries: StudioDemoEntry[], identity?: Identity
       profiles: buildAllPlayerSeasonProfiles(bundle),
       insights: demos.length > 0 ? buildTournamentInsights(demos) : null
     };
+    // 聚合完成，释放 DemoPackage 缓存降低峰值内存；后续读取从 derived 表重建
+    clearPkgCache();
     void writePersisted(key, summary);
     return summary;
   })();

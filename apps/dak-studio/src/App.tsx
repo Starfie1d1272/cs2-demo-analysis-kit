@@ -75,9 +75,9 @@ export function App() {
   const scopedEntries = useMemo(() => applyScope(entries, scope), [entries, scope]);
   const identityOptions = useMemo<IdentityOptions | undefined>(
     () => identityState.version > 0
-      ? { version: identityState.version, map: buildCohortIdentityMap(identityState.mappings) }
+      ? { version: identityState.version, map: buildCohortIdentityMap(identityState.mappings), teamRenames: identityState.teamRenames }
       : undefined,
-    [identityState.version, identityState.mappings]
+    [identityState.version, identityState.mappings, identityState.teamRenames]
   );
 
   useEffect(() => {

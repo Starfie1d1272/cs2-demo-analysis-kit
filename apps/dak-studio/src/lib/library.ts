@@ -153,6 +153,12 @@ export function formatMatchLabel(entry: StudioDemoEntry): string {
 }
 
 const pkgCache = new Map<string, Promise<DemoPackage>>();
+
+/** 释放内存中的 DemoPackage 缓存。聚合完成后调用以降低峰值内存。 */
+export function clearPkgCache(): void {
+  pkgCache.clear();
+}
+
 let workerSeq = 0;
 
 function parseZipInWorker(buffer: ArrayBuffer): Promise<DemoPackage> {
