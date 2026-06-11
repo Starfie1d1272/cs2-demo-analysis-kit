@@ -1564,3 +1564,13 @@ body {
 .stu-trend-range {
   margin-top: 4px;
 }
+
+/* 开局动线：轨迹透明度滑块 */
+.stu-trail-opacity {
+  display: inline-flex;
+  align-items: center;
+}
+.stu-trail-opacity input[type="range"] {
+  width: 72px;
+  accent-color: var(--stu-accent, #ffd84d);
+}

@@ -22,7 +22,7 @@ import { getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "./library
  */
 
 /** 聚合算法/口径变化时 +1，旧缓存自动失效重算。 */
-const CACHE_VERSION = 3;
+const CACHE_VERSION = 4;
 
 export interface SeasonSummary {
   bundle: SeasonCohortBundle;
@@ -52,16 +52,38 @@ function openCacheDb(): Promise<IDBDatabase> {
   });
 }
 
+/** 按 key 多条缓存（不同 scope 互不覆盖），LRU 清理只保留最近 MAX_CACHE_KEYS 条。 */
+const MAX_CACHE_KEYS = 12;
+
+interface PersistedSummary {
+  key: string;
+  touchedAt: number;
+  summary: SeasonSummary;
+}
+
+function txRequest<T>(req: IDBRequest<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
 async function readPersisted(key: string): Promise<SeasonSummary | null> {
   try {
     const db = await openCacheDb();
-    const record = await new Promise<{ key: string; summary: SeasonSummary } | undefined>((resolve, reject) => {
-      const req = db.transaction(CACHE_STORE, "readonly").objectStore(CACHE_STORE).get("current");
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
+    const record = await txRequest(
+      db.transaction(CACHE_STORE, "readonly").objectStore(CACHE_STORE).get(key) as IDBRequest<PersistedSummary | undefined>
+    );
+    if (record) {
+      // 刷新 LRU 时间戳；失败无妨
+      try {
+        await txRequest(
+          db.transaction(CACHE_STORE, "readwrite").objectStore(CACHE_STORE).put({ ...record, touchedAt: Date.now() }, key)
+        );
+      } catch { /* 忽略 */ }
+    }
     db.close();
-    return record && record.key === key ? record.summary : null;
+    return record?.summary ?? null;
   } catch {
     return null; // 缓存只是加速，读失败回落重算
   }
@@ -70,17 +92,34 @@ async function readPersisted(key: string): Promise<SeasonSummary | null> {
 async function writePersisted(key: string, summary: SeasonSummary): Promise<void> {
   try {
     const db = await openCacheDb();
-    await new Promise<void>((resolve, reject) => {
-      const req = db
-        .transaction(CACHE_STORE, "readwrite")
-        .objectStore(CACHE_STORE)
-        .put({ key, summary }, "current");
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
-    });
+    const store = db.transaction(CACHE_STORE, "readwrite").objectStore(CACHE_STORE);
+    await txRequest(store.put({ key, touchedAt: Date.now(), summary } satisfies PersistedSummary, key));
     db.close();
+    void prunePersisted();
   } catch {
     // 写失败不影响功能
+  }
+}
+
+/** 清理：旧版本 key（前缀不符）直接删，其余按 touchedAt 保留最近 MAX_CACHE_KEYS 条。 */
+async function prunePersisted(): Promise<void> {
+  try {
+    const db = await openCacheDb();
+    const store = db.transaction(CACHE_STORE, "readwrite").objectStore(CACHE_STORE);
+    const keys = await txRequest(store.getAllKeys() as IDBRequest<IDBValidKey[]>);
+    const records = await txRequest(store.getAll() as IDBRequest<(PersistedSummary | { key?: string })[]>);
+    const prefix = `v${CACHE_VERSION}:`;
+    const rows = keys.map((k, i) => ({ k, record: records[i] as PersistedSummary | undefined }));
+    const stale = rows.filter((row) => typeof row.k !== "string" || !row.k.startsWith(prefix));
+    const live = rows
+      .filter((row) => !stale.includes(row))
+      .sort((a, b) => (b.record?.touchedAt ?? 0) - (a.record?.touchedAt ?? 0));
+    for (const row of [...stale, ...live.slice(MAX_CACHE_KEYS)]) {
+      await txRequest(store.delete(row.k));
+    }
+    db.close();
+  } catch {
+    // 清理失败不影响功能
   }
 }
 

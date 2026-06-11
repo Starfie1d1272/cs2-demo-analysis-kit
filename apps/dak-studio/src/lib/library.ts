@@ -3,8 +3,9 @@ import type { DemoPackage } from "@cs2dak/contract";
 
 /**
  * DAK Studio 本地 Demo 库。
- * - v2 ZIP 原始字节持久化在 IndexedDB，刷新不丢。
- * - DemoPackage 解析结果只缓存在内存，按需重建（来源永远是 ZIP，规则：v2 ZIP 是唯一 seam）。
+ * - v2 ZIP 原始字节持久化在 IndexedDB，刷新不丢（来源永远是 ZIP，规则：v2 ZIP 是唯一 seam）。
+ * - DemoPackage 解析结果持久化在 derived 表：可丢弃缓存，未命中/版本不符时从 ZIP 重建。
+ *   解压 + 解析是聚合首屏的主要耗时，命中 derived 后直接读 JSON。
  */
 
 export interface DemoMeta {
@@ -41,18 +42,66 @@ function normalizeTags(tags: string[]): string[] {
 
 const DB_NAME = "dak-studio";
 const STORE = "demos";
+const DERIVED_STORE = "derived";
+/** 解析口径（@cs2dak/core loadDemoPackageFromZip）变化时 +1，旧 derived 缓存自动失效。 */
+const DERIVED_VERSION = 1;
+
+interface DerivedRecord {
+  id: string;
+  version: number;
+  pkg: DemoPackage;
+}
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
+    const request = indexedDB.open(DB_NAME, 2);
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(STORE)) {
         request.result.createObjectStore(STORE, { keyPath: "id" });
+      }
+      if (!request.result.objectStoreNames.contains(DERIVED_STORE)) {
+        request.result.createObjectStore(DERIVED_STORE, { keyPath: "id" });
       }
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error ?? new Error("无法打开 IndexedDB"));
   });
+}
+
+/** derived 是纯加速缓存：读写失败一律静默回落到 ZIP 重建。 */
+async function readDerived(id: string): Promise<DemoPackage | null> {
+  try {
+    const db = await openDb();
+    const record = await requestAsPromise(
+      db.transaction(DERIVED_STORE, "readonly").objectStore(DERIVED_STORE).get(id) as IDBRequest<DerivedRecord | undefined>
+    );
+    db.close();
+    return record && record.version === DERIVED_VERSION ? record.pkg : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeDerived(id: string, pkg: DemoPackage): Promise<void> {
+  try {
+    const db = await openDb();
+    await requestAsPromise(
+      db.transaction(DERIVED_STORE, "readwrite").objectStore(DERIVED_STORE).put({ id, version: DERIVED_VERSION, pkg } satisfies DerivedRecord)
+    );
+    db.close();
+  } catch {
+    // 写失败不影响功能
+  }
+}
+
+async function deleteDerived(id: string): Promise<void> {
+  try {
+    const db = await openDb();
+    await requestAsPromise(db.transaction(DERIVED_STORE, "readwrite").objectStore(DERIVED_STORE).delete(id));
+    db.close();
+  } catch {
+    // 忽略
+  }
 }
 
 function requestAsPromise<T>(request: IDBRequest<T>): Promise<T> {
@@ -202,6 +251,7 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     if (replacement && replacement.id !== id) {
       await requestAsPromise(store.delete(replacement.id));
       pkgCache.delete(replacement.id);
+      void deleteDerived(replacement.id);
     }
     db.close();
     const { buffer: _ignored, ...existingEntry } = existing;
@@ -219,6 +269,8 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
   }
   db.close();
   pkgCache.set(id, Promise.resolve(pkg));
+  // 导入时已解析出 pkg，顺手持久化，后续聚合不再解压 ZIP
+  void writeDerived(id, pkg);
   return { entry, duplicate: false, replaced: Boolean(replacement), replacedId: replacement?.id };
 }
 
@@ -254,20 +306,25 @@ export async function removeDemo(id: string): Promise<void> {
   await requestAsPromise(db.transaction(STORE, "readwrite").objectStore(STORE).delete(id));
   db.close();
   pkgCache.delete(id);
+  await deleteDerived(id);
 }
 
-/** 取解析后的 DemoPackage；内存缓存，未命中时从 IndexedDB 的 ZIP 字节重建。 */
+/** 取解析后的 DemoPackage：内存 → derived 持久缓存 → ZIP 重建（并回写 derived）。 */
 export function getDemoPackage(id: string): Promise<DemoPackage> {
   const cached = pkgCache.get(id);
   if (cached) return cached;
   const loading = (async () => {
+    const derived = await readDerived(id);
+    if (derived) return derived;
     const db = await openDb();
     const record = await requestAsPromise(
       db.transaction(STORE, "readonly").objectStore(STORE).get(id) as IDBRequest<DemoRecord | undefined>
     );
     db.close();
     if (!record) throw new Error("demo 不存在或已被删除");
-    return parseZipInWorker(record.buffer.slice(0));
+    const pkg = await parseZipInWorker(record.buffer.slice(0));
+    void writeDerived(id, pkg);
+    return pkg;
   })();
   pkgCache.set(id, loading);
   loading.catch(() => pkgCache.delete(id));

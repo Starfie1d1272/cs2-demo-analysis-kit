@@ -1,9 +1,9 @@
 import { ShieldAlert, ShieldCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { buildMatchWorkspaceModel } from "@cs2dak/presentation";
 import type { MatchWorkspaceModel } from "@cs2dak/contract";
 import { MatchWorkspace, QaReportPanel } from "@cs2dak/react";
-import { getDemoPackage, type StudioDemoEntry } from "../lib/library";
+import { getDemoPackage, matchDateFromFileName, type StudioDemoEntry } from "../lib/library";
 
 export interface MatchViewProps {
   entries: StudioDemoEntry[];
@@ -20,6 +20,25 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onGoLibrary
   const [model, setModel] = useState<MatchWorkspaceModel | null>(activeId ? modelCache.get(activeId) ?? null : null);
   const [error, setError] = useState<string | null>(null);
   const [showQa, setShowQa] = useState(false);
+  // 50+ 场时纯下拉不可用：搜索过滤（队名/地图/日期/文件名）+ 按地图分组
+  const [matchSearch, setMatchSearch] = useState("");
+  const groupedEntries = useMemo(() => {
+    const term = matchSearch.trim().toLowerCase();
+    const hit = entries.filter((entry) => {
+      if (!term) return true;
+      return [entry.fileName, entry.meta.mapName, entry.meta.teamAName, entry.meta.teamBName, ...entry.tags]
+        .join(" ")
+        .toLowerCase()
+        .includes(term);
+    });
+    const groups = new Map<string, StudioDemoEntry[]>();
+    for (const entry of hit) {
+      const list = groups.get(entry.meta.mapName) ?? [];
+      list.push(entry);
+      groups.set(entry.meta.mapName, list);
+    }
+    return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [entries, matchSearch]);
 
   useEffect(() => {
     if (!activeId) return;
@@ -66,11 +85,25 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onGoLibrary
     <div className="stu-view stu-view-flush">
       <div className="stu-context-bar">
         <span className="stu-context-label">当前比赛</span>
+        {entries.length > 8 && (
+          <input
+            className="stu-search"
+            type="search"
+            placeholder="搜索队伍 / 地图 / 文件名…"
+            value={matchSearch}
+            onChange={(e) => setMatchSearch(e.target.value)}
+          />
+        )}
         <select className="stu-select" value={activeId ?? ""} onChange={(e) => onSelectDemo(e.target.value)}>
-          {entries.map((entry) => (
-            <option key={entry.id} value={entry.id}>
-              {entry.meta.mapName} · {entry.meta.teamAName} {entry.meta.teamAScore}:{entry.meta.teamBScore} {entry.meta.teamBName}
-            </option>
+          {groupedEntries.map(([mapName, group]) => (
+            <optgroup key={mapName} label={`${mapName}（${group.length} 场）`}>
+              {group.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.meta.teamAName} {entry.meta.teamAScore}:{entry.meta.teamBScore} {entry.meta.teamBName}
+                  {matchDateFromFileName(entry.fileName) ? ` · ${matchDateFromFileName(entry.fileName)}` : ""}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
         {model && (

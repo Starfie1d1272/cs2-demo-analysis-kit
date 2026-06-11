@@ -46,6 +46,10 @@ export interface FlashValueSummary {
   flashesThrown: number;
   enemyBlindSeconds: number;
   teamBlindSeconds: number;
+  /** 致盲敌方人次（被白的敌人数量累计，不是秒数）。 */
+  enemyBlindVictims: number;
+  /** 敌方致盲秒数 / 投掷数；没投过闪为 null。 */
+  enemySecondsPerFlash: number | null;
   /** (敌方 - 友方) 致盲秒数 / 投掷数；没投过闪为 null。 */
   netSecondsPerFlash: number | null;
   flashAssists: number;
@@ -62,9 +66,19 @@ export interface MistakeEvidence {
   detail: string;
 }
 
+export interface FirstDeathStat {
+  count: number;
+  attempts: number;
+  evidence: MistakeEvidence[];
+}
+
 export interface MistakeReview {
-  /** 低买局（eco/semi/force）中首死的回合。 */
-  lowBuyFirstDeaths: { count: number; attempts: number; evidence: MistakeEvidence[] };
+  /** 低买局（eco/semi/force）中首死的回合（劣势局风险参考，权重低）。 */
+  lowBuyFirstDeaths: FirstDeathStat;
+  /** 全枪全弹局（full）首死——最有分析价值的失误信号。 */
+  fullBuyFirstDeaths: FirstDeathStat;
+  /** Anti-eco 首死：对手 eco/semi 时我方首死。 */
+  antiEcoFirstDeaths: FirstDeathStat;
   /** 死亡时间分布（相对 freeze end 的秒数）。 */
   deathTiming: { early: number; mid: number; late: number; total: number };
   /** 残局失利（1vN 没打赢）。 */
@@ -105,10 +119,11 @@ export function buildPlayerSeasonInsights(
   let enemyBlindSeconds = 0;
   let teamBlindSeconds = 0;
   let flashAssists = 0;
+  let enemyBlindVictims = 0;
   const teamFlashes: TeamFlashIncident[] = [];
-  const lowBuyEvidence: MistakeEvidence[] = [];
-  let lowBuyFirstDeaths = 0;
-  let lowBuyAttempts = 0;
+  const lowBuy: FirstDeathStat = { count: 0, attempts: 0, evidence: [] };
+  const fullBuy: FirstDeathStat = { count: 0, attempts: 0, evidence: [] };
+  const antiEco: FirstDeathStat = { count: 0, attempts: 0, evidence: [] };
   const deathTiming = { early: 0, mid: 0, late: 0, total: 0 };
   const clutchLossEvidence: MistakeEvidence[] = [];
   let clutchLosses = 0;
@@ -139,6 +154,9 @@ export function buildPlayerSeasonInsights(
     flashAssists += sum((r) => r.flashAssistCount);
     flashesThrown += pkg.grenades.filter(
       (g) => g.grenade === "flashbang" && g.throwerSteamId64 != null && ids.has(g.throwerSteamId64)
+    ).length;
+    enemyBlindVictims += pkg.blinds.filter(
+      (b) => ids.has(b.flasherSteamId64) && b.flasherTeamKey !== b.flashedTeamKey
     ).length;
 
     // 队闪事件：同 (round, tick±8) 的同投掷者致盲友方行归并为一颗闪
@@ -177,17 +195,37 @@ export function buildPlayerSeasonInsights(
       killsByRound.set(kill.roundNumber, list);
     }
     const freezeByRound = new Map(pkg.rounds.map((row) => [row.roundNumber, row.freezeEndTick]));
+    const roundEconomies = new Map(
+      pkg.rounds.map((row) => [row.roundNumber, { a: row.teamAEconomy, b: row.teamBEconomy }])
+    );
     const tickrate = tickrateOf(pkg);
 
     for (const [roundNumber, list] of killsByRound) {
       const sorted = [...list].sort((a, b) => a.tick - b.tick);
       const economy = economyByRound.get(roundNumber);
+      // 对手经济：回合行里非我方类型的一侧（两侧相同时无歧义）
+      const pair = roundEconomies.get(roundNumber);
+      const opponentEconomy =
+        economy != null && pair != null ? (economy === pair.a ? pair.b : pair.a) : null;
       const firstDeath = sorted[0];
+      const meFirstDead = firstDeath != null && ids.has(firstDeath.victimSteamId64);
       const isLowBuy = economy != null && LOW_BUY_TYPES.has(economy);
-      if (isLowBuy) lowBuyAttempts += 1;
-      if (firstDeath && ids.has(firstDeath.victimSteamId64) && isLowBuy) {
-        lowBuyFirstDeaths += 1;
-        lowBuyEvidence.push({ matchId, roundNumber, tick: firstDeath.tick, detail: `${economy} 局首死` });
+      const isFullBuy = economy === "full";
+      const isAntiEco = opponentEconomy === "eco" || opponentEconomy === "semi";
+      if (isLowBuy) lowBuy.attempts += 1;
+      if (isFullBuy) fullBuy.attempts += 1;
+      if (isAntiEco) antiEco.attempts += 1;
+      if (meFirstDead && isLowBuy) {
+        lowBuy.count += 1;
+        lowBuy.evidence.push({ matchId, roundNumber, tick: firstDeath.tick, detail: `${economy} 局首死` });
+      }
+      if (meFirstDead && isFullBuy) {
+        fullBuy.count += 1;
+        fullBuy.evidence.push({ matchId, roundNumber, tick: firstDeath.tick, detail: "长枪局首死" });
+      }
+      if (meFirstDead && isAntiEco) {
+        antiEco.count += 1;
+        antiEco.evidence.push({ matchId, roundNumber, tick: firstDeath.tick, detail: `对手 ${opponentEconomy} 局首死` });
       }
       // 死亡时间分布
       for (const kill of sorted) {
@@ -222,6 +260,8 @@ export function buildPlayerSeasonInsights(
       flashesThrown,
       enemyBlindSeconds: round(enemyBlindSeconds, 1),
       teamBlindSeconds: round(teamBlindSeconds, 1),
+      enemyBlindVictims,
+      enemySecondsPerFlash: flashesThrown > 0 ? round(enemyBlindSeconds / flashesThrown, 2) : null,
       netSecondsPerFlash: flashesThrown > 0
         ? round((enemyBlindSeconds - teamBlindSeconds) / flashesThrown, 2)
         : null,
@@ -229,11 +269,9 @@ export function buildPlayerSeasonInsights(
       worstTeamFlashes: teamFlashes.slice(0, MAX_EVIDENCE)
     },
     mistakes: {
-      lowBuyFirstDeaths: {
-        count: lowBuyFirstDeaths,
-        attempts: lowBuyAttempts,
-        evidence: lowBuyEvidence.slice(0, MAX_EVIDENCE)
-      },
+      lowBuyFirstDeaths: { ...lowBuy, evidence: lowBuy.evidence.slice(0, MAX_EVIDENCE) },
+      fullBuyFirstDeaths: { ...fullBuy, evidence: fullBuy.evidence.slice(0, MAX_EVIDENCE) },
+      antiEcoFirstDeaths: { ...antiEco, evidence: antiEco.evidence.slice(0, MAX_EVIDENCE) },
       deathTiming,
       clutchLosses: { count: clutchLosses, evidence: clutchLossEvidence.slice(0, MAX_EVIDENCE) }
     }
@@ -360,14 +398,22 @@ export interface TournamentTeamPistolStat {
   conversionRounds: number;
   conversionWins: number;
   conversionPercent: number | null;
+  /** 反转换机会数：对手赢下手枪局且存在下一回合的次数。 */
+  breakRounds: number;
+  /** 反转换：对手赢手枪局后，该队赢了下一回合的次数。 */
   breakWins: number;
+  breakRatePercent: number | null;
 }
 
+/**
+ * 经济对位胜率（按高低经济重排，跨场聚合时 A/B 队伍无意义）。
+ * 手枪局不入矩阵（见手枪局表）；同档对局对称，lowWinRatePercent 为 null。
+ */
 export interface TournamentEconomyMatrixCell {
-  teamAEconomy: string;
-  teamBEconomy: string;
+  lowEconomy: string;
+  highEconomy: string;
   rounds: number;
-  teamAWinRatePercent: number | null;
+  lowWinRatePercent: number | null;
 }
 
 export interface TournamentEcoUpsetStat {
@@ -400,7 +446,9 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
   const byMap = new Map<string, { matches: number; rounds: number; tWins: number; pistolT: number; pistolTotal: number }>();
   const weaponRows = new Map<string, { weapon: string; kills: number; headshots: number; players: Map<string, { name: string; kills: number }> }>();
   const teamPistols = new Map<string, TournamentTeamPistolStat>();
-  const economyMatrix = new Map<string, { teamAEconomy: string; teamBEconomy: string; rounds: number; teamAWins: number }>();
+  // 经济档位：低买 → 高买；手枪局单列，不入矩阵
+  const ECON_RANK: Record<string, number> = { eco: 0, semi: 1, force: 2, full: 3 };
+  const economyMatrix = new Map<string, { lowEconomy: string; highEconomy: string; rounds: number; lowWins: number; symmetric: boolean }>();
   const ecoUpsets = new Map<string, { teamName: string; opportunities: number; wins: number }>();
 
   const teamNameFor = (pkg: DemoPackage, teamKey: "teamA" | "teamB") =>
@@ -416,7 +464,9 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
       conversionRounds: 0,
       conversionWins: 0,
       conversionPercent: null,
-      breakWins: 0
+      breakRounds: 0,
+      breakWins: 0,
+      breakRatePercent: null
     };
     teamPistols.set(teamName, created);
     return created;
@@ -465,16 +515,24 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
           if (ordered[i + 1]!.winnerTeamKey === row.winnerTeamKey) pistolConversions += 1;
         }
       }
-      const matrixKey = `${row.teamAEconomy}:${row.teamBEconomy}`;
-      const matrixCell = economyMatrix.get(matrixKey) ?? {
-        teamAEconomy: row.teamAEconomy,
-        teamBEconomy: row.teamBEconomy,
-        rounds: 0,
-        teamAWins: 0
-      };
-      matrixCell.rounds += 1;
-      if (row.winnerTeamKey === "teamA") matrixCell.teamAWins += 1;
-      economyMatrix.set(matrixKey, matrixCell);
+      const rankA = ECON_RANK[row.teamAEconomy];
+      const rankB = ECON_RANK[row.teamBEconomy];
+      if (rankA != null && rankB != null) {
+        const lowIsA = rankA <= rankB;
+        const lowEconomy = lowIsA ? row.teamAEconomy : row.teamBEconomy;
+        const highEconomy = lowIsA ? row.teamBEconomy : row.teamAEconomy;
+        const matrixKey = `${lowEconomy}:${highEconomy}`;
+        const matrixCell = economyMatrix.get(matrixKey) ?? {
+          lowEconomy,
+          highEconomy,
+          rounds: 0,
+          lowWins: 0,
+          symmetric: rankA === rankB
+        };
+        matrixCell.rounds += 1;
+        if (row.winnerTeamKey === (lowIsA ? "teamA" : "teamB")) matrixCell.lowWins += 1;
+        economyMatrix.set(matrixKey, matrixCell);
+      }
 
       const teamAName = teamNameFor(pkg, "teamA");
       const teamBName = teamNameFor(pkg, "teamB");
@@ -492,6 +550,7 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
           const winner = pistolCell(winnerName);
           const loser = pistolCell(loserName);
           winner.conversionRounds += 1;
+          loser.breakRounds += 1;
           if (next.winnerTeamKey === row.winnerTeamKey) winner.conversionWins += 1;
           else loser.breakWins += 1;
         }
@@ -543,15 +602,17 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
       .map((row) => ({
         ...row,
         winRatePercent: row.pistolRounds > 0 ? round((row.pistolWins / row.pistolRounds) * 100, 1) : null,
-        conversionPercent: row.conversionRounds > 0 ? round((row.conversionWins / row.conversionRounds) * 100, 1) : null
+        conversionPercent: row.conversionRounds > 0 ? round((row.conversionWins / row.conversionRounds) * 100, 1) : null,
+        breakRatePercent: row.breakRounds > 0 ? round((row.breakWins / row.breakRounds) * 100, 1) : null
       }))
       .sort((a, b) => b.pistolWins - a.pistolWins),
     economyMatrix: [...economyMatrix.values()]
       .map((row) => ({
-        teamAEconomy: row.teamAEconomy,
-        teamBEconomy: row.teamBEconomy,
+        lowEconomy: row.lowEconomy,
+        highEconomy: row.highEconomy,
         rounds: row.rounds,
-        teamAWinRatePercent: row.rounds > 0 ? round((row.teamAWins / row.rounds) * 100, 1) : null
+        // 同档对局对称，没有“低经济方”可言
+        lowWinRatePercent: !row.symmetric && row.rounds > 0 ? round((row.lowWins / row.rounds) * 100, 1) : null
       }))
       .sort((a, b) => b.rounds - a.rounds),
     ecoUpsets: [...ecoUpsets.values()]

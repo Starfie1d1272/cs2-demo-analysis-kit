@@ -240,11 +240,11 @@ export function PlayersView({
               </button>
             </div>
             <div className="stu-rating-cards">
-              <div className="stu-rating-card stu-rating-card-primary">
-                <span>RivalHub RR</span>
+              <div className="stu-rating-card stu-rating-card-primary" title="Rival Rating（RivalHub 绝对刻度评分）">
+                <span>RR</span>
                 <b>{selected.rating.rivalhubRR.toFixed(2)}</b>
               </div>
-              <div className="stu-rating-card">
+              <div className="stu-rating-card" title="HLTV Rating 2.0 量纲">
                 <span>Rating 2.0</span>
                 <b>{selected.rating.hltvRating.toFixed(2)}</b>
                 <small>P{selected.rating.hltvPercentile.toFixed(0)}</small>
@@ -302,18 +302,22 @@ export function PlayersView({
             <div className="stu-card">
               <h3>RR 六账户分解</h3>
               <div className="stu-bars">
-                {selected.rating.breakdown.map((part) => (
-                  <div className="stu-bar-row" key={part.key}>
-                    <span>{part.label}</span>
-                    <div className="stu-bar-track">
-                      <div
-                        className={part.value >= 0 ? "stu-bar stu-bar-pos" : "stu-bar stu-bar-neg"}
-                        style={{ width: `${Math.min(100, Math.abs(part.value) * 100)}%` }}
-                      />
+                {(() => {
+                  // 账户值是贡献量（非百分位），条形按六账户最大绝对值归一化
+                  const maxAbs = Math.max(...selected.rating.breakdown.map((p) => Math.abs(p.value)), 0.0001);
+                  return selected.rating.breakdown.map((part) => (
+                    <div className="stu-bar-row" key={part.key}>
+                      <span>{part.label}</span>
+                      <div className="stu-bar-track">
+                        <div
+                          className={part.value >= 0 ? "stu-bar stu-bar-pos" : "stu-bar stu-bar-neg"}
+                          style={{ width: `${(Math.abs(part.value) / maxAbs) * 100}%` }}
+                        />
+                      </div>
+                      <b>{(part.value >= 0 ? "+" : "") + part.value.toFixed(3)}</b>
                     </div>
-                    <b>{part.value.toFixed(3)}</b>
-                  </div>
-                ))}
+                  ));
+                })()}
               </div>
             </div>
 
@@ -359,8 +363,17 @@ export function PlayersView({
                 <h3>Flash Value</h3>
                 <div className="stu-metric-grid">
                   <div className="stu-metric"><span>投掷闪光</span><b>{insights.flash.flashesThrown}</b></div>
-                  <div className="stu-metric"><span>致盲敌方</span><b>{insights.flash.enemyBlindSeconds.toFixed(1)}s</b></div>
-                  <div className="stu-metric"><span>致盲队友</span><b>{insights.flash.teamBlindSeconds.toFixed(1)}s</b></div>
+                  <div className="stu-metric" title="所有回合敌方致盲秒数累计（总量，不是单颗效果）">
+                    <span>致盲敌方·总</span><b>{insights.flash.enemyBlindSeconds.toFixed(1)}s</b>
+                  </div>
+                  <div className="stu-metric" title="被该选手闪到的敌人数累计（人次）">
+                    <span>致盲人次</span><b>{insights.flash.enemyBlindVictims}</b>
+                  </div>
+                  <div className="stu-metric" title="敌方致盲秒数 / 投掷数">
+                    <span>均致盲/颗</span>
+                    <b>{insights.flash.enemySecondsPerFlash == null ? "—" : `${insights.flash.enemySecondsPerFlash.toFixed(2)}s`}</b>
+                  </div>
+                  <div className="stu-metric" title="所有回合队友致盲秒数累计"><span>致盲队友·总</span><b>{insights.flash.teamBlindSeconds.toFixed(1)}s</b></div>
                   <div className="stu-metric" title="（敌方 - 友方）致盲秒数 / 投掷数">
                     <span>净价值/颗</span>
                     <b>{insights.flash.netSecondsPerFlash == null ? "—" : `${insights.flash.netSecondsPerFlash.toFixed(2)}s`}</b>
@@ -393,7 +406,15 @@ export function PlayersView({
               <div className="stu-card">
                 <h3>Mistake Review</h3>
                 <div className="stu-metric-grid">
-                  <div className="stu-metric" title="eco/半起/强起局中本队首死">
+                  <div className="stu-metric" title="我方 full 局该选手首死——最值得复盘的失误信号">
+                    <span>长枪局首死</span>
+                    <b>{insights.mistakes.fullBuyFirstDeaths.count}/{insights.mistakes.fullBuyFirstDeaths.attempts} 局</b>
+                  </div>
+                  <div className="stu-metric" title="对手 eco/semi 局该选手首死（优势局被换掉）">
+                    <span>Anti-eco 首死</span>
+                    <b>{insights.mistakes.antiEcoFirstDeaths.count}/{insights.mistakes.antiEcoFirstDeaths.attempts} 局</b>
+                  </div>
+                  <div className="stu-metric" title="eco/半起/强起局中该选手首死（劣势局，参考为主）">
                     <span>低买局首死</span>
                     <b>{insights.mistakes.lowBuyFirstDeaths.count}/{insights.mistakes.lowBuyFirstDeaths.attempts} 局</b>
                   </div>
@@ -407,9 +428,9 @@ export function PlayersView({
                     </b>
                   </div>
                 </div>
-                {[...insights.mistakes.lowBuyFirstDeaths.evidence, ...insights.mistakes.clutchLosses.evidence].length > 0 && (
+                {[...insights.mistakes.fullBuyFirstDeaths.evidence, ...insights.mistakes.antiEcoFirstDeaths.evidence, ...insights.mistakes.clutchLosses.evidence].length > 0 && (
                   <div className="stu-evidence-list">
-                    {[...insights.mistakes.lowBuyFirstDeaths.evidence.slice(0, 4), ...insights.mistakes.clutchLosses.evidence.slice(0, 4)].map((evidence, i) => (
+                    {[...insights.mistakes.fullBuyFirstDeaths.evidence.slice(0, 3), ...insights.mistakes.antiEcoFirstDeaths.evidence.slice(0, 3), ...insights.mistakes.clutchLosses.evidence.slice(0, 3)].map((evidence, i) => (
                       <button
                         key={`${evidence.matchId}-${evidence.roundNumber}-${i}`}
                         type="button"
@@ -527,7 +548,7 @@ function FingerprintRadar({ axes }: { axes: { key: string; label: string; percen
 const TREND_METRICS = [
   { key: "adr", label: "ADR", format: (v: number) => v.toFixed(1) },
   { key: "kast", label: "KAST%", format: (v: number) => v.toFixed(1) },
-  { key: "fkMinusFd", label: "FK-FD", format: (v: number) => v.toFixed(0) },
+  { key: "fkMinusFd", label: "首杀差(FK-FD)", format: (v: number) => v.toFixed(0) },
   { key: "utilityDamagePerRound", label: "Util/R", format: (v: number) => v.toFixed(2) }
 ] as const;
 type TrendMetricKey = (typeof TREND_METRICS)[number]["key"];

@@ -63,16 +63,16 @@ export function EconomyView({ allEntries, entries, scope, onScopeChange, onGoLib
       {insights && (
         <>
           <div className="stu-card">
-            <h3>经济类型胜率矩阵</h3>
+            <h3>经济对位胜率（按高低经济，非手枪局）</h3>
             <table className="stu-mini-table">
-              <thead><tr><th>A 队经济</th><th>B 队经济</th><th className="stu-num">样本</th><th className="stu-num">A 队胜率</th></tr></thead>
+              <thead><tr><th>低经济方</th><th>高经济方</th><th className="stu-num">样本</th><th className="stu-num" title="同档对局对称，不出胜率">低经济方胜率</th></tr></thead>
               <tbody>
                 {insights.economyMatrix.map((row) => (
-                  <tr key={`${row.teamAEconomy}-${row.teamBEconomy}`} className={row.rounds < 5 ? "stu-row-muted" : undefined}>
-                    <td>{row.teamAEconomy}</td>
-                    <td>{row.teamBEconomy}</td>
+                  <tr key={`${row.lowEconomy}-${row.highEconomy}`} className={row.rounds < 5 ? "stu-row-muted" : undefined}>
+                    <td>{row.lowEconomy}</td>
+                    <td>{row.highEconomy}</td>
                     <td className="stu-num">{row.rounds}</td>
-                    <td className="stu-num">{formatPercent(row.teamAWinRatePercent)}</td>
+                    <td className="stu-num">{formatPercent(row.lowWinRatePercent)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -81,14 +81,14 @@ export function EconomyView({ allEntries, entries, scope, onScopeChange, onGoLib
           <div className="stu-card">
             <h3>手枪局与第二局</h3>
             <table className="stu-mini-table">
-              <thead><tr><th>队伍</th><th className="stu-num">手枪胜率</th><th className="stu-num">转化</th><th className="stu-num">破局</th></tr></thead>
+              <thead><tr><th>队伍</th><th className="stu-num">手枪胜率</th><th className="stu-num">转化</th><th className="stu-num" title="对手赢手枪局后，该队赢了下一回合的比率">反转换</th></tr></thead>
               <tbody>
                 {insights.teamPistols.map((row) => (
                   <tr key={row.teamName}>
                     <td>{row.teamName}</td>
                     <td className="stu-num">{formatPercent(row.winRatePercent)}</td>
                     <td className="stu-num">{row.conversionPercent == null ? "—" : `${row.conversionPercent.toFixed(1)}%`}</td>
-                    <td className="stu-num">{row.breakWins}</td>
+                    <td className="stu-num">{formatPercent(row.breakRatePercent)} ({row.breakWins}/{row.breakRounds})</td>
                   </tr>
                 ))}
               </tbody>

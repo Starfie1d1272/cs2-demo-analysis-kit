@@ -191,38 +191,67 @@ export function App() {
     setEntries(await listDemoEntries());
   }, []);
 
-  const handleReexportDemo = useCallback(async (entry: StudioDemoEntry) => {
-    if (!entry.sourceDemPath) {
-      setNotice("这场 demo 没有记录原始 .dem 路径，需要手动重新导入");
-      return;
-    }
+  /** 单场重导核心：exporter 转 ZIP 后原地替换；调用方负责 importing 状态与错误提示。 */
+  const reexportOne = useCallback(async (entry: StudioDemoEntry) => {
+    if (!entry.sourceDemPath) throw new Error(`${entry.fileName}：没有记录原始 .dem 路径`);
     const api = window.pywebview?.api;
     if (typeof api?.path_exists === "function" && !(await api.path_exists(entry.sourceDemPath))) {
-      setNotice(`原始文件不存在：${entry.sourceDemPath}`);
-      return;
+      throw new Error(`${entry.fileName}：原始文件不存在（${entry.sourceDemPath}）`);
     }
+    const backend = await detectDemBackend();
+    const demName = entry.sourceDemPath.split(/[\\/]/).pop() ?? entry.fileName.replace(/\.zip$/i, ".dem");
+    const demFile = new File([], demName);
+    (demFile as File & { pywebviewFullPath?: string }).pywebviewFullPath = entry.sourceDemPath;
+    const exported = await exportDemToZip(demFile, backend, setNotice);
+    const result = await importDemoFile(exported.file, {
+      tags: entry.tags,
+      sourceDemPath: entry.sourceDemPath,
+      replaceId: entry.id
+    });
+    setSelectedDemoId((current) => (current === entry.id ? result.entry.id : current));
+  }, []);
+
+  const handleReexportDemo = useCallback(async (entry: StudioDemoEntry) => {
     setImporting(true);
     setNotice(`正在重新导出 ${entry.fileName}…`);
     try {
-      const backend = await detectDemBackend();
-      const demName = entry.sourceDemPath.split(/[\\/]/).pop() ?? entry.fileName.replace(/\.zip$/i, ".dem");
-      const demFile = new File([], demName);
-      (demFile as File & { pywebviewFullPath?: string }).pywebviewFullPath = entry.sourceDemPath;
-      const exported = await exportDemToZip(demFile, backend, setNotice);
-      const result = await importDemoFile(exported.file, {
-        tags: entry.tags,
-        sourceDemPath: entry.sourceDemPath,
-        replaceId: entry.id
-      });
+      await reexportOne(entry);
       setEntries(await listDemoEntries());
-      setSelectedDemoId((current) => (current === entry.id ? result.entry.id : current));
       setNotice(`已重新导出并替换 ${entry.fileName}`);
     } catch (err) {
       setNotice(`重新导出失败：${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setImporting(false);
     }
-  }, []);
+  }, [reexportOne]);
+
+  /** 全部重新导出：逐场串行（exporter 与内存吃不住并发），失败不打断，结束后汇总。 */
+  const handleReexportAll = useCallback(async () => {
+    const targets = entries.filter((entry) => entry.sourceDemPath);
+    if (targets.length === 0) {
+      setNotice("没有记录原始 .dem 路径的条目，无法批量重新导出");
+      return;
+    }
+    if (!window.confirm(`将重新导出 ${targets.length} 场 demo（逐场进行，可能需要较长时间），继续？`)) return;
+    setImporting(true);
+    let done = 0;
+    const failures: string[] = [];
+    for (const [index, entry] of targets.entries()) {
+      setNotice(`批量重新导出（${index + 1}/${targets.length}）：${entry.fileName}…`);
+      try {
+        await reexportOne(entry);
+        done += 1;
+      } catch (err) {
+        failures.push(err instanceof Error ? err.message : String(err));
+      }
+      setEntries(await listDemoEntries());
+    }
+    setNotice(
+      `批量重新导出完成：成功 ${done} 场` +
+        (failures.length > 0 ? `，失败 ${failures.length} 场（${failures[0]}）` : "")
+    );
+    setImporting(false);
+  }, [entries, reexportOne]);
 
   return (
     <div
@@ -301,6 +330,7 @@ export function App() {
             onUpdateTags={handleUpdateTags}
             onBulkUpdateTags={handleBulkUpdateTags}
             onReexportDemo={handleReexportDemo}
+            onReexportAll={handleReexportAll}
           />
         )}
         {view === "match" && (

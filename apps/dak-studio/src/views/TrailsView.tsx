@@ -70,8 +70,12 @@ const EFFECT_DURATION_SECONDS: Partial<Record<string, number>> = {
 
 export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibrary }: TrailsViewProps) {
   const [rangeN, setRangeN] = useState<number>(5);
+  /** 范围基准：地图最近 N 场，或该选手在该图的最近 N 场。 */
+  const [rangeBasis, setRangeBasis] = useState<"map" | "player">("map");
   const [steamId64, setSteamId64] = useState<string | null>(null);
   const [players, setPlayers] = useState<PlayerOption[] | null>(null);
+  /** entryId → 该场出场选手集合（用于按选手筛选范围）。 */
+  const [rosterByEntry, setRosterByEntry] = useState<Map<string, Set<string>> | null>(null);
   const [models, setModels] = useState<OpeningTrailsModel[] | null>(null);
   const [mapName, setMapName] = useState<string | null>(null);
   const [side, setSide] = useState<"t" | "ct">("t");
@@ -93,38 +97,43 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
     );
   }, [mapOptions]);
 
-  // 范围：所选地图内按 matchId（日期前缀）降序取最近 N 场
-  const rangeEntries = useMemo(() => {
+  // 该图全部场次（matchId 日期前缀降序）；范围在其上截取
+  const mapEntries = useMemo(() => {
     if (!mapName) return [];
-    const sorted = entries
+    return entries
       .filter((entry) => entry.meta.mapName === mapName)
       .sort((a, b) => matchIdForEntry(b).localeCompare(matchIdForEntry(a)));
-    return rangeN > 0 ? sorted.slice(0, rangeN) : sorted;
-  }, [entries, mapName, rangeN]);
+  }, [entries, mapName]);
 
-  // 加载范围内的 DemoPackage，统计候选选手
+  // 加载该图全部 DemoPackage，统计候选选手与每场名单（derived 缓存命中后开销很小）
   useEffect(() => {
-    if (rangeEntries.length === 0) {
+    if (mapEntries.length === 0) {
       setPlayers(null);
+      setRosterByEntry(null);
       setModels(null);
       return;
     }
     let cancelled = false;
     setPlayers(null);
     setError(null);
-    Promise.all(rangeEntries.map((entry) => getDemoPackage(entry.id)))
-      .then((pkgs) => {
+    Promise.all(mapEntries.map(async (entry) => ({ id: entry.id, pkg: await getDemoPackage(entry.id) })))
+      .then((loaded) => {
         if (cancelled) return;
         const counts = new Map<string, PlayerOption>();
-        for (const pkg of pkgs) {
+        const roster = new Map<string, Set<string>>();
+        for (const { id, pkg } of loaded) {
+          const ids = new Set<string>();
           for (const player of pkg.players) {
+            ids.add(player.steamId64);
             const current = counts.get(player.steamId64);
             if (current) current.matchCount += 1;
             else counts.set(player.steamId64, { steamId64: player.steamId64, name: player.name, matchCount: 1 });
           }
+          roster.set(id, ids);
         }
         const options = [...counts.values()].sort((a, b) => b.matchCount - a.matchCount || a.name.localeCompare(b.name));
         setPlayers(options);
+        setRosterByEntry(roster);
         setSteamId64((current) => {
           if (current && options.some((option) => option.steamId64 === current)) return current;
           const pinned = getPinnedPlayer();
@@ -138,7 +147,16 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
     return () => {
       cancelled = true;
     };
-  }, [rangeEntries]);
+  }, [mapEntries]);
+
+  // 范围：地图最近 N 场，或该选手出场的最近 N 场
+  const rangeEntries = useMemo(() => {
+    const pool =
+      rangeBasis === "player" && steamId64 && rosterByEntry
+        ? mapEntries.filter((entry) => rosterByEntry.get(entry.id)?.has(steamId64))
+        : mapEntries;
+    return rangeN > 0 ? pool.slice(0, rangeN) : pool;
+  }, [mapEntries, rangeBasis, steamId64, rosterByEntry, rangeN]);
 
   // 为选中选手构建各场动线
   useEffect(() => {
@@ -236,6 +254,23 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
           </select>
         </label>
         <label>
+          <span>范围基准</span>
+          <select
+            className="stu-select"
+            value={rangeBasis}
+            onChange={(e) => setRangeBasis(e.target.value as "map" | "player")}
+            title="「该选手」= 在该图出场的最近 N 场"
+          >
+            <option value="map">地图最近 N 场</option>
+            <option value="player">该选手最近 N 场</option>
+          </select>
+        </label>
+        {selectedPlayer && mapName && (
+          <span className="stu-dim" title="该选手在当前地图的出场场次">
+            {selectedPlayer.name} 在 {mapName} 共 {selectedPlayer.matchCount} 场
+          </span>
+        )}
+        <label>
           <span>地图</span>
           <select className="stu-select" value={mapName ?? ""} onChange={(e) => setMapName(e.target.value || null)}>
             {mapOptions.map(([map, count]) => (
@@ -315,6 +350,9 @@ function TrailStage({ mapName, rounds, hiddenRounds, onToggleRound, missingRepla
   const [time, setTime] = useState(WINDOW_SECONDS);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(2);
+  const [trailOpacity, setTrailOpacity] = useState(0.5);
+  const [showTrails, setShowTrails] = useState(true);
+  const [showGrenades, setShowGrenades] = useState(true);
   const rafRef = useRef<number | null>(null);
   const lastTsRef = useRef<number | null>(null);
 
@@ -400,17 +438,21 @@ function TrailStage({ mapName, rounds, hiddenRounds, onToggleRound, missingRepla
             const head = pts[pts.length - 1];
             return (
               <g key={item.key}>
-                <polyline
-                  points={pts.map((p) => `${p.x},${p.y}`).join(" ")}
-                  fill="none"
-                  stroke={item.color}
-                  strokeWidth={size / 340}
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                  opacity={0.9}
-                />
-                <circle cx={head.x} cy={head.y} r={size / 110} fill={item.color} stroke="#0b0e10" strokeWidth={size / 512} />
-                {item.grenades
+                {showTrails && (
+                  <>
+                    <polyline
+                      points={pts.map((p) => `${p.x},${p.y}`).join(" ")}
+                      fill="none"
+                      stroke={item.color}
+                      strokeWidth={size / 340}
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                      opacity={trailOpacity}
+                    />
+                    <circle cx={head.x} cy={head.y} r={size / 110} fill={item.color} stroke="#0b0e10" strokeWidth={size / 512} opacity={Math.min(1, trailOpacity + 0.3)} />
+                  </>
+                )}
+                {showGrenades && item.grenades
                   .filter((g) => g.t <= time)
                   .map((g, gi) => {
                     const scale = calibration?.scale ?? 10;
@@ -458,6 +500,32 @@ function TrailStage({ mapName, rounds, hiddenRounds, onToggleRound, missingRepla
             }}
           />
           <span className="stu-trail-clock">{time.toFixed(1)}s / {WINDOW_SECONDS}s</span>
+          <div className="stu-speed-toggle" role="group" aria-label="图层">
+            <button
+              type="button"
+              className={showTrails ? "stu-chip stu-chip-active" : "stu-chip"}
+              onClick={() => setShowTrails((v) => !v)}
+            >
+              轨迹
+            </button>
+            <button
+              type="button"
+              className={showGrenades ? "stu-chip stu-chip-active" : "stu-chip"}
+              onClick={() => setShowGrenades((v) => !v)}
+            >
+              道具
+            </button>
+          </div>
+          <label className="stu-trail-opacity" title="轨迹透明度">
+            <input
+              type="range"
+              min={0.1}
+              max={1}
+              step={0.05}
+              value={trailOpacity}
+              onChange={(e) => setTrailOpacity(Number(e.target.value))}
+            />
+          </label>
           <div className="stu-speed-toggle" role="group" aria-label="播放速度">
             {[1, 2, 4].map((value) => (
               <button

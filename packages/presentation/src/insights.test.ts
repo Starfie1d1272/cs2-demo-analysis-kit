@@ -39,8 +39,25 @@ describe("buildPlayerSeasonInsights", () => {
 
     // flash value 字段自洽
     expect(insights.flash.enemyBlindSeconds).toBeGreaterThanOrEqual(0);
+    expect(insights.flash.enemyBlindVictims).toBeGreaterThanOrEqual(0);
     if (insights.flash.flashesThrown === 0) {
       expect(insights.flash.netSecondsPerFlash).toBeNull();
+      expect(insights.flash.enemySecondsPerFlash).toBeNull();
+    } else {
+      expect(insights.flash.enemySecondsPerFlash).toBeCloseTo(
+        insights.flash.enemyBlindSeconds / insights.flash.flashesThrown,
+        1
+      );
+    }
+
+    // 首死统计：count ≤ attempts，三个口径各自自洽
+    for (const stat of [
+      insights.mistakes.lowBuyFirstDeaths,
+      insights.mistakes.fullBuyFirstDeaths,
+      insights.mistakes.antiEcoFirstDeaths
+    ]) {
+      expect(stat.count).toBeLessThanOrEqual(stat.attempts);
+      expect(stat.evidence.length).toBeLessThanOrEqual(stat.count);
     }
   });
 
@@ -79,6 +96,22 @@ describe("buildTournamentInsights", () => {
     expect(insights.tWinRatePercent + insights.ctWinRatePercent).toBeCloseTo(100, 0);
     expect(insights.maps[0].mapName).toBe("de_ancient");
     expect(insights.maps[0].matches).toBe(2);
+
+    // 经济矩阵：按高低经济重排，手枪局不入矩阵；同档对局不出胜率
+    for (const cell of insights.economyMatrix) {
+      expect(cell.lowEconomy).not.toBe("pistol");
+      expect(cell.highEconomy).not.toBe("pistol");
+      if (cell.lowEconomy === cell.highEconomy) expect(cell.lowWinRatePercent).toBeNull();
+      else expect(cell.lowWinRatePercent).not.toBeNull();
+    }
+
+    // 反转换：机会数 ≥ 成功数，全队 breakRounds 总和 = 全队 conversionRounds 总和
+    const totalBreakRounds = insights.teamPistols.reduce((acc, row) => acc + row.breakRounds, 0);
+    const totalConversionRounds = insights.teamPistols.reduce((acc, row) => acc + row.conversionRounds, 0);
+    expect(totalBreakRounds).toBe(totalConversionRounds);
+    for (const row of insights.teamPistols) {
+      expect(row.breakWins).toBeLessThanOrEqual(row.breakRounds);
+    }
   });
 });
 

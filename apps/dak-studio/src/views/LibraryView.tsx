@@ -17,6 +17,8 @@ export interface LibraryViewProps {
   onUpdateTags: (id: string, tags: string[]) => void;
   onBulkUpdateTags: (ids: string[], add: string[], remove: string[]) => void;
   onReexportDemo: (entry: StudioDemoEntry) => void;
+  /** 批量重新导出所有有原始 .dem 路径的条目。 */
+  onReexportAll?: () => void;
 }
 
 function formatDuration(seconds: number): string {
@@ -41,7 +43,8 @@ export function LibraryView({
   onRemoveDemo,
   onUpdateTags,
   onBulkUpdateTags,
-  onReexportDemo
+  onReexportDemo,
+  onReexportAll
 }: LibraryViewProps) {
   const [search, setSearch] = useState("");
   const [mapFilter, setMapFilter] = useState<string | null>(null);
@@ -132,6 +135,17 @@ export function LibraryView({
           </p>
         </div>
         <div className="stu-header-actions">
+          {onReexportAll && entries.some((entry) => entry.sourceDemPath) && (
+            <button
+              type="button"
+              className="stu-button stu-button-ghost"
+              onClick={onReexportAll}
+              disabled={importing}
+              title="逐场重新导出所有记录了原始 .dem 路径的条目（exporter 升级后刷新数据）"
+            >
+              <RotateCw size={15} /> 全部重新导出
+            </button>
+          )}
           <input
             className="stu-search stu-import-tags"
             type="text"
