@@ -18,11 +18,11 @@
 | 1 | Ingest & Data QA | ✅ 基本完成 | .dem/ZIP 导入、hash 幂等、标签、QA badge、strict validator |
 | 2 | Demo Explorer（2D 回合浏览器） | ✅ 基本完成 | 回合筛选器、统计跳回放、时间轴锚点、图层开关、双层雷达（0.3.0） |
 | 3 | Personal Lab（个人打法） | ✅ 基本完成 | 档案、动线、趋势曲线、Fingerprint、Mistake Review（0.3.0） |
-| 4 | Duel & Mechanics Lab | ⬜ 未开始 | 依赖 shots.json（格式已支持，导出未接） |
+| 4 | Duel & Mechanics Lab | 🟡 已设计 | shots.json 已导出；缺 core 信号 + 视图（[design/duel-coach-lab.md](design/duel-coach-lab.md)） |
 | 5 | Utility Lab | ✅ 基本完成 | Flash Value 排行、负收益队闪证据与回放跳转已转正；缺 lineup library |
 | 6 | Economy & Round Flow | ✅ 基本完成 | 经济矩阵、手枪转化、eco/semi 翻盘已转正；缺回合 swing |
 | 7 | Tournament Hub（高校赛事中台） | ✅ 基本完成 | 排行榜、赛事总览、比赛报告与选手图卡导出（0.3.0） |
-| 8 | Coach / Analyst Workbench | ⬜ 远期 | pattern finder / playbook / anti-strat / veto lite |
+| 8 | Coach / Analyst Workbench | 🟡 已设计 | pattern finder / playbook / anti-strat / veto + BP 录入，双视角（[design/duel-coach-lab.md](design/duel-coach-lab.md)） |
 
 ## v0.2 — 单场证据闭环（下一个里程碑）
 
@@ -52,14 +52,22 @@
 - [x] **RR 透明解释**：单场与赛季统一 frozen pro baseline（1.0 = 职业基线），
       比赛工作台展示六账户贡献与 RR 输入指标。
 
-## v0.4 — 硬核机制与模式识别
+## v0.4 — 硬核机制与模式识别（设计见 [design/duel-coach-lab.md](design/duel-coach-lab.md)）
 
-- [ ] **shots.json 接入**：exporter 导出逐枪流（格式 2.x 已定义 optional 文件）
-- [ ] **Duel Finder / Opening Duel 分析**：对枪重构、TTK、武器对位、移动射击
-- [ ] **Rule-based 开局聚类**：开局 15/20/30 秒位置聚类 + 道具序列 → 战术模式标注
-      （透明展示聚类依据，不做黑盒）
-- [ ] **Timing Heatmap**:同一战术按回合秒数拆解关键事件分布
-- [ ] **Playbook / Anti-Strat 报告**：自动聚类 + 手工命名、对手近 N 场倾向汇总
+- [x] **shots.json 接入**：exporter 已导出逐枪流（`exporter.py` `_build_shots`，
+      含 position/velocity/yaw/pitch）；瓶颈在消费端（core 信号 + 视图）
+- [ ] **M1 core duels**（4a）：engagement 切分（1.5s）/ 对枪配对（±2s）/
+      受害者三分类（contested / outaimed / 被偷）/ burst 锚定 TTK / 残血满血分档
+- [ ] **M2 core mechanics**（4c 信号）：burst 切分、首发/扫射精准度、急停成功率、
+      一枪致命率、开枪节奏；待办：preaim、反应时间（beta，8Hz 分辨率受限）
+- [ ] **M3 Duel 视图**（4b/4c 呈现）：DuelView 三 tab（Duel Finder / Opening /
+      Mechanics）、A/B/C 评级标联赛 percentile、每指标 ⓘ 计算说明、跳回放
+- [ ] **M4 series + BP**（8d）：studio series 分组（BO3/BO5）、BP 录入表单、
+      `SeriesVeto` 合同 schema（RivalHub 接口共用 shape）、Veto Lite
+- [ ] **M5 Pattern Finder**（8a）：开局 15/20/30s callout 向量 + 道具序列 →
+      动线规则聚类（透明展示聚类依据，不做黑盒）
+- [ ] **M6 Playbook / Anti-Strat**（8b/8c）：cluster 手工命名沉淀、Timing Heatmap、
+      对手近 N 场倾向报告（Markdown 导出）、主办方/教练双视角
 - [ ] **Lineup Library**：成功道具自动沉淀（throwPosition / effectPosition / 关联胜率）
 
 ## 工程债与分发
