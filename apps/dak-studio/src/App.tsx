@@ -1,4 +1,4 @@
-import { Bomb, ClipboardList, Coins, Crosshair, Film, LibraryBig, Swords, Trophy, UserRound } from "lucide-react";
+import { Bomb, ClipboardList, Coins, Crosshair, Film, LibraryBig, Settings, Swords, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { bulkUpdateTags, importDemoFile, listDemoEntries, removeDemo, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { EMPTY_SCOPE, applyScope, type CohortScopeState } from "./components/CohortScope";
@@ -14,6 +14,9 @@ import { ComingSoonView } from "./views/ComingSoonView";
 import { TournamentDashboardView } from "./views/TournamentDashboardView";
 import { UtilityView } from "./views/UtilityView";
 import { EconomyView } from "./views/EconomyView";
+import { ManagementView } from "./views/ManagementView";
+import { loadIdentityState, buildCohortIdentityMap, type IdentityStoreState } from "./lib/identity";
+import type { IdentityOptions } from "./lib/season";
 import sampleZipUrl from "../../../fixtures/input/sample-match.zip?url";
 
 // 八模块信息架构（docs/roadmap.md），未实现的模块以「制作中」占位展示
@@ -25,7 +28,8 @@ type StudioView =
   | "utility"
   | "economy"
   | "tournament"
-  | "coach";
+  | "coach"
+  | "management";
 
 const NAV: { key: StudioView; label: string; hint: string; icon: typeof LibraryBig; wip?: boolean }[] = [
   { key: "library", label: "资料库", hint: "导入与管理 Demo", icon: LibraryBig },
@@ -35,7 +39,8 @@ const NAV: { key: StudioView; label: string; hint: string; icon: typeof LibraryB
   { key: "utility", label: "道具实验室", hint: "道具价值与落点", icon: Bomb },
   { key: "economy", label: "经济与节奏", hint: "买局质量 / 回合 swing", icon: Coins },
   { key: "tournament", label: "赛事中台", hint: "排行榜 / 报表", icon: Trophy },
-  { key: "coach", label: "教练工作台", hint: "战术模式与 playbook", icon: ClipboardList, wip: true }
+  { key: "coach", label: "教练工作台", hint: "战术模式与 playbook", icon: ClipboardList, wip: true },
+  { key: "management", label: "管理", hint: "选手身份归并与队伍改名", icon: Settings }
 ];
 
 const PLAYER_TABS = [
@@ -62,17 +67,25 @@ export function App() {
   const [importing, setImporting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [scope, setScope] = useState<CohortScopeState>(EMPTY_SCOPE);
+  const [identityState, setIdentityState] = useState<IdentityStoreState>({ version: 0, mappings: [], teamRenames: {} });
   // 导入标签输入放在 App：全窗口拖拽导入也要带上
   const [importTagsRaw, setImportTagsRaw] = useState("");
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   // 稳定数组标识：避免 App 无关重渲染触发档案/排行榜重新聚合
   const scopedEntries = useMemo(() => applyScope(entries, scope), [entries, scope]);
+  const identityOptions = useMemo<IdentityOptions | undefined>(
+    () => identityState.version > 0
+      ? { version: identityState.version, map: buildCohortIdentityMap(identityState.mappings) }
+      : undefined,
+    [identityState.version, identityState.mappings]
+  );
 
   useEffect(() => {
     listDemoEntries()
       .then(setEntries)
       .catch((err) => setNotice(`读取本地资料库失败：${err instanceof Error ? err.message : String(err)}`));
     void checkForUpdate().then(setUpdate);
+    void loadIdentityState().then(setIdentityState);
   }, []);
 
   const importFiles = useCallback(async (files: Iterable<File | ExportedDemoFile>, tags: string[] = [], initialErrors: string[] = []) => {
@@ -370,6 +383,7 @@ export function App() {
                 selectedPlayerKey={selectedPlayerKey}
                 onSelectPlayer={setSelectedPlayerKey}
                 onOpenMatch={openDemo}
+                identityOptions={identityOptions}
                 onGoLibrary={() => setView("library")}
               />
             ) : (
@@ -403,6 +417,7 @@ export function App() {
             scope={scope}
             onScopeChange={setScope}
             onOpenMatch={openDemo}
+            identityOptions={identityOptions}
             onGoLibrary={() => setView("library")}
           />
         )}
@@ -412,6 +427,7 @@ export function App() {
             entries={scopedEntries}
             scope={scope}
             onScopeChange={setScope}
+            identityOptions={identityOptions}
             onGoLibrary={() => setView("library")}
           />
         )}
@@ -450,6 +466,7 @@ export function App() {
                 scope={scope}
                 onScopeChange={setScope}
                 onPlayerClick={openPlayer}
+                identityOptions={identityOptions}
                 onGoLibrary={() => setView("library")}
               />
             ) : (
@@ -458,10 +475,23 @@ export function App() {
                 entries={scopedEntries}
                 scope={scope}
                 onScopeChange={setScope}
+                identityOptions={identityOptions}
                 onGoLibrary={() => setView("library")}
               />
             )}
           </>
+        )}
+        {view === "management" && (
+          <ManagementView
+            allEntries={entries}
+            entries={scopedEntries}
+            scope={scope}
+            onScopeChange={setScope}
+            identity={identityState}
+            onIdentityChange={setIdentityState}
+            identityOptions={identityOptions}
+            onGoLibrary={() => setView("library")}
+          />
         )}
       </main>
     </div>

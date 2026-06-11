@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { formatPercent, type TournamentInsights } from "@cs2dak/presentation";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
-import { getSeasonSummary } from "../lib/season";
+import { getSeasonSummary, type IdentityOptions } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";
 
 export interface EconomyViewProps {
@@ -10,9 +10,10 @@ export interface EconomyViewProps {
   scope: CohortScopeState;
   onScopeChange: (scope: CohortScopeState) => void;
   onGoLibrary: () => void;
+  identityOptions?: IdentityOptions;
 }
 
-export function EconomyView({ allEntries, entries, scope, onScopeChange, onGoLibrary }: EconomyViewProps) {
+export function EconomyView({ allEntries, entries, scope, onScopeChange, onGoLibrary, identityOptions }: EconomyViewProps) {
   const [insights, setInsights] = useState<TournamentInsights | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,7 +25,7 @@ export function EconomyView({ allEntries, entries, scope, onScopeChange, onGoLib
     let cancelled = false;
     setInsights(null);
     setError(null);
-    getSeasonSummary(entries)
+    getSeasonSummary(entries, identityOptions)
       .then((summary) => {
         if (!cancelled) setInsights(summary.insights);
       })
@@ -34,7 +35,7 @@ export function EconomyView({ allEntries, entries, scope, onScopeChange, onGoLib
     return () => {
       cancelled = true;
     };
-  }, [entries]);
+  }, [entries, identityOptions?.version]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   if (allEntries.length === 0) {
     return (

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { SeasonLeaderboardModel } from "@cs2dak/contract";
 import { SeasonLeaderboard } from "@cs2dak/react";
-import { getSeasonSummary } from "../lib/season";
+import { getSeasonSummary, type IdentityOptions } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 
@@ -12,9 +12,10 @@ export interface LeaderboardViewProps {
   onScopeChange: (scope: CohortScopeState) => void;
   onPlayerClick: (playerKey: string) => void;
   onGoLibrary: () => void;
+  identityOptions?: IdentityOptions;
 }
 
-export function LeaderboardView({ allEntries, entries, scope, onScopeChange, onPlayerClick, onGoLibrary }: LeaderboardViewProps) {
+export function LeaderboardView({ allEntries, entries, scope, onScopeChange, onPlayerClick, onGoLibrary, identityOptions }: LeaderboardViewProps) {
   const [model, setModel] = useState<SeasonLeaderboardModel | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,7 +27,7 @@ export function LeaderboardView({ allEntries, entries, scope, onScopeChange, onP
     let cancelled = false;
     setModel(null);
     setError(null);
-    getSeasonSummary(entries)
+    getSeasonSummary(entries, identityOptions)
       .then((summary) => {
         if (!cancelled) setModel(summary.leaderboard);
       })
@@ -36,7 +37,7 @@ export function LeaderboardView({ allEntries, entries, scope, onScopeChange, onP
     return () => {
       cancelled = true;
     };
-  }, [entries]);
+  }, [entries, identityOptions?.version]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   if (allEntries.length === 0) {
     return (

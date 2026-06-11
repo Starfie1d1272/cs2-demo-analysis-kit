@@ -643,6 +643,15 @@ export function ReplayViewer({ replay, map, target = null }: {
   const levelOf = (z: number): MapLevel => (calibration ? levelAt(z, calibration) : "upper");
   const round = replay.rounds.find((row) => row.roundNumber === roundNumber) ?? replay.rounds[0];
 
+  // 有效帧范围：数据实际帧数；officialEndTick 可能将 scrubber 延伸到更晚的 tick
+  const lastDataFrameIndex = round ? Math.max(round.frameCount - 1, 0) : 0;
+  const officialEndFrameIndex = useMemo(() => {
+    if (!round) return lastDataFrameIndex;
+    if (round.officialEndTick == null) return lastDataFrameIndex;
+    const computed = Math.round((round.officialEndTick - round.startTick) / round.tickStep);
+    return Math.max(lastDataFrameIndex, computed);
+  }, [round, lastDataFrameIndex]);
+
   useEffect(() => {
     setFrameIndex(0);
     setPlaying(false);
@@ -656,27 +665,30 @@ export function ReplayViewer({ replay, map, target = null }: {
     setRoundNumber(target.roundNumber);
     setPlaying(false);
     if (target.tick != null) {
+      const endIdx = targetRound.officialEndTick != null
+        ? Math.max(targetRound.frameCount - 1, Math.round((targetRound.officialEndTick - targetRound.startTick) / targetRound.tickStep))
+        : targetRound.frameCount - 1;
       const idx = Math.round((target.tick - targetRound.startTick) / targetRound.tickStep);
-      setFrameIndex(Math.max(0, Math.min(targetRound.frameCount - 1, idx)));
+      setFrameIndex(Math.max(0, Math.min(endIdx, idx)));
     } else {
       setFrameIndex(0);
     }
   }, [target?.seq]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!playing || !round || round.frameCount <= 1) return undefined;
+    if (!playing || !round || officialEndFrameIndex <= 0) return undefined;
     const msPerFrame = Math.max(35, 1000 / ((replay.sampleRate ?? 8) * speed));
     const timer = window.setInterval(() => {
       setFrameIndex((value) => {
-        if (value >= round.frameCount - 1) {
+        if (value >= officialEndFrameIndex) {
           setPlaying(false);
-          return round.frameCount - 1;
+          return officialEndFrameIndex;
         }
         return value + 1;
       });
     }, msPerFrame);
     return () => window.clearInterval(timer);
-  }, [playing, replay.sampleRate, round?.frameCount, speed]);
+  }, [playing, replay.sampleRate, officialEndFrameIndex, speed]);
 
   // Stable per-player numbers: teamA → 1-5, teamB → 6-0.
   // Computed from round.players order so the mapping is consistent across frames.
@@ -692,9 +704,11 @@ export function ReplayViewer({ replay, map, target = null }: {
     return <Panel title="2D 回放"><p className="dak-muted">该导出包不含回放流。</p></Panel>;
   }
 
-  const currentFrameIndex = Math.min(frameIndex, Math.max(round.frameCount - 1, 0));
+  const currentFrameIndex = Math.min(frameIndex, officialEndFrameIndex);
+  // 数据帧 clamp：超出实际录制帧数时冻结在最后一帧
+  const dataFrameIndex = Math.min(currentFrameIndex, lastDataFrameIndex);
   const currentTick = round.startTick + currentFrameIndex * round.tickStep;
-  const endTick = round.startTick + Math.max(round.frameCount - 1, 0) * round.tickStep;
+  const endTick = round.startTick + officialEndFrameIndex * round.tickStep;
 
   // 2D 时间轴锚点：首杀 / 每次击杀 / 下包拆包（freeze end = 起点本身）
   const anchors = useMemo(() => {
@@ -710,10 +724,11 @@ export function ReplayViewer({ replay, map, target = null }: {
   }, [round, endTick]);
   const seekTick = (tick: number) => {
     setPlaying(false);
-    setFrameIndex(Math.max(0, Math.min(round.frameCount - 1, Math.round((tick - round.startTick) / round.tickStep))));
+    setFrameIndex(Math.max(0, Math.min(officialEndFrameIndex, Math.round((tick - round.startTick) / round.tickStep))));
   };
+  // 帧数据访问用 dataFrameIndex（clamp 到实际录制范围），让超出部分冻结在最后帧
   const currentPlayers = round.players
-    .map((player) => ({ player, frame: player.frames[currentFrameIndex] ?? player.frames.find((frame) => frame.alive) ?? player.frames[0] }))
+    .map((player) => ({ player, frame: player.frames[dataFrameIndex] ?? player.frames.find((frame) => frame.alive) ?? player.frames[0] }))
     .filter((row): row is { player: WorkspaceReplayRound["players"][number]; frame: WorkspaceReplayFrame } => Boolean(row.frame));
 
   return (
@@ -756,12 +771,12 @@ export function ReplayViewer({ replay, map, target = null }: {
               className="dak-scrubber"
               type="range"
               min={0}
-              max={Math.max(round.frameCount - 1, 0)}
+              max={officialEndFrameIndex}
               value={currentFrameIndex}
               onChange={(event) => setFrameIndex(Number(event.target.value))}
             />
           </div>
-          <button className="dak-icon-button" type="button" onClick={() => setFrameIndex((value) => Math.min(round.frameCount - 1, value + Math.max(1, Math.round((replay.sampleRate ?? 8) / 2))))} aria-label="前进">
+          <button className="dak-icon-button" type="button" onClick={() => setFrameIndex((value) => Math.min(officialEndFrameIndex, value + Math.max(1, Math.round((replay.sampleRate ?? 8) / 2))))} aria-label="前进">
             <ChevronRight size={17} />
           </button>
         </div>
@@ -829,8 +844,8 @@ export function ReplayViewer({ replay, map, target = null }: {
               {currentPlayers.map(({ player, frame }) => {
                 if (!frame.alive) return null;
                 if (dualLevel && levelOf(frame.z) !== level) return null;
-                // 最近 ~10 秒的走位轨迹（8 Hz × 80 帧）
-                const traceFrames = player.frames.slice(Math.max(0, currentFrameIndex - 80), currentFrameIndex + 1).filter((f) => f.alive);
+                // 最近 ~10 秒的走位轨迹（8 Hz × 80 帧）；clamp 到实际录制范围
+                const traceFrames = player.frames.slice(Math.max(0, dataFrameIndex - 80), dataFrameIndex + 1).filter((f) => f.alive);
                 if (traceFrames.length < 2) return null;
                 const points = traceFrames.map((f) => {
                   const pos = replayPointPercent(f, map);
@@ -1061,7 +1076,7 @@ function DuelsView({ model }: MatchWorkspaceProps) {
           </table>
         </div>
       </Panel>
-      <Panel title="开局对枪">
+      <Panel title="首杀尝试">
         <table className="dak-table">
           <thead>
             <tr>

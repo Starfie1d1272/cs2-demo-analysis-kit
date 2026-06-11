@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { buildPlayerSeasonInsights } from "@cs2dak/presentation";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
-import { getSeasonDemos, getSeasonSummary } from "../lib/season";
+import { getSeasonDemos, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { formatMatchLabel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 
 export interface UtilityViewProps {
@@ -11,9 +11,10 @@ export interface UtilityViewProps {
   onScopeChange: (scope: CohortScopeState) => void;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
+  identityOptions?: IdentityOptions;
 }
 
-export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenMatch, onGoLibrary }: UtilityViewProps) {
+export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenMatch, onGoLibrary, identityOptions }: UtilityViewProps) {
   const [rows, setRows] = useState<{
     playerKey: string;
     name: string;
@@ -42,7 +43,7 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
     let cancelled = false;
     setRows(null);
     setError(null);
-    Promise.all([getSeasonSummary(entries), getSeasonDemos(entries)])
+    Promise.all([getSeasonSummary(entries, identityOptions), getSeasonDemos(entries)])
       .then(([summary, demos]) => {
         if (cancelled) return;
         const nextRows = summary.profiles.map((profile) => {
@@ -72,7 +73,7 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
     return () => {
       cancelled = true;
     };
-  }, [entries]);
+  }, [entries, identityOptions?.version]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   if (allEntries.length === 0) {
     return (

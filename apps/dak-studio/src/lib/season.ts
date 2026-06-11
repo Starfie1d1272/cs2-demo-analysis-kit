@@ -1,4 +1,4 @@
-import { buildSeasonCohort } from "@cs2dak/cohort";
+import { buildSeasonCohort, type PlayerIdentityMap } from "@cs2dak/cohort";
 import {
   buildAllPlayerSeasonProfiles,
   buildSeasonLeaderboardModel,
@@ -12,6 +12,12 @@ import type {
   SeasonLeaderboardModel
 } from "@cs2dak/contract";
 import { getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "./library";
+
+export interface IdentityOptions {
+  /** 与 IdentityStoreState.version 一致；0 表示无自定义映射。 */
+  version: number;
+  map: PlayerIdentityMap;
+}
 
 /**
  * 跨场聚合缓存，两层：
@@ -31,8 +37,9 @@ export interface SeasonSummary {
   insights: TournamentInsights | null;
 }
 
-function keyOf(entries: StudioDemoEntry[]): string {
-  return `v${CACHE_VERSION}:` + entries.map((entry) => entry.id).sort().join("|");
+function keyOf(entries: StudioDemoEntry[], identityVersion?: number): string {
+  const idPart = identityVersion ? `:idv${identityVersion}` : "";
+  return `v${CACHE_VERSION}${idPart}:` + entries.map((entry) => entry.id).sort().join("|");
 }
 
 // ── 持久层：独立小库，避免动主库（dak-studio）的 schema 版本 ──
@@ -150,16 +157,18 @@ export function getSeasonDemos(entries: StudioDemoEntry[]): Promise<SeasonInsigh
 let summaryKey = "";
 let summaryPromise: Promise<SeasonSummary> | null = null;
 
-/** 聚合摘要：优先持久缓存命中（不触碰 ZIP），未命中才全量解析并回写。 */
-export function getSeasonSummary(entries: StudioDemoEntry[]): Promise<SeasonSummary> {
-  const key = keyOf(entries);
+/** 聚合摘要：优先持久缓存命中（不触碰 ZIP），未命中才全量解析并回写。
+ *  传入 identity 时将其并入缓存 key，identityMap 作为归并参数传给 buildSeasonCohort。 */
+export function getSeasonSummary(entries: StudioDemoEntry[], identity?: IdentityOptions): Promise<SeasonSummary> {
+  const key = keyOf(entries, identity?.version);
   if (summaryPromise && key === summaryKey) return summaryPromise;
   summaryKey = key;
   summaryPromise = (async () => {
     const persisted = await readPersisted(key);
     if (persisted) return persisted;
     const demos = await getSeasonDemos(entries);
-    const bundle = buildSeasonCohort(demos);
+    const cohortOpts = identity?.version ? { identityMap: identity.map } : {};
+    const bundle = buildSeasonCohort(demos, cohortOpts);
     const summary: SeasonSummary = {
       bundle,
       leaderboard: buildSeasonLeaderboardModel(bundle),

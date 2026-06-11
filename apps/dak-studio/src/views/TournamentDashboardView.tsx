@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { formatPercent, type TournamentInsights } from "@cs2dak/presentation";
-import { getSeasonSummary } from "../lib/season";
+import { getSeasonSummary, type IdentityOptions } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 
@@ -10,6 +10,7 @@ export interface TournamentDashboardViewProps {
   scope: CohortScopeState;
   onScopeChange: (scope: CohortScopeState) => void;
   onGoLibrary: () => void;
+  identityOptions?: IdentityOptions;
 }
 
 /** v0.3 赛事总览：地图使用率、T/CT 胜率、手枪局与转化（cohort 同源聚合）。 */
@@ -18,7 +19,8 @@ export function TournamentDashboardView({
   entries,
   scope,
   onScopeChange,
-  onGoLibrary
+  onGoLibrary,
+  identityOptions
 }: TournamentDashboardViewProps) {
   const [insights, setInsights] = useState<TournamentInsights | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +33,7 @@ export function TournamentDashboardView({
     let cancelled = false;
     setInsights(null);
     setError(null);
-    getSeasonSummary(entries)
+    getSeasonSummary(entries, identityOptions)
       .then((summary) => {
         if (!cancelled) setInsights(summary.insights);
       })
@@ -41,7 +43,7 @@ export function TournamentDashboardView({
     return () => {
       cancelled = true;
     };
-  }, [entries]);
+  }, [entries, identityOptions?.version]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   if (allEntries.length === 0) {
     return (

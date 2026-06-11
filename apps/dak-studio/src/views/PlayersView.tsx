@@ -9,7 +9,7 @@ import {
   type PlayerWeaponStat,
   type SeasonInsightsDemo
 } from "@cs2dak/presentation";
-import { getSeasonDemos, getSeasonSummary } from "../lib/season";
+import { getSeasonDemos, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { formatMatchLabel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
@@ -23,6 +23,7 @@ export interface PlayersViewProps {
   onSelectPlayer: (playerKey: string) => void;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
+  identityOptions?: IdentityOptions;
 }
 
 const CORE_VIEW = SEASON_STAT_VIEWS.find((view) => view.key === "core")!;
@@ -44,7 +45,8 @@ export function PlayersView({
   selectedPlayerKey,
   onSelectPlayer,
   onOpenMatch,
-  onGoLibrary
+  onGoLibrary,
+  identityOptions
 }: PlayersViewProps) {
   const [profiles, setProfiles] = useState<PlayerSeasonProfile[] | null>(null);
   const [demos, setDemos] = useState<SeasonInsightsDemo[]>([]);
@@ -60,7 +62,7 @@ export function PlayersView({
     let cancelled = false;
     setProfiles(null);
     setError(null);
-    getSeasonSummary(entries)
+    getSeasonSummary(entries, identityOptions)
       .then((summary) => {
         if (!cancelled) {
           setProfiles([...summary.profiles].sort((a, b) => b.rating.rivalhubRR - a.rating.rivalhubRR));
@@ -80,7 +82,7 @@ export function PlayersView({
     return () => {
       cancelled = true;
     };
-  }, [entries]);
+  }, [entries, identityOptions?.version]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // 关注选手置顶；其余按 RR 降序
   const orderedProfiles = useMemo(() => {

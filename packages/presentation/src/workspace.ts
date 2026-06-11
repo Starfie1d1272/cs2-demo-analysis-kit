@@ -740,6 +740,7 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
   const killsByRound = groupBy(pkg.kills, (k) => k.roundNumber);
   const grenadesByRound = groupBy(pkg.grenades, (g) => g.roundNumber);
   const bombsByRound = groupBy(pkg.bombs, (b) => b.roundNumber);
+  const endTickByRound = new Map(pkg.rounds.map((r) => [r.roundNumber, r.endTick]));
 
   let hasDefuseKit = false;
   const rounds = replay.rounds.map((roundRow) => ({
@@ -747,6 +748,7 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
     startTick: roundRow.startTick,
     tickStep: roundRow.tickStep,
     frameCount: roundRow.frameCount,
+    officialEndTick: endTickByRound.get(roundRow.roundNumber),
     kills: buildRoundKills(pkg, killsByRound.get(roundRow.roundNumber) ?? []),
     grenades: (grenadesByRound.get(roundRow.roundNumber) ?? []).map((row) => ({
       grenade: row.grenade,
