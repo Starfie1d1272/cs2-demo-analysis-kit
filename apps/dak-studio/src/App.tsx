@@ -491,6 +491,7 @@ export function App() {
             onIdentityChange={setIdentityState}
             identityOptions={identityOptions}
             onGoLibrary={() => setView("library")}
+            onEntriesChange={setEntries}
           />
         )}
       </main>

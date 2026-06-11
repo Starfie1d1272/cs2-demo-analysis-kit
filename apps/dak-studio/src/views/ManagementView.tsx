@@ -12,7 +12,7 @@ import {
   undoLastAction,
   type IdentityStoreState
 } from "../lib/identity";
-import type { StudioDemoEntry } from "../lib/library";
+import { listDemoEntries, renameTeamInLibrary, type StudioDemoEntry } from "../lib/library";
 
 export interface ManagementViewProps {
   allEntries: StudioDemoEntry[];
@@ -23,6 +23,7 @@ export interface ManagementViewProps {
   onIdentityChange: (state: IdentityStoreState) => void;
   identityOptions?: IdentityOptions;
   onGoLibrary: () => void;
+  onEntriesChange?: (entries: StudioDemoEntry[]) => void;
 }
 
 type BundlePlayer = SeasonCohortBundle["players"][number];
@@ -41,7 +42,8 @@ export function ManagementView({
   identity,
   onIdentityChange,
   identityOptions,
-  onGoLibrary
+  onGoLibrary,
+  onEntriesChange
 }: ManagementViewProps) {
   const [bundle, setBundle] = useState<SeasonCohortBundle | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -152,6 +154,11 @@ export function ManagementView({
     try {
       const next = await setTeamRename(identity, original, displayName);
       onIdentityChange(next);
+      // 同步更新资料库中的 entry meta，让所有 UI 显示改名后的队伍
+      await renameTeamInLibrary(original, displayName || original);
+      // 刷新 entry 列表以反映元数据变化
+      const fresh = await listDemoEntries();
+      onEntriesChange?.(fresh);
     } finally {
       setWorking(false);
     }
@@ -161,7 +168,26 @@ export function ManagementView({
     setWorking(true);
     try {
       const prev = await undoLastAction(identity);
-      if (prev) onIdentityChange(prev);
+      if (!prev) return;
+      // 撤销队伍改名：对比前后 teamRenames，反向还原 entry meta
+      const oldRenames = identity.teamRenames;
+      const newRenames = prev.teamRenames;
+      const allCurrentNames = new Set([
+        ...allEntries.map((e) => e.meta.teamAName),
+        ...allEntries.map((e) => e.meta.teamBName)
+      ]);
+      // 1) 撤销当前状态中的改名（如果目标名不在 restored 中则还原原名）
+      for (const [original, display] of Object.entries(oldRenames)) {
+        if (newRenames[original] === display) continue; // restored 后仍保留此改名
+        if (allCurrentNames.has(display)) await renameTeamInLibrary(display, original);
+      }
+      // 2) 应用 restored 中的新改名
+      for (const [original, display] of Object.entries(newRenames)) {
+        if (allCurrentNames.has(original) && original !== display) await renameTeamInLibrary(original, display);
+      }
+      onIdentityChange(prev);
+      const fresh = await listDemoEntries();
+      onEntriesChange?.(fresh);
     } finally {
       setWorking(false);
     }
@@ -354,9 +380,14 @@ export function ManagementView({
                         type="button"
                         className="stu-button-sm stu-button-ghost"
                         disabled={working}
-                        onClick={() => {
+                        onClick={async () => {
+                          const currentDisplay = identity.teamRenames[team];
                           setTeamInputs((prev) => ({ ...prev, [team]: "" }));
-                          void setTeamRename(identity, team, "").then(onIdentityChange);
+                          const next = await setTeamRename(identity, team, "");
+                          onIdentityChange(next);
+                          if (currentDisplay) await renameTeamInLibrary(currentDisplay, team);
+                          const fresh = await listDemoEntries();
+                          onEntriesChange?.(fresh);
                         }}
                       >
                         清除

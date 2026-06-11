@@ -336,3 +336,17 @@ export function getDemoPackage(id: string): Promise<DemoPackage> {
   loading.catch(() => pkgCache.delete(id));
   return loading;
 }
+
+/** 批量替换资料库中所有匹配 originalName 的队伍名为 displayName。 */
+export async function renameTeamInLibrary(originalName: string, displayName: string): Promise<void> {
+  const db = await openDb();
+  const store = db.transaction(STORE, "readwrite").objectStore(STORE);
+  const all = await requestAsPromise(store.getAll() as IDBRequest<DemoRecord[]>);
+  for (const record of all) {
+    let changed = false;
+    if (record.meta.teamAName === originalName) { record.meta.teamAName = displayName; changed = true; }
+    if (record.meta.teamBName === originalName) { record.meta.teamBName = displayName; changed = true; }
+    if (changed) await requestAsPromise(store.put(record));
+  }
+  db.close();
+}
