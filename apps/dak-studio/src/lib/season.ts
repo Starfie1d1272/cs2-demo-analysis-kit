@@ -136,22 +136,30 @@ async function prunePersisted(): Promise<void> {
 let demosKey = "";
 let demosPromise: Promise<SeasonInsightsDemo[]> | null = null;
 
-/** 逐场加载 DemoPackage 并应用队伍改名，返回 SeasonInsightsDemo[]。 */
+/** 分批并行加载 DemoPackage 并应用队伍改名。批大小 BATCH_SIZE 控制内存峰值。 */
+const BATCH_SIZE = 5;
+
 async function loadDemosWithRenames(
   entries: StudioDemoEntry[],
   teamRenames?: Record<string, string>
 ): Promise<SeasonInsightsDemo[]> {
   const sorted = [...entries].sort((a, b) => a.fileName.localeCompare(b.fileName));
   const demos: SeasonInsightsDemo[] = [];
-  for (const entry of sorted) {
-    const pkg = await getDemoPackage(entry.id);
-    // 应用队伍改名：直接修改 match 对象（Zod parsed，非 frozen）
-    if (teamRenames && Object.keys(teamRenames).length > 0) {
-      const rename = (name: string | null) => name == null ? name : (teamRenames[name] ?? name);
-      pkg.match.teamA.name = rename(pkg.match.teamA.name);
-      pkg.match.teamB.name = rename(pkg.match.teamB.name);
-    }
-    demos.push({ matchId: matchIdForEntry(entry), pkg });
+  const hasRenames = teamRenames && Object.keys(teamRenames).length > 0;
+  for (let i = 0; i < sorted.length; i += BATCH_SIZE) {
+    const batch = sorted.slice(i, i + BATCH_SIZE);
+    const loaded = await Promise.all(
+      batch.map(async (entry) => {
+        const pkg = await getDemoPackage(entry.id);
+        if (hasRenames) {
+          const rename = (name: string | null) => name == null ? name : (teamRenames![name] ?? name);
+          pkg.match.teamA.name = rename(pkg.match.teamA.name);
+          pkg.match.teamB.name = rename(pkg.match.teamB.name);
+        }
+        return { matchId: matchIdForEntry(entry), pkg };
+      })
+    );
+    demos.push(...loaded);
   }
   return demos;
 }
