@@ -88,10 +88,14 @@ export function buildSeasonCohort(
     const matchAccounts = computeAccountRatingsV2(demo.pkg);
     const matchAccountBySteamId = new Map(matchAccounts.map((row) => [row.signals.steamId64, row.rr]));
     const rrBySteamId = new Map(indicators.map((row) => [row.steamId64, computeRR(row, rrWeights)]));
+    // index per-demo rows by steamId64 once (was O(players²) via .find in the loop)
+    const signalBySteamId = new Map(signals.map((row) => [row.steamId64, row]));
+    const indicatorBySteamId = new Map(indicators.map((row) => [row.steamId64, row]));
+    const weaponHighlightBySteamId = new Map(weaponHighlights.map((row) => [row.steamId64, row]));
 
     for (const player of demo.pkg.players) {
-      const signal = signals.find((row) => row.steamId64 === player.steamId64);
-      const indicator = indicators.find((row) => row.steamId64 === player.steamId64);
+      const signal = signalBySteamId.get(player.steamId64);
+      const indicator = indicatorBySteamId.get(player.steamId64);
       if (!signal || !indicator) continue;
       const identity = resolveIdentity(player.steamId64, identityMap);
 
@@ -118,7 +122,7 @@ export function buildSeasonCohort(
       acc.mapCount += 1;
       acc.signals.push(signal);
       acc.indicators.push(indicator);
-      const weaponHighlight = weaponHighlights.find((row) => row.steamId64 === player.steamId64);
+      const weaponHighlight = weaponHighlightBySteamId.get(player.steamId64);
       if (weaponHighlight) acc.weaponHighlights.push(weaponHighlight);
       acc.perMatch.push({
         matchId: demo.matchId,

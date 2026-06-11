@@ -52,8 +52,13 @@ interface DerivedRecord {
   pkg: DemoPackage;
 }
 
+// 进程内复用单连接：聚合批量加载时每场都会多次读写，反复 open/close 握手是
+// 可观测开销。连接长开，事务自动提交，不需要逐次 close。
+let dbPromise: Promise<IDBDatabase> | null = null;
+
 function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 2);
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(STORE)) {
@@ -63,9 +68,17 @@ function openDb(): Promise<IDBDatabase> {
         request.result.createObjectStore(DERIVED_STORE, { keyPath: "id" });
       }
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("无法打开 IndexedDB"));
+    request.onsuccess = () => {
+      const db = request.result;
+      // 另一标签页升级版本时让出连接，并丢弃缓存以便下次重开
+      db.onversionchange = () => { db.close(); dbPromise = null; };
+      db.onclose = () => { dbPromise = null; };
+      resolve(db);
+    };
+    request.onerror = () => { dbPromise = null; reject(request.error ?? new Error("无法打开 IndexedDB")); };
   });
+  dbPromise.catch(() => { dbPromise = null; });
+  return dbPromise;
 }
 
 /** derived 是纯加速缓存：读写失败一律静默回落到 ZIP 重建。 */
@@ -75,7 +88,6 @@ async function readDerived(id: string): Promise<DemoPackage | null> {
     const record = await requestAsPromise(
       db.transaction(DERIVED_STORE, "readonly").objectStore(DERIVED_STORE).get(id) as IDBRequest<DerivedRecord | undefined>
     );
-    db.close();
     return record && record.version === DERIVED_VERSION ? record.pkg : null;
   } catch {
     return null;
@@ -88,7 +100,6 @@ async function writeDerived(id: string, pkg: DemoPackage): Promise<void> {
     await requestAsPromise(
       db.transaction(DERIVED_STORE, "readwrite").objectStore(DERIVED_STORE).put({ id, version: DERIVED_VERSION, pkg } satisfies DerivedRecord)
     );
-    db.close();
   } catch {
     // 写失败不影响功能
   }
@@ -98,7 +109,6 @@ async function deleteDerived(id: string): Promise<void> {
   try {
     const db = await openDb();
     await requestAsPromise(db.transaction(DERIVED_STORE, "readwrite").objectStore(DERIVED_STORE).delete(id));
-    db.close();
   } catch {
     // 忽略
   }
@@ -159,7 +169,70 @@ export function clearPkgCache(): void {
   pkgCache.clear();
 }
 
+// ── ZIP 解析 worker pool ──
+// 复用固定数量的 worker：每场解析不再新建/销毁 worker（那样每次都要重新加载
+// @cs2dak/core 模块）。任务排队分发给空闲 worker，并发上限即池大小。
+const WORKER_POOL_SIZE = 4;
+
+interface ParseTask {
+  buffer: ArrayBuffer;          // 转移给 worker（转移后 detach）
+  fallbackBuffer: ArrayBuffer;  // worker 失败时回主线程解析用的副本
+  resolve: (pkg: DemoPackage) => void;
+  reject: (err: Error) => void;
+}
+
+interface PoolWorker {
+  worker: Worker;
+  task: ParseTask | null;
+  taskId: number;
+}
+
+const workerPool: PoolWorker[] = [];
+const parseQueue: ParseTask[] = [];
 let workerSeq = 0;
+
+function settleWithFallback(task: ParseTask): void {
+  loadDemoPackageFromZip(task.fallbackBuffer).then(task.resolve, task.reject);
+}
+
+function makePoolWorker(): PoolWorker {
+  const pw: PoolWorker = {
+    worker: new Worker(new URL("./pkg-worker.ts", import.meta.url), { type: "module" }),
+    task: null,
+    taskId: 0
+  };
+  pw.worker.onmessage = (event: MessageEvent<{ id: number; ok: boolean; pkg?: DemoPackage; error?: string }>) => {
+    if (!pw.task || event.data.id !== pw.taskId) return;
+    const task = pw.task;
+    pw.task = null;
+    if (event.data.ok && event.data.pkg) task.resolve(event.data.pkg);
+    else settleWithFallback(task);
+    pumpParseQueue();
+  };
+  pw.worker.onerror = () => {
+    // worker 可能已损坏：销毁、移出池，正在执行的任务回退主线程
+    const task = pw.task;
+    pw.task = null;
+    pw.worker.terminate();
+    const idx = workerPool.indexOf(pw);
+    if (idx >= 0) workerPool.splice(idx, 1);
+    if (task) settleWithFallback(task);
+    pumpParseQueue();
+  };
+  workerPool.push(pw);
+  return pw;
+}
+
+function pumpParseQueue(): void {
+  if (parseQueue.length === 0) return;
+  let idle = workerPool.find((pw) => pw.task === null);
+  if (!idle && workerPool.length < WORKER_POOL_SIZE) idle = makePoolWorker();
+  if (!idle) return;
+  const task = parseQueue.shift()!;
+  idle.task = task;
+  idle.taskId = ++workerSeq;
+  idle.worker.postMessage({ id: idle.taskId, buffer: task.buffer }, [task.buffer]);
+}
 
 function parseZipInWorker(buffer: ArrayBuffer): Promise<DemoPackage> {
   if (typeof Worker === "undefined") {
@@ -167,20 +240,9 @@ function parseZipInWorker(buffer: ArrayBuffer): Promise<DemoPackage> {
   }
   const fallbackBuffer = buffer.slice(0);
   return new Promise<DemoPackage>((resolve, reject) => {
-    const id = ++workerSeq;
-    const worker = new Worker(new URL("./pkg-worker.ts", import.meta.url), { type: "module" });
-    worker.onmessage = (event: MessageEvent<{ id: number; ok: boolean; pkg?: DemoPackage; error?: string }>) => {
-      if (event.data.id !== id) return;
-      worker.terminate();
-      if (event.data.ok && event.data.pkg) resolve(event.data.pkg);
-      else reject(new Error(event.data.error ?? "ZIP 解析失败"));
-    };
-    worker.onerror = (event) => {
-      worker.terminate();
-      reject(new Error(event.message || "ZIP 解析 Worker 失败"));
-    };
-    worker.postMessage({ id, buffer }, [buffer]);
-  }).catch(() => loadDemoPackageFromZip(fallbackBuffer));
+    parseQueue.push({ buffer, fallbackBuffer, resolve, reject });
+    pumpParseQueue();
+  });
 }
 
 export async function listDemoEntries(): Promise<StudioDemoEntry[]> {
@@ -188,7 +250,6 @@ export async function listDemoEntries(): Promise<StudioDemoEntry[]> {
   const records = await requestAsPromise(
     db.transaction(STORE, "readonly").objectStore(STORE).getAll() as IDBRequest<DemoRecord[]>
   );
-  db.close();
   return records
     // tags 为后加字段：旧记录读出时补默认值
     .map(({ id, fileName, importedAt, tags, sourceDemPath, meta }) => ({
@@ -259,7 +320,6 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
       pkgCache.delete(replacement.id);
       void deleteDerived(replacement.id);
     }
-    db.close();
     const { buffer: _ignored, ...existingEntry } = existing;
     return {
       entry: { ...existingEntry, tags: mergedTags, sourceDemPath: sourceDemPath ?? existing.sourceDemPath ?? null },
@@ -273,7 +333,6 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     await requestAsPromise(store.delete(replacement.id));
     pkgCache.delete(replacement.id);
   }
-  db.close();
   pkgCache.set(id, Promise.resolve(pkg));
   // 导入时已解析出 pkg，顺手持久化，后续聚合不再解压 ZIP
   void writeDerived(id, pkg);
@@ -288,7 +347,6 @@ export async function updateDemoTags(id: string, tags: string[]): Promise<void> 
   if (record) {
     await requestAsPromise(store.put({ ...record, tags: normalizeTags(tags) }));
   }
-  db.close();
 }
 
 export async function bulkUpdateTags(ids: string[], add: string[] = [], remove: string[] = []): Promise<void> {
@@ -304,13 +362,11 @@ export async function bulkUpdateTags(ids: string[], add: string[] = [], remove: 
     const nextTags = normalizeTags([...(record.tags ?? []).filter((tag) => !removeSet.has(tag)), ...addSet]);
     await requestAsPromise(store.put({ ...record, tags: nextTags }));
   }
-  db.close();
 }
 
 export async function removeDemo(id: string): Promise<void> {
   const db = await openDb();
   await requestAsPromise(db.transaction(STORE, "readwrite").objectStore(STORE).delete(id));
-  db.close();
   pkgCache.delete(id);
   await deleteDerived(id);
 }
@@ -326,7 +382,6 @@ export function getDemoPackage(id: string): Promise<DemoPackage> {
     const record = await requestAsPromise(
       db.transaction(STORE, "readonly").objectStore(STORE).get(id) as IDBRequest<DemoRecord | undefined>
     );
-    db.close();
     if (!record) throw new Error("demo 不存在或已被删除");
     const pkg = await parseZipInWorker(record.buffer.slice(0));
     void writeDerived(id, pkg);
@@ -348,5 +403,4 @@ export async function renameTeamInLibrary(originalName: string, displayName: str
     if (record.meta.teamBName === originalName) { record.meta.teamBName = displayName; changed = true; }
     if (changed) await requestAsPromise(store.put(record));
   }
-  db.close();
 }
