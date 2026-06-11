@@ -72,14 +72,17 @@ def _assemble_zip(raw: dict[str, Any], dem_path: str, demo_hash: str | None) -> 
         for g in grenades if g["grenade"] == "flashbang" and g["grenadeId"]
     }
     blinds_json  = _build_blinds(raw, team_map, round_model, flash_lookup=flash_lookup)
-    player_stats = _build_player_stats(raw, team_map, round_model, rounds,
-                                       kills_list=kills, blinds_list=blinds_json)
+    # damages + clutches are computed once here and reused inside _build_player_stats
+    # (both are otherwise rebuilt a second time during stat aggregation).
     damages      = _build_damages(raw, team_map, round_model)
+    clutches     = _build_clutches(kills, rounds, team_map)
+    player_stats = _build_player_stats(raw, team_map, round_model, rounds,
+                                       kills_list=kills, blinds_list=blinds_json,
+                                       damages_list=damages, clutches_list=clutches)
     bombs        = _build_bombs(raw, team_map, round_model)
     shots        = _build_shots(raw, team_map, round_model)
     positions    = _build_positions(raw, team_map, round_model)
     economies    = _build_economies(raw, team_map, round_model, rounds)
-    clutches     = _build_clutches(kills, rounds, team_map)
     replay       = _build_replay(raw, team_map, round_model, raw.get("tickrate", 64))
     manifest     = _build_manifest(raw, dem_path, demo_hash, shots, positions, replay)
 
@@ -1129,6 +1132,8 @@ def _build_player_stats(
     raw: dict, team_map: dict, round_model: _RoundModel, rounds: list[dict],
     kills_list: list[dict] | None = None,
     blinds_list: list[dict] | None = None,
+    damages_list: list[dict] | None = None,
+    clutches_list: list[dict] | None = None,
 ) -> list[dict]:
     total_rounds = len(rounds)
     kills_by = _kills_per_round_per_player(raw.get("deaths", []), round_model)
@@ -1287,7 +1292,9 @@ def _build_player_stats(
     # Must match cs2-demo-format/tools/validate.py utility set exactly so
     # playerStats.utilityDamage agrees with the canonical recomputation.
     util_weapons = {"hegrenade", "inferno", "molotov", "incendiary"}
-    for r in _iter_effective_damage_rows(raw, team_map, round_model):
+    if damages_list is None:
+        damages_list = _iter_effective_damage_rows(raw, team_map, round_model)
+    for r in damages_list:
         atk = r["attackerSteamId64"]
         vic = r["victimSteamId64"]
         if not atk or atk == vic:
@@ -1340,7 +1347,7 @@ def _build_player_stats(
         s["kast_rounds"] = len(kast & all_rounds)
 
     # clutches
-    clutches = _build_clutches(kills_list, rounds, team_map)
+    clutches = clutches_list if clutches_list is not None else _build_clutches(kills_list, rounds, team_map)
     for c in clutches:
         sid = c["clutcherSteamId64"]
         s = _get(sid)
@@ -1375,7 +1382,7 @@ def _event_round_number(round_model: _RoundModel, row: dict) -> int | None:
     n = round_model.round_for_event(row)
     if n is None:
         return None
-    return n if any(window.round_number == n for window in round_model.windows) else None
+    return n if round_model.has_round(n) else None
 
 
 def _active_event_round_number(round_model: _RoundModel, row: dict) -> int | None:

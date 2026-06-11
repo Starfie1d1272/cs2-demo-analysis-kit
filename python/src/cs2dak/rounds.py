@@ -11,8 +11,9 @@ never leak into kills/damages/positions etc.
 
 from __future__ import annotations
 
+import bisect
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .enums import normalize_round_end_reason
 
@@ -49,18 +50,33 @@ class _RoundWindow:
 class _RoundModel:
     windows: list[_RoundWindow]
     side_map: dict[tuple[int, str], str]
+    # Indexes built in __post_init__; events are resolved per-row across every
+    # builder, so these turn O(rounds) scans into O(1)/O(log rounds) lookups.
+    _by_round: dict[int, _RoundWindow] = field(init=False, repr=False, default_factory=dict)
+    _sorted_starts: list[int] = field(init=False, repr=False, default_factory=list)
+    _sorted_windows: list[_RoundWindow] = field(init=False, repr=False, default_factory=list)
+
+    def __post_init__(self) -> None:
+        self._by_round = {w.round_number: w for w in self.windows}
+        ordered = sorted(self.windows, key=lambda w: w.start_tick)
+        self._sorted_windows = ordered
+        self._sorted_starts = [w.start_tick for w in ordered]
 
     def window_for_round(self, round_number: int) -> _RoundWindow | None:
-        for window in self.windows:
-            if window.round_number == round_number:
-                return window
-        return None
+        return self._by_round.get(round_number)
+
+    def has_round(self, round_number: int) -> bool:
+        return round_number in self._by_round
 
     def round_for_tick(self, tick: int) -> int | None:
-        for window in self.windows:
-            if window.start_tick <= tick <= window.end_tick:
-                return window.round_number
-        return None
+        # Windows are sorted by start_tick and non-overlapping: the candidate is
+        # the last window whose start_tick <= tick; confirm tick is within it
+        # (ticks falling in inter-round gaps resolve to None, as before).
+        i = bisect.bisect_right(self._sorted_starts, tick) - 1
+        if i < 0:
+            return None
+        window = self._sorted_windows[i]
+        return window.round_number if window.start_tick <= tick <= window.end_tick else None
 
     def round_for_event(self, row: dict) -> int | None:
         tick = int(row.get("tick") or 0)
