@@ -26,6 +26,8 @@ export interface StudioDemoEntry {
   importedAt: number;
   /** 用户标签（赛事、阶段等），导入时附加，可后续编辑。 */
   tags: string[];
+  /** 本机原始 .dem 路径，仅用于桌面端重新导出；浏览器/ZIP 导入为空。 */
+  sourceDemPath?: string | null;
   meta: DemoMeta;
 }
 
@@ -54,7 +56,7 @@ function openDb(): Promise<IDBDatabase> {
 }
 
 function requestAsPromise<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
+  return new Promise<T>((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error ?? new Error("IndexedDB 请求失败"));
   });
@@ -91,7 +93,40 @@ export function matchDateFromFileName(fileName: string): string | null {
   return match ? match[1] : null;
 }
 
+/** 格式化为可读的比赛标签："de_mirage · 2025-03-15 · FURIA 13:9 Vitality"。消除多处的重复拼接。 */
+export function formatMatchLabel(entry: StudioDemoEntry): string {
+  const date = matchDateFromFileName(entry.fileName);
+  return [
+    entry.meta.mapName,
+    date,
+    `${entry.meta.teamAName} ${entry.meta.teamAScore}:${entry.meta.teamBScore} ${entry.meta.teamBName}`
+  ].filter(Boolean).join(" · ");
+}
+
 const pkgCache = new Map<string, Promise<DemoPackage>>();
+let workerSeq = 0;
+
+function parseZipInWorker(buffer: ArrayBuffer): Promise<DemoPackage> {
+  if (typeof Worker === "undefined") {
+    return loadDemoPackageFromZip(buffer);
+  }
+  const fallbackBuffer = buffer.slice(0);
+  return new Promise<DemoPackage>((resolve, reject) => {
+    const id = ++workerSeq;
+    const worker = new Worker(new URL("./pkg-worker.ts", import.meta.url), { type: "module" });
+    worker.onmessage = (event: MessageEvent<{ id: number; ok: boolean; pkg?: DemoPackage; error?: string }>) => {
+      if (event.data.id !== id) return;
+      worker.terminate();
+      if (event.data.ok && event.data.pkg) resolve(event.data.pkg);
+      else reject(new Error(event.data.error ?? "ZIP 解析失败"));
+    };
+    worker.onerror = (event) => {
+      worker.terminate();
+      reject(new Error(event.message || "ZIP 解析 Worker 失败"));
+    };
+    worker.postMessage({ id, buffer }, [buffer]);
+  }).catch(() => loadDemoPackageFromZip(fallbackBuffer));
+}
 
 export async function listDemoEntries(): Promise<StudioDemoEntry[]> {
   const db = await openDb();
@@ -101,24 +136,40 @@ export async function listDemoEntries(): Promise<StudioDemoEntry[]> {
   db.close();
   return records
     // tags 为后加字段：旧记录读出时补默认值
-    .map(({ id, fileName, importedAt, tags, meta }) => ({ id, fileName, importedAt, tags: tags ?? [], meta }))
+    .map(({ id, fileName, importedAt, tags, sourceDemPath, meta }) => ({
+      id,
+      fileName,
+      importedAt,
+      tags: tags ?? [],
+      sourceDemPath: sourceDemPath ?? null,
+      meta
+    }))
     .sort((a, b) => b.importedAt - a.importedAt);
 }
 
 export interface ImportResult {
   entry: StudioDemoEntry;
   duplicate: boolean;
+  replaced: boolean;
+  replacedId?: string;
+}
+
+export interface ImportDemoOptions {
+  tags?: string[];
+  sourceDemPath?: string | null;
+  replaceId?: string;
 }
 
 /**
  * 导入一个 v2 ZIP；以内容哈希为 id，重复导入幂等（标签做并集）。
  * 解析失败抛错（带文件名）。
  */
-export async function importDemoFile(file: File, tags: string[] = []): Promise<ImportResult> {
+export async function importDemoFile(file: File, options: ImportDemoOptions | string[] = []): Promise<ImportResult> {
+  const { tags = [], sourceDemPath = null, replaceId } = Array.isArray(options) ? { tags: options } : options;
   const buffer = await file.arrayBuffer();
   let pkg: DemoPackage;
   try {
-    pkg = await loadDemoPackageFromZip(buffer);
+    pkg = await parseZipInWorker(buffer.slice(0));
   } catch (err) {
     throw new Error(`${file.name}: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -128,23 +179,47 @@ export async function importDemoFile(file: File, tags: string[] = []): Promise<I
     fileName: file.name,
     importedAt: Date.now(),
     tags: normalizeTags(tags),
+    sourceDemPath,
     meta: metaFromPackage(pkg)
   };
 
   const db = await openDb();
-  const store = db.transaction(STORE, "readwrite").objectStore(STORE);
+  const tx = db.transaction(STORE, "readwrite");
+  const store = tx.objectStore(STORE);
+  const replacement = replaceId ? await requestAsPromise(store.get(replaceId) as IDBRequest<DemoRecord | undefined>) : undefined;
+  if (replacement) {
+    entry.tags = normalizeTags([...(replacement.tags ?? []), ...entry.tags]);
+    entry.sourceDemPath = sourceDemPath ?? replacement.sourceDemPath ?? null;
+  }
   const existing = await requestAsPromise(store.get(id) as IDBRequest<DemoRecord | undefined>);
   if (existing) {
     const mergedTags = normalizeTags([...(existing.tags ?? []), ...entry.tags]);
-    await requestAsPromise(store.put({ ...existing, tags: mergedTags }));
+    await requestAsPromise(store.put({
+      ...existing,
+      tags: mergedTags,
+      sourceDemPath: sourceDemPath ?? existing.sourceDemPath ?? null
+    }));
+    if (replacement && replacement.id !== id) {
+      await requestAsPromise(store.delete(replacement.id));
+      pkgCache.delete(replacement.id);
+    }
     db.close();
     const { buffer: _ignored, ...existingEntry } = existing;
-    return { entry: { ...existingEntry, tags: mergedTags }, duplicate: true };
+    return {
+      entry: { ...existingEntry, tags: mergedTags, sourceDemPath: sourceDemPath ?? existing.sourceDemPath ?? null },
+      duplicate: true,
+      replaced: Boolean(replacement),
+      replacedId: replacement?.id
+    };
   }
   await requestAsPromise(store.put({ ...entry, buffer } satisfies DemoRecord));
+  if (replacement && replacement.id !== id) {
+    await requestAsPromise(store.delete(replacement.id));
+    pkgCache.delete(replacement.id);
+  }
   db.close();
   pkgCache.set(id, Promise.resolve(pkg));
-  return { entry, duplicate: false };
+  return { entry, duplicate: false, replaced: Boolean(replacement), replacedId: replacement?.id };
 }
 
 /** 更新某条 demo 的标签。 */
@@ -154,6 +229,22 @@ export async function updateDemoTags(id: string, tags: string[]): Promise<void> 
   const record = await requestAsPromise(store.get(id) as IDBRequest<DemoRecord | undefined>);
   if (record) {
     await requestAsPromise(store.put({ ...record, tags: normalizeTags(tags) }));
+  }
+  db.close();
+}
+
+export async function bulkUpdateTags(ids: string[], add: string[] = [], remove: string[] = []): Promise<void> {
+  const targetIds = [...new Set(ids)];
+  if (targetIds.length === 0) return;
+  const addSet = normalizeTags(add);
+  const removeSet = new Set(normalizeTags(remove));
+  const db = await openDb();
+  const store = db.transaction(STORE, "readwrite").objectStore(STORE);
+  for (const id of targetIds) {
+    const record = await requestAsPromise(store.get(id) as IDBRequest<DemoRecord | undefined>);
+    if (!record) continue;
+    const nextTags = normalizeTags([...(record.tags ?? []).filter((tag) => !removeSet.has(tag)), ...addSet]);
+    await requestAsPromise(store.put({ ...record, tags: nextTags }));
   }
   db.close();
 }
@@ -176,7 +267,7 @@ export function getDemoPackage(id: string): Promise<DemoPackage> {
     );
     db.close();
     if (!record) throw new Error("demo 不存在或已被删除");
-    return loadDemoPackageFromZip(record.buffer);
+    return parseZipInWorker(record.buffer.slice(0));
   })();
   pkgCache.set(id, loading);
   loading.catch(() => pkgCache.delete(id));

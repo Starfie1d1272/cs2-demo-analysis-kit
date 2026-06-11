@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cs2dak"
-version = "0.3.2"
+version = "0.4.0"
 description = "Parse CS2 .dem files into cs2-demo-format v2 ZIP exports"
 readme = "README.md"
 requires-python = ">=3.10"

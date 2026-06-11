@@ -16,13 +16,15 @@ import {
   type RRSixAccountWeights
 } from "@cs2dak/contract";
 import {
-  computeCohortAccountsRR,
+  computeFrozenProBaselineRR,
   computePrism,
   computeRR,
   prismWeightsV1,
+  rrSixAccountProBaselineV0,
   rrToPercentile,
   hltv2BaselineWeightsV1,
   rrSixAccountWeightsV1,
+  type ProBaselineConfig,
   type PrismComputeInput,
   type PrismWeights,
   type RRWeights
@@ -74,6 +76,7 @@ export function buildSeasonCohort(
 ): SeasonCohortBundle {
   const rrWeights = opts.rrWeights ?? (hltv2BaselineWeightsV1 as unknown as RRWeights);
   const valueWeights = opts.valueWeights ?? (rrSixAccountWeightsV1 as unknown as RRSixAccountWeights);
+  const proBaseline = rrSixAccountProBaselineV0 as unknown as ProBaselineConfig;
   const prismWeights = opts.prismWeights ?? (prismWeightsV1 as unknown as PrismWeights);
   const identityMap = opts.identityMap ?? {};
   const players = new Map<string, PlayerAccumulator>();
@@ -133,15 +136,11 @@ export function buildSeasonCohort(
     return { acc, signals, indicators, rrV1 };
   });
 
-  // 账户平衡（标准化 + 残差化）由 rival-rating 的 computeCohortAccountsRR 拥有（公式归属）。
-  // scale 对齐到 rrV1 的离散度，使 v2 与已被 HLTV 逆向验证的 v1 量纲可比。详见该库 docs/rr-v2.md
-  // 与本仓库 docs/design/cohort.md。
-  const targetStd = stdev(seasonRows.map((row) => row.rrV1.rr));
   const balancedByKey = new Map(
-    computeCohortAccountsRR(seasonRows.map((row) => row.signals), valueWeights, { targetStd }).map((b) => [
-      b.steamId64,
-      b
-    ])
+    seasonRows.map((row) => {
+      const scored = computeFrozenProBaselineRR(row.signals, valueWeights, proBaseline);
+      return [scored.steamId64, scored] as const;
+    })
   );
   const rrV1Scores = seasonRows.map((row) => row.rrV1.rr);
   const prismInputs: PrismComputeInput[] = seasonRows.map((row) => ({
@@ -406,14 +405,6 @@ function aggregateWeaponHighlights(
       collateralKills: sumNullable(rows.map((row) => row.highlights.collateralKills))
     }
   };
-}
-
-// 账户平衡的数学（标准化 + 残差化）已迁入 rival-rating 的 computeCohortAccountsRR（公式归属）。
-// 本层只负责把 std(rrV1) 作为 targetStd 传进去，对齐 v2 与 HLTV 逆向的量纲。
-function stdev(xs: number[]): number {
-  if (xs.length === 0) return 0;
-  const m = sum(xs, (x) => x) / xs.length;
-  return Math.sqrt(sum(xs, (x) => (x - m) ** 2) / xs.length);
 }
 
 function accountContextStatus(rows: RRSignals[]): { buyDelta: AccountContextAvailability; manState: AccountContextAvailability } {

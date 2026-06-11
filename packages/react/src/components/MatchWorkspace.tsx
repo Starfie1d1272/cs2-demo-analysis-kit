@@ -10,6 +10,7 @@ import { ScoreboardTable } from "./ScoreboardTable";
 
 export interface MatchWorkspaceProps {
   model: MatchWorkspaceModel;
+  initialTarget?: { roundNumber: number; tick?: number } | null;
 }
 
 type WorkspaceView = MatchWorkspaceModel["tabs"][number]["key"];
@@ -24,13 +25,17 @@ export interface ReplayTarget {
   seq: number;
 }
 
-export function MatchWorkspace({ model }: MatchWorkspaceProps) {
+export function MatchWorkspace({ model, initialTarget }: MatchWorkspaceProps) {
   const [view, setView] = useState<WorkspaceView>("overview");
   const [replayTarget, setReplayTarget] = useState<ReplayTarget | null>(null);
   const openReplay = (roundNumber: number, tick?: number) => {
     setReplayTarget((prev) => ({ roundNumber, tick, seq: (prev?.seq ?? 0) + 1 }));
     setView("replay");
   };
+  useEffect(() => {
+    if (!initialTarget) return;
+    openReplay(initialTarget.roundNumber, initialTarget.tick);
+  }, [initialTarget?.roundNumber, initialTarget?.tick]);
   const replayDetail = model.replay.available
     ? `${model.replay.sampleRate ?? 0} Hz · ${model.replay.rounds.length} 回合`
     : "无回放流";
@@ -396,6 +401,7 @@ function PlayerStoryPanel({ model, onOpenReplay }: MatchWorkspaceProps & { onOpe
             </div>
           ))}
         </div>
+        <RRExplainPanel model={model} steamId64={selected.row.steamId64} />
         {selected.roundFacts.length > 0 && (
           <div className="dak-player-roundfacts">
             {selected.roundFacts.slice(0, 18).map((fact) => (
@@ -426,6 +432,145 @@ function PlayerStoryPanel({ model, onOpenReplay }: MatchWorkspaceProps & { onOpe
       </Panel>
     </div>
   );
+}
+
+const RR_INDICATOR_GROUPS = [
+  {
+    title: "Combat",
+    rows: [
+      ["kills", "击杀"],
+      ["deaths", "死亡"],
+      ["assists", "助攻"],
+      ["kpr", "KPR"],
+      ["dpr", "DPR"],
+      ["adr", "ADR"],
+      ["hsPercent", "HS%"],
+      ["kast", "KAST"],
+      ["survivalRate", "存活率"],
+      ["twoKillRounds", "2杀回合"],
+      ["threeKillRounds", "3杀回合"],
+      ["fourKillRounds", "4杀回合"],
+      ["fiveKillRounds", "5杀回合"],
+      ["multiKillRate", "多杀率"]
+    ]
+  },
+  {
+    title: "Opening / Trade",
+    rows: [
+      ["firstKillCount", "首杀"],
+      ["firstDeathCount", "首死"],
+      ["openingDuelWinRate", "首杀对决胜率"],
+      ["tradeKillCount", "补枪"],
+      ["tradeDeathCount", "被补枪"],
+      ["tradeKillRate", "补枪率"],
+      ["tradeDeathRate", "被补率"]
+    ]
+  },
+  {
+    title: "Clutch / Weapon",
+    rows: [
+      ["clutchAttempts", "残局尝试"],
+      ["clutchWins", "残局胜利"],
+      ["clutchWinRate", "残局胜率"],
+      ["clutchFrequency", "残局频率"],
+      ["clutchScore", "残局分"],
+      ["clutchScoreRate", "残局分/回合"],
+      ["vsOne.won", "1v1 胜"],
+      ["vsTwo.won", "1v2 胜"],
+      ["vsThree.won", "1v3 胜"],
+      ["awpKills", "AWP 击杀"],
+      ["awpKillsPerRound", "AWP K/R"],
+      ["awpKillRate", "AWP 占比"],
+      ["awpMultiKillRate", "AWP 多杀率"],
+      ["awpDuelWinRate", "AWP 对决胜率"],
+      ["sniperKills", "狙击击杀"],
+      ["sniperKillRate", "狙击占比"]
+    ]
+  },
+  {
+    title: "Utility / Economy",
+    rows: [
+      ["utilityDamage", "道具伤害"],
+      ["utilityDamagePerRound", "道具伤害/回合"],
+      ["flashAssistCount", "闪光助攻"],
+      ["enemyFlashDurationPerRound", "敌方白/回合"],
+      ["teamFlashDurationPerRound", "队友白/回合"],
+      ["blindDurationPerRound", "致盲/回合"],
+      ["grenadeCount", "道具数"],
+      ["grenadeCountPerRound", "道具/回合"],
+      ["ecoRoundCount", "eco 局"],
+      ["forceRoundCount", "force 局"],
+      ["fullBuyRoundCount", "full 局"],
+      ["pistolRoundCount", "手枪局"],
+      ["avgEquipmentValue", "平均装备值"],
+      ["combatDeathCount", "交火死亡"],
+      ["bombDeathCount", "C4 死亡"],
+      ["wallbangKillCount", "穿墙杀"],
+      ["roundSwingTotal", "Swing 总量"],
+      ["roundSwingPerKill", "Swing/K"]
+    ]
+  }
+] as const;
+
+function RRExplainPanel({ model, steamId64 }: MatchWorkspaceProps & { steamId64: string }) {
+  const row = model.scoreboard.find((player) => player.steamId64 === steamId64);
+  if (!row) return null;
+  return (
+    <div className="dak-rr-explain">
+      <div className="dak-rr-explain-head">
+        <span>RR 解释</span>
+        <b className="dak-mono">{row.accountRR.toFixed(3)}</b>
+        <small>1.0 = 职业基线 · Raw {row.accountRRRaw.toFixed(3)}</small>
+      </div>
+      <div className="dak-rr-status">
+        <span>BuyDelta: {row.accountContextStatus.buyDelta === "available" ? "已启用" : "缺失"}</span>
+        <span>ManState: {row.accountContextStatus.manState === "available" ? "已启用" : "缺失"}</span>
+        <span>Combat context ×{row.accountCombatContextFactor.toFixed(2)}</span>
+      </div>
+      <div className="dak-rr-metric-groups">
+        {RR_INDICATOR_GROUPS.map((group) => (
+          <div className="dak-rr-metric-group" key={group.title}>
+            <h4>{group.title}</h4>
+            {group.rows.map(([key, label]) => {
+              const value = indicatorValue(row.indicators, key);
+              const width = indicatorBarWidth(value);
+              return (
+                <div className="dak-rr-metric-row" key={key}>
+                  <span>{label}</span>
+                  <div className="dak-rr-metric-track">
+                    <i style={{ width: `${width}%` }} />
+                  </div>
+                  <b className="dak-mono">{formatIndicatorValue(value)}</b>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function indicatorValue(indicators: MatchWorkspaceModel["scoreboard"][number]["indicators"], key: string): number | null {
+  const value = key.split(".").reduce<unknown>((acc, part) => {
+    if (acc && typeof acc === "object") return (acc as Record<string, unknown>)[part];
+    return undefined;
+  }, indicators);
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function indicatorBarWidth(value: number | null): number {
+  if (value == null) return 0;
+  if (value <= 1) return Math.max(2, Math.min(100, value * 100));
+  if (value <= 100) return Math.max(2, Math.min(100, value));
+  return 100;
+}
+
+function formatIndicatorValue(value: number | null): string {
+  if (value == null) return "—";
+  if (value >= 100) return value.toFixed(0);
+  if (value >= 10) return value.toFixed(1);
+  return value.toFixed(2);
 }
 
 function MapWorkspace({ model }: MatchWorkspaceProps) {
@@ -1130,9 +1275,9 @@ function replayRadiusPercent(radiusUnits: number, map: MatchWorkspaceModel["map"
 
 // 效果消失 tick 缺失时的保底时长（秒）；半径为近似游戏单位，只服务视觉示意。
 const GRENADE_EFFECT_DEFAULTS: Record<string, { durationSeconds: number; radiusUnits: number; kind: "smoke" | "fire" | "he" | "flash" | "decoy" }> = {
-  smoke: { durationSeconds: 18, radiusUnits: 144, kind: "smoke" },
+  smoke: { durationSeconds: 20, radiusUnits: 144, kind: "smoke" },
   molotov: { durationSeconds: 7, radiusUnits: 120, kind: "fire" },
-  incendiary: { durationSeconds: 7, radiusUnits: 120, kind: "fire" },
+  incendiary: { durationSeconds: 5.5, radiusUnits: 120, kind: "fire" },
   hegrenade: { durationSeconds: 0.7, radiusUnits: 90, kind: "he" },
   flashbang: { durationSeconds: 0.7, radiusUnits: 70, kind: "flash" },
   decoy: { durationSeconds: 15, radiusUnits: 30, kind: "decoy" }

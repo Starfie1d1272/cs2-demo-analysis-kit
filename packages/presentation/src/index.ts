@@ -4,14 +4,16 @@ export { buildSeasonLeaderboardModel } from "./leaderboard.js";
 export { buildPlayerSeasonProfile, buildAllPlayerSeasonProfiles } from "./player.js";
 export { buildTeamCohortSummary } from "./team.js";
 export { buildSeriesSummary, recommendMatchMvp } from "./series.js";
-export { SEASON_STAT_VIEWS } from "./season-metrics.js";
+export { SEASON_STAT_VIEWS, formatPercent } from "./season-metrics.js";
 export {
   buildPlayerSeasonInsights,
+  buildPlayerWeaponStats,
   buildMatchBuyQuality,
   buildTournamentInsights,
   buildMatchReportMarkdown,
   type SeasonInsightsDemo,
   type PlayerSeasonInsights,
+  type PlayerWeaponStat,
   type PlayerTrendPoint,
   type FlashValueSummary,
   type MistakeReview,

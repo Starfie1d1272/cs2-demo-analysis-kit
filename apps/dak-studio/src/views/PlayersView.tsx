@@ -4,11 +4,13 @@ import type { PlayerSeasonProfile } from "@cs2dak/contract";
 import {
   SEASON_STAT_VIEWS,
   buildPlayerSeasonInsights,
+  buildPlayerWeaponStats,
   type PlayerSeasonInsights,
+  type PlayerWeaponStat,
   type SeasonInsightsDemo
 } from "@cs2dak/presentation";
 import { getSeasonDemos, getSeasonSummary } from "../lib/season";
-import { matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { formatMatchLabel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 
@@ -19,7 +21,7 @@ export interface PlayersViewProps {
   onScopeChange: (scope: CohortScopeState) => void;
   selectedPlayerKey: string | null;
   onSelectPlayer: (playerKey: string) => void;
-  onOpenMatch: (entryId: string) => void;
+  onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
 }
 
@@ -109,6 +111,10 @@ export function PlayersView({
     () => (selected && demos.length > 0 ? buildPlayerSeasonInsights(demos, selected.steamIds) : null),
     [demos, selected]
   );
+  const weaponStats = useMemo<PlayerWeaponStat[]>(
+    () => (selected && demos.length > 0 ? buildPlayerWeaponStats(demos, selected.steamIds).slice(0, 8) : []),
+    [demos, selected]
+  );
 
   if (allEntries.length === 0) {
     return (
@@ -167,10 +173,6 @@ export function PlayersView({
 
   const trendMax = Math.max(...selected.perMatch.map((m) => m.rivalhubRR), 0.01);
   const playerMatches = [...selected.perMatch].reverse();
-  const openMatchById = (matchId: string) => {
-    const entry = entryByMatchId.get(matchId);
-    if (entry) onOpenMatch(entry.id);
-  };
 
   const exportPlayerCard = () => {
     const md = buildPlayerCardMarkdown(selected, insights);
@@ -336,26 +338,13 @@ export function PlayersView({
 
             <div className="stu-card">
               <h3>武器画像</h3>
-              <table className="stu-mini-table">
-                <thead>
-                  <tr>
-                    <th>武器</th>
-                    <th className="stu-num">击杀</th>
-                    <th className="stu-num">占比</th>
-                    <th className="stu-num">HS%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selected.weapons.slice(0, 6).map((weapon) => (
-                    <tr key={weapon.weapon}>
-                      <td>{weapon.label}</td>
-                      <td className="stu-num">{weapon.kills}</td>
-                      <td className="stu-num">{weapon.killSharePercent.toFixed(1)}%</td>
-                      <td className="stu-num">{weapon.headshotPercent == null ? "—" : `${weapon.headshotPercent.toFixed(1)}%`}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <WeaponBars weapons={weaponStats.length > 0 ? weaponStats : selected.weapons.slice(0, 8).map((weapon) => ({
+                weapon: weapon.weapon,
+                label: weapon.label,
+                kills: weapon.kills,
+                headshotPercent: weapon.headshotPercent,
+                killsPerMatch: 0
+              }))} />
             </div>
 
             {selected.style && (
@@ -388,10 +377,10 @@ export function PlayersView({
                           type="button"
                           className="stu-evidence"
                           disabled={!entryByMatchId.get(incident.matchId)}
-                          onClick={() => openMatchById(incident.matchId)}
+                          onClick={() => { const e = entryByMatchId.get(incident.matchId); if (e) onOpenMatch(e.id, { roundNumber: incident.roundNumber, tick: incident.tick }); }}
                           title="打开该场比赛复盘"
                         >
-                          R{incident.roundNumber} · 闪到 {incident.victimCount} 名队友 {incident.totalSeconds.toFixed(1)}s
+                          {formatMatchLabel(entryByMatchId.get(incident.matchId)!)} · R{incident.roundNumber} · 闪到 {incident.victimCount} 名队友 {incident.totalSeconds.toFixed(1)}s
                         </button>
                       ))}
                     </div>
@@ -426,10 +415,10 @@ export function PlayersView({
                         type="button"
                         className="stu-evidence"
                         disabled={!entryByMatchId.get(evidence.matchId)}
-                        onClick={() => openMatchById(evidence.matchId)}
+                        onClick={() => { const e = entryByMatchId.get(evidence.matchId); if (e) onOpenMatch(e.id, { roundNumber: evidence.roundNumber, tick: evidence.tick }); }}
                         title="打开该场比赛复盘"
                       >
-                        R{evidence.roundNumber} · {evidence.detail}
+                        {formatMatchLabel(entryByMatchId.get(evidence.matchId)!)} · R{evidence.roundNumber} · {evidence.detail}
                       </button>
                     ))}
                   </div>
@@ -440,7 +429,7 @@ export function PlayersView({
             {insights && insights.trend.length > 1 && (
               <div className="stu-card stu-card-wide">
                 <h3>个人趋势</h3>
-                <TrendChart trend={insights.trend} />
+                <TrendChart trend={insights.trend} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} />
               </div>
             )}
 
@@ -543,22 +532,45 @@ const TREND_METRICS = [
 ] as const;
 type TrendMetricKey = (typeof TREND_METRICS)[number]["key"];
 
-/** 个人趋势折线（SVG），指标可切换；按导入顺序（matchId 升序）排布。 */
-function TrendChart({ trend }: { trend: PlayerSeasonInsights["trend"] }) {
+function WeaponBars({ weapons }: { weapons: PlayerWeaponStat[] }) {
+  const max = Math.max(...weapons.map((weapon) => weapon.kills), 1);
+  if (weapons.length === 0) {
+    return <p className="stu-dim">该聚合范围没有武器击杀数据。</p>;
+  }
+  return (
+    <div className="stu-bars">
+      {weapons.map((weapon) => (
+        <div className="stu-bar-row" key={weapon.weapon}>
+          <span>{weapon.label}</span>
+          <div className="stu-bar-track">
+            <div className="stu-bar stu-bar-style" style={{ width: `${(weapon.kills / max) * 100}%` }} />
+          </div>
+          <b title={weapon.headshotPercent == null ? undefined : `HS ${weapon.headshotPercent.toFixed(1)}%`}>
+            {weapon.kills}
+          </b>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** 个人趋势柱状图，指标可切换；点击柱进入对应比赛。 */
+function TrendChart({
+  trend,
+  entryByMatchId,
+  onOpenMatch
+}: {
+  trend: PlayerSeasonInsights["trend"];
+  entryByMatchId: Map<string, StudioDemoEntry>;
+  onOpenMatch: (entryId: string) => void;
+}) {
   const [metric, setMetric] = useState<TrendMetricKey>("adr");
   const spec = TREND_METRICS.find((m) => m.key === metric)!;
   const values = trend.map((point) => point[metric]);
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const span = Math.max(max - min, 0.0001);
-  const width = 100;
-  const height = 36;
-  const pad = 4;
-  const coords = values.map((value, i) => {
-    const x = trend.length > 1 ? pad + ((width - pad * 2) * i) / (trend.length - 1) : width / 2;
-    const y = height - pad - ((height - pad * 2) * (value - min)) / span;
-    return [x, y] as const;
-  });
+  const span = Math.max(max - Math.min(min, 0), 0.0001);
+  const baseline = Math.min(min, 0);
 
   return (
     <div>
@@ -576,14 +588,29 @@ function TrendChart({ trend }: { trend: PlayerSeasonInsights["trend"] }) {
           </button>
         ))}
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="stu-trend-chart" preserveAspectRatio="none" role="img" aria-label={`${spec.label} 趋势`}>
-        <polyline className="stu-trend-line" points={coords.map((c) => c.join(",")).join(" ")} />
-        {coords.map(([x, y], i) => (
-          <circle key={i} className="stu-trend-dot" cx={x} cy={y} r={1.1}>
-            <title>{`${trend[i].mapName} · ${spec.label} ${spec.format(values[i])}`}</title>
-          </circle>
-        ))}
-      </svg>
+      <div className="stu-trend-bars" role="list" aria-label={`${spec.label} 趋势`}>
+        {trend.map((point) => {
+          const entry = entryByMatchId.get(point.matchId);
+          const value = point[metric];
+          const height = Math.max(6, ((value - baseline) / span) * 100);
+          const title = entry
+            ? `${formatMatchLabel(entry)} · ${spec.label} ${spec.format(value)}`
+            : `${point.matchId} · ${spec.label} ${spec.format(value)}`;
+          return (
+            <button
+              key={point.matchId}
+              type="button"
+              className="stu-trend-col"
+              disabled={!entry}
+              title={title}
+              onClick={() => entry && onOpenMatch(entry.id)}
+            >
+              <span className="stu-trend-bar" style={{ height: `${height}%` }} />
+              <small>{spec.format(value)}</small>
+            </button>
+          );
+        })}
+      </div>
       <div className="stu-trend-range stu-dim">
         <small>{spec.label}：{spec.format(min)} – {spec.format(max)} · {trend.length} 场</small>
       </div>

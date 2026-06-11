@@ -229,6 +229,7 @@ export function buildScoreboard(
       steamId64: row.steamId64,
       name: row.name,
       teamKey: row.teamKey,
+      indicators: row.indicators,
       kills: row.indicators.kills,
       deaths: row.indicators.deaths,
       assists: row.indicators.assists,

@@ -241,6 +241,50 @@ def test_grenade_destroy_tick_after_round_end_is_cleared():
     assert grenade["destroyTick"] is None
 
 
+def test_smoke_destroy_tick_uses_expired_entity_not_projectile_tail():
+    raw = _base_raw()
+    team_a = "76561198000000001"
+    raw["grenade_throws"] = [
+        {
+            "tick": 7000,
+            "grenade": "smoke",
+            "destroy_tick": 7350,
+            "grenade_entity_id": 42,
+            "steamid": team_a,
+            "X": 1,
+            "Y": 2,
+            "Z": 3,
+        }
+    ]
+    raw["grenade_detonations"] = [
+        {
+            "tick": 7100,
+            "total_rounds_played": 1,
+            "entityid": 42,
+            "_grenade_type": "smoke",
+            "user_steamid": team_a,
+            "user_X": 4,
+            "user_Y": 5,
+            "user_Z": 6,
+        }
+    ]
+    raw["smoke_expires"] = [
+        {
+            "tick": 8512,
+            "total_rounds_played": 1,
+            "entityid": 42,
+            "user_X": 4,
+            "user_Y": 5,
+            "user_Z": 6,
+        }
+    ]
+
+    pkg = _read_zip(raw)
+    grenade = next(g for g in pkg["grenades.json"] if g["effectTick"] == 7100)
+
+    assert grenade["destroyTick"] == 8512
+
+
 def test_phantom_round_end_before_freeze_is_dropped() -> None:
     """A bogus round_end firing before its freeze ends must not become a real
     round nor inflate the score (regression: 16:12 OT exported as 17:12)."""
@@ -278,3 +322,48 @@ def test_phantom_round_end_before_freeze_is_dropped() -> None:
     assert [r["roundNumber"] for r in rounds] == [1, 2]
     assert rounds[0]["endReason"] == "ct_win"
     assert rounds[0]["endTick"] == 7540
+
+
+def test_overtime_sides_prefer_freeze_side_samples() -> None:
+    from cs2dak.rounds import build_rounds
+
+    team_a = "76561198000000001"
+    team_b = "76561198000000002"
+    team_map = {team_a: "teamA", team_b: "teamB"}
+    raw: dict[str, Any] = {
+        "player_info": [
+            {"steamid": team_a, "name": "A", "team_num": 2},
+            {"steamid": team_b, "name": "B", "team_num": 3},
+        ],
+        "round_starts": [],
+        "round_freeze_ends": [],
+        "round_ends": [],
+        "round_side_samples": [],
+    }
+    expected = {
+        24: ("ct", "t"),
+        25: ("ct", "t"),
+        28: ("t", "ct"),
+    }
+    for n in range(1, 29):
+        start = n * 1000
+        freeze = start + 100
+        end = start + 900
+        raw["round_starts"].append({"tick": start, "total_rounds_played": n - 1})
+        raw["round_freeze_ends"].append({"tick": freeze, "total_rounds_played": n - 1})
+        raw["round_ends"].append({"tick": end, "total_rounds_played": n, "winner": "T", "reason": "t_win"})
+        team_a_side, team_b_side = expected.get(
+            n,
+            ("t", "ct") if n <= 12 or 28 <= n else ("ct", "t"),
+        )
+        raw["round_side_samples"].extend([
+            {"tick": freeze + 16, "steamid": team_a, "team_num": 2 if team_a_side == "t" else 3},
+            {"tick": freeze + 16, "steamid": team_b, "team_num": 2 if team_b_side == "t" else 3},
+        ])
+
+    rounds, _ = build_rounds(raw, team_map)
+    by_round = {row["roundNumber"]: row for row in rounds}
+
+    assert (by_round[24]["teamASide"], by_round[24]["teamBSide"]) == ("ct", "t")
+    assert (by_round[25]["teamASide"], by_round[25]["teamBSide"]) == ("ct", "t")
+    assert (by_round[28]["teamASide"], by_round[28]["teamBSide"]) == ("t", "ct")

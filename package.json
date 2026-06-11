@@ -1,6 +1,6 @@
 {
   "name": "cs2-demo-analysis-kit",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "private": true,
   "description": "Reusable CS2 demo analysis models, QA reports, and previewable UI components.",
   "license": "MIT",
@@ -36,7 +36,7 @@
     "vitest": "^4.1.8"
   },
   "dependencies": {
-    "@rivalhub/rival-rating": "^0.2.0",
+    "@rivalhub/rival-rating": "^0.3.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",

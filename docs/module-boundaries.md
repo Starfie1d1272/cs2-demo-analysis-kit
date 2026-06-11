@@ -36,7 +36,24 @@
 | RivalHub                 | 赛事、赛季、身份、权限、持久化和公开展示                        | 复制 DAK 分析与评分逻辑                     | 赛事产品                    |
 | CS2 Insight Agent        | 高光录制软件，复用本仓库 demo 展示模块                          | 复制 Demo 解析与评分逻辑                    | 产品                        |
 
-DAK Studio 已落地为 `apps/dak-studio`（资料库 / 比赛工作台 / 选手档案 / 排行榜），仍须遵守上表边界：只做适配与编排，不拥有共享逻辑。
+DAK Studio 已落地为 `apps/dak-studio`（资料库 / 比赛工作台 / 选手档案 / 道具实验室 / 经济与节奏 / 排行榜 / 赛事总览），仍须遵守上表边界：只做适配与编排，不拥有共享逻辑。
+
+## DAK Studio 八模块归属
+
+| Studio 模块 | 唯一职责 | 共享逻辑 owner |
+|---|---|---|
+| 资料库 | 本地 ZIP/.dem 导入、标签、重导、检索 | Studio 本地适配；ZIP 解析仍属 core/contract |
+| 比赛工作台 | 单场回合、回放、地图、经济与 RR 解释入口 | `@cs2dak/presentation` + `@cs2dak/react` |
+| 个人实验室 | 选手档案、趋势、武器分布、证据跳转 | `@cs2dak/cohort` + `@cs2dak/presentation` |
+| 对枪实验室 | shots/duel 能力归位；未接 shots 前保持占位 | 未来 core/presentation |
+| 道具实验室 | 跨场 Flash Value、负收益队闪、道具证据 | `@cs2dak/presentation` |
+| 经济与节奏 | 经济矩阵、手枪转化、eco/semi 翻盘 | `@cs2dak/presentation` / core economy |
+| 赛事中台 | 跨队横向对比、地图盘面、武器榜、报表 | `@cs2dak/cohort` + `@cs2dak/presentation` |
+| 教练工作台 | pattern/playbook/anti-strat；未实现前占位 | 未来 presentation/maps |
+
+RR 口径统一使用 `@rivalhub/rival-rating` 的 frozen pro baseline：单场和跨场聚合都以
+`1.0 = 职业基线` 为同一标准；cohort 层只做身份归并、信号汇总和展示模型整形。
+PRISM 风格、强弱项等“相对当前范围”的判断可以继续使用 cohort 百分位，但不得改变 RR 标尺。
 
 ## 强制规则
 

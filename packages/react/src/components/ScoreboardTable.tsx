@@ -20,7 +20,7 @@ export function ScoreboardTable({ rows, onPlayerClick }: ScoreboardTableProps) {
       <thead>
         <tr>
           <th>选手</th>
-          <th>V2 RR</th>
+          <th title="1.0 = 职业基线">职业 RR</th>
           <th>RR</th>
           <th>K</th>
           <th>D</th>

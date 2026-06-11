@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { type TournamentInsights } from "@cs2dak/presentation";
+import { formatPercent, type TournamentInsights } from "@cs2dak/presentation";
 import { getSeasonSummary } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
@@ -79,7 +79,7 @@ export function TournamentDashboardView({
             <div className="stu-metric"><span>CT 胜率</span><b>{insights.ctWinRatePercent.toFixed(1)}%</b></div>
             <div className="stu-metric" title="赢下手枪局后把下一回合也拿下的比率">
               <span>手枪局转化</span>
-              <b>{insights.pistolConversionPercent == null ? "—" : `${insights.pistolConversionPercent.toFixed(1)}%`}</b>
+              <b>{formatPercent(insights.pistolConversionPercent)}</b>
             </div>
           </div>
           <div className="stu-card">
@@ -101,7 +101,103 @@ export function TournamentDashboardView({
                     <td className="stu-num">{row.matches}</td>
                     <td className="stu-num">{row.tWinRatePercent.toFixed(1)}%</td>
                     <td className="stu-num">{row.ctWinRatePercent.toFixed(1)}%</td>
-                    <td className="stu-num">{row.pistolTWinRatePercent == null ? "—" : `${row.pistolTWinRatePercent.toFixed(1)}%`}</td>
+                    <td className="stu-num">{formatPercent(row.pistolTWinRatePercent)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="stu-card">
+            <h3>武器击杀榜</h3>
+            <table className="stu-mini-table">
+              <thead>
+                <tr>
+                  <th>武器</th>
+                  <th className="stu-num">击杀</th>
+                  <th className="stu-num">HS%</th>
+                  <th>最高选手</th>
+                </tr>
+              </thead>
+              <tbody>
+                {insights.weaponKills.map((row) => (
+                  <tr key={row.weapon}>
+                    <td>{row.label}</td>
+                    <td className="stu-num">{row.kills}</td>
+                    <td className="stu-num">{formatPercent(row.headshotPercent)}</td>
+                    <td>{row.topPlayerName ? `${row.topPlayerName} · ${row.topPlayerKills}` : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="stu-card">
+            <h3>队伍手枪局</h3>
+            <table className="stu-mini-table">
+              <thead>
+                <tr>
+                  <th>队伍</th>
+                  <th className="stu-num">手枪胜率</th>
+                  <th className="stu-num">第二局转化</th>
+                  <th className="stu-num">破局</th>
+                </tr>
+              </thead>
+              <tbody>
+                {insights.teamPistols.map((row) => (
+                  <tr key={row.teamName}>
+                    <td>{row.teamName}</td>
+                    <td className="stu-num">
+                      {formatPercent(row.winRatePercent)} ({row.pistolWins}/{row.pistolRounds})
+                    </td>
+                    <td className="stu-num">
+                      {formatPercent(row.conversionPercent)} ({row.conversionWins}/{row.conversionRounds})
+                    </td>
+                    <td className="stu-num">{row.breakWins}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="stu-card">
+            <h3>经济类型胜率矩阵</h3>
+            <table className="stu-mini-table">
+              <thead>
+                <tr>
+                  <th>A 队经济</th>
+                  <th>B 队经济</th>
+                  <th className="stu-num">样本</th>
+                  <th className="stu-num">A 队胜率</th>
+                </tr>
+              </thead>
+              <tbody>
+                {insights.economyMatrix.slice(0, 12).map((row) => (
+                  <tr key={`${row.teamAEconomy}-${row.teamBEconomy}`} className={row.rounds < 5 ? "stu-row-muted" : undefined}>
+                    <td>{row.teamAEconomy}</td>
+                    <td>{row.teamBEconomy}</td>
+                    <td className="stu-num">{row.rounds}</td>
+                    <td className="stu-num">{formatPercent(row.teamAWinRatePercent)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="stu-card">
+            <h3>Eco / Semi 翻盘</h3>
+            <table className="stu-mini-table">
+              <thead>
+                <tr>
+                  <th>队伍</th>
+                  <th className="stu-num">翻盘</th>
+                  <th className="stu-num">机会</th>
+                  <th className="stu-num">胜率</th>
+                </tr>
+              </thead>
+              <tbody>
+                {insights.ecoUpsets.slice(0, 8).map((row) => (
+                  <tr key={row.teamName}>
+                    <td>{row.teamName}</td>
+                    <td className="stu-num">{row.wins}</td>
+                    <td className="stu-num">{row.opportunities}</td>
+                    <td className="stu-num">{formatPercent(row.winRatePercent)}</td>
                   </tr>
                 ))}
               </tbody>

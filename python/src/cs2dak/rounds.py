@@ -142,7 +142,7 @@ def build_rounds(
         if fz_tick > 0 and 0 < end_tick <= fz_tick:
             continue
 
-        team_a_side, team_b_side = _sides_for_round(raw, team_map, n)
+        team_a_side, team_b_side = _sides_for_round(raw, team_map, n, fz_tick)
         side_map[(n, "teamA")] = team_a_side
         side_map[(n, "teamB")] = team_b_side
 
@@ -212,8 +212,17 @@ def build_rounds(
 
 # ── side inference ─────────────────────────────────────────────────────────────
 
-def _sides_for_round(raw: dict, team_map: dict[str, str], round_number: int) -> tuple[str, str]:
-    """Infer teamA/teamB side for MR12 + OT from player_info, falling back to A=T."""
+def _sides_for_round(
+    raw: dict,
+    team_map: dict[str, str],
+    round_number: int,
+    freeze_end_tick: int | None = None,
+) -> tuple[str, str]:
+    """Infer teamA/teamB side from freeze samples; formula is only fallback."""
+    sampled = _sampled_side_for_round(raw, team_map, round_number, freeze_end_tick)
+    if sampled is not None:
+        return sampled
+
     start_side_by_team = _starting_side_by_team(raw, team_map)
     team_a_initial = start_side_by_team.get("teamA", "t")
     team_b_initial = "ct" if team_a_initial == "t" else "t"
@@ -224,11 +233,59 @@ def _sides_for_round(raw: dict, team_map: dict[str, str], round_number: int) -> 
     else:
         ot_block = (round_number - 25) // 3
         if ot_block % 2 == 0:
-            team_a_side = team_a_initial
-        else:
             team_a_side = "ct" if team_a_initial == "t" else "t"
+        else:
+            team_a_side = team_a_initial
     team_b_side = team_b_initial if team_a_side == team_a_initial else team_a_initial
     return team_a_side, team_b_side
+
+
+def _sampled_side_for_round(
+    raw: dict,
+    team_map: dict[str, str],
+    round_number: int,
+    freeze_end_tick: int | None,
+) -> tuple[str, str] | None:
+    expected_tick = (freeze_end_tick or 0) + 16
+    counts: dict[str, dict[str, int]] = {"teamA": {"t": 0, "ct": 0}, "teamB": {"t": 0, "ct": 0}}
+
+    for row in raw.get("round_side_samples", []):
+        tick = int(row.get("tick") or 0)
+        if expected_tick > 16 and tick != expected_tick:
+            continue
+        if expected_tick <= 16:
+            raw_round = _rn(row)
+            if raw_round and raw_round + 1 != round_number:
+                continue
+        sid = _sid(row.get("steamid"))
+        key = team_map.get(sid or "")
+        if key not in counts:
+            continue
+        try:
+            team_num = int(row.get("team_num") or 0)
+        except (TypeError, ValueError):
+            continue
+        side = "t" if team_num == 2 else "ct" if team_num == 3 else None
+        if side:
+            counts[key][side] += 1
+
+    team_a_side = _majority_side(counts["teamA"])
+    team_b_side = _majority_side(counts["teamB"])
+    if team_a_side and team_b_side and team_a_side != team_b_side:
+        return team_a_side, team_b_side
+    if team_a_side:
+        return team_a_side, "ct" if team_a_side == "t" else "t"
+    if team_b_side:
+        return ("ct" if team_b_side == "t" else "t"), team_b_side
+    return None
+
+
+def _majority_side(side_counts: dict[str, int]) -> str | None:
+    if side_counts["t"] == 0 and side_counts["ct"] == 0:
+        return None
+    if side_counts["t"] == side_counts["ct"]:
+        return None
+    return "t" if side_counts["t"] > side_counts["ct"] else "ct"
 
 
 def _starting_side_by_team(raw: dict, team_map: dict[str, str]) -> dict[str, str]:

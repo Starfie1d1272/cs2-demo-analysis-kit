@@ -15,6 +15,11 @@ export function round(value: number, digits = 2): number {
   return Math.round(value * factor) / factor;
 }
 
+/** 百分比格式化：null → "—"，否则 `${value.toFixed(digits)}%`。消除 `value == null ? "—" : `${value.toFixed(1)}%`` 的重复模式。 */
+export function formatPercent(value: number | null, digits = 1): string {
+  return value == null ? "—" : `${value.toFixed(digits)}%`;
+}
+
 /** 视图列定义（信息架构来自 RivalHub StatsLeaderboard，去掉 OCR 副指标与独立 Demo tab）。 */
 export const SEASON_STAT_VIEWS: LeaderboardView[] = [
   {

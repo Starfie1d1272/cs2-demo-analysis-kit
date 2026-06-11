@@ -197,6 +197,18 @@ def _is_valid_teamkey(s) -> bool:
     return s in ("teamA", "teamB")
 
 
+def _event_entity_id(row: dict) -> int | None:
+    for key in ("entityid", "entity_id", "grenade_entity_id"):
+        val = row.get(key)
+        if val is None:
+            continue
+        try:
+            return int(val)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
 def _pos(row: dict, xk="X", yk="Y", zk="Z") -> dict:
     """Non-nullable vec3: NaN/missing → 0.0. Coordinates rounded to trim parser precision noise."""
     return {
@@ -642,17 +654,18 @@ def _build_grenades(raw: dict, team_map: dict, round_model: _RoundModel) -> list
 
         thrower_sid = _event_steamid(r)
         matched = _match_throw(n, gtype, tick, thrower_sid)
+        detonate_entity_id = _event_entity_id(r)
         if matched:
             thrower_sid = thrower_sid or matched["sid"]
             throw_pos = matched["pos"]
             throw_tick = matched["tick"]
-            destroy_tick = matched["destroy_tick"]
+            destroy_tick = None if gtype == "smoke" else matched["destroy_tick"]
             grenade_id = matched["eid"]
         else:
             throw_pos = _pos(r)
             throw_tick = tick
             destroy_tick = None
-            grenade_id = None
+            grenade_id = f"{detonate_entity_id}-{tick}" if detonate_entity_id is not None else None
 
         # v2: throwTick and effectTick must be >= 1
         if throw_tick <= 0 or tick <= 0:
@@ -684,6 +697,7 @@ def _build_grenades(raw: dict, team_map: dict, round_model: _RoundModel) -> list
             "throwTick": throw_tick,
             "effectTick": tick,
             "destroyTick": destroy_tick,
+            "_entityId": detonate_entity_id,
             "grenade": gtype,
             "throwerSteamId64": thrower_sid,
             "throwerTeamKey": thrower_key,
@@ -721,6 +735,42 @@ def _build_grenades(raw: dict, team_map: dict, round_model: _RoundModel) -> list
         if best is not None:
             best["used"] = True
             g["destroyTick"] = best["tick"]
+
+    # Smoke projectile paths become sparse after detonation, so their segment
+    # tail is not a reliable lifetime. CS2 emits smokegrenade_expired with the
+    # same entity id; use that engine event as the smoke destroy tick.
+    smoke_expires: list[dict] = []
+    for r in raw.get("smoke_expires", []):
+        n = round_model.round_for_event(r)
+        t = int(r.get("tick") or 0)
+        eid = _event_entity_id(r)
+        if n is None or t <= 0 or eid is None:
+            continue
+        smoke_expires.append({"rn": n, "tick": t, "eid": eid, "used": False})
+    # Index smoke_expires by (roundNumber, eid) → O(1) lookup per grenade
+    # instead of O(n*m) linear scan. Each (rn, eid) pair is unique per throw.
+    smoke_index: dict[tuple[int, int], list[dict]] = {}
+    for e in smoke_expires:
+        smoke_index.setdefault((e["rn"], e["eid"]), []).append(e)
+    for lst in smoke_index.values():
+        lst.sort(key=lambda e: e["tick"])
+
+    for g in out:
+        if g["grenade"] != "smoke":
+            g.pop("_entityId", None)
+            continue
+        eid = g.get("_entityId")
+        g.pop("_entityId", None)
+        if eid is None:
+            continue
+        window = round_model.window_for_round(g["roundNumber"])
+        for e in smoke_index.get((g["roundNumber"], eid), []):
+            if e["tick"] < g["effectTick"]:
+                continue
+            if window is not None and e["tick"] > window.end_tick:
+                continue
+            g["destroyTick"] = e["tick"]
+            break
     return out
 
 

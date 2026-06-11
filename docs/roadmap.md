@@ -19,8 +19,8 @@
 | 2 | Demo Explorer（2D 回合浏览器） | ✅ 基本完成 | 回合筛选器、统计跳回放、时间轴锚点、图层开关、双层雷达（0.3.0） |
 | 3 | Personal Lab（个人打法） | ✅ 基本完成 | 档案、动线、趋势曲线、Fingerprint、Mistake Review（0.3.0） |
 | 4 | Duel & Mechanics Lab | ⬜ 未开始 | 依赖 shots.json（格式已支持，导出未接） |
-| 5 | Utility Lab | 🟡 部分 | Flash Value 已有（0.3.0）；缺 lineup library 与落点热力 |
-| 6 | Economy & Round Flow | 🟡 部分 | 经济 timeline + buy quality 已有（0.3.0）；缺回合 swing |
+| 5 | Utility Lab | ✅ 基本完成 | Flash Value 排行、负收益队闪证据与回放跳转已转正；缺 lineup library |
+| 6 | Economy & Round Flow | ✅ 基本完成 | 经济矩阵、手枪转化、eco/semi 翻盘已转正；缺回合 swing |
 | 7 | Tournament Hub（高校赛事中台） | ✅ 基本完成 | 排行榜、赛事总览、比赛报告与选手图卡导出（0.3.0） |
 | 8 | Coach / Analyst Workbench | ⬜ 远期 | pattern finder / playbook / anti-strat / veto lite |
 
@@ -49,6 +49,8 @@
       选手图卡（PNG / Markdown），服务高校赛事主办方发布
 - [x] **Tournament Dashboard**：地图使用率、T/CT 胜率、pistol/conversion 胜率、
       最佳选手榜（cohort 聚合已有，缺产品化页面）
+- [x] **RR 透明解释**：单场与赛季统一 frozen pro baseline（1.0 = 职业基线），
+      比赛工作台展示六账户贡献与 RR 输入指标。
 
 ## v0.4 — 硬核机制与模式识别
 

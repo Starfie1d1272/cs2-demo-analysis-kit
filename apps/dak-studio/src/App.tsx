@@ -1,8 +1,8 @@
 import { Bomb, ClipboardList, Coins, Crosshair, Film, LibraryBig, Swords, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { importDemoFile, listDemoEntries, removeDemo, updateDemoTags, type StudioDemoEntry } from "./lib/library";
+import { bulkUpdateTags, importDemoFile, listDemoEntries, removeDemo, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { EMPTY_SCOPE, applyScope, type CohortScopeState } from "./components/CohortScope";
-import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems, triggerWindowsDropCapture } from "./lib/dem";
+import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems, triggerWindowsDropCapture, type ExportedDemoFile } from "./lib/dem";
 import { parseTags } from "./lib/tags";
 import { APP_VERSION, checkForUpdate, type UpdateInfo } from "./lib/update";
 import { LibraryView } from "./views/LibraryView";
@@ -12,6 +12,8 @@ import { LeaderboardView } from "./views/LeaderboardView";
 import { TrailsView } from "./views/TrailsView";
 import { ComingSoonView } from "./views/ComingSoonView";
 import { TournamentDashboardView } from "./views/TournamentDashboardView";
+import { UtilityView } from "./views/UtilityView";
+import { EconomyView } from "./views/EconomyView";
 import sampleZipUrl from "../../../fixtures/input/sample-match.zip?url";
 
 // 八模块信息架构（docs/roadmap.md），未实现的模块以「制作中」占位展示
@@ -30,8 +32,8 @@ const NAV: { key: StudioView; label: string; hint: string; icon: typeof LibraryB
   { key: "match", label: "比赛工作台", hint: "回合 / 地图 / 回放", icon: Film },
   { key: "players", label: "个人实验室", hint: "档案 / 开局动线", icon: UserRound },
   { key: "duel", label: "对枪实验室", hint: "对枪与机制分析", icon: Swords, wip: true },
-  { key: "utility", label: "道具实验室", hint: "道具价值与落点", icon: Bomb, wip: true },
-  { key: "economy", label: "经济与节奏", hint: "买局质量 / 回合 swing", icon: Coins, wip: true },
+  { key: "utility", label: "道具实验室", hint: "道具价值与落点", icon: Bomb },
+  { key: "economy", label: "经济与节奏", hint: "买局质量 / 回合 swing", icon: Coins },
   { key: "tournament", label: "赛事中台", hint: "排行榜 / 报表", icon: Trophy },
   { key: "coach", label: "教练工作台", hint: "战术模式与 playbook", icon: ClipboardList, wip: true }
 ];
@@ -47,6 +49,7 @@ const TOURNAMENT_TABS = [
   { key: "dashboard", label: "赛事总览" }
 ] as const;
 type TournamentTab = (typeof TOURNAMENT_TABS)[number]["key"];
+type MatchDeepLink = { roundNumber: number; tick?: number };
 
 export function App() {
   const [entries, setEntries] = useState<StudioDemoEntry[]>([]);
@@ -54,6 +57,7 @@ export function App() {
   const [playerTab, setPlayerTab] = useState<PlayerTab>("profile");
   const [tournamentTab, setTournamentTab] = useState<TournamentTab>("leaderboard");
   const [selectedDemoId, setSelectedDemoId] = useState<string | null>(null);
+  const [matchDeepLink, setMatchDeepLink] = useState<MatchDeepLink | null>(null);
   const [selectedPlayerKey, setSelectedPlayerKey] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -71,10 +75,11 @@ export function App() {
     void checkForUpdate().then(setUpdate);
   }, []);
 
-  const importFiles = useCallback(async (files: Iterable<File>, tags: string[] = [], initialErrors: string[] = []) => {
+  const importFiles = useCallback(async (files: Iterable<File | ExportedDemoFile>, tags: string[] = [], initialErrors: string[] = []) => {
     const fileList = [...files];
-    const zips = fileList.filter((file) => file.name.toLowerCase().endsWith(".zip"));
-    const dems = fileList.filter(isDemFile);
+    const items = fileList.map((item) => item instanceof File ? { file: item, sourceDemPath: null } : item);
+    const zips = items.filter((item) => item.file.name.toLowerCase().endsWith(".zip"));
+    const dems = items.filter((item) => isDemFile(item.file));
     if (zips.length === 0 && dems.length === 0 && initialErrors.length === 0) {
       setNotice("请选择 .dem 或 cs2-demo-format/2.0 ZIP 文件");
       return;
@@ -88,7 +93,8 @@ export function App() {
     // .dem 先经 exporter 转 ZIP（数据库只存 ZIP）
     if (dems.length > 0) {
       const backend = await detectDemBackend();
-      for (const [index, dem] of dems.entries()) {
+      for (const [index, demItem] of dems.entries()) {
+        const dem = demItem.file;
         try {
           setNotice(`正在导出 ${dem.name}…（${index + 1}/${dems.length}，demo 解析需要一点时间）`);
           zips.push(await exportDemToZip(dem, backend, setNotice));
@@ -98,12 +104,13 @@ export function App() {
       }
     }
 
-    for (const [index, file] of zips.entries()) {
+    for (const [index, item] of zips.entries()) {
+      const file = item.file;
       try {
         if (zips.length > 1) setNotice(`正在入库 ${file.name}…（${index + 1}/${zips.length}）`);
         // 解析在主线程，逐场让出一帧，避免批量导入时 UI 完全冻结
         await new Promise((resolve) => setTimeout(resolve, 0));
-        const result = await importDemoFile(file, tags);
+        const result = await importDemoFile(file, { tags, sourceDemPath: item.sourceDemPath });
         if (result.duplicate) duplicates += 1;
         else imported += 1;
       } catch (err) {
@@ -153,8 +160,9 @@ export function App() {
     }
   }, [importFiles]);
 
-  const openDemo = useCallback((id: string) => {
+  const openDemo = useCallback((id: string, target?: MatchDeepLink) => {
     setSelectedDemoId(id);
+    setMatchDeepLink(target ?? null);
     setView("match");
   }, []);
 
@@ -176,6 +184,44 @@ export function App() {
   const handleUpdateTags = useCallback(async (id: string, tags: string[]) => {
     await updateDemoTags(id, tags);
     setEntries(await listDemoEntries());
+  }, []);
+
+  const handleBulkUpdateTags = useCallback(async (ids: string[], add: string[], remove: string[]) => {
+    await bulkUpdateTags(ids, add, remove);
+    setEntries(await listDemoEntries());
+  }, []);
+
+  const handleReexportDemo = useCallback(async (entry: StudioDemoEntry) => {
+    if (!entry.sourceDemPath) {
+      setNotice("这场 demo 没有记录原始 .dem 路径，需要手动重新导入");
+      return;
+    }
+    const api = window.pywebview?.api;
+    if (typeof api?.path_exists === "function" && !(await api.path_exists(entry.sourceDemPath))) {
+      setNotice(`原始文件不存在：${entry.sourceDemPath}`);
+      return;
+    }
+    setImporting(true);
+    setNotice(`正在重新导出 ${entry.fileName}…`);
+    try {
+      const backend = await detectDemBackend();
+      const demName = entry.sourceDemPath.split(/[\\/]/).pop() ?? entry.fileName.replace(/\.zip$/i, ".dem");
+      const demFile = new File([], demName);
+      (demFile as File & { pywebviewFullPath?: string }).pywebviewFullPath = entry.sourceDemPath;
+      const exported = await exportDemToZip(demFile, backend, setNotice);
+      const result = await importDemoFile(exported.file, {
+        tags: entry.tags,
+        sourceDemPath: entry.sourceDemPath,
+        replaceId: entry.id
+      });
+      setEntries(await listDemoEntries());
+      setSelectedDemoId((current) => (current === entry.id ? result.entry.id : current));
+      setNotice(`已重新导出并替换 ${entry.fileName}`);
+    } catch (err) {
+      setNotice(`重新导出失败：${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setImporting(false);
+    }
   }, []);
 
   return (
@@ -253,10 +299,21 @@ export function App() {
             onOpenDemo={openDemo}
             onRemoveDemo={handleRemove}
             onUpdateTags={handleUpdateTags}
+            onBulkUpdateTags={handleBulkUpdateTags}
+            onReexportDemo={handleReexportDemo}
           />
         )}
         {view === "match" && (
-          <MatchView entries={entries} demoId={selectedDemoId} onSelectDemo={setSelectedDemoId} onGoLibrary={() => setView("library")} />
+          <MatchView
+            entries={entries}
+            demoId={selectedDemoId}
+            deepLink={matchDeepLink}
+            onSelectDemo={(id) => {
+              setSelectedDemoId(id);
+              setMatchDeepLink(null);
+            }}
+            onGoLibrary={() => setView("library")}
+          />
         )}
         {view === "players" && (
           <>
@@ -310,29 +367,22 @@ export function App() {
           />
         )}
         {view === "utility" && (
-          <ComingSoonView
-            title="道具实验室"
-            description="道具价值量化——每颗闪 / 烟 / 火的实际收益，与负收益道具证据化。"
-            planned={[
-              "Flash Value：enemy/team flashed 秒数与净价值",
-              "负收益道具（队闪、空爆烟）Top 列表",
-              "Lineup Library：成功道具自动沉淀",
-              "道具落点与时机热力图"
-            ]}
-            availableNow="目前可在「个人实验室 → 开局动线」查看走位叠加的道具投掷习惯。"
+          <UtilityView
+            allEntries={entries}
+            entries={scopedEntries}
+            scope={scope}
+            onScopeChange={setScope}
+            onOpenMatch={openDemo}
+            onGoLibrary={() => setView("library")}
           />
         )}
         {view === "economy" && (
-          <ComingSoonView
-            title="经济与节奏"
-            description="买局质量与回合 momentum——经济决策对比赛节奏的影响。"
-            planned={[
-              "Buy Quality：full / force / eco / conversion 胜率链",
-              "kit / 头盔覆盖率与经济断点",
-              "回合 swing 与 momentum 时间线",
-              "手枪局与转化局专项分析"
-            ]}
-            availableNow="目前可在「比赛工作台」的经济面板查看逐回合经济。"
+          <EconomyView
+            allEntries={entries}
+            entries={scopedEntries}
+            scope={scope}
+            onScopeChange={setScope}
+            onGoLibrary={() => setView("library")}
           />
         )}
         {view === "coach" && (

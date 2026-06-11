@@ -22,7 +22,7 @@ import { getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "./library
  */
 
 /** 聚合算法/口径变化时 +1，旧缓存自动失效重算。 */
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 
 export interface SeasonSummary {
   bundle: SeasonCohortBundle;

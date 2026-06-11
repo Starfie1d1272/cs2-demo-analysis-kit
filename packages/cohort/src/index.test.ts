@@ -96,11 +96,12 @@ describe("buildSeasonCohort", () => {
     expect(merged!.prism?.steamId64).toBe("user:rivalhub-user-1");
   }, integrationTimeoutMs);
 
-  it("anchors season accountRR around the season cohort mean", async () => {
+  it("scores season accountRR against the same frozen pro baseline as single matches", async () => {
     const bundle = buildSeasonCohort(await getCohortFixtures());
     const mean = bundle.players.reduce((sum, row) => sum + row.accountRR, 0) / bundle.players.length;
 
-    expect(mean).toBeCloseTo(1, 2);
+    expect(mean).toBeGreaterThan(0);
+    expect(mean).not.toBeCloseTo(1, 2);
     expect(bundle.players.some((row) => row.accountRR > 1)).toBe(true);
     expect(bundle.players.some((row) => row.accountRR < 1)).toBe(true);
   }, integrationTimeoutMs);

@@ -20,6 +20,7 @@ interface ExportJobStatus {
 
 interface PywebviewStudioApi {
   pick_dems: () => Promise<string[]>;
+  path_exists?: (path: string) => Promise<boolean>;
   export_dem_path: (path: string) => Promise<
     { ok: true; fileName: string; dataBase64: string } | { ok: false; error: string }
   >;
@@ -44,6 +45,11 @@ declare global {
 }
 
 export type DemBackend = "pywebview" | "dev" | null;
+
+export interface ExportedDemoFile {
+  file: File;
+  sourceDemPath?: string | null;
+}
 
 let devProbe: Promise<boolean> | null = null;
 
@@ -105,15 +111,15 @@ async function exportViaDev(file: File): Promise<File> {
 /** pywebview 模式：优先按路径导出；无路径时（如 Windows/macOS 拖入）调用 get_drop_path
  *  解析本机路径；再不行才走字节回退。前两级覆盖了绝大多数场景，
  *  字节回退仅当桌面壳版本过旧且不提供 get_drop_path 时触发。 */
-async function exportViaPywebview(file: File, onProgress?: (message: string) => void): Promise<File> {
+async function exportViaPywebview(file: File, onProgress?: (message: string) => void): Promise<ExportedDemoFile> {
   const path = (file as File & { pywebviewFullPath?: string }).pywebviewFullPath;
-  if (path) return exportPathViaPywebview(path, file.name, onProgress);
+  if (path) return { file: await exportPathViaPywebview(path, file.name, onProgress), sourceDemPath: path };
 
   // 拖拽时 pywebviewFullPath 可能缺失（标准浏览器 drop 事件，非 pywebview DOM 系统），
   // 尝试通过 Python 端 _dnd_state 解析本机路径。
   const api = window.pywebview!.api;
   const resolvedPath = await api.get_drop_path?.(file.name);
-  if (resolvedPath) return exportPathViaPywebview(resolvedPath, file.name, onProgress);
+  if (resolvedPath) return { file: await exportPathViaPywebview(resolvedPath, file.name, onProgress), sourceDemPath: resolvedPath };
 
   // 无文件系统路径：仅剩字节传输。走到这里说明桌面壳版本过旧
   // （不提供 get_drop_path），或文件来自浏览器 <input type="file">
@@ -127,7 +133,10 @@ async function exportViaPywebview(file: File, onProgress?: (message: string) => 
   const dataB64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
   const result = await api.export_dem_bytes(file.name, dataB64);
   if (!result.ok) throw new Error(`${file.name}: ${result.error}`);
-  return new File([base64ToBytes(result.dataBase64) as BlobPart], result.fileName, { type: "application/zip" });
+  return {
+    file: new File([base64ToBytes(result.dataBase64) as BlobPart], result.fileName, { type: "application/zip" }),
+    sourceDemPath: null
+  };
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -194,26 +203,26 @@ export async function exportDemToZip(
   file: File,
   backend: DemBackend,
   onProgress?: (message: string) => void
-): Promise<File> {
-  if (backend === "dev") return exportViaDev(file);
+): Promise<ExportedDemoFile> {
+  if (backend === "dev") return { file: await exportViaDev(file), sourceDemPath: null };
   if (backend === "pywebview") return exportViaPywebview(file, onProgress);
   throw new Error(`${file.name}: 当前环境不支持 .dem 直接导入（开发模式跑 pnpm dev:studio，或使用打包版桌面应用）`);
 }
 
 /** pywebview 原生文件对话框：选多个 .dem/.zip 并逐个导出。paths 为空时 cancelled 为 true。 */
-export async function pickAndExportDems(onProgress: (message: string) => void): Promise<{ files: File[]; errors: string[]; cancelled: boolean }> {
+export async function pickAndExportDems(onProgress: (message: string) => void): Promise<{ files: ExportedDemoFile[]; errors: string[]; cancelled: boolean }> {
   const api = window.pywebview?.api;
   if (!api) return { files: [], errors: ["桌面壳不可用"], cancelled: false };
   const paths = await api.pick_dems();
   if (paths.length === 0) return { files: [], errors: [], cancelled: true };
-  const files: File[] = [];
+  const files: ExportedDemoFile[] = [];
   const errors: string[] = [];
   for (const path of paths) {
     const name = path.split(/[\\/]/).pop() ?? path;
     const prefix = `（${files.length + errors.length + 1}/${paths.length}）`;
     onProgress(`正在导出 ${name}…${prefix}`);
     try {
-      files.push(await exportPathViaPywebview(path, name, (msg) => onProgress(`${prefix}${msg}`)));
+      files.push({ file: await exportPathViaPywebview(path, name, (msg) => onProgress(`${prefix}${msg}`)), sourceDemPath: path });
     } catch (err) {
       errors.push(err instanceof Error ? err.message : String(err));
     }

@@ -1,10 +1,11 @@
 import {
-  computeCohortAccountsRR,
+  computeFrozenProBaselineRR,
   computeRRSixAccounts,
+  rrSixAccountProBaselineV0,
   rrSixAccountWeightsV1
 } from "@rivalhub/rival-rating";
 import type { DemoPackage, RRSignals, RRSixAccountWeights } from "@cs2dak/contract";
-import type { CohortAccountResult, RRSixAccountResult } from "@rivalhub/rival-rating";
+import type { CohortAccountResult, ProBaselineConfig, RRSixAccountResult } from "@rivalhub/rival-rating";
 import { normalizeDemoPackage } from "./normalize.js";
 import { loadSpatialAssets } from "./spatial/annotate.js";
 import { buildOfficialMapControl } from "./spatial/mapcontrol.js";
@@ -125,9 +126,10 @@ export const deriveAccountSignalsV2 = deriveRRSignals;
 
 export function computeAccountRatingsV2(input: unknown): Array<{ signals: RRSignals; rr: AccountRatingResult }> {
   const weights = rrSixAccountWeightsV1 as unknown as RRSixAccountWeights;
+  const baseline = rrSixAccountProBaselineV0 as unknown as ProBaselineConfig;
   const signals = deriveRRSignals(input);
   const rawBySteamId = new Map(signals.map((row) => [row.steamId64, computeRRSixAccounts(row, weights)]));
-  const balanced = computeCohortAccountsRR(signals, weights);
+  const balanced = signals.map((signal) => computeFrozenProBaselineRR(signal, weights, baseline));
 
   return balanced.map((rr, index) => {
     const signal = signals[index]!;

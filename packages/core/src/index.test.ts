@@ -49,15 +49,16 @@ describe("analyzeDemoPackage", () => {
     expect(ratings[0]?.rr.rr).toBeGreaterThan(0);
   });
 
-  it("anchors accountRR so the per-match league mean is ~1.0", async () => {
+  it("scores accountRR against the frozen pro baseline instead of the match mean", async () => {
     const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
     const pkg = await loadDemoPackageFromZip(zip);
     const bundle = analyzeDemoPackage(pkg);
 
     const accountRRs = bundle.scoreboard.map((row) => row.accountRR);
     const mean = accountRRs.reduce((sum, v) => sum + v, 0) / accountRRs.length;
-    expect(mean).toBeCloseTo(1.0, 2);
-    // 锚定后必然有人高于、有人低于 1.0
+    expect(mean).toBeGreaterThan(0);
+    expect(mean).not.toBeCloseTo(1.0, 2);
+    // 职业基线不会强制当前比赛均值为 1.0，但仍应保留个体区分。
     expect(accountRRs.some((v) => v > 1.0)).toBe(true);
     expect(accountRRs.some((v) => v < 1.0)).toBe(true);
   });

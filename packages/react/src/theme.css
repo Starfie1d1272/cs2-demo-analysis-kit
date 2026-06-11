@@ -1008,6 +1008,79 @@
   height: 8px;
 }
 
+.dak-rr-explain {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--dak-border);
+  border-radius: 8px;
+  background: var(--dak-panel);
+}
+
+.dak-rr-explain-head,
+.dak-rr-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dak-rr-explain-head span {
+  color: var(--dak-fg-mid);
+  font-size: 12px;
+}
+
+.dak-rr-explain-head small,
+.dak-rr-status span {
+  color: var(--dak-fg-dim);
+  font-size: 11px;
+}
+
+.dak-rr-metric-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dak-rr-metric-group h4 {
+  margin: 0 0 6px;
+  color: var(--dak-fg-mid);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dak-rr-metric-row {
+  display: grid;
+  grid-template-columns: minmax(86px, 1fr) minmax(72px, 1.4fr) 48px;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+  color: var(--dak-fg-mid);
+  font-size: 11px;
+}
+
+.dak-rr-metric-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dak-rr-metric-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--dak-accent), var(--dak-accent-b));
+}
+
+.dak-rr-metric-row b {
+  text-align: right;
+  color: var(--dak-fg);
+  font-size: 11px;
+}
+
 .dak-replay-stage {
   position: relative;
   min-height: 520px;

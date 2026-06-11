@@ -1,5 +1,6 @@
 import type { DemoPackage, MatchWorkspaceModel } from "@cs2dak/contract";
 import { round } from "./season-metrics.js";
+import { displayWeaponName } from "./weapons.js";
 
 /**
  * v0.3 洞察派生：个人趋势 / Flash Value / Mistake Review / Buy Quality /
@@ -36,6 +37,7 @@ export interface PlayerTrendPoint {
 export interface TeamFlashIncident {
   matchId: string;
   roundNumber: number;
+  tick?: number;
   victimCount: number;
   totalSeconds: number;
 }
@@ -56,6 +58,7 @@ export interface FlashValueSummary {
 export interface MistakeEvidence {
   matchId: string;
   roundNumber: number;
+  tick?: number;
   detail: string;
 }
 
@@ -72,6 +75,14 @@ export interface PlayerSeasonInsights {
   trend: PlayerTrendPoint[];
   flash: FlashValueSummary;
   mistakes: MistakeReview;
+}
+
+export interface PlayerWeaponStat {
+  weapon: string;
+  label: string;
+  kills: number;
+  headshotPercent: number | null;
+  killsPerMatch: number;
 }
 
 const DEATH_EARLY_SECONDS = 20;
@@ -134,10 +145,11 @@ export function buildPlayerSeasonInsights(
     const teamBlindRows = pkg.blinds.filter(
       (b) => ids.has(b.flasherSteamId64) && b.flasherTeamKey === b.flashedTeamKey && b.flasherSteamId64 !== b.flashedSteamId64
     );
-    const grouped = new Map<string, { roundNumber: number; victims: Set<string>; seconds: number }>();
+    const grouped = new Map<string, { roundNumber: number; tick: number; victims: Set<string>; seconds: number }>();
     for (const blind of teamBlindRows) {
       const key = blind.flashId ?? `${blind.roundNumber}-${Math.round(blind.tick / 16)}`;
-      const cell = grouped.get(key) ?? { roundNumber: blind.roundNumber, victims: new Set(), seconds: 0 };
+      const cell = grouped.get(key) ?? { roundNumber: blind.roundNumber, tick: blind.tick, victims: new Set(), seconds: 0 };
+      cell.tick = Math.min(cell.tick, blind.tick);
       cell.victims.add(blind.flashedSteamId64);
       cell.seconds += blind.durationSeconds;
       grouped.set(key, cell);
@@ -146,6 +158,7 @@ export function buildPlayerSeasonInsights(
       teamFlashes.push({
         matchId,
         roundNumber: cell.roundNumber,
+        tick: cell.tick,
         victimCount: cell.victims.size,
         totalSeconds: round(cell.seconds, 2)
       });
@@ -174,7 +187,7 @@ export function buildPlayerSeasonInsights(
       if (isLowBuy) lowBuyAttempts += 1;
       if (firstDeath && ids.has(firstDeath.victimSteamId64) && isLowBuy) {
         lowBuyFirstDeaths += 1;
-        lowBuyEvidence.push({ matchId, roundNumber, detail: `${economy} 局首死` });
+        lowBuyEvidence.push({ matchId, roundNumber, tick: firstDeath.tick, detail: `${economy} 局首死` });
       }
       // 死亡时间分布
       for (const kill of sorted) {
@@ -225,6 +238,38 @@ export function buildPlayerSeasonInsights(
       clutchLosses: { count: clutchLosses, evidence: clutchLossEvidence.slice(0, MAX_EVIDENCE) }
     }
   };
+}
+
+export function buildPlayerWeaponStats(
+  demos: SeasonInsightsDemo[],
+  steamIds: string[]
+): PlayerWeaponStat[] {
+  const ids = new Set(steamIds);
+  const rows = new Map<string, { weapon: string; kills: number; headshots: number }>();
+  let matchCount = 0;
+  for (const { pkg } of demos) {
+    let appeared = false;
+    for (const kill of pkg.kills) {
+      if (!kill.killerSteamId64 || !ids.has(kill.killerSteamId64)) continue;
+      appeared = true;
+      const weapon = kill.weapon || "unknown";
+      const row = rows.get(weapon) ?? { weapon, kills: 0, headshots: 0 };
+      row.kills += 1;
+      if (kill.headshot) row.headshots += 1;
+      rows.set(weapon, row);
+    }
+    if (appeared) matchCount += 1;
+  }
+  const denominator = Math.max(1, matchCount);
+  return [...rows.values()]
+    .map((row) => ({
+      weapon: row.weapon,
+      label: displayWeaponName(row.weapon),
+      kills: row.kills,
+      headshotPercent: row.kills > 0 ? round((row.headshots / row.kills) * 100, 1) : null,
+      killsPerMatch: round(row.kills / denominator, 2)
+    }))
+    .sort((a, b) => b.kills - a.kills || a.label.localeCompare(b.label));
 }
 
 // ── Buy Quality（单场，比赛工作台经济页用）──────────────────────────────────
@@ -298,10 +343,48 @@ export interface TournamentMapStat {
   pistolTWinRatePercent: number | null;
 }
 
+export interface TournamentWeaponStat {
+  weapon: string;
+  label: string;
+  kills: number;
+  headshotPercent: number | null;
+  topPlayerName: string | null;
+  topPlayerKills: number;
+}
+
+export interface TournamentTeamPistolStat {
+  teamName: string;
+  pistolRounds: number;
+  pistolWins: number;
+  winRatePercent: number | null;
+  conversionRounds: number;
+  conversionWins: number;
+  conversionPercent: number | null;
+  breakWins: number;
+}
+
+export interface TournamentEconomyMatrixCell {
+  teamAEconomy: string;
+  teamBEconomy: string;
+  rounds: number;
+  teamAWinRatePercent: number | null;
+}
+
+export interface TournamentEcoUpsetStat {
+  teamName: string;
+  opportunities: number;
+  wins: number;
+  winRatePercent: number | null;
+}
+
 export interface TournamentInsights {
   matchCount: number;
   roundCount: number;
   maps: TournamentMapStat[];
+  weaponKills: TournamentWeaponStat[];
+  teamPistols: TournamentTeamPistolStat[];
+  economyMatrix: TournamentEconomyMatrixCell[];
+  ecoUpsets: TournamentEcoUpsetStat[];
   /** 全部回合的 T / CT 胜率（0-100）。 */
   tWinRatePercent: number;
   ctWinRatePercent: number;
@@ -315,12 +398,56 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
   let pistolConversions = 0;
   let pistolWonRounds = 0;
   const byMap = new Map<string, { matches: number; rounds: number; tWins: number; pistolT: number; pistolTotal: number }>();
+  const weaponRows = new Map<string, { weapon: string; kills: number; headshots: number; players: Map<string, { name: string; kills: number }> }>();
+  const teamPistols = new Map<string, TournamentTeamPistolStat>();
+  const economyMatrix = new Map<string, { teamAEconomy: string; teamBEconomy: string; rounds: number; teamAWins: number }>();
+  const ecoUpsets = new Map<string, { teamName: string; opportunities: number; wins: number }>();
+
+  const teamNameFor = (pkg: DemoPackage, teamKey: "teamA" | "teamB") =>
+    teamKey === "teamA" ? (pkg.match.teamA.name ?? "Team A") : (pkg.match.teamB.name ?? "Team B");
+  const pistolCell = (teamName: string) => {
+    const existing = teamPistols.get(teamName);
+    if (existing) return existing;
+    const created: TournamentTeamPistolStat = {
+      teamName,
+      pistolRounds: 0,
+      pistolWins: 0,
+      winRatePercent: null,
+      conversionRounds: 0,
+      conversionWins: 0,
+      conversionPercent: null,
+      breakWins: 0
+    };
+    teamPistols.set(teamName, created);
+    return created;
+  };
+  const ecoCell = (teamName: string) => {
+    const existing = ecoUpsets.get(teamName);
+    if (existing) return existing;
+    const created = { teamName, opportunities: 0, wins: 0 };
+    ecoUpsets.set(teamName, created);
+    return created;
+  };
 
   for (const { pkg } of demos) {
     const mapName = pkg.match.mapName;
     const cell = byMap.get(mapName) ?? { matches: 0, rounds: 0, tWins: 0, pistolT: 0, pistolTotal: 0 };
     cell.matches += 1;
     const ordered = [...pkg.rounds].sort((a, b) => a.roundNumber - b.roundNumber);
+    const playerNameBySteam = new Map(pkg.players.map((player) => [player.steamId64, player.name ?? player.steamId64]));
+    for (const kill of pkg.kills) {
+      const weapon = kill.weapon || "unknown";
+      const weaponCell = weaponRows.get(weapon) ?? { weapon, kills: 0, headshots: 0, players: new Map() };
+      weaponCell.kills += 1;
+      if (kill.headshot) weaponCell.headshots += 1;
+      if (kill.killerSteamId64) {
+        const playerName = playerNameBySteam.get(kill.killerSteamId64) ?? kill.killerSteamId64;
+        const playerCell = weaponCell.players.get(kill.killerSteamId64) ?? { name: playerName, kills: 0 };
+        playerCell.kills += 1;
+        weaponCell.players.set(kill.killerSteamId64, playerCell);
+      }
+      weaponRows.set(weapon, weaponCell);
+    }
     for (let i = 0; i < ordered.length; i += 1) {
       const row = ordered[i]!;
       totalRounds += 1;
@@ -338,6 +465,50 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
           if (ordered[i + 1]!.winnerTeamKey === row.winnerTeamKey) pistolConversions += 1;
         }
       }
+      const matrixKey = `${row.teamAEconomy}:${row.teamBEconomy}`;
+      const matrixCell = economyMatrix.get(matrixKey) ?? {
+        teamAEconomy: row.teamAEconomy,
+        teamBEconomy: row.teamBEconomy,
+        rounds: 0,
+        teamAWins: 0
+      };
+      matrixCell.rounds += 1;
+      if (row.winnerTeamKey === "teamA") matrixCell.teamAWins += 1;
+      economyMatrix.set(matrixKey, matrixCell);
+
+      const teamAName = teamNameFor(pkg, "teamA");
+      const teamBName = teamNameFor(pkg, "teamB");
+      if (row.roundNumber === 1 || row.roundNumber === 13 || isPistol) {
+        const a = pistolCell(teamAName);
+        const b = pistolCell(teamBName);
+        a.pistolRounds += 1;
+        b.pistolRounds += 1;
+        if (row.winnerTeamKey === "teamA") a.pistolWins += 1;
+        if (row.winnerTeamKey === "teamB") b.pistolWins += 1;
+        const next = ordered[i + 1];
+        if (next) {
+          const winnerName = teamNameFor(pkg, row.winnerTeamKey);
+          const loserName = teamNameFor(pkg, row.winnerTeamKey === "teamA" ? "teamB" : "teamA");
+          const winner = pistolCell(winnerName);
+          const loser = pistolCell(loserName);
+          winner.conversionRounds += 1;
+          if (next.winnerTeamKey === row.winnerTeamKey) winner.conversionWins += 1;
+          else loser.breakWins += 1;
+        }
+      }
+
+      const aWeak = row.teamAEconomy === "eco" || row.teamAEconomy === "semi";
+      const bWeak = row.teamBEconomy === "eco" || row.teamBEconomy === "semi";
+      if (aWeak && row.teamBEconomy === "full") {
+        const c = ecoCell(teamAName);
+        c.opportunities += 1;
+        if (row.winnerTeamKey === "teamA") c.wins += 1;
+      }
+      if (bWeak && row.teamAEconomy === "full") {
+        const c = ecoCell(teamBName);
+        c.opportunities += 1;
+        if (row.winnerTeamKey === "teamB") c.wins += 1;
+      }
     }
     byMap.set(mapName, cell);
   }
@@ -354,6 +525,43 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
         pistolTWinRatePercent: cell.pistolTotal > 0 ? round((cell.pistolT / cell.pistolTotal) * 100, 1) : null
       }))
       .sort((a, b) => b.matches - a.matches),
+    weaponKills: [...weaponRows.values()]
+      .map((cell) => {
+        const topPlayer = [...cell.players.values()].sort((a, b) => b.kills - a.kills)[0];
+        return {
+          weapon: cell.weapon,
+          label: displayWeaponName(cell.weapon),
+          kills: cell.kills,
+          headshotPercent: cell.kills > 0 ? round((cell.headshots / cell.kills) * 100, 1) : null,
+          topPlayerName: topPlayer?.name ?? null,
+          topPlayerKills: topPlayer?.kills ?? 0
+        };
+      })
+      .sort((a, b) => b.kills - a.kills)
+      .slice(0, 10),
+    teamPistols: [...teamPistols.values()]
+      .map((row) => ({
+        ...row,
+        winRatePercent: row.pistolRounds > 0 ? round((row.pistolWins / row.pistolRounds) * 100, 1) : null,
+        conversionPercent: row.conversionRounds > 0 ? round((row.conversionWins / row.conversionRounds) * 100, 1) : null
+      }))
+      .sort((a, b) => b.pistolWins - a.pistolWins),
+    economyMatrix: [...economyMatrix.values()]
+      .map((row) => ({
+        teamAEconomy: row.teamAEconomy,
+        teamBEconomy: row.teamBEconomy,
+        rounds: row.rounds,
+        teamAWinRatePercent: row.rounds > 0 ? round((row.teamAWins / row.rounds) * 100, 1) : null
+      }))
+      .sort((a, b) => b.rounds - a.rounds),
+    ecoUpsets: [...ecoUpsets.values()]
+      .map((row) => ({
+        teamName: row.teamName,
+        opportunities: row.opportunities,
+        wins: row.wins,
+        winRatePercent: row.opportunities > 0 ? round((row.wins / row.opportunities) * 100, 1) : null
+      }))
+      .sort((a, b) => b.wins - a.wins || b.opportunities - a.opportunities),
     tWinRatePercent: round((tWins / Math.max(1, totalRounds)) * 100, 1),
     ctWinRatePercent: round(((totalRounds - tWins) / Math.max(1, totalRounds)) * 100, 1),
     pistolConversionPercent: pistolWonRounds > 0

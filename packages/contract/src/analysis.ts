@@ -39,6 +39,7 @@ export const playerScoreboardRowSchema = z.object({
   steamId64: z.string(),
   name: z.string(),
   teamKey: teamKeySchema,
+  indicators: rrIndicatorsSchema,
   kills: z.number().int().nonnegative(),
   deaths: z.number().int().nonnegative(),
   assists: z.number().int().nonnegative(),
@@ -69,7 +70,7 @@ export const playerScoreboardRowSchema = z.object({
   ratingSeed: z.number().nonnegative(),
   rr: z.number().nonnegative(),
   rrPercentile: z.number().min(0).max(100),
-  /** RR v2 账户分。锚定后：1.00 = 本场联赛均值（per-match league mean）。 */
+  /** RR v2 账户分。单场为 frozen pro baseline：1.00 = 职业基线。 */
   accountRR: z.number().nonnegative(),
   /** 锚定/clamp 前的原始账户分（调试用）。 */
   accountRRRaw: z.number(),

@@ -88,6 +88,7 @@ const minimalScoreboardRow = {
   steamId64: "76561198000000001",
   name: "Player A",
   teamKey: "teamA" as const,
+  indicators: minimalIndicators,
   kills: 10, deaths: 8, assists: 2,
   adr: 72.5, kast: 66.7, headshotPercent: 40,
   entryKills: 2, tradeKills: 1, awpKills: 2, utilityDamage: 150,

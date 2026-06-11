@@ -300,7 +300,7 @@ def parse_demo(dem_path: str, progress: ProgressFn | None = None) -> dict[str, A
     _p("解析道具引爆", 0.52)
     # ── grenades ─────────────────────────────────────────────────
     # One scan for all detonation types; tag each row with its v2 grenade type.
-    g_nade = _safe_events(p, [name for name, _ in _GRENADE_EVENTS] + ["inferno_expire"],
+    g_nade = _safe_events(p, [name for name, _ in _GRENADE_EVENTS] + ["inferno_expire", "smokegrenade_expired"],
                           other=["total_rounds_played"], player=_GRENADE_PLAYER_FIELDS)
     grenade_detonations: list[dict] = []
     for ev_name, gtype in _GRENADE_EVENTS:
@@ -308,6 +308,7 @@ def parse_demo(dem_path: str, progress: ProgressFn | None = None) -> dict[str, A
             {**r, "_grenade_type": gtype} for r in g_nade[ev_name]
         )
     inferno_expires = g_nade["inferno_expire"]
+    smoke_expires = g_nade["smokegrenade_expired"]
 
     # ── player info at match start ───────────────────────────────
     if announce_rows:
@@ -344,6 +345,24 @@ def parse_demo(dem_path: str, progress: ProgressFn | None = None) -> dict[str, A
         ))
     except BaseException:
         player_info = []
+
+    # Side ground truth sampled shortly after each freeze ends. OT side rules can
+    # differ across environments; this lets round modeling follow the demo
+    # state and keeps the formula as a fallback only.
+    round_side_ticks = sorted({
+        int(r["tick"]) + 16
+        for r in round_freeze_ends
+        if int(r.get("tick") or 0) > 0
+    })
+    round_side_samples: list[dict] = []
+    if round_side_ticks:
+        try:
+            round_side_samples = _rows(p.parse_ticks(
+                ["steamid", "team_num"],
+                ticks=round_side_ticks,
+            ))
+        except BaseException:
+            round_side_samples = []
 
     # ── positions (~1 Hz) + replay (~8 Hz): single parse over replay ticks ──
     _p("解析走位回放（最耗时）", 0.60)
@@ -419,12 +438,14 @@ def parse_demo(dem_path: str, progress: ProgressFn | None = None) -> dict[str, A
         "bomb_pickup": bomb_pickup,
         "grenade_detonations": grenade_detonations,
         "inferno_expires": inferno_expires,
+        "smoke_expires": smoke_expires,
         "grenade_throws": grenade_throws,
         "grenade_trajectories": grenade_trajectories,
         "positions_raw": positions_raw,
         "sample_ticks": sample_ticks,
         "replay_raw": replay_raw,
         "replay_ticks": replay_ticks,
+        "round_side_samples": round_side_samples,
         "economy_raw": economy_raw,
         "freeze_ticks": freeze_ticks,
     }

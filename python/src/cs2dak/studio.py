@@ -147,6 +147,9 @@ class StudioApi:
     def get_version(self) -> str:
         return __version__
 
+    def path_exists(self, path: str) -> bool:
+        return Path(path).exists()
+
     # --- .dem import ----------------------------------------------------
     def pick_dems(self) -> list[str]:
         """Open a native file dialog and return chosen .dem / .zip paths."""

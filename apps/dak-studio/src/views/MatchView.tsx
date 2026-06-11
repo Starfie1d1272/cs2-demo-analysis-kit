@@ -8,13 +8,14 @@ import { getDemoPackage, type StudioDemoEntry } from "../lib/library";
 export interface MatchViewProps {
   entries: StudioDemoEntry[];
   demoId: string | null;
+  deepLink?: { roundNumber: number; tick?: number } | null;
   onSelectDemo: (id: string) => void;
   onGoLibrary: () => void;
 }
 
 const modelCache = new Map<string, MatchWorkspaceModel>();
 
-export function MatchView({ entries, demoId, onSelectDemo, onGoLibrary }: MatchViewProps) {
+export function MatchView({ entries, demoId, deepLink, onSelectDemo, onGoLibrary }: MatchViewProps) {
   const activeId = demoId ?? entries[0]?.id ?? null;
   const [model, setModel] = useState<MatchWorkspaceModel | null>(activeId ? modelCache.get(activeId) ?? null : null);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +99,7 @@ export function MatchView({ entries, demoId, onSelectDemo, onGoLibrary }: MatchV
         <div className="stu-loading">解析 demo 包并构建工作台…</div>
       ) : (
         <div className="stu-embed">
-          <MatchWorkspace model={model} />
+          <MatchWorkspace model={model} initialTarget={deepLink} />
         </div>
       )}
     </div>

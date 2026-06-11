@@ -61,7 +61,10 @@ Three rating layers answer three different questions and must never be merged in
 All three are specified in the single design doc [design/rr-model.md](design/rr-model.md).
 
 Formula ownership stays in `@rivalhub/rival-rating` (the only implementation of
-`computeRR` / `computeRRSixAccounts` / `computeCohortAccountsRR` / `computePrism`).
+`computeRR` / `computeRRSixAccounts` / `computeFrozenProBaselineRR` /
+`computeCohortAccountsRR` / `computePrism`). Production RR uses frozen pro
+baseline so single-match and cohort views share one scale (`1.0 = pro baseline`);
+cohort-relative scoring remains useful only for analysis comparisons.
 This kit only derives signals, wires the models, anchors, and shapes output.
 
 > `analyzeDemoPackage` processes **one demo at a time**. Season-level PRISM and RR
@@ -133,7 +136,9 @@ or consume the JSON.
 三层统一在单一设计文档 [design/rr-model.md](design/rr-model.md) 描述。
 
 公式所有权在 `@rivalhub/rival-rating`（`computeRR` / `computeRRSixAccounts` /
-`computeCohortAccountsRR` / `computePrism` 的唯一实现）。本 kit 只做信号派生、
+`computeFrozenProBaselineRR` / `computeCohortAccountsRR` / `computePrism` 的唯一实现）。
+生产 RR 统一使用 frozen pro baseline（`1.0 = 职业基线`），单场与 cohort 视图共用同一标尺；
+cohort-relative scoring 仅保留作分析对照。本 kit 只做信号派生、
 模型接线、锚定与输出整形。
 
 > `analyzeDemoPackage` 一次只处理一场 demo。PRISM 的跨人 z-score 和赛季级 RR 锚定由

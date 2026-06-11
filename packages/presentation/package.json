@@ -10,7 +10,7 @@
     "@cs2dak/contract": "workspace:*",
     "@cs2dak/core": "workspace:*",
     "@cs2dak/maps": "workspace:*",
-    "@rivalhub/rival-rating": "^0.2.0"
+    "@rivalhub/rival-rating": "^0.3.0"
   },
   "devDependencies": {
     "@cs2dak/cohort": "workspace:*"

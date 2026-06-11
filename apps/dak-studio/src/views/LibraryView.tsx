@@ -1,4 +1,4 @@
-import { FolderOpen, Play, Sparkles, Tag as TagIcon, Trash2 } from "lucide-react";
+import { FolderOpen, Play, RotateCw, Tag as TagIcon, Trash2 } from "lucide-react";
 import { useMemo, useState, type ChangeEvent } from "react";
 import { matchDateFromFileName, type StudioDemoEntry } from "../lib/library";
 import { parseTags } from "../lib/tags";
@@ -15,6 +15,8 @@ export interface LibraryViewProps {
   onOpenDemo: (id: string) => void;
   onRemoveDemo: (id: string) => void;
   onUpdateTags: (id: string, tags: string[]) => void;
+  onBulkUpdateTags: (ids: string[], add: string[], remove: string[]) => void;
+  onReexportDemo: (entry: StudioDemoEntry) => void;
 }
 
 function formatDuration(seconds: number): string {
@@ -37,11 +39,14 @@ export function LibraryView({
   onLoadSample,
   onOpenDemo,
   onRemoveDemo,
-  onUpdateTags
+  onUpdateTags,
+  onBulkUpdateTags,
+  onReexportDemo
 }: LibraryViewProps) {
   const [search, setSearch] = useState("");
   const [mapFilter, setMapFilter] = useState<string | null>(null);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 
   const allTags = useMemo(() => [...new Set(entries.flatMap((entry) => entry.tags))].sort(), [entries]);
 
@@ -77,6 +82,46 @@ export function LibraryView({
     e.target.value = "";
   };
 
+  const selectedVisible = filtered.filter((entry) => selectedIds.has(entry.id));
+  const allVisibleSelected = filtered.length > 0 && filtered.every((entry) => selectedIds.has(entry.id));
+  const selectedTags = [...new Set(selectedVisible.flatMap((entry) => entry.tags))].sort();
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleVisible = () => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (allVisibleSelected) {
+        filtered.forEach((entry) => next.delete(entry.id));
+      } else {
+        filtered.forEach((entry) => next.add(entry.id));
+      }
+      return next;
+    });
+  };
+
+  const addBatchTags = () => {
+    const raw = window.prompt(`给 ${selectedIds.size} 场 demo 添加标签（逗号分隔）`);
+    const tags = parseTags(raw ?? "");
+    if (tags.length > 0) onBulkUpdateTags([...selectedIds], tags, []);
+  };
+
+  const removeBatchTags = () => {
+    const raw = window.prompt(
+      `从 ${selectedIds.size} 场 demo 移除标签（逗号分隔）`,
+      selectedTags.join(", ")
+    );
+    const tags = parseTags(raw ?? "");
+    if (tags.length > 0) onBulkUpdateTags([...selectedIds], [], tags);
+  };
+
   return (
     <div className="stu-view">
       <header className="stu-view-header">
@@ -95,18 +140,17 @@ export function LibraryView({
             onChange={(e) => onImportTagsChange(e.target.value)}
             title="本次导入的 demo 都会附加这些标签"
           />
-          <button type="button" className="stu-button stu-button-ghost" onClick={onLoadSample} disabled={importing}>
-            <Sparkles size={15} /> 加载示例
-          </button>
           {onNativeImport && (
             <button type="button" className="stu-button" onClick={onNativeImport} disabled={importing}>
-              <FolderOpen size={15} /> {importing ? "导入中…" : "导入 .dem"}
+              <FolderOpen size={15} /> {importing ? "导入中…" : "导入 demo"}
             </button>
           )}
-          <label className={importing ? "stu-button stu-button-disabled" : "stu-button stu-button-ghost"}>
-            <FolderOpen size={15} /> {importing ? "导入中…" : "导入 ZIP"}
-            <input type="file" accept=".zip,.dem" multiple hidden onChange={onPick} disabled={importing} />
-          </label>
+          {!onNativeImport && (
+            <label className={importing ? "stu-button stu-button-disabled" : "stu-button"}>
+              <FolderOpen size={15} /> {importing ? "导入中…" : "导入 demo"}
+              <input type="file" accept=".zip,.dem" multiple hidden onChange={onPick} disabled={importing} />
+            </label>
+          )}
         </div>
       </header>
 
@@ -131,33 +175,50 @@ export function LibraryView({
 
       {entries.length > 0 && (
         <div className="stu-toolbar">
-          <input
-            className="stu-search"
-            type="search"
-            placeholder="搜索地图 / 队伍 / 文件名…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <div className="stu-chip-row">
-            <button
-              type="button"
-              className={mapFilter === null ? "stu-chip stu-chip-active" : "stu-chip"}
-              onClick={() => setMapFilter(null)}
-            >
-              全部
-            </button>
-            {maps.map((map) => (
-              <button
-                key={map}
-                type="button"
-                className={mapFilter === map ? "stu-chip stu-chip-active" : "stu-chip"}
-                onClick={() => setMapFilter(mapFilter === map ? null : map)}
-              >
-                {map}
+          {selectedIds.size > 0 ? (
+            <>
+              <span className="stu-bulk-count">{selectedIds.size} 场已选</span>
+              <button type="button" className="stu-button stu-button-ghost" onClick={addBatchTags}>
+                添加标签
               </button>
-            ))}
-          </div>
-          {allTags.length > 0 && (
+              <button type="button" className="stu-button stu-button-ghost" onClick={removeBatchTags} disabled={selectedTags.length === 0}>
+                移除标签
+              </button>
+              <button type="button" className="stu-button stu-button-ghost" onClick={() => setSelectedIds(new Set())}>
+                取消
+              </button>
+            </>
+          ) : (
+            <>
+              <input
+                className="stu-search"
+                type="search"
+                placeholder="搜索地图 / 队伍 / 文件名…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <div className="stu-chip-row">
+                <button
+                  type="button"
+                  className={mapFilter === null ? "stu-chip stu-chip-active" : "stu-chip"}
+                  onClick={() => setMapFilter(null)}
+                >
+                  全部
+                </button>
+                {maps.map((map) => (
+                  <button
+                    key={map}
+                    type="button"
+                    className={mapFilter === map ? "stu-chip stu-chip-active" : "stu-chip"}
+                    onClick={() => setMapFilter(mapFilter === map ? null : map)}
+                  >
+                    {map}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {selectedIds.size === 0 && allTags.length > 0 && (
             <div className="stu-chip-row">
               {allTags.map((tag) => (
                 <button
@@ -178,13 +239,19 @@ export function LibraryView({
         <div className="stu-empty">
           <div className="stu-empty-mark">⌖</div>
           <h2>资料库为空</h2>
-          <p>把 .dem 或 v2 ZIP 拖进窗口，或点右上角「导入 demo」。先用「加载示例」也能体验完整工作台。</p>
+          <p>把 .dem 或 v2 ZIP 拖进窗口，或点右上角「导入 demo」。</p>
+          <button type="button" className="stu-button stu-button-ghost" onClick={onLoadSample} disabled={importing}>
+            加载示例
+          </button>
         </div>
       ) : (
         <div className="stu-table-wrap">
           <table className="stu-table">
             <thead>
               <tr>
+                <th aria-label="选择">
+                  <input type="checkbox" checked={allVisibleSelected} onChange={toggleVisible} />
+                </th>
                 <th>地图</th>
                 <th>对阵</th>
                 <th>日期</th>
@@ -198,6 +265,14 @@ export function LibraryView({
             <tbody>
               {filtered.map((entry) => (
                 <tr key={entry.id} onClick={() => onOpenDemo(entry.id)}>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(entry.id)}
+                      onChange={() => toggleSelected(entry.id)}
+                      aria-label={`选择 ${entry.fileName}`}
+                    />
+                  </td>
                   <td>
                     <span className="stu-map-badge">{entry.meta.mapName}</span>
                   </td>
@@ -225,6 +300,15 @@ export function LibraryView({
                     <button type="button" className="stu-icon-button" title="编辑标签" onClick={() => editTags(entry)}>
                       <TagIcon size={14} />
                     </button>
+                    <button
+                      type="button"
+                      className="stu-icon-button"
+                      title={entry.sourceDemPath ? "重新导出并替换" : "未记录原始 .dem 路径"}
+                      disabled={!entry.sourceDemPath || importing}
+                      onClick={() => onReexportDemo(entry)}
+                    >
+                      <RotateCw size={14} />
+                    </button>
                     <button type="button" className="stu-icon-button" title="打开工作台" onClick={() => onOpenDemo(entry.id)}>
                       <Play size={14} />
                     </button>
@@ -241,7 +325,7 @@ export function LibraryView({
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="stu-dim" style={{ textAlign: "center" }}>
+                  <td colSpan={9} className="stu-dim" style={{ textAlign: "center" }}>
                     没有匹配的 demo
                   </td>
                 </tr>
