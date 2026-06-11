@@ -162,6 +162,45 @@ describe("buildTournamentInsights", () => {
         row.opportunities > 0 ? Math.round((row.disadvantageWins / row.opportunities) * 1000) / 10 : null
       );
     }
+
+    for (const global of insights.manAdvantageConversions) {
+      const teamStates = insights.teamManAdvantageConversions.flatMap((team) =>
+        team.states.filter(
+          (state) => state.advantageAlive === global.advantageAlive && state.disadvantageAlive === global.disadvantageAlive
+        )
+      );
+      expect(teamStates.reduce((sum, state) => sum + state.advantageOpportunities, 0)).toBe(global.opportunities);
+      expect(teamStates.reduce((sum, state) => sum + state.advantageWins, 0)).toBe(global.advantageWins);
+      expect(teamStates.reduce((sum, state) => sum + state.disadvantageOpportunities, 0)).toBe(global.opportunities);
+      expect(teamStates.reduce((sum, state) => sum + state.disadvantageWins, 0)).toBe(global.disadvantageWins);
+    }
+  });
+
+  it("builds team economy summaries with maps, round win rate and sample counts", async () => {
+    const pkg = await loadFixture();
+    const insights = buildTournamentInsights([{ matchId: "m1", pkg }]);
+    const teamAName = pkg.match.teamA.name ?? "Team A";
+    const teamBName = pkg.match.teamB.name ?? "Team B";
+
+    const teamA = insights.teamEconomySummaries.find((row) => row.teamName === teamAName);
+    const teamB = insights.teamEconomySummaries.find((row) => row.teamName === teamBName);
+    expect(teamA).toBeDefined();
+    expect(teamB).toBeDefined();
+    expect(teamA?.maps).toBe(1);
+    expect(teamB?.maps).toBe(1);
+    expect(teamA?.rounds).toBe(pkg.rounds.length);
+    expect(teamB?.rounds).toBe(pkg.rounds.length);
+    expect((teamA?.roundWins ?? 0) + (teamB?.roundWins ?? 0)).toBe(pkg.rounds.length);
+    expect(teamA!.pistol.rounds).toBe(teamA!.pistol.wins + teamB!.pistol.wins);
+    expect(teamA!.pistol.winRatePercent).toBe(
+      Math.round((teamA!.pistol.wins / teamA!.pistol.rounds) * 1000) / 10
+    );
+    if (teamA!.round2.conversionRounds > 0) {
+      expect(teamA!.round2.conversionPercent).toBe(
+        Math.round((teamA!.round2.conversionWins / teamA!.round2.conversionRounds) * 1000) / 10
+      );
+    }
+    expect(teamA?.manAdvantage.states.length).toBeGreaterThan(0);
   });
 });
 

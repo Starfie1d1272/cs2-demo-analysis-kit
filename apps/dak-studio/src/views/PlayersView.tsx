@@ -429,8 +429,8 @@ export function PlayersView({
                     <span>Anti-eco 首死</span>
                     <b>{insights.mistakes.antiEcoFirstDeaths.count}/{insights.mistakes.antiEcoFirstDeaths.attempts} 局</b>
                   </div>
-                  <div className="stu-metric" title="eco/半起/强起局中该选手首死（劣势局，参考为主）">
-                    <span>低买局首死</span>
+                  <div className="stu-metric" title="eco/半起/强起局中该选手首死（劣势经济，参考为主）">
+                    <span>劣势经济首死</span>
                     <b>{insights.mistakes.lowBuyFirstDeaths.count}/{insights.mistakes.lowBuyFirstDeaths.attempts} 局</b>
                   </div>
                   <div className="stu-metric"><span>残局失利</span><b>{insights.mistakes.clutchLosses.count}</b></div>

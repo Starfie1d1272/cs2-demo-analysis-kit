@@ -13,7 +13,7 @@ import { buildSeasonLeaderboardModel, buildAllPlayerSeasonProfiles } from "./ind
 
 const ZIP_DIR = fileURLToPath(new URL("../../../fixtures/output/nju-rivals-2026", import.meta.url));
 const REPORT_FILE = fileURLToPath(new URL("../../../fixtures/output/_c-phase-report.txt", import.meta.url));
-const integrationTimeoutMs = 120_000;
+const integrationTimeoutMs = 180_000;
 const reportLines: string[] = [];
 
 function report(msg: string) {

@@ -22,6 +22,8 @@ export {
   type MistakeEvidence,
   type MatchBuyQuality,
   type TournamentManAdvantageStat,
+  type TournamentTeamEconomySummary,
+  type TournamentTeamManAdvantageStat,
   type TournamentInsights
 } from "./insights.js";
 export { displayWeaponName } from "./weapons.js";

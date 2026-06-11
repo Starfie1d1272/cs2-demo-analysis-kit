@@ -36,7 +36,7 @@ export interface IdentityOptions {
  */
 
 /** 聚合算法/口径变化时 +1，旧缓存自动失效重算。 */
-const CACHE_VERSION = 4;
+const CACHE_VERSION = 6;
 
 export interface SeasonSummary {
   bundle: SeasonCohortBundle;

@@ -57,7 +57,8 @@ The v2 ZIP is the only coupling point between Python and TypeScript — neither 
 ```bash
 pnpm install
 pnpm dev:studio        # DAK Studio (port 5178, .dem import via local uv env)
-pnpm test              # vitest
+pnpm test              # fast vitest suite (excludes 55-ZIP fixture validation)
+pnpm test:fixtures     # real ZIP season validation
 pnpm python:test       # pytest
 pnpm analyze:sample    # CLI analysis of the sample ZIP → fixtures/output/sample/
 bash scripts/package.sh  # package the desktop app (DMG / exe)

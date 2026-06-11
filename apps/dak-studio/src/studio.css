@@ -818,6 +818,158 @@ body {
   text-align: right;
 }
 
+/* ── 经济与节奏 ─────────────────────────────────────────── */
+
+.stu-econ-dashboard {
+  display: grid;
+  gap: 12px;
+}
+
+.stu-econ-hero {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stu-econ-metric {
+  min-width: 0;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-bg-subtle);
+}
+
+.stu-econ-metric {
+  padding: 12px 14px;
+}
+
+.stu-econ-metric span,
+.stu-econ-callout span {
+  display: block;
+  color: var(--dak-fg-dim);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stu-econ-metric b {
+  display: block;
+  margin-top: 4px;
+  font-size: 24px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.stu-econ-metric small,
+.stu-econ-callout small {
+  display: block;
+  margin-top: 5px;
+  color: var(--dak-fg-dim);
+  font-size: 11px;
+}
+
+.stu-econ-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.stu-econ-card {
+  min-width: 0;
+}
+
+.stu-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.stu-econ-detail-table {
+  min-width: 1040px;
+}
+
+.stu-econ-detail-table thead tr:first-child th {
+  border-top: 1px solid var(--dak-border);
+  border-bottom: 1px solid var(--dak-border);
+  background: rgba(24, 30, 34, 0.72);
+  color: var(--dak-fg-mid);
+  font-size: 10px;
+  text-align: center;
+}
+
+.stu-econ-detail-table thead tr:nth-child(2) th {
+  background: rgba(12, 16, 18, 0.84);
+}
+
+.stu-econ-detail-table th:first-child,
+.stu-econ-detail-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  max-width: 180px;
+  background: var(--dak-panel);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stu-econ-detail-table thead th:first-child {
+  z-index: 2;
+}
+
+.stu-econ-state-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.stu-econ-state {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stu-econ-state > div,
+.stu-econ-callout {
+  padding: 10px 12px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius-sm);
+  background: rgba(11, 14, 16, 0.56);
+}
+
+.stu-econ-state b,
+.stu-econ-callout b {
+  display: block;
+  margin-top: 4px;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stu-econ-callouts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stu-heat-high {
+  border-color: rgba(79, 217, 138, 0.36);
+  background: linear-gradient(180deg, rgba(79, 217, 138, 0.24), rgba(79, 217, 138, 0.08));
+}
+
+.stu-heat-mid {
+  border-color: rgba(243, 198, 79, 0.34);
+  background: linear-gradient(180deg, rgba(243, 198, 79, 0.2), rgba(243, 198, 79, 0.07));
+}
+
+.stu-heat-low {
+  border-color: rgba(255, 95, 110, 0.32);
+  background: linear-gradient(180deg, rgba(255, 95, 110, 0.17), rgba(255, 95, 110, 0.06));
+}
+
+.stu-heat-neutral {
+  border-color: var(--dak-border);
+  background: rgba(14, 18, 20, 0.78);
+}
+
 .stu-trend {
   display: flex;
   align-items: flex-end;
