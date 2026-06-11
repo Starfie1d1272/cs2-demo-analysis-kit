@@ -1159,13 +1159,16 @@ function GrenadeEffectLayer({ round, currentTick, tickrate, map, level = null, l
         if (currentTick < row.effectTick || currentTick > endTick) return null;
         if (level && levelOf && levelOf(row.effectZ ?? 0) !== level) return null;
         const sizePercent = replayRadiusPercent(spec.radiusUnits, map) * 2;
+        const countdown = spec.kind === "smoke" ? Math.max(0, Math.ceil((endTick - currentTick) / tickrate)) : null;
         return (
           <span
             key={`fx-${index}`}
             className={`dak-replay-fx dak-replay-fx-${spec.kind}`}
             style={{ ...replayFramePosition({ x: row.effectX, y: row.effectY }, map), width: `${sizePercent}%`, height: `${sizePercent}%` }}
             aria-hidden="true"
-          />
+          >
+            {countdown != null && <span className="dak-replay-fx-countdown">{countdown}</span>}
+          </span>
         );
       })}
       <svg className="dak-replay-trajectories" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">

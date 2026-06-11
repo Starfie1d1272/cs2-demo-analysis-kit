@@ -7,7 +7,7 @@ import {
   type PlayerSeasonInsights,
   type SeasonInsightsDemo
 } from "@cs2dak/presentation";
-import { getSeasonData } from "../lib/season";
+import { getSeasonDemos, getSeasonSummary } from "../lib/season";
 import { matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
@@ -58,15 +58,22 @@ export function PlayersView({
     let cancelled = false;
     setProfiles(null);
     setError(null);
-    getSeasonData(entries)
-      .then((data) => {
+    getSeasonSummary(entries)
+      .then((summary) => {
         if (!cancelled) {
-          setProfiles([...data.profiles].sort((a, b) => b.rating.rivalhubRR - a.rating.rivalhubRR));
-          setDemos(data.demos);
+          setProfiles([...summary.profiles].sort((a, b) => b.rating.rivalhubRR - a.rating.rivalhubRR));
         }
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      });
+    // 逐场洞察需要原始包；单独懒加载，不阻塞档案首屏
+    getSeasonDemos(entries)
+      .then((result) => {
+        if (!cancelled) setDemos(result);
+      })
+      .catch(() => {
+        /* 洞察缺失时档案仍可用 */
       });
     return () => {
       cancelled = true;

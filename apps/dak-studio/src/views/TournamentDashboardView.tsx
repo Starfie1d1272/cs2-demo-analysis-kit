@@ -1,10 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  buildTournamentInsights,
-  type SeasonInsightsDemo,
-  type TournamentInsights
-} from "@cs2dak/presentation";
-import { getSeasonData } from "../lib/season";
+import { useEffect, useState } from "react";
+import { type TournamentInsights } from "@cs2dak/presentation";
+import { getSeasonSummary } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 
@@ -24,20 +20,20 @@ export function TournamentDashboardView({
   onScopeChange,
   onGoLibrary
 }: TournamentDashboardViewProps) {
-  const [demos, setDemos] = useState<SeasonInsightsDemo[] | null>(null);
+  const [insights, setInsights] = useState<TournamentInsights | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (entries.length === 0) {
-      setDemos(null);
+      setInsights(null);
       return;
     }
     let cancelled = false;
-    setDemos(null);
+    setInsights(null);
     setError(null);
-    getSeasonData(entries)
-      .then((data) => {
-        if (!cancelled) setDemos(data.demos);
+    getSeasonSummary(entries)
+      .then((summary) => {
+        if (!cancelled) setInsights(summary.insights);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
@@ -46,11 +42,6 @@ export function TournamentDashboardView({
       cancelled = true;
     };
   }, [entries]);
-
-  const insights = useMemo<TournamentInsights | null>(
-    () => (demos && demos.length > 0 ? buildTournamentInsights(demos) : null),
-    [demos]
-  );
 
   if (allEntries.length === 0) {
     return (

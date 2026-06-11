@@ -691,6 +691,36 @@ def _build_grenades(raw: dict, team_map: dict, round_model: _RoundModel) -> list
             "throwPosition": throw_pos,
             "effectPosition": _pos(r),
         })
+
+    # 火的 effectTick 来自 inferno_startburn（起火），燃烧结束时间由
+    # inferno_expire 配对得到：同回合内 effectTick 之后最近的、位置最近的
+    # expire，每个 expire 只用一次。配不上则保持 None（前端按保底时长画）。
+    expires: list[dict] = []
+    for r in raw.get("inferno_expires", []):
+        n = round_model.round_for_event(r)
+        t = int(r.get("tick") or 0)
+        if n is None or t <= 0:
+            continue
+        expires.append({"rn": n, "tick": t, "pos": _pos(r), "used": False})
+    expires.sort(key=lambda e: e["tick"])
+    for g in out:
+        if g["grenade"] != "molotov" or g["destroyTick"] is not None:
+            continue
+        window = round_model.window_for_round(g["roundNumber"])
+        best = None
+        best_d2 = None
+        for e in expires:
+            if e["used"] or e["rn"] != g["roundNumber"] or e["tick"] < g["effectTick"]:
+                continue
+            if window is not None and e["tick"] > window.end_tick:
+                continue
+            ep, gp = e["pos"], g["effectPosition"]
+            d2 = (ep["x"] - gp["x"]) ** 2 + (ep["y"] - gp["y"]) ** 2
+            if best is None or d2 < best_d2:
+                best, best_d2 = e, d2
+        if best is not None:
+            best["used"] = True
+            g["destroyTick"] = best["tick"]
     return out
 
 

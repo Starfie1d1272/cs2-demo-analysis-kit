@@ -206,6 +206,8 @@ body {
 
 .stu-header-actions {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -783,6 +785,13 @@ body {
 .stu-mini-table td {
   padding: 5px 6px;
   border-top: 1px solid var(--dak-border);
+}
+
+/* 数字列：表头与单元格同向右对齐（.stu-mini-table th 特异性更高，会把
+   .stu-num 的右对齐盖回左对齐，导致表头和数字错位）。 */
+.stu-mini-table th.stu-num,
+.stu-mini-table td.stu-num {
+  text-align: right;
 }
 
 .stu-trend {
@@ -1410,7 +1419,8 @@ body {
 
 .stu-import-tags {
   flex: 0 1 240px;
-  font-size: 12px;
+  /* 与相邻按钮同字号同高，避免导入工具条控件高低不齐 */
+  font-size: 13px;
 }
 
 .stu-tag-label {

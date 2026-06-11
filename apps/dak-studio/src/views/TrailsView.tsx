@@ -78,11 +78,29 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
   const [hiddenRounds, setHiddenRounds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
-  // 范围：按 matchId（日期前缀）降序取最近 N 场
+  // 地图先行：直接读 entry 元数据，选了地图才知道"该图最近 N 场"是哪些
+  const mapOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const entry of entries) {
+      counts.set(entry.meta.mapName, (counts.get(entry.meta.mapName) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [entries]);
+
+  useEffect(() => {
+    setMapName((current) =>
+      current && mapOptions.some(([map]) => map === current) ? current : (mapOptions[0]?.[0] ?? null)
+    );
+  }, [mapOptions]);
+
+  // 范围：所选地图内按 matchId（日期前缀）降序取最近 N 场
   const rangeEntries = useMemo(() => {
-    const sorted = [...entries].sort((a, b) => matchIdForEntry(b).localeCompare(matchIdForEntry(a)));
+    if (!mapName) return [];
+    const sorted = entries
+      .filter((entry) => entry.meta.mapName === mapName)
+      .sort((a, b) => matchIdForEntry(b).localeCompare(matchIdForEntry(a)));
     return rangeN > 0 ? sorted.slice(0, rangeN) : sorted;
-  }, [entries, rangeN]);
+  }, [entries, mapName, rangeN]);
 
   // 加载范围内的 DemoPackage，统计候选选手
   useEffect(() => {
@@ -141,14 +159,6 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
       .then((result) => {
         if (cancelled) return;
         setModels(result);
-        const roundsByMap = new Map<string, number>();
-        for (const model of result) {
-          for (const round of model.rounds) {
-            roundsByMap.set(model.mapName, (roundsByMap.get(model.mapName) ?? 0) + 1);
-          }
-        }
-        const best = [...roundsByMap.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
-        setMapName((current) => (current && roundsByMap.has(current) ? current : best));
         setHiddenRounds(new Set());
       })
       .catch((err) => {
@@ -158,17 +168,6 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
       cancelled = true;
     };
   }, [rangeEntries, steamId64]);
-
-  const mapOptions = useMemo(() => {
-    if (!models) return [];
-    const counts = new Map<string, number>();
-    for (const model of models) {
-      for (const _round of model.rounds) {
-        counts.set(model.mapName, (counts.get(model.mapName) ?? 0) + 1);
-      }
-    }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
-  }, [models]);
 
   const visibleRounds = useMemo(() => {
     if (!models || !mapName) return [];
@@ -229,7 +228,9 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
           <select className="stu-select" value={rangeN} onChange={(e) => setRangeN(Number(e.target.value))}>
             {RANGE_OPTIONS.map((n) => (
               <option key={n} value={n}>
-                {n === 0 ? `全部（${entries.length} 场）` : `最近 ${n} 场`}
+                {n === 0
+                  ? `全部（${mapName ? (mapOptions.find(([map]) => map === mapName)?.[1] ?? 0) : entries.length} 场）`
+                  : `最近 ${n} 场`}
               </option>
             ))}
           </select>
@@ -239,7 +240,7 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
           <select className="stu-select" value={mapName ?? ""} onChange={(e) => setMapName(e.target.value || null)}>
             {mapOptions.map(([map, count]) => (
               <option key={map} value={map}>
-                {map}（{count} 回合）
+                {map}（{count} 场）
               </option>
             ))}
           </select>

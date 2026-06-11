@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { SeasonLeaderboardModel } from "@cs2dak/contract";
 import { SeasonLeaderboard } from "@cs2dak/react";
-import { getSeasonData } from "../lib/season";
+import { getSeasonSummary } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 
@@ -26,9 +26,9 @@ export function LeaderboardView({ allEntries, entries, scope, onScopeChange, onP
     let cancelled = false;
     setModel(null);
     setError(null);
-    getSeasonData(entries)
-      .then((data) => {
-        if (!cancelled) setModel(data.leaderboard);
+    getSeasonSummary(entries)
+      .then((summary) => {
+        if (!cancelled) setModel(summary.leaderboard);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));

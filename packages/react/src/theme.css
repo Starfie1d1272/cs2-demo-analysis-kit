@@ -1879,6 +1879,19 @@
   animation: dak-fx-burst 0.7s ease-out forwards;
 }
 
+.dak-replay-fx-countdown {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: rgba(28, 34, 40, 0.85);
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.7);
+}
+
 .dak-replay-fx-decoy {
   background: radial-gradient(circle, rgba(111, 125, 138, 0.6) 0%, transparent 100%);
 }

@@ -98,8 +98,11 @@ export function App() {
       }
     }
 
-    for (const file of zips) {
+    for (const [index, file] of zips.entries()) {
       try {
+        if (zips.length > 1) setNotice(`正在入库 ${file.name}…（${index + 1}/${zips.length}）`);
+        // 解析在主线程，逐场让出一帧，避免批量导入时 UI 完全冻结
+        await new Promise((resolve) => setTimeout(resolve, 0));
         const result = await importDemoFile(file, tags);
         if (result.duplicate) duplicates += 1;
         else imported += 1;

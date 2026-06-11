@@ -22,11 +22,14 @@ log = logging.getLogger(__name__)
 ProgressFn = Callable[[str, float], None]
 
 
+# 火用 inferno_startburn（起火）作为 effect 事件；inferno_expire（熄灭）单独
+# 解析，由 exporter 配对成 destroyTick。用 expire 当 effect 会让回放里的火
+# 晚出现一整个燃烧时长（~7s）。
 _GRENADE_EVENTS = [
     ("smokegrenade_detonate", "smoke"),
     ("flashbang_detonate", "flashbang"),
     ("hegrenade_detonate", "hegrenade"),
-    ("inferno_expire", "molotov"),
+    ("inferno_startburn", "molotov"),
     ("decoy_detonate", "decoy"),
 ]
 
@@ -297,13 +300,14 @@ def parse_demo(dem_path: str, progress: ProgressFn | None = None) -> dict[str, A
     _p("解析道具引爆", 0.52)
     # ── grenades ─────────────────────────────────────────────────
     # One scan for all detonation types; tag each row with its v2 grenade type.
-    g_nade = _safe_events(p, [name for name, _ in _GRENADE_EVENTS],
+    g_nade = _safe_events(p, [name for name, _ in _GRENADE_EVENTS] + ["inferno_expire"],
                           other=["total_rounds_played"], player=_GRENADE_PLAYER_FIELDS)
     grenade_detonations: list[dict] = []
     for ev_name, gtype in _GRENADE_EVENTS:
         grenade_detonations.extend(
             {**r, "_grenade_type": gtype} for r in g_nade[ev_name]
         )
+    inferno_expires = g_nade["inferno_expire"]
 
     # ── player info at match start ───────────────────────────────
     if announce_rows:
@@ -414,6 +418,7 @@ def parse_demo(dem_path: str, progress: ProgressFn | None = None) -> dict[str, A
         "bomb_dropped": bomb_dropped,
         "bomb_pickup": bomb_pickup,
         "grenade_detonations": grenade_detonations,
+        "inferno_expires": inferno_expires,
         "grenade_throws": grenade_throws,
         "grenade_trajectories": grenade_trajectories,
         "positions_raw": positions_raw,
