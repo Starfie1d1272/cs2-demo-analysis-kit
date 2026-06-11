@@ -5,6 +5,7 @@ import { loadDemoPackageFromZip } from "@cs2dak/core";
 import {
   buildMatchBuyQuality,
   buildMatchReportMarkdown,
+  buildPlayerFlashSummaries,
   buildPlayerSeasonInsights,
   buildTournamentInsights
 } from "./insights";
@@ -69,6 +70,33 @@ describe("buildPlayerSeasonInsights", () => {
   });
 });
 
+describe("buildPlayerFlashSummaries", () => {
+  it("matches the existing per-player flash value derivation", async () => {
+    const pkg = await loadFixture();
+    const players = pkg.players.slice(0, 4).map((player) => ({
+      playerKey: `steam:${player.steamId64}`,
+      name: player.name,
+      steamIds: [player.steamId64]
+    }));
+    const demos = [{ matchId: "m1", pkg }];
+    const summaries = buildPlayerFlashSummaries(demos, players);
+
+    for (const player of players) {
+      const expected = buildPlayerSeasonInsights(demos, player.steamIds).flash;
+      const actual = summaries.find((row) => row.playerKey === player.playerKey);
+      expect(actual).toBeDefined();
+      expect(actual?.flashesThrown).toBe(expected.flashesThrown);
+      expect(actual?.enemyBlindSeconds).toBe(expected.enemyBlindSeconds);
+      expect(actual?.teamBlindSeconds).toBe(expected.teamBlindSeconds);
+      expect(actual?.enemyBlindVictims).toBe(expected.enemyBlindVictims);
+      expect(actual?.enemySecondsPerFlash).toBe(expected.enemySecondsPerFlash);
+      expect(actual?.netSecondsPerFlash).toBe(expected.netSecondsPerFlash);
+      expect(actual?.flashAssists).toBe(expected.flashAssists);
+      expect(actual?.worstTeamFlashes).toEqual(expected.worstTeamFlashes);
+    }
+  });
+});
+
 describe("buildMatchBuyQuality", () => {
   it("win counts never exceed round counts and pistol rounds exist", async () => {
     const pkg = await loadFixture();
@@ -113,7 +141,74 @@ describe("buildTournamentInsights", () => {
       expect(row.breakWins).toBeLessThanOrEqual(row.breakRounds);
     }
   });
+
+  it("tracks first 5v4 and 5v3 round-state conversion opportunities", async () => {
+    const pkg = await loadFixture();
+    const insights = buildTournamentInsights([{ matchId: "m1", pkg }]);
+    const expected = expectedManAdvantageRows(pkg);
+
+    for (const row of expected) {
+      const actual = insights.manAdvantageConversions.find(
+        (candidate) => candidate.advantageAlive === row.advantageAlive && candidate.disadvantageAlive === row.disadvantageAlive
+      );
+      expect(actual).toBeDefined();
+      expect(actual?.opportunities).toBe(row.opportunities);
+      expect(actual?.advantageWins).toBe(row.advantageWins);
+      expect(actual?.disadvantageWins).toBe(row.disadvantageWins);
+      expect(actual?.advantageConversionPercent).toBe(
+        row.opportunities > 0 ? Math.round((row.advantageWins / row.opportunities) * 1000) / 10 : null
+      );
+      expect(actual?.disadvantageConversionPercent).toBe(
+        row.opportunities > 0 ? Math.round((row.disadvantageWins / row.opportunities) * 1000) / 10 : null
+      );
+    }
+  });
 });
+
+function expectedManAdvantageRows(pkg: Awaited<ReturnType<typeof loadFixture>>) {
+  const targetPairs = new Map(["5:4", "5:3"].map((key) => [key, {
+    advantageAlive: Number(key[0]),
+    disadvantageAlive: Number(key[2]),
+    opportunities: 0,
+    advantageWins: 0,
+    disadvantageWins: 0
+  }]));
+  const playersByTeam = {
+    teamA: new Set(pkg.players.filter((player) => player.teamKey === "teamA").map((player) => player.steamId64)),
+    teamB: new Set(pkg.players.filter((player) => player.teamKey === "teamB").map((player) => player.steamId64))
+  };
+  const killsByRound = new Map<number, typeof pkg.kills>();
+  for (const kill of pkg.kills) {
+    const rows = killsByRound.get(kill.roundNumber) ?? [];
+    rows.push(kill);
+    killsByRound.set(kill.roundNumber, rows);
+  }
+
+  for (const round of pkg.rounds) {
+    const alive = {
+      teamA: new Set(playersByTeam.teamA),
+      teamB: new Set(playersByTeam.teamB)
+    };
+    const seen = new Set<string>();
+    const kills = [...(killsByRound.get(round.roundNumber) ?? [])].sort((a, b) => a.tick - b.tick);
+    for (const kill of kills) {
+      alive[kill.victimTeamKey].delete(kill.victimSteamId64);
+      const a = alive.teamA.size;
+      const b = alive.teamB.size;
+      const high = Math.max(a, b);
+      const low = Math.min(a, b);
+      const key = `${high}:${low}`;
+      const row = targetPairs.get(key);
+      if (!row || seen.has(key) || a === b) continue;
+      seen.add(key);
+      row.opportunities += 1;
+      const advantageTeam = a > b ? "teamA" : "teamB";
+      if (round.winnerTeamKey === advantageTeam) row.advantageWins += 1;
+      else row.disadvantageWins += 1;
+    }
+  }
+  return [...targetPairs.values()];
+}
 
 describe("buildMatchReportMarkdown", () => {
   it("renders a markdown report with scoreboard and rounds", async () => {

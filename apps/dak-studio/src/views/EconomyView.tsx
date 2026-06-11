@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { formatPercent, type TournamentInsights } from "@cs2dak/presentation";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
-import { getSeasonSummary, type IdentityOptions } from "../lib/season";
+import { getTournamentInsights, type IdentityOptions } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";
 
 export interface EconomyViewProps {
@@ -25,9 +25,9 @@ export function EconomyView({ allEntries, entries, scope, onScopeChange, onGoLib
     let cancelled = false;
     setInsights(null);
     setError(null);
-    getSeasonSummary(entries, identityOptions)
-      .then((summary) => {
-        if (!cancelled) setInsights(summary.insights);
+    getTournamentInsights(entries, identityOptions)
+      .then((result) => {
+        if (!cancelled) setInsights(result);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
@@ -74,6 +74,22 @@ export function EconomyView({ allEntries, entries, scope, onScopeChange, onGoLib
                     <td>{row.highEconomy}</td>
                     <td className="stu-num">{row.rounds}</td>
                     <td className="stu-num">{formatPercent(row.lowWinRatePercent)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="stu-card">
+            <h3>人数优势转换</h3>
+            <table className="stu-mini-table">
+              <thead><tr><th>状态</th><th className="stu-num">样本</th><th className="stu-num">优势方转化</th><th className="stu-num">劣势方翻盘</th></tr></thead>
+              <tbody>
+                {insights.manAdvantageConversions.map((row) => (
+                  <tr key={row.advantageLabel} className={row.opportunities < 5 ? "stu-row-muted" : undefined}>
+                    <td>{row.advantageLabel} / {row.disadvantageLabel}</td>
+                    <td className="stu-num">{row.opportunities}</td>
+                    <td className="stu-num">{formatPercent(row.advantageConversionPercent)} ({row.advantageWins}/{row.opportunities})</td>
+                    <td className="stu-num">{formatPercent(row.disadvantageConversionPercent)} ({row.disadvantageWins}/{row.opportunities})</td>
                   </tr>
                 ))}
               </tbody>

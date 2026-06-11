@@ -8,17 +8,20 @@ export { SEASON_STAT_VIEWS, formatPercent } from "./season-metrics.js";
 export {
   buildPlayerSeasonInsights,
   buildPlayerWeaponStats,
+  buildPlayerFlashSummaries,
   buildMatchBuyQuality,
   buildTournamentInsights,
   buildMatchReportMarkdown,
   type SeasonInsightsDemo,
   type PlayerSeasonInsights,
   type PlayerWeaponStat,
+  type PlayerFlashSummary,
   type PlayerTrendPoint,
   type FlashValueSummary,
   type MistakeReview,
   type MistakeEvidence,
   type MatchBuyQuality,
+  type TournamentManAdvantageStat,
   type TournamentInsights
 } from "./insights.js";
 export { displayWeaponName } from "./weapons.js";

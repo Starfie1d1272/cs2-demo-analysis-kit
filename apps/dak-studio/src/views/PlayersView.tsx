@@ -3,13 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { PlayerSeasonProfile } from "@cs2dak/contract";
 import {
   SEASON_STAT_VIEWS,
-  buildPlayerSeasonInsights,
-  buildPlayerWeaponStats,
   type PlayerSeasonInsights,
-  type PlayerWeaponStat,
-  type SeasonInsightsDemo
+  type PlayerWeaponStat
 } from "@cs2dak/presentation";
-import { getSeasonDemos, getSeasonSummary, type IdentityOptions } from "../lib/season";
+import { getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { formatMatchLabel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
@@ -49,8 +46,10 @@ export function PlayersView({
   identityOptions
 }: PlayersViewProps) {
   const [profiles, setProfiles] = useState<PlayerSeasonProfile[] | null>(null);
-  const [demos, setDemos] = useState<SeasonInsightsDemo[]>([]);
+  const [insights, setInsights] = useState<PlayerSeasonInsights | null>(null);
+  const [weaponStats, setWeaponStats] = useState<PlayerWeaponStat[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
   const [pinned, setPinned] = useState<PinnedPlayer | null>(() => getPinnedPlayer());
   const [compareKey, setCompareKey] = useState<string | null>(null);
 
@@ -70,14 +69,6 @@ export function PlayersView({
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
-      });
-    // 逐场洞察需要原始包；单独懒加载，不阻塞档案首屏
-    getSeasonDemos(entries)
-      .then((result) => {
-        if (!cancelled) setDemos(result);
-      })
-      .catch(() => {
-        /* 洞察缺失时档案仍可用 */
       });
     return () => {
       cancelled = true;
@@ -108,15 +99,30 @@ export function PlayersView({
     [entries]
   );
 
-  // v0.3 洞察：趋势 / Flash Value / Mistake Review（与档案同源的 demos 派生）
-  const insights = useMemo<PlayerSeasonInsights | null>(
-    () => (selected && demos.length > 0 ? buildPlayerSeasonInsights(demos, selected.steamIds) : null),
-    [demos, selected]
-  );
-  const weaponStats = useMemo<PlayerWeaponStat[]>(
-    () => (selected && demos.length > 0 ? buildPlayerWeaponStats(demos, selected.steamIds).slice(0, 8) : []),
-    [demos, selected]
-  );
+  useEffect(() => {
+    if (!selected || entries.length === 0) {
+      setInsights(null);
+      setWeaponStats([]);
+      setDetailsError(null);
+      return;
+    }
+    let cancelled = false;
+    setInsights(null);
+    setWeaponStats([]);
+    setDetailsError(null);
+    getPlayerSeasonDetails(entries, selected.steamIds)
+      .then((details) => {
+        if (cancelled) return;
+        setInsights(details.insights);
+        setWeaponStats(details.weaponStats.slice(0, 8));
+      })
+      .catch((err) => {
+        if (!cancelled) setDetailsError(err instanceof Error ? err.message : String(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [entries, selected?.playerKey]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   if (allEntries.length === 0) {
     return (
@@ -357,6 +363,13 @@ export function PlayersView({
               <div className="stu-card">
                 <h3>Playstyle Fingerprint</h3>
                 <FingerprintRadar axes={selected.style.axes} />
+              </div>
+            )}
+
+            {detailsError && (
+              <div className="stu-card">
+                <h3>逐场洞察</h3>
+                <p className="stu-dim">加载失败：{detailsError}</p>
               </div>
             )}
 

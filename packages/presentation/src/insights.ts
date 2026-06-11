@@ -1,4 +1,4 @@
-import type { DemoPackage, MatchWorkspaceModel } from "@cs2dak/contract";
+import type { DemoPackage, MatchWorkspaceModel, TeamKey } from "@cs2dak/contract";
 import { round } from "./season-metrics.js";
 import { displayWeaponName } from "./weapons.js";
 
@@ -97,6 +97,25 @@ export interface PlayerWeaponStat {
   kills: number;
   headshotPercent: number | null;
   killsPerMatch: number;
+}
+
+export interface PlayerFlashSummaryInput {
+  playerKey: string;
+  name: string;
+  steamIds: string[];
+}
+
+export interface PlayerFlashSummary {
+  playerKey: string;
+  name: string;
+  flashesThrown: number;
+  enemyBlindSeconds: number;
+  teamBlindSeconds: number;
+  enemyBlindVictims: number;
+  enemySecondsPerFlash: number | null;
+  netSecondsPerFlash: number | null;
+  flashAssists: number;
+  worstTeamFlashes: TeamFlashIncident[];
 }
 
 const DEATH_EARLY_SECONDS = 20;
@@ -310,6 +329,111 @@ export function buildPlayerWeaponStats(
     .sort((a, b) => b.kills - a.kills || a.label.localeCompare(b.label));
 }
 
+export function buildPlayerFlashSummaries(
+  demos: SeasonInsightsDemo[],
+  players: PlayerFlashSummaryInput[]
+): PlayerFlashSummary[] {
+  const bySteamId = new Map<string, PlayerFlashSummaryInput>();
+  const rows = new Map<string, {
+    playerKey: string;
+    name: string;
+    flashesThrown: number;
+    enemyBlindSeconds: number;
+    teamBlindSeconds: number;
+    enemyBlindVictims: number;
+    flashAssists: number;
+    teamFlashes: TeamFlashIncident[];
+  }>();
+
+  for (const player of players) {
+    rows.set(player.playerKey, {
+      playerKey: player.playerKey,
+      name: player.name,
+      flashesThrown: 0,
+      enemyBlindSeconds: 0,
+      teamBlindSeconds: 0,
+      enemyBlindVictims: 0,
+      flashAssists: 0,
+      teamFlashes: []
+    });
+    for (const steamId of player.steamIds) bySteamId.set(steamId, player);
+  }
+
+  for (const { matchId, pkg } of demos) {
+    for (const stat of pkg.playerStats) {
+      const player = bySteamId.get(stat.steamId64);
+      if (!player) continue;
+      const row = rows.get(player.playerKey)!;
+      row.enemyBlindSeconds += stat.enemyFlashDurationSeconds;
+      row.teamBlindSeconds += stat.teamFlashDurationSeconds;
+      row.flashAssists += stat.flashAssistCount;
+    }
+
+    for (const grenade of pkg.grenades) {
+      if (grenade.grenade !== "flashbang" || grenade.throwerSteamId64 == null) continue;
+      const player = bySteamId.get(grenade.throwerSteamId64);
+      if (player) rows.get(player.playerKey)!.flashesThrown += 1;
+    }
+
+    const grouped = new Map<string, {
+      playerKey: string;
+      roundNumber: number;
+      tick: number;
+      victims: Set<string>;
+      seconds: number;
+    }>();
+    for (const blind of pkg.blinds) {
+      const player = bySteamId.get(blind.flasherSteamId64);
+      if (!player) continue;
+      const row = rows.get(player.playerKey)!;
+      if (blind.flasherTeamKey !== blind.flashedTeamKey) {
+        row.enemyBlindVictims += 1;
+        continue;
+      }
+      if (blind.flasherSteamId64 === blind.flashedSteamId64) continue;
+      const key = `${player.playerKey}:${blind.flashId ?? `${blind.roundNumber}-${Math.round(blind.tick / 16)}`}`;
+      const cell = grouped.get(key) ?? {
+        playerKey: player.playerKey,
+        roundNumber: blind.roundNumber,
+        tick: blind.tick,
+        victims: new Set<string>(),
+        seconds: 0
+      };
+      cell.tick = Math.min(cell.tick, blind.tick);
+      cell.victims.add(blind.flashedSteamId64);
+      cell.seconds += blind.durationSeconds;
+      grouped.set(key, cell);
+    }
+    for (const cell of grouped.values()) {
+      rows.get(cell.playerKey)!.teamFlashes.push({
+        matchId,
+        roundNumber: cell.roundNumber,
+        tick: cell.tick,
+        victimCount: cell.victims.size,
+        totalSeconds: round(cell.seconds, 2)
+      });
+    }
+  }
+
+  return [...rows.values()].map((row) => {
+    row.teamFlashes.sort((a, b) => b.totalSeconds - a.totalSeconds);
+    return {
+      playerKey: row.playerKey,
+      name: row.name,
+      flashesThrown: row.flashesThrown,
+      enemyBlindSeconds: round(row.enemyBlindSeconds, 1),
+      teamBlindSeconds: round(row.teamBlindSeconds, 1),
+      enemyBlindVictims: row.enemyBlindVictims,
+      enemySecondsPerFlash: row.flashesThrown > 0 ? round(row.enemyBlindSeconds / row.flashesThrown, 2) : null,
+      netSecondsPerFlash: row.flashesThrown > 0
+        ? round((row.enemyBlindSeconds - row.teamBlindSeconds) / row.flashesThrown, 2)
+        : null,
+      flashAssists: row.flashAssists,
+      worstTeamFlashes: row.teamFlashes.slice(0, MAX_EVIDENCE)
+    };
+  });
+}
+
 // ── Buy Quality（单场，比赛工作台经济页用）──────────────────────────────────
 
 export interface BuyQualityRow {
@@ -423,6 +547,18 @@ export interface TournamentEcoUpsetStat {
   winRatePercent: number | null;
 }
 
+export interface TournamentManAdvantageStat {
+  advantageAlive: number;
+  disadvantageAlive: number;
+  advantageLabel: string;
+  disadvantageLabel: string;
+  opportunities: number;
+  advantageWins: number;
+  advantageConversionPercent: number | null;
+  disadvantageWins: number;
+  disadvantageConversionPercent: number | null;
+}
+
 export interface TournamentInsights {
   matchCount: number;
   roundCount: number;
@@ -431,6 +567,7 @@ export interface TournamentInsights {
   teamPistols: TournamentTeamPistolStat[];
   economyMatrix: TournamentEconomyMatrixCell[];
   ecoUpsets: TournamentEcoUpsetStat[];
+  manAdvantageConversions: TournamentManAdvantageStat[];
   /** 全部回合的 T / CT 胜率（0-100）。 */
   tWinRatePercent: number;
   ctWinRatePercent: number;
@@ -450,6 +587,13 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
   const ECON_RANK: Record<string, number> = { eco: 0, semi: 1, force: 2, full: 3 };
   const economyMatrix = new Map<string, { lowEconomy: string; highEconomy: string; rounds: number; lowWins: number; symmetric: boolean }>();
   const ecoUpsets = new Map<string, { teamName: string; opportunities: number; wins: number }>();
+  const manAdvantage = new Map<string, {
+    advantageAlive: number;
+    disadvantageAlive: number;
+    opportunities: number;
+    advantageWins: number;
+    disadvantageWins: number;
+  }>();
 
   const teamNameFor = (pkg: DemoPackage, teamKey: "teamA" | "teamB") =>
     teamKey === "teamA" ? (pkg.match.teamA.name ?? "Team A") : (pkg.match.teamB.name ?? "Team B");
@@ -485,7 +629,12 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
     cell.matches += 1;
     const ordered = [...pkg.rounds].sort((a, b) => a.roundNumber - b.roundNumber);
     const playerNameBySteam = new Map(pkg.players.map((player) => [player.steamId64, player.name ?? player.steamId64]));
+    const killsByRound = new Map<number, typeof pkg.kills>();
     for (const kill of pkg.kills) {
+      const roundKills = killsByRound.get(kill.roundNumber) ?? [];
+      roundKills.push(kill);
+      killsByRound.set(kill.roundNumber, roundKills);
+
       const weapon = kill.weapon || "unknown";
       const weaponCell = weaponRows.get(weapon) ?? { weapon, kills: 0, headshots: 0, players: new Map() };
       weaponCell.kills += 1;
@@ -498,6 +647,10 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
       }
       weaponRows.set(weapon, weaponCell);
     }
+    const playersByTeam = {
+      teamA: new Set(pkg.players.filter((player) => player.teamKey === "teamA").map((player) => player.steamId64)),
+      teamB: new Set(pkg.players.filter((player) => player.teamKey === "teamB").map((player) => player.steamId64))
+    };
     for (let i = 0; i < ordered.length; i += 1) {
       const row = ordered[i]!;
       totalRounds += 1;
@@ -568,6 +721,13 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
         c.opportunities += 1;
         if (row.winnerTeamKey === "teamB") c.wins += 1;
       }
+
+      collectManAdvantageRound(
+        manAdvantage,
+        playersByTeam,
+        killsByRound.get(row.roundNumber) ?? [],
+        row.winnerTeamKey
+      );
     }
     byMap.set(mapName, cell);
   }
@@ -623,12 +783,67 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
         winRatePercent: row.opportunities > 0 ? round((row.wins / row.opportunities) * 100, 1) : null
       }))
       .sort((a, b) => b.wins - a.wins || b.opportunities - a.opportunities),
+    manAdvantageConversions: [...manAdvantage.values()]
+      .map((row) => ({
+        ...row,
+        advantageLabel: `${row.advantageAlive}v${row.disadvantageAlive}`,
+        disadvantageLabel: `${row.disadvantageAlive}v${row.advantageAlive}`,
+        advantageConversionPercent: row.opportunities > 0 ? round((row.advantageWins / row.opportunities) * 100, 1) : null,
+        disadvantageConversionPercent: row.opportunities > 0 ? round((row.disadvantageWins / row.opportunities) * 100, 1) : null
+      }))
+      .sort((a, b) => b.advantageAlive - a.advantageAlive || b.disadvantageAlive - a.disadvantageAlive),
     tWinRatePercent: round((tWins / Math.max(1, totalRounds)) * 100, 1),
     ctWinRatePercent: round(((totalRounds - tWins) / Math.max(1, totalRounds)) * 100, 1),
     pistolConversionPercent: pistolWonRounds > 0
       ? round((pistolConversions / pistolWonRounds) * 100, 1)
       : null
   };
+}
+
+const MAN_ADVANTAGE_TARGETS = new Set(["5:4", "5:3"]);
+
+function collectManAdvantageRound(
+  rows: Map<string, {
+    advantageAlive: number;
+    disadvantageAlive: number;
+    opportunities: number;
+    advantageWins: number;
+    disadvantageWins: number;
+  }>,
+  playersByTeam: Record<TeamKey, Set<string>>,
+  kills: DemoPackage["kills"],
+  winnerTeamKey: TeamKey
+): void {
+  const alive: Record<TeamKey, Set<string>> = {
+    teamA: new Set(playersByTeam.teamA),
+    teamB: new Set(playersByTeam.teamB)
+  };
+  const seen = new Set<string>();
+  for (const kill of [...kills].sort((a, b) => a.tick - b.tick)) {
+    alive[kill.victimTeamKey].delete(kill.victimSteamId64);
+    const teamAAlive = alive.teamA.size;
+    const teamBAlive = alive.teamB.size;
+    if (teamAAlive === teamBAlive) continue;
+
+    const advantageAlive = Math.max(teamAAlive, teamBAlive);
+    const disadvantageAlive = Math.min(teamAAlive, teamBAlive);
+    const key = `${advantageAlive}:${disadvantageAlive}`;
+    if (!MAN_ADVANTAGE_TARGETS.has(key) || seen.has(key)) continue;
+    seen.add(key);
+
+    const row = rows.get(key) ?? {
+      advantageAlive,
+      disadvantageAlive,
+      opportunities: 0,
+      advantageWins: 0,
+      disadvantageWins: 0
+    };
+    row.opportunities += 1;
+    const advantageTeam: TeamKey = teamAAlive > teamBAlive ? "teamA" : "teamB";
+    if (winnerTeamKey === advantageTeam) row.advantageWins += 1;
+    else row.disadvantageWins += 1;
+    rows.set(key, row);
+  }
 }
 
 // ── 赛事报表（Markdown）─────────────────────────────────────────────────────

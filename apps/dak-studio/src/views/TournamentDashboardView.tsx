@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { formatPercent, type TournamentInsights } from "@cs2dak/presentation";
-import { getSeasonSummary, type IdentityOptions } from "../lib/season";
+import { getTournamentInsights, type IdentityOptions } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 
@@ -33,9 +33,9 @@ export function TournamentDashboardView({
     let cancelled = false;
     setInsights(null);
     setError(null);
-    getSeasonSummary(entries, identityOptions)
-      .then((summary) => {
-        if (!cancelled) setInsights(summary.insights);
+    getTournamentInsights(entries, identityOptions)
+      .then((result) => {
+        if (!cancelled) setInsights(result);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));

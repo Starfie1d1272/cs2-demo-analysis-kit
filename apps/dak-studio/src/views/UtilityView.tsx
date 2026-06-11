@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { buildPlayerSeasonInsights } from "@cs2dak/presentation";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
-import { getSeasonDemos, getSeasonSummary, type IdentityOptions } from "../lib/season";
+import { getPlayerFlashSummaries, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { formatMatchLabel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 
 export interface UtilityViewProps {
@@ -43,25 +42,32 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
     let cancelled = false;
     setRows(null);
     setError(null);
-    Promise.all([getSeasonSummary(entries, identityOptions), getSeasonDemos(entries)])
-      .then(([summary, demos]) => {
+    getSeasonSummary(entries, identityOptions)
+      .then(async (summary) => {
         if (cancelled) return;
-        const nextRows = summary.profiles.map((profile) => {
-          const insights = buildPlayerSeasonInsights(demos, profile.steamIds);
-          return {
+        const flashes = await getPlayerFlashSummaries(
+          entries,
+          summary.profiles.map((profile) => ({
             playerKey: profile.playerKey,
             name: profile.name,
-            flashesThrown: insights.flash.flashesThrown,
-            enemyBlindSeconds: insights.flash.enemyBlindSeconds,
-            teamBlindSeconds: insights.flash.teamBlindSeconds,
-            netSecondsPerFlash: insights.flash.netSecondsPerFlash
+            steamIds: profile.steamIds
+          }))
+        );
+        if (cancelled) return;
+        const nextRows = flashes.map((flash) => {
+          return {
+            playerKey: flash.playerKey,
+            name: flash.name,
+            flashesThrown: flash.flashesThrown,
+            enemyBlindSeconds: flash.enemyBlindSeconds,
+            teamBlindSeconds: flash.teamBlindSeconds,
+            netSecondsPerFlash: flash.netSecondsPerFlash
           };
         }).sort((a, b) => (b.netSecondsPerFlash ?? -999) - (a.netSecondsPerFlash ?? -999));
-        const nextIncidents = summary.profiles.flatMap((profile) => {
-          const insights = buildPlayerSeasonInsights(demos, profile.steamIds);
-          return insights.flash.worstTeamFlashes.map((incident) => ({
+        const nextIncidents = flashes.flatMap((flash) => {
+          return flash.worstTeamFlashes.map((incident) => ({
             ...incident,
-            playerName: profile.name
+            playerName: flash.name
           }));
         }).sort((a, b) => b.totalSeconds - a.totalSeconds).slice(0, 12);
         setRows(nextRows);

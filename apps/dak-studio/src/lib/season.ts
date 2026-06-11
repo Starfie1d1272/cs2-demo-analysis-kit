@@ -1,9 +1,15 @@
 import { buildSeasonCohort, type PlayerIdentityMap } from "@cs2dak/cohort";
 import {
   buildAllPlayerSeasonProfiles,
+  buildPlayerSeasonInsights,
+  buildPlayerWeaponStats,
   buildSeasonLeaderboardModel,
   buildTournamentInsights,
+  buildPlayerFlashSummaries,
   type SeasonInsightsDemo,
+  type PlayerFlashSummary,
+  type PlayerSeasonInsights,
+  type PlayerWeaponStat,
   type TournamentInsights
 } from "@cs2dak/presentation";
 import type {
@@ -70,6 +76,12 @@ interface PersistedSummary {
   summary: SeasonSummary;
 }
 
+interface PersistedTournamentInsights {
+  key: string;
+  touchedAt: number;
+  insights: TournamentInsights | null;
+}
+
 function txRequest<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     req.onsuccess = () => resolve(req.result);
@@ -103,6 +115,38 @@ async function writePersisted(key: string, summary: SeasonSummary): Promise<void
     const db = await openCacheDb();
     const store = db.transaction(CACHE_STORE, "readwrite").objectStore(CACHE_STORE);
     await txRequest(store.put({ key, touchedAt: Date.now(), summary } satisfies PersistedSummary, key));
+    db.close();
+    void prunePersisted();
+  } catch {
+    // 写失败不影响功能
+  }
+}
+
+async function readPersistedTournamentInsights(key: string): Promise<TournamentInsights | null | undefined> {
+  try {
+    const db = await openCacheDb();
+    const record = await txRequest(
+      db.transaction(CACHE_STORE, "readonly").objectStore(CACHE_STORE).get(key) as IDBRequest<PersistedTournamentInsights | undefined>
+    );
+    if (record) {
+      try {
+        await txRequest(
+          db.transaction(CACHE_STORE, "readwrite").objectStore(CACHE_STORE).put({ ...record, touchedAt: Date.now() }, key)
+        );
+      } catch { /* 忽略 */ }
+    }
+    db.close();
+    return record ? record.insights : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function writePersistedTournamentInsights(key: string, insights: TournamentInsights | null): Promise<void> {
+  try {
+    const db = await openCacheDb();
+    const store = db.transaction(CACHE_STORE, "readwrite").objectStore(CACHE_STORE);
+    await txRequest(store.put({ key, touchedAt: Date.now(), insights } satisfies PersistedTournamentInsights, key));
     db.close();
     void prunePersisted();
   } catch {
@@ -177,8 +221,86 @@ export function getSeasonDemos(entries: StudioDemoEntry[]): Promise<SeasonInsigh
   return demosPromise;
 }
 
+export interface PlayerSeasonDetails {
+  insights: PlayerSeasonInsights;
+  weaponStats: PlayerWeaponStat[];
+}
+
+const DETAILS_CACHE_LIMIT = 24;
+const detailsCache = new Map<string, Promise<PlayerSeasonDetails>>();
+const flashCache = new Map<string, Promise<PlayerFlashSummary[]>>();
+
+function touchLimitedCache<T>(cache: Map<string, Promise<T>>, key: string, value: Promise<T>, limit: number): Promise<T> {
+  cache.delete(key);
+  cache.set(key, value);
+  while (cache.size > limit) {
+    const oldest = cache.keys().next().value;
+    if (oldest == null) break;
+    cache.delete(oldest);
+  }
+  value.catch(() => cache.delete(key));
+  return value;
+}
+
+/** 选中选手的逐场洞察：只返回小结果，不把全量 DemoPackage 长期放进 React state。 */
+export function getPlayerSeasonDetails(entries: StudioDemoEntry[], steamIds: string[]): Promise<PlayerSeasonDetails> {
+  const key = `${keyOf(entries)}:player:${[...steamIds].sort().join(",")}`;
+  const cached = detailsCache.get(key);
+  if (cached) return cached;
+  const loading = (async () => {
+    const demos = await loadDemosWithRenames(entries);
+    const details = {
+      insights: buildPlayerSeasonInsights(demos, steamIds),
+      weaponStats: buildPlayerWeaponStats(demos, steamIds)
+    };
+    clearPkgCache();
+    return details;
+  })();
+  return touchLimitedCache(detailsCache, key, loading, DETAILS_CACHE_LIMIT);
+}
+
+/** 道具页多人 Flash Value：单次扫描所有 demo，避免每个选手重复扫全量 events。 */
+export function getPlayerFlashSummaries(
+  entries: StudioDemoEntry[],
+  players: Array<{ playerKey: string; name: string; steamIds: string[] }>
+): Promise<PlayerFlashSummary[]> {
+  const key = `${keyOf(entries)}:flash:${players.map((p) => `${p.playerKey}=${p.steamIds.join(",")}`).sort().join("|")}`;
+  const cached = flashCache.get(key);
+  if (cached) return cached;
+  const loading = (async () => {
+    const demos = await loadDemosWithRenames(entries);
+    const summaries = buildPlayerFlashSummaries(demos, players);
+    clearPkgCache();
+    return summaries;
+  })();
+  return touchLimitedCache(flashCache, key, loading, DETAILS_CACHE_LIMIT);
+}
+
 let summaryKey = "";
 let summaryPromise: Promise<SeasonSummary> | null = null;
+let tournamentKey = "";
+let tournamentPromise: Promise<TournamentInsights | null> | null = null;
+
+/** 赛事/经济页面只需要 TournamentInsights，不必冷启动时构建 cohort + profiles + RR/PRISM。 */
+export function getTournamentInsights(entries: StudioDemoEntry[], identity?: IdentityOptions): Promise<TournamentInsights | null> {
+  const key = `${keyOf(entries, identity?.version)}:tournament`;
+  if (tournamentPromise && key === tournamentKey) return tournamentPromise;
+  tournamentKey = key;
+  tournamentPromise = (async () => {
+    const persisted = await readPersistedTournamentInsights(key);
+    if (persisted !== undefined) return persisted;
+    const demos = await loadDemosWithRenames(entries, identity?.teamRenames);
+    const insights = demos.length > 0 ? buildTournamentInsights(demos) : null;
+    clearPkgCache();
+    void writePersistedTournamentInsights(key, insights);
+    return insights;
+  })();
+  tournamentPromise.catch(() => {
+    tournamentKey = "";
+    tournamentPromise = null;
+  });
+  return tournamentPromise;
+}
 
 /** 聚合摘要：优先持久缓存命中（不触碰 ZIP），未命中才全量解析并回写。
  *  传入 identity 时将其并入缓存 key，identityMap 作为归并参数传给 buildSeasonCohort。
