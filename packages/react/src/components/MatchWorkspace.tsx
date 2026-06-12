@@ -926,7 +926,7 @@ export function ReplayViewer({ replay, map, target = null }: {
                     {player.name}
                     {frame.alive && (
                       <small className="dak-frame-weapon">
-                        {`[${main ?? "∅"}][${frame.weapon ?? "∅"}]`}
+                        {main ?? frame.weapon ?? "—"}
                         {frame.armor > 0 ? (frame.hasHelmet ? " · 全甲" : " · 半甲") : ""}
                         {frame.hasDefuseKit ? " · kit" : ""}
                         {frame.flashed ? " · flashed" : ""}
@@ -1285,7 +1285,7 @@ function hpBarColor(hp: number): string {
 
 /** 简单回溯：从当前帧往回找，跳过刀/道具/空，返回第一个有意义的武器。
  *  不用 set 匹配，直接判断是否是非刀具非投掷物武器。 */
-const NOT_A_GUN = new Set(["刀", "C4", "Zeus x27", "闪光弹", "烟雾弹", "燃烧弹", "HE 手雷", "诱饵弹"]);
+const NOT_A_GUN = new Set(["刀", "knife", "C4", "Zeus x27", "闪光弹", "烟雾弹", "燃烧弹", "HE 手雷", "诱饵弹"]);
 
 function mainWeaponSoFar(frames: WorkspaceReplayFrame[], uptoIndex: number): string | null {
   for (let i = Math.min(uptoIndex, frames.length - 1); i >= 0; i -= 1) {
