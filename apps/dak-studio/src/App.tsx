@@ -1,10 +1,11 @@
-import { Bomb, ClipboardList, Coins, Crosshair, Film, LibraryBig, Settings, Swords, Trophy, UserRound } from "lucide-react";
+import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Settings, Swords, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { bulkUpdateTags, importDemoFile, listDemoEntries, removeDemo, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { EMPTY_SCOPE, applyScope, type CohortScopeState } from "./components/CohortScope";
 import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems, triggerWindowsDropCapture, type ExportedDemoFile } from "./lib/dem";
 import { parseTags } from "./lib/tags";
 import { APP_VERSION, checkForUpdate, type UpdateInfo } from "./lib/update";
+import { HomeView } from "./views/HomeView";
 import { LibraryView } from "./views/LibraryView";
 import { MatchView } from "./views/MatchView";
 import { PlayersView } from "./views/PlayersView";
@@ -22,6 +23,7 @@ import sampleZipUrl from "../../../fixtures/input/sample-match.zip?url";
 
 // 八模块信息架构（docs/roadmap.md），未实现的模块以「制作中」占位展示
 type StudioView =
+  | "home"
   | "library"
   | "match"
   | "players"
@@ -33,6 +35,7 @@ type StudioView =
   | "management";
 
 const NAV: { key: StudioView; label: string; hint: string; icon: typeof LibraryBig; wip?: boolean }[] = [
+  { key: "home", label: "我的主页", hint: "近期状态 / 该练什么", icon: House },
   { key: "library", label: "资料库", hint: "导入与管理 Demo", icon: LibraryBig },
   { key: "match", label: "比赛工作台", hint: "回合 / 地图 / 回放", icon: Film },
   { key: "players", label: "个人实验室", hint: "档案 / 开局动线", icon: UserRound },
@@ -59,7 +62,7 @@ type MatchDeepLink = { roundNumber: number; tick?: number };
 
 export function App() {
   const [entries, setEntries] = useState<StudioDemoEntry[]>([]);
-  const [view, setView] = useState<StudioView>("library");
+  const [view, setView] = useState<StudioView>("home");
   const [playerTab, setPlayerTab] = useState<PlayerTab>("profile");
   const [tournamentTab, setTournamentTab] = useState<TournamentTab>("leaderboard");
   const [selectedDemoId, setSelectedDemoId] = useState<string | null>(null);
@@ -332,6 +335,15 @@ export function App() {
               ✕
             </button>
           </div>
+        )}
+        {view === "home" && (
+          <HomeView
+            entries={entries}
+            onOpenMatch={openDemo}
+            onGoPlayers={() => { setPlayerTab("profile"); setView("players"); }}
+            onGoLibrary={() => setView("library")}
+            identityOptions={identityOptions}
+          />
         )}
         {view === "library" && (
           <LibraryView

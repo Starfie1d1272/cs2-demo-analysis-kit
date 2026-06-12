@@ -562,6 +562,81 @@ body {
   transform: translateX(-50%) translateY(0);
 }
 
+/* ── 我的主页 ───────────────────────────────────────────── */
+
+.stu-home-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.stu-home-head h2 {
+  margin: 0;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stu-home-head > button {
+  margin-left: auto;
+}
+
+.stu-home-trends {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.stu-home-spark {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stu-home-spark span {
+  color: var(--dak-fg-dim);
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+}
+
+.stu-home-spark b {
+  font-family: var(--dak-mono);
+  font-size: 14px;
+}
+
+.stu-home-spark-line {
+  stroke: var(--dak-accent);
+  stroke-width: 1.5;
+}
+
+.stu-home-matches {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stu-home-match {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-panel);
+  color: var(--dak-fg);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stu-home-match:hover {
+  border-color: var(--dak-border-hi);
+  background: var(--dak-panel-hi);
+}
+
 .stu-bulk-count {
   color: var(--dak-accent);
   font-size: 13px;
