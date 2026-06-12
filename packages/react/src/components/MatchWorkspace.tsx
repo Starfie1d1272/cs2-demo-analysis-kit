@@ -923,13 +923,13 @@ export function ReplayViewer({ replay, map, target = null }: {
                   <span className={`dak-team-dot dak-team-dot-${player.teamKey}`} />
                   <span className="dak-frame-player-num">{playerNumbers[player.steamId64] ?? "?"}</span>
                   <span className="dak-frame-player-name">{player.name}</span>
-                  <div className="dak-hp-bar-wrap" title={`${frame.hp} HP · 护甲 ${frame.armor}`}>
-                    <div className="dak-hp-bar" style={{ width: `${frame.hp}%`, background: hpBarColor(frame.hp) }} />
-                    {frame.armor > 0 && <div className="dak-armor-bar" style={{ width: `${frame.armor}%` }} />}
-                  </div>
+                  {renderHpArmor(frame)}
                   <small>
                     {frame.alive
-                      ? `${main ? displayWeaponName(main) : frame.weapon ? displayWeaponName(frame.weapon) : "—"}${frame.armor > 0 ? " · 甲" : ""}${frame.hasDefuseKit ? " · kit" : ""}${frame.flashed ? " · flashed" : ""}`
+                      ? `${main ?? frame.weapon ?? "—"}` +
+                        `${frame.armor > 0 ? " · 甲" : ""}` +
+                        `${frame.hasDefuseKit ? " · kit" : ""}` +
+                        `${frame.flashed ? " · flashed" : ""}`
                       : "阵亡"}
                   </small>
                 </div>
@@ -1255,6 +1255,18 @@ function roundFactTags(fact: MatchWorkspaceModel["players"][number]["roundFacts"
   if (fact.tradedDeaths > 0) tags.push("死亡被补");
   if (fact.flashAssists > 0) tags.push(`闪助 +${fact.flashAssists}`);
   return tags.length > 0 ? tags : ["无 KAST"];
+}
+
+/** 渲染 HP 条 + 护甲底色（HP 条盖在护甲层上；护甲层满宽时可区分全甲 vs 半甲）。 */
+function renderHpArmor(frame: WorkspaceReplayFrame) {
+  return (
+    <div className="dak-hp-bar-wrap" title={`${frame.hp} HP · 护甲 ${frame.armor}`}>
+      <div className="dak-hp-bar" style={{ width: `${frame.hp}%`, background: hpBarColor(frame.hp) }} />
+      {frame.armor > 0 && (
+        <div className="dak-armor-bar" style={{ width: `${frame.armor >= 100 ? 100 : frame.armor}%` }} />
+      )}
+    </div>
+  );
 }
 
 function hpBarColor(hp: number): string {
