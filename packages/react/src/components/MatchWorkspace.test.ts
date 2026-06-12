@@ -2,7 +2,7 @@ import React from "react";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { MatchWorkspaceModel } from "@cs2dak/contract";
-import { MatchWorkspace } from "./MatchWorkspace";
+import { MatchWorkspace, ReplayViewer } from "./MatchWorkspace";
 import { RoundTimeline } from "./RoundTimeline";
 
 const model: MatchWorkspaceModel = {
@@ -81,7 +81,20 @@ const model: MatchWorkspaceModel = {
         tickStep: 8,
         frameCount: 1,
         kills: [],
-        grenades: [],
+        grenades: [
+          {
+            grenade: "smoke",
+            throwerSide: "ct",
+            throwTick: 90,
+            effectTick: 100,
+            destroyTick: 300,
+            throwX: 1,
+            throwY: 2,
+            effectX: 1,
+            effectY: 2,
+            effectZ: 3
+          }
+        ],
         projectiles: [],
         groundBombs: [],
         bomb: null,
@@ -91,8 +104,14 @@ const model: MatchWorkspaceModel = {
             name: "Player A",
             teamKey: "teamA",
             side: "ct",
+            loadout: {
+              primaryWeapon: "AK-47",
+              secondaryWeapon: "USP-S",
+              grenadeCount: 2,
+              grenades: ["smoke", "flashbang"]
+            },
             frames: [
-              { tick: 100, x: 1, y: 2, z: 3, yaw: 90, hp: 100, armor: 100, weapon: "ak47", alive: true, flashed: false, hasDefuseKit: true, hasBomb: false }
+              { tick: 100, x: 1, y: 2, z: 3, yaw: 90, hp: 100, armor: 100, weapon: "ak47", grenades: ["smoke"], alive: true, flashed: false, hasDefuseKit: true, hasBomb: false, hasHelmet: true }
             ]
           }
         ]
@@ -120,6 +139,28 @@ describe("MatchWorkspace", () => {
     expect(html).not.toContain("pr1maly");
     expect(html).not.toContain("AWPy");
     expect(html).not.toContain("CS Demo Manager");
+  });
+
+  it("renders stable loadout and current held utility in replay roster", () => {
+    const html = renderToStaticMarkup(React.createElement(ReplayViewer, {
+      replay: model.replay,
+      map: model.map.view
+    }));
+
+    expect(html).toContain("AK-47");
+    expect(html).toContain("USP-S");
+    expect(html).toContain("烟");
+    expect(html).not.toContain("闪");
+  });
+
+  it("colors replay smoke by current side instead of team identity", () => {
+    const html = renderToStaticMarkup(React.createElement(ReplayViewer, {
+      replay: model.replay,
+      map: model.map.view
+    }));
+
+    expect(html).toContain("dak-replay-fx-ct");
+    expect(html).not.toContain("dak-replay-fx-teamA");
   });
 
   it("renders truncated timelines with an explicit expand control", () => {

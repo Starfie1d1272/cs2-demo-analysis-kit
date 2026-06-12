@@ -69,16 +69,16 @@ server + 导出编排）、PyInstaller 打包。
   （资料库已有重导入口）。理由：本地产品、demo 源文件都在用户手里。
 - `pnpm test` / `pnpm python:test` / fixture-verify 全绿为迁移完成标准。
 
-## 5. 实施顺序
+## 5. 实施顺序（已完成）
 
-1. contract 升级 3.0.0 + loader（playerIndex/side 推导/decodeDelta）——
-   一切下游的地基；
-2. core normalize 及各信号模块过 typecheck + 测试；
-3. positions-1s 消费方（heatmap/trails/pattern）迁 replay；
-4. presentation / react / studio 视图修复；
-5. fixtures 重导 + 全量验证；
-6. Python 侧切换 cs2df、删解析代码、打包验证；
-7. 文档同步（AGENTS.md 数据流、architecture.md、module-boundaries.md 的
-   "Python exporter" 行改为 "cs2df (PyPI)"）。
+> ⚠️ 2026-06-13：以下 7 步骤已全部合入 `main`，全量 200/200 测试通过。本文档保留为历史参考。
 
-步骤 1–7 已在 `v3-migration` 分支同一轮收口；中间态不可用，不再拆分独立 PR。
+1. contract 升级 3.0.0 + loader（playerIndex/side 推导/decodeDelta）——✅
+2. core normalize 及各信号模块过 typecheck + 测试——✅
+3. positions-1s 消费方（heatmap/trails/pattern）迁 replay——✅
+4. presentation / react / studio 视图修复——✅
+5. fixtures 重导 + 全量验证——✅
+6. Python 侧切换 cs2df、删解析代码、打包验证——✅
+7. 文档同步——✅
+
+各步骤对应 commit 见 git log（`eea6aeb`、`8a5038c`、`014a793`、`6fbfd6d`、`fbfcceb`）。

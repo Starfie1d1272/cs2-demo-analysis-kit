@@ -144,6 +144,16 @@ export const workspaceMapSchema = z.object({
   })
 });
 
+export const workspaceReplayLoadoutSchema = z.object({
+  /** 回合 freeze time 的主武器；手枪/eco 局可能为 null。 */
+  primaryWeapon: z.string().nullable(),
+  /** 回合 freeze time 的副武器；极少数丢枪/拾枪状态可能为 null。 */
+  secondaryWeapon: z.string().nullable(),
+  grenadeCount: z.number().int().nonnegative(),
+  /** 具体持有道具类型；旧 v3 导出包只有 grenadeCount，此数组为空。 */
+  grenades: z.array(grenadeTypeSchema).default([])
+});
+
 export const workspaceReplayFrameSchema = z.object({
   tick: z.number().int().positive(),
   x: z.number(),
@@ -154,6 +164,8 @@ export const workspaceReplayFrameSchema = z.object({
   /** 护甲值 0–100；旧模型缺省 0。 */
   armor: z.number().int().nonnegative().max(100).optional().default(0),
   weapon: z.string().nullable(),
+  /** 当前帧真实持有道具；旧导出包缺省为空，UI 可回退到 loadout。 */
+  grenades: z.array(grenadeTypeSchema).optional().default([]),
   alive: z.boolean(),
   flashed: z.boolean(),
   hasDefuseKit: z.boolean(),
@@ -167,6 +179,12 @@ export const workspaceReplayPlayerSchema = z.object({
   name: z.string(),
   teamKey: teamKeySchema,
   side: sideSchema,
+  loadout: workspaceReplayLoadoutSchema.optional().default({
+    primaryWeapon: null,
+    secondaryWeapon: null,
+    grenadeCount: 0,
+    grenades: []
+  }),
   frames: z.array(workspaceReplayFrameSchema)
 });
 
@@ -194,6 +212,8 @@ export const workspaceKillEventSchema = z.object({
 /** 回合内一颗道具的完整生命周期（world 坐标），来自 grenades.json。 */
 export const workspaceReplayGrenadeSchema = z.object({
   grenade: grenadeTypeSchema,
+  /** 投掷者在该回合的阵营；烟雾边框按 T/CT 着色，而不是固定 teamA/teamB。 */
+  throwerSide: sideSchema.nullable().optional().default(null),
   throwTick: z.number().int().positive(),
   effectTick: z.number().int().positive(),
   /** 效果消失 tick；导出包缺失时 null，渲染端按道具类型取默认时长。 */
@@ -291,6 +311,7 @@ export type WorkspaceWeaponRow = z.infer<typeof workspaceWeaponRowSchema>;
 export type WorkspaceDuels = z.infer<typeof workspaceDuelsSchema>;
 export type WorkspacePlayer = z.infer<typeof workspacePlayerSchema>;
 export type WorkspaceSpatialPoint = z.infer<typeof workspaceSpatialPointSchema>;
+export type WorkspaceReplayLoadout = z.infer<typeof workspaceReplayLoadoutSchema>;
 export type WorkspaceReplayFrame = z.infer<typeof workspaceReplayFrameSchema>;
 export type WorkspaceReplayPlayer = z.infer<typeof workspaceReplayPlayerSchema>;
 export type WorkspaceKillEvent = z.infer<typeof workspaceKillEventSchema>;

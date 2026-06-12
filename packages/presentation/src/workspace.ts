@@ -9,6 +9,7 @@ import {
   type TeamKey,
   type WorkspaceKillEvent,
   type WorkspaceReplayFrame,
+  type WorkspaceReplayLoadout,
   type WorkspaceReplayRound,
   type WorkspaceSpatialPoint
 } from "@cs2dak/contract";
@@ -732,95 +733,99 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
   const killsByRound = groupBy(pkg.kills, (k) => k.roundNumber);
   const grenadesByRound = groupBy(pkg.grenades, (g) => g.roundNumber);
   const bombsByRound = groupBy(pkg.bombs, (b) => b.roundNumber);
+  const roundsByNumber = new Map(pkg.rounds.map((r) => [r.roundNumber, r]));
   const endTickByRound = new Map(pkg.rounds.map((r) => [r.roundNumber, r.endTick]));
-
-  // 选手每回合头盔状态（player-economies → steamId64 × roundNumber → helmet）
-  const helmetByRoundPlayer = new Map<string, boolean>();
-  for (const econ of pkg.playerEconomies ?? []) {
-    const player = pkg.players[econ.playerIndex];
-    if (player) {
-      helmetByRoundPlayer.set(`${econ.roundNumber}:${player.steamId64}`, !!econ.hasHelmet);
-    }
-  }
+  const economyByRoundPlayer = new Map(pkg.playerEconomies.map((row) => [`${row.roundNumber}:${row.playerIndex}`, row]));
 
   let hasDefuseKit = false;
-  const rounds = replay.rounds.map((roundRow) => ({
-    roundNumber: roundRow.roundNumber,
-    startTick: roundRow.startTick,
-    tickStep: roundRow.tickStep,
-    frameCount: roundRow.frameCount,
-    officialEndTick: endTickByRound.get(roundRow.roundNumber),
-    kills: buildRoundKills(pkg, killsByRound.get(roundRow.roundNumber) ?? []),
-    grenades: (grenadesByRound.get(roundRow.roundNumber) ?? []).map((row) => ({
-      grenade: row.grenade,
-      throwTick: row.throwTick,
-      effectTick: row.effectTick,
-      destroyTick: row.destroyTick,
-      throwX: row.throwPosition.x,
-      throwY: row.throwPosition.y,
-      effectX: row.effectPosition.x,
-      effectY: row.effectPosition.y,
-      effectZ: row.effectPosition.z
-    })),
-    // v2.3+ 导出包才带飞行轨迹；旧包置空，渲染端按"无数据"处理
-    // v3 起 x/y/z 为差分编码（首元素绝对值 + 后续 delta），前缀和解码后 × coordScale 还原游戏单位
-    projectiles: (roundRow.projectiles ?? []).map((proj) => ({
-      grenade: proj.grenade,
-      startTick: proj.startTick,
-      x: decodeDelta(proj.x).map((v) => v * (replay.meta.coordScale || 1)),
-      y: decodeDelta(proj.y).map((v) => v * (replay.meta.coordScale || 1)),
-      z: decodeDelta(proj.z ?? []).map((v) => v * (replay.meta.coordScale || 1))
-    })),
-    bomb: buildRoundBomb(bombsByRound.get(roundRow.roundNumber) ?? []),
-    groundBombs: buildGroundBombs(
-      bombsByRound.get(roundRow.roundNumber) ?? [],
-      roundRow.startTick + roundRow.frameCount * roundRow.tickStep
-    ),
-    players: roundRow.players.map((player) => {
-      // v3 起 x/y/z/yaw 为差分编码，flash 改为独立列（0.1 秒单位，flags 不再含致盲位）
-      const coordScale = replay.meta.coordScale || 1;
-      const angleScale = replay.meta.angleScale || 1;
-      const xs = decodeDelta(player.x);
-      const ys = decodeDelta(player.y);
-      const zs = decodeDelta(player.z);
-      const yaws = decodeDelta(player.yaw);
-      const replayPlayer = pkg.players[player.playerIndex];
-      // 此位选手本回合是否戴头盔（player-economies 逐回合数据，全帧相同）
-      const hasHelmet = helmetByRoundPlayer.get(`${roundRow.roundNumber}:${replayPlayer?.steamId64}`) ?? false;
-      const frames: WorkspaceReplayFrame[] = [];
-      for (let index = 0; index < roundRow.frameCount; index += 1) {
-        const flags = player.flags[index] ?? 0;
-        const frame = {
-          tick: roundRow.startTick + index * roundRow.tickStep,
-          x: (xs[index] ?? 0) * coordScale,
-          y: (ys[index] ?? 0) * coordScale,
-          z: (zs[index] ?? 0) * coordScale,
-          yaw: (yaws[index] ?? 0) / angleScale,
-          hp: player.hp[index] ?? 0,
-          armor: player.armor?.[index] ?? 0,
-          weapon: weaponNameForIndex(replay.weaponDict, player.weapon[index] ?? -1),
-          alive: (flags & 1) !== 0,
-          flashed: (player.flash?.[index] ?? 0) > 0,
-          hasDefuseKit: (flags & 4) !== 0,
-          hasBomb: (flags & 2) !== 0,
-          hasHelmet
-        };
-        if (frame.hasDefuseKit) {
-          hasDefuseKit = true;
+  const rounds = replay.rounds.map((roundRow) => {
+    const sourceRound = roundsByNumber.get(roundRow.roundNumber);
+    const sideForTeam = (teamKey: TeamKey | null | undefined) => {
+      if (!sourceRound || !teamKey) return null;
+      return teamKey === "teamA" ? sourceRound.teamASide : sourceRound.teamBSide;
+    };
+
+    return {
+      roundNumber: roundRow.roundNumber,
+      startTick: roundRow.startTick,
+      tickStep: roundRow.tickStep,
+      frameCount: roundRow.frameCount,
+      officialEndTick: endTickByRound.get(roundRow.roundNumber),
+      kills: buildRoundKills(pkg, killsByRound.get(roundRow.roundNumber) ?? []),
+      grenades: (grenadesByRound.get(roundRow.roundNumber) ?? []).map((row) => ({
+        grenade: row.grenade,
+        throwerSide: sideForTeam(pkg.players[row.throwerIndex]?.teamKey),
+        throwTick: row.throwTick,
+        effectTick: row.effectTick,
+        destroyTick: row.destroyTick,
+        throwX: row.throwPosition.x,
+        throwY: row.throwPosition.y,
+        effectX: row.effectPosition.x,
+        effectY: row.effectPosition.y,
+        effectZ: row.effectPosition.z
+      })),
+      // v2.3+ 导出包才带飞行轨迹；旧包置空，渲染端按"无数据"处理
+      // v3 起 x/y/z 为差分编码（首元素绝对值 + 后续 delta），前缀和解码后 × coordScale 还原游戏单位
+      projectiles: (roundRow.projectiles ?? []).map((proj) => ({
+        grenade: proj.grenade,
+        startTick: proj.startTick,
+        x: decodeDelta(proj.x).map((v) => v * (replay.meta.coordScale || 1)),
+        y: decodeDelta(proj.y).map((v) => v * (replay.meta.coordScale || 1)),
+        z: decodeDelta(proj.z ?? []).map((v) => v * (replay.meta.coordScale || 1))
+      })),
+      bomb: buildRoundBomb(bombsByRound.get(roundRow.roundNumber) ?? []),
+      groundBombs: buildGroundBombs(
+        bombsByRound.get(roundRow.roundNumber) ?? [],
+        roundRow.startTick + roundRow.frameCount * roundRow.tickStep
+      ),
+      players: roundRow.players.map((player) => {
+        // v3 起 x/y/z/yaw 为差分编码，flash 改为独立列（0.1 秒单位，flags 不再含致盲位）
+        const coordScale = replay.meta.coordScale || 1;
+        const angleScale = replay.meta.angleScale || 1;
+        const xs = decodeDelta(player.x);
+        const ys = decodeDelta(player.y);
+        const zs = decodeDelta(player.z);
+        const yaws = decodeDelta(player.yaw);
+        const replayPlayer = pkg.players[player.playerIndex];
+        const economy = economyByRoundPlayer.get(`${roundRow.roundNumber}:${player.playerIndex}`);
+        // 此位选手本回合是否戴头盔（player-economies 逐回合数据，全帧相同）
+        const hasHelmet = economy?.hasHelmet ?? false;
+        const loadout = loadoutForEconomy(economy);
+        const frames: WorkspaceReplayFrame[] = [];
+        for (let index = 0; index < roundRow.frameCount; index += 1) {
+          const flags = player.flags[index] ?? 0;
+          const frame = {
+            tick: roundRow.startTick + index * roundRow.tickStep,
+            x: (xs[index] ?? 0) * coordScale,
+            y: (ys[index] ?? 0) * coordScale,
+            z: (zs[index] ?? 0) * coordScale,
+            yaw: (yaws[index] ?? 0) / angleScale,
+            hp: player.hp[index] ?? 0,
+            armor: player.armor?.[index] ?? 0,
+            weapon: weaponNameForIndex(replay.weaponDict, player.weapon[index] ?? -1),
+            grenades: normalizeHeldGrenades((player as { grenades?: unknown[][] }).grenades?.[index]),
+            alive: (flags & 1) !== 0,
+            flashed: (player.flash?.[index] ?? 0) > 0,
+            hasDefuseKit: (flags & 4) !== 0,
+            hasBomb: (flags & 2) !== 0,
+            hasHelmet
+          };
+          if (frame.hasDefuseKit) {
+            hasDefuseKit = true;
+          }
+          frames.push(frame);
         }
-        frames.push(frame);
-      }
-      return {
-        steamId64: replayPlayer?.steamId64 ?? String(player.playerIndex),
-        name: replayPlayer?.name ?? `Player ${player.playerIndex}`,
-        teamKey: replayPlayer?.teamKey ?? "teamA",
-        side: replayPlayer?.teamKey != null
-          ? (pkg.rounds.find((r) => r.roundNumber === roundRow.roundNumber)?.[replayPlayer.teamKey === "teamA" ? "teamASide" : "teamBSide"] ?? "t")
-          : "t",
-        frames
-      };
-    })
-  }));
+        return {
+          steamId64: replayPlayer?.steamId64 ?? String(player.playerIndex),
+          name: replayPlayer?.name ?? `Player ${player.playerIndex}`,
+          teamKey: replayPlayer?.teamKey ?? "teamA",
+          side: sideForTeam(replayPlayer?.teamKey) ?? "t",
+          loadout,
+          frames
+        };
+      })
+    };
+  });
 
   return {
     available: true,
@@ -831,6 +836,28 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
       hasDefuseKit
     }
   };
+}
+
+const HELD_GRENADE_TYPES = new Set(["flashbang", "smoke", "molotov", "incendiary", "hegrenade", "decoy"]);
+
+function loadoutForEconomy(economy: DemoPackage["playerEconomies"][number] | undefined): WorkspaceReplayLoadout {
+  const maybeGrenades = (economy as { grenades?: unknown } | undefined)?.grenades;
+  const rawGrenades = Array.isArray(maybeGrenades) ? maybeGrenades : [];
+  return {
+    primaryWeapon: economy?.primaryWeapon ?? null,
+    secondaryWeapon: economy?.secondaryWeapon ?? null,
+    grenadeCount: economy?.grenadeCount ?? 0,
+    grenades: rawGrenades.filter((value): value is WorkspaceReplayLoadout["grenades"][number] =>
+      typeof value === "string" && HELD_GRENADE_TYPES.has(value)
+    )
+  };
+}
+
+function normalizeHeldGrenades(value: unknown): WorkspaceReplayLoadout["grenades"] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is WorkspaceReplayLoadout["grenades"][number] =>
+    typeof item === "string" && HELD_GRENADE_TYPES.has(item)
+  );
 }
 
 /** 从 bombs.json 取该回合 C4 锚点：plant 位置定格，defuse/explode 决定终态。 */

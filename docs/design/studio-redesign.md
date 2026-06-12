@@ -41,7 +41,7 @@
 | StatCard / DataTable / EmptyState | 基础展示原语 | 🟡 样式分散，需收敛进 studio.css 公共段 |
 | ExportButton | Markdown / PNG 报表导出 | ✅ 已有导出逻辑，需统一入口样式 |
 
-### v3 新增数据能力（设计前提，详见 `docs/v3-migration.md`）
+### v3 新增数据能力（设计前提，详见 `docs/archive/2026-06/v3-migration.md`）
 
 - `duels.json`：满 tick 交火窗口 → **反应时间、preaim 从「误差大」变为可做**；
 - `replay.json` 8Hz 全状态流（pitch/armor/money/equipValue/flash/place/flags）：

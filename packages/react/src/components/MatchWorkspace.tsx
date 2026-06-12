@@ -1,7 +1,7 @@
-import type { MatchWorkspaceModel, WorkspaceReplayFrame, WorkspaceReplayRound, WorkspaceSpatialPoint } from "@cs2dak/contract";
+import type { MatchWorkspaceModel, WorkspaceReplayFrame, WorkspaceReplayLoadout, WorkspaceReplayRound, WorkspaceSpatialPoint } from "@cs2dak/contract";
 import { displayWeaponName, sideLabel, economyLabelCn, buildMatchBuyQuality, buildMatchReportMarkdown } from "@cs2dak/presentation";
 import { getMapCalibration, worldToRadar, hasLowerLevel, levelAt, type MapLevel } from "@cs2dak/maps";
-import { Activity, BarChart3, ChevronLeft, ChevronRight, Crosshair, Film, Gauge, ListChecks, Map, Pause, Play, ShieldCheck, Swords, Table2, Users } from "lucide-react";
+import { Activity, BarChart3, ChevronLeft, ChevronRight, Crosshair, Film, Gauge, ListChecks, Map as MapIcon, Pause, Play, ShieldCheck, Swords, Table2, Users } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { EconomyPanel } from "./EconomyPanel";
 import { HeatmapCanvas } from "./HeatmapCanvas";
@@ -130,7 +130,7 @@ function OverviewView({ model, onNavigate }: MatchWorkspaceProps & { onNavigate:
           <div className="dak-module-actions">
             <ModuleAction icon={<ListChecks size={16} />} label="回合浏览" value={`${model.rounds.length} 回合`} detail="横向 timeline + selected round events" onClick={() => onNavigate("rounds")} />
             <ModuleAction icon={<Users size={16} />} label="选手视角" value={`${model.players.length} 名选手`} detail="RR breakdown + round facts" onClick={() => onNavigate("players")} />
-            <ModuleAction icon={<Map size={16} />} label="地图图层" value={`${model.map.points.length} 点`} detail={model.map.status.message ?? "kill/death/grenade layers"} onClick={() => onNavigate("map")} />
+            <ModuleAction icon={<MapIcon size={16} />} label="地图图层" value={`${model.map.points.length} 点`} detail={model.map.status.message ?? "kill/death/grenade layers"} onClick={() => onNavigate("map")} />
             <ModuleAction icon={<Film size={16} />} label="2D 回放" value={model.replay.available ? `${model.replay.sampleRate ?? 0} Hz` : "无回放"} detail={model.replay.available ? "走位 / 道具 / C4 时间线" : "导出时未附带回放流"} onClick={() => onNavigate("replay")} />
           </div>
         </Panel>
@@ -730,22 +730,88 @@ export function ReplayViewer({ replay, map, target = null }: {
   const currentPlayers = round.players
     .map((player) => ({ player, frame: player.frames[dataFrameIndex] ?? player.frames.find((frame) => frame.alive) ?? player.frames[0] }))
     .filter((row): row is { player: WorkspaceReplayRound["players"][number]; frame: WorkspaceReplayFrame } => Boolean(row.frame));
+  const selectedRoundIndex = Math.max(0, replay.rounds.findIndex((row) => row.roundNumber === round.roundNumber));
+  const seekRoundByOffset = (offset: number) => {
+    const next = replay.rounds[Math.max(0, Math.min(replay.rounds.length - 1, selectedRoundIndex + offset))];
+    if (next) setRoundNumber(next.roundNumber);
+  };
+  const rosterTeams = (["teamA", "teamB"] as const).map((teamKey) => ({
+    teamKey,
+    side: currentPlayers.find(({ player }) => player.teamKey === teamKey)?.player.side ?? null,
+    rows: [...currentPlayers]
+      .filter(({ player }) => player.teamKey === teamKey)
+      .sort((a, b) => {
+        const na = Number(playerNumbers[a.player.steamId64] ?? "99");
+        const nb = Number(playerNumbers[b.player.steamId64] ?? "99");
+        return (na === 0 ? 10 : na) - (nb === 0 ? 10 : nb);
+      })
+  }));
+  const renderRosterTeam = (team: typeof rosterTeams[number]) => (
+    <section className="dak-roster-team" key={team.teamKey} aria-label={`${team.teamKey} 当前状态`}>
+      <div className="dak-roster-team-head">
+        <span className={`dak-team-dot dak-team-dot-${team.teamKey}`} />
+        <b>{team.side ? team.side.toUpperCase() : team.teamKey}</b>
+        <small>{team.rows.length}/5</small>
+      </div>
+      <div className="dak-frame-player-list">
+        {team.rows.map(({ player, frame }) => {
+          const primary = primaryLoadoutLabel(player.loadout);
+          const heldUtility = frame.grenades.length > 0
+            ? heldUtilityLabel({ ...player.loadout, grenadeCount: frame.grenades.length, grenades: frame.grenades })
+            : player.loadout.grenadeCount > 0
+              ? heldUtilityLabel(player.loadout)
+              : null;
+          const current = frame.weapon && frame.weapon !== player.loadout.primaryWeapon && frame.weapon !== player.loadout.secondaryWeapon
+            ? frame.weapon
+            : null;
+          return (
+            <div
+              className={`dak-frame-player-row${!frame.alive ? " dak-frame-player-row-dead" : ""}`}
+              key={player.steamId64}
+            >
+              <span className="dak-frame-player-num">{playerNumbers[player.steamId64] ?? "?"}</span>
+              <span className="dak-frame-player-name">
+                {player.name}
+                {frame.alive && (
+                  <small className="dak-frame-loadout">
+                    <span className="dak-frame-primary">{primary}</span>
+                    {player.loadout.primaryWeapon && player.loadout.secondaryWeapon && <span>{player.loadout.secondaryWeapon}</span>}
+                    {heldUtility && <span>{heldUtility}</span>}
+                    {frame.armor > 0 && <span>{frame.hasHelmet ? "全甲" : "半甲"}</span>}
+                    {frame.hasDefuseKit && <span>kit</span>}
+                    {frame.hasBomb && <span>C4</span>}
+                    {frame.flashed && <span>flashed</span>}
+                    {current && <span className="dak-frame-current">当前 {current}</span>}
+                  </small>
+                )}
+                {!frame.alive && <small className="dak-frame-weapon">阵亡</small>}
+              </span>
+              {renderHpArmor(frame)}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
 
   return (
     <div className="dak-replay-layout">
-      <Panel title="回放控制">
-        <div className="dak-round-pills">
-          {replay.rounds.map((row) => (
-            <button
-              key={row.roundNumber}
-              className={row.roundNumber === round.roundNumber ? "dak-round-pill dak-round-pill-active" : "dak-round-pill"}
-              type="button"
-              onClick={() => setRoundNumber(row.roundNumber)}
-            >
-              <span>R{row.roundNumber}</span>
-              <small>{row.frameCount} 帧</small>
-            </button>
-          ))}
+      <section className="dak-replay-controlbar" aria-label="回放控制">
+        <div className="dak-replay-round-nav">
+          <button className="dak-icon-button" type="button" onClick={() => seekRoundByOffset(-1)} disabled={selectedRoundIndex <= 0} aria-label="上一回合">
+            <ChevronLeft size={17} />
+          </button>
+          <label className="dak-round-select-label">
+            <span>回合</span>
+            <select className="dak-round-select" value={round.roundNumber} onChange={(event) => setRoundNumber(Number(event.target.value))}>
+              {replay.rounds.map((row) => (
+                <option key={row.roundNumber} value={row.roundNumber}>R{row.roundNumber} · {row.frameCount} 帧</option>
+              ))}
+            </select>
+          </label>
+          <button className="dak-icon-button" type="button" onClick={() => seekRoundByOffset(1)} disabled={selectedRoundIndex >= replay.rounds.length - 1} aria-label="下一回合">
+            <ChevronRight size={17} />
+          </button>
         </div>
         <div className="dak-playback">
           <button className="dak-play-button" type="button" onClick={() => setPlaying((value) => !value)} aria-label={playing ? "暂停" : "播放"}>
@@ -780,56 +846,64 @@ export function ReplayViewer({ replay, map, target = null }: {
             <ChevronRight size={17} />
           </button>
         </div>
-        <div className="dak-speed-group" role="group" aria-label="叠加图层">
-          {([
-            ["trace", "走位轨迹"],
-            ["killLines", "击杀连线"],
-            ["grenades", "道具"]
-          ] as const).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              className={layers[key] ? "dak-speed dak-speed-active" : "dak-speed"}
-              aria-pressed={layers[key]}
-              onClick={() => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="dak-replay-statusline" aria-label="当前回放状态">
+          <span>R{round.roundNumber}</span>
+          <span>Tick {currentTick}</span>
+          <span>帧 {currentFrameIndex + 1}/{round.frameCount}</span>
+          <span>{replay.sampleRate ?? 0} Hz</span>
         </div>
-        {dualLevel && (
-          <div className="dak-speed-group" role="group" aria-label="地图层级">
-            {(["upper", "lower"] as const).map((nextLevel) => (
+        <div className="dak-replay-togglebar">
+          <div className="dak-speed-group" role="group" aria-label="叠加图层">
+            {([
+              ["trace", "走位轨迹"],
+              ["killLines", "击杀连线"],
+              ["grenades", "道具轨迹"]
+            ] as const).map(([key, label]) => (
               <button
-                key={nextLevel}
+                key={key}
                 type="button"
-                className={level === nextLevel ? "dak-speed dak-speed-active" : "dak-speed"}
-                onClick={() => setLevel(nextLevel)}
+                className={layers[key] ? "dak-speed dak-speed-active" : "dak-speed"}
+                aria-pressed={layers[key]}
+                onClick={() => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
               >
-                {nextLevel === "upper" ? "上层" : "下层"}
+                {label}
               </button>
             ))}
           </div>
-        )}
-        <div className="dak-speed-group" role="group" aria-label="播放速度">
-          {[0.5, 1, 2, 4].map((nextSpeed) => (
-            <button
-              key={nextSpeed}
-              type="button"
-              className={speed === nextSpeed ? "dak-speed dak-speed-active" : "dak-speed"}
-              onClick={() => setSpeed(nextSpeed)}
-            >
-              {nextSpeed}x
-            </button>
-          ))}
+          {dualLevel && (
+            <div className="dak-speed-group dak-speed-group-compact" role="group" aria-label="地图层级">
+              {(["upper", "lower"] as const).map((nextLevel) => (
+                <button
+                  key={nextLevel}
+                  type="button"
+                  className={level === nextLevel ? "dak-speed dak-speed-active" : "dak-speed"}
+                  onClick={() => setLevel(nextLevel)}
+                >
+                  {nextLevel === "upper" ? "上层" : "下层"}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="dak-speed-group dak-speed-group-compact" role="group" aria-label="播放速度">
+            {[0.5, 1, 2, 4].map((nextSpeed) => (
+              <button
+                key={nextSpeed}
+                type="button"
+                className={speed === nextSpeed ? "dak-speed dak-speed-active" : "dak-speed"}
+                onClick={() => setSpeed(nextSpeed)}
+              >
+                {nextSpeed}x
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="dak-replay-meta">
-          <Fact label="Tick" value={`${currentTick}`} />
-          <Fact label="帧" value={`${currentFrameIndex + 1}/${round.frameCount}`} />
-          <Fact label="采样率" value={`${replay.sampleRate ?? 0} Hz`} />
+      </section>
+      <aside className="dak-replay-roster-panel dak-replay-roster-left">
+        <div className="dak-roster-board">
+          {renderRosterTeam(rosterTeams[0])}
         </div>
-      </Panel>
-      <Panel title={`R${round.roundNumber} 2D 回放`}>
+      </aside>
+      <section className="dak-replay-stage-panel" aria-label={`R${round.roundNumber} 2D 回放`}>
         <div
           className="dak-replay-stage"
           style={(() => {
@@ -903,43 +977,12 @@ export function ReplayViewer({ replay, map, target = null }: {
             </div>
           ))}
         </div>
-      </Panel>
-      <Panel title="当前帧选手">
-        <div className="dak-frame-player-list">
-          {[...currentPlayers]
-            .sort((a, b) => {
-              // Sort by assigned player number; treat 0 (teamB slot 5) as 10 so order is 1-9,0
-              const na = Number(playerNumbers[a.player.steamId64] ?? "99");
-              const nb = Number(playerNumbers[b.player.steamId64] ?? "99");
-              return (na === 0 ? 10 : na) - (nb === 0 ? 10 : nb);
-            })
-            .map(({ player, frame }) => {
-              const main = mainWeaponSoFar(player.frames, dataFrameIndex);
-              return (
-                <div
-                  className={`dak-frame-player-row${!frame.alive ? " dak-frame-player-row-dead" : ""}`}
-                  key={player.steamId64}
-                >
-                  <span className={`dak-team-dot dak-team-dot-${player.teamKey}`} />
-                  <span className="dak-frame-player-num">{playerNumbers[player.steamId64] ?? "?"}</span>
-                  <span className="dak-frame-player-name">
-                    {player.name}
-                    {frame.alive && (
-                      <small className="dak-frame-weapon">
-                        {main ?? frame.weapon ?? "—"}
-                        {frame.armor > 0 ? (frame.hasHelmet ? " · 全甲" : " · 半甲") : ""}
-                        {frame.hasDefuseKit ? " · kit" : ""}
-                        {frame.flashed ? " · flashed" : ""}
-                      </small>
-                    )}
-                    {!frame.alive && <small className="dak-frame-weapon">阵亡</small>}
-                  </span>
-                  {renderHpArmor(frame)}
-                </div>
-              );
-            })}
+      </section>
+      <aside className="dak-replay-roster-panel dak-replay-roster-right">
+        <div className="dak-roster-board">
+          {renderRosterTeam(rosterTeams[1])}
         </div>
-      </Panel>
+      </aside>
     </div>
   );
 }
@@ -1213,7 +1256,7 @@ function iconForTab(key: WorkspaceView) {
   if (key === "economy") return <BarChart3 size={16} />;
   if (key === "weapons") return <Crosshair size={16} />;
   if (key === "duels") return <Swords size={16} />;
-  if (key === "map") return <Map size={16} />;
+  if (key === "map") return <MapIcon size={16} />;
   return <Film size={16} />;
 }
 
@@ -1283,17 +1326,29 @@ function hpBarColor(hp: number): string {
   return "var(--dak-danger)";
 }
 
-/** 简单回溯：从当前帧往回找，跳过刀/道具/空，返回第一个有意义的武器。
- *  不用 set 匹配，直接判断是否是非刀具非投掷物武器。 */
-const NOT_A_GUN = new Set(["刀", "knife", "C4", "Zeus x27", "闪光弹", "烟雾弹", "燃烧弹", "HE 手雷", "诱饵弹"]);
+function primaryLoadoutLabel(loadout: WorkspaceReplayLoadout): string {
+  return loadout.primaryWeapon ?? loadout.secondaryWeapon ?? "—";
+}
 
-function mainWeaponSoFar(frames: WorkspaceReplayFrame[], uptoIndex: number): string | null {
-  for (let i = Math.min(uptoIndex, frames.length - 1); i >= 0; i -= 1) {
-    const w = frames[i]?.weapon;
-    if (!w || NOT_A_GUN.has(w)) continue;
-    return w;
+function heldUtilityLabel(loadout: WorkspaceReplayLoadout): string {
+  if (loadout.grenades.length === 0) {
+    return `道具 x${loadout.grenadeCount}`;
   }
-  return null;
+  const counts = new Map<WorkspaceReplayLoadout["grenades"][number], number>();
+  for (const grenade of loadout.grenades) {
+    counts.set(grenade, (counts.get(grenade) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([grenade, count]) => `${grenadeShortLabel(grenade)}${count > 1 ? count : ""}`)
+    .join(" ");
+}
+
+function grenadeShortLabel(grenade: WorkspaceReplayLoadout["grenades"][number]): string {
+  if (grenade === "flashbang") return "闪";
+  if (grenade === "smoke") return "烟";
+  if (grenade === "molotov" || grenade === "incendiary") return "火";
+  if (grenade === "hegrenade") return "雷";
+  return "诱";
 }
 
 function replayPointPercent(frame: { x: number; y: number }, map: MatchWorkspaceModel["map"]["view"]) {
@@ -1360,7 +1415,7 @@ function GrenadeEffectLayer({ round, currentTick, tickrate, map, level = null, l
         return (
           <span
             key={`fx-${index}`}
-            className={`dak-replay-fx dak-replay-fx-${spec.kind}`}
+            className={`dak-replay-fx dak-replay-fx-${spec.kind}${row.throwerSide ? ` dak-replay-fx-${row.throwerSide}` : ""}`}
             style={{ ...replayFramePosition({ x: row.effectX, y: row.effectY }, map), width: `${sizePercent}%`, height: `${sizePercent}%` }}
             aria-hidden="true"
           >

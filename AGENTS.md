@@ -92,7 +92,7 @@ docs/                  # 架构与集成文档
 
 > **已迁移**：cs2-demo-format 3.0.0（2026-06）。TS 管线全部使用 v3 合同，
 > Python exporter 切换为 PyPI `cs2df`（本仓库只留 GUI/Studio 壳层）。
-> 需用 cs2df 重导测试 fixture 后方可全量验证（详见 `docs/v3-migration.md` §5）。
+> 需用 cs2df 重导测试 fixture 后方可全量验证（已归档到 `docs/archive/2026-06/v3-migration.md`）。
 > Studio 最终形态设计见 [`docs/design/studio-redesign.md`](docs/design/studio-redesign.md)。
 
 ### 模块边界规则

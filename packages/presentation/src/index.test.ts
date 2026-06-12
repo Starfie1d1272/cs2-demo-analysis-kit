@@ -16,4 +16,20 @@ describe("@cs2dak/presentation", () => {
     expect(workspace.rounds).toHaveLength(15);
     expect(workspace.replay.available).toBe(true);
   });
+
+  it("uses round-persistent loadout facts for replay weapons and utility", async () => {
+    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
+    const pkg = await loadDemoPackageFromZip(zip);
+    const workspace = buildMatchWorkspaceModel(pkg);
+    const economy = pkg.playerEconomies.find((row) => row.roundNumber === 2 && row.primaryWeapon && row.grenadeCount > 0);
+    expect(economy).toBeTruthy();
+
+    const sourcePlayer = pkg.players[economy!.playerIndex];
+    const replayRound = workspace.replay.rounds.find((row) => row.roundNumber === economy!.roundNumber);
+    const replayPlayer = replayRound?.players.find((player) => player.steamId64 === sourcePlayer?.steamId64);
+
+    expect(replayPlayer?.loadout.primaryWeapon).toBe(economy!.primaryWeapon);
+    expect(replayPlayer?.loadout.secondaryWeapon).toBe(economy!.secondaryWeapon);
+    expect(replayPlayer?.loadout.grenadeCount).toBe(economy!.grenadeCount);
+  });
 });

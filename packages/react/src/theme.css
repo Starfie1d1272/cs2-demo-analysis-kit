@@ -1329,9 +1329,117 @@
 
 .dak-replay-layout {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr) 260px;
+  grid-template-columns: minmax(210px, 260px) minmax(520px, 1fr) minmax(210px, 260px);
+  grid-template-areas:
+    "controls controls controls"
+    "roster-left stage roster-right";
   gap: 14px;
   align-items: start;
+}
+
+.dak-replay-controlbar {
+  grid-area: controls;
+  display: grid;
+  grid-template-columns: 270px minmax(360px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--dak-border);
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(238, 243, 248, 0.035), transparent), var(--dak-bg-panel);
+}
+
+.dak-replay-round-nav {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  gap: 8px;
+  align-items: center;
+}
+
+.dak-round-select-label {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  color: var(--dak-fg-dim);
+  font-family: var(--dak-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.dak-round-select {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--dak-border);
+  border-radius: 4px;
+  background: var(--dak-bg-subtle);
+  color: var(--dak-fg);
+  font: inherit;
+  font-family: var(--dak-mono);
+}
+
+.dak-replay-togglebar {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.dak-replay-statusline {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  color: var(--dak-fg-mid);
+  font-family: var(--dak-mono);
+  font-size: 11px;
+}
+
+.dak-replay-statusline span {
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 7px;
+  border: 1px solid rgba(238, 243, 248, 0.1);
+  border-radius: 3px;
+  background: rgba(9, 11, 15, 0.32);
+  white-space: nowrap;
+}
+
+.dak-replay-stage-panel {
+  grid-area: stage;
+  min-width: 0;
+}
+
+.dak-replay-roster-panel {
+  min-width: 0;
+}
+
+.dak-replay-roster-left {
+  grid-area: roster-left;
+}
+
+.dak-replay-roster-right {
+  grid-area: roster-right;
+}
+
+.dak-replay-stage-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: var(--dak-fg-mid);
+  font-family: var(--dak-mono);
+  font-size: 12px;
+}
+
+.dak-replay-stage-head span {
+  color: var(--dak-fg);
+  font-weight: 800;
 }
 
 .dak-playback {
@@ -1339,7 +1447,7 @@
   grid-template-columns: 42px 34px minmax(0, 1fr) 34px;
   gap: 8px;
   align-items: center;
-  margin: 14px 0 10px;
+  margin: 0;
 }
 
 .dak-play-button,
@@ -1363,6 +1471,11 @@
   width: 34px;
   height: 34px;
   background: var(--dak-bg-subtle);
+}
+
+.dak-icon-button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
 }
 
 .dak-scrubber {
@@ -1501,8 +1614,8 @@
 
 .dak-replay-meta {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(70px, 1fr));
+  gap: 6px;
 }
 
 .dak-replay-gridlines {
@@ -1546,21 +1659,63 @@
 
 .dak-frame-player-list {
   display: grid;
+  gap: 5px;
+}
+
+.dak-roster-board {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid var(--dak-border);
+  border-radius: 4px;
+  background:
+    linear-gradient(180deg, rgba(238, 243, 248, 0.035), transparent 48%),
+    var(--dak-bg-panel);
+}
+
+.dak-roster-team {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.dak-roster-team-head {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
   gap: 7px;
-  max-height: 620px;
-  overflow: auto;
+  align-items: center;
+  color: var(--dak-fg-dim);
+  font-family: var(--dak-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.dak-roster-team-head b {
+  color: var(--dak-fg);
+  font-size: 12px;
+}
+
+.dak-roster-team-head small {
+  color: var(--dak-fg-dim);
 }
 
 .dak-frame-player-row {
   display: grid;
-  grid-template-columns: 10px 18px minmax(0, 1fr) 52px;
-  gap: 8px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 7px;
   align-items: center;
-  padding: 8px 9px;
+  min-height: 54px;
+  padding: 6px 8px;
   border: 1px solid var(--dak-border);
   border-radius: 4px;
   background: var(--dak-bg-subtle);
   font-size: 12px;
+}
+
+.dak-frame-player-row .dak-hp-bar-wrap {
+  grid-column: 2;
+  width: 100%;
 }
 
 .dak-frame-player-name,
@@ -1589,6 +1744,41 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.dak-frame-loadout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  min-width: 0;
+  color: var(--dak-fg-dim);
+  font-family: var(--dak-mono);
+  font-size: 10px;
+}
+
+.dak-frame-loadout span {
+  min-width: 0;
+  max-width: 92px;
+  overflow: hidden;
+  padding: 1px 5px;
+  border: 1px solid rgba(238, 243, 248, 0.11);
+  border-radius: 3px;
+  background: rgba(9, 11, 15, 0.34);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dak-frame-loadout .dak-frame-primary {
+  color: var(--dak-fg);
+  border-color: rgba(73, 182, 255, 0.28);
+  background: rgba(73, 182, 255, 0.09);
+}
+
+.dak-frame-loadout .dak-frame-current {
+  color: var(--dak-warn);
+  border-color: rgba(255, 198, 77, 0.28);
+  background: rgba(255, 198, 77, 0.08);
 }
 
 .dak-frame-player-row-dead {
@@ -1922,6 +2112,20 @@
   .dak-player-round-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .dak-replay-layout {
+    grid-template-areas:
+      "controls controls"
+      "roster-left roster-right"
+      "stage stage";
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dak-replay-controlbar,
+  .dak-replay-togglebar {
+    grid-template-columns: 1fr;
+  }
+
 }
 
 @media (max-width: 720px) {
@@ -1949,6 +2153,19 @@
     width: 100%;
   }
 
+  .dak-roster-board {
+    grid-template-columns: 1fr;
+  }
+
+  .dak-replay-layout {
+    grid-template-areas:
+      "controls"
+      "roster-left"
+      "roster-right"
+      "stage";
+    grid-template-columns: 1fr;
+  }
+
   .dak-player-round-summary {
     grid-template-columns: 1fr;
   }
@@ -1965,6 +2182,18 @@
 
 .dak-replay-fx-smoke {
   background: radial-gradient(circle, rgba(214, 222, 230, 0.55) 0%, rgba(214, 222, 230, 0.35) 65%, transparent 100%);
+  border: 1px solid rgba(214, 222, 230, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(9, 11, 15, 0.42), 0 0 12px rgba(214, 222, 230, 0.18);
+}
+
+.dak-replay-fx-smoke.dak-replay-fx-ct {
+  border-color: color-mix(in srgb, var(--dak-accent-b) 72%, white 12%);
+  box-shadow: inset 0 0 0 1px rgba(9, 11, 15, 0.45), 0 0 14px rgba(73, 182, 255, 0.34);
+}
+
+.dak-replay-fx-smoke.dak-replay-fx-t {
+  border-color: color-mix(in srgb, var(--dak-accent) 76%, white 10%);
+  box-shadow: inset 0 0 0 1px rgba(9, 11, 15, 0.45), 0 0 14px rgba(255, 122, 33, 0.34);
 }
 
 .dak-replay-fx-fire {
