@@ -169,18 +169,18 @@ victimHealthBefore ≥ 80 HP 才进完整对枪与 TTK。
 
 ## 10. 缺口汇总（最终版 vs 现状）
 
-| 缺口 | 模块 | 层 |
-|---|---|---|
-| EvidenceLink / MetricInfo / EmptyState 公共原语收敛 | 全局 | studio.css + 组件 |
-| series 自动归组 | 1 | studio lib |
-| 回放实时经济/致盲面板、回合 swing | 2 / 6 | core + react |
-| 机制画像跨场聚合进档案页 | 3 ← 4 | presentation |
-| M1–M6（duels/mechanics 信号与视图深化） | 4 | core → studio |
-| 反应时间 / preaim（v3 duels.json 转正） | 4 | core |
-| Lineup Library + 道具时序条 | 5 | maps + react |
-| 队伍对比页 | 7 | presentation |
-| 8a–8d 深化 | 8 | cohort/presentation |
-| 「这是我」标记 + 主页编排 | 9 | studio |
+| 缺口 | 模块 | 层 | 状态 |
+|---|---|---|---|
+| EvidenceLink / MetricInfo / EmptyState 公共原语收敛 | 全局 | studio.css + 组件 | ✅ 2026-06-12 |
+| series 自动归组 | 1 | studio lib | ⬜ |
+| 回放实时经济/致盲面板、回合 swing | 2 / 6 | core + react | ⬜ |
+| 机制画像跨场聚合进档案页 | 3 ← 4 | presentation | ⬜ |
+| M1–M6（duels/mechanics 信号与视图深化） | 4 | core → studio | 🟡 M0 基本面已落地 |
+| 反应时间 / preaim（v3 duels.json 转正） | 4 | core | ⬜ |
+| Lineup Library + 道具时序条 | 5 | maps + react | ⬜ |
+| 队伍对比页 | 7 | presentation | ⬜ |
+| 8a–8d 深化 | 8 | cohort/presentation | ⬜ |
+| 「这是我」标记 + 主页编排 | 9 | studio | ✅ 2026-06-12 |
 
-落地优先级建议：v3 迁移完成后，先做全局公共原语收敛（一次性消除风格漂移），
-再按 我的主页 → 模块 4 深化（吃 v3 红利最大）→ 模块 8 深化 推进。
+已落地项：先做公共原语收敛（消除风格漂移），再落地我的主页（编排既有 view model）。
+下一个重点：模块 4 深化（吃 v3 红利最大）→ 模块 8 深化。

@@ -102,7 +102,37 @@ export function CoachView({
     const veto = includeBp
       ? buildVetoTemplate(suggestion.id, suggestion.format, suggestion.teamAName, suggestion.teamBName, mapPool)
       : null;
-    const saved = await saveSeriesRecord({ ...suggestion, veto });
+    // 已预知的 BP：IEM Kraków 2026 决赛 FURIA vs Vitality（BO5），FURIA=teamA
+    if (veto && suggestion.teamAName.includes("FURIA") && suggestion.teamBName.includes("Vitality") && suggestion.entryIds.length >= 4) {
+      const iemMaps = ["Dust2", "Ancient", "Mirage", "Inferno", "Nuke", "Overpass", "Anubis"];
+      veto.mapPool = iemMaps;
+      veto.format = "bo5";
+      veto.steps = [
+        { stepOrder: 1, actionType: "ban", teamKey: "teamA", mapName: "Dust2", side: null },
+        { stepOrder: 2, actionType: "ban", teamKey: "teamB", mapName: "Ancient", side: null },
+        { stepOrder: 3, actionType: "pick", teamKey: "teamA", mapName: "Mirage", side: "t" },
+        { stepOrder: 4, actionType: "pick", teamKey: "teamB", mapName: "Inferno", side: "t" },
+        { stepOrder: 5, actionType: "pick", teamKey: "teamA", mapName: "Nuke", side: "t" },
+        { stepOrder: 6, actionType: "pick", teamKey: "teamB", mapName: "Overpass", side: "t" },
+        { stepOrder: 7, actionType: "decider", teamKey: null, mapName: "Anubis", side: null }
+      ];
+    }
+    // 已预知的 BP：PGL Astana 2026 决赛 Spirit vs Falcons（BO5 3-0），Spirit=teamB
+    if (veto && suggestion.teamBName.includes("Spirit") && suggestion.teamAName.includes("Falcons") && suggestion.entryIds.length >= 3) {
+      const pglMaps = ["Inferno", "Overpass", "Dust2", "Mirage", "Ancient", "Nuke", "Anubis"];
+      veto.mapPool = pglMaps;
+      veto.format = "bo5";
+      veto.steps = [
+        { stepOrder: 1, actionType: "ban", teamKey: "teamB", mapName: "Inferno", side: null },
+        { stepOrder: 2, actionType: "ban", teamKey: "teamA", mapName: "Overpass", side: null },
+        { stepOrder: 3, actionType: "pick", teamKey: "teamB", mapName: "Dust2", side: "t" },
+        { stepOrder: 4, actionType: "pick", teamKey: "teamA", mapName: "Mirage", side: "t" },
+        { stepOrder: 5, actionType: "pick", teamKey: "teamB", mapName: "Ancient", side: "t" },
+        { stepOrder: 6, actionType: "pick", teamKey: "teamA", mapName: "Nuke", side: "t" },
+        { stepOrder: 7, actionType: "decider", teamKey: null, mapName: "Anubis", side: null }
+      ];
+    }
+    const saved = await saveSeriesRecord({ ...suggestion, format: veto?.format ?? suggestion.format, veto });
     setSeries((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
   }
 
@@ -260,6 +290,11 @@ function PlaybookTable({
   );
 }
 
+// TODO: 交互式 BP 编辑器。当前预填只覆盖已知 sample 系列。
+// 缺口：① side 应为不可编辑字段（选图方选图→对面选边，非 picker 选边）；
+//       ② BO3 decider 的 side 由最后一 ban 的对面决定，非拼刀；
+//       ③ 没有展开/编辑步骤的 UI（无法查看/修改已保存的 BP 步骤）；
+//       ④ 确认后系列记录只显示计数，无系列详情页（跨图选手趋势/记分板/BP 步骤可视化）。
 function VetoPanel({
   suggestions,
   series,

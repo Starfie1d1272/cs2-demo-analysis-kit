@@ -19,7 +19,14 @@ import { DuelView } from "./views/DuelView";
 import { CoachView } from "./views/CoachView";
 import { loadIdentityState, buildCohortIdentityMap, type IdentityStoreState } from "./lib/identity";
 import type { IdentityOptions } from "./lib/season";
-import sampleZipUrl from "../../../fixtures/input/sample-match.zip?url";
+import sampleMirage from "../../../fixtures/input/sample-2026-02-09_de_mirage_FURIA_13-11_Team_Vitality.zip?url";
+import sampleInferno from "../../../fixtures/input/sample-2026-02-09_de_inferno_Team_Vitality_13-8_FURIA.zip?url";
+import sampleNuke from "../../../fixtures/input/sample-2026-02-09_de_nuke_FURIA_2-13_Team_Vitality.zip?url";
+import sampleOverpass from "../../../fixtures/input/sample-2026-02-09_de_overpass_Team_Vitality_13-10_FURIA.zip?url";
+import sampleDust2 from "../../../fixtures/input/sample-2026-05-17_de_dust2_Team_Spirit_16-12_Team_Falcons.zip?url";
+import sampleSphMirage from "../../../fixtures/input/sample-2026-05-17_de_mirage_Team_Spirit_13-7_Team_Falcons.zip?url";
+import sampleAncient from "../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip?url";
+const sampleUrls = [sampleMirage, sampleInferno, sampleNuke, sampleOverpass, sampleDust2, sampleSphMirage, sampleAncient];
 
 // 八模块信息架构（docs/roadmap.md），未实现的模块以「制作中」占位展示
 type StudioView =
@@ -171,9 +178,15 @@ export function App() {
     setImporting(true);
     setNotice(null);
     try {
-      const response = await fetch(sampleZipUrl);
-      const blob = await response.blob();
-      await importFiles([new File([blob], "2026-02-09_de_mirage_FURIA-vs-Team_Vitality_13-11.zip", { type: "application/zip" })]);
+      const files = await Promise.all(
+        sampleUrls.map(async (url) => {
+          const response = await fetch(url);
+          const blob = await response.blob();
+          const name = url.split("/").pop() ?? "sample.zip";
+          return new File([blob], name.replace(/^sample-/i, ""), { type: "application/zip" });
+        })
+      );
+      await importFiles(files);
     } catch (err) {
       setNotice(`示例加载失败：${err instanceof Error ? err.message : String(err)}`);
       setImporting(false);

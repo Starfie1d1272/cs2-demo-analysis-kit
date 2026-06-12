@@ -23,6 +23,7 @@
 | 6 | Economy & Round Flow | ✅ 基本完成 | 经济矩阵、手枪转化、eco/semi 翻盘已转正；缺回合 swing |
 | 7 | Tournament Hub（高校赛事中台） | ✅ 基本完成 | 排行榜、赛事总览、比赛报告与选手图卡导出（0.3.0） |
 | 8 | Coach / Analyst Workbench | 🟡 已设计 | pattern finder / playbook / anti-strat / veto + BP 录入，双视角（[design/duel-coach-lab.md](design/duel-coach-lab.md)） |
+| 9 | 我的主页 | ✅ 已完成 | 「这是我」标记 + 趋势速览 + 该练什么 + 最近比赛，纯编排零新信号 |
 
 ## v0.2 — 单场证据闭环（下一个里程碑）
 
