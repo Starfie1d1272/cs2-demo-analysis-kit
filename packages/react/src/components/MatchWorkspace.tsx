@@ -922,16 +922,19 @@ export function ReplayViewer({ replay, map, target = null }: {
                 >
                   <span className={`dak-team-dot dak-team-dot-${player.teamKey}`} />
                   <span className="dak-frame-player-num">{playerNumbers[player.steamId64] ?? "?"}</span>
-                  <span className="dak-frame-player-name">{player.name}</span>
+                  <span className="dak-frame-player-name">
+                    {player.name}
+                    {frame.alive && (
+                      <small className="dak-frame-weapon">
+                        {main ?? frame.weapon ?? "—"}
+                        {frame.armor > 0 ? (frame.hasHelmet ? " · 全甲" : " · 半甲") : ""}
+                        {frame.hasDefuseKit ? " · kit" : ""}
+                        {frame.flashed ? " · flashed" : ""}
+                      </small>
+                    )}
+                    {!frame.alive && <small className="dak-frame-weapon">阵亡</small>}
+                  </span>
                   {renderHpArmor(frame)}
-                  <small>
-                    {frame.alive
-                      ? `${main ?? frame.weapon ?? "—"}` +
-                        `${frame.armor > 0 ? (frame.hasHelmet ? " · 全甲" : " · 半甲") : ""}` +
-                        `${frame.hasDefuseKit ? " · kit" : ""}` +
-                        `${frame.flashed ? " · flashed" : ""}`
-                      : "阵亡"}
-                  </small>
                 </div>
               );
             })}
@@ -1280,31 +1283,17 @@ function hpBarColor(hp: number): string {
   return "var(--dak-danger)";
 }
 
-/** 主武器（步枪/狙/冲锋/霰弹/机枪）与手枪的显示名称集合。
- *  frame.weapon 在 workspace 层已由 weaponNameForIndex → displayWeaponName 转为显示名。 */
-const PRIMARY_WEAPONS = new Set([
-  "AK-47", "M4A4", "M4A1-S", "Galil AR", "FAMAS", "SG 553", "AUG",
-  "AWP", "SSG 08", "SCAR-20", "G3SG1",
-  "MAC-10", "MP9", "MP7", "MP5-SD", "UMP-45", "P90", "PP-Bizon",
-  "Nova", "XM1014", "MAG-7", "Sawed-Off", "M249", "Negev"
-]);
-const PISTOL_WEAPONS = new Set([
-  "Desert Eagle", "R8 Revolver", "Glock-18", "USP-S", "P2000", "P250",
-  "Five-SeveN", "Tec-9", "CZ75-Auto", "Dual Berettas"
-]);
+/** 简单回溯：从当前帧往回找，跳过刀/道具/空，返回第一个有意义的武器。
+ *  不用 set 匹配，直接判断是否是非刀具非投掷物武器。 */
+const NOT_A_GUN = new Set(["刀", "C4", "Zeus x27", "闪光弹", "烟雾弹", "燃烧弹", "HE 手雷", "诱饵弹"]);
 
-/** 本回合至当前帧最近持有的主武器；没碰过主武器则显示最近持有的手枪。
- *  回放流只记当前手持武器，切刀/掏雷时用持枪历史回推背包。 */
 function mainWeaponSoFar(frames: WorkspaceReplayFrame[], uptoIndex: number): string | null {
-  let primary: string | null = null;
-  let pistol: string | null = null;
-  for (let i = 0; i <= uptoIndex && i < frames.length; i += 1) {
+  for (let i = Math.min(uptoIndex, frames.length - 1); i >= 0; i -= 1) {
     const w = frames[i]?.weapon;
-    if (!w) continue;
-    if (PRIMARY_WEAPONS.has(w)) primary = w;
-    else if (PISTOL_WEAPONS.has(w)) pistol = w;
+    if (!w || NOT_A_GUN.has(w)) continue;
+    return w;
   }
-  return primary ?? pistol;
+  return null;
 }
 
 function replayPointPercent(frame: { x: number; y: number }, map: MatchWorkspaceModel["map"]["view"]) {

@@ -1579,10 +1579,16 @@
   text-align: center;
 }
 
-.dak-frame-player-row small {
-  grid-column: 1 / -1;
+.dak-frame-weapon {
+  display: block;
+  margin-top: 2px;
   color: var(--dak-fg-dim);
   font-family: var(--dak-mono);
+  font-size: 11px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dak-frame-player-row-dead {
