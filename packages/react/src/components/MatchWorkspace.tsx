@@ -926,7 +926,7 @@ export function ReplayViewer({ replay, map, target = null }: {
                     {player.name}
                     {frame.alive && (
                       <small className="dak-frame-weapon">
-                        {main ?? frame.weapon ?? "—"}
+                        {`[${main ?? "∅"}][${frame.weapon ?? "∅"}]`}
                         {frame.armor > 0 ? (frame.hasHelmet ? " · 全甲" : " · 半甲") : ""}
                         {frame.hasDefuseKit ? " · kit" : ""}
                         {frame.flashed ? " · flashed" : ""}
