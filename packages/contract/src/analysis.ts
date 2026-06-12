@@ -166,7 +166,7 @@ export const mapViewSchema = z.object({
 
 export const analysisProvenanceSchema = z.object({
   analysisVersion: z.string(),
-  sourceSchemaVersion: z.literal("cs2-demo-format/2.0"),
+  sourceSchemaVersion: z.literal("cs2-demo-format/3.0"),
   sourceDemoHash: z.string().nullable(),
   exporter: z.object({ name: z.string(), version: z.string() }),
   parser: z.object({ name: z.string(), version: z.string() }),
@@ -178,7 +178,7 @@ export const analysisProvenanceSchema = z.object({
 
 export const analysisBundleSchema = z.object({
   version: z.literal("cs2-demo-analysis-kit/1.0"),
-  sourceSchemaVersion: z.literal("cs2-demo-format/2.0"),
+  sourceSchemaVersion: z.literal("cs2-demo-format/3.0"),
   provenance: analysisProvenanceSchema,
   mapName: z.string(),
   tickrate: z.number().int().positive(),

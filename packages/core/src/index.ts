@@ -8,6 +8,8 @@ import { buildPlayerWeaponHighlights } from "./weapon-highlights.js";
 
 export { loadDemoPackageFromZip } from "./loader.js";
 export { normalizeDemoPackage } from "./normalize.js";
+export { createPlayerResolver, createResolverFromPackage } from "./resolve.js";
+export type { PlayerResolver } from "./resolve.js";
 export { deriveRRSignals, deriveAccountSignalsV2, computeAccountRatingsV2 } from "./signals.js";
 export * from "./spatial/index.js";
 export { deriveRRIndicators } from "./scoreboard.js";

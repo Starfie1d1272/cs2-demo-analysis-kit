@@ -13,8 +13,8 @@ import {
   grenadesSchema,
   clutchesSchema,
   shotsSchema,
-  positionsSchema,
   replaySchema,
+  duelsSchema,
 } from "cs2-demo-format";
 
 export const demoPackageSchema = z.object({
@@ -31,8 +31,8 @@ export const demoPackageSchema = z.object({
   grenades: grenadesSchema.default([]),
   clutches: clutchesSchema.default([]),
   shots: shotsSchema.optional(),
-  positions1s: positionsSchema.optional(),
   replay: replaySchema.optional(),
+  duels: duelsSchema.optional(),
 });
 
 export type DemoPackage = z.infer<typeof demoPackageSchema>;

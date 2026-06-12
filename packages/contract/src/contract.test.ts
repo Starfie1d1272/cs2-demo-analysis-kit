@@ -77,7 +77,7 @@ const minimalIndicators = {
 
 const minimalProvenance = {
   analysisVersion: "cs2-demo-analysis-kit/1.0",
-  sourceSchemaVersion: "cs2-demo-format/2.0" as const,
+  sourceSchemaVersion: "cs2-demo-format/3.0" as const,
   sourceDemoHash: null,
   exporter: { name: "cs2dak", version: "0.2.1" },
   parser: { name: "demoparser2", version: "0.1.0" },
@@ -115,7 +115,7 @@ const minimalScoreboardRow = {
 
 const minimalBundle = {
   version: "cs2-demo-analysis-kit/1.0" as const,
-  sourceSchemaVersion: "cs2-demo-format/2.0" as const,
+  sourceSchemaVersion: "cs2-demo-format/3.0" as const,
   provenance: minimalProvenance,
   mapName: "de_ancient",
   tickrate: 64,
@@ -135,7 +135,7 @@ const minimalBundle = {
 
 const minimalWorkspaceModel = {
   version: "cs2-demo-analysis-kit/workspace-0.1" as const,
-  sourceSchemaVersion: "cs2-demo-format/2.0" as const,
+  sourceSchemaVersion: "cs2-demo-format/3.0" as const,
   title: "Team A vs Team B",
   subtitle: "de_ancient · 10 名选手 · 21 回合",
   scoreline: "13:8",
@@ -253,7 +253,7 @@ describe("demoPackageSchema", () => {
   it("applies defaults for optional array fields", () => {
     const pkg = demoPackageSchema.parse({
       manifest: {
-        schemaVersion: "cs2-demo-format/2.0",
+        schemaVersion: "cs2-demo-format/3.0",
         exporter: { name: "cs2dak", version: "0.2.1" },
         parser: { name: "demoparser2", version: "0.1.0" },
         demo: { hash: null, sourceFileName: null },
@@ -295,8 +295,8 @@ describe("demoPackageSchema", () => {
     expect(pkg.grenades).toEqual([]);
     expect(pkg.clutches).toEqual([]);
     expect(pkg.shots).toBeUndefined();
-    expect(pkg.positions1s).toBeUndefined();
     expect(pkg.replay).toBeUndefined();
+    expect(pkg.duels).toBeUndefined();
   });
 });
 
@@ -500,7 +500,7 @@ describe("seasonCohortBundleSchema", () => {
     weightsVersion: "rr-six-accounts-1.0",
     provenance: {
       cohortVersion: "cs2-demo-analysis-kit/cohort-1.0" as const,
-      sourceSchemaVersion: "cs2-demo-format/2.0" as const,
+      sourceSchemaVersion: "cs2-demo-format/3.0" as const,
       matches: [{ matchId: "abc123", sourceDemoHash: null }],
     },
   };
@@ -545,7 +545,7 @@ describe("matchWorkspaceModelSchema", () => {
 
   it("enforces sourceSchemaVersion literal", () => {
     expect(
-      matchWorkspaceModelSchema.safeParse({ ...minimalWorkspaceModel, sourceSchemaVersion: "cs2-demo-format/3.0" }).success
+      matchWorkspaceModelSchema.safeParse({ ...minimalWorkspaceModel, sourceSchemaVersion: "cs2-demo-format/2.0" }).success
     ).toBe(false);
   });
 

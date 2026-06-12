@@ -1,5 +1,6 @@
 import JSZip from "jszip";
 import type { DemoPackage } from "@cs2dak/contract";
+import { manifestSchema } from "@cs2dak/contract";
 import { normalizeDemoPackage, parsePackageJson } from "./normalize.js";
 
 export async function loadDemoPackageFromZip(bytes: ArrayBuffer | Uint8Array): Promise<DemoPackage> {
@@ -12,21 +13,35 @@ export async function loadDemoPackageFromZip(bytes: ArrayBuffer | Uint8Array): P
     return parsePackageJson(await file.async("string")) as T;
   };
 
-  const manifest = await readJson<unknown>("manifest.json");
-  const match = await readJson<unknown>("match.json");
-  const players = await readJson<unknown>("players.json");
-  const rounds = await readJson<unknown>("rounds.json");
-  const playerEconomies = await readJson<unknown>("player-economies.json").catch(() => []);
-  const playerStats = await readJson<unknown>("player-stats.json").catch(() => []);
-  const kills = await readJson<unknown>("kills.json").catch(() => []);
-  const damages = await readJson<unknown>("damages.json").catch(() => []);
-  const blinds = await readJson<unknown>("blinds.json").catch(() => []);
-  const bombs = await readJson<unknown>("bombs.json").catch(() => []);
-  const grenades = await readJson<unknown>("grenades.json").catch(() => []);
-  const clutches = await readJson<unknown>("clutches.json").catch(() => []);
-  const shots = await readJson<unknown>("shots.json").catch(() => undefined);
-  const positions1s = await readJson<unknown>("positions-1s.json").catch(() => undefined);
-  const replay = await readJson<unknown>("replay.json").catch(() => undefined);
+  const rawManifest = await readJson<{ schemaVersion?: string }>("manifest.json");
+  const version = rawManifest?.schemaVersion ?? "unknown";
+  if (!version.startsWith("cs2-demo-format/3.")) {
+    throw new Error(
+      `不支持的包版本 ${version}：本版本只读取 cs2-demo-format/3.x，请用 cs2df 重新导出该 demo`
+    );
+  }
+  const manifest = manifestSchema.parse(rawManifest);
+  const files = manifest.files;
+
+  const optional = async (name: string | undefined): Promise<unknown> =>
+    name ? readJson<unknown>(name).catch(() => undefined) : undefined;
+  const required = async (name: string, fallback: unknown): Promise<unknown> =>
+    readJson<unknown>(name).catch(() => fallback);
+
+  const match = await readJson<unknown>(files.match);
+  const players = await readJson<unknown>(files.players);
+  const rounds = await readJson<unknown>(files.rounds);
+  const playerEconomies = await required(files.playerEconomies, []);
+  const playerStats = await required(files.playerStats, []);
+  const kills = await required(files.kills, []);
+  const damages = await required(files.damages, []);
+  const blinds = await required(files.blinds, []);
+  const bombs = await required(files.bombs, []);
+  const grenades = await required(files.grenades, []);
+  const clutches = await required(files.clutches, []);
+  const shots = await optional(files.shots);
+  const replay = await optional(files.replay);
+  const duels = await optional(files.duels);
 
   return normalizeDemoPackage({
     manifest,
@@ -42,7 +57,7 @@ export async function loadDemoPackageFromZip(bytes: ArrayBuffer | Uint8Array): P
     grenades,
     clutches,
     shots,
-    positions1s,
-    replay
+    replay,
+    duels
   });
 }

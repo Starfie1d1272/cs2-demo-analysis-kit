@@ -5,6 +5,7 @@ import {
   economyTypeSchema,
   teamEconomySchema,
   vec3Schema,
+  playerIndexSchema,
   playerRowSchema,
   roundRowSchema,
   killRowSchema,
@@ -15,11 +16,16 @@ import {
   bombRowSchema,
   grenadeRowSchema,
   clutchRowSchema,
-  shotRowSchema,
-  positionRowSchema,
+  shotTrackSchema,
+  shotsSchema,
   replaySchema,
   replayRoundSchema,
   replayPlayerTrackSchema,
+  replayProjectileSchema,
+  duelsSchema,
+  duelWindowSchema,
+  duelPlayerTrackSchema,
+  duelAnchorSchema,
 } from "cs2-demo-format";
 
 export {
@@ -33,8 +39,16 @@ export {
   clutchesSchema,
   damageRowSchema,
   damagesSchema,
+  decodeDelta,
+  duelAnchorSchema,
+  duelPlayerTrackSchema,
+  duelsSchema,
+  duelWindowSchema,
   economyTypeSchema,
   endReasonSchema,
+  FLAG_ALIVE,
+  FLAG_HAS_BOMB,
+  FLAG_HAS_DEFUSE_KIT,
   grenadeRowSchema,
   grenadeTypeSchema,
   grenadesSchema,
@@ -45,18 +59,18 @@ export {
   matchSchema,
   playerEconomiesSchema,
   playerEconomyRowSchema,
+  playerIndexSchema,
   playerRowSchema,
   playersSchema,
   playerStatsRowSchema,
   playerStatsSchema,
-  positionRowSchema,
-  positionsSchema,
   replaySchema,
   replayPlayerTrackSchema,
+  replayProjectileSchema,
   replayRoundSchema,
   roundRowSchema,
   roundsSchema,
-  shotRowSchema,
+  shotTrackSchema,
   shotsSchema,
   sideSchema,
   steamId64Schema,
@@ -72,6 +86,7 @@ export type TeamKey = z.infer<typeof teamKeySchema>;
 export type EconomyType = z.infer<typeof economyTypeSchema>;
 export type TeamEconomyType = z.infer<typeof teamEconomySchema>;
 export type Vec3 = z.infer<typeof vec3Schema>;
+export type PlayerIndex = z.infer<typeof playerIndexSchema>;
 
 export type PackagePlayer = z.infer<typeof playerRowSchema>;
 export type PackageRound = z.infer<typeof roundRowSchema>;
@@ -83,8 +98,13 @@ export type PackageBlind = z.infer<typeof blindRowSchema>;
 export type PackageBomb = z.infer<typeof bombRowSchema>;
 export type PackageGrenade = z.infer<typeof grenadeRowSchema>;
 export type PackageClutch = z.infer<typeof clutchRowSchema>;
-export type PackageShot = z.infer<typeof shotRowSchema>;
-export type PackagePosition = z.infer<typeof positionRowSchema>;
+export type PackageShots = z.infer<typeof shotsSchema>;
+export type PackageShotTrack = z.infer<typeof shotTrackSchema>;
 export type Replay = z.infer<typeof replaySchema>;
 export type ReplayRound = z.infer<typeof replayRoundSchema>;
 export type ReplayPlayerTrack = z.infer<typeof replayPlayerTrackSchema>;
+export type ReplayProjectile = z.infer<typeof replayProjectileSchema>;
+export type Duels = z.infer<typeof duelsSchema>;
+export type DuelWindow = z.infer<typeof duelWindowSchema>;
+export type DuelPlayerTrack = z.infer<typeof duelPlayerTrackSchema>;
+export type DuelAnchor = z.infer<typeof duelAnchorSchema>;

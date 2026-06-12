@@ -8,5 +8,5 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - '@rivalhub/rival-rating'
   - '@rivalhub/rival-rating@0.1.0'
-  - cs2-demo-format@2.3.0
+  - cs2-demo-format
   - '@rivalhub/rival-rating@0.2.0'
