@@ -11,7 +11,7 @@
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
 
 IS_WIN = sys.platform.startswith("win")
 ROOT = Path(SPECPATH).resolve()         # python/packaging/
@@ -36,6 +36,35 @@ else:
 
 binaries = []
 hiddenimports = []
+
+def keep_runtime_module(name: str) -> bool:
+    blocked_parts = (
+        ".tests",
+        ".testing",
+        "._testing",
+        ".bench",
+        ".benchmarks",
+        ".conftest",
+        "._pyinstaller",
+    )
+    blocked_names = (
+        "benchmark",
+        "conftest",
+        "pytest",
+        "_pytest",
+        "_test",
+        "test_",
+        "testutils",
+    )
+    return (
+        not any(part in name for part in blocked_parts)
+        and not any(segment.startswith(blocked_names) for segment in name.split("."))
+        and not any(
+            segment.endswith(("_test", "_tests", "_testing"))
+            for segment in name.split(".")
+        )
+    )
+
 for pkg in (
     # cs2df 及其传递依赖（动态加载，静态分析易遗漏）
     "cs2df", "pyarrow", "polars", "polars-runtime-32",
@@ -45,10 +74,9 @@ for pkg in (
     # 常用被动态 import 的标准补充
     "typing_extensions",
 ):
-    d, b, h = collect_all(pkg)
-    datas += d
-    binaries += b
-    hiddenimports += h
+    datas += collect_data_files(pkg, include_py_files=False)
+    binaries += collect_dynamic_libs(pkg)
+    hiddenimports += collect_submodules(pkg, filter=keep_runtime_module)
 
 a = Analysis(
     [str(SRC / "cs2dak" / "studio.py")],

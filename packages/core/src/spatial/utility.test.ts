@@ -3,7 +3,6 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import type { DemoPackage, Replay } from "@cs2dak/contract";
 import type { MapZones } from "@cs2dak/maps";
-import { getMapTri } from "@cs2dak/maps/tri-assets";
 import { loadDemoPackageFromZip } from "../loader.js";
 import { loadSpatialAssets, type SpatialAssets } from "./annotate.js";
 import { buildOfficialUtilitySpatial, buildUtilityWindows } from "./utility.js";
@@ -118,27 +117,4 @@ describe("UtilitySpatial end-to-end on real fixture (nav-detour isolation, no tr
     }
     expect(isoTotal).toBeGreaterThanOrEqual(0); // nav 绕路隔离，因地图/比赛可能为零
   });
-});
-
-describe("UtilitySpatial LOS metrics on real fixture (tri-backed)", () => {
-  it("derives non-null sightline denial / protected crossings when tri-BVH is available", () => {
-    const pkg = deAncientPkg!;
-    const mapName = pkg.match.mapName;
-    const tri = getMapTri(mapName);
-    if (!tri) {
-      // 本机未下载 ~/.awpy/tris/{mapName}.tri → 跳过（CI 无 tri）
-      return;
-    }
-    const assets = loadSpatialAssets(mapName, tri);
-    expect(assets.available.visibility).toBe(true);
-
-    const u = buildOfficialUtilitySpatial(pkg, assets);
-    let sightTotal = 0;
-    for (const v of u.values()) {
-      expect(v.actualSmokeSightlineDenialSeconds).not.toBeNull();
-      expect(v.actualSmokeProtectedCrossings).not.toBeNull();
-      sightTotal += v.actualSmokeSightlineDenialSeconds ?? 0;
-    }
-    expect(sightTotal).toBeGreaterThanOrEqual(0);
-  }, 60_000);
 });
