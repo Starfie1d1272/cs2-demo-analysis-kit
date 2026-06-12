@@ -163,7 +163,7 @@ export function buildSeasonCohort(
     weightsVersion: `${rrWeights.version}+${valueWeights.version}+${prismWeights.version}`,
     provenance: {
       cohortVersion: "cs2-demo-analysis-kit/cohort-1.0",
-      sourceSchemaVersion: "cs2-demo-format/2.0",
+      sourceSchemaVersion: "cs2-demo-format/3.0",
       matches: demos.map((demo) => ({
         matchId: demo.matchId,
         sourceDemoHash: demo.pkg.manifest.demo?.hash ?? null

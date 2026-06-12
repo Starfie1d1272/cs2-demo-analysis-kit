@@ -1,23 +1,67 @@
 import { describe, expect, it } from "vitest";
-import type { DemoPackage } from "@cs2dak/contract";
+import type { DemoPackage, Replay } from "@cs2dak/contract";
 import { loadSpatialAssets } from "./annotate.js";
 import { buildOfficialMapControl } from "./mapcontrol.js";
 
 const TICKS = [150, 214, 278, 342];
 
-function pos(tick: number, steamId64: string, teamKey: string, place: string) {
-  return { roundNumber: 1, tick, steamId64, teamKey, side: teamKey === "teamA" ? "t" : "ct", alive: true, position: { x: 0, y: 0, z: 0 }, lastPlaceName: place };
+function deltaArr(values: number[]): number[] {
+  const out: number[] = [];
+  let prev = 0;
+  for (const v of values) { out.push(v - prev); prev = v; }
+  return out;
+}
+
+function replayTracks(t1Places: string[], idxByPlace: Map<string, number>) {
+  return [
+    {
+      playerIndex: 0,
+      x: deltaArr([0, 0, 0, 0]), y: deltaArr([0, 0, 0, 0]), z: deltaArr([0, 0, 0, 0]),
+      yaw: deltaArr([0, 0, 0, 0]), pitch: deltaArr([0, 0, 0, 0]),
+      hp: [100, 100, 100, 100], armor: [100, 100, 100, 100],
+      money: [800, 800, 800, 800], equipValue: [800, 800, 800, 800],
+      weapon: [-1, -1, -1, -1],
+      place: t1Places.map((p) => idxByPlace.get(p) ?? -1),
+      flash: [0, 0, 0, 0], flags: [1, 1, 1, 1],
+    },
+    {
+      playerIndex: 1,
+      x: deltaArr([0, 0, 0, 0]), y: deltaArr([0, 0, 0, 0]), z: deltaArr([0, 0, 0, 0]),
+      yaw: deltaArr([0, 0, 0, 0]), pitch: deltaArr([0, 0, 0, 0]),
+      hp: [100, 100, 100, 100], armor: [100, 100, 100, 100],
+      money: [800, 800, 800, 800], equipValue: [800, 800, 800, 800],
+      weapon: [-1, -1, -1, -1],
+      place: [idxByPlace.get("TSpawn")!, idxByPlace.get("TSpawn")!, idxByPlace.get("TSpawn")!, idxByPlace.get("TSpawn")!],
+      flash: [0, 0, 0, 0], flags: [1, 1, 1, 1],
+    },
+    {
+      playerIndex: 2,
+      x: deltaArr([0, 0, 0, 0]), y: deltaArr([0, 0, 0, 0]), z: deltaArr([0, 0, 0, 0]),
+      yaw: deltaArr([0, 0, 0, 0]), pitch: deltaArr([0, 0, 0, 0]),
+      hp: [100, 100, 100, 100], armor: [100, 100, 100, 100],
+      money: [800, 800, 800, 800], equipValue: [800, 800, 800, 800],
+      weapon: [-1, -1, -1, -1],
+      place: [idxByPlace.get("BombsiteA")!, idxByPlace.get("BombsiteA")!, idxByPlace.get("BombsiteA")!, idxByPlace.get("BombsiteA")!],
+      flash: [0, 0, 0, 0], flags: [1, 1, 1, 1],
+    },
+    {
+      playerIndex: 3,
+      x: deltaArr([0, 0, 0, 0]), y: deltaArr([0, 0, 0, 0]), z: deltaArr([0, 0, 0, 0]),
+      yaw: deltaArr([0, 0, 0, 0]), pitch: deltaArr([0, 0, 0, 0]),
+      hp: [100, 100, 100, 100], armor: [100, 100, 100, 100],
+      money: [800, 800, 800, 800], equipValue: [800, 800, 800, 800],
+      weapon: [-1, -1, -1, -1],
+      place: [idxByPlace.get("CTSpawn")!, idxByPlace.get("CTSpawn")!, idxByPlace.get("CTSpawn")!, idxByPlace.get("CTSpawn")!],
+      flash: [0, 0, 0, 0], flags: [1, 1, 1, 1],
+    },
+  ];
 }
 
 /** T1 独推 a_long（LongDoors→ARamp），T2 留 TSpawn，C1 守 BombsiteA（同线施压），C2 离线。 */
 function makePkg(over: { kills?: unknown[] } = {}): DemoPackage {
   const t1 = ["LongDoors", "LongA", "ARamp", "ARamp"];
-  const positions1s = TICKS.flatMap((tick, i) => [
-    pos(tick, "T1", "teamA", t1[i]!),
-    pos(tick, "T2", "teamA", "TSpawn"),
-    pos(tick, "C1", "teamB", "BombsiteA"),
-    pos(tick, "C2", "teamB", "CTSpawn"),
-  ]);
+  const allPlaces = [...new Set([...t1, "TSpawn", "BombsiteA", "CTSpawn"])];
+  const idxByPlace = new Map(allPlaces.map((p, i) => [p, i]));
   return {
     match: { mapName: "de_dust2", tickrate: 64 },
     players: [
@@ -29,11 +73,23 @@ function makePkg(over: { kills?: unknown[] } = {}): DemoPackage {
     rounds: [{ roundNumber: 1, startTick: 1, freezeEndTick: 100, endTick: 2000, teamASide: "t", teamBSide: "ct" }],
     bombs: [],
     kills: over.kills ?? [],
-    positions1s,
+    replay: {
+      meta: { sampleRate: 1, tickrate: 64, coordScale: 1, angleScale: 10 },
+      weaponDict: [],
+      placeDict: allPlaces,
+      rounds: [{
+        roundNumber: 1,
+        startTick: 150,
+        tickStep: 64,
+        frameCount: 4,
+        players: replayTracks(t1, idxByPlace) as unknown as Replay["rounds"][number]["players"],
+        projectiles: [],
+      }],
+    },
   } as unknown as DemoPackage;
 }
 
-const untradedDeath = [{ roundNumber: 1, tick: 410, victimSteamId64: "T1", victimTeamKey: "teamA", killerSteamId64: "C1", killerTeamKey: "teamB", tradeDeath: false }];
+const untradedDeath = [{ roundNumber: 1, tick: 410, killerIndex: 2, victimIndex: 0, victimSteamId64: "T1", victimTeamKey: "teamA", killerSteamId64: "C1", killerTeamKey: "teamB", tradeDeath: false, weapon: "ak47", headshot: false }];
 
 describe("buildOfficialMapControl", () => {
   it("accumulates activeSoloPressureSeconds for a lone route pusher with enemy on the lane", () => {
@@ -65,7 +121,7 @@ describe("buildOfficialMapControl", () => {
   });
 
   it("gives no credit when there was no prior solo pressure (TSpawn camper)", () => {
-    const death = [{ roundNumber: 1, tick: 410, victimSteamId64: "T2", victimTeamKey: "teamA", killerSteamId64: "C1", killerTeamKey: "teamB", tradeDeath: false }];
+    const death = [{ roundNumber: 1, tick: 410, killerIndex: 2, victimIndex: 1, victimSteamId64: "T2", victimTeamKey: "teamA", killerSteamId64: "C1", killerTeamKey: "teamB", tradeDeath: false, weapon: "ak47", headshot: false }];
     const mc = buildOfficialMapControl(makePkg({ kills: death }), loadSpatialAssets("de_dust2"));
     expect(mc.get("T2")?.strategicIsolationDeaths ?? 0).toBe(0);
   });

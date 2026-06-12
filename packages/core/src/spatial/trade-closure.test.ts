@@ -5,7 +5,7 @@ import { loadDemoPackageFromZip } from "../loader.js";
 import { deriveAccountSignalsV2 } from "../signals.js";
 
 /**
- * SP2 Trade 闭环端到端：de_ancient fixture 含 positions-1s + 现役图动线，
+ * SP2 Trade 闭环端到端：de_ancient fixture 含 replay + 现役图动线，
  * 故 strategicIsolationDeaths 应可观测（非 null），接入 rival-rating 的
  * effectiveUntradedDeaths（rr-model.md §3.3）。
  */
@@ -26,12 +26,12 @@ describe("strategicIsolationDeaths wiring (de_ancient fixture)", () => {
     }
   });
 
-  it("returns null strategicIsolationDeaths when positions are absent (unobservable)", async () => {
+  it("returns null strategicIsolationDeaths when replay is absent (unobservable)", async () => {
     const zip = await readFile(
       fileURLToPath(new URL("../../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)),
     );
     const pkg = await loadDemoPackageFromZip(zip);
-    const stripped = { ...pkg, positions1s: [] };
+    const { replay: _, ...stripped } = pkg;
     const signals = deriveAccountSignalsV2(stripped);
     for (const s of signals) expect(s.trade.strategicIsolationDeaths).toBeNull();
   });

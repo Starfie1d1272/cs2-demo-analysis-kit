@@ -43,7 +43,7 @@ export function deriveRRSignals(input: unknown): RRSignals[] {
 
   const spatialAssets = loadSpatialAssets(pkg.match?.mapName ?? pkg.manifest?.mapName ?? "");
   const officialMapControl = buildOfficialMapControl(pkg, spatialAssets);
-  // positions-1s removed in v3; replay-based spatial re-impl is step 3
+  // replay-based spatial re-impl (step 3)
   const spatialObservable = spatialAssets.routes != null && (pkg.replay?.rounds?.length ?? 0) > 0;
 
   return pkg.players.map((player, playerIdx) => {

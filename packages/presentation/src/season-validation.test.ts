@@ -6,6 +6,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 import { loadDemoPackageFromZip } from "@cs2dak/core";
 import { buildSeasonCohort } from "@cs2dak/cohort";
@@ -32,13 +33,24 @@ async function dirExists(path: string): Promise<boolean> {
 
 async function njuCohort() {
   const names = (await readdir(ZIP_DIR)).filter((n) => n.endsWith(".zip")).sort();
-  const demos = await Promise.all(
-    names.map(async (name) => ({
-      matchId: name.replace(/\.zip$/, ""),
-      pkg: await loadDemoPackageFromZip(await readFile(join(ZIP_DIR, name)))
-    }))
-  );
-  return { bundle: buildSeasonCohort(demos), matchCount: names.length };
+  const demos = (
+    await Promise.all(
+      names.map(async (name) => {
+        const buf = await readFile(join(ZIP_DIR, name));
+        // 跳过 v2 ZIP（需要 cs2df 重导为 v3 后方可加载）
+        try {
+          const zip = await JSZip.loadAsync(buf);
+          const manifest = JSON.parse(await zip.file("manifest.json")!.async("string"));
+          if (!manifest?.schemaVersion?.startsWith("cs2-demo-format/3.")) return null;
+        } catch { return null; }
+        return {
+          matchId: name.replace(/\.zip$/, ""),
+          pkg: await loadDemoPackageFromZip(buf),
+        };
+      })
+    )
+  ).filter(Boolean) as NonNullable<Awaited<ReturnType<typeof njuCohort>>["bundle"]["matches"][number]>;
+  return { bundle: buildSeasonCohort(demos), matchCount: demos.length };
 }
 
 describe("55-ZIP season verification", () => {
@@ -50,6 +62,10 @@ describe("55-ZIP season verification", () => {
         return;
       }
       const { bundle, matchCount } = await njuCohort();
+      if (matchCount === 0) {
+        report("无 v3 ZIP，跳过验证（需用 cs2df 重导所有 demo）");
+        return;
+      }
       expect(matchCount).toBeGreaterThanOrEqual(50);
       expect(bundle.players.length).toBeGreaterThan(30);
 

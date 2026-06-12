@@ -19,6 +19,7 @@ import {
   getMapNav,
   getMapRoutes,
   getMapZones,
+  zoneAt,
   type CompactNav,
   type MapRoutes,
   type MapZones,
@@ -88,7 +89,7 @@ export interface AnnotatedSample {
  * 从 replay 8Hz 流标注位置样本（v3 替代 v2 positions-1s）。
  * 返回所有存活/阵亡玩家的逐帧标注，zone/nav 判定暂缺（需 maps 包导出 zoneAt/nearestNavArea）。
  */
-export function annotatePositions(pkg: DemoPackage, _assets: SpatialAssets): AnnotatedSample[] {
+export function annotatePositions(pkg: DemoPackage, assets: SpatialAssets): AnnotatedSample[] {
   const replay = pkg.replay;
   if (!replay) return [];
 
@@ -115,6 +116,10 @@ export function annotatePositions(pkg: DemoPackage, _assets: SpatialAssets): Ann
 
       for (let i = 0; i < xs.length; i++) {
         const placeIdx = track.place[i] ?? -1;
+        const px = (xs[i] ?? 0) * coordScale;
+        const py = (ys[i] ?? 0) * coordScale;
+        const pz = (zs[i] ?? 0) * coordScale;
+        const zone = assets.zones ? zoneAt(assets.zones, px, py, pz) : null;
         samples.push({
           roundNumber: round.roundNumber,
           tick: round.startTick + i * tickStep,
@@ -122,15 +127,11 @@ export function annotatePositions(pkg: DemoPackage, _assets: SpatialAssets): Ann
           teamKey: player.teamKey,
           side,
           alive: ((track.flags[i] ?? 0) & FLAG_ALIVE) !== 0,
-          position: {
-            x: (xs[i] ?? 0) * coordScale,
-            y: (ys[i] ?? 0) * coordScale,
-            z: (zs[i] ?? 0) * coordScale,
-          },
+          position: { x: px, y: py, z: pz },
           callout: placeIdx >= 0 && placeIdx < placeDict.length ? placeDict[placeIdx] : null,
-          zoneId: null,
-          zoneRole: null,
-          zoneBombsite: null,
+          zoneId: zone?.id ?? null,
+          zoneRole: (zone?.role as ZoneRole | undefined) ?? null,
+          zoneBombsite: (zone?.bombsite as "a" | "b" | undefined) ?? null,
           navAreaId: null,
           health: track.hp[i] ?? 100,
         });
