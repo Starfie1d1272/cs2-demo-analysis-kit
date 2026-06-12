@@ -181,7 +181,7 @@ export function buildTestSeasonCohortBundle(): SeasonCohortBundle {
     players: [1, 2, 3, 4, 5].map((i) => player(i)),
     provenance: {
       cohortVersion: "cs2-demo-analysis-kit/cohort-1.0",
-      sourceSchemaVersion: "cs2-demo-format/2.0",
+      sourceSchemaVersion: "cs2-demo-format/3.0",
       matches: [
         { matchId: "m1", sourceDemoHash: "hash-1" },
         { matchId: "m2", sourceDemoHash: "hash-2" }

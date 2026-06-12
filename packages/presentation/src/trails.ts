@@ -1,4 +1,5 @@
 import {
+  decodeDelta,
   openingTrailsModelSchema,
   type DemoPackage,
   type OpeningTrailRound,
@@ -51,16 +52,24 @@ export function buildOpeningTrails(
 
   const rounds = replay.rounds.flatMap((replayRound) => {
     const roundRow = roundRowByNumber.get(replayRound.roundNumber);
-    const player = replayRound.players.find((p) => p.steamId64 === steamId64);
+    const player = replayRound.players.find((p) => {
+      const playerRow = pkg.players[p.playerIndex];
+      return playerRow?.steamId64 === steamId64;
+    });
     if (!roundRow || !player) return [];
 
-    const economyType = player.teamKey === "teamA" ? roundRow.teamAEconomy : roundRow.teamBEconomy;
+    const playerRow = pkg.players[player.playerIndex];
+    if (!playerRow) return [];
+    const economyType = playerRow.teamKey === "teamA" ? roundRow.teamAEconomy : roundRow.teamBEconomy;
     if (!economyTypes.includes(economyType)) return [];
 
     const windowStart = roundRow.freezeEndTick;
     const windowEnd = windowStart + windowSeconds * tickrate;
 
     const points: { t: number; x: number; y: number }[] = [];
+    const xs = decodeDelta(player.x);
+    const ys = decodeDelta(player.y);
+    const coordScale = replay.meta.coordScale;
     for (let index = 0; index < replayRound.frameCount; index += 1) {
       const tick = replayRound.startTick + index * replayRound.tickStep;
       if (tick < windowStart || tick > windowEnd) continue;
@@ -68,8 +77,8 @@ export function buildOpeningTrails(
       if (!alive) break; // 阵亡即终止轨迹
       points.push({
         t: (tick - windowStart) / tickrate,
-        x: player.x[index] ?? 0,
-        y: player.y[index] ?? 0
+        x: (xs[index] ?? 0) * coordScale,
+        y: (ys[index] ?? 0) * coordScale,
       });
     }
     if (points.length === 0) return [];
@@ -78,7 +87,7 @@ export function buildOpeningTrails(
       .filter(
         (row) =>
           row.roundNumber === replayRound.roundNumber &&
-          row.throwerSteamId64 === steamId64 &&
+          (pkg.players[row.throwerIndex]?.steamId64 ?? null) === steamId64 &&
           row.throwTick >= windowStart &&
           row.throwTick <= windowEnd
       )
@@ -98,7 +107,7 @@ export function buildOpeningTrails(
       {
         matchId,
         roundNumber: replayRound.roundNumber,
-        side: player.side,
+        side: playerRow.teamKey === "teamA" ? roundRow.teamASide : roundRow.teamBSide,
         economyType,
         points,
         grenades

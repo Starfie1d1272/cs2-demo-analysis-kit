@@ -83,14 +83,16 @@ describe("analyzeDemoPackage", () => {
     };
     const patchedPkg = {
       ...pkg,
-      playerStats: pkg.playerStats.map((row) => row.steamId64 === statsTruth.steamId64 ? patchedStats : row)
+      playerStats: pkg.playerStats.map((row) => row.playerIndex === statsTruth.playerIndex ? patchedStats : row)
     };
     const indicators = deriveRRIndicators(patchedPkg);
     const bombDeathStats = patchedStats;
     const wallbangStats = pkg.playerStats.find((row) => row.wallbangKillCount > 0)!;
 
-    const bombDeathIndicators = indicators.find((row) => row.steamId64 === bombDeathStats.steamId64)!;
-    const wallbangIndicators = indicators.find((row) => row.steamId64 === wallbangStats.steamId64)!;
+    const bombDeathSteamId64 = pkg.players[statsTruth.playerIndex]?.steamId64 ?? "unknown";
+    const wallbangSteamId64 = pkg.players[wallbangStats.playerIndex]?.steamId64 ?? "unknown";
+    const bombDeathIndicators = indicators.find((row) => row.steamId64 === bombDeathSteamId64)!;
+    const wallbangIndicators = indicators.find((row) => row.steamId64 === wallbangSteamId64)!;
 
     expect(bombDeathStats.deaths).not.toBe(bombDeathStats.combatDeathCount);
     expect(bombDeathIndicators.combatDeathCount).toBe(bombDeathStats.combatDeathCount);

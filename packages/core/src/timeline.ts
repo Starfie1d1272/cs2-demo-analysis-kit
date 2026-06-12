@@ -1,39 +1,52 @@
 import type { DemoPackage, EconomyPoint, HeatmapPoint, TimelineEvent } from "@cs2dak/contract";
-import { round, clamp, formatClock, nameForSteamId, normalizeWeapon } from "./utils.js";
+import { round, clamp, formatClock, normalizeWeapon } from "./utils.js";
+import { createResolverFromPackage } from "./resolve.js";
 
 export function buildTimeline(pkg: DemoPackage): TimelineEvent[] {
-  const killEvents = pkg.kills.map<TimelineEvent>((kill, index) => ({
-    id: `kill-${index}`,
-    roundNumber: kill.roundNumber,
-    tick: kill.tick,
-    timeSeconds: tickToRoundSeconds(pkg, kill.roundNumber, kill.tick),
-    ...clockForTick(pkg, kill.roundNumber, kill.tick),
-    type: "kill",
-    label: `${nameForSteamId(pkg, kill.killerSteamId64) ?? "环境"} 击杀 ${nameForSteamId(pkg, kill.victimSteamId64)}`,
-    teamKey: kill.killerTeamKey
-  }));
+  const resolver = createResolverFromPackage(pkg);
 
-  const bombEvents = pkg.bombs.map<TimelineEvent>((bomb, index) => ({
-    id: `bomb-${index}`,
-    roundNumber: bomb.roundNumber,
-    tick: bomb.tick,
-    timeSeconds: tickToRoundSeconds(pkg, bomb.roundNumber, bomb.tick),
-    ...clockForTick(pkg, bomb.roundNumber, bomb.tick),
-    type: "bomb",
-    label: bombLabel(pkg, bomb),
-    teamKey: bomb.actorTeamKey
-  }));
+  const killEvents = pkg.kills.map<TimelineEvent>((kill, index) => {
+    const killer = resolver.byIndexOrNull(kill.killerIndex);
+    const victim = resolver.byIndex(kill.victimIndex);
+    return {
+      id: `kill-${index}`,
+      roundNumber: kill.roundNumber,
+      tick: kill.tick,
+      timeSeconds: tickToRoundSeconds(pkg, kill.roundNumber, kill.tick),
+      ...clockForTick(pkg, kill.roundNumber, kill.tick),
+      type: "kill",
+      label: `${killer?.name ?? "环境"} 击杀 ${victim.name}`,
+      teamKey: killer?.teamKey ?? null
+    };
+  });
 
-  const grenadeEvents = pkg.grenades.map<TimelineEvent>((grenade, index) => ({
-    id: `grenade-${index}`,
-    roundNumber: grenade.roundNumber,
-    tick: grenade.effectTick,
-    timeSeconds: tickToRoundSeconds(pkg, grenade.roundNumber, grenade.effectTick),
-    ...clockForTick(pkg, grenade.roundNumber, grenade.effectTick),
-    type: "grenade",
-    label: `${nameForSteamId(pkg, grenade.throwerSteamId64) ?? "未知选手"} 投掷${grenadeLabel(grenade.grenade)}`,
-    teamKey: grenade.throwerTeamKey
-  }));
+  const bombEvents = pkg.bombs.map<TimelineEvent>((bomb, index) => {
+    const actor = resolver.byIndexOrNull(bomb.actorIndex);
+    return {
+      id: `bomb-${index}`,
+      roundNumber: bomb.roundNumber,
+      tick: bomb.tick,
+      timeSeconds: tickToRoundSeconds(pkg, bomb.roundNumber, bomb.tick),
+      ...clockForTick(pkg, bomb.roundNumber, bomb.tick),
+      type: "bomb",
+      label: bombLabel(actor?.name, bomb),
+      teamKey: actor?.teamKey ?? null
+    };
+  });
+
+  const grenadeEvents = pkg.grenades.map<TimelineEvent>((grenade, index) => {
+    const thrower = resolver.byIndex(grenade.throwerIndex);
+    return {
+      id: `grenade-${index}`,
+      roundNumber: grenade.roundNumber,
+      tick: grenade.effectTick,
+      timeSeconds: tickToRoundSeconds(pkg, grenade.roundNumber, grenade.effectTick),
+      ...clockForTick(pkg, grenade.roundNumber, grenade.effectTick),
+      type: "grenade",
+      label: `${thrower.name} 投掷${grenadeLabel(grenade.grenade)}`,
+      teamKey: thrower.teamKey
+    };
+  });
 
   const roundEvents = pkg.rounds.map<TimelineEvent>((roundRow) => ({
     id: `round-end-${roundRow.roundNumber}`,
@@ -57,7 +70,7 @@ export function buildEconomy(pkg: DemoPackage): EconomyPoint[] {
     const rows = pkg.playerEconomies.filter((row) => row.roundNumber === roundRow.roundNumber);
     const sumForTeam = (teamKey: "teamA" | "teamB") =>
       rows
-        .filter((row) => row.teamKey === teamKey)
+        .filter((row) => pkg.players[row.playerIndex]?.teamKey === teamKey)
         .reduce((sum, row) => sum + row.equipmentValue, 0);
     const teamA = sumForTeam("teamA");
     const teamB = sumForTeam("teamB");
@@ -75,7 +88,6 @@ export function buildEconomy(pkg: DemoPackage): EconomyPoint[] {
 }
 
 export function buildHeatmap(pkg: DemoPackage): HeatmapPoint[] {
-  // Pre-index sides per round to derive CT/T for any teamKey lookup.
   const roundSides = new Map(
     pkg.rounds.map((r) => [r.roundNumber, { teamA: r.teamASide, teamB: r.teamBSide }])
   );
@@ -87,15 +99,19 @@ export function buildHeatmap(pkg: DemoPackage): HeatmapPoint[] {
   };
 
   const kills = pkg.kills.flatMap<HeatmapPoint>((kill) => {
+    const victimPlayer = pkg.players[kill.victimIndex];
+    const killerPlayer = kill.killerIndex !== null ? pkg.players[kill.killerIndex] : null;
+    const victimTeamKey = victimPlayer?.teamKey ?? null;
+    const killerTeamKey = killerPlayer?.teamKey ?? null;
     const out: HeatmapPoint[] = [
       {
         x: kill.victimPosition.x,
         y: kill.victimPosition.y,
         z: kill.victimPosition.z,
         roundNumber: kill.roundNumber,
-        teamKey: kill.victimTeamKey,
-        steamId64: kill.victimSteamId64,
-        side: sideFor(kill.victimTeamKey, kill.roundNumber),
+        teamKey: victimTeamKey,
+        steamId64: victimPlayer?.steamId64 ?? null,
+        side: sideFor(victimTeamKey, kill.roundNumber),
         kind: "death",
         grenadeType: null
       }
@@ -106,9 +122,9 @@ export function buildHeatmap(pkg: DemoPackage): HeatmapPoint[] {
         y: kill.killerPosition.y,
         z: kill.killerPosition.z,
         roundNumber: kill.roundNumber,
-        teamKey: kill.killerTeamKey,
-        steamId64: kill.killerSteamId64,
-        side: sideFor(kill.killerTeamKey, kill.roundNumber),
+        teamKey: killerTeamKey,
+        steamId64: killerPlayer?.steamId64 ?? null,
+        side: sideFor(killerTeamKey, kill.roundNumber),
         kind: "kill",
         grenadeType: null
       });
@@ -117,17 +133,20 @@ export function buildHeatmap(pkg: DemoPackage): HeatmapPoint[] {
   });
 
   const grenades = pkg.grenades
-    .map<HeatmapPoint>((grenade) => ({
-      x: grenade.effectPosition.x,
-      y: grenade.effectPosition.y,
-      z: grenade.effectPosition.z,
-      roundNumber: grenade.roundNumber,
-      teamKey: grenade.throwerTeamKey,
-      steamId64: grenade.throwerSteamId64,
-      side: sideFor(grenade.throwerTeamKey, grenade.roundNumber),
-      kind: "grenade",
-      grenadeType: grenade.grenade
-    }));
+    .map<HeatmapPoint>((grenade) => {
+      const thrower = pkg.players[grenade.throwerIndex];
+      return {
+        x: grenade.effectPosition.x,
+        y: grenade.effectPosition.y,
+        z: grenade.effectPosition.z,
+        roundNumber: grenade.roundNumber,
+        teamKey: thrower?.teamKey ?? null,
+        steamId64: thrower?.steamId64 ?? null,
+        side: sideFor(thrower?.teamKey ?? null, grenade.roundNumber),
+        kind: "grenade",
+        grenadeType: grenade.grenade
+      };
+    });
 
   return [...kills, ...grenades].filter((point) => point.x !== 0 || point.y !== 0);
 }
@@ -166,8 +185,8 @@ function eventSortWeight(type: TimelineEvent["type"]): number {
   return 3;
 }
 
-function bombLabel(pkg: DemoPackage, bomb: DemoPackage["bombs"][number]): string {
-  const actor = nameForSteamId(pkg, bomb.actorSteamId64) ?? "未知选手";
+function bombLabel(actorName: string | undefined, bomb: DemoPackage["bombs"][number]): string {
+  const actor = actorName ?? "未知选手";
   const labels: Record<string, string> = {
     planted: "下包",
     defused: "拆包",

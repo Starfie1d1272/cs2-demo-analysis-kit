@@ -7,7 +7,7 @@ import { RoundTimeline } from "./RoundTimeline";
 
 const model: MatchWorkspaceModel = {
   version: "cs2-demo-analysis-kit/workspace-0.1",
-  sourceSchemaVersion: "cs2-demo-format/2.0",
+  sourceSchemaVersion: "cs2-demo-format/3.0",
   title: "Team A vs Team B",
   subtitle: "de_ancient · 10 名选手 · 21 回合",
   scoreline: "13:8",

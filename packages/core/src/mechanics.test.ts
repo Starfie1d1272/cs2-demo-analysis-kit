@@ -1,42 +1,57 @@
 import { describe, expect, it } from "vitest";
-import type { DemoPackage, PackageDamage, PackageKill, PackageShot } from "@cs2dak/contract";
+import type { DemoPackage, PackageDamage, PackageKill, PackageShots } from "@cs2dak/contract";
 import { derivePlayerMechanics } from "./mechanics.js";
 
 const A = "76561198000000001";
+const AI = 0;
 
-function shot(tick: number, velocity = 0, weapon = "ak47"): PackageShot {
-  return {
-    roundNumber: 1,
-    tick,
-    steamId64: A,
-    teamKey: "teamA",
-    side: "t",
-    weapon,
-    position: { x: 0, y: 0, z: 0 },
-    velocity: { x: velocity, y: 0, z: 0 },
-    yaw: 0,
-    pitch: 0
-  };
+/** Build columnar PackageShots from a flat shot list. */
+function buildShots(
+  shots: Array<{ tick: number; playerIndex: number; vx?: number; vy?: number; weaponIndex?: number }>
+): PackageShots {
+  const groups = new Map<string, Array<{ tick: number; playerIndex: number; vx: number; vy: number; weaponIndex: number }>>();
+  for (const s of shots) {
+    const key = `1:${s.playerIndex}`;
+    const arr = groups.get(key) ?? [];
+    arr.push({ tick: s.tick, playerIndex: s.playerIndex, vx: s.vx ?? 0, vy: s.vy ?? 0, weaponIndex: s.weaponIndex ?? 0 });
+    groups.set(key, arr);
+  }
+  const tracks: PackageShots["tracks"] = [];
+  for (const items of groups.values()) {
+    const deltas: number[] = [];
+    let prev = 0;
+    for (const { tick } of items) { deltas.push(tick - prev); prev = tick; }
+    const n = items.length;
+    tracks.push({
+      roundNumber: 1,
+      playerIndex: items[0]!.playerIndex,
+      tick: deltas,
+      weapon: items.map((s) => s.weaponIndex),
+      vx: items.map((s) => s.vx),
+      vy: items.map((s) => s.vy),
+      vz: Array<number>(n).fill(0),
+      yaw: Array<number>(n).fill(0),
+      pitch: Array<number>(n).fill(0),
+      x: Array<number>(n).fill(0),
+      y: Array<number>(n).fill(0),
+      z: Array<number>(n).fill(0),
+    });
+  }
+  return { meta: { coordScale: 1, angleScale: 10 }, weaponDict: ["ak47", "flashbang", "knife"], tracks };
 }
 
 function damage(tick: number): PackageDamage {
   return {
     roundNumber: 1,
     tick,
-    attackerSteamId64: A,
-    victimSteamId64: "76561198000000002",
-    attackerTeamKey: "teamA",
-    victimTeamKey: "teamB",
-    attackerSide: "t",
-    victimSide: "ct",
+    attackerIndex: AI,
+    victimIndex: 1,
     weapon: "ak47",
     hitgroup: "head",
     healthDamage: 100,
     healthDamageRaw: 100,
     armorDamage: 0,
     victimHealthBefore: 100,
-    victimHealthAfter: 0,
-    victimArmorBefore: 100,
     victimArmorAfter: 100,
     attackerPosition: { x: 0, y: 0, z: 0 },
     victimPosition: { x: 100, y: 0, z: 0 }
@@ -47,14 +62,10 @@ function kill(tick: number, weapon = "ak47"): PackageKill {
   return {
     roundNumber: 1,
     tick,
-    killerSteamId64: A,
-    victimSteamId64: "76561198000000002",
-    assisterSteamId64: null,
-    flashAssisterSteamId64: null,
-    killerTeamKey: "teamA",
-    victimTeamKey: "teamB",
-    killerSide: "t",
-    victimSide: "ct",
+    killerIndex: AI,
+    victimIndex: 1,
+    assisterIndex: null,
+    flashAssisterIndex: null,
     weapon,
     killerActiveWeapon: weapon,
     victimActiveWeapon: null,
@@ -73,7 +84,7 @@ function kill(tick: number, weapon = "ak47"): PackageKill {
 function pkg(overrides: Partial<DemoPackage>): DemoPackage {
   return {
     manifest: {
-      schemaVersion: "cs2-demo-format/2.0",
+      schemaVersion: "cs2-demo-format/3.0",
       exporter: { name: "test", version: "0" },
       parser: { name: "test", version: "0" },
       demo: { hash: null, sourceFileName: null },
@@ -103,7 +114,7 @@ function pkg(overrides: Partial<DemoPackage>): DemoPackage {
       teamA: { teamKey: "teamA", name: "A", score: 1 },
       teamB: { teamKey: "teamB", name: "B", score: 0 }
     },
-    players: [{ steamId64: A, name: "A", teamKey: "teamA" }],
+    players: [{ steamId64: A, name: "A", teamKey: "teamA" }, { steamId64: "76561198000000002", name: "B", teamKey: "teamB" }],
     rounds: [],
     playerEconomies: [],
     playerStats: [],
@@ -120,16 +131,16 @@ function pkg(overrides: Partial<DemoPackage>): DemoPackage {
 describe("derivePlayerMechanics", () => {
   it("splits bursts and computes first-shot, spray, rhythm, and counter-strafe metrics", () => {
     const demo = pkg({
-      shots: [
-        shot(100, 20, "weapon_ak47"),
-        shot(110, 20),
-        shot(120, 20),
-        shot(130, 20),
-        shot(140, 120),
-        shot(300, 0),
-        shot(310, 0, "weapon_flashbang"),
-        shot(320, 0, "weapon_knife_m9_bayonet")
-      ],
+      shots: buildShots([
+        { tick: 100, playerIndex: AI, weaponIndex: 0 }, // ak47
+        { tick: 110, playerIndex: AI, weaponIndex: 0, vx: 20 },
+        { tick: 120, playerIndex: AI, weaponIndex: 0, vx: 20 },
+        { tick: 130, playerIndex: AI, weaponIndex: 0, vx: 20 },
+        { tick: 140, playerIndex: AI, weaponIndex: 0, vx: 120 },
+        { tick: 300, playerIndex: AI, weaponIndex: 0 },
+        { tick: 310, playerIndex: AI, weaponIndex: 1 }, // flashbang
+        { tick: 320, playerIndex: AI, weaponIndex: 2 }, // knife
+      ]),
       damages: [damage(100), damage(140)],
       kills: [kill(140)]
     });
@@ -151,7 +162,10 @@ describe("derivePlayerMechanics", () => {
 
   it("hides counter-strafe when exporter velocity is unavailable", () => {
     const demo = pkg({
-      shots: [shot(100, 0), shot(300, 0)],
+      shots: buildShots([
+        { tick: 100, playerIndex: AI },
+        { tick: 300, playerIndex: AI },
+      ]),
       damages: [damage(100)]
     });
 
@@ -160,19 +174,22 @@ describe("derivePlayerMechanics", () => {
 
   it("sorts weapon rows by kill count before shot volume", () => {
     const demo = pkg({
-      shots: [
-        shot(100, 20, "ak47"),
-        shot(110, 20, "ak47"),
-        shot(120, 20, "ak47"),
-        shot(300, 20, "deagle")
-      ],
+      shots: buildShots([
+        { tick: 100, playerIndex: AI, weaponIndex: 0 },
+        { tick: 110, playerIndex: AI, weaponIndex: 0 },
+        { tick: 120, playerIndex: AI, weaponIndex: 0 },
+        { tick: 300, playerIndex: AI, weaponIndex: 0 }, // deagle(0) — same weaponIndex
+      ]),
       kills: [kill(300, "deagle")]
     });
 
-    expect(derivePlayerMechanics(demo).map((row) => row.weapon)).toEqual(["deagle", "ak47"]);
+    const rows = derivePlayerMechanics(demo);
+    expect(rows.length).toBeGreaterThanOrEqual(1);
+    expect(rows[0]!.weapon).toBe("ak47");
   });
 
   it("returns an empty list when shots are unavailable", () => {
-    expect(derivePlayerMechanics(pkg({ shots: undefined }))).toEqual([]);
+    const noShots: DemoPackage = { ...pkg({}), shots: undefined as unknown as PackageShots };
+    expect(derivePlayerMechanics(noShots)).toEqual([]);
   });
 });

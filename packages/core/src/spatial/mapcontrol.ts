@@ -30,7 +30,7 @@ const SOLO_PRESSURE_PER_ROUND_CAP = 8; // 秒
 const DENIAL_PER_ROUND_CAP = 10; // 秒（已乘 phaseFactor）
 const ISOLATION_WINDOW_SECONDS = 8; // 死前回看窗口 W
 const ISOLATION_MIN_TRIGGER_SECONDS = 3; // 触发阈值 S
-const SAMPLE_SECONDS = 1; // positions-1s 为 1Hz
+const DEFAULT_SAMPLE_RATE = 1; // 无 replay 时降级为 1Hz
 
 type Team = string;
 
@@ -51,6 +51,8 @@ export function buildOfficialMapControl(
   const routes = assets.routes;
   const samples = annotatePositions(pkg, assets);
   if (samples.length === 0) return out;
+  const sampleRate = pkg.replay?.meta.sampleRate ?? DEFAULT_SAMPLE_RATE;
+  const SAMPLE_SECONDS = 1 / sampleRate;
   const phaseModels = phases ?? inferRoundPhases(pkg);
   const teamByPlayer = new Map(pkg.players.map((p) => [p.steamId64, p.teamKey]));
   const sideByTeam = new Map<number, { defendPre: Team | null; t: Team | null; ct: Team | null }>();
@@ -86,7 +88,7 @@ export function buildOfficialMapControl(
       const solo = new Set<string>();
       const denial = new Set<string>();
       for (const [route, byTeam] of presence) {
-        deriveSoloAndDenial(route, byTeam, defenderTeam, ph, solo, denial, perRoundSolo, perRoundDenial);
+        deriveSoloAndDenial(route, byTeam, defenderTeam, ph, solo, denial, perRoundSolo, perRoundDenial, SAMPLE_SECONDS);
         // firstMeaningfulControlEvents：T 首次到达关键段（neutral/key index）
         recordFirstControl(route, byTeam, sides.t, takenRoutes, firstControlEvents, ph);
       }
@@ -103,7 +105,7 @@ export function buildOfficialMapControl(
     evidenceByRound.set(roundNumber, evidence);
   }
 
-  const credits = buildIsolationCredits(pkg, evidenceByRound, phaseModels);
+  const credits = buildIsolationCredits(pkg, evidenceByRound, phaseModels, SAMPLE_SECONDS);
 
   const ids = new Set<string>([
     ...pressureSeconds.keys(),
@@ -154,6 +156,7 @@ function deriveSoloAndDenial(
   denial: Set<string>,
   perRoundSolo: Map<string, number>,
   perRoundDenial: Map<string, number>,
+  sampleSecs: number,
 ): void {
   if (byTeam.size < 2) return; // 需双方都在该线（敌方施压）
   for (const [team, members] of byTeam) {
@@ -162,7 +165,7 @@ function deriveSoloAndDenial(
     // solo：本队仅此一人在该线
     if (members.length === 1 && !solo.has(members[0]!.id)) {
       solo.add(members[0]!.id);
-      perRoundSolo.set(members[0]!.id, (perRoundSolo.get(members[0]!.id) ?? 0) + SAMPLE_SECONDS);
+      perRoundSolo.set(members[0]!.id, (perRoundSolo.get(members[0]!.id) ?? 0) + sampleSecs);
     }
     // denial：防守方在敌方施压的动线上 holding（× phaseFactor）
     if (defenderTeam != null && team === defenderTeam) {
@@ -171,7 +174,7 @@ function deriveSoloAndDenial(
         for (const m of members) {
           if (denial.has(m.id)) continue;
           denial.add(m.id);
-          perRoundDenial.set(m.id, (perRoundDenial.get(m.id) ?? 0) + SAMPLE_SECONDS * factor);
+          perRoundDenial.set(m.id, (perRoundDenial.get(m.id) ?? 0) + sampleSecs * factor);
         }
       }
     }
@@ -202,15 +205,18 @@ function buildIsolationCredits(
   pkg: DemoPackage,
   evidenceByRound: Map<number, RoundEvidence>,
   phases: Map<number, RoundPhaseModel>,
+  sampleSecs: number,
 ): Map<string, number> {
   const tickrate = pkg.match?.tickrate ?? pkg.manifest?.tickrate ?? 64;
   const windowTicks = ISOLATION_WINDOW_SECONDS * tickrate;
   const credits = new Map<string, number>();
 
   for (const kill of pkg.kills) {
-    if (kill.killerTeamKey && kill.victimTeamKey && kill.killerTeamKey === kill.victimTeamKey) continue;
+    const killerTeam = kill.killerIndex !== null ? pkg.players[kill.killerIndex]?.teamKey : null;
+    const victimTeam = pkg.players[kill.victimIndex]?.teamKey;
+    if (killerTeam && victimTeam && killerTeam === victimTeam) continue;
     if ((kill as { tradeDeath?: boolean }).tradeDeath) continue;
-    const victim = kill.victimSteamId64;
+    const victim = pkg.players[kill.victimIndex]?.steamId64;
     if (!victim) continue;
     const phase = phases.get(kill.roundNumber);
     if (phase && !isOfficialScoringPhase(phaseAtTick(phase, kill.tick))) continue;
@@ -218,8 +224,8 @@ function buildIsolationCredits(
     if (!evidence) continue;
 
     const lo = kill.tick - windowTicks;
-    const pressure = secondsInWindow(evidence.soloByTick, victim, lo, kill.tick);
-    const denial = secondsInWindow(evidence.denialByTick, victim, lo, kill.tick);
+    const pressure = secondsInWindow(evidence.soloByTick, victim, lo, kill.tick, sampleSecs);
+    const denial = secondsInWindow(evidence.denialByTick, victim, lo, kill.tick, sampleSecs);
     if (pressure < ISOLATION_MIN_TRIGGER_SECONDS && denial < ISOLATION_MIN_TRIGGER_SECONDS) continue;
 
     // credit = clamp(0.25 + 0.10×pressure + 0.10×denial, 0, 1)（doc §10.3 子集）
@@ -229,11 +235,11 @@ function buildIsolationCredits(
   return credits;
 }
 
-function secondsInWindow(byTick: Map<number, Set<string>>, id: string, lo: number, hi: number): number {
+function secondsInWindow(byTick: Map<number, Set<string>>, id: string, lo: number, hi: number, sampleSecs: number): number {
   let secs = 0;
   for (const [tick, set] of byTick) {
     if (tick > hi || tick < lo) continue;
-    if (set.has(id)) secs += SAMPLE_SECONDS;
+    if (set.has(id)) secs += sampleSecs;
   }
   return secs;
 }

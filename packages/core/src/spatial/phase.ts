@@ -16,12 +16,13 @@ import { getMapRoutes, routeIndex, type MapRoutes } from "@cs2dak/maps";
 import type { RoundPhase, RoundPhaseModel } from "./types.js";
 
 type Round = DemoPackage["rounds"][number];
-type PositionRow = NonNullable<DemoPackage["positions1s"]>[number];
+type PositionRow = { roundNumber: number; tick: number; steamId64: string; lastPlaceName?: string | null };
 type Kill = DemoPackage["kills"][number];
 
 export function inferRoundPhases(pkg: DemoPackage): Map<number, RoundPhaseModel> {
   const routes = getMapRoutes(pkg.match?.mapName ?? "");
-  const positions = pkg.positions1s ?? [];
+  // Build positions from replay 8Hz stream (v3 replaces positions-1s)
+  const positions = buildPositionRows(pkg);
   const hasPositions = positions.length > 0;
   const hasRoutes = routes != null;
 
@@ -30,6 +31,7 @@ export function inferRoundPhases(pkg: DemoPackage): Map<number, RoundPhaseModel>
 
   const posByRound = groupBy(positions, (row) => row.roundNumber);
   const killsByRound = groupBy(pkg.kills, (k) => k.roundNumber);
+  const playerTeams = pkg.players.map((p) => p.teamKey);
   const plantByRound = new Map<number, number>();
   for (const bomb of pkg.bombs) {
     if (bomb.type === "planted" && !plantByRound.has(bomb.roundNumber)) {
@@ -41,7 +43,7 @@ export function inferRoundPhases(pkg: DemoPackage): Map<number, RoundPhaseModel>
   for (const round of pkg.rounds) {
     const tTeam = round.teamASide === "t" ? "teamA" : round.teamBSide === "t" ? "teamB" : null;
     const plantTick = plantByRound.get(round.roundNumber) ?? null;
-    const clutchStartTick = computeClutchStart(killsByRound.get(round.roundNumber) ?? [], teamSize);
+    const clutchStartTick = computeClutchStart(killsByRound.get(round.roundNumber) ?? [], teamSize, playerTeams);
     const { takeTick, executeTick } = computeTakeExecute(
       round,
       tTeam,
@@ -86,13 +88,14 @@ function countByTeam(pkg: DemoPackage): { teamA: number; teamB: number } {
 }
 
 /** 一方存活降到 1（另一方 ≥ 1）的首个 tick。 */
-function computeClutchStart(kills: Kill[], teamSize: { teamA: number; teamB: number }): number | null {
+function computeClutchStart(kills: Kill[], teamSize: { teamA: number; teamB: number }, playerTeams: string[]): number | null {
   let aliveA = teamSize.teamA;
   let aliveB = teamSize.teamB;
   if (aliveA === 0 || aliveB === 0) return null;
   for (const kill of [...kills].sort((a, b) => a.tick - b.tick)) {
-    if (kill.victimTeamKey === "teamA") aliveA = Math.max(0, aliveA - 1);
-    else if (kill.victimTeamKey === "teamB") aliveB = Math.max(0, aliveB - 1);
+    const victimTeam = playerTeams[kill.victimIndex];
+    if (victimTeam === "teamA") aliveA = Math.max(0, aliveA - 1);
+    else if (victimTeam === "teamB") aliveB = Math.max(0, aliveB - 1);
     if ((aliveA === 1 && aliveB >= 1) || (aliveB === 1 && aliveA >= 1)) {
       return kill.tick;
     }
@@ -152,6 +155,33 @@ function groupBy<T>(items: readonly T[], key: (item: T) => number): Map<number, 
     const arr = out.get(k) ?? [];
     arr.push(item);
     out.set(k, arr);
+  }
+  return out;
+}
+
+/** 从 replay 8Hz 流提取回合阶段推导所需的简化位置行。 */
+function buildPositionRows(pkg: DemoPackage): PositionRow[] {
+  const replay = pkg.replay;
+  if (!replay) return [];
+  const placeDict = replay.placeDict ?? [];
+  const out: PositionRow[] = [];
+  for (const round of replay.rounds) {
+    const tickStep = round.tickStep;
+    for (const track of round.players) {
+      const player = pkg.players[track.playerIndex];
+      if (!player) continue;
+      for (let i = 0; i < track.x.length; i++) {
+        const placeIdx = track.place[i] ?? -1;
+        const lastPlaceName =
+          placeIdx >= 0 && placeIdx < placeDict.length ? placeDict[placeIdx] : null;
+        out.push({
+          roundNumber: round.roundNumber,
+          tick: round.startTick + i * tickStep,
+          steamId64: player.steamId64,
+          lastPlaceName,
+        });
+      }
+    }
   }
   return out;
 }

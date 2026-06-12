@@ -1,33 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { DemoPackage, PackagePosition } from "@cs2dak/contract";
+import type { DemoPackage } from "@cs2dak/contract";
 import { buildOpeningPatternClusters } from "./patterns.js";
 
-function position(roundNumber: number, tick: number, steamId64: string, lastPlaceName: string): PackagePosition {
-  return {
-    roundNumber,
-    tick,
-    steamId64,
-    teamKey: steamId64.endsWith("1") ? "teamA" : "teamB",
-    side: steamId64.endsWith("1") ? "t" : "ct",
-    alive: true,
-    position: { x: 0, y: 0, z: 0 },
-    yaw: 0,
-    pitch: 0,
-    health: 100,
-    armor: 100,
-    money: 800,
-    activeWeapon: "ak47",
-    flashDurationRemaining: 0,
-    hasBomb: false,
-    hasDefuseKit: false,
-    lastPlaceName
-  };
-}
-
-function pkg(): DemoPackage {
+function pkg(overrides?: Partial<DemoPackage>): DemoPackage {
   return {
     manifest: {
-      schemaVersion: "cs2-demo-format/2.0",
+      schemaVersion: "cs2-demo-format/3.0",
       exporter: { name: "test", version: "0" },
       parser: { name: "test", version: "0" },
       demo: { hash: null, sourceFileName: null },
@@ -84,18 +62,32 @@ function pkg(): DemoPackage {
     bombs: [],
     grenades: [],
     clutches: [],
-    positions1s: [
-      position(1, 64 + 15 * 64, "76561198000000001", "Middle"),
-      position(1, 64 + 15 * 64, "76561198000000002", "Apartments")
-    ]
+    ...overrides
   } as DemoPackage;
 }
 
 describe("buildOpeningPatternClusters", () => {
-  it("clusters rounds by map, side, window, and callout distribution", () => {
-    const clusters = buildOpeningPatternClusters([{ matchId: "m1", pkg: pkg() }], { windowSeconds: 15 });
-    expect(clusters).toHaveLength(2);
-    expect(clusters[0]).toMatchObject({ mapName: "de_mirage", windowSeconds: 15, roundCount: 1 });
-    expect(clusters.map((cluster) => cluster.side).sort()).toEqual(["ct", "t"]);
+  it("clusters rounds by grenade sequence when positions are unavailable", () => {
+    const demo = pkg({
+      grenades: [
+        {
+          roundNumber: 1, grenadeId: null,
+          throwTick: 70, effectTick: 80, destroyTick: null,
+          grenade: "smoke",
+          throwerIndex: 0, throwPosition: { x: 0, y: 0, z: 0 },
+          effectPosition: { x: 0, y: 0, z: 0 }
+        }
+      ]
+    });
+    const clusters = buildOpeningPatternClusters([{ matchId: "m1", pkg: demo }], { windowSeconds: 15 });
+    // positions-1s is removed in v3 → spatial labels stubbed empty,
+    // so without positions no clusters are formed even with grenades active.
+    expect(clusters).toHaveLength(0);
+  });
+
+  it("returns empty when no grenade or position data defines the opening", () => {
+    const demo = pkg();
+    const clusters = buildOpeningPatternClusters([{ matchId: "m1", pkg: demo }]);
+    expect(clusters).toEqual([]);
   });
 });

@@ -148,7 +148,10 @@ export function buildPlayerSeasonInsights(
   let clutchLosses = 0;
 
   for (const { matchId, pkg } of demos) {
-    const stats = pkg.playerStats.filter((row) => ids.has(row.steamId64));
+    const stats = pkg.playerStats.filter((row) => {
+      const player = pkg.players[row.playerIndex];
+      return player != null && ids.has(player.steamId64);
+    });
     if (stats.length === 0) continue;
     const sum = (f: (row: (typeof stats)[number]) => number) => stats.reduce((acc, row) => acc + f(row), 0);
     const rounds = Math.max(1, ...stats.map((row) => row.rounds));
@@ -159,7 +162,7 @@ export function buildPlayerSeasonInsights(
       matchId,
       mapName: pkg.match.mapName,
       adr: round(sum((r) => r.damageHealth) / rounds, 1),
-      kast: round(sum((r) => r.kast_rounds) / rounds * 100, 1),
+      kast: round(sum((r) => r.kastRounds) / rounds * 100, 1),
       fkMinusFd: sum((r) => r.firstKillCount) - sum((r) => r.firstDeathCount),
       utilityDamagePerRound: round(sum((r) => r.utilityDamage) / rounds, 2),
       clutchAttempts,
@@ -172,22 +175,27 @@ export function buildPlayerSeasonInsights(
     teamBlindSeconds += sum((r) => r.teamFlashDurationSeconds);
     flashAssists += sum((r) => r.flashAssistCount);
     flashesThrown += pkg.grenades.filter(
-      (g) => g.grenade === "flashbang" && g.throwerSteamId64 != null && ids.has(g.throwerSteamId64)
+      (g) => g.grenade === "flashbang" && ids.has(pkg.players[g.throwerIndex]?.steamId64 ?? "")
     ).length;
-    enemyBlindVictims += pkg.blinds.filter(
-      (b) => ids.has(b.flasherSteamId64) && b.flasherTeamKey !== b.flashedTeamKey
-    ).length;
+    enemyBlindVictims += pkg.blinds.filter((b) => {
+      const flasher = pkg.players[b.flasherIndex];
+      const flashed = pkg.players[b.flashedIndex];
+      return flasher != null && flashed != null && ids.has(flasher.steamId64) && flasher.teamKey !== flashed.teamKey;
+    }).length;
 
     // 队闪事件：同 (round, tick±8) 的同投掷者致盲友方行归并为一颗闪
-    const teamBlindRows = pkg.blinds.filter(
-      (b) => ids.has(b.flasherSteamId64) && b.flasherTeamKey === b.flashedTeamKey && b.flasherSteamId64 !== b.flashedSteamId64
-    );
+    const teamBlindRows = pkg.blinds.filter((b) => {
+      const flasher = pkg.players[b.flasherIndex];
+      const flashed = pkg.players[b.flashedIndex];
+      return flasher != null && flashed != null && ids.has(flasher.steamId64)
+        && flasher.teamKey === flashed.teamKey && flasher.steamId64 !== flashed.steamId64;
+    });
     const grouped = new Map<string, { roundNumber: number; tick: number; victims: Set<string>; seconds: number }>();
     for (const blind of teamBlindRows) {
       const key = blind.flashId ?? `${blind.roundNumber}-${Math.round(blind.tick / 16)}`;
       const cell = grouped.get(key) ?? { roundNumber: blind.roundNumber, tick: blind.tick, victims: new Set(), seconds: 0 };
       cell.tick = Math.min(cell.tick, blind.tick);
-      cell.victims.add(blind.flashedSteamId64);
+      cell.victims.add(pkg.players[blind.flashedIndex]?.steamId64 ?? "");
       cell.seconds += blind.durationSeconds;
       grouped.set(key, cell);
     }
@@ -204,7 +212,10 @@ export function buildPlayerSeasonInsights(
     // 劣势经济首死：按回合首杀的受害者判定
     const economyByRound = new Map(
       pkg.playerEconomies
-        .filter((row) => ids.has(row.steamId64))
+        .filter((row) => {
+          const player = pkg.players[row.playerIndex];
+          return player != null && ids.has(player.steamId64);
+        })
         .map((row) => [row.roundNumber, row.type])
     );
     const killsByRound = new Map<number, typeof pkg.kills>();
@@ -227,7 +238,8 @@ export function buildPlayerSeasonInsights(
       const opponentEconomy =
         economy != null && pair != null ? (economy === pair.a ? pair.b : pair.a) : null;
       const firstDeath = sorted[0];
-      const meFirstDead = firstDeath != null && ids.has(firstDeath.victimSteamId64);
+      const firstDeadVictim = firstDeath != null ? pkg.players[firstDeath.victimIndex] : undefined;
+      const meFirstDead = firstDeath != null && firstDeadVictim != null && ids.has(firstDeadVictim.steamId64);
       const isLowBuy = economy != null && LOW_BUY_TYPES.has(economy);
       const isFullBuy = economy === "full";
       const isAntiEco = opponentEconomy === "eco" || opponentEconomy === "semi";
@@ -248,7 +260,8 @@ export function buildPlayerSeasonInsights(
       }
       // 死亡时间分布
       for (const kill of sorted) {
-        if (!ids.has(kill.victimSteamId64)) continue;
+        const victim = pkg.players[kill.victimIndex];
+        if (!victim || !ids.has(victim.steamId64)) continue;
         const freeze = freezeByRound.get(roundNumber);
         if (freeze == null) continue;
         const seconds = (kill.tick - freeze) / tickrate;
@@ -261,7 +274,8 @@ export function buildPlayerSeasonInsights(
 
     // 残局失利
     for (const clutch of pkg.clutches) {
-      if (!ids.has(clutch.clutcherSteamId64) || clutch.won) continue;
+      const clutcher = pkg.players[clutch.clutcherIndex];
+      if (!clutcher || !ids.has(clutcher.steamId64) || clutch.won) continue;
       clutchLosses += 1;
       clutchLossEvidence.push({
         matchId,
@@ -307,7 +321,9 @@ export function buildPlayerWeaponStats(
   for (const { pkg } of demos) {
     let appeared = false;
     for (const kill of pkg.kills) {
-      if (!kill.killerSteamId64 || !ids.has(kill.killerSteamId64)) continue;
+      if (kill.killerIndex == null) continue;
+      const killer = pkg.players[kill.killerIndex];
+      if (!killer || !ids.has(killer.steamId64)) continue;
       appeared = true;
       const weapon = kill.weapon || "unknown";
       const row = rows.get(weapon) ?? { weapon, kills: 0, headshots: 0 };
@@ -361,7 +377,7 @@ export function buildPlayerFlashSummaries(
 
   for (const { matchId, pkg } of demos) {
     for (const stat of pkg.playerStats) {
-      const player = bySteamId.get(stat.steamId64);
+      const player = bySteamId.get(pkg.players[stat.playerIndex]?.steamId64 ?? "");
       if (!player) continue;
       const row = rows.get(player.playerKey)!;
       row.enemyBlindSeconds += stat.enemyFlashDurationSeconds;
@@ -370,8 +386,10 @@ export function buildPlayerFlashSummaries(
     }
 
     for (const grenade of pkg.grenades) {
-      if (grenade.grenade !== "flashbang" || grenade.throwerSteamId64 == null) continue;
-      const player = bySteamId.get(grenade.throwerSteamId64);
+      if (grenade.grenade !== "flashbang") continue;
+      const thrower = pkg.players[grenade.throwerIndex];
+      if (!thrower) continue;
+      const player = bySteamId.get(thrower.steamId64);
       if (player) rows.get(player.playerKey)!.flashesThrown += 1;
     }
 
@@ -383,14 +401,17 @@ export function buildPlayerFlashSummaries(
       seconds: number;
     }>();
     for (const blind of pkg.blinds) {
-      const player = bySteamId.get(blind.flasherSteamId64);
+      const flasher = pkg.players[blind.flasherIndex];
+      const flashed = pkg.players[blind.flashedIndex];
+      if (!flasher || !flashed) continue;
+      const player = bySteamId.get(flasher.steamId64);
       if (!player) continue;
       const row = rows.get(player.playerKey)!;
-      if (blind.flasherTeamKey !== blind.flashedTeamKey) {
+      if (flasher.teamKey !== flashed.teamKey) {
         row.enemyBlindVictims += 1;
         continue;
       }
-      if (blind.flasherSteamId64 === blind.flashedSteamId64) continue;
+      if (flasher.steamId64 === flashed.steamId64) continue;
       const key = `${player.playerKey}:${blind.flashId ?? `${blind.roundNumber}-${Math.round(blind.tick / 16)}`}`;
       const cell = grouped.get(key) ?? {
         playerKey: player.playerKey,
@@ -400,7 +421,7 @@ export function buildPlayerFlashSummaries(
         seconds: 0
       };
       cell.tick = Math.min(cell.tick, blind.tick);
-      cell.victims.add(blind.flashedSteamId64);
+      cell.victims.add(pkg.players[blind.flashedIndex]?.steamId64 ?? "");
       cell.seconds += blind.durationSeconds;
       grouped.set(key, cell);
     }
@@ -709,11 +730,12 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
       const weaponCell = weaponRows.get(weapon) ?? { weapon, kills: 0, headshots: 0, players: new Map() };
       weaponCell.kills += 1;
       if (kill.headshot) weaponCell.headshots += 1;
-      if (kill.killerSteamId64) {
-        const playerName = playerNameBySteam.get(kill.killerSteamId64) ?? kill.killerSteamId64;
-        const playerCell = weaponCell.players.get(kill.killerSteamId64) ?? { name: playerName, kills: 0 };
+      const killerSteamId64 = kill.killerIndex != null ? (pkg.players[kill.killerIndex]?.steamId64 ?? null) : null;
+      if (killerSteamId64) {
+        const playerName = playerNameBySteam.get(killerSteamId64) ?? killerSteamId64;
+        const playerCell = weaponCell.players.get(killerSteamId64) ?? { name: playerName, kills: 0 };
         playerCell.kills += 1;
-        weaponCell.players.set(kill.killerSteamId64, playerCell);
+        weaponCell.players.set(killerSteamId64, playerCell);
       }
       weaponRows.set(weapon, weaponCell);
     }
@@ -800,6 +822,7 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
       collectManAdvantageRound(
         manAdvantage,
         teamManAdvantage,
+        pkg.players,
         playersByTeam,
         { teamA: teamAName, teamB: teamBName },
         killsByRound.get(row.roundNumber) ?? [],
@@ -992,6 +1015,7 @@ function collectManAdvantageRound(
       disadvantageWins: number;
     }>;
   }>,
+  players: DemoPackage["players"],
   playersByTeam: Record<TeamKey, Set<string>>,
   teamNames: Record<TeamKey, string>,
   kills: DemoPackage["kills"],
@@ -1003,7 +1027,11 @@ function collectManAdvantageRound(
   };
   const seen = new Set<string>();
   for (const kill of [...kills].sort((a, b) => a.tick - b.tick)) {
-    alive[kill.victimTeamKey].delete(kill.victimSteamId64);
+    const victimPlayer = players[kill.victimIndex];
+    const victimTeamKey = victimPlayer?.teamKey;
+    const victimSteamId64 = victimPlayer?.steamId64;
+    if (!victimTeamKey || !victimSteamId64) continue;
+    alive[victimTeamKey].delete(victimSteamId64);
     const teamAAlive = alive.teamA.size;
     const teamBAlive = alive.teamB.size;
     if (teamAAlive === teamBAlive) continue;

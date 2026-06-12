@@ -1,4 +1,4 @@
-import type { EconomyPoint } from "@cs2dak/contract";
+import type { EconomyPoint, EconomyType } from "@cs2dak/contract";
 import { ECONOMY_LABEL_SHORT } from "@cs2dak/presentation";
 
 export interface EconomyPanelProps {
@@ -10,14 +10,13 @@ export interface EconomyPanelProps {
 const width = 760;
 const height = 260;
 const pad = { left: 48, right: 18, top: 24, bottom: 34 };
-const economyColors = {
+const economyColors: Record<EconomyType, string> = {
   pistol: "rgba(255, 198, 77, 0.18)",
   eco: "rgba(104, 115, 129, 0.18)",
   semi: "rgba(73, 182, 255, 0.16)",
   force: "rgba(255, 122, 33, 0.18)",
-  full: "rgba(83, 215, 126, 0.16)",
-  conversion: "rgba(83, 215, 126, 0.16)"
-} as const;
+  full: "rgba(83, 215, 126, 0.16)"
+};
 
 const upsetLabels: Record<string, string> = {
   eco: "ECO翻",
@@ -35,7 +34,7 @@ function getUpsetType(point: EconomyPoint): "eco" | "semi" | "force" | null {
   const winnerEco = point.winnerTeamKey === "teamA" ? point.teamAEconomy : point.teamBEconomy;
   const loserEco  = point.winnerTeamKey === "teamA" ? point.teamBEconomy : point.teamAEconomy;
   if (winnerEco !== "eco" && winnerEco !== "semi" && winnerEco !== "force") return null;
-  if (loserEco !== "full" && loserEco !== "conversion") return null;
+  if (loserEco !== "full") return null;
   return winnerEco;
 }
 

@@ -60,18 +60,27 @@ export function firstKillMap(pkg: DemoPackage): Map<number, DemoPackage["kills"]
   return firstKillByRound;
 }
 
-export function sumDamageForPlayer(pkg: DemoPackage, steamId64: string): number {
+export function nameForPlayerIndex(pkg: DemoPackage, playerIndex: number | null | undefined): string | null {
+  if (playerIndex === null || playerIndex === undefined) return null;
+  return pkg.players[playerIndex]?.name ?? null;
+}
+
+export function sumDamageForPlayer(pkg: DemoPackage, playerIndex: number): number {
+  const playerTeam = pkg.players[playerIndex]?.teamKey;
   return pkg.damages
-    .filter((damage) => damage.attackerSteamId64 === steamId64 && damage.attackerTeamKey !== damage.victimTeamKey)
+    .filter((damage) =>
+      damage.attackerIndex === playerIndex &&
+      pkg.players[damage.victimIndex]?.teamKey !== playerTeam
+    )
     .reduce((sum, damage) => sum + damage.healthDamage, 0);
 }
 
-export function openingKillsForPlayer(pkg: DemoPackage, steamId64: string): number {
-  return [...firstKillMap(pkg).values()].filter((kill) => kill.killerSteamId64 === steamId64).length;
+export function openingKillsForPlayer(pkg: DemoPackage, playerIndex: number): number {
+  return [...firstKillMap(pkg).values()].filter((kill) => kill.killerIndex === playerIndex).length;
 }
 
-export function openingDeathsForPlayer(pkg: DemoPackage, steamId64: string): number {
-  return [...firstKillMap(pkg).values()].filter((kill) => kill.victimSteamId64 === steamId64).length;
+export function openingDeathsForPlayer(pkg: DemoPackage, playerIndex: number): number {
+  return [...firstKillMap(pkg).values()].filter((kill) => kill.victimIndex === playerIndex).length;
 }
 
 export function multiKillRounds(kills: DemoPackage["kills"], target: number): number {

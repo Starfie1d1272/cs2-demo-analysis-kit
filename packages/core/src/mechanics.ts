@@ -1,4 +1,5 @@
-import type { DemoPackage, PackageDamage, PackageShot } from "@cs2dak/contract";
+import type { DemoPackage, PackageDamage } from "@cs2dak/contract";
+import { decodeDelta } from "@cs2dak/contract";
 import { killWeaponName, normalizeWeapon } from "./utils.js";
 
 const BURST_GAP_MS = 250;
@@ -76,6 +77,15 @@ export interface PlayerMechanicsFact {
   burstLengthBuckets: BurstLengthBuckets;
 }
 
+interface FlatShot {
+  roundNumber: number;
+  playerIndex: number;
+  tick: number;
+  weapon: string;
+  vx: number;
+  vy: number;
+}
+
 function round(value: number, digits = 1): number {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
@@ -85,8 +95,8 @@ function tickrateOf(pkg: DemoPackage): number {
   return pkg.match.tickrate || 64;
 }
 
-function speed(shot: PackageShot): number {
-  return Math.hypot(shot.velocity.x, shot.velocity.y);
+function speed(shot: FlatShot): number {
+  return Math.hypot(shot.vx, shot.vy);
 }
 
 function accurateSpeedForWeapon(weapon: string): number {
@@ -97,20 +107,20 @@ function isFirearmWeapon(weapon: string): boolean {
   return FIREARM_WEAPONS.has(normalizeWeapon(weapon));
 }
 
-function hasDamageMatch(damages: PackageDamage[], shot: PackageShot): boolean {
+function hasDamageMatch(damages: PackageDamage[], shot: FlatShot): boolean {
   const shotWeapon = normalizeWeapon(shot.weapon);
   return damages.some(
     (damage) =>
       damage.roundNumber === shot.roundNumber &&
-      damage.attackerSteamId64 === shot.steamId64 &&
+      damage.attackerIndex === shot.playerIndex &&
       normalizeWeapon(damage.weapon) === shotWeapon &&
       Math.abs(damage.tick - shot.tick) <= 1
   );
 }
 
-function splitBursts(shots: PackageShot[], tickrate: number): PackageShot[][] {
+function splitBursts(shots: FlatShot[], tickrate: number): FlatShot[][] {
   const maxGap = Math.round(BURST_GAP_MS / 1000 * tickrate);
-  const bursts: PackageShot[][] = [];
+  const bursts: FlatShot[][] = [];
   for (const shot of [...shots].sort((a, b) => a.tick - b.tick)) {
     const current = bursts[bursts.length - 1];
     if (!current || shot.tick - current[current.length - 1].tick >= maxGap) bursts.push([shot]);
@@ -119,7 +129,7 @@ function splitBursts(shots: PackageShot[], tickrate: number): PackageShot[][] {
   return bursts;
 }
 
-function bucketBursts(bursts: PackageShot[][]): BurstLengthBuckets {
+function bucketBursts(bursts: FlatShot[][]): BurstLengthBuckets {
   const buckets: BurstLengthBuckets = { single: 0, short: 0, medium: 0, long: 0 };
   for (const burst of bursts) {
     if (burst.length === 1) buckets.single += 1;
@@ -134,7 +144,7 @@ function percent(count: number, total: number): number | null {
   return total > 0 ? round(count / total * 100, 1) : null;
 }
 
-function counterStrafePercent(shots: PackageShot[]): number | null {
+function counterStrafePercent(shots: FlatShot[]): number | null {
   if (shots.length === 0) return null;
   if (shots.every((shot) => speed(shot) === 0)) return null;
   const counterStrafeShots = shots.filter((shot) => speed(shot) <= accurateSpeedForWeapon(shot.weapon));
@@ -142,38 +152,56 @@ function counterStrafePercent(shots: PackageShot[]): number | null {
 }
 
 export function derivePlayerMechanics(pkg: DemoPackage): PlayerMechanicsFact[] {
-  if (!pkg.shots || pkg.shots.length === 0) return [];
+  if (!pkg.shots || pkg.shots.tracks.length === 0) return [];
   const tickrate = tickrateOf(pkg);
-  const playerById = new Map(pkg.players.map((player) => [player.steamId64, player]));
+  const { weaponDict, tracks } = pkg.shots;
+
   const killCounts = new Map<string, number>();
   for (const kill of pkg.kills) {
-    if (!kill.killerSteamId64 || kill.killerTeamKey === kill.victimTeamKey) continue;
+    if (kill.killerIndex === null) continue;
+    const killerTeam = pkg.players[kill.killerIndex]?.teamKey;
+    const victimTeam = pkg.players[kill.victimIndex]?.teamKey;
+    if (!killerTeam || killerTeam === victimTeam) continue;
     const weapon = normalizeWeapon(killWeaponName(kill));
     if (!isFirearmWeapon(weapon)) continue;
-    const key = `${kill.killerSteamId64}:${weapon}`;
+    const key = `${kill.killerIndex}:${weapon}`;
     killCounts.set(key, (killCounts.get(key) ?? 0) + 1);
   }
-  const grouped = new Map<string, PackageShot[]>();
-  for (const shot of pkg.shots) {
-    const weapon = normalizeWeapon(shot.weapon);
-    if (!isFirearmWeapon(weapon)) continue;
-    const key = `${shot.steamId64}:${weapon}`;
-    const list = grouped.get(key) ?? [];
-    list.push({ ...shot, weapon });
-    grouped.set(key, list);
+
+  const grouped = new Map<string, FlatShot[]>();
+  for (const track of tracks) {
+    const trackTicks = decodeDelta(track.tick);
+    for (let i = 0; i < trackTicks.length; i++) {
+      const weaponIdx = track.weapon[i] ?? -1;
+      const weapon = weaponIdx >= 0 ? normalizeWeapon(weaponDict[weaponIdx] ?? "") : "";
+      if (!isFirearmWeapon(weapon)) continue;
+      const key = `${track.playerIndex}:${weapon}`;
+      const list = grouped.get(key) ?? [];
+      list.push({
+        roundNumber: track.roundNumber,
+        playerIndex: track.playerIndex,
+        tick: trackTicks[i]!,
+        weapon,
+        vx: track.vx[i] ?? 0,
+        vy: track.vy[i] ?? 0
+      });
+      grouped.set(key, list);
+    }
   }
 
   return [...grouped.entries()]
     .map(([key, shots]) => {
-      const [steamId64, weapon] = key.split(":");
-      const player = playerById.get(steamId64);
+      const colonIdx = key.indexOf(":");
+      const playerIdx = parseInt(key.slice(0, colonIdx));
+      const weapon = key.slice(colonIdx + 1);
+      const player = pkg.players[playerIdx];
       const bursts = splitBursts(shots, tickrate);
-      const firstShots = bursts.map((burst) => burst[0]);
+      const firstShots = bursts.map((burst) => burst[0]!);
       const sprayShots = bursts.flatMap((burst) => burst.slice(3));
       return {
-        steamId64,
-        playerName: player?.name ?? steamId64,
-        teamKey: player?.teamKey ?? shots[0].teamKey,
+        steamId64: player?.steamId64 ?? String(playerIdx),
+        playerName: player?.name ?? String(playerIdx),
+        teamKey: player?.teamKey ?? "teamA",
         weapon,
         killCount: killCounts.get(key) ?? 0,
         burstCount: bursts.length,

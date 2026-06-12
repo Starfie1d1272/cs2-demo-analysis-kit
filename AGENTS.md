@@ -87,6 +87,11 @@ docs/                  # 架构与集成文档
 
 详细架构见 `docs/architecture.md`。
 
+> **迁移中**：cs2-demo-format 3.0.0 已发布（breaking）。本仓库按
+> [`docs/v3-migration.md`](docs/v3-migration.md) 迁移：TS 管线升 v3 合同，
+> Python exporter 切换为 PyPI `cs2df`（本仓库只留 GUI/Studio 壳层）。
+> Studio 最终形态设计见 [`docs/design/studio-redesign.md`](docs/design/studio-redesign.md)。
+
 ### 模块边界规则
 
 模块职责、禁止事项与目标依赖边界以 [`docs/module-boundaries.md`](docs/module-boundaries.md)
@@ -99,6 +104,10 @@ docs/                  # 架构与集成文档
 - **TypeScript**：pnpm workspace，vitest（node 环境），`tsc -b` 类型检查。测试与源码同目录 `*.test.ts`
 - **跨语言 seam**：v2 ZIP 是唯一耦合点。Python 和 TS 不互相 import
 - **组件导出**：公共组件从 `packages/react/src/index.ts` 统一导出
+- **UI 设计语言**：DAK Studio 所有页面与组件必须遵守
+  [`docs/design-language.md`](docs/design-language.md)（Tactical Slate：只用
+  `--dak-*`/`stu-*` token，禁止裸色值与视图私有控件样式；统计证据可点击、
+  派生指标带 ⓘ、缺失值显示 `—`）
 - **Git commit**：中文，不加 `Co-Authored-By` trailer，语言跟随仓库现有约定
 
 ### 版本与发布

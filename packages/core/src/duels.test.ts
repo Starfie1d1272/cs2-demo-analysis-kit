@@ -1,42 +1,36 @@
 import { describe, expect, it } from "vitest";
-import type { DemoPackage, PackageDamage, PackageKill, PackageShot, Replay } from "@cs2dak/contract";
+import type { DemoPackage, PackageDamage, PackageKill, PackageShots, Replay } from "@cs2dak/contract";
 import { deriveDuels, deriveOpeningDuels } from "./duels.js";
 
 const A = "76561198000000001";
 const B = "76561198000000002";
 const C = "76561198000000003";
 
-function damage(row: Partial<PackageDamage> & Pick<PackageDamage, "tick" | "attackerSteamId64" | "victimSteamId64">): PackageDamage {
+// Player indices matching pkg().players order
+const AI = 0;
+const BI = 1;
+const CI = 2;
+
+function damage(row: { attackerIndex: number | null; victimIndex: number; tick: number } & Partial<PackageDamage>): PackageDamage {
   return {
     roundNumber: 1,
-    attackerTeamKey: row.attackerSteamId64 === A ? "teamA" : "teamB",
-    victimTeamKey: row.victimSteamId64 === A ? "teamA" : "teamB",
-    attackerSide: row.attackerSteamId64 === A ? "t" : "ct",
-    victimSide: row.victimSteamId64 === A ? "t" : "ct",
     weapon: "ak47",
     hitgroup: "chest",
     healthDamage: 40,
     healthDamageRaw: 40,
     armorDamage: 0,
     victimHealthBefore: 100,
-    victimHealthAfter: 60,
-    victimArmorBefore: 100,
-    victimArmorAfter: 100,
     attackerPosition: { x: 0, y: 0, z: 0 },
     victimPosition: { x: 100, y: 0, z: 0 },
     ...row
-  };
+  } as PackageDamage;
 }
 
-function kill(row: Partial<PackageKill> & Pick<PackageKill, "tick" | "killerSteamId64" | "victimSteamId64">): PackageKill {
+function kill(row: { killerIndex: number | null; victimIndex: number; tick: number } & Partial<PackageKill>): PackageKill {
   return {
     roundNumber: 1,
-    assisterSteamId64: null,
-    flashAssisterSteamId64: null,
-    killerTeamKey: row.killerSteamId64 === A ? "teamA" : "teamB",
-    victimTeamKey: row.victimSteamId64 === A ? "teamA" : "teamB",
-    killerSide: row.killerSteamId64 === A ? "t" : "ct",
-    victimSide: row.victimSteamId64 === A ? "t" : "ct",
+    assisterIndex: null,
+    flashAssisterIndex: null,
     weapon: "ak47",
     killerActiveWeapon: "ak47",
     victimActiveWeapon: "ak47",
@@ -50,27 +44,49 @@ function kill(row: Partial<PackageKill> & Pick<PackageKill, "tick" | "killerStea
     killerPosition: { x: 0, y: 0, z: 0 },
     victimPosition: { x: 100, y: 0, z: 0 },
     ...row
-  };
+  } as PackageKill;
 }
 
-function shot(row: Partial<PackageShot> & Pick<PackageShot, "tick" | "steamId64">): PackageShot {
-  return {
-    roundNumber: 1,
-    teamKey: row.steamId64 === A ? "teamA" : "teamB",
-    side: row.steamId64 === A ? "t" : "ct",
-    weapon: "ak47",
-    position: row.steamId64 === A ? { x: 0, y: 0, z: 0 } : { x: 100, y: 0, z: 0 },
-    velocity: { x: 0, y: 0, z: 0 },
-    yaw: row.steamId64 === A ? 0 : 180,
-    pitch: 0,
-    ...row
-  };
+/** Build columnar PackageShots from a flat shot list. Ticks are delta-encoded per track. */
+function buildShots(
+  shots: Array<{ tick: number; playerIndex: number; roundNumber?: number }>
+): PackageShots {
+  const groups = new Map<string, Array<{ tick: number; playerIndex: number; roundNumber: number }>>();
+  for (const s of shots) {
+    const rn = s.roundNumber ?? 1;
+    const key = `${rn}:${s.playerIndex}`;
+    const arr = groups.get(key) ?? [];
+    arr.push({ tick: s.tick, playerIndex: s.playerIndex, roundNumber: rn });
+    groups.set(key, arr);
+  }
+  const tracks: PackageShots["tracks"] = [];
+  for (const items of groups.values()) {
+    const deltas: number[] = [];
+    let prev = 0;
+    for (const { tick } of items) { deltas.push(tick - prev); prev = tick; }
+    const n = items.length;
+    tracks.push({
+      roundNumber: items[0]!.roundNumber,
+      playerIndex: items[0]!.playerIndex,
+      tick: deltas,
+      weapon: Array<number>(n).fill(0),
+      vx: Array<number>(n).fill(0),
+      vy: Array<number>(n).fill(0),
+      vz: Array<number>(n).fill(0),
+      yaw: Array<number>(n).fill(0),
+      pitch: Array<number>(n).fill(0),
+      x: Array<number>(n).fill(0),
+      y: Array<number>(n).fill(0),
+      z: Array<number>(n).fill(0),
+    });
+  }
+  return { meta: { coordScale: 1, angleScale: 10 }, weaponDict: ["ak47"], tracks };
 }
 
 function pkg(overrides: Partial<DemoPackage>): DemoPackage {
   return {
     manifest: {
-      schemaVersion: "cs2-demo-format/2.0",
+      schemaVersion: "cs2-demo-format/3.0",
       exporter: { name: "test", version: "0" },
       parser: { name: "test", version: "0" },
       demo: { hash: null, sourceFileName: null },
@@ -135,12 +151,17 @@ describe("deriveDuels", () => {
   it("classifies mutual damage inside the window as contested and computes burst-anchored ttk", () => {
     const demo = pkg({
       damages: [
-        damage({ tick: 100, attackerSteamId64: A, victimSteamId64: B }),
-        damage({ tick: 120, attackerSteamId64: B, victimSteamId64: A }),
-        damage({ tick: 150, attackerSteamId64: A, victimSteamId64: B, victimHealthBefore: 40, victimHealthAfter: 0 })
+        damage({ tick: 100, attackerIndex: AI, victimIndex: BI }),
+        damage({ tick: 120, attackerIndex: BI, victimIndex: AI }),
+        damage({ tick: 150, attackerIndex: AI, victimIndex: BI, victimHealthBefore: 40 })
       ],
-      kills: [kill({ tick: 150, killerSteamId64: A, victimSteamId64: B })],
-      shots: [shot({ tick: 96, steamId64: A }), shot({ tick: 108, steamId64: A }), shot({ tick: 120, steamId64: B })]
+      kills: [kill({ tick: 150, killerIndex: AI, victimIndex: BI })],
+      // A fires at 96,108; B fires at 120 — B response tick 120 is in window [150-192,150]
+      shots: buildShots([
+        { tick: 96, playerIndex: AI },
+        { tick: 108, playerIndex: AI },
+        { tick: 120, playerIndex: BI }
+      ])
     });
 
     const rows = deriveDuels(demo);
@@ -150,36 +171,53 @@ describe("deriveDuels", () => {
       victimSteamId64: B,
       classification: "contested",
       fullHealth: true,
-      ttkMs: 844
+      ttkMs: 844 // (150 - 96) / 64 * 1000 = 843.75 → 844
     });
   });
 
   it("separates outaimed from caught off guard using replay yaw when victim does not return fire", () => {
     const replay: Replay = {
-      meta: { sampleRate: 8, tickrate: 64, coordScale: 1 },
+      meta: { sampleRate: 8, tickrate: 64, coordScale: 1, angleScale: 10 },
       weaponDict: [],
+      placeDict: [],
       rounds: [{
         roundNumber: 1,
         startTick: 64,
         tickStep: 8,
         frameCount: 1,
+        projectiles: [],
         players: [
-          { steamId64: B, teamKey: "teamB", side: "ct", x: [100], y: [0], z: [0], yaw: [180], hp: [0], weapon: [-1], flags: [0] },
-          { steamId64: C, teamKey: "teamB", side: "ct", x: [100], y: [0], z: [0], yaw: [90], hp: [0], weapon: [-1], flags: [0] }
+          {
+            // B faces 180° (toward killer A at x=0, from x=100) → outaimed
+            playerIndex: BI,
+            x: [100], y: [0], z: [0],
+            yaw: [1800], // 180° × angleScale 10
+            pitch: [0], hp: [0], armor: [0], money: [0], equipValue: [0],
+            place: [0], flash: [0], flags: [0], weapon: [-1]
+          },
+          {
+            // C faces 90° (perpendicular to killer) → caught_off_guard
+            playerIndex: CI,
+            x: [100], y: [0], z: [0],
+            yaw: [900], // 90° × angleScale 10
+            pitch: [0], hp: [0], armor: [0], money: [0], equipValue: [0],
+            place: [0], flash: [0], flags: [0], weapon: [-1]
+          }
         ]
       }]
     };
+
     const demo = pkg({
       replay,
       damages: [
-        damage({ tick: 64, attackerSteamId64: A, victimSteamId64: B }),
-        damage({ tick: 64, attackerSteamId64: A, victimSteamId64: C })
+        damage({ tick: 64, attackerIndex: AI, victimIndex: BI }),
+        damage({ tick: 64, attackerIndex: AI, victimIndex: CI })
       ],
       kills: [
-        kill({ tick: 64, killerSteamId64: A, victimSteamId64: B }),
-        kill({ tick: 64, killerSteamId64: A, victimSteamId64: C })
+        kill({ tick: 64, killerIndex: AI, victimIndex: BI }),
+        kill({ tick: 64, killerIndex: AI, victimIndex: CI })
       ],
-      shots: [shot({ tick: 64, steamId64: A })]
+      shots: buildShots([{ tick: 64, playerIndex: AI }])
     });
 
     const rows = deriveDuels(demo);
@@ -192,14 +230,17 @@ describe("deriveOpeningDuels", () => {
   it("returns only the first duel per round", () => {
     const demo = pkg({
       damages: [
-        damage({ tick: 100, attackerSteamId64: A, victimSteamId64: B }),
-        damage({ tick: 200, attackerSteamId64: A, victimSteamId64: C })
+        damage({ tick: 100, attackerIndex: AI, victimIndex: BI }),
+        damage({ tick: 200, attackerIndex: AI, victimIndex: CI })
       ],
       kills: [
-        kill({ tick: 100, killerSteamId64: A, victimSteamId64: B }),
-        kill({ tick: 200, killerSteamId64: A, victimSteamId64: C })
+        kill({ tick: 100, killerIndex: AI, victimIndex: BI }),
+        kill({ tick: 200, killerIndex: AI, victimIndex: CI })
       ],
-      shots: [shot({ tick: 100, steamId64: A }), shot({ tick: 200, steamId64: A })]
+      shots: buildShots([
+        { tick: 100, playerIndex: AI },
+        { tick: 200, playerIndex: AI }
+      ])
     });
 
     expect(deriveOpeningDuels(demo).map((row) => row.victimSteamId64)).toEqual([B]);

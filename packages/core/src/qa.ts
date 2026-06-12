@@ -7,7 +7,6 @@ export function buildQaReport(pkg: DemoPackage): QaReport {
   const issues: QaIssue[] = [];
   const roundNumbers = pkg.rounds.map((round) => round.roundNumber).sort((a, b) => a - b);
   const roundsByNumber = new Map(pkg.rounds.map((round) => [round.roundNumber, round]));
-  const playerIds = new Set(pkg.players.map((player) => player.steamId64));
 
   for (let i = 0; i < roundNumbers.length; i += 1) {
     if (roundNumbers[i] !== i + 1) {
@@ -86,19 +85,19 @@ export function buildQaReport(pkg: DemoPackage): QaReport {
 
   pkg.kills.forEach((kill, index) => {
     checkEventTick("kills", kill.roundNumber, kill.tick, index);
-    if (kill.killerSteamId64 && !playerIds.has(kill.killerSteamId64)) {
+    if (kill.killerIndex !== null && kill.killerIndex >= pkg.players.length) {
       issues.push({
         severity: "warning",
         code: "kill.unknown_killer",
-        message: `Killer ${kill.killerSteamId64} is not present in players.json.`,
+        message: `Killer playerIndex ${kill.killerIndex} is out of range (players.length=${pkg.players.length}).`,
         path: "kills"
       });
     }
-    if (!playerIds.has(kill.victimSteamId64)) {
+    if (kill.victimIndex >= pkg.players.length) {
       issues.push({
         severity: "error",
         code: "kill.unknown_victim",
-        message: `Victim ${kill.victimSteamId64} is not present in players.json.`,
+        message: `Victim playerIndex ${kill.victimIndex} is out of range (players.length=${pkg.players.length}).`,
         path: "kills"
       });
     }
@@ -117,11 +116,11 @@ export function buildQaReport(pkg: DemoPackage): QaReport {
     const events = bombEventsByRound.get(bomb.roundNumber) ?? [];
     events.push(bomb);
     bombEventsByRound.set(bomb.roundNumber, events);
-    if (bomb.actorSteamId64 && !playerIds.has(bomb.actorSteamId64)) {
+    if (bomb.actorIndex !== null && bomb.actorIndex >= pkg.players.length) {
       issues.push({
         severity: "warning",
         code: "bomb.unknown_actor",
-        message: `Bomb actor ${bomb.actorSteamId64} is not present in players.json.`,
+        message: `Bomb actor playerIndex ${bomb.actorIndex} is out of range (players.length=${pkg.players.length}).`,
         path: "bombs"
       });
     }

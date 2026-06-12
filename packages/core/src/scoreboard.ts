@@ -31,13 +31,17 @@ export function buildPlayerRoundFacts(pkg: DemoPackage): PlayerRoundFact[] {
   const firstKillByRound = firstKillMap(pkg);
 
   return pkg.rounds.flatMap((roundRow) =>
-    pkg.players.map((player) => {
-      const kills = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.killerSteamId64 === player.steamId64);
-      const deaths = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.victimSteamId64 === player.steamId64);
-      const assists = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.assisterSteamId64 === player.steamId64);
-      const flashAssists = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.flashAssisterSteamId64 === player.steamId64);
-      const damageRows = pkg.damages.filter((row) => row.roundNumber === roundRow.roundNumber && row.attackerSteamId64 === player.steamId64 && row.victimTeamKey !== player.teamKey);
-      const economy = pkg.playerEconomies.find((row) => row.roundNumber === roundRow.roundNumber && row.steamId64 === player.steamId64);
+    pkg.players.map((player, playerIdx) => {
+      const kills = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.killerIndex === playerIdx);
+      const deaths = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.victimIndex === playerIdx);
+      const assists = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.assisterIndex === playerIdx);
+      const flashAssists = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.flashAssisterIndex === playerIdx);
+      const damageRows = pkg.damages.filter((row) =>
+        row.roundNumber === roundRow.roundNumber &&
+        row.attackerIndex === playerIdx &&
+        pkg.players[row.victimIndex]?.teamKey !== player.teamKey
+      );
+      const economy = pkg.playerEconomies.find((row) => row.roundNumber === roundRow.roundNumber && row.playerIndex === playerIdx);
       const side = player.teamKey === "teamA" ? roundRow.teamASide : roundRow.teamBSide;
       const firstKill = firstKillByRound.get(roundRow.roundNumber);
       const kastTags = new Set<PlayerRoundFact["kastTags"][number]>();
@@ -62,7 +66,7 @@ export function buildPlayerRoundFacts(pkg: DemoPackage): PlayerRoundFact[] {
         flashAssists: flashAssists.length + kills.filter((kill) => kill.flashAssist).length,
         tradeKills: kills.filter((kill) => kill.tradeKill).length,
         tradedDeaths: deaths.filter((death) => death.tradeDeath).length,
-        openingDuel: firstKill?.killerSteamId64 === player.steamId64 ? "won" : firstKill?.victimSteamId64 === player.steamId64 ? "lost" : "none",
+        openingDuel: firstKill?.killerIndex === playerIdx ? "won" : firstKill?.victimIndex === playerIdx ? "lost" : "none",
         kastTags: [...kastTags],
         equipmentValue: economy?.equipmentValue ?? null,
         economyType: economy?.type ?? null
@@ -72,14 +76,16 @@ export function buildPlayerRoundFacts(pkg: DemoPackage): PlayerRoundFact[] {
 }
 
 export function buildPlayerIndicators(pkg: DemoPackage, facts: PlayerRoundFact[]): PlayerIndicatorRow[] {
-  const indicators = pkg.players.map((player) => {
-    const stats = pkg.playerStats.find((row) => row.steamId64 === player.steamId64);
+  const statsMap = new Map(pkg.playerStats.map((row) => [row.playerIndex, row]));
+
+  const indicators = pkg.players.map((player, playerIdx) => {
+    const stats = statsMap.get(playerIdx);
     const playerFacts = facts.filter((fact) => fact.steamId64 === player.steamId64);
-    const playerKills = pkg.kills.filter((kill) => kill.killerSteamId64 === player.steamId64);
-    const playerDeaths = pkg.kills.filter((kill) => kill.victimSteamId64 === player.steamId64);
-    const playerEconomies = pkg.playerEconomies.filter((row) => row.steamId64 === player.steamId64);
-    const playerClutches = pkg.clutches.filter((row) => row.clutcherSteamId64 === player.steamId64);
-    const playerBlinds = pkg.blinds.filter((row) => row.flasherSteamId64 === player.steamId64);
+    const playerKills = pkg.kills.filter((kill) => kill.killerIndex === playerIdx);
+    const playerDeaths = pkg.kills.filter((kill) => kill.victimIndex === playerIdx);
+    const playerEconomies = pkg.playerEconomies.filter((row) => row.playerIndex === playerIdx);
+    const playerClutches = pkg.clutches.filter((row) => row.clutcherIndex === playerIdx);
+    const playerBlinds = pkg.blinds.filter((row) => row.flasherIndex === playerIdx);
     const totalRounds = Math.max(playerFacts.length, 1);
     const killsByRound = new Map<number, number>();
     for (const kill of playerKills) {
@@ -94,12 +100,18 @@ export function buildPlayerIndicators(pkg: DemoPackage, facts: PlayerRoundFact[]
     const utilityDamage = stats?.utilityDamage ?? playerFacts.reduce((sum, fact) => sum + fact.utilityDamage, 0);
     const flashAssistCount = stats?.flashAssistCount ?? playerFacts.reduce((sum, fact) => sum + fact.flashAssists, 0);
     const enemyFlashDurationSeconds = stats?.enemyFlashDurationSeconds ?? playerBlinds
-      .filter((blind) => blind.flashedTeamKey && blind.flashedTeamKey !== player.teamKey)
+      .filter((blind) => {
+        const flashedTeam = pkg.players[blind.flashedIndex]?.teamKey;
+        return flashedTeam && flashedTeam !== player.teamKey;
+      })
       .reduce((sum, blind) => sum + blind.durationSeconds, 0);
     const teamFlashDurationSeconds = stats?.teamFlashDurationSeconds ?? playerBlinds
-      .filter((blind) => blind.flashedTeamKey === player.teamKey && blind.flashedSteamId64 !== player.steamId64)
+      .filter((blind) => {
+        const flashedTeam = pkg.players[blind.flashedIndex]?.teamKey;
+        return flashedTeam === player.teamKey && blind.flashedIndex !== playerIdx;
+      })
       .reduce((sum, blind) => sum + blind.durationSeconds, 0);
-    const grenadeCount = pkg.grenades.filter((grenade) => grenade.throwerSteamId64 === player.steamId64).length;
+    const grenadeCount = pkg.grenades.filter((grenade) => grenade.throwerIndex === playerIdx).length;
     const deaths = stats?.deaths ?? playerDeaths.length;
     const kills = stats?.kills ?? playerKills.length;
     const assists = stats?.assists ?? playerFacts.reduce((sum, fact) => sum + fact.assists, 0);
@@ -216,15 +228,18 @@ export function buildScoreboard(
   accountRatings: Array<{ signals: RRSignals; rr: AccountRatingResult }>
 ): PlayerScoreboardRow[] {
   const accountBySteamId = new Map(accountRatings.map((row) => [row.signals.steamId64, row]));
-  const statsBySteamId = new Map(pkg.playerStats.map((row) => [row.steamId64, row]));
+  const statsMap = new Map(pkg.playerStats.map((row) => [row.playerIndex, row]));
   const availability = fieldAvailability(pkg);
   const confidence = fieldConfidence(availability);
   return rows.map((row) => {
     const account = accountBySteamId.get(row.steamId64);
     const accountRr = account?.rr;
     const combatSignals = account?.signals.combat;
-    const stats = statsBySteamId.get(row.steamId64);
-    const playerKills = pkg.kills.filter((kill) => kill.killerSteamId64 === row.steamId64);
+    const playerIdx = pkg.players.findIndex((p) => p.steamId64 === row.steamId64);
+    const stats = statsMap.get(playerIdx);
+    const playerKills = playerIdx >= 0
+      ? pkg.kills.filter((kill) => kill.killerIndex === playerIdx)
+      : [];
     return {
       steamId64: row.steamId64,
       name: row.name,

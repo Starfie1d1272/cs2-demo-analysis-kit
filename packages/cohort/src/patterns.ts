@@ -32,9 +32,20 @@ function distributionKey(labels: string[]): string {
   return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([label, count]) => `${label}:${count}`).join("|");
 }
 
-function grenadeKey(pkg: DemoPackage, roundNumber: number, side: Side, windowStart: number, windowEnd: number): string[] {
+/** Resolve a player's side (t/ct) for a given round from their teamKey. */
+function playerSideAtRound(pkg: DemoPackage, round: { teamASide: Side; teamBSide: Side }, playerIndex: number): Side | null {
+  const player = pkg.players[playerIndex];
+  if (!player) return null;
+  return player.teamKey === "teamA" ? round.teamASide : round.teamBSide;
+}
+
+function grenadeKey(pkg: DemoPackage, round: { roundNumber: number; teamASide: Side; teamBSide: Side }, side: Side, windowStart: number, windowEnd: number): string[] {
   return pkg.grenades
-    .filter((grenade) => grenade.roundNumber === roundNumber && grenade.throwTick >= windowStart && grenade.throwTick <= windowEnd && grenade.throwerSide === side)
+    .filter((grenade) => {
+      if (grenade.roundNumber !== round.roundNumber) return false;
+      if (grenade.throwTick < windowStart || grenade.throwTick > windowEnd) return false;
+      return playerSideAtRound(pkg, round, grenade.throwerIndex) === side;
+    })
     .sort((a, b) => a.throwTick - b.throwTick)
     .map((grenade) => grenade.grenade);
 }
@@ -51,14 +62,11 @@ export function buildOpeningPatternClusters(
     for (const round of pkg.rounds) {
       const sampleTick = round.freezeEndTick + windowSeconds * tickrate;
       for (const side of ["t", "ct"] as const) {
-        const labels = (pkg.positions1s ?? [])
-          .filter((position) => position.roundNumber === round.roundNumber && position.side === side && position.alive)
-          .sort((a, b) => Math.abs(a.tick - sampleTick) - Math.abs(b.tick - sampleTick))
-          .slice(0, 5)
-          .map((position) => position.lastPlaceName ?? "unknown");
+        // positions-1s was removed in v3; spatial label clustering pending replay-based re-impl
+        const labels: string[] = [];
         if (labels.length === 0) continue;
         const basis = distributionKey(labels);
-        const grenades = grenadeKey(pkg, round.roundNumber, side, round.freezeEndTick, sampleTick);
+        const grenades = grenadeKey(pkg, round, side, round.freezeEndTick, sampleTick);
         const key = `${pkg.match.mapName}:${side}:${windowSeconds}:${basis}:${grenades.join(">")}`;
         const won = round.winnerSide === side;
         const cluster = clusters.get(key) ?? {

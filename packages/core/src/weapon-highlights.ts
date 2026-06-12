@@ -11,11 +11,11 @@ export function derivePlayerWeaponHighlights(input: unknown): PlayerWeaponHighli
 }
 
 export function buildPlayerWeaponHighlights(pkg: DemoPackage): PlayerWeaponHighlightFacts[] {
-  const statsBySteamId = new Map(pkg.playerStats.map((row) => [row.steamId64, row]));
+  const statsMap = new Map(pkg.playerStats.map((row) => [row.playerIndex, row]));
 
-  return pkg.players.map((player) => {
-    const stats = statsBySteamId.get(player.steamId64);
-    const kills = pkg.kills.filter((kill) => kill.killerSteamId64 === player.steamId64);
+  return pkg.players.map((player, playerIdx) => {
+    const stats = statsMap.get(playerIdx);
+    const kills = pkg.kills.filter((kill) => kill.killerIndex === playerIdx);
     const weaponCounts = new Map<string, PlayerWeaponHighlightFacts["weapons"][number]>();
     for (const kill of kills) {
       const weapon = killWeaponName(kill);

@@ -21,7 +21,7 @@ async function loadFixture() {
 describe("buildPlayerSeasonInsights", () => {
   it("derives trend, flash value and mistakes from one match", async () => {
     const pkg = await loadFixture();
-    const steamId64 = pkg.playerStats[0].steamId64;
+    const steamId64 = pkg.players[pkg.playerStats[0].playerIndex]?.steamId64 ?? "";
     const insights = buildPlayerSeasonInsights([{ matchId: "m1", pkg }], [steamId64]);
 
     expect(insights.trend).toHaveLength(1);
@@ -33,7 +33,7 @@ describe("buildPlayerSeasonInsights", () => {
     expect(point.kast).toBeLessThanOrEqual(100);
 
     // 死亡分布总数 = 该选手 deaths（kills.json 口径）
-    const deaths = pkg.kills.filter((k) => k.victimSteamId64 === steamId64).length;
+    const deaths = pkg.kills.filter((k) => pkg.players[k.victimIndex]?.steamId64 === steamId64).length;
     const dt = insights.mistakes.deathTiming;
     expect(dt.early + dt.mid + dt.late).toBe(dt.total);
     expect(dt.total).toBe(deaths);
@@ -231,7 +231,9 @@ function expectedManAdvantageRows(pkg: Awaited<ReturnType<typeof loadFixture>>) 
     const seen = new Set<string>();
     const kills = [...(killsByRound.get(round.roundNumber) ?? [])].sort((a, b) => a.tick - b.tick);
     for (const kill of kills) {
-      alive[kill.victimTeamKey].delete(kill.victimSteamId64);
+      const victimPlayer = pkg.players[kill.victimIndex];
+      if (!victimPlayer) continue;
+      alive[victimPlayer.teamKey].delete(victimPlayer.steamId64);
       const a = alive.teamA.size;
       const b = alive.teamB.size;
       const high = Math.max(a, b);

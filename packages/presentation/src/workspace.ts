@@ -123,8 +123,10 @@ function buildRoundFacets(pkg: DemoPackage, roundNumber: number) {
 
   const killsByPlayer = new Map<string, number>();
   for (const kill of kills) {
-    if (!kill.killerSteamId64 || kill.killerTeamKey === kill.victimTeamKey) continue;
-    killsByPlayer.set(kill.killerSteamId64, (killsByPlayer.get(kill.killerSteamId64) ?? 0) + 1);
+    const killerPlayer = kill.killerIndex != null ? pkg.players[kill.killerIndex] : undefined;
+    const victimPlayer = pkg.players[kill.victimIndex];
+    if (!killerPlayer || !victimPlayer || killerPlayer.teamKey === victimPlayer.teamKey) continue;
+    killsByPlayer.set(killerPlayer.steamId64, (killsByPlayer.get(killerPlayer.steamId64) ?? 0) + 1);
   }
 
   return {
@@ -132,12 +134,12 @@ function buildRoundFacets(pkg: DemoPackage, roundNumber: number) {
     bombPlantTick: plant?.tick ?? null,
     bombDefuseTick: defuse?.tick ?? null,
     firstKillTick: firstKill?.tick ?? null,
-    firstKillSteamId64: firstKill?.killerSteamId64 ?? null,
-    firstKillTeamKey: firstKill?.killerTeamKey ?? null,
+    firstKillSteamId64: firstKill && firstKill.killerIndex != null ? (pkg.players[firstKill.killerIndex]?.steamId64 ?? null) : null,
+    firstKillTeamKey: firstKill && firstKill.killerIndex != null ? (pkg.players[firstKill.killerIndex]?.teamKey ?? null) : null,
     clutch: clutch
       ? {
-          steamId64: clutch.clutcherSteamId64,
-          teamKey: clutch.clutcherTeamKey,
+          steamId64: pkg.players[clutch.clutcherIndex]?.steamId64 ?? "",
+          teamKey: pkg.players[clutch.clutcherIndex]?.teamKey ?? "",
           opponentCount: clutch.opponentCount,
           won: clutch.won,
           tick: clutch.tick
@@ -166,9 +168,9 @@ function buildWorkspaceWeapons(pkg: DemoPackage) {
     .map(([weapon, kills]) => {
       const killerCounts = new Map<string, number>();
       for (const kill of kills) {
-        if (kill.killerSteamId64) {
-          killerCounts.set(kill.killerSteamId64, (killerCounts.get(kill.killerSteamId64) ?? 0) + 1);
-        }
+        if (kill.killerIndex == null) continue;
+        const killer = pkg.players[kill.killerIndex];
+        if (killer) killerCounts.set(killer.steamId64, (killerCounts.get(killer.steamId64) ?? 0) + 1);
       }
       const topKiller = [...killerCounts.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
       const headshots = kills.filter((kill) => kill.headshot).length;
@@ -197,11 +199,14 @@ function buildWorkspaceDuels(pkg: DemoPackage, bundle: AnalysisBundle) {
 
   const matrix = players.map(() => players.map(() => 0));
   for (const kill of pkg.kills) {
-    if (!kill.killerSteamId64) continue;
-    const killerIndex = indexBySteamId.get(kill.killerSteamId64);
-    const victimIndex = indexBySteamId.get(kill.victimSteamId64);
-    if (killerIndex == null || victimIndex == null) continue;
-    matrix[killerIndex][victimIndex] += 1;
+    if (kill.killerIndex == null) continue;
+    const killer = pkg.players[kill.killerIndex];
+    const victim = pkg.players[kill.victimIndex];
+    if (!killer || !victim) continue;
+    const killerIdx = indexBySteamId.get(killer.steamId64);
+    const victimIdx = indexBySteamId.get(victim.steamId64);
+    if (killerIdx == null || victimIdx == null) continue;
+    matrix[killerIdx][victimIdx] += 1;
   }
 
   const factsByPlayer = groupBy(bundle.playerRoundFacts, (fact) => fact.steamId64);
@@ -542,7 +547,7 @@ function clutchBeat(ctx: StoryContext): StoryBeat | null {
   const won = ctx.pkg.clutches.filter((row) => row.won && (row.opponentCount ?? 0) >= 2);
   if (won.length === 0) return null;
   const top = [...won].sort((a, b) => (b.opponentCount ?? 0) - (a.opponentCount ?? 0))[0]!;
-  const player = ctx.pkg.players.find((row) => row.steamId64 === top.clutcherSteamId64);
+  const player = ctx.pkg.players[top.clutcherIndex];
   const who = player?.name ?? "某选手";
   const teamName = player
     ? player.teamKey === "teamA"
@@ -674,29 +679,15 @@ function buildWorkspaceMap(pkg: DemoPackage, view: ReturnType<typeof buildDemoVi
       y: bomb.position.y,
       z: bomb.position.z,
       roundNumber: bomb.roundNumber,
-      teamKey: bomb.actorTeamKey,
-      steamId64: bomb.actorSteamId64,
+      teamKey: bomb.actorIndex != null ? (pkg.players[bomb.actorIndex]?.teamKey ?? null) : null,
+      steamId64: bomb.actorIndex != null ? (pkg.players[bomb.actorIndex]?.steamId64 ?? null) : null,
       kind: "bomb",
-      side: null,
-      grenadeType: null
-    }));
-  const positionPoints: WorkspaceSpatialPoint[] = (pkg.positions1s ?? [])
-    .filter((row) => row.position && (row.position.x !== 0 || row.position.y !== 0))
-    .map((row) => ({
-      x: row.position?.x ?? 0,
-      y: row.position?.y ?? 0,
-      z: row.position?.z ?? 0,
-      roundNumber: row.roundNumber,
-      teamKey: row.teamKey,
-      steamId64: row.steamId64,
-      kind: "position",
       side: null,
       grenadeType: null
     }));
   const points: WorkspaceSpatialPoint[] = [
     ...heatmap.map((point) => ({ ...point, kind: point.kind })),
-    ...bombPoints,
-    ...positionPoints
+    ...bombPoints
   ];
   const count = (kind: WorkspaceSpatialPoint["kind"]) => points.filter((point) => point.kind === kind).length;
   const hasPositionData = points.length > 0;
@@ -796,11 +787,14 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
         }
         frames.push(frame);
       }
+      const replayPlayer = pkg.players[player.playerIndex];
       return {
-        steamId64: player.steamId64,
-        name: nameForSteamId(pkg, player.steamId64) ?? player.steamId64,
-        teamKey: player.teamKey,
-        side: player.side,
+        steamId64: replayPlayer?.steamId64 ?? String(player.playerIndex),
+        name: replayPlayer?.name ?? `Player ${player.playerIndex}`,
+        teamKey: replayPlayer?.teamKey ?? "teamA",
+        side: replayPlayer?.teamKey != null
+          ? (pkg.rounds.find((r) => r.roundNumber === roundRow.roundNumber)?.[replayPlayer.teamKey === "teamA" ? "teamASide" : "teamBSide"] ?? "t")
+          : "t",
         frames
       };
     })
@@ -869,12 +863,15 @@ function buildRoundKills(pkg: DemoPackage, kills: DemoPackage["kills"]): Workspa
   return kills.map((kill, index) => {
     const activeRaw = kill.killerActiveWeapon;
     const weaponRaw = activeRaw && isNamedWeapon(normalizeWeapon(activeRaw)) ? activeRaw : kill.weapon;
+    const killerSteamId = kill.killerIndex != null ? pkg.players[kill.killerIndex]?.steamId64 ?? null : null;
+    const victimSteamId = pkg.players[kill.victimIndex]?.steamId64 ?? "";
+    const killerTeamKey = kill.killerIndex != null ? (pkg.players[kill.killerIndex]?.teamKey ?? null) : null;
     return {
       id: `kf-${kill.roundNumber}-${kill.tick}-${index}`,
       tick: kill.tick,
-      killerName: nameForSteamId(pkg, kill.killerSteamId64),
-      killerTeamKey: kill.killerTeamKey,
-      victimName: nameForSteamId(pkg, kill.victimSteamId64) ?? kill.victimSteamId64,
+      killerName: nameForSteamId(pkg, killerSteamId),
+      killerTeamKey,
+      victimName: nameForSteamId(pkg, victimSteamId) ?? victimSteamId,
       weapon: displayWeaponName(weaponRaw),
       headshot: kill.headshot,
       throughSmoke: kill.throughSmoke,

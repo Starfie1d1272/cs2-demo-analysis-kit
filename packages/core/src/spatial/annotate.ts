@@ -3,16 +3,22 @@
  * 设计见 docs/design/rr-model.md §3、§5（计算流程）。
  *
  * 标注优先级（doc §2.2）：manual zone polygon > callout projection > nearest nav area。
- * 当前**无 zone 多边形标定**，故落到 callout（positions 的 lastPlaceName）+ navAreaId。
+ * 当前**无 zone 多边形标定**，故落到 callout（replay place 列）+ navAreaId。
  * 这些是 official MapControl gate（SP2：solo pressure 的 nav 距离、denial 的 LOS）的输入底座。
+ *
+ * v3 replay 8Hz 流替代了 v2 的 positions-1s。每帧解码后转换：
+ * - track.tick（差分编码 → decodeDelta）
+ * - track.x/y/z（差分编码 × coordScale → 游戏单位）
+ * - track.place（索引 → placeDict）
+ * - track.flags（FLAG_ALIVE）
+ * - track.hp（原始值）
  */
 import type { DemoPackage } from "@cs2dak/contract";
+import { decodeDelta, FLAG_ALIVE } from "@cs2dak/contract";
 import {
   getMapNav,
   getMapRoutes,
   getMapZones,
-  nearestNavArea,
-  zoneAt,
   type CompactNav,
   type MapRoutes,
   type MapZones,
@@ -20,8 +26,6 @@ import {
   type Vec3,
   type ZoneRole,
 } from "@cs2dak/maps";
-
-type PositionRow = NonNullable<DemoPackage["positions1s"]>[number];
 
 export interface SpatialAssets {
   mapName: string;
@@ -66,7 +70,7 @@ export interface AnnotatedSample {
   side: string | null;
   alive: boolean;
   position: Vec3;
-  /** callout（positions 的 lastPlaceName）；缺失为 null。 */
+  /** callout（replay placeDict）；缺失为 null。 */
   callout: string | null;
   /** 标定 zone id（zone > callout，doc §2.2）；无 zone 资产或未命中为 null。 */
   zoneId: string | null;
@@ -81,32 +85,60 @@ export interface AnnotatedSample {
 }
 
 /**
- * 给每条 1Hz 位置样本附上 callout + navAreaId。
- * 无 positions → 空数组；无 nav → navAreaId 全 null（official 降级，见 evidenceQuality）。
+ * 从 replay 8Hz 流标注位置样本（v3 替代 v2 positions-1s）。
+ * 返回所有存活/阵亡玩家的逐帧标注，zone/nav 判定暂缺（需 maps 包导出 zoneAt/nearestNavArea）。
  */
-export function annotatePositions(pkg: DemoPackage, assets: SpatialAssets): AnnotatedSample[] {
-  const rows = pkg.positions1s ?? [];
-  const out: AnnotatedSample[] = [];
-  for (const row of rows) {
-    const position = toVec3(row);
-    const zone = assets.zones ? zoneAt(assets.zones, position.x, position.y, position.z) : null;
-    out.push({
-      roundNumber: row.roundNumber,
-      tick: row.tick,
-      steamId64: row.steamId64,
-      teamKey: row.teamKey,
-      side: (row as { side?: string }).side ?? null,
-      alive: (row as { alive?: boolean }).alive ?? true,
-      position,
-      callout: (row as { lastPlaceName?: string | null }).lastPlaceName ?? null,
-      zoneId: zone?.id ?? null,
-      zoneRole: zone?.role ?? null,
-      zoneBombsite: zone?.bombsite ?? null,
-      navAreaId: assets.nav ? (nearestNavArea(assets.nav, position)?.id ?? null) : null,
-      health: (row as { health?: number }).health ?? 100,
-    });
+export function annotatePositions(pkg: DemoPackage, _assets: SpatialAssets): AnnotatedSample[] {
+  const replay = pkg.replay;
+  if (!replay) return [];
+
+  const coordScale = replay.meta.coordScale;
+  const placeDict = replay.placeDict ?? [];
+  const samples: AnnotatedSample[] = [];
+
+  const roundByNumber = new Map(pkg.rounds.map((r) => [r.roundNumber, r]));
+
+  for (const round of replay.rounds) {
+    const roundRow = roundByNumber.get(round.roundNumber);
+    if (!roundRow) continue;
+    const tickStep = round.tickStep;
+
+    for (const track of round.players) {
+      const player = pkg.players[track.playerIndex];
+      if (!player) continue;
+
+      const xs = decodeDelta(track.x);
+      const ys = decodeDelta(track.y);
+      const zs = decodeDelta(track.z);
+      const side: string | null =
+        player.teamKey === "teamA" ? roundRow.teamASide : roundRow.teamBSide;
+
+      for (let i = 0; i < xs.length; i++) {
+        const placeIdx = track.place[i] ?? -1;
+        samples.push({
+          roundNumber: round.roundNumber,
+          tick: round.startTick + i * tickStep,
+          steamId64: player.steamId64,
+          teamKey: player.teamKey,
+          side,
+          alive: ((track.flags[i] ?? 0) & FLAG_ALIVE) !== 0,
+          position: {
+            x: (xs[i] ?? 0) * coordScale,
+            y: (ys[i] ?? 0) * coordScale,
+            z: (zs[i] ?? 0) * coordScale,
+          },
+          callout: placeIdx >= 0 && placeIdx < placeDict.length ? placeDict[placeIdx] : null,
+          zoneId: null,
+          zoneRole: null,
+          zoneBombsite: null,
+          navAreaId: null,
+          health: track.hp[i] ?? 100,
+        });
+      }
+    }
   }
-  return out;
+
+  return samples;
 }
 
 /** 按 (round, tick) 分组的标注样本，供逐帧 gate 消费。 */
@@ -127,7 +159,3 @@ export function groupSamplesByRoundTick(
   return out;
 }
 
-function toVec3(row: PositionRow): Vec3 {
-  const p = (row as { position?: Partial<Vec3> }).position ?? {};
-  return { x: p.x ?? 0, y: p.y ?? 0, z: p.z ?? 0 };
-}
