@@ -53,7 +53,8 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
             playerKey: profile.playerKey,
             name: profile.name,
             steamIds: profile.steamIds
-          }))
+          })),
+          identityOptions
         );
         if (cancelled) return;
         const nextRows = flashes.map((flash) => {

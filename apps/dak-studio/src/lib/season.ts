@@ -230,11 +230,11 @@ async function loadDemosWithRenames(
 }
 
 /** 与 cohort 同源的 {matchId, pkg} 列表；只有逐场派生（个人洞察）才需要。 */
-export function getSeasonDemos(entries: StudioDemoEntry[]): Promise<SeasonInsightsDemo[]> {
-  const key = keyOf(entries);
+export function getSeasonDemos(entries: StudioDemoEntry[], identity?: IdentityOptions): Promise<SeasonInsightsDemo[]> {
+  const key = keyOf(entries, identity?.version);
   if (demosPromise && key === demosKey) return demosPromise;
   demosKey = key;
-  demosPromise = loadDemosWithRenames(entries);
+  demosPromise = loadDemosWithRenames(entries, identity?.teamRenames);
   demosPromise.catch(() => {
     demosKey = "";
     demosPromise = null;
@@ -264,12 +264,12 @@ function touchLimitedCache<T>(cache: Map<string, Promise<T>>, key: string, value
 }
 
 /** 选中选手的逐场洞察：只返回小结果，不把全量 DemoPackage 长期放进 React state。 */
-export function getPlayerSeasonDetails(entries: StudioDemoEntry[], steamIds: string[]): Promise<PlayerSeasonDetails> {
-  const key = `${keyOf(entries)}:player:${[...steamIds].sort().join(",")}`;
+export function getPlayerSeasonDetails(entries: StudioDemoEntry[], steamIds: string[], identity?: IdentityOptions): Promise<PlayerSeasonDetails> {
+  const key = `${keyOf(entries, identity?.version)}:player:${[...steamIds].sort().join(",")}`;
   const cached = detailsCache.get(key);
   if (cached) return cached;
   const loading = (async () => {
-    const demos = await loadDemosWithRenames(entries);
+    const demos = await loadDemosWithRenames(entries, identity?.teamRenames);
     const details = {
       insights: buildPlayerSeasonInsights(demos, steamIds),
       weaponStats: buildPlayerWeaponStats(demos, steamIds)
@@ -283,13 +283,14 @@ export function getPlayerSeasonDetails(entries: StudioDemoEntry[], steamIds: str
 /** 道具页多人 Flash Value：单次扫描所有 demo，避免每个选手重复扫全量 events。 */
 export function getPlayerFlashSummaries(
   entries: StudioDemoEntry[],
-  players: Array<{ playerKey: string; name: string; steamIds: string[] }>
+  players: Array<{ playerKey: string; name: string; steamIds: string[] }>,
+  identity?: IdentityOptions
 ): Promise<PlayerFlashSummary[]> {
-  const key = `${keyOf(entries)}:flash:${players.map((p) => `${p.playerKey}=${p.steamIds.join(",")}`).sort().join("|")}`;
+  const key = `${keyOf(entries, identity?.version)}:flash:${players.map((p) => `${p.playerKey}=${p.steamIds.join(",")}`).sort().join("|")}`;
   const cached = flashCache.get(key);
   if (cached) return cached;
   const loading = (async () => {
-    const demos = await loadDemosWithRenames(entries);
+    const demos = await loadDemosWithRenames(entries, identity?.teamRenames);
     const summaries = buildPlayerFlashSummaries(demos, players);
     clearPkgCache();
     return summaries;

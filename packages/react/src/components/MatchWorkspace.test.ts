@@ -92,7 +92,7 @@ const model: MatchWorkspaceModel = {
             teamKey: "teamA",
             side: "ct",
             frames: [
-              { tick: 100, x: 1, y: 2, z: 3, yaw: 90, hp: 100, weapon: "ak47", alive: true, flashed: false, hasDefuseKit: true, hasBomb: false }
+              { tick: 100, x: 1, y: 2, z: 3, yaw: 90, hp: 100, armor: 100, weapon: "ak47", alive: true, flashed: false, hasDefuseKit: true, hasBomb: false }
             ]
           }
         ]

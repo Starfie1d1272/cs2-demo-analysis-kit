@@ -913,24 +913,28 @@ export function ReplayViewer({ replay, map, target = null }: {
               const nb = Number(playerNumbers[b.player.steamId64] ?? "99");
               return (na === 0 ? 10 : na) - (nb === 0 ? 10 : nb);
             })
-            .map(({ player, frame }) => (
-              <div
-                className={`dak-frame-player-row${!frame.alive ? " dak-frame-player-row-dead" : ""}`}
-                key={player.steamId64}
-              >
-                <span className={`dak-team-dot dak-team-dot-${player.teamKey}`} />
-                <span className="dak-frame-player-num">{playerNumbers[player.steamId64] ?? "?"}</span>
-                <span className="dak-frame-player-name">{player.name}</span>
-                <div className="dak-hp-bar-wrap" title={`${frame.hp} HP`}>
-                  <div className="dak-hp-bar" style={{ width: `${frame.hp}%`, background: hpBarColor(frame.hp) }} />
+            .map(({ player, frame }) => {
+              const main = mainWeaponSoFar(player.frames, dataFrameIndex);
+              return (
+                <div
+                  className={`dak-frame-player-row${!frame.alive ? " dak-frame-player-row-dead" : ""}`}
+                  key={player.steamId64}
+                >
+                  <span className={`dak-team-dot dak-team-dot-${player.teamKey}`} />
+                  <span className="dak-frame-player-num">{playerNumbers[player.steamId64] ?? "?"}</span>
+                  <span className="dak-frame-player-name">{player.name}</span>
+                  <div className="dak-hp-bar-wrap" title={`${frame.hp} HP · 护甲 ${frame.armor}`}>
+                    <div className="dak-hp-bar" style={{ width: `${frame.hp}%`, background: hpBarColor(frame.hp) }} />
+                    {frame.armor > 0 && <div className="dak-armor-bar" style={{ width: `${frame.armor}%` }} />}
+                  </div>
+                  <small>
+                    {frame.alive
+                      ? `${main ? displayWeaponName(main) : frame.weapon ? displayWeaponName(frame.weapon) : "—"}${frame.armor > 0 ? " · 甲" : ""}${frame.hasDefuseKit ? " · kit" : ""}${frame.flashed ? " · flashed" : ""}`
+                      : "阵亡"}
+                  </small>
                 </div>
-                <small>
-                  {frame.alive
-                    ? `${frame.weapon ? displayWeaponName(frame.weapon) : "—"}${frame.hasDefuseKit ? " · kit" : ""}${frame.flashed ? " · flashed" : ""}`
-                    : "阵亡"}
-                </small>
-              </div>
-            ))}
+              );
+            })}
         </div>
       </Panel>
     </div>
@@ -1257,6 +1261,33 @@ function hpBarColor(hp: number): string {
   if (hp > 60) return "var(--dak-ok)";
   if (hp > 30) return "var(--dak-warn)";
   return "var(--dak-danger)";
+}
+
+/** 主武器（步枪/狙/冲锋/霰弹/机枪）与手枪的显示名称集合。
+ *  frame.weapon 在 workspace 层已由 weaponNameForIndex → displayWeaponName 转为显示名。 */
+const PRIMARY_WEAPONS = new Set([
+  "AK-47", "M4A4", "M4A1-S", "Galil AR", "FAMAS", "SG 553", "AUG",
+  "AWP", "SSG 08", "SCAR-20", "G3SG1",
+  "MAC-10", "MP9", "MP7", "MP5-SD", "UMP-45", "P90", "PP-Bizon",
+  "Nova", "XM1014", "MAG-7", "Sawed-Off", "M249", "Negev"
+]);
+const PISTOL_WEAPONS = new Set([
+  "Desert Eagle", "R8 Revolver", "Glock-18", "USP-S", "P2000", "P250",
+  "Five-SeveN", "Tec-9", "CZ75-Auto", "Dual Berettas"
+]);
+
+/** 本回合至当前帧最近持有的主武器；没碰过主武器则显示最近持有的手枪。
+ *  回放流只记当前手持武器，切刀/掏雷时用持枪历史回推背包。 */
+function mainWeaponSoFar(frames: WorkspaceReplayFrame[], uptoIndex: number): string | null {
+  let primary: string | null = null;
+  let pistol: string | null = null;
+  for (let i = 0; i <= uptoIndex && i < frames.length; i += 1) {
+    const w = frames[i]?.weapon;
+    if (!w) continue;
+    if (PRIMARY_WEAPONS.has(w)) primary = w;
+    else if (PISTOL_WEAPONS.has(w)) pistol = w;
+  }
+  return primary ?? pistol;
 }
 
 function replayPointPercent(frame: { x: number; y: number }, map: MatchWorkspaceModel["map"]["view"]) {

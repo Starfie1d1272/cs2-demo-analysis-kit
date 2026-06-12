@@ -151,6 +151,8 @@ export const workspaceReplayFrameSchema = z.object({
   z: z.number(),
   yaw: z.number(),
   hp: z.number().int().nonnegative().max(100),
+  /** 护甲值 0–100；旧模型缺省 0。 */
+  armor: z.number().int().nonnegative().max(100).optional().default(0),
   weapon: z.string().nullable(),
   alive: z.boolean(),
   flashed: z.boolean(),

@@ -12,6 +12,7 @@ import {
   type WorkspaceReplayRound,
   type WorkspaceSpatialPoint
 } from "@cs2dak/contract";
+import { decodeDelta } from "@cs2dak/contract";
 import { groupBy, nameForSteamId, round, normalizeWeapon, isNamedWeapon } from "./workspace-utils.js";
 import { displayWeaponName } from "./weapons.js";
 import { analyzeDemoPackage, normalizeDemoPackage } from "@cs2dak/core";
@@ -753,12 +754,13 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
       effectZ: row.effectPosition.z
     })),
     // v2.3+ 导出包才带飞行轨迹；旧包置空，渲染端按"无数据"处理
+    // v3 起 x/y/z 为差分编码（首元素绝对值 + 后续 delta），前缀和解码后 × coordScale 还原游戏单位
     projectiles: (roundRow.projectiles ?? []).map((proj) => ({
       grenade: proj.grenade,
       startTick: proj.startTick,
-      x: proj.x,
-      y: proj.y,
-      z: proj.z ?? []
+      x: decodeDelta(proj.x).map((v) => v * (replay.meta.coordScale || 1)),
+      y: decodeDelta(proj.y).map((v) => v * (replay.meta.coordScale || 1)),
+      z: decodeDelta(proj.z ?? []).map((v) => v * (replay.meta.coordScale || 1))
     })),
     bomb: buildRoundBomb(bombsByRound.get(roundRow.roundNumber) ?? []),
     groundBombs: buildGroundBombs(
@@ -766,19 +768,27 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
       roundRow.startTick + roundRow.frameCount * roundRow.tickStep
     ),
     players: roundRow.players.map((player) => {
+      // v3 起 x/y/z/yaw 为差分编码，flash 改为独立列（0.1 秒单位，flags 不再含致盲位）
+      const coordScale = replay.meta.coordScale || 1;
+      const angleScale = replay.meta.angleScale || 1;
+      const xs = decodeDelta(player.x);
+      const ys = decodeDelta(player.y);
+      const zs = decodeDelta(player.z);
+      const yaws = decodeDelta(player.yaw);
       const frames: WorkspaceReplayFrame[] = [];
       for (let index = 0; index < roundRow.frameCount; index += 1) {
         const flags = player.flags[index] ?? 0;
         const frame = {
           tick: roundRow.startTick + index * roundRow.tickStep,
-          x: player.x[index] ?? 0,
-          y: player.y[index] ?? 0,
-          z: player.z[index] ?? 0,
-          yaw: player.yaw[index] ?? 0,
+          x: (xs[index] ?? 0) * coordScale,
+          y: (ys[index] ?? 0) * coordScale,
+          z: (zs[index] ?? 0) * coordScale,
+          yaw: (yaws[index] ?? 0) / angleScale,
           hp: player.hp[index] ?? 0,
+          armor: player.armor?.[index] ?? 0,
           weapon: weaponNameForIndex(replay.weaponDict, player.weapon[index] ?? -1),
           alive: (flags & 1) !== 0,
-          flashed: (flags & 8) !== 0,
+          flashed: (player.flash?.[index] ?? 0) > 0,
           hasDefuseKit: (flags & 4) !== 0,
           hasBomb: (flags & 2) !== 0
         };

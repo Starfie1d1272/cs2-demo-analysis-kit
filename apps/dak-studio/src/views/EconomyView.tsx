@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatPercent, type TournamentInsights } from "@cs2dak/presentation";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState } from "../components/primitives";
@@ -123,54 +123,7 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
 
         <article className="stu-card stu-econ-card stu-card-wide">
           <h3>队伍明细矩阵</h3>
-          <div className="stu-table-scroll">
-            <table className="stu-mini-table stu-econ-detail-table">
-              <thead>
-                <tr>
-                  <th colSpan={4}>基础</th>
-                  <th colSpan={3} className="stu-num">手枪与第二局</th>
-                  <th colSpan={4} className="stu-num">人数状态</th>
-                  <th className="stu-num">经济</th>
-                </tr>
-                <tr>
-                  <th>队伍</th>
-                  <th className="stu-num">Maps</th>
-                  <th className="stu-num">Won - Lost</th>
-                  <th className="stu-num">RW%</th>
-                  <th className="stu-num">Pistol</th>
-                  <th className="stu-num">R2 Conv</th>
-                  <th className="stu-num">R2 Break</th>
-                  <th className="stu-num">5v4</th>
-                  <th className="stu-num">4v5</th>
-                  <th className="stu-num">5v3</th>
-                  <th className="stu-num">3v5</th>
-                  <th className="stu-num" title="Eco / 半起面对长枪局的胜率">小枪破局</th>
-                </tr>
-              </thead>
-              <tbody>
-                {insights.teamEconomySummaries.map((team) => {
-                  const state5v4 = team.manAdvantage.states.find((state) => state.advantageAlive === 5 && state.disadvantageAlive === 4) ?? null;
-                  const state5v3 = team.manAdvantage.states.find((state) => state.advantageAlive === 5 && state.disadvantageAlive === 3) ?? null;
-                  return (
-                    <tr key={team.teamName}>
-                      <td>{team.teamName}</td>
-                      <td className="stu-num">{team.maps}</td>
-                      <td className="stu-num">{team.roundWins} - {team.rounds - team.roundWins}</td>
-                      <td className="stu-num">{formatPercent(team.roundWinPercent)}</td>
-                      <td className="stu-num">{percentWithSample(team.pistol.winRatePercent, team.pistol.wins, team.pistol.rounds)}</td>
-                      <td className="stu-num">{percentWithSample(team.round2.conversionPercent, team.round2.conversionWins, team.round2.conversionRounds)}</td>
-                      <td className="stu-num">{percentWithSample(team.round2.breakRatePercent, team.round2.breakWins, team.round2.breakRounds)}</td>
-                      <td className="stu-num">{percentWithSample(state5v4?.advantageConversionPercent ?? null, state5v4?.advantageWins ?? 0, state5v4?.advantageOpportunities ?? 0)}</td>
-                      <td className="stu-num">{percentWithSample(state5v4?.disadvantageConversionPercent ?? null, state5v4?.disadvantageWins ?? 0, state5v4?.disadvantageOpportunities ?? 0)}</td>
-                      <td className="stu-num">{percentWithSample(state5v3?.advantageConversionPercent ?? null, state5v3?.advantageWins ?? 0, state5v3?.advantageOpportunities ?? 0)}</td>
-                      <td className="stu-num">{percentWithSample(state5v3?.disadvantageConversionPercent ?? null, state5v3?.disadvantageWins ?? 0, state5v3?.disadvantageOpportunities ?? 0)}</td>
-                      <td className="stu-num">{percentWithSample(team.smallBuyUpset.winRatePercent, team.smallBuyUpset.wins, team.smallBuyUpset.opportunities)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <TeamDetailMatrix teams={insights.teamEconomySummaries} />
         </article>
 
         <article className="stu-card stu-econ-card">
@@ -265,6 +218,97 @@ function bestManState(
 
 function percentWithSample(value: number | null, wins: number, total: number): string {
   return `${formatPercent(value)} (${wins}/${total})`;
+}
+
+type TeamEconomySummary = TournamentInsights["teamEconomySummaries"][number];
+
+interface MatrixCell {
+  percent: number | null;
+  wins: number;
+  total: number;
+}
+
+interface MatrixColumn {
+  key: string;
+  label: string;
+  title?: string;
+  get: (team: TeamEconomySummary) => MatrixCell;
+}
+
+function manState(team: TeamEconomySummary, adv: number, dis: number) {
+  return team.manAdvantage.states.find((s) => s.advantageAlive === adv && s.disadvantageAlive === dis) ?? null;
+}
+
+const MATRIX_COLUMNS: MatrixColumn[] = [
+  { key: "rw", label: "RW%", title: "回合胜率", get: (t) => ({ percent: t.roundWinPercent, wins: t.roundWins, total: t.rounds }) },
+  { key: "pistol", label: "Pistol", title: "手枪局胜率", get: (t) => ({ percent: t.pistol.winRatePercent, wins: t.pistol.wins, total: t.pistol.rounds }) },
+  { key: "conv", label: "R2 Conv", title: "赢手枪局后拿下第二局", get: (t) => ({ percent: t.round2.conversionPercent, wins: t.round2.conversionWins, total: t.round2.conversionRounds }) },
+  { key: "break", label: "R2 Break", title: "输手枪局后扳回第二局", get: (t) => ({ percent: t.round2.breakRatePercent, wins: t.round2.breakWins, total: t.round2.breakRounds }) },
+  { key: "5v4", label: "5v4", title: "5v4 人数优势转化", get: (t) => { const s = manState(t, 5, 4); return { percent: s?.advantageConversionPercent ?? null, wins: s?.advantageWins ?? 0, total: s?.advantageOpportunities ?? 0 }; } },
+  { key: "4v5", label: "4v5", title: "4v5 劣势翻盘", get: (t) => { const s = manState(t, 5, 4); return { percent: s?.disadvantageConversionPercent ?? null, wins: s?.disadvantageWins ?? 0, total: s?.disadvantageOpportunities ?? 0 }; } },
+  { key: "5v3", label: "5v3", title: "5v3 人数优势转化", get: (t) => { const s = manState(t, 5, 3); return { percent: s?.advantageConversionPercent ?? null, wins: s?.advantageWins ?? 0, total: s?.advantageOpportunities ?? 0 }; } },
+  { key: "3v5", label: "3v5", title: "3v5 劣势翻盘", get: (t) => { const s = manState(t, 5, 3); return { percent: s?.disadvantageConversionPercent ?? null, wins: s?.disadvantageWins ?? 0, total: s?.disadvantageOpportunities ?? 0 }; } },
+  { key: "upset", label: "小枪破局", title: "Eco / 半起面对长枪局的胜率", get: (t) => ({ percent: t.smallBuyUpset.winRatePercent, wins: t.smallBuyUpset.wins, total: t.smallBuyUpset.opportunities }) }
+];
+
+/** 队伍明细矩阵：点击列头排序（降序），胜率按高低热力着色。 */
+function TeamDetailMatrix({ teams }: { teams: TeamEconomySummary[] }) {
+  const [sortKey, setSortKey] = useState<string>("rw");
+  const sorted = useMemo(() => {
+    const col = MATRIX_COLUMNS.find((c) => c.key === sortKey) ?? MATRIX_COLUMNS[0];
+    return [...teams].sort((a, b) => {
+      const va = col.get(a).percent;
+      const vb = col.get(b).percent;
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      return vb - va;
+    });
+  }, [teams, sortKey]);
+
+  return (
+    <div className="stu-table-scroll">
+      <table className="stu-mini-table stu-econ-detail-table">
+        <thead>
+          <tr>
+            <th>队伍</th>
+            <th className="stu-num">Maps</th>
+            <th className="stu-num">Won - Lost</th>
+            {MATRIX_COLUMNS.map((col) => (
+              <th key={col.key} className="stu-num" title={col.title}>
+                <button
+                  type="button"
+                  className={col.key === sortKey ? "stu-sort-header stu-sort-header-active" : "stu-sort-header"}
+                  onClick={() => setSortKey(col.key)}
+                >
+                  {col.label}
+                  {col.key === sortKey ? " ↓" : ""}
+                </button>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((team) => (
+            <tr key={team.teamName}>
+              <td>{team.teamName}</td>
+              <td className="stu-num">{team.maps}</td>
+              <td className="stu-num">{team.roundWins} - {team.rounds - team.roundWins}</td>
+              {MATRIX_COLUMNS.map((col) => {
+                const cell = col.get(team);
+                return (
+                  <td key={col.key} className={`stu-num stu-heat-cell stu-heat-${toneForPercent(cell.percent)}`} title={`${cell.wins}/${cell.total}`}>
+                    {formatPercent(cell.percent)}
+                    <small className="stu-dim"> {cell.wins}/{cell.total}</small>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 function toneForPercent(value: number | null): HeatTone {

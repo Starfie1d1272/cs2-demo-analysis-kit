@@ -113,7 +113,7 @@ export function PlayersView({
     setInsights(null);
     setWeaponStats([]);
     setDetailsError(null);
-    getPlayerSeasonDetails(entries, selected.steamIds)
+    getPlayerSeasonDetails(entries, selected.steamIds, identityOptions)
       .then((details) => {
         if (cancelled) return;
         setInsights(details.insights);
@@ -125,7 +125,7 @@ export function PlayersView({
     return () => {
       cancelled = true;
     };
-  }, [entries, selected?.playerKey]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entries, selected?.playerKey, identityOptions?.version]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   if (allEntries.length === 0) {
     return (

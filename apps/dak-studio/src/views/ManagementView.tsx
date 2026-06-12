@@ -54,6 +54,8 @@ export function ManagementView({
   const [renameValue, setRenameValue] = useState("");
   const [renameKey, setRenameKey] = useState<string | null>(null);
   const [teamInputs, setTeamInputs] = useState<Record<string, string>>({});
+  const [selectedTeams, setSelectedTeams] = useState<Set<string>>(new Set());
+  const [teamMergeName, setTeamMergeName] = useState("");
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
   const [working, setWorking] = useState(false);
   const cancelRef = useRef(false);
@@ -145,6 +147,58 @@ export function ManagementView({
       const next = await splitIdentity(identity, playerKey, toSplit);
       onIdentityChange(next);
       setSelected(new Set());
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  const selectedTeamGroups = teamGroups.filter((t) => selectedTeams.has(t.displayName));
+
+  // 选中 2+ 支队伍时预填合并名
+  useEffect(() => {
+    if (selectedTeamGroups.length >= 2) {
+      setTeamMergeName(selectedTeamGroups[0]?.displayName ?? "");
+    }
+  }, [selectedTeams.size]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleSelectTeam = (displayName: string) => {
+    setSelectedTeams((prev) => {
+      const next = new Set(prev);
+      if (next.has(displayName)) next.delete(displayName); else next.add(displayName);
+      return next;
+    });
+  };
+
+  /** 队伍合并：所有选中组的全部原名映射到同一显示名（与选手合并同语义，可撤销）。 */
+  async function handleTeamMerge() {
+    if (selectedTeamGroups.length < 2 || !teamMergeName.trim()) return;
+    const displayName = teamMergeName.trim();
+    setWorking(true);
+    try {
+      let next = identity;
+      for (const team of selectedTeamGroups) {
+        for (const original of team.originals) {
+          next = await setTeamRename(next, original, displayName === original ? "" : displayName);
+        }
+      }
+      onIdentityChange(next);
+      setSelectedTeams(new Set());
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  /** 拆分合并的队伍：清掉所有原名映射，恢复各自原名显示。 */
+  async function handleTeamSplit(originals: string[], displayName: string) {
+    setWorking(true);
+    try {
+      setTeamInputs((prev) => ({ ...prev, [displayName]: "" }));
+      let next = identity;
+      for (const original of originals) {
+        next = await setTeamRename(next, original, "");
+      }
+      onIdentityChange(next);
+      setSelectedTeams(new Set());
     } finally {
       setWorking(false);
     }
@@ -323,72 +377,113 @@ export function ManagementView({
         </aside>
       </div>
 
-      {/* ── 队伍改名 ── */}
+      {/* ── 队伍身份：与选手相同的"勾选 → 合并/改名"交互 ── */}
       <section className="stu-mgmt-teams">
-        <h2>队伍改名</h2>
-        <table className="stu-table">
-          <thead>
-            <tr><th>原名</th><th>显示名</th><th /></tr>
-          </thead>
-          <tbody>
+        <div className="stu-mgmt-section-head">
+          <h2>队伍身份</h2>
+          {selectedTeams.size > 0 && (
+            <button type="button" className="stu-mgmt-clear" onClick={() => setSelectedTeams(new Set())}>
+              清除选择
+            </button>
+          )}
+        </div>
+        <div className="stu-view-body stu-mgmt-layout">
+          <div className="stu-mgmt-player-list">
             {teamGroups.map((team) => {
-              const current = team.displayName;
-              const local = teamInputs[team.displayName] ?? current;
               const merged = team.originals.length > 1;
               return (
-                <tr key={team.displayName}>
-                  <td>
-                    <div className="stu-mgmt-team-cell">
-                      <strong>{team.displayName}</strong>
-                      <span className="stu-muted">
-                        {merged ? `已合并：${team.originals.join(" / ")}` : team.originals[0]}
-                      </span>
-                      <span className="stu-muted">{team.matchCount} 场相关比赛</span>
-                    </div>
-                  </td>
-                  <td>
-                    <input
-                      type="text"
-                      className="stu-input stu-input-sm"
-                      value={local}
-                      placeholder={team.displayName}
-                      onChange={(e) =>
-                        setTeamInputs((prev) => ({ ...prev, [team.displayName]: e.target.value }))
-                      }
-                    />
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="stu-button-sm"
-                      disabled={working || local === current}
-                      onClick={() => handleTeamRename(team.originals, team.displayName)}
-                    >
-                      更新
-                    </button>
-                    {merged && (
-                      <button
-                        type="button"
-                        className="stu-button-sm stu-button-ghost"
-                        disabled={working}
-                        onClick={async () => {
-                          setTeamInputs((prev) => ({ ...prev, [team.displayName]: "" }));
-                          let next = identity;
-                          for (const original of team.originals) {
-                            next = await setTeamRename(next, original, "");
-                          }
-                          onIdentityChange(next);
-                        }}
-                      >
-                        清除
-                      </button>
-                    )}
-                  </td>
-                </tr>
+                <label
+                  key={team.displayName}
+                  className={`stu-mgmt-player-row${selectedTeams.has(team.displayName) ? " stu-mgmt-player-row-selected" : ""}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedTeams.has(team.displayName)}
+                    onChange={() => toggleSelectTeam(team.displayName)}
+                  />
+                  <span className="stu-mgmt-player-name">{team.displayName}</span>
+                  <span className="stu-mgmt-player-meta">
+                    {merged && <span className="stu-mgmt-multi-badge">{team.originals.length} 原名</span>}
+                    <span>{team.matchCount} 场</span>
+                  </span>
+                </label>
               );
             })}
-          </tbody>
-        </table>
+            {teamGroups.length === 0 && <p className="stu-muted">当前范围无队伍数据</p>}
+          </div>
+          <aside className="stu-mgmt-actions">
+            {selectedTeamGroups.length >= 2 && (
+              <div className="stu-mgmt-action-panel">
+                <h3>合并 {selectedTeamGroups.length} 支队伍</h3>
+                <p className="stu-muted">{selectedTeamGroups.map((t) => t.displayName).join(" + ")}</p>
+                <label className="stu-mgmt-label">
+                  显示名
+                  <input
+                    type="text"
+                    className="stu-input"
+                    value={teamMergeName}
+                    onChange={(e) => setTeamMergeName(e.target.value)}
+                    placeholder="合并后显示名"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="stu-button"
+                  disabled={working || !teamMergeName.trim()}
+                  onClick={handleTeamMerge}
+                >
+                  确认合并
+                </button>
+              </div>
+            )}
+            {selectedTeamGroups.length === 1 && (() => {
+              const team = selectedTeamGroups[0];
+              const local = teamInputs[team.displayName] ?? team.displayName;
+              const merged = team.originals.length > 1;
+              return (
+                <div className="stu-mgmt-action-panel">
+                  <h3>{team.displayName}</h3>
+                  <p className="stu-muted">
+                    {merged ? `已合并：${team.originals.join(" / ")}` : team.originals[0]} · {team.matchCount} 场
+                  </p>
+                  <label className="stu-mgmt-label">
+                    显示名
+                    <div className="stu-mgmt-rename-row">
+                      <input
+                        type="text"
+                        className="stu-input"
+                        value={local}
+                        placeholder={team.displayName}
+                        onChange={(e) =>
+                          setTeamInputs((prev) => ({ ...prev, [team.displayName]: e.target.value }))
+                        }
+                      />
+                      <button
+                        type="button"
+                        className="stu-button-sm"
+                        disabled={working || local === team.displayName || !local.trim()}
+                        onClick={() => handleTeamRename(team.originals, team.displayName)}
+                      >
+                        保存
+                      </button>
+                    </div>
+                  </label>
+                  {merged && (
+                    <button
+                      type="button"
+                      className="stu-button-danger"
+                      disabled={working}
+                      onClick={() => handleTeamSplit(team.originals, team.displayName)}
+                    >
+                      拆分回原名（可撤销）
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+            {selectedTeams.size === 0 && <p className="stu-muted">勾选队伍可改名；勾选多支可合并（同队改名导致的分裂用合并修复）</p>}
+          </aside>
+        </div>
       </section>
 
       {/* ── 操作历史 ── */}

@@ -47,7 +47,7 @@ export function HomeView({ entries, onOpenMatch, onGoPlayers, onGoLibrary, ident
       return;
     }
     let cancelled = false;
-    getPlayerSeasonDetails(entries, me.steamIds)
+    getPlayerSeasonDetails(entries, me.steamIds, identityOptions)
       .then((details) => {
         if (!cancelled) setInsights(details.insights);
       })
@@ -57,7 +57,7 @@ export function HomeView({ entries, onOpenMatch, onGoPlayers, onGoLibrary, ident
     return () => {
       cancelled = true;
     };
-  }, [entries, me?.playerKey]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entries, me?.playerKey, identityOptions?.version]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   if (entries.length === 0) {
     return (

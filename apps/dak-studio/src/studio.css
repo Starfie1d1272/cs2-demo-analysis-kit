@@ -1089,6 +1089,49 @@ body {
   background: rgba(14, 18, 20, 0.78);
 }
 
+/* 明细矩阵单元格热力：比卡片版收敛，neutral 不上色 */
+td.stu-heat-cell {
+  white-space: nowrap;
+}
+
+td.stu-heat-cell.stu-heat-high {
+  border-color: inherit;
+  background: rgba(79, 217, 138, 0.16);
+}
+
+td.stu-heat-cell.stu-heat-mid {
+  border-color: inherit;
+  background: rgba(243, 198, 79, 0.12);
+}
+
+td.stu-heat-cell.stu-heat-low {
+  border-color: inherit;
+  background: rgba(255, 95, 110, 0.12);
+}
+
+td.stu-heat-cell.stu-heat-neutral {
+  border-color: inherit;
+  background: transparent;
+}
+
+.stu-sort-header {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.stu-sort-header:hover {
+  color: var(--dak-fg);
+}
+
+.stu-sort-header-active {
+  color: var(--dak-fg);
+  font-weight: 700;
+}
+
 .stu-trend {
   display: flex;
   align-items: flex-end;

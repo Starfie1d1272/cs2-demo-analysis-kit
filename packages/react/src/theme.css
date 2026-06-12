@@ -1083,7 +1083,11 @@
 
 .dak-replay-stage {
   position: relative;
-  min-height: 520px;
+  /* 雷达图与回放坐标都以正方形为基准：强制 1:1 防止容器变窄时左右被裁剪 */
+  aspect-ratio: 1 / 1;
+  width: min(100%, calc(100vh - 240px));
+  min-width: 320px;
+  margin: 0 auto;
   overflow: hidden;
   border: 1px solid var(--dak-border);
   border-radius: 4px;
@@ -1092,7 +1096,7 @@
     linear-gradient(90deg, rgba(238, 243, 248, 0.04) 1px, transparent 1px),
     radial-gradient(circle at 50% 50%, rgba(73, 182, 255, 0.08), transparent 48%),
     #07090d;
-  background-size: cover;
+  background-size: 100% 100%;
   background-position: center;
   background-repeat: no-repeat;
 }
@@ -1150,14 +1154,15 @@
   min-width: 0;
 }
 
-.dak-tabs {
+/* 工作台侧边栏专属的纵向大块导航；不要泄漏到排行榜等处的普通小 tab */
+.dak-workbench-sidebar .dak-tabs {
   display: grid;
   gap: 7px;
   margin: 0;
   overflow: visible;
 }
 
-.dak-tab {
+.dak-workbench-sidebar .dak-tab {
   width: 100%;
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);
@@ -1171,11 +1176,11 @@
   text-align: left;
 }
 
-.dak-tab svg {
+.dak-workbench-sidebar .dak-tab svg {
   grid-area: icon;
 }
 
-.dak-tab span {
+.dak-workbench-sidebar .dak-tab span {
   grid-area: label;
   min-width: 0;
   overflow: hidden;
@@ -1185,7 +1190,7 @@
   font-weight: 800;
 }
 
-.dak-tab small {
+.dak-workbench-sidebar .dak-tab small {
   grid-area: detail;
   min-width: 0;
   overflow: hidden;
@@ -1585,10 +1590,21 @@
 }
 
 .dak-hp-bar-wrap {
-  height: 6px;
+  position: relative;
+  height: 8px;
   background: rgba(238, 243, 248, 0.08);
   border-radius: 3px;
   overflow: hidden;
+}
+
+/* 护甲底色层：填 HP 容器整个底部背景，HP 条盖在上面 */
+.dak-armor-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 100%;
+  background: var(--dak-accent-b);
+  opacity: 0.35;
 }
 
 .dak-hp-bar {
@@ -1916,7 +1932,7 @@
   }
 
   .dak-replay-stage {
-    min-height: 380px;
+    width: 100%;
   }
 
   .dak-player-round-summary {
