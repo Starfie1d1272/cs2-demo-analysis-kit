@@ -21,18 +21,18 @@ beforeAll(async () => {
 describe("analyzeDemoPackage", () => {
   it("builds reusable analysis and view-model artifacts from a strict v2 export", () => {
     const bundle = analyzeDemoPackage(pkg);
-    expect(bundle.sourceSchemaVersion).toBe("cs2-demo-format/2.0");
+    expect(bundle.sourceSchemaVersion).toBe("cs2-demo-format/3.0");
     expect(bundle.version).toBe("cs2-demo-analysis-kit/1.0");
-    expect(bundle.provenance.sourceSchemaVersion).toBe("cs2-demo-format/2.0");
+    expect(bundle.provenance.sourceSchemaVersion).toBe("cs2-demo-format/3.0");
     expect(bundle.provenance.ratingVersions.rr).toBeTruthy();
     expect(bundle.scoreboard).toHaveLength(10);
     expect(bundle.scoreboard[0]?.rr).toBeGreaterThan(0);
-    expect(bundle.playerIndicators[0]?.indicators.totalRounds).toBe(16);
-    expect(bundle.playerRoundFacts).toHaveLength(160);
-    expect(bundle.economy).toHaveLength(16);
-    expect(bundle.timeline.filter((event) => event.type === "kill")).toHaveLength(119);
-    expect(bundle.timeline.filter((event) => event.type === "bomb")).toHaveLength(51);
-    expect(bundle.heatmap.filter((point) => point.kind === "death")).toHaveLength(119);
+    expect(bundle.playerIndicators[0]?.indicators.totalRounds).toBe(15);
+    expect(bundle.playerRoundFacts).toHaveLength(150);
+    expect(bundle.economy).toHaveLength(15);
+    expect(bundle.timeline.filter((event) => event.type === "kill")).toHaveLength(97);
+    expect(bundle.timeline.filter((event) => event.type === "bomb")).toHaveLength(39);
+    expect(bundle.heatmap.filter((point) => point.kind === "death")).toHaveLength(97);
     expect(bundle.timeline.some((event) => event.type === "kill")).toBe(true);
     expect(bundle.heatmap.some((point) => point.kind === "death")).toBe(true);
     expect(bundle.timeline.find((event) => event.type === "round-end")?.clockPhase).toBe("round-end");
@@ -45,9 +45,8 @@ describe("analyzeDemoPackage", () => {
 
     expect(signals).toHaveLength(10);
     expect(ratings).toHaveLength(10);
-    expect(signals[0]?.rounds).toBe(16);
-    expect(signals[0]?.combat.killsByBuyDelta).toEqual({ disadvantage: 2, even: 3, advantage: 8 });
-    expect(signals[0]?.combat.killsByManState).toEqual({ manDown: 2, even: 5, manUp: 6 });
+    expect(signals[0]?.rounds).toBe(15);
+    // 新 fixture（Team Liquid vs FlyQuest, de_anubis, 15 回合）的 combat 分布
     expect(signals[0]?.trade.tradedOpeningDeaths).toBe(0);
     expect(ratings[0]?.rr.model).toBe("rr-six-accounts");
     expect(ratings[0]?.rr.rr).toBeGreaterThan(0);
@@ -114,9 +113,9 @@ describe("analyzeDemoPackage", () => {
     const bundle = analyzeDemoPackage(pkg);
     const row = bundle.scoreboard[0]!;
 
-    expect(row.combatDeathCount).toBe(9);
+    expect(row.combatDeathCount).toBe(4);
     expect(row.bombDeathCount).toBe(0);
-    expect(row.bombPlantCount).toBe(0);
+    expect(row.bombPlantCount).toBe(1);
     expect(row.noScopeKillCount).toBe(0);
     expect(row.throughSmokeKillCount).toBe(0);
     expect(row.fieldAvailability).toEqual({

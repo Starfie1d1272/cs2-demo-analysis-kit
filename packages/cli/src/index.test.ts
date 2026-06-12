@@ -47,7 +47,7 @@ describe("cs2dak analyze", () => {
 
     const bundle = JSON.parse(await readFile(join(outDir, "analysis-bundle.json"), "utf-8"));
     expect(bundle.version).toBe("cs2-demo-analysis-kit/1.0");
-    expect(bundle.provenance.sourceSchemaVersion).toBe("cs2-demo-format/2.0");
+    expect(bundle.provenance.sourceSchemaVersion).toBe("cs2-demo-format/3.0");
     expect(bundle.scoreboard.length).toBeGreaterThan(0);
   }, 30_000);
 

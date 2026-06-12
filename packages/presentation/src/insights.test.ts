@@ -27,7 +27,7 @@ describe("buildPlayerSeasonInsights", () => {
     expect(insights.trend).toHaveLength(1);
     const point = insights.trend[0];
     expect(point.matchId).toBe("m1");
-    expect(point.mapName).toBe("de_ancient");
+    expect(point.mapName).toBe("de_anubis");
     expect(point.adr).toBeGreaterThan(0);
     expect(point.kast).toBeGreaterThan(0);
     expect(point.kast).toBeLessThanOrEqual(100);
@@ -122,7 +122,7 @@ describe("buildTournamentInsights", () => {
     expect(insights.matchCount).toBe(2);
     expect(insights.roundCount).toBe(pkg.rounds.length * 2);
     expect(insights.tWinRatePercent + insights.ctWinRatePercent).toBeCloseTo(100, 0);
-    expect(insights.maps[0].mapName).toBe("de_ancient");
+    expect(insights.maps[0].mapName).toBe("de_anubis");
     expect(insights.maps[0].matches).toBe(2);
 
     // 经济矩阵：按高低经济重排，手枪局不入矩阵；同档对局不出胜率

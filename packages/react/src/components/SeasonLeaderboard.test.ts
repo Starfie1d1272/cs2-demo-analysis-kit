@@ -9,7 +9,7 @@ const model = {
   version: "cs2-demo-analysis-kit/leaderboard-0.1",
   weightsVersion: "test",
   matchCount: 1,
-  provenance: { cohortVersion: "cs2-demo-analysis-kit/cohort-1.0", sourceSchemaVersion: "cs2-demo-format/2.0", matches: [] },
+  provenance: { cohortVersion: "cs2-demo-analysis-kit/cohort-1.0", sourceSchemaVersion: "cs2-demo-format/3.0", matches: [] },
   views: [
     {
       key: "core",

@@ -15,7 +15,7 @@ describe("buildOpeningTrails", () => {
     const model = buildOpeningTrails(pkg, "fixture-match", steamId64);
 
     expect(model.available).toBe(true);
-    expect(model.mapName).toBe("de_ancient");
+    expect(model.mapName).toBe("de_anubis");
     expect(model.steamId64).toBe(steamId64);
     expect(model.windowSeconds).toBe(30);
     // 长枪局存在且轨迹点落在窗口内、时间递增
