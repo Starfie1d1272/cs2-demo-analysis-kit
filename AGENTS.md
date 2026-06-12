@@ -138,5 +138,6 @@ docs/                  # 架构与集成文档
 - **WKWebView sandbox 警告**：macOS 上非 `.app` bundle 运行 GUI 时，WKWebView 会在 stderr 输出沙盒目录创建失败。无害，PyInstaller 打包后自动消失
 - **ruff 路径**：`ruff` 不在全局 PATH，用 `uv run ruff check <path>` 跑 lint
 - **cs2df 导出**：`uv run cs2df export` 直接导出 v3 ZIP（无需本仓库 Python 壳）。GUI/Studio 需要 `uv sync --extra gui` 装 pywebview
+- **`.tri` 碰撞几何**：反应时间/预瞄的 LOS 口径需要 awpy `.tri`（`uvx awpy get tris`，~30MB/图，不进 git）。Node 端从 `~/.awpy/tris` 读（`AWPY_TRIS_DIR` 可覆盖）；Studio 浏览器端 fetch `tris/{map}.tri`——开发环境放/链到 `apps/dak-studio/public/tris/`，打包时 `scripts/package.sh` 自动从 `~/.awpy/tris` 拷入安装包。缺失只降级不报错
 - **cwd 敏感**：pnpm 命令只在 workspace root 有效，不要在 `python/` 子目录下跑
 - **dist 被 gitignore**：`apps/demo-lab/dist/` 不提交，CI 或本地需先构建
