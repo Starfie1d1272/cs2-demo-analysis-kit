@@ -1,5 +1,6 @@
 import type { DemoPackage, PackageDamage, PackageKill, ReplayPlayerTrack, Vec3 } from "@cs2dak/contract";
 import { decodeDelta } from "@cs2dak/contract";
+import { createResolverFromPackage, type PlayerResolver } from "./resolve.js";
 import { normalizeWeapon } from "./utils.js";
 
 const ENGAGEMENT_GAP_SECONDS = 1.5;
@@ -46,15 +47,15 @@ function pairKey(roundNumber: number, attacker: number, victim: number): string 
   return `${roundNumber}:${attacker}:${victim}`;
 }
 
-function groupDamages(pkg: DemoPackage): Map<string, PackageDamage[][]> {
+function groupDamages(pkg: DemoPackage, resolver: PlayerResolver): Map<string, PackageDamage[][]> {
   const tickrate = tickrateOf(pkg);
   const maxGap = ticks(ENGAGEMENT_GAP_SECONDS, tickrate);
   const byPair = new Map<string, PackageDamage[]>();
   for (const damage of pkg.damages) {
     if (damage.attackerIndex === null || damage.attackerIndex === damage.victimIndex) continue;
-    const attackerTeam = pkg.players[damage.attackerIndex]?.teamKey;
-    const victimTeam = pkg.players[damage.victimIndex]?.teamKey;
-    if (!attackerTeam || !victimTeam || attackerTeam === victimTeam) continue;
+    const attackerPlayer = resolver.byIndexOrNull(damage.attackerIndex);
+    const victimPlayer = resolver.byIndexOrNull(damage.victimIndex);
+    if (!attackerPlayer || !victimPlayer || attackerPlayer.teamKey === victimPlayer.teamKey) continue;
     const key = pairKey(damage.roundNumber, damage.attackerIndex, damage.victimIndex);
     const list = byPair.get(key) ?? [];
     list.push(damage);
@@ -175,13 +176,14 @@ function killerHealthBefore(pkg: DemoPackage, kill: PackageKill): number | null 
 }
 
 export function deriveDuels(pkg: DemoPackage): DuelFact[] {
+  const resolver = createResolverFromPackage(pkg);
   const tickrate = tickrateOf(pkg);
-  const damageGroups = groupDamages(pkg);
+  const damageGroups = groupDamages(pkg, resolver);
   return pkg.kills
     .filter((kill) => kill.killerIndex !== null && kill.killerIndex !== kill.victimIndex)
     .map((kill, index) => {
-      const killerPlayer = pkg.players[kill.killerIndex!]!;
-      const victimPlayer = pkg.players[kill.victimIndex]!;
+      const killerPlayer = resolver.byIndex(kill.killerIndex!);
+      const victimPlayer = resolver.byIndex(kill.victimIndex);
       const group = groupForKill(damageGroups, kill);
       const firstDamage = group[0] ?? null;
       const victimHealthBefore = firstDamage?.victimHealthBefore ?? 100;

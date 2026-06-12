@@ -79,7 +79,7 @@ export function DuelView({
       <div className="stu-view">
         <div className="stu-empty">
           <h2>还没有对枪数据</h2>
-          <p>先导入带逐枪数据的 v2 ZIP，再查看对枪和机制指标。</p>
+          <p>先导入带逐枪数据的 v3 ZIP，再查看对枪和机制指标。</p>
           <button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>
         </div>
       </div>

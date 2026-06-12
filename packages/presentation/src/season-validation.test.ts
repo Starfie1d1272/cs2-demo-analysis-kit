@@ -16,6 +16,10 @@ const ZIP_DIR = fileURLToPath(new URL("../../../fixtures/output/nju-rivals-2026"
 const REPORT_FILE = fileURLToPath(new URL("../../../fixtures/output/_c-phase-report.txt", import.meta.url));
 const integrationTimeoutMs = 180_000;
 const reportLines: string[] = [];
+type SeasonDemoInput = {
+  matchId: string;
+  pkg: Awaited<ReturnType<typeof loadDemoPackageFromZip>>;
+};
 
 function report(msg: string) {
   reportLines.push(msg);
@@ -33,11 +37,11 @@ async function dirExists(path: string): Promise<boolean> {
 
 async function njuCohort() {
   const names = (await readdir(ZIP_DIR)).filter((n) => n.endsWith(".zip")).sort();
-  const demos = (
+  const demos: SeasonDemoInput[] = (
     await Promise.all(
       names.map(async (name) => {
         const buf = await readFile(join(ZIP_DIR, name));
-        // 跳过 v2 ZIP（需要 cs2df 重导为 v3 后方可加载）
+        // 跳过旧版 ZIP（需要 cs2df 重导为 v3 后方可加载）
         try {
           const zip = await JSZip.loadAsync(buf);
           const manifest = JSON.parse(await zip.file("manifest.json")!.async("string"));
@@ -49,7 +53,7 @@ async function njuCohort() {
         };
       })
     )
-  ).filter(Boolean) as NonNullable<Awaited<ReturnType<typeof njuCohort>>["bundle"]["matches"][number]>;
+  ).filter((demo): demo is SeasonDemoInput => demo !== null);
   return { bundle: buildSeasonCohort(demos), matchCount: demos.length };
 }
 
@@ -62,8 +66,8 @@ describe("55-ZIP season verification", () => {
         return;
       }
       const { bundle, matchCount } = await njuCohort();
-      if (matchCount === 0) {
-        report("无 v3 ZIP，跳过验证（需用 cs2df 重导所有 demo）");
+      if (matchCount < 50) {
+        report(`v3 ZIP 数量不足（${matchCount}/50），跳过 55 场验证（需用 cs2df 重导所有 demo）`);
         return;
       }
       expect(matchCount).toBeGreaterThanOrEqual(50);

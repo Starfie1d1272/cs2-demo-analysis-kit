@@ -61,7 +61,6 @@ function replayTwoFrames(
 function makePkg(over: Partial<{
   bombs: unknown[];
   kills: unknown[];
-  positions1s: unknown[];
   replay: unknown;
 }> = {}): DemoPackage {
   return {

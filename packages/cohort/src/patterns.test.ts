@@ -67,8 +67,47 @@ function pkg(overrides?: Partial<DemoPackage>): DemoPackage {
 }
 
 describe("buildOpeningPatternClusters", () => {
-  it("clusters rounds by grenade sequence when positions are unavailable", () => {
+  it("clusters rounds by replay callout distribution and grenade sequence", () => {
+    const places = Array.from({ length: 16 }, () => 0);
     const demo = pkg({
+      replay: {
+        meta: { tickrate: 64, sampleRate: 1, coordScale: 1, angleScale: 10 },
+        placeDict: ["TSpawn", "LongDoors"],
+        weaponDict: [],
+        rounds: [{
+          roundNumber: 1,
+          startTick: 64,
+          tickStep: 64,
+          frameCount: 16,
+          projectiles: [],
+          players: [
+            {
+              playerIndex: 0,
+              x: [0], y: [0], z: [0], yaw: [0], pitch: [0],
+              hp: Array.from({ length: 16 }, () => 100),
+              armor: Array.from({ length: 16 }, () => 100),
+              money: Array.from({ length: 16 }, () => 800),
+              equipValue: Array.from({ length: 16 }, () => 800),
+              place: places,
+              flash: Array.from({ length: 16 }, () => 0),
+              flags: Array.from({ length: 16 }, () => 1),
+              weapon: Array.from({ length: 16 }, () => -1)
+            },
+            {
+              playerIndex: 1,
+              x: [0], y: [0], z: [0], yaw: [0], pitch: [0],
+              hp: Array.from({ length: 16 }, () => 100),
+              armor: Array.from({ length: 16 }, () => 100),
+              money: Array.from({ length: 16 }, () => 800),
+              equipValue: Array.from({ length: 16 }, () => 800),
+              place: Array.from({ length: 16 }, () => 1),
+              flash: Array.from({ length: 16 }, () => 0),
+              flags: Array.from({ length: 16 }, () => 1),
+              weapon: Array.from({ length: 16 }, () => -1)
+            }
+          ]
+        }]
+      },
       grenades: [
         {
           roundNumber: 1, grenadeId: null,
@@ -80,9 +119,11 @@ describe("buildOpeningPatternClusters", () => {
       ]
     });
     const clusters = buildOpeningPatternClusters([{ matchId: "m1", pkg: demo }], { windowSeconds: 15 });
-    // positions-1s is removed in v3 → spatial labels stubbed empty,
-    // so without positions no clusters are formed even with grenades active.
-    expect(clusters).toHaveLength(0);
+    expect(clusters).toHaveLength(2);
+    const tCluster = clusters.find((cluster) => cluster.side === "t");
+    expect(tCluster?.basis).toBe("TSpawn:1");
+    expect(tCluster?.grenadeSequence).toEqual(["smoke"]);
+    expect(tCluster?.roundCount).toBe(1);
   });
 
   it("returns empty when no grenade or position data defines the opening", () => {

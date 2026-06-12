@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * freeze-pro-baseline — 从一批职业 demo 的 v2 ZIP 冻结固定职业基准曲线参数。
+ * freeze-pro-baseline — 从一批职业 demo 的 v3 ZIP 冻结固定职业基准曲线参数。
  *
  * 背景见 docs/archive/2026-06/pro-baseline.md。当前 cohort 归一化是「赛季相对」（在被分析这批人
  * 内部 z-score + 残差化 + 按 std(rrV1) 缩放），分数不可移植、单 demo 无法绝对评分。

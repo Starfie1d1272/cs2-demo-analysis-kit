@@ -50,23 +50,54 @@ for zp in zips:
     mp = re.search(r'(de_[a-z0-9]+)', os.path.basename(zp))
     if mp: maps[mp.group(1)].append(zp)
 
+def decode_delta(values):
+    out = []
+    acc = 0
+    for v in values:
+        acc += v
+        out.append(acc)
+    return out
+
 def centroids(mp):
     """{placeName: (x,y,z,T%,n)}"""
     agg = collections.defaultdict(lambda: {"n":0,"sx":0.0,"sy":0.0,"sz":0.0,"t":0})
     for zp in maps[mp]:
-        for r in json.loads(zipfile.ZipFile(zp).read("positions-1s.json")):
-            pl = r.get("lastPlaceName")
-            if not pl: continue
-            p = r.get("position") or {}
-            a = agg[pl]; a["n"] += 1; a["sx"] += p.get("x",0); a["sy"] += p.get("y",0); a["sz"] += p.get("z",0)
-            if r.get("side") == "t": a["t"] += 1
+        with zipfile.ZipFile(zp) as zf:
+            replay = json.loads(zf.read("replay.json"))
+            players = json.loads(zf.read("players.json"))
+            rounds = {r["roundNumber"]: r for r in json.loads(zf.read("rounds.json"))}
+        place_dict = replay.get("placeDict") or []
+        coord_scale = (replay.get("meta") or {}).get("coordScale", 1)
+        for replay_round in replay.get("rounds", []):
+            round_row = rounds.get(replay_round.get("roundNumber"))
+            if not round_row:
+                continue
+            for track in replay_round.get("players", []):
+                player = players[track["playerIndex"]]
+                side = round_row["teamASide"] if player["teamKey"] == "teamA" else round_row["teamBSide"]
+                xs = decode_delta(track.get("x", []))
+                ys = decode_delta(track.get("y", []))
+                zs = decode_delta(track.get("z", []))
+                for i, place_idx in enumerate(track.get("place", [])):
+                    if place_idx < 0 or place_idx >= len(place_dict):
+                        continue
+                    pl = place_dict[place_idx]
+                    if not pl:
+                        continue
+                    a = agg[pl]
+                    a["n"] += 1
+                    a["sx"] += (xs[i] if i < len(xs) else 0) * coord_scale
+                    a["sy"] += (ys[i] if i < len(ys) else 0) * coord_scale
+                    a["sz"] += (zs[i] if i < len(zs) else 0) * coord_scale
+                    if side == "t":
+                        a["t"] += 1
     return {pl: (a["sx"]/a["n"], a["sy"]/a["n"], a["sz"]/a["n"],
                  round(100*a["t"]/a["n"]), a["n"]) for pl, a in agg.items()}
 
 # ── 1. callout-review.md ──
 os.makedirs(VIZ, exist_ok=True)
 lines = ["# CS2 Callout 位置字段核对表", "",
-         "源：79 场 demo（pro 24 + NJU 55）positions-1s 全量 `lastPlaceName`。",
+         "源：79 场 demo（pro 24 + NJU 55）v3 replay `place` 全量采样。",
          "用途：确认中文命名 / 标注 side 归属 / 为动线提供 T%·质心 依据。",
          "T% = 该区域采样里 T 方占比（高=T 进攻地盘，低=CT 防守地盘，~50=争夺区）。", ""]
 for mp in sorted(maps):

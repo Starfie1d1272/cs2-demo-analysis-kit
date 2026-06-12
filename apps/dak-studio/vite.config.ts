@@ -1,5 +1,5 @@
 import { createReadStream, createWriteStream, readFileSync } from "node:fs";
-import { mkdtemp, readdir, rm, stat, utimes } from "node:fs/promises";
+import { mkdtemp, rm, stat, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { execFile } from "node:child_process";
@@ -12,7 +12,7 @@ const EXPORT_TIMEOUT_MS = 10 * 60 * 1000;
 
 /**
  * dev 模式的 .dem 导入后端：POST /api/export-dem 收 .dem 字节流，
- * 调本仓库 Python exporter（uv run cs2dak export）转 v2 ZIP 后回传。
+ * 调 cs2df（uv run cs2df export）转 v3 ZIP 后回传。
  * 打包版桌面壳里这条链路由 pywebview bridge（cs2dak-studio）承担。
  */
 function demExportPlugin(): Plugin {
@@ -44,11 +44,11 @@ function demExportPlugin(): Plugin {
               await utimes(demPath, new Date(mtimeMs), new Date(mtimeMs));
             }
 
-            const outDir = join(workDir, "out");
+            const zipPath = join(workDir, demName.replace(/\.dem$/i, ".zip"));
             await new Promise<void>((resolvePromise, rejectPromise) => {
               execFile(
                 "uv",
-                ["run", "cs2dak", "export", demPath, "--out", outDir],
+                ["run", "cs2df", "export", demPath, "-o", zipPath, "-q"],
                 { cwd: PYTHON_ROOT, timeout: EXPORT_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 },
                 (error, _stdout, stderr) => {
                   if (error) rejectPromise(new Error(stderr.trim() || error.message));
@@ -57,9 +57,7 @@ function demExportPlugin(): Plugin {
               );
             });
 
-            const zipName = (await readdir(outDir)).find((name) => name.endsWith(".zip"));
-            if (!zipName) throw new Error("exporter 没有产出 ZIP");
-            const zipPath = join(outDir, zipName);
+            const zipName = basename(zipPath);
             const { size } = await stat(zipPath);
             res.writeHead(200, {
               "Content-Type": "application/zip",

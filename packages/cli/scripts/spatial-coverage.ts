@@ -1,5 +1,5 @@
 /**
- * 空间分析覆盖诊断：扫一批 v2 ZIP，按地图报告 zone 标定覆盖、手雷归属率、
+ * 空间分析覆盖诊断：扫一批 v3 ZIP，按地图报告 zone 标定覆盖、手雷归属率、
  * UtilitySpatial actual-effect 与 MapControl official 指标产出。
  *
  * 用途：验证新标定的图是否「跑通」、发现 zone/route 缺口。

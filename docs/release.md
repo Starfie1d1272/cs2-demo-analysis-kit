@@ -4,7 +4,7 @@
 
 | 版本流 | 对象 | 版本来源 | tag 形式 | 发布渠道 |
 |---|---|---|---|---|
-| 桌面应用 | DAK Studio / cs2dak exporter（根 `package.json`、私有 apps、`python/`） | `vX.Y.Z` git tag | `v0.1.0` | GitHub Release（DMG / zip） |
+| 桌面应用 | DAK Studio / cs2dak GUI 壳（根 `package.json`、私有 apps、`python/`） | `vX.Y.Z` git tag | `v0.1.0` | GitHub Release（DMG / zip） |
 | npm 包 | `@cs2dak/*` 公共包 | Changesets | `@cs2dak/core@1.0.0` | npm registry |
 
 两条流版本号互不对应是正常的（如桌面 0.1.0 时 npm 包是 1.0.0）。

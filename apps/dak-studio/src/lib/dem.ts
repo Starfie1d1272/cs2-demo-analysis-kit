@@ -1,10 +1,10 @@
 /**
- * .dem 直接导入：把原始 demo 交给 Python exporter 转成 v2 ZIP，
+ * .dem 直接导入：把原始 demo 交给 cs2df 转成 v3 ZIP，
  * Studio 数据库里只存 ZIP（不落地 .dem，省空间）。
  *
  * 两种后端，自动探测：
- * - "pywebview"：打包版桌面壳（cs2dak-studio），经 JS bridge 调本机 exporter；
- * - "dev"：pnpm dev:studio 时的 Vite 中间件（POST /api/export-dem → uv run cs2dak export）。
+ * - "pywebview"：打包版桌面壳（cs2dak-studio），经 JS bridge 调本机 cs2df；
+ * - "dev"：pnpm dev:studio 时的 Vite 中间件（POST /api/export-dem → uv run cs2df export）。
  */
 
 interface ExportJobStatus {
@@ -198,7 +198,7 @@ async function exportPathViaPywebview(
   return new File([base64ToBytes(result.dataBase64) as BlobPart], result.fileName, { type: "application/zip" });
 }
 
-/** 把单个 .dem 转成 v2 ZIP File；onProgress 用于界面提示。 */
+/** 把单个 .dem 转成 v3 ZIP File；onProgress 用于界面提示。 */
 export async function exportDemToZip(
   file: File,
   backend: DemBackend,

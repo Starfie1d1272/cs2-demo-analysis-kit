@@ -99,11 +99,11 @@ function MatchView() {
       </label>
       {error ? (
         <div className="dak-shell">
-          <div className="dak-workspace dak-loading">加载失败：{error}（可拖入 v2 ZIP 重试）</div>
+          <div className="dak-workspace dak-loading">加载失败：{error}（可拖入 v3 ZIP 重试）</div>
         </div>
       ) : loading || !model ? (
         <div className="dak-shell">
-          <div className="dak-workspace dak-loading">加载 strict v2 导出中…</div>
+          <div className="dak-workspace dak-loading">加载 v3 导出中…</div>
         </div>
       ) : (
         <MatchWorkspace model={model} />

@@ -66,11 +66,12 @@ export function buildTimeline(pkg: DemoPackage): TimelineEvent[] {
 }
 
 export function buildEconomy(pkg: DemoPackage): EconomyPoint[] {
+  const resolver = createResolverFromPackage(pkg);
   return pkg.rounds.map((roundRow) => {
     const rows = pkg.playerEconomies.filter((row) => row.roundNumber === roundRow.roundNumber);
     const sumForTeam = (teamKey: "teamA" | "teamB") =>
       rows
-        .filter((row) => pkg.players[row.playerIndex]?.teamKey === teamKey)
+        .filter((row) => resolver.byIndexOrNull(row.playerIndex)?.teamKey === teamKey)
         .reduce((sum, row) => sum + row.equipmentValue, 0);
     const teamA = sumForTeam("teamA");
     const teamB = sumForTeam("teamB");
@@ -88,6 +89,7 @@ export function buildEconomy(pkg: DemoPackage): EconomyPoint[] {
 }
 
 export function buildHeatmap(pkg: DemoPackage): HeatmapPoint[] {
+  const resolver = createResolverFromPackage(pkg);
   const roundSides = new Map(
     pkg.rounds.map((r) => [r.roundNumber, { teamA: r.teamASide, teamB: r.teamBSide }])
   );
@@ -99,8 +101,8 @@ export function buildHeatmap(pkg: DemoPackage): HeatmapPoint[] {
   };
 
   const kills = pkg.kills.flatMap<HeatmapPoint>((kill) => {
-    const victimPlayer = pkg.players[kill.victimIndex];
-    const killerPlayer = kill.killerIndex !== null ? pkg.players[kill.killerIndex] : null;
+    const victimPlayer = resolver.byIndexOrNull(kill.victimIndex);
+    const killerPlayer = resolver.byIndexOrNull(kill.killerIndex);
     const victimTeamKey = victimPlayer?.teamKey ?? null;
     const killerTeamKey = killerPlayer?.teamKey ?? null;
     const out: HeatmapPoint[] = [
@@ -134,7 +136,7 @@ export function buildHeatmap(pkg: DemoPackage): HeatmapPoint[] {
 
   const grenades = pkg.grenades
     .map<HeatmapPoint>((grenade) => {
-      const thrower = pkg.players[grenade.throwerIndex];
+      const thrower = resolver.byIndexOrNull(grenade.throwerIndex);
       return {
         x: grenade.effectPosition.x,
         y: grenade.effectPosition.y,

@@ -180,7 +180,7 @@ nav 绕路把"奖励投掷量"变成"奖励有效封锁"，方向对但被 isola
 - **Cap**：per-round（soloPressure ≤ 8s、denial ≤ 10s）+ per-match（≤ rounds×系数），防保守站位刷秒。
 - **标准化**：统一转 per-round → cohort z-score。
 - **Combat 残差化**：`mapControlResidual = raw − β·combatZ − …`；MVP 简化：advance/firstControl 同 tick 伴随本人击杀则 ×0.5。
-- **Evidence Quality**（0~1）：positions1s/routes/zones/nav/staticLos/phase 各加权；< 0.6 不进 official，只进 shadow。
+- **Evidence Quality**（0~1）：replay/routes/zones/nav/staticLos/phase 各加权；< 0.6 不进 official，只进 shadow。
 
 ### 3.6 权重 ramp（不要从 proxy 直接进 0.20）
 
@@ -209,7 +209,7 @@ nav 绕路把"奖励投掷量"变成"奖励有效封锁"，方向对但被 isola
 ## 5. 信号 → 评分接线
 
 ```text
-v2 ZIP → deriveRRSignals(pkg)            [core/signals.ts]
+v3 ZIP → deriveRRSignals(pkg)            [core/signals.ts]
   ├─ buildKillsByBuyDelta / buildKillsByManState        Combat context（缺源发 null）
   ├─ buildTradedOpeningDeaths                            Trade
   ├─ buildObjectiveSignals                               Objective

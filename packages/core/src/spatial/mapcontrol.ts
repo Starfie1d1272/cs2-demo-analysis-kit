@@ -14,6 +14,8 @@
  */
 import type { DemoPackage } from "@cs2dak/contract";
 import { routeIndex, type MapRoute, type MapRoutes } from "@cs2dak/maps";
+import { createResolverFromPackage, type PlayerResolver } from "../resolve.js";
+import { groupBy } from "../utils.js";
 import { annotatePositions, type SpatialAssets, type AnnotatedSample } from "./annotate.js";
 import { inferRoundPhases, phaseAtTick } from "./phase.js";
 import { isOfficialScoringPhase, type RoundPhase, type RoundPhaseModel } from "./types.js";
@@ -49,6 +51,7 @@ export function buildOfficialMapControl(
   const out = new Map<string, OfficialMapControl>();
   if (!assets.routes) return out; // callout-based，需要动线资产
   const routes = assets.routes;
+  const resolver = createResolverFromPackage(pkg);
   const samples = annotatePositions(pkg, assets);
   if (samples.length === 0) return out;
   const sampleRate = pkg.replay?.meta.sampleRate ?? DEFAULT_SAMPLE_RATE;
@@ -105,7 +108,7 @@ export function buildOfficialMapControl(
     evidenceByRound.set(roundNumber, evidence);
   }
 
-  const credits = buildIsolationCredits(pkg, evidenceByRound, phaseModels, SAMPLE_SECONDS);
+  const credits = buildIsolationCredits(pkg, evidenceByRound, phaseModels, SAMPLE_SECONDS, resolver);
 
   const ids = new Set<string>([
     ...pressureSeconds.keys(),
@@ -206,17 +209,19 @@ function buildIsolationCredits(
   evidenceByRound: Map<number, RoundEvidence>,
   phases: Map<number, RoundPhaseModel>,
   sampleSecs: number,
+  resolver: PlayerResolver,
 ): Map<string, number> {
   const tickrate = pkg.match?.tickrate ?? pkg.manifest?.tickrate ?? 64;
   const windowTicks = ISOLATION_WINDOW_SECONDS * tickrate;
   const credits = new Map<string, number>();
 
   for (const kill of pkg.kills) {
-    const killerTeam = kill.killerIndex !== null ? pkg.players[kill.killerIndex]?.teamKey : null;
-    const victimTeam = pkg.players[kill.victimIndex]?.teamKey;
-    if (killerTeam && victimTeam && killerTeam === victimTeam) continue;
+    const killerPlayer = resolver.byIndexOrNull(kill.killerIndex);
+    const victimPlayer = resolver.byIndexOrNull(kill.victimIndex);
+    if (!victimPlayer) continue;
+    if (killerPlayer && killerPlayer.teamKey === victimPlayer.teamKey) continue;
     if ((kill as { tradeDeath?: boolean }).tradeDeath) continue;
-    const victim = pkg.players[kill.victimIndex]?.steamId64;
+    const victim = victimPlayer.steamId64;
     if (!victim) continue;
     const phase = phases.get(kill.roundNumber);
     if (phase && !isOfficialScoringPhase(phaseAtTick(phase, kill.tick))) continue;
@@ -264,17 +269,6 @@ function plantTicks(pkg: DemoPackage): Map<number, number> {
   const out = new Map<number, number>();
   for (const bomb of pkg.bombs) {
     if (bomb.type === "planted" && !out.has(bomb.roundNumber)) out.set(bomb.roundNumber, bomb.tick);
-  }
-  return out;
-}
-
-function groupBy<T>(items: readonly T[], key: (item: T) => number): Map<number, T[]> {
-  const out = new Map<number, T[]>();
-  for (const item of items) {
-    const k = key(item);
-    const arr = out.get(k) ?? [];
-    arr.push(item);
-    out.set(k, arr);
   }
   return out;
 }

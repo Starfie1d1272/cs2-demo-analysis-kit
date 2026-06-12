@@ -98,7 +98,7 @@ export function App() {
     const zips = items.filter((item) => item.file.name.toLowerCase().endsWith(".zip"));
     const dems = items.filter((item) => isDemFile(item.file));
     if (zips.length === 0 && dems.length === 0 && initialErrors.length === 0) {
-      setNotice("请选择 .dem 或 cs2-demo-format/2.0 ZIP 文件");
+      setNotice("请选择 .dem 或 cs2-demo-format/3.x ZIP 文件");
       return;
     }
     setImporting(true);
@@ -315,7 +315,7 @@ export function App() {
         </nav>
         <div className="stu-sidebar-foot">
           <span>{entries.length} 场 demo</span>
-          <small>v{APP_VERSION} · v2 ZIP · 本地存储</small>
+          <small>v{APP_VERSION} · v3 ZIP · 本地存储</small>
           {update && (
             <a className="stu-update-link" href={update.url} target="_blank" rel="noreferrer">
               新版本 v{update.latest} 可下载

@@ -54,8 +54,8 @@
 
 ## v0.4 — 硬核机制与模式识别（设计见 [design/duel-coach-lab.md](design/duel-coach-lab.md)）
 
-- [x] **shots.json 接入**：exporter 已导出逐枪流（`exporter.py` `_build_shots`，
-      含 position/velocity/yaw/pitch）；瓶颈在消费端（core 信号 + 视图）
+- [x] **shots.json 接入**：cs2df 已导出 v3 列式逐枪流（含 position/velocity/yaw/pitch）；
+      core 信号与视图已按 v3 消费
 - [ ] **M1 core duels**（4a）：engagement 切分（1.5s）/ 对枪配对（±2s）/
       受害者三分类（contested / outaimed / 被偷）/ burst 锚定 TTK / 残血满血分档
 - [ ] **M2 core mechanics**（4c 信号）：burst 切分、首发/扫射精准度、急停成功率、

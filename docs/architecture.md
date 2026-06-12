@@ -2,18 +2,16 @@
 
 ## English
 
-This repository owns the **full pipeline** from a raw `.dem` file to product-ready
-view models — exporter included. It is no longer "just the middle layer".
+This repository owns the product-neutral analysis pipeline from a `cs2-demo-format/3.x` ZIP to reusable view models. Raw `.dem` parsing is delegated to [`cs2df`](https://pypi.org/project/cs2df/), the reference exporter for `cs2-demo-format` v3. The Python code in this repo is now only a desktop/Studio shell around that exporter.
 
 ```text
 .dem
-  -> python/src/cs2dak         (in-repo; demoparser2 → cs2-demo-format/2.0 ZIP)
-        ├─ CLI: export / export-batch / validate
-        └─ GUI: focused desktop export / batch export
-  -> @cs2dak/core  (loads ZIP → DemoPackage)
+  -> cs2df (PyPI; demoparser2 -> cs2-demo-format/3.x ZIP)
+       └─ python/src/cs2dak  (GUI / DAK Studio bridge / packaging shell)
+  -> @cs2dak/core  (loads v3 ZIP -> DemoPackage -> AnalysisBundle)
+       ├─ normalize / economy / kills / clutches / timeline / heatmap / QA
        ├─ box-score / HLTV baseline / RR six-account / PRISM  (via @rivalhub/rival-rating)
-       ├─ economy / kills / clutches / timeline / heatmap / QA
-       └─ → AnalysisBundle
+       └─ replay / shots / duels decoding through cs2-demo-format helpers
   -> @cs2dak/cohort       (cross-match aggregation + identity map)
   -> @cs2dak/presentation (product-neutral view models)
   -> @cs2dak/react / product adapters (RivalHub, CS2 Insight Agent)
@@ -23,30 +21,34 @@ view models — exporter included. It is no longer "just the middle layer".
 
 | Component | Role |
 |---|---|
-| `python/src/cs2dak` | **In-repo** `.dem → v2 ZIP` pipeline (demoparser2 + GUI + PyInstaller). Owns the export side. |
-| `@cs2dak/contract` | Zod schemas + types; single source of truth for shapes. Re-exports `cs2-demo-format`. |
-| `@cs2dak/core` | Deterministic analysis, RR/PRISM adapter, QA. No side effects. |
+| `cs2df` | Reference `.dem -> cs2-demo-format/3.x ZIP` exporter. Owns raw parsing and ZIP production. |
+| `python/src/cs2dak` | Desktop launcher shell: pywebview GUI, DAK Studio bridge, PyInstaller packaging. Does not contain parser/exporter logic. |
+| `@cs2dak/contract` | Zod schemas + types; re-exports `cs2-demo-format` instead of forking it. |
+| `@cs2dak/core` | Deterministic single-match analysis, RR/PRISM signal derivation, QA. No product side effects. |
 | `@cs2dak/cohort` | Cross-match aggregation and identity merging. No product ranking rules. |
-| `@cs2dak/maps` | Map calibration + world→radar transform + attack routes (`MapRoute`) + zone geometry (`zoneAt` / `pointInPolygon`) + callout name mappings. |
+| `@cs2dak/maps` | Map calibration + world-to-radar transform + attack routes (`MapRoute`) + zone geometry (`zoneAt` / `pointInPolygon`) + callout mappings. |
 | `@cs2dak/presentation` | Product-neutral view models, labels, stories, and workspace composition. |
-| `@cs2dak/react` | Product-neutral preview components (consume presentation contracts only). |
-| `@cs2dak/cli` | Language-neutral integration surface. |
+| `@cs2dak/react` | Product-neutral preview components that consume presentation contracts only. |
+| `@cs2dak/cli` | Language-neutral filesystem/automation wrapper around TypeScript packages. |
+| `apps/demo-lab` | Component preview, fixture acceptance, and visual regression entrypoint. |
+| `apps/dak-studio` | Local demo library and analysis workbench. Stores ZIP bytes locally; `.dem` import is exported through `cs2df`. |
 
-> Ownership note: the exporter lives **here**, in `python/src/cs2dak`.
-> CS2 Insight Agent is a downstream consumer and source of raw `.dem` files.
+### The v3 ZIP seam
 
-### The v2 ZIP is a rich event warehouse
+`cs2-demo-format/3.x` ZIP is the only Python/TypeScript seam. v2 packages are not supported at runtime; loaders fail fast and ask the user to re-export with `cs2df`.
 
-The `cs2-demo-format/2.0` ZIP carries far more than a scoreboard. 15 files in three tiers:
+The v3 package includes:
 
-- **Aggregates**: `match` `players` `rounds` `player-stats` `player-economies`
-- **Events**: `kills` `damages` `blinds` `bombs` `grenades` `clutches`
-- **Spatial / tick-level**: `shots` (per-shot yaw/pitch/velocity), `positions-1s` (1 Hz tracks), `replay` (~8 Hz tracks)
+- **Aggregates**: `match`, `players`, `rounds`, `player-stats`, `player-economies`
+- **Events**: `kills`, `damages`, `blinds`, `bombs`, `grenades`, `clutches`
+- **Columnar/tick-level streams**: `shots`, `replay`, optional research `duels`
 
-Events carry context fields beyond a scoreboard — e.g. `damages` has
-`victimHealthBefore/After` / `armorDamage` / `hitgroup`; `kills` has `throughSmoke` /
-`noScope` / `killerActiveWeapon`; `bombs` has an explicit `site: "a"|"b"`.
-Longer-term consumption is tracked in [rr-roadmap.md](rr-roadmap.md).
+Important v3 semantics:
+
+- Events reference players by `playerIndex`; consumers resolve player/team/side through `players.json` and `rounds.json`.
+- `positions-1s.json` is gone; spatial consumers read the 8 Hz replay stream and `place` column.
+- Columnar streams are delta encoded; consumers use `decodeDelta()` from `cs2-demo-format`.
+- Missing derived data remains `null`, not coerced to `0`.
 
 ### Rating layers
 
@@ -55,77 +57,64 @@ Three rating layers answer three different questions and must never be merged in
 | Layer | Question | Granularity |
 |---|---|---|
 | RR v1 | How did this match's stat line look? | per-match |
-| RR six-account | How much was your contribution worth (with context)? | per-match / cohort |
+| RR six-account | How much was your contribution worth with context? | per-match / cohort |
 | PRISM | What is your play style? | cross-match cohort |
 
-All three are specified in the single design doc [design/rr-model.md](design/rr-model.md).
-
-Formula ownership stays in `@rivalhub/rival-rating` (the only implementation of
-`computeRR` / `computeRRSixAccounts` / `computeFrozenProBaselineRR` /
-`computeCohortAccountsRR` / `computePrism`). Production RR uses frozen pro
-baseline so single-match and cohort views share one scale (`1.0 = pro baseline`);
-cohort-relative scoring remains useful only for analysis comparisons.
-This kit only derives signals, wires the models, anchors, and shapes output.
-
-> `analyzeDemoPackage` processes **one demo at a time**. Season-level PRISM and RR
-> anchoring live in `@cs2dak/cohort`, which aggregates many demos and supports
-> external identity maps for RivalHub user/Steam alias binding.
-
-Consumers: RivalHub stores immutable imports and versioned analysis runs, then renders
-product pages from DAK presentation models. Standalone tools can import the TS packages
-or consume the JSON.
+Formula ownership stays in `@rivalhub/rival-rating`. This kit only derives signals, wires the models, anchors, and shapes output. Production RR uses a frozen pro baseline so single-match and cohort views share one scale (`1.0 = pro baseline`).
 
 ## 简体中文
 
-本仓库拥有从原始 `.dem` 到产品级 view model 的**完整管道**——**导出器也在内**。
-它已经不只是"中间层"了。
+本仓库拥有从 `cs2-demo-format/3.x` ZIP 到产品级 View Model 的产品中立分析管道。原始 `.dem` 解析交给 [`cs2df`](https://pypi.org/project/cs2df/)（`cs2-demo-format` v3 参考导出器）。本仓库 Python 代码现在只保留桌面 GUI / Studio 桥 / 打包壳层。
 
 ```text
 .dem
-  -> python/src/cs2dak         (本仓库内；demoparser2 → cs2-demo-format/2.0 ZIP)
-        ├─ CLI: export / export-batch / validate
-        └─ GUI: 专注于单场和批量导出
-  -> @cs2dak/core  (加载 ZIP → DemoPackage)
-       ├─ box-score / HLTV baseline / RR 六账户 / PRISM  (经 @rivalhub/rival-rating)
-       ├─ 经济 / 击杀 / 残局 / 时间线 / 热力图 / QA
-       └─ → AnalysisBundle
+  -> cs2df（PyPI；demoparser2 -> cs2-demo-format/3.x ZIP）
+       └─ python/src/cs2dak  （GUI / DAK Studio 桥 / 打包壳）
+  -> @cs2dak/core  （加载 v3 ZIP -> DemoPackage -> AnalysisBundle）
+       ├─ 标准化 / 经济 / 击杀 / 残局 / 时间线 / 热力图 / QA
+       ├─ box-score / HLTV baseline / RR 六账户 / PRISM（经 @rivalhub/rival-rating）
+       └─ replay / shots / duels 通过 cs2-demo-format helper 解码
   -> @cs2dak/cohort       （跨场聚合 + identity map）
   -> @cs2dak/presentation （产品中立 View Model）
   -> @cs2dak/react / 产品适配层（RivalHub、CS2 Insight Agent）
 ```
 
-### 组成
+### 组件
 
 | 组件 | 角色 |
 |---|---|
-| `python/src/cs2dak` | **本仓库内**的 `.dem → v2 ZIP` 管道（demoparser2 + GUI + PyInstaller），拥有导出端。 |
-| `@cs2dak/contract` | Zod schema + 类型，形状的单一真相源；re-export `cs2-demo-format`。 |
-| `@cs2dak/core` | 确定性分析、RR/PRISM 适配、QA。无副作用。 |
+| `cs2df` | `.dem -> cs2-demo-format/3.x ZIP` 参考导出器，拥有原始解析和 ZIP 生产。 |
+| `python/src/cs2dak` | 桌面壳：pywebview GUI、DAK Studio 桥、PyInstaller 打包；不再包含 parser/exporter 实现。 |
+| `@cs2dak/contract` | Zod schema + 类型；re-export `cs2-demo-format`，不 fork 合同。 |
+| `@cs2dak/core` | 单场确定性分析、RR/PRISM 信号派生、QA；无产品副作用。 |
 | `@cs2dak/cohort` | 跨场聚合与身份归并，不拥有产品排行榜规则。 |
-| `@cs2dak/maps` | 地图标定 + world→radar 转换 + 进攻动线（`MapRoute`）+ zone 几何（`zoneAt` / `pointInPolygon` / `ACTIVE_DUTY_MAPS`）+ callout 中文映射。 |
+| `@cs2dak/maps` | 地图标定、world-to-radar 转换、进攻动线、zone 几何与 callout 映射。 |
 | `@cs2dak/presentation` | 产品中立 View Model、标签、叙事与 workspace 编排。 |
-| `@cs2dak/react` | 产品中立的预览组件（只消费 presentation 合同）。 |
-| `@cs2dak/cli` | 跨语言集成入口。 |
+| `@cs2dak/react` | 只消费 presentation 合同的产品中立组件。 |
+| `@cs2dak/cli` | TypeScript 包的文件系统/自动化入口。 |
+| `apps/demo-lab` | 组件预览、fixture 人工验收与视觉回归入口。 |
+| `apps/dak-studio` | 本地 Demo 库和分析工作台；本地保存 ZIP 字节，`.dem` 导入通过 `cs2df` 导出。 |
 
-> 归属说明：导出器在**本仓库** `python/src/cs2dak`。
-> CS2 Insight Agent 是下游消费方和原始 `.dem` 的来源。
+### v3 ZIP seam
 
-### v2 ZIP 是一个富事件仓库
+`cs2-demo-format/3.x` ZIP 是 Python/TypeScript 的唯一接口。v2 包不做运行时兼容；loader 会直接提示用 `cs2df` 重导。
 
-`cs2-demo-format/2.0` ZIP 远不止 scoreboard。15 个文件分三档：
+v3 包包含：
 
-- **聚合量**：`match` `players` `rounds` `player-stats` `player-economies`
-- **事件**：`kills` `damages` `blinds` `bombs` `grenades` `clutches`
-- **时空 / tick 级**：`shots`（每发 yaw/pitch/velocity）、`positions-1s`（1 Hz 轨迹）、`replay`（~8 Hz 轨迹）
+- **聚合量**：`match`、`players`、`rounds`、`player-stats`、`player-economies`
+- **事件**：`kills`、`damages`、`blinds`、`bombs`、`grenades`、`clutches`
+- **列式 / tick 级流**：`shots`、`replay`、可选 research `duels`
 
-事件里带着大量 context 字段——例如 `damages` 有
-`victimHealthBefore/After` / `armorDamage` / `hitgroup`；`kills` 有 `throughSmoke` /
-`noScope` / `killerActiveWeapon`；`bombs` 直接带 `site: "a"|"b"`。后续消费计划见
-[rr-roadmap.md](rr-roadmap.md)。
+关键语义：
+
+- 事件通过 `playerIndex` 引用玩家；消费者经 `players.json` 和 `rounds.json` 推导 player/team/side。
+- `positions-1s.json` 已删除；空间消费者改读 8 Hz replay 流和 `place` 列。
+- 列式流为 delta 编码；消费者使用 `cs2-demo-format` 导出的 `decodeDelta()`。
+- 缺失派生数据保持 `null`，不得伪造为 `0`。
 
 ### 评分三层
 
-三层评分回答三个不同问题，**绝不能合并成一个数**：
+三层评分回答三个不同问题，绝不能合并成一个数：
 
 | 层 | 回答的问题 | 粒度 |
 |---|---|---|
@@ -133,17 +122,4 @@ or consume the JSON.
 | RR 六账户 | 这场/赛季里你的贡献值多少（含上下文） | 单场 / cohort |
 | PRISM | 你是什么风格 | 跨场 cohort |
 
-三层统一在单一设计文档 [design/rr-model.md](design/rr-model.md) 描述。
-
-公式所有权在 `@rivalhub/rival-rating`（`computeRR` / `computeRRSixAccounts` /
-`computeFrozenProBaselineRR` / `computeCohortAccountsRR` / `computePrism` 的唯一实现）。
-生产 RR 统一使用 frozen pro baseline（`1.0 = 职业基线`），单场与 cohort 视图共用同一标尺；
-cohort-relative scoring 仅保留作分析对照。本 kit 只做信号派生、
-模型接线、锚定与输出整形。
-
-> `analyzeDemoPackage` 一次只处理一场 demo。PRISM 的跨人 z-score 和赛季级 RR 锚定由
-> `@cs2dak/cohort` 聚合多场 demo 完成；RivalHub 的 userId / Steam alias 绑定通过
-> 外部 identity map 接入。
-
-消费方：RivalHub 保存不可变导入记录与版本化 analysis run，并基于 DAK presentation
-模型渲染产品页面。独立工具可直接 import TS 包或消费 JSON。
+公式所有权在 `@rivalhub/rival-rating`。本 kit 只做信号派生、模型接线、锚定与输出整形。生产 RR 统一使用 frozen pro baseline（`1.0 = 职业基线`），单场与 cohort 视图共用同一标尺。

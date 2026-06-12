@@ -131,7 +131,7 @@ export function LibraryView({
         <div>
           <h1>资料库</h1>
           <p>
-            导入 .dem（自动经 exporter 转 v2 ZIP）或 cs2-demo-format/2.0 ZIP，本地管理、检索并进入分析。支持拖拽到窗口任意位置。
+            导入 .dem（自动经 cs2df 转 v3 ZIP）或 cs2-demo-format/3.x ZIP，本地管理、检索并进入分析。支持拖拽到窗口任意位置。
           </p>
         </div>
         <div className="stu-header-actions">
@@ -141,7 +141,7 @@ export function LibraryView({
               className="stu-button stu-button-ghost"
               onClick={onReexportAll}
               disabled={importing}
-              title="逐场重新导出所有记录了原始 .dem 路径的条目（exporter 升级后刷新数据）"
+              title="逐场重新导出所有记录了原始 .dem 路径的条目（cs2df 升级后刷新数据）"
             >
               <RotateCw size={15} /> 全部重新导出
             </button>
@@ -253,7 +253,7 @@ export function LibraryView({
         <div className="stu-empty">
           <div className="stu-empty-mark">⌖</div>
           <h2>资料库为空</h2>
-          <p>把 .dem 或 v2 ZIP 拖进窗口，或点右上角「导入 demo」。</p>
+          <p>把 .dem 或 v3 ZIP 拖进窗口，或点右上角「导入 demo」。</p>
           <button type="button" className="stu-button stu-button-ghost" onClick={onLoadSample} disabled={importing}>
             加载示例
           </button>

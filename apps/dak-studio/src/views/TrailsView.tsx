@@ -207,7 +207,7 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
         <div className="stu-empty">
           <div className="stu-empty-mark">⌖</div>
           <h2>还没有动线数据</h2>
-          <p>开局动线需要含回放流的 v2 ZIP，先导入几场比赛。</p>
+          <p>开局动线需要含回放流的 v3 ZIP，先导入几场比赛。</p>
           <button type="button" className="stu-button" onClick={onGoLibrary}>
             去资料库
           </button>

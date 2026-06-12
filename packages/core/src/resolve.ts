@@ -11,6 +11,10 @@ export interface PlayerResolver {
   byIndexOrNull(index: number | null | undefined): PackagePlayer | null;
   /** 同一局内 steamId64 → playerIndex（cohort 身份归并入口用） */
   indexOfSteamId(steamId64: string): number | null;
+  /** playerIndex 对应的 steamId64；index 无效返回空串。 */
+  steamIdOf(index: number | null | undefined): string;
+  /** playerIndex 对应的玩家名；index 无效返回 null。 */
+  nameByIndex(index: number | null | undefined): string | null;
   /** 玩家在指定回合所处 side（由 teamKey + rounds.teamASide/BSide 推导） */
   sideOf(playerIndex: number, roundNumber: number): Side;
   /** 指定回合某 teamKey 的 side */
@@ -45,11 +49,16 @@ export function createPlayerResolver(
     return teamKey === "teamA" ? round.teamASide : round.teamBSide;
   };
 
+  const byIndexOrNull = (index: number | null | undefined): PackagePlayer | null =>
+    index === null || index === undefined ? null : byIndex(index);
+
   return {
     players,
     byIndex,
-    byIndexOrNull: (index) => (index === null || index === undefined ? null : byIndex(index)),
+    byIndexOrNull,
     indexOfSteamId: (steamId64) => steamIdToIndex.get(steamId64) ?? null,
+    steamIdOf: (index) => byIndexOrNull(index)?.steamId64 ?? "",
+    nameByIndex: (index) => byIndexOrNull(index)?.name ?? null,
     sideOf: (playerIndex, roundNumber) => teamSideOf(byIndex(playerIndex).teamKey, roundNumber),
     teamSideOf,
   };

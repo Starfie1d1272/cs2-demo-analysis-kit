@@ -1,4 +1,6 @@
 import type { DemoPackage, Side } from "@cs2dak/contract";
+import { FLAG_ALIVE } from "@cs2dak/contract";
+import { createResolverFromPackage } from "@cs2dak/core";
 
 export interface OpeningPatternInput {
   matchId: string;
@@ -32,22 +34,42 @@ function distributionKey(labels: string[]): string {
   return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([label, count]) => `${label}:${count}`).join("|");
 }
 
-/** Resolve a player's side (t/ct) for a given round from their teamKey. */
-function playerSideAtRound(pkg: DemoPackage, round: { teamASide: Side; teamBSide: Side }, playerIndex: number): Side | null {
-  const player = pkg.players[playerIndex];
-  if (!player) return null;
-  return player.teamKey === "teamA" ? round.teamASide : round.teamBSide;
-}
-
 function grenadeKey(pkg: DemoPackage, round: { roundNumber: number; teamASide: Side; teamBSide: Side }, side: Side, windowStart: number, windowEnd: number): string[] {
+  const resolver = createResolverFromPackage(pkg);
   return pkg.grenades
     .filter((grenade) => {
       if (grenade.roundNumber !== round.roundNumber) return false;
       if (grenade.throwTick < windowStart || grenade.throwTick > windowEnd) return false;
-      return playerSideAtRound(pkg, round, grenade.throwerIndex) === side;
+      return resolver.sideOf(grenade.throwerIndex, round.roundNumber) === side;
     })
     .sort((a, b) => a.throwTick - b.throwTick)
     .map((grenade) => grenade.grenade);
+}
+
+function replayLabelsAt(
+  pkg: DemoPackage,
+  round: { roundNumber: number; teamASide: Side; teamBSide: Side },
+  side: Side,
+  sampleTick: number
+): string[] {
+  const replay = pkg.replay;
+  const replayRound = replay?.rounds.find((row) => row.roundNumber === round.roundNumber);
+  if (!replay || !replayRound) return [];
+  const labels: string[] = [];
+  for (const track of replayRound.players) {
+    const player = pkg.players[track.playerIndex];
+    if (!player) continue;
+    const playerSide = player.teamKey === "teamA" ? round.teamASide : round.teamBSide;
+    if (playerSide !== side) continue;
+    const frameIndex = Math.max(
+      0,
+      Math.min(replayRound.frameCount - 1, Math.round((sampleTick - replayRound.startTick) / replayRound.tickStep))
+    );
+    if (((track.flags[frameIndex] ?? 0) & FLAG_ALIVE) === 0) continue;
+    const place = replay.placeDict?.[track.place[frameIndex] ?? -1];
+    if (place) labels.push(place);
+  }
+  return labels.sort();
 }
 
 export function buildOpeningPatternClusters(
@@ -62,8 +84,7 @@ export function buildOpeningPatternClusters(
     for (const round of pkg.rounds) {
       const sampleTick = round.freezeEndTick + windowSeconds * tickrate;
       for (const side of ["t", "ct"] as const) {
-        // positions-1s was removed in v3; spatial label clustering pending replay-based re-impl
-        const labels: string[] = [];
+        const labels = replayLabelsAt(pkg, round, side, sampleTick);
         if (labels.length === 0) continue;
         const basis = distributionKey(labels);
         const grenades = grenadeKey(pkg, round, side, round.freezeEndTick, sampleTick);

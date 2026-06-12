@@ -3,7 +3,7 @@ import type { DemoPackage } from "@cs2dak/contract";
 
 /**
  * DAK Studio 本地 Demo 库。
- * - v2 ZIP 原始字节持久化在 IndexedDB，刷新不丢（来源永远是 ZIP，规则：v2 ZIP 是唯一 seam）。
+ * - v3 ZIP 原始字节持久化在 IndexedDB，刷新不丢（来源永远是 ZIP，规则：v3 ZIP 是唯一 seam）。
  * - DemoPackage 解析结果持久化在 derived 表：可丢弃缓存，未命中/版本不符时从 ZIP 重建。
  *   解压 + 解析是聚合首屏的主要耗时，命中 derived 后直接读 JSON。
  */
@@ -277,7 +277,7 @@ export interface ImportDemoOptions {
 }
 
 /**
- * 导入一个 v2 ZIP；以内容哈希为 id，重复导入幂等（标签做并集）。
+ * 导入一个 v3 ZIP；以内容哈希为 id，重复导入幂等（标签做并集）。
  * 解析失败抛错（带文件名）。
  */
 export async function importDemoFile(file: File, options: ImportDemoOptions | string[] = []): Promise<ImportResult> {

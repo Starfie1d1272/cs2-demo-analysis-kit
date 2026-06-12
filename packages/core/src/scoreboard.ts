@@ -20,6 +20,7 @@ import type { RRSignals } from "@rivalhub/rival-rating";
 import type { AccountRatingResult } from "./signals.js";
 import { normalizeDemoPackage } from "./normalize.js";
 import { round, firstKillMap, clutchSplit, isUtilityWeapon, killWeaponName } from "./utils.js";
+import { createResolverFromPackage } from "./resolve.js";
 import { fieldAvailability, fieldConfidence } from "./qa.js";
 
 export function deriveRRIndicators(input: unknown): RRIndicators[] {
@@ -28,6 +29,7 @@ export function deriveRRIndicators(input: unknown): RRIndicators[] {
 }
 
 export function buildPlayerRoundFacts(pkg: DemoPackage): PlayerRoundFact[] {
+  const resolver = createResolverFromPackage(pkg);
   const firstKillByRound = firstKillMap(pkg);
 
   return pkg.rounds.flatMap((roundRow) =>
@@ -39,7 +41,7 @@ export function buildPlayerRoundFacts(pkg: DemoPackage): PlayerRoundFact[] {
       const damageRows = pkg.damages.filter((row) =>
         row.roundNumber === roundRow.roundNumber &&
         row.attackerIndex === playerIdx &&
-        pkg.players[row.victimIndex]?.teamKey !== player.teamKey
+        resolver.byIndexOrNull(row.victimIndex)?.teamKey !== player.teamKey
       );
       const economy = pkg.playerEconomies.find((row) => row.roundNumber === roundRow.roundNumber && row.playerIndex === playerIdx);
       const side = player.teamKey === "teamA" ? roundRow.teamASide : roundRow.teamBSide;
@@ -99,16 +101,17 @@ export function buildPlayerIndicators(pkg: DemoPackage, facts: PlayerRoundFact[]
     const sniperKills = playerKills.filter((kill) => ["awp", "ssg08", "scout"].includes(killWeaponName(kill))).length;
     const utilityDamage = stats?.utilityDamage ?? playerFacts.reduce((sum, fact) => sum + fact.utilityDamage, 0);
     const flashAssistCount = stats?.flashAssistCount ?? playerFacts.reduce((sum, fact) => sum + fact.flashAssists, 0);
+    const resolver = createResolverFromPackage(pkg);
     const enemyFlashDurationSeconds = stats?.enemyFlashDurationSeconds ?? playerBlinds
       .filter((blind) => {
-        const flashedTeam = pkg.players[blind.flashedIndex]?.teamKey;
-        return flashedTeam && flashedTeam !== player.teamKey;
+        const flashedPlayer = resolver.byIndexOrNull(blind.flashedIndex);
+        return flashedPlayer != null && flashedPlayer.teamKey !== player.teamKey;
       })
       .reduce((sum, blind) => sum + blind.durationSeconds, 0);
     const teamFlashDurationSeconds = stats?.teamFlashDurationSeconds ?? playerBlinds
       .filter((blind) => {
-        const flashedTeam = pkg.players[blind.flashedIndex]?.teamKey;
-        return flashedTeam === player.teamKey && blind.flashedIndex !== playerIdx;
+        const flashedPlayer = resolver.byIndexOrNull(blind.flashedIndex);
+        return flashedPlayer?.teamKey === player.teamKey && blind.flashedIndex !== playerIdx;
       })
       .reduce((sum, blind) => sum + blind.durationSeconds, 0);
     const grenadeCount = pkg.grenades.filter((grenade) => grenade.throwerIndex === playerIdx).length;
@@ -227,6 +230,7 @@ export function buildScoreboard(
   rows: PlayerIndicatorRow[],
   accountRatings: Array<{ signals: RRSignals; rr: AccountRatingResult }>
 ): PlayerScoreboardRow[] {
+  const resolver = createResolverFromPackage(pkg);
   const accountBySteamId = new Map(accountRatings.map((row) => [row.signals.steamId64, row]));
   const statsMap = new Map(pkg.playerStats.map((row) => [row.playerIndex, row]));
   const availability = fieldAvailability(pkg);
@@ -235,9 +239,9 @@ export function buildScoreboard(
     const account = accountBySteamId.get(row.steamId64);
     const accountRr = account?.rr;
     const combatSignals = account?.signals.combat;
-    const playerIdx = pkg.players.findIndex((p) => p.steamId64 === row.steamId64);
-    const stats = statsMap.get(playerIdx);
-    const playerKills = playerIdx >= 0
+    const playerIdx = resolver.indexOfSteamId(row.steamId64);
+    const stats = playerIdx != null ? statsMap.get(playerIdx) : undefined;
+    const playerKills = playerIdx != null
       ? pkg.kills.filter((kill) => kill.killerIndex === playerIdx)
       : [];
     return {

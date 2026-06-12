@@ -24,7 +24,7 @@ P4 空间分析（Area / Utility Block）的唯一人工输入。每张现役图
 
 ## 关键约定
 
-- **坐标系 = 世界坐标 XY**，与 demo 的 `positions-1s[].position` 同系（不是 radar 像素）。
+- **坐标系 = 世界坐标 XY**，与 demo 的 replay 坐标同系（不是 radar 像素）。
 - **顶点顺序无所谓**（顺/逆时针都行），首尾**不必闭合**（`zoneAt` 自动闭合）。
 - **重叠时数组顺序 = 优先级**：窄/特殊区域排在前，大区域排后（`zoneAt` 返回第一个命中）。
 - **空 `polygon: []` 是安全的**：永不命中、返回 null，便于先建结构后逐个填。
@@ -34,7 +34,7 @@ P4 空间分析（Area / Utility Block）的唯一人工输入。每张现役图
 
 1. **2D 回放取点**：在 replay 流（已是世界坐标 ÷ coordScale）上沿区域边界点几个点，
    ×coordScale 还原世界坐标。
-2. **地标反推**：用已知世界点（出生点、包点中心来自 bombs/positions）对照
+2. **地标反推**：用已知世界点（出生点、包点中心来自 bombs/replay）对照
    `MAP_CALIBRATIONS[map]` 的 `worldToRadar`，在 radar 上量边界再反算世界坐标。
 
 ## 建议工作流

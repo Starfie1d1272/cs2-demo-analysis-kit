@@ -1,12 +1,12 @@
 {
-  "schemaVersion": "cs2-demo-format/2.0",
+  "schemaVersion": "cs2-demo-format/3.0",
   "exporter": {
-    "name": "cs2-demo-analysis-kit",
-    "version": "1.0.0"
+    "name": "cs2df",
+    "version": "3.0.0"
   },
   "parser": {
     "name": "demoparser2",
-    "version": "unknown"
+    "version": "0.41.3"
   },
   "demo": {
     "hash": "602a433d7dc4361373138d895d439f1d765453892b915a92081d01666e530a10",
@@ -14,7 +14,7 @@
   },
   "mapName": "de_ancient",
   "tickrate": 64,
-  "exportedAt": "2026-06-04T07:31:18.004177+00:00",
+  "exportedAt": "2026-06-12T14:33:25.859100+00:00",
   "files": {
     "match": "match.json",
     "players": "players.json",
@@ -28,7 +28,6 @@
     "grenades": "grenades.json",
     "clutches": "clutches.json",
     "shots": "shots.json",
-    "positions1s": "positions-1s.json",
     "replay": "replay.json"
   }
 }

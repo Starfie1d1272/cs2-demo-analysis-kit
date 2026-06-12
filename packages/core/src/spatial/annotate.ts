@@ -15,6 +15,7 @@
  */
 import type { DemoPackage } from "@cs2dak/contract";
 import { decodeDelta, FLAG_ALIVE } from "@cs2dak/contract";
+import { createResolverFromPackage } from "../resolve.js";
 import {
   getMapNav,
   getMapRoutes,
@@ -90,6 +91,7 @@ export interface AnnotatedSample {
  * 返回所有存活/阵亡玩家的逐帧标注，zone/nav 判定暂缺（需 maps 包导出 zoneAt/nearestNavArea）。
  */
 export function annotatePositions(pkg: DemoPackage, assets: SpatialAssets): AnnotatedSample[] {
+  const resolver = createResolverFromPackage(pkg);
   const replay = pkg.replay;
   if (!replay) return [];
 
@@ -105,7 +107,7 @@ export function annotatePositions(pkg: DemoPackage, assets: SpatialAssets): Anno
     const tickStep = round.tickStep;
 
     for (const track of round.players) {
-      const player = pkg.players[track.playerIndex];
+      const player = resolver.byIndexOrNull(track.playerIndex);
       if (!player) continue;
 
       const xs = decodeDelta(track.x);

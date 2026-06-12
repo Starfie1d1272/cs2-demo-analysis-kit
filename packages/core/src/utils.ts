@@ -1,4 +1,5 @@
 import type { DemoPackage, RRSignals } from "@cs2dak/contract";
+import { createResolverFromPackage } from "./resolve.js";
 
 export type BuyDeltaBuckets = NonNullable<RRSignals["combat"]["killsByBuyDelta"]>;
 export type ManStateBuckets = NonNullable<RRSignals["combat"]["killsByManState"]>;
@@ -61,16 +62,16 @@ export function firstKillMap(pkg: DemoPackage): Map<number, DemoPackage["kills"]
 }
 
 export function nameForPlayerIndex(pkg: DemoPackage, playerIndex: number | null | undefined): string | null {
-  if (playerIndex === null || playerIndex === undefined) return null;
-  return pkg.players[playerIndex]?.name ?? null;
+  return createResolverFromPackage(pkg).nameByIndex(playerIndex);
 }
 
 export function sumDamageForPlayer(pkg: DemoPackage, playerIndex: number): number {
-  const playerTeam = pkg.players[playerIndex]?.teamKey;
+  const resolver = createResolverFromPackage(pkg);
+  const playerTeam = resolver.byIndex(playerIndex).teamKey;
   return pkg.damages
     .filter((damage) =>
       damage.attackerIndex === playerIndex &&
-      pkg.players[damage.victimIndex]?.teamKey !== playerTeam
+      resolver.byIndexOrNull(damage.victimIndex)?.teamKey !== playerTeam
     )
     .reduce((sum, damage) => sum + damage.healthDamage, 0);
 }
@@ -92,19 +93,6 @@ export function multiKillRounds(kills: DemoPackage["kills"], target: number): nu
 }
 
 export function clutchSplit(
-  statsCount: number | undefined,
-  statsWon: number | undefined,
-  clutches: DemoPackage["clutches"],
-  opponentCount: number
-) {
-  const rows = clutches.filter((row) => row.opponentCount === opponentCount);
-  return {
-    count: statsCount ?? rows.length,
-    won: statsWon ?? rows.filter((row) => row.won).length
-  };
-}
-
-export function clutchSplitV2(
   count: number | undefined,
   won: number | undefined,
   rows: DemoPackage["clutches"],

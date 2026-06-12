@@ -5,11 +5,9 @@ build-backend = "hatchling.build"
 [project]
 name = "cs2dak"
 version = "0.4.3"
-description = "Parse CS2 .dem files into cs2-demo-format v2 ZIP exports"
+description = "Desktop shell for cs2df v3 demo exports and DAK Studio"
 readme = "README.md"
 requires-python = ">=3.11"
-# 与仓库根 LICENSE 一致。parse_worker/exporter 自 CS2-insight-agent 移植，
-# 已获原作者授权按本仓库许可证分发（见 THIRD-PARTY-NOTICES.md）。
 license = { text = "MIT" }
 authors = [{ name = "Xinyu Du" }]
 dependencies = [
@@ -35,7 +33,7 @@ artifacts = ["src/cs2dak/gui/web/*", "src/cs2dak/studio_web/**"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

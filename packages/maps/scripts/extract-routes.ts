@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * extract-routes — 从一批同图 v2 ZIP 半自动挖进攻动线。
+ * extract-routes — 从一批同图 v3 ZIP 半自动挖进攻动线。
  *
  * 一条动线 = T 方从匪家到包点的有序 callout 序列（见 src/routes.ts）。本脚本不直接
  * 产出 routes.json，而是打印三样供人工定稿：
@@ -15,7 +15,8 @@
  */
 import { readFile, readdir } from "node:fs/promises";
 import { extname, join } from "node:path";
-import { loadDemoPackageFromZip } from "@cs2dak/core";
+import { loadDemoPackageFromZip } from "../../core/src/index.ts";
+import { decodeDelta } from "../../contract/src/index.ts";
 
 interface Sample {
   round: number;
@@ -35,24 +36,40 @@ async function loadSamples(zipDir: string): Promise<Sample[]> {
   for (const name of names) {
     process.stderr.write(`  loading ${name}...`);
     const pkg = await loadDemoPackageFromZip(await readFile(join(zipDir, name)));
-    const rows = pkg.positions1s ?? [];
     let maxRound = 0;
-    for (const r of rows) {
-      const place = r.lastPlaceName;
-      if (!place || !r.position) continue;
-      maxRound = Math.max(maxRound, r.roundNumber);
-      out.push({
-        round: roundBase + r.roundNumber,
-        tick: r.tick,
-        side: r.side,
-        steamId64: r.steamId64,
-        place,
-        x: r.position.x,
-        y: r.position.y,
-      });
+    let sampleCount = 0;
+    const replay = pkg.replay;
+    const placeDict = replay?.placeDict ?? [];
+    const coordScale = replay?.meta.coordScale ?? 1;
+    const roundByNumber = new Map(pkg.rounds.map((round) => [round.roundNumber, round]));
+    for (const replayRound of replay?.rounds ?? []) {
+      const round = roundByNumber.get(replayRound.roundNumber);
+      if (!round) continue;
+      maxRound = Math.max(maxRound, replayRound.roundNumber);
+      for (const track of replayRound.players) {
+        const player = pkg.players[track.playerIndex];
+        if (!player) continue;
+        const side = player.teamKey === "teamA" ? round.teamASide : round.teamBSide;
+        const xs = decodeDelta(track.x);
+        const ys = decodeDelta(track.y);
+        for (let i = 0; i < xs.length; i += 1) {
+          const place = placeDict[track.place[i] ?? -1];
+          if (!place) continue;
+          out.push({
+            round: roundBase + replayRound.roundNumber,
+            tick: replayRound.startTick + i * replayRound.tickStep,
+            side,
+            steamId64: player.steamId64,
+            place,
+            x: (xs[i] ?? 0) * coordScale,
+            y: (ys[i] ?? 0) * coordScale,
+          });
+          sampleCount += 1;
+        }
+      }
     }
     roundBase += maxRound;
-    process.stderr.write(` ${rows.length} samples\n`);
+    process.stderr.write(` ${sampleCount} samples\n`);
   }
   return out;
 }

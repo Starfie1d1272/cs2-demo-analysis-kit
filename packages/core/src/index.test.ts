@@ -19,7 +19,7 @@ beforeAll(async () => {
 }, 30_000);
 
 describe("analyzeDemoPackage", () => {
-  it("builds reusable analysis and view-model artifacts from a strict v2 export", () => {
+  it("builds reusable analysis and view-model artifacts from a v3 export", () => {
     const bundle = analyzeDemoPackage(pkg);
     expect(bundle.sourceSchemaVersion).toBe("cs2-demo-format/3.0");
     expect(bundle.version).toBe("cs2-demo-analysis-kit/1.0");
@@ -39,7 +39,7 @@ describe("analyzeDemoPackage", () => {
     expect(bundle.timeline.find((event) => event.type === "kill")?.clockLabel).toMatch(/^\d:\d{2}$/);
   });
 
-  it("derives RR six-account signals and computes v2 RR from the strict v2 fixture", () => {
+  it("derives RR six-account signals and computes six-account RR from the v3 fixture", () => {
     const signals = deriveAccountSignalsV2(pkg);
     const ratings = computeAccountRatingsV2(pkg);
 

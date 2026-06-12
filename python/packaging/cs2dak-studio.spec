@@ -4,7 +4,7 @@
 #   uv sync --extra gui --extra build
 #   uv run pyinstaller packaging/cs2dak-studio.spec
 #
-# 一体化封装：Python exporter 与 Studio 前端（静态 SPA）打进同一个应用，
+# 一体化封装：Python cs2df 壳层与 Studio 前端（静态 SPA）打进同一个应用，
 # 运行时不需要 Node —— 前端只是 pywebview 托管的构建产物，分析在浏览器引擎里跑。
 # 推荐入口是 scripts/package.sh（会先构建前端再打包）。
 

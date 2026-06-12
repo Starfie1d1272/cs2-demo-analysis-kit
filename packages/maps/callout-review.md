@@ -1,6 +1,6 @@
 # CS2 Callout 位置字段核对表
 
-源：79 场 demo（pro 24 + NJU 55）positions-1s 全量 `lastPlaceName`。
+源：79 场 demo（pro 24 + NJU 55）v3 replay `place` 全量采样。
 用途：确认中文命名 / 标注 side 归属 / 为动线提供 T%·质心 依据。
 T% = 该区域采样里 T 方占比（高=T 进攻地盘，低=CT 防守地盘，~50=争夺区）。
 

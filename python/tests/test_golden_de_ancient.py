@@ -27,7 +27,7 @@ pytestmark = pytest.mark.skipif(not DEMO_PATH.exists(), reason="demo file not pr
 _MANIFEST_EXCLUDE_KEYS = {"exportedAt"}
 
 # 超大文件：全字段对比但单独断言，方便快速定位问题
-_LARGE_FILES = {"positions-1s.json", "replay.json", "shots.json"}
+_LARGE_FILES = {"replay.json", "shots.json"}
 
 
 def _load_golden(name: str) -> object:
@@ -118,10 +118,6 @@ def test_player_economies_golden(exported_zip: Path) -> None:
 
 def test_shots_golden(exported_zip: Path) -> None:
     assert _read_zip_json(exported_zip, "shots.json") == _load_golden("shots.json")
-
-
-def test_positions_1s_golden(exported_zip: Path) -> None:
-    assert _read_zip_json(exported_zip, "positions-1s.json") == _load_golden("positions-1s.json")
 
 
 def test_replay_golden(exported_zip: Path) -> None:

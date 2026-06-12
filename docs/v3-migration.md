@@ -1,8 +1,18 @@
 # cs2-demo-format v3 迁移计划（exporter 切换 + 全管线升级）
 
-> 2026-06-12 制定。两件事：①废弃本仓库 Python exporter，转向 PyPI `cs2df`
+> 2026-06-12 制定，2026-06-12 收口。两件事：①废弃本仓库 Python exporter，转向 PyPI `cs2df`
 > （cs2-demo-format 3.0.0 参考导出器）；②TypeScript 全管线从 v2 合同迁到 v3。
 > 完成后本仓库不再持有任何 `.dem` 解析代码。
+
+## 0. 完成状态
+
+- ✅ `@cs2dak/contract` 升级到 `cs2-demo-format` 3.0.0，并 re-export 上游合同。
+- ✅ loader 只接受 `cs2-demo-format/3.x`，v2 ZIP 直接提示用 `cs2df` 重导。
+- ✅ core / cohort / presentation / react / Studio 的 v3 `playerIndex`、列式 `shots`、8Hz `replay` 消费已迁移。
+- ✅ `positions-1s` 消费方已切到 replay `place`/坐标流；Pattern Finder 不再保留空 stub。
+- ✅ `fixtures/input/` 与 `fixtures/baselines/de_ancient/` 已按 v3 重导，旧 `positions-1s.json` baseline 删除。
+- ✅ Python parser/exporter 自有实现删除；Python 仅保留 GUI / Studio / packaging 壳层，内部调用 `cs2df`。
+- ✅ 常青文档、Studio 文案、dev middleware 与导出脚本同步到 v3 / `cs2df` 口径。
 
 ## 1. 导出器对比结论
 
@@ -71,4 +81,4 @@ server + 导出编排）、PyInstaller 打包。
 7. 文档同步（AGENTS.md 数据流、architecture.md、module-boundaries.md 的
    "Python exporter" 行改为 "cs2df (PyPI)"）。
 
-步骤 1–5 一个 PR 做完（中间态不可用），6–7 各自独立 PR。
+步骤 1–7 已在 `v3-migration` 分支同一轮收口；中间态不可用，不再拆分独立 PR。

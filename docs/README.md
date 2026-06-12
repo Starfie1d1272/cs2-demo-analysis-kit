@@ -4,7 +4,7 @@
 
 ## 常青规则
 
-- [架构](architecture.md)：数据流、组件职责、v2 ZIP 富事件、评分三层。
+- [架构](architecture.md)：数据流、组件职责、v3 ZIP seam、评分三层。
 - [模块边界](module-boundaries.md)：每个模块做什么、不做什么、唯一 owner。
 
 ## 设计

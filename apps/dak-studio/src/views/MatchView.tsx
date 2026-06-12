@@ -72,7 +72,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onGoLibrary
         <div className="stu-empty">
           <div className="stu-empty-mark">⌖</div>
           <h2>还没有可分析的比赛</h2>
-          <p>先在资料库导入 v2 ZIP。</p>
+          <p>先在资料库导入 v3 ZIP。</p>
           <button type="button" className="stu-button" onClick={onGoLibrary}>
             去资料库
           </button>

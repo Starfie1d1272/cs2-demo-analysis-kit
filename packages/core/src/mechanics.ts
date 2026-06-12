@@ -1,6 +1,7 @@
 import type { DemoPackage, PackageDamage } from "@cs2dak/contract";
 import { decodeDelta } from "@cs2dak/contract";
-import { killWeaponName, normalizeWeapon } from "./utils.js";
+import { createResolverFromPackage } from "./resolve.js";
+import { killWeaponName, normalizeWeapon, round } from "./utils.js";
 
 const BURST_GAP_MS = 250;
 
@@ -86,11 +87,6 @@ interface FlatShot {
   vy: number;
 }
 
-function round(value: number, digits = 1): number {
-  const factor = 10 ** digits;
-  return Math.round(value * factor) / factor;
-}
-
 function tickrateOf(pkg: DemoPackage): number {
   return pkg.match.tickrate || 64;
 }
@@ -152,6 +148,7 @@ function counterStrafePercent(shots: FlatShot[]): number | null {
 }
 
 export function derivePlayerMechanics(pkg: DemoPackage): PlayerMechanicsFact[] {
+  const resolver = createResolverFromPackage(pkg);
   if (!pkg.shots || pkg.shots.tracks.length === 0) return [];
   const tickrate = tickrateOf(pkg);
   const { weaponDict, tracks } = pkg.shots;
@@ -159,9 +156,9 @@ export function derivePlayerMechanics(pkg: DemoPackage): PlayerMechanicsFact[] {
   const killCounts = new Map<string, number>();
   for (const kill of pkg.kills) {
     if (kill.killerIndex === null) continue;
-    const killerTeam = pkg.players[kill.killerIndex]?.teamKey;
-    const victimTeam = pkg.players[kill.victimIndex]?.teamKey;
-    if (!killerTeam || killerTeam === victimTeam) continue;
+    const killerPlayer = resolver.byIndexOrNull(kill.killerIndex);
+    const victimPlayer = resolver.byIndexOrNull(kill.victimIndex);
+    if (!killerPlayer || !victimPlayer || killerPlayer.teamKey === victimPlayer.teamKey) continue;
     const weapon = normalizeWeapon(killWeaponName(kill));
     if (!isFirearmWeapon(weapon)) continue;
     const key = `${kill.killerIndex}:${weapon}`;
@@ -194,7 +191,7 @@ export function derivePlayerMechanics(pkg: DemoPackage): PlayerMechanicsFact[] {
       const colonIdx = key.indexOf(":");
       const playerIdx = parseInt(key.slice(0, colonIdx));
       const weapon = key.slice(colonIdx + 1);
-      const player = pkg.players[playerIdx];
+      const player = resolver.byIndexOrNull(playerIdx);
       const bursts = splitBursts(shots, tickrate);
       const firstShots = bursts.map((burst) => burst[0]!);
       const sprayShots = bursts.flatMap((burst) => burst.slice(3));

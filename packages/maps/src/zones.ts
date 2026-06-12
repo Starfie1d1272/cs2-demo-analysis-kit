@@ -4,7 +4,7 @@
  * 定位：把世界坐标的一个点映射到一个**有名字、有角色**的区域（A 点 / mid / banana …），
  * 供 Area（区域占有）、Utility Block（道具封锁）等空间指标使用。
  *
- * 坐标系：多边形顶点用**世界坐标 XY**（与 positions-1s / replay 的 position 同系），
+ * 坐标系：多边形顶点用**世界坐标 XY**（与 v3 replay 的 position 同系），
  * 分辨率无关、无需 radar 标定。多层地图（nuke / vertigo）用可选 [zMin, zMax] 区分上下层。
  *
  * 边界：本文件只做「点 → 区域」的几何归属，不算任何指标，不依赖 demo 数据。

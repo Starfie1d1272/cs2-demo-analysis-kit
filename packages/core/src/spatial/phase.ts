@@ -13,6 +13,8 @@
  */
 import type { DemoPackage } from "@cs2dak/contract";
 import { getMapRoutes, routeIndex, type MapRoutes } from "@cs2dak/maps";
+import { createResolverFromPackage } from "../resolve.js";
+import { groupBy } from "../utils.js";
 import type { RoundPhase, RoundPhaseModel } from "./types.js";
 
 type Round = DemoPackage["rounds"][number];
@@ -148,19 +150,9 @@ function computeTakeExecute(
   return { takeTick, executeTick };
 }
 
-function groupBy<T>(items: readonly T[], key: (item: T) => number): Map<number, T[]> {
-  const out = new Map<number, T[]>();
-  for (const item of items) {
-    const k = key(item);
-    const arr = out.get(k) ?? [];
-    arr.push(item);
-    out.set(k, arr);
-  }
-  return out;
-}
-
 /** 从 replay 8Hz 流提取回合阶段推导所需的简化位置行。 */
 function buildPositionRows(pkg: DemoPackage): PositionRow[] {
+  const resolver = createResolverFromPackage(pkg);
   const replay = pkg.replay;
   if (!replay) return [];
   const placeDict = replay.placeDict ?? [];
@@ -168,7 +160,7 @@ function buildPositionRows(pkg: DemoPackage): PositionRow[] {
   for (const round of replay.rounds) {
     const tickStep = round.tickStep;
     for (const track of round.players) {
-      const player = pkg.players[track.playerIndex];
+      const player = resolver.byIndexOrNull(track.playerIndex);
       if (!player) continue;
       for (let i = 0; i < track.x.length; i++) {
         const placeIdx = track.place[i] ?? -1;

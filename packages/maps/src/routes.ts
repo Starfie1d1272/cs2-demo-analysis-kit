@@ -1,12 +1,12 @@
 /**
  * map-routes — 进攻动线（T 方从匪家到包点的推进路径）
  *
- * 定位：一条动线 = 一串**有序的 CS2 callout 区域名**（= positions-1s 的
- * `lastPlaceName` 取值），从 T 出生区指向某个包点。控制进度 / 道具拖延都沿这条
+ * 定位：一条动线 = 一串**有序的 CS2 callout 区域名**（= replay `place` 列
+ * 对应的 placeDict 取值），从 T 出生区指向某个包点。控制进度 / 道具拖延都沿这条
  * 一维序列度量。
  *
- * 边界：动线**只引用 callout 名字，不含任何坐标**——区域归属由导出器写进
- * `lastPlaceName`，本层不做几何。需要把一个 callout 再切细（如 Palace 分上下）时
+ * 边界：动线**只引用 callout 名字，不含任何坐标**——区域归属由 v3 replay `place`
+ * 列提供，本层不做几何。需要把一个 callout 再切细（如 Palace 分上下）时
  * 才回到 `zones.ts` 的多边形层。本文件只定义结构 + 沿线定位，不算指标（指标在 core）。
  *
  * 数据：每张图一个 `packages/maps/map-routes/<map>.json`，由 `scripts/extract-routes.ts`

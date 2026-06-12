@@ -9,6 +9,7 @@ import type { CohortAccountResult, ProBaselineConfig, RRSixAccountResult } from 
 import { normalizeDemoPackage } from "./normalize.js";
 import { loadSpatialAssets } from "./spatial/annotate.js";
 import { buildOfficialMapControl } from "./spatial/mapcontrol.js";
+import { createResolverFromPackage, type PlayerResolver } from "./resolve.js";
 import {
   type BuyDeltaBuckets,
   type ManStateBuckets,
@@ -18,7 +19,7 @@ import {
   getOrInit,
   zeroBuyDelta,
   zeroManState,
-  clutchSplitV2,
+  clutchSplit,
   sumDamageForPlayer,
   openingKillsForPlayer,
   openingDeathsForPlayer,
@@ -31,12 +32,13 @@ export type AccountRatingResult = CohortAccountResult & Pick<RRSixAccountResult,
 
 export function deriveRRSignals(input: unknown): RRSignals[] {
   const pkg = normalizeDemoPackage(input);
+  const resolver = createResolverFromPackage(pkg);
   const statsMap = new Map(pkg.playerStats.map((row) => [row.playerIndex, row]));
-  const killsByBuyDelta = buildKillsByBuyDelta(pkg);
-  const killsByManState = buildKillsByManState(pkg);
-  const tradedOpeningDeaths = buildTradedOpeningDeaths(pkg);
-  const objective = buildObjectiveSignals(pkg);
-  const utility = buildUtilitySignals(pkg, statsMap);
+  const killsByBuyDelta = buildKillsByBuyDelta(pkg, resolver);
+  const killsByManState = buildKillsByManState(pkg, resolver);
+  const tradedOpeningDeaths = buildTradedOpeningDeaths(pkg, resolver);
+  const objective = buildObjectiveSignals(pkg, resolver);
+  const utility = buildUtilitySignals(pkg, statsMap, resolver);
 
   const buyDeltaAvailable = pkg.playerEconomies.length > 0;
   const manStateAvailable = pkg.rounds.length > 0;
@@ -92,11 +94,11 @@ export function deriveRRSignals(input: unknown): RRSignals[] {
         firstControlEvents: null
       },
       clutch: {
-        vsOne: clutchSplitV2(stats?.vsOneCount, stats?.vsOneWonCount, playerClutches, 1),
-        vsTwo: clutchSplitV2(stats?.vsTwoCount, stats?.vsTwoWonCount, playerClutches, 2),
-        vsThree: clutchSplitV2(stats?.vsThreeCount, stats?.vsThreeWonCount, playerClutches, 3),
-        vsFour: clutchSplitV2(stats?.vsFourCount, stats?.vsFourWonCount, playerClutches, 4),
-        vsFive: clutchSplitV2(stats?.vsFiveCount, stats?.vsFiveWonCount, playerClutches, 5)
+        vsOne: clutchSplit(stats?.vsOneCount, stats?.vsOneWonCount, playerClutches, 1),
+        vsTwo: clutchSplit(stats?.vsTwoCount, stats?.vsTwoWonCount, playerClutches, 2),
+        vsThree: clutchSplit(stats?.vsThreeCount, stats?.vsThreeWonCount, playerClutches, 3),
+        vsFour: clutchSplit(stats?.vsFourCount, stats?.vsFourWonCount, playerClutches, 4),
+        vsFive: clutchSplit(stats?.vsFiveCount, stats?.vsFiveWonCount, playerClutches, 5)
       },
       objective: objective.get(player.steamId64) ?? { plants: 0, defuses: 0, plantsConverted: 0 },
       utility: {
@@ -140,7 +142,7 @@ export function computeAccountRatingsV2(input: unknown): Array<{ signals: RRSign
   });
 }
 
-function buildKillsByBuyDelta(pkg: DemoPackage): Map<string, BuyDeltaBuckets> {
+function buildKillsByBuyDelta(pkg: DemoPackage, resolver: PlayerResolver): Map<string, BuyDeltaBuckets> {
   const out = new Map<string, BuyDeltaBuckets>();
   const economyByPlayerRound = new Map(pkg.playerEconomies.map((row) => [`${row.roundNumber}:${row.playerIndex}`, row]));
 
@@ -150,7 +152,7 @@ function buildKillsByBuyDelta(pkg: DemoPackage): Map<string, BuyDeltaBuckets> {
     const victimEconomy = economyByPlayerRound.get(`${kill.roundNumber}:${kill.victimIndex}`);
     if (!killerEconomy || !victimEconomy) continue;
 
-    const killerSteamId = pkg.players[kill.killerIndex]?.steamId64;
+    const killerSteamId = resolver.steamIdOf(kill.killerIndex);
     if (!killerSteamId) continue;
     const buckets = getOrInit(out, killerSteamId, zeroBuyDelta);
     const delta = killerEconomy.equipmentValue - victimEconomy.equipmentValue;
@@ -166,7 +168,7 @@ function buildKillsByBuyDelta(pkg: DemoPackage): Map<string, BuyDeltaBuckets> {
   return out;
 }
 
-function buildKillsByManState(pkg: DemoPackage): Map<string, ManStateBuckets> {
+function buildKillsByManState(pkg: DemoPackage, resolver: PlayerResolver): Map<string, ManStateBuckets> {
   const out = new Map<string, ManStateBuckets>();
   const teamAIndices = new Set(pkg.players.flatMap((p, i) => p.teamKey === "teamA" ? [i] : []));
   const teamBIndices = new Set(pkg.players.flatMap((p, i) => p.teamKey === "teamB" ? [i] : []));
@@ -180,14 +182,14 @@ function buildKillsByManState(pkg: DemoPackage): Map<string, ManStateBuckets> {
 
     for (const kill of roundKills) {
       if (kill.killerIndex === null) continue;
-      const killerTeam = pkg.players[kill.killerIndex]?.teamKey;
-      const victimTeam = pkg.players[kill.victimIndex]?.teamKey;
-      if (!killerTeam || !victimTeam || killerTeam === victimTeam) continue;
+      const killerPlayer = resolver.byIndexOrNull(kill.killerIndex);
+      const victimPlayer = resolver.byIndexOrNull(kill.victimIndex);
+      if (!killerPlayer || !victimPlayer || killerPlayer.teamKey === victimPlayer.teamKey) continue;
 
-      const killerSteamId = pkg.players[kill.killerIndex]!.steamId64;
+      const killerSteamId = killerPlayer.steamId64;
       const buckets = getOrInit(out, killerSteamId, zeroManState);
-      const killerAlive = killerTeam === "teamA" ? aliveA.size : aliveB.size;
-      const victimAlive = victimTeam === "teamA" ? aliveA.size : aliveB.size;
+      const killerAlive = killerPlayer.teamKey === "teamA" ? aliveA.size : aliveB.size;
+      const victimAlive = victimPlayer.teamKey === "teamA" ? aliveA.size : aliveB.size;
       const diff = killerAlive - victimAlive;
       if (diff < 0) {
         buckets.manDown += 1;
@@ -197,7 +199,7 @@ function buildKillsByManState(pkg: DemoPackage): Map<string, ManStateBuckets> {
         buckets.even += 1;
       }
 
-      if (victimTeam === "teamA") aliveA.delete(kill.victimIndex);
+      if (victimPlayer.teamKey === "teamA") aliveA.delete(kill.victimIndex);
       else aliveB.delete(kill.victimIndex);
     }
   }
@@ -205,30 +207,29 @@ function buildKillsByManState(pkg: DemoPackage): Map<string, ManStateBuckets> {
   return out;
 }
 
-function buildTradedOpeningDeaths(pkg: DemoPackage): Map<string, number> {
+function buildTradedOpeningDeaths(pkg: DemoPackage, resolver: PlayerResolver): Map<string, number> {
   const out = new Map<string, number>();
   for (const kill of firstKillMap(pkg).values()) {
     if (kill.tradeDeath) {
-      const victimSteamId = pkg.players[kill.victimIndex]?.steamId64;
+      const victimSteamId = resolver.steamIdOf(kill.victimIndex);
       if (victimSteamId) out.set(victimSteamId, (out.get(victimSteamId) ?? 0) + 1);
     }
   }
   return out;
 }
 
-function buildObjectiveSignals(pkg: DemoPackage): Map<string, ObjectiveBuckets> {
+function buildObjectiveSignals(pkg: DemoPackage, resolver: PlayerResolver): Map<string, ObjectiveBuckets> {
   const out = new Map<string, ObjectiveBuckets>();
   const roundWinner = new Map(pkg.rounds.map((round) => [round.roundNumber, round.winnerTeamKey]));
 
   for (const bomb of pkg.bombs) {
     if (bomb.actorIndex === null) continue;
-    const actorSteamId = pkg.players[bomb.actorIndex]?.steamId64;
-    if (!actorSteamId) continue;
-    const buckets = getOrInit(out, actorSteamId, () => ({ plants: 0, defuses: 0, plantsConverted: 0 }));
+    const actorPlayer = resolver.byIndexOrNull(bomb.actorIndex);
+    if (!actorPlayer) continue;
+    const buckets = getOrInit(out, actorPlayer.steamId64, () => ({ plants: 0, defuses: 0, plantsConverted: 0 }));
     if (bomb.type === "planted") {
       buckets.plants += 1;
-      const actorTeamKey = pkg.players[bomb.actorIndex]?.teamKey;
-      if (actorTeamKey && roundWinner.get(bomb.roundNumber) === actorTeamKey) {
+      if (roundWinner.get(bomb.roundNumber) === actorPlayer.teamKey) {
         buckets.plantsConverted = (buckets.plantsConverted ?? 0) + 1;
       }
     } else if (bomb.type === "defused") {
@@ -239,7 +240,7 @@ function buildObjectiveSignals(pkg: DemoPackage): Map<string, ObjectiveBuckets> 
   return out;
 }
 
-function buildUtilitySignals(pkg: DemoPackage, statsMap: Map<number, DemoPackage["playerStats"][number]>): Map<string, UtilityBuckets> {
+function buildUtilitySignals(pkg: DemoPackage, statsMap: Map<number, DemoPackage["playerStats"][number]>, resolver: PlayerResolver): Map<string, UtilityBuckets> {
   const out = new Map<string, UtilityBuckets>();
 
   pkg.players.forEach((player, playerIdx) => {
@@ -258,9 +259,9 @@ function buildUtilitySignals(pkg: DemoPackage, statsMap: Map<number, DemoPackage
   });
 
   for (const blind of pkg.blinds) {
-    const flasherSteamId = pkg.players[blind.flasherIndex]?.steamId64;
-    if (!flasherSteamId) continue;
-    const buckets = getOrInit(out, flasherSteamId, () => ({
+    const flasherPlayer = resolver.byIndexOrNull(blind.flasherIndex);
+    if (!flasherPlayer) continue;
+    const buckets = getOrInit(out, flasherPlayer.steamId64, () => ({
       flashAssists: 0,
       effectiveEnemyFlashSeconds: 0,
       teamFlashSuppressionSeconds: 0,
@@ -271,9 +272,9 @@ function buildUtilitySignals(pkg: DemoPackage, statsMap: Map<number, DemoPackage
       incendiaryDisplacementEvents: null,
       utilityDamage: 0
     }));
-    const flasherTeam = pkg.players[blind.flasherIndex]?.teamKey;
-    const flashedTeam = pkg.players[blind.flashedIndex]?.teamKey;
-    if (flasherTeam !== flashedTeam) {
+    const flashedPlayer = resolver.byIndexOrNull(blind.flashedIndex);
+    if (!flashedPlayer) continue;
+    if (flasherPlayer.teamKey !== flashedPlayer.teamKey) {
       buckets.effectiveEnemyFlashSeconds = round((buckets.effectiveEnemyFlashSeconds ?? 0) + blind.durationSeconds, 3);
     } else if (blind.flashedIndex !== blind.flasherIndex) {
       buckets.teamFlashSuppressionSeconds = round((buckets.teamFlashSuppressionSeconds ?? 0) + blind.durationSeconds, 3);
