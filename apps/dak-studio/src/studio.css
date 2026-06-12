@@ -518,6 +518,50 @@ body {
   line-height: 1.6;
 }
 
+.stu-empty-error h2 {
+  color: var(--dak-danger);
+}
+
+/* ⓘ 口径说明（MetricInfo 原语） */
+.stu-info {
+  position: relative;
+  display: inline-block;
+  margin-left: 4px;
+  color: var(--dak-fg-dim);
+  font-size: 11px;
+  cursor: help;
+}
+
+.stu-info-tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%) translateY(2px);
+  z-index: 30;
+  width: max-content;
+  max-width: 300px;
+  padding: 8px 10px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-bg-subtle);
+  color: var(--dak-fg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .35);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: normal;
+  text-transform: none;
+  letter-spacing: normal;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s ease, transform .12s ease;
+}
+
+.stu-info:hover .stu-info-tip,
+.stu-info:focus-visible .stu-info-tip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 .stu-bulk-count {
   color: var(--dak-accent);
   font-size: 13px;
@@ -1639,17 +1683,18 @@ body {
 }
 
 .stu-evidence {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: inherit;
+  background: var(--dak-panel);
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius-sm);
+  color: var(--dak-accent);
   font-size: 12px;
   padding: 4px 8px;
   cursor: pointer;
 }
 
 .stu-evidence:hover:not(:disabled) {
-  border-color: rgba(47, 224, 168, 0.5);
+  border-color: var(--dak-border-hi);
+  background: var(--dak-panel-hi);
 }
 
 .stu-evidence:disabled {

@@ -10,6 +10,7 @@ import { getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "
 import { formatMatchLabel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
+import { EmptyState, EvidenceLink, MetricInfo } from "../components/primitives";
 
 export interface PlayersViewProps {
   allEntries: StudioDemoEntry[];
@@ -129,14 +130,12 @@ export function PlayersView({
   if (allEntries.length === 0) {
     return (
       <div className="stu-view">
-        <div className="stu-empty">
-          <div className="stu-empty-mark">⌖</div>
-          <h2>还没有选手数据</h2>
-          <p>选手档案由资料库内 demo 聚合而成，先导入几场比赛。</p>
-          <button type="button" className="stu-button" onClick={onGoLibrary}>
-            去资料库
-          </button>
-        </div>
+        <EmptyState
+          mark
+          title="还没有选手数据"
+          hint="选手档案由资料库内 demo 聚合而成，先导入几场比赛。"
+          action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
+        />
       </div>
     );
   }
@@ -147,10 +146,7 @@ export function PlayersView({
     return (
       <div className="stu-view">
         {scopePanel}
-        <div className="stu-empty">
-          <h2>聚合失败</h2>
-          <p>{error}</p>
-        </div>
+        <EmptyState variant="error" title="聚合失败" hint={error} />
       </div>
     );
   }
@@ -158,10 +154,7 @@ export function PlayersView({
     return (
       <div className="stu-view">
         {scopePanel}
-        <div className="stu-empty">
-          <h2>聚合范围为空</h2>
-          <p>当前过滤条件没有命中任何 demo，请调整聚合范围。</p>
-        </div>
+        <EmptyState variant="insufficient" title="聚合范围为空" hint="当前过滤条件没有命中任何 demo，请调整聚合范围。" />
       </div>
     );
   }
@@ -402,16 +395,13 @@ export function PlayersView({
                     <h4 className="stu-subhead">最严重队闪</h4>
                     <div className="stu-evidence-list">
                       {insights.flash.worstTeamFlashes.slice(0, 5).map((incident, i) => (
-                        <button
+                        <EvidenceLink
                           key={`${incident.matchId}-${incident.roundNumber}-${i}`}
-                          type="button"
-                          className="stu-evidence"
                           disabled={!entryByMatchId.get(incident.matchId)}
-                          onClick={() => { const e = entryByMatchId.get(incident.matchId); if (e) onOpenMatch(e.id, { roundNumber: incident.roundNumber, tick: incident.tick }); }}
-                          title="打开该场比赛复盘"
+                          onOpen={() => { const e = entryByMatchId.get(incident.matchId); if (e) onOpenMatch(e.id, { roundNumber: incident.roundNumber, tick: incident.tick }); }}
                         >
                           {formatMatchLabel(entryByMatchId.get(incident.matchId)!)} · R{incident.roundNumber} · 闪到 {incident.victimCount} 名队友 {incident.totalSeconds.toFixed(1)}s
-                        </button>
+                        </EvidenceLink>
                       ))}
                     </div>
                   </>
@@ -423,21 +413,21 @@ export function PlayersView({
               <div className="stu-card">
                 <h3>Mistake Review</h3>
                 <div className="stu-metric-grid">
-                  <div className="stu-metric" title="我方 full 局该选手首死——最值得复盘的失误信号">
-                    <span>长枪局首死</span>
+                  <div className="stu-metric">
+                    <span>长枪局首死<MetricInfo note="我方 full 局该选手首死——最值得复盘的失误信号" /></span>
                     <b>{insights.mistakes.fullBuyFirstDeaths.count}/{insights.mistakes.fullBuyFirstDeaths.attempts} 局</b>
                   </div>
-                  <div className="stu-metric" title="对手 eco/semi 局该选手首死（优势局被换掉）">
-                    <span>Anti-eco 首死</span>
+                  <div className="stu-metric">
+                    <span>Anti-eco 首死<MetricInfo note="对手 eco/semi 局该选手首死（优势局被换掉）" /></span>
                     <b>{insights.mistakes.antiEcoFirstDeaths.count}/{insights.mistakes.antiEcoFirstDeaths.attempts} 局</b>
                   </div>
-                  <div className="stu-metric" title="eco/半起/强起局中该选手首死（劣势经济，参考为主）">
-                    <span>劣势经济首死</span>
+                  <div className="stu-metric">
+                    <span>劣势经济首死<MetricInfo note="eco/半起/强起局中该选手首死（劣势经济，参考为主）" /></span>
                     <b>{insights.mistakes.lowBuyFirstDeaths.count}/{insights.mistakes.lowBuyFirstDeaths.attempts} 局</b>
                   </div>
                   <div className="stu-metric"><span>残局失利</span><b>{insights.mistakes.clutchLosses.count}</b></div>
-                  <div className="stu-metric" title="开局 20 秒内 / 中段 / 50 秒后">
-                    <span>死亡分布</span>
+                  <div className="stu-metric">
+                    <span>死亡分布<MetricInfo note="开局 20 秒内 / 中段 / 50 秒后" /></span>
                     <b>
                       {insights.mistakes.deathTiming.total > 0
                         ? `${insights.mistakes.deathTiming.early}早/${insights.mistakes.deathTiming.mid}中/${insights.mistakes.deathTiming.late}晚`
@@ -448,16 +438,13 @@ export function PlayersView({
                 {[...insights.mistakes.fullBuyFirstDeaths.evidence, ...insights.mistakes.antiEcoFirstDeaths.evidence, ...insights.mistakes.clutchLosses.evidence].length > 0 && (
                   <div className="stu-evidence-list">
                     {[...insights.mistakes.fullBuyFirstDeaths.evidence.slice(0, 3), ...insights.mistakes.antiEcoFirstDeaths.evidence.slice(0, 3), ...insights.mistakes.clutchLosses.evidence.slice(0, 3)].map((evidence, i) => (
-                      <button
+                      <EvidenceLink
                         key={`${evidence.matchId}-${evidence.roundNumber}-${i}`}
-                        type="button"
-                        className="stu-evidence"
                         disabled={!entryByMatchId.get(evidence.matchId)}
-                        onClick={() => { const e = entryByMatchId.get(evidence.matchId); if (e) onOpenMatch(e.id, { roundNumber: evidence.roundNumber, tick: evidence.tick }); }}
-                        title="打开该场比赛复盘"
+                        onOpen={() => { const e = entryByMatchId.get(evidence.matchId); if (e) onOpenMatch(e.id, { roundNumber: evidence.roundNumber, tick: evidence.tick }); }}
                       >
                         {formatMatchLabel(entryByMatchId.get(evidence.matchId)!)} · R{evidence.roundNumber} · {evidence.detail}
-                      </button>
+                      </EvidenceLink>
                     ))}
                   </div>
                 )}

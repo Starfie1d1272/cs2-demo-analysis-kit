@@ -3,6 +3,7 @@ import { formatPercent, type TournamentInsights } from "@cs2dak/presentation";
 import { getTournamentInsights, type IdentityOptions } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
+import { EmptyState, MetricInfo } from "../components/primitives";
 
 export interface TournamentDashboardViewProps {
   allEntries: StudioDemoEntry[];
@@ -50,12 +51,12 @@ export function TournamentDashboardView({
   if (allEntries.length === 0) {
     return (
       <div className="stu-view">
-        <div className="stu-empty">
-          <div className="stu-empty-mark">⌖</div>
-          <h2>还没有赛事数据</h2>
-          <p>赛事总览由资料库内 demo 聚合而成，先导入比赛。</p>
-          <button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>
-        </div>
+        <EmptyState
+          mark
+          title="还没有赛事数据"
+          hint="赛事总览由资料库内 demo 聚合而成，先导入比赛。"
+          action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
+        />
       </div>
     );
   }
@@ -71,9 +72,9 @@ export function TournamentDashboardView({
         </div>
       </header>
       {scopePanel}
-      {error && <div className="stu-empty"><h2>聚合失败</h2><p>{error}</p></div>}
+      {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && !insights && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo…</div>}
-      {!error && entries.length === 0 && <div className="stu-empty"><h2>聚合范围为空</h2><p>请调整聚合范围。</p></div>}
+      {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
       {insights && (
         <>
           <div className="stu-metric-grid stu-card">
@@ -81,8 +82,8 @@ export function TournamentDashboardView({
             <div className="stu-metric"><span>总回合</span><b>{insights.roundCount}</b></div>
             <div className="stu-metric"><span>T 胜率</span><b>{insights.tWinRatePercent.toFixed(1)}%</b></div>
             <div className="stu-metric"><span>CT 胜率</span><b>{insights.ctWinRatePercent.toFixed(1)}%</b></div>
-            <div className="stu-metric" title="赢下手枪局后把下一回合也拿下的比率">
-              <span>手枪局转化</span>
+            <div className="stu-metric">
+              <span>手枪局转化<MetricInfo note="赢下手枪局后把下一回合也拿下的比率" /></span>
               <b>{formatPercent(insights.pistolConversionPercent)}</b>
             </div>
           </div>
@@ -142,7 +143,7 @@ export function TournamentDashboardView({
                   <th>队伍</th>
                   <th className="stu-num">手枪胜率</th>
                   <th className="stu-num">第二局转化</th>
-                  <th className="stu-num" title="对手赢手枪局后，该队赢了下一回合（次局）的比率">反转换</th>
+                  <th className="stu-num">反转换<MetricInfo note="对手赢手枪局后，该队赢了下一回合（次局）的比率" /></th>
                 </tr>
               </thead>
               <tbody>
@@ -171,7 +172,7 @@ export function TournamentDashboardView({
                   <th>低经济方</th>
                   <th>高经济方</th>
                   <th className="stu-num">样本</th>
-                  <th className="stu-num" title="同档对局对称，不出胜率">低经济方胜率</th>
+                  <th className="stu-num">低经济方胜率<MetricInfo note="同档对局对称，不出胜率" /></th>
                 </tr>
               </thead>
               <tbody>

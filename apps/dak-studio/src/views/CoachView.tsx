@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { buildOpeningPatternClusters, type OpeningPatternCluster } from "@cs2dak/cohort";
 import { CALLOUT_NAME_CN } from "@cs2dak/maps";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
+import { EmptyState } from "../components/primitives";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
 import { getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import {
@@ -113,11 +114,12 @@ export function CoachView({
   if (allEntries.length === 0) {
     return (
       <div className="stu-view">
-        <div className="stu-empty">
-          <h2>还没有教练数据</h2>
-          <p>先导入多场 demo，再沉淀开局模式、战术本和备战报告。</p>
-          <button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>
-        </div>
+        <EmptyState
+          mark
+          title="还没有教练数据"
+          hint="先导入多场 demo，再沉淀开局模式、战术本和备战报告。"
+          action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
+        />
       </div>
     );
   }
@@ -154,8 +156,8 @@ export function CoachView({
           </button>
         ))}
       </div>
-      {error && <div className="stu-empty"><h2>聚合失败</h2><p>{error}</p></div>}
-      {!error && entries.length === 0 && <div className="stu-empty"><h2>聚合范围为空</h2><p>请调整聚合范围。</p></div>}
+      {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
+      {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
       {!error && !clusters && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的开局 pattern…</div>}
       {clusters && tab === "patterns" && <PatternTable clusters={clusters} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} />}
       {clusters && tab === "playbook" && (

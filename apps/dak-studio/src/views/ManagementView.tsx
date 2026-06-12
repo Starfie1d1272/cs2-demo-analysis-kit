@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SeasonCohortBundle } from "@cs2dak/contract";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
+import { EmptyState } from "../components/primitives";
 import { getSeasonSummary, type IdentityOptions } from "../lib/season";
 import {
   buildCohortIdentityMap,
@@ -177,12 +178,12 @@ export function ManagementView({
   if (allEntries.length === 0) {
     return (
       <div className="stu-view">
-        <div className="stu-empty">
-          <div className="stu-empty-mark">⌖</div>
-          <h2>还没有选手数据</h2>
-          <p>先导入几场 demo，才能管理选手身份。</p>
-          <button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>
-        </div>
+        <EmptyState
+          mark
+          title="还没有选手数据"
+          hint="先导入几场 demo，才能管理选手身份。"
+          action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
+        />
       </div>
     );
   }

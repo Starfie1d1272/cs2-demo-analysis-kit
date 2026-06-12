@@ -4,6 +4,7 @@ import { SeasonLeaderboard } from "@cs2dak/react";
 import { getSeasonSummary, type IdentityOptions } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
+import { EmptyState } from "../components/primitives";
 
 export interface LeaderboardViewProps {
   allEntries: StudioDemoEntry[];
@@ -43,14 +44,12 @@ export function LeaderboardView({ allEntries, entries, scope, onScopeChange, onP
   if (allEntries.length === 0) {
     return (
       <div className="stu-view">
-        <div className="stu-empty">
-          <div className="stu-empty-mark">⌖</div>
-          <h2>还没有排行数据</h2>
-          <p>排行榜由资料库内 demo 聚合而成，先导入几场比赛。</p>
-          <button type="button" className="stu-button" onClick={onGoLibrary}>
-            去资料库
-          </button>
-        </div>
+        <EmptyState
+          mark
+          title="还没有排行数据"
+          hint="排行榜由资料库内 demo 聚合而成，先导入几场比赛。"
+          action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
+        />
       </div>
     );
   }
@@ -70,15 +69,9 @@ export function LeaderboardView({ allEntries, entries, scope, onScopeChange, onP
       </header>
       {scopePanel}
       {error ? (
-        <div className="stu-empty">
-          <h2>聚合失败</h2>
-          <p>{error}</p>
-        </div>
+        <EmptyState variant="error" title="聚合失败" hint={error} />
       ) : entries.length === 0 ? (
-        <div className="stu-empty">
-          <h2>聚合范围为空</h2>
-          <p>当前过滤条件没有命中任何 demo，请调整聚合范围。</p>
-        </div>
+        <EmptyState variant="insufficient" title="聚合范围为空" hint="当前过滤条件没有命中任何 demo，请调整聚合范围。" />
       ) : !model ? (
         <div className="stu-loading">聚合 {entries.length} 场 demo，构建排行榜…</div>
       ) : (

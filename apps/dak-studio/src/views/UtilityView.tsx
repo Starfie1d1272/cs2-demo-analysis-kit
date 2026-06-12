@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
+import { EmptyState, EvidenceLink } from "../components/primitives";
 import { getPlayerFlashSummaries, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { formatMatchLabel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 
@@ -85,11 +86,12 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
   if (allEntries.length === 0) {
     return (
       <div className="stu-view">
-        <div className="stu-empty">
-          <h2>还没有道具数据</h2>
-          <p>先导入 demo，再查看跨场 Flash Value 与负收益道具。</p>
-          <button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>
-        </div>
+        <EmptyState
+          mark
+          title="还没有道具数据"
+          hint="先导入 demo，再查看跨场 Flash Value 与负收益道具。"
+          action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
+        />
       </div>
     );
   }
@@ -103,9 +105,9 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
         </div>
       </header>
       <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />
-      {error && <div className="stu-empty"><h2>聚合失败</h2><p>{error}</p></div>}
+      {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && !rows && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的道具数据…</div>}
-      {!error && entries.length === 0 && <div className="stu-empty"><h2>聚合范围为空</h2><p>请调整聚合范围。</p></div>}
+      {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
       {rows && (
         <div className="stu-card">
           <h3>Flash Value 排行</h3>
@@ -132,15 +134,13 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
             {incidents.map((incident, index) => {
               const entry = entryByMatchId.get(incident.matchId);
               return (
-                <button
+                <EvidenceLink
                   key={`${incident.matchId}-${incident.roundNumber}-${index}`}
-                  type="button"
-                  className="stu-evidence"
                   disabled={!entry}
-                  onClick={() => entry && onOpenMatch(entry.id, { roundNumber: incident.roundNumber, tick: incident.tick })}
+                  onOpen={() => entry && onOpenMatch(entry.id, { roundNumber: incident.roundNumber, tick: incident.tick })}
                 >
                   {incident.playerName} · {entry ? formatMatchLabel(entry) : incident.matchId} · R{incident.roundNumber} · {incident.victimCount} 人 {incident.totalSeconds.toFixed(1)}s
-                </button>
+                </EvidenceLink>
               );
             })}
           </div>

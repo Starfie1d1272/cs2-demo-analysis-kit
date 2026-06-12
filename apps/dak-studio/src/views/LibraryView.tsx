@@ -2,6 +2,7 @@ import { FolderOpen, Play, RotateCw, Tag as TagIcon, Trash2 } from "lucide-react
 import { useMemo, useState, type ChangeEvent } from "react";
 import { matchDateFromFileName, type StudioDemoEntry } from "../lib/library";
 import { parseTags } from "../lib/tags";
+import { EmptyState } from "../components/primitives";
 
 export interface LibraryViewProps {
   entries: StudioDemoEntry[];
@@ -250,14 +251,16 @@ export function LibraryView({
       )}
 
       {entries.length === 0 ? (
-        <div className="stu-empty">
-          <div className="stu-empty-mark">⌖</div>
-          <h2>资料库为空</h2>
-          <p>把 .dem 或 v3 ZIP 拖进窗口，或点右上角「导入 demo」。</p>
-          <button type="button" className="stu-button stu-button-ghost" onClick={onLoadSample} disabled={importing}>
-            加载示例
-          </button>
-        </div>
+        <EmptyState
+          mark
+          title="资料库为空"
+          hint="把 .dem 或 v3 ZIP 拖进窗口，或点右上角「导入 demo」。"
+          action={
+            <button type="button" className="stu-button stu-button-ghost" onClick={onLoadSample} disabled={importing}>
+              加载示例
+            </button>
+          }
+        />
       ) : (
         <div className="stu-table-wrap">
           <table className="stu-table">

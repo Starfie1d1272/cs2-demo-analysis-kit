@@ -4,6 +4,7 @@ import { buildMatchWorkspaceModel } from "@cs2dak/presentation";
 import type { MatchWorkspaceModel } from "@cs2dak/contract";
 import { MatchWorkspace, QaReportPanel } from "@cs2dak/react";
 import { getDemoPackage, matchDateFromFileName, type StudioDemoEntry } from "../lib/library";
+import { EmptyState } from "../components/primitives";
 
 export interface MatchViewProps {
   entries: StudioDemoEntry[];
@@ -69,14 +70,12 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onGoLibrary
   if (entries.length === 0) {
     return (
       <div className="stu-view">
-        <div className="stu-empty">
-          <div className="stu-empty-mark">⌖</div>
-          <h2>还没有可分析的比赛</h2>
-          <p>先在资料库导入 v3 ZIP。</p>
-          <button type="button" className="stu-button" onClick={onGoLibrary}>
-            去资料库
-          </button>
-        </div>
+        <EmptyState
+          mark
+          title="还没有可分析的比赛"
+          hint="先在资料库导入 v3 ZIP。"
+          action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
+        />
       </div>
     );
   }
@@ -124,10 +123,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onGoLibrary
         </div>
       )}
       {error ? (
-        <div className="stu-empty">
-          <h2>加载失败</h2>
-          <p>{error}</p>
-        </div>
+        <EmptyState variant="error" title="加载失败" hint={error} />
       ) : !model ? (
         <div className="stu-loading">解析 demo 包并构建工作台…</div>
       ) : (

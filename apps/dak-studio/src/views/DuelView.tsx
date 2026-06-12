@@ -3,6 +3,7 @@ import type { DuelFinderRow, DuelInsightsModel, PlayerMechanicsRow } from "@cs2d
 import { buildDuelInsights, displayWeaponName, duelClassificationLabel } from "@cs2dak/presentation";
 import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
+import { EmptyState } from "../components/primitives";
 import { displayTeamName } from "../lib/identity";
 import { getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 
@@ -77,11 +78,12 @@ export function DuelView({
   if (allEntries.length === 0) {
     return (
       <div className="stu-view">
-        <div className="stu-empty">
-          <h2>还没有对枪数据</h2>
-          <p>先导入带逐枪数据的 v3 ZIP，再查看对枪和机制指标。</p>
-          <button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>
-        </div>
+        <EmptyState
+          mark
+          title="还没有对枪数据"
+          hint="先导入带逐枪数据的 v3 ZIP，再查看对枪和机制指标。"
+          action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
+        />
       </div>
     );
   }
@@ -138,8 +140,8 @@ export function DuelView({
         ))}
       </div>
 
-      {error && <div className="stu-empty"><h2>分析失败</h2><p>{error}</p></div>}
-      {!error && entries.length === 0 && <div className="stu-empty"><h2>聚合范围为空</h2><p>请调整聚合范围。</p></div>}
+      {error && <EmptyState variant="error" title="分析失败" hint={error} />}
+      {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
       {!error && !model && entries.length > 0 && <div className="stu-loading">分析 {entries.length} 场 demo 的逐枪与伤害事件…</div>}
 
       {model && tab === "overview" && (

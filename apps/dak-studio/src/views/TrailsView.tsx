@@ -6,6 +6,7 @@ import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
 import { getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer } from "../lib/pin";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
+import { EmptyState } from "../components/primitives";
 
 /**
  * 开局动线：选手在长枪局开局前 N 秒的走位 + 道具投掷叠加动画。
@@ -204,14 +205,12 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
   if (allEntries.length === 0) {
     return (
       <div className="stu-view">
-        <div className="stu-empty">
-          <div className="stu-empty-mark">⌖</div>
-          <h2>还没有动线数据</h2>
-          <p>开局动线需要含回放流的 v3 ZIP，先导入几场比赛。</p>
-          <button type="button" className="stu-button" onClick={onGoLibrary}>
-            去资料库
-          </button>
-        </div>
+        <EmptyState
+          mark
+          title="还没有动线数据"
+          hint="开局动线需要含回放流的 v3 ZIP，先导入几场比赛。"
+          action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
+        />
       </div>
     );
   }
@@ -298,22 +297,22 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
       </div>
 
       {error ? (
-        <div className="stu-empty">
-          <h2>构建失败</h2>
-          <p>{error}</p>
-        </div>
+        <EmptyState variant="error" title="构建失败" hint={error} />
       ) : !models || !players ? (
         <div className="stu-loading">提取 {rangeEntries.length} 场回放轨迹…</div>
       ) : visibleRounds.length === 0 ? (
-        <div className="stu-empty">
-          <h2>没有可叠加的回合</h2>
-          <p>
-            {mapName
-              ? `${selectedPlayer?.name ?? "该选手"} 在 ${mapName} 的 ${side.toUpperCase()} 方没有含回放的长枪局。试试切换阵营、地图或扩大范围。`
-              : "该范围内没有含回放流的长枪局。"}
-            {missingReplay.length > 0 && ` 注意：${missingReplay.join("、")} 不含回放流。`}
-          </p>
-        </div>
+        <EmptyState
+          variant="insufficient"
+          title="没有可叠加的回合"
+          hint={
+            <>
+              {mapName
+                ? `${selectedPlayer?.name ?? "该选手"} 在 ${mapName} 的 ${side.toUpperCase()} 方没有含回放的长枪局。试试切换阵营、地图或扩大范围。`
+                : "该范围内没有含回放流的长枪局。"}
+              {missingReplay.length > 0 && ` 注意：${missingReplay.join("、")} 不含回放流。`}
+            </>
+          }
+        />
       ) : (
         <TrailStage
           key={`${mapName}-${side}-${steamId64}-${visibleRounds.length}`}

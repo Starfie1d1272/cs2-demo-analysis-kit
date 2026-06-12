@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { formatPercent, type TournamentInsights } from "@cs2dak/presentation";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
+import { EmptyState } from "../components/primitives";
 import { getTournamentInsights, type IdentityOptions } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";
 
@@ -41,11 +42,12 @@ export function EconomyView({ allEntries, entries, scope, onScopeChange, onGoLib
   if (allEntries.length === 0) {
     return (
       <div className="stu-view">
-        <div className="stu-empty">
-          <h2>还没有经济数据</h2>
-          <p>先导入 demo，再查看经济矩阵、手枪转化和 eco 翻盘。</p>
-          <button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>
-        </div>
+        <EmptyState
+          mark
+          title="还没有经济数据"
+          hint="先导入 demo，再查看经济矩阵、手枪转化和 eco 翻盘。"
+          action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
+        />
       </div>
     );
   }
@@ -59,9 +61,9 @@ export function EconomyView({ allEntries, entries, scope, onScopeChange, onGoLib
         </div>
       </header>
       <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />
-      {error && <div className="stu-empty"><h2>聚合失败</h2><p>{error}</p></div>}
+      {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && !insights && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的经济数据…</div>}
-      {!error && entries.length === 0 && <div className="stu-empty"><h2>聚合范围为空</h2><p>请调整聚合范围。</p></div>}
+      {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
       {insights && (
         <EconomyDashboard insights={insights} />
       )}
