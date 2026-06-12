@@ -1259,11 +1259,14 @@ function roundFactTags(fact: MatchWorkspaceModel["players"][number]["roundFacts"
 
 /** 渲染 HP 条 + 护甲底色（HP 条盖在护甲层上；护甲层满宽时可区分全甲 vs 半甲）。 */
 function renderHpArmor(frame: WorkspaceReplayFrame) {
+  const armorColor = frame.armor >= 100 ? "var(--dak-accent)" : "var(--dak-accent-b)";
   return (
-    <div className="dak-hp-bar-wrap" title={`${frame.hp} HP · 护甲 ${frame.armor}`}>
-      <div className="dak-hp-bar" style={{ width: `${frame.hp}%`, background: hpBarColor(frame.hp) }} />
+    <div className="dak-hp-bar-wrap" title={`${frame.hp} HP · 护甲 ${frame.armor}${frame.armor >= 100 ? " (全甲)" : ""}`}>
+      <div className="dak-hp-bar-track">
+        <div className="dak-hp-bar" style={{ width: `${frame.hp}%`, background: hpBarColor(frame.hp) }} />
+      </div>
       {frame.armor > 0 && (
-        <div className="dak-armor-bar" style={{ width: `${frame.armor >= 100 ? 100 : frame.armor}%` }} />
+        <div className="dak-armor-bar" style={{ width: `${frame.armor}%`, background: armorColor }} />
       )}
     </div>
   );

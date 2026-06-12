@@ -1580,7 +1580,7 @@
 }
 
 .dak-frame-player-row small {
-  grid-column: 2 / 5;
+  grid-column: 1 / -1;
   color: var(--dak-fg-dim);
   font-family: var(--dak-mono);
 }
@@ -1590,27 +1590,35 @@
 }
 
 .dak-hp-bar-wrap {
-  position: relative;
-  height: 8px;
+  /* 垂直叠层：HP 条（6px）+ 护甲条（2px），之间 1px 间隙，不重叠 */
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  height: 9px;
+}
+
+.dak-hp-bar-track {
+  flex: none;
+  height: 6px;
+  border-radius: 2px;
   background: rgba(238, 243, 248, 0.08);
-  border-radius: 3px;
   overflow: hidden;
 }
 
-/* 护甲底色层：填 HP 容器整个底部背景，HP 条盖在上面 */
-.dak-armor-bar {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  height: 100%;
-  background: var(--dak-accent-b);
-  opacity: 0.35;
+.dak-hp-bar {
+  flex: none;
+  height: 6px;
+  border-radius: 2px;
+  transition: width 80ms linear, background 200ms ease;
 }
 
-.dak-hp-bar {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 80ms linear, background 200ms ease;
+/* 护甲独立细条：在 HP 下方，不覆盖 */
+.dak-armor-bar {
+  flex: none;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--dak-accent-b);
+  transition: width 80ms linear;
 }
 
 .dak-team-dot-teamA {
