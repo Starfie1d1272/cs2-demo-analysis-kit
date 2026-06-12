@@ -11,6 +11,7 @@ export interface TournamentDashboardViewProps {
   onScopeChange: (scope: CohortScopeState) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
+  teamRenames?: Record<string, string>;
 }
 
 /** v0.3 赛事总览：地图使用率、T/CT 胜率、手枪局与转化（cohort 同源聚合）。 */
@@ -20,7 +21,8 @@ export function TournamentDashboardView({
   scope,
   onScopeChange,
   onGoLibrary,
-  identityOptions
+  identityOptions,
+  teamRenames = {}
 }: TournamentDashboardViewProps) {
   const [insights, setInsights] = useState<TournamentInsights | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export function TournamentDashboardView({
     );
   }
 
-  const scopePanel = <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} />;
+  const scopePanel = <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />;
 
   return (
     <div className="stu-view">

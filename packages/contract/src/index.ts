@@ -10,3 +10,5 @@ export * from "./team.js";
 export * from "./series.js";
 export * from "./workspace.js";
 export * from "./trails.js";
+export * from "./duel.js";
+export * from "./veto.js";

@@ -11,9 +11,10 @@ export interface UtilityViewProps {
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
+  teamRenames?: Record<string, string>;
 }
 
-export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenMatch, onGoLibrary, identityOptions }: UtilityViewProps) {
+export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenMatch, onGoLibrary, identityOptions, teamRenames = {} }: UtilityViewProps) {
   const [rows, setRows] = useState<{
     playerKey: string;
     name: string;
@@ -101,7 +102,7 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
           <p>跨场 Flash Value 与负收益队闪证据，点击证据可回到对应回合/tick。</p>
         </div>
       </header>
-      <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} />
+      <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />
       {error && <div className="stu-empty"><h2>聚合失败</h2><p>{error}</p></div>}
       {!error && !rows && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的道具数据…</div>}
       {!error && entries.length === 0 && <div className="stu-empty"><h2>聚合范围为空</h2><p>请调整聚合范围。</p></div>}

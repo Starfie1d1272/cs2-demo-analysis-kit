@@ -18,6 +18,7 @@ export interface TrailsViewProps {
   scope: CohortScopeState;
   onScopeChange: (scope: CohortScopeState) => void;
   onGoLibrary: () => void;
+  teamRenames?: Record<string, string>;
 }
 
 const WINDOW_SECONDS = 30;
@@ -68,7 +69,7 @@ const EFFECT_DURATION_SECONDS: Partial<Record<string, number>> = {
   decoy: 15
 };
 
-export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibrary }: TrailsViewProps) {
+export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibrary, teamRenames = {} }: TrailsViewProps) {
   const [rangeN, setRangeN] = useState<number>(5);
   /** 范围基准：地图最近 N 场，或该选手在该图的最近 N 场。 */
   const [rangeBasis, setRangeBasis] = useState<"map" | "player">("map");
@@ -228,7 +229,7 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
         </div>
       </header>
 
-      <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} />
+      <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />
 
       <div className="stu-trail-controls">
         <label>

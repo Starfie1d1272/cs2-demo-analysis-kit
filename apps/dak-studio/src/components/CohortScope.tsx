@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp, Filter } from "lucide-react";
 import { useMemo, useState } from "react";
 import { matchDateFromFileName, type StudioDemoEntry } from "../lib/library";
+import { displayTeamName, originalTeamNamesForDisplay, teamRenameGroups } from "../lib/identity";
 
 /**
  * 聚合范围控制（CS Demo Manager 的 player filters 形态）：
@@ -20,15 +21,22 @@ export interface CohortScopeState {
 
 export const EMPTY_SCOPE: CohortScopeState = { maps: [], tags: [], teams: [], excludedIds: [] };
 
-export function applyScope(entries: StudioDemoEntry[], scope: CohortScopeState): StudioDemoEntry[] {
+export function applyScope(
+  entries: StudioDemoEntry[],
+  scope: CohortScopeState,
+  teamRenames: Record<string, string> = {}
+): StudioDemoEntry[] {
   const excluded = new Set(scope.excludedIds);
+  const selectedOriginalTeams = new Set(
+    scope.teams.flatMap((team) => originalTeamNamesForDisplay(team, teamRenames))
+  );
   return entries.filter(
     (entry) =>
       (scope.maps.length === 0 || scope.maps.includes(entry.meta.mapName)) &&
       (scope.tags.length === 0 || entry.tags.some((tag) => scope.tags.includes(tag))) &&
       (scope.teams.length === 0 ||
-        scope.teams.includes(entry.meta.teamAName) ||
-        scope.teams.includes(entry.meta.teamBName)) &&
+        selectedOriginalTeams.has(entry.meta.teamAName) ||
+        selectedOriginalTeams.has(entry.meta.teamBName)) &&
       !excluded.has(entry.id)
   );
 }
@@ -37,17 +45,18 @@ export interface CohortScopeProps {
   entries: StudioDemoEntry[];
   scope: CohortScopeState;
   onChange: (scope: CohortScopeState) => void;
+  teamRenames?: Record<string, string>;
 }
 
-export function CohortScope({ entries, scope, onChange }: CohortScopeProps) {
+export function CohortScope({ entries, scope, onChange, teamRenames = {} }: CohortScopeProps) {
   const [expanded, setExpanded] = useState(false);
   const maps = useMemo(() => [...new Set(entries.map((e) => e.meta.mapName))].sort(), [entries]);
   const tags = useMemo(() => [...new Set(entries.flatMap((e) => e.tags))].sort(), [entries]);
   const teams = useMemo(
-    () => [...new Set(entries.flatMap((e) => [e.meta.teamAName, e.meta.teamBName]))].sort(),
-    [entries]
+    () => teamRenameGroups(entries.map((e) => ({ teamA: e.meta.teamAName, teamB: e.meta.teamBName })), teamRenames),
+    [entries, teamRenames]
   );
-  const effective = applyScope(entries, scope);
+  const effective = applyScope(entries, scope, teamRenames);
   const filtered = effective.length !== entries.length;
 
   const toggleMap = (map: string) => {
@@ -106,12 +115,13 @@ export function CohortScope({ entries, scope, onChange }: CohortScopeProps) {
             </button>
             {teams.map((team) => (
               <button
-                key={team}
+                key={team.displayName}
                 type="button"
-                className={scope.teams.includes(team) ? "stu-chip stu-chip-active" : "stu-chip"}
-                onClick={() => toggleTeam(team)}
+                className={scope.teams.includes(team.displayName) ? "stu-chip stu-chip-active" : "stu-chip"}
+                title={team.originals.length > 1 ? `已合并：${team.originals.join(" / ")}` : undefined}
+                onClick={() => toggleTeam(team.displayName)}
               >
-                {team}
+                {team.displayName}
               </button>
             ))}
           </div>
@@ -153,7 +163,8 @@ export function CohortScope({ entries, scope, onChange }: CohortScopeProps) {
                 />
                 <span className="stu-map-badge">{entry.meta.mapName}</span>
                 <span className="stu-scope-item-title">
-                  {entry.meta.teamAName} {entry.meta.teamAScore}:{entry.meta.teamBScore} {entry.meta.teamBName}
+                  {displayTeamName(entry.meta.teamAName, teamRenames)} {entry.meta.teamAScore}:{entry.meta.teamBScore}{" "}
+                  {displayTeamName(entry.meta.teamBName, teamRenames)}
                 </span>
                 {date && <small className="stu-dim">{date}</small>}
               </label>

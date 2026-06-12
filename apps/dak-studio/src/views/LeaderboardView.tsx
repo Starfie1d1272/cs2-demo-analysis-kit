@@ -13,9 +13,10 @@ export interface LeaderboardViewProps {
   onPlayerClick: (playerKey: string) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
+  teamRenames?: Record<string, string>;
 }
 
-export function LeaderboardView({ allEntries, entries, scope, onScopeChange, onPlayerClick, onGoLibrary, identityOptions }: LeaderboardViewProps) {
+export function LeaderboardView({ allEntries, entries, scope, onScopeChange, onPlayerClick, onGoLibrary, identityOptions, teamRenames = {} }: LeaderboardViewProps) {
   const [model, setModel] = useState<SeasonLeaderboardModel | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,7 +55,7 @@ export function LeaderboardView({ allEntries, entries, scope, onScopeChange, onP
     );
   }
 
-  const scopePanel = <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} />;
+  const scopePanel = <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />;
 
   return (
     <div className="stu-view">

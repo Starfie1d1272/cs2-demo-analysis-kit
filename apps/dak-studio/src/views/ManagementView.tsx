@@ -9,10 +9,11 @@ import {
   renamePlayer,
   setTeamRename,
   splitIdentity,
+  teamRenameGroups,
   undoLastAction,
   type IdentityStoreState
 } from "../lib/identity";
-import { listDemoEntries, renameTeamInLibrary, type StudioDemoEntry } from "../lib/library";
+import type { StudioDemoEntry } from "../lib/library";
 
 export interface ManagementViewProps {
   allEntries: StudioDemoEntry[];
@@ -23,7 +24,7 @@ export interface ManagementViewProps {
   onIdentityChange: (state: IdentityStoreState) => void;
   identityOptions?: IdentityOptions;
   onGoLibrary: () => void;
-  onEntriesChange?: (entries: StudioDemoEntry[]) => void;
+  teamRenames?: Record<string, string>;
 }
 
 type BundlePlayer = SeasonCohortBundle["players"][number];
@@ -43,7 +44,7 @@ export function ManagementView({
   onIdentityChange,
   identityOptions,
   onGoLibrary,
-  onEntriesChange
+  teamRenames = identity.teamRenames
 }: ManagementViewProps) {
   const [bundle, setBundle] = useState<SeasonCohortBundle | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -78,9 +79,9 @@ export function ManagementView({
   }, [identity.version]);
 
   // 唯一队伍名
-  const allTeams = useMemo(
-    () => [...new Set(allEntries.flatMap((e) => [e.meta.teamAName, e.meta.teamBName]))].sort(),
-    [allEntries]
+  const teamGroups = useMemo(
+    () => teamRenameGroups(allEntries.map((entry) => ({ teamA: entry.meta.teamAName, teamB: entry.meta.teamBName })), teamRenames),
+    [allEntries, teamRenames]
   );
 
   const selectedList = bundle?.players.filter((p) => selected.has(p.playerKey)) ?? [];
@@ -148,17 +149,15 @@ export function ManagementView({
     }
   }
 
-  async function handleTeamRename(original: string) {
-    const displayName = teamInputs[original] ?? identity.teamRenames[original] ?? "";
+  async function handleTeamRename(originals: string[], currentDisplayName: string) {
+    const displayName = teamInputs[currentDisplayName] ?? currentDisplayName;
     setWorking(true);
     try {
-      const next = await setTeamRename(identity, original, displayName);
+      let next = identity;
+      for (const original of originals) {
+        next = await setTeamRename(next, original, displayName === original ? "" : displayName);
+      }
       onIdentityChange(next);
-      // 同步更新资料库中的 entry meta，让所有 UI 显示改名后的队伍
-      await renameTeamInLibrary(original, displayName || original);
-      // 刷新 entry 列表以反映元数据变化
-      const fresh = await listDemoEntries();
-      onEntriesChange?.(fresh);
     } finally {
       setWorking(false);
     }
@@ -169,25 +168,7 @@ export function ManagementView({
     try {
       const prev = await undoLastAction(identity);
       if (!prev) return;
-      // 撤销队伍改名：对比前后 teamRenames，反向还原 entry meta
-      const oldRenames = identity.teamRenames;
-      const newRenames = prev.teamRenames;
-      const allCurrentNames = new Set([
-        ...allEntries.map((e) => e.meta.teamAName),
-        ...allEntries.map((e) => e.meta.teamBName)
-      ]);
-      // 1) 撤销当前状态中的改名（如果目标名不在 restored 中则还原原名）
-      for (const [original, display] of Object.entries(oldRenames)) {
-        if (newRenames[original] === display) continue; // restored 后仍保留此改名
-        if (allCurrentNames.has(display)) await renameTeamInLibrary(display, original);
-      }
-      // 2) 应用 restored 中的新改名
-      for (const [original, display] of Object.entries(newRenames)) {
-        if (allCurrentNames.has(original) && original !== display) await renameTeamInLibrary(original, display);
-      }
       onIdentityChange(prev);
-      const fresh = await listDemoEntries();
-      onEntriesChange?.(fresh);
     } finally {
       setWorking(false);
     }
@@ -214,7 +195,7 @@ export function ManagementView({
           <p className="stu-view-sub">选手身份归并 · 别名 · 队伍改名</p>
         </div>
       </header>
-      <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} />
+      <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />
       <div className="stu-view-body stu-mgmt-layout">
         {/* ── 选手身份 ── */}
         <section className="stu-mgmt-players">
@@ -349,20 +330,29 @@ export function ManagementView({
             <tr><th>原名</th><th>显示名</th><th /></tr>
           </thead>
           <tbody>
-            {allTeams.map((team) => {
-              const current = identity.teamRenames[team] ?? "";
-              const local = teamInputs[team] ?? current;
+            {teamGroups.map((team) => {
+              const current = team.displayName;
+              const local = teamInputs[team.displayName] ?? current;
+              const merged = team.originals.length > 1;
               return (
-                <tr key={team}>
-                  <td>{team}</td>
+                <tr key={team.displayName}>
+                  <td>
+                    <div className="stu-mgmt-team-cell">
+                      <strong>{team.displayName}</strong>
+                      <span className="stu-muted">
+                        {merged ? `已合并：${team.originals.join(" / ")}` : team.originals[0]}
+                      </span>
+                      <span className="stu-muted">{team.matchCount} 场相关比赛</span>
+                    </div>
+                  </td>
                   <td>
                     <input
                       type="text"
                       className="stu-input stu-input-sm"
                       value={local}
-                      placeholder={team}
+                      placeholder={team.displayName}
                       onChange={(e) =>
-                        setTeamInputs((prev) => ({ ...prev, [team]: e.target.value }))
+                        setTeamInputs((prev) => ({ ...prev, [team.displayName]: e.target.value }))
                       }
                     />
                   </td>
@@ -371,23 +361,22 @@ export function ManagementView({
                       type="button"
                       className="stu-button-sm"
                       disabled={working || local === current}
-                      onClick={() => handleTeamRename(team)}
+                      onClick={() => handleTeamRename(team.originals, team.displayName)}
                     >
-                      {current ? "更新" : "设定"}
+                      更新
                     </button>
-                    {current && (
+                    {merged && (
                       <button
                         type="button"
                         className="stu-button-sm stu-button-ghost"
                         disabled={working}
                         onClick={async () => {
-                          const currentDisplay = identity.teamRenames[team];
-                          setTeamInputs((prev) => ({ ...prev, [team]: "" }));
-                          const next = await setTeamRename(identity, team, "");
+                          setTeamInputs((prev) => ({ ...prev, [team.displayName]: "" }));
+                          let next = identity;
+                          for (const original of team.originals) {
+                            next = await setTeamRename(next, original, "");
+                          }
                           onIdentityChange(next);
-                          if (currentDisplay) await renameTeamInLibrary(currentDisplay, team);
-                          const fresh = await listDemoEntries();
-                          onEntriesChange?.(fresh);
                         }}
                       >
                         清除

@@ -11,9 +11,10 @@ export interface EconomyViewProps {
   onScopeChange: (scope: CohortScopeState) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
+  teamRenames?: Record<string, string>;
 }
 
-export function EconomyView({ allEntries, entries, scope, onScopeChange, onGoLibrary, identityOptions }: EconomyViewProps) {
+export function EconomyView({ allEntries, entries, scope, onScopeChange, onGoLibrary, identityOptions, teamRenames = {} }: EconomyViewProps) {
   const [insights, setInsights] = useState<TournamentInsights | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,7 +58,7 @@ export function EconomyView({ allEntries, entries, scope, onScopeChange, onGoLib
           <p>跨场经济类型胜率矩阵、手枪局转化和 eco/semi 对 full 的破局。</p>
         </div>
       </header>
-      <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} />
+      <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />
       {error && <div className="stu-empty"><h2>聚合失败</h2><p>{error}</p></div>}
       {!error && !insights && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的经济数据…</div>}
       {!error && entries.length === 0 && <div className="stu-empty"><h2>聚合范围为空</h2><p>请调整聚合范围。</p></div>}

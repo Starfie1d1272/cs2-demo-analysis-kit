@@ -5,6 +5,9 @@ import {
   applyRename,
   applyTeamRename,
   buildCohortIdentityMap,
+  displayTeamName,
+  originalTeamNamesForDisplay,
+  teamRenameGroups,
   type IdentityMapping,
   type IdentityStoreState
 } from "./identity";
@@ -159,6 +162,36 @@ describe("applyTeamRename", () => {
   it("trims whitespace from displayName", () => {
     const next = applyTeamRename(EMPTY, "Team Alpha", "  乙队  ");
     expect(next.teamRenames["Team Alpha"]).toBe("乙队");
+  });
+});
+
+describe("team rename display helpers", () => {
+  it("maps raw team names to their display name without mutating the raw key", () => {
+    const renames = { "NJU A": "NJU", "NJU-A": "NJU" };
+    expect(displayTeamName("NJU A", renames)).toBe("NJU");
+    expect(displayTeamName("Other", renames)).toBe("Other");
+  });
+
+  it("finds all original team names that fold into a selected display name", () => {
+    const renames = { "NJU A": "NJU", "NJU-A": "NJU", "Rivals Blue": "Rivals" };
+    expect(originalTeamNamesForDisplay("NJU", renames)).toEqual(["NJU", "NJU A", "NJU-A"]);
+    expect(originalTeamNamesForDisplay("Rivals", renames)).toEqual(["Rivals", "Rivals Blue"]);
+  });
+
+  it("groups visible teams with original aliases and match counts", () => {
+    const groups = teamRenameGroups(
+      [
+        { teamA: "NJU A", teamB: "Rivals Blue" },
+        { teamA: "NJU-A", teamB: "Rivals" },
+        { teamA: "Other", teamB: "NJU A" }
+      ],
+      { "NJU A": "NJU", "NJU-A": "NJU", "Rivals Blue": "Rivals" }
+    );
+    expect(groups).toEqual([
+      { displayName: "NJU", originals: ["NJU A", "NJU-A"], matchCount: 3 },
+      { displayName: "Other", originals: ["Other"], matchCount: 1 },
+      { displayName: "Rivals", originals: ["Rivals", "Rivals Blue"], matchCount: 2 }
+    ]);
   });
 });
 

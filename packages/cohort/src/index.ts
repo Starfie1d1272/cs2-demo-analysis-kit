@@ -30,6 +30,9 @@ import {
   type RRWeights
 } from "@rivalhub/rival-rating";
 
+export { buildOpeningPatternClusters } from "./patterns.js";
+export type { OpeningPatternCluster, OpeningPatternInput, OpeningPatternOptions } from "./patterns.js";
+
 /**
  * "Season" 是历史命名：cohort = 任意一组比赛的跨场聚合，不限于赛季。
  * 同一 API 服务于赛季排行（RivalHub）、单赛事统计（主办方）、个人全量复盘（玩家）

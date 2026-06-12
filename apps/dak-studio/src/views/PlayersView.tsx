@@ -21,6 +21,7 @@ export interface PlayersViewProps {
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
+  teamRenames?: Record<string, string>;
 }
 
 const CORE_VIEW = SEASON_STAT_VIEWS.find((view) => view.key === "core")!;
@@ -43,7 +44,8 @@ export function PlayersView({
   onSelectPlayer,
   onOpenMatch,
   onGoLibrary,
-  identityOptions
+  identityOptions,
+  teamRenames = {}
 }: PlayersViewProps) {
   const [profiles, setProfiles] = useState<PlayerSeasonProfile[] | null>(null);
   const [insights, setInsights] = useState<PlayerSeasonInsights | null>(null);
@@ -139,7 +141,7 @@ export function PlayersView({
     );
   }
 
-  const scopePanel = <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} />;
+  const scopePanel = <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />;
 
   if (error) {
     return (

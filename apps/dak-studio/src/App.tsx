@@ -10,11 +10,12 @@ import { MatchView } from "./views/MatchView";
 import { PlayersView } from "./views/PlayersView";
 import { LeaderboardView } from "./views/LeaderboardView";
 import { TrailsView } from "./views/TrailsView";
-import { ComingSoonView } from "./views/ComingSoonView";
 import { TournamentDashboardView } from "./views/TournamentDashboardView";
 import { UtilityView } from "./views/UtilityView";
 import { EconomyView } from "./views/EconomyView";
 import { ManagementView } from "./views/ManagementView";
+import { DuelView } from "./views/DuelView";
+import { CoachView } from "./views/CoachView";
 import { loadIdentityState, buildCohortIdentityMap, type IdentityStoreState } from "./lib/identity";
 import type { IdentityOptions } from "./lib/season";
 import sampleZipUrl from "../../../fixtures/input/sample-match.zip?url";
@@ -35,11 +36,11 @@ const NAV: { key: StudioView; label: string; hint: string; icon: typeof LibraryB
   { key: "library", label: "资料库", hint: "导入与管理 Demo", icon: LibraryBig },
   { key: "match", label: "比赛工作台", hint: "回合 / 地图 / 回放", icon: Film },
   { key: "players", label: "个人实验室", hint: "档案 / 开局动线", icon: UserRound },
-  { key: "duel", label: "对枪实验室", hint: "对枪与机制分析", icon: Swords, wip: true },
+  { key: "duel", label: "对枪实验室", hint: "对枪与机制分析", icon: Swords },
   { key: "utility", label: "道具实验室", hint: "道具价值与落点", icon: Bomb },
   { key: "economy", label: "经济与节奏", hint: "买局质量 / 回合 swing", icon: Coins },
   { key: "tournament", label: "赛事中台", hint: "排行榜 / 报表", icon: Trophy },
-  { key: "coach", label: "教练工作台", hint: "战术模式与 playbook", icon: ClipboardList, wip: true },
+  { key: "coach", label: "教练工作台", hint: "战术模式与战术本", icon: ClipboardList },
   { key: "management", label: "管理", hint: "选手身份归并与队伍改名", icon: Settings }
 ];
 
@@ -72,7 +73,10 @@ export function App() {
   const [importTagsRaw, setImportTagsRaw] = useState("");
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   // 稳定数组标识：避免 App 无关重渲染触发档案/排行榜重新聚合
-  const scopedEntries = useMemo(() => applyScope(entries, scope), [entries, scope]);
+  const scopedEntries = useMemo(
+    () => applyScope(entries, scope, identityState.teamRenames),
+    [entries, scope, identityState.teamRenames]
+  );
   const identityOptions = useMemo<IdentityOptions | undefined>(
     () => identityState.version > 0
       ? { version: identityState.version, map: buildCohortIdentityMap(identityState.mappings), teamRenames: identityState.teamRenames }
@@ -384,6 +388,7 @@ export function App() {
                 onSelectPlayer={setSelectedPlayerKey}
                 onOpenMatch={openDemo}
                 identityOptions={identityOptions}
+                teamRenames={identityState.teamRenames}
                 onGoLibrary={() => setView("library")}
               />
             ) : (
@@ -392,22 +397,21 @@ export function App() {
                 entries={scopedEntries}
                 scope={scope}
                 onScopeChange={setScope}
+                teamRenames={identityState.teamRenames}
                 onGoLibrary={() => setView("library")}
               />
             )}
           </>
         )}
         {view === "duel" && (
-          <ComingSoonView
-            title="对枪实验室"
-            description="对枪重构与射击机制分析——谁先开枪、TTK、武器对位、移动射击纪律。"
-            planned={[
-              "逐枪流（shots.json）接入 exporter",
-              "Duel Finder：按位置 / 武器 / 先手筛选对枪",
-              "Opening Duel 分析：首杀对位与 TTK 拆解",
-              "移动射击与压枪纪律统计"
-            ]}
-            availableNow="目前可在「比赛工作台」的对位矩阵与击杀列表中查看对枪结果。"
+          <DuelView
+            allEntries={entries}
+            entries={scopedEntries}
+            scope={scope}
+            onScopeChange={setScope}
+            onOpenMatch={openDemo}
+            onGoLibrary={() => setView("library")}
+            teamRenames={identityState.teamRenames}
           />
         )}
         {view === "utility" && (
@@ -418,6 +422,7 @@ export function App() {
             onScopeChange={setScope}
             onOpenMatch={openDemo}
             identityOptions={identityOptions}
+            teamRenames={identityState.teamRenames}
             onGoLibrary={() => setView("library")}
           />
         )}
@@ -428,19 +433,19 @@ export function App() {
             scope={scope}
             onScopeChange={setScope}
             identityOptions={identityOptions}
+            teamRenames={identityState.teamRenames}
             onGoLibrary={() => setView("library")}
           />
         )}
         {view === "coach" && (
-          <ComingSoonView
-            title="教练工作台"
-            description="战术模式识别与备战——pattern finder、playbook 沉淀与对手倾向分析。"
-            planned={[
-              "Rule-based 开局聚类与战术模式标注",
-              "Timing Heatmap：战术关键事件按回合秒数分布",
-              "Playbook / Anti-Strat 报告",
-              "Veto 辅助（地图池倾向）"
-            ]}
+          <CoachView
+            allEntries={entries}
+            entries={scopedEntries}
+            scope={scope}
+            onScopeChange={setScope}
+            onOpenMatch={openDemo}
+            onGoLibrary={() => setView("library")}
+            teamRenames={identityState.teamRenames}
           />
         )}
         {view === "tournament" && (
@@ -467,6 +472,7 @@ export function App() {
                 onScopeChange={setScope}
                 onPlayerClick={openPlayer}
                 identityOptions={identityOptions}
+                teamRenames={identityState.teamRenames}
                 onGoLibrary={() => setView("library")}
               />
             ) : (
@@ -476,6 +482,7 @@ export function App() {
                 scope={scope}
                 onScopeChange={setScope}
                 identityOptions={identityOptions}
+                teamRenames={identityState.teamRenames}
                 onGoLibrary={() => setView("library")}
               />
             )}
@@ -490,8 +497,8 @@ export function App() {
             identity={identityState}
             onIdentityChange={setIdentityState}
             identityOptions={identityOptions}
+            teamRenames={identityState.teamRenames}
             onGoLibrary={() => setView("library")}
-            onEntriesChange={setEntries}
           />
         )}
       </main>
