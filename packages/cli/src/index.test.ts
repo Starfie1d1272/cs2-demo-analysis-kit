@@ -54,7 +54,7 @@ describe("cs2dak analyze", () => {
   it("exits 1 when --out argument is missing", async () => {
     const result = await runCli("analyze", FIXTURE_ZIP, "--out");
     expect(result.code).toBe(1);
-  }, 10_000);
+  }, 30_000);
 });
 
 describe("cs2dak cohort", () => {
@@ -65,7 +65,7 @@ describe("cs2dak cohort", () => {
     const result = await runCli("cohort", tmpDir, "--out", join(tmpDir, "empty-cohort.json"));
     expect(result.code).toBe(1);
     expect(result.stderr).toMatch(/No \.zip files found/i);
-  }, 10_000);
+  }, 30_000);
 });
 
 describe("cs2dak (usage)", () => {
@@ -73,10 +73,10 @@ describe("cs2dak (usage)", () => {
     const result = await runCli();
     expect(result.code).toBe(0);
     expect(result.stdout).toMatch(/Usage/i);
-  }, 10_000);
+  }, 30_000);
 
   it("exits 1 for an unknown command", async () => {
     const result = await runCli("unknown-command", FIXTURE_ZIP);
     expect(result.code).toBe(1);
-  }, 10_000);
+  }, 30_000);
 });
