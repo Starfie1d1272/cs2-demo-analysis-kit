@@ -157,7 +157,9 @@ export const workspaceReplayFrameSchema = z.object({
   alive: z.boolean(),
   flashed: z.boolean(),
   hasDefuseKit: z.boolean(),
-  hasBomb: z.boolean()
+  hasBomb: z.boolean(),
+  /** 本回合是否有头盔（player-economies 查表，非逐帧变化）。 */
+  hasHelmet: z.boolean().optional().default(false)
 });
 
 export const workspaceReplayPlayerSchema = z.object({

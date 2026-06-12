@@ -927,7 +927,7 @@ export function ReplayViewer({ replay, map, target = null }: {
                   <small>
                     {frame.alive
                       ? `${main ?? frame.weapon ?? "—"}` +
-                        `${frame.armor > 0 ? " · 甲" : ""}` +
+                        `${frame.armor > 0 ? (frame.hasHelmet ? " · 全甲" : " · 半甲") : ""}` +
                         `${frame.hasDefuseKit ? " · kit" : ""}` +
                         `${frame.flashed ? " · flashed" : ""}`
                       : "阵亡"}
@@ -1259,9 +1259,11 @@ function roundFactTags(fact: MatchWorkspaceModel["players"][number]["roundFacts"
 
 /** 渲染 HP 条 + 护甲底色（HP 条盖在护甲层上；护甲层满宽时可区分全甲 vs 半甲）。 */
 function renderHpArmor(frame: WorkspaceReplayFrame) {
-  const armorColor = frame.armor >= 100 ? "var(--dak-accent)" : "var(--dak-accent-b)";
+  const fullArmor = frame.hasHelmet && frame.armor >= 100;
+  const armorColor = fullArmor ? "var(--dak-accent)" : "var(--dak-accent-b)";
+  const armorLabel = !frame.hasHelmet ? "半甲" : frame.armor >= 100 ? "全甲" : `甲 ${frame.armor}`;
   return (
-    <div className="dak-hp-bar-wrap" title={`${frame.hp} HP · 护甲 ${frame.armor}${frame.armor >= 100 ? " (全甲)" : ""}`}>
+    <div className="dak-hp-bar-wrap" title={`${frame.hp} HP · ${armorLabel}`}>
       <div className="dak-hp-bar-track">
         <div className="dak-hp-bar" style={{ width: `${frame.hp}%`, background: hpBarColor(frame.hp) }} />
       </div>

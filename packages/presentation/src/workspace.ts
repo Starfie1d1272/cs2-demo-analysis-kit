@@ -734,6 +734,15 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
   const bombsByRound = groupBy(pkg.bombs, (b) => b.roundNumber);
   const endTickByRound = new Map(pkg.rounds.map((r) => [r.roundNumber, r.endTick]));
 
+  // 选手每回合头盔状态（player-economies → steamId64 × roundNumber → helmet）
+  const helmetByRoundPlayer = new Map<string, boolean>();
+  for (const econ of pkg.playerEconomies ?? []) {
+    const player = pkg.players[econ.playerIndex];
+    if (player) {
+      helmetByRoundPlayer.set(`${econ.roundNumber}:${player.steamId64}`, !!econ.hasHelmet);
+    }
+  }
+
   let hasDefuseKit = false;
   const rounds = replay.rounds.map((roundRow) => ({
     roundNumber: roundRow.roundNumber,
@@ -775,6 +784,9 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
       const ys = decodeDelta(player.y);
       const zs = decodeDelta(player.z);
       const yaws = decodeDelta(player.yaw);
+      const replayPlayer = pkg.players[player.playerIndex];
+      // 此位选手本回合是否戴头盔（player-economies 逐回合数据，全帧相同）
+      const hasHelmet = helmetByRoundPlayer.get(`${roundRow.roundNumber}:${replayPlayer?.steamId64}`) ?? false;
       const frames: WorkspaceReplayFrame[] = [];
       for (let index = 0; index < roundRow.frameCount; index += 1) {
         const flags = player.flags[index] ?? 0;
@@ -790,14 +802,14 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
           alive: (flags & 1) !== 0,
           flashed: (player.flash?.[index] ?? 0) > 0,
           hasDefuseKit: (flags & 4) !== 0,
-          hasBomb: (flags & 2) !== 0
+          hasBomb: (flags & 2) !== 0,
+          hasHelmet
         };
         if (frame.hasDefuseKit) {
           hasDefuseKit = true;
         }
         frames.push(frame);
       }
-      const replayPlayer = pkg.players[player.playerIndex];
       return {
         steamId64: replayPlayer?.steamId64 ?? String(player.playerIndex),
         name: replayPlayer?.name ?? `Player ${player.playerIndex}`,
