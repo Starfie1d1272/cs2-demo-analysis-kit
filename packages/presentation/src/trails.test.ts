@@ -7,7 +7,7 @@ import { buildOpeningTrails } from "./trails";
 describe("buildOpeningTrails", () => {
   it("extracts full-buy opening trails with grenades from the sanitized fixture", async () => {
     const zip = await readFile(
-      fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url))
+      fileURLToPath(new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url))
     );
     const pkg = await loadDemoPackageFromZip(zip);
     const steamId64 = pkg.players[0].steamId64;
@@ -15,7 +15,7 @@ describe("buildOpeningTrails", () => {
     const model = buildOpeningTrails(pkg, "fixture-match", steamId64);
 
     expect(model.available).toBe(true);
-    expect(model.mapName).toBe("de_anubis");
+    expect(model.mapName).toBe("de_ancient");
     expect(model.steamId64).toBe(steamId64);
     expect(model.windowSeconds).toBe(30);
     // 长枪局存在且轨迹点落在窗口内、时间递增
@@ -35,7 +35,7 @@ describe("buildOpeningTrails", () => {
 
   it("supports custom window and economy filters", async () => {
     const zip = await readFile(
-      fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url))
+      fileURLToPath(new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url))
     );
     const pkg = await loadDemoPackageFromZip(zip);
     const steamId64 = pkg.players[0].steamId64;
@@ -53,7 +53,7 @@ describe("buildOpeningTrails", () => {
 
   it("returns unavailable model when replay stream is missing", async () => {
     const zip = await readFile(
-      fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url))
+      fileURLToPath(new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url))
     );
     const pkg = await loadDemoPackageFromZip(zip);
     const model = buildOpeningTrails({ ...pkg, replay: undefined }, "m", pkg.players[0].steamId64);

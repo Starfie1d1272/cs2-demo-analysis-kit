@@ -12,7 +12,7 @@ import { deriveAccountSignalsV2 } from "../signals.js";
 describe("strategicIsolationDeaths wiring (de_ancient fixture)", () => {
   it("derives an observable (non-null, >= 0) credit for every player", async () => {
     const zip = await readFile(
-      fileURLToPath(new URL("../../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)),
+      fileURLToPath(new URL("../../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url)),
     );
     const pkg = await loadDemoPackageFromZip(zip);
     const signals = deriveAccountSignalsV2(pkg);
@@ -28,7 +28,7 @@ describe("strategicIsolationDeaths wiring (de_ancient fixture)", () => {
 
   it("returns null strategicIsolationDeaths when replay is absent (unobservable)", async () => {
     const zip = await readFile(
-      fileURLToPath(new URL("../../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)),
+      fileURLToPath(new URL("../../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url)),
     );
     const pkg = await loadDemoPackageFromZip(zip);
     const { replay: _, ...stripped } = pkg;

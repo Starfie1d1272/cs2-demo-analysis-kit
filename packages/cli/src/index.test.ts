@@ -11,7 +11,7 @@ const execFileAsync = promisify(execFile);
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const TSX = resolve(__dirname, "../../../node_modules/.bin/tsx");
 const CLI = resolve(__dirname, "index.ts");
-const FIXTURE_ZIP = resolve(__dirname, "../../../fixtures/input/cs2dak-sanitized-de_ancient.zip");
+const FIXTURE_ZIP = resolve(__dirname, "../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip");
 
 async function runCli(...args: string[]): Promise<{ stdout: string; stderr: string; code: number }> {
   return execFileAsync(TSX, [CLI, ...args], { env: { ...process.env, NODE_NO_WARNINGS: "1" } })

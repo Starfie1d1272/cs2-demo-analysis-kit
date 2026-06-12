@@ -6,7 +6,7 @@ import { mvpRecommendationSchema, seriesSummarySchema } from "@cs2dak/contract";
 import { buildMatchWorkspaceModel, buildSeriesSummary, recommendMatchMvp } from "./index";
 
 async function buildWorkspace() {
-  const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
+  const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url)));
   return buildMatchWorkspaceModel(await loadDemoPackageFromZip(zip));
 }
 

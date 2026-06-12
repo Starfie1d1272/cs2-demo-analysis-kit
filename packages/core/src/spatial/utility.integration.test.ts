@@ -10,7 +10,7 @@ import { buildOfficialUtilitySpatial } from "./utility.js";
 let deAncientPkg: DemoPackage | null = null;
 
 beforeAll(async () => {
-  const zip = await readFile(fileURLToPath(new URL("../../../../fixtures/input/cs2dak-sanitized-de_ancient.zip", import.meta.url)));
+  const zip = await readFile(fileURLToPath(new URL("../../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url)));
   deAncientPkg = await loadDemoPackageFromZip(zip);
 }, 30_000);
 
