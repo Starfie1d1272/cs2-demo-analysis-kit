@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { PlayerSeasonProfile } from "@cs2dak/contract";
 import {
   SEASON_STAT_VIEWS,
+  type PlayerMechanicsProfile,
   type PlayerSeasonInsights,
   type PlayerWeaponStat
 } from "@cs2dak/presentation";
@@ -51,6 +52,7 @@ export function PlayersView({
   const [profiles, setProfiles] = useState<PlayerSeasonProfile[] | null>(null);
   const [insights, setInsights] = useState<PlayerSeasonInsights | null>(null);
   const [weaponStats, setWeaponStats] = useState<PlayerWeaponStat[]>([]);
+  const [mechanics, setMechanics] = useState<PlayerMechanicsProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [pinned, setPinned] = useState<PinnedPlayer | null>(() => getPinnedPlayer());
@@ -106,18 +108,21 @@ export function PlayersView({
     if (!selected || entries.length === 0) {
       setInsights(null);
       setWeaponStats([]);
+      setMechanics(null);
       setDetailsError(null);
       return;
     }
     let cancelled = false;
     setInsights(null);
     setWeaponStats([]);
+    setMechanics(null);
     setDetailsError(null);
     getPlayerSeasonDetails(entries, selected.steamIds, identityOptions)
       .then((details) => {
         if (cancelled) return;
         setInsights(details.insights);
         setWeaponStats(details.weaponStats.slice(0, 8));
+        setMechanics(details.mechanics);
       })
       .catch((err) => {
         if (!cancelled) setDetailsError(err instanceof Error ? err.message : String(err));
@@ -354,6 +359,13 @@ export function PlayersView({
               }))} />
             </div>
 
+            {mechanics && (
+              <div className="stu-card stu-card-wide">
+                <h3>武器分析</h3>
+                <MechanicsWeaponCards profile={mechanics} />
+              </div>
+            )}
+
             {selected.style && (
               <div className="stu-card">
                 <h3>Playstyle Fingerprint</h3>
@@ -575,6 +587,56 @@ function WeaponBars({ weapons }: { weapons: PlayerWeaponStat[] }) {
           </b>
         </div>
       ))}
+    </div>
+  );
+}
+
+function MechanicsWeaponCards({ profile }: { profile: PlayerMechanicsProfile }) {
+  const rows = [profile.overall, ...profile.weapons].filter((row) => row.kills > 0);
+  if (rows.length === 0) {
+    return <p className="stu-dim">当前范围缺少 shots/duels 数据，无法生成枪法机制画像。</p>;
+  }
+  return (
+    <div className="stu-mechanics-grid">
+      {rows.slice(0, 6).map((row) => (
+        <article key={row.weapon} className="stu-mechanics-card">
+          <header>
+            <h4>{row.label}</h4>
+            <span>{row.kills} 击杀</span>
+          </header>
+          <div className="stu-metric-grid">
+            <MechanicsMetric label="首发" value={row.firstShotAccuracyPercent} unit="%" note="每个 burst 第一发是否命中；当前范围百分位。" percentile={row.percentile.firstShotAccuracy} />
+            <MechanicsMetric label="扫射" value={row.sprayAccuracyPercent} unit="%" note="同一 burst 第二发起，击杀边界前命中率。" percentile={row.percentile.sprayAccuracy} />
+            <MechanicsMetric label="TTK" value={row.medianTtkMs} unit="ms" note="full HP 且无第三方样本的 TTK 中位数，越低越好。" percentile={row.percentile.medianTtk} />
+            <MechanicsMetric label="急停" value={row.counterStrafeSuccessPercent} unit="%" note="开枪前 200ms velocity 按武器/类别阈值判定。" percentile={row.percentile.counterStrafe} />
+            <MechanicsMetric label="一枪致命" value={row.oneTapRatePercent} unit="%" note="单发击杀 / 总击杀。" percentile={row.percentile.oneTapRate} />
+            <MechanicsMetric label="视觉反应" value={row.visualReactionMs} unit="ms" note="首次可见 tick 到首发开枪；有 tri BVH 时用 LOS。" percentile={row.percentile.visualReaction} />
+            <MechanicsMetric label="预瞄" value={row.preaimSuccessPercent} unit="%" note="peek 前视角接近敌人位置的成功率。" percentile={row.percentile.preaimSuccess} />
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function MechanicsMetric({
+  label,
+  value,
+  unit,
+  note,
+  percentile
+}: {
+  label: string;
+  value: number | null;
+  unit: string;
+  note: string;
+  percentile: string | null;
+}) {
+  return (
+    <div className="stu-metric">
+      <span>{label}<MetricInfo note={note} /></span>
+      <b>{value == null ? "—" : `${value.toFixed(unit === "ms" ? 0 : 1)}${unit}`}</b>
+      {percentile && <small>{percentile}</small>}
     </div>
   );
 }

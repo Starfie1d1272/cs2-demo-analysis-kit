@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { formatPercent, type TournamentInsights } from "@cs2dak/presentation";
-import { getTournamentInsights, type IdentityOptions } from "../lib/season";
-import type { StudioDemoEntry } from "../lib/library";
+import { formatPercent, type TeamComparisonModel, type TournamentInsights } from "@cs2dak/presentation";
+import { TeamComparisonPanel } from "@cs2dak/react";
+import { getTeamComparison, getTournamentInsights, type IdentityOptions } from "../lib/season";
+import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState, MetricInfo } from "../components/primitives";
 
@@ -10,6 +11,7 @@ export interface TournamentDashboardViewProps {
   entries: StudioDemoEntry[];
   scope: CohortScopeState;
   onScopeChange: (scope: CohortScopeState) => void;
+  onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
   teamRenames?: Record<string, string>;
@@ -21,20 +23,24 @@ export function TournamentDashboardView({
   entries,
   scope,
   onScopeChange,
+  onOpenMatch,
   onGoLibrary,
   identityOptions,
   teamRenames = {}
 }: TournamentDashboardViewProps) {
   const [insights, setInsights] = useState<TournamentInsights | null>(null);
+  const [teamComparison, setTeamComparison] = useState<TeamComparisonModel | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (entries.length === 0) {
       setInsights(null);
+      setTeamComparison(null);
       return;
     }
     let cancelled = false;
     setInsights(null);
+    setTeamComparison(null);
     setError(null);
     getTournamentInsights(entries, identityOptions)
       .then((result) => {
@@ -42,6 +48,13 @@ export function TournamentDashboardView({
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      });
+    getTeamComparison(entries, identityOptions)
+      .then((result) => {
+        if (!cancelled) setTeamComparison(result);
+      })
+      .catch(() => {
+        if (!cancelled) setTeamComparison(null);
       });
     return () => {
       cancelled = true;
@@ -62,6 +75,7 @@ export function TournamentDashboardView({
   }
 
   const scopePanel = <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />;
+  const entryByMatchId = new Map(entries.map((entry) => [matchIdForEntry(entry), entry]));
 
   return (
     <div className="stu-view">
@@ -86,6 +100,20 @@ export function TournamentDashboardView({
               <span>手枪局转化<MetricInfo note="赢下手枪局后把下一回合也拿下的比率" /></span>
               <b>{formatPercent(insights.pistolConversionPercent)}</b>
             </div>
+          </div>
+          <div className="stu-card">
+            <h3>队伍对比</h3>
+            {teamComparison ? (
+              <TeamComparisonPanel
+                model={teamComparison}
+                onOpenEvidence={(matchId, roundNumber, tick) => {
+                  const entry = entryByMatchId.get(matchId);
+                  if (entry) onOpenMatch(entry.id, { roundNumber, tick });
+                }}
+              />
+            ) : (
+              <p className="stu-dim">至少需要两个队伍的 demo 才能生成对比。</p>
+            )}
           </div>
           <div className="stu-card">
             <h3>地图盘面</h3>

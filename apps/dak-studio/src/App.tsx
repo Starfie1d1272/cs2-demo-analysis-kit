@@ -508,6 +508,7 @@ export function App() {
                 onScopeChange={setScope}
                 identityOptions={identityOptions}
                 teamRenames={identityState.teamRenames}
+                onOpenMatch={openDemo}
                 onGoLibrary={() => setView("library")}
               />
             )}

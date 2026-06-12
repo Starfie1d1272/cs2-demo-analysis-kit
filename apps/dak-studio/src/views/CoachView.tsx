@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { buildOpeningPatternClusters, type OpeningPatternCluster } from "@cs2dak/cohort";
 import { CALLOUT_NAME_CN } from "@cs2dak/maps";
+import { buildAntiStratMarkdownFromPatterns } from "@cs2dak/presentation";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState } from "../components/primitives";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
 import { getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { BpView } from "./BpView";
 import {
   buildVetoTemplate,
+  deriveVetoSummary,
   listPlaybookNames,
   listSeriesRecords,
   loadCoachSettings,
@@ -132,7 +135,8 @@ export function CoachView({
         { stepOrder: 7, actionType: "decider", teamKey: null, mapName: "Anubis", side: null }
       ];
     }
-    const saved = await saveSeriesRecord({ ...suggestion, format: veto?.format ?? suggestion.format, veto });
+    const finalVeto = veto ? { ...veto, ...deriveVetoSummary(veto.steps) } : null;
+    const saved = await saveSeriesRecord({ ...suggestion, format: finalVeto?.format ?? suggestion.format, veto: finalVeto });
     setSeries((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
   }
 
@@ -331,6 +335,7 @@ function VetoPanel({
             <div key={item.id} className="stu-coach-series-item">
               <strong>{item.name}</strong>
               <span>{item.format.toUpperCase()} · {item.entryIds.length} 图 · BP {item.veto ? `${item.veto.steps.length} 步` : "未录入"}</span>
+              {item.veto && <BpView veto={item.veto} />}
             </div>
           ))}
         </div>
@@ -344,13 +349,9 @@ function buildAntiStratMarkdown(
   myTeamName: string | null,
   teamRenames: Record<string, string>
 ): string {
-  const title = myTeamName ? `# 备战报告：${myTeamName}` : "# 备战报告";
-  const lines = [title, "", "## 开局模式"];
-  for (const cluster of clusters.slice(0, 10)) {
-    lines.push(`- ${cluster.mapName} ${SIDE_LABEL[cluster.side]}：${formatPatternBasis(cluster)}，${cluster.roundCount} 回合，胜率 ${cluster.winRatePercent ?? "—"}%`);
-  }
-  lines.push("", "## 队伍身份", `- 已加载队伍归并：${Object.keys(teamRenames).length} 条`);
-  return lines.join("\n");
+  const mapPool = [...new Set(clusters.map((cluster) => cluster.mapName))].sort();
+  const markdown = buildAntiStratMarkdownFromPatterns(clusters, { myTeamName, opponentName: myTeamName ? null : "对手", mapPool });
+  return `${markdown}\n\n## 队伍身份\n- 已加载队伍归并：${Object.keys(teamRenames).length} 条`;
 }
 
 function calloutName(mapName: string, callout: string): string {

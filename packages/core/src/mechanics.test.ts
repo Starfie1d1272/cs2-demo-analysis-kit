@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DemoPackage, PackageDamage, PackageKill, PackageShots } from "@cs2dak/contract";
-import { derivePlayerMechanics } from "./mechanics.js";
+import { buildMechanicsSignals, derivePlayerMechanics } from "./mechanics.js";
 
 const A = "76561198000000001";
 const AI = 0;
@@ -153,10 +153,18 @@ describe("derivePlayerMechanics", () => {
       burstCount: 2,
       shotCount: 6,
       firstShotAccuracyPercent: 50,
-      sprayAccuracyPercent: 50,
+      sprayAccuracyPercent: 25,
       counterStrafeSuccessPercent: 83.3
     });
     expect(row.burstLengthBuckets).toEqual({ single: 1, short: 0, medium: 1, long: 0 });
+    expect(row.oneTapRatePercent).toBe(0);
+    expect(row.medianShotIntervalMs).toBeGreaterThan(0);
+    expect(row.firingPatternRatio).toEqual({ tap: 50, burst: 50, spray: 0 });
+    expect(buildMechanicsSignals(demo)).toMatchObject({
+      version: "cs2-demo-analysis-kit/mechanics-signals-0.1",
+      burstGapSeconds: 0.25,
+      velocityWindowSeconds: 0.2
+    });
     expect(derivePlayerMechanics(demo).map((item) => item.weapon)).toEqual(["ak47"]);
   });
 

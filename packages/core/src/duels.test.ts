@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DemoPackage, PackageDamage, PackageKill, PackageShots, Replay } from "@cs2dak/contract";
-import { deriveDuels, deriveOpeningDuels } from "./duels.js";
+import { buildDuelsSignals, deriveDuels, deriveOpeningDuels } from "./duels.js";
 
 const A = "76561198000000001";
 const B = "76561198000000002";
@@ -169,13 +169,13 @@ describe("deriveDuels", () => {
     expect(rows[0]).toMatchObject({
       killerSteamId64: A,
       victimSteamId64: B,
-      classification: "contested",
+      classification: "contested_duel",
       fullHealth: true,
-      ttkMs: 844 // (150 - 96) / 64 * 1000 = 843.75 → 844
+      ttkMs: 843.8 // (150 - 96) / 64 * 1000 = 843.75 → 843.8
     });
   });
 
-  it("separates outaimed from caught off guard using replay yaw when victim does not return fire", () => {
+  it("separates suppressed kill from caught off guard using replay yaw when victim does not return fire", () => {
     const replay: Replay = {
       meta: { sampleRate: 8, tickrate: 64, coordScale: 1, angleScale: 10 },
       weaponDict: [],
@@ -193,7 +193,7 @@ describe("deriveDuels", () => {
             x: [100], y: [0], z: [0],
             yaw: [1800], // 180° × angleScale 10
             pitch: [0], hp: [0], armor: [0], money: [0], equipValue: [0],
-            place: [0], flash: [0], flags: [0], weapon: [-1]
+            place: [0], flash: [0], flags: [0], weapon: [-1], grenades: [[]]
           },
           {
             // C faces 90° (perpendicular to killer) → caught_off_guard
@@ -201,7 +201,7 @@ describe("deriveDuels", () => {
             x: [100], y: [0], z: [0],
             yaw: [900], // 90° × angleScale 10
             pitch: [0], hp: [0], armor: [0], money: [0], equipValue: [0],
-            place: [0], flash: [0], flags: [0], weapon: [-1]
+            place: [0], flash: [0], flags: [0], weapon: [-1], grenades: [[]]
           }
         ]
       }]
@@ -221,8 +221,57 @@ describe("deriveDuels", () => {
     });
 
     const rows = deriveDuels(demo);
-    expect(rows.find((row) => row.victimSteamId64 === B)?.classification).toBe("outaimed");
+    expect(rows.find((row) => row.victimSteamId64 === B)?.classification).toBe("suppressed_kill");
     expect(rows.find((row) => row.victimSteamId64 === C)?.classification).toBe("caught_off_guard");
+  });
+
+  it("keeps one-tap ttk near zero when the kill lands on the first burst shot", () => {
+    const demo = pkg({
+      damages: [damage({ tick: 100, attackerIndex: AI, victimIndex: BI, hitgroup: "head", healthDamage: 100 })],
+      kills: [kill({ tick: 100, killerIndex: AI, victimIndex: BI, headshot: true })],
+      shots: buildShots([{ tick: 100, playerIndex: AI }])
+    });
+
+    const row = deriveDuels(demo)[0]!;
+    expect(row.oneShotKill).toBe(true);
+    expect(row.ttkMs).toBe(0);
+  });
+
+  it("treats 80 HP as full hp but excludes third-party damage from ttk distribution", () => {
+    const demo = pkg({
+      damages: [
+        damage({ tick: 90, attackerIndex: CI, victimIndex: BI, victimHealthBefore: 100, healthDamage: 20 }),
+        damage({ tick: 100, attackerIndex: AI, victimIndex: BI, victimHealthBefore: 80, healthDamage: 80 })
+      ],
+      kills: [kill({ tick: 100, killerIndex: AI, victimIndex: BI })],
+      shots: buildShots([{ tick: 92, playerIndex: AI }])
+    });
+
+    const signals = buildDuelsSignals(demo);
+    expect(signals.records[0]).toMatchObject({
+      hpBucket: "full_hp",
+      fullHealth: true,
+      victimHealthBefore: 80,
+      thirdParty: true,
+      ttkMs: null
+    });
+    expect(signals.ttk.allFullHp.count).toBe(0);
+  });
+
+  it("marks low-hp cleanup pressure without polluting full-hp ttk", () => {
+    const demo = pkg({
+      damages: [damage({ tick: 100, attackerIndex: AI, victimIndex: BI, victimHealthBefore: 79 })],
+      kills: [kill({ tick: 100, killerIndex: AI, victimIndex: BI })],
+      shots: buildShots([{ tick: 90, playerIndex: AI }])
+    });
+
+    const signals = buildDuelsSignals(demo);
+    expect(signals.records[0]).toMatchObject({
+      hpBucket: "low_hp",
+      fullHealth: false,
+      ttkMs: null
+    });
+    expect(signals.ttk.allFullHp.count).toBe(0);
   });
 });
 

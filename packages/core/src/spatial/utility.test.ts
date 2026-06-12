@@ -48,7 +48,7 @@ function molotovReplay(): Replay {
         x: deltaArr([50, 500]), y: deltaArr([50, 500]), z: deltaArr([0, 0]),
         yaw: deltaArr([0, 0]), pitch: deltaArr([0, 0]),
         hp: [100, 100], armor: [100, 100], money: [800, 800], equipValue: [800, 800],
-        weapon: [-1, -1], place: [-1, -1], flash: [0, 0], flags: [1, 1],
+        weapon: [-1, -1], place: [-1, -1], flash: [0, 0], flags: [1, 1], grenades: [[], []],
       }],
       projectiles: [],
     }],

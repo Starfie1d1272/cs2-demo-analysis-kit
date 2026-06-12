@@ -111,7 +111,7 @@ const model: MatchWorkspaceModel = {
               grenades: ["smoke", "flashbang"]
             },
             frames: [
-              { tick: 100, x: 1, y: 2, z: 3, yaw: 90, hp: 100, armor: 100, weapon: "ak47", grenades: ["smoke"], alive: true, flashed: false, hasDefuseKit: true, hasBomb: false, hasHelmet: true }
+              { tick: 100, x: 1, y: 2, z: 3, yaw: 90, hp: 100, armor: 100, weapon: "ak47", grenades: ["smoke"], alive: true, flashed: false, flashRemainingSeconds: 0, hasDefuseKit: true, hasBomb: false, hasHelmet: true }
             ]
           }
         ]

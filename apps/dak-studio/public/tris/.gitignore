@@ -1,0 +1,4 @@
+# .tri 碰撞几何太大不进 git（7 图约 207MB）。
+# 开发环境：`uvx awpy get tris` 下载后拷贝或符号链接到这里，
+# 打包时 scripts/package.sh 自动从 ~/.awpy/tris 拷入安装包。
+*.tri

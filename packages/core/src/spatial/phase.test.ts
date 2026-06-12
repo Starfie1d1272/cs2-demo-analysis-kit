@@ -26,7 +26,7 @@ function replayFrame(
       x: deltaArr([0]), y: deltaArr([0]), z: deltaArr([0]),
       yaw: deltaArr([0]), pitch: deltaArr([0]),
       hp: [100], armor: [100], money: [800], equipValue: [800],
-      place: [t.placeIdx], flash: [0], flags: [1], weapon: [-1],
+      place: [t.placeIdx], flash: [0], flags: [1], weapon: [-1], grenades: [[]],
     })),
     projectiles: [],
   };
@@ -51,7 +51,7 @@ function replayTwoFrames(
       x: deltaArr([0, 0]), y: deltaArr([0, 0]), z: deltaArr([0, 0]),
       yaw: deltaArr([0, 0]), pitch: deltaArr([0, 0]),
       hp: [100, 100], armor: [100, 100], money: [800, 800], equipValue: [800, 800],
-      place: [place1, place2], flash: [0, 0], flags: [1, 1], weapon: [-1, -1],
+      place: [place1, place2], flash: [0, 0], flags: [1, 1], weapon: [-1, -1], grenades: [[], []],
     });
   }
   return { roundNumber, startTick: frame1.tick, tickStep, frameCount: 2, players, projectiles: [] };

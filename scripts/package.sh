@@ -27,6 +27,17 @@ STUDIO_WEB="python/src/cs2dak/studio_web"
 rm -rf "$STUDIO_WEB"
 cp -R apps/dak-studio/dist "$STUDIO_WEB"
 
+# .tri 碰撞几何（awpy 导出，~30MB/图）：打进安装包后视觉反应/预瞄走 LOS 精确口径。
+# 来源 $AWPY_TRIS_DIR（默认 ~/.awpy/tris，`uvx awpy get tris` 下载）。缺失只降级不报错。
+TRIS_DIR="${AWPY_TRIS_DIR:-$HOME/.awpy/tris}"
+if compgen -G "$TRIS_DIR/*.tri" > /dev/null; then
+  mkdir -p "$STUDIO_WEB/tris"
+  cp "$TRIS_DIR"/*.tri "$STUDIO_WEB/tris/"
+  echo "    Bundled $(ls "$STUDIO_WEB/tris" | wc -l | tr -d ' ') .tri maps from $TRIS_DIR"
+else
+  echo "    WARNING: no .tri files in $TRIS_DIR — 反应时间/预瞄将走降级口径（uvx awpy get tris 可下载）"
+fi
+
 echo "==> [3/5] PyInstaller build (studio)"
 cd python
 uv sync --extra gui --extra build

@@ -3,6 +3,7 @@ import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState, EvidenceLink } from "../components/primitives";
 import { getPlayerFlashSummaries, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { formatMatchLabel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { LineupView } from "./LineupView";
 
 export interface UtilityViewProps {
   allEntries: StudioDemoEntry[];
@@ -146,6 +147,12 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
             })}
           </div>
         </div>
+      )}
+      {rows && (
+        <section>
+          <h2 className="stu-section-title">Lineup Library</h2>
+          <LineupView entries={entries} onOpenMatch={onOpenMatch} />
+        </section>
       )}
     </div>
   );

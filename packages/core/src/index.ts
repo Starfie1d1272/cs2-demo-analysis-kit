@@ -16,16 +16,16 @@ export { deriveRRIndicators } from "./scoreboard.js";
 export { derivePlayerWeaponHighlights } from "./weapon-highlights.js";
 export { buildEconomyConversion } from "./economy.js";
 export { buildTeamSideWinRates } from "./side-win-rate.js";
-export { deriveDuels, deriveOpeningDuels } from "./duels.js";
-export { derivePlayerMechanics } from "./mechanics.js";
+export { buildDuelsSignals, deriveDuels, deriveOpeningDuels } from "./duels.js";
+export { buildMechanicsSignals, counterStrafeThresholdForWeapon, derivePlayerMechanics } from "./mechanics.js";
 export type {
   EconomyTypeStats,
   EconomyConversion,
   MatchEconomyConversion,
 } from "./economy.js";
 export type { SideWinRateStats, TeamSideWinRates } from "./side-win-rate.js";
-export type { DuelClassification, DuelFact } from "./duels.js";
-export type { BurstLengthBuckets, PlayerMechanicsFact } from "./mechanics.js";
+export type { DuelClassification, DuelHpBucket, DuelRecord, DuelSignals, TtkDistribution } from "./duels.js";
+export type { BurstLengthBuckets, MechanicsSignals, PlayerMechanicsFact, ReactionPreaimSignals } from "./mechanics.js";
 
 export function analyzeDemoPackage(input: unknown): AnalysisBundle {
   const pkg = normalizeDemoPackage(input);

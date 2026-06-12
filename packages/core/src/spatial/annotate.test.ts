@@ -28,6 +28,7 @@ function replayRound(
       place: [t.placeIdx], flash: [0],
       flags: [1],
       weapon: [-1],
+      grenades: [[]],
     })),
     projectiles: [],
   };

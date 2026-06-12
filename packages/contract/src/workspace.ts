@@ -1,4 +1,5 @@
 import { z } from "zod";
+export { seriesVetoSchema, type SeriesVeto } from "./veto.js";
 import { teamKeySchema, sideSchema, grenadeTypeSchema, teamEconomySchema } from "cs2-demo-format";
 import { qaReportSchema } from "./qa.js";
 import {
@@ -168,6 +169,7 @@ export const workspaceReplayFrameSchema = z.object({
   grenades: z.array(grenadeTypeSchema).optional().default([]),
   alive: z.boolean(),
   flashed: z.boolean(),
+  flashRemainingSeconds: z.number().nonnegative().optional().default(0),
   hasDefuseKit: z.boolean(),
   hasBomb: z.boolean(),
   /** 本回合是否有头盔（player-economies 查表，非逐帧变化）。 */

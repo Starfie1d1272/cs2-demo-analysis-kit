@@ -1,17 +1,22 @@
 import type { DemoPackage, DuelInsightsModel, DuelFinderRow, OpeningDuelRow, PlayerMechanicsRow } from "@cs2dak/contract";
 import { duelInsightsModelSchema } from "@cs2dak/contract";
 import { deriveDuels, deriveOpeningDuels, derivePlayerMechanics, type PlayerMechanicsFact } from "@cs2dak/core";
+import type { TriangleBvh } from "@cs2dak/maps";
 
 export interface DuelInsightsInput {
   matchId: string;
   pkg: DemoPackage;
 }
 
+export interface DuelInsightsOptions {
+  /** 按地图名提供 .tri BVH；提供后视觉反应/预瞄走 LOS 精确口径，否则退化为 duels 窗口起点。 */
+  visibilityFor?: (mapName: string) => TriangleBvh | null;
+}
+
 const CLASSIFICATION_LABEL: Record<string, string> = {
-  contested: "正面对枪",
-  outaimed: "正面秒杀",
-  caught_off_guard: "偷背身",
-  cleanup: "补残血"
+  contested_duel: "对枪胜出",
+  suppressed_kill: "先手压制击杀",
+  caught_off_guard: "侧背身击杀"
 };
 
 function nameFor(pkg: DemoPackage, steamId64: string): string {
@@ -35,11 +40,14 @@ function duelRow(input: DuelInsightsInput, fact: ReturnType<typeof deriveDuels>[
     victimName: nameFor(input.pkg, fact.victimSteamId64),
     weapon: fact.weapon,
     classification: fact.classification,
+    hpBucket: fact.hpBucket,
+    thirdParty: fact.thirdParty,
     fullHealth: fact.fullHealth,
     victimHealthBefore: fact.victimHealthBefore,
     killerHealthBefore: fact.killerHealthBefore,
     ttkMs: fact.ttkMs,
     oneShotKill: fact.oneShotKill,
+    evidenceTicks: fact.evidenceTicks,
     killerPosition: fact.killerPosition,
     victimPosition: fact.victimPosition,
     evidence: { matchId: input.matchId, roundNumber: fact.roundNumber, tick: fact.tick }
@@ -58,7 +66,7 @@ function rankLabel(value: number, values: number[], higherIsBetter = true): stri
   if (values.length < 1) return null;
   const sorted = [...values].sort((a, b) => higherIsBetter ? b - a : a - b);
   const rank = sorted.findIndex((candidate) => candidate === value) + 1;
-  return rank > 0 ? `当前范围第 ${rank}/${values.length}` : null;
+  return rank > 0 ? `当前范围前 ${Math.max(1, Math.round(rank / values.length * 100))}%` : null;
 }
 
 function metricValues(rows: PlayerMechanicsFact[], pick: (row: PlayerMechanicsFact) => number | null): number[] {
@@ -69,6 +77,10 @@ function mechanicsRow(pkg: DemoPackage, fact: PlayerMechanicsFact, allFacts: Pla
   const firstShotValues = metricValues(allFacts, (row) => row.firstShotAccuracyPercent);
   const sprayValues = metricValues(allFacts, (row) => row.sprayAccuracyPercent);
   const counterStrafeValues = metricValues(allFacts, (row) => row.counterStrafeSuccessPercent);
+  const oneTapValues = metricValues(allFacts, (row) => row.oneTapRatePercent);
+  const shotIntervalValues = metricValues(allFacts, (row) => row.medianShotIntervalMs);
+  const visualReactionValues = metricValues(allFacts, (row) => row.reaction.visualReactionMs);
+  const preaimValues = metricValues(allFacts, (row) => row.reaction.preaimAngleErrorDegrees);
   const metrics = [
     fact.firstShotAccuracyPercent == null ? null : {
       key: "firstShotAccuracy",
@@ -90,6 +102,34 @@ function mechanicsRow(pkg: DemoPackage, fact: PlayerMechanicsFact, allFacts: Pla
       value: fact.counterStrafeSuccessPercent,
       unit: "%",
       percentileLabel: rankLabel(fact.counterStrafeSuccessPercent, counterStrafeValues)
+    },
+    fact.oneTapRatePercent == null ? null : {
+      key: "oneTapRate",
+      label: "一枪致命率",
+      value: fact.oneTapRatePercent,
+      unit: "%",
+      percentileLabel: rankLabel(fact.oneTapRatePercent, oneTapValues)
+    },
+    fact.medianShotIntervalMs == null ? null : {
+      key: "medianShotInterval",
+      label: "开枪间隔",
+      value: fact.medianShotIntervalMs,
+      unit: "ms",
+      percentileLabel: rankLabel(fact.medianShotIntervalMs, shotIntervalValues, false)
+    },
+    fact.reaction.visualReactionMs == null ? null : {
+      key: "visualReaction",
+      label: "视觉反应",
+      value: fact.reaction.visualReactionMs,
+      unit: "ms",
+      percentileLabel: rankLabel(fact.reaction.visualReactionMs, visualReactionValues, false)
+    },
+    fact.reaction.preaimAngleErrorDegrees == null ? null : {
+      key: "preaimAngleError",
+      label: "预瞄误差",
+      value: fact.reaction.preaimAngleErrorDegrees,
+      unit: "°",
+      percentileLabel: rankLabel(fact.reaction.preaimAngleErrorDegrees, preaimValues, false)
     }
   ].filter((metric): metric is NonNullable<typeof metric> => metric != null);
 
@@ -102,7 +142,9 @@ function mechanicsRow(pkg: DemoPackage, fact: PlayerMechanicsFact, allFacts: Pla
     shotCount: fact.shotCount,
     burstCount: fact.burstCount,
     metrics,
-    burstLengthBuckets: fact.burstLengthBuckets
+    reaction: fact.reaction,
+    burstLengthBuckets: fact.burstLengthBuckets,
+    firingPatternRatio: fact.firingPatternRatio
   };
 }
 
@@ -110,15 +152,16 @@ export function duelClassificationLabel(classification: string): string {
   return CLASSIFICATION_LABEL[classification] ?? classification;
 }
 
-export function buildDuelInsights(inputs: DuelInsightsInput[]): DuelInsightsModel {
+export function buildDuelInsights(inputs: DuelInsightsInput[], options: DuelInsightsOptions = {}): DuelInsightsModel {
   const duelRows: DuelFinderRow[] = [];
   const openingRows: OpeningDuelRow[] = [];
   const mechanicsPairs: Array<{ pkg: DemoPackage; fact: PlayerMechanicsFact }> = [];
 
   for (const input of inputs) {
+    const visibility = options.visibilityFor?.(input.pkg.match.mapName) ?? null;
     duelRows.push(...deriveDuels(input.pkg).map((fact) => duelRow(input, fact)));
     openingRows.push(...deriveOpeningDuels(input.pkg).map((fact) => openingRow(input, fact)));
-    mechanicsPairs.push(...derivePlayerMechanics(input.pkg).map((fact) => ({ pkg: input.pkg, fact })));
+    mechanicsPairs.push(...derivePlayerMechanics(input.pkg, { visibility }).map((fact) => ({ pkg: input.pkg, fact })));
   }
 
   const allFacts = mechanicsPairs.map((pair) => pair.fact);
@@ -131,8 +174,10 @@ export function buildDuelInsights(inputs: DuelInsightsInput[]): DuelInsightsMode
     notes: [
       "TTK 以击杀连发组第一枪到击杀 tick 计算；AK 一枪头可能接近 0ms。",
       "首发/扫射命中按开枪 tick ±1 匹配伤害事件；穿物体、霰弹多弹丸可能低估。",
-      "急停成功率只在 shots.velocity 有有效非零采样时展示；全零 velocity 视为导出不可用。",
-      "当前范围标签只基于本次选择的 demo，不是固定联赛评级。"
+      "扫射命中率从同一 burst 第二发起算，且只统计击杀边界前的开枪。",
+      "急停成功率读取开枪前 200ms 的 shots velocity，并按武器/类别阈值判定；全零 velocity 视为导出不可用。",
+      "反应/预瞄优先消费 research duels.json 满 tick 窗口；缺失窗口时只展示可证据化字段。",
+      "百分位标签基于当前聚合范围；未接入固定联赛基线时不输出 A/B/C。"
     ]
   });
 }

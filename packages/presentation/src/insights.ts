@@ -1,4 +1,6 @@
 import type { DemoPackage, MatchWorkspaceModel, TeamKey } from "@cs2dak/contract";
+import { deriveDuels, derivePlayerMechanics } from "@cs2dak/core";
+import type { TriangleBvh } from "@cs2dak/maps";
 import { round } from "./season-metrics.js";
 import { displayWeaponName } from "./weapons.js";
 
@@ -97,6 +99,25 @@ export interface PlayerWeaponStat {
   kills: number;
   headshotPercent: number | null;
   killsPerMatch: number;
+}
+
+export interface PlayerMechanicsWeaponProfile {
+  weapon: string;
+  label: string;
+  kills: number;
+  firstShotAccuracyPercent: number | null;
+  sprayAccuracyPercent: number | null;
+  medianTtkMs: number | null;
+  counterStrafeSuccessPercent: number | null;
+  oneTapRatePercent: number | null;
+  visualReactionMs: number | null;
+  preaimSuccessPercent: number | null;
+  percentile: Record<string, string | null>;
+}
+
+export interface PlayerMechanicsProfile {
+  overall: PlayerMechanicsWeaponProfile;
+  weapons: PlayerMechanicsWeaponProfile[];
 }
 
 export interface PlayerFlashSummaryInput {
@@ -309,6 +330,157 @@ export function buildPlayerSeasonInsights(
       clutchLosses: { count: clutchLosses, evidence: clutchLossEvidence.slice(0, MAX_EVIDENCE) }
     }
   };
+}
+
+function avg(values: Array<number | null>): number | null {
+  const nums = values.filter((value): value is number => value != null);
+  return nums.length > 0 ? round(nums.reduce((sum, value) => sum + value, 0) / nums.length, 1) : null;
+}
+
+function medianNumber(values: Array<number | null>): number | null {
+  const nums = values.filter((value): value is number => value != null).sort((a, b) => a - b);
+  if (nums.length === 0) return null;
+  const mid = Math.floor(nums.length / 2);
+  return nums.length % 2 === 0 ? round((nums[mid - 1]! + nums[mid]!) / 2, 1) : round(nums[mid]!, 1);
+}
+
+function percentileLabel(value: number | null, values: Array<number | null>, lowerIsBetter = false): string | null {
+  if (value == null) return null;
+  const nums = values.filter((candidate): candidate is number => candidate != null);
+  if (nums.length === 0) return null;
+  const better = nums.filter((candidate) => lowerIsBetter ? candidate <= value : candidate >= value).length;
+  return `当前范围前 ${Math.max(1, Math.round(better / nums.length * 100))}%`;
+}
+
+function weaponBucket(weapon: string): string {
+  const normalized = weapon.toLowerCase();
+  if (["ak47"].includes(normalized)) return "ak47";
+  if (["m4a1", "m4a4", "m4a1_silencer"].includes(normalized)) return "m4";
+  if (normalized === "awp") return "awp";
+  if (normalized === "deagle") return "deagle";
+  return "other";
+}
+
+function weaponBucketLabel(bucket: string): string {
+  if (bucket === "ak47") return "AK";
+  if (bucket === "m4") return "M4";
+  if (bucket === "awp") return "AWP";
+  if (bucket === "deagle") return "Deagle";
+  if (bucket === "all") return "全部武器";
+  return "其他";
+}
+
+export interface MechanicsProfileOptions {
+  /** 按地图名提供 .tri BVH；提供后视觉反应/预瞄走 LOS 精确口径。 */
+  visibilityFor?: (mapName: string) => TriangleBvh | null;
+}
+
+export function buildPlayerMechanicsProfile(
+  demos: SeasonInsightsDemo[],
+  steamIds: string[],
+  options: MechanicsProfileOptions = {}
+): PlayerMechanicsProfile {
+  const ids = new Set(steamIds);
+  const byBucket = new Map<string, {
+    kills: number;
+    first: Array<number | null>;
+    spray: Array<number | null>;
+    counter: Array<number | null>;
+    oneTap: Array<number | null>;
+    reaction: Array<number | null>;
+    preaim: Array<number | null>;
+    ttk: Array<number | null>;
+  }>();
+  const allRows: Array<{ bucket: string; first: number | null; spray: number | null; counter: number | null; oneTap: number | null; reaction: number | null; preaim: number | null; ttk: number | null }> = [];
+
+  const get = (bucket: string) => {
+    const current = byBucket.get(bucket) ?? { kills: 0, first: [], spray: [], counter: [], oneTap: [], reaction: [], preaim: [], ttk: [] };
+    byBucket.set(bucket, current);
+    return current;
+  };
+
+  for (const { pkg } of demos) {
+    const duelRows = deriveDuels(pkg).filter((duel) => ids.has(duel.killerSteamId64));
+    const ttkByBucket = new Map<string, number[]>();
+    for (const duel of duelRows) {
+      if (duel.ttkMs == null) continue;
+      const bucket = weaponBucket(duel.weapon);
+      const list = ttkByBucket.get(bucket) ?? [];
+      list.push(duel.ttkMs);
+      ttkByBucket.set(bucket, list);
+    }
+    const visibility = options.visibilityFor?.(pkg.match.mapName) ?? null;
+    for (const row of derivePlayerMechanics(pkg, { visibility }).filter((item) => ids.has(item.steamId64))) {
+      const bucket = weaponBucket(row.weapon);
+      const cell = get(bucket);
+      const ttk = medianNumber(ttkByBucket.get(bucket) ?? []);
+      const preaim = row.reaction.preaimSuccess == null ? null : row.reaction.preaimSuccess ? 100 : 0;
+      cell.kills += row.killCount;
+      cell.first.push(row.firstShotAccuracyPercent);
+      cell.spray.push(row.sprayAccuracyPercent);
+      cell.counter.push(row.counterStrafeSuccessPercent);
+      cell.oneTap.push(row.oneTapRatePercent);
+      cell.reaction.push(row.reaction.visualReactionMs);
+      cell.preaim.push(preaim);
+      cell.ttk.push(ttk);
+      allRows.push({
+        bucket,
+        first: row.firstShotAccuracyPercent,
+        spray: row.sprayAccuracyPercent,
+        counter: row.counterStrafeSuccessPercent,
+        oneTap: row.oneTapRatePercent,
+        reaction: row.reaction.visualReactionMs,
+        preaim,
+        ttk
+      });
+    }
+  }
+
+  const toProfile = (bucket: string, cell: ReturnType<typeof get>): PlayerMechanicsWeaponProfile => {
+    const first = avg(cell.first);
+    const spray = avg(cell.spray);
+    const ttk = medianNumber(cell.ttk);
+    const counter = avg(cell.counter);
+    const oneTap = avg(cell.oneTap);
+    const reaction = medianNumber(cell.reaction);
+    const preaim = avg(cell.preaim);
+    return {
+      weapon: bucket,
+      label: weaponBucketLabel(bucket),
+      kills: cell.kills,
+      firstShotAccuracyPercent: first,
+      sprayAccuracyPercent: spray,
+      medianTtkMs: ttk,
+      counterStrafeSuccessPercent: counter,
+      oneTapRatePercent: oneTap,
+      visualReactionMs: reaction,
+      preaimSuccessPercent: preaim,
+      percentile: {
+        firstShotAccuracy: percentileLabel(first, allRows.map((row) => row.first)),
+        sprayAccuracy: percentileLabel(spray, allRows.map((row) => row.spray)),
+        medianTtk: percentileLabel(ttk, allRows.map((row) => row.ttk), true),
+        counterStrafe: percentileLabel(counter, allRows.map((row) => row.counter)),
+        oneTapRate: percentileLabel(oneTap, allRows.map((row) => row.oneTap)),
+        visualReaction: percentileLabel(reaction, allRows.map((row) => row.reaction), true),
+        preaimSuccess: percentileLabel(preaim, allRows.map((row) => row.preaim))
+      }
+    };
+  };
+
+  const overall = toProfile("all", {
+    kills: [...byBucket.values()].reduce((sum, row) => sum + row.kills, 0),
+    first: [...byBucket.values()].flatMap((row) => row.first),
+    spray: [...byBucket.values()].flatMap((row) => row.spray),
+    counter: [...byBucket.values()].flatMap((row) => row.counter),
+    oneTap: [...byBucket.values()].flatMap((row) => row.oneTap),
+    reaction: [...byBucket.values()].flatMap((row) => row.reaction),
+    preaim: [...byBucket.values()].flatMap((row) => row.preaim),
+    ttk: [...byBucket.values()].flatMap((row) => row.ttk)
+  });
+  const weapons = [...byBucket.entries()]
+    .map(([bucket, cell]) => toProfile(bucket, cell))
+    .sort((a, b) => b.kills - a.kills || a.label.localeCompare(b.label));
+  return { overall, weapons };
 }
 
 export function buildPlayerWeaponStats(

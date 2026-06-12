@@ -2,16 +2,21 @@ import { buildSeasonCohort, type PlayerIdentityMap } from "@cs2dak/cohort";
 import {
   buildAllPlayerSeasonProfiles,
   buildPlayerSeasonInsights,
+  buildPlayerMechanicsProfile,
   buildPlayerWeaponStats,
   buildSeasonLeaderboardModel,
   buildTournamentInsights,
+  buildTeamComparison,
   buildPlayerFlashSummaries,
   type SeasonInsightsDemo,
   type PlayerFlashSummary,
   type PlayerSeasonInsights,
+  type PlayerMechanicsProfile,
   type PlayerWeaponStat,
-  type TournamentInsights
+  type TournamentInsights,
+  type TeamComparisonModel
 } from "@cs2dak/presentation";
+import { loadTriLookup } from "./tri";
 import type {
   PlayerSeasonProfile,
   SeasonCohortBundle,
@@ -245,6 +250,7 @@ export function getSeasonDemos(entries: StudioDemoEntry[], identity?: IdentityOp
 export interface PlayerSeasonDetails {
   insights: PlayerSeasonInsights;
   weaponStats: PlayerWeaponStat[];
+  mechanics: PlayerMechanicsProfile;
 }
 
 const DETAILS_CACHE_LIMIT = 24;
@@ -270,9 +276,11 @@ export function getPlayerSeasonDetails(entries: StudioDemoEntry[], steamIds: str
   if (cached) return cached;
   const loading = (async () => {
     const demos = await loadDemosWithRenames(entries, identity?.teamRenames);
+    const visibilityFor = await loadTriLookup(demos.map((demo) => demo.pkg.match.mapName));
     const details = {
       insights: buildPlayerSeasonInsights(demos, steamIds),
-      weaponStats: buildPlayerWeaponStats(demos, steamIds)
+      weaponStats: buildPlayerWeaponStats(demos, steamIds),
+      mechanics: buildPlayerMechanicsProfile(demos, steamIds, { visibilityFor })
     };
     clearPkgCache();
     return details;
@@ -322,6 +330,13 @@ export function getTournamentInsights(entries: StudioDemoEntry[], identity?: Ide
     tournamentPromise = null;
   });
   return tournamentPromise;
+}
+
+export async function getTeamComparison(entries: StudioDemoEntry[], identity?: IdentityOptions): Promise<TeamComparisonModel> {
+  const demos = await loadDemosWithRenames(entries, identity?.teamRenames);
+  const model = buildTeamComparison(demos);
+  clearPkgCache();
+  return model;
 }
 
 /** 聚合摘要：优先持久缓存命中（不触碰 ZIP），未命中才全量解析并回写。

@@ -780,7 +780,7 @@ export function ReplayViewer({ replay, map, target = null }: {
                     {frame.armor > 0 && <span>{frame.hasHelmet ? "全甲" : "半甲"}</span>}
                     {frame.hasDefuseKit && <span>kit</span>}
                     {frame.hasBomb && <span>C4</span>}
-                    {frame.flashed && <span>flashed</span>}
+                    {frame.flashed && <span>白 {frame.flashRemainingSeconds.toFixed(1)}s</span>}
                     {current && <span className="dak-frame-current">当前 {current}</span>}
                   </small>
                 )}
@@ -969,7 +969,7 @@ export function ReplayViewer({ replay, map, target = null }: {
               key={player.steamId64}
               className={`dak-replay-token dak-replay-token-${player.teamKey}${!frame.alive ? " dak-replay-token-dead" : ""}${frame.flashed ? " dak-replay-token-flashed" : ""}${dualLevel && levelOf(frame.z) !== level ? " dak-replay-token-offlevel" : ""}`}
               style={{ ...replayFramePosition(frame, map), transform: `translate(-50%, -50%) rotate(${90 - frame.yaw}deg)` }}
-              title={`${playerNumbers[player.steamId64] ?? "?"} ${player.name} · ${frame.hp} HP${frame.hasDefuseKit ? " · 拆弹器" : ""}${frame.flashed ? " · flashed" : ""}`}
+              title={`${playerNumbers[player.steamId64] ?? "?"} ${player.name} · ${frame.hp} HP${frame.hasDefuseKit ? " · 拆弹器" : ""}${frame.flashed ? ` · 白 ${frame.flashRemainingSeconds.toFixed(1)}s` : ""}`}
             >
               <span style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>{playerNumbers[player.steamId64] ?? "?"}</span>
               {frame.hasDefuseKit && <i style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>kit</i>}

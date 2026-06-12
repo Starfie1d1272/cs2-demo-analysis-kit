@@ -130,6 +130,13 @@ export function buildVetoTemplate(
             { actionType: "pick", teamKey: "teamA" },
             { actionType: "decider", teamKey: null }
           ];
+  const steps = raw.map((step, index) => ({
+    stepOrder: index + 1,
+    actionType: step.actionType,
+    teamKey: step.teamKey,
+    mapName: mapPool[index % Math.max(mapPool.length, 1)] ?? "",
+    side: step.side ?? null
+  }));
   return {
     version: "cs2-demo-analysis-kit/series-veto-0.1",
     seriesId,
@@ -137,13 +144,25 @@ export function buildVetoTemplate(
     teamAName,
     teamBName,
     mapPool,
-    steps: raw.map((step, index) => ({
-      stepOrder: index + 1,
-      actionType: step.actionType,
-      teamKey: step.teamKey,
-      mapName: mapPool[index % Math.max(mapPool.length, 1)] ?? "",
-      side: step.side ?? null
-    }))
+    ...deriveVetoSummary(steps),
+    steps
+  };
+}
+
+export function deriveVetoSummary(steps: SeriesVetoStep[]): Pick<SeriesVeto, "maps" | "sideChoices"> {
+  return {
+    maps: {
+      picked: steps
+        .filter((step) => step.actionType === "pick")
+        .map((step) => ({ mapName: step.mapName, teamKey: step.teamKey })),
+      banned: steps
+        .filter((step) => step.actionType === "ban")
+        .map((step) => ({ mapName: step.mapName, teamKey: step.teamKey })),
+      decider: steps.find((step) => step.actionType === "decider")?.mapName ?? null
+    },
+    sideChoices: steps
+      .filter((step): step is SeriesVetoStep & { side: "t" | "ct" } => step.side != null)
+      .map((step) => ({ mapName: step.mapName, teamKey: step.teamKey, side: step.side }))
   };
 }
 

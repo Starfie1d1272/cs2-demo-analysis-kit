@@ -19,6 +19,22 @@ export const seriesVetoSchema = z.object({
   teamAName: z.string(),
   teamBName: z.string(),
   mapPool: z.array(z.string().min(1)),
+  maps: z.object({
+    picked: z.array(z.object({
+      mapName: z.string().min(1),
+      teamKey: z.enum(["teamA", "teamB"]).nullable()
+    })),
+    banned: z.array(z.object({
+      mapName: z.string().min(1),
+      teamKey: z.enum(["teamA", "teamB"]).nullable()
+    })),
+    decider: z.string().min(1).nullable()
+  }),
+  sideChoices: z.array(z.object({
+    mapName: z.string().min(1),
+    teamKey: z.enum(["teamA", "teamB"]).nullable(),
+    side: z.enum(["t", "ct"])
+  })),
   steps: z.array(seriesVetoStepSchema)
 });
 

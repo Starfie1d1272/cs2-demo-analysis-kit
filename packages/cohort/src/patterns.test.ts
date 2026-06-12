@@ -91,7 +91,8 @@ describe("buildOpeningPatternClusters", () => {
               place: places,
               flash: Array.from({ length: 16 }, () => 0),
               flags: Array.from({ length: 16 }, () => 1),
-              weapon: Array.from({ length: 16 }, () => -1)
+              weapon: Array.from({ length: 16 }, () => -1),
+              grenades: Array.from({ length: 16 }, () => [])
             },
             {
               playerIndex: 1,
@@ -103,7 +104,8 @@ describe("buildOpeningPatternClusters", () => {
               place: Array.from({ length: 16 }, () => 1),
               flash: Array.from({ length: 16 }, () => 0),
               flags: Array.from({ length: 16 }, () => 1),
-              weapon: Array.from({ length: 16 }, () => -1)
+              weapon: Array.from({ length: 16 }, () => -1),
+              grenades: Array.from({ length: 16 }, () => [])
             }
           ]
         }]

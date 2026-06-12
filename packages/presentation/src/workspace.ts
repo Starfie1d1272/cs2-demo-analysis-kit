@@ -806,6 +806,7 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
             grenades: normalizeHeldGrenades((player as { grenades?: unknown[][] }).grenades?.[index]),
             alive: (flags & 1) !== 0,
             flashed: (player.flash?.[index] ?? 0) > 0,
+            flashRemainingSeconds: Math.max(0, (player.flash?.[index] ?? 0) / 10),
             hasDefuseKit: (flags & 4) !== 0,
             hasBomb: (flags & 2) !== 0,
             hasHelmet
