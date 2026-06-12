@@ -1,19 +1,16 @@
 """
-Golden regression test: 3696714896_1000003075.dem (NJU de_ancient) → cs2dak export → 对比 fixtures/baselines/de_ancient/
+Golden regression test: 3696714896_1000003075.dem (NJU de_ancient) → cs2df export → 对比 fixtures/baselines/de_ancient/
 
 运行方式：
-  pnpm python:test -- python/tests/test_golden_de_ancient.py -v
   uv run pytest python/tests/test_golden_de_ancient.py -v
 
 demo 文件被 gitignore，CI 没有 .dem 时自动跳过。
 Golden baselines 在 fixtures/baselines/de_ancient/ 下，是提交的真相源。
-更新 baselines：重新运行 cs2dak export 后把 ZIP 内容解压到该目录覆写即可。
 """
 
 from __future__ import annotations
 
 import json
-import subprocess
 import zipfile
 from pathlib import Path
 
@@ -27,8 +24,7 @@ GOLDEN_DIR = REPO_ROOT / "fixtures/baselines/de_ancient"
 pytestmark = pytest.mark.skipif(not DEMO_PATH.exists(), reason="demo file not present (gitignored)")
 
 # 每次运行时间戳不同，从对比中排除
-# exporter.version 随发版变动（scripts/sync-version.mjs），不参与 golden 对比
-_MANIFEST_EXCLUDE_KEYS = {"exportedAt", "exporter"}
+_MANIFEST_EXCLUDE_KEYS = {"exportedAt"}
 
 # 超大文件：全字段对比但单独断言，方便快速定位问题
 _LARGE_FILES = {"positions-1s.json", "replay.json", "shots.json"}
@@ -46,19 +42,14 @@ def _strip_manifest(data: dict) -> dict:
 
 @pytest.fixture(scope="module")
 def exported_zip(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """运行 cs2dak export，返回产出 ZIP 的路径。module 级缓存，同一 pytest 会话只跑一次。"""
-    out_dir = tmp_path_factory.mktemp("golden-export")
-    result = subprocess.run(
-        ["uv", "run", "--project", "python", "cs2dak", "export", str(DEMO_PATH), "--out", str(out_dir)],
-        capture_output=True,
-        text=True,
-        cwd=REPO_ROOT,
-    )
-    assert result.returncode == 0, f"cs2dak export failed:\n{result.stderr}"
+    """Run cs2df export, write the result to a temp ZIP, return its path."""
+    from cs2df.package import export_demo
 
-    zips = list(out_dir.glob("*.zip"))
-    assert len(zips) == 1, f"expected 1 ZIP, got: {[z.name for z in zips]}"
-    return zips[0]
+    data, _match_meta = export_demo(str(DEMO_PATH))
+    out_dir = tmp_path_factory.mktemp("golden-export")
+    zip_path = out_dir / "output.zip"
+    zip_path.write_bytes(data)
+    return zip_path
 
 
 def _read_zip_json(zip_path: Path, name: str) -> object:
@@ -168,10 +159,10 @@ def test_player_count_matches_across_files(exported_zip: Path) -> None:
 def test_manifest_schema_version(exported_zip: Path) -> None:
     manifest = _read_zip_json(exported_zip, "manifest.json")
     assert isinstance(manifest, dict)
-    assert manifest["schemaVersion"] == "cs2-demo-format/2.0"
+    assert manifest["schemaVersion"] == "cs2-demo-format/3.0"
 
 
-def test_manifest_exporter_is_cs2dak(exported_zip: Path) -> None:
+def test_manifest_exporter_is_cs2df(exported_zip: Path) -> None:
     manifest = _read_zip_json(exported_zip, "manifest.json")
     assert isinstance(manifest, dict)
-    assert manifest["exporter"]["name"] == "cs2-demo-analysis-kit"
+    assert manifest["exporter"]["name"] == "cs2df"

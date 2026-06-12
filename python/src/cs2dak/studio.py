@@ -7,11 +7,11 @@
 
 前端通过 window.pywebview.api 调用本桥：
   - pick_dems():        原生文件对话框选 .dem/.zip
-  - export_dem_path():  按路径导出为 v2 ZIP，base64 回传（ZIP 仅 1–3MB）
+  - export_dem_path():  按路径导出为 v3 ZIP，base64 回传（ZIP 仅 1–3MB）
   - export_dem_bytes(): 按字节导出（Windows 拖拽无路径时的回退）
   - get_drop_path():    拖拽后按文件名解析本机路径（macOS WKWebView）
 
-数据流向与 dev 模式一致：.dem → exporter → v2 ZIP → 前端 IndexedDB。
+数据流向与 dev 模式一致：.dem → cs2df → v3 ZIP → 前端 IndexedDB。
 .dem 本身不进库，导出的临时 ZIP 用完即删。
 """
 
@@ -188,8 +188,7 @@ class StudioApi:
         return {"jobId": job.id}
 
     def _run_export_job(self, job: _ExportJob) -> None:
-        from cs2dak.cli import _build_zip_name
-        from cs2dak.exporter import export_demo
+        from cs2df.package import export_demo
 
         dem = Path(job.path)
         try:
@@ -203,8 +202,8 @@ class StudioApi:
                     job.progress = frac
                     log.info("export job %s %s %.0f%%", job.id, stage, frac * 100)
 
-                data = export_demo(str(dem), progress=on_progress)
-                job.file_name = _build_zip_name(dem, data)
+                data, _match_meta = export_demo(str(dem), progress=on_progress)
+                job.file_name = dem.with_suffix(".zip").name
             job.result_b64 = base64.b64encode(data).decode("ascii")
             job.progress = 1.0
             job.state = "done"
@@ -237,16 +236,16 @@ class StudioApi:
         return {"ok": True, "data": chunk, "done": done}
 
     def export_dem_path(self, path: str) -> dict:
-        """Export one .dem to a v2 ZIP and return its bytes base64-encoded.
+        """Export one .dem to a v3 ZIP and return its bytes base64-encoded.
 
         Returns {ok, fileName, dataBase64} or {ok: False, error}.
         ZIP stays small (columnar replay), so the base64 bridge transfer is cheap;
         the temp dir is removed afterwards either way.
         """
-        from cs2dak.cli import _export_one
+        from cs2df.package import export_demo
 
         dem = Path(path)
-        # 原生对话框也允许直接选 v2 ZIP：不经 exporter，原样回传字节。
+        # 原生对话框也允许直接选 v3 ZIP：不经 exporter，原样回传字节。
         if dem.suffix.lower() == ".zip":
             try:
                 return {
@@ -258,11 +257,11 @@ class StudioApi:
                 return {"ok": False, "error": str(exc)}
         tmp_dir = Path(tempfile.mkdtemp(prefix="cs2dak-studio-"))
         try:
-            zip_path = _export_one(dem, tmp_dir)
-            data = zip_path.read_bytes()
+            data, _match_meta = export_demo(str(dem))
+            file_name = dem.with_suffix(".zip").name
             return {
                 "ok": True,
-                "fileName": zip_path.name,
+                "fileName": file_name,
                 "dataBase64": base64.b64encode(data).decode("ascii"),
             }
         except Exception as exc:  # noqa: BLE001 - surface parse failures to the UI
@@ -271,23 +270,23 @@ class StudioApi:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
     def export_dem_bytes(self, name: str, data_b64: str) -> dict:
-        """Export .dem raw bytes (base64) to a v2 ZIP.
+        """Export .dem raw bytes (base64) to a v3 ZIP.
 
         Used by the frontend when drag-and-drop cannot provide a filesystem path
         (e.g. Windows pywebview). Writes the bytes to a temp file, runs the
         exporter, and returns the ZIP the same way export_dem_path does.
         """
-        from cs2dak.cli import _export_one
+        from cs2df.package import export_demo
 
         tmp_dir = Path(tempfile.mkdtemp(prefix="cs2dak-studio-"))
         try:
             dem_path = tmp_dir / name
             dem_path.write_bytes(base64.b64decode(data_b64))
-            zip_path = _export_one(dem_path, tmp_dir)
-            data = zip_path.read_bytes()
+            data, _match_meta = export_demo(str(dem_path))
+            file_name = dem_path.with_suffix(".zip").name
             return {
                 "ok": True,
-                "fileName": zip_path.name,
+                "fileName": file_name,
                 "dataBase64": base64.b64encode(data).decode("ascii"),
             }
         except Exception as exc:

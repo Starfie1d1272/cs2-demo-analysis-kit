@@ -7,15 +7,14 @@ name = "cs2dak"
 version = "0.4.3"
 description = "Parse CS2 .dem files into cs2-demo-format v2 ZIP exports"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 # 与仓库根 LICENSE 一致。parse_worker/exporter 自 CS2-insight-agent 移植，
 # 已获原作者授权按本仓库许可证分发（见 THIRD-PARTY-NOTICES.md）。
 license = { text = "MIT" }
 authors = [{ name = "Xinyu Du" }]
 dependencies = [
-    "demoparser2>=0.41.2", # native CS2 demo parser (raw events + ticks)
-    "typer>=0.12",         # CLI
-    "jsonschema>=4.21",    # validate output against cs2-demo-format/spec/*.schema.json
+    "cs2df>=3.0.0",  # v3 reference exporter (polars/numpy-based)
+    "typer>=0.12",   # CLI (only gui/version remaining)
 ]
 
 [project.optional-dependencies]

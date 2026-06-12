@@ -7,7 +7,7 @@
 #   Windows -> dist/cs2dak.exe   (onefile, double-click to run)
 #   macOS   -> dist/cs2dak.app   (CI wraps it into a .dmg)
 #
-# demoparser2 is a native (Rust) extension, so we collect_all its binaries.
+# cs2df is a native (Rust) extension, so we collect_all its binaries.
 # The web/ assets are bundled as package data and resolved via __file__ at runtime.
 
 import sys
@@ -22,7 +22,7 @@ SRC = (ROOT / ".." / "src").resolve()   # python/src/
 datas = collect_data_files("cs2dak", includes=["gui/web/*"])
 binaries = []
 hiddenimports = []
-for pkg in ("demoparser2",):
+for pkg in ("cs2df",):
     d, b, h = collect_all(pkg)
     datas += d
     binaries += b

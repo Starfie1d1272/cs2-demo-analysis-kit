@@ -72,17 +72,21 @@ class Api:
 
     # --- the actual work ----------------------------------------------------
     def export_one(self, path: str) -> dict:
-        """Export a single .dem to a cs2-demo-format v2 ZIP in the output dir.
+        """Export a single .dem to a cs2-demo-format v3 ZIP in the output dir.
 
         Returns {name, ok, output|error}. Called per-file from JS so the
         frontend can show per-file progress incrementally.
         """
-        from ..cli import _export_one
+        from cs2df.package import export_demo
 
         p = Path(path)
         name = p.name
         try:
-            zip_path = _export_one(p, self._out_dir)
+            data, _match_meta = export_demo(str(p))
+            self._out_dir.mkdir(parents=True, exist_ok=True)
+            file_name = p.with_suffix(".zip").name
+            zip_path = self._out_dir / file_name
+            zip_path.write_bytes(data)
             return {"name": name, "ok": True, "output": str(zip_path)}
         except Exception as exc:  # noqa: BLE001 - surface any parse failure to the UI
             return {"name": name, "ok": False, "error": str(exc)}

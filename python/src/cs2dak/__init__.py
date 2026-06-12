@@ -1,9 +1,10 @@
-"""cs2dak — CS2 .dem -> cs2-demo-format v2 ZIP.
+"""cs2dak — GUI and Studio launcher for cs2df v3 exporter.
 
-Pipeline: .dem --(parse_worker via demoparser2)--> raw rows --(exporter)--> ZIP.
+Manages the desktop application shell (DAK Studio, standalone GUI
+exporter) around cs2df — the external cs2-demo-format v3 export pipeline.
 """
 
 __version__ = "0.4.3"
 
-# The contract this exporter targets. Must match cs2-demo-format manifest.
-SCHEMA_VERSION = "cs2-demo-format/2.0"
+# The contract this package targets. Matches cs2-demo-format manifest.
+SCHEMA_VERSION = "cs2-demo-format/3.0"
