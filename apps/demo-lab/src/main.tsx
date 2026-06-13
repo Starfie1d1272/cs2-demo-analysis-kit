@@ -7,7 +7,7 @@ import { buildMatchWorkspaceModel, buildSeasonLeaderboardModel } from "@cs2dak/p
 import type { MatchWorkspaceModel, SeasonLeaderboardModel } from "@cs2dak/contract";
 import { MatchWorkspace, SeasonLeaderboard } from "@cs2dak/react";
 import "@cs2dak/react/theme.css";
-import sampleZipUrl from "../../../fixtures/input/sample-match.zip?url";
+import sampleZipUrl from "../../../fixtures/input/sample-2026-02-09_de_mirage_FURIA_13-11_Team_Vitality.zip?url";
 
 // 排行榜预览用 cohort fixtures（多场）构建，验收列/格式/排序。
 const cohortZipUrls = import.meta.glob("../../../fixtures/input/cohort/*.zip", {
