@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cs2dak"
-version = "0.5.0"
+version = "0.5.1"
 description = "Desktop shell for cs2df v3 demo exports and DAK Studio"
 readme = "README.md"
 requires-python = ">=3.11"

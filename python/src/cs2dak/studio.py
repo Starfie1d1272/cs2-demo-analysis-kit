@@ -27,6 +27,7 @@ import threading
 import time
 import urllib.parse
 import uuid
+from datetime import datetime
 from pathlib import Path
 
 from cs2dak import __version__
@@ -44,6 +45,32 @@ if getattr(sys, "frozen", False):
     WEB_DIR = Path(sys._MEIPASS) / "studio_web"
 else:
     WEB_DIR = Path(__file__).parent / "studio_web"
+
+
+def _sanitize(s: str) -> str:
+    for ch in r' <>:"/\|?*':
+        s = s.replace(ch, "_")
+    while "__" in s:
+        s = s.replace("__", "_")
+    return s.strip("_")
+
+
+def _build_zip_name(dem: Path, match_meta: dict) -> str:
+    """Build a descriptive filename from match_meta; fallback to dem stem."""
+    try:
+        date = datetime.fromtimestamp(os.path.getmtime(str(dem))).strftime("%Y-%m-%d")
+        map_name = _sanitize(match_meta.get("mapName") or "unknown")
+        team_a = _sanitize((match_meta.get("teamA") or {}).get("name") or "")
+        team_b = _sanitize((match_meta.get("teamB") or {}).get("name") or "")
+        score_a = (match_meta.get("teamA") or {}).get("score", 0)
+        score_b = (match_meta.get("teamB") or {}).get("score", 0)
+        if team_a and team_b:
+            stem = f"{date}_{map_name}_{team_a}-vs-{team_b}_{score_a}-{score_b}"
+        else:
+            stem = f"{date}_{map_name}_{score_a}-{score_b}_{dem.stem}"
+        return f"{stem}.zip"
+    except Exception:
+        return f"{dem.stem}.zip"
 
 
 def _appdata_userdata() -> Path:
@@ -202,8 +229,8 @@ class StudioApi:
                     job.progress = frac
                     log.info("export job %s %s %.0f%%", job.id, stage, frac * 100)
 
-                data, _match_meta = export_demo(str(dem), progress=on_progress)
-                job.file_name = dem.with_suffix(".zip").name
+                data, match_meta = export_demo(str(dem), progress=on_progress)
+                job.file_name = _build_zip_name(dem, match_meta)
             job.result_b64 = base64.b64encode(data).decode("ascii")
             job.progress = 1.0
             job.state = "done"
@@ -255,19 +282,15 @@ class StudioApi:
                 }
             except OSError as exc:
                 return {"ok": False, "error": str(exc)}
-        tmp_dir = Path(tempfile.mkdtemp(prefix="cs2dak-studio-"))
         try:
-            data, _match_meta = export_demo(str(dem))
-            file_name = dem.with_suffix(".zip").name
+            data, match_meta = export_demo(str(dem))
             return {
                 "ok": True,
-                "fileName": file_name,
+                "fileName": _build_zip_name(dem, match_meta),
                 "dataBase64": base64.b64encode(data).decode("ascii"),
             }
         except Exception as exc:  # noqa: BLE001 - surface parse failures to the UI
             return {"ok": False, "error": str(exc)}
-        finally:
-            shutil.rmtree(tmp_dir, ignore_errors=True)
 
     def export_dem_bytes(self, name: str, data_b64: str) -> dict:
         """Export .dem raw bytes (base64) to a v3 ZIP.
@@ -282,11 +305,10 @@ class StudioApi:
         try:
             dem_path = tmp_dir / name
             dem_path.write_bytes(base64.b64decode(data_b64))
-            data, _match_meta = export_demo(str(dem_path))
-            file_name = dem_path.with_suffix(".zip").name
+            data, match_meta = export_demo(str(dem_path))
             return {
                 "ok": True,
-                "fileName": file_name,
+                "fileName": _build_zip_name(dem_path, match_meta),
                 "dataBase64": base64.b64encode(data).decode("ascii"),
             }
         except Exception as exc:
