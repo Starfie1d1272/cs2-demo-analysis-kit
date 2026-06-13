@@ -493,26 +493,7 @@ function EvidenceCards({
               );
             })}
           </div>
-          {/* 分页 */}
-          {totalPages > 1 && (
-            <nav className="stu-pagination" aria-label="分页">
-              <button type="button" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>‹</button>
-              {Array.from({ length: Math.min(totalPages, 8) }, (_, i) => {
-                const start = Math.max(0, Math.min(safePage - 3, totalPages - 8));
-                return (
-                  <button
-                    key={start + i}
-                    type="button"
-                    className={safePage === start + i ? "active" : ""}
-                    onClick={() => setPage(start + i)}
-                  >
-                    {start + i + 1}
-                  </button>
-                );
-              })}
-              <Pagination page={page} totalPages={totalPages} onChange={setPage} info={`${activeRows.length} 条 · ${safePage + 1}/${totalPages} 页`} />
-            </>
-          )}
+          <Pagination page={page} totalPages={totalPages} onChange={setPage} info={`${activeRows.length} 条 · ${safePage + 1}/${totalPages} 页`} />
         </>
       )}
     </section>
