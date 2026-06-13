@@ -222,10 +222,10 @@ utility 1.76，而 combat/trade 仅 0.38/0.21。裸 z-score（v0 现状）压不
 某人一场道具/残局爆炸会刷高分 → **v1 必须上 percentile-mapping / sigmoid 尾部饱和**
 （分位表已冻进 JSON，数据就绪）。
 
-**待办**：
-- 正式接线：rival-rating 提交 + re-pin `core`/`cohort` 的 commit → CLI 加「单 demo 绝对评分」入口。
-- 扩样到 100–200 张出权威 v1，并把归一化形状从裸 z-score 换成分位映射。
-- 当前 v0 标 `_provisional`，只用于工程验证，**非权威职业标尺**。
+**待办（2026-06-13 更新：接线已完毕，v0 provisional 已冻结）**：
+- ✅ 正式接线已完成：`core/signals.ts` 已 `import { computeFrozenProBaselineRR }` 并接入 `deriveRRSignals` → `computeAccountRatingsV2` 管线；端到端测试覆盖。
+- ⬜ 扩样到 100–200 张出权威 v1，并把归一化形状从裸 z-score 换成分位映射。
+- ⬜ 当前 v0 标 `_provisional`，只用于工程验证，**非权威职业标尺**。
 
 > 数据源 7 图池：ancient / anubis / dust2 / inferno / mirage / nuke / overpass（train 已出池）。
 > spike 已全覆盖，但 overpass/anubis 各仅 1 张，扩样时优先补。

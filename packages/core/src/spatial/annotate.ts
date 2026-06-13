@@ -3,7 +3,7 @@
  * 设计见 docs/design/rr-model.md §3、§5（计算流程）。
  *
  * 标注优先级（doc §2.2）：manual zone polygon > callout projection > nearest nav area。
- * 当前**无 zone 多边形标定**，故落到 callout（replay place 列）+ navAreaId。
+ * 当前 zone 多边形标定仅用于 utility 几何（`utility.ts` 的 `effectPosition → zoneAt`），annotate 层暂不接入 zone，保留 callout 路径。
  * 这些是 official MapControl gate（SP2：solo pressure 的 nav 距离、denial 的 LOS）的输入底座。
  *
  * v3 replay 8Hz 流替代了 v2 的 positions-1s。每帧解码后转换：

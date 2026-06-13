@@ -148,7 +148,7 @@ official scoring 排除 `save / exit / freeze`（仍可进 review 层）。
 
 ### 3.4 Official UtilitySpatial（5 指标，actual-effect）
 
-> **状态（SP3 v2，2026-06-06）**：zone 多边形 **4/7 图** + nav 拓扑 + tri-BVH 静态视线（4 图本机已下载）
+> **状态（SP3 v2，2026-06-06）**：zone 多边形 **5/7 图**（ancient/anubis/dust2/inferno/mirage） + nav 拓扑 + tri-BVH 静态视线（4 图本机已下载）
 > → `core/spatial/{utility,utility-geometry}.ts` 落地**全部 5 项**几何 actual-effect。
 > 手雷归属率 94–98%。进 review/shadow，**未进 RR 评分**（待职业样本校准）。
 > 诊断：`pnpm analyze:spatial-coverage`（看覆盖）/ `analyze:utility-rr-impact`（看 RR 影响）。
