@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { buildLineupClusters } from "./lineups.js";
 
 const throwAt = (roundNumber: number, tick: number, x: number, effectX = 500) => ({
+  entryId: "d1",
+  freezeEndTick: 0,
   roundNumber,
   grenade: "smoke",
   throwerIndex: 0,
@@ -15,7 +17,7 @@ describe("buildLineupClusters", () => {
     const clusters = buildLineupClusters({
       mapName: "de_mirage",
       grenades: [throwAt(3, 3000, 10), throwAt(1, 1000, 0), throwAt(5, 5000, 2000, 3000)],
-      roundWinners: new Map([[1, "teamA"], [3, "teamB"], [5, "teamA"]]),
+      roundWinners: new Map([["d1:1", "teamA"], ["d1:3", "teamB"], ["d1:5", "teamA"]]),
       throwerTeam: () => "teamA"
     });
     expect(clusters).toHaveLength(2);

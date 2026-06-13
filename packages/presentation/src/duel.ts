@@ -27,6 +27,21 @@ function teamNameFor(pkg: DemoPackage, teamKey: string): string {
   return teamKey === "teamA" ? (pkg.match.teamA.name ?? "Team A") : (pkg.match.teamB.name ?? "Team B");
 }
 
+/** CS2 标准回合时长（秒，freeze 结束后），用于回合剩余时间倒计时显示。 */
+const ROUND_DURATION = 115;
+
+/** 对枪发生时的回合剩余时间标签（"1:23"），无 freezeEnd 时为 null。 */
+function roundTimeLabelFor(input: DuelInsightsInput, fact: ReturnType<typeof deriveDuels>[number]): string | null {
+  const tickrate = input.pkg.match.tickrate || input.pkg.manifest.tickrate || 64;
+  const roundRow = input.pkg.rounds.find((r) => r.roundNumber === fact.roundNumber);
+  if (!roundRow || roundRow.freezeEndTick == null || tickrate <= 0) return null;
+  const elapsed = (fact.tick - roundRow.freezeEndTick) / tickrate;
+  const remaining = Math.max(0, ROUND_DURATION - elapsed);
+  const min = Math.floor(remaining / 60);
+  const sec = Math.round(remaining % 60);
+  return `${min}:${String(sec).padStart(2, "0")}`;
+}
+
 function duelRow(input: DuelInsightsInput, fact: ReturnType<typeof deriveDuels>[number]): DuelFinderRow {
   return {
     id: `${input.matchId}:${fact.id}`,
@@ -50,29 +65,16 @@ function duelRow(input: DuelInsightsInput, fact: ReturnType<typeof deriveDuels>[
     evidenceTicks: fact.evidenceTicks,
     killerPosition: fact.killerPosition,
     victimPosition: fact.victimPosition,
+    roundTimeLabel: roundTimeLabelFor(input, fact),
     evidence: { matchId: input.matchId, roundNumber: fact.roundNumber, tick: fact.tick }
   };
 }
 
-/** CS2 标准回合时长（秒，freeze 结束后）。CLOCK_START 用于倒计时显示。 */
-const ROUND_DURATION = 115;
-
 function openingRow(input: DuelInsightsInput, fact: ReturnType<typeof deriveDuels>[number]): OpeningDuelRow {
-  const tickrate = input.pkg.match.tickrate || input.pkg.manifest.tickrate || 64;
-  const roundRow = input.pkg.rounds.find((r) => r.roundNumber === fact.roundNumber);
-  let roundTimeLabel: string | null = null;
-  if (roundRow && roundRow.freezeEndTick != null && tickrate > 0) {
-    const elapsed = (fact.tick - roundRow.freezeEndTick) / tickrate;
-    const remaining = Math.max(0, ROUND_DURATION - elapsed);
-    const min = Math.floor(remaining / 60);
-    const sec = Math.round(remaining % 60);
-    roundTimeLabel = `${min}:${String(sec).padStart(2, "0")}`;
-  }
   return {
     ...duelRow(input, fact),
     attackerCallout: null,
-    victimCallout: null,
-    roundTimeLabel
+    victimCallout: null
   };
 }
 

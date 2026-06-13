@@ -42,13 +42,14 @@ export const duelFinderRowSchema = z.object({
   }),
   killerPosition: duelPointSchema,
   victimPosition: duelPointSchema,
+  /** 对枪发生时的回合剩余时间标签（"1:23"），无 freezeEnd 时为 null。 */
+  roundTimeLabel: z.string().nullable(),
   evidence: duelEvidenceSchema
 });
 
 export const openingDuelRowSchema = duelFinderRowSchema.extend({
   attackerCallout: z.string().nullable(),
-  victimCallout: z.string().nullable(),
-  roundTimeLabel: z.string().nullable()
+  victimCallout: z.string().nullable()
 });
 
 export const mechanicsMetricSchema = z.object({
