@@ -37,9 +37,9 @@ describe("series grouping", () => {
       entry("bo5-4", "2026-06-03", "D", "Alpha"),
     ], { Alpha: "A" });
 
-    expect(groups.find((group) => group.id === "bo1")?.format).toBe("bo1");
-    expect(groups.find((group) => group.entryIds.includes("bo3-1"))?.format).toBe("bo3");
-    expect(groups.find((group) => group.entryIds.includes("bo5-1"))?.format).toBe("bo5");
+    expect(groups.find((group) => group.id === "series:2026-06-01:A|B")?.format).toBe("bo1");
+    expect(groups.find((group) => group.id === "series:2026-06-02:A|C")?.format).toBe("bo3");
+    expect(groups.find((group) => group.id === "series:2026-06-03:A|D")?.format).toBe("bo5");
   });
 
   it("BO5 骨架是 2 ban + 4 pick + 1 decider（与打了几张图无关）", () => {

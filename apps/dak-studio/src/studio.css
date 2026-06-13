@@ -2702,6 +2702,22 @@ td.stu-heat-cell.stu-heat-neutral {
   stroke-width: 4;
 }
 
+/* 双向 hover 高亮：地图侧 */
+.stu-duel-map-point-hovered .stu-duel-map-point-ring {
+  opacity: 0.5;
+}
+.stu-duel-map-point-hovered .stu-duel-map-point-core {
+  stroke-width: 4;
+}
+.stu-duel-map-point-hovered .stu-duel-killline {
+  opacity: 0.8;
+  stroke-width: 3;
+}
+.stu-duel-map-point-hovered .stu-duel-map-point-killer {
+  opacity: 1;
+  stroke-width: 3.5;
+}
+
 .stu-duel-map-point-contested {
   color: #3ddc97;
 }
@@ -2716,6 +2732,33 @@ td.stu-heat-cell.stu-heat-neutral {
 
 .stu-duel-map-point-cleanup {
   color: #9ca3af;
+}
+
+.stu-duel-killline {
+  stroke: currentColor;
+  stroke-width: 1.5;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.stu-duel-map-point:hover .stu-duel-killline,
+.stu-duel-map-point:focus-visible .stu-duel-killline {
+  opacity: 0.7;
+  stroke-width: 2.5;
+}
+
+.stu-duel-map-point-killer {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 2;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.stu-duel-map-point:hover .stu-duel-map-point-killer,
+.stu-duel-map-point:focus-visible .stu-duel-map-point-killer {
+  stroke-width: 3;
+  opacity: 1;
 }
 
 .stu-duel-dot {
@@ -2774,6 +2817,16 @@ td.stu-heat-cell.stu-heat-neutral {
   height: 9px;
   box-shadow: none;
   cursor: default;
+}
+
+.stu-duel-legend .stu-duel-dot-killer {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: transparent;
+  opacity: 0.7;
 }
 
 .stu-duel-evidence-wrap {
@@ -3249,23 +3302,98 @@ td.stu-heat-cell.stu-heat-neutral {
   font-size: 11px;
 }
 
-/* 首杀 tab 侧栏小卡片 */
+/* 首杀 tab 侧栏卡片（两行布局） */
 .stu-duel-card-compact {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 8px;
-  padding: 6px 8px;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 10px;
   border: 1px solid var(--dak-border);
   border-radius: var(--stu-radius-sm);
   background: var(--dak-panel);
   font-size: 12px;
+  cursor: pointer;
+  transition: border-color 120ms, background 120ms;
+}
+.stu-duel-card-compact:hover {
+  border-color: var(--dak-border-hi);
+  background: var(--dak-panel-hi);
+}
+.stu-duel-card-compact:focus-visible {
+  outline: 2px solid var(--dak-accent);
+  outline-offset: 2px;
 }
 
-.stu-duel-card-compact small:first-of-type {
+.stu-duel-compact-row1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.stu-duel-compact-row1 .stu-duel-grid-info {
   flex: 1;
   min-width: 0;
+}
+
+.stu-duel-compact-weapon {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: var(--dak-panel-hi);
+  color: var(--dak-fg-mid);
+  font-size: 10px;
+  white-space: nowrap;
+  line-height: 18px;
+}
+
+.stu-duel-compact-hp {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--dak-fg-dim);
+  white-space: nowrap;
+  font-family: var(--dak-mono);
+}
+
+.stu-duel-compact-row2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--dak-fg-dim);
+}
+.stu-duel-compact-row2 .stu-duel-compact-match {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.stu-duel-compact-round {
+  flex-shrink: 0;
+  font-family: var(--dak-mono);
+}
+.stu-duel-compact-clock {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: var(--dak-panel-hi);
+  font-family: var(--dak-mono);
+  font-size: 10px;
+  color: var(--dak-fg-mid);
+  line-height: 16px;
+}
+.stu-duel-compact-oneshot {
+  flex-shrink: 0;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 16px;
+}
+
+/* 双向 hover 高亮：列表侧 */
+.stu-duel-card-compact.stu-duel-card-hovered {
+  background: color-mix(in srgb, var(--dak-accent) 15%, transparent);
+  border-color: var(--dak-accent);
 }

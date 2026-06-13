@@ -4,6 +4,8 @@ import { bulkUpdateTags, importDemoFile, listDemoEntries, removeDemo, updateDemo
 import { EMPTY_SCOPE, applyScope, type CohortScopeState } from "./components/CohortScope";
 import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems, triggerWindowsDropCapture, type ExportedDemoFile } from "./lib/dem";
 import { parseTags } from "./lib/tags";
+import { saveSeriesRecord, suggestSeriesGroups, deriveVetoSummary } from "./lib/series";
+import type { SeriesVeto, SeriesVetoStep } from "@cs2dak/contract";
 import { APP_VERSION, checkForUpdate, type UpdateInfo } from "./lib/update";
 import { HomeView } from "./views/HomeView";
 import { LibraryView } from "./views/LibraryView";
@@ -187,6 +189,57 @@ export function App() {
         })
       );
       await importFiles(files);
+
+      // 预设 BP：示例系列自动填入已知 BP
+      const allEntries = await listDemoEntries();
+      const suggestions = suggestSeriesGroups(allEntries);
+
+      for (const suggestion of suggestions) {
+        let steps: SeriesVetoStep[] | null = null;
+        let pool: string[] = [];
+
+        if (suggestion.teamAName.includes("FURIA") && suggestion.teamBName.includes("Vitality")) {
+          // IEM Kraków 2026 决赛 FURIA vs Vitality（BO5）
+          pool = ["de_dust2", "de_ancient", "de_mirage", "de_inferno", "de_nuke", "de_overpass", "de_anubis"];
+          steps = [
+            { stepOrder: 1, actionType: "ban", teamKey: "teamA", mapName: "de_dust2", side: null },
+            { stepOrder: 2, actionType: "ban", teamKey: "teamB", mapName: "de_ancient", side: null },
+            { stepOrder: 3, actionType: "pick", teamKey: "teamA", mapName: "de_mirage", side: "t" },
+            { stepOrder: 4, actionType: "pick", teamKey: "teamB", mapName: "de_inferno", side: "t" },
+            { stepOrder: 5, actionType: "pick", teamKey: "teamA", mapName: "de_nuke", side: "t" },
+            { stepOrder: 6, actionType: "pick", teamKey: "teamB", mapName: "de_overpass", side: "t" },
+            { stepOrder: 7, actionType: "decider", teamKey: null, mapName: "de_anubis", side: null },
+          ];
+        } else if (suggestion.teamAName.includes("Falcons") && suggestion.teamBName.includes("Spirit")) {
+          // PGL Astana 2026 决赛 Spirit vs Falcons（BO5）
+          pool = ["de_inferno", "de_overpass", "de_dust2", "de_mirage", "de_ancient", "de_nuke", "de_anubis"];
+          steps = [
+            { stepOrder: 1, actionType: "ban", teamKey: "teamB", mapName: "de_inferno", side: null },
+            { stepOrder: 2, actionType: "ban", teamKey: "teamA", mapName: "de_overpass", side: null },
+            { stepOrder: 3, actionType: "pick", teamKey: "teamB", mapName: "de_dust2", side: "t" },
+            { stepOrder: 4, actionType: "pick", teamKey: "teamA", mapName: "de_mirage", side: "t" },
+            { stepOrder: 5, actionType: "pick", teamKey: "teamB", mapName: "de_ancient", side: "t" },
+            { stepOrder: 6, actionType: "pick", teamKey: "teamA", mapName: "de_nuke", side: "t" },
+            { stepOrder: 7, actionType: "decider", teamKey: null, mapName: "de_anubis", side: null },
+          ];
+        }
+
+        if (steps) {
+          const veto: SeriesVeto = {
+            version: "cs2-demo-analysis-kit/series-veto-0.1",
+            seriesId: suggestion.id,
+            format: "bo5",
+            teamAName: suggestion.teamAName,
+            teamBName: suggestion.teamBName,
+            mapPool: pool,
+            ...deriveVetoSummary(steps),
+            steps,
+          };
+          await saveSeriesRecord({ ...suggestion, format: veto.format, veto });
+        }
+      }
+
+      setEntries(await listDemoEntries());
     } catch (err) {
       setNotice(`示例加载失败：${err instanceof Error ? err.message : String(err)}`);
       setImporting(false);

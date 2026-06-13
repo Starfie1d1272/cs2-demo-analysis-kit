@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import type { SeriesSummary } from "@cs2dak/contract";
 import type { StudioDemoEntry } from "../lib/library";
-import { mapDisplayName, type StudioSeriesRecord } from "../lib/series";
+import { mapDisplayName, sortEntriesByVeto, type StudioSeriesRecord } from "../lib/series";
 import { BpView } from "./BpView";
 
 export interface SeriesWorkspaceProps {
@@ -58,6 +58,10 @@ export function SeriesWorkspace({
   children
 }: SeriesWorkspaceProps) {
   const score = seriesScore(entries);
+  const sortedEntries = useMemo(
+    () => series.veto ? sortEntriesByVeto(entries, series.veto) : entries,
+    [entries, series.veto]
+  );
   return (
     <div className="stu-series">
       <header className="stu-series-head">
@@ -84,7 +88,7 @@ export function SeriesWorkspace({
         >
           系列汇总
         </button>
-        {entries.map((entry, index) => {
+        {sortedEntries.map((entry, index) => {
           const badge = pickBadge(series, entry.meta.mapName);
           const active = !summaryMode && entry.id === activeId;
           return (

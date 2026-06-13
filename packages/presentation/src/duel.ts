@@ -54,11 +54,25 @@ function duelRow(input: DuelInsightsInput, fact: ReturnType<typeof deriveDuels>[
   };
 }
 
+/** CS2 标准回合时长（秒，freeze 结束后）。CLOCK_START 用于倒计时显示。 */
+const ROUND_DURATION = 115;
+
 function openingRow(input: DuelInsightsInput, fact: ReturnType<typeof deriveDuels>[number]): OpeningDuelRow {
+  const tickrate = input.pkg.match.tickrate || input.pkg.manifest.tickrate || 64;
+  const roundRow = input.pkg.rounds.find((r) => r.roundNumber === fact.roundNumber);
+  let roundTimeLabel: string | null = null;
+  if (roundRow && roundRow.freezeEndTick != null && tickrate > 0) {
+    const elapsed = (fact.tick - roundRow.freezeEndTick) / tickrate;
+    const remaining = Math.max(0, ROUND_DURATION - elapsed);
+    const min = Math.floor(remaining / 60);
+    const sec = Math.round(remaining % 60);
+    roundTimeLabel = `${min}:${String(sec).padStart(2, "0")}`;
+  }
   return {
     ...duelRow(input, fact),
     attackerCallout: null,
-    victimCallout: null
+    victimCallout: null,
+    roundTimeLabel
   };
 }
 

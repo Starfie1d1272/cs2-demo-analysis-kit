@@ -91,8 +91,9 @@ export function suggestSeriesGroups(
       const teamAName = displayTeamName(first.meta.teamAName, teamRenames);
       const teamBName = displayTeamName(first.meta.teamBName, teamRenames);
       const date = matchDateFromFileName(first.fileName) ?? "未标日期";
+      const stableTeamKey = [teamAName, teamBName].sort().join("|");
       return {
-        id: sorted.map((entry) => entry.id).sort().join("|"),
+        id: `series:${date}:${stableTeamKey}`,
         name: `${date} · ${teamAName} vs ${teamBName}`,
         entryIds: sorted.map((entry) => entry.id),
         format: formatForCount(sorted.length),
@@ -142,6 +143,20 @@ export function vetoSkeleton(format: SeriesFormat): Array<Pick<SeriesVetoStep, "
     { actionType: "pick", teamKey: "teamB" },
     { actionType: "decider", teamKey: null }
   ];
+}
+
+/** 按 BP 顺序排序 entries（pick→decider→其余在最后）。可用于系列工作台地图 tab 排序。 */
+export function sortEntriesByVeto(entries: StudioDemoEntry[], veto: SeriesVeto): StudioDemoEntry[] {
+  const order = new Map<string, number>();
+  let idx = 0;
+  for (const step of veto.steps) {
+    if (step.actionType === "pick" || step.actionType === "decider") {
+      if (!order.has(step.mapName)) order.set(step.mapName, idx++);
+    }
+  }
+  return [...entries].sort(
+    (a, b) => (order.get(a.meta.mapName) ?? 999) - (order.get(b.meta.mapName) ?? 999)
+  );
 }
 
 export function deriveVetoSummary(steps: SeriesVetoStep[]): Pick<SeriesVeto, "maps" | "sideChoices"> {

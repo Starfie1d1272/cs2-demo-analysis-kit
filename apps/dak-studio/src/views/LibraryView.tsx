@@ -377,8 +377,11 @@ function SeriesManager({ entries }: { entries: StudioDemoEntry[] }) {
   const suggestions = useMemo(() => suggestSeriesGroups(entries), [entries]);
 
   useEffect(() => {
-    void listSeriesRecords().then(setRecords);
-  }, []);
+    void listSeriesRecords().then((allRecords) => {
+      const entryIds = new Set(entries.map((e) => e.id));
+      setRecords(allRecords.filter((r) => r.entryIds.some((id) => entryIds.has(id))));
+    });
+  }, [entries]);
 
   const recordById = useMemo(() => new Map(records.map((r) => [r.id, r])), [records]);
 

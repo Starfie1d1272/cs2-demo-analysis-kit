@@ -233,8 +233,9 @@ export function getPlayerSeasonDetails(entries: StudioDemoEntry[], steamIds: str
 }
 
 /** 对枪实验室：DuelInsights 是 LOS-heavy 派生模型，持久化后反复切页不再重跑 tri 判定。 */
+const DUEL_CACHE_VER = 2;
 export function getDuelInsights(entries: StudioDemoEntry[], identity?: IdentityOptions): Promise<DuelInsightsModel> {
-  const key = `${keyOf(entries, identity?.version)}:duels`;
+  const key = `${keyOf(entries, identity?.version)}:duels:v${DUEL_CACHE_VER}`;
   const cached = duelInsightsCache.get(key);
   if (cached) return cached;
   const loading = (async () => {

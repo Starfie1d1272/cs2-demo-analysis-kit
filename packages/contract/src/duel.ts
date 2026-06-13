@@ -47,7 +47,8 @@ export const duelFinderRowSchema = z.object({
 
 export const openingDuelRowSchema = duelFinderRowSchema.extend({
   attackerCallout: z.string().nullable(),
-  victimCallout: z.string().nullable()
+  victimCallout: z.string().nullable(),
+  roundTimeLabel: z.string().nullable()
 });
 
 export const mechanicsMetricSchema = z.object({

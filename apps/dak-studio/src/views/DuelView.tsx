@@ -296,17 +296,30 @@ function EvidenceCards({
   rows,
   entryByMatchId,
   onOpenMatch,
-  compact = false
+  compact = false,
+  hoveredId,
+  onHoverChange,
+  page: controlledPage,
+  onPageChange,
+  pageSize = 48
 }: {
   rows: DuelInsightsModel["duelRows"];
   entryByMatchId: Map<string, StudioDemoEntry>;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   compact?: boolean;
+  hoveredId?: string | null;
+  onHoverChange?: (id: string | null) => void;
+  page?: number;
+  onPageChange?: (page: number) => void;
+  pageSize?: number;
 }) {
   const [filter, setFilter] = useState<EvidenceFilter>(compact ? "all" : "contested_duel");
   const [weaponCatFilter, setWeaponCatFilter] = useState<WeaponCategory | "其他" | "全部">("全部");
-  const [page, setPage] = useState(0);
-  const perPage = 48;
+  const isControlled = controlledPage != null && onPageChange != null;
+  const [internalPage, setInternalPage] = useState(0);
+  const page = isControlled ? controlledPage : internalPage;
+  const setPage = isControlled ? onPageChange : setInternalPage;
+  const perPage = pageSize;
 
   // 分类计数
   const counts = useMemo(() => {
@@ -354,28 +367,56 @@ function EvidenceCards({
   }
 
   if (compact) {
-    // 首杀 tab 侧栏简单列表
+    const totalPages = Math.max(1, Math.ceil(rows.length / perPage));
+    const safePage = Math.min(page, Math.max(0, totalPages - 1));
+    const pageRows = rows.slice(safePage * perPage, (safePage + 1) * perPage);
     return (
       <section className="stu-duel-evidence-wrap compact">
         <div className="stu-duel-evidence compact">
-          {rows.slice(0, 10).map((row) => {
+          {pageRows.map((row) => {
             const entry = entryByMatchId.get(row.matchId);
+            const hovered = hoveredId === row.id;
+            const hp = row.killerHealthBefore != null ? `${row.killerHealthBefore}→${row.victimHealthBefore}` : `?→${row.victimHealthBefore}`;
+            const matchLabel = entry ? `${entry.meta.teamAName} ${entry.meta.teamAScore}:${entry.meta.teamBScore} ${entry.meta.teamBName}` : row.mapName;
             return (
-              <article key={row.id} className="stu-duel-card-compact">
-                <span className={`stu-duel-type stu-duel-type-${row.classification}`}>
-                  {CLASS_TONE[row.classification] ?? duelClassificationLabel(row.classification)}
-                </span>
-                <small>{row.killerName} → {row.victimName}</small>
-                <small className="stu-dim">{row.mapName} R{row.roundNumber}</small>
-                {entry && (
-                  <button type="button" className="stu-button-sm" onClick={() => onOpenMatch(entry.id, { roundNumber: row.roundNumber, tick: row.tick })}>
-                    回放
-                  </button>
-                )}
+              <article
+                key={row.id}
+                className={`stu-duel-card-compact${hovered ? " stu-duel-card-hovered" : ""}`}
+                onMouseEnter={() => onHoverChange?.(row.id)}
+                onMouseLeave={() => onHoverChange?.(null)}
+                role={entry ? "button" : undefined}
+                tabIndex={entry ? 0 : undefined}
+                onClick={() => entry && onOpenMatch(entry.id, { roundNumber: row.roundNumber, tick: row.tick })}
+                onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && entry) { e.preventDefault(); onOpenMatch(entry.id, { roundNumber: row.roundNumber, tick: row.tick }); } }}
+              >
+                <div className="stu-duel-compact-row1">
+                  <span className={`stu-duel-grid-badge stu-duel-grid-badge-${row.classification}`}>
+                    {CLASS_TONE[row.classification] ?? duelClassificationLabel(row.classification)}
+                  </span>
+                  <span className="stu-duel-grid-info">
+                    <b className="stu-duel-grid-killer">{row.killerName}</b>
+                    <i className="stu-duel-grid-arrow">→</i>
+                    <span className="stu-duel-grid-victim">{row.victimName}</span>
+                  </span>
+                  <span className="stu-duel-compact-weapon">{displayWeaponName(row.weapon)}</span>
+                  <span className="stu-duel-compact-hp">{hp}</span>
+                  {entry && (
+                    <button type="button" className="stu-button-sm" onClick={(e) => { e.stopPropagation(); onOpenMatch(entry.id, { roundNumber: row.roundNumber, tick: row.tick }); }}>
+                      回放
+                    </button>
+                  )}
+                </div>
+                <div className="stu-duel-compact-row2">
+                  <span className="stu-duel-compact-match">{matchLabel}</span>
+                  <span className="stu-duel-compact-round">R{row.roundNumber}</span>
+                  {row.roundTimeLabel && <span className="stu-duel-compact-clock">{row.roundTimeLabel}</span>}
+                  {row.oneShotKill && <span className="stu-duel-compact-oneshot">一发</span>}
+                </div>
               </article>
             );
           })}
         </div>
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} maxButtons={6} info={`${rows.length} 条`} />
       </section>
     );
   }
@@ -469,9 +510,8 @@ function EvidenceCards({
                   </button>
                 );
               })}
-              <button type="button" disabled={safePage >= totalPages - 1} onClick={() => setPage(safePage + 1)}>›</button>
-              <span className="stu-pagination-info">{activeRows.length} 条 · {safePage + 1}/{totalPages} 页</span>
-            </nav>
+              <Pagination page={page} totalPages={totalPages} onChange={setPage} info={`${activeRows.length} 条 · ${safePage + 1}/${totalPages} 页`} />
+            </>
           )}
         </>
       )}
@@ -480,6 +520,46 @@ function EvidenceCards({
 }
 
 /** TTK 值的展示颜色分类。 */
+/** 分页控件：页码按钮 + 前后翻页 + 可选信息文字。消除 compact/full 两处分页代码重复。 */
+function Pagination({
+  page,
+  totalPages,
+  onChange,
+  maxButtons = 8,
+  info
+}: {
+  page: number;
+  totalPages: number;
+  onChange: (page: number) => void;
+  maxButtons?: number;
+  info?: string;
+}) {
+  if (totalPages <= 1) return null;
+  const safePage = Math.min(page, Math.max(0, totalPages - 1));
+  const radius = Math.floor((maxButtons - 1) / 2);
+  const start = Math.max(0, Math.min(safePage - radius, totalPages - maxButtons));
+  return (
+    <nav className="stu-pagination" aria-label="分页">
+      <button type="button" disabled={safePage === 0} onClick={() => onChange(safePage - 1)}>‹</button>
+      {Array.from({ length: Math.min(totalPages, maxButtons) }, (_, i) => {
+        const p = start + i;
+        return (
+          <button
+            key={p}
+            type="button"
+            className={safePage === p ? "active" : ""}
+            onClick={() => onChange(p)}
+          >
+            {p + 1}
+          </button>
+        );
+      })}
+      <button type="button" disabled={safePage >= totalPages - 1} onClick={() => onChange(safePage + 1)}>›</button>
+      {info && <span className="stu-pagination-info">{info}</span>}
+    </nav>
+  );
+}
+
 function ttkTone(row: DuelFinderRow): "ok" | "warn" | "danger" | undefined {
   if (row.ttkMs != null) return "ok";
   if (row.hpBucket === "low_hp") return "warn";
@@ -510,6 +590,9 @@ function OpeningDuelMap({
   entryByMatchId: Map<string, StudioDemoEntry>;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
 }) {
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [listPage, setListPage] = useState(0);
+  const LIST_PAGE_SIZE = 12;
   const mapNames = useMemo(() => {
     const seen = new Map<string, number>();
     for (const row of rows) seen.set(row.mapName, (seen.get(row.mapName) ?? 0) + 1);
@@ -519,6 +602,14 @@ function OpeningDuelMap({
   const mapName = activeMap && mapNames.includes(activeMap) ? activeMap : mapNames[0] ?? "de_mirage";
   const mapRows = useMemo(() => rows.filter((row) => row.mapName === mapName), [rows, mapName]);
   const calibration = getMapCalibration(mapName);
+  // 地图 hover 时自动翻到对应页面
+  useEffect(() => {
+    if (!hoveredId) return;
+    const idx = mapRows.findIndex((r) => r.id === hoveredId);
+    if (idx >= 0) {
+      setListPage(Math.floor(idx / LIST_PAGE_SIZE));
+    }
+  }, [hoveredId, mapRows]);
   return (
     <section className="stu-duel-opening-layout">
       <div className="stu-card stu-duel-map-card">
@@ -549,11 +640,13 @@ function OpeningDuelMap({
           {calibration && <image href={`./maps/radars/${mapName}.png`} width={calibration.radarSize} height={calibration.radarSize} opacity={0.88} />}
           {calibration && mapRows.slice(0, 80).map((row) => {
             if (!row.victimPosition) return null;
-            const point = worldToRadar(row.victimPosition, calibration);
+            const victimP = worldToRadar(row.victimPosition, calibration);
+            const killerP = row.killerPosition ? worldToRadar(row.killerPosition, calibration) : null;
+            const hovered = hoveredId === row.id;
             return (
               <g
                 key={row.id}
-                className={`stu-duel-map-point stu-duel-map-point-${row.classification}`}
+                className={`stu-duel-map-point stu-duel-map-point-${row.classification}${hovered ? " stu-duel-map-point-hovered" : ""}`}
                 role="button"
                 tabIndex={0}
                 onClick={() => {
@@ -566,10 +659,20 @@ function OpeningDuelMap({
                   const entry = entryByMatchId.get(row.matchId);
                   if (entry) onOpenMatch(entry.id, { roundNumber: row.roundNumber, tick: row.tick });
                 }}
+                onMouseEnter={() => setHoveredId(row.id)}
+                onMouseLeave={() => setHoveredId(null)}
+                onFocus={() => setHoveredId(row.id)}
+                onBlur={() => setHoveredId(null)}
               >
                 <title>{`R${row.roundNumber} ${row.killerName} > ${row.victimName}`}</title>
-                <circle cx={point.x} cy={point.y} r={10} className="stu-duel-map-point-ring" />
-                <circle cx={point.x} cy={point.y} r={5} className="stu-duel-map-point-core" />
+                {killerP && (
+                  <>
+                    <line x1={killerP.x} y1={killerP.y} x2={victimP.x} y2={victimP.y} className="stu-duel-killline" />
+                    <circle cx={killerP.x} cy={killerP.y} r={4} className="stu-duel-map-point-killer" />
+                  </>
+                )}
+                <circle cx={victimP.x} cy={victimP.y} r={10} className="stu-duel-map-point-ring" />
+                <circle cx={victimP.x} cy={victimP.y} r={5} className="stu-duel-map-point-core" />
               </g>
             );
           })}
@@ -578,9 +681,10 @@ function OpeningDuelMap({
           <span><i className="stu-duel-dot contested" />对枪胜出</span>
           <span><i className="stu-duel-dot outaimed" />先手压制</span>
           <span><i className="stu-duel-dot caught" />侧背身</span>
+          <span><i className="stu-duel-dot-killer" />击杀方</span>
         </div>
       </div>
-      <EvidenceCards rows={rows} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} compact />
+      <EvidenceCards rows={mapRows} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} compact hoveredId={hoveredId} onHoverChange={setHoveredId} page={listPage} onPageChange={setListPage} pageSize={LIST_PAGE_SIZE} />
     </section>
   );
 }
