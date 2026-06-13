@@ -14,7 +14,7 @@ import { getStorage } from "./storage";
 const BVH_CACHE_LIMIT = 4;
 const bvhCache = new Map<string, Promise<TriangleBvh | null>>();
 
-const triStore = () => getStorage().blobs("tri");
+const triStore = getStorage().blobs("tri");
 
 function isValidTriBuffer(buffer: ArrayBuffer): boolean {
   return buffer.byteLength > 0 && buffer.byteLength % 36 === 0;
@@ -22,7 +22,7 @@ function isValidTriBuffer(buffer: ArrayBuffer): boolean {
 
 async function readTriBuffer(mapName: string): Promise<ArrayBuffer | null> {
   try {
-    const buffer = await triStore().get(mapName);
+    const buffer = await triStore.get(mapName);
     return buffer && isValidTriBuffer(buffer) ? buffer : null;
   } catch {
     return null;
@@ -32,7 +32,7 @@ async function readTriBuffer(mapName: string): Promise<ArrayBuffer | null> {
 async function writeTriBuffer(mapName: string, buffer: ArrayBuffer): Promise<void> {
   try {
     if (!isValidTriBuffer(buffer)) return;
-    await triStore().put(mapName, buffer);
+    await triStore.put(mapName, buffer);
   } catch {
     // tri cache is an optimization; fetch fallback remains valid.
   }

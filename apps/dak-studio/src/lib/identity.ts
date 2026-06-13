@@ -35,8 +35,8 @@ const MAX_AUDIT = 20;
 
 const EMPTY_STATE: IdentityStoreState = { version: 0, mappings: [], teamRenames: {} };
 
-const stateStore = () => getStorage().records("identity");
-const auditStore = () => getStorage().records("identity-audit");
+const stateStore = getStorage().records("identity");
+const auditStore = getStorage().records("identity-audit");
 
 export interface TeamRenameGroup {
   displayName: string;
@@ -46,7 +46,7 @@ export interface TeamRenameGroup {
 
 export async function loadIdentityState(): Promise<IdentityStoreState> {
   try {
-    const record = await stateStore().get<IdentityStoreState>(STATE_KEY);
+    const record = await stateStore.get<IdentityStoreState>(STATE_KEY);
     return record ?? EMPTY_STATE;
   } catch {
     return EMPTY_STATE;
@@ -58,21 +58,22 @@ async function commitChange(
   next: IdentityStoreState,
   description: string
 ): Promise<IdentityStoreState> {
-  // 写新状态
-  await stateStore().put(STATE_KEY, next);
-  // 写审计（保存变更前快照）
+  // 写新状态 + 审计（独立命名空间，可并行）
   const entry: AuditEntry = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     timestamp: Date.now(),
     description,
     snapshot: current
   };
-  await auditStore().put(entry.id, entry);
+  await Promise.all([
+    stateStore.put(STATE_KEY, next),
+    auditStore.put(entry.id, entry)
+  ]);
   // 清理超出上限的旧条目
-  const all = await auditStore().getAll<AuditEntry>();
+  const all = await auditStore.getAll<AuditEntry>();
   if (all.length > MAX_AUDIT) {
     const stale = all.sort((a, b) => a.timestamp - b.timestamp).slice(0, all.length - MAX_AUDIT);
-    for (const e of stale) await auditStore().delete(e.id);
+    for (const e of stale) await auditStore.delete(e.id);
   }
   return next;
 }
@@ -225,11 +226,13 @@ export async function setTeamRename(
 /** 撤销最近一次操作，返回恢复后的状态；无可撤销时返回 null。 */
 export async function undoLastAction(current: IdentityStoreState): Promise<IdentityStoreState | null> {
   try {
-    const all = await auditStore().getAll<AuditEntry>();
+    const all = await auditStore.getAll<AuditEntry>();
     if (all.length === 0) return null;
     const latest = all.sort((a, b) => b.timestamp - a.timestamp)[0];
-    await stateStore().put(STATE_KEY, latest.snapshot);
-    await auditStore().delete(latest.id);
+    await Promise.all([
+      stateStore.put(STATE_KEY, latest.snapshot),
+      auditStore.delete(latest.id)
+    ]);
     return latest.snapshot;
   } catch {
     return null;
@@ -238,7 +241,7 @@ export async function undoLastAction(current: IdentityStoreState): Promise<Ident
 
 export async function listAuditEntries(): Promise<AuditEntry[]> {
   try {
-    const all = await auditStore().getAll<AuditEntry>();
+    const all = await auditStore.getAll<AuditEntry>();
     return all.sort((a, b) => b.timestamp - a.timestamp);
   } catch {
     return [];

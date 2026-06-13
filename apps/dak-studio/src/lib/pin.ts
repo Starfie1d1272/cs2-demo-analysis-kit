@@ -13,11 +13,11 @@ export interface PinnedPlayer {
 }
 
 const KEY = "pinned-player";
-const kv = () => getStorage().records("kv");
+const kv = getStorage().records("kv");
 
 export async function getPinnedPlayer(): Promise<PinnedPlayer | null> {
   try {
-    const parsed = await kv().get<PinnedPlayer>(KEY);
+    const parsed = await kv.get<PinnedPlayer>(KEY);
     if (!parsed || typeof parsed.playerKey !== "string" || !Array.isArray(parsed.steamIds)) return null;
     return parsed;
   } catch {
@@ -27,8 +27,8 @@ export async function getPinnedPlayer(): Promise<PinnedPlayer | null> {
 
 export async function setPinnedPlayer(pinned: PinnedPlayer | null): Promise<void> {
   try {
-    if (pinned) await kv().put(KEY, pinned);
-    else await kv().delete(KEY);
+    if (pinned) await kv.put(KEY, pinned);
+    else await kv.delete(KEY);
   } catch {
     // 偏好持久化失败不阻塞 UI
   }

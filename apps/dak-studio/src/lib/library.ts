@@ -51,9 +51,9 @@ interface DerivedRecord {
 }
 
 // ── 存储命名空间（经 StorageAdapter 接缝，后端可换） ──
-const demoMeta = () => getStorage().records("demos"); // StudioDemoEntry by id
-const demoBlobs = () => getStorage().blobs("demos"); // ZIP 原始字节 by id
-const derivedStore = () => getStorage().records("derived"); // {version, pkg} by id
+const demoMeta = getStorage().records("demos"); // StudioDemoEntry by id
+const demoBlobs = getStorage().blobs("demos"); // ZIP 原始字节 by id
+const derivedStore = getStorage().records("derived"); // {version, pkg} by id
 
 /** demo 元数据补默认值（tags / sourceDemPath 为后加字段）。 */
 function normalizeEntry(entry: StudioDemoEntry): StudioDemoEntry {
@@ -70,7 +70,7 @@ function normalizeEntry(entry: StudioDemoEntry): StudioDemoEntry {
 /** derived 是纯加速缓存：读写失败一律静默回落到 ZIP 重建。 */
 async function readDerived(id: string): Promise<DemoPackage | null> {
   try {
-    const record = await derivedStore().get<DerivedRecord>(id);
+    const record = await derivedStore.get<DerivedRecord>(id);
     return record && record.version === DERIVED_VERSION ? record.pkg : null;
   } catch {
     return null;
@@ -79,7 +79,7 @@ async function readDerived(id: string): Promise<DemoPackage | null> {
 
 async function writeDerived(id: string, pkg: DemoPackage): Promise<void> {
   try {
-    await derivedStore().put<DerivedRecord>(id, { version: DERIVED_VERSION, pkg });
+    await derivedStore.put<DerivedRecord>(id, { version: DERIVED_VERSION, pkg });
   } catch {
     // 写失败不影响功能
   }
@@ -87,7 +87,7 @@ async function writeDerived(id: string, pkg: DemoPackage): Promise<void> {
 
 async function deleteDerived(id: string): Promise<void> {
   try {
-    await derivedStore().delete(id);
+    await derivedStore.delete(id);
   } catch {
     // 忽略
   }
@@ -218,7 +218,7 @@ function parseZipInWorker(buffer: ArrayBuffer): Promise<DemoPackage> {
 }
 
 export async function listDemoEntries(): Promise<StudioDemoEntry[]> {
-  const records = await demoMeta().getAll<StudioDemoEntry>();
+  const records = await demoMeta.getAll<StudioDemoEntry>();
   return records.map(normalizeEntry).sort((a, b) => b.importedAt - a.importedAt);
 }
 
@@ -258,8 +258,8 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     meta: metaFromPackage(pkg)
   };
 
-  const meta = demoMeta();
-  const blobs = demoBlobs();
+  const meta = demoMeta;
+  const blobs = demoBlobs;
   const replacement = replaceId ? await meta.get<StudioDemoEntry>(replaceId) : undefined;
   if (replacement) {
     entry.tags = normalizeTags([...(replacement.tags ?? []), ...entry.tags]);
@@ -275,8 +275,10 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     };
     await meta.put(id, mergedEntry);
     if (replacement && replacement.id !== id) {
-      await meta.delete(replacement.id);
-      await blobs.delete(replacement.id);
+      await Promise.all([
+        meta.delete(replacement.id),
+        blobs.delete(replacement.id)
+      ]);
       pkgCache.delete(replacement.id);
       void deleteDerived(replacement.id);
     }
@@ -287,11 +289,15 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
       replacedId: replacement?.id
     };
   }
-  await blobs.put(id, buffer);
-  await meta.put(id, entry);
+  await Promise.all([
+    blobs.put(id, buffer),
+    meta.put(id, entry)
+  ]);
   if (replacement && replacement.id !== id) {
-    await meta.delete(replacement.id);
-    await blobs.delete(replacement.id);
+    await Promise.all([
+      meta.delete(replacement.id),
+      blobs.delete(replacement.id)
+    ]);
     pkgCache.delete(replacement.id);
     void deleteDerived(replacement.id);
   }
@@ -303,7 +309,7 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
 
 /** 更新某条 demo 的标签。 */
 export async function updateDemoTags(id: string, tags: string[]): Promise<void> {
-  const meta = demoMeta();
+  const meta = demoMeta;
   const record = await meta.get<StudioDemoEntry>(id);
   if (record) {
     await meta.put(id, { ...record, tags: normalizeTags(tags) });
@@ -315,7 +321,7 @@ export async function bulkUpdateTags(ids: string[], add: string[] = [], remove: 
   if (targetIds.length === 0) return;
   const addSet = normalizeTags(add);
   const removeSet = new Set(normalizeTags(remove));
-  const meta = demoMeta();
+  const meta = demoMeta;
   for (const id of targetIds) {
     const record = await meta.get<StudioDemoEntry>(id);
     if (!record) continue;
@@ -325,8 +331,10 @@ export async function bulkUpdateTags(ids: string[], add: string[] = [], remove: 
 }
 
 export async function removeDemo(id: string): Promise<void> {
-  await demoMeta().delete(id);
-  await demoBlobs().delete(id);
+  await Promise.all([
+    demoMeta.delete(id),
+    demoBlobs.delete(id)
+  ]);
   pkgCache.delete(id);
   await deleteDerived(id);
 }
@@ -338,7 +346,7 @@ export function getDemoPackage(id: string): Promise<DemoPackage> {
   const loading = (async () => {
     const derived = await readDerived(id);
     if (derived) return derived;
-    const buffer = await demoBlobs().get(id);
+    const buffer = await demoBlobs.get(id);
     if (!buffer) throw new Error("demo 不存在或已被删除");
     const pkg = await parseZipInWorker(buffer);
     void writeDerived(id, pkg);
@@ -351,7 +359,7 @@ export function getDemoPackage(id: string): Promise<DemoPackage> {
 
 /** 批量替换资料库中所有匹配 originalName 的队伍名为 displayName。 */
 export async function renameTeamInLibrary(originalName: string, displayName: string): Promise<void> {
-  const meta = demoMeta();
+  const meta = demoMeta;
   const all = await meta.getAll<StudioDemoEntry>();
   for (const record of all) {
     let changed = false;

@@ -61,8 +61,8 @@ function keyOf(entries: StudioDemoEntry[], identityVersion?: number): string {
 
 // ── 持久层：StorageAdapter 的 "cache" 命名空间。touchedAt 拆到伴随命名空间
 //    "cache-meta"，命中只刷新轻量时间戳，不重写数 MB 的 summary 本体；prune 也只读它。 ──
-const cacheStore = () => getStorage().records("cache");
-const cacheMeta = () => getStorage().records("cache-meta");
+const cacheStore = getStorage().records("cache");
+const cacheMeta = getStorage().records("cache-meta");
 
 /** 按 key 多条缓存（不同 scope 互不覆盖），LRU 清理只保留最近 MAX_CACHE_KEYS 条。 */
 const MAX_CACHE_KEYS = 12;
@@ -80,13 +80,13 @@ interface PersistedValue<T> {
 /** 只刷新 LRU 时间戳（轻量命名空间），不重写 summary 本体。 */
 async function touchMeta(key: string): Promise<void> {
   try {
-    await cacheMeta().put<MetaRecord>(key, { touchedAt: Date.now() });
+    await cacheMeta.put<MetaRecord>(key, { touchedAt: Date.now() });
   } catch { /* 忽略 */ }
 }
 
 async function readPersistedValue<T>(key: string): Promise<T | undefined> {
   try {
-    const record = await cacheStore().get<PersistedValue<T>>(key);
+    const record = await cacheStore.get<PersistedValue<T>>(key);
     if (record) {
       await touchMeta(key);
       return record.value;
@@ -99,7 +99,7 @@ async function readPersistedValue<T>(key: string): Promise<T | undefined> {
 
 async function writePersistedValue<T>(key: string, value: T): Promise<void> {
   try {
-    await cacheStore().put<PersistedValue<T>>(key, { key, touchedAt: Date.now(), value });
+    await cacheStore.put<PersistedValue<T>>(key, { key, touchedAt: Date.now(), value });
     await touchMeta(key);
     void prunePersisted();
   } catch {
@@ -111,8 +111,8 @@ async function writePersistedValue<T>(key: string, value: T): Promise<void> {
  *  只读 cache 的 key 列表与轻量 meta 命名空间，不反序列化任何 summary 本体。 */
 async function prunePersisted(): Promise<void> {
   try {
-    const keys = await cacheStore().keys();
-    const metaEntries = await cacheMeta().entries<MetaRecord>();
+    const keys = await cacheStore.keys();
+    const metaEntries = await cacheMeta.entries<MetaRecord>();
     const touchedByKey = new Map<string, number>(metaEntries.map(([k, v]) => [k, v?.touchedAt ?? 0]));
     const prefix = `v${CACHE_VERSION}:`;
     const stale = keys.filter((k) => !k.startsWith(prefix));
@@ -122,8 +122,8 @@ async function prunePersisted(): Promise<void> {
       .sort((a, b) => (touchedByKey.get(b) ?? 0) - (touchedByKey.get(a) ?? 0));
     const toDelete = [...stale, ...live.slice(MAX_CACHE_KEYS)];
     for (const k of toDelete) {
-      await cacheStore().delete(k);
-      await cacheMeta().delete(k);
+      await cacheStore.delete(k);
+      await cacheMeta.delete(k);
     }
   } catch {
     // 清理失败不影响功能

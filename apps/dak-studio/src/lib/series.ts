@@ -40,9 +40,9 @@ export interface CoachSettings {
 
 const SETTINGS_KEY = "coach";
 
-const seriesStore = () => getStorage().records("series");
-const settingsStore = () => getStorage().records("series-settings");
-const playbookStore = () => getStorage().records("playbook");
+const seriesStore = getStorage().records("series");
+const settingsStore = getStorage().records("series-settings");
+const playbookStore = getStorage().records("playbook");
 
 function formatForCount(count: number): SeriesFormat {
   if (count >= 4) return "bo5";
@@ -157,7 +157,7 @@ export function deriveVetoSummary(steps: SeriesVetoStep[]): Pick<SeriesVeto, "ma
 
 export async function listSeriesRecords(): Promise<StudioSeriesRecord[]> {
   try {
-    const rows = await seriesStore().getAll<StudioSeriesRecord>();
+    const rows = await seriesStore.getAll<StudioSeriesRecord>();
     return rows.sort((a, b) => b.updatedAt - a.updatedAt);
   } catch {
     return [];
@@ -165,16 +165,16 @@ export async function listSeriesRecords(): Promise<StudioSeriesRecord[]> {
 }
 
 export async function saveSeriesRecord(record: Omit<StudioSeriesRecord, "createdAt" | "updatedAt">): Promise<StudioSeriesRecord> {
-  const existing = await seriesStore().get<StudioSeriesRecord>(record.id);
+  const existing = await seriesStore.get<StudioSeriesRecord>(record.id);
   const now = Date.now();
   const next: StudioSeriesRecord = { ...record, createdAt: existing?.createdAt ?? now, updatedAt: now };
-  await seriesStore().put(next.id, next);
+  await seriesStore.put(next.id, next);
   return next;
 }
 
 export async function loadCoachSettings(): Promise<CoachSettings> {
   try {
-    const value = await settingsStore().get<CoachSettings>(SETTINGS_KEY);
+    const value = await settingsStore.get<CoachSettings>(SETTINGS_KEY);
     return value ?? { myTeamName: null };
   } catch {
     return { myTeamName: null };
@@ -182,13 +182,13 @@ export async function loadCoachSettings(): Promise<CoachSettings> {
 }
 
 export async function saveCoachSettings(settings: CoachSettings): Promise<CoachSettings> {
-  await settingsStore().put(SETTINGS_KEY, settings);
+  await settingsStore.put(SETTINGS_KEY, settings);
   return settings;
 }
 
 export async function listPlaybookNames(): Promise<Record<string, string>> {
   try {
-    const entries = await playbookStore().entries<string>();
+    const entries = await playbookStore.entries<string>();
     return Object.fromEntries(entries.map(([key, value]) => [key, value ?? ""]));
   } catch {
     return {};
@@ -196,5 +196,5 @@ export async function listPlaybookNames(): Promise<Record<string, string>> {
 }
 
 export async function savePlaybookName(clusterId: string, name: string): Promise<void> {
-  await playbookStore().put(clusterId, name.trim());
+  await playbookStore.put(clusterId, name.trim());
 }
