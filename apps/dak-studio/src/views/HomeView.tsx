@@ -4,7 +4,7 @@ import type { PlayerSeasonProfile } from "@cs2dak/contract";
 import type { PlayerSeasonInsights } from "@cs2dak/presentation";
 import { getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { formatMatchLabel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
-import { getPinnedPlayer, matchPinned } from "../lib/pin";
+import { getPinnedPlayer, matchPinned, type PinnedPlayer } from "../lib/pin";
 import { EmptyState, EvidenceLink, MetricInfo } from "../components/primitives";
 
 export interface HomeViewProps {
@@ -20,8 +20,17 @@ export function HomeView({ entries, onOpenMatch, onGoPlayers, onGoLibrary, ident
   const [profiles, setProfiles] = useState<PlayerSeasonProfile[] | null>(null);
   const [insights, setInsights] = useState<PlayerSeasonInsights | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const pinned = getPinnedPlayer();
+  const [pinned, setPinned] = useState<PinnedPlayer | null>(null);
+  const [pinnedLoaded, setPinnedLoaded] = useState(false);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPinnedPlayer().then((p) => {
+      if (!cancelled) { setPinned(p); setPinnedLoaded(true); }
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (entries.length === 0) return;
@@ -72,7 +81,7 @@ export function HomeView({ entries, onOpenMatch, onGoPlayers, onGoLibrary, ident
     );
   }
 
-  if (!pinned) {
+  if (pinnedLoaded && !pinned) {
     return (
       <div className="stu-view">
         <EmptyState
@@ -107,7 +116,7 @@ export function HomeView({ entries, onOpenMatch, onGoPlayers, onGoLibrary, ident
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && !profiles && <div className="stu-loading">聚合 {entries.length} 场 demo…</div>}
 
-      {profiles && !me && (
+      {profiles && !me && pinned && (
         <EmptyState
           variant="insufficient"
           title={`当前资料库里没有 ${pinned.name} 的比赛`}

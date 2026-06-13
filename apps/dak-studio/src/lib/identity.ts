@@ -1,9 +1,9 @@
 import type { PlayerIdentityMap } from "@cs2dak/cohort";
-import { createDbOpener, txRequest } from "./idb";
+import { getStorage } from "./storage";
 
 /**
  * 选手身份归并存储。
- * - 独立 IndexedDB 库（dak-studio-identity），不影响主库 schema。
+ * - 经 StorageAdapter 的 "identity"（当前状态）/ "identity-audit"（审计）命名空间持久化。
  * - version 每次变更 +1，调用方将其并入 season 缓存 key。
  * - 审计留最近 MAX_AUDIT 条；每条保存变更前快照，支持单步撤销。
  */
@@ -30,14 +30,13 @@ interface AuditEntry {
   snapshot: IdentityStoreState;
 }
 
-const DB_NAME = "dak-studio-identity";
-const DB_VER = 1;
-const STATE_STORE = "state";
-const AUDIT_STORE = "audit";
 const STATE_KEY = "current";
 const MAX_AUDIT = 20;
 
 const EMPTY_STATE: IdentityStoreState = { version: 0, mappings: [], teamRenames: {} };
+
+const stateStore = () => getStorage().records("identity");
+const auditStore = () => getStorage().records("identity-audit");
 
 export interface TeamRenameGroup {
   displayName: string;
@@ -45,17 +44,9 @@ export interface TeamRenameGroup {
   matchCount: number;
 }
 
-const openDb = createDbOpener(DB_NAME, DB_VER, (db) => {
-  if (!db.objectStoreNames.contains(STATE_STORE)) db.createObjectStore(STATE_STORE);
-  if (!db.objectStoreNames.contains(AUDIT_STORE)) db.createObjectStore(AUDIT_STORE, { keyPath: "id" });
-});
-
 export async function loadIdentityState(): Promise<IdentityStoreState> {
   try {
-    const db = await openDb();
-    const record = await txRequest(
-      db.transaction(STATE_STORE, "readonly").objectStore(STATE_STORE).get(STATE_KEY) as IDBRequest<IdentityStoreState | undefined>
-    );
+    const record = await stateStore().get<IdentityStoreState>(STATE_KEY);
     return record ?? EMPTY_STATE;
   } catch {
     return EMPTY_STATE;
@@ -67,9 +58,8 @@ async function commitChange(
   next: IdentityStoreState,
   description: string
 ): Promise<IdentityStoreState> {
-  const db = await openDb();
   // 写新状态
-  await txRequest(db.transaction(STATE_STORE, "readwrite").objectStore(STATE_STORE).put(next, STATE_KEY));
+  await stateStore().put(STATE_KEY, next);
   // 写审计（保存变更前快照）
   const entry: AuditEntry = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -77,14 +67,12 @@ async function commitChange(
     description,
     snapshot: current
   };
-  const auditStore = db.transaction(AUDIT_STORE, "readwrite").objectStore(AUDIT_STORE);
-  await txRequest(auditStore.put(entry));
+  await auditStore().put(entry.id, entry);
   // 清理超出上限的旧条目
-  const all = await txRequest(db.transaction(AUDIT_STORE, "readonly").objectStore(AUDIT_STORE).getAll() as IDBRequest<AuditEntry[]>);
+  const all = await auditStore().getAll<AuditEntry>();
   if (all.length > MAX_AUDIT) {
     const stale = all.sort((a, b) => a.timestamp - b.timestamp).slice(0, all.length - MAX_AUDIT);
-    const pruneStore = db.transaction(AUDIT_STORE, "readwrite").objectStore(AUDIT_STORE);
-    for (const e of stale) await txRequest(pruneStore.delete(e.id));
+    for (const e of stale) await auditStore().delete(e.id);
   }
   return next;
 }
@@ -237,14 +225,11 @@ export async function setTeamRename(
 /** 撤销最近一次操作，返回恢复后的状态；无可撤销时返回 null。 */
 export async function undoLastAction(current: IdentityStoreState): Promise<IdentityStoreState | null> {
   try {
-    const db = await openDb();
-    const all = await txRequest(
-      db.transaction(AUDIT_STORE, "readonly").objectStore(AUDIT_STORE).getAll() as IDBRequest<AuditEntry[]>
-    );
+    const all = await auditStore().getAll<AuditEntry>();
     if (all.length === 0) return null;
     const latest = all.sort((a, b) => b.timestamp - a.timestamp)[0];
-    await txRequest(db.transaction(STATE_STORE, "readwrite").objectStore(STATE_STORE).put(latest.snapshot, STATE_KEY));
-    await txRequest(db.transaction(AUDIT_STORE, "readwrite").objectStore(AUDIT_STORE).delete(latest.id));
+    await stateStore().put(STATE_KEY, latest.snapshot);
+    await auditStore().delete(latest.id);
     return latest.snapshot;
   } catch {
     return null;
@@ -253,10 +238,7 @@ export async function undoLastAction(current: IdentityStoreState): Promise<Ident
 
 export async function listAuditEntries(): Promise<AuditEntry[]> {
   try {
-    const db = await openDb();
-    const all = await txRequest(
-      db.transaction(AUDIT_STORE, "readonly").objectStore(AUDIT_STORE).getAll() as IDBRequest<AuditEntry[]>
-    );
+    const all = await auditStore().getAll<AuditEntry>();
     return all.sort((a, b) => b.timestamp - a.timestamp);
   } catch {
     return [];

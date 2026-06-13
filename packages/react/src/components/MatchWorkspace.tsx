@@ -654,12 +654,13 @@ export function ReplayViewer({ replay, map, target = null }: {
   const levelOf = (z: number): MapLevel => (calibration ? levelAt(z, calibration) : "upper");
   const round = replay.rounds.find((row) => row.roundNumber === roundNumber) ?? replay.rounds[0];
 
-  // 有效帧范围：数据实际帧数；officialEndTick 可能将 scrubber 延伸到更晚的 tick
+  // 有效帧范围：数据实际帧数；targetEndTick 优先延伸到下一回合 freeze/start 边界。
   const lastDataFrameIndex = round ? Math.max(round.frameCount - 1, 0) : 0;
-  const officialEndFrameIndex = useMemo(() => {
+  const targetEndFrameIndex = useMemo(() => {
     if (!round) return lastDataFrameIndex;
-    if (round.officialEndTick == null) return lastDataFrameIndex;
-    const computed = Math.round((round.officialEndTick - round.startTick) / round.tickStep);
+    const targetEndTick = round.targetEndTick ?? round.officialEndTick;
+    if (targetEndTick == null) return lastDataFrameIndex;
+    const computed = Math.round((targetEndTick - round.startTick) / round.tickStep);
     return Math.max(lastDataFrameIndex, computed);
   }, [round, lastDataFrameIndex]);
 
@@ -676,8 +677,9 @@ export function ReplayViewer({ replay, map, target = null }: {
     setRoundNumber(target.roundNumber);
     setPlaying(false);
     if (target.tick != null) {
-      const endIdx = targetRound.officialEndTick != null
-        ? Math.max(targetRound.frameCount - 1, Math.round((targetRound.officialEndTick - targetRound.startTick) / targetRound.tickStep))
+      const targetEndTick = targetRound.targetEndTick ?? targetRound.officialEndTick;
+      const endIdx = targetEndTick != null
+        ? Math.max(targetRound.frameCount - 1, Math.round((targetEndTick - targetRound.startTick) / targetRound.tickStep))
         : targetRound.frameCount - 1;
       const idx = Math.round((target.tick - targetRound.startTick) / targetRound.tickStep);
       setFrameIndex(Math.max(0, Math.min(endIdx, idx)));
@@ -687,19 +689,19 @@ export function ReplayViewer({ replay, map, target = null }: {
   }, [target?.seq]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!playing || !round || officialEndFrameIndex <= 0) return undefined;
+    if (!playing || !round || targetEndFrameIndex <= 0) return undefined;
     const msPerFrame = Math.max(35, 1000 / ((replay.sampleRate ?? 8) * speed));
     const timer = window.setInterval(() => {
       setFrameIndex((value) => {
-        if (value >= officialEndFrameIndex) {
+        if (value >= targetEndFrameIndex) {
           setPlaying(false);
-          return officialEndFrameIndex;
+          return targetEndFrameIndex;
         }
         return value + 1;
       });
     }, msPerFrame);
     return () => window.clearInterval(timer);
-  }, [playing, replay.sampleRate, officialEndFrameIndex, speed]);
+  }, [playing, replay.sampleRate, targetEndFrameIndex, speed]);
 
   // Stable per-player numbers: teamA → 1-5, teamB → 6-0.
   // Computed from round.players order so the mapping is consistent across frames.
@@ -715,11 +717,11 @@ export function ReplayViewer({ replay, map, target = null }: {
     return <Panel title="2D 回放"><p className="dak-muted">该导出包不含回放流。</p></Panel>;
   }
 
-  const currentFrameIndex = Math.min(frameIndex, officialEndFrameIndex);
+  const currentFrameIndex = Math.min(frameIndex, targetEndFrameIndex);
   // 数据帧 clamp：超出实际录制帧数时冻结在最后一帧
   const dataFrameIndex = Math.min(currentFrameIndex, lastDataFrameIndex);
   const currentTick = round.startTick + currentFrameIndex * round.tickStep;
-  const endTick = round.startTick + officialEndFrameIndex * round.tickStep;
+  const endTick = round.startTick + targetEndFrameIndex * round.tickStep;
 
   // 2D 时间轴锚点：首杀 / 每次击杀 / 下包拆包（freeze end = 起点本身）
   const anchors = useMemo(() => {
@@ -735,7 +737,7 @@ export function ReplayViewer({ replay, map, target = null }: {
   }, [round, endTick]);
   const seekTick = (tick: number) => {
     setPlaying(false);
-    setFrameIndex(Math.max(0, Math.min(officialEndFrameIndex, Math.round((tick - round.startTick) / round.tickStep))));
+    setFrameIndex(Math.max(0, Math.min(targetEndFrameIndex, Math.round((tick - round.startTick) / round.tickStep))));
   };
   // 帧数据访问用 dataFrameIndex（clamp 到实际录制范围），让超出部分冻结在最后帧
   const currentPlayers = round.players
@@ -848,12 +850,12 @@ export function ReplayViewer({ replay, map, target = null }: {
               className="dak-scrubber"
               type="range"
               min={0}
-              max={officialEndFrameIndex}
+              max={targetEndFrameIndex}
               value={currentFrameIndex}
               onChange={(event) => setFrameIndex(Number(event.target.value))}
             />
           </div>
-          <button className="dak-icon-button" type="button" onClick={() => setFrameIndex((value) => Math.min(officialEndFrameIndex, value + Math.max(1, Math.round((replay.sampleRate ?? 8) / 2))))} aria-label="前进">
+          <button className="dak-icon-button" type="button" onClick={() => setFrameIndex((value) => Math.min(targetEndFrameIndex, value + Math.max(1, Math.round((replay.sampleRate ?? 8) / 2))))} aria-label="前进">
             <ChevronRight size={17} />
           </button>
         </div>

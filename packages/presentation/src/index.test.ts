@@ -32,4 +32,17 @@ describe("@cs2dak/presentation", () => {
     expect(replayPlayer?.loadout.secondaryWeapon).toBe(economy!.secondaryWeapon);
     expect(replayPlayer?.loadout.grenadeCount).toBe(economy!.grenadeCount);
   });
+
+  it("uses next round start tick as replay target end when available", async () => {
+    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url)));
+    const pkg = await loadDemoPackageFromZip(zip);
+    const workspace = buildMatchWorkspaceModel(pkg);
+    const firstReplayRound = workspace.replay.rounds[0]!;
+    const firstPackageRound = pkg.rounds.find((round) => round.roundNumber === firstReplayRound.roundNumber)!;
+    const nextPackageRound = pkg.rounds
+      .filter((round) => round.startTick > firstPackageRound.startTick)
+      .sort((a, b) => a.startTick - b.startTick)[0]!;
+
+    expect(firstReplayRound.targetEndTick).toBe(nextPackageRound.startTick);
+  });
 });

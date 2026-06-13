@@ -14,11 +14,15 @@ cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 VERSION_ARG="${1:-}"
 
-echo "==> [1/5] Syncing version into all manifests"
-if [[ -n "$VERSION_ARG" ]]; then
-  node scripts/sync-version.mjs "$VERSION_ARG"
+if [[ "${PACKAGE_SKIP_VERSION_SYNC:-0}" == "1" ]]; then
+  echo "==> [1/5] Skipping version sync"
 else
-  node scripts/sync-version.mjs
+  echo "==> [1/5] Syncing version into all manifests"
+  if [[ -n "$VERSION_ARG" ]]; then
+    node scripts/sync-version.mjs "$VERSION_ARG"
+  else
+    node scripts/sync-version.mjs
+  fi
 fi
 
 echo "==> [2/5] Building DAK Studio frontend"

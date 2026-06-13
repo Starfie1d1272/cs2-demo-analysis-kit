@@ -37,6 +37,8 @@ const SIDE_LABEL: Record<string, string> = { t: "T", ct: "CT" };
 
 const BATCH_SIZE = 5;
 const PAGE_SIZE = 16;
+const TOP_N_OPTIONS = [20, 40, 60] as const;
+type TopNOption = (typeof TOP_N_OPTIONS)[number];
 
 // ── 数据加载与 callout 解析 ──────────────────────────────────────────────────
 
@@ -176,6 +178,7 @@ export function LineupView({
   const [sortKey, setSortKey] = useState<"count" | "winRate" | "demoCount">("count");
   const [sortDesc, setSortDesc] = useState(true);
   const [page, setPage] = useState(0);
+  const [radarTopN, setRadarTopN] = useState<TopNOption>(20);
 
   function handleSort(key: typeof sortKey) {
     if (sortKey === key) setSortDesc((d) => !d);
@@ -319,6 +322,11 @@ export function LineupView({
   const safePage = Math.min(page, totalPages - 1);
   const pageRows = current.rows.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
   const calibration = getMapCalibration(current.mapName);
+  const radarRows = current.rows.slice(0, radarTopN);
+  const selectedCluster = hoveredId ? current.rows.find((cluster) => cluster.id === hoveredId) : undefined;
+  const radarClusters = selectedCluster && !radarRows.some((cluster) => cluster.id === selectedCluster.id)
+    ? [...radarRows, selectedCluster]
+    : radarRows;
 
   return (
     <div className="stu-lineup-layout">
@@ -376,6 +384,21 @@ export function LineupView({
           </div>
         )}
 
+        <div className="stu-chip-row stu-lineup-topn" role="radiogroup" aria-label="雷达显示数量">
+          {TOP_N_OPTIONS.map((value) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={radarTopN === value}
+              className={radarTopN === value ? "stu-chip stu-chip-active" : "stu-chip"}
+              onClick={() => setRadarTopN(value)}
+            >
+              Top {value}
+            </button>
+          ))}
+        </div>
+
         {calibration ? (
           <svg
             className="stu-duel-radar"
@@ -389,7 +412,7 @@ export function LineupView({
               height={calibration.radarSize}
               opacity={0.85}
             />
-            {current.rows.slice(0, 60).map((cluster) => {
+            {radarClusters.map((cluster) => {
               const from = worldToRadar(cluster.throwPosition, calibration);
               const to = worldToRadar(cluster.effectPosition, calibration);
               const color = GRENADE_COLOR[cluster.grenade] ?? "#888";

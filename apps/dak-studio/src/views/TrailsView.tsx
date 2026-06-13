@@ -95,7 +95,7 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
     setPlayers(null);
     setError(null);
     Promise.all(entries.map(async (entry) => ({ id: entry.id, pkg: await getDemoPackage(entry.id) })))
-      .then((loaded) => {
+      .then(async (loaded) => {
         if (cancelled) return;
         const counts = new Map<string, PlayerOption>();
         const roster = new Map<string, Set<string>>();
@@ -110,11 +110,12 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
           roster.set(id, ids);
         }
         const options = [...counts.values()].sort((a, b) => b.matchCount - a.matchCount || a.name.localeCompare(b.name));
+        const pinned = await getPinnedPlayer();
+        if (cancelled) return;
         setPlayers(options);
         setRosterByEntry(roster);
         setSteamId64((current) => {
           if (current && options.some((option) => option.steamId64 === current)) return current;
-          const pinned = getPinnedPlayer();
           const pinnedOption = pinned ? options.find((option) => pinned.steamIds.includes(option.steamId64)) : null;
           return (pinnedOption ?? options[0])?.steamId64 ?? null;
         });

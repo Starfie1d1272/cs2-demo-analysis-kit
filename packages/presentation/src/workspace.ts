@@ -735,6 +735,14 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
   const bombsByRound = groupBy(pkg.bombs, (b) => b.roundNumber);
   const roundsByNumber = new Map(pkg.rounds.map((r) => [r.roundNumber, r]));
   const endTickByRound = new Map(pkg.rounds.map((r) => [r.roundNumber, r.endTick]));
+  const sortedPackageRounds = [...pkg.rounds].sort((a, b) => a.startTick - b.startTick);
+  const targetEndTickByRound = new Map<number, number>();
+  sortedPackageRounds.forEach((round, index) => {
+    targetEndTickByRound.set(
+      round.roundNumber,
+      sortedPackageRounds[index + 1]?.startTick ?? round.endTick
+    );
+  });
   const economyByRoundPlayer = new Map(pkg.playerEconomies.map((row) => [`${row.roundNumber}:${row.playerIndex}`, row]));
 
   let hasDefuseKit = false;
@@ -745,12 +753,16 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
       return teamKey === "teamA" ? sourceRound.teamASide : sourceRound.teamBSide;
     };
 
+    const officialEndTick = endTickByRound.get(roundRow.roundNumber);
+    const targetEndTick = targetEndTickByRound.get(roundRow.roundNumber) ?? officialEndTick;
+
     return {
       roundNumber: roundRow.roundNumber,
       startTick: roundRow.startTick,
       tickStep: roundRow.tickStep,
       frameCount: roundRow.frameCount,
-      officialEndTick: endTickByRound.get(roundRow.roundNumber),
+      officialEndTick,
+      targetEndTick,
       kills: buildRoundKills(pkg, killsByRound.get(roundRow.roundNumber) ?? []),
       grenades: (grenadesByRound.get(roundRow.roundNumber) ?? []).map((row) => ({
         grenade: row.grenade,
@@ -776,7 +788,7 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
       bomb: buildRoundBomb(bombsByRound.get(roundRow.roundNumber) ?? []),
       groundBombs: buildGroundBombs(
         bombsByRound.get(roundRow.roundNumber) ?? [],
-        roundRow.startTick + roundRow.frameCount * roundRow.tickStep
+        targetEndTick ?? roundRow.startTick + roundRow.frameCount * roundRow.tickStep
       ),
       players: roundRow.players.map((player) => {
         // v3 起 x/y/z/yaw 为差分编码，flash 改为独立列（0.1 秒单位，flags 不再含致盲位）
