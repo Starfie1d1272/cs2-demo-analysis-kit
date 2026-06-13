@@ -43,6 +43,18 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # .tri 碰撞几何（~30MB/图，不进 git）：runner 上现场下载到 ~/.awpy/tris，
+      # package.sh 自动拷进安装包；缺失只降级（反应时间/预瞄退化口径）。
+      - name: Cache awpy tris
+        uses: actions/cache@v4
+        with:
+          path: ~/.awpy/tris
+          key: awpy-tris-${{ runner.os }}-v1
+
+      - name: Download awpy tris
+        shell: bash
+        run: uvx awpy get tris
+
       - name: Build desktop packages
         run: bash scripts/package.sh
         shell: bash

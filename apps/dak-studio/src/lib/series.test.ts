@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { seriesVetoSchema } from "@cs2dak/contract";
-import { buildVetoTemplate, suggestSeriesGroups } from "./series";
+import { deriveVetoSummary, suggestSeriesGroups, vetoSkeleton } from "./series";
 import type { StudioDemoEntry } from "./library";
 
 function entry(id: string, date: string, teamAName: string, teamBName: string): StudioDemoEntry {
@@ -42,8 +42,39 @@ describe("series grouping", () => {
     expect(groups.find((group) => group.entryIds.includes("bo5-1"))?.format).toBe("bo5");
   });
 
-  it("builds SeriesVeto with maps summary and side choices", () => {
-    const veto = buildVetoTemplate("s1", "bo3", "A", "B", ["Mirage", "Inferno", "Nuke", "Ancient", "Anubis", "Dust2", "Overpass"]);
+  it("BO5 骨架是 2 ban + 4 pick + 1 decider（与打了几张图无关）", () => {
+    const bo5 = vetoSkeleton("bo5");
+    expect(bo5.filter((s) => s.actionType === "ban").length).toBe(2);
+    expect(bo5.filter((s) => s.actionType === "pick").length).toBe(4);
+    expect(bo5.filter((s) => s.actionType === "decider").length).toBe(1);
+    // decider 留空队伍 = 拼刀选边
+    expect(bo5.at(-1)?.teamKey).toBeNull();
+  });
+
+  it("BO3 骨架是 ban-ban-pick-pick-ban-ban-decider", () => {
+    const bo3 = vetoSkeleton("bo3");
+    expect(bo3.map((s) => s.actionType)).toEqual(["ban", "ban", "pick", "pick", "ban", "ban", "decider"]);
+  });
+
+  it("填满地图的 veto 通过 schema 并派生出 picked/banned/decider", () => {
+    const maps = ["de_mirage", "de_inferno", "de_nuke", "de_ancient", "de_anubis", "de_dust2", "de_overpass"];
+    const steps = vetoSkeleton("bo3").map((step, i) => ({
+      stepOrder: i + 1,
+      actionType: step.actionType,
+      teamKey: step.teamKey,
+      mapName: maps[i]!,
+      side: null as "t" | "ct" | null
+    }));
+    const veto = {
+      version: "cs2-demo-analysis-kit/series-veto-0.1" as const,
+      seriesId: "s1",
+      format: "bo3" as const,
+      teamAName: "A",
+      teamBName: "B",
+      mapPool: maps,
+      ...deriveVetoSummary(steps),
+      steps
+    };
     expect(() => seriesVetoSchema.parse(veto)).not.toThrow();
     expect(veto.maps.picked.length).toBe(2);
     expect(veto.maps.banned.length).toBe(4);

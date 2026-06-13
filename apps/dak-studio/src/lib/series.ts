@@ -1,6 +1,16 @@
 import type { SeriesFormat, SeriesVeto, SeriesVetoStep } from "@cs2dak/contract";
+import { ACTIVE_DUTY_MAPS } from "@cs2dak/maps";
 import { matchDateFromFileName, type StudioDemoEntry } from "./library";
 import { displayTeamName } from "./identity";
+
+/** BP 录入默认图池：CS2 现役 7 张（de_ 形式，与 entry.meta.mapName 对齐）。 */
+export const SERIES_MAP_POOL: string[] = [...ACTIVE_DUTY_MAPS];
+
+/** de_mirage → Mirage（BP 录入/展示统一用此显示名）。 */
+export function mapDisplayName(mapName: string): string {
+  const base = mapName.replace(/^de_/, "");
+  return base.charAt(0).toUpperCase() + base.slice(1);
+}
 
 export interface StudioSeriesRecord {
   id: string;
@@ -93,60 +103,45 @@ export function suggestSeriesGroups(
     .sort((a, b) => b.entryIds.length - a.entryIds.length || a.name.localeCompare(b.name));
 }
 
-export function buildVetoTemplate(
-  seriesId: string,
-  format: SeriesFormat,
-  teamAName: string,
-  teamBName: string,
-  mapPool: string[]
-): SeriesVeto {
-  const raw: Array<Omit<SeriesVetoStep, "stepOrder" | "mapName" | "side"> & { side?: "t" | "ct" | null }> =
-    format === "bo1"
-      ? [
-          { actionType: "ban", teamKey: "teamA" },
-          { actionType: "ban", teamKey: "teamA" },
-          { actionType: "ban", teamKey: "teamB" },
-          { actionType: "ban", teamKey: "teamB" },
-          { actionType: "ban", teamKey: "teamB" },
-          { actionType: "ban", teamKey: "teamA" },
-          { actionType: "decider", teamKey: "teamB" }
-        ]
-      : format === "bo3"
-        ? [
-            { actionType: "ban", teamKey: "teamA" },
-            { actionType: "ban", teamKey: "teamB" },
-            { actionType: "pick", teamKey: "teamA" },
-            { actionType: "pick", teamKey: "teamB" },
-            { actionType: "ban", teamKey: "teamB" },
-            { actionType: "ban", teamKey: "teamA" },
-            { actionType: "decider", teamKey: null }
-          ]
-        : [
-            { actionType: "ban", teamKey: "teamA" },
-            { actionType: "ban", teamKey: "teamA" },
-            { actionType: "pick", teamKey: "teamB" },
-            { actionType: "pick", teamKey: "teamA" },
-            { actionType: "pick", teamKey: "teamB" },
-            { actionType: "pick", teamKey: "teamA" },
-            { actionType: "decider", teamKey: null }
-          ];
-  const steps = raw.map((step, index) => ({
-    stepOrder: index + 1,
-    actionType: step.actionType,
-    teamKey: step.teamKey,
-    mapName: mapPool[index % Math.max(mapPool.length, 1)] ?? "",
-    side: step.side ?? null
-  }));
-  return {
-    version: "cs2-demo-analysis-kit/series-veto-0.1",
-    seriesId,
-    format,
-    teamAName,
-    teamBName,
-    mapPool,
-    ...deriveVetoSummary(steps),
-    steps
-  };
+/**
+ * 各赛制标准 BP 步骤骨架（队伍与动作，地图/选边留空）：
+ * - BO1：A/B 轮流 ban 6 张 → decider（B 选边）
+ * - BO3：A/B 各 ban → A/B 各 pick → A/B 各 ban → decider（剩图，拼刀）
+ * - BO5：A/B 各 ban → 四张 pick 交替 → decider（剩图，拼刀）
+ */
+export function vetoSkeleton(format: SeriesFormat): Array<Pick<SeriesVetoStep, "actionType" | "teamKey">> {
+  if (format === "bo1") {
+    return [
+      { actionType: "ban", teamKey: "teamA" },
+      { actionType: "ban", teamKey: "teamA" },
+      { actionType: "ban", teamKey: "teamB" },
+      { actionType: "ban", teamKey: "teamB" },
+      { actionType: "ban", teamKey: "teamB" },
+      { actionType: "ban", teamKey: "teamA" },
+      { actionType: "decider", teamKey: "teamB" }
+    ];
+  }
+  if (format === "bo3") {
+    return [
+      { actionType: "ban", teamKey: "teamA" },
+      { actionType: "ban", teamKey: "teamB" },
+      { actionType: "pick", teamKey: "teamA" },
+      { actionType: "pick", teamKey: "teamB" },
+      { actionType: "ban", teamKey: "teamB" },
+      { actionType: "ban", teamKey: "teamA" },
+      { actionType: "decider", teamKey: null }
+    ];
+  }
+  // bo5：2 ban 各一 + 4 pick 交替 + decider（拼刀）
+  return [
+    { actionType: "ban", teamKey: "teamA" },
+    { actionType: "ban", teamKey: "teamB" },
+    { actionType: "pick", teamKey: "teamA" },
+    { actionType: "pick", teamKey: "teamB" },
+    { actionType: "pick", teamKey: "teamA" },
+    { actionType: "pick", teamKey: "teamB" },
+    { actionType: "decider", teamKey: null }
+  ];
 }
 
 export function deriveVetoSummary(steps: SeriesVetoStep[]): Pick<SeriesVeto, "maps" | "sideChoices"> {

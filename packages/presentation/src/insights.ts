@@ -352,26 +352,21 @@ function percentileLabel(value: number | null, values: Array<number | null>, low
   return `当前范围前 ${Math.max(1, Math.round(better / nums.length * 100))}%`;
 }
 
+// 武器卡按真实武器名统计（区分 m4a1_silencer / m4a4），展示层取击杀数前 6，其余并入「其他」
+const MECHANICS_TOP_WEAPONS = 6;
+
 function weaponBucket(weapon: string): string {
-  const normalized = weapon.toLowerCase();
-  if (["ak47"].includes(normalized)) return "ak47";
-  if (["m4a1", "m4a4", "m4a1_silencer"].includes(normalized)) return "m4";
-  if (normalized === "awp") return "awp";
-  if (normalized === "deagle") return "deagle";
-  return "other";
+  return weapon.toLowerCase();
 }
 
 function weaponBucketLabel(bucket: string): string {
-  if (bucket === "ak47") return "AK";
-  if (bucket === "m4") return "M4";
-  if (bucket === "awp") return "AWP";
-  if (bucket === "deagle") return "Deagle";
   if (bucket === "all") return "全部武器";
-  return "其他";
+  if (bucket === "other") return "其他";
+  return displayWeaponName(bucket);
 }
 
 export interface MechanicsProfileOptions {
-  /** 按地图名提供 .tri BVH；提供后视觉反应/预瞄走 LOS 精确口径。 */
+  /** 按地图名提供 .tri BVH；提供后反应时间/预瞄走 LOS 精确口径。 */
   visibilityFor?: (mapName: string) => TriangleBvh | null;
 }
 
@@ -477,9 +472,23 @@ export function buildPlayerMechanicsProfile(
     preaim: [...byBucket.values()].flatMap((row) => row.preaim),
     ttk: [...byBucket.values()].flatMap((row) => row.ttk)
   });
-  const weapons = [...byBucket.entries()]
-    .map(([bucket, cell]) => toProfile(bucket, cell))
-    .sort((a, b) => b.kills - a.kills || a.label.localeCompare(b.label));
+  // 击杀数前 6 把武器单列，其余合并为「其他」（样本数组直接拼接，口径与单桶一致）
+  const ranked = [...byBucket.entries()].sort((a, b) => b[1].kills - a[1].kills || a[0].localeCompare(b[0]));
+  const top = ranked.slice(0, MECHANICS_TOP_WEAPONS);
+  const rest = ranked.slice(MECHANICS_TOP_WEAPONS);
+  const weapons = top.map(([bucket, cell]) => toProfile(bucket, cell));
+  if (rest.length > 0) {
+    weapons.push(toProfile("other", {
+      kills: rest.reduce((sum, [, cell]) => sum + cell.kills, 0),
+      first: rest.flatMap(([, cell]) => cell.first),
+      spray: rest.flatMap(([, cell]) => cell.spray),
+      counter: rest.flatMap(([, cell]) => cell.counter),
+      oneTap: rest.flatMap(([, cell]) => cell.oneTap),
+      reaction: rest.flatMap(([, cell]) => cell.reaction),
+      preaim: rest.flatMap(([, cell]) => cell.preaim),
+      ttk: rest.flatMap(([, cell]) => cell.ttk)
+    }));
+  }
   return { overall, weapons };
 }
 

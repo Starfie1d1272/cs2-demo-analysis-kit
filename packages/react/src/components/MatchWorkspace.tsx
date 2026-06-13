@@ -25,8 +25,21 @@ export interface ReplayTarget {
   seq: number;
 }
 
+const WORKSPACE_NAV: Array<{ key: WorkspaceView; label: string }> = [
+  { key: "replay", label: "回放" },
+  { key: "overview", label: "概览" },
+  { key: "rounds", label: "回合" },
+  { key: "players", label: "选手" },
+  { key: "economy", label: "经济" },
+  { key: "weapons", label: "武器" },
+  { key: "duels", label: "对位" },
+  { key: "map", label: "地图" }
+];
+
 export function MatchWorkspace({ model, initialTarget }: MatchWorkspaceProps) {
-  const [view, setView] = useState<WorkspaceView>("overview");
+  // 顶部横向分段导航 + 单一全宽主区：一次只显示一个视图，避免宽回放与其它视图争抢宽度。
+  // 回放是默认首项（无回放流时退化为概览）；EvidenceLink 跳转自动切到回放并定位 tick。
+  const [view, setView] = useState<WorkspaceView>(model.replay.available ? "replay" : "overview");
   const [replayTarget, setReplayTarget] = useState<ReplayTarget | null>(null);
   const openReplay = (roundNumber: number, tick?: number) => {
     setReplayTarget((prev) => ({ roundNumber, tick, seq: (prev?.seq ?? 0) + 1 }));
@@ -36,9 +49,8 @@ export function MatchWorkspace({ model, initialTarget }: MatchWorkspaceProps) {
     if (!initialTarget) return;
     openReplay(initialTarget.roundNumber, initialTarget.tick);
   }, [initialTarget?.roundNumber, initialTarget?.tick]);
-  const replayDetail = model.replay.available
-    ? `${model.replay.sampleRate ?? 0} Hz · ${model.replay.rounds.length} 回合`
-    : "无回放流";
+  const replayHandler = model.replay.available ? openReplay : undefined;
+  const nav = model.replay.available ? WORKSPACE_NAV : WORKSPACE_NAV.filter((item) => item.key !== "replay");
 
   return (
     <main className="dak-shell">
@@ -69,48 +81,46 @@ export function MatchWorkspace({ model, initialTarget }: MatchWorkspaceProps) {
           ))}
         </section>
 
-        <div className="dak-workbench">
-          <aside className="dak-workbench-sidebar">
-            <nav className="dak-tabs" aria-label="Match workspace views">
-              {model.tabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  className={view === tab.key ? "dak-tab dak-tab-active" : "dak-tab"}
-                  type="button"
-                  onClick={() => setView(tab.key)}
-                >
-                  {iconForTab(tab.key)}
-                  <span>{tab.label}</span>
-                  <small>{detailForTab(tab.key, model, replayDetail)}</small>
-                </button>
-              ))}
-            </nav>
-          </aside>
+        <nav className="dak-ws-nav" aria-label="比赛工作台视图">
+          {nav.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              className={view === item.key ? "dak-ws-navtab dak-ws-navtab-active" : "dak-ws-navtab"}
+              onClick={() => setView(item.key)}
+            >
+              {iconForTab(item.key)}
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </nav>
 
-          <section className="dak-workbench-main">
-            {view === "overview" && <OverviewView model={model} onNavigate={setView} />}
-            {view === "rounds" && <RoundExplorer model={model} onOpenReplay={model.replay.available ? openReplay : undefined} />}
-            {view === "players" && <PlayerStoryPanel model={model} onOpenReplay={model.replay.available ? openReplay : undefined} />}
-            {view === "economy" && (
-              <div className="dak-stack">
-                <Panel title="经济走势">
-                  <EconomyPanel points={model.economy} teamAName={model.teams.teamA.name} teamBName={model.teams.teamB.name} />
-                </Panel>
-                <BuyQualityPanel model={model} />
-              </div>
-            )}
-            {view === "weapons" && <WeaponsView model={model} />}
-            {view === "duels" && <DuelsView model={model} />}
-            {view === "map" && <MapWorkspace model={model} />}
-            {view === "replay" && <ReplayViewer replay={model.replay} map={model.map.view} target={replayTarget} />}
-          </section>
-        </div>
+        <section className="dak-ws-main">
+          {view === "replay" && model.replay.available && (
+            <ReplayViewer replay={model.replay} map={model.map.view} target={replayTarget} />
+          )}
+          {view === "overview" && <OverviewView model={model} onNavigate={setView} />}
+          {view === "rounds" && <RoundExplorer model={model} onOpenReplay={replayHandler} />}
+          {view === "players" && <PlayerStoryPanel model={model} onOpenReplay={replayHandler} />}
+          {view === "economy" && (
+            <div className="dak-stack">
+              <Panel title="经济走势">
+                <EconomyPanel points={model.economy} teamAName={model.teams.teamA.name} teamBName={model.teams.teamB.name} />
+              </Panel>
+              <BuyQualityPanel model={model} />
+            </div>
+          )}
+          {view === "weapons" && <WeaponsView model={model} />}
+          {view === "duels" && <DuelsView model={model} />}
+          {view === "map" && <MapWorkspace model={model} />}
+        </section>
       </div>
     </main>
   );
 }
 
 function OverviewView({ model, onNavigate }: MatchWorkspaceProps & { onNavigate: (view: WorkspaceView) => void }) {
+  // 全宽 2 栏：左 = 主线 + 记分板，右 = 模块快捷入口 + 地图状态。
   return (
     <div className="dak-grid">
       <section className="dak-stack">
@@ -126,12 +136,12 @@ function OverviewView({ model, onNavigate }: MatchWorkspaceProps & { onNavigate:
         </Panel>
       </section>
       <aside className="dak-stack">
-        <Panel title="模块入口">
+        <Panel title="快捷入口">
           <div className="dak-module-actions">
-            <ModuleAction icon={<ListChecks size={16} />} label="回合浏览" value={`${model.rounds.length} 回合`} detail="横向 timeline + selected round events" onClick={() => onNavigate("rounds")} />
-            <ModuleAction icon={<Users size={16} />} label="选手视角" value={`${model.players.length} 名选手`} detail="RR breakdown + round facts" onClick={() => onNavigate("players")} />
-            <ModuleAction icon={<MapIcon size={16} />} label="地图图层" value={`${model.map.points.length} 点`} detail={model.map.status.message ?? "kill/death/grenade layers"} onClick={() => onNavigate("map")} />
             <ModuleAction icon={<Film size={16} />} label="2D 回放" value={model.replay.available ? `${model.replay.sampleRate ?? 0} Hz` : "无回放"} detail={model.replay.available ? "走位 / 道具 / C4 时间线" : "导出时未附带回放流"} onClick={() => onNavigate("replay")} />
+            <ModuleAction icon={<ListChecks size={16} />} label="回合浏览" value={`${model.rounds.length} 回合`} detail="时间轴 + 选中回合事件" onClick={() => onNavigate("rounds")} />
+            <ModuleAction icon={<Users size={16} />} label="选手视角" value={`${model.players.length} 名选手`} detail="RR 拆解 + 逐回合事实" onClick={() => onNavigate("players")} />
+            <ModuleAction icon={<MapIcon size={16} />} label="地图图层" value={`${model.map.points.length} 点`} detail={model.map.status.message ?? "击杀 / 死亡 / 道具图层"} onClick={() => onNavigate("map")} />
           </div>
         </Panel>
         <Panel title="地图状态">
@@ -755,37 +765,33 @@ export function ReplayViewer({ replay, map, target = null }: {
       </div>
       <div className="dak-frame-player-list">
         {team.rows.map(({ player, frame }) => {
-          const primary = primaryLoadoutLabel(player.loadout);
+          // 装备严格跟随逐帧数据：道具丢出后即消失，捡/传枪后主武器即替换（不回退到开局 loadout）
           const heldUtility = frame.grenades.length > 0
             ? heldUtilityLabel({ ...player.loadout, grenadeCount: frame.grenades.length, grenades: frame.grenades })
-            : player.loadout.grenadeCount > 0
-              ? heldUtilityLabel(player.loadout)
-              : null;
-          const current = frame.weapon && frame.weapon !== player.loadout.primaryWeapon && frame.weapon !== player.loadout.secondaryWeapon
-            ? frame.weapon
             : null;
+          const heldGun = frame.weapon && isGunWeapon(frame.weapon) ? frame.weapon : null;
+          const pickedUp = heldGun && heldGun !== player.loadout.primaryWeapon && heldGun !== player.loadout.secondaryWeapon;
+          const primary = pickedUp ? heldGun : primaryLoadoutLabel(player.loadout);
           return (
             <div
               className={`dak-frame-player-row${!frame.alive ? " dak-frame-player-row-dead" : ""}`}
               key={player.steamId64}
             >
               <span className="dak-frame-player-num">{playerNumbers[player.steamId64] ?? "?"}</span>
-              <span className="dak-frame-player-name">
-                {player.name}
-                {frame.alive && (
-                  <small className="dak-frame-loadout">
-                    <span className="dak-frame-primary">{primary}</span>
-                    {player.loadout.primaryWeapon && player.loadout.secondaryWeapon && <span>{player.loadout.secondaryWeapon}</span>}
-                    {heldUtility && <span>{heldUtility}</span>}
-                    {frame.armor > 0 && <span>{frame.hasHelmet ? "全甲" : "半甲"}</span>}
-                    {frame.hasDefuseKit && <span>kit</span>}
-                    {frame.hasBomb && <span>C4</span>}
-                    {frame.flashed && <span>白 {frame.flashRemainingSeconds.toFixed(1)}s</span>}
-                    {current && <span className="dak-frame-current">当前 {current}</span>}
-                  </small>
-                )}
-                {!frame.alive && <small className="dak-frame-weapon">阵亡</small>}
-              </span>
+              <span className="dak-frame-player-name">{player.name}</span>
+              {frame.alive ? (
+                <small className="dak-frame-loadout">
+                  <span className="dak-frame-primary">{primary}{pickedUp ? "*" : ""}</span>
+                  {player.loadout.primaryWeapon && player.loadout.secondaryWeapon && !pickedUp && <span>{player.loadout.secondaryWeapon}</span>}
+                  {heldUtility && <span>{heldUtility}</span>}
+                  {frame.armor > 0 && <span>{frame.hasHelmet ? "全甲" : "半甲"}</span>}
+                  {frame.hasDefuseKit && <span>kit</span>}
+                  {frame.hasBomb && <span>C4</span>}
+                  {frame.flashed && <span>白 {frame.flashRemainingSeconds.toFixed(1)}s</span>}
+                </small>
+              ) : (
+                <small className="dak-frame-weapon">阵亡</small>
+              )}
               {renderHpArmor(frame)}
             </div>
           );
@@ -1260,17 +1266,6 @@ function iconForTab(key: WorkspaceView) {
   return <Film size={16} />;
 }
 
-function detailForTab(key: WorkspaceView, model: MatchWorkspaceModel, replayDetail: string) {
-  if (key === "overview") return model.scoreline;
-  if (key === "rounds") return `${model.rounds.length} rounds`;
-  if (key === "players") return `${model.players.length} players`;
-  if (key === "economy") return `${model.economy.length} rows`;
-  if (key === "weapons") return `${model.weapons.length} weapons`;
-  if (key === "duels") return `${model.duels.players.length} players`;
-  if (key === "map") return `${model.map.points.length} points`;
-  return replayDetail;
-}
-
 function summarizePlayerRoundFacts(facts: MatchWorkspaceModel["players"][number]["roundFacts"]) {
   return facts.reduce(
     (summary, fact) => ({
@@ -1324,6 +1319,14 @@ function hpBarColor(hp: number): string {
   if (hp > 60) return "var(--dak-ok)";
   if (hp > 30) return "var(--dak-warn)";
   return "var(--dak-danger)";
+}
+
+// 刀/各类投掷物/C4 不算枪：用于判定逐帧手持是否应替换主武器显示
+function isGunWeapon(weapon: string): boolean {
+  if (weapon === "c4" || weapon === "taser") return false;
+  if (weapon.includes("knife") || weapon.includes("bayonet") || weapon === "karambit") return false;
+  if (weapon.includes("grenade") || weapon === "flashbang" || weapon === "molotov" || weapon === "decoy") return false;
+  return true;
 }
 
 function primaryLoadoutLabel(loadout: WorkspaceReplayLoadout): string {

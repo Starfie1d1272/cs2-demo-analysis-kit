@@ -6,22 +6,15 @@ import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState } from "../components/primitives";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
 import { getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
-import { BpView } from "./BpView";
 import {
-  buildVetoTemplate,
-  deriveVetoSummary,
   listPlaybookNames,
-  listSeriesRecords,
   loadCoachSettings,
   saveCoachSettings,
   savePlaybookName,
-  saveSeriesRecord,
-  suggestSeriesGroups,
-  type CoachSettings,
-  type StudioSeriesRecord
+  type CoachSettings
 } from "../lib/series";
 
-type CoachTab = "patterns" | "playbook" | "anti" | "veto";
+type CoachTab = "patterns" | "playbook" | "anti";
 
 export interface CoachViewProps {
   allEntries: StudioDemoEntry[];
@@ -36,8 +29,7 @@ export interface CoachViewProps {
 const TABS: Array<{ key: CoachTab; label: string }> = [
   { key: "patterns", label: "开局模式" },
   { key: "playbook", label: "战术本" },
-  { key: "anti", label: "备战报告" },
-  { key: "veto", label: "BP / Veto" }
+  { key: "anti", label: "备战报告" }
 ];
 
 const SIDE_LABEL: Record<string, string> = { t: "T 方", ct: "CT 方" };
@@ -61,7 +53,6 @@ export function CoachView({
 }: CoachViewProps) {
   const [tab, setTab] = useState<CoachTab>("patterns");
   const [clusters, setClusters] = useState<OpeningPatternCluster[] | null>(null);
-  const [series, setSeries] = useState<StudioSeriesRecord[]>([]);
   const [settings, setSettings] = useState<CoachSettings>({ myTeamName: null });
   const [playbook, setPlaybook] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -70,11 +61,7 @@ export function CoachView({
     () => teamRenameGroups(allEntries.map((entry) => ({ teamA: entry.meta.teamAName, teamB: entry.meta.teamBName })), teamRenames),
     [allEntries, teamRenames]
   );
-  const suggestions = useMemo(() => suggestSeriesGroups(entries, teamRenames), [entries, teamRenames]);
-  const mapPool = useMemo(() => [...new Set(entries.map((entry) => entry.meta.mapName))].sort(), [entries]);
-
   useEffect(() => {
-    void listSeriesRecords().then(setSeries);
     void loadCoachSettings().then(setSettings);
     void listPlaybookNames().then(setPlaybook);
   }, []);
@@ -98,47 +85,6 @@ export function CoachView({
       cancelled = true;
     };
   }, [entries]);
-
-  async function confirmSeries(suggestionId: string, includeBp: boolean) {
-    const suggestion = suggestions.find((item) => item.id === suggestionId);
-    if (!suggestion) return;
-    const veto = includeBp
-      ? buildVetoTemplate(suggestion.id, suggestion.format, suggestion.teamAName, suggestion.teamBName, mapPool)
-      : null;
-    // 已预知的 BP：IEM Kraków 2026 决赛 FURIA vs Vitality（BO5），FURIA=teamA
-    if (veto && suggestion.teamAName.includes("FURIA") && suggestion.teamBName.includes("Vitality") && suggestion.entryIds.length >= 4) {
-      const iemMaps = ["Dust2", "Ancient", "Mirage", "Inferno", "Nuke", "Overpass", "Anubis"];
-      veto.mapPool = iemMaps;
-      veto.format = "bo5";
-      veto.steps = [
-        { stepOrder: 1, actionType: "ban", teamKey: "teamA", mapName: "Dust2", side: null },
-        { stepOrder: 2, actionType: "ban", teamKey: "teamB", mapName: "Ancient", side: null },
-        { stepOrder: 3, actionType: "pick", teamKey: "teamA", mapName: "Mirage", side: "t" },
-        { stepOrder: 4, actionType: "pick", teamKey: "teamB", mapName: "Inferno", side: "t" },
-        { stepOrder: 5, actionType: "pick", teamKey: "teamA", mapName: "Nuke", side: "t" },
-        { stepOrder: 6, actionType: "pick", teamKey: "teamB", mapName: "Overpass", side: "t" },
-        { stepOrder: 7, actionType: "decider", teamKey: null, mapName: "Anubis", side: null }
-      ];
-    }
-    // 已预知的 BP：PGL Astana 2026 决赛 Spirit vs Falcons（BO5 3-0），Spirit=teamB
-    if (veto && suggestion.teamBName.includes("Spirit") && suggestion.teamAName.includes("Falcons") && suggestion.entryIds.length >= 3) {
-      const pglMaps = ["Inferno", "Overpass", "Dust2", "Mirage", "Ancient", "Nuke", "Anubis"];
-      veto.mapPool = pglMaps;
-      veto.format = "bo5";
-      veto.steps = [
-        { stepOrder: 1, actionType: "ban", teamKey: "teamB", mapName: "Inferno", side: null },
-        { stepOrder: 2, actionType: "ban", teamKey: "teamA", mapName: "Overpass", side: null },
-        { stepOrder: 3, actionType: "pick", teamKey: "teamB", mapName: "Dust2", side: "t" },
-        { stepOrder: 4, actionType: "pick", teamKey: "teamA", mapName: "Mirage", side: "t" },
-        { stepOrder: 5, actionType: "pick", teamKey: "teamB", mapName: "Ancient", side: "t" },
-        { stepOrder: 6, actionType: "pick", teamKey: "teamA", mapName: "Nuke", side: "t" },
-        { stepOrder: 7, actionType: "decider", teamKey: null, mapName: "Anubis", side: null }
-      ];
-    }
-    const finalVeto = veto ? { ...veto, ...deriveVetoSummary(veto.steps) } : null;
-    const saved = await saveSeriesRecord({ ...suggestion, format: finalVeto?.format ?? suggestion.format, veto: finalVeto });
-    setSeries((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
-  }
 
   async function setMyTeam(teamName: string) {
     const next = await saveCoachSettings({ myTeamName: teamName || null });
@@ -209,13 +155,6 @@ export function CoachView({
           <h3>备战报告 Markdown</h3>
           <textarea className="stu-coach-report" readOnly value={antiMarkdown} />
         </div>
-      )}
-      {tab === "veto" && (
-        <VetoPanel
-          suggestions={suggestions}
-          series={series}
-          onConfirm={confirmSeries}
-        />
       )}
     </div>
   );
@@ -299,51 +238,6 @@ function PlaybookTable({
 //       ② BO3 decider 的 side 由最后一 ban 的对面决定，非拼刀；
 //       ③ 没有展开/编辑步骤的 UI（无法查看/修改已保存的 BP 步骤）；
 //       ④ 确认后系列记录只显示计数，无系列详情页（跨图选手趋势/记分板/BP 步骤可视化）。
-function VetoPanel({
-  suggestions,
-  series,
-  onConfirm
-}: {
-  suggestions: ReturnType<typeof suggestSeriesGroups>;
-  series: StudioSeriesRecord[];
-  onConfirm: (suggestionId: string, includeBp: boolean) => Promise<void>;
-}) {
-  const [bpEnabled, setBpEnabled] = useState<Record<string, boolean>>({});
-  return (
-    <div className="stu-card">
-      <h3>系列赛 / BP</h3>
-      <table className="stu-mini-table">
-        <thead><tr><th>建议分组</th><th className="stu-num">地图</th><th>赛制</th><th>BP</th><th /></tr></thead>
-        <tbody>
-          {suggestions.map((suggestion) => {
-            const saved = series.some((item) => item.id === suggestion.id);
-            return (
-              <tr key={suggestion.id}>
-                <td>{suggestion.name}</td>
-                <td className="stu-num">{suggestion.entryIds.length}</td>
-                <td>{suggestion.format.toUpperCase()}</td>
-                <td><label><input type="checkbox" checked={bpEnabled[suggestion.id] ?? false} onChange={(event) => setBpEnabled((current) => ({ ...current, [suggestion.id]: event.target.checked }))} /> 同时生成 BP 模板</label></td>
-                <td><button type="button" className="stu-button-sm" disabled={saved} onClick={() => void onConfirm(suggestion.id, bpEnabled[suggestion.id] ?? false)}>{saved ? "已确认" : "确认"}</button></td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {series.length > 0 && (
-        <div className="stu-coach-series-list">
-          {series.map((item) => (
-            <div key={item.id} className="stu-coach-series-item">
-              <strong>{item.name}</strong>
-              <span>{item.format.toUpperCase()} · {item.entryIds.length} 图 · BP {item.veto ? `${item.veto.steps.length} 步` : "未录入"}</span>
-              {item.veto && <BpView veto={item.veto} />}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function buildAntiStratMarkdown(
   clusters: OpeningPatternCluster[],
   myTeamName: string | null,

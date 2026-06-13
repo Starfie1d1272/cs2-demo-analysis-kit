@@ -9,7 +9,7 @@ export interface DuelInsightsInput {
 }
 
 export interface DuelInsightsOptions {
-  /** 按地图名提供 .tri BVH；提供后视觉反应/预瞄走 LOS 精确口径，否则退化为 duels 窗口起点。 */
+  /** 按地图名提供 .tri BVH；提供后反应时间/预瞄走 LOS 精确口径，否则退化为 duels 窗口起点。 */
   visibilityFor?: (mapName: string) => TriangleBvh | null;
 }
 
@@ -119,7 +119,7 @@ function mechanicsRow(pkg: DemoPackage, fact: PlayerMechanicsFact, allFacts: Pla
     },
     fact.reaction.visualReactionMs == null ? null : {
       key: "visualReaction",
-      label: "视觉反应",
+      label: "反应时间",
       value: fact.reaction.visualReactionMs,
       unit: "ms",
       percentileLabel: rankLabel(fact.reaction.visualReactionMs, visualReactionValues, false)

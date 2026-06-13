@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Xinyu Du" }]
 dependencies = [
-    "cs2df>=3.0.0",  # v3 reference exporter (polars/numpy-based)
+    "cs2df>=3.0.2",  # v3 reference exporter (polars/numpy-based)
     "typer>=0.12",   # CLI (only gui/version remaining)
 ]
 

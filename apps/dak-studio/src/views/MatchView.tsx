@@ -1,10 +1,12 @@
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { buildMatchWorkspaceModel } from "@cs2dak/presentation";
-import type { MatchWorkspaceModel } from "@cs2dak/contract";
+import { buildMatchWorkspaceModel, buildSeriesSummary } from "@cs2dak/presentation";
+import type { MatchWorkspaceModel, SeriesSummary } from "@cs2dak/contract";
 import { MatchWorkspace, QaReportPanel } from "@cs2dak/react";
-import { getDemoPackage, matchDateFromFileName, type StudioDemoEntry } from "../lib/library";
+import { getDemoPackage, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import { EmptyState } from "../components/primitives";
+import { SeriesWorkspace } from "./SeriesWorkspace";
 
 export interface MatchViewProps {
   entries: StudioDemoEntry[];
@@ -16,13 +18,30 @@ export interface MatchViewProps {
 
 const modelCache = new Map<string, MatchWorkspaceModel>();
 
+async function loadModel(id: string): Promise<MatchWorkspaceModel> {
+  const cached = modelCache.get(id);
+  if (cached) return cached;
+  const pkg = await getDemoPackage(id);
+  const built = buildMatchWorkspaceModel(pkg);
+  modelCache.set(id, built);
+  return built;
+}
+
 export function MatchView({ entries, demoId, deepLink, onSelectDemo, onGoLibrary }: MatchViewProps) {
   const activeId = demoId ?? entries[0]?.id ?? null;
   const [model, setModel] = useState<MatchWorkspaceModel | null>(activeId ? modelCache.get(activeId) ?? null : null);
   const [error, setError] = useState<string | null>(null);
   const [showQa, setShowQa] = useState(false);
+  const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
+  const [summaryMode, setSummaryMode] = useState(false);
+  const [summary, setSummary] = useState<SeriesSummary | null>(null);
   // 50+ 场时纯下拉不可用：搜索过滤（队名/地图/日期/文件名）+ 按地图分组
   const [matchSearch, setMatchSearch] = useState("");
+
+  useEffect(() => {
+    void listSeriesRecords().then(setSeriesRecords);
+  }, []);
+
   const groupedEntries = useMemo(() => {
     const term = matchSearch.trim().toLowerCase();
     const hit = entries.filter((entry) => {
@@ -41,6 +60,24 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onGoLibrary
     return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [entries, matchSearch]);
 
+  // 当前 demo 所属的系列赛（含它的 entryIds）
+  const activeSeries = useMemo(
+    () => (activeId ? seriesRecords.find((record) => record.entryIds.includes(activeId)) ?? null : null),
+    [seriesRecords, activeId]
+  );
+  const seriesEntries = useMemo(() => {
+    if (!activeSeries) return [];
+    return activeSeries.entryIds
+      .map((id) => entries.find((entry) => entry.id === id))
+      .filter((entry): entry is StudioDemoEntry => Boolean(entry))
+      .sort((a, b) => a.fileName.localeCompare(b.fileName));
+  }, [activeSeries, entries]);
+
+  // 切换当前 demo 时退出汇总模式
+  useEffect(() => {
+    setSummaryMode(false);
+  }, [activeId]);
+
   useEffect(() => {
     if (!activeId) return;
     setShowQa(false);
@@ -53,19 +90,22 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onGoLibrary
     let cancelled = false;
     setModel(null);
     setError(null);
-    getDemoPackage(activeId)
-      .then((pkg) => {
-        const built = buildMatchWorkspaceModel(pkg);
-        modelCache.set(activeId, built);
-        if (!cancelled) setModel(built);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
-      });
-    return () => {
-      cancelled = true;
-    };
+    loadModel(activeId)
+      .then((built) => { if (!cancelled) setModel(built); })
+      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); });
+    return () => { cancelled = true; };
   }, [activeId]);
+
+  // 汇总模式：懒构建系列内各图模型 → 跨图记分板
+  useEffect(() => {
+    if (!summaryMode || !activeSeries || seriesEntries.length === 0) return;
+    let cancelled = false;
+    setSummary(null);
+    Promise.all(seriesEntries.map(async (entry) => ({ matchId: matchIdForEntry(entry), model: await loadModel(entry.id) })))
+      .then((matches) => { if (!cancelled) setSummary(buildSeriesSummary(matches)); })
+      .catch(() => { if (!cancelled) setSummary(null); });
+    return () => { cancelled = true; };
+  }, [summaryMode, activeSeries, seriesEntries]);
 
   if (entries.length === 0) {
     return (
@@ -79,6 +119,12 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onGoLibrary
       </div>
     );
   }
+
+  const workspaceBody = error
+    ? <EmptyState variant="error" title="加载失败" hint={error} />
+    : !model
+      ? <div className="stu-loading">解析 demo 包并构建工作台…</div>
+      : <MatchWorkspace model={model} initialTarget={deepLink} />;
 
   return (
     <div className="stu-view stu-view-flush">
@@ -122,15 +168,23 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onGoLibrary
           <QaReportPanel report={model.adminQa} />
         </div>
       )}
-      {error ? (
-        <EmptyState variant="error" title="加载失败" hint={error} />
-      ) : !model ? (
-        <div className="stu-loading">解析 demo 包并构建工作台…</div>
-      ) : (
-        <div className="stu-embed">
-          <MatchWorkspace model={model} initialTarget={deepLink} />
-        </div>
-      )}
+      <div className="stu-embed">
+        {activeSeries && seriesEntries.length > 0 ? (
+          <SeriesWorkspace
+            series={activeSeries}
+            entries={seriesEntries}
+            activeId={activeId ?? ""}
+            summaryMode={summaryMode}
+            summary={summary}
+            onSelectMap={(id) => { setSummaryMode(false); onSelectDemo(id); }}
+            onShowSummary={() => setSummaryMode(true)}
+          >
+            {workspaceBody}
+          </SeriesWorkspace>
+        ) : (
+          workspaceBody
+        )}
+      </div>
     </div>
   );
 }

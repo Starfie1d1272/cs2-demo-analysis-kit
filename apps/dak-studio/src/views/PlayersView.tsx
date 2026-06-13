@@ -598,7 +598,7 @@ function MechanicsWeaponCards({ profile }: { profile: PlayerMechanicsProfile }) 
   }
   return (
     <div className="stu-mechanics-grid">
-      {rows.slice(0, 6).map((row) => (
+      {rows.map((row) => (
         <article key={row.weapon} className="stu-mechanics-card">
           <header>
             <h4>{row.label}</h4>
@@ -610,7 +610,7 @@ function MechanicsWeaponCards({ profile }: { profile: PlayerMechanicsProfile }) 
             <MechanicsMetric label="TTK" value={row.medianTtkMs} unit="ms" note="full HP 且无第三方样本的 TTK 中位数，越低越好。" percentile={row.percentile.medianTtk} />
             <MechanicsMetric label="急停" value={row.counterStrafeSuccessPercent} unit="%" note="开枪前 200ms velocity 按武器/类别阈值判定。" percentile={row.percentile.counterStrafe} />
             <MechanicsMetric label="一枪致命" value={row.oneTapRatePercent} unit="%" note="单发击杀 / 总击杀。" percentile={row.percentile.oneTapRate} />
-            <MechanicsMetric label="视觉反应" value={row.visualReactionMs} unit="ms" note="首次可见 tick 到首发开枪；有 tri BVH 时用 LOS。" percentile={row.percentile.visualReaction} />
+            <MechanicsMetric label="反应时间" value={row.visualReactionMs} unit="ms" note="首次可见 tick 到首发开枪；有 tri BVH 时用 LOS。" percentile={row.percentile.visualReaction} />
             <MechanicsMetric label="预瞄" value={row.preaimSuccessPercent} unit="%" note="peek 前视角接近敌人位置的成功率。" percentile={row.percentile.preaimSuccess} />
           </div>
         </article>
