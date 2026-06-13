@@ -17,7 +17,8 @@ import {
   type TournamentInsights,
   type TeamComparisonModel
 } from "@cs2dak/presentation";
-import { createDbOpener, touchLimitedCache, txRequest } from "./idb";
+import { touchLimitedCache } from "./idb";
+import { getStorage } from "./storage";
 import { loadTriLookup } from "./tri";
 import type {
   DuelInsightsModel,
@@ -58,17 +59,10 @@ function keyOf(entries: StudioDemoEntry[], identityVersion?: number): string {
   return `v${CACHE_VERSION}${idPart}:` + entries.map((entry) => entry.id).sort().join("|");
 }
 
-// ── 持久层：独立小库，避免动主库（dak-studio）的 schema 版本 ──
-const CACHE_DB = "dak-studio-cache";
-const CACHE_STORE = "season";
-/** 仅存 touchedAt 的轻量伴随表：命中只刷新它（不重写数 MB 的 summary），
- *  prune 也只读它（不反序列化全部 summary）。 */
-const META_STORE = "season-meta";
-
-const openCacheDb = createDbOpener(CACHE_DB, 2, (db) => {
-  if (!db.objectStoreNames.contains(CACHE_STORE)) db.createObjectStore(CACHE_STORE);
-  if (!db.objectStoreNames.contains(META_STORE)) db.createObjectStore(META_STORE);
-});
+// ── 持久层：StorageAdapter 的 "cache" 命名空间。touchedAt 拆到伴随命名空间
+//    "cache-meta"，命中只刷新轻量时间戳，不重写数 MB 的 summary 本体；prune 也只读它。 ──
+const cacheStore = () => getStorage().records("cache");
+const cacheMeta = () => getStorage().records("cache-meta");
 
 /** 按 key 多条缓存（不同 scope 互不覆盖），LRU 清理只保留最近 MAX_CACHE_KEYS 条。 */
 const MAX_CACHE_KEYS = 12;
@@ -83,23 +77,18 @@ interface PersistedValue<T> {
   value: T;
 }
 
-/** 只刷新 LRU 时间戳（轻量表），不重写 summary 本体。 */
-async function touchMeta(db: IDBDatabase, key: string): Promise<void> {
+/** 只刷新 LRU 时间戳（轻量命名空间），不重写 summary 本体。 */
+async function touchMeta(key: string): Promise<void> {
   try {
-    await txRequest(
-      db.transaction(META_STORE, "readwrite").objectStore(META_STORE).put({ touchedAt: Date.now() } satisfies MetaRecord, key)
-    );
+    await cacheMeta().put<MetaRecord>(key, { touchedAt: Date.now() });
   } catch { /* 忽略 */ }
 }
 
 async function readPersistedValue<T>(key: string): Promise<T | undefined> {
   try {
-    const db = await openCacheDb();
-    const record = await txRequest(
-      db.transaction(CACHE_STORE, "readonly").objectStore(CACHE_STORE).get(key) as IDBRequest<PersistedValue<T> | undefined>
-    );
+    const record = await cacheStore().get<PersistedValue<T>>(key);
     if (record) {
-      await touchMeta(db, key);
+      await touchMeta(key);
       return record.value;
     }
     return undefined;
@@ -110,10 +99,8 @@ async function readPersistedValue<T>(key: string): Promise<T | undefined> {
 
 async function writePersistedValue<T>(key: string, value: T): Promise<void> {
   try {
-    const db = await openCacheDb();
-    const store = db.transaction(CACHE_STORE, "readwrite").objectStore(CACHE_STORE);
-    await txRequest(store.put({ key, touchedAt: Date.now(), value } satisfies PersistedValue<T>, key));
-    await touchMeta(db, key);
+    await cacheStore().put<PersistedValue<T>>(key, { key, touchedAt: Date.now(), value });
+    await touchMeta(key);
     void prunePersisted();
   } catch {
     // 写失败不影响功能
@@ -121,31 +108,22 @@ async function writePersistedValue<T>(key: string, value: T): Promise<void> {
 }
 
 /** 清理：旧版本 key（前缀不符）直接删，其余按 touchedAt 保留最近 MAX_CACHE_KEYS 条。
- *  只读 CACHE_STORE 的 key 列表与轻量 meta 表，不反序列化任何 summary 本体。 */
+ *  只读 cache 的 key 列表与轻量 meta 命名空间，不反序列化任何 summary 本体。 */
 async function prunePersisted(): Promise<void> {
   try {
-    const db = await openCacheDb();
-    const keys = await txRequest(
-      db.transaction(CACHE_STORE, "readonly").objectStore(CACHE_STORE).getAllKeys() as IDBRequest<IDBValidKey[]>
-    );
-    const metaStore = db.transaction(META_STORE, "readonly").objectStore(META_STORE);
-    const metaKeys = await txRequest(metaStore.getAllKeys() as IDBRequest<IDBValidKey[]>);
-    const metaVals = await txRequest(metaStore.getAll() as IDBRequest<MetaRecord[]>);
-    const touchedByKey = new Map<IDBValidKey, number>(metaKeys.map((k, i) => [k, metaVals[i]?.touchedAt ?? 0]));
+    const keys = await cacheStore().keys();
+    const metaEntries = await cacheMeta().entries<MetaRecord>();
+    const touchedByKey = new Map<string, number>(metaEntries.map(([k, v]) => [k, v?.touchedAt ?? 0]));
     const prefix = `v${CACHE_VERSION}:`;
-    const stale = keys.filter((k) => typeof k !== "string" || !k.startsWith(prefix));
+    const stale = keys.filter((k) => !k.startsWith(prefix));
     const staleSet = new Set(stale);
     const live = keys
       .filter((k) => !staleSet.has(k))
       .sort((a, b) => (touchedByKey.get(b) ?? 0) - (touchedByKey.get(a) ?? 0));
     const toDelete = [...stale, ...live.slice(MAX_CACHE_KEYS)];
-    if (toDelete.length === 0) return;
-    const tx = db.transaction([CACHE_STORE, META_STORE], "readwrite");
-    const seasonStore = tx.objectStore(CACHE_STORE);
-    const mStore = tx.objectStore(META_STORE);
     for (const k of toDelete) {
-      await txRequest(seasonStore.delete(k));
-      await txRequest(mStore.delete(k));
+      await cacheStore().delete(k);
+      await cacheMeta().delete(k);
     }
   } catch {
     // 清理失败不影响功能

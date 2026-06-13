@@ -58,6 +58,7 @@ def keep_runtime_module(name: str) -> bool:
     )
     return (
         not any(part in name for part in blocked_parts)
+        and name != "cs2df.cli"
         and not any(segment.startswith(blocked_names) for segment in name.split("."))
         and not any(
             segment.endswith(("_test", "_tests", "_testing"))
@@ -67,12 +68,7 @@ def keep_runtime_module(name: str) -> bool:
 
 for pkg in (
     # cs2df 及其传递依赖（动态加载，静态分析易遗漏）
-    "cs2df", "pyarrow", "polars", "polars-runtime-32",
-    "pandas", "numpy", "python-dateutil", "tqdm",
-    # typer CLI 依赖
-    "typer", "rich", "shellingham",
-    # 常用被动态 import 的标准补充
-    "typing_extensions",
+    "cs2df", "pyarrow", "polars", "pandas", "numpy",
 ):
     datas += collect_data_files(pkg, include_py_files=False)
     binaries += collect_dynamic_libs(pkg)
@@ -92,13 +88,13 @@ if IS_WIN:
     exe = EXE(
         pyz,
         a.scripts,
-        a.binaries,
-        a.datas,
         [],
+        exclude_binaries=True,
         name="dak-studio",
         console=False,
         icon=str(ROOT / "icon.ico"),
     )
+    coll = COLLECT(exe, a.binaries, a.datas, name="dak-studio")
 else:
     exe = EXE(
         pyz,

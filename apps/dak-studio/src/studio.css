@@ -2973,6 +2973,10 @@ td.stu-heat-cell.stu-heat-neutral {
   min-width: 0;
 }
 
+.stu-lineup-topn {
+  margin-top: 8px;
+}
+
 @media (max-width: 1000px) {
   .stu-lineup-layout {
     flex-direction: column;

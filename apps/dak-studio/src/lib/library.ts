@@ -1,10 +1,13 @@
 import { loadDemoPackageFromZip } from "@cs2dak/core";
 import type { DemoPackage } from "@cs2dak/contract";
+import { getStorage } from "./storage";
 
 /**
  * DAK Studio 本地 Demo 库。
- * - v3 ZIP 原始字节持久化在 IndexedDB，刷新不丢（来源永远是 ZIP，规则：v3 ZIP 是唯一 seam）。
- * - DemoPackage 解析结果持久化在 derived 表：可丢弃缓存，未命中/版本不符时从 ZIP 重建。
+ * - v3 ZIP 原始字节持久化在 blobs("demos") 命名空间（来源永远是 ZIP，规则：v3 ZIP 是唯一 seam）。
+ * - demo 元数据（StudioDemoEntry）持久化在 records("demos")：与字节分离，未来 SQLite
+ *   方案直接对应"原始 ZIP 落盘 / 元数据入库"。
+ * - DemoPackage 解析结果持久化在 records("derived")：可丢弃缓存，未命中/版本不符时从 ZIP 重建。
  *   解压 + 解析是聚合首屏的主要耗时，命中 derived 后直接读 JSON。
  */
 
@@ -32,17 +35,10 @@ export interface StudioDemoEntry {
   meta: DemoMeta;
 }
 
-interface DemoRecord extends StudioDemoEntry {
-  buffer: ArrayBuffer;
-}
-
 function normalizeTags(tags: string[]): string[] {
   return [...new Set(tags.map((tag) => tag.trim()).filter(Boolean))];
 }
 
-const DB_NAME = "dak-studio";
-const STORE = "demos";
-const DERIVED_STORE = "derived";
 /**
  * 解析口径（@cs2dak/core loadDemoPackageFromZip）变化时 +1，旧 derived 缓存自动失效。
  * v2→v3：DemoPackage 形状剧变，0.4.x 旧库的 v2 派生缓存必须失效，否则 v3 会吃到 v2 数据。
@@ -50,47 +46,31 @@ const DERIVED_STORE = "derived";
 const DERIVED_VERSION = 2;
 
 interface DerivedRecord {
-  id: string;
   version: number;
   pkg: DemoPackage;
 }
 
-// 进程内复用单连接：聚合批量加载时每场都会多次读写，反复 open/close 握手是
-// 可观测开销。连接长开，事务自动提交，不需要逐次 close。
-let dbPromise: Promise<IDBDatabase> | null = null;
+// ── 存储命名空间（经 StorageAdapter 接缝，后端可换） ──
+const demoMeta = () => getStorage().records("demos"); // StudioDemoEntry by id
+const demoBlobs = () => getStorage().blobs("demos"); // ZIP 原始字节 by id
+const derivedStore = () => getStorage().records("derived"); // {version, pkg} by id
 
-function openDb(): Promise<IDBDatabase> {
-  if (dbPromise) return dbPromise;
-  dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 2);
-    request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains(STORE)) {
-        request.result.createObjectStore(STORE, { keyPath: "id" });
-      }
-      if (!request.result.objectStoreNames.contains(DERIVED_STORE)) {
-        request.result.createObjectStore(DERIVED_STORE, { keyPath: "id" });
-      }
-    };
-    request.onsuccess = () => {
-      const db = request.result;
-      // 另一标签页升级版本时让出连接，并丢弃缓存以便下次重开
-      db.onversionchange = () => { db.close(); dbPromise = null; };
-      db.onclose = () => { dbPromise = null; };
-      resolve(db);
-    };
-    request.onerror = () => { dbPromise = null; reject(request.error ?? new Error("无法打开 IndexedDB")); };
-  });
-  dbPromise.catch(() => { dbPromise = null; });
-  return dbPromise;
+/** demo 元数据补默认值（tags / sourceDemPath 为后加字段）。 */
+function normalizeEntry(entry: StudioDemoEntry): StudioDemoEntry {
+  return {
+    id: entry.id,
+    fileName: entry.fileName,
+    importedAt: entry.importedAt,
+    tags: entry.tags ?? [],
+    sourceDemPath: entry.sourceDemPath ?? null,
+    meta: entry.meta
+  };
 }
 
 /** derived 是纯加速缓存：读写失败一律静默回落到 ZIP 重建。 */
 async function readDerived(id: string): Promise<DemoPackage | null> {
   try {
-    const db = await openDb();
-    const record = await requestAsPromise(
-      db.transaction(DERIVED_STORE, "readonly").objectStore(DERIVED_STORE).get(id) as IDBRequest<DerivedRecord | undefined>
-    );
+    const record = await derivedStore().get<DerivedRecord>(id);
     return record && record.version === DERIVED_VERSION ? record.pkg : null;
   } catch {
     return null;
@@ -99,10 +79,7 @@ async function readDerived(id: string): Promise<DemoPackage | null> {
 
 async function writeDerived(id: string, pkg: DemoPackage): Promise<void> {
   try {
-    const db = await openDb();
-    await requestAsPromise(
-      db.transaction(DERIVED_STORE, "readwrite").objectStore(DERIVED_STORE).put({ id, version: DERIVED_VERSION, pkg } satisfies DerivedRecord)
-    );
+    await derivedStore().put<DerivedRecord>(id, { version: DERIVED_VERSION, pkg });
   } catch {
     // 写失败不影响功能
   }
@@ -110,18 +87,10 @@ async function writeDerived(id: string, pkg: DemoPackage): Promise<void> {
 
 async function deleteDerived(id: string): Promise<void> {
   try {
-    const db = await openDb();
-    await requestAsPromise(db.transaction(DERIVED_STORE, "readwrite").objectStore(DERIVED_STORE).delete(id));
+    await derivedStore().delete(id);
   } catch {
     // 忽略
   }
-}
-
-function requestAsPromise<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("IndexedDB 请求失败"));
-  });
 }
 
 async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
@@ -249,21 +218,8 @@ function parseZipInWorker(buffer: ArrayBuffer): Promise<DemoPackage> {
 }
 
 export async function listDemoEntries(): Promise<StudioDemoEntry[]> {
-  const db = await openDb();
-  const records = await requestAsPromise(
-    db.transaction(STORE, "readonly").objectStore(STORE).getAll() as IDBRequest<DemoRecord[]>
-  );
-  return records
-    // tags 为后加字段：旧记录读出时补默认值
-    .map(({ id, fileName, importedAt, tags, sourceDemPath, meta }) => ({
-      id,
-      fileName,
-      importedAt,
-      tags: tags ?? [],
-      sourceDemPath: sourceDemPath ?? null,
-      meta
-    }))
-    .sort((a, b) => b.importedAt - a.importedAt);
+  const records = await demoMeta().getAll<StudioDemoEntry>();
+  return records.map(normalizeEntry).sort((a, b) => b.importedAt - a.importedAt);
 }
 
 export interface ImportResult {
@@ -302,39 +258,42 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     meta: metaFromPackage(pkg)
   };
 
-  const db = await openDb();
-  const tx = db.transaction(STORE, "readwrite");
-  const store = tx.objectStore(STORE);
-  const replacement = replaceId ? await requestAsPromise(store.get(replaceId) as IDBRequest<DemoRecord | undefined>) : undefined;
+  const meta = demoMeta();
+  const blobs = demoBlobs();
+  const replacement = replaceId ? await meta.get<StudioDemoEntry>(replaceId) : undefined;
   if (replacement) {
     entry.tags = normalizeTags([...(replacement.tags ?? []), ...entry.tags]);
     entry.sourceDemPath = sourceDemPath ?? replacement.sourceDemPath ?? null;
   }
-  const existing = await requestAsPromise(store.get(id) as IDBRequest<DemoRecord | undefined>);
+  const existing = await meta.get<StudioDemoEntry>(id);
   if (existing) {
     const mergedTags = normalizeTags([...(existing.tags ?? []), ...entry.tags]);
-    await requestAsPromise(store.put({
+    const mergedEntry: StudioDemoEntry = {
       ...existing,
       tags: mergedTags,
       sourceDemPath: sourceDemPath ?? existing.sourceDemPath ?? null
-    }));
+    };
+    await meta.put(id, mergedEntry);
     if (replacement && replacement.id !== id) {
-      await requestAsPromise(store.delete(replacement.id));
+      await meta.delete(replacement.id);
+      await blobs.delete(replacement.id);
       pkgCache.delete(replacement.id);
       void deleteDerived(replacement.id);
     }
-    const { buffer: _ignored, ...existingEntry } = existing;
     return {
-      entry: { ...existingEntry, tags: mergedTags, sourceDemPath: sourceDemPath ?? existing.sourceDemPath ?? null },
+      entry: mergedEntry,
       duplicate: true,
       replaced: Boolean(replacement),
       replacedId: replacement?.id
     };
   }
-  await requestAsPromise(store.put({ ...entry, buffer } satisfies DemoRecord));
+  await blobs.put(id, buffer);
+  await meta.put(id, entry);
   if (replacement && replacement.id !== id) {
-    await requestAsPromise(store.delete(replacement.id));
+    await meta.delete(replacement.id);
+    await blobs.delete(replacement.id);
     pkgCache.delete(replacement.id);
+    void deleteDerived(replacement.id);
   }
   pkgCache.set(id, Promise.resolve(pkg));
   // 导入时已解析出 pkg，顺手持久化，后续聚合不再解压 ZIP
@@ -344,11 +303,10 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
 
 /** 更新某条 demo 的标签。 */
 export async function updateDemoTags(id: string, tags: string[]): Promise<void> {
-  const db = await openDb();
-  const store = db.transaction(STORE, "readwrite").objectStore(STORE);
-  const record = await requestAsPromise(store.get(id) as IDBRequest<DemoRecord | undefined>);
+  const meta = demoMeta();
+  const record = await meta.get<StudioDemoEntry>(id);
   if (record) {
-    await requestAsPromise(store.put({ ...record, tags: normalizeTags(tags) }));
+    await meta.put(id, { ...record, tags: normalizeTags(tags) });
   }
 }
 
@@ -357,19 +315,18 @@ export async function bulkUpdateTags(ids: string[], add: string[] = [], remove: 
   if (targetIds.length === 0) return;
   const addSet = normalizeTags(add);
   const removeSet = new Set(normalizeTags(remove));
-  const db = await openDb();
-  const store = db.transaction(STORE, "readwrite").objectStore(STORE);
+  const meta = demoMeta();
   for (const id of targetIds) {
-    const record = await requestAsPromise(store.get(id) as IDBRequest<DemoRecord | undefined>);
+    const record = await meta.get<StudioDemoEntry>(id);
     if (!record) continue;
     const nextTags = normalizeTags([...(record.tags ?? []).filter((tag) => !removeSet.has(tag)), ...addSet]);
-    await requestAsPromise(store.put({ ...record, tags: nextTags }));
+    await meta.put(id, { ...record, tags: nextTags });
   }
 }
 
 export async function removeDemo(id: string): Promise<void> {
-  const db = await openDb();
-  await requestAsPromise(db.transaction(STORE, "readwrite").objectStore(STORE).delete(id));
+  await demoMeta().delete(id);
+  await demoBlobs().delete(id);
   pkgCache.delete(id);
   await deleteDerived(id);
 }
@@ -381,12 +338,9 @@ export function getDemoPackage(id: string): Promise<DemoPackage> {
   const loading = (async () => {
     const derived = await readDerived(id);
     if (derived) return derived;
-    const db = await openDb();
-    const record = await requestAsPromise(
-      db.transaction(STORE, "readonly").objectStore(STORE).get(id) as IDBRequest<DemoRecord | undefined>
-    );
-    if (!record) throw new Error("demo 不存在或已被删除");
-    const pkg = await parseZipInWorker(record.buffer.slice(0));
+    const buffer = await demoBlobs().get(id);
+    if (!buffer) throw new Error("demo 不存在或已被删除");
+    const pkg = await parseZipInWorker(buffer);
     void writeDerived(id, pkg);
     return pkg;
   })();
@@ -397,13 +351,12 @@ export function getDemoPackage(id: string): Promise<DemoPackage> {
 
 /** 批量替换资料库中所有匹配 originalName 的队伍名为 displayName。 */
 export async function renameTeamInLibrary(originalName: string, displayName: string): Promise<void> {
-  const db = await openDb();
-  const store = db.transaction(STORE, "readwrite").objectStore(STORE);
-  const all = await requestAsPromise(store.getAll() as IDBRequest<DemoRecord[]>);
+  const meta = demoMeta();
+  const all = await meta.getAll<StudioDemoEntry>();
   for (const record of all) {
     let changed = false;
     if (record.meta.teamAName === originalName) { record.meta.teamAName = displayName; changed = true; }
     if (record.meta.teamBName === originalName) { record.meta.teamBName = displayName; changed = true; }
-    if (changed) await requestAsPromise(store.put(record));
+    if (changed) await meta.put(record.id, record);
   }
 }

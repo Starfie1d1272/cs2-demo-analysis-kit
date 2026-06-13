@@ -35,4 +35,17 @@ describe("buildLineupClusters", () => {
     const clusters = buildLineupClusters({ mapName: "de_mirage", grenades: [throwAt(1, 1000, 0)] });
     expect(clusters[0]!.winRatePercent).toBeNull();
   });
+
+  it("默认容差会合并更宽松的同类投掷", () => {
+    const clusters = buildLineupClusters({
+      mapName: "de_mirage",
+      grenades: [
+        throwAt(1, 1000, 0, 500),
+        throwAt(2, 2000, 180, 720)
+      ]
+    });
+
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0]!.count).toBe(2);
+  });
 });

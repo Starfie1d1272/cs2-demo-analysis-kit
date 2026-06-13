@@ -21,6 +21,7 @@ import base64
 import logging
 import os
 import shutil
+import socket
 import sys
 import tempfile
 import threading
@@ -28,6 +29,7 @@ import time
 import urllib.parse
 import uuid
 from datetime import datetime
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from cs2dak import __version__
@@ -117,6 +119,56 @@ def _studio_userdata() -> Path:
 
 
 log = logging.getLogger("cs2dak.studio")
+
+
+class _StudioStaticHandler(SimpleHTTPRequestHandler):
+    """Static file handler with real cache headers for large immutable assets."""
+
+    def __init__(self, *args, directory: str | None = None, **kwargs) -> None:
+        super().__init__(*args, directory=directory, **kwargs)
+
+    def log_message(self, format: str, *args) -> None:  # noqa: A002 - stdlib signature
+        log.debug("static: " + format, *args)
+
+    def end_headers(self) -> None:
+        path = urllib.parse.urlparse(self.path).path
+        if path == "/" or path.endswith("/index.html"):
+            self.send_header("Cache-Control", "no-cache")
+        elif path.startswith("/tris/") or path.startswith("/maps/radars/"):
+            self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+        elif path.startswith("/assets/"):
+            self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+        else:
+            self.send_header("Cache-Control", "public, max-age=3600")
+        super().end_headers()
+
+
+def _find_static_port(start: int = 51780) -> int:
+    """Prefer a stable localhost port so WebView storage origin stays predictable."""
+    for port in range(start, start + 20):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                sock.bind(("127.0.0.1", port))
+            except OSError:
+                continue
+            return port
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+def _start_static_server(root: Path) -> tuple[ThreadingHTTPServer, str]:
+    from functools import partial
+
+    port = _find_static_port()
+    handler = partial(_StudioStaticHandler, directory=str(root))
+    server = ThreadingHTTPServer(("127.0.0.1", port), handler)
+    thread = threading.Thread(target=server.serve_forever, name="dak-studio-static", daemon=True)
+    thread.start()
+    url = f"http://127.0.0.1:{port}/index.html"
+    log.info("static server: %s -> %s", url, root)
+    return server, url
 
 
 def _setup_logging(userdata: Path) -> None:
@@ -351,21 +403,22 @@ def main() -> None:
             f"{WEB_DIR}"
         )
 
+    _server, index_url = _start_static_server(WEB_DIR)
     api = StudioApi()
     window = webview.create_window(
         title=f"DAK Studio {__version__}",
-        url=str(index),
+        url=index_url,
         js_api=api,
         width=1440,
         height=920,
         min_size=(1024, 700),
     )
     api._window = window
-    # http_server=True：以 localhost HTTP 提供 studio_web，保证 IndexedDB
-    # 持久化与相对资源（雷达图）在 WKWebView 下行为与浏览器一致。
+    # 自建 localhost 静态服务：pywebview 内置 server 会给静态文件写
+    # no-cache/no-store，导致 .tri 与雷达图在切图时反复重拉。
     # private_mode=False：Windows Edge Chromium 默认隐私模式会把
     # IndexedDB 等数据存到临时目录，重启丢失；显式关掉后落盘到持久目录。
-    webview.start(http_server=True, private_mode=False, storage_path=str(storage))
+    webview.start(private_mode=False, storage_path=str(storage))
 
 
 if __name__ == "__main__":

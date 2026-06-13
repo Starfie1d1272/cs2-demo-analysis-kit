@@ -270,8 +270,10 @@ export const workspaceReplayRoundSchema = z.object({
   bomb: workspaceReplayBombSchema.nullable(),
   /** C4 掉落在地上的区间（掉落→捡起/安放）。数组可能为空。 */
   groundBombs: z.array(workspaceReplayGroundBombSchema).default([]),
-  /** 回合官方结束 tick（rounds.json endTick），scrubber 末尾对齐用。旧缓存缺省。 */
-  officialEndTick: z.number().int().positive().optional()
+  /** 回合官方结束 tick（rounds.json endTick）。旧缓存缺省。 */
+  officialEndTick: z.number().int().positive().optional(),
+  /** 回放目标结束 tick：优先使用下一回合 startTick，保留回合结束余韵但不拉到过长窗口。 */
+  targetEndTick: z.number().int().positive().optional()
 });
 
 export const workspaceReplaySchema = z.object({

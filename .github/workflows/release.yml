@@ -2,7 +2,7 @@ name: Release
 
 # 打 vX.Y.Z tag 自动构建桌面应用（unsigned）并发布到 GitHub Release：
 #   macOS  → dak-studio-X.Y.Z.dmg
-#   Windows→ dak-studio-windows-X.Y.Z.zip
+#   Windows→ dak-studio-windows-X.Y.Z.zip（onedir）
 # 只发 DAK Studio（自带 exporter bridge）；纯导出器 cs2dak 不进 Release。
 # 首次打开需绕过 Gatekeeper / SmartScreen，见 Release 描述。
 
@@ -23,8 +23,8 @@ jobs:
         os: [macos-14, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      # Windows Defender 实时扫描会逐个扫 PyInstaller/pnpm 写出的成千上万个小文件，
-      # 是 Windows onefile 打包慢一倍的主因。排除 workspace 与 temp 目录显著提速。
+      # Windows Defender 实时扫描会逐个扫 PyInstaller/pnpm 写出的成千上万个小文件。
+      # 排除 workspace 与 temp 目录显著提速。
       - name: Exclude workspace from Windows Defender
         if: runner.os == 'Windows'
         shell: pwsh
@@ -62,23 +62,29 @@ jobs:
 
       - name: Download awpy tris
         shell: bash
-        run: uvx awpy get tris
+        run: |
+          if compgen -G "$HOME/.awpy/tris/*.tri" > /dev/null; then
+            echo "awpy tris cache hit; skipping download"
+          else
+            uvx awpy get tris
+          fi
 
       - name: Build desktop packages
-        run: bash scripts/package.sh
+        run: PACKAGE_SKIP_VERSION_SYNC=1 bash scripts/package.sh
         shell: bash
 
-      - name: Zip Windows executable
+      - name: Zip Windows onedir app
         if: runner.os == 'Windows'
         shell: bash
         run: |
           VERSION="$(node -p "require('./package.json').version")"
           cd python/dist
-          7z a "dak-studio-windows-${VERSION}.zip" dak-studio.exe
+          7z a -mx=9 "dak-studio-windows-${VERSION}.zip" dak-studio
 
       - uses: actions/upload-artifact@v7
         with:
           name: packages-${{ matrix.os }}
+          compression-level: 0
           path: |
             python/dist/*.dmg
             python/dist/*.zip
@@ -135,7 +141,7 @@ jobs:
             ---
 
             **Windows**
-            - 解压 zip，双击 `dak-studio.exe`。
+            - 解压 zip，打开 `dak-studio` 文件夹，双击 `dak-studio.exe`。
             - SmartScreen 警告 → 「更多信息」→「仍要运行」。
             - 老版本 Win10 如启动后白屏，需安装 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)。
 

@@ -57,8 +57,14 @@ export function PlayersView({
   const [mechanics, setMechanics] = useState<PlayerMechanicsProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [detailsError, setDetailsError] = useState<string | null>(null);
-  const [pinned, setPinned] = useState<PinnedPlayer | null>(() => getPinnedPlayer());
+  const [pinned, setPinned] = useState<PinnedPlayer | null>(null);
   const [compareKey, setCompareKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPinnedPlayer().then((p) => { if (!cancelled) setPinned(p); });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (entries.length === 0) {
@@ -178,7 +184,7 @@ export function PlayersView({
   const togglePin = (p: PlayerSeasonProfile) => {
     const next = isPinned(p) ? null : { playerKey: p.playerKey, steamIds: p.steamIds, name: p.name };
     setPinned(next);
-    setPinnedPlayer(next);
+    void setPinnedPlayer(next);
   };
 
   const trendMax = Math.max(...selected.perMatch.map((m) => m.rivalhubRR), 0.01);

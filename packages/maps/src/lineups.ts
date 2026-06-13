@@ -75,8 +75,8 @@ export function buildLineupClusters({
   grenades,
   roundWinners,
   throwerTeam,
-  throwToleranceUnits = 128,
-  effectToleranceUnits = 160,
+  throwToleranceUnits = 192,
+  effectToleranceUnits = 240,
   tickrate = 64
 }: BuildLineupClustersOptions): LineupCluster[] {
   const clusters: Array<

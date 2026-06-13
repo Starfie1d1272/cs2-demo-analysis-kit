@@ -1,5 +1,6 @@
 import { buildTriangleBvh, parseAwpyTri, type TriangleBvh } from "@cs2dak/maps";
-import { createDbOpener, touchLimitedCache, txRequest } from "./idb";
+import { touchLimitedCache } from "./idb";
+import { getStorage } from "./storage";
 
 /**
  * 浏览器端 .tri 加载器（maps 的 tri-assets 是 Node-only，Studio 走 fetch）。
@@ -7,23 +8,13 @@ import { createDbOpener, touchLimitedCache, txRequest } from "./idb";
  * .tri 由打包脚本放进前端静态资源 `tris/{mapName}.tri`
  * （开发环境放 apps/dak-studio/public/tris/，可符号链接 ~/.awpy/tris）。
  * 文件缺失时返回 null；调用方只跳过静态墙体 LOS，仍保留 hp/flash/视野锥/烟雾约束。
- * 原始 .tri bytes 会写入 IndexedDB；BVH 树只做会话内缓存，避免持久化深层对象带来的 clone 开销。
+ * 原始 .tri bytes 经 StorageAdapter 的 blob 命名空间持久化；BVH 树只做会话内缓存，
+ * 避免持久化深层对象带来的 clone 开销。
  */
 const BVH_CACHE_LIMIT = 4;
 const bvhCache = new Map<string, Promise<TriangleBvh | null>>();
-const TRI_DB = "dak-studio-tri-cache";
-const TRI_STORE = "tri";
-interface TriRecord {
-  mapName: string;
-  touchedAt: number;
-  buffer: ArrayBuffer;
-}
 
-const openTriDb = createDbOpener(TRI_DB, 1, (db) => {
-  if (!db.objectStoreNames.contains(TRI_STORE)) {
-    db.createObjectStore(TRI_STORE, { keyPath: "mapName" });
-  }
-});
+const triStore = () => getStorage().blobs("tri");
 
 function isValidTriBuffer(buffer: ArrayBuffer): boolean {
   return buffer.byteLength > 0 && buffer.byteLength % 36 === 0;
@@ -31,15 +22,8 @@ function isValidTriBuffer(buffer: ArrayBuffer): boolean {
 
 async function readTriBuffer(mapName: string): Promise<ArrayBuffer | null> {
   try {
-    const db = await openTriDb();
-    const record = await txRequest(
-      db.transaction(TRI_STORE, "readonly").objectStore(TRI_STORE).get(mapName) as IDBRequest<TriRecord | undefined>
-    );
-    if (!record || !isValidTriBuffer(record.buffer)) return null;
-    void txRequest(
-      db.transaction(TRI_STORE, "readwrite").objectStore(TRI_STORE).put({ ...record, touchedAt: Date.now() } satisfies TriRecord)
-    );
-    return record.buffer;
+    const buffer = await triStore().get(mapName);
+    return buffer && isValidTriBuffer(buffer) ? buffer : null;
   } catch {
     return null;
   }
@@ -48,14 +32,7 @@ async function readTriBuffer(mapName: string): Promise<ArrayBuffer | null> {
 async function writeTriBuffer(mapName: string, buffer: ArrayBuffer): Promise<void> {
   try {
     if (!isValidTriBuffer(buffer)) return;
-    const db = await openTriDb();
-    await txRequest(
-      db.transaction(TRI_STORE, "readwrite").objectStore(TRI_STORE).put({
-        mapName,
-        touchedAt: Date.now(),
-        buffer
-      } satisfies TriRecord)
-    );
+    await triStore().put(mapName, buffer);
   } catch {
     // tri cache is an optimization; fetch fallback remains valid.
   }

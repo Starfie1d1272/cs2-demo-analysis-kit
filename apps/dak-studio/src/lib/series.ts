@@ -2,6 +2,7 @@ import type { SeriesFormat, SeriesVeto, SeriesVetoStep } from "@cs2dak/contract"
 import { ACTIVE_DUTY_MAPS } from "@cs2dak/maps";
 import { matchDateFromFileName, type StudioDemoEntry } from "./library";
 import { displayTeamName } from "./identity";
+import { getStorage } from "./storage";
 
 /** BP 录入默认图池：CS2 现役 7 张（de_ 形式，与 entry.meta.mapName 对齐）。 */
 export const SERIES_MAP_POOL: string[] = [...ACTIVE_DUTY_MAPS];
@@ -37,33 +38,11 @@ export interface CoachSettings {
   myTeamName: string | null;
 }
 
-const DB_NAME = "dak-studio-series";
-const DB_VER = 1;
-const SERIES_STORE = "series";
-const SETTINGS_STORE = "settings";
-const PLAYBOOK_STORE = "playbook";
 const SETTINGS_KEY = "coach";
 
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VER);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(SERIES_STORE)) db.createObjectStore(SERIES_STORE, { keyPath: "id" });
-      if (!db.objectStoreNames.contains(SETTINGS_STORE)) db.createObjectStore(SETTINGS_STORE);
-      if (!db.objectStoreNames.contains(PLAYBOOK_STORE)) db.createObjectStore(PLAYBOOK_STORE);
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error ?? new Error("无法打开 series 库"));
-  });
-}
-
-function idbReq<T>(req: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
+const seriesStore = () => getStorage().records("series");
+const settingsStore = () => getStorage().records("series-settings");
+const playbookStore = () => getStorage().records("playbook");
 
 function formatForCount(count: number): SeriesFormat {
   if (count >= 4) return "bo5";
@@ -178,9 +157,7 @@ export function deriveVetoSummary(steps: SeriesVetoStep[]): Pick<SeriesVeto, "ma
 
 export async function listSeriesRecords(): Promise<StudioSeriesRecord[]> {
   try {
-    const db = await openDb();
-    const rows = await idbReq(db.transaction(SERIES_STORE, "readonly").objectStore(SERIES_STORE).getAll() as IDBRequest<StudioSeriesRecord[]>);
-    db.close();
+    const rows = await seriesStore().getAll<StudioSeriesRecord>();
     return rows.sort((a, b) => b.updatedAt - a.updatedAt);
   } catch {
     return [];
@@ -188,20 +165,16 @@ export async function listSeriesRecords(): Promise<StudioSeriesRecord[]> {
 }
 
 export async function saveSeriesRecord(record: Omit<StudioSeriesRecord, "createdAt" | "updatedAt">): Promise<StudioSeriesRecord> {
-  const db = await openDb();
-  const existing = await idbReq(db.transaction(SERIES_STORE, "readonly").objectStore(SERIES_STORE).get(record.id) as IDBRequest<StudioSeriesRecord | undefined>);
+  const existing = await seriesStore().get<StudioSeriesRecord>(record.id);
   const now = Date.now();
   const next: StudioSeriesRecord = { ...record, createdAt: existing?.createdAt ?? now, updatedAt: now };
-  await idbReq(db.transaction(SERIES_STORE, "readwrite").objectStore(SERIES_STORE).put(next));
-  db.close();
+  await seriesStore().put(next.id, next);
   return next;
 }
 
 export async function loadCoachSettings(): Promise<CoachSettings> {
   try {
-    const db = await openDb();
-    const value = await idbReq(db.transaction(SETTINGS_STORE, "readonly").objectStore(SETTINGS_STORE).get(SETTINGS_KEY) as IDBRequest<CoachSettings | undefined>);
-    db.close();
+    const value = await settingsStore().get<CoachSettings>(SETTINGS_KEY);
     return value ?? { myTeamName: null };
   } catch {
     return { myTeamName: null };
@@ -209,27 +182,19 @@ export async function loadCoachSettings(): Promise<CoachSettings> {
 }
 
 export async function saveCoachSettings(settings: CoachSettings): Promise<CoachSettings> {
-  const db = await openDb();
-  await idbReq(db.transaction(SETTINGS_STORE, "readwrite").objectStore(SETTINGS_STORE).put(settings, SETTINGS_KEY));
-  db.close();
+  await settingsStore().put(SETTINGS_KEY, settings);
   return settings;
 }
 
 export async function listPlaybookNames(): Promise<Record<string, string>> {
   try {
-    const db = await openDb();
-    const store = db.transaction(PLAYBOOK_STORE, "readonly").objectStore(PLAYBOOK_STORE);
-    const keys = await idbReq(store.getAllKeys() as IDBRequest<IDBValidKey[]>);
-    const values = await idbReq(store.getAll() as IDBRequest<string[]>);
-    db.close();
-    return Object.fromEntries(keys.map((key, index) => [String(key), values[index] ?? ""]));
+    const entries = await playbookStore().entries<string>();
+    return Object.fromEntries(entries.map(([key, value]) => [key, value ?? ""]));
   } catch {
     return {};
   }
 }
 
 export async function savePlaybookName(clusterId: string, name: string): Promise<void> {
-  const db = await openDb();
-  await idbReq(db.transaction(PLAYBOOK_STORE, "readwrite").objectStore(PLAYBOOK_STORE).put(name.trim(), clusterId));
-  db.close();
+  await playbookStore().put(clusterId, name.trim());
 }
