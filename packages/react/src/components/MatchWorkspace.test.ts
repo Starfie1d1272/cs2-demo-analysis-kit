@@ -105,8 +105,8 @@ const model: MatchWorkspaceModel = {
             teamKey: "teamA",
             side: "ct",
             loadout: {
-              primaryWeapon: "AK-47",
-              secondaryWeapon: "USP-S",
+              primaryWeapon: "ak47",
+              secondaryWeapon: "usp_silencer",
               grenadeCount: 2,
               grenades: ["smoke", "flashbang"]
             },

@@ -53,16 +53,17 @@ export const openingDuelRowSchema = duelFinderRowSchema.extend({
 export const mechanicsMetricSchema = z.object({
   key: z.string(),
   label: z.string(),
-  value: z.number(),
+  /** 主数值；无有效样本时为 null（UI 显示 —）。 */
+  value: z.number().nullable(),
   unit: z.string().optional(),
+  /** 证据分子/分母（命中率类指标）。 */
+  successes: z.number().int().nonnegative().optional(),
+  attempts: z.number().int().nonnegative().optional(),
+  /** 中位类指标的样本数。 */
+  sampleSize: z.number().int().nonnegative().optional(),
+  /** 次级证据行，如「27/44 ≤5°」。 */
+  detail: z.string().optional(),
   percentileLabel: z.string().nullable()
-});
-
-export const reactionPreaimSchema = z.object({
-  audioReactionMs: z.number().nonnegative().nullable(),
-  visualReactionMs: z.number().nonnegative().nullable(),
-  preaimAngleErrorDegrees: z.number().nonnegative().nullable(),
-  preaimSuccess: z.boolean().nullable()
 });
 
 export const playerMechanicsRowSchema = z.object({
@@ -74,7 +75,6 @@ export const playerMechanicsRowSchema = z.object({
   shotCount: z.number().int().nonnegative(),
   burstCount: z.number().int().nonnegative(),
   metrics: z.array(mechanicsMetricSchema),
-  reaction: reactionPreaimSchema,
   burstLengthBuckets: z.object({
     single: z.number().int().nonnegative(),
     short: z.number().int().nonnegative(),
@@ -102,6 +102,5 @@ export type DuelPoint = z.infer<typeof duelPointSchema>;
 export type DuelFinderRow = z.infer<typeof duelFinderRowSchema>;
 export type OpeningDuelRow = z.infer<typeof openingDuelRowSchema>;
 export type MechanicsMetric = z.infer<typeof mechanicsMetricSchema>;
-export type ReactionPreaim = z.infer<typeof reactionPreaimSchema>;
 export type PlayerMechanicsRow = z.infer<typeof playerMechanicsRowSchema>;
 export type DuelInsightsModel = z.infer<typeof duelInsightsModelSchema>;

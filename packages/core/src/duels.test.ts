@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { DemoPackage, PackageDamage, PackageKill, PackageShots, Replay } from "@cs2dak/contract";
+import type { DemoPackage, Duels, PackageDamage, PackageKill, PackageShots, Replay } from "@cs2dak/contract";
+import { buildTriangleBvh } from "@cs2dak/maps";
 import { buildDuelsSignals, deriveDuels, deriveOpeningDuels } from "./duels.js";
 
 const A = "76561198000000001";
@@ -81,6 +82,26 @@ function buildShots(
     });
   }
   return { meta: { coordScale: 1, angleScale: 10 }, weaponDict: ["ak47"], tracks };
+}
+
+function encodeDelta(values: number[]): number[] {
+  const out: number[] = [];
+  let prev = 0;
+  for (const value of values) { out.push(value - prev); prev = value; }
+  return out;
+}
+
+function duelTrack(playerIndex: number, abs: { x: number[]; y: number[]; z: number[]; yaw: number[]; pitch: number[]; hp: number[]; flash: number[] }) {
+  return {
+    playerIndex,
+    x: encodeDelta(abs.x),
+    y: encodeDelta(abs.y),
+    z: encodeDelta(abs.z),
+    yaw: encodeDelta(abs.yaw.map((deg) => deg * 10)),
+    pitch: encodeDelta(abs.pitch.map((deg) => deg * 10)),
+    hp: abs.hp,
+    flash: abs.flash
+  };
 }
 
 function pkg(overrides: Partial<DemoPackage>): DemoPackage {
@@ -237,6 +258,37 @@ describe("deriveDuels", () => {
     expect(row.ttkMs).toBe(0);
   });
 
+  it("uses static LOS for full-tick classification when visibility is provided", () => {
+    const duels: Duels = {
+      meta: { tickrate: 64, sampleRate: 64, coordScale: 1, angleScale: 10, windowBeforeMs: 1000, windowAfterMs: 1000 },
+      windows: [{
+        roundNumber: 1,
+        startTick: 100,
+        tickStep: 1,
+        frameCount: 1,
+        anchors: [{ kind: "kill", tick: 100, attackerIndex: AI, victimIndex: BI }],
+        players: [
+          duelTrack(AI, { x: [-5], y: [0], z: [0], yaw: [0], pitch: [0], hp: [100], flash: [0] }),
+          duelTrack(BI, { x: [5], y: [0], z: [0], yaw: [180], pitch: [0], hp: [100], flash: [0] })
+        ]
+      }]
+    };
+    const demo = pkg({
+      duels,
+      damages: [damage({ tick: 100, attackerIndex: AI, victimIndex: BI })],
+      kills: [kill({ tick: 100, killerIndex: AI, victimIndex: BI })],
+      shots: buildShots([{ tick: 100, playerIndex: AI }])
+    });
+    const wall = buildTriangleBvh([{
+      a: { x: 0, y: -10, z: 0 },
+      b: { x: 0, y: 10, z: 0 },
+      c: { x: 0, y: 0, z: 100 }
+    }]);
+
+    expect(deriveDuels(demo)[0]!.classification).toBe("suppressed_kill");
+    expect(deriveDuels(demo, { visibility: wall })[0]!.classification).toBe("caught_off_guard");
+  });
+
   it("treats 80 HP as full hp but excludes third-party damage from ttk distribution", () => {
     const demo = pkg({
       damages: [
@@ -256,6 +308,27 @@ describe("deriveDuels", () => {
       ttkMs: null
     });
     expect(signals.ttk.allFullHp.count).toBe(0);
+  });
+
+  it("excludes through-smoke and wallbang kills from ttk distribution", () => {
+    const demo = pkg({
+      damages: [
+        damage({ tick: 100, attackerIndex: AI, victimIndex: BI }),
+        damage({ tick: 200, attackerIndex: AI, victimIndex: CI })
+      ],
+      kills: [
+        kill({ tick: 100, killerIndex: AI, victimIndex: BI, throughSmoke: true }),
+        kill({ tick: 200, killerIndex: AI, victimIndex: CI, penetratedObjects: 1 })
+      ],
+      shots: buildShots([
+        { tick: 100, playerIndex: AI },
+        { tick: 200, playerIndex: AI }
+      ])
+    });
+
+    const signals = buildDuelsSignals(demo);
+    expect(signals.ttk.allFullHp.count).toBe(0);
+    expect(signals.ttk.byWeapon.find((row) => row.weapon === "ak47")?.distribution.count).toBe(0);
   });
 
   it("marks low-hp cleanup pressure without polluting full-hp ttk", () => {

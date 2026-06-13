@@ -1,5 +1,7 @@
 import type { DemoPackage, DuelWindow, PackageDamage, PackageKill, PackageShots, ReplayPlayerTrack, Vec3 } from "@cs2dak/contract";
+import type { TriangleBvh } from "@cs2dak/maps";
 import { decodeDelta } from "@cs2dak/contract";
+import { decodeDuelWindow, frameIndexForTick, isVisibleAt, type VisibilityContext } from "./duel-window.js";
 import { createResolverFromPackage, type PlayerResolver } from "./resolve.js";
 import { killWeaponName, normalizeWeapon, round } from "./utils.js";
 
@@ -39,6 +41,9 @@ export interface DuelRecord {
   killerIndex: number;
   victimIndex: number;
   weapon: string;
+  headshot: boolean;
+  throughSmoke: boolean;
+  penetratedObjects: number;
   classification: DuelClassification;
   hpBucket: DuelHpBucket;
   fullHealth: boolean;
@@ -69,6 +74,10 @@ export interface DuelSignals {
     allFullHp: TtkDistribution;
     byWeapon: Array<{ weapon: string; distribution: TtkDistribution }>;
   };
+}
+
+export interface DuelSignalsOptions {
+  visibility?: TriangleBvh | null;
 }
 
 interface FlatShot {
@@ -366,15 +375,62 @@ function isEnemyKill(pkg: DemoPackage, resolver: PlayerResolver, kill: PackageKi
   return Boolean(killer && victim && killer.teamKey !== victim.teamKey);
 }
 
-/** buildDuelsSignals 是 pkg 的纯函数；duel/mechanics/presentation 多处消费，按 pkg 实例记忆化避免重复构建 engagement。 */
+function isCleanDuelRecord(record: DuelRecord): boolean {
+  return !record.thirdParty && !record.throughSmoke && record.penetratedObjects <= 0;
+}
+
+/**
+ * 对枪三分类（视野时间线版）：用「受害者 → 击杀者」可见性判定，比旧的 ±1.5s 任意开枪更准。
+ * - contested_duel：受害者在交火中对击杀者造成伤害，或在 [击杀者首发, 击杀] 间「看得到击杀者」时开过枪。
+ * - suppressed_kill：受害者死前曾有「看得到击杀者」的机会，但没有有效还手。
+ * - caught_off_guard：受害者死前从未获得有效可见机会（侧背身 / 被预瞄）。
+ * 可见性用 duels 满 tick 窗口的视野锥 + hp + flash + 烟雾 + 静态 LOS（调用方传入 .tri 时）。
+ * 无窗口时回退启发式。
+ */
+function classifyDuel(
+  ctx: VisibilityContext,
+  kill: PackageKill & { killerIndex: number },
+  window: DuelWindow | null,
+  shots: FlatShot[],
+  engagement: Engagement,
+  killerFirstShotTick: number | null,
+  fallback: DuelClassification
+): DuelClassification {
+  if (!window) return fallback;
+  const view = decodeDuelWindow(ctx.pkg, window);
+  const victimDamagedKiller = ctx.pkg.damages.some((damage) =>
+    damage.roundNumber === kill.roundNumber &&
+    damage.attackerIndex === kill.victimIndex &&
+    damage.victimIndex === kill.killerIndex &&
+    damage.tick >= engagement.startTick &&
+    damage.tick <= kill.tick
+  );
+  if (victimDamagedKiller) return "contested_duel";
+  const contestStart = killerFirstShotTick ?? engagement.startTick;
+  const victimShots = shots.filter((shot) =>
+    shot.roundNumber === kill.roundNumber && shot.playerIndex === kill.victimIndex && shot.tick >= contestStart && shot.tick <= kill.tick
+  );
+  for (const shot of victimShots) {
+    if (isVisibleAt(ctx, view, kill.victimIndex, kill.killerIndex, frameIndexForTick(view, shot.tick))) return "contested_duel";
+  }
+  const killFrame = frameIndexForTick(view, kill.tick);
+  for (let frame = 0; frame <= killFrame; frame++) {
+    if (isVisibleAt(ctx, view, kill.victimIndex, kill.killerIndex, frame)) return "suppressed_kill";
+  }
+  return "caught_off_guard";
+}
+
+/** buildDuelsSignals 默认路径按 pkg 实例记忆化；传入 visibility 时结果依赖 BVH，跳过全局缓存。 */
 const duelSignalsCache = new WeakMap<DemoPackage, DuelSignals>();
 
-export function buildDuelsSignals(input: DemoPackage): DuelSignals {
-  const cached = duelSignalsCache.get(input);
+export function buildDuelsSignals(input: DemoPackage, options: DuelSignalsOptions = {}): DuelSignals {
+  const cacheable = options.visibility == null;
+  const cached = cacheable ? duelSignalsCache.get(input) : undefined;
   if (cached) return cached;
   const pkg = input;
   const resolver = createResolverFromPackage(pkg);
   const tickrate = tickrateOf(pkg);
+  const ctx: VisibilityContext = { pkg, visibility: options.visibility };
   const shots = flattenShots(pkg.shots);
   const engagements = buildEngagements(pkg, shots, tickrate);
   const records = pkg.kills
@@ -385,16 +441,18 @@ export function buildDuelsSignals(input: DemoPackage): DuelSignals {
       const engagement = engagementForKill(engagements, kill);
       const responseTick = victimResponseTick(shots, kill, tickrate);
       const facing = victimFacingState(pkg, kill);
-      const classification: DuelClassification = responseTick != null
+      const burst = burstForKill(shots, kill, tickrate);
+      const window = duelWindowForKill(pkg, kill);
+      // 有 duels 满 tick 窗口时用「受害者 → 击杀者」可见性时间线判定；否则回退到还手/朝向启发式。
+      const fallbackClass: DuelClassification = responseTick != null
         ? "contested_duel"
         : facing.faced === true && !facing.moving
           ? "suppressed_kill"
           : "caught_off_guard";
-      const burst = burstForKill(shots, kill, tickrate);
+      const classification = classifyDuel(ctx, kill, window, shots, engagement, burst[0]?.tick ?? null, fallbackClass);
       const hp = victimHealthBefore(pkg, kill);
       const hpBucket: DuelHpBucket = hp >= FULL_HEALTH_HP ? "full_hp" : "low_hp";
       const thirdParty = hasThirdPartyImpact(pkg, kill, engagement);
-      const window = duelWindowForKill(pkg, kill);
       const ttkMs = hpBucket === "full_hp" && !thirdParty && burst.length > 0
         ? msBetween(burst[0]!.tick, kill.tick, tickrate)
         : null;
@@ -413,6 +471,9 @@ export function buildDuelsSignals(input: DemoPackage): DuelSignals {
         killerIndex: kill.killerIndex!,
         victimIndex: kill.victimIndex,
         weapon: killWeaponName(kill),
+        headshot: kill.headshot,
+        throughSmoke: kill.throughSmoke,
+        penetratedObjects: kill.penetratedObjects ?? 0,
         classification,
         hpBucket,
         fullHealth: hpBucket === "full_hp",
@@ -438,7 +499,7 @@ export function buildDuelsSignals(input: DemoPackage): DuelSignals {
     .sort((a, b) => a.roundNumber - b.roundNumber || a.tick - b.tick);
 
   const fullHpTtk = records
-    .filter((record) => record.hpBucket === "full_hp" && !record.thirdParty && record.ttkMs != null)
+    .filter((record) => record.hpBucket === "full_hp" && isCleanDuelRecord(record) && record.ttkMs != null)
     .map((record) => record.ttkMs!);
   const weaponKeys = [...new Set(records.map((record) => normalizeWeapon(record.weapon)))].sort();
   const signals: DuelSignals = {
@@ -450,27 +511,26 @@ export function buildDuelsSignals(input: DemoPackage): DuelSignals {
       byWeapon: weaponKeys.map((weapon) => ({
         weapon,
         distribution: distribution(records
-          .filter((record) => normalizeWeapon(record.weapon) === weapon && record.hpBucket === "full_hp" && !record.thirdParty && record.ttkMs != null)
+          .filter((record) => normalizeWeapon(record.weapon) === weapon && record.hpBucket === "full_hp" && isCleanDuelRecord(record) && record.ttkMs != null)
           .map((record) => record.ttkMs!))
       }))
     }
   };
-  duelSignalsCache.set(input, signals);
+  if (cacheable) duelSignalsCache.set(input, signals);
   return signals;
 }
 
-export function deriveDuels(pkg: DemoPackage): DuelRecord[] {
-  return buildDuelsSignals(pkg).records;
+export function deriveDuels(pkg: DemoPackage, options: DuelSignalsOptions = {}): DuelRecord[] {
+  return buildDuelsSignals(pkg, options).records;
 }
 
-export function deriveOpeningDuels(pkg: DemoPackage): DuelRecord[] {
+export function deriveOpeningDuels(pkg: DemoPackage, options: DuelSignalsOptions = {}): DuelRecord[] {
   const seen = new Set<number>();
   const rows: DuelRecord[] = [];
-  for (const duel of deriveDuels(pkg)) {
+  for (const duel of deriveDuels(pkg, options)) {
     if (seen.has(duel.roundNumber)) continue;
     seen.add(duel.roundNumber);
     rows.push(duel);
   }
   return rows;
 }
-

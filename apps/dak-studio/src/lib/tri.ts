@@ -5,7 +5,7 @@ import { buildTriangleBvh, parseAwpyTri, type TriangleBvh } from "@cs2dak/maps";
  *
  * .tri 由打包脚本放进前端静态资源 `tris/{mapName}.tri`
  * （开发环境放 apps/dak-studio/public/tris/，可符号链接 ~/.awpy/tris）。
- * 文件缺失时返回 null，反应/预瞄退化为 duels 窗口起点口径，不报错。
+ * 文件缺失时返回 null；调用方只跳过静态墙体 LOS，仍保留 hp/flash/视野锥/烟雾约束。
  */
 const bvhCache = new Map<string, Promise<TriangleBvh | null>>();
 

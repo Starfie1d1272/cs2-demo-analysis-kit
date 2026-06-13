@@ -37,7 +37,7 @@
 | RoundFilterBar | 回合多维筛选（地图/side/经济/首杀/clutch/…） | ✅ 已有，需做成可嵌入任意视图 |
 | ReplayCanvas | 2D 回放（双层雷达、图层开关、时间轴锚点、投掷物弧线） | ✅ 已有；v3 后吃 replay 8Hz 全状态流 |
 | CohortScope | 跨场范围选择 | ✅ 已有组件 |
-| MetricInfo (ⓘ) | 口径说明 tooltip | ⬜ 缺统一原语 |
+| MetricInfo (ⓘ) | 口径说明 tooltip | ✅ 已抽公共原语 |
 | StatCard / DataTable / EmptyState | 基础展示原语 | 🟡 样式分散，需收敛进 studio.css 公共段 |
 | ExportButton | Markdown / PNG 报表导出 | ✅ 已有导出逻辑，需统一入口样式 |
 
@@ -91,21 +91,29 @@
 
 **回答**：对枪到底输在哪——枪法、定位、还是反应。
 
-口径（**已冻结，勿回退**；2026-06-13 修订分类命名，参数不变）：
-engagement 切分 1.5s；对枪配对 ±2s 互伤窗口；burst 切分 **250ms**；
-TTK 为 burst 锚定（击杀 tick − 致死 burst 首发 tick，中位数 + 分布呈现）；
-一枪致命率单列；受害者三分类 `contested_duel`（±1.5s 内还手）/
-`suppressed_kill`（朝向夹角 ≤60° 且静止未还手）/ `caught_off_guard`
-（未面向、转点或跑动中）；HP 档独立为 `hpBucket`（full_hp ≥80 / low_hp），
-仅 full_hp 且无第三方伤害的样本进 TTK 分布。
+口径（**已冻结，勿回退**；2026-06-13 按最终软件口径修订）：
+engagement 切分 1.5s；burst 切分 **250ms**；TTK 为 lethal burst 锚定
+（击杀 tick − 致死 burst 首发 tick，中位数 + 分布呈现，AK 一枪头可接近 0ms）。
+受害者三分类走逐 tick 可见性时间线：`contested_duel`=受害者伤到击杀者，
+或在击杀者首发到死亡之间看得到击杀者并开火；`suppressed_kill`=死前有过有效
+可见机会但没有有效还手；`caught_off_guard`=死前从未获得有效可见机会。有效可见
+必须满足 hp>0、未被闪、视野锥内、`.tri` 静态 LOS 通透且无烟雾遮挡。
+HP 档独立为 `hpBucket`（full_hp ≥80 / low_hp）。
+
+机制画像统一使用 **clean gunfight gate**：排除第三方伤害、穿烟击杀和穿墙击杀。
+首发命中、扫射、急停、TTK、one tap、反应时间、预瞄、爆头率都基于 clean 样本；
+标题击杀数/发数仍保留真实武器产出。TTK 与 one tap 额外要求满血 100HP；
+one tap 只对可一枪满血终结的武器展示，Glock/USP/M4 等不展示。
 
 - 层级：三 tab——对枪记录（明细 + 筛选：三分类/HP 档）→ 首杀分析
   （对位矩阵、FK/FD 散点、首杀时间分布）→ 枪法机制
   （个人机制画像：TTK/首发精准/扫射精准/急停/一枪致命/开枪节奏/
   视觉反应/预瞄，按武器拆分，标「当前范围前 X%」）。
 - 组件：M1–M6 实施拆分沿用归档文档；反应时间与 preaim ✅ 2026-06-13 转正
-  （`duels.json` 满 tick 窗口 + 安装包内置 `.tri` LOS；无 `.tri` 时退化为
-  窗口起点口径，UI 口径说明须如实标注）。
+  （`duels.json` 满 tick 窗口 + 浏览器/安装包加载 `.tri` BVH；无 `.tri` 时只跳过
+  静态墙体 LOS，仍保留 hp/flash/视野锥/烟雾约束，UI 口径说明须如实标注）。
+  一枪终结时若首发帧 victim HP 已经落到 0，反应时间使用上一帧仍存活的可见状态作为
+  anchor，避免 AWP/USP/Glock 等首发即击杀被误判为 prefire。
 - **不做**：A/B/C 固定联赛基线 percentile（2026-06-13 决策：本地工作台
   没有稳定联赛样本池，固定基线意义不大，保留「当前范围前 X%」相对标签）。
 - 交叉：Mechanics 跨场聚合输出给模块 3 档案页与 §9 我的主页。

@@ -5,7 +5,8 @@ export { buildPlayerSeasonProfile, buildAllPlayerSeasonProfiles } from "./player
 export { buildTeamCohortSummary, buildTeamComparison, type TeamComparisonModel } from "./team.js";
 export { buildSeriesSummary, recommendMatchMvp } from "./series.js";
 export { buildAntiStratMarkdownFromPatterns, buildPlaybookRows, type PlaybookPatternRow } from "./patterns.js";
-export { buildDuelInsights, duelClassificationLabel } from "./duel.js";
+export { buildDuelInsights, duelClassificationLabel, weaponCategory, CATEGORY_METRICS, mechanicsMetricsForWeapon } from "./duel.js";
+export type { MechanicsMetricKey, WeaponCategory } from "./duel.js";
 export { SEASON_STAT_VIEWS, formatPercent } from "./season-metrics.js";
 export {
   buildPlayerSeasonInsights,

@@ -1,5 +1,5 @@
 import type { DemoPackage, MatchWorkspaceModel, TeamKey } from "@cs2dak/contract";
-import { deriveDuels, derivePlayerMechanics } from "@cs2dak/core";
+import { derivePlayerMechanics } from "@cs2dak/core";
 import type { TriangleBvh } from "@cs2dak/maps";
 import { round } from "./season-metrics.js";
 import { displayWeaponName } from "./weapons.js";
@@ -111,7 +111,9 @@ export interface PlayerMechanicsWeaponProfile {
   counterStrafeSuccessPercent: number | null;
   oneTapRatePercent: number | null;
   visualReactionMs: number | null;
-  preaimSuccessPercent: number | null;
+  preaimErrorDegrees: number | null;
+  headshotPercent: number | null;
+  killsPerMatch: number | null;
   percentile: Record<string, string | null>;
 }
 
@@ -366,7 +368,7 @@ function weaponBucketLabel(bucket: string): string {
 }
 
 export interface MechanicsProfileOptions {
-  /** 按地图名提供 .tri BVH；提供后反应时间/预瞄走 LOS 精确口径。 */
+  /** 按地图名提供 .tri BVH；提供后枪法机制的可见性样本走静态 LOS 精确口径。 */
   visibilityFor?: (mapName: string) => TriangleBvh | null;
 }
 
@@ -385,48 +387,42 @@ export function buildPlayerMechanicsProfile(
     reaction: Array<number | null>;
     preaim: Array<number | null>;
     ttk: Array<number | null>;
+    headshot: number;
+    headshotTotal: number;
   }>();
   const allRows: Array<{ bucket: string; first: number | null; spray: number | null; counter: number | null; oneTap: number | null; reaction: number | null; preaim: number | null; ttk: number | null }> = [];
 
   const get = (bucket: string) => {
-    const current = byBucket.get(bucket) ?? { kills: 0, first: [], spray: [], counter: [], oneTap: [], reaction: [], preaim: [], ttk: [] };
+    const current = byBucket.get(bucket) ?? { kills: 0, first: [], spray: [], counter: [], oneTap: [], reaction: [], preaim: [], ttk: [], headshot: 0, headshotTotal: 0 };
     byBucket.set(bucket, current);
     return current;
   };
 
   for (const { pkg } of demos) {
-    const duelRows = deriveDuels(pkg).filter((duel) => ids.has(duel.killerSteamId64));
-    const ttkByBucket = new Map<string, number[]>();
-    for (const duel of duelRows) {
-      if (duel.ttkMs == null) continue;
-      const bucket = weaponBucket(duel.weapon);
-      const list = ttkByBucket.get(bucket) ?? [];
-      list.push(duel.ttkMs);
-      ttkByBucket.set(bucket, list);
-    }
     const visibility = options.visibilityFor?.(pkg.match.mapName) ?? null;
     for (const row of derivePlayerMechanics(pkg, { visibility }).filter((item) => ids.has(item.steamId64))) {
       const bucket = weaponBucket(row.weapon);
       const cell = get(bucket);
-      const ttk = medianNumber(ttkByBucket.get(bucket) ?? []);
-      const preaim = row.reaction.preaimSuccess == null ? null : row.reaction.preaimSuccess ? 100 : 0;
+      const preaim = row.preaim.medianDegrees;
       cell.kills += row.killCount;
-      cell.first.push(row.firstShotAccuracyPercent);
-      cell.spray.push(row.sprayAccuracyPercent);
-      cell.counter.push(row.counterStrafeSuccessPercent);
-      cell.oneTap.push(row.oneTapRatePercent);
-      cell.reaction.push(row.reaction.visualReactionMs);
+      cell.headshot += row.cleanHeadshotKills;
+      cell.headshotTotal += row.cleanKillCount;
+      cell.first.push(row.firstShotHit.value);
+      cell.spray.push(row.sprayHit?.value ?? null);
+      cell.counter.push(row.counterStrafe.value);
+      cell.oneTap.push(row.oneTap.value);
+      cell.reaction.push(row.reaction.value);
       cell.preaim.push(preaim);
-      cell.ttk.push(ttk);
+      cell.ttk.push(...row.ttkSamplesMs);
       allRows.push({
         bucket,
-        first: row.firstShotAccuracyPercent,
-        spray: row.sprayAccuracyPercent,
-        counter: row.counterStrafeSuccessPercent,
-        oneTap: row.oneTapRatePercent,
-        reaction: row.reaction.visualReactionMs,
+        first: row.firstShotHit.value,
+        spray: row.sprayHit?.value ?? null,
+        counter: row.counterStrafe.value,
+        oneTap: row.oneTap.value,
+        reaction: row.reaction.value,
         preaim,
-        ttk
+        ttk: row.ttk.value
       });
     }
   }
@@ -438,7 +434,7 @@ export function buildPlayerMechanicsProfile(
     const counter = avg(cell.counter);
     const oneTap = avg(cell.oneTap);
     const reaction = medianNumber(cell.reaction);
-    const preaim = avg(cell.preaim);
+    const preaim = medianNumber(cell.preaim);
     return {
       weapon: bucket,
       label: weaponBucketLabel(bucket),
@@ -449,7 +445,9 @@ export function buildPlayerMechanicsProfile(
       counterStrafeSuccessPercent: counter,
       oneTapRatePercent: oneTap,
       visualReactionMs: reaction,
-      preaimSuccessPercent: preaim,
+      preaimErrorDegrees: preaim,
+      headshotPercent: cell.headshotTotal > 0 ? Math.round((cell.headshot / cell.headshotTotal) * 1000) / 10 : null,
+      killsPerMatch: demos.length > 0 ? Math.round((cell.kills / demos.length) * 10) / 10 : null,
       percentile: {
         firstShotAccuracy: percentileLabel(first, allRows.map((row) => row.first)),
         sprayAccuracy: percentileLabel(spray, allRows.map((row) => row.spray)),
@@ -457,7 +455,7 @@ export function buildPlayerMechanicsProfile(
         counterStrafe: percentileLabel(counter, allRows.map((row) => row.counter)),
         oneTapRate: percentileLabel(oneTap, allRows.map((row) => row.oneTap)),
         visualReaction: percentileLabel(reaction, allRows.map((row) => row.reaction), true),
-        preaimSuccess: percentileLabel(preaim, allRows.map((row) => row.preaim))
+        preaimError: percentileLabel(preaim, allRows.map((row) => row.preaim), true)
       }
     };
   };
@@ -470,7 +468,9 @@ export function buildPlayerMechanicsProfile(
     oneTap: [...byBucket.values()].flatMap((row) => row.oneTap),
     reaction: [...byBucket.values()].flatMap((row) => row.reaction),
     preaim: [...byBucket.values()].flatMap((row) => row.preaim),
-    ttk: [...byBucket.values()].flatMap((row) => row.ttk)
+    ttk: [...byBucket.values()].flatMap((row) => row.ttk),
+    headshot: [...byBucket.values()].reduce((sum, row) => sum + row.headshot, 0),
+    headshotTotal: [...byBucket.values()].reduce((sum, row) => sum + row.headshotTotal, 0)
   });
   // 击杀数前 6 把武器单列，其余合并为「其他」（样本数组直接拼接，口径与单桶一致）
   const ranked = [...byBucket.entries()].sort((a, b) => b[1].kills - a[1].kills || a[0].localeCompare(b[0]));
@@ -486,7 +486,9 @@ export function buildPlayerMechanicsProfile(
       oneTap: rest.flatMap(([, cell]) => cell.oneTap),
       reaction: rest.flatMap(([, cell]) => cell.reaction),
       preaim: rest.flatMap(([, cell]) => cell.preaim),
-      ttk: rest.flatMap(([, cell]) => cell.ttk)
+      ttk: rest.flatMap(([, cell]) => cell.ttk),
+      headshot: rest.reduce((sum, [, cell]) => sum + cell.headshot, 0),
+      headshotTotal: rest.reduce((sum, [, cell]) => sum + cell.headshotTotal, 0)
     }));
   }
   return { overall, weapons };

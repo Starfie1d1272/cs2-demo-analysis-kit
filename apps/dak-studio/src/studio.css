@@ -849,8 +849,8 @@ body {
 
 .stu-metric-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
+  gap: 8px;
 }
 
 /* BP 流程时间线：顺序步骤 + 彩色动作标签 */
@@ -1099,15 +1099,37 @@ body {
   font-size: 11px;
 }
 
+.stu-metric {
+  min-height: 74px;
+  padding: 8px 9px;
+  border: 1px solid color-mix(in srgb, var(--dak-border) 72%, transparent);
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-panel);
+}
+
 .stu-metric span {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   color: var(--dak-fg-dim);
   font-size: 11px;
+  line-height: 1.25;
 }
 
 .stu-metric b {
+  display: block;
+  margin-top: 4px;
   font-size: 17px;
+  line-height: 1.1;
   font-variant-numeric: tabular-nums;
+}
+
+.stu-metric small {
+  display: block;
+  margin-top: 3px;
+  color: var(--stu-muted);
+  font-size: 11px;
+  line-height: 1.25;
 }
 
 .stu-bars {
@@ -2573,7 +2595,6 @@ td.stu-heat-cell.stu-heat-neutral {
 .stu-duel-pill-ok b { color: var(--dak-ok); }
 .stu-duel-pill-warn b { color: var(--dak-warn); }
 .stu-duel-pill-danger b { color: var(--dak-danger); }
-}
 
 .stu-duel-weapon-stack {
   display: grid;
@@ -2583,8 +2604,8 @@ td.stu-heat-cell.stu-heat-neutral {
 .stu-duel-weapon-row {
   display: grid;
   grid-template-columns: minmax(70px, .9fr) auto;
-  gap: 4px 8px;
-  padding-top: 8px;
+  gap: 6px 10px;
+  padding-top: 10px;
   border-top: 1px solid var(--dak-border);
 }
 
@@ -2593,19 +2614,45 @@ td.stu-heat-cell.stu-heat-neutral {
   font-size: 12px;
 }
 
-.stu-duel-weapon-row div {
+.stu-duel-weapon-metrics {
   grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
 }
 
-.stu-duel-weapon-row small {
-  padding: 2px 6px;
-  border-radius: 999px;
+.stu-duel-metric-item {
+  min-height: 58px;
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--dak-border) 72%, transparent);
+  border-radius: var(--stu-radius-sm);
   background: var(--dak-panel);
+}
+
+.stu-duel-metric-item span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   color: var(--stu-muted);
   font-size: 11px;
+  line-height: 1.2;
+}
+
+.stu-duel-metric-item b {
+  display: block;
+  margin-top: 4px;
+  color: var(--stu-text);
+  font-size: 14px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.stu-duel-metric-item small {
+  display: block;
+  margin-top: 4px;
+  color: var(--dak-fg-dim);
+  font-size: 10px;
+  line-height: 1.2;
 }
 
 .stu-duel-opening-layout {

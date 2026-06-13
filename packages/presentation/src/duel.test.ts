@@ -12,14 +12,14 @@ const BI = 1;
 
 /** Build columnar PackageShots from a flat shot list. Ticks are delta-encoded per track. */
 function buildShots(
-  shots: Array<{ tick: number; playerIndex: number; roundNumber?: number }>
+  shots: Array<{ tick: number; playerIndex: number; roundNumber?: number; weaponIndex?: number }>
 ): PackageShots {
-  const groups = new Map<string, Array<{ tick: number; playerIndex: number; roundNumber: number }>>();
+  const groups = new Map<string, Array<{ tick: number; playerIndex: number; roundNumber: number; weaponIndex: number }>>();
   for (const s of shots) {
     const rn = s.roundNumber ?? 1;
     const key = `${rn}:${s.playerIndex}`;
     const arr = groups.get(key) ?? [];
-    arr.push({ tick: s.tick, playerIndex: s.playerIndex, roundNumber: rn });
+    arr.push({ tick: s.tick, playerIndex: s.playerIndex, roundNumber: rn, weaponIndex: s.weaponIndex ?? 0 });
     groups.set(key, arr);
   }
   const tracks: PackageShots["tracks"] = [];
@@ -32,7 +32,7 @@ function buildShots(
       roundNumber: items[0]!.roundNumber,
       playerIndex: items[0]!.playerIndex,
       tick: deltas,
-      weapon: Array<number>(n).fill(0),
+      weapon: items.map((s) => s.weaponIndex),
       vx: Array<number>(n).fill(0),
       vy: Array<number>(n).fill(0),
       vz: Array<number>(n).fill(0),
@@ -43,7 +43,7 @@ function buildShots(
       z: Array<number>(n).fill(0),
     });
   }
-  return { meta: { coordScale: 1, angleScale: 10 }, weaponDict: ["ak47"], tracks };
+  return { meta: { coordScale: 1, angleScale: 10 }, weaponDict: ["ak47", "glock"], tracks };
 }
 
 function damage(row: { attackerIndex: number | null; victimIndex: number; tick: number } & Partial<PackageDamage>): PackageDamage {
@@ -145,5 +145,35 @@ describe("buildDuelInsights", () => {
     const model = buildDuelInsights([{ matchId: "m1", pkg: pkg(undefined) }]);
     expect(model.duelRows).toHaveLength(1);
     expect(model.mechanicsRows).toHaveLength(0);
+  });
+
+  it("aggregates the same player+weapon across matches into a single tailored row", () => {
+    const withShots = () => pkg(buildShots([{ tick: 100, playerIndex: AI }, { tick: 120, playerIndex: AI }]));
+    const model = buildDuelInsights([
+      { matchId: "m1", pkg: withShots() },
+      { matchId: "m2", pkg: withShots() }
+    ]);
+    const akRows = model.mechanicsRows.filter((row) => row.steamId64 === A && row.weapon === "ak47");
+    expect(akRows).toHaveLength(1); // 两场的 AK 合并为一行，而非各出一行
+    expect(akRows[0]!.killCount).toBe(2);
+    // 场均击杀 = 2 杀 / 2 场
+    expect(akRows[0]!.metrics.find((metric) => metric.key === "killsPerMatch")?.value).toBe(2 / 2);
+    // 爆头率：两场都是爆头击杀
+    expect(akRows[0]!.metrics.find((metric) => metric.key === "headshot")?.value).toBe(100);
+    // 步枪类别展示扫射命中率，而狙击会隐藏 TTK/预瞄（此处验证步枪保留 sprayHit）
+    const keys = akRows[0]!.metrics.map((metric) => metric.key);
+    expect(keys).toContain("sprayHit");
+    expect(keys).toContain("headshot");
+  });
+
+  it("does not show one tap for weapons that cannot one-shot full HP", () => {
+    const demo = pkg(buildShots([{ tick: 100, playerIndex: AI, weaponIndex: 1 }, { tick: 120, playerIndex: AI, weaponIndex: 1 }]));
+    demo.kills = [kill({ tick: 120, killerIndex: AI, victimIndex: BI, weapon: "glock", killerActiveWeapon: "glock" })];
+    demo.damages = [damage({ tick: 120, attackerIndex: AI, victimIndex: BI, weapon: "glock" })];
+
+    const model = buildDuelInsights([{ matchId: "m1", pkg: demo }]);
+    const glock = model.mechanicsRows.find((row) => row.weapon === "glock")!;
+
+    expect(glock.metrics.map((metric) => metric.key)).not.toContain("oneTap");
   });
 });

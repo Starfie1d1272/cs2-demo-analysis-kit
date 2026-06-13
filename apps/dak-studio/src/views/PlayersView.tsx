@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { PlayerSeasonProfile } from "@cs2dak/contract";
 import {
   SEASON_STAT_VIEWS,
+  mechanicsMetricsForWeapon,
+  type MechanicsMetricKey,
   type PlayerMechanicsProfile,
   type PlayerSeasonInsights,
   type PlayerWeaponStat
@@ -591,6 +593,28 @@ function WeaponBars({ weapons }: { weapons: PlayerWeaponStat[] }) {
   );
 }
 
+// 概览卡（all/other 桶）展示全集；具体武器按类别只展示有意义的指标（与对枪实验室口径一致）。
+const OVERALL_METRIC_KEYS: MechanicsMetricKey[] = ["firstShotHit", "sprayHit", "counterStrafe", "ttk", "oneTap", "reaction", "preaim", "headshot", "killsPerMatch"];
+
+function mechanicsKeysFor(weapon: string): MechanicsMetricKey[] {
+  if (weapon === "all" || weapon === "other") return OVERALL_METRIC_KEYS;
+  return mechanicsMetricsForWeapon(weapon);
+}
+
+function mechanicsMetricCell(key: MechanicsMetricKey, row: PlayerMechanicsProfile["weapons"][number]) {
+  switch (key) {
+    case "firstShotHit": return <MechanicsMetric key={key} label="首发命中率" value={row.firstShotAccuracyPercent} unit="%" note="clean combat burst 第一发命中 / clean combat burst 数。" percentile={row.percentile.firstShotAccuracy} />;
+    case "sprayHit": return <MechanicsMetric key={key} label="扫射命中率" value={row.sprayAccuracyPercent} unit="%" note="clean 全自动 burst≥5 的第 4 发起命中率。" percentile={row.percentile.sprayAccuracy} />;
+    case "counterStrafe": return <MechanicsMetric key={key} label="急停成功率" value={row.counterStrafeSuccessPercent} unit="%" note="clean combat burst 中，开枪前在移动且开枪时已停稳的比例。" percentile={row.percentile.counterStrafe} />;
+    case "oneTap": return <MechanicsMetric key={key} label="one tap 率" value={row.oneTapRatePercent} unit="%" note="可一枪满血终结武器中，clean 满血击杀的单发终结比例。" percentile={row.percentile.oneTapRate} />;
+    case "ttk": return <MechanicsMetric key={key} label="TTK" value={row.medianTtkMs} unit="ms" note="clean 满血击杀的 lethal burst 第一枪到击杀中位，越低越好。" percentile={row.percentile.medianTtk} />;
+    case "reaction": return <MechanicsMetric key={key} label="反应时间" value={row.visualReactionMs} unit="ms" note="clean 击杀中，敌人进入有效视野到首发开枪的中位耗时。" percentile={row.percentile.visualReaction} />;
+    case "preaim": return <MechanicsMetric key={key} label="预瞄误差" value={row.preaimErrorDegrees} unit="°" note="clean 击杀中，捕获前准星与目标三维夹角中位。" percentile={row.percentile.preaimError} />;
+    case "headshot": return <MechanicsMetric key={key} label="爆头率" value={row.headshotPercent} unit="%" note="clean 爆头击杀 / clean 击杀。" percentile={null} />;
+    case "killsPerMatch": return <MechanicsMetric key={key} label="场均击杀" value={row.killsPerMatch} unit="" note="该武器击杀 / 参与场数。" percentile={null} />;
+  }
+}
+
 function MechanicsWeaponCards({ profile }: { profile: PlayerMechanicsProfile }) {
   const rows = [profile.overall, ...profile.weapons].filter((row) => row.kills > 0);
   if (rows.length === 0) {
@@ -605,13 +629,7 @@ function MechanicsWeaponCards({ profile }: { profile: PlayerMechanicsProfile }) 
             <span>{row.kills} 击杀</span>
           </header>
           <div className="stu-metric-grid">
-            <MechanicsMetric label="首发" value={row.firstShotAccuracyPercent} unit="%" note="每个 burst 第一发是否命中；当前范围百分位。" percentile={row.percentile.firstShotAccuracy} />
-            <MechanicsMetric label="扫射" value={row.sprayAccuracyPercent} unit="%" note="同一 burst 第二发起，击杀边界前命中率。" percentile={row.percentile.sprayAccuracy} />
-            <MechanicsMetric label="TTK" value={row.medianTtkMs} unit="ms" note="full HP 且无第三方样本的 TTK 中位数，越低越好。" percentile={row.percentile.medianTtk} />
-            <MechanicsMetric label="急停" value={row.counterStrafeSuccessPercent} unit="%" note="开枪前 200ms velocity 按武器/类别阈值判定。" percentile={row.percentile.counterStrafe} />
-            <MechanicsMetric label="一枪致命" value={row.oneTapRatePercent} unit="%" note="单发击杀 / 总击杀。" percentile={row.percentile.oneTapRate} />
-            <MechanicsMetric label="反应时间" value={row.visualReactionMs} unit="ms" note="首次可见 tick 到首发开枪；有 tri BVH 时用 LOS。" percentile={row.percentile.visualReaction} />
-            <MechanicsMetric label="预瞄" value={row.preaimSuccessPercent} unit="%" note="peek 前视角接近敌人位置的成功率。" percentile={row.percentile.preaimSuccess} />
+            {mechanicsKeysFor(row.weapon).map((key) => mechanicsMetricCell(key, row))}
           </div>
         </article>
       ))}

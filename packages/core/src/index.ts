@@ -25,7 +25,15 @@ export type {
 } from "./economy.js";
 export type { SideWinRateStats, TeamSideWinRates } from "./side-win-rate.js";
 export type { DuelClassification, DuelHpBucket, DuelRecord, DuelSignals, TtkDistribution } from "./duels.js";
-export type { BurstLengthBuckets, MechanicsSignals, PlayerMechanicsFact, ReactionPreaimSignals } from "./mechanics.js";
+export type {
+  BurstLengthBuckets,
+  MechanicsMetricSet,
+  MechanicsSignals,
+  MedianSample,
+  PlayerMechanicsFact,
+  PreaimSample,
+  RateSample,
+} from "./mechanics.js";
 
 export function analyzeDemoPackage(input: unknown): AnalysisBundle {
   const pkg = normalizeDemoPackage(input);

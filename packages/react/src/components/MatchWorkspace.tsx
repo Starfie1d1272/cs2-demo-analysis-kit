@@ -39,7 +39,8 @@ const WORKSPACE_NAV: Array<{ key: WorkspaceView; label: string }> = [
 export function MatchWorkspace({ model, initialTarget }: MatchWorkspaceProps) {
   // 顶部横向分段导航 + 单一全宽主区：一次只显示一个视图，避免宽回放与其它视图争抢宽度。
   // 回放是默认首项（无回放流时退化为概览）；EvidenceLink 跳转自动切到回放并定位 tick。
-  const [view, setView] = useState<WorkspaceView>(model.replay.available ? "replay" : "overview");
+  // 落地视图固定为概览仪表盘（KPI / 计分板 / 快捷入口）；带 initialTarget 打开时才经 useEffect 跳到回放。
+  const [view, setView] = useState<WorkspaceView>("overview");
   const [replayTarget, setReplayTarget] = useState<ReplayTarget | null>(null);
   const openReplay = (roundNumber: number, tick?: number) => {
     setReplayTarget((prev) => ({ roundNumber, tick, seq: (prev?.seq ?? 0) + 1 }));
@@ -770,8 +771,12 @@ export function ReplayViewer({ replay, map, target = null }: {
             ? heldUtilityLabel({ ...player.loadout, grenadeCount: frame.grenades.length, grenades: frame.grenades })
             : null;
           const heldGun = frame.weapon && isGunWeapon(frame.weapon) ? frame.weapon : null;
-          const pickedUp = heldGun && heldGun !== player.loadout.primaryWeapon && heldGun !== player.loadout.secondaryWeapon;
-          const primary = pickedUp ? heldGun : primaryLoadoutLabel(player.loadout);
+          // frame.weapon 是武器原始 key，loadout 可能存展示名；统一到展示名空间再比较与渲染，避免误判「捡枪」并显示原始 key。
+          const heldGunLabel = heldGun ? displayWeaponName(heldGun) : null;
+          const primaryLabel = primaryLoadoutLabel(player.loadout);
+          const secondaryLabel = player.loadout.secondaryWeapon ? displayWeaponName(player.loadout.secondaryWeapon) : null;
+          const pickedUp = heldGunLabel != null && heldGunLabel !== primaryLabel && heldGunLabel !== secondaryLabel;
+          const primary = pickedUp ? heldGunLabel : primaryLabel;
           return (
             <div
               className={`dak-frame-player-row${!frame.alive ? " dak-frame-player-row-dead" : ""}`}
@@ -782,7 +787,7 @@ export function ReplayViewer({ replay, map, target = null }: {
               {frame.alive ? (
                 <small className="dak-frame-loadout">
                   <span className="dak-frame-primary">{primary}{pickedUp ? "*" : ""}</span>
-                  {player.loadout.primaryWeapon && player.loadout.secondaryWeapon && !pickedUp && <span>{player.loadout.secondaryWeapon}</span>}
+                  {player.loadout.primaryWeapon && secondaryLabel && !pickedUp && <span>{secondaryLabel}</span>}
                   {heldUtility && <span>{heldUtility}</span>}
                   {frame.armor > 0 && <span>{frame.hasHelmet ? "全甲" : "半甲"}</span>}
                   {frame.hasDefuseKit && <span>kit</span>}
@@ -1330,7 +1335,8 @@ function isGunWeapon(weapon: string): boolean {
 }
 
 function primaryLoadoutLabel(loadout: WorkspaceReplayLoadout): string {
-  return loadout.primaryWeapon ?? loadout.secondaryWeapon ?? "—";
+  const weapon = loadout.primaryWeapon ?? loadout.secondaryWeapon;
+  return weapon ? displayWeaponName(weapon) : "—";
 }
 
 function heldUtilityLabel(loadout: WorkspaceReplayLoadout): string {

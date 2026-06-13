@@ -237,12 +237,9 @@ function PlayerMechanicsGrid({
                 <div key={`${row.steamId64}-${row.weapon}`} className="stu-duel-weapon-row">
                   <span>{displayWeaponName(row.weapon)}</span>
                   <b>{row.killCount} 击杀 · {row.shotCount} 发</b>
-                  <div>
-                    {row.metrics.slice(0, 4).map((metric) => (
-                      <small key={metric.key}>
-                        {metric.label} {metric.value.toFixed(1)}{metric.unit ?? ""}
-                        <MetricInfo note={metricInfoNote(metric.key)} />
-                      </small>
+                  <div className="stu-duel-weapon-metrics">
+                    {row.metrics.map((metric) => (
+                      <MechanicsMetricItem key={metric.key} metric={metric} />
                     ))}
                   </div>
                 </div>
@@ -605,13 +602,43 @@ function explainDuelRow(row: DuelFinderRow): string {
   return "对枪胜出：受害者在 ±1.5s 内还手。";
 }
 
+/** 主数值：null 显示 —，否则保留一位小数加单位。 */
+function formatMetricValue(metric: PlayerMechanicsRow["metrics"][number]): string {
+  if (metric.value == null) return "—";
+  return `${metric.value.toFixed(1)}${metric.unit ?? ""}`;
+}
+
+/** 证据：命中率类附 (分子/分母)，中位类附样本数，外加 detail（如 ≤5° 比例 / 非自动武器）。 */
+function formatMetricEvidence(metric: PlayerMechanicsRow["metrics"][number]): string {
+  const parts: string[] = [];
+  if (metric.attempts != null && metric.attempts > 0) parts.push(`${metric.successes ?? 0}/${metric.attempts}`);
+  else if (metric.sampleSize != null && metric.sampleSize > 0) parts.push(`n=${metric.sampleSize}`);
+  if (metric.detail) parts.push(metric.detail);
+  return parts.length > 0 ? ` (${parts.join(" · ")})` : "";
+}
+
+function MechanicsMetricItem({ metric }: { metric: PlayerMechanicsRow["metrics"][number] }) {
+  const evidence = formatMetricEvidence(metric).replace(/^\s*\(|\)$/g, "");
+  return (
+    <div className="stu-duel-metric-item">
+      <span>{metric.label}<MetricInfo note={metricInfoNote(metric.key)} /></span>
+      <b>{formatMetricValue(metric)}</b>
+      {evidence && <small>{evidence}</small>}
+      {!evidence && metric.percentileLabel && <small>{metric.percentileLabel}</small>}
+    </div>
+  );
+}
+
 function metricInfoNote(key: string): string {
-  if (key === "firstShotAccuracy") return "每个 burst 第一发是否在 ±1 tick 匹配伤害事件。";
-  if (key === "sprayAccuracy") return "同一 burst 第二发起，且只统计击杀边界前开枪。";
-  if (key === "counterStrafe") return "开枪前 200ms velocity 按武器/类别阈值判定，缺失 velocity 显示 —。";
-  if (key === "oneTapRate") return "单发击杀数 / 总击杀数，一枪头 TTK≈0 合法。";
-  if (key === "visualReaction") return "首次可见 tick 到首发开枪；有 tri BVH 时使用 LOS，否则降级到 duels window 起点。";
-  if (key === "preaimAngleError") return "peek 前视角与敌人方向夹角；误差越小越好。";
+  if (key === "firstShotHit") return "clean combat burst 第一发命中 / clean combat burst 数；排除第三方、穿烟和穿墙终结。";
+  if (key === "sprayHit") return "clean 全自动 burst≥5 的第 4 发起命中率；排除第三方、穿烟和穿墙终结。";
+  if (key === "counterStrafe") return "clean combat burst 中，开枪前确实在移动且开枪时已降到武器站立精准速度内的比例。";
+  if (key === "oneTap") return "可一枪满血终结武器中，clean 满血击杀的 lethal burst 仅一发比例。";
+  if (key === "ttk") return "clean 满血击杀的 lethal burst 第一枪到击杀中位耗时，越低越好。";
+  if (key === "reaction") return "clean 击杀中，敌人进入有效视野(锥+静态LOS+无烟+未被闪)到首发开枪的中位耗时；首发即击杀用上一帧仍存活的可见状态。";
+  if (key === "preaim") return "clean 击杀中，捕获前 1~3 帧准星与目标三维夹角中位，附 ≤5° 比例。";
+  if (key === "headshot") return "clean 爆头击杀 / clean 击杀。";
+  if (key === "killsPerMatch") return "该武器击杀数 / 选手参与场数。";
   return "当前范围百分位，不输出 A/B/C。";
 }
 
