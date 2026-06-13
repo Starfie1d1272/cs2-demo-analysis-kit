@@ -23,6 +23,15 @@ jobs:
         os: [macos-14, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
+      # Windows Defender 实时扫描会逐个扫 PyInstaller/pnpm 写出的成千上万个小文件，
+      # 是 Windows onefile 打包慢一倍的主因。排除 workspace 与 temp 目录显著提速。
+      - name: Exclude workspace from Windows Defender
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE" -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath "$env:RUNNER_TEMP" -ErrorAction SilentlyContinue
+
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # sync-version.mjs 需要 git tag
