@@ -1,4 +1,5 @@
 import { buildTriangleBvh, parseAwpyTri, type TriangleBvh } from "@cs2dak/maps";
+import { createDbOpener, touchLimitedCache, txRequest } from "./idb";
 
 /**
  * 浏览器端 .tri 加载器（maps 的 tri-assets 是 Node-only，Studio 走 fetch）。
@@ -8,6 +9,7 @@ import { buildTriangleBvh, parseAwpyTri, type TriangleBvh } from "@cs2dak/maps";
  * 文件缺失时返回 null；调用方只跳过静态墙体 LOS，仍保留 hp/flash/视野锥/烟雾约束。
  * 原始 .tri bytes 会写入 IndexedDB；BVH 树只做会话内缓存，避免持久化深层对象带来的 clone 开销。
  */
+const BVH_CACHE_LIMIT = 4;
 const bvhCache = new Map<string, Promise<TriangleBvh | null>>();
 const TRI_DB = "dak-studio-tri-cache";
 const TRI_STORE = "tri";
@@ -21,35 +23,11 @@ interface TriRecord {
   buffer: ArrayBuffer;
 }
 
-let triDbPromise: Promise<IDBDatabase> | null = null;
-
-function openTriDb(): Promise<IDBDatabase> {
-  if (triDbPromise) return triDbPromise;
-  triDbPromise = new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(TRI_DB, 1);
-    request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains(TRI_STORE)) {
-        request.result.createObjectStore(TRI_STORE, { keyPath: "mapName" });
-      }
-    };
-    request.onsuccess = () => {
-      const db = request.result;
-      db.onversionchange = () => { db.close(); triDbPromise = null; };
-      db.onclose = () => { triDbPromise = null; };
-      resolve(db);
-    };
-    request.onerror = () => { triDbPromise = null; reject(request.error ?? new Error("无法打开 tri 缓存库")); };
-  });
-  triDbPromise.catch(() => { triDbPromise = null; });
-  return triDbPromise;
-}
-
-function requestAsPromise<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("IndexedDB 请求失败"));
-  });
-}
+const openTriDb = createDbOpener(TRI_DB, 1, (db) => {
+  if (!db.objectStoreNames.contains(TRI_STORE)) {
+    db.createObjectStore(TRI_STORE, { keyPath: "mapName" });
+  }
+});
 
 function isValidTriBuffer(buffer: ArrayBuffer): boolean {
   return buffer.byteLength > 0 && buffer.byteLength % 36 === 0;
@@ -58,11 +36,11 @@ function isValidTriBuffer(buffer: ArrayBuffer): boolean {
 async function readTriBuffer(mapName: string): Promise<ArrayBuffer | null> {
   try {
     const db = await openTriDb();
-    const record = await requestAsPromise(
+    const record = await txRequest(
       db.transaction(TRI_STORE, "readonly").objectStore(TRI_STORE).get(mapName) as IDBRequest<TriRecord | undefined>
     );
     if (!record || record.version !== TRI_CACHE_VERSION || !isValidTriBuffer(record.buffer)) return null;
-    void requestAsPromise(
+    void txRequest(
       db.transaction(TRI_STORE, "readwrite").objectStore(TRI_STORE).put({ ...record, touchedAt: Date.now() } satisfies TriRecord)
     );
     return record.buffer;
@@ -75,7 +53,7 @@ async function writeTriBuffer(mapName: string, buffer: ArrayBuffer): Promise<voi
   try {
     if (!isValidTriBuffer(buffer)) return;
     const db = await openTriDb();
-    await requestAsPromise(
+    await txRequest(
       db.transaction(TRI_STORE, "readwrite").objectStore(TRI_STORE).put({
         mapName,
         version: TRI_CACHE_VERSION,
@@ -113,8 +91,7 @@ export function loadMapTri(mapName: string): Promise<TriangleBvh | null> {
       return null;
     }
   })();
-  bvhCache.set(mapName, promise);
-  return promise;
+  return touchLimitedCache(bvhCache, mapName, promise, BVH_CACHE_LIMIT);
 }
 
 /** 预载多张地图的 BVH，返回同步 lookup（给 presentation 的 visibilityFor 用）。 */

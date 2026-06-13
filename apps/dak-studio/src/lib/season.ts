@@ -17,6 +17,7 @@ import {
   type TournamentInsights,
   type TeamComparisonModel
 } from "@cs2dak/presentation";
+import { createDbOpener, touchLimitedCache, txRequest } from "./idb";
 import { loadTriLookup } from "./tri";
 import type {
   DuelInsightsModel,
@@ -64,43 +65,13 @@ const CACHE_STORE = "season";
  *  prune 也只读它（不反序列化全部 summary）。 */
 const META_STORE = "season-meta";
 
-let cacheDbPromise: Promise<IDBDatabase> | null = null;
-
-function openCacheDb(): Promise<IDBDatabase> {
-  if (cacheDbPromise) return cacheDbPromise;
-  cacheDbPromise = new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(CACHE_DB, 2);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(CACHE_STORE)) db.createObjectStore(CACHE_STORE);
-      if (!db.objectStoreNames.contains(META_STORE)) db.createObjectStore(META_STORE);
-    };
-    request.onsuccess = () => {
-      const db = request.result;
-      db.onversionchange = () => { db.close(); cacheDbPromise = null; };
-      db.onclose = () => { cacheDbPromise = null; };
-      resolve(db);
-    };
-    request.onerror = () => { cacheDbPromise = null; reject(request.error ?? new Error("无法打开缓存库")); };
-  });
-  cacheDbPromise.catch(() => { cacheDbPromise = null; });
-  return cacheDbPromise;
-}
+const openCacheDb = createDbOpener(CACHE_DB, 2, (db) => {
+  if (!db.objectStoreNames.contains(CACHE_STORE)) db.createObjectStore(CACHE_STORE);
+  if (!db.objectStoreNames.contains(META_STORE)) db.createObjectStore(META_STORE);
+});
 
 /** 按 key 多条缓存（不同 scope 互不覆盖），LRU 清理只保留最近 MAX_CACHE_KEYS 条。 */
 const MAX_CACHE_KEYS = 12;
-
-interface PersistedSummary {
-  key: string;
-  touchedAt: number;
-  summary: SeasonSummary;
-}
-
-interface PersistedTournamentInsights {
-  key: string;
-  touchedAt: number;
-  insights: TournamentInsights | null;
-}
 
 interface MetaRecord {
   touchedAt: number;
@@ -112,13 +83,6 @@ interface PersistedValue<T> {
   value: T;
 }
 
-function txRequest<T>(req: IDBRequest<T>): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
 /** 只刷新 LRU 时间戳（轻量表），不重写 summary 本体。 */
 async function touchMeta(db: IDBDatabase, key: string): Promise<void> {
   try {
@@ -126,56 +90,6 @@ async function touchMeta(db: IDBDatabase, key: string): Promise<void> {
       db.transaction(META_STORE, "readwrite").objectStore(META_STORE).put({ touchedAt: Date.now() } satisfies MetaRecord, key)
     );
   } catch { /* 忽略 */ }
-}
-
-async function readPersisted(key: string): Promise<SeasonSummary | null> {
-  try {
-    const db = await openCacheDb();
-    const record = await txRequest(
-      db.transaction(CACHE_STORE, "readonly").objectStore(CACHE_STORE).get(key) as IDBRequest<PersistedSummary | undefined>
-    );
-    if (record) await touchMeta(db, key);
-    return record?.summary ?? null;
-  } catch {
-    return null; // 缓存只是加速，读失败回落重算
-  }
-}
-
-async function writePersisted(key: string, summary: SeasonSummary): Promise<void> {
-  try {
-    const db = await openCacheDb();
-    const store = db.transaction(CACHE_STORE, "readwrite").objectStore(CACHE_STORE);
-    await txRequest(store.put({ key, touchedAt: Date.now(), summary } satisfies PersistedSummary, key));
-    await touchMeta(db, key);
-    void prunePersisted();
-  } catch {
-    // 写失败不影响功能
-  }
-}
-
-async function readPersistedTournamentInsights(key: string): Promise<TournamentInsights | null | undefined> {
-  try {
-    const db = await openCacheDb();
-    const record = await txRequest(
-      db.transaction(CACHE_STORE, "readonly").objectStore(CACHE_STORE).get(key) as IDBRequest<PersistedTournamentInsights | undefined>
-    );
-    if (record) await touchMeta(db, key);
-    return record ? record.insights : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-async function writePersistedTournamentInsights(key: string, insights: TournamentInsights | null): Promise<void> {
-  try {
-    const db = await openCacheDb();
-    const store = db.transaction(CACHE_STORE, "readwrite").objectStore(CACHE_STORE);
-    await txRequest(store.put({ key, touchedAt: Date.now(), insights } satisfies PersistedTournamentInsights, key));
-    await touchMeta(db, key);
-    void prunePersisted();
-  } catch {
-    // 写失败不影响功能
-  }
 }
 
 async function readPersistedValue<T>(key: string): Promise<T | undefined> {
@@ -289,23 +203,12 @@ export interface PlayerSeasonDetails {
   mechanics: PlayerMechanicsProfile;
 }
 
-const DETAILS_CACHE_LIMIT = 24;
+const DETAILS_CACHE_LIMIT = 6;
+const SMALL_CACHE_LIMIT = 3;
 const detailsCache = new Map<string, Promise<PlayerSeasonDetails>>();
 const flashCache = new Map<string, Promise<PlayerFlashSummary[]>>();
 const duelInsightsCache = new Map<string, Promise<DuelInsightsModel>>();
 const teamComparisonCache = new Map<string, Promise<TeamComparisonModel>>();
-
-function touchLimitedCache<T>(cache: Map<string, Promise<T>>, key: string, value: Promise<T>, limit: number): Promise<T> {
-  cache.delete(key);
-  cache.set(key, value);
-  while (cache.size > limit) {
-    const oldest = cache.keys().next().value;
-    if (oldest == null) break;
-    cache.delete(oldest);
-  }
-  value.catch(() => cache.delete(key));
-  return value;
-}
 
 /** 选中选手的逐场洞察：只返回小结果，不把全量 DemoPackage 长期放进 React state。 */
 export function getPlayerSeasonDetails(entries: StudioDemoEntry[], steamIds: string[], identity?: IdentityOptions): Promise<PlayerSeasonDetails> {
@@ -344,7 +247,7 @@ export function getDuelInsights(entries: StudioDemoEntry[], identity?: IdentityO
     void writePersistedValue(key, model);
     return model;
   })();
-  return touchLimitedCache(duelInsightsCache, key, loading, DETAILS_CACHE_LIMIT);
+  return touchLimitedCache(duelInsightsCache, key, loading, SMALL_CACHE_LIMIT);
 }
 
 /** 道具页多人 Flash Value：单次扫描所有 demo，避免每个选手重复扫全量 events。 */
@@ -365,33 +268,26 @@ export function getPlayerFlashSummaries(
     void writePersistedValue(key, summaries);
     return summaries;
   })();
-  return touchLimitedCache(flashCache, key, loading, DETAILS_CACHE_LIMIT);
+  return touchLimitedCache(flashCache, key, loading, SMALL_CACHE_LIMIT);
 }
 
-let summaryKey = "";
-let summaryPromise: Promise<SeasonSummary> | null = null;
-let tournamentKey = "";
-let tournamentPromise: Promise<TournamentInsights | null> | null = null;
+const tournamentInsightsCache = new Map<string, Promise<TournamentInsights | null>>();
 
 /** 赛事/经济页面只需要 TournamentInsights，不必冷启动时构建 cohort + profiles + RR/PRISM。 */
 export function getTournamentInsights(entries: StudioDemoEntry[], identity?: IdentityOptions): Promise<TournamentInsights | null> {
   const key = `${keyOf(entries, identity?.version)}:tournament`;
-  if (tournamentPromise && key === tournamentKey) return tournamentPromise;
-  tournamentKey = key;
-  tournamentPromise = (async () => {
-    const persisted = await readPersistedTournamentInsights(key);
+  const cached = tournamentInsightsCache.get(key);
+  if (cached) return cached;
+  const loading = (async () => {
+    const persisted = await readPersistedValue<TournamentInsights | null>(key);
     if (persisted !== undefined) return persisted;
     const demos = await loadDemosWithRenames(entries, identity?.teamRenames);
     const insights = demos.length > 0 ? buildTournamentInsights(demos) : null;
     clearPkgCache();
-    void writePersistedTournamentInsights(key, insights);
+    void writePersistedValue(key, insights);
     return insights;
   })();
-  tournamentPromise.catch(() => {
-    tournamentKey = "";
-    tournamentPromise = null;
-  });
-  return tournamentPromise;
+  return touchLimitedCache(tournamentInsightsCache, key, loading, SMALL_CACHE_LIMIT);
 }
 
 export async function getTeamComparison(entries: StudioDemoEntry[], identity?: IdentityOptions): Promise<TeamComparisonModel> {
@@ -407,18 +303,20 @@ export async function getTeamComparison(entries: StudioDemoEntry[], identity?: I
     void writePersistedValue(key, model);
     return model;
   })();
-  return touchLimitedCache(teamComparisonCache, key, loading, DETAILS_CACHE_LIMIT);
+  return touchLimitedCache(teamComparisonCache, key, loading, SMALL_CACHE_LIMIT);
 }
+
+const seasonSummaryCache = new Map<string, Promise<SeasonSummary>>();
 
 /** 聚合摘要：优先持久缓存命中（不触碰 ZIP），未命中才全量解析并回写。
  *  传入 identity 时将其并入缓存 key，identityMap 作为归并参数传给 buildSeasonCohort。
  *  teamRenames 在加载阶段应用，同名队伍自动合并。聚合后释放 pkgCache 降低峰值内存。 */
 export function getSeasonSummary(entries: StudioDemoEntry[], identity?: IdentityOptions): Promise<SeasonSummary> {
   const key = keyOf(entries, identity?.version);
-  if (summaryPromise && key === summaryKey) return summaryPromise;
-  summaryKey = key;
-  summaryPromise = (async () => {
-    const persisted = await readPersisted(key);
+  const cached = seasonSummaryCache.get(key);
+  if (cached) return cached;
+  const loading = (async () => {
+    const persisted = await readPersistedValue<SeasonSummary>(key);
     if (persisted) return persisted;
     const demos = await loadDemosWithRenames(entries, identity?.teamRenames);
     const cohortOpts = identity?.version ? { identityMap: identity.map } : {};
@@ -431,12 +329,8 @@ export function getSeasonSummary(entries: StudioDemoEntry[], identity?: Identity
     };
     // 聚合完成，释放 DemoPackage 缓存降低峰值内存；后续读取从 derived 表重建
     clearPkgCache();
-    void writePersisted(key, summary);
+    void writePersistedValue(key, summary);
     return summary;
   })();
-  summaryPromise.catch(() => {
-    summaryKey = "";
-    summaryPromise = null;
-  });
-  return summaryPromise;
+  return touchLimitedCache(seasonSummaryCache, key, loading, SMALL_CACHE_LIMIT);
 }
