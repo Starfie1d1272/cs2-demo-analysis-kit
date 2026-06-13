@@ -98,7 +98,7 @@ async function readPersistedValue<T>(key: string): Promise<T | undefined> {
     const record = await txRequest(
       db.transaction(CACHE_STORE, "readonly").objectStore(CACHE_STORE).get(key) as IDBRequest<PersistedValue<T> | undefined>
     );
-    if (record && "value" in record) {
+    if (record) {
       await touchMeta(db, key);
       return record.value;
     }
@@ -218,7 +218,7 @@ export function getPlayerSeasonDetails(entries: StudioDemoEntry[], steamIds: str
   const loading = (async () => {
     const persisted = await readPersistedValue<PlayerSeasonDetails>(key);
     if (persisted) return persisted;
-    const demos = await loadDemosWithRenames(entries, identity?.teamRenames);
+    const demos = await getSeasonDemos(entries, identity);
     const visibilityFor = await loadTriLookup(demos.map((demo) => demo.pkg.match.mapName));
     const details = {
       insights: buildPlayerSeasonInsights(demos, steamIds),
@@ -240,7 +240,7 @@ export function getDuelInsights(entries: StudioDemoEntry[], identity?: IdentityO
   const loading = (async () => {
     const persisted = await readPersistedValue<DuelInsightsModel>(key);
     if (persisted) return persisted;
-    const demos = await loadDemosWithRenames(entries, identity?.teamRenames);
+    const demos = await getSeasonDemos(entries, identity);
     const visibilityFor = await loadTriLookup(demos.map((demo) => demo.pkg.match.mapName));
     const model = buildDuelInsights(demos, { visibilityFor });
     clearPkgCache();
@@ -262,7 +262,7 @@ export function getPlayerFlashSummaries(
   const loading = (async () => {
     const persisted = await readPersistedValue<PlayerFlashSummary[]>(key);
     if (persisted) return persisted;
-    const demos = await loadDemosWithRenames(entries, identity?.teamRenames);
+    const demos = await getSeasonDemos(entries, identity);
     const summaries = buildPlayerFlashSummaries(demos, players);
     clearPkgCache();
     void writePersistedValue(key, summaries);
@@ -281,7 +281,7 @@ export function getTournamentInsights(entries: StudioDemoEntry[], identity?: Ide
   const loading = (async () => {
     const persisted = await readPersistedValue<TournamentInsights | null>(key);
     if (persisted !== undefined) return persisted;
-    const demos = await loadDemosWithRenames(entries, identity?.teamRenames);
+    const demos = await getSeasonDemos(entries, identity);
     const insights = demos.length > 0 ? buildTournamentInsights(demos) : null;
     clearPkgCache();
     void writePersistedValue(key, insights);
@@ -297,7 +297,7 @@ export async function getTeamComparison(entries: StudioDemoEntry[], identity?: I
   const loading = (async () => {
     const persisted = await readPersistedValue<TeamComparisonModel>(key);
     if (persisted) return persisted;
-    const demos = await loadDemosWithRenames(entries, identity?.teamRenames);
+    const demos = await getSeasonDemos(entries, identity);
     const model = buildTeamComparison(demos);
     clearPkgCache();
     void writePersistedValue(key, model);
@@ -318,7 +318,7 @@ export function getSeasonSummary(entries: StudioDemoEntry[], identity?: Identity
   const loading = (async () => {
     const persisted = await readPersistedValue<SeasonSummary>(key);
     if (persisted) return persisted;
-    const demos = await loadDemosWithRenames(entries, identity?.teamRenames);
+    const demos = await getSeasonDemos(entries, identity);
     const cohortOpts = identity?.version ? { identityMap: identity.map } : {};
     const bundle = buildSeasonCohort(demos, cohortOpts);
     const summary: SeasonSummary = {

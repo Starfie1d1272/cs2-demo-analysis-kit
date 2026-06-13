@@ -61,14 +61,19 @@ export function firstKillMap(pkg: DemoPackage): Map<number, DemoPackage["kills"]
   return firstKillByRound;
 }
 
-export function isActiveRoundTick(pkg: DemoPackage, roundNumber: number, tick: number): boolean {
-  const roundRow = pkg.rounds.find((round) => round.roundNumber === roundNumber);
+export function isActiveRoundTick(
+  roundsByNumber: Map<number, DemoPackage["rounds"][number]>,
+  roundNumber: number,
+  tick: number
+): boolean {
+  const roundRow = roundsByNumber.get(roundNumber);
   return Boolean(roundRow && tick >= roundRow.freezeEndTick && tick <= roundRow.endTick);
 }
 
 export function activeDamages(pkg: DemoPackage): DemoPackage["damages"] {
   if (pkg.rounds.length === 0) return pkg.damages;
-  return pkg.damages.filter((damage) => isActiveRoundTick(pkg, damage.roundNumber, damage.tick));
+  const roundsByNumber = new Map(pkg.rounds.map((r) => [r.roundNumber, r]));
+  return pkg.damages.filter((damage) => isActiveRoundTick(roundsByNumber, damage.roundNumber, damage.tick));
 }
 
 export function nameForPlayerIndex(pkg: DemoPackage, playerIndex: number | null | undefined): string | null {

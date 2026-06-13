@@ -1,4 +1,5 @@
 import type { PlayerIdentityMap } from "@cs2dak/cohort";
+import { createDbOpener, txRequest } from "./idb";
 
 /**
  * 选手身份归并存储。
@@ -44,34 +45,17 @@ export interface TeamRenameGroup {
   matchCount: number;
 }
 
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VER);
-    req.onupgradeneeded = () => {
-      if (!req.result.objectStoreNames.contains(STATE_STORE))
-        req.result.createObjectStore(STATE_STORE);
-      if (!req.result.objectStoreNames.contains(AUDIT_STORE))
-        req.result.createObjectStore(AUDIT_STORE, { keyPath: "id" });
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error ?? new Error("无法打开 identity 库"));
-  });
-}
-
-function idbReq<T>(req: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
+const openDb = createDbOpener(DB_NAME, DB_VER, (db) => {
+  if (!db.objectStoreNames.contains(STATE_STORE)) db.createObjectStore(STATE_STORE);
+  if (!db.objectStoreNames.contains(AUDIT_STORE)) db.createObjectStore(AUDIT_STORE, { keyPath: "id" });
+});
 
 export async function loadIdentityState(): Promise<IdentityStoreState> {
   try {
     const db = await openDb();
-    const record = await idbReq(
+    const record = await txRequest(
       db.transaction(STATE_STORE, "readonly").objectStore(STATE_STORE).get(STATE_KEY) as IDBRequest<IdentityStoreState | undefined>
     );
-    db.close();
     return record ?? EMPTY_STATE;
   } catch {
     return EMPTY_STATE;
@@ -85,7 +69,7 @@ async function commitChange(
 ): Promise<IdentityStoreState> {
   const db = await openDb();
   // 写新状态
-  await idbReq(db.transaction(STATE_STORE, "readwrite").objectStore(STATE_STORE).put(next, STATE_KEY));
+  await txRequest(db.transaction(STATE_STORE, "readwrite").objectStore(STATE_STORE).put(next, STATE_KEY));
   // 写审计（保存变更前快照）
   const entry: AuditEntry = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -94,15 +78,14 @@ async function commitChange(
     snapshot: current
   };
   const auditStore = db.transaction(AUDIT_STORE, "readwrite").objectStore(AUDIT_STORE);
-  await idbReq(auditStore.put(entry));
+  await txRequest(auditStore.put(entry));
   // 清理超出上限的旧条目
-  const all = await idbReq(db.transaction(AUDIT_STORE, "readonly").objectStore(AUDIT_STORE).getAll() as IDBRequest<AuditEntry[]>);
+  const all = await txRequest(db.transaction(AUDIT_STORE, "readonly").objectStore(AUDIT_STORE).getAll() as IDBRequest<AuditEntry[]>);
   if (all.length > MAX_AUDIT) {
     const stale = all.sort((a, b) => a.timestamp - b.timestamp).slice(0, all.length - MAX_AUDIT);
     const pruneStore = db.transaction(AUDIT_STORE, "readwrite").objectStore(AUDIT_STORE);
-    for (const e of stale) await idbReq(pruneStore.delete(e.id));
+    for (const e of stale) await txRequest(pruneStore.delete(e.id));
   }
-  db.close();
   return next;
 }
 
@@ -255,14 +238,13 @@ export async function setTeamRename(
 export async function undoLastAction(current: IdentityStoreState): Promise<IdentityStoreState | null> {
   try {
     const db = await openDb();
-    const all = await idbReq(
+    const all = await txRequest(
       db.transaction(AUDIT_STORE, "readonly").objectStore(AUDIT_STORE).getAll() as IDBRequest<AuditEntry[]>
     );
-    if (all.length === 0) { db.close(); return null; }
+    if (all.length === 0) return null;
     const latest = all.sort((a, b) => b.timestamp - a.timestamp)[0];
-    await idbReq(db.transaction(STATE_STORE, "readwrite").objectStore(STATE_STORE).put(latest.snapshot, STATE_KEY));
-    await idbReq(db.transaction(AUDIT_STORE, "readwrite").objectStore(AUDIT_STORE).delete(latest.id));
-    db.close();
+    await txRequest(db.transaction(STATE_STORE, "readwrite").objectStore(STATE_STORE).put(latest.snapshot, STATE_KEY));
+    await txRequest(db.transaction(AUDIT_STORE, "readwrite").objectStore(AUDIT_STORE).delete(latest.id));
     return latest.snapshot;
   } catch {
     return null;
@@ -272,10 +254,9 @@ export async function undoLastAction(current: IdentityStoreState): Promise<Ident
 export async function listAuditEntries(): Promise<AuditEntry[]> {
   try {
     const db = await openDb();
-    const all = await idbReq(
+    const all = await txRequest(
       db.transaction(AUDIT_STORE, "readonly").objectStore(AUDIT_STORE).getAll() as IDBRequest<AuditEntry[]>
     );
-    db.close();
     return all.sort((a, b) => b.timestamp - a.timestamp);
   } catch {
     return [];

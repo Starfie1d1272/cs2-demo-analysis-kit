@@ -13,13 +13,9 @@ const BVH_CACHE_LIMIT = 4;
 const bvhCache = new Map<string, Promise<TriangleBvh | null>>();
 const TRI_DB = "dak-studio-tri-cache";
 const TRI_STORE = "tri";
-const TRI_CACHE_VERSION = 1;
-
 interface TriRecord {
   mapName: string;
-  version: number;
   touchedAt: number;
-  byteLength: number;
   buffer: ArrayBuffer;
 }
 
@@ -39,7 +35,7 @@ async function readTriBuffer(mapName: string): Promise<ArrayBuffer | null> {
     const record = await txRequest(
       db.transaction(TRI_STORE, "readonly").objectStore(TRI_STORE).get(mapName) as IDBRequest<TriRecord | undefined>
     );
-    if (!record || record.version !== TRI_CACHE_VERSION || !isValidTriBuffer(record.buffer)) return null;
+    if (!record || !isValidTriBuffer(record.buffer)) return null;
     void txRequest(
       db.transaction(TRI_STORE, "readwrite").objectStore(TRI_STORE).put({ ...record, touchedAt: Date.now() } satisfies TriRecord)
     );
@@ -56,9 +52,7 @@ async function writeTriBuffer(mapName: string, buffer: ArrayBuffer): Promise<voi
     await txRequest(
       db.transaction(TRI_STORE, "readwrite").objectStore(TRI_STORE).put({
         mapName,
-        version: TRI_CACHE_VERSION,
         touchedAt: Date.now(),
-        byteLength: buffer.byteLength,
         buffer
       } satisfies TriRecord)
     );
