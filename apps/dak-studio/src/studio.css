@@ -2978,3 +2978,247 @@ td.stu-heat-cell.stu-heat-neutral {
 .stu-coach-series-item strong {
   color: var(--stu-text);
 }
+
+/* ── 对枪网格紧凑卡片（DuelView） ── */
+
+.stu-duel-weaponbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.stu-duel-weaponbar button {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-panel);
+  color: var(--dak-fg-mid);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  transition: border-color 120ms, color 120ms;
+}
+
+.stu-duel-weaponbar button:hover {
+  border-color: var(--dak-border-hi);
+  color: var(--dak-fg);
+}
+
+.stu-duel-weaponbar button.active {
+  border-color: var(--dak-accent);
+  color: var(--dak-fg);
+  background: var(--dak-accent-soft);
+}
+
+.stu-duel-weaponbar b {
+  color: var(--dak-fg-dim);
+  font-family: var(--dak-mono);
+  font-size: 11px;
+}
+
+.stu-duel-weaponbar button.active b {
+  color: var(--dak-accent);
+}
+
+/* 网格容器 */
+.stu-duel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+/* 紧凑卡片 */
+.stu-duel-grid-card {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 10px 10px 8px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-panel);
+  cursor: pointer;
+  transition: border-color 120ms, background 120ms;
+}
+
+.stu-duel-grid-card:hover {
+  border-color: var(--dak-border-hi);
+  background: var(--dak-panel-hi);
+}
+
+.stu-duel-grid-card:focus-visible {
+  outline: 2px solid var(--dak-accent);
+  outline-offset: 2px;
+}
+
+/* 分类标签 */
+.stu-duel-grid-badge {
+  display: inline-block;
+  width: fit-content;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border: 1px solid currentColor;
+}
+
+.stu-duel-grid-badge-contested_duel { color: #3ddc97; background: rgba(61, 220, 151, 0.10); }
+.stu-duel-grid-badge-suppressed_kill { color: #38bdf8; background: rgba(56, 189, 248, 0.10); }
+.stu-duel-grid-badge-caught_off_guard { color: #f59e0b; background: rgba(245, 158, 11, 0.10); }
+
+/* 击杀者 → 受害者 */
+.stu-duel-grid-info {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+
+.stu-duel-grid-killer {
+  color: var(--dak-fg);
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stu-duel-grid-arrow {
+  flex-shrink: 0;
+  color: var(--dak-fg-dim);
+  font-style: normal;
+  font-size: 11px;
+}
+
+.stu-duel-grid-victim {
+  color: var(--dak-fg-mid);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 武器 · 地图 R 回合 */
+.stu-duel-grid-meta {
+  color: var(--dak-fg-dim);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stu-duel-grid-ttk {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.stu-duel-grid-ttk-track {
+  flex: 1;
+  min-width: 0;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--dak-panel-hi);
+  overflow: hidden;
+}
+
+.stu-duel-grid-ttk-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 200ms ease;
+}
+
+.stu-duel-grid-ttk-fill.stu-duel-grid-ttk-ok { background: var(--dak-ok); }
+.stu-duel-grid-ttk-fill.stu-duel-grid-ttk-warn { background: var(--dak-warn); }
+.stu-duel-grid-ttk-fill.stu-duel-grid-ttk-danger { background: var(--dak-danger); }
+.stu-duel-grid-ttk-fill.stu-duel-grid-ttk-none { background: var(--dak-border); }
+
+.stu-duel-grid-ttk-label {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.stu-duel-grid-ttk-ok.stu-duel-grid-ttk-label { color: var(--dak-ok); }
+.stu-duel-grid-ttk-warn.stu-duel-grid-ttk-label { color: var(--dak-warn); }
+.stu-duel-grid-ttk-danger.stu-duel-grid-ttk-label { color: var(--dak-danger); }
+
+/* 分页 */
+.stu-pagination {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+}
+
+.stu-pagination button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0 6px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-panel);
+  color: var(--dak-fg-mid);
+  cursor: pointer;
+  font: inherit;
+  font-family: var(--dak-mono);
+  font-size: 12px;
+}
+
+.stu-pagination button:hover:not(:disabled) {
+  border-color: var(--dak-border-hi);
+  color: var(--dak-fg);
+}
+
+.stu-pagination button.active {
+  border-color: var(--dak-accent);
+  color: var(--dak-accent);
+  background: var(--dak-accent-soft);
+}
+
+.stu-pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.stu-pagination-info {
+  margin-left: auto;
+  color: var(--dak-fg-dim);
+  font-family: var(--dak-mono);
+  font-size: 11px;
+}
+
+/* 首杀 tab 侧栏小卡片 */
+.stu-duel-card-compact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-panel);
+  font-size: 12px;
+}
+
+.stu-duel-card-compact small:first-of-type {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

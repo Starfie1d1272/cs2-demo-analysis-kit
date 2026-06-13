@@ -9,13 +9,15 @@ import { getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "../lib/li
 import { loadTriLookup } from "../lib/tri";
 
 type DuelTab = "records" | "opening" | "mechanics";
-type EvidenceFilter = "contested_duel" | "suppressed_kill" | "caught_off_guard" | "all";
+type EvidenceFilter = "contested_duel" | "suppressed_kill" | "caught_off_guard" | "low_hp" | "third_party" | "all";
 
 const EVIDENCE_FILTERS: Array<{ key: EvidenceFilter; label: string; description: string }> = [
   { key: "contested_duel", label: "对枪胜出", description: "受害者在 ±1.5s 内还手，属于真实对枪样本" },
   { key: "suppressed_kill", label: "先手压制", description: "受害者面向击杀者但未开枪" },
   { key: "caught_off_guard", label: "侧背身", description: "受害者未面向、转点或跑动中被击杀" },
-  { key: "all", label: "全部", description: "保留完整证据队列" }
+  { key: "low_hp", label: "低血量", description: "victimHealthBefore < 80，保留证据但不进 full HP TTK" },
+  { key: "third_party", label: "补枪", description: "第三方在 ±2s 内造成关键伤害，TTK 不计入分布" },
+  { key: "all", label: "全部", description: "保留全部证据队列" }
 ];
 
 export interface DuelViewProps {
@@ -253,12 +255,232 @@ function PlayerMechanicsGrid({
   );
 }
 
+// ── 武器分类映射（用于筛选栏） ──
+type WeaponCategory = "步枪" | "狙击" | "手枪" | "冲锋枪" | "霰弹机枪";
+
+const WEAPON_CATS: Record<string, WeaponCategory> = {
+  // 步枪（从 WEAPON_DISPLAY_NAMES 的 key 看）
+  ak47: "步枪", m4a4: "步枪", m4a1: "步枪", m4a1_silencer: "步枪",
+  aug: "步枪", sg556: "步枪", sg553: "步枪",
+  famas: "步枪", galilar: "步枪", galil: "步枪",
+  // 狙击
+  awp: "狙击", ssg08: "狙击", scar20: "狙击", g3sg1: "狙击",
+  // 手枪
+  deagle: "手枪", deserteagle: "手枪", revolver: "手枪",
+  glock: "手枪", usp_silencer: "手枪", usp: "手枪",
+  hkp2000: "手枪", p2000: "手枪", p250: "手枪",
+  fiveseven: "手枪", tec9: "手枪", cz75a: "手枪", cz75: "手枪",
+  elite: "手枪",
+  // 冲锋枪
+  mp9: "冲锋枪", mp7: "冲锋枪", mp5sd: "冲锋枪",
+  ump45: "冲锋枪", p90: "冲锋枪", bizon: "冲锋枪", mac10: "冲锋枪",
+  // 霰弹/机枪
+  nova: "霰弹机枪", xm1014: "霰弹机枪", mag7: "霰弹机枪",
+  sawedoff: "霰弹机枪", m249: "霰弹机枪", negev: "霰弹机枪"
+};
+
+function weaponCat(name: string): WeaponCategory | "其他" {
+  return WEAPON_CATS[name.toLowerCase()] ?? "其他";
+}
+
+const CAT_KEYS: Array<WeaponCategory | "其他" | "全部"> = ["步枪", "狙击", "手枪", "冲锋枪", "霰弹机枪", "其他", "全部"];
+const CAT_LABEL: Record<WeaponCategory | "其他" | "全部", string> = {
+  步枪: "步枪", 狙击: "狙击", 手枪: "手枪", 冲锋枪: "冲锋枪", 霰弹机枪: "霰弹机枪", 其他: "其他", 全部: "全部"
+};
+
 /** 统一 TTK 列标签：有合法 TTK 显示数值，低血量 / 补枪分别标注。 */
 function ttkLabel(row: DuelFinderRow): string {
   if (row.ttkMs != null) return `${row.ttkMs}ms`;
   if (row.hpBucket === "low_hp") return "低血量";
   if (row.thirdParty) return "补枪";
   return "—";
+}
+
+function EvidenceCards({
+  rows,
+  entryByMatchId,
+  onOpenMatch,
+  compact = false
+}: {
+  rows: DuelInsightsModel["duelRows"];
+  entryByMatchId: Map<string, StudioDemoEntry>;
+  onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  compact?: boolean;
+}) {
+  const [filter, setFilter] = useState<EvidenceFilter>(compact ? "all" : "contested_duel");
+  const [weaponCatFilter, setWeaponCatFilter] = useState<WeaponCategory | "其他" | "全部">("全部");
+  const [page, setPage] = useState(0);
+  const perPage = 48;
+
+  // 分类计数
+  const counts = useMemo(() => {
+    const next = new Map<EvidenceFilter | WeaponCategory | "其他" | "全部", number>();
+    for (const f of EVIDENCE_FILTERS) next.set(f.key, 0);
+    for (const cat of CAT_KEYS) next.set(cat, 0);
+    for (const row of rows) {
+      const c = row.classification;
+      next.set(c, (next.get(c) ?? 0) + 1);
+      if (row.hpBucket === "low_hp") next.set("low_hp", (next.get("low_hp") ?? 0) + 1);
+      if (row.thirdParty) next.set("third_party", (next.get("third_party") ?? 0) + 1);
+      const wc = weaponCat(row.weapon);
+      next.set(wc, (next.get(wc) ?? 0) + 1);
+      next.set("全部", (next.get("全部") ?? 0) + 1);
+      next.set("all", (next.get("all") ?? 0) + 1);
+    }
+    return next;
+  }, [rows]);
+
+  // 分类 + 武器 + 排序
+  const activeRows = useMemo(() => {
+    let filtered = rows;
+    if (filter === "low_hp") filtered = filtered.filter((r) => r.hpBucket === "low_hp");
+    else if (filter === "third_party") filtered = filtered.filter((r) => r.thirdParty);
+    else if (filter !== "all") filtered = filtered.filter((r) => r.classification === filter);
+    if (weaponCatFilter !== "全部") filtered = filtered.filter((r) => weaponCat(r.weapon) === weaponCatFilter);
+    return [...filtered].sort((a, b) => {
+      const orderA = a.ttkMs != null ? 0 : a.hpBucket === "low_hp" ? 1 : 2;
+      const orderB = b.ttkMs != null ? 0 : b.hpBucket === "low_hp" ? 1 : 2;
+      return orderA - orderB || a.roundNumber - b.roundNumber || a.tick - b.tick;
+    });
+  }, [rows, filter, weaponCatFilter]);
+
+  const totalPages = Math.ceil(activeRows.length / perPage);
+  const safePage = Math.min(page, Math.max(0, totalPages - 1));
+  const pageRows = activeRows.slice(safePage * perPage, (safePage + 1) * perPage);
+
+  function switchFilter(next: EvidenceFilter) {
+    setFilter(next);
+    setPage(0);
+  }
+  function switchWeapon(next: WeaponCategory | "其他" | "全部") {
+    setWeaponCatFilter((prev) => (prev === next ? "全部" : next));
+    setPage(0);
+  }
+
+  if (compact) {
+    // 首杀 tab 侧栏简单列表
+    return (
+      <section className="stu-duel-evidence-wrap compact">
+        <div className="stu-duel-evidence compact">
+          {rows.slice(0, 10).map((row) => {
+            const entry = entryByMatchId.get(row.matchId);
+            return (
+              <article key={row.id} className="stu-duel-card-compact">
+                <span className={`stu-duel-type stu-duel-type-${row.classification}`}>
+                  {CLASS_TONE[row.classification] ?? duelClassificationLabel(row.classification)}
+                </span>
+                <small>{row.killerName} → {row.victimName}</small>
+                <small className="stu-dim">{row.mapName} R{row.roundNumber}</small>
+                {entry && (
+                  <button type="button" className="stu-button-sm" onClick={() => onOpenMatch(entry.id, { roundNumber: row.roundNumber, tick: row.tick })}>
+                    回放
+                  </button>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="stu-duel-evidence-wrap">
+      {rows.length === 0 ? (
+        <div className="stu-card"><p className="stu-muted">当前范围没有可识别对枪。</p></div>
+      ) : (
+        <>
+          {/* 分类筛选栏 */}
+          <div className="stu-duel-evidence-toolbar" role="tablist" aria-label="证据分类">
+            {EVIDENCE_FILTERS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={filter === item.key ? "active" : ""}
+                onClick={() => switchFilter(item.key)}
+              >
+                <span>{item.label}</span>
+                <b>{counts.get(item.key) ?? 0}</b>
+                <small className="stu-duel-tooltip" role="tooltip">{item.description}</small>
+              </button>
+            ))}
+          </div>
+          {/* 武器分类筛选栏 */}
+          <div className="stu-duel-weaponbar" role="tablist" aria-label="武器分类">
+            {CAT_KEYS.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                className={weaponCatFilter === cat ? "active" : ""}
+                onClick={() => switchWeapon(cat)}
+              >
+                <span>{CAT_LABEL[cat]}</span>
+                <b>{counts.get(cat) ?? 0}</b>
+              </button>
+            ))}
+          </div>
+          {/* 网格卡片 */}
+          <div className="stu-duel-grid">
+            {pageRows.map((row) => {
+              const entry = entryByMatchId.get(row.matchId);
+              return (
+                <article
+                  key={row.id}
+                  className="stu-duel-grid-card"
+                  role={entry ? "button" : undefined}
+                  tabIndex={entry ? 0 : undefined}
+                  onClick={() => entry && onOpenMatch(entry.id, { roundNumber: row.roundNumber, tick: row.tick })}
+                  onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && entry) { e.preventDefault(); onOpenMatch(entry.id, { roundNumber: row.roundNumber, tick: row.tick }); } }}
+                >
+                  <span className={`stu-duel-grid-badge stu-duel-grid-badge-${row.classification}`}>
+                    {CLASS_TONE[row.classification] ?? duelClassificationLabel(row.classification)}
+                  </span>
+                  <div className="stu-duel-grid-info">
+                    <b className="stu-duel-grid-killer">{row.killerName}</b>
+                    <i className="stu-duel-grid-arrow">→</i>
+                    <span className="stu-duel-grid-victim">{row.victimName}</span>
+                  </div>
+                  <small className="stu-duel-grid-meta">
+                    {displayWeaponName(row.weapon)} · {row.mapName.replace(/^de_/, "")} R{row.roundNumber}
+                  </small>
+                  <div className="stu-duel-grid-ttk">
+                    <div className="stu-duel-grid-ttk-track">
+                      <div className={`stu-duel-grid-ttk-fill stu-duel-grid-ttk-${ttkTone(row) ?? "none"}`}
+                        style={{ width: ttkBarWidth(row) }} />
+                    </div>
+                    <span className={`stu-duel-grid-ttk-label stu-duel-grid-ttk-${ttkTone(row) ?? "none"}`}>
+                      {ttkLabel(row)}
+                    </span>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          {/* 分页 */}
+          {totalPages > 1 && (
+            <nav className="stu-pagination" aria-label="分页">
+              <button type="button" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>‹</button>
+              {Array.from({ length: Math.min(totalPages, 8) }, (_, i) => {
+                const start = Math.max(0, Math.min(safePage - 3, totalPages - 8));
+                return (
+                  <button
+                    key={start + i}
+                    type="button"
+                    className={safePage === start + i ? "active" : ""}
+                    onClick={() => setPage(start + i)}
+                  >
+                    {start + i + 1}
+                  </button>
+                );
+              })}
+              <button type="button" disabled={safePage >= totalPages - 1} onClick={() => setPage(safePage + 1)}>›</button>
+              <span className="stu-pagination-info">{activeRows.length} 条 · {safePage + 1}/{totalPages} 页</span>
+            </nav>
+          )}
+        </>
+      )}
+    </section>
+  );
 }
 
 /** TTK 值的展示颜色分类。 */
@@ -269,6 +491,11 @@ function ttkTone(row: DuelFinderRow): "ok" | "warn" | "danger" | undefined {
   return undefined;
 }
 
+/** TTK 色条宽度（满宽度对应 1000ms，超过或补枪/低血量固定 100%）。 */
+function ttkBarWidth(row: DuelFinderRow): string {
+  if (row.ttkMs == null) return "100%";
+  return `${Math.min(100, Math.round(row.ttkMs / 1000 * 100))}%`;
+}
 function MetricPill({ label, value, tone }: { label: string; value: string; tone?: "ok" | "warn" | "danger" }) {
   return (
     <span className={`stu-duel-pill${tone ? ` stu-duel-pill-${tone}` : ""}`}>
@@ -358,95 +585,6 @@ function OpeningDuelMap({
         </div>
       </div>
       <EvidenceCards rows={rows} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} compact />
-    </section>
-  );
-}
-
-function EvidenceCards({
-  rows,
-  entryByMatchId,
-  onOpenMatch,
-  compact = false
-}: {
-  rows: DuelInsightsModel["duelRows"];
-  entryByMatchId: Map<string, StudioDemoEntry>;
-  onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
-  compact?: boolean;
-}) {
-  const [filter, setFilter] = useState<EvidenceFilter>(compact ? "all" : "contested_duel");
-  const counts = useMemo(() => {
-    const next = new Map<EvidenceFilter, number>(EVIDENCE_FILTERS.map((item) => [item.key, 0]));
-    for (const row of rows) {
-      next.set(row.classification, (next.get(row.classification) ?? 0) + 1);
-      next.set("all", (next.get("all") ?? 0) + 1);
-    }
-    return next;
-  }, [rows]);
-  const activeRows = useMemo(
-    () => {
-      const rows_ = filter === "all"
-        ? rows
-        : rows.filter((row) => row.classification === filter);
-      // 排序：有合法 TTK 的在前 → 低血量 → 补枪
-      return [...rows_].sort((a, b) => {
-        const orderA = a.ttkMs != null ? 0 : a.hpBucket === "low_hp" ? 1 : 2;
-        const orderB = b.ttkMs != null ? 0 : b.hpBucket === "low_hp" ? 1 : 2;
-        return orderA - orderB || a.roundNumber - b.roundNumber || a.tick - b.tick;
-      });
-    },
-    [filter, rows]
-  );
-  return (
-    <section className={compact ? "stu-duel-evidence-wrap compact" : "stu-duel-evidence-wrap"}>
-      {rows.length === 0 ? (
-        <div className="stu-card"><p className="stu-muted">当前范围没有可识别对枪。</p></div>
-      ) : (
-        <>
-          {!compact && (
-            <div className="stu-duel-evidence-toolbar" role="tablist" aria-label="证据分类">
-              {EVIDENCE_FILTERS.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  className={filter === item.key ? "active" : ""}
-                  onClick={() => setFilter(item.key)}
-                >
-                  <span>{item.label}</span>
-                  <b>{counts.get(item.key) ?? 0}</b>
-                  <small className="stu-duel-tooltip" role="tooltip">{item.description}</small>
-                </button>
-              ))}
-            </div>
-          )}
-          <div className={compact ? "stu-duel-evidence compact" : "stu-duel-evidence-list"}>
-            {activeRows.slice(0, compact ? 10 : 80).map((row) => {
-              const entry = entryByMatchId.get(row.matchId);
-              const explanation = explainDuelRow(row);
-              return (
-                <article key={row.id} className="stu-duel-evidence-card">
-                  <div className="stu-duel-evidence-main">
-                    <span className={`stu-duel-type stu-duel-type-${row.classification}`}>
-                      {CLASS_TONE[row.classification] ?? duelClassificationLabel(row.classification)}
-                      <small className="stu-duel-tooltip" role="tooltip">{explanation}</small>
-                    </span>
-                    <h3>{row.killerName} <small>击败</small> {row.victimName}</h3>
-                    <p>{row.mapName} · R{row.roundNumber} · {displayWeaponName(row.weapon)}</p>
-                  </div>
-                  <div className="stu-duel-evidence-meta">
-                    <MetricPill label="TTK" value={ttkLabel(row)} tone={ttkTone(row)} />
-                    <MetricPill label="自己血量" value={row.killerHealthBefore == null ? "—" : `${row.killerHealthBefore} HP`} />
-                  </div>
-                  {entry && (
-                    <button type="button" className="stu-button-sm" onClick={() => onOpenMatch(entry.id, { roundNumber: row.roundNumber, tick: row.tick })}>
-                      看回放
-                    </button>
-                  )}
-                </article>
-              );
-            })}
-          </div>
-        </>
-      )}
     </section>
   );
 }
