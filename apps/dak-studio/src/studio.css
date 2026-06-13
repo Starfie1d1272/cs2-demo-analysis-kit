@@ -2959,6 +2959,56 @@ td.stu-heat-cell.stu-heat-neutral {
   }
 }
 
+/* ── Lineup 道具库 ──────────────────────────────────────────── */
+
+.stu-lineup-layout {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.stu-lineup-layout > .stu-card {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 1000px) {
+  .stu-lineup-layout {
+    flex-direction: column;
+  }
+}
+
+/* SVG 交互元素 */
+.stu-lineup-g {
+  cursor: pointer;
+  outline: none;
+  transition: opacity 0.15s;
+}
+
+.stu-lineup-g:focus-visible {
+  outline: 2px solid var(--dak-accent, #58a6ff);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* 双向 hover：表格行 */
+.stu-lineup-row-hovered {
+  background: var(--dak-accent-soft, rgba(88, 166, 255, 0.08));
+  outline: 1px solid var(--dak-accent, #58a6ff);
+  outline-offset: -1px;
+}
+
+/* 可点击排序的表头 */
+.stu-col-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.stu-col-sortable:hover {
+  color: var(--dak-fg, #e6edf3);
+}
+
 .stu-coach-team-picker {
   display: grid;
   gap: 5px;
