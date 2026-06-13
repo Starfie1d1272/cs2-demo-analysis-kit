@@ -79,7 +79,7 @@ jobs:
         run: |
           VERSION="$(node -p "require('./package.json').version")"
           cd python/dist
-          7z a -mx=9 "dak-studio-windows-${VERSION}.zip" dak-studio
+          7z a -mx=5 "dak-studio-windows-${VERSION}.zip" dak-studio
 
       - uses: actions/upload-artifact@v7
         with:
