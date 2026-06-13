@@ -43,8 +43,11 @@ function normalizeTags(tags: string[]): string[] {
 const DB_NAME = "dak-studio";
 const STORE = "demos";
 const DERIVED_STORE = "derived";
-/** 解析口径（@cs2dak/core loadDemoPackageFromZip）变化时 +1，旧 derived 缓存自动失效。 */
-const DERIVED_VERSION = 1;
+/**
+ * 解析口径（@cs2dak/core loadDemoPackageFromZip）变化时 +1，旧 derived 缓存自动失效。
+ * v2→v3：DemoPackage 形状剧变，0.4.x 旧库的 v2 派生缓存必须失效，否则 v3 会吃到 v2 数据。
+ */
+const DERIVED_VERSION = 2;
 
 interface DerivedRecord {
   id: string;
