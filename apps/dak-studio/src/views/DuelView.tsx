@@ -1,20 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DuelFinderRow, DuelInsightsModel, PlayerMechanicsRow } from "@cs2dak/contract";
-import { buildDuelInsights, displayWeaponName, duelClassificationLabel } from "@cs2dak/presentation";
+import { displayWeaponName, duelClassificationLabel } from "@cs2dak/presentation";
 import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState, MetricInfo } from "../components/primitives";
 import { displayTeamName } from "../lib/identity";
-import { getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
-import { loadTriLookup } from "../lib/tri";
+import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { getDuelInsights, type IdentityOptions } from "../lib/season";
 
 type DuelTab = "records" | "opening" | "mechanics";
 type EvidenceFilter = "contested_duel" | "suppressed_kill" | "caught_off_guard" | "low_hp" | "third_party" | "all";
 
 const EVIDENCE_FILTERS: Array<{ key: EvidenceFilter; label: string; description: string }> = [
-  { key: "contested_duel", label: "对枪胜出", description: "受害者在 ±1.5s 内还手，属于真实对枪样本" },
-  { key: "suppressed_kill", label: "先手压制", description: "受害者面向击杀者但未开枪" },
-  { key: "caught_off_guard", label: "侧背身", description: "受害者未面向、转点或跑动中被击杀" },
+  { key: "contested_duel", label: "对枪胜出", description: "受害者造成伤害，或可见击杀者时开火" },
+  { key: "suppressed_kill", label: "先手压制", description: "受害者死前获得过有效可见机会但没有有效还手" },
+  { key: "caught_off_guard", label: "侧背身", description: "受害者死前没有获得有效可见机会" },
   { key: "low_hp", label: "低血量", description: "victimHealthBefore < 80，保留证据但不进 full HP TTK" },
   { key: "third_party", label: "补枪", description: "第三方在 ±2s 内造成关键伤害，TTK 不计入分布" },
   { key: "all", label: "全部", description: "保留全部证据队列" }
@@ -27,6 +27,7 @@ export interface DuelViewProps {
   onScopeChange: (scope: CohortScopeState) => void;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
+  identityOptions?: IdentityOptions;
   teamRenames?: Record<string, string>;
 }
 
@@ -49,6 +50,7 @@ export function DuelView({
   onScopeChange,
   onOpenMatch,
   onGoLibrary,
+  identityOptions,
   teamRenames = {}
 }: DuelViewProps) {
   const [tab, setTab] = useState<DuelTab>("records");
@@ -64,12 +66,9 @@ export function DuelView({
     let cancelled = false;
     setModel(null);
     setError(null);
-    Promise.all([
-      Promise.all(entries.map(async (entry) => ({ matchId: matchIdForEntry(entry), pkg: await getDemoPackage(entry.id) }))),
-      loadTriLookup(entries.map((entry) => entry.meta.mapName))
-    ])
-      .then(([demos, visibilityFor]) => {
-        if (!cancelled) setModel(buildDuelInsights(demos, { visibilityFor }));
+    getDuelInsights(entries, identityOptions)
+      .then((next) => {
+        if (!cancelled) setModel(next);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
@@ -77,7 +76,7 @@ export function DuelView({
     return () => {
       cancelled = true;
     };
-  }, [entries]);
+  }, [entries, identityOptions?.version]);
 
   if (allEntries.length === 0) {
     return (

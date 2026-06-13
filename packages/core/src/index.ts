@@ -11,6 +11,7 @@ export { normalizeDemoPackage } from "./normalize.js";
 export { createPlayerResolver, createResolverFromPackage } from "./resolve.js";
 export type { PlayerResolver } from "./resolve.js";
 export { deriveRRSignals, deriveAccountSignalsV2, computeAccountRatingsV2 } from "./signals.js";
+export { activeDamages, isActiveRoundTick } from "./utils.js";
 export * from "./spatial/index.js";
 export { deriveRRIndicators } from "./scoreboard.js";
 export { derivePlayerWeaponHighlights } from "./weapon-highlights.js";

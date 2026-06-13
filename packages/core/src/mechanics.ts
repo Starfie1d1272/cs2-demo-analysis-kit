@@ -17,7 +17,7 @@ import {
   type VisibilityContext
 } from "./duel-window.js";
 import { createResolverFromPackage, type PlayerResolver } from "./resolve.js";
-import { normalizeWeapon, round } from "./utils.js";
+import { activeDamages, normalizeWeapon, round } from "./utils.js";
 
 const BURST_GAP_SECONDS = 0.25;
 const PRE_MOVE_START_SECONDS = 0.2; // 开枪前 200ms
@@ -489,6 +489,7 @@ export function buildMechanicsSignals(
   const tickrate = tickrateOf(pkg);
   const ctx: VisibilityContext = { pkg, visibility: options.visibility };
   const shots = flattenShots(pkg);
+  const damages = activeDamages(pkg);
   const allZeroVelocity = shots.length > 0 && shots.every((shot) => shot.vx === 0 && shot.vy === 0);
 
   // duels 按 killerIndex + weapon 归并，供 TTK / one tap / 反应 / 预瞄 join。
@@ -516,7 +517,7 @@ export function buildMechanicsSignals(
     if (!player) return null;
 
     const bursts = splitBursts(playerShots, tickrate);
-    const combatBursts = bursts.filter((burst) => isCombatBurst(ctx, resolver, pkg.damages, burst));
+    const combatBursts = bursts.filter((burst) => isCombatBurst(ctx, resolver, damages, burst));
     const buckets = bucketBursts(bursts);
     const playerDuels = duelsByKey.get(key) ?? [];
     const cleanPlayerDuels = playerDuels.filter(isCleanGunfightKill);
@@ -524,7 +525,7 @@ export function buildMechanicsSignals(
 
     // 首发命中率（combat burst 第一发）
     const firstShotHit = rate(
-      cleanCombatBursts.filter((burst) => hasDamageMatch(pkg.damages, burst[0]!)).length,
+      cleanCombatBursts.filter((burst) => hasDamageMatch(damages, burst[0]!)).length,
       cleanCombatBursts.length
     );
 
@@ -532,7 +533,7 @@ export function buildMechanicsSignals(
     let sprayHit: RateSample | null = null;
     if (AUTO_WEAPONS.has(weapon)) {
       const sprayShots = cleanCombatBursts.filter((burst) => burst.length >= 5).flatMap((burst) => burst.slice(3));
-      sprayHit = rate(sprayShots.filter((shot) => hasDamageMatch(pkg.damages, shot)).length, sprayShots.length);
+      sprayHit = rate(sprayShots.filter((shot) => hasDamageMatch(damages, shot)).length, sprayShots.length);
     }
 
     // 急停成功率（移动后停稳）；导出器无 velocity 时整体置空

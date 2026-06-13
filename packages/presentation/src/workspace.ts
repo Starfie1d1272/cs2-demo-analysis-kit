@@ -16,7 +16,7 @@ import {
 import { decodeDelta } from "@cs2dak/contract";
 import { groupBy, nameForSteamId, round, normalizeWeapon, isNamedWeapon } from "./workspace-utils.js";
 import { displayWeaponName } from "./weapons.js";
-import { analyzeDemoPackage, normalizeDemoPackage } from "@cs2dak/core";
+import { activeDamages, analyzeDemoPackage, normalizeDemoPackage } from "@cs2dak/core";
 import { getMapCalibration, hasLowerLevel } from "@cs2dak/maps";
 
 export function buildDemoViewModel(bundle: AnalysisBundle) {
@@ -160,7 +160,7 @@ function buildWorkspaceWeapons(pkg: DemoPackage) {
     (kill) => normalizeWeapon(kill.weapon)
   );
   const damageByWeapon = new Map<string, number>();
-  for (const damage of pkg.damages) {
+  for (const damage of activeDamages(pkg)) {
     if (!isNamedWeapon(damage.weapon)) continue;
     const key = normalizeWeapon(damage.weapon);
     damageByWeapon.set(key, (damageByWeapon.get(key) ?? 0) + damage.healthDamage);

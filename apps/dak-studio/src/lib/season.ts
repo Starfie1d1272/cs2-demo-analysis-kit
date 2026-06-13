@@ -4,6 +4,7 @@ import {
   buildPlayerSeasonInsights,
   buildPlayerMechanicsProfile,
   buildPlayerWeaponStats,
+  buildDuelInsights,
   buildSeasonLeaderboardModel,
   buildTournamentInsights,
   buildTeamComparison,
@@ -18,6 +19,7 @@ import {
 } from "@cs2dak/presentation";
 import { loadTriLookup } from "./tri";
 import type {
+  DuelInsightsModel,
   PlayerSeasonProfile,
   SeasonCohortBundle,
   SeasonLeaderboardModel
@@ -41,7 +43,7 @@ export interface IdentityOptions {
  */
 
 /** 聚合算法/口径变化时 +1，旧缓存自动失效重算。 */
-const CACHE_VERSION = 6;
+const CACHE_VERSION = 7;
 
 export interface SeasonSummary {
   bundle: SeasonCohortBundle;
@@ -104,6 +106,12 @@ interface MetaRecord {
   touchedAt: number;
 }
 
+interface PersistedValue<T> {
+  key: string;
+  touchedAt: number;
+  value: T;
+}
+
 function txRequest<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     req.onsuccess = () => resolve(req.result);
@@ -163,6 +171,34 @@ async function writePersistedTournamentInsights(key: string, insights: Tournamen
     const db = await openCacheDb();
     const store = db.transaction(CACHE_STORE, "readwrite").objectStore(CACHE_STORE);
     await txRequest(store.put({ key, touchedAt: Date.now(), insights } satisfies PersistedTournamentInsights, key));
+    await touchMeta(db, key);
+    void prunePersisted();
+  } catch {
+    // 写失败不影响功能
+  }
+}
+
+async function readPersistedValue<T>(key: string): Promise<T | undefined> {
+  try {
+    const db = await openCacheDb();
+    const record = await txRequest(
+      db.transaction(CACHE_STORE, "readonly").objectStore(CACHE_STORE).get(key) as IDBRequest<PersistedValue<T> | undefined>
+    );
+    if (record && "value" in record) {
+      await touchMeta(db, key);
+      return record.value;
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function writePersistedValue<T>(key: string, value: T): Promise<void> {
+  try {
+    const db = await openCacheDb();
+    const store = db.transaction(CACHE_STORE, "readwrite").objectStore(CACHE_STORE);
+    await txRequest(store.put({ key, touchedAt: Date.now(), value } satisfies PersistedValue<T>, key));
     await touchMeta(db, key);
     void prunePersisted();
   } catch {
@@ -256,6 +292,8 @@ export interface PlayerSeasonDetails {
 const DETAILS_CACHE_LIMIT = 24;
 const detailsCache = new Map<string, Promise<PlayerSeasonDetails>>();
 const flashCache = new Map<string, Promise<PlayerFlashSummary[]>>();
+const duelInsightsCache = new Map<string, Promise<DuelInsightsModel>>();
+const teamComparisonCache = new Map<string, Promise<TeamComparisonModel>>();
 
 function touchLimitedCache<T>(cache: Map<string, Promise<T>>, key: string, value: Promise<T>, limit: number): Promise<T> {
   cache.delete(key);
@@ -275,6 +313,8 @@ export function getPlayerSeasonDetails(entries: StudioDemoEntry[], steamIds: str
   const cached = detailsCache.get(key);
   if (cached) return cached;
   const loading = (async () => {
+    const persisted = await readPersistedValue<PlayerSeasonDetails>(key);
+    if (persisted) return persisted;
     const demos = await loadDemosWithRenames(entries, identity?.teamRenames);
     const visibilityFor = await loadTriLookup(demos.map((demo) => demo.pkg.match.mapName));
     const details = {
@@ -283,9 +323,28 @@ export function getPlayerSeasonDetails(entries: StudioDemoEntry[], steamIds: str
       mechanics: buildPlayerMechanicsProfile(demos, steamIds, { visibilityFor })
     };
     clearPkgCache();
+    void writePersistedValue(key, details);
     return details;
   })();
   return touchLimitedCache(detailsCache, key, loading, DETAILS_CACHE_LIMIT);
+}
+
+/** 对枪实验室：DuelInsights 是 LOS-heavy 派生模型，持久化后反复切页不再重跑 tri 判定。 */
+export function getDuelInsights(entries: StudioDemoEntry[], identity?: IdentityOptions): Promise<DuelInsightsModel> {
+  const key = `${keyOf(entries, identity?.version)}:duels`;
+  const cached = duelInsightsCache.get(key);
+  if (cached) return cached;
+  const loading = (async () => {
+    const persisted = await readPersistedValue<DuelInsightsModel>(key);
+    if (persisted) return persisted;
+    const demos = await loadDemosWithRenames(entries, identity?.teamRenames);
+    const visibilityFor = await loadTriLookup(demos.map((demo) => demo.pkg.match.mapName));
+    const model = buildDuelInsights(demos, { visibilityFor });
+    clearPkgCache();
+    void writePersistedValue(key, model);
+    return model;
+  })();
+  return touchLimitedCache(duelInsightsCache, key, loading, DETAILS_CACHE_LIMIT);
 }
 
 /** 道具页多人 Flash Value：单次扫描所有 demo，避免每个选手重复扫全量 events。 */
@@ -298,9 +357,12 @@ export function getPlayerFlashSummaries(
   const cached = flashCache.get(key);
   if (cached) return cached;
   const loading = (async () => {
+    const persisted = await readPersistedValue<PlayerFlashSummary[]>(key);
+    if (persisted) return persisted;
     const demos = await loadDemosWithRenames(entries, identity?.teamRenames);
     const summaries = buildPlayerFlashSummaries(demos, players);
     clearPkgCache();
+    void writePersistedValue(key, summaries);
     return summaries;
   })();
   return touchLimitedCache(flashCache, key, loading, DETAILS_CACHE_LIMIT);
@@ -333,10 +395,19 @@ export function getTournamentInsights(entries: StudioDemoEntry[], identity?: Ide
 }
 
 export async function getTeamComparison(entries: StudioDemoEntry[], identity?: IdentityOptions): Promise<TeamComparisonModel> {
-  const demos = await loadDemosWithRenames(entries, identity?.teamRenames);
-  const model = buildTeamComparison(demos);
-  clearPkgCache();
-  return model;
+  const key = `${keyOf(entries, identity?.version)}:team-comparison`;
+  const cached = teamComparisonCache.get(key);
+  if (cached) return cached;
+  const loading = (async () => {
+    const persisted = await readPersistedValue<TeamComparisonModel>(key);
+    if (persisted) return persisted;
+    const demos = await loadDemosWithRenames(entries, identity?.teamRenames);
+    const model = buildTeamComparison(demos);
+    clearPkgCache();
+    void writePersistedValue(key, model);
+    return model;
+  })();
+  return touchLimitedCache(teamComparisonCache, key, loading, DETAILS_CACHE_LIMIT);
 }
 
 /** 聚合摘要：优先持久缓存命中（不触碰 ZIP），未命中才全量解析并回写。

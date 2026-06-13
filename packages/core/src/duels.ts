@@ -3,7 +3,7 @@ import type { TriangleBvh } from "@cs2dak/maps";
 import { decodeDelta } from "@cs2dak/contract";
 import { decodeDuelWindow, frameIndexForTick, isVisibleAt, type VisibilityContext } from "./duel-window.js";
 import { createResolverFromPackage, type PlayerResolver } from "./resolve.js";
-import { killWeaponName, normalizeWeapon, round } from "./utils.js";
+import { activeDamages, killWeaponName, normalizeWeapon, round } from "./utils.js";
 
 const ENGAGEMENT_GAP_SECONDS = 1.5;
 const CONTESTED_WINDOW_SECONDS = 1.5;
@@ -161,7 +161,7 @@ function flattenShots(shots: PackageShots | undefined): FlatShot[] {
   return rows.sort((a, b) => a.roundNumber - b.roundNumber || a.tick - b.tick);
 }
 
-function buildEngagements(pkg: DemoPackage, shots: FlatShot[], tickrate: number): Engagement[] {
+function buildEngagements(damages: PackageDamage[], pkg: DemoPackage, shots: FlatShot[], tickrate: number): Engagement[] {
   const maxGap = ticks(ENGAGEMENT_GAP_SECONDS, tickrate);
   const events = [
     ...shots.map((shot) => ({
@@ -171,7 +171,7 @@ function buildEngagements(pkg: DemoPackage, shots: FlatShot[], tickrate: number)
       victimIndex: null,
       kind: "shot" as const
     })),
-    ...pkg.damages.map((damage) => ({
+    ...damages.map((damage) => ({
       roundNumber: damage.roundNumber,
       tick: damage.tick,
       attackerIndex: damage.attackerIndex,
@@ -334,8 +334,8 @@ function burstForKill(shots: FlatShot[], kill: PackageKill, tickrate: number): F
   return bursts[bursts.length - 1] ?? [];
 }
 
-function victimHealthBefore(pkg: DemoPackage, kill: PackageKill): number {
-  const direct = pkg.damages
+function victimHealthBefore(damages: PackageDamage[], kill: PackageKill): number {
+  const direct = damages
     .filter((row) =>
       row.roundNumber === kill.roundNumber &&
       row.victimIndex === kill.victimIndex &&
@@ -346,18 +346,18 @@ function victimHealthBefore(pkg: DemoPackage, kill: PackageKill): number {
   return direct?.victimHealthBefore ?? 100;
 }
 
-function killerHealthBefore(pkg: DemoPackage, kill: PackageKill): number | null {
+function killerHealthBefore(damages: PackageDamage[], kill: PackageKill): number | null {
   if (kill.killerIndex === null) return null;
-  const prior = pkg.damages
+  const prior = damages
     .filter((row) => row.roundNumber === kill.roundNumber && row.victimIndex === kill.killerIndex && row.tick <= kill.tick)
     .sort((a, b) => b.tick - a.tick)[0];
   return prior ? Math.max(0, prior.victimHealthBefore - prior.healthDamage) : 100;
 }
 
-function hasThirdPartyImpact(pkg: DemoPackage, kill: PackageKill, engagement: Engagement): boolean {
+function hasThirdPartyImpact(damages: PackageDamage[], pkg: DemoPackage, kill: PackageKill, engagement: Engagement): boolean {
   if (kill.killerIndex === null) return true;
   const pairedWindow = ticks(DUEL_PAIR_WINDOW_SECONDS, tickrateOf(pkg));
-  return pkg.damages.some((damage) =>
+  return damages.some((damage) =>
     damage.roundNumber === kill.roundNumber &&
     damage.victimIndex === kill.victimIndex &&
     damage.attackerIndex !== null &&
@@ -389,6 +389,7 @@ function isCleanDuelRecord(record: DuelRecord): boolean {
  */
 function classifyDuel(
   ctx: VisibilityContext,
+  damages: PackageDamage[],
   kill: PackageKill & { killerIndex: number },
   window: DuelWindow | null,
   shots: FlatShot[],
@@ -398,7 +399,7 @@ function classifyDuel(
 ): DuelClassification {
   if (!window) return fallback;
   const view = decodeDuelWindow(ctx.pkg, window);
-  const victimDamagedKiller = ctx.pkg.damages.some((damage) =>
+  const victimDamagedKiller = damages.some((damage) =>
     damage.roundNumber === kill.roundNumber &&
     damage.attackerIndex === kill.victimIndex &&
     damage.victimIndex === kill.killerIndex &&
@@ -432,7 +433,8 @@ export function buildDuelsSignals(input: DemoPackage, options: DuelSignalsOption
   const tickrate = tickrateOf(pkg);
   const ctx: VisibilityContext = { pkg, visibility: options.visibility };
   const shots = flattenShots(pkg.shots);
-  const engagements = buildEngagements(pkg, shots, tickrate);
+  const damages = activeDamages(pkg);
+  const engagements = buildEngagements(damages, pkg, shots, tickrate);
   const records = pkg.kills
     .filter((kill) => isEnemyKill(pkg, resolver, kill))
     .map((kill, index): DuelRecord => {
@@ -449,10 +451,10 @@ export function buildDuelsSignals(input: DemoPackage, options: DuelSignalsOption
         : facing.faced === true && !facing.moving
           ? "suppressed_kill"
           : "caught_off_guard";
-      const classification = classifyDuel(ctx, kill, window, shots, engagement, burst[0]?.tick ?? null, fallbackClass);
-      const hp = victimHealthBefore(pkg, kill);
+      const classification = classifyDuel(ctx, damages, kill, window, shots, engagement, burst[0]?.tick ?? null, fallbackClass);
+      const hp = victimHealthBefore(damages, kill);
       const hpBucket: DuelHpBucket = hp >= FULL_HEALTH_HP ? "full_hp" : "low_hp";
-      const thirdParty = hasThirdPartyImpact(pkg, kill, engagement);
+      const thirdParty = hasThirdPartyImpact(damages, pkg, kill, engagement);
       const ttkMs = hpBucket === "full_hp" && !thirdParty && burst.length > 0
         ? msBetween(burst[0]!.tick, kill.tick, tickrate)
         : null;
@@ -478,7 +480,7 @@ export function buildDuelsSignals(input: DemoPackage, options: DuelSignalsOption
         hpBucket,
         fullHealth: hpBucket === "full_hp",
         victimHealthBefore: hp,
-        killerHealthBefore: killerHealthBefore(pkg, kill),
+        killerHealthBefore: killerHealthBefore(damages, kill),
         ttkMs,
         thirdParty,
         oneShotKill: burst.length === 1,

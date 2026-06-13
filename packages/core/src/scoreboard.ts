@@ -19,7 +19,7 @@ import type {
 import type { RRSignals } from "@rivalhub/rival-rating";
 import type { AccountRatingResult } from "./signals.js";
 import { normalizeDemoPackage } from "./normalize.js";
-import { round, firstKillMap, clutchSplit, isUtilityWeapon, killWeaponName } from "./utils.js";
+import { activeDamages, round, firstKillMap, clutchSplit, isUtilityWeapon, killWeaponName } from "./utils.js";
 import { createResolverFromPackage } from "./resolve.js";
 import { fieldAvailability, fieldConfidence } from "./qa.js";
 
@@ -31,6 +31,7 @@ export function deriveRRIndicators(input: unknown): RRIndicators[] {
 export function buildPlayerRoundFacts(pkg: DemoPackage): PlayerRoundFact[] {
   const resolver = createResolverFromPackage(pkg);
   const firstKillByRound = firstKillMap(pkg);
+  const damageRows = activeDamages(pkg);
 
   return pkg.rounds.flatMap((roundRow) =>
     pkg.players.map((player, playerIdx) => {
@@ -38,7 +39,7 @@ export function buildPlayerRoundFacts(pkg: DemoPackage): PlayerRoundFact[] {
       const deaths = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.victimIndex === playerIdx);
       const assists = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.assisterIndex === playerIdx);
       const flashAssists = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.flashAssisterIndex === playerIdx);
-      const damageRows = pkg.damages.filter((row) =>
+      const playerDamageRows = damageRows.filter((row) =>
         row.roundNumber === roundRow.roundNumber &&
         row.attackerIndex === playerIdx &&
         resolver.byIndexOrNull(row.victimIndex)?.teamKey !== player.teamKey
@@ -63,8 +64,8 @@ export function buildPlayerRoundFacts(pkg: DemoPackage): PlayerRoundFact[] {
         kills: kills.length,
         deaths: deaths.length,
         assists: assists.length + flashAssists.length,
-        damage: damageRows.reduce((sum, row) => sum + row.healthDamage, 0),
-        utilityDamage: damageRows.filter((row) => isUtilityWeapon(row.weapon)).reduce((sum, row) => sum + row.healthDamage, 0),
+        damage: playerDamageRows.reduce((sum, row) => sum + row.healthDamage, 0),
+        utilityDamage: playerDamageRows.filter((row) => isUtilityWeapon(row.weapon)).reduce((sum, row) => sum + row.healthDamage, 0),
         flashAssists: flashAssists.length + kills.filter((kill) => kill.flashAssist).length,
         tradeKills: kills.filter((kill) => kill.tradeKill).length,
         tradedDeaths: deaths.filter((death) => death.tradeDeath).length,

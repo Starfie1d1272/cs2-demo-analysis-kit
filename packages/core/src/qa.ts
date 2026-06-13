@@ -103,7 +103,7 @@ export function buildQaReport(pkg: DemoPackage): QaReport {
     }
   });
 
-  pkg.damages.forEach((damage, index) => checkEventTick("damages", damage.roundNumber, damage.tick, index));
+  pkg.damages.forEach((damage, index) => checkEventTick("damages", damage.roundNumber, damage.tick, index, true));
   pkg.blinds.forEach((blind, index) => checkEventTick("blinds", blind.roundNumber, blind.tick, index));
   pkg.grenades.forEach((grenade, index) => {
     checkEventTick("grenades", grenade.roundNumber, grenade.throwTick, index);
