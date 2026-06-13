@@ -116,7 +116,7 @@ gui = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cs2df", specifier = ">=3.0.2" },
+    { name = "cs2df", specifier = ">=3.0.3" },
     { name = "pyinstaller", marker = "extra == 'build'", specifier = ">=6.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pywebview", marker = "extra == 'gui'", specifier = ">=5.0" },
@@ -127,7 +127,7 @@ provides-extras = ["dev", "gui", "build"]
 
 [[package]]
 name = "cs2df"
-version = "3.0.2"
+version = "3.0.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "demoparser2" },
@@ -136,9 +136,9 @@ dependencies = [
     { name = "orjson" },
     { name = "pandas" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e4/44/0955b9ed172ce1b410881e82ba635cc50b56430f4e166af72c45aeffc19b/cs2df-3.0.2.tar.gz", hash = "sha256:7e329786a3b84ecf7fafa495fc0a37c811dfb73111aaadd723988cf564256413", size = 83988, upload-time = "2026-06-12T18:13:52.477Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/43/6a/2809d91c0fabe79e52b855d8b8a7af78a5fbfa2c7b3712915b23bcecae3d/cs2df-3.0.3.tar.gz", hash = "sha256:e9f348c0673eaa2bab891ba955b3db3a46e4f526750d43e1f31860c170c9821f", size = 85647, upload-time = "2026-06-13T19:45:31.171Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5a/cd/9a996a29ffbddc3089a502d33b2c5ccf2c103de83b65fb825e9a2af0dd63/cs2df-3.0.2-py3-none-any.whl", hash = "sha256:0459fbaebbe1bf0cd7b974cc63ea3905ffe9440c1429a30889ad5e451674af96", size = 44098, upload-time = "2026-06-12T18:13:51.395Z" },
+    { url = "https://files.pythonhosted.org/packages/16/dd/4b95a3c0d08de451814e329d9db24aea5e6d1075f3b5e9dd6c1218347915/cs2df-3.0.3-py3-none-any.whl", hash = "sha256:51c3072dfef4354544c9f9902280e7358ce5e529c47637660226272f54bf1ba0", size = 44525, upload-time = "2026-06-13T19:45:29.873Z" },
 ]
 
 [[package]]
