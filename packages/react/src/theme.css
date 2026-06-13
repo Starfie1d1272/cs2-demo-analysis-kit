@@ -300,6 +300,155 @@
   border-radius: 50%;
 }
 
+/* ── 队伍对比（TeamComparisonPanel） ── */
+
+.dak-team-compare {
+  min-width: 0;
+}
+
+.dak-team-compare-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.9fr) minmax(200px, 1.2fr) minmax(180px, 0.9fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.dak-team-side {
+  min-width: 0;
+}
+
+.dak-team-side h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dak-team-side table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.dak-team-side th,
+.dak-team-side td {
+  padding: 5px 4px;
+  border-bottom: 1px solid var(--dak-border);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.dak-team-side th:first-child,
+.dak-team-side td:first-child {
+  text-align: left;
+  min-width: 60px;
+}
+
+.dak-team-side th {
+  color: var(--dak-fg-dim);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.dak-team-weapons,
+.dak-team-economy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.dak-team-weapons span,
+.dak-team-economy span {
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  border: 1px solid var(--dak-border);
+  border-radius: 3px;
+  background: var(--dak-bg-subtle);
+  color: var(--dak-fg-mid);
+  font-size: 11px;
+}
+
+.dak-team-weapons b,
+.dak-team-economy b {
+  color: var(--dak-fg);
+}
+
+/* 雷达对比行 */
+.dak-team-radar {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.dak-team-radar-row {
+  display: grid;
+  grid-template-columns: minmax(64px, 0.5fr) 44px minmax(0, 1fr) 44px 44px;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.dak-team-radar-row span {
+  color: var(--dak-fg-mid);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dak-team-radar-row b {
+  text-align: right;
+  font-family: var(--dak-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.dak-team-radar-row i {
+  display: block;
+  height: 7px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--dak-accent), var(--dak-accent-b));
+  min-width: 4%;
+}
+
+.dak-team-radar-row em {
+  font-style: normal;
+  color: var(--dak-fg-dim);
+  text-align: right;
+  font-family: var(--dak-mono);
+  font-size: 11px;
+}
+
+.dak-team-evidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.dak-team-evidence button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--dak-border);
+  border-radius: 3px;
+  background: var(--dak-bg-subtle);
+  color: var(--dak-fg-mid);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+}
+
+.dak-team-evidence button:hover {
+  color: var(--dak-fg);
+  border-color: var(--dak-border-hi);
+  background: var(--dak-accent-soft);
+}
+
 .dak-muted {
   color: var(--dak-fg-mid);
 }
@@ -1137,68 +1286,49 @@
   text-transform: uppercase;
 }
 
-.dak-workbench {
-  display: grid;
-  grid-template-columns: 238px minmax(0, 1fr);
-  gap: 14px;
-  align-items: start;
+/* 比赛工作台：顶部横向分段导航 + 单一全宽主区（一次一个视图，无重叠） */
+.dak-ws-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--dak-border);
+  border-radius: 10px;
+  background: var(--dak-panel);
 }
 
-.dak-workbench-sidebar {
-  position: sticky;
-  top: 12px;
-  min-width: 0;
-}
-
-.dak-workbench-main {
-  min-width: 0;
-}
-
-/* 工作台侧边栏专属的纵向大块导航；不要泄漏到排行榜等处的普通小 tab */
-.dak-workbench-sidebar .dak-tabs {
-  display: grid;
-  gap: 7px;
-  margin: 0;
-  overflow: visible;
-}
-
-.dak-workbench-sidebar .dak-tab {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
-  grid-template-areas:
-    "icon label"
-    "icon detail";
+.dak-ws-navtab {
+  display: inline-flex;
   align-items: center;
-  gap: 1px 9px;
-  min-height: 54px;
-  padding: 8px 10px;
-  text-align: left;
-}
-
-.dak-workbench-sidebar .dak-tab svg {
-  grid-area: icon;
-}
-
-.dak-workbench-sidebar .dak-tab span {
-  grid-area: label;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--dak-fg);
-  font-weight: 800;
-}
-
-.dak-workbench-sidebar .dak-tab small {
-  grid-area: detail;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
   color: var(--dak-fg-dim);
-  font-size: 10px;
-  font-family: var(--dak-mono);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dak-ws-navtab svg {
+  flex: 0 0 auto;
+}
+
+.dak-ws-navtab:hover {
+  color: var(--dak-fg);
+  background: var(--dak-bg-subtle);
+}
+
+.dak-ws-navtab-active {
+  color: var(--dak-accent);
+  border-color: var(--dak-accent);
+  background: var(--dak-accent-soft, rgba(47, 224, 168, 0.08));
+}
+
+.dak-ws-main {
+  min-width: 0;
 }
 
 .dak-tab:hover,
@@ -1346,7 +1476,7 @@
   padding: 10px;
   border: 1px solid var(--dak-border);
   border-radius: 4px;
-  background: linear-gradient(180deg, rgba(238, 243, 248, 0.035), transparent), var(--dak-bg-panel);
+  background: linear-gradient(180deg, rgba(238, 243, 248, 0.035), transparent), var(--dak-panel);
 }
 
 .dak-replay-round-nav {
@@ -1670,7 +1800,7 @@
   border-radius: 4px;
   background:
     linear-gradient(180deg, rgba(238, 243, 248, 0.035), transparent 48%),
-    var(--dak-bg-panel);
+    var(--dak-panel);
 }
 
 .dak-roster-team {
@@ -1702,20 +1832,51 @@
 
 .dak-frame-player-row {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  gap: 7px;
-  align-items: center;
-  min-height: 54px;
-  padding: 6px 8px;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-content: center;
+  gap: 6px 10px;
+  /* min-height 预留「名字 + 2 行 loadout + 血条」的空间：
+     逐帧道具增减时高度稳定（不跳动），罕见超长 loadout 才轻微增高，信息始终完整显示 */
+  min-height: 82px;
+  padding: 10px 12px;
   border: 1px solid var(--dak-border);
-  border-radius: 4px;
+  border-radius: 6px;
   background: var(--dak-bg-subtle);
   font-size: 12px;
 }
 
+.dak-frame-player-row .dak-frame-player-num {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  align-self: center;
+}
+
+.dak-frame-player-row .dak-frame-player-name {
+  grid-column: 2;
+  grid-row: 1;
+  font-weight: 700;
+  color: var(--dak-fg);
+}
+
+.dak-frame-player-row .dak-frame-loadout {
+  grid-column: 2;
+  grid-row: 2;
+  /* 预留 2 行高度：常见 loadout 不会让卡片忽高忽低 */
+  min-height: 32px;
+  align-content: flex-start;
+}
+
+.dak-frame-player-row .dak-frame-weapon {
+  grid-column: 2;
+  grid-row: 2;
+  min-height: 32px;
+}
+
 .dak-frame-player-row .dak-hp-bar-wrap {
   grid-column: 2;
+  grid-row: 3;
   width: 100%;
+  align-self: center;
 }
 
 .dak-frame-player-name,
@@ -1736,7 +1897,6 @@
 
 .dak-frame-weapon {
   display: block;
-  margin-top: 2px;
   color: var(--dak-fg-dim);
   font-family: var(--dak-mono);
   font-size: 11px;
@@ -1750,7 +1910,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: 4px;
   min-width: 0;
   color: var(--dak-fg-dim);
   font-family: var(--dak-mono);
@@ -1758,7 +1917,7 @@
 }
 
 .dak-frame-loadout span {
-  min-width: 0;
+  flex: 0 0 auto;
   max-width: 92px;
   overflow: hidden;
   padding: 1px 5px;

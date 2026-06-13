@@ -45,7 +45,7 @@ DAK Studio 已落地为 `apps/dak-studio`（资料库 / 比赛工作台 / 选手
 | 资料库 | 本地 ZIP/.dem 导入、标签、重导、检索 | Studio 本地适配；ZIP 解析仍属 core/contract |
 | 比赛工作台 | 单场回合、回放、地图、经济与 RR 解释入口 | `@cs2dak/presentation` + `@cs2dak/react` |
 | 个人实验室 | 选手档案、趋势、武器分布、证据跳转 | `@cs2dak/cohort` + `@cs2dak/presentation` |
-| 对枪实验室 | shots/duel 能力归位；未接 shots 前保持占位 | 未来 core/presentation |
+| 对枪实验室 | duels/mechanics 信号聚合、三分类对枪、TTK、机制画像（含 .tri LOS 反应时间/预瞄） | `@cs2dak/core` + `@cs2dak/presentation` |
 | 道具实验室 | 跨场 Flash Value、负收益队闪、道具证据 | `@cs2dak/presentation` |
 | 经济与节奏 | 经济矩阵、手枪转化、eco/semi 翻盘 | `@cs2dak/presentation` / core economy |
 | 赛事中台 | 跨队横向对比、地图盘面、武器榜、报表 | `@cs2dak/cohort` + `@cs2dak/presentation` |

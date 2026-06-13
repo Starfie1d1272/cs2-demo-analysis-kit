@@ -853,6 +853,252 @@ body {
   gap: 10px;
 }
 
+/* BP 流程时间线：顺序步骤 + 彩色动作标签 */
+.stu-bp-flow {
+  margin: 0;
+  padding: 14px 18px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius);
+  background: var(--dak-panel);
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stu-bp-step {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.stu-bp-order {
+  min-width: 20px;
+  color: var(--dak-fg-dim);
+  text-align: right;
+}
+
+.stu-bp-action {
+  font-family: var(--stu-mono, ui-monospace, monospace);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  min-width: 64px;
+}
+
+.stu-bp-action-ban { color: var(--dak-danger); }
+.stu-bp-action-pick { color: var(--dak-ok); }
+.stu-bp-action-decider { color: var(--dak-info, var(--dak-accent)); }
+
+.stu-bp-team { color: var(--dak-fg); }
+.stu-bp-verb { color: var(--dak-fg-dim); }
+.stu-bp-map { color: var(--dak-fg); }
+.stu-bp-side { color: var(--dak-fg-dim); font-size: 12px; }
+
+/* ── 弹窗（BP 录入等通用） ───────────────────────────────────────── */
+.stu-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 6vh 16px;
+  background: rgba(4, 6, 9, 0.62);
+  overflow-y: auto;
+}
+
+.stu-modal {
+  width: min(720px, 100%);
+  background: var(--dak-panel);
+  border: 1px solid var(--dak-border);
+  border-radius: 12px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+.stu-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--dak-border);
+}
+
+.stu-modal-head h3 { margin: 0; font-size: 15px; }
+
+.stu-modal-close {
+  border: none;
+  background: transparent;
+  color: var(--dak-fg-dim);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.stu-modal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--dak-border);
+}
+
+.stu-modal-actions { display: flex; gap: 8px; }
+.stu-button-primary {
+  border-color: var(--dak-accent);
+  background: var(--dak-accent-soft, rgba(47, 224, 168, 0.1));
+  color: var(--dak-accent);
+}
+.stu-button-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── BP 录入步骤行 ──────────────────────────────────────────────── */
+.stu-veto-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+}
+.stu-veto-toolbar label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dak-fg-dim); }
+
+.stu-veto-steps { display: flex; flex-direction: column; gap: 8px; padding: 0 18px; }
+
+.stu-veto-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--dak-border);
+  border-radius: 8px;
+}
+
+.stu-veto-order { width: 18px; text-align: right; color: var(--dak-fg-dim); font-size: 12px; }
+
+.stu-veto-action {
+  width: 64px;
+  text-align: center;
+  font-family: var(--stu-mono, ui-monospace, monospace);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.stu-veto-action-ban { color: var(--dak-danger); }
+.stu-veto-action-pick { color: var(--dak-ok); }
+.stu-veto-action-decider { color: var(--dak-info, var(--dak-accent)); }
+
+.stu-veto-team { display: flex; gap: 4px; }
+.stu-veto-ab {
+  width: 30px;
+  padding: 5px 0;
+  border: 1px solid var(--dak-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dak-fg-dim);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.stu-veto-ab-a.active { background: #d9772b; border-color: #d9772b; color: #fff; }
+.stu-veto-ab-b.active { background: #3f8fe0; border-color: #3f8fe0; color: #fff; }
+
+.stu-veto-map { flex: 1; min-width: 0; }
+.stu-veto-side { display: flex; align-items: center; gap: 6px; }
+.stu-veto-side small { color: var(--dak-fg-dim); white-space: nowrap; }
+.stu-veto-error { color: var(--dak-danger); font-size: 12px; }
+
+.stu-select-sm { padding: 4px 8px; font-size: 12px; }
+
+/* ── 系列赛工作台壳 ─────────────────────────────────────────────── */
+.stu-series { display: flex; flex-direction: column; gap: 14px; }
+
+.stu-series-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border: 1px solid var(--dak-border);
+  border-radius: 10px;
+  background: var(--dak-panel);
+}
+.stu-series-teams { display: flex; align-items: center; gap: 14px; font-size: 16px; }
+.stu-series-score { font-family: var(--stu-mono, ui-monospace, monospace); font-size: 20px; font-weight: 800; color: var(--dak-accent); }
+.stu-series-format {
+  font-family: var(--stu-mono, ui-monospace, monospace);
+  font-size: 12px;
+  color: var(--dak-fg-dim);
+  border: 1px solid var(--dak-border);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
+.stu-series-bp { border: 1px solid var(--dak-border); border-radius: 10px; padding: 10px 14px; }
+.stu-series-bp > summary { cursor: pointer; color: var(--dak-fg-dim); font-size: 13px; }
+.stu-series-bp > summary + * { margin-top: 10px; }
+
+.stu-series-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.stu-series-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 12px;
+  border: 1px solid var(--dak-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dak-fg-dim);
+  cursor: pointer;
+  text-align: left;
+}
+.stu-series-tab:hover { color: var(--dak-fg); }
+.stu-series-tab-active { border-color: var(--dak-accent); color: var(--dak-accent); background: var(--dak-accent-soft, rgba(47, 224, 168, 0.08)); }
+.stu-series-tab-map { font-size: 13px; font-weight: 600; }
+.stu-series-tab-score { font-family: var(--stu-mono, ui-monospace, monospace); font-size: 11px; }
+.stu-series-tab-badge { font-size: 9px; color: var(--dak-ok); }
+
+.stu-series-summary { display: flex; flex-direction: column; gap: 14px; }
+.stu-series-maps { display: flex; flex-direction: column; gap: 6px; }
+.stu-series-map-row { display: flex; align-items: baseline; gap: 12px; }
+.stu-series-map-row b { min-width: 90px; }
+.stu-series-map-row span { font-family: var(--stu-mono, ui-monospace, monospace); }
+
+.stu-series-manager > summary { cursor: pointer; font-size: 14px; font-weight: 600; }
+.stu-series-manager > summary + * { margin-top: 12px; }
+.stu-series-bp-list { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.stu-series-bp-item strong { display: block; margin-bottom: 6px; font-size: 13px; }
+
+/* 机制画像武器卡：击杀数前 6 + 其他，真实武器名 */
+.stu-mechanics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.stu-mechanics-card {
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius);
+  background: var(--dak-bg-raised);
+  padding: 12px 14px;
+}
+
+.stu-mechanics-card header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--dak-border);
+}
+
+.stu-mechanics-card header h4 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--dak-fg);
+}
+
+.stu-mechanics-card header span {
+  color: var(--dak-fg-dim);
+  font-size: 11px;
+}
+
 .stu-metric span {
   display: block;
   color: var(--dak-fg-dim);
@@ -2321,6 +2567,12 @@ td.stu-heat-cell.stu-heat-neutral {
   white-space: nowrap;
   color: var(--stu-text);
   font-size: 13px;
+}
+
+/* TTK 值颜色分类：ok=合法数值 / warn=低血量 / danger=补枪 */
+.stu-duel-pill-ok b { color: var(--dak-ok); }
+.stu-duel-pill-warn b { color: var(--dak-warn); }
+.stu-duel-pill-danger b { color: var(--dak-danger); }
 }
 
 .stu-duel-weapon-stack {

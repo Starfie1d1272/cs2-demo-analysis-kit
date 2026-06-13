@@ -9,7 +9,14 @@ import { getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "../lib/li
 import { loadTriLookup } from "../lib/tri";
 
 type DuelTab = "records" | "opening" | "mechanics";
-type EvidenceFilter = "contested_duel" | "suppressed_kill" | "caught_off_guard" | "full_hp" | "low_hp" | "all";
+type EvidenceFilter = "contested_duel" | "suppressed_kill" | "caught_off_guard" | "all";
+
+const EVIDENCE_FILTERS: Array<{ key: EvidenceFilter; label: string; description: string }> = [
+  { key: "contested_duel", label: "对枪胜出", description: "受害者在 ±1.5s 内还手，属于真实对枪样本" },
+  { key: "suppressed_kill", label: "先手压制", description: "受害者面向击杀者但未开枪" },
+  { key: "caught_off_guard", label: "侧背身", description: "受害者未面向、转点或跑动中被击杀" },
+  { key: "all", label: "全部", description: "保留完整证据队列" }
+];
 
 export interface DuelViewProps {
   allEntries: StudioDemoEntry[];
@@ -32,15 +39,6 @@ const CLASS_TONE: Record<string, string> = {
   suppressed_kill: "先手压制击杀",
   caught_off_guard: "侧背身击杀"
 };
-
-const EVIDENCE_FILTERS: Array<{ key: EvidenceFilter; label: string; description: string }> = [
-  { key: "contested_duel", label: "对枪胜出", description: "受害者在 ±1.5s 内还手，属于真实对枪样本" },
-  { key: "suppressed_kill", label: "先手压制", description: "受害者面向击杀者但未开枪" },
-  { key: "caught_off_guard", label: "侧背身", description: "受害者未面向、转点或跑动中被击杀" },
-  { key: "full_hp", label: "完整 HP", description: "victimHealthBefore ≥ 80，可进入 full HP TTK 分布" },
-  { key: "low_hp", label: "低 HP", description: "victimHealthBefore < 80，保留证据但不污染 full HP TTK" },
-  { key: "all", label: "全部", description: "保留完整证据队列" }
-];
 
 export function DuelView({
   allEntries,
@@ -255,9 +253,25 @@ function PlayerMechanicsGrid({
   );
 }
 
-function MetricPill({ label, value }: { label: string; value: string }) {
+/** 统一 TTK 列标签：有合法 TTK 显示数值，低血量 / 补枪分别标注。 */
+function ttkLabel(row: DuelFinderRow): string {
+  if (row.ttkMs != null) return `${row.ttkMs}ms`;
+  if (row.hpBucket === "low_hp") return "低血量";
+  if (row.thirdParty) return "补枪";
+  return "—";
+}
+
+/** TTK 值的展示颜色分类。 */
+function ttkTone(row: DuelFinderRow): "ok" | "warn" | "danger" | undefined {
+  if (row.ttkMs != null) return "ok";
+  if (row.hpBucket === "low_hp") return "warn";
+  if (row.thirdParty) return "danger";
+  return undefined;
+}
+
+function MetricPill({ label, value, tone }: { label: string; value: string; tone?: "ok" | "warn" | "danger" }) {
   return (
-    <span className="stu-duel-pill">
+    <span className={`stu-duel-pill${tone ? ` stu-duel-pill-${tone}` : ""}`}>
       <small>{label}</small>
       <b>{value}</b>
     </span>
@@ -273,13 +287,36 @@ function OpeningDuelMap({
   entryByMatchId: Map<string, StudioDemoEntry>;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
 }) {
-  const mapName = rows[0]?.mapName ?? "de_mirage";
+  const mapNames = useMemo(() => {
+    const seen = new Map<string, number>();
+    for (const row of rows) seen.set(row.mapName, (seen.get(row.mapName) ?? 0) + 1);
+    return [...seen.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name);
+  }, [rows]);
+  const [activeMap, setActiveMap] = useState<string | null>(null);
+  const mapName = activeMap && mapNames.includes(activeMap) ? activeMap : mapNames[0] ?? "de_mirage";
+  const mapRows = useMemo(() => rows.filter((row) => row.mapName === mapName), [rows, mapName]);
   const calibration = getMapCalibration(mapName);
   return (
     <section className="stu-duel-opening-layout">
       <div className="stu-card stu-duel-map-card">
         <h3>首杀位置</h3>
         <p className="stu-muted">每回合第一条击杀事件，落点取受害者死亡位置；点击点位跳到对应回合回放。</p>
+        {mapNames.length > 1 && (
+          <div className="stu-chip-row" role="tablist" aria-label="按地图筛选首杀位置">
+            {mapNames.map((name) => (
+              <button
+                key={name}
+                type="button"
+                role="tab"
+                aria-selected={name === mapName}
+                className={name === mapName ? "stu-chip stu-chip-active" : "stu-chip"}
+                onClick={() => setActiveMap(name)}
+              >
+                {name.replace(/^de_/, "")}
+              </button>
+            ))}
+          </div>
+        )}
         <svg
           className="stu-duel-radar"
           viewBox={`0 0 ${calibration?.radarSize ?? 1024} ${calibration?.radarSize ?? 1024}`}
@@ -287,7 +324,7 @@ function OpeningDuelMap({
           aria-label={`${mapName} 首杀位置`}
         >
           {calibration && <image href={`./maps/radars/${mapName}.png`} width={calibration.radarSize} height={calibration.radarSize} opacity={0.88} />}
-          {calibration && rows.slice(0, 80).map((row) => {
+          {calibration && mapRows.slice(0, 80).map((row) => {
             if (!row.victimPosition) return null;
             const point = worldToRadar(row.victimPosition, calibration);
             return (
@@ -341,17 +378,22 @@ function EvidenceCards({
     const next = new Map<EvidenceFilter, number>(EVIDENCE_FILTERS.map((item) => [item.key, 0]));
     for (const row of rows) {
       next.set(row.classification, (next.get(row.classification) ?? 0) + 1);
-      next.set(row.hpBucket, (next.get(row.hpBucket) ?? 0) + 1);
       next.set("all", (next.get("all") ?? 0) + 1);
     }
     return next;
   }, [rows]);
   const activeRows = useMemo(
-    () => filter === "all"
-      ? rows
-      : filter === "full_hp" || filter === "low_hp"
-        ? rows.filter((row) => row.hpBucket === filter)
-        : rows.filter((row) => row.classification === filter),
+    () => {
+      const rows_ = filter === "all"
+        ? rows
+        : rows.filter((row) => row.classification === filter);
+      // 排序：有合法 TTK 的在前 → 低血量 → 补枪
+      return [...rows_].sort((a, b) => {
+        const orderA = a.ttkMs != null ? 0 : a.hpBucket === "low_hp" ? 1 : 2;
+        const orderB = b.ttkMs != null ? 0 : b.hpBucket === "low_hp" ? 1 : 2;
+        return orderA - orderB || a.roundNumber - b.roundNumber || a.tick - b.tick;
+      });
+    },
     [filter, rows]
   );
   return (
@@ -391,10 +433,8 @@ function EvidenceCards({
                     <p>{row.mapName} · R{row.roundNumber} · {displayWeaponName(row.weapon)}</p>
                   </div>
                   <div className="stu-duel-evidence-meta">
-                    <MetricPill label="TTK" value={row.ttkMs == null ? "—" : `${row.ttkMs}ms`} />
-                    <MetricPill label="HP 分档" value={row.hpBucket === "full_hp" ? "完整" : "低血"} />
+                    <MetricPill label="TTK" value={ttkLabel(row)} tone={ttkTone(row)} />
                     <MetricPill label="自己血量" value={row.killerHealthBefore == null ? "—" : `${row.killerHealthBefore} HP`} />
-                    {row.thirdParty && <MetricPill label="第三方" value="已隔离" />}
                   </div>
                   {entry && (
                     <button type="button" className="stu-button-sm" onClick={() => onOpenMatch(entry.id, { roundNumber: row.roundNumber, tick: row.tick })}>
@@ -412,16 +452,16 @@ function EvidenceCards({
 }
 
 function explainDuelRow(row: DuelFinderRow): string {
+  if (row.thirdParty) return "补枪：第三方在 ±2s 窗口内对受害者造成了关键伤害，TTK 不计入完整分布。";
   if (row.hpBucket === "low_hp") {
     const killer = row.killerHealthBefore == null ? "己方血量未知" : `己方 ${row.killerHealthBefore} HP`;
-    return `低血样本：交火开始时对手 ${row.victimHealthBefore} HP，${killer}；保留证据但不计入 full HP TTK。`;
+    return `低血量对决：交手时受害者 ${row.victimHealthBefore} HP，${killer}；保留证据但不计入 full HP TTK。`;
   }
   if (row.ttkMs === 0 && row.oneShotKill) {
     return row.classification === "contested_duel"
       ? "0ms 表示击杀者这一组第一枪就是致命伤；对手在判定窗口内有开枪或伤害，所以仍归为正面对枪。"
       : "0ms 表示击杀者这一组第一枪就是致命伤。";
   }
-  if (row.thirdParty) return "第三方关键伤害参与，TTK 已从完整分布隔离。";
   if (row.classification === "caught_off_guard") return "侧背身击杀：对手未面向、转点或跑动中被击杀。";
   if (row.classification === "suppressed_kill") return "先手压制击杀：对手面向击杀者，但未在窗口内开枪。";
   return "对枪胜出：受害者在 ±1.5s 内还手。";
