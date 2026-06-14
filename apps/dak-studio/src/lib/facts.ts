@@ -7,7 +7,7 @@ import {
 } from "@cs2dak/core";
 import type { SeasonCohortFactRow } from "@cs2dak/cohort";
 import type { OpeningPatternCluster } from "@cs2dak/cohort";
-import type { DemoPackage, MatchWorkspaceModel, OpeningTrailsModel, RRSignals, Side, TeamKey } from "@cs2dak/contract";
+import type { DemoPackage, MatchWorkspaceModel, OpeningTrailsModel, Side, TeamKey } from "@cs2dak/contract";
 import { FLAG_ALIVE } from "@cs2dak/contract";
 import type { TriangleBvh } from "@cs2dak/maps";
 import type { LineupGrenadeLike } from "@cs2dak/maps";
@@ -29,14 +29,23 @@ import {
 } from "@cs2dak/presentation";
 import { getStorage, type RecordStore, type StorageAdapter } from "./storage";
 
-export const MATCH_FACTS_VERSION = 1;
+// ── 事实行基类型（消除 13 个接口中重复的 matchId/playerKey/…//） ──
 
-export interface PlayerMatchStatsFact {
-  version: number;
+interface FactBase {
   matchId: string;
+}
+
+interface PlayerFactBase extends FactBase {
   playerKey: string;
   steamId64: string;
   playerName: string;
+}
+
+interface MatchFactBase extends FactBase {
+  mapName: string;
+}
+
+export interface PlayerMatchStatsFact extends PlayerFactBase {
   teamKey: TeamKey;
   mapName: string;
   rounds: number;
@@ -66,101 +75,54 @@ export interface PlayerMatchStatsFact {
   vsFiveWonCount: number;
 }
 
-export interface PlayerInsightFact {
-  version: number;
-  matchId: string;
-  playerKey: string;
-  steamId64: string;
-  playerName: string;
+export interface PlayerInsightFact extends PlayerFactBase {
   insight: PlayerSeasonInsights;
 }
 
-export interface PlayerWeaponFact {
-  version: number;
-  matchId: string;
-  playerKey: string;
-  steamId64: string;
-  playerName: string;
+export interface PlayerWeaponFact extends PlayerFactBase {
   weapon: string;
   kills: number;
   headshots: number;
 }
 
-export interface MechanicsSamplesFact {
-  version: number;
-  matchId: string;
-  playerKey: string;
-  steamId64: string;
+export interface MechanicsSamplesFact extends PlayerFactBase {
   weapon: string;
   row: PlayerMechanicsFact;
 }
 
-export interface RRInputFact {
-  version: number;
-  matchId: string;
-  playerKey: string;
-  steamId64: string;
-  signals: RRSignals;
-}
-
-export interface CohortFact {
-  version: number;
-  matchId: string;
-  playerKey: string;
-  steamId64: string;
+export interface CohortFact extends PlayerFactBase {
   row: SeasonCohortFactRow;
 }
 
-export interface TournamentFact {
-  version: number;
-  matchId: string;
-  mapName: string;
+export interface TournamentFact extends MatchFactBase {
   row: TournamentFacts;
 }
 
-export interface TeamComparisonFact {
-  version: number;
-  matchId: string;
-  mapName: string;
+export interface TeamComparisonFact extends MatchFactBase {
   row: TeamComparisonFacts;
 }
 
-export interface DuelFact {
-  version: number;
-  matchId: string;
-  mapName: string;
+export interface DuelFact extends MatchFactBase {
   row: DuelInsightsFacts;
 }
 
-export interface MatchWorkspaceFact {
-  version: number;
-  matchId: string;
-  mapName: string;
+export interface MatchWorkspaceFact extends MatchFactBase {
   row: MatchWorkspaceModel;
 }
 
-export interface OpeningTrailFact {
-  version: number;
-  matchId: string;
-  mapName: string;
+export interface OpeningTrailFact extends MatchFactBase {
   playerKey: string;
   steamId64: string;
   row: OpeningTrailsModel;
 }
 
-export interface LineupFact {
-  version: number;
-  matchId: string;
-  mapName: string;
+export interface LineupFact extends MatchFactBase {
   grenades: LineupGrenadeLike[];
   roundWinners: Array<[string, string]>;
   tickrate: number;
 }
 
-export interface OpeningPatternFact {
-  version: number;
-  matchId: string;
-  mapName: string;
+export interface OpeningPatternFact extends MatchFactBase {
   side: Side;
   windowSeconds: number;
   basis: string;
@@ -170,14 +132,12 @@ export interface OpeningPatternFact {
 }
 
 export interface MatchFacts {
-  version: number;
   matchId: string;
   mapName: string;
   playerMatchStats: PlayerMatchStatsFact[];
   playerInsights: PlayerInsightFact[];
   playerWeapons: PlayerWeaponFact[];
   mechanicsSamples: MechanicsSamplesFact[];
-  rrInputs: RRInputFact[];
   cohortRows: CohortFact[];
   tournamentFacts: TournamentFact[];
   teamComparisonFacts: TeamComparisonFact[];
@@ -212,7 +172,6 @@ export interface FactsStore {
   getPlayerInsights(scope?: FactsScope): Promise<PlayerInsightFact[]>;
   getPlayerWeapons(scope?: FactsScope): Promise<PlayerWeaponFact[]>;
   getMechanicsRows(scope?: FactsScope): Promise<ProjectedMechanicsRows[]>;
-  getRRInputs(scope?: FactsScope): Promise<RRInputFact[]>;
   getCohortRows(scope?: FactsScope): Promise<SeasonCohortFactRow[]>;
   getTournamentFacts(scope?: FactsScope): Promise<TournamentFacts[]>;
   getTeamComparisonFacts(scope?: FactsScope): Promise<TeamComparisonFacts[]>;
@@ -271,9 +230,7 @@ function throwerPlaceAt(pkg: DemoPackage, roundNumber: number, playerIndex: numb
 
 function extractLineupFact(pkg: DemoPackage, matchId: string): LineupFact {
   const roundsByNumber = new Map(pkg.rounds.map((round) => [round.roundNumber, round]));
-  return {
-    version: MATCH_FACTS_VERSION,
-    matchId,
+  return {    matchId,
     mapName: pkg.match.mapName,
     tickrate: pkg.match.tickrate || 64,
     roundWinners: pkg.rounds.map((round) => [`${matchId}:${round.roundNumber}`, round.winnerTeamKey]),
@@ -341,9 +298,7 @@ function extractOpeningPatternFacts(pkg: DemoPackage, matchId: string, windowSec
         )
         .sort((a, b) => a.throwTick - b.throwTick)
         .map((grenade) => grenade.grenade);
-      return [{
-        version: MATCH_FACTS_VERSION,
-        matchId,
+      return [{        matchId,
         mapName: pkg.match.mapName,
         side,
         windowSeconds,
@@ -361,9 +316,7 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
   const playerStats = pkg.playerStats.map((stats): PlayerMatchStatsFact | null => {
     const player = pkg.players[stats.playerIndex];
     if (!player) return null;
-    return {
-      version: MATCH_FACTS_VERSION,
-      matchId: options.matchId,
+    return {      matchId: options.matchId,
       playerKey: playerKeyFor(player),
       steamId64: player.steamId64,
       playerName: player.name,
@@ -404,9 +357,7 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
   const signalBySteamId = new Map(rrSignals.map((row) => [row.steamId64, row]));
   const indicatorBySteamId = new Map(rrIndicators.map((row) => [row.steamId64, row]));
   const weaponBySteamId = new Map(weaponHighlights.map((row) => [row.steamId64, row]));
-  const playerInsights = pkg.players.map((player) => ({
-    version: MATCH_FACTS_VERSION,
-    matchId: options.matchId,
+  const playerInsights = pkg.players.map((player) => ({    matchId: options.matchId,
     playerKey: playerKeyFor(player),
     steamId64: player.steamId64,
     playerName: player.name,
@@ -420,9 +371,7 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
     if (!killer) continue;
     const weapon = kill.weapon || "unknown";
     const key = rowKey(options.matchId, killer.steamId64, weapon);
-    const cell = weaponCells.get(key) ?? {
-      version: MATCH_FACTS_VERSION,
-      matchId: options.matchId,
+    const cell = weaponCells.get(key) ?? {      matchId: options.matchId,
       playerKey: playerKeyFor(killer),
       steamId64: killer.steamId64,
       playerName: killer.name,
@@ -440,36 +389,23 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
     visibility: options.visibilityFor?.(pkg.match.mapName) ?? null
   }).map((row) => {
     const player = players.get(row.steamId64);
-    return {
-      version: MATCH_FACTS_VERSION,
-      matchId: options.matchId,
+    return {      matchId: options.matchId,
       playerKey: player ? playerKeyFor(player) : defaultPlayerKey(row),
       steamId64: row.steamId64,
+      playerName: player?.name ?? row.steamId64,
       weapon: row.weapon,
       row
     } satisfies MechanicsSamplesFact;
-  });
-
-  const rrInputs = rrSignals.map((signals) => {
-    const player = players.get(signals.steamId64);
-    return {
-      version: MATCH_FACTS_VERSION,
-      matchId: options.matchId,
-      playerKey: player ? playerKeyFor(player) : defaultPlayerKey(signals),
-      steamId64: signals.steamId64,
-      signals
-    } satisfies RRInputFact;
   });
 
   const cohortRows = pkg.players.map((player): CohortFact | null => {
     const signals = signalBySteamId.get(player.steamId64);
     const indicators = indicatorBySteamId.get(player.steamId64);
     if (!signals || !indicators) return null;
-    return {
-      version: MATCH_FACTS_VERSION,
-      matchId: options.matchId,
+    return {      matchId: options.matchId,
       playerKey: playerKeyFor(player),
       steamId64: player.steamId64,
+      playerName: player.name,
       row: {
         matchId: options.matchId,
         sourceDemoHash: pkg.manifest.demo?.hash ?? null,
@@ -486,46 +422,33 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
   const visibilityFor = options.visibilityFor?.(mapName) ?? null;
   const input = { matchId: options.matchId, pkg };
   const matchWorkspace = buildMatchWorkspaceModel(pkg);
-  const openingTrails = pkg.players.map((player) => ({
-    version: MATCH_FACTS_VERSION,
-    matchId: options.matchId,
+  const openingTrails = pkg.players.map((player) => ({    matchId: options.matchId,
     mapName,
     playerKey: playerKeyFor(player),
     steamId64: player.steamId64,
     row: buildOpeningTrails(pkg, options.matchId, player.steamId64, { windowSeconds: 30 })
   } satisfies OpeningTrailFact));
 
-  return {
-    version: MATCH_FACTS_VERSION,
-    matchId: options.matchId,
+  return {    matchId: options.matchId,
     mapName,
     playerMatchStats: playerStats,
     playerInsights,
     playerWeapons,
     mechanicsSamples,
-    rrInputs,
     cohortRows,
-    tournamentFacts: [{
-      version: MATCH_FACTS_VERSION,
-      matchId: options.matchId,
+    tournamentFacts: [{      matchId: options.matchId,
       mapName,
       row: extractTournamentFacts(input)
     }],
-    teamComparisonFacts: [{
-      version: MATCH_FACTS_VERSION,
-      matchId: options.matchId,
+    teamComparisonFacts: [{      matchId: options.matchId,
       mapName,
       row: extractTeamComparisonFacts(input)
     }],
-    duelFacts: [{
-      version: MATCH_FACTS_VERSION,
-      matchId: options.matchId,
+    duelFacts: [{      matchId: options.matchId,
       mapName,
       row: extractDuelInsightsFacts(input, { visibilityFor: () => visibilityFor })
     }],
-    matchWorkspace: [{
-      version: MATCH_FACTS_VERSION,
-      matchId: options.matchId,
+    matchWorkspace: [{      matchId: options.matchId,
       mapName,
       row: matchWorkspace
     }],
@@ -568,7 +491,6 @@ export function createFactsStore(adapter: StorageAdapter, namespace = "facts"): 
   const playerInsights = adapter.records(`${namespace}:player_insights`);
   const playerWeapons = adapter.records(`${namespace}:player_weapons`);
   const mechanics = adapter.records(`${namespace}:mechanics_samples`);
-  const rrInputs = adapter.records(`${namespace}:rr_inputs`);
   const cohortRows = adapter.records(`${namespace}:cohort_rows`);
   const tournamentFacts = adapter.records(`${namespace}:tournament_facts`);
   const teamComparisonFacts = adapter.records(`${namespace}:team_comparison_facts`);
@@ -599,11 +521,6 @@ export function createFactsStore(adapter: StorageAdapter, namespace = "facts"): 
         replaceRows(
           mechanics,
           facts.mechanicsSamples.map((row) => [rowKey(row.matchId, row.playerKey, row.weapon), row]),
-          facts.matchId
-        ),
-        replaceRows(
-          rrInputs,
-          facts.rrInputs.map((row) => [rowKey(row.matchId, row.playerKey), row]),
           facts.matchId
         ),
         replaceRows(
@@ -675,11 +592,6 @@ export function createFactsStore(adapter: StorageAdapter, namespace = "facts"): 
       }
       return [...byMatch.entries()].map(([matchId, matchRows]) => ({ matchId, rows: matchRows }));
     },
-    async getRRInputs(scope) {
-      return (await rrInputs.getAll<RRInputFact>())
-        .filter((row) => inScope(row, scope))
-        .sort((a, b) => a.matchId.localeCompare(b.matchId) || a.playerKey.localeCompare(b.playerKey));
-    },
     async getCohortRows(scope) {
       return (await cohortRows.getAll<CohortFact>())
         .filter((row) => inScope(row, scope))
@@ -725,21 +637,12 @@ export function createFactsStore(adapter: StorageAdapter, namespace = "facts"): 
         .sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.side.localeCompare(b.side));
     },
     async deleteMatchFacts(matchId) {
-      await Promise.all([
-        replaceRows(playerStats, [], matchId),
-        replaceRows(playerInsights, [], matchId),
-        replaceRows(playerWeapons, [], matchId),
-        replaceRows(mechanics, [], matchId),
-        replaceRows(rrInputs, [], matchId),
-        replaceRows(cohortRows, [], matchId),
-        replaceRows(tournamentFacts, [], matchId),
-        replaceRows(teamComparisonFacts, [], matchId),
-        replaceRows(duelFacts, [], matchId),
-        replaceRows(matchWorkspace, [], matchId),
-        replaceRows(openingTrails, [], matchId),
-        replaceRows(lineups, [], matchId),
-        replaceRows(openingPatterns, [], matchId)
-      ]);
+      await Promise.all(
+        [playerStats, playerInsights, playerWeapons, mechanics,
+         cohortRows, tournamentFacts, teamComparisonFacts, duelFacts,
+         matchWorkspace, openingTrails, lineups, openingPatterns]
+          .map((store) => replaceRows(store as RecordStore, [], matchId))
+      );
     }
   };
 }
@@ -846,16 +749,10 @@ export async function buildPlayerSeasonDetailsFromFacts(
   store: FactsStore,
   options: PlayerSeasonDetailsFactsOptions
 ): Promise<PlayerSeasonDetailsFromFacts> {
-  const scope: FactsScope = {
-    matchIds: options.matchIds,
-    playerKeys: options.playerKeys,
-    steamIds: options.steamIds,
-    mapNames: options.mapNames
-  };
   const [insights, weapons, mechanics] = await Promise.all([
-    store.getPlayerInsights(scope),
-    store.getPlayerWeapons(scope),
-    store.getMechanicsRows(scope)
+    store.getPlayerInsights(options),
+    store.getPlayerWeapons(options),
+    store.getMechanicsRows(options)
   ]);
   return {
     insights: mergeInsights(insights),

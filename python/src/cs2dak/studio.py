@@ -126,9 +126,6 @@ log = logging.getLogger("cs2dak.studio")
 class _StudioStaticHandler(SimpleHTTPRequestHandler):
     """Static file handler with real cache headers for large immutable assets."""
 
-    def __init__(self, *args, directory: str | None = None, **kwargs) -> None:
-        super().__init__(*args, directory=directory, **kwargs)
-
     def log_message(self, format: str, *args) -> None:  # noqa: A002 - stdlib signature
         log.debug("static: " + format, *args)
 

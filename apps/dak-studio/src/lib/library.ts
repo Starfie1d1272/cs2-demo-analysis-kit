@@ -299,12 +299,13 @@ export async function bulkUpdateTags(ids: string[], add: string[] = [], remove: 
   const addSet = normalizeTags(add);
   const removeSet = new Set(normalizeTags(remove));
   const meta = demoMeta;
-  for (const id of targetIds) {
-    const record = await meta.get<StudioDemoEntry>(id);
-    if (!record) continue;
-    const nextTags = normalizeTags([...(record.tags ?? []).filter((tag) => !removeSet.has(tag)), ...addSet]);
-    await meta.put(id, { ...record, tags: nextTags });
-  }
+  const records = await Promise.all(targetIds.map((id) => meta.get<StudioDemoEntry>(id)));
+  await Promise.all(
+    records.filter((r): r is StudioDemoEntry => r != null).map((record) => {
+      const nextTags = normalizeTags([...(record.tags ?? []).filter((tag) => !removeSet.has(tag)), ...addSet]);
+      return meta.put(record.id, { ...record, tags: nextTags });
+    })
+  );
 }
 
 export async function removeDemo(id: string): Promise<void> {
@@ -335,10 +336,13 @@ export function getDemoPackage(id: string): Promise<DemoPackage> {
 export async function renameTeamInLibrary(originalName: string, displayName: string): Promise<void> {
   const meta = demoMeta;
   const all = await meta.getAll<StudioDemoEntry>();
-  for (const record of all) {
-    let changed = false;
-    if (record.meta.teamAName === originalName) { record.meta.teamAName = displayName; changed = true; }
-    if (record.meta.teamBName === originalName) { record.meta.teamBName = displayName; changed = true; }
-    if (changed) await meta.put(record.id, record);
-  }
+  await Promise.all(
+    all.map((record) => {
+      let recordMut = record;
+      let changed = false;
+      if (recordMut.meta.teamAName === originalName) { recordMut = { ...recordMut, meta: { ...recordMut.meta, teamAName: displayName } }; changed = true; }
+      if (recordMut.meta.teamBName === originalName) { recordMut = { ...recordMut, meta: { ...recordMut.meta, teamBName: displayName } }; changed = true; }
+      return changed ? meta.put(recordMut.id, recordMut) : Promise.resolve();
+    })
+  );
 }
