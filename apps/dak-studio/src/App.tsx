@@ -475,6 +475,7 @@ export function App() {
                 entries={scopedEntries}
                 scope={scope}
                 onScopeChange={setScope}
+                identityOptions={identityOptions}
                 teamRenames={identityState.teamRenames}
                 onGoLibrary={() => setView("library")}
               />

@@ -4,6 +4,7 @@ import type { OpeningTrailsModel, OpeningTrailRound } from "@cs2dak/contract";
 import { buildOpeningTrails } from "@cs2dak/presentation";
 import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
 import { getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import type { IdentityOptions } from "../lib/season";
 import { getPinnedPlayer } from "../lib/pin";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState } from "../components/primitives";
@@ -19,6 +20,7 @@ export interface TrailsViewProps {
   scope: CohortScopeState;
   onScopeChange: (scope: CohortScopeState) => void;
   onGoLibrary: () => void;
+  identityOptions?: IdentityOptions;
   teamRenames?: Record<string, string>;
 }
 
@@ -26,8 +28,11 @@ const WINDOW_SECONDS = 30;
 const RANGE_OPTIONS = [3, 5, 10, 0] as const; // 0 = 全部
 
 interface PlayerOption {
-  steamId64: string;
+  /** identity 归并后的稳定 key（未归并者为 steam:${steamId}）。 */
+  playerKey: string;
   name: string;
+  /** 归并到此选手的全部 steamId（一人多账号）。 */
+  steamIds: string[];
   matchCount: number;
 }
 
@@ -70,10 +75,10 @@ const EFFECT_DURATION_SECONDS: Partial<Record<string, number>> = {
   decoy: 15
 };
 
-export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibrary, teamRenames = {} }: TrailsViewProps) {
+export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibrary, identityOptions, teamRenames = {} }: TrailsViewProps) {
   // 业务流程：① 选手 → ② 地图（该选手出场的图）→ ③ 最近 N 场（该选手在该图）
   const [rangeN, setRangeN] = useState<number>(5);
-  const [steamId64, setSteamId64] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [players, setPlayers] = useState<PlayerOption[] | null>(null);
   /** entryId → 该场出场选手集合。 */
   const [rosterByEntry, setRosterByEntry] = useState<Map<string, Set<string>> | null>(null);
@@ -94,30 +99,45 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
     let cancelled = false;
     setPlayers(null);
     setError(null);
+    // identity 归并：把每个 steamId 解析到稳定 playerKey + 显示名（未归并者各自成键）。
+    const idMap = identityOptions?.map ?? {};
+    const resolve = (steamId: string, name: string): { playerKey: string; displayName: string } => {
+      const found = idMap[steamId];
+      if (found && typeof found === "object") return { playerKey: found.playerKey, displayName: found.displayName ?? name };
+      if (typeof found === "string") return { playerKey: found, displayName: name };
+      return { playerKey: `steam:${steamId}`, displayName: name };
+    };
     Promise.all(entries.map(async (entry) => ({ id: entry.id, pkg: await getDemoPackage(entry.id) })))
       .then(async (loaded) => {
         if (cancelled) return;
         const counts = new Map<string, PlayerOption>();
         const roster = new Map<string, Set<string>>();
         for (const { id, pkg } of loaded) {
-          const ids = new Set<string>();
+          const keys = new Set<string>();
           for (const player of pkg.players) {
-            ids.add(player.steamId64);
-            const current = counts.get(player.steamId64);
-            if (current) current.matchCount += 1;
-            else counts.set(player.steamId64, { steamId64: player.steamId64, name: player.name, matchCount: 1 });
+            const { playerKey, displayName } = resolve(player.steamId64, player.name);
+            const current = counts.get(playerKey);
+            if (current) {
+              if (!current.steamIds.includes(player.steamId64)) current.steamIds.push(player.steamId64);
+              if (!keys.has(playerKey)) current.matchCount += 1;
+            } else {
+              counts.set(playerKey, { playerKey, name: displayName, steamIds: [player.steamId64], matchCount: 1 });
+            }
+            keys.add(playerKey);
           }
-          roster.set(id, ids);
+          roster.set(id, keys);
         }
         const options = [...counts.values()].sort((a, b) => b.matchCount - a.matchCount || a.name.localeCompare(b.name));
         const pinned = await getPinnedPlayer();
         if (cancelled) return;
         setPlayers(options);
         setRosterByEntry(roster);
-        setSteamId64((current) => {
-          if (current && options.some((option) => option.steamId64 === current)) return current;
-          const pinnedOption = pinned ? options.find((option) => pinned.steamIds.includes(option.steamId64)) : null;
-          return (pinnedOption ?? options[0])?.steamId64 ?? null;
+        setSelectedKey((current) => {
+          if (current && options.some((option) => option.playerKey === current)) return current;
+          const pinnedOption = pinned
+            ? options.find((option) => option.playerKey === pinned.playerKey || option.steamIds.some((s) => pinned.steamIds.includes(s)))
+            : null;
+          return (pinnedOption ?? options[0])?.playerKey ?? null;
         });
       })
       .catch((err) => {
@@ -126,15 +146,15 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
     return () => {
       cancelled = true;
     };
-  }, [entries]);
+  }, [entries, identityOptions?.version]);
 
   // 该选手出场的全部场次（matchId 日期前缀降序）
   const playerEntries = useMemo(() => {
-    if (!steamId64 || !rosterByEntry) return [];
+    if (!selectedKey || !rosterByEntry) return [];
     return entries
-      .filter((entry) => rosterByEntry.get(entry.id)?.has(steamId64))
+      .filter((entry) => rosterByEntry.get(entry.id)?.has(selectedKey))
       .sort((a, b) => matchIdForEntry(b).localeCompare(matchIdForEntry(a)));
-  }, [entries, steamId64, rosterByEntry]);
+  }, [entries, selectedKey, rosterByEntry]);
 
   // ② 地图选项 = 该选手出场过的图
   const mapOptions = useMemo(() => {
@@ -160,23 +180,27 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
 
   // 为选中选手构建各场动线
   useEffect(() => {
-    if (!steamId64 || rangeEntries.length === 0) {
+    const selected = players?.find((option) => option.playerKey === selectedKey);
+    if (!selected || rangeEntries.length === 0) {
       setModels(null);
       return;
     }
     let cancelled = false;
     setModels(null);
     setError(null);
+    const steamIdSet = new Set(selected.steamIds);
     Promise.all(
-      rangeEntries.map(async (entry) =>
-        buildOpeningTrails(await getDemoPackage(entry.id), matchIdForEntry(entry), steamId64, {
-          windowSeconds: WINDOW_SECONDS
-        })
-      )
+      rangeEntries.map(async (entry) => {
+        const pkg = await getDemoPackage(entry.id);
+        // 归并选手在该场出场的具体 steamId（一人一场只有一个账号）
+        const steamId = pkg.players.find((p) => steamIdSet.has(p.steamId64))?.steamId64;
+        if (!steamId) return null;
+        return buildOpeningTrails(pkg, matchIdForEntry(entry), steamId, { windowSeconds: WINDOW_SECONDS });
+      })
     )
       .then((result) => {
         if (cancelled) return;
-        setModels(result);
+        setModels(result.filter((model): model is OpeningTrailsModel => model != null));
         setHiddenRounds(new Set());
       })
       .catch((err) => {
@@ -185,7 +209,7 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
     return () => {
       cancelled = true;
     };
-  }, [rangeEntries, steamId64]);
+  }, [rangeEntries, selectedKey, players]);
 
   const visibleRounds = useMemo(() => {
     if (!models || !mapName) return [];
@@ -213,7 +237,7 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
     );
   }
 
-  const selectedPlayer = players?.find((option) => option.steamId64 === steamId64) ?? null;
+  const selectedPlayer = players?.find((option) => option.playerKey === selectedKey) ?? null;
 
   return (
     <div className="stu-view">
@@ -231,9 +255,9 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
       <div className="stu-trail-controls">
         <label>
           <span>① 选手</span>
-          <select className="stu-select" value={steamId64 ?? ""} onChange={(e) => setSteamId64(e.target.value || null)}>
+          <select className="stu-select" value={selectedKey ?? ""} onChange={(e) => setSelectedKey(e.target.value || null)}>
             {(players ?? []).map((option) => (
-              <option key={option.steamId64} value={option.steamId64}>
+              <option key={option.playerKey} value={option.playerKey}>
                 {option.name}（{option.matchCount} 场）
               </option>
             ))}
@@ -306,7 +330,7 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
         />
       ) : (
         <TrailStage
-          key={`${mapName}-${side}-${steamId64}-${visibleRounds.length}`}
+          key={`${mapName}-${side}-${selectedKey}-${visibleRounds.length}`}
           mapName={mapName!}
           rounds={visibleRounds}
           hiddenRounds={hiddenRounds}
