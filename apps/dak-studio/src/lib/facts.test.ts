@@ -17,6 +17,7 @@ import {
   buildTournamentInsightsFromFacts
 } from "@cs2dak/presentation";
 import { buildPlayerSeasonDetailsFromFacts, createFactsStore, extractMatchFacts } from "./facts";
+import type { ExecuteBucket } from "./facts";
 import { createIdbAdapter } from "./storage/idb-adapter";
 
 async function loadFixture() {
@@ -131,5 +132,38 @@ describe("MatchFacts", () => {
     expect(buildDuelInsightsFromFacts(await store.getDuelFacts({ matchIds: [matchId] }))).toEqual(
       buildDuelInsights([{ matchId, pkg }])
     );
+  });
+
+  it("提取 TacticalRoundFact：每回合每存活 side 一行，字段完整", async () => {
+    const pkg = await loadFixture();
+    const facts = extractMatchFacts(pkg, { matchId: "m1" });
+    expect(facts.tacticalRounds.length).toBeGreaterThan(0);
+    const f = facts.tacticalRounds[0]!;
+    expect(f.snapshots.length).toBeGreaterThanOrEqual(2);
+    expect(["a", "b", null]).toContain(f.targetSite);
+    expect(f.siteInvestment.a.entryCount).toBeGreaterThanOrEqual(0);
+    expect(f.siteInvestment.b.entryCount).toBeGreaterThanOrEqual(0);
+    expect(typeof f.won).toBe("boolean");
+    expect(["teamA", "teamB"]).toContain(f.teamKey);
+    // 真正下包的回合必有 targetSite 与节奏桶
+    const planted = facts.tacticalRounds.find(
+      (r) => r.siteInvestment.a.planted || r.siteInvestment.b.planted
+    );
+    if (planted) {
+      expect(planted.targetSite).not.toBeNull();
+      expect(planted.executeBucket).not.toBeNull();
+      expect(["rush", "fast", "mid", "late"] satisfies ExecuteBucket[]).toContain(planted.executeBucket!);
+    }
+  });
+
+  it("TacticalRoundFact store 读写：putMatchFacts 后 getTacticalRounds 返回相同数据", async () => {
+    const pkg = await loadFixture();
+    const matchId = "m1";
+    const facts = extractMatchFacts(pkg, { matchId });
+    const store = createFactsStore(createIdbAdapter(), "facts-tactical-rounds");
+    await store.putMatchFacts(facts);
+    const rows = await store.getTacticalRounds({ matchIds: [matchId] });
+    expect(rows.length).toBe(facts.tacticalRounds.length);
+    expect(rows[0]?.snapshots.length).toBeGreaterThanOrEqual(2);
   });
 });

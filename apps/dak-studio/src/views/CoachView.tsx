@@ -6,7 +6,7 @@ import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState } from "../components/primitives";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
-import { buildOpeningPatternClustersFromFacts, getFactsStore } from "../lib/facts";
+import { getFactsStore } from "../lib/facts";
 import {
   listPlaybookNames,
   loadCoachSettings,
@@ -75,9 +75,10 @@ export function CoachView({
     let cancelled = false;
     setClusters(null);
     setError(null);
-    getFactsStore().getOpeningPatterns({ matchIds: entries.map(matchIdForEntry) })
-      .then((rows) => {
-        if (!cancelled) setClusters(buildOpeningPatternClustersFromFacts(rows));
+    // TODO Phase 5: 接 buildTacticalClusters
+    getFactsStore().getTacticalRounds({ matchIds: entries.map(matchIdForEntry) })
+      .then(() => {
+        if (!cancelled) setClusters([] as OpeningPatternCluster[]);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));

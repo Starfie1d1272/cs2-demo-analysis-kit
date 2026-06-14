@@ -6,11 +6,11 @@ import {
   type PlayerMechanicsFact
 } from "@cs2dak/core";
 import type { SeasonCohortFactRow } from "@cs2dak/cohort";
-import type { OpeningPatternCluster } from "@cs2dak/cohort";
-import type { DemoPackage, MatchWorkspaceModel, OpeningTrailsModel, Side, TeamKey } from "@cs2dak/contract";
+import type { DemoPackage, EconomyType, MatchWorkspaceModel, OpeningTrailsModel, Side, TeamKey } from "@cs2dak/contract";
 import { FLAG_ALIVE } from "@cs2dak/contract";
 import type { TriangleBvh } from "@cs2dak/maps";
 import type { LineupGrenadeLike } from "@cs2dak/maps";
+import { roleOf } from "@cs2dak/maps";
 import {
   buildMatchWorkspaceModel,
   buildOpeningTrails,
@@ -122,13 +122,36 @@ export interface LineupFact extends MatchFactBase {
   tickrate: number;
 }
 
-export interface OpeningPatternFact extends MatchFactBase {
+/** 回合剩余秒（1:55=115 起倒计时）下的一次站位切片。 */
+export interface TacticalSnapshot {
+  remainSec: number;
+  defaults: Record<string, number>;   // anchorId → 存活人数
+  advanced: Record<string, number>;   // advanced callout → 人数
+}
+
+export interface SiteInvestment {
+  entryCount: number;       // 进入该包点 zone 的人数
+  grenadeCount: number;     // 该回合朝该 site 投出的道具数
+  deepestAnchor: string | null;  // 最深推进 anchor
+  planted: boolean;
+}
+
+export type ExecuteBucket = "rush" | "fast" | "mid" | "late";
+
+export interface TacticalRoundFact extends MatchFactBase {
   side: Side;
-  windowSeconds: number;
-  basis: string;
-  grenadeSequence: string[];
-  roundNumber: number;
+  teamKey: "teamA" | "teamB";
+  economy: EconomyType;
   won: boolean;
+  roundNumber: number;
+  snapshots: TacticalSnapshot[];
+  targetSite: "a" | "b" | null;
+  siteInvestment: { a: SiteInvestment; b: SiteInvestment };
+  entryAnchors: string[];
+  executeRemainSec: number | null;
+  executeBucket: ExecuteBucket | null;
+  firstKillForTeam: boolean | null;
+  grenadeIds: string[];
 }
 
 export interface MatchFacts {
@@ -145,7 +168,7 @@ export interface MatchFacts {
   matchWorkspace: MatchWorkspaceFact[];
   openingTrails: OpeningTrailFact[];
   lineups: LineupFact[];
-  openingPatterns: OpeningPatternFact[];
+  tacticalRounds: TacticalRoundFact[];
 }
 
 export interface ExtractMatchFactsOptions {
@@ -179,7 +202,7 @@ export interface FactsStore {
   getMatchWorkspaces(scope?: FactsScope): Promise<MatchWorkspaceFact[]>;
   getOpeningTrails(scope?: FactsScope): Promise<OpeningTrailFact[]>;
   getLineups(scope?: FactsScope): Promise<LineupFact[]>;
-  getOpeningPatterns(scope?: FactsScope): Promise<OpeningPatternFact[]>;
+  getTacticalRounds(scope?: FactsScope): Promise<TacticalRoundFact[]>;
   deleteMatchFacts(matchId: string): Promise<void>;
 }
 
@@ -254,11 +277,6 @@ function extractLineupFact(pkg: DemoPackage, matchId: string): LineupFact {
   };
 }
 
-function distributionKey(labels: string[]): string {
-  const counts = new Map<string, number>();
-  for (const label of labels) counts.set(label, (counts.get(label) ?? 0) + 1);
-  return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([label, count]) => `${label}:${count}`).join("|");
-}
 
 function replayLabelsAt(pkg: DemoPackage, roundNumber: number, side: Side, sampleTick: number): string[] {
   const replay = pkg.replay;
@@ -282,33 +300,198 @@ function replayLabelsAt(pkg: DemoPackage, roundNumber: number, side: Side, sampl
   return labels.sort();
 }
 
-function extractOpeningPatternFacts(pkg: DemoPackage, matchId: string, windowSeconds = 15): OpeningPatternFact[] {
+// ── TacticalRoundFact helpers ─────────────────────────────────────────────────
+
+const ROUND_SECONDS = 115; // 1:55 倒计时起点
+
+function remainSecAt(tick: number, freezeEndTick: number, tickrate: number): number {
+  return Math.max(0, Math.round(ROUND_SECONDS - (tick - freezeEndTick) / tickrate));
+}
+
+function bucketOf(remainSec: number | null): ExecuteBucket | null {
+  if (remainSec == null) return null;
+  if (remainSec > 95) return "rush";  // 剩 >1:35
+  if (remainSec > 70) return "fast";  // 1:35–1:10
+  if (remainSec > 40) return "mid";   // 1:10–0:40
+  return "late";                      // <0:40
+}
+
+function snapshotAt(
+  pkg: DemoPackage,
+  roundNumber: number,
+  side: Side,
+  tick: number,
+  freezeEndTick: number,
+  tickrate: number
+): TacticalSnapshot {
+  const remainSec = remainSecAt(tick, freezeEndTick, tickrate);
+  const defaults: Record<string, number> = {};
+  const advanced: Record<string, number> = {};
+  for (const callout of replayLabelsAt(pkg, roundNumber, side, tick)) {
+    const role = roleOf(pkg.match.mapName, side, callout);
+    if (role.kind === "default") {
+      defaults[role.anchorId] = (defaults[role.anchorId] ?? 0) + 1;
+    } else if (role.kind === "advanced") {
+      advanced[callout] = (advanced[callout] ?? 0) + 1;
+    }
+  }
+  return { remainSec, defaults, advanced };
+}
+
+function economyTypeFor(
+  pkg: DemoPackage,
+  round: DemoPackage["rounds"][number],
+  teamKey: "teamA" | "teamB"
+): EconomyType {
+  const teamIndices = new Set(
+    pkg.players.map((p, i) => ({ p, i })).filter(({ p }) => p.teamKey === teamKey).map(({ i }) => i)
+  );
+  const econs = pkg.playerEconomies.filter(
+    (e) => e.roundNumber === round.roundNumber && teamIndices.has(e.playerIndex)
+  );
+  if (econs.length === 0) return "full";
+  const counts = new Map<EconomyType, number>();
+  for (const e of econs) counts.set(e.type, (counts.get(e.type) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+}
+
+function siteInvestmentFor(
+  pkg: DemoPackage,
+  round: DemoPackage["rounds"][number],
+  side: Side
+): { a: SiteInvestment; b: SiteInvestment } {
   const tickrate = pkg.match.tickrate || 64;
-  return pkg.rounds.flatMap((round) => {
-    const sampleTick = round.freezeEndTick + windowSeconds * tickrate;
-    return (["t", "ct"] as const).flatMap((side) => {
-      const labels = replayLabelsAt(pkg, round.roundNumber, side, sampleTick);
-      if (labels.length === 0) return [];
-      const grenades = pkg.grenades
-        .filter((grenade) =>
-          grenade.roundNumber === round.roundNumber &&
-          grenade.throwTick >= round.freezeEndTick &&
-          grenade.throwTick <= sampleTick &&
-          sideOf(pkg, grenade.throwerIndex, round.roundNumber) === side
-        )
-        .sort((a, b) => a.throwTick - b.throwTick)
-        .map((grenade) => grenade.grenade);
-      return [{        matchId,
-        mapName: pkg.match.mapName,
-        side,
-        windowSeconds,
-        basis: distributionKey(labels),
-        grenadeSequence: grenades,
+  // 进点阶段采样：~40s 剩余
+  const entryTick = round.freezeEndTick + 75 * tickrate;
+  const labels = replayLabelsAt(pkg, round.roundNumber, side, entryTick);
+
+  const plantA = pkg.bombs.find(
+    (b) => b.roundNumber === round.roundNumber && b.type === "plant" && b.site === "a"
+  );
+  const plantB = pkg.bombs.find(
+    (b) => b.roundNumber === round.roundNumber && b.type === "plant" && b.site === "b"
+  );
+
+  const sideGrenades = pkg.grenades.filter(
+    (g) => g.roundNumber === round.roundNumber && sideOf(pkg, g.throwerIndex, round.roundNumber) === side
+  );
+  const total = sideGrenades.length;
+
+  const aEntry = labels.filter((l) => l === "BombsiteA").length;
+  const bEntry = labels.filter((l) => l === "BombsiteB").length;
+
+  const deepFromLabels = () => {
+    for (const callout of labels) {
+      const role = roleOf(pkg.match.mapName, side, callout);
+      if (role.kind === "default") return role.anchorId;
+    }
+    return null;
+  };
+
+  return {
+    a: {
+      entryCount: aEntry,
+      grenadeCount: plantA ? total : plantB ? 0 : Math.ceil(total / 2),
+      deepestAnchor: aEntry > 0 ? "BombsiteA" : deepFromLabels(),
+      planted: !!plantA,
+    },
+    b: {
+      entryCount: bEntry,
+      grenadeCount: plantB ? total : plantA ? 0 : Math.floor(total / 2),
+      deepestAnchor: bEntry > 0 ? "BombsiteB" : deepFromLabels(),
+      planted: !!plantB,
+    },
+  };
+}
+
+function targetSiteFor(
+  pkg: DemoPackage,
+  round: DemoPackage["rounds"][number],
+  invest: { a: SiteInvestment; b: SiteInvestment }
+): "a" | "b" | null {
+  if (invest.a.planted) return "a";
+  if (invest.b.planted) return "b";
+  if (invest.a.entryCount > invest.b.entryCount) return "a";
+  if (invest.b.entryCount > invest.a.entryCount) return "b";
+  return null;
+}
+
+function executeRemainFor(
+  pkg: DemoPackage,
+  round: DemoPackage["rounds"][number],
+  _side: Side,
+  targetSite: "a" | "b" | null,
+  tickrate: number
+): number | null {
+  if (!targetSite) return null;
+  const plant = pkg.bombs.find(
+    (b) => b.roundNumber === round.roundNumber && b.type === "plant" && b.site === targetSite
+  );
+  if (plant) return remainSecAt(plant.tick, round.freezeEndTick, tickrate);
+  return null;
+}
+
+function entryAnchorsFor(
+  pkg: DemoPackage,
+  round: DemoPackage["rounds"][number],
+  side: Side
+): string[] {
+  const tickrate = pkg.match.tickrate || 64;
+  const entryTick = round.freezeEndTick + 75 * tickrate;
+  const anchors = new Set<string>();
+  for (const callout of replayLabelsAt(pkg, round.roundNumber, side, entryTick)) {
+    const role = roleOf(pkg.match.mapName, side, callout);
+    if (role.kind === "default") anchors.add(role.anchorId);
+  }
+  return [...anchors].sort();
+}
+
+function firstKillForTeamFor(
+  pkg: DemoPackage,
+  round: DemoPackage["rounds"][number],
+  teamKey: "teamA" | "teamB"
+): boolean | null {
+  const kills = pkg.kills.filter((k) => k.roundNumber === round.roundNumber).sort((a, b) => a.tick - b.tick);
+  if (kills.length === 0) return null;
+  const first = kills[0];
+  if (first.killerIndex == null) return null;
+  const killer = pkg.players[first.killerIndex];
+  if (!killer) return null;
+  return killer.teamKey === teamKey;
+}
+
+function extractTacticalRoundFacts(pkg: DemoPackage, matchId: string): TacticalRoundFact[] {
+  const tickrate = pkg.match.tickrate || 64;
+  const out: TacticalRoundFact[] = [];
+  for (const round of pkg.rounds) {
+    const fe = round.freezeEndTick;
+    // T: 剩 1:40 / 1:25
+    const tSlices = [fe + 15 * tickrate, fe + 30 * tickrate];
+    // CT: 剩 1:35 / 1:00 / 0:30
+    const ctSlices = [fe + 20 * tickrate, fe + 55 * tickrate, fe + 85 * tickrate];
+    for (const side of ["t", "ct"] as const) {
+      const slices = side === "t" ? tSlices : ctSlices;
+      const snapshots = slices.map((tk) => snapshotAt(pkg, round.roundNumber, side, tk, fe, tickrate));
+      if (snapshots.every((s) => Object.keys(s.defaults).length === 0 && Object.keys(s.advanced).length === 0)) continue;
+      const teamKey = round.teamASide === side ? "teamA" : "teamB";
+      const invest = siteInvestmentFor(pkg, round, side);
+      const target = targetSiteFor(pkg, round, invest);
+      const exec = executeRemainFor(pkg, round, side, target, tickrate);
+      out.push({
+        matchId, mapName: pkg.match.mapName, side, teamKey,
+        economy: economyTypeFor(pkg, round, teamKey),
+        won: round.winnerSide === side,
         roundNumber: round.roundNumber,
-        won: round.winnerSide === side
-      }];
-    });
-  });
+        snapshots, targetSite: target,
+        siteInvestment: invest,
+        entryAnchors: entryAnchorsFor(pkg, round, side),
+        executeRemainSec: exec, executeBucket: bucketOf(exec),
+        firstKillForTeam: firstKillForTeamFor(pkg, round, teamKey),
+        grenadeIds: [],
+      });
+    }
+  }
+  return out;
 }
 
 export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOptions): MatchFacts {
@@ -454,7 +637,7 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
     }],
     openingTrails,
     lineups: [extractLineupFact(pkg, options.matchId)],
-    openingPatterns: extractOpeningPatternFacts(pkg, options.matchId)
+    tacticalRounds: extractTacticalRoundFacts(pkg, options.matchId)
   };
 }
 
@@ -498,7 +681,7 @@ export function createFactsStore(adapter: StorageAdapter, namespace = "facts"): 
   const matchWorkspace = adapter.records(`${namespace}:match_workspace`);
   const openingTrails = adapter.records(`${namespace}:opening_trails`);
   const lineups = adapter.records(`${namespace}:lineups`);
-  const openingPatterns = adapter.records(`${namespace}:opening_patterns`);
+  const tacticalRounds = adapter.records(`${namespace}:tactical_rounds`);
 
   return {
     async putMatchFacts(facts) {
@@ -559,8 +742,8 @@ export function createFactsStore(adapter: StorageAdapter, namespace = "facts"): 
           facts.matchId
         ),
         replaceRows(
-          openingPatterns,
-          facts.openingPatterns.map((row) => [rowKey(row.matchId, String(row.roundNumber), row.side), row]),
+          tacticalRounds,
+          facts.tacticalRounds.map((row) => [rowKey(row.matchId, String(row.roundNumber), row.side), row]),
           facts.matchId
         )
       ]);
@@ -631,8 +814,8 @@ export function createFactsStore(adapter: StorageAdapter, namespace = "facts"): 
         .filter((row) => inScope(row, scope))
         .sort((a, b) => a.matchId.localeCompare(b.matchId));
     },
-    async getOpeningPatterns(scope) {
-      return (await openingPatterns.getAll<OpeningPatternFact>())
+    async getTacticalRounds(scope) {
+      return (await tacticalRounds.getAll<TacticalRoundFact>())
         .filter((row) => inScope(row, scope))
         .sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.side.localeCompare(b.side));
     },
@@ -640,7 +823,7 @@ export function createFactsStore(adapter: StorageAdapter, namespace = "facts"): 
       await Promise.all(
         [playerStats, playerInsights, playerWeapons, mechanics,
          cohortRows, tournamentFacts, teamComparisonFacts, duelFacts,
-         matchWorkspace, openingTrails, lineups, openingPatterns]
+         matchWorkspace, openingTrails, lineups, tacticalRounds]
           .map((store) => replaceRows(store as RecordStore, [], matchId))
       );
     }
@@ -791,29 +974,3 @@ export async function buildPlayerFlashSummariesFromFacts(
   }));
 }
 
-export function buildOpeningPatternClustersFromFacts(rows: OpeningPatternFact[]): OpeningPatternCluster[] {
-  const clusters = new Map<string, OpeningPatternCluster>();
-  for (const row of rows) {
-    const key = `${row.mapName}:${row.side}:${row.windowSeconds}:${row.basis}:${row.grenadeSequence.join(">")}`;
-    const cluster = clusters.get(key) ?? {
-      id: key,
-      mapName: row.mapName,
-      side: row.side,
-      windowSeconds: row.windowSeconds as 15 | 20 | 30,
-      basis: row.basis,
-      roundCount: 0,
-      winRatePercent: null,
-      grenadeSequence: row.grenadeSequence,
-      rounds: []
-    };
-    cluster.roundCount += 1;
-    cluster.rounds.push({ matchId: row.matchId, roundNumber: row.roundNumber, won: row.won });
-    clusters.set(key, cluster);
-  }
-  return [...clusters.values()]
-    .map((cluster) => {
-      const wins = cluster.rounds.filter((round) => round.won).length;
-      return { ...cluster, winRatePercent: cluster.roundCount > 0 ? round1((wins / cluster.roundCount) * 100) : null };
-    })
-    .sort((a, b) => b.roundCount - a.roundCount || a.id.localeCompare(b.id));
-}
