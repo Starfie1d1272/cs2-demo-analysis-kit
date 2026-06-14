@@ -65,9 +65,9 @@ describe("default-positions", () => {
     expect(isContested("de_dust2", "LongA")).toBe(true);
 
     expect(anchorOf("de_nuke", "t", "Ramp")).toBeNull();
-    expect(anchorOf("de_nuke", "t", "Trophy")).toBe("trophy");
+    expect(anchorOf("de_nuke", "t", "Trophy")).toBe("lobby");
 
-    expect(anchorOf("de_overpass", "t", "Water")).toBeNull();
+    expect(anchorOf("de_overpass", "t", "Water")).toBe("short_pipe");
     expect(isContested("de_overpass", "Water")).toBe(true);
   });
 

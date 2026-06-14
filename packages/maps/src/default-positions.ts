@@ -57,14 +57,14 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
       anchors: {
         b_long: { name: "B外", callouts: ["Ruins", "OutsideLong"] },
         mid_bridge: { name: "中桥", callouts: ["Bridge"] },
-        street: { name: "街道", callouts: ["Street", "TStairs"] },
+        street: { name: "匪梯", callouts: ["Street", "TStairs"] },
         canal: { name: "水下", callouts: ["Canal"] },
         t_upper: { name: "匪跳", callouts: ["TSideUpper"] },
       },
     },
     ct: {
       anchors: {
-        a_main: { name: "A厅前压", callouts: ["Main"] },
+        a_main: { name: "A厅", callouts: ["Main"] },
         a_site: { name: "A包", callouts: ["BombsiteA"] },
         a_connector: { name: "A连", callouts: ["Walkway"] },
         a_heaven: { name: "天堂", callouts: ["Heaven"] },
@@ -92,12 +92,9 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
       anchors: {
         a_long: { name: "A大", callouts: ["LongA"] },
         pit: { name: "大坑", callouts: ["Pit"] },
-        catwalk: { name: "A小", callouts: ["Catwalk"] },
-        short_stairs: { name: "A小楼梯", callouts: ["ShortStairs"] },
-        extended_a: { name: "A小过点", callouts: ["ExtendedA"] },
+        catwalk: { name: "A小", callouts: ["Catwalk", "ShortStairs", "ExtendedA"] },
         mid_doors: { name: "中门", callouts: ["MidDoors"] },
-        under_a: { name: "沙地/警家", callouts: ["UnderA"] },
-        ct_spawn: { name: "警家", callouts: ["CTSpawn"] },
+        ct_spawn: { name: "警家", callouts: ["CTSpawn", "UnderA"] },
         b_site: { name: "B包", callouts: ["BombsiteB"] },
         b_doors: { name: "B门", callouts: ["BDoors"] },
       },
@@ -118,7 +115,7 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
         a_site: { name: "A包", callouts: ["BombsiteA"] },
         pit: { name: "大坑", callouts: ["Pit"] },
         quad: { name: "马棚", callouts: ["Quad"] },
-        arch: { name: "拱门", callouts: ["Arch"] },
+        arch: { name: "连接/拱门", callouts: ["Arch"] },
         library: { name: "书房", callouts: ["Library"] },
         top_mid: { name: "中路", callouts: ["TopofMid"] },
         apartments: { name: "二楼", callouts: ["Apartments"] },
@@ -159,11 +156,8 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
   de_nuke: {
     t: {
       anchors: {
-        outside: { name: "外场准备", callouts: ["Outside", "Roof", "Silo"] },
-        lobby: { name: "匪厅", callouts: ["Lobby"] },
-        squeaky: { name: "铁门", callouts: ["Squeaky"] },
-        trophy: { name: "奖杯房", callouts: ["Trophy"] },
-        vending: { name: "链接", callouts: ["Vending"] },
+        outside: { name: "外场", callouts: ["Outside", "Roof", "Silo"] },
+        lobby: { name: "匪厅", callouts: ["Lobby", "Squeaky", "Trophy", "Vending"] },
       },
     },
     ct: {
@@ -187,14 +181,12 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
         underpass: { name: "下水道", callouts: ["Tunnels"] },
         fountain: { name: "喷泉/游乐园", callouts: ["Fountain", "Playground"] },
         b_long: { name: "B外/长管", callouts: ["Alley", "Canal"] },
-        short_pipe: { name: "短管", callouts: ["Pipe"] },
+        short_pipe: { name: "短管/工地", callouts: ["Pipe", "Water"] },
       },
     },
     ct: {
       anchors: {
-        lower_park: { name: "A小厕所", callouts: ["LowerPark"] },
-        upper_park: { name: "A大厕所", callouts: ["UpperPark"] },
-        restroom: { name: "厕所", callouts: ["Restroom"] },
+        restroom: { name: "厕所", callouts: ["Restroom", "UpperPark", "LowerPark"] },
         a_site: { name: "A包", callouts: ["BombsiteA"] },
         b_site: { name: "B包", callouts: ["BombsiteB"] },
         walkway: { name: "ABC", callouts: ["Walkway"] },
