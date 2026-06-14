@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CALLOUT_NAME_CN } from "./callout-names.js";
+import { CALLOUT_MAPS, CALLOUT_NAME_CN } from "./callout-names.js";
 import { DEFAULT_POSITIONS, anchorOf, roleOf } from "./default-positions.js";
 
 describe("default-positions", () => {
@@ -19,6 +19,20 @@ describe("default-positions", () => {
       for (const side of ["t", "ct"] as const) {
         for (const anchor of Object.values(sides[side].anchors)) {
           for (const callout of anchor.callouts) expect(table[callout]).toBeTruthy();
+        }
+      }
+    }
+  });
+
+  it("7 图都有 t/ct 默认位且每个 anchor 至少 1 callout", () => {
+    for (const map of CALLOUT_MAPS) {
+      const defaults = DEFAULT_POSITIONS[map];
+      expect(defaults, map).toBeTruthy();
+      for (const side of ["t", "ct"] as const) {
+        const anchors = Object.values(defaults[side].anchors);
+        expect(anchors.length, `${map}.${side}`).toBeGreaterThan(0);
+        for (const anchor of anchors) {
+          expect(anchor.callouts.length, `${map}.${side}.${anchor.name}`).toBeGreaterThan(0);
         }
       }
     }
