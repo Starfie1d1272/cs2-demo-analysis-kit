@@ -10,8 +10,9 @@
 2. **三层视角共用同一数据层**：个人 / 主办方 / 教练；
 3. **Pattern 可解释**：不做黑盒评分，展示由哪些位置/道具/时间/交火结构得出。
 
-现状：九模块主体已落地（详见 studio-redesign）。当前重心是**稳定并发布 0.5.0**，
-再用 0.6 集中重做教练战术路线，0.7 让它成为可靠的长期桌面软件。
+现状：九模块主体已落地（详见 studio-redesign）。**0.5.x 已发布（最新 0.5.3）**，
+0.5.3 后 main 新增 facts 本地持久化投影层（导入即提取 facts 行，视图读投影不重聚合）。
+0.6 集中重做教练战术路线，0.7 让它成为可靠的长期桌面软件。
 
 ---
 
@@ -20,21 +21,26 @@
 **不再新增模块**，把 main 已有的成果冻结发版：Home、完整 Duel/Mechanics（含 `.tri` LOS）、
 Coach 首版、Series/BP、Team Comparison、Lineup Library 重写，以及所有性能与缓存修复。
 
-发布清单：
+已发布内容（v0.5.0–v0.5.3）：
 - [x] 文档与代码状态同步（README v2→v3 全面重写、integration 分阶段接缝、本路线图收敛、stability-tiers）
 - [x] StorageAdapter 解耦：业务层读写统一经 `records()` / `blobs()`，IndexedDB 后端可替换
 - [x] Windows 打包从 onefile 改为 onedir，Release zip 整个 `dak-studio/` 目录
 - [x] 桌面静态服务缓存修复：`.tri` / 雷达图 / hashed assets 可缓存，避免反复拉大文件
 - [x] Lineup Library 小修：默认聚类容差调大，雷达 Top 20/40/60 切换且选中项临时绘制
 - [x] 2D 回放接口预留 `targetEndTick`，优先对齐下一回合 `startTick`
-- [ ] CHANGELOG 写 0.5.0 条目
-- [ ] `node scripts/sync-version.mjs 0.5.0`（根 / 私有 apps / python 同步，不碰公共包）
-- [ ] `pnpm typecheck` + `pnpm test` + `pnpm test:integration` + `pnpm python:test` 全绿
-- [ ] 打包后 macOS / Windows 冒烟测试
-- [ ] 旧 IndexedDB 升级测试（老库能平滑打开）
+- [x] CHANGELOG 与版本同步（v0.5.0–v0.5.3 条目）
+- [x] `pnpm typecheck` + `pnpm test` 全绿
+- [x] cs2df 3.0.3 升级 + sample ZIP 重导（--research --compress-level 9）
+- [x] 导出默认启用 `--research`（急停/反应/预瞄恢复正常）
+- [x] pywebview→SQLite 存储后端接入（桌面版资料库落盘到 `userdata/studio.sqlite`）
+
+在建（main，待发）：
+- [x] facts 本地持久化投影层：`extractMatchFacts` + `FactsStore`，导入即落 facts 行
+- [x] season.ts + 各重型视图（TrailsView/CoachView/LineupView/MatchView）全切投影读取
+- [x] 清除死代码：`rrInputs` 投影与 `MATCH_FACTS_VERSION` 只写不读字段移除
 - [ ] 50 / 200 / 500 场资料库性能抽测
 - [ ] 对枪人工验证集首版（对枪三分类 Beta→Stable 的闸门，见 stability-tiers）
-- [ ] 打 `v0.5.0` tag → Release CI 出 DMG/zip
+- [ ] macOS / Windows 冒烟测试 → 打 `v0.5.4` 或 `v0.6.0` tag
 
 > 发版机制见 [`docs/release.md`](release.md)：桌面随 `vX.Y.Z` git tag；npm 包独立走 changesets。
 
@@ -66,9 +72,9 @@ presentation 已以 `targetEndTick = nextRound.startTick` 留出接口）。
 
 ## 0.7.0 — 成为可靠的长期桌面软件
 
-- **StorageAdapter 后端迁移**：在已解耦的业务层下验证 SQLite + 文件系统后端。
+- **大库稳定性验证**：StorageAdapter 解耦（`records()` / `blobs()` 接缝）已在 0.5.1 完成，pywebview→SQLite 后端已在桌面版生产运行；0.7 重点改为 200–500 场规模的稳定性抽测与数据库迁移工具。
 - **用户可见 Library 目录** + 一键备份/恢复（manifest、标签、身份归并、BP、Playbook、原始 ZIP）。
-- **SQLite 元数据方案验证**（原始 ZIP 落盘、元数据/索引入 SQLite、可删缓存单列目录）。
+- **存储空间管理**（原始 ZIP / derived cache / `.tri` / 报告 各项占用展示，支持按类清理）。
 - **数据库迁移与修复工具**；存储空间占用展示（原始 ZIP / derived cache / `.tri` / 报告）。
 - **`.tri` 资产包管理**：从 Release CI 现场打包（~30MB/图）改为版本化资产包或首次按图下载。
 - **签名与公证**：macOS notarization（$99/年）、Windows 签名——优先级高于付费墙。
