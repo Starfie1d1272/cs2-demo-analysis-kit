@@ -22,8 +22,8 @@ describe("derive-default-positions review report", () => {
     expect(report).toContain("## de_mirage");
     expect(report).toContain("### T 默认位草案");
     expect(report).toContain("A1");
-    expect(report).toContain("PalaceAlley(A1) T=10 CT=1");
+    expect(report).toContain("PalaceAlley / A1: T=10, CT=1, T占比=90.9%, 倾向=T");
     expect(report).toContain("### 相邻证据");
-    expect(report).toContain("PalaceAlley(A1) -> TRamp(A1): T=7 CT=0");
+    expect(report).toContain("PalaceAlley / A1 -> TRamp / A1: T=7, CT=0, T占比=100.0%, 倾向=T");
   });
 });

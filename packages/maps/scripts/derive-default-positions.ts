@@ -298,18 +298,28 @@ function renderTsObject(mapName: string, occ: Occ): string {
 
 function formatCallout(mapName: string, callout: string): string {
   const cn = (CALLOUT_NAME_CN as Record<string, Record<string, string>>)[mapName]?.[callout] ?? "";
-  return cn ? `${callout}(${cn})` : callout;
+  return cn ? `${callout} / ${cn}` : callout;
 }
 
 function formatCounts(counts: SideCount | undefined): string {
-  return `T=${counts?.t ?? 0} CT=${counts?.ct ?? 0}`;
+  const t = counts?.t ?? 0;
+  const ct = counts?.ct ?? 0;
+  const total = t + ct;
+  const tPct = total > 0 ? (100 * t / total).toFixed(1) : "0.0";
+  let leaning = "均衡";
+  if (total > 0) {
+    const ratio = t / total;
+    if (ratio >= 0.65) leaning = "T";
+    else if (ratio <= 0.35) leaning = "CT";
+  }
+  return `T=${t}, CT=${ct}, T占比=${tPct}%, 倾向=${leaning}`;
 }
 
-function topOccupancy(occ: Occ, side: Side, limit = 8): string {
+function topOccupancy(mapName: string, occ: Occ, side: Side, limit = 8): string {
   return [...occ.entries()]
     .sort((a, b) => b[1][side] - a[1][side])
     .slice(0, limit)
-    .map(([callout, counts]) => `${callout} ${formatCounts(counts)}`)
+    .map(([callout, counts]) => `${formatCallout(mapName, callout)}: ${formatCounts(counts)}`)
     .join("; ");
 }
 
@@ -318,8 +328,13 @@ function renderAnchorReview(mapName: string, side: Side, evidence: MapEvidence):
   const lines = [`### ${side === "t" ? "T" : "CT"} 默认位草案`];
   for (const [anchorId, anchor] of Object.entries(anchors)) {
     const callouts = anchor.callouts
-      .map((callout) => `${formatCallout(mapName, callout)} ${formatCounts(evidence.occupancy.get(callout))}`)
+      .filter((callout) => {
+        const counts = evidence.occupancy.get(callout);
+        return (counts?.t ?? 0) + (counts?.ct ?? 0) > 0;
+      })
+      .map((callout) => `${formatCallout(mapName, callout)}: ${formatCounts(evidence.occupancy.get(callout))}`)
       .join("; ");
+    if (!callouts) continue;
     lines.push(`- ${anchorId} / ${anchor.name}: ${callouts}`);
   }
   return lines;
@@ -344,8 +359,8 @@ function renderMapReview(mapName: string, evidence: MapEvidence): string {
     `样本 ZIP：${evidence.zipCount}`,
     "",
     "### 高频占有",
-    `- T: ${topOccupancy(evidence.occupancy, "t")}`,
-    `- CT: ${topOccupancy(evidence.occupancy, "ct")}`,
+    `- T: ${topOccupancy(mapName, evidence.occupancy, "t")}`,
+    `- CT: ${topOccupancy(mapName, evidence.occupancy, "ct")}`,
     "",
     ...renderAnchorReview(mapName, "t", evidence),
     "",
