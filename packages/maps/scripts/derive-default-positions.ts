@@ -3,9 +3,9 @@ import { join } from "node:path";
 import { loadDemoPackageFromZip } from "../../core/src/index.ts";
 import { FLAG_ALIVE, type DemoPackage } from "../../contract/src/index.ts";
 import { CALLOUT_NAME_CN } from "../src/callout-names.js";
+import { DEFAULT_POSITIONS, type DefaultAnchor } from "../src/default-positions.js";
 
 const WINDOW_SEC = 30;
-const TERMINAL = new Set(["BombsiteA", "BombsiteB", "CTSpawn"]);
 
 type Side = "t" | "ct";
 type SideCount = Record<Side, number>;
@@ -17,148 +17,6 @@ export interface MapEvidence {
   transitions: Transitions;
   zipCount: number;
 }
-
-interface AnchorSeed {
-  name: string;
-  callouts: string[];
-}
-
-interface SideSeed {
-  anchors: Record<string, AnchorSeed>;
-}
-
-const SEEDS: Record<string, Record<Side, SideSeed>> = {
-  de_mirage: {
-    t: {
-      anchors: {
-        a_ramp: { name: "A1", callouts: ["PalaceAlley", "TRamp"] },
-        a_palace: { name: "A二楼", callouts: ["PalaceInterior", "Scaffolding"] },
-        mid: { name: "中路", callouts: ["TopofMid", "SideAlley", "Middle"] },
-        underpass: { name: "下水道", callouts: ["Underpass"] },
-        b_apps: { name: "B二楼", callouts: ["House", "BackAlley", "Apartments"] },
-      },
-    },
-    ct: {
-      anchors: {
-        a_site: { name: "A点", callouts: ["BombsiteA", "Stairs", "Jungle"] },
-        mid: { name: "中路", callouts: ["SnipersNest", "Connector", "Catwalk", "Ladder"] },
-        b_site: { name: "B点", callouts: ["BombsiteB", "Shop", "Truck"] },
-      },
-    },
-  },
-  de_ancient: {
-    t: {
-      anchors: {
-        a_hall: { name: "A厅", callouts: ["MainHall", "Outside"] },
-        b_ramp: { name: "B坡/B外", callouts: ["Ruins", "Ramp"] },
-        b_short: { name: "B小/跳台", callouts: ["TSideLower", "TSideUpper"] },
-        tunnel_water: { name: "隧道/水路", callouts: ["Tunnel", "Water"] },
-      },
-    },
-    ct: {
-      anchors: {
-        mid: { name: "中路", callouts: ["Middle", "TopofMid"] },
-        a_site: { name: "A点", callouts: ["BombsiteA", "SideHall", "SideEntrance"] },
-        b_site: { name: "B点", callouts: ["BombsiteB", "Alley", "House"] },
-        ct_spawn: { name: "警家", callouts: ["CTSpawn"] },
-      },
-    },
-  },
-  de_anubis: {
-    t: {
-      anchors: {
-        a_hall: { name: "A厅", callouts: ["Main"] },
-        mid: { name: "中路", callouts: ["Bridge", "Middle", "MidDoors"] },
-        canal: { name: "水下", callouts: ["Canal"] },
-        b_long: { name: "B外", callouts: ["Ruins", "OutsideLong"] },
-        t_spawn_route: { name: "匪路", callouts: ["Street", "TSideUpper", "TStairs"] },
-      },
-    },
-    ct: {
-      anchors: {
-        b_site: { name: "B点", callouts: ["BombsiteB", "BackofB", "PalaceInterior", "Bricks"] },
-        mid: { name: "中路", callouts: ["Middle", "Connector", "MidDoors"] },
-        a_site: { name: "A点", callouts: ["BombsiteA", "Walkway", "Heaven"] },
-        ct_spawn: { name: "警家", callouts: ["CTSideUpper", "Alley", "LowerTunnel", "CTSpawn", "SnipersNest"] },
-      },
-    },
-  },
-  de_dust2: {
-    t: {
-      anchors: {
-        a_long: { name: "A大", callouts: ["OutsideLong", "LongDoors", "LongA"] },
-        mid_b1: { name: "中路/B1", callouts: ["TopofMid", "Middle", "LowerTunnel"] },
-        b_tunnels: { name: "B洞", callouts: ["OutsideTunnel", "UpperTunnel", "TunnelStairs"] },
-      },
-    },
-    ct: {
-      anchors: {
-        a_long: { name: "A大", callouts: ["LongA", "Pit"] },
-        a_short: { name: "A小", callouts: ["Catwalk", "ShortStairs", "ExtendedA"] },
-        mid: { name: "中门/警家", callouts: ["MidDoors", "UnderA", "CTSpawn"] },
-        b_site: { name: "B点", callouts: ["BombsiteB", "BDoors", "Hole"] },
-      },
-    },
-  },
-  de_inferno: {
-    t: {
-      anchors: {
-        banana: { name: "香蕉道", callouts: ["Banana"] },
-        mid: { name: "中路", callouts: ["TRamp", "LowerMid", "Middle", "TopofMid"] },
-        second_mid_apps: {
-          name: "侧道/二楼",
-          callouts: ["SecondMid", "Apartments", "BackAlley", "Underpass", "Bridge", "Upstairs", "Deck"],
-        },
-      },
-    },
-    ct: {
-      anchors: {
-        b_site: { name: "B点", callouts: ["BombsiteB", "Banana", "Ruins"] },
-        a_site: { name: "A点", callouts: ["BombsiteA", "Pit", "Quad", "Graveyard"] },
-        arch_library: { name: "拱门/书房", callouts: ["Arch", "Library"] },
-        ct_spawn: { name: "警家", callouts: ["CTSpawn"] },
-      },
-    },
-  },
-  de_nuke: {
-    t: {
-      anchors: {
-        outside: { name: "外场", callouts: ["Outside", "Roof", "Silo"] },
-        lobby_a: { name: "匪厅/A内", callouts: ["Lobby", "Squeaky", "Hut", "Trophy"] },
-        ramp: { name: "铁板", callouts: ["Ramp"] },
-        secret_b: { name: "K1/地下", callouts: ["Secret", "Tunnels", "Vending", "Control"] },
-      },
-    },
-    ct: {
-      anchors: {
-        outside: { name: "外场", callouts: ["Outside", "Garage", "Catwalk", "Crane"] },
-        a_site: { name: "A点", callouts: ["BombsiteA", "Rafters", "Mini", "HutRoof", "Heaven", "Hell"] },
-        ramp: { name: "铁板", callouts: ["Ramp", "Admin"] },
-        b_site: { name: "B点", callouts: ["BombsiteB", "Control", "Decon", "Observation"] },
-        ct_spawn: { name: "警家", callouts: ["CTSpawn", "LockerRoom"] },
-      },
-    },
-  },
-  de_overpass: {
-    t: {
-      anchors: {
-        a_upper: { name: "A区上路", callouts: ["Fountain", "Playground", "UpperPark", "LowerPark"] },
-        underpass: { name: "下水道", callouts: ["Tunnels", "Connector"] },
-        canal: { name: "长管", callouts: ["Canal"] },
-        b_short: { name: "B短/工地", callouts: ["Pipe", "Water", "Construction"] },
-        b_outer: { name: "B外", callouts: ["Alley", "TStairs"] },
-      },
-    },
-    ct: {
-      anchors: {
-        a_site: { name: "A点", callouts: ["BombsiteA", "LowerPark", "UpperPark", "BackofA", "UnderA", "Stairs", "Restroom"] },
-        b_site: { name: "B点", callouts: ["BombsiteB", "Water", "Walkway", "SnipersNest", "Construction"] },
-        connector: { name: "下水道", callouts: ["Connector"] },
-        bank: { name: "银行", callouts: ["Lobby", "StorageRoom"] },
-      },
-    },
-  },
-};
 
 function zipFiles(dir: string): string[] {
   const out: string[] = [];
@@ -226,74 +84,22 @@ function knownCallouts(mapName: string): Set<string> {
   return new Set(Object.keys((CALLOUT_NAME_CN as Record<string, Record<string, string>>)[mapName] ?? {}));
 }
 
-function anchorTokens(name: string): string[] {
-  return name.split(/[\/、]/).map((token) => token.trim()).filter(Boolean);
-}
-
-function belongsByName(mapName: string, anchorName: string, callout: string): boolean {
-  const cn = (CALLOUT_NAME_CN as Record<string, Record<string, string>>)[mapName]?.[callout] ?? "";
-  if (!cn) return false;
-  return anchorTokens(anchorName).some((token) => cn.startsWith(token) || token.startsWith(cn));
-}
-
-function renderAnchors(mapName: string, side: Side, occ: Occ): Record<string, AnchorSeed> {
-  const seedAnchors = SEEDS[mapName]?.[side].anchors ?? {};
+function renderAnchors(mapName: string, side: Side): Record<string, DefaultAnchor> {
+  const sourceAnchors = DEFAULT_POSITIONS[mapName]?.[side].anchors ?? {};
   const known = knownCallouts(mapName);
-  const anchors = Object.fromEntries(
-    Object.entries(seedAnchors)
+  return Object.fromEntries(
+    Object.entries(sourceAnchors)
       .map(([anchorId, anchor]) => [
         anchorId,
         { name: anchor.name, callouts: anchor.callouts.filter((callout) => known.has(callout)) },
       ] as const)
       .filter(([, anchor]) => anchor.callouts.length > 0),
   );
-  const assigned = new Set(Object.values(anchors).flatMap((anchor) => anchor.callouts));
-  for (const callout of [...known].sort((a, b) => a.localeCompare(b))) {
-    if (assigned.has(callout) || TERMINAL.has(callout)) continue;
-    const counts = occ.get(callout) ?? { t: 0, ct: 0 };
-    const own = counts[side];
-    const other = counts[side === "t" ? "ct" : "t"];
-    if (own < 10 || own <= other * 1.2) continue;
-    const match = Object.entries(anchors).find(([, anchor]) => belongsByName(mapName, anchor.name, callout));
-    if (!match) continue;
-    match[1].callouts.push(callout);
-    assigned.add(callout);
-  }
-  return anchors;
 }
 
-function renderRoles(mapName: string, side: Side, occ: Occ, anchors: Record<string, AnchorSeed>): Record<string, string> {
-  const known = knownCallouts(mapName);
-  const anchored = new Set(Object.values(anchors).flatMap((anchor) => anchor.callouts));
-  const roles: Record<string, string> = {};
-  for (const callout of [...known].sort((a, b) => a.localeCompare(b))) {
-    if (anchored.has(callout)) continue;
-    if (side === "t" && TERMINAL.has(callout)) {
-      roles[callout] = "terminal";
-      continue;
-    }
-    if (side === "ct" && callout === "TSpawn") {
-      roles[callout] = "terminal";
-      continue;
-    }
-    const counts = occ.get(callout) ?? { t: 0, ct: 0 };
-    const own = counts[side];
-    const other = counts[side === "t" ? "ct" : "t"];
-    if (side === "t" && other > own * 1.4 && other >= 25) roles[callout] = "ct";
-    else if (own >= 10) roles[callout] = "advanced";
-  }
-  return roles;
-}
-
-function renderTsObject(mapName: string, occ: Occ): string {
-  const seed = SEEDS[mapName];
-  if (!seed) return "";
-  const sides = (["t", "ct"] as const).map((side) => {
-    const anchors = renderAnchors(mapName, side, occ);
-    const roles = renderRoles(mapName, side, occ, anchors);
-    return `${side}: {\n      anchors: ${JSON.stringify(anchors, null, 8).replace(/\n/g, "\n      ")},\n      roles: ${JSON.stringify(roles, null, 8).replace(/\n/g, "\n      ")},\n    }`;
-  });
-  return `${mapName}: {\n    ${sides.join(",\n    ")},\n  },`;
+function renderTsObject(mapName: string): string {
+  const defaults = DEFAULT_POSITIONS[mapName];
+  return defaults ? `${mapName}: ${JSON.stringify(defaults, null, 2)},` : "";
 }
 
 function formatCallout(mapName: string, callout: string): string {
@@ -315,17 +121,19 @@ function formatCounts(counts: SideCount | undefined): string {
   return `T=${t}, CT=${ct}, T占比=${tPct}%, 倾向=${leaning}`;
 }
 
-function topOccupancy(mapName: string, occ: Occ, side: Side, limit = 8): string {
-  return [...occ.entries()]
+function topOccupancy(mapName: string, occ: Occ, side: Side, limit = 8): string[] {
+  return [
+    `- ${side.toUpperCase()}:`,
+    ...[...occ.entries()]
     .sort((a, b) => b[1][side] - a[1][side])
     .slice(0, limit)
-    .map(([callout, counts]) => `${formatCallout(mapName, callout)}: ${formatCounts(counts)}`)
-    .join("; ");
+    .map(([callout, counts]) => `  - ${formatCallout(mapName, callout)}: ${formatCounts(counts)}`),
+  ];
 }
 
 function renderAnchorReview(mapName: string, side: Side, evidence: MapEvidence): string[] {
-  const anchors = renderAnchors(mapName, side, evidence.occupancy);
-  const lines = [`### ${side === "t" ? "T" : "CT"} 默认位草案`];
+  const anchors = renderAnchors(mapName, side);
+  const lines = [`#### ${side === "t" ? "T 默认位" : "CT 默认位"}`];
   for (const [anchorId, anchor] of Object.entries(anchors)) {
     const callouts = anchor.callouts
       .filter((callout) => {
@@ -333,9 +141,21 @@ function renderAnchorReview(mapName: string, side: Side, evidence: MapEvidence):
         return (counts?.t ?? 0) + (counts?.ct ?? 0) > 0;
       })
       .map((callout) => `${formatCallout(mapName, callout)}: ${formatCounts(evidence.occupancy.get(callout))}`)
-      .join("; ");
-    if (!callouts) continue;
-    lines.push(`- ${anchorId} / ${anchor.name}: ${callouts}`);
+    lines.push(`- ${anchorId} / ${anchor.name}:`);
+    if (callouts.length === 0) {
+      lines.push("  - 无样本命中");
+    } else {
+      for (const row of callouts) lines.push(`  - ${row}`);
+    }
+  }
+  return lines;
+}
+
+function renderContestedReview(mapName: string, evidence: MapEvidence): string[] {
+  const contested = DEFAULT_POSITIONS[mapName]?.contested ?? [];
+  const lines = ["#### 争夺区/通道（不作为默认位）"];
+  for (const callout of contested) {
+    lines.push(`- ${formatCallout(mapName, callout)}: ${formatCounts(evidence.occupancy.get(callout))}`);
   }
   return lines;
 }
@@ -358,19 +178,22 @@ function renderMapReview(mapName: string, evidence: MapEvidence): string {
     "",
     `样本 ZIP：${evidence.zipCount}`,
     "",
-    "### 高频占有",
-    `- T: ${topOccupancy(mapName, evidence.occupancy, "t")}`,
-    `- CT: ${topOccupancy(mapName, evidence.occupancy, "ct")}`,
-    "",
+    "### 当前推荐（人工修订 v1）",
     ...renderAnchorReview(mapName, "t", evidence),
     "",
     ...renderAnchorReview(mapName, "ct", evidence),
     "",
+    ...renderContestedReview(mapName, evidence),
+    "",
+    "### 数据证据：高频占有",
+    ...topOccupancy(mapName, evidence.occupancy, "t"),
+    ...topOccupancy(mapName, evidence.occupancy, "ct"),
+    "",
     ...renderAdjacency(mapName, evidence.transitions),
     "",
-    "### TS 草案",
+    "### 运行时资产片段",
     "```ts",
-    renderTsObject(mapName, evidence.occupancy),
+    renderTsObject(mapName),
     "```",
   ].join("\n");
 }
@@ -386,18 +209,6 @@ export function renderReviewReport(byMap: Map<string, MapEvidence>, scannedCount
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([mapName, evidence]) => renderMapReview(mapName, evidence)),
   ].join("\n");
-}
-
-function renderStats(mapName: string, occ: Occ): string {
-  const total = [...occ.values()].reduce((sum, counts) => sum + counts.t + counts.ct, 0);
-  const rows = [...occ.entries()]
-    .sort((a, b) => b[1].t + b[1].ct - (a[1].t + a[1].ct))
-    .map(([callout, counts]) => {
-      const t = total ? ((100 * counts.t) / total).toFixed(2) : "0.00";
-      const ct = total ? ((100 * counts.ct) / total).toFixed(2) : "0.00";
-      return `//   ${callout.padEnd(16)} T=${counts.t.toString().padStart(6)} (${t}%) CT=${counts.ct.toString().padStart(6)} (${ct}%)`;
-    });
-  return [`// ${mapName} opening occupancy`, ...rows].join("\n");
 }
 
 async function main(paths: string[]): Promise<void> {

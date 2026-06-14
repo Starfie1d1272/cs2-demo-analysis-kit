@@ -7,21 +7,57 @@
 
 样本 ZIP：23
 
-### 高频占有
-- T: Outside / 匪口: T=147437, CT=3003, T占比=98.0%, 倾向=T; TSpawn / 匪家: T=89614, CT=298, T占比=99.7%, 倾向=T; Ruins / B外: T=80924, CT=448, T占比=99.4%, 倾向=T; TSideLower / B小: T=53966, CT=3323, T占比=94.2%, 倾向=T; MainHall / A厅: T=39180, CT=8667, T占比=81.9%, 倾向=T; Tunnel / 隧道: T=31790, CT=236, T占比=99.3%, 倾向=T; TSideUpper / 跳台: T=29539, CT=13467, T占比=68.7%, 倾向=T; Middle / 中路: T=28784, CT=72678, T占比=28.4%, 倾向=CT
-- CT: CTSpawn / 警家: T=92, CT=94174, T占比=0.1%, 倾向=CT; Alley / 底线: T=1216, CT=84272, T占比=1.4%, 倾向=CT; BombsiteA / A包: T=11797, CT=81070, T占比=12.7%, 倾向=CT; Middle / 中路: T=28784, CT=72678, T占比=28.4%, 倾向=CT; BombsiteB / B包: T=14919, CT=71388, T占比=17.3%, 倾向=CT; House / VIP: T=923, CT=59525, T占比=1.5%, 倾向=CT; SideEntrance / 黑屋: T=10767, CT=55244, T占比=16.3%, 倾向=CT; SideHall / 甜甜圈: T=3078, CT=24528, T占比=11.1%, 倾向=CT
+### 当前推荐（人工修订 v1）
+#### T 默认位
+- t_outside / 匪口:
+  - Outside / 匪口: T=147437, CT=3003, T占比=98.0%, 倾向=T
+- a_hall / A厅:
+  - MainHall / A厅: T=39180, CT=8667, T占比=81.9%, 倾向=T
+- b_outer / B外:
+  - Ruins / B外: T=80924, CT=448, T占比=99.4%, 倾向=T
+- b_short / B小:
+  - TSideLower / B小: T=53966, CT=3323, T占比=94.2%, 倾向=T
 
-### T 默认位草案
-- a_hall / A厅: MainHall / A厅: T=39180, CT=8667, T占比=81.9%, 倾向=T; Outside / 匪口: T=147437, CT=3003, T占比=98.0%, 倾向=T
-- b_ramp / B坡/B外: Ruins / B外: T=80924, CT=448, T占比=99.4%, 倾向=T; Ramp / B坡: T=14794, CT=5013, T占比=74.7%, 倾向=T
-- b_short / B小/跳台: TSideLower / B小: T=53966, CT=3323, T占比=94.2%, 倾向=T; TSideUpper / 跳台: T=29539, CT=13467, T占比=68.7%, 倾向=T
-- tunnel_water / 隧道/水路: Tunnel / 隧道: T=31790, CT=236, T占比=99.3%, 倾向=T; Water / 水路: T=13688, CT=127, T占比=99.1%, 倾向=T
+#### CT 默认位
+- a_site / A包/甜甜圈:
+  - BombsiteA / A包: T=11797, CT=81070, T占比=12.7%, 倾向=CT
+  - SideHall / 甜甜圈: T=3078, CT=24528, T占比=11.1%, 倾向=CT
+- mid / 中路/中远:
+  - Middle / 中路: T=28784, CT=72678, T占比=28.4%, 倾向=CT
+  - TopofMid / 中远: T=745, CT=8440, T占比=8.1%, 倾向=CT
+- b_site / B包/底线/VIP:
+  - BombsiteB / B包: T=14919, CT=71388, T占比=17.3%, 倾向=CT
+  - Alley / 底线: T=1216, CT=84272, T占比=1.4%, 倾向=CT
+  - House / VIP: T=923, CT=59525, T占比=1.5%, 倾向=CT
+- black_house / 黑屋:
+  - SideEntrance / 黑屋: T=10767, CT=55244, T占比=16.3%, 倾向=CT
 
-### CT 默认位草案
-- mid / 中路: Middle / 中路: T=28784, CT=72678, T占比=28.4%, 倾向=CT; TopofMid / 中远: T=745, CT=8440, T占比=8.1%, 倾向=CT
-- a_site / A点: BombsiteA / A包: T=11797, CT=81070, T占比=12.7%, 倾向=CT; SideHall / 甜甜圈: T=3078, CT=24528, T占比=11.1%, 倾向=CT; SideEntrance / 黑屋: T=10767, CT=55244, T占比=16.3%, 倾向=CT
-- b_site / B点: BombsiteB / B包: T=14919, CT=71388, T占比=17.3%, 倾向=CT; Alley / 底线: T=1216, CT=84272, T占比=1.4%, 倾向=CT; House / VIP: T=923, CT=59525, T占比=1.5%, 倾向=CT
-- ct_spawn / 警家: CTSpawn / 警家: T=92, CT=94174, T占比=0.1%, 倾向=CT
+#### 争夺区/通道（不作为默认位）
+- Middle / 中路: T=28784, CT=72678, T占比=28.4%, 倾向=CT
+- TSideUpper / 跳台: T=29539, CT=13467, T占比=68.7%, 倾向=T
+- SideEntrance / 黑屋: T=10767, CT=55244, T占比=16.3%, 倾向=CT
+- Ramp / B坡: T=14794, CT=5013, T占比=74.7%, 倾向=T
+- MainHall / A厅: T=39180, CT=8667, T占比=81.9%, 倾向=T
+
+### 数据证据：高频占有
+- T:
+  - Outside / 匪口: T=147437, CT=3003, T占比=98.0%, 倾向=T
+  - TSpawn / 匪家: T=89614, CT=298, T占比=99.7%, 倾向=T
+  - Ruins / B外: T=80924, CT=448, T占比=99.4%, 倾向=T
+  - TSideLower / B小: T=53966, CT=3323, T占比=94.2%, 倾向=T
+  - MainHall / A厅: T=39180, CT=8667, T占比=81.9%, 倾向=T
+  - Tunnel / 隧道: T=31790, CT=236, T占比=99.3%, 倾向=T
+  - TSideUpper / 跳台: T=29539, CT=13467, T占比=68.7%, 倾向=T
+  - Middle / 中路: T=28784, CT=72678, T占比=28.4%, 倾向=CT
+- CT:
+  - CTSpawn / 警家: T=92, CT=94174, T占比=0.1%, 倾向=CT
+  - Alley / 底线: T=1216, CT=84272, T占比=1.4%, 倾向=CT
+  - BombsiteA / A包: T=11797, CT=81070, T占比=12.7%, 倾向=CT
+  - Middle / 中路: T=28784, CT=72678, T占比=28.4%, 倾向=CT
+  - BombsiteB / B包: T=14919, CT=71388, T占比=17.3%, 倾向=CT
+  - House / VIP: T=923, CT=59525, T占比=1.5%, 倾向=CT
+  - SideEntrance / 黑屋: T=10767, CT=55244, T占比=16.3%, 倾向=CT
+  - SideHall / 甜甜圈: T=3078, CT=24528, T占比=11.1%, 倾向=CT
 
 ### 相邻证据
 同一玩家在开局窗口内发生 callout 变化时记录一条有向边。
@@ -42,119 +78,144 @@
 - Outside / 匪口 -> MainHall / A厅: T=470, CT=3, T占比=99.4%, 倾向=T
 - Outside / 匪口 -> Middle / 中路: T=411, CT=11, T占比=97.4%, 倾向=T
 
-### TS 草案
+### 运行时资产片段
 ```ts
 de_ancient: {
-    t: {
-      anchors: {
-              "a_hall": {
-                      "name": "A厅",
-                      "callouts": [
-                              "MainHall",
-                              "Outside"
-                      ]
-              },
-              "b_ramp": {
-                      "name": "B坡/B外",
-                      "callouts": [
-                              "Ruins",
-                              "Ramp"
-                      ]
-              },
-              "b_short": {
-                      "name": "B小/跳台",
-                      "callouts": [
-                              "TSideLower",
-                              "TSideUpper"
-                      ]
-              },
-              "tunnel_water": {
-                      "name": "隧道/水路",
-                      "callouts": [
-                              "Tunnel",
-                              "Water"
-                      ]
-              }
+  "t": {
+    "anchors": {
+      "t_outside": {
+        "name": "匪口",
+        "callouts": [
+          "Outside"
+        ]
       },
-      roles: {
-              "Alley": "ct",
-              "BombsiteA": "terminal",
-              "BombsiteB": "terminal",
-              "CTSpawn": "terminal",
-              "House": "ct",
-              "Middle": "ct",
-              "SideEntrance": "ct",
-              "SideHall": "ct",
-              "TopofMid": "ct",
-              "TSpawn": "advanced"
+      "a_hall": {
+        "name": "A厅",
+        "callouts": [
+          "MainHall"
+        ]
       },
-    },
-    ct: {
-      anchors: {
-              "mid": {
-                      "name": "中路",
-                      "callouts": [
-                              "Middle",
-                              "TopofMid"
-                      ]
-              },
-              "a_site": {
-                      "name": "A点",
-                      "callouts": [
-                              "BombsiteA",
-                              "SideHall",
-                              "SideEntrance"
-                      ]
-              },
-              "b_site": {
-                      "name": "B点",
-                      "callouts": [
-                              "BombsiteB",
-                              "Alley",
-                              "House"
-                      ]
-              },
-              "ct_spawn": {
-                      "name": "警家",
-                      "callouts": [
-                              "CTSpawn"
-                      ]
-              }
+      "b_outer": {
+        "name": "B外",
+        "callouts": [
+          "Ruins"
+        ]
       },
-      roles: {
-              "MainHall": "advanced",
-              "Outside": "advanced",
-              "Ramp": "advanced",
-              "Ruins": "advanced",
-              "TSideLower": "advanced",
-              "TSideUpper": "advanced",
-              "TSpawn": "terminal",
-              "Tunnel": "advanced",
-              "Water": "advanced"
-      },
-    },
+      "b_short": {
+        "name": "B小",
+        "callouts": [
+          "TSideLower"
+        ]
+      }
+    }
   },
+  "ct": {
+    "anchors": {
+      "a_site": {
+        "name": "A包/甜甜圈",
+        "callouts": [
+          "BombsiteA",
+          "SideHall"
+        ]
+      },
+      "mid": {
+        "name": "中路/中远",
+        "callouts": [
+          "Middle",
+          "TopofMid"
+        ]
+      },
+      "b_site": {
+        "name": "B包/底线/VIP",
+        "callouts": [
+          "BombsiteB",
+          "Alley",
+          "House"
+        ]
+      },
+      "black_house": {
+        "name": "黑屋",
+        "callouts": [
+          "SideEntrance"
+        ]
+      }
+    }
+  },
+  "contested": [
+    "Middle",
+    "TSideUpper",
+    "SideEntrance",
+    "Ramp",
+    "MainHall"
+  ]
+},
 ```
 ## de_anubis
 
 样本 ZIP：5
 
-### 高频占有
-- T: Ruins / B外: T=25965, CT=0, T占比=100.0%, 倾向=T; TSpawn / 匪家: T=20459, CT=0, T占比=100.0%, 倾向=T; Bridge / 中桥: T=17222, CT=683, T占比=96.2%, 倾向=T; Street / 街道: T=14018, CT=0, T占比=100.0%, 倾向=T; Canal / 水下: T=12982, CT=3294, T占比=79.8%, 倾向=T; OutsideLong / B外: T=11445, CT=611, T占比=94.9%, 倾向=T; TSideUpper / 匪跳: T=8202, CT=0, T占比=100.0%, 倾向=T; TStairs / 匪梯: T=5967, CT=0, T占比=100.0%, 倾向=T
-- CT: Middle / 中路: T=684, CT=23917, T占比=2.8%, 倾向=CT; BombsiteB / B包: T=331, CT=21515, T占比=1.5%, 倾向=CT; Connector / 黑屋: T=58, CT=10411, T占比=0.6%, 倾向=CT; CTSideUpper / 警家: T=58, CT=9449, T占比=0.6%, 倾向=CT; PalaceInterior / B连: T=73, CT=7707, T占比=0.9%, 倾向=CT; BombsiteA / A包: T=63, CT=7700, T占比=0.8%, 倾向=CT; Main / A厅: T=1780, CT=6524, T占比=21.4%, 倾向=CT; Walkway / A连: T=0, CT=6237, T占比=0.0%, 倾向=CT
+### 当前推荐（人工修订 v1）
+#### T 默认位
+- b_long / B外:
+  - Ruins / B外: T=25965, CT=0, T占比=100.0%, 倾向=T
+  - OutsideLong / B外: T=11445, CT=611, T占比=94.9%, 倾向=T
+- mid_bridge / 中桥:
+  - Bridge / 中桥: T=17222, CT=683, T占比=96.2%, 倾向=T
+- street_stairs / 街道/匪梯:
+  - Street / 街道: T=14018, CT=0, T占比=100.0%, 倾向=T
+  - TStairs / 匪梯: T=5967, CT=0, T占比=100.0%, 倾向=T
+- canal / 水下:
+  - Canal / 水下: T=12982, CT=3294, T占比=79.8%, 倾向=T
+- t_upper / 匪跳:
+  - TSideUpper / 匪跳: T=8202, CT=0, T占比=100.0%, 倾向=T
 
-### T 默认位草案
-- a_hall / A厅: Main / A厅: T=1780, CT=6524, T占比=21.4%, 倾向=CT
-- mid / 中路: Bridge / 中桥: T=17222, CT=683, T占比=96.2%, 倾向=T; Middle / 中路: T=684, CT=23917, T占比=2.8%, 倾向=CT; MidDoors / 中门: T=610, CT=4010, T占比=13.2%, 倾向=CT
-- canal / 水下: Canal / 水下: T=12982, CT=3294, T占比=79.8%, 倾向=T
-- b_long / B外: Ruins / B外: T=25965, CT=0, T占比=100.0%, 倾向=T; OutsideLong / B外: T=11445, CT=611, T占比=94.9%, 倾向=T
-- t_spawn_route / 匪路: Street / 街道: T=14018, CT=0, T占比=100.0%, 倾向=T; TSideUpper / 匪跳: T=8202, CT=0, T占比=100.0%, 倾向=T; TStairs / 匪梯: T=5967, CT=0, T占比=100.0%, 倾向=T
+#### CT 默认位
+- a_site / A包/A连/天堂:
+  - BombsiteA / A包: T=63, CT=7700, T占比=0.8%, 倾向=CT
+  - Walkway / A连: T=0, CT=6237, T占比=0.0%, 倾向=CT
+  - Heaven / 天堂: T=0, CT=1767, T占比=0.0%, 倾向=CT
+- mid / 中路/中门/黑屋:
+  - Middle / 中路: T=684, CT=23917, T占比=2.8%, 倾向=CT
+  - MidDoors / 中门: T=610, CT=4010, T占比=13.2%, 倾向=CT
+  - Connector / 黑屋: T=58, CT=10411, T占比=0.6%, 倾向=CT
+- b_site / B包/B连:
+  - BombsiteB / B包: T=331, CT=21515, T占比=1.5%, 倾向=CT
+  - PalaceInterior / B连: T=73, CT=7707, T占比=0.9%, 倾向=CT
+  - BackofB / B包台上: T=0, CT=3968, T占比=0.0%, 倾向=CT
+  - Bricks / B连阳光房: T=0, CT=2283, T占比=0.0%, 倾向=CT
+- ct_spawn / 警家:
+  - CTSideUpper / 警家: T=58, CT=9449, T占比=0.6%, 倾向=CT
+  - Alley / 警家: T=0, CT=5560, T占比=0.0%, 倾向=CT
+  - LowerTunnel / 警家隧道: T=0, CT=3143, T占比=0.0%, 倾向=CT
 
-### CT 默认位草案
-- b_site / B点: BombsiteB / B包: T=331, CT=21515, T占比=1.5%, 倾向=CT; BackofB / B包台上: T=0, CT=3968, T占比=0.0%, 倾向=CT; PalaceInterior / B连: T=73, CT=7707, T占比=0.9%, 倾向=CT; Bricks / B连阳光房: T=0, CT=2283, T占比=0.0%, 倾向=CT
-- mid / 中路: Middle / 中路: T=684, CT=23917, T占比=2.8%, 倾向=CT; Connector / 黑屋: T=58, CT=10411, T占比=0.6%, 倾向=CT; MidDoors / 中门: T=610, CT=4010, T占比=13.2%, 倾向=CT
-- a_site / A点: BombsiteA / A包: T=63, CT=7700, T占比=0.8%, 倾向=CT; Walkway / A连: T=0, CT=6237, T占比=0.0%, 倾向=CT; Heaven / 天堂: T=0, CT=1767, T占比=0.0%, 倾向=CT
-- ct_spawn / 警家: CTSideUpper / 警家: T=58, CT=9449, T占比=0.6%, 倾向=CT; Alley / 警家: T=0, CT=5560, T占比=0.0%, 倾向=CT; LowerTunnel / 警家隧道: T=0, CT=3143, T占比=0.0%, 倾向=CT; CTSpawn / 警家后: T=0, CT=353, T占比=0.0%, 倾向=CT; SnipersNest / 警家狙位: T=25, CT=705, T占比=3.4%, 倾向=CT
+#### 争夺区/通道（不作为默认位）
+- Main / A厅: T=1780, CT=6524, T占比=21.4%, 倾向=CT
+- MidDoors / 中门: T=610, CT=4010, T占比=13.2%, 倾向=CT
+- Middle / 中路: T=684, CT=23917, T占比=2.8%, 倾向=CT
+- Canal / 水下: T=12982, CT=3294, T占比=79.8%, 倾向=T
+- PalaceInterior / B连: T=73, CT=7707, T占比=0.9%, 倾向=CT
+- Connector / 黑屋: T=58, CT=10411, T占比=0.6%, 倾向=CT
+- Walkway / A连: T=0, CT=6237, T占比=0.0%, 倾向=CT
+
+### 数据证据：高频占有
+- T:
+  - Ruins / B外: T=25965, CT=0, T占比=100.0%, 倾向=T
+  - TSpawn / 匪家: T=20459, CT=0, T占比=100.0%, 倾向=T
+  - Bridge / 中桥: T=17222, CT=683, T占比=96.2%, 倾向=T
+  - Street / 街道: T=14018, CT=0, T占比=100.0%, 倾向=T
+  - Canal / 水下: T=12982, CT=3294, T占比=79.8%, 倾向=T
+  - OutsideLong / B外: T=11445, CT=611, T占比=94.9%, 倾向=T
+  - TSideUpper / 匪跳: T=8202, CT=0, T占比=100.0%, 倾向=T
+  - TStairs / 匪梯: T=5967, CT=0, T占比=100.0%, 倾向=T
+- CT:
+  - Middle / 中路: T=684, CT=23917, T占比=2.8%, 倾向=CT
+  - BombsiteB / B包: T=331, CT=21515, T占比=1.5%, 倾向=CT
+  - Connector / 黑屋: T=58, CT=10411, T占比=0.6%, 倾向=CT
+  - CTSideUpper / 警家: T=58, CT=9449, T占比=0.6%, 倾向=CT
+  - PalaceInterior / B连: T=73, CT=7707, T占比=0.9%, 倾向=CT
+  - BombsiteA / A包: T=63, CT=7700, T占比=0.8%, 倾向=CT
+  - Main / A厅: T=1780, CT=6524, T占比=21.4%, 倾向=CT
+  - Walkway / A连: T=0, CT=6237, T占比=0.0%, 倾向=CT
 
 ### 相邻证据
 同一玩家在开局窗口内发生 callout 变化时记录一条有向边。
@@ -175,136 +236,153 @@ de_ancient: {
 - Street / 街道 -> TSideUpper / 匪跳: T=94, CT=0, T占比=100.0%, 倾向=T
 - BombsiteA / A包 -> Main / A厅: T=0, CT=78, T占比=0.0%, 倾向=CT
 
-### TS 草案
+### 运行时资产片段
 ```ts
 de_anubis: {
-    t: {
-      anchors: {
-              "a_hall": {
-                      "name": "A厅",
-                      "callouts": [
-                              "Main"
-                      ]
-              },
-              "mid": {
-                      "name": "中路",
-                      "callouts": [
-                              "Bridge",
-                              "Middle",
-                              "MidDoors"
-                      ]
-              },
-              "canal": {
-                      "name": "水下",
-                      "callouts": [
-                              "Canal"
-                      ]
-              },
-              "b_long": {
-                      "name": "B外",
-                      "callouts": [
-                              "Ruins",
-                              "OutsideLong"
-                      ]
-              },
-              "t_spawn_route": {
-                      "name": "匪路",
-                      "callouts": [
-                              "Street",
-                              "TSideUpper",
-                              "TStairs"
-                      ]
-              }
+  "t": {
+    "anchors": {
+      "b_long": {
+        "name": "B外",
+        "callouts": [
+          "Ruins",
+          "OutsideLong"
+        ]
       },
-      roles: {
-              "Alley": "ct",
-              "BackofB": "ct",
-              "BombsiteA": "terminal",
-              "BombsiteB": "terminal",
-              "Bricks": "ct",
-              "Connector": "ct",
-              "CTSideUpper": "ct",
-              "CTSpawn": "terminal",
-              "Fountain": "ct",
-              "Heaven": "ct",
-              "LowerTunnel": "ct",
-              "PalaceInterior": "ct",
-              "SnipersNest": "ct",
-              "TSpawn": "advanced",
-              "Tunnel": "ct",
-              "TunnelStairs": "ct",
-              "Walkway": "ct"
+      "mid_bridge": {
+        "name": "中桥",
+        "callouts": [
+          "Bridge"
+        ]
       },
-    },
-    ct: {
-      anchors: {
-              "b_site": {
-                      "name": "B点",
-                      "callouts": [
-                              "BombsiteB",
-                              "BackofB",
-                              "PalaceInterior",
-                              "Bricks"
-                      ]
-              },
-              "mid": {
-                      "name": "中路",
-                      "callouts": [
-                              "Middle",
-                              "Connector",
-                              "MidDoors"
-                      ]
-              },
-              "a_site": {
-                      "name": "A点",
-                      "callouts": [
-                              "BombsiteA",
-                              "Walkway",
-                              "Heaven"
-                      ]
-              },
-              "ct_spawn": {
-                      "name": "警家",
-                      "callouts": [
-                              "CTSideUpper",
-                              "Alley",
-                              "LowerTunnel",
-                              "CTSpawn",
-                              "SnipersNest"
-                      ]
-              }
+      "street_stairs": {
+        "name": "街道/匪梯",
+        "callouts": [
+          "Street",
+          "TStairs"
+        ]
       },
-      roles: {
-              "Bridge": "advanced",
-              "Canal": "advanced",
-              "Fountain": "advanced",
-              "Main": "advanced",
-              "OutsideLong": "advanced",
-              "TSpawn": "terminal",
-              "Tunnel": "advanced",
-              "TunnelStairs": "advanced"
+      "canal": {
+        "name": "水下",
+        "callouts": [
+          "Canal"
+        ]
       },
-    },
+      "t_upper": {
+        "name": "匪跳",
+        "callouts": [
+          "TSideUpper"
+        ]
+      }
+    }
   },
+  "ct": {
+    "anchors": {
+      "a_site": {
+        "name": "A包/A连/天堂",
+        "callouts": [
+          "BombsiteA",
+          "Walkway",
+          "Heaven"
+        ]
+      },
+      "mid": {
+        "name": "中路/中门/黑屋",
+        "callouts": [
+          "Middle",
+          "MidDoors",
+          "Connector"
+        ]
+      },
+      "b_site": {
+        "name": "B包/B连",
+        "callouts": [
+          "BombsiteB",
+          "PalaceInterior",
+          "BackofB",
+          "Bricks"
+        ]
+      },
+      "ct_spawn": {
+        "name": "警家",
+        "callouts": [
+          "CTSideUpper",
+          "Alley",
+          "LowerTunnel"
+        ]
+      }
+    }
+  },
+  "contested": [
+    "Main",
+    "MidDoors",
+    "Middle",
+    "Canal",
+    "PalaceInterior",
+    "Connector",
+    "Walkway"
+  ]
+},
 ```
 ## de_dust2
 
 样本 ZIP：26
 
-### 高频占有
-- T: OutsideLong / A门外: T=113393, CT=1505, T占比=98.7%, 倾向=T; TopofMid / 中远匪口: T=105479, CT=3313, T占比=97.0%, 倾向=T; TSpawn / 匪家: T=96108, CT=745, T占比=99.2%, 倾向=T; UpperTunnel / B洞: T=87472, CT=5553, T占比=94.0%, 倾向=T; LongDoors / A门: T=65613, CT=27026, T占比=70.8%, 倾向=T; OutsideTunnel / B洞外: T=39365, CT=524, T占比=98.7%, 倾向=T; LowerTunnel / B1: T=30771, CT=8581, T占比=78.2%, 倾向=T; TunnelStairs / B洞楼梯: T=17523, CT=1751, T占比=90.9%, 倾向=T
-- CT: LongA / A大: T=8155, CT=106811, T占比=7.1%, 倾向=CT; MidDoors / 中门: T=3394, CT=99233, T占比=3.3%, 倾向=CT; BombsiteB / B包: T=9595, CT=93774, T占比=9.3%, 倾向=CT; UnderA / 警家: T=135, CT=76937, T占比=0.2%, 倾向=CT; CTSpawn / 警家: T=30, CT=70045, T占比=0.0%, 倾向=CT; ShortStairs / A小楼梯: T=2921, CT=28393, T占比=9.3%, 倾向=CT; BDoors / B门: T=133, CT=28245, T占比=0.5%, 倾向=CT; LongDoors / A门: T=65613, CT=27026, T占比=70.8%, 倾向=T
+### 当前推荐（人工修订 v1）
+#### T 默认位
+- a_doors / A门外/A门:
+  - OutsideLong / A门外: T=113393, CT=1505, T占比=98.7%, 倾向=T
+  - LongDoors / A门: T=65613, CT=27026, T占比=70.8%, 倾向=T
+- top_mid / 中远:
+  - TopofMid / 中远匪口: T=105479, CT=3313, T占比=97.0%, 倾向=T
+- b1 / B1:
+  - LowerTunnel / B1: T=30771, CT=8581, T占比=78.2%, 倾向=T
+- b_tunnels / B洞:
+  - OutsideTunnel / B洞外: T=39365, CT=524, T占比=98.7%, 倾向=T
+  - UpperTunnel / B洞: T=87472, CT=5553, T占比=94.0%, 倾向=T
 
-### T 默认位草案
-- a_long / A大: OutsideLong / A门外: T=113393, CT=1505, T占比=98.7%, 倾向=T; LongDoors / A门: T=65613, CT=27026, T占比=70.8%, 倾向=T; LongA / A大: T=8155, CT=106811, T占比=7.1%, 倾向=CT
-- mid_b1 / 中路/B1: TopofMid / 中远匪口: T=105479, CT=3313, T占比=97.0%, 倾向=T; Middle / 中路: T=17503, CT=5710, T占比=75.4%, 倾向=T; LowerTunnel / B1: T=30771, CT=8581, T占比=78.2%, 倾向=T
-- b_tunnels / B洞: OutsideTunnel / B洞外: T=39365, CT=524, T占比=98.7%, 倾向=T; UpperTunnel / B洞: T=87472, CT=5553, T占比=94.0%, 倾向=T; TunnelStairs / B洞楼梯: T=17523, CT=1751, T占比=90.9%, 倾向=T
+#### CT 默认位
+- a_long / A大/大坑:
+  - LongA / A大: T=8155, CT=106811, T占比=7.1%, 倾向=CT
+  - Pit / 大坑: T=1790, CT=7684, T占比=18.9%, 倾向=CT
+- a_short / A小:
+  - Catwalk / A小: T=15299, CT=15509, T占比=49.7%, 倾向=均衡
+  - ShortStairs / A小楼梯: T=2921, CT=28393, T占比=9.3%, 倾向=CT
+  - ExtendedA / A小过点: T=1550, CT=16809, T占比=8.4%, 倾向=CT
+- mid / 中门/警家:
+  - MidDoors / 中门: T=3394, CT=99233, T占比=3.3%, 倾向=CT
+  - UnderA / 警家: T=135, CT=76937, T占比=0.2%, 倾向=CT
+  - CTSpawn / 警家: T=30, CT=70045, T占比=0.0%, 倾向=CT
+- b_site / B包/B门:
+  - BombsiteB / B包: T=9595, CT=93774, T占比=9.3%, 倾向=CT
+  - BDoors / B门: T=133, CT=28245, T占比=0.5%, 倾向=CT
 
-### CT 默认位草案
-- a_long / A大: LongA / A大: T=8155, CT=106811, T占比=7.1%, 倾向=CT; Pit / 大坑: T=1790, CT=7684, T占比=18.9%, 倾向=CT
-- a_short / A小: Catwalk / A小: T=15299, CT=15509, T占比=49.7%, 倾向=均衡; ShortStairs / A小楼梯: T=2921, CT=28393, T占比=9.3%, 倾向=CT; ExtendedA / A小过点: T=1550, CT=16809, T占比=8.4%, 倾向=CT
-- mid / 中门/警家: MidDoors / 中门: T=3394, CT=99233, T占比=3.3%, 倾向=CT; UnderA / 警家: T=135, CT=76937, T占比=0.2%, 倾向=CT; CTSpawn / 警家: T=30, CT=70045, T占比=0.0%, 倾向=CT
-- b_site / B点: BombsiteB / B包: T=9595, CT=93774, T占比=9.3%, 倾向=CT; BDoors / B门: T=133, CT=28245, T占比=0.5%, 倾向=CT; Hole / 狗洞: T=13, CT=5398, T占比=0.2%, 倾向=CT
+#### 争夺区/通道（不作为默认位）
+- LongA / A大: T=8155, CT=106811, T占比=7.1%, 倾向=CT
+- Catwalk / A小: T=15299, CT=15509, T占比=49.7%, 倾向=均衡
+- Middle / 中路: T=17503, CT=5710, T占比=75.4%, 倾向=T
+- TunnelStairs / B洞楼梯: T=17523, CT=1751, T占比=90.9%, 倾向=T
+- BDoors / B门: T=133, CT=28245, T占比=0.5%, 倾向=CT
+- ARamp / A斜坡: T=815, CT=10006, T占比=7.5%, 倾向=CT
+
+### 数据证据：高频占有
+- T:
+  - OutsideLong / A门外: T=113393, CT=1505, T占比=98.7%, 倾向=T
+  - TopofMid / 中远匪口: T=105479, CT=3313, T占比=97.0%, 倾向=T
+  - TSpawn / 匪家: T=96108, CT=745, T占比=99.2%, 倾向=T
+  - UpperTunnel / B洞: T=87472, CT=5553, T占比=94.0%, 倾向=T
+  - LongDoors / A门: T=65613, CT=27026, T占比=70.8%, 倾向=T
+  - OutsideTunnel / B洞外: T=39365, CT=524, T占比=98.7%, 倾向=T
+  - LowerTunnel / B1: T=30771, CT=8581, T占比=78.2%, 倾向=T
+  - TunnelStairs / B洞楼梯: T=17523, CT=1751, T占比=90.9%, 倾向=T
+- CT:
+  - LongA / A大: T=8155, CT=106811, T占比=7.1%, 倾向=CT
+  - MidDoors / 中门: T=3394, CT=99233, T占比=3.3%, 倾向=CT
+  - BombsiteB / B包: T=9595, CT=93774, T占比=9.3%, 倾向=CT
+  - UnderA / 警家: T=135, CT=76937, T占比=0.2%, 倾向=CT
+  - CTSpawn / 警家: T=30, CT=70045, T占比=0.0%, 倾向=CT
+  - ShortStairs / A小楼梯: T=2921, CT=28393, T占比=9.3%, 倾向=CT
+  - BDoors / B门: T=133, CT=28245, T占比=0.5%, 倾向=CT
+  - LongDoors / A门: T=65613, CT=27026, T占比=70.8%, 倾向=T
 
 ### 相邻证据
 同一玩家在开局窗口内发生 callout 变化时记录一条有向边。
@@ -325,124 +403,141 @@ de_anubis: {
 - BDoors / B门 -> BombsiteB / B包: T=0, CT=499, T占比=0.0%, 倾向=CT
 - TSpawn / 匪家 -> OutsideLong / A门外: T=455, CT=1, T占比=99.8%, 倾向=T
 
-### TS 草案
+### 运行时资产片段
 ```ts
 de_dust2: {
-    t: {
-      anchors: {
-              "a_long": {
-                      "name": "A大",
-                      "callouts": [
-                              "OutsideLong",
-                              "LongDoors",
-                              "LongA"
-                      ]
-              },
-              "mid_b1": {
-                      "name": "中路/B1",
-                      "callouts": [
-                              "TopofMid",
-                              "Middle",
-                              "LowerTunnel"
-                      ]
-              },
-              "b_tunnels": {
-                      "name": "B洞",
-                      "callouts": [
-                              "OutsideTunnel",
-                              "UpperTunnel",
-                              "TunnelStairs"
-                      ]
-              }
+  "t": {
+    "anchors": {
+      "a_doors": {
+        "name": "A门外/A门",
+        "callouts": [
+          "OutsideLong",
+          "LongDoors"
+        ]
       },
-      roles: {
-              "ARamp": "ct",
-              "BDoors": "ct",
-              "BombsiteA": "terminal",
-              "BombsiteB": "terminal",
-              "Catwalk": "advanced",
-              "CTSpawn": "terminal",
-              "ExtendedA": "ct",
-              "Hole": "ct",
-              "MidDoors": "ct",
-              "Pit": "ct",
-              "ShortStairs": "ct",
-              "Side": "advanced",
-              "TRamp": "advanced",
-              "TSpawn": "advanced",
-              "UnderA": "ct"
+      "top_mid": {
+        "name": "中远",
+        "callouts": [
+          "TopofMid"
+        ]
       },
-    },
-    ct: {
-      anchors: {
-              "a_long": {
-                      "name": "A大",
-                      "callouts": [
-                              "LongA",
-                              "Pit"
-                      ]
-              },
-              "a_short": {
-                      "name": "A小",
-                      "callouts": [
-                              "Catwalk",
-                              "ShortStairs",
-                              "ExtendedA"
-                      ]
-              },
-              "mid": {
-                      "name": "中门/警家",
-                      "callouts": [
-                              "MidDoors",
-                              "UnderA",
-                              "CTSpawn"
-                      ]
-              },
-              "b_site": {
-                      "name": "B点",
-                      "callouts": [
-                              "BombsiteB",
-                              "BDoors",
-                              "Hole"
-                      ]
-              }
+      "b1": {
+        "name": "B1",
+        "callouts": [
+          "LowerTunnel"
+        ]
       },
-      roles: {
-              "ARamp": "advanced",
-              "BombsiteA": "advanced",
-              "LongDoors": "advanced",
-              "LowerTunnel": "advanced",
-              "Middle": "advanced",
-              "OutsideLong": "advanced",
-              "OutsideTunnel": "advanced",
-              "Side": "advanced",
-              "TopofMid": "advanced",
-              "TRamp": "advanced",
-              "TSpawn": "terminal",
-              "TunnelStairs": "advanced",
-              "UpperTunnel": "advanced"
-      },
-    },
+      "b_tunnels": {
+        "name": "B洞",
+        "callouts": [
+          "OutsideTunnel",
+          "UpperTunnel"
+        ]
+      }
+    }
   },
+  "ct": {
+    "anchors": {
+      "a_long": {
+        "name": "A大/大坑",
+        "callouts": [
+          "LongA",
+          "Pit"
+        ]
+      },
+      "a_short": {
+        "name": "A小",
+        "callouts": [
+          "Catwalk",
+          "ShortStairs",
+          "ExtendedA"
+        ]
+      },
+      "mid": {
+        "name": "中门/警家",
+        "callouts": [
+          "MidDoors",
+          "UnderA",
+          "CTSpawn"
+        ]
+      },
+      "b_site": {
+        "name": "B包/B门",
+        "callouts": [
+          "BombsiteB",
+          "BDoors"
+        ]
+      }
+    }
+  },
+  "contested": [
+    "LongA",
+    "Catwalk",
+    "Middle",
+    "TunnelStairs",
+    "BDoors",
+    "ARamp"
+  ]
+},
 ```
 ## de_inferno
 
 样本 ZIP：16
 
-### 高频占有
-- T: TSpawn / 匪家: T=72683, CT=0, T占比=100.0%, 倾向=T; Banana / 香蕉道: T=61001, CT=51128, T占比=54.4%, 倾向=均衡; SecondMid / 侧道: T=57697, CT=139, T占比=99.8%, 倾向=T; TRamp / 匪口: T=56041, CT=43, T占比=99.9%, 倾向=T; Middle / 中路: T=50938, CT=2731, T占比=94.9%, 倾向=T; LowerMid / 匪口: T=48264, CT=0, T占比=100.0%, 倾向=T; Apartments / 二楼: T=23286, CT=22970, T占比=50.3%, 倾向=均衡; BackAlley / 匪二楼: T=8452, CT=67, T占比=99.2%, 倾向=T
-- CT: CTSpawn / 警家: T=131, CT=75347, T占比=0.2%, 倾向=CT; BombsiteB / B包: T=1490, CT=69597, T占比=2.1%, 倾向=CT; BombsiteA / A包: T=1090, CT=57995, T占比=1.8%, 倾向=CT; Banana / 香蕉道: T=61001, CT=51128, T占比=54.4%, 倾向=均衡; TopofMid / 中路: T=4062, CT=35348, T占比=10.3%, 倾向=CT; Arch / 拱门: T=1262, CT=32110, T占比=3.8%, 倾向=CT; Ruins / 警家教堂: T=3, CT=23815, T占比=0.0%, 倾向=CT; Apartments / 二楼: T=23286, CT=22970, T占比=50.3%, 倾向=均衡
+### 当前推荐（人工修订 v1）
+#### T 默认位
+- banana / 香蕉道:
+  - Banana / 香蕉道: T=61001, CT=51128, T占比=54.4%, 倾向=均衡
+- mid / 匪口/中路:
+  - TRamp / 匪口: T=56041, CT=43, T占比=99.9%, 倾向=T
+  - LowerMid / 匪口: T=48264, CT=0, T占比=100.0%, 倾向=T
+  - Middle / 中路: T=50938, CT=2731, T占比=94.9%, 倾向=T
+- second_mid / 侧道:
+  - SecondMid / 侧道: T=57697, CT=139, T占比=99.8%, 倾向=T
+- t_apps / 匪二楼:
+  - BackAlley / 匪二楼: T=8452, CT=67, T占比=99.2%, 倾向=T
+  - Upstairs / 匪二楼: T=3160, CT=0, T占比=100.0%, 倾向=T
 
-### T 默认位草案
-- banana / 香蕉道: Banana / 香蕉道: T=61001, CT=51128, T占比=54.4%, 倾向=均衡
-- mid / 中路: TRamp / 匪口: T=56041, CT=43, T占比=99.9%, 倾向=T; LowerMid / 匪口: T=48264, CT=0, T占比=100.0%, 倾向=T; Middle / 中路: T=50938, CT=2731, T占比=94.9%, 倾向=T; TopofMid / 中路: T=4062, CT=35348, T占比=10.3%, 倾向=CT
-- second_mid_apps / 侧道/二楼: SecondMid / 侧道: T=57697, CT=139, T占比=99.8%, 倾向=T; Apartments / 二楼: T=23286, CT=22970, T占比=50.3%, 倾向=均衡; BackAlley / 匪二楼: T=8452, CT=67, T占比=99.2%, 倾向=T; Underpass / 下水道: T=5433, CT=20, T占比=99.6%, 倾向=T; Bridge / 匪桥: T=3396, CT=0, T占比=100.0%, 倾向=T; Upstairs / 匪二楼: T=3160, CT=0, T占比=100.0%, 倾向=T; Deck / 匪二阳台: T=1754, CT=0, T占比=100.0%, 倾向=T
+#### CT 默认位
+- a_site / A包/大坑/马棚:
+  - BombsiteA / A包: T=1090, CT=57995, T占比=1.8%, 倾向=CT
+  - Pit / 大坑: T=125, CT=5874, T占比=2.1%, 倾向=CT
+  - Quad / 马鹏: T=165, CT=4726, T占比=3.4%, 倾向=CT
+- arch_library / 拱门/书房:
+  - Arch / 拱门: T=1262, CT=32110, T占比=3.8%, 倾向=CT
+  - Library / 书房: T=35, CT=11963, T占比=0.3%, 倾向=CT
+- b_site / B包/教堂:
+  - BombsiteB / B包: T=1490, CT=69597, T占比=2.1%, 倾向=CT
+  - Ruins / 警家教堂: T=3, CT=23815, T占比=0.0%, 倾向=CT
+- ct_spawn / 警家:
+  - CTSpawn / 警家: T=131, CT=75347, T占比=0.2%, 倾向=CT
 
-### CT 默认位草案
-- b_site / B点: BombsiteB / B包: T=1490, CT=69597, T占比=2.1%, 倾向=CT; Banana / 香蕉道: T=61001, CT=51128, T占比=54.4%, 倾向=均衡; Ruins / 警家教堂: T=3, CT=23815, T占比=0.0%, 倾向=CT
-- a_site / A点: BombsiteA / A包: T=1090, CT=57995, T占比=1.8%, 倾向=CT; Pit / 大坑: T=125, CT=5874, T占比=2.1%, 倾向=CT; Quad / 马鹏: T=165, CT=4726, T占比=3.4%, 倾向=CT; Graveyard / 墓地: T=21, CT=80, T占比=20.8%, 倾向=CT
-- arch_library / 拱门/书房: Arch / 拱门: T=1262, CT=32110, T占比=3.8%, 倾向=CT; Library / 书房: T=35, CT=11963, T占比=0.3%, 倾向=CT
-- ct_spawn / 警家: CTSpawn / 警家: T=131, CT=75347, T占比=0.2%, 倾向=CT
+#### 争夺区/通道（不作为默认位）
+- Banana / 香蕉道: T=61001, CT=51128, T占比=54.4%, 倾向=均衡
+- Apartments / 二楼: T=23286, CT=22970, T占比=50.3%, 倾向=均衡
+- Balcony / 阳台: T=1452, CT=9388, T占比=13.4%, 倾向=CT
+- TopofMid / 中路: T=4062, CT=35348, T占比=10.3%, 倾向=CT
+- Arch / 拱门: T=1262, CT=32110, T占比=3.8%, 倾向=CT
+
+### 数据证据：高频占有
+- T:
+  - TSpawn / 匪家: T=72683, CT=0, T占比=100.0%, 倾向=T
+  - Banana / 香蕉道: T=61001, CT=51128, T占比=54.4%, 倾向=均衡
+  - SecondMid / 侧道: T=57697, CT=139, T占比=99.8%, 倾向=T
+  - TRamp / 匪口: T=56041, CT=43, T占比=99.9%, 倾向=T
+  - Middle / 中路: T=50938, CT=2731, T占比=94.9%, 倾向=T
+  - LowerMid / 匪口: T=48264, CT=0, T占比=100.0%, 倾向=T
+  - Apartments / 二楼: T=23286, CT=22970, T占比=50.3%, 倾向=均衡
+  - BackAlley / 匪二楼: T=8452, CT=67, T占比=99.2%, 倾向=T
+- CT:
+  - CTSpawn / 警家: T=131, CT=75347, T占比=0.2%, 倾向=CT
+  - BombsiteB / B包: T=1490, CT=69597, T占比=2.1%, 倾向=CT
+  - BombsiteA / A包: T=1090, CT=57995, T占比=1.8%, 倾向=CT
+  - Banana / 香蕉道: T=61001, CT=51128, T占比=54.4%, 倾向=均衡
+  - TopofMid / 中路: T=4062, CT=35348, T占比=10.3%, 倾向=CT
+  - Arch / 拱门: T=1262, CT=32110, T占比=3.8%, 倾向=CT
+  - Ruins / 警家教堂: T=3, CT=23815, T占比=0.0%, 倾向=CT
+  - Apartments / 二楼: T=23286, CT=22970, T占比=50.3%, 倾向=均衡
 
 ### 相邻证据
 同一玩家在开局窗口内发生 callout 变化时记录一条有向边。
@@ -463,120 +558,143 @@ de_dust2: {
 - TopofMid / 中路 -> Arch / 拱门: T=41, CT=241, T占比=14.5%, 倾向=CT
 - Banana / 香蕉道 -> Middle / 中路: T=244, CT=14, T占比=94.6%, 倾向=T
 
-### TS 草案
+### 运行时资产片段
 ```ts
 de_inferno: {
-    t: {
-      anchors: {
-              "banana": {
-                      "name": "香蕉道",
-                      "callouts": [
-                              "Banana"
-                      ]
-              },
-              "mid": {
-                      "name": "中路",
-                      "callouts": [
-                              "TRamp",
-                              "LowerMid",
-                              "Middle",
-                              "TopofMid"
-                      ]
-              },
-              "second_mid_apps": {
-                      "name": "侧道/二楼",
-                      "callouts": [
-                              "SecondMid",
-                              "Apartments",
-                              "BackAlley",
-                              "Underpass",
-                              "Bridge",
-                              "Upstairs",
-                              "Deck"
-                      ]
-              }
+  "t": {
+    "anchors": {
+      "banana": {
+        "name": "香蕉道",
+        "callouts": [
+          "Banana"
+        ]
       },
-      roles: {
-              "Arch": "ct",
-              "Balcony": "ct",
-              "BombsiteA": "terminal",
-              "BombsiteB": "terminal",
-              "CTSpawn": "terminal",
-              "Graveyard": "ct",
-              "Kitchen": "advanced",
-              "Library": "ct",
-              "Pit": "ct",
-              "Quad": "ct",
-              "Ruins": "ct",
-              "TSpawn": "advanced"
+      "mid": {
+        "name": "匪口/中路",
+        "callouts": [
+          "TRamp",
+          "LowerMid",
+          "Middle"
+        ]
       },
-    },
-    ct: {
-      anchors: {
-              "b_site": {
-                      "name": "B点",
-                      "callouts": [
-                              "BombsiteB",
-                              "Banana",
-                              "Ruins"
-                      ]
-              },
-              "a_site": {
-                      "name": "A点",
-                      "callouts": [
-                              "BombsiteA",
-                              "Pit",
-                              "Quad",
-                              "Graveyard"
-                      ]
-              },
-              "arch_library": {
-                      "name": "拱门/书房",
-                      "callouts": [
-                              "Arch",
-                              "Library"
-                      ]
-              },
-              "ct_spawn": {
-                      "name": "警家",
-                      "callouts": [
-                              "CTSpawn"
-                      ]
-              }
+      "second_mid": {
+        "name": "侧道",
+        "callouts": [
+          "SecondMid"
+        ]
       },
-      roles: {
-              "Apartments": "advanced",
-              "BackAlley": "advanced",
-              "Balcony": "advanced",
-              "Middle": "advanced",
-              "SecondMid": "advanced",
-              "TopofMid": "advanced",
-              "TRamp": "advanced",
-              "TSpawn": "terminal",
-              "Underpass": "advanced"
-      },
-    },
+      "t_apps": {
+        "name": "匪二楼",
+        "callouts": [
+          "BackAlley",
+          "Upstairs"
+        ]
+      }
+    }
   },
+  "ct": {
+    "anchors": {
+      "a_site": {
+        "name": "A包/大坑/马棚",
+        "callouts": [
+          "BombsiteA",
+          "Pit",
+          "Quad"
+        ]
+      },
+      "arch_library": {
+        "name": "拱门/书房",
+        "callouts": [
+          "Arch",
+          "Library"
+        ]
+      },
+      "b_site": {
+        "name": "B包/教堂",
+        "callouts": [
+          "BombsiteB",
+          "Ruins"
+        ]
+      },
+      "ct_spawn": {
+        "name": "警家",
+        "callouts": [
+          "CTSpawn"
+        ]
+      }
+    }
+  },
+  "contested": [
+    "Banana",
+    "Apartments",
+    "Balcony",
+    "TopofMid",
+    "Arch"
+  ]
+},
 ```
 ## de_mirage
 
 样本 ZIP：21
 
-### 高频占有
-- T: TSpawn / 匪家: T=87332, CT=241, T占比=99.7%, 倾向=T; TopofMid / 中远/匪口: T=74393, CT=1610, T占比=97.9%, 倾向=T; SideAlley / 匪口: T=72414, CT=296, T占比=99.6%, 倾向=T; PalaceAlley / A1: T=57524, CT=1512, T占比=97.4%, 倾向=T; PalaceInterior / A二楼: T=49022, CT=14836, T占比=76.8%, 倾向=T; BackAlley / B二楼: T=46128, CT=408, T占比=99.1%, 倾向=T; Underpass / 下水道: T=26029, CT=12877, T占比=66.9%, 倾向=T; House / 匪二楼: T=25676, CT=73, T占比=99.7%, 倾向=T
-- CT: CTSpawn / 警家: T=451, CT=146393, T占比=0.3%, 倾向=CT; BombsiteA / A包: T=7362, CT=110185, T占比=6.3%, 倾向=CT; BombsiteB / B包: T=3324, CT=61716, T占比=5.1%, 倾向=CT; Catwalk / B小: T=13265, CT=28887, T占比=31.5%, 倾向=CT; SnipersNest / VIP: T=188, CT=27035, T占比=0.7%, 倾向=CT; Truck / 白车: T=354, CT=24682, T占比=1.4%, 倾向=CT; Shop / 超市: T=64, CT=22529, T占比=0.3%, 倾向=CT; Connector / 拱门: T=1384, CT=21962, T占比=5.9%, 倾向=CT
+### 当前推荐（人工修订 v1）
+#### T 默认位
+- a_ramp / A1:
+  - PalaceAlley / A1: T=57524, CT=1512, T占比=97.4%, 倾向=T
+  - TRamp / A1: T=15470, CT=1313, T占比=92.2%, 倾向=T
+- a_palace / A二楼:
+  - PalaceInterior / A二楼: T=49022, CT=14836, T占比=76.8%, 倾向=T
+- mid_spawn / 匪口/中远:
+  - SideAlley / 匪口: T=72414, CT=296, T占比=99.6%, 倾向=T
+  - TopofMid / 中远/匪口: T=74393, CT=1610, T占比=97.9%, 倾向=T
+- underpass / 下水道:
+  - Underpass / 下水道: T=26029, CT=12877, T占比=66.9%, 倾向=T
+- b_apps / 匪二楼/B二楼:
+  - House / 匪二楼: T=25676, CT=73, T占比=99.7%, 倾向=T
+  - BackAlley / B二楼: T=46128, CT=408, T占比=99.1%, 倾向=T
 
-### T 默认位草案
-- a_ramp / A1: PalaceAlley / A1: T=57524, CT=1512, T占比=97.4%, 倾向=T; TRamp / A1: T=15470, CT=1313, T占比=92.2%, 倾向=T
-- a_palace / A二楼: PalaceInterior / A二楼: T=49022, CT=14836, T占比=76.8%, 倾向=T; Scaffolding / A2上下: T=280, CT=1477, T占比=15.9%, 倾向=CT
-- mid / 中路: TopofMid / 中远/匪口: T=74393, CT=1610, T占比=97.9%, 倾向=T; SideAlley / 匪口: T=72414, CT=296, T占比=99.6%, 倾向=T; Middle / 中路: T=24862, CT=13634, T占比=64.6%, 倾向=均衡
-- underpass / 下水道: Underpass / 下水道: T=26029, CT=12877, T占比=66.9%, 倾向=T
-- b_apps / B二楼: House / 匪二楼: T=25676, CT=73, T占比=99.7%, 倾向=T; BackAlley / B二楼: T=46128, CT=408, T占比=99.1%, 倾向=T; Apartments / B二楼: T=19170, CT=9690, T占比=66.4%, 倾向=T
+#### CT 默认位
+- a_site / A包/跳台/Jungle:
+  - BombsiteA / A包: T=7362, CT=110185, T占比=6.3%, 倾向=CT
+  - Stairs / 跳台: T=145, CT=7823, T占比=1.8%, 倾向=CT
+  - Jungle / Jungle: T=99, CT=14519, T占比=0.7%, 倾向=CT
+- mid / VIP/拱门/B小/黑屋:
+  - SnipersNest / VIP: T=188, CT=27035, T占比=0.7%, 倾向=CT
+  - Connector / 拱门: T=1384, CT=21962, T占比=5.9%, 倾向=CT
+  - Catwalk / B小: T=13265, CT=28887, T占比=31.5%, 倾向=CT
+  - Ladder / 黑屋: T=278, CT=3431, T占比=7.5%, 倾向=CT
+- b_site / B包/超市/白车:
+  - BombsiteB / B包: T=3324, CT=61716, T占比=5.1%, 倾向=CT
+  - Shop / 超市: T=64, CT=22529, T占比=0.3%, 倾向=CT
+  - Truck / 白车: T=354, CT=24682, T占比=1.4%, 倾向=CT
 
-### CT 默认位草案
-- a_site / A点: BombsiteA / A包: T=7362, CT=110185, T占比=6.3%, 倾向=CT; Stairs / 跳台: T=145, CT=7823, T占比=1.8%, 倾向=CT; Jungle / Jungle: T=99, CT=14519, T占比=0.7%, 倾向=CT
-- mid / 中路: SnipersNest / VIP: T=188, CT=27035, T占比=0.7%, 倾向=CT; Connector / 拱门: T=1384, CT=21962, T占比=5.9%, 倾向=CT; Catwalk / B小: T=13265, CT=28887, T占比=31.5%, 倾向=CT; Ladder / 黑屋: T=278, CT=3431, T占比=7.5%, 倾向=CT
-- b_site / B点: BombsiteB / B包: T=3324, CT=61716, T占比=5.1%, 倾向=CT; Shop / 超市: T=64, CT=22529, T占比=0.3%, 倾向=CT; Truck / 白车: T=354, CT=24682, T占比=1.4%, 倾向=CT
+#### 争夺区/通道（不作为默认位）
+- Middle / 中路: T=24862, CT=13634, T占比=64.6%, 倾向=均衡
+- Underpass / 下水道: T=26029, CT=12877, T占比=66.9%, 倾向=T
+- Connector / 拱门: T=1384, CT=21962, T占比=5.9%, 倾向=CT
+- Catwalk / B小: T=13265, CT=28887, T占比=31.5%, 倾向=CT
+- PalaceInterior / A二楼: T=49022, CT=14836, T占比=76.8%, 倾向=T
+- Apartments / B二楼: T=19170, CT=9690, T占比=66.4%, 倾向=T
+
+### 数据证据：高频占有
+- T:
+  - TSpawn / 匪家: T=87332, CT=241, T占比=99.7%, 倾向=T
+  - TopofMid / 中远/匪口: T=74393, CT=1610, T占比=97.9%, 倾向=T
+  - SideAlley / 匪口: T=72414, CT=296, T占比=99.6%, 倾向=T
+  - PalaceAlley / A1: T=57524, CT=1512, T占比=97.4%, 倾向=T
+  - PalaceInterior / A二楼: T=49022, CT=14836, T占比=76.8%, 倾向=T
+  - BackAlley / B二楼: T=46128, CT=408, T占比=99.1%, 倾向=T
+  - Underpass / 下水道: T=26029, CT=12877, T占比=66.9%, 倾向=T
+  - House / 匪二楼: T=25676, CT=73, T占比=99.7%, 倾向=T
+- CT:
+  - CTSpawn / 警家: T=451, CT=146393, T占比=0.3%, 倾向=CT
+  - BombsiteA / A包: T=7362, CT=110185, T占比=6.3%, 倾向=CT
+  - BombsiteB / B包: T=3324, CT=61716, T占比=5.1%, 倾向=CT
+  - Catwalk / B小: T=13265, CT=28887, T占比=31.5%, 倾向=CT
+  - SnipersNest / VIP: T=188, CT=27035, T占比=0.7%, 倾向=CT
+  - Truck / 白车: T=354, CT=24682, T占比=1.4%, 倾向=CT
+  - Shop / 超市: T=64, CT=22529, T占比=0.3%, 倾向=CT
+  - Connector / 拱门: T=1384, CT=21962, T占比=5.9%, 倾向=CT
 
 ### 相邻证据
 同一玩家在开局窗口内发生 callout 变化时记录一条有向边。
@@ -597,129 +715,150 @@ de_inferno: {
 - Jungle / Jungle -> BombsiteA / A包: T=0, CT=329, T占比=0.0%, 倾向=CT
 - PalaceAlley / A1 -> TRamp / A1: T=303, CT=17, T占比=94.7%, 倾向=T
 
-### TS 草案
+### 运行时资产片段
 ```ts
 de_mirage: {
-    t: {
-      anchors: {
-              "a_ramp": {
-                      "name": "A1",
-                      "callouts": [
-                              "PalaceAlley",
-                              "TRamp"
-                      ]
-              },
-              "a_palace": {
-                      "name": "A二楼",
-                      "callouts": [
-                              "PalaceInterior",
-                              "Scaffolding"
-                      ]
-              },
-              "mid": {
-                      "name": "中路",
-                      "callouts": [
-                              "TopofMid",
-                              "SideAlley",
-                              "Middle"
-                      ]
-              },
-              "underpass": {
-                      "name": "下水道",
-                      "callouts": [
-                              "Underpass"
-                      ]
-              },
-              "b_apps": {
-                      "name": "B二楼",
-                      "callouts": [
-                              "House",
-                              "BackAlley",
-                              "Apartments"
-                      ]
-              }
+  "t": {
+    "anchors": {
+      "a_ramp": {
+        "name": "A1",
+        "callouts": [
+          "PalaceAlley",
+          "TRamp"
+        ]
       },
-      roles: {
-              "BombsiteA": "terminal",
-              "BombsiteB": "terminal",
-              "Catwalk": "ct",
-              "Connector": "ct",
-              "CTSpawn": "terminal",
-              "Jungle": "ct",
-              "Ladder": "ct",
-              "Shop": "ct",
-              "SnipersNest": "ct",
-              "Stairs": "ct",
-              "Truck": "ct",
-              "TSpawn": "advanced"
+      "a_palace": {
+        "name": "A二楼",
+        "callouts": [
+          "PalaceInterior"
+        ]
       },
-    },
-    ct: {
-      anchors: {
-              "a_site": {
-                      "name": "A点",
-                      "callouts": [
-                              "BombsiteA",
-                              "Stairs",
-                              "Jungle"
-                      ]
-              },
-              "mid": {
-                      "name": "中路",
-                      "callouts": [
-                              "SnipersNest",
-                              "Connector",
-                              "Catwalk",
-                              "Ladder"
-                      ]
-              },
-              "b_site": {
-                      "name": "B点",
-                      "callouts": [
-                              "BombsiteB",
-                              "Shop",
-                              "Truck"
-                      ]
-              }
+      "mid_spawn": {
+        "name": "匪口/中远",
+        "callouts": [
+          "SideAlley",
+          "TopofMid"
+        ]
       },
-      roles: {
-              "Apartments": "advanced",
-              "BackAlley": "advanced",
-              "CTSpawn": "advanced",
-              "House": "advanced",
-              "Middle": "advanced",
-              "PalaceAlley": "advanced",
-              "PalaceInterior": "advanced",
-              "Scaffolding": "advanced",
-              "SideAlley": "advanced",
-              "TopofMid": "advanced",
-              "TRamp": "advanced",
-              "TSpawn": "terminal",
-              "Underpass": "advanced"
+      "underpass": {
+        "name": "下水道",
+        "callouts": [
+          "Underpass"
+        ]
       },
-    },
+      "b_apps": {
+        "name": "匪二楼/B二楼",
+        "callouts": [
+          "House",
+          "BackAlley"
+        ]
+      }
+    }
   },
+  "ct": {
+    "anchors": {
+      "a_site": {
+        "name": "A包/跳台/Jungle",
+        "callouts": [
+          "BombsiteA",
+          "Stairs",
+          "Jungle"
+        ]
+      },
+      "mid": {
+        "name": "VIP/拱门/B小/黑屋",
+        "callouts": [
+          "SnipersNest",
+          "Connector",
+          "Catwalk",
+          "Ladder"
+        ]
+      },
+      "b_site": {
+        "name": "B包/超市/白车",
+        "callouts": [
+          "BombsiteB",
+          "Shop",
+          "Truck"
+        ]
+      }
+    }
+  },
+  "contested": [
+    "Middle",
+    "Underpass",
+    "Connector",
+    "Catwalk",
+    "PalaceInterior",
+    "Apartments"
+  ]
+},
 ```
 ## de_nuke
 
 样本 ZIP：12
 
-### 高频占有
-- T: Outside / 外场: T=112614, CT=77005, T占比=59.4%, 倾向=均衡; TSpawn / 匪家: T=63604, CT=13, T占比=100.0%, 倾向=T; Lobby / 匪厅: T=48452, CT=2005, T占比=96.0%, 倾向=T; Vending / 链接: T=13354, CT=764, T占比=94.6%, 倾向=T; Roof / 屋顶: T=12504, CT=107, T占比=99.2%, 倾向=T; Silo / 山上: T=12299, CT=0, T占比=100.0%, 倾向=T; Squeaky / 铁门房: T=7703, CT=1020, T占比=88.3%, 倾向=T; Trophy / 奖杯房: T=6461, CT=839, T占比=88.5%, 倾向=T
-- CT: Outside / 外场: T=112614, CT=77005, T占比=59.4%, 倾向=均衡; Ramp / 铁板: T=2107, CT=40490, T占比=4.9%, 倾向=CT; BombsiteA / A包: T=4688, CT=33009, T占比=12.4%, 倾向=CT; CTSpawn / 警家: T=0, CT=25131, T占比=0.0%, 倾向=CT; Rafters / 三楼横梁: T=0, CT=21442, T占比=0.0%, 倾向=CT; Hell / 三楼下: T=0, CT=13992, T占比=0.0%, 倾向=CT; Mini / 正门: T=123, CT=13664, T占比=0.9%, 倾向=CT; Admin / 铁板三楼下: T=0, CT=12218, T占比=0.0%, 倾向=CT
+### 当前推荐（人工修订 v1）
+#### T 默认位
+- outside / 外场准备:
+  - Outside / 外场: T=112614, CT=77005, T占比=59.4%, 倾向=均衡
+  - Roof / 屋顶: T=12504, CT=107, T占比=99.2%, 倾向=T
+  - Silo / 山上: T=12299, CT=0, T占比=100.0%, 倾向=T
+- lobby / 匪厅:
+  - Lobby / 匪厅: T=48452, CT=2005, T占比=96.0%, 倾向=T
+- squeaky / 铁门:
+  - Squeaky / 铁门房: T=7703, CT=1020, T占比=88.3%, 倾向=T
+- trophy_link / 奖杯/链接:
+  - Trophy / 奖杯房: T=6461, CT=839, T占比=88.5%, 倾向=T
+  - Vending / 链接: T=13354, CT=764, T占比=94.6%, 倾向=T
 
-### T 默认位草案
-- outside / 外场: Outside / 外场: T=112614, CT=77005, T占比=59.4%, 倾向=均衡; Roof / 屋顶: T=12504, CT=107, T占比=99.2%, 倾向=T; Silo / 山上: T=12299, CT=0, T占比=100.0%, 倾向=T
-- lobby_a / 匪厅/A内: Lobby / 匪厅: T=48452, CT=2005, T占比=96.0%, 倾向=T; Squeaky / 铁门房: T=7703, CT=1020, T占比=88.3%, 倾向=T; Hut / 黄房: T=2055, CT=2126, T占比=49.2%, 倾向=均衡; Trophy / 奖杯房: T=6461, CT=839, T占比=88.5%, 倾向=T
-- ramp / 铁板: Ramp / 铁板: T=2107, CT=40490, T占比=4.9%, 倾向=CT
-- secret_b / K1/地下: Secret / K1: T=3692, CT=869, T占比=80.9%, 倾向=T; Tunnels / K1地下: T=1976, CT=4362, T占比=31.2%, 倾向=CT; Vending / 链接: T=13354, CT=764, T占比=94.6%, 倾向=T; Control / 链接: T=2336, CT=2985, T占比=43.9%, 倾向=均衡
+#### CT 默认位
+- outside / 外场/大仓:
+  - Outside / 外场: T=112614, CT=77005, T占比=59.4%, 倾向=均衡
+  - Garage / 大仓: T=465, CT=10787, T占比=4.1%, 倾向=CT
+- a_site / A包/三楼/正门:
+  - BombsiteA / A包: T=4688, CT=33009, T占比=12.4%, 倾向=CT
+  - Rafters / 三楼横梁: T=0, CT=21442, T占比=0.0%, 倾向=CT
+  - Mini / 正门: T=123, CT=13664, T占比=0.9%, 倾向=CT
+  - Heaven / 三楼: T=0, CT=12031, T占比=0.0%, 倾向=CT
+  - Hell / 三楼下: T=0, CT=13992, T占比=0.0%, 倾向=CT
+- ramp / 铁板:
+  - Ramp / 铁板: T=2107, CT=40490, T占比=4.9%, 倾向=CT
+  - Admin / 铁板三楼下: T=0, CT=12218, T占比=0.0%, 倾向=CT
+- b_site / B包/控制室/死门:
+  - BombsiteB / B包: T=450, CT=1688, T占比=21.0%, 倾向=CT
+  - Control / 链接: T=2336, CT=2985, T占比=43.9%, 倾向=均衡
+  - Decon / 死门: T=4, CT=183, T占比=2.1%, 倾向=CT
+  - Observation / 控制室: T=19, CT=777, T占比=2.4%, 倾向=CT
 
-### CT 默认位草案
-- outside / 外场: Outside / 外场: T=112614, CT=77005, T占比=59.4%, 倾向=均衡; Garage / 大仓: T=465, CT=10787, T占比=4.1%, 倾向=CT; Catwalk / 外场三楼: T=0, CT=4091, T占比=0.0%, 倾向=CT; Crane: T=0, CT=3039, T占比=0.0%, 倾向=CT
-- a_site / A点: BombsiteA / A包: T=4688, CT=33009, T占比=12.4%, 倾向=CT; Rafters / 三楼横梁: T=0, CT=21442, T占比=0.0%, 倾向=CT; Mini / 正门: T=123, CT=13664, T占比=0.9%, 倾向=CT; HutRoof / 黄房顶: T=0, CT=8058, T占比=0.0%, 倾向=CT; Heaven / 三楼: T=0, CT=12031, T占比=0.0%, 倾向=CT; Hell / 三楼下: T=0, CT=13992, T占比=0.0%, 倾向=CT
-- ramp / 铁板: Ramp / 铁板: T=2107, CT=40490, T占比=4.9%, 倾向=CT; Admin / 铁板三楼下: T=0, CT=12218, T占比=0.0%, 倾向=CT
-- b_site / B点: BombsiteB / B包: T=450, CT=1688, T占比=21.0%, 倾向=CT; Control / 链接: T=2336, CT=2985, T占比=43.9%, 倾向=均衡; Decon / 死门: T=4, CT=183, T占比=2.1%, 倾向=CT; Observation / 控制室: T=19, CT=777, T占比=2.4%, 倾向=CT
-- ct_spawn / 警家: CTSpawn / 警家: T=0, CT=25131, T占比=0.0%, 倾向=CT; LockerRoom / 更衣室: T=9, CT=1376, T占比=0.6%, 倾向=CT
+#### 争夺区/通道（不作为默认位）
+- Outside / 外场: T=112614, CT=77005, T占比=59.4%, 倾向=均衡
+- Hut / 黄房: T=2055, CT=2126, T占比=49.2%, 倾向=均衡
+- Ramp / 铁板: T=2107, CT=40490, T占比=4.9%, 倾向=CT
+- Secret / K1: T=3692, CT=869, T占比=80.9%, 倾向=T
+- Tunnels / K1地下: T=1976, CT=4362, T占比=31.2%, 倾向=CT
+- Control / 链接: T=2336, CT=2985, T占比=43.9%, 倾向=均衡
+- Vending / 链接: T=13354, CT=764, T占比=94.6%, 倾向=T
+
+### 数据证据：高频占有
+- T:
+  - Outside / 外场: T=112614, CT=77005, T占比=59.4%, 倾向=均衡
+  - TSpawn / 匪家: T=63604, CT=13, T占比=100.0%, 倾向=T
+  - Lobby / 匪厅: T=48452, CT=2005, T占比=96.0%, 倾向=T
+  - Vending / 链接: T=13354, CT=764, T占比=94.6%, 倾向=T
+  - Roof / 屋顶: T=12504, CT=107, T占比=99.2%, 倾向=T
+  - Silo / 山上: T=12299, CT=0, T占比=100.0%, 倾向=T
+  - Squeaky / 铁门房: T=7703, CT=1020, T占比=88.3%, 倾向=T
+  - Trophy / 奖杯房: T=6461, CT=839, T占比=88.5%, 倾向=T
+- CT:
+  - Outside / 外场: T=112614, CT=77005, T占比=59.4%, 倾向=均衡
+  - Ramp / 铁板: T=2107, CT=40490, T占比=4.9%, 倾向=CT
+  - BombsiteA / A包: T=4688, CT=33009, T占比=12.4%, 倾向=CT
+  - CTSpawn / 警家: T=0, CT=25131, T占比=0.0%, 倾向=CT
+  - Rafters / 三楼横梁: T=0, CT=21442, T占比=0.0%, 倾向=CT
+  - Hell / 三楼下: T=0, CT=13992, T占比=0.0%, 倾向=CT
+  - Mini / 正门: T=123, CT=13664, T占比=0.9%, 倾向=CT
+  - Admin / 铁板三楼下: T=0, CT=12218, T占比=0.0%, 倾向=CT
 
 ### 相邻证据
 同一玩家在开局窗口内发生 callout 变化时记录一条有向边。
@@ -740,145 +879,151 @@ de_mirage: {
 - Lobby / 匪厅 -> Squeaky / 铁门房: T=133, CT=6, T占比=95.7%, 倾向=T
 - Outside / 外场 -> Secret / K1: T=115, CT=2, T占比=98.3%, 倾向=T
 
-### TS 草案
+### 运行时资产片段
 ```ts
 de_nuke: {
-    t: {
-      anchors: {
-              "outside": {
-                      "name": "外场",
-                      "callouts": [
-                              "Outside",
-                              "Roof",
-                              "Silo"
-                      ]
-              },
-              "lobby_a": {
-                      "name": "匪厅/A内",
-                      "callouts": [
-                              "Lobby",
-                              "Squeaky",
-                              "Hut",
-                              "Trophy"
-                      ]
-              },
-              "ramp": {
-                      "name": "铁板",
-                      "callouts": [
-                              "Ramp"
-                      ]
-              },
-              "secret_b": {
-                      "name": "K1/地下",
-                      "callouts": [
-                              "Secret",
-                              "Tunnels",
-                              "Vending",
-                              "Control"
-                      ]
-              }
+  "t": {
+    "anchors": {
+      "outside": {
+        "name": "外场准备",
+        "callouts": [
+          "Outside",
+          "Roof",
+          "Silo"
+        ]
       },
-      roles: {
-              "Admin": "ct",
-              "BombsiteA": "terminal",
-              "BombsiteB": "terminal",
-              "Catwalk": "ct",
-              "Crane": "ct",
-              "CTSpawn": "terminal",
-              "Decon": "ct",
-              "Garage": "ct",
-              "Heaven": "ct",
-              "Hell": "ct",
-              "HutRoof": "ct",
-              "LockerRoom": "ct",
-              "Mini": "ct",
-              "Observation": "ct",
-              "Rafters": "ct",
-              "TSpawn": "advanced",
-              "Vents": "ct"
+      "lobby": {
+        "name": "匪厅",
+        "callouts": [
+          "Lobby"
+        ]
       },
-    },
-    ct: {
-      anchors: {
-              "outside": {
-                      "name": "外场",
-                      "callouts": [
-                              "Outside",
-                              "Garage",
-                              "Catwalk",
-                              "Crane"
-                      ]
-              },
-              "a_site": {
-                      "name": "A点",
-                      "callouts": [
-                              "BombsiteA",
-                              "Rafters",
-                              "Mini",
-                              "HutRoof",
-                              "Heaven",
-                              "Hell"
-                      ]
-              },
-              "ramp": {
-                      "name": "铁板",
-                      "callouts": [
-                              "Ramp",
-                              "Admin"
-                      ]
-              },
-              "b_site": {
-                      "name": "B点",
-                      "callouts": [
-                              "BombsiteB",
-                              "Control",
-                              "Decon",
-                              "Observation"
-                      ]
-              },
-              "ct_spawn": {
-                      "name": "警家",
-                      "callouts": [
-                              "CTSpawn",
-                              "LockerRoom"
-                      ]
-              }
+      "squeaky": {
+        "name": "铁门",
+        "callouts": [
+          "Squeaky"
+        ]
       },
-      roles: {
-              "Hut": "advanced",
-              "Lobby": "advanced",
-              "Roof": "advanced",
-              "Secret": "advanced",
-              "Squeaky": "advanced",
-              "Trophy": "advanced",
-              "TSpawn": "terminal",
-              "Tunnels": "advanced",
-              "Vending": "advanced",
-              "Vents": "advanced"
-      },
-    },
+      "trophy_link": {
+        "name": "奖杯/链接",
+        "callouts": [
+          "Trophy",
+          "Vending"
+        ]
+      }
+    }
   },
+  "ct": {
+    "anchors": {
+      "outside": {
+        "name": "外场/大仓",
+        "callouts": [
+          "Outside",
+          "Garage"
+        ]
+      },
+      "a_site": {
+        "name": "A包/三楼/正门",
+        "callouts": [
+          "BombsiteA",
+          "Rafters",
+          "Mini",
+          "Heaven",
+          "Hell"
+        ]
+      },
+      "ramp": {
+        "name": "铁板",
+        "callouts": [
+          "Ramp",
+          "Admin"
+        ]
+      },
+      "b_site": {
+        "name": "B包/控制室/死门",
+        "callouts": [
+          "BombsiteB",
+          "Control",
+          "Decon",
+          "Observation"
+        ]
+      }
+    }
+  },
+  "contested": [
+    "Outside",
+    "Hut",
+    "Ramp",
+    "Secret",
+    "Tunnels",
+    "Control",
+    "Vending"
+  ]
+},
 ```
 ## de_overpass
 
 样本 ZIP：7
 
-### 高频占有
-- T: Tunnels / 下水道: T=28742, CT=725, T占比=97.5%, 倾向=T; TSpawn / 匪家: T=24011, CT=0, T占比=100.0%, 倾向=T; Fountain / 喷泉: T=19654, CT=1220, T占比=94.2%, 倾向=T; Alley / 匪家B外: T=12585, CT=58, T占比=99.5%, 倾向=T; Canal / 长管: T=10775, CT=3988, T占比=73.0%, 倾向=T; TStairs / 匪楼梯: T=5685, CT=13, T占比=99.8%, 倾向=T; Water / 工地: T=5519, CT=11237, T占比=32.9%, 倾向=CT; Pipe / 短管: T=5035, CT=36, T占比=99.3%, 倾向=T
-- CT: LowerPark / A小厕所: T=2609, CT=29154, T占比=8.2%, 倾向=CT; Walkway / ABC: T=173, CT=13900, T占比=1.2%, 倾向=CT; BombsiteB / B包: T=1671, CT=13466, T占比=11.0%, 倾向=CT; BombsiteA / A包: T=0, CT=13424, T占比=0.0%, 倾向=CT; Water / 工地: T=5519, CT=11237, T占比=32.9%, 倾向=CT; UpperPark / A大厕所: T=3104, CT=8601, T占比=26.5%, 倾向=CT; UnderA / 一层: T=0, CT=8386, T占比=0.0%, 倾向=CT; SnipersNest / B二楼: T=0, CT=6328, T占比=0.0%, 倾向=CT
+### 当前推荐（人工修订 v1）
+#### T 默认位
+- fountain / 喷泉/游乐园:
+  - Fountain / 喷泉: T=19654, CT=1220, T占比=94.2%, 倾向=T
+  - Playground / 游乐园: T=4153, CT=41, T占比=99.0%, 倾向=T
+- underpass / 下水道:
+  - Tunnels / 下水道: T=28742, CT=725, T占比=97.5%, 倾向=T
+- canal / 匪家B外/长管:
+  - Alley / 匪家B外: T=12585, CT=58, T占比=99.5%, 倾向=T
+  - Canal / 长管: T=10775, CT=3988, T占比=73.0%, 倾向=T
+- short_pipe / 匪楼梯/短管:
+  - TStairs / 匪楼梯: T=5685, CT=13, T占比=99.8%, 倾向=T
+  - Pipe / 短管: T=5035, CT=36, T占比=99.3%, 倾向=T
 
-### T 默认位草案
-- a_upper / A区上路: Fountain / 喷泉: T=19654, CT=1220, T占比=94.2%, 倾向=T; Playground / 游乐园: T=4153, CT=41, T占比=99.0%, 倾向=T; UpperPark / A大厕所: T=3104, CT=8601, T占比=26.5%, 倾向=CT; LowerPark / A小厕所: T=2609, CT=29154, T占比=8.2%, 倾向=CT
-- underpass / 下水道: Tunnels / 下水道: T=28742, CT=725, T占比=97.5%, 倾向=T; Connector / 下水道: T=4377, CT=5229, T占比=45.6%, 倾向=均衡
-- canal / 长管: Canal / 长管: T=10775, CT=3988, T占比=73.0%, 倾向=T
-- b_short / B短/工地: Pipe / 短管: T=5035, CT=36, T占比=99.3%, 倾向=T; Water / 工地: T=5519, CT=11237, T占比=32.9%, 倾向=CT; Construction / B小: T=1598, CT=3920, T占比=29.0%, 倾向=CT
-- b_outer / B外: Alley / 匪家B外: T=12585, CT=58, T占比=99.5%, 倾向=T; TStairs / 匪楼梯: T=5685, CT=13, T占比=99.8%, 倾向=T
+#### CT 默认位
+- a_site / A厕所/A包:
+  - LowerPark / A小厕所: T=2609, CT=29154, T占比=8.2%, 倾向=CT
+  - UpperPark / A大厕所: T=3104, CT=8601, T占比=26.5%, 倾向=CT
+  - BombsiteA / A包: T=0, CT=13424, T占比=0.0%, 倾向=CT
+  - Restroom / 厕所: T=186, CT=759, T占比=19.7%, 倾向=CT
+- b_site / B包/ABC/B二楼:
+  - BombsiteB / B包: T=1671, CT=13466, T占比=11.0%, 倾向=CT
+  - Walkway / ABC: T=173, CT=13900, T占比=1.2%, 倾向=CT
+  - SnipersNest / B二楼: T=0, CT=6328, T占比=0.0%, 倾向=CT
+- construction / 工地/B小:
+  - Water / 工地: T=5519, CT=11237, T占比=32.9%, 倾向=CT
+  - Construction / B小: T=1598, CT=3920, T占比=29.0%, 倾向=CT
+- connector / 下水道连接:
+  - Connector / 下水道: T=4377, CT=5229, T占比=45.6%, 倾向=均衡
 
-### CT 默认位草案
-- a_site / A点: BombsiteA / A包: T=0, CT=13424, T占比=0.0%, 倾向=CT; LowerPark / A小厕所: T=2609, CT=29154, T占比=8.2%, 倾向=CT; UpperPark / A大厕所: T=3104, CT=8601, T占比=26.5%, 倾向=CT; BackofA / 垃圾桶: T=0, CT=5374, T占比=0.0%, 倾向=CT; UnderA / 一层: T=0, CT=8386, T占比=0.0%, 倾向=CT; Stairs / 楼梯: T=0, CT=3088, T占比=0.0%, 倾向=CT; Restroom / 厕所: T=186, CT=759, T占比=19.7%, 倾向=CT
-- b_site / B点: BombsiteB / B包: T=1671, CT=13466, T占比=11.0%, 倾向=CT; Water / 工地: T=5519, CT=11237, T占比=32.9%, 倾向=CT; Walkway / ABC: T=173, CT=13900, T占比=1.2%, 倾向=CT; SnipersNest / B二楼: T=0, CT=6328, T占比=0.0%, 倾向=CT; Construction / B小: T=1598, CT=3920, T占比=29.0%, 倾向=CT
-- connector / 下水道: Connector / 下水道: T=4377, CT=5229, T占比=45.6%, 倾向=均衡
-- bank / 银行: Lobby / 银行: T=0, CT=249, T占比=0.0%, 倾向=CT; StorageRoom / 银行: T=0, CT=266, T占比=0.0%, 倾向=CT
+#### 争夺区/通道（不作为默认位）
+- Restroom / 厕所: T=186, CT=759, T占比=19.7%, 倾向=CT
+- Tunnels / 下水道: T=28742, CT=725, T占比=97.5%, 倾向=T
+- Canal / 长管: T=10775, CT=3988, T占比=73.0%, 倾向=T
+- Pipe / 短管: T=5035, CT=36, T占比=99.3%, 倾向=T
+- Water / 工地: T=5519, CT=11237, T占比=32.9%, 倾向=CT
+- Construction / B小: T=1598, CT=3920, T占比=29.0%, 倾向=CT
+- UpperPark / A大厕所: T=3104, CT=8601, T占比=26.5%, 倾向=CT
+- LowerPark / A小厕所: T=2609, CT=29154, T占比=8.2%, 倾向=CT
+
+### 数据证据：高频占有
+- T:
+  - Tunnels / 下水道: T=28742, CT=725, T占比=97.5%, 倾向=T
+  - TSpawn / 匪家: T=24011, CT=0, T占比=100.0%, 倾向=T
+  - Fountain / 喷泉: T=19654, CT=1220, T占比=94.2%, 倾向=T
+  - Alley / 匪家B外: T=12585, CT=58, T占比=99.5%, 倾向=T
+  - Canal / 长管: T=10775, CT=3988, T占比=73.0%, 倾向=T
+  - TStairs / 匪楼梯: T=5685, CT=13, T占比=99.8%, 倾向=T
+  - Water / 工地: T=5519, CT=11237, T占比=32.9%, 倾向=CT
+  - Pipe / 短管: T=5035, CT=36, T占比=99.3%, 倾向=T
+- CT:
+  - LowerPark / A小厕所: T=2609, CT=29154, T占比=8.2%, 倾向=CT
+  - Walkway / ABC: T=173, CT=13900, T占比=1.2%, 倾向=CT
+  - BombsiteB / B包: T=1671, CT=13466, T占比=11.0%, 倾向=CT
+  - BombsiteA / A包: T=0, CT=13424, T占比=0.0%, 倾向=CT
+  - Water / 工地: T=5519, CT=11237, T占比=32.9%, 倾向=CT
+  - UpperPark / A大厕所: T=3104, CT=8601, T占比=26.5%, 倾向=CT
+  - UnderA / 一层: T=0, CT=8386, T占比=0.0%, 倾向=CT
+  - SnipersNest / B二楼: T=0, CT=6328, T占比=0.0%, 倾向=CT
 
 ### 相邻证据
 同一玩家在开局窗口内发生 callout 变化时记录一条有向边。
@@ -899,114 +1044,83 @@ de_nuke: {
 - SnipersNest / B二楼 -> Water / 工地: T=0, CT=99, T占比=0.0%, 倾向=CT
 - Pipe / 短管 -> Water / 工地: T=91, CT=0, T占比=100.0%, 倾向=T
 
-### TS 草案
+### 运行时资产片段
 ```ts
 de_overpass: {
-    t: {
-      anchors: {
-              "a_upper": {
-                      "name": "A区上路",
-                      "callouts": [
-                              "Fountain",
-                              "Playground",
-                              "UpperPark",
-                              "LowerPark"
-                      ]
-              },
-              "underpass": {
-                      "name": "下水道",
-                      "callouts": [
-                              "Tunnels",
-                              "Connector"
-                      ]
-              },
-              "canal": {
-                      "name": "长管",
-                      "callouts": [
-                              "Canal"
-                      ]
-              },
-              "b_short": {
-                      "name": "B短/工地",
-                      "callouts": [
-                              "Pipe",
-                              "Water",
-                              "Construction"
-                      ]
-              },
-              "b_outer": {
-                      "name": "B外",
-                      "callouts": [
-                              "Alley",
-                              "TStairs"
-                      ]
-              }
+  "t": {
+    "anchors": {
+      "fountain": {
+        "name": "喷泉/游乐园",
+        "callouts": [
+          "Fountain",
+          "Playground"
+        ]
       },
-      roles: {
-              "BackofA": "ct",
-              "BombsiteA": "terminal",
-              "BombsiteB": "terminal",
-              "Bridge": "ct",
-              "Lobby": "ct",
-              "Restroom": "ct",
-              "SideAlley": "advanced",
-              "SnipersNest": "ct",
-              "Stairs": "ct",
-              "StorageRoom": "ct",
-              "TSpawn": "advanced",
-              "UnderA": "ct",
-              "Walkway": "ct"
+      "underpass": {
+        "name": "下水道",
+        "callouts": [
+          "Tunnels"
+        ]
       },
-    },
-    ct: {
-      anchors: {
-              "a_site": {
-                      "name": "A点",
-                      "callouts": [
-                              "BombsiteA",
-                              "LowerPark",
-                              "UpperPark",
-                              "BackofA",
-                              "UnderA",
-                              "Stairs",
-                              "Restroom"
-                      ]
-              },
-              "b_site": {
-                      "name": "B点",
-                      "callouts": [
-                              "BombsiteB",
-                              "Water",
-                              "Walkway",
-                              "SnipersNest",
-                              "Construction"
-                      ]
-              },
-              "connector": {
-                      "name": "下水道",
-                      "callouts": [
-                              "Connector"
-                      ]
-              },
-              "bank": {
-                      "name": "银行",
-                      "callouts": [
-                              "Lobby",
-                              "StorageRoom"
-                      ]
-              }
+      "canal": {
+        "name": "匪家B外/长管",
+        "callouts": [
+          "Alley",
+          "Canal"
+        ]
       },
-      roles: {
-              "Alley": "advanced",
-              "Bridge": "advanced",
-              "Canal": "advanced",
-              "Fountain": "advanced",
-              "Pipe": "advanced",
-              "Playground": "advanced",
-              "TSpawn": "terminal",
-              "TStairs": "advanced",
-              "Tunnels": "advanced"
-      },
-    },
+      "short_pipe": {
+        "name": "匪楼梯/短管",
+        "callouts": [
+          "TStairs",
+          "Pipe"
+        ]
+      }
+    }
   },
+  "ct": {
+    "anchors": {
+      "a_site": {
+        "name": "A厕所/A包",
+        "callouts": [
+          "LowerPark",
+          "UpperPark",
+          "BombsiteA",
+          "Restroom"
+        ]
+      },
+      "b_site": {
+        "name": "B包/ABC/B二楼",
+        "callouts": [
+          "BombsiteB",
+          "Walkway",
+          "SnipersNest"
+        ]
+      },
+      "construction": {
+        "name": "工地/B小",
+        "callouts": [
+          "Water",
+          "Construction"
+        ]
+      },
+      "connector": {
+        "name": "下水道连接",
+        "callouts": [
+          "Connector"
+        ]
+      }
+    }
+  },
+  "contested": [
+    "Restroom",
+    "Tunnels",
+    "Canal",
+    "Pipe",
+    "Water",
+    "Construction",
+    "UpperPark",
+    "LowerPark"
+  ]
+},
 ```

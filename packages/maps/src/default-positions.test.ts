@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { CALLOUT_MAPS, CALLOUT_NAME_CN } from "./callout-names.js";
-import { DEFAULT_POSITIONS, anchorOf, roleOf } from "./default-positions.js";
+import { DEFAULT_POSITIONS, anchorOf, isContested, roleOf } from "./default-positions.js";
 
 describe("default-positions", () => {
   it("mirage T 默认位含 5 个 anchor", () => {
     expect(Object.keys(DEFAULT_POSITIONS.de_mirage.t.anchors)).toEqual([
       "a_ramp",
       "a_palace",
-      "mid",
+      "mid_spawn",
       "underpass",
       "b_apps",
     ]);
@@ -20,9 +20,9 @@ describe("default-positions", () => {
         for (const anchor of Object.values(sides[side].anchors)) {
           for (const callout of anchor.callouts) expect(table[callout]).toBeTruthy();
         }
-        for (const callout of Object.keys(sides[side].roles)) {
-          expect(table[callout], `${map}.${side}.${callout}`).toBeTruthy();
-        }
+      }
+      for (const callout of sides.contested) {
+        expect(table[callout], `${map}.contested.${callout}`).toBeTruthy();
       }
     }
   });
@@ -49,6 +49,26 @@ describe("default-positions", () => {
     expect(roleOf("de_mirage", "t", "Catwalk")).toEqual({ kind: "advanced" });
     expect(roleOf("de_mirage", "t", "Jungle")).toEqual({ kind: "ct" });
     expect(roleOf("de_mirage", "t", "BombsiteA")).toEqual({ kind: "terminal" });
+  });
+
+  it("第一轮人工审核口径：默认位只保留开局停挂点，通道/争夺区不误入 default", () => {
+    expect(anchorOf("de_ancient", "t", "Outside")).toBe("t_outside");
+    expect(anchorOf("de_ancient", "t", "Tunnel")).toBeNull();
+    expect(anchorOf("de_ancient", "t", "Water")).toBeNull();
+    expect(isContested("de_ancient", "Middle")).toBe(true);
+
+    expect(anchorOf("de_anubis", "t", "Bridge")).toBe("mid_bridge");
+    expect(anchorOf("de_anubis", "t", "Middle")).toBeNull();
+    expect(isContested("de_anubis", "Middle")).toBe(true);
+
+    expect(anchorOf("de_dust2", "t", "LongA")).toBeNull();
+    expect(isContested("de_dust2", "LongA")).toBe(true);
+
+    expect(anchorOf("de_nuke", "t", "Ramp")).toBeNull();
+    expect(anchorOf("de_nuke", "t", "Trophy")).toBe("trophy_link");
+
+    expect(anchorOf("de_overpass", "t", "Water")).toBeNull();
+    expect(isContested("de_overpass", "Water")).toBe(true);
   });
 
   it("roleOf：未知 callout 返回 other", () => {
