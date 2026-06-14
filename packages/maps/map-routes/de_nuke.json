@@ -10,24 +10,19 @@
       "confidence": "medium",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "Outside",
-          "nameCn": "外场"
+          "id": "Outside"
         },
         {
-          "id": "Secret",
-          "nameCn": "K1"
+          "id": "Secret"
         },
         {
-          "id": "Tunnels",
-          "nameCn": "K1地下"
+          "id": "Tunnels"
         },
         {
-          "id": "BombsiteB",
-          "nameCn": "B包"
+          "id": "BombsiteB"
         }
       ]
     },
@@ -39,36 +34,28 @@
       "confidence": "medium",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "Outside",
-          "nameCn": "外场"
+          "id": "Outside"
         },
         {
-          "id": "Lobby",
-          "nameCn": "匪厅"
+          "id": "Lobby"
         },
         {
-          "id": "Vending",
-          "nameCn": "链接"
+          "id": "Vending"
         },
         {
-          "id": "Trophy",
-          "nameCn": "奖杯房"
+          "id": "Trophy"
         },
         {
-          "id": "Control",
-          "nameCn": "链接"
+          "id": "Control"
         },
         {
-          "id": "Ramp",
-          "nameCn": "铁板"
+          "id": "Ramp"
         },
         {
-          "id": "BombsiteB",
-          "nameCn": "B包"
+          "id": "BombsiteB"
         }
       ]
     }

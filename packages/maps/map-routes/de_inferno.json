@@ -10,32 +10,25 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "TRamp",
-          "nameCn": "匪口"
+          "id": "TRamp"
         },
         {
-          "id": "LowerMid",
-          "nameCn": "匪口"
+          "id": "LowerMid"
         },
         {
-          "id": "Middle",
-          "nameCn": "中路"
+          "id": "Middle"
         },
         {
-          "id": "TopofMid",
-          "nameCn": "中路"
+          "id": "TopofMid"
         },
         {
-          "id": "Quad",
-          "nameCn": "马鹏"
+          "id": "Quad"
         },
         {
-          "id": "BombsiteA",
-          "nameCn": "A包"
+          "id": "BombsiteA"
         }
       ]
     },
@@ -47,32 +40,25 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "TRamp",
-          "nameCn": "匪口"
+          "id": "TRamp"
         },
         {
-          "id": "LowerMid",
-          "nameCn": "匪口"
+          "id": "LowerMid"
         },
         {
-          "id": "Middle",
-          "nameCn": "中路"
+          "id": "Middle"
         },
         {
-          "id": "TopofMid",
-          "nameCn": "中路"
+          "id": "TopofMid"
         },
         {
-          "id": "Arch",
-          "nameCn": "拱门"
+          "id": "Arch"
         },
         {
-          "id": "BombsiteA",
-          "nameCn": "A包"
+          "id": "BombsiteA"
         }
       ]
     },
@@ -84,24 +70,19 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "TRamp",
-          "nameCn": "匪口"
+          "id": "TRamp"
         },
         {
-          "id": "LowerMid",
-          "nameCn": "匪口"
+          "id": "LowerMid"
         },
         {
-          "id": "Banana",
-          "nameCn": "香蕉道"
+          "id": "Banana"
         },
         {
-          "id": "BombsiteB",
-          "nameCn": "B包"
+          "id": "BombsiteB"
         }
       ]
     },
@@ -113,24 +94,19 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "SecondMid",
-          "nameCn": "侧道"
+          "id": "SecondMid"
         },
         {
-          "id": "TopofMid",
-          "nameCn": "中路"
+          "id": "TopofMid"
         },
         {
-          "id": "Quad",
-          "nameCn": "马鹏"
+          "id": "Quad"
         },
         {
-          "id": "BombsiteA",
-          "nameCn": "A包"
+          "id": "BombsiteA"
         }
       ]
     },
@@ -142,36 +118,28 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "TRamp",
-          "nameCn": "匪口"
+          "id": "TRamp"
         },
         {
-          "id": "Bridge",
-          "nameCn": "匪桥"
+          "id": "Bridge"
         },
         {
-          "id": "Upstairs",
-          "nameCn": "匪二楼"
+          "id": "Upstairs"
         },
         {
-          "id": "BackAlley",
-          "nameCn": "匪二楼"
+          "id": "BackAlley"
         },
         {
-          "id": "Apartments",
-          "nameCn": "二楼"
+          "id": "Apartments"
         },
         {
-          "id": "Balcony",
-          "nameCn": "阳台"
+          "id": "Balcony"
         },
         {
-          "id": "BombsiteA",
-          "nameCn": "A包"
+          "id": "BombsiteA"
         }
       ]
     },
@@ -183,24 +151,19 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "SecondMid",
-          "nameCn": "侧道"
+          "id": "SecondMid"
         },
         {
-          "id": "Apartments",
-          "nameCn": "二楼"
+          "id": "Apartments"
         },
         {
-          "id": "Balcony",
-          "nameCn": "阳台"
+          "id": "Balcony"
         },
         {
-          "id": "BombsiteA",
-          "nameCn": "A包"
+          "id": "BombsiteA"
         }
       ]
     },
@@ -212,40 +175,31 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "TRamp",
-          "nameCn": "匪口"
+          "id": "TRamp"
         },
         {
-          "id": "LowerMid",
-          "nameCn": "匪口"
+          "id": "LowerMid"
         },
         {
-          "id": "Middle",
-          "nameCn": "中路"
+          "id": "Middle"
         },
         {
-          "id": "TopofMid",
-          "nameCn": "中路"
+          "id": "TopofMid"
         },
         {
-          "id": "Arch",
-          "nameCn": "拱门"
+          "id": "Arch"
         },
         {
-          "id": "CTSpawn",
-          "nameCn": "警家"
+          "id": "CTSpawn"
         },
         {
-          "id": "Ruins",
-          "nameCn": "警家教堂"
+          "id": "Ruins"
         },
         {
-          "id": "BombsiteB",
-          "nameCn": "B包"
+          "id": "BombsiteB"
         }
       ]
     }

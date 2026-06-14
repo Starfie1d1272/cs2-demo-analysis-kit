@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { CALLOUT_NAME_CN } from "./callout-names.js";
-import { getMapRoutes } from "./route-assets.js";
+import { getMapRoutes, MAP_ROUTE_ASSETS } from "./route-assets.js";
 import { ACTIVE_DUTY_MAPS } from "./zones.js";
 import type { MapRoute, MapRoutes } from "./routes.js";
 
@@ -25,6 +25,18 @@ function expectedBombsite(route: MapRoute): string {
 }
 
 describe("map route assets", () => {
+  it("route zones 不重复维护中文名", () => {
+    for (const [map, routes] of Object.entries(MAP_ROUTE_ASSETS)) {
+      const table = (CALLOUT_NAME_CN as Record<string, Record<string, string>>)[map] ?? {};
+      for (const route of routes.routes) {
+        for (const zone of route.zones) {
+          expect("nameCn" in zone).toBe(false);
+          expect(table[zone.id] ?? zone.id).toBeTruthy();
+        }
+      }
+    }
+  });
+
   it("provides at least one confirmed route for every active duty map", () => {
     for (const mapName of ACTIVE_DUTY_MAPS) {
       expect(loadRoutes(mapName).routes, mapName).not.toHaveLength(0);
@@ -61,9 +73,6 @@ describe("map route assets", () => {
 
         for (const zone of route.zones) {
           expect(zone.id in callouts, `${mapName}/${route.id}/${zone.id}`).toBe(true);
-          expect(zone.nameCn, `${mapName}/${route.id}/${zone.id} name`).toBe(
-            callouts[zone.id as keyof typeof callouts],
-          );
         }
       }
     }

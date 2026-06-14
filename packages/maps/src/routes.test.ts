@@ -8,11 +8,11 @@ const aPalace: MapRoute = {
   bombsite: "a",
   confidence: "high",
   zones: [
-    { id: "TSpawn", nameCn: "T 出生点" },
-    { id: "PalaceAlley", nameCn: "Palace 巷口" },
-    { id: "TRamp", nameCn: "T 坡道" },
-    { id: "PalaceInterior", nameCn: "Palace 内部" },
-    { id: "BombsiteA", nameCn: "A 包点" },
+    { id: "TSpawn" },
+    { id: "PalaceAlley" },
+    { id: "TRamp" },
+    { id: "PalaceInterior" },
+    { id: "BombsiteA" },
   ],
 };
 

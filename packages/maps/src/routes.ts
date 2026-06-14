@@ -17,8 +17,6 @@
 export interface RouteZone {
   /** `lastPlaceName` 原始取值（如 "TSpawn" / "PalaceAlley" / "BombsiteA"）。 */
   id: string;
-  /** 中文名（如 "T 出生点" / "Palace 巷口"）。 */
-  nameCn: string;
 }
 
 /** 动线类型——区分进攻线 vs 控制/入侵线。 */

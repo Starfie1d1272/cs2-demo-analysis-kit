@@ -10,28 +10,22 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "OutsideLong",
-          "nameCn": "A门外"
+          "id": "OutsideLong"
         },
         {
-          "id": "LongDoors",
-          "nameCn": "A门"
+          "id": "LongDoors"
         },
         {
-          "id": "LongA",
-          "nameCn": "A大"
+          "id": "LongA"
         },
         {
-          "id": "ARamp",
-          "nameCn": "A斜坡"
+          "id": "ARamp"
         },
         {
-          "id": "BombsiteA",
-          "nameCn": "A包"
+          "id": "BombsiteA"
         }
       ]
     },
@@ -43,32 +37,25 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "TopofMid",
-          "nameCn": "中远匪口"
+          "id": "TopofMid"
         },
         {
-          "id": "Middle",
-          "nameCn": "中路"
+          "id": "Middle"
         },
         {
-          "id": "Catwalk",
-          "nameCn": "A小"
+          "id": "Catwalk"
         },
         {
-          "id": "ShortStairs",
-          "nameCn": "A小楼梯"
+          "id": "ShortStairs"
         },
         {
-          "id": "ExtendedA",
-          "nameCn": "A小过点"
+          "id": "ExtendedA"
         },
         {
-          "id": "BombsiteA",
-          "nameCn": "A包"
+          "id": "BombsiteA"
         }
       ]
     },
@@ -80,24 +67,19 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "TRamp",
-          "nameCn": "后花"
+          "id": "TRamp"
         },
         {
-          "id": "OutsideTunnel",
-          "nameCn": "B洞外"
+          "id": "OutsideTunnel"
         },
         {
-          "id": "UpperTunnel",
-          "nameCn": "B洞"
+          "id": "UpperTunnel"
         },
         {
-          "id": "BombsiteB",
-          "nameCn": "B包"
+          "id": "BombsiteB"
         }
       ]
     },
@@ -109,28 +91,22 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "TopofMid",
-          "nameCn": "中远匪口"
+          "id": "TopofMid"
         },
         {
-          "id": "Middle",
-          "nameCn": "中路"
+          "id": "Middle"
         },
         {
-          "id": "MidDoors",
-          "nameCn": "中门"
+          "id": "MidDoors"
         },
         {
-          "id": "BDoors",
-          "nameCn": "B门"
+          "id": "BDoors"
         },
         {
-          "id": "BombsiteB",
-          "nameCn": "B包"
+          "id": "BombsiteB"
         }
       ]
     },
@@ -142,44 +118,34 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "TRamp",
-          "nameCn": "后花"
+          "id": "TRamp"
         },
         {
-          "id": "OutsideTunnel",
-          "nameCn": "B洞外"
+          "id": "OutsideTunnel"
         },
         {
-          "id": "UpperTunnel",
-          "nameCn": "B洞"
+          "id": "UpperTunnel"
         },
         {
-          "id": "TunnelStairs",
-          "nameCn": "B洞楼梯"
+          "id": "TunnelStairs"
         },
         {
-          "id": "LowerTunnel",
-          "nameCn": "B1"
+          "id": "LowerTunnel"
         },
         {
-          "id": "Middle",
-          "nameCn": "中路"
+          "id": "Middle"
         },
         {
-          "id": "MidDoors",
-          "nameCn": "中门"
+          "id": "MidDoors"
         },
         {
-          "id": "BDoors",
-          "nameCn": "B门"
+          "id": "BDoors"
         },
         {
-          "id": "BombsiteB",
-          "nameCn": "B包"
+          "id": "BombsiteB"
         }
       ]
     }

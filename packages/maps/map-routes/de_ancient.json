@@ -10,20 +10,16 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "Outside",
-          "nameCn": "匪口"
+          "id": "Outside"
         },
         {
-          "id": "MainHall",
-          "nameCn": "A厅"
+          "id": "MainHall"
         },
         {
-          "id": "BombsiteA",
-          "nameCn": "A包"
+          "id": "BombsiteA"
         }
       ]
     },
@@ -35,24 +31,19 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "Outside",
-          "nameCn": "匪口"
+          "id": "Outside"
         },
         {
-          "id": "Middle",
-          "nameCn": "中路"
+          "id": "Middle"
         },
         {
-          "id": "SideHall",
-          "nameCn": "甜甜圈"
+          "id": "SideHall"
         },
         {
-          "id": "BombsiteA",
-          "nameCn": "A包"
+          "id": "BombsiteA"
         }
       ]
     },
@@ -64,40 +55,31 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "Tunnel",
-          "nameCn": "隧道"
+          "id": "Tunnel"
         },
         {
-          "id": "Water",
-          "nameCn": "水路"
+          "id": "Water"
         },
         {
-          "id": "Ruins",
-          "nameCn": "B外"
+          "id": "Ruins"
         },
         {
-          "id": "TSideLower",
-          "nameCn": "B小"
+          "id": "TSideLower"
         },
         {
-          "id": "TSideUpper",
-          "nameCn": "跳台"
+          "id": "TSideUpper"
         },
         {
-          "id": "Middle",
-          "nameCn": "中路"
+          "id": "Middle"
         },
         {
-          "id": "SideHall",
-          "nameCn": "甜甜圈"
+          "id": "SideHall"
         },
         {
-          "id": "BombsiteA",
-          "nameCn": "A包"
+          "id": "BombsiteA"
         }
       ]
     },
@@ -109,32 +91,25 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "Outside",
-          "nameCn": "匪口"
+          "id": "Outside"
         },
         {
-          "id": "Middle",
-          "nameCn": "中路"
+          "id": "Middle"
         },
         {
-          "id": "TopofMid",
-          "nameCn": "中远"
+          "id": "TopofMid"
         },
         {
-          "id": "House",
-          "nameCn": "VIP"
+          "id": "House"
         },
         {
-          "id": "CTSpawn",
-          "nameCn": "警家"
+          "id": "CTSpawn"
         },
         {
-          "id": "BombsiteA",
-          "nameCn": "A包"
+          "id": "BombsiteA"
         }
       ]
     },
@@ -146,28 +121,22 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "Tunnel",
-          "nameCn": "隧道"
+          "id": "Tunnel"
         },
         {
-          "id": "Water",
-          "nameCn": "水路"
+          "id": "Water"
         },
         {
-          "id": "Ruins",
-          "nameCn": "B外"
+          "id": "Ruins"
         },
         {
-          "id": "Ramp",
-          "nameCn": "B坡"
+          "id": "Ramp"
         },
         {
-          "id": "BombsiteB",
-          "nameCn": "B包"
+          "id": "BombsiteB"
         }
       ]
     },
@@ -179,28 +148,22 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "Outside",
-          "nameCn": "匪口"
+          "id": "Outside"
         },
         {
-          "id": "Middle",
-          "nameCn": "中路"
+          "id": "Middle"
         },
         {
-          "id": "TSideUpper",
-          "nameCn": "跳台"
+          "id": "TSideUpper"
         },
         {
-          "id": "SideEntrance",
-          "nameCn": "黑屋"
+          "id": "SideEntrance"
         },
         {
-          "id": "BombsiteB",
-          "nameCn": "B包"
+          "id": "BombsiteB"
         }
       ]
     },
@@ -212,32 +175,25 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "Outside",
-          "nameCn": "匪口"
+          "id": "Outside"
         },
         {
-          "id": "Middle",
-          "nameCn": "中路"
+          "id": "Middle"
         },
         {
-          "id": "TopofMid",
-          "nameCn": "中远"
+          "id": "TopofMid"
         },
         {
-          "id": "House",
-          "nameCn": "VIP"
+          "id": "House"
         },
         {
-          "id": "Alley",
-          "nameCn": "底线"
+          "id": "Alley"
         },
         {
-          "id": "BombsiteB",
-          "nameCn": "B包"
+          "id": "BombsiteB"
         }
       ]
     },
@@ -249,32 +205,25 @@
       "confidence": "high",
       "zones": [
         {
-          "id": "TSpawn",
-          "nameCn": "匪家"
+          "id": "TSpawn"
         },
         {
-          "id": "Tunnel",
-          "nameCn": "隧道"
+          "id": "Tunnel"
         },
         {
-          "id": "Water",
-          "nameCn": "水路"
+          "id": "Water"
         },
         {
-          "id": "Ruins",
-          "nameCn": "B外"
+          "id": "Ruins"
         },
         {
-          "id": "TSideLower",
-          "nameCn": "B小"
+          "id": "TSideLower"
         },
         {
-          "id": "SideEntrance",
-          "nameCn": "黑屋"
+          "id": "SideEntrance"
         },
         {
-          "id": "BombsiteB",
-          "nameCn": "B包"
+          "id": "BombsiteB"
         }
       ]
     }
