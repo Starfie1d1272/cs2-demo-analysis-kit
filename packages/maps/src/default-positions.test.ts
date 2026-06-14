@@ -20,6 +20,9 @@ describe("default-positions", () => {
         for (const anchor of Object.values(sides[side].anchors)) {
           for (const callout of anchor.callouts) expect(table[callout]).toBeTruthy();
         }
+        for (const callout of Object.keys(sides[side].roles)) {
+          expect(table[callout], `${map}.${side}.${callout}`).toBeTruthy();
+        }
       }
     }
   });

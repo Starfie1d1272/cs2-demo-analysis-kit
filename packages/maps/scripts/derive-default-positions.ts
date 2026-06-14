@@ -203,11 +203,40 @@ function knownCallouts(mapName: string): Set<string> {
   return new Set(Object.keys((CALLOUT_NAME_CN as Record<string, Record<string, string>>)[mapName] ?? {}));
 }
 
-function renderAnchor(seed: AnchorSeed, known: Set<string>): AnchorSeed {
-  return {
-    name: seed.name,
-    callouts: seed.callouts.filter((callout) => known.has(callout)),
-  };
+function anchorTokens(name: string): string[] {
+  return name.split(/[\/、]/).map((token) => token.trim()).filter(Boolean);
+}
+
+function belongsByName(mapName: string, anchorName: string, callout: string): boolean {
+  const cn = (CALLOUT_NAME_CN as Record<string, Record<string, string>>)[mapName]?.[callout] ?? "";
+  if (!cn) return false;
+  return anchorTokens(anchorName).some((token) => cn.startsWith(token) || token.startsWith(cn));
+}
+
+function renderAnchors(mapName: string, side: Side, occ: Occ): Record<string, AnchorSeed> {
+  const seedAnchors = SEEDS[mapName]?.[side].anchors ?? {};
+  const known = knownCallouts(mapName);
+  const anchors = Object.fromEntries(
+    Object.entries(seedAnchors)
+      .map(([anchorId, anchor]) => [
+        anchorId,
+        { name: anchor.name, callouts: anchor.callouts.filter((callout) => known.has(callout)) },
+      ] as const)
+      .filter(([, anchor]) => anchor.callouts.length > 0),
+  );
+  const assigned = new Set(Object.values(anchors).flatMap((anchor) => anchor.callouts));
+  for (const callout of [...known].sort((a, b) => a.localeCompare(b))) {
+    if (assigned.has(callout) || TERMINAL.has(callout)) continue;
+    const counts = occ.get(callout) ?? { t: 0, ct: 0 };
+    const own = counts[side];
+    const other = counts[side === "t" ? "ct" : "t"];
+    if (own < 10 || own <= other * 1.2) continue;
+    const match = Object.entries(anchors).find(([, anchor]) => belongsByName(mapName, anchor.name, callout));
+    if (!match) continue;
+    match[1].callouts.push(callout);
+    assigned.add(callout);
+  }
+  return anchors;
 }
 
 function renderRoles(mapName: string, side: Side, occ: Occ, anchors: Record<string, AnchorSeed>): Record<string, string> {
@@ -236,13 +265,8 @@ function renderRoles(mapName: string, side: Side, occ: Occ, anchors: Record<stri
 function renderTsObject(mapName: string, occ: Occ): string {
   const seed = SEEDS[mapName];
   if (!seed) return "";
-  const known = knownCallouts(mapName);
   const sides = (["t", "ct"] as const).map((side) => {
-    const anchors = Object.fromEntries(
-      Object.entries(seed[side].anchors)
-        .map(([anchorId, anchor]) => [anchorId, renderAnchor(anchor, known)] as const)
-        .filter(([, anchor]) => anchor.callouts.length > 0),
-    );
+    const anchors = renderAnchors(mapName, side, occ);
     const roles = renderRoles(mapName, side, occ, anchors);
     return `${side}: {\n      anchors: ${JSON.stringify(anchors, null, 8).replace(/\n/g, "\n      ")},\n      roles: ${JSON.stringify(roles, null, 8).replace(/\n/g, "\n      ")},\n    }`;
   });
