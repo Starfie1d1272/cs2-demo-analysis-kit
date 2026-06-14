@@ -6,6 +6,7 @@ export * from "./geometry-assets.js";
 export * from "./nav.js";
 export * from "./visibility.js";
 export * from "./lineups.js";
+export * from "./default-positions.js";
 export { CALLOUT_NAME_CN, CALLOUT_MAPS } from "./callout-names.js";
 
 export interface MapCalibration {
