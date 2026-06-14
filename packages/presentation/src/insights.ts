@@ -1,5 +1,5 @@
 import type { DemoPackage, MatchWorkspaceModel, TeamKey } from "@cs2dak/contract";
-import { derivePlayerMechanics } from "@cs2dak/core";
+import { derivePlayerMechanics, type PlayerMechanicsFact } from "@cs2dak/core";
 import type { TriangleBvh } from "@cs2dak/maps";
 import { round } from "./season-metrics.js";
 import { displayWeaponName } from "./weapons.js";
@@ -377,6 +377,22 @@ export function buildPlayerMechanicsProfile(
   steamIds: string[],
   options: MechanicsProfileOptions = {}
 ): PlayerMechanicsProfile {
+  const perMatchRows = demos.map(({ pkg }) =>
+    derivePlayerMechanics(pkg, { visibility: options.visibilityFor?.(pkg.match.mapName) ?? null })
+  );
+  return buildPlayerMechanicsProfileFromRows(perMatchRows, steamIds, demos.length);
+}
+
+/**
+ * 跨场机制合并（投影层）：吃预派生的逐场 PlayerMechanicsFact[]，与
+ * buildPlayerMechanicsProfile 共用同一套分桶 / 百分位口径。facts 缓存命中后
+ * 无需重新解析 DemoPackage，是 SQLite/facts 方案下选手档案的聚合入口。
+ */
+export function buildPlayerMechanicsProfileFromRows(
+  perMatchRows: PlayerMechanicsFact[][],
+  steamIds: string[],
+  matchCount: number
+): PlayerMechanicsProfile {
   const ids = new Set(steamIds);
   const byBucket = new Map<string, {
     kills: number;
@@ -398,9 +414,8 @@ export function buildPlayerMechanicsProfile(
     return current;
   };
 
-  for (const { pkg } of demos) {
-    const visibility = options.visibilityFor?.(pkg.match.mapName) ?? null;
-    for (const row of derivePlayerMechanics(pkg, { visibility }).filter((item) => ids.has(item.steamId64))) {
+  for (const rows of perMatchRows) {
+    for (const row of rows.filter((item) => ids.has(item.steamId64))) {
       const bucket = weaponBucket(row.weapon);
       const cell = get(bucket);
       const preaim = row.preaim.medianDegrees;
@@ -447,7 +462,7 @@ export function buildPlayerMechanicsProfile(
       visualReactionMs: reaction,
       preaimErrorDegrees: preaim,
       headshotPercent: cell.headshotTotal > 0 ? Math.round((cell.headshot / cell.headshotTotal) * 1000) / 10 : null,
-      killsPerMatch: demos.length > 0 ? Math.round((cell.kills / demos.length) * 10) / 10 : null,
+      killsPerMatch: matchCount > 0 ? Math.round((cell.kills / matchCount) * 10) / 10 : null,
       percentile: {
         firstShotAccuracy: percentileLabel(first, allRows.map((row) => row.first)),
         sprayAccuracy: percentileLabel(spray, allRows.map((row) => row.spray)),
