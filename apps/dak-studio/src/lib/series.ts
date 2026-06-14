@@ -1,4 +1,5 @@
 import type { SeriesFormat, SeriesVeto, SeriesVetoStep } from "@cs2dak/contract";
+import type { PlaylistItem } from "./playlist";
 import { ACTIVE_DUTY_MAPS } from "@cs2dak/maps";
 import { matchDateFromFileName, type StudioDemoEntry } from "./library";
 import { displayTeamName } from "./identity";
@@ -43,6 +44,7 @@ const SETTINGS_KEY = "coach";
 const seriesStore = getStorage().records("series");
 const settingsStore = getStorage().records("series-settings");
 const playbookStore = getStorage().records("playbook");
+const playlistStore = getStorage().records("playlist");
 
 function formatForCount(count: number): SeriesFormat {
   if (count >= 4) return "bo5";
@@ -197,4 +199,21 @@ export async function listPlaybookNames(): Promise<Record<string, string>> {
 
 export async function savePlaybookName(clusterId: string, name: string): Promise<void> {
   await playbookStore.put(clusterId, name.trim());
+}
+
+export async function listPlaylist(): Promise<PlaylistItem[]> {
+  try {
+    const rows = await playlistStore.getAll<PlaylistItem>();
+    return rows.sort((a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0));
+  } catch {
+    return [];
+  }
+}
+
+export async function savePlaylistItem(item: PlaylistItem): Promise<void> {
+  await playlistStore.put(item.id, { ...item, addedAt: item.addedAt ?? Date.now() });
+}
+
+export async function removePlaylistItem(id: string): Promise<void> {
+  await playlistStore.delete(id);
 }
