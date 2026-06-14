@@ -10,6 +10,13 @@ const TERMINAL = new Set(["BombsiteA", "BombsiteB", "CTSpawn"]);
 type Side = "t" | "ct";
 type SideCount = Record<Side, number>;
 type Occ = Map<string, SideCount>;
+type Transitions = Map<string, SideCount>;
+
+export interface MapEvidence {
+  occupancy: Occ;
+  transitions: Transitions;
+  zipCount: number;
+}
 
 interface AnchorSeed {
   name: string;
@@ -174,7 +181,19 @@ function add(occ: Occ, callout: string, side: Side): void {
   occ.set(callout, current);
 }
 
-function accumulate(pkg: DemoPackage, occ: Occ): void {
+function transitionKey(from: string, to: string): string {
+  return `${from}\t${to}`;
+}
+
+function addTransition(transitions: Transitions, from: string, to: string, side: Side): void {
+  if (from === to) return;
+  const key = transitionKey(from, to);
+  const current = transitions.get(key) ?? { t: 0, ct: 0 };
+  current[side] += 1;
+  transitions.set(key, current);
+}
+
+function accumulate(pkg: DemoPackage, evidence: MapEvidence): void {
   const replay = pkg.replay;
   if (!replay) return;
   const rounds = new Map(pkg.rounds.map((round) => [round.roundNumber, round]));
@@ -188,12 +207,16 @@ function accumulate(pkg: DemoPackage, occ: Occ): void {
       const player = pkg.players[track.playerIndex];
       if (!player) continue;
       const side = player.teamKey === "teamA" ? round.teamASide : round.teamBSide;
+      let previousPlace: string | null = null;
       for (let frame = 0; frame < replayRound.frameCount; frame++) {
         const tick = replayRound.startTick + frame * replayRound.tickStep;
         if (tick < round.freezeEndTick || tick > endTick) continue;
         if (((track.flags[frame] ?? 0) & FLAG_ALIVE) === 0) continue;
         const place = placeDict[track.place[frame] ?? -1];
-        if (place) add(occ, place, side);
+        if (!place) continue;
+        add(evidence.occupancy, place, side);
+        if (previousPlace && previousPlace !== place) addTransition(evidence.transitions, previousPlace, place, side);
+        previousPlace = place;
       }
     }
   }
@@ -273,6 +296,83 @@ function renderTsObject(mapName: string, occ: Occ): string {
   return `${mapName}: {\n    ${sides.join(",\n    ")},\n  },`;
 }
 
+function formatCallout(mapName: string, callout: string): string {
+  const cn = (CALLOUT_NAME_CN as Record<string, Record<string, string>>)[mapName]?.[callout] ?? "";
+  return cn ? `${callout}(${cn})` : callout;
+}
+
+function formatCounts(counts: SideCount | undefined): string {
+  return `T=${counts?.t ?? 0} CT=${counts?.ct ?? 0}`;
+}
+
+function topOccupancy(occ: Occ, side: Side, limit = 8): string {
+  return [...occ.entries()]
+    .sort((a, b) => b[1][side] - a[1][side])
+    .slice(0, limit)
+    .map(([callout, counts]) => `${callout} ${formatCounts(counts)}`)
+    .join("; ");
+}
+
+function renderAnchorReview(mapName: string, side: Side, evidence: MapEvidence): string[] {
+  const anchors = renderAnchors(mapName, side, evidence.occupancy);
+  const lines = [`### ${side === "t" ? "T" : "CT"} 默认位草案`];
+  for (const [anchorId, anchor] of Object.entries(anchors)) {
+    const callouts = anchor.callouts
+      .map((callout) => `${formatCallout(mapName, callout)} ${formatCounts(evidence.occupancy.get(callout))}`)
+      .join("; ");
+    lines.push(`- ${anchorId} / ${anchor.name}: ${callouts}`);
+  }
+  return lines;
+}
+
+function renderAdjacency(mapName: string, transitions: Transitions, limit = 16): string[] {
+  const rows = [...transitions.entries()]
+    .sort((a, b) => b[1].t + b[1].ct - (a[1].t + a[1].ct))
+    .slice(0, limit);
+  const lines = ["### 相邻证据", "同一玩家在开局窗口内发生 callout 变化时记录一条有向边。"];
+  for (const [key, counts] of rows) {
+    const [from, to] = key.split("\t");
+    lines.push(`- ${formatCallout(mapName, from)} -> ${formatCallout(mapName, to)}: ${formatCounts(counts)}`);
+  }
+  return lines;
+}
+
+function renderMapReview(mapName: string, evidence: MapEvidence): string {
+  return [
+    `## ${mapName}`,
+    "",
+    `样本 ZIP：${evidence.zipCount}`,
+    "",
+    "### 高频占有",
+    `- T: ${topOccupancy(evidence.occupancy, "t")}`,
+    `- CT: ${topOccupancy(evidence.occupancy, "ct")}`,
+    "",
+    ...renderAnchorReview(mapName, "t", evidence),
+    "",
+    ...renderAnchorReview(mapName, "ct", evidence),
+    "",
+    ...renderAdjacency(mapName, evidence.transitions),
+    "",
+    "### TS 草案",
+    "```ts",
+    renderTsObject(mapName, evidence.occupancy),
+    "```",
+  ].join("\n");
+}
+
+export function renderReviewReport(byMap: Map<string, MapEvidence>, scannedCount: number): string {
+  return [
+    "# Default Positions Review",
+    "",
+    `扫描 ZIP：${scannedCount}`,
+    `统计窗口：freezeEnd + ${WINDOW_SEC}s`,
+    "",
+    ...[...byMap.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([mapName, evidence]) => renderMapReview(mapName, evidence)),
+  ].join("\n");
+}
+
 function renderStats(mapName: string, occ: Occ): string {
   const total = [...occ.values()].reduce((sum, counts) => sum + counts.t + counts.ct, 0);
   const rows = [...occ.entries()]
@@ -287,24 +387,25 @@ function renderStats(mapName: string, occ: Occ): string {
 
 async function main(paths: string[]): Promise<void> {
   const roots = paths.length > 0 ? paths : ["fixtures/output"];
-  const byMap = new Map<string, Occ>();
+  const byMap = new Map<string, MapEvidence>();
   const files = roots.flatMap(zipFiles);
   for (const file of files) {
     const pkg = await loadZip(file);
-    const occ = byMap.get(pkg.match.mapName) ?? new Map();
-    accumulate(pkg, occ);
-    byMap.set(pkg.match.mapName, occ);
+    const evidence = byMap.get(pkg.match.mapName) ?? {
+      occupancy: new Map(),
+      transitions: new Map(),
+      zipCount: 0,
+    };
+    evidence.zipCount += 1;
+    accumulate(pkg, evidence);
+    byMap.set(pkg.match.mapName, evidence);
   }
-  console.log(`// scanned ${files.length} zip(s); opening window: freezeEnd + ${WINDOW_SEC}s`);
-  for (const mapName of [...byMap.keys()].sort((a, b) => a.localeCompare(b))) {
-    const occ = byMap.get(mapName)!;
-    console.log(renderStats(mapName, occ));
-    const snippet = renderTsObject(mapName, occ);
-    if (snippet) console.log(snippet);
-  }
+  console.log(renderReviewReport(byMap, files.length));
 }
 
-main(process.argv.slice(2)).catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (process.argv[1]?.endsWith("derive-default-positions.ts")) {
+  main(process.argv.slice(2)).catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}
