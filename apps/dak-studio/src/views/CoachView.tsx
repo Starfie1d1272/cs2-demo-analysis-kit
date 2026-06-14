@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import type { OpeningPatternCluster } from "@cs2dak/cohort";
-import { CALLOUT_NAME_CN } from "@cs2dak/maps";
-import { buildAntiStratMarkdownFromPatterns } from "@cs2dak/presentation";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState } from "../components/primitives";
-import { displayTeamName, teamRenameGroups } from "../lib/identity";
+import { teamRenameGroups } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
-import { getFactsStore } from "../lib/facts";
+import { getFactsStore, type TacticalRoundFact } from "../lib/facts";
+import { buildTacticalClusters, autoName, type TacticalCluster } from "../lib/tactics";
 import {
   listPlaybookNames,
   loadCoachSettings,
@@ -14,6 +12,7 @@ import {
   savePlaybookName,
   type CoachSettings
 } from "../lib/series";
+import { PatternExplorer } from "./coach/PatternExplorer";
 
 type CoachTab = "patterns" | "playbook" | "anti";
 
@@ -34,14 +33,6 @@ const TABS: Array<{ key: CoachTab; label: string }> = [
 ];
 
 const SIDE_LABEL: Record<string, string> = { t: "T 方", ct: "CT 方" };
-const GRENADE_LABEL: Record<string, string> = {
-  flashbang: "闪光",
-  smoke: "烟",
-  molotov: "火",
-  incendiary: "火",
-  hegrenade: "雷",
-  decoy: "诱饵"
-};
 
 export function CoachView({
   allEntries,
@@ -53,7 +44,8 @@ export function CoachView({
   teamRenames = {}
 }: CoachViewProps) {
   const [tab, setTab] = useState<CoachTab>("patterns");
-  const [clusters, setClusters] = useState<OpeningPatternCluster[] | null>(null);
+  const [clusters, setClusters] = useState<TacticalCluster[] | null>(null);
+  const [facts, setFacts] = useState<TacticalRoundFact[]>([]);
   const [settings, setSettings] = useState<CoachSettings>({ myTeamName: null });
   const [playbook, setPlaybook] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -74,11 +66,14 @@ export function CoachView({
     }
     let cancelled = false;
     setClusters(null);
+    setFacts([]);
     setError(null);
-    // TODO Phase 5: 接 buildTacticalClusters
     getFactsStore().getTacticalRounds({ matchIds: entries.map(matchIdForEntry) })
-      .then(() => {
-        if (!cancelled) setClusters([] as OpeningPatternCluster[]);
+      .then((rows) => {
+        if (!cancelled) {
+          setFacts(rows);
+          setClusters(buildTacticalClusters(rows));
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
@@ -106,7 +101,7 @@ export function CoachView({
     );
   }
 
-  const antiMarkdown = buildAntiStratMarkdown(clusters ?? [], settings.myTeamName, teamRenames);
+  const antiMarkdown = buildAntiStratMarkdown(clusters ?? [], settings.myTeamName);
 
   return (
     <div className="stu-view">
@@ -141,7 +136,14 @@ export function CoachView({
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
       {!error && !clusters && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的开局 pattern…</div>}
-      {clusters && tab === "patterns" && <PatternTable clusters={clusters} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} />}
+      {clusters && tab === "patterns" && (
+        <PatternExplorer
+          clusters={clusters}
+          facts={facts}
+          entryByMatchId={entryByMatchId}
+          onOpenMatch={onOpenMatch}
+        />
+      )}
       {clusters && tab === "playbook" && (
         <PlaybookTable
           clusters={clusters}
@@ -162,52 +164,12 @@ export function CoachView({
   );
 }
 
-function PatternTable({
-  clusters,
-  entryByMatchId,
-  onOpenMatch
-}: {
-  clusters: OpeningPatternCluster[];
-  entryByMatchId: Map<string, StudioDemoEntry>;
-  onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
-}) {
-  return (
-    <section className="stu-coach-pattern-grid">
-      {clusters.slice(0, 24).map((cluster) => {
-        const first = cluster.rounds[0];
-        const entry = first ? entryByMatchId.get(first.matchId) : null;
-        return (
-          <article key={cluster.id} className="stu-coach-pattern-card">
-            <header>
-              <span>{cluster.mapName}</span>
-              <b>{SIDE_LABEL[cluster.side]}</b>
-            </header>
-            <h3>{formatPatternBasis(cluster)}</h3>
-            {cluster.grenadeSequence.length > 0 && (
-              <p className="stu-coach-nades">{formatGrenades(cluster.grenadeSequence)}</p>
-            )}
-            <div className="stu-coach-pattern-metrics">
-              <span><small>回合</small><b>{cluster.roundCount}</b></span>
-              <span><small>胜率</small><b>{cluster.winRatePercent == null ? "—" : `${cluster.winRatePercent.toFixed(1)}%`}</b></span>
-            </div>
-            {entry && first && (
-              <button type="button" className="stu-button-sm" onClick={() => onOpenMatch(entry.id, { roundNumber: first.roundNumber })}>
-                查看代表回合
-              </button>
-            )}
-          </article>
-        );
-      })}
-    </section>
-  );
-}
-
 function PlaybookTable({
   clusters,
   playbook,
   onRename
 }: {
-  clusters: OpeningPatternCluster[];
+  clusters: TacticalCluster[];
   playbook: Record<string, string>;
   onRename: (clusterId: string, name: string) => Promise<void>;
 }) {
@@ -216,14 +178,14 @@ function PlaybookTable({
     <div className="stu-card">
       <h3>战术本</h3>
       <table className="stu-mini-table">
-        <thead><tr><th>战术名</th><th>开局模式</th><th className="stu-num">样本</th><th /></tr></thead>
+        <thead><tr><th>战术名</th><th>打法模式</th><th className="stu-num">样本</th><th /></tr></thead>
         <tbody>
           {clusters.slice(0, 20).map((cluster) => {
             const value = drafts[cluster.id] ?? playbook[cluster.id] ?? "";
             return (
               <tr key={cluster.id}>
                 <td><input className="stu-input stu-input-sm" value={value} placeholder="命名战术" onChange={(event) => setDrafts((current) => ({ ...current, [cluster.id]: event.target.value }))} /></td>
-                <td>{cluster.mapName} · {SIDE_LABEL[cluster.side]} · {formatPatternBasis(cluster)}</td>
+                <td>{cluster.mapName} · {SIDE_LABEL[cluster.side]} · {autoName(cluster)}</td>
                 <td className="stu-num">{cluster.roundCount}</td>
                 <td><button type="button" className="stu-button-sm" onClick={() => void onRename(cluster.id, value)}>保存</button></td>
               </tr>
@@ -235,33 +197,16 @@ function PlaybookTable({
   );
 }
 
-// TODO: 交互式 BP 编辑器。当前预填只覆盖已知 sample 系列。
-// 缺口：① side 应为不可编辑字段（选图方选图→对面选边，非 picker 选边）；
-//       ② BO3 decider 的 side 由最后一 ban 的对面决定，非拼刀；
-//       ③ 没有展开/编辑步骤的 UI（无法查看/修改已保存的 BP 步骤）；
-//       ④ 确认后系列记录只显示计数，无系列详情页（跨图选手趋势/记分板/BP 步骤可视化）。
-function buildAntiStratMarkdown(
-  clusters: OpeningPatternCluster[],
-  myTeamName: string | null,
-  teamRenames: Record<string, string>
-): string {
-  const mapPool = [...new Set(clusters.map((cluster) => cluster.mapName))].sort();
-  const markdown = buildAntiStratMarkdownFromPatterns(clusters, { myTeamName, opponentName: myTeamName ? null : "对手", mapPool });
-  return `${markdown}\n\n## 队伍身份\n- 已加载队伍归并：${Object.keys(teamRenames).length} 条`;
-}
-
-function calloutName(mapName: string, callout: string): string {
-  const table = (CALLOUT_NAME_CN as Record<string, Record<string, string>>)[mapName] ?? {};
-  return table[callout] || callout;
-}
-
-function formatPatternBasis(cluster: OpeningPatternCluster): string {
-  return cluster.basis.split("|").map((part) => {
-    const [callout, count] = part.split(":");
-    return `${calloutName(cluster.mapName, callout ?? "unknown")}×${count ?? "1"}`;
-  }).join(" / ");
-}
-
-function formatGrenades(sequence: string[]): string {
-  return sequence.map((item) => GRENADE_LABEL[item] ?? item).join(" → ");
+function buildAntiStratMarkdown(clusters: TacticalCluster[], myTeamName: string | null): string {
+  const mapPool = [...new Set(clusters.map((c) => c.mapName))].sort();
+  const sections = mapPool.map((map) => {
+    const mapClusters = clusters.filter((c) => c.mapName === map);
+    const tPatterns = mapClusters.filter((c) => c.side === "t").slice(0, 5);
+    const ctPatterns = mapClusters.filter((c) => c.side === "ct").slice(0, 5);
+    const fmt = (cs: TacticalCluster[]) =>
+      cs.map((c) => `- ${autoName(c)}（${c.roundCount} 回合，胜率 ${c.winRatePercent?.toFixed(1) ?? "—"}%）`).join("\n");
+    return `## ${map}\n\n### T 方\n${fmt(tPatterns) || "暂无数据"}\n\n### CT 方\n${fmt(ctPatterns) || "暂无数据"}`;
+  });
+  const header = `# 备战报告${myTeamName ? `（${myTeamName}）` : ""}\n`;
+  return sections.length > 0 ? `${header}\n${sections.join("\n\n")}` : `${header}\n暂无聚类数据。`;
 }
