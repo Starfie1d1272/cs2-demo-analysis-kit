@@ -7,7 +7,7 @@ describe("default-positions", () => {
     expect(Object.keys(DEFAULT_POSITIONS.de_mirage.t.anchors)).toEqual([
       "a_ramp",
       "a_palace",
-      "mid_spawn",
+      "top_mid",
       "underpass",
       "b_apps",
     ]);
@@ -65,7 +65,7 @@ describe("default-positions", () => {
     expect(isContested("de_dust2", "LongA")).toBe(true);
 
     expect(anchorOf("de_nuke", "t", "Ramp")).toBeNull();
-    expect(anchorOf("de_nuke", "t", "Trophy")).toBe("trophy_link");
+    expect(anchorOf("de_nuke", "t", "Trophy")).toBe("trophy");
 
     expect(anchorOf("de_overpass", "t", "Water")).toBeNull();
     expect(isContested("de_overpass", "Water")).toBe(true);
