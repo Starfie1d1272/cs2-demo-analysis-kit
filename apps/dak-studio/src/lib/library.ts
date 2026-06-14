@@ -250,6 +250,7 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
       sourceDemPath: sourceDemPath ?? existing.sourceDemPath ?? null
     };
     await meta.put(id, mergedEntry);
+    await writeFactsForPackage(id, mergedEntry, pkg);
     if (replacement && replacement.id !== id) {
       await Promise.all([
         meta.delete(replacement.id),
