@@ -1,7 +1,7 @@
 import { Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { OpeningTrailsModel, OpeningTrailRound } from "@cs2dak/contract";
-import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
+import { RadarTrails, GRENADE_COLOR, type RadarTrail, type RadarGrenadeOverlay } from "../components/RadarTrails";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import type { IdentityOptions } from "../lib/season";
 import { getPinnedPlayer } from "../lib/pin";
@@ -36,15 +36,6 @@ interface PlayerOption {
   matchCount: number;
 }
 
-const GRENADE_COLOR: Record<string, string> = {
-  flashbang: "#ffd84d",
-  smoke: "#9aa6b2",
-  molotov: "#ff8a3d",
-  incendiary: "#ff8a3d",
-  hegrenade: "#ff5f6e",
-  decoy: "#6f7d8a"
-};
-
 const GRENADE_LABEL: Record<string, string> = {
   flashbang: "闪光",
   smoke: "烟雾",
@@ -57,13 +48,6 @@ const GRENADE_LABEL: Record<string, string> = {
 function trailColor(index: number): string {
   return `hsl(${(index * 47) % 360} 75% 60%)`;
 }
-
-/** 烟/火的近似作用半径（游戏单位），只服务视觉示意；其余道具不画范围圈。 */
-const EFFECT_RADIUS_UNITS: Partial<Record<string, number>> = {
-  smoke: 144,
-  molotov: 120,
-  incendiary: 120
-};
 
 /** destroyT 缺失时的保底效果时长（秒）。 */
 const EFFECT_DURATION_SECONDS: Partial<Record<string, number>> = {
@@ -366,37 +350,15 @@ function TrailStage({ mapName, rounds, hiddenRounds, onToggleRound, missingRepla
   const rafRef = useRef<number | null>(null);
   const lastTsRef = useRef<number | null>(null);
 
-  const calibration = getMapCalibration(mapName);
-  const size = calibration?.radarSize ?? 1024;
-
-  // 预投影到 radar 坐标
-  const projected = useMemo(() => {
-    return rounds.map((round, index) => {
-      const project = (point: { x: number; y: number }) => {
-        if (!calibration) return { x: size / 2 + point.x / 10, y: size / 2 - point.y / 10 };
-        const radar = worldToRadar(point, calibration);
-        return { x: radar.x, y: radar.y };
-      };
-      return {
+  const prepared = useMemo(
+    () =>
+      rounds.map((round, index) => ({
         key: roundKeyOf(round),
         color: trailColor(index),
         round,
-        points: round.points.map((p) => ({ t: p.t, ...project(p) })),
-        grenades: round.grenades.map((g) => {
-          const effect = project({ x: g.effectX, y: g.effectY });
-          return {
-            t: g.t,
-            grenade: g.grenade,
-            effectT: g.effectT,
-            destroyT: g.destroyT,
-            ex: effect.x,
-            ey: effect.y,
-            ...project(g)
-          };
-        })
-      };
-    });
-  }, [rounds, calibration, size]);
+      })),
+    [rounds]
+  );
 
   useEffect(() => {
     if (!playing) {
@@ -430,65 +392,42 @@ function TrailStage({ mapName, rounds, hiddenRounds, onToggleRound, missingRepla
     setPlaying(true);
   };
 
-  const visible = projected.filter((item) => !hiddenRounds.has(item.key));
+  const visible = prepared.filter((item) => !hiddenRounds.has(item.key));
+
+  const trails: RadarTrail[] = visible.map((item) => ({
+    id: item.key,
+    points: item.round.points.filter((p) => p.t <= time).map((p) => ({ x: p.x, y: p.y })),
+    color: item.color,
+    opacity: trailOpacity,
+  }));
+
+  const grenadeOverlays: RadarGrenadeOverlay[] = visible.flatMap((item) =>
+    item.round.grenades
+      .filter((g) => g.t <= time)
+      .map((g, gi) => {
+        const effectEnd = g.destroyT ?? g.effectT + (EFFECT_DURATION_SECONDS[g.grenade] ?? 0);
+        return {
+          trailId: `${item.key}-g${gi}`,
+          type: g.grenade,
+          x: g.x, y: g.y,
+          ex: g.effectX, ey: g.effectY,
+          showEffect: time >= g.effectT,
+          effectActive: time >= g.effectT && time <= effectEnd,
+        };
+      })
+  );
 
   return (
     <div className="stu-trail-layout">
       <div className="stu-trail-stage-wrap">
-        <svg
-          className="stu-trail-stage"
-          viewBox={`0 0 ${size} ${size}`}
-          role="img"
-          aria-label={`${mapName} 开局动线`}
-        >
-          <image href={`./maps/radars/${mapName}.png`} width={size} height={size} opacity={0.85} />
-          {visible.map((item) => {
-            const pts = item.points.filter((p) => p.t <= time);
-            if (pts.length === 0) return null;
-            const head = pts[pts.length - 1];
-            return (
-              <g key={item.key}>
-                {/* 轨迹开关只控制路径线；选手当前位置点始终可见 */}
-                {showTrails && (
-                  <polyline
-                    points={pts.map((p) => `${p.x},${p.y}`).join(" ")}
-                    fill="none"
-                    stroke={item.color}
-                    strokeWidth={size / 340}
-                    strokeLinejoin="round"
-                    strokeLinecap="round"
-                    opacity={trailOpacity}
-                  />
-                )}
-                <circle cx={head.x} cy={head.y} r={size / 110} fill={item.color} stroke="#0b0e10" strokeWidth={size / 512} opacity={Math.min(1, trailOpacity + 0.3)} />
-                {showGrenades && item.grenades
-                  .filter((g) => g.t <= time)
-                  .map((g, gi) => {
-                    const scale = calibration?.scale ?? 10;
-                    const effectRadius = EFFECT_RADIUS_UNITS[g.grenade];
-                    const effectEnd = g.destroyT ?? g.effectT + (EFFECT_DURATION_SECONDS[g.grenade] ?? 0);
-                    const effectVisible = time >= g.effectT;
-                    const effectActive = effectVisible && time <= effectEnd;
-                    return (
-                      <g key={`${item.key}-g${gi}`}>
-                        {effectVisible && (
-                          <line x1={g.x} y1={g.y} x2={g.ex} y2={g.ey} stroke={GRENADE_COLOR[g.grenade] ?? "#fff"} strokeWidth={size / 1024} strokeDasharray={`${size / 256} ${size / 256}`} opacity={0.55} />
-                        )}
-                        {effectActive && effectRadius != null && (
-                          <circle cx={g.ex} cy={g.ey} r={effectRadius / scale} fill={GRENADE_COLOR[g.grenade] ?? "#fff"} opacity={0.22} stroke={GRENADE_COLOR[g.grenade] ?? "#fff"} strokeOpacity={0.5} strokeWidth={size / 1024} />
-                        )}
-                        {effectVisible && (
-                          <circle cx={g.ex} cy={g.ey} r={size / 170} fill={GRENADE_COLOR[g.grenade] ?? "#fff"} opacity={0.95} stroke="#0b0e10" strokeWidth={size / 680} />
-                        )}
-                        <circle cx={g.x} cy={g.y} r={size / 240} fill="none" stroke={GRENADE_COLOR[g.grenade] ?? "#fff"} strokeWidth={size / 768} opacity={0.8} />
-                        <title>{`${GRENADE_LABEL[g.grenade] ?? g.grenade} · 出手 ${g.t.toFixed(1)}s → 生效 ${g.effectT.toFixed(1)}s（${item.round.matchId} R${item.round.roundNumber}）`}</title>
-                      </g>
-                    );
-                  })}
-              </g>
-            );
-          })}
-        </svg>
+        <RadarTrails
+          mapName={mapName}
+          trails={trails}
+          grenades={grenadeOverlays}
+          showTrails={showTrails}
+          showGrenades={showGrenades}
+          trailOpacity={trailOpacity}
+        />
         <div className="stu-trail-playbar">
           <button type="button" className="stu-icon-button" onClick={() => (time >= WINDOW_SECONDS ? restart() : setPlaying((v) => !v))} aria-label={playing ? "暂停" : "播放"}>
             {playing ? <Pause size={15} /> : <Play size={15} />}
@@ -551,7 +490,7 @@ function TrailStage({ mapName, rounds, hiddenRounds, onToggleRound, missingRepla
       </div>
       <aside className="stu-trail-legend">
         <h3>回合（{rounds.length}）</h3>
-        {projected.map((item) => (
+        {prepared.map((item) => (
           <button
             key={item.key}
             type="button"

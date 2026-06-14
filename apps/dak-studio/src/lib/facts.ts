@@ -366,10 +366,10 @@ function siteInvestmentFor(
   const labels = replayLabelsAt(pkg, round.roundNumber, side, entryTick);
 
   const plantA = pkg.bombs.find(
-    (b) => b.roundNumber === round.roundNumber && b.type === "plant" && b.site === "a"
+    (b) => b.roundNumber === round.roundNumber && b.type === "planted" && b.site === "a"
   );
   const plantB = pkg.bombs.find(
-    (b) => b.roundNumber === round.roundNumber && b.type === "plant" && b.site === "b"
+    (b) => b.roundNumber === round.roundNumber && b.type === "planted" && b.site === "b"
   );
 
   const sideGrenades = pkg.grenades.filter(
@@ -425,7 +425,7 @@ function executeRemainFor(
 ): number | null {
   if (!targetSite) return null;
   const plant = pkg.bombs.find(
-    (b) => b.roundNumber === round.roundNumber && b.type === "plant" && b.site === targetSite
+    (b) => b.roundNumber === round.roundNumber && b.type === "planted" && b.site === targetSite
   );
   if (plant) return remainSecAt(plant.tick, round.freezeEndTick, tickrate);
   return null;
