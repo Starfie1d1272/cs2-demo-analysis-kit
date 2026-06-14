@@ -1,6 +1,6 @@
 {
   "name": "cs2-demo-analysis-kit",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "private": true,
   "description": "Reusable CS2 demo analysis models, QA reports, and previewable UI components.",
   "license": "MIT",
