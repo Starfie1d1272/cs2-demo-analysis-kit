@@ -7,7 +7,9 @@ import {
   buildMatchReportMarkdown,
   buildPlayerFlashSummaries,
   buildPlayerSeasonInsights,
-  buildTournamentInsights
+  buildTournamentInsights,
+  buildTournamentInsightsFromFacts,
+  extractTournamentFacts
 } from "./insights";
 import { buildMatchWorkspaceModel } from "./workspace";
 
@@ -113,6 +115,16 @@ describe("buildMatchBuyQuality", () => {
 });
 
 describe("buildTournamentInsights", () => {
+  it("builds the same model from persisted tournament facts", async () => {
+    const pkg = await loadFixture();
+    const demos = [
+      { matchId: "m1", pkg },
+      { matchId: "m2", pkg }
+    ];
+
+    expect(buildTournamentInsightsFromFacts(demos.map(extractTournamentFacts))).toEqual(buildTournamentInsights(demos));
+  });
+
   it("aggregates round-level rates across demos", async () => {
     const pkg = await loadFixture();
     const insights = buildTournamentInsights([

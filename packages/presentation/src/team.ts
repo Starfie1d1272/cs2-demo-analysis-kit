@@ -175,6 +175,23 @@ export interface TeamComparisonInput {
   pkg: DemoPackage;
 }
 
+export interface TeamComparisonFacts {
+  matchId: string;
+  mapName: string;
+  teams: Record<"teamA" | "teamB", string>;
+  players: Array<{ steamId64: string; name: string; teamKey: "teamA" | "teamB" }>;
+  playerStats: Array<{
+    playerSteamId64: string;
+    rounds: number;
+    kills: number;
+    deaths: number;
+    damageHealth: number;
+    kastRounds: number;
+  }>;
+  kills: Array<{ killerSteamId64: string | null; roundNumber: number; tick: number; weapon: string }>;
+  rounds: Array<{ teamAEconomy: string; teamBEconomy: string; winnerTeamKey: "teamA" | "teamB" }>;
+}
+
 function teamName(pkg: DemoPackage, key: string): string {
   return key === "teamA" ? (pkg.match.teamA.name ?? "Team A") : (pkg.match.teamB.name ?? "Team B");
 }
@@ -184,8 +201,47 @@ function averageNullable(values: Array<number | null | undefined>): number | nul
   return nums.length > 0 ? round(nums.reduce((sum, value) => sum + value, 0) / nums.length, 2) : null;
 }
 
-export function buildTeamComparison(inputs: TeamComparisonInput[]): TeamComparisonModel {
-  const teamNames = [...new Set(inputs.flatMap(({ pkg }) => [teamName(pkg, "teamA"), teamName(pkg, "teamB")]))].slice(0, 2);
+export function extractTeamComparisonFacts(input: TeamComparisonInput): TeamComparisonFacts {
+  const { pkg } = input;
+  return {
+    matchId: input.matchId,
+    mapName: pkg.match.mapName,
+    teams: {
+      teamA: teamName(pkg, "teamA"),
+      teamB: teamName(pkg, "teamB")
+    },
+    players: pkg.players.map((player) => ({
+      steamId64: player.steamId64,
+      name: player.name,
+      teamKey: player.teamKey
+    })),
+    playerStats: pkg.playerStats.map((stat) => {
+      const player = pkg.players[stat.playerIndex];
+      return {
+        playerSteamId64: player?.steamId64 ?? "",
+        rounds: stat.rounds,
+        kills: stat.kills,
+        deaths: stat.deaths,
+        damageHealth: stat.damageHealth,
+        kastRounds: stat.kastRounds
+      };
+    }).filter((row) => row.playerSteamId64 !== ""),
+    kills: pkg.kills.map((kill) => ({
+      killerSteamId64: kill.killerIndex != null ? (pkg.players[kill.killerIndex]?.steamId64 ?? null) : null,
+      roundNumber: kill.roundNumber,
+      tick: kill.tick,
+      weapon: kill.weapon
+    })),
+    rounds: pkg.rounds.map((roundRow) => ({
+      teamAEconomy: roundRow.teamAEconomy,
+      teamBEconomy: roundRow.teamBEconomy,
+      winnerTeamKey: roundRow.winnerTeamKey
+    }))
+  };
+}
+
+export function buildTeamComparisonFromFacts(inputs: TeamComparisonFacts[]): TeamComparisonModel {
+  const teamNames = [...new Set(inputs.flatMap((row) => [row.teams.teamA, row.teams.teamB]))].slice(0, 2);
   if (teamNames.length < 2) {
     return { version: "cs2-demo-analysis-kit/team-comparison-0.1", teams: [], radar: [], evidence: [] };
   }
@@ -193,11 +249,12 @@ export function buildTeamComparison(inputs: TeamComparisonInput[]): TeamComparis
     const playerRows = new Map<string, TeamComparisonPlayerRow & { rounds: number; kills: number; deaths: number; damage: number; kastRounds: number }>();
     const weaponKills = new Map<string, number>();
     const economy = new Map<string, { rounds: number; wins: number }>();
-    for (const { pkg } of inputs) {
-      for (const [teamKey, candidate] of [["teamA", teamName(pkg, "teamA")], ["teamB", teamName(pkg, "teamB")]] as const) {
+    for (const input of inputs) {
+      const playerBySteam = new Map(input.players.map((player) => [player.steamId64, player]));
+      for (const [teamKey, candidate] of [["teamA", input.teams.teamA], ["teamB", input.teams.teamB]] as const) {
         if (candidate !== name) continue;
-        for (const stat of pkg.playerStats) {
-          const player = pkg.players[stat.playerIndex];
+        for (const stat of input.playerStats) {
+          const player = playerBySteam.get(stat.playerSteamId64);
           if (!player || player.teamKey !== teamKey) continue;
           const current = playerRows.get(player.steamId64) ?? {
             teamName: name,
@@ -221,14 +278,14 @@ export function buildTeamComparison(inputs: TeamComparisonInput[]): TeamComparis
           current.kastRounds += stat.kastRounds;
           playerRows.set(player.steamId64, current);
         }
-        for (const kill of pkg.kills) {
-          if (kill.killerIndex == null) continue;
-          const killer = pkg.players[kill.killerIndex];
+        for (const kill of input.kills) {
+          if (kill.killerSteamId64 == null) continue;
+          const killer = playerBySteam.get(kill.killerSteamId64);
           if (!killer || killer.teamKey !== teamKey) continue;
           const weapon = killWeaponLabel(kill.weapon);
           weaponKills.set(weapon, (weaponKills.get(weapon) ?? 0) + 1);
         }
-        for (const round of pkg.rounds) {
+        for (const round of input.rounds) {
           const type = teamKey === "teamA" ? round.teamAEconomy : round.teamBEconomy;
           const cell = economy.get(type) ?? { rounds: 0, wins: 0 };
           cell.rounds += 1;
@@ -267,15 +324,19 @@ export function buildTeamComparison(inputs: TeamComparisonInput[]): TeamComparis
     { metric: "kpr", label: "KPR", a: averageNullable(sides[0].players.map((row) => row.kpr)), b: averageNullable(sides[1].players.map((row) => row.kpr)) },
     { metric: "dpr", label: "DPR", a: averageNullable(sides[0].players.map((row) => row.dpr)), b: averageNullable(sides[1].players.map((row) => row.dpr)) }
   ].map((row) => ({ ...row, delta: row.a != null && row.b != null ? round(row.a - row.b, 2) : null }));
-  const evidence = inputs.flatMap(({ matchId, pkg }) =>
-    pkg.kills.slice(0, 5).map((kill) => ({
-      matchId,
+  const evidence = inputs.flatMap((input) =>
+    input.kills.slice(0, 5).map((kill) => ({
+      matchId: input.matchId,
       roundNumber: kill.roundNumber,
       tick: kill.tick,
-      label: `${pkg.match.mapName} R${kill.roundNumber}`
+      label: `${input.mapName} R${kill.roundNumber}`
     }))
   ).slice(0, 20);
   return { version: "cs2-demo-analysis-kit/team-comparison-0.1", teams: sides, radar, evidence };
+}
+
+export function buildTeamComparison(inputs: TeamComparisonInput[]): TeamComparisonModel {
+  return buildTeamComparisonFromFacts(inputs.map(extractTeamComparisonFacts));
 }
 
 function killWeaponLabel(weapon: string): string {

@@ -8,7 +8,13 @@ import {
   buildPlayerMechanicsProfile,
   buildPlayerMechanicsProfileFromRows,
   buildPlayerSeasonInsights,
-  buildPlayerWeaponStats
+  buildPlayerWeaponStats,
+  buildDuelInsights,
+  buildDuelInsightsFromFacts,
+  buildTeamComparison,
+  buildTeamComparisonFromFacts,
+  buildTournamentInsights,
+  buildTournamentInsightsFromFacts
 } from "@cs2dak/presentation";
 import { buildPlayerSeasonDetailsFromFacts, createFactsStore, extractMatchFacts } from "./facts";
 import { createIdbAdapter } from "./storage/idb-adapter";
@@ -91,6 +97,39 @@ describe("MatchFacts", () => {
     expect({ ...fromRows, players: [] }).toEqual({ ...fromPackages, players: [] });
     expect(new Map(fromRows.players.map((row) => [row.playerKey, stableNumbers(row)]))).toEqual(
       new Map(fromPackages.players.map((row) => [row.playerKey, stableNumbers(row)]))
+    );
+  });
+
+  it("projects persisted tournament facts to the same tournament insights as the existing package path", async () => {
+    const pkg = await loadFixture();
+    const matchId = "m1";
+    const store = createFactsStore(createIdbAdapter(), "facts-tournament-equivalence");
+    await store.putMatchFacts(extractMatchFacts(pkg, { matchId }));
+
+    expect(buildTournamentInsightsFromFacts(await store.getTournamentFacts({ matchIds: [matchId] }))).toEqual(
+      buildTournamentInsights([{ matchId, pkg }])
+    );
+  });
+
+  it("projects persisted team comparison facts to the same model as the existing package path", async () => {
+    const pkg = await loadFixture();
+    const matchId = "m1";
+    const store = createFactsStore(createIdbAdapter(), "facts-team-equivalence");
+    await store.putMatchFacts(extractMatchFacts(pkg, { matchId }));
+
+    expect(buildTeamComparisonFromFacts(await store.getTeamComparisonFacts({ matchIds: [matchId] }))).toEqual(
+      buildTeamComparison([{ matchId, pkg }])
+    );
+  });
+
+  it("projects persisted duel facts to the same model as the existing package path", async () => {
+    const pkg = await loadFixture();
+    const matchId = "m1";
+    const store = createFactsStore(createIdbAdapter(), "facts-duel-equivalence");
+    await store.putMatchFacts(extractMatchFacts(pkg, { matchId }));
+
+    expect(buildDuelInsightsFromFacts(await store.getDuelFacts({ matchIds: [matchId] }))).toEqual(
+      buildDuelInsights([{ matchId, pkg }])
     );
   });
 });

@@ -8,10 +8,10 @@ import {
   type LineupGrenadeLike,
 } from "@cs2dak/maps";
 import { displayWeaponName } from "@cs2dak/presentation";
-import type { DemoPackage } from "@cs2dak/contract";
 import { EmptyState } from "../components/primitives";
 import { Pagination } from "../components/Pagination";
-import { getDemoPackage, type StudioDemoEntry } from "../lib/library";
+import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { getFactsStore } from "../lib/facts";
 
 // ── 常亮 ────────────────────────────────────────────────────────────────────
 
@@ -35,7 +35,6 @@ const GRENADE_COLOR: Record<string, string> = {
 
 const SIDE_LABEL: Record<string, string> = { t: "T", ct: "CT" };
 
-const BATCH_SIZE = 5;
 const PAGE_SIZE = 16;
 const TOP_N_OPTIONS = [20, 40, 60] as const;
 type TopNOption = (typeof TOP_N_OPTIONS)[number];
@@ -50,107 +49,23 @@ interface LoadedGrenades {
   tickrate: number;
 }
 
-/**
- * 分批加载所有 entry 的 pkg，把 raw grenade 行 enrich 为 LineupGrenadeLike。
- * BATCH_SIZE = 5 避免浏览器的 IndexedDB 并发压力。
- */
 async function loadAllGrenades(
   entries: StudioDemoEntry[],
   onProgress?: (done: number, total: number) => void
 ): Promise<LoadedGrenades[]> {
-  const result: LoadedGrenades[] = [];
-  for (let i = 0; i < entries.length; i += BATCH_SIZE) {
-    const batch = entries.slice(i, i + BATCH_SIZE);
-    const loaded = await Promise.all(
-      batch.map(async (entry) => {
-        const pkg = await getDemoPackage(entry.id);
-        return {
-          entryId: entry.id,
-          mapName: pkg.match.mapName,
-          tickrate: pkg.match.tickrate || 64,
-          grenades: enrichGrenades(pkg, entry.id),
-          winners: buildWinnersMap(pkg, entry.id),
-        };
-      })
-    );
-    result.push(...loaded);
-    onProgress?.(Math.min(i + BATCH_SIZE, entries.length), entries.length);
-  }
-  return result;
-}
-
-/** 为单个 entry 构建 roundWinners map，key = `${entryId}:${roundNumber}`。 */
-function buildWinnersMap(pkg: DemoPackage, entryId: string): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const round of pkg.rounds) {
-    map.set(`${entryId}:${round.roundNumber}`, round.winnerTeamKey);
-  }
-  return map;
-}
-
-/** 把 pkg 的 raw grenade 转为 LineupGrenadeLike，附加上 callout/side/freezeEndTick。 */
-function enrichGrenades(pkg: DemoPackage, entryId: string): LineupGrenadeLike[] {
-  const roundsByNumber = new Map(pkg.rounds.map((r) => [r.roundNumber, r]));
-  return (pkg.grenades ?? []).map((grenade) => {
-    const round = roundsByNumber.get(grenade.roundNumber);
-    const player = pkg.players[grenade.throwerIndex];
+  const facts = await getFactsStore().getLineups({ matchIds: entries.map(matchIdForEntry) });
+  const entryIdByMatchId = new Map(entries.map((entry) => [matchIdForEntry(entry), entry.id]));
+  onProgress?.(facts.length, entries.length);
+  return facts.map((fact) => {
+    const entryId = entryIdByMatchId.get(fact.matchId) ?? fact.matchId;
     return {
-      roundNumber: grenade.roundNumber,
-      grenade: grenade.grenade,
-      throwerIndex: grenade.throwerIndex,
-      throwTick: grenade.throwTick,
-      throwPosition: grenade.throwPosition,
-      effectPosition: grenade.effectPosition,
       entryId,
-      freezeEndTick: round?.freezeEndTick ?? 0,
-      throwerPlaceName: getThrowerPlaceAt(pkg, grenade.roundNumber, grenade.throwerIndex, grenade.throwTick),
-      side: resolveSide(pkg, grenade.throwerIndex, grenade.roundNumber),
-      teamKey: player?.teamKey ?? null,
+      mapName: fact.mapName,
+      tickrate: fact.tickrate,
+      grenades: fact.grenades.map((grenade) => ({ ...grenade, entryId })),
+      winners: new Map(fact.roundWinners.map(([key, value]) => [key.replace(`${fact.matchId}:`, `${entryId}:`), value]))
     };
   });
-}
-
-/**
- * 从 replay 取 thrower 在 throwTick 帧的 callout 名。
- *
- * TODO: effectPosition 的 callout 标注待 zone 多边形标定覆盖全部地图后，
- * 通过 zoneAt() 补全。当前仅 4/7 图有 zone 数据（见 MAP_ZONE_ASSETS），
- * 且 effectPosition 无玩家关联，无法走 replay player track 路径。
- */
-function getThrowerPlaceAt(
-  pkg: DemoPackage,
-  roundNumber: number,
-  playerIndex: number,
-  tick: number
-): string | null {
-  if (!pkg.replay) return null;
-  const replayRound = pkg.replay.rounds.find((r) => r.roundNumber === roundNumber);
-  if (!replayRound) return null;
-  const track = replayRound.players.find((p) => p.playerIndex === playerIndex);
-  if (!track) return null;
-  const frameIndex = Math.max(
-    0,
-    Math.min(
-      replayRound.frameCount - 1,
-      Math.round((tick - replayRound.startTick) / replayRound.tickStep)
-    )
-  );
-  const placeIdx = track.place[frameIndex];
-  if (placeIdx == null || placeIdx < 0 || placeIdx >= pkg.replay.placeDict.length) return null;
-  return pkg.replay.placeDict[placeIdx] || null;
-}
-
-/** 判断 thrower 在特定回合的 side。 */
-function resolveSide(
-  pkg: DemoPackage,
-  playerIndex: number,
-  roundNumber: number
-): "t" | "ct" | null {
-  const player = pkg.players[playerIndex];
-  if (!player) return null;
-  const round = pkg.rounds.find((r) => r.roundNumber === roundNumber);
-  if (!round) return null;
-  return player.teamKey === "teamA" ? round.teamASide : round.teamBSide;
 }
 
 /** 英文 callout → 中文（有映射时）。 */

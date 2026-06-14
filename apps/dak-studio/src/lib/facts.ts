@@ -6,15 +6,26 @@ import {
   type PlayerMechanicsFact
 } from "@cs2dak/core";
 import type { SeasonCohortFactRow } from "@cs2dak/cohort";
-import type { DemoPackage, RRSignals, TeamKey } from "@cs2dak/contract";
+import type { OpeningPatternCluster } from "@cs2dak/cohort";
+import type { DemoPackage, MatchWorkspaceModel, OpeningTrailsModel, RRSignals, Side, TeamKey } from "@cs2dak/contract";
+import { FLAG_ALIVE } from "@cs2dak/contract";
 import type { TriangleBvh } from "@cs2dak/maps";
+import type { LineupGrenadeLike } from "@cs2dak/maps";
 import {
+  buildMatchWorkspaceModel,
+  buildOpeningTrails,
   buildPlayerMechanicsProfileFromRows,
   buildPlayerSeasonInsights,
+  extractDuelInsightsFacts,
+  extractTeamComparisonFacts,
+  extractTournamentFacts,
   displayWeaponName,
+  type DuelInsightsFacts,
   type PlayerMechanicsProfile,
   type PlayerSeasonInsights,
-  type PlayerWeaponStat
+  type PlayerWeaponStat,
+  type TeamComparisonFacts,
+  type TournamentFacts
 } from "@cs2dak/presentation";
 import { getStorage, type RecordStore, type StorageAdapter } from "./storage";
 
@@ -100,6 +111,64 @@ export interface CohortFact {
   row: SeasonCohortFactRow;
 }
 
+export interface TournamentFact {
+  version: number;
+  matchId: string;
+  mapName: string;
+  row: TournamentFacts;
+}
+
+export interface TeamComparisonFact {
+  version: number;
+  matchId: string;
+  mapName: string;
+  row: TeamComparisonFacts;
+}
+
+export interface DuelFact {
+  version: number;
+  matchId: string;
+  mapName: string;
+  row: DuelInsightsFacts;
+}
+
+export interface MatchWorkspaceFact {
+  version: number;
+  matchId: string;
+  mapName: string;
+  row: MatchWorkspaceModel;
+}
+
+export interface OpeningTrailFact {
+  version: number;
+  matchId: string;
+  mapName: string;
+  playerKey: string;
+  steamId64: string;
+  row: OpeningTrailsModel;
+}
+
+export interface LineupFact {
+  version: number;
+  matchId: string;
+  mapName: string;
+  grenades: LineupGrenadeLike[];
+  roundWinners: Array<[string, string]>;
+  tickrate: number;
+}
+
+export interface OpeningPatternFact {
+  version: number;
+  matchId: string;
+  mapName: string;
+  side: Side;
+  windowSeconds: number;
+  basis: string;
+  grenadeSequence: string[];
+  roundNumber: number;
+  won: boolean;
+}
+
 export interface MatchFacts {
   version: number;
   matchId: string;
@@ -110,6 +179,13 @@ export interface MatchFacts {
   mechanicsSamples: MechanicsSamplesFact[];
   rrInputs: RRInputFact[];
   cohortRows: CohortFact[];
+  tournamentFacts: TournamentFact[];
+  teamComparisonFacts: TeamComparisonFact[];
+  duelFacts: DuelFact[];
+  matchWorkspace: MatchWorkspaceFact[];
+  openingTrails: OpeningTrailFact[];
+  lineups: LineupFact[];
+  openingPatterns: OpeningPatternFact[];
 }
 
 export interface ExtractMatchFactsOptions {
@@ -138,6 +214,13 @@ export interface FactsStore {
   getMechanicsRows(scope?: FactsScope): Promise<ProjectedMechanicsRows[]>;
   getRRInputs(scope?: FactsScope): Promise<RRInputFact[]>;
   getCohortRows(scope?: FactsScope): Promise<SeasonCohortFactRow[]>;
+  getTournamentFacts(scope?: FactsScope): Promise<TournamentFacts[]>;
+  getTeamComparisonFacts(scope?: FactsScope): Promise<TeamComparisonFacts[]>;
+  getDuelFacts(scope?: FactsScope): Promise<DuelInsightsFacts[]>;
+  getMatchWorkspaces(scope?: FactsScope): Promise<MatchWorkspaceFact[]>;
+  getOpeningTrails(scope?: FactsScope): Promise<OpeningTrailFact[]>;
+  getLineups(scope?: FactsScope): Promise<LineupFact[]>;
+  getOpeningPatterns(scope?: FactsScope): Promise<OpeningPatternFact[]>;
   deleteMatchFacts(matchId: string): Promise<void>;
 }
 
@@ -161,6 +244,116 @@ function defaultPlayerKey(player: { steamId64: string }): string {
 
 function playerBySteamId(pkg: DemoPackage): Map<string, DemoPackage["players"][number]> {
   return new Map(pkg.players.map((player) => [player.steamId64, player]));
+}
+
+function sideOf(pkg: DemoPackage, playerIndex: number, roundNumber: number): Side | null {
+  const player = pkg.players[playerIndex];
+  const round = pkg.rounds.find((row) => row.roundNumber === roundNumber);
+  if (!player || !round) return null;
+  return player.teamKey === "teamA" ? round.teamASide : round.teamBSide;
+}
+
+function throwerPlaceAt(pkg: DemoPackage, roundNumber: number, playerIndex: number, tick: number): string | null {
+  const replay = pkg.replay;
+  if (!replay) return null;
+  const replayRound = replay.rounds.find((row) => row.roundNumber === roundNumber);
+  if (!replayRound) return null;
+  const track = replayRound.players.find((player) => player.playerIndex === playerIndex);
+  if (!track) return null;
+  const frameIndex = Math.max(
+    0,
+    Math.min(replayRound.frameCount - 1, Math.round((tick - replayRound.startTick) / replayRound.tickStep))
+  );
+  const placeIndex = track.place[frameIndex];
+  if (placeIndex == null || placeIndex < 0 || placeIndex >= replay.placeDict.length) return null;
+  return replay.placeDict[placeIndex] || null;
+}
+
+function extractLineupFact(pkg: DemoPackage, matchId: string): LineupFact {
+  const roundsByNumber = new Map(pkg.rounds.map((round) => [round.roundNumber, round]));
+  return {
+    version: MATCH_FACTS_VERSION,
+    matchId,
+    mapName: pkg.match.mapName,
+    tickrate: pkg.match.tickrate || 64,
+    roundWinners: pkg.rounds.map((round) => [`${matchId}:${round.roundNumber}`, round.winnerTeamKey]),
+    grenades: (pkg.grenades ?? []).map((grenade) => {
+      const round = roundsByNumber.get(grenade.roundNumber);
+      const player = pkg.players[grenade.throwerIndex];
+      return {
+        roundNumber: grenade.roundNumber,
+        grenade: grenade.grenade,
+        throwerIndex: grenade.throwerIndex,
+        throwTick: grenade.throwTick,
+        throwPosition: grenade.throwPosition,
+        effectPosition: grenade.effectPosition,
+        entryId: matchId,
+        freezeEndTick: round?.freezeEndTick ?? 0,
+        throwerPlaceName: throwerPlaceAt(pkg, grenade.roundNumber, grenade.throwerIndex, grenade.throwTick),
+        side: sideOf(pkg, grenade.throwerIndex, grenade.roundNumber),
+        teamKey: player?.teamKey ?? null
+      };
+    })
+  };
+}
+
+function distributionKey(labels: string[]): string {
+  const counts = new Map<string, number>();
+  for (const label of labels) counts.set(label, (counts.get(label) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([label, count]) => `${label}:${count}`).join("|");
+}
+
+function replayLabelsAt(pkg: DemoPackage, roundNumber: number, side: Side, sampleTick: number): string[] {
+  const replay = pkg.replay;
+  const round = pkg.rounds.find((row) => row.roundNumber === roundNumber);
+  const replayRound = replay?.rounds.find((row) => row.roundNumber === roundNumber);
+  if (!replay || !round || !replayRound) return [];
+  const labels: string[] = [];
+  for (const track of replayRound.players) {
+    const player = pkg.players[track.playerIndex];
+    if (!player) continue;
+    const playerSide = player.teamKey === "teamA" ? round.teamASide : round.teamBSide;
+    if (playerSide !== side) continue;
+    const frameIndex = Math.max(
+      0,
+      Math.min(replayRound.frameCount - 1, Math.round((sampleTick - replayRound.startTick) / replayRound.tickStep))
+    );
+    if (((track.flags[frameIndex] ?? 0) & FLAG_ALIVE) === 0) continue;
+    const place = replay.placeDict?.[track.place[frameIndex] ?? -1];
+    if (place) labels.push(place);
+  }
+  return labels.sort();
+}
+
+function extractOpeningPatternFacts(pkg: DemoPackage, matchId: string, windowSeconds = 15): OpeningPatternFact[] {
+  const tickrate = pkg.match.tickrate || 64;
+  return pkg.rounds.flatMap((round) => {
+    const sampleTick = round.freezeEndTick + windowSeconds * tickrate;
+    return (["t", "ct"] as const).flatMap((side) => {
+      const labels = replayLabelsAt(pkg, round.roundNumber, side, sampleTick);
+      if (labels.length === 0) return [];
+      const grenades = pkg.grenades
+        .filter((grenade) =>
+          grenade.roundNumber === round.roundNumber &&
+          grenade.throwTick >= round.freezeEndTick &&
+          grenade.throwTick <= sampleTick &&
+          sideOf(pkg, grenade.throwerIndex, round.roundNumber) === side
+        )
+        .sort((a, b) => a.throwTick - b.throwTick)
+        .map((grenade) => grenade.grenade);
+      return [{
+        version: MATCH_FACTS_VERSION,
+        matchId,
+        mapName: pkg.match.mapName,
+        side,
+        windowSeconds,
+        basis: distributionKey(labels),
+        grenadeSequence: grenades,
+        roundNumber: round.roundNumber,
+        won: round.winnerSide === side
+      }];
+    });
+  });
 }
 
 export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOptions): MatchFacts {
@@ -289,28 +482,67 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
       }
     };
   }).filter((row): row is CohortFact => row != null);
+  const mapName = pkg.match.mapName;
+  const visibilityFor = options.visibilityFor?.(mapName) ?? null;
+  const input = { matchId: options.matchId, pkg };
+  const matchWorkspace = buildMatchWorkspaceModel(pkg);
+  const openingTrails = pkg.players.map((player) => ({
+    version: MATCH_FACTS_VERSION,
+    matchId: options.matchId,
+    mapName,
+    playerKey: playerKeyFor(player),
+    steamId64: player.steamId64,
+    row: buildOpeningTrails(pkg, options.matchId, player.steamId64, { windowSeconds: 30 })
+  } satisfies OpeningTrailFact));
 
   return {
     version: MATCH_FACTS_VERSION,
     matchId: options.matchId,
-    mapName: pkg.match.mapName,
+    mapName,
     playerMatchStats: playerStats,
     playerInsights,
     playerWeapons,
     mechanicsSamples,
     rrInputs,
-    cohortRows
+    cohortRows,
+    tournamentFacts: [{
+      version: MATCH_FACTS_VERSION,
+      matchId: options.matchId,
+      mapName,
+      row: extractTournamentFacts(input)
+    }],
+    teamComparisonFacts: [{
+      version: MATCH_FACTS_VERSION,
+      matchId: options.matchId,
+      mapName,
+      row: extractTeamComparisonFacts(input)
+    }],
+    duelFacts: [{
+      version: MATCH_FACTS_VERSION,
+      matchId: options.matchId,
+      mapName,
+      row: extractDuelInsightsFacts(input, { visibilityFor: () => visibilityFor })
+    }],
+    matchWorkspace: [{
+      version: MATCH_FACTS_VERSION,
+      matchId: options.matchId,
+      mapName,
+      row: matchWorkspace
+    }],
+    openingTrails,
+    lineups: [extractLineupFact(pkg, options.matchId)],
+    openingPatterns: extractOpeningPatternFacts(pkg, options.matchId)
   };
 }
 
-function inScope(row: { matchId: string; playerKey: string; mapName?: string }, scope?: FactsScope): boolean {
+function inScope(row: { matchId: string; playerKey?: string; mapName?: string; steamId64?: string }, scope?: FactsScope): boolean {
   if (!scope) return true;
   if (scope.matchIds && !scope.matchIds.includes(row.matchId)) return false;
-  const steamId64 = (row as { steamId64?: string }).steamId64 ?? "";
+  const steamId64 = row.steamId64 ?? "";
   if (scope.playerKeys && scope.steamIds) {
-    if (!scope.playerKeys.includes(row.playerKey) && !scope.steamIds.includes(steamId64)) return false;
+    if ((!row.playerKey || !scope.playerKeys.includes(row.playerKey)) && !scope.steamIds.includes(steamId64)) return false;
   } else {
-    if (scope.playerKeys && !scope.playerKeys.includes(row.playerKey)) return false;
+    if (scope.playerKeys && (!row.playerKey || !scope.playerKeys.includes(row.playerKey))) return false;
     if (scope.steamIds && !scope.steamIds.includes(steamId64)) return false;
   }
   if (scope.mapNames && (!row.mapName || !scope.mapNames.includes(row.mapName))) return false;
@@ -338,6 +570,13 @@ export function createFactsStore(adapter: StorageAdapter, namespace = "facts"): 
   const mechanics = adapter.records(`${namespace}:mechanics_samples`);
   const rrInputs = adapter.records(`${namespace}:rr_inputs`);
   const cohortRows = adapter.records(`${namespace}:cohort_rows`);
+  const tournamentFacts = adapter.records(`${namespace}:tournament_facts`);
+  const teamComparisonFacts = adapter.records(`${namespace}:team_comparison_facts`);
+  const duelFacts = adapter.records(`${namespace}:duel_facts`);
+  const matchWorkspace = adapter.records(`${namespace}:match_workspace`);
+  const openingTrails = adapter.records(`${namespace}:opening_trails`);
+  const lineups = adapter.records(`${namespace}:lineups`);
+  const openingPatterns = adapter.records(`${namespace}:opening_patterns`);
 
   return {
     async putMatchFacts(facts) {
@@ -370,6 +609,41 @@ export function createFactsStore(adapter: StorageAdapter, namespace = "facts"): 
         replaceRows(
           cohortRows,
           facts.cohortRows.map((row) => [rowKey(row.matchId, row.playerKey), row]),
+          facts.matchId
+        ),
+        replaceRows(
+          tournamentFacts,
+          facts.tournamentFacts.map((row) => [row.matchId, row]),
+          facts.matchId
+        ),
+        replaceRows(
+          teamComparisonFacts,
+          facts.teamComparisonFacts.map((row) => [row.matchId, row]),
+          facts.matchId
+        ),
+        replaceRows(
+          duelFacts,
+          facts.duelFacts.map((row) => [row.matchId, row]),
+          facts.matchId
+        ),
+        replaceRows(
+          matchWorkspace,
+          facts.matchWorkspace.map((row) => [row.matchId, row]),
+          facts.matchId
+        ),
+        replaceRows(
+          openingTrails,
+          facts.openingTrails.map((row) => [rowKey(row.matchId, row.playerKey), row]),
+          facts.matchId
+        ),
+        replaceRows(
+          lineups,
+          facts.lineups.map((row) => [row.matchId, row]),
+          facts.matchId
+        ),
+        replaceRows(
+          openingPatterns,
+          facts.openingPatterns.map((row) => [rowKey(row.matchId, String(row.roundNumber), row.side), row]),
           facts.matchId
         )
       ]);
@@ -412,6 +686,44 @@ export function createFactsStore(adapter: StorageAdapter, namespace = "facts"): 
         .sort((a, b) => a.matchId.localeCompare(b.matchId) || a.playerKey.localeCompare(b.playerKey))
         .map((row) => row.row);
     },
+    async getTournamentFacts(scope) {
+      return (await tournamentFacts.getAll<TournamentFact>())
+        .filter((row) => inScope(row, scope))
+        .sort((a, b) => a.matchId.localeCompare(b.matchId))
+        .map((row) => row.row);
+    },
+    async getTeamComparisonFacts(scope) {
+      return (await teamComparisonFacts.getAll<TeamComparisonFact>())
+        .filter((row) => inScope(row, scope))
+        .sort((a, b) => a.matchId.localeCompare(b.matchId))
+        .map((row) => row.row);
+    },
+    async getDuelFacts(scope) {
+      return (await duelFacts.getAll<DuelFact>())
+        .filter((row) => inScope(row, scope))
+        .sort((a, b) => a.matchId.localeCompare(b.matchId))
+        .map((row) => row.row);
+    },
+    async getMatchWorkspaces(scope) {
+      return (await matchWorkspace.getAll<MatchWorkspaceFact>())
+        .filter((row) => inScope(row, scope))
+        .sort((a, b) => a.matchId.localeCompare(b.matchId));
+    },
+    async getOpeningTrails(scope) {
+      return (await openingTrails.getAll<OpeningTrailFact>())
+        .filter((row) => inScope(row, scope))
+        .sort((a, b) => a.matchId.localeCompare(b.matchId) || a.playerKey.localeCompare(b.playerKey));
+    },
+    async getLineups(scope) {
+      return (await lineups.getAll<LineupFact>())
+        .filter((row) => inScope(row, scope))
+        .sort((a, b) => a.matchId.localeCompare(b.matchId));
+    },
+    async getOpeningPatterns(scope) {
+      return (await openingPatterns.getAll<OpeningPatternFact>())
+        .filter((row) => inScope(row, scope))
+        .sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.side.localeCompare(b.side));
+    },
     async deleteMatchFacts(matchId) {
       await Promise.all([
         replaceRows(playerStats, [], matchId),
@@ -419,7 +731,14 @@ export function createFactsStore(adapter: StorageAdapter, namespace = "facts"): 
         replaceRows(playerWeapons, [], matchId),
         replaceRows(mechanics, [], matchId),
         replaceRows(rrInputs, [], matchId),
-        replaceRows(cohortRows, [], matchId)
+        replaceRows(cohortRows, [], matchId),
+        replaceRows(tournamentFacts, [], matchId),
+        replaceRows(teamComparisonFacts, [], matchId),
+        replaceRows(duelFacts, [], matchId),
+        replaceRows(matchWorkspace, [], matchId),
+        replaceRows(openingTrails, [], matchId),
+        replaceRows(lineups, [], matchId),
+        replaceRows(openingPatterns, [], matchId)
       ]);
     }
   };
@@ -573,4 +892,31 @@ export async function buildPlayerFlashSummariesFromFacts(
       ...merged.flash
     };
   }));
+}
+
+export function buildOpeningPatternClustersFromFacts(rows: OpeningPatternFact[]): OpeningPatternCluster[] {
+  const clusters = new Map<string, OpeningPatternCluster>();
+  for (const row of rows) {
+    const key = `${row.mapName}:${row.side}:${row.windowSeconds}:${row.basis}:${row.grenadeSequence.join(">")}`;
+    const cluster = clusters.get(key) ?? {
+      id: key,
+      mapName: row.mapName,
+      side: row.side,
+      windowSeconds: row.windowSeconds as 15 | 20 | 30,
+      basis: row.basis,
+      roundCount: 0,
+      winRatePercent: null,
+      grenadeSequence: row.grenadeSequence,
+      rounds: []
+    };
+    cluster.roundCount += 1;
+    cluster.rounds.push({ matchId: row.matchId, roundNumber: row.roundNumber, won: row.won });
+    clusters.set(key, cluster);
+  }
+  return [...clusters.values()]
+    .map((cluster) => {
+      const wins = cluster.rounds.filter((round) => round.won).length;
+      return { ...cluster, winRatePercent: cluster.roundCount > 0 ? round1((wins / cluster.roundCount) * 100) : null };
+    })
+    .sort((a, b) => b.roundCount - a.roundCount || a.id.localeCompare(b.id));
 }

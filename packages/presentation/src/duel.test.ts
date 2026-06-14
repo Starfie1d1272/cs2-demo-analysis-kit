@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DemoPackage, PackageDamage, PackageKill, PackageShots } from "@cs2dak/contract";
 import { duelInsightsModelSchema } from "@cs2dak/contract";
-import { buildDuelInsights } from "./duel.js";
+import { buildDuelInsights, buildDuelInsightsFromFacts, extractDuelInsightsFacts } from "./duel.js";
 
 const A = "76561198000000001";
 const B = "76561198000000002";
@@ -133,6 +133,17 @@ function pkg(shots?: PackageShots): DemoPackage {
 }
 
 describe("buildDuelInsights", () => {
+  it("builds the same model from persisted duel facts", () => {
+    const inputs = [
+      { matchId: "m1", pkg: pkg(buildShots([{ tick: 100, playerIndex: AI }, { tick: 120, playerIndex: AI }])) },
+      { matchId: "m2", pkg: pkg(buildShots([{ tick: 100, playerIndex: AI }, { tick: 120, playerIndex: AI }])) }
+    ];
+
+    expect(buildDuelInsightsFromFacts(inputs.map((input) => extractDuelInsightsFacts(input)))).toEqual(
+      buildDuelInsights(inputs)
+    );
+  });
+
   it("builds a schema-valid model with raw values and current-range percentile labels", () => {
     const model = buildDuelInsights([{ matchId: "m1", pkg: pkg(buildShots([{ tick: 100, playerIndex: AI }, { tick: 120, playerIndex: AI }])) }]);
     expect(() => duelInsightsModelSchema.parse(model)).not.toThrow();

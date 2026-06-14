@@ -8,6 +8,14 @@ export interface DuelInsightsInput {
   pkg: DemoPackage;
 }
 
+export interface DuelInsightsFacts {
+  matchId: string;
+  duelRows: DuelFinderRow[];
+  openingRows: OpeningDuelRow[];
+  mechanicsRows: PlayerMechanicsFact[];
+  teamNamesBySteamId: Record<string, string>;
+}
+
 export interface DuelInsightsOptions {
   /** 按地图名提供 .tri BVH；提供后分类、反应时间、预瞄与首发可见性走静态 LOS 精确口径。 */
   visibilityFor?: (mapName: string) => TriangleBvh | null;
@@ -21,10 +29,6 @@ const CLASSIFICATION_LABEL: Record<string, string> = {
 
 function nameFor(pkg: DemoPackage, steamId64: string): string {
   return pkg.players.find((player) => player.steamId64 === steamId64)?.name ?? steamId64;
-}
-
-function teamNameFor(pkg: DemoPackage, teamKey: string): string {
-  return teamKey === "teamA" ? (pkg.match.teamA.name ?? "Team A") : (pkg.match.teamB.name ?? "Team B");
 }
 
 /** CS2 标准回合时长（秒，freeze 结束后），用于回合剩余时间倒计时显示。 */
@@ -240,23 +244,39 @@ export function duelClassificationLabel(classification: string): string {
   return CLASSIFICATION_LABEL[classification] ?? classification;
 }
 
-export function buildDuelInsights(inputs: DuelInsightsInput[], options: DuelInsightsOptions = {}): DuelInsightsModel {
+export function extractDuelInsightsFacts(input: DuelInsightsInput, options: DuelInsightsOptions = {}): DuelInsightsFacts {
+  const visibility = options.visibilityFor?.(input.pkg.match.mapName) ?? null;
+  const teamNames = {
+    teamA: input.pkg.match.teamA.name ?? "Team A",
+    teamB: input.pkg.match.teamB.name ?? "Team B"
+  };
+  return {
+    matchId: input.matchId,
+    duelRows: deriveDuels(input.pkg, { visibility }).map((fact) => duelRow(input, fact)),
+    openingRows: deriveOpeningDuels(input.pkg, { visibility }).map((fact) => openingRow(input, fact)),
+    mechanicsRows: derivePlayerMechanics(input.pkg, { visibility }),
+    teamNamesBySteamId: Object.fromEntries(
+      input.pkg.players.map((player) => [player.steamId64, teamNames[player.teamKey]])
+    )
+  };
+}
+
+export function buildDuelInsightsFromFacts(facts: DuelInsightsFacts[]): DuelInsightsModel {
   const duelRows: DuelFinderRow[] = [];
   const openingRows: OpeningDuelRow[] = [];
   // 跨场按 (steamId64, weapon) 聚合，避免同一选手同把武器在多场各出一行。
   const aggByKey = new Map<string, AggMechanics>();
   const matchesByPlayer = new Map<string, Set<string>>();
 
-  for (const input of inputs) {
-    const visibility = options.visibilityFor?.(input.pkg.match.mapName) ?? null;
-    duelRows.push(...deriveDuels(input.pkg, { visibility }).map((fact) => duelRow(input, fact)));
-    openingRows.push(...deriveOpeningDuels(input.pkg, { visibility }).map((fact) => openingRow(input, fact)));
-    for (const fact of derivePlayerMechanics(input.pkg, { visibility })) {
+  for (const input of facts) {
+    duelRows.push(...input.duelRows);
+    openingRows.push(...input.openingRows);
+    for (const fact of input.mechanicsRows) {
       const playerMatches = matchesByPlayer.get(fact.steamId64) ?? new Set<string>();
       playerMatches.add(input.matchId);
       matchesByPlayer.set(fact.steamId64, playerMatches);
       const key = `${fact.steamId64}:${fact.weapon}`;
-      const teamName = teamNameFor(input.pkg, fact.teamKey);
+      const teamName = input.teamNamesBySteamId[fact.steamId64] ?? "";
       const prev = aggByKey.get(key);
       if (!prev) {
         aggByKey.set(key, {
@@ -310,7 +330,7 @@ export function buildDuelInsights(inputs: DuelInsightsInput[], options: DuelInsi
 
   return duelInsightsModelSchema.parse({
     version: "cs2-demo-analysis-kit/duel-insights-0.1",
-    matchCount: inputs.length,
+    matchCount: facts.length,
     duelRows,
     openingRows,
     mechanicsRows,
@@ -326,4 +346,8 @@ export function buildDuelInsights(inputs: DuelInsightsInput[], options: DuelInsi
       "百分位标签基于当前聚合范围；未接入固定联赛基线时不输出 A/B/C。"
     ]
   });
+}
+
+export function buildDuelInsights(inputs: DuelInsightsInput[], options: DuelInsightsOptions = {}): DuelInsightsModel {
+  return buildDuelInsightsFromFacts(inputs.map((input) => extractDuelInsightsFacts(input, options)));
 }

@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { loadDemoPackageFromZip } from "@cs2dak/core";
 import { teamCohortSummarySchema } from "@cs2dak/contract";
-import { buildTeamCohortSummary } from "./index";
+import { buildTeamCohortSummary, buildTeamComparison, buildTeamComparisonFromFacts, extractTeamComparisonFacts } from "./index";
 import { buildTestSeasonCohortBundle } from "./test-fixtures";
+
+async function loadFixture() {
+  const zip = await readFile(
+    fileURLToPath(new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url))
+  );
+  return loadDemoPackageFromZip(zip);
+}
 
 describe("buildTeamCohortSummary", () => {
   it("builds a product-neutral team summary from an externally supplied roster", () => {
@@ -45,5 +55,14 @@ describe("buildTeamCohortSummary", () => {
     expect(() =>
       buildTeamCohortSummary(bundle, { teamKey: "unknown", name: "Unknown", playerKeys: ["missing"] })
     ).toThrow(/not found/);
+  });
+});
+
+describe("buildTeamComparison", () => {
+  it("builds the same model from persisted comparison facts", async () => {
+    const pkg = await loadFixture();
+    const inputs = [{ matchId: "m1", pkg }];
+
+    expect(buildTeamComparisonFromFacts(inputs.map(extractTeamComparisonFacts))).toEqual(buildTeamComparison(inputs));
   });
 });

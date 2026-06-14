@@ -841,7 +841,65 @@ export interface TournamentInsights {
   pistolConversionPercent: number | null;
 }
 
-export function buildTournamentInsights(demos: SeasonInsightsDemo[]): TournamentInsights {
+export interface TournamentFacts {
+  matchId: string;
+  mapName: string;
+  teams: Record<TeamKey, string>;
+  players: Array<{ steamId64: string; name: string; teamKey: TeamKey }>;
+  kills: Array<{
+    roundNumber: number;
+    tick: number;
+    killerSteamId64: string | null;
+    victimSteamId64: string;
+    weapon: string;
+    headshot: boolean;
+  }>;
+  rounds: Array<{
+    roundNumber: number;
+    winnerSide: "t" | "ct";
+    winnerTeamKey: TeamKey;
+    teamAEconomy: string;
+    teamBEconomy: string;
+  }>;
+}
+
+function teamNameForTournament(pkg: DemoPackage, teamKey: TeamKey): string {
+  return teamKey === "teamA" ? (pkg.match.teamA.name ?? "Team A") : (pkg.match.teamB.name ?? "Team B");
+}
+
+export function extractTournamentFacts(input: SeasonInsightsDemo): TournamentFacts {
+  const { pkg } = input;
+  return {
+    matchId: input.matchId,
+    mapName: pkg.match.mapName,
+    teams: {
+      teamA: teamNameForTournament(pkg, "teamA"),
+      teamB: teamNameForTournament(pkg, "teamB")
+    },
+    players: pkg.players.map((player) => ({
+      steamId64: player.steamId64,
+      name: player.name,
+      teamKey: player.teamKey
+    })),
+    kills: pkg.kills.map((kill) => ({
+      roundNumber: kill.roundNumber,
+      tick: kill.tick,
+      killerSteamId64: kill.killerIndex != null ? (pkg.players[kill.killerIndex]?.steamId64 ?? null) : null,
+      victimSteamId64: pkg.players[kill.victimIndex]?.steamId64 ?? "",
+      weapon: kill.weapon || "unknown",
+      headshot: kill.headshot
+    })).filter((kill) => kill.victimSteamId64 !== ""),
+    rounds: pkg.rounds.map((roundRow) => ({
+      roundNumber: roundRow.roundNumber,
+      winnerSide: roundRow.winnerSide,
+      winnerTeamKey: roundRow.winnerTeamKey,
+      teamAEconomy: roundRow.teamAEconomy,
+      teamBEconomy: roundRow.teamBEconomy
+    }))
+  };
+}
+
+export function buildTournamentInsightsFromFacts(demos: TournamentFacts[]): TournamentInsights {
   let totalRounds = 0;
   let tWins = 0;
   let pistolConversions = 0;
@@ -873,8 +931,6 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
     }>;
   }>();
 
-  const teamNameFor = (pkg: DemoPackage, teamKey: "teamA" | "teamB") =>
-    teamKey === "teamA" ? (pkg.match.teamA.name ?? "Team A") : (pkg.match.teamB.name ?? "Team B");
   const pistolCell = (teamName: string) => {
     const existing = teamPistols.get(teamName);
     if (existing) return existing;
@@ -908,18 +964,18 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
     return created;
   };
 
-  for (const { pkg } of demos) {
-    const mapName = pkg.match.mapName;
+  for (const facts of demos) {
+    const mapName = facts.mapName;
     const cell = byMap.get(mapName) ?? { matches: 0, rounds: 0, tWins: 0, pistolT: 0, pistolTotal: 0 };
     cell.matches += 1;
-    const ordered = [...pkg.rounds].sort((a, b) => a.roundNumber - b.roundNumber);
-    const teamAName = teamNameFor(pkg, "teamA");
-    const teamBName = teamNameFor(pkg, "teamB");
+    const ordered = [...facts.rounds].sort((a, b) => a.roundNumber - b.roundNumber);
+    const teamAName = facts.teams.teamA;
+    const teamBName = facts.teams.teamB;
     teamRoundCell(teamAName).maps += 1;
     teamRoundCell(teamBName).maps += 1;
-    const playerNameBySteam = new Map(pkg.players.map((player) => [player.steamId64, player.name ?? player.steamId64]));
-    const killsByRound = new Map<number, typeof pkg.kills>();
-    for (const kill of pkg.kills) {
+    const playerNameBySteam = new Map(facts.players.map((player) => [player.steamId64, player.name ?? player.steamId64]));
+    const killsByRound = new Map<number, TournamentFacts["kills"]>();
+    for (const kill of facts.kills) {
       const roundKills = killsByRound.get(kill.roundNumber) ?? [];
       roundKills.push(kill);
       killsByRound.set(kill.roundNumber, roundKills);
@@ -928,7 +984,7 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
       const weaponCell = weaponRows.get(weapon) ?? { weapon, kills: 0, headshots: 0, players: new Map() };
       weaponCell.kills += 1;
       if (kill.headshot) weaponCell.headshots += 1;
-      const killerSteamId64 = kill.killerIndex != null ? (pkg.players[kill.killerIndex]?.steamId64 ?? null) : null;
+      const killerSteamId64 = kill.killerSteamId64;
       if (killerSteamId64) {
         const playerName = playerNameBySteam.get(killerSteamId64) ?? killerSteamId64;
         const playerCell = weaponCell.players.get(killerSteamId64) ?? { name: playerName, kills: 0 };
@@ -938,8 +994,8 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
       weaponRows.set(weapon, weaponCell);
     }
     const playersByTeam = {
-      teamA: new Set(pkg.players.filter((player) => player.teamKey === "teamA").map((player) => player.steamId64)),
-      teamB: new Set(pkg.players.filter((player) => player.teamKey === "teamB").map((player) => player.steamId64))
+      teamA: new Set(facts.players.filter((player) => player.teamKey === "teamA").map((player) => player.steamId64)),
+      teamB: new Set(facts.players.filter((player) => player.teamKey === "teamB").map((player) => player.steamId64))
     };
     for (let i = 0; i < ordered.length; i += 1) {
       const row = ordered[i]!;
@@ -993,8 +1049,8 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
         if (row.winnerTeamKey === "teamB") b.pistolWins += 1;
         const next = ordered[i + 1];
         if (next) {
-          const winnerName = teamNameFor(pkg, row.winnerTeamKey);
-          const loserName = teamNameFor(pkg, row.winnerTeamKey === "teamA" ? "teamB" : "teamA");
+          const winnerName = facts.teams[row.winnerTeamKey];
+          const loserName = facts.teams[row.winnerTeamKey === "teamA" ? "teamB" : "teamA"];
           const winner = pistolCell(winnerName);
           const loser = pistolCell(loserName);
           winner.conversionRounds += 1;
@@ -1020,7 +1076,7 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
       collectManAdvantageRound(
         manAdvantage,
         teamManAdvantage,
-        pkg.players,
+        facts.players,
         playersByTeam,
         { teamA: teamAName, teamB: teamBName },
         killsByRound.get(row.roundNumber) ?? [],
@@ -1115,6 +1171,10 @@ export function buildTournamentInsights(demos: SeasonInsightsDemo[]): Tournament
       ? round((pistolConversions / pistolWonRounds) * 100, 1)
       : null
   };
+}
+
+export function buildTournamentInsights(demos: SeasonInsightsDemo[]): TournamentInsights {
+  return buildTournamentInsightsFromFacts(demos.map(extractTournamentFacts));
 }
 
 function buildTeamEconomySummaries(
@@ -1213,10 +1273,10 @@ function collectManAdvantageRound(
       disadvantageWins: number;
     }>;
   }>,
-  players: DemoPackage["players"],
+  players: Array<{ steamId64: string; teamKey: TeamKey }>,
   playersByTeam: Record<TeamKey, Set<string>>,
   teamNames: Record<TeamKey, string>,
-  kills: DemoPackage["kills"],
+  kills: TournamentFacts["kills"],
   winnerTeamKey: TeamKey
 ): void {
   const alive: Record<TeamKey, Set<string>> = {
@@ -1225,9 +1285,9 @@ function collectManAdvantageRound(
   };
   const seen = new Set<string>();
   for (const kill of [...kills].sort((a, b) => a.tick - b.tick)) {
-    const victimPlayer = players[kill.victimIndex];
+    const victimPlayer = players.find((player) => player.steamId64 === kill.victimSteamId64);
     const victimTeamKey = victimPlayer?.teamKey;
-    const victimSteamId64 = victimPlayer?.steamId64;
+    const victimSteamId64 = kill.victimSteamId64;
     if (!victimTeamKey || !victimSteamId64) continue;
     alive[victimTeamKey].delete(victimSteamId64);
     const teamAAlive = alive.teamA.size;

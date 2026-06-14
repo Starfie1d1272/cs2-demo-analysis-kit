@@ -1,15 +1,10 @@
-import { buildSeasonCohort, buildSeasonCohortFromRows, type PlayerIdentityMap } from "@cs2dak/cohort";
+import { buildSeasonCohortFromRows, type PlayerIdentityMap } from "@cs2dak/cohort";
 import {
   buildAllPlayerSeasonProfiles,
-  buildPlayerSeasonInsights,
-  buildPlayerMechanicsProfile,
-  buildPlayerWeaponStats,
-  buildDuelInsights,
+  buildDuelInsightsFromFacts,
   buildSeasonLeaderboardModel,
-  buildTournamentInsights,
-  buildTeamComparison,
-  buildPlayerFlashSummaries,
-  type SeasonInsightsDemo,
+  buildTournamentInsightsFromFacts,
+  buildTeamComparisonFromFacts,
   type PlayerFlashSummary,
   type PlayerSeasonInsights,
   type PlayerMechanicsProfile,
@@ -21,18 +16,16 @@ import { touchLimitedCache } from "./idb";
 import {
   buildPlayerFlashSummariesFromFacts,
   buildPlayerSeasonDetailsFromFacts,
-  extractMatchFacts,
   getFactsStore
 } from "./facts";
 import { getStorage } from "./storage";
-import { loadTriLookup } from "./tri";
 import type {
   DuelInsightsModel,
   PlayerSeasonProfile,
   SeasonCohortBundle,
   SeasonLeaderboardModel
 } from "@cs2dak/contract";
-import { clearPkgCache, getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "./library";
+import { matchIdForEntry, type StudioDemoEntry } from "./library";
 
 export interface IdentityOptions {
   /** 与 IdentityStoreState.version 一致；0 表示无自定义映射。 */
@@ -47,11 +40,11 @@ export interface IdentityOptions {
  * - 内存：同一会话内 id 集合不变时复用。
  * - IndexedDB：派生产物（bundle/排行榜/档案/赛事 insights）持久化，
  *   重开应用时无需重新解压解析全部 ZIP——这是赛事中台首屏慢的主因。
- * 原始 DemoPackage 列表只在需要逐场证据（个人洞察）时经 getSeasonDemos 懒加载。
+ * 聚合入口只读本地持久化 facts；缺 facts 时要求显式回填/重新导入，不在视图请求里现场解 ZIP。
  */
 
 /** 聚合算法/口径变化时 +1，旧缓存自动失效重算。 */
-const CACHE_VERSION = 7;
+const CACHE_VERSION = 8;
 
 export interface SeasonSummary {
   bundle: SeasonCohortBundle;
@@ -136,49 +129,8 @@ async function prunePersisted(): Promise<void> {
   }
 }
 
-// ── 内存层 ──
-let demosKey = "";
-let demosPromise: Promise<SeasonInsightsDemo[]> | null = null;
-
-/** 分批并行加载 DemoPackage 并应用队伍改名。批大小 BATCH_SIZE 控制内存峰值。 */
-const BATCH_SIZE = 5;
-
-async function loadDemosWithRenames(
-  entries: StudioDemoEntry[],
-  teamRenames?: Record<string, string>
-): Promise<SeasonInsightsDemo[]> {
-  const sorted = [...entries].sort((a, b) => a.fileName.localeCompare(b.fileName));
-  const demos: SeasonInsightsDemo[] = [];
-  const hasRenames = teamRenames && Object.keys(teamRenames).length > 0;
-  for (let i = 0; i < sorted.length; i += BATCH_SIZE) {
-    const batch = sorted.slice(i, i + BATCH_SIZE);
-    const loaded = await Promise.all(
-      batch.map(async (entry) => {
-        const pkg = await getDemoPackage(entry.id);
-        if (hasRenames) {
-          const rename = (name: string | null) => name == null ? name : (teamRenames![name] ?? name);
-          pkg.match.teamA.name = rename(pkg.match.teamA.name);
-          pkg.match.teamB.name = rename(pkg.match.teamB.name);
-        }
-        return { matchId: matchIdForEntry(entry), pkg };
-      })
-    );
-    demos.push(...loaded);
-  }
-  return demos;
-}
-
-/** 与 cohort 同源的 {matchId, pkg} 列表；只有逐场派生（个人洞察）才需要。 */
-export function getSeasonDemos(entries: StudioDemoEntry[], identity?: IdentityOptions): Promise<SeasonInsightsDemo[]> {
-  const key = keyOf(entries, identity?.version);
-  if (demosPromise && key === demosKey) return demosPromise;
-  demosKey = key;
-  demosPromise = loadDemosWithRenames(entries, identity?.teamRenames);
-  demosPromise.catch(() => {
-    demosKey = "";
-    demosPromise = null;
-  });
-  return demosPromise;
+function missingFactsError(scope: string): Error {
+  return new Error(`${scope} 缺少本地持久化 facts，请重新导入或执行 facts 回填后再打开。`);
 }
 
 export interface PlayerSeasonDetails {
@@ -211,28 +163,13 @@ export function getPlayerSeasonDetails(entries: StudioDemoEntry[], steamIds: str
       void writePersistedValue(key, details);
       return details;
     }
-    const demos = await getSeasonDemos(entries, identity);
-    const visibilityFor = await loadTriLookup(demos.map((demo) => demo.pkg.match.mapName));
-    for (const demo of demos) {
-      void factsStore.putMatchFacts(extractMatchFacts(demo.pkg, {
-        matchId: demo.matchId,
-        visibilityFor
-      }));
-    }
-    const details = {
-      insights: buildPlayerSeasonInsights(demos, steamIds),
-      weaponStats: buildPlayerWeaponStats(demos, steamIds),
-      mechanics: buildPlayerMechanicsProfile(demos, steamIds, { visibilityFor })
-    };
-    clearPkgCache();
-    void writePersistedValue(key, details);
-    return details;
+    throw missingFactsError("选手详情");
   })();
   return touchLimitedCache(detailsCache, key, loading, DETAILS_CACHE_LIMIT);
 }
 
 /** 对枪实验室：DuelInsights 是 LOS-heavy 派生模型，持久化后反复切页不再重跑 tri 判定。 */
-const DUEL_CACHE_VER = 2;
+const DUEL_CACHE_VER = 3;
 export function getDuelInsights(entries: StudioDemoEntry[], identity?: IdentityOptions): Promise<DuelInsightsModel> {
   const key = `${keyOf(entries, identity?.version)}:duels:v${DUEL_CACHE_VER}`;
   const cached = duelInsightsCache.get(key);
@@ -240,12 +177,15 @@ export function getDuelInsights(entries: StudioDemoEntry[], identity?: IdentityO
   const loading = (async () => {
     const persisted = await readPersistedValue<DuelInsightsModel>(key);
     if (persisted) return persisted;
-    const demos = await getSeasonDemos(entries, identity);
-    const visibilityFor = await loadTriLookup(demos.map((demo) => demo.pkg.match.mapName));
-    const model = buildDuelInsights(demos, { visibilityFor });
-    clearPkgCache();
-    void writePersistedValue(key, model);
-    return model;
+    const factsStore = getFactsStore();
+    const matchIds = entries.map(matchIdForEntry);
+    const duelFacts = await factsStore.getDuelFacts({ matchIds });
+    if (duelFacts.length >= entries.length) {
+      const model = buildDuelInsightsFromFacts(duelFacts);
+      void writePersistedValue(key, model);
+      return model;
+    }
+    throw missingFactsError("对枪实验室");
   })();
   return touchLimitedCache(duelInsightsCache, key, loading, SMALL_CACHE_LIMIT);
 }
@@ -270,11 +210,7 @@ export function getPlayerFlashSummaries(
       void writePersistedValue(key, summaries);
       return summaries;
     }
-    const demos = await getSeasonDemos(entries, identity);
-    const summaries = buildPlayerFlashSummaries(demos, players);
-    clearPkgCache();
-    void writePersistedValue(key, summaries);
-    return summaries;
+    throw missingFactsError("Flash Value");
   })();
   return touchLimitedCache(flashCache, key, loading, SMALL_CACHE_LIMIT);
 }
@@ -289,11 +225,15 @@ export function getTournamentInsights(entries: StudioDemoEntry[], identity?: Ide
   const loading = (async () => {
     const persisted = await readPersistedValue<TournamentInsights | null>(key);
     if (persisted !== undefined) return persisted;
-    const demos = await getSeasonDemos(entries, identity);
-    const insights = demos.length > 0 ? buildTournamentInsights(demos) : null;
-    clearPkgCache();
-    void writePersistedValue(key, insights);
-    return insights;
+    const factsStore = getFactsStore();
+    const matchIds = entries.map(matchIdForEntry);
+    const facts = await factsStore.getTournamentFacts({ matchIds });
+    if (facts.length >= entries.length) {
+      const insights = facts.length > 0 ? buildTournamentInsightsFromFacts(facts) : null;
+      void writePersistedValue(key, insights);
+      return insights;
+    }
+    throw missingFactsError("赛事洞察");
   })();
   return touchLimitedCache(tournamentInsightsCache, key, loading, SMALL_CACHE_LIMIT);
 }
@@ -305,11 +245,15 @@ export async function getTeamComparison(entries: StudioDemoEntry[], identity?: I
   const loading = (async () => {
     const persisted = await readPersistedValue<TeamComparisonModel>(key);
     if (persisted) return persisted;
-    const demos = await getSeasonDemos(entries, identity);
-    const model = buildTeamComparison(demos);
-    clearPkgCache();
-    void writePersistedValue(key, model);
-    return model;
+    const factsStore = getFactsStore();
+    const matchIds = entries.map(matchIdForEntry);
+    const facts = await factsStore.getTeamComparisonFacts({ matchIds });
+    if (facts.length >= entries.length) {
+      const model = buildTeamComparisonFromFacts(facts);
+      void writePersistedValue(key, model);
+      return model;
+    }
+    throw missingFactsError("队伍对比");
   })();
   return touchLimitedCache(teamComparisonCache, key, loading, SMALL_CACHE_LIMIT);
 }
@@ -332,32 +276,17 @@ export function getSeasonSummary(entries: StudioDemoEntry[], identity?: Identity
     if (cohortRows.length > 0) {
       const cohortOpts = identity?.version ? { identityMap: identity.map } : {};
       const bundle = buildSeasonCohortFromRows(cohortRows, { ...cohortOpts, matchCount: entries.length });
+      const tournamentFacts = await factsStore.getTournamentFacts({ matchIds });
       const summary: SeasonSummary = {
         bundle,
         leaderboard: buildSeasonLeaderboardModel(bundle),
         profiles: buildAllPlayerSeasonProfiles(bundle),
-        insights: null
+        insights: tournamentFacts.length > 0 ? buildTournamentInsightsFromFacts(tournamentFacts) : null
       };
       void writePersistedValue(key, summary);
       return summary;
     }
-    const demos = await getSeasonDemos(entries, identity);
-    const cohortOpts = identity?.version ? { identityMap: identity.map } : {};
-    const bundle = buildSeasonCohort(demos, cohortOpts);
-    const visibilityFor = await loadTriLookup(demos.map((demo) => demo.pkg.match.mapName));
-    for (const demo of demos) {
-      void factsStore.putMatchFacts(extractMatchFacts(demo.pkg, { matchId: demo.matchId, visibilityFor }));
-    }
-    const summary: SeasonSummary = {
-      bundle,
-      leaderboard: buildSeasonLeaderboardModel(bundle),
-      profiles: buildAllPlayerSeasonProfiles(bundle),
-      insights: demos.length > 0 ? buildTournamentInsights(demos) : null
-    };
-    // 聚合完成，释放 DemoPackage 缓存降低峰值内存；后续读取从 derived 表重建
-    clearPkgCache();
-    void writePersistedValue(key, summary);
-    return summary;
+    throw missingFactsError("赛季聚合");
   })();
   return touchLimitedCache(seasonSummaryCache, key, loading, SMALL_CACHE_LIMIT);
 }

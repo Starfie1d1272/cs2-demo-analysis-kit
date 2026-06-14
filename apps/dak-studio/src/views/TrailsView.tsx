@@ -1,11 +1,11 @@
 import { Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { OpeningTrailsModel, OpeningTrailRound } from "@cs2dak/contract";
-import { buildOpeningTrails } from "@cs2dak/presentation";
 import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
-import { getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import type { IdentityOptions } from "../lib/season";
 import { getPinnedPlayer } from "../lib/pin";
+import { getFactsStore } from "../lib/facts";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState } from "../components/primitives";
 
@@ -107,25 +107,25 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
       if (typeof found === "string") return { playerKey: found, displayName: name };
       return { playerKey: `steam:${steamId}`, displayName: name };
     };
-    Promise.all(entries.map(async (entry) => ({ id: entry.id, pkg: await getDemoPackage(entry.id) })))
-      .then(async (loaded) => {
+    getFactsStore().getPlayerMatchStats({ matchIds: entries.map(matchIdForEntry) })
+      .then(async (rows) => {
         if (cancelled) return;
         const counts = new Map<string, PlayerOption>();
         const roster = new Map<string, Set<string>>();
-        for (const { id, pkg } of loaded) {
+        for (const row of rows) {
+          const entry = entries.find((candidate) => matchIdForEntry(candidate) === row.matchId);
+          if (!entry) continue;
           const keys = new Set<string>();
-          for (const player of pkg.players) {
-            const { playerKey, displayName } = resolve(player.steamId64, player.name);
+          const { playerKey, displayName } = resolve(row.steamId64, row.playerName);
             const current = counts.get(playerKey);
             if (current) {
-              if (!current.steamIds.includes(player.steamId64)) current.steamIds.push(player.steamId64);
+              if (!current.steamIds.includes(row.steamId64)) current.steamIds.push(row.steamId64);
               if (!keys.has(playerKey)) current.matchCount += 1;
             } else {
-              counts.set(playerKey, { playerKey, name: displayName, steamIds: [player.steamId64], matchCount: 1 });
+              counts.set(playerKey, { playerKey, name: displayName, steamIds: [row.steamId64], matchCount: 1 });
             }
             keys.add(playerKey);
-          }
-          roster.set(id, keys);
+          roster.set(entry.id, new Set([...(roster.get(entry.id) ?? []), ...keys]));
         }
         const options = [...counts.values()].sort((a, b) => b.matchCount - a.matchCount || a.name.localeCompare(b.name));
         const pinned = await getPinnedPlayer();
@@ -188,19 +188,14 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
     let cancelled = false;
     setModels(null);
     setError(null);
-    const steamIdSet = new Set(selected.steamIds);
-    Promise.all(
-      rangeEntries.map(async (entry) => {
-        const pkg = await getDemoPackage(entry.id);
-        // 归并选手在该场出场的具体 steamId（一人一场只有一个账号）
-        const steamId = pkg.players.find((p) => steamIdSet.has(p.steamId64))?.steamId64;
-        if (!steamId) return null;
-        return buildOpeningTrails(pkg, matchIdForEntry(entry), steamId, { windowSeconds: WINDOW_SECONDS });
-      })
-    )
+    getFactsStore().getOpeningTrails({
+      matchIds: rangeEntries.map(matchIdForEntry),
+      playerKeys: [selected.playerKey],
+      steamIds: selected.steamIds
+    })
       .then((result) => {
         if (cancelled) return;
-        setModels(result.filter((model): model is OpeningTrailsModel => model != null));
+        setModels(result.map((fact) => fact.row));
         setHiddenRounds(new Set());
       })
       .catch((err) => {

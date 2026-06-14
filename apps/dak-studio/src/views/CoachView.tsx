@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { buildOpeningPatternClusters, type OpeningPatternCluster } from "@cs2dak/cohort";
+import type { OpeningPatternCluster } from "@cs2dak/cohort";
 import { CALLOUT_NAME_CN } from "@cs2dak/maps";
 import { buildAntiStratMarkdownFromPatterns } from "@cs2dak/presentation";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState } from "../components/primitives";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
-import { getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { buildOpeningPatternClustersFromFacts, getFactsStore } from "../lib/facts";
 import {
   listPlaybookNames,
   loadCoachSettings,
@@ -74,9 +75,9 @@ export function CoachView({
     let cancelled = false;
     setClusters(null);
     setError(null);
-    Promise.all(entries.map(async (entry) => ({ matchId: matchIdForEntry(entry), pkg: await getDemoPackage(entry.id) })))
-      .then((demos) => {
-        if (!cancelled) setClusters(buildOpeningPatternClusters(demos, { windowSeconds: 15 }));
+    getFactsStore().getOpeningPatterns({ matchIds: entries.map(matchIdForEntry) })
+      .then((rows) => {
+        if (!cancelled) setClusters(buildOpeningPatternClustersFromFacts(rows));
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));

@@ -2,11 +2,26 @@ export { buildDemoViewModel, buildMatchWorkspaceModel } from "./workspace.js";
 export { buildOpeningTrails, type OpeningTrailsOptions } from "./trails.js";
 export { buildSeasonLeaderboardModel } from "./leaderboard.js";
 export { buildPlayerSeasonProfile, buildAllPlayerSeasonProfiles } from "./player.js";
-export { buildTeamCohortSummary, buildTeamComparison, type TeamComparisonModel } from "./team.js";
+export {
+  buildTeamCohortSummary,
+  buildTeamComparison,
+  buildTeamComparisonFromFacts,
+  extractTeamComparisonFacts,
+  type TeamComparisonFacts,
+  type TeamComparisonModel
+} from "./team.js";
 export { buildSeriesSummary, recommendMatchMvp } from "./series.js";
 export { buildAntiStratMarkdownFromPatterns, buildPlaybookRows, type PlaybookPatternRow } from "./patterns.js";
-export { buildDuelInsights, duelClassificationLabel, weaponCategory, CATEGORY_METRICS, mechanicsMetricsForWeapon } from "./duel.js";
-export type { MechanicsMetricKey, WeaponCategory } from "./duel.js";
+export {
+  buildDuelInsights,
+  buildDuelInsightsFromFacts,
+  extractDuelInsightsFacts,
+  duelClassificationLabel,
+  weaponCategory,
+  CATEGORY_METRICS,
+  mechanicsMetricsForWeapon
+} from "./duel.js";
+export type { DuelInsightsFacts, MechanicsMetricKey, WeaponCategory } from "./duel.js";
 export { SEASON_STAT_VIEWS, formatPercent } from "./season-metrics.js";
 export {
   buildPlayerSeasonInsights,
@@ -16,6 +31,8 @@ export {
   buildPlayerFlashSummaries,
   buildMatchBuyQuality,
   buildTournamentInsights,
+  buildTournamentInsightsFromFacts,
+  extractTournamentFacts,
   buildMatchReportMarkdown,
   type SeasonInsightsDemo,
   type PlayerSeasonInsights,
@@ -31,6 +48,7 @@ export {
   type TournamentManAdvantageStat,
   type TournamentTeamEconomySummary,
   type TournamentTeamManAdvantageStat,
+  type TournamentFacts,
   type TournamentInsights
 } from "./insights.js";
 export { displayWeaponName } from "./weapons.js";
