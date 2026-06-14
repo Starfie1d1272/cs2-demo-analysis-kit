@@ -18,10 +18,12 @@
 from __future__ import annotations
 
 import base64
+import json
 import logging
 import os
 import shutil
 import socket
+import sqlite3
 import sys
 import tempfile
 import threading
@@ -221,6 +223,105 @@ class StudioApi:
     def __init__(self) -> None:
         self._window = None  # set in main() after window creation
         self._jobs: dict[str, _ExportJob] = {}
+        self._userdata = _studio_userdata()
+        self._db_lock = threading.Lock()
+        self._db: sqlite3.Connection | None = None
+
+    # --- native storage -------------------------------------------------
+    # 待桌面验证：CI/沙箱没有真实 pywebview 桌面壳。TS 侧已保留 IndexedDB fallback。
+    def _conn(self) -> sqlite3.Connection:
+        if self._db is None:
+            self._userdata.mkdir(parents=True, exist_ok=True)
+            db = sqlite3.connect(self._userdata / "studio.sqlite", check_same_thread=False)
+            db.execute(
+                "create table if not exists records ("
+                "namespace text not null, key text not null, value text not null, "
+                "primary key (namespace, key))"
+            )
+            self._db = db
+        return self._db
+
+    def storage_record_get(self, namespace: str, key: str):
+        with self._db_lock:
+            row = self._conn().execute(
+                "select value from records where namespace=? and key=?",
+                (namespace, key),
+            ).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def storage_record_get_all(self, namespace: str) -> list:
+        with self._db_lock:
+            rows = self._conn().execute(
+                "select value from records where namespace=?",
+                (namespace,),
+            ).fetchall()
+        return [json.loads(row[0]) for row in rows]
+
+    def storage_record_entries(self, namespace: str) -> list:
+        with self._db_lock:
+            rows = self._conn().execute(
+                "select key, value from records where namespace=?",
+                (namespace,),
+            ).fetchall()
+        return [[key, json.loads(value)] for key, value in rows]
+
+    def storage_record_keys(self, namespace: str) -> list[str]:
+        with self._db_lock:
+            rows = self._conn().execute(
+                "select key from records where namespace=?",
+                (namespace,),
+            ).fetchall()
+        return [row[0] for row in rows]
+
+    def storage_record_put(self, namespace: str, key: str, value) -> None:
+        data = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+        with self._db_lock:
+            self._conn().execute(
+                "insert into records(namespace, key, value) values(?, ?, ?) "
+                "on conflict(namespace, key) do update set value=excluded.value",
+                (namespace, key, data),
+            )
+            self._conn().commit()
+
+    def storage_record_delete(self, namespace: str, key: str) -> None:
+        with self._db_lock:
+            self._conn().execute("delete from records where namespace=? and key=?", (namespace, key))
+            self._conn().commit()
+
+    def _blob_dir(self, namespace: str) -> Path:
+        if namespace == "demos":
+            path = self._userdata / "demos"
+        else:
+            path = self._userdata / "cache" / "blobs" / _sanitize(namespace)
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def _blob_path(self, namespace: str, key: str) -> Path:
+        name = urllib.parse.quote(key, safe="")
+        suffix = ".zip" if namespace == "demos" else ".bin"
+        return self._blob_dir(namespace) / f"{name}{suffix}"
+
+    def storage_blob_get(self, namespace: str, key: str) -> str | None:
+        path = self._blob_path(namespace, key)
+        if not path.exists():
+            return None
+        return base64.b64encode(path.read_bytes()).decode("ascii")
+
+    def storage_blob_put(self, namespace: str, key: str, dataBase64: str) -> None:  # noqa: N803 - JS bridge name
+        self._blob_path(namespace, key).write_bytes(base64.b64decode(dataBase64))
+
+    def storage_blob_delete(self, namespace: str, key: str) -> None:
+        try:
+            self._blob_path(namespace, key).unlink()
+        except FileNotFoundError:
+            pass
+
+    def storage_blob_keys(self, namespace: str) -> list[str]:
+        suffix = ".zip" if namespace == "demos" else ".bin"
+        return [
+            urllib.parse.unquote(path.name[: -len(suffix)])
+            for path in self._blob_dir(namespace).glob(f"*{suffix}")
+        ]
 
     # --- info -----------------------------------------------------------
     def get_version(self) -> str:

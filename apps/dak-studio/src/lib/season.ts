@@ -1,4 +1,4 @@
-import { buildSeasonCohort, type PlayerIdentityMap } from "@cs2dak/cohort";
+import { buildSeasonCohort, buildSeasonCohortFromRows, type PlayerIdentityMap } from "@cs2dak/cohort";
 import {
   buildAllPlayerSeasonProfiles,
   buildPlayerSeasonInsights,
@@ -18,6 +18,12 @@ import {
   type TeamComparisonModel
 } from "@cs2dak/presentation";
 import { touchLimitedCache } from "./idb";
+import {
+  buildPlayerFlashSummariesFromFacts,
+  buildPlayerSeasonDetailsFromFacts,
+  extractMatchFacts,
+  getFactsStore
+} from "./facts";
 import { getStorage } from "./storage";
 import { loadTriLookup } from "./tri";
 import type {
@@ -196,8 +202,23 @@ export function getPlayerSeasonDetails(entries: StudioDemoEntry[], steamIds: str
   const loading = (async () => {
     const persisted = await readPersistedValue<PlayerSeasonDetails>(key);
     if (persisted) return persisted;
+    const factsStore = getFactsStore();
+    const factsScope = { matchIds: entries.map(matchIdForEntry), steamIds };
+    const factRows = await factsStore.getPlayerInsights(factsScope);
+    const mechanicRows = await factsStore.getMechanicsRows(factsScope);
+    if (factRows.length > 0 || mechanicRows.length > 0) {
+      const details = await buildPlayerSeasonDetailsFromFacts(factsStore, factsScope);
+      void writePersistedValue(key, details);
+      return details;
+    }
     const demos = await getSeasonDemos(entries, identity);
     const visibilityFor = await loadTriLookup(demos.map((demo) => demo.pkg.match.mapName));
+    for (const demo of demos) {
+      void factsStore.putMatchFacts(extractMatchFacts(demo.pkg, {
+        matchId: demo.matchId,
+        visibilityFor
+      }));
+    }
     const details = {
       insights: buildPlayerSeasonInsights(demos, steamIds),
       weaponStats: buildPlayerWeaponStats(demos, steamIds),
@@ -241,6 +262,14 @@ export function getPlayerFlashSummaries(
   const loading = (async () => {
     const persisted = await readPersistedValue<PlayerFlashSummary[]>(key);
     if (persisted) return persisted;
+    const factsStore = getFactsStore();
+    const matchIds = entries.map(matchIdForEntry);
+    const factRows = await factsStore.getPlayerInsights({ matchIds });
+    if (factRows.length > 0) {
+      const summaries = await buildPlayerFlashSummariesFromFacts(factsStore, { matchIds, players });
+      void writePersistedValue(key, summaries);
+      return summaries;
+    }
     const demos = await getSeasonDemos(entries, identity);
     const summaries = buildPlayerFlashSummaries(demos, players);
     clearPkgCache();
@@ -297,9 +326,28 @@ export function getSeasonSummary(entries: StudioDemoEntry[], identity?: Identity
   const loading = (async () => {
     const persisted = await readPersistedValue<SeasonSummary>(key);
     if (persisted) return persisted;
+    const factsStore = getFactsStore();
+    const matchIds = entries.map(matchIdForEntry);
+    const cohortRows = await factsStore.getCohortRows({ matchIds });
+    if (cohortRows.length > 0) {
+      const cohortOpts = identity?.version ? { identityMap: identity.map } : {};
+      const bundle = buildSeasonCohortFromRows(cohortRows, { ...cohortOpts, matchCount: entries.length });
+      const summary: SeasonSummary = {
+        bundle,
+        leaderboard: buildSeasonLeaderboardModel(bundle),
+        profiles: buildAllPlayerSeasonProfiles(bundle),
+        insights: null
+      };
+      void writePersistedValue(key, summary);
+      return summary;
+    }
     const demos = await getSeasonDemos(entries, identity);
     const cohortOpts = identity?.version ? { identityMap: identity.map } : {};
     const bundle = buildSeasonCohort(demos, cohortOpts);
+    const visibilityFor = await loadTriLookup(demos.map((demo) => demo.pkg.match.mapName));
+    for (const demo of demos) {
+      void factsStore.putMatchFacts(extractMatchFacts(demo.pkg, { matchId: demo.matchId, visibilityFor }));
+    }
     const summary: SeasonSummary = {
       bundle,
       leaderboard: buildSeasonLeaderboardModel(bundle),

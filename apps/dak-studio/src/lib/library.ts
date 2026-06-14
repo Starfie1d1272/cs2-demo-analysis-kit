@@ -1,14 +1,16 @@
 import { loadDemoPackageFromZip } from "@cs2dak/core";
 import type { DemoPackage } from "@cs2dak/contract";
+import { extractMatchFacts, getFactsStore } from "./facts";
 import { getStorage } from "./storage";
+import { loadTriLookup } from "./tri";
 
 /**
  * DAK Studio 本地 Demo 库。
  * - v3 ZIP 原始字节持久化在 blobs("demos") 命名空间（来源永远是 ZIP，规则：v3 ZIP 是唯一 seam）。
  * - demo 元数据（StudioDemoEntry）持久化在 records("demos")：与字节分离，未来 SQLite
  *   方案直接对应"原始 ZIP 落盘 / 元数据入库"。
- * - DemoPackage 解析结果持久化在 records("derived")：可丢弃缓存，未命中/版本不符时从 ZIP 重建。
- *   解压 + 解析是聚合首屏的主要耗时，命中 derived 后直接读 JSON。
+ * - 导入时把 DemoPackage 榨成紧凑 facts 行持久化，聚合查询走 facts 投影；
+ *   DemoPackage 只在比赛工作台/逐场证据需要时从 ZIP 懒加载。
  */
 
 export interface DemoMeta {
@@ -39,21 +41,9 @@ function normalizeTags(tags: string[]): string[] {
   return [...new Set(tags.map((tag) => tag.trim()).filter(Boolean))];
 }
 
-/**
- * 解析口径（@cs2dak/core loadDemoPackageFromZip）变化时 +1，旧 derived 缓存自动失效。
- * v2→v3：DemoPackage 形状剧变，0.4.x 旧库的 v2 派生缓存必须失效，否则 v3 会吃到 v2 数据。
- */
-const DERIVED_VERSION = 2;
-
-interface DerivedRecord {
-  version: number;
-  pkg: DemoPackage;
-}
-
 // ── 存储命名空间（经 StorageAdapter 接缝，后端可换） ──
 const demoMeta = getStorage().records("demos"); // StudioDemoEntry by id
 const demoBlobs = getStorage().blobs("demos"); // ZIP 原始字节 by id
-const derivedStore = getStorage().records("derived"); // {version, pkg} by id
 
 /** demo 元数据补默认值（tags / sourceDemPath 为后加字段）。 */
 function normalizeEntry(entry: StudioDemoEntry): StudioDemoEntry {
@@ -67,29 +57,15 @@ function normalizeEntry(entry: StudioDemoEntry): StudioDemoEntry {
   };
 }
 
-/** derived 是纯加速缓存：读写失败一律静默回落到 ZIP 重建。 */
-async function readDerived(id: string): Promise<DemoPackage | null> {
+async function writeFactsForPackage(id: string, entry: StudioDemoEntry, pkg: DemoPackage): Promise<void> {
   try {
-    const record = await derivedStore.get<DerivedRecord>(id);
-    return record && record.version === DERIVED_VERSION ? record.pkg : null;
+    const visibilityFor = await loadTriLookup([pkg.match.mapName]);
+    await getFactsStore().putMatchFacts(extractMatchFacts(pkg, {
+      matchId: matchIdForEntry(entry),
+      visibilityFor
+    }));
   } catch {
-    return null;
-  }
-}
-
-async function writeDerived(id: string, pkg: DemoPackage): Promise<void> {
-  try {
-    await derivedStore.put<DerivedRecord>(id, { version: DERIVED_VERSION, pkg });
-  } catch {
-    // 写失败不影响功能
-  }
-}
-
-async function deleteDerived(id: string): Promise<void> {
-  try {
-    await derivedStore.delete(id);
-  } catch {
-    // 忽略
+    // facts 是查询加速层；导入主流程仍保留 ZIP 和元数据，失败后可由后续修复/重导补齐。
   }
 }
 
@@ -280,7 +256,7 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
         blobs.delete(replacement.id)
       ]);
       pkgCache.delete(replacement.id);
-      void deleteDerived(replacement.id);
+      void getFactsStore().deleteMatchFacts(matchIdForEntry(replacement));
     }
     return {
       entry: mergedEntry,
@@ -299,11 +275,11 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
       blobs.delete(replacement.id)
     ]);
     pkgCache.delete(replacement.id);
-    void deleteDerived(replacement.id);
+    void getFactsStore().deleteMatchFacts(matchIdForEntry(replacement));
   }
   pkgCache.set(id, Promise.resolve(pkg));
-  // 导入时已解析出 pkg，顺手持久化，后续聚合不再解压 ZIP
-  void writeDerived(id, pkg);
+  // 导入时已解析出 pkg，顺手榨成 facts；后续聚合走 facts 投影，不再反序列化整包 derived。
+  await writeFactsForPackage(id, entry, pkg);
   return { entry, duplicate: false, replaced: Boolean(replacement), replacedId: replacement?.id };
 }
 
@@ -331,26 +307,23 @@ export async function bulkUpdateTags(ids: string[], add: string[] = [], remove: 
 }
 
 export async function removeDemo(id: string): Promise<void> {
+  const record = await demoMeta.get<StudioDemoEntry>(id);
   await Promise.all([
     demoMeta.delete(id),
     demoBlobs.delete(id)
   ]);
   pkgCache.delete(id);
-  await deleteDerived(id);
+  if (record) await getFactsStore().deleteMatchFacts(matchIdForEntry(record));
 }
 
-/** 取解析后的 DemoPackage：内存 → derived 持久缓存 → ZIP 重建（并回写 derived）。 */
+/** 取解析后的 DemoPackage：内存 → ZIP 重建。仅用于逐场证据/工作台，不作为聚合缓存。 */
 export function getDemoPackage(id: string): Promise<DemoPackage> {
   const cached = pkgCache.get(id);
   if (cached) return cached;
   const loading = (async () => {
-    const derived = await readDerived(id);
-    if (derived) return derived;
     const buffer = await demoBlobs.get(id);
     if (!buffer) throw new Error("demo 不存在或已被删除");
-    const pkg = await parseZipInWorker(buffer);
-    void writeDerived(id, pkg);
-    return pkg;
+    return parseZipInWorker(buffer);
   })();
   pkgCache.set(id, loading);
   loading.catch(() => pkgCache.delete(id));

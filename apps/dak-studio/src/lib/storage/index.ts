@@ -7,12 +7,16 @@
  */
 
 import { createIdbAdapter } from "./idb-adapter";
+import { createPywebviewAdapter, getPywebviewStorageApi } from "./pywebview-adapter";
 import type { StorageAdapter } from "./types";
 
 let adapter: StorageAdapter | null = null;
 
 export function getStorage(): StorageAdapter {
-  return (adapter ??= createIdbAdapter());
+  if (adapter) return adapter;
+  const nativeApi = getPywebviewStorageApi();
+  adapter = nativeApi ? createPywebviewAdapter(nativeApi) : createIdbAdapter();
+  return adapter;
 }
 
 export type { StorageAdapter, RecordStore, BlobStore } from "./types";

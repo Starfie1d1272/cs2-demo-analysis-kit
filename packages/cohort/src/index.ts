@@ -1,8 +1,7 @@
 import {
   deriveRRSignals,
   derivePlayerWeaponHighlights,
-  deriveRRIndicators,
-  computeAccountRatingsV2
+  deriveRRIndicators
 } from "@cs2dak/core";
 import {
   seasonCohortBundleSchema,
@@ -50,6 +49,17 @@ export interface SeasonCohortOptions {
   identityMap?: PlayerIdentityMap;
 }
 
+export interface SeasonCohortFactRow {
+  matchId: string;
+  sourceDemoHash: string | null;
+  steamId64: string;
+  playerName: string;
+  teamKey: TeamKey;
+  signals: RRSignals;
+  indicators: RRIndicators;
+  weaponHighlight: PlayerWeaponHighlightFacts | null;
+}
+
 export interface PlayerIdentity {
   playerKey: string;
   displayName?: string;
@@ -79,61 +89,84 @@ export function buildSeasonCohort(
 ): SeasonCohortBundle {
   const rrWeights = opts.rrWeights ?? (hltv2BaselineWeightsV1 as unknown as RRWeights);
   const valueWeights = opts.valueWeights ?? (rrSixAccountWeightsV1 as unknown as RRSixAccountWeights);
+  const rows: SeasonCohortFactRow[] = [];
+  for (const demo of demos) {
+    const signals = deriveRRSignals(demo.pkg);
+    const indicators = deriveRRIndicators(demo.pkg);
+    const weaponHighlights = derivePlayerWeaponHighlights(demo.pkg);
+    const signalBySteamId = new Map(signals.map((row) => [row.steamId64, row]));
+    const indicatorBySteamId = new Map(indicators.map((row) => [row.steamId64, row]));
+    const weaponHighlightBySteamId = new Map(weaponHighlights.map((row) => [row.steamId64, row]));
+    for (const player of demo.pkg.players) {
+      const signal = signalBySteamId.get(player.steamId64);
+      const indicator = indicatorBySteamId.get(player.steamId64);
+      if (!signal || !indicator) continue;
+      rows.push({
+        matchId: demo.matchId,
+        sourceDemoHash: demo.pkg.manifest.demo?.hash ?? null,
+        steamId64: player.steamId64,
+        playerName: player.name,
+        teamKey: player.teamKey,
+        signals: signal,
+        indicators: indicator,
+        weaponHighlight: weaponHighlightBySteamId.get(player.steamId64) ?? null
+      });
+    }
+  }
+  return buildSeasonCohortFromRows(rows, {
+    ...opts,
+    rrWeights,
+    valueWeights,
+    matchCount: demos.length
+  });
+}
+
+export function buildSeasonCohortFromRows(
+  rows: SeasonCohortFactRow[],
+  opts: SeasonCohortOptions & { matchCount?: number } = {}
+): SeasonCohortBundle {
+  const rrWeights = opts.rrWeights ?? (hltv2BaselineWeightsV1 as unknown as RRWeights);
+  const valueWeights = opts.valueWeights ?? (rrSixAccountWeightsV1 as unknown as RRSixAccountWeights);
   const proBaseline = rrSixAccountProBaselineV0 as unknown as ProBaselineConfig;
   const prismWeights = opts.prismWeights ?? (prismWeightsV1 as unknown as PrismWeights);
   const identityMap = opts.identityMap ?? {};
   const players = new Map<string, PlayerAccumulator>();
 
-  for (const demo of demos) {
-    const signals = deriveRRSignals(demo.pkg);
-    const indicators = deriveRRIndicators(demo.pkg);
-    const weaponHighlights = derivePlayerWeaponHighlights(demo.pkg);
-    const matchAccounts = computeAccountRatingsV2(demo.pkg);
-    const matchAccountBySteamId = new Map(matchAccounts.map((row) => [row.signals.steamId64, row.rr]));
-    const rrBySteamId = new Map(indicators.map((row) => [row.steamId64, computeRR(row, rrWeights)]));
-    // index per-demo rows by steamId64 once (was O(players²) via .find in the loop)
-    const signalBySteamId = new Map(signals.map((row) => [row.steamId64, row]));
-    const indicatorBySteamId = new Map(indicators.map((row) => [row.steamId64, row]));
-    const weaponHighlightBySteamId = new Map(weaponHighlights.map((row) => [row.steamId64, row]));
+  for (const row of rows) {
+    const identity = resolveIdentity(row.steamId64, identityMap);
 
-    for (const player of demo.pkg.players) {
-      const signal = signalBySteamId.get(player.steamId64);
-      const indicator = indicatorBySteamId.get(player.steamId64);
-      if (!signal || !indicator) continue;
-      const identity = resolveIdentity(player.steamId64, identityMap);
+    const acc = getOrInit(players, identity.playerKey, () => ({
+      playerKey: identity.playerKey,
+      steamIds: new Set<string>(),
+      primarySteamId64: row.steamId64,
+      externalUserId: identity.userId ?? null,
+      displayName: identity.displayName ?? null,
+      names: new Map<string, number>(),
+      teamKeys: new Set<TeamKey>(),
+      mapCount: 0,
+      signals: [],
+      indicators: [],
+      weaponHighlights: [],
+      perMatch: []
+    }));
 
-      const acc = getOrInit(players, identity.playerKey, () => ({
-        playerKey: identity.playerKey,
-        steamIds: new Set<string>(),
-        primarySteamId64: player.steamId64,
-        externalUserId: identity.userId ?? null,
-        displayName: identity.displayName ?? null,
-        names: new Map<string, number>(),
-        teamKeys: new Set<TeamKey>(),
-        mapCount: 0,
-        signals: [],
-        indicators: [],
-        weaponHighlights: [],
-        perMatch: []
-      }));
-
-      acc.steamIds.add(player.steamId64);
-      if (!acc.externalUserId && identity.userId) acc.externalUserId = identity.userId;
-      if (!acc.displayName && identity.displayName) acc.displayName = identity.displayName;
-      acc.names.set(player.name, (acc.names.get(player.name) ?? 0) + 1);
-      acc.teamKeys.add(player.teamKey);
-      acc.mapCount += 1;
-      acc.signals.push(signal);
-      acc.indicators.push(indicator);
-      const weaponHighlight = weaponHighlightBySteamId.get(player.steamId64);
-      if (weaponHighlight) acc.weaponHighlights.push(weaponHighlight);
-      acc.perMatch.push({
-        matchId: demo.matchId,
-        steamId64: player.steamId64,
-        accountRR: round(matchAccountBySteamId.get(player.steamId64)?.rr ?? 0, 3),
-        rrV1: round(rrBySteamId.get(player.steamId64)?.rr ?? 0, 3)
-      });
-    }
+    acc.steamIds.add(row.steamId64);
+    if (!acc.externalUserId && identity.userId) acc.externalUserId = identity.userId;
+    if (!acc.displayName && identity.displayName) acc.displayName = identity.displayName;
+    acc.names.set(row.playerName, (acc.names.get(row.playerName) ?? 0) + 1);
+    acc.teamKeys.add(row.teamKey);
+    acc.mapCount += 1;
+    acc.signals.push(row.signals);
+    acc.indicators.push(row.indicators);
+    if (row.weaponHighlight) acc.weaponHighlights.push(row.weaponHighlight);
+    const accountRR = computeFrozenProBaselineRR(row.signals, valueWeights, proBaseline);
+    const rrV1 = computeRR(row.indicators, rrWeights);
+    acc.perMatch.push({
+      matchId: row.matchId,
+      steamId64: row.steamId64,
+      accountRR: round(accountRR.rr, 3),
+      rrV1: round(rrV1.rr, 3)
+    });
   }
 
   const seasonRows = [...players.values()].map((acc) => {
@@ -159,15 +192,15 @@ export function buildSeasonCohort(
 
   return seasonCohortBundleSchema.parse({
     version: "cs2-demo-analysis-kit/cohort-1.0",
-    matchCount: demos.length,
+    matchCount: opts.matchCount ?? new Set(rows.map((row) => row.matchId)).size,
     weightsVersion: `${rrWeights.version}+${valueWeights.version}+${prismWeights.version}`,
     provenance: {
       cohortVersion: "cs2-demo-analysis-kit/cohort-1.0",
       sourceSchemaVersion: "cs2-demo-format/3.0",
-      matches: demos.map((demo) => ({
-        matchId: demo.matchId,
-        sourceDemoHash: demo.pkg.manifest.demo?.hash ?? null
-      }))
+      matches: [...new Map(rows.map((row) => [row.matchId, {
+        matchId: row.matchId,
+        sourceDemoHash: row.sourceDemoHash
+      }])).values()]
     },
     players: seasonRows
       .map((row) => {
