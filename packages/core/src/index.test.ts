@@ -30,9 +30,9 @@ describe("analyzeDemoPackage", () => {
     expect(bundle.playerIndicators[0]?.indicators.totalRounds).toBe(23);
     expect(bundle.playerRoundFacts).toHaveLength(230);
     expect(bundle.economy).toHaveLength(23);
-    expect(bundle.timeline.filter((event) => event.type === "kill")).toHaveLength(148);
-    expect(bundle.timeline.filter((event) => event.type === "bomb")).toHaveLength(87);
-    expect(bundle.heatmap.filter((point) => point.kind === "death")).toHaveLength(148);
+    expect(bundle.timeline.filter((event) => event.type === "kill")).toHaveLength(153);
+    expect(bundle.timeline.filter((event) => event.type === "bomb")).toHaveLength(89);
+    expect(bundle.heatmap.filter((point) => point.kind === "death")).toHaveLength(153);
     expect(bundle.timeline.some((event) => event.type === "kill")).toBe(true);
     expect(bundle.heatmap.some((point) => point.kind === "death")).toBe(true);
     expect(bundle.timeline.find((event) => event.type === "round-end")?.clockPhase).toBe("round-end");

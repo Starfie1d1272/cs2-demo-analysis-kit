@@ -281,7 +281,7 @@ class StudioApi:
                     job.progress = frac
                     log.info("export job %s %s %.0f%%", job.id, stage, frac * 100)
 
-                data, match_meta = export_demo(str(dem), progress=on_progress)
+                data, match_meta = export_demo(str(dem), research=True, progress=on_progress)
                 job.file_name = _build_zip_name(dem, match_meta)
             job.result_b64 = base64.b64encode(data).decode("ascii")
             job.progress = 1.0
@@ -335,7 +335,7 @@ class StudioApi:
             except OSError as exc:
                 return {"ok": False, "error": str(exc)}
         try:
-            data, match_meta = export_demo(str(dem))
+            data, match_meta = export_demo(str(dem), research=True)
             return {
                 "ok": True,
                 "fileName": _build_zip_name(dem, match_meta),
@@ -357,7 +357,7 @@ class StudioApi:
         try:
             dem_path = tmp_dir / name
             dem_path.write_bytes(base64.b64decode(data_b64))
-            data, match_meta = export_demo(str(dem_path))
+            data, match_meta = export_demo(str(dem_path), research=True)
             return {
                 "ok": True,
                 "fileName": _build_zip_name(dem_path, match_meta),

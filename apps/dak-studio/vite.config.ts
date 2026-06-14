@@ -48,7 +48,8 @@ function demExportPlugin(): Plugin {
             await new Promise<void>((resolvePromise, rejectPromise) => {
               execFile(
                 "uv",
-                ["run", "cs2df", "export", demPath, "-o", zipPath, "-q"],
+                // --research：产出 duels.json 满 tick 战斗窗口，Studio 的急停/反应/预瞄依赖它
+                ["run", "cs2df", "export", demPath, "-o", zipPath, "--research", "-q"],
                 { cwd: PYTHON_ROOT, timeout: EXPORT_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 },
                 (error, _stdout, stderr) => {
                   if (error) rejectPromise(new Error(stderr.trim() || error.message));
