@@ -1,6 +1,10 @@
 /**
  * map-routes — 进攻动线（T 方从匪家到包点的推进路径）
  *
+ * 【归档 2026-06】route(有序动线)+zone(多边形) 的人工标注已停止演进，被
+ * `default-positions.ts`（callout 默认位归并）取代。本文件仅为 spatial shadow 层
+ * （phase/mapcontrol，当前发 null）保留，不再新增/修订动线资产。RR 现役零依赖。
+ *
  * 定位：一条动线 = 一串**有序的 CS2 callout 区域名**（= replay `place` 列
  * 对应的 placeDict 取值），从 T 出生区指向某个包点。控制进度 / 道具拖延都沿这条
  * 一维序列度量。
