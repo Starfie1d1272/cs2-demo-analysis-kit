@@ -21,19 +21,7 @@ export function getPywebviewStorageApi(): PywebviewStorageApi | null {
   return api as PywebviewStorageApi;
 }
 
-function bytesToBase64(bytes: ArrayBuffer): string {
-  const arr = new Uint8Array(bytes);
-  let binary = "";
-  for (let i = 0; i < arr.length; i += 1) binary += String.fromCharCode(arr[i]!);
-  return btoa(binary);
-}
-
-function base64ToBytes(data: string): ArrayBuffer {
-  const binary = atob(data);
-  const out = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) out[i] = binary.charCodeAt(i);
-  return out.buffer;
-}
+import { bytesToBase64, base64ToBytes } from "./base64";
 
 /**
  * pywebview native 后端。待桌面验证：当前 CI/沙箱没有真实桌面壳，

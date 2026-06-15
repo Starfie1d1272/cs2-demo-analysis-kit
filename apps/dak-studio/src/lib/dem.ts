@@ -7,6 +7,8 @@
  * - "dev"：pnpm dev:studio 时的 Vite 中间件（POST /api/export-dem → uv run cs2df export）。
  */
 
+import { bytesToBase64, base64ToBytes } from "./storage/base64";
+
 interface ExportJobStatus {
   id: string;
   state: "running" | "done" | "error";
@@ -84,24 +86,6 @@ export async function detectDemBackend(): Promise<DemBackend> {
 
 export function isDemFile(file: File): boolean {
   return file.name.toLowerCase().endsWith(".dem");
-}
-
-function base64ToBytes(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
-/** 分块 base64 编码：避免 `String.fromCharCode(...huge)` 对大 .dem（上百 MB）爆调用栈。 */
-function bytesToBase64(buf: ArrayBuffer): string {
-  const bytes = new Uint8Array(buf);
-  const CHUNK = 0x8000; // 32KB/块，远低于参数展开上限
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-  }
-  return btoa(binary);
 }
 
 /** dev 模式：把 .dem 字节流交给 Vite 中间件，拿回导出的 ZIP。 */
