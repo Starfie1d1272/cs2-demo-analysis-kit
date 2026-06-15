@@ -43,27 +43,82 @@ export function parseAwpyTri(input: ArrayBuffer | Uint8Array): Triangle[] {
   return triangles;
 }
 
+/** 三角形 + 预计算质心；建树时避免在 sort 比较器里反复算质心并分配 Vec3。 */
+interface CentroidTriangle {
+  tri: Triangle;
+  c: Vec3;
+}
+
 export function buildTriangleBvh(triangles: Triangle[]): TriangleBvh {
   if (triangles.length === 0) throw new Error("Cannot build a BVH without triangles");
-  return buildNode([...triangles]);
+  // 质心只算一次（旧实现在每层 sort 比较器里重算并 new Vec3，百万三角形下产生
+  // 数千万次冗余计算与分配）。建树拓扑、分裂点与叶子内容完全不变。
+  const items = triangles.map((tri) => ({ tri, c: triangleCentroid(tri) }));
+  return buildNode(items);
 }
 
 export function staticLineOfSight(root: TriangleBvh, start: Vec3, end: Vec3): boolean {
   return !segmentHitsNode(root, start, end);
 }
 
-function buildNode(triangles: Triangle[]): TriangleBvh {
-  const bounds = boundsForTriangles(triangles);
-  if (triangles.length <= LEAF_SIZE) return { bounds, triangles };
+function buildNode(items: CentroidTriangle[]): TriangleBvh {
+  const bounds = boundsForCentroidTriangles(items);
+  if (items.length <= LEAF_SIZE) return { bounds, triangles: items.map((item) => item.tri) };
 
   const axis = largestAxis(bounds);
-  triangles.sort((a, b) => triangleCentroid(a)[axis] - triangleCentroid(b)[axis]);
-  const middle = Math.floor(triangles.length / 2);
+  // 只需把中位数选到 middle 处（左半 ≤、右半 ≥），无需整层全排序：
+  // quickselect 让建树从 O(n log²n) 降到 O(n log n)。LOS 与树结构无关
+  // （每个节点按实际三角形重算 bounds，叶子全量求交），任何合法划分结果都等价。
+  const middle = items.length >> 1;
+  nthElement(items, middle, axis);
   return {
     bounds,
-    left: buildNode(triangles.slice(0, middle)),
-    right: buildNode(triangles.slice(middle)),
+    left: buildNode(items.slice(0, middle)),
+    right: buildNode(items.slice(middle)),
   };
+}
+
+/** Hoare 划分的 quickselect：原地重排，使 arr[k] 落在按 axis 排序后的位置。 */
+function nthElement(arr: CentroidTriangle[], k: number, axis: keyof Vec3): void {
+  let lo = 0;
+  let hi = arr.length - 1;
+  while (lo < hi) {
+    const pivot = arr[(lo + hi) >> 1].c[axis];
+    let i = lo;
+    let j = hi;
+    while (i <= j) {
+      while (arr[i].c[axis] < pivot) i++;
+      while (arr[j].c[axis] > pivot) j--;
+      if (i <= j) {
+        const tmp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+        i++;
+        j--;
+      }
+    }
+    if (k <= j) hi = j;
+    else if (k >= i) lo = i;
+    else break;
+  }
+}
+
+function boundsForCentroidTriangles(items: CentroidTriangle[]): Bounds {
+  const bounds: Bounds = {
+    min: { x: Number.POSITIVE_INFINITY, y: Number.POSITIVE_INFINITY, z: Number.POSITIVE_INFINITY },
+    max: { x: Number.NEGATIVE_INFINITY, y: Number.NEGATIVE_INFINITY, z: Number.NEGATIVE_INFINITY },
+  };
+  for (const { tri } of items) {
+    for (const point of [tri.a, tri.b, tri.c]) {
+      bounds.min.x = Math.min(bounds.min.x, point.x);
+      bounds.min.y = Math.min(bounds.min.y, point.y);
+      bounds.min.z = Math.min(bounds.min.z, point.z);
+      bounds.max.x = Math.max(bounds.max.x, point.x);
+      bounds.max.y = Math.max(bounds.max.y, point.y);
+      bounds.max.z = Math.max(bounds.max.z, point.z);
+    }
+  }
+  return bounds;
 }
 
 function segmentHitsNode(node: TriangleBvh, start: Vec3, end: Vec3): boolean {
@@ -116,24 +171,6 @@ function segmentHitsTriangle(start: Vec3, end: Vec3, triangle: Triangle): boolea
 
   const t = inverse * dot(edge2, q);
   return t > EPSILON && t < 1 - EPSILON;
-}
-
-function boundsForTriangles(triangles: Triangle[]): Bounds {
-  const bounds: Bounds = {
-    min: { x: Number.POSITIVE_INFINITY, y: Number.POSITIVE_INFINITY, z: Number.POSITIVE_INFINITY },
-    max: { x: Number.NEGATIVE_INFINITY, y: Number.NEGATIVE_INFINITY, z: Number.NEGATIVE_INFINITY },
-  };
-  for (const triangle of triangles) {
-    for (const point of [triangle.a, triangle.b, triangle.c]) {
-      bounds.min.x = Math.min(bounds.min.x, point.x);
-      bounds.min.y = Math.min(bounds.min.y, point.y);
-      bounds.min.z = Math.min(bounds.min.z, point.z);
-      bounds.max.x = Math.max(bounds.max.x, point.x);
-      bounds.max.y = Math.max(bounds.max.y, point.y);
-      bounds.max.z = Math.max(bounds.max.z, point.z);
-    }
-  }
-  return bounds;
 }
 
 function largestAxis(bounds: Bounds): keyof Vec3 {

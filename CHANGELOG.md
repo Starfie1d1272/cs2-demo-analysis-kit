@@ -4,7 +4,7 @@ DAK Studio 桌面应用及 `@cs2dak/*` 分析管道面向用户的变更记录�
 
 > 0.1.3 起面向 Studio 用户维护。`@cs2dak/*` npm 包版本由 changesets 独立管理（见各包的 CHANGELOG.md）；本文件聚焦 DAK Studio 桌面应用变更。
 
-## [Unreleased] — 2026-06-16 (0.6.0 教练工作台 + maps 默认位)
+## [0.6.0] — 2026-06-16 (0.6.0 教练工作台 + maps 默认位)
 
 ### 新增
 
@@ -46,6 +46,7 @@ DAK Studio 桌面应用及 `@cs2dak/*` 分析管道面向用户的变更记录�
 
 ### 性能
 
+- **`.tri` 碰撞几何 BVH 建树加速 ~60%**：`buildTriangleBvh` 质心预计算一次 + median 划分改用 quickselect，建树复杂度从 `O(n log²n)` 降到 `O(n log n)`（de_inferno 等大图首次加载尖峰从 ~18s 降到 ~6s）。LOS 结果与树结构无关，输出完全不变（golden 测试全绿）。批量导入内置 demo 的整体耗时显著下降。
 - **消除批量导入/删除 OOM**：`StorageAdapter` 加 `deleteByPrefix`，批量重导不再内存爆炸。
 - **CoachView 合 state + facts OOM 修复** + **PatternExplorer 缓存清理**。
 - **经济标签统一为标准中文**。
