@@ -285,6 +285,14 @@ class StudioApi:
             self._conn().execute("delete from records where namespace=? and key=?", (namespace, key))
             self._conn().commit()
 
+    def storage_record_delete_prefix(self, namespace: str, prefix: str) -> None:
+        with self._db_lock:
+            self._conn().execute(
+                "delete from records where namespace=? and (key=? or key like ? || '%')",
+                (namespace, prefix, prefix),
+            )
+            self._conn().commit()
+
     def _blob_dir(self, namespace: str) -> Path:
         if namespace == "demos":
             path = self._userdata / "demos"
@@ -312,6 +320,11 @@ class StudioApi:
             self._blob_path(namespace, key).unlink()
         except FileNotFoundError:
             pass
+
+    def storage_blob_delete_prefix(self, namespace: str, prefix: str) -> None:
+        for key in self.storage_blob_keys(namespace):
+            if key == prefix or key.startswith(prefix + "\t"):
+                self.storage_blob_delete(namespace, key)
 
     def storage_blob_keys(self, namespace: str) -> list[str]:
         suffix = ".zip" if namespace == "demos" else ".bin"

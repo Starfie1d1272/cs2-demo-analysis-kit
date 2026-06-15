@@ -895,28 +895,18 @@ function inScope(row: { matchId: string; playerKey?: string; mapName?: string; s
 /**
  * 用新行整体替换某 matchId 的旧行。
  *
- * 关键：删除阶段只读 `store.keys()`（仅键，不反序列化值）后按 `key === matchId ||
- * key.startsWith(matchId + ROW_KEY_SEP)` 前缀过滤——因为所有 store 的键要么是 `matchId`
- * 本身（tournament/teamComparison/duel/matchWorkspace/lineups），要么是 `rowKey(matchId, …)`
- * 即 `matchId\t…` 前缀（其余 store）。绝不调用 `entries()`/`getAll()`。否则像
- * match_workspace 这种每行存一整场 8Hz replay 的命名空间，会在每次导入/删除时把库里
- * 所有场次的完整 replay 全部反序列化进内存（O(N²)，批量重导/删除直接 OOM）。
- * 已在新集合里的键跳过删除，避免无谓删→写。
+ * 委托后端 deleteByPrefix 实现键范围删除（IDBKeyRange / SQL LIKE），
+ * 无需反序列化 key→value 映射，彻底消除批量重导时的 OOM 风险。
  */
 async function replaceRows<T extends { matchId: string }>(
   store: RecordStore,
   rows: Array<[string, T]>,
   matchId: string
 ): Promise<void> {
-  const prefix = `${matchId}${ROW_KEY_SEP}`;
-  const keys = await store.keys();
-  const nextKeys = new Set(rows.map(([key]) => key));
-  await Promise.all(
-    keys
-      .filter((key) => (key === matchId || key.startsWith(prefix)) && !nextKeys.has(key))
-      .map((key) => store.delete(key))
-  );
-  await Promise.all(rows.map(([key, row]) => store.put(key, row)));
+  await store.deleteByPrefix(matchId);
+  if (rows.length > 0) {
+    await Promise.all(rows.map(([key, row]) => store.put(key, row)));
+  }
 }
 
 const ROW_KEY_SEP = "\t";
@@ -1080,7 +1070,7 @@ export function createFactsStore(adapter: StorageAdapter, namespace = "facts"): 
         [playerStats, playerInsights, playerWeapons, mechanics,
          cohortRows, tournamentFacts, teamComparisonFacts, duelFacts,
          matchWorkspace, openingTrails, lineups, tacticalRounds]
-          .map((store) => replaceRows(store as RecordStore, [], matchId))
+          .map((store) => store.deleteByPrefix(matchId))
       );
     }
   };

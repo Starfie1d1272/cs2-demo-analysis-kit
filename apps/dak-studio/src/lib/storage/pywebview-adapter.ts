@@ -7,9 +7,11 @@ interface PywebviewStorageApi {
   storage_record_keys(namespace: string): Promise<string[]>;
   storage_record_put(namespace: string, key: string, value: unknown): Promise<void>;
   storage_record_delete(namespace: string, key: string): Promise<void>;
+  storage_record_delete_prefix(namespace: string, prefix: string): Promise<void>;
   storage_blob_get(namespace: string, key: string): Promise<string | null>;
   storage_blob_put(namespace: string, key: string, dataBase64: string): Promise<void>;
   storage_blob_delete(namespace: string, key: string): Promise<void>;
+  storage_blob_delete_prefix(namespace: string, prefix: string): Promise<void>;
   storage_blob_keys(namespace: string): Promise<string[]>;
 }
 
@@ -48,6 +50,7 @@ export function createPywebviewAdapter(api: PywebviewStorageApi): StorageAdapter
           keys: () => api.storage_record_keys(namespace),
           put: (key, value) => api.storage_record_put(namespace, key, value),
           delete: (key) => api.storage_record_delete(namespace, key),
+          deleteByPrefix: (prefix) => api.storage_record_delete_prefix(namespace, prefix),
         };
         recordStores.set(namespace, store);
       }
@@ -64,6 +67,7 @@ export function createPywebviewAdapter(api: PywebviewStorageApi): StorageAdapter
           put: (key, bytes) => api.storage_blob_put(namespace, key, bytesToBase64(bytes)),
           delete: (key) => api.storage_blob_delete(namespace, key),
           keys: () => api.storage_blob_keys(namespace),
+          deleteByPrefix: (prefix) => api.storage_blob_delete_prefix(namespace, prefix),
         };
         blobStores.set(namespace, store);
       }

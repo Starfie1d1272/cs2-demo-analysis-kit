@@ -52,6 +52,11 @@ function makeKv(dbName: string) {
       const db = await open();
       await txRequest(db.transaction("kv", "readwrite").objectStore("kv").delete(key));
     },
+    async deleteByPrefix(prefix: string): Promise<void> {
+      const db = await open();
+      const range = IDBKeyRange.bound(prefix, prefix + '￿');
+      await txRequest(db.transaction("kv", "readwrite").objectStore("kv").delete(range));
+    },
   };
 }
 
@@ -71,6 +76,7 @@ export function createIdbAdapter(): StorageAdapter {
           keys: () => kv.keys(),
           put: (key, value) => kv.put(key, value),
           delete: (key) => kv.delete(key),
+          deleteByPrefix: (prefix) => kv.deleteByPrefix(prefix),
         };
         recordStores.set(namespace, store);
       }
@@ -85,6 +91,7 @@ export function createIdbAdapter(): StorageAdapter {
           put: (key, bytes) => kv.put(key, bytes),
           delete: (key) => kv.delete(key),
           keys: () => kv.keys(),
+          deleteByPrefix: (prefix) => kv.deleteByPrefix(prefix),
         };
         blobStores.set(namespace, store);
       }

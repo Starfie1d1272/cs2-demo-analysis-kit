@@ -21,6 +21,8 @@ export interface RecordStore {
   keys(): Promise<string[]>;
   put<T>(key: string, value: T): Promise<void>;
   delete(key: string): Promise<void>;
+  /** 删除所有 key 以 prefix 开头的记录（含精确匹配）。 */
+  deleteByPrefix(prefix: string): Promise<void>;
 }
 
 /** 按 key 存取二进制字节的命名空间。 */
@@ -29,6 +31,7 @@ export interface BlobStore {
   put(key: string, bytes: ArrayBuffer): Promise<void>;
   delete(key: string): Promise<void>;
   keys(): Promise<string[]>;
+  deleteByPrefix(prefix: string): Promise<void>;
 }
 
 export interface StorageAdapter {
