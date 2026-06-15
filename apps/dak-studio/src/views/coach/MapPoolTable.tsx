@@ -71,7 +71,7 @@ export function MapPoolTable({ clusters, facts, entries, myTeamName, teamRenames
         topOppPatterns,
       };
     });
-  }, [facts, myNorm]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [facts, myNorm, entryMeta]);
 
   if (maps.length === 0) {
     return <div className="stu-card stu-empty">暂无地图数据，请导入 demo。</div>;

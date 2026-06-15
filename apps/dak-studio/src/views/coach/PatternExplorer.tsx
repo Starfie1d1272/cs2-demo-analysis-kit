@@ -31,6 +31,20 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch }
     );
   }, [selected, facts]);
 
+  // 对所有簇预计算佯攻标志（基于该簇全量 facts，而非仅当前选中簇）
+  const clusterFakeMap = useMemo(() => {
+    const m = new Map<string, { suspected: boolean; reason?: string }>();
+    for (const c of clusters) {
+      const clusterFacts = facts.filter(
+        (f) => f.side === c.side && f.mapName === c.mapName &&
+          c.rounds.some((r) => r.matchId === f.matchId && r.roundNumber === f.roundNumber)
+      );
+      const representativeFact = clusterFacts[0];
+      m.set(c.id, representativeFact ? suspectFake(representativeFact) : { suspected: false });
+    }
+    return m;
+  }, [clusters, facts]);
+
   if (clusters.length === 0) {
     return <div className="stu-coach-pattern-explorer stu-empty">暂无聚类数据，请导入更多 demo。</div>;
   }
@@ -40,7 +54,7 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch }
       {/* 左栏：簇列表 */}
       <aside className="stu-pe-list">
         {clusters.map((c) => {
-          const fake = suspectFake(selectedFacts.find((f) => f.matchId === c.rounds[0]?.matchId && f.roundNumber === c.rounds[0]?.roundNumber) ?? { targetSite: null, siteInvestment: { a: { grenadeCount: 0, entryCount: 0, deepestAnchor: null, planted: false }, b: { grenadeCount: 0, entryCount: 0, deepestAnchor: null, planted: false } } } as TacticalRoundFact);
+          const fake = clusterFakeMap.get(c.id) ?? { suspected: false };
           return (
             <button
               key={c.id}
