@@ -1,6 +1,8 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
+import type { MatchWorkspaceModel } from "@cs2dak/contract";
+import { ReplayViewer } from "@cs2dak/react";
 import { autoName, type TacticalCluster } from "../../lib/tactics.js";
-import type { TacticalRoundFact } from "../../lib/facts.js";
+import { getFactsStore, type TacticalRoundFact } from "../../lib/facts.js";
 import type { StudioDemoEntry } from "../../lib/library.js";
 import { RadarTrails, GRENADE_COLOR, type RadarGrenadeOverlay, type RadarTrail } from "../../components/RadarTrails.js";
 
@@ -19,9 +21,24 @@ export interface PatternExplorerProps {
 }
 
 export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, onAddToPlaylist }: PatternExplorerProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(clusters[0]?.id ?? null);
+  // 顶部视角切换：T 进攻语境 / CT 防守语境分开看，避免两个 side 的簇混在一列。
+  const [side, setSide] = useState<"t" | "ct">("t");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // 页面内回放：选中证据回合后在本页弹出 2D 回放，不跳转比赛工作台。
+  const [replayTarget, setReplayTarget] = useState<{ matchId: string; roundNumber: number; tick?: number } | null>(null);
 
-  const selected = useMemo(() => clusters.find((c) => c.id === selectedId) ?? null, [clusters, selectedId]);
+  const sideCounts = useMemo(() => ({
+    t: clusters.filter((c) => c.side === "t").length,
+    ct: clusters.filter((c) => c.side === "ct").length,
+  }), [clusters]);
+
+  const visibleClusters = useMemo(() => clusters.filter((c) => c.side === side), [clusters, side]);
+
+  // 选中项必须属于当前 side；切换 side 或数据变化后回退到首个可见簇。
+  const selected = useMemo(
+    () => visibleClusters.find((c) => c.id === selectedId) ?? visibleClusters[0] ?? null,
+    [visibleClusters, selectedId]
+  );
 
   const selectedFacts = useMemo(() => {
     if (!selected) return [];
@@ -37,10 +54,36 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
   }
 
   return (
-    <div className="stu-coach-pattern-explorer">
-      {/* 左栏：簇列表 */}
-      <aside className="stu-pe-list">
-        {clusters.map((c) => {
+    <div className="stu-pe-shell">
+      <div className="stu-subtabs stu-pe-side-toggle" role="tablist" aria-label="进攻/防守视角">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={side === "t"}
+          className={side === "t" ? "stu-subtab stu-subtab-active" : "stu-subtab"}
+          onClick={() => setSide("t")}
+        >
+          T 进攻视角（{sideCounts.t}）
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={side === "ct"}
+          className={side === "ct" ? "stu-subtab stu-subtab-active" : "stu-subtab"}
+          onClick={() => setSide("ct")}
+        >
+          CT 防守视角（{sideCounts.ct}）
+        </button>
+      </div>
+      {visibleClusters.length === 0 ? (
+        <div className="stu-coach-pattern-explorer stu-empty">
+          该视角下暂无聚类（{side === "t" ? "T" : "CT"} 方）。切换到另一视角，或导入更多 demo。
+        </div>
+      ) : (
+        <div className="stu-coach-pattern-explorer">
+          {/* 左栏：簇列表 */}
+          <aside className="stu-pe-list">
+            {visibleClusters.map((c) => {
           return (
             <button
               key={c.id}
@@ -70,30 +113,99 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
         })}
       </aside>
 
-      {/* 中栏：雷达快照 */}
-      <div className="stu-pe-radar">
-        {selected ? (
-          <ClusterRadar facts={selectedFacts} mapName={selected.mapName} />
-        ) : (
-          <div className="stu-pe-radar-empty">选择左侧聚类</div>
-        )}
-      </div>
+          {/* 中栏：站位快照 ↔ 该回合 2D 回放（同一张雷达上播放，不跳转） */}
+          <div className="stu-pe-radar">
+            {replayTarget ? (
+              <InlineRoundReplay
+                matchId={replayTarget.matchId}
+                roundNumber={replayTarget.roundNumber}
+                tick={replayTarget.tick}
+                label={entryByMatchId.get(replayTarget.matchId)
+                  ? `${entryByMatchId.get(replayTarget.matchId)!.meta.teamAName} vs ${entryByMatchId.get(replayTarget.matchId)!.meta.teamBName} · R${replayTarget.roundNumber}`
+                  : `R${replayTarget.roundNumber}`}
+                onBack={() => setReplayTarget(null)}
+              />
+            ) : selected ? (
+              <ClusterRadar facts={selectedFacts} mapName={selected.mapName} />
+            ) : (
+              <div className="stu-pe-radar-empty">选择左侧聚类</div>
+            )}
+          </div>
 
-      {/* 右栏：数据摘要 + 证据回合 */}
-      <div className="stu-pe-detail">
-        {selected && (
-          <>
-            <ClusterSummary cluster={selected} facts={selectedFacts} />
-            <EvidenceTable
-              cluster={selected}
-              facts={selectedFacts}
-              entryByMatchId={entryByMatchId}
-              onOpenMatch={onOpenMatch}
-              onAddToPlaylist={onAddToPlaylist}
-            />
-          </>
-        )}
+          {/* 右栏：数据摘要 + 证据回合 */}
+          <div className="stu-pe-detail">
+            {selected && (
+              <>
+                <ClusterSummary cluster={selected} facts={selectedFacts} />
+                <EvidenceTable
+                  cluster={selected}
+                  facts={selectedFacts}
+                  entryByMatchId={entryByMatchId}
+                  activeReplay={replayTarget}
+                  onOpenMatch={onOpenMatch}
+                  onPlayInline={(matchId, roundNumber, tick) => setReplayTarget({ matchId, roundNumber, tick })}
+                  onAddToPlaylist={onAddToPlaylist}
+                />
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const replayModelCache = new Map<string, MatchWorkspaceModel>();
+
+async function loadReplayModel(matchId: string): Promise<MatchWorkspaceModel> {
+  const cached = replayModelCache.get(matchId);
+  if (cached) return cached;
+  const stored = await getFactsStore().getMatchWorkspaces({ matchIds: [matchId] });
+  if (!stored[0]) throw new Error("本场没有本地持久化回放，请重新导入或重建该场。");
+  replayModelCache.set(matchId, stored[0].row);
+  return stored[0].row;
+}
+
+/** 在中栏雷达位置直接播放某回合的 2D 回放（懒加载该场 workspace facts）。 */
+function InlineRoundReplay({ matchId, roundNumber, tick, label, onBack }: {
+  matchId: string;
+  roundNumber: number;
+  tick?: number;
+  label: string;
+  onBack: () => void;
+}) {
+  const [model, setModel] = useState<MatchWorkspaceModel | null>(replayModelCache.get(matchId) ?? null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    if (!replayModelCache.get(matchId)) setModel(null);
+    loadReplayModel(matchId)
+      .then((m) => { if (!cancelled) setModel(m); })
+      .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)); });
+    return () => { cancelled = true; };
+  }, [matchId]);
+
+  return (
+    <div className="stu-pe-replay">
+      <div className="stu-pe-replay-bar">
+        <button type="button" className="stu-button-sm" onClick={onBack}>← 返回站位</button>
+        <span className="stu-pe-replay-label">{label}</span>
       </div>
+      {error ? (
+        <div className="stu-pe-radar-empty">{error}</div>
+      ) : !model ? (
+        <div className="stu-loading">读取本地回放…</div>
+      ) : !model.replay.available ? (
+        <div className="stu-pe-radar-empty">本场导出未附带 2D 回放流。</div>
+      ) : (
+        <ReplayViewer
+          replay={model.replay}
+          map={model.map.view}
+          target={{ roundNumber, tick, seq: tick ?? roundNumber }}
+        />
+      )}
     </div>
   );
 }
@@ -239,13 +351,17 @@ function EvidenceTable({
   cluster,
   facts,
   entryByMatchId,
+  activeReplay,
   onOpenMatch,
+  onPlayInline,
   onAddToPlaylist,
 }: {
   cluster: TacticalCluster;
   facts: TacticalRoundFact[];
   entryByMatchId: Map<string, StudioDemoEntry>;
+  activeReplay: { matchId: string; roundNumber: number } | null;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onPlayInline: (matchId: string, roundNumber: number, tick?: number) => void;
   onAddToPlaylist?: (cluster: TacticalCluster, fact: TacticalRoundFact) => void;
 }) {
   return (
@@ -289,16 +405,29 @@ function EvidenceTable({
                     </button>
                   )}
                   {entry && (
-                    <button
-                      type="button"
-                      className="stu-button-sm"
-                      onClick={() => onOpenMatch(entry.id, {
-                        roundNumber: r.roundNumber,
-                        tick: fact ? jumpTickFor(fact) : undefined,
-                      })}
-                    >
-                      回放
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className={activeReplay?.matchId === r.matchId && activeReplay.roundNumber === r.roundNumber
+                          ? "stu-button-sm stu-button-sm-active"
+                          : "stu-button-sm"}
+                        title="在左侧雷达上直接播放该回合"
+                        onClick={() => onPlayInline(r.matchId, r.roundNumber, fact ? jumpTickFor(fact) : undefined)}
+                      >
+                        ▶ 回放
+                      </button>
+                      <button
+                        type="button"
+                        className="stu-button-sm"
+                        title="在比赛工作台打开（完整分析）"
+                        onClick={() => onOpenMatch(entry.id, {
+                          roundNumber: r.roundNumber,
+                          tick: fact ? jumpTickFor(fact) : undefined,
+                        })}
+                      >
+                        工作台 ↗
+                      </button>
+                    </>
                   )}
                 </td>
               </tr>

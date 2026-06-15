@@ -51,8 +51,15 @@ export function CoachView({
 }: CoachViewProps) {
   const [tab, setTab] = useState<CoachTab>("patterns");
   const [clusters, setClusters] = useState<TacticalCluster[] | null>(null);
+  // facts：subject（分析主体队伍）过滤后用于开局模式/战术本；allFacts：全量（当前口径）
+  // 用于备战报告把两支队伍各自跨所有对手聚合比较。对手是"抽象的"——分析永远是
+  // 针对一支队伍、跨其所有对手聚合，不做 head-to-head 限制。
   const [facts, setFacts] = useState<TacticalRoundFact[]>([]);
+  const [allFacts, setAllFacts] = useState<TacticalRoundFact[]>([]);
+  const [hasValidFacts, setHasValidFacts] = useState(false);
   const [settings, setSettings] = useState<CoachSettings>({ myTeamName: null, opponentTeamName: null });
+  // 视角：己方复盘（主体=我的队伍）/ 敌方侦察（主体=对手队伍）。两者复用同一套分析。
+  const [mode, setMode] = useState<"own" | "scout">("own");
   const [playbook, setPlaybook] = useState<Record<string, string>>({});
   const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +68,7 @@ export function CoachView({
     () => teamRenameGroups(allEntries.map((entry) => ({ teamA: entry.meta.teamAName, teamB: entry.meta.teamBName })), teamRenames),
     [allEntries, teamRenames]
   );
+  const subjectTeam = mode === "own" ? settings.myTeamName : settings.opponentTeamName;
   useEffect(() => {
     void loadCoachSettings().then(setSettings);
     void listPlaybookNames().then(setPlaybook);
@@ -80,9 +88,11 @@ export function CoachView({
       .then((rows) => {
         if (!cancelled) {
           const validRows = rows.filter(isCurrentTacticalRoundFact);
-          const filteredRows = filterTacticalRows(validRows, settings, teamRenames);
-          setFacts(filteredRows);
-          setClusters(buildTacticalClusters(filteredRows));
+          const subjectRows = filterBySubjectTeam(validRows, subjectTeam, teamRenames);
+          setHasValidFacts(validRows.length > 0);
+          setAllFacts(validRows);
+          setFacts(subjectRows);
+          setClusters(buildTacticalClusters(subjectRows));
         }
       })
       .catch((err) => {
@@ -91,7 +101,7 @@ export function CoachView({
     return () => {
       cancelled = true;
     };
-  }, [entries, settings, teamRenames]);
+  }, [entries, subjectTeam, teamRenames]);
 
   async function setMyTeam(teamName: string) {
     const next = await saveCoachSettings({ ...settings, myTeamName: teamName || null });
@@ -116,7 +126,7 @@ export function CoachView({
     );
   }
 
-  const antiMarkdown = buildAntiStratMarkdown(clusters ?? [], settings.myTeamName);
+  const antiMarkdown = buildAntiStratMarkdown(clusters ?? [], subjectTeam);
 
   return (
     <div className="stu-view">
@@ -126,17 +136,39 @@ export function CoachView({
           <p>把多场 demo 里的开局站位、道具顺序和系列赛 BP 整理成教练能直接阅读的备战视图。</p>
         </div>
         <div className="stu-coach-filter-row">
-          <label className="stu-coach-team-picker">
-            分析对象
+          <div className="stu-subtabs stu-coach-mode-toggle" role="tablist" aria-label="分析视角">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "own"}
+              className={mode === "own" ? "stu-subtab stu-subtab-active" : "stu-subtab"}
+              onClick={() => setMode("own")}
+              title="复盘我的队伍：跨所有对手聚合其打法"
+            >
+              己方复盘
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "scout"}
+              className={mode === "scout" ? "stu-subtab stu-subtab-active" : "stu-subtab"}
+              onClick={() => setMode("scout")}
+              title="侦察即将交手的对手：跨所有对手聚合其打法（不限是否与我方交手过）"
+            >
+              敌方侦察
+            </button>
+          </div>
+          <label className={mode === "own" ? "stu-coach-team-picker stu-coach-team-picker-active" : "stu-coach-team-picker"}>
+            我的队伍
             <select value={settings.myTeamName ?? ""} onChange={(event) => void setMyTeam(event.target.value)}>
               <option value="">全部队伍</option>
               {teamGroups.map((team) => <option key={team.displayName} value={team.displayName}>{team.displayName}</option>)}
             </select>
           </label>
-          <label className="stu-coach-team-picker">
-            指定对手
+          <label className={mode === "scout" ? "stu-coach-team-picker stu-coach-team-picker-active" : "stu-coach-team-picker"}>
+            对手队伍
             <select value={settings.opponentTeamName ?? ""} onChange={(event) => void setOpponentTeam(event.target.value)}>
-              <option value="">未指定</option>
+              <option value="">未选择</option>
               {teamGroups.map((team) => <option key={team.displayName} value={team.displayName}>{team.displayName}</option>)}
             </select>
           </label>
@@ -160,7 +192,16 @@ export function CoachView({
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
       {!error && !clusters && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的开局 pattern…</div>}
-      {!error && clusters && clusters.length === 0 && entries.length > 0 && (
+      {!error && clusters && clusters.length === 0 && entries.length > 0 && hasValidFacts && (
+        <EmptyState
+          variant="insufficient"
+          title="该队伍在当前范围内无战术回合"
+          hint={subjectTeam
+            ? `「${subjectTeam}」在当前聚合范围内没有可用回合（可能这些场次里没有该队，或该队未打这些地图）。调整上方聚合范围或在「${mode === "own" ? "我的队伍" : "对手队伍"}」里换一支队。`
+            : `请在上方${mode === "own" ? "「我的队伍」" : "「对手队伍」"}里选择要分析的队伍。`}
+        />
+      )}
+      {!error && clusters && clusters.length === 0 && entries.length > 0 && !hasValidFacts && (
         <EmptyState
           variant="insufficient"
           title="需要重建教练事实"
@@ -221,7 +262,7 @@ export function CoachView({
         <>
           <MapPoolTable
             clusters={clusters}
-            facts={facts}
+            facts={allFacts}
             entries={allEntries}
             myTeamName={settings.myTeamName}
             opponentTeamName={settings.opponentTeamName}
@@ -251,20 +292,18 @@ function normalizeTeamName(name: string | null | undefined, teamRenames: Record<
   return displayTeamName(name ?? "", teamRenames).trim().toLowerCase();
 }
 
-function filterTacticalRows(
+/**
+ * 按"分析主体队伍"过滤——只看该队的回合，跨其所有对手聚合（对手是抽象维度）。
+ * subjectTeam 为 null 时返回全部（"全部队伍"概览）。绝不做 head-to-head 对手限制。
+ */
+function filterBySubjectTeam(
   rows: TacticalRoundFact[],
-  settings: CoachSettings,
+  subjectTeam: string | null,
   teamRenames: Record<string, string>,
 ): TacticalRoundFact[] {
-  const team = settings.myTeamName ? normalizeTeamName(settings.myTeamName, teamRenames) : null;
-  const opponent = settings.opponentTeamName ? normalizeTeamName(settings.opponentTeamName, teamRenames) : null;
-  return rows.filter((row) => {
-    const rowTeam = normalizeTeamName(row.teamName, teamRenames);
-    const rowOpponent = normalizeTeamName(row.opponentName, teamRenames);
-    if (team && rowTeam !== team) return false;
-    if (opponent && rowOpponent !== opponent) return false;
-    return true;
-  });
+  if (!subjectTeam) return rows;
+  const subject = normalizeTeamName(subjectTeam, teamRenames);
+  return rows.filter((row) => normalizeTeamName(row.teamName, teamRenames) === subject);
 }
 
 function isCurrentTacticalRoundFact(row: TacticalRoundFact): boolean {

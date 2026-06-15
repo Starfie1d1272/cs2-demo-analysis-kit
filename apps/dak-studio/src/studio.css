@@ -3054,6 +3054,16 @@ td.stu-heat-cell.stu-heat-neutral {
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
+  align-items: end;
+}
+
+.stu-coach-mode-toggle {
+  align-self: end;
+}
+
+.stu-coach-team-picker-active select {
+  border-color: rgba(47, 224, 168, 0.5);
+  background: var(--dak-accent-soft);
 }
 
 .stu-coach-team-picker select {
@@ -3159,6 +3169,32 @@ td.stu-heat-cell.stu-heat-neutral {
   text-align: center;
   color: var(--dak-fg-dim);
   font-size: 13px;
+}
+
+.stu-pe-side-toggle {
+  margin-bottom: 12px;
+}
+
+.stu-pe-replay {
+  display: grid;
+  gap: 8px;
+}
+
+.stu-pe-replay-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stu-pe-replay-label {
+  font-size: 12px;
+  color: var(--dak-fg-mid);
+}
+
+.stu-button-sm-active {
+  border-color: rgba(47, 224, 168, 0.5);
+  background: var(--dak-accent-soft);
+  color: var(--dak-fg);
 }
 
 .stu-pe-radar-wrap {

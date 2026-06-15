@@ -51,11 +51,12 @@ export function MapPoolTable({ facts, myTeamName, opponentTeamName, teamRenames 
     const mapNames = [...new Set(facts.map((f) => f.mapName))].sort();
     return mapNames.map((mapName): MapRow => {
       const mapFacts = facts.filter((f) => f.mapName === mapName);
+      // 对手抽象：两支队伍各自跨所有对手聚合，不做 head-to-head 限制。
       const myFacts = myNorm
-        ? mapFacts.filter((f) => norm(f.teamName, teamRenames) === myNorm && (!oppNorm || norm(f.opponentName, teamRenames) === oppNorm))
+        ? mapFacts.filter((f) => norm(f.teamName, teamRenames) === myNorm)
         : [];
       const oppFacts = oppNorm
-        ? mapFacts.filter((f) => norm(f.teamName, teamRenames) === oppNorm && (!myNorm || norm(f.opponentName, teamRenames) === myNorm))
+        ? mapFacts.filter((f) => norm(f.teamName, teamRenames) === oppNorm)
         : [];
 
       const oppClusters = buildTacticalClusters(oppFacts).slice(0, 3);
@@ -75,7 +76,7 @@ export function MapPoolTable({ facts, myTeamName, opponentTeamName, teamRenames 
   }, [facts, myNorm, oppNorm, teamRenames]);
 
   if (!oppNorm) {
-    return <div className="stu-card stu-empty">请先选择指定对手，地图池不会把所有非我方队伍混算为对手。</div>;
+    return <div className="stu-card stu-empty">在上方「对手队伍」里选择即将交手的对手，这里会把它（与我的队伍）各自跨所有对手聚合后按地图比较。</div>;
   }
 
   if (maps.length === 0) {
