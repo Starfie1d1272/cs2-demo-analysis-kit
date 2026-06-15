@@ -10,7 +10,7 @@ import type { DemoPackage, EconomyType, MatchWorkspaceModel, OpeningTrailsModel,
 import { decodeDelta, FLAG_ALIVE, FLAG_HAS_BOMB } from "@cs2dak/contract";
 import type { TriangleBvh, CalloutGrid, Vec3 } from "@cs2dak/maps";
 import type { LineupGrenadeLike } from "@cs2dak/maps";
-import { calloutNear, DEFAULT_POSITIONS, roleOf } from "@cs2dak/maps";
+import { calloutNear, calloutTendency, roleOf } from "@cs2dak/maps";
 import {
   buildMatchWorkspaceModel,
   buildOpeningTrails,
@@ -500,26 +500,11 @@ function siteFromCallout(callout: string | null): "a" | "b" | null {
   return null;
 }
 
+/** 查 callout 的战术方向：委托 calloutTendency（CALLOUT_DICT 倾向表），
+ *  取代旧的 anchorId 前缀启发式（对非标准锚点名会产生误报 "other"）。 */
 function targetRegionFromCallout(mapName: string, callout: string | null): TacticalGrenadeOccurrence["targetRegion"] {
   if (!callout) return "unknown";
-  if (callout === "BombsiteA") return "a";
-  if (callout === "BombsiteB") return "b";
-  const defaults = DEFAULT_POSITIONS[mapName];
-  if (!defaults) return "unknown";
-
-  for (const [anchorId, anchor] of Object.entries(defaults.ct.anchors)) {
-    if (!anchor.callouts.includes(callout)) continue;
-    if (anchorId.startsWith("a_")) return "a";
-    if (anchorId.startsWith("b_")) return "b";
-    if (anchorId.includes("mid")) return "mid";
-    return "other";
-  }
-
-  for (const [anchorId, anchor] of Object.entries(defaults.t.anchors)) {
-    if (anchor.callouts.includes(callout) && anchorId.includes("mid")) return "mid";
-  }
-
-  return "unknown";
+  return calloutTendency(mapName, callout)?.[0] ?? "unknown";
 }
 
 function siteEntriesFor(
