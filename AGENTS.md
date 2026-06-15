@@ -67,7 +67,7 @@ Python `uv sync --extra gui` 装 pywebview（GUI 运行需要）。禁止向系�
 | `@cs2dak/react` | React 组件。只消费 presentation 合同，不查数据库、不跑分析。 |
 | `@cs2dak/cli` | 薄 CLI（tsx），把 `@cs2dak/core` 接到文件系统。 |
 | `apps/demo-lab` | Vite + React 应用：组件预览、fixture 人工验收与视觉回归入口。 |
-| `apps/dak-studio` | DAK Studio：本地 Demo 管理、战术分析与个人打法复盘工作台（独立设计语言；导入即提取 facts 行持久化，视图读投影；IndexedDB 开发 / SQLite 桌面双后端）。教练页战术聚类（`TacticalRoundFact`/`TacticalCluster` + `PatternExplorer` + `MapPoolTable` + Round Playlist）见 `docs/design/studio-redesign.md §8`。 |
+| `apps/dak-studio` | DAK Studio：本地 Demo 管理、战术分析与个人打法复盘工作台（独立设计语言；导入即提取 facts 行持久化，视图读投影；IndexedDB 开发 / SQLite 桌面双后端）。教练页战术聚类 0.6.0 已落地（`TacticalRoundFact`/`TacticalCluster` + `PatternExplorer` 三栏 + `RadarTrails` + `MapPoolTable` + Round Playlist + 默认位资产 + 3D callout 网格）见 `docs/design/studio-redesign.md §8`。 |
 | `python/src/cs2dak` | Python 壳（cs2df 包装器）：pywebview GUI + DAK Studio 导出桥。CLI 仅保留 gui/version。 |
 
 ```

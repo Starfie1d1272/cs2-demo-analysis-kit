@@ -4,6 +4,64 @@ DAK Studio 桌面应用及 `@cs2dak/*` 分析管道面向用户的变更记录�
 
 > 0.1.3 起面向 Studio 用户维护。`@cs2dak/*` npm 包版本由 changesets 独立管理（见各包的 CHANGELOG.md）；本文件聚焦 DAK Studio 桌面应用变更。
 
+## [Unreleased] — 2026-06-16 (0.6.0 教练工作台 + maps 默认位)
+
+### 新增
+
+#### 教练工作台战术聚类 0.6.0
+
+- **TacticalRoundFact 提取**：替换旧 OpeningPatternFact。每存活 side 一行，携带多时间切片双层站位（阵营专属默认位 + 深层图权）、双点投入人数/道具/最深推进、进点节奏桶（rush/fast/mid/late）、首杀、经济、下包状态。
+- **战术聚类**（`buildTacticalClusters`）：双层 basis（defaults/advanced）序列化进 key，道具移出 key 改为关联统计；复合 key = map + side + targetSite + 首切片 defaults + entryAnchors + 节奏桶。
+- **RadarTrails 共享雷达叠加组件**：从 TrailsView 抽出，world-space 输入、内部投影。`TrailsView` 改造为消费它。
+- **PatternExplorer 三栏布局**：簇列表/雷达快照/数据摘要+证据回合表；`autoName` 模板自动命名（锚点名 + 节奏）。
+- **判断层 v0**：疑似道具佯攻检测（site 道具≥2 且进点 0 人）。
+- **CT/T 视角切换** + **页内回放** + **对手抽象**：CoachView 支持 CT/T 双视角查看 pattern，回放直接嵌入教练页内，对手对象解耦为可配置。
+- **进点 A1/A2 区分** + **C4 轨迹佯攻判定**：双点投入统计区分包点入口子区域；C4 全程轨迹辅助判断是真打还是佯攻。
+- **切片时间标签** + **聚类双层大分类**：snapshots 时间切片加标签；聚类按先深层后表层分层。
+- **备战清单持久化 + Markdown 导出**：新建 `playlist.ts`（PlaylistItem 类型 + `playlistToMarkdown`），series.ts 追加 playlist CRUD。
+- **MapPoolTable 地图池比较表**：按地图列出我方/对手样本胜率+对手高频打法+备注列，CoachView anti tab 主体。
+- **资料库服务器筛选 + 日期区间 + 批量删除/重导**。
+
+#### Maps 包 — 默认位资产
+
+- **七图阵营默认位固化**：数据驱动归并脚本（`scripts/derive-default-positions.ts`），11 场 NJU+24 场职业共 110 场样本，7 张竞技图的 CT/T/争夺三组口径固化到 `default-positions.ts`。
+- **审核报告管线**：脚本输出可读审核报告（含 T/CT 高频占有、≥5s/≥10s 连续驻留率、相邻转换边证据）、双语 callout、三组口径（T 默认/CT 默认/争夺区）。
+- **多轮迭代精度**：草案归并→人工抽查→微调归并→重跑报告。
+
+#### Maps 包 — callout 网格 3D 化
+
+- **3D 多数表决 callout 网格 + `calloutAt()` 接口**：三维空间位置直接查 callout，替代人工映射。
+- **callout 条目统一格式**：全部改为 `{cn, tendency?}`，`regionOfAnchor` 三步查找机制。
+- **`CALLOUT_NAME_CN` 更名为 `CALLOUT_DICT`**：统一命名规范。
+- **`targetRegionFromCallout` 改为委托 `calloutTendency`**：消除重复的阵营倾向逻辑。
+- **route zone 中文名统一取自 callout-names**：消除 route 和 callout 间的中文硬编码重复。
+
+#### 回放
+
+- **地面掉落拆弹器标注**：Defuse Kit 落地即标注可见。
+
+#### 公共模块
+
+- **Base64 分块编码模块**：避免大文件栈溢出。
+
+### 性能
+
+- **消除批量导入/删除 OOM**：`StorageAdapter` 加 `deleteByPrefix`，批量重导不再内存爆炸。
+- **CoachView 合 state + facts OOM 修复** + **PatternExplorer 缓存清理**。
+- **经济标签统一为标准中文**。
+
+### 修复
+
+- **教练页 CT/T 语义修正**：佯攻/下包率口径修正。
+- **PatternExplorer 回放缓存传参类型补全**。
+- **资料库日期范围不再折行** + 教练页内回放铺满不重叠。
+- **UI token 合规**：悬挂变量、旧死 CSS、PatternExplorer 样式。
+
+### 清除
+
+- 旧 `OpeningPatternFact`、`PatternTable`/`formatPatternBasis`/`formatGrenades`/`GRENADE_LABEL` 等废弃代码删除。
+- Route 动线资产标记归档。
+
 ## [0.5.4] — 2026-06-14
 
 ### 新增

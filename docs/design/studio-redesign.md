@@ -172,6 +172,10 @@ one tap 只对可一枪满血终结的武器展示，Glock/USP/M4 等不展示�
   聚类 key；`PatternExplorer` 三栏（簇列表 / 雷达快照叠加 / 数据摘要 + 证据
   回合表）；`autoName` 模板自动命名（锚点名 + 节奏）；判断层 v0 疑似佯攻检测。
   道具移出 key 改为关联统计，不影响聚类稳定性。
+  **CT/T 视角切换** + **页内回放**：支持 CT 侧和 T 侧双视角查看 pattern；
+  回放直接嵌入教练页内，无需跳转比赛工作台。
+  **进点 A1/A2 子区域区分** + **C4 轨迹佯攻判定**：双点投入细分为包点入口子区域；
+  全程 C4 轨迹辅助判断是真打还是佯攻。
 - 8b Playbook：cluster 命名沉淀（IndexedDB，接新 `TacticalCluster.id`）✅。
 - 8c Anti-Strat 报告：对手近 N 场倾向 → Markdown 导出 ✅（基于 `TacticalCluster`
   重写，按地图/side 分段列出 `autoName` + 胜率）。
@@ -221,11 +225,19 @@ one tap 只对可一枪满血终结的武器展示，Glock/USP/M4 等不展示�
 | 道具时序条（与回合时间轴对齐） | 5 | react | ⬜ |
 | 队伍对比页 | 7 | presentation + react | ✅ 2026-06-13 |
 | 8a 战术聚类（TacticalCluster + PatternExplorer） | 8 | dak-studio | ✅ 2026-06-15 |
+| CT/T 视角切换 + 页内回放 | 8 | dak-studio | ✅ 2026-06-16 |
+| A1/A2 进点子区域区分 + C4 轨迹佯攻判定 | 8 | dak-studio | ✅ 2026-06-16 |
+| 切片时间标签 + 聚类双层大分类 | 8 | dak-studio | ✅ 2026-06-16 |
 | 8d series/BP（SeriesWorkspace/BpView/VetoInputDialog） | 8 | presentation + studio | ✅ 2026-06-13 |
 | 8d 地图池比较表（MapPoolTable） | 8 | dak-studio | ✅ 2026-06-15 |
 | 8e Round Playlist 备战清单 | 8 | dak-studio | ✅ 2026-06-15 |
 | 8a 完整战术路线（MapRoute+zone 动线链） | 8 | cohort/maps/presentation | ⬜ v0.7+ |
 | 「这是我」标记 + 主页编排 | 9 | studio | ✅ 2026-06-12 |
+| 资料库服务器筛选 + 日期区间 + 批量删除/重导 | 1 | dak-studio | ✅ 2026-06-16 |
+| 公共 base64 分块编码模块 | 全局 | studio lib | ✅ 2026-06-16 |
+| maps 默认位资产（七图阵营专属默认位） | maps | `@cs2dak/maps` | ✅ 2026-06-15 |
+| maps 3D callout 网格（calloutAt） | maps | `@cs2dak/maps` | ✅ 2026-06-16 |
+| 地面掉落拆弹器标注 | 2 | replay | ✅ 2026-06-16 |
 | 机制跨场聚合从 presentation 迁往 cohort | 架构债 | presentation → cohort | ⬜ 低优先 |
 
-下一个重点：模块 8 完整战术路线重设计（§8，0.6）；其余缺口按需排期。
+下一个重点：模块 8 完整战术路线重设计（全程 zone 动线链，§8，v0.7）；其余缺口按需排期。

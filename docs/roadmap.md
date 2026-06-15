@@ -10,9 +10,10 @@
 2. **三层视角共用同一数据层**：个人 / 主办方 / 教练；
 3. **Pattern 可解释**：不做黑盒评分，展示由哪些位置/道具/时间/交火结构得出。
 
-现状：九模块主体已落地（详见 studio-redesign）。**0.5.x 已发布（最新 0.5.3）**，
-0.5.3 后 main 新增 facts 本地持久化投影层（导入即提取 facts 行，视图读投影不重聚合）。
-0.6 集中重做教练战术路线，0.7 让它成为可靠的长期桌面软件。
+现状：九模块主体已落地（详见 studio-redesign）。**0.5.x 已发布（最新 0.5.4）**，
+0.5.4 后 main 已完成 0.6.0 教练工作台战术聚类首版（`TacticalRoundFact`+`PatternExplorer`+`RadarTrails`+
+`MapPoolTable`+`Playlist`）+ maps 默认位资产 + 3D callout 网格。
+完整战术路线（MapRoute+zone 动线链）为 v0.7 方向。
 
 ---
 
@@ -34,13 +35,16 @@ Coach 首版、Series/BP、Team Comparison、Lineup Library 重写，以及所�
 - [x] 导出默认启用 `--research`（急停/反应/预瞄恢复正常）
 - [x] pywebview→SQLite 存储后端接入（桌面版资料库落盘到 `userdata/studio.sqlite`）
 
-在建（main，待发）：
+在建（main，待发，0.6.0 教练首版已完成）：
 - [x] facts 本地持久化投影层：`extractMatchFacts` + `FactsStore`，导入即落 facts 行
 - [x] season.ts + 各重型视图（TrailsView/CoachView/LineupView/MatchView）全切投影读取
 - [x] 清除死代码：`rrInputs` 投影与 `MATCH_FACTS_VERSION` 只写不读字段移除
+- [x] 教练首版 0.6.0：TacticalRoundFact + PatternExplorer 三栏 + RadarTrails + MapPoolTable + Playlist
+- [x] maps 默认位资产（七图阵营专属默认位固化）
+- [x] maps 3D callout 网格 + calloutAt() 接口
 - [ ] 50 / 200 / 500 场资料库性能抽测
 - [ ] 对枪人工验证集首版（对枪三分类 Beta→Stable 的闸门，见 stability-tiers）
-- [ ] macOS / Windows 冒烟测试 → 打 `v0.5.4` 或 `v0.6.0` tag
+- [ ] macOS / Windows 冒烟测试 → 打 `v0.6.0` tag
 
 > 发版机制见 [`docs/release.md`](release.md)：桌面随 `vX.Y.Z` git tag；npm 包独立走 changesets。
 
@@ -50,22 +54,27 @@ presentation 已以 `targetEndTick = nextRound.startTick` 留出接口）。
 
 ---
 
-## 0.6.0 — 只重做教练的完整战术路线
+## 0.6.0 — 教练战术首版 + maps 资产落地
 
-**只集中做这一件事**（设计见 studio-redesign §8）。现有 8a 只回答「开局 15/20/30s 站在哪」，
-无中期动线、无「如何打进包点」，教练视角几乎不可用——这是当前唯一需要「大改而非小修」的模块。
+### 已完成（2026-06-16）
 
-### Tactical Route 模型
-每轮抽取：五人开局 zone → 每人完整 zone 序列 → 关键区域首次进入时间 → 首接触/首杀 →
-道具在路线节点的相对时间 → 包的路线 → 最终进点人数 → 下包点与 post-plant 分布 → 战术结果。
+- **TacticalRoundFact 提取**：替换旧 OpeningPatternFact，双层站位（defaults/advanced）+ 双点投入 + 倒计时节奏桶 + 首杀 + 经济。
+- **PatternExplorer 三栏**：簇列表/雷达快照/数据摘要+证据回合表；`autoName` 模板命名。
+- **RadarTrails**：从 TrailsView 抽出的共享雷达叠加渲染器。
+- **CT/T 视角切换 + 页内回放 + 对手抽象**。
+- **MapPoolTable**：地图池比较表（我方/对手胜率+高频打法+备注）。
+- **Round Playlist**：备战清单持久化 + Markdown 导出。
+- **Maps 默认位资产**：七图阵营专属默认位（110 场数据驱动 + 人工抽查）。
+- **Maps 3D callout 网格**：`calloutAt()` 三维空间查 callout。
 
-聚类后每个 Pattern 展示：一条可读路线 + 典型回合（可点回放）+ 变化分支 + 使用频率 +
-经济条件 + 成功率 + 对手反制 + 证据回放。execute / split / fake / default / retake 规则透明。
+### 未完成（v0.7+）
 
-配套：道具实验室的 lineup 聚类作为路线节点的证据源；8d ban/pick 建议表（纯统计）。
-**落地前不把 Coach 作为付费卖点。**
+- **完整战术路线**（开局站位 → zone 动线链 → 进包执行）：需扩展 Pattern 向量为全回合 zone 轨迹。现有 `TacticalRoundFact.snapshots[]` 已预留多切片扩展。
+- **道具实验室 lineup 聚类作为路线节点证据源**。
+- **8d ban/pick 建议表**（纯统计）。
 
-并行（不占 Coach 主线）：集成 Phase 1 数据 API（[`integration.md`](integration.md) §2），
+### 并行（不占 Coach 主线）
+集成 Phase 1 数据 API（[`integration.md`](integration.md) §2），
 让赛事数据在 RivalHub ↔ DAK 之间流起来。
 
 ---

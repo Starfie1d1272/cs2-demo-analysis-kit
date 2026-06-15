@@ -41,9 +41,8 @@ UI 约定：Beta 指标在标题旁标 `Beta`，Experimental 标 `实验`；两�
 
 ### Experimental
 
-- **Pattern Finder（8a）**：当前只回答「开局 15/20/30s 站位」，无中期动线，教练视角不可用。
-  0.6 完整战术路线重写前视为占位骨架。
-- **Anti-strat 报告文本**：首版 Markdown，结论强度受 Pattern Finder 限制。
+- **8a 战术聚类（TacticalCluster + PatternExplorer）**：0.6 首版已落地——双层默认位快照 + 倒计时节奏桶 + 佯攻检测，支持 CT/T 双视角。但当前仍是开局`snapshots[]`切片采样，**无全程 zone 动线轨迹**。0.7 完整战术路线重写前视为骨架。
+- **Anti-strat 报告文本**：已随 TacticalCluster 重写为按地图/side 分段的备战 Markdown，不再使用旧 OpeningPatternCluster；结论强度仍受缺失全程动线限制。
 - **BP / Veto 建议表**：ban/pick 纯统计建议未实现；现有仅录入/展示。
 
 ### 不做（已决策，非分级）
@@ -60,6 +59,6 @@ UI 约定：Beta 指标在标题旁标 `Beta`，Experimental 标 `实验`；两�
 | 枪法机制 | Beta | 同上验证集 + 跨地图稳健性抽查 |
 | 反应/预瞄 | Beta | `.tri` 精确 vs 退化口径差异量化 |
 | Lineup zone 归属 | Beta | 全地图 zone 多边形标定完成 |
-| Pattern Finder | Experimental | 0.6 完整战术路线落地（`studio-redesign.md` §8） |
+| 8a 战术聚类（TacticalCluster）| Experimental | 0.7 完整战术路线落地（全程 zone 动线轨迹，`studio-redesign.md` §8） |
 
 > 对枪验证集是 0.5/0.6 的关键工程债：没有它，对枪实验室再复杂，用户也无从判断可靠性。
