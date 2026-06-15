@@ -283,8 +283,9 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     pkgCache.delete(replacement.id);
     void getFactsStore().deleteMatchFacts(matchIdForEntry(replacement));
   }
-  pkgCache.set(id, Promise.resolve(pkg));
   // 导入时已解析出 pkg，顺手榨成 facts；后续聚合走 facts 投影，不再反序列化整包 derived。
+  // 注意：不把 pkg 放进 pkgCache —— 批量导入会让每场 DemoPackage（含完整 replay）常驻内存
+  // 导致 OOM。需要整包时由 getDemoPackage 按需从 ZIP 懒加载即可。
   await writeFactsForPackage(id, entry, pkg);
   return { entry, duplicate: false, replaced: Boolean(replacement), replacedId: replacement?.id };
 }

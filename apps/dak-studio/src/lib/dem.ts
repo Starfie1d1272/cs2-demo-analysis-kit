@@ -93,6 +93,17 @@ function base64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
+/** 分块 base64 编码：避免 `String.fromCharCode(...huge)` 对大 .dem（上百 MB）爆调用栈。 */
+function bytesToBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  const CHUNK = 0x8000; // 32KB/块，远低于参数展开上限
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
 /** dev 模式：把 .dem 字节流交给 Vite 中间件，拿回导出的 ZIP。 */
 async function exportViaDev(file: File): Promise<File> {
   // lastModified 透传给中间件：exporter 用 .dem 的 mtime 生成比赛日期前缀，
@@ -130,7 +141,7 @@ async function exportViaPywebview(file: File, onProgress?: (message: string) => 
     );
   }
   const buf = await file.arrayBuffer();
-  const dataB64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const dataB64 = bytesToBase64(buf);
   const result = await api.export_dem_bytes(file.name, dataB64);
   if (!result.ok) throw new Error(`${file.name}: ${result.error}`);
   return {

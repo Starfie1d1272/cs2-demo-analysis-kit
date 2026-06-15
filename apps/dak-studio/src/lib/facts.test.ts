@@ -169,4 +169,35 @@ describe("MatchFacts", () => {
     expect(rows.length).toBe(facts.tacticalRounds.length);
     expect(rows[0]?.snapshots.length).toBeGreaterThanOrEqual(2);
   });
+
+  it("replaceRows：删除一场只动该场，另一场完整保留（key 前缀删除，不全量反序列化）", async () => {
+    const pkg = await loadFixture();
+    const store = createFactsStore(createIdbAdapter(), "facts-replace-isolation");
+    await store.putMatchFacts(extractMatchFacts(pkg, { matchId: "m1" }));
+    await store.putMatchFacts(extractMatchFacts(pkg, { matchId: "m2" }));
+
+    // 两场并存
+    expect((await store.getMatchWorkspaces({ matchIds: ["m1"] })).length).toBe(1);
+    expect((await store.getMatchWorkspaces({ matchIds: ["m2"] })).length).toBe(1);
+    const m2Tactical = (await store.getTacticalRounds({ matchIds: ["m2"] })).length;
+    expect(m2Tactical).toBeGreaterThan(0);
+
+    // 删除 m1：m1 全部清空，m2 不受影响
+    await store.deleteMatchFacts("m1");
+    expect((await store.getMatchWorkspaces({ matchIds: ["m1"] })).length).toBe(0);
+    expect((await store.getTacticalRounds({ matchIds: ["m1"] })).length).toBe(0);
+    expect((await store.getPlayerMatchStats({ matchIds: ["m1"] })).length).toBe(0);
+    expect((await store.getMatchWorkspaces({ matchIds: ["m2"] })).length).toBe(1);
+    expect((await store.getTacticalRounds({ matchIds: ["m2"] })).length).toBe(m2Tactical);
+  });
+
+  it("replaceRows：重复 put 同一场幂等，不产生重复行", async () => {
+    const pkg = await loadFixture();
+    const store = createFactsStore(createIdbAdapter(), "facts-replace-idempotent");
+    const facts = extractMatchFacts(pkg, { matchId: "m1" });
+    await store.putMatchFacts(facts);
+    await store.putMatchFacts(facts);
+    expect((await store.getTacticalRounds({ matchIds: ["m1"] })).length).toBe(facts.tacticalRounds.length);
+    expect((await store.getMatchWorkspaces({ matchIds: ["m1"] })).length).toBe(1);
+  });
 });
