@@ -4,14 +4,14 @@ import { playlistToMarkdown, type PlaylistItem } from "./playlist.js";
 describe("playlistToMarkdown", () => {
   it("导出 Markdown：分组 + 人工备注", () => {
     const items: PlaylistItem[] = [
-      { id: "1", group: "对手 A 双线", matchId: "m1", roundNumber: 7, note: "二楼晚 3-5 秒" },
-      { id: "2", group: "对手 A 双线", matchId: "m1", roundNumber: 9, note: "" },
+      { id: "1", group: "对手 A 双线", matchId: "m1", mapName: "de_mirage", roundNumber: 7, note: "二楼晚 3-5 秒" },
+      { id: "2", group: "对手 A 双线", matchId: "m1", mapName: "de_mirage", roundNumber: 9, note: "" },
     ];
     const md = playlistToMarkdown("Mirage vs Team B", items);
     expect(md).toContain("# Mirage vs Team B");
     expect(md).toContain("## 对手 A 双线");
-    expect(md).toContain("- R7 — 二楼晚 3-5 秒");
-    expect(md).toContain("- R9");
+    expect(md).toContain("- de_mirage · m1 · R7 — 二楼晚 3-5 秒");
+    expect(md).toContain("- de_mirage · m1 · R9");
   });
 
   it("无备注行只输出回合号", () => {
@@ -19,7 +19,7 @@ describe("playlistToMarkdown", () => {
       { id: "1", group: "测试组", matchId: "m1", roundNumber: 3, note: "" },
     ];
     const md = playlistToMarkdown("测试", items);
-    expect(md).toContain("- R3");
+    expect(md).toContain("- m1 · R3");
     expect(md).not.toContain("—");
   });
 

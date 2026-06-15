@@ -2,8 +2,10 @@ export interface PlaylistItem {
   id: string;
   group: string;
   matchId: string;
+  mapName?: string;
   roundNumber: number;
   clusterId?: string;
+  patternFingerprint?: string;
   note: string;
   addedAt?: number;
 }
@@ -17,7 +19,10 @@ export function playlistToMarkdown(title: string, items: PlaylistItem[]): string
   }
 
   const sections = [...groups.entries()].map(([group, rows]) => {
-    const lines = rows.map((r) => (r.note ? `- R${r.roundNumber} — ${r.note}` : `- R${r.roundNumber}`));
+    const lines = rows.map((r) => {
+      const source = [r.mapName, r.matchId, `R${r.roundNumber}`].filter(Boolean).join(" · ");
+      return r.note ? `- ${source} — ${r.note}` : `- ${source}`;
+    });
     return `## ${group}\n${lines.join("\n")}`;
   });
 

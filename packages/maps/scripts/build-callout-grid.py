@@ -19,7 +19,7 @@ import zipfile, json, glob, os, re, collections, math, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 GRID = 10  # 每个格点 10 单位
-MIN_CONFIDENCE = 0.50  # 多数占比低于此 → 标记为 unknown
+MIN_CONFIDENCE = 0.50  # 多数占比小于等于此 → 标记为 unknown
 MIN_SAMPLES = 3  # 少于这个帧数 → 不纳入网格
 
 def decode_delta(values):
@@ -124,10 +124,14 @@ for mp, mp_zips in sorted(maps_zips.items()):
             continue
         total_cells += 1
 
-        top_callout, top_count = counter.most_common(1)[0]
+        common = counter.most_common(2)
+        top_callout, top_count = common[0]
+        if len(common) > 1 and common[1][1] == top_count:
+            unknown_count += 1
+            continue
         confidence = top_count / total_samples
 
-        if confidence < MIN_CONFIDENCE:
+        if confidence <= MIN_CONFIDENCE:
             unknown_count += 1
             continue
 

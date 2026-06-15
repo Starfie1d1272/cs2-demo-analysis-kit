@@ -3038,6 +3038,13 @@ td.stu-heat-cell.stu-heat-neutral {
   font-size: 12px;
 }
 
+.stu-coach-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .stu-coach-team-picker select {
   height: 32px;
   border: 1px solid var(--dak-border);

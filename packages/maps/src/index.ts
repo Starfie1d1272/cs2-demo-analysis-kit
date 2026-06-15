@@ -10,9 +10,13 @@ export * from "./default-positions.js";
 export { CALLOUT_NAME_CN, CALLOUT_MAPS } from "./callout-names.js";
 export {
   calloutAt,
+  calloutNear,
   type CalloutGrid,
+  type CalloutGridCell,
   type CalloutGridMeta,
   type CalloutAtResult,
+  type CalloutNearOptions,
+  type CalloutNearResult,
 } from "./callout-grid.js";
 
 export interface MapCalibration {

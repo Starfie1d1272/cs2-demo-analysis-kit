@@ -7,7 +7,26 @@ import {
   suspectFake,
   autoName,
 } from "./tactics.js";
-import type { TacticalRoundFact } from "./facts.js";
+import type { TacticalGrenadeOccurrence, TacticalRoundFact } from "./facts.js";
+
+function grenade(p: Partial<TacticalGrenadeOccurrence> = {}): TacticalGrenadeOccurrence {
+  return {
+    id: "g",
+    type: "smoke",
+    throwTick: 800,
+    effectTick: 900,
+    throwPosition: { x: 0, y: 0, z: 0 },
+    effectPosition: { x: 1, y: 1, z: 0 },
+    throwCallout: "Ramp",
+    effectCallout: "BombsiteA",
+    effectCalloutSource: "exact",
+    effectCalloutDistance: 0,
+    confidence: 0.8,
+    samples: 10,
+    targetRegion: "a",
+    ...p,
+  };
+}
 
 function fact(p: Partial<TacticalRoundFact> = {}): TacticalRoundFact {
   return {
@@ -110,9 +129,9 @@ describe("判断层 v0", () => {
         b: { entrants: 3, firstEntryTick: 1000, secondEntryTick: 1100, firstEntryRemainSec: 90, executeRemainSec: 88, order: [] },
       },
       grenades: [
-        { id: "g1", type: "smoke", throwTick: 800, effectTick: 900, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
-        { id: "g2", type: "flashbang", throwTick: 810, effectTick: 910, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
-        { id: "g3", type: "hegrenade", throwTick: 820, effectTick: 920, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
+        grenade({ id: "g1", type: "smoke" }),
+        grenade({ id: "g2", type: "flashbang", throwTick: 810, effectTick: 910 }),
+        grenade({ id: "g3", type: "hegrenade", throwTick: 820, effectTick: 920 }),
       ],
       targetSite: "b",
     });
@@ -126,9 +145,9 @@ describe("判断层 v0", () => {
         b: { entrants: 3, firstEntryTick: 1000, secondEntryTick: 1100, firstEntryRemainSec: 90, executeRemainSec: 88, order: [] },
       },
       grenades: [
-        { id: "g1", type: "flashbang", throwTick: 800, effectTick: 900, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
-        { id: "g2", type: "flashbang", throwTick: 810, effectTick: 910, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
-        { id: "g3", type: "hegrenade", throwTick: 820, effectTick: 920, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
+        grenade({ id: "g1", type: "flashbang" }),
+        grenade({ id: "g2", type: "flashbang", throwTick: 810, effectTick: 910 }),
+        grenade({ id: "g3", type: "hegrenade", throwTick: 820, effectTick: 920 }),
       ],
     })).suspected).toBe(false);
     expect(suspectFake(fact({
@@ -138,8 +157,8 @@ describe("判断层 v0", () => {
         b: { entrants: 3, firstEntryTick: 1000, secondEntryTick: 1100, firstEntryRemainSec: 90, executeRemainSec: 88, order: [] },
       },
       grenades: [
-        { id: "g1", type: "smoke", throwTick: 800, effectTick: 900, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
-        { id: "g2", type: "flashbang", throwTick: 810, effectTick: 910, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
+        grenade({ id: "g1", type: "smoke" }),
+        grenade({ id: "g2", type: "flashbang", throwTick: 810, effectTick: 910 }),
       ],
     })).suspected).toBe(false);
   });
@@ -150,9 +169,9 @@ describe("判断层 v0", () => {
         b: { entrants: 3, firstEntryTick: 1000, secondEntryTick: 1100, firstEntryRemainSec: 90, executeRemainSec: 88, order: [] },
       },
       grenades: [
-        { id: "g1", type: "smoke", throwTick: 800, effectTick: 900, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
-        { id: "g2", type: "flashbang", throwTick: 810, effectTick: 910, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
-        { id: "g3", type: "hegrenade", throwTick: 820, effectTick: 920, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
+        grenade({ id: "g1", type: "smoke" }),
+        grenade({ id: "g2", type: "flashbang", throwTick: 810, effectTick: 910 }),
+        grenade({ id: "g3", type: "hegrenade", throwTick: 820, effectTick: 920 }),
       ],
       targetSite: "b",
     });

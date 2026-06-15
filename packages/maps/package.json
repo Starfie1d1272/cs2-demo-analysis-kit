@@ -5,11 +5,13 @@
   "license": "MIT",
   "exports": {
     ".": "./src/index.ts",
+    "./callout-grid-browser": "./src/callout-grid-browser.ts",
     "./callout-grid-node": "./src/callout-grid-node.ts",
     "./tri-assets": "./src/tri-assets.ts"
   },
   "files": [
     "src",
+    "callout-grid",
     "map-routes",
     "map-nav"
   ],

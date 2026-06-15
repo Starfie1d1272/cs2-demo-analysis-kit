@@ -37,6 +37,7 @@ export interface SeriesSuggestion {
 
 export interface CoachSettings {
   myTeamName: string | null;
+  opponentTeamName: string | null;
 }
 
 const SETTINGS_KEY = "coach";
@@ -45,6 +46,7 @@ const seriesStore = getStorage().records("series");
 const settingsStore = getStorage().records("series-settings");
 const playbookStore = getStorage().records("playbook");
 const playlistStore = getStorage().records("playlist");
+const mapPoolNotesStore = getStorage().records("map-pool-notes");
 
 function formatForCount(count: number): SeriesFormat {
   if (count >= 4) return "bo5";
@@ -177,9 +179,9 @@ export async function saveSeriesRecord(record: Omit<StudioSeriesRecord, "created
 export async function loadCoachSettings(): Promise<CoachSettings> {
   try {
     const value = await settingsStore.get<CoachSettings>(SETTINGS_KEY);
-    return value ?? { myTeamName: null };
+    return { myTeamName: value?.myTeamName ?? null, opponentTeamName: value?.opponentTeamName ?? null };
   } catch {
-    return { myTeamName: null };
+    return { myTeamName: null, opponentTeamName: null };
   }
 }
 
@@ -216,4 +218,17 @@ export async function savePlaylistItem(item: PlaylistItem): Promise<void> {
 
 export async function removePlaylistItem(id: string): Promise<void> {
   await playlistStore.delete(id);
+}
+
+export async function listMapPoolNotes(): Promise<Record<string, string>> {
+  try {
+    const entries = await mapPoolNotesStore.entries<string>();
+    return Object.fromEntries(entries.map(([mapName, note]) => [mapName, note ?? ""]));
+  } catch {
+    return {};
+  }
+}
+
+export async function saveMapPoolNote(mapName: string, note: string): Promise<void> {
+  await mapPoolNotesStore.put(mapName, note);
 }

@@ -15,9 +15,10 @@ export interface PatternExplorerProps {
   facts: TacticalRoundFact[];
   entryByMatchId: Map<string, StudioDemoEntry>;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onAddToPlaylist?: (cluster: TacticalCluster, fact: TacticalRoundFact) => void;
 }
 
-export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch }: PatternExplorerProps) {
+export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, onAddToPlaylist }: PatternExplorerProps) {
   const [selectedId, setSelectedId] = useState<string | null>(clusters[0]?.id ?? null);
 
   const selected = useMemo(() => clusters.find((c) => c.id === selectedId) ?? null, [clusters, selectedId]);
@@ -96,6 +97,7 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch }
               facts={selectedFacts}
               entryByMatchId={entryByMatchId}
               onOpenMatch={onOpenMatch}
+              onAddToPlaylist={onAddToPlaylist}
             />
           </>
         )}
@@ -116,7 +118,7 @@ function ClusterRadar({ facts, mapName }: { facts: TacticalRoundFact[]; mapName:
     return snapshot.positions.map((position) => ({
       id: `${fact.matchId}:${fact.roundNumber}:${position.playerIndex}:${safeSnapshotIndex}`,
       points: [{ x: position.x, y: position.y }],
-      color: fact.won ? "var(--dak-success)" : "var(--dak-danger)",
+      color: fact.won ? "var(--dak-ok)" : "var(--dak-danger)",
       opacity: 0.85 - Math.min(0.45, factIndex * 0.04),
     }));
   });
@@ -162,7 +164,7 @@ function ClusterRadar({ facts, mapName }: { facts: TacticalRoundFact[]; mapName:
         className="stu-trail-stage"
       />
       <div className="stu-pe-radar-legend">
-        <span><i style={{ background: "var(--dak-success)" }} />胜回合站位</span>
+        <span><i style={{ background: "var(--dak-ok)" }} />胜回合站位</span>
         <span><i style={{ background: "var(--dak-danger)" }} />负回合站位</span>
         {Object.entries(GRENADE_COLOR).map(([type, color]) => (
           <span key={type}><i style={{ background: color }} />{type}</span>
@@ -234,11 +236,13 @@ function EvidenceTable({
   facts,
   entryByMatchId,
   onOpenMatch,
+  onAddToPlaylist,
 }: {
   cluster: TacticalCluster;
   facts: TacticalRoundFact[];
   entryByMatchId: Map<string, StudioDemoEntry>;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onAddToPlaylist?: (cluster: TacticalCluster, fact: TacticalRoundFact) => void;
 }) {
   return (
     <div className="stu-pe-evidence">
@@ -271,6 +275,15 @@ function EvidenceTable({
                 <td>{fact?.plant ? `${fact.plant.site.toUpperCase()} ${fact.plant.remainSec}s` : "—"}</td>
                 <td className={r.won ? "stu-win" : "stu-loss"}>{r.won ? "胜" : "负"}</td>
                 <td>
+                  {fact && onAddToPlaylist && (
+                    <button
+                      type="button"
+                      className="stu-button-sm"
+                      onClick={() => onAddToPlaylist(cluster, fact)}
+                    >
+                      加入
+                    </button>
+                  )}
                   {entry && (
                     <button
                       type="button"

@@ -1,21 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState } from "../components/primitives";
-import { teamRenameGroups } from "../lib/identity";
+import { displayTeamName, teamRenameGroups } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getFactsStore, type TacticalRoundFact } from "../lib/facts";
 import { buildTacticalClusters, autoName, type TacticalCluster } from "../lib/tactics";
+import { playlistToMarkdown, type PlaylistItem } from "../lib/playlist";
 import {
   listPlaybookNames,
+  listPlaylist,
   loadCoachSettings,
+  removePlaylistItem,
   saveCoachSettings,
+  savePlaylistItem,
   savePlaybookName,
   type CoachSettings
 } from "../lib/series";
 import { PatternExplorer } from "./coach/PatternExplorer";
 import { MapPoolTable } from "./coach/MapPoolTable";
 
-type CoachTab = "patterns" | "playbook" | "anti";
+type CoachTab = "patterns" | "playbook" | "playlist" | "anti";
 
 export interface CoachViewProps {
   allEntries: StudioDemoEntry[];
@@ -30,6 +34,7 @@ export interface CoachViewProps {
 const TABS: Array<{ key: CoachTab; label: string }> = [
   { key: "patterns", label: "开局模式" },
   { key: "playbook", label: "战术本" },
+  { key: "playlist", label: "备战清单" },
   { key: "anti", label: "备战报告" }
 ];
 
@@ -47,8 +52,9 @@ export function CoachView({
   const [tab, setTab] = useState<CoachTab>("patterns");
   const [clusters, setClusters] = useState<TacticalCluster[] | null>(null);
   const [facts, setFacts] = useState<TacticalRoundFact[]>([]);
-  const [settings, setSettings] = useState<CoachSettings>({ myTeamName: null });
+  const [settings, setSettings] = useState<CoachSettings>({ myTeamName: null, opponentTeamName: null });
   const [playbook, setPlaybook] = useState<Record<string, string>>({});
+  const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
   const teamGroups = useMemo(
@@ -58,6 +64,7 @@ export function CoachView({
   useEffect(() => {
     void loadCoachSettings().then(setSettings);
     void listPlaybookNames().then(setPlaybook);
+    void listPlaylist().then(setPlaylist);
   }, []);
 
   useEffect(() => {
@@ -73,8 +80,9 @@ export function CoachView({
       .then((rows) => {
         if (!cancelled) {
           const validRows = rows.filter(isCurrentTacticalRoundFact);
-          setFacts(validRows);
-          setClusters(buildTacticalClusters(validRows));
+          const filteredRows = filterTacticalRows(validRows, settings, teamRenames);
+          setFacts(filteredRows);
+          setClusters(buildTacticalClusters(filteredRows));
         }
       })
       .catch((err) => {
@@ -83,10 +91,15 @@ export function CoachView({
     return () => {
       cancelled = true;
     };
-  }, [entries]);
+  }, [entries, settings, teamRenames]);
 
   async function setMyTeam(teamName: string) {
-    const next = await saveCoachSettings({ myTeamName: teamName || null });
+    const next = await saveCoachSettings({ ...settings, myTeamName: teamName || null });
+    setSettings(next);
+  }
+
+  async function setOpponentTeam(teamName: string) {
+    const next = await saveCoachSettings({ ...settings, opponentTeamName: teamName || null });
     setSettings(next);
   }
 
@@ -112,13 +125,22 @@ export function CoachView({
           <h1>教练工作台</h1>
           <p>把多场 demo 里的开局站位、道具顺序和系列赛 BP 整理成教练能直接阅读的备战视图。</p>
         </div>
-        <label className="stu-coach-team-picker">
-          我的队伍
-          <select value={settings.myTeamName ?? ""} onChange={(event) => void setMyTeam(event.target.value)}>
-            <option value="">未设置</option>
-            {teamGroups.map((team) => <option key={team.displayName} value={team.displayName}>{team.displayName}</option>)}
-          </select>
-        </label>
+        <div className="stu-coach-filter-row">
+          <label className="stu-coach-team-picker">
+            分析对象
+            <select value={settings.myTeamName ?? ""} onChange={(event) => void setMyTeam(event.target.value)}>
+              <option value="">全部队伍</option>
+              {teamGroups.map((team) => <option key={team.displayName} value={team.displayName}>{team.displayName}</option>)}
+            </select>
+          </label>
+          <label className="stu-coach-team-picker">
+            指定对手
+            <select value={settings.opponentTeamName ?? ""} onChange={(event) => void setOpponentTeam(event.target.value)}>
+              <option value="">未指定</option>
+              {teamGroups.map((team) => <option key={team.displayName} value={team.displayName}>{team.displayName}</option>)}
+            </select>
+          </label>
+        </div>
       </header>
       <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />
       <div className="stu-subtabs" role="tablist" aria-label="教练工作台">
@@ -151,15 +173,47 @@ export function CoachView({
           facts={facts}
           entryByMatchId={entryByMatchId}
           onOpenMatch={onOpenMatch}
+          onAddToPlaylist={async (cluster, fact) => {
+            const entry = entryByMatchId.get(fact.matchId);
+            const item: PlaylistItem = {
+              id: `${cluster.id}:${fact.matchId}:${fact.roundNumber}`,
+              group: autoName(cluster) || `${cluster.mapName} ${cluster.side.toUpperCase()}`,
+              matchId: fact.matchId,
+              mapName: fact.mapName,
+              roundNumber: fact.roundNumber,
+              clusterId: cluster.id,
+              patternFingerprint: patternFingerprint(cluster),
+              note: entry ? `${entry.meta.teamAName} ${entry.meta.teamAScore}:${entry.meta.teamBScore} ${entry.meta.teamBName}` : "",
+            };
+            await savePlaylistItem(item);
+            setPlaylist(await listPlaylist());
+          }}
         />
       )}
       {clusters && clusters.length > 0 && tab === "playbook" && (
         <PlaybookTable
           clusters={clusters}
           playbook={playbook}
-          onRename={async (clusterId, name) => {
-            await savePlaybookName(clusterId, name);
+          onRename={async (patternKey, name) => {
+            await savePlaybookName(patternKey, name);
             setPlaybook(await listPlaybookNames());
+          }}
+        />
+      )}
+      {tab === "playlist" && (
+        <PlaylistTable
+          items={playlist}
+          onUpdate={async (item) => {
+            await savePlaylistItem(item);
+            setPlaylist(await listPlaylist());
+          }}
+          onRemove={async (id) => {
+            await removePlaylistItem(id);
+            setPlaylist(await listPlaylist());
+          }}
+          onOpenMatch={(matchId, roundNumber) => {
+            const entry = entryByMatchId.get(matchId);
+            if (entry) onOpenMatch(entry.id, { roundNumber });
           }}
         />
       )}
@@ -170,6 +224,7 @@ export function CoachView({
             facts={facts}
             entries={allEntries}
             myTeamName={settings.myTeamName}
+            opponentTeamName={settings.opponentTeamName}
             teamRenames={teamRenames}
           />
           <details className="stu-card stu-coach-report-details">
@@ -180,6 +235,36 @@ export function CoachView({
       )}
     </div>
   );
+}
+
+function patternFingerprint(cluster: TacticalCluster): string {
+  return [
+    cluster.mapName,
+    cluster.side,
+    cluster.targetSite ?? "-",
+    cluster.defaultsBasis,
+    cluster.executeBucket ?? "-",
+  ].join(":");
+}
+
+function normalizeTeamName(name: string | null | undefined, teamRenames: Record<string, string>): string {
+  return displayTeamName(name ?? "", teamRenames).trim().toLowerCase();
+}
+
+function filterTacticalRows(
+  rows: TacticalRoundFact[],
+  settings: CoachSettings,
+  teamRenames: Record<string, string>,
+): TacticalRoundFact[] {
+  const team = settings.myTeamName ? normalizeTeamName(settings.myTeamName, teamRenames) : null;
+  const opponent = settings.opponentTeamName ? normalizeTeamName(settings.opponentTeamName, teamRenames) : null;
+  return rows.filter((row) => {
+    const rowTeam = normalizeTeamName(row.teamName, teamRenames);
+    const rowOpponent = normalizeTeamName(row.opponentName, teamRenames);
+    if (team && rowTeam !== team) return false;
+    if (opponent && rowOpponent !== opponent) return false;
+    return true;
+  });
 }
 
 function isCurrentTacticalRoundFact(row: TacticalRoundFact): boolean {
@@ -213,18 +298,70 @@ function PlaybookTable({
         <thead><tr><th>战术名</th><th>打法模式</th><th className="stu-num">样本</th><th /></tr></thead>
         <tbody>
           {clusters.slice(0, 20).map((cluster) => {
-            const value = drafts[cluster.id] ?? playbook[cluster.id] ?? "";
+            const key = patternFingerprint(cluster);
+            const value = drafts[key] ?? playbook[key] ?? "";
             return (
               <tr key={cluster.id}>
-                <td><input className="stu-input stu-input-sm" value={value} placeholder="命名战术" onChange={(event) => setDrafts((current) => ({ ...current, [cluster.id]: event.target.value }))} /></td>
+                <td><input className="stu-input stu-input-sm" value={value} placeholder="命名战术" onChange={(event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))} /></td>
                 <td>{cluster.mapName} · {SIDE_LABEL[cluster.side]} · {autoName(cluster)}</td>
                 <td className="stu-num">{cluster.roundCount}</td>
-                <td><button type="button" className="stu-button-sm" onClick={() => void onRename(cluster.id, value)}>保存</button></td>
+                <td><button type="button" className="stu-button-sm" onClick={() => void onRename(key, value)}>保存</button></td>
               </tr>
             );
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function PlaylistTable({
+  items,
+  onUpdate,
+  onRemove,
+  onOpenMatch,
+}: {
+  items: PlaylistItem[];
+  onUpdate: (item: PlaylistItem) => Promise<void>;
+  onRemove: (id: string) => Promise<void>;
+  onOpenMatch: (matchId: string, roundNumber: number) => void;
+}) {
+  const markdown = playlistToMarkdown("备战清单", items);
+  if (items.length === 0) {
+    return <EmptyState variant="insufficient" title="备战清单为空" hint="在开局模式的证据回合里点击加入。" />;
+  }
+  return (
+    <div className="stu-card">
+      <h3>备战清单</h3>
+      <table className="stu-mini-table">
+        <thead>
+          <tr><th>分组</th><th>来源</th><th className="stu-num">回合</th><th>备注</th><th /></tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <tr key={item.id}>
+              <td>{item.group}</td>
+              <td title={item.matchId}>{item.mapName ? `${item.mapName} · ${item.matchId}` : item.matchId}</td>
+              <td className="stu-num">R{item.roundNumber}</td>
+              <td>
+                <input
+                  className="stu-input stu-input-sm"
+                  value={item.note}
+                  onChange={(event) => void onUpdate({ ...item, note: event.target.value })}
+                />
+              </td>
+              <td>
+                <button type="button" className="stu-button-sm" onClick={() => onOpenMatch(item.matchId, item.roundNumber)}>回放</button>
+                <button type="button" className="stu-button-sm" onClick={() => void onRemove(item.id)}>删除</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <details className="stu-coach-report-details">
+        <summary>Markdown 导出</summary>
+        <textarea className="stu-coach-report" readOnly value={markdown} />
+      </details>
     </div>
   );
 }

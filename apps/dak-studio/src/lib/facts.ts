@@ -10,7 +10,7 @@ import type { DemoPackage, EconomyType, MatchWorkspaceModel, OpeningTrailsModel,
 import { decodeDelta, FLAG_ALIVE } from "@cs2dak/contract";
 import type { TriangleBvh, CalloutGrid, Vec3 } from "@cs2dak/maps";
 import type { LineupGrenadeLike } from "@cs2dak/maps";
-import { calloutAt, DEFAULT_POSITIONS, roleOf } from "@cs2dak/maps";
+import { calloutNear, DEFAULT_POSITIONS, roleOf } from "@cs2dak/maps";
 import {
   buildMatchWorkspaceModel,
   buildOpeningTrails,
@@ -156,6 +156,8 @@ export interface TacticalGrenadeOccurrence {
   effectPosition: Vec3;
   throwCallout: string | null;
   effectCallout: string | null;
+  effectCalloutSource: "exact" | "nearby" | null;
+  effectCalloutDistance: number | null;
   confidence: number;
   samples: number;
   targetRegion: "a" | "b" | "mid" | "other" | "unknown";
@@ -286,12 +288,18 @@ function opponentTeamKey(teamKey: "teamA" | "teamB"): "teamA" | "teamB" {
   return teamKey === "teamA" ? "teamB" : "teamA";
 }
 
-function effectCalloutFor(grid: CalloutGrid | null, point: Vec3): { callout: string | null; confidence: number | null; samples: number | null } {
-  if (!grid) return { callout: null, confidence: null, samples: null };
-  const result = calloutAt(grid, point);
+function effectCalloutFor(grid: CalloutGrid | null, point: Vec3): {
+  callout: string | null;
+  confidence: number | null;
+  samples: number | null;
+  source: "exact" | "nearby" | null;
+  distance: number | null;
+} {
+  if (!grid) return { callout: null, confidence: null, samples: null, source: null, distance: null };
+  const result = calloutNear(grid, point, { horizontalRadius: 20, verticalRadius: 40 });
   return result
-    ? { callout: result.callout, confidence: result.confidence, samples: result.samples }
-    : { callout: null, confidence: null, samples: null };
+    ? { callout: result.callout, confidence: result.confidence, samples: result.samples, source: result.source, distance: result.distance }
+    : { callout: null, confidence: null, samples: null, source: null, distance: null };
 }
 
 function extractLineupFact(pkg: DemoPackage, matchId: string, grid: CalloutGrid | null): LineupFact {
@@ -584,6 +592,8 @@ function grenadeOccurrencesFor(
         effectPosition: grenade.effectPosition,
         throwCallout,
         effectCallout: effect.callout,
+        effectCalloutSource: effect.source,
+        effectCalloutDistance: effect.distance,
         confidence: effect.confidence ?? 0,
         samples: effect.samples ?? 0,
         targetRegion: targetRegionFromCallout(pkg.match.mapName, effect.callout),
