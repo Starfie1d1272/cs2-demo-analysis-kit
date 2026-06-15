@@ -13,6 +13,7 @@ import {
   type CoachSettings
 } from "../lib/series";
 import { PatternExplorer } from "./coach/PatternExplorer";
+import { MapPoolTable } from "./coach/MapPoolTable";
 
 type CoachTab = "patterns" | "playbook" | "anti";
 
@@ -155,10 +156,19 @@ export function CoachView({
         />
       )}
       {clusters && tab === "anti" && (
-        <div className="stu-card">
-          <h3>备战报告 Markdown</h3>
-          <textarea className="stu-coach-report" readOnly value={antiMarkdown} />
-        </div>
+        <>
+          <MapPoolTable
+            clusters={clusters}
+            facts={facts}
+            entries={allEntries}
+            myTeamName={settings.myTeamName}
+            teamRenames={teamRenames}
+          />
+          <details className="stu-card stu-coach-report-details">
+            <summary>备战报告 Markdown</summary>
+            <textarea className="stu-coach-report" readOnly value={antiMarkdown} />
+          </details>
+        </>
       )}
     </div>
   );
