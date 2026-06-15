@@ -29,8 +29,8 @@ export interface TacticalCluster {
   rounds: Array<{ matchId: string; roundNumber: number; won: boolean; economy: string }>;
 }
 
-export function tacticalClusterKey(f: TacticalRoundFact): string {
-  const defaults = defaultsBasisKey(f.snapshots[0]?.defaults ?? {});
+export function tacticalClusterKey(f: TacticalRoundFact, defaultsBasis?: string): string {
+  const defaults = defaultsBasis ?? defaultsBasisKey(f.snapshots[0]?.defaults ?? {});
   const entries = [...f.entryAnchors].sort().join(",");
   return `${f.mapName}:${f.side}:${f.targetSite ?? "-"}:${defaults}:${entries}:${f.executeBucket ?? "-"}`;
 }
@@ -38,13 +38,14 @@ export function tacticalClusterKey(f: TacticalRoundFact): string {
 export function buildTacticalClusters(rows: TacticalRoundFact[]): TacticalCluster[] {
   const map = new Map<string, TacticalCluster>();
   for (const f of rows) {
-    const id = tacticalClusterKey(f);
+    const db = defaultsBasisKey(f.snapshots[0]?.defaults ?? {});
+    const id = tacticalClusterKey(f, db);
     const c = map.get(id) ?? {
       id,
       mapName: f.mapName,
       side: f.side,
       targetSite: f.targetSite,
-      defaultsBasis: defaultsBasisKey(f.snapshots[0]?.defaults ?? {}),
+      defaultsBasis: db,
       entryAnchors: f.entryAnchors,
       executeBucket: f.executeBucket,
       roundCount: 0,
