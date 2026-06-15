@@ -30,7 +30,7 @@ function grenade(p: Partial<TacticalGrenadeOccurrence> = {}): TacticalGrenadeOcc
 
 function fact(p: Partial<TacticalRoundFact> = {}): TacticalRoundFact {
   return {
-    analysisVersion: 2,
+    analysisVersion: 3,
     c4Route: null,
     matchId: "m",
     mapName: "de_mirage",

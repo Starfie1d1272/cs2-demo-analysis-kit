@@ -34,6 +34,17 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
 
   const visibleClusters = useMemo(() => clusters.filter((c) => c.side === side), [clusters, side]);
 
+  // 双层分组：大分类（打A/打B…）→ 小聚类（具体站位/结构）。
+  const groupedClusters = useMemo(() => {
+    const groups = new Map<string, TacticalCluster[]>();
+    for (const c of visibleClusters) {
+      const cat = c.primaryCategory;
+      if (!groups.has(cat)) groups.set(cat, []);
+      groups.get(cat)!.push(c);
+    }
+    return [...groups.entries()];
+  }, [visibleClusters]);
+
   // 选中项必须属于当前 side；切换 side 或数据变化后回退到首个可见簇。
   const selected = useMemo(
     () => visibleClusters.find((c) => c.id === selectedId) ?? visibleClusters[0] ?? null,
@@ -93,37 +104,39 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
         </div>
       ) : (
         <div className="stu-coach-pattern-explorer">
-          {/* 左栏：簇列表 */}
+          {/* 左栏：大分类 → 小聚类双层列表 */}
           <aside className="stu-pe-list">
-            {visibleClusters.map((c) => {
-          return (
-            <button
-              key={c.id}
-              type="button"
-              className={c.id === selectedId ? "stu-pe-cluster stu-pe-cluster-active" : "stu-pe-cluster"}
-              onClick={() => setSelectedId(c.id)}
-            >
-              <span className="stu-pe-cluster-name">
-                {autoName(c)}
-                {c.fakeRoundCount > 0 && (
-                  <span
-                    className="stu-pe-tag stu-pe-tag-fake"
-                    title={`疑似纯道具佯攻 ${c.fakeRoundCount}/${c.roundCount} 回合 · Experimental`}
+            {groupedClusters.map(([category, cats]) => (
+              <div key={category} className="stu-pe-group">
+                <div className="stu-pe-group-header">{category}</div>
+                {cats.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={c.id === selectedId ? "stu-pe-cluster stu-pe-cluster-active" : "stu-pe-cluster"}
+                    onClick={() => setSelectedId(c.id)}
                   >
-                    佯 {c.fakeRoundCount}
-                  </span>
-                )}
-              </span>
-              <span className="stu-pe-cluster-meta">
-                <span>{SIDE_LABEL[c.side]}</span>
-                {c.executeBucket && <span className="stu-pe-bucket">{BUCKET_LABEL[c.executeBucket] ?? c.executeBucket}</span>}
-                <span>{c.roundCount} 回合</span>
-                <span>{c.winRatePercent != null ? `${c.winRatePercent.toFixed(1)}%` : "—"}</span>
-              </span>
-            </button>
-          );
-        })}
-      </aside>
+                    <span className="stu-pe-cluster-name">
+                      {autoName(c)}
+                      {c.fakeRoundCount > 0 && (
+                        <span
+                          className="stu-pe-tag stu-pe-tag-fake"
+                          title={`疑似纯道具佯攻 ${c.fakeRoundCount}/${c.roundCount} 回合 · Experimental`}
+                        >
+                          佯 {c.fakeRoundCount}
+                        </span>
+                      )}
+                    </span>
+                    <span className="stu-pe-cluster-meta">
+                      {c.executeBucket && <span className="stu-pe-bucket">{BUCKET_LABEL[c.executeBucket] ?? c.executeBucket}</span>}
+                      <span>{c.roundCount} 回合</span>
+                      <span>{c.winRatePercent != null ? `${c.winRatePercent.toFixed(1)}%` : "—"}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </aside>
 
           {/* 中栏：多回合站位快照（点证据回合的 ▶回放 切到整页回放视图） */}
           <div className="stu-pe-radar">
@@ -212,11 +225,21 @@ function InlineRoundReplay({ matchId, roundNumber, tick, label, onBack }: {
   );
 }
 
+function fmtRemainSec(s: number): string {
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
 function ClusterRadar({ facts, mapName }: { facts: TacticalRoundFact[]; mapName: string }) {
   const maxSnapshots = Math.max(0, ...facts.map((fact) => fact.snapshots.length));
   const [snapshotIndex, setSnapshotIndex] = useState(0);
   const safeSnapshotIndex = Math.min(snapshotIndex, Math.max(0, maxSnapshots - 1));
   const shownFacts = facts.slice(0, 8);
+
+  // 用第一个有该索引的事实的 remainSec 作为标签；同簇切片时机相同。
+  const snapshotLabels = Array.from({ length: maxSnapshots }, (_, i) => {
+    const remainSec = shownFacts.find((f) => f.snapshots[i] != null)?.snapshots[i]?.remainSec;
+    return remainSec != null ? fmtRemainSec(remainSec) : `切片 ${i + 1}`;
+  });
 
   const trails: RadarTrail[] = shownFacts.flatMap((fact, factIndex) => {
     const snapshot = fact.snapshots[safeSnapshotIndex];
@@ -246,7 +269,7 @@ function ClusterRadar({ facts, mapName }: { facts: TacticalRoundFact[]; mapName:
     <div className="stu-pe-radar-wrap">
       {maxSnapshots > 1 && (
         <div className="stu-chip-row" role="tablist" aria-label="战术切片">
-          {Array.from({ length: maxSnapshots }, (_, index) => (
+          {snapshotLabels.map((label, index) => (
             <button
               key={index}
               type="button"
@@ -255,7 +278,7 @@ function ClusterRadar({ facts, mapName }: { facts: TacticalRoundFact[]; mapName:
               className={safeSnapshotIndex === index ? "stu-chip stu-chip-active" : "stu-chip"}
               onClick={() => setSnapshotIndex(index)}
             >
-              切片 {index + 1}
+              {label}
             </button>
           ))}
         </div>

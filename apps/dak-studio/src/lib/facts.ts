@@ -179,7 +179,7 @@ export interface C4RouteFact {
 }
 
 /** TacticalRoundFact 口径版本：schema/语义变化时 +1，旧 facts 据此提示重建。 */
-export const TACTICAL_FACT_VERSION = 2;
+export const TACTICAL_FACT_VERSION = 3;
 
 export interface TacticalRoundFact extends MatchFactBase {
   /** 口径版本（见 TACTICAL_FACT_VERSION）。 */
@@ -683,16 +683,18 @@ function extractTacticalRoundFacts(pkg: DemoPackage, matchId: string, grid: Call
     const fe = round.freezeEndTick;
     // 每回合解码一次玩家轨迹，snapshots / 进点 / C4 轨迹共用，避免重复 decodeDelta。
     const dr = decodeRound(pkg, round);
-    // T: 剩 1:40 / 1:25
-    const tSlices = [fe + 15 * tickrate, fe + 30 * tickrate];
+    // T: 剩 1:30 / 1:10 / 0:55 / 0:35（从 1:55 倒计时；回合提前结束的切片自动剔除）
+    const tSlices = [fe + 25 * tickrate, fe + 45 * tickrate, fe + 60 * tickrate, fe + 80 * tickrate];
     // CT: 剩 1:35 / 1:00 / 0:30
     const ctSlices = [fe + 20 * tickrate, fe + 55 * tickrate, fe + 85 * tickrate];
     const plant = plantFor(pkg, round, tickrate);
     for (const side of ["t", "ct"] as const) {
       const slices = side === "t" ? tSlices : ctSlices;
-      const snapshots = dr
+      const allSnapshots = dr
         ? slices.map((tk) => snapshotAt(dr, mapName, side, tk, fe, tickrate, grid))
         : slices.map((tk) => ({ remainSec: remainSecAt(tk, fe, tickrate), defaults: {}, advanced: {}, positions: [] }));
+      // T 方：回合提前结束后无存活玩家的切片自动剔除，保留 1-4 片。
+      const snapshots = side === "t" ? allSnapshots.filter((s) => s.positions.length > 0) : allSnapshots;
       if (snapshots.every((s) => Object.keys(s.defaults).length === 0 && Object.keys(s.advanced).length === 0 && s.positions.length === 0)) continue;
       const teamKey = round.teamASide === side ? "teamA" : "teamB";
       const entries = siteEntriesFor(dr, round, side, tickrate, grid);

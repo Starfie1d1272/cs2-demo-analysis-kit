@@ -22,6 +22,8 @@ export interface TacticalCluster {
   teamName: string;
   opponentName: string;
   targetSite: "a" | "b" | null;
+  /** 大分类：T 方为打A/打B/中路争夺；CT 方为双B/三中路/双B单A 等站位架构。 */
+  primaryCategory: string;
   defaultsBasis: string;
   executeBucket: ExecuteBucket | null;
   roundCount: number;
@@ -66,6 +68,35 @@ export function tacticalClusterKey(f: TacticalRoundFact, defaultsBasis?: string)
   ].join(":");
 }
 
+// ── 大分类推导 ─────────────────────────────────────────────────────────────────
+
+function tPrimaryCategory(targetSite: "a" | "b" | null): string {
+  if (targetSite === "a") return "打A";
+  if (targetSite === "b") return "打B";
+  return "中路争夺";
+}
+
+const NUM_CN = ["", "单", "双", "三", "四", "五"];
+
+/** 按 anchor ID 前缀统计 A/B/中路人数，生成如"双B单中路"的大分类标签。 */
+function ctPrimaryCategory(defaultsBasis: string): string {
+  if (!defaultsBasis || defaultsBasis === "-") return "其他";
+  let a = 0, b = 0, mid = 0;
+  for (const seg of defaultsBasis.split("|").filter(Boolean)) {
+    const [id, nStr] = seg.split(":");
+    const n = parseInt(nStr ?? "1", 10);
+    if (!id) continue;
+    if (id.startsWith("a_") || id === "a") a += n;
+    else if (id.startsWith("b_") || id.startsWith("back_") || id === "b") b += n;
+    else if (id.startsWith("mid")) mid += n;
+  }
+  const parts: string[] = [];
+  if (b > 0) parts.push(`${NUM_CN[Math.min(b, 5)] ?? b}B`);
+  if (mid > 0) parts.push(`${NUM_CN[Math.min(mid, 5)] ?? mid}中路`);
+  if (a > 0) parts.push(`${NUM_CN[Math.min(a, 5)] ?? a}A`);
+  return parts.length > 0 ? parts.join("") : "其他";
+}
+
 export function buildTacticalClusters(rows: TacticalRoundFact[]): TacticalCluster[] {
   const map = new Map<string, TacticalCluster>();
   for (const f of rows) {
@@ -80,6 +111,7 @@ export function buildTacticalClusters(rows: TacticalRoundFact[]): TacticalCluste
       // CT 视角下"目标包点 / 执行节奏"是 T 方语义，不属于防守方 → 固定 null，
       // 避免出现"CT 执行剩余 115s / CT 下包率"这类不成立的描述。
       targetSite: f.side === "ct" ? null : f.targetSite,
+      primaryCategory: f.side === "t" ? tPrimaryCategory(f.targetSite) : ctPrimaryCategory(db),
       defaultsBasis: db,
       executeBucket: f.side === "ct" ? null : f.executeBucket,
       roundCount: 0,

@@ -165,7 +165,7 @@ describe("MatchFacts", () => {
     const t = facts.tacticalRounds.filter((f) => f.side === "t");
     expect(t.length).toBeGreaterThan(0);
     // 版本号写入
-    expect(facts.tacticalRounds.every((f) => f.analysisVersion === 2)).toBe(true);
+    expect(facts.tacticalRounds.every((f) => f.analysisVersion === 3)).toBe(true);
     // CT 不算 C4 轨迹
     expect(facts.tacticalRounds.filter((f) => f.side === "ct").every((f) => f.c4Route === null)).toBe(true);
     // 至少有一回合能跟到 C4 携带轨迹

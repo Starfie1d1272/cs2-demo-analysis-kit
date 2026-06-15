@@ -3100,6 +3100,26 @@ td.stu-heat-cell.stu-heat-neutral {
   overflow-y: auto;
 }
 
+.stu-pe-group {
+  display: contents;
+}
+
+.stu-pe-group-header {
+  padding: 6px 10px 2px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--dak-muted);
+  text-transform: uppercase;
+  border-top: 1px solid var(--dak-border);
+  margin-top: 4px;
+}
+
+.stu-pe-group:first-child .stu-pe-group-header {
+  border-top: none;
+  margin-top: 0;
+}
+
 .stu-pe-cluster {
   display: grid;
   gap: 2px;
