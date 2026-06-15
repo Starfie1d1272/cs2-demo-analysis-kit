@@ -4,6 +4,14 @@ DAK Studio 桌面应用及 `@cs2dak/*` 分析管道面向用户的变更记录�
 
 > 0.1.3 起面向 Studio 用户维护。`@cs2dak/*` npm 包版本由 changesets 独立管理（见各包的 CHANGELOG.md）；本文件聚焦 DAK Studio 桌面应用变更。
 
+## [Unreleased] — 0.7.0（开发中）
+
+### 性能
+
+- **导入 facts 抽取移入 worker 池**：原先 ZIP 解析在 worker、但最重的 facts 抽取（视野锥/`.tri` LOS 遍历）仍在主线程串行跑，批量导入会长时间冻结 UI。现在解析 + 建 BVH + 榨 facts 全在导入 worker 内完成，只把紧凑的 `{meta, facts}` 回传主线程（含 replay 的整包不再跨线程克隆）。worker 取与主线程同一份静态 `.tri`（base URL 由主线程算好传入）与 callout grid，输出与主线程逐字节等价；tri/callout 缺失或 worker 异常时回退主线程，行为不变。
+- **批量导入并行化**：导入循环由逐场串行 `await` 改为滑动窗口并发（并发 2），多场在 worker 池里并行解析 + 抽取、且全程不冻结 UI。并发取 2 以兼顾吞吐与渲染器内存峰值（每场 worker 需驻留一份完整 DemoPackage）。
+- **库内重构**：`extractMatchFacts` 的 worker/主线程两条路径共用同一份纯抽取逻辑；`DemoMeta`/`metaFromPackage` 抽到无存储依赖的 `demo-meta.ts`，供 worker 与主线程共用。
+
 ## [0.6.0] — 2026-06-16 (0.6.0 教练工作台 + maps 默认位)
 
 ### 新增

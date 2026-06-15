@@ -133,19 +133,28 @@ export function App() {
       }
     }
 
-    for (const [index, item] of zips.entries()) {
-      const file = item.file;
-      try {
-        if (zips.length > 1) setNotice(`正在入库 ${file.name}…（${index + 1}/${zips.length}）`);
-        // 解析在主线程，逐场让出一帧，避免批量导入时 UI 完全冻结
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        const result = await importDemoFile(file, { tags, sourceDemPath: item.sourceDemPath });
-        if (result.duplicate) duplicates += 1;
-        else imported += 1;
-      } catch (err) {
-        errors.push(err instanceof Error ? err.message : String(err));
+    // 解析 + facts 抽取都在 worker 池里跑；滑动窗口并发让批量导入并行、且不冻结 UI。
+    // 并发 2：每场 worker 要驻留一份完整 DemoPackage（含 replay），并发过高会让多份大包
+    // 同时占用 + 多个 worker 同时冷启动模块图，撑爆渲染器；2 兼顾吞吐与内存安全。
+    const IMPORT_CONCURRENCY = 2;
+    const total = zips.length;
+    const queue = [...zips];
+    let done = 0;
+    const runWorker = async (): Promise<void> => {
+      for (let item = queue.shift(); item; item = queue.shift()) {
+        try {
+          const result = await importDemoFile(item.file, { tags, sourceDemPath: item.sourceDemPath });
+          if (result.duplicate) duplicates += 1;
+          else imported += 1;
+        } catch (err) {
+          errors.push(err instanceof Error ? err.message : String(err));
+        } finally {
+          done += 1;
+          if (total > 1) setNotice(`正在入库…（${done}/${total}）`);
+        }
       }
-    }
+    };
+    await Promise.all(Array.from({ length: Math.min(IMPORT_CONCURRENCY, total) }, () => runWorker()));
     setEntries(await listDemoEntries());
     const parts: string[] = [];
     if (imported > 0) parts.push(`导入 ${imported} 场`);

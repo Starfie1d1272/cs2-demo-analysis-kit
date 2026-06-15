@@ -1,7 +1,8 @@
 import { loadDemoPackageFromZip } from "@cs2dak/core";
 import type { DemoPackage } from "@cs2dak/contract";
-import { extractMatchFacts, getFactsStore } from "./facts";
-import { loadStudioCalloutGrid } from "./callout-grid";
+import { extractMatchFacts, getFactsStore, type MatchFacts } from "./facts";
+import { CALLOUT_GRID_URLS, loadStudioCalloutGrid } from "./callout-grid";
+import { metaFromPackage, type DemoMeta } from "./demo-meta";
 import { getStorage } from "./storage";
 import { loadTriLookup } from "./tri";
 
@@ -14,20 +15,7 @@ import { loadTriLookup } from "./tri";
  *   DemoPackage 只在比赛工作台/逐场证据需要时从 ZIP 懒加载。
  */
 
-export interface DemoMeta {
-  mapName: string;
-  teamAName: string;
-  teamBName: string;
-  teamAScore: number;
-  teamBScore: number;
-  roundCount: number;
-  durationSeconds: number;
-  playerCount: number;
-  hasReplay: boolean;
-  source: string;
-  /** 服务器名（来自 cs2-demo-format match.serverName）；旧条目/无值为 null。 */
-  serverName: string | null;
-}
+export type { DemoMeta };
 
 export interface StudioDemoEntry {
   id: string;
@@ -60,41 +48,32 @@ function normalizeEntry(entry: StudioDemoEntry): StudioDemoEntry {
   };
 }
 
-async function writeFactsForPackage(id: string, entry: StudioDemoEntry, pkg: DemoPackage): Promise<void> {
+/** facts 是查询加速层；写失败不破坏库完整性（ZIP+元数据已落盘，可后续重导补齐）。 */
+async function persistFacts(facts: MatchFacts): Promise<void> {
   try {
-    const [visibilityFor, calloutGrid] = await Promise.all([
-      loadTriLookup([pkg.match.mapName]),
-      loadStudioCalloutGrid(pkg.match.mapName),
-    ]);
-    await getFactsStore().putMatchFacts(extractMatchFacts(pkg, {
-      matchId: matchIdForEntry(entry),
-      visibilityFor,
-      calloutGrid
-    }));
+    await getFactsStore().putMatchFacts(facts);
   } catch {
-    // facts 是查询加速层；导入主流程仍保留 ZIP 和元数据，失败后可由后续修复/重导补齐。
+    // 吞掉：facts 缺失只降级聚合查询。
   }
+}
+
+/**
+ * worker 不可用时（测试 node 环境 / 无 Worker）的主线程兜底：解析 + 榨 facts + 元数据。
+ * 与 worker 路径输出等价（同一份 tri/callout → 同一 visibilityFor → 同一 MatchFacts）。
+ */
+async function importOnMainThread(buffer: ArrayBuffer, matchId: string): Promise<ImportWorkerResult> {
+  const pkg = await loadDemoPackageFromZip(buffer);
+  const [visibilityFor, calloutGrid] = await Promise.all([
+    loadTriLookup([pkg.match.mapName]),
+    loadStudioCalloutGrid(pkg.match.mapName)
+  ]);
+  const facts = extractMatchFacts(pkg, { matchId, visibilityFor, calloutGrid });
+  return { meta: metaFromPackage(pkg), facts };
 }
 
 async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", buffer);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-function metaFromPackage(pkg: DemoPackage): DemoMeta {
-  return {
-    mapName: pkg.match.mapName,
-    teamAName: pkg.match.teamA.name ?? "Team A",
-    teamBName: pkg.match.teamB.name ?? "Team B",
-    teamAScore: pkg.match.teamA.score,
-    teamBScore: pkg.match.teamB.score,
-    roundCount: pkg.rounds.length,
-    durationSeconds: pkg.match.durationSeconds,
-    playerCount: pkg.players.length,
-    hasReplay: Boolean(pkg.replay),
-    source: pkg.match.source,
-    serverName: pkg.match.serverName ?? null
-  };
 }
 
 /** 跨场聚合使用的 matchId：文件名去掉 .zip。exporter 命名带日期前缀时天然按时间排序。 */
@@ -125,30 +104,46 @@ export function clearPkgCache(): void {
   pkgCache.clear();
 }
 
-// ── ZIP 解析 worker pool ──
-// 复用固定数量的 worker：每场解析不再新建/销毁 worker（那样每次都要重新加载
-// @cs2dak/core 模块）。任务排队分发给空闲 worker，并发上限即池大小。
+// ── 导入 worker pool ──
+// 复用固定数量的 worker：每场不再新建/销毁 worker（那样每次都要重新加载 @cs2dak/* 模块）。
+// 任务排队分发给空闲 worker，并发上限即池大小；批量导入时多场可在池里真正并行。
+// 两种任务：
+//   parse  —— 仅解析，返回整包（逐场证据/工作台用）
+//   import —— 解析 + 就地榨 facts，返回紧凑 {meta, facts}（含 replay 的整包不回主线程）
 const WORKER_POOL_SIZE = 4;
 
-interface ParseTask {
+export interface ImportWorkerResult {
+  meta: DemoMeta;
+  facts: MatchFacts;
+}
+
+type WorkerReply =
+  | { id: number; ok: true; pkg: DemoPackage }
+  | { id: number; ok: true; meta: DemoMeta; facts: MatchFacts }
+  | { id: number; ok: false; error: string };
+
+interface PoolTask {
+  op: "parse" | "import";
   buffer: ArrayBuffer;          // 转移给 worker（转移后 detach）
-  fallbackBuffer: ArrayBuffer;  // worker 失败时回主线程解析用的副本
-  resolve: (pkg: DemoPackage) => void;
+  fallbackBuffer: ArrayBuffer;  // worker 失败时回主线程用的副本
+  matchId?: string;             // op === "import" 时必有
+  resolve: (result: DemoPackage | ImportWorkerResult) => void;
   reject: (err: Error) => void;
+  fallback: (buffer: ArrayBuffer) => Promise<DemoPackage | ImportWorkerResult>;
 }
 
 interface PoolWorker {
   worker: Worker;
-  task: ParseTask | null;
+  task: PoolTask | null;
   taskId: number;
 }
 
 const workerPool: PoolWorker[] = [];
-const parseQueue: ParseTask[] = [];
+const taskQueue: PoolTask[] = [];
 let workerSeq = 0;
 
-function settleWithFallback(task: ParseTask): void {
-  loadDemoPackageFromZip(task.fallbackBuffer).then(task.resolve, task.reject);
+function settleWithFallback(task: PoolTask): void {
+  task.fallback(task.fallbackBuffer).then(task.resolve, task.reject);
 }
 
 function makePoolWorker(): PoolWorker {
@@ -157,13 +152,14 @@ function makePoolWorker(): PoolWorker {
     task: null,
     taskId: 0
   };
-  pw.worker.onmessage = (event: MessageEvent<{ id: number; ok: boolean; pkg?: DemoPackage; error?: string }>) => {
+  pw.worker.onmessage = (event: MessageEvent<WorkerReply>) => {
     if (!pw.task || event.data.id !== pw.taskId) return;
     const task = pw.task;
     pw.task = null;
-    if (event.data.ok && event.data.pkg) task.resolve(event.data.pkg);
+    const reply = event.data;
+    if (reply.ok) task.resolve("pkg" in reply ? reply.pkg : { meta: reply.meta, facts: reply.facts });
     else settleWithFallback(task);
-    pumpParseQueue();
+    dispatchTasks();
   };
   pw.worker.onerror = () => {
     // worker 可能已损坏：销毁、移出池，正在执行的任务回退主线程
@@ -173,21 +169,32 @@ function makePoolWorker(): PoolWorker {
     const idx = workerPool.indexOf(pw);
     if (idx >= 0) workerPool.splice(idx, 1);
     if (task) settleWithFallback(task);
-    pumpParseQueue();
+    dispatchTasks();
   };
   workerPool.push(pw);
   return pw;
 }
 
-function pumpParseQueue(): void {
-  if (parseQueue.length === 0) return;
-  let idle = workerPool.find((pw) => pw.task === null);
-  if (!idle && workerPool.length < WORKER_POOL_SIZE) idle = makePoolWorker();
-  if (!idle) return;
-  const task = parseQueue.shift()!;
-  idle.task = task;
-  idle.taskId = ++workerSeq;
-  idle.worker.postMessage({ id: idle.taskId, buffer: task.buffer }, [task.buffer]);
+/** `.tri` 静态资源根的绝对 URL（worker chunk 相对路径会歧义，主线程算好传过去保证一致）。 */
+function triBaseUrl(): string {
+  return new URL("./tris/", document.baseURI).href;
+}
+
+function dispatchTasks(): void {
+  while (taskQueue.length > 0) {
+    let idle = workerPool.find((pw) => pw.task === null);
+    if (!idle && workerPool.length < WORKER_POOL_SIZE) idle = makePoolWorker();
+    if (!idle) return;
+    const task = taskQueue.shift()!;
+    idle.task = task;
+    idle.taskId = ++workerSeq;
+    const id = idle.taskId;
+    const message =
+      task.op === "parse"
+        ? { id, op: "parse", buffer: task.buffer }
+        : { id, op: "import", buffer: task.buffer, matchId: task.matchId, triBaseUrl: triBaseUrl(), calloutUrls: CALLOUT_GRID_URLS };
+    idle.worker.postMessage(message, [task.buffer]);
+  }
 }
 
 function parseZipInWorker(buffer: ArrayBuffer): Promise<DemoPackage> {
@@ -196,8 +203,35 @@ function parseZipInWorker(buffer: ArrayBuffer): Promise<DemoPackage> {
   }
   const fallbackBuffer = buffer.slice(0);
   return new Promise<DemoPackage>((resolve, reject) => {
-    parseQueue.push({ buffer, fallbackBuffer, resolve, reject });
-    pumpParseQueue();
+    taskQueue.push({
+      op: "parse",
+      buffer,
+      fallbackBuffer,
+      resolve: resolve as (r: DemoPackage | ImportWorkerResult) => void,
+      reject,
+      fallback: (buf) => loadDemoPackageFromZip(buf)
+    });
+    dispatchTasks();
+  });
+}
+
+/** 在 worker 里解析 + 榨 facts；无 Worker / 无 document（测试 node）时回主线程兜底。 */
+function importInWorker(buffer: ArrayBuffer, matchId: string): Promise<ImportWorkerResult> {
+  if (typeof Worker === "undefined" || typeof document === "undefined") {
+    return importOnMainThread(buffer, matchId);
+  }
+  const fallbackBuffer = buffer.slice(0);
+  return new Promise<ImportWorkerResult>((resolve, reject) => {
+    taskQueue.push({
+      op: "import",
+      buffer,
+      fallbackBuffer,
+      matchId,
+      resolve: resolve as (r: DemoPackage | ImportWorkerResult) => void,
+      reject,
+      fallback: (buf) => importOnMainThread(buf, matchId)
+    });
+    dispatchTasks();
   });
 }
 
@@ -226,30 +260,37 @@ export interface ImportDemoOptions {
 export async function importDemoFile(file: File, options: ImportDemoOptions | string[] = []): Promise<ImportResult> {
   const { tags = [], sourceDemPath = null, replaceId } = Array.isArray(options) ? { tags: options } : options;
   const buffer = await file.arrayBuffer();
-  let pkg: DemoPackage;
+  const id = await sha256Hex(buffer);
+
+  const meta = demoMeta;
+  const blobs = demoBlobs;
+  const replacement = replaceId ? await meta.get<StudioDemoEntry>(replaceId) : undefined;
+  const existing = await meta.get<StudioDemoEntry>(id);
+
+  // facts 的 matchId 必须等于最终持久化条目的 matchId：重复导入沿用既有条目的 fileName，
+  // 否则用本次文件名。故先定 matchId 再榨 facts（在 worker 里，含 replay 的整包不回主线程）。
+  const matchId = matchIdForEntry({ fileName: existing?.fileName ?? file.name });
+  let result: ImportWorkerResult;
   try {
-    pkg = await parseZipInWorker(buffer.slice(0));
+    result = await importInWorker(buffer.slice(0), matchId);
   } catch (err) {
     throw new Error(`${file.name}: ${err instanceof Error ? err.message : String(err)}`);
   }
-  const id = await sha256Hex(buffer);
+  const { meta: pkgMeta, facts } = result;
+
   const entry: StudioDemoEntry = {
     id,
     fileName: file.name,
     importedAt: Date.now(),
     tags: normalizeTags(tags),
     sourceDemPath,
-    meta: metaFromPackage(pkg)
+    meta: pkgMeta
   };
-
-  const meta = demoMeta;
-  const blobs = demoBlobs;
-  const replacement = replaceId ? await meta.get<StudioDemoEntry>(replaceId) : undefined;
   if (replacement) {
     entry.tags = normalizeTags([...(replacement.tags ?? []), ...entry.tags]);
     entry.sourceDemPath = sourceDemPath ?? replacement.sourceDemPath ?? null;
   }
-  const existing = await meta.get<StudioDemoEntry>(id);
+
   if (existing) {
     const mergedTags = normalizeTags([...(existing.tags ?? []), ...entry.tags]);
     const mergedEntry: StudioDemoEntry = {
@@ -258,7 +299,7 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
       sourceDemPath: sourceDemPath ?? existing.sourceDemPath ?? null
     };
     await meta.put(id, mergedEntry);
-    await writeFactsForPackage(id, mergedEntry, pkg);
+    await persistFacts(facts);
     if (replacement && replacement.id !== id) {
       await Promise.all([
         meta.delete(replacement.id),
@@ -286,10 +327,10 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     pkgCache.delete(replacement.id);
     void getFactsStore().deleteMatchFacts(matchIdForEntry(replacement));
   }
-  // 导入时已解析出 pkg，顺手榨成 facts；后续聚合走 facts 投影，不再反序列化整包 derived。
-  // 注意：不把 pkg 放进 pkgCache —— 批量导入会让每场 DemoPackage（含完整 replay）常驻内存
+  // facts 已在 worker 里榨好；后续聚合走 facts 投影，不再反序列化整包 derived。
+  // 注意：不把整包放进 pkgCache —— 批量导入会让每场 DemoPackage（含完整 replay）常驻内存
   // 导致 OOM。需要整包时由 getDemoPackage 按需从 ZIP 懒加载即可。
-  await writeFactsForPackage(id, entry, pkg);
+  await persistFacts(facts);
   return { entry, duplicate: false, replaced: Boolean(replacement), replacedId: replacement?.id };
 }
 

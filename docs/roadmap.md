@@ -85,7 +85,7 @@ presentation 已以 `targetEndTick = nextRound.startTick` 留出接口）。
 ## 0.7.0 — 成为可靠的长期桌面软件
 
 - **大库稳定性验证**：StorageAdapter 解耦（`records()` / `blobs()` 接缝）已在 0.5.1 完成，pywebview→SQLite 后端已在桌面版生产运行；0.7 重点改为 200–500 场规模的稳定性抽测与数据库迁移工具。
-- **导入吞吐并行化**：当前批量导入串行 + facts 抽取在主线程（0.6 已先削掉 `.tri` BVH 建树尖峰）；0.7 把 `extractMatchFacts` 移入 worker 池，多场并行且不冻结 UI（剩余瓶颈为 facts 抽取本身）。
+- **导入吞吐并行化**（✅ 已落地）：facts 抽取（含 `.tri` LOS 遍历）已从主线程移入导入 worker 池——worker 内解析 + 建 BVH + 榨 facts，只回传紧凑 `{meta, facts}`，输出与主线程逐字节等价、异常回退主线程。批量导入改滑动窗口并发（并发 2，兼顾吞吐与渲染器内存峰值）。剩余：大库规模下的并发调参与 facts 抽取本身的算法优化。
 - **用户可见 Library 目录** + 一键备份/恢复（manifest、标签、身份归并、BP、Playbook、原始 ZIP）。
 - **存储空间管理**（原始 ZIP / derived cache / `.tri` / 报告 各项占用展示，支持按类清理）。
 - **数据库迁移与修复工具**；存储空间占用展示（原始 ZIP / derived cache / `.tri` / 报告）。
