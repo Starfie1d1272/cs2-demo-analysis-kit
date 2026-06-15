@@ -16,6 +16,8 @@ export interface PatternExplorerProps {
   entryByMatchId: Map<string, StudioDemoEntry>;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onAddToPlaylist?: (cluster: TacticalCluster, fact: TacticalRoundFact) => void;
+  /** 回放缓存：传入则复用已有的 MatchWorkspaceModel 以避免重复加载。组件内无默认值——用完即弃。 */
+  replayModelCache?: Map<string, MatchWorkspaceModel>;
 }
 
 export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, onAddToPlaylist, replayModelCache }: PatternExplorerProps) {
@@ -181,12 +183,13 @@ async function loadReplayModel(matchId: string, cache: Map<string, MatchWorkspac
 }
 
 /** 在中栏雷达位置直接播放某回合的 2D 回放（懒加载该场 workspace facts）。 */
-function InlineRoundReplay({ matchId, roundNumber, tick, label, onBack, cache }: {
+function InlineRoundReplay({ matchId, roundNumber, tick, label, onBack, cache = new Map() }: {
   matchId: string;
   roundNumber: number;
   tick?: number;
   label: string;
   onBack: () => void;
+  cache?: Map<string, MatchWorkspaceModel>;
 }) {
   const [model, setModel] = useState<MatchWorkspaceModel | null>(cache.get(matchId) ?? null);
   const [error, setError] = useState<string | null>(null);
