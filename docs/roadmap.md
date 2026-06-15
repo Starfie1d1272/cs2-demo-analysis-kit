@@ -10,10 +10,10 @@
 2. **三层视角共用同一数据层**：个人 / 主办方 / 教练；
 3. **Pattern 可解释**：不做黑盒评分，展示由哪些位置/道具/时间/交火结构得出。
 
-现状：九模块主体已落地（详见 studio-redesign）。**0.5.x 已发布（最新 0.5.4）**，
-0.5.4 后 main 已完成 0.6.0 教练工作台战术聚类首版（`TacticalRoundFact`+`PatternExplorer`+`RadarTrails`+
-`MapPoolTable`+`Playlist`）+ maps 默认位资产 + 3D callout 网格。
-完整战术路线（MapRoute+zone 动线链）为 v0.7 方向。
+现状：九模块主体已落地（详见 studio-redesign）。**0.6.0 已发布（2026-06-16）**——
+教练工作台战术聚类首版（`TacticalRoundFact`+`PatternExplorer`+`RadarTrails`+`MapPoolTable`+`Playlist`）
++ maps 默认位资产 + 3D callout 网格 + `.tri` BVH 建树加速（quickselect，O(n log²n)→O(n log n)）。
+完整战术路线（MapRoute+zone 动线链）与资产管理/导入吞吐为 v0.7 方向。
 
 ---
 
@@ -35,16 +35,19 @@ Coach 首版、Series/BP、Team Comparison、Lineup Library 重写，以及所�
 - [x] 导出默认启用 `--research`（急停/反应/预瞄恢复正常）
 - [x] pywebview→SQLite 存储后端接入（桌面版资料库落盘到 `userdata/studio.sqlite`）
 
-在建（main，待发，0.6.0 教练首版已完成）：
+已发布（v0.6.0）：
 - [x] facts 本地持久化投影层：`extractMatchFacts` + `FactsStore`，导入即落 facts 行
 - [x] season.ts + 各重型视图（TrailsView/CoachView/LineupView/MatchView）全切投影读取
 - [x] 清除死代码：`rrInputs` 投影与 `MATCH_FACTS_VERSION` 只写不读字段移除
 - [x] 教练首版 0.6.0：TacticalRoundFact + PatternExplorer 三栏 + RadarTrails + MapPoolTable + Playlist
 - [x] maps 默认位资产（七图阵营专属默认位固化）
 - [x] maps 3D callout 网格 + calloutAt() 接口
-- [ ] 50 / 200 / 500 场资料库性能抽测
+- [x] `.tri` BVH 建树加速（quickselect，大图首次加载尖峰 ~18s→~6s）
+- [x] macOS / Windows 冒烟测试 → 打 `v0.6.0` tag（2026-06-16）
+
+挂账到 v0.7（发版时未完成）：
 - [ ] 对枪人工验证集首版（对枪三分类 Beta→Stable 的闸门，见 stability-tiers）
-- [ ] macOS / Windows 冒烟测试 → 打 `v0.6.0` tag
+- [ ] 50 / 200 / 500 场资料库性能抽测 + 导入吞吐并行化（facts 抽取移入 worker 池，离开主线程）
 
 > 发版机制见 [`docs/release.md`](release.md)：桌面随 `vX.Y.Z` git tag；npm 包独立走 changesets。
 
@@ -82,6 +85,7 @@ presentation 已以 `targetEndTick = nextRound.startTick` 留出接口）。
 ## 0.7.0 — 成为可靠的长期桌面软件
 
 - **大库稳定性验证**：StorageAdapter 解耦（`records()` / `blobs()` 接缝）已在 0.5.1 完成，pywebview→SQLite 后端已在桌面版生产运行；0.7 重点改为 200–500 场规模的稳定性抽测与数据库迁移工具。
+- **导入吞吐并行化**：当前批量导入串行 + facts 抽取在主线程（0.6 已先削掉 `.tri` BVH 建树尖峰）；0.7 把 `extractMatchFacts` 移入 worker 池，多场并行且不冻结 UI（剩余瓶颈为 facts 抽取本身）。
 - **用户可见 Library 目录** + 一键备份/恢复（manifest、标签、身份归并、BP、Playbook、原始 ZIP）。
 - **存储空间管理**（原始 ZIP / derived cache / `.tri` / 报告 各项占用展示，支持按类清理）。
 - **数据库迁移与修复工具**；存储空间占用展示（原始 ZIP / derived cache / `.tri` / 报告）。
