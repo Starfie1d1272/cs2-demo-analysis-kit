@@ -2469,6 +2469,26 @@
   padding: 1px 5px;
 }
 
+/* 地面掉落的拆弹器：蓝色虚线，与橙色 C4 区分。 */
+.dak-replay-defuser {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #0b0e10;
+  pointer-events: none;
+}
+
+.dak-replay-defuser-dropped {
+  background: rgba(77, 184, 255, 0.55);
+  border: 1px dashed #4db8ff;
+  animation: dak-bomb-blink 1.2s ease-in-out infinite;
+  padding: 1px 5px;
+}
+
 @keyframes dak-bomb-blink {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 0.9; }

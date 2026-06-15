@@ -247,6 +247,15 @@ export const workspaceReplayGroundBombSchema = z.object({
   z: z.number().optional().default(0)
 });
 
+/** 拆弹器掉落期间（world 坐标）：持 kit 的 CT 阵亡 → kit 落地，直到被捡起/回合结束。 */
+export const workspaceReplayGroundDefuserSchema = z.object({
+  startTick: z.number().int().positive(),
+  endTick: z.number().int().positive(),
+  x: z.number(),
+  y: z.number(),
+  z: z.number().optional().default(0)
+});
+
 /** C4 事件锚点（world 坐标）：plant 之后在落点定格显示。 */
 export const workspaceReplayBombSchema = z.object({
   plantTick: z.number().int().positive(),
@@ -270,6 +279,8 @@ export const workspaceReplayRoundSchema = z.object({
   bomb: workspaceReplayBombSchema.nullable(),
   /** C4 掉落在地上的区间（掉落→捡起/安放）。数组可能为空。 */
   groundBombs: z.array(workspaceReplayGroundBombSchema).default([]),
+  /** 拆弹器掉落在地上的区间（持 kit 的 CT 阵亡→被捡起/回合结束）。数组可能为空。 */
+  groundDefusers: z.array(workspaceReplayGroundDefuserSchema).default([]),
   /** 回合官方结束 tick（rounds.json endTick）。旧缓存缺省。 */
   officialEndTick: z.number().int().positive().optional(),
   /** 回放目标结束 tick：优先使用下一回合 startTick，保留回合结束余韵但不拉到过长窗口。 */
@@ -322,6 +333,7 @@ export type WorkspaceKillEvent = z.infer<typeof workspaceKillEventSchema>;
 export type WorkspaceReplayGrenade = z.infer<typeof workspaceReplayGrenadeSchema>;
 export type WorkspaceReplayProjectile = z.infer<typeof workspaceReplayProjectileSchema>;
 export type WorkspaceReplayGroundBomb = z.infer<typeof workspaceReplayGroundBombSchema>;
+export type WorkspaceReplayGroundDefuser = z.infer<typeof workspaceReplayGroundDefuserSchema>;
 export type WorkspaceReplayBomb = z.infer<typeof workspaceReplayBombSchema>;
 export type WorkspaceReplayRound = z.infer<typeof workspaceReplayRoundSchema>;
 export type MatchWorkspaceModel = z.infer<typeof matchWorkspaceModelSchema>;

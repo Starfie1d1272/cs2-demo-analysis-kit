@@ -977,6 +977,21 @@ export function ReplayViewer({ replay, map, target = null }: {
               </span>
             );
           })}
+          {(round.groundDefusers ?? []).map((gd, gdIdx) => {
+            if (currentTick < gd.startTick || currentTick > gd.endTick) return null;
+            if (dualLevel && levelOf(gd.z ?? 0) !== level) return null;
+            return (
+              <span
+                key={`gd-${gdIdx}`}
+                className="dak-replay-defuser dak-replay-defuser-dropped"
+                style={{ left: `${replayPointPercent(gd, map).x}%`, top: `${replayPointPercent(gd, map).y}%` }}
+                title="拆弹器掉落"
+                aria-hidden="true"
+              >
+                kit
+              </span>
+            );
+          })}
           {currentPlayers.map(({ player, frame }) => (
             <div
               key={player.steamId64}

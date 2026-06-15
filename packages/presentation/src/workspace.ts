@@ -790,6 +790,12 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
         bombsByRound.get(roundRow.roundNumber) ?? [],
         targetEndTick ?? roundRow.startTick + roundRow.frameCount * roundRow.tickStep
       ),
+      groundDefusers: buildGroundDefusers(
+        roundRow,
+        replay.meta.coordScale || 1,
+        sourceRound?.freezeEndTick ?? roundRow.startTick,
+        targetEndTick ?? roundRow.startTick + roundRow.frameCount * roundRow.tickStep
+      ),
       players: roundRow.players.map((player) => {
         // v3 起 x/y/z/yaw 为差分编码，flash 改为独立列（0.1 秒单位，flags 不再含致盲位）
         const coordScale = replay.meta.coordScale || 1;
@@ -907,6 +913,55 @@ function buildGroundBombs(events: DemoPackage["bombs"], roundEndTick: number): W
     });
   }
   return intervals;
+}
+
+/**
+ * 拆弹器掉落区间：CS2 中 kit 只在持有者阵亡时落地（不可手动丢弃）。
+ * 逐帧扫描每名玩家的存活位（flags&1）与持 kit 位（flags&4）：
+ *  - 阵亡掉落：上一帧"存活且持 kit" → 本帧"阵亡" ⇒ 在上一帧位置生成一个落地 kit；
+ *  - 被捡起：某玩家存活且 kit 由无变有（freezeEnd 之后，排除买阶段初始持有）⇒ 关闭最早一个落地 kit（FIFO）。
+ * 未被捡起的落地 kit 持续到回合结束（符合"钳子一直留在地上"）。
+ */
+function buildGroundDefusers(
+  roundRow: NonNullable<DemoPackage["replay"]>["rounds"][number],
+  coordScale: number,
+  freezeEndTick: number,
+  roundEndTick: number
+): WorkspaceReplayRound["groundDefusers"] {
+  const decoded = roundRow.players.map((p) => ({
+    x: decodeDelta(p.x),
+    y: decodeDelta(p.y),
+    z: decodeDelta(p.z),
+    flags: p.flags
+  }));
+  const result: WorkspaceReplayRound["groundDefusers"] = [];
+  const active: Array<{ startTick: number; x: number; y: number; z: number }> = [];
+  for (let i = 1; i < roundRow.frameCount; i += 1) {
+    const tick = roundRow.startTick + i * roundRow.tickStep;
+    if (tick < freezeEndTick) continue;
+    for (const p of decoded) {
+      const prev = p.flags[i - 1] ?? 0;
+      const cur = p.flags[i] ?? 0;
+      const prevAlive = (prev & 1) !== 0;
+      const prevKit = (prev & 4) !== 0;
+      const curAlive = (cur & 1) !== 0;
+      const curKit = (cur & 4) !== 0;
+      if (prevAlive && prevKit && !curAlive) {
+        active.push({
+          startTick: tick,
+          x: (p.x[i - 1] ?? 0) * coordScale,
+          y: (p.y[i - 1] ?? 0) * coordScale,
+          z: (p.z[i - 1] ?? 0) * coordScale
+        });
+      }
+      if (curAlive && !prevKit && curKit && active.length > 0) {
+        const dropped = active.shift()!;
+        result.push({ ...dropped, endTick: tick });
+      }
+    }
+  }
+  for (const dropped of active) result.push({ ...dropped, endTick: roundEndTick });
+  return result;
 }
 
 function weaponNameForIndex(weaponDict: string[], index: number): string | null {
