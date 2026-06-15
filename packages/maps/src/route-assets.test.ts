@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { CALLOUT_NAME_CN } from "./callout-names.js";
+import { CALLOUT_DICT } from "./callout-names.js";
 import { getMapRoutes, MAP_ROUTE_ASSETS } from "./route-assets.js";
 import { ACTIVE_DUTY_MAPS } from "./zones.js";
 import type { MapRoute, MapRoutes } from "./routes.js";
@@ -27,7 +27,7 @@ function expectedBombsite(route: MapRoute): string {
 describe("map route assets", () => {
   it("route zones 不重复维护中文名", () => {
     for (const [map, routes] of Object.entries(MAP_ROUTE_ASSETS)) {
-      const table = CALLOUT_NAME_CN[map] ?? {};
+      const table = CALLOUT_DICT[map] ?? {};
       for (const route of routes.routes) {
         for (const zone of route.zones) {
           expect("nameCn" in zone).toBe(false);
@@ -56,7 +56,7 @@ describe("map route assets", () => {
   it("keeps route metadata and callout references internally consistent", () => {
     for (const mapName of ACTIVE_DUTY_MAPS) {
       const asset = loadRoutes(mapName);
-      const callouts = CALLOUT_NAME_CN[mapName];
+      const callouts = CALLOUT_DICT[mapName];
       const ids = asset.routes.map((route) => route.id);
 
       expect(asset.mapName).toBe(mapName);

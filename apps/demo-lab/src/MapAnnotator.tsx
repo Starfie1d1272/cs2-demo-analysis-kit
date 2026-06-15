@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { CALLOUT_NAME_CN, calloutCn, getMapCalibration, worldToRadar, getMapNav, pointInPolygon, sampleNavZ } from "@cs2dak/maps";
+import { CALLOUT_DICT, calloutCn, getMapCalibration, worldToRadar, getMapNav, pointInPolygon, sampleNavZ } from "@cs2dak/maps";
 import type { MapZone } from "@cs2dak/maps";
 
 // ── 地图列表 & 多层配置 ──────────────────────────────────────────────────────
@@ -320,7 +320,7 @@ export function MapAnnotator(){
   useEffect(()=>{setLevel("upper");setLoading(true);let c=false;fetchZones(mapName).then(s=>{if(!c){setStore(s);setLoading(false);}});try{setCustom(JSON.parse(localStorage.getItem("cs2dak-customcallouts-"+mapName)??"{}"));}catch{setCustom({});}return()=>{c=true;};},[mapName]);
   useEffect(()=>{try{localStorage.setItem("cs2dak-customcallouts-"+mapName,JSON.stringify(custom));}catch{}},[custom,mapName]);
   const vocab=useMemo(()=>{
-    const base=CALLOUT_NAME_CN[mapName]??{};
+    const base=CALLOUT_DICT[mapName]??{};
     const strMap:Record<string,string>={};
     for(const k of Object.keys(base))strMap[k]=calloutCn(mapName,k);
     return{...strMap,...custom};

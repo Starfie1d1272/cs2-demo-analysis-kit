@@ -7,22 +7,22 @@ export interface CalloutNameEntry {
 
 /** 取 callout 的中文名。 */
 export function calloutCn(mapName: string, id: string): string {
-  return CALLOUT_NAME_CN[mapName]?.[id]?.cn ?? "";
+  return CALLOUT_DICT[mapName]?.[id]?.cn ?? "";
 }
 
 /** 取 callout 的战术倾向。 */
 export function calloutTendency(mapName: string, id: string): Array<"a" | "b" | "mid"> | undefined {
-  return CALLOUT_NAME_CN[mapName]?.[id]?.tendency;
+  return CALLOUT_DICT[mapName]?.[id]?.tendency;
 }
 
 /**
- * CS2 官方 callout 名 → 中文名映射表。
+ * CS2 官方 callout 名 → 中文名 + 战术倾向映射表。
  *
  * 来源：79 场 demo（pro 24 + NJU 55）的 `lastPlaceName` 词表 + 社区约定。
  * 定位：供 Area v1 / 动线 / 展示层消费，不含坐标与路由逻辑。
  * 待核验：部分 callout 可能有更精确的社区叫法，本表为初稿。
  */
-export const CALLOUT_NAME_CN: Record<string, Record<string, CalloutNameEntry>> = {
+export const CALLOUT_DICT: Record<string, Record<string, CalloutNameEntry>> = {
   de_ancient: {
     BombsiteA: { cn: "A包", tendency: ["a"] },
     BombsiteB: { cn: "B包", tendency: ["b"] },
@@ -217,4 +217,4 @@ export const CALLOUT_NAME_CN: Record<string, Record<string, CalloutNameEntry>> =
 };
 
 /** 所有已标定的地图名。 */
-export const CALLOUT_MAPS = Object.keys(CALLOUT_NAME_CN) as ReadonlyArray<string>;
+export const CALLOUT_MAPS = Object.keys(CALLOUT_DICT) as ReadonlyArray<string>;

@@ -79,7 +79,7 @@ function tPrimaryCategory(targetSite: "a" | "b" | null): string {
 const NUM_CN = ["", "单", "双", "三", "四", "五"];
 
 /** 查锚点或 callout 的倾向方向：
- *  1. calloutName → CALLOUT_NAME_CN.tendency（如 SideHall → ["a"]）
+ *  1. calloutName → CALLOUT_DICT.tendency（如 SideHall → ["a"]）
  *  2. anchorId → DEFAULT_POSITIONS.callouts → calloutName → tendency（如 donut → SideHall → ["a"]）
  *  3. 前缀启发式 fallback（a_/b_/back_/mid*）
  */

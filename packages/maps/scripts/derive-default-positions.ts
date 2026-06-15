@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { loadDemoPackageFromZip } from "../../core/src/index.ts";
 import { FLAG_ALIVE, type DemoPackage } from "../../contract/src/index.ts";
-import { CALLOUT_NAME_CN, calloutCn } from "../src/callout-names.js";
+import { CALLOUT_DICT, calloutCn } from "../src/callout-names.js";
 import { DEFAULT_POSITIONS, type DefaultAnchor } from "../src/default-positions.js";
 
 const WINDOW_SEC = 30;
@@ -231,7 +231,7 @@ function accumulate(pkg: DemoPackage, evidence: MapEvidence): void {
 }
 
 function knownCallouts(mapName: string): Set<string> {
-  return new Set(Object.keys(CALLOUT_NAME_CN[mapName] ?? {}));
+  return new Set(Object.keys(CALLOUT_DICT[mapName] ?? {}));
 }
 
 function renderAnchors(mapName: string, side: Side): Record<string, DefaultAnchor> {
