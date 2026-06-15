@@ -166,23 +166,25 @@ one tap 只对可一枪满血终结的武器展示，Glock/USP/M4 等不展示�
 **回答**：对手会打什么，我们准备什么。
 
 双视角（主办方任选两队 / 教练「我的队伍」vs 对手）维持归档文档设计：
-- 8a Pattern Finder：开局 15/20/30s callout 位置向量 + 道具序列 →
-  **规则聚类**（动线链 + 人数分桶，不用黑箱 k-means），每个 cluster 展示
-  覆盖回合（可点回放）、雷达缩略图、胜率、聚类依据。
-- 8b Playbook：cluster 命名沉淀（IndexedDB）+ Timing Heatmap。
-- 8c Anti-Strat 报告：对手近 N 场倾向 → Markdown 导出 ✅（首版）。
+- **8a Pattern Finder（0.6 已落地）**：`TacticalRoundFact` 替换旧 opening
+  pattern；双层站位快照（阵营专属默认位 `defaults` / 深层图权 `advanced`）+
+  倒计时节奏桶（rush/fast/mid/late）+ 双点投入（进点人数/道具/下包）构成
+  聚类 key；`PatternExplorer` 三栏（簇列表 / 雷达快照叠加 / 数据摘要 + 证据
+  回合表）；`autoName` 模板自动命名（锚点名 + 节奏）；判断层 v0 疑似佯攻检测。
+  道具移出 key 改为关联统计，不影响聚类稳定性。
+- 8b Playbook：cluster 命名沉淀（IndexedDB，接新 `TacticalCluster.id`）✅。
+- 8c Anti-Strat 报告：对手近 N 场倾向 → Markdown 导出 ✅（基于 `TacticalCluster`
+  重写，按地图/side 分段列出 `autoName` + 胜率）。
 - 8d Series/BP/Veto Lite：series 分组 ✅ + BP 录入/展示 ✅（`SeriesVeto`
   schema + `VetoInputDialog` + `SeriesWorkspace` 系列赛工作台含各图 tab/比分/跨图记分板）
-  + 地图池 ban/pick 建议表（纯统计）⬜。
+  + `MapPoolTable`（地图池比较表：我方/对手样本胜率 + 对手高频打法）✅ 2026-06-15。
+- 8e Round Playlist：备战清单持久化（`PlaylistItem` + IndexedDB `playlist`
+  namespace）+ Markdown 导出（`playlistToMarkdown`）✅ 2026-06-15。
 
-> **⚠ 重设计方向（2026-06-13，0.6 重点）**：现有 8a 只回答「开局 15/20/30s
-> 站在哪」，没有后续动线、没有「最终如何打进包点」的完整战术路线，教练
-> 视角下几乎不可用；配套的道具序列也因此失去战术语境。重设计核心叙事改为
-> **完整回合战术路线**：开局站位 → 中期动线链（`MapRoute` + zone 序列）→
-> 进包点执行（爆弹时间、人数、配套道具 lineup 时机），一个 cluster 对应
-> 一条「打法」，而不是一组开局坐标。Pattern 向量需扩展为全回合 zone 轨迹，
-> 道具序列与路线节点对齐（道具实验室的 lineup 聚类作为路线节点的证据源）。
-> 落地前 8a/8b 现状视为占位骨架，不再继续小修。
+> **后续方向（v0.7+）**：完整战术路线（开局站位 → 中期动线链 `MapRoute`+zone
+> 序列 → 进包执行），需扩展 Pattern 向量为全回合 zone 轨迹；道具实验室
+> lineup 聚类作为路线节点证据源。0.6 的 `TacticalRoundFact` 快照数据结构
+> 已预留 `snapshots[]` 多切片，可直接扩展为更密的轨迹采样。
 
 ---
 
@@ -218,9 +220,11 @@ one tap 只对可一枪满血终结的武器展示，Glock/USP/M4 等不展示�
 | Lineup 视觉效果优化 | 5 | studio + maps | 🟡 首版已重写为 SVG 雷达渲染（发射线/落点标记/双向高亮），缩略图与几何降维仍需进一步优化 |
 | 道具时序条（与回合时间轴对齐） | 5 | react | ⬜ |
 | 队伍对比页 | 7 | presentation + react | ✅ 2026-06-13 |
-| 8a 完整战术路线重设计 | 8 | cohort/maps/presentation | ⬜ **0.6 重点**（§8） |
+| 8a 战术聚类（TacticalCluster + PatternExplorer） | 8 | dak-studio | ✅ 2026-06-15 |
 | 8d series/BP（SeriesWorkspace/BpView/VetoInputDialog） | 8 | presentation + studio | ✅ 2026-06-13 |
-| 8d ban/pick 建议表 | 8 | presentation | ⬜ |
+| 8d 地图池比较表（MapPoolTable） | 8 | dak-studio | ✅ 2026-06-15 |
+| 8e Round Playlist 备战清单 | 8 | dak-studio | ✅ 2026-06-15 |
+| 8a 完整战术路线（MapRoute+zone 动线链） | 8 | cohort/maps/presentation | ⬜ v0.7+ |
 | 「这是我」标记 + 主页编排 | 9 | studio | ✅ 2026-06-12 |
 | 机制跨场聚合从 presentation 迁往 cohort | 架构债 | presentation → cohort | ⬜ 低优先 |
 
