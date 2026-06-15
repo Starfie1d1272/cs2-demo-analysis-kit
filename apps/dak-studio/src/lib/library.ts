@@ -25,6 +25,8 @@ export interface DemoMeta {
   playerCount: number;
   hasReplay: boolean;
   source: string;
+  /** 服务器名（来自 cs2-demo-format match.serverName）；旧条目/无值为 null。 */
+  serverName: string | null;
 }
 
 export interface StudioDemoEntry {
@@ -54,7 +56,7 @@ function normalizeEntry(entry: StudioDemoEntry): StudioDemoEntry {
     importedAt: entry.importedAt,
     tags: entry.tags ?? [],
     sourceDemPath: entry.sourceDemPath ?? null,
-    meta: entry.meta
+    meta: { ...entry.meta, serverName: entry.meta.serverName ?? null }
   };
 }
 
@@ -90,7 +92,8 @@ function metaFromPackage(pkg: DemoPackage): DemoMeta {
     durationSeconds: pkg.match.durationSeconds,
     playerCount: pkg.players.length,
     hasReplay: Boolean(pkg.replay),
-    source: pkg.match.source
+    source: pkg.match.source,
+    serverName: pkg.match.serverName ?? null
   };
 }
 
@@ -322,6 +325,21 @@ export async function removeDemo(id: string): Promise<void> {
   ]);
   pkgCache.delete(id);
   if (record) await getFactsStore().deleteMatchFacts(matchIdForEntry(record));
+}
+
+/**
+ * 批量删除。逐场串行（每场要删 ZIP blob + 12 个 facts 命名空间的行），
+ * 串行避免删除时的瞬时内存/IO 尖峰；onProgress 驱动界面提示。
+ */
+export async function removeDemos(
+  ids: string[],
+  onProgress?: (done: number, total: number) => void
+): Promise<void> {
+  const targets = [...new Set(ids)];
+  for (let i = 0; i < targets.length; i += 1) {
+    await removeDemo(targets[i]!);
+    onProgress?.(i + 1, targets.length);
+  }
 }
 
 /** 取解析后的 DemoPackage：内存 → ZIP 重建。仅用于逐场证据/工作台，不作为聚合缓存。 */

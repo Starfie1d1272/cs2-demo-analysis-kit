@@ -1,6 +1,6 @@
 import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Settings, Swords, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { bulkUpdateTags, importDemoFile, listDemoEntries, removeDemo, updateDemoTags, type StudioDemoEntry } from "./lib/library";
+import { bulkUpdateTags, importDemoFile, listDemoEntries, removeDemo, removeDemos, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { EMPTY_SCOPE, applyScope, type CohortScopeState } from "./components/CohortScope";
 import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems, triggerWindowsDropCapture, type ExportedDemoFile } from "./lib/dem";
 import { parseTags } from "./lib/tags";
@@ -312,18 +312,19 @@ export function App() {
   }, [reexportOne]);
 
   /** 全部重新导出：逐场串行（exporter 与内存吃不住并发），失败不打断，结束后汇总。 */
-  const handleReexportAll = useCallback(async () => {
-    const targets = entries.filter((entry) => entry.sourceDemPath);
-    if (targets.length === 0) {
-      setNotice("没有记录原始 .dem 路径的条目，无法批量重新导出");
+  /** 逐场串行重新导出给定条目集合（exporter 与内存吃不住并发），失败不打断，结束后汇总。 */
+  const reexportEntries = useCallback(async (targets: StudioDemoEntry[]) => {
+    const withPath = targets.filter((entry) => entry.sourceDemPath);
+    if (withPath.length === 0) {
+      setNotice("选中的条目都没有记录原始 .dem 路径，无法重新导出");
       return;
     }
-    if (!window.confirm(`将重新导出 ${targets.length} 场 demo（逐场进行，可能需要较长时间），继续？`)) return;
+    if (!window.confirm(`将重新导出 ${withPath.length} 场 demo（逐场进行，可能需要较长时间），继续？`)) return;
     setImporting(true);
     let done = 0;
     const failures: string[] = [];
-    for (const [index, entry] of targets.entries()) {
-      setNotice(`批量重新导出（${index + 1}/${targets.length}）：${entry.fileName}…`);
+    for (const [index, entry] of withPath.entries()) {
+      setNotice(`批量重新导出（${index + 1}/${withPath.length}）：${entry.fileName}…`);
       try {
         await reexportOne(entry);
         done += 1;
@@ -337,7 +338,32 @@ export function App() {
         (failures.length > 0 ? `，失败 ${failures.length} 场（${failures[0]}）` : "")
     );
     setImporting(false);
-  }, [entries, reexportOne]);
+  }, [reexportOne]);
+
+  const handleReexportAll = useCallback(async () => {
+    await reexportEntries(entries);
+  }, [entries, reexportEntries]);
+
+  const handleReexportSelected = useCallback(async (ids: string[]) => {
+    const idSet = new Set(ids);
+    await reexportEntries(entries.filter((entry) => idSet.has(entry.id)));
+  }, [entries, reexportEntries]);
+
+  const handleRemoveMany = useCallback(async (ids: string[]) => {
+    if (ids.length === 0) return;
+    if (!window.confirm(`确认从资料库删除 ${ids.length} 场 demo？此操作不可撤销。`)) return;
+    setImporting(true);
+    try {
+      await removeDemos(ids, (done, total) => setNotice(`正在删除（${done}/${total}）…`));
+      setEntries(await listDemoEntries());
+      setSelectedDemoId((current) => (current && ids.includes(current) ? null : current));
+      setNotice(`已删除 ${ids.length} 场 demo`);
+    } catch (err) {
+      setNotice(`批量删除失败：${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setImporting(false);
+    }
+  }, []);
 
   return (
     <div
@@ -426,6 +452,8 @@ export function App() {
             onBulkUpdateTags={handleBulkUpdateTags}
             onReexportDemo={handleReexportDemo}
             onReexportAll={handleReexportAll}
+            onReexportSelected={handleReexportSelected}
+            onRemoveMany={handleRemoveMany}
           />
         )}
         {view === "match" && (

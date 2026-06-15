@@ -30,6 +30,10 @@ export interface LibraryViewProps {
   onReexportDemo: (entry: StudioDemoEntry) => void;
   /** 批量重新导出所有有原始 .dem 路径的条目。 */
   onReexportAll?: () => void;
+  /** 批量重新导出选中条目（其中有原始 .dem 路径的）。 */
+  onReexportSelected?: (ids: string[]) => void;
+  /** 批量删除选中条目。 */
+  onRemoveMany?: (ids: string[]) => void;
 }
 
 function formatDuration(seconds: number): string {
@@ -55,14 +59,23 @@ export function LibraryView({
   onUpdateTags,
   onBulkUpdateTags,
   onReexportDemo,
-  onReexportAll
+  onReexportAll,
+  onReexportSelected,
+  onRemoveMany
 }: LibraryViewProps) {
   const [search, setSearch] = useState("");
   const [mapFilter, setMapFilter] = useState<string | null>(null);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [serverFilter, setServerFilter] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 
   const allTags = useMemo(() => [...new Set(entries.flatMap((entry) => entry.tags))].sort(), [entries]);
+  const servers = useMemo(
+    () => [...new Set(entries.map((entry) => entry.meta.serverName).filter((s): s is string => Boolean(s)))].sort(),
+    [entries]
+  );
 
   const editTags = (entry: StudioDemoEntry) => {
     const raw = window.prompt(`编辑「${entry.fileName}」的标签（逗号分隔）`, entry.tags.join(", "));
@@ -83,13 +96,20 @@ export function LibraryView({
     return entries.filter((entry) => {
       if (mapFilter && entry.meta.mapName !== mapFilter) return false;
       if (tagFilter && !entry.tags.includes(tagFilter)) return false;
+      if (serverFilter && entry.meta.serverName !== serverFilter) return false;
+      if (dateFrom || dateTo) {
+        const date = matchDateFromFileName(entry.fileName);
+        if (!date) return false;
+        if (dateFrom && date < dateFrom) return false;
+        if (dateTo && date > dateTo) return false;
+      }
       if (!term) return true;
-      return [entry.fileName, entry.meta.mapName, entry.meta.teamAName, entry.meta.teamBName, ...entry.tags]
+      return [entry.fileName, entry.meta.mapName, entry.meta.teamAName, entry.meta.teamBName, entry.meta.serverName ?? "", ...entry.tags]
         .join(" ")
         .toLowerCase()
         .includes(term);
     });
-  }, [entries, search, mapFilter, tagFilter]);
+  }, [entries, search, mapFilter, tagFilter, serverFilter, dateFrom, dateTo]);
 
   const onPick = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) onImportFiles(e.target.files, parseTags(importTagsRaw));
@@ -99,6 +119,7 @@ export function LibraryView({
   const selectedVisible = filtered.filter((entry) => selectedIds.has(entry.id));
   const allVisibleSelected = filtered.length > 0 && filtered.every((entry) => selectedIds.has(entry.id));
   const selectedTags = [...new Set(selectedVisible.flatMap((entry) => entry.tags))].sort();
+  const selectedReexportable = entries.filter((entry) => selectedIds.has(entry.id) && entry.sourceDemPath).length;
 
   const toggleSelected = (id: string) => {
     setSelectedIds((current) => {
@@ -211,6 +232,27 @@ export function LibraryView({
               <button type="button" className="stu-button stu-button-ghost" onClick={removeBatchTags} disabled={selectedTags.length === 0}>
                 移除标签
               </button>
+              {onReexportSelected && (
+                <button
+                  type="button"
+                  className="stu-button stu-button-ghost"
+                  onClick={() => { onReexportSelected([...selectedIds]); setSelectedIds(new Set()); }}
+                  disabled={importing || selectedReexportable === 0}
+                  title={selectedReexportable === 0 ? "选中条目都没有记录原始 .dem 路径" : `重新导出选中且有原始路径的 ${selectedReexportable} 场`}
+                >
+                  <RotateCw size={15} /> 重新导出（{selectedReexportable}）
+                </button>
+              )}
+              {onRemoveMany && (
+                <button
+                  type="button"
+                  className="stu-button stu-button-ghost stu-button-danger"
+                  onClick={() => { onRemoveMany([...selectedIds]); setSelectedIds(new Set()); }}
+                  disabled={importing}
+                >
+                  <Trash2 size={15} /> 删除（{selectedIds.size}）
+                </button>
+              )}
               <button type="button" className="stu-button stu-button-ghost" onClick={() => setSelectedIds(new Set())}>
                 取消
               </button>
@@ -259,6 +301,49 @@ export function LibraryView({
               ))}
             </div>
           )}
+          {selectedIds.size === 0 && servers.length > 0 && (
+            <div className="stu-chip-row">
+              <span className="stu-muted stu-chip-row-label">服务器</span>
+              {servers.map((server) => (
+                <button
+                  key={server}
+                  type="button"
+                  className={serverFilter === server ? "stu-chip stu-chip-active" : "stu-chip"}
+                  onClick={() => setServerFilter(serverFilter === server ? null : server)}
+                  title={server}
+                >
+                  {server}
+                </button>
+              ))}
+            </div>
+          )}
+          {selectedIds.size === 0 && (
+            <div className="stu-chip-row">
+              <span className="stu-muted stu-chip-row-label">日期</span>
+              <input
+                className="stu-search stu-date-input"
+                type="date"
+                value={dateFrom}
+                max={dateTo || undefined}
+                onChange={(e) => setDateFrom(e.target.value)}
+                aria-label="起始日期"
+              />
+              <span className="stu-muted">—</span>
+              <input
+                className="stu-search stu-date-input"
+                type="date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(e) => setDateTo(e.target.value)}
+                aria-label="结束日期"
+              />
+              {(dateFrom || dateTo) && (
+                <button type="button" className="stu-chip" onClick={() => { setDateFrom(""); setDateTo(""); }}>
+                  清除
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -284,6 +369,7 @@ export function LibraryView({
                 <th>地图</th>
                 <th>对阵</th>
                 <th>日期</th>
+                <th>服务器</th>
                 <th className="stu-num">回合</th>
                 <th className="stu-num">时长</th>
                 <th>回放</th>
@@ -321,6 +407,7 @@ export function LibraryView({
                     <small className="stu-filename">{entry.fileName}</small>
                   </td>
                   <td className="stu-dim">{matchDateFromFileName(entry.fileName) ?? "—"}</td>
+                  <td className="stu-dim" title={entry.meta.serverName ?? undefined}>{entry.meta.serverName ?? "—"}</td>
                   <td className="stu-num">{entry.meta.roundCount}</td>
                   <td className="stu-num">{formatDuration(entry.meta.durationSeconds)}</td>
                   <td>{entry.meta.hasReplay ? <span className="stu-tag stu-tag-ok">8Hz</span> : <span className="stu-tag">无</span>}</td>
@@ -354,7 +441,7 @@ export function LibraryView({
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="stu-dim" style={{ textAlign: "center" }}>
+                  <td colSpan={10} className="stu-dim" style={{ textAlign: "center" }}>
                     没有匹配的 demo
                   </td>
                 </tr>

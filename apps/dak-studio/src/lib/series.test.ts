@@ -20,7 +20,8 @@ function entry(id: string, date: string, teamAName: string, teamBName: string): 
       durationSeconds: 2400,
       playerCount: 10,
       hasReplay: true,
-      source: "test"
+      source: "test",
+      serverName: null
     }
   };
 }
