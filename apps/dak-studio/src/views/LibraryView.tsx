@@ -320,23 +320,25 @@ export function LibraryView({
           {selectedIds.size === 0 && (
             <div className="stu-chip-row">
               <span className="stu-muted stu-chip-row-label">日期</span>
-              <input
-                className="stu-search stu-date-input"
-                type="date"
-                value={dateFrom}
-                max={dateTo || undefined}
-                onChange={(e) => setDateFrom(e.target.value)}
-                aria-label="起始日期"
-              />
-              <span className="stu-muted">—</span>
-              <input
-                className="stu-search stu-date-input"
-                type="date"
-                value={dateTo}
-                min={dateFrom || undefined}
-                onChange={(e) => setDateTo(e.target.value)}
-                aria-label="结束日期"
-              />
+              <span className="stu-date-pair">
+                <input
+                  className="stu-search stu-date-input"
+                  type="date"
+                  value={dateFrom}
+                  max={dateTo || undefined}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  aria-label="起始日期"
+                />
+                <span className="stu-muted">—</span>
+                <input
+                  className="stu-search stu-date-input"
+                  type="date"
+                  value={dateTo}
+                  min={dateFrom || undefined}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  aria-label="结束日期"
+                />
+              </span>
               {(dateFrom || dateTo) && (
                 <button type="button" className="stu-chip" onClick={() => { setDateFrom(""); setDateTo(""); }}>
                   清除

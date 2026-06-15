@@ -75,7 +75,19 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
           CT 防守视角（{sideCounts.ct}）
         </button>
       </div>
-      {visibleClusters.length === 0 ? (
+      {replayTarget ? (
+        // 回放占满整块面板：ReplayViewer 的三列布局最小约 968px，塞进窄中栏会溢出重叠，
+        // 故播放时铺满（同一页、同一张雷达，不弹窗不跳转），「返回站位」回到聚类视图。
+        <InlineRoundReplay
+          matchId={replayTarget.matchId}
+          roundNumber={replayTarget.roundNumber}
+          tick={replayTarget.tick}
+          label={entryByMatchId.get(replayTarget.matchId)
+            ? `${entryByMatchId.get(replayTarget.matchId)!.meta.teamAName} vs ${entryByMatchId.get(replayTarget.matchId)!.meta.teamBName} · R${replayTarget.roundNumber}`
+            : `R${replayTarget.roundNumber}`}
+          onBack={() => setReplayTarget(null)}
+        />
+      ) : visibleClusters.length === 0 ? (
         <div className="stu-coach-pattern-explorer stu-empty">
           该视角下暂无聚类（{side === "t" ? "T" : "CT"} 方）。切换到另一视角，或导入更多 demo。
         </div>
@@ -113,19 +125,9 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
         })}
       </aside>
 
-          {/* 中栏：站位快照 ↔ 该回合 2D 回放（同一张雷达上播放，不跳转） */}
+          {/* 中栏：多回合站位快照（点证据回合的 ▶回放 切到整页回放视图） */}
           <div className="stu-pe-radar">
-            {replayTarget ? (
-              <InlineRoundReplay
-                matchId={replayTarget.matchId}
-                roundNumber={replayTarget.roundNumber}
-                tick={replayTarget.tick}
-                label={entryByMatchId.get(replayTarget.matchId)
-                  ? `${entryByMatchId.get(replayTarget.matchId)!.meta.teamAName} vs ${entryByMatchId.get(replayTarget.matchId)!.meta.teamBName} · R${replayTarget.roundNumber}`
-                  : `R${replayTarget.roundNumber}`}
-                onBack={() => setReplayTarget(null)}
-              />
-            ) : selected ? (
+            {selected ? (
               <ClusterRadar facts={selectedFacts} mapName={selected.mapName} />
             ) : (
               <div className="stu-pe-radar-empty">选择左侧聚类</div>

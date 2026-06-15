@@ -353,9 +353,16 @@ body {
   margin-right: 2px;
 }
 
+.stu-date-pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
 .stu-date-input {
   width: auto;
-  min-width: 140px;
+  min-width: 130px;
 }
 
 .stu-chip {
