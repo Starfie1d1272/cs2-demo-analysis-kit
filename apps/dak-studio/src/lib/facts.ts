@@ -7,7 +7,7 @@ import {
 } from "@cs2dak/core";
 import type { SeasonCohortFactRow } from "@cs2dak/cohort";
 import type { DemoPackage, EconomyType, MatchWorkspaceModel, OpeningTrailsModel, Side, TeamKey } from "@cs2dak/contract";
-import { decodeDelta, FLAG_ALIVE } from "@cs2dak/contract";
+import { decodeDelta, FLAG_ALIVE, FLAG_HAS_BOMB } from "@cs2dak/contract";
 import type { TriangleBvh, CalloutGrid, Vec3 } from "@cs2dak/maps";
 import type { LineupGrenadeLike } from "@cs2dak/maps";
 import { calloutNear, DEFAULT_POSITIONS, roleOf } from "@cs2dak/maps";
@@ -138,7 +138,8 @@ export interface SiteEntryFact {
   secondEntryTick: number | null;
   firstEntryRemainSec: number | null;
   executeRemainSec: number | null;
-  order: Array<{ playerIndex: number; tick: number; remainSec: number; callout: string }>;
+  /** entryCallout：进入包点前的最后一个非包点 callout（A1/A2/拱门等真实入口路线）。 */
+  order: Array<{ playerIndex: number; tick: number; remainSec: number; callout: string; entryCallout: string | null }>;
 }
 
 export interface TacticalPlantFact {
@@ -163,7 +164,26 @@ export interface TacticalGrenadeOccurrence {
   targetRegion: "a" | "b" | "mid" | "other" | "unknown";
 }
 
+/** C4 携带/落点轨迹：用于推断主攻方向与转点，并作为佯攻的第二条独立证据。 */
+export interface C4RouteFact {
+  /** 携带者经过的去重相邻 callout 序列（freezeEnd → 安放/回合结束）。 */
+  callouts: string[];
+  /** 初期方向区域（首个可判定 region）。 */
+  startRegion: "a" | "b" | "mid" | "other" | null;
+  /** 末期方向区域（最后一个可判定 region）。 */
+  endRegion: "a" | "b" | "mid" | "other" | null;
+  /** 主方向是否在 A/B 之间发生转点。 */
+  rotated: boolean;
+  /** 安放点 callout（未安放为 null）。 */
+  plantCallout: string | null;
+}
+
+/** TacticalRoundFact 口径版本：schema/语义变化时 +1，旧 facts 据此提示重建。 */
+export const TACTICAL_FACT_VERSION = 2;
+
 export interface TacticalRoundFact extends MatchFactBase {
+  /** 口径版本（见 TACTICAL_FACT_VERSION）。 */
+  analysisVersion: number;
   side: Side;
   teamKey: "teamA" | "teamB";
   teamName: string;
@@ -176,6 +196,8 @@ export interface TacticalRoundFact extends MatchFactBase {
   siteEntries: { a: SiteEntryFact; b: SiteEntryFact };
   plant: TacticalPlantFact | null;
   grenades: TacticalGrenadeOccurrence[];
+  /** C4 轨迹（仅 T 方计算；CT 或无回放为 null）。 */
+  c4Route: C4RouteFact | null;
   executeRemainSec: number | null;
   executeBucket: ExecuteBucket | null;
   firstKillForTeam: boolean | null;
@@ -333,71 +355,62 @@ function extractLineupFact(pkg: DemoPackage, matchId: string, grid: CalloutGrid 
 }
 
 
-function replayLabelsAt(pkg: DemoPackage, roundNumber: number, side: Side, sampleTick: number): string[] {
-  const replay = pkg.replay;
-  const round = pkg.rounds.find((row) => row.roundNumber === roundNumber);
-  const replayRound = replay?.rounds.find((row) => row.roundNumber === roundNumber);
-  if (!replay || !round || !replayRound) return [];
-  const labels: string[] = [];
-  for (const track of replayRound.players) {
-    const player = pkg.players[track.playerIndex];
-    if (!player) continue;
-    const playerSide = player.teamKey === "teamA" ? round.teamASide : round.teamBSide;
-    if (playerSide !== side) continue;
-    const frameIndex = Math.max(
-      0,
-      Math.min(replayRound.frameCount - 1, Math.round((sampleTick - replayRound.startTick) / replayRound.tickStep))
-    );
-    if (((track.flags[frameIndex] ?? 0) & FLAG_ALIVE) === 0) continue;
-    const place = replay.placeDict?.[track.place[frameIndex] ?? -1];
-    if (place) labels.push(place);
-  }
-  return labels.sort();
+// ── 每回合解码一次（避免每个 snapshot/进点/C4 轨迹重复 decodeDelta）──────────────
+interface DecodedTrack {
+  playerIndex: number;
+  side: Side | null;
+  x: number[];  // 游戏单位（已 × coordScale）
+  y: number[];
+  z: number[];
+  flags: number[];
+  place: number[];
 }
 
-function replayFrameIndex(replayRound: NonNullable<DemoPackage["replay"]>["rounds"][number], tick: number): number {
-  return Math.max(
-    0,
-    Math.min(replayRound.frameCount - 1, Math.round((tick - replayRound.startTick) / replayRound.tickStep))
-  );
+interface DecodedRound {
+  startTick: number;
+  tickStep: number;
+  frameCount: number;
+  tracks: DecodedTrack[];
+  placeDict: string[];
 }
 
-function replayPositionsAt(
-  pkg: DemoPackage,
-  roundNumber: number,
-  side: Side,
-  sampleTick: number,
-  grid: CalloutGrid | null
-): TacticalSnapshot["positions"] {
+/** 解码一回合所有玩家轨迹（x/y/z 前缀和 × coordScale）；无回放返回 null。 */
+function decodeRound(pkg: DemoPackage, round: DemoPackage["rounds"][number]): DecodedRound | null {
   const replay = pkg.replay;
-  const round = pkg.rounds.find((row) => row.roundNumber === roundNumber);
-  const replayRound = replay?.rounds.find((row) => row.roundNumber === roundNumber);
-  if (!replay || !round || !replayRound) return [];
-  const positions: TacticalSnapshot["positions"] = [];
-  for (const track of replayRound.players) {
+  const replayRound = replay?.rounds.find((row) => row.roundNumber === round.roundNumber);
+  if (!replay || !replayRound) return null;
+  const scale = replay.meta.coordScale;
+  const tracks: DecodedTrack[] = replayRound.players.map((track) => {
     const player = pkg.players[track.playerIndex];
-    if (!player) continue;
-    const playerSide = player.teamKey === "teamA" ? round.teamASide : round.teamBSide;
-    if (playerSide !== side) continue;
-    const frameIndex = replayFrameIndex(replayRound, sampleTick);
-    if (((track.flags[frameIndex] ?? 0) & FLAG_ALIVE) === 0) continue;
-    const coordScale = replay.meta.coordScale;
-    const xs = decodeDelta(track.x);
-    const ys = decodeDelta(track.y);
-    const zs = decodeDelta(track.z);
-    const point = {
-      x: (xs[frameIndex] ?? 0) * coordScale,
-      y: (ys[frameIndex] ?? 0) * coordScale,
-      z: (zs[frameIndex] ?? 0) * coordScale,
-    };
-    const place = replay.placeDict?.[track.place[frameIndex] ?? -1] ?? null;
-    positions.push({
+    const side = player ? (player.teamKey === "teamA" ? round.teamASide : round.teamBSide) : null;
+    return {
       playerIndex: track.playerIndex,
-      ...point,
-      callout: place || effectCalloutFor(grid, point).callout,
-    });
-  }
-  return positions;
+      side,
+      x: decodeDelta(track.x).map((v) => v * scale),
+      y: decodeDelta(track.y).map((v) => v * scale),
+      z: decodeDelta(track.z).map((v) => v * scale),
+      flags: track.flags,
+      place: track.place,
+    };
+  });
+  return {
+    startTick: replayRound.startTick,
+    tickStep: replayRound.tickStep,
+    frameCount: replayRound.frameCount,
+    tracks,
+    placeDict: replay.placeDict ?? [],
+  };
+}
+
+function frameIndexAt(dr: DecodedRound, tick: number): number {
+  return Math.max(0, Math.min(dr.frameCount - 1, Math.round((tick - dr.startTick) / dr.tickStep)));
+}
+
+/** 某帧某玩家的 callout：优先 placeDict，回退到 callout-grid 邻近格。 */
+function calloutAtFrame(dr: DecodedRound, track: DecodedTrack, index: number, grid: CalloutGrid | null): string | null {
+  const place = dr.placeDict[track.place[index] ?? -1] ?? null;
+  if (place) return place;
+  return effectCalloutFor(grid, { x: track.x[index] ?? 0, y: track.y[index] ?? 0, z: track.z[index] ?? 0 }).callout;
 }
 
 // ── TacticalRoundFact helpers ─────────────────────────────────────────────────
@@ -417,8 +430,8 @@ function bucketOf(remainSec: number | null): ExecuteBucket | null {
 }
 
 function snapshotAt(
-  pkg: DemoPackage,
-  roundNumber: number,
+  dr: DecodedRound,
+  mapName: string,
   side: Side,
   tick: number,
   freezeEndTick: number,
@@ -428,15 +441,28 @@ function snapshotAt(
   const remainSec = remainSecAt(tick, freezeEndTick, tickrate);
   const defaults: Record<string, number> = {};
   const advanced: Record<string, number> = {};
-  for (const callout of replayLabelsAt(pkg, roundNumber, side, tick)) {
-    const role = roleOf(pkg.match.mapName, side, callout);
-    if (role.kind === "default") {
-      defaults[role.anchorId] = (defaults[role.anchorId] ?? 0) + 1;
-    } else if (role.kind === "advanced") {
-      advanced[callout] = (advanced[callout] ?? 0) + 1;
+  const positions: TacticalSnapshot["positions"] = [];
+  const index = frameIndexAt(dr, tick);
+  for (const track of dr.tracks) {
+    if (track.side !== side) continue;
+    if (((track.flags[index] ?? 0) & FLAG_ALIVE) === 0) continue;
+    const place = dr.placeDict[track.place[index] ?? -1] ?? null;
+    if (place) {
+      const role = roleOf(mapName, side, place);
+      if (role.kind === "default") {
+        defaults[role.anchorId] = (defaults[role.anchorId] ?? 0) + 1;
+      } else if (role.kind === "advanced") {
+        advanced[place] = (advanced[place] ?? 0) + 1;
+      }
     }
+    const point = { x: track.x[index] ?? 0, y: track.y[index] ?? 0, z: track.z[index] ?? 0 };
+    positions.push({
+      playerIndex: track.playerIndex,
+      ...point,
+      callout: place || effectCalloutFor(grid, point).callout,
+    });
   }
-  return { remainSec, defaults, advanced, positions: replayPositionsAt(pkg, roundNumber, side, tick, grid) };
+  return { remainSec, defaults, advanced, positions };
 }
 
 function economyTypeFor(
@@ -497,47 +523,39 @@ function targetRegionFromCallout(mapName: string, callout: string | null): Tacti
 }
 
 function siteEntriesFor(
-  pkg: DemoPackage,
+  dr: DecodedRound | null,
   round: DemoPackage["rounds"][number],
   side: Side,
+  tickrate: number,
   grid: CalloutGrid | null
 ): { a: SiteEntryFact; b: SiteEntryFact } {
-  const replay = pkg.replay;
-  const replayRound = replay?.rounds.find((row) => row.roundNumber === round.roundNumber);
-  if (!replay || !replayRound) return { a: emptySiteEntry(), b: emptySiteEntry() };
+  if (!dr) return { a: emptySiteEntry(), b: emptySiteEntry() };
 
-  const tickrate = pkg.match.tickrate || 64;
   const bySite = { a: new Map<number, SiteEntryFact["order"][number]>(), b: new Map<number, SiteEntryFact["order"][number]>() };
-  for (const track of replayRound.players) {
-    const player = pkg.players[track.playerIndex];
-    if (!player) continue;
-    const playerSide = player.teamKey === "teamA" ? round.teamASide : round.teamBSide;
-    if (playerSide !== side) continue;
+  for (const track of dr.tracks) {
+    if (track.side !== side) continue;
 
-    const coordScale = replay.meta.coordScale;
-    const xs = decodeDelta(track.x);
-    const ys = decodeDelta(track.y);
-    const zs = decodeDelta(track.z);
     const seen = new Set<"a" | "b">();
-    for (let index = 0; index < replayRound.frameCount; index += 1) {
-      const tick = replayRound.startTick + index * replayRound.tickStep;
+    // 进入包点前的最后一个非包点 callout = 真实入口路线（A1/A2/拱门），用来区分打法。
+    let lastEntryCallout: string | null = null;
+    for (let index = 0; index < dr.frameCount; index += 1) {
+      const tick = dr.startTick + index * dr.tickStep;
       if (tick < round.freezeEndTick || tick > round.endTick) continue;
       if (((track.flags[index] ?? 0) & FLAG_ALIVE) === 0) break;
-      const place = replay.placeDict?.[track.place[index] ?? -1] ?? null;
-      const point = {
-        x: (xs[index] ?? 0) * coordScale,
-        y: (ys[index] ?? 0) * coordScale,
-        z: (zs[index] ?? 0) * coordScale,
-      };
-      const callout = place || effectCalloutFor(grid, point).callout;
+      const callout = calloutAtFrame(dr, track, index, grid);
       const site = siteFromCallout(callout);
-      if (!site || seen.has(site)) continue;
+      if (!site) {
+        if (callout) lastEntryCallout = callout;
+        continue;
+      }
+      if (seen.has(site)) continue;
       seen.add(site);
       bySite[site].set(track.playerIndex, {
         playerIndex: track.playerIndex,
         tick,
         remainSec: remainSecAt(tick, round.freezeEndTick, tickrate),
         callout: callout ?? site,
+        entryCallout: lastEntryCallout,
       });
     }
   }
@@ -555,6 +573,48 @@ function siteEntriesFor(
   };
 
   return { a: build("a"), b: build("b") };
+}
+
+/**
+ * C4 携带/落点轨迹：扫描每帧持弹（FLAG_HAS_BOMB）玩家的 callout，得到去重相邻序列，
+ * 据此推断主攻方向与转点。用作佯攻的第二条独立证据（道具指向 A 但 C4 走向 B → 强佯攻）。
+ */
+function c4RouteFor(
+  dr: DecodedRound | null,
+  round: DemoPackage["rounds"][number],
+  mapName: string,
+  plant: TacticalPlantFact | null,
+  grid: CalloutGrid | null
+): C4RouteFact | null {
+  if (!dr) return null;
+  const callouts: string[] = [];
+  for (let index = 0; index < dr.frameCount; index += 1) {
+    const tick = dr.startTick + index * dr.tickStep;
+    if (tick < round.freezeEndTick || tick > round.endTick) continue;
+    // 该帧持弹的玩家（通常唯一）
+    const carrier = dr.tracks.find((track) =>
+      ((track.flags[index] ?? 0) & FLAG_ALIVE) !== 0 && ((track.flags[index] ?? 0) & FLAG_HAS_BOMB) !== 0
+    );
+    if (!carrier) continue;
+    const callout = calloutAtFrame(dr, carrier, index, grid);
+    if (callout && callout !== callouts[callouts.length - 1]) callouts.push(callout);
+  }
+  if (callouts.length === 0) return null;
+  const regionOf = (callout: string) => targetRegionFromCallout(mapName, callout);
+  const regions = callouts.map(regionOf).filter((r): r is "a" | "b" | "mid" | "other" => r !== "unknown");
+  const directional = regions.filter((r): r is "a" | "b" => r === "a" || r === "b");
+  const startRegion = regions[0] ?? null;
+  const endRegion = regions[regions.length - 1] ?? null;
+  const firstSide = directional[0] ?? null;
+  const lastSide = directional[directional.length - 1] ?? null;
+  const rotated = Boolean(firstSide && lastSide && firstSide !== lastSide);
+  return {
+    callouts,
+    startRegion,
+    endRegion,
+    rotated,
+    plantCallout: plant ? callouts[callouts.length - 1] ?? null : null,
+  };
 }
 
 function plantFor(pkg: DemoPackage, round: DemoPackage["rounds"][number], tickrate: number): TacticalPlantFact | null {
@@ -617,25 +677,33 @@ function firstKillForTeamFor(
 
 function extractTacticalRoundFacts(pkg: DemoPackage, matchId: string, grid: CalloutGrid | null): TacticalRoundFact[] {
   const tickrate = pkg.match.tickrate || 64;
+  const mapName = pkg.match.mapName;
   const out: TacticalRoundFact[] = [];
   for (const round of pkg.rounds) {
     const fe = round.freezeEndTick;
+    // 每回合解码一次玩家轨迹，snapshots / 进点 / C4 轨迹共用，避免重复 decodeDelta。
+    const dr = decodeRound(pkg, round);
     // T: 剩 1:40 / 1:25
     const tSlices = [fe + 15 * tickrate, fe + 30 * tickrate];
     // CT: 剩 1:35 / 1:00 / 0:30
     const ctSlices = [fe + 20 * tickrate, fe + 55 * tickrate, fe + 85 * tickrate];
+    const plant = plantFor(pkg, round, tickrate);
     for (const side of ["t", "ct"] as const) {
       const slices = side === "t" ? tSlices : ctSlices;
-      const snapshots = slices.map((tk) => snapshotAt(pkg, round.roundNumber, side, tk, fe, tickrate, grid));
+      const snapshots = dr
+        ? slices.map((tk) => snapshotAt(dr, mapName, side, tk, fe, tickrate, grid))
+        : slices.map((tk) => ({ remainSec: remainSecAt(tk, fe, tickrate), defaults: {}, advanced: {}, positions: [] }));
       if (snapshots.every((s) => Object.keys(s.defaults).length === 0 && Object.keys(s.advanced).length === 0 && s.positions.length === 0)) continue;
       const teamKey = round.teamASide === side ? "teamA" : "teamB";
-      const entries = siteEntriesFor(pkg, round, side, grid);
-      const plant = plantFor(pkg, round, tickrate);
+      const entries = siteEntriesFor(dr, round, side, tickrate, grid);
       const target = targetSiteFor(plant, entries);
       const exec = target ? entries[target].executeRemainSec : null;
       const grenades = grenadeOccurrencesFor(pkg, matchId, round, side, grid);
+      // C4 轨迹只对进攻方（T）有意义。
+      const c4Route = side === "t" ? c4RouteFor(dr, round, mapName, plant, grid) : null;
       out.push({
-        matchId, mapName: pkg.match.mapName, side, teamKey,
+        analysisVersion: TACTICAL_FACT_VERSION,
+        matchId, mapName, side, teamKey,
         teamName: teamNameOf(pkg, teamKey),
         opponentName: teamNameOf(pkg, opponentTeamKey(teamKey)),
         economy: economyTypeFor(pkg, round, teamKey),
@@ -645,6 +713,7 @@ function extractTacticalRoundFacts(pkg: DemoPackage, matchId: string, grid: Call
         siteEntries: entries,
         plant,
         grenades,
+        c4Route,
         executeRemainSec: exec, executeBucket: bucketOf(exec),
         firstKillForTeam: firstKillForTeamFor(pkg, round, teamKey),
         grenadeOccurrenceIds: grenades.map((grenade) => grenade.id),

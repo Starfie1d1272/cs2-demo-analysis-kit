@@ -159,6 +159,25 @@ describe("MatchFacts", () => {
     }
   });
 
+  it("提取 C4 轨迹与进点入口（A1/A2）字段", async () => {
+    const pkg = await loadFixture();
+    const facts = extractMatchFacts(pkg, { matchId: "m1" });
+    const t = facts.tacticalRounds.filter((f) => f.side === "t");
+    expect(t.length).toBeGreaterThan(0);
+    // 版本号写入
+    expect(facts.tacticalRounds.every((f) => f.analysisVersion === 2)).toBe(true);
+    // CT 不算 C4 轨迹
+    expect(facts.tacticalRounds.filter((f) => f.side === "ct").every((f) => f.c4Route === null)).toBe(true);
+    // 至少有一回合能跟到 C4 携带轨迹
+    expect(t.some((f) => f.c4Route && f.c4Route.callouts.length > 0)).toBe(true);
+    // 进点 order 带 entryCallout 字段（A1/A2 区分基础）
+    const withEntries = facts.tacticalRounds.find((f) => f.siteEntries.a.order.length + f.siteEntries.b.order.length > 0);
+    if (withEntries) {
+      const order = [...withEntries.siteEntries.a.order, ...withEntries.siteEntries.b.order];
+      expect(order.every((o) => "entryCallout" in o)).toBe(true);
+    }
+  });
+
   it("TacticalRoundFact store 读写：putMatchFacts 后 getTacticalRounds 返回相同数据", async () => {
     const pkg = await loadFixture();
     const matchId = "m1";

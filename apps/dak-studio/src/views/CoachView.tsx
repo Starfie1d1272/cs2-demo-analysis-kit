@@ -3,7 +3,7 @@ import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState } from "../components/primitives";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
-import { getFactsStore, type TacticalRoundFact } from "../lib/facts";
+import { getFactsStore, TACTICAL_FACT_VERSION, type TacticalRoundFact } from "../lib/facts";
 import { buildTacticalClusters, autoName, type TacticalCluster } from "../lib/tactics";
 import { playlistToMarkdown, type PlaylistItem } from "../lib/playlist";
 import {
@@ -307,6 +307,8 @@ function filterBySubjectTeam(
 }
 
 function isCurrentTacticalRoundFact(row: TacticalRoundFact): boolean {
+  // 口径版本不符（旧 facts 无 analysisVersion / 缺 c4Route 等新字段）→ 需重建。
+  if (row.analysisVersion !== TACTICAL_FACT_VERSION) return false;
   if (!Array.isArray(row.snapshots) || row.snapshots.length === 0) return false;
   if (!row.siteEntries?.a || !row.siteEntries.b) return false;
   if (!Array.isArray(row.grenades) || !Array.isArray(row.grenadeOccurrenceIds)) return false;

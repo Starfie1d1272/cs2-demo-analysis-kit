@@ -106,9 +106,22 @@ export function buildTacticalClusters(rows: TacticalRoundFact[]): TacticalCluste
 }
 
 function entryStructureKey(f: TacticalRoundFact): string {
-  const entries = f.siteEntries?.[f.targetSite ?? "a"];
+  if (!f.targetSite) return "-";
+  const entries = f.siteEntries[f.targetSite];
   if (!entries || entries.entrants <= 0) return "-";
-  return `${f.targetSite}:${entries.entrants}`;
+  // 按真实进点路线（entryCallout）分组，区分 A1/A2/拱门 等不同打法；
+  // 无路线信息（旧 facts）时回退到"总进点人数"。
+  const counts = new Map<string, number>();
+  for (const o of entries.order) {
+    if (!o.entryCallout) continue;
+    counts.set(o.entryCallout, (counts.get(o.entryCallout) ?? 0) + 1);
+  }
+  if (counts.size === 0) return `${f.targetSite}:${entries.entrants}`;
+  const structure = [...counts.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([route, n]) => `${route}:${n}`)
+    .join(",");
+  return `${f.targetSite}:${structure}`;
 }
 
 // ── Phase 4: 判断层 v0 ────────────────────────────────────────────────────────
@@ -126,10 +139,16 @@ export function suspectFake(f: TacticalRoundFact): { suspected: boolean; confide
   const otherGrenades = f.grenades.filter((grenade) => grenade.targetRegion === other);
   const smokeCount = otherGrenades.filter((grenade) => grenade.type === "smoke").length;
   if (otherGrenades.length >= 3 && smokeCount >= 1 && otherEntries.entrants === 0) {
+    // C4 轨迹作为第二条独立证据：C4 最终走向真实目标点（与道具佯攻点相反）→ 提高置信。
+    const c4 = f.c4Route;
+    const c4Corroborates = Boolean(c4 && (c4.endRegion === f.targetSite || c4.rotated));
+    const c4Note = c4
+      ? `；C4 ${c4.rotated ? "中途转点" : "走向"}${c4.endRegion ? c4.endRegion.toUpperCase() : "？"}`
+      : "";
     return {
       suspected: true,
-      confidence: "medium",
-      reason: `${other.toUpperCase()} 区疑似纯道具佯攻 · Experimental（道具${otherGrenades.length}/烟${smokeCount}/进点0）`,
+      confidence: c4Corroborates ? "medium" : "low",
+      reason: `${other.toUpperCase()} 区疑似纯道具佯攻 · Experimental（道具${otherGrenades.length}/烟${smokeCount}/进点0${c4Note}）`,
     };
   }
   return { suspected: false };

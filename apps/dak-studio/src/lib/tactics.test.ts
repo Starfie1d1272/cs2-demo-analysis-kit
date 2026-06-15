@@ -30,6 +30,8 @@ function grenade(p: Partial<TacticalGrenadeOccurrence> = {}): TacticalGrenadeOcc
 
 function fact(p: Partial<TacticalRoundFact> = {}): TacticalRoundFact {
   return {
+    analysisVersion: 2,
+    c4Route: null,
     matchId: "m",
     mapName: "de_mirage",
     side: "t",
@@ -167,7 +169,27 @@ describe("判断层 v0", () => {
       ],
       targetSite: "b",
     });
-    expect(suspectFake(f)).toEqual({ suspected: true, confidence: "medium", reason: "A 区疑似纯道具佯攻 · Experimental（道具3/烟1/进点0）" });
+    // 无 C4 轨迹证据 → 置信 low
+    expect(suspectFake(f)).toEqual({ suspected: true, confidence: "low", reason: "A 区疑似纯道具佯攻 · Experimental（道具3/烟1/进点0）" });
+  });
+  it("C4 走向真实目标点时佯攻置信提升为 medium 并标注 C4 走向", () => {
+    const f = fact({
+      siteEntries: {
+        a: { entrants: 0, firstEntryTick: null, secondEntryTick: null, firstEntryRemainSec: null, executeRemainSec: null, order: [] },
+        b: { entrants: 3, firstEntryTick: 1000, secondEntryTick: 1100, firstEntryRemainSec: 90, executeRemainSec: 88, order: [] },
+      },
+      grenades: [
+        grenade({ id: "g1", type: "smoke", targetRegion: "a" }),
+        grenade({ id: "g2", type: "flashbang", throwTick: 810, effectTick: 910, targetRegion: "a" }),
+        grenade({ id: "g3", type: "hegrenade", throwTick: 820, effectTick: 920, targetRegion: "a" }),
+      ],
+      targetSite: "b",
+      c4Route: { callouts: ["Ramp", "BombsiteB"], startRegion: "mid", endRegion: "b", rotated: false, plantCallout: "BombsiteB" },
+    });
+    const result = suspectFake(f);
+    expect(result.suspected).toBe(true);
+    expect(result.confidence).toBe("medium");
+    expect(result.reason).toContain("C4 走向B");
   });
   it("CT 方不判佯攻（佯攻是进攻方语义）", () => {
     const f = fact({

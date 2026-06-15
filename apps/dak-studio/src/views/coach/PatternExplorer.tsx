@@ -296,6 +296,15 @@ function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: T
 
   const isT = cluster.side === "t";
 
+  // C4 轨迹统计（仅 T）：转点回合数 + 主要走向（按 endRegion 多数表决）。
+  const c4Routes = facts.map((f) => f.c4Route).filter((r): r is NonNullable<typeof r> => r != null);
+  const c4Rotated = c4Routes.filter((r) => r.rotated).length;
+  const c4EndCounts = c4Routes.reduce<Record<string, number>>((acc, r) => {
+    if (r.endRegion) acc[r.endRegion] = (acc[r.endRegion] ?? 0) + 1;
+    return acc;
+  }, {});
+  const c4MainEnd = Object.entries(c4EndCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
   return (
     <div className="stu-pe-summary">
       <h3 className="stu-pe-summary-title">{autoName(cluster)} <small>（推测名）</small></h3>
@@ -332,6 +341,12 @@ function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: T
           <div>
             <dt>疑似纯道具佯攻 <span className="stu-derived-hint" title="非目标点成片道具但无人真正进点的回合数 · Experimental">ⓘ</span></dt>
             <dd>{cluster.fakeRoundCount}/{cluster.roundCount} 回合</dd>
+          </div>
+        )}
+        {isT && c4Routes.length > 0 && (
+          <div>
+            <dt>C4 走向 <span className="stu-derived-hint" title="按 C4 携带者最终所在区域多数表决；转点=C4 主方向在 A/B 间发生切换">ⓘ</span></dt>
+            <dd>{c4MainEnd ? c4MainEnd.toUpperCase() : "—"}{c4Rotated > 0 ? ` · 转点 ${c4Rotated}/${c4Routes.length}` : ""}</dd>
           </div>
         )}
       </dl>
