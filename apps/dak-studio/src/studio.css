@@ -29,6 +29,14 @@
   --stu-sidebar-w: 218px;
   --stu-radius: 10px;
   --stu-radius-sm: 7px;
+
+  /* 道具色值（服务视觉示意雷达图层与桌面导览） */
+  --dak-grenade-flashbang: #ffd84d;
+  --dak-grenade-smoke: #9aa6b2;
+  --dak-grenade-molotov: #ff8a3d;
+  --dak-grenade-incendiary: #ff8a3d;
+  --dak-grenade-hegrenade: #ff5f6e;
+  --dak-grenade-decoy: #6f7d8a;
 }
 
 html,
@@ -1127,7 +1135,7 @@ body {
 .stu-metric small {
   display: block;
   margin-top: 3px;
-  color: var(--stu-muted);
+  color: var(--dak-fg-dim);
   font-size: 11px;
   line-height: 1.25;
 }
@@ -1196,6 +1204,15 @@ body {
 .stu-mini-table td {
   padding: 5px 6px;
   border-top: 1px solid var(--dak-border);
+}
+
+.stu-win { color: var(--dak-ok); }
+.stu-loss { color: var(--dak-danger); }
+
+.stu-derived-hint {
+  cursor: help;
+  font-size: 11px;
+  opacity: 0.65;
 }
 
 /* 数字列：表头与单元格同向右对齐（.stu-mini-table th 特异性更高，会把
@@ -2426,7 +2443,7 @@ td.stu-heat-cell.stu-heat-neutral {
 
 .stu-mgmt-team-cell strong {
   font-size: 13px;
-  color: var(--stu-text);
+  color: var(--dak-fg);
 }
 
 .stu-mgmt-audit {
@@ -2468,14 +2485,14 @@ td.stu-heat-cell.stu-heat-neutral {
 }
 
 .stu-duel-metric-list small {
-  color: var(--stu-muted);
+  color: var(--dak-fg-dim);
 }
 
 .stu-duel-notes {
   display: grid;
   gap: 5px;
   margin-top: 12px;
-  color: var(--stu-muted);
+  color: var(--dak-fg-dim);
   font-size: 12px;
 }
 
@@ -2503,14 +2520,14 @@ td.stu-heat-cell.stu-heat-neutral {
 .stu-duel-hero span,
 .stu-duel-hero small {
   display: block;
-  color: var(--stu-muted);
+  color: var(--dak-fg-dim);
   font-size: 12px;
 }
 
 .stu-duel-hero strong {
   display: block;
   margin: 5px 0;
-  color: var(--stu-text);
+  color: var(--dak-fg);
   font-size: 28px;
   line-height: 1;
 }
@@ -2526,7 +2543,7 @@ td.stu-heat-cell.stu-heat-neutral {
   padding: 14px;
   border: 1px solid var(--dak-border);
   border-radius: var(--stu-radius);
-  background: var(--dak-card);
+  background: var(--dak-panel);
 }
 
 .stu-duel-player-card header {
@@ -2543,7 +2560,7 @@ td.stu-heat-cell.stu-heat-neutral {
 
 .stu-duel-player-card header span,
 .stu-duel-player-card header b {
-  color: var(--stu-muted);
+  color: var(--dak-fg-dim);
   font-size: 12px;
 }
 
@@ -2554,7 +2571,7 @@ td.stu-heat-cell.stu-heat-neutral {
   place-items: center;
   border-radius: 50%;
   background: color-mix(in srgb, var(--dak-accent) 18%, transparent);
-  color: var(--stu-text);
+  color: var(--dak-fg);
   font-size: 16px;
 }
 
@@ -2578,7 +2595,7 @@ td.stu-heat-cell.stu-heat-neutral {
 }
 
 .stu-duel-pill small {
-  color: var(--stu-muted);
+  color: var(--dak-fg-dim);
   font-size: 11px;
 }
 
@@ -2587,7 +2604,7 @@ td.stu-heat-cell.stu-heat-neutral {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--stu-text);
+  color: var(--dak-fg);
   font-size: 13px;
 }
 
@@ -2633,7 +2650,7 @@ td.stu-heat-cell.stu-heat-neutral {
   display: flex;
   align-items: center;
   gap: 4px;
-  color: var(--stu-muted);
+  color: var(--dak-fg-dim);
   font-size: 11px;
   line-height: 1.2;
 }
@@ -2641,7 +2658,7 @@ td.stu-heat-cell.stu-heat-neutral {
 .stu-duel-metric-item b {
   display: block;
   margin-top: 4px;
-  color: var(--stu-text);
+  color: var(--dak-fg);
   font-size: 14px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -2800,7 +2817,7 @@ td.stu-heat-cell.stu-heat-neutral {
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 10px;
-  color: var(--stu-muted);
+  color: var(--dak-fg-dim);
   font-size: 12px;
 }
 
@@ -2855,7 +2872,7 @@ td.stu-heat-cell.stu-heat-neutral {
   border: 1px solid var(--dak-border);
   border-radius: 8px;
   background: var(--dak-panel);
-  color: var(--stu-muted);
+  color: var(--dak-fg-dim);
   cursor: pointer;
 }
 
@@ -2885,7 +2902,7 @@ td.stu-heat-cell.stu-heat-neutral {
   padding: 11px 12px;
   border: 1px solid var(--dak-border);
   border-radius: var(--stu-radius);
-  background: var(--dak-card);
+  background: var(--dak-panel);
 }
 
 .stu-duel-evidence-main {
@@ -2899,7 +2916,7 @@ td.stu-heat-cell.stu-heat-neutral {
 
 .stu-duel-evidence-card h3 small,
 .stu-duel-evidence-card p {
-  color: var(--stu-muted);
+  color: var(--dak-fg-dim);
   font-size: 12px;
 }
 
@@ -3017,7 +3034,7 @@ td.stu-heat-cell.stu-heat-neutral {
   display: grid;
   gap: 5px;
   min-width: 180px;
-  color: var(--stu-muted);
+  color: var(--dak-fg-dim);
   font-size: 12px;
 }
 
@@ -3026,79 +3043,273 @@ td.stu-heat-cell.stu-heat-neutral {
   border: 1px solid var(--dak-border);
   border-radius: var(--stu-radius-sm);
   background: var(--dak-panel);
-  color: var(--stu-text);
+  color: var(--dak-fg);
   padding: 0 8px;
 }
 
-.stu-coach-pattern-grid {
+/* ── 教练·战术聚类 PatternExplorer（三栏） ────────────────────────────────── */
+
+.stu-coach-pattern-explorer {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 12px;
+  grid-template-columns: 240px minmax(0, 1fr) minmax(280px, 380px);
+  gap: 14px;
   margin-top: 14px;
+  align-items: start;
 }
 
-.stu-coach-pattern-card {
+/* 左栏：簇列表 */
+.stu-pe-list {
   display: grid;
-  gap: 10px;
-  padding: 14px;
-  border: 1px solid var(--dak-border);
-  border-radius: var(--stu-radius);
-  background: var(--dak-card);
+  gap: 4px;
+  max-height: 68vh;
+  overflow-y: auto;
 }
 
-.stu-coach-pattern-card header {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: center;
-  color: var(--stu-muted);
-  font-size: 12px;
-}
-
-.stu-coach-pattern-card header b {
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--dak-accent) 16%, transparent);
-  color: var(--stu-text);
-}
-
-.stu-coach-pattern-card h3 {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.5;
-}
-
-.stu-coach-nades {
-  margin: 0;
-  color: var(--stu-muted);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.stu-coach-pattern-metrics {
+.stu-pe-cluster {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.stu-coach-pattern-metrics span {
-  padding: 8px;
+  gap: 2px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid transparent;
   border-radius: var(--stu-radius-sm);
+  background: transparent;
+  color: var(--dak-fg-mid);
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.stu-pe-cluster:hover {
+  background: var(--dak-panel);
+  border-color: var(--dak-border);
+}
+
+.stu-pe-cluster-active,
+.stu-pe-cluster-active:hover {
+  background: var(--dak-accent-soft);
+  border-color: color-mix(in srgb, var(--dak-accent) 35%, transparent);
+  color: var(--dak-fg);
+}
+
+.stu-pe-cluster-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  font-size: 12.5px;
+}
+
+.stu-pe-tag {
+  display: inline-flex;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.stu-pe-tag-fake {
+  background: color-mix(in srgb, var(--dak-warn) 22%, transparent);
+  color: var(--dak-warn);
+}
+
+.stu-pe-cluster-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 11px;
+  color: var(--dak-fg-dim);
+}
+
+.stu-pe-bucket {
+  padding: 0 5px;
+  border-radius: 3px;
   background: var(--dak-panel);
 }
 
-.stu-coach-pattern-metrics small,
-.stu-coach-pattern-metrics b {
-  display: block;
+/* 中栏：雷达快照 */
+.stu-pe-radar {
+  align-self: start;
+  display: grid;
+  gap: 8px;
 }
 
-.stu-coach-pattern-metrics small {
-  color: var(--stu-muted);
+.stu-pe-radar-empty {
+  padding: 60px 0;
+  text-align: center;
+  color: var(--dak-fg-dim);
+  font-size: 13px;
+}
+
+.stu-pe-radar-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--stu-radius);
+  border: 1px solid var(--dak-border);
+}
+
+.stu-pe-radar-bg {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  opacity: 0.75;
+}
+
+.stu-pe-radar-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px;
+  background: linear-gradient(transparent, rgba(11, 14, 16, 0.92));
+  pointer-events: none;
+}
+
+.stu-pe-snapshot-title {
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dak-fg-dim);
+}
+
+.stu-pe-anchor-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.stu-pe-anchor-name {
+  flex: none;
+  width: 48px;
+  font-size: 11px;
+  color: var(--dak-fg-mid);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stu-pe-anchor-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--dak-accent);
+  opacity: 0.55;
+  max-width: 100%;
+}
+
+.stu-pe-anchor-count {
+  flex: none;
+  width: 28px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dak-fg-dim);
+  text-align: right;
+}
+
+.stu-pe-entry-anchors {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--dak-border) 50%, transparent);
+  font-size: 11px;
+  color: var(--dak-fg-dim);
+}
+
+/* 右栏：数据摘要 */
+.stu-pe-detail {
+  display: grid;
+  gap: 12px;
+}
+
+.stu-pe-summary {
+  padding: 14px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius);
+  background: var(--dak-panel);
+}
+
+.stu-pe-summary-title {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stu-pe-summary-title small {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--dak-fg-dim);
+}
+
+.stu-pe-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.stu-pe-stats > div {
+  padding: 7px 10px;
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-bg-subtle);
+}
+
+.stu-pe-stats dt {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--dak-fg-dim);
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.stu-pe-stats dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.stu-pe-eco {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--dak-border);
   font-size: 11px;
 }
 
-.stu-coach-pattern-metrics b {
-  margin-top: 2px;
+.stu-pe-eco-label {
+  color: var(--dak-fg-dim);
+}
+
+.stu-pe-eco-item {
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--dak-bg-subtle);
+  color: var(--dak-fg-mid);
+}
+
+/* 右栏：证据回合表 */
+.stu-pe-evidence {
+  padding: 12px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius);
+  background: var(--dak-panel);
+}
+
+.stu-pe-evidence h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stu-pe-evidence .stu-mini-table {
+  font-size: 11.5px;
 }
 
 .stu-coach-report {
@@ -3107,7 +3318,7 @@ td.stu-heat-cell.stu-heat-neutral {
   border: 1px solid var(--dak-border);
   border-radius: var(--stu-radius-sm);
   background: var(--dak-panel);
-  color: var(--stu-text);
+  color: var(--dak-fg);
   padding: 12px;
   font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
@@ -3125,12 +3336,12 @@ td.stu-heat-cell.stu-heat-neutral {
   padding: 9px 10px;
   border: 1px solid var(--dak-border);
   border-radius: var(--stu-radius-sm);
-  color: var(--stu-muted);
+  color: var(--dak-fg-dim);
   font-size: 12px;
 }
 
 .stu-coach-series-item strong {
-  color: var(--stu-text);
+  color: var(--dak-fg);
 }
 
 /* ── 对枪网格紧凑卡片（DuelView） ── */

@@ -2,12 +2,12 @@ import { useMemo } from "react";
 import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
 
 export const GRENADE_COLOR: Record<string, string> = {
-  flashbang: "#ffd84d",
-  smoke: "#9aa6b2",
-  molotov: "#ff8a3d",
-  incendiary: "#ff8a3d",
-  hegrenade: "#ff5f6e",
-  decoy: "#6f7d8a",
+  flashbang: "var(--dak-grenade-flashbang)",
+  smoke: "var(--dak-grenade-smoke)",
+  molotov: "var(--dak-grenade-molotov)",
+  incendiary: "var(--dak-grenade-incendiary)",
+  hegrenade: "var(--dak-grenade-hegrenade)",
+  decoy: "var(--dak-grenade-decoy)",
 };
 
 /** 烟/火的近似作用半径（游戏单位），只服务视觉示意。 */
