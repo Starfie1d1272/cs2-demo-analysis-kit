@@ -26,8 +26,11 @@ export interface TacticalCluster {
   executeBucket: ExecuteBucket | null;
   roundCount: number;
   winRatePercent: number | null;
+  /** T 簇：本方下包率；CT 簇：对手下包率（同一回合事件，按本簇 side 的回合统计，不跨 side 重复计数）。 */
   plantRatePercent: number | null;
-  rounds: Array<{ matchId: string; roundNumber: number; won: boolean; economy: string }>;
+  /** 簇内疑似纯道具佯攻的回合数（仅 T 簇有意义，CT 恒为 0）。 */
+  fakeRoundCount: number;
+  rounds: Array<{ matchId: string; roundNumber: number; won: boolean; economy: string; planted: boolean }>;
 }
 
 function snapshotBasisKey(snapshot: TacticalRoundFact["snapshots"][number] | undefined): string {
@@ -74,16 +77,20 @@ export function buildTacticalClusters(rows: TacticalRoundFact[]): TacticalCluste
       side: f.side,
       teamName: f.teamName,
       opponentName: f.opponentName,
-      targetSite: f.targetSite,
+      // CT 视角下"目标包点 / 执行节奏"是 T 方语义，不属于防守方 → 固定 null，
+      // 避免出现"CT 执行剩余 115s / CT 下包率"这类不成立的描述。
+      targetSite: f.side === "ct" ? null : f.targetSite,
       defaultsBasis: db,
-      executeBucket: f.executeBucket,
+      executeBucket: f.side === "ct" ? null : f.executeBucket,
       roundCount: 0,
       winRatePercent: null,
       plantRatePercent: null,
+      fakeRoundCount: 0,
       rounds: [],
     };
     c.roundCount += 1;
-    c.rounds.push({ matchId: f.matchId, roundNumber: f.roundNumber, won: f.won, economy: f.economy });
+    c.rounds.push({ matchId: f.matchId, roundNumber: f.roundNumber, won: f.won, economy: f.economy, planted: f.plant != null });
+    if (suspectFake(f).suspected) c.fakeRoundCount += 1;
     map.set(id, c);
   }
   const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 1000) / 10 : null);
@@ -91,10 +98,9 @@ export function buildTacticalClusters(rows: TacticalRoundFact[]): TacticalCluste
     .map((c) => ({
       ...c,
       winRatePercent: pct(c.rounds.filter((r) => r.won).length, c.roundCount),
-      plantRatePercent: pct(
-        rows.filter((f) => c.rounds.some((r) => r.matchId === f.matchId && r.roundNumber === f.roundNumber) && f.plant != null).length,
-        c.roundCount
-      ),
+      // 簇内回合都同 side（cluster key 含 side），按本簇回合的 planted 统计即可，
+      // 不再回扫全量 rows（旧实现 T/CT 两条 fact 共享同一 plant，会双倍计数甚至 >100%）。
+      plantRatePercent: pct(c.rounds.filter((r) => r.planted).length, c.roundCount),
     }))
     .sort((a, b) => b.roundCount - a.roundCount || a.id.localeCompare(b.id));
 }
@@ -109,9 +115,13 @@ function entryStructureKey(f: TacticalRoundFact): string {
 
 const BUCKET_CN: Record<string, string> = { rush: "提速", fast: "速爆", mid: "默认", late: "后打" };
 
+/**
+ * 疑似"纯道具佯攻"：仅对 T（进攻方）有意义。当前只覆盖一种形态——
+ * 在非目标点投放成片道具（含烟）却无人真正进点。CT 防守方不存在"佯攻"语义，直接返回 false。
+ */
 export function suspectFake(f: TacticalRoundFact): { suspected: boolean; confidence?: "low" | "medium"; reason?: string } {
+  if (f.side !== "t" || !f.targetSite) return { suspected: false };
   const other = f.targetSite === "a" ? "b" : "a";
-  if (!f.targetSite) return { suspected: false };
   const otherEntries = f.siteEntries[other as "a" | "b"];
   const otherGrenades = f.grenades.filter((grenade) => grenade.targetRegion === other);
   const smokeCount = otherGrenades.filter((grenade) => grenade.type === "smoke").length;
@@ -119,7 +129,7 @@ export function suspectFake(f: TacticalRoundFact): { suspected: boolean; confide
     return {
       suspected: true,
       confidence: "medium",
-      reason: `${other.toUpperCase()} 区疑似道具佯攻 · Experimental（道具${otherGrenades.length}/烟${smokeCount}/进点0）`,
+      reason: `${other.toUpperCase()} 区疑似纯道具佯攻 · Experimental（道具${otherGrenades.length}/烟${smokeCount}/进点0）`,
     };
   }
   return { suspected: false };

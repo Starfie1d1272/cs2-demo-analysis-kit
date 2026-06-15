@@ -110,6 +110,38 @@ describe("tactical 聚类", () => {
     expect(clusters[0]!.roundCount).toBe(2);
     expect(clusters[0]!.winRatePercent).toBe(50);
   });
+  it("CT 簇 targetSite / executeBucket 固定为 null（不带 T 方语义）", () => {
+    const clusters = buildTacticalClusters([fact({ side: "ct", targetSite: "a", executeBucket: "rush" })]);
+    expect(clusters[0]!.targetSite).toBeNull();
+    expect(clusters[0]!.executeBucket).toBeNull();
+  });
+  it("plantRate 不跨 side 双算：同回合 T+CT 两条 fact 各归各簇，T 簇下包率=100%", () => {
+    const tRow = fact({ side: "t", plant: { site: "a", tick: 1600, remainSec: 60 } });
+    const ctRow = fact({ side: "ct", plant: { site: "a", tick: 1600, remainSec: 60 } });
+    const clusters = buildTacticalClusters([tRow, ctRow]);
+    const tCluster = clusters.find((c) => c.side === "t")!;
+    expect(tCluster.roundCount).toBe(1);
+    expect(tCluster.plantRatePercent).toBe(100); // 旧实现会算成 200
+  });
+  it("fakeRoundCount 簇级聚合，且 CT 簇恒为 0", () => {
+    const fakeFact = fact({
+      roundNumber: 5,
+      targetSite: "b",
+      siteEntries: {
+        a: { entrants: 0, firstEntryTick: null, secondEntryTick: null, firstEntryRemainSec: null, executeRemainSec: null, order: [] },
+        b: { entrants: 3, firstEntryTick: 1000, secondEntryTick: 1100, firstEntryRemainSec: 90, executeRemainSec: 88, order: [] },
+      },
+      grenades: [
+        grenade({ id: "g1", type: "smoke", targetRegion: "a" }),
+        grenade({ id: "g2", type: "flashbang", throwTick: 810, effectTick: 910, targetRegion: "a" }),
+        grenade({ id: "g3", type: "hegrenade", throwTick: 820, effectTick: 920, targetRegion: "a" }),
+      ],
+    });
+    const tClusters = buildTacticalClusters([fakeFact]);
+    expect(tClusters[0]!.fakeRoundCount).toBe(1);
+    const ctClusters = buildTacticalClusters([{ ...fakeFact, side: "ct" } as TacticalRoundFact]);
+    expect(ctClusters[0]!.fakeRoundCount).toBe(0);
+  });
   it("按 roundCount 降序", () => {
     const rows = [
       fact({ roundNumber: 1, executeBucket: "mid" }),
@@ -135,7 +167,23 @@ describe("判断层 v0", () => {
       ],
       targetSite: "b",
     });
-    expect(suspectFake(f)).toEqual({ suspected: true, confidence: "medium", reason: "A 区疑似道具佯攻 · Experimental（道具3/烟1/进点0）" });
+    expect(suspectFake(f)).toEqual({ suspected: true, confidence: "medium", reason: "A 区疑似纯道具佯攻 · Experimental（道具3/烟1/进点0）" });
+  });
+  it("CT 方不判佯攻（佯攻是进攻方语义）", () => {
+    const f = fact({
+      side: "ct",
+      targetSite: "b",
+      siteEntries: {
+        a: { entrants: 0, firstEntryTick: null, secondEntryTick: null, firstEntryRemainSec: null, executeRemainSec: null, order: [] },
+        b: { entrants: 3, firstEntryTick: 1000, secondEntryTick: 1100, firstEntryRemainSec: 90, executeRemainSec: 88, order: [] },
+      },
+      grenades: [
+        grenade({ id: "g1", type: "smoke" }),
+        grenade({ id: "g2", type: "flashbang", throwTick: 810, effectTick: 910 }),
+        grenade({ id: "g3", type: "hegrenade", throwTick: 820, effectTick: 920 }),
+      ],
+    });
+    expect(suspectFake(f).suspected).toBe(false);
   });
   it("fake 判断要求至少 3 颗道具且至少 1 颗烟", () => {
     expect(suspectFake(fact({

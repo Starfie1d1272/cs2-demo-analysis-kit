@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { autoName, suspectFake, type TacticalCluster } from "../../lib/tactics.js";
+import { autoName, type TacticalCluster } from "../../lib/tactics.js";
 import type { TacticalRoundFact } from "../../lib/facts.js";
 import type { StudioDemoEntry } from "../../lib/library.js";
 import { RadarTrails, GRENADE_COLOR, type RadarGrenadeOverlay, type RadarTrail } from "../../components/RadarTrails.js";
@@ -32,20 +32,6 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
     );
   }, [selected, facts]);
 
-  // 对所有簇预计算佯攻标志（基于该簇全量 facts，而非仅当前选中簇）
-  const clusterFakeMap = useMemo(() => {
-    const m = new Map<string, { suspected: boolean; reason?: string }>();
-    for (const c of clusters) {
-      const clusterFacts = facts.filter(
-        (f) => f.side === c.side && f.mapName === c.mapName &&
-          c.rounds.some((r) => r.matchId === f.matchId && r.roundNumber === f.roundNumber)
-      );
-      const representativeFact = clusterFacts[0];
-      m.set(c.id, representativeFact ? suspectFake(representativeFact) : { suspected: false });
-    }
-    return m;
-  }, [clusters, facts]);
-
   if (clusters.length === 0) {
     return <div className="stu-coach-pattern-explorer stu-empty">暂无聚类数据，请导入更多 demo。</div>;
   }
@@ -55,7 +41,6 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
       {/* 左栏：簇列表 */}
       <aside className="stu-pe-list">
         {clusters.map((c) => {
-          const fake = clusterFakeMap.get(c.id) ?? { suspected: false };
           return (
             <button
               key={c.id}
@@ -65,7 +50,14 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
             >
               <span className="stu-pe-cluster-name">
                 {autoName(c)}
-                {fake.suspected && <span className="stu-pe-tag stu-pe-tag-fake" title={fake.reason}>佯</span>}
+                {c.fakeRoundCount > 0 && (
+                  <span
+                    className="stu-pe-tag stu-pe-tag-fake"
+                    title={`疑似纯道具佯攻 ${c.fakeRoundCount}/${c.roundCount} 回合 · Experimental`}
+                  >
+                    佯 {c.fakeRoundCount}
+                  </span>
+                )}
               </span>
               <span className="stu-pe-cluster-meta">
                 <span>{SIDE_LABEL[c.side]}</span>
@@ -190,6 +182,8 @@ function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: T
     return vals[Math.floor(vals.length / 2)] ?? null;
   })();
 
+  const isT = cluster.side === "t";
+
   return (
     <div className="stu-pe-summary">
       <h3 className="stu-pe-summary-title">{autoName(cluster)} <small>（推测名）</small></h3>
@@ -203,21 +197,31 @@ function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: T
           <dd>{cluster.winRatePercent != null ? `${cluster.winRatePercent.toFixed(1)}%` : "—"}</dd>
         </div>
         <div>
-          <dt>下包率 <span className="stu-derived-hint" title="成功下包的回合比例">ⓘ</span></dt>
+          <dt>{isT ? "下包率" : "对手下包率"} <span className="stu-derived-hint" title={isT ? "本方成功下包的回合比例" : "该防守阵型下对手成功下包的回合比例"}>ⓘ</span></dt>
           <dd>{facts.length > 0 ? `${((plantCount / facts.length) * 100).toFixed(1)}%` : "—"}</dd>
         </div>
-        <div>
-          <dt>执行剩余（中位）<span className="stu-derived-hint" title="第二名队员进入目标包点时的回合剩余秒中位数">ⓘ</span></dt>
-          <dd>{execMedian != null ? `${execMedian}s` : "—"}</dd>
-        </div>
+        {isT && (
+          <div>
+            <dt>执行剩余（中位）<span className="stu-derived-hint" title="第二名队员进入目标包点时的回合剩余秒中位数">ⓘ</span></dt>
+            <dd>{execMedian != null ? `${execMedian}s` : "—"}</dd>
+          </div>
+        )}
         <div>
           <dt>首杀率 <span className="stu-derived-hint" title="该 side 率先击杀的回合比例">ⓘ</span></dt>
           <dd>{firstKillValid > 0 ? `${((firstKillCount / firstKillValid) * 100).toFixed(1)}%` : "—"}</dd>
         </div>
-        <div>
-          <dt>节奏</dt>
-          <dd>{cluster.executeBucket ? (BUCKET_LABEL[cluster.executeBucket] ?? cluster.executeBucket) : "—"}</dd>
-        </div>
+        {isT && (
+          <div>
+            <dt>节奏</dt>
+            <dd>{cluster.executeBucket ? (BUCKET_LABEL[cluster.executeBucket] ?? cluster.executeBucket) : "—"}</dd>
+          </div>
+        )}
+        {isT && cluster.fakeRoundCount > 0 && (
+          <div>
+            <dt>疑似纯道具佯攻 <span className="stu-derived-hint" title="非目标点成片道具但无人真正进点的回合数 · Experimental">ⓘ</span></dt>
+            <dd>{cluster.fakeRoundCount}/{cluster.roundCount} 回合</dd>
+          </div>
+        )}
       </dl>
       {Object.keys(ecoCounts).length > 0 && (
         <div className="stu-pe-eco">
