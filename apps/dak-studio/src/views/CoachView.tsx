@@ -50,13 +50,10 @@ export function CoachView({
   teamRenames = {}
 }: CoachViewProps) {
   const [tab, setTab] = useState<CoachTab>("patterns");
-  const [clusters, setClusters] = useState<TacticalCluster[] | null>(null);
-  // facts：subject（分析主体队伍）过滤后用于开局模式/战术本；allFacts：全量（当前口径）
-  // 用于备战报告把两支队伍各自跨所有对手聚合比较。对手是"抽象的"——分析永远是
-  // 针对一支队伍、跨其所有对手聚合，不做 head-to-head 限制。
-  const [facts, setFacts] = useState<TacticalRoundFact[]>([]);
   const [allFacts, setAllFacts] = useState<TacticalRoundFact[]>([]);
   const [hasValidFacts, setHasValidFacts] = useState(false);
+  // loading=true 初始值：防止首帧渲染时 clusters=[] && !loading 导致闪出空态
+  const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<CoachSettings>({ myTeamName: null, opponentTeamName: null });
   // 视角：己方复盘（主体=我的队伍）/ 敌方侦察（主体=对手队伍）。两者复用同一套分析。
   const [mode, setMode] = useState<"own" | "scout">("own");
@@ -69,6 +66,17 @@ export function CoachView({
     [allEntries, teamRenames]
   );
   const subjectTeam = mode === "own" ? settings.myTeamName : settings.opponentTeamName;
+
+  // facts：filterBySubjectTeam 过滤后的子集（给开局模式/战术本）；allFacts：全量（给备战报告，两支队伍各自跨对手聚合）。
+  const facts = useMemo(
+    () => filterBySubjectTeam(allFacts, subjectTeam, teamRenames),
+    [allFacts, subjectTeam, teamRenames]
+  );
+  const clusters = useMemo(
+    () => facts.length > 0 ? buildTacticalClusters(facts) : [],
+    [facts]
+  );
+
   useEffect(() => {
     void loadCoachSettings().then(setSettings);
     void listPlaybookNames().then(setPlaybook);
@@ -77,31 +85,31 @@ export function CoachView({
 
   useEffect(() => {
     if (entries.length === 0) {
-      setClusters(null);
+      setAllFacts([]);
+      setHasValidFacts(false);
+      setLoading(false);
       return;
     }
     let cancelled = false;
-    setClusters(null);
-    setFacts([]);
+    setLoading(true);
     setError(null);
     getFactsStore().getTacticalRounds({ matchIds: entries.map(matchIdForEntry) })
       .then((rows) => {
         if (!cancelled) {
           const validRows = rows.filter(isCurrentTacticalRoundFact);
-          const subjectRows = filterBySubjectTeam(validRows, subjectTeam, teamRenames);
           setHasValidFacts(validRows.length > 0);
           setAllFacts(validRows);
-          setFacts(subjectRows);
-          setClusters(buildTacticalClusters(subjectRows));
+          setLoading(false);
         }
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : String(err));
+          setLoading(false);
+        }
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [entries, subjectTeam, teamRenames]);
+    return () => { cancelled = true; };
+  }, [entries, teamRenames]); // subjectTeam 变化时不回库——useMemo 派生即可
 
   async function setMyTeam(teamName: string) {
     const next = await saveCoachSettings({ ...settings, myTeamName: teamName || null });
@@ -126,7 +134,7 @@ export function CoachView({
     );
   }
 
-  const antiMarkdown = buildAntiStratMarkdown(clusters ?? [], subjectTeam);
+  const antiMarkdown = buildAntiStratMarkdown(clusters, subjectTeam);
 
   return (
     <div className="stu-view">
@@ -191,8 +199,8 @@ export function CoachView({
       </div>
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
-      {!error && !clusters && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的开局 pattern…</div>}
-      {!error && clusters && clusters.length === 0 && entries.length > 0 && hasValidFacts && (
+      {!error && loading && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的开局 pattern…</div>}
+      {!error && !loading && clusters.length === 0 && entries.length > 0 && hasValidFacts && (
         <EmptyState
           variant="insufficient"
           title="该队伍在当前范围内无战术回合"
@@ -201,14 +209,14 @@ export function CoachView({
             : `请在上方${mode === "own" ? "「我的队伍」" : "「对手队伍」"}里选择要分析的队伍。`}
         />
       )}
-      {!error && clusters && clusters.length === 0 && entries.length > 0 && !hasValidFacts && (
+      {!error && !loading && clusters.length === 0 && entries.length > 0 && !hasValidFacts && (
         <EmptyState
           variant="insufficient"
           title="需要重建教练事实"
           hint="当前资料库里的教练 facts 是旧口径，请重新导入或重建这些 demo 后再查看战术聚类。"
         />
       )}
-      {clusters && clusters.length > 0 && tab === "patterns" && (
+      {!loading && clusters.length > 0 && tab === "patterns" && (
         <PatternExplorer
           clusters={clusters}
           facts={facts}
@@ -231,7 +239,7 @@ export function CoachView({
           }}
         />
       )}
-      {clusters && clusters.length > 0 && tab === "playbook" && (
+      {!loading && clusters.length > 0 && tab === "playbook" && (
         <PlaybookTable
           clusters={clusters}
           playbook={playbook}
@@ -258,7 +266,7 @@ export function CoachView({
           }}
         />
       )}
-      {clusters && clusters.length > 0 && tab === "anti" && (
+      {!loading && clusters.length > 0 && tab === "anti" && (
         <>
           <MapPoolTable
             clusters={clusters}

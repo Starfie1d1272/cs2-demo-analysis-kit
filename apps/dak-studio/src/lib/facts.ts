@@ -588,15 +588,20 @@ function c4RouteFor(
 ): C4RouteFact | null {
   if (!dr) return null;
   const callouts: string[] = [];
+  let carrierIndex = -1; // 缓存的持弹者索引，利用时空局部性减少线性搜索
   for (let index = 0; index < dr.frameCount; index += 1) {
     const tick = dr.startTick + index * dr.tickStep;
     if (tick < round.freezeEndTick || tick > round.endTick) continue;
-    // 该帧持弹的玩家（通常唯一）
-    const carrier = dr.tracks.find((track) =>
-      ((track.flags[index] ?? 0) & FLAG_ALIVE) !== 0 && ((track.flags[index] ?? 0) & FLAG_HAS_BOMB) !== 0
-    );
-    if (!carrier) continue;
-    const callout = calloutAtFrame(dr, carrier, index, grid);
+    // 优先检查上次已知持弹者（同一玩家很少切枪/死亡后立即换人，绝大多数帧命中缓存）
+    if (carrierIndex < 0 ||
+      ((dr.tracks[carrierIndex]?.flags[index] ?? 0) & FLAG_ALIVE) === 0 ||
+      ((dr.tracks[carrierIndex]?.flags[index] ?? 0) & FLAG_HAS_BOMB) === 0) {
+      carrierIndex = dr.tracks.findIndex((track) =>
+        ((track.flags[index] ?? 0) & FLAG_ALIVE) !== 0 && ((track.flags[index] ?? 0) & FLAG_HAS_BOMB) !== 0
+      );
+    }
+    if (carrierIndex < 0) continue;
+    const callout = calloutAtFrame(dr, dr.tracks[carrierIndex]!, index, grid);
     if (callout && callout !== callouts[callouts.length - 1]) callouts.push(callout);
   }
   if (callouts.length === 0) return null;
@@ -888,32 +893,27 @@ function inScope(row: { matchId: string; playerKey?: string; mapName?: string; s
 }
 
 /**
- * 某 store 内属于该 matchId 的键判定。所有 store 的键要么是 `matchId` 本身
- * （tournament/teamComparison/duel/matchWorkspace/lineups），要么是 `rowKey(matchId, …)`
- * 即 `matchId\t…` 前缀（其余 store）。据此可只凭键判定归属，无需读取行的值。
- */
-function keyBelongsToMatch(key: string, matchId: string): boolean {
-  return key === matchId || key.startsWith(`${matchId}${ROW_KEY_SEP}`);
-}
-
-/**
  * 用新行整体替换某 matchId 的旧行。
  *
- * 关键：删除阶段只读 `store.keys()`（仅键，不反序列化值）后按 matchId 前缀过滤，
- * 绝不调用 `entries()`/`getAll()`。否则像 match_workspace 这种每行存一整场 8Hz
- * replay 的命名空间，会在每次导入/删除时把库里所有场次的完整 replay 全部反序列化
- * 进内存（O(N²)，批量重导/删除直接 OOM）。已在新集合里的键跳过删除，避免无谓删→写。
+ * 关键：删除阶段只读 `store.keys()`（仅键，不反序列化值）后按 `key === matchId ||
+ * key.startsWith(matchId + ROW_KEY_SEP)` 前缀过滤——因为所有 store 的键要么是 `matchId`
+ * 本身（tournament/teamComparison/duel/matchWorkspace/lineups），要么是 `rowKey(matchId, …)`
+ * 即 `matchId\t…` 前缀（其余 store）。绝不调用 `entries()`/`getAll()`。否则像
+ * match_workspace 这种每行存一整场 8Hz replay 的命名空间，会在每次导入/删除时把库里
+ * 所有场次的完整 replay 全部反序列化进内存（O(N²)，批量重导/删除直接 OOM）。
+ * 已在新集合里的键跳过删除，避免无谓删→写。
  */
 async function replaceRows<T extends { matchId: string }>(
   store: RecordStore,
   rows: Array<[string, T]>,
   matchId: string
 ): Promise<void> {
+  const prefix = `${matchId}${ROW_KEY_SEP}`;
   const keys = await store.keys();
   const nextKeys = new Set(rows.map(([key]) => key));
   await Promise.all(
     keys
-      .filter((key) => keyBelongsToMatch(key, matchId) && !nextKeys.has(key))
+      .filter((key) => (key === matchId || key.startsWith(prefix)) && !nextKeys.has(key))
       .map((key) => store.delete(key))
   );
   await Promise.all(rows.map(([key, row]) => store.put(key, row)));

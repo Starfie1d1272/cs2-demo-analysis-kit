@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import type { MatchWorkspaceModel } from "@cs2dak/contract";
 import { ReplayViewer } from "@cs2dak/react";
+import { economyLabelCn } from "@cs2dak/presentation";
 import { autoName, type TacticalCluster } from "../../lib/tactics.js";
 import { getFactsStore, type TacticalRoundFact } from "../../lib/facts.js";
 import type { StudioDemoEntry } from "../../lib/library.js";
@@ -8,9 +9,6 @@ import { RadarTrails, GRENADE_COLOR, type RadarGrenadeOverlay, type RadarTrail }
 
 const SIDE_LABEL: Record<string, string> = { t: "T 方", ct: "CT 方" };
 const BUCKET_LABEL: Record<string, string> = { rush: "提速", fast: "速爆", mid: "默认", late: "后打" };
-const ECO_LABEL: Record<string, string> = {
-  full: "全购", half: "半购", "half-buy": "半购", force: "强购", eco: "省钱", pistol: "手枪局",
-};
 
 export interface PatternExplorerProps {
   clusters: TacticalCluster[];
@@ -20,12 +18,13 @@ export interface PatternExplorerProps {
   onAddToPlaylist?: (cluster: TacticalCluster, fact: TacticalRoundFact) => void;
 }
 
-export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, onAddToPlaylist }: PatternExplorerProps) {
+export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, onAddToPlaylist, replayModelCache }: PatternExplorerProps) {
   // 顶部视角切换：T 进攻语境 / CT 防守语境分开看，避免两个 side 的簇混在一列。
   const [side, setSide] = useState<"t" | "ct">("t");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // 页面内回放：选中证据回合后在本页弹出 2D 回放，不跳转比赛工作台。
   const [replayTarget, setReplayTarget] = useState<{ matchId: string; roundNumber: number; tick?: number } | null>(null);
+
 
   const sideCounts = useMemo(() => ({
     t: clusters.filter((c) => c.side === "t").length,
@@ -97,6 +96,7 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
             ? `${entryByMatchId.get(replayTarget.matchId)!.meta.teamAName} vs ${entryByMatchId.get(replayTarget.matchId)!.meta.teamBName} · R${replayTarget.roundNumber}`
             : `R${replayTarget.roundNumber}`}
           onBack={() => setReplayTarget(null)}
+          cache={replayModelCache}
         />
       ) : visibleClusters.length === 0 ? (
         <div className="stu-coach-pattern-explorer stu-empty">
@@ -170,37 +170,36 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
   );
 }
 
-const replayModelCache = new Map<string, MatchWorkspaceModel>();
 
-async function loadReplayModel(matchId: string): Promise<MatchWorkspaceModel> {
-  const cached = replayModelCache.get(matchId);
+async function loadReplayModel(matchId: string, cache: Map<string, MatchWorkspaceModel>): Promise<MatchWorkspaceModel> {
+  const cached = cache.get(matchId);
   if (cached) return cached;
   const stored = await getFactsStore().getMatchWorkspaces({ matchIds: [matchId] });
   if (!stored[0]) throw new Error("本场没有本地持久化回放，请重新导入或重建该场。");
-  replayModelCache.set(matchId, stored[0].row);
+  cache.set(matchId, stored[0].row);
   return stored[0].row;
 }
 
 /** 在中栏雷达位置直接播放某回合的 2D 回放（懒加载该场 workspace facts）。 */
-function InlineRoundReplay({ matchId, roundNumber, tick, label, onBack }: {
+function InlineRoundReplay({ matchId, roundNumber, tick, label, onBack, cache }: {
   matchId: string;
   roundNumber: number;
   tick?: number;
   label: string;
   onBack: () => void;
 }) {
-  const [model, setModel] = useState<MatchWorkspaceModel | null>(replayModelCache.get(matchId) ?? null);
+  const [model, setModel] = useState<MatchWorkspaceModel | null>(cache.get(matchId) ?? null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    if (!replayModelCache.get(matchId)) setModel(null);
-    loadReplayModel(matchId)
+    if (!cache.get(matchId)) setModel(null);
+    loadReplayModel(matchId, cache)
       .then((m) => { if (!cancelled) setModel(m); })
       .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)); });
     return () => { cancelled = true; };
-  }, [matchId]);
+  }, [matchId, cache]);
 
   return (
     <div className="stu-pe-replay">
@@ -379,7 +378,7 @@ function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: T
         <div className="stu-pe-eco">
           <span className="stu-pe-eco-label">经济分布：</span>
           {Object.entries(ecoCounts).map(([eco, n]) => (
-            <span key={eco} className="stu-pe-eco-item">{ECO_LABEL[eco] ?? eco} {n}</span>
+            <span key={eco} className="stu-pe-eco-item">{economyLabelCn(eco)} {n}</span>
           ))}
         </div>
       )}
@@ -429,7 +428,7 @@ function EvidenceTable({
               <tr key={`${r.matchId}-${r.roundNumber}`}>
                 <td title={r.matchId}>{label}</td>
                 <td className="stu-num">R{r.roundNumber}</td>
-                <td>{ECO_LABEL[r.economy] ?? r.economy}</td>
+                <td>{economyLabelCn(r.economy)}</td>
                 <td className="stu-num">{fact?.executeRemainSec != null ? `${fact.executeRemainSec}s` : "—"}</td>
                 <td>{fact?.firstKillForTeam == null ? "—" : fact.firstKillForTeam ? "✓" : "✗"}</td>
                 <td>{fact?.plant ? `${fact.plant.site.toUpperCase()} ${fact.plant.remainSec}s` : "—"}</td>
