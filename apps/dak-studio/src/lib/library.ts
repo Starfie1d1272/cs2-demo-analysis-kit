@@ -1,6 +1,7 @@
 import { loadDemoPackageFromZip } from "@cs2dak/core";
 import type { DemoPackage } from "@cs2dak/contract";
 import { extractMatchFacts, getFactsStore } from "./facts";
+import { loadStudioCalloutGrid } from "./callout-grid";
 import { getStorage } from "./storage";
 import { loadTriLookup } from "./tri";
 
@@ -59,10 +60,14 @@ function normalizeEntry(entry: StudioDemoEntry): StudioDemoEntry {
 
 async function writeFactsForPackage(id: string, entry: StudioDemoEntry, pkg: DemoPackage): Promise<void> {
   try {
-    const visibilityFor = await loadTriLookup([pkg.match.mapName]);
+    const [visibilityFor, calloutGrid] = await Promise.all([
+      loadTriLookup([pkg.match.mapName]),
+      loadStudioCalloutGrid(pkg.match.mapName),
+    ]);
     await getFactsStore().putMatchFacts(extractMatchFacts(pkg, {
       matchId: matchIdForEntry(entry),
-      visibilityFor
+      visibilityFor,
+      calloutGrid
     }));
   } catch {
     // facts 是查询加速层；导入主流程仍保留 ZIP 和元数据，失败后可由后续修复/重导补齐。

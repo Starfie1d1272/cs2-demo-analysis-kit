@@ -5,6 +5,7 @@
   "license": "MIT",
   "exports": {
     ".": "./src/index.ts",
+    "./callout-grid-node": "./src/callout-grid-node.ts",
     "./tri-assets": "./src/tri-assets.ts"
   },
   "files": [

@@ -3144,78 +3144,39 @@ td.stu-heat-cell.stu-heat-neutral {
 }
 
 .stu-pe-radar-wrap {
-  position: relative;
+  display: grid;
+  gap: 8px;
   overflow: hidden;
   border-radius: var(--stu-radius);
   border: 1px solid var(--dak-border);
+  background: var(--dak-panel);
 }
 
-.stu-pe-radar-bg {
-  display: block;
-  width: 100%;
-  aspect-ratio: 1;
-  opacity: 0.75;
+.stu-pe-radar-wrap .stu-chip-row {
+  padding: 8px 8px 0;
 }
 
-.stu-pe-radar-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 12px;
-  background: linear-gradient(transparent, rgba(11, 14, 16, 0.92));
-  pointer-events: none;
-}
-
-.stu-pe-snapshot-title {
-  margin-bottom: 6px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--dak-fg-dim);
-}
-
-.stu-pe-anchor-row {
+.stu-pe-radar-legend {
   display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 0 10px 10px;
+  color: var(--dak-fg-dim);
+  font-size: 11px;
+}
+
+.stu-pe-radar-legend span {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 3px;
+  gap: 5px;
+  min-width: 0;
 }
 
-.stu-pe-anchor-name {
+.stu-pe-radar-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
   flex: none;
-  width: 48px;
-  font-size: 11px;
-  color: var(--dak-fg-mid);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.stu-pe-anchor-bar {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--dak-accent);
-  opacity: 0.55;
-  max-width: 100%;
-}
-
-.stu-pe-anchor-count {
-  flex: none;
-  width: 28px;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: var(--dak-fg-dim);
-  text-align: right;
-}
-
-.stu-pe-entry-anchors {
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px solid color-mix(in srgb, var(--dak-border) 50%, transparent);
-  font-size: 11px;
-  color: var(--dak-fg-dim);
 }
 
 /* 右栏：数据摘要 */

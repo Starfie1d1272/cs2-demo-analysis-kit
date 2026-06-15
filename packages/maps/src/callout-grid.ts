@@ -6,12 +6,7 @@
  * 生成：scripts/build-callout-grid.py
  *
  * 核心是纯函数 calloutAt()，无平台依赖。
- * loadCalloutGrid() 是 Node.js 快捷加载器（跟随 tri-assets 的 readFileSync 模式）；
- * 浏览器端自行 fetch JSON 后直接调 calloutAt()。
  */
-import { readFileSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import type { Vec3 } from "./nav.js";
 
 // ── 类型 ──
@@ -63,40 +58,4 @@ export function calloutAt(
   const cell = grid.cells[key];
   if (!cell) return null;
   return { callout: grid.vocabulary[cell[0]], confidence: cell[1], samples: cell[2] };
-}
-
-// ── 路径解析（ESM-only，跟随 tri-assets 的 readFileSync 模式） ──
-
-const THIS_DIR = dirname(fileURLToPath(import.meta.url));
-/** packages/maps/ 目录。 */
-const MAPS_ROOT = join(THIS_DIR, "..");
-const GRID_DIR = join(MAPS_ROOT, "callout-grid");
-
-// ── Node.js 加载器 ──
-
-const CACHE = new Map<string, CalloutGrid>();
-
-/**
- * 从 callout-grid/ 按需加载一张地图的网格（Node.js）。
- * 缓存驻留进程生命周期。
- * 返回 null 表示该图无网格数据。
- */
-export function loadCalloutGrid(mapName: string): CalloutGrid | null {
-  const cached = CACHE.get(mapName);
-  if (cached !== undefined) return cached;
-
-  try {
-    const raw = readFileSync(join(GRID_DIR, `${mapName}.json`), "utf-8");
-    const grid = JSON.parse(raw) as CalloutGrid;
-    CACHE.set(mapName, grid);
-    return grid;
-  } catch {
-    CACHE.set(mapName, null as unknown as CalloutGrid);
-    return null;
-  }
-}
-
-/** 清空缓存（测试用）。 */
-export function clearCalloutGridCache(): void {
-  CACHE.clear();
 }

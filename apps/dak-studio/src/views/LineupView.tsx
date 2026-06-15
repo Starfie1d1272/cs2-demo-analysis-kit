@@ -356,10 +356,14 @@ export function LineupView({
                   <title>
                     {GRENADE_LABEL[cluster.grenade] ?? cluster.grenade} · ×{cluster.count} ·{" "}
                     {cluster.demoCount} 场 · 投掷位{" "}
-                    {cluster.throwerPlaceName
-                      ? calloutName(cluster.mapName, cluster.throwerPlaceName)
-                      : "—"}{" "}
-                    · 胜率{" "}
+	                    {cluster.throwerPlaceName
+	                      ? calloutName(cluster.mapName, cluster.throwerPlaceName)
+	                      : "—"}{" "}
+	                    → 落点{" "}
+	                    {cluster.effectCallout
+	                      ? calloutName(cluster.mapName, cluster.effectCallout)
+	                      : "—"}{" "}
+	                    · 胜率{" "}
                     {cluster.winRatePercent == null
                       ? "—"
                       : `${cluster.winRatePercent.toFixed(1)}%`}
@@ -415,9 +419,10 @@ export function LineupView({
           <thead>
             <tr>
               <th>道具</th>
-              <th>方</th>
-              <th>投掷位</th>
-              <th>时间</th>
+	              <th>方</th>
+	              <th>投掷位</th>
+	              <th>落点</th>
+	              <th>时间</th>
               <th>回合</th>
               <th className="stu-num stu-col-sortable" onClick={() => handleSort("count")}>
                 次数{sortKey === "count" ? (sortDesc ? " ↓" : " ↑") : ""}
@@ -434,10 +439,13 @@ export function LineupView({
           <tbody>
             {pageRows.map((cluster) => {
               const firstThrow = cluster.throws[0];
-              const place = cluster.throwerPlaceName
-                ? calloutName(cluster.mapName, cluster.throwerPlaceName)
-                : null;
-              const timeBucket = cluster.throwTimeBucket ?? null;
+	              const place = cluster.throwerPlaceName
+	                ? calloutName(cluster.mapName, cluster.throwerPlaceName)
+	                : null;
+	              const effectPlace = cluster.effectCallout
+	                ? calloutName(cluster.mapName, cluster.effectCallout)
+	                : null;
+	              const timeBucket = cluster.throwTimeBucket ?? null;
 
               return (
                 <tr
@@ -462,9 +470,12 @@ export function LineupView({
                     />
                     {GRENADE_LABEL[cluster.grenade] ?? displayWeaponName(cluster.grenade)}
                   </td>
-                  <td>{cluster.side ? SIDE_LABEL[cluster.side] : "—"}</td>
-                  <td>{place ?? "—"}</td>
-                  <td>{timeBucket ?? "—"}</td>
+	                  <td>{cluster.side ? SIDE_LABEL[cluster.side] : "—"}</td>
+	                  <td>{place ?? "—"}</td>
+	                  <td title={cluster.effectCalloutConfidence != null ? `confidence ${cluster.effectCalloutConfidence.toFixed(2)} · samples ${cluster.effectCalloutSamples ?? 0}` : undefined}>
+	                    {effectPlace ?? "—"}
+	                  </td>
+	                  <td>{timeBucket ?? "—"}</td>
                   <td>
                     R{cluster.roundNumbers.slice(0, 3).join("/")}
                     {cluster.roundNumbers.length > 3 ? "…" : ""}

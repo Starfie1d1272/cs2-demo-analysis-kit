@@ -72,8 +72,9 @@ export function CoachView({
     getFactsStore().getTacticalRounds({ matchIds: entries.map(matchIdForEntry) })
       .then((rows) => {
         if (!cancelled) {
-          setFacts(rows);
-          setClusters(buildTacticalClusters(rows));
+          const validRows = rows.filter(isCurrentTacticalRoundFact);
+          setFacts(validRows);
+          setClusters(buildTacticalClusters(validRows));
         }
       })
       .catch((err) => {
@@ -137,7 +138,14 @@ export function CoachView({
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
       {!error && !clusters && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的开局 pattern…</div>}
-      {clusters && tab === "patterns" && (
+      {!error && clusters && clusters.length === 0 && entries.length > 0 && (
+        <EmptyState
+          variant="insufficient"
+          title="需要重建教练事实"
+          hint="当前资料库里的教练 facts 是旧口径，请重新导入或重建这些 demo 后再查看战术聚类。"
+        />
+      )}
+      {clusters && clusters.length > 0 && tab === "patterns" && (
         <PatternExplorer
           clusters={clusters}
           facts={facts}
@@ -145,7 +153,7 @@ export function CoachView({
           onOpenMatch={onOpenMatch}
         />
       )}
-      {clusters && tab === "playbook" && (
+      {clusters && clusters.length > 0 && tab === "playbook" && (
         <PlaybookTable
           clusters={clusters}
           playbook={playbook}
@@ -155,7 +163,7 @@ export function CoachView({
           }}
         />
       )}
-      {clusters && tab === "anti" && (
+      {clusters && clusters.length > 0 && tab === "anti" && (
         <>
           <MapPoolTable
             clusters={clusters}
@@ -171,6 +179,20 @@ export function CoachView({
         </>
       )}
     </div>
+  );
+}
+
+function isCurrentTacticalRoundFact(row: TacticalRoundFact): boolean {
+  if (!Array.isArray(row.snapshots) || row.snapshots.length === 0) return false;
+  if (!row.siteEntries?.a || !row.siteEntries.b) return false;
+  if (!Array.isArray(row.grenades) || !Array.isArray(row.grenadeOccurrenceIds)) return false;
+  if (typeof row.teamName !== "string" || typeof row.opponentName !== "string") return false;
+  return row.snapshots.every((snapshot) =>
+    snapshot &&
+    typeof snapshot.remainSec === "number" &&
+    snapshot.defaults &&
+    snapshot.advanced &&
+    Array.isArray(snapshot.positions)
   );
 }
 

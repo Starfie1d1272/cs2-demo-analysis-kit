@@ -19,9 +19,10 @@ export interface TacticalCluster {
   id: string;
   mapName: string;
   side: TacticalRoundFact["side"];
+  teamName: string;
+  opponentName: string;
   targetSite: "a" | "b" | null;
   defaultsBasis: string;
-  entryAnchors: string[];
   executeBucket: ExecuteBucket | null;
   roundCount: number;
   winRatePercent: number | null;
@@ -29,24 +30,52 @@ export interface TacticalCluster {
   rounds: Array<{ matchId: string; roundNumber: number; won: boolean; economy: string }>;
 }
 
+function snapshotBasisKey(snapshot: TacticalRoundFact["snapshots"][number] | undefined): string {
+  if (!snapshot) return "-";
+  const defaults = defaultsBasisKey(snapshot.defaults);
+  const advanced = advancedBasisKey(snapshot.advanced);
+  if (defaults && advanced) return `${defaults}+${advanced}`;
+  return defaults || advanced || "-";
+}
+
 export function tacticalClusterKey(f: TacticalRoundFact, defaultsBasis?: string): string {
-  const defaults = defaultsBasis ?? defaultsBasisKey(f.snapshots[0]?.defaults ?? {});
-  const entries = [...f.entryAnchors].sort().join(",");
-  return `${f.mapName}:${f.side}:${f.targetSite ?? "-"}:${defaults}:${entries}:${f.executeBucket ?? "-"}`;
+  const first = defaultsBasis ?? snapshotBasisKey(f.snapshots[0]);
+  if (f.side === "ct") {
+    return [
+      f.mapName,
+      f.side,
+      f.economy,
+      first,
+      snapshotBasisKey(f.snapshots[1]),
+      snapshotBasisKey(f.snapshots[2]),
+      "-",
+    ].join(":");
+  }
+  return [
+    f.mapName,
+    f.side,
+    f.economy,
+    first,
+    snapshotBasisKey(f.snapshots[1]),
+    f.targetSite ?? "-",
+    entryStructureKey(f),
+    f.executeBucket ?? "-",
+  ].join(":");
 }
 
 export function buildTacticalClusters(rows: TacticalRoundFact[]): TacticalCluster[] {
   const map = new Map<string, TacticalCluster>();
   for (const f of rows) {
-    const db = defaultsBasisKey(f.snapshots[0]?.defaults ?? {});
+    const db = snapshotBasisKey(f.snapshots[0]);
     const id = tacticalClusterKey(f, db);
     const c = map.get(id) ?? {
       id,
       mapName: f.mapName,
       side: f.side,
+      teamName: f.teamName,
+      opponentName: f.opponentName,
       targetSite: f.targetSite,
       defaultsBasis: db,
-      entryAnchors: f.entryAnchors,
       executeBucket: f.executeBucket,
       roundCount: 0,
       winRatePercent: null,
@@ -62,29 +91,42 @@ export function buildTacticalClusters(rows: TacticalRoundFact[]): TacticalCluste
     .map((c) => ({
       ...c,
       winRatePercent: pct(c.rounds.filter((r) => r.won).length, c.roundCount),
+      plantRatePercent: pct(
+        rows.filter((f) => c.rounds.some((r) => r.matchId === f.matchId && r.roundNumber === f.roundNumber) && f.plant != null).length,
+        c.roundCount
+      ),
     }))
     .sort((a, b) => b.roundCount - a.roundCount || a.id.localeCompare(b.id));
+}
+
+function entryStructureKey(f: TacticalRoundFact): string {
+  const entries = f.siteEntries?.[f.targetSite ?? "a"];
+  if (!entries || entries.entrants <= 0) return "-";
+  return `${f.targetSite}:${entries.entrants}`;
 }
 
 // ── Phase 4: 判断层 v0 ────────────────────────────────────────────────────────
 
 const BUCKET_CN: Record<string, string> = { rush: "提速", fast: "速爆", mid: "默认", late: "后打" };
 
-export function suspectFake(f: TacticalRoundFact): { suspected: boolean; reason?: string } {
+export function suspectFake(f: TacticalRoundFact): { suspected: boolean; confidence?: "low" | "medium"; reason?: string } {
   const other = f.targetSite === "a" ? "b" : "a";
   if (!f.targetSite) return { suspected: false };
-  const inv = f.siteInvestment[other as "a" | "b"];
-  if (inv && inv.grenadeCount >= 2 && inv.entryCount === 0) {
+  const otherEntries = f.siteEntries[other as "a" | "b"];
+  const otherGrenades = f.grenades.filter((grenade) => grenade.targetRegion === other);
+  const smokeCount = otherGrenades.filter((grenade) => grenade.type === "smoke").length;
+  if (otherGrenades.length >= 3 && smokeCount >= 1 && otherEntries.entrants === 0) {
     return {
       suspected: true,
-      reason: `${other.toUpperCase()} 区道具佯攻（道具${inv.grenadeCount}/进点0）`,
+      confidence: "medium",
+      reason: `${other.toUpperCase()} 区疑似道具佯攻 · Experimental（道具${otherGrenades.length}/烟${smokeCount}/进点0）`,
     };
   }
   return { suspected: false };
 }
 
 export function autoName(
-  c: Pick<TacticalCluster, "mapName" | "side" | "defaultsBasis" | "entryAnchors" | "executeBucket" | "targetSite">
+  c: Pick<TacticalCluster, "mapName" | "side" | "defaultsBasis" | "executeBucket" | "targetSite">
 ): string {
   const anchors = DEFAULT_POSITIONS[c.mapName]?.[c.side].anchors ?? {};
   const parts = c.defaultsBasis

@@ -16,6 +16,12 @@ export interface LineupGrenadeLike {
   freezeEndTick: number;
   /** 投掷时 thrower 所在的 callout 名（从 replay placeDict 解析）。 */
   throwerPlaceName?: string | null;
+  /** 落点/生效点对应的 callout 名（从 3D callout grid 解析）。 */
+  effectCallout?: string | null;
+  /** effectCallout 的多数表决置信度。 */
+  effectCalloutConfidence?: number | null;
+  /** effectCallout 所在格采样数。 */
+  effectCalloutSamples?: number | null;
   /** thrower 所在方。 */
   side?: "t" | "ct" | null;
   /**
@@ -45,6 +51,12 @@ export interface LineupCluster {
   throwTimeBucket: string | null;
   /** 最高频投掷位 callout（从 replay placeDict 取 thrower 位置）。 */
   throwerPlaceName: string | null;
+  /** 最高频落点 callout（从 3D callout grid 取 effectPosition 位置）。 */
+  effectCallout: string | null;
+  /** 同簇内落点 callout 置信度均值。 */
+  effectCalloutConfidence: number | null;
+  /** 同簇内落点 callout 采样总数。 */
+  effectCalloutSamples: number | null;
   /** 最高频 side。 */
   side: "t" | "ct" | null;
 }
@@ -85,6 +97,8 @@ export function buildLineupClusters({
   // 辅助 map：记录 throwTimeBucket 的频次分布，用于取 mode
   const bucketCounts: Array<Map<string, number>> = [];
   const placeCounts: Array<Map<string, number>> = [];
+  const effectCalloutCounts: Array<Map<string, number>> = [];
+  const effectCalloutStats: Array<Map<string, { confidenceSum: number; confidenceCount: number; samples: number }>> = [];
   const sideCounts: Array<Map<string, number>> = [];
 
   for (const grenade of grenades) {
@@ -114,6 +128,9 @@ export function buildLineupClusters({
       demoCount: 0,
       throwTimeBucket: null,
       throwerPlaceName: null,
+      effectCallout: null,
+      effectCalloutConfidence: null,
+      effectCalloutSamples: null,
       side: null,
     };
 
@@ -121,6 +138,8 @@ export function buildLineupClusters({
     if (!existing) {
       bucketCounts.push(new Map());
       placeCounts.push(new Map());
+      effectCalloutCounts.push(new Map());
+      effectCalloutStats.push(new Map());
       sideCounts.push(new Map());
     }
 
@@ -159,6 +178,22 @@ export function buildLineupClusters({
       pc.set(grenade.throwerPlaceName, (pc.get(grenade.throwerPlaceName) ?? 0) + 1);
     }
 
+    // 落点 callout
+    if (grenade.effectCallout) {
+      const ec = effectCalloutCounts[idx];
+      ec.set(grenade.effectCallout, (ec.get(grenade.effectCallout) ?? 0) + 1);
+      const statsByCallout = effectCalloutStats[idx];
+      const stats = statsByCallout.get(grenade.effectCallout) ?? { confidenceSum: 0, confidenceCount: 0, samples: 0 };
+      if (typeof grenade.effectCalloutConfidence === "number") {
+        stats.confidenceSum += grenade.effectCalloutConfidence;
+        stats.confidenceCount += 1;
+      }
+      if (typeof grenade.effectCalloutSamples === "number") {
+        stats.samples += grenade.effectCalloutSamples;
+      }
+      statsByCallout.set(grenade.effectCallout, stats);
+    }
+
     // side
     if (grenade.side) {
       const sc = sideCounts[idx];
@@ -169,20 +204,29 @@ export function buildLineupClusters({
   }
 
   return clusters
-    .map((cluster, i) => ({
-      ...cluster,
-      roundNumbers: [...new Set(cluster.roundNumbers)].sort((a, b) => a - b),
-      throwerIndices: [...new Set(cluster.throwerIndices)].sort((a, b) => a - b),
-      throws: [...cluster.throws].sort((a, b) => a.roundNumber - b.roundNumber || a.tick - b.tick),
-      winRatePercent: cluster.teamRounds > 0
-        ? Math.round((cluster.wins / cluster.teamRounds) * 1000) / 10
-        : null,
-      entryIds: [...new Set(cluster.entryIds)].sort(),
-      demoCount: new Set(cluster.entryIds).size,
-      throwTimeBucket: modeOfMap(bucketCounts[i]),
-      throwerPlaceName: modeOfMap(placeCounts[i]),
-      side: modeOfMap(sideCounts[i]) as "t" | "ct" | null,
-    }))
+    .map((cluster, i) => {
+      const effectCallout = modeOfMap(effectCalloutCounts[i]);
+      const effectStats = effectCallout ? effectCalloutStats[i].get(effectCallout) : undefined;
+      return {
+        ...cluster,
+        roundNumbers: [...new Set(cluster.roundNumbers)].sort((a, b) => a - b),
+        throwerIndices: [...new Set(cluster.throwerIndices)].sort((a, b) => a - b),
+        throws: [...cluster.throws].sort((a, b) => a.roundNumber - b.roundNumber || a.tick - b.tick),
+        winRatePercent: cluster.teamRounds > 0
+          ? Math.round((cluster.wins / cluster.teamRounds) * 1000) / 10
+          : null,
+        entryIds: [...new Set(cluster.entryIds)].sort(),
+        demoCount: new Set(cluster.entryIds).size,
+        throwTimeBucket: modeOfMap(bucketCounts[i]),
+        throwerPlaceName: modeOfMap(placeCounts[i]),
+        effectCallout,
+        effectCalloutConfidence: effectStats && effectStats.confidenceCount > 0
+          ? Math.round((effectStats.confidenceSum / effectStats.confidenceCount) * 1000) / 1000
+          : null,
+        effectCalloutSamples: effectStats && effectStats.samples > 0 ? effectStats.samples : null,
+        side: modeOfMap(sideCounts[i]) as "t" | "ct" | null,
+      };
+    })
     .sort((a, b) => b.count - a.count || a.grenade.localeCompare(b.grenade));
 }
 

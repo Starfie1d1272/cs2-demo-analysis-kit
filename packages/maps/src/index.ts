@@ -9,8 +9,6 @@ export * from "./lineups.js";
 export * from "./default-positions.js";
 export { CALLOUT_NAME_CN, CALLOUT_MAPS } from "./callout-names.js";
 export {
-  loadCalloutGrid,
-  clearCalloutGridCache,
   calloutAt,
   type CalloutGrid,
   type CalloutGridMeta,

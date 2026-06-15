@@ -141,18 +141,21 @@ describe("MatchFacts", () => {
     const f = facts.tacticalRounds[0]!;
     expect(f.snapshots.length).toBeGreaterThanOrEqual(2);
     expect(["a", "b", null]).toContain(f.targetSite);
-    expect(f.siteInvestment.a.entryCount).toBeGreaterThanOrEqual(0);
-    expect(f.siteInvestment.b.entryCount).toBeGreaterThanOrEqual(0);
+    expect(f.siteEntries.a.entrants).toBeGreaterThanOrEqual(0);
+    expect(f.siteEntries.b.entrants).toBeGreaterThanOrEqual(0);
+    expect(f.teamName).toBeTruthy();
+    expect(f.opponentName).toBeTruthy();
     expect(typeof f.won).toBe("boolean");
     expect(["teamA", "teamB"]).toContain(f.teamKey);
-    // 真正下包的回合必有 targetSite 与节奏桶
+    // 真正下包的回合必有独立 plant 事实与 targetSite；execute 只在第二人真实进点时存在。
     const planted = facts.tacticalRounds.find(
-      (r) => r.siteInvestment.a.planted || r.siteInvestment.b.planted
+      (r) => r.plant != null
     );
     if (planted) {
       expect(planted.targetSite).not.toBeNull();
-      expect(planted.executeBucket).not.toBeNull();
-      expect(["rush", "fast", "mid", "late"] satisfies ExecuteBucket[]).toContain(planted.executeBucket!);
+      if (planted.executeBucket) {
+        expect(["rush", "fast", "mid", "late"] satisfies ExecuteBucket[]).toContain(planted.executeBucket);
+      }
     }
   });
 

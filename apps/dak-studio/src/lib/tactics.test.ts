@@ -15,20 +15,23 @@ function fact(p: Partial<TacticalRoundFact> = {}): TacticalRoundFact {
     mapName: "de_mirage",
     side: "t",
     teamKey: "teamA",
+    teamName: "Team A",
+    opponentName: "Team B",
     economy: "full",
     won: true,
     roundNumber: 1,
-    snapshots: [{ remainSec: 100, defaults: { a_ramp: 3, mid: 2 }, advanced: {} }],
+    snapshots: [{ remainSec: 100, defaults: { a_ramp: 3, mid: 2 }, advanced: {}, positions: [] }],
     targetSite: "a",
-    siteInvestment: {
-      a: { entryCount: 4, grenadeCount: 3, deepestAnchor: "a_ramp", planted: true },
-      b: { entryCount: 0, grenadeCount: 0, deepestAnchor: null, planted: false },
+    siteEntries: {
+      a: { entrants: 4, firstEntryTick: 1000, secondEntryTick: 1100, firstEntryRemainSec: 90, executeRemainSec: 88, order: [] },
+      b: { entrants: 0, firstEntryTick: null, secondEntryTick: null, firstEntryRemainSec: null, executeRemainSec: null, order: [] },
     },
-    entryAnchors: ["a_palace", "a_ramp"],
+    plant: { site: "a", tick: 1600, remainSec: 60 },
+    grenades: [],
     executeRemainSec: 30,
     executeBucket: "late",
     firstKillForTeam: true,
-    grenadeIds: [],
+    grenadeOccurrenceIds: [],
     ...p,
   } as TacticalRoundFact;
 }
@@ -49,10 +52,34 @@ describe("basis 序列化", () => {
 });
 
 describe("tactical 聚类", () => {
-  it("key 含 map/side/targetSite/首切片defaults/entryAnchors/节奏桶，不含道具", () => {
+  it("key 含 map/side/经济/多切片/targetSite/节奏桶，不含道具", () => {
     expect(tacticalClusterKey(fact())).toBe(
-      "de_mirage:t:a:a_ramp:3|mid:2:a_palace,a_ramp:late"
+      "de_mirage:t:full:a_ramp:3|mid:2:-:a:a:4:late"
     );
+  });
+  it("T key 使用前两切片 defaults/advanced、目标点和节奏", () => {
+    expect(tacticalClusterKey(fact({
+      snapshots: [
+        { remainSec: 100, defaults: { a_ramp: 2, mid: 3 }, advanced: { Connector: 1 }, positions: [] },
+        { remainSec: 85, defaults: { a_ramp: 1, mid: 2 }, advanced: { Jungle: 2 }, positions: [] },
+      ],
+      targetSite: "b",
+      executeBucket: "fast",
+    }))).toBe("de_mirage:t:full:a_ramp:2|mid:3+Connector:1:a_ramp:1|mid:2+Jungle:2:b:-:fast");
+  });
+  it("CT key 不使用 targetSite 或 executeBucket", () => {
+    const a = tacticalClusterKey(fact({
+      side: "ct",
+      targetSite: "a",
+      executeBucket: "rush",
+    }));
+    const b = tacticalClusterKey(fact({
+      side: "ct",
+      targetSite: "b",
+      executeBucket: "late",
+    }));
+    expect(a).toBe(b);
+    expect(a).toBe("de_mirage:ct:full:a_ramp:3|mid:2:-:-:-");
   });
   it("同站位不同节奏 → 两簇", () => {
     const rush = fact({ executeBucket: "rush", roundNumber: 2, won: false });
@@ -60,7 +87,7 @@ describe("tactical 聚类", () => {
     expect(buildTacticalClusters([rush, late]).length).toBe(2);
   });
   it("簇聚合胜率", () => {
-    const clusters = buildTacticalClusters([fact({ won: true }), fact({ won: false, roundNumber: 2, grenadeIds: ["g1"] })]);
+    const clusters = buildTacticalClusters([fact({ won: true }), fact({ won: false, roundNumber: 2, grenadeOccurrenceIds: ["g1"] })]);
     expect(clusters[0]!.roundCount).toBe(2);
     expect(clusters[0]!.winRatePercent).toBe(50);
   });
@@ -78,20 +105,55 @@ describe("tactical 聚类", () => {
 describe("判断层 v0", () => {
   it("某 site 道具≥2 且进点 0 人 → 疑似道具佯攻", () => {
     const f = fact({
-      siteInvestment: {
-        a: { entryCount: 0, grenadeCount: 2, deepestAnchor: null, planted: false },
-        b: { entryCount: 3, grenadeCount: 1, deepestAnchor: "b_apps", planted: true },
+      siteEntries: {
+        a: { entrants: 0, firstEntryTick: null, secondEntryTick: null, firstEntryRemainSec: null, executeRemainSec: null, order: [] },
+        b: { entrants: 3, firstEntryTick: 1000, secondEntryTick: 1100, firstEntryRemainSec: 90, executeRemainSec: 88, order: [] },
       },
+      grenades: [
+        { id: "g1", type: "smoke", throwTick: 800, effectTick: 900, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
+        { id: "g2", type: "flashbang", throwTick: 810, effectTick: 910, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
+        { id: "g3", type: "hegrenade", throwTick: 820, effectTick: 920, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
+      ],
       targetSite: "b",
     });
-    expect(suspectFake(f)).toEqual({ suspected: true, reason: "A 区道具佯攻（道具2/进点0）" });
+    expect(suspectFake(f)).toEqual({ suspected: true, confidence: "medium", reason: "A 区疑似道具佯攻 · Experimental（道具3/烟1/进点0）" });
+  });
+  it("fake 判断要求至少 3 颗道具且至少 1 颗烟", () => {
+    expect(suspectFake(fact({
+      targetSite: "b",
+      siteEntries: {
+        a: { entrants: 0, firstEntryTick: null, secondEntryTick: null, firstEntryRemainSec: null, executeRemainSec: null, order: [] },
+        b: { entrants: 3, firstEntryTick: 1000, secondEntryTick: 1100, firstEntryRemainSec: 90, executeRemainSec: 88, order: [] },
+      },
+      grenades: [
+        { id: "g1", type: "flashbang", throwTick: 800, effectTick: 900, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
+        { id: "g2", type: "flashbang", throwTick: 810, effectTick: 910, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
+        { id: "g3", type: "hegrenade", throwTick: 820, effectTick: 920, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
+      ],
+    })).suspected).toBe(false);
+    expect(suspectFake(fact({
+      targetSite: "b",
+      siteEntries: {
+        a: { entrants: 0, firstEntryTick: null, secondEntryTick: null, firstEntryRemainSec: null, executeRemainSec: null, order: [] },
+        b: { entrants: 3, firstEntryTick: 1000, secondEntryTick: 1100, firstEntryRemainSec: 90, executeRemainSec: 88, order: [] },
+      },
+      grenades: [
+        { id: "g1", type: "smoke", throwTick: 800, effectTick: 900, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
+        { id: "g2", type: "flashbang", throwTick: 810, effectTick: 910, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
+      ],
+    })).suspected).toBe(false);
   });
   it("双点都出人不算 fake", () => {
     const f = fact({
-      siteInvestment: {
-        a: { entryCount: 1, grenadeCount: 1, deepestAnchor: "a_ramp", planted: false },
-        b: { entryCount: 3, grenadeCount: 1, deepestAnchor: "b_apps", planted: true },
+      siteEntries: {
+        a: { entrants: 1, firstEntryTick: 900, secondEntryTick: null, firstEntryRemainSec: 94, executeRemainSec: null, order: [] },
+        b: { entrants: 3, firstEntryTick: 1000, secondEntryTick: 1100, firstEntryRemainSec: 90, executeRemainSec: 88, order: [] },
       },
+      grenades: [
+        { id: "g1", type: "smoke", throwTick: 800, effectTick: 900, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
+        { id: "g2", type: "flashbang", throwTick: 810, effectTick: 910, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
+        { id: "g3", type: "hegrenade", throwTick: 820, effectTick: 920, throwPosition: { x: 0, y: 0, z: 0 }, effectPosition: { x: 1, y: 1, z: 0 }, throwCallout: "Ramp", effectCallout: "BombsiteA", confidence: 0.8, samples: 10, targetRegion: "a" },
+      ],
       targetSite: "b",
     });
     expect(suspectFake(f).suspected).toBe(false);
@@ -104,7 +166,6 @@ describe("判断层 v0", () => {
       mapName: "de_mirage",
       side: "t",
       defaultsBasis: "a_ramp:3|mid:1",
-      entryAnchors: ["a_ramp"],
       executeBucket: "rush",
       targetSite: "a",
     });

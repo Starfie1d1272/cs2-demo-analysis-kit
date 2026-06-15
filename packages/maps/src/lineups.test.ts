@@ -48,4 +48,20 @@ describe("buildLineupClusters", () => {
     expect(clusters).toHaveLength(1);
     expect(clusters[0]!.count).toBe(2);
   });
+
+  it("聚合 effectPosition 对应的落点 callout", () => {
+    const clusters = buildLineupClusters({
+      mapName: "de_mirage",
+      grenades: [
+        { ...throwAt(1, 1000, 0, 500), effectCallout: "BombsiteA", effectCalloutConfidence: 0.82, effectCalloutSamples: 12 },
+        { ...throwAt(2, 2000, 10, 520), effectCallout: "BombsiteA", effectCalloutConfidence: 0.76, effectCalloutSamples: 8 },
+        { ...throwAt(3, 3000, 20, 540), effectCallout: "Ramp", effectCalloutConfidence: 0.9, effectCalloutSamples: 20 },
+      ]
+    });
+
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0]!.effectCallout).toBe("BombsiteA");
+    expect(clusters[0]!.effectCalloutConfidence).toBeCloseTo(0.79);
+    expect(clusters[0]!.effectCalloutSamples).toBe(20);
+  });
 });

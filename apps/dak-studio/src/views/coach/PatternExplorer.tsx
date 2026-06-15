@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
-import { DEFAULT_POSITIONS } from "@cs2dak/maps";
 import { autoName, suspectFake, type TacticalCluster } from "../../lib/tactics.js";
 import type { TacticalRoundFact } from "../../lib/facts.js";
 import type { StudioDemoEntry } from "../../lib/library.js";
+import { RadarTrails, GRENADE_COLOR, type RadarGrenadeOverlay, type RadarTrail } from "../../components/RadarTrails.js";
 
 const SIDE_LABEL: Record<string, string> = { t: "T 方", ct: "CT 方" };
 const BUCKET_LABEL: Record<string, string> = { rush: "提速", fast: "速爆", mid: "默认", late: "后打" };
@@ -80,7 +80,7 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch }
       {/* 中栏：雷达快照 */}
       <div className="stu-pe-radar">
         {selected ? (
-          <ClusterRadar cluster={selected} mapName={selected.mapName} />
+          <ClusterRadar facts={selectedFacts} mapName={selected.mapName} />
         ) : (
           <div className="stu-pe-radar-empty">选择左侧聚类</div>
         )}
@@ -104,38 +104,76 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch }
   );
 }
 
-function ClusterRadar({ cluster, mapName }: { cluster: TacticalCluster; mapName: string }) {
-  const anchors = DEFAULT_POSITIONS[mapName]?.[cluster.side]?.anchors ?? {};
+function ClusterRadar({ facts, mapName }: { facts: TacticalRoundFact[]; mapName: string }) {
+  const maxSnapshots = Math.max(0, ...facts.map((fact) => fact.snapshots.length));
+  const [snapshotIndex, setSnapshotIndex] = useState(0);
+  const safeSnapshotIndex = Math.min(snapshotIndex, Math.max(0, maxSnapshots - 1));
+  const shownFacts = facts.slice(0, 8);
 
-  const basisParts = cluster.defaultsBasis.split("|").filter(Boolean).map((seg) => {
-    const [id, n] = seg.split(":");
-    return { id: id ?? "", count: Number(n ?? 1), name: anchors[id ?? ""]?.name ?? id ?? "" };
+  const trails: RadarTrail[] = shownFacts.flatMap((fact, factIndex) => {
+    const snapshot = fact.snapshots[safeSnapshotIndex];
+    if (!snapshot) return [];
+    return snapshot.positions.map((position) => ({
+      id: `${fact.matchId}:${fact.roundNumber}:${position.playerIndex}:${safeSnapshotIndex}`,
+      points: [{ x: position.x, y: position.y }],
+      color: fact.won ? "var(--dak-success)" : "var(--dak-danger)",
+      opacity: 0.85 - Math.min(0.45, factIndex * 0.04),
+    }));
   });
+
+  const grenades: RadarGrenadeOverlay[] = shownFacts.flatMap((fact) =>
+    fact.grenades.map((grenade) => ({
+      trailId: grenade.id,
+      type: grenade.type,
+      x: grenade.throwPosition.x,
+      y: grenade.throwPosition.y,
+      ex: grenade.effectPosition.x,
+      ey: grenade.effectPosition.y,
+      showEffect: true,
+      effectActive: grenade.type === "smoke" || grenade.type === "molotov" || grenade.type === "incendiary",
+    }))
+  );
 
   return (
     <div className="stu-pe-radar-wrap">
-      <img className="stu-pe-radar-bg" src={`./maps/radars/${mapName}.png`} alt={mapName} />
-      <div className="stu-pe-radar-overlay">
-        <div className="stu-pe-snapshot-title">首切片站位分布</div>
-        {basisParts.map(({ id, count, name }) => (
-          <div key={id} className="stu-pe-anchor-row">
-            <span className="stu-pe-anchor-name">{name}</span>
-            <span className="stu-pe-anchor-bar" style={{ width: `${Math.min(100, count * 22)}%` }} />
-            <span className="stu-pe-anchor-count">{count} 人</span>
-          </div>
+      {maxSnapshots > 1 && (
+        <div className="stu-chip-row" role="tablist" aria-label="战术切片">
+          {Array.from({ length: maxSnapshots }, (_, index) => (
+            <button
+              key={index}
+              type="button"
+              role="tab"
+              aria-selected={safeSnapshotIndex === index}
+              className={safeSnapshotIndex === index ? "stu-chip stu-chip-active" : "stu-chip"}
+              onClick={() => setSnapshotIndex(index)}
+            >
+              切片 {index + 1}
+            </button>
+          ))}
+        </div>
+      )}
+      <RadarTrails
+        mapName={mapName}
+        trails={trails}
+        grenades={grenades}
+        showTrails={false}
+        showGrenades
+        trailOpacity={0.7}
+        className="stu-trail-stage"
+      />
+      <div className="stu-pe-radar-legend">
+        <span><i style={{ background: "var(--dak-success)" }} />胜回合站位</span>
+        <span><i style={{ background: "var(--dak-danger)" }} />负回合站位</span>
+        {Object.entries(GRENADE_COLOR).map(([type, color]) => (
+          <span key={type}><i style={{ background: color }} />{type}</span>
         ))}
-        {cluster.entryAnchors.length > 0 && (
-          <div className="stu-pe-entry-anchors">
-            进点：{cluster.entryAnchors.map((a) => anchors[a]?.name ?? a).join("、")}
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
 function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: TacticalRoundFact[] }) {
-  const plantCount = facts.filter((f) => f.siteInvestment.a.planted || f.siteInvestment.b.planted).length;
+  const plantCount = facts.filter((f) => f.plant != null).length;
   const firstKillCount = facts.filter((f) => f.firstKillForTeam === true).length;
   const firstKillValid = facts.filter((f) => f.firstKillForTeam !== null).length;
 
@@ -167,7 +205,7 @@ function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: T
           <dd>{facts.length > 0 ? `${((plantCount / facts.length) * 100).toFixed(1)}%` : "—"}</dd>
         </div>
         <div>
-          <dt>执行剩余（中位）<span className="stu-derived-hint" title="下包时回合剩余秒中位数">ⓘ</span></dt>
+          <dt>执行剩余（中位）<span className="stu-derived-hint" title="第二名队员进入目标包点时的回合剩余秒中位数">ⓘ</span></dt>
           <dd>{execMedian != null ? `${execMedian}s` : "—"}</dd>
         </div>
         <div>
@@ -230,14 +268,17 @@ function EvidenceTable({
                 <td>{ECO_LABEL[r.economy] ?? r.economy}</td>
                 <td className="stu-num">{fact?.executeRemainSec != null ? `${fact.executeRemainSec}s` : "—"}</td>
                 <td>{fact?.firstKillForTeam == null ? "—" : fact.firstKillForTeam ? "✓" : "✗"}</td>
-                <td>{fact ? ((fact.siteInvestment.a.planted || fact.siteInvestment.b.planted) ? "✓" : "—") : "—"}</td>
+                <td>{fact?.plant ? `${fact.plant.site.toUpperCase()} ${fact.plant.remainSec}s` : "—"}</td>
                 <td className={r.won ? "stu-win" : "stu-loss"}>{r.won ? "胜" : "负"}</td>
                 <td>
                   {entry && (
                     <button
                       type="button"
                       className="stu-button-sm"
-                      onClick={() => onOpenMatch(entry.id, { roundNumber: r.roundNumber })}
+                      onClick={() => onOpenMatch(entry.id, {
+                        roundNumber: r.roundNumber,
+                        tick: fact ? jumpTickFor(fact) : undefined,
+                      })}
                     >
                       回放
                     </button>
@@ -250,4 +291,9 @@ function EvidenceTable({
       </table>
     </div>
   );
+}
+
+function jumpTickFor(fact: TacticalRoundFact): number | undefined {
+  const target = fact.targetSite ? fact.siteEntries[fact.targetSite] : null;
+  return target?.secondEntryTick ?? fact.plant?.tick ?? undefined;
 }

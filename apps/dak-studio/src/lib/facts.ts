@@ -7,10 +7,10 @@ import {
 } from "@cs2dak/core";
 import type { SeasonCohortFactRow } from "@cs2dak/cohort";
 import type { DemoPackage, EconomyType, MatchWorkspaceModel, OpeningTrailsModel, Side, TeamKey } from "@cs2dak/contract";
-import { FLAG_ALIVE } from "@cs2dak/contract";
-import type { TriangleBvh } from "@cs2dak/maps";
+import { decodeDelta, FLAG_ALIVE } from "@cs2dak/contract";
+import type { TriangleBvh, CalloutGrid, Vec3 } from "@cs2dak/maps";
 import type { LineupGrenadeLike } from "@cs2dak/maps";
-import { roleOf } from "@cs2dak/maps";
+import { calloutAt, DEFAULT_POSITIONS, roleOf } from "@cs2dak/maps";
 import {
   buildMatchWorkspaceModel,
   buildOpeningTrails,
@@ -127,31 +127,57 @@ export interface TacticalSnapshot {
   remainSec: number;
   defaults: Record<string, number>;   // anchorId → 存活人数
   advanced: Record<string, number>;   // advanced callout → 人数
-}
-
-export interface SiteInvestment {
-  entryCount: number;       // 进入该包点 zone 的人数
-  grenadeCount: number;     // 该回合朝该 site 投出的道具数
-  deepestAnchor: string | null;  // 最深推进 anchor
-  planted: boolean;
+  positions: Array<{ playerIndex: number; x: number; y: number; z: number; callout: string | null }>;
 }
 
 export type ExecuteBucket = "rush" | "fast" | "mid" | "late";
 
+export interface SiteEntryFact {
+  entrants: number;
+  firstEntryTick: number | null;
+  secondEntryTick: number | null;
+  firstEntryRemainSec: number | null;
+  executeRemainSec: number | null;
+  order: Array<{ playerIndex: number; tick: number; remainSec: number; callout: string }>;
+}
+
+export interface TacticalPlantFact {
+  site: "a" | "b";
+  tick: number;
+  remainSec: number;
+}
+
+export interface TacticalGrenadeOccurrence {
+  id: string;
+  type: string;
+  throwTick: number;
+  effectTick: number | null;
+  throwPosition: Vec3;
+  effectPosition: Vec3;
+  throwCallout: string | null;
+  effectCallout: string | null;
+  confidence: number;
+  samples: number;
+  targetRegion: "a" | "b" | "mid" | "other" | "unknown";
+}
+
 export interface TacticalRoundFact extends MatchFactBase {
   side: Side;
   teamKey: "teamA" | "teamB";
+  teamName: string;
+  opponentName: string;
   economy: EconomyType;
   won: boolean;
   roundNumber: number;
   snapshots: TacticalSnapshot[];
   targetSite: "a" | "b" | null;
-  siteInvestment: { a: SiteInvestment; b: SiteInvestment };
-  entryAnchors: string[];
+  siteEntries: { a: SiteEntryFact; b: SiteEntryFact };
+  plant: TacticalPlantFact | null;
+  grenades: TacticalGrenadeOccurrence[];
   executeRemainSec: number | null;
   executeBucket: ExecuteBucket | null;
   firstKillForTeam: boolean | null;
-  grenadeIds: string[];
+  grenadeOccurrenceIds: string[];
 }
 
 export interface MatchFacts {
@@ -174,6 +200,7 @@ export interface MatchFacts {
 export interface ExtractMatchFactsOptions {
   matchId: string;
   visibilityFor?: (mapName: string) => TriangleBvh | null;
+  calloutGrid?: CalloutGrid | null;
   playerKeyFor?: (player: { steamId64: string; name: string; teamKey: string }) => string;
 }
 
@@ -251,7 +278,23 @@ function throwerPlaceAt(pkg: DemoPackage, roundNumber: number, playerIndex: numb
   return replay.placeDict[placeIndex] || null;
 }
 
-function extractLineupFact(pkg: DemoPackage, matchId: string): LineupFact {
+function teamNameOf(pkg: DemoPackage, teamKey: "teamA" | "teamB"): string {
+  return pkg.match[teamKey].name ?? teamKey;
+}
+
+function opponentTeamKey(teamKey: "teamA" | "teamB"): "teamA" | "teamB" {
+  return teamKey === "teamA" ? "teamB" : "teamA";
+}
+
+function effectCalloutFor(grid: CalloutGrid | null, point: Vec3): { callout: string | null; confidence: number | null; samples: number | null } {
+  if (!grid) return { callout: null, confidence: null, samples: null };
+  const result = calloutAt(grid, point);
+  return result
+    ? { callout: result.callout, confidence: result.confidence, samples: result.samples }
+    : { callout: null, confidence: null, samples: null };
+}
+
+function extractLineupFact(pkg: DemoPackage, matchId: string, grid: CalloutGrid | null): LineupFact {
   const roundsByNumber = new Map(pkg.rounds.map((round) => [round.roundNumber, round]));
   return {    matchId,
     mapName: pkg.match.mapName,
@@ -260,6 +303,7 @@ function extractLineupFact(pkg: DemoPackage, matchId: string): LineupFact {
     grenades: (pkg.grenades ?? []).map((grenade) => {
       const round = roundsByNumber.get(grenade.roundNumber);
       const player = pkg.players[grenade.throwerIndex];
+      const effect = effectCalloutFor(grid, grenade.effectPosition);
       return {
         roundNumber: grenade.roundNumber,
         grenade: grenade.grenade,
@@ -270,6 +314,9 @@ function extractLineupFact(pkg: DemoPackage, matchId: string): LineupFact {
         entryId: matchId,
         freezeEndTick: round?.freezeEndTick ?? 0,
         throwerPlaceName: throwerPlaceAt(pkg, grenade.roundNumber, grenade.throwerIndex, grenade.throwTick),
+        effectCallout: effect.callout,
+        effectCalloutConfidence: effect.confidence,
+        effectCalloutSamples: effect.samples,
         side: sideOf(pkg, grenade.throwerIndex, grenade.roundNumber),
         teamKey: player?.teamKey ?? null
       };
@@ -300,6 +347,51 @@ function replayLabelsAt(pkg: DemoPackage, roundNumber: number, side: Side, sampl
   return labels.sort();
 }
 
+function replayFrameIndex(replayRound: NonNullable<DemoPackage["replay"]>["rounds"][number], tick: number): number {
+  return Math.max(
+    0,
+    Math.min(replayRound.frameCount - 1, Math.round((tick - replayRound.startTick) / replayRound.tickStep))
+  );
+}
+
+function replayPositionsAt(
+  pkg: DemoPackage,
+  roundNumber: number,
+  side: Side,
+  sampleTick: number,
+  grid: CalloutGrid | null
+): TacticalSnapshot["positions"] {
+  const replay = pkg.replay;
+  const round = pkg.rounds.find((row) => row.roundNumber === roundNumber);
+  const replayRound = replay?.rounds.find((row) => row.roundNumber === roundNumber);
+  if (!replay || !round || !replayRound) return [];
+  const positions: TacticalSnapshot["positions"] = [];
+  for (const track of replayRound.players) {
+    const player = pkg.players[track.playerIndex];
+    if (!player) continue;
+    const playerSide = player.teamKey === "teamA" ? round.teamASide : round.teamBSide;
+    if (playerSide !== side) continue;
+    const frameIndex = replayFrameIndex(replayRound, sampleTick);
+    if (((track.flags[frameIndex] ?? 0) & FLAG_ALIVE) === 0) continue;
+    const coordScale = replay.meta.coordScale;
+    const xs = decodeDelta(track.x);
+    const ys = decodeDelta(track.y);
+    const zs = decodeDelta(track.z);
+    const point = {
+      x: (xs[frameIndex] ?? 0) * coordScale,
+      y: (ys[frameIndex] ?? 0) * coordScale,
+      z: (zs[frameIndex] ?? 0) * coordScale,
+    };
+    const place = replay.placeDict?.[track.place[frameIndex] ?? -1] ?? null;
+    positions.push({
+      playerIndex: track.playerIndex,
+      ...point,
+      callout: place || effectCalloutFor(grid, point).callout,
+    });
+  }
+  return positions;
+}
+
 // ── TacticalRoundFact helpers ─────────────────────────────────────────────────
 
 const ROUND_SECONDS = 115; // 1:55 倒计时起点
@@ -322,7 +414,8 @@ function snapshotAt(
   side: Side,
   tick: number,
   freezeEndTick: number,
-  tickrate: number
+  tickrate: number,
+  grid: CalloutGrid | null
 ): TacticalSnapshot {
   const remainSec = remainSecAt(tick, freezeEndTick, tickrate);
   const defaults: Record<string, number> = {};
@@ -335,7 +428,7 @@ function snapshotAt(
       advanced[callout] = (advanced[callout] ?? 0) + 1;
     }
   }
-  return { remainSec, defaults, advanced };
+  return { remainSec, defaults, advanced, positions: replayPositionsAt(pkg, roundNumber, side, tick, grid) };
 }
 
 function economyTypeFor(
@@ -355,95 +448,147 @@ function economyTypeFor(
   return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
 }
 
-function siteInvestmentFor(
-  pkg: DemoPackage,
-  round: DemoPackage["rounds"][number],
-  side: Side
-): { a: SiteInvestment; b: SiteInvestment } {
-  const tickrate = pkg.match.tickrate || 64;
-  // 进点阶段采样：~40s 剩余
-  const entryTick = round.freezeEndTick + 75 * tickrate;
-  const labels = replayLabelsAt(pkg, round.roundNumber, side, entryTick);
-
-  const plantA = pkg.bombs.find(
-    (b) => b.roundNumber === round.roundNumber && b.type === "planted" && b.site === "a"
-  );
-  const plantB = pkg.bombs.find(
-    (b) => b.roundNumber === round.roundNumber && b.type === "planted" && b.site === "b"
-  );
-
-  const sideGrenades = pkg.grenades.filter(
-    (g) => g.roundNumber === round.roundNumber && sideOf(pkg, g.throwerIndex, round.roundNumber) === side
-  );
-  const total = sideGrenades.length;
-
-  const aEntry = labels.filter((l) => l === "BombsiteA").length;
-  const bEntry = labels.filter((l) => l === "BombsiteB").length;
-
-  const deepFromLabels = () => {
-    for (const callout of labels) {
-      const role = roleOf(pkg.match.mapName, side, callout);
-      if (role.kind === "default") return role.anchorId;
-    }
-    return null;
-  };
-
+function emptySiteEntry(): SiteEntryFact {
   return {
-    a: {
-      entryCount: aEntry,
-      grenadeCount: plantA ? total : plantB ? 0 : Math.ceil(total / 2),
-      deepestAnchor: aEntry > 0 ? "BombsiteA" : deepFromLabels(),
-      planted: !!plantA,
-    },
-    b: {
-      entryCount: bEntry,
-      grenadeCount: plantB ? total : plantA ? 0 : Math.floor(total / 2),
-      deepestAnchor: bEntry > 0 ? "BombsiteB" : deepFromLabels(),
-      planted: !!plantB,
-    },
+    entrants: 0,
+    firstEntryTick: null,
+    secondEntryTick: null,
+    firstEntryRemainSec: null,
+    executeRemainSec: null,
+    order: [],
   };
 }
 
-function targetSiteFor(
-  pkg: DemoPackage,
-  round: DemoPackage["rounds"][number],
-  invest: { a: SiteInvestment; b: SiteInvestment }
-): "a" | "b" | null {
-  if (invest.a.planted) return "a";
-  if (invest.b.planted) return "b";
-  if (invest.a.entryCount > invest.b.entryCount) return "a";
-  if (invest.b.entryCount > invest.a.entryCount) return "b";
+function siteFromCallout(callout: string | null): "a" | "b" | null {
+  if (!callout) return null;
+  if (callout === "BombsiteA") return "a";
+  if (callout === "BombsiteB") return "b";
   return null;
 }
 
-function executeRemainFor(
-  pkg: DemoPackage,
-  round: DemoPackage["rounds"][number],
-  _side: Side,
-  targetSite: "a" | "b" | null,
-  tickrate: number
-): number | null {
-  if (!targetSite) return null;
-  const plant = pkg.bombs.find(
-    (b) => b.roundNumber === round.roundNumber && b.type === "planted" && b.site === targetSite
-  );
-  if (plant) return remainSecAt(plant.tick, round.freezeEndTick, tickrate);
-  return null;
-}
+function targetRegionFromCallout(mapName: string, callout: string | null): TacticalGrenadeOccurrence["targetRegion"] {
+  if (!callout) return "unknown";
+  if (callout === "BombsiteA") return "a";
+  if (callout === "BombsiteB") return "b";
+  const defaults = DEFAULT_POSITIONS[mapName];
+  if (!defaults) return "unknown";
 
-function entryAnchorsFor(
-  pkg: DemoPackage,
-  round: DemoPackage["rounds"][number],
-  side: Side
-): string[] {
-  const tickrate = pkg.match.tickrate || 64;
-  const entryTick = round.freezeEndTick + 75 * tickrate;
-  const anchors = new Set<string>();
-  for (const callout of replayLabelsAt(pkg, round.roundNumber, side, entryTick)) {
-    const role = roleOf(pkg.match.mapName, side, callout);
-    if (role.kind === "default") anchors.add(role.anchorId);
+  for (const [anchorId, anchor] of Object.entries(defaults.ct.anchors)) {
+    if (!anchor.callouts.includes(callout)) continue;
+    if (anchorId.startsWith("a_")) return "a";
+    if (anchorId.startsWith("b_")) return "b";
+    if (anchorId.includes("mid")) return "mid";
+    return "other";
   }
-  return [...anchors].sort();
+
+  for (const [anchorId, anchor] of Object.entries(defaults.t.anchors)) {
+    if (anchor.callouts.includes(callout) && anchorId.includes("mid")) return "mid";
+  }
+
+  return "unknown";
+}
+
+function siteEntriesFor(
+  pkg: DemoPackage,
+  round: DemoPackage["rounds"][number],
+  side: Side,
+  grid: CalloutGrid | null
+): { a: SiteEntryFact; b: SiteEntryFact } {
+  const replay = pkg.replay;
+  const replayRound = replay?.rounds.find((row) => row.roundNumber === round.roundNumber);
+  if (!replay || !replayRound) return { a: emptySiteEntry(), b: emptySiteEntry() };
+
+  const tickrate = pkg.match.tickrate || 64;
+  const bySite = { a: new Map<number, SiteEntryFact["order"][number]>(), b: new Map<number, SiteEntryFact["order"][number]>() };
+  for (const track of replayRound.players) {
+    const player = pkg.players[track.playerIndex];
+    if (!player) continue;
+    const playerSide = player.teamKey === "teamA" ? round.teamASide : round.teamBSide;
+    if (playerSide !== side) continue;
+
+    const coordScale = replay.meta.coordScale;
+    const xs = decodeDelta(track.x);
+    const ys = decodeDelta(track.y);
+    const zs = decodeDelta(track.z);
+    const seen = new Set<"a" | "b">();
+    for (let index = 0; index < replayRound.frameCount; index += 1) {
+      const tick = replayRound.startTick + index * replayRound.tickStep;
+      if (tick < round.freezeEndTick || tick > round.endTick) continue;
+      if (((track.flags[index] ?? 0) & FLAG_ALIVE) === 0) break;
+      const place = replay.placeDict?.[track.place[index] ?? -1] ?? null;
+      const point = {
+        x: (xs[index] ?? 0) * coordScale,
+        y: (ys[index] ?? 0) * coordScale,
+        z: (zs[index] ?? 0) * coordScale,
+      };
+      const callout = place || effectCalloutFor(grid, point).callout;
+      const site = siteFromCallout(callout);
+      if (!site || seen.has(site)) continue;
+      seen.add(site);
+      bySite[site].set(track.playerIndex, {
+        playerIndex: track.playerIndex,
+        tick,
+        remainSec: remainSecAt(tick, round.freezeEndTick, tickrate),
+        callout: callout ?? site,
+      });
+    }
+  }
+
+  const build = (site: "a" | "b"): SiteEntryFact => {
+    const order = [...bySite[site].values()].sort((a, b) => a.tick - b.tick || a.playerIndex - b.playerIndex);
+    return {
+      entrants: order.length,
+      firstEntryTick: order[0]?.tick ?? null,
+      secondEntryTick: order[1]?.tick ?? null,
+      firstEntryRemainSec: order[0]?.remainSec ?? null,
+      executeRemainSec: order[1]?.remainSec ?? null,
+      order,
+    };
+  };
+
+  return { a: build("a"), b: build("b") };
+}
+
+function plantFor(pkg: DemoPackage, round: DemoPackage["rounds"][number], tickrate: number): TacticalPlantFact | null {
+  const plant = pkg.bombs.find((b) => b.roundNumber === round.roundNumber && b.type === "planted" && (b.site === "a" || b.site === "b"));
+  if (!plant || (plant.site !== "a" && plant.site !== "b")) return null;
+  return { site: plant.site, tick: plant.tick, remainSec: remainSecAt(plant.tick, round.freezeEndTick, tickrate) };
+}
+
+function targetSiteFor(plant: TacticalPlantFact | null, entries: { a: SiteEntryFact; b: SiteEntryFact }): "a" | "b" | null {
+  if (plant) return plant.site;
+  if (entries.a.entrants > entries.b.entrants) return "a";
+  if (entries.b.entrants > entries.a.entrants) return "b";
+  return null;
+}
+
+function grenadeOccurrencesFor(
+  pkg: DemoPackage,
+  matchId: string,
+  round: DemoPackage["rounds"][number],
+  side: Side,
+  grid: CalloutGrid | null
+): TacticalGrenadeOccurrence[] {
+  return (pkg.grenades ?? [])
+    .map((grenade, index) => ({ grenade, index }))
+    .filter(({ grenade }) => grenade.roundNumber === round.roundNumber && sideOf(pkg, grenade.throwerIndex, round.roundNumber) === side)
+    .map(({ grenade, index }) => {
+      const effect = effectCalloutFor(grid, grenade.effectPosition);
+      const throwCallout = throwerPlaceAt(pkg, grenade.roundNumber, grenade.throwerIndex, grenade.throwTick);
+      return {
+        id: grenade.grenadeId ?? `${matchId}:r${grenade.roundNumber}:g${index}`,
+        type: grenade.grenade,
+        throwTick: grenade.throwTick,
+        effectTick: grenade.effectTick ?? null,
+        throwPosition: grenade.throwPosition,
+        effectPosition: grenade.effectPosition,
+        throwCallout,
+        effectCallout: effect.callout,
+        confidence: effect.confidence ?? 0,
+        samples: effect.samples ?? 0,
+        targetRegion: targetRegionFromCallout(pkg.match.mapName, effect.callout),
+      };
+    });
 }
 
 function firstKillForTeamFor(
@@ -460,7 +605,7 @@ function firstKillForTeamFor(
   return killer.teamKey === teamKey;
 }
 
-function extractTacticalRoundFacts(pkg: DemoPackage, matchId: string): TacticalRoundFact[] {
+function extractTacticalRoundFacts(pkg: DemoPackage, matchId: string, grid: CalloutGrid | null): TacticalRoundFact[] {
   const tickrate = pkg.match.tickrate || 64;
   const out: TacticalRoundFact[] = [];
   for (const round of pkg.rounds) {
@@ -471,23 +616,28 @@ function extractTacticalRoundFacts(pkg: DemoPackage, matchId: string): TacticalR
     const ctSlices = [fe + 20 * tickrate, fe + 55 * tickrate, fe + 85 * tickrate];
     for (const side of ["t", "ct"] as const) {
       const slices = side === "t" ? tSlices : ctSlices;
-      const snapshots = slices.map((tk) => snapshotAt(pkg, round.roundNumber, side, tk, fe, tickrate));
-      if (snapshots.every((s) => Object.keys(s.defaults).length === 0 && Object.keys(s.advanced).length === 0)) continue;
+      const snapshots = slices.map((tk) => snapshotAt(pkg, round.roundNumber, side, tk, fe, tickrate, grid));
+      if (snapshots.every((s) => Object.keys(s.defaults).length === 0 && Object.keys(s.advanced).length === 0 && s.positions.length === 0)) continue;
       const teamKey = round.teamASide === side ? "teamA" : "teamB";
-      const invest = siteInvestmentFor(pkg, round, side);
-      const target = targetSiteFor(pkg, round, invest);
-      const exec = executeRemainFor(pkg, round, side, target, tickrate);
+      const entries = siteEntriesFor(pkg, round, side, grid);
+      const plant = plantFor(pkg, round, tickrate);
+      const target = targetSiteFor(plant, entries);
+      const exec = target ? entries[target].executeRemainSec : null;
+      const grenades = grenadeOccurrencesFor(pkg, matchId, round, side, grid);
       out.push({
         matchId, mapName: pkg.match.mapName, side, teamKey,
+        teamName: teamNameOf(pkg, teamKey),
+        opponentName: teamNameOf(pkg, opponentTeamKey(teamKey)),
         economy: economyTypeFor(pkg, round, teamKey),
         won: round.winnerSide === side,
         roundNumber: round.roundNumber,
         snapshots, targetSite: target,
-        siteInvestment: invest,
-        entryAnchors: entryAnchorsFor(pkg, round, side),
+        siteEntries: entries,
+        plant,
+        grenades,
         executeRemainSec: exec, executeBucket: bucketOf(exec),
         firstKillForTeam: firstKillForTeamFor(pkg, round, teamKey),
-        grenadeIds: [],
+        grenadeOccurrenceIds: grenades.map((grenade) => grenade.id),
       });
     }
   }
@@ -603,6 +753,7 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
   }).filter((row): row is CohortFact => row != null);
   const mapName = pkg.match.mapName;
   const visibilityFor = options.visibilityFor?.(mapName) ?? null;
+  const calloutGrid = options.calloutGrid ?? null;
   const input = { matchId: options.matchId, pkg };
   const matchWorkspace = buildMatchWorkspaceModel(pkg);
   const openingTrails = pkg.players.map((player) => ({    matchId: options.matchId,
@@ -636,8 +787,8 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
       row: matchWorkspace
     }],
     openingTrails,
-    lineups: [extractLineupFact(pkg, options.matchId)],
-    tacticalRounds: extractTacticalRoundFacts(pkg, options.matchId)
+    lineups: [extractLineupFact(pkg, options.matchId, calloutGrid)],
+    tacticalRounds: extractTacticalRoundFacts(pkg, options.matchId, calloutGrid)
   };
 }
 
@@ -973,4 +1124,3 @@ export async function buildPlayerFlashSummariesFromFacts(
     };
   }));
 }
-
