@@ -1,4 +1,4 @@
-import { DEFAULT_POSITIONS } from "@cs2dak/maps";
+import { DEFAULT_POSITIONS, calloutTendency } from "@cs2dak/maps";
 import type { TacticalRoundFact, ExecuteBucket } from "./facts.js";
 
 // ── Phase 3.1: 双层 basis 序列化 ─────────────────────────────────────────────
@@ -78,17 +78,42 @@ function tPrimaryCategory(targetSite: "a" | "b" | null): string {
 
 const NUM_CN = ["", "单", "双", "三", "四", "五"];
 
-/** 按 anchor ID 前缀统计 A/B/中路人数，生成如"双B单中路"的大分类标签。 */
-function ctPrimaryCategory(defaultsBasis: string): string {
+/** 查锚点或 callout 的倾向方向：
+ *  1. calloutName → CALLOUT_NAME_CN.tendency（如 SideHall → ["a"]）
+ *  2. anchorId → DEFAULT_POSITIONS.callouts → calloutName → tendency（如 donut → SideHall → ["a"]）
+ *  3. 前缀启发式 fallback（a_/b_/back_/mid*）
+ */
+function regionOfAnchor(mapName: string, side: "t" | "ct", anchorId: string): "a" | "b" | "mid" | null {
+  // 直接查 callout 倾向
+  const t = calloutTendency(mapName, anchorId)?.[0];
+  if (t) return t;
+  // anchorId → anchor.callouts → callout 倾向（覆盖前缀推不出的锚点）
+  const anchor = DEFAULT_POSITIONS[mapName]?.[side]?.anchors[anchorId];
+  if (anchor) {
+    for (const callout of anchor.callouts) {
+      const ct = calloutTendency(mapName, callout)?.[0];
+      if (ct) return ct;
+    }
+  }
+  // 前缀启发式 fallback
+  if (anchorId.startsWith("a_") || anchorId === "a") return "a";
+  if (anchorId.startsWith("b_") || anchorId.startsWith("back_") || anchorId === "b") return "b";
+  if (anchorId.startsWith("mid")) return "mid";
+  return null;
+}
+
+/** 按 region 统计人数，生成如"双B单中路"的大分类标签。 */
+function regionCategory(defaultsBasis: string, mapName: string, side: "t" | "ct"): string {
   if (!defaultsBasis || defaultsBasis === "-") return "其他";
   let a = 0, b = 0, mid = 0;
   for (const seg of defaultsBasis.split("|").filter(Boolean)) {
     const [id, nStr] = seg.split(":");
     const n = parseInt(nStr ?? "1", 10);
     if (!id) continue;
-    if (id.startsWith("a_") || id === "a") a += n;
-    else if (id.startsWith("b_") || id.startsWith("back_") || id === "b") b += n;
-    else if (id.startsWith("mid")) mid += n;
+    const r = regionOfAnchor(mapName, side, id);
+    if (r === "a") a += n;
+    else if (r === "b") b += n;
+    else if (r === "mid") mid += n;
   }
   const parts: string[] = [];
   if (b > 0) parts.push(`${NUM_CN[Math.min(b, 5)] ?? b}B`);
@@ -111,7 +136,7 @@ export function buildTacticalClusters(rows: TacticalRoundFact[]): TacticalCluste
       // CT 视角下"目标包点 / 执行节奏"是 T 方语义，不属于防守方 → 固定 null，
       // 避免出现"CT 执行剩余 115s / CT 下包率"这类不成立的描述。
       targetSite: f.side === "ct" ? null : f.targetSite,
-      primaryCategory: f.side === "t" ? tPrimaryCategory(f.targetSite) : ctPrimaryCategory(db),
+      primaryCategory: f.side === "t" ? tPrimaryCategory(f.targetSite) : regionCategory(db, f.mapName, "ct"),
       defaultsBasis: db,
       executeBucket: f.side === "ct" ? null : f.executeBucket,
       roundCount: 0,

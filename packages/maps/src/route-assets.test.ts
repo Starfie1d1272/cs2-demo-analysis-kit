@@ -27,7 +27,7 @@ function expectedBombsite(route: MapRoute): string {
 describe("map route assets", () => {
   it("route zones 不重复维护中文名", () => {
     for (const [map, routes] of Object.entries(MAP_ROUTE_ASSETS)) {
-      const table = (CALLOUT_NAME_CN as Record<string, Record<string, string>>)[map] ?? {};
+      const table = CALLOUT_NAME_CN[map] ?? {};
       for (const route of routes.routes) {
         for (const zone of route.zones) {
           expect("nameCn" in zone).toBe(false);

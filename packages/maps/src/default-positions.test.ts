@@ -15,7 +15,7 @@ describe("default-positions", () => {
 
   it("anchor 里引用的 callout 都是合法 callout（在 callout-names 中）", () => {
     for (const [map, sides] of Object.entries(DEFAULT_POSITIONS)) {
-      const table = (CALLOUT_NAME_CN as Record<string, Record<string, string>>)[map];
+      const table = CALLOUT_NAME_CN[map];
       for (const side of ["t", "ct"] as const) {
         for (const anchor of Object.values(sides[side].anchors)) {
           for (const callout of anchor.callouts) expect(table[callout]).toBeTruthy();

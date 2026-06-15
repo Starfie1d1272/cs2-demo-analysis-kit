@@ -3,7 +3,7 @@ import {
   buildLineupClusters,
   getMapCalibration,
   worldToRadar,
-  CALLOUT_NAME_CN,
+  calloutCn,
   type LineupCluster,
   type LineupGrenadeLike,
 } from "@cs2dak/maps";
@@ -70,8 +70,7 @@ async function loadAllGrenades(
 
 /** 英文 callout → 中文（有映射时）。 */
 function calloutName(mapName: string, place: string): string {
-  const table = (CALLOUT_NAME_CN as Record<string, Record<string, string>>)[mapName] ?? {};
-  return table[place] || place;
+  return calloutCn(mapName, place) || place;
 }
 
 // ── 组件 ────────────────────────────────────────────────────────────────────
