@@ -2,6 +2,7 @@ import { X, Download, ExternalLink } from "lucide-react";
 import { type UpdateInfo, RELEASES_PAGE } from "../lib/update";
 import { applyUpdate, canSelfUpdate, downloadUpdate, type UpdateJobStatus } from "../lib/updater-bridge";
 import { useState, useCallback } from "react";
+import { Changelog } from "./Changelog";
 
 interface Props {
   update: UpdateInfo;
@@ -9,7 +10,8 @@ interface Props {
 }
 
 /**
- * 发现新版本弹窗：显示版本号与更新日志（notes），提供一键更新或跳转 Release。
+ * 发现新版本弹窗：显示 changelog（markdown 渲染）+ 一键更新/手动跳转。
+ * 安装说明仅留在 GitHub Release 页，弹窗只展示变更内容。
  * 弹窗关闭后侧栏仍保留更新入口（UpdateControl）。
  */
 export function UpdateModal({ update, onDismiss }: Props) {
@@ -66,11 +68,13 @@ export function UpdateModal({ update, onDismiss }: Props) {
           </button>
         </div>
 
-        {update.notes && (
-          <div className="stu-modal-body">
-            <pre className="stu-update-changelog">{update.notes}</pre>
-          </div>
-        )}
+        <div className="stu-modal-body">
+          {update.notes ? (
+            <Changelog markdown={update.notes} />
+          ) : (
+            <p className="stu-text-dim">查看 GitHub Release 了解更新内容</p>
+          )}
+        </div>
 
         <div className="stu-modal-footer">
           {failed && (

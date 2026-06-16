@@ -300,14 +300,39 @@ body {
   flex: 1;
 }
 
-.stu-update-changelog {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: inherit;
+.stu-changelog {
   font-size: 12.5px;
   line-height: 1.6;
   color: var(--dak-fg);
+}
+.stu-changelog h3 {
+  margin: 12px 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--dak-accent);
+}
+.stu-changelog p {
+  margin: 0 0 4px;
+}
+.stu-changelog li {
+  margin: 0 0 2px 0;
+  list-style: disc;
+  margin-left: 16px;
+}
+.stu-changelog code {
+  background: var(--dak-bg-subtle);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: var(--dak-mono);
+  font-size: 11.5px;
+}
+.stu-changelog strong {
+  font-weight: 700;
+  color: var(--dak-fg);
+}
+
+.stu-text-dim {
+  color: var(--dak-fg-dim);
 }
 
 .stu-modal-footer {

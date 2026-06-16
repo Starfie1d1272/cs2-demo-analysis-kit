@@ -169,16 +169,12 @@ function currentPlatform(): "windows" | "macos" | null {
   return null;
 }
 
-/** GitHub API 兜底：老发布无 manifest 时仍给出可点的下载链接（无一键更新资产）。 */
-async function checkViaGitHubApi(): Promise<UpdateInfo | null> {
-  const raw = await fetchJson(RELEASES_LATEST_API);
-  if (!raw || typeof raw !== "object") return null;
-  const data = raw as { tag_name?: string; html_url?: string; body?: string };
-  const latest = (data.tag_name ?? "").replace(/^v/, "");
-  if (!latest || !semverLess(APP_VERSION, latest)) return null;
-  return { latest, url: data.html_url ?? RELEASES_PAGE, notes: data.body };
-}
-
+/**
+ * 更新检查（浏览器 fetch 路径）：拉 manifest → 命中 → 返回；否则退 API。
+ *
+ * 桌面壳的桥优先检查在 App.tsx 的 doCheckUpdate 中处理（桥无 CORS 问题）；
+ * 本函数供 dev/浏览器模式及桥失败的降级使用。
+ */
 export async function checkForUpdate(): Promise<UpdateInfo | null> {
   const manifest = await fetchManifest();
   if (manifest) {
@@ -189,4 +185,17 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
   }
   // 所有镜像都失败 → 退回 GitHub API（直连成功的网络仍可用）。
   return checkViaGitHubApi();
+}
+
+/**
+ * GitHub API 兜底。极其罕见才触发（bridge + browser manifest 全失败时）。
+ * 无一键更新资产（asset），用户只能点链接手动下载。
+ */
+async function checkViaGitHubApi(): Promise<UpdateInfo | null> {
+  const raw = await fetchJson(RELEASES_LATEST_API);
+  if (!raw || typeof raw !== "object") return null;
+  const data = raw as { tag_name?: string; html_url?: string };
+  const latest = (data.tag_name ?? "").replace(/^v/, "");
+  if (!latest || !semverLess(APP_VERSION, latest)) return null;
+  return { latest, url: data.html_url ?? RELEASES_PAGE };
 }

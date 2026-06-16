@@ -115,14 +115,22 @@ jobs:
 
       # 自动更新 manifest：客户端从 releases/latest/download/latest.json 拉取（带镜像）。
       # 只在 Windows job 产出（桌面端只面向 Windows）。
-      - name: Generate update manifest
+      - name: Generate update manifest (with changelog notes)
         if: runner.os == 'Windows'
         shell: bash
         run: |
           VERSION="$(node -p "require('./package.json').version")"
+          # 提取 CHANGELOG.md 中本版本的更新说明，注入 manifest notes
+          awk -v ver="$VERSION" '
+            BEGIN { in_section=0 }
+            $0 ~ "^## \\[" ver "\\]" { in_section=1; next }
+            in_section && /^## \[/ { exit }
+            in_section { print }
+          ' CHANGELOG.md > /tmp/changelog-notes.txt
           node scripts/gen-update-manifest.mjs "$VERSION" \
             "python/dist/dak-studio-windows-${VERSION}.zip" \
-            "python/dist/latest.json"
+            "python/dist/latest.json" \
+            --notes-file /tmp/changelog-notes.txt
 
       - uses: actions/upload-artifact@v7
         with:

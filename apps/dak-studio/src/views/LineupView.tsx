@@ -35,7 +35,7 @@ const GRENADE_COLOR: Record<string, string> = {
 
 const SIDE_LABEL: Record<string, string> = { t: "T", ct: "CT" };
 
-const PAGE_SIZE = 16;
+const PAGE_SIZE = 20;
 const TOP_N_OPTIONS = [20, 40, 60] as const;
 type TopNOption = (typeof TOP_N_OPTIONS)[number];
 
@@ -89,6 +89,7 @@ export function LineupView({
   const [activeMap, setActiveMap] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [sideFilter, setSideFilter] = useState<"t" | "ct" | null>(null);
   const [sortKey, setSortKey] = useState<"count" | "winRate" | "demoCount">("count");
   const [sortDesc, setSortDesc] = useState(true);
   const [page, setPage] = useState(0);
@@ -232,9 +233,12 @@ export function LineupView({
 
   // ── 当前地图的分页数据（byMap 非空，current 安全） ───────────────────
   const current = byMap.find((group) => group.mapName === activeMap) ?? byMap[0]!;
-  const totalPages = Math.max(1, Math.ceil(current.rows.length / PAGE_SIZE));
+  const sideFilteredRows = sideFilter
+    ? current.rows.filter((r) => r.side === sideFilter)
+    : current.rows;
+  const totalPages = Math.max(1, Math.ceil(sideFilteredRows.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1);
-  const pageRows = current.rows.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+  const pageRows = sideFilteredRows.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
   const calibration = getMapCalibration(current.mapName);
   const radarRows = current.rows.slice(0, radarTopN);
   const selectedCluster = hoveredId ? current.rows.find((cluster) => cluster.id === hoveredId) : undefined;
@@ -405,6 +409,37 @@ export function LineupView({
         )}
       </div>
 
+      {/* ── 阵营筛选 Tabs ────────────────────────────────────────────── */}
+      <div className="stu-chip-row" role="tablist" aria-label="阵营筛选">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={sideFilter === null}
+          className={sideFilter === null ? "stu-chip stu-chip-active" : "stu-chip"}
+          onClick={() => { setSideFilter(null); setPage(0); }}
+        >
+          全部
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={sideFilter === "t"}
+          className={sideFilter === "t" ? "stu-chip stu-chip-active" : "stu-chip"}
+          onClick={() => { setSideFilter("t"); setPage(0); }}
+        >
+          T · {current.rows.filter((r) => r.side === "t").length}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={sideFilter === "ct"}
+          className={sideFilter === "ct" ? "stu-chip stu-chip-active" : "stu-chip"}
+          onClick={() => { setSideFilter("ct"); setPage(0); }}
+        >
+          CT · {current.rows.filter((r) => r.side === "ct").length}
+        </button>
+      </div>
+
       {/* ── 表格 + 分页 ──────────────────────────────────────────────── */}
       <div className="stu-card">
         <h3>常用道具库 · {current.mapName}</h3>
@@ -412,7 +447,7 @@ export function LineupView({
           page={safePage}
           totalPages={totalPages}
           onChange={setPage}
-          info={`${current.rows.length} 条 · ${safePage + 1}/${totalPages} 页`}
+          info={`${sideFilteredRows.length} 条 · ${safePage + 1}/${totalPages} 页`}
         />
         <table className="stu-mini-table">
           <thead>

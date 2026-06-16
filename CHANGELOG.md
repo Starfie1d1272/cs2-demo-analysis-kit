@@ -9,6 +9,39 @@ DAK Studio 桌面应用及 `@cs2dak/*` 分析管道面向用户的变更记录�
 > 大库稳定性验证、赛事资产库/赛事包导入（见 [`docs/design/event-packages.md`](docs/design/event-packages.md)）、
 > Windows 签名等仍在 [`docs/roadmap.md`](docs/roadmap.md) 0.7.0 排期中。
 
+## [0.6.5] — 2026-06-16
+
+### 修复
+
+- **更新弹窗「没有一键更新按钮」**：`checkForUpdate` 之前用浏览器 `fetch()` 拉 manifest，
+  但 `http://127.0.0.1` 的 webview 跨域请求 R2/GitHub，manifest 始终被 CORS 策略
+  拦截，静默退回 GitHub API 兜底（返回的 Release body 无资产字段）。修复为桌面壳走
+  Python 桥 `window.pywebview.api.check_update()` — Python 侧 `urllib` 拉 manifest
+  不受浏览器 CORS 限制，命中 0.6.5 manifest → 自动出现「更新到 v0.6.5」按钮。
+- **弹窗显示安装说明而非更新日志**：同上原因（API 兜底返回 Release body），改为 Python
+  桥返回 manifest 的 `notes`（发版 CI 已注入 CHANGELOG 本版本段）；manifest 无 notes
+  时自动从 GitHub 原始 CHANGELOG.md 提取对应版本段做兜底。
+
+### 变更
+
+- **更新弹窗 changelog 支持 markdown 渲染**：新增 `Changelog` 组件（轻量内联渲染，
+  支持 `###` 标题、`-` 列表、`**加粗**`、`` `行内代码` ``），替换之前的 `<pre>` 纯文本。
+- **弹窗布局精简**：安装说明移出弹窗（保留在 GitHub Release 页面），弹窗只展示当前版本
+  的变更内容 + 更新按钮 + 稍后提醒。
+- **`checkViaGitHubApi` 简化**：移除脆弱的 Release body `---` 分隔符解析，只返 URL+版本号。
+
+### 道具实验室（LineupView）
+
+- **常用道具库每页 16 → 20 条**：Windows 上不再缺底下一节，分页更紧凑。
+- **新增 CT / T 阵营 Tab 筛选**：Tab 切换仅过滤表格行，不影响雷达展示；各 Tab 显示该阵营数量。
+
+### 基础设施
+
+- **`.tri` 外置验证（0.6.4）**：R2 `tris/manifest.json` 已上线（18 张图），
+  `de_mirage.tri` 等随机抽检 200 OK。无侵入改动。
+- **Python 端 `_MANIFEST_URLS`** 补齐 ghproxy×3，与前端 `update.ts` 保持一致。
+- **删除 `_fetch_changelog_for_version` 死代码**（发版 CI 的 `--notes-file` 已注入 manifest）。
+
 ## [0.6.4] — 2026-06-16
 
 ### 变更

@@ -7,6 +7,7 @@ import { parseTags } from "./lib/tags";
 import { saveSeriesRecord, suggestSeriesGroups, deriveVetoSummary } from "./lib/series";
 import type { SeriesVeto, SeriesVetoStep } from "@cs2dak/contract";
 import { APP_VERSION, checkForUpdate, type UpdateInfo } from "./lib/update";
+import { checkForUpdateViaBridge } from "./lib/updater-bridge";
 import { UpdateControl } from "./components/UpdateControl";
 import { UpdateModal } from "./components/UpdateModal";
 import { LibraryDirButton } from "./components/LibraryDirButton";
@@ -91,18 +92,20 @@ export function App() {
   const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
   const [showLatestMsg, setShowLatestMsg] = useState(false);
 
-  function doCheckUpdate() {
+  async function doCheckUpdate() {
     setCheckingUpdate(true);
     setShowLatestMsg(false);
-    checkForUpdate()
-      .then((info) => {
-        setUpdate(info);
-        if (!info) {
-          setShowLatestMsg(true);
-          setTimeout(() => setShowLatestMsg(false), 3000);
-        }
-      })
-      .finally(() => setCheckingUpdate(false));
+    try {
+      // 桌面壳优先走 Python 桥（urllib，无 CORS），dev 退浏览器 fetch。
+      const info = (await checkForUpdateViaBridge()) ?? (await checkForUpdate());
+      setUpdate(info);
+      if (!info) {
+        setShowLatestMsg(true);
+        setTimeout(() => setShowLatestMsg(false), 3000);
+      }
+    } finally {
+      setCheckingUpdate(false);
+    }
   }
 
   // 稳定数组标识：避免 App 无关重渲染触发档案/排行榜重新聚合

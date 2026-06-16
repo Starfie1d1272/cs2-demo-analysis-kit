@@ -57,6 +57,20 @@ else:
 TRIS_MANIFEST_URL = "https://dakupdate.starfie1d.top/tris/manifest.json"
 TRIS_MANIFEST_TIMEOUT_S = 8
 
+# 更新检查引用的镜像源（优先级：R2 → GitHub 直连 → ghproxy×3，与前端 update.ts 一致）。
+_MANIFEST_URLS = [
+    "https://dakupdate.starfie1d.top/releases/latest.json",
+    "https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/latest/download/latest.json",
+    "https://ghfast.top/https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/latest/download/latest.json",
+    "https://gh-proxy.com/https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/latest/download/latest.json",
+    "https://ghproxy.net/https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/latest/download/latest.json",
+]
+_MANIFEST_TIMEOUT_S = 8
+
+
+def _version_tuple(v: str) -> tuple[int, ...]:
+    return tuple(int(x) for x in v.split(".")[:3])
+
 
 def _sanitize(s: str) -> str:
     for ch in r' <>:"/\|?*':
@@ -701,6 +715,33 @@ class StudioApi:
 
         threading.Thread(target=_quit, daemon=True).start()
         return {"ok": True}
+
+    # --- update check bridge（服务端拉 manifest，消除 webview CORS 问题）---
+    def check_update(self) -> dict | None:
+        """通过服务端 HTTP（无 CORS）拉取更新 manifest。
+
+        前端直接消费返回的 { version, notes, publishedAt, assets }。
+        仅当远端版本 > 当前版本时返回；无更新 / 网络不可达返回 None。
+        notes 由发版 CI 的 --notes-file 注入 manifest（见 release.yml），
+        旧 release 不返回 notes 时前端退而显示「查看 GitHub Release」。
+        """
+        from cs2dak import __version__ as local_ver
+
+        local_ver_t = _version_tuple(local_ver)
+        for url in _MANIFEST_URLS:
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "DAK-Studio-Updater"})
+                with urllib.request.urlopen(req, timeout=_MANIFEST_TIMEOUT_S) as resp:  # noqa: S310 - https
+                    data = json.loads(resp.read().decode("utf-8"))
+                if not isinstance(data, dict):
+                    continue
+                ver = (data.get("version") or "").lstrip("v")
+                if not ver or _version_tuple(ver) <= local_ver_t:
+                    continue
+                return data
+            except Exception:  # noqa: BLE001 - 网络失败静默降级
+                continue
+        return None
 
     # --- .tri 资产管理（外置 overlay + 按需下载）-----------------------------
     def _tri_overlay_dir(self) -> Path:
