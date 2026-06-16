@@ -74,6 +74,10 @@ for pkg in (
     binaries += collect_dynamic_libs(pkg)
     hiddenimports += collect_submodules(pkg, filter=keep_runtime_module)
 
+# cs2dak 自身——studio.py 是入口点，但其内部惰性导入（updater 等）
+# 不在模块顶层，PyInstaller 静态分析无法追踪，需显式声明。
+hiddenimports += ["cs2dak.updater"]
+
 a = Analysis(
     [str(SRC / "cs2dak" / "studio.py")],
     pathex=[str(SRC)],

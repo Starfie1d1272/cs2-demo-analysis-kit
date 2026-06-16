@@ -9,6 +9,17 @@ DAK Studio 桌面应用及 `@cs2dak/*` 分析管道面向用户的变更记录�
 > 大库稳定性验证、赛事资产库/赛事包导入（见 [`docs/design/event-packages.md`](docs/design/event-packages.md)）、
 > Windows 签名等仍在 [`docs/roadmap.md`](docs/roadmap.md) 0.7.0 排期中。
 
+## [0.6.3] — 2026-06-16
+
+### 修复
+
+- **`cs2dak.updater` 未被打包，致 pywebview 桥无法暴露更新方法**：`studio.py` 中
+  `from cs2dak import updater` 在三个函数体内惰性导入（`_run_update_job`、`update_apply`、
+  `tri_download`），PyInstaller 静态分析无法追踪，导致安装包缺失 `cs2dak/updater.py` 模块，
+  `window.pywebview.api.update_start/update_status/update_apply` 无法暴露给 JS 桥，
+  桌面版侧栏看不到一键更新按钮。修复为顶层 `from cs2dak import __version__, updater`
+  + `packaging/cs2dak-studio.spec` 显式 `hiddenimports += ["cs2dak.updater"]` 双保险。
+
 ## [0.6.2] — 2026-06-16
 
 ### 新增

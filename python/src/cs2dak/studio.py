@@ -34,7 +34,7 @@ from datetime import datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from cs2dak import __version__
+from cs2dak import __version__, updater
 from webview.dom import _dnd_state
 
 # 强制在任意拖拽操作中捕获文件路径，即使前端使用标准浏览器
@@ -560,8 +560,6 @@ class StudioApi:
         return {"jobId": job.id}
 
     def _run_update_job(self, job: _UpdateJob) -> None:
-        from cs2dak import updater
-
         dest = updater.updates_dir(self._userdata) / job.name
 
         def on_progress(received: int) -> None:
@@ -602,8 +600,6 @@ class StudioApi:
 
         Windows only. On success the app restarts and this call may not return.
         """
-        from cs2dak import updater
-
         job = self._update_jobs.get(job_id)
         if job is None or job.staged_path is None or job.state != "ready":
             return {"ok": False, "error": "更新包尚未就绪"}
@@ -659,8 +655,6 @@ class StudioApi:
 
         资产托管 URL 由调用方/manifest 提供（本仓库不内置 .tri 源地址）。
         """
-        from cs2dak import updater
-
         dest = self._tri_overlay_dir() / f"{map_name}.tri"
         try:
             updater.download_with_fallback(list(urls), dest, expected_sha256=sha256)
