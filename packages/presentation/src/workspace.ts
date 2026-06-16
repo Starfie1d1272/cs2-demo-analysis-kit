@@ -995,6 +995,7 @@ function buildRoundKills(pkg: DemoPackage, kills: DemoPackage["kills"]): Workspa
       noScope: kill.noScope,
       flashAssist: kill.flashAssist,
       tradeKill: kill.tradeKill,
+      wallbang: kill.penetratedObjects > 0,
       killerX: kill.killerPosition?.x ?? null,
       killerY: kill.killerPosition?.y ?? null,
       killerZ: kill.killerPosition?.z ?? null,

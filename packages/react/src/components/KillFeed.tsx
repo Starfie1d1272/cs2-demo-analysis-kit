@@ -34,6 +34,7 @@ export function KillFeed({ kills, currentTick, tickrate }: KillFeedProps) {
             {k.throughSmoke && <b className="dak-kf-badge dak-kf-smk">SMK</b>}
             {k.noScope && <b className="dak-kf-badge dak-kf-ns">NS</b>}
             {k.flashAssist && <b className="dak-kf-badge dak-kf-fa">FA</b>}
+            {k.wallbang && <b className="dak-kf-badge dak-kf-wb">WB</b>}
           </span>
         </div>
       ))}

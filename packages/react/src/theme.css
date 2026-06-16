@@ -2230,6 +2230,7 @@
 .dak-kf-smk { background: rgba(162, 172, 184, 0.14); color: var(--dak-fg-mid); }
 .dak-kf-ns  { background: rgba(73, 182, 255, 0.16); color: var(--dak-accent-b); }
 .dak-kf-fa  { background: rgba(83, 215, 126, 0.18); color: var(--dak-ok); }
+.dak-kf-wb  { background: rgba(255, 198, 77, 0.18); color: var(--dak-warn); }
 
 @media (max-width: 1080px) {
   .dak-header,

@@ -28,6 +28,21 @@ if getattr(sys, "frozen", False):
     WEB_DIR = Path(sys._MEIPASS) / "web"
 else:
     WEB_DIR = Path(__file__).parent / "web"
+    # macOS: 非打包模式下 WKWebView 会在 stderr 输出 sandbox 目录创建失败的警告，
+    # 这是 pywebview / WKWebView 的预期行为且无害（打包后自动消失）。
+    # 精确匹配同时含 sandbox + Library/WebKit 的行，不误伤其他 stderr。
+    class _StderrFilter:
+        def __init__(self, stream):
+            self._stream = stream
+        def write(self, text):
+            if "sandbox" in text and "Library/WebKit" in text:
+                return
+            self._stream.write(text)
+        def flush(self):
+            self._stream.flush()
+        def isatty(self):
+            return self._stream.isatty()
+    sys.stderr = _StderrFilter(sys.stderr)
 
 # Default output directory works cross-platform:
 #   macOS  → /Users/<name>/cs2-demo-exports

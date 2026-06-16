@@ -999,7 +999,14 @@ export function ReplayViewer({ replay, map, target = null }: {
               style={{ ...replayFramePosition(frame, map), transform: `translate(-50%, -50%) rotate(${90 - frame.yaw}deg)` }}
               title={`${playerNumbers[player.steamId64] ?? "?"} ${player.name} · ${frame.hp} HP${frame.hasDefuseKit ? " · 拆弹器" : ""}${frame.flashed ? ` · 白 ${frame.flashRemainingSeconds.toFixed(1)}s` : ""}`}
             >
-              <span style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>{playerNumbers[player.steamId64] ?? "?"}</span>
+              {frame.alive ? (
+                <span style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>{playerNumbers[player.steamId64] ?? "?"}</span>
+              ) : (
+                <svg className="dak-replay-dead-x" viewBox="0 0 10 10" width="14" height="14" aria-hidden="true" style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>
+                  <line x1="1.5" y1="1.5" x2="8.5" y2="8.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                  <line x1="8.5" y1="1.5" x2="1.5" y2="8.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              )}
               {frame.hasDefuseKit && <i style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>kit</i>}
               {frame.hasBomb && <i className="dak-replay-c4-tag" style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>c4</i>}
             </div>

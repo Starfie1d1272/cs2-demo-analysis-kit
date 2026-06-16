@@ -202,6 +202,7 @@ export const workspaceKillEventSchema = z.object({
   noScope: z.boolean(),
   flashAssist: z.boolean(),
   tradeKill: z.boolean(),
+  wallbang: z.boolean(),
   /** 击杀连线图层用的 world 坐标；旧模型缺省 null（连线图层降级隐藏）。 */
   killerX: z.number().nullable().optional().default(null),
   killerY: z.number().nullable().optional().default(null),
