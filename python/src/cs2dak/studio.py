@@ -214,12 +214,40 @@ class _ExportJob:
         }
 
 
+class _UpdateJob:
+    """One background download for an in-app update. Polled over the bridge."""
+
+    def __init__(self, urls: list[str], sha256: str, size: int, name: str) -> None:
+        self.id = uuid.uuid4().hex
+        self.urls = urls
+        self.sha256 = sha256
+        self.size = size
+        self.name = name
+        self.state = "downloading"  # downloading | verifying | ready | applying | error
+        self.stage = "准备中"
+        self.received = 0
+        self.error: str | None = None
+        self.staged_path: Path | None = None
+
+    def status(self) -> dict:
+        progress = (self.received / self.size) if self.size else 0.0
+        return {
+            "jobId": self.id,
+            "state": self.state,
+            "stage": self.stage,
+            "progress": round(min(progress, 1.0), 3),
+            "error": self.error,
+            "receivedBytes": self.received,
+        }
+
+
 class StudioApi:
     """Bridge exposed to the Studio frontend as window.pywebview.api.*"""
 
     def __init__(self) -> None:
         self._window = None  # set in main() after window creation
         self._jobs: dict[str, _ExportJob] = {}
+        self._update_jobs: dict[str, _UpdateJob] = {}
         self._userdata = _studio_userdata()
         self._db_lock = threading.Lock()
         self._db: sqlite3.Connection | None = None
@@ -496,6 +524,95 @@ class StudioApi:
                 _dnd_state["paths"].remove(item)
                 return urllib.parse.unquote(item[1])
         return None
+
+    # --- in-app update（Windows 一键更新；macOS/dev 不暴露 apply 的真实替换）-----
+    def update_start(self, urls: list[str], sha256: str, size: int, name: str) -> dict:
+        """Start a background download for an update asset; returns {jobId}.
+
+        Poll update_status(jobId); when state == "ready" call update_apply.
+        """
+        job = _UpdateJob(list(urls), sha256, int(size), name)
+        self._update_jobs[job.id] = job
+        log.info("update job %s start: %s (%d bytes, %d mirrors)", job.id, name, size, len(urls))
+        threading.Thread(target=self._run_update_job, args=(job,), daemon=True).start()
+        return {"jobId": job.id}
+
+    def _run_update_job(self, job: _UpdateJob) -> None:
+        from cs2dak import updater
+
+        dest = updater.updates_dir(self._userdata) / job.name
+
+        def on_progress(received: int) -> None:
+            job.received = received
+            if job.size and received >= job.size:
+                job.state = "verifying"
+                job.stage = "校验中"
+
+        def on_mirror(index: int, _url: str) -> None:
+            job.received = 0
+            job.state = "downloading"
+            job.stage = f"下载中（镜像 {index + 1}）"
+
+        try:
+            updater.download_with_fallback(
+                job.urls, dest, expected_sha256=job.sha256,
+                expected_size=job.size or None,
+                on_progress=on_progress, on_mirror=on_mirror,
+            )
+            job.staged_path = dest
+            job.state = "ready"
+            job.stage = "已就绪"
+            log.info("update job %s ready: %s", job.id, dest)
+        except Exception as exc:  # noqa: BLE001 - surface to UI
+            job.state = "error"
+            job.error = str(exc)
+            log.exception("update job %s failed", job.id)
+
+    def update_status(self, job_id: str) -> dict:
+        job = self._update_jobs.get(job_id)
+        if job is None:
+            return {"jobId": job_id, "state": "error", "stage": "",
+                    "progress": 0, "error": "未知任务", "receivedBytes": 0}
+        return job.status()
+
+    def update_apply(self, job_id: str) -> dict:
+        """Extract + launch the relaunch script, then quit so it can swap dirs.
+
+        Windows only. On success the app restarts and this call may not return.
+        """
+        from cs2dak import updater
+
+        job = self._update_jobs.get(job_id)
+        if job is None or job.staged_path is None or job.state != "ready":
+            return {"ok": False, "error": "更新包尚未就绪"}
+        if sys.platform != "win32":
+            return {"ok": False, "error": "应用内替换目前只支持 Windows"}
+        try:
+            job.state = "applying"
+            updater.apply_windows_update(
+                job.staged_path,
+                updater.current_install_dir(),
+                updater.current_exe_name(),
+                updater.current_pid(),
+                work_dir=updater.updates_dir(self._userdata),
+            )
+        except Exception as exc:  # noqa: BLE001
+            job.state = "error"
+            job.error = str(exc)
+            log.exception("update apply %s failed", job_id)
+            return {"ok": False, "error": str(exc)}
+
+        # 让 bridge 先返回，再销毁窗口退出进程，交给接力脚本接管。
+        def _quit() -> None:
+            time.sleep(0.6)
+            try:
+                if self._window is not None:
+                    self._window.destroy()
+            except Exception:  # noqa: BLE001
+                os._exit(0)
+
+        threading.Thread(target=_quit, daemon=True).start()
+        return {"ok": True}
 
 
 def main() -> None:
