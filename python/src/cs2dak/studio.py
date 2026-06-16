@@ -124,10 +124,29 @@ log = logging.getLogger("cs2dak.studio")
 
 
 class _StudioStaticHandler(SimpleHTTPRequestHandler):
-    """Static file handler with real cache headers for large immutable assets."""
+    """Static file handler with real cache headers for large immutable assets.
+
+    `/tris/<map>.tri` 支持 overlay：若 userdata/tris 下存在同名文件，优先于打包
+    内置版本提供——这样 .tri 资产可外置到用户目录（手动放置或按需下载），
+    打包不再强制内嵌 ~30MB/图。overlay 缺失则回退内置，缺内置只降级不报错。
+    """
+
+    overlay_tris: Path | None = None
 
     def log_message(self, format: str, *args) -> None:  # noqa: A002 - stdlib signature
         log.debug("static: " + format, *args)
+
+    def translate_path(self, path: str) -> str:
+        default = super().translate_path(path)
+        overlay = self.overlay_tris
+        if overlay is not None:
+            urlpath = urllib.parse.urlparse(path).path
+            if urlpath.startswith("/tris/"):
+                name = os.path.basename(urlpath)
+                candidate = overlay / name
+                if candidate.is_file():
+                    return str(candidate)
+        return default
 
     def end_headers(self) -> None:
         path = urllib.parse.urlparse(self.path).path
@@ -157,10 +176,13 @@ def _find_static_port(start: int = 51780) -> int:
         return int(sock.getsockname()[1])
 
 
-def _start_static_server(root: Path) -> tuple[ThreadingHTTPServer, str]:
+def _start_static_server(root: Path, overlay_tris: Path | None = None) -> tuple[ThreadingHTTPServer, str]:
     from functools import partial
 
     port = _find_static_port()
+    if overlay_tris is not None:
+        # 类属性形式注入 overlay 目录（partial 只能传 handler __init__ 参数）。
+        _StudioStaticHandler.overlay_tris = overlay_tris
     handler = partial(_StudioStaticHandler, directory=str(root))
     server = ThreadingHTTPServer(("127.0.0.1", port), handler)
     thread = threading.Thread(target=server.serve_forever, name="dak-studio-static", daemon=True)
@@ -614,6 +636,39 @@ class StudioApi:
         threading.Thread(target=_quit, daemon=True).start()
         return {"ok": True}
 
+    # --- .tri 资产管理（外置 overlay + 按需下载）-----------------------------
+    def _tri_overlay_dir(self) -> Path:
+        path = self._userdata / "tris"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def tri_dir(self) -> str:
+        """userdata 下的 .tri overlay 目录（供 UI 显示/打开/手动放置资产）。"""
+        return str(self._tri_overlay_dir())
+
+    def tri_present(self) -> list[str]:
+        """当前可用的地图 .tri（overlay + 内置去重），返回地图名（不含扩展名）。"""
+        names: set[str] = set()
+        for base in (self._tri_overlay_dir(), WEB_DIR / "tris"):
+            if base.is_dir():
+                names.update(p.stem for p in base.glob("*.tri"))
+        return sorted(names)
+
+    def tri_download(self, map_name: str, urls: list[str], sha256: str | None = None) -> dict:
+        """按需下载某图 .tri 到 overlay（镜像失败转移 + 可选 sha256 校验）。
+
+        资产托管 URL 由调用方/manifest 提供（本仓库不内置 .tri 源地址）。
+        """
+        from cs2dak import updater
+
+        dest = self._tri_overlay_dir() / f"{map_name}.tri"
+        try:
+            updater.download_with_fallback(list(urls), dest, expected_sha256=sha256)
+            return {"ok": True, "path": str(dest)}
+        except Exception as exc:  # noqa: BLE001 - surface to UI
+            log.warning("tri_download %s failed: %s", map_name, exc)
+            return {"ok": False, "error": str(exc)}
+
 
 def main() -> None:
     """gui-script entry point (see pyproject [project.gui-scripts])."""
@@ -631,7 +686,10 @@ def main() -> None:
             f"{WEB_DIR}"
         )
 
-    _server, index_url = _start_static_server(WEB_DIR)
+    # .tri overlay：userdata/tris 优先于内置（外置资产管理）。
+    overlay_tris = storage / "tris"
+    overlay_tris.mkdir(parents=True, exist_ok=True)
+    _server, index_url = _start_static_server(WEB_DIR, overlay_tris=overlay_tris)
     api = StudioApi()
     window = webview.create_window(
         title=f"DAK Studio {__version__}",
