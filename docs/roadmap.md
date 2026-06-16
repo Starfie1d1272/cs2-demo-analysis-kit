@@ -91,8 +91,12 @@ presentation 已以 `targetEndTick = nextRound.startTick` 留出接口）。
 - **数据库迁移与修复工具**；存储空间占用展示（原始 ZIP / derived cache / `.tri` / 报告）。
 - **自动更新 + 国内可达分发**（🟡 主体已落地，见 [`docs/design/auto-update.md`](design/auto-update.md)）：
   manifest + 镜像失败转移的更新检查（替代 `api.github.com`）、Windows 应用内一键更新
-  （下载+sha256 校验+side-by-side 接力替换）、CI 自动生成 `latest.json`。**剩**：填自建 CDN
-  镜像、Windows 真机冒烟验证接力替换路径。
+  （下载+sha256 校验+side-by-side 接力替换）、CI 自动生成 `latest.json`。
+  ✅ **Cloudflare R2 镜像已接入**（`dakupdate.starfie1d.top`，最高优先级，CI 上传 zip+manifest）。
+  **剩**：发一次 tag 验证 R2 上传链路 + Windows 真机冒烟验证接力替换路径（RC still required）。
+- **赛事资产库 + 赛事包导入**（🟡 设计稿，见 [`docs/design/event-packages.md`](design/event-packages.md)）：
+  复用 R2 资产层托管结构化数据包（不托管原始 `.dem`）；一次性导入 1–5 demo 为 BO1/3/5 + BP +
+  赛事框架；RivalHub 元数据经文件导出桥接。本地分析永久免费，捐赠仅支持维护/存储/带宽。
 - **`.tri` 资产包管理**：从 Release CI 现场打包（~30MB/图）改为版本化资产包或首次按图下载。
   （🟡 `userdata/tris` overlay + `tri_download` 桥已落地，是去内置化地基；当前仍内置作回退。）
 - **签名与公证**：Windows 签名（去 SmartScreen 警告，让自动更新更可信）——优先级高于付费墙。
