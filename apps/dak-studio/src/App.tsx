@@ -8,6 +8,7 @@ import { saveSeriesRecord, suggestSeriesGroups, deriveVetoSummary } from "./lib/
 import type { SeriesVeto, SeriesVetoStep } from "@cs2dak/contract";
 import { APP_VERSION, checkForUpdate, type UpdateInfo } from "./lib/update";
 import { UpdateControl } from "./components/UpdateControl";
+import { LibraryDirButton } from "./components/LibraryDirButton";
 import { HomeView } from "./views/HomeView";
 import { LibraryView } from "./views/LibraryView";
 import { MatchView } from "./views/MatchView";
@@ -421,6 +422,7 @@ export function App() {
         <div className="stu-sidebar-foot">
           <span>{entries.length} 场 demo</span>
           <small>v{APP_VERSION} · v3 ZIP · 本地存储</small>
+          <LibraryDirButton onError={setNotice} />
           {update && <UpdateControl update={update} />}
         </div>
       </aside>

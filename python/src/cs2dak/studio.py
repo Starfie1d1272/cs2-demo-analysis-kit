@@ -669,6 +669,32 @@ class StudioApi:
             log.warning("tri_download %s failed: %s", map_name, exc)
             return {"ok": False, "error": str(exc)}
 
+    # --- Library 目录（用户可见数据目录：显示路径 / 在文件管理器打开）-------------
+    def userdata_dir(self) -> str:
+        """用户数据目录绝对路径（资料库 SQLite + demo blobs + 缓存 + 日志 + .tri overlay）。"""
+        return str(self._userdata)
+
+    def open_userdata_dir(self) -> dict:
+        """在系统文件管理器中打开用户数据目录，便于备份/排错。
+
+        返回 {ok, path} 或 {ok: False, error}。浏览器/无桥环境不暴露此方法。
+        """
+        import subprocess
+
+        self._userdata.mkdir(parents=True, exist_ok=True)
+        target = str(self._userdata)
+        try:
+            if sys.platform == "win32":
+                os.startfile(target)  # type: ignore[attr-defined]  # noqa: S606 - 打开本地目录
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", target])  # noqa: S603,S607
+            else:
+                subprocess.Popen(["xdg-open", target])  # noqa: S603,S607
+            return {"ok": True, "path": target}
+        except Exception as exc:  # noqa: BLE001 - surface to UI
+            log.warning("open_userdata_dir failed: %s", exc)
+            return {"ok": False, "error": str(exc)}
+
 
 def main() -> None:
     """gui-script entry point (see pyproject [project.gui-scripts])."""

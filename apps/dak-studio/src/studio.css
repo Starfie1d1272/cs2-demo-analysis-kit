@@ -166,6 +166,23 @@ body {
   margin-top: 2px;
 }
 
+.stu-libdir-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--dak-fg-mid);
+}
+
+.stu-libdir-btn:hover {
+  color: var(--dak-accent);
+}
+
 .stu-update-link {
   display: block;
   margin-top: 6px;

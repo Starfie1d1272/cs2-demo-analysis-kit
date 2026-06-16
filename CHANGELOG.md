@@ -9,6 +9,10 @@ DAK Studio 桌面应用及 `@cs2dak/*` 分析管道面向用户的变更记录�
 > 大库稳定性验证、赛事资产库/赛事包导入（见 [`docs/design/event-packages.md`](docs/design/event-packages.md)）、
 > Windows 签名等仍在 [`docs/roadmap.md`](docs/roadmap.md) 0.7.0 排期中。
 
+### 新增
+
+- **侧栏「数据目录」入口**（桌面）：一键在系统文件管理器打开 userdata 目录（资料库 SQLite / demo blobs / 缓存 / 日志 / `.tri` overlay），便于手动备份与排错；路径作 tooltip 展示。浏览器无本地目录概念，不显示该入口。
+
 ## [0.6.1] — 2026-06-16
 
 ### 新增
