@@ -52,8 +52,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # .tri 碰撞几何（~30MB/图，不进 git）：runner 上现场下载到 ~/.awpy/tris，
-      # package.sh 自动拷进安装包；缺失只降级（反应时间/预瞄退化口径）。
+      # .tri 碰撞几何（~30MB/图，不进 git）：runner 上现场下载到 ~/.awpy/tris。
+      # 0.6.4 起**不再内置**进安装包，而是上传到 R2，客户端首次用到某图时按需下载
+      # 到 userdata/tris overlay（缺失只降级：反应时间/预瞄退化口径）。
       - name: Cache awpy tris
         uses: actions/cache@v4
         with:
@@ -68,6 +69,37 @@ jobs:
           else
             uvx awpy get tris
           fi
+
+      # .tri 资产外置：生成 tris-manifest 并把 .tri + 清单同步到 R2。只在 Windows
+      # job 跑一次（.tri 与平台无关）。aws s3 sync --size-only 保证未变更的 .tri
+      # 不重复上传——仅 awpy 更新时才真正再传 ~200MB；平时近乎零成本。
+      - name: Upload .tri assets to R2
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          set -euo pipefail
+          node scripts/gen-tris-manifest.mjs "$HOME/.awpy/tris" tris-manifest.json
+          # 各 .tri：不可变长缓存；--size-only 跳过已存在且大小相同的
+          aws s3 sync "$HOME/.awpy/tris" "s3://${R2_BUCKET}/tris/" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --exclude "*" --include "*.tri" \
+            --size-only \
+            --content-type application/octet-stream \
+            --cache-control "public, max-age=31536000, immutable"
+          # 清单：短缓存（max-age=300），客户端尽快看到资产变化
+          aws s3 cp tris-manifest.json "s3://${R2_BUCKET}/tris/manifest.json" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type application/json \
+            --cache-control "public, max-age=300"
+          echo "R2 .tri 同步完成：${R2_BUCKET}/tris/"
 
       - name: Build desktop packages
         run: PACKAGE_SKIP_VERSION_SYNC=1 bash scripts/package.sh

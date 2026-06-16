@@ -72,14 +72,24 @@ Windows 无法删除/覆盖正在运行的 exe。`apply_windows_update`：
 
 **回滚**：旧目录改名失败/移动失败时把 `*.old` 改回原名再启动，保证不变砖。
 
-### 4. `.tri` 资产外置（瘦安装包地基）
+### 4. `.tri` 资产外置（0.6.4 已去内置化，安装包 ~220MB → ~20MB）
 
 - 静态服务 `/tris/` 支持 `userdata/tris` **overlay**：外置/手动放置/下载的 `.tri`
   优先于打包内置（[`python/src/cs2dak/studio.py`](../../python/src/cs2dak/studio.py)
   `_StudioStaticHandler.translate_path`）。
 - 桥：`tri_dir`（overlay 目录）/ `tri_present`（已有图）/ `tri_download`（按需下载，复用 updater）。
-- **现状**：`package.sh` 仍内置 `.tri` 作回退，无回归。overlay 让未来“去内置化”
-  （安装包瘦 ~200MB）可平滑切换：停止内置后，首次用某图时按需下到 overlay。
+- **打包侧**：`package.sh` / `release.yml` **不再把 `.tri` 打进 onedir**。发版 CI 改为把
+  awpy `.tri` 与清单同步到 R2：`tris/<map>.tri`（不可变长缓存）+ `tris/manifest.json`
+  （短缓存，每图 `size` / `sha256` / `urls`，见
+  [`scripts/gen-tris-manifest.mjs`](../../scripts/gen-tris-manifest.mjs)）；
+  `aws s3 sync --size-only` 保证仅 awpy 更新时才真正再传 ~200MB。
+- **按需下载（全在服务端，前端零改动）**：`_StudioStaticHandler.do_GET` 命中
+  `/tris/<map>.tri` 且 overlay/内置都缺时，按 `TRIS_MANIFEST_URL` 拉清单 → 用
+  `download_with_fallback` 下到 overlay（sha256 + size 校验，同图并行导入按文件名
+  加锁去重）→ 再由 `translate_path` 的 overlay 命中提供。worker/主线程原有的
+  `fetch('./tris/<map>.tri')` 不变；下载失败只降级（跳过静态墙体 LOS），不报错。
+- **本地调试**：想要内置回退就手动把 `.tri` 放进 `studio_web/tris/`（overlay 优先，
+  内置兜底）；dev（vite）仍走 `apps/dak-studio/public/tris/` 符号链接。
 
 ## 与 churn 拆分的协同（后续）
 
@@ -99,7 +109,8 @@ Windows 无法删除/覆盖正在运行的 exe。`apply_windows_update`：
 2. **Windows 真机冒烟测试**：接力替换（`apply_windows_update`）我无法在 macOS 验证。
    发一个测试 tag 出 0.7.0-rc，在 Windows 上装旧版 → 点“一键更新”，确认：下载进度正常、
    重启后版本号变了、`userdata`（资料库/身份归并）没丢。有问题把 `userdata/studio.log` 发我。
-3. **`.tri` 资产托管（可选，后续）**：若要去掉内置 `.tri` 瘦身，需要把 `.tri` 包传到某处
-   并提供一个 `tris-manifest`（每图 URL + sha256）。现在不做也不影响——内置回退还在。
+3. **`.tri` 资产托管** ✅ **已落地（0.6.4）**：发版 CI 把 awpy `.tri` 与
+   `tris/manifest.json` 同步到 R2，客户端按需下载到 overlay。安装包 ~220MB → ~20MB。
+   剩余只差发一次 tag 验证 R2 `.tri` 上传链路 + Windows 真机首次用某图时的按需下载。
 4. **签名/公证（可选）**：Windows 代码签名能去掉 SmartScreen 警告、也让自动更新更可信
    （roadmap 0.7 已排）。需要证书（约 $200–400/年 OV，或 EV）。暂不做不影响功能。

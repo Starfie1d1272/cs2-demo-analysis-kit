@@ -9,6 +9,18 @@ DAK Studio 桌面应用及 `@cs2dak/*` 分析管道面向用户的变更记录�
 > 大库稳定性验证、赛事资产库/赛事包导入（见 [`docs/design/event-packages.md`](docs/design/event-packages.md)）、
 > Windows 签名等仍在 [`docs/roadmap.md`](docs/roadmap.md) 0.7.0 排期中。
 
+## [0.6.4] — 2026-06-16
+
+### 变更
+
+- **`.tri` 碰撞几何外置，安装包 ~220MB → ~20MB**：`.tri`（~200MB 全量）不再打进
+  onedir。发版 CI 改为把 awpy `.tri` 与清单同步到 R2（`tris/<map>.tri` +
+  `tris/manifest.json`，`aws s3 sync --size-only` 仅在 awpy 更新时才真正再传）；
+  桌面壳首次用到某图时由静态服务 `_StudioStaticHandler.do_GET` 按 manifest 下载到
+  `userdata/tris` overlay（sha256 + size 校验、并行导入按图加锁去重），下载失败只
+  降级（跳过静态墙体 LOS）。worker/主线程的 `fetch('./tris/<map>.tri')` 无需改动。
+  这也让需要真机验证的「全量更新闭环」更快——下载体积从 ~220MB 降到 ~20MB。
+
 ## [0.6.3] — 2026-06-16
 
 ### 修复

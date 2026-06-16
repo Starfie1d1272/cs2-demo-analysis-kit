@@ -31,16 +31,11 @@ STUDIO_WEB="python/src/cs2dak/studio_web"
 rm -rf "$STUDIO_WEB"
 cp -R apps/dak-studio/dist "$STUDIO_WEB"
 
-# .tri 碰撞几何（awpy 导出，~30MB/图）：打进安装包后视觉反应/预瞄走 LOS 精确口径。
-# 来源 $AWPY_TRIS_DIR（默认 ~/.awpy/tris，`uvx awpy get tris` 下载）。缺失只降级不报错。
-TRIS_DIR="${AWPY_TRIS_DIR:-$HOME/.awpy/tris}"
-if compgen -G "$TRIS_DIR/*.tri" > /dev/null; then
-  mkdir -p "$STUDIO_WEB/tris"
-  cp "$TRIS_DIR"/*.tri "$STUDIO_WEB/tris/"
-  echo "    Bundled $(ls "$STUDIO_WEB/tris" | wc -l | tr -d ' ') .tri maps from $TRIS_DIR"
-else
-  echo "    WARNING: no .tri files in $TRIS_DIR — 反应时间/预瞄将走降级口径（uvx awpy get tris 可下载）"
-fi
+# .tri 碰撞几何（~30MB/图，~200MB 全量）自 0.6.4 起**不再内置**：安装包从
+# ~220MB 瘦到 ~20MB。运行时首次用到某图时由桌面壳按 tris-manifest 从镜像（R2）
+# 按需下载到 userdata/tris overlay（python/src/cs2dak/studio.py 的 _StudioStaticHandler）。
+# 资产由发版 CI（release.yml）上传到 R2；本地调试若想内置回退，手动把 .tri 放进
+# "$STUDIO_WEB/tris/" 即可（overlay 优先，内置为兜底）。
 
 echo "==> [3/5] PyInstaller build (studio)"
 cd python

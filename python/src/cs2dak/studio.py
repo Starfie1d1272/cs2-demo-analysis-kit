@@ -29,6 +29,7 @@ import tempfile
 import threading
 import time
 import urllib.parse
+import urllib.request
 import uuid
 from datetime import datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -49,6 +50,12 @@ if getattr(sys, "frozen", False):
     WEB_DIR = Path(sys._MEIPASS) / "studio_web"
 else:
     WEB_DIR = Path(__file__).parent / "studio_web"
+
+# .tri 碰撞几何资产外置（0.6.4 起）：打包不再内嵌 ~200MB，安装包从 ~220MB 瘦到 ~20MB。
+# 运行时首次用到某图时按需从镜像下载到 userdata/tris overlay（见 _StudioStaticHandler）。
+# 资产与清单托管在自建 R2（与更新包同一镜像层）；缺失只降级（LOS 口径退化），不报错。
+TRIS_MANIFEST_URL = "https://dakupdate.starfie1d.top/tris/manifest.json"
+TRIS_MANIFEST_TIMEOUT_S = 8
 
 
 def _sanitize(s: str) -> str:
@@ -126,15 +133,78 @@ log = logging.getLogger("cs2dak.studio")
 class _StudioStaticHandler(SimpleHTTPRequestHandler):
     """Static file handler with real cache headers for large immutable assets.
 
-    `/tris/<map>.tri` 支持 overlay：若 userdata/tris 下存在同名文件，优先于打包
-    内置版本提供——这样 .tri 资产可外置到用户目录（手动放置或按需下载），
-    打包不再强制内嵌 ~30MB/图。overlay 缺失则回退内置，缺内置只降级不报错。
+    `/tris/<map>.tri` 支持 overlay + 按需下载：
+      1. userdata/tris 下存在同名文件 → 优先提供（外置资产，手动放置或已下载）；
+      2. 打包内置（去内置化后通常不存在）→ 回退提供；
+      3. 都没有 → 命中 GET 时按 tris-manifest 从镜像下载到 overlay，再提供。
+    下载失败只降级（跳过静态墙体 LOS），不报错。同图多场并行导入按文件名加锁去重。
     """
 
     overlay_tris: Path | None = None
+    _tri_locks: dict[str, threading.Lock] = {}
+    _tri_locks_guard = threading.Lock()
+    _tris_manifest: dict | None = None
 
     def log_message(self, format: str, *args) -> None:  # noqa: A002 - stdlib signature
         log.debug("static: " + format, *args)
+
+    def do_GET(self) -> None:  # noqa: N802 - stdlib signature
+        urlpath = urllib.parse.urlparse(self.path).path
+        if urlpath.startswith("/tris/") and urlpath.endswith(".tri"):
+            self._ensure_tri(os.path.basename(urlpath))
+        super().do_GET()
+
+    @classmethod
+    def _tri_lock(cls, filename: str) -> threading.Lock:
+        with cls._tri_locks_guard:
+            lock = cls._tri_locks.get(filename)
+            if lock is None:
+                lock = threading.Lock()
+                cls._tri_locks[filename] = lock
+            return lock
+
+    @classmethod
+    def _tris_manifest_load(cls) -> dict | None:
+        """拉一次 tris-manifest 并缓存（仅成功缓存；失败下次仍可重试）。"""
+        if cls._tris_manifest is not None:
+            return cls._tris_manifest
+        try:
+            req = urllib.request.Request(TRIS_MANIFEST_URL, headers={"User-Agent": "DAK-Studio-Tri"})
+            with urllib.request.urlopen(req, timeout=TRIS_MANIFEST_TIMEOUT_S) as resp:  # noqa: S310 - https
+                cls._tris_manifest = json.loads(resp.read().decode("utf-8"))
+        except Exception as exc:  # noqa: BLE001 - 缺失只降级
+            log.warning("拉取 tris-manifest 失败：%s", exc)
+            return None
+        return cls._tris_manifest
+
+    def _ensure_tri(self, filename: str) -> None:
+        """overlay/内置都缺时，按 manifest 把该图 .tri 下到 overlay。失败静默降级。"""
+        overlay = self.overlay_tris
+        if overlay is None:
+            return
+        dest = overlay / filename
+        if dest.is_file() or (WEB_DIR / "tris" / filename).is_file():
+            return
+        manifest = self._tris_manifest_load()
+        if not manifest:
+            return
+        stem = filename[:-4]  # 去掉 .tri
+        entry = (manifest.get("maps") or {}).get(stem)
+        if not isinstance(entry, dict) or not entry.get("urls"):
+            return
+        with self._tri_lock(filename):
+            if dest.is_file():  # 并发下另一线程已下完
+                return
+            try:
+                updater.download_with_fallback(
+                    list(entry["urls"]),
+                    dest,
+                    expected_sha256=entry.get("sha256"),
+                    expected_size=entry.get("size"),
+                )
+                log.info("按需下载 .tri 完成：%s", filename)
+            except Exception as exc:  # noqa: BLE001 - 缺失只降级
+                log.warning("按需下载 .tri 失败 %s：%s", filename, exc)
 
     def translate_path(self, path: str) -> str:
         default = super().translate_path(path)
