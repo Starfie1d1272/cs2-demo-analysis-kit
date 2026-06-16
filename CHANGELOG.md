@@ -6,21 +6,37 @@ DAK Studio 桌面应用及 `@cs2dak/*` 分析管道面向用户的变更记录�
 
 ## [Unreleased] — 0.7.0（开发中）
 
+> 大库稳定性验证、赛事资产库/赛事包导入（见 [`docs/design/event-packages.md`](docs/design/event-packages.md)）、
+> Windows 签名等仍在 [`docs/roadmap.md`](docs/roadmap.md) 0.7.0 排期中。
+
+## [0.6.1] — 2026-06-16
+
 ### 新增
 
 #### 自动更新与资产管理（基础设施）
 
-- **manifest + 镜像驱动的更新检查**：不再依赖 `api.github.com`（国内常被墙/限流）。客户端从稳定地址 `releases/latest/download/latest.json` 拉取 manifest，带一串镜像 URL 顺序失败转移（8s 超时），全部失败再退回 GitHub API 兜底。发版 CI 自动生成并发布 `latest.json`（`gen-update-manifest.mjs` 算 sha256/size）。
+- **manifest + 镜像驱动的更新检查**：不再依赖 `api.github.com`（国内常被墙/限流）。客户端按 **R2 → GitHub → ghproxy** 顺序拉取 `latest.json`（8s 超时失败转移），全部失败再退回 GitHub API 兜底。发版 CI 自动生成并发布 `latest.json`（`gen-update-manifest.mjs` 算 sha256/size，`asset.urls` 同序）。
+- **Cloudflare R2 镜像（国内可达）**：自建 R2（`cs2dak-assets` + 自定义域 `dakupdate.starfie1d.top`）作最高优先级镜像。发版 CI 在 GitHub Release 之外把 Windows zip 与 `latest.json` 同步上传到 R2；GitHub Release 仍是权威源，公共 ghproxy 为最后兜底。
 - **应用内一键更新（Windows）**：侧栏 `UpdateControl` 在桌面壳 + 有当前平台资产时提供一键更新——经 pywebview 桥下载（镜像失败转移 + sha256 校验）、解压、side-by-side 接力替换（等本进程退出→旧目录改名→新目录就位→搬回 `userdata`→重启→清理），失败回滚不变砖。否则退回 Release 页面手动下载。
 - **`.tri` 资产外置 overlay**：静态服务 `/tris/` 支持 `userdata/tris` overlay，外置/手动放置/下载的 `.tri` 优先于打包内置；`tri_download` 桥支持按需下载。是去内置化（瘦安装包 ~200MB）的地基；当前仍内置 `.tri` 作回退，无回归。
 
-> ⚠️ 镜像清单目前是公共 ghproxy 兜底（易失效）。长期可靠分发需填入自建 CDN/对象存储，见 [`docs/design/auto-update.md`](docs/design/auto-update.md)。Windows 接力替换路径需真机冒烟验证。
+> ⚠️ Windows side-by-side 接力替换路径需真机冒烟验证（macOS/CI 只覆盖纯函数）。
+
+#### Killfeed 与回放
+
+- **穿墙击杀（WB）徽章**：killfeed 标注穿墙击杀。
+- **回放死亡标记**：2D 回放在死亡位置绘制叉叉标记。
+- **sandbox 噪音抑制**：过滤训练/sandbox 场景的噪声事件。
 
 ### 性能
 
 - **导入 facts 抽取移入 worker 池**：原先 ZIP 解析在 worker、但最重的 facts 抽取（视野锥/`.tri` LOS 遍历）仍在主线程串行跑，批量导入会长时间冻结 UI。现在解析 + 建 BVH + 榨 facts 全在导入 worker 内完成，只把紧凑的 `{meta, facts}` 回传主线程（含 replay 的整包不再跨线程克隆）。worker 取与主线程同一份静态 `.tri`（base URL 由主线程算好传入）与 callout grid，输出与主线程逐字节等价；tri/callout 缺失或 worker 异常时回退主线程，行为不变。
 - **批量导入并行化**：导入循环由逐场串行 `await` 改为滑动窗口并发（并发 2），多场在 worker 池里并行解析 + 抽取、且全程不冻结 UI。并发取 2 以兼顾吞吐与渲染器内存峰值（每场 worker 需驻留一份完整 DemoPackage）。
 - **库内重构**：`extractMatchFacts` 的 worker/主线程两条路径共用同一份纯抽取逻辑；`DemoMeta`/`metaFromPackage` 抽到无存储依赖的 `demo-meta.ts`，供 worker 与主线程共用。
+
+### 修复
+
+- **教练战术聚合队伍改名未生效**：facts 聚合三入口（赛事洞察/队伍对比/赛季汇总）重放 `teamRenames`，改名后的队伍正确合并为一行。
 
 ## [0.6.0] — 2026-06-16 (0.6.0 教练工作台 + maps 默认位)
 
