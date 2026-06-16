@@ -8,6 +8,7 @@ import { saveSeriesRecord, suggestSeriesGroups, deriveVetoSummary } from "./lib/
 import type { SeriesVeto, SeriesVetoStep } from "@cs2dak/contract";
 import { APP_VERSION, checkForUpdate, type UpdateInfo } from "./lib/update";
 import { UpdateControl } from "./components/UpdateControl";
+import { UpdateModal } from "./components/UpdateModal";
 import { LibraryDirButton } from "./components/LibraryDirButton";
 import { HomeView } from "./views/HomeView";
 import { LibraryView } from "./views/LibraryView";
@@ -86,6 +87,24 @@ export function App() {
   // 导入标签输入放在 App：全窗口拖拽导入也要带上
   const [importTagsRaw, setImportTagsRaw] = useState("");
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
+  const [showLatestMsg, setShowLatestMsg] = useState(false);
+
+  function doCheckUpdate() {
+    setCheckingUpdate(true);
+    setShowLatestMsg(false);
+    checkForUpdate()
+      .then((info) => {
+        setUpdate(info);
+        if (!info) {
+          setShowLatestMsg(true);
+          setTimeout(() => setShowLatestMsg(false), 3000);
+        }
+      })
+      .finally(() => setCheckingUpdate(false));
+  }
+
   // 稳定数组标识：避免 App 无关重渲染触发档案/排行榜重新聚合
   const scopedEntries = useMemo(
     () => applyScope(entries, scope, identityState.teamRenames),
@@ -102,7 +121,7 @@ export function App() {
     listDemoEntries()
       .then(setEntries)
       .catch((err) => setNotice(`读取本地资料库失败：${err instanceof Error ? err.message : String(err)}`));
-    void checkForUpdate().then(setUpdate);
+    doCheckUpdate();
     void loadIdentityState().then(setIdentityState);
   }, []);
 
@@ -422,10 +441,19 @@ export function App() {
         <div className="stu-sidebar-foot">
           <span>{entries.length} 场 demo</span>
           <small>v{APP_VERSION} · v3 ZIP · 本地存储</small>
-          <LibraryDirButton onError={setNotice} />
+          <div className="stu-foot-actions">
+            <LibraryDirButton onError={setNotice} />
+            <button type="button" className="stu-check-update-btn" onClick={doCheckUpdate} disabled={checkingUpdate}>
+              {checkingUpdate ? "检查中…" : showLatestMsg ? "已是最新" : "检查更新"}
+            </button>
+          </div>
           {update && <UpdateControl update={update} />}
         </div>
       </aside>
+
+      {update && update.latest !== dismissedVersion && (
+        <UpdateModal update={update} onDismiss={() => setDismissedVersion(update.latest)} />
+      )}
 
       <main className="stu-main">
         {notice && (

@@ -1,0 +1,23 @@
+{
+  "mapName": "de_mirage",
+  "version": "auto-v1-de_mirage",
+  "_gridMeta": {
+    "origin": [
+      -2660,
+      -2610,
+      -370
+    ],
+    "maxCoord": [
+      1450,
+      880,
+      40
+    ],
+    "dims": [
+      412,
+      350,
+      42
+    ],
+    "vocabularySize": 23
+  },
+  "zones": []
+}

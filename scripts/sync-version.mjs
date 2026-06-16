@@ -62,6 +62,8 @@ for (const rel of privateWorkspacePackageJsons()) {
 const pyTargets = [
   ["python/src/cs2dak/__init__.py", /__version__\s*=\s*"[^"]*"/, `__version__ = "${version}"`],
   ["python/pyproject.toml", /^version\s*=\s*"[^"]*"/m, `version = "${version}"`],
+  // uv.lock 里 `[[package]]\nname = "cs2dak"` 下的版本号；之前每次发版都漏掉
+  ["python/uv.lock", /^(name = "cs2dak"\n)version = "\d+\.\d+\.\d+"/m, `$1version = "${version}"`],
 ];
 for (const [rel, re, replacement] of pyTargets) {
   const path = join(repoRoot, rel);

@@ -9,9 +9,17 @@ DAK Studio 桌面应用及 `@cs2dak/*` 分析管道面向用户的变更记录�
 > 大库稳定性验证、赛事资产库/赛事包导入（见 [`docs/design/event-packages.md`](docs/design/event-packages.md)）、
 > Windows 签名等仍在 [`docs/roadmap.md`](docs/roadmap.md) 0.7.0 排期中。
 
+## [0.6.2] — 2026-06-16
+
 ### 新增
 
+- **更新弹窗（changelog 展示）**：启动检测或手动检查到新版本时弹出模态框，显示版本号与更新说明（`latest.json.notes`），提供一键更新或稍后提醒。侧栏仍保留更新入口，不因弹窗关闭而消失。
+- **手动「检查更新」按钮**：侧栏底部新增按钮，随时重新拉取 manifest 检测新版本；无更新时短暂显示"已是最新"后恢复。
 - **侧栏「数据目录」入口**（桌面）：一键在系统文件管理器打开 userdata 目录（资料库 SQLite / demo blobs / 缓存 / 日志 / `.tri` overlay），便于手动备份与排错；路径作 tooltip 展示。浏览器无本地目录概念，不显示该入口。
+
+### 修复
+
+- **`sync-version.mjs` 漏同步 `uv.lock`**：发版时 Python 锁文件的 `cs2dak` 版本号字段未随版本脚本更新，导致每次发版后 `uv run` 重建锁文件产生额外 diff。已在 `pyTargets` 中补录该条目。
 
 ## [0.6.1] — 2026-06-16
 

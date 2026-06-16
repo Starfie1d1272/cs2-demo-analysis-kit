@@ -166,11 +166,35 @@ body {
   margin-top: 2px;
 }
 
+.stu-foot-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.stu-check-update-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--dak-fg-mid);
+}
+
+.stu-check-update-btn:hover:not(:disabled) {
+  color: var(--dak-accent);
+}
+
+.stu-check-update-btn:disabled {
+  color: var(--dak-fg-dim);
+  cursor: progress;
+}
+
 .stu-libdir-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-top: 6px;
   padding: 0;
   border: 0;
   background: none;
@@ -218,6 +242,124 @@ body {
 
 .stu-update-failed a {
   color: var(--dak-accent);
+}
+
+/* ── 更新弹窗 ──────────────────────────────────────────── */
+
+.stu-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.stu-modal {
+  background: var(--dak-bg-panel, #1e1e1e);
+  border: 1px solid var(--dak-border);
+  border-radius: 8px;
+  max-width: 520px;
+  width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.stu-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--dak-border);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--dak-accent);
+}
+
+.stu-modal-close {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--dak-fg-dim);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.stu-modal-close:hover {
+  color: var(--dak-fg);
+}
+
+.stu-modal-body {
+  overflow-y: auto;
+  padding: 16px;
+  flex: 1;
+}
+
+.stu-update-changelog {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--dak-fg);
+}
+
+.stu-modal-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--dak-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stu-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.stu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 5px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  text-decoration: none;
+  border: 1px solid var(--dak-border);
+  background: var(--dak-bg);
+  color: var(--dak-fg);
+}
+
+.stu-btn-primary {
+  background: var(--dak-accent);
+  color: #fff;
+  border-color: var(--dak-accent);
+}
+
+.stu-btn-primary:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.stu-btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--dak-fg-mid);
+}
+
+.stu-btn-ghost:hover {
+  background: var(--dak-bg-raised, #2a2a2a);
+  color: var(--dak-fg);
 }
 
 .stu-main {
