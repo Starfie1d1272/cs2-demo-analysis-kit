@@ -133,6 +133,23 @@ function missingFactsError(scope: string): Error {
   return new Error(`${scope} 缺少本地持久化 facts，请重新导入或执行 facts 回填后再打开。`);
 }
 
+/**
+ * 把 facts 里的原始队名按 teamRenames 重映射后再交给 builder 聚合。
+ * facts 在导入时以原始队名落库，聚合按 `teams[teamKey]` 字符串做 key——
+ * 不在此重放改名，同名队伍就不会合并（队伍明细矩阵/对比表会显示未合并的原名）。
+ * cache key 已并入 identity.version（改名 +1），无需额外失效处理。
+ */
+export function withTeamRenames<T extends { teams: Record<string, string> }>(
+  facts: T[],
+  renames?: Record<string, string>
+): T[] {
+  if (!renames || Object.keys(renames).length === 0) return facts;
+  return facts.map((f) => ({
+    ...f,
+    teams: Object.fromEntries(Object.entries(f.teams).map(([k, v]) => [k, renames[v] ?? v]))
+  }));
+}
+
 export interface PlayerSeasonDetails {
   insights: PlayerSeasonInsights;
   weaponStats: PlayerWeaponStat[];
@@ -227,7 +244,7 @@ export function getTournamentInsights(entries: StudioDemoEntry[], identity?: Ide
     if (persisted !== undefined) return persisted;
     const factsStore = getFactsStore();
     const matchIds = entries.map(matchIdForEntry);
-    const facts = await factsStore.getTournamentFacts({ matchIds });
+    const facts = withTeamRenames(await factsStore.getTournamentFacts({ matchIds }), identity?.teamRenames);
     if (facts.length >= entries.length) {
       const insights = facts.length > 0 ? buildTournamentInsightsFromFacts(facts) : null;
       void writePersistedValue(key, insights);
@@ -247,7 +264,7 @@ export async function getTeamComparison(entries: StudioDemoEntry[], identity?: I
     if (persisted) return persisted;
     const factsStore = getFactsStore();
     const matchIds = entries.map(matchIdForEntry);
-    const facts = await factsStore.getTeamComparisonFacts({ matchIds });
+    const facts = withTeamRenames(await factsStore.getTeamComparisonFacts({ matchIds }), identity?.teamRenames);
     if (facts.length >= entries.length) {
       const model = buildTeamComparisonFromFacts(facts);
       void writePersistedValue(key, model);
@@ -276,7 +293,7 @@ export function getSeasonSummary(entries: StudioDemoEntry[], identity?: Identity
     if (cohortRows.length > 0) {
       const cohortOpts = identity?.version ? { identityMap: identity.map } : {};
       const bundle = buildSeasonCohortFromRows(cohortRows, { ...cohortOpts, matchCount: entries.length });
-      const tournamentFacts = await factsStore.getTournamentFacts({ matchIds });
+      const tournamentFacts = withTeamRenames(await factsStore.getTournamentFacts({ matchIds }), identity?.teamRenames);
       const summary: SeasonSummary = {
         bundle,
         leaderboard: buildSeasonLeaderboardModel(bundle),
