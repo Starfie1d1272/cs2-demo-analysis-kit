@@ -169,13 +169,38 @@ body {
 .stu-update-link {
   display: block;
   margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
   font-size: 11px;
   color: var(--dak-accent);
   text-decoration: none;
 }
 
-.stu-update-link:hover {
+.stu-update-link:hover:not(:disabled) {
   text-decoration: underline;
+}
+
+.stu-update-link:disabled {
+  color: var(--dak-fg-mid);
+  cursor: progress;
+}
+
+.stu-update-control {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stu-update-failed {
+  color: var(--dak-danger, #e06c6c);
+  font-size: 10.5px;
+}
+
+.stu-update-failed a {
+  color: var(--dak-accent);
 }
 
 .stu-main {

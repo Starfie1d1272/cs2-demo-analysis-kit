@@ -7,6 +7,7 @@ import { parseTags } from "./lib/tags";
 import { saveSeriesRecord, suggestSeriesGroups, deriveVetoSummary } from "./lib/series";
 import type { SeriesVeto, SeriesVetoStep } from "@cs2dak/contract";
 import { APP_VERSION, checkForUpdate, type UpdateInfo } from "./lib/update";
+import { UpdateControl } from "./components/UpdateControl";
 import { HomeView } from "./views/HomeView";
 import { LibraryView } from "./views/LibraryView";
 import { MatchView } from "./views/MatchView";
@@ -420,11 +421,7 @@ export function App() {
         <div className="stu-sidebar-foot">
           <span>{entries.length} 场 demo</span>
           <small>v{APP_VERSION} · v3 ZIP · 本地存储</small>
-          {update && (
-            <a className="stu-update-link" href={update.url} target="_blank" rel="noreferrer">
-              新版本 v{update.latest} 可下载
-            </a>
-          )}
+          {update && <UpdateControl update={update} />}
         </div>
       </aside>
 
