@@ -89,8 +89,14 @@ presentation 已以 `targetEndTick = nextRound.startTick` 留出接口）。
 - **用户可见 Library 目录** + 一键备份/恢复（manifest、标签、身份归并、BP、Playbook、原始 ZIP）。
 - **存储空间管理**（原始 ZIP / derived cache / `.tri` / 报告 各项占用展示，支持按类清理）。
 - **数据库迁移与修复工具**；存储空间占用展示（原始 ZIP / derived cache / `.tri` / 报告）。
+- **自动更新 + 国内可达分发**（🟡 主体已落地，见 [`docs/design/auto-update.md`](design/auto-update.md)）：
+  manifest + 镜像失败转移的更新检查（替代 `api.github.com`）、Windows 应用内一键更新
+  （下载+sha256 校验+side-by-side 接力替换）、CI 自动生成 `latest.json`。**剩**：填自建 CDN
+  镜像、Windows 真机冒烟验证接力替换路径。
 - **`.tri` 资产包管理**：从 Release CI 现场打包（~30MB/图）改为版本化资产包或首次按图下载。
-- **签名与公证**：macOS notarization（$99/年）、Windows 签名——优先级高于付费墙。
+  （🟡 `userdata/tris` overlay + `tri_download` 桥已落地，是去内置化地基；当前仍内置作回退。）
+- **签名与公证**：Windows 签名（去 SmartScreen 警告，让自动更新更可信）——优先级高于付费墙。
+  （macOS 不再排期：CS2 仅 Windows 可玩，桌面端只面向 Windows。）
 - **崩溃诊断包** + 可选、匿名、明确授权的使用统计。
 - **统一 AnalysisManifest**：收敛分散的 `DERIVED_VERSION` / Duel cache version 等版本号
   （`formatVersion` / `analysisVersion` / `cacheVersion` / `reportVersion` / `appVersion`）。

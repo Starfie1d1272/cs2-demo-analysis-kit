@@ -33,9 +33,12 @@ Changesets 管理的公共包。
    附安装说明发到 GitHub Release。纯导出器 cs2dak 不进 Release（本地需要时
    `PACKAGE_EXPORTER=1 bash scripts/package.sh`）。
 
-4. 发布后无需额外通知：DAK Studio 启动时会查
-   `releases/latest`（`apps/dak-studio/src/lib/update.ts`），旧版本用户侧栏会
-   出现"新版本 vX.Y.Z 可下载"链接。
+4. 发布后无需额外通知。Release CI 会随产物生成 `latest.json` 更新 manifest
+   并发到 Release。DAK Studio 启动时从 `releases/latest/download/latest.json`
+   拉取（镜像失败转移，绕开 `api.github.com`），旧版本侧栏出现更新入口：
+   桌面壳（Windows）显示"更新到 vX.Y.Z"一键更新，否则退回手动下载链接。
+   机制详见 [`docs/design/auto-update.md`](design/auto-update.md)。
+   ⚠️ 镜像默认是公共 ghproxy 兜底，长期可靠分发需填自建 CDN（见该文档末尾“需要你操作的事项”）。
 
 本地验证打包（发版前建议跑一次）：
 

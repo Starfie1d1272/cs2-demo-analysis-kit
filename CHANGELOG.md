@@ -6,6 +6,16 @@ DAK Studio 桌面应用及 `@cs2dak/*` 分析管道面向用户的变更记录�
 
 ## [Unreleased] — 0.7.0（开发中）
 
+### 新增
+
+#### 自动更新与资产管理（基础设施）
+
+- **manifest + 镜像驱动的更新检查**：不再依赖 `api.github.com`（国内常被墙/限流）。客户端从稳定地址 `releases/latest/download/latest.json` 拉取 manifest，带一串镜像 URL 顺序失败转移（8s 超时），全部失败再退回 GitHub API 兜底。发版 CI 自动生成并发布 `latest.json`（`gen-update-manifest.mjs` 算 sha256/size）。
+- **应用内一键更新（Windows）**：侧栏 `UpdateControl` 在桌面壳 + 有当前平台资产时提供一键更新——经 pywebview 桥下载（镜像失败转移 + sha256 校验）、解压、side-by-side 接力替换（等本进程退出→旧目录改名→新目录就位→搬回 `userdata`→重启→清理），失败回滚不变砖。否则退回 Release 页面手动下载。
+- **`.tri` 资产外置 overlay**：静态服务 `/tris/` 支持 `userdata/tris` overlay，外置/手动放置/下载的 `.tri` 优先于打包内置；`tri_download` 桥支持按需下载。是去内置化（瘦安装包 ~200MB）的地基；当前仍内置 `.tri` 作回退，无回归。
+
+> ⚠️ 镜像清单目前是公共 ghproxy 兜底（易失效）。长期可靠分发需填入自建 CDN/对象存储，见 [`docs/design/auto-update.md`](docs/design/auto-update.md)。Windows 接力替换路径需真机冒烟验证。
+
 ### 性能
 
 - **导入 facts 抽取移入 worker 池**：原先 ZIP 解析在 worker、但最重的 facts 抽取（视野锥/`.tri` LOS 遍历）仍在主线程串行跑，批量导入会长时间冻结 UI。现在解析 + 建 BVH + 榨 facts 全在导入 worker 内完成，只把紧凑的 `{meta, facts}` 回传主线程（含 replay 的整包不再跨线程克隆）。worker 取与主线程同一份静态 `.tri`（base URL 由主线程算好传入）与 callout grid，输出与主线程逐字节等价；tri/callout 缺失或 worker 异常时回退主线程，行为不变。
