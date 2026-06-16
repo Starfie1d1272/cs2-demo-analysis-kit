@@ -15,8 +15,13 @@ import { basename, dirname, join } from "node:path";
 
 const OWNER_REPO = "Starfie1d1272/cs2-demo-analysis-kit";
 
+// 自建 R2 镜像（Cloudflare R2 + 自定义域，国内可达，**最高优先级**）。
+// 完整 URL 独立来源（非 github 代理前缀）。release.yml 把 zip 上传到对应路径，
+// 路径约定必须与此一致：releases/<tag>/<name>。
+const R2_BASE = "https://dakupdate.starfie1d.top";
+
 // 二进制下载镜像前缀（拼到 github.com 原始 URL 前）。空串=直连。
-// ⚠️ 公共 ghproxy 域名易失效；长期可靠镜像请加自建 CDN/对象存储 URL（直接整条，不走前缀）。
+// ⚠️ 公共 ghproxy 域名易失效；长期可靠分发走上面的 R2（自建）。
 const BINARY_MIRROR_PREFIXES = ["", "https://ghfast.top/", "https://gh-proxy.com/", "https://ghproxy.net/"];
 
 function sha256(path) {
@@ -25,9 +30,13 @@ function sha256(path) {
   return h.digest("hex");
 }
 
+// 顺序即优先级：R2（自建）→ GitHub 直连 → ghproxy×3。
 function assetUrls(version, name) {
-  const raw = `https://github.com/${OWNER_REPO}/releases/download/v${version}/${name}`;
-  return BINARY_MIRROR_PREFIXES.map((p) => (p ? (p.endsWith("/") ? p + raw : `${p}/${raw}`) : raw));
+  const tag = `v${version}`;
+  const r2 = `${R2_BASE}/releases/${tag}/${name}`;
+  const raw = `https://github.com/${OWNER_REPO}/releases/download/${tag}/${name}`;
+  const ghproxied = BINARY_MIRROR_PREFIXES.map((p) => (p ? (p.endsWith("/") ? p + raw : `${p}/${raw}`) : raw));
+  return [r2, ...ghproxied];
 }
 
 function main() {

@@ -131,6 +131,44 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # 自建 R2 镜像（国内可达，最高优先级）。把 Windows zip 与 latest.json
+      # 上传到与 manifest asset.urls 一致的路径：
+      #   releases/<tag>/dak-studio-windows-<version>.zip
+      #   releases/latest.json
+      # GitHub Release 仍是权威源/兜底；ghproxy 为最后兜底。
+      - name: Upload to R2 mirror
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          # aws-cli v2 默认附加 flexible checksum，部分 R2 端点会拒收；只在需要时计算。
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          TAG="v${VERSION}"
+          ZIP="dist/dak-studio-windows-${VERSION}.zip"
+          if [ ! -f "$ZIP" ]; then
+            echo "::error::缺少 $ZIP，跳过 R2 上传"
+            exit 1
+          fi
+          # 版本化、不可变：长缓存
+          aws s3 cp "$ZIP" \
+            "s3://${R2_BUCKET}/releases/${TAG}/dak-studio-windows-${VERSION}.zip" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type application/zip \
+            --cache-control "public, max-age=31536000, immutable"
+          # latest.json 固定地址：短缓存让客户端尽快看到新版本
+          aws s3 cp "dist/latest.json" \
+            "s3://${R2_BUCKET}/releases/latest.json" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type application/json \
+            --cache-control "public, max-age=300"
+          echo "R2 上传完成：${R2_BUCKET}/releases/${TAG}/ + releases/latest.json"
+
       - uses: softprops/action-gh-release@v3
         with:
           files: |

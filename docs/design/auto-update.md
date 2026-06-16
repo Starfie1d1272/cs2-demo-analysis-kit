@@ -28,11 +28,30 @@
 ### 1. 检查（manifest 驱动）
 
 - 客户端：[`apps/dak-studio/src/lib/update.ts`](../../apps/dak-studio/src/lib/update.ts)。
-- 不再依赖 `api.github.com`。拉 `latest.json`（发版作为 Release 资产，挂稳定地址
-  `https://github.com/<owner>/<repo>/releases/latest/download/latest.json`）。
-- **镜像失败转移**：`MANIFEST_MIRRORS`（直连 + 几个 ghproxy 前缀）按顺序尝试，单个 8s 超时切下一个。
-- **兜底**：所有镜像失败 → 退回 GitHub API（直连成功的网络仍可用），老发布（无 manifest）也能给出“去下载”链接。
-- manifest 由发版 CI 生成：[`scripts/gen-update-manifest.mjs`](../../scripts/gen-update-manifest.mjs)（算 sha256/size，写二进制镜像 URL 列表）。
+- 不再依赖 `api.github.com`。拉 `latest.json`，来源按优先级（`manifestSources()`）：
+  1. **R2（自建，最高优先级）**：`https://dakupdate.starfie1d.top/releases/latest.json`；
+  2. **GitHub Release 直连**：`https://github.com/<owner>/<repo>/releases/latest/download/latest.json`（权威源/兜底）；
+  3. **ghproxy×3**：套在 GitHub URL 前的公共代理（最后兜底）。
+- **失败转移**：按上面顺序尝试，单个 8s 超时切下一个。
+- **兜底**：所有来源失败 → 退回 GitHub API（直连成功的网络仍可用），老发布（无 manifest）也能给出“去下载”链接。
+- manifest 由发版 CI 生成：[`scripts/gen-update-manifest.mjs`](../../scripts/gen-update-manifest.mjs)（算 sha256/size，
+  写 `asset.urls` 列表，顺序同样是 **R2 → GitHub → ghproxy**）。
+
+#### R2 镜像（Cloudflare R2）
+
+| 项 | 值 |
+|---|---|
+| bucket | `cs2dak-assets` |
+| public base | `https://dakupdate.starfie1d.top`（自定义域，不用 r2.dev） |
+| manifest 路径 | `releases/latest.json`（短缓存 `max-age=300`） |
+| Windows zip 路径 | `releases/<tag>/dak-studio-windows-<version>.zip`（不可变，长缓存） |
+| GitHub Secrets | `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` / `R2_PUBLIC_BASE_URL` / `R2_ENDPOINT` |
+
+发版 CI（[`release.yml`](../../.github/workflows/release.yml)）在 GitHub Release 之外，
+用 `aws s3 cp --endpoint-url "$R2_ENDPOINT"` 把 zip 与 `latest.json` 同步到上述路径
+（`aws-cli` v2 的 flexible checksum 设为 `when_required` 以兼容 R2）。
+R2 上传路径与 manifest `asset.urls` 里的 R2 URL **必须一致**，否则客户端命中 404 才转移。
+优先级：**R2 → GitHub Release（权威源）→ ghproxy（最后兜底）**。
 
 ### 2. 下载 + 校验（Python）
 
@@ -74,13 +93,9 @@ Windows 无法删除/覆盖正在运行的 exe。`apply_windows_update`：
 
 代码已就绪，但以下依赖你的账号/托管决策，**届时按需告诉我即可**：
 
-1. **镜像站点（最关键）**。当前内置的是公共 ghproxy 兜底（`ghfast.top` / `gh-proxy.com` /
-   `ghproxy.net`），这些域名**经常失效或限速**，不能长期依赖。建议二选一或都做：
-   - **自建 CDN/对象存储**：把 `latest.json` 和 Windows zip 也镜像一份到国内可达的存储
-     （Cloudflare R2 出口免费但国内时通时不通；国内 OSS/COS 最稳但要备案+按量付费）。
-     给我 base URL，我把它加进 `MANIFEST_MIRRORS`（前端）和 `BINARY_MIRROR_PREFIXES`
-     （`gen-update-manifest.mjs`），直连优先、镜像兜底。
-   - **确认 ghproxy 域名**：如果你有长期稳定的代理域名，告诉我替换掉默认列表。
+1. **镜像站点** ✅ **已接入 Cloudflare R2**（`https://dakupdate.starfie1d.top`，最高优先级，
+   见上「R2 镜像」表）。公共 ghproxy 仍保留为最后兜底。剩余只差发一次 tag 验证 R2 上传
+   链路（见 [`release.md`](../release.md) 发版后验证清单）。
 2. **Windows 真机冒烟测试**：接力替换（`apply_windows_update`）我无法在 macOS 验证。
    发一个测试 tag 出 0.7.0-rc，在 Windows 上装旧版 → 点“一键更新”，确认：下载进度正常、
    重启后版本号变了、`userdata`（资料库/身份归并）没丢。有问题把 `userdata/studio.log` 发我。

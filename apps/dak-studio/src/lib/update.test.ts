@@ -8,7 +8,9 @@ const {
   withMirror,
   parseManifest,
   checkForUpdate,
-  MANIFEST_MIRRORS
+  manifestSources,
+  MANIFEST_MIRRORS,
+  R2_BASE
 } = await import("./update");
 
 afterEach(() => {
@@ -32,6 +34,19 @@ describe("withMirror", () => {
     expect(withMirror("", raw)).toBe(raw);
     expect(withMirror("https://ghfast.top/", raw)).toBe("https://ghfast.top/" + raw);
     expect(withMirror("https://ghfast.top", raw)).toBe("https://ghfast.top/" + raw);
+  });
+});
+
+describe("manifestSources", () => {
+  it("R2 最高优先级，其后 GitHub 直连 + ghproxy", () => {
+    const sources = manifestSources();
+    // R2 完整 URL 在最前
+    expect(sources[0]).toBe(`${R2_BASE}/releases/latest.json`);
+    // 其后是 MANIFEST_MIRRORS 套在 github canonical 上（数量 = 1 + 镜像数）
+    expect(sources).toHaveLength(1 + MANIFEST_MIRRORS.length);
+    // 第二个是 github 直连（空前缀）
+    expect(sources[1]).toContain("github.com");
+    expect(sources[1]).not.toContain("ghproxy");
   });
 });
 
@@ -84,6 +99,20 @@ describe("checkForUpdate", () => {
     assets: {
       windows: { name: "dak-studio-windows-0.7.0.zip", size: 1, sha256: "deadbeef", urls: ["https://x/a.zip"] }
     }
+  });
+
+  it("优先命中 R2，不再尝试后续来源", async () => {
+    vi.stubGlobal("navigator", { userAgent: "windows nt" });
+    const seen: string[] = [];
+    stubFetchSequence((url) => {
+      seen.push(url);
+      if (url.startsWith(R2_BASE)) return new Response(manifestBody, { status: 200 });
+      return null;
+    });
+    const info = await checkForUpdate();
+    expect(info?.latest).toBe("0.7.0");
+    expect(seen[0]).toBe(`${R2_BASE}/releases/latest.json`);
+    expect(seen).toHaveLength(1); // R2 成功即停
   });
 
   it("第一个镜像失败时转移到下一个", async () => {

@@ -33,12 +33,27 @@ Changesets 管理的公共包。
    附安装说明发到 GitHub Release。纯导出器 cs2dak 不进 Release（本地需要时
    `PACKAGE_EXPORTER=1 bash scripts/package.sh`）。
 
-4. 发布后无需额外通知。Release CI 会随产物生成 `latest.json` 更新 manifest
-   并发到 Release。DAK Studio 启动时从 `releases/latest/download/latest.json`
-   拉取（镜像失败转移，绕开 `api.github.com`），旧版本侧栏出现更新入口：
-   桌面壳（Windows）显示"更新到 vX.Y.Z"一键更新，否则退回手动下载链接。
+4. 发布后无需额外通知。Release CI 会随产物生成 `latest.json` 更新 manifest，
+   同时发到 GitHub Release **并上传到 Cloudflare R2**
+   （`R2_*` secrets，`aws s3 cp --endpoint-url`）。DAK Studio 启动时按
+   **R2 → GitHub → ghproxy** 顺序拉取 manifest（失败转移，绕开 `api.github.com`），
+   旧版本侧栏出现更新入口：桌面壳（Windows）显示"更新到 vX.Y.Z"一键更新，否则退回手动下载链接。
    机制详见 [`docs/design/auto-update.md`](design/auto-update.md)。
-   ⚠️ 镜像默认是公共 ghproxy 兜底，长期可靠分发需填自建 CDN（见该文档末尾“需要你操作的事项”）。
+
+   **发版后验证（R2 链路）**：
+
+   ```bash
+   # 1) R2 上的 manifest 可访问
+   curl -fsSL https://dakupdate.starfie1d.top/releases/latest.json | tee /tmp/latest.json
+   # 2) manifest 里第一个（R2）zip URL 可访问，且 sha256/size 与 manifest 一致
+   URL=$(node -p "require('/tmp/latest.json').assets.windows.urls[0]")
+   curl -fsSL "$URL" -o /tmp/dak.zip
+   node -e "const c=require('crypto'),f=require('fs'),m=require('/tmp/latest.json').assets.windows; \
+     const b=f.readFileSync('/tmp/dak.zip'); \
+     console.assert(b.length===m.size,'size mismatch'); \
+     console.assert(c.createHash('sha256').update(b).digest('hex')===m.sha256,'sha256 mismatch'); \
+     console.log('R2 zip OK', b.length, m.sha256)"
+   ```
 
 本地验证打包（发版前建议跑一次）：
 

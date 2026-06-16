@@ -23,14 +23,22 @@ const OWNER_REPO = "Starfie1d1272/cs2-demo-analysis-kit";
 export const RELEASES_PAGE = `https://github.com/${OWNER_REPO}/releases/latest`;
 const RELEASES_LATEST_API = `https://api.github.com/repos/${OWNER_REPO}/releases/latest`;
 
-/** manifest 稳定地址（指向最新 Release 的 latest.json 资产）。 */
+/**
+ * 自建 R2 镜像（Cloudflare R2 + 自定义域，国内可达，**最高优先级**）。
+ * 与 ghproxy 前缀不同：R2 是完整 URL 的独立来源，路径约定见
+ * docs/design/auto-update.md。manifest 固定挂在 `releases/latest.json`，
+ * 二进制资产路径由发版 CI（gen-update-manifest.mjs）写入 manifest 的 asset.urls。
+ */
+export const R2_BASE = "https://dakupdate.starfie1d.top";
+const MANIFEST_R2 = `${R2_BASE}/releases/latest.json`;
+
+/** manifest 在 GitHub Release 上的稳定地址（权威源/兜底）。 */
 const MANIFEST_CANONICAL = `https://github.com/${OWNER_REPO}/releases/latest/download/latest.json`;
 
 /**
  * 镜像前缀：拼到 github.com 原始 URL 前形成代理 URL。
  * ⚠️ ghproxy 类公共代理域名经常更替/失效——这是一份兜底 bootstrap，
- * 真正长期可靠的镜像应由你填入自建 CDN/对象存储（见 docs/design/auto-update.md）。
- * 顺序即优先级；空串代表直连 github.com。
+ * 长期可靠分发走上面的 R2（自建）。顺序即优先级；空串代表直连 github.com。
  */
 export const MANIFEST_MIRRORS: readonly string[] = [
   "", // 直连（海外/能直连的网络）
@@ -38,6 +46,14 @@ export const MANIFEST_MIRRORS: readonly string[] = [
   "https://gh-proxy.com/",
   "https://ghproxy.net/"
 ];
+
+/**
+ * manifest 拉取来源（完整 URL），顺序即优先级：
+ *   R2（自建，国内可达）→ GitHub 直连 → ghproxy×3。
+ */
+export function manifestSources(): string[] {
+  return [MANIFEST_R2, ...MANIFEST_MIRRORS.map((prefix) => withMirror(prefix, MANIFEST_CANONICAL))];
+}
 
 /** 单个镜像 fetch 的超时（ms）。 */
 const FETCH_TIMEOUT_MS = 8000;
@@ -134,10 +150,10 @@ async function fetchJson(url: string): Promise<unknown | null> {
   }
 }
 
-/** 依次尝试各镜像拉取并解析 manifest，第一份成功的即返回。 */
+/** 依次尝试各来源拉取并解析 manifest，第一份成功的即返回。 */
 async function fetchManifest(): Promise<UpdateManifest | null> {
-  for (const prefix of MANIFEST_MIRRORS) {
-    const raw = await fetchJson(withMirror(prefix, MANIFEST_CANONICAL));
+  for (const url of manifestSources()) {
+    const raw = await fetchJson(url);
     const manifest = parseManifest(raw);
     if (manifest) return manifest;
   }
