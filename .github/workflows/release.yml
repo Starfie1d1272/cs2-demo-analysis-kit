@@ -81,6 +81,17 @@ jobs:
           cd python/dist
           7z a -mx=5 "dak-studio-windows-${VERSION}.zip" dak-studio
 
+      # 自动更新 manifest：客户端从 releases/latest/download/latest.json 拉取（带镜像）。
+      # 只在 Windows job 产出（桌面端只面向 Windows）。
+      - name: Generate update manifest
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          node scripts/gen-update-manifest.mjs "$VERSION" \
+            "python/dist/dak-studio-windows-${VERSION}.zip" \
+            "python/dist/latest.json"
+
       - uses: actions/upload-artifact@v7
         with:
           name: packages-${{ matrix.os }}
@@ -88,6 +99,7 @@ jobs:
           path: |
             python/dist/*.dmg
             python/dist/*.zip
+            python/dist/latest.json
           if-no-files-found: error
 
   release:
@@ -124,6 +136,7 @@ jobs:
           files: |
             dist/*.dmg
             dist/*.zip
+            dist/latest.json
           body: |
             **安装说明**
 
