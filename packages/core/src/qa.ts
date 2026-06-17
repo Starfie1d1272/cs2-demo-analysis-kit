@@ -7,6 +7,17 @@ export function buildQaReport(pkg: DemoPackage): QaReport {
   const issues: QaIssue[] = [];
   const roundNumbers = pkg.rounds.map((round) => round.roundNumber).sort((a, b) => a - b);
   const roundsByNumber = new Map(pkg.rounds.map((round) => [round.roundNumber, round]));
+  // 3.0.3+: 非最终回合的事件窗口延伸到下一回合 startTick 前
+  const sortedRounds = [...pkg.rounds].sort((a, b) => a.roundNumber - b.roundNumber);
+  const eventEndTickByRound = new Map<number, number>();
+  for (let i = 0; i < sortedRounds.length; i++) {
+    const current = sortedRounds[i];
+    const next = sortedRounds[i + 1];
+    eventEndTickByRound.set(
+      current.roundNumber,
+      next ? next.startTick - 1 : current.endTick
+    );
+  }
 
   for (let i = 0; i < roundNumbers.length; i += 1) {
     if (roundNumbers[i] !== i + 1) {
@@ -63,7 +74,8 @@ export function buildQaReport(pkg: DemoPackage): QaReport {
       return;
     }
     const minTick = allowFreeze ? roundRow.startTick : roundRow.freezeEndTick;
-    if (tick < minTick || tick > roundRow.endTick) {
+    const eventEnd = eventEndTickByRound.get(roundNumber) ?? roundRow.endTick;
+    if (tick < minTick || tick > eventEnd) {
       issues.push({
         severity: "error",
         code: `${kind}.tick_outside_round`,
