@@ -1436,12 +1436,6 @@ body {
 .stu-win { color: var(--dak-ok); }
 .stu-loss { color: var(--dak-danger); }
 
-.stu-derived-hint {
-  cursor: help;
-  font-size: 11px;
-  opacity: 0.65;
-}
-
 /* 数字列：表头与单元格同向右对齐（.stu-mini-table th 特异性更高，会把
    .stu-num 的右对齐盖回左对齐，导致表头和数字错位）。 */
 .stu-mini-table th.stu-num,
@@ -3291,14 +3285,14 @@ td.stu-heat-cell.stu-heat-neutral {
   padding: 0 8px;
 }
 
-/* ── 教练·战术聚类 PatternExplorer（三栏） ────────────────────────────────── */
+/* ── 教练·战术聚类 PatternExplorer（列表 / 常驻回放 / 证据） ─────────────── */
 
 .stu-coach-pattern-explorer {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) minmax(280px, 380px);
+  grid-template-columns: 220px minmax(680px, 1fr) minmax(300px, 360px);
   gap: 14px;
   margin-top: 14px;
-  align-items: start;
+  align-items: stretch;
 }
 
 /* 左栏：簇列表 */
@@ -3393,13 +3387,6 @@ td.stu-heat-cell.stu-heat-neutral {
   background: var(--dak-panel);
 }
 
-/* 中栏：雷达快照 */
-.stu-pe-radar {
-  align-self: start;
-  display: grid;
-  gap: 8px;
-}
-
 .stu-pe-radar-empty {
   padding: 60px 0;
   text-align: center;
@@ -3411,8 +3398,10 @@ td.stu-heat-cell.stu-heat-neutral {
   margin-bottom: 12px;
 }
 
-.stu-pe-replay {
+.stu-pe-replay-main {
+  min-width: 0;
   display: grid;
+  align-content: start;
   gap: 8px;
 }
 
@@ -3427,46 +3416,18 @@ td.stu-heat-cell.stu-heat-neutral {
   color: var(--dak-fg-mid);
 }
 
+.stu-pe-replay-kicker {
+  padding-right: 10px;
+  border-right: 1px solid var(--dak-border);
+  color: var(--dak-accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .stu-button-sm-active {
   border-color: rgba(47, 224, 168, 0.5);
   background: var(--dak-accent-soft);
   color: var(--dak-fg);
-}
-
-.stu-pe-radar-wrap {
-  display: grid;
-  gap: 8px;
-  overflow: hidden;
-  border-radius: var(--stu-radius);
-  border: 1px solid var(--dak-border);
-  background: var(--dak-panel);
-}
-
-.stu-pe-radar-wrap .stu-chip-row {
-  padding: 8px 8px 0;
-}
-
-.stu-pe-radar-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 10px;
-  padding: 0 10px 10px;
-  color: var(--dak-fg-dim);
-  font-size: 11px;
-}
-
-.stu-pe-radar-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-}
-
-.stu-pe-radar-legend i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex: none;
 }
 
 /* 右栏：数据摘要 */
@@ -3561,6 +3522,54 @@ td.stu-heat-cell.stu-heat-neutral {
 
 .stu-pe-evidence .stu-mini-table {
   font-size: 11.5px;
+}
+
+.stu-pe-evidence-active {
+  background: var(--dak-accent-soft);
+}
+
+.stu-pe-evidence-select {
+  max-width: 150px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--dak-accent-b);
+  font: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.stu-pe-evidence-select:disabled {
+  color: var(--dak-fg-dim);
+  cursor: default;
+}
+
+@media (max-width: 1560px) {
+  .stu-coach-pattern-explorer {
+    grid-template-columns: 200px minmax(680px, 1fr);
+  }
+
+  .stu-pe-detail {
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1040px) {
+  .stu-coach-pattern-explorer,
+  .stu-pe-detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stu-pe-detail {
+    grid-column: auto;
+  }
+
+  .stu-pe-list {
+    max-height: 260px;
+  }
 }
 
 .stu-coach-report {

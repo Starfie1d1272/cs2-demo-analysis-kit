@@ -759,6 +759,7 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
     return {
       roundNumber: roundRow.roundNumber,
       startTick: roundRow.startTick,
+      freezeEndTick: sourceRound?.freezeEndTick ?? roundRow.startTick,
       tickStep: roundRow.tickStep,
       frameCount: roundRow.frameCount,
       officialEndTick,

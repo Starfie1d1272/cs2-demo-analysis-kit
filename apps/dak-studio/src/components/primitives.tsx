@@ -52,7 +52,8 @@ export function EvidenceLink({
 }
 
 /** 派生指标的 ⓘ 口径说明（公式、窗口参数、已知误差）。 */
-export function MetricInfo({ note }: { note: ReactNode }) {
+export function MetricInfo({ note }: { note?: ReactNode }) {
+  if (note == null || note === false || (typeof note === "string" && note.trim().length === 0)) return null;
   return (
     <span className="stu-info" tabIndex={0} aria-label="口径说明">
       ⓘ<span className="stu-info-tip" role="tooltip">{note}</span>

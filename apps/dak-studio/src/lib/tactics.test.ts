@@ -3,6 +3,7 @@ import {
   defaultsBasisKey,
   advancedBasisKey,
   tacticalClusterKey,
+  openingPatternKey,
   buildTacticalClusters,
   suspectFake,
   autoName,
@@ -30,7 +31,7 @@ function grenade(p: Partial<TacticalGrenadeOccurrence> = {}): TacticalGrenadeOcc
 
 function fact(p: Partial<TacticalRoundFact> = {}): TacticalRoundFact {
   return {
-    analysisVersion: 3,
+    analysisVersion: 4,
     c4Route: null,
     matchId: "m",
     mapName: "de_mirage",
@@ -41,7 +42,16 @@ function fact(p: Partial<TacticalRoundFact> = {}): TacticalRoundFact {
     economy: "full",
     won: true,
     roundNumber: 1,
-    snapshots: [{ remainSec: 100, defaults: { a_ramp: 3, mid: 2 }, advanced: {}, positions: [] }],
+    openingPressure: [],
+    openingPattern: {
+      side: "t",
+      regionCounts: { a: 3, b: 0, mid: 2, unknown: 0 },
+      defaultAnchorCounts: { a_ramp: 3, top_mid: 2 },
+      spread: "split",
+      coarseSignature: "T:3A-2MID-0B:split",
+      detailedSignature: "T:a_ramp:3|top_mid:2",
+      evidence: [],
+    },
     targetSite: "a",
     siteEntries: {
       a: { entrants: 4, firstEntryTick: 1000, secondEntryTick: 1100, firstEntryRemainSec: 90, executeRemainSec: 88, order: [] },
@@ -73,20 +83,16 @@ describe("basis 序列化", () => {
 });
 
 describe("tactical 聚类", () => {
-  it("key 含 map/side/经济/多切片/targetSite/节奏桶，不含道具", () => {
+  it("key 使用开局双层签名 + 执行维度，不再用经济或瞬时快照", () => {
     expect(tacticalClusterKey(fact())).toBe(
-      "de_mirage:t:full:a_ramp:3|mid:2:-:a:a:4:late"
+      "de_mirage:t:T:3A-2MID-0B:split:T:a_ramp:3|top_mid:2:a:a:4:late"
     );
   });
-  it("T key 使用前两切片 defaults/advanced、目标点和节奏", () => {
-    expect(tacticalClusterKey(fact({
-      snapshots: [
-        { remainSec: 100, defaults: { a_ramp: 2, mid: 3 }, advanced: { Connector: 1 }, positions: [] },
-        { remainSec: 85, defaults: { a_ramp: 1, mid: 2 }, advanced: { Jungle: 2 }, positions: [] },
-      ],
-      targetSite: "b",
-      executeBucket: "fast",
-    }))).toBe("de_mirage:t:full:a_ramp:2|mid:3+Connector:1:a_ramp:1|mid:2+Jungle:2:b:-:fast");
+  it("开局模式 key 与最终打点、经济和节奏正交", () => {
+    const a = fact({ targetSite: "a", economy: "full", executeBucket: "rush" });
+    const b = fact({ targetSite: "b", economy: "eco", executeBucket: "late" });
+    expect(openingPatternKey(a)).toBe(openingPatternKey(b));
+    expect(openingPatternKey(a)).toBe("de_mirage:t:T:3A-2MID-0B:split:T:a_ramp:3|top_mid:2");
   });
   it("CT key 不使用 targetSite 或 executeBucket", () => {
     const a = tacticalClusterKey(fact({
@@ -100,7 +106,7 @@ describe("tactical 聚类", () => {
       executeBucket: "late",
     }));
     expect(a).toBe(b);
-    expect(a).toBe("de_mirage:ct:full:a_ramp:3|mid:2:-:-:-");
+    expect(a).toBe("de_mirage:ct:T:3A-2MID-0B:split:T:a_ramp:3|top_mid:2");
   });
   it("同站位不同节奏 → 两簇", () => {
     const rush = fact({ executeBucket: "rush", roundNumber: 2, won: false });
@@ -261,5 +267,14 @@ describe("判断层 v0", () => {
     // de_mirage T side: a_ramp → "坡道口", mid → "中路"
     expect(name).toMatch(/提速/);
     expect(name).toMatch(/A/);
+  });
+  it("autoName：无默认位时不泄漏序列化占位符", () => {
+    expect(autoName({
+      mapName: "de_mirage",
+      side: "t",
+      defaultsBasis: "-",
+      executeBucket: null,
+      targetSite: null,
+    })).toBe("");
   });
 });

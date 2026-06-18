@@ -1,16 +1,22 @@
 import {
+  buildPlayerTacticalSegments,
+  deriveOpeningPressure,
+  deriveOpeningPattern,
   derivePlayerMechanics,
   derivePlayerWeaponHighlights,
   deriveRRIndicators,
   deriveRRSignals,
-  type PlayerMechanicsFact
+  type OpeningPattern,
+  type OpeningPressureEvent,
+  type PlayerMechanicsFact,
+  type TacticalFrameSample,
 } from "@cs2dak/core";
 import type { SeasonCohortFactRow } from "@cs2dak/cohort";
 import type { DemoPackage, EconomyType, MatchWorkspaceModel, OpeningTrailsModel, Side, TeamKey } from "@cs2dak/contract";
 import { decodeDelta, FLAG_ALIVE, FLAG_HAS_BOMB } from "@cs2dak/contract";
 import type { TriangleBvh, CalloutGrid, Vec3 } from "@cs2dak/maps";
 import type { LineupGrenadeLike } from "@cs2dak/maps";
-import { calloutNear, calloutTendency, roleOf } from "@cs2dak/maps";
+import { calloutNear, getPrimaryCalloutRegion } from "@cs2dak/maps";
 import {
   buildMatchWorkspaceModel,
   buildOpeningTrails,
@@ -122,14 +128,6 @@ export interface LineupFact extends MatchFactBase {
   tickrate: number;
 }
 
-/** 回合剩余秒（1:55=115 起倒计时）下的一次站位切片。 */
-export interface TacticalSnapshot {
-  remainSec: number;
-  defaults: Record<string, number>;   // anchorId → 存活人数
-  advanced: Record<string, number>;   // advanced callout → 人数
-  positions: Array<{ playerIndex: number; x: number; y: number; z: number; callout: string | null }>;
-}
-
 export type ExecuteBucket = "rush" | "fast" | "mid" | "late";
 
 export interface SiteEntryFact {
@@ -179,7 +177,7 @@ export interface C4RouteFact {
 }
 
 /** TacticalRoundFact 口径版本：schema/语义变化时 +1，旧 facts 据此提示重建。 */
-export const TACTICAL_FACT_VERSION = 3;
+export const TACTICAL_FACT_VERSION = 5;
 
 export interface TacticalRoundFact extends MatchFactBase {
   /** 口径版本（见 TACTICAL_FACT_VERSION）。 */
@@ -191,7 +189,10 @@ export interface TacticalRoundFact extends MatchFactBase {
   economy: EconomyType;
   won: boolean;
   roundNumber: number;
-  snapshots: TacticalSnapshot[];
+  /** 基于开局连续区域段推导，不依赖最终打点或单个瞬时快照。 */
+  openingPattern: OpeningPattern;
+  /** 开局窗口内离开本方默认位后的推进证据；deep 表示进入对方默认位。 */
+  openingPressure: OpeningPressureEvent[];
   targetSite: "a" | "b" | null;
   siteEntries: { a: SiteEntryFact; b: SiteEntryFact };
   plant: TacticalPlantFact | null;
@@ -250,6 +251,7 @@ export interface FactsStore {
   getTournamentFacts(scope?: FactsScope): Promise<TournamentFacts[]>;
   getTeamComparisonFacts(scope?: FactsScope): Promise<TeamComparisonFacts[]>;
   getDuelFacts(scope?: FactsScope): Promise<DuelInsightsFacts[]>;
+  getMatchWorkspace(matchId: string): Promise<MatchWorkspaceFact | null>;
   getMatchWorkspaces(scope?: FactsScope): Promise<MatchWorkspaceFact[]>;
   getOpeningTrails(scope?: FactsScope): Promise<OpeningTrailFact[]>;
   getLineups(scope?: FactsScope): Promise<LineupFact[]>;
@@ -402,10 +404,6 @@ function decodeRound(pkg: DemoPackage, round: DemoPackage["rounds"][number]): De
   };
 }
 
-function frameIndexAt(dr: DecodedRound, tick: number): number {
-  return Math.max(0, Math.min(dr.frameCount - 1, Math.round((tick - dr.startTick) / dr.tickStep)));
-}
-
 /** 某帧某玩家的 callout：优先 placeDict，回退到 callout-grid 邻近格。 */
 function calloutAtFrame(dr: DecodedRound, track: DecodedTrack, index: number, grid: CalloutGrid | null): string | null {
   const place = dr.placeDict[track.place[index] ?? -1] ?? null;
@@ -427,42 +425,6 @@ function bucketOf(remainSec: number | null): ExecuteBucket | null {
   if (remainSec > 70) return "fast";  // 1:35–1:10
   if (remainSec > 40) return "mid";   // 1:10–0:40
   return "late";                      // <0:40
-}
-
-function snapshotAt(
-  dr: DecodedRound,
-  mapName: string,
-  side: Side,
-  tick: number,
-  freezeEndTick: number,
-  tickrate: number,
-  grid: CalloutGrid | null
-): TacticalSnapshot {
-  const remainSec = remainSecAt(tick, freezeEndTick, tickrate);
-  const defaults: Record<string, number> = {};
-  const advanced: Record<string, number> = {};
-  const positions: TacticalSnapshot["positions"] = [];
-  const index = frameIndexAt(dr, tick);
-  for (const track of dr.tracks) {
-    if (track.side !== side) continue;
-    if (((track.flags[index] ?? 0) & FLAG_ALIVE) === 0) continue;
-    const place = dr.placeDict[track.place[index] ?? -1] ?? null;
-    if (place) {
-      const role = roleOf(mapName, side, place);
-      if (role.kind === "default") {
-        defaults[role.anchorId] = (defaults[role.anchorId] ?? 0) + 1;
-      } else if (role.kind === "advanced") {
-        advanced[place] = (advanced[place] ?? 0) + 1;
-      }
-    }
-    const point = { x: track.x[index] ?? 0, y: track.y[index] ?? 0, z: track.z[index] ?? 0 };
-    positions.push({
-      playerIndex: track.playerIndex,
-      ...point,
-      callout: place || effectCalloutFor(grid, point).callout,
-    });
-  }
-  return { remainSec, defaults, advanced, positions };
 }
 
 function economyTypeFor(
@@ -500,11 +462,58 @@ function siteFromCallout(callout: string | null): "a" | "b" | null {
   return null;
 }
 
-/** 查 callout 的战术方向：委托 calloutTendency（CALLOUT_DICT 倾向表），
- *  取代旧的 anchorId 前缀启发式（对非标准锚点名会产生误报 "other"）。 */
+/** 查 callout 的主要战术方向；未知项保持 unknown，不按 anchor/callout 名称猜测。 */
 function targetRegionFromCallout(mapName: string, callout: string | null): TacticalGrenadeOccurrence["targetRegion"] {
   if (!callout) return "unknown";
-  return calloutTendency(mapName, callout)?.[0] ?? "unknown";
+  return getPrimaryCalloutRegion(mapName, callout) ?? "unknown";
+}
+
+function openingAnalysisFor(
+  dr: DecodedRound | null,
+  round: DemoPackage["rounds"][number],
+  mapName: string,
+  side: Side,
+  tickrate: number,
+  grid: CalloutGrid | null,
+): { openingPattern: OpeningPattern; openingPressure: OpeningPressureEvent[] } {
+  const endTick = Math.min(round.endTick, round.freezeEndTick + 30 * tickrate);
+  const samples: TacticalFrameSample[] = [];
+  if (dr) {
+    for (const track of dr.tracks) {
+      if (track.side !== side) continue;
+      for (let index = 0; index < dr.frameCount; index += 1) {
+        const tick = dr.startTick + index * dr.tickStep;
+        if (tick < round.freezeEndTick) continue;
+        if (tick > endTick) break;
+        const alive = ((track.flags[index] ?? 0) & FLAG_ALIVE) !== 0;
+        samples.push({
+          tick,
+          playerIndex: track.playerIndex,
+          side,
+          alive,
+          callout: alive ? calloutAtFrame(dr, track, index, grid) : null,
+        });
+      }
+    }
+  }
+  const segments = buildPlayerTacticalSegments(samples, {
+    mapName,
+    tickrate,
+    maxGapTicks: dr ? dr.tickStep * 2 : undefined,
+  });
+  return {
+    openingPattern: deriveOpeningPattern(segments, {
+      side,
+      startTick: round.freezeEndTick,
+      endTick,
+    }),
+    openingPressure: deriveOpeningPressure(segments, {
+      mapName,
+      side,
+      startTick: round.freezeEndTick,
+      endTick,
+    }),
+  };
 }
 
 function siteEntriesFor(
@@ -670,24 +679,14 @@ function extractTacticalRoundFacts(pkg: DemoPackage, matchId: string, grid: Call
   const mapName = pkg.match.mapName;
   const out: TacticalRoundFact[] = [];
   for (const round of pkg.rounds) {
-    const fe = round.freezeEndTick;
-    // 每回合解码一次玩家轨迹，snapshots / 进点 / C4 轨迹共用，避免重复 decodeDelta。
+    // 每回合解码一次玩家轨迹，开局连续段 / 进点 / C4 轨迹共用，避免重复 decodeDelta。
     const dr = decodeRound(pkg, round);
-    // T: 剩 1:30 / 1:10 / 0:55 / 0:35（从 1:55 倒计时；回合提前结束的切片自动剔除）
-    const tSlices = [fe + 25 * tickrate, fe + 45 * tickrate, fe + 60 * tickrate, fe + 80 * tickrate];
-    // CT: 剩 1:35 / 1:00 / 0:30
-    const ctSlices = [fe + 20 * tickrate, fe + 55 * tickrate, fe + 85 * tickrate];
     const plant = plantFor(pkg, round, tickrate);
     for (const side of ["t", "ct"] as const) {
-      const slices = side === "t" ? tSlices : ctSlices;
-      const allSnapshots = dr
-        ? slices.map((tk) => snapshotAt(dr, mapName, side, tk, fe, tickrate, grid))
-        : slices.map((tk) => ({ remainSec: remainSecAt(tk, fe, tickrate), defaults: {}, advanced: {}, positions: [] }));
-      // T 方：回合提前结束后无存活玩家的切片自动剔除，保留 1-4 片。
-      const snapshots = side === "t" ? allSnapshots.filter((s) => s.positions.length > 0) : allSnapshots;
-      if (snapshots.every((s) => Object.keys(s.defaults).length === 0 && Object.keys(s.advanced).length === 0 && s.positions.length === 0)) continue;
+      if (!dr?.tracks.some((track) => track.side === side)) continue;
       const teamKey = round.teamASide === side ? "teamA" : "teamB";
       const entries = siteEntriesFor(dr, round, side, tickrate, grid);
+      const { openingPattern, openingPressure } = openingAnalysisFor(dr, round, mapName, side, tickrate, grid);
       const target = targetSiteFor(plant, entries);
       const exec = target ? entries[target].executeRemainSec : null;
       const grenades = grenadeOccurrencesFor(pkg, matchId, round, side, grid);
@@ -701,7 +700,7 @@ function extractTacticalRoundFacts(pkg: DemoPackage, matchId: string, grid: Call
         economy: economyTypeFor(pkg, round, teamKey),
         won: round.winnerSide === side,
         roundNumber: round.roundNumber,
-        snapshots, targetSite: target,
+        openingPattern, openingPressure, targetSite: target,
         siteEntries: entries,
         plant,
         grenades,
@@ -1029,6 +1028,9 @@ export function createFactsStore(adapter: StorageAdapter, namespace = "facts"): 
         .filter((row) => inScope(row, scope))
         .sort((a, b) => a.matchId.localeCompare(b.matchId))
         .map((row) => row.row);
+    },
+    async getMatchWorkspace(matchId) {
+      return (await matchWorkspace.get<MatchWorkspaceFact>(matchId)) ?? null;
     },
     async getMatchWorkspaces(scope) {
       return (await matchWorkspace.getAll<MatchWorkspaceFact>())

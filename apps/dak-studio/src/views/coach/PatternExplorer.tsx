@@ -1,13 +1,12 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MatchWorkspaceModel } from "@cs2dak/contract";
 import { ReplayViewer } from "@cs2dak/react";
-import { economyLabelCn } from "@cs2dak/presentation";
+import { economyLabelCn, formatClockSeconds } from "@cs2dak/presentation";
 import { autoName, type TacticalCluster } from "../../lib/tactics.js";
 import { getFactsStore, type TacticalRoundFact } from "../../lib/facts.js";
 import type { StudioDemoEntry } from "../../lib/library.js";
-import { RadarTrails, GRENADE_COLOR, type RadarGrenadeOverlay, type RadarTrail } from "../../components/RadarTrails.js";
+import { MetricInfo } from "../../components/primitives.js";
 
-const SIDE_LABEL: Record<string, string> = { t: "T 方", ct: "CT 方" };
 const BUCKET_LABEL: Record<string, string> = { rush: "提速", fast: "速爆", mid: "默认", late: "后打" };
 
 export interface PatternExplorerProps {
@@ -16,7 +15,7 @@ export interface PatternExplorerProps {
   entryByMatchId: Map<string, StudioDemoEntry>;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onAddToPlaylist?: (cluster: TacticalCluster, fact: TacticalRoundFact) => void;
-  /** 回放缓存：传入则复用已有的 MatchWorkspaceModel 以避免重复加载。组件内无默认值——用完即弃。 */
+  /** 回放缓存：传入则与上层复用；未传时组件生命周期内保持同一个缓存。 */
   replayModelCache?: Map<string, MatchWorkspaceModel>;
 }
 
@@ -24,9 +23,9 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
   // 顶部视角切换：T 进攻语境 / CT 防守语境分开看，避免两个 side 的簇混在一列。
   const [side, setSide] = useState<"t" | "ct">("t");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  // 页面内回放：选中证据回合后在本页弹出 2D 回放，不跳转比赛工作台。
-  const [replayTarget, setReplayTarget] = useState<{ matchId: string; roundNumber: number; tick?: number } | null>(null);
-
+  const [selectedEvidenceKey, setSelectedEvidenceKey] = useState<string | null>(null);
+  const localReplayCache = useRef(new Map<string, MatchWorkspaceModel>());
+  const replayCache = replayModelCache ?? localReplayCache.current;
 
   const sideCounts = useMemo(() => ({
     t: clusters.filter((c) => c.side === "t").length,
@@ -60,6 +59,10 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
         selected.rounds.some((r) => r.matchId === f.matchId && r.roundNumber === f.roundNumber)
     );
   }, [selected, facts]);
+  const activeFact = useMemo(
+    () => selectedFacts.find((fact) => evidenceKey(fact) === selectedEvidenceKey) ?? selectedFacts[0] ?? null,
+    [selectedFacts, selectedEvidenceKey]
+  );
 
   if (clusters.length === 0) {
     return <div className="stu-coach-pattern-explorer stu-empty">暂无聚类数据，请导入更多 demo。</div>;
@@ -87,20 +90,7 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
           CT 防守视角（{sideCounts.ct}）
         </button>
       </div>
-      {replayTarget ? (
-        // 回放占满整块面板：ReplayViewer 的三列布局最小约 968px，塞进窄中栏会溢出重叠，
-        // 故播放时铺满（同一页、同一张雷达，不弹窗不跳转），「返回站位」回到聚类视图。
-        <InlineRoundReplay
-          matchId={replayTarget.matchId}
-          roundNumber={replayTarget.roundNumber}
-          tick={replayTarget.tick}
-          label={entryByMatchId.get(replayTarget.matchId)
-            ? `${entryByMatchId.get(replayTarget.matchId)!.meta.teamAName} vs ${entryByMatchId.get(replayTarget.matchId)!.meta.teamBName} · R${replayTarget.roundNumber}`
-            : `R${replayTarget.roundNumber}`}
-          onBack={() => setReplayTarget(null)}
-          cache={replayModelCache}
-        />
-      ) : visibleClusters.length === 0 ? (
+      {visibleClusters.length === 0 ? (
         <div className="stu-coach-pattern-explorer stu-empty">
           该视角下暂无聚类（{side === "t" ? "T" : "CT"} 方）。切换到另一视角，或导入更多 demo。
         </div>
@@ -115,8 +105,11 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
                   <button
                     key={c.id}
                     type="button"
-                    className={c.id === selectedId ? "stu-pe-cluster stu-pe-cluster-active" : "stu-pe-cluster"}
-                    onClick={() => setSelectedId(c.id)}
+                    className={c.id === selected?.id ? "stu-pe-cluster stu-pe-cluster-active" : "stu-pe-cluster"}
+                    onClick={() => {
+                      setSelectedId(c.id);
+                      setSelectedEvidenceKey(null);
+                    }}
                   >
                     <span className="stu-pe-cluster-name">
                       {autoName(c)}
@@ -140,14 +133,8 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
             ))}
           </aside>
 
-          {/* 中栏：多回合站位快照（点证据回合的 ▶回放 切到整页回放视图） */}
-          <div className="stu-pe-radar">
-            {selected ? (
-              <ClusterRadar facts={selectedFacts} mapName={selected.mapName} />
-            ) : (
-              <div className="stu-pe-radar-empty">选择左侧聚类</div>
-            )}
-          </div>
+          {/* 中栏：常驻统一回放。模式与证据选择只改变它的当前回合。 */}
+          <CoachReplayStage fact={activeFact} entryByMatchId={entryByMatchId} cache={replayCache} />
 
           {/* 右栏：数据摘要 + 证据回合 */}
           <div className="stu-pe-detail">
@@ -158,9 +145,9 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
                   cluster={selected}
                   facts={selectedFacts}
                   entryByMatchId={entryByMatchId}
-                  activeReplay={replayTarget}
+                  activeFact={activeFact}
                   onOpenMatch={onOpenMatch}
-                  onPlayInline={(matchId, roundNumber, tick) => setReplayTarget({ matchId, roundNumber, tick })}
+                  onSelect={setSelectedEvidenceKey}
                   onAddToPlaylist={onAddToPlaylist}
                 />
               </>
@@ -176,38 +163,57 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
 async function loadReplayModel(matchId: string, cache: Map<string, MatchWorkspaceModel>): Promise<MatchWorkspaceModel> {
   const cached = cache.get(matchId);
   if (cached) return cached;
-  const stored = await getFactsStore().getMatchWorkspaces({ matchIds: [matchId] });
-  if (!stored[0]) throw new Error("本场没有本地持久化回放，请重新导入或重建该场。");
-  cache.set(matchId, stored[0].row);
-  return stored[0].row;
+  const stored = await getFactsStore().getMatchWorkspace(matchId);
+  if (!stored) throw new Error("本场没有本地持久化回放，请重新导入或重建该场。");
+  cache.set(matchId, stored.row);
+  return stored.row;
 }
 
-/** 在中栏雷达位置直接播放某回合的 2D 回放（懒加载该场 workspace facts）。 */
-function InlineRoundReplay({ matchId, roundNumber, tick, label, onBack, cache = new Map() }: {
-  matchId: string;
-  roundNumber: number;
-  tick?: number;
-  label: string;
-  onBack: () => void;
-  cache?: Map<string, MatchWorkspaceModel>;
+function replayTargetSeq(matchId: string, roundNumber: number): number {
+  let hash = roundNumber;
+  for (let index = 0; index < matchId.length; index += 1) hash = (hash * 31 + matchId.charCodeAt(index)) | 0;
+  return Math.abs(hash);
+}
+
+/** 教练页常驻回放主画布：只按当前证据的 matchId 懒加载单场 workspace。 */
+function CoachReplayStage({ fact, entryByMatchId, cache }: {
+  fact: TacticalRoundFact | null;
+  entryByMatchId: Map<string, StudioDemoEntry>;
+  cache: Map<string, MatchWorkspaceModel>;
 }) {
-  const [model, setModel] = useState<MatchWorkspaceModel | null>(cache.get(matchId) ?? null);
+  const matchId = fact?.matchId ?? null;
+  const cachedModel = matchId ? cache.get(matchId) ?? null : null;
+  const [loaded, setLoaded] = useState<{ matchId: string; model: MatchWorkspaceModel } | null>(
+    matchId && cachedModel ? { matchId, model: cachedModel } : null
+  );
   const [error, setError] = useState<string | null>(null);
+  const model = loaded?.matchId === matchId ? loaded.model : null;
 
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    if (!cache.get(matchId)) setModel(null);
+    if (!matchId) {
+      setLoaded(null);
+      return () => { cancelled = true; };
+    }
+    const nextCached = cache.get(matchId);
+    setLoaded(nextCached ? { matchId, model: nextCached } : null);
     loadReplayModel(matchId, cache)
-      .then((m) => { if (!cancelled) setModel(m); })
+      .then((nextModel) => { if (!cancelled) setLoaded({ matchId, model: nextModel }); })
       .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)); });
     return () => { cancelled = true; };
   }, [matchId, cache]);
 
+  if (!fact) return <div className="stu-pe-replay-main stu-pe-radar-empty">该模式没有可用证据回合。</div>;
+  const entry = entryByMatchId.get(fact.matchId);
+  const label = entry
+    ? `${entry.meta.teamAName} vs ${entry.meta.teamBName} · R${fact.roundNumber}`
+    : `${fact.teamName} vs ${fact.opponentName} · R${fact.roundNumber}`;
+
   return (
-    <div className="stu-pe-replay">
+    <div className="stu-pe-replay-main">
       <div className="stu-pe-replay-bar">
-        <button type="button" className="stu-button-sm" onClick={onBack}>← 返回站位</button>
+        <span className="stu-pe-replay-kicker">代表回合</span>
         <span className="stu-pe-replay-label">{label}</span>
       </div>
       {error ? (
@@ -220,87 +226,10 @@ function InlineRoundReplay({ matchId, roundNumber, tick, label, onBack, cache = 
         <ReplayViewer
           replay={model.replay}
           map={model.map.view}
-          target={{ roundNumber, tick, seq: tick ?? roundNumber }}
+          target={{ roundNumber: fact.roundNumber, seq: replayTargetSeq(fact.matchId, fact.roundNumber) }}
+          initialClockSeconds={95}
         />
       )}
-    </div>
-  );
-}
-
-function fmtRemainSec(s: number): string {
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
-
-function ClusterRadar({ facts, mapName }: { facts: TacticalRoundFact[]; mapName: string }) {
-  const maxSnapshots = Math.max(0, ...facts.map((fact) => fact.snapshots.length));
-  const [snapshotIndex, setSnapshotIndex] = useState(0);
-  const safeSnapshotIndex = Math.min(snapshotIndex, Math.max(0, maxSnapshots - 1));
-  const shownFacts = facts.slice(0, 8);
-
-  // 用第一个有该索引的事实的 remainSec 作为标签；同簇切片时机相同。
-  const snapshotLabels = Array.from({ length: maxSnapshots }, (_, i) => {
-    const remainSec = shownFacts.find((f) => f.snapshots[i] != null)?.snapshots[i]?.remainSec;
-    return remainSec != null ? fmtRemainSec(remainSec) : `切片 ${i + 1}`;
-  });
-
-  const trails: RadarTrail[] = shownFacts.flatMap((fact, factIndex) => {
-    const snapshot = fact.snapshots[safeSnapshotIndex];
-    if (!snapshot) return [];
-    return snapshot.positions.map((position) => ({
-      id: `${fact.matchId}:${fact.roundNumber}:${position.playerIndex}:${safeSnapshotIndex}`,
-      points: [{ x: position.x, y: position.y }],
-      color: fact.won ? "var(--dak-ok)" : "var(--dak-danger)",
-      opacity: 0.85 - Math.min(0.45, factIndex * 0.04),
-    }));
-  });
-
-  const grenades: RadarGrenadeOverlay[] = shownFacts.flatMap((fact) =>
-    fact.grenades.map((grenade) => ({
-      trailId: grenade.id,
-      type: grenade.type,
-      x: grenade.throwPosition.x,
-      y: grenade.throwPosition.y,
-      ex: grenade.effectPosition.x,
-      ey: grenade.effectPosition.y,
-      showEffect: true,
-      effectActive: grenade.type === "smoke" || grenade.type === "molotov" || grenade.type === "incendiary",
-    }))
-  );
-
-  return (
-    <div className="stu-pe-radar-wrap">
-      {maxSnapshots > 1 && (
-        <div className="stu-chip-row" role="tablist" aria-label="战术切片">
-          {snapshotLabels.map((label, index) => (
-            <button
-              key={index}
-              type="button"
-              role="tab"
-              aria-selected={safeSnapshotIndex === index}
-              className={safeSnapshotIndex === index ? "stu-chip stu-chip-active" : "stu-chip"}
-              onClick={() => setSnapshotIndex(index)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-      <RadarTrails
-        mapName={mapName}
-        trails={trails}
-        grenades={grenades}
-        showTrails={false}
-        showGrenades
-        trailOpacity={0.7}
-        className="stu-trail-stage"
-      />
-      <div className="stu-pe-radar-legend">
-        <span><i style={{ background: "var(--dak-ok)" }} />胜回合站位</span>
-        <span><i style={{ background: "var(--dak-danger)" }} />负回合站位</span>
-        {Object.entries(GRENADE_COLOR).map(([type, color]) => (
-          <span key={type}><i style={{ background: color }} />{type}</span>
-        ))}
-      </div>
     </div>
   );
 }
@@ -322,6 +251,12 @@ function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: T
   })();
 
   const isT = cluster.side === "t";
+  const pressureLabels = [...new Map(
+    facts.flatMap((fact) => fact.openingPressure).map((event) => [
+      `${event.calloutLabel}:${event.kind}`,
+      `${event.calloutLabel}${event.kind === "deep" ? "（深入）" : "（前压）"}`
+    ])
+  ).values()];
 
   // C4 轨迹统计（仅 T）：转点回合数 + 主要走向（按 endRegion 多数表决）。
   const c4Routes = facts.map((f) => f.c4Route).filter((r): r is NonNullable<typeof r> => r != null);
@@ -341,22 +276,26 @@ function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: T
           <dd>{cluster.roundCount} 回合</dd>
         </div>
         <div>
-          <dt>胜率 <span className="stu-derived-hint" title="赢得该回合的比例">ⓘ</span></dt>
+          <dt>胜率 <MetricInfo note="该模式证据回合中赢得回合的比例" /></dt>
           <dd>{cluster.winRatePercent != null ? `${cluster.winRatePercent.toFixed(1)}%` : "—"}</dd>
         </div>
         <div>
-          <dt>{isT ? "下包率" : "对手下包率"} <span className="stu-derived-hint" title={isT ? "本方成功下包的回合比例" : "该防守阵型下对手成功下包的回合比例"}>ⓘ</span></dt>
+          <dt>{isT ? "下包率" : "对手下包率"} <MetricInfo note={isT ? "本方成功下包的证据回合比例" : "该防守模式下对手成功下包的证据回合比例"} /></dt>
           <dd>{facts.length > 0 ? `${((plantCount / facts.length) * 100).toFixed(1)}%` : "—"}</dd>
         </div>
         {isT && (
           <div>
-            <dt>执行剩余（中位）<span className="stu-derived-hint" title="第二名队员进入目标包点时的回合剩余秒中位数">ⓘ</span></dt>
-            <dd>{execMedian != null ? `${execMedian}s` : "—"}</dd>
+            <dt>执行时钟（中位）<MetricInfo note="第二名队员进入目标包点时的 1:55 回合倒计时中位数" /></dt>
+            <dd>{execMedian != null ? formatClockSeconds(execMedian) : "—"}</dd>
           </div>
         )}
         <div>
-          <dt>首杀率 <span className="stu-derived-hint" title="该 side 率先击杀的回合比例">ⓘ</span></dt>
+          <dt>首杀率 <MetricInfo note="该模式中本方取得回合首个击杀的比例；没有击杀的回合不进入分母" /></dt>
           <dd>{firstKillValid > 0 ? `${((firstKillCount / firstKillValid) * 100).toFixed(1)}%` : "—"}</dd>
+        </div>
+        <div>
+          <dt>开局推进 <MetricInfo note="离开本方默认位后进入前方战术区域；深入表示已进入对方默认位覆盖区域" /></dt>
+          <dd>{pressureLabels.length > 0 ? pressureLabels.slice(0, 3).join(" / ") : "—"}</dd>
         </div>
         {isT && (
           <div>
@@ -366,13 +305,13 @@ function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: T
         )}
         {isT && cluster.fakeRoundCount > 0 && (
           <div>
-            <dt>疑似纯道具佯攻 <span className="stu-derived-hint" title="非目标点成片道具但无人真正进点的回合数 · Experimental">ⓘ</span></dt>
+            <dt>疑似纯道具佯攻 <MetricInfo note="非目标点出现成片道具但无人真正进点的回合数；当前为实验性判断" /></dt>
             <dd>{cluster.fakeRoundCount}/{cluster.roundCount} 回合</dd>
           </div>
         )}
         {isT && c4Routes.length > 0 && (
           <div>
-            <dt>C4 走向 <span className="stu-derived-hint" title="按 C4 携带者最终所在区域多数表决；转点=C4 主方向在 A/B 间发生切换">ⓘ</span></dt>
+            <dt>C4 走向 <MetricInfo note="按 C4 携带者最终所在区域多数表决；转点表示 C4 主方向在 A/B 之间切换" /></dt>
             <dd>{c4MainEnd ? c4MainEnd.toUpperCase() : "—"}{c4Rotated > 0 ? ` · 转点 ${c4Rotated}/${c4Routes.length}` : ""}</dd>
           </div>
         )}
@@ -393,17 +332,17 @@ function EvidenceTable({
   cluster,
   facts,
   entryByMatchId,
-  activeReplay,
+  activeFact,
   onOpenMatch,
-  onPlayInline,
+  onSelect,
   onAddToPlaylist,
 }: {
   cluster: TacticalCluster;
   facts: TacticalRoundFact[];
   entryByMatchId: Map<string, StudioDemoEntry>;
-  activeReplay: { matchId: string; roundNumber: number } | null;
+  activeFact: TacticalRoundFact | null;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
-  onPlayInline: (matchId: string, roundNumber: number, tick?: number) => void;
+  onSelect: (key: string) => void;
   onAddToPlaylist?: (cluster: TacticalCluster, fact: TacticalRoundFact) => void;
 }) {
   return (
@@ -428,13 +367,26 @@ function EvidenceTable({
             const entry = entryByMatchId.get(r.matchId);
             const label = r.matchId.length > 18 ? `${r.matchId.slice(0, 18)}…` : r.matchId;
             return (
-              <tr key={`${r.matchId}-${r.roundNumber}`}>
-                <td title={r.matchId}>{label}</td>
+              <tr
+                key={`${r.matchId}-${r.roundNumber}`}
+                className={activeFact?.matchId === r.matchId && activeFact.roundNumber === r.roundNumber ? "stu-pe-evidence-active" : undefined}
+              >
+                <td title={r.matchId}>
+                  <button
+                    type="button"
+                    className="stu-pe-evidence-select"
+                    onClick={() => fact && onSelect(evidenceKey(fact))}
+                    disabled={!fact}
+                    aria-label={`查看 ${label} 第 ${r.roundNumber} 回合`}
+                  >
+                    {label}
+                  </button>
+                </td>
                 <td className="stu-num">R{r.roundNumber}</td>
                 <td>{economyLabelCn(r.economy)}</td>
-                <td className="stu-num">{fact?.executeRemainSec != null ? `${fact.executeRemainSec}s` : "—"}</td>
+                <td className="stu-num">{fact?.executeRemainSec != null ? formatClockSeconds(fact.executeRemainSec) : "—"}</td>
                 <td>{fact?.firstKillForTeam == null ? "—" : fact.firstKillForTeam ? "✓" : "✗"}</td>
-                <td>{fact?.plant ? `${fact.plant.site.toUpperCase()} ${fact.plant.remainSec}s` : "—"}</td>
+                <td>{fact?.plant ? `${fact.plant.site.toUpperCase()} ${formatClockSeconds(fact.plant.remainSec)}` : "—"}</td>
                 <td className={r.won ? "stu-win" : "stu-loss"}>{r.won ? "胜" : "负"}</td>
                 <td>
                   {fact && onAddToPlaylist && (
@@ -447,29 +399,17 @@ function EvidenceTable({
                     </button>
                   )}
                   {entry && (
-                    <>
-                      <button
-                        type="button"
-                        className={activeReplay?.matchId === r.matchId && activeReplay.roundNumber === r.roundNumber
-                          ? "stu-button-sm stu-button-sm-active"
-                          : "stu-button-sm"}
-                        title="在左侧雷达上直接播放该回合"
-                        onClick={() => onPlayInline(r.matchId, r.roundNumber, fact ? jumpTickFor(fact) : undefined)}
-                      >
-                        ▶ 回放
-                      </button>
-                      <button
-                        type="button"
-                        className="stu-button-sm"
-                        title="在比赛工作台打开（完整分析）"
-                        onClick={() => onOpenMatch(entry.id, {
-                          roundNumber: r.roundNumber,
-                          tick: fact ? jumpTickFor(fact) : undefined,
-                        })}
-                      >
-                        工作台 ↗
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      className="stu-button-sm"
+                      title="在比赛工作台打开完整分析并定位执行证据"
+                      onClick={() => onOpenMatch(entry.id, {
+                        roundNumber: r.roundNumber,
+                        tick: fact ? jumpTickFor(fact) : undefined,
+                      })}
+                    >
+                      工作台 ↗
+                    </button>
                   )}
                 </td>
               </tr>
@@ -479,6 +419,10 @@ function EvidenceTable({
       </table>
     </div>
   );
+}
+
+function evidenceKey(fact: Pick<TacticalRoundFact, "matchId" | "roundNumber">): string {
+  return `${fact.matchId}:${fact.roundNumber}`;
 }
 
 function jumpTickFor(fact: TacticalRoundFact): number | undefined {

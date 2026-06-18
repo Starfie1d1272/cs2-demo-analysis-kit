@@ -290,8 +290,8 @@ function patternFingerprint(cluster: TacticalCluster): string {
   return [
     cluster.mapName,
     cluster.side,
+    cluster.openingSignature,
     cluster.targetSite ?? "-",
-    cluster.defaultsBasis,
     cluster.executeBucket ?? "-",
   ].join(":");
 }
@@ -317,16 +317,17 @@ function filterBySubjectTeam(
 function isCurrentTacticalRoundFact(row: TacticalRoundFact): boolean {
   // 口径版本不符（旧 facts 无 analysisVersion / 缺 c4Route 等新字段）→ 需重建。
   if (row.analysisVersion !== TACTICAL_FACT_VERSION) return false;
-  if (!Array.isArray(row.snapshots) || row.snapshots.length === 0) return false;
+  if (!row.openingPattern || typeof row.openingPattern.coarseSignature !== "string") return false;
+  if (typeof row.openingPattern.detailedSignature !== "string" || !Array.isArray(row.openingPattern.evidence)) return false;
+  if (!Array.isArray(row.openingPressure)) return false;
   if (!row.siteEntries?.a || !row.siteEntries.b) return false;
   if (!Array.isArray(row.grenades) || !Array.isArray(row.grenadeOccurrenceIds)) return false;
   if (typeof row.teamName !== "string" || typeof row.opponentName !== "string") return false;
-  return row.snapshots.every((snapshot) =>
-    snapshot &&
-    typeof snapshot.remainSec === "number" &&
-    snapshot.defaults &&
-    snapshot.advanced &&
-    Array.isArray(snapshot.positions)
+  return row.openingPressure.every((event) =>
+    event &&
+    typeof event.callout === "string" &&
+    typeof event.calloutLabel === "string" &&
+    (event.kind === "forward" || event.kind === "deep")
   );
 }
 

@@ -166,14 +166,18 @@ one tap 只对可一枪满血终结的武器展示，Glock/USP/M4 等不展示�
 **回答**：对手会打什么，我们准备什么。
 
 双视角（主办方任选两队 / 教练「我的队伍」vs 对手）维持归档文档设计：
-- **8a Pattern Finder（0.6 已落地）**：`TacticalRoundFact` 替换旧 opening
-  pattern；双层站位快照（阵营专属默认位 `defaults` / 深层图权 `advanced`）+
-  倒计时节奏桶（rush/fast/mid/late）+ 双点投入（进点人数/道具/下包）构成
-  聚类 key；`PatternExplorer` 三栏（簇列表 / 雷达快照叠加 / 数据摘要 + 证据
-  回合表）；`autoName` 模板自动命名（锚点名 + 节奏）；判断层 v0 疑似佯攻检测。
+- **8a Pattern Finder（0.6 已落地，0.7 底层与 UI 已重构）**：`TacticalRoundFact v5`
+  使用 `@cs2dak/maps` 的 callout 倾向与双方默认位作为唯二静态地图语义，
+  `@cs2dak/core` 从开局连续区域段推导 coarse/detailed 双层开局签名。经济、最终打点
+  与执行节奏不再污染开局模式；完整战术簇再组合目标点、入口结构和节奏。
+  旧 `advanced/contested/anchor 前缀` 静态判断和固定 `snapshots` 切片已删除。
+  `openingPressure` 独立记录离开本方默认位后的中文 callout 前压证据，进入对方默认位标记为深入，
+  不再把前压点伪装成默认站位。`PatternExplorer` 三栏现为簇列表 / 常驻统一回放 / 数据摘要与证据
+  回合表；`autoName` 模板自动命名（锚点名 + 节奏）；判断层 v0 疑似佯攻检测。
   道具移出 key 改为关联统计，不影响聚类稳定性。
-  **CT/T 视角切换** + **页内回放**：支持 CT 侧和 T 侧双视角查看 pattern；
-  回放直接嵌入教练页内，无需跳转比赛工作台。
+  **CT/T 视角切换** + **常驻页内回放**：支持 CT 侧和 T 侧双视角查看 pattern；
+  教练页与比赛工作台复用同一 `ReplayViewer` 和四阶段比赛时钟。教练默认 1:35，比赛默认 1:55；
+  C4 安放与赛后窗口按真实回合边界倒计时。单场 workspace 按 matchId 主键直读。
   **进点 A1/A2 子区域区分** + **C4 轨迹佯攻判定**：双点投入细分为包点入口子区域；
   全程 C4 轨迹辅助判断是真打还是佯攻。
 - 8b Playbook：cluster 命名沉淀（IndexedDB，接新 `TacticalCluster.id`）✅。
@@ -185,10 +189,9 @@ one tap 只对可一枪满血终结的武器展示，Glock/USP/M4 等不展示�
 - 8e Round Playlist：备战清单持久化（`PlaylistItem` + IndexedDB `playlist`
   namespace）+ Markdown 导出（`playlistToMarkdown`）✅ 2026-06-15。
 
-> **后续方向（v0.7+）**：完整战术路线（开局站位 → 中期动线链 `MapRoute`+zone
-> 序列 → 进包执行），需扩展 Pattern 向量为全回合 zone 轨迹；道具实验室
-> lineup 聚类作为路线节点证据源。0.6 的 `TacticalRoundFact` 快照数据结构
-> 已预留 `snapshots[]` 多切片，可直接扩展为更密的轨迹采样。
+> **后续 UI 方向**：完整战术路线（开局站位 → 中期动线链 → 进包执行）直接消费
+> `TacticalRoundFact v4.openingPattern` 与 core 时间化证据；`MapRoute`、zone/nav 和
+> lineup 聚类只能作为额外事实源，不再各自生成一套区域判断。
 
 ---
 
@@ -227,7 +230,7 @@ one tap 只对可一枪满血终结的武器展示，Glock/USP/M4 等不展示�
 | 8a 战术聚类（TacticalCluster + PatternExplorer） | 8 | dak-studio | ✅ 2026-06-15 |
 | CT/T 视角切换 + 页内回放 | 8 | dak-studio | ✅ 2026-06-16 |
 | A1/A2 进点子区域区分 + C4 轨迹佯攻判定 | 8 | dak-studio | ✅ 2026-06-16 |
-| 切片时间标签 + 聚类双层大分类 | 8 | dak-studio | ✅ 2026-06-16 |
+| 常驻统一回放 + 聚类双层大分类 | 8 | react + dak-studio | ✅ 2026-06-17（替代固定切片） |
 | 8d series/BP（SeriesWorkspace/BpView/VetoInputDialog） | 8 | presentation + studio | ✅ 2026-06-13 |
 | 8d 地图池比较表（MapPoolTable） | 8 | dak-studio | ✅ 2026-06-15 |
 | 8e Round Playlist 备战清单 | 8 | dak-studio | ✅ 2026-06-15 |

@@ -9,8 +9,9 @@ export * from "./lineups.js";
 export * from "./default-positions.js";
 export {
   CALLOUT_DICT, CALLOUT_MAPS,
-  calloutCn, calloutTendency,
-  type CalloutNameEntry,
+  calloutBelongsToRegion, calloutCn,
+  getCalloutDefinition, getCalloutTendencies, getPrimaryCalloutRegion,
+  type CalloutNameEntry, type TacticalRegion,
 } from "./callout-names.js";
 export {
   calloutAt,

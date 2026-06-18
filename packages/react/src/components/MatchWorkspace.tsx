@@ -1,5 +1,5 @@
 import type { MatchWorkspaceModel, WorkspaceReplayFrame, WorkspaceReplayLoadout, WorkspaceReplayRound, WorkspaceSpatialPoint } from "@cs2dak/contract";
-import { displayWeaponName, sideLabel, economyLabelCn, buildMatchBuyQuality, buildMatchReportMarkdown } from "@cs2dak/presentation";
+import { displayWeaponName, sideLabel, economyLabelCn, buildMatchBuyQuality, buildMatchReportMarkdown, deriveReplayClock } from "@cs2dak/presentation";
 import { getMapCalibration, worldToRadar, hasLowerLevel, levelAt, type MapLevel } from "@cs2dak/maps";
 import { Activity, BarChart3, ChevronLeft, ChevronRight, Crosshair, Film, Gauge, ListChecks, Map as MapIcon, Pause, Play, ShieldCheck, Swords, Table2, Users } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -635,14 +635,42 @@ interface ReplayLayerState {
   grenades: boolean;
 }
 
-export function ReplayViewer({ replay, map, target = null }: {
+const STANDARD_ROUND_SECONDS = 115;
+
+function replayFrameIndexAtTick(round: WorkspaceReplayRound, tick: number): number {
+  const targetEndTick = round.targetEndTick ?? round.officialEndTick;
+  const endIndex = targetEndTick != null
+    ? Math.max(round.frameCount - 1, Math.round((targetEndTick - round.startTick) / round.tickStep))
+    : Math.max(round.frameCount - 1, 0);
+  const index = Math.round((tick - round.startTick) / round.tickStep);
+  return Math.max(0, Math.min(endIndex, index));
+}
+
+export function replayInitialFrameIndex(
+  round: WorkspaceReplayRound,
+  tickrate: number,
+  initialClockSeconds = STANDARD_ROUND_SECONDS,
+): number {
+  const elapsedSeconds = Math.max(0, STANDARD_ROUND_SECONDS - initialClockSeconds);
+  return replayFrameIndexAtTick(round, round.freezeEndTick + elapsedSeconds * Math.max(tickrate, 1));
+}
+
+export function ReplayViewer({ replay, map, target = null, initialClockSeconds = STANDARD_ROUND_SECONDS }: {
   replay: MatchWorkspaceModel["replay"];
   map: MatchWorkspaceModel["map"]["view"];
   /** 统计跳回放：定位到某回合（可选定位 tick）。 */
   target?: ReplayTarget | null;
+  /** 未指定 tick 时的初始比赛时钟；比赛工作台 1:55，教练工作台 1:35。 */
+  initialClockSeconds?: number;
 }) {
-  const [roundNumber, setRoundNumber] = useState(target?.roundNumber ?? replay.rounds[0]?.roundNumber ?? 1);
-  const [frameIndex, setFrameIndex] = useState(0);
+  const initialRoundNumber = target?.roundNumber ?? replay.rounds[0]?.roundNumber ?? 1;
+  const initialRound = replay.rounds.find((row) => row.roundNumber === initialRoundNumber) ?? replay.rounds[0];
+  const [roundNumber, setRoundNumber] = useState(initialRoundNumber);
+  const [frameIndex, setFrameIndex] = useState(() => {
+    if (!initialRound) return 0;
+    if (target?.tick != null) return replayFrameIndexAtTick(initialRound, target.tick);
+    return replayInitialFrameIndex(initialRound, replay.tickrate ?? 64, initialClockSeconds);
+  });
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [layers, setLayers] = useState<ReplayLayerState>({ trace: false, killLines: true, grenades: true });
@@ -664,29 +692,22 @@ export function ReplayViewer({ replay, map, target = null }: {
     return Math.max(lastDataFrameIndex, computed);
   }, [round, lastDataFrameIndex]);
 
+  // 回合切换与统计跳转统一走同一定位规则；显式 tick 优先，否则使用调用方的初始比赛时钟。
   useEffect(() => {
-    setFrameIndex(0);
+    const selectedRound = replay.rounds.find((row) => row.roundNumber === roundNumber);
+    if (!selectedRound) return;
     setPlaying(false);
-  }, [roundNumber]);
+    const explicitTick = target?.roundNumber === roundNumber ? target.tick : undefined;
+    setFrameIndex(explicitTick != null
+      ? replayFrameIndexAtTick(selectedRound, explicitTick)
+      : replayInitialFrameIndex(selectedRound, replay.tickrate ?? 64, initialClockSeconds));
+  }, [roundNumber, target?.seq, replay.rounds, replay.tickrate, initialClockSeconds]);
 
-  // 统计跳回放：target 变化时切回合并定位帧
   useEffect(() => {
-    if (!target) return;
-    const targetRound = replay.rounds.find((row) => row.roundNumber === target.roundNumber);
-    if (!targetRound) return;
-    setRoundNumber(target.roundNumber);
-    setPlaying(false);
-    if (target.tick != null) {
-      const targetEndTick = targetRound.targetEndTick ?? targetRound.officialEndTick;
-      const endIdx = targetEndTick != null
-        ? Math.max(targetRound.frameCount - 1, Math.round((targetEndTick - targetRound.startTick) / targetRound.tickStep))
-        : targetRound.frameCount - 1;
-      const idx = Math.round((target.tick - targetRound.startTick) / targetRound.tickStep);
-      setFrameIndex(Math.max(0, Math.min(endIdx, idx)));
-    } else {
-      setFrameIndex(0);
+    if (target && replay.rounds.some((row) => row.roundNumber === target.roundNumber)) {
+      setRoundNumber(target.roundNumber);
     }
-  }, [target?.seq]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [target?.seq, replay.rounds]);
 
   useEffect(() => {
     if (!playing || !round || targetEndFrameIndex <= 0) return undefined;
@@ -722,6 +743,7 @@ export function ReplayViewer({ replay, map, target = null }: {
   const dataFrameIndex = Math.min(currentFrameIndex, lastDataFrameIndex);
   const currentTick = round.startTick + currentFrameIndex * round.tickStep;
   const endTick = round.startTick + targetEndFrameIndex * round.tickStep;
+  const replayClock = deriveReplayClock(round, currentTick, replay.tickrate ?? 64);
 
   // 2D 时间轴锚点：首杀 / 每次击杀 / 下包拆包（freeze end = 起点本身）
   const anchors = useMemo(() => {
@@ -860,10 +882,16 @@ export function ReplayViewer({ replay, map, target = null }: {
           </button>
         </div>
         <div className="dak-replay-statusline" aria-label="当前回放状态">
-          <span>R{round.roundNumber}</span>
-          <span>Tick {currentTick}</span>
-          <span>帧 {currentFrameIndex + 1}/{round.frameCount}</span>
-          <span>{replay.sampleRate ?? 0} Hz</span>
+          <div className={`dak-replay-clock dak-replay-clock-${replayClock.phase}`}>
+            <span>{replayClock.label === "回合" ? "回合时间" : replayClock.label}</span>
+            <strong>{replayClock.display}</strong>
+          </div>
+          <div className="dak-replay-techline" aria-label="回放技术信息">
+            <span>R{round.roundNumber}</span>
+            <span>Tick {currentTick}</span>
+            <span>帧 {currentFrameIndex + 1}/{round.frameCount}</span>
+            <span>{replay.sampleRate ?? 0} Hz</span>
+          </div>
         </div>
         <div className="dak-replay-togglebar">
           <div className="dak-speed-group" role="group" aria-label="叠加图层">

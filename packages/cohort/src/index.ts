@@ -31,6 +31,19 @@ import {
 
 export { buildOpeningPatternClusters } from "./patterns.js";
 export type { OpeningPatternCluster, OpeningPatternInput, OpeningPatternOptions } from "./patterns.js";
+export {
+  advancedBasisKey,
+  buildTacticalClusters,
+  defaultsBasisKey,
+  openingPatternKey,
+  tacticalClusterKey,
+} from "./tactical-clusters.js";
+export type {
+  TacticalCluster,
+  TacticalExecuteBucket,
+  TacticalPatternRow,
+} from "./tactical-clusters.js";
+
 
 /**
  * "Season" 是历史命名：cohort = 任意一组比赛的跨场聚合，不限于赛季。

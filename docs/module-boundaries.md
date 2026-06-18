@@ -49,7 +49,7 @@ DAK Studio 已落地为 `apps/dak-studio`（资料库 / 比赛工作台 / 选手
 | 道具实验室 | 跨场 Flash Value、负收益队闪、道具证据 | `@cs2dak/presentation` |
 | 经济与节奏 | 经济矩阵、手枪转化、eco/semi 翻盘 | `@cs2dak/presentation` / core economy |
 | 赛事中台 | 跨队横向对比、地图盘面、武器榜、报表 | `@cs2dak/cohort` + `@cs2dak/presentation` |
-| 教练工作台 | pattern/playbook/anti-strat；未实现前占位 | 未来 presentation/maps |
+| 教练工作台 | pattern/playbook/anti-strat 的本地查询与编排 | `@cs2dak/maps` 静态地图语义 + `@cs2dak/core` 回合推导 + `@cs2dak/cohort` 聚合 + `@cs2dak/presentation` 展示模型 |
 
 RR 口径统一使用 `@rivalhub/rival-rating` 的 frozen pro baseline：单场和跨场聚合都以
 `1.0 = 职业基线` 为同一标准；cohort 层只做身份归并、信号汇总和展示模型整形。

@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { loadDemoPackageFromZip } from "../../core/src/index.ts";
 import { FLAG_ALIVE, type DemoPackage } from "../../contract/src/index.ts";
-import { CALLOUT_DICT, calloutCn } from "../src/callout-names.js";
+import { CALLOUT_DICT, calloutCn, getCalloutTendencies } from "../src/callout-names.js";
 import { DEFAULT_POSITIONS, type DefaultAnchor } from "../src/default-positions.js";
 
 const WINDOW_SEC = 30;
@@ -326,16 +326,47 @@ function renderAnchorReview(mapName: string, side: Side, evidence: MapEvidence):
   return lines;
 }
 
-function renderContestedReview(mapName: string, evidence: MapEvidence): string[] {
-  const contested = DEFAULT_POSITIONS[mapName]?.contested ?? [];
-  const lines = [
-    "#### 争夺区属性",
-    "以下 callout 可同时属于默认位；contested 表示该区域存在显著控制权争夺，而非排除默认位。",
+function defaultCallouts(mapName: string): Set<string> {
+  const defaults = DEFAULT_POSITIONS[mapName];
+  if (!defaults) return new Set();
+  return new Set(
+    (["t", "ct"] as const).flatMap((side) =>
+      Object.values(defaults[side].anchors).flatMap((anchor) => anchor.callouts),
+    ),
+  );
+}
+
+function renderDefaultCandidates(mapName: string, evidence: MapEvidence, limit = 12): string[] {
+  const defaults = defaultCallouts(mapName);
+  const rows = [...evidence.dwell.entries()]
+    .filter(([callout]) => !defaults.has(callout))
+    .sort((a, b) => {
+      const aScore = a[1].t.playerRounds5 + a[1].ct.playerRounds5;
+      const bScore = b[1].t.playerRounds5 + b[1].ct.playerRounds5;
+      return bScore - aScore || a[0].localeCompare(b[0]);
+    })
+    .slice(0, limit);
+  return [
+    "### 默认位候选（未纳入 runtime）",
+    "按双方 ≥5s 连续驻留 player-round 排序；候选仅供人工复核，不自动写入默认位资产。",
+    ...(rows.length > 0
+      ? rows.map(([callout, stats]) =>
+          `- ${formatCallout(mapName, callout)}: T≥5s=${stats.t.playerRounds5} PR，CT≥5s=${stats.ct.playerRounds5} PR`,
+        )
+      : ["- 无候选"]),
   ];
-  for (const callout of contested) {
-    lines.push(`- ${formatCallout(mapName, callout)}: ${formatCounts(evidence.occupancy.get(callout))}`);
-  }
-  return lines;
+}
+
+function renderCalloutTendencyCoverage(mapName: string): string[] {
+  const entries = Object.entries(CALLOUT_DICT[mapName] ?? {}).sort(([a], [b]) => a.localeCompare(b));
+  return [
+    "### 基础 Callout 倾向覆盖",
+    "该章节直接呈现第二个静态真相源；顺序表示主要方向到次要方向，未标注保持未知。",
+    ...entries.map(([callout]) => {
+      const tendencies = getCalloutTendencies(mapName, callout) ?? [];
+      return `- ${formatCallout(mapName, callout)}: ${tendencies.length > 0 ? tendencies.join(" → ") : "未标注"}`;
+    }),
+  ];
 }
 
 function topDwell(mapName: string, evidence: MapEvidence, side: Side, limit = 10): string[] {
@@ -386,12 +417,10 @@ function renderMapReview(mapName: string, evidence: MapEvidence): string {
     "",
     `样本 ZIP：${evidence.zipCount}`,
     "",
-    "### 当前推荐（人工修订 v1）",
+    "### 当前 runtime 默认位（最终确认版）",
     ...renderAnchorReview(mapName, "t", evidence),
     "",
     ...renderAnchorReview(mapName, "ct", evidence),
-    "",
-    ...renderContestedReview(mapName, evidence),
     "",
     "### 数据证据：高频占有",
     ...topOccupancy(mapName, evidence.occupancy, "t"),
@@ -400,6 +429,10 @@ function renderMapReview(mapName: string, evidence: MapEvidence): string {
     "### 数据证据：持续驻留",
     ...topDwell(mapName, evidence, "t"),
     ...topDwell(mapName, evidence, "ct"),
+    "",
+    ...renderDefaultCandidates(mapName, evidence),
+    "",
+    ...renderCalloutTendencyCoverage(mapName),
     "",
     ...renderAdjacency(mapName, evidence.transitions),
     "",

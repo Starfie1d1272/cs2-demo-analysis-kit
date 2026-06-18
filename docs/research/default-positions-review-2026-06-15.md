@@ -7,7 +7,7 @@
 
 样本 ZIP：23
 
-### 当前推荐（人工修订 v1）
+### 当前 runtime 默认位（最终确认版）
 #### T 默认位
 - t_outside / 匪口:
   - Outside / 匪口: T=147437, CT=3003, T占比=98.0%, 倾向=T；T分段=56786/56585/34066；访问=1321 PR；≥5s=1295 PR (50.0%), 459 R (88.6%)；≥10s=741 PR (28.6%), 392 R (75.7%)；最长=27.5s
@@ -36,14 +36,6 @@
   - House / VIP: T=923, CT=59525, T占比=1.5%, 倾向=CT；CT分段=37412/12436/9677；访问=2116 PR；≥5s=243 PR (9.4%), 213 R (41.1%)；≥10s=154 PR (5.9%), 143 R (27.6%)；最长=26.6s
 - black_house / 黑屋:
   - SideEntrance / 黑屋: T=10767, CT=55244, T占比=16.3%, 倾向=CT；CT分段=18/31138/24088；访问=577 PR；≥5s=468 PR (18.1%), 386 R (74.5%)；≥10s=299 PR (11.5%), 257 R (49.6%)；最长=20.3s
-
-#### 争夺区属性
-以下 callout 可同时属于默认位；contested 表示该区域存在显著控制权争夺，而非排除默认位。
-- MainHall / A厅: T=39180, CT=8667, T占比=81.9%, 倾向=T
-- Middle / 中路: T=28784, CT=72678, T占比=28.4%, 倾向=CT
-- TSideUpper / 跳台: T=29539, CT=13467, T占比=68.7%, 倾向=T
-- SideEntrance / 黑屋: T=10767, CT=55244, T占比=16.3%, 倾向=CT
-- Ramp / B坡: T=14794, CT=5013, T占比=74.7%, 倾向=T
 
 ### 数据证据：高频占有
 - T:
@@ -88,6 +80,36 @@
   - SideHall / 甜甜圈: ≥5s=225 PR (8.7%) ≥10s=107 PR (4.1%) 涉及回合=180/518 平均单段=7.1s 最长=22.9s
   - TSideUpper / 跳台: ≥5s=127 PR (4.9%) ≥10s=35 PR (1.4%) 涉及回合=110/518 平均单段=4.7s 最长=16.1s
   - MainHall / A厅: ≥5s=82 PR (3.2%) ≥10s=50 PR (1.9%) 涉及回合=59/518 平均单段=9.4s 最长=20.9s
+
+### 默认位候选（未纳入 runtime）
+按双方 ≥5s 连续驻留 player-round 排序；候选仅供人工复核，不自动写入默认位资产。
+- TSpawn / 匪家: T≥5s=428 PR，CT≥5s=1 PR
+- CTSpawn / 警家: T≥5s=0 PR，CT≥5s=325 PR
+- Ramp / B坡: T≥5s=90 PR，CT≥5s=45 PR
+- Water / 水路: T≥5s=14 PR，CT≥5s=0 PR
+- Tunnel / 隧道: T≥5s=10 PR，CT≥5s=0 PR
+- TopofMid / 中远: T≥5s=4 PR，CT≥5s=5 PR
+
+### 基础 Callout 倾向覆盖
+该章节直接呈现第二个静态真相源；顺序表示主要方向到次要方向，未标注保持未知。
+- Alley / 底线: b
+- BombsiteA / A包: a
+- BombsiteB / B包: b
+- CTSpawn / 警家: a
+- House / VIP: mid
+- MainHall / A厅: a
+- Middle / 中路: mid
+- Outside / 匪口: a → mid
+- Ramp / B坡: b
+- Ruins / B外: b
+- SideEntrance / 黑屋: b
+- SideHall / 甜甜圈: a
+- TopofMid / 中远: mid
+- TSideLower / B小: b
+- TSideUpper / 跳台: mid → b
+- TSpawn / 匪家: 未标注
+- Tunnel / 隧道: b
+- Water / 水路: b
 
 ### 相邻证据
 同一玩家在开局窗口内发生 callout 变化时记录一条有向边。
@@ -191,21 +213,14 @@ de_ancient: {
         ]
       }
     }
-  },
-  "contested": [
-    "MainHall",
-    "Middle",
-    "TSideUpper",
-    "SideEntrance",
-    "Ramp"
-  ]
+  }
 },
 ```
 ## de_anubis
 
 样本 ZIP：5
 
-### 当前推荐（人工修订 v1）
+### 当前 runtime 默认位（最终确认版）
 #### T 默认位
 - b_long / B外:
   - Ruins / B外: T=25965, CT=0, T占比=100.0%, 倾向=T；T分段=10819/8675/6471；访问=276 PR；≥5s=202 PR (38.8%), 91 R (87.5%)；≥10s=104 PR (20.0%), 73 R (70.2%)；最长=27.5s
@@ -243,16 +258,6 @@ de_ancient: {
   - Bricks / B连阳光房: T=0, CT=2283, T占比=0.0%, 倾向=CT；CT分段=337/1007/939；访问=75 PR；≥5s=16 PR (3.1%), 16 R (15.4%)；≥10s=10 PR (1.9%), 10 R (9.6%)；最长=23.4s
 - b_connector / B连:
   - PalaceInterior / B连: T=73, CT=7707, T占比=0.9%, 倾向=CT；CT分段=5499/714/1494；访问=316 PR；≥5s=33 PR (6.3%), 29 R (27.9%)；≥10s=5 PR (1.0%), 5 R (4.8%)；最长=21.3s
-
-#### 争夺区属性
-以下 callout 可同时属于默认位；contested 表示该区域存在显著控制权争夺，而非排除默认位。
-- Main / A厅: T=1780, CT=6524, T占比=21.4%, 倾向=CT
-- Walkway / A连: T=0, CT=6237, T占比=0.0%, 倾向=CT
-- MidDoors / 中门: T=610, CT=4010, T占比=13.2%, 倾向=CT
-- Middle / 中路: T=684, CT=23917, T占比=2.8%, 倾向=CT
-- Connector / 黑屋: T=58, CT=10411, T占比=0.6%, 倾向=CT
-- Canal / 水下: T=12982, CT=3294, T占比=79.8%, 倾向=T
-- PalaceInterior / B连: T=73, CT=7707, T占比=0.9%, 倾向=CT
 
 ### 数据证据：高频占有
 - T:
@@ -297,6 +302,49 @@ de_ancient: {
   - Canal / 水下: ≥5s=36 PR (6.9%) ≥10s=14 PR (2.7%) 涉及回合=20/104 平均单段=7.9s 最长=20.9s
   - PalaceInterior / B连: ≥5s=33 PR (6.3%) ≥10s=5 PR (1.0%) 涉及回合=29/104 平均单段=2.7s 最长=21.3s
   - BackofB / B包台上: ≥5s=32 PR (6.2%) ≥10s=22 PR (4.2%) 涉及回合=30/104 平均单段=9.9s 最长=22.8s
+
+### 默认位候选（未纳入 runtime）
+按双方 ≥5s 连续驻留 player-round 排序；候选仅供人工复核，不自动写入默认位资产。
+- TSpawn / 匪家: T≥5s=201 PR，CT≥5s=0 PR
+- Alley / 警家: T≥5s=0 PR，CT≥5s=19 PR
+- CTSideUpper / 警家: T≥5s=0 PR，CT≥5s=12 PR
+- Fountain / 喷泉: T≥5s=0 PR，CT≥5s=12 PR
+- CTSpawn / 警家后: T≥5s=0 PR，CT≥5s=1 PR
+- LowerTunnel / 警家隧道: T≥5s=0 PR，CT≥5s=1 PR
+- SnipersNest / 警家狙位: T≥5s=0 PR，CT≥5s=0 PR
+- Tunnel / 隧道: T≥5s=0 PR，CT≥5s=0 PR
+- TunnelStairs / 隧道楼梯: T≥5s=0 PR，CT≥5s=0 PR
+
+### 基础 Callout 倾向覆盖
+该章节直接呈现第二个静态真相源；顺序表示主要方向到次要方向，未标注保持未知。
+- Alley / 警家: b
+- BackofB / B包台上: b
+- BombsiteA / A包: a
+- BombsiteB / B包: b
+- Bricks / B连阳光房: b
+- Bridge / 中桥: mid
+- Canal / 水下: a → b
+- Connector / 黑屋: b
+- CTSideUpper / 警家: 未标注
+- CTSpawn / 警家后: 未标注
+- Fountain / 喷泉: a
+- Heaven / 天堂: a
+- LowerTunnel / 警家隧道: b
+- Main / A厅: a
+- Middle / 中路: mid
+- MidDoors / 中门: mid
+- OutsideLong / B外: b
+- PalaceInterior / B连: b
+- Ruins / B外: b
+- SnipersNest / 警家狙位: b
+- Street / 街道: a
+- TSideUpper / 匪跳: a
+- TSpawn / 匪家: 未标注
+- TStairs / 匪梯: a → b
+- Tunnel / 隧道: a
+- TunnelStairs / 隧道楼梯: a
+- Walkway / A连: a
+- Water / 警家水下: a → b
 
 ### 相邻证据
 同一玩家在开局窗口内发生 callout 变化时记录一条有向边。
@@ -425,23 +473,14 @@ de_anubis: {
         ]
       }
     }
-  },
-  "contested": [
-    "Main",
-    "Walkway",
-    "MidDoors",
-    "Middle",
-    "Connector",
-    "Canal",
-    "PalaceInterior"
-  ]
+  }
 },
 ```
 ## de_dust2
 
 样本 ZIP：26
 
-### 当前推荐（人工修订 v1）
+### 当前 runtime 默认位（最终确认版）
 #### T 默认位
 - a_doors / A门外/A门:
   - OutsideLong / A门外: T=113393, CT=1505, T占比=98.7%, 倾向=T；T分段=45157/43463/24773；访问=1430 PR；≥5s=892 PR (33.1%), 442 R (82.0%)；≥10s=482 PR (17.9%), 314 R (58.3%)；最长=28.1s
@@ -472,16 +511,6 @@ de_anubis: {
   - BombsiteB / B包: T=9595, CT=93774, T占比=9.3%, 倾向=CT；CT分段=6852/46336/40586；访问=736 PR；≥5s=664 PR (24.6%), 484 R (89.8%)；≥10s=545 PR (20.2%), 422 R (78.3%)；最长=23.4s
 - b_doors / B门:
   - BDoors / B门: T=133, CT=28245, T占比=0.5%, 倾向=CT；CT分段=11066/7884/9295；访问=917 PR；≥5s=151 PR (5.6%), 142 R (26.3%)；≥10s=40 PR (1.5%), 40 R (7.4%)；最长=24.5s
-
-#### 争夺区属性
-以下 callout 可同时属于默认位；contested 表示该区域存在显著控制权争夺，而非排除默认位。
-- LongDoors / A门: T=65613, CT=27026, T占比=70.8%, 倾向=T
-- LongA / A大: T=8155, CT=106811, T占比=7.1%, 倾向=CT
-- Catwalk / A小: T=15299, CT=15509, T占比=49.7%, 倾向=均衡
-- Middle / 中路: T=17503, CT=5710, T占比=75.4%, 倾向=T
-- TunnelStairs / B洞楼梯: T=17523, CT=1751, T占比=90.9%, 倾向=T
-- BDoors / B门: T=133, CT=28245, T占比=0.5%, 倾向=CT
-- ARamp / A斜坡: T=815, CT=10006, T占比=7.5%, 倾向=CT
 
 ### 数据证据：高频占有
 - T:
@@ -526,6 +555,44 @@ de_anubis: {
   - BDoors / B门: ≥5s=151 PR (5.6%) ≥10s=40 PR (1.5%) 涉及回合=142/539 平均单段=3.0s 最长=24.5s
   - Catwalk / A小: ≥5s=147 PR (5.5%) ≥10s=74 PR (2.7%) 涉及回合=110/539 平均单段=7.2s 最长=23.1s
   - ARamp / A斜坡: ≥5s=89 PR (3.3%) ≥10s=33 PR (1.2%) 涉及回合=86/539 平均单段=4.5s 最长=18.4s
+
+### 默认位候选（未纳入 runtime）
+按双方 ≥5s 连续驻留 player-round 排序；候选仅供人工复核，不自动写入默认位资产。
+- TSpawn / 匪家: T≥5s=679 PR，CT≥5s=10 PR
+- Middle / 中路: T≥5s=183 PR，CT≥5s=38 PR
+- TunnelStairs / B洞楼梯: T≥5s=97 PR，CT≥5s=6 PR
+- ARamp / A斜坡: T≥5s=2 PR，CT≥5s=89 PR
+- BombsiteA / A包: T≥5s=4 PR，CT≥5s=71 PR
+- Hole / 狗洞: T≥5s=0 PR，CT≥5s=23 PR
+- Side / 大坑平台: T≥5s=3 PR，CT≥5s=3 PR
+- TRamp / 后花: T≥5s=1 PR，CT≥5s=0 PR
+
+### 基础 Callout 倾向覆盖
+该章节直接呈现第二个静态真相源；顺序表示主要方向到次要方向，未标注保持未知。
+- ARamp / A斜坡: a
+- BDoors / B门: b
+- BombsiteA / A包: a
+- BombsiteB / B包: b
+- Catwalk / A小: a → mid
+- CTSpawn / 警家: mid → a
+- ExtendedA / A小过点: a
+- Hole / 狗洞: b
+- LongA / A大: a
+- LongDoors / A门: a
+- LowerTunnel / B1: mid
+- Middle / 中路: mid
+- MidDoors / 中门: mid
+- OutsideLong / A门外: a
+- OutsideTunnel / B洞外: b
+- Pit / 大坑: a
+- ShortStairs / A小楼梯: a
+- Side / 大坑平台: a
+- TopofMid / 中远匪口: mid
+- TRamp / 后花: b
+- TSpawn / 匪家: 未标注
+- TunnelStairs / B洞楼梯: b
+- UnderA / 警家: a
+- UpperTunnel / B洞: b
 
 ### 相邻证据
 同一玩家在开局窗口内发生 callout 变化时记录一条有向边。
@@ -627,23 +694,14 @@ de_dust2: {
         ]
       }
     }
-  },
-  "contested": [
-    "LongDoors",
-    "LongA",
-    "Catwalk",
-    "Middle",
-    "TunnelStairs",
-    "BDoors",
-    "ARamp"
-  ]
+  }
 },
 ```
 ## de_inferno
 
 样本 ZIP：16
 
-### 当前推荐（人工修订 v1）
+### 当前 runtime 默认位（最终确认版）
 #### T 默认位
 - banana / 香蕉道:
   - Banana / 香蕉道: T=61001, CT=51128, T占比=54.4%, 倾向=均衡；T分段=2034/26705/32262；访问=660 PR；≥5s=509 PR (29.4%), 215 R (62.1%)；≥10s=358 PR (20.7%), 182 R (52.6%)；最长=21.9s
@@ -664,7 +722,7 @@ de_dust2: {
 - pit / 大坑:
   - Pit / 大坑: T=125, CT=5874, T占比=2.1%, 倾向=CT；CT分段=10/1214/4650；访问=93 PR；≥5s=65 PR (3.8%), 65 R (18.8%)；≥10s=22 PR (1.3%), 22 R (6.4%)；最长=20.8s
 - quad / 马棚:
-  - Quad / 马鹏: T=165, CT=4726, T占比=3.4%, 倾向=CT；CT分段=0/1882/2844；访问=67 PR；≥5s=41 PR (2.4%), 40 R (11.6%)；≥10s=25 PR (1.4%), 24 R (6.9%)；最长=19.0s
+  - Quad / 马棚: T=165, CT=4726, T占比=3.4%, 倾向=CT；CT分段=0/1882/2844；访问=67 PR；≥5s=41 PR (2.4%), 40 R (11.6%)；≥10s=25 PR (1.4%), 24 R (6.9%)；最长=19.0s
 - arch / 连接/拱门:
   - Arch / 拱门: T=1262, CT=32110, T占比=3.8%, 倾向=CT；CT分段=9402/11176/11532；访问=465 PR；≥5s=187 PR (10.8%), 167 R (48.3%)；≥10s=110 PR (6.4%), 107 R (30.9%)；最长=26.8s
 - library / 书房:
@@ -681,14 +739,6 @@ de_dust2: {
   - Ruins / 警家教堂: T=3, CT=23815, T占比=0.0%, 倾向=CT；CT分段=15547/3728/4540；访问=865 PR；≥5s=49 PR (2.8%), 46 R (13.3%)；≥10s=7 PR (0.4%), 7 R (2.0%)；最长=25.3s
 - banana / 香蕉道:
   - Banana / 香蕉道: T=61001, CT=51128, T占比=54.4%, 倾向=均衡；CT分段=928/26771/23429；访问=548 PR；≥5s=410 PR (23.7%), 247 R (71.4%)；≥10s=305 PR (17.6%), 207 R (59.8%)；最长=21.1s
-
-#### 争夺区属性
-以下 callout 可同时属于默认位；contested 表示该区域存在显著控制权争夺，而非排除默认位。
-- Banana / 香蕉道: T=61001, CT=51128, T占比=54.4%, 倾向=均衡
-- Apartments / 二楼: T=23286, CT=22970, T占比=50.3%, 倾向=均衡
-- Balcony / 阳台: T=1452, CT=9388, T占比=13.4%, 倾向=CT
-- TopofMid / 中路: T=4062, CT=35348, T占比=10.3%, 倾向=CT
-- Arch / 拱门: T=1262, CT=32110, T占比=3.8%, 倾向=CT
 
 ### 数据证据：高频占有
 - T:
@@ -733,6 +783,43 @@ de_dust2: {
   - Balcony / 阳台: ≥5s=75 PR (4.3%) ≥10s=46 PR (2.7%) 涉及回合=75/346 平均单段=3.7s 最长=19.4s
   - Pit / 大坑: ≥5s=65 PR (3.8%) ≥10s=22 PR (1.3%) 涉及回合=65/346 平均单段=7.5s 最长=20.8s
   - Ruins / 警家教堂: ≥5s=49 PR (2.8%) ≥10s=7 PR (0.4%) 涉及回合=46/346 平均单段=2.6s 最长=25.3s
+
+### 默认位候选（未纳入 runtime）
+按双方 ≥5s 连续驻留 player-round 排序；候选仅供人工复核，不自动写入默认位资产。
+- TSpawn / 匪家: T≥5s=801 PR，CT≥5s=0 PR
+- CTSpawn / 警家: T≥5s=2 PR，CT≥5s=784 PR
+- Underpass / 下水道: T≥5s=57 PR，CT≥5s=0 PR
+- Bridge / 匪桥: T≥5s=33 PR，CT≥5s=0 PR
+- Deck / 匪二阳台: T≥5s=15 PR，CT≥5s=0 PR
+- Kitchen / 厨房: T≥5s=3 PR，CT≥5s=0 PR
+- Graveyard / 墓地: T≥5s=0 PR，CT≥5s=1 PR
+
+### 基础 Callout 倾向覆盖
+该章节直接呈现第二个静态真相源；顺序表示主要方向到次要方向，未标注保持未知。
+- Apartments / 二楼: a
+- Arch / 拱门: a
+- BackAlley / 匪二楼: a
+- Balcony / 阳台: a
+- Banana / 香蕉道: b
+- BombsiteA / A包: a
+- BombsiteB / B包: b
+- Bridge / 匪桥: mid → a
+- CTSpawn / 警家: 未标注
+- Deck / 匪二阳台: 未标注
+- Graveyard / 墓地: a
+- Kitchen / 厨房: 未标注
+- Library / 书房: a
+- LowerMid / 匪口: mid → b
+- Middle / 中路: mid
+- Pit / 大坑: a
+- Quad / 马棚: a
+- Ruins / 警家教堂: b
+- SecondMid / 侧道: mid → a
+- TopofMid / 中路: mid
+- TRamp / 匪口: mid → b
+- TSpawn / 匪家: 未标注
+- Underpass / 下水道: mid
+- Upstairs / 匪二楼: mid → a
 
 ### 相邻证据
 同一玩家在开局窗口内发生 callout 变化时记录一条有向边。
@@ -857,21 +944,14 @@ de_inferno: {
         ]
       }
     }
-  },
-  "contested": [
-    "Banana",
-    "Apartments",
-    "Balcony",
-    "TopofMid",
-    "Arch"
-  ]
+  }
 },
 ```
 ## de_mirage
 
 样本 ZIP：21
 
-### 当前推荐（人工修订 v1）
+### 当前 runtime 默认位（最终确认版）
 #### T 默认位
 - a_ramp / A1:
   - PalaceAlley / A1: T=57524, CT=1512, T占比=97.4%, 倾向=T；T分段=16425/24423/16676；访问=503 PR；≥5s=436 PR (19.0%), 258 R (56.3%)；≥10s=314 PR (13.7%), 212 R (46.3%)；最长=27.1s
@@ -909,15 +989,6 @@ de_inferno: {
   - Truck / 白车: T=354, CT=24682, T占比=1.4%, 倾向=CT；CT分段=0/13160/11522；访问=357 PR；≥5s=163 PR (7.1%), 163 R (35.6%)；≥10s=79 PR (3.4%), 79 R (17.2%)；最长=19.4s
 - market / 超市:
   - Shop / 超市: T=64, CT=22529, T占比=0.3%, 倾向=CT；CT分段=15273/1916/5340；访问=892 PR；≥5s=61 PR (2.7%), 56 R (12.2%)；≥10s=15 PR (0.7%), 15 R (3.3%)；最长=24.5s
-
-#### 争夺区属性
-以下 callout 可同时属于默认位；contested 表示该区域存在显著控制权争夺，而非排除默认位。
-- Middle / 中路: T=24862, CT=13634, T占比=64.6%, 倾向=均衡
-- Underpass / 下水道: T=26029, CT=12877, T占比=66.9%, 倾向=T
-- Connector / 拱门: T=1384, CT=21962, T占比=5.9%, 倾向=CT
-- Catwalk / B小: T=13265, CT=28887, T占比=31.5%, 倾向=CT
-- PalaceInterior / A二楼: T=49022, CT=14836, T占比=76.8%, 倾向=T
-- Apartments / B二楼: T=19170, CT=9690, T占比=66.4%, 倾向=T
 
 ### 数据证据：高频占有
 - T:
@@ -962,6 +1033,39 @@ de_inferno: {
   - Middle / 中路: ≥5s=132 PR (5.8%) ≥10s=46 PR (2.0%) 涉及回合=94/458 平均单段=4.9s 最长=22.4s
   - PalaceInterior / A二楼: ≥5s=120 PR (5.2%) ≥10s=81 PR (3.5%) 涉及回合=110/458 平均单段=7.8s 最长=21.5s
   - Underpass / 下水道: ≥5s=116 PR (5.1%) ≥10s=69 PR (3.0%) 涉及回合=112/458 平均单段=8.1s 最长=22.6s
+
+### 默认位候选（未纳入 runtime）
+按双方 ≥5s 连续驻留 player-round 排序；候选仅供人工复核，不自动写入默认位资产。
+- CTSpawn / 警家: T≥5s=1 PR，CT≥5s=1725 PR
+- TSpawn / 匪家: T≥5s=635 PR，CT≥5s=3 PR
+- Middle / 中路: T≥5s=251 PR，CT≥5s=132 PR
+- Scaffolding / A2上下: T≥5s=0 PR，CT≥5s=12 PR
+
+### 基础 Callout 倾向覆盖
+该章节直接呈现第二个静态真相源；顺序表示主要方向到次要方向，未标注保持未知。
+- Apartments / B二楼: b
+- BackAlley / B二楼: b
+- BombsiteA / A包: a
+- BombsiteB / B包: b
+- Catwalk / B小: b
+- Connector / 拱门: a → mid
+- CTSpawn / 警家: 未标注
+- House / 匪二楼: b
+- Jungle / Jungle: a
+- Ladder / 黑屋: mid → b
+- Middle / 中路: mid
+- PalaceAlley / A1: a
+- PalaceInterior / A二楼: a
+- Scaffolding / A2上下: a
+- Shop / 超市: b
+- SideAlley / 匪口: mid
+- SnipersNest / VIP: mid
+- Stairs / 跳台: a
+- TopofMid / 中远/匪口: mid
+- TRamp / A1: a
+- Truck / 白车: b
+- TSpawn / 匪家: 未标注
+- Underpass / 下水道: mid → b
 
 ### 相邻证据
 同一玩家在开局窗口内发生 callout 变化时记录一条有向边。
@@ -1086,22 +1190,14 @@ de_mirage: {
         ]
       }
     }
-  },
-  "contested": [
-    "Middle",
-    "Underpass",
-    "Connector",
-    "Catwalk",
-    "PalaceInterior",
-    "Apartments"
-  ]
+  }
 },
 ```
 ## de_nuke
 
 样本 ZIP：12
 
-### 当前推荐（人工修订 v1）
+### 当前 runtime 默认位（最终确认版）
 #### T 默认位
 - outside / 外场:
   - Outside / 外场: T=112614, CT=77005, T占比=59.4%, 倾向=均衡；T分段=34200/43204/35210；访问=1272 PR；≥5s=626 PR (48.9%), 230 R (89.8%)；≥10s=520 PR (40.6%), 220 R (85.9%)；最长=26.3s
@@ -1132,16 +1228,6 @@ de_mirage: {
   - Ramp / 铁板: T=2107, CT=40490, T占比=4.9%, 倾向=CT；CT分段=4220/20349/15921；访问=354 PR；≥5s=273 PR (21.3%), 218 R (85.2%)；≥10s=214 PR (16.7%), 181 R (70.7%)；最长=22.5s
 - admin / 铁板三楼下:
   - Admin / 铁板三楼下: T=0, CT=12218, T占比=0.0%, 倾向=CT；CT分段=5739/3796/2683；访问=404 PR；≥5s=55 PR (4.3%), 54 R (21.1%)；≥10s=30 PR (2.3%), 30 R (11.7%)；最长=24.1s
-
-#### 争夺区属性
-以下 callout 可同时属于默认位；contested 表示该区域存在显著控制权争夺，而非排除默认位。
-- Outside / 外场: T=112614, CT=77005, T占比=59.4%, 倾向=均衡
-- Hut / 黄房: T=2055, CT=2126, T占比=49.2%, 倾向=均衡
-- Ramp / 铁板: T=2107, CT=40490, T占比=4.9%, 倾向=CT
-- Secret / K1: T=3692, CT=869, T占比=80.9%, 倾向=T
-- Tunnels / K1地下: T=1976, CT=4362, T占比=31.2%, 倾向=CT
-- Control / 链接: T=2336, CT=2985, T占比=43.9%, 倾向=均衡
-- Vending / 链接: T=13354, CT=764, T占比=94.6%, 倾向=T
 
 ### 数据证据：高频占有
 - T:
@@ -1186,6 +1272,53 @@ de_mirage: {
   - Admin / 铁板三楼下: ≥5s=55 PR (4.3%) ≥10s=30 PR (2.3%) 涉及回合=54/256 平均单段=3.2s 最长=24.1s
   - Tunnels / K1地下: ≥5s=51 PR (4.0%) ≥10s=17 PR (1.3%) 涉及回合=50/256 平均单段=6.3s 最长=14.4s
   - Heaven / 三楼: ≥5s=46 PR (3.6%) ≥10s=14 PR (1.1%) 涉及回合=44/256 平均单段=2.1s 最长=15.5s
+
+### 默认位候选（未纳入 runtime）
+按双方 ≥5s 连续驻留 player-round 排序；候选仅供人工复核，不自动写入默认位资产。
+- TSpawn / 匪家: T≥5s=582 PR，CT≥5s=0 PR
+- Tunnels / K1地下: T≥5s=25 PR，CT≥5s=51 PR
+- HutRoof / 黄房顶: T≥5s=0 PR，CT≥5s=74 PR
+- Secret / K1: T≥5s=33 PR，CT≥5s=11 PR
+- Control / 链接: T≥5s=12 PR，CT≥5s=28 PR
+- Catwalk / 外场三楼: T≥5s=0 PR，CT≥5s=37 PR
+- Crane / A包柱上: T≥5s=0 PR，CT≥5s=30 PR
+- Vents / 管道: T≥5s=3 PR，CT≥5s=20 PR
+- LockerRoom / 更衣室: T≥5s=0 PR，CT≥5s=15 PR
+- BombsiteB / B包: T≥5s=4 PR，CT≥5s=8 PR
+- Hell / 三楼下: T≥5s=0 PR，CT≥5s=9 PR
+- CTSpawn / 警家: T≥5s=0 PR，CT≥5s=3 PR
+
+### 基础 Callout 倾向覆盖
+该章节直接呈现第二个静态真相源；顺序表示主要方向到次要方向，未标注保持未知。
+- Admin / 铁板三楼下: b
+- BombsiteA / A包: a
+- BombsiteB / B包: b
+- Catwalk / 外场三楼: mid
+- Control / 链接: b
+- Crane / A包柱上: a
+- CTSpawn / 警家: 未标注
+- Decon / 死门: b
+- Garage / 大仓: mid
+- Heaven / 三楼: a
+- Hell / 三楼下: a → b → mid
+- Hut / 黄房: a
+- HutRoof / 黄房顶: a
+- Lobby / 匪厅: a
+- LockerRoom / 更衣室: mid
+- Mini / 正门: a → mid
+- Observation / 控制室: b
+- Outside / 外场: mid
+- Rafters / 三楼横梁: a
+- Ramp / 铁板: b
+- Roof / 屋顶: a
+- Secret / K1: b → mid
+- Silo / 山上: mid
+- Squeaky / 铁门房: a
+- Trophy / 奖杯房: b
+- TSpawn / 匪家: 未标注
+- Tunnels / K1地下: b
+- Vending / 链接: b
+- Vents / 管道: b
 
 ### 相邻证据
 同一玩家在开局窗口内发生 callout 变化时记录一条有向边。
@@ -1287,23 +1420,14 @@ de_nuke: {
         ]
       }
     }
-  },
-  "contested": [
-    "Outside",
-    "Hut",
-    "Ramp",
-    "Secret",
-    "Tunnels",
-    "Control",
-    "Vending"
-  ]
+  }
 },
 ```
 ## de_overpass
 
 样本 ZIP：7
 
-### 当前推荐（人工修订 v1）
+### 当前 runtime 默认位（最终确认版）
 #### T 默认位
 - underpass / 下水道:
   - Tunnels / 下水道: T=28742, CT=725, T占比=97.5%, 倾向=T；T分段=9923/12587/6232；访问=373 PR；≥5s=234 PR (41.1%), 101 R (88.6%)；≥10s=119 PR (20.9%), 79 R (69.3%)；最长=24.5s
@@ -1336,19 +1460,6 @@ de_nuke: {
   - Construction / B小: T=1598, CT=3920, T占比=29.0%, 倾向=CT；CT分段=0/1827/2093；访问=78 PR；≥5s=29 PR (5.1%), 25 R (21.9%)；≥10s=12 PR (2.1%), 12 R (10.5%)；最长=17.8s
 - connector / 下水道连接:
   - Connector / 下水道: T=4377, CT=5229, T占比=45.6%, 倾向=均衡；CT分段=16/2812/2401；访问=61 PR；≥5s=42 PR (7.4%), 35 R (30.7%)；≥10s=29 PR (5.1%), 25 R (21.9%)；最长=20.1s
-
-#### 争夺区属性
-以下 callout 可同时属于默认位；contested 表示该区域存在显著控制权争夺，而非排除默认位。
-- Fountain / 喷泉: T=19654, CT=1220, T占比=94.2%, 倾向=T
-- LowerPark / A小厕所: T=2609, CT=29154, T占比=8.2%, 倾向=CT
-- UpperPark / A大厕所: T=3104, CT=8601, T占比=26.5%, 倾向=CT
-- Restroom / 厕所: T=186, CT=759, T占比=19.7%, 倾向=CT
-- Tunnels / 下水道: T=28742, CT=725, T占比=97.5%, 倾向=T
-- Connector / 下水道: T=4377, CT=5229, T占比=45.6%, 倾向=均衡
-- Canal / 长管: T=10775, CT=3988, T占比=73.0%, 倾向=T
-- Pipe / 短管: T=5035, CT=36, T占比=99.3%, 倾向=T
-- Water / 工地: T=5519, CT=11237, T占比=32.9%, 倾向=CT
-- Construction / B小: T=1598, CT=3920, T占比=29.0%, 倾向=CT
 
 ### 数据证据：高频占有
 - T:
@@ -1393,6 +1504,46 @@ de_nuke: {
   - Canal / 长管: ≥5s=35 PR (6.1%) ≥10s=25 PR (4.4%) 涉及回合=34/114 平均单段=6.2s 最长=18.3s
   - Construction / B小: ≥5s=29 PR (5.1%) ≥10s=12 PR (2.1%) 涉及回合=25/114 平均单段=4.6s 最长=17.8s
   - SnipersNest / B二楼: ≥5s=26 PR (4.6%) ≥10s=22 PR (3.9%) 涉及回合=24/114 平均单段=6.2s 最长=25.5s
+
+### 默认位候选（未纳入 runtime）
+按双方 ≥5s 连续驻留 player-round 排序；候选仅供人工复核，不自动写入默认位资产。
+- TSpawn / 匪家: T≥5s=279 PR，CT≥5s=0 PR
+- UnderA / 一层: T≥5s=0 PR，CT≥5s=17 PR
+- Bridge / 桥: T≥5s=0 PR，CT≥5s=8 PR
+- BackofA / 垃圾桶: T≥5s=0 PR，CT≥5s=1 PR
+- Lobby / 银行: T≥5s=0 PR，CT≥5s=1 PR
+- SideAlley / 匪家保枪位: T≥5s=1 PR，CT≥5s=0 PR
+- StorageRoom / 银行: T≥5s=0 PR，CT≥5s=1 PR
+- TStairs / 匪楼梯: T≥5s=1 PR，CT≥5s=0 PR
+- Stairs / 楼梯: T≥5s=0 PR，CT≥5s=0 PR
+
+### 基础 Callout 倾向覆盖
+该章节直接呈现第二个静态真相源；顺序表示主要方向到次要方向，未标注保持未知。
+- Alley / 匪家B外: b
+- BackofA / 垃圾桶: a
+- BombsiteA / A包: a
+- BombsiteB / B包: b
+- Bridge / 桥: b
+- Canal / 长管: b
+- Connector / 下水道: mid → a
+- Construction / B小: b
+- Fountain / 喷泉: a
+- Lobby / 银行: a
+- LowerPark / A小厕所: a
+- Pipe / 短管: b
+- Playground / 游乐园: a
+- Restroom / 厕所: a
+- SideAlley / 匪家保枪位: 未标注
+- SnipersNest / B二楼: b
+- Stairs / 楼梯: a
+- StorageRoom / 银行: a
+- TSpawn / 匪家: 未标注
+- TStairs / 匪楼梯: 未标注
+- Tunnels / 下水道: mid
+- UnderA / 一层: b
+- UpperPark / A大厕所: a
+- Walkway / ABC: b
+- Water / 工地: b
 
 ### 相邻证据
 同一玩家在开局窗口内发生 callout 变化时记录一条有向边。
@@ -1500,18 +1651,6 @@ de_overpass: {
         ]
       }
     }
-  },
-  "contested": [
-    "Fountain",
-    "LowerPark",
-    "UpperPark",
-    "Restroom",
-    "Tunnels",
-    "Connector",
-    "Canal",
-    "Pipe",
-    "Water",
-    "Construction"
-  ]
+  }
 },
 ```

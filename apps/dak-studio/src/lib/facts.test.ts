@@ -139,7 +139,10 @@ describe("MatchFacts", () => {
     const facts = extractMatchFacts(pkg, { matchId: "m1" });
     expect(facts.tacticalRounds.length).toBeGreaterThan(0);
     const f = facts.tacticalRounds[0]!;
-    expect(f.snapshots.length).toBeGreaterThanOrEqual(2);
+    expect("snapshots" in f).toBe(false);
+    expect(f.openingPattern.coarseSignature).toMatch(/^[TC]{1,2}:/);
+    expect(f.openingPattern.evidence.every((row) => typeof row.tick === "number")).toBe(true);
+    expect(Array.isArray(f.openingPressure)).toBe(true);
     expect(["a", "b", null]).toContain(f.targetSite);
     expect(f.siteEntries.a.entrants).toBeGreaterThanOrEqual(0);
     expect(f.siteEntries.b.entrants).toBeGreaterThanOrEqual(0);
@@ -165,7 +168,7 @@ describe("MatchFacts", () => {
     const t = facts.tacticalRounds.filter((f) => f.side === "t");
     expect(t.length).toBeGreaterThan(0);
     // 版本号写入
-    expect(facts.tacticalRounds.every((f) => f.analysisVersion === 3)).toBe(true);
+    expect(facts.tacticalRounds.every((f) => f.analysisVersion === 5)).toBe(true);
     // CT 不算 C4 轨迹
     expect(facts.tacticalRounds.filter((f) => f.side === "ct").every((f) => f.c4Route === null)).toBe(true);
     // 至少有一回合能跟到 C4 携带轨迹
@@ -186,7 +189,25 @@ describe("MatchFacts", () => {
     await store.putMatchFacts(facts);
     const rows = await store.getTacticalRounds({ matchIds: [matchId] });
     expect(rows.length).toBe(facts.tacticalRounds.length);
-    expect(rows[0]?.snapshots.length).toBeGreaterThanOrEqual(2);
+    expect(rows[0]?.openingPattern.coarseSignature).toBeTruthy();
+  });
+
+  it("单场 workspace 按 matchId 直读，不扫描全部大型回放记录", async () => {
+    const pkg = await loadFixture();
+    const adapter = createIdbAdapter();
+    const namespace = "facts-direct-workspace";
+    const store = createFactsStore(adapter, namespace);
+    await store.putMatchFacts(extractMatchFacts(pkg, { matchId: "m1" }));
+
+    const workspaceRecords = adapter.records(`${namespace}:match_workspace`);
+    workspaceRecords.getAll = async () => {
+      throw new Error("不应扫描全部 workspace");
+    };
+
+    const row = await store.getMatchWorkspace("m1");
+    expect(row?.matchId).toBe("m1");
+    expect(row?.row.replay.available).toBe(true);
+    expect(await store.getMatchWorkspace("missing")).toBeNull();
   });
 
   it("replaceRows：删除一场只动该场，另一场完整保留（key 前缀删除，不全量反序列化）", async () => {

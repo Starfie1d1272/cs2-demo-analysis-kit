@@ -1521,22 +1521,62 @@
 .dak-replay-statusline {
   min-width: 0;
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 10px;
   color: var(--dak-fg-mid);
   font-family: var(--dak-mono);
   font-size: 11px;
 }
 
-.dak-replay-statusline span {
+.dak-replay-clock {
+  min-width: 104px;
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid var(--dak-border-hi);
+  border-radius: 3px;
+  background: var(--dak-bg-subtle);
+}
+
+.dak-replay-clock span {
+  color: var(--dak-fg-mid);
+  font-family: var(--dak-font);
+  font-size: 10px;
+}
+
+.dak-replay-clock strong {
+  color: var(--dak-fg);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.dak-replay-clock-bomb strong {
+  color: var(--dak-danger);
+}
+
+.dak-replay-clock-round-end strong {
+  color: var(--dak-warn);
+}
+
+.dak-replay-techline {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.dak-replay-techline span {
   min-height: 22px;
   display: inline-flex;
   align-items: center;
   padding: 0 7px;
-  border: 1px solid rgba(238, 243, 248, 0.1);
+  border: 1px solid var(--dak-border);
   border-radius: 3px;
-  background: rgba(9, 11, 15, 0.32);
+  background: var(--dak-bg-subtle);
   white-space: nowrap;
 }
 

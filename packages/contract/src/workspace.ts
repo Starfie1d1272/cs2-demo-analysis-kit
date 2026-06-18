@@ -270,6 +270,8 @@ export const workspaceReplayBombSchema = z.object({
 export const workspaceReplayRoundSchema = z.object({
   roundNumber: z.number().int().positive(),
   startTick: z.number().int().positive(),
+  /** 比赛钟开始倒计时的 freeze end tick。 */
+  freezeEndTick: z.number().int().positive(),
   tickStep: z.number().int().positive(),
   frameCount: z.number().int().nonnegative(),
   players: z.array(workspaceReplayPlayerSchema),

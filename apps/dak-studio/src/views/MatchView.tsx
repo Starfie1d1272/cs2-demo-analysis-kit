@@ -23,10 +23,10 @@ async function loadModel(id: string, matchId: string): Promise<MatchWorkspaceMod
   const cached = modelCache.get(id);
   if (cached) return cached;
   const factsStore = getFactsStore();
-  const stored = await factsStore.getMatchWorkspaces({ matchIds: [matchId] });
-  if (stored[0]) {
-    modelCache.set(id, stored[0].row);
-    return stored[0].row;
+  const stored = await factsStore.getMatchWorkspace(matchId);
+  if (stored) {
+    modelCache.set(id, stored.row);
+    return stored.row;
   }
   throw new Error("本场还没有本地持久化 workspace facts，请重新导入或执行 facts 回填后再打开。");
 }

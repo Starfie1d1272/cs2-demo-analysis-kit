@@ -60,7 +60,7 @@ describe("derive-default-positions review report", () => {
 
     expect(report).toContain("# Default Positions Review");
     expect(report).toContain("## de_mirage");
-    expect(report).toContain("### 当前推荐（人工修订 v1）");
+    expect(report).toContain("### 当前 runtime 默认位（最终确认版）");
     expect(report).toContain("#### T 默认位");
     expect(report).toContain("A1");
     expect(report).toContain("PalaceAlley / A1: T=10, CT=1, T占比=90.9%, 倾向=T");
@@ -68,8 +68,11 @@ describe("derive-default-positions review report", () => {
     expect(report).toContain("≥5s=1 PR (20.0%), 1 R (100.0%)");
     expect(report).toContain("### 数据证据：持续驻留");
     expect(report).toContain("平均单段=6.0s");
-    expect(report).toContain("#### 争夺区属性");
-    expect(report).toContain("contested 表示该区域存在显著控制权争夺，而非排除默认位");
+    expect(report).toContain("### 默认位候选（未纳入 runtime）");
+    expect(report).toContain("### 基础 Callout 倾向覆盖");
+    expect(report).toContain("Connector / 拱门: a → mid");
+    expect(report).not.toContain("争夺区属性");
+    expect(report).not.toContain("contested");
     expect(report).toContain("### 相邻证据");
     expect(report).toContain("PalaceAlley / A1 -> TRamp / A1: T=7, CT=0, T占比=100.0%, 倾向=T");
   });

@@ -2,7 +2,7 @@ import React from "react";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { MatchWorkspaceModel } from "@cs2dak/contract";
-import { MatchWorkspace, ReplayViewer } from "./MatchWorkspace";
+import { MatchWorkspace, ReplayViewer, replayInitialFrameIndex } from "./MatchWorkspace";
 import { RoundTimeline } from "./RoundTimeline";
 
 const model: MatchWorkspaceModel = {
@@ -78,6 +78,7 @@ const model: MatchWorkspaceModel = {
       {
         roundNumber: 1,
         startTick: 100,
+        freezeEndTick: 100,
         tickStep: 8,
         frameCount: 1,
         kills: [],
@@ -162,6 +163,25 @@ describe("MatchWorkspace", () => {
 
     expect(html).toContain("dak-replay-fx-ct");
     expect(html).not.toContain("dak-replay-fx-teamA");
+  });
+
+  it("starts coach replay at 1:35 and renders the shared round clock", () => {
+    const round = {
+      ...model.replay.rounds[0]!,
+      frameCount: 201,
+      targetEndTick: 1700
+    };
+    const replay = { ...model.replay, rounds: [round] };
+
+    expect(replayInitialFrameIndex(round, 64, 95)).toBe(160);
+
+    const html = renderToStaticMarkup(React.createElement(ReplayViewer, {
+      replay,
+      map: model.map.view,
+      initialClockSeconds: 95
+    }));
+    expect(html).toContain("回合时间");
+    expect(html).toContain("1:35");
   });
 
   it("renders truncated timelines with an explicit expand control", () => {

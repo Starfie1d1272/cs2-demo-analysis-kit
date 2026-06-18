@@ -78,3 +78,4 @@ export function analyzeDemoPackage(input: unknown): AnalysisBundle {
     qa
   });
 }
+export * from "./tactics/index.js";

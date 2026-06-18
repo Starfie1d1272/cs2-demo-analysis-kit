@@ -1,3 +1,5 @@
+import { getCalloutTendencies, getPrimaryCalloutRegion, type TacticalRegion } from "./callout-names.js";
+
 export interface DefaultAnchor {
   /** 展示名（社区叫法），如 "A1"。 */
   name: string;
@@ -15,18 +17,21 @@ export interface MapDefaults {
   t: SideDefaults;
   /** CT 默认位：按具体防守站位划分，尽量一个 anchor 对应一个明确位置。 */
   ct: SideDefaults;
-  /** 双方会争夺或推进经过的区域，与 T/CT 默认位正交，允许重合。 */
-  contested: string[];
 }
 
 export type DefaultPositionSide = "t" | "ct";
 
-export type CalloutRole =
-  | { kind: "default"; anchorId: string }
-  | { kind: "advanced" }
-  | { kind: "ct" }
-  | { kind: "terminal" }
-  | { kind: "other" };
+export interface DefaultAnchorMatch extends DefaultAnchor {
+  id: string;
+}
+
+export interface TacticalLocation {
+  callout: string | null;
+  tendencies: readonly TacticalRegion[];
+  primaryRegion: TacticalRegion | null;
+  defaultAnchorId: string | null;
+  isDefaultPosition: boolean;
+}
 
 export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
   de_ancient: {
@@ -50,7 +55,6 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
         black_house: { name: "黑屋", callouts: ["SideEntrance"] },
       },
     },
-    contested: ["MainHall", "Middle", "TSideUpper", "SideEntrance", "Ramp"],
   },
   de_anubis: {
     t: {
@@ -77,7 +81,6 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
         b_connector: { name: "B连", callouts: ["PalaceInterior"] },
       },
     },
-    contested: ["Main", "Walkway", "MidDoors", "Middle", "Connector", "Canal", "PalaceInterior"],
   },
   de_dust2: {
     t: {
@@ -99,7 +102,6 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
         b_doors: { name: "B门", callouts: ["BDoors"] },
       },
     },
-    contested: ["LongDoors", "LongA", "Catwalk", "Middle", "TunnelStairs", "BDoors", "ARamp"],
   },
   de_inferno: {
     t: {
@@ -125,7 +127,6 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
         banana: { name: "香蕉道", callouts: ["Banana"] },
       },
     },
-    contested: ["Banana", "Apartments", "Balcony", "TopofMid", "Arch"],
   },
   de_mirage: {
     t: {
@@ -151,7 +152,6 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
         market: { name: "超市", callouts: ["Shop"] },
       },
     },
-    contested: ["Middle", "Underpass", "Connector", "Catwalk", "PalaceInterior", "Apartments"],
   },
   de_nuke: {
     t: {
@@ -173,7 +173,6 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
         admin: { name: "铁板三楼下", callouts: ["Admin"] },
       },
     },
-    contested: ["Outside", "Hut", "Ramp", "Secret", "Tunnels", "Control", "Vending"],
   },
   de_overpass: {
     t: {
@@ -196,18 +195,6 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
         connector: { name: "下水道连接", callouts: ["Connector"] },
       },
     },
-    contested: [
-      "Fountain",
-      "LowerPark",
-      "UpperPark",
-      "Restroom",
-      "Tunnels",
-      "Connector",
-      "Canal",
-      "Pipe",
-      "Water",
-      "Construction",
-    ],
   },
 };
 
@@ -223,33 +210,42 @@ function calloutInAnchors(defaults: SideDefaults | null, callout: string): strin
   return null;
 }
 
-function isTerminalFor(side: DefaultPositionSide, callout: string): boolean {
-  if (side === "t") return callout === "BombsiteA" || callout === "BombsiteB" || callout === "CTSpawn";
-  return callout === "TSpawn";
-}
-
-export function isContested(mapName: string, callout: string): boolean {
-  return DEFAULT_POSITIONS[mapName]?.contested.includes(callout) ?? false;
-}
-
-export function roleOf(mapName: string, side: DefaultPositionSide, callout: string): CalloutRole {
-  const defaults = sideDefaults(mapName, side);
-  if (!defaults) return { kind: "other" };
-
-  const ownAnchorId = calloutInAnchors(defaults, callout);
-  if (ownAnchorId) return { kind: "default", anchorId: ownAnchorId };
-
-  if (isTerminalFor(side, callout)) return { kind: "terminal" };
-  if (isContested(mapName, callout)) return { kind: "advanced" };
-
-  const otherSide = side === "t" ? "ct" : "t";
-  const otherAnchorId = calloutInAnchors(sideDefaults(mapName, otherSide), callout);
-  if (otherAnchorId) return side === "t" ? { kind: "ct" } : { kind: "advanced" };
-
-  return { kind: "other" };
-}
-
 export function anchorOf(mapName: string, side: DefaultPositionSide, callout: string): string | null {
-  const role = roleOf(mapName, side, callout);
-  return role.kind === "default" ? role.anchorId : null;
+  return calloutInAnchors(sideDefaults(mapName, side), callout);
+}
+
+export function getDefaultAnchor(
+  mapName: string,
+  side: DefaultPositionSide,
+  callout: string,
+): DefaultAnchorMatch | null {
+  const defaults = sideDefaults(mapName, side);
+  const id = calloutInAnchors(defaults, callout);
+  if (!defaults || !id) return null;
+  return { id, ...defaults.anchors[id] };
+}
+
+/** 只组合两个静态真相源；推进、争夺、终点等动态语义由 core 时间线推导。 */
+export function classifyTacticalLocation(
+  mapName: string,
+  side: DefaultPositionSide,
+  callout: string | null,
+): TacticalLocation {
+  if (!callout) {
+    return {
+      callout: null,
+      tendencies: [],
+      primaryRegion: null,
+      defaultAnchorId: null,
+      isDefaultPosition: false,
+    };
+  }
+  const defaultAnchorId = anchorOf(mapName, side, callout);
+  return {
+    callout,
+    tendencies: getCalloutTendencies(mapName, callout) ?? [],
+    primaryRegion: getPrimaryCalloutRegion(mapName, callout),
+    defaultAnchorId,
+    isDefaultPosition: defaultAnchorId != null,
+  };
 }

@@ -44,5 +44,6 @@ describe("@cs2dak/presentation", () => {
       .sort((a, b) => a.startTick - b.startTick)[0]!;
 
     expect(firstReplayRound.targetEndTick).toBe(nextPackageRound.startTick);
+    expect(firstReplayRound.freezeEndTick).toBe(firstPackageRound.freezeEndTick);
   });
 });

@@ -1,18 +1,36 @@
+export type TacticalRegion = "a" | "b" | "mid";
+
 /** callout 条目：中文名 + 可选战术倾向。 */
 export interface CalloutNameEntry {
   cn: string;
   /** 战术倾向：首元素为该位置在阵容中的主要方向。取 tendency[0] 参与区域人数统计。 */
-  tendency?: Array<"a" | "b" | "mid">;
+  tendency?: TacticalRegion[];
+}
+
+/** 读取一个已知 callout 的静态定义；未知地图或 callout 返回 null。 */
+export function getCalloutDefinition(mapName: string, id: string): CalloutNameEntry | null {
+  return CALLOUT_DICT[mapName]?.[id] ?? null;
+}
+
+/** 读取有序战术方向；已知但未标注方向时返回空数组，未知 callout 返回 null。 */
+export function getCalloutTendencies(mapName: string, id: string): readonly TacticalRegion[] | null {
+  const entry = getCalloutDefinition(mapName, id);
+  return entry ? entry.tendency ?? [] : null;
+}
+
+/** 读取 callout 的主要方向。 */
+export function getPrimaryCalloutRegion(mapName: string, id: string): TacticalRegion | null {
+  return getCalloutTendencies(mapName, id)?.[0] ?? null;
+}
+
+/** 判断 callout 是否可连接到指定方向（包含次要方向）。 */
+export function calloutBelongsToRegion(mapName: string, id: string, region: TacticalRegion): boolean {
+  return getCalloutTendencies(mapName, id)?.includes(region) ?? false;
 }
 
 /** 取 callout 的中文名。 */
 export function calloutCn(mapName: string, id: string): string {
   return CALLOUT_DICT[mapName]?.[id]?.cn ?? "";
-}
-
-/** 取 callout 的战术倾向。 */
-export function calloutTendency(mapName: string, id: string): Array<"a" | "b" | "mid"> | undefined {
-  return CALLOUT_DICT[mapName]?.[id]?.tendency;
 }
 
 /**

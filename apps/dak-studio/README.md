@@ -26,6 +26,7 @@ pnpm dev:studio   # http://127.0.0.1:5178
 - **选手档案**：跨场画像（RR / Rating 2.0 / 六账户 / PRISM / 武器 / 每场走势 / 比赛列表）+ 关注选手 + 双人对比。
 - **开局动线**：选手在长枪局开局前 30 秒的走位 + 道具投掷叠加动画（默认最近 5 场，地图/阵营筛选，逐回合开关）。数据由 `@cs2dak/presentation` `buildOpeningTrails` 派生。
 - **排行榜**：`SeasonLeaderboard`，点选手跳档案。
+- **教练工作台**：导入时持久化 `TacticalRoundFact v5`；开局模式来自 core 的连续区域段与双层签名，前压使用独立中文 callout 证据。模式页常驻复用比赛工作台的 `ReplayViewer`，默认从 1:35 开始，回合/C4/赛后统一倒计时；不再生成或展示固定战术切片。
 
 选手档案、开局动线与排行榜共享同一个「聚合范围」（地图多选 + 标签 + 单场勾选），对应 `buildSeasonCohort` 的输入集合。
 
