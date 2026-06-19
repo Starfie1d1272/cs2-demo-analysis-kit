@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { pathToFileURL } from "node:url";
+import { routeEntryChokeId } from "../src/route-entry-chokes.js";
 import {
   addSequenceTransitions,
   clusterRouteCandidates,
@@ -15,6 +16,24 @@ describe("repoRootFromScriptUrl", () => {
     const url = pathToFileURL("/repo/packages/maps/scripts/derive-route-graph.ts").href;
 
     expect(repoRootFromScriptUrl(url)).toBe("/repo");
+  });
+});
+
+describe("routeEntryChokeId", () => {
+  it("separates Dust2 tunnel and mid-door entries while merging door/hole aliases", () => {
+    expect(routeEntryChokeId("de_dust2", "b", ["TSpawn", "UpperTunnel", "BombsiteB"]))
+      .toBe("b_upper_tunnel");
+    expect(routeEntryChokeId("de_dust2", "b", ["TSpawn", "BDoors", "BombsiteB"]))
+      .toBe("b_mid_doors");
+    expect(routeEntryChokeId("de_dust2", "b", ["TSpawn", "Hole", "BombsiteB"]))
+      .toBe("b_mid_doors");
+  });
+
+  it("treats Anubis Fountain as an extension of the Main entry", () => {
+    expect(routeEntryChokeId("de_anubis", "a", ["TSpawn", "Main", "BombsiteA"]))
+      .toBe("a_main");
+    expect(routeEntryChokeId("de_anubis", "a", ["TSpawn", "Main", "Fountain", "BombsiteA"]))
+      .toBe("a_main");
   });
 });
 
@@ -76,13 +95,13 @@ describe("findRouteCandidates", () => {
       edge("CTLane", "BombsiteA", 50, 201),
     ];
     const sequences = [
-      ["TSpawn", "Main", "BombsiteA"],
-      ["TSpawn", "Main", "BombsiteA"],
-      ["TSpawn", "Main", "BombsiteA"],
-      ["TSpawn", "Mid", "Connector", "BombsiteA"],
-      ["TSpawn", "Mid", "Connector", "BombsiteA"],
-      ["TSpawn", "Mid", "Connector", "BombsiteA"],
-      ["TSpawn", "BombsiteB", "BombsiteA"],
+      observedSequence(["TSpawn", "Main", "BombsiteA"], "p1", "r1"),
+      observedSequence(["TSpawn", "Main", "BombsiteA"], "p2", "r1"),
+      observedSequence(["TSpawn", "Main", "BombsiteA"], "p3", "r1"),
+      observedSequence(["TSpawn", "Mid", "Connector", "BombsiteA"], "p1", "r2"),
+      observedSequence(["TSpawn", "Mid", "Connector", "BombsiteA"], "p2", "r2"),
+      observedSequence(["TSpawn", "Mid", "Connector", "BombsiteA"], "p3", "r2"),
+      observedSequence(["TSpawn", "BombsiteB", "BombsiteA"], "p4", "r3"),
     ];
 
     const routes = findRouteCandidates(edges, sequences, {
@@ -101,6 +120,9 @@ describe("findRouteCandidates", () => {
       bottleneckCount: 18,
       totalCount: 38,
       playerRoundSupport: 3,
+      roundSupport: 1,
+      demoSupport: 1,
+      teamRoundSupport: 1,
     });
   });
 
@@ -114,7 +136,11 @@ describe("findRouteCandidates", () => {
       edge(path[0]!, path[1]!, 10, 0),
       edge(path[1]!, path[2]!, 10, 0),
     ]);
-    const sequences = paths.flatMap((path) => [path, path, path]);
+    const sequences = paths.flatMap((path, routeIndex) => [
+      observedSequence(path, `p${routeIndex}-1`, `r${routeIndex}`),
+      observedSequence(path, `p${routeIndex}-2`, `r${routeIndex}`),
+      observedSequence(path, `p${routeIndex}-3`, `r${routeIndex}`),
+    ]);
 
     const routes = findRouteCandidates(edges, sequences, {
       source: "TSpawn",
@@ -130,7 +156,7 @@ describe("findRouteCandidates", () => {
 
 describe("clusterRouteCandidates", () => {
   it("merges alternate entrances while preserving every concrete path", () => {
-    const corridors = clusterRouteCandidates("a", [
+    const corridors = clusterRouteCandidates("de_test", "a", [
       candidate(["TSpawn", "Street", "TSideUpper", "Canal", "Main", "BombsiteA"], 33),
       candidate(["TSpawn", "Street", "TStairs", "Canal", "Main", "BombsiteA"], 11),
       candidate(["TSpawn", "Ruins", "Bridge", "Middle", "Walkway", "BombsiteA"], 9),
@@ -161,11 +187,11 @@ describe("clusterRouteCandidates", () => {
       candidate(["TSpawn", `Lane${index + 1}`, "BombsiteA"], 10 - index),
     );
 
-    expect(clusterRouteCandidates("a", routes)).toHaveLength(6);
+    expect(clusterRouteCandidates("de_test", "a", routes)).toHaveLength(6);
   });
 
   it("keeps different terminal approaches separate despite a shared opening", () => {
-    const corridors = clusterRouteCandidates("b", [
+    const corridors = clusterRouteCandidates("de_test", "b", [
       candidate(["TSpawn", "LowerMid", "TRamp", "Middle", "Banana", "BombsiteB"], 100),
       candidate([
         "TSpawn",
@@ -184,7 +210,7 @@ describe("clusterRouteCandidates", () => {
   });
 
   it("keeps B ramp and side entrance as separate corridors", () => {
-    const corridors = clusterRouteCandidates("b", [
+    const corridors = clusterRouteCandidates("de_test", "b", [
       candidate(["TSpawn", "Tunnel", "Water", "Ruins", "Lower", "Ramp", "BombsiteB"], 100),
       candidate([
         "TSpawn",
@@ -201,6 +227,26 @@ describe("clusterRouteCandidates", () => {
     expect(corridors).toHaveLength(2);
   });
 
+  it("keeps dissimilar prefixes as variants when they share one entry choke", () => {
+    const corridors = clusterRouteCandidates("de_dust2", "b", [
+      candidate(["TSpawn", "Middle", "MidDoors", "BDoors", "BombsiteB"], 20),
+      candidate([
+        "TSpawn",
+        "OutsideTunnel",
+        "UpperTunnel",
+        "LowerTunnel",
+        "Middle",
+        "MidDoors",
+        "Hole",
+        "BombsiteB",
+      ], 10),
+    ]);
+
+    expect(corridors).toHaveLength(1);
+    expect(corridors[0]).toMatchObject({ id: "b_mid_doors", entryChokeId: "b_mid_doors" });
+    expect(corridors[0]?.variants).toHaveLength(2);
+  });
+
 });
 
 function edge(from: string, to: string, tCount: number, ctCount: number): ObservedEdge {
@@ -215,12 +261,32 @@ function edge(from: string, to: string, tCount: number, ctCount: number): Observ
 }
 
 function candidate(callouts: string[], playerRoundSupport: number) {
+  const key = callouts.join("-");
   return {
     callouts,
     bottleneckCount: playerRoundSupport,
     totalCount: playerRoundSupport * (callouts.length - 1),
     minTShare: 0.5,
     playerRoundSupport,
+    roundSupport: playerRoundSupport,
+    demoSupport: 1,
+    teamRoundSupport: playerRoundSupport,
+    supportKeys: {
+      playerRounds: Array.from({ length: playerRoundSupport }, (_, index) => `${key}:pr:${index}`),
+      rounds: Array.from({ length: playerRoundSupport }, (_, index) => `${key}:r:${index}`),
+      demos: [`${key}:demo`],
+      teamRounds: Array.from({ length: playerRoundSupport }, (_, index) => `${key}:tr:${index}`),
+    },
     score: 1,
+  };
+}
+
+function observedSequence(callouts: string[], player: string, round: string) {
+  return {
+    callouts,
+    demoKey: "demo-1",
+    roundKey: `demo-1:${round}`,
+    teamRoundKey: `demo-1:${round}:teamA`,
+    playerRoundKey: `demo-1:${round}:${player}`,
   };
 }

@@ -2,7 +2,7 @@
 
 扫描 ZIP：110
 候选限制：maxHops=12，minEdgeCount=3，minRouteSupport=3 player-round；不限制候选条数。
-聚类口径：去掉起点/包点后，callout Jaccard ≥ 0.60，或较短路径的有序覆盖 ≥ 0.75。
+聚类口径：`entryChokeId` 决定 route family；同一最终入口下的全部完整走法保留为 variants。
 统计窗口：每回合 freezeEndTick 至 endTick；只统计存活玩家的 replay place。
 去抖口径：连续 callout 合并为 visit；少于 2 帧的 visit 丢弃；死亡或缺失 callout 截断序列。
 
@@ -67,104 +67,81 @@
 
 ### A 包 Route Corridors
 
-| corridor | 共同骨架 | variants | 累计 player-round 支持 | 主 variant 支持 |
-|---|---|---:|---:|---:|
-| a_corridor_01 | TSpawn / 匪家 → Outside / 匪口 → MainHall / A厅 → BombsiteA / A包 | 2 | 549 | 540 |
-| a_corridor_02 | TSpawn / 匪家 → Outside / 匪口 → Middle / 中路 → SideHall / 甜甜圈 → BombsiteA / A包 | 1 | 100 | 100 |
-| a_corridor_03 | TSpawn / 匪家 → Tunnel / 隧道 → Water / 水路 → Ruins / B外 → TSideLower / B小 → TSideUpper / 跳台 → Middle / 中路 → SideHall / 甜甜圈 → BombsiteA / A包 | 1 | 46 | 46 |
-| a_corridor_04 | TSpawn / 匪家 → Middle / 中路 → TopofMid / 中远 → House / VIP → CTSpawn / 警家 → BombsiteA / A包 | 2 | 22 | 17 |
+| corridor | entryChokeId | 共同骨架 | variants | player-round | round | demo | team-round |
+|---|---|---|---:|---:|---:|---:|---:|
+| a_main | a_main | TSpawn / 匪家 → Outside / 匪口 → MainHall / A厅 → BombsiteA / A包 | 2 | 549 | 207 | 23 | 207 |
+| a_side_hall | a_side_hall | TSpawn / 匪家 → Middle / 中路 → SideHall / 甜甜圈 → BombsiteA / A包 | 2 | 146 | 69 | 23 | 69 |
+| a_ct_spawn | a_ct_spawn | TSpawn / 匪家 → Middle / 中路 → TopofMid / 中远 → House / VIP → CTSpawn / 警家 → BombsiteA / A包 | 2 | 22 | 16 | 12 | 16 |
 
-#### a_corridor_01
+#### a_main
 
 共同骨架：TSpawn / 匪家 → Outside / 匪口 → MainHall / A厅 → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Outside / 匪口 → MainHall / A厅 → BombsiteA / A包 | 540 | 660 | 91.0% |
-| 2 | TSpawn / 匪家 → Tunnel / 隧道 → Water / 水路 → Ruins / B外 → TSideLower / B小 → TSideUpper / 跳台 → Middle / 中路 → Outside / 匪口 → MainHall / A厅 → BombsiteA / A包 | 9 | 133 | 51.2% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Outside / 匪口 → MainHall / A厅 → BombsiteA / A包 | 540 | 207 | 23 | 207 | 660 | 91.0% |
+| 2 | TSpawn / 匪家 → Tunnel / 隧道 → Water / 水路 → Ruins / B外 → TSideLower / B小 → TSideUpper / 跳台 → Middle / 中路 → Outside / 匪口 → MainHall / A厅 → BombsiteA / A包 | 9 | 8 | 7 | 8 | 133 | 51.2% |
 
-#### a_corridor_02
+#### a_side_hall
 
-共同骨架：TSpawn / 匪家 → Outside / 匪口 → Middle / 中路 → SideHall / 甜甜圈 → BombsiteA / A包
+共同骨架：TSpawn / 匪家 → Middle / 中路 → SideHall / 甜甜圈 → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Outside / 匪口 → Middle / 中路 → SideHall / 甜甜圈 → BombsiteA / A包 | 100 | 169 | 31.0% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Outside / 匪口 → Middle / 中路 → SideHall / 甜甜圈 → BombsiteA / A包 | 100 | 56 | 21 | 56 | 169 | 31.0% |
+| 2 | TSpawn / 匪家 → Tunnel / 隧道 → Water / 水路 → Ruins / B外 → TSideLower / B小 → TSideUpper / 跳台 → Middle / 中路 → SideHall / 甜甜圈 → BombsiteA / A包 | 46 | 38 | 21 | 38 | 169 | 31.0% |
 
-#### a_corridor_03
-
-共同骨架：TSpawn / 匪家 → Tunnel / 隧道 → Water / 水路 → Ruins / B外 → TSideLower / B小 → TSideUpper / 跳台 → Middle / 中路 → SideHall / 甜甜圈 → BombsiteA / A包
-
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Tunnel / 隧道 → Water / 水路 → Ruins / B外 → TSideLower / B小 → TSideUpper / 跳台 → Middle / 中路 → SideHall / 甜甜圈 → BombsiteA / A包 | 46 | 169 | 31.0% |
-
-#### a_corridor_04
+#### a_ct_spawn
 
 共同骨架：TSpawn / 匪家 → Middle / 中路 → TopofMid / 中远 → House / VIP → CTSpawn / 警家 → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Outside / 匪口 → Middle / 中路 → TopofMid / 中远 → House / VIP → CTSpawn / 警家 → BombsiteA / A包 | 17 | 58 | 5.3% |
-| 2 | TSpawn / 匪家 → Tunnel / 隧道 → Water / 水路 → Ruins / B外 → TSideLower / B小 → TSideUpper / 跳台 → Middle / 中路 → TopofMid / 中远 → House / VIP → CTSpawn / 警家 → BombsiteA / A包 | 5 | 58 | 5.3% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Outside / 匪口 → Middle / 中路 → TopofMid / 中远 → House / VIP → CTSpawn / 警家 → BombsiteA / A包 | 17 | 12 | 11 | 12 | 58 | 5.3% |
+| 2 | TSpawn / 匪家 → Tunnel / 隧道 → Water / 水路 → Ruins / B外 → TSideLower / B小 → TSideUpper / 跳台 → Middle / 中路 → TopofMid / 中远 → House / VIP → CTSpawn / 警家 → BombsiteA / A包 | 5 | 5 | 5 | 5 | 58 | 5.3% |
 
 ### B 包 Route Corridors
 
-| corridor | 共同骨架 | variants | 累计 player-round 支持 | 主 variant 支持 |
-|---|---|---:|---:|---:|
-| b_corridor_01 | TSpawn / 匪家 → Tunnel / 隧道 → Water / 水路 → Ruins / B外 → TSideLower / B小 → Ramp / B坡 → BombsiteB / B包 | 1 | 566 | 566 |
-| b_corridor_02 | TSpawn / 匪家 → Tunnel / 隧道 → Water / 水路 → Ruins / B外 → TSideLower / B小 → TSideUpper / 跳台 → SideEntrance / 黑屋 → BombsiteB / B包 | 1 | 102 | 102 |
-| b_corridor_03 | TSpawn / 匪家 → Outside / 匪口 → Middle / 中路 → TSideUpper / 跳台 → SideEntrance / 黑屋 → BombsiteB / B包 | 1 | 46 | 46 |
-| b_corridor_04 | TSpawn / 匪家 → Outside / 匪口 → Middle / 中路 → TSideUpper / 跳台 → TSideLower / B小 → Ramp / B坡 → BombsiteB / B包 | 1 | 22 | 22 |
-| b_corridor_05 | TSpawn / 匪家 → Outside / 匪口 → Middle / 中路 → TopofMid / 中远 → House / VIP → Alley / 底线 → BombsiteB / B包 | 1 | 15 | 15 |
+| corridor | entryChokeId | 共同骨架 | variants | player-round | round | demo | team-round |
+|---|---|---|---:|---:|---:|---:|---:|
+| b_ramp | b_ramp | TSpawn / 匪家 → TSideLower / B小 → Ramp / B坡 → BombsiteB / B包 | 2 | 588 | 243 | 23 | 243 |
+| b_side_entrance | b_side_entrance | TSpawn / 匪家 → TSideUpper / 跳台 → SideEntrance / 黑屋 → BombsiteB / B包 | 2 | 148 | 96 | 23 | 96 |
+| b_alley | b_alley | TSpawn / 匪家 → Outside / 匪口 → Middle / 中路 → TopofMid / 中远 → House / VIP → Alley / 底线 → BombsiteB / B包 | 1 | 15 | 12 | 9 | 12 |
 
-#### b_corridor_01
+#### b_ramp
 
-共同骨架：TSpawn / 匪家 → Tunnel / 隧道 → Water / 水路 → Ruins / B外 → TSideLower / B小 → Ramp / B坡 → BombsiteB / B包
+共同骨架：TSpawn / 匪家 → TSideLower / B小 → Ramp / B坡 → BombsiteB / B包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Tunnel / 隧道 → Water / 水路 → Ruins / B外 → TSideLower / B小 → Ramp / B坡 → BombsiteB / B包 | 566 | 627 | 84.6% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Tunnel / 隧道 → Water / 水路 → Ruins / B外 → TSideLower / B小 → Ramp / B坡 → BombsiteB / B包 | 566 | 240 | 23 | 240 | 627 | 84.6% |
+| 2 | TSpawn / 匪家 → Outside / 匪口 → Middle / 中路 → TSideUpper / 跳台 → TSideLower / B小 → Ramp / B坡 → BombsiteB / B包 | 22 | 21 | 13 | 21 | 207 | 43.8% |
 
-#### b_corridor_02
+#### b_side_entrance
 
-共同骨架：TSpawn / 匪家 → Tunnel / 隧道 → Water / 水路 → Ruins / B外 → TSideLower / B小 → TSideUpper / 跳台 → SideEntrance / 黑屋 → BombsiteB / B包
+共同骨架：TSpawn / 匪家 → TSideUpper / 跳台 → SideEntrance / 黑屋 → BombsiteB / B包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Tunnel / 隧道 → Water / 水路 → Ruins / B外 → TSideLower / B小 → TSideUpper / 跳台 → SideEntrance / 黑屋 → BombsiteB / B包 | 102 | 211 | 32.0% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Tunnel / 隧道 → Water / 水路 → Ruins / B外 → TSideLower / B小 → TSideUpper / 跳台 → SideEntrance / 黑屋 → BombsiteB / B包 | 102 | 75 | 21 | 75 | 211 | 32.0% |
+| 2 | TSpawn / 匪家 → Outside / 匪口 → Middle / 中路 → TSideUpper / 跳台 → SideEntrance / 黑屋 → BombsiteB / B包 | 46 | 37 | 19 | 37 | 207 | 32.0% |
 
-#### b_corridor_03
-
-共同骨架：TSpawn / 匪家 → Outside / 匪口 → Middle / 中路 → TSideUpper / 跳台 → SideEntrance / 黑屋 → BombsiteB / B包
-
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Outside / 匪口 → Middle / 中路 → TSideUpper / 跳台 → SideEntrance / 黑屋 → BombsiteB / B包 | 46 | 207 | 32.0% |
-
-#### b_corridor_04
-
-共同骨架：TSpawn / 匪家 → Outside / 匪口 → Middle / 中路 → TSideUpper / 跳台 → TSideLower / B小 → Ramp / B坡 → BombsiteB / B包
-
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Outside / 匪口 → Middle / 中路 → TSideUpper / 跳台 → TSideLower / B小 → Ramp / B坡 → BombsiteB / B包 | 22 | 207 | 43.8% |
-
-#### b_corridor_05
+#### b_alley
 
 共同骨架：TSpawn / 匪家 → Outside / 匪口 → Middle / 中路 → TopofMid / 中远 → House / VIP → Alley / 底线 → BombsiteB / B包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Outside / 匪口 → Middle / 中路 → TopofMid / 中远 → House / VIP → Alley / 底线 → BombsiteB / B包 | 15 | 67 | 3.7% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Outside / 匪口 → Middle / 中路 → TopofMid / 中远 → House / VIP → Alley / 底线 → BombsiteB / B包 | 15 | 12 | 9 | 12 | 67 | 3.7% |
 
 ### Corridor 候选 JSON
 
 ```json
 [
   {
-    "id": "a_corridor_01",
+    "id": "a_main",
     "target": "a",
+    "entryChokeId": "a_main",
     "sharedCallouts": [
       "TSpawn",
       "Outside",
@@ -178,6 +155,9 @@
       "BombsiteA"
     ],
     "totalPlayerRoundSupport": 549,
+    "roundSupport": 207,
+    "demoSupport": 23,
+    "teamRoundSupport": 207,
     "variants": [
       {
         "callouts": [
@@ -186,7 +166,10 @@
           "MainHall",
           "BombsiteA"
         ],
-        "playerRoundSupport": 540
+        "playerRoundSupport": 540,
+        "roundSupport": 207,
+        "demoSupport": 23,
+        "teamRoundSupport": 207
       },
       {
         "callouts": [
@@ -201,17 +184,20 @@
           "MainHall",
           "BombsiteA"
         ],
-        "playerRoundSupport": 9
+        "playerRoundSupport": 9,
+        "roundSupport": 8,
+        "demoSupport": 7,
+        "teamRoundSupport": 8
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "a_corridor_02",
+    "id": "a_side_hall",
     "target": "a",
+    "entryChokeId": "a_side_hall",
     "sharedCallouts": [
       "TSpawn",
-      "Outside",
       "Middle",
       "SideHall",
       "BombsiteA"
@@ -223,7 +209,10 @@
       "SideHall",
       "BombsiteA"
     ],
-    "totalPlayerRoundSupport": 100,
+    "totalPlayerRoundSupport": 146,
+    "roundSupport": 69,
+    "demoSupport": 23,
+    "teamRoundSupport": 69,
     "variants": [
       {
         "callouts": [
@@ -233,38 +222,11 @@
           "SideHall",
           "BombsiteA"
         ],
-        "playerRoundSupport": 100
-      }
-    ],
-    "confidence": "observed-complete-path-cluster"
-  },
-  {
-    "id": "a_corridor_03",
-    "target": "a",
-    "sharedCallouts": [
-      "TSpawn",
-      "Tunnel",
-      "Water",
-      "Ruins",
-      "TSideLower",
-      "TSideUpper",
-      "Middle",
-      "SideHall",
-      "BombsiteA"
-    ],
-    "representativeCallouts": [
-      "TSpawn",
-      "Tunnel",
-      "Water",
-      "Ruins",
-      "TSideLower",
-      "TSideUpper",
-      "Middle",
-      "SideHall",
-      "BombsiteA"
-    ],
-    "totalPlayerRoundSupport": 46,
-    "variants": [
+        "playerRoundSupport": 100,
+        "roundSupport": 56,
+        "demoSupport": 21,
+        "teamRoundSupport": 56
+      },
       {
         "callouts": [
           "TSpawn",
@@ -277,14 +239,18 @@
           "SideHall",
           "BombsiteA"
         ],
-        "playerRoundSupport": 46
+        "playerRoundSupport": 46,
+        "roundSupport": 38,
+        "demoSupport": 21,
+        "teamRoundSupport": 38
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "a_corridor_04",
+    "id": "a_ct_spawn",
     "target": "a",
+    "entryChokeId": "a_ct_spawn",
     "sharedCallouts": [
       "TSpawn",
       "Middle",
@@ -303,6 +269,9 @@
       "BombsiteA"
     ],
     "totalPlayerRoundSupport": 22,
+    "roundSupport": 16,
+    "demoSupport": 12,
+    "teamRoundSupport": 16,
     "variants": [
       {
         "callouts": [
@@ -314,7 +283,10 @@
           "CTSpawn",
           "BombsiteA"
         ],
-        "playerRoundSupport": 17
+        "playerRoundSupport": 17,
+        "roundSupport": 12,
+        "demoSupport": 11,
+        "teamRoundSupport": 12
       },
       {
         "callouts": [
@@ -330,19 +302,20 @@
           "CTSpawn",
           "BombsiteA"
         ],
-        "playerRoundSupport": 5
+        "playerRoundSupport": 5,
+        "roundSupport": 5,
+        "demoSupport": 5,
+        "teamRoundSupport": 5
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "b_corridor_01",
+    "id": "b_ramp",
     "target": "b",
+    "entryChokeId": "b_ramp",
     "sharedCallouts": [
       "TSpawn",
-      "Tunnel",
-      "Water",
-      "Ruins",
       "TSideLower",
       "Ramp",
       "BombsiteB"
@@ -356,7 +329,10 @@
       "Ramp",
       "BombsiteB"
     ],
-    "totalPlayerRoundSupport": 566,
+    "totalPlayerRoundSupport": 588,
+    "roundSupport": 243,
+    "demoSupport": 23,
+    "teamRoundSupport": 243,
     "variants": [
       {
         "callouts": [
@@ -368,20 +344,35 @@
           "Ramp",
           "BombsiteB"
         ],
-        "playerRoundSupport": 566
+        "playerRoundSupport": 566,
+        "roundSupport": 240,
+        "demoSupport": 23,
+        "teamRoundSupport": 240
+      },
+      {
+        "callouts": [
+          "TSpawn",
+          "Outside",
+          "Middle",
+          "TSideUpper",
+          "TSideLower",
+          "Ramp",
+          "BombsiteB"
+        ],
+        "playerRoundSupport": 22,
+        "roundSupport": 21,
+        "demoSupport": 13,
+        "teamRoundSupport": 21
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "b_corridor_02",
+    "id": "b_side_entrance",
     "target": "b",
+    "entryChokeId": "b_side_entrance",
     "sharedCallouts": [
       "TSpawn",
-      "Tunnel",
-      "Water",
-      "Ruins",
-      "TSideLower",
       "TSideUpper",
       "SideEntrance",
       "BombsiteB"
@@ -396,7 +387,10 @@
       "SideEntrance",
       "BombsiteB"
     ],
-    "totalPlayerRoundSupport": 102,
+    "totalPlayerRoundSupport": 148,
+    "roundSupport": 96,
+    "demoSupport": 23,
+    "teamRoundSupport": 96,
     "variants": [
       {
         "callouts": [
@@ -409,32 +403,11 @@
           "SideEntrance",
           "BombsiteB"
         ],
-        "playerRoundSupport": 102
-      }
-    ],
-    "confidence": "observed-complete-path-cluster"
-  },
-  {
-    "id": "b_corridor_03",
-    "target": "b",
-    "sharedCallouts": [
-      "TSpawn",
-      "Outside",
-      "Middle",
-      "TSideUpper",
-      "SideEntrance",
-      "BombsiteB"
-    ],
-    "representativeCallouts": [
-      "TSpawn",
-      "Outside",
-      "Middle",
-      "TSideUpper",
-      "SideEntrance",
-      "BombsiteB"
-    ],
-    "totalPlayerRoundSupport": 46,
-    "variants": [
+        "playerRoundSupport": 102,
+        "roundSupport": 75,
+        "demoSupport": 21,
+        "teamRoundSupport": 75
+      },
       {
         "callouts": [
           "TSpawn",
@@ -444,52 +417,18 @@
           "SideEntrance",
           "BombsiteB"
         ],
-        "playerRoundSupport": 46
+        "playerRoundSupport": 46,
+        "roundSupport": 37,
+        "demoSupport": 19,
+        "teamRoundSupport": 37
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "b_corridor_04",
+    "id": "b_alley",
     "target": "b",
-    "sharedCallouts": [
-      "TSpawn",
-      "Outside",
-      "Middle",
-      "TSideUpper",
-      "TSideLower",
-      "Ramp",
-      "BombsiteB"
-    ],
-    "representativeCallouts": [
-      "TSpawn",
-      "Outside",
-      "Middle",
-      "TSideUpper",
-      "TSideLower",
-      "Ramp",
-      "BombsiteB"
-    ],
-    "totalPlayerRoundSupport": 22,
-    "variants": [
-      {
-        "callouts": [
-          "TSpawn",
-          "Outside",
-          "Middle",
-          "TSideUpper",
-          "TSideLower",
-          "Ramp",
-          "BombsiteB"
-        ],
-        "playerRoundSupport": 22
-      }
-    ],
-    "confidence": "observed-complete-path-cluster"
-  },
-  {
-    "id": "b_corridor_05",
-    "target": "b",
+    "entryChokeId": "b_alley",
     "sharedCallouts": [
       "TSpawn",
       "Outside",
@@ -509,6 +448,9 @@
       "BombsiteB"
     ],
     "totalPlayerRoundSupport": 15,
+    "roundSupport": 12,
+    "demoSupport": 9,
+    "teamRoundSupport": 12,
     "variants": [
       {
         "callouts": [
@@ -520,7 +462,10 @@
           "Alley",
           "BombsiteB"
         ],
-        "playerRoundSupport": 15
+        "playerRoundSupport": 15,
+        "roundSupport": 12,
+        "demoSupport": 9,
+        "teamRoundSupport": 12
       }
     ],
     "confidence": "observed-complete-path-cluster"
@@ -579,80 +524,81 @@
 
 ### A 包 Route Corridors
 
-| corridor | 共同骨架 | variants | 累计 player-round 支持 | 主 variant 支持 |
-|---|---|---:|---:|---:|
-| a_corridor_01 | TSpawn / 匪家 → Street / 街道 → Canal / 水下 → Main / A厅 → BombsiteA / A包 | 7 | 68 | 33 |
-| a_corridor_02 | TSpawn / 匪家 → Bridge / 中桥 → Middle / 中路 → Walkway / A连 → BombsiteA / A包 | 4 | 23 | 9 |
+| corridor | entryChokeId | 共同骨架 | variants | player-round | round | demo | team-round |
+|---|---|---|---:|---:|---:|---:|---:|
+| a_main | a_main | TSpawn / 匪家 → Street / 街道 → Canal / 水下 → Main / A厅 → BombsiteA / A包 | 7 | 68 | 33 | 5 | 33 |
+| a_walkway | a_walkway | TSpawn / 匪家 → Bridge / 中桥 → Middle / 中路 → Walkway / A连 → BombsiteA / A包 | 4 | 23 | 15 | 5 | 15 |
 
-#### a_corridor_01
+#### a_main
 
 共同骨架：TSpawn / 匪家 → Street / 街道 → Canal / 水下 → Main / A厅 → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Street / 街道 → TSideUpper / 匪跳 → Canal / 水下 → Main / A厅 → BombsiteA / A包 | 33 | 63 | 42.9% |
-| 2 | TSpawn / 匪家 → Street / 街道 → TStairs / 匪梯 → Canal / 水下 → Main / A厅 → BombsiteA / A包 | 11 | 63 | 42.9% |
-| 3 | TSpawn / 匪家 → Ruins / B外 → Bridge / 中桥 → Street / 街道 → TSideUpper / 匪跳 → Canal / 水下 → Main / A厅 → BombsiteA / A包 | 6 | 56 | 42.9% |
-| 4 | TSpawn / 匪家 → Street / 街道 → TStairs / 匪梯 → Canal / 水下 → Main / A厅 → Fountain / 喷泉 → BombsiteA / A包 | 6 | 16 | 41.0% |
-| 5 | TSpawn / 匪家 → Street / 街道 → TSideUpper / 匪跳 → Canal / 水下 → Main / A厅 → Fountain / 喷泉 → BombsiteA / A包 | 5 | 16 | 41.0% |
-| 6 | TSpawn / 匪家 → Ruins / B外 → Bridge / 中桥 → Street / 街道 → TStairs / 匪梯 → Canal / 水下 → Main / A厅 → BombsiteA / A包 | 4 | 56 | 42.9% |
-| 7 | TSpawn / 匪家 → Ruins / B外 → Bridge / 中桥 → Street / 街道 → TStairs / 匪梯 → Canal / 水下 → Main / A厅 → Fountain / 喷泉 → BombsiteA / A包 | 3 | 16 | 41.0% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Street / 街道 → TSideUpper / 匪跳 → Canal / 水下 → Main / A厅 → BombsiteA / A包 | 33 | 25 | 5 | 25 | 63 | 42.9% |
+| 2 | TSpawn / 匪家 → Street / 街道 → TStairs / 匪梯 → Canal / 水下 → Main / A厅 → BombsiteA / A包 | 11 | 10 | 4 | 10 | 63 | 42.9% |
+| 3 | TSpawn / 匪家 → Ruins / B外 → Bridge / 中桥 → Street / 街道 → TSideUpper / 匪跳 → Canal / 水下 → Main / A厅 → BombsiteA / A包 | 6 | 5 | 3 | 5 | 56 | 42.9% |
+| 4 | TSpawn / 匪家 → Street / 街道 → TStairs / 匪梯 → Canal / 水下 → Main / A厅 → Fountain / 喷泉 → BombsiteA / A包 | 6 | 6 | 4 | 6 | 16 | 41.0% |
+| 5 | TSpawn / 匪家 → Street / 街道 → TSideUpper / 匪跳 → Canal / 水下 → Main / A厅 → Fountain / 喷泉 → BombsiteA / A包 | 5 | 5 | 3 | 5 | 16 | 41.0% |
+| 6 | TSpawn / 匪家 → Ruins / B外 → Bridge / 中桥 → Street / 街道 → TStairs / 匪梯 → Canal / 水下 → Main / A厅 → BombsiteA / A包 | 4 | 4 | 2 | 4 | 56 | 42.9% |
+| 7 | TSpawn / 匪家 → Ruins / B外 → Bridge / 中桥 → Street / 街道 → TStairs / 匪梯 → Canal / 水下 → Main / A厅 → Fountain / 喷泉 → BombsiteA / A包 | 3 | 3 | 3 | 3 | 16 | 41.0% |
 
-#### a_corridor_02
+#### a_walkway
 
 共同骨架：TSpawn / 匪家 → Bridge / 中桥 → Middle / 中路 → Walkway / A连 → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Ruins / B外 → Bridge / 中桥 → MidDoors / 中门 → Middle / 中路 → Walkway / A连 → BombsiteA / A包 | 9 | 37 | 16.3% |
-| 2 | TSpawn / 匪家 → Ruins / B外 → Bridge / 中桥 → Middle / 中路 → Walkway / A连 → BombsiteA / A包 | 8 | 37 | 16.3% |
-| 3 | TSpawn / 匪家 → Street / 街道 → Bridge / 中桥 → Middle / 中路 → Walkway / A连 → BombsiteA / A包 | 3 | 37 | 16.3% |
-| 4 | TSpawn / 匪家 → Street / 街道 → Bridge / 中桥 → MidDoors / 中门 → Middle / 中路 → Walkway / A连 → BombsiteA / A包 | 3 | 37 | 16.3% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Ruins / B外 → Bridge / 中桥 → MidDoors / 中门 → Middle / 中路 → Walkway / A连 → BombsiteA / A包 | 9 | 8 | 3 | 8 | 37 | 16.3% |
+| 2 | TSpawn / 匪家 → Ruins / B外 → Bridge / 中桥 → Middle / 中路 → Walkway / A连 → BombsiteA / A包 | 8 | 7 | 4 | 7 | 37 | 16.3% |
+| 3 | TSpawn / 匪家 → Street / 街道 → Bridge / 中桥 → Middle / 中路 → Walkway / A连 → BombsiteA / A包 | 3 | 3 | 2 | 3 | 37 | 16.3% |
+| 4 | TSpawn / 匪家 → Street / 街道 → Bridge / 中桥 → MidDoors / 中门 → Middle / 中路 → Walkway / A连 → BombsiteA / A包 | 3 | 3 | 3 | 3 | 37 | 16.3% |
 
 ### B 包 Route Corridors
 
-| corridor | 共同骨架 | variants | 累计 player-round 支持 | 主 variant 支持 |
-|---|---|---:|---:|---:|
-| b_corridor_01 | TSpawn / 匪家 → Ruins / B外 → OutsideLong / B外 → BombsiteB / B包 | 2 | 122 | 113 |
-| b_corridor_02 | TSpawn / 匪家 → Street / 街道 → Canal / 水下 → Connector / 黑屋 → BombsiteB / B包 | 3 | 48 | 31 |
-| b_corridor_03 | TSpawn / 匪家 → Bridge / 中桥 → Middle / 中路 → PalaceInterior / B连 → Bricks / B连阳光房 → BombsiteB / B包 | 3 | 11 | 5 |
+| corridor | entryChokeId | 共同骨架 | variants | player-round | round | demo | team-round |
+|---|---|---|---:|---:|---:|---:|---:|
+| b_outside | b_outside | TSpawn / 匪家 → Ruins / B外 → OutsideLong / B外 → BombsiteB / B包 | 2 | 122 | 53 | 5 | 53 |
+| b_connector | b_connector | TSpawn / 匪家 → Street / 街道 → Canal / 水下 → Connector / 黑屋 → BombsiteB / B包 | 3 | 48 | 30 | 5 | 30 |
+| b_bricks | b_bricks | TSpawn / 匪家 → Bridge / 中桥 → Middle / 中路 → PalaceInterior / B连 → Bricks / B连阳光房 → BombsiteB / B包 | 3 | 11 | 7 | 4 | 7 |
 
-#### b_corridor_01
+#### b_outside
 
 共同骨架：TSpawn / 匪家 → Ruins / B外 → OutsideLong / B外 → BombsiteB / B包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Ruins / B外 → OutsideLong / B外 → BombsiteB / B包 | 113 | 134 | 86.5% |
-| 2 | TSpawn / 匪家 → Street / 街道 → Bridge / 中桥 → Ruins / B外 → OutsideLong / B外 → BombsiteB / B包 | 9 | 77 | 86.5% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Ruins / B外 → OutsideLong / B外 → BombsiteB / B包 | 113 | 52 | 5 | 52 | 134 | 86.5% |
+| 2 | TSpawn / 匪家 → Street / 街道 → Bridge / 中桥 → Ruins / B外 → OutsideLong / B外 → BombsiteB / B包 | 9 | 9 | 5 | 9 | 77 | 86.5% |
 
-#### b_corridor_02
+#### b_connector
 
 共同骨架：TSpawn / 匪家 → Street / 街道 → Canal / 水下 → Connector / 黑屋 → BombsiteB / B包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Street / 街道 → TStairs / 匪梯 → Canal / 水下 → Connector / 黑屋 → BombsiteB / B包 | 31 | 69 | 33.0% |
-| 2 | TSpawn / 匪家 → Street / 街道 → TSideUpper / 匪跳 → Canal / 水下 → Connector / 黑屋 → BombsiteB / B包 | 11 | 69 | 33.0% |
-| 3 | TSpawn / 匪家 → Ruins / B外 → Bridge / 中桥 → Street / 街道 → TStairs / 匪梯 → Canal / 水下 → Connector / 黑屋 → BombsiteB / B包 | 6 | 56 | 33.0% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Street / 街道 → TStairs / 匪梯 → Canal / 水下 → Connector / 黑屋 → BombsiteB / B包 | 31 | 24 | 5 | 24 | 69 | 33.0% |
+| 2 | TSpawn / 匪家 → Street / 街道 → TSideUpper / 匪跳 → Canal / 水下 → Connector / 黑屋 → BombsiteB / B包 | 11 | 11 | 4 | 11 | 69 | 33.0% |
+| 3 | TSpawn / 匪家 → Ruins / B外 → Bridge / 中桥 → Street / 街道 → TStairs / 匪梯 → Canal / 水下 → Connector / 黑屋 → BombsiteB / B包 | 6 | 5 | 5 | 5 | 56 | 33.0% |
 
-#### b_corridor_03
+#### b_bricks
 
 共同骨架：TSpawn / 匪家 → Bridge / 中桥 → Middle / 中路 → PalaceInterior / B连 → Bricks / B连阳光房 → BombsiteB / B包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Ruins / B外 → Bridge / 中桥 → Middle / 中路 → PalaceInterior / B连 → Bricks / B连阳光房 → BombsiteB / B包 | 5 | 16 | 13.7% |
-| 2 | TSpawn / 匪家 → Ruins / B外 → Bridge / 中桥 → MidDoors / 中门 → Middle / 中路 → PalaceInterior / B连 → Bricks / B连阳光房 → BombsiteB / B包 | 3 | 16 | 13.7% |
-| 3 | TSpawn / 匪家 → Street / 街道 → Bridge / 中桥 → Middle / 中路 → PalaceInterior / B连 → Bricks / B连阳光房 → BombsiteB / B包 | 3 | 16 | 13.7% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Ruins / B外 → Bridge / 中桥 → Middle / 中路 → PalaceInterior / B连 → Bricks / B连阳光房 → BombsiteB / B包 | 5 | 4 | 2 | 4 | 16 | 13.7% |
+| 2 | TSpawn / 匪家 → Ruins / B外 → Bridge / 中桥 → MidDoors / 中门 → Middle / 中路 → PalaceInterior / B连 → Bricks / B连阳光房 → BombsiteB / B包 | 3 | 3 | 3 | 3 | 16 | 13.7% |
+| 3 | TSpawn / 匪家 → Street / 街道 → Bridge / 中桥 → Middle / 中路 → PalaceInterior / B连 → Bricks / B连阳光房 → BombsiteB / B包 | 3 | 3 | 3 | 3 | 16 | 13.7% |
 
 ### Corridor 候选 JSON
 
 ```json
 [
   {
-    "id": "a_corridor_01",
+    "id": "a_main",
     "target": "a",
+    "entryChokeId": "a_main",
     "sharedCallouts": [
       "TSpawn",
       "Street",
@@ -669,6 +615,9 @@
       "BombsiteA"
     ],
     "totalPlayerRoundSupport": 68,
+    "roundSupport": 33,
+    "demoSupport": 5,
+    "teamRoundSupport": 33,
     "variants": [
       {
         "callouts": [
@@ -679,7 +628,10 @@
           "Main",
           "BombsiteA"
         ],
-        "playerRoundSupport": 33
+        "playerRoundSupport": 33,
+        "roundSupport": 25,
+        "demoSupport": 5,
+        "teamRoundSupport": 25
       },
       {
         "callouts": [
@@ -690,7 +642,10 @@
           "Main",
           "BombsiteA"
         ],
-        "playerRoundSupport": 11
+        "playerRoundSupport": 11,
+        "roundSupport": 10,
+        "demoSupport": 4,
+        "teamRoundSupport": 10
       },
       {
         "callouts": [
@@ -703,7 +658,10 @@
           "Main",
           "BombsiteA"
         ],
-        "playerRoundSupport": 6
+        "playerRoundSupport": 6,
+        "roundSupport": 5,
+        "demoSupport": 3,
+        "teamRoundSupport": 5
       },
       {
         "callouts": [
@@ -715,7 +673,10 @@
           "Fountain",
           "BombsiteA"
         ],
-        "playerRoundSupport": 6
+        "playerRoundSupport": 6,
+        "roundSupport": 6,
+        "demoSupport": 4,
+        "teamRoundSupport": 6
       },
       {
         "callouts": [
@@ -727,7 +688,10 @@
           "Fountain",
           "BombsiteA"
         ],
-        "playerRoundSupport": 5
+        "playerRoundSupport": 5,
+        "roundSupport": 5,
+        "demoSupport": 3,
+        "teamRoundSupport": 5
       },
       {
         "callouts": [
@@ -740,7 +704,10 @@
           "Main",
           "BombsiteA"
         ],
-        "playerRoundSupport": 4
+        "playerRoundSupport": 4,
+        "roundSupport": 4,
+        "demoSupport": 2,
+        "teamRoundSupport": 4
       },
       {
         "callouts": [
@@ -754,14 +721,18 @@
           "Fountain",
           "BombsiteA"
         ],
-        "playerRoundSupport": 3
+        "playerRoundSupport": 3,
+        "roundSupport": 3,
+        "demoSupport": 3,
+        "teamRoundSupport": 3
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "a_corridor_02",
+    "id": "a_walkway",
     "target": "a",
+    "entryChokeId": "a_walkway",
     "sharedCallouts": [
       "TSpawn",
       "Bridge",
@@ -779,6 +750,9 @@
       "BombsiteA"
     ],
     "totalPlayerRoundSupport": 23,
+    "roundSupport": 15,
+    "demoSupport": 5,
+    "teamRoundSupport": 15,
     "variants": [
       {
         "callouts": [
@@ -790,7 +764,10 @@
           "Walkway",
           "BombsiteA"
         ],
-        "playerRoundSupport": 9
+        "playerRoundSupport": 9,
+        "roundSupport": 8,
+        "demoSupport": 3,
+        "teamRoundSupport": 8
       },
       {
         "callouts": [
@@ -801,7 +778,10 @@
           "Walkway",
           "BombsiteA"
         ],
-        "playerRoundSupport": 8
+        "playerRoundSupport": 8,
+        "roundSupport": 7,
+        "demoSupport": 4,
+        "teamRoundSupport": 7
       },
       {
         "callouts": [
@@ -812,7 +792,10 @@
           "Walkway",
           "BombsiteA"
         ],
-        "playerRoundSupport": 3
+        "playerRoundSupport": 3,
+        "roundSupport": 3,
+        "demoSupport": 2,
+        "teamRoundSupport": 3
       },
       {
         "callouts": [
@@ -824,14 +807,18 @@
           "Walkway",
           "BombsiteA"
         ],
-        "playerRoundSupport": 3
+        "playerRoundSupport": 3,
+        "roundSupport": 3,
+        "demoSupport": 3,
+        "teamRoundSupport": 3
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "b_corridor_01",
+    "id": "b_outside",
     "target": "b",
+    "entryChokeId": "b_outside",
     "sharedCallouts": [
       "TSpawn",
       "Ruins",
@@ -845,6 +832,9 @@
       "BombsiteB"
     ],
     "totalPlayerRoundSupport": 122,
+    "roundSupport": 53,
+    "demoSupport": 5,
+    "teamRoundSupport": 53,
     "variants": [
       {
         "callouts": [
@@ -853,7 +843,10 @@
           "OutsideLong",
           "BombsiteB"
         ],
-        "playerRoundSupport": 113
+        "playerRoundSupport": 113,
+        "roundSupport": 52,
+        "demoSupport": 5,
+        "teamRoundSupport": 52
       },
       {
         "callouts": [
@@ -864,14 +857,18 @@
           "OutsideLong",
           "BombsiteB"
         ],
-        "playerRoundSupport": 9
+        "playerRoundSupport": 9,
+        "roundSupport": 9,
+        "demoSupport": 5,
+        "teamRoundSupport": 9
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "b_corridor_02",
+    "id": "b_connector",
     "target": "b",
+    "entryChokeId": "b_connector",
     "sharedCallouts": [
       "TSpawn",
       "Street",
@@ -888,6 +885,9 @@
       "BombsiteB"
     ],
     "totalPlayerRoundSupport": 48,
+    "roundSupport": 30,
+    "demoSupport": 5,
+    "teamRoundSupport": 30,
     "variants": [
       {
         "callouts": [
@@ -898,7 +898,10 @@
           "Connector",
           "BombsiteB"
         ],
-        "playerRoundSupport": 31
+        "playerRoundSupport": 31,
+        "roundSupport": 24,
+        "demoSupport": 5,
+        "teamRoundSupport": 24
       },
       {
         "callouts": [
@@ -909,7 +912,10 @@
           "Connector",
           "BombsiteB"
         ],
-        "playerRoundSupport": 11
+        "playerRoundSupport": 11,
+        "roundSupport": 11,
+        "demoSupport": 4,
+        "teamRoundSupport": 11
       },
       {
         "callouts": [
@@ -922,14 +928,18 @@
           "Connector",
           "BombsiteB"
         ],
-        "playerRoundSupport": 6
+        "playerRoundSupport": 6,
+        "roundSupport": 5,
+        "demoSupport": 5,
+        "teamRoundSupport": 5
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "b_corridor_03",
+    "id": "b_bricks",
     "target": "b",
+    "entryChokeId": "b_bricks",
     "sharedCallouts": [
       "TSpawn",
       "Bridge",
@@ -948,6 +958,9 @@
       "BombsiteB"
     ],
     "totalPlayerRoundSupport": 11,
+    "roundSupport": 7,
+    "demoSupport": 4,
+    "teamRoundSupport": 7,
     "variants": [
       {
         "callouts": [
@@ -959,7 +972,10 @@
           "Bricks",
           "BombsiteB"
         ],
-        "playerRoundSupport": 5
+        "playerRoundSupport": 5,
+        "roundSupport": 4,
+        "demoSupport": 2,
+        "teamRoundSupport": 4
       },
       {
         "callouts": [
@@ -972,7 +988,10 @@
           "Bricks",
           "BombsiteB"
         ],
-        "playerRoundSupport": 3
+        "playerRoundSupport": 3,
+        "roundSupport": 3,
+        "demoSupport": 3,
+        "teamRoundSupport": 3
       },
       {
         "callouts": [
@@ -984,7 +1003,10 @@
           "Bricks",
           "BombsiteB"
         ],
-        "playerRoundSupport": 3
+        "playerRoundSupport": 3,
+        "roundSupport": 3,
+        "demoSupport": 3,
+        "teamRoundSupport": 3
       }
     ],
     "confidence": "observed-complete-path-cluster"
@@ -1043,92 +1065,77 @@
 
 ### A 包 Route Corridors
 
-| corridor | 共同骨架 | variants | 累计 player-round 支持 | 主 variant 支持 |
-|---|---|---:|---:|---:|
-| a_corridor_01 | TSpawn / 匪家 → Catwalk / A小 → ShortStairs / A小楼梯 → ExtendedA / A小过点 → BombsiteA / A包 | 3 | 211 | 80 |
-| a_corridor_02 | TSpawn / 匪家 → OutsideLong / A门外 → LongDoors / A门 → LongA / A大 → ARamp / A斜坡 → BombsiteA / A包 | 4 | 171 | 104 |
-| a_corridor_03 | TSpawn / 匪家 → OutsideLong / A门外 → TopofMid / 中远匪口 → Catwalk / A小 → ShortStairs / A小楼梯 → ExtendedA / A小过点 → BombsiteA / A包 | 2 | 31 | 20 |
+| corridor | entryChokeId | 共同骨架 | variants | player-round | round | demo | team-round |
+|---|---|---|---:|---:|---:|---:|---:|
+| a_short | a_short | TSpawn / 匪家 → Catwalk / A小 → ShortStairs / A小楼梯 → ExtendedA / A小过点 → BombsiteA / A包 | 5 | 242 | 119 | 26 | 119 |
+| a_long | a_long | TSpawn / 匪家 → OutsideLong / A门外 → LongDoors / A门 → LongA / A大 → ARamp / A斜坡 → BombsiteA / A包 | 4 | 171 | 90 | 25 | 90 |
 
-#### a_corridor_01
+#### a_short
 
 共同骨架：TSpawn / 匪家 → Catwalk / A小 → ShortStairs / A小楼梯 → ExtendedA / A小过点 → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → OutsideTunnel / B洞外 → UpperTunnel / B洞 → TunnelStairs / B洞楼梯 → LowerTunnel / B1 → Middle / 中路 → Catwalk / A小 → ShortStairs / A小楼梯 → ExtendedA / A小过点 → BombsiteA / A包 | 80 | 308 | 46.9% |
-| 2 | TSpawn / 匪家 → TopofMid / 中远匪口 → Catwalk / A小 → ShortStairs / A小楼梯 → ExtendedA / A小过点 → BombsiteA / A包 | 78 | 308 | 46.9% |
-| 3 | TSpawn / 匪家 → TopofMid / 中远匪口 → Middle / 中路 → Catwalk / A小 → ShortStairs / A小楼梯 → ExtendedA / A小过点 → BombsiteA / A包 | 53 | 308 | 46.9% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → OutsideTunnel / B洞外 → UpperTunnel / B洞 → TunnelStairs / B洞楼梯 → LowerTunnel / B1 → Middle / 中路 → Catwalk / A小 → ShortStairs / A小楼梯 → ExtendedA / A小过点 → BombsiteA / A包 | 80 | 61 | 23 | 61 | 308 | 46.9% |
+| 2 | TSpawn / 匪家 → TopofMid / 中远匪口 → Catwalk / A小 → ShortStairs / A小楼梯 → ExtendedA / A小过点 → BombsiteA / A包 | 78 | 62 | 26 | 62 | 308 | 46.9% |
+| 3 | TSpawn / 匪家 → TopofMid / 中远匪口 → Middle / 中路 → Catwalk / A小 → ShortStairs / A小楼梯 → ExtendedA / A小过点 → BombsiteA / A包 | 53 | 48 | 22 | 48 | 308 | 46.9% |
+| 4 | TSpawn / 匪家 → OutsideLong / A门外 → TopofMid / 中远匪口 → Catwalk / A小 → ShortStairs / A小楼梯 → ExtendedA / A小过点 → BombsiteA / A包 | 20 | 18 | 14 | 18 | 308 | 46.9% |
+| 5 | TSpawn / 匪家 → OutsideLong / A门外 → TopofMid / 中远匪口 → Middle / 中路 → Catwalk / A小 → ShortStairs / A小楼梯 → ExtendedA / A小过点 → BombsiteA / A包 | 11 | 10 | 9 | 10 | 308 | 46.9% |
 
-#### a_corridor_02
+#### a_long
 
 共同骨架：TSpawn / 匪家 → OutsideLong / A门外 → LongDoors / A门 → LongA / A大 → ARamp / A斜坡 → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → TopofMid / 中远匪口 → OutsideLong / A门外 → LongDoors / A门 → LongA / A大 → ARamp / A斜坡 → BombsiteA / A包 | 104 | 311 | 31.1% |
-| 2 | TSpawn / 匪家 → OutsideLong / A门外 → LongDoors / A门 → LongA / A大 → ARamp / A斜坡 → BombsiteA / A包 | 56 | 311 | 31.1% |
-| 3 | TSpawn / 匪家 → TopofMid / 中远匪口 → OutsideLong / A门外 → LongDoors / A门 → Pit / 大坑 → LongA / A大 → ARamp / A斜坡 → BombsiteA / A包 | 6 | 88 | 31.1% |
-| 4 | TSpawn / 匪家 → OutsideLong / A门外 → LongDoors / A门 → Pit / 大坑 → LongA / A大 → ARamp / A斜坡 → BombsiteA / A包 | 5 | 88 | 31.1% |
-
-#### a_corridor_03
-
-共同骨架：TSpawn / 匪家 → OutsideLong / A门外 → TopofMid / 中远匪口 → Catwalk / A小 → ShortStairs / A小楼梯 → ExtendedA / A小过点 → BombsiteA / A包
-
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → OutsideLong / A门外 → TopofMid / 中远匪口 → Catwalk / A小 → ShortStairs / A小楼梯 → ExtendedA / A小过点 → BombsiteA / A包 | 20 | 308 | 46.9% |
-| 2 | TSpawn / 匪家 → OutsideLong / A门外 → TopofMid / 中远匪口 → Middle / 中路 → Catwalk / A小 → ShortStairs / A小楼梯 → ExtendedA / A小过点 → BombsiteA / A包 | 11 | 308 | 46.9% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → TopofMid / 中远匪口 → OutsideLong / A门外 → LongDoors / A门 → LongA / A大 → ARamp / A斜坡 → BombsiteA / A包 | 104 | 68 | 25 | 68 | 311 | 31.1% |
+| 2 | TSpawn / 匪家 → OutsideLong / A门外 → LongDoors / A门 → LongA / A大 → ARamp / A斜坡 → BombsiteA / A包 | 56 | 46 | 23 | 46 | 311 | 31.1% |
+| 3 | TSpawn / 匪家 → TopofMid / 中远匪口 → OutsideLong / A门外 → LongDoors / A门 → Pit / 大坑 → LongA / A大 → ARamp / A斜坡 → BombsiteA / A包 | 6 | 6 | 6 | 6 | 88 | 31.1% |
+| 4 | TSpawn / 匪家 → OutsideLong / A门外 → LongDoors / A门 → Pit / 大坑 → LongA / A大 → ARamp / A斜坡 → BombsiteA / A包 | 5 | 5 | 3 | 5 | 88 | 31.1% |
 
 ### B 包 Route Corridors
 
-| corridor | 共同骨架 | variants | 累计 player-round 支持 | 主 variant 支持 |
-|---|---|---:|---:|---:|
-| b_corridor_01 | TSpawn / 匪家 → OutsideTunnel / B洞外 → UpperTunnel / B洞 → BombsiteB / B包 | 4 | 491 | 438 |
-| b_corridor_02 | TSpawn / 匪家 → TopofMid / 中远匪口 → Middle / 中路 → LowerTunnel / B1 → TunnelStairs / B洞楼梯 → UpperTunnel / B洞 → BombsiteB / B包 | 4 | 71 | 44 |
-| b_corridor_03 | TSpawn / 匪家 → TopofMid / 中远匪口 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → BombsiteB / B包 | 6 | 49 | 21 |
+| corridor | entryChokeId | 共同骨架 | variants | player-round | round | demo | team-round |
+|---|---|---|---:|---:|---:|---:|---:|
+| b_upper_tunnel | b_upper_tunnel | TSpawn / 匪家 → UpperTunnel / B洞 → BombsiteB / B包 | 6 | 523 | 201 | 26 | 201 |
+| b_mid_doors | b_mid_doors | TSpawn / 匪家 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → BombsiteB / B包 | 8 | 88 | 58 | 22 | 58 |
 
-#### b_corridor_01
+#### b_upper_tunnel
 
-共同骨架：TSpawn / 匪家 → OutsideTunnel / B洞外 → UpperTunnel / B洞 → BombsiteB / B包
+共同骨架：TSpawn / 匪家 → UpperTunnel / B洞 → BombsiteB / B包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → OutsideTunnel / B洞外 → UpperTunnel / B洞 → BombsiteB / B包 | 438 | 567 | 85.6% |
-| 2 | TSpawn / 匪家 → OutsideTunnel / B洞外 → UpperTunnel / B洞 → TunnelStairs / B洞楼梯 → LowerTunnel / B1 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → Hole / 狗洞 → BombsiteB / B包 | 22 | 82 | 10.1% |
-| 3 | TSpawn / 匪家 → OutsideTunnel / B洞外 → UpperTunnel / B洞 → TunnelStairs / B洞楼梯 → LowerTunnel / B1 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → BombsiteB / B包 | 17 | 50 | 6.2% |
-| 4 | TSpawn / 匪家 → TRamp / 后花 → OutsideTunnel / B洞外 → UpperTunnel / B洞 → BombsiteB / B包 | 14 | 30 | 75.0% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → OutsideTunnel / B洞外 → UpperTunnel / B洞 → BombsiteB / B包 | 438 | 181 | 26 | 181 | 567 | 85.6% |
+| 2 | TSpawn / 匪家 → TopofMid / 中远匪口 → Middle / 中路 → LowerTunnel / B1 → TunnelStairs / B洞楼梯 → UpperTunnel / B洞 → BombsiteB / B包 | 44 | 38 | 19 | 38 | 395 | 63.1% |
+| 3 | TSpawn / 匪家 → TRamp / 后花 → OutsideTunnel / B洞外 → UpperTunnel / B洞 → BombsiteB / B包 | 14 | 14 | 12 | 14 | 30 | 75.0% |
+| 4 | TSpawn / 匪家 → TopofMid / 中远匪口 → Catwalk / A小 → Middle / 中路 → LowerTunnel / B1 → TunnelStairs / B洞楼梯 → UpperTunnel / B洞 → BombsiteB / B包 | 13 | 12 | 10 | 12 | 278 | 63.1% |
+| 5 | TSpawn / 匪家 → OutsideLong / A门外 → TopofMid / 中远匪口 → Middle / 中路 → LowerTunnel / B1 → TunnelStairs / B洞楼梯 → UpperTunnel / B洞 → BombsiteB / B包 | 10 | 9 | 8 | 9 | 395 | 63.1% |
+| 6 | TSpawn / 匪家 → OutsideLong / A门外 → TopofMid / 中远匪口 → Catwalk / A小 → Middle / 中路 → LowerTunnel / B1 → TunnelStairs / B洞楼梯 → UpperTunnel / B洞 → BombsiteB / B包 | 4 | 4 | 4 | 4 | 278 | 63.1% |
 
-#### b_corridor_02
+#### b_mid_doors
 
-共同骨架：TSpawn / 匪家 → TopofMid / 中远匪口 → Middle / 中路 → LowerTunnel / B1 → TunnelStairs / B洞楼梯 → UpperTunnel / B洞 → BombsiteB / B包
+共同骨架：TSpawn / 匪家 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → BombsiteB / B包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → TopofMid / 中远匪口 → Middle / 中路 → LowerTunnel / B1 → TunnelStairs / B洞楼梯 → UpperTunnel / B洞 → BombsiteB / B包 | 44 | 395 | 63.1% |
-| 2 | TSpawn / 匪家 → TopofMid / 中远匪口 → Catwalk / A小 → Middle / 中路 → LowerTunnel / B1 → TunnelStairs / B洞楼梯 → UpperTunnel / B洞 → BombsiteB / B包 | 13 | 278 | 63.1% |
-| 3 | TSpawn / 匪家 → OutsideLong / A门外 → TopofMid / 中远匪口 → Middle / 中路 → LowerTunnel / B1 → TunnelStairs / B洞楼梯 → UpperTunnel / B洞 → BombsiteB / B包 | 10 | 395 | 63.1% |
-| 4 | TSpawn / 匪家 → OutsideLong / A门外 → TopofMid / 中远匪口 → Catwalk / A小 → Middle / 中路 → LowerTunnel / B1 → TunnelStairs / B洞楼梯 → UpperTunnel / B洞 → BombsiteB / B包 | 4 | 278 | 63.1% |
-
-#### b_corridor_03
-
-共同骨架：TSpawn / 匪家 → TopofMid / 中远匪口 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → BombsiteB / B包
-
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → TopofMid / 中远匪口 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → Hole / 狗洞 → BombsiteB / B包 | 21 | 82 | 10.1% |
-| 2 | TSpawn / 匪家 → TopofMid / 中远匪口 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → BombsiteB / B包 | 13 | 50 | 6.2% |
-| 3 | TSpawn / 匪家 → TopofMid / 中远匪口 → Catwalk / A小 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → BombsiteB / B包 | 5 | 50 | 6.2% |
-| 4 | TSpawn / 匪家 → OutsideLong / A门外 → TopofMid / 中远匪口 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → BombsiteB / B包 | 4 | 50 | 6.2% |
-| 5 | TSpawn / 匪家 → TopofMid / 中远匪口 → Catwalk / A小 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → Hole / 狗洞 → BombsiteB / B包 | 3 | 82 | 10.1% |
-| 6 | TSpawn / 匪家 → OutsideLong / A门外 → TopofMid / 中远匪口 → Catwalk / A小 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → BombsiteB / B包 | 3 | 50 | 6.2% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → OutsideTunnel / B洞外 → UpperTunnel / B洞 → TunnelStairs / B洞楼梯 → LowerTunnel / B1 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → Hole / 狗洞 → BombsiteB / B包 | 22 | 20 | 14 | 20 | 82 | 10.1% |
+| 2 | TSpawn / 匪家 → TopofMid / 中远匪口 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → Hole / 狗洞 → BombsiteB / B包 | 21 | 19 | 13 | 19 | 82 | 10.1% |
+| 3 | TSpawn / 匪家 → OutsideTunnel / B洞外 → UpperTunnel / B洞 → TunnelStairs / B洞楼梯 → LowerTunnel / B1 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → BombsiteB / B包 | 17 | 13 | 10 | 13 | 50 | 6.2% |
+| 4 | TSpawn / 匪家 → TopofMid / 中远匪口 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → BombsiteB / B包 | 13 | 12 | 8 | 12 | 50 | 6.2% |
+| 5 | TSpawn / 匪家 → TopofMid / 中远匪口 → Catwalk / A小 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → BombsiteB / B包 | 5 | 5 | 5 | 5 | 50 | 6.2% |
+| 6 | TSpawn / 匪家 → OutsideLong / A门外 → TopofMid / 中远匪口 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → BombsiteB / B包 | 4 | 4 | 4 | 4 | 50 | 6.2% |
+| 7 | TSpawn / 匪家 → TopofMid / 中远匪口 → Catwalk / A小 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → Hole / 狗洞 → BombsiteB / B包 | 3 | 3 | 3 | 3 | 82 | 10.1% |
+| 8 | TSpawn / 匪家 → OutsideLong / A门外 → TopofMid / 中远匪口 → Catwalk / A小 → Middle / 中路 → MidDoors / 中门 → BDoors / B门 → BombsiteB / B包 | 3 | 3 | 3 | 3 | 50 | 6.2% |
 
 ### Corridor 候选 JSON
 
 ```json
 [
   {
-    "id": "a_corridor_01",
+    "id": "a_short",
     "target": "a",
+    "entryChokeId": "a_short",
     "sharedCallouts": [
       "TSpawn",
       "Catwalk",
@@ -1148,7 +1155,10 @@
       "ExtendedA",
       "BombsiteA"
     ],
-    "totalPlayerRoundSupport": 211,
+    "totalPlayerRoundSupport": 242,
+    "roundSupport": 119,
+    "demoSupport": 26,
+    "teamRoundSupport": 119,
     "variants": [
       {
         "callouts": [
@@ -1163,7 +1173,10 @@
           "ExtendedA",
           "BombsiteA"
         ],
-        "playerRoundSupport": 80
+        "playerRoundSupport": 80,
+        "roundSupport": 61,
+        "demoSupport": 23,
+        "teamRoundSupport": 61
       },
       {
         "callouts": [
@@ -1174,7 +1187,10 @@
           "ExtendedA",
           "BombsiteA"
         ],
-        "playerRoundSupport": 78
+        "playerRoundSupport": 78,
+        "roundSupport": 62,
+        "demoSupport": 26,
+        "teamRoundSupport": 62
       },
       {
         "callouts": [
@@ -1186,14 +1202,49 @@
           "ExtendedA",
           "BombsiteA"
         ],
-        "playerRoundSupport": 53
+        "playerRoundSupport": 53,
+        "roundSupport": 48,
+        "demoSupport": 22,
+        "teamRoundSupport": 48
+      },
+      {
+        "callouts": [
+          "TSpawn",
+          "OutsideLong",
+          "TopofMid",
+          "Catwalk",
+          "ShortStairs",
+          "ExtendedA",
+          "BombsiteA"
+        ],
+        "playerRoundSupport": 20,
+        "roundSupport": 18,
+        "demoSupport": 14,
+        "teamRoundSupport": 18
+      },
+      {
+        "callouts": [
+          "TSpawn",
+          "OutsideLong",
+          "TopofMid",
+          "Middle",
+          "Catwalk",
+          "ShortStairs",
+          "ExtendedA",
+          "BombsiteA"
+        ],
+        "playerRoundSupport": 11,
+        "roundSupport": 10,
+        "demoSupport": 9,
+        "teamRoundSupport": 10
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "a_corridor_02",
+    "id": "a_long",
     "target": "a",
+    "entryChokeId": "a_long",
     "sharedCallouts": [
       "TSpawn",
       "OutsideLong",
@@ -1212,6 +1263,9 @@
       "BombsiteA"
     ],
     "totalPlayerRoundSupport": 171,
+    "roundSupport": 90,
+    "demoSupport": 25,
+    "teamRoundSupport": 90,
     "variants": [
       {
         "callouts": [
@@ -1223,7 +1277,10 @@
           "ARamp",
           "BombsiteA"
         ],
-        "playerRoundSupport": 104
+        "playerRoundSupport": 104,
+        "roundSupport": 68,
+        "demoSupport": 25,
+        "teamRoundSupport": 68
       },
       {
         "callouts": [
@@ -1234,7 +1291,10 @@
           "ARamp",
           "BombsiteA"
         ],
-        "playerRoundSupport": 56
+        "playerRoundSupport": 56,
+        "roundSupport": 46,
+        "demoSupport": 23,
+        "teamRoundSupport": 46
       },
       {
         "callouts": [
@@ -1247,7 +1307,10 @@
           "ARamp",
           "BombsiteA"
         ],
-        "playerRoundSupport": 6
+        "playerRoundSupport": 6,
+        "roundSupport": 6,
+        "demoSupport": 6,
+        "teamRoundSupport": 6
       },
       {
         "callouts": [
@@ -1259,68 +1322,20 @@
           "ARamp",
           "BombsiteA"
         ],
-        "playerRoundSupport": 5
+        "playerRoundSupport": 5,
+        "roundSupport": 5,
+        "demoSupport": 3,
+        "teamRoundSupport": 5
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "a_corridor_03",
-    "target": "a",
-    "sharedCallouts": [
-      "TSpawn",
-      "OutsideLong",
-      "TopofMid",
-      "Catwalk",
-      "ShortStairs",
-      "ExtendedA",
-      "BombsiteA"
-    ],
-    "representativeCallouts": [
-      "TSpawn",
-      "OutsideLong",
-      "TopofMid",
-      "Catwalk",
-      "ShortStairs",
-      "ExtendedA",
-      "BombsiteA"
-    ],
-    "totalPlayerRoundSupport": 31,
-    "variants": [
-      {
-        "callouts": [
-          "TSpawn",
-          "OutsideLong",
-          "TopofMid",
-          "Catwalk",
-          "ShortStairs",
-          "ExtendedA",
-          "BombsiteA"
-        ],
-        "playerRoundSupport": 20
-      },
-      {
-        "callouts": [
-          "TSpawn",
-          "OutsideLong",
-          "TopofMid",
-          "Middle",
-          "Catwalk",
-          "ShortStairs",
-          "ExtendedA",
-          "BombsiteA"
-        ],
-        "playerRoundSupport": 11
-      }
-    ],
-    "confidence": "observed-complete-path-cluster"
-  },
-  {
-    "id": "b_corridor_01",
+    "id": "b_upper_tunnel",
     "target": "b",
+    "entryChokeId": "b_upper_tunnel",
     "sharedCallouts": [
       "TSpawn",
-      "OutsideTunnel",
       "UpperTunnel",
       "BombsiteB"
     ],
@@ -1330,7 +1345,10 @@
       "UpperTunnel",
       "BombsiteB"
     ],
-    "totalPlayerRoundSupport": 491,
+    "totalPlayerRoundSupport": 523,
+    "roundSupport": 201,
+    "demoSupport": 26,
+    "teamRoundSupport": 201,
     "variants": [
       {
         "callouts": [
@@ -1339,36 +1357,25 @@
           "UpperTunnel",
           "BombsiteB"
         ],
-        "playerRoundSupport": 438
+        "playerRoundSupport": 438,
+        "roundSupport": 181,
+        "demoSupport": 26,
+        "teamRoundSupport": 181
       },
       {
         "callouts": [
           "TSpawn",
-          "OutsideTunnel",
-          "UpperTunnel",
-          "TunnelStairs",
-          "LowerTunnel",
+          "TopofMid",
           "Middle",
-          "MidDoors",
-          "BDoors",
-          "Hole",
+          "LowerTunnel",
+          "TunnelStairs",
+          "UpperTunnel",
           "BombsiteB"
         ],
-        "playerRoundSupport": 22
-      },
-      {
-        "callouts": [
-          "TSpawn",
-          "OutsideTunnel",
-          "UpperTunnel",
-          "TunnelStairs",
-          "LowerTunnel",
-          "Middle",
-          "MidDoors",
-          "BDoors",
-          "BombsiteB"
-        ],
-        "playerRoundSupport": 17
+        "playerRoundSupport": 44,
+        "roundSupport": 38,
+        "demoSupport": 19,
+        "teamRoundSupport": 38
       },
       {
         "callouts": [
@@ -1378,45 +1385,10 @@
           "UpperTunnel",
           "BombsiteB"
         ],
-        "playerRoundSupport": 14
-      }
-    ],
-    "confidence": "observed-complete-path-cluster"
-  },
-  {
-    "id": "b_corridor_02",
-    "target": "b",
-    "sharedCallouts": [
-      "TSpawn",
-      "TopofMid",
-      "Middle",
-      "LowerTunnel",
-      "TunnelStairs",
-      "UpperTunnel",
-      "BombsiteB"
-    ],
-    "representativeCallouts": [
-      "TSpawn",
-      "TopofMid",
-      "Middle",
-      "LowerTunnel",
-      "TunnelStairs",
-      "UpperTunnel",
-      "BombsiteB"
-    ],
-    "totalPlayerRoundSupport": 71,
-    "variants": [
-      {
-        "callouts": [
-          "TSpawn",
-          "TopofMid",
-          "Middle",
-          "LowerTunnel",
-          "TunnelStairs",
-          "UpperTunnel",
-          "BombsiteB"
-        ],
-        "playerRoundSupport": 44
+        "playerRoundSupport": 14,
+        "roundSupport": 14,
+        "demoSupport": 12,
+        "teamRoundSupport": 14
       },
       {
         "callouts": [
@@ -1429,7 +1401,10 @@
           "UpperTunnel",
           "BombsiteB"
         ],
-        "playerRoundSupport": 13
+        "playerRoundSupport": 13,
+        "roundSupport": 12,
+        "demoSupport": 10,
+        "teamRoundSupport": 12
       },
       {
         "callouts": [
@@ -1442,7 +1417,10 @@
           "UpperTunnel",
           "BombsiteB"
         ],
-        "playerRoundSupport": 10
+        "playerRoundSupport": 10,
+        "roundSupport": 9,
+        "demoSupport": 8,
+        "teamRoundSupport": 9
       },
       {
         "callouts": [
@@ -1456,17 +1434,20 @@
           "UpperTunnel",
           "BombsiteB"
         ],
-        "playerRoundSupport": 4
+        "playerRoundSupport": 4,
+        "roundSupport": 4,
+        "demoSupport": 4,
+        "teamRoundSupport": 4
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "b_corridor_03",
+    "id": "b_mid_doors",
     "target": "b",
+    "entryChokeId": "b_mid_doors",
     "sharedCallouts": [
       "TSpawn",
-      "TopofMid",
       "Middle",
       "MidDoors",
       "BDoors",
@@ -1474,18 +1455,42 @@
     ],
     "representativeCallouts": [
       "TSpawn",
-      "TopofMid",
+      "OutsideTunnel",
+      "UpperTunnel",
+      "TunnelStairs",
+      "LowerTunnel",
       "Middle",
       "MidDoors",
       "BDoors",
       "Hole",
       "BombsiteB"
     ],
-    "totalPlayerRoundSupport": 49,
+    "totalPlayerRoundSupport": 88,
+    "roundSupport": 58,
+    "demoSupport": 22,
+    "teamRoundSupport": 58,
     "variants": [
       {
         "callouts": [
           "TSpawn",
+          "OutsideTunnel",
+          "UpperTunnel",
+          "TunnelStairs",
+          "LowerTunnel",
+          "Middle",
+          "MidDoors",
+          "BDoors",
+          "Hole",
+          "BombsiteB"
+        ],
+        "playerRoundSupport": 22,
+        "roundSupport": 20,
+        "demoSupport": 14,
+        "teamRoundSupport": 20
+      },
+      {
+        "callouts": [
+          "TSpawn",
           "TopofMid",
           "Middle",
           "MidDoors",
@@ -1493,7 +1498,27 @@
           "Hole",
           "BombsiteB"
         ],
-        "playerRoundSupport": 21
+        "playerRoundSupport": 21,
+        "roundSupport": 19,
+        "demoSupport": 13,
+        "teamRoundSupport": 19
+      },
+      {
+        "callouts": [
+          "TSpawn",
+          "OutsideTunnel",
+          "UpperTunnel",
+          "TunnelStairs",
+          "LowerTunnel",
+          "Middle",
+          "MidDoors",
+          "BDoors",
+          "BombsiteB"
+        ],
+        "playerRoundSupport": 17,
+        "roundSupport": 13,
+        "demoSupport": 10,
+        "teamRoundSupport": 13
       },
       {
         "callouts": [
@@ -1504,7 +1529,10 @@
           "BDoors",
           "BombsiteB"
         ],
-        "playerRoundSupport": 13
+        "playerRoundSupport": 13,
+        "roundSupport": 12,
+        "demoSupport": 8,
+        "teamRoundSupport": 12
       },
       {
         "callouts": [
@@ -1516,7 +1544,10 @@
           "BDoors",
           "BombsiteB"
         ],
-        "playerRoundSupport": 5
+        "playerRoundSupport": 5,
+        "roundSupport": 5,
+        "demoSupport": 5,
+        "teamRoundSupport": 5
       },
       {
         "callouts": [
@@ -1528,7 +1559,10 @@
           "BDoors",
           "BombsiteB"
         ],
-        "playerRoundSupport": 4
+        "playerRoundSupport": 4,
+        "roundSupport": 4,
+        "demoSupport": 4,
+        "teamRoundSupport": 4
       },
       {
         "callouts": [
@@ -1541,7 +1575,10 @@
           "Hole",
           "BombsiteB"
         ],
-        "playerRoundSupport": 3
+        "playerRoundSupport": 3,
+        "roundSupport": 3,
+        "demoSupport": 3,
+        "teamRoundSupport": 3
       },
       {
         "callouts": [
@@ -1554,7 +1591,10 @@
           "BDoors",
           "BombsiteB"
         ],
-        "playerRoundSupport": 3
+        "playerRoundSupport": 3,
+        "roundSupport": 3,
+        "demoSupport": 3,
+        "teamRoundSupport": 3
       }
     ],
     "confidence": "observed-complete-path-cluster"
@@ -1613,97 +1653,105 @@
 
 ### A 包 Route Corridors
 
-| corridor | 共同骨架 | variants | 累计 player-round 支持 | 主 variant 支持 |
-|---|---|---:|---:|---:|
-| a_corridor_01 | TSpawn / 匪家 → LowerMid / 匪口 → Middle / 中路 → TopofMid / 中路 → BombsiteA / A包 | 8 | 314 | 143 |
-| a_corridor_02 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Apartments / 二楼 → BombsiteA / A包 | 6 | 51 | 19 |
-| a_corridor_03 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Apartments / 二楼 → Balcony / 阳台 → Pit / 大坑 → BombsiteA / A包 | 2 | 13 | 10 |
-| a_corridor_04 | TSpawn / 匪家 → LowerMid / 匪口 → Upstairs / 匪二楼 → Bridge / 匪桥 → Apartments / 二楼 → Balcony / 阳台 → BombsiteA / A包 | 1 | 3 | 3 |
+| corridor | entryChokeId | 共同骨架 | variants | player-round | round | demo | team-round |
+|---|---|---|---:|---:|---:|---:|---:|
+| a_mid | a_mid | TSpawn / 匪家 → LowerMid / 匪口 → TopofMid / 中路 → BombsiteA / A包 | 6 | 196 | 113 | 16 | 113 |
+| a_arch | a_arch | TSpawn / 匪家 → LowerMid / 匪口 → Middle / 中路 → TopofMid / 中路 → Arch / 拱门 → BombsiteA / A包 | 3 | 86 | 50 | 15 | 50 |
+| a_quad | a_quad | TSpawn / 匪家 → LowerMid / 匪口 → TopofMid / 中路 → Quad / 马棚 → BombsiteA / A包 | 4 | 69 | 57 | 14 | 57 |
+| a_balcony | a_balcony | TSpawn / 匪家 → LowerMid / 匪口 → Apartments / 二楼 → Balcony / 阳台 → BombsiteA / A包 | 2 | 17 | 16 | 9 | 16 |
+| a_pit | a_pit | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Apartments / 二楼 → Balcony / 阳台 → Pit / 大坑 → BombsiteA / A包 | 2 | 13 | 12 | 9 | 12 |
 
-#### a_corridor_01
+#### a_mid
 
-共同骨架：TSpawn / 匪家 → LowerMid / 匪口 → Middle / 中路 → TopofMid / 中路 → BombsiteA / A包
+共同骨架：TSpawn / 匪家 → LowerMid / 匪口 → TopofMid / 中路 → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → LowerMid / 匪口 → TRamp / 匪口 → Middle / 中路 → TopofMid / 中路 → BombsiteA / A包 | 143 | 217 | 50.6% |
-| 2 | TSpawn / 匪家 → LowerMid / 匪口 → TRamp / 匪口 → Middle / 中路 → TopofMid / 中路 → Arch / 拱门 → BombsiteA / A包 | 57 | 106 | 26.3% |
-| 3 | TSpawn / 匪家 → LowerMid / 匪口 → TRamp / 匪口 → Middle / 中路 → TopofMid / 中路 → Quad / 马棚 → BombsiteA / A包 | 46 | 94 | 50.3% |
-| 4 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Middle / 中路 → TopofMid / 中路 → Arch / 拱门 → BombsiteA / A包 | 26 | 106 | 26.3% |
-| 5 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Middle / 中路 → TopofMid / 中路 → BombsiteA / A包 | 23 | 217 | 50.6% |
-| 6 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Middle / 中路 → TopofMid / 中路 → Quad / 马棚 → BombsiteA / A包 | 12 | 94 | 50.3% |
-| 7 | TSpawn / 匪家 → LowerMid / 匪口 → TRamp / 匪口 → Middle / 中路 → SecondMid / 侧道 → Balcony / 阳台 → Apartments / 二楼 → TopofMid / 中路 → BombsiteA / A包 | 4 | 131 | 47.8% |
-| 8 | TSpawn / 匪家 → LowerMid / 匪口 → Upstairs / 匪二楼 → Bridge / 匪桥 → SecondMid / 侧道 → Middle / 中路 → TopofMid / 中路 → Arch / 拱门 → BombsiteA / A包 | 3 | 26 | 26.3% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → LowerMid / 匪口 → TRamp / 匪口 → Middle / 中路 → TopofMid / 中路 → BombsiteA / A包 | 143 | 99 | 16 | 99 | 217 | 50.6% |
+| 2 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Middle / 中路 → TopofMid / 中路 → BombsiteA / A包 | 23 | 22 | 12 | 22 | 217 | 50.6% |
+| 3 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Balcony / 阳台 → Apartments / 二楼 → TopofMid / 中路 → BombsiteA / A包 | 19 | 18 | 10 | 18 | 131 | 47.8% |
+| 4 | TSpawn / 匪家 → LowerMid / 匪口 → TRamp / 匪口 → Middle / 中路 → SecondMid / 侧道 → Balcony / 阳台 → Apartments / 二楼 → TopofMid / 中路 → BombsiteA / A包 | 4 | 4 | 4 | 4 | 131 | 47.8% |
+| 5 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → BackAlley / 匪二楼 → Apartments / 二楼 → TopofMid / 中路 → BombsiteA / A包 | 4 | 4 | 4 | 4 | 131 | 47.8% |
+| 6 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Apartments / 二楼 → TopofMid / 中路 → BombsiteA / A包 | 3 | 3 | 3 | 3 | 87 | 47.8% |
 
-#### a_corridor_02
+#### a_arch
 
-共同骨架：TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Apartments / 二楼 → BombsiteA / A包
+共同骨架：TSpawn / 匪家 → LowerMid / 匪口 → Middle / 中路 → TopofMid / 中路 → Arch / 拱门 → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Balcony / 阳台 → Apartments / 二楼 → TopofMid / 中路 → BombsiteA / A包 | 19 | 131 | 47.8% |
-| 2 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → BackAlley / 匪二楼 → Apartments / 二楼 → Balcony / 阳台 → BombsiteA / A包 | 14 | 29 | 24.4% |
-| 3 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Balcony / 阳台 → Apartments / 二楼 → TopofMid / 中路 → Quad / 马棚 → BombsiteA / A包 | 7 | 94 | 47.8% |
-| 4 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → BackAlley / 匪二楼 → Apartments / 二楼 → TopofMid / 中路 → BombsiteA / A包 | 4 | 131 | 47.8% |
-| 5 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → BackAlley / 匪二楼 → Apartments / 二楼 → TopofMid / 中路 → Quad / 马棚 → BombsiteA / A包 | 4 | 94 | 47.8% |
-| 6 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Apartments / 二楼 → TopofMid / 中路 → BombsiteA / A包 | 3 | 87 | 47.8% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → LowerMid / 匪口 → TRamp / 匪口 → Middle / 中路 → TopofMid / 中路 → Arch / 拱门 → BombsiteA / A包 | 57 | 40 | 15 | 40 | 106 | 26.3% |
+| 2 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Middle / 中路 → TopofMid / 中路 → Arch / 拱门 → BombsiteA / A包 | 26 | 16 | 11 | 16 | 106 | 26.3% |
+| 3 | TSpawn / 匪家 → LowerMid / 匪口 → Upstairs / 匪二楼 → Bridge / 匪桥 → SecondMid / 侧道 → Middle / 中路 → TopofMid / 中路 → Arch / 拱门 → BombsiteA / A包 | 3 | 3 | 3 | 3 | 26 | 26.3% |
 
-#### a_corridor_03
+#### a_quad
+
+共同骨架：TSpawn / 匪家 → LowerMid / 匪口 → TopofMid / 中路 → Quad / 马棚 → BombsiteA / A包
+
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → LowerMid / 匪口 → TRamp / 匪口 → Middle / 中路 → TopofMid / 中路 → Quad / 马棚 → BombsiteA / A包 | 46 | 39 | 13 | 39 | 94 | 50.3% |
+| 2 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Middle / 中路 → TopofMid / 中路 → Quad / 马棚 → BombsiteA / A包 | 12 | 12 | 8 | 12 | 94 | 50.3% |
+| 3 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Balcony / 阳台 → Apartments / 二楼 → TopofMid / 中路 → Quad / 马棚 → BombsiteA / A包 | 7 | 7 | 6 | 7 | 94 | 47.8% |
+| 4 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → BackAlley / 匪二楼 → Apartments / 二楼 → TopofMid / 中路 → Quad / 马棚 → BombsiteA / A包 | 4 | 4 | 4 | 4 | 94 | 47.8% |
+
+#### a_balcony
+
+共同骨架：TSpawn / 匪家 → LowerMid / 匪口 → Apartments / 二楼 → Balcony / 阳台 → BombsiteA / A包
+
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → BackAlley / 匪二楼 → Apartments / 二楼 → Balcony / 阳台 → BombsiteA / A包 | 14 | 13 | 7 | 13 | 29 | 24.4% |
+| 2 | TSpawn / 匪家 → LowerMid / 匪口 → Upstairs / 匪二楼 → Bridge / 匪桥 → Apartments / 二楼 → Balcony / 阳台 → BombsiteA / A包 | 3 | 3 | 3 | 3 | 29 | 24.4% |
+
+#### a_pit
 
 共同骨架：TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Apartments / 二楼 → Balcony / 阳台 → Pit / 大坑 → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → BackAlley / 匪二楼 → Apartments / 二楼 → Balcony / 阳台 → Pit / 大坑 → BombsiteA / A包 | 10 | 43 | 23.8% |
-| 2 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Apartments / 二楼 → Balcony / 阳台 → Pit / 大坑 → BombsiteA / A包 | 3 | 43 | 23.8% |
-
-#### a_corridor_04
-
-共同骨架：TSpawn / 匪家 → LowerMid / 匪口 → Upstairs / 匪二楼 → Bridge / 匪桥 → Apartments / 二楼 → Balcony / 阳台 → BombsiteA / A包
-
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → LowerMid / 匪口 → Upstairs / 匪二楼 → Bridge / 匪桥 → Apartments / 二楼 → Balcony / 阳台 → BombsiteA / A包 | 3 | 29 | 24.4% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → BackAlley / 匪二楼 → Apartments / 二楼 → Balcony / 阳台 → Pit / 大坑 → BombsiteA / A包 | 10 | 9 | 7 | 9 | 43 | 23.8% |
+| 2 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Apartments / 二楼 → Balcony / 阳台 → Pit / 大坑 → BombsiteA / A包 | 3 | 3 | 3 | 3 | 43 | 23.8% |
 
 ### B 包 Route Corridors
 
-| corridor | 共同骨架 | variants | 累计 player-round 支持 | 主 variant 支持 |
-|---|---|---:|---:|---:|
-| b_corridor_01 | TSpawn / 匪家 → LowerMid / 匪口 → Banana / 香蕉道 → BombsiteB / B包 | 6 | 488 | 409 |
-| b_corridor_02 | TSpawn / 匪家 → LowerMid / 匪口 → TRamp / 匪口 → Middle / 中路 → TopofMid / 中路 → Arch / 拱门 → CTSpawn / 警家 → Ruins / 警家教堂 → BombsiteB / B包 | 1 | 6 | 6 |
+| corridor | entryChokeId | 共同骨架 | variants | player-round | round | demo | team-round |
+|---|---|---|---:|---:|---:|---:|---:|
+| b_banana | b_banana | TSpawn / 匪家 → LowerMid / 匪口 → Banana / 香蕉道 → BombsiteB / B包 | 6 | 488 | 154 | 16 | 154 |
+| b_ruins | b_ruins | TSpawn / 匪家 → LowerMid / 匪口 → TRamp / 匪口 → Middle / 中路 → TopofMid / 中路 → Arch / 拱门 → CTSpawn / 警家 → Ruins / 警家教堂 → BombsiteB / B包 | 1 | 6 | 6 | 4 | 6 |
 
-#### b_corridor_01
+#### b_banana
 
 共同骨架：TSpawn / 匪家 → LowerMid / 匪口 → Banana / 香蕉道 → BombsiteB / B包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → LowerMid / 匪口 → TRamp / 匪口 → Middle / 中路 → Banana / 香蕉道 → BombsiteB / B包 | 409 | 529 | 48.9% |
-| 2 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Middle / 中路 → Banana / 香蕉道 → BombsiteB / B包 | 34 | 370 | 48.9% |
-| 3 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Underpass / 下水道 → Middle / 中路 → Banana / 香蕉道 → BombsiteB / B包 | 25 | 77 | 48.9% |
-| 4 | TSpawn / 匪家 → LowerMid / 匪口 → TRamp / 匪口 → Banana / 香蕉道 → BombsiteB / B包 | 14 | 38 | 48.9% |
-| 5 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Balcony / 阳台 → Apartments / 二楼 → TopofMid / 中路 → Middle / 中路 → Banana / 香蕉道 → BombsiteB / B包 | 3 | 123 | 43.2% |
-| 6 | TSpawn / 匪家 → LowerMid / 匪口 → Upstairs / 匪二楼 → Bridge / 匪桥 → SecondMid / 侧道 → Middle / 中路 → Banana / 香蕉道 → BombsiteB / B包 | 3 | 26 | 48.9% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → LowerMid / 匪口 → TRamp / 匪口 → Middle / 中路 → Banana / 香蕉道 → BombsiteB / B包 | 409 | 153 | 16 | 153 | 529 | 48.9% |
+| 2 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Middle / 中路 → Banana / 香蕉道 → BombsiteB / B包 | 34 | 30 | 14 | 30 | 370 | 48.9% |
+| 3 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Underpass / 下水道 → Middle / 中路 → Banana / 香蕉道 → BombsiteB / B包 | 25 | 25 | 13 | 25 | 77 | 48.9% |
+| 4 | TSpawn / 匪家 → LowerMid / 匪口 → TRamp / 匪口 → Banana / 香蕉道 → BombsiteB / B包 | 14 | 13 | 9 | 13 | 38 | 48.9% |
+| 5 | TSpawn / 匪家 → LowerMid / 匪口 → SecondMid / 侧道 → Balcony / 阳台 → Apartments / 二楼 → TopofMid / 中路 → Middle / 中路 → Banana / 香蕉道 → BombsiteB / B包 | 3 | 3 | 3 | 3 | 123 | 43.2% |
+| 6 | TSpawn / 匪家 → LowerMid / 匪口 → Upstairs / 匪二楼 → Bridge / 匪桥 → SecondMid / 侧道 → Middle / 中路 → Banana / 香蕉道 → BombsiteB / B包 | 3 | 3 | 3 | 3 | 26 | 48.9% |
 
-#### b_corridor_02
+#### b_ruins
 
 共同骨架：TSpawn / 匪家 → LowerMid / 匪口 → TRamp / 匪口 → Middle / 中路 → TopofMid / 中路 → Arch / 拱门 → CTSpawn / 警家 → Ruins / 警家教堂 → BombsiteB / B包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → LowerMid / 匪口 → TRamp / 匪口 → Middle / 中路 → TopofMid / 中路 → Arch / 拱门 → CTSpawn / 警家 → Ruins / 警家教堂 → BombsiteB / B包 | 6 | 21 | 1.7% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → LowerMid / 匪口 → TRamp / 匪口 → Middle / 中路 → TopofMid / 中路 → Arch / 拱门 → CTSpawn / 警家 → Ruins / 警家教堂 → BombsiteB / B包 | 6 | 6 | 4 | 6 | 21 | 1.7% |
 
 ### Corridor 候选 JSON
 
 ```json
 [
   {
-    "id": "a_corridor_01",
+    "id": "a_mid",
     "target": "a",
+    "entryChokeId": "a_mid",
     "sharedCallouts": [
       "TSpawn",
       "LowerMid",
-      "Middle",
       "TopofMid",
       "BombsiteA"
     ],
@@ -1715,7 +1763,10 @@
       "TopofMid",
       "BombsiteA"
     ],
-    "totalPlayerRoundSupport": 314,
+    "totalPlayerRoundSupport": 196,
+    "roundSupport": 113,
+    "demoSupport": 16,
+    "teamRoundSupport": 113,
     "variants": [
       {
         "callouts": [
@@ -1726,43 +1777,10 @@
           "TopofMid",
           "BombsiteA"
         ],
-        "playerRoundSupport": 143
-      },
-      {
-        "callouts": [
-          "TSpawn",
-          "LowerMid",
-          "TRamp",
-          "Middle",
-          "TopofMid",
-          "Arch",
-          "BombsiteA"
-        ],
-        "playerRoundSupport": 57
-      },
-      {
-        "callouts": [
-          "TSpawn",
-          "LowerMid",
-          "TRamp",
-          "Middle",
-          "TopofMid",
-          "Quad",
-          "BombsiteA"
-        ],
-        "playerRoundSupport": 46
-      },
-      {
-        "callouts": [
-          "TSpawn",
-          "LowerMid",
-          "SecondMid",
-          "Middle",
-          "TopofMid",
-          "Arch",
-          "BombsiteA"
-        ],
-        "playerRoundSupport": 26
+        "playerRoundSupport": 143,
+        "roundSupport": 99,
+        "demoSupport": 16,
+        "teamRoundSupport": 99
       },
       {
         "callouts": [
@@ -1773,19 +1791,25 @@
           "TopofMid",
           "BombsiteA"
         ],
-        "playerRoundSupport": 23
+        "playerRoundSupport": 23,
+        "roundSupport": 22,
+        "demoSupport": 12,
+        "teamRoundSupport": 22
       },
       {
         "callouts": [
           "TSpawn",
           "LowerMid",
           "SecondMid",
-          "Middle",
+          "Balcony",
+          "Apartments",
           "TopofMid",
-          "Quad",
           "BombsiteA"
         ],
-        "playerRoundSupport": 12
+        "playerRoundSupport": 19,
+        "roundSupport": 18,
+        "demoSupport": 10,
+        "teamRoundSupport": 18
       },
       {
         "callouts": [
@@ -1799,7 +1823,98 @@
           "TopofMid",
           "BombsiteA"
         ],
-        "playerRoundSupport": 4
+        "playerRoundSupport": 4,
+        "roundSupport": 4,
+        "demoSupport": 4,
+        "teamRoundSupport": 4
+      },
+      {
+        "callouts": [
+          "TSpawn",
+          "LowerMid",
+          "SecondMid",
+          "BackAlley",
+          "Apartments",
+          "TopofMid",
+          "BombsiteA"
+        ],
+        "playerRoundSupport": 4,
+        "roundSupport": 4,
+        "demoSupport": 4,
+        "teamRoundSupport": 4
+      },
+      {
+        "callouts": [
+          "TSpawn",
+          "LowerMid",
+          "SecondMid",
+          "Apartments",
+          "TopofMid",
+          "BombsiteA"
+        ],
+        "playerRoundSupport": 3,
+        "roundSupport": 3,
+        "demoSupport": 3,
+        "teamRoundSupport": 3
+      }
+    ],
+    "confidence": "observed-complete-path-cluster"
+  },
+  {
+    "id": "a_arch",
+    "target": "a",
+    "entryChokeId": "a_arch",
+    "sharedCallouts": [
+      "TSpawn",
+      "LowerMid",
+      "Middle",
+      "TopofMid",
+      "Arch",
+      "BombsiteA"
+    ],
+    "representativeCallouts": [
+      "TSpawn",
+      "LowerMid",
+      "TRamp",
+      "Middle",
+      "TopofMid",
+      "Arch",
+      "BombsiteA"
+    ],
+    "totalPlayerRoundSupport": 86,
+    "roundSupport": 50,
+    "demoSupport": 15,
+    "teamRoundSupport": 50,
+    "variants": [
+      {
+        "callouts": [
+          "TSpawn",
+          "LowerMid",
+          "TRamp",
+          "Middle",
+          "TopofMid",
+          "Arch",
+          "BombsiteA"
+        ],
+        "playerRoundSupport": 57,
+        "roundSupport": 40,
+        "demoSupport": 15,
+        "teamRoundSupport": 40
+      },
+      {
+        "callouts": [
+          "TSpawn",
+          "LowerMid",
+          "SecondMid",
+          "Middle",
+          "TopofMid",
+          "Arch",
+          "BombsiteA"
+        ],
+        "playerRoundSupport": 26,
+        "roundSupport": 16,
+        "demoSupport": 11,
+        "teamRoundSupport": 16
       },
       {
         "callouts": [
@@ -1813,111 +1928,166 @@
           "Arch",
           "BombsiteA"
         ],
-        "playerRoundSupport": 3
+        "playerRoundSupport": 3,
+        "roundSupport": 3,
+        "demoSupport": 3,
+        "teamRoundSupport": 3
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "a_corridor_02",
+    "id": "a_quad",
     "target": "a",
+    "entryChokeId": "a_quad",
     "sharedCallouts": [
       "TSpawn",
       "LowerMid",
-      "SecondMid",
+      "TopofMid",
+      "Quad",
+      "BombsiteA"
+    ],
+    "representativeCallouts": [
+      "TSpawn",
+      "LowerMid",
+      "TRamp",
+      "Middle",
+      "TopofMid",
+      "Quad",
+      "BombsiteA"
+    ],
+    "totalPlayerRoundSupport": 69,
+    "roundSupport": 57,
+    "demoSupport": 14,
+    "teamRoundSupport": 57,
+    "variants": [
+      {
+        "callouts": [
+          "TSpawn",
+          "LowerMid",
+          "TRamp",
+          "Middle",
+          "TopofMid",
+          "Quad",
+          "BombsiteA"
+        ],
+        "playerRoundSupport": 46,
+        "roundSupport": 39,
+        "demoSupport": 13,
+        "teamRoundSupport": 39
+      },
+      {
+        "callouts": [
+          "TSpawn",
+          "LowerMid",
+          "SecondMid",
+          "Middle",
+          "TopofMid",
+          "Quad",
+          "BombsiteA"
+        ],
+        "playerRoundSupport": 12,
+        "roundSupport": 12,
+        "demoSupport": 8,
+        "teamRoundSupport": 12
+      },
+      {
+        "callouts": [
+          "TSpawn",
+          "LowerMid",
+          "SecondMid",
+          "Balcony",
+          "Apartments",
+          "TopofMid",
+          "Quad",
+          "BombsiteA"
+        ],
+        "playerRoundSupport": 7,
+        "roundSupport": 7,
+        "demoSupport": 6,
+        "teamRoundSupport": 7
+      },
+      {
+        "callouts": [
+          "TSpawn",
+          "LowerMid",
+          "SecondMid",
+          "BackAlley",
+          "Apartments",
+          "TopofMid",
+          "Quad",
+          "BombsiteA"
+        ],
+        "playerRoundSupport": 4,
+        "roundSupport": 4,
+        "demoSupport": 4,
+        "teamRoundSupport": 4
+      }
+    ],
+    "confidence": "observed-complete-path-cluster"
+  },
+  {
+    "id": "a_balcony",
+    "target": "a",
+    "entryChokeId": "a_balcony",
+    "sharedCallouts": [
+      "TSpawn",
+      "LowerMid",
       "Apartments",
+      "Balcony",
       "BombsiteA"
     ],
     "representativeCallouts": [
       "TSpawn",
       "LowerMid",
       "SecondMid",
-      "Balcony",
+      "BackAlley",
       "Apartments",
-      "TopofMid",
+      "Balcony",
       "BombsiteA"
     ],
-    "totalPlayerRoundSupport": 51,
+    "totalPlayerRoundSupport": 17,
+    "roundSupport": 16,
+    "demoSupport": 9,
+    "teamRoundSupport": 16,
     "variants": [
       {
         "callouts": [
           "TSpawn",
           "LowerMid",
           "SecondMid",
-          "Balcony",
-          "Apartments",
-          "TopofMid",
-          "BombsiteA"
-        ],
-        "playerRoundSupport": 19
-      },
-      {
-        "callouts": [
-          "TSpawn",
-          "LowerMid",
-          "SecondMid",
           "BackAlley",
           "Apartments",
           "Balcony",
           "BombsiteA"
         ],
-        "playerRoundSupport": 14
+        "playerRoundSupport": 14,
+        "roundSupport": 13,
+        "demoSupport": 7,
+        "teamRoundSupport": 13
       },
       {
         "callouts": [
           "TSpawn",
           "LowerMid",
-          "SecondMid",
+          "Upstairs",
+          "Bridge",
+          "Apartments",
           "Balcony",
-          "Apartments",
-          "TopofMid",
-          "Quad",
           "BombsiteA"
         ],
-        "playerRoundSupport": 7
-      },
-      {
-        "callouts": [
-          "TSpawn",
-          "LowerMid",
-          "SecondMid",
-          "BackAlley",
-          "Apartments",
-          "TopofMid",
-          "BombsiteA"
-        ],
-        "playerRoundSupport": 4
-      },
-      {
-        "callouts": [
-          "TSpawn",
-          "LowerMid",
-          "SecondMid",
-          "BackAlley",
-          "Apartments",
-          "TopofMid",
-          "Quad",
-          "BombsiteA"
-        ],
-        "playerRoundSupport": 4
-      },
-      {
-        "callouts": [
-          "TSpawn",
-          "LowerMid",
-          "SecondMid",
-          "Apartments",
-          "TopofMid",
-          "BombsiteA"
-        ],
-        "playerRoundSupport": 3
+        "playerRoundSupport": 3,
+        "roundSupport": 3,
+        "demoSupport": 3,
+        "teamRoundSupport": 3
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "a_corridor_03",
+    "id": "a_pit",
     "target": "a",
+    "entryChokeId": "a_pit",
     "sharedCallouts": [
       "TSpawn",
       "LowerMid",
@@ -1938,6 +2108,9 @@
       "BombsiteA"
     ],
     "totalPlayerRoundSupport": 13,
+    "roundSupport": 12,
+    "demoSupport": 9,
+    "teamRoundSupport": 12,
     "variants": [
       {
         "callouts": [
@@ -1950,7 +2123,10 @@
           "Pit",
           "BombsiteA"
         ],
-        "playerRoundSupport": 10
+        "playerRoundSupport": 10,
+        "roundSupport": 9,
+        "demoSupport": 7,
+        "teamRoundSupport": 9
       },
       {
         "callouts": [
@@ -1962,52 +2138,18 @@
           "Pit",
           "BombsiteA"
         ],
-        "playerRoundSupport": 3
+        "playerRoundSupport": 3,
+        "roundSupport": 3,
+        "demoSupport": 3,
+        "teamRoundSupport": 3
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "a_corridor_04",
-    "target": "a",
-    "sharedCallouts": [
-      "TSpawn",
-      "LowerMid",
-      "Upstairs",
-      "Bridge",
-      "Apartments",
-      "Balcony",
-      "BombsiteA"
-    ],
-    "representativeCallouts": [
-      "TSpawn",
-      "LowerMid",
-      "Upstairs",
-      "Bridge",
-      "Apartments",
-      "Balcony",
-      "BombsiteA"
-    ],
-    "totalPlayerRoundSupport": 3,
-    "variants": [
-      {
-        "callouts": [
-          "TSpawn",
-          "LowerMid",
-          "Upstairs",
-          "Bridge",
-          "Apartments",
-          "Balcony",
-          "BombsiteA"
-        ],
-        "playerRoundSupport": 3
-      }
-    ],
-    "confidence": "observed-complete-path-cluster"
-  },
-  {
-    "id": "b_corridor_01",
+    "id": "b_banana",
     "target": "b",
+    "entryChokeId": "b_banana",
     "sharedCallouts": [
       "TSpawn",
       "LowerMid",
@@ -2023,6 +2165,9 @@
       "BombsiteB"
     ],
     "totalPlayerRoundSupport": 488,
+    "roundSupport": 154,
+    "demoSupport": 16,
+    "teamRoundSupport": 154,
     "variants": [
       {
         "callouts": [
@@ -2033,7 +2178,10 @@
           "Banana",
           "BombsiteB"
         ],
-        "playerRoundSupport": 409
+        "playerRoundSupport": 409,
+        "roundSupport": 153,
+        "demoSupport": 16,
+        "teamRoundSupport": 153
       },
       {
         "callouts": [
@@ -2044,7 +2192,10 @@
           "Banana",
           "BombsiteB"
         ],
-        "playerRoundSupport": 34
+        "playerRoundSupport": 34,
+        "roundSupport": 30,
+        "demoSupport": 14,
+        "teamRoundSupport": 30
       },
       {
         "callouts": [
@@ -2056,7 +2207,10 @@
           "Banana",
           "BombsiteB"
         ],
-        "playerRoundSupport": 25
+        "playerRoundSupport": 25,
+        "roundSupport": 25,
+        "demoSupport": 13,
+        "teamRoundSupport": 25
       },
       {
         "callouts": [
@@ -2066,7 +2220,10 @@
           "Banana",
           "BombsiteB"
         ],
-        "playerRoundSupport": 14
+        "playerRoundSupport": 14,
+        "roundSupport": 13,
+        "demoSupport": 9,
+        "teamRoundSupport": 13
       },
       {
         "callouts": [
@@ -2080,7 +2237,10 @@
           "Banana",
           "BombsiteB"
         ],
-        "playerRoundSupport": 3
+        "playerRoundSupport": 3,
+        "roundSupport": 3,
+        "demoSupport": 3,
+        "teamRoundSupport": 3
       },
       {
         "callouts": [
@@ -2093,14 +2253,18 @@
           "Banana",
           "BombsiteB"
         ],
-        "playerRoundSupport": 3
+        "playerRoundSupport": 3,
+        "roundSupport": 3,
+        "demoSupport": 3,
+        "teamRoundSupport": 3
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "b_corridor_02",
+    "id": "b_ruins",
     "target": "b",
+    "entryChokeId": "b_ruins",
     "sharedCallouts": [
       "TSpawn",
       "LowerMid",
@@ -2124,6 +2288,9 @@
       "BombsiteB"
     ],
     "totalPlayerRoundSupport": 6,
+    "roundSupport": 6,
+    "demoSupport": 4,
+    "teamRoundSupport": 6,
     "variants": [
       {
         "callouts": [
@@ -2137,7 +2304,10 @@
           "Ruins",
           "BombsiteB"
         ],
-        "playerRoundSupport": 6
+        "playerRoundSupport": 6,
+        "roundSupport": 6,
+        "demoSupport": 4,
+        "teamRoundSupport": 6
       }
     ],
     "confidence": "observed-complete-path-cluster"
@@ -2196,82 +2366,91 @@
 
 ### A 包 Route Corridors
 
-| corridor | 共同骨架 | variants | 累计 player-round 支持 | 主 variant 支持 |
-|---|---|---:|---:|---:|
-| a_corridor_01 | TSpawn / 匪家 → PalaceInterior / A二楼 → BombsiteA / A包 | 2 | 457 | 436 |
-| a_corridor_02 | TSpawn / 匪家 → SideAlley / 匪口 → Middle / 中路 → Connector / 拱门 → BombsiteA / A包 | 4 | 247 | 146 |
-| a_corridor_03 | TSpawn / 匪家 → PalaceInterior / A二楼 → Scaffolding / A2上下 → BombsiteA / A包 | 1 | 108 | 108 |
-| a_corridor_04 | TSpawn / 匪家 → SideAlley / 匪口 → TopofMid / 中远/匪口 → Middle / 中路 → SnipersNest / VIP → CTSpawn / 警家 → Jungle / Jungle → BombsiteA / A包 | 1 | 5 | 5 |
+| corridor | entryChokeId | 共同骨架 | variants | player-round | round | demo | team-round |
+|---|---|---|---:|---:|---:|---:|---:|
+| a_palace | a_palace | TSpawn / 匪家 → PalaceInterior / A二楼 → BombsiteA / A包 | 2 | 457 | 217 | 21 | 217 |
+| a_connector | a_connector | TSpawn / 匪家 → SideAlley / 匪口 → Middle / 中路 → Connector / 拱门 → BombsiteA / A包 | 3 | 242 | 125 | 21 | 125 |
+| a_scaffolding | a_scaffolding | TSpawn / 匪家 → PalaceInterior / A二楼 → Scaffolding / A2上下 → BombsiteA / A包 | 1 | 108 | 90 | 21 | 90 |
+| a_jungle | a_jungle | TSpawn / 匪家 → SideAlley / 匪口 → Middle / 中路 → Jungle / Jungle → BombsiteA / A包 | 2 | 10 | 10 | 9 | 10 |
 
-#### a_corridor_01
+#### a_palace
 
 共同骨架：TSpawn / 匪家 → PalaceInterior / A二楼 → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → PalaceAlley / A1 → TRamp / A1 → PalaceInterior / A二楼 → BombsiteA / A包 | 436 | 499 | 78.0% |
-| 2 | TSpawn / 匪家 → PalaceInterior / A二楼 → BombsiteA / A包 | 21 | 320 | 78.0% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → PalaceAlley / A1 → TRamp / A1 → PalaceInterior / A二楼 → BombsiteA / A包 | 436 | 209 | 21 | 209 | 499 | 78.0% |
+| 2 | TSpawn / 匪家 → PalaceInterior / A二楼 → BombsiteA / A包 | 21 | 20 | 12 | 20 | 320 | 78.0% |
 
-#### a_corridor_02
+#### a_connector
 
 共同骨架：TSpawn / 匪家 → SideAlley / 匪口 → Middle / 中路 → Connector / 拱门 → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → SideAlley / 匪口 → TopofMid / 中远/匪口 → Middle / 中路 → Connector / 拱门 → BombsiteA / A包 | 146 | 264 | 34.5% |
-| 2 | TSpawn / 匪家 → SideAlley / 匪口 → House / 匪二楼 → BackAlley / B二楼 → Underpass / 下水道 → Middle / 中路 → Connector / 拱门 → BombsiteA / A包 | 70 | 233 | 34.5% |
-| 3 | TSpawn / 匪家 → SideAlley / 匪口 → TopofMid / 中远/匪口 → Catwalk / B小 → Middle / 中路 → Connector / 拱门 → BombsiteA / A包 | 26 | 112 | 34.5% |
-| 4 | TSpawn / 匪家 → SideAlley / 匪口 → House / 匪二楼 → BackAlley / B二楼 → Underpass / 下水道 → Middle / 中路 → Connector / 拱门 → Jungle / Jungle → BombsiteA / A包 | 5 | 17 | 10.6% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → SideAlley / 匪口 → TopofMid / 中远/匪口 → Middle / 中路 → Connector / 拱门 → BombsiteA / A包 | 146 | 95 | 21 | 95 | 264 | 34.5% |
+| 2 | TSpawn / 匪家 → SideAlley / 匪口 → House / 匪二楼 → BackAlley / B二楼 → Underpass / 下水道 → Middle / 中路 → Connector / 拱门 → BombsiteA / A包 | 70 | 61 | 20 | 61 | 233 | 34.5% |
+| 3 | TSpawn / 匪家 → SideAlley / 匪口 → TopofMid / 中远/匪口 → Catwalk / B小 → Middle / 中路 → Connector / 拱门 → BombsiteA / A包 | 26 | 24 | 14 | 24 | 112 | 34.5% |
 
-#### a_corridor_03
+#### a_scaffolding
 
 共同骨架：TSpawn / 匪家 → PalaceInterior / A二楼 → Scaffolding / A2上下 → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → PalaceInterior / A二楼 → Scaffolding / A2上下 → BombsiteA / A包 | 108 | 116 | 63.1% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → PalaceInterior / A二楼 → Scaffolding / A2上下 → BombsiteA / A包 | 108 | 90 | 21 | 90 | 116 | 63.1% |
 
-#### a_corridor_04
+#### a_jungle
 
-共同骨架：TSpawn / 匪家 → SideAlley / 匪口 → TopofMid / 中远/匪口 → Middle / 中路 → SnipersNest / VIP → CTSpawn / 警家 → Jungle / Jungle → BombsiteA / A包
+共同骨架：TSpawn / 匪家 → SideAlley / 匪口 → Middle / 中路 → Jungle / Jungle → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → SideAlley / 匪口 → TopofMid / 中远/匪口 → Middle / 中路 → SnipersNest / VIP → CTSpawn / 警家 → Jungle / Jungle → BombsiteA / A包 | 5 | 24 | 4.8% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → SideAlley / 匪口 → TopofMid / 中远/匪口 → Middle / 中路 → SnipersNest / VIP → CTSpawn / 警家 → Jungle / Jungle → BombsiteA / A包 | 5 | 5 | 4 | 5 | 24 | 4.8% |
+| 2 | TSpawn / 匪家 → SideAlley / 匪口 → House / 匪二楼 → BackAlley / B二楼 → Underpass / 下水道 → Middle / 中路 → Connector / 拱门 → Jungle / Jungle → BombsiteA / A包 | 5 | 5 | 5 | 5 | 17 | 10.6% |
 
 ### B 包 Route Corridors
 
-| corridor | 共同骨架 | variants | 累计 player-round 支持 | 主 variant 支持 |
-|---|---|---:|---:|---:|
-| b_corridor_01 | TSpawn / 匪家 → SideAlley / 匪口 → BackAlley / B二楼 → Apartments / B二楼 → BombsiteB / B包 | 3 | 306 | 227 |
-| b_corridor_02 | TSpawn / 匪家 → SideAlley / 匪口 → TopofMid / 中远/匪口 → Catwalk / B小 → BombsiteB / B包 | 2 | 114 | 93 |
+| corridor | entryChokeId | 共同骨架 | variants | player-round | round | demo | team-round |
+|---|---|---|---:|---:|---:|---:|---:|
+| b_apartments | b_apartments | TSpawn / 匪家 → SideAlley / 匪口 → BackAlley / B二楼 → Apartments / B二楼 → BombsiteB / B包 | 2 | 232 | 129 | 21 | 129 |
+| b_catwalk | b_catwalk | TSpawn / 匪家 → SideAlley / 匪口 → TopofMid / 中远/匪口 → Catwalk / B小 → BombsiteB / B包 | 2 | 114 | 64 | 21 | 64 |
+| b_truck | b_truck | TSpawn / 匪家 → SideAlley / 匪口 → House / 匪二楼 → BackAlley / B二楼 → Apartments / B二楼 → Truck / 白车 → BombsiteB / B包 | 1 | 74 | 61 | 18 | 61 |
 
-#### b_corridor_01
+#### b_apartments
 
 共同骨架：TSpawn / 匪家 → SideAlley / 匪口 → BackAlley / B二楼 → Apartments / B二楼 → BombsiteB / B包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → SideAlley / 匪口 → House / 匪二楼 → BackAlley / B二楼 → Apartments / B二楼 → BombsiteB / B包 | 227 | 240 | 70.8% |
-| 2 | TSpawn / 匪家 → SideAlley / 匪口 → House / 匪二楼 → BackAlley / B二楼 → Apartments / B二楼 → Truck / 白车 → BombsiteB / B包 | 74 | 94 | 8.9% |
-| 3 | TSpawn / 匪家 → SideAlley / 匪口 → TopofMid / 中远/匪口 → Middle / 中路 → Underpass / 下水道 → BackAlley / B二楼 → Apartments / B二楼 → BombsiteB / B包 | 5 | 80 | 41.7% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → SideAlley / 匪口 → House / 匪二楼 → BackAlley / B二楼 → Apartments / B二楼 → BombsiteB / B包 | 227 | 127 | 21 | 127 | 240 | 70.8% |
+| 2 | TSpawn / 匪家 → SideAlley / 匪口 → TopofMid / 中远/匪口 → Middle / 中路 → Underpass / 下水道 → BackAlley / B二楼 → Apartments / B二楼 → BombsiteB / B包 | 5 | 4 | 4 | 4 | 80 | 41.7% |
 
-#### b_corridor_02
+#### b_catwalk
 
 共同骨架：TSpawn / 匪家 → SideAlley / 匪口 → TopofMid / 中远/匪口 → Catwalk / B小 → BombsiteB / B包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → SideAlley / 匪口 → TopofMid / 中远/匪口 → Catwalk / B小 → BombsiteB / B包 | 93 | 134 | 38.3% |
-| 2 | TSpawn / 匪家 → SideAlley / 匪口 → TopofMid / 中远/匪口 → Middle / 中路 → Catwalk / B小 → BombsiteB / B包 | 21 | 94 | 38.3% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → SideAlley / 匪口 → TopofMid / 中远/匪口 → Catwalk / B小 → BombsiteB / B包 | 93 | 56 | 20 | 56 | 134 | 38.3% |
+| 2 | TSpawn / 匪家 → SideAlley / 匪口 → TopofMid / 中远/匪口 → Middle / 中路 → Catwalk / B小 → BombsiteB / B包 | 21 | 17 | 14 | 17 | 94 | 38.3% |
+
+#### b_truck
+
+共同骨架：TSpawn / 匪家 → SideAlley / 匪口 → House / 匪二楼 → BackAlley / B二楼 → Apartments / B二楼 → Truck / 白车 → BombsiteB / B包
+
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → SideAlley / 匪口 → House / 匪二楼 → BackAlley / B二楼 → Apartments / B二楼 → Truck / 白车 → BombsiteB / B包 | 74 | 61 | 18 | 61 | 94 | 8.9% |
 
 ### Corridor 候选 JSON
 
 ```json
 [
   {
-    "id": "a_corridor_01",
+    "id": "a_palace",
     "target": "a",
+    "entryChokeId": "a_palace",
     "sharedCallouts": [
       "TSpawn",
       "PalaceInterior",
@@ -2285,6 +2464,9 @@
       "BombsiteA"
     ],
     "totalPlayerRoundSupport": 457,
+    "roundSupport": 217,
+    "demoSupport": 21,
+    "teamRoundSupport": 217,
     "variants": [
       {
         "callouts": [
@@ -2294,7 +2476,10 @@
           "PalaceInterior",
           "BombsiteA"
         ],
-        "playerRoundSupport": 436
+        "playerRoundSupport": 436,
+        "roundSupport": 209,
+        "demoSupport": 21,
+        "teamRoundSupport": 209
       },
       {
         "callouts": [
@@ -2302,14 +2487,18 @@
           "PalaceInterior",
           "BombsiteA"
         ],
-        "playerRoundSupport": 21
+        "playerRoundSupport": 21,
+        "roundSupport": 20,
+        "demoSupport": 12,
+        "teamRoundSupport": 20
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "a_corridor_02",
+    "id": "a_connector",
     "target": "a",
+    "entryChokeId": "a_connector",
     "sharedCallouts": [
       "TSpawn",
       "SideAlley",
@@ -2325,7 +2514,10 @@
       "Connector",
       "BombsiteA"
     ],
-    "totalPlayerRoundSupport": 247,
+    "totalPlayerRoundSupport": 242,
+    "roundSupport": 125,
+    "demoSupport": 21,
+    "teamRoundSupport": 125,
     "variants": [
       {
         "callouts": [
@@ -2336,7 +2528,10 @@
           "Connector",
           "BombsiteA"
         ],
-        "playerRoundSupport": 146
+        "playerRoundSupport": 146,
+        "roundSupport": 95,
+        "demoSupport": 21,
+        "teamRoundSupport": 95
       },
       {
         "callouts": [
@@ -2349,7 +2544,10 @@
           "Connector",
           "BombsiteA"
         ],
-        "playerRoundSupport": 70
+        "playerRoundSupport": 70,
+        "roundSupport": 61,
+        "demoSupport": 20,
+        "teamRoundSupport": 61
       },
       {
         "callouts": [
@@ -2361,28 +2559,18 @@
           "Connector",
           "BombsiteA"
         ],
-        "playerRoundSupport": 26
-      },
-      {
-        "callouts": [
-          "TSpawn",
-          "SideAlley",
-          "House",
-          "BackAlley",
-          "Underpass",
-          "Middle",
-          "Connector",
-          "Jungle",
-          "BombsiteA"
-        ],
-        "playerRoundSupport": 5
+        "playerRoundSupport": 26,
+        "roundSupport": 24,
+        "demoSupport": 14,
+        "teamRoundSupport": 24
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "a_corridor_03",
+    "id": "a_scaffolding",
     "target": "a",
+    "entryChokeId": "a_scaffolding",
     "sharedCallouts": [
       "TSpawn",
       "PalaceInterior",
@@ -2396,6 +2584,9 @@
       "BombsiteA"
     ],
     "totalPlayerRoundSupport": 108,
+    "roundSupport": 90,
+    "demoSupport": 21,
+    "teamRoundSupport": 90,
     "variants": [
       {
         "callouts": [
@@ -2404,21 +2595,22 @@
           "Scaffolding",
           "BombsiteA"
         ],
-        "playerRoundSupport": 108
+        "playerRoundSupport": 108,
+        "roundSupport": 90,
+        "demoSupport": 21,
+        "teamRoundSupport": 90
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "a_corridor_04",
+    "id": "a_jungle",
     "target": "a",
+    "entryChokeId": "a_jungle",
     "sharedCallouts": [
       "TSpawn",
       "SideAlley",
-      "TopofMid",
       "Middle",
-      "SnipersNest",
-      "CTSpawn",
       "Jungle",
       "BombsiteA"
     ],
@@ -2432,7 +2624,10 @@
       "Jungle",
       "BombsiteA"
     ],
-    "totalPlayerRoundSupport": 5,
+    "totalPlayerRoundSupport": 10,
+    "roundSupport": 10,
+    "demoSupport": 9,
+    "teamRoundSupport": 10,
     "variants": [
       {
         "callouts": [
@@ -2445,14 +2640,35 @@
           "Jungle",
           "BombsiteA"
         ],
-        "playerRoundSupport": 5
+        "playerRoundSupport": 5,
+        "roundSupport": 5,
+        "demoSupport": 4,
+        "teamRoundSupport": 5
+      },
+      {
+        "callouts": [
+          "TSpawn",
+          "SideAlley",
+          "House",
+          "BackAlley",
+          "Underpass",
+          "Middle",
+          "Connector",
+          "Jungle",
+          "BombsiteA"
+        ],
+        "playerRoundSupport": 5,
+        "roundSupport": 5,
+        "demoSupport": 5,
+        "teamRoundSupport": 5
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "b_corridor_01",
+    "id": "b_apartments",
     "target": "b",
+    "entryChokeId": "b_apartments",
     "sharedCallouts": [
       "TSpawn",
       "SideAlley",
@@ -2468,7 +2684,10 @@
       "Apartments",
       "BombsiteB"
     ],
-    "totalPlayerRoundSupport": 306,
+    "totalPlayerRoundSupport": 232,
+    "roundSupport": 129,
+    "demoSupport": 21,
+    "teamRoundSupport": 129,
     "variants": [
       {
         "callouts": [
@@ -2479,19 +2698,10 @@
           "Apartments",
           "BombsiteB"
         ],
-        "playerRoundSupport": 227
-      },
-      {
-        "callouts": [
-          "TSpawn",
-          "SideAlley",
-          "House",
-          "BackAlley",
-          "Apartments",
-          "Truck",
-          "BombsiteB"
-        ],
-        "playerRoundSupport": 74
+        "playerRoundSupport": 227,
+        "roundSupport": 127,
+        "demoSupport": 21,
+        "teamRoundSupport": 127
       },
       {
         "callouts": [
@@ -2504,14 +2714,18 @@
           "Apartments",
           "BombsiteB"
         ],
-        "playerRoundSupport": 5
+        "playerRoundSupport": 5,
+        "roundSupport": 4,
+        "demoSupport": 4,
+        "teamRoundSupport": 4
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "b_corridor_02",
+    "id": "b_catwalk",
     "target": "b",
+    "entryChokeId": "b_catwalk",
     "sharedCallouts": [
       "TSpawn",
       "SideAlley",
@@ -2527,6 +2741,9 @@
       "BombsiteB"
     ],
     "totalPlayerRoundSupport": 114,
+    "roundSupport": 64,
+    "demoSupport": 21,
+    "teamRoundSupport": 64,
     "variants": [
       {
         "callouts": [
@@ -2536,7 +2753,10 @@
           "Catwalk",
           "BombsiteB"
         ],
-        "playerRoundSupport": 93
+        "playerRoundSupport": 93,
+        "roundSupport": 56,
+        "demoSupport": 20,
+        "teamRoundSupport": 56
       },
       {
         "callouts": [
@@ -2547,7 +2767,55 @@
           "Catwalk",
           "BombsiteB"
         ],
-        "playerRoundSupport": 21
+        "playerRoundSupport": 21,
+        "roundSupport": 17,
+        "demoSupport": 14,
+        "teamRoundSupport": 17
+      }
+    ],
+    "confidence": "observed-complete-path-cluster"
+  },
+  {
+    "id": "b_truck",
+    "target": "b",
+    "entryChokeId": "b_truck",
+    "sharedCallouts": [
+      "TSpawn",
+      "SideAlley",
+      "House",
+      "BackAlley",
+      "Apartments",
+      "Truck",
+      "BombsiteB"
+    ],
+    "representativeCallouts": [
+      "TSpawn",
+      "SideAlley",
+      "House",
+      "BackAlley",
+      "Apartments",
+      "Truck",
+      "BombsiteB"
+    ],
+    "totalPlayerRoundSupport": 74,
+    "roundSupport": 61,
+    "demoSupport": 18,
+    "teamRoundSupport": 61,
+    "variants": [
+      {
+        "callouts": [
+          "TSpawn",
+          "SideAlley",
+          "House",
+          "BackAlley",
+          "Apartments",
+          "Truck",
+          "BombsiteB"
+        ],
+        "playerRoundSupport": 74,
+        "roundSupport": 61,
+        "demoSupport": 18,
+        "teamRoundSupport": 61
       }
     ],
     "confidence": "observed-complete-path-cluster"
@@ -2606,98 +2874,107 @@
 
 ### A 包 Route Corridors
 
-| corridor | 共同骨架 | variants | 累计 player-round 支持 | 主 variant 支持 |
-|---|---|---:|---:|---:|
-| a_corridor_01 | TSpawn / 匪家 → Outside / 外场 → Lobby / 匪厅 → Squeaky / 铁门房 → BombsiteA / A包 | 2 | 154 | 143 |
-| a_corridor_02 | TSpawn / 匪家 → Outside / 外场 → Lobby / 匪厅 → Hut / 黄房 → BombsiteA / A包 | 2 | 103 | 87 |
-| a_corridor_03 | TSpawn / 匪家 → Outside / 外场 → Mini / 正门 → BombsiteA / A包 | 1 | 61 | 61 |
-| a_corridor_04 | TSpawn / 匪家 → Outside / 外场 → Secret / K1 → Tunnels / K1地下 → Vents / 管道 → BombsiteA / A包 | 1 | 14 | 14 |
-| a_corridor_05 | TSpawn / 匪家 → Outside / 外场 → Hell / 三楼下 → Heaven / 三楼 → Rafters / 三楼横梁 → BombsiteA / A包 | 2 | 6 | 3 |
+| corridor | entryChokeId | 共同骨架 | variants | player-round | round | demo | team-round |
+|---|---|---|---:|---:|---:|---:|---:|
+| a_squeaky | a_squeaky | TSpawn / 匪家 → Outside / 外场 → Lobby / 匪厅 → Squeaky / 铁门房 → BombsiteA / A包 | 2 | 154 | 96 | 12 | 96 |
+| a_hut | a_hut | TSpawn / 匪家 → Outside / 外场 → Lobby / 匪厅 → Hut / 黄房 → BombsiteA / A包 | 2 | 103 | 65 | 12 | 65 |
+| a_mini | a_mini | TSpawn / 匪家 → Outside / 外场 → Mini / 正门 → BombsiteA / A包 | 1 | 61 | 40 | 12 | 40 |
+| a_vents | a_vents | TSpawn / 匪家 → Outside / 外场 → Secret / K1 → Tunnels / K1地下 → Vents / 管道 → BombsiteA / A包 | 1 | 14 | 11 | 8 | 11 |
+| a_rafters | a_rafters | TSpawn / 匪家 → Outside / 外场 → Hell / 三楼下 → Heaven / 三楼 → Rafters / 三楼横梁 → BombsiteA / A包 | 2 | 6 | 6 | 4 | 6 |
 
-#### a_corridor_01
+#### a_squeaky
 
 共同骨架：TSpawn / 匪家 → Outside / 外场 → Lobby / 匪厅 → Squeaky / 铁门房 → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Outside / 外场 → Lobby / 匪厅 → Squeaky / 铁门房 → BombsiteA / A包 | 143 | 178 | 79.8% |
-| 2 | TSpawn / 匪家 → Outside / 外场 → Roof / 屋顶 → Lobby / 匪厅 → Squeaky / 铁门房 → BombsiteA / A包 | 11 | 84 | 79.8% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Outside / 外场 → Lobby / 匪厅 → Squeaky / 铁门房 → BombsiteA / A包 | 143 | 92 | 12 | 92 | 178 | 79.8% |
+| 2 | TSpawn / 匪家 → Outside / 外场 → Roof / 屋顶 → Lobby / 匪厅 → Squeaky / 铁门房 → BombsiteA / A包 | 11 | 11 | 8 | 11 | 84 | 79.8% |
 
-#### a_corridor_02
+#### a_hut
 
 共同骨架：TSpawn / 匪家 → Outside / 外场 → Lobby / 匪厅 → Hut / 黄房 → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Outside / 外场 → Lobby / 匪厅 → Hut / 黄房 → BombsiteA / A包 | 87 | 154 | 70.3% |
-| 2 | TSpawn / 匪家 → Outside / 外场 → Roof / 屋顶 → Lobby / 匪厅 → Hut / 黄房 → BombsiteA / A包 | 16 | 84 | 70.3% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Outside / 外场 → Lobby / 匪厅 → Hut / 黄房 → BombsiteA / A包 | 87 | 60 | 12 | 60 | 154 | 70.3% |
+| 2 | TSpawn / 匪家 → Outside / 外场 → Roof / 屋顶 → Lobby / 匪厅 → Hut / 黄房 → BombsiteA / A包 | 16 | 15 | 7 | 15 | 84 | 70.3% |
 
-#### a_corridor_03
+#### a_mini
 
 共同骨架：TSpawn / 匪家 → Outside / 外场 → Mini / 正门 → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Outside / 外场 → Mini / 正门 → BombsiteA / A包 | 61 | 70 | 22.3% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Outside / 外场 → Mini / 正门 → BombsiteA / A包 | 61 | 40 | 12 | 40 | 70 | 22.3% |
 
-#### a_corridor_04
+#### a_vents
 
 共同骨架：TSpawn / 匪家 → Outside / 外场 → Secret / K1 → Tunnels / K1地下 → Vents / 管道 → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Outside / 外场 → Secret / K1 → Tunnels / K1地下 → Vents / 管道 → BombsiteA / A包 | 14 | 25 | 36.8% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Outside / 外场 → Secret / K1 → Tunnels / K1地下 → Vents / 管道 → BombsiteA / A包 | 14 | 11 | 8 | 11 | 25 | 36.8% |
 
-#### a_corridor_05
+#### a_rafters
 
 共同骨架：TSpawn / 匪家 → Outside / 外场 → Hell / 三楼下 → Heaven / 三楼 → Rafters / 三楼横梁 → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Outside / 外场 → Lobby / 匪厅 → Vending / 链接 → Trophy / 奖杯房 → Control / 链接 → Ramp / 铁板 → Admin / 铁板三楼下 → Hell / 三楼下 → Heaven / 三楼 → Rafters / 三楼横梁 → BombsiteA / A包 | 3 | 8 | 2.6% |
-| 2 | TSpawn / 匪家 → Outside / 外场 → LockerRoom / 更衣室 → Hell / 三楼下 → Heaven / 三楼 → Rafters / 三楼横梁 → BombsiteA / A包 | 3 | 7 | 2.6% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Outside / 外场 → Lobby / 匪厅 → Vending / 链接 → Trophy / 奖杯房 → Control / 链接 → Ramp / 铁板 → Admin / 铁板三楼下 → Hell / 三楼下 → Heaven / 三楼 → Rafters / 三楼横梁 → BombsiteA / A包 | 3 | 3 | 3 | 3 | 8 | 2.6% |
+| 2 | TSpawn / 匪家 → Outside / 外场 → LockerRoom / 更衣室 → Hell / 三楼下 → Heaven / 三楼 → Rafters / 三楼横梁 → BombsiteA / A包 | 3 | 3 | 2 | 3 | 7 | 2.6% |
 
 ### B 包 Route Corridors
 
-| corridor | 共同骨架 | variants | 累计 player-round 支持 | 主 variant 支持 |
-|---|---|---:|---:|---:|
-| b_corridor_01 | TSpawn / 匪家 → Outside / 外场 → Lobby / 匪厅 → Vending / 链接 → Trophy / 奖杯房 → Control / 链接 → Ramp / 铁板 → BombsiteB / B包 | 2 | 109 | 103 |
-| b_corridor_02 | TSpawn / 匪家 → Outside / 外场 → Secret / K1 → Tunnels / K1地下 → BombsiteB / B包 | 2 | 89 | 53 |
-| b_corridor_03 | TSpawn / 匪家 → Outside / 外场 → Secret / K1 → Tunnels / K1地下 → Observation / 控制室 → BombsiteB / B包 | 1 | 34 | 34 |
+| corridor | entryChokeId | 共同骨架 | variants | player-round | round | demo | team-round |
+|---|---|---|---:|---:|---:|---:|---:|
+| b_ramp | b_ramp | TSpawn / 匪家 → Outside / 外场 → Lobby / 匪厅 → Vending / 链接 → Trophy / 奖杯房 → Control / 链接 → Ramp / 铁板 → BombsiteB / B包 | 2 | 109 | 42 | 12 | 42 |
+| b_decon | b_decon | TSpawn / 匪家 → Outside / 外场 → Secret / K1 → Tunnels / K1地下 → Decon / 死门 → BombsiteB / B包 | 1 | 53 | 31 | 11 | 31 |
+| b_tunnels | b_tunnels | TSpawn / 匪家 → Outside / 外场 → Secret / K1 → Tunnels / K1地下 → BombsiteB / B包 | 1 | 36 | 25 | 11 | 25 |
+| b_observation | b_observation | TSpawn / 匪家 → Outside / 外场 → Secret / K1 → Tunnels / K1地下 → Observation / 控制室 → BombsiteB / B包 | 1 | 34 | 29 | 9 | 29 |
 
-#### b_corridor_01
+#### b_ramp
 
 共同骨架：TSpawn / 匪家 → Outside / 外场 → Lobby / 匪厅 → Vending / 链接 → Trophy / 奖杯房 → Control / 链接 → Ramp / 铁板 → BombsiteB / B包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Outside / 外场 → Lobby / 匪厅 → Vending / 链接 → Trophy / 奖杯房 → Control / 链接 → Ramp / 铁板 → BombsiteB / B包 | 103 | 125 | 39.1% |
-| 2 | TSpawn / 匪家 → Outside / 外场 → Roof / 屋顶 → Lobby / 匪厅 → Vending / 链接 → Trophy / 奖杯房 → Control / 链接 → Ramp / 铁板 → BombsiteB / B包 | 6 | 84 | 39.1% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Outside / 外场 → Lobby / 匪厅 → Vending / 链接 → Trophy / 奖杯房 → Control / 链接 → Ramp / 铁板 → BombsiteB / B包 | 103 | 40 | 12 | 40 | 125 | 39.1% |
+| 2 | TSpawn / 匪家 → Outside / 外场 → Roof / 屋顶 → Lobby / 匪厅 → Vending / 链接 → Trophy / 奖杯房 → Control / 链接 → Ramp / 铁板 → BombsiteB / B包 | 6 | 6 | 4 | 6 | 84 | 39.1% |
 
-#### b_corridor_02
+#### b_decon
+
+共同骨架：TSpawn / 匪家 → Outside / 外场 → Secret / K1 → Tunnels / K1地下 → Decon / 死门 → BombsiteB / B包
+
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Outside / 外场 → Secret / K1 → Tunnels / K1地下 → Decon / 死门 → BombsiteB / B包 | 53 | 31 | 11 | 31 | 83 | 40.2% |
+
+#### b_tunnels
 
 共同骨架：TSpawn / 匪家 → Outside / 外场 → Secret / K1 → Tunnels / K1地下 → BombsiteB / B包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Outside / 外场 → Secret / K1 → Tunnels / K1地下 → Decon / 死门 → BombsiteB / B包 | 53 | 83 | 40.2% |
-| 2 | TSpawn / 匪家 → Outside / 外场 → Secret / K1 → Tunnels / K1地下 → BombsiteB / B包 | 36 | 47 | 60.3% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Outside / 外场 → Secret / K1 → Tunnels / K1地下 → BombsiteB / B包 | 36 | 25 | 11 | 25 | 47 | 60.3% |
 
-#### b_corridor_03
+#### b_observation
 
 共同骨架：TSpawn / 匪家 → Outside / 外场 → Secret / K1 → Tunnels / K1地下 → Observation / 控制室 → BombsiteB / B包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Outside / 外场 → Secret / K1 → Tunnels / K1地下 → Observation / 控制室 → BombsiteB / B包 | 34 | 45 | 78.9% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Outside / 外场 → Secret / K1 → Tunnels / K1地下 → Observation / 控制室 → BombsiteB / B包 | 34 | 29 | 9 | 29 | 45 | 78.9% |
 
 ### Corridor 候选 JSON
 
 ```json
 [
   {
-    "id": "a_corridor_01",
+    "id": "a_squeaky",
     "target": "a",
+    "entryChokeId": "a_squeaky",
     "sharedCallouts": [
       "TSpawn",
       "Outside",
@@ -2713,6 +2990,9 @@
       "BombsiteA"
     ],
     "totalPlayerRoundSupport": 154,
+    "roundSupport": 96,
+    "demoSupport": 12,
+    "teamRoundSupport": 96,
     "variants": [
       {
         "callouts": [
@@ -2722,7 +3002,10 @@
           "Squeaky",
           "BombsiteA"
         ],
-        "playerRoundSupport": 143
+        "playerRoundSupport": 143,
+        "roundSupport": 92,
+        "demoSupport": 12,
+        "teamRoundSupport": 92
       },
       {
         "callouts": [
@@ -2733,14 +3016,18 @@
           "Squeaky",
           "BombsiteA"
         ],
-        "playerRoundSupport": 11
+        "playerRoundSupport": 11,
+        "roundSupport": 11,
+        "demoSupport": 8,
+        "teamRoundSupport": 11
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "a_corridor_02",
+    "id": "a_hut",
     "target": "a",
+    "entryChokeId": "a_hut",
     "sharedCallouts": [
       "TSpawn",
       "Outside",
@@ -2756,6 +3043,9 @@
       "BombsiteA"
     ],
     "totalPlayerRoundSupport": 103,
+    "roundSupport": 65,
+    "demoSupport": 12,
+    "teamRoundSupport": 65,
     "variants": [
       {
         "callouts": [
@@ -2765,7 +3055,10 @@
           "Hut",
           "BombsiteA"
         ],
-        "playerRoundSupport": 87
+        "playerRoundSupport": 87,
+        "roundSupport": 60,
+        "demoSupport": 12,
+        "teamRoundSupport": 60
       },
       {
         "callouts": [
@@ -2776,14 +3069,18 @@
           "Hut",
           "BombsiteA"
         ],
-        "playerRoundSupport": 16
+        "playerRoundSupport": 16,
+        "roundSupport": 15,
+        "demoSupport": 7,
+        "teamRoundSupport": 15
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "a_corridor_03",
+    "id": "a_mini",
     "target": "a",
+    "entryChokeId": "a_mini",
     "sharedCallouts": [
       "TSpawn",
       "Outside",
@@ -2797,6 +3094,9 @@
       "BombsiteA"
     ],
     "totalPlayerRoundSupport": 61,
+    "roundSupport": 40,
+    "demoSupport": 12,
+    "teamRoundSupport": 40,
     "variants": [
       {
         "callouts": [
@@ -2805,14 +3105,18 @@
           "Mini",
           "BombsiteA"
         ],
-        "playerRoundSupport": 61
+        "playerRoundSupport": 61,
+        "roundSupport": 40,
+        "demoSupport": 12,
+        "teamRoundSupport": 40
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "a_corridor_04",
+    "id": "a_vents",
     "target": "a",
+    "entryChokeId": "a_vents",
     "sharedCallouts": [
       "TSpawn",
       "Outside",
@@ -2830,6 +3134,9 @@
       "BombsiteA"
     ],
     "totalPlayerRoundSupport": 14,
+    "roundSupport": 11,
+    "demoSupport": 8,
+    "teamRoundSupport": 11,
     "variants": [
       {
         "callouts": [
@@ -2840,14 +3147,18 @@
           "Vents",
           "BombsiteA"
         ],
-        "playerRoundSupport": 14
+        "playerRoundSupport": 14,
+        "roundSupport": 11,
+        "demoSupport": 8,
+        "teamRoundSupport": 11
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "a_corridor_05",
+    "id": "a_rafters",
     "target": "a",
+    "entryChokeId": "a_rafters",
     "sharedCallouts": [
       "TSpawn",
       "Outside",
@@ -2871,6 +3182,9 @@
       "BombsiteA"
     ],
     "totalPlayerRoundSupport": 6,
+    "roundSupport": 6,
+    "demoSupport": 4,
+    "teamRoundSupport": 6,
     "variants": [
       {
         "callouts": [
@@ -2887,7 +3201,10 @@
           "Rafters",
           "BombsiteA"
         ],
-        "playerRoundSupport": 3
+        "playerRoundSupport": 3,
+        "roundSupport": 3,
+        "demoSupport": 3,
+        "teamRoundSupport": 3
       },
       {
         "callouts": [
@@ -2899,14 +3216,18 @@
           "Rafters",
           "BombsiteA"
         ],
-        "playerRoundSupport": 3
+        "playerRoundSupport": 3,
+        "roundSupport": 3,
+        "demoSupport": 2,
+        "teamRoundSupport": 3
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "b_corridor_01",
+    "id": "b_ramp",
     "target": "b",
+    "entryChokeId": "b_ramp",
     "sharedCallouts": [
       "TSpawn",
       "Outside",
@@ -2928,6 +3249,9 @@
       "BombsiteB"
     ],
     "totalPlayerRoundSupport": 109,
+    "roundSupport": 42,
+    "demoSupport": 12,
+    "teamRoundSupport": 42,
     "variants": [
       {
         "callouts": [
@@ -2940,7 +3264,10 @@
           "Ramp",
           "BombsiteB"
         ],
-        "playerRoundSupport": 103
+        "playerRoundSupport": 103,
+        "roundSupport": 40,
+        "demoSupport": 12,
+        "teamRoundSupport": 40
       },
       {
         "callouts": [
@@ -2954,14 +3281,60 @@
           "Ramp",
           "BombsiteB"
         ],
-        "playerRoundSupport": 6
+        "playerRoundSupport": 6,
+        "roundSupport": 6,
+        "demoSupport": 4,
+        "teamRoundSupport": 6
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "b_corridor_02",
+    "id": "b_decon",
     "target": "b",
+    "entryChokeId": "b_decon",
+    "sharedCallouts": [
+      "TSpawn",
+      "Outside",
+      "Secret",
+      "Tunnels",
+      "Decon",
+      "BombsiteB"
+    ],
+    "representativeCallouts": [
+      "TSpawn",
+      "Outside",
+      "Secret",
+      "Tunnels",
+      "Decon",
+      "BombsiteB"
+    ],
+    "totalPlayerRoundSupport": 53,
+    "roundSupport": 31,
+    "demoSupport": 11,
+    "teamRoundSupport": 31,
+    "variants": [
+      {
+        "callouts": [
+          "TSpawn",
+          "Outside",
+          "Secret",
+          "Tunnels",
+          "Decon",
+          "BombsiteB"
+        ],
+        "playerRoundSupport": 53,
+        "roundSupport": 31,
+        "demoSupport": 11,
+        "teamRoundSupport": 31
+      }
+    ],
+    "confidence": "observed-complete-path-cluster"
+  },
+  {
+    "id": "b_tunnels",
+    "target": "b",
+    "entryChokeId": "b_tunnels",
     "sharedCallouts": [
       "TSpawn",
       "Outside",
@@ -2974,10 +3347,12 @@
       "Outside",
       "Secret",
       "Tunnels",
-      "Decon",
       "BombsiteB"
     ],
-    "totalPlayerRoundSupport": 89,
+    "totalPlayerRoundSupport": 36,
+    "roundSupport": 25,
+    "demoSupport": 11,
+    "teamRoundSupport": 25,
     "variants": [
       {
         "callouts": [
@@ -2985,27 +3360,20 @@
           "Outside",
           "Secret",
           "Tunnels",
-          "Decon",
           "BombsiteB"
         ],
-        "playerRoundSupport": 53
-      },
-      {
-        "callouts": [
-          "TSpawn",
-          "Outside",
-          "Secret",
-          "Tunnels",
-          "BombsiteB"
-        ],
-        "playerRoundSupport": 36
+        "playerRoundSupport": 36,
+        "roundSupport": 25,
+        "demoSupport": 11,
+        "teamRoundSupport": 25
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "b_corridor_03",
+    "id": "b_observation",
     "target": "b",
+    "entryChokeId": "b_observation",
     "sharedCallouts": [
       "TSpawn",
       "Outside",
@@ -3023,6 +3391,9 @@
       "BombsiteB"
     ],
     "totalPlayerRoundSupport": 34,
+    "roundSupport": 29,
+    "demoSupport": 9,
+    "teamRoundSupport": 29,
     "variants": [
       {
         "callouts": [
@@ -3033,7 +3404,10 @@
           "Observation",
           "BombsiteB"
         ],
-        "playerRoundSupport": 34
+        "playerRoundSupport": 34,
+        "roundSupport": 29,
+        "demoSupport": 9,
+        "teamRoundSupport": 29
       }
     ],
     "confidence": "observed-complete-path-cluster"
@@ -3092,78 +3466,170 @@
 
 ### A 包 Route Corridors
 
-| corridor | 共同骨架 | variants | 累计 player-round 支持 | 主 variant 支持 |
-|---|---|---:|---:|---:|
-| a_corridor_01 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → UpperPark / A大厕所 → BombsiteA / A包 | 5 | 62 | 33 |
-| a_corridor_02 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → LowerPark / A小厕所 → BombsiteA / A包 | 3 | 37 | 21 |
-| a_corridor_03 | TSpawn / 匪家 → Alley / 匪家B外 → Canal / 长管 → Pipe / 短管 → Water / 工地 → Connector / 下水道 → LowerPark / A小厕所 → BombsiteA / A包 | 1 | 7 | 7 |
+| corridor | entryChokeId | 共同骨架 | variants | player-round | round | demo | team-round |
+|---|---|---|---:|---:|---:|---:|---:|
+| a_lower_park | a_lower_park | TSpawn / 匪家 → LowerPark / A小厕所 → BombsiteA / A包 | 5 | 54 | 29 | 5 | 29 |
+| a_upper_park | a_upper_park | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → UpperPark / A大厕所 → BombsiteA / A包 | 4 | 52 | 30 | 5 | 30 |
 
-#### a_corridor_01
+#### a_lower_park
+
+共同骨架：TSpawn / 匪家 → LowerPark / A小厕所 → BombsiteA / A包
+
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Fountain / 喷泉 → LowerPark / A小厕所 → BombsiteA / A包 | 21 | 15 | 5 | 15 | 66 | 37.3% |
+| 2 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Connector / 下水道 → LowerPark / A小厕所 → BombsiteA / A包 | 11 | 9 | 4 | 9 | 66 | 37.3% |
+| 3 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Fountain / 喷泉 → UpperPark / A大厕所 → LowerPark / A小厕所 → BombsiteA / A包 | 10 | 7 | 3 | 7 | 46 | 37.3% |
+| 4 | TSpawn / 匪家 → Alley / 匪家B外 → Canal / 长管 → Pipe / 短管 → Water / 工地 → Connector / 下水道 → LowerPark / A小厕所 → BombsiteA / A包 | 7 | 6 | 4 | 6 | 34 | 37.3% |
+| 5 | TSpawn / 匪家 → Alley / 匪家B外 → TStairs / 匪楼梯 → Tunnels / 下水道 → Fountain / 喷泉 → LowerPark / A小厕所 → BombsiteA / A包 | 5 | 5 | 4 | 5 | 45 | 37.3% |
+
+#### a_upper_park
 
 共同骨架：TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → UpperPark / A大厕所 → BombsiteA / A包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Fountain / 喷泉 → UpperPark / A大厕所 → BombsiteA / A包 | 33 | 61 | 68.5% |
-| 2 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Fountain / 喷泉 → UpperPark / A大厕所 → LowerPark / A小厕所 → BombsiteA / A包 | 10 | 46 | 37.3% |
-| 3 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Fountain / 喷泉 → LowerPark / A小厕所 → Restroom / 厕所 → UpperPark / A大厕所 → BombsiteA / A包 | 9 | 23 | 60.5% |
-| 4 | TSpawn / 匪家 → Alley / 匪家B外 → TStairs / 匪楼梯 → Tunnels / 下水道 → Fountain / 喷泉 → UpperPark / A大厕所 → BombsiteA / A包 | 6 | 45 | 68.5% |
-| 5 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Connector / 下水道 → LowerPark / A小厕所 → Restroom / 厕所 → UpperPark / A大厕所 → BombsiteA / A包 | 4 | 23 | 60.5% |
-
-#### a_corridor_02
-
-共同骨架：TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → LowerPark / A小厕所 → BombsiteA / A包
-
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Fountain / 喷泉 → LowerPark / A小厕所 → BombsiteA / A包 | 21 | 66 | 37.3% |
-| 2 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Connector / 下水道 → LowerPark / A小厕所 → BombsiteA / A包 | 11 | 66 | 37.3% |
-| 3 | TSpawn / 匪家 → Alley / 匪家B外 → TStairs / 匪楼梯 → Tunnels / 下水道 → Fountain / 喷泉 → LowerPark / A小厕所 → BombsiteA / A包 | 5 | 45 | 37.3% |
-
-#### a_corridor_03
-
-共同骨架：TSpawn / 匪家 → Alley / 匪家B外 → Canal / 长管 → Pipe / 短管 → Water / 工地 → Connector / 下水道 → LowerPark / A小厕所 → BombsiteA / A包
-
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Alley / 匪家B外 → Canal / 长管 → Pipe / 短管 → Water / 工地 → Connector / 下水道 → LowerPark / A小厕所 → BombsiteA / A包 | 7 | 34 | 37.3% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Fountain / 喷泉 → UpperPark / A大厕所 → BombsiteA / A包 | 33 | 23 | 5 | 23 | 61 | 68.5% |
+| 2 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Fountain / 喷泉 → LowerPark / A小厕所 → Restroom / 厕所 → UpperPark / A大厕所 → BombsiteA / A包 | 9 | 7 | 5 | 7 | 23 | 60.5% |
+| 3 | TSpawn / 匪家 → Alley / 匪家B外 → TStairs / 匪楼梯 → Tunnels / 下水道 → Fountain / 喷泉 → UpperPark / A大厕所 → BombsiteA / A包 | 6 | 5 | 2 | 5 | 45 | 68.5% |
+| 4 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Connector / 下水道 → LowerPark / A小厕所 → Restroom / 厕所 → UpperPark / A大厕所 → BombsiteA / A包 | 4 | 1 | 1 | 1 | 23 | 60.5% |
 
 ### B 包 Route Corridors
 
-| corridor | 共同骨架 | variants | 累计 player-round 支持 | 主 variant 支持 |
-|---|---|---:|---:|---:|
-| b_corridor_01 | TSpawn / 匪家 → Alley / 匪家B外 → Canal / 长管 → BombsiteB / B包 | 4 | 119 | 55 |
-| b_corridor_02 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Connector / 下水道 → Water / 工地 → Construction / B小 → BombsiteB / B包 | 4 | 25 | 12 |
+| corridor | entryChokeId | 共同骨架 | variants | player-round | round | demo | team-round |
+|---|---|---|---:|---:|---:|---:|---:|
+| b_monster | b_monster | TSpawn / 匪家 → Alley / 匪家B外 → Canal / 长管 → BombsiteB / B包 | 2 | 77 | 36 | 6 | 36 |
+| b_short | b_short | TSpawn / 匪家 → Water / 工地 → Construction / B小 → BombsiteB / B包 | 6 | 67 | 33 | 6 | 33 |
 
-#### b_corridor_01
+#### b_monster
 
 共同骨架：TSpawn / 匪家 → Alley / 匪家B外 → Canal / 长管 → BombsiteB / B包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → Alley / 匪家B外 → Canal / 长管 → BombsiteB / B包 | 55 | 121 | 44.0% |
-| 2 | TSpawn / 匪家 → Alley / 匪家B外 → Canal / 长管 → Pipe / 短管 → Water / 工地 → Construction / B小 → BombsiteB / B包 | 37 | 79 | 47.9% |
-| 3 | TSpawn / 匪家 → TStairs / 匪楼梯 → Alley / 匪家B外 → Canal / 长管 → BombsiteB / B包 | 22 | 58 | 44.0% |
-| 4 | TSpawn / 匪家 → TStairs / 匪楼梯 → Alley / 匪家B外 → Canal / 长管 → Pipe / 短管 → Water / 工地 → Construction / B小 → BombsiteB / B包 | 5 | 58 | 47.9% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Alley / 匪家B外 → Canal / 长管 → BombsiteB / B包 | 55 | 32 | 6 | 32 | 121 | 44.0% |
+| 2 | TSpawn / 匪家 → TStairs / 匪楼梯 → Alley / 匪家B外 → Canal / 长管 → BombsiteB / B包 | 22 | 17 | 6 | 17 | 58 | 44.0% |
 
-#### b_corridor_02
+#### b_short
 
-共同骨架：TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Connector / 下水道 → Water / 工地 → Construction / B小 → BombsiteB / B包
+共同骨架：TSpawn / 匪家 → Water / 工地 → Construction / B小 → BombsiteB / B包
 
-| variant | 完整走向 | player-round 支持 | 瓶颈 T 次数 | 最低 T 占比 |
-|---:|---|---:|---:|---:|
-| 1 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Connector / 下水道 → Water / 工地 → Construction / B小 → BombsiteB / B包 | 12 | 60 | 47.9% |
-| 2 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Fountain / 喷泉 → LowerPark / A小厕所 → Connector / 下水道 → Water / 工地 → Construction / B小 → BombsiteB / B包 | 5 | 60 | 43.8% |
-| 3 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Fountain / 喷泉 → UpperPark / A大厕所 → Restroom / 厕所 → LowerPark / A小厕所 → Connector / 下水道 → Water / 工地 → Construction / B小 → BombsiteB / B包 | 5 | 18 | 43.8% |
-| 4 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Fountain / 喷泉 → UpperPark / A大厕所 → LowerPark / A小厕所 → Connector / 下水道 → Water / 工地 → Construction / B小 → BombsiteB / B包 | 3 | 46 | 43.8% |
+| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | TSpawn / 匪家 → Alley / 匪家B外 → Canal / 长管 → Pipe / 短管 → Water / 工地 → Construction / B小 → BombsiteB / B包 | 37 | 23 | 6 | 23 | 79 | 47.9% |
+| 2 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Connector / 下水道 → Water / 工地 → Construction / B小 → BombsiteB / B包 | 12 | 11 | 4 | 11 | 60 | 47.9% |
+| 3 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Fountain / 喷泉 → LowerPark / A小厕所 → Connector / 下水道 → Water / 工地 → Construction / B小 → BombsiteB / B包 | 5 | 4 | 3 | 4 | 60 | 43.8% |
+| 4 | TSpawn / 匪家 → TStairs / 匪楼梯 → Alley / 匪家B外 → Canal / 长管 → Pipe / 短管 → Water / 工地 → Construction / B小 → BombsiteB / B包 | 5 | 4 | 2 | 4 | 58 | 47.9% |
+| 5 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Fountain / 喷泉 → UpperPark / A大厕所 → Restroom / 厕所 → LowerPark / A小厕所 → Connector / 下水道 → Water / 工地 → Construction / B小 → BombsiteB / B包 | 5 | 4 | 3 | 4 | 18 | 43.8% |
+| 6 | TSpawn / 匪家 → TStairs / 匪楼梯 → Tunnels / 下水道 → Fountain / 喷泉 → UpperPark / A大厕所 → LowerPark / A小厕所 → Connector / 下水道 → Water / 工地 → Construction / B小 → BombsiteB / B包 | 3 | 3 | 2 | 3 | 46 | 43.8% |
 
 ### Corridor 候选 JSON
 
 ```json
 [
   {
-    "id": "a_corridor_01",
+    "id": "a_lower_park",
     "target": "a",
+    "entryChokeId": "a_lower_park",
+    "sharedCallouts": [
+      "TSpawn",
+      "LowerPark",
+      "BombsiteA"
+    ],
+    "representativeCallouts": [
+      "TSpawn",
+      "TStairs",
+      "Tunnels",
+      "Fountain",
+      "LowerPark",
+      "BombsiteA"
+    ],
+    "totalPlayerRoundSupport": 54,
+    "roundSupport": 29,
+    "demoSupport": 5,
+    "teamRoundSupport": 29,
+    "variants": [
+      {
+        "callouts": [
+          "TSpawn",
+          "TStairs",
+          "Tunnels",
+          "Fountain",
+          "LowerPark",
+          "BombsiteA"
+        ],
+        "playerRoundSupport": 21,
+        "roundSupport": 15,
+        "demoSupport": 5,
+        "teamRoundSupport": 15
+      },
+      {
+        "callouts": [
+          "TSpawn",
+          "TStairs",
+          "Tunnels",
+          "Connector",
+          "LowerPark",
+          "BombsiteA"
+        ],
+        "playerRoundSupport": 11,
+        "roundSupport": 9,
+        "demoSupport": 4,
+        "teamRoundSupport": 9
+      },
+      {
+        "callouts": [
+          "TSpawn",
+          "TStairs",
+          "Tunnels",
+          "Fountain",
+          "UpperPark",
+          "LowerPark",
+          "BombsiteA"
+        ],
+        "playerRoundSupport": 10,
+        "roundSupport": 7,
+        "demoSupport": 3,
+        "teamRoundSupport": 7
+      },
+      {
+        "callouts": [
+          "TSpawn",
+          "Alley",
+          "Canal",
+          "Pipe",
+          "Water",
+          "Connector",
+          "LowerPark",
+          "BombsiteA"
+        ],
+        "playerRoundSupport": 7,
+        "roundSupport": 6,
+        "demoSupport": 4,
+        "teamRoundSupport": 6
+      },
+      {
+        "callouts": [
+          "TSpawn",
+          "Alley",
+          "TStairs",
+          "Tunnels",
+          "Fountain",
+          "LowerPark",
+          "BombsiteA"
+        ],
+        "playerRoundSupport": 5,
+        "roundSupport": 5,
+        "demoSupport": 4,
+        "teamRoundSupport": 5
+      }
+    ],
+    "confidence": "observed-complete-path-cluster"
+  },
+  {
+    "id": "a_upper_park",
+    "target": "a",
+    "entryChokeId": "a_upper_park",
     "sharedCallouts": [
       "TSpawn",
       "TStairs",
@@ -3179,7 +3645,10 @@
       "UpperPark",
       "BombsiteA"
     ],
-    "totalPlayerRoundSupport": 62,
+    "totalPlayerRoundSupport": 52,
+    "roundSupport": 30,
+    "demoSupport": 5,
+    "teamRoundSupport": 30,
     "variants": [
       {
         "callouts": [
@@ -3190,19 +3659,10 @@
           "UpperPark",
           "BombsiteA"
         ],
-        "playerRoundSupport": 33
-      },
-      {
-        "callouts": [
-          "TSpawn",
-          "TStairs",
-          "Tunnels",
-          "Fountain",
-          "UpperPark",
-          "LowerPark",
-          "BombsiteA"
-        ],
-        "playerRoundSupport": 10
+        "playerRoundSupport": 33,
+        "roundSupport": 23,
+        "demoSupport": 5,
+        "teamRoundSupport": 23
       },
       {
         "callouts": [
@@ -3215,7 +3675,10 @@
           "UpperPark",
           "BombsiteA"
         ],
-        "playerRoundSupport": 9
+        "playerRoundSupport": 9,
+        "roundSupport": 7,
+        "demoSupport": 5,
+        "teamRoundSupport": 7
       },
       {
         "callouts": [
@@ -3227,7 +3690,10 @@
           "UpperPark",
           "BombsiteA"
         ],
-        "playerRoundSupport": 6
+        "playerRoundSupport": 6,
+        "roundSupport": 5,
+        "demoSupport": 2,
+        "teamRoundSupport": 5
       },
       {
         "callouts": [
@@ -3240,80 +3706,72 @@
           "UpperPark",
           "BombsiteA"
         ],
-        "playerRoundSupport": 4
+        "playerRoundSupport": 4,
+        "roundSupport": 1,
+        "demoSupport": 1,
+        "teamRoundSupport": 1
       }
     ],
     "confidence": "observed-complete-path-cluster"
   },
   {
-    "id": "a_corridor_02",
-    "target": "a",
-    "sharedCallouts": [
-      "TSpawn",
-      "TStairs",
-      "Tunnels",
-      "LowerPark",
-      "BombsiteA"
-    ],
-    "representativeCallouts": [
-      "TSpawn",
-      "TStairs",
-      "Tunnels",
-      "Fountain",
-      "LowerPark",
-      "BombsiteA"
-    ],
-    "totalPlayerRoundSupport": 37,
-    "variants": [
-      {
-        "callouts": [
-          "TSpawn",
-          "TStairs",
-          "Tunnels",
-          "Fountain",
-          "LowerPark",
-          "BombsiteA"
-        ],
-        "playerRoundSupport": 21
-      },
-      {
-        "callouts": [
-          "TSpawn",
-          "TStairs",
-          "Tunnels",
-          "Connector",
-          "LowerPark",
-          "BombsiteA"
-        ],
-        "playerRoundSupport": 11
-      },
-      {
-        "callouts": [
-          "TSpawn",
-          "Alley",
-          "TStairs",
-          "Tunnels",
-          "Fountain",
-          "LowerPark",
-          "BombsiteA"
-        ],
-        "playerRoundSupport": 5
-      }
-    ],
-    "confidence": "observed-complete-path-cluster"
-  },
-  {
-    "id": "a_corridor_03",
-    "target": "a",
+    "id": "b_monster",
+    "target": "b",
+    "entryChokeId": "b_monster",
     "sharedCallouts": [
       "TSpawn",
       "Alley",
       "Canal",
-      "Pipe",
+      "BombsiteB"
+    ],
+    "representativeCallouts": [
+      "TSpawn",
+      "Alley",
+      "Canal",
+      "BombsiteB"
+    ],
+    "totalPlayerRoundSupport": 77,
+    "roundSupport": 36,
+    "demoSupport": 6,
+    "teamRoundSupport": 36,
+    "variants": [
+      {
+        "callouts": [
+          "TSpawn",
+          "Alley",
+          "Canal",
+          "BombsiteB"
+        ],
+        "playerRoundSupport": 55,
+        "roundSupport": 32,
+        "demoSupport": 6,
+        "teamRoundSupport": 32
+      },
+      {
+        "callouts": [
+          "TSpawn",
+          "TStairs",
+          "Alley",
+          "Canal",
+          "BombsiteB"
+        ],
+        "playerRoundSupport": 22,
+        "roundSupport": 17,
+        "demoSupport": 6,
+        "teamRoundSupport": 17
+      }
+    ],
+    "confidence": "observed-complete-path-cluster"
+  },
+  {
+    "id": "b_short",
+    "target": "b",
+    "entryChokeId": "b_short",
+    "sharedCallouts": [
+      "TSpawn",
       "Water",
-      "Connector",
-      "LowerPark",
-      "BombsiteA"
+      "Construction",
+      "BombsiteB"
     ],
     "representativeCallouts": [
       "TSpawn",
@@ -3321,54 +3779,14 @@
       "Canal",
       "Pipe",
       "Water",
-      "Connector",
-      "LowerPark",
-      "BombsiteA"
-    ],
-    "totalPlayerRoundSupport": 7,
-    "variants": [
-      {
-        "callouts": [
-          "TSpawn",
-          "Alley",
-          "Canal",
-          "Pipe",
-          "Water",
-          "Connector",
-          "LowerPark",
-          "BombsiteA"
-        ],
-        "playerRoundSupport": 7
-      }
-    ],
-    "confidence": "observed-complete-path-cluster"
-  },
-  {
-    "id": "b_corridor_01",
-    "target": "b",
-    "sharedCallouts": [
-      "TSpawn",
-      "Alley",
-      "Canal",
+      "Construction",
       "BombsiteB"
     ],
-    "representativeCallouts": [
-      "TSpawn",
-      "Alley",
-      "Canal",
-      "BombsiteB"
-    ],
-    "totalPlayerRoundSupport": 119,
+    "totalPlayerRoundSupport": 67,
+    "roundSupport": 33,
+    "demoSupport": 6,
+    "teamRoundSupport": 33,
     "variants": [
-      {
-        "callouts": [
-          "TSpawn",
-          "Alley",
-          "Canal",
-          "BombsiteB"
-        ],
-        "playerRoundSupport": 55
-      },
       {
         "callouts": [
           "TSpawn",
@@ -3379,57 +3797,11 @@
           "Construction",
           "BombsiteB"
         ],
-        "playerRoundSupport": 37
+        "playerRoundSupport": 37,
+        "roundSupport": 23,
+        "demoSupport": 6,
+        "teamRoundSupport": 23
       },
-      {
-        "callouts": [
-          "TSpawn",
-          "TStairs",
-          "Alley",
-          "Canal",
-          "BombsiteB"
-        ],
-        "playerRoundSupport": 22
-      },
-      {
-        "callouts": [
-          "TSpawn",
-          "TStairs",
-          "Alley",
-          "Canal",
-          "Pipe",
-          "Water",
-          "Construction",
-          "BombsiteB"
-        ],
-        "playerRoundSupport": 5
-      }
-    ],
-    "confidence": "observed-complete-path-cluster"
-  },
-  {
-    "id": "b_corridor_02",
-    "target": "b",
-    "sharedCallouts": [
-      "TSpawn",
-      "TStairs",
-      "Tunnels",
-      "Connector",
-      "Water",
-      "Construction",
-      "BombsiteB"
-    ],
-    "representativeCallouts": [
-      "TSpawn",
-      "TStairs",
-      "Tunnels",
-      "Connector",
-      "Water",
-      "Construction",
-      "BombsiteB"
-    ],
-    "totalPlayerRoundSupport": 25,
-    "variants": [
       {
         "callouts": [
           "TSpawn",
@@ -3440,7 +3812,10 @@
           "Construction",
           "BombsiteB"
         ],
-        "playerRoundSupport": 12
+        "playerRoundSupport": 12,
+        "roundSupport": 11,
+        "demoSupport": 4,
+        "teamRoundSupport": 11
       },
       {
         "callouts": [
@@ -3454,7 +3829,26 @@
           "Construction",
           "BombsiteB"
         ],
-        "playerRoundSupport": 5
+        "playerRoundSupport": 5,
+        "roundSupport": 4,
+        "demoSupport": 3,
+        "teamRoundSupport": 4
+      },
+      {
+        "callouts": [
+          "TSpawn",
+          "TStairs",
+          "Alley",
+          "Canal",
+          "Pipe",
+          "Water",
+          "Construction",
+          "BombsiteB"
+        ],
+        "playerRoundSupport": 5,
+        "roundSupport": 4,
+        "demoSupport": 2,
+        "teamRoundSupport": 4
       },
       {
         "callouts": [
@@ -3470,7 +3864,10 @@
           "Construction",
           "BombsiteB"
         ],
-        "playerRoundSupport": 5
+        "playerRoundSupport": 5,
+        "roundSupport": 4,
+        "demoSupport": 3,
+        "teamRoundSupport": 4
       },
       {
         "callouts": [
@@ -3485,7 +3882,10 @@
           "Construction",
           "BombsiteB"
         ],
-        "playerRoundSupport": 3
+        "playerRoundSupport": 3,
+        "roundSupport": 3,
+        "demoSupport": 2,
+        "teamRoundSupport": 3
       }
     ],
     "confidence": "observed-complete-path-cluster"
