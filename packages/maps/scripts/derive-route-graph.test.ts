@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { pathToFileURL } from "node:url";
 import {
   addSequenceTransitions,
+  clusterRouteCandidates,
   compressCalloutVisits,
   findRouteCandidates,
   repoRootFromScriptUrl,
@@ -59,7 +60,7 @@ describe("addSequenceTransitions", () => {
 });
 
 describe("findRouteCandidates", () => {
-  it("returns deterministic loop-free routes within edge thresholds", () => {
+  it("returns only routes observed as complete player-round sequences", () => {
     const edges: ObservedEdge[] = [
       edge("TSpawn", "Main", 20, 2),
       edge("Main", "BombsiteA", 18, 2),
@@ -74,40 +75,132 @@ describe("findRouteCandidates", () => {
       edge("TSpawn", "CTLane", 50, 201),
       edge("CTLane", "BombsiteA", 50, 201),
     ];
+    const sequences = [
+      ["TSpawn", "Main", "BombsiteA"],
+      ["TSpawn", "Main", "BombsiteA"],
+      ["TSpawn", "Main", "BombsiteA"],
+      ["TSpawn", "Mid", "Connector", "BombsiteA"],
+      ["TSpawn", "Mid", "Connector", "BombsiteA"],
+      ["TSpawn", "Mid", "Connector", "BombsiteA"],
+      ["TSpawn", "BombsiteB", "BombsiteA"],
+    ];
 
-    const routes = findRouteCandidates(edges, {
+    const routes = findRouteCandidates(edges, sequences, {
       source: "TSpawn",
       target: "BombsiteA",
       maxHops: 3,
       minEdgeCount: 3,
-      minTShare: 0.2,
-      topK: 20,
+      minRouteSupport: 3,
     });
 
     expect(routes.map((route) => route.callouts)).toEqual([
       ["TSpawn", "Main", "BombsiteA"],
       ["TSpawn", "Mid", "Connector", "BombsiteA"],
     ]);
-    expect(routes[0]).toMatchObject({ bottleneckCount: 18, totalCount: 38 });
+    expect(routes[0]).toMatchObject({
+      bottleneckCount: 18,
+      totalCount: 38,
+      playerRoundSupport: 3,
+    });
   });
 
-  it("ranks stable bottleneck support ahead of one weak high-volume edge", () => {
-    const routes = findRouteCandidates([
-      edge("TSpawn", "Weak", 1000, 0),
-      edge("Weak", "BombsiteA", 4, 0),
-      edge("TSpawn", "Stable", 20, 0),
-      edge("Stable", "BombsiteA", 18, 0),
-    ], {
+  it("does not cap the number of routes that meet whole-route support", () => {
+    const paths = Array.from({ length: 6 }, (_, index) => [
+      "TSpawn",
+      `Lane${index + 1}`,
+      "BombsiteA",
+    ]);
+    const edges = paths.flatMap((path) => [
+      edge(path[0]!, path[1]!, 10, 0),
+      edge(path[1]!, path[2]!, 10, 0),
+    ]);
+    const sequences = paths.flatMap((path) => [path, path, path]);
+
+    const routes = findRouteCandidates(edges, sequences, {
       source: "TSpawn",
       target: "BombsiteA",
       maxHops: 3,
       minEdgeCount: 3,
-      minTShare: 0.2,
-      topK: 20,
+      minRouteSupport: 3,
     });
 
-    expect(routes[0]?.callouts).toEqual(["TSpawn", "Stable", "BombsiteA"]);
+    expect(routes).toHaveLength(6);
   });
+});
+
+describe("clusterRouteCandidates", () => {
+  it("merges alternate entrances while preserving every concrete path", () => {
+    const corridors = clusterRouteCandidates("a", [
+      candidate(["TSpawn", "Street", "TSideUpper", "Canal", "Main", "BombsiteA"], 33),
+      candidate(["TSpawn", "Street", "TStairs", "Canal", "Main", "BombsiteA"], 11),
+      candidate(["TSpawn", "Ruins", "Bridge", "Middle", "Walkway", "BombsiteA"], 9),
+    ]);
+
+    expect(corridors).toHaveLength(2);
+    expect(corridors[0]).toMatchObject({
+      target: "a",
+      totalPlayerRoundSupport: 44,
+      sharedCallouts: ["TSpawn", "Street", "Canal", "Main", "BombsiteA"],
+    });
+    expect(corridors[0]?.variants.map((variant) => variant.callouts)).toEqual([
+      ["TSpawn", "Street", "TSideUpper", "Canal", "Main", "BombsiteA"],
+      ["TSpawn", "Street", "TStairs", "Canal", "Main", "BombsiteA"],
+    ]);
+    expect(corridors[1]?.sharedCallouts).toEqual([
+      "TSpawn",
+      "Ruins",
+      "Bridge",
+      "Middle",
+      "Walkway",
+      "BombsiteA",
+    ]);
+  });
+
+  it("does not impose a corridor count cap", () => {
+    const routes = Array.from({ length: 6 }, (_, index) =>
+      candidate(["TSpawn", `Lane${index + 1}`, "BombsiteA"], 10 - index),
+    );
+
+    expect(clusterRouteCandidates("a", routes)).toHaveLength(6);
+  });
+
+  it("keeps different terminal approaches separate despite a shared opening", () => {
+    const corridors = clusterRouteCandidates("b", [
+      candidate(["TSpawn", "LowerMid", "TRamp", "Middle", "Banana", "BombsiteB"], 100),
+      candidate([
+        "TSpawn",
+        "LowerMid",
+        "TRamp",
+        "Middle",
+        "TopofMid",
+        "Arch",
+        "CTSpawn",
+        "Ruins",
+        "BombsiteB",
+      ], 10),
+    ]);
+
+    expect(corridors).toHaveLength(2);
+  });
+
+  it("keeps B ramp and side entrance as separate corridors", () => {
+    const corridors = clusterRouteCandidates("b", [
+      candidate(["TSpawn", "Tunnel", "Water", "Ruins", "Lower", "Ramp", "BombsiteB"], 100),
+      candidate([
+        "TSpawn",
+        "Tunnel",
+        "Water",
+        "Ruins",
+        "Lower",
+        "Upper",
+        "SideEntrance",
+        "BombsiteB",
+      ], 20),
+    ]);
+
+    expect(corridors).toHaveLength(2);
+  });
+
 });
 
 function edge(from: string, to: string, tCount: number, ctCount: number): ObservedEdge {
@@ -118,5 +211,16 @@ function edge(from: string, to: string, tCount: number, ctCount: number): Observ
     ctCount,
     total: tCount + ctCount,
     roundCount: tCount + ctCount,
+  };
+}
+
+function candidate(callouts: string[], playerRoundSupport: number) {
+  return {
+    callouts,
+    bottleneckCount: playerRoundSupport,
+    totalCount: playerRoundSupport * (callouts.length - 1),
+    minTShare: 0.5,
+    playerRoundSupport,
+    score: 1,
   };
 }
