@@ -1,0 +1,18 @@
+{
+  "version": "cs2-demo-analysis-kit/event-package-1.0",
+  "source": "r2",
+  "exportedAt": "2026-06-20T00:00:00Z",
+  "event": {
+    "slug": "cologne-major-2026",
+    "name": "IEM Cologne Major 2026",
+    "kind": "major",
+    "stages": [
+      { "key": "stage1", "name": "阶段一", "type": "swiss", "teamCount": 16, "advanceCount": 8, "matchFormat": "bo1" },
+      { "key": "stage2", "name": "阶段二", "type": "swiss", "teamCount": 16, "advanceCount": 8, "matchFormat": "bo1" },
+      { "key": "stage3", "name": "阶段三", "type": "swiss", "teamCount": 16, "advanceCount": 8, "matchFormat": "bo3" },
+      { "key": "playoff", "name": "淘汰赛", "type": "single_elim", "teamCount": 8, "advanceCount": 1, "matchFormat": "bo3", "finalFormat": "bo5" }
+    ]
+  },
+  "teams": [],
+  "series": []
+}

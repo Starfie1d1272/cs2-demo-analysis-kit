@@ -1,4 +1,8 @@
-# 赛事资产库与赛事包导入（Event Packages）
+# 赛事资产库、赛事包导入与制作（Event Packages）
+
+> 实施状态（2026-06-20）：`event-package/1.0` 合同、Event/Series 导入、在线资产下载、
+> 资源管理及 round robin / Swiss / single-elim / double-elim 展示已落地。
+> Cologne Major 已建立空赛事骨架，需在赛程结束后补真实队伍、系列赛、BP 与 v3 ZIP。
 
 > 0.7.0 方向设计稿。**只定义合同与落点，不在本稿实现平台**。
 > 复用已落地的 R2 资产层 + manifest + sha256 校验 + `download_with_fallback`
@@ -80,9 +84,11 @@
   → 序列化为 `event-package/1.0` → 触发浏览器下载。
 - 队伍/选手用稳定显示名导出（DAK 侧再走身份归并 `displayTeamName`）。
 
-## 5. `event-package/1.0` 合同草案
+## 5. `event-package/1.0` 合同
 
-DAK 侧新增 `packages/contract/src/event-package.ts`（Zod）。草案：
+合同由 `packages/contract/src/event-package.ts` 的 Zod schema 持有。阶段类型与 RivalHub
+当前模型对齐：`round_robin | swiss | single_elim | double_elim | gsl_group`；Series 可携带
+轮次、胜/败者组节点、赛前 Swiss 战绩、赛程、比分、BP 和地图资源线索。
 
 ```jsonc
 {
@@ -152,25 +158,44 @@ DAK 侧新增 `packages/contract/src/event-package.ts`（Zod）。草案：
 - 资产路径约定（与 [`auto-update.md`](auto-update.md) 同 bucket `cs2dak-assets`）：
   - 资产清单：`https://dakupdate.starfie1d.top/events/manifest.json`
   - 单个赛事包：`https://dakupdate.starfie1d.top/events/<slug>/<file>.zip`
-- 清单 `events-manifest`（每包 `slug / name / size / sha256 / urls[]`），
-  下载走 `updater.download_with_fallback`（sha256 强校验，镜像失败转移），
-  与二进制更新同一条可信下载路径。
+- 清单 `events-manifest`（每包 `slug / name / size / sha256 / urls[]`）；Studio 按 `urls[]`
+  顺序下载并强校验 sha256。R2 域名必须允许 Studio WebView 跨域读取。
 - 资产包内容 = 已脱敏 v3 ZIP（或 analysis bundle）+ 可选 `event-package/1.0`，
   下载即同时落"可分析数据 + 赛事框架"。
 - 首发候选：**Cologne Major 内置示例**、若干职业局样本。
 
-## 8. 分期
+构建与上传：
 
-**v1（本轮目标）**
-- [ ] `event-package/1.0` 合同（`packages/contract/src/event-package.ts` + Zod）。
-- [ ] DAK Event 层 + 导入模块（读 JSON 建 Event/Series/BP + 本地 demo 配对）。
-- [ ] 一次性导入 1–5 demo → 一场 BO1/3/5 + BP 的最小 UI（不依赖 RivalHub）。
-- [ ] RivalHub 侧导出 server action（在 RivalHub 仓库；本仓库只交付合同）。
+```bash
+pnpm events:build fixtures/events/cologne-major-2026 dist/events
+# 或直接登记 Studio 制作器生成的 ZIP：
+pnpm events:build ~/Downloads/cologne-major-2026.zip dist/events
+R2_ENDPOINT=... R2_BUCKET=... pnpm events:publish dist/events
+```
 
-**v2（资产库）**
-- [ ] `events-manifest` + R2 `events/` 路径上传（扩展 release/资产发布流程）。
-- [ ] DAK「赛事资产库」面板：列清单 → 按需下载导入 Library。
-- [ ] Cologne Major 内置示例随上述清单分发。
+上传顺序固定为 ZIP 先、manifest 后。ZIP 使用不可变长缓存，manifest 使用 5 分钟短缓存。
+
+## 8. 分期与当前状态
+
+**已落地**
+- [x] `event-package/1.0` 与 `events-manifest-1.0` Zod 合同。
+- [x] DAK Event 层；读 JSON/资产包建立 Event → Stage → Series → Map/BP。
+- [x] 本地 demo 自动配对与缺图资源计数；移除组织记录不删除原始 ZIP。
+- [x] 选择 1–5 个已导入地图建立 BO1/3/5，并复用现有 BP 编辑器。
+- [x] 在线赛事资产列表、下载、sha256 校验、导入与 R2 构建/上传脚本。
+- [x] 单循环、Swiss、单败、双败的专用展示；GSL 当前复用小组积分视图。
+
+**待真实内容与跨仓工作**
+- [ ] Cologne Major 完赛后补真实队伍、赛程、BP、比分与 v3 ZIP，再发布 R2 manifest。
+- [ ] RivalHub 增加 `event-package/1.0` 文件导出（本仓库只消费合同）。
+- [ ] Windows 真机验证 WebView 的 R2 CORS、下载、校验与大包导入。
+
+**赛事资源制作器**
+- [x] 预设单循环、瑞士轮、单败、双败及 Major（三阶段瑞士轮 + 单败）赛事框架。
+- [x] 逐系列赛填写阶段、轮次、淘汰节点、双方、BO、赛程状态与 BP。
+- [x] 每系列附加 1–5 场原始 `.dem` 或 v3 ZIP；`.dem` 调用现有 `cs2df` 桥导出。
+- [x] 解析真实 ZIP 校验对阵，按系列赛 A/B 方向校正比分并生成赛事资源 ZIP。
+- [ ] 草稿持久化和单系列增量重建；当前刷新页面会丢失尚未打包的制作状态。
 
 **v2+（可选）**
 - [ ] RivalHub HTTP 只读 API 导出（免下载文件，需 RivalHub 暴露鉴权端点）。

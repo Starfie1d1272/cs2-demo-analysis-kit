@@ -22,6 +22,19 @@ export interface StudioSeriesRecord {
   teamAName: string;
   teamBName: string;
   veto: SeriesVeto | null;
+  eventId?: string | null;
+  externalKey?: string | null;
+  stageKey?: string | null;
+  round?: number | null;
+  entryRound?: string | null;
+  bracketNodeId?: string | null;
+  status?: "scheduled" | "in_progress" | "finished" | "cancelled";
+  scoreA?: number | null;
+  scoreB?: number | null;
+  teamARecordBefore?: string | null;
+  teamBRecordBefore?: string | null;
+  scheduledAt?: string | null;
+  mapAssignments?: Array<{ order: number; mapName: string; entryId: string | null }>;
   createdAt: number;
   updatedAt: number;
 }
@@ -48,7 +61,10 @@ const playbookStore = getStorage().records("playbook");
 const playlistStore = getStorage().records("playlist");
 const mapPoolNotesStore = getStorage().records("map-pool-notes");
 
-function formatForCount(count: number): SeriesFormat {
+/** 按 demo 数量推断初始赛制（用户可在 UI 中手动调整）。
+ *  启发式：>=4 场只可能是 BO5；2-3 场大概率 BO3。
+ *  无法区分 BO3(2:1) 与 BO5(3:0)，保守偏 BO3。 */
+export function formatForCount(count: number): SeriesFormat {
   if (count >= 4) return "bo5";
   if (count >= 2) return "bo3";
   return "bo1";
@@ -174,6 +190,10 @@ export async function saveSeriesRecord(record: Omit<StudioSeriesRecord, "created
   const next: StudioSeriesRecord = { ...record, createdAt: existing?.createdAt ?? now, updatedAt: now };
   await seriesStore.put(next.id, next);
   return next;
+}
+
+export async function deleteSeriesRecord(id: string): Promise<void> {
+  await seriesStore.delete(id);
 }
 
 export async function loadCoachSettings(): Promise<CoachSettings> {

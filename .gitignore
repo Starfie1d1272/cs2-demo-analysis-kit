@@ -10,6 +10,8 @@ packages/maps/experimental-output/
 *.dem
 # Local scratch: benchmark demos, scripts, and golden baselines
 fixtures/_bench/
+fixtures/events/*/maps/*.zip
+dist/events/
 *.tsbuildinfo
 __pycache__/
 .pytest_cache/
