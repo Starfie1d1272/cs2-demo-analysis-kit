@@ -14,7 +14,7 @@
 UI 约定：Beta 指标在标题旁标 `Beta`，Experimental 标 `实验`；两者的 ⓘ 口径说明里
 必须写明「样本数 / 数据完整性 / 是否依赖 `.tri` / 口径版本」。缺失值一律显示 `—`，不补 0。
 
-## 模块与指标分级（0.5.0 基线）
+## 模块与指标分级（0.6.5 基线）
 
 ### Stable
 
@@ -41,8 +41,13 @@ UI 约定：Beta 指标在标题旁标 `Beta`，Experimental 标 `实验`；两�
 
 ### Experimental
 
-- **8a 战术聚类（TacticalCluster + PatternExplorer）**：0.6 首版已落地——双层默认位快照 + 倒计时节奏桶 + 佯攻检测，支持 CT/T 双视角。但当前仍是开局`snapshots[]`切片采样，**无全程 zone 动线轨迹**。0.7 完整战术路线重写前视为骨架。
-- **Anti-strat 报告文本**：已随 TacticalCluster 重写为按地图/side 分段的备战 Markdown，不再使用旧 OpeningPatternCluster；结论强度仍受缺失全程动线限制。
+- **Coach 事实簇（TacticalCluster + PatternExplorer）**：由已人工核实的中文名/倾向、callout
+  空间近似、默认位和最终进点节点，加上 demo 中真实 opening、入口轨迹、C4、道具与战斗事实组成。
+  聚类身份不再使用执行时间，UI 不再自动宣称“假打/转点/完整战术”；但它仍不是完整地图控制模型。
+- **Anti-strat 报告文本**：按地图/side 汇总事实簇并附证据回合；名称只描述开局与进点事实，
+  不能替代教练对完整战术意图的人工判断。
+- **赛事合集**：Event/Stage/Series/Map 组织合同与本地/R2 资源链可用；赛制视图属于展示层，
+  不负责裁判规则、自动排赛或晋级判定。
 - **BP / Veto 建议表**：ban/pick 纯统计建议未实现；现有仅录入/展示。
 
 ### 不做（已决策，非分级）
@@ -59,6 +64,12 @@ UI 约定：Beta 指标在标题旁标 `Beta`，Experimental 标 `实验`；两�
 | 枪法机制 | Beta | 同上验证集 + 跨地图稳健性抽查 |
 | 反应/预瞄 | Beta | `.tri` 精确 vs 退化口径差异量化 |
 | Lineup zone 归属 | Beta | 全地图 zone 多边形标定完成 |
-| 8a 战术聚类（TacticalCluster）| Experimental | 0.7 完整战术路线落地（全程 zone 动线轨迹，`studio-redesign.md` §8） |
+| Coach 事实簇（TacticalCluster）| Experimental | 多赛事人工核实入口归并稳定性，并明确后续地图控制研究是否独立建模 |
 
 > 对枪验证集是 0.5/0.6 的关键工程债：没有它，对枪实验室再复杂，用户也无从判断可靠性。
+
+## “全量稳定性标签”是否阻碍 0.7
+
+不是发布阻碍。它指把本表的成熟度逐页映射到 UI：Stable 可不加徽标，Beta 显示 `Beta`，
+Experimental 显示“实验”，并在 ⓘ 中交代版本、样本和降级条件。当前硬门槛只是新功能不能把
+Experimental 输出伪装成确定结论；历史页面的全量盘点与视觉统一可以在后续小版本逐步完成。

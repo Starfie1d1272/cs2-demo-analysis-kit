@@ -86,17 +86,17 @@ presentation 已以 `targetEndTick = nextRound.startTick` 留出接口）。
 
 - **大库稳定性验证**：StorageAdapter 解耦（`records()` / `blobs()` 接缝）已在 0.5.1 完成，pywebview→SQLite 后端已在桌面版生产运行；0.7 重点改为 200–500 场规模的稳定性抽测与数据库迁移工具。
 - **导入吞吐并行化**（✅ 已落地）：facts 抽取（含 `.tri` LOS 遍历）已从主线程移入导入 worker 池——worker 内解析 + 建 BVH + 榨 facts，只回传紧凑 `{meta, facts}`，输出与主线程逐字节等价、异常回退主线程。批量导入改滑动窗口并发（并发 2，兼顾吞吐与渲染器内存峰值）。剩余：大库规模下的并发调参与 facts 抽取本身的算法优化。
-- **用户可见 Library 目录** + 一键备份/恢复（manifest、标签、身份归并、BP、Playbook、原始 ZIP）。
-- **存储空间管理**（原始 ZIP / derived cache / `.tri` / 报告 各项占用展示，支持按类清理）。
-- **数据库迁移与修复工具**；存储空间占用展示（原始 ZIP / derived cache / `.tri` / 报告）。
+- **用户可见 Library 目录 + 维护工具**（✅ 已落地）：展示持久化目录与分类占用；一键备份/恢复
+  SQLite、组织数据与原始 ZIP；按类清理可重建缓存；完整性检查、孤儿资源修复与压缩。
 - **自动更新 + 国内可达分发**（🟡 主体已落地，见 [`docs/design/auto-update.md`](design/auto-update.md)）：
   manifest + 镜像失败转移的更新检查（替代 `api.github.com`）、Windows 应用内一键更新
   （下载+sha256 校验+side-by-side 接力替换）、CI 自动生成 `latest.json`。
   ✅ **Cloudflare R2 镜像已接入**（`dakupdate.starfie1d.top`，最高优先级，CI 上传 zip+manifest）。
   **剩**：发一次 tag 验证 R2 上传链路 + Windows 真机冒烟验证接力替换路径（RC still required）。
-- **赛事资产库 + 赛事包导入**（🟡 设计稿，见 [`docs/design/event-packages.md`](design/event-packages.md)）：
-  复用 R2 资产层托管结构化数据包（不托管原始 `.dem`）；一次性导入 1–5 demo 为 BO1/3/5 + BP +
-  赛事框架；RivalHub 元数据经文件导出桥接。本地分析永久免费，捐赠仅支持维护/存储/带宽。
+- **赛事资产库 + 赛事包导入**（🟡 消费端已落地，见 [`docs/design/event-packages.md`](design/event-packages.md)）：
+  Event/Stage/Series/Map 合同、1–5 图系列赛、BP、资源管理、R2 下载校验及单循环/Swiss/单败/双败 UI
+  已完成；从赛事框架、BP 与 1–5 场 `.dem` 生成资源包的制作器也已落地。
+  剩余：科隆真实内容、RivalHub 文件导出、制作器草稿持久化，以及 Windows 真机下载/导出验证。
 - **`.tri` 资产包管理**：从 Release CI 现场打包（~30MB/图）改为版本化资产包或首次按图下载。
   （🟡 `userdata/tris` overlay + `tri_download` 桥已落地，是去内置化地基；当前仍内置作回退。）
 - **签名与公证**：Windows 签名（去 SmartScreen 警告，让自动更新更可信）——优先级高于付费墙。
@@ -104,7 +104,7 @@ presentation 已以 `targetEndTick = nextRound.startTick` 留出接口）。
 - **崩溃诊断包** + 可选、匿名、明确授权的使用统计。
 - **统一 AnalysisManifest**：收敛分散的 `DERIVED_VERSION` / Duel cache version 等版本号
   （`formatVersion` / `analysisVersion` / `cacheVersion` / `reportVersion` / `appVersion`）。
-- Stable/Beta/Experimental 标签在 UI 全量落地。
+- Stable/Beta/Experimental 标签在 UI 全量落地（非 0.7 发布阻碍；新功能必须如实标注，历史页面逐步补齐）。
 
 ---
 

@@ -16,6 +16,7 @@
     "@cs2dak/maps": "workspace:*",
     "@cs2dak/presentation": "workspace:*",
     "@cs2dak/react": "workspace:*",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

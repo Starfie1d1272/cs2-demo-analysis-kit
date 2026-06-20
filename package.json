@@ -25,7 +25,9 @@
     "version:packages": "changeset version",
     "release:npm": "pnpm build && pnpm test:all && pnpm typecheck && changeset publish",
     "sync-version": "node scripts/sync-version.mjs",
-    "package": "bash scripts/package.sh"
+    "package": "bash scripts/package.sh",
+    "events:build": "node scripts/build-event-asset.mjs",
+    "events:publish": "bash scripts/publish-event-assets.sh"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
