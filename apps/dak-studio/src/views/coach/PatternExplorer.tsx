@@ -7,8 +7,6 @@ import { getFactsStore, type TacticalRoundFact } from "../../lib/facts.js";
 import type { StudioDemoEntry } from "../../lib/library.js";
 import { MetricInfo } from "../../components/primitives.js";
 
-const BUCKET_LABEL: Record<string, string> = { rush: "提速", fast: "速爆", mid: "默认", late: "后打" };
-
 export interface PatternExplorerProps {
   clusters: TacticalCluster[];
   facts: TacticalRoundFact[];
@@ -113,17 +111,8 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
                   >
                     <span className="stu-pe-cluster-name">
                       {autoName(c)}
-                      {c.fakeRoundCount > 0 && (
-                        <span
-                          className="stu-pe-tag stu-pe-tag-fake"
-                          title={`疑似纯道具佯攻 ${c.fakeRoundCount}/${c.roundCount} 回合 · Experimental`}
-                        >
-                          佯 {c.fakeRoundCount}
-                        </span>
-                      )}
                     </span>
                     <span className="stu-pe-cluster-meta">
-                      {c.executeBucket && <span className="stu-pe-bucket">{BUCKET_LABEL[c.executeBucket] ?? c.executeBucket}</span>}
                       <span>{c.roundCount} 回合</span>
                       <span>{c.winRatePercent != null ? `${c.winRatePercent.toFixed(1)}%` : "—"}</span>
                     </span>
@@ -258,7 +247,7 @@ function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: T
     ])
   ).values()];
 
-  // C4 轨迹统计（仅 T）：转点回合数 + 主要走向（按 endRegion 多数表决）。
+  // C4 首尾方向只作轨迹事实，不自动命名“转点”。
   const c4Routes = facts.map((f) => f.c4Route).filter((r): r is NonNullable<typeof r> => r != null);
   const c4Rotated = c4Routes.filter((r) => r.rotated).length;
   const c4EndCounts = c4Routes.reduce<Record<string, number>>((acc, r) => {
@@ -269,7 +258,7 @@ function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: T
 
   return (
     <div className="stu-pe-summary">
-      <h3 className="stu-pe-summary-title">{autoName(cluster)} <small>（推测名）</small></h3>
+      <h3 className="stu-pe-summary-title">{autoName(cluster)} <small>（事实簇）</small></h3>
       <dl className="stu-pe-stats">
         <div>
           <dt>样本</dt>
@@ -297,22 +286,10 @@ function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: T
           <dt>开局推进 <MetricInfo note="离开本方默认位后进入前方战术区域；深入表示已进入对方默认位覆盖区域" /></dt>
           <dd>{pressureLabels.length > 0 ? pressureLabels.slice(0, 3).join(" / ") : "—"}</dd>
         </div>
-        {isT && (
-          <div>
-            <dt>节奏</dt>
-            <dd>{cluster.executeBucket ? (BUCKET_LABEL[cluster.executeBucket] ?? cluster.executeBucket) : "—"}</dd>
-          </div>
-        )}
-        {isT && cluster.fakeRoundCount > 0 && (
-          <div>
-            <dt>疑似纯道具佯攻 <MetricInfo note="非目标点出现成片道具但无人真正进点的回合数；当前为实验性判断" /></dt>
-            <dd>{cluster.fakeRoundCount}/{cluster.roundCount} 回合</dd>
-          </div>
-        )}
         {isT && c4Routes.length > 0 && (
           <div>
-            <dt>C4 走向 <MetricInfo note="按 C4 携带者最终所在区域多数表决；转点表示 C4 主方向在 A/B 之间切换" /></dt>
-            <dd>{c4MainEnd ? c4MainEnd.toUpperCase() : "—"}{c4Rotated > 0 ? ` · 转点 ${c4Rotated}/${c4Routes.length}` : ""}</dd>
+            <dt>C4 轨迹末端 <MetricInfo note="按 C4 携带者轨迹末端区域多数表决；跨方向只描述轨迹首尾经过不同 A/B 方向，不等同于战术转点" /></dt>
+            <dd>{c4MainEnd ? c4MainEnd.toUpperCase() : "—"}{c4Rotated > 0 ? ` · 跨方向 ${c4Rotated}/${c4Routes.length}` : ""}</dd>
           </div>
         )}
       </dl>

@@ -12,3 +12,4 @@ export * from "./workspace.js";
 export * from "./trails.js";
 export * from "./duel.js";
 export * from "./veto.js";
+export * from "./event-package.js";

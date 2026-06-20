@@ -1,8 +1,10 @@
-import { inferTacticalFake, type OpeningPattern, type TacticalFakeInput } from "@cs2dak/core";
+import type { OpeningPattern } from "@cs2dak/core";
 
 export type TacticalExecuteBucket = "rush" | "fast" | "mid" | "late";
 
-export interface TacticalPatternRow extends TacticalFakeInput {
+export interface TacticalPatternRow {
+  side: "t" | "ct";
+  targetSite: "a" | "b" | null;
   matchId: string;
   mapName: string;
   teamName: string;
@@ -12,10 +14,12 @@ export interface TacticalPatternRow extends TacticalFakeInput {
   roundNumber: number;
   openingPattern: OpeningPattern;
   siteEntries: {
-    a: { entrants: number; order: Array<{ entryCallout: string | null }> };
-    b: { entrants: number; order: Array<{ entryCallout: string | null }> };
+    a: { entrants: number; order: Array<{ entryCallout: string | null; entryChokeId?: string | null; routeFamilyId?: string | null }> };
+    b: { entrants: number; order: Array<{ entryCallout: string | null; entryChokeId?: string | null; routeFamilyId?: string | null }> };
   };
   plant: unknown | null;
+  grenades: Array<{ type: string; targetRegion: "a" | "b" | "mid" | "other" | "unknown" }>;
+  c4Route: { endRegion: "a" | "b" | "mid" | "other" | null; rotated: boolean } | null;
   executeBucket: TacticalExecuteBucket | null;
 }
 
@@ -29,11 +33,9 @@ export interface TacticalCluster {
   primaryCategory: string;
   openingSignature: string;
   defaultsBasis: string;
-  executeBucket: TacticalExecuteBucket | null;
   roundCount: number;
   winRatePercent: number | null;
   plantRatePercent: number | null;
-  fakeRoundCount: number;
   rounds: Array<{ matchId: string; roundNumber: number; won: boolean; economy: string; planted: boolean }>;
 }
 
@@ -57,8 +59,9 @@ function entryStructureKey(fact: TacticalPatternRow): string {
   if (entries.entrants <= 0) return "-";
   const counts = new Map<string, number>();
   for (const occurrence of entries.order) {
-    if (!occurrence.entryCallout) continue;
-    counts.set(occurrence.entryCallout, (counts.get(occurrence.entryCallout) ?? 0) + 1);
+    const stableEntry = occurrence.routeFamilyId ?? occurrence.entryChokeId;
+    if (!stableEntry) continue;
+    counts.set(stableEntry, (counts.get(stableEntry) ?? 0) + 1);
   }
   if (counts.size === 0) return `${fact.targetSite}:${entries.entrants}`;
   return `${fact.targetSite}:${[...counts.entries()]
@@ -70,7 +73,8 @@ function entryStructureKey(fact: TacticalPatternRow): string {
 export function tacticalClusterKey(fact: TacticalPatternRow): string {
   const opening = openingPatternKey(fact);
   if (fact.side === "ct") return opening;
-  return [opening, fact.targetSite ?? "-", entryStructureKey(fact), fact.executeBucket ?? "-"].join(":");
+  // 执行时间只作为证据，不进入稳定 pattern 身份。
+  return [opening, fact.targetSite ?? "-", entryStructureKey(fact)].join(":");
 }
 
 const NUM_CN = ["", "单", "双", "三", "四", "五"];
@@ -88,7 +92,7 @@ export function buildTacticalClusters(rows: readonly TacticalPatternRow[]): Tact
   const clusters = new Map<string, TacticalCluster>();
   for (const fact of rows) {
     const id = tacticalClusterKey(fact);
-    const cluster = clusters.get(id) ?? {
+    const cluster: TacticalCluster = clusters.get(id) ?? {
       id,
       mapName: fact.mapName,
       side: fact.side,
@@ -98,11 +102,9 @@ export function buildTacticalClusters(rows: readonly TacticalPatternRow[]): Tact
       primaryCategory: regionCategory(fact.openingPattern.regionCounts),
       openingSignature: openingPatternKey(fact),
       defaultsBasis: defaultsBasisKey(fact.openingPattern.defaultAnchorCounts) || "-",
-      executeBucket: fact.side === "ct" ? null : fact.executeBucket,
       roundCount: 0,
       winRatePercent: null,
       plantRatePercent: null,
-      fakeRoundCount: 0,
       rounds: [],
     };
     cluster.roundCount += 1;
@@ -113,7 +115,6 @@ export function buildTacticalClusters(rows: readonly TacticalPatternRow[]): Tact
       economy: fact.economy,
       planted: fact.plant != null,
     });
-    if (inferTacticalFake(fact).suspected) cluster.fakeRoundCount += 1;
     clusters.set(id, cluster);
   }
   const percent = (numerator: number, denominator: number) =>
@@ -126,4 +127,3 @@ export function buildTacticalClusters(rows: readonly TacticalPatternRow[]): Tact
     }))
     .sort((a, b) => b.roundCount - a.roundCount || a.id.localeCompare(b.id));
 }
-

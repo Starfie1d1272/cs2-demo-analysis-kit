@@ -292,7 +292,6 @@ function patternFingerprint(cluster: TacticalCluster): string {
     cluster.side,
     cluster.openingSignature,
     cluster.targetSite ?? "-",
-    cluster.executeBucket ?? "-",
   ].join(":");
 }
 
@@ -314,6 +313,11 @@ function filterBySubjectTeam(
   return rows.filter((row) => normalizeTeamName(row.teamName, teamRenames) === subject);
 }
 
+/** 验证 site entry 子字段包含扩展口径（trajectory / entryChokeId / routeFamilyId）。 */
+function hasExtendedEntryFields(entry: object): boolean {
+  return Array.isArray((entry as Record<string, unknown>).trajectory) && "entryChokeId" in entry && "routeFamilyId" in entry;
+}
+
 function isCurrentTacticalRoundFact(row: TacticalRoundFact): boolean {
   // 口径版本不符（旧 facts 无 analysisVersion / 缺 c4Route 等新字段）→ 需重建。
   if (row.analysisVersion !== TACTICAL_FACT_VERSION) return false;
@@ -321,6 +325,8 @@ function isCurrentTacticalRoundFact(row: TacticalRoundFact): boolean {
   if (typeof row.openingPattern.detailedSignature !== "string" || !Array.isArray(row.openingPattern.evidence)) return false;
   if (!Array.isArray(row.openingPressure)) return false;
   if (!row.siteEntries?.a || !row.siteEntries.b) return false;
+  if (typeof row.opponentEconomy !== "string") return false;
+  if (![...row.siteEntries.a.order, ...row.siteEntries.b.order].every(hasExtendedEntryFields)) return false;
   if (!Array.isArray(row.grenades) || !Array.isArray(row.grenadeOccurrenceIds)) return false;
   if (typeof row.teamName !== "string" || typeof row.opponentName !== "string") return false;
   return row.openingPressure.every((event) =>

@@ -1,22 +1,18 @@
 import {
-  buildPlayerTacticalSegments,
-  deriveOpeningPressure,
-  deriveOpeningPattern,
   derivePlayerMechanics,
   derivePlayerWeaponHighlights,
   deriveRRIndicators,
   deriveRRSignals,
-  type OpeningPattern,
-  type OpeningPressureEvent,
+  extractTacticalRoundFacts,
+  TACTICAL_FACT_VERSION,
   type PlayerMechanicsFact,
-  type TacticalFrameSample,
+  type TacticalRoundFact,
 } from "@cs2dak/core";
 import type { SeasonCohortFactRow } from "@cs2dak/cohort";
-import type { DemoPackage, EconomyType, MatchWorkspaceModel, OpeningTrailsModel, Side, TeamKey } from "@cs2dak/contract";
-import { decodeDelta, FLAG_ALIVE, FLAG_HAS_BOMB } from "@cs2dak/contract";
+import type { DemoPackage, MatchWorkspaceModel, OpeningTrailsModel, Side, TeamKey } from "@cs2dak/contract";
 import type { TriangleBvh, CalloutGrid, Vec3 } from "@cs2dak/maps";
 import type { LineupGrenadeLike } from "@cs2dak/maps";
-import { calloutNear, getPrimaryCalloutRegion } from "@cs2dak/maps";
+import { calloutNear } from "@cs2dak/maps";
 import {
   buildMatchWorkspaceModel,
   buildOpeningTrails,
@@ -128,82 +124,15 @@ export interface LineupFact extends MatchFactBase {
   tickrate: number;
 }
 
-export type ExecuteBucket = "rush" | "fast" | "mid" | "late";
-
-export interface SiteEntryFact {
-  entrants: number;
-  firstEntryTick: number | null;
-  secondEntryTick: number | null;
-  firstEntryRemainSec: number | null;
-  executeRemainSec: number | null;
-  /** entryCallout：进入包点前的最后一个非包点 callout（A1/A2/拱门等真实入口路线）。 */
-  order: Array<{ playerIndex: number; tick: number; remainSec: number; callout: string; entryCallout: string | null }>;
-}
-
-export interface TacticalPlantFact {
-  site: "a" | "b";
-  tick: number;
-  remainSec: number;
-}
-
-export interface TacticalGrenadeOccurrence {
-  id: string;
-  type: string;
-  throwTick: number;
-  effectTick: number | null;
-  throwPosition: Vec3;
-  effectPosition: Vec3;
-  throwCallout: string | null;
-  effectCallout: string | null;
-  effectCalloutSource: "exact" | "nearby" | null;
-  effectCalloutDistance: number | null;
-  confidence: number;
-  samples: number;
-  targetRegion: "a" | "b" | "mid" | "other" | "unknown";
-}
-
-/** C4 携带/落点轨迹：用于推断主攻方向与转点，并作为佯攻的第二条独立证据。 */
-export interface C4RouteFact {
-  /** 携带者经过的去重相邻 callout 序列（freezeEnd → 安放/回合结束）。 */
-  callouts: string[];
-  /** 初期方向区域（首个可判定 region）。 */
-  startRegion: "a" | "b" | "mid" | "other" | null;
-  /** 末期方向区域（最后一个可判定 region）。 */
-  endRegion: "a" | "b" | "mid" | "other" | null;
-  /** 主方向是否在 A/B 之间发生转点。 */
-  rotated: boolean;
-  /** 安放点 callout（未安放为 null）。 */
-  plantCallout: string | null;
-}
-
-/** TacticalRoundFact 口径版本：schema/语义变化时 +1，旧 facts 据此提示重建。 */
-export const TACTICAL_FACT_VERSION = 5;
-
-export interface TacticalRoundFact extends MatchFactBase {
-  /** 口径版本（见 TACTICAL_FACT_VERSION）。 */
-  analysisVersion: number;
-  side: Side;
-  teamKey: "teamA" | "teamB";
-  teamName: string;
-  opponentName: string;
-  economy: EconomyType;
-  won: boolean;
-  roundNumber: number;
-  /** 基于开局连续区域段推导，不依赖最终打点或单个瞬时快照。 */
-  openingPattern: OpeningPattern;
-  /** 开局窗口内离开本方默认位后的推进证据；deep 表示进入对方默认位。 */
-  openingPressure: OpeningPressureEvent[];
-  targetSite: "a" | "b" | null;
-  siteEntries: { a: SiteEntryFact; b: SiteEntryFact };
-  plant: TacticalPlantFact | null;
-  grenades: TacticalGrenadeOccurrence[];
-  /** C4 轨迹（仅 T 方计算；CT 或无回放为 null）。 */
-  c4Route: C4RouteFact | null;
-  executeRemainSec: number | null;
-  executeBucket: ExecuteBucket | null;
-  firstKillForTeam: boolean | null;
-  grenadeOccurrenceIds: string[];
-}
+export { TACTICAL_FACT_VERSION };
+export type {
+  C4RouteFact,
+  ExecuteBucket,
+  SiteEntryFact,
+  TacticalGrenadeOccurrence,
+  TacticalPlantFact,
+  TacticalRoundFact,
+} from "@cs2dak/core";
 
 export interface MatchFacts {
   matchId: string;
@@ -304,14 +233,6 @@ function throwerPlaceAt(pkg: DemoPackage, roundNumber: number, playerIndex: numb
   return replay.placeDict[placeIndex] || null;
 }
 
-function teamNameOf(pkg: DemoPackage, teamKey: "teamA" | "teamB"): string {
-  return pkg.match[teamKey].name ?? teamKey;
-}
-
-function opponentTeamKey(teamKey: "teamA" | "teamB"): "teamA" | "teamB" {
-  return teamKey === "teamA" ? "teamB" : "teamA";
-}
-
 function effectCalloutFor(grid: CalloutGrid | null, point: Vec3): {
   callout: string | null;
   confidence: number | null;
@@ -356,363 +277,6 @@ function extractLineupFact(pkg: DemoPackage, matchId: string, grid: CalloutGrid 
   };
 }
 
-
-// ── 每回合解码一次（避免每个 snapshot/进点/C4 轨迹重复 decodeDelta）──────────────
-interface DecodedTrack {
-  playerIndex: number;
-  side: Side | null;
-  x: number[];  // 游戏单位（已 × coordScale）
-  y: number[];
-  z: number[];
-  flags: number[];
-  place: number[];
-}
-
-interface DecodedRound {
-  startTick: number;
-  tickStep: number;
-  frameCount: number;
-  tracks: DecodedTrack[];
-  placeDict: string[];
-}
-
-/** 解码一回合所有玩家轨迹（x/y/z 前缀和 × coordScale）；无回放返回 null。 */
-function decodeRound(pkg: DemoPackage, round: DemoPackage["rounds"][number]): DecodedRound | null {
-  const replay = pkg.replay;
-  const replayRound = replay?.rounds.find((row) => row.roundNumber === round.roundNumber);
-  if (!replay || !replayRound) return null;
-  const scale = replay.meta.coordScale;
-  const tracks: DecodedTrack[] = replayRound.players.map((track) => {
-    const player = pkg.players[track.playerIndex];
-    const side = player ? (player.teamKey === "teamA" ? round.teamASide : round.teamBSide) : null;
-    return {
-      playerIndex: track.playerIndex,
-      side,
-      x: decodeDelta(track.x).map((v) => v * scale),
-      y: decodeDelta(track.y).map((v) => v * scale),
-      z: decodeDelta(track.z).map((v) => v * scale),
-      flags: track.flags,
-      place: track.place,
-    };
-  });
-  return {
-    startTick: replayRound.startTick,
-    tickStep: replayRound.tickStep,
-    frameCount: replayRound.frameCount,
-    tracks,
-    placeDict: replay.placeDict ?? [],
-  };
-}
-
-/** 某帧某玩家的 callout：优先 placeDict，回退到 callout-grid 邻近格。 */
-function calloutAtFrame(dr: DecodedRound, track: DecodedTrack, index: number, grid: CalloutGrid | null): string | null {
-  const place = dr.placeDict[track.place[index] ?? -1] ?? null;
-  if (place) return place;
-  return effectCalloutFor(grid, { x: track.x[index] ?? 0, y: track.y[index] ?? 0, z: track.z[index] ?? 0 }).callout;
-}
-
-// ── TacticalRoundFact helpers ─────────────────────────────────────────────────
-
-const ROUND_SECONDS = 115; // 1:55 倒计时起点
-
-function remainSecAt(tick: number, freezeEndTick: number, tickrate: number): number {
-  return Math.max(0, Math.round(ROUND_SECONDS - (tick - freezeEndTick) / tickrate));
-}
-
-function bucketOf(remainSec: number | null): ExecuteBucket | null {
-  if (remainSec == null) return null;
-  if (remainSec > 95) return "rush";  // 剩 >1:35
-  if (remainSec > 70) return "fast";  // 1:35–1:10
-  if (remainSec > 40) return "mid";   // 1:10–0:40
-  return "late";                      // <0:40
-}
-
-function economyTypeFor(
-  pkg: DemoPackage,
-  round: DemoPackage["rounds"][number],
-  teamKey: "teamA" | "teamB"
-): EconomyType {
-  const teamIndices = new Set(
-    pkg.players.map((p, i) => ({ p, i })).filter(({ p }) => p.teamKey === teamKey).map(({ i }) => i)
-  );
-  const econs = pkg.playerEconomies.filter(
-    (e) => e.roundNumber === round.roundNumber && teamIndices.has(e.playerIndex)
-  );
-  if (econs.length === 0) return "full";
-  const counts = new Map<EconomyType, number>();
-  for (const e of econs) counts.set(e.type, (counts.get(e.type) ?? 0) + 1);
-  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
-}
-
-function emptySiteEntry(): SiteEntryFact {
-  return {
-    entrants: 0,
-    firstEntryTick: null,
-    secondEntryTick: null,
-    firstEntryRemainSec: null,
-    executeRemainSec: null,
-    order: [],
-  };
-}
-
-function siteFromCallout(callout: string | null): "a" | "b" | null {
-  if (!callout) return null;
-  if (callout === "BombsiteA") return "a";
-  if (callout === "BombsiteB") return "b";
-  return null;
-}
-
-/** 查 callout 的主要战术方向；未知项保持 unknown，不按 anchor/callout 名称猜测。 */
-function targetRegionFromCallout(mapName: string, callout: string | null): TacticalGrenadeOccurrence["targetRegion"] {
-  if (!callout) return "unknown";
-  return getPrimaryCalloutRegion(mapName, callout) ?? "unknown";
-}
-
-function openingAnalysisFor(
-  dr: DecodedRound | null,
-  round: DemoPackage["rounds"][number],
-  mapName: string,
-  side: Side,
-  tickrate: number,
-  grid: CalloutGrid | null,
-): { openingPattern: OpeningPattern; openingPressure: OpeningPressureEvent[] } {
-  const endTick = Math.min(round.endTick, round.freezeEndTick + 30 * tickrate);
-  const samples: TacticalFrameSample[] = [];
-  if (dr) {
-    for (const track of dr.tracks) {
-      if (track.side !== side) continue;
-      for (let index = 0; index < dr.frameCount; index += 1) {
-        const tick = dr.startTick + index * dr.tickStep;
-        if (tick < round.freezeEndTick) continue;
-        if (tick > endTick) break;
-        const alive = ((track.flags[index] ?? 0) & FLAG_ALIVE) !== 0;
-        samples.push({
-          tick,
-          playerIndex: track.playerIndex,
-          side,
-          alive,
-          callout: alive ? calloutAtFrame(dr, track, index, grid) : null,
-        });
-      }
-    }
-  }
-  const segments = buildPlayerTacticalSegments(samples, {
-    mapName,
-    tickrate,
-    maxGapTicks: dr ? dr.tickStep * 2 : undefined,
-  });
-  return {
-    openingPattern: deriveOpeningPattern(segments, {
-      side,
-      startTick: round.freezeEndTick,
-      endTick,
-    }),
-    openingPressure: deriveOpeningPressure(segments, {
-      mapName,
-      side,
-      startTick: round.freezeEndTick,
-      endTick,
-    }),
-  };
-}
-
-function siteEntriesFor(
-  dr: DecodedRound | null,
-  round: DemoPackage["rounds"][number],
-  side: Side,
-  tickrate: number,
-  grid: CalloutGrid | null
-): { a: SiteEntryFact; b: SiteEntryFact } {
-  if (!dr) return { a: emptySiteEntry(), b: emptySiteEntry() };
-
-  const bySite = { a: new Map<number, SiteEntryFact["order"][number]>(), b: new Map<number, SiteEntryFact["order"][number]>() };
-  for (const track of dr.tracks) {
-    if (track.side !== side) continue;
-
-    const seen = new Set<"a" | "b">();
-    // 进入包点前的最后一个非包点 callout = 真实入口路线（A1/A2/拱门），用来区分打法。
-    let lastEntryCallout: string | null = null;
-    for (let index = 0; index < dr.frameCount; index += 1) {
-      const tick = dr.startTick + index * dr.tickStep;
-      if (tick < round.freezeEndTick || tick > round.endTick) continue;
-      if (((track.flags[index] ?? 0) & FLAG_ALIVE) === 0) break;
-      const callout = calloutAtFrame(dr, track, index, grid);
-      const site = siteFromCallout(callout);
-      if (!site) {
-        if (callout) lastEntryCallout = callout;
-        continue;
-      }
-      if (seen.has(site)) continue;
-      seen.add(site);
-      bySite[site].set(track.playerIndex, {
-        playerIndex: track.playerIndex,
-        tick,
-        remainSec: remainSecAt(tick, round.freezeEndTick, tickrate),
-        callout: callout ?? site,
-        entryCallout: lastEntryCallout,
-      });
-    }
-  }
-
-  const build = (site: "a" | "b"): SiteEntryFact => {
-    const order = [...bySite[site].values()].sort((a, b) => a.tick - b.tick || a.playerIndex - b.playerIndex);
-    return {
-      entrants: order.length,
-      firstEntryTick: order[0]?.tick ?? null,
-      secondEntryTick: order[1]?.tick ?? null,
-      firstEntryRemainSec: order[0]?.remainSec ?? null,
-      executeRemainSec: order[1]?.remainSec ?? null,
-      order,
-    };
-  };
-
-  return { a: build("a"), b: build("b") };
-}
-
-/**
- * C4 携带/落点轨迹：扫描每帧持弹（FLAG_HAS_BOMB）玩家的 callout，得到去重相邻序列，
- * 据此推断主攻方向与转点。用作佯攻的第二条独立证据（道具指向 A 但 C4 走向 B → 强佯攻）。
- */
-function c4RouteFor(
-  dr: DecodedRound | null,
-  round: DemoPackage["rounds"][number],
-  mapName: string,
-  plant: TacticalPlantFact | null,
-  grid: CalloutGrid | null
-): C4RouteFact | null {
-  if (!dr) return null;
-  const callouts: string[] = [];
-  let carrierIndex = -1; // 缓存的持弹者索引，利用时空局部性减少线性搜索
-  for (let index = 0; index < dr.frameCount; index += 1) {
-    const tick = dr.startTick + index * dr.tickStep;
-    if (tick < round.freezeEndTick || tick > round.endTick) continue;
-    // 优先检查上次已知持弹者（同一玩家很少切枪/死亡后立即换人，绝大多数帧命中缓存）
-    if (carrierIndex < 0 ||
-      ((dr.tracks[carrierIndex]?.flags[index] ?? 0) & FLAG_ALIVE) === 0 ||
-      ((dr.tracks[carrierIndex]?.flags[index] ?? 0) & FLAG_HAS_BOMB) === 0) {
-      carrierIndex = dr.tracks.findIndex((track) =>
-        ((track.flags[index] ?? 0) & FLAG_ALIVE) !== 0 && ((track.flags[index] ?? 0) & FLAG_HAS_BOMB) !== 0
-      );
-    }
-    if (carrierIndex < 0) continue;
-    const callout = calloutAtFrame(dr, dr.tracks[carrierIndex]!, index, grid);
-    if (callout && callout !== callouts[callouts.length - 1]) callouts.push(callout);
-  }
-  if (callouts.length === 0) return null;
-  const regionOf = (callout: string) => targetRegionFromCallout(mapName, callout);
-  const regions = callouts.map(regionOf).filter((r): r is "a" | "b" | "mid" | "other" => r !== "unknown");
-  const directional = regions.filter((r): r is "a" | "b" => r === "a" || r === "b");
-  const startRegion = regions[0] ?? null;
-  const endRegion = regions[regions.length - 1] ?? null;
-  const firstSide = directional[0] ?? null;
-  const lastSide = directional[directional.length - 1] ?? null;
-  const rotated = Boolean(firstSide && lastSide && firstSide !== lastSide);
-  return {
-    callouts,
-    startRegion,
-    endRegion,
-    rotated,
-    plantCallout: plant ? callouts[callouts.length - 1] ?? null : null,
-  };
-}
-
-function plantFor(pkg: DemoPackage, round: DemoPackage["rounds"][number], tickrate: number): TacticalPlantFact | null {
-  const plant = pkg.bombs.find((b) => b.roundNumber === round.roundNumber && b.type === "planted" && (b.site === "a" || b.site === "b"));
-  if (!plant || (plant.site !== "a" && plant.site !== "b")) return null;
-  return { site: plant.site, tick: plant.tick, remainSec: remainSecAt(plant.tick, round.freezeEndTick, tickrate) };
-}
-
-function targetSiteFor(plant: TacticalPlantFact | null, entries: { a: SiteEntryFact; b: SiteEntryFact }): "a" | "b" | null {
-  if (plant) return plant.site;
-  if (entries.a.entrants > entries.b.entrants) return "a";
-  if (entries.b.entrants > entries.a.entrants) return "b";
-  return null;
-}
-
-function grenadeOccurrencesFor(
-  pkg: DemoPackage,
-  matchId: string,
-  round: DemoPackage["rounds"][number],
-  side: Side,
-  grid: CalloutGrid | null
-): TacticalGrenadeOccurrence[] {
-  return (pkg.grenades ?? [])
-    .map((grenade, index) => ({ grenade, index }))
-    .filter(({ grenade }) => grenade.roundNumber === round.roundNumber && sideOf(pkg, grenade.throwerIndex, round.roundNumber) === side)
-    .map(({ grenade, index }) => {
-      const effect = effectCalloutFor(grid, grenade.effectPosition);
-      const throwCallout = throwerPlaceAt(pkg, grenade.roundNumber, grenade.throwerIndex, grenade.throwTick);
-      return {
-        id: grenade.grenadeId ?? `${matchId}:r${grenade.roundNumber}:g${index}`,
-        type: grenade.grenade,
-        throwTick: grenade.throwTick,
-        effectTick: grenade.effectTick ?? null,
-        throwPosition: grenade.throwPosition,
-        effectPosition: grenade.effectPosition,
-        throwCallout,
-        effectCallout: effect.callout,
-        effectCalloutSource: effect.source,
-        effectCalloutDistance: effect.distance,
-        confidence: effect.confidence ?? 0,
-        samples: effect.samples ?? 0,
-        targetRegion: targetRegionFromCallout(pkg.match.mapName, effect.callout),
-      };
-    });
-}
-
-function firstKillForTeamFor(
-  pkg: DemoPackage,
-  round: DemoPackage["rounds"][number],
-  teamKey: "teamA" | "teamB"
-): boolean | null {
-  const kills = pkg.kills.filter((k) => k.roundNumber === round.roundNumber).sort((a, b) => a.tick - b.tick);
-  if (kills.length === 0) return null;
-  const first = kills[0];
-  if (first.killerIndex == null) return null;
-  const killer = pkg.players[first.killerIndex];
-  if (!killer) return null;
-  return killer.teamKey === teamKey;
-}
-
-function extractTacticalRoundFacts(pkg: DemoPackage, matchId: string, grid: CalloutGrid | null): TacticalRoundFact[] {
-  const tickrate = pkg.match.tickrate || 64;
-  const mapName = pkg.match.mapName;
-  const out: TacticalRoundFact[] = [];
-  for (const round of pkg.rounds) {
-    // 每回合解码一次玩家轨迹，开局连续段 / 进点 / C4 轨迹共用，避免重复 decodeDelta。
-    const dr = decodeRound(pkg, round);
-    const plant = plantFor(pkg, round, tickrate);
-    for (const side of ["t", "ct"] as const) {
-      if (!dr?.tracks.some((track) => track.side === side)) continue;
-      const teamKey = round.teamASide === side ? "teamA" : "teamB";
-      const entries = siteEntriesFor(dr, round, side, tickrate, grid);
-      const { openingPattern, openingPressure } = openingAnalysisFor(dr, round, mapName, side, tickrate, grid);
-      const target = targetSiteFor(plant, entries);
-      const exec = target ? entries[target].executeRemainSec : null;
-      const grenades = grenadeOccurrencesFor(pkg, matchId, round, side, grid);
-      // C4 轨迹只对进攻方（T）有意义。
-      const c4Route = side === "t" ? c4RouteFor(dr, round, mapName, plant, grid) : null;
-      out.push({
-        analysisVersion: TACTICAL_FACT_VERSION,
-        matchId, mapName, side, teamKey,
-        teamName: teamNameOf(pkg, teamKey),
-        opponentName: teamNameOf(pkg, opponentTeamKey(teamKey)),
-        economy: economyTypeFor(pkg, round, teamKey),
-        won: round.winnerSide === side,
-        roundNumber: round.roundNumber,
-        openingPattern, openingPressure, targetSite: target,
-        siteEntries: entries,
-        plant,
-        grenades,
-        c4Route,
-        executeRemainSec: exec, executeBucket: bucketOf(exec),
-        firstKillForTeam: firstKillForTeamFor(pkg, round, teamKey),
-        grenadeOccurrenceIds: grenades.map((grenade) => grenade.id),
-      });
-    }
-  }
-  return out;
-}
 
 export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOptions): MatchFacts {
   const playerKeyFor = options.playerKeyFor ?? defaultPlayerKey;
@@ -858,7 +422,7 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
     }],
     openingTrails,
     lineups: [extractLineupFact(pkg, options.matchId, calloutGrid)],
-    tacticalRounds: extractTacticalRoundFacts(pkg, options.matchId, calloutGrid)
+    tacticalRounds: extractTacticalRoundFacts(pkg, { matchId: options.matchId, calloutGrid })
   };
 }
 

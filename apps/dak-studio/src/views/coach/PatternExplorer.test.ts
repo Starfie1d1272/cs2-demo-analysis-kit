@@ -17,11 +17,9 @@ describe("PatternExplorer", () => {
       primaryCategory: "三A",
       openingSignature: "opening",
       defaultsBasis: "-",
-      executeBucket: "mid",
       roundCount: 1,
       winRatePercent: 100,
       plantRatePercent: 100,
-      fakeRoundCount: 0,
       rounds: [{ matchId: "m1", roundNumber: 7, won: true, economy: "full", planted: true }]
     } satisfies TacticalCluster;
     const fact = {

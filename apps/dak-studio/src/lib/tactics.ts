@@ -10,5 +10,4 @@ export {
   tacticalClusterKey,
   type TacticalCluster,
 } from "@cs2dak/cohort";
-export { inferTacticalFake as suspectFake } from "@cs2dak/core";
 export { formatTacticalClusterName as autoName } from "@cs2dak/presentation";

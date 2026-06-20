@@ -16,7 +16,7 @@ import {
   buildTournamentInsights,
   buildTournamentInsightsFromFacts
 } from "@cs2dak/presentation";
-import { buildPlayerSeasonDetailsFromFacts, createFactsStore, extractMatchFacts } from "./facts";
+import { TACTICAL_FACT_VERSION, buildPlayerSeasonDetailsFromFacts, createFactsStore, extractMatchFacts } from "./facts";
 import type { ExecuteBucket } from "./facts";
 import { createIdbAdapter } from "./storage/idb-adapter";
 
@@ -168,7 +168,8 @@ describe("MatchFacts", () => {
     const t = facts.tacticalRounds.filter((f) => f.side === "t");
     expect(t.length).toBeGreaterThan(0);
     // 版本号写入
-    expect(facts.tacticalRounds.every((f) => f.analysisVersion === 5)).toBe(true);
+    expect(facts.tacticalRounds.every((f) => f.analysisVersion === TACTICAL_FACT_VERSION)).toBe(true);
+    expect(facts.tacticalRounds.every((f) => Boolean(f.opponentEconomy))).toBe(true);
     // CT 不算 C4 轨迹
     expect(facts.tacticalRounds.filter((f) => f.side === "ct").every((f) => f.c4Route === null)).toBe(true);
     // 至少有一回合能跟到 C4 携带轨迹
@@ -177,7 +178,7 @@ describe("MatchFacts", () => {
     const withEntries = facts.tacticalRounds.find((f) => f.siteEntries.a.order.length + f.siteEntries.b.order.length > 0);
     if (withEntries) {
       const order = [...withEntries.siteEntries.a.order, ...withEntries.siteEntries.b.order];
-      expect(order.every((o) => "entryCallout" in o)).toBe(true);
+      expect(order.every((o) => "entryCallout" in o && "entryChokeId" in o && "trajectory" in o)).toBe(true);
     }
   });
 
