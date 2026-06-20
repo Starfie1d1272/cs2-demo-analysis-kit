@@ -18,6 +18,7 @@ import { PlayersView } from "./views/PlayersView";
 import { LeaderboardView } from "./views/LeaderboardView";
 import { TrailsView } from "./views/TrailsView";
 import { TournamentDashboardView } from "./views/TournamentDashboardView";
+import { EventsView } from "./views/EventsView";
 import { UtilityView } from "./views/UtilityView";
 import { EconomyView } from "./views/EconomyView";
 import { ManagementView } from "./views/ManagementView";
@@ -68,7 +69,8 @@ type PlayerTab = (typeof PLAYER_TABS)[number]["key"];
 
 const TOURNAMENT_TABS = [
   { key: "leaderboard", label: "排行榜" },
-  { key: "dashboard", label: "赛事总览" }
+  { key: "dashboard", label: "赛事总览" },
+  { key: "events", label: "赛事合集" }
 ] as const;
 type TournamentTab = (typeof TOURNAMENT_TABS)[number]["key"];
 type MatchDeepLink = { roundNumber: number; tick?: number };
@@ -493,6 +495,8 @@ export function App() {
             onReexportAll={handleReexportAll}
             onReexportSelected={handleReexportSelected}
             onRemoveMany={handleRemoveMany}
+            onNotice={setNotice}
+            onLibraryChanged={setEntries}
           />
         )}
         {view === "match" && (
@@ -622,7 +626,7 @@ export function App() {
                 teamRenames={identityState.teamRenames}
                 onGoLibrary={() => setView("library")}
               />
-            ) : (
+            ) : tournamentTab === "dashboard" ? (
               <TournamentDashboardView
                 allEntries={entries}
                 entries={scopedEntries}
@@ -633,6 +637,8 @@ export function App() {
                 onOpenMatch={openDemo}
                 onGoLibrary={() => setView("library")}
               />
+            ) : (
+              <EventsView entries={entries} onOpenMatch={openDemo} onGoLibrary={() => setView("library")} />
             )}
           </>
         )}

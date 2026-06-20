@@ -4,6 +4,7 @@ import type { SeriesFormat, SeriesVeto } from "@cs2dak/contract";
 import { matchDateFromFileName, type StudioDemoEntry } from "../lib/library";
 import { parseTags } from "../lib/tags";
 import {
+  formatForCount,
   listSeriesRecords,
   saveSeriesRecord,
   suggestSeriesGroups,
@@ -13,6 +14,8 @@ import {
 import { EmptyState } from "../components/primitives";
 import { VetoInputDialog } from "../components/VetoInputDialog";
 import { BpView } from "./BpView";
+import { LibraryMaintenance } from "../components/LibraryMaintenance";
+import { EventManager } from "../components/EventManager";
 
 export interface LibraryViewProps {
   entries: StudioDemoEntry[];
@@ -34,6 +37,8 @@ export interface LibraryViewProps {
   onReexportSelected?: (ids: string[]) => void;
   /** 批量删除选中条目。 */
   onRemoveMany?: (ids: string[]) => void;
+  onNotice?: (message: string) => void;
+  onLibraryChanged?: (entries: StudioDemoEntry[]) => void;
 }
 
 function formatDuration(seconds: number): string {
@@ -61,7 +66,9 @@ export function LibraryView({
   onReexportDemo,
   onReexportAll,
   onReexportSelected,
-  onRemoveMany
+  onRemoveMany,
+  onNotice = () => {},
+  onLibraryChanged
 }: LibraryViewProps) {
   const [search, setSearch] = useState("");
   const [mapFilter, setMapFilter] = useState<string | null>(null);
@@ -219,7 +226,10 @@ export function LibraryView({
         </div>
       </div>
 
-      {entries.length > 0 && <SeriesManager entries={entries} />}
+      <LibraryMaintenance onNotice={onNotice} />
+      <EventManager entries={entries} onNotice={onNotice} onLibraryChanged={onLibraryChanged} />
+
+      {entries.length > 0 && <SeriesManager entries={entries} selectedEntries={selectedVisible} />}
 
       {entries.length > 0 && (
         <div className="stu-toolbar">
@@ -460,7 +470,7 @@ export function LibraryView({
  * 系列赛与 BP 管理（资料库为 owner）：自动按日期+两队建议分组，
  * 手动选 BO 格式、确认系列、录入 BP（VetoInputDialog）。工作台与教练页只消费。
  */
-function SeriesManager({ entries }: { entries: StudioDemoEntry[] }) {
+function SeriesManager({ entries, selectedEntries }: { entries: StudioDemoEntry[]; selectedEntries: StudioDemoEntry[] }) {
   const [records, setRecords] = useState<StudioSeriesRecord[]>([]);
   const [editing, setEditing] = useState<{ suggestion: SeriesSuggestion; format: SeriesFormat; veto: SeriesVeto | null } | null>(null);
   const suggestions = useMemo(() => suggestSeriesGroups(entries), [entries]);
@@ -474,16 +484,44 @@ function SeriesManager({ entries }: { entries: StudioDemoEntry[] }) {
 
   const recordById = useMemo(() => new Map(records.map((r) => [r.id, r])), [records]);
 
+  const selectedSuggestion = useMemo((): SeriesSuggestion | null => {
+    if (selectedEntries.length < 1 || selectedEntries.length > 5) return null;
+    const first = selectedEntries[0]!;
+    const expectedTeams = [first.meta.teamAName, first.meta.teamBName].sort().join("\t");
+    if (!selectedEntries.every((entry) => [entry.meta.teamAName, entry.meta.teamBName].sort().join("\t") === expectedTeams)) return null;
+    const sorted = [...selectedEntries].sort((a, b) => a.fileName.localeCompare(b.fileName));
+    const format = formatForCount(sorted.length);
+    return {
+      id: `series:manual:${sorted.map((entry) => entry.id).join("-")}`,
+      name: `${first.meta.teamAName} vs ${first.meta.teamBName}`,
+      entryIds: sorted.map((entry) => entry.id),
+      format,
+      teamAName: first.meta.teamAName,
+      teamBName: first.meta.teamBName,
+    };
+  }, [selectedEntries]);
+
   async function persist(suggestion: SeriesSuggestion, format: SeriesFormat, veto: SeriesVeto | null) {
     const saved = await saveSeriesRecord({ ...suggestion, format, veto });
     setRecords((cur) => [saved, ...cur.filter((r) => r.id !== saved.id)]);
   }
 
-  if (suggestions.length === 0) return null;
+  if (suggestions.length === 0 && !selectedSuggestion) return null;
 
   return (
     <details className="stu-card stu-series-manager">
       <summary>系列赛与 BP（{records.length}/{suggestions.length} 已建）</summary>
+      {selectedSuggestion && (
+        <p>
+          <button
+            type="button"
+            className="stu-button stu-button-ghost"
+            onClick={() => setEditing({ suggestion: selectedSuggestion, format: selectedSuggestion.format, veto: recordById.get(selectedSuggestion.id)?.veto ?? null })}
+          >
+            将选中的 {selectedSuggestion.entryIds.length} 图建为 {selectedSuggestion.format.toUpperCase()} 并录入 BP
+          </button>
+        </p>
+      )}
       <table className="stu-mini-table">
         <thead>
           <tr><th>建议分组</th><th className="stu-num">图</th><th>赛制</th><th>BP</th><th /></tr>
