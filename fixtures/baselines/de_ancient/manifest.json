@@ -2,7 +2,7 @@
   "schemaVersion": "cs2-demo-format/3.0",
   "exporter": {
     "name": "cs2df",
-    "version": "3.0.0"
+    "version": "3.0.4"
   },
   "parser": {
     "name": "demoparser2",
@@ -14,7 +14,7 @@
   },
   "mapName": "de_ancient",
   "tickrate": 64,
-  "exportedAt": "2026-06-13T16:30:41.334927+00:00",
+  "exportedAt": "2026-06-20T13:10:30.214628+00:00",
   "files": {
     "match": "match.json",
     "players": "players.json",

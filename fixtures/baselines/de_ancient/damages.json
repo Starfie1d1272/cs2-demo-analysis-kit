@@ -3151,6 +3151,29 @@
     }
   },
   {
+    "roundNumber": 5,
+    "tick": 28413,
+    "attackerIndex": 2,
+    "victimIndex": 5,
+    "weapon": "galilar",
+    "hitgroup": "chest",
+    "healthDamage": 13,
+    "healthDamageRaw": 13,
+    "armorDamage": 1,
+    "victimHealthBefore": 100,
+    "victimArmorAfter": 99,
+    "attackerPosition": {
+      "x": 349,
+      "y": -35,
+      "z": 154
+    },
+    "victimPosition": {
+      "x": 788,
+      "y": -17,
+      "z": 130
+    }
+  },
+  {
     "roundNumber": 6,
     "tick": 31457,
     "attackerIndex": 6,
@@ -8645,6 +8668,29 @@
       "x": 855,
       "y": 909,
       "z": 104
+    }
+  },
+  {
+    "roundNumber": 11,
+    "tick": 63766,
+    "attackerIndex": 3,
+    "victimIndex": 7,
+    "weapon": "m4a1",
+    "hitgroup": "head",
+    "healthDamage": 61,
+    "healthDamageRaw": 90,
+    "armorDamage": 19,
+    "victimHealthBefore": 61,
+    "victimArmorAfter": 73,
+    "attackerPosition": {
+      "x": 1049,
+      "y": 834,
+      "z": 117
+    },
+    "victimPosition": {
+      "x": 1293,
+      "y": 597,
+      "z": 127
     }
   },
   {

@@ -31,18 +31,12 @@ import time
 import urllib.parse
 import urllib.request
 import uuid
+import zipfile
 from datetime import datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from cs2dak import __version__, updater
-from webview.dom import _dnd_state
-
-# 强制在任意拖拽操作中捕获文件路径，即使前端使用标准浏览器
-# drop 事件（而非 pywebview DOM 事件系统）。默认为 0，只有
-# pywebview element.events.drop 注册监听器后才会计数；而我们
-# 使用 React onDrop，永远不会触发该计数。
-_dnd_state["num_listeners"] = max(_dnd_state["num_listeners"], 1)
 
 # PyInstaller 打包后 __file__ 指向 Contents/Frameworks/（不含数据文件），
 # 实际资源在 sys._MEIPASS 临时目录。未打包时回退到源码目录。
@@ -467,6 +461,175 @@ class StudioApi:
             for path in self._blob_dir(namespace).glob(f"*{suffix}")
         ]
 
+    # --- Library maintenance -------------------------------------------
+    @staticmethod
+    def _path_size(path: Path) -> tuple[int, int]:
+        if not path.exists():
+            return 0, 0
+        if path.is_file():
+            return path.stat().st_size, 1
+        size = 0
+        files = 0
+        for child in path.rglob("*"):
+            if not child.is_file():
+                continue
+            try:
+                size += child.stat().st_size
+                files += 1
+            except OSError:
+                continue
+        return size, files
+
+    def storage_overview(self) -> dict:
+        """Return user-visible disk usage categories without loading file contents."""
+        categories = []
+        paths = {
+            "database": self._userdata / "studio.sqlite",
+            "demos": self._userdata / "demos",
+            "cache": self._userdata / "cache",
+            "tris": self._userdata / "tris",
+            "updates": self._userdata / "updates",
+            "reports": self._userdata / "reports",
+            "logs": self._userdata / "studio.log",
+            "backups": self._userdata / "backups",
+        }
+        for category, path in paths.items():
+            size, files = self._path_size(path)
+            categories.append({"id": category, "bytes": size, "files": files, "path": str(path)})
+        return {"ok": True, "userdata": str(self._userdata), "categories": categories}
+
+    def storage_backup(self) -> dict:
+        """Create a portable backup containing durable records and original ZIPs."""
+        backups = self._userdata / "backups"
+        backups.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        destination = backups / f"dak-studio-backup-{stamp}.zip"
+        with tempfile.TemporaryDirectory(prefix="dak-backup-") as temp_name:
+            temp = Path(temp_name)
+            snapshot = temp / "studio.sqlite"
+            with self._db_lock:
+                source = self._conn()
+                target = sqlite3.connect(snapshot)
+                try:
+                    source.backup(target)
+                finally:
+                    target.close()
+            demo_dir = self._userdata / "demos"
+            demo_files = sorted(path for path in demo_dir.glob("*.zip") if path.is_file())
+            manifest = {
+                "version": "cs2-demo-analysis-kit/library-backup-1.0",
+                "appVersion": __version__,
+                "createdAt": datetime.now().astimezone().isoformat(),
+                "demoCount": len(demo_files),
+                "includes": ["studio.sqlite", "demos"],
+            }
+            with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=3) as archive:
+                archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+                archive.write(snapshot, "studio.sqlite")
+                for demo in demo_files:
+                    archive.write(demo, f"demos/{demo.name}")
+        return {"ok": True, "path": str(destination), "demoCount": len(demo_files)}
+
+    def _pick_backup(self) -> str | None:
+        import webview
+
+        result = self._window.create_file_dialog(
+            webview.FileDialog.OPEN,
+            allow_multiple=False,
+            file_types=("DAK Studio Backup (*.zip)", "All files (*.*)"),
+        )
+        return str(result[0]) if result else None
+
+    def storage_restore(self, path: str | None = None) -> dict:
+        """Validate and restore a library backup. The app must restart afterwards."""
+        source = Path(path) if path else Path(self._pick_backup() or "")
+        if not source.is_file():
+            return {"ok": False, "error": "未选择有效备份文件"}
+        with tempfile.TemporaryDirectory(prefix="dak-restore-") as temp_name:
+            temp = Path(temp_name)
+            try:
+                with zipfile.ZipFile(source) as archive:
+                    names = set(archive.namelist())
+                    if "manifest.json" not in names or "studio.sqlite" not in names:
+                        return {"ok": False, "error": "备份缺少 manifest.json 或 studio.sqlite"}
+                    manifest = json.loads(archive.read("manifest.json"))
+                    if manifest.get("version") != "cs2-demo-analysis-kit/library-backup-1.0":
+                        return {"ok": False, "error": "不支持的备份版本"}
+                    archive.extractall(temp)
+            except (OSError, ValueError, zipfile.BadZipFile, json.JSONDecodeError) as exc:
+                return {"ok": False, "error": f"备份校验失败：{exc}"}
+            restored_db = temp / "studio.sqlite"
+            check = sqlite3.connect(restored_db)
+            try:
+                integrity = check.execute("pragma integrity_check").fetchone()[0]
+            finally:
+                check.close()
+            if integrity != "ok":
+                return {"ok": False, "error": f"备份数据库损坏：{integrity}"}
+            with self._db_lock:
+                if self._db is not None:
+                    self._db.close()
+                    self._db = None
+                self._userdata.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(restored_db, self._userdata / "studio.sqlite")
+                destination_demos = self._userdata / "demos"
+                shutil.rmtree(destination_demos, ignore_errors=True)
+                source_demos = temp / "demos"
+                if source_demos.exists():
+                    shutil.copytree(source_demos, destination_demos)
+                else:
+                    destination_demos.mkdir(parents=True, exist_ok=True)
+        return {"ok": True, "path": str(source), "restartRequired": True}
+
+    def storage_cleanup(self, category: str) -> dict:
+        """Delete only explicitly rebuildable storage categories."""
+        targets = {
+            "cache": self._userdata / "cache",
+            "tris": self._userdata / "tris",
+            "updates": self._userdata / "updates",
+            "reports": self._userdata / "reports",
+            "logs": self._userdata / "studio.log",
+        }
+        target = targets.get(category)
+        if target is None:
+            return {"ok": False, "error": "该分类不可自动清理"}
+        before, files = self._path_size(target)
+        if target.is_dir():
+            shutil.rmtree(target, ignore_errors=True)
+        else:
+            try:
+                target.unlink()
+            except FileNotFoundError:
+                pass
+        return {"ok": True, "category": category, "freedBytes": before, "files": files}
+
+    def storage_repair(self) -> dict:
+        """Repair durable Library consistency and compact SQLite."""
+        with self._db_lock:
+            conn = self._conn()
+            integrity = conn.execute("pragma integrity_check").fetchone()[0]
+            if integrity != "ok":
+                return {"ok": False, "error": f"SQLite integrity_check: {integrity}"}
+            record_rows = conn.execute(
+                "select key from records where namespace='demos'"
+            ).fetchall()
+            record_keys = {row[0] for row in record_rows}
+            blob_keys = set(self.storage_blob_keys("demos"))
+            missing_blobs = sorted(record_keys - blob_keys)
+            orphan_blobs = sorted(blob_keys - record_keys)
+            for key in missing_blobs:
+                conn.execute("delete from records where namespace='demos' and key=?", (key,))
+            conn.commit()
+            conn.execute("vacuum")
+        for key in orphan_blobs:
+            self.storage_blob_delete("demos", key)
+        return {
+            "ok": True,
+            "integrity": integrity,
+            "removedMissingBlobRecords": len(missing_blobs),
+            "removedOrphanBlobs": len(orphan_blobs),
+        }
+
     # --- info -----------------------------------------------------------
     def get_version(self) -> str:
         return __version__
@@ -804,6 +967,13 @@ class StudioApi:
 def main() -> None:
     """gui-script entry point (see pyproject [project.gui-scripts])."""
     import webview
+
+    # 强制在任意拖拽操作中捕获文件路径，即使前端使用标准浏览器
+    # drop 事件（而非 pywebview DOM 事件系统）。默认为 0，只有
+    # pywebview element.events.drop 注册监听器后才会计数；而我们
+    # 使用 React onDrop，永远不会触发该计数。
+    from webview.dom import _dnd_state
+    _dnd_state["num_listeners"] = max(_dnd_state["num_listeners"], 1)
 
     storage = _studio_userdata()
     _setup_logging(storage)

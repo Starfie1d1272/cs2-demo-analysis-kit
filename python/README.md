@@ -12,7 +12,6 @@
 
 This package is now a thin desktop shell:
 
-- `cs2dak gui`: standalone pywebview exporter UI backed by `cs2df`
 - `cs2dak-studio`: DAK Studio desktop bridge and bundled web assets
 - `cs2dak version`: package version
 
@@ -27,10 +26,9 @@ cd python
 uv sync --extra dev
 uv run pytest
 uv run cs2dak version
-uv run cs2dak gui
 ```
 
-GUI development additionally needs:
+DAK Studio additionally needs:
 
 ```bash
 uv sync --extra gui
@@ -46,7 +44,7 @@ uv run cs2df export-batch demos/ --out exports/bundle.zip --descriptive
 uv run cs2df validate exports/example.zip
 ```
 
-The desktop GUI and DAK Studio call the same `cs2df` package internally. The
+DAK Studio calls the same `cs2df` package internally. The
 exported ZIP is the only Python/TypeScript seam.
 
 ### Packaging
@@ -55,7 +53,7 @@ exported ZIP is the only Python/TypeScript seam.
 bash scripts/package.sh
 ```
 
-The PyInstaller specs bundle the Python shell plus DAK Studio/static GUI assets.
+The PyInstaller spec bundles the Python shell plus DAK Studio frontend assets.
 
 ---
 
@@ -66,7 +64,6 @@ The PyInstaller specs bundle the Python shell plus DAK Studio/static GUI assets.
 
 本包现在只是桌面壳层：
 
-- `cs2dak gui`：由 `cs2df` 驱动的 pywebview 导出器 UI
 - `cs2dak-studio`：DAK Studio 桌面桥和打包后的前端资产
 - `cs2dak version`：包版本
 
@@ -81,10 +78,9 @@ cd python
 uv sync --extra dev
 uv run pytest
 uv run cs2dak version
-uv run cs2dak gui
 ```
 
-GUI 开发还需要：
+DAK Studio 还需要：
 
 ```bash
 uv sync --extra gui
@@ -100,7 +96,7 @@ uv run cs2df export-batch demos/ --out exports/bundle.zip --descriptive
 uv run cs2df validate exports/example.zip
 ```
 
-桌面 GUI 和 DAK Studio 内部也调用同一个 `cs2df` 包。导出的 ZIP 是 Python/TypeScript 的唯一 seam。
+DAK Studio 内部也调用同一个 `cs2df` 包。导出的 ZIP 是 Python/TypeScript 的唯一 seam。
 
 ### 打包
 
@@ -108,4 +104,4 @@ uv run cs2df validate exports/example.zip
 bash scripts/package.sh
 ```
 
-PyInstaller spec 会把 Python 壳层和 DAK Studio/static GUI 资产一起打包。
+PyInstaller spec 会把 Python 壳层和 DAK Studio 前端资产一起打包。

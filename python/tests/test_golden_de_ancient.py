@@ -37,7 +37,11 @@ def _load_golden(name: str) -> object:
 
 
 def _strip_manifest(data: dict) -> dict:
-    return {k: v for k, v in data.items() if k not in _MANIFEST_EXCLUDE_KEYS}
+    result = {k: v for k, v in data.items() if k not in _MANIFEST_EXCLUDE_KEYS}
+    # 导出器版本随 cs2df 升级变化，不影响数据正确性
+    if "exporter" in result and isinstance(result["exporter"], dict):
+        result["exporter"] = {k: v for k, v in result["exporter"].items() if k != "version"}
+    return result
 
 
 @pytest.fixture(scope="module")

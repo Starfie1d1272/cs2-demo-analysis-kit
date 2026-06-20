@@ -132,7 +132,16 @@
     "opponentCount": 3,
     "won": false,
     "survived": true,
-    "killCount": 1
+    "killCount": 2
+  },
+  {
+    "roundNumber": 11,
+    "tick": 63766,
+    "clutcherIndex": 6,
+    "opponentCount": 1,
+    "won": true,
+    "survived": true,
+    "killCount": 0
   },
   {
     "roundNumber": 12,

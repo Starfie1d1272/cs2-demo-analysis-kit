@@ -23,7 +23,7 @@
     "grenadeId": "490-3100",
     "throwTick": 3100,
     "effectTick": 3542,
-    "destroyTick": null,
+    "destroyTick": 4954,
     "grenade": "smoke",
     "throwerIndex": 2,
     "throwPosition": {
@@ -42,7 +42,7 @@
     "grenadeId": "69-3482",
     "throwTick": 3482,
     "effectTick": 3574,
-    "destroyTick": null,
+    "destroyTick": 4986,
     "grenade": "smoke",
     "throwerIndex": 5,
     "throwPosition": {
@@ -437,6 +437,25 @@
     }
   },
   {
+    "roundNumber": 4,
+    "grenadeId": "372-21462",
+    "throwTick": 21462,
+    "effectTick": 21577,
+    "destroyTick": null,
+    "grenade": "smoke",
+    "throwerIndex": 5,
+    "throwPosition": {
+      "x": -939,
+      "y": -744,
+      "z": 98
+    },
+    "effectPosition": {
+      "x": -1116,
+      "y": -1092,
+      "z": 7
+    }
+  },
+  {
     "roundNumber": 5,
     "grenadeId": "155-23100",
     "throwTick": 23100,
@@ -745,7 +764,7 @@
     "grenadeId": "286-33273",
     "throwTick": 33273,
     "effectTick": 33438,
-    "destroyTick": null,
+    "destroyTick": 34850,
     "grenade": "smoke",
     "throwerIndex": 7,
     "throwPosition": {
@@ -1239,7 +1258,7 @@
     "grenadeId": "316-57513",
     "throwTick": 57513,
     "effectTick": 57639,
-    "destroyTick": null,
+    "destroyTick": 59051,
     "grenade": "smoke",
     "throwerIndex": 4,
     "throwPosition": {
@@ -1334,7 +1353,7 @@
     "grenadeId": "364-62172",
     "throwTick": 62172,
     "effectTick": 62343,
-    "destroyTick": null,
+    "destroyTick": 63755,
     "grenade": "smoke",
     "throwerIndex": 1,
     "throwPosition": {
@@ -1809,7 +1828,7 @@
     "grenadeId": "193-92160",
     "throwTick": 92160,
     "effectTick": 92285,
-    "destroyTick": null,
+    "destroyTick": 93697,
     "grenade": "smoke",
     "throwerIndex": 2,
     "throwPosition": {
@@ -4754,7 +4773,7 @@
     "grenadeId": "131-14770",
     "throwTick": 14770,
     "effectTick": 14837,
-    "destroyTick": null,
+    "destroyTick": 15189,
     "grenade": "molotov",
     "throwerIndex": 8,
     "throwPosition": {

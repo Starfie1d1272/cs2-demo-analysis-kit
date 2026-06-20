@@ -6,7 +6,7 @@ CS2 Demo 的共享数据与分析能力仓库。从 `.dem` 导出到产品中立
 
 - **技术栈**：TypeScript（pnpm monorepo）+ Python（uv 管理依赖）
 - **定位**：`.dem → v3 ZIP → @cs2dak/* 分析包 → RivalHub / CS2 Insight Agent`
-- **GUI**：pywebview 桌面导出器；可视化开发与验收由 demo-lab 承担
+- **GUI**：DAK Studio（pywebview 桌面壳）；可视化开发与验收由 demo-lab 承担
 
 ## 2. Commands
 
@@ -32,21 +32,20 @@ cs2df export <demo.dem>          # 导出单场 .dem → v3 ZIP（cs2df CLI）
 cs2df export-batch <dir> --out bundle.zip  # 批量导出
 
 # GUI
-cd python && uv run cs2dak-gui   # 启动 pywebview 桌面导出器
-bash scripts/package.sh          # 打包桌面应用（exporter + DAK Studio，PyInstaller）
+bash scripts/package.sh          # 打包桌面应用（DAK Studio + PyInstaller）
 
 # 单测单文件
 pnpm vitest run packages/core/src/index.test.ts
 ```
 
-Python `uv sync --extra gui` 装 pywebview（GUI 运行需要）。禁止向系统 python 和 conda base 安装包。
+Python `uv sync --extra gui` 装 pywebview（DAK Studio 桌面壳运行需要）。禁止向系统 python 和 conda base 安装包。
 
 ## 3. Architecture
 
 ```
 .dem
   → cs2df（PyPI）  （demoparser2 → cs2-demo-format/3.0 ZIP）
-       └─ python/src/cs2dak  （薄壳：CLI→gui/version，Studio/桌面导出器桥）
+       └─ python/src/cs2dak  （薄壳：CLI→version，Studio 桌面桥）
   → @cs2dak/core  （加载 ZIP → DemoPackage → AnalysisBundle）
        ├─ normalize / economy / kills / clutches / timeline / heatmap / QA
        ├─ box-score / HLTV baseline / RR 六账户 / PRISM（经 @rivalhub/rival-rating）
@@ -68,7 +67,7 @@ Python `uv sync --extra gui` 装 pywebview（GUI 运行需要）。禁止向系�
 | `@cs2dak/cli` | 薄 CLI（tsx），把 `@cs2dak/core` 接到文件系统。 |
 | `apps/demo-lab` | Vite + React 应用：组件预览、fixture 人工验收与视觉回归入口。 |
 | `apps/dak-studio` | DAK Studio：本地 Demo 管理、战术分析与个人打法复盘工作台（独立设计语言；导入即提取 facts 行持久化，视图读投影；IndexedDB 开发 / SQLite 桌面双后端）。教练页战术聚类 0.6.0 已落地（`TacticalRoundFact`/`TacticalCluster` + `PatternExplorer` 三栏 + `RadarTrails` + `MapPoolTable` + Round Playlist + 默认位资产 + 3D callout 网格）见 `docs/design/studio-redesign.md §8`。 |
-| `python/src/cs2dak` | Python 壳（cs2df 包装器）：pywebview GUI + DAK Studio 导出桥。CLI 仅保留 gui/version。 |
+| `python/src/cs2dak` | Python 壳（cs2df 包装器）：DAK Studio 桌面桥。CLI 仅保留 version。 |
 
 ```
 packages/              # @cs2dak/* TypeScript 库
@@ -90,8 +89,8 @@ docs/                  # 架构与集成文档
 
 详细架构见 `docs/architecture.md`。
 
-> **已迁移**：cs2-demo-format 3.0.3（2026-06）。TS 管线全部使用 v3 合同，
-> Python exporter 切换为 PyPI `cs2df`（本仓库只留 GUI/Studio 壳层）。
+> **已迁移**：cs2-demo-format 3.0.4（2026-06）。TS 管线全部使用 v3 合同，
+> Python exporter 切换为 PyPI `cs2df`（本仓库只留 Studio 桌面壳）。
 > v3 迁移与 fixture 重导均已完成（归档见 `docs/archive/2026-06/v3-migration.md`）。
 > Studio 最终形态设计见 [`docs/design/studio-redesign.md`](docs/design/studio-redesign.md)。
 
@@ -137,7 +136,7 @@ docs/                  # 架构与集成文档
 
 - **WKWebView sandbox 警告**：macOS 上非 `.app` bundle 运行 GUI 时，WKWebView 会在 stderr 输出沙盒目录创建失败。无害，PyInstaller 打包后自动消失
 - **ruff 路径**：`ruff` 不在全局 PATH，用 `uv run ruff check <path>` 跑 lint
-- **cs2df 导出**：`uv run cs2df export` 直接导出 v3 ZIP（无需本仓库 Python 壳）。GUI/Studio 需要 `uv sync --extra gui` 装 pywebview
+- **cs2df 导出**：`uv run cs2df export` 直接导出 v3 ZIP（无需本仓库 Python 壳）。DAK Studio 需要 `uv sync --extra gui` 装 pywebview
 - **`.tri` 碰撞几何**：反应时间/预瞄的 LOS 口径需要 awpy `.tri`（`uvx awpy get tris`，~30MB/图，不进 git）。Node 端从 `~/.awpy/tris` 读（`AWPY_TRIS_DIR` 可覆盖）；Studio 浏览器端 fetch `tris/{map}.tri`——开发环境放/链到 `apps/dak-studio/public/tris/`，打包时 `scripts/package.sh` 自动从 `~/.awpy/tris` 拷入安装包。缺失只降级不报错
 - **cwd 敏感**：pnpm 命令只在 workspace root 有效，不要在 `python/` 子目录下跑
 - **dist 被 gitignore**：`apps/demo-lab/dist/` 不提交，CI 或本地需先构建

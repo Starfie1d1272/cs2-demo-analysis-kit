@@ -2208,6 +2208,34 @@
     }
   },
   {
+    "roundNumber": 11,
+    "tick": 63766,
+    "killerIndex": 3,
+    "victimIndex": 7,
+    "assisterIndex": 0,
+    "flashAssisterIndex": null,
+    "weapon": "m4a1",
+    "killerActiveWeapon": null,
+    "victimActiveWeapon": null,
+    "headshot": true,
+    "flashAssist": false,
+    "tradeKill": false,
+    "tradeDeath": false,
+    "throughSmoke": false,
+    "noScope": false,
+    "penetratedObjects": 0,
+    "killerPosition": {
+      "x": 1049,
+      "y": 834,
+      "z": 117
+    },
+    "victimPosition": {
+      "x": 1293,
+      "y": 597,
+      "z": 127
+    }
+  },
+  {
     "roundNumber": 12,
     "tick": 66061,
     "killerIndex": 6,
