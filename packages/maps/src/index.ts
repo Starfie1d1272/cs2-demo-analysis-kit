@@ -2,7 +2,7 @@ export * from "./zones.js";
 export * from "./zone-assets.js";
 export * from "./routes.js";
 export * from "./route-assets.js";
-export * from "./route-entry-chokes.js";
+export * from "./site-entry-chokes.js";
 export * from "./geometry-assets.js";
 export * from "./nav.js";
 export * from "./visibility.js";

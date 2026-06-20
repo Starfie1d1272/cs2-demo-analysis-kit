@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { pathToFileURL } from "node:url";
-import { routeEntryChokeId } from "../src/route-entry-chokes.js";
+import { resolveSiteEntry, siteEntryChokeId } from "../src/site-entry-chokes.js";
 import {
   addSequenceTransitions,
-  clusterRouteCandidates,
+  clusterSiteEntryTrajectories,
   compressCalloutVisits,
   findRouteCandidates,
   repoRootFromScriptUrl,
@@ -19,21 +19,43 @@ describe("repoRootFromScriptUrl", () => {
   });
 });
 
-describe("routeEntryChokeId", () => {
+describe("siteEntryChokeId", () => {
   it("separates Dust2 tunnel and mid-door entries while merging door/hole aliases", () => {
-    expect(routeEntryChokeId("de_dust2", "b", ["TSpawn", "UpperTunnel", "BombsiteB"]))
+    expect(siteEntryChokeId("de_dust2", "b", ["TSpawn", "UpperTunnel", "BombsiteB"]))
       .toBe("b_upper_tunnel");
-    expect(routeEntryChokeId("de_dust2", "b", ["TSpawn", "BDoors", "BombsiteB"]))
+    expect(siteEntryChokeId("de_dust2", "b", ["TSpawn", "BDoors", "BombsiteB"]))
       .toBe("b_mid_doors");
-    expect(routeEntryChokeId("de_dust2", "b", ["TSpawn", "Hole", "BombsiteB"]))
+    expect(siteEntryChokeId("de_dust2", "b", ["TSpawn", "Hole", "BombsiteB"]))
       .toBe("b_mid_doors");
   });
 
   it("treats Anubis Fountain as an extension of the Main entry", () => {
-    expect(routeEntryChokeId("de_anubis", "a", ["TSpawn", "Main", "BombsiteA"]))
+    expect(siteEntryChokeId("de_anubis", "a", ["TSpawn", "Main", "BombsiteA"]))
       .toBe("a_main");
-    expect(routeEntryChokeId("de_anubis", "a", ["TSpawn", "Main", "Fountain", "BombsiteA"]))
+    expect(siteEntryChokeId("de_anubis", "a", ["TSpawn", "Main", "Fountain", "BombsiteA"]))
       .toBe("a_main");
+  });
+
+  it("keeps Dust2 route markers separate from physical site boundaries", () => {
+    expect(resolveSiteEntry("de_dust2", "a", [
+      "TSpawn", "ShortStairs", "UnderA", "ExtendedA", "BombsiteA",
+    ])).toMatchObject({ entryChokeId: "a_short_entry", routeFamilyId: "a_short_route" });
+    expect(resolveSiteEntry("de_dust2", "a", [
+      "TSpawn", "LongA", "ARamp", "BombsiteA",
+    ])).toMatchObject({ entryChokeId: "a_long_entry", routeFamilyId: "a_long_route" });
+  });
+
+  it("keeps confirmed Nuke and Overpass deep-wrap families", () => {
+    expect(siteEntryChokeId("de_nuke", "b", ["TSpawn", "Tunnels", "Observation", "BombsiteB"]))
+      .toBe("b_tunnels");
+    expect(resolveSiteEntry("de_overpass", "b", [
+      "TSpawn", "UpperPark", "SnipersNest", "Walkway", "Construction", "BombsiteB",
+    ])).toMatchObject({ entryChokeId: "b_short", routeFamilyId: "b_snipers_walkway_route" });
+  });
+
+  it("does not invent a stable id for an unreviewed entry", () => {
+    expect(siteEntryChokeId("de_test", "a", ["TSpawn", "UnknownLane", "BombsiteA"]))
+      .toBeNull();
   });
 });
 
@@ -122,7 +144,6 @@ describe("findRouteCandidates", () => {
       playerRoundSupport: 3,
       roundSupport: 1,
       demoSupport: 1,
-      teamRoundSupport: 1,
     });
   });
 
@@ -154,9 +175,9 @@ describe("findRouteCandidates", () => {
   });
 });
 
-describe("clusterRouteCandidates", () => {
+describe("clusterSiteEntryTrajectories", () => {
   it("merges alternate entrances while preserving every concrete path", () => {
-    const corridors = clusterRouteCandidates("de_test", "a", [
+    const corridors = clusterSiteEntryTrajectories("de_test", "a", [
       candidate(["TSpawn", "Street", "TSideUpper", "Canal", "Main", "BombsiteA"], 33),
       candidate(["TSpawn", "Street", "TStairs", "Canal", "Main", "BombsiteA"], 11),
       candidate(["TSpawn", "Ruins", "Bridge", "Middle", "Walkway", "BombsiteA"], 9),
@@ -187,11 +208,11 @@ describe("clusterRouteCandidates", () => {
       candidate(["TSpawn", `Lane${index + 1}`, "BombsiteA"], 10 - index),
     );
 
-    expect(clusterRouteCandidates("de_test", "a", routes)).toHaveLength(6);
+    expect(clusterSiteEntryTrajectories("de_test", "a", routes)).toHaveLength(6);
   });
 
   it("keeps different terminal approaches separate despite a shared opening", () => {
-    const corridors = clusterRouteCandidates("de_test", "b", [
+    const corridors = clusterSiteEntryTrajectories("de_test", "b", [
       candidate(["TSpawn", "LowerMid", "TRamp", "Middle", "Banana", "BombsiteB"], 100),
       candidate([
         "TSpawn",
@@ -210,7 +231,7 @@ describe("clusterRouteCandidates", () => {
   });
 
   it("keeps B ramp and side entrance as separate corridors", () => {
-    const corridors = clusterRouteCandidates("de_test", "b", [
+    const corridors = clusterSiteEntryTrajectories("de_test", "b", [
       candidate(["TSpawn", "Tunnel", "Water", "Ruins", "Lower", "Ramp", "BombsiteB"], 100),
       candidate([
         "TSpawn",
@@ -228,7 +249,7 @@ describe("clusterRouteCandidates", () => {
   });
 
   it("keeps dissimilar prefixes as variants when they share one entry choke", () => {
-    const corridors = clusterRouteCandidates("de_dust2", "b", [
+    const corridors = clusterSiteEntryTrajectories("de_dust2", "b", [
       candidate(["TSpawn", "Middle", "MidDoors", "BDoors", "BombsiteB"], 20),
       candidate([
         "TSpawn",
@@ -270,12 +291,10 @@ function candidate(callouts: string[], playerRoundSupport: number) {
     playerRoundSupport,
     roundSupport: playerRoundSupport,
     demoSupport: 1,
-    teamRoundSupport: playerRoundSupport,
     supportKeys: {
       playerRounds: Array.from({ length: playerRoundSupport }, (_, index) => `${key}:pr:${index}`),
       rounds: Array.from({ length: playerRoundSupport }, (_, index) => `${key}:r:${index}`),
       demos: [`${key}:demo`],
-      teamRounds: Array.from({ length: playerRoundSupport }, (_, index) => `${key}:tr:${index}`),
     },
     score: 1,
   };
@@ -286,7 +305,6 @@ function observedSequence(callouts: string[], player: string, round: string) {
     callouts,
     demoKey: "demo-1",
     roundKey: `demo-1:${round}`,
-    teamRoundKey: `demo-1:${round}:teamA`,
     playerRoundKey: `demo-1:${round}:${player}`,
   };
 }

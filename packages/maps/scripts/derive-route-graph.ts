@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { loadDemoPackageFromZip } from "../../core/src/index.ts";
 import { FLAG_ALIVE, type DemoPackage } from "../../contract/src/index.ts";
 import { calloutCn } from "../src/callout-names.js";
-import { routeEntryChokeId } from "../src/route-entry-chokes.js";
+import { siteEntryChokeId } from "../src/site-entry-chokes.js";
 
 type Side = "t" | "ct";
 
@@ -40,7 +40,6 @@ export interface RouteCandidate {
   playerRoundSupport: number;
   roundSupport: number;
   demoSupport: number;
-  teamRoundSupport: number;
   supportKeys: RouteSupportKeys;
   score: number;
 }
@@ -49,18 +48,16 @@ export interface RouteSupportKeys {
   playerRounds: string[];
   rounds: string[];
   demos: string[];
-  teamRounds: string[];
 }
 
 export interface ObservedRouteSequence {
   callouts: string[];
   demoKey: string;
   roundKey: string;
-  teamRoundKey: string;
   playerRoundKey: string;
 }
 
-export interface DerivedRouteCorridor {
+export interface SiteEntryTrajectoryFamily {
   id: string;
   target: "a" | "b";
   entryChokeId: string;
@@ -69,7 +66,6 @@ export interface DerivedRouteCorridor {
   totalPlayerRoundSupport: number;
   roundSupport: number;
   demoSupport: number;
-  teamRoundSupport: number;
   variants: RouteCandidate[];
 }
 
@@ -224,14 +220,17 @@ function uniqueSupportCount(
   return new Set(variants.flatMap((variant) => variant.supportKeys[key])).size;
 }
 
-export function clusterRouteCandidates(
+export function clusterSiteEntryTrajectories(
   mapName: string,
   target: "a" | "b",
   candidates: RouteCandidate[],
-): DerivedRouteCorridor[] {
+): SiteEntryTrajectoryFamily[] {
   const groups: Array<{ entryChokeId: string; variants: RouteCandidate[] }> = [];
   for (const candidate of [...candidates].sort(compareCandidates)) {
-    const entryChokeId = routeEntryChokeId(mapName, target, candidate.callouts);
+    // 未审入口只在离线报告中按观察到的末端分组；不得回写 maps 稳定语义。
+    const observedTerminal = candidate.callouts.at(-2) ?? "unknown";
+    const entryChokeId = siteEntryChokeId(mapName, target, candidate.callouts) ??
+      `observed_${target}_${observedTerminal.replace(/[^a-zA-Z0-9]+/g, "_").toLowerCase()}`;
     const group = groups.find(({ entryChokeId: groupEntry }) => groupEntry === entryChokeId);
     if (group) group.variants.push(candidate);
     else groups.push({ entryChokeId, variants: [candidate] });
@@ -250,7 +249,6 @@ export function clusterRouteCandidates(
       ),
       roundSupport: uniqueSupportCount(variants, "rounds"),
       demoSupport: uniqueSupportCount(variants, "demos"),
-      teamRoundSupport: uniqueSupportCount(variants, "teamRounds"),
       variants,
     }))
     .sort((a, b) =>
@@ -274,7 +272,6 @@ export function findRouteCandidates(
     playerRounds: Set<string>;
     rounds: Set<string>;
     demos: Set<string>;
-    teamRounds: Set<string>;
   }>();
 
   for (const sequence of sequences) {
@@ -298,12 +295,10 @@ export function findRouteCandidates(
       playerRounds: new Set<string>(),
       rounds: new Set<string>(),
       demos: new Set<string>(),
-      teamRounds: new Set<string>(),
     };
     current.playerRounds.add(sequence.playerRoundKey);
     current.rounds.add(sequence.roundKey);
     current.demos.add(sequence.demoKey);
-    current.teamRounds.add(sequence.teamRoundKey);
     routeCounts.set(key, current);
   }
 
@@ -323,12 +318,10 @@ export function findRouteCandidates(
       playerRoundSupport: route.playerRounds.size,
       roundSupport: route.rounds.size,
       demoSupport: route.demos.size,
-      teamRoundSupport: route.teamRounds.size,
       supportKeys: {
         playerRounds: [...route.playerRounds],
         rounds: [...route.rounds],
         demos: [...route.demos],
-        teamRounds: [...route.teamRounds],
       },
       score: candidateScore(resolved),
     });
@@ -404,7 +397,6 @@ function accumulate(pkg: DemoPackage, demoKey: string, evidence: MapEvidence): v
             callouts,
             demoKey,
             roundKey,
-            teamRoundKey: `${roundKey}:${player.teamKey}`,
             playerRoundKey: `${roundKey}:${player.steamId64}`,
           });
         }
@@ -450,20 +442,20 @@ function renderEdges(mapName: string, edges: ObservedEdge[], limit: number): str
   ];
 }
 
-function renderCorridors(
+function renderTrajectoryFamilies(
   mapName: string,
   site: "a" | "b",
-  corridors: DerivedRouteCorridor[],
+  corridors: SiteEntryTrajectoryFamily[],
 ): string[] {
-  const title = `### ${site.toUpperCase()} 包 Route Corridors`;
-  if (corridors.length === 0) return [title, "", "- 当前整路径支持阈值下没有 corridor。"];
+  const title = `### ${site.toUpperCase()} 包 Site-entry Trajectory Families`;
+  if (corridors.length === 0) return [title, "", "- 当前整路径支持阈值下没有进点轨迹 family。"];
   const lines = [
     title,
     "",
-    "| corridor | entryChokeId | 共同骨架 | variants | player-round | round | demo | team-round |",
-    "|---|---|---|---:|---:|---:|---:|---:|",
+    "| family | entryChokeId | 共同骨架 | variants | player-round | round | demo |",
+    "|---|---|---|---:|---:|---:|---:|",
     ...corridors.map((corridor) =>
-      `| ${corridor.id} | ${corridor.entryChokeId} | ${corridor.sharedCallouts.map((callout) => formatCallout(mapName, callout)).join(" → ")} | ${corridor.variants.length} | ${corridor.totalPlayerRoundSupport} | ${corridor.roundSupport} | ${corridor.demoSupport} | ${corridor.teamRoundSupport} |`,
+      `| ${corridor.id} | ${corridor.entryChokeId} | ${corridor.sharedCallouts.map((callout) => formatCallout(mapName, callout)).join(" → ")} | ${corridor.variants.length} | ${corridor.totalPlayerRoundSupport} | ${corridor.roundSupport} | ${corridor.demoSupport} |`,
     ),
   ];
   for (const corridor of corridors) {
@@ -473,17 +465,17 @@ function renderCorridors(
       "",
       `共同骨架：${corridor.sharedCallouts.map((callout) => formatCallout(mapName, callout)).join(" → ")}`,
       "",
-      "| variant | 完整走向 | player-round | round | demo | team-round | 瓶颈 T 次数 | 最低 T 占比 |",
-      "|---:|---|---:|---:|---:|---:|---:|---:|",
+      "| variant | 完整走向 | player-round | round | demo | 瓶颈 T 次数 | 最低 T 占比 |",
+      "|---:|---|---:|---:|---:|---:|---:|",
       ...corridor.variants.map((variant, index) =>
-        `| ${index + 1} | ${variant.callouts.map((callout) => formatCallout(mapName, callout)).join(" → ")} | ${variant.playerRoundSupport} | ${variant.roundSupport} | ${variant.demoSupport} | ${variant.teamRoundSupport} | ${variant.bottleneckCount} | ${formatPercent(variant.minTShare)} |`,
+        `| ${index + 1} | ${variant.callouts.map((callout) => formatCallout(mapName, callout)).join(" → ")} | ${variant.playerRoundSupport} | ${variant.roundSupport} | ${variant.demoSupport} | ${variant.bottleneckCount} | ${formatPercent(variant.minTShare)} |`,
       ),
     );
   }
   return lines;
 }
 
-function renderCorridorJson(corridors: DerivedRouteCorridor[]): string[] {
+function renderTrajectoryFamilyJson(corridors: SiteEntryTrajectoryFamily[]): string[] {
   const compact = corridors.map((corridor) => ({
     id: corridor.id,
     target: corridor.target,
@@ -493,13 +485,11 @@ function renderCorridorJson(corridors: DerivedRouteCorridor[]): string[] {
     totalPlayerRoundSupport: corridor.totalPlayerRoundSupport,
     roundSupport: corridor.roundSupport,
     demoSupport: corridor.demoSupport,
-    teamRoundSupport: corridor.teamRoundSupport,
     variants: corridor.variants.map((variant) => ({
       callouts: variant.callouts,
       playerRoundSupport: variant.playerRoundSupport,
       roundSupport: variant.roundSupport,
       demoSupport: variant.demoSupport,
-      teamRoundSupport: variant.teamRoundSupport,
     })),
     confidence: "observed-complete-path-cluster",
   }));
@@ -516,7 +506,7 @@ export function renderRouteGraphReport(
     "",
     `扫描 ZIP：${scannedCount}`,
     `候选限制：maxHops=${options.maxHops}，minEdgeCount=${options.minEdgeCount}，minRouteSupport=${options.minRouteSupport} player-round；不限制候选条数。`,
-    "聚类口径：`entryChokeId` 决定 route family；同一最终入口下的全部完整走法保留为 variants。",
+    "投影口径：`entryChokeId` 决定 site-entry trajectory family；同一物理入口下的完整观察轨迹保留为 variants。",
     "统计窗口：每回合 freezeEndTick 至 endTick；只统计存活玩家的 replay place。",
     "去抖口径：连续 callout 合并为 visit；少于 2 帧的 visit 丢弃；死亡或缺失 callout 截断序列。",
     "",
@@ -526,9 +516,9 @@ export function renderRouteGraphReport(
     "## 人工审查顺序",
     "",
     "1. 先检查高频边是否符合地图方向，特别留意跨层 callout 或死亡附近的假转换。",
-    "2. 检查 corridor 的共同骨架是否表达同一地图控制方向，而不是只看入口 callout 是否相同。",
+    "2. 检查 family 的共同骨架是否确实属于同一进点入口；它不等同于完整地图控制或战术。",
     "3. 检查 variants 是否保留不同入口、转点和夹击走向；不应为了合并而删除真实路径。",
-    "4. JSON 块包含全部 corridor 与 variants，人工确认前不要写入 runtime 资产。",
+    "4. JSON 块包含全部 family 与 variants；统计结果不写入 runtime 地图真相源。",
   ];
 
   for (const [mapName, evidence] of [...byMap.entries()].sort(([a], [b]) => a.localeCompare(b))) {
@@ -541,8 +531,8 @@ export function renderRouteGraphReport(
     };
     const a = findRouteCandidates(edges, evidence.tSequences, { ...searchBase, target: "BombsiteA" });
     const b = findRouteCandidates(edges, evidence.tSequences, { ...searchBase, target: "BombsiteB" });
-    const aCorridors = clusterRouteCandidates(mapName, "a", a);
-    const bCorridors = clusterRouteCandidates(mapName, "b", b);
+    const aCorridors = clusterSiteEntryTrajectories(mapName, "a", a);
+    const bCorridors = clusterSiteEntryTrajectories(mapName, "b", b);
     lines.push(
       "",
       `## ${mapName}`,
@@ -553,13 +543,13 @@ export function renderRouteGraphReport(
       "",
       ...renderEdges(mapName, edges, options.edgeLimit),
       "",
-      ...renderCorridors(mapName, "a", aCorridors),
+      ...renderTrajectoryFamilies(mapName, "a", aCorridors),
       "",
-      ...renderCorridors(mapName, "b", bCorridors),
+      ...renderTrajectoryFamilies(mapName, "b", bCorridors),
       "",
-      "### Corridor 候选 JSON",
+      "### Site-entry trajectory JSON",
       "",
-      ...renderCorridorJson([...aCorridors, ...bCorridors]),
+      ...renderTrajectoryFamilyJson([...aCorridors, ...bCorridors]),
     );
   }
   return lines.join("\n");
