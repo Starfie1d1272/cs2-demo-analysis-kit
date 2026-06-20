@@ -42,14 +42,14 @@ export function TournamentDashboardView({
     setInsights(null);
     setTeamComparison(null);
     setError(null);
-    getTournamentInsights(entries, identityOptions)
+    getTournamentInsights(entries, identityOptions, scope.teams)
       .then((result) => {
         if (!cancelled) setInsights(result);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
       });
-    getTeamComparison(entries, identityOptions)
+    getTeamComparison(entries, identityOptions, scope.teams)
       .then((result) => {
         if (!cancelled) setTeamComparison(result);
       })
@@ -59,7 +59,7 @@ export function TournamentDashboardView({
     return () => {
       cancelled = true;
     };
-  }, [entries, identityOptions?.version]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entries, identityOptions?.version, scope.teams]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   if (allEntries.length === 0) {
     return (

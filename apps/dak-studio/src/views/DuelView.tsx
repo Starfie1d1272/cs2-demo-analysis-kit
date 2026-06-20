@@ -67,7 +67,7 @@ export function DuelView({
     let cancelled = false;
     setModel(null);
     setError(null);
-    getDuelInsights(entries, identityOptions)
+    getDuelInsights(entries, identityOptions, scope.teams)
       .then((next) => {
         if (!cancelled) setModel(next);
       })
@@ -77,7 +77,7 @@ export function DuelView({
     return () => {
       cancelled = true;
     };
-  }, [entries, identityOptions?.version]);
+  }, [entries, identityOptions?.version, scope.teams]);
 
   if (allEntries.length === 0) {
     return (

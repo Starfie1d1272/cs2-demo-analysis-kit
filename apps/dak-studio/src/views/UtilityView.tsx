@@ -45,7 +45,7 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
     let cancelled = false;
     setRows(null);
     setError(null);
-    getSeasonSummary(entries, identityOptions)
+    getSeasonSummary(entries, identityOptions, scope.teams)
       .then(async (summary) => {
         if (cancelled) return;
         const flashes = await getPlayerFlashSummaries(
@@ -55,7 +55,8 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
             name: profile.name,
             steamIds: profile.steamIds
           })),
-          identityOptions
+          identityOptions,
+          scope.teams,
         );
         if (cancelled) return;
         const nextRows = flashes.map((flash) => {
@@ -83,7 +84,7 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
     return () => {
       cancelled = true;
     };
-  }, [entries, identityOptions?.version]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entries, identityOptions?.version, scope.teams]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   if (allEntries.length === 0) {
     return (

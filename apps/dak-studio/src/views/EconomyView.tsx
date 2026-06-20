@@ -27,7 +27,7 @@ export function EconomyView({ allEntries, entries, scope, onScopeChange, onGoLib
     let cancelled = false;
     setInsights(null);
     setError(null);
-    getTournamentInsights(entries, identityOptions)
+    getTournamentInsights(entries, identityOptions, scope.teams)
       .then((result) => {
         if (!cancelled) setInsights(result);
       })
@@ -37,7 +37,7 @@ export function EconomyView({ allEntries, entries, scope, onScopeChange, onGoLib
     return () => {
       cancelled = true;
     };
-  }, [entries, identityOptions?.version]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entries, identityOptions?.version, scope.teams]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   if (allEntries.length === 0) {
     return (

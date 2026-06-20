@@ -74,7 +74,7 @@ export function PlayersView({
     let cancelled = false;
     setProfiles(null);
     setError(null);
-    getSeasonSummary(entries, identityOptions)
+    getSeasonSummary(entries, identityOptions, scope.teams)
       .then((summary) => {
         if (!cancelled) {
           setProfiles([...summary.profiles].sort((a, b) => b.rating.rivalhubRR - a.rating.rivalhubRR));
@@ -86,7 +86,7 @@ export function PlayersView({
     return () => {
       cancelled = true;
     };
-  }, [entries, identityOptions?.version]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entries, identityOptions?.version, scope.teams]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // 关注选手置顶；其余按 RR 降序
   const orderedProfiles = useMemo(() => {
@@ -125,7 +125,7 @@ export function PlayersView({
     setWeaponStats([]);
     setMechanics(null);
     setDetailsError(null);
-    getPlayerSeasonDetails(entries, selected.steamIds, identityOptions)
+    getPlayerSeasonDetails(entries, selected.steamIds, identityOptions, scope.teams)
       .then((details) => {
         if (cancelled) return;
         setInsights(details.insights);
@@ -138,7 +138,7 @@ export function PlayersView({
     return () => {
       cancelled = true;
     };
-  }, [entries, selected?.playerKey, identityOptions?.version]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entries, selected?.playerKey, identityOptions?.version, scope.teams]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   if (allEntries.length === 0) {
     return (

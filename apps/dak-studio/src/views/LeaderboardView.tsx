@@ -29,7 +29,7 @@ export function LeaderboardView({ allEntries, entries, scope, onScopeChange, onP
     let cancelled = false;
     setModel(null);
     setError(null);
-    getSeasonSummary(entries, identityOptions)
+    getSeasonSummary(entries, identityOptions, scope.teams)
       .then((summary) => {
         if (!cancelled) setModel(summary.leaderboard);
       })
@@ -39,7 +39,7 @@ export function LeaderboardView({ allEntries, entries, scope, onScopeChange, onP
     return () => {
       cancelled = true;
     };
-  }, [entries, identityOptions?.version]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entries, identityOptions?.version, scope.teams]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   if (allEntries.length === 0) {
     return (

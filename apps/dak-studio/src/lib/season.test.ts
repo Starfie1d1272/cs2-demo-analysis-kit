@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildTournamentInsightsFromFacts, type TournamentFacts } from "@cs2dak/presentation";
-import { withTeamRenames } from "./season";
+import { buildTournamentInsightsFromFacts, type DuelInsightsFacts, type TournamentFacts } from "@cs2dak/presentation";
+import { filterDuelFactsByTeam, withTeamRenames } from "./season";
 
 /** 一张地图的最小 TournamentFacts：teamA 赢全部 N 个回合（手枪局走 ct 侧）。 */
 function makeFacts(matchId: string, teamA: string, teamB: string): TournamentFacts {
@@ -50,5 +50,25 @@ describe("withTeamRenames", () => {
     const merged = after.teamEconomySummaries.filter((t) => t.teamName === "NJU");
     expect(merged).toHaveLength(1);
     expect(merged[0].maps).toBe(2);
+  });
+});
+
+describe("team row filtering", () => {
+  it("keeps only duels involving the selected team and removes opponent mechanics rows", () => {
+    const facts = [{
+      matchId: "m1",
+      teamNamesBySteamId: { a: "Alpha", b: "Bravo", c: "Bravo" },
+      duelRows: [
+        { killerSteamId64: "a", victimSteamId64: "b", id: "keep" },
+        { killerSteamId64: "b", victimSteamId64: "c", id: "drop" },
+      ],
+      openingRows: [],
+      mechanicsRows: [{ steamId64: "a" }, { steamId64: "b" }],
+    }] as unknown as DuelInsightsFacts[];
+
+    const filtered = filterDuelFactsByTeam(facts, ["Alpha"]);
+    expect(filtered[0]!.duelRows.map((row) => row.id)).toEqual(["keep"]);
+    expect(filtered[0]!.mechanicsRows.map((row) => row.steamId64)).toEqual(["a"]);
+    expect(filtered[0]!.teamNamesBySteamId).toEqual({ a: "Alpha" });
   });
 });

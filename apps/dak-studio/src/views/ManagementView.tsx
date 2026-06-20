@@ -68,11 +68,11 @@ export function ManagementView({
     setBundle(null);
     setError(null);
     setSelected(new Set());
-    getSeasonSummary(entries, identityOptions)
+    getSeasonSummary(entries, identityOptions, scope.teams)
       .then((s) => { if (!cancelled) setBundle(s.bundle); })
       .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); });
     return () => { cancelled = true; };
-  }, [entries, identityOptions?.version]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entries, identityOptions?.version, scope.teams]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // 加载审计记录
   useEffect(() => {
