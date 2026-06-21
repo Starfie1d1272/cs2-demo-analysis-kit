@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronUp, Filter } from "lucide-react";
 import { useMemo, useState } from "react";
-import { matchDateFromFileName, type StudioDemoEntry } from "../lib/library";
+import { entryDate, type StudioDemoEntry } from "../lib/library";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
 
 /**
@@ -155,7 +155,7 @@ export function CohortScope({ entries, scope, onChange, teamRenames = {} }: Coho
         <div className="stu-scope-list">
           {entries.map((entry) => {
             const included = effective.some((e) => e.id === entry.id);
-            const date = matchDateFromFileName(entry.fileName);
+            const date = entryDate(entry);
             return (
               <label key={entry.id} className={included ? "stu-scope-item" : "stu-scope-item stu-scope-item-off"}>
                 <input

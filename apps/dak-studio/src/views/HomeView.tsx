@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { PlayerSeasonProfile } from "@cs2dak/contract";
 import type { PlayerSeasonInsights } from "@cs2dak/presentation";
 import { getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
-import { formatMatchLabel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, type PinnedPlayer } from "../lib/pin";
 import { EmptyState, EvidenceLink, MetricInfo } from "../components/primitives";
 
@@ -98,7 +98,7 @@ export function HomeView({ entries, onOpenMatch, onGoPlayers, onGoLibrary, ident
   const myMatches = me
     ? entries
         .filter((entry) => (insights?.trend ?? []).some((point) => point.matchId === matchIdForEntry(entry)))
-        .sort((a, b) => (matchDateFromFileName(b.fileName) ?? "").localeCompare(matchDateFromFileName(a.fileName) ?? ""))
+        .sort((a, b) => (entryDate(b) ?? "").localeCompare(entryDate(a) ?? ""))
     : [];
   const latestMatch = myMatches[0] ?? null;
 
@@ -196,7 +196,7 @@ export function HomeView({ entries, onOpenMatch, onGoPlayers, onGoLibrary, ident
                 {myMatches.slice(0, 8).map((entry) => (
                   <button key={entry.id} type="button" className="stu-home-match" onClick={() => onOpenMatch(entry.id)}>
                     <span>{formatMatchLabel(entry)}</span>
-                    <small className="stu-dim">{matchDateFromFileName(entry.fileName) ?? "—"} · {entry.meta.mapName}</small>
+                    <small className="stu-dim">{entryDate(entry) ?? "—"} · {entry.meta.mapName}</small>
                   </button>
                 ))}
               </div>

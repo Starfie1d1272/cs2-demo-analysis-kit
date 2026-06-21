@@ -88,9 +88,14 @@ export function matchDateFromFileName(fileName: string): string | null {
   return match ? match[1] : null;
 }
 
+/** 比赛日期统一收口：优先文件名，不命中则 fallback 到 meta.matchDate（事件包导入写入）。 */
+export function entryDate(entry: StudioDemoEntry): string | null {
+  return matchDateFromFileName(entry.fileName) ?? entry.meta.matchDate ?? null;
+}
+
 /** 格式化为可读的比赛标签："de_mirage · 2025-03-15 · FURIA 13:9 Vitality"。消除多处的重复拼接。 */
 export function formatMatchLabel(entry: StudioDemoEntry): string {
-  const date = matchDateFromFileName(entry.fileName) ?? entry.meta.matchDate ?? null;
+  const date = entryDate(entry);
   return [
     entry.meta.mapName,
     date,

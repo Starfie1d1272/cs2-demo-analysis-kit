@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { buildSeriesSummary } from "@cs2dak/presentation";
 import type { MatchWorkspaceModel, SeriesSummary } from "@cs2dak/contract";
 import { MatchWorkspace, QaReportPanel } from "@cs2dak/react";
-import { loadMatchWorkspaceModel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { entryDate, loadMatchWorkspaceModel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getFactsStore } from "../lib/facts";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import { EmptyState } from "../components/primitives";
@@ -148,7 +148,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onGoLibrary
               {group.map((entry) => (
                 <option key={entry.id} value={entry.id}>
                   {entry.meta.teamAName} {entry.meta.teamAScore}:{entry.meta.teamBScore} {entry.meta.teamBName}
-                  {matchDateFromFileName(entry.fileName) ? ` · ${matchDateFromFileName(entry.fileName)}` : ""}
+                  {entryDate(entry) ? ` · ${entryDate(entry)}` : ""}
                 </option>
               ))}
             </optgroup>

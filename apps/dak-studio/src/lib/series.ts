@@ -1,7 +1,7 @@
 import type { SeriesFormat, SeriesVeto, SeriesVetoStep } from "@cs2dak/contract";
 import type { PlaylistItem } from "./playlist";
 import { ACTIVE_DUTY_MAPS } from "@cs2dak/maps";
-import { matchDateFromFileName, type StudioDemoEntry } from "./library";
+import { entryDate, type StudioDemoEntry } from "./library";
 import { displayTeamName } from "./identity";
 import { getStorage } from "./storage";
 
@@ -77,7 +77,7 @@ export function suggestSeriesGroups(
 ): SeriesSuggestion[] {
   const groups = new Map<string, StudioDemoEntry[]>();
   for (const entry of entries) {
-    const date = matchDateFromFileName(entry.fileName) ?? "unknown-date";
+    const date = entryDate(entry) ?? "unknown-date";
     const teams = [displayTeamName(entry.meta.teamAName, teamRenames), displayTeamName(entry.meta.teamBName, teamRenames)].sort();
     const key = `${date}:${teams.join("|")}`;
     const list = groups.get(key) ?? [];
@@ -90,7 +90,7 @@ export function suggestSeriesGroups(
       const first = sorted[0];
       const teamAName = displayTeamName(first.meta.teamAName, teamRenames);
       const teamBName = displayTeamName(first.meta.teamBName, teamRenames);
-      const date = matchDateFromFileName(first.fileName) ?? "未标日期";
+      const date = entryDate(first) ?? "未标日期";
       const stableTeamKey = [teamAName, teamBName].sort().join("|");
       return {
         id: `series:${date}:${stableTeamKey}`,

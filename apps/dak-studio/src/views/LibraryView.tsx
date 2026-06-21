@@ -1,7 +1,7 @@
 import { FolderOpen, Play, RotateCw, Tag as TagIcon, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import type { SeriesFormat, SeriesVeto } from "@cs2dak/contract";
-import { matchDateFromFileName, type StudioDemoEntry } from "../lib/library";
+import { entryDate, type StudioDemoEntry } from "../lib/library";
 import { parseTags } from "../lib/tags";
 import {
   formatForCount,
@@ -101,7 +101,7 @@ export function LibraryView({
       if (tagFilter && !entry.tags.includes(tagFilter)) return false;
       if (serverFilter && entry.meta.serverName !== serverFilter) return false;
       if (dateFrom || dateTo) {
-        const date = matchDateFromFileName(entry.fileName);
+        const date = entryDate(entry);
         if (!date) return false;
         if (dateFrom && date < dateFrom) return false;
         if (dateTo && date > dateTo) return false;
@@ -411,7 +411,7 @@ export function LibraryView({
                     </div>
                     <small className="stu-filename">{entry.fileName}</small>
                   </td>
-                  <td className="stu-dim">{matchDateFromFileName(entry.fileName) ?? "—"}</td>
+                  <td className="stu-dim">{entryDate(entry) ?? "—"}</td>
                   <td className="stu-dim" title={entry.meta.serverName ?? undefined}>{entry.meta.serverName ?? "—"}</td>
                   <td className="stu-num">{entry.meta.roundCount}</td>
                   <td className="stu-num">{formatDuration(entry.meta.durationSeconds)}</td>

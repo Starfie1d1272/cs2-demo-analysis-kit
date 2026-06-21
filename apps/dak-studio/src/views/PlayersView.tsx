@@ -10,7 +10,7 @@ import {
   type PlayerWeaponStat
 } from "@cs2dak/presentation";
 import { getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
-import { formatMatchLabel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState, EvidenceLink, MetricInfo } from "../components/primitives";
@@ -495,7 +495,7 @@ export function PlayersView({
               <div className="stu-player-matches">
                 {playerMatches.map((point) => {
                   const entry = entryByMatchId.get(point.matchId);
-                  const date = entry ? matchDateFromFileName(entry.fileName) : null;
+                  const date = entry ? entryDate(entry) : null;
                   return (
                     <button
                       key={point.matchId}
