@@ -6,6 +6,9 @@ export type EventPreset = "round_robin" | "swiss" | "single_elim" | "double_elim
 
 export interface MakerMapResource {
   file: File;
+  nativePath?: string | null;
+  sha256?: string | null;
+  occurredAt?: string | null;
   mapName: string;
   teamAName: string;
   teamBName: string;
@@ -18,6 +21,7 @@ export interface MakerSeriesDraft {
   stage: string;
   round: number | null;
   entryRound: string | null;
+  bracketNodeId?: string | null;
   status: "scheduled" | "in_progress" | "finished" | "cancelled";
   format: SeriesFormat;
   teamAName: string;
@@ -32,8 +36,83 @@ export interface EventMakerDraft {
   name: string;
   kind: string;
   stages: EventStage[];
-  teams: string[];
   series: MakerSeriesDraft[];
+}
+
+interface NativeEventMakerApi {
+  event_maker_start(): Promise<{ sessionId: string }>;
+  event_maker_cleanup(sessionId: string): Promise<void>;
+  event_resource_prepare(sessionId: string, path: string): Promise<{ ok: boolean; error?: string; path?: string; fileName?: string; sha256?: string; occurredAt?: string; mapName?: string; teamAName?: string; teamBName?: string; scoreA?: number; scoreB?: number }>;
+  event_package_write(sessionId: string, pkg: EventPackage, resources: Array<{ path: string; name: string }>, suggestedName: string): Promise<{ ok: boolean; cancelled?: boolean; error?: string; path?: string }>;
+}
+
+function nativeMakerApi(): NativeEventMakerApi | null {
+  const api = (window as unknown as { pywebview?: { api?: Partial<NativeEventMakerApi> } }).pywebview?.api;
+  return api?.event_maker_start && api.event_maker_cleanup && api.event_resource_prepare && api.event_package_write ? api as NativeEventMakerApi : null;
+}
+
+export async function startNativeMakerSession(): Promise<string | null> {
+  const api = nativeMakerApi();
+  return api ? (await api.event_maker_start()).sessionId : null;
+}
+
+export async function cleanupNativeMakerSession(sessionId: string | null): Promise<void> {
+  if (sessionId) await nativeMakerApi()?.event_maker_cleanup(sessionId);
+}
+
+export async function resourceFromNativePath(sessionId: string, path: string): Promise<MakerMapResource> {
+  const api = nativeMakerApi();
+  if (!api) throw new Error("桌面赛事制作桥不可用");
+  const result = await api.event_resource_prepare(sessionId, path);
+  if (!result.ok || !result.path || !result.fileName || !result.mapName || !result.teamAName || !result.teamBName) throw new Error(result.error ?? `${path} 解析失败`);
+  return { file: new File([], result.fileName, { type: "application/zip" }), nativePath: result.path, sha256: result.sha256, occurredAt: result.occurredAt, mapName: result.mapName, teamAName: result.teamAName, teamBName: result.teamBName, scoreA: result.scoreA ?? 0, scoreB: result.scoreB ?? 0 };
+}
+
+/** 赛事类型固定枚举（不再手填）。 */
+export const KIND_OPTIONS = [
+  { value: "major", label: "Major" },
+  { value: "tournament", label: "锦标赛" },
+  { value: "league", label: "联赛" },
+  { value: "qualifier", label: "预选赛" },
+  { value: "scrim", label: "训练赛" },
+] as const;
+
+/** 阶段赛制类型（与 contract eventStageSchema.type 对齐）。 */
+export const STAGE_TYPE_OPTIONS = [
+  { value: "round_robin", label: "单循环" },
+  { value: "swiss", label: "瑞士轮" },
+  { value: "single_elim", label: "单败淘汰" },
+  { value: "double_elim", label: "双败淘汰" },
+  { value: "gsl_group", label: "GSL 双败小组" },
+] as const;
+
+export function newStage(index: number): EventStage {
+  return { key: `stage-${index}`, name: `阶段${index}`, type: "swiss", teamCount: 16, advanceCount: 8, matchFormat: "bo3" };
+}
+
+/** 事件队伍 = 各系列已附 demo 推出的队伍并集（demo 优先，不手填）。 */
+export function deriveEventTeams(series: MakerSeriesDraft[]): string[] {
+  const names: string[] = [];
+  for (const row of series) {
+    for (const name of [row.teamAName, row.teamBName]) {
+      if (name && !names.includes(name)) names.push(name);
+    }
+  }
+  return names;
+}
+
+/** BP 与已附 demo 地图集合是否相符；返回不一致说明（空数组=相符或无法判定）。 */
+export function vetoMapMismatch(row: MakerSeriesDraft): string[] {
+  if (!row.veto || row.resources.length === 0) return [];
+  const demoMaps = new Set(row.resources.map((r) => r.mapName));
+  const bpMaps = new Set<string>([
+    ...row.veto.maps.picked.map((m) => m.mapName),
+    ...(row.veto.maps.decider ? [row.veto.maps.decider] : []),
+  ]);
+  const issues: string[] = [];
+  for (const m of bpMaps) if (!demoMaps.has(m)) issues.push(`BP 选了 ${m} 但无对应 demo`);
+  for (const m of demoMaps) if (bpMaps.size > 0 && !bpMaps.has(m)) issues.push(`demo ${m} 不在 BP 的 pick/decider 里`);
+  return issues;
 }
 
 export function stagesForPreset(preset: EventPreset): EventStage[] {
@@ -41,7 +120,7 @@ export function stagesForPreset(preset: EventPreset): EventStage[] {
     { key: "stage1", name: "阶段一", type: "swiss", teamCount: 16, advanceCount: 8, matchFormat: "bo1" },
     { key: "stage2", name: "阶段二", type: "swiss", teamCount: 16, advanceCount: 8, matchFormat: "bo1" },
     { key: "stage3", name: "阶段三", type: "swiss", teamCount: 16, advanceCount: 8, matchFormat: "bo3" },
-    { key: "playoff", name: "淘汰赛", type: "single_elim", teamCount: 8, advanceCount: 1, matchFormat: "bo3", finalFormat: "bo5" },
+    { key: "playoff", name: "淘汰赛", type: "single_elim", teamCount: 8, advanceCount: 1, matchFormat: "bo3", finalFormat: "bo5", bracketNodes: singleEliminationNodes(8) },
   ];
   const labels: Record<Exclude<EventPreset, "major">, string> = {
     round_robin: "单循环",
@@ -49,11 +128,54 @@ export function stagesForPreset(preset: EventPreset): EventStage[] {
     single_elim: "单败淘汰",
     double_elim: "双败淘汰",
   };
-  return [{ key: "main", name: labels[preset], type: preset, teamCount: preset === "swiss" ? 16 : 8, advanceCount: preset === "round_robin" ? 4 : 1, matchFormat: "bo3" }];
+  const bracketNodes = preset === "single_elim" ? singleEliminationNodes(8) : preset === "double_elim" ? doubleEliminationNodes() : undefined;
+  return [{ key: "main", name: labels[preset], type: preset, teamCount: preset === "swiss" ? 16 : 8, advanceCount: preset === "round_robin" ? 4 : 1, matchFormat: "bo3", bracketNodes }];
 }
 
-export function normalizeTeamNames(raw: string): string[] {
-  return [...new Set(raw.split(/[,\n]/).map((name) => name.trim()).filter(Boolean))];
+function doubleEliminationNodes(): NonNullable<EventStage["bracketNodes"]> {
+  return [
+    ...[1, 2, 3, 4].map((index) => ({ id: `w1-m${index}`, label: `胜者组首轮 ${index}`, round: 1, lane: "winner" as const, nextWinNodeId: `w2-m${Math.ceil(index / 2)}`, nextLossNodeId: `l1-m${Math.ceil(index / 2)}` })),
+    { id: "l1-m1", label: "败者组首轮 1", round: 2, lane: "loser", nextWinNodeId: "l2-m1", nextLossNodeId: null },
+    { id: "l1-m2", label: "败者组首轮 2", round: 2, lane: "loser", nextWinNodeId: "l2-m2", nextLossNodeId: null },
+    { id: "w2-m1", label: "胜者组半决赛 1", round: 2, lane: "winner", nextWinNodeId: "w3-m1", nextLossNodeId: "l2-m2" },
+    { id: "w2-m2", label: "胜者组半决赛 2", round: 2, lane: "winner", nextWinNodeId: "w3-m1", nextLossNodeId: "l2-m1" },
+    { id: "l2-m1", label: "败者组第二轮 1", round: 3, lane: "loser", nextWinNodeId: "l3-m1", nextLossNodeId: null },
+    { id: "l2-m2", label: "败者组第二轮 2", round: 3, lane: "loser", nextWinNodeId: "l3-m1", nextLossNodeId: null },
+    { id: "l3-m1", label: "败者组半决赛", round: 4, lane: "loser", nextWinNodeId: "l4-m1", nextLossNodeId: null },
+    { id: "w3-m1", label: "胜者组决赛", round: 3, lane: "winner", nextWinNodeId: "g1", nextLossNodeId: "l4-m1" },
+    { id: "l4-m1", label: "败者组决赛", round: 5, lane: "loser", nextWinNodeId: "g1", nextLossNodeId: null },
+    { id: "g1", label: "总决赛", round: 6, lane: "grand", nextWinNodeId: null, nextLossNodeId: null },
+  ];
+}
+
+function singleEliminationNodes(teamCount: number): NonNullable<EventStage["bracketNodes"]> {
+  const rounds = Math.ceil(Math.log2(teamCount));
+  const nodes: NonNullable<EventStage["bracketNodes"]> = [];
+  for (let round = 1; round <= rounds; round += 1) {
+    const count = 2 ** (rounds - round);
+    for (let index = 1; index <= count; index += 1) {
+      const id = `r${round}-m${index}`;
+      nodes.push({ id, label: round === rounds ? "决赛" : round === rounds - 1 ? `半决赛 ${index}` : `第 ${round} 轮 ${index}`, round, lane: "single", nextWinNodeId: round < rounds ? `r${round + 1}-m${Math.ceil(index / 2)}` : null, nextLossNodeId: null });
+    }
+  }
+  return nodes;
+}
+
+export function seriesSkeletonForPreset(preset: EventPreset, stages = stagesForPreset(preset)): MakerSeriesDraft[] {
+  const rows: MakerSeriesDraft[] = [];
+  for (const stage of stages) {
+    if (stage.bracketNodes?.length) {
+      for (const node of stage.bracketNodes) rows.push(emptySeries(`${stage.key}-${node.id}`, stage, node.round, node.label, node.id));
+      continue;
+    }
+    const rounds = stage.type === "swiss" ? 5 : 1;
+    for (let round = 1; round <= rounds; round += 1) rows.push(emptySeries(`${stage.key}-r${round}`, stage, round, stage.type === "swiss" ? `${round} 轮` : stage.name, null));
+  }
+  return rows;
+}
+
+function emptySeries(key: string, stage: EventStage, round: number, entryRound: string, bracketNodeId: string | null): MakerSeriesDraft {
+  return { key, stage: stage.key, round, entryRound, bracketNodeId, status: "finished", format: round === stage.bracketNodes?.at(-1)?.round ? (stage.finalFormat ?? stage.matchFormat ?? "bo3") : (stage.matchFormat ?? "bo3"), teamAName: "", teamBName: "", scheduledAt: "", veto: null, resources: [] };
 }
 
 export async function resourceFromFile(file: File): Promise<MakerMapResource> {
@@ -61,6 +183,7 @@ export async function resourceFromFile(file: File): Promise<MakerMapResource> {
   if (!pkg.match.teamA.name || !pkg.match.teamB.name) throw new Error(`${file.name} 缺少队伍名称，不能自动归入系列赛`);
   return {
     file,
+    occurredAt: file.lastModified > 0 ? new Date(file.lastModified).toISOString() : null,
     mapName: pkg.match.mapName,
     teamAName: pkg.match.teamA.name,
     teamBName: pkg.match.teamB.name,
@@ -79,9 +202,11 @@ function assetName(seriesKey: string, order: number, fileName: string): string {
   return safe.toLowerCase().endsWith(".zip") ? safe : `${safe}.zip`;
 }
 
-export async function buildEventPackage(draft: EventMakerDraft): Promise<{ eventPackage: EventPackage; blob: Blob }> {
-  const teamKeyByName = new Map(draft.teams.map((name, index) => [name, `team-${index + 1}`]));
-  const series = await Promise.all(draft.series.map(async (row) => {
+async function compileEventPackage(draft: EventMakerDraft): Promise<EventPackage> {
+  const activeSeries = draft.series.filter((row) => row.resources.length > 0);
+  const teams = deriveEventTeams(activeSeries);
+  const teamKeyByName = new Map(teams.map((name, index) => [name, `team-${index + 1}`]));
+  const series = await Promise.all(activeSeries.map(async (row) => {
     if (row.resources.length > 5) throw new Error(`${row.key} 超过 5 张地图`);
     const maps = await Promise.all(row.resources.map(async (resource, index) => {
       const direct = resource.teamAName === row.teamAName && resource.teamBName === row.teamBName;
@@ -94,7 +219,7 @@ export async function buildEventPackage(draft: EventMakerDraft): Promise<{ event
         pickedBy: row.veto?.maps.picked.find((map) => map.mapName === resource.mapName)?.teamKey ?? null,
         scoreA: direct ? resource.scoreA : resource.scoreB,
         scoreB: direct ? resource.scoreB : resource.scoreA,
-        demoHint: { fileName: name, sha256: await sha256(resource.file) },
+        demoHint: { fileName: name, sha256: resource.sha256 ?? await sha256(resource.file) },
       };
     }));
     return {
@@ -102,6 +227,7 @@ export async function buildEventPackage(draft: EventMakerDraft): Promise<{ event
       stage: row.stage || null,
       round: row.round,
       entryRound: row.entryRound,
+      bracketNodeId: row.bracketNodeId,
       status: row.status,
       format: row.format,
       teamAKey: teamKeyByName.get(row.teamAName) ?? "",
@@ -109,18 +235,23 @@ export async function buildEventPackage(draft: EventMakerDraft): Promise<{ event
       scoreA: row.status === "finished" ? maps.filter((map) => map.scoreA > map.scoreB).length : null,
       scoreB: row.status === "finished" ? maps.filter((map) => map.scoreB > map.scoreA).length : null,
       scheduledAt: row.scheduledAt ? new Date(row.scheduledAt).toISOString() : null,
+      completedAt: row.resources.map((resource) => resource.occurredAt).find(Boolean) ?? null,
       veto: row.veto,
       maps,
     };
   }));
-  const eventPackage = eventPackageSchema.parse({
+  return eventPackageSchema.parse({
     version: "cs2-demo-analysis-kit/event-package-1.0",
     source: "manual",
     exportedAt: new Date().toISOString(),
     event: { slug: draft.slug, name: draft.name, kind: draft.kind, stages: draft.stages },
-    teams: draft.teams.map((name) => ({ key: teamKeyByName.get(name), name, players: [] })),
+    teams: teams.map((name) => ({ key: teamKeyByName.get(name), name, players: [] })),
     series,
   });
+}
+
+export async function buildEventPackage(draft: EventMakerDraft): Promise<{ eventPackage: EventPackage; blob: Blob }> {
+  const eventPackage = await compileEventPackage(draft);
   const archive = new JSZip();
   archive.file("event-package.json", `${JSON.stringify(eventPackage, null, 2)}\n`);
   for (const row of draft.series) {
@@ -129,4 +260,15 @@ export async function buildEventPackage(draft: EventMakerDraft): Promise<{ event
     }
   }
   return { eventPackage, blob: await archive.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 3 } }) };
+}
+
+export async function buildEventPackageNative(draft: EventMakerDraft, sessionId: string | null): Promise<{ path: string } | null> {
+  const api = nativeMakerApi();
+  if (!api || !sessionId || draft.series.some((row) => row.resources.some((resource) => !resource.nativePath))) return null;
+  const eventPackage = await compileEventPackage(draft);
+  const resources = draft.series.flatMap((row) => row.resources.map((resource, index) => ({ path: resource.nativePath!, name: assetName(row.key, index + 1, resource.file.name) })));
+  const result = await api.event_package_write(sessionId, eventPackage, resources, `${draft.slug}.zip`);
+  if (result.cancelled) return { path: "" };
+  if (!result.ok) throw new Error(result.error ?? "原生赛事包写入失败");
+  return { path: result.path ?? `${draft.slug}.zip` };
 }

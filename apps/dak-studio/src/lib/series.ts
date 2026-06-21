@@ -34,6 +34,7 @@ export interface StudioSeriesRecord {
   teamARecordBefore?: string | null;
   teamBRecordBefore?: string | null;
   scheduledAt?: string | null;
+  completedAt?: string | null;
   mapAssignments?: Array<{ order: number; mapName: string; entryId: string | null }>;
   createdAt: number;
   updatedAt: number;

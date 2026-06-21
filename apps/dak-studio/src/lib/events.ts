@@ -92,6 +92,7 @@ export async function importEventPackage(input: unknown, entries: StudioDemoEntr
       teamARecordBefore: external.teamARecordBefore ?? null,
       teamBRecordBefore: external.teamBRecordBefore ?? null,
       scheduledAt: external.scheduledAt ?? null,
+      completedAt: external.completedAt ?? null,
       mapAssignments: assignments,
     }));
   }
@@ -112,10 +113,6 @@ export async function importEventPackage(input: unknown, entries: StudioDemoEntr
   };
   await eventStore.put(event.id, event);
   return { event, series: savedSeries, matchedMaps, missingMaps };
-}
-
-export async function importEventPackageFile(file: File, entries: StudioDemoEntry[]): Promise<EventImportResult> {
-  return importEventPackage(JSON.parse(await file.text()), entries);
 }
 
 export async function deleteEventRecord(event: StudioEventRecord): Promise<void> {

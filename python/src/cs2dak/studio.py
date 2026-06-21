@@ -348,6 +348,9 @@ class StudioApi:
         self._window = None  # set in main() after window creation
         self._jobs: dict[str, _ExportJob] = {}
         self._update_jobs: dict[str, _UpdateJob] = {}
+        self._event_sessions: dict[str, dict] = {}
+        self._event_download_jobs: dict[str, _UpdateJob] = {}
+        self._event_maker_sessions: dict[str, Path] = {}
         self._userdata = _studio_userdata()
         self._db_lock = threading.Lock()
         self._db: sqlite3.Connection | None = None
@@ -661,6 +664,223 @@ class StudioApi:
         log.info("pick_dems: %d 个文件 %s", len(paths), paths)
         return paths
 
+    # --- event packages ------------------------------------------------
+    def event_package_pick(self) -> dict:
+        """Pick an event archive and keep it native; JS never receives the outer ZIP."""
+        import webview
+
+        result = self._window.create_file_dialog(
+            webview.FileDialog.OPEN,
+            allow_multiple=False,
+            file_types=("DAK Event Package (*.zip)", "All files (*.*)"),
+        )
+        if not result:
+            return {"ok": False, "cancelled": True}
+        return self.event_package_open(str(result[0]))
+
+    def _cleanup_stale_event_sessions(self, max_age_seconds: int = 3600) -> None:
+        cutoff = time.monotonic() - max_age_seconds
+        for session_id, session in list(self._event_sessions.items()):
+            if session["touched"] < cutoff:
+                self.event_package_close(session_id)
+
+    def event_package_open(self, path: str, cleanup_source: bool = False) -> dict:
+        self._cleanup_stale_event_sessions()
+        source = Path(path)
+        try:
+            with zipfile.ZipFile(source) as archive:
+                package = json.loads(archive.read("event-package.json"))
+                maps = [
+                    {"name": info.filename, "size": info.file_size}
+                    for info in archive.infolist()
+                    if not info.is_dir()
+                    and info.filename.lower().startswith("maps/")
+                    and info.filename.lower().endswith(".zip")
+                ]
+        except (OSError, KeyError, ValueError, zipfile.BadZipFile, json.JSONDecodeError) as exc:
+            return {"ok": False, "error": f"赛事资源包无效：{exc}"}
+        session_id = uuid.uuid4().hex
+        temp = Path(tempfile.mkdtemp(prefix="dak-event-import-"))
+        self._event_sessions[session_id] = {
+            "source": source,
+            "temp": temp,
+            "members": {item["name"] for item in maps},
+            "lock": threading.Lock(),
+            "touched": time.monotonic(),
+            "cleanup_source": cleanup_source,
+        }
+        return {"ok": True, "sessionId": session_id, "eventPackage": package, "maps": maps}
+
+    def event_package_map_chunk(self, session_id: str, member: str, offset: int, size: int) -> dict:
+        """Extract one inner demo ZIP at a time and return bounded base64 chunks."""
+        session = self._event_sessions.get(session_id)
+        if session is None or member not in session["members"]:
+            return {"ok": False, "error": "赛事导入会话或地图资源不存在"}
+        session["touched"] = time.monotonic()
+        target = session["temp"] / f"{uuid.uuid5(uuid.NAMESPACE_URL, member).hex}.zip"
+        with session["lock"]:
+            if offset == 0:
+                try:
+                    archive = zipfile.ZipFile(session["source"])
+                    src = archive.open(member)
+                    dst = target.open("wb")
+                    with archive, src, dst:
+                        shutil.copyfileobj(src, dst, length=1024 * 1024)
+                except (OSError, zipfile.BadZipFile, KeyError) as exc:
+                    return {"ok": False, "error": str(exc)}
+            try:
+                with target.open("rb") as handle:
+                    handle.seek(max(0, int(offset)))
+                    data = handle.read(max(1, min(int(size), 1024 * 1024)))
+                    done = handle.tell() >= target.stat().st_size
+                if done:
+                    target.unlink(missing_ok=True)
+                return {"ok": True, "data": base64.b64encode(data).decode("ascii"), "done": done}
+            except OSError as exc:
+                return {"ok": False, "error": str(exc)}
+
+    def event_package_close(self, session_id: str) -> None:
+        session = self._event_sessions.pop(session_id, None)
+        if session:
+            shutil.rmtree(session["temp"], ignore_errors=True)
+            if session.get("cleanup_source"):
+                session["source"].unlink(missing_ok=True)
+
+    def event_download_start(self, urls: list[str], sha256: str, size: int, slug: str) -> dict:
+        job = _UpdateJob(list(urls), sha256, int(size), f"{_sanitize(slug)}.zip")
+        self._event_download_jobs[job.id] = job
+        threading.Thread(target=self._run_event_download, args=(job,), daemon=True).start()
+        return {"jobId": job.id}
+
+    def _run_event_download(self, job: _UpdateJob) -> None:
+        directory = self._userdata / "cache" / "events"
+        directory.mkdir(parents=True, exist_ok=True)
+        partial = directory / f"{job.id}.part"
+        destination = directory / f"{job.id}.zip"
+        try:
+            def on_progress(received: int) -> None:
+                if getattr(job, "cancelled", False):
+                    raise RuntimeError("用户已取消赛事下载")
+                job.received = received
+
+            updater.download_with_fallback(
+                job.urls, partial, expected_sha256=job.sha256,
+                expected_size=job.size or None,
+                on_progress=on_progress,
+                on_mirror=lambda index, _url: setattr(job, "stage", f"下载中（镜像 {index + 1}）"),
+            )
+            if getattr(job, "cancelled", False):
+                raise RuntimeError("用户已取消赛事下载")
+            partial.replace(destination)
+            job.staged_path = destination
+            job.state = "ready"
+            job.stage = "下载完成"
+        except Exception as exc:  # noqa: BLE001 - surfaced through status polling
+            job.state = "error"
+            job.error = str(exc)
+            partial.unlink(missing_ok=True)
+            destination.unlink(missing_ok=True)
+
+    def event_download_status(self, job_id: str) -> dict:
+        job = self._event_download_jobs.get(job_id)
+        return job.status() if job else {
+            "jobId": job_id, "state": "error", "error": "未知下载任务", "progress": 0,
+        }
+
+    def event_download_open(self, job_id: str) -> dict:
+        job = self._event_download_jobs.pop(job_id, None)
+        if job is None or job.state != "ready" or job.staged_path is None:
+            return {"ok": False, "error": "赛事资源尚未下载完成"}
+        return self.event_package_open(str(job.staged_path), cleanup_source=True)
+
+    def event_download_cancel(self, job_id: str) -> None:
+        job = self._event_download_jobs.pop(job_id, None)
+        if job:
+            job.cancelled = True
+            if job.staged_path:
+                job.staged_path.unlink(missing_ok=True)
+
+    def event_maker_start(self) -> dict:
+        session_id = uuid.uuid4().hex
+        directory = Path(tempfile.mkdtemp(prefix="dak-event-maker-"))
+        self._event_maker_sessions[session_id] = directory
+        return {"sessionId": session_id}
+
+    def event_maker_cleanup(self, session_id: str) -> None:
+        directory = self._event_maker_sessions.pop(session_id, None)
+        if directory:
+            shutil.rmtree(directory, ignore_errors=True)
+
+    def event_resource_prepare(self, session_id: str, path: str) -> dict:
+        """Prepare one source demo on disk for the maker without a JS byte round-trip."""
+        from cs2df.package import export_demo
+
+        source = Path(path)
+        output_dir = self._event_maker_sessions.get(session_id)
+        if output_dir is None:
+            return {"ok": False, "error": "赛事制作会话不存在或已释放"}
+        try:
+            if source.suffix.lower() == ".zip":
+                output = output_dir / f"{uuid.uuid4().hex}-{source.name}"
+                shutil.copy2(source, output)
+            else:
+                data, match_meta = export_demo(str(source), research=True)
+                output = output_dir / f"{uuid.uuid4().hex}-{_build_zip_name(source, match_meta)}"
+                output.write_bytes(data)
+            with zipfile.ZipFile(output) as archive:
+                match = json.loads(archive.read("match.json"))
+            digest = updater.sha256_file(output)
+            return {
+                "ok": True, "path": str(output), "fileName": output.name.split("-", 1)[-1],
+                "sha256": digest,
+                "occurredAt": datetime.fromtimestamp(
+                    source.stat().st_mtime
+                ).astimezone().isoformat(),
+                "mapName": match["mapName"],
+                "teamAName": match["teamA"]["name"],
+                "teamBName": match["teamB"]["name"],
+                "scoreA": match["teamA"]["score"], "scoreB": match["teamB"]["score"],
+            }
+        except Exception as exc:  # noqa: BLE001 - surfaced to the maker UI
+            return {"ok": False, "error": str(exc)}
+
+    def event_package_write(
+        self, session_id: str, package: dict, resources: list[dict], suggested_name: str
+    ) -> dict:
+        """Write the final archive incrementally from native resource paths."""
+        import webview
+
+        session_dir = self._event_maker_sessions.get(session_id)
+        if session_dir is None:
+            return {"ok": False, "error": "赛事制作会话不存在或已释放"}
+        allowed = session_dir.resolve()
+        if any(Path(item["path"]).resolve().parent != allowed for item in resources):
+            return {"ok": False, "error": "赛事资源不属于当前制作会话"}
+
+        result = self._window.create_file_dialog(
+            webview.FileDialog.SAVE,
+            save_filename=suggested_name,
+            file_types=("DAK Event Package (*.zip)",),
+        )
+        if not result:
+            return {"ok": False, "cancelled": True}
+        destination = Path(result if isinstance(result, str) else result[0])
+        if destination.suffix.lower() != ".zip":
+            destination = destination.with_suffix(".zip")
+        try:
+            with zipfile.ZipFile(
+                destination, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=3
+            ) as archive:
+                archive.writestr(
+                    "event-package.json",
+                    json.dumps(package, ensure_ascii=False, indent=2) + "\n",
+                )
+                for item in resources:
+                    archive.write(Path(item["path"]), f"maps/{item['name']}")
+            return {"ok": True, "path": str(destination)}
+        except (OSError, ValueError) as exc:
+            return {"ok": False, "error": str(exc)}
+
     # --- async export jobs（0.3.0：避免长阻塞 bridge 调用与超大单条回传） ---
     def start_export_job(self, path: str) -> dict:
         """Start a background .dem→ZIP export; returns {jobId} immediately.
@@ -788,6 +1008,8 @@ class StudioApi:
         Returns the absolute path if found, or ``None`` if the file wasn't
         dropped in the current operation (e.g. selected via <input type="file">).
         """
+        from webview.dom import _dnd_state
+
         for item in _dnd_state["paths"]:
             if urllib.parse.unquote(item[0]) == filename:
                 _dnd_state["paths"].remove(item)

@@ -125,7 +125,7 @@ type WorkerReply =
 interface PoolTask {
   op: "parse" | "import";
   buffer: ArrayBuffer;          // 转移给 worker（转移后 detach）
-  fallbackBuffer: ArrayBuffer;  // worker 失败时回主线程用的副本
+  fallbackBuffer: ArrayBuffer | null; // worker 失败时回主线程用的副本；大包可禁用
   matchId?: string;             // op === "import" 时必有
   resolve: (result: DemoPackage | ImportWorkerResult) => void;
   reject: (err: Error) => void;
@@ -143,6 +143,10 @@ const taskQueue: PoolTask[] = [];
 let workerSeq = 0;
 
 function settleWithFallback(task: PoolTask): void {
+  if (task.fallbackBuffer == null) {
+    task.reject(new Error("后台解析失败；低内存导入未保留回退字节，请重试该地图"));
+    return;
+  }
   task.fallback(task.fallbackBuffer).then(task.resolve, task.reject);
 }
 
@@ -216,11 +220,11 @@ function parseZipInWorker(buffer: ArrayBuffer): Promise<DemoPackage> {
 }
 
 /** 在 worker 里解析 + 榨 facts；无 Worker / 无 document（测试 node）时回主线程兜底。 */
-function importInWorker(buffer: ArrayBuffer, matchId: string): Promise<ImportWorkerResult> {
+function importInWorker(buffer: ArrayBuffer, matchId: string, keepFallback = true): Promise<ImportWorkerResult> {
   if (typeof Worker === "undefined" || typeof document === "undefined") {
     return importOnMainThread(buffer, matchId);
   }
-  const fallbackBuffer = buffer.slice(0);
+  const fallbackBuffer = keepFallback ? buffer.slice(0) : null;
   return new Promise<ImportWorkerResult>((resolve, reject) => {
     taskQueue.push({
       op: "import",
@@ -251,6 +255,8 @@ export interface ImportDemoOptions {
   tags?: string[];
   sourceDemPath?: string | null;
   replaceId?: string;
+  /** 批量赛事导入使用：不保留 worker 回退副本，峰值限制为单图。 */
+  lowMemory?: boolean;
 }
 
 /**
@@ -258,8 +264,8 @@ export interface ImportDemoOptions {
  * 解析失败抛错（带文件名）。
  */
 export async function importDemoFile(file: File, options: ImportDemoOptions | string[] = []): Promise<ImportResult> {
-  const { tags = [], sourceDemPath = null, replaceId } = Array.isArray(options) ? { tags: options } : options;
-  const buffer = await file.arrayBuffer();
+  const { tags = [], sourceDemPath = null, replaceId, lowMemory = false } = Array.isArray(options) ? { tags: options } : options;
+  let buffer = await file.arrayBuffer();
   const id = await sha256Hex(buffer);
 
   const meta = demoMeta;
@@ -272,11 +278,12 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
   const matchId = matchIdForEntry({ fileName: existing?.fileName ?? file.name });
   let result: ImportWorkerResult;
   try {
-    result = await importInWorker(buffer.slice(0), matchId);
+    result = await importInWorker(lowMemory ? buffer : buffer.slice(0), matchId, !lowMemory);
   } catch (err) {
     throw new Error(`${file.name}: ${err instanceof Error ? err.message : String(err)}`);
   }
   const { meta: pkgMeta, facts } = result;
+  if (buffer.byteLength === 0) buffer = await file.arrayBuffer();
 
   const entry: StudioDemoEntry = {
     id,
