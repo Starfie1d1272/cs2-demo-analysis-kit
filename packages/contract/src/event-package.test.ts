@@ -24,4 +24,25 @@ describe("eventPackageSchema", () => {
     expect(eventPackageSchema.safeParse({ ...valid, teams: [valid.teams[0], valid.teams[0]] }).success).toBe(false);
     expect(eventPackageSchema.safeParse({ ...valid, series: [{ ...valid.series[0], teamBKey: "a" }] }).success).toBe(false);
   });
+
+  it("validates bracket nodes and series node references", () => {
+    const bracket = {
+      ...valid,
+      event: { ...valid.event, stages: [{ ...valid.event.stages[0], bracketNodes: [
+        { id: "semi", label: "半决赛", round: 1, lane: "single", nextWinNodeId: "final" },
+        { id: "final", label: "决赛", round: 2, lane: "single", nextWinNodeId: null },
+      ] }] },
+      series: [{ ...valid.series[0], bracketNodeId: "final" }],
+    };
+    expect(eventPackageSchema.safeParse(bracket).success).toBe(true);
+    expect(eventPackageSchema.safeParse({ ...bracket, series: [{ ...bracket.series[0], bracketNodeId: "missing" }] }).success).toBe(false);
+    expect(eventPackageSchema.safeParse({ ...bracket, event: { ...bracket.event, stages: [{ ...bracket.event.stages[0], bracketNodes: [{ id: "semi", label: "半决赛", round: 1, nextWinNodeId: "missing" }] }] } }).success).toBe(false);
+    expect(eventPackageSchema.safeParse({ ...bracket, event: { ...bracket.event, stages: [{ ...bracket.event.stages[0], bracketNodes: [{ id: "self", label: "自环", round: 1, nextWinNodeId: "self" }] }] } }).success).toBe(false);
+    expect(eventPackageSchema.safeParse({ ...bracket, event: { ...bracket.event, stages: [{ ...bracket.event.stages[0], bracketNodes: [
+      { id: "later", label: "后轮", round: 2, nextWinNodeId: "early" }, { id: "early", label: "前轮", round: 1 },
+    ] }] } }).success).toBe(false);
+    expect(eventPackageSchema.safeParse({ ...bracket, event: { ...bracket.event, stages: [{ ...bracket.event.stages[0], bracketNodes: [
+      { id: "a", label: "A", round: 1, nextWinNodeId: "b" }, { id: "b", label: "B", round: 2, nextWinNodeId: "a" },
+    ] }] } }).success).toBe(false);
+  });
 });

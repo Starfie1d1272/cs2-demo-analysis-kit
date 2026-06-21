@@ -1,6 +1,15 @@
 import { z } from "zod";
 import { seriesVetoSchema } from "./veto.js";
 
+export const eventBracketNodeSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  round: z.number().int().positive(),
+  lane: z.enum(["single", "winner", "loser", "grand"]).default("single"),
+  nextWinNodeId: z.string().nullable().optional(),
+  nextLossNodeId: z.string().nullable().optional(),
+});
+
 export const eventStageSchema = z.object({
   key: z.string().min(1),
   name: z.string().min(1),
@@ -9,6 +18,7 @@ export const eventStageSchema = z.object({
   advanceCount: z.number().int().nonnegative().default(0),
   matchFormat: z.enum(["bo1", "bo3", "bo5"]).optional(),
   finalFormat: z.enum(["bo3", "bo5"]).optional(),
+  bracketNodes: z.array(eventBracketNodeSchema).optional(),
 });
 
 export const eventTeamSchema = z.object({
@@ -48,6 +58,7 @@ export const eventSeriesSchema = z.object({
   scoreA: z.number().int().nonnegative().nullable().optional(),
   scoreB: z.number().int().nonnegative().nullable().optional(),
   scheduledAt: z.string().datetime().nullable().optional(),
+  completedAt: z.string().datetime().nullable().optional(),
   veto: seriesVetoSchema.nullable().optional(),
   maps: z.array(eventMapSchema).default([]),
 });
@@ -71,12 +82,41 @@ export const eventPackageSchema = z.object({
   if (teamKeys.size !== value.teams.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ["teams"], message: "队伍 key 必须唯一" });
   if (stageKeys.size !== value.event.stages.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ["event", "stages"], message: "阶段 key 必须唯一" });
   if (seriesKeys.size !== value.series.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ["series"], message: "系列赛 key 必须唯一" });
+  for (const [stageIndex, stage] of value.event.stages.entries()) {
+    const nodes = stage.bracketNodes ?? [];
+    const nodeIds = new Set(nodes.map((node) => node.id));
+    if (nodeIds.size !== nodes.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ["event", "stages", stageIndex, "bracketNodes"], message: "bracket 节点 id 必须唯一" });
+    for (const [nodeIndex, node] of nodes.entries()) {
+      for (const target of [node.nextWinNodeId, node.nextLossNodeId]) {
+        if (target && !nodeIds.has(target)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["event", "stages", stageIndex, "bracketNodes", nodeIndex], message: "bracket 晋级关系引用了不存在的节点" });
+        const targetNode = target ? nodes.find((candidate) => candidate.id === target) : null;
+        if (targetNode && targetNode.round <= node.round) context.addIssue({ code: z.ZodIssueCode.custom, path: ["event", "stages", stageIndex, "bracketNodes", nodeIndex], message: "bracket 晋级关系必须指向后续轮次" });
+      }
+    }
+    const visiting = new Set<string>();
+    const visited = new Set<string>();
+    const visit = (id: string): boolean => {
+      if (visiting.has(id)) return true;
+      if (visited.has(id)) return false;
+      visiting.add(id);
+      const node = nodes.find((candidate) => candidate.id === id);
+      const cyclic = [node?.nextWinNodeId, node?.nextLossNodeId].some((target) => target ? visit(target) : false);
+      visiting.delete(id);
+      visited.add(id);
+      return cyclic;
+    };
+    if (nodes.some((node) => visit(node.id))) context.addIssue({ code: z.ZodIssueCode.custom, path: ["event", "stages", stageIndex, "bracketNodes"], message: "bracket 晋级关系不能成环" });
+  }
   for (const [index, series] of value.series.entries()) {
     if (!teamKeys.has(series.teamAKey) || !teamKeys.has(series.teamBKey)) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ["series", index], message: "series 引用了不存在的队伍" });
     }
     if (series.stage && !stageKeys.has(series.stage)) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ["series", index, "stage"], message: "series 引用了不存在的阶段" });
+    }
+    if (series.bracketNodeId) {
+      const stage = value.event.stages.find((candidate) => candidate.key === series.stage);
+      if (!stage?.bracketNodes?.some((node) => node.id === series.bracketNodeId)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["series", index, "bracketNodeId"], message: "series 引用了不存在的 bracket 节点" });
     }
     if (series.teamAKey === series.teamBKey) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ["series", index], message: "系列赛双方不能是同一队" });
@@ -89,6 +129,7 @@ export const eventPackageSchema = z.object({
 
 export type EventPackage = z.infer<typeof eventPackageSchema>;
 export type EventStage = z.infer<typeof eventStageSchema>;
+export type EventBracketNode = z.infer<typeof eventBracketNodeSchema>;
 export type EventTeam = z.infer<typeof eventTeamSchema>;
 export type EventSeries = z.infer<typeof eventSeriesSchema>;
 
