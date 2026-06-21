@@ -3,6 +3,8 @@ import type { EventStage } from "@cs2dak/contract";
 import { listEventRecords, type StudioEventRecord } from "../lib/events";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import type { StudioDemoEntry } from "../lib/library";
+import { elimModelFromResults, swissModelFromResults } from "../lib/event-bracket";
+import { ElimBracket, SwissBracket } from "../components/EventBracket";
 import { BpView } from "./BpView";
 import { EmptyState } from "../components/primitives";
 
@@ -95,51 +97,23 @@ function RoundRobinStage(props: StageProps) {
 }
 
 function SwissStage(props: StageProps & { advanceCount: number }) {
+  const model = swissModelFromResults(props.series);
   const rounds = [...new Set(props.series.map((row) => row.round ?? 0))].sort((a, b) => a - b);
-  return <div className="stu-pe-grid">{rounds.map((round) => <div key={round}><h3>第 {round} 轮</h3><SeriesList {...props} series={props.series.filter((row) => (row.round ?? 0) === round)} showRecord /></div>)}{rounds.length > 0 && <div><h3>晋级目标</h3><p className="stu-muted">{props.advanceCount} 队晋级；战绩以每场赛前 record 展示。</p></div>}</div>;
+  return <>
+    <SwissBracket model={model} onOpenMatch={props.onOpenMatch} />
+    <details className="stu-card"><summary className="stu-muted">详细列表与 BP</summary>
+      {rounds.map((round) => <div key={round}><h4>第 {round} 轮</h4><SeriesList {...props} series={props.series.filter((row) => (row.round ?? 0) === round)} showRecord /></div>)}
+    </details>
+  </>;
 }
 
 function EliminationStage(props: StageProps & { double: boolean; stage: EventStage }) {
-  if (props.stage.bracketNodes?.length) return <BracketStage {...props} />;
-  const lanes = props.double ? ["winner", "loser", "grand"] : ["single"];
-  const laneOf = (row: StudioSeriesRecord) => {
-    const value = (row.entryRound ?? "").toLowerCase();
-    if (!props.double) return "single";
-    if (value.includes("loser") || value.includes("lower")) return "loser";
-    if (value.includes("grand")) return "grand";
-    return "winner";
-  };
-  return <div>{lanes.map((lane) => {
-    const rows = props.series.filter((row) => laneOf(row) === lane);
-    if (rows.length === 0) return null;
-    const rounds = [...new Set(rows.map((row) => row.entryRound ?? `R${row.round ?? 1}`))];
-    return <div key={lane}><h3>{lane === "winner" ? "胜者组" : lane === "loser" ? "败者组" : lane === "grand" ? "总决赛" : "淘汰赛"}</h3><div className="stu-pe-grid">{rounds.map((round) => <div key={round}><h4>{round}</h4><SeriesList {...props} series={rows.filter((row) => (row.entryRound ?? `R${row.round ?? 1}`) === round)} /></div>)}</div></div>;
-  })}</div>;
-}
-
-function BracketStage(props: StageProps & { stage: EventStage }) {
-  const nodes = props.stage.bracketNodes ?? [];
-  const rounds = [...new Set(nodes.map((node) => node.round))].sort((a, b) => a - b);
-  const nodeLabel = new Map(nodes.map((node) => [node.id, node.label]));
+  const model = elimModelFromResults(props.series, props.stage);
   return <>
-    <BracketConnections stage={props.stage} series={props.series} />
-    <div className="stu-bracket" aria-label={`${props.stage.name} 节点详情`}>
-    {rounds.map((round) => <div key={round} className="stu-bracket-round">
-      <h3>第 {round} 轮</h3>
-      {nodes.filter((node) => node.round === round).map((node) => {
-        const matches = props.series.filter((row) => row.bracketNodeId === node.id);
-        return <article key={node.id} className="stu-bracket-node">
-          <h4>{node.label}</h4>
-          {matches.length ? <SeriesList {...props} series={matches} /> : <p className="stu-muted">暂无比赛资源</p>}
-          {(node.nextWinNodeId || node.nextLossNodeId) && <div className="stu-bracket-links">
-            {node.nextWinNodeId && <span>胜者 → {nodeLabel.get(node.nextWinNodeId) ?? node.nextWinNodeId}</span>}
-            {node.nextLossNodeId && <span>败者 → {nodeLabel.get(node.nextLossNodeId) ?? node.nextLossNodeId}</span>}
-          </div>}
-        </article>;
-      })}
-    </div>)}
-    {props.series.some((row) => row.bracketNodeId && !nodeLabel.has(row.bracketNodeId)) && <p className="stu-muted">部分系列引用了模板中不存在的 bracket 节点，请重新生成赛事包。</p>}
-    </div>
+    <ElimBracket model={model} onOpenMatch={props.onOpenMatch} />
+    <details className="stu-card"><summary className="stu-muted">详细列表与 BP</summary>
+      <SeriesList {...props} />
+    </details>
   </>;
 }
 

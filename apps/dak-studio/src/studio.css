@@ -3753,6 +3753,246 @@ td.stu-heat-cell.stu-heat-neutral {
   font-size: 11px;
 }
 
+/* 赛事框架板：可点击槽位 */
+.stu-fb-stage-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.stu-fb-round-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--dak-fg-mid);
+  margin-bottom: 2px;
+}
+
+.stu-fb-lane {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.stu-fb-lane-label {
+  font-size: 10px;
+  color: var(--dak-fg-dim);
+}
+
+.stu-fb-slot {
+  display: grid;
+  gap: 3px;
+  text-align: left;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-panel);
+  color: var(--dak-fg);
+  cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+
+.stu-fb-slot:hover {
+  border-color: var(--dak-border-hi);
+  background: var(--dak-panel-hi);
+}
+
+.stu-fb-slot-active {
+  border-color: var(--dak-accent);
+  background: var(--dak-accent-soft);
+}
+
+.stu-fb-slot-filled {
+  border-left: 3px solid var(--dak-ok);
+}
+
+.stu-fb-slot-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stu-fb-slot-meta {
+  font-size: 11px;
+  color: var(--dak-fg-mid);
+}
+
+/* ── 赛事 bracket（瑞士轮 Buchholz + 淘汰赛），观看侧与制作器共用 ── */
+.stu-eb {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  overflow-x: auto;
+  padding: 6px 2px 12px;
+}
+
+.stu-eb-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 210px;
+}
+
+.stu-eb-elim {
+  align-items: stretch;
+}
+
+.stu-eb-elim-col {
+  justify-content: center;
+}
+
+.stu-eb-elim-matches {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  justify-content: space-around;
+  flex: 1;
+}
+
+.stu-eb-col-head {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--dak-fg-mid);
+}
+
+.stu-eb-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stu-eb-group-head {
+  font-family: var(--dak-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dak-fg-dim);
+}
+
+.stu-eb-box {
+  display: grid;
+  gap: 1px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-panel);
+  overflow: hidden;
+  text-align: left;
+  width: 100%;
+  padding: 0;
+}
+
+.stu-eb-box-click {
+  cursor: pointer;
+}
+
+.stu-eb-box-click:hover {
+  border-color: var(--dak-border-hi);
+}
+
+.stu-eb-box-sel {
+  border-color: var(--dak-accent);
+}
+
+.stu-eb-team {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  font-size: 13px;
+  color: var(--dak-fg-mid);
+  background: var(--dak-panel);
+}
+
+.stu-eb-team b {
+  font-family: var(--dak-mono);
+  color: var(--dak-fg);
+}
+
+.stu-eb-win {
+  color: var(--dak-fg);
+  font-weight: 700;
+  border-left: 3px solid var(--dak-ok);
+}
+
+.stu-eb-lose {
+  color: var(--dak-fg-dim);
+  border-left: 3px solid var(--dak-danger);
+}
+
+.stu-eb-date {
+  padding: 3px 9px;
+  font-size: 10px;
+  color: var(--dak-fg-dim);
+  border-top: 1px solid var(--dak-border);
+}
+
+.stu-eb-box-empty {
+  padding: 12px 9px;
+  border-style: dashed;
+  color: var(--dak-fg-dim);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.stu-eb-box-empty:hover {
+  border-color: var(--dak-accent);
+  color: var(--dak-accent);
+}
+
+.stu-eb-add {
+  border: 1px dashed var(--dak-border-hi);
+  border-radius: var(--stu-radius-sm);
+  background: transparent;
+  color: var(--dak-fg-dim);
+  font-size: 11px;
+  padding: 5px;
+  cursor: pointer;
+}
+
+.stu-eb-add:hover {
+  border-color: var(--dak-accent);
+  color: var(--dak-accent);
+}
+
+.stu-eb-outcomes {
+  gap: 14px;
+}
+
+.stu-eb-outcome {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border-radius: var(--stu-radius-sm);
+}
+
+.stu-eb-advanced {
+  background: color-mix(in srgb, var(--dak-ok) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dak-ok) 40%, transparent);
+}
+
+.stu-eb-eliminated {
+  background: color-mix(in srgb, var(--dak-danger) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dak-danger) 38%, transparent);
+}
+
+.stu-eb-outcome-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--dak-fg);
+}
+
+.stu-eb-outcome-row b {
+  font-family: var(--dak-mono);
+  color: var(--dak-fg-mid);
+}
+
 /* 网格容器 */
 .stu-duel-grid {
   display: grid;

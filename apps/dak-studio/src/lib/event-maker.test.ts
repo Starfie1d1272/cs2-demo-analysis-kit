@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import JSZip from "jszip";
-import { buildEventPackage, deriveEventTeams, resourceFromFile, seriesSkeletonForPreset, stagesForPreset } from "./event-maker";
+import { buildEventPackage, deriveEventTeams, resourceFromFile, seriesSkeletonForPreset, stagesForPreset, swissBuckets } from "./event-maker";
 import { slugifyEventName } from "../components/EventPackageMaker";
 
 describe("赛事资源制作器", () => {
@@ -18,14 +18,23 @@ describe("赛事资源制作器", () => {
     expect(stages[3]?.finalFormat).toBe("bo5");
   });
 
-  it("模板同时生成系列骨架与可追踪的淘汰赛晋级关系", () => {
+  it("淘汰赛框架预建定额系列；瑞士轮按战绩组逐场添加（不预生成）", () => {
     const stages = stagesForPreset("major");
     const rows = seriesSkeletonForPreset("major", stages);
     const playoff = stages.find((stage) => stage.key === "playoff")!;
-    expect(rows.filter((row) => row.stage === "stage1")).toHaveLength(5);
+    // 瑞士轮阶段不预生成系列：战绩组在框架板上逐场添加
+    expect(rows.filter((row) => row.stage === "stage1")).toHaveLength(0);
     expect(rows.filter((row) => row.stage === "playoff")).toHaveLength(7);
     expect(playoff.bracketNodes?.find((node) => node.id === "r1-m1")?.nextWinNodeId).toBe("r2-m1");
     expect(rows.find((row) => row.key === "playoff-r3-m1")).toMatchObject({ status: "finished", bracketNodeId: "r3-m1", entryRound: "决赛" });
+  });
+
+  it("瑞士轮战绩组：3 胜进 / 3 负汰的 (w-l) 网格，按轮次排列", () => {
+    const buckets = swissBuckets();
+    expect(buckets).toHaveLength(9); // 3×3：0-0 … 2-2
+    expect(buckets.filter((b) => b.round === 1).map((b) => b.label)).toEqual(["0-0"]);
+    expect(buckets.filter((b) => b.round === 3).map((b) => b.label).sort()).toEqual(["0-2", "1-1", "2-0"]);
+    expect(buckets.every((b) => b.kind === "bucket")).toBe(true);
   });
 
   it("双败模板包含胜者、败者和总决赛的真实去向", () => {

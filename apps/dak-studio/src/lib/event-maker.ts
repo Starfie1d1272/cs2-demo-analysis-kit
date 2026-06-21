@@ -161,15 +161,51 @@ function singleEliminationNodes(teamCount: number): NonNullable<EventStage["brac
   return nodes;
 }
 
+/**
+ * 框架槽位：把一个阶段的赛制展开成可点击的二维布局。
+ * - 淘汰赛（bracketNodes）：每个节点是一个定额槽（恰好一场，带晋级去向）。
+ * - 瑞士轮：按战绩组（w-l）展开（如 Major 3 胜进 / 3 负汰），每组可加多场。
+ * - 循环赛/其它：单池，可加多场。
+ */
+export interface FrameworkSlot {
+  id: string;
+  label: string;
+  round: number;
+  lane: "single" | "winner" | "loser" | "grand";
+  /** node：恰好一场（淘汰赛节点）；bucket：可加多场（瑞士轮战绩组 / 循环赛池）。 */
+  kind: "node" | "bucket";
+  nextWinNodeId?: string | null;
+  nextLossNodeId?: string | null;
+}
+
+/** 瑞士轮战绩组网格：w<wins、l<losses，round = w+l+1（默认 Major 制 3 胜进 / 3 负汰）。 */
+export function swissBuckets(wins = 3, losses = 3): FrameworkSlot[] {
+  const slots: FrameworkSlot[] = [];
+  for (let w = 0; w < wins; w += 1)
+    for (let l = 0; l < losses; l += 1)
+      slots.push({ id: `b-${w}-${l}`, label: `${w}-${l}`, round: w + l + 1, lane: "single", kind: "bucket" });
+  return slots.sort((a, b) => a.round - b.round || a.label.localeCompare(b.label));
+}
+
+export function frameworkSlots(stage: EventStage): FrameworkSlot[] {
+  if (stage.bracketNodes?.length)
+    return stage.bracketNodes.map((node) => ({ id: node.id, label: node.label, round: node.round, lane: node.lane, kind: "node", nextWinNodeId: node.nextWinNodeId, nextLossNodeId: node.nextLossNodeId }));
+  if (stage.type === "swiss") return swissBuckets();
+  return [{ id: "pool", label: stage.name, round: 1, lane: "single", kind: "bucket" }];
+}
+
+/** 新建一场绑定到某槽位的系列：淘汰赛槽沿用节点 key（定额），bucket 槽用序号区分。 */
+export function seriesForSlot(stage: EventStage, slot: FrameworkSlot, ordinal: number): MakerSeriesDraft {
+  const key = slot.kind === "node" ? `${stage.key}-${slot.id}` : `${stage.key}-${slot.id}-${ordinal}`;
+  return emptySeries(key, stage, slot.round, slot.label, slot.kind === "node" ? slot.id : null);
+}
+
 export function seriesSkeletonForPreset(preset: EventPreset, stages = stagesForPreset(preset)): MakerSeriesDraft[] {
   const rows: MakerSeriesDraft[] = [];
   for (const stage of stages) {
-    if (stage.bracketNodes?.length) {
+    // 淘汰赛框架确定 → 每节点预建一场定额系列；瑞士轮/循环赛由框架板按战绩组/池逐场添加。
+    if (stage.bracketNodes?.length)
       for (const node of stage.bracketNodes) rows.push(emptySeries(`${stage.key}-${node.id}`, stage, node.round, node.label, node.id));
-      continue;
-    }
-    const rounds = stage.type === "swiss" ? 5 : 1;
-    for (let round = 1; round <= rounds; round += 1) rows.push(emptySeries(`${stage.key}-r${round}`, stage, round, stage.type === "swiss" ? `${round} 轮` : stage.name, null));
   }
   return rows;
 }
