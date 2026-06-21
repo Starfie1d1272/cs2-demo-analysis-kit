@@ -4,7 +4,7 @@ import { EmptyState } from "../components/primitives";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getFactsStore, TACTICAL_FACT_VERSION, type TacticalRoundFact } from "../lib/facts";
-import { buildTacticalClusters, autoName, type TacticalCluster } from "../lib/tactics";
+import { buildTacticalClusters, autoName, withTacticalTeamIdentities, type TacticalCluster } from "../lib/tactics";
 import { playlistToMarkdown, type PlaylistItem } from "../lib/playlist";
 import {
   listPlaybookNames,
@@ -73,8 +73,8 @@ export function CoachView({
     [allFacts, subjectTeam, teamRenames]
   );
   const clusters = useMemo(
-    () => facts.length > 0 ? buildTacticalClusters(facts) : [],
-    [facts]
+    () => facts.length > 0 ? buildTacticalClusters(withTacticalTeamIdentities(facts, teamRenames)) : [],
+    [facts, teamRenames]
   );
 
   useEffect(() => {
@@ -287,12 +287,7 @@ export function CoachView({
 }
 
 function patternFingerprint(cluster: TacticalCluster): string {
-  return [
-    cluster.mapName,
-    cluster.side,
-    cluster.openingSignature,
-    cluster.targetSite ?? "-",
-  ].join(":");
+  return [cluster.mapName, cluster.side, cluster.teamIdentity, cluster.economyEntry, cluster.openingSignature].join(":");
 }
 
 function normalizeTeamName(name: string | null | undefined, teamRenames: Record<string, string>): string {

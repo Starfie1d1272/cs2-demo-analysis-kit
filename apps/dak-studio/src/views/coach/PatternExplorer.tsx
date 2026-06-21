@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MatchWorkspaceModel } from "@cs2dak/contract";
 import { ReplayViewer } from "@cs2dak/react";
-import { economyLabelCn, formatClockSeconds } from "@cs2dak/presentation";
+import { economyLabelCn, formatClockSeconds, ECONOMY_ENTRY_CN, formatEntryEvidenceLabel, formatTacticalClusterShortName } from "@cs2dak/presentation";
+import { calloutCn } from "@cs2dak/maps";
+import type { EconomyEntry } from "@cs2dak/cohort";
 import { autoName, type TacticalCluster } from "../../lib/tactics.js";
 import { getFactsStore, type TacticalRoundFact } from "../../lib/facts.js";
 import type { StudioDemoEntry } from "../../lib/library.js";
@@ -17,9 +19,19 @@ export interface PatternExplorerProps {
   replayModelCache?: Map<string, MatchWorkspaceModel>;
 }
 
+export function resolveEconomyFilter(
+  requested: EconomyEntry | "all",
+  available: readonly EconomyEntry[],
+): EconomyEntry | "all" {
+  if (requested === "all" || available.includes(requested)) return requested;
+  return available[0] ?? "all";
+}
+
 export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, onAddToPlaylist, replayModelCache }: PatternExplorerProps) {
   // 顶部视角切换：T 进攻语境 / CT 防守语境分开看，避免两个 side 的簇混在一列。
   const [side, setSide] = useState<"t" | "ct">("t");
+  // 一级经济入口筛选：手枪/长枪/Anti-eco/强起/半起/Eco，默认看长枪局。
+  const [econ, setEcon] = useState<EconomyEntry | "all">("gun");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedEvidenceKey, setSelectedEvidenceKey] = useState<string | null>(null);
   const localReplayCache = useRef(new Map<string, MatchWorkspaceModel>());
@@ -30,7 +42,17 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
     ct: clusters.filter((c) => c.side === "ct").length,
   }), [clusters]);
 
-  const visibleClusters = useMemo(() => clusters.filter((c) => c.side === side), [clusters, side]);
+  // 当前 side 下实际出现的经济入口（用于只渲染有数据的筛选项）。
+  const econOptions = useMemo(() => {
+    const present = new Set(clusters.filter((c) => c.side === side).map((c) => c.economyEntry));
+    return (["pistol", "gun", "anti_eco", "force", "semi", "eco"] as EconomyEntry[]).filter((e) => present.has(e));
+  }, [clusters, side]);
+  const effectiveEcon = resolveEconomyFilter(econ, econOptions);
+
+  const visibleClusters = useMemo(
+    () => clusters.filter((c) => c.side === side && (effectiveEcon === "all" || c.economyEntry === effectiveEcon)),
+    [clusters, side, effectiveEcon]
+  );
 
   // 双层分组：大分类（打A/打B…）→ 小聚类（具体站位/结构）。
   const groupedClusters = useMemo(() => {
@@ -68,6 +90,29 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
 
   return (
     <div className="stu-pe-shell">
+      <div className="stu-subtabs stu-pe-econ-filter" role="tablist" aria-label="经济入口筛选">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={effectiveEcon === "all"}
+          className={effectiveEcon === "all" ? "stu-subtab stu-subtab-active" : "stu-subtab"}
+          onClick={() => setEcon("all")}
+        >
+          全部
+        </button>
+        {econOptions.map((entry) => (
+          <button
+            key={entry}
+            type="button"
+            role="tab"
+            aria-selected={effectiveEcon === entry}
+            className={effectiveEcon === entry ? "stu-subtab stu-subtab-active" : "stu-subtab"}
+            onClick={() => setEcon(entry)}
+          >
+            {ECONOMY_ENTRY_CN[entry]}
+          </button>
+        ))}
+      </div>
       <div className="stu-subtabs stu-pe-side-toggle" role="tablist" aria-label="进攻/防守视角">
         <button
           type="button"
@@ -110,7 +155,7 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
                     }}
                   >
                     <span className="stu-pe-cluster-name">
-                      {autoName(c)}
+                      {formatTacticalClusterShortName(c)}
                     </span>
                     <span className="stu-pe-cluster-meta">
                       <span>{c.roundCount} 回合</span>
@@ -240,6 +285,8 @@ function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: T
   })();
 
   const isT = cluster.side === "t";
+  // 道具落点（纯展示）：命中目标点的烟/火，按 effect callout 中文名计数。
+  const utilityLanding = isT ? buildUtilityLanding(facts, cluster.mapName) : null;
   const pressureLabels = [...new Map(
     facts.flatMap((fact) => fact.openingPressure).map((event) => [
       `${event.calloutLabel}:${event.kind}`,
@@ -301,8 +348,59 @@ function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: T
           ))}
         </div>
       )}
+      {isT && (
+        <div className="stu-pe-eco">
+          <span className="stu-pe-eco-label">
+            常见进点路线 <MetricInfo note="只统计有真实目标点与进点口判定的回合；进点路线不参与聚类身份" />
+          </span>
+          {cluster.entryEvidence.routes.length > 0 ? cluster.entryEvidence.routes.slice(0, 5).map((route) => (
+            <span key={`${route.site}:${route.combo}`} className="stu-pe-eco-item">
+              {route.site.toUpperCase()} · {formatEntryEvidenceLabel(cluster.mapName, route.site, route.combo)} {route.roundCount} 回合（{route.percentOfCovered.toFixed(1)}%）
+            </span>
+          )) : <span className="stu-pe-eco-item">—</span>}
+          <span className="stu-pe-eco-item">覆盖 {cluster.entryEvidence.coveredRounds}/{cluster.entryEvidence.totalRounds}（{cluster.entryEvidence.coveragePercent.toFixed(1)}%）</span>
+        </div>
+      )}
+      {utilityLanding && (utilityLanding.smoke.length > 0 || utilityLanding.fire.length > 0) && (
+        <div className="stu-pe-eco">
+          <span className="stu-pe-eco-label">
+            目标点道具落点 <MetricInfo note="这些回合中命中目标点的烟与火，按落点 callout 计数（grid 解析，仅展示不参与聚类）；当前事实没有可靠的统一秒制执行窗口，因此不按 tick 猜测过滤" />
+          </span>
+          {utilityLanding.smoke.length > 0 && (
+            <span className="stu-pe-eco-item">烟：{utilityLanding.smoke.map((s) => `${s.cn}×${s.n}`).join(" / ")}</span>
+          )}
+          {utilityLanding.fire.length > 0 && (
+            <span className="stu-pe-eco-item">火：{utilityLanding.fire.map((s) => `${s.cn}×${s.n}`).join(" / ")}</span>
+          )}
+        </div>
+      )}
     </div>
   );
+}
+
+/** 目标点道具落点聚合：不假设 tickrate，只按目标区域与 effect callout 计数。 */
+function buildUtilityLanding(facts: TacticalRoundFact[], mapName: string) {
+  const normType = (t: string): "smoke" | "fire" | "other" => {
+    const s = t.toLowerCase();
+    if (s.includes("smoke")) return "smoke";
+    if (s.includes("molot") || s.includes("incend") || s.includes("fire")) return "fire";
+    return "other";
+  };
+  const tally = { smoke: new Map<string, number>(), fire: new Map<string, number>() };
+  for (const f of facts) {
+    const site = f.targetSite;
+    if (!site) continue;
+    for (const g of f.grenades ?? []) {
+      if (g.targetRegion !== site) continue;
+      const kind = normType(g.type);
+      if (kind === "other") continue;
+      const cn = (g.effectCallout ? calloutCn(mapName, g.effectCallout) : "") || g.effectCallout || "未知";
+      tally[kind].set(cn, (tally[kind].get(cn) ?? 0) + 1);
+    }
+  }
+  const top = (m: Map<string, number>) =>
+    [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([cn, n]) => ({ cn, n }));
+  return { smoke: top(tally.smoke), fire: top(tally.fire) };
 }
 
 function EvidenceTable({

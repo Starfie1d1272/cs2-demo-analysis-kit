@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { autoName, buildTacticalClusters, type TacticalCluster } from "../../lib/tactics.js";
+import { autoName, buildTacticalClusters, withTacticalTeamIdentities, type TacticalCluster } from "../../lib/tactics.js";
 import type { TacticalRoundFact } from "../../lib/facts.js";
 import type { StudioDemoEntry } from "../../lib/library.js";
 import { displayTeamName } from "../../lib/identity.js";
@@ -59,7 +59,7 @@ export function MapPoolTable({ facts, myTeamName, opponentTeamName, teamRenames 
         ? mapFacts.filter((f) => norm(f.teamName, teamRenames) === oppNorm)
         : [];
 
-      const oppClusters = buildTacticalClusters(oppFacts).slice(0, 3);
+      const oppClusters = buildTacticalClusters(withTacticalTeamIdentities(oppFacts, teamRenames)).slice(0, 3);
       const topOppPatterns = oppClusters.map((c) => autoName(c));
 
       return {
