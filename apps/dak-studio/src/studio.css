@@ -3831,25 +3831,30 @@ td.stu-heat-cell.stu-heat-neutral {
 .stu-eb-col {
   display: flex;
   flex-direction: column;
-  gap: 10px;
   min-width: 210px;
   align-self: stretch;
-  justify-content: space-around;
+}
+
+.stu-eb-col-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
 }
 
 .stu-eb-elim {
   align-items: stretch;
 }
 
-.stu-eb-elim-col {
-  justify-content: space-around;
+.stu-eb-elim-col .stu-eb-col-body {
+  justify-content: space-evenly;
 }
 
 .stu-eb-elim-matches {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  justify-content: space-evenly;
   flex: 1;
 }
 

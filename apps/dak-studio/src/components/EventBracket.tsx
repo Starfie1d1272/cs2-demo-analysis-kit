@@ -47,6 +47,7 @@ export function SwissBracket({
       {model.columns.map((col, colIndex) => (
         <div key={`col-${colIndex}-${col.round}`} className="stu-eb-col">
           <div className="stu-eb-col-head">第 {col.round} 轮</div>
+          <div className="stu-eb-col-body">
           {col.groups.map((group) => (
             <div key={`${col.round}-${group.record}`} className="stu-eb-group">
               <div className="stu-eb-group-head">{group.record}</div>
@@ -56,6 +57,7 @@ export function SwissBracket({
               )}
             </div>
           ))}
+          </div>
         </div>
       ))}
       {(model.advanced.length > 0 || model.eliminated.length > 0) && (
@@ -86,7 +88,7 @@ export function ElimBracket({ model, ...handlers }: { model: ElimModel } & CellH
       {model.columns.map((col) => (
         <div key={col.round} className="stu-eb-col stu-eb-elim-col">
           <div className="stu-eb-col-head">{col.label}</div>
-          <div className="stu-eb-elim-matches">
+          <div className="stu-eb-col-body stu-eb-elim-matches">
             {col.matches.map((cell) => <MatchBox key={cell.key} cell={cell} {...handlers} />)}
           </div>
         </div>
