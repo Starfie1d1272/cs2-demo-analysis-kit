@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { deleteEventRecord, listEventRecords, type StudioEventRecord } from "../lib/events";
-import type { StudioDemoEntry } from "../lib/library";
+import { removeDemos, type StudioDemoEntry } from "../lib/library";
 import { BROWSER_EVENT_PACKAGE_LIMIT, downloadAndImportEvent, importEventAssetFile, loadEventsManifest, pickAndImportEventAsset, supportsNativeEventImport } from "../lib/event-assets";
 import type { EventsManifest } from "@cs2dak/contract";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
@@ -80,10 +80,25 @@ export function EventManager({
               <td>{event.seriesIds.length}</td>
               <td>{(() => { const rows = series.filter((row) => row.eventId === event.id); const total = rows.reduce((sum, row) => sum + (row.mapAssignments?.length ?? row.entryIds.length), 0); const linked = rows.reduce((sum, row) => sum + (row.mapAssignments?.filter((map) => map.entryId).length ?? row.entryIds.length), 0); return `${linked}/${total} 图`; })()}</td>
               <td>{event.source}{event.readOnly ? " · 只读" : ""}</td>
-              <td><button type="button" className="stu-button-sm" onClick={() => {
-                if (!window.confirm(`移除赛事「${event.name}」及其系列赛组织记录？原始 ZIP 不会删除。`)) return;
-                void deleteEventRecord(event).then(async () => { setEvents(await listEventRecords()); setSeries(await listSeriesRecords()); onNotice(`已移除赛事「${event.name}」；原始 ZIP 保留`); });
-              }}>移除</button></td>
+              <td>
+                <button type="button" className="stu-button-sm" onClick={() => {
+                  if (!window.confirm(`移除赛事「${event.name}」？demo 档案保留在资料库。`)) return;
+                  void deleteEventRecord(event).then(async () => { setEvents(await listEventRecords()); setSeries(await listSeriesRecords()); onNotice(`已移除赛事「${event.name}」`); });
+                }}>移除赛事</button>
+                {" "}
+                <button type="button" className="stu-button-sm" onClick={() => {
+                  const entryIds = [...new Set(series.filter((row) => row.eventId === event.id).flatMap((row) => row.entryIds))];
+                  if (entryIds.length === 0) { onNotice("该赛事无关联 demo，无需删除档案"); return; }
+                  if (!window.confirm(`删除赛事「${event.name}」及其全部 ${entryIds.length} 场 demo 档案？此操作不可撤销。`)) return;
+                  void deleteEventRecord(event).then(async () => {
+                    await removeDemos(entryIds, (done, total) => onNotice(`删除档案 ${done}/${total}…`));
+                    onLibraryChanged?.(entries.filter((e) => !new Set(entryIds).has(e.id)));
+                    setEvents(await listEventRecords());
+                    setSeries(await listSeriesRecords());
+                    onNotice(`已删除赛事「${event.name}」及 ${entryIds.length} 场 demo`);
+                  });
+                }}>连带档案</button>
+              </td>
             </tr>
           ))}</tbody>
         </table>

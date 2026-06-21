@@ -3833,7 +3833,8 @@ td.stu-heat-cell.stu-heat-neutral {
   flex-direction: column;
   gap: 10px;
   min-width: 210px;
-  justify-content: center;
+  align-self: stretch;
+  justify-content: space-around;
 }
 
 .stu-eb-elim {
@@ -3841,7 +3842,7 @@ td.stu-heat-cell.stu-heat-neutral {
 }
 
 .stu-eb-elim-col {
-  justify-content: center;
+  justify-content: space-around;
 }
 
 .stu-eb-elim-matches {
