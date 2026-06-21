@@ -45,7 +45,7 @@ function normalizeEntry(entry: StudioDemoEntry): StudioDemoEntry {
     importedAt: entry.importedAt,
     tags: entry.tags ?? [],
     sourceDemPath: entry.sourceDemPath ?? null,
-    meta: { ...entry.meta, serverName: entry.meta.serverName ?? null }
+    meta: { ...entry.meta, serverName: entry.meta.serverName ?? null, matchDate: entry.meta.matchDate ?? null }
   };
 }
 
@@ -90,7 +90,7 @@ export function matchDateFromFileName(fileName: string): string | null {
 
 /** 格式化为可读的比赛标签："de_mirage · 2025-03-15 · FURIA 13:9 Vitality"。消除多处的重复拼接。 */
 export function formatMatchLabel(entry: StudioDemoEntry): string {
-  const date = matchDateFromFileName(entry.fileName);
+  const date = matchDateFromFileName(entry.fileName) ?? entry.meta.matchDate ?? null;
   return [
     entry.meta.mapName,
     date,
@@ -258,6 +258,8 @@ export interface ImportDemoOptions {
   replaceId?: string;
   /** 批量赛事导入使用：不保留 worker 回退副本，峰值限制为单图。 */
   lowMemory?: boolean;
+  /** 比赛日期（YYYY-MM-DD）；事件包导入时由 series.completedAt 传入。 */
+  matchDate?: string | null;
 }
 
 /**
@@ -265,7 +267,7 @@ export interface ImportDemoOptions {
  * 解析失败抛错（带文件名）。
  */
 export async function importDemoFile(file: File, options: ImportDemoOptions | string[] = []): Promise<ImportResult> {
-  const { tags = [], sourceDemPath = null, replaceId, lowMemory = false } = Array.isArray(options) ? { tags: options } : options;
+  const { tags = [], sourceDemPath = null, replaceId, lowMemory = false, matchDate = null } = Array.isArray(options) ? { tags: options } : options;
   let buffer = await file.arrayBuffer();
   const id = await sha256Hex(buffer);
 
@@ -292,7 +294,7 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     importedAt: Date.now(),
     tags: normalizeTags(tags),
     sourceDemPath,
-    meta: pkgMeta
+    meta: matchDate ? { ...pkgMeta, matchDate } : pkgMeta,
   };
   if (replacement) {
     entry.tags = normalizeTags([...(replacement.tags ?? []), ...entry.tags]);

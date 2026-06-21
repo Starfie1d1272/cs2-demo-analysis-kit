@@ -22,6 +22,7 @@ function entry(id: string, mapName: string): StudioDemoEntry {
       hasReplay: true,
       source: "test",
       serverName: null,
+      matchDate: null,
     },
   };
 }

@@ -21,7 +21,8 @@ function entry(id: string, date: string, teamAName: string, teamBName: string): 
       playerCount: 10,
       hasReplay: true,
       source: "test",
-      serverName: null
+      serverName: null,
+      matchDate: null
     }
   };
 }

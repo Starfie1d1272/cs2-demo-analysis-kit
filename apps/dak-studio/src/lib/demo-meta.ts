@@ -17,6 +17,8 @@ export interface DemoMeta {
   source: string;
   /** 服务器名（来自 cs2-demo-format match.serverName）；旧条目/无值为 null。 */
   serverName: string | null;
+  /** 比赛日期（YYYY-MM-DD）；从事件包导入时由 series.completedAt 传入，fallback 给 matchDateFromFileName。 */
+  matchDate: string | null;
 }
 
 export function metaFromPackage(pkg: DemoPackage): DemoMeta {
@@ -31,6 +33,7 @@ export function metaFromPackage(pkg: DemoPackage): DemoMeta {
     playerCount: pkg.players.length,
     hasReplay: Boolean(pkg.replay),
     source: pkg.match.source,
-    serverName: pkg.match.serverName ?? null
+    serverName: pkg.match.serverName ?? null,
+    matchDate: null,
   };
 }

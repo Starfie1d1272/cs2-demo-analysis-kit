@@ -98,6 +98,10 @@ export async function importEventAssetArchive(
   const packageFile = archive.file("event-package.json");
   if (!packageFile) throw new Error("赛事资源包缺少 event-package.json（请确认导入的是 <slug>.zip 资源包，而非裸 JSON）");
   const eventPackage = eventPackageSchema.parse(JSON.parse(await packageFile.async("string")));
+  const demoDateByFileName = new Map(eventPackage.series.flatMap((series) => {
+    const date = series.completedAt ? String(series.completedAt).slice(0, 10) : null;
+    return series.maps.filter((map) => map.demoHint?.fileName).map((map) => [map.demoHint!.fileName!, date] as const);
+  }));
   const entries = [...existingEntries];
   const errors: string[] = [];
   let cancelled = false;
@@ -106,11 +110,13 @@ export async function importEventAssetArchive(
     .sort((a, b) => a.name.localeCompare(b.name));
   for (const [index, demo] of demoFiles.entries()) {
     if (progress.isCancelled?.()) { cancelled = true; break; }
-    progress.onProgress?.(`浏览器降级导入第 ${index + 1}/${demoFiles.length} 图：${demo.name.split("/").at(-1)}`);
+    const innerName = demo.name.split("/").at(-1)!;
+    progress.onProgress?.(`浏览器降级导入第 ${index + 1}/${demoFiles.length} 图：${innerName}`);
     try {
       const data = await demo.async("arraybuffer");
-      const imported = await importDemoFile(new File([data], demo.name.split("/").at(-1)!, { type: "application/zip" }), {
+      const imported = await importDemoFile(new File([data], innerName, { type: "application/zip" }), {
         tags: [eventPackage.event?.slug ?? fallbackSlug ?? "event"], lowMemory: true,
+        matchDate: demoDateByFileName.get(innerName) ?? null,
       });
       if (!entries.some((entry) => entry.id === imported.entry.id)) entries.push(imported.entry);
     } catch (error) {
@@ -152,6 +158,10 @@ async function importNativeOpened(
   if (!opened.ok || !opened.sessionId || !opened.eventPackage) throw new Error(opened.error ?? "赛事包打开失败");
   try {
     const eventPackage = eventPackageSchema.parse(opened.eventPackage);
+    const demoDateByFileName = new Map(eventPackage.series.flatMap((series) => {
+      const date = series.completedAt ? String(series.completedAt).slice(0, 10) : null;
+      return series.maps.filter((map) => map.demoHint?.fileName).map((map) => [map.demoHint!.fileName!, date] as const);
+    }));
     const entries = [...existingEntries];
     const maps = opened.maps ?? [];
     const errors: string[] = [];
@@ -173,6 +183,7 @@ async function importNativeOpened(
         const name = map.name.split("/").at(-1)!;
         const imported = await importDemoFile(new File(parts as BlobPart[], name, { type: "application/zip" }), {
           tags: [eventPackage.event.slug], lowMemory: true,
+          matchDate: demoDateByFileName.get(name) ?? null,
         });
         if (!entries.some((entry) => entry.id === imported.entry.id)) entries.push(imported.entry);
         parts.length = 0;
