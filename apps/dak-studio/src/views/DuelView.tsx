@@ -212,9 +212,22 @@ function PlayerMechanicsGrid({
       .sort((a, b) => b.duels.length - a.duels.length || a.name.localeCompare(b.name));
   }, [rows, duelRows]);
 
+  const MECHANICS_PAGE_SIZE = 12;
+  const [mechPage, setMechPage] = useState(0);
+  const mechTotalPages = Math.max(1, Math.ceil(grouped.length / MECHANICS_PAGE_SIZE));
+  const mechSafePage = Math.min(mechPage, mechTotalPages - 1);
+  const pagePlayers = grouped.slice(mechSafePage * MECHANICS_PAGE_SIZE, (mechSafePage + 1) * MECHANICS_PAGE_SIZE);
+
   return (
-    <section className="stu-duel-player-grid">
-      {grouped.slice(0, 12).map((player) => {
+    <section className="stu-duel-player-grid-section">
+      <Pagination
+        page={mechSafePage}
+        totalPages={mechTotalPages}
+        onChange={setMechPage}
+        info={`${grouped.length} 人 · ${mechSafePage + 1}/${mechTotalPages} 页`}
+      />
+      <div className="stu-duel-player-grid">
+      {pagePlayers.map((player) => {
         const topWeapon = [...player.rows].sort((a, b) => b.killCount - a.killCount || b.shotCount - a.shotCount)[0];
         const contested = player.duels.filter((duel) => duel.classification === "contested_duel").length;
         const suppressed = player.duels.filter((duel) => duel.classification === "suppressed_kill").length;
@@ -225,7 +238,10 @@ function PlayerMechanicsGrid({
                 <h3>{player.name}</h3>
                 <span>{displayTeamName(player.teamName, teamRenames)}</span>
               </div>
-              <b>{player.duels.length}</b>
+              <div className="stu-duel-kill-count">
+                <b>{player.duels.length}</b>
+                <small>击杀</small>
+              </div>
             </header>
             <div className="stu-duel-card-stats">
               <MetricPill label="主武器" value={topWeapon ? displayWeaponName(topWeapon.weapon) : "—"} />
@@ -248,6 +264,7 @@ function PlayerMechanicsGrid({
           </article>
         );
       })}
+      </div>
     </section>
   );
 }

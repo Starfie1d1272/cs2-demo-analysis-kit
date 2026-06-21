@@ -2753,11 +2753,14 @@ td.stu-heat-cell.stu-heat-neutral {
   line-height: 1;
 }
 
+.stu-duel-player-grid-section {
+  margin-top: 14px;
+}
+
 .stu-duel-player-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 12px;
-  margin-top: 14px;
 }
 
 .stu-duel-player-card {
@@ -2794,6 +2797,18 @@ td.stu-heat-cell.stu-heat-neutral {
   background: color-mix(in srgb, var(--dak-accent) 18%, transparent);
   color: var(--dak-fg);
   font-size: 16px;
+}
+
+.stu-duel-kill-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.stu-duel-kill-count small {
+  color: var(--dak-fg-dim);
+  font-size: 10px;
 }
 
 .stu-duel-card-stats {
