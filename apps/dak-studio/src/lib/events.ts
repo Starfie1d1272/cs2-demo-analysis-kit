@@ -55,13 +55,17 @@ export async function importEventPackage(input: unknown, entries: StudioDemoEntr
     const assignments = [...external.maps]
       .sort((a, b) => a.order - b.order)
       .map((map) => {
-        const matched = candidates.find((entry) =>
-          !used.has(entry.id) && (
-            (map.demoHint?.sha256 && entry.id === map.demoHint.sha256) ||
-            (map.demoHint?.fileName && entry.fileName === map.demoHint.fileName) ||
-            entry.meta.mapName === map.mapName
-          ),
-        ) ?? null;
+        // sha256 / fileName 全局唯一 → 优先全局匹配，不被 demo 内嵌队名与包内队名的拼写差异挡住
+        // （如 demo "Team Liquid"/"BetBoom Team" vs 包 "Liquid"/"BetBoom"）；无 hint 命中再按同队伍 + 地图兜底。
+        const matched =
+          entries.find((entry) =>
+            !used.has(entry.id) && (
+              (map.demoHint?.sha256 && entry.id === map.demoHint.sha256) ||
+              (map.demoHint?.fileName && entry.fileName === map.demoHint.fileName)
+            ),
+          ) ??
+          candidates.find((entry) => !used.has(entry.id) && entry.meta.mapName === map.mapName) ??
+          null;
         if (matched) {
           used.add(matched.id);
           matchedMaps += 1;

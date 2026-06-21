@@ -45,4 +45,26 @@ describe("importEventPackage", () => {
     expect(result.matchedMaps).toBe(1);
     expect(result.missingMaps).toBe(1);
   });
+
+  it("按 sha256 全局匹配，不被 demo 与包的队名拼写差异（Team Liquid vs Liquid）挡住", async () => {
+    // demo 内嵌队名是 "Team Liquid"，包内队名是 "Liquid"：sameTeams 不相等，但 sha256 一致应命中。
+    const demo = entry("hash-xyz", "de_nuke");
+    demo.meta.teamAName = "Team Liquid";
+    demo.meta.teamBName = "BIG";
+    const result = await importEventPackage({
+      version: "cs2-demo-analysis-kit/event-package-1.0",
+      source: "manual",
+      exportedAt: "2026-06-20T00:00:00Z",
+      event: { slug: "ev2", name: "Ev2", kind: "major", stages: [{ key: "s", name: "瑞士轮", type: "swiss", teamCount: 16, advanceCount: 8 }] },
+      teams: [{ key: "liquid", name: "Liquid", players: [] }, { key: "big", name: "BIG", players: [] }],
+      series: [{
+        key: "s1", stage: "s", round: 1, format: "bo1", teamAKey: "liquid", teamBKey: "big",
+        maps: [{ order: 1, mapName: "de_nuke", demoHint: { fileName: "x.zip", sha256: "hash-xyz" } }],
+      }],
+    }, [demo]);
+
+    expect(result.matchedMaps).toBe(1);
+    expect(result.missingMaps).toBe(0);
+    expect(result.series[0]?.entryIds).toEqual(["hash-xyz"]);
+  });
 });
