@@ -303,10 +303,13 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
 
   if (existing) {
     const mergedTags = normalizeTags([...(existing.tags ?? []), ...entry.tags]);
+    // 重复导入时合并 matchDate：已有不覆盖，没有则从新 entry 补（事件包回填日期）
+    const mergedMeta = existing.meta.matchDate ? existing.meta : { ...existing.meta, matchDate: entry.meta.matchDate ?? null };
     const mergedEntry: StudioDemoEntry = {
       ...existing,
       tags: mergedTags,
-      sourceDemPath: sourceDemPath ?? existing.sourceDemPath ?? null
+      sourceDemPath: sourceDemPath ?? existing.sourceDemPath ?? null,
+      meta: mergedMeta,
     };
     await meta.put(id, mergedEntry);
     await persistFacts(facts);
