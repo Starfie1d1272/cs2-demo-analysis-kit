@@ -1,5 +1,6 @@
 import { loadDemoPackageFromZip } from "@cs2dak/core";
-import type { DemoPackage } from "@cs2dak/contract";
+import { buildMatchWorkspaceModel } from "@cs2dak/presentation";
+import type { DemoPackage, MatchWorkspaceModel } from "@cs2dak/contract";
 import { extractMatchFacts, getFactsStore, type MatchFacts } from "./facts";
 import { CALLOUT_GRID_URLS, loadStudioCalloutGrid } from "./callout-grid";
 import { metaFromPackage, type DemoMeta } from "./demo-meta";
@@ -402,6 +403,15 @@ export function getDemoPackage(id: string): Promise<DemoPackage> {
   pkgCache.set(id, loading);
   loading.catch(() => pkgCache.delete(id));
   return loading;
+}
+
+/**
+ * 单场工作台 model 懒算：从 ZIP 重建 pkg 再构 workspace。
+ * 不在导入时持久化（workspace model 单场 ~35MB，整包全量分析，是导入内存/耗时大头），
+ * 只在打开该场工作台/教练回放时按需构建——与 getDemoPackage 同款懒加载策略。
+ */
+export async function loadMatchWorkspaceModel(demoId: string): Promise<MatchWorkspaceModel> {
+  return buildMatchWorkspaceModel(await getDemoPackage(demoId));
 }
 
 /** 批量替换资料库中所有匹配 originalName 的队伍名为 displayName。 */

@@ -6,7 +6,7 @@ import { calloutCn } from "@cs2dak/maps";
 import type { EconomyEntry } from "@cs2dak/cohort";
 import { autoName, type TacticalCluster } from "../../lib/tactics.js";
 import { getFactsStore, type TacticalRoundFact } from "../../lib/facts.js";
-import type { StudioDemoEntry } from "../../lib/library.js";
+import { loadMatchWorkspaceModel, type StudioDemoEntry } from "../../lib/library.js";
 import { MetricInfo } from "../../components/primitives.js";
 
 export interface PatternExplorerProps {
@@ -194,13 +194,15 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
 }
 
 
-async function loadReplayModel(matchId: string, cache: Map<string, MatchWorkspaceModel>): Promise<MatchWorkspaceModel> {
+async function loadReplayModel(matchId: string, demoId: string | null, cache: Map<string, MatchWorkspaceModel>): Promise<MatchWorkspaceModel> {
   const cached = cache.get(matchId);
   if (cached) return cached;
+  // 旧库可能仍有持久化 workspace；新导入不再持久化，按 demo id 从 ZIP 懒算。
   const stored = await getFactsStore().getMatchWorkspace(matchId);
-  if (!stored) throw new Error("本场没有本地持久化回放，请重新导入或重建该场。");
-  cache.set(matchId, stored.row);
-  return stored.row;
+  const model = stored?.row ?? (demoId ? await loadMatchWorkspaceModel(demoId) : null);
+  if (!model) throw new Error("本场没有可用回放，请重新导入或重建该场。");
+  cache.set(matchId, model);
+  return model;
 }
 
 function replayTargetSeq(matchId: string, roundNumber: number): number {
@@ -232,11 +234,11 @@ function CoachReplayStage({ fact, entryByMatchId, cache }: {
     }
     const nextCached = cache.get(matchId);
     setLoaded(nextCached ? { matchId, model: nextCached } : null);
-    loadReplayModel(matchId, cache)
+    loadReplayModel(matchId, entryByMatchId.get(matchId)?.id ?? null, cache)
       .then((nextModel) => { if (!cancelled) setLoaded({ matchId, model: nextModel }); })
       .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)); });
     return () => { cancelled = true; };
-  }, [matchId, cache]);
+  }, [matchId, cache, entryByMatchId]);
 
   if (!fact) return <div className="stu-pe-replay-main stu-pe-radar-empty">该模式没有可用证据回合。</div>;
   const entry = entryByMatchId.get(fact.matchId);

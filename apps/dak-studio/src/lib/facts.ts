@@ -14,7 +14,6 @@ import type { TriangleBvh, CalloutGrid, Vec3 } from "@cs2dak/maps";
 import type { LineupGrenadeLike } from "@cs2dak/maps";
 import { calloutNear } from "@cs2dak/maps";
 import {
-  buildMatchWorkspaceModel,
   buildOpeningTrails,
   buildPlayerMechanicsProfileFromRows,
   buildPlayerSeasonInsights,
@@ -180,8 +179,8 @@ export interface FactsStore {
   getTournamentFacts(scope?: FactsScope): Promise<TournamentFacts[]>;
   getTeamComparisonFacts(scope?: FactsScope): Promise<TeamComparisonFacts[]>;
   getDuelFacts(scope?: FactsScope): Promise<DuelInsightsFacts[]>;
+  /** 单场 workspace：仅读旧库残留（新导入不再持久化，由 loadMatchWorkspaceModel 懒算）。 */
   getMatchWorkspace(matchId: string): Promise<MatchWorkspaceFact | null>;
-  getMatchWorkspaces(scope?: FactsScope): Promise<MatchWorkspaceFact[]>;
   getOpeningTrails(scope?: FactsScope): Promise<OpeningTrailFact[]>;
   getLineups(scope?: FactsScope): Promise<LineupFact[]>;
   getTacticalRounds(scope?: FactsScope): Promise<TacticalRoundFact[]>;
@@ -389,7 +388,6 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
   const visibilityFor = options.visibilityFor?.(mapName) ?? null;
   const calloutGrid = options.calloutGrid ?? null;
   const input = { matchId: options.matchId, pkg };
-  const matchWorkspace = buildMatchWorkspaceModel(pkg);
   const openingTrails = pkg.players.map((player) => ({    matchId: options.matchId,
     mapName,
     playerKey: playerKeyFor(player),
@@ -416,10 +414,9 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
       mapName,
       row: extractDuelInsightsFacts(input, { visibilityFor: () => visibilityFor })
     }],
-    matchWorkspace: [{      matchId: options.matchId,
-      mapName,
-      row: matchWorkspace
-    }],
+    // workspace model 不再随导入持久化（单场 ~35MB、整包全量分析，是导入内存/耗时大头）；
+    // 打开单场工作台/教练回放时由 loadMatchWorkspaceModel 从 ZIP 懒算。
+    matchWorkspace: [],
     openingTrails,
     lineups: [extractLineupFact(pkg, options.matchId, calloutGrid)],
     tacticalRounds: extractTacticalRoundFacts(pkg, { matchId: options.matchId, calloutGrid })
@@ -595,11 +592,6 @@ export function createFactsStore(adapter: StorageAdapter, namespace = "facts"): 
     },
     async getMatchWorkspace(matchId) {
       return (await matchWorkspace.get<MatchWorkspaceFact>(matchId)) ?? null;
-    },
-    async getMatchWorkspaces(scope) {
-      return (await matchWorkspace.getAll<MatchWorkspaceFact>())
-        .filter((row) => inScope(row, scope))
-        .sort((a, b) => a.matchId.localeCompare(b.matchId));
     },
     async getOpeningTrails(scope) {
       return (await openingTrails.getAll<OpeningTrailFact>())

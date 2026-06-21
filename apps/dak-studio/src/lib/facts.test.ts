@@ -193,22 +193,14 @@ describe("MatchFacts", () => {
     expect(rows[0]?.openingPattern.coarseSignature).toBeTruthy();
   });
 
-  it("单场 workspace 按 matchId 直读，不扫描全部大型回放记录", async () => {
+  it("workspace 不随导入持久化（单场 ~35MB、整包全量分析的导入大头），改为打开时懒算", async () => {
     const pkg = await loadFixture();
-    const adapter = createIdbAdapter();
-    const namespace = "facts-direct-workspace";
-    const store = createFactsStore(adapter, namespace);
-    await store.putMatchFacts(extractMatchFacts(pkg, { matchId: "m1" }));
-
-    const workspaceRecords = adapter.records(`${namespace}:match_workspace`);
-    workspaceRecords.getAll = async () => {
-      throw new Error("不应扫描全部 workspace");
-    };
-
-    const row = await store.getMatchWorkspace("m1");
-    expect(row?.matchId).toBe("m1");
-    expect(row?.row.replay.available).toBe(true);
-    expect(await store.getMatchWorkspace("missing")).toBeNull();
+    const store = createFactsStore(createIdbAdapter(), "facts-no-workspace");
+    const facts = extractMatchFacts(pkg, { matchId: "m1" });
+    expect(facts.matchWorkspace).toEqual([]);
+    await store.putMatchFacts(facts);
+    // 导入不再写 workspace，直读返回 null；视图改用 loadMatchWorkspaceModel 从 ZIP 懒算。
+    expect(await store.getMatchWorkspace("m1")).toBeNull();
   });
 
   it("replaceRows：删除一场只动该场，另一场完整保留（key 前缀删除，不全量反序列化）", async () => {
@@ -218,17 +210,14 @@ describe("MatchFacts", () => {
     await store.putMatchFacts(extractMatchFacts(pkg, { matchId: "m2" }));
 
     // 两场并存
-    expect((await store.getMatchWorkspaces({ matchIds: ["m1"] })).length).toBe(1);
-    expect((await store.getMatchWorkspaces({ matchIds: ["m2"] })).length).toBe(1);
     const m2Tactical = (await store.getTacticalRounds({ matchIds: ["m2"] })).length;
     expect(m2Tactical).toBeGreaterThan(0);
+    expect((await store.getPlayerMatchStats({ matchIds: ["m1"] })).length).toBeGreaterThan(0);
 
     // 删除 m1：m1 全部清空，m2 不受影响
     await store.deleteMatchFacts("m1");
-    expect((await store.getMatchWorkspaces({ matchIds: ["m1"] })).length).toBe(0);
     expect((await store.getTacticalRounds({ matchIds: ["m1"] })).length).toBe(0);
     expect((await store.getPlayerMatchStats({ matchIds: ["m1"] })).length).toBe(0);
-    expect((await store.getMatchWorkspaces({ matchIds: ["m2"] })).length).toBe(1);
     expect((await store.getTacticalRounds({ matchIds: ["m2"] })).length).toBe(m2Tactical);
   });
 
@@ -239,6 +228,5 @@ describe("MatchFacts", () => {
     await store.putMatchFacts(facts);
     await store.putMatchFacts(facts);
     expect((await store.getTacticalRounds({ matchIds: ["m1"] })).length).toBe(facts.tacticalRounds.length);
-    expect((await store.getMatchWorkspaces({ matchIds: ["m1"] })).length).toBe(1);
   });
 });

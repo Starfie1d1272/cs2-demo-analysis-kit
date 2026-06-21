@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { buildSeriesSummary } from "@cs2dak/presentation";
 import type { MatchWorkspaceModel, SeriesSummary } from "@cs2dak/contract";
 import { MatchWorkspace, QaReportPanel } from "@cs2dak/react";
-import { matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { loadMatchWorkspaceModel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getFactsStore } from "../lib/facts";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import { EmptyState } from "../components/primitives";
@@ -22,13 +22,11 @@ const modelCache = new Map<string, MatchWorkspaceModel>();
 async function loadModel(id: string, matchId: string): Promise<MatchWorkspaceModel> {
   const cached = modelCache.get(id);
   if (cached) return cached;
-  const factsStore = getFactsStore();
-  const stored = await factsStore.getMatchWorkspace(matchId);
-  if (stored) {
-    modelCache.set(id, stored.row);
-    return stored.row;
-  }
-  throw new Error("本场还没有本地持久化 workspace facts，请重新导入或执行 facts 回填后再打开。");
+  // 旧库可能仍有持久化 workspace（向后兼容直接用）；新导入不再持久化，按需从 ZIP 懒算。
+  const stored = await getFactsStore().getMatchWorkspace(matchId);
+  const model = stored?.row ?? (await loadMatchWorkspaceModel(id));
+  modelCache.set(id, model);
+  return model;
 }
 
 export function MatchView({ entries, demoId, deepLink, onSelectDemo, onGoLibrary }: MatchViewProps) {

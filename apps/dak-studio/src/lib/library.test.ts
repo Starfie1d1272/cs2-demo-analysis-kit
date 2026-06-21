@@ -25,7 +25,7 @@ describe("importDemoFile", () => {
     const duplicate = await importDemoFile(await sampleFile(), { tags: ["reimport"] });
 
     expect(duplicate.duplicate).toBe(true);
-    expect(await factsStore.getMatchWorkspaces({ matchIds: [matchId] })).toHaveLength(1);
     expect(await factsStore.getCohortRows({ matchIds: [matchId] })).not.toHaveLength(0);
+    expect(await factsStore.getTacticalRounds({ matchIds: [matchId] })).not.toHaveLength(0);
   });
 });
