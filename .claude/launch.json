@@ -12,6 +12,13 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev:studio"],
       "port": 5178
+    },
+    {
+      "name": "dak-studio-verify",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@cs2dak/dak-studio", "dev", "--", "--port", "5179", "--strictPort"],
+      "port": 5179,
+      "autoPort": false
     }
   ]
 }

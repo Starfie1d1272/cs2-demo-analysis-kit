@@ -3823,7 +3823,7 @@ td.stu-heat-cell.stu-heat-neutral {
 .stu-eb {
   display: flex;
   gap: 18px;
-  align-items: flex-start;
+  align-items: stretch;
   overflow-x: auto;
   padding: 6px 2px 12px;
 }
