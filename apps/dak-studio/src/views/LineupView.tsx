@@ -240,7 +240,10 @@ export function LineupView({
   const safePage = Math.min(page, totalPages - 1);
   const pageRows = sideFilteredRows.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
   const calibration = getMapCalibration(current.mapName);
-  const radarRows = current.rows.slice(0, radarTopN);
+  const radarSideFiltered = sideFilter
+    ? current.rows.filter((r) => r.side === sideFilter)
+    : current.rows;
+  const radarRows = radarSideFiltered.slice(0, radarTopN);
   const selectedCluster = hoveredId ? current.rows.find((cluster) => cluster.id === hoveredId) : undefined;
   const radarClusters = selectedCluster && !radarRows.some((cluster) => cluster.id === selectedCluster.id)
     ? [...radarRows, selectedCluster]
@@ -301,6 +304,36 @@ export function LineupView({
             ))}
           </div>
         )}
+
+        <div className="stu-chip-row" role="tablist" aria-label="阵营筛选" style={{ marginTop: 8 }}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={sideFilter === null}
+            className={sideFilter === null ? "stu-chip stu-chip-active" : "stu-chip"}
+            onClick={() => { setSideFilter(null); setPage(0); }}
+          >
+            全部
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={sideFilter === "t"}
+            className={sideFilter === "t" ? "stu-chip stu-chip-active" : "stu-chip"}
+            onClick={() => { setSideFilter("t"); setPage(0); }}
+          >
+            T · {current.rows.filter((r) => r.side === "t").length}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={sideFilter === "ct"}
+            className={sideFilter === "ct" ? "stu-chip stu-chip-active" : "stu-chip"}
+            onClick={() => { setSideFilter("ct"); setPage(0); }}
+          >
+            CT · {current.rows.filter((r) => r.side === "ct").length}
+          </button>
+        </div>
 
         <div className="stu-chip-row stu-lineup-topn" role="radiogroup" aria-label="雷达显示数量">
           {TOP_N_OPTIONS.map((value) => (
@@ -407,37 +440,6 @@ export function LineupView({
         ) : (
           <p className="stu-muted">{current.mapName} 缺少雷达标定，仅显示列表。</p>
         )}
-      </div>
-
-      {/* ── 阵营筛选 Tabs ────────────────────────────────────────────── */}
-      <div className="stu-chip-row" role="tablist" aria-label="阵营筛选">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={sideFilter === null}
-          className={sideFilter === null ? "stu-chip stu-chip-active" : "stu-chip"}
-          onClick={() => { setSideFilter(null); setPage(0); }}
-        >
-          全部
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={sideFilter === "t"}
-          className={sideFilter === "t" ? "stu-chip stu-chip-active" : "stu-chip"}
-          onClick={() => { setSideFilter("t"); setPage(0); }}
-        >
-          T · {current.rows.filter((r) => r.side === "t").length}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={sideFilter === "ct"}
-          className={sideFilter === "ct" ? "stu-chip stu-chip-active" : "stu-chip"}
-          onClick={() => { setSideFilter("ct"); setPage(0); }}
-        >
-          CT · {current.rows.filter((r) => r.side === "ct").length}
-        </button>
       </div>
 
       {/* ── 表格 + 分页 ──────────────────────────────────────────────── */}
