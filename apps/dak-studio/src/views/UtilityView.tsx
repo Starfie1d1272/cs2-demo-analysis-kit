@@ -3,6 +3,7 @@ import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState, EvidenceLink } from "../components/primitives";
 import { getPlayerFlashSummaries, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { formatMatchLabel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { Pagination } from "../components/Pagination";
 import { LineupView } from "./LineupView";
 
 export interface UtilityViewProps {
@@ -34,6 +35,32 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
     totalSeconds: number;
   }[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<"netSecondsPerFlash" | "flashesThrown" | "enemyBlindSeconds" | "teamBlindSeconds">("netSecondsPerFlash");
+  const [sortDesc, setSortDesc] = useState(true);
+  const [page, setPage] = useState(0);
+  const FLASH_PAGE_SIZE = 15;
+
+  function handleSort(key: typeof sortKey) {
+    if (sortKey === key) setSortDesc((d) => !d);
+    else { setSortKey(key); setSortDesc(true); }
+    setPage(0);
+  }
+
+  // ── 排序 + 分页 ──────────────────────────────────────────────────────────
+  const sortedRows = useMemo(() => {
+    if (!rows) return [];
+    return [...rows].sort((a, b) => {
+      const dir = sortDesc ? 1 : -1;
+      const va = a[sortKey] ?? -999;
+      const vb = b[sortKey] ?? -999;
+      return (vb - va) * dir;
+    });
+  }, [rows, sortKey, sortDesc]);
+
+  const flashTotalPages = Math.max(1, Math.ceil(sortedRows.length / FLASH_PAGE_SIZE));
+  const flashSafePage = Math.min(page, flashTotalPages - 1);
+  const pageRows = sortedRows.slice(flashSafePage * FLASH_PAGE_SIZE, (flashSafePage + 1) * FLASH_PAGE_SIZE);
+
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
 
   useEffect(() => {
@@ -114,10 +141,32 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
       {rows && (
         <div className="stu-card">
           <h3>Flash Value 排行</h3>
+          <Pagination
+            page={flashSafePage}
+            totalPages={flashTotalPages}
+            onChange={setPage}
+            info={`${sortedRows.length} 人 · ${flashSafePage + 1}/${flashTotalPages} 页`}
+          />
           <table className="stu-mini-table">
-            <thead><tr><th>选手</th><th className="stu-num">闪光</th><th className="stu-num">致盲敌方</th><th className="stu-num">致盲队友</th><th className="stu-num">净值/颗</th></tr></thead>
+            <thead>
+              <tr>
+                <th>选手</th>
+                <th className="stu-num stu-col-sortable" onClick={() => handleSort("flashesThrown")}>
+                  闪光{sortKey === "flashesThrown" ? (sortDesc ? " ↓" : " ↑") : ""}
+                </th>
+                <th className="stu-num stu-col-sortable" onClick={() => handleSort("enemyBlindSeconds")}>
+                  致盲敌方{sortKey === "enemyBlindSeconds" ? (sortDesc ? " ↓" : " ↑") : ""}
+                </th>
+                <th className="stu-num stu-col-sortable" onClick={() => handleSort("teamBlindSeconds")}>
+                  致盲队友{sortKey === "teamBlindSeconds" ? (sortDesc ? " ↓" : " ↑") : ""}
+                </th>
+                <th className="stu-num stu-col-sortable" onClick={() => handleSort("netSecondsPerFlash")}>
+                  净值/颗{sortKey === "netSecondsPerFlash" ? (sortDesc ? " ↓" : " ↑") : ""}
+                </th>
+              </tr>
+            </thead>
             <tbody>
-              {rows.slice(0, 12).map((row) => (
+              {pageRows.map((row) => (
                 <tr key={row.playerKey}>
                   <td>{row.name}</td>
                   <td className="stu-num">{row.flashesThrown}</td>
