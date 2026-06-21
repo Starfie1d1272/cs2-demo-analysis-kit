@@ -1,3 +1,5 @@
+import { getPrimaryCalloutRegion } from "./callout-names.js";
+
 export type SiteTarget = "a" | "b";
 export type SiteEntryKind = "canonical" | "split" | "deep_wrap";
 
@@ -98,6 +100,7 @@ export const SITE_ENTRY_SEMANTICS: Record<string, MapSiteSemantics> = {
       entry("a_hut", "a", ["Hut"]),
       entry("a_mini", "a", ["Mini"]),
       entry("a_squeaky", "a", ["Squeaky"]),
+      entry("a_vents", "a", ["Vents"], "deep_wrap"),
       entry("a_heaven", "a", ["Heaven", "Rafters"], "deep_wrap"),
       entry("b_ramp", "b", ["Ramp"]),
       entry("b_decon", "b", ["Decon"]),
@@ -110,7 +113,7 @@ export const SITE_ENTRY_SEMANTICS: Record<string, MapSiteSemantics> = {
       entry("a_upper_park", "a", ["UpperPark"]),
       entry("a_bank", "a", ["Lobby", "StorageRoom", "Stairs", "BackofA"], "deep_wrap"),
       entry("b_monster", "b", ["Canal"]),
-      entry("b_short", "b", ["Construction", "Bridge"]),
+      entry("b_short", "b", ["Construction", "Bridge", "Water"]),
       entry("b_snipers_walkway", "b", ["SnipersNest", "Walkway"], "deep_wrap"),
     ],
     routeMarkers: [
@@ -155,6 +158,44 @@ function lastMatch<T extends { callouts?: readonly string[]; entryCallouts?: rea
   return best;
 }
 
+/** 沿路径正序，第一个命中任一 definition 标志 callout 的位置（最早途经点）。 */
+function firstMatch<T extends { callouts?: readonly string[]; entryCallouts?: readonly string[] }>(
+  definitions: readonly T[],
+  path: readonly string[],
+): { definition: T; callout: string; index: number } | null {
+  for (let index = 0; index < path.length; index += 1) {
+    const callout = path[index];
+    for (const definition of definitions) {
+      const aliases = definition.entryCallouts ?? definition.callouts ?? [];
+      if (callout && aliases.includes(callout)) return { definition, callout, index };
+    }
+  }
+  return null;
+}
+
+/**
+ * 进包前「最后一段连续朝该站推进」的轨迹：从进包点往回收，
+ * 只要还在该站区域（或命中进点标志）就并入，一旦折返到异区即截断。
+ * 用于剔除开局在某口子架枪/控图后折返、最终从别处进包造成的误判。
+ */
+function approachSegment(
+  mapName: string,
+  target: SiteTarget,
+  prefix: readonly string[],
+  entries: readonly SiteEntryFamilyDefinition[],
+): string[] {
+  const segment: string[] = [];
+  for (let index = prefix.length - 1; index >= 0; index -= 1) {
+    const callout = prefix[index]!;
+    const onApproach =
+      getPrimaryCalloutRegion(mapName, callout) === target ||
+      entries.some((definition) => definition.entryCallouts.includes(callout));
+    if (!onApproach) break;
+    segment.unshift(callout);
+  }
+  return segment;
+}
+
 export function resolveSiteEntry(
   mapName: string,
   target: SiteTarget,
@@ -164,10 +205,10 @@ export function resolveSiteEntry(
   const siteCallout = target === "a" ? "BombsiteA" : "BombsiteB";
   const siteIndex = callouts.indexOf(siteCallout);
   const prefix = siteIndex >= 0 ? callouts.slice(0, siteIndex) : callouts;
-  const entryMatch = lastMatch(
-    semantics?.entries.filter((definition) => definition.target === target) ?? [],
-    prefix,
-  );
+  const entries = semantics?.entries.filter((definition) => definition.target === target) ?? [];
+  // 判定点 = 进包前最终冲包段里「最早」命中的进点口子：经过更早分叉（如 TRamp=A1）的
+  // 优先于进包边界（殿=A2），且折返到异区前的开局停留不计入。
+  const entryMatch = firstMatch(entries, approachSegment(mapName, target, prefix, entries));
   const routeMatch = lastMatch(
     semantics?.routeMarkers?.filter((definition) => definition.target === target) ?? [],
     prefix,

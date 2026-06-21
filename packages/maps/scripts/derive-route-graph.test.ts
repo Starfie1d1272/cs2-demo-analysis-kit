@@ -36,6 +36,16 @@ describe("siteEntryChokeId", () => {
       .toBe("a_main");
   });
 
+  it("uses the first choke in Mirage's final continuous A approach", () => {
+    expect(resolveSiteEntry("de_mirage", "a", [
+      "TSpawn", "TRamp", "PalaceInterior", "BombsiteA",
+    ])).toMatchObject({ entryChokeId: "a_ramp", entryCallout: "TRamp" });
+
+    expect(resolveSiteEntry("de_mirage", "a", [
+      "TSpawn", "TRamp", "Middle", "Connector", "BombsiteA",
+    ])).toMatchObject({ entryChokeId: "a_connector", entryCallout: "Connector" });
+  });
+
   it("keeps Dust2 route markers separate from physical site boundaries", () => {
     expect(resolveSiteEntry("de_dust2", "a", [
       "TSpawn", "ShortStairs", "UnderA", "ExtendedA", "BombsiteA",
@@ -48,9 +58,17 @@ describe("siteEntryChokeId", () => {
   it("keeps confirmed Nuke and Overpass deep-wrap families", () => {
     expect(siteEntryChokeId("de_nuke", "b", ["TSpawn", "Tunnels", "Observation", "BombsiteB"]))
       .toBe("b_tunnels");
+    expect(resolveSiteEntry("de_nuke", "a", [
+      "TSpawn", "Ramp", "Vents", "BombsiteA",
+    ])).toMatchObject({ entryChokeId: "a_vents", entryCallout: "Vents", kind: "deep_wrap" });
+    expect(resolveSiteEntry("de_overpass", "b", [
+      "TSpawn", "Tunnels", "Water", "BombsiteB",
+    ])).toMatchObject({ entryChokeId: "b_short", entryCallout: "Water" });
+    // 判定点取最终冲包段里「最早」的进攻线标志：从狙击位绕后下 B 小，
+    // 归到「B 二楼绕后」这条线（b_snipers_walkway），而非进包边界（b_short）。
     expect(resolveSiteEntry("de_overpass", "b", [
       "TSpawn", "UpperPark", "SnipersNest", "Walkway", "Construction", "BombsiteB",
-    ])).toMatchObject({ entryChokeId: "b_short", routeFamilyId: "b_snipers_walkway_route" });
+    ])).toMatchObject({ entryChokeId: "b_snipers_walkway", routeFamilyId: "b_snipers_walkway_route" });
   });
 
   it("does not invent a stable id for an unreviewed entry", () => {
