@@ -67,7 +67,9 @@ export const playerScoreboardRowSchema = z.object({
     damages: z.enum(["available", "missing"]),
     bombs: z.enum(["available", "missing"])
   }),
-  ratingSeed: z.number().nonnegative(),
+  // rrBase（clamp 前的基础分）：被碾压方 KAST/KPR 低、死亡惩罚大时可为负，
+  // 不能强制非负，否则一边倒的真实比赛整场导入失败。最终 rr 才被 clamp 到非负。
+  ratingSeed: z.number(),
   rr: z.number().nonnegative(),
   rrPercentile: z.number().min(0).max(100),
   /** RR v2 账户分。单场为 frozen pro baseline：1.00 = 职业基线。 */
