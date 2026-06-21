@@ -1,11 +1,20 @@
-import { useMemo, useState, type ChangeEvent } from "react";
-import type { SeriesFormat, SeriesVeto } from "@cs2dak/contract";
-import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems } from "../lib/dem";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import type { EventStage, SeriesFormat, SeriesVeto } from "@cs2dak/contract";
+import { detectDemBackend, exportDemToZip, isDemFile } from "../lib/dem";
 import {
   buildEventPackage,
-  normalizeTeamNames,
+  buildEventPackageNative,
+  cleanupNativeMakerSession,
+  deriveEventTeams,
+  newStage,
   resourceFromFile,
+  resourceFromNativePath,
+  seriesSkeletonForPreset,
+  startNativeMakerSession,
   stagesForPreset,
+  vetoMapMismatch,
+  KIND_OPTIONS,
+  STAGE_TYPE_OPTIONS,
   type EventMakerDraft,
   type EventPreset,
   type MakerSeriesDraft,
@@ -20,20 +29,73 @@ const PRESETS: Array<{ id: EventPreset; label: string }> = [
   { id: "major", label: "Major：三阶段瑞士轮 + 单败" },
 ];
 
-function slugify(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+export function slugifyEventName(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return "";
+  const ascii = normalized.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  if (ascii) return ascii;
+  let hash = 2166136261;
+  for (let index = 0; index < normalized.length; index += 1) {
+    hash ^= normalized.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `event-${(hash >>> 0).toString(36).padStart(7, "0")}`;
 }
 
-function newSeries(index: number, draft: Pick<EventMakerDraft, "stages" | "teams">): MakerSeriesDraft {
+// 草稿自动保存：只持久化录入数据（赛事框架、阶段、系列赛骨架/BP/赛制/时间），
+// 不持久化附加的 .dem/ZIP（二进制不入草稿，刷新后重新附加；队伍由 demo 派生）。
+const DRAFT_KEY = "dak.event-maker.draft.v2";
+
+interface PersistedDraft {
+  name: string;
+  slug: string;
+  kind: string;
+  stages: EventStage[];
+  series: MakerSeriesDraft[];
+}
+
+function loadDraft(): PersistedDraft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PersistedDraft>;
+    if (!parsed || typeof parsed !== "object") return null;
+    return {
+      name: parsed.name ?? "",
+      slug: parsed.slug || slugifyEventName(parsed.name ?? ""),
+      kind: parsed.kind ?? "tournament",
+      stages: Array.isArray(parsed.stages) && parsed.stages.length > 0 ? parsed.stages : stagesForPreset("major"),
+      // 恢复时 resources 一律清空：二进制不入草稿。teamAName/teamBName 是 demo 派生缓存，一并清空。
+      series: Array.isArray(parsed.series) ? parsed.series.map((row) => ({ ...row, status: row.status === "cancelled" ? "cancelled" : "finished", resources: [], teamAName: "", teamBName: "" })) : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveDraft(draft: PersistedDraft): void {
+  try {
+    const stripped: PersistedDraft = {
+      ...draft,
+      series: draft.series.map((row) => ({ ...row, resources: [] })),
+    };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(stripped));
+  } catch {
+    // 配额超限或禁用 localStorage 时静默降级。
+  }
+}
+
+function newSeries(index: number, stages: EventStage[]): MakerSeriesDraft {
   return {
     key: `series-${index}`,
-    stage: draft.stages[0]?.key ?? "",
+    stage: stages[0]?.key ?? "",
     round: 1,
     entryRound: null,
-    status: "scheduled",
-    format: draft.stages[0]?.matchFormat ?? "bo3",
-    teamAName: draft.teams[0] ?? "",
-    teamBName: draft.teams[1] ?? "",
+    bracketNodeId: null,
+    status: "finished",
+    format: stages[0]?.matchFormat ?? "bo3",
+    teamAName: "",
+    teamBName: "",
     scheduledAt: "",
     veto: null,
     resources: [],
@@ -41,29 +103,74 @@ function newSeries(index: number, draft: Pick<EventMakerDraft, "stages" | "teams
 }
 
 export function EventPackageMaker({ onNotice }: { onNotice: (message: string) => void }) {
-  const [preset, setPreset] = useState<EventPreset>("round_robin");
-  const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [kind, setKind] = useState("tournament");
-  const [teamText, setTeamText] = useState("");
-  const [series, setSeries] = useState<MakerSeriesDraft[]>([]);
+  const initial = useMemo(() => loadDraft(), []);
+  const [name, setName] = useState(initial?.name ?? "");
+  const [slug, setSlug] = useState(initial?.slug || slugifyEventName(initial?.name ?? ""));
+  const [kind, setKind] = useState(initial?.kind ?? "tournament");
+  const [stages, setStages] = useState<EventStage[]>(initial?.stages ?? stagesForPreset("major"));
+  const [series, setSeries] = useState<MakerSeriesDraft[]>(initial?.series ?? []);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [editingVeto, setEditingVeto] = useState<string | null>(null);
-  const stages = useMemo(() => stagesForPreset(preset), [preset]);
-  const teams = useMemo(() => normalizeTeamNames(teamText), [teamText]);
-  const draft = useMemo<EventMakerDraft>(() => ({ slug, name, kind, stages, teams, series }), [slug, name, kind, stages, teams, series]);
+  const makerSession = useRef<string | null>(null);
+  const teams = useMemo(() => deriveEventTeams(series), [series]);
+  const draft = useMemo<EventMakerDraft>(() => ({ slug, name, kind, stages, series }), [slug, name, kind, stages, series]);
+
+  useEffect(() => {
+    saveDraft({ name, slug, kind, stages, series });
+  }, [name, slug, kind, stages, series]);
+
+  useEffect(() => () => { void cleanupNativeMakerSession(makerSession.current); }, []);
+
+  async function ensureMakerSession(): Promise<string> {
+    makerSession.current ??= await startNativeMakerSession();
+    if (!makerSession.current) throw new Error("桌面赛事制作桥不可用");
+    return makerSession.current;
+  }
+
+  function releaseMakerSession() {
+    const current = makerSession.current;
+    makerSession.current = null;
+    void cleanupNativeMakerSession(current);
+  }
+
+  function clearDraft() {
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* 忽略 */ }
+    setName("");
+    setSlug("");
+    setKind("tournament");
+    setStages(stagesForPreset("major"));
+    setSeries([]);
+    releaseMakerSession();
+    onNotice("已清空赛事草稿");
+  }
 
   function patchSeries(key: string, patch: Partial<MakerSeriesDraft>) {
     setSeries((rows) => rows.map((row) => row.key === key ? { ...row, ...patch } : row));
   }
+  function patchStage(key: string, patch: Partial<EventStage>) {
+    setStages((rows) => rows.map((row) => row.key === key ? { ...row, ...patch } : row));
+  }
 
-  async function attachFiles(key: string, files: File[]) {
+  // 附加 demo：解析后队伍/地图/比分自动从 demo 取；首张 demo 决定该系列对阵。
+  async function attachResources(key: string, newResources: Awaited<ReturnType<typeof resourceFromFile>>[]) {
     const row = series.find((item) => item.key === key);
     if (!row) return;
-    if (row.resources.length + files.length > 5) {
+    if (row.resources.length + newResources.length > 5) {
       onNotice("每个系列赛最多附加 5 张地图");
       return;
     }
+    const merged = [...row.resources, ...newResources];
+    const first = merged[0];
+    patchSeries(key, {
+      resources: merged,
+      // demo 优先：对阵从首张 demo 派生，不手填。
+      teamAName: first?.teamAName ?? row.teamAName,
+      teamBName: first?.teamBName ?? row.teamBName,
+    });
+    onNotice(`已为 ${key} 附加 ${newResources.length} 张地图（队伍/比分已从 demo 自动识别）`);
+  }
+
+  async function attachFiles(key: string, files: File[]) {
     setBusyKey(key);
     try {
       const backend = await detectDemBackend();
@@ -74,8 +181,7 @@ export function EventPackageMaker({ onNotice }: { onNotice: (message: string) =>
           : file;
         resources.push(await resourceFromFile(zip));
       }
-      patchSeries(key, { resources: [...row.resources, ...resources] });
-      onNotice(`已为 ${row.key} 附加 ${resources.length} 张地图`);
+      await attachResources(key, resources);
     } catch (error) {
       onNotice(`demo 处理失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -84,16 +190,19 @@ export function EventPackageMaker({ onNotice }: { onNotice: (message: string) =>
   }
 
   async function attachNative(key: string) {
-    const row = series.find((item) => item.key === key);
-    if (!row) return;
     setBusyKey(key);
     try {
-      const result = await pickAndExportDems(onNotice);
-      if (result.cancelled) return;
-      if (result.errors.length > 0) onNotice(result.errors.join("；"));
-      if (row.resources.length + result.files.length > 5) throw new Error("每个系列赛最多附加 5 张地图");
-      const resources = await Promise.all(result.files.map((item) => resourceFromFile(item.file)));
-      patchSeries(key, { resources: [...row.resources, ...resources] });
+      const api = window.pywebview?.api;
+      if (!api) throw new Error("桌面壳不可用");
+      const paths = await api.pick_dems();
+      if (paths.length === 0) return;
+      const sessionId = await ensureMakerSession();
+      const resources = [];
+      for (const [index, path] of paths.entries()) {
+        onNotice(`正在准备第 ${index + 1}/${paths.length} 图：${path.split(/[\\/]/).at(-1)}`);
+        resources.push(await resourceFromNativePath(sessionId, path));
+      }
+      await attachResources(key, resources);
     } catch (error) {
       onNotice(error instanceof Error ? error.message : String(error));
     } finally {
@@ -102,16 +211,23 @@ export function EventPackageMaker({ onNotice }: { onNotice: (message: string) =>
   }
 
   async function generate() {
-    if (!name.trim() || !slug.trim() || teams.length < 2 || series.length === 0) {
-      onNotice("请填写赛事名、slug、至少两支队伍和一个系列赛");
+    if (!name.trim() || !slug.trim() || stages.length === 0 || series.length === 0) {
+      onNotice("请填写赛事名、slug、至少一个阶段和一个系列赛");
       return;
     }
-    if (series.some((row) => !row.teamAName || !row.teamBName || row.teamAName === row.teamBName)) {
-      onNotice("每个系列赛必须选择两支不同队伍");
+    if (!series.some((row) => row.resources.length > 0)) {
+      onNotice("请至少为一个系列赛附加 demo；模板中的空节点不会写入资源包");
       return;
     }
     setBusyKey("__build__");
+    let releaseNative = false;
     try {
+      const native = await buildEventPackageNative(draft, makerSession.current);
+      if (native) {
+        releaseNative = true;
+        if (native.path) onNotice(`赛事资源包已生成：${native.path}`);
+        return;
+      }
       const { blob } = await buildEventPackage(draft);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -123,6 +239,13 @@ export function EventPackageMaker({ onNotice }: { onNotice: (message: string) =>
     } catch (error) {
       onNotice(`生成失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
+      if (releaseNative) {
+        releaseMakerSession();
+        setSeries((rows) => rows.map((row) => {
+          const resources = row.resources.filter((resource) => !resource.nativePath);
+          return { ...row, resources, teamAName: resources[0]?.teamAName ?? "", teamBName: resources[0]?.teamBName ?? "" };
+        }));
+      }
       setBusyKey(null);
     }
   }
@@ -131,43 +254,71 @@ export function EventPackageMaker({ onNotice }: { onNotice: (message: string) =>
   return (
     <details className="stu-card">
       <summary><b>赛事资源制作器</b></summary>
-      <p className="stu-muted">创建赛事框架，逐系列录入 BP 与 1–5 场原始 .dem/v3 ZIP，生成可直接导入或发布到 R2 的赛事资源包。</p>
+      <p className="stu-muted">定义赛事框架与各阶段赛制，逐系列附加 1–5 场原始 .dem/v3 ZIP——队伍、地图、比分自动从 demo 识别，再录 BP，生成可导入或发布的 <code>&lt;slug&gt;.zip</code> 资源包。附加的 demo 不入草稿，刷新后需重附。</p>
+
       <div className="stu-veto-toolbar">
-        <label>赛事名<input value={name} onChange={(event) => { setName(event.target.value); if (!slug) setSlug(slugify(event.target.value)); }} placeholder="Cologne Major 2026" /></label>
-        <label>slug<input value={slug} onChange={(event) => setSlug(slugify(event.target.value))} placeholder="cologne-major-2026" /></label>
-        <label>类型<input value={kind} onChange={(event) => setKind(event.target.value)} placeholder="major / league" /></label>
-        <label>框架<select value={preset} onChange={(event) => { setPreset(event.target.value as EventPreset); setSeries([]); }}>
+        <label>赛事名<input value={name} onChange={(event) => { setName(event.target.value); setSlug(slugifyEventName(event.target.value)); }} placeholder="Cologne Major 2026" /></label>
+        <label>资源标识<input value={slug} readOnly placeholder="由赛事名自动生成" /></label>
+        <label>类型<select value={kind} onChange={(event) => setKind(event.target.value)}>
+          {KIND_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+        </select></label>
+        <label>套用模板<select value="" onChange={(event) => { if (event.target.value) { const preset = event.target.value as EventPreset; const nextStages = stagesForPreset(preset); setStages(nextStages); setSeries(seriesSkeletonForPreset(preset, nextStages)); } }}>
+          <option value="">— 生成阶段与系列骨架 —</option>
           {PRESETS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
         </select></label>
       </div>
-      <p className="stu-muted">阶段：{stages.map((stage) => `${stage.name}（${stage.type}，${stage.matchFormat?.toUpperCase() ?? "—"}）`).join(" → ")}</p>
-      <label>参赛队伍（每行一个，也可逗号分隔）<textarea className="stu-coach-report" value={teamText} onChange={(event) => setTeamText(event.target.value)} rows={4} /></label>
-      <div className="stu-header-actions">
-        <button className="stu-button stu-button-ghost" type="button" disabled={teams.length < 2} onClick={() => setSeries((rows) => [...rows, newSeries(Date.now(), { stages, teams })])}>添加系列赛</button>
-        <button className="stu-button" type="button" disabled={busyKey != null || series.length === 0} onClick={() => void generate()}>{busyKey === "__build__" ? "打包中…" : "生成赛事资源包"}</button>
-      </div>
-      {series.map((row) => (
-        <div key={row.key} className="stu-card">
-          <div className="stu-veto-toolbar">
-            <label>系列 key<input value={row.key} onChange={(event) => patchSeries(row.key, { key: event.target.value })} /></label>
-            <label>阶段<select value={row.stage} onChange={(event) => patchSeries(row.key, { stage: event.target.value })}>{stages.map((stage) => <option key={stage.key} value={stage.key}>{stage.name}</option>)}</select></label>
-            <label>轮次<input type="number" min={1} value={row.round ?? ""} onChange={(event) => patchSeries(row.key, { round: event.target.value ? Number(event.target.value) : null })} /></label>
-            <label>组别/节点<input value={row.entryRound ?? ""} onChange={(event) => patchSeries(row.key, { entryRound: event.target.value || null })} placeholder="winner-r1 / quarterfinal" /></label>
-            <label>A 队<select value={row.teamAName} onChange={(event) => patchSeries(row.key, { teamAName: event.target.value, veto: null })}>{teams.map((team) => <option key={team}>{team}</option>)}</select></label>
-            <label>B 队<select value={row.teamBName} onChange={(event) => patchSeries(row.key, { teamBName: event.target.value, veto: null })}>{teams.map((team) => <option key={team}>{team}</option>)}</select></label>
-            <label>赛制<select value={row.format} onChange={(event) => patchSeries(row.key, { format: event.target.value as SeriesFormat, veto: null })}>{(["bo1", "bo3", "bo5"] as const).map((format) => <option key={format} value={format}>{format.toUpperCase()}</option>)}</select></label>
-            <label>状态<select value={row.status} onChange={(event) => patchSeries(row.key, { status: event.target.value as MakerSeriesDraft["status"] })}><option value="scheduled">未开始</option><option value="in_progress">进行中</option><option value="finished">已结束</option><option value="cancelled">取消</option></select></label>
-            <label>时间<input type="datetime-local" value={row.scheduledAt} onChange={(event) => patchSeries(row.key, { scheduledAt: event.target.value })} /></label>
-          </div>
-          <div className="stu-chip-row">
-            <button type="button" className="stu-button-sm" onClick={() => setEditingVeto(row.key)}>录入 BP{row.veto ? "（已填）" : ""}</button>
-            {typeof window.pywebview?.api?.pick_dems === "function" && <button type="button" className="stu-button-sm" disabled={busyKey != null} onClick={() => void attachNative(row.key)}>选择 .dem / ZIP</button>}
-            <label className="stu-button-sm">从文件附加<input hidden type="file" accept=".dem,.zip" multiple onChange={(event: ChangeEvent<HTMLInputElement>) => { const files = [...(event.target.files ?? [])]; event.target.value = ""; void attachFiles(row.key, files); }} /></label>
-            <button type="button" className="stu-button-sm" onClick={() => setSeries((rows) => rows.filter((item) => item.key !== row.key))}>删除系列</button>
-          </div>
-          <p className="stu-muted">资源 {row.resources.length}/{row.format === "bo1" ? 1 : row.format === "bo3" ? 3 : 5}：{row.resources.map((resource) => `${resource.mapName} ${resource.scoreA}:${resource.scoreB}`).join(" / ") || "尚未附加"}</p>
+
+      {/* 阶段编辑：几个阶段 + 每阶段赛制（type）+ 赛制（format），与赛事框架解耦 */}
+      <div className="stu-card">
+        <div className="stu-header-actions">
+          <b>阶段（{stages.length}）</b>
+          <button className="stu-button-sm" type="button" onClick={() => setStages((rows) => [...rows, newStage(rows.length + 1)])}>添加阶段</button>
         </div>
-      ))}
+        {stages.map((stage) => (
+          <div key={stage.key} className="stu-veto-toolbar">
+            <label>名称<input value={stage.name} onChange={(event) => patchStage(stage.key, { name: event.target.value })} /></label>
+            <label>赛制<select value={stage.type} onChange={(event) => patchStage(stage.key, { type: event.target.value as EventStage["type"] })}>
+              {STAGE_TYPE_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select></label>
+            <label>默认局制<select value={stage.matchFormat ?? "bo3"} onChange={(event) => patchStage(stage.key, { matchFormat: event.target.value as SeriesFormat })}>
+              {(["bo1", "bo3", "bo5"] as const).map((format) => <option key={format} value={format}>{format.toUpperCase()}</option>)}
+            </select></label>
+            <label>队伍数<input type="number" min={2} value={stage.teamCount} onChange={(event) => patchStage(stage.key, { teamCount: Number(event.target.value) || 2 })} /></label>
+            <button className="stu-button-sm" type="button" disabled={stages.length <= 1} onClick={() => setStages((rows) => rows.filter((row) => row.key !== stage.key))}>删除</button>
+          </div>
+        ))}
+      </div>
+
+      <div className="stu-header-actions">
+        <button className="stu-button stu-button-ghost" type="button" disabled={stages.length === 0} onClick={() => setSeries((rows) => [...rows, newSeries(Date.now(), stages)])}>添加系列赛</button>
+        <button className="stu-button" type="button" disabled={busyKey != null || series.length === 0} onClick={() => void generate()}>{busyKey === "__build__" ? "打包中…" : "生成赛事资源包"}</button>
+        <button className="stu-button stu-button-ghost" type="button" onClick={clearDraft}>清空草稿</button>
+      </div>
+      <p className="stu-muted">参赛队伍（{teams.length}，自动来自已附 demo）：{teams.join(" / ") || "—"}</p>
+
+      {series.map((row) => {
+        const mismatch = vetoMapMismatch(row);
+        return (
+          <div key={row.key} className="stu-card">
+            <div className="stu-veto-toolbar">
+              <label>阶段<select value={row.stage} onChange={(event) => patchSeries(row.key, { stage: event.target.value })}>{stages.map((stage) => <option key={stage.key} value={stage.key}>{stage.name}</option>)}</select></label>
+              <label>轮次<select value={row.round ?? 1} onChange={(event) => patchSeries(row.key, { round: Number(event.target.value) })}>{Array.from({ length: row.stage && stages.find((stage) => stage.key === row.stage)?.type === "swiss" ? 5 : 8 }, (_, index) => <option key={index + 1} value={index + 1}>第 {index + 1} 轮</option>)}</select></label>
+              <label>组别/节点<select value={row.bracketNodeId ?? ""} onChange={(event) => { const node = stages.find((stage) => stage.key === row.stage)?.bracketNodes?.find((item) => item.id === event.target.value); patchSeries(row.key, { bracketNodeId: node?.id ?? null, entryRound: node?.label ?? null, round: node?.round ?? row.round }); }}><option value="">普通轮次</option>{stages.find((stage) => stage.key === row.stage)?.bracketNodes?.map((node) => <option key={node.id} value={node.id}>{node.label}</option>)}</select></label>
+              <label>局制<select value={row.format} onChange={(event) => patchSeries(row.key, { format: event.target.value as SeriesFormat, veto: null })}>{(["bo1", "bo3", "bo5"] as const).map((format) => <option key={format} value={format}>{format.toUpperCase()}</option>)}</select></label>
+              <label>状态<select value={row.status === "cancelled" ? "cancelled" : "finished"} onChange={(event) => patchSeries(row.key, { status: event.target.value as MakerSeriesDraft["status"] })}><option value="finished">已结束</option><option value="cancelled">取消</option></select></label>
+            </div>
+            <p className="stu-muted">内部标识：<code>{row.key}</code> · 对阵（来自 demo）：{row.teamAName && row.teamBName ? `${row.teamAName} vs ${row.teamBName}` : "尚未附加 demo"} · 时间：{row.resources[0]?.occurredAt ? new Date(row.resources[0].occurredAt).toLocaleString("zh-CN") : "附加 demo 后自动读取文件时间"}</p>
+            <div className="stu-chip-row">
+              <button type="button" className="stu-button-sm" disabled={!row.teamAName} onClick={() => setEditingVeto(row.key)}>录入 BP{row.veto ? "（已填）" : ""}</button>
+              {typeof window.pywebview?.api?.pick_dems === "function" && <button type="button" className="stu-button-sm" disabled={busyKey != null} onClick={() => void attachNative(row.key)}>选择 .dem / ZIP</button>}
+              <label className="stu-button-sm">从文件附加<input hidden type="file" accept=".dem,.zip" multiple onChange={(event: ChangeEvent<HTMLInputElement>) => { const files = [...(event.target.files ?? [])]; event.target.value = ""; void attachFiles(row.key, files); }} /></label>
+              <button type="button" className="stu-button-sm" onClick={() => setSeries((rows) => rows.filter((item) => item.key !== row.key))}>删除系列</button>
+            </div>
+            <p className="stu-muted">资源 {row.resources.length}/{row.format === "bo1" ? 1 : row.format === "bo3" ? 3 : 5}：{row.resources.map((resource) => `${resource.mapName} ${resource.scoreA}:${resource.scoreB}`).join(" / ") || "尚未附加"}</p>
+            {mismatch.length > 0 && <p className="stu-muted" style={{ color: "var(--dak-danger, #d66)" }}>BP 与 demo 不一致：{mismatch.join("；")}</p>}
+          </div>
+        );
+      })}
       {vetoRow && <VetoInputDialog seriesId={vetoRow.key} teamAName={vetoRow.teamAName} teamBName={vetoRow.teamBName} initialFormat={vetoRow.format} initialVeto={vetoRow.veto} onClose={() => setEditingVeto(null)} onSave={(veto: SeriesVeto) => patchSeries(vetoRow.key, { veto, format: veto.format })} />}
     </details>
   );

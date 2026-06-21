@@ -58,7 +58,7 @@ const NAV: { key: StudioView; label: string; hint: string; icon: typeof LibraryB
   { key: "economy", label: "经济与节奏", hint: "买局质量 / 回合 swing", icon: Coins },
   { key: "tournament", label: "赛事中台", hint: "排行榜 / 报表", icon: Trophy },
   { key: "coach", label: "教练工作台", hint: "战术模式与战术本", icon: ClipboardList },
-  { key: "management", label: "管理", hint: "选手身份归并与队伍改名", icon: Settings }
+  { key: "management", label: "管理", hint: "身份归并 · 资料库维护 · 赛事资产", icon: Settings }
 ];
 
 const PLAYER_TABS = [
@@ -112,8 +112,8 @@ export function App() {
 
   // 稳定数组标识：避免 App 无关重渲染触发档案/排行榜重新聚合
   const scopedEntries = useMemo(
-    () => applyScope(entries, scope, identityState.teamRenames),
-    [entries, scope, identityState.teamRenames]
+    () => applyScope(entries, scope),
+    [entries, scope]
   );
   const identityOptions = useMemo<IdentityOptions | undefined>(
     () => identityState.version > 0
@@ -496,7 +496,6 @@ export function App() {
             onReexportSelected={handleReexportSelected}
             onRemoveMany={handleRemoveMany}
             onNotice={setNotice}
-            onLibraryChanged={setEntries}
           />
         )}
         {view === "match" && (
@@ -653,6 +652,8 @@ export function App() {
             identityOptions={identityOptions}
             teamRenames={identityState.teamRenames}
             onGoLibrary={() => setView("library")}
+            onNotice={setNotice}
+            onLibraryChanged={setEntries}
           />
         )}
       </main>
