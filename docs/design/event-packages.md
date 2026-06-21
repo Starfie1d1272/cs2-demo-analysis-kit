@@ -1,7 +1,8 @@
 # 赛事资产库、赛事包导入与制作（Event Packages）
 
-> 实施状态（2026-06-20）：`event-package/1.0` 合同、Event/Series 导入、在线资产下载、
-> 资源管理及 round robin / Swiss / single-elim / double-elim 展示已落地。
+> 实施状态（2026-06-21）：`event-package/1.0` 合同、Event/Series 导入、在线资产下载、
+> 原生低内存逐图导入/生成、可取消 checkpoint，以及 round robin / Swiss /
+> single-elim / double-elim bracket 展示已落地。
 > Cologne Major 已建立空赛事骨架，需在赛程结束后补真实队伍、系列赛、BP 与 v3 ZIP。
 
 > 0.7.0 方向设计稿。**只定义合同与落点，不在本稿实现平台**。
@@ -183,7 +184,9 @@ R2_ENDPOINT=... R2_BUCKET=... pnpm events:publish dist/events
 - [x] 本地 demo 自动配对与缺图资源计数；移除组织记录不删除原始 ZIP。
 - [x] 选择 1–5 个已导入地图建立 BO1/3/5，并复用现有 BP 编辑器。
 - [x] 在线赛事资产列表、下载、sha256 校验、导入与 R2 构建/上传脚本。
-- [x] 单循环、Swiss、单败、双败的专用展示；GSL 当前复用小组积分视图。
+- [x] 桌面端外层赛事 ZIP 保留在 Python，逐图解压并分块传输；失败继续、取消后可重试补图。
+- [x] 在线资产由 Python 后台下载与 sha256 校验，不再让完整赛事包进入 WebView 内存。
+- [x] 单循环、Swiss、单败、双败的专用展示；淘汰赛合同保存 bracket 节点和胜败去向，GSL 当前复用小组积分视图。
 
 **待真实内容与跨仓工作**
 - [ ] Cologne Major 完赛后补真实队伍、赛程、BP、比分与 v3 ZIP，再发布 R2 manifest。
@@ -195,7 +198,9 @@ R2_ENDPOINT=... R2_BUCKET=... pnpm events:publish dist/events
 - [x] 逐系列赛填写阶段、轮次、淘汰节点、双方、BO、赛程状态与 BP。
 - [x] 每系列附加 1–5 场原始 `.dem` 或 v3 ZIP；`.dem` 调用现有 `cs2df` 桥导出。
 - [x] 解析真实 ZIP 校验对阵，按系列赛 A/B 方向校正比分并生成赛事资源 ZIP。
-- [ ] 草稿持久化和单系列增量重建；当前刷新页面会丢失尚未打包的制作状态。
+- [x] 草稿持久化；二进制资源不写入 localStorage，刷新后需重新附加。
+- [x] 赛后制作默认 `finished`；series key 为内部只读标识，slug 与比赛时间从赛事名/demo 元数据自动生成。
+- [x] 模板同时生成阶段、轮次与 bracket series skeleton；桌面端从原生路径增量写最终 ZIP。
 
 **v2+（可选）**
 - [ ] RivalHub HTTP 只读 API 导出（免下载文件，需 RivalHub 暴露鉴权端点）。

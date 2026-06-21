@@ -14,8 +14,6 @@ import {
 import { EmptyState } from "../components/primitives";
 import { VetoInputDialog } from "../components/VetoInputDialog";
 import { BpView } from "./BpView";
-import { LibraryMaintenance } from "../components/LibraryMaintenance";
-import { EventManager } from "../components/EventManager";
 
 export interface LibraryViewProps {
   entries: StudioDemoEntry[];
@@ -38,7 +36,6 @@ export interface LibraryViewProps {
   /** 批量删除选中条目。 */
   onRemoveMany?: (ids: string[]) => void;
   onNotice?: (message: string) => void;
-  onLibraryChanged?: (entries: StudioDemoEntry[]) => void;
 }
 
 function formatDuration(seconds: number): string {
@@ -67,8 +64,7 @@ export function LibraryView({
   onReexportAll,
   onReexportSelected,
   onRemoveMany,
-  onNotice = () => {},
-  onLibraryChanged
+  onNotice = () => {}
 }: LibraryViewProps) {
   const [search, setSearch] = useState("");
   const [mapFilter, setMapFilter] = useState<string | null>(null);
@@ -225,9 +221,6 @@ export function LibraryView({
           <span>选手人次</span>
         </div>
       </div>
-
-      <LibraryMaintenance onNotice={onNotice} />
-      <EventManager entries={entries} onNotice={onNotice} onLibraryChanged={onLibraryChanged} />
 
       {entries.length > 0 && <SeriesManager entries={entries} selectedEntries={selectedVisible} />}
 

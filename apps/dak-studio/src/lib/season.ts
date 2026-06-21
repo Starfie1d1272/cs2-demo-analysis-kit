@@ -103,6 +103,24 @@ export function filterDuelFactsByTeam(
   });
 }
 
+/**
+ * 队伍透镜（match 级）：按队伍过滤 TournamentInsights 的各队伍数组。
+ * insights 由已 `withTeamRenames` 的 facts 构建，teamName 是显示名，
+ * 故直接按 selectedTeams（显示名）匹配，不走 originalTeamNamesForDisplay。
+ */
+function filterTournamentInsightsByTeam(insights: TournamentInsights, selectedTeams: string[]): TournamentInsights {
+  if (selectedTeams.length === 0) return insights;
+  const selected = new Set(selectedTeams);
+  const byTeam = <T extends { teamName: string }>(rows: T[]) => rows.filter((row) => selected.has(row.teamName));
+  return {
+    ...insights,
+    teamPistols: byTeam(insights.teamPistols),
+    ecoUpsets: byTeam(insights.ecoUpsets),
+    teamManAdvantageConversions: byTeam(insights.teamManAdvantageConversions),
+    teamEconomySummaries: byTeam(insights.teamEconomySummaries),
+  };
+}
+
 // ── 持久层：StorageAdapter 的 "cache" 命名空间。touchedAt 拆到伴随命名空间
 //    "cache-meta"，命中只刷新轻量时间戳，不重写数 MB 的 summary 本体；prune 也只读它。 ──
 const cacheStore = getStorage().records("cache");
@@ -292,18 +310,8 @@ export function getTournamentInsights(entries: StudioDemoEntry[], identity?: Ide
     const matchIds = entries.map(matchIdForEntry);
     const facts = withTeamRenames(await factsStore.getTournamentFacts({ matchIds }), identity?.teamRenames);
     if (facts.length >= entries.length) {
-      let insights = facts.length > 0 ? buildTournamentInsightsFromFacts(facts) : null;
-      if (insights && selectedTeams.length > 0) {
-        const selected = new Set(selectedTeams);
-        const byTeam = <T extends { teamName: string }>(rows: T[]) => rows.filter((row) => selected.has(row.teamName));
-        insights = {
-          ...insights,
-          teamPistols: byTeam(insights.teamPistols),
-          ecoUpsets: byTeam(insights.ecoUpsets),
-          teamManAdvantageConversions: byTeam(insights.teamManAdvantageConversions),
-          teamEconomySummaries: byTeam(insights.teamEconomySummaries),
-        };
-      }
+      const built = facts.length > 0 ? buildTournamentInsightsFromFacts(facts) : null;
+      const insights = built ? filterTournamentInsightsByTeam(built, selectedTeams) : null;
       void writePersistedValue(key, insights);
       return insights;
     }
@@ -346,6 +354,7 @@ export function getSeasonSummary(entries: StudioDemoEntry[], identity?: Identity
     if (persisted) return persisted;
     const factsStore = getFactsStore();
     const matchIds = entries.map(matchIdForEntry);
+    // 队伍透镜（行级）：不窄化 demo 语料，只按 teamKey 过滤 cohort 行。内层 row.teamKey 新旧 facts 皆有。
     const allowed = allowedTeamKeysByMatch(entries, selectedTeams, identity?.teamRenames);
     const cohortRows = (await factsStore.getCohortRows({ matchIds })).filter((row) =>
       !allowed || allowed.get(row.matchId)?.has(row.teamKey),

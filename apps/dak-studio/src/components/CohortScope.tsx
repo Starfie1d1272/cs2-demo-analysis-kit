@@ -1,42 +1,44 @@
 import { ChevronDown, ChevronUp, Filter } from "lucide-react";
 import { useMemo, useState } from "react";
 import { matchDateFromFileName, type StudioDemoEntry } from "../lib/library";
-import { displayTeamName, originalTeamNamesForDisplay, teamRenameGroups } from "../lib/identity";
+import { displayTeamName, teamRenameGroups } from "../lib/identity";
 
 /**
  * 聚合范围控制（CS Demo Manager 的 player filters 形态）：
  * 地图多选 + 单场勾选，选手档案与排行榜共享同一份范围状态（state 在 App）。
  */
 
+/**
+ * 聚合范围分两层：
+ * - **语料层**（`maps` / `tags` / `excludedIds`）：决定加载/聚合哪些 demo（`applyScope`）。
+ *   地图即一整场 demo，按图过滤等价于窄化 demo 列表，故归语料层。
+ * - **透镜层**（`teams`）：不重新聚合 demo，只在已加载的 facts 上按队伍筛行（下推到
+ *   `FactsScope.allowedTeamsByMatch`）。选队伍不丢对手与其他队伍交手的对局，切换队伍也无需
+ *   重选 demo。
+ */
 export interface CohortScopeState {
-  /** 选中的地图；空数组 = 不按地图过滤。 */
+  /** 语料层·地图；空数组 = 不按地图过滤。 */
   maps: string[];
-  /** 选中的标签（任一命中即可）；空数组 = 不按标签过滤。 */
+  /** 语料层·标签（任一命中即可）；空数组 = 不按标签过滤。 */
   tags: string[];
-  /** 选中的队伍（A/B 任一命中即可）；空数组 = 不按队伍过滤。 */
+  /** 透镜层·队伍（A/B 任一命中即可）；只筛行级数据，不窄化 demo 语料。 */
   teams: string[];
-  /** 手动排除的 demo id。 */
+  /** 语料层·手动排除的 demo id。 */
   excludedIds: string[];
 }
 
 export const EMPTY_SCOPE: CohortScopeState = { maps: [], tags: [], teams: [], excludedIds: [] };
 
+/** 只按语料层（地图/标签/排除）窄化 demo 集合；队伍是透镜，不在此过滤。 */
 export function applyScope(
   entries: StudioDemoEntry[],
-  scope: CohortScopeState,
-  teamRenames: Record<string, string> = {}
+  scope: CohortScopeState
 ): StudioDemoEntry[] {
   const excluded = new Set(scope.excludedIds);
-  const selectedOriginalTeams = new Set(
-    scope.teams.flatMap((team) => originalTeamNamesForDisplay(team, teamRenames))
-  );
   return entries.filter(
     (entry) =>
       (scope.maps.length === 0 || scope.maps.includes(entry.meta.mapName)) &&
       (scope.tags.length === 0 || entry.tags.some((tag) => scope.tags.includes(tag))) &&
-      (scope.teams.length === 0 ||
-        selectedOriginalTeams.has(entry.meta.teamAName) ||
-        selectedOriginalTeams.has(entry.meta.teamBName)) &&
       !excluded.has(entry.id)
   );
 }
@@ -56,7 +58,7 @@ export function CohortScope({ entries, scope, onChange, teamRenames = {} }: Coho
     () => teamRenameGroups(entries.map((e) => ({ teamA: e.meta.teamAName, teamB: e.meta.teamBName })), teamRenames),
     [entries, teamRenames]
   );
-  const effective = applyScope(entries, scope, teamRenames);
+  const effective = applyScope(entries, scope);
   const filtered = effective.length !== entries.length;
 
   const toggleMap = (map: string) => {

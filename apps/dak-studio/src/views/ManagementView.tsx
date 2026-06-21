@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { SeasonCohortBundle } from "@cs2dak/contract";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState } from "../components/primitives";
+import { LibraryMaintenance } from "../components/LibraryMaintenance";
+import { EventManager } from "../components/EventManager";
 import { getSeasonSummary, type IdentityOptions } from "../lib/season";
 import {
   buildCohortIdentityMap,
@@ -26,6 +28,8 @@ export interface ManagementViewProps {
   identityOptions?: IdentityOptions;
   onGoLibrary: () => void;
   teamRenames?: Record<string, string>;
+  onNotice?: (message: string) => void;
+  onLibraryChanged?: (entries: StudioDemoEntry[]) => void;
 }
 
 type BundlePlayer = SeasonCohortBundle["players"][number];
@@ -45,7 +49,9 @@ export function ManagementView({
   onIdentityChange,
   identityOptions,
   onGoLibrary,
-  teamRenames = identity.teamRenames
+  teamRenames = identity.teamRenames,
+  onNotice = () => {},
+  onLibraryChanged
 }: ManagementViewProps) {
   const [bundle, setBundle] = useState<SeasonCohortBundle | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -229,9 +235,24 @@ export function ManagementView({
     }
   }
 
+  // 资料库维护 + 赛事资产/制作器：与选手数据无关，空库也要可达（备份/恢复、导入赛事包）。
+  const toolsSection = (
+    <>
+      <LibraryMaintenance onNotice={onNotice} />
+      <EventManager entries={allEntries} onNotice={onNotice} onLibraryChanged={onLibraryChanged} />
+    </>
+  );
+
   if (allEntries.length === 0) {
     return (
       <div className="stu-view">
+        <header className="stu-view-header">
+          <div>
+            <h1>管理</h1>
+            <p className="stu-view-sub">资料库维护 · 赛事资产 · 制作器</p>
+          </div>
+        </header>
+        {toolsSection}
         <EmptyState
           mark
           title="还没有选手数据"
@@ -247,9 +268,10 @@ export function ManagementView({
       <header className="stu-view-header">
         <div>
           <h1>管理</h1>
-          <p className="stu-view-sub">选手身份归并 · 别名 · 队伍改名</p>
+          <p className="stu-view-sub">选手身份归并 · 别名 · 队伍改名 · 资料库维护 · 赛事资产</p>
         </div>
       </header>
+      {toolsSection}
       <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />
       <div className="stu-view-body stu-mgmt-layout">
         {/* ── 选手身份 ── */}

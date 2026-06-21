@@ -166,20 +166,21 @@ one tap 只对可一枪满血终结的武器展示，Glock/USP/M4 等不展示�
 **回答**：对手会打什么，我们准备什么。
 
 双视角（主办方任选两队 / 教练「我的队伍」vs 对手）维持归档文档设计：
-- **8a Pattern Finder（0.6 已落地，0.7 底层与 UI 已重构）**：`TacticalRoundFact v5`
+- **8a Pattern Finder（0.6 已落地，0.7 底层与 UI 已重构）**：`TacticalRoundFact`
   使用 `@cs2dak/maps` 的 callout 倾向与双方默认位作为唯二静态地图语义，
-  `@cs2dak/core` 从开局连续区域段推导 coarse/detailed 双层开局签名。经济、最终打点
-  与执行节奏不再污染开局模式；完整战术簇再组合目标点、入口结构和节奏。
+  `@cs2dak/core` 从开局连续区域段推导 coarse/detailed 双层开局签名。聚类主身份只由
+  经济层、开局区域人数/形态与默认位人数结构组成；最终打点、C4、入口结构、道具和执行
+  节奏全部降为 evidence，不再改变开局模式身份。没有进包的回合仍可进入主聚类。
   旧 `advanced/contested/anchor 前缀` 静态判断和固定 `snapshots` 切片已删除。
   `openingPressure` 独立记录离开本方默认位后的中文 callout 前压证据，进入对方默认位标记为深入，
   不再把前压点伪装成默认站位。`PatternExplorer` 三栏现为簇列表 / 常驻统一回放 / 数据摘要与证据
-  回合表；`autoName` 模板自动命名（锚点名 + 节奏）；判断层 v0 疑似佯攻检测。
-  道具移出 key 改为关联统计，不影响聚类稳定性。
+  回合表；主名称只使用已审核的默认位中文名与真实人数结构。进点词典只负责 evidence
+  文案，摘要展示常见进点路线、回合数和覆盖率；道具作为关联统计，不影响聚类稳定性。
   **CT/T 视角切换** + **常驻页内回放**：支持 CT 侧和 T 侧双视角查看 pattern；
   教练页与比赛工作台复用同一 `ReplayViewer` 和四阶段比赛时钟。教练默认 1:35，比赛默认 1:55；
   C4 安放与赛后窗口按真实回合边界倒计时。单场 workspace 按 matchId 主键直读。
-  **进点 A1/A2 子区域区分** + **C4 轨迹佯攻判定**：双点投入细分为包点入口子区域；
-  全程 C4 轨迹辅助判断是真打还是佯攻。
+  **进点 A1/A2 子区域区分** + **C4 轨迹证据**：入口使用进包前最终连续推进段的最早
+  命中点，能区分 A1/A2/连接等最终执行路线；C4 轨迹只作证据，不自动拍死“佯攻/转点”。
 - 8b Playbook：cluster 命名沉淀（IndexedDB，接新 `TacticalCluster.id`）✅。
 - 8c Anti-Strat 报告：对手近 N 场倾向 → Markdown 导出 ✅（基于 `TacticalCluster`
   重写，按地图/side 分段列出 `autoName` + 胜率）。
@@ -227,7 +228,7 @@ one tap 只对可一枪满血终结的武器展示，Glock/USP/M4 等不展示�
 | Lineup 视觉效果优化 | 5 | studio + maps | 🟡 首版已重写为 SVG 雷达渲染（发射线/落点标记/双向高亮），缩略图与几何降维仍需进一步优化 |
 | 道具时序条（与回合时间轴对齐） | 5 | react | ⬜ |
 | 队伍对比页 | 7 | presentation + react | ✅ 2026-06-13 |
-| 8a 战术聚类（TacticalCluster + PatternExplorer） | 8 | dak-studio | ✅ 2026-06-15 |
+| 8a 默认位主导战术聚类 + 进点 evidence（TacticalCluster + PatternExplorer） | 8 | cohort + presentation + dak-studio | ✅ 2026-06-21 |
 | CT/T 视角切换 + 页内回放 | 8 | dak-studio | ✅ 2026-06-16 |
 | A1/A2 进点子区域区分 + C4 轨迹佯攻判定 | 8 | dak-studio | ✅ 2026-06-16 |
 | 常驻统一回放 + 聚类双层大分类 | 8 | react + dak-studio | ✅ 2026-06-17（替代固定切片） |
