@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
-import { BROWSER_EVENT_PACKAGE_LIMIT, downloadAndImportEvent, importEventAssetArchive, importEventAssetFile } from "./event-assets";
+import { downloadAndImportEvent, importEventAssetArchive } from "./event-assets";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -41,11 +41,6 @@ describe("赛事包渐进导入", () => {
     archive.file("event-package.json", JSON.stringify({ version: "bad" }));
     archive.file("maps/a.zip", "not-a-demo");
     await expect(importEventAssetArchive(await archive.generateAsync({ type: "arraybuffer" }), [])).rejects.toThrow();
-  });
-
-  it("浏览器入口在读取字节前拒绝大包", async () => {
-    const oversized = { size: BROWSER_EVENT_PACKAGE_LIMIT + 1, name: "huge.zip" } as File;
-    await expect(importEventAssetFile(oversized, [])).rejects.toThrow("桌面端低内存入口");
   });
 
   it("浏览器在线下载使用 AbortSignal 真正取消 fetch", async () => {

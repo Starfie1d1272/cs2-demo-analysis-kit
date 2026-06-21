@@ -5,8 +5,6 @@ import { importEventPackage, type EventImportResult } from "./events";
 import { base64ToBytes } from "./storage/base64";
 
 export const EVENTS_MANIFEST_URL = "https://dakupdate.starfie1d.top/events/manifest.json";
-/** 浏览器内存安全上限：超限赛事包必须使用桌面端原生低内存路径导入。 */
-export const BROWSER_EVENT_PACKAGE_LIMIT = 64 * 1024 * 1024;
 
 export interface EventAssetImportResult {
   event: EventImportResult;
@@ -60,7 +58,6 @@ async function downloadWithFallback(urls: string[], progress: EventImportProgres
       const response = await fetch(url, { signal: controller.signal });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const declared = Number(response.headers.get("content-length") ?? 0);
-      if (declared > BROWSER_EVENT_PACKAGE_LIMIT) throw new Error(`浏览器模式仅支持 ${(BROWSER_EVENT_PACKAGE_LIMIT / 1024 / 1024).toFixed(0)} MB 以下赛事包`);
       if (!response.body) return await response.arrayBuffer();
       const reader = response.body.getReader();
       const chunks: Uint8Array[] = [];
@@ -69,7 +66,6 @@ async function downloadWithFallback(urls: string[], progress: EventImportProgres
         const { done, value } = await reader.read();
         if (done) break;
         received += value.byteLength;
-        if (received > BROWSER_EVENT_PACKAGE_LIMIT) { controller.abort(); throw new Error(`浏览器模式赛事包超过 ${(BROWSER_EVENT_PACKAGE_LIMIT / 1024 / 1024).toFixed(0)} MB 上限`); }
         chunks.push(value);
         progress.onProgress?.(`浏览器降级下载 ${(received / 1024 / 1024).toFixed(1)} MB${declared ? ` / ${(declared / 1024 / 1024).toFixed(1)} MB` : ""}`);
       }
@@ -132,7 +128,6 @@ export async function importEventAssetFile(
   existingEntries: StudioDemoEntry[],
   progress: EventImportProgress = {},
 ): Promise<EventAssetImportResult> {
-  if (file.size > BROWSER_EVENT_PACKAGE_LIMIT) throw new Error(`浏览器导入仅支持 ${(BROWSER_EVENT_PACKAGE_LIMIT / 1024 / 1024).toFixed(0)} MB 以下赛事包，请使用桌面端低内存入口`);
   return importEventAssetArchive(await file.arrayBuffer(), existingEntries, file.name.replace(/\.zip$/i, ""), progress);
 }
 
@@ -219,7 +214,6 @@ export async function downloadAndImportEvent(
     }
     return importNativeOpened(api, await api.event_download_open(jobId), existingEntries, { onProgress, isCancelled });
   }
-  if (asset.size > BROWSER_EVENT_PACKAGE_LIMIT) throw new Error(`浏览器在线导入仅支持 ${(BROWSER_EVENT_PACKAGE_LIMIT / 1024 / 1024).toFixed(0)} MB 以下赛事包，请使用桌面端`);
   const bytes = await downloadWithFallback(asset.urls, { onProgress, isCancelled });
   const actualHash = await sha256Hex(bytes);
   if (actualHash !== asset.sha256.toLowerCase()) throw new Error("赛事资产 sha256 校验失败");

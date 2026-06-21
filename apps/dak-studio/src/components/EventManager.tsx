@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { deleteEventRecord, listEventRecords, type StudioEventRecord } from "../lib/events";
 import { removeDemos, type StudioDemoEntry } from "../lib/library";
-import { BROWSER_EVENT_PACKAGE_LIMIT, downloadAndImportEvent, importEventAssetFile, loadEventsManifest, pickAndImportEventAsset, supportsNativeEventImport } from "../lib/event-assets";
+import { downloadAndImportEvent, importEventAssetFile, loadEventsManifest, pickAndImportEventAsset, supportsNativeEventImport } from "../lib/event-assets";
 import type { EventsManifest } from "@cs2dak/contract";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import { EventPackageMaker } from "./EventPackageMaker";
@@ -67,7 +67,7 @@ export function EventManager({
         导入赛事资源包 .zip
         <input hidden type="file" accept=".zip,application/zip" onChange={(event) => void importFile(event)} />
       </label>}
-      {!nativeImport && <p className="stu-muted">浏览器降级入口仅支持 {(BROWSER_EVENT_PACKAGE_LIMIT / 1024 / 1024).toFixed(0)} MB 以下赛事包；大型赛事包必须使用桌面端。</p>}
+      {!nativeImport && <p className="stu-muted">浏览器降级入口会把整个赛事包载入内存后逐图导入；桌面端走原生低内存路径，更适合大型赛事包。</p>}
       {busySlug != null && <button type="button" className="stu-button-sm" onClick={() => { cancelRequested.current = true; onNotice("将在当前地图处理完成后停止"); }}>停止导入</button>}
       {events.length > 0 && (
         <table className="stu-mini-table">
@@ -111,7 +111,7 @@ export function EventManager({
               key={asset.slug}
               type="button"
               className="stu-button stu-button-ghost"
-              disabled={busySlug != null || (!nativeImport && asset.size > BROWSER_EVENT_PACKAGE_LIMIT)}
+              disabled={busySlug != null}
               onClick={() => {
                 cancelRequested.current = false;
                 setBusySlug(asset.slug);
@@ -126,7 +126,7 @@ export function EventManager({
                   .finally(() => setBusySlug(null));
               }}
             >
-              {busySlug === asset.slug ? "下载并导入中…" : !nativeImport && asset.size > BROWSER_EVENT_PACKAGE_LIMIT ? `${asset.name}（需桌面端）` : `下载 ${asset.name}（${(asset.size / 1024 / 1024).toFixed(1)} MB）`}
+              {busySlug === asset.slug ? "下载并导入中…" : `下载 ${asset.name}（${(asset.size / 1024 / 1024).toFixed(1)} MB）`}
             </button>
           ))}
         </div>
