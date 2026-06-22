@@ -1,19 +1,8 @@
 import { FolderOpen, Play, RotateCw, Tag as TagIcon, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
-import type { SeriesFormat, SeriesVeto } from "@cs2dak/contract";
 import { entryDate, type StudioDemoEntry } from "../lib/library";
 import { parseTags } from "../lib/tags";
-import {
-  formatForCount,
-  listSeriesRecords,
-  saveSeriesRecord,
-  suggestSeriesGroups,
-  type SeriesSuggestion,
-  type StudioSeriesRecord
-} from "../lib/series";
 import { EmptyState } from "../components/primitives";
-import { VetoInputDialog } from "../components/VetoInputDialog";
-import { BpView } from "./BpView";
 
 export interface LibraryViewProps {
   entries: StudioDemoEntry[];
@@ -221,8 +210,6 @@ export function LibraryView({
           <span>选手人次</span>
         </div>
       </div>
-
-      {entries.length > 0 && <SeriesManager entries={entries} selectedEntries={selectedVisible} />}
 
       {entries.length > 0 && (
         <div className="stu-toolbar">
@@ -459,121 +446,3 @@ export function LibraryView({
   );
 }
 
-/**
- * 系列赛与 BP 管理（资料库为 owner）：自动按日期+两队建议分组，
- * 手动选 BO 格式、确认系列、录入 BP（VetoInputDialog）。工作台与教练页只消费。
- */
-function SeriesManager({ entries, selectedEntries }: { entries: StudioDemoEntry[]; selectedEntries: StudioDemoEntry[] }) {
-  const [records, setRecords] = useState<StudioSeriesRecord[]>([]);
-  const [editing, setEditing] = useState<{ suggestion: SeriesSuggestion; format: SeriesFormat; veto: SeriesVeto | null } | null>(null);
-  const suggestions = useMemo(() => suggestSeriesGroups(entries), [entries]);
-
-  useEffect(() => {
-    void listSeriesRecords().then((allRecords) => {
-      const entryIds = new Set(entries.map((e) => e.id));
-      setRecords(allRecords.filter((r) => r.entryIds.some((id) => entryIds.has(id))));
-    });
-  }, [entries]);
-
-  const recordById = useMemo(() => new Map(records.map((r) => [r.id, r])), [records]);
-
-  const selectedSuggestion = useMemo((): SeriesSuggestion | null => {
-    if (selectedEntries.length < 1 || selectedEntries.length > 5) return null;
-    const first = selectedEntries[0]!;
-    const expectedTeams = [first.meta.teamAName, first.meta.teamBName].sort().join("\t");
-    if (!selectedEntries.every((entry) => [entry.meta.teamAName, entry.meta.teamBName].sort().join("\t") === expectedTeams)) return null;
-    const sorted = [...selectedEntries].sort((a, b) => a.fileName.localeCompare(b.fileName));
-    const format = formatForCount(sorted.length);
-    return {
-      id: `series:manual:${sorted.map((entry) => entry.id).join("-")}`,
-      name: `${first.meta.teamAName} vs ${first.meta.teamBName}`,
-      entryIds: sorted.map((entry) => entry.id),
-      format,
-      teamAName: first.meta.teamAName,
-      teamBName: first.meta.teamBName,
-    };
-  }, [selectedEntries]);
-
-  async function persist(suggestion: SeriesSuggestion, format: SeriesFormat, veto: SeriesVeto | null) {
-    const saved = await saveSeriesRecord({ ...suggestion, format, veto });
-    setRecords((cur) => [saved, ...cur.filter((r) => r.id !== saved.id)]);
-  }
-
-  if (suggestions.length === 0 && !selectedSuggestion) return null;
-
-  return (
-    <details className="stu-card stu-series-manager">
-      <summary>系列赛与 BP（{records.length}/{suggestions.length} 已建）</summary>
-      {selectedSuggestion && (
-        <p>
-          <button
-            type="button"
-            className="stu-button stu-button-ghost"
-            onClick={() => setEditing({ suggestion: selectedSuggestion, format: selectedSuggestion.format, veto: recordById.get(selectedSuggestion.id)?.veto ?? null })}
-          >
-            将选中的 {selectedSuggestion.entryIds.length} 图建为 {selectedSuggestion.format.toUpperCase()} 并录入 BP
-          </button>
-        </p>
-      )}
-      <table className="stu-mini-table">
-        <thead>
-          <tr><th>建议分组</th><th className="stu-num">图</th><th>赛制</th><th>BP</th><th /></tr>
-        </thead>
-        <tbody>
-          {suggestions.map((suggestion) => {
-            const record = recordById.get(suggestion.id);
-            const format = record?.format ?? suggestion.format;
-            return (
-              <tr key={suggestion.id}>
-                <td>{suggestion.name}</td>
-                <td className="stu-num">{suggestion.entryIds.length}</td>
-                <td>
-                  <select
-                    className="stu-select stu-select-sm"
-                    value={format}
-                    onChange={(e) => void persist(suggestion, e.target.value as SeriesFormat, record?.veto ?? null)}
-                  >
-                    <option value="bo1">BO1</option>
-                    <option value="bo3">BO3</option>
-                    <option value="bo5">BO5</option>
-                  </select>
-                </td>
-                <td className="stu-muted">{record?.veto ? `${record.veto.steps.length} 步` : "未录入"}</td>
-                <td>
-                  <button
-                    type="button"
-                    className="stu-button-sm"
-                    onClick={() => setEditing({ suggestion, format, veto: record?.veto ?? null })}
-                  >
-                    {record?.veto ? "编辑 BP" : "录入 BP"}
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {records.some((r) => r.veto) && (
-        <div className="stu-series-bp-list">
-          {records.filter((r) => r.veto).map((r) => (
-            <div key={r.id} className="stu-series-bp-item">
-              <strong>{r.name} · {r.format.toUpperCase()}</strong>
-              {r.veto && <BpView veto={r.veto} />}
-            </div>
-          ))}
-        </div>
-      )}
-      {editing && (
-        <VetoInputDialog
-          seriesId={editing.suggestion.id}
-          teamAName={editing.suggestion.teamAName}
-          teamBName={editing.suggestion.teamBName}
-          initialFormat={editing.format}
-          initialVeto={editing.veto}
-          onSave={(veto) => persist(editing.suggestion, veto.format, veto)}
-          onClose={() => setEditing(null)}
-        />
-      )}
-    </details>
-  );
-}

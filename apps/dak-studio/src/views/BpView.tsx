@@ -35,7 +35,7 @@ export function BpView({ veto }: { veto: SeriesVeto }) {
             <span className="stu-bp-verb">{ACTION_VERB[step.actionType]}</span>
             <b className="stu-bp-map">{displayMapName(step.mapName)}</b>
             {sideChoice && sideChooser && (
-              <span className="stu-bp-side">→ {sideChooser} 选 {sideChoice.side.toUpperCase()} 方先</span>
+              <span className="stu-bp-side">→ {sideChooser} chose {sideChoice.side.toUpperCase()}</span>
             )}
           </li>
         );

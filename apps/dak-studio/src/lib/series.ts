@@ -197,6 +197,26 @@ export async function deleteSeriesRecord(id: string): Promise<void> {
   await seriesStore.delete(id);
 }
 
+/**
+ * 清理孤儿系列赛 record：无 eventId（loose——由 suggestSeriesGroups + BP 录入产生）且 entryIds
+ * 全部已不在资料库的记录删掉。赛事关联的 series 由 deleteEventRecord 管理，不在此动。
+ * 删 demo 后调用可避免残留的旧系列赛（含其 BP）继续显示，造成 records>suggestions 的计数错位。
+ * 返回删除条数。
+ */
+export async function pruneOrphanSeries(existingEntryIds: Set<string>): Promise<number> {
+  const records = await listSeriesRecords();
+  let removed = 0;
+  for (const record of records) {
+    if (record.eventId) continue;
+    const stillLinked = record.entryIds.some((id) => existingEntryIds.has(id));
+    if (!stillLinked) {
+      await deleteSeriesRecord(record.id);
+      removed += 1;
+    }
+  }
+  return removed;
+}
+
 export async function loadCoachSettings(): Promise<CoachSettings> {
   try {
     const value = await settingsStore.get<CoachSettings>(SETTINGS_KEY);

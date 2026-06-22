@@ -332,7 +332,7 @@ export function EventPackageMaker({ onNotice }: { onNotice: (message: string) =>
               <button type="button" className="stu-button-sm" onClick={() => setSeries((rows) => rows.filter((item) => item.key !== row.key))}>删除系列</button>
             </div>
             <p className="stu-muted">资源 {row.resources.length}/{row.format === "bo1" ? 1 : row.format === "bo3" ? 3 : 5}：{row.resources.map((resource) => `${resource.mapName} ${resource.scoreA}:${resource.scoreB}`).join(" / ") || "尚未附加"}</p>
-            {mismatch.length > 0 && <p className="stu-muted" style={{ color: "var(--dak-danger, #d66)" }}>BP 与 demo 不一致：{mismatch.join("；")}</p>}
+            {mismatch.length > 0 && <p className="stu-veto-error">BP 与 demo 不一致：{mismatch.join("；")}</p>}
           </div>
         );
       })}

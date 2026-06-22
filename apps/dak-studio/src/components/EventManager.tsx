@@ -5,15 +5,25 @@ import { downloadAndImportEvent, importEventAssetFile, loadEventsManifest, pickA
 import type { EventsManifest } from "@cs2dak/contract";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import { EventPackageMaker } from "./EventPackageMaker";
+import { EventGallery } from "./EventGallery";
+import { BUILTIN_EVENTS, type BuiltinEvent } from "../lib/builtin-events";
+import { KIND_OPTIONS } from "../lib/event-maker";
+
+const KIND_LABEL: Record<string, string> = { ...Object.fromEntries(KIND_OPTIONS.map((k) => [k.value, k.label])), showcase: "示例" };
+const SOURCE_LABEL: Record<string, string> = { rivalhub: "RivalHub", manual: "本地制作", r2: "在线下载" };
+const kindLabel = (kind: string) => KIND_LABEL[kind] ?? kind;
+const sourceLabel = (source: string) => SOURCE_LABEL[source] ?? source;
 
 export function EventManager({
   entries,
   onNotice,
   onLibraryChanged,
+  onLoadBuiltin,
 }: {
   entries: StudioDemoEntry[];
   onNotice: (message: string) => void;
   onLibraryChanged?: (entries: StudioDemoEntry[]) => void;
+  onLoadBuiltin: (builtin: BuiltinEvent) => Promise<void> | void;
 }) {
   const [events, setEvents] = useState<StudioEventRecord[]>([]);
   const [manifest, setManifest] = useState<EventsManifest | null>(null);
@@ -41,6 +51,31 @@ export function EventManager({
     } finally { setBusySlug(null); }
   }
 
+  async function loadBuiltin(builtin: BuiltinEvent) {
+    setBusySlug(builtin.slug);
+    try {
+      await onLoadBuiltin(builtin);
+      setEvents(await listEventRecords());
+      setSeries(await listSeriesRecords());
+    } finally {
+      setBusySlug(null);
+    }
+  }
+
+  function downloadOnline(asset: EventsManifest["events"][number]) {
+    cancelRequested.current = false;
+    setBusySlug(asset.slug);
+    void downloadAndImportEvent(asset, entries, onNotice, () => cancelRequested.current)
+      .then(async (result) => {
+        onLibraryChanged?.(result.entries);
+        setEvents(await listEventRecords());
+        setSeries(await listSeriesRecords());
+        onNotice(`${result.cancelled ? "已停止" : "已下载并导入"}「${result.event.event.name}」${result.errors.length ? `；${result.errors.length} 图失败，可重试续导` : ""}`);
+      })
+      .catch((error) => onNotice(error instanceof Error ? error.message : String(error)))
+      .finally(() => setBusySlug(null));
+  }
+
   async function importNative() {
     cancelRequested.current = false;
     setBusySlug("__local__");
@@ -59,79 +94,71 @@ export function EventManager({
   }
 
   return <>
-    <details className="stu-card">
-      <summary><b>赛事合集（{events.length}）</b></summary>
-      <p className="stu-muted">导入赛事资源包 <code>&lt;slug&gt;.zip</code>（含 event-package.json + 各图 ZIP）：自动导入 demo 并建立 Event → Series → Map，按队伍/地图/文件名/sha256 配对。</p>
-      {nativeImport && <button type="button" className="stu-button stu-button-ghost" disabled={busySlug != null} onClick={() => void importNative()}>{busySlug === "__local__" ? "逐图导入中…" : "选择赛事资源包（低内存）"}</button>}
-      {!nativeImport && <label className="stu-button stu-button-ghost">
-        导入赛事资源包 .zip
-        <input hidden type="file" accept=".zip,application/zip" onChange={(event) => void importFile(event)} />
-      </label>}
+    {/* 获取赛事：下载内置/在线赛事，或导入本地资源包。与「已导入赛事」管理分开。 */}
+    <details className="stu-card" open>
+      <summary><b>获取赛事</b></summary>
+      <p className="stu-muted">下载内置示例或在线赛事，或导入本地赛事资源包 <code>&lt;slug&gt;.zip</code>（含 event-package.json + 各图 ZIP）。导入后自动建立赛事 → 系列 → 地图并配对 demo。</p>
+      <EventGallery
+        builtins={BUILTIN_EVENTS}
+        manifest={manifest}
+        busySlug={busySlug}
+        onLoadBuiltin={(builtin) => void loadBuiltin(builtin)}
+        onDownloadOnline={downloadOnline}
+      />
+      <div className="stu-header-actions">
+        {nativeImport && <button type="button" className="stu-button stu-button-ghost" disabled={busySlug != null} onClick={() => void importNative()}>{busySlug === "__local__" ? "逐图导入中…" : "导入本地资源包（低内存）"}</button>}
+        {!nativeImport && <label className="stu-button stu-button-ghost">
+          导入本地资源包 .zip
+          <input hidden type="file" accept=".zip,application/zip" onChange={(event) => void importFile(event)} />
+        </label>}
+        {busySlug != null && <button type="button" className="stu-button-sm" onClick={() => { cancelRequested.current = true; onNotice("将在当前地图处理完成后停止"); }}>停止导入</button>}
+      </div>
       {!nativeImport && <p className="stu-muted">浏览器降级入口会把整个赛事包载入内存后逐图导入；桌面端走原生低内存路径，更适合大型赛事包。</p>}
-      {busySlug != null && <button type="button" className="stu-button-sm" onClick={() => { cancelRequested.current = true; onNotice("将在当前地图处理完成后停止"); }}>停止导入</button>}
-      {events.length > 0 && (
-        <table className="stu-mini-table">
-          <thead><tr><th>赛事</th><th>类型</th><th>阶段</th><th>系列</th><th>资源</th><th>来源</th><th /></tr></thead>
-          <tbody>{events.map((event) => (
-            <tr key={event.id}>
-              <td>{event.name}</td>
-              <td>{event.kind}</td>
-              <td>{event.stages.map((stage) => stage.name).join(" / ") || "—"}</td>
-              <td>{event.seriesIds.length}</td>
-              <td>{(() => { const rows = series.filter((row) => row.eventId === event.id); const total = rows.reduce((sum, row) => sum + (row.mapAssignments?.length ?? row.entryIds.length), 0); const linked = rows.reduce((sum, row) => sum + (row.mapAssignments?.filter((map) => map.entryId).length ?? row.entryIds.length), 0); return `${linked}/${total} 图`; })()}</td>
-              <td>{event.source}{event.readOnly ? " · 只读" : ""}</td>
-              <td>
-                <button type="button" className="stu-button-sm" onClick={() => {
-                  if (!window.confirm(`移除赛事「${event.name}」？demo 档案保留在资料库。`)) return;
-                  void deleteEventRecord(event).then(async () => { setEvents(await listEventRecords()); setSeries(await listSeriesRecords()); onNotice(`已移除赛事「${event.name}」`); });
-                }}>移除赛事</button>
-                {" "}
-                <button type="button" className="stu-button-sm" onClick={() => {
-                  const entryIds = [...new Set(series.filter((row) => row.eventId === event.id).flatMap((row) => row.entryIds))];
-                  if (entryIds.length === 0) { onNotice("该赛事无关联 demo，无需删除档案"); return; }
-                  if (!window.confirm(`删除赛事「${event.name}」及其全部 ${entryIds.length} 场 demo 档案？此操作不可撤销。`)) return;
-                  void deleteEventRecord(event).then(async () => {
-                    await removeDemos(entryIds, (done, total) => onNotice(`删除档案 ${done}/${total}…`));
-                    onLibraryChanged?.(entries.filter((e) => !new Set(entryIds).has(e.id)));
-                    setEvents(await listEventRecords());
-                    setSeries(await listSeriesRecords());
-                    onNotice(`已删除赛事「${event.name}」及 ${entryIds.length} 场 demo`);
-                  });
-                }}>连带档案</button>
-              </td>
-            </tr>
-          ))}</tbody>
-        </table>
-      )}
-      {manifest && manifest.events.length > 0 && (
-        <div>
-          <h4>在线赛事资产</h4>
-          {manifest.events.map((asset) => (
-            <button
-              key={asset.slug}
-              type="button"
-              className="stu-button stu-button-ghost"
-              disabled={busySlug != null}
-              onClick={() => {
-                cancelRequested.current = false;
-                setBusySlug(asset.slug);
-                void downloadAndImportEvent(asset, entries, onNotice, () => cancelRequested.current)
-                  .then(async (result) => {
-                    onLibraryChanged?.(result.entries);
-                    setEvents(await listEventRecords());
-                    setSeries(await listSeriesRecords());
-                    onNotice(`${result.cancelled ? "已停止" : "已下载并导入"}「${result.event.event.name}」${result.errors.length ? `；${result.errors.length} 图失败，可重试续导` : ""}`);
-                  })
-                  .catch((error) => onNotice(error instanceof Error ? error.message : String(error)))
-                  .finally(() => setBusySlug(null));
-              }}
-            >
-              {busySlug === asset.slug ? "下载并导入中…" : `下载 ${asset.name}（${(asset.size / 1024 / 1024).toFixed(1)} MB）`}
-            </button>
-          ))}
-        </div>
-      )}
     </details>
+
+    {/* 已导入赛事：管理与删除。 */}
+    {events.length > 0 && (
+      <details className="stu-card" open>
+        <summary><b>已导入赛事（{events.length}）</b></summary>
+        <table className="stu-mini-table">
+          <thead><tr><th>赛事</th><th>类型</th><th>阶段</th><th>系列</th><th>已匹配地图</th><th>来源</th><th /></tr></thead>
+          <tbody>{events.map((event) => {
+            const rows = series.filter((row) => row.eventId === event.id);
+            const total = rows.reduce((sum, row) => sum + (row.mapAssignments?.length ?? row.entryIds.length), 0);
+            const linked = rows.reduce((sum, row) => sum + (row.mapAssignments?.filter((map) => map.entryId).length ?? row.entryIds.length), 0);
+            return (
+              <tr key={event.id}>
+                <td>{event.name}</td>
+                <td>{kindLabel(event.kind)}</td>
+                <td>{event.stages.map((stage) => stage.name).join(" / ") || "—"}</td>
+                <td>{event.seriesIds.length}</td>
+                <td>{total > 0 ? `${linked} / ${total}` : "—"}</td>
+                <td>{sourceLabel(event.source)}{event.readOnly ? " · 只读" : ""}</td>
+                <td>
+                  <button type="button" className="stu-button-sm" onClick={() => {
+                    if (!window.confirm(`移除赛事「${event.name}」的组织记录？\n\ndemo 档案会保留在资料库，可重新建立赛事。`)) return;
+                    void deleteEventRecord(event).then(async () => { setEvents(await listEventRecords()); setSeries(await listSeriesRecords()); onNotice(`已移除赛事「${event.name}」（demo 保留）`); });
+                  }}>移除（保留 demo）</button>
+                  {" "}
+                  <button type="button" className="stu-button-sm stu-button-danger" onClick={() => {
+                    const entryIds = [...new Set(rows.flatMap((row) => row.entryIds))];
+                    if (entryIds.length === 0) { onNotice("该赛事无关联 demo，无需删除档案"); return; }
+                    if (!window.confirm(`彻底删除赛事「${event.name}」及其 ${entryIds.length} 场 demo 档案？\n\n⚠️ demo 的 ZIP 会从资料库永久删除，不可撤销。`)) return;
+                    void deleteEventRecord(event).then(async () => {
+                      await removeDemos(entryIds, (done, total) => onNotice(`删除档案 ${done}/${total}…`));
+                      onLibraryChanged?.(entries.filter((e) => !new Set(entryIds).has(e.id)));
+                      setEvents(await listEventRecords());
+                      setSeries(await listSeriesRecords());
+                      onNotice(`已彻底删除赛事「${event.name}」及 ${entryIds.length} 场 demo`);
+                    });
+                  }}>删除赛事及 demo</button>
+                </td>
+              </tr>
+            );
+          })}</tbody>
+        </table>
+      </details>
+    )}
     <EventPackageMaker onNotice={onNotice} />
   </>;
 }

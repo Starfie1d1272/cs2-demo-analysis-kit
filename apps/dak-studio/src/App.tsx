@@ -4,8 +4,8 @@ import { bulkUpdateTags, importDemoFile, listDemoEntries, removeDemo, removeDemo
 import { EMPTY_SCOPE, applyScope, type CohortScopeState } from "./components/CohortScope";
 import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems, triggerWindowsDropCapture, type ExportedDemoFile } from "./lib/dem";
 import { parseTags } from "./lib/tags";
-import { saveSeriesRecord, suggestSeriesGroups, deriveVetoSummary } from "./lib/series";
-import type { SeriesVeto, SeriesVetoStep } from "@cs2dak/contract";
+import { pruneOrphanSeries } from "./lib/series";
+import { importEventAssetArchive } from "./lib/event-assets";
 import { APP_VERSION, checkForUpdate, type UpdateInfo } from "./lib/update";
 import { checkForUpdateViaBridge } from "./lib/updater-bridge";
 import { UpdateControl } from "./components/UpdateControl";
@@ -26,14 +26,7 @@ import { DuelView } from "./views/DuelView";
 import { CoachView } from "./views/CoachView";
 import { loadIdentityState, buildCohortIdentityMap, type IdentityStoreState } from "./lib/identity";
 import type { IdentityOptions } from "./lib/season";
-import sampleMirage from "../../../fixtures/input/sample-2026-02-09_de_mirage_FURIA_13-11_Team_Vitality.zip?url";
-import sampleInferno from "../../../fixtures/input/sample-2026-02-09_de_inferno_Team_Vitality_13-8_FURIA.zip?url";
-import sampleNuke from "../../../fixtures/input/sample-2026-02-09_de_nuke_FURIA_2-13_Team_Vitality.zip?url";
-import sampleOverpass from "../../../fixtures/input/sample-2026-02-09_de_overpass_Team_Vitality_13-10_FURIA.zip?url";
-import sampleDust2 from "../../../fixtures/input/sample-2026-05-17_de_dust2_Team_Spirit_16-12_Team_Falcons.zip?url";
-import sampleSphMirage from "../../../fixtures/input/sample-2026-05-17_de_mirage_Team_Spirit_13-7_Team_Falcons.zip?url";
-import sampleAncient from "../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip?url";
-const sampleUrls = [sampleMirage, sampleInferno, sampleNuke, sampleOverpass, sampleDust2, sampleSphMirage, sampleAncient];
+import { BUILTIN_EVENTS, type BuiltinEvent } from "./lib/builtin-events";
 
 // 八模块信息架构（docs/roadmap.md），未实现的模块以「制作中」占位展示
 type StudioView =
@@ -124,7 +117,11 @@ export function App() {
 
   useEffect(() => {
     listDemoEntries()
-      .then(setEntries)
+      .then(async (loaded) => {
+        setEntries(loaded);
+        // 启动时清理历史遗留的孤儿系列赛（删过 demo 但 record 残留，会造成 records>suggestions 计数错位）。
+        await pruneOrphanSeries(new Set(loaded.map((entry) => entry.id))).catch(() => 0);
+      })
       .catch((err) => setNotice(`读取本地资料库失败：${err instanceof Error ? err.message : String(err)}`));
     doCheckUpdate();
     void loadIdentityState().then(setIdentityState);
@@ -211,75 +208,27 @@ export function App() {
   /** pywebview 桌面壳提供原生对话框，由 LibraryView 条件展示。 */
   const nativeImportAvailable = typeof window.pywebview?.api?.pick_dems === "function";
 
-  const loadSample = useCallback(async () => {
+  // 载入一个内置赛事/示例：拉随包 event-package zip，走与在线/cologne 完全相同的导入路径
+  // （importEventAssetArchive：逐图导入 demo + 建立赛事/系列/BP）。BP 已写在包里，无需回填。
+  const loadBuiltinEvent = useCallback(async (builtin: BuiltinEvent) => {
     setImporting(true);
     setNotice(null);
     try {
-      const files = await Promise.all(
-        sampleUrls.map(async (url) => {
-          const response = await fetch(url);
-          const blob = await response.blob();
-          const name = url.split("/").pop() ?? "sample.zip";
-          return new File([blob], name.replace(/^sample-/i, ""), { type: "application/zip" });
-        })
-      );
-      await importFiles(files);
-
-      // 预设 BP：示例系列自动填入已知 BP
-      const allEntries = await listDemoEntries();
-      const suggestions = suggestSeriesGroups(allEntries);
-
-      for (const suggestion of suggestions) {
-        let steps: SeriesVetoStep[] | null = null;
-        let pool: string[] = [];
-
-        if (suggestion.teamAName.includes("FURIA") && suggestion.teamBName.includes("Vitality")) {
-          // IEM Kraków 2026 决赛 FURIA vs Vitality（BO5）
-          pool = ["de_dust2", "de_ancient", "de_mirage", "de_inferno", "de_nuke", "de_overpass", "de_anubis"];
-          steps = [
-            { stepOrder: 1, actionType: "ban", teamKey: "teamA", mapName: "de_dust2", side: null },
-            { stepOrder: 2, actionType: "ban", teamKey: "teamB", mapName: "de_ancient", side: null },
-            { stepOrder: 3, actionType: "pick", teamKey: "teamA", mapName: "de_mirage", side: "t" },
-            { stepOrder: 4, actionType: "pick", teamKey: "teamB", mapName: "de_inferno", side: "t" },
-            { stepOrder: 5, actionType: "pick", teamKey: "teamA", mapName: "de_nuke", side: "t" },
-            { stepOrder: 6, actionType: "pick", teamKey: "teamB", mapName: "de_overpass", side: "t" },
-            { stepOrder: 7, actionType: "decider", teamKey: null, mapName: "de_anubis", side: null },
-          ];
-        } else if (suggestion.teamAName.includes("Falcons") && suggestion.teamBName.includes("Spirit")) {
-          // PGL Astana 2026 决赛 Spirit vs Falcons（BO5）
-          pool = ["de_inferno", "de_overpass", "de_dust2", "de_mirage", "de_ancient", "de_nuke", "de_anubis"];
-          steps = [
-            { stepOrder: 1, actionType: "ban", teamKey: "teamB", mapName: "de_inferno", side: null },
-            { stepOrder: 2, actionType: "ban", teamKey: "teamA", mapName: "de_overpass", side: null },
-            { stepOrder: 3, actionType: "pick", teamKey: "teamB", mapName: "de_dust2", side: "t" },
-            { stepOrder: 4, actionType: "pick", teamKey: "teamA", mapName: "de_mirage", side: "t" },
-            { stepOrder: 5, actionType: "pick", teamKey: "teamB", mapName: "de_ancient", side: "t" },
-            { stepOrder: 6, actionType: "pick", teamKey: "teamA", mapName: "de_nuke", side: "t" },
-            { stepOrder: 7, actionType: "decider", teamKey: null, mapName: "de_anubis", side: null },
-          ];
-        }
-
-        if (steps) {
-          const veto: SeriesVeto = {
-            version: "cs2-demo-analysis-kit/series-veto-0.1",
-            seriesId: suggestion.id,
-            format: "bo5",
-            teamAName: suggestion.teamAName,
-            teamBName: suggestion.teamBName,
-            mapPool: pool,
-            ...deriveVetoSummary(steps),
-            steps,
-          };
-          await saveSeriesRecord({ ...suggestion, format: veto.format, veto });
-        }
-      }
-
+      const response = await fetch(builtin.packageUrl);
+      const bytes = await response.arrayBuffer();
+      const existing = await listDemoEntries();
+      const result = await importEventAssetArchive(bytes, existing, builtin.slug, { onProgress: setNotice });
       setEntries(await listDemoEntries());
+      setNotice(`已载入「${result.event.event.name}」：匹配 ${result.event.matchedMaps} 图${result.errors.length ? `；${result.errors.length} 图失败` : ""}`);
     } catch (err) {
-      setNotice(`示例加载失败：${err instanceof Error ? err.message : String(err)}`);
+      setNotice(`载入失败：${err instanceof Error ? err.message : String(err)}`);
+    } finally {
       setImporting(false);
     }
-  }, [importFiles]);
+  }, []);
+
+  // 兼容旧入口：LibraryView 的「加载示例」载入首个内置条目（示例职业局）。
+  const loadSample = useCallback(() => loadBuiltinEvent(BUILTIN_EVENTS[0]), [loadBuiltinEvent]);
 
   const openDemo = useCallback((id: string, target?: MatchDeepLink) => {
     setSelectedDemoId(id);
@@ -296,7 +245,9 @@ export function App() {
   const handleRemove = useCallback(
     async (id: string) => {
       await removeDemo(id);
-      setEntries(await listDemoEntries());
+      const next = await listDemoEntries();
+      setEntries(next);
+      await pruneOrphanSeries(new Set(next.map((entry) => entry.id))).catch(() => 0);
       setSelectedDemoId((current) => (current === id ? null : current));
     },
     []
@@ -390,7 +341,9 @@ export function App() {
     setImporting(true);
     try {
       await removeDemos(ids, (done, total) => setNotice(`正在删除（${done}/${total}）…`));
-      setEntries(await listDemoEntries());
+      const next = await listDemoEntries();
+      setEntries(next);
+      await pruneOrphanSeries(new Set(next.map((entry) => entry.id))).catch(() => 0);
       setSelectedDemoId((current) => (current && ids.includes(current) ? null : current));
       setNotice(`已删除 ${ids.length} 场 demo`);
     } catch (err) {
@@ -654,6 +607,7 @@ export function App() {
             onGoLibrary={() => setView("library")}
             onNotice={setNotice}
             onLibraryChanged={setEntries}
+            onLoadBuiltin={loadBuiltinEvent}
           />
         )}
       </main>

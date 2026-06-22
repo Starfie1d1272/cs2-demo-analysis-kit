@@ -2499,6 +2499,20 @@ td.stu-heat-cell.stu-heat-neutral {
   opacity: 0.4;
   cursor: not-allowed;
 }
+/* 小号危险按钮：表格行内的不可逆删除动作，复用危险色但走 sm 尺寸 */
+.stu-button-sm.stu-button-danger {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+/* 赛事画廊空态 */
+.stu-event-gallery-empty {
+  padding: 14px;
+  border: 1px dashed var(--dak-border-hi);
+  border-radius: var(--stu-radius-sm);
+  color: var(--dak-fg-dim);
+  font-size: 13px;
+}
 
 /* ── 管理视图 ─────────────────────────────────────────────── */
 
@@ -4285,4 +4299,75 @@ td.stu-heat-cell.stu-heat-neutral {
 .stu-duel-card-compact.stu-duel-card-hovered {
   background: color-mix(in srgb, var(--dak-accent) 15%, transparent);
   border-color: var(--dak-accent);
+}
+
+/* 赛事/示例统一画廊：内置与在线共用卡片 */
+.stu-event-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+.stu-event-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  padding: 12px;
+  border: 1px solid var(--dak-border);
+  border-left: 3px solid var(--dak-accent);
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-panel);
+  color: var(--dak-fg);
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.stu-event-card:hover:not(:disabled) {
+  border-color: var(--dak-accent);
+  background: var(--dak-panel-hi);
+}
+.stu-event-card:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.stu-event-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stu-event-badge {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--dak-accent-soft);
+  color: var(--dak-accent);
+}
+.stu-event-card-action {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--dak-accent);
+}
+.stu-event-group {
+  grid-column: 1 / -1;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-bg-subtle);
+  padding: 8px;
+}
+.stu-event-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 4px 6px;
+  background: transparent;
+  border: none;
+  color: var(--dak-fg);
+  cursor: pointer;
+}
+.stu-event-group-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
 }

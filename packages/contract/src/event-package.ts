@@ -143,6 +143,10 @@ export const eventsManifestSchema = z.object({
     sha256: z.string().regex(/^[a-fA-F0-9]{64}$/),
     urls: z.array(z.string().url()).min(1),
     packageVersion: z.string().min(1),
+    // 展示层可选字段（向后兼容；旧 manifest 不带也合法）：
+    description: z.string().optional(), // 卡片副标题文案
+    builtin: z.boolean().optional(), // 首发/内置：进入页面提示一键下载
+    group: z.string().optional(), // UI 归组键（同 group 折叠成一个赛事、展开见各阶段，如 iem-cologne-major-2026）
   })),
 });
 

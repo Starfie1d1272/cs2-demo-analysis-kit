@@ -4,6 +4,7 @@ import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState } from "../components/primitives";
 import { LibraryMaintenance } from "../components/LibraryMaintenance";
 import { EventManager } from "../components/EventManager";
+import type { BuiltinEvent } from "../lib/builtin-events";
 import { getSeasonSummary, type IdentityOptions } from "../lib/season";
 import {
   buildCohortIdentityMap,
@@ -30,6 +31,7 @@ export interface ManagementViewProps {
   teamRenames?: Record<string, string>;
   onNotice?: (message: string) => void;
   onLibraryChanged?: (entries: StudioDemoEntry[]) => void;
+  onLoadBuiltin: (builtin: BuiltinEvent) => Promise<void> | void;
 }
 
 type BundlePlayer = SeasonCohortBundle["players"][number];
@@ -51,7 +53,8 @@ export function ManagementView({
   onGoLibrary,
   teamRenames = identity.teamRenames,
   onNotice = () => {},
-  onLibraryChanged
+  onLibraryChanged,
+  onLoadBuiltin
 }: ManagementViewProps) {
   const [bundle, setBundle] = useState<SeasonCohortBundle | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -239,7 +242,7 @@ export function ManagementView({
   const toolsSection = (
     <>
       <LibraryMaintenance onNotice={onNotice} />
-      <EventManager entries={allEntries} onNotice={onNotice} onLibraryChanged={onLibraryChanged} />
+      <EventManager entries={allEntries} onNotice={onNotice} onLibraryChanged={onLibraryChanged} onLoadBuiltin={onLoadBuiltin} />
     </>
   );
 
