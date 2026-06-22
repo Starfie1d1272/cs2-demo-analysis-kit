@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# 科隆 Major 赛事包本地制作辅助：.rar/.dem → 解压 → cs2df 导出 v3 ZIP → 放入分阶段子文件夹。
+# 通用赛事单源导出：.rar/.dem → 解压 → cs2df 导出 v3 ZIP → 放入 <outRoot>/<stage>/。
+# 任何赛事通用，输出根目录与阶段名全部参数化（旧 cologne-export.sh 的泛化版）。
 #
 # 用法：
-#   bash scripts/cologne-export.sh <Stage1|Stage2|Stage3|Playoff> <demo.rar|demo.dem> [输出名前缀(无扩展名)]
+#   bash scripts/event-export.sh <outRoot> <stage> <demo.rar|demo.dem> [输出名前缀(无扩展名)]
 #
+# - <outRoot>：赛事 demo 根目录（如 fixtures/demos/pro/IEM-Cologne-Major-2026），相对路径按仓库根解析。
+# - <stage>：阶段子目录名（如 Stage1 / Playoff）。
 # - 接受 .rar（含 1 或多张 .dem）或单个 .dem。
 # - rar 内按 base 名（去 -pN 后缀）分组：同图被 GOTV 切成 -p1/-p2/… 的多段会
 #   合并成一份完整 ZIP（cs2df export part1 part2 … 做 tick 偏移 + 重新派生）；
@@ -13,17 +16,23 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-STAGE="${1:?需要阶段：Stage1/Stage2/Stage3/Playoff}"
-SRC="${2:?需要 .rar 或 .dem 路径}"
-PREFIX="${3:-}"
-OUTDIR="$REPO/fixtures/demos/pro/IEM-Cologne-Major-2026/$STAGE"
+OUTROOT_ARG="${1:?需要 outRoot：赛事 demo 根目录}"
+STAGE="${2:?需要阶段：如 Stage1/Playoff}"
+SRC="${3:?需要 .rar 或 .dem 路径}"
+PREFIX="${4:-}"
+
+# outRoot 相对路径按仓库根解析
+case "$OUTROOT_ARG" in
+  /*) OUTDIR="$OUTROOT_ARG/$STAGE" ;;
+  *)  OUTDIR="$REPO/$OUTROOT_ARG/$STAGE" ;;
+esac
 mkdir -p "$OUTDIR"
 
-# .dem 原名 → 干净 base：去 -pN 分段后缀、去 HLTV 前缀，sanitize 成 [a-z0-9-]。
+# .dem 原名 → 干净 base：去 -pN 分段后缀、去常见赛事/HLTV 前缀，sanitize 成 [a-z0-9-]。
 clean_base() {
   # 注意 tr 保留集要含 \n，否则结尾换行被转成 -，多 base 会粘连。
   basename "$1" .dem \
-    | sed -E 's/-p[0-9]+$//; s/^iem-cologne-major-2026-stage-[0-9]+-//' \
+    | sed -E 's/-p[0-9]+$//; s/^[a-z-]*-stage-[0-9]+-//' \
     | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-\n' '-' | sed -E 's/-+/-/g; s/^-|-$//g'
 }
 
@@ -48,12 +57,10 @@ write_date() {
 do_export() {
   local name="$1"; shift
   local out="$OUTDIR/$name.zip"
-  local datefile="$OUTDIR/$name.date"
   # 总是写 .date（幂等：覆盖最新导出时间）
   write_date "$name" "$@"
   if [ -f "$out" ]; then echo "  · 跳过（已存在）：$STAGE/$name.zip"; return; fi
   if [ "$#" -gt 1 ]; then echo "  → 合并 $# 段 → $STAGE/$name.zip"; else echo "  → 导出 → $STAGE/$name.zip"; fi
-  # --no-sync：保留本地 editable 安装的 cs2df（clone，含分段合并），避免 uv re-sync 回退 PyPI 版。
   uv run --project "$REPO/python" cs2df export "$@" -o "$out" --research
 }
 

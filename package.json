@@ -27,7 +27,8 @@
     "sync-version": "node scripts/sync-version.mjs",
     "package": "bash scripts/package.sh",
     "events:build": "node scripts/build-event-asset.mjs",
-    "events:publish": "bash scripts/publish-event-assets.sh"
+    "events:publish": "bash scripts/publish-event-assets.sh",
+    "event:export": "node scripts/event-export.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",

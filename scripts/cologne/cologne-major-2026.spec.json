@@ -5,6 +5,16 @@
     "name": "IEM Cologne Major 2026",
     "kind": "major"
   },
+  "_exportNote": "scripts/event-export.mjs 读此块：按阶段展开源 glob（~ 展开为家目录），逐源调用 event-export.sh。源命名按 HLTV 下载约定 iem-cologne-major-2026-<stage>-*.rar。可断点续跑；--reexport 先清空再全量重导。",
+  "export": {
+    "outRoot": "fixtures/demos/pro/IEM-Cologne-Major-2026",
+    "stages": [
+      { "stage": "Stage1", "sources": ["~/Downloads/iem-cologne-major-2026-stage-1-*.rar"] },
+      { "stage": "Stage2", "sources": ["~/Downloads/iem-cologne-major-2026-stage-2-*.rar"] },
+      { "stage": "Stage3", "sources": ["~/Downloads/iem-cologne-major-2026-stage-3-*.rar"] },
+      { "stage": "Playoff", "sources": ["~/Downloads/iem-cologne-major-2026-playoff-*.rar"] }
+    ]
+  },
   "stages": [
     {
       "key": "stage1",
