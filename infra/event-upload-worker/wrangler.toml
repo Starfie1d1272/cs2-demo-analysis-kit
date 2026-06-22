@@ -1,0 +1,29 @@
+# Cloudflare Worker：赛事包上传隔离区（submission quarantine）。
+# 只负责"收"——把用户上传的 <slug>.zip 落到 R2 的 events/_submissions/ 前缀（不进 manifest、
+# 不可公开下载）。审核与 promote 到 events/ 的写权限完全留在本地（scripts/promote-event-submission.mjs +
+# 你的 R2 凭证），边缘绝不持有 promote 能力。
+#
+# 部署（需你在装了 Cloudflare 凭证的环境跑）：
+#   cd infra/event-upload-worker
+#   npx wrangler deploy
+#   npx wrangler secret put TURNSTILE_SECRET   # 可选：开人机校验防滥用
+# bucket 名与自动更新/赛事资产同一个 cs2dak-assets。
+name = "event-upload-worker"
+main = "src/index.ts"
+compatibility_date = "2026-06-01"
+
+# 与现网赛事资产同 bucket；Worker 只写 events/_submissions/ 前缀。
+[[r2_buckets]]
+binding = "ASSETS"
+bucket_name = "cs2dak-assets"
+
+[vars]
+# 单个赛事包上限（字节）。默认 512MB——按 stage 拆包后单包远小于此，留足余量。
+MAX_UPLOAD_BYTES = "536870912"
+# 允许跨域上传的来源（Studio WebView / 本地开发）。逗号分隔；* 表示放开（不建议生产用）。
+ALLOWED_ORIGINS = "*"
+
+# 路由：默认走 workers.dev 子域；如需绑自定义域，取消下面注释并改成你的路由。
+# [[routes]]
+# pattern = "events-upload.starfie1d.top/*"
+# custom_domain = true
