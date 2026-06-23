@@ -1,94 +1,134 @@
-# scripts/hltv — 赛事包 dev 侧流水线
+# scripts/hltv — 赛事包批量制作工具
 
-HLTV → 赛事包的**开发机工具**。**不随 DAK Studio 分发**：依赖 Playwright + CDP 接管真实
-Chrome + 手过 Cloudflare，天然绑开发机；且产品内置 HLTV 爬虫有 ToS/法务风险。
-分工：**官方赛事包**由维护者在本机爬取→装配→传 R2（用户只下成品）；**用户自己的 demo**
-走 Studio 手动制作器拖 `.dem`。对外只出「Console 提取片段 + 本机下载脚本 + 教程」，不做代爬服务。
+**把 HLTV 赛事页面变成 DAK Studio 可用的 event-package，全链路命令行完成。**
 
-## 科隆 Major 2026 各阶段 HLTV 入口
+## 这个工具是给谁的
 
-| 阶段 | HLTV Results 页 | URL slug 特征 |
-|---|---|---|
-| Stage 1 | `https://www.hltv.org/results?event=9028` | `iem-cologne-major-2026-stage-1` |
-| Stage 2 | `https://www.hltv.org/results?event=9029` | `iem-cologne-major-2026-stage-2` |
-| Stage 3 + Playoff | `https://www.hltv.org/results?event=8301` | `iem-cologne-major-2026`（无 stage 后缀） |
+| 你的情况 | 你应该 |
+|---|---|
+| **DAK Studio 用户**，只想导入现成赛事 | 打开 Studio → EventGallery → 下载或一键载入。**不需要看这篇。** |
+| **教练 / 主办方 / 爱好者**，想要一个还没人做好的赛事包 | 到 [GitHub Issues](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues) 提赛事名 + HLTV 链接，等维护者跑完上传 R2 即可。**不需要看这篇。** |
+| **有命令行基础**，想自己批量制作赛事包 | **看这篇。** 下面讲的都是命令行操作。 |
 
-Stage 3 和 Playoff 共用 `event=8301` 页面，**无法靠 URL slug 区分**。
-导出时靠 spec `export.Playoff.pairs` / `Stage3.excludePairs` 按对阵路由（同名对阵
-再遇用 `matchIds` 精确匹配）。
+## 开始之前
 
-## 全链路
+你得有这些：
 
-```
-HLTV results 页 (Console 片段或 CDP 脚本提取 URL)
-  → matches-{stage}.txt      (存 scripts/cologne/data/)
-  → download-hltv-demos.ts     (CDP + 并发池 → 下载 .rar)
-        ⇒ fixtures/demos/pro/<Event>/_src/*.rar   (gitignored)
-  → extract-bp.ts              (CDP → 爬 veto 文本)
-        ⇒ bp-output.txt / *-bp-complete.txt   (存 scripts/cologne/data/)
-  → bp-to-spec.mjs             (文本 → spec.series 的 bp + 真实对阵 + matchUrl)   ★ 关键修复点
-        ⇒ --merge 覆盖 scripts/cologne/<event>.spec.json
-  → extract-stage-urls.mjs     (CDP 轻量提取，纯 Node WebSocket，零依赖；备用)
-        ⇒ matches-stage1.txt / matches-stage2.txt
-  → node scripts/event-export.mjs <spec>   (.rar → cs2df export --research --compress-level 9)
-        ⇒ fixtures/demos/pro/<Event>/<Stage>/*.zip
-  → node scripts/cologne-build.mjs  (按队伍/地图匹配 → 4 个 per-stage event-package-1.0)
-        ⇒ _build/{slug}-stage1.zip … {slug}-playoff.zip
-  → Stage1/2 → R2 (build-event-asset.mjs + publish-event-assets.sh)
-    Stage3/Playoff → Studio 内置 (随安装包分发)
-```
+- **Node.js 24+**（`node --version`）
+- **Chrome 浏览器**（只要还能正常上 HLTV 就行）
+- **终端**（macOS 自带 Terminal；Windows 用 **Git Bash** 或 **WSL**）
+- **一个 HLTV 账号**（已经在 Chrome 里登录过，过了一次 Cloudflare 验证就行）
+- 本仓库 clone 到本地，依赖已装（`pnpm install`、`uv sync`）
 
-## URL 提取
+> **Windows 用户注意**：Chrome 和 Node 在 Windows 上都正常跑，但管线的最后一步——`event-export.sh` 当前是 bash 脚本，
+> 需要用 **Git Bash** 或 **WSL** 来跑。如果都没有，只跑"下载 + BP 提取"两步也行（把 .rar 和 bp 文本交给 macOS 侧出包）。
 
-### 方式一：CDP 自动化（推荐，fast-path）
+## macOS 快速上手（完整链路）
 
 ```bash
-# 前提：Chrome 已启动 --remote-debugging-port=9222 并登录 HLTV
-node scripts/hltv/extract-stage-urls.mjs                    # 全 stage
-node scripts/hltv/extract-stage-urls.mjs --stage stage1     # 单 stage
+# 0. 启动 Chrome（打开一次，后面一直用）
+open -a "Google Chrome" --args \
+  --remote-debugging-port=9222 \
+  --user-data-dir="$HOME/hltv-real-chrome-profile"
+
+# 0b. 在打开的 Chrome 里登录 HLTV，手动过一次 CF 验证
+
+# 1. 提取 URL（二选一）
+#    a) CDP 自动化：在 HLTV results 页开着的情况下
+node scripts/hltv/extract-stage-urls.mjs --stage stage1
+#    b) 手动：打开对应 results 页 → F12 Console → 粘贴下面的片段
+
+# 2. 下载 demo（各阶段 matches 文件名见下表）
+#    Chrome 保持 9222 端口，另开终端
+cd scripts/hltv              # 或独立目录，playwright 不进仓库 node_modules
+npx -y -p @playwright/test -p tsx tsx download-hltv-demos.ts
+
+# 3. 提取 BP
+npx -y -p @playwright/test -p tsx tsx extract-bp.ts
+
+# 4. BP → spec
+node bp-to-spec.mjs ../cologne/data/stage3-bp-complete.txt \
+  --matches ../cologne/data/matches.txt
+node bp-to-spec.mjs ../cologne/data/*.txt \
+  --matches ../cologne/data/matches.txt \
+  --merge ../cologne/cologne-major-2026.spec.json
+
+# 5. 导出（回到仓库根目录）
+node scripts/event-export.mjs scripts/cologne/cologne-major-2026.spec.json
+
+# 6. 装配
+node scripts/cologne-build.mjs
 ```
-直接在当前 Chrome 页面导航 HLTV results 页并执行 JS 提取，输出
-`matches-stage1.txt` / `matches-stage2.txt`。零依赖（Node 24 原生 WebSocket）。
 
-### 方式二：Console 手动粘贴（fallback / 跨平台）
+## Windows 上手
 
-打开对应 results 页，F12 Console 粘贴：
+跟上面差不多，区别在这：
+
+```powershell
+# 0. 启动 Chrome（PowerShell）
+& "C:\Program Files\Google\Chrome\Application\chrome.exe" `
+  --remote-debugging-port=9222 `
+  --user-data-dir="$env:USERPROFILE\hltv-real-chrome-profile"
+
+# 步骤 1–4：同上（Node 跨平台，extract-stage-urls / bp-to-spec 都是 .mjs）
+
+# 步骤 5–6：需要 Git Bash 或 WSL
+#   → 在 Git Bash 里 cd 到仓库根目录，跑同上的 node 命令即可
+```
+
+> `download-hltv-demos.ts` / `extract-bp.ts` 在 PowerShell 里也能跑（npx 是跨平台的），
+> 只有 `event-export.sh` 绑 bash——未来会重写为 `.mjs`。
+
+## Console 提取片段（手动方式，Windows/macOS/任何 OS 都能用）
+
+打开对应 HLTV results 页，F12 打开 Console，粘贴并回车：
 
 ```js
-// Stage 1 (event=9028)
+// Stage 1（https://www.hltv.org/results?event=9028）
 copy([...document.querySelectorAll('a[href*="/matches/"]')]
   .map(a => new URL(a.getAttribute('href'), location.origin).href.split('#')[0])
   .filter(v => v.includes('iem-cologne-major-2026-stage-1'))
   .filter((v, i, arr) => arr.indexOf(v) === i).join('\n'));
 
-// Stage 2 (event=9029) — 把 filter 换成 stage-2
-// Stage 3 + Playoff (event=8301) — 把 filter 换成 iem-cologne-major-2026（不要 stage 后缀），
-//   整页存下来，导出时由 pairs/excludePairs 路由。
+// Stage 2（https://www.hltv.org/results?event=9029）
+//   把 filter 换成 .includes('iem-cologne-major-2026-stage-2')
+
+// Stage 3 + Playoff（https://www.hltv.org/results?event=8301）
+//   把 filter 换成 .includes('iem-cologne-major-2026')
+//   （不要加 stage 后缀——这页两个阶段混在一起，导出时由 spec 的 pairs 自动分开）
 ```
+
+`copy()` 会把 URL 列表拷到剪贴板，粘到 `scripts/cologne/data/matches-{stage}.txt` 即可。
 
 ## 命令速查
 
 ```bash
-# 下载（先开 Chrome --remote-debugging-port=9222 并手过一次 CF，详见脚本头注释）
+# CDP 提取 URL（Node 24 原生 WebSocket，零依赖）
+node scripts/hltv/extract-stage-urls.mjs                   # 全 stage
+node scripts/hltv/extract-stage-urls.mjs --stage stage1    # 单 stage
+
+# 下载 + 提取 BP（需 Chrome CDP + npx 临时拉 playwright）
 npx -y -p @playwright/test -p tsx tsx scripts/hltv/download-hltv-demos.ts
 npx -y -p @playwright/test -p tsx tsx scripts/hltv/extract-bp.ts
 
-# BP 文本 → spec（先干跑核对，再 --merge 写回）
-node scripts/hltv/bp-to-spec.mjs scripts/hltv/stage3-bp-complete.txt --matches scripts/hltv/matches.txt
-node scripts/hltv/bp-to-spec.mjs scripts/hltv/*.txt --matches scripts/hltv/matches.txt \
+# BP 文本 → spec
+node scripts/hltv/bp-to-spec.mjs scripts/cologne/data/stage3-bp-complete.txt \
+  --matches scripts/cologne/data/matches.txt
+node scripts/hltv/bp-to-spec.mjs scripts/cologne/data/*.txt \
+  --matches scripts/cologne/data/matches.txt \
   --merge scripts/cologne/cologne-major-2026.spec.json
 
-# 导出（--research --compress-level 9 由 spec.export 透传）
-node scripts/event-export.mjs scripts/cologne/cologne-major-2026.spec.json    # 全阶段
-node scripts/event-export.mjs scripts/cologne/cologne-major-2026.spec.json --stage Stage3
-
-# 装配（per-stage 4 包）
+# 导出 + 装配
+node scripts/event-export.mjs scripts/cologne/cologne-major-2026.spec.json
 node scripts/cologne-build.mjs
-
-# R2 发布（Stage1/2）
-pnpm events:build  # build-event-asset.mjs 生成 manifest assets
-bash scripts/publish-event-assets.sh        # 上传 R2
 ```
 
-> 爬虫脚本要 `@playwright/test`，本仓库不装它（不污染 monorepo），用上面的 `npx -p` 临时拉起，
-> 或在独立目录跑。`.download-state.json` / `.extract-state.json` 是断点续跑状态，可删重跑。
+## 科隆 Major 2026 数据文件参考
+
+| 文件 | 内容 |
+|---|---|
+| `scripts/cologne/data/matches-stage1.txt` | Stage 1 的 33 个 HLTV match URL |
+| `scripts/cologne/data/matches-stage2.txt` | Stage 2 的 33 个 HLTV match URL |
+| `scripts/cologne/data/matches.txt` | Stage 3 + Playoff 的 28 个 HLTV match URL |
+| `scripts/cologne/data/stage3-bp-complete.txt` | 40 场 BP 全量（33 stage3 + 7 playoff） |
+| `scripts/cologne/data/bp-output.txt` | 早期爬取输出（可能不全，以 complete 为准） |
