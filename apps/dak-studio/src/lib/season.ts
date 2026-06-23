@@ -277,7 +277,7 @@ export function getPlayerFlashSummaries(
   identity?: IdentityOptions,
   selectedTeams: string[] = [],
 ): Promise<PlayerFlashSummary[]> {
-  const key = `${keyOf(entries, identity?.version, selectedTeams)}:flash:${players.map((p) => `${p.playerKey}=${p.steamIds.join(",")}`).sort().join("|")}`;
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:flash:v2:${players.map((p) => `${p.playerKey}=${p.steamIds.join(",")}`).sort().join("|")}`;
   const cached = flashCache.get(key);
   if (cached) return cached;
   const loading = (async () => {

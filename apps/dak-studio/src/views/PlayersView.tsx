@@ -31,6 +31,14 @@ export interface PlayersViewProps {
 const CORE_VIEW = SEASON_STAT_VIEWS.find((view) => view.key === "core")!;
 const CORE_COLUMNS = CORE_VIEW.columns.filter((col) => col.key !== "maps");
 
+const PROFILE_TABS = [
+  { key: "overview", label: "总览" },
+  { key: "aim", label: "枪法 / 机制" },
+  { key: "utility", label: "道具 / 失误" },
+  { key: "trend", label: "趋势 / 比赛" }
+] as const;
+type ProfileTab = (typeof PROFILE_TABS)[number]["key"];
+
 function formatMetric(value: number | null, format: string): string {
   if (value == null) return "—";
   if (format === "integer") return String(Math.round(value));
@@ -59,6 +67,8 @@ export function PlayersView({
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [pinned, setPinned] = useState<PinnedPlayer | null>(null);
   const [compareKey, setCompareKey] = useState<string | null>(null);
+  const [profileTab, setProfileTab] = useState<ProfileTab>("overview");
+  const [flashMode, setFlashMode] = useState<"net" | "enemy">("net");
 
   useEffect(() => {
     let cancelled = false;
@@ -302,6 +312,22 @@ export function PlayersView({
 
           {compare && <CompareCard left={selected} right={compare} />}
 
+          <div className="stu-subtabs" role="tablist" aria-label="档案分区">
+            {PROFILE_TABS.map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={profileTab === key}
+                className={profileTab === key ? "stu-subtab stu-subtab-active" : "stu-subtab"}
+                onClick={() => setProfileTab(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {profileTab === "overview" && (
           <div className="stu-profile-grid">
             <div className="stu-card">
               <h3>核心指标</h3>
@@ -356,6 +382,17 @@ export function PlayersView({
               )}
             </div>
 
+            {selected.style && (
+              <div className="stu-card">
+                <h3>打法风格</h3>
+                <FingerprintRadar axes={selected.style.axes} />
+              </div>
+            )}
+          </div>
+          )}
+
+          {profileTab === "aim" && (
+          <div className="stu-profile-grid">
             <div className="stu-card">
               <h3>武器画像</h3>
               <WeaponBars weapons={weaponStats.length > 0 ? weaponStats : selected.weapons.slice(0, 8).map((weapon) => ({
@@ -374,20 +411,17 @@ export function PlayersView({
               </div>
             )}
 
-            {selected.style && (
-              <div className="stu-card">
-                <h3>打法风格</h3>
-                <FingerprintRadar axes={selected.style.axes} />
-              </div>
-            )}
-
             {detailsError && (
               <div className="stu-card">
                 <h3>逐场洞察</h3>
                 <p className="stu-dim">加载失败：{detailsError}</p>
               </div>
             )}
+          </div>
+          )}
 
+          {profileTab === "utility" && (
+          <div className="stu-profile-grid">
             {insights && (
               <div className="stu-card">
                 <h3>闪光价值</h3>
@@ -410,11 +444,46 @@ export function PlayersView({
                   </div>
                   <div className="stu-metric"><span>闪光助攻</span><b>{insights.flash.flashAssists}</b></div>
                 </div>
+                {(insights.flash.bestEnemyFlashes?.length ?? 0) > 0 && (
+                  <>
+                    <div className="stu-card-head" style={{ marginTop: 12 }}>
+                      <h4 className="stu-subhead" style={{ margin: 0 }}>最佳闪光</h4>
+                      <div className="stu-chip-row" role="tablist" aria-label="最佳闪光排序">
+                        <button type="button" role="tab" aria-selected={flashMode === "net"}
+                          className={flashMode === "net" ? "stu-chip stu-chip-active" : "stu-chip"}
+                          onClick={() => setFlashMode("net")}>净收益</button>
+                        <button type="button" role="tab" aria-selected={flashMode === "enemy"}
+                          className={flashMode === "enemy" ? "stu-chip stu-chip-active" : "stu-chip"}
+                          onClick={() => setFlashMode("enemy")}>致盲最久</button>
+                      </div>
+                    </div>
+                    <div className="stu-evidence-list">
+                      {[...insights.flash.bestEnemyFlashes]
+                        .sort((a, b) => flashMode === "net" ? b.netSeconds - a.netSeconds : b.enemySeconds - a.enemySeconds)
+                        .slice(0, 5)
+                        .map((flash, i) => {
+                          const e = entryByMatchId.get(flash.matchId);
+                          const metric = flashMode === "net"
+                            ? `净 ${flash.netSeconds.toFixed(1)}s`
+                            : `致盲 ${flash.enemySeconds.toFixed(1)}s`;
+                          return (
+                            <EvidenceLink
+                              key={`${flash.matchId}-${flash.roundNumber}-${i}`}
+                              disabled={!e}
+                              onOpen={() => { if (e) onOpenMatch(e.id, { roundNumber: flash.roundNumber, tick: flash.tick }); }}
+                            >
+                              {e ? formatMatchLabel(e) : flash.matchId} · R{flash.roundNumber} · 致盲 {flash.victimCount} 人 · {metric}
+                            </EvidenceLink>
+                          );
+                        })}
+                    </div>
+                  </>
+                )}
                 {insights.flash.worstTeamFlashes.length > 0 && (
                   <>
                     <h4 className="stu-subhead">最严重队闪</h4>
                     <div className="stu-evidence-list">
-                      {insights.flash.worstTeamFlashes.slice(0, 5).map((incident, i) => (
+                      {insights.flash.worstTeamFlashes.slice(0, 3).map((incident, i) => (
                         <EvidenceLink
                           key={`${incident.matchId}-${incident.roundNumber}-${i}`}
                           disabled={!entryByMatchId.get(incident.matchId)}
@@ -470,7 +539,11 @@ export function PlayersView({
                 )}
               </div>
             )}
+          </div>
+          )}
 
+          {profileTab === "trend" && (
+          <div className="stu-profile-grid">
             {insights && insights.trend.length > 1 && (
               <div className="stu-card stu-card-wide">
                 <h3>个人趋势</h3>
@@ -528,6 +601,7 @@ export function PlayersView({
               </div>
             </div>
           </div>
+          )}
         </section>
       </div>
     </div>

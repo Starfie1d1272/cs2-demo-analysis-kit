@@ -44,6 +44,21 @@ export interface TeamFlashIncident {
   totalSeconds: number;
 }
 
+/** 单颗（按 flashId 归并）致盲敌方的闪光事件，含同颗队闪秒数与净收益。 */
+export interface EnemyFlashIncident {
+  matchId: string;
+  roundNumber: number;
+  tick?: number;
+  /** 被这颗闪致盲的敌方人数。 */
+  victimCount: number;
+  /** 这颗闪致盲敌方总秒数。 */
+  enemySeconds: number;
+  /** 同一颗闪误盲队友的总秒数（无误盲为 0）。 */
+  teamSeconds: number;
+  /** enemySeconds − teamSeconds，单颗净收益。 */
+  netSeconds: number;
+}
+
 export interface FlashValueSummary {
   flashesThrown: number;
   enemyBlindSeconds: number;
@@ -57,6 +72,8 @@ export interface FlashValueSummary {
   flashAssists: number;
   /** 最严重的队闪事件（按致盲总秒数降序，最多 10 条）。 */
   worstTeamFlashes: TeamFlashIncident[];
+  /** 效果最好的闪光事件（按致盲敌方秒数降序的候选集，UI 可再按净收益排序）。 */
+  bestEnemyFlashes: EnemyFlashIncident[];
 }
 
 // ── Mistake Review ──────────────────────────────────────────────────────────
@@ -139,12 +156,15 @@ export interface PlayerFlashSummary {
   netSecondsPerFlash: number | null;
   flashAssists: number;
   worstTeamFlashes: TeamFlashIncident[];
+  bestEnemyFlashes: EnemyFlashIncident[];
 }
 
 const DEATH_EARLY_SECONDS = 20;
 const DEATH_LATE_SECONDS = 50;
 const LOW_BUY_TYPES = new Set(["eco", "semi", "force"]);
 const MAX_EVIDENCE = 10;
+/** 最佳闪光候选集容量：因 netSeconds ≤ enemySeconds，按敌方秒数取 Top-N 必含净收益 Top。 */
+const MAX_BEST_FLASH = 15;
 
 function tickrateOf(pkg: DemoPackage): number {
   return pkg.match.tickrate ?? 64;
@@ -163,6 +183,7 @@ export function buildPlayerSeasonInsights(
   let flashAssists = 0;
   let enemyBlindVictims = 0;
   const teamFlashes: TeamFlashIncident[] = [];
+  const enemyFlashes: EnemyFlashIncident[] = [];
   const lowBuy: FirstDeathStat = { count: 0, attempts: 0, evidence: [] };
   const fullBuy: FirstDeathStat = { count: 0, attempts: 0, evidence: [] };
   const antiEco: FirstDeathStat = { count: 0, attempts: 0, evidence: [] };
@@ -229,6 +250,35 @@ export function buildPlayerSeasonInsights(
         tick: cell.tick,
         victimCount: cell.victims.size,
         totalSeconds: round(cell.seconds, 2)
+      });
+    }
+
+    // 致盲敌方事件：同 flashId 的本人致盲敌方行归并为一颗闪，并扣除同颗误盲队友秒数算净收益
+    const enemyBlindRows = pkg.blinds.filter((b) => {
+      const flasher = pkg.players[b.flasherIndex];
+      const flashed = pkg.players[b.flashedIndex];
+      return flasher != null && flashed != null && ids.has(flasher.steamId64)
+        && flasher.teamKey !== flashed.teamKey;
+    });
+    const enemyGrouped = new Map<string, { roundNumber: number; tick: number; victims: Set<string>; seconds: number }>();
+    for (const blind of enemyBlindRows) {
+      const key = blind.flashId ?? `${blind.roundNumber}-${Math.round(blind.tick / 16)}`;
+      const cell = enemyGrouped.get(key) ?? { roundNumber: blind.roundNumber, tick: blind.tick, victims: new Set(), seconds: 0 };
+      cell.tick = Math.min(cell.tick, blind.tick);
+      cell.victims.add(pkg.players[blind.flashedIndex]?.steamId64 ?? "");
+      cell.seconds += blind.durationSeconds;
+      enemyGrouped.set(key, cell);
+    }
+    for (const [key, cell] of enemyGrouped) {
+      const teamSeconds = grouped.get(key)?.seconds ?? 0;
+      enemyFlashes.push({
+        matchId,
+        roundNumber: cell.roundNumber,
+        tick: cell.tick,
+        victimCount: cell.victims.size,
+        enemySeconds: round(cell.seconds, 2),
+        teamSeconds: round(teamSeconds, 2),
+        netSeconds: round(cell.seconds - teamSeconds, 2)
       });
     }
 
@@ -309,6 +359,7 @@ export function buildPlayerSeasonInsights(
   }
 
   teamFlashes.sort((a, b) => b.totalSeconds - a.totalSeconds);
+  enemyFlashes.sort((a, b) => b.enemySeconds - a.enemySeconds);
 
   return {
     trend,
@@ -322,7 +373,8 @@ export function buildPlayerSeasonInsights(
         ? round((enemyBlindSeconds - teamBlindSeconds) / flashesThrown, 2)
         : null,
       flashAssists,
-      worstTeamFlashes: teamFlashes.slice(0, MAX_EVIDENCE)
+      worstTeamFlashes: teamFlashes.slice(0, MAX_EVIDENCE),
+      bestEnemyFlashes: enemyFlashes.slice(0, MAX_BEST_FLASH)
     },
     mistakes: {
       lowBuyFirstDeaths: { ...lowBuy, evidence: lowBuy.evidence.slice(0, MAX_EVIDENCE) },
@@ -557,6 +609,7 @@ export function buildPlayerFlashSummaries(
     enemyBlindVictims: number;
     flashAssists: number;
     teamFlashes: TeamFlashIncident[];
+    enemyFlashes: EnemyFlashIncident[];
   }>();
 
   for (const player of players) {
@@ -568,7 +621,8 @@ export function buildPlayerFlashSummaries(
       teamBlindSeconds: 0,
       enemyBlindVictims: 0,
       flashAssists: 0,
-      teamFlashes: []
+      teamFlashes: [],
+      enemyFlashes: []
     });
     for (const steamId of player.steamIds) bySteamId.set(steamId, player);
   }
@@ -591,13 +645,9 @@ export function buildPlayerFlashSummaries(
       if (player) rows.get(player.playerKey)!.flashesThrown += 1;
     }
 
-    const grouped = new Map<string, {
-      playerKey: string;
-      roundNumber: number;
-      tick: number;
-      victims: Set<string>;
-      seconds: number;
-    }>();
+    type FlashCell = { playerKey: string; roundNumber: number; tick: number; victims: Set<string>; seconds: number };
+    const grouped = new Map<string, FlashCell>();
+    const enemyGrouped = new Map<string, FlashCell>();
     for (const blind of pkg.blinds) {
       const flasher = pkg.players[blind.flasherIndex];
       const flashed = pkg.players[blind.flashedIndex];
@@ -605,23 +655,27 @@ export function buildPlayerFlashSummaries(
       const player = bySteamId.get(flasher.steamId64);
       if (!player) continue;
       const row = rows.get(player.playerKey)!;
+      const key = `${player.playerKey}:${blind.flashId ?? `${blind.roundNumber}-${Math.round(blind.tick / 16)}`}`;
+      const accumulate = (map: Map<string, FlashCell>) => {
+        const cell = map.get(key) ?? {
+          playerKey: player.playerKey,
+          roundNumber: blind.roundNumber,
+          tick: blind.tick,
+          victims: new Set<string>(),
+          seconds: 0
+        };
+        cell.tick = Math.min(cell.tick, blind.tick);
+        cell.victims.add(pkg.players[blind.flashedIndex]?.steamId64 ?? "");
+        cell.seconds += blind.durationSeconds;
+        map.set(key, cell);
+      };
       if (flasher.teamKey !== flashed.teamKey) {
         row.enemyBlindVictims += 1;
+        accumulate(enemyGrouped);
         continue;
       }
       if (flasher.steamId64 === flashed.steamId64) continue;
-      const key = `${player.playerKey}:${blind.flashId ?? `${blind.roundNumber}-${Math.round(blind.tick / 16)}`}`;
-      const cell = grouped.get(key) ?? {
-        playerKey: player.playerKey,
-        roundNumber: blind.roundNumber,
-        tick: blind.tick,
-        victims: new Set<string>(),
-        seconds: 0
-      };
-      cell.tick = Math.min(cell.tick, blind.tick);
-      cell.victims.add(pkg.players[blind.flashedIndex]?.steamId64 ?? "");
-      cell.seconds += blind.durationSeconds;
-      grouped.set(key, cell);
+      accumulate(grouped);
     }
     for (const cell of grouped.values()) {
       rows.get(cell.playerKey)!.teamFlashes.push({
@@ -632,10 +686,23 @@ export function buildPlayerFlashSummaries(
         totalSeconds: round(cell.seconds, 2)
       });
     }
+    for (const [key, cell] of enemyGrouped) {
+      const teamSeconds = grouped.get(key)?.seconds ?? 0;
+      rows.get(cell.playerKey)!.enemyFlashes.push({
+        matchId,
+        roundNumber: cell.roundNumber,
+        tick: cell.tick,
+        victimCount: cell.victims.size,
+        enemySeconds: round(cell.seconds, 2),
+        teamSeconds: round(teamSeconds, 2),
+        netSeconds: round(cell.seconds - teamSeconds, 2)
+      });
+    }
   }
 
   return [...rows.values()].map((row) => {
     row.teamFlashes.sort((a, b) => b.totalSeconds - a.totalSeconds);
+    row.enemyFlashes.sort((a, b) => b.enemySeconds - a.enemySeconds);
     return {
       playerKey: row.playerKey,
       name: row.name,
@@ -648,7 +715,8 @@ export function buildPlayerFlashSummaries(
         ? round((row.enemyBlindSeconds - row.teamBlindSeconds) / row.flashesThrown, 2)
         : null,
       flashAssists: row.flashAssists,
-      worstTeamFlashes: row.teamFlashes.slice(0, MAX_EVIDENCE)
+      worstTeamFlashes: row.teamFlashes.slice(0, MAX_EVIDENCE),
+      bestEnemyFlashes: row.enemyFlashes.slice(0, MAX_BEST_FLASH)
     };
   });
 }

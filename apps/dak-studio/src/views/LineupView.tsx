@@ -187,41 +187,7 @@ export function LineupView({
     if (idx >= 0) setPage(Math.floor(idx / PAGE_SIZE));
   }, [hoveredId, byMap]);
 
-  // ── 渲染（空态提前返回） ──────────────────────────────────────────────
-
-  if (error) return <EmptyState variant="error" title="Lineup 聚类失败" hint={error} />;
-  if (loading) {
-    return (
-      <div className="stu-loading">
-        扫描 {entries.length} 场 demo 的 grenades.json… ({progress}/{entries.length})
-      </div>
-    );
-  }
-  if (byMap.length === 0) {
-    return (
-      <EmptyState
-        variant="insufficient"
-        title="没有可聚类道具"
-        hint="需要 v3 ZIP 中的 grenades.json 才能生成道具库。"
-      />
-    );
-  }
-
-  // ── 当前地图数据（byMap 非空，current 安全） ─────────────────────────
-  const current = byMap.find((group) => group.mapName === activeMap) ?? byMap[0]!;
-  const sideFilteredRows = sideFilter
-    ? current.rows.filter((r) => r.side === sideFilter)
-    : current.rows;
-  const calibration = getMapCalibration(current.mapName);
-  const radarSideFiltered = sideFilter
-    ? current.rows.filter((r) => r.side === sideFilter)
-    : current.rows;
-  const radarRows = radarSideFiltered.slice(0, radarTopN);
-  const selectedCluster = hoveredId ? current.rows.find((cluster) => cluster.id === hoveredId) : undefined;
-  const radarClusters = selectedCluster && !radarRows.some((cluster) => cluster.id === selectedCluster.id)
-    ? [...radarRows, selectedCluster]
-    : radarRows;
-
+  // 列定义：必须在所有 early return 之前声明，否则 Hook 数量随 loading 态变化导致崩溃
   const lineupColumns = useMemo<DataTableColumn<LineupCluster>[]>(() => [
     {
       key: "grenade", label: "道具",
@@ -257,6 +223,41 @@ export function LineupView({
       }
     },
   ], [onOpenMatch]);
+
+  // ── 渲染（空态提前返回） ──────────────────────────────────────────────
+
+  if (error) return <EmptyState variant="error" title="Lineup 聚类失败" hint={error} />;
+  if (loading) {
+    return (
+      <div className="stu-loading">
+        扫描 {entries.length} 场 demo 的 grenades.json… ({progress}/{entries.length})
+      </div>
+    );
+  }
+  if (byMap.length === 0) {
+    return (
+      <EmptyState
+        variant="insufficient"
+        title="没有可聚类道具"
+        hint="需要 v3 ZIP 中的 grenades.json 才能生成道具库。"
+      />
+    );
+  }
+
+  // ── 当前地图数据（byMap 非空，current 安全） ─────────────────────────
+  const current = byMap.find((group) => group.mapName === activeMap) ?? byMap[0]!;
+  const sideFilteredRows = sideFilter
+    ? current.rows.filter((r) => r.side === sideFilter)
+    : current.rows;
+  const calibration = getMapCalibration(current.mapName);
+  const radarSideFiltered = sideFilter
+    ? current.rows.filter((r) => r.side === sideFilter)
+    : current.rows;
+  const radarRows = radarSideFiltered.slice(0, radarTopN);
+  const selectedCluster = hoveredId ? current.rows.find((cluster) => cluster.id === hoveredId) : undefined;
+  const radarClusters = selectedCluster && !radarRows.some((cluster) => cluster.id === selectedCluster.id)
+    ? [...radarRows, selectedCluster]
+    : radarRows;
 
   return (
     <div className="stu-lineup-layout">

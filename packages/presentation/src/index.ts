@@ -42,6 +42,8 @@ export {
   type PlayerFlashSummary,
   type PlayerTrendPoint,
   type FlashValueSummary,
+  type TeamFlashIncident,
+  type EnemyFlashIncident,
   type MistakeReview,
   type MistakeEvidence,
   type MatchBuyQuality,

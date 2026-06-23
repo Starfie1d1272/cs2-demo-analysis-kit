@@ -644,7 +644,8 @@ function emptyInsights(): PlayerSeasonInsights {
       enemySecondsPerFlash: null,
       netSecondsPerFlash: null,
       flashAssists: 0,
-      worstTeamFlashes: []
+      worstTeamFlashes: [],
+      bestEnemyFlashes: []
     },
     mistakes: {
       lowBuyFirstDeaths: { count: 0, attempts: 0, evidence: [] },
@@ -668,6 +669,7 @@ function mergeInsights(rows: PlayerInsightFact[]): PlayerSeasonInsights {
     out.flash.enemyBlindVictims += insight.flash.enemyBlindVictims;
     out.flash.flashAssists += insight.flash.flashAssists;
     out.flash.worstTeamFlashes.push(...insight.flash.worstTeamFlashes);
+    out.flash.bestEnemyFlashes.push(...(insight.flash.bestEnemyFlashes ?? []));
     for (const key of ["lowBuyFirstDeaths", "fullBuyFirstDeaths", "antiEcoFirstDeaths"] as const) {
       out.mistakes[key].count += insight.mistakes[key].count;
       out.mistakes[key].attempts += insight.mistakes[key].attempts;
@@ -690,6 +692,7 @@ function mergeInsights(rows: PlayerInsightFact[]): PlayerSeasonInsights {
     ? round2((out.flash.enemyBlindSeconds - out.flash.teamBlindSeconds) / out.flash.flashesThrown)
     : null;
   out.flash.worstTeamFlashes = out.flash.worstTeamFlashes.sort((a, b) => b.totalSeconds - a.totalSeconds).slice(0, 10);
+  out.flash.bestEnemyFlashes = out.flash.bestEnemyFlashes.sort((a, b) => b.enemySeconds - a.enemySeconds).slice(0, 15);
   out.mistakes.lowBuyFirstDeaths.evidence = out.mistakes.lowBuyFirstDeaths.evidence.slice(0, 10);
   out.mistakes.fullBuyFirstDeaths.evidence = out.mistakes.fullBuyFirstDeaths.evidence.slice(0, 10);
   out.mistakes.antiEcoFirstDeaths.evidence = out.mistakes.antiEcoFirstDeaths.evidence.slice(0, 10);
@@ -747,6 +750,7 @@ export async function buildPlayerFlashSummariesFromFacts(
   netSecondsPerFlash: number | null;
   flashAssists: number;
   worstTeamFlashes: PlayerSeasonInsights["flash"]["worstTeamFlashes"];
+  bestEnemyFlashes: PlayerSeasonInsights["flash"]["bestEnemyFlashes"];
 }>> {
   return Promise.all(options.players.map(async (player) => {
     const merged = mergeInsights(await store.getPlayerInsights({

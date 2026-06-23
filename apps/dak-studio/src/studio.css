@@ -724,6 +724,17 @@ body {
   color: var(--dak-danger);
 }
 
+/* 旧口径 facts：重建按钮高亮提示（与 .stu-tag-warn 同色，引导用户重建）。 */
+.stu-icon-button-warn {
+  border-color: var(--dak-warn);
+  color: var(--dak-warn);
+}
+
+.stu-icon-button-warn:hover {
+  border-color: var(--dak-warn);
+  color: var(--dak-warn);
+}
+
 /* ── 我的主页 ───────────────────────────────────────────── */
 
 .stu-home-head {
@@ -1007,6 +1018,18 @@ body {
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+/* 卡片标题 + 右侧控件（tab / 折叠按钮）同行 */
+.stu-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.stu-card-head h3 {
+  margin: 0;
 }
 
 .stu-metric-grid {
