@@ -118,3 +118,29 @@ A 小跳警家后可以不进入任何包点，因此 `a_short_route` 可以存�
 - `@cs2dak/presentation` 负责中文标签和证据说明；
 - Studio 只做筛选、持久化、回放定位与展示；
 - MapControl 或完整战术判断必须建立在 demo 派生证据之上，不得把入口 family 当作战术意图。
+
+## 地图分类合同
+
+`@cs2dak/maps` 对外暴露 `classifyTacticalLocation(mapName, side, callout)` 单一查询入口：
+
+```ts
+interface TacticalLocation {
+  callout: string | null;
+  tendencies: readonly TacticalRegion[];      // 从 callout-names 读取
+  primaryRegion: TacticalRegion | null;
+  defaultAnchorId: string | null;             // 从 default-positions 读取
+  isDefaultPosition: boolean;
+}
+```
+
+旧 `roleOf()` 的 `advanced/ct/terminal/other` 已删除——这些是动态回合结果，不是静态地图属性。未知 callout 返回 `null`，不按名称前缀猜测。
+
+## 模块边界
+
+地图层只保存静态人工资产与无状态查询原语。动态回合状态在其它层推导：
+
+- `@cs2dak/maps`：四类人工资产 + `classifyTacticalLocation`；
+- `@cs2dak/core`：时间化玩家段、阵型时间线、开局模式、进点判断、高阶推断；
+- `@cs2dak/cohort`：跨回合聚类，只消费 facts 中的稳定 ID；
+- `@cs2dak/presentation`：人类可读标签与证据入口；
+- `apps/dak-studio`：持久化、查询、展示，不保有共享战术公式。

@@ -61,7 +61,7 @@ Python `uv sync --extra gui` 装 pywebview（DAK Studio 桌面壳运行需要）
 | `@cs2dak/contract` | Zod schemas + TS 类型。re-export `cs2-demo-format`。 |
 | `@cs2dak/core` | 纯分析逻辑。加载 v3 ZIP → 标准化、信号派生、QA、RR/PRISM 接线。无副作用。 |
 | `@cs2dak/cohort` | 跨场聚合、身份归并与赛季 RR/PRISM 整形。 |
-| `@cs2dak/maps` | 地图标定、world→radar 坐标变换、进攻动线（`MapRoute`）、zone 几何（`zoneAt` / `pointInPolygon`）、callout 中文映射。 |
+| `@cs2dak/maps` | 地图标定、world→radar 坐标变换、zone 几何（`zoneAt` / `pointInPolygon`）、callout 中文名与倾向、callout grid、进点入口（`site-entry-chokes`）、默认站位查询（`classifyTacticalLocation`）。 |
 | `@cs2dak/presentation` | 产品中立 View Model、标签与 workspace 编排。 |
 | `@cs2dak/react` | React 组件。只消费 presentation 合同，不查数据库、不跑分析。 |
 | `@cs2dak/cli` | 薄 CLI（tsx），把 `@cs2dak/core` 接到文件系统。 |
@@ -84,7 +84,7 @@ fixtures/
   output/              # 生成的 v3 ZIP（gitignored）
   baselines/           # 精选非再生产物（提交）
   _bench/              # 本地 benchmark 与大文件（gitignored）
-docs/                  # 架构与集成文档
+docs/                  # 架构与集成文档（索引见 docs/README.md）
 ```
 
 详细架构见 `docs/architecture.md`。

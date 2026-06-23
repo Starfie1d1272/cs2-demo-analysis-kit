@@ -7,6 +7,8 @@
 - [架构](architecture.md)：数据流、组件职责、v3 ZIP seam、评分三层。
 - [模块边界](module-boundaries.md)：每个模块做什么、不做什么、唯一 owner。
 - [设计语言](design-language.md)：Tactical Slate，Studio 所有页面强制遵守。
+- [组件登记表](design/studio-components.md)：可复用组件与 token 速查，新增 UI 前必查。
+- [地图语义](design/map-semantics.md)：callout 倾向、默认位、进点入口七图表与分类合同。
 
 ## 设计与排期
 
@@ -15,6 +17,12 @@
 - [稳定性等级](stability-tiers.md)：各指标 Stable / Beta / Experimental。
 - [RR 评分模型](design/rr-model.md)：RR v1 / 六账户 / PRISM 唯一设计文档。
 - [RR / PRISM Roadmap](rr-roadmap.md)：评分阶段顺序与现状速查。
+
+## 功能模块设计
+
+- [赛事资源包](design/event-packages.md)：Event Package 格式、Gallery 与 Maker 工作流。
+- [教练回放 UI](design/coach-replay-ui.md)：Coach 页 2D 回放与视频导出设计。
+- [自动更新](design/auto-update.md)：manifest 方案、R2 镜像与 Windows 接力替换。
 
 ## 集成与发布
 
