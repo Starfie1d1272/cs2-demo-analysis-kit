@@ -31,6 +31,7 @@ export interface StudioSeriesRecord {
   status?: "scheduled" | "in_progress" | "finished" | "cancelled";
   scoreA?: number | null;
   scoreB?: number | null;
+  matchUrl?: string | null;
   teamARecordBefore?: string | null;
   teamBRecordBefore?: string | null;
   scheduledAt?: string | null;

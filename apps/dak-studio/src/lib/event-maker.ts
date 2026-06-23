@@ -28,6 +28,7 @@ export interface MakerSeriesDraft {
   teamBName: string;
   scheduledAt: string;
   veto: SeriesVeto | null;
+  matchUrl?: string;
   resources: MakerMapResource[];
 }
 
@@ -35,6 +36,7 @@ export interface EventMakerDraft {
   slug: string;
   name: string;
   kind: string;
+  sourceUrl?: string;
   stages: EventStage[];
   series: MakerSeriesDraft[];
 }
@@ -332,6 +334,7 @@ async function compileEventPackage(draft: EventMakerDraft): Promise<EventPackage
       scheduledAt: row.scheduledAt ? new Date(row.scheduledAt).toISOString() : null,
       completedAt: row.resources.map((resource) => resource.occurredAt).find(Boolean) ?? null,
       veto: row.veto,
+      matchUrl: row.matchUrl ?? null,
       maps,
     };
   }));
@@ -339,7 +342,7 @@ async function compileEventPackage(draft: EventMakerDraft): Promise<EventPackage
     version: "cs2-demo-analysis-kit/event-package-1.0",
     source: "manual",
     exportedAt: new Date().toISOString(),
-    event: { slug: draft.slug, name: draft.name, kind: draft.kind, stages: draft.stages },
+    event: { slug: draft.slug, name: draft.name, kind: draft.kind, ...(draft.sourceUrl ? { sourceUrl: draft.sourceUrl } : {}), stages: draft.stages },
     teams: teams.map((name) => ({ key: teamKeyByName.get(name), name, players: [] })),
     series,
   });

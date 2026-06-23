@@ -9,6 +9,7 @@ export interface StudioEventRecord {
   name: string;
   kind: string;
   source: EventPackage["source"];
+  sourceUrl?: string | null;
   stages: EventStage[];
   seriesIds: string[];
   readOnly: boolean;
@@ -97,6 +98,7 @@ export async function importEventPackage(input: unknown, entries: StudioDemoEntr
       teamBRecordBefore: external.teamBRecordBefore ?? null,
       scheduledAt: external.scheduledAt ?? null,
       completedAt: external.completedAt ?? null,
+      matchUrl: external.matchUrl ?? null,
       mapAssignments: assignments,
     }));
   }
@@ -109,6 +111,7 @@ export async function importEventPackage(input: unknown, entries: StudioDemoEntr
     name: pkg.event.name,
     kind: pkg.event.kind,
     source: pkg.source,
+    sourceUrl: pkg.event.sourceUrl ?? null,
     stages: pkg.event.stages,
     seriesIds: savedSeries.map((series) => series.id),
     readOnly: pkg.source === "r2",
