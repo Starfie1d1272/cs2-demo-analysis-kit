@@ -2,9 +2,12 @@
 // 导入管线（importEventAssetArchive）与 EventGallery 卡片 UI。BP 直接写在包里（见
 // scripts/build-sample-event.mjs），不再按队名匹配回填——内置示例与真实赛事完全同一路径。
 //
-// 占位框架：往 BUILTIN_EVENTS 加一条（slug/name/description + 随包发布的 event-package zip）即可
-// 让新内置赛事出现在画廊，文案走 name/description，无需改组件代码。
+// 往 BUILTIN_EVENTS 加一条（slug/name/description/group + Vite ?url import）即可让新内置赛事
+// 出现在画廊，无需改组件代码。注意：大文件（>10MB）不入 git —— 由 `scripts/cologne-build.mjs`
+// 产出后手工拷到 fixtures/input/，再加到 .gitignore。package.sh 构建前确保文件存在。
 import samplePackageUrl from "../../../../fixtures/input/sample-pro-finals-2026.zip?url";
+// 科隆 Major 2026 内置阶段（cologne-build 产出后拷入 fixtures/input/，不入 git）
+// 文件不存在时 Vite build 会报错 —— 先跑完 cologne-build 再 build。
 
 /** 内置条目：与在线赛事共用展示形状（slug/name/description/group），载入即走 event 包导入路径。 */
 export interface BuiltinEvent {
@@ -23,4 +26,19 @@ export const BUILTIN_EVENTS: BuiltinEvent[] = [
     description: "IEM Kraków 2026 决赛（FURIA vs Vitality）+ PGL Astana 2026 决赛（Spirit vs Falcons），两场 BO5 共 7 图，含真实 BP。一键载入即可体验完整分析。",
     packageUrl: samplePackageUrl,
   },
+  // Stage3 + Playoff 在 cologne-build 完成后解除注释：
+  // {
+  //   slug: "iem-cologne-major-2026-stage3",
+  //   name: "IEM Cologne Major 2026 — 阶段三",
+  //   description: "科隆 Major 2026 阶段三（Swiss BO3），16 队 33 场，含全量 BP + 对枪/反应分析。",
+  //   group: "iem-cologne-major-2026",
+  //   packageUrl: new URL("../../../../fixtures/input/iem-cologne-major-2026-stage3.zip", import.meta.url).href,
+  // },
+  // {
+  //   slug: "iem-cologne-major-2026-playoff",
+  //   name: "IEM Cologne Major 2026 — 淘汰赛",
+  //   description: "科隆 Major 2026 淘汰赛（8 强单败，决赛 BO5），QF 4 场 + SF 2 场 + GF 1 场。",
+  //   group: "iem-cologne-major-2026",
+  //   packageUrl: new URL("../../../../fixtures/input/iem-cologne-major-2026-playoff.zip", import.meta.url).href,
+  // },
 ];
