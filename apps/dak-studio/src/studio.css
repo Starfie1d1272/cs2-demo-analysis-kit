@@ -3329,23 +3329,8 @@ td.stu-heat-cell.stu-heat-neutral {
   display: grid;
   gap: 4px;
   overflow-y: auto;
+  min-height: 0;
 }
-
-@media (min-width: 1561px) {
-  .stu-coach-pattern-explorer {
-    height: 68vh;
-    min-height: 0;
-  }
-
-  .stu-pe-list,
-  .stu-pe-replay-main,
-  .stu-pe-detail {
-    min-height: 0;
-    height: 100%;
-    overflow-y: auto;
-  }
-}
-
 .stu-pe-group {
   display: contents;
 }
@@ -3477,6 +3462,7 @@ td.stu-heat-cell.stu-heat-neutral {
 .stu-pe-detail {
   display: grid;
   gap: 12px;
+  min-height: 0;
 }
 
 .stu-pe-summary {
@@ -3600,12 +3586,10 @@ td.stu-heat-cell.stu-heat-neutral {
   }
 }
 
-@media (min-width: 1041px) and (max-width: 1560px) {
-  .stu-pe-list,
-  .stu-pe-replay-main {
-    min-height: 0;
-    height: 68vh;
-    overflow-y: auto;
+@media (min-width: 1041px) {
+  .stu-coach-pattern-explorer {
+    height: calc(100dvh - 130px);
+    min-height: 600px;
   }
 }
 
@@ -3808,6 +3792,15 @@ td.stu-heat-cell.stu-heat-neutral {
 .stu-fb-lane-label {
   font-size: 10px;
   color: var(--dak-fg-dim);
+}
+
+/* 双败 / GSL 制作板的 lane 分段标题（胜者组 / 败者组 / 总决赛） */
+.stu-fb-lane-head {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--dak-fg-mid);
+  margin: 4px 0 2px;
 }
 
 .stu-fb-slot {

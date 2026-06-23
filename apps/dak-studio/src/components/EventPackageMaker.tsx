@@ -17,6 +17,7 @@ import {
   vetoMapMismatch,
   KIND_OPTIONS,
   STAGE_TYPE_OPTIONS,
+  bracketNodesForType,
   type EventMakerDraft,
   type EventPreset,
   type FrameworkSlot,
@@ -286,7 +287,11 @@ export function EventPackageMaker({ onNotice }: { onNotice: (message: string) =>
         {stages.map((stage) => (
           <div key={stage.key} className="stu-veto-toolbar">
             <label>名称<input value={stage.name} onChange={(event) => patchStage(stage.key, { name: event.target.value })} /></label>
-            <label>赛制<select value={stage.type} onChange={(event) => patchStage(stage.key, { type: event.target.value as EventStage["type"] })}>
+            <label>赛制<select value={stage.type} onChange={(event) => {
+              const type = event.target.value as EventStage["type"];
+              // 切赛制时一并挂上/清除对应 bracketNodes（淘汰/GSL 才有节点），否则双败/GSL 渲染不出 lane。
+              patchStage(stage.key, { type, bracketNodes: bracketNodesForType(type, stage.teamCount) });
+            }}>
               {STAGE_TYPE_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
             </select></label>
             <label>默认局制<select value={stage.matchFormat ?? "bo3"} onChange={(event) => patchStage(stage.key, { matchFormat: event.target.value as SeriesFormat })}>

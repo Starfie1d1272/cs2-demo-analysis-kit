@@ -162,6 +162,33 @@ function singleEliminationNodes(teamCount: number): NonNullable<EventStage["brac
 }
 
 /**
+ * GSL 小组（4 队双败）：双开局 → 胜者组决胜（2-0 直接晋级）/ 败者组淘汰（0-2 直接出局）
+ * → 小组决胜（胜者组败方 vs 败者组胜方，胜者 2-1 晋级、负者 1-2 出局）。
+ */
+function gslGroupNodes(): NonNullable<EventStage["bracketNodes"]> {
+  return [
+    { id: "om1", label: "首轮 1", round: 1, lane: "winner", nextWinNodeId: "wm", nextLossNodeId: "em" },
+    { id: "om2", label: "首轮 2", round: 1, lane: "winner", nextWinNodeId: "wm", nextLossNodeId: "em" },
+    { id: "wm", label: "胜者组决胜", round: 2, lane: "winner", nextWinNodeId: null, nextLossNodeId: "dm" },
+    { id: "em", label: "败者组淘汰", round: 2, lane: "loser", nextWinNodeId: "dm", nextLossNodeId: null },
+    { id: "dm", label: "小组决胜", round: 3, lane: "grand", nextWinNodeId: null, nextLossNodeId: null },
+  ];
+}
+
+/**
+ * 按阶段赛制取默认 bracketNodes；非淘汰类（单循环 / 瑞士轮）返回 undefined。
+ *
+ * NOTE: `teamCount` 仅 single_elim 使用——单败节点数随队伍数变化；
+ * double_elim 固定 16 队节点（可容纳 ≤16 队），gsl_group 固定 4 队（GSL 定义如此）。
+ */
+export function bracketNodesForType(type: EventStage["type"], teamCount: number): EventStage["bracketNodes"] | undefined {
+  if (type === "single_elim") return singleEliminationNodes(Math.max(2, teamCount));
+  if (type === "double_elim") return doubleEliminationNodes();
+  if (type === "gsl_group") return gslGroupNodes();
+  return undefined;
+}
+
+/**
  * 框架槽位：把一个阶段的赛制展开成可点击的二维布局。
  * - 淘汰赛（bracketNodes）：每个节点是一个定额槽（恰好一场，带晋级去向）。
  * - 瑞士轮：按战绩组（w-l）展开（如 Major 3 胜进 / 3 负汰），每组可加多场。

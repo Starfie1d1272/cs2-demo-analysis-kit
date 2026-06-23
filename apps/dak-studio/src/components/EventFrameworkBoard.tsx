@@ -24,6 +24,14 @@ const STAGE_TYPE_LABEL: Record<EventStage["type"], string> = {
   gsl_group: "GSL 双败小组",
 };
 
+/** lane 中文段标题；single 无标题（单败不分段）。 */
+const LANE_LABEL: Record<string, string | null> = {
+  single: null,
+  winner: "胜者组",
+  loser: "败者组",
+  grand: "总决赛",
+};
+
 /** 槽位绑定的系列：淘汰赛节点按 bracketNodeId，瑞士轮/循环赛 bucket 按战绩组标签。 */
 export function seriesInSlot(series: MakerSeriesDraft[], stageKey: string, slot: { id: string; kind: "node" | "bucket"; label: string }): MakerSeriesDraft[] {
   return series.filter((row) =>
@@ -46,6 +54,31 @@ function draftCell(row: MakerSeriesDraft, key: string): BracketCell {
   };
 }
 
+/** 淘汰赛格子 key 固定模板（空槽位）。 */
+const EMPTY_CELL: BracketCell = { key: "", teamA: null, teamB: null, scoreA: null, scoreB: null, winner: null, date: null, empty: true };
+
+/** 从框架槽位构造淘汰赛模型：按 round 去重排序，每 round 一列，匹配已绑定的系列。 */
+function buildElimModel(
+  laneSlots: ReturnType<typeof frameworkSlots>,
+  series: MakerSeriesDraft[],
+  stageKey: string,
+): ElimModel {
+  const rounds = [...new Set(laneSlots.map((slot) => slot.round))].sort((a, b) => a - b);
+  const total = rounds.length;
+  return {
+    columns: rounds.map((round, index) => ({
+      round,
+      label: total === 1
+        ? (LANE_LABEL[laneSlots[0]?.lane ?? "single"] ?? "决赛")
+        : index === total - 1 ? "决赛" : index === total - 2 ? "半决赛" : `第 ${index + 1} 轮`,
+      matches: laneSlots.filter((slot) => slot.round === round).map((slot) => {
+        const bound = seriesInSlot(series, stageKey, slot)[0];
+        return bound ? draftCell(bound, slot.id) : { ...EMPTY_CELL, key: slot.id };
+      }),
+    })),
+  };
+}
+
 /**
  * 赛事框架板（制作器输入侧）：与观看侧共用 SwissBracket/ElimBracket 渲染——
  * 淘汰赛节点成 bracket、瑞士轮成战绩组，点击格子在下方编辑并附 demo，瑞士轮战绩组可"添加比赛"。
@@ -63,23 +96,23 @@ export function EventFrameworkBoard({ stages, series, selected, onSelect, onAddM
         );
 
         if (slots.some((slot) => slot.kind === "node")) {
-          // 淘汰赛：每节点一格，cell.key = 节点 id（即槽位 id），点击直接选中该槽。
-          const rounds = [...new Set(slots.map((slot) => slot.round))].sort((a, b) => a - b);
-          const total = rounds.length;
-          const model: ElimModel = {
-            columns: rounds.map((round, index) => ({
-              round,
-              label: round === total ? "决赛" : round === total - 1 ? "半决赛" : `第 ${round} 轮`,
-              matches: slots.filter((slot) => slot.round === round).map((slot) => {
-                const bound = seriesInSlot(series, stage.key, slot)[0];
-                return bound ? draftCell(bound, slot.id) : { key: slot.id, teamA: null, teamB: null, scoreA: null, scoreB: null, winner: null, date: null, empty: true };
-              }),
-            })),
-          };
+          // 淘汰赛：每节点一格，cell.key = 节点 id（即槽位 id）。双败 / GSL 按 lane（胜者组 /
+          // 败者组 / 总决赛）分段渲染，单败只有一条 single lane（保持原样）。
+          const lanes = [...new Set(slots.map((slot) => slot.lane))];
+          const multiLane = lanes.length > 1;
           return (
             <div key={stage.key} className="stu-card">
               {head}
-              <ElimBracket model={model} onSelectCell={(slotId) => onSelect({ stageKey: stage.key, slotId })} selectedKey={selected?.stageKey === stage.key ? selected.slotId : null} />
+              {lanes.map((lane) => {
+                const laneSlots = slots.filter((slot) => slot.lane === lane);
+                const laneLabel = multiLane ? LANE_LABEL[lane] : null;
+                return (
+                  <div key={lane} className="stu-fb-lane">
+                    {laneLabel && <div className="stu-fb-lane-head">{laneLabel}</div>}
+                    <ElimBracket model={buildElimModel(laneSlots, series, stage.key)} onSelectCell={(slotId) => onSelect({ stageKey: stage.key, slotId })} selectedKey={selected?.stageKey === stage.key ? selected.slotId : null} />
+                  </div>
+                );
+              })}
             </div>
           );
         }

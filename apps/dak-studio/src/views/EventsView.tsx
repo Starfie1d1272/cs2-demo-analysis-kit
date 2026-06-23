@@ -11,11 +11,11 @@ import { EmptyState } from "../components/primitives";
 export function EventsView({
   entries,
   onOpenMatch,
-  onGoLibrary,
+  onGoManage,
 }: {
   entries: StudioDemoEntry[];
   onOpenMatch: (entryId: string) => void;
-  onGoLibrary: () => void;
+  onGoManage: () => void;
 }) {
   const [events, setEvents] = useState<StudioEventRecord[]>([]);
   const [series, setSeries] = useState<StudioSeriesRecord[]>([]);
@@ -33,7 +33,7 @@ export function EventsView({
     [active, series],
   );
   if (events.length === 0) {
-    return <div className="stu-view"><EmptyState title="还没有赛事合集" hint="在资料库导入 event-package/1.0，或从在线赛事资产下载。" action={<button className="stu-button" onClick={onGoLibrary}>去资料库</button>} /></div>;
+    return <div className="stu-view"><EmptyState title="还没有赛事合集" hint="去「管理 → 赛事资产」下载内置/在线赛事，或导入本地 event-package/1.0 资源包。" action={<button className="stu-button" onClick={onGoManage}>去管理</button>} /></div>;
   }
   return (
     <div className="stu-view">
@@ -63,13 +63,21 @@ export function EventsView({
   );
 }
 
+/** 按阶段赛制选择渲染组件。GSL 小组有 bracketNodes 时走 lane-aware bracket，缺节点的旧资产降级为积分榜。 */
+function renderStageContent(stage: EventStage, series: StudioSeriesRecord[], entries: StudioDemoEntry[], onOpenMatch: (entryId: string) => void) {
+  const hasNodes = (stage.bracketNodes?.length ?? 0) > 0;
+  const asBracket = stage.type === "single_elim" || stage.type === "double_elim" || (stage.type === "gsl_group" && hasNodes);
+  if (asBracket) return <EliminationStage stage={stage} series={series} entries={entries} onOpenMatch={onOpenMatch} double={stage.type !== "single_elim"} />;
+  if (stage.type === "swiss") return <SwissStage series={series} entries={entries} onOpenMatch={onOpenMatch} advanceCount={stage.advanceCount} />;
+  if (stage.type === "round_robin" || stage.type === "gsl_group") return <RoundRobinStage series={series} entries={entries} onOpenMatch={onOpenMatch} />;
+  return null;
+}
+
 function EventStageSection({ stage, series, entries, onOpenMatch }: { stage: EventStage; series: StudioSeriesRecord[]; entries: StudioDemoEntry[]; onOpenMatch: (entryId: string) => void }) {
   return (
     <section className="stu-card">
       <h2>{stage.name} <small className="stu-muted">{stage.type} · {stage.teamCount} 队</small></h2>
-      {stage.type === "round_robin" || stage.type === "gsl_group" ? <RoundRobinStage series={series} entries={entries} onOpenMatch={onOpenMatch} /> : null}
-      {stage.type === "swiss" ? <SwissStage series={series} entries={entries} onOpenMatch={onOpenMatch} advanceCount={stage.advanceCount} /> : null}
-      {stage.type === "single_elim" || stage.type === "double_elim" ? <EliminationStage stage={stage} series={series} entries={entries} onOpenMatch={onOpenMatch} double={stage.type === "double_elim"} /> : null}
+      {renderStageContent(stage, series, entries, onOpenMatch)}
       {series.length === 0 && <p className="stu-muted">该阶段暂无系列赛。</p>}
     </section>
   );
@@ -91,9 +99,28 @@ function standings(series: StudioSeriesRecord[]) {
   return [...rows.values()].sort((a, b) => b.wins - a.wins || (b.mapsFor - b.mapsAgainst) - (a.mapsFor - a.mapsAgainst) || a.team.localeCompare(b.team));
 }
 
+type StandingsKey = "played" | "wins" | "losses" | "diff";
+
 function RoundRobinStage(props: StageProps) {
-  const table = standings(props.series);
-  return <div><table className="stu-mini-table"><thead><tr><th>队伍</th><th>场</th><th>胜</th><th>负</th><th>图差</th></tr></thead><tbody>{table.map((row) => <tr key={row.team}><td>{row.team}</td><td>{row.played}</td><td>{row.wins}</td><td>{row.losses}</td><td>{row.mapsFor - row.mapsAgainst}</td></tr>)}</tbody></table><SeriesList {...props} /></div>;
+  const [sortKey, setSortKey] = useState<StandingsKey>("wins");
+  const [sortDesc, setSortDesc] = useState(true);
+  const base = standings(props.series);
+  const diff = (row: ReturnType<typeof standings>[number]) => row.mapsFor - row.mapsAgainst;
+  const table = [...base].sort((a, b) => {
+    const dir = sortDesc ? 1 : -1;
+    const va = sortKey === "diff" ? diff(a) : a[sortKey];
+    const vb = sortKey === "diff" ? diff(b) : b[sortKey];
+    return (vb - va) * dir || a.team.localeCompare(b.team);
+  });
+  const handleSort = (key: StandingsKey) => {
+    if (sortKey === key) setSortDesc((d) => !d);
+    else { setSortKey(key); setSortDesc(true); }
+  };
+  const arrow = (key: StandingsKey) => (sortKey === key ? (sortDesc ? " ↓" : " ↑") : "");
+  const COLS: Array<{ key: StandingsKey; label: string }> = [
+    { key: "played", label: "场" }, { key: "wins", label: "胜" }, { key: "losses", label: "负" }, { key: "diff", label: "图差" },
+  ];
+  return <div><table className="stu-mini-table"><thead><tr><th>队伍</th>{COLS.map((c) => <th key={c.key} className="stu-num stu-col-sortable" onClick={() => handleSort(c.key)}>{c.label}{arrow(c.key)}</th>)}</tr></thead><tbody>{table.map((row) => <tr key={row.team}><td>{row.team}</td><td className="stu-num">{row.played}</td><td className="stu-num">{row.wins}</td><td className="stu-num">{row.losses}</td><td className="stu-num">{diff(row)}</td></tr>)}</tbody></table><SeriesList {...props} /></div>;
 }
 
 function SwissStage(props: StageProps & { advanceCount: number }) {
@@ -109,8 +136,13 @@ function SwissStage(props: StageProps & { advanceCount: number }) {
 
 function EliminationStage(props: StageProps & { double: boolean; stage: EventStage }) {
   const model = elimModelFromResults(props.series, props.stage);
+  // 双败有胜者组/败者组 lane，用带晋级连线的 BracketConnections 才能正确表达；
+  // 单败单 lane，保留可点开 demo 的 ElimBracket。
+  const useLaneDiagram = props.double && (props.stage.bracketNodes?.length ?? 0) > 0;
   return <>
-    <ElimBracket model={model} onOpenMatch={props.onOpenMatch} />
+    {useLaneDiagram
+      ? <BracketConnections stage={props.stage} series={props.series} />
+      : <ElimBracket model={model} onOpenMatch={props.onOpenMatch} />}
     <details className="stu-card"><summary className="stu-muted">详细列表与 BP</summary>
       <SeriesList {...props} />
     </details>
