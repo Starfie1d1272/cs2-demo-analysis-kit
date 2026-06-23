@@ -1093,12 +1093,13 @@ class StudioApi:
             return {"ok": False, "error": "应用内替换目前只支持 Windows"}
         try:
             job.state = "applying"
+            # apply_windows_update 自行在 install_dir.parent 下创建 staging 目录，
+            # 不再使用 install_dir/userdata/updates（否则 bat 第一步 move 后路径失效）
             updater.apply_windows_update(
                 job.staged_path,
                 updater.current_install_dir(),
                 updater.current_exe_name(),
                 updater.current_pid(),
-                work_dir=updater.updates_dir(self._userdata),
             )
         except Exception as exc:  # noqa: BLE001
             job.state = "error"
@@ -1106,13 +1107,15 @@ class StudioApi:
             log.exception("update apply %s failed", job_id)
             return {"ok": False, "error": str(exc)}
 
-        # 让 bridge 先返回，再销毁窗口退出进程，交给接力脚本接管。
+        # 先返回 bridge，再销毁窗口并强制退出进程，交给接力脚本接管。
         def _quit() -> None:
             time.sleep(0.6)
             try:
                 if self._window is not None:
                     self._window.destroy()
             except Exception:  # noqa: BLE001
+                pass
+            finally:
                 os._exit(0)
 
         threading.Thread(target=_quit, daemon=True).start()

@@ -6,13 +6,18 @@
   **在 macOS/CI 上无法端到端验证**——只做严格的参数构造与 guard，需 Windows 冒烟测试。
 
 替换策略（Windows 无法删除正在运行的 exe）：
-  下载 zip → 校验 → 解压到 updates/ 旁目录 → 写一个 .bat 接力脚本：
+  下载 zip → 校验 → 解压到 install_dir.parent/.dak-update-<ts>/extract/
+  → 写 .bat 接力脚本到同级目录：
     1. 等当前进程 PID 退出；
     2. 把旧安装目录改名为 *.old-<ts>；
     3. 把新目录移到原位；
     4. 从 *.old 把 userdata/ 搬回新目录（便携式数据不能丢）；
     5. 启动新 exe；6. 删除 *.old；7. 自删脚本。
   任一步失败回滚（把 *.old 改回原名），保证不变砖。
+
+  注意：staging 目录必须在 install_dir 外部（install_dir.parent），
+  不能在 install_dir/userdata 内部——否则 bat 第一步 move install_dir 后
+  new_dir 原路径也跟着消失，替换失败回滚。
 """
 
 from __future__ import annotations
@@ -163,26 +168,26 @@ def apply_windows_update(
     install_dir: Path,
     exe_name: str,
     pid: int,
-    work_dir: Path,
 ) -> Path:
     """解压更新包并启动接力脚本；调用方随后退出进程让脚本接管。
 
     仅在 Windows 有意义。返回写出的 .bat 路径（供日志/测试）。
-    实际进程替换需 Windows 冒烟验证。
+
+    关键：staging 目录必须放在 install_dir 外部（install_dir.parent），
+    不能在 install_dir/userdata 内部——否则 bat 第一步 move install_dir 后，
+    new_dir 原路径也跟着消失，替换失败回滚。
     """
     if sys.platform != "win32":
         raise UpdateError("应用内替换目前只支持 Windows")
-    extract_dir = work_dir / "extract"
-    if extract_dir.exists():
-        import shutil
-
-        shutil.rmtree(extract_dir, ignore_errors=True)
+    ts = time.strftime("%Y%m%d%H%M%S")
+    stage_root = install_dir.parent / f".dak-update-{ts}"
+    extract_dir = stage_root / "extract"
     extract_dir.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(zip_path) as zf:
         zf.extractall(extract_dir)
     new_dir = _find_app_root(extract_dir, exe_name)
     bat_text = _relaunch_bat(pid, install_dir, new_dir, exe_name)
-    bat_path = work_dir / "apply-update.bat"
+    bat_path = stage_root / "apply-update.bat"
     bat_path.write_text(bat_text, encoding="utf-8")
 
     import subprocess
