@@ -17,7 +17,9 @@ export {
   type DataTableColumn,
   type DataTableClasses,
   type DataTableProps,
-  type SortDirection
+  type HeatTone,
+  type SortDirection,
+  useSortable
 } from "./components/DataTable";
 
 // AdminQaWorkspace 和 EconomyConversionPanel 保留在源文件中但不再从公共 API 导出：

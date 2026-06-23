@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Pagination } from "./Pagination";
 
 /**
@@ -15,6 +15,9 @@ import { Pagination } from "./Pagination";
  */
 
 export type SortDirection = "asc" | "desc";
+
+/** 热力图色调：供列 `heat` 回调返回，由 classes.heatCell 映射为 CSS class。 */
+export type HeatTone = "high" | "mid" | "low" | "neutral";
 
 export interface DataTableColumn<T> {
   key: string;
@@ -33,7 +36,7 @@ export interface DataTableColumn<T> {
   /** 表头 title 提示。 */
   title?: string;
   /** 可选热力着色：返回色阶名，套用 classes.heatCell。 */
-  heat?: (row: T) => "high" | "mid" | "low" | "neutral";
+  heat?: (row: T) => HeatTone | undefined;
   /** 单元格附加 class。 */
   cellClassName?: (row: T) => string | undefined;
 }
@@ -45,7 +48,7 @@ export interface DataTableClasses {
   sortableActive: string;
   rowClickable?: string;
   /** 热力单元格 class 生成器（可选）。 */
-  heatCell?: (tone: "high" | "mid" | "low" | "neutral") => string;
+  heatCell?: (tone: HeatTone) => string;
   /** 内部分页控件 class。 */
   pagination?: string;
 }
@@ -93,6 +96,31 @@ export interface DataTableProps<T> {
   rowProps?: (row: T) => React.HTMLAttributes<HTMLTableRowElement>;
   /** 首列前置一个序号列（如排行榜的 #）。 */
   showRank?: boolean;
+}
+
+/**
+ * 通用排序切换 hook：同 key 切换升/降，换 key 默认降序。
+ * DataTable、SeasonLeaderboard、RoundRobinStage 共用同一模式。
+ */
+export function useSortable<K extends string>(initialKey: K, initialDesc = true) {
+  const [sortKey, setSortKey] = useState<K>(initialKey);
+  const [sortDesc, setSortDesc] = useState(initialDesc);
+
+  const handleSort = useCallback((key: K) => {
+    setSortKey((prev) => {
+      if (key === prev) setSortDesc((d) => !d);
+      else setSortDesc(true);
+      return key;
+    });
+  }, []);
+
+  /** 外部重置排序列（如切换 view 时）。 */
+  const resetSort = useCallback((key: K) => {
+    setSortKey(key);
+    setSortDesc(true);
+  }, []);
+
+  return { sortKey, sortDesc, handleSort, resetSort };
 }
 
 export function DataTable<T>({

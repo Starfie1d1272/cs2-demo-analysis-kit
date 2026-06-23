@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSortable } from "./DataTable";
 import type {
   LeaderboardFormat,
   LeaderboardMetricKey,
@@ -34,25 +35,12 @@ function formatMetric(value: number | null | undefined, format: LeaderboardForma
 export function SeasonLeaderboard({ model, onPlayerClick }: SeasonLeaderboardProps) {
   const [viewKey, setViewKey] = useState<LeaderboardViewKey>(model.views[0]?.key ?? "core");
   const view = model.views.find((v) => v.key === viewKey) ?? model.views[0];
-  const [sortKey, setSortKey] = useState<LeaderboardMetricKey>(view.defaultSort);
-  const [sortDesc, setSortDesc] = useState(true);
+  const { sortKey, sortDesc, handleSort, resetSort } = useSortable<LeaderboardMetricKey>(view.defaultSort);
 
   function selectView(next: LeaderboardViewKey) {
     setViewKey(next);
     const nextView = model.views.find((v) => v.key === next);
-    if (nextView) {
-      setSortKey(nextView.defaultSort);
-      setSortDesc(true);
-    }
-  }
-
-  // 点同列切换升/降；换列默认降序。缺失（null）始终排在最后（与方向无关）。
-  function handleSort(key: LeaderboardMetricKey) {
-    if (key === sortKey) setSortDesc((d) => !d);
-    else {
-      setSortKey(key);
-      setSortDesc(true);
-    }
+    if (nextView) resetSort(nextView.defaultSort);
   }
 
   const rows = useMemo(() => {
