@@ -7,8 +7,7 @@ import type { EconomyEntry } from "@cs2dak/cohort";
 import { autoName, type TacticalCluster } from "../../lib/tactics.js";
 import { getFactsStore, type TacticalRoundFact } from "../../lib/facts.js";
 import { loadMatchWorkspaceModel, type StudioDemoEntry } from "../../lib/library.js";
-import { MetricInfo, EvidenceLink } from "@cs2dak/react";
-import { Pagination } from "../../components/Pagination.js";
+import { MetricInfo, EvidenceLink, DataTable, STUDIO_TABLE_CLASSES, type DataTableColumn } from "@cs2dak/react";
 
 export interface PatternExplorerProps {
   clusters: TacticalCluster[];
@@ -475,82 +474,90 @@ function EvidenceTable({
   const PAGE_SIZE = 12;
   const [page, setPage] = useState(0);
   useEffect(() => { setPage(0); }, [cluster.id]);
-  const totalPages = Math.max(1, Math.ceil(cluster.rounds.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages - 1);
-  const pageRounds = cluster.rounds.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+
+  const columns = useMemo<DataTableColumn<TacticalCluster["rounds"][number]>[]>(() => [
+    {
+      key: "match", label: "比赛",
+      render: (r) => {
+        const fact = facts.find((f) => f.matchId === r.matchId && f.roundNumber === r.roundNumber);
+        const entry = entryByMatchId.get(r.matchId);
+        const label = entry ? `${entry.meta.teamAName} vs ${entry.meta.teamBName}` : r.matchId.length > 18 ? `${r.matchId.slice(0, 18)}…` : r.matchId;
+        return (
+          <button
+            type="button"
+            className="stu-pe-evidence-select"
+            onClick={() => fact && onSelect(evidenceKey(fact))}
+            disabled={!fact}
+            aria-label={`查看 ${label} 第 ${r.roundNumber} 回合`}
+            title={r.matchId}
+          >
+            {label}
+          </button>
+        );
+      }
+    },
+    { key: "round", label: "回合", numeric: true, format: (r) => `R${r.roundNumber}` },
+    { key: "economy", label: "经济", format: (r) => economyLabelCn(r.economy) },
+    {
+      key: "executeRemain", label: "执行剩余", numeric: true,
+      format: (r) => {
+        const fact = facts.find((f) => f.matchId === r.matchId && f.roundNumber === r.roundNumber);
+        return fact?.executeRemainSec != null ? formatClockSeconds(fact.executeRemainSec) : "—";
+      }
+    },
+    {
+      key: "firstKill", label: "首杀",
+      format: (r) => {
+        const fact = facts.find((f) => f.matchId === r.matchId && f.roundNumber === r.roundNumber);
+        return fact?.firstKillForTeam == null ? "—" : fact.firstKillForTeam ? "✓" : "✗";
+      }
+    },
+    {
+      key: "plant", label: "下包",
+      format: (r) => {
+        const fact = facts.find((f) => f.matchId === r.matchId && f.roundNumber === r.roundNumber);
+        return fact?.plant ? `${fact.plant.site.toUpperCase()} ${formatClockSeconds(fact.plant.remainSec)}` : "—";
+      }
+    },
+    {
+      key: "result", label: "结果",
+      format: (r) => r.won ? "胜" : "负",
+      cellClassName: (r) => r.won ? "stu-win" : "stu-loss",
+    },
+    {
+      key: "actions", label: "",
+      render: (r) => {
+        const fact = facts.find((f) => f.matchId === r.matchId && f.roundNumber === r.roundNumber);
+        const entry = entryByMatchId.get(r.matchId);
+        return <>
+          {fact && onAddToPlaylist && (
+            <button type="button" className="stu-button-sm" onClick={() => onAddToPlaylist(cluster, fact)}>加入</button>
+          )}
+          {entry && (
+            <EvidenceLink hint="在比赛工作台打开完整分析并定位执行证据" onOpen={() => onOpenMatch(entry.id, { roundNumber: r.roundNumber, tick: fact ? jumpTickFor(fact) : undefined })}>
+              工作台 ↗
+            </EvidenceLink>
+          )}
+        </>;
+      }
+    },
+  ], [facts, entryByMatchId, onSelect, onOpenMatch, onAddToPlaylist, cluster]);
+
   return (
     <div className="stu-pe-evidence">
       <h4>证据回合（{cluster.roundCount}）</h4>
-      <Pagination page={safePage} totalPages={totalPages} onChange={setPage} maxButtons={6} info={`${cluster.rounds.length} 回合`} />
-      <table className="stu-mini-table">
-        <thead>
-          <tr>
-            <th>比赛</th>
-            <th className="stu-num">回合</th>
-            <th>经济</th>
-            <th className="stu-num">执行剩余</th>
-            <th>首杀</th>
-            <th>下包</th>
-            <th>结果</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {pageRounds.map((r) => {
-            const fact = facts.find((f) => f.matchId === r.matchId && f.roundNumber === r.roundNumber);
-            const entry = entryByMatchId.get(r.matchId);
-            const label = entry
-              ? `${entry.meta.teamAName} vs ${entry.meta.teamBName}`
-              : r.matchId.length > 18 ? `${r.matchId.slice(0, 18)}…` : r.matchId;
-            return (
-              <tr
-                key={`${r.matchId}-${r.roundNumber}`}
-                className={activeFact?.matchId === r.matchId && activeFact.roundNumber === r.roundNumber ? "stu-pe-evidence-active" : undefined}
-              >
-                <td title={r.matchId}>
-                  <button
-                    type="button"
-                    className="stu-pe-evidence-select"
-                    onClick={() => fact && onSelect(evidenceKey(fact))}
-                    disabled={!fact}
-                    aria-label={`查看 ${label} 第 ${r.roundNumber} 回合`}
-                  >
-                    {label}
-                  </button>
-                </td>
-                <td className="stu-num">R{r.roundNumber}</td>
-                <td>{economyLabelCn(r.economy)}</td>
-                <td className="stu-num">{fact?.executeRemainSec != null ? formatClockSeconds(fact.executeRemainSec) : "—"}</td>
-                <td>{fact?.firstKillForTeam == null ? "—" : fact.firstKillForTeam ? "✓" : "✗"}</td>
-                <td>{fact?.plant ? `${fact.plant.site.toUpperCase()} ${formatClockSeconds(fact.plant.remainSec)}` : "—"}</td>
-                <td className={r.won ? "stu-win" : "stu-loss"}>{r.won ? "胜" : "负"}</td>
-                <td>
-                  {fact && onAddToPlaylist && (
-                    <button
-                      type="button"
-                      className="stu-button-sm"
-                      onClick={() => onAddToPlaylist(cluster, fact)}
-                    >
-                      加入
-                    </button>
-                  )}
-                  {entry && (
-                    <EvidenceLink
-                      hint="在比赛工作台打开完整分析并定位执行证据"
-                      onOpen={() => onOpenMatch(entry.id, {
-                        roundNumber: r.roundNumber,
-                        tick: fact ? jumpTickFor(fact) : undefined,
-                      })}
-                    >
-                      工作台 ↗
-                    </EvidenceLink>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <DataTable
+        classes={STUDIO_TABLE_CLASSES}
+        rows={cluster.rounds}
+        rowKey={(r) => `${r.matchId}-${r.roundNumber}`}
+        pageSize={PAGE_SIZE}
+        page={page}
+        onPageChange={setPage}
+        paginationMaxButtons={6}
+        paginationInfo={(total) => `${total} 回合`}
+        rowClassName={(r) => activeFact?.matchId === r.matchId && activeFact.roundNumber === r.roundNumber ? "stu-pe-evidence-active" : undefined}
+        columns={columns}
+      />
     </div>
   );
 }
