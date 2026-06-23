@@ -10,6 +10,7 @@ import { APP_VERSION, checkForUpdate, type UpdateInfo } from "./lib/update";
 import { checkForUpdateViaBridge } from "./lib/updater-bridge";
 import { UpdateControl } from "./components/UpdateControl";
 import { UpdateModal } from "./components/UpdateModal";
+import { AssetHealthBanner } from "./components/AssetHealthBanner";
 import { LibraryDirButton } from "./components/LibraryDirButton";
 import { HomeView } from "./views/HomeView";
 import { LibraryView } from "./views/LibraryView";
@@ -460,6 +461,7 @@ export function App() {
       )}
 
       <main className="stu-main">
+        <AssetHealthBanner />
         {notice && (
           <div className="stu-notice" role="status">
             <span>{notice}</span>

@@ -113,6 +113,62 @@ jobs:
           cd python/dist
           7z a -mx=5 "dak-studio-windows-${VERSION}.zip" dak-studio
 
+      # 0.7.0: Web Installer（极简 tkinter，onefile ~15MB）
+      - name: Build Web Installer
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cd python
+          uv sync --extra gui --extra build
+          uv run pyinstaller packaging/installer.spec --noconfirm --distpath dist
+          cd ..
+          VERSION="$(node -p "require('./package.json').version")"
+          cp python/dist/DAK-Studio-Setup.exe "python/dist/DAK-Studio-Setup-${VERSION}.exe" || true
+
+      # 0.7.0: 准备 event packages（从 fixtures/input/ 复制，已是成品）
+      - name: Prepare event packages
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          mkdir -p dist/events
+          for zip in fixtures/input/iem-cologne-major-2026-*.zip; do
+            slug="$(basename "$zip" .zip)"
+            mkdir -p "dist/events/${slug}"
+            cp "$zip" "dist/events/${slug}/${slug}.zip"
+            echo "event: ${slug}"
+          done
+          # 生成 events manifest
+          node scripts/build-event-asset.mjs --dir dist/events 2>/dev/null || true
+
+      # 0.7.0: 生成 install-manifest.json
+      - name: Generate install manifest
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          node scripts/gen-install-manifest.mjs \
+            --version "$VERSION" \
+            --runtime-zip "python/dist/dak-studio-windows-${VERSION}.zip" \
+            --event-packages dist/events/ \
+            --tris-manifest tris-manifest.json \
+            --channel stable \
+            --asset-set cologne-major-2026-full \
+            --out python/dist/install-manifest.json
+
+      # 0.7.0: 组装 Full Portable Zip
+      - name: Assemble full portable zip
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          node scripts/assemble-full-zip.mjs \
+            --runtime-zip "python/dist/dak-studio-windows-${VERSION}.zip" \
+            --bundled-events dist/events/ \
+            --tris-manifest tris-manifest.json \
+            --tris-dir "$HOME/.awpy/tris" \
+            --install-manifest python/dist/install-manifest.json \
+            --out python/dist/
+
       # 自动更新 manifest：客户端从 releases/latest/download/latest.json 拉取（带镜像）。
       # 只在 Windows job 产出（桌面端只面向 Windows）。
       - name: Generate update manifest (with changelog notes)
@@ -139,6 +195,8 @@ jobs:
           path: |
             python/dist/*.dmg
             python/dist/*.zip
+            python/dist/DAK-Studio-Setup*.exe
+            python/dist/install-manifest.json
             python/dist/latest.json
           if-no-files-found: error
 
@@ -171,17 +229,14 @@ jobs:
           path: dist
           merge-multiple: true
 
-      # 自建 R2 镜像（国内可达，最高优先级）。把 Windows zip 与 latest.json
-      # 上传到与 manifest asset.urls 一致的路径：
-      #   releases/<tag>/dak-studio-windows-<version>.zip
-      #   releases/latest.json
+      # 自建 R2 镜像（国内可达，最高优先级）。上传 runtime zip、installer、full zip、
+      # install-manifest.json、event packages 到与代码中 URL 一致的路径。
       # GitHub Release 仍是权威源/兜底；ghproxy 为最后兜底。
       - name: Upload to R2 mirror
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
-          # aws-cli v2 默认附加 flexible checksum，部分 R2 端点会拒收；只在需要时计算。
           AWS_REQUEST_CHECKSUM_CALCULATION: when_required
           AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
@@ -191,33 +246,92 @@ jobs:
           VERSION="${GITHUB_REF#refs/tags/v}"
           TAG="v${VERSION}"
           ZIP="dist/dak-studio-windows-${VERSION}.zip"
+          INSTALLER="dist/DAK-Studio-Setup-${VERSION}.exe"
+          FULL_ZIP="dist/dak-studio-windows-${VERSION}-full.zip"
+          INSTALL_MANIFEST="dist/install-manifest.json"
+
           if [ ! -f "$ZIP" ]; then
             echo "::error::缺少 $ZIP，跳过 R2 上传"
             exit 1
           fi
-          # 版本化、不可变：长缓存
+
+          # 1. Core runtime zip（不可变）
           aws s3 cp "$ZIP" \
             "s3://${R2_BUCKET}/releases/${TAG}/dak-studio-windows-${VERSION}.zip" \
             --endpoint-url "$R2_ENDPOINT" \
             --content-type application/zip \
             --cache-control "public, max-age=31536000, immutable"
-          # latest.json 固定地址：短缓存让客户端尽快看到新版本
+          echo "R2: runtime zip ✓"
+
+          # 2. Web Installer exe（不可变）
+          if [ -f "$INSTALLER" ]; then
+            aws s3 cp "$INSTALLER" \
+              "s3://${R2_BUCKET}/releases/${TAG}/DAK-Studio-Setup-${VERSION}.exe" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --content-type application/vnd.microsoft.portable-executable \
+              --cache-control "public, max-age=31536000, immutable"
+            echo "R2: installer ✓"
+          fi
+
+          # 3. Full portable zip（不可变）
+          if [ -f "$FULL_ZIP" ]; then
+            aws s3 cp "$FULL_ZIP" \
+              "s3://${R2_BUCKET}/releases/${TAG}/dak-studio-windows-${VERSION}-full.zip" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --content-type application/zip \
+              --cache-control "public, max-age=31536000, immutable"
+            echo "R2: full zip ✓"
+          fi
+
+          # 4. install-manifest.json（versioned + latest 双路径）
+          if [ -f "$INSTALL_MANIFEST" ]; then
+            aws s3 cp "$INSTALL_MANIFEST" \
+              "s3://${R2_BUCKET}/releases/${TAG}/install-manifest.json" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --content-type application/json \
+              --cache-control "public, max-age=31536000, immutable"
+            aws s3 cp "$INSTALL_MANIFEST" \
+              "s3://${R2_BUCKET}/releases/install-manifest.json" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --content-type application/json \
+              --cache-control "public, max-age=300"
+            echo "R2: install-manifest ✓ (${TAG}/ + latest)"
+          fi
+
+          # 5. latest.json（现有逻辑）
           aws s3 cp "dist/latest.json" \
             "s3://${R2_BUCKET}/releases/latest.json" \
             --endpoint-url "$R2_ENDPOINT" \
             --content-type application/json \
             --cache-control "public, max-age=300"
-          echo "R2 上传完成：${R2_BUCKET}/releases/${TAG}/ + releases/latest.json"
+          echo "R2: latest.json ✓"
+
+          echo "R2 上传完成"
 
       - uses: softprops/action-gh-release@v3
         with:
           files: |
             dist/*.dmg
             dist/*.zip
+            dist/DAK-Studio-Setup*.exe
+            dist/install-manifest.json
             dist/latest.json
           body: |
             **安装说明**
 
+            ### Windows（推荐：Web Installer）
+            下载 `DAK-Studio-Setup-<version>.exe`，运行后选择安装目录，联网自动下载运行时 +
+            内置赛事 + 地图数据。安装完成后首次启动即完整体验。
+
+            ### Windows（离线：Full Portable Zip）
+            下载 `dak-studio-windows-<version>-full.zip`，解压即用。
+            已预装 Cologne Major 2026 完整赛事包 + 全部地图数据。
+
+            ### Windows（开发者：Core Zip）
+            下载 `dak-studio-windows-<version>.zip`，仅运行时，不含大赛事和地图数据。
+            启动后可从 "获取赛事" 在线下载，或在管理页安装官方资产。
+
+            ### macOS
             1. 打开 DMG，把 **DAK Studio** 拖到右侧的 **Applications** 文件夹。
             2. 推出 DMG（桌面上右键 → 推出"DAK Studio"）。
             3. 从 **启动台** 或 `/Applications/DAK Studio.app` 打开。
@@ -229,12 +343,7 @@ jobs:
             xattr -dr com.apple.quarantine "/Applications/DAK Studio.app"
             ```
 
-            ---
-
-            **Windows**
-            - 解压 zip，打开 `dak-studio` 文件夹，双击 `dak-studio.exe`。
-            - SmartScreen 警告 → 「更多信息」→「仍要运行」。
-            - 老版本 Win10 如启动后白屏，需安装 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)。
+            老版本 Win10 如启动后白屏，需安装 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)。
 
             ---
 

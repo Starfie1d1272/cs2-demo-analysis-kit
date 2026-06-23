@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { deleteEventRecord, listEventRecords, type StudioEventRecord } from "../lib/events";
 import { removeDemos, type StudioDemoEntry } from "../lib/library";
-import { downloadAndImportEvent, importEventAssetFile, loadEventsManifest, pickAndImportEventAsset, supportsNativeEventImport } from "../lib/event-assets";
+import { downloadAndImportEvent, importEventAssetArchive, importEventAssetFile, loadEventsManifest, pickAndImportEventAsset, supportsNativeEventImport } from "../lib/event-assets";
 import type { EventsManifest } from "@cs2dak/contract";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import { EventPackageMaker } from "./EventPackageMaker";
 import { EventGallery } from "./EventGallery";
 import { BUILTIN_EVENTS, type BuiltinEvent } from "../lib/builtin-events";
+import { loadBundledEventsManifest } from "../lib/bundled-events";
 import { KIND_OPTIONS } from "../lib/event-maker";
 
 const KIND_LABEL: Record<string, string> = { ...Object.fromEntries(KIND_OPTIONS.map((k) => [k.value, k.label])), showcase: "示例" };
@@ -27,12 +28,14 @@ export function EventManager({
 }) {
   const [events, setEvents] = useState<StudioEventRecord[]>([]);
   const [manifest, setManifest] = useState<EventsManifest | null>(null);
+  const [bundledManifest, setBundledManifest] = useState<EventsManifest | null>(null);
   const [series, setSeries] = useState<StudioSeriesRecord[]>([]);
   const [busySlug, setBusySlug] = useState<string | null>(null);
   const cancelRequested = useRef(false);
   const nativeImport = supportsNativeEventImport();
   useEffect(() => { void Promise.all([listEventRecords(), listSeriesRecords()]).then(([nextEvents, nextSeries]) => { setEvents(nextEvents); setSeries(nextSeries); }); }, []);
   useEffect(() => { void loadEventsManifest().then(setManifest).catch(() => setManifest(null)); }, []);
+  useEffect(() => { void loadBundledEventsManifest().then(setBundledManifest).catch(() => setBundledManifest(null)); }, []);
 
   async function importFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -76,6 +79,27 @@ export function EventManager({
       .finally(() => setBusySlug(null));
   }
 
+  async function loadBundledEvent(asset: EventsManifest["events"][number]) {
+    cancelRequested.current = false;
+    setBusySlug(asset.slug);
+    try {
+      const url = `./bundled-events/${asset.slug}.zip`;
+      onNotice(`正在载入本地预装赛事「${asset.name}」…`);
+      const response = await fetch(url, { cache: "no-cache" });
+      if (!response.ok) throw new Error(`无法加载预装赛事包：HTTP ${response.status}`);
+      const contentType = response.headers.get("content-type") ?? "";
+      if (contentType.includes("text/html")) throw new Error("预装赛事包不可达（bundled-events 不完整或缺失）");
+      const buffer = await response.arrayBuffer();
+      const result = await importEventAssetArchive(buffer, entries, asset.slug, { onProgress: onNotice, isCancelled: () => cancelRequested.current });
+      onLibraryChanged?.(result.entries);
+      setEvents(await listEventRecords());
+      setSeries(await listSeriesRecords());
+      onNotice(`${result.cancelled ? "已停止" : "已载入"}预装赛事「${result.event.event.name}」：匹配 ${result.event.matchedMaps} 图，待补 ${result.event.missingMaps} 图${result.errors.length ? `；${result.errors.length} 图失败，可重试续导` : ""}`);
+    } catch (error) {
+      onNotice(`预装赛事载入失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally { setBusySlug(null); }
+  }
+
   async function importNative() {
     cancelRequested.current = false;
     setBusySlug("__local__");
@@ -100,9 +124,11 @@ export function EventManager({
       <p className="stu-muted">下载内置示例或在线赛事，或导入本地赛事资源包 <code>&lt;slug&gt;.zip</code>（含 event-package.json + 各图 ZIP）。导入后自动建立赛事 → 系列 → 地图并配对 demo。</p>
       <EventGallery
         builtins={BUILTIN_EVENTS}
+        bundledManifest={bundledManifest}
         manifest={manifest}
         busySlug={busySlug}
         onLoadBuiltin={(builtin) => void loadBuiltin(builtin)}
+        onLoadBundled={(asset) => void loadBundledEvent(asset)}
         onDownloadOnline={downloadOnline}
       />
       <div className="stu-header-actions">

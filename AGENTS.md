@@ -41,6 +41,11 @@ pnpm events:publish              # 上传赛事资产到 R2
 node scripts/cologne-build.mjs   # 科隆 Major per-stage 装配（4 个 event-package）
 node scripts/hltv/extract-stage-urls.mjs  # CDP 提取 HLTV match URL（Node 24 原生 WebSocket）
 
+# 分发
+python src/cs2dak/installer.py        # Web Installer（极简 tkinter GUI）
+node scripts/gen-install-manifest.mjs # 生成 install-manifest.json
+node scripts/assemble-full-zip.mjs    # 组装 Full Portable Zip
+
 # 单测单文件
 pnpm vitest run packages/core/src/index.test.ts
 ```
@@ -94,7 +99,7 @@ fixtures/
 docs/                  # 架构与集成文档（索引见 docs/README.md）
 ```
 
-详细架构见 `docs/architecture.md`。
+详细架构见 `docs/architecture.md`。分发架构见 `docs/design/distribution.md`。
 
 > **已迁移**：cs2-demo-format 3.0.4（2026-06）。TS 管线全部使用 v3 合同，
 > Python exporter 切换为 PyPI `cs2df`（本仓库只留 Studio 桌面壳）。

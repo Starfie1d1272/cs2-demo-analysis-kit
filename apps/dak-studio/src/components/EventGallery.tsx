@@ -2,10 +2,10 @@ import { useMemo, useState } from "react";
 import type { EventsManifest } from "@cs2dak/contract";
 import type { BuiltinEvent } from "../lib/builtin-events";
 
-// 统一画廊：本地内置赛事/示例与在线 R2 赛事并列，共用同一张卡片。同 group 折叠成一个赛事、
-// 展开见各阶段（如科隆按 stage 拆的 4 个包）。内置走 onLoadBuiltin，在线走 onDownloadOnline。
+// 统一画廊：内置示例 + 本地预装 + 在线 R2 赛事并列，共用同一张卡片。同 group 折叠成一个赛事、
+// 展开见各阶段（如科隆按 stage 拆的 4 个包）。内置走 onLoadBuiltin，预装走 onLoadBundled，在线走 onDownloadOnline。
 export interface GalleryItem {
-  source: "builtin" | "online";
+  source: "builtin" | "bundled" | "online";
   slug: string;
   name: string;
   description?: string;
@@ -33,8 +33,9 @@ function Card({ item, busy, disabled }: { item: GalleryItem; busy: boolean; disa
     >
       <span className="stu-event-card-head">
         <b>{stageName}</b>
-        {item.builtin && <span className="stu-event-badge">内置</span>}
-        {item.source === "builtin" && !item.builtin && <span className="stu-event-badge">示例</span>}
+        {item.source === "bundled" && <span className="stu-event-badge">已安装</span>}
+        {item.source === "builtin" && item.builtin !== true && <span className="stu-event-badge">示例</span>}
+        {item.source === "builtin" && item.builtin === true && <span className="stu-event-badge">内置</span>}
       </span>
       {item.description && <span className="stu-muted">{item.description}</span>}
       <span className="stu-event-card-action">
@@ -46,15 +47,19 @@ function Card({ item, busy, disabled }: { item: GalleryItem; busy: boolean; disa
 
 export function EventGallery({
   builtins,
+  bundledManifest,
   manifest,
   busySlug,
   onLoadBuiltin,
+  onLoadBundled,
   onDownloadOnline,
 }: {
   builtins: BuiltinEvent[];
+  bundledManifest: EventsManifest | null;
   manifest: EventsManifest | null;
   busySlug: string | null;
   onLoadBuiltin: (builtin: BuiltinEvent) => void;
+  onLoadBundled: (asset: EventsManifest["events"][number]) => void;
   onDownloadOnline: (asset: EventsManifest["events"][number]) => void;
 }) {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
@@ -64,6 +69,11 @@ export function EventGallery({
       ...builtins.map((b): GalleryItem => ({
         source: "builtin", slug: b.slug, name: b.name, description: b.description,
         group: b.group, onLoad: () => onLoadBuiltin(b),
+      })),
+      ...(bundledManifest?.events ?? []).map((e): GalleryItem => ({
+        source: "bundled", slug: e.slug, name: e.name, description: e.description,
+        group: e.group, sizeLabel: e.size ? `${(e.size / 1024 / 1024).toFixed(1)} MB` : undefined,
+        onLoad: () => onLoadBundled(e),
       })),
       ...(manifest?.events ?? []).map((e): GalleryItem => ({
         source: "online", slug: e.slug, name: e.name, description: e.description,
@@ -80,7 +90,7 @@ export function EventGallery({
       byGroup.set(key, arr);
     }
     return [...byGroup.entries()].map(([key, groupItems]) => ({ key, items: groupItems }));
-  }, [builtins, manifest, onLoadBuiltin, onDownloadOnline]);
+  }, [builtins, bundledManifest, manifest, onLoadBuiltin, onLoadBundled, onDownloadOnline]);
 
   if (groups.length === 0) {
     return <p className="stu-event-gallery-empty">暂无可下载的赛事。内置示例与在线赛事会显示在这里。</p>;

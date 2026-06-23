@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import base64
+import datetime
 import json
 import logging
 import os
@@ -146,9 +147,13 @@ class _StudioStaticHandler(SimpleHTTPRequestHandler):
       2. 打包内置（去内置化后通常不存在）→ 回退提供；
       3. 都没有 → 命中 GET 时按 tris-manifest 从镜像下载到 overlay，再提供。
     下载失败只降级（跳过静态墙体 LOS），不报错。同图多场并行导入按文件名加锁去重。
+
+    `/bundled-events/` overlay：userdata/bundled-events 优先，回退 WEB_DIR/bundled-events。
+    不做按需下载（events 由 installer 预装或 health check 修复）。
     """
 
     overlay_tris: Path | None = None
+    overlay_bundled_events: Path | None = None
     _tri_locks: dict[str, threading.Lock] = {}
     _tri_locks_guard = threading.Lock()
     _tris_manifest: dict | None = None
@@ -216,21 +221,31 @@ class _StudioStaticHandler(SimpleHTTPRequestHandler):
 
     def translate_path(self, path: str) -> str:
         default = super().translate_path(path)
+        urlpath = urllib.parse.urlparse(path).path
+
+        # /tris/ overlay：userdata/tris 优先于内置
         overlay = self.overlay_tris
-        if overlay is not None:
-            urlpath = urllib.parse.urlparse(path).path
-            if urlpath.startswith("/tris/"):
-                name = os.path.basename(urlpath)
-                candidate = overlay / name
-                if candidate.is_file():
-                    return str(candidate)
+        if overlay is not None and urlpath.startswith("/tris/"):
+            name = os.path.basename(urlpath)
+            candidate = overlay / name
+            if candidate.is_file():
+                return str(candidate)
+
+        # /bundled-events/ overlay：userdata/bundled-events 优先于内置
+        overlay_be = self.overlay_bundled_events
+        if overlay_be is not None and urlpath.startswith("/bundled-events/"):
+            name = os.path.basename(urlpath)
+            candidate = overlay_be / name
+            if candidate.is_file():
+                return str(candidate)
+
         return default
 
     def end_headers(self) -> None:
         path = urllib.parse.urlparse(self.path).path
         if path == "/" or path.endswith("/index.html"):
             self.send_header("Cache-Control", "no-cache")
-        elif path.startswith("/tris/") or path.startswith("/maps/radars/"):
+        elif path.startswith("/tris/") or path.startswith("/bundled-events/") or path.startswith("/maps/radars/"):
             self.send_header("Cache-Control", "public, max-age=31536000, immutable")
         elif path.startswith("/assets/"):
             self.send_header("Cache-Control", "public, max-age=31536000, immutable")
@@ -254,13 +269,15 @@ def _find_static_port(start: int = 51780) -> int:
         return int(sock.getsockname()[1])
 
 
-def _start_static_server(root: Path, overlay_tris: Path | None = None) -> tuple[ThreadingHTTPServer, str]:
+def _start_static_server(root: Path, overlay_tris: Path | None = None, overlay_bundled_events: Path | None = None) -> tuple[ThreadingHTTPServer, str]:
     from functools import partial
 
     port = _find_static_port()
     if overlay_tris is not None:
         # 类属性形式注入 overlay 目录（partial 只能传 handler __init__ 参数）。
         _StudioStaticHandler.overlay_tris = overlay_tris
+    if overlay_bundled_events is not None:
+        _StudioStaticHandler.overlay_bundled_events = overlay_bundled_events
     handler = partial(_StudioStaticHandler, directory=str(root))
     server = ThreadingHTTPServer(("127.0.0.1", port), handler)
     thread = threading.Thread(target=server.serve_forever, name="dak-studio-static", daemon=True)
@@ -1128,6 +1145,193 @@ class StudioApi:
                 continue
         return None
 
+    # --- bundled-events 资产管理（本地预装赛事包发现）--------------------------
+    def _bundled_events_manifest_path(self) -> Path:
+        return self._userdata / "bundled-events" / "manifest.json"
+
+    def bundled_events_manifest(self) -> dict | None:
+        """返回 userdata/bundled-events/manifest.json 内容。
+
+        manifest 是唯一真相源——不存在则返回 None，不做动态扫描。
+        """
+        path = self._bundled_events_manifest_path()
+        if not path.is_file():
+            return None
+        try:
+            return json.loads(path.read_text("utf-8"))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("读取 bundled-events manifest 失败：%s", exc)
+            return None
+
+    def bundled_events_list(self) -> list[dict]:
+        """已安装的 bundled events 列表 [{slug, name, size}]。"""
+        m = self.bundled_events_manifest()
+        if not m or not isinstance(m.get("events"), list):
+            return []
+        return [{"slug": e["slug"], "name": e.get("name", e["slug"]), "size": e.get("size", 0)} for e in m["events"]]
+
+    # --- asset health check（启动完整性校验 + 修复）----------------------------
+    def _install_manifest(self) -> dict | None:
+        """读取 userdata/install-manifest.json。不存在返回 None。"""
+        path = self._userdata / "install-manifest.json"
+        if not path.is_file():
+            return None
+        try:
+            return json.loads(path.read_text("utf-8"))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("读取 install-manifest 失败：%s", exc)
+            return None
+
+    def check_assets(self, deep: bool = False) -> dict:
+        """启动时校验预装资产完整性。
+
+        deep=False（默认）：只检查存在 + 文件 size 匹配，不 hash。
+        deep=True：逐文件 sha256 校验（用户点「修复安装」或「重新校验」时）。
+
+        返回 {status, noManifest, checkedAt, assetSet, missingEvents[], missingTris[], canRepair}
+        status: "ok" | "not_installed" | "incomplete" | "corrupt"
+        """
+        manifest = self._install_manifest()
+        result: dict = {
+            "status": "ok",
+            "noManifest": manifest is None,
+            "checkedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "assetSet": manifest.get("assetSet") if manifest else None,
+            "missingEvents": [],
+            "missingTris": [],
+            "canRepair": True,
+        }
+        if manifest is None:
+            result["status"] = "not_installed"
+            return result
+
+        bundled_dir = self._userdata / "bundled-events"
+        for event in manifest.get("bundledEvents", []):
+            slug = event.get("slug", "")
+            name = event.get("name", slug)
+            fpath = bundled_dir / f"{slug}.zip"
+            expected_size = event.get("size")
+            expected_sha256 = event.get("sha256")
+
+            if not fpath.is_file():
+                result["missingEvents"].append({"slug": slug, "name": name, "reason": "missing"})
+                continue
+            actual_size = fpath.stat().st_size
+            if expected_size is not None and actual_size != expected_size:
+                result["missingEvents"].append({"slug": slug, "name": name, "reason": "size_mismatch"})
+                continue
+            if deep and expected_sha256:
+                try:
+                    if updater.sha256_file(fpath) != expected_sha256:
+                        result["missingEvents"].append({"slug": slug, "name": name, "reason": "hash_mismatch"})
+                except Exception:  # noqa: BLE001
+                    result["missingEvents"].append({"slug": slug, "name": name, "reason": "hash_mismatch"})
+
+        tris_dir = self._userdata / "tris"
+        for map_name, entry in (manifest.get("requiredTris", {}) or {}).items():
+            fpath = tris_dir / entry.get("name", f"{map_name}.tri")
+            expected_size = entry.get("size")
+            expected_sha256 = entry.get("sha256")
+            required_by = entry.get("requiredBy", [])
+
+            if not fpath.is_file():
+                result["missingTris"].append({"mapName": map_name, "requiredBy": required_by, "reason": "missing"})
+                continue
+            actual_size = fpath.stat().st_size
+            if expected_size is not None and actual_size != expected_size:
+                result["missingTris"].append({"mapName": map_name, "requiredBy": required_by, "reason": "size_mismatch"})
+                continue
+            if deep and expected_sha256:
+                try:
+                    if updater.sha256_file(fpath) != expected_sha256:
+                        result["missingTris"].append({"mapName": map_name, "requiredBy": required_by, "reason": "hash_mismatch"})
+                except Exception:  # noqa: BLE001
+                    result["missingTris"].append({"mapName": map_name, "requiredBy": required_by, "reason": "hash_mismatch"})
+
+        has_missing = len(result["missingEvents"]) > 0 or len(result["missingTris"]) > 0
+        if deep and has_missing:
+            # 仅在 deep 模式可判定 corrupt——缺文件但 size 对的极端情况
+            result["status"] = "corrupt"
+        elif has_missing:
+            result["status"] = "incomplete"
+        else:
+            result["status"] = "ok"
+
+        return result
+
+    # repair_assets 内部 job 跟踪
+    _repair_jobs: dict[str, dict] = {}
+    _repair_jobs_lock = threading.Lock()
+
+    def repair_assets(self, items: list[dict]) -> str:
+        """批量修复缺失资产（下载 + sha256 校验）。
+
+        items: [{type: "event", slug: "..."} | {type: "tri", mapName: "..."}]
+        返回 jobId，前端通过 asset_repair_status 轮询进度。
+        """
+        import uuid
+
+        job_id = uuid.uuid4().hex[:12]
+        manifest = self._install_manifest()
+        if not manifest:
+            return job_id  # 无 manifest 无法修复
+
+        job = {"state": "starting", "progress": 0, "current": 0, "total": len(items), "errors": []}
+        with self._repair_jobs_lock:
+            self._repair_jobs[job_id] = job
+
+        def run():
+            bundled_dir = self._userdata / "bundled-events"
+            bundled_dir.mkdir(parents=True, exist_ok=True)
+            tris_dir = self._userdata / "tris"
+            tris_dir.mkdir(parents=True, exist_ok=True)
+
+            for i, item in enumerate(items):
+                job["state"] = "downloading"
+                job["current"] = i
+                job["progress"] = round(i / max(len(items), 1), 3) if items else 1.0
+                try:
+                    if item.get("type") == "event":
+                        slug = item["slug"]
+                        evt = next((e for e in manifest.get("bundledEvents", []) if e.get("slug") == slug), None)
+                        if not evt:
+                            job["errors"].append(f"{slug}: manifest 中未找到")
+                            continue
+                        dest = bundled_dir / f"{slug}.zip"
+                        updater.download_with_fallback(
+                            list(evt.get("urls", [])),
+                            dest,
+                            expected_sha256=evt.get("sha256"),
+                            expected_size=evt.get("size"),
+                        )
+                    elif item.get("type") == "tri":
+                        map_name = item["mapName"]
+                        entry = (manifest.get("requiredTris") or {}).get(map_name)
+                        if not entry:
+                            job["errors"].append(f"{map_name}: manifest 中未找到")
+                            continue
+                        dest = tris_dir / entry.get("name", f"{map_name}.tri")
+                        updater.download_with_fallback(
+                            list(entry.get("urls", [])),
+                            dest,
+                            expected_sha256=entry.get("sha256"),
+                            expected_size=entry.get("size"),
+                        )
+                except Exception as exc:  # noqa: BLE001
+                    job["errors"].append(f"{item}: {exc}")
+
+            job["progress"] = 1.0
+            job["current"] = len(items)
+            job["state"] = "done" if not job["errors"] else "error"
+
+        threading.Thread(target=run, name=f"repair-{job_id}", daemon=True).start()
+        return job_id
+
+    def asset_repair_status(self, job_id: str) -> dict | None:
+        """查询修复 job 状态。返回 {state, progress, current, total, errors} 或 None。"""
+        with self._repair_jobs_lock:
+            return self._repair_jobs.get(job_id)
+
     # --- .tri 资产管理（外置 overlay + 按需下载）-----------------------------
     def _tri_overlay_dir(self) -> Path:
         path = self._userdata / "tris"
@@ -1212,7 +1416,10 @@ def main() -> None:
     # .tri overlay：userdata/tris 优先于内置（外置资产管理）。
     overlay_tris = storage / "tris"
     overlay_tris.mkdir(parents=True, exist_ok=True)
-    _server, index_url = _start_static_server(WEB_DIR, overlay_tris=overlay_tris)
+    # bundled-events overlay：userdata/bundled-events（installer 预装或 health check 修复）。
+    overlay_bundled_events = storage / "bundled-events"
+    overlay_bundled_events.mkdir(parents=True, exist_ok=True)
+    _server, index_url = _start_static_server(WEB_DIR, overlay_tris=overlay_tris, overlay_bundled_events=overlay_bundled_events)
     api = StudioApi()
     window = webview.create_window(
         title=f"DAK Studio {__version__}",
