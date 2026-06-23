@@ -34,6 +34,13 @@ cs2df export-batch <dir> --out bundle.zip  # 批量导出
 # GUI
 bash scripts/package.sh          # 打包桌面应用（DAK Studio + PyInstaller）
 
+# 赛事制作
+pnpm event:export                # 赛事批量导出（读 spec.export，--research --compress-level 9）
+pnpm events:build                # 构建赛事 R2 资产（build-event-asset.mjs）
+pnpm events:publish              # 上传赛事资产到 R2
+node scripts/cologne-build.mjs   # 科隆 Major per-stage 装配（4 个 event-package）
+node scripts/hltv/extract-stage-urls.mjs  # CDP 提取 HLTV match URL（Node 24 原生 WebSocket）
+
 # 单测单文件
 pnpm vitest run packages/core/src/index.test.ts
 ```

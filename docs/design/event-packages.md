@@ -1,9 +1,11 @@
 # 赛事资产库、赛事包导入与制作（Event Packages）
 
-> 实施状态（2026-06-21）：`event-package/1.0` 合同、Event/Series 导入、在线资产下载、
+> 实施状态（2026-06-24）：`event-package/1.0` 合同、Event/Series 导入、在线资产下载、
 > 原生低内存逐图导入/生成、可取消 checkpoint，以及 round robin / Swiss /
 > single-elim / double-elim bracket 展示已落地。
-> Cologne Major 已建立空赛事骨架，需在赛程结束后补真实队伍、系列赛、BP 与 v3 ZIP。
+> **科隆 Major 2026 四阶段已全量完成**：Stage1/2 → R2 在线下载，Stage3/Playoff → 内置安装包。
+> 合同新增 `event.sourceUrl`、`event.group`、`series.matchUrl` 可选字段，
+> Studio EventManager/BpView/SeriesWorkspace/制作器均有 HLTV 外链渲染。
 
 > 0.7.0 方向设计稿。**只定义合同与落点，不在本稿实现平台**。
 > 复用已落地的 R2 资产层 + manifest + sha256 校验 + `download_with_fallback`
