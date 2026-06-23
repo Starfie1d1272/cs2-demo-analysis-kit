@@ -8,6 +8,8 @@
 export interface AssetStatus {
   status: "ok" | "not_installed" | "incomplete" | "corrupt";
   noManifest?: boolean;
+  /** 清单来源："local"（已写入本地）| "remote"（R2 拉取）| "none"（不可用） */
+  manifestSource?: string;
   checkedAt?: string;
   assetSet?: string;
   /** 官方资产集定义的完整 bundled event slug 列表（非仅缺失项） */

@@ -1176,33 +1176,39 @@ class StudioApi:
     ]
 
     _cached_remote_manifest: dict | None = None  # 类级缓存，启动期间只拉一次
+    _manifest_source: str = "none"  # "local" | "remote" | "none"
 
     def _install_manifest(self) -> dict | None:
         """读取 userdata/install-manifest.json；不存在时尝试从 R2 拉取。
 
         这样老用户 auto-update 到 0.7.0（无本地 manifest）也能通过
         health check 发现可安装的官方资产列表并完成修复。
+        同时记录 _manifest_source 供 check_assets 返回。
         """
         path = self._userdata / "install-manifest.json"
         if path.is_file():
             try:
+                self._manifest_source = "local"
                 return json.loads(path.read_text("utf-8"))
             except Exception as exc:  # noqa: BLE001
                 log.warning("读取 install-manifest 失败：%s", exc)
 
         # Fallback: 从 R2 拉取（缓存类级别，同一进程只拉一次）
         if self._cached_remote_manifest is not None:
+            self._manifest_source = "remote"
             return self._cached_remote_manifest
         for url in self._INSTALL_MANIFEST_URLS:
             try:
                 req = urllib.request.Request(url, headers={"User-Agent": "DAK-Studio-HealthCheck"})
                 with urllib.request.urlopen(req, timeout=15) as resp:  # noqa: S310
                     self._cached_remote_manifest = json.loads(resp.read().decode("utf-8"))
+                    self._manifest_source = "remote"
                     log.info("从 R2 获取 install-manifest 成功")
                     return self._cached_remote_manifest
             except Exception as exc:  # noqa: BLE001
                 log.debug("从 %s 获取 install-manifest 失败：%s", url, exc)
                 continue
+        self._manifest_source = "none"
         return None
 
     def check_assets(self, deep: bool = False) -> dict:
@@ -1221,6 +1227,7 @@ class StudioApi:
         result: dict = {
             "status": "ok",
             "noManifest": manifest is None,
+            "manifestSource": self._manifest_source,  # "local" | "remote" | "none"
             "checkedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "assetSet": manifest.get("assetSet") if manifest else None,
             "bundledEventSlugs": full_events,
@@ -1232,7 +1239,6 @@ class StudioApi:
         if manifest is None:
             result["status"] = "not_installed"
             result["canRepair"] = False  # R2 不可达，无法修复
-            return result
             return result
 
         bundled_dir = self._userdata / "bundled-events"

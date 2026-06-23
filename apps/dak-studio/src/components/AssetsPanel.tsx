@@ -238,7 +238,7 @@ export function AssetsPanel({ entries, onLibraryChanged, onNotice = () => {} }: 
                   )}
                 </td>
               </tr>
-              <tr><td>安装清单</td><td>{assetStatus.noManifest ? "不可用" : "本地"}</td></tr>
+              <tr><td>安装清单</td><td>{assetStatus.manifestSource === "local" ? "本地" : assetStatus.manifestSource === "remote" ? "远程可用" : "不可用"}</td></tr>
             </tbody>
           </table>
         </div>
