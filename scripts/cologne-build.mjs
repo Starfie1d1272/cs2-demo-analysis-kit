@@ -82,12 +82,26 @@ function matchDemos(s) {
   const wantA = normTeam(s.teamA), wantB = normTeam(s.teamB);
   const decider = s.bp?.find((b) => b[1] === "decider");
   const wantMap = decider ? deMap(decider[2]) : null;
-  return demos.filter((d) => {
+
+  // stage key → 目录名：stage1 → "Stage1"
+  const stageDir = s.stage ? "Stage" + s.stage.replace(/^stage/, "") : null;
+
+  const match = (d) => {
     const pair = (d.a.key === wantA && d.b.key === wantB) || (d.a.key === wantB && d.b.key === wantA);
     if (!pair) return false;
     if (s.format === "bo1" && wantMap) return d.mapName === wantMap;
     return true;
-  });
+  };
+
+  // 优先在本阶段目录找
+  if (stageDir) {
+    const sameStage = demos.filter((d) => d.stage === stageDir);
+    const hits = sameStage.filter(match);
+    if (hits.length > 0) return hits;
+  }
+
+  // 找不到再跨阶段
+  return demos.filter(match);
 }
 
 // 4. 由 bp 构建 veto
@@ -180,6 +194,7 @@ for (const s of spec.series) {
     entryRound: s.entryRound ?? null,
     status: s.status,
     format: s.format,
+    matchUrl: s.matchUrl ?? null,
     teamAKey: teamKeyByName.get(s.teamA),
     teamBKey: teamKeyByName.get(s.teamB),
     scoreA: finished ? maps.filter((m) => m.scoreA > m.scoreB).length : null,
@@ -196,7 +211,7 @@ const eventPackage = {
   version: "cs2-demo-analysis-kit/event-package-1.0",
   source: "manual",
   exportedAt: new Date().toISOString(),
-  event: { slug: spec.event.slug, name: spec.event.name, kind: spec.event.kind, stages: spec.stages },
+  event: { slug: spec.event.slug, name: spec.event.name, kind: spec.event.kind, ...(spec.event.sourceUrl ? { sourceUrl: spec.event.sourceUrl } : {}), stages: spec.stages },
   teams: teamNames.map((n) => ({ key: teamKeyByName.get(n), name: n, players: [] })),
   series: builtSeries,
 };

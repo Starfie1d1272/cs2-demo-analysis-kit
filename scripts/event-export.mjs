@@ -72,7 +72,24 @@ for (const stageDef of exp.stages) {
     console.log(`  · --reexport：已清空 ${stageDef.stage}/ 的旧 zip/date`);
   }
 
-  const sources = (stageDef.sources ?? []).flatMap(expandGlob);
+  let sources = [...new Set((stageDef.sources ?? []).flatMap(expandGlob))];
+  // 同一 slug 的 Stage3/Playoff 无法靠文件名分阶段：按对阵清单路由。
+  // pairs（白名单）/excludePairs（黑名单）为归一化对阵 "a|b"（字母序）。pairs 已定义但为空 → 该阶段不取任何源（清单待填）。
+  const normTeam = (s) => String(s).toLowerCase().replace(/\b(gaming|esports|team)\b/g, "").replace(/[^a-z0-9]/g, "");
+  const pairOf = (file) => {
+    const m = file.split("/").at(-1).match(/^iem-cologne-major-2026-(.+?)-bo\d-.+\.rar$/i);
+    if (!m) return null;
+    const vs = m[1].split("-vs-");
+    return vs.length === 2 ? [normTeam(vs[0]), normTeam(vs[1])].sort().join("|") : null;
+  };
+  if (Array.isArray(stageDef.pairs)) {
+    const allow = new Set(stageDef.pairs.map((p) => p.split("|").map(normTeam).sort().join("|")));
+    sources = sources.filter((s) => { const p = pairOf(s); return p && allow.has(p); });
+  }
+  if (Array.isArray(stageDef.excludePairs) && stageDef.excludePairs.length > 0) {
+    const deny = new Set(stageDef.excludePairs.map((p) => p.split("|").map(normTeam).sort().join("|")));
+    sources = sources.filter((s) => { const p = pairOf(s); return !(p && deny.has(p)); });
+  }
   if (sources.length === 0) {
     console.log(`  · 无匹配源（globs: ${(stageDef.sources ?? []).join(", ")}），跳过`);
     continue;
@@ -81,7 +98,8 @@ for (const stageDef of exp.stages) {
     totalSources += 1;
     console.log(`--- [${i + 1}/${sources.length}] ${src.split("/").at(-1)} ---`);
     try {
-      execFileSync("bash", [exportScript, outRootAbs, stageDef.stage, src, stageDef.prefix ?? ""], { stdio: "inherit" });
+      const compressLevel = String(stageDef.compressLevel ?? exp.compressLevel ?? 9);
+      execFileSync("bash", [exportScript, outRootAbs, stageDef.stage, src, stageDef.prefix ?? "", compressLevel], { stdio: "inherit" });
     } catch {
       console.error(`!! 失败：${src}`);
       totalFail += 1;

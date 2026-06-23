@@ -11,6 +11,9 @@ packages/maps/experimental-output/
 # 本地导出的 v3 ZIP 工作区 + 赛事装配输出（中转产物，最终内置包另存 apps/dak-studio）
 fixtures/demos/**/*.zip
 fixtures/demos/**/_build/
+# 赛事原始下载档（.rar/.dem 源，喂给 event-export，体积大不入库）
+fixtures/demos/**/_src/
+*.rar
 # 导出脚本写的比赛时间 sidecar，由本地 demo mtime 派生，不可复现
 fixtures/demos/**/*.date
 # Local scratch: benchmark demos, scripts, and golden baselines

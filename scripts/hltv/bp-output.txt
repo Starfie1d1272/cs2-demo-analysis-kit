@@ -1,0 +1,540 @@
+
+========================================
+阶段：0-1（4 场）
+=".repeat(40)}
+
+# the-mongolz-vs-b8-iem-cologne-major-2026
+1. B8 removed Inferno
+2. The MongolZ removed Ancient
+3. B8 picked Mirage
+4. The MongolZ picked Overpass
+5. The MongolZ removed Anubis
+6. B8 removed Nuke
+7. Dust2 was left over
+
+# parivision-vs-monte-iem-cologne-major-2026
+1. Monte removed Overpass
+2. PARIVISION removed Nuke
+3. Monte picked Mirage
+4. PARIVISION picked Ancient
+5. PARIVISION removed Anubis
+6. Monte removed Dust2
+7. Inferno was left over
+
+# fut-vs-g2-iem-cologne-major-2026
+1. G2 removed Nuke
+2. FUT removed Inferno
+3. G2 picked Overpass
+4. FUT picked Ancient
+5. FUT removed Dust2
+6. G2 removed Anubis
+7. Mirage was left over
+
+# natus-vincere-vs-legacy-iem-cologne-major-2026
+1. Legacy removed Anubis
+2. Natus Vincere removed Overpass
+3. Legacy picked Inferno
+4. Natus Vincere picked Ancient
+5. Natus Vincere removed Dust2
+6. Legacy removed Nuke
+7. Mirage was left over
+
+
+========================================
+阶段：2-0（2 场）
+=".repeat(40)}
+
+# betboom-vs-furia-iem-cologne-major-2026
+1. FURIA removed Ancient
+2. BetBoom removed Inferno
+3. FURIA picked Overpass
+4. BetBoom picked Dust2
+5. BetBoom removed Mirage
+6. FURIA removed Anubis
+7. Nuke was left over
+
+# spirit-vs-9z-iem-cologne-major-2026
+1. 9z removed Anubis
+2. Spirit removed Inferno
+3. 9z picked Overpass
+4. Spirit picked Mirage
+5. Spirit removed Nuke
+6. 9z removed Ancient
+7. Dust2 was left over
+
+
+========================================
+阶段：1-1（4 场）
+=".repeat(40)}
+
+# natus-vincere-vs-the-mongolz-iem-cologne-major-2026
+1. The MongolZ removed Anubis
+2. Natus Vincere removed Overpass
+3. The MongolZ picked Nuke
+4. Natus Vincere picked Ancient
+5. Natus Vincere removed Dust2
+6. The MongolZ removed Inferno
+7. Mirage was left over
+
+# falcons-vs-monte-iem-cologne-major-2026
+1. Monte removed Ancient
+2. Falcons removed Overpass
+3. Monte picked Inferno
+4. Falcons picked Dust2
+5. Falcons removed Nuke
+6. Monte removed Anubis
+7. Mirage was left over
+
+# aurora-vs-g2-iem-cologne-major-2026
+1. G2 removed Nuke
+2. Aurora removed Ancient
+3. G2 picked Overpass
+4. Aurora picked Anubis
+5. Aurora removed Mirage
+6. G2 removed Dust2
+7. Inferno was left over
+
+# vitality-vs-mouz-iem-cologne-major-2026
+1. MOUZ removed Anubis
+2. Vitality removed Ancient
+3. MOUZ picked Mirage
+4. Vitality picked Dust2
+5. Vitality removed Nuke
+6. MOUZ removed Overpass
+7. Inferno was left over
+
+
+========================================
+阶段：0-2（2 场）
+=".repeat(40)}
+
+# b8-vs-fut-iem-cologne-major-2026
+1. FUT removed Inferno
+2. B8 removed Anubis
+3. FUT picked Dust2
+4. B8 picked Mirage
+5. B8 removed Overpass
+6. FUT removed Nuke
+7. Ancient was left over
+
+# parivision-vs-legacy-iem-cologne-major-2026
+1. Legacy removed Anubis
+2. PARIVISION removed Nuke
+3. Legacy picked Inferno
+4. PARIVISION picked Dust2
+5. PARIVISION removed Overpass
+6. Legacy removed Ancient
+7. Mirage was left over
+
+
+========================================
+阶段：2-1（3 场）
+========================================
+
+# betboom-vs-vitality-iem-cologne-major-2026
+1. Vitality removed Ancient
+2. BetBoom removed Inferno
+3. Vitality picked Overpass
+4. BetBoom picked Nuke
+5. BetBoom removed Dust2
+6. Vitality removed Anubis
+7. Mirage was left over
+
+# aurora-vs-9z-iem-cologne-major-2026
+1. 9z removed Anubis
+2. Aurora removed Ancient
+3. 9z picked Nuke
+4. Aurora picked Dust2
+5. Aurora removed Overpass
+6. 9z removed Mirage
+7. Inferno was left over
+
+# natus-vincere-vs-falcons-iem-cologne-major-2026
+1. Falcons removed Inferno
+2. Natus Vincere removed Nuke
+3. Falcons picked Dust2
+4. Natus Vincere picked Mirage
+5. Natus Vincere removed Overpass
+6. Falcons removed Ancient
+7. Anubis was left over
+
+
+========================================
+阶段：1-2（3 场）
+========================================
+
+# mouz-vs-fut-iem-cologne-major-2026
+1. FUT removed Inferno
+2. MOUZ removed Anubis
+3. FUT picked Ancient
+4. MOUZ picked Nuke
+5. MOUZ removed Dust2
+6. FUT removed Overpass
+7. Mirage was left over
+
+# the-mongolz-vs-monte-iem-cologne-major-2026
+1. Monte removed Overpass
+2. The MongolZ removed Anubis
+3. Monte picked Nuke
+4. The MongolZ picked Inferno
+5. The MongolZ removed Ancient
+6. Monte removed Mirage
+7. Dust2 was left over
+
+# g2-vs-legacy-iem-cologne-major-2026
+1. Legacy removed Anubis
+2. G2 removed Nuke
+3. Legacy picked Dust2
+4. G2 picked Overpass
+5. G2 removed Mirage
+6. Legacy removed Ancient
+7. Inferno was left over
+
+
+========================================
+阶段：2-2（3 场）
+========================================
+
+# 9z-vs-the-mongolz-iem-cologne-major-2026
+1. The MongolZ removed Anubis
+2. 9z removed Mirage
+3. The MongolZ picked Inferno
+4. 9z picked Overpass
+5. 9z removed Ancient
+6. The MongolZ removed Nuke
+7. Dust2 was left over
+
+# betboom-vs-fut-iem-cologne-major-2026
+1. FUT removed Nuke
+2. BetBoom removed Ancient
+3. FUT picked Mirage
+4. BetBoom picked Dust2
+5. BetBoom removed Anubis
+6. FUT removed Inferno
+7. Overpass was left over
+
+# natus-vincere-vs-g2-iem-cologne-major-2026
+1. G2 removed Nuke
+2. Natus Vincere removed Overpass
+3. G2 picked Dust2
+4. Natus Vincere picked Inferno
+5. Natus Vincere removed Anubis
+6. G2 removed Ancient
+7. Mirage was left over
+
+
+========================================
+阶段：unknown-stage（4 场）
+========================================
+
+# 9z-vs-furia-iem-cologne-major-2026
+1. 9z removed Anubis
+2. FURIA removed Ancient
+3. 9z picked Dust2
+4. FURIA picked Mirage
+5. FURIA removed Inferno
+6. 9z removed Nuke
+7. Overpass was left over
+
+# g2-vs-spirit-iem-cologne-major-2026
+1. G2 removed Nuke
+2. Spirit removed Inferno
+3. G2 picked Overpass
+4. Spirit picked Dust2
+5. Spirit removed Ancient
+6. G2 removed Anubis
+7. Mirage was left over
+
+# falcons-vs-vitality-iem-cologne-major-2026
+1. Falcons removed Overpass
+2. Vitality removed Ancient
+3. Falcons picked Anubis
+4. Vitality picked Inferno
+5. Vitality removed Mirage
+6. Falcons removed Nuke
+7. Dust2 was left over
+
+# spirit-vs-falcons-iem-cologne-major-2026
+1. Falcons removed Overpass
+2. Spirit removed Inferno
+3. Falcons picked Anubis
+4. Spirit picked Mirage
+5. Spirit removed Ancient
+6. Falcons removed Nuke
+7. Dust2 was left over
+
+
+========================================
+阶段：1-2（1 场）
+========================================
+
+# aurora-vs-betboom-iem-cologne-major-2026
+1. BetBoom removed Inferno
+2. Aurora removed Ancient
+3. BetBoom picked Nuke
+4. Aurora picked Anubis
+5. Aurora removed Mirage
+6. BetBoom removed Overpass
+7. Dust2 was left over
+
+
+========================================
+阶段：1-1（1 场）
+========================================
+
+# aurora-vs-furia-iem-cologne-major-2026
+1. Aurora removed Overpass
+2. FURIA removed Anubis
+3. Aurora picked Dust2
+4. FURIA picked Nuke
+5. FURIA removed Ancient
+6. Aurora removed Mirage
+7. Inferno was left over
+
+
+========================================
+阶段：playoff / grand final（1 场）
+========================================
+
+# furia-vs-falcons-iem-cologne-major-2026
+1. FURIA removed Ancient
+2. Falcons removed Overpass
+3. FURIA picked Mirage
+4. Falcons picked Anubis
+5. FURIA picked Inferno
+6. Falcons picked Dust2
+7. Nuke was left over
+
+
+========================================
+阶段：playoff / quarter-final（3 场）
+========================================
+
+# 9z-vs-furia-iem-cologne-major-2026
+1. 9z removed Anubis
+2. FURIA removed Ancient
+3. 9z picked Dust2
+4. FURIA picked Mirage
+5. FURIA removed Inferno
+6. 9z removed Nuke
+7. Overpass was left over
+
+# g2-vs-spirit-iem-cologne-major-2026
+1. G2 removed Nuke
+2. Spirit removed Inferno
+3. G2 picked Overpass
+4. Spirit picked Dust2
+5. Spirit removed Ancient
+6. G2 removed Anubis
+7. Mirage was left over
+
+# falcons-vs-vitality-iem-cologne-major-2026
+1. Falcons removed Overpass
+2. Vitality removed Ancient
+3. Falcons picked Anubis
+4. Vitality picked Inferno
+5. Vitality removed Mirage
+6. Falcons removed Nuke
+7. Dust2 was left over
+
+
+========================================
+阶段：1-2（1 场）
+========================================
+
+# aurora-vs-betboom-iem-cologne-major-2026
+1. BetBoom removed Inferno
+2. Aurora removed Ancient
+3. BetBoom picked Nuke
+4. Aurora picked Anubis
+5. Aurora removed Mirage
+6. BetBoom removed Overpass
+7. Dust2 was left over
+
+
+========================================
+阶段：1-1（1 场）
+========================================
+
+# aurora-vs-furia-iem-cologne-major-2026
+1. Aurora removed Overpass
+2. FURIA removed Anubis
+3. Aurora picked Dust2
+4. FURIA picked Nuke
+5. FURIA removed Ancient
+6. Aurora removed Mirage
+7. Inferno was left over
+
+
+========================================
+阶段：playoff / semi-final（2 场）
+========================================
+
+# spirit-vs-falcons-iem-cologne-major-2026
+1. Falcons removed Overpass
+2. Spirit removed Inferno
+3. Falcons picked Anubis
+4. Spirit picked Mirage
+5. Spirit removed Ancient
+6. Falcons removed Nuke
+7. Dust2 was left over
+
+# furia-vs-falcons-iem-cologne-major-2026
+1. FURIA removed Ancient
+2. Falcons removed Overpass
+3. FURIA picked Mirage
+4. Falcons picked Anubis
+5. FURIA picked Inferno
+6. Falcons picked Dust2
+7. Nuke was left over
+
+
+========================================
+阶段：playoff / quarter-final（4 场）
+========================================
+
+# 9z-vs-furia-iem-cologne-major-2026
+1. 9z removed Anubis
+2. FURIA removed Ancient
+3. 9z picked Dust2
+4. FURIA picked Mirage
+5. FURIA removed Inferno
+6. 9z removed Nuke
+7. Overpass was left over
+
+# aurora-vs-betboom-iem-cologne-major-2026
+1. BetBoom removed Inferno
+2. Aurora removed Ancient
+3. BetBoom picked Nuke
+4. Aurora picked Anubis
+5. Aurora removed Mirage
+6. BetBoom removed Overpass
+7. Dust2 was left over
+
+# g2-vs-spirit-iem-cologne-major-2026
+1. G2 removed Nuke
+2. Spirit removed Inferno
+3. G2 picked Overpass
+4. Spirit picked Dust2
+5. Spirit removed Ancient
+6. G2 removed Anubis
+7. Mirage was left over
+
+# falcons-vs-vitality-iem-cologne-major-2026
+1. Falcons removed Overpass
+2. Vitality removed Ancient
+3. Falcons picked Anubis
+4. Vitality picked Inferno
+5. Vitality removed Mirage
+6. Falcons removed Nuke
+7. Dust2 was left over
+
+
+========================================
+阶段：playoff / semi-final（3 场）
+========================================
+
+# aurora-vs-furia-iem-cologne-major-2026
+1. Aurora removed Overpass
+2. FURIA removed Anubis
+3. Aurora picked Dust2
+4. FURIA picked Nuke
+5. FURIA removed Ancient
+6. Aurora removed Mirage
+7. Inferno was left over
+
+# spirit-vs-falcons-iem-cologne-major-2026
+1. Falcons removed Overpass
+2. Spirit removed Inferno
+3. Falcons picked Anubis
+4. Spirit picked Mirage
+5. Spirit removed Ancient
+6. Falcons removed Nuke
+7. Dust2 was left over
+
+# furia-vs-falcons-iem-cologne-major-2026
+1. FURIA removed Ancient
+2. Falcons removed Overpass
+3. FURIA picked Mirage
+4. Falcons picked Anubis
+5. FURIA picked Inferno
+6. Falcons picked Dust2
+7. Nuke was left over
+
+
+========================================
+阶段：playoff / quarter-final（4 场）
+========================================
+
+# 9z-vs-furia-iem-cologne-major-2026
+1. 9z removed Anubis
+2. FURIA removed Ancient
+3. 9z picked Dust2
+4. FURIA picked Mirage
+5. FURIA removed Inferno
+6. 9z removed Nuke
+7. Overpass was left over
+
+# aurora-vs-betboom-iem-cologne-major-2026
+1. BetBoom removed Inferno
+2. Aurora removed Ancient
+3. BetBoom picked Nuke
+4. Aurora picked Anubis
+5. Aurora removed Mirage
+6. BetBoom removed Overpass
+7. Dust2 was left over
+
+# g2-vs-spirit-iem-cologne-major-2026
+1. G2 removed Nuke
+2. Spirit removed Inferno
+3. G2 picked Overpass
+4. Spirit picked Dust2
+5. Spirit removed Ancient
+6. G2 removed Anubis
+7. Mirage was left over
+
+# falcons-vs-vitality-iem-cologne-major-2026
+1. Falcons removed Overpass
+2. Vitality removed Ancient
+3. Falcons picked Anubis
+4. Vitality picked Inferno
+5. Vitality removed Mirage
+6. Falcons removed Nuke
+7. Dust2 was left over
+
+
+========================================
+阶段：playoff / semi-final（2 场）
+========================================
+
+# aurora-vs-furia-iem-cologne-major-2026
+1. Aurora removed Overpass
+2. FURIA removed Anubis
+3. Aurora picked Dust2
+4. FURIA picked Nuke
+5. FURIA removed Ancient
+6. Aurora removed Mirage
+7. Inferno was left over
+
+# spirit-vs-falcons-iem-cologne-major-2026
+1. Falcons removed Overpass
+2. Spirit removed Inferno
+3. Falcons picked Anubis
+4. Spirit picked Mirage
+5. Spirit removed Ancient
+6. Falcons removed Nuke
+7. Dust2 was left over
+
+
+========================================
+阶段：playoff / grand final（1 场）
+========================================
+
+# furia-vs-falcons-iem-cologne-major-2026
+1. FURIA removed Ancient
+2. Falcons removed Overpass
+3. FURIA picked Mirage
+4. Falcons picked Anubis
+5. FURIA picked Inferno
+6. Falcons picked Dust2
+7. Nuke was left over

@@ -20,6 +20,7 @@ OUTROOT_ARG="${1:?需要 outRoot：赛事 demo 根目录}"
 STAGE="${2:?需要阶段：如 Stage1/Playoff}"
 SRC="${3:?需要 .rar 或 .dem 路径}"
 PREFIX="${4:-}"
+COMPRESS_LEVEL="${5:-9}"  # cs2df 内部 ZIP 压缩等级，默认 9（最高）；event-export.mjs 由 spec.export.compressLevel 透传
 
 # outRoot 相对路径按仓库根解析
 case "$OUTROOT_ARG" in
@@ -61,7 +62,7 @@ do_export() {
   write_date "$name" "$@"
   if [ -f "$out" ]; then echo "  · 跳过（已存在）：$STAGE/$name.zip"; return; fi
   if [ "$#" -gt 1 ]; then echo "  → 合并 $# 段 → $STAGE/$name.zip"; else echo "  → 导出 → $STAGE/$name.zip"; fi
-  uv run --project "$REPO/python" cs2df export "$@" -o "$out" --research
+  uv run --project "$REPO/python" cs2df export "$@" -o "$out" --research --compress-level "$COMPRESS_LEVEL"
 }
 
 case "$SRC" in

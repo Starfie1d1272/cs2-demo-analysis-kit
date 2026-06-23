@@ -53,6 +53,7 @@ export const eventSeriesSchema = z.object({
   teamARecordBefore: z.string().nullable().optional(),
   teamBRecordBefore: z.string().nullable().optional(),
   format: z.enum(["bo1", "bo3", "bo5"]),
+  matchUrl: z.string().url().nullable().optional(), // 该系列来源页（HLTV match 页），展示层可链回
   teamAKey: z.string().min(1),
   teamBKey: z.string().min(1),
   scoreA: z.number().int().nonnegative().nullable().optional(),
@@ -71,6 +72,7 @@ export const eventPackageSchema = z.object({
     slug: z.string().min(1),
     name: z.string().min(1),
     kind: z.string().min(1),
+    sourceUrl: z.string().url().optional(), // 赛事来源页（如 HLTV results 页），展示层可链回
     stages: z.array(eventStageSchema).default([]),
   }),
   teams: z.array(eventTeamSchema),
