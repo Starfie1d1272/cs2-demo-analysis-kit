@@ -18,6 +18,7 @@ import {
 } from "../lib/series";
 import { PatternExplorer } from "./coach/PatternExplorer";
 import { MapPoolTable } from "./coach/MapPoolTable";
+import { Pagination } from "../components/Pagination";
 
 type CoachTab = "patterns" | "playbook" | "playlist" | "anti";
 
@@ -134,7 +135,10 @@ export function CoachView({
     );
   }
 
-  const antiMarkdown = buildAntiStratMarkdown(clusters, subjectTeam);
+  const antiMarkdown = useMemo(
+    () => (tab === "anti" ? buildAntiStratMarkdown(clusters, subjectTeam) : ""),
+    [tab, clusters, subjectTeam],
+  );
 
   return (
     <div className="stu-view">
@@ -269,9 +273,7 @@ export function CoachView({
       {!loading && clusters.length > 0 && tab === "anti" && (
         <>
           <MapPoolTable
-            clusters={clusters}
             facts={allFacts}
-            entries={allEntries}
             myTeamName={settings.myTeamName}
             opponentTeamName={settings.opponentTeamName}
             teamRenames={teamRenames}
@@ -342,13 +344,19 @@ function PlaybookTable({
   onRename: (clusterId: string, name: string) => Promise<void>;
 }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const PAGE_SIZE = 20;
+  const [page, setPage] = useState(0);
+  const totalPages = Math.max(1, Math.ceil(clusters.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const pageClusters = clusters.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
   return (
     <div className="stu-card">
       <h3>战术本</h3>
+      <Pagination page={safePage} totalPages={totalPages} onChange={setPage} info={`${clusters.length} 个打法模式`} />
       <table className="stu-mini-table">
         <thead><tr><th>战术名</th><th>打法模式</th><th className="stu-num">样本</th><th /></tr></thead>
         <tbody>
-          {clusters.slice(0, 20).map((cluster) => {
+          {pageClusters.map((cluster) => {
             const key = patternFingerprint(cluster);
             const value = drafts[key] ?? playbook[key] ?? "";
             return (

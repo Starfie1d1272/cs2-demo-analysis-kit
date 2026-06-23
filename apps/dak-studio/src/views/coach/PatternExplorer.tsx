@@ -2,12 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { MatchWorkspaceModel } from "@cs2dak/contract";
 import { ReplayViewer } from "@cs2dak/react";
 import { economyLabelCn, formatClockSeconds, ECONOMY_ENTRY_CN, formatEntryEvidenceLabel, formatTacticalClusterShortName } from "@cs2dak/presentation";
-import { calloutCn } from "@cs2dak/maps";
+import { calloutCn, buildLineupClusters, type LineupGrenadeLike } from "@cs2dak/maps";
 import type { EconomyEntry } from "@cs2dak/cohort";
 import { autoName, type TacticalCluster } from "../../lib/tactics.js";
 import { getFactsStore, type TacticalRoundFact } from "../../lib/facts.js";
 import { loadMatchWorkspaceModel, type StudioDemoEntry } from "../../lib/library.js";
-import { MetricInfo } from "../../components/primitives.js";
+import { MetricInfo, EvidenceLink } from "../../components/primitives.js";
+import { Pagination } from "../../components/Pagination.js";
 
 export interface PatternExplorerProps {
   clusters: TacticalCluster[];
@@ -225,6 +226,29 @@ function CoachReplayStage({ fact, entryByMatchId, cache }: {
   const [error, setError] = useState<string | null>(null);
   const model = loaded?.matchId === matchId ? loaded.model : null;
 
+  // ResizeObserver：测量中间列真实可用空间，算雷达最大尺寸
+  const mainRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const [radarMaxWidth, setRadarMaxWidth] = useState(660);
+
+  useEffect(() => {
+    const main = mainRef.current;
+    const bar = barRef.current;
+    if (!main || !bar) return;
+    const measure = () => {
+      const w = main.clientWidth;
+      const h = main.clientHeight;
+      const barH = bar.offsetHeight;
+      const gap = 8;
+      // 雷达最大 = min(列宽, 列高 − bar − gap, 绝对上限 660)
+      setRadarMaxWidth(Math.max(200, Math.min(w, h - barH - gap, 660)));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(main);
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     setError(null);
@@ -247,8 +271,8 @@ function CoachReplayStage({ fact, entryByMatchId, cache }: {
     : `${fact.teamName} vs ${fact.opponentName} · R${fact.roundNumber}`;
 
   return (
-    <div className="stu-pe-replay-main">
-      <div className="stu-pe-replay-bar">
+    <div className="stu-pe-replay-main" ref={mainRef}>
+      <div className="stu-pe-replay-bar" ref={barRef}>
         <span className="stu-pe-replay-kicker">代表回合</span>
         <span className="stu-pe-replay-label">{label}</span>
       </div>
@@ -259,12 +283,14 @@ function CoachReplayStage({ fact, entryByMatchId, cache }: {
       ) : !model.replay.available ? (
         <div className="stu-pe-radar-empty">本场导出未附带 2D 回放流。</div>
       ) : (
-        <ReplayViewer
-          replay={model.replay}
-          map={model.map.view}
-          target={{ roundNumber: fact.roundNumber, seq: replayTargetSeq(fact.matchId, fact.roundNumber) }}
-          initialClockSeconds={95}
-        />
+        <div style={{ maxWidth: radarMaxWidth }}>
+          <ReplayViewer
+            replay={model.replay}
+            map={model.map.view}
+            target={{ roundNumber: fact.roundNumber, seq: replayTargetSeq(fact.matchId, fact.roundNumber) }}
+            initialClockSeconds={95}
+          />
+        </div>
       )}
     </div>
   );
@@ -287,8 +313,11 @@ function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: T
   })();
 
   const isT = cluster.side === "t";
-  // 道具落点（纯展示）：命中目标点的烟/火，按 effect callout 中文名计数。
-  const utilityLanding = isT ? buildUtilityLanding(facts, cluster.mapName) : null;
+  // 道具落点：命中目标点的烟/火按落点空间聚类（buildLineupClusters），开销较大，对 facts/cluster 加 memo。
+  const utilityLanding = useMemo(
+    () => isT ? buildUtilityLanding(facts, cluster.mapName) : null,
+    [isT, facts, cluster.mapName],
+  );
   const pressureLabels = [...new Map(
     facts.flatMap((fact) => fact.openingPressure).map((event) => [
       `${event.calloutLabel}:${event.kind}`,
@@ -380,7 +409,11 @@ function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: T
   );
 }
 
-/** 目标点道具落点聚合：不假设 tickrate，只按目标区域与 effect callout 计数。 */
+/**
+ * 目标点道具落点聚合：保留"落点大区 == 本回合目标包点"的过滤，烟与火分别用
+ * 验证过的 buildLineupClusters 做空间聚类（按落点 + 投掷位置容差合并近似点位，
+ * 落点 callout 走多数表决），再按簇内回合数排序取 Top。
+ */
 function buildUtilityLanding(facts: TacticalRoundFact[], mapName: string) {
   const normType = (t: string): "smoke" | "fire" | "other" => {
     const s = t.toLowerCase();
@@ -388,7 +421,7 @@ function buildUtilityLanding(facts: TacticalRoundFact[], mapName: string) {
     if (s.includes("molot") || s.includes("incend") || s.includes("fire")) return "fire";
     return "other";
   };
-  const tally = { smoke: new Map<string, number>(), fire: new Map<string, number>() };
+  const buckets: { smoke: LineupGrenadeLike[]; fire: LineupGrenadeLike[] } = { smoke: [], fire: [] };
   for (const f of facts) {
     const site = f.targetSite;
     if (!site) continue;
@@ -396,13 +429,30 @@ function buildUtilityLanding(facts: TacticalRoundFact[], mapName: string) {
       if (g.targetRegion !== site) continue;
       const kind = normType(g.type);
       if (kind === "other") continue;
-      const cn = (g.effectCallout ? calloutCn(mapName, g.effectCallout) : "") || g.effectCallout || "未知";
-      tally[kind].set(cn, (tally[kind].get(cn) ?? 0) + 1);
+      // 教练 fact 的 grenade 已带 3D 投掷/落点与 effectCallout，直接构造 LineupGrenadeLike；
+      // throwerIndex / freezeEndTick 此处不参与展示（不算 winRate / 投掷时间桶），置 0 即可。
+      buckets[kind].push({
+        roundNumber: f.roundNumber,
+        grenade: g.type,
+        throwerIndex: 0,
+        throwTick: g.throwTick,
+        throwPosition: g.throwPosition,
+        effectPosition: g.effectPosition,
+        entryId: f.matchId,
+        freezeEndTick: 0,
+        effectCallout: g.effectCallout,
+      });
     }
   }
-  const top = (m: Map<string, number>) =>
-    [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([cn, n]) => ({ cn, n }));
-  return { smoke: top(tally.smoke), fire: top(tally.fire) };
+  const top = (grenades: LineupGrenadeLike[]) =>
+    buildLineupClusters({ mapName, grenades })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4)
+      .map((c) => ({
+        cn: (c.effectCallout ? calloutCn(mapName, c.effectCallout) : "") || c.effectCallout || "未知",
+        n: c.count,
+      }));
+  return { smoke: top(buckets.smoke), fire: top(buckets.fire) };
 }
 
 function EvidenceTable({
@@ -422,9 +472,16 @@ function EvidenceTable({
   onSelect: (key: string) => void;
   onAddToPlaylist?: (cluster: TacticalCluster, fact: TacticalRoundFact) => void;
 }) {
+  const PAGE_SIZE = 12;
+  const [page, setPage] = useState(0);
+  useEffect(() => { setPage(0); }, [cluster.id]);
+  const totalPages = Math.max(1, Math.ceil(cluster.rounds.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const pageRounds = cluster.rounds.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
   return (
     <div className="stu-pe-evidence">
       <h4>证据回合（{cluster.roundCount}）</h4>
+      <Pagination page={safePage} totalPages={totalPages} onChange={setPage} maxButtons={6} info={`${cluster.rounds.length} 回合`} />
       <table className="stu-mini-table">
         <thead>
           <tr>
@@ -439,10 +496,12 @@ function EvidenceTable({
           </tr>
         </thead>
         <tbody>
-          {cluster.rounds.map((r) => {
+          {pageRounds.map((r) => {
             const fact = facts.find((f) => f.matchId === r.matchId && f.roundNumber === r.roundNumber);
             const entry = entryByMatchId.get(r.matchId);
-            const label = r.matchId.length > 18 ? `${r.matchId.slice(0, 18)}…` : r.matchId;
+            const label = entry
+              ? `${entry.meta.teamAName} vs ${entry.meta.teamBName}`
+              : r.matchId.length > 18 ? `${r.matchId.slice(0, 18)}…` : r.matchId;
             return (
               <tr
                 key={`${r.matchId}-${r.roundNumber}`}
@@ -476,17 +535,15 @@ function EvidenceTable({
                     </button>
                   )}
                   {entry && (
-                    <button
-                      type="button"
-                      className="stu-button-sm"
-                      title="在比赛工作台打开完整分析并定位执行证据"
-                      onClick={() => onOpenMatch(entry.id, {
+                    <EvidenceLink
+                      hint="在比赛工作台打开完整分析并定位执行证据"
+                      onOpen={() => onOpenMatch(entry.id, {
                         roundNumber: r.roundNumber,
                         tick: fact ? jumpTickFor(fact) : undefined,
                       })}
                     >
                       工作台 ↗
-                    </button>
+                    </EvidenceLink>
                   )}
                 </td>
               </tr>
