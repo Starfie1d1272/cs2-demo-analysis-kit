@@ -15,7 +15,7 @@ function displayMapName(mapName: string): string {
 }
 
 /** BP 流程时间线：顺序步骤 + BAN/PICK/DECIDER 标签 + pick 图的选边注释。 */
-export function BpView({ veto }: { veto: SeriesVeto }) {
+export function BpView({ veto, matchUrl }: { veto: SeriesVeto; matchUrl?: string | null }) {
   if (veto.steps.length === 0) {
     return <p className="stu-dim">该系列赛没有录入 BP 流程。</p>;
   }
@@ -40,6 +40,9 @@ export function BpView({ veto }: { veto: SeriesVeto }) {
           </li>
         );
       })}
+      {matchUrl && (
+        <a href={matchUrl} target="_blank" rel="noreferrer" className="stu-dim" style={{ fontSize: "0.8em" }}>HLTV ↗</a>
+      )}
     </ol>
   );
 }

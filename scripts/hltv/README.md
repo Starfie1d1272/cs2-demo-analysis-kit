@@ -21,11 +21,11 @@ Stage 3 和 Playoff 共用 `event=8301` 页面，**无法靠 URL slug 区分**�
 
 ```
 HLTV results 页 (Console 片段或 CDP 脚本提取 URL)
-  → matches-{stage}.txt
+  → matches-{stage}.txt      (存 scripts/cologne/data/)
   → download-hltv-demos.ts     (CDP + 并发池 → 下载 .rar)
         ⇒ fixtures/demos/pro/<Event>/_src/*.rar   (gitignored)
   → extract-bp.ts              (CDP → 爬 veto 文本)
-        ⇒ bp-output.txt / *-bp-complete.txt
+        ⇒ bp-output.txt / *-bp-complete.txt   (存 scripts/cologne/data/)
   → bp-to-spec.mjs             (文本 → spec.series 的 bp + 真实对阵 + matchUrl)   ★ 关键修复点
         ⇒ --merge 覆盖 scripts/cologne/<event>.spec.json
   → extract-stage-urls.mjs     (CDP 轻量提取，纯 Node WebSocket，零依赖；备用)

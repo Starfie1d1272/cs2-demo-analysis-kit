@@ -55,6 +55,7 @@ interface PersistedDraft {
   name: string;
   slug: string;
   kind: string;
+  sourceUrl?: string;
   stages: EventStage[];
   series: MakerSeriesDraft[];
 }
@@ -69,8 +70,10 @@ function loadDraft(): PersistedDraft | null {
       name: parsed.name ?? "",
       slug: parsed.slug || slugifyEventName(parsed.name ?? ""),
       kind: parsed.kind ?? "tournament",
+      sourceUrl: parsed.sourceUrl ?? undefined,
       stages: Array.isArray(parsed.stages) && parsed.stages.length > 0 ? parsed.stages : stagesForPreset("major"),
       // 恢复时 resources 一律清空：二进制不入草稿。teamAName/teamBName 是 demo 派生缓存，一并清空。
+      // matchUrl 保留（字符串，可持久化）。
       series: Array.isArray(parsed.series) ? parsed.series.map((row) => ({ ...row, status: row.status === "cancelled" ? "cancelled" : "finished", resources: [], teamAName: "", teamBName: "" })) : [],
     };
   } catch {
@@ -95,6 +98,7 @@ export function EventPackageMaker({ onNotice }: { onNotice: (message: string) =>
   const [name, setName] = useState(initial?.name ?? "");
   const [slug, setSlug] = useState(initial?.slug || slugifyEventName(initial?.name ?? ""));
   const [kind, setKind] = useState(initial?.kind ?? "tournament");
+  const [sourceUrl, setSourceUrl] = useState(initial?.sourceUrl ?? "");
   const [stages, setStages] = useState<EventStage[]>(initial?.stages ?? stagesForPreset("major"));
   // 无草稿时直接铺开默认 Major 框架（淘汰赛节点预建定额系列），框架板即开即用。
   const [series, setSeries] = useState<MakerSeriesDraft[]>(initial?.series ?? seriesSkeletonForPreset("major"));
@@ -103,11 +107,11 @@ export function EventPackageMaker({ onNotice }: { onNotice: (message: string) =>
   const [selected, setSelected] = useState<FrameworkSelection | null>(null);
   const makerSession = useRef<string | null>(null);
   const teams = useMemo(() => deriveEventTeams(series), [series]);
-  const draft = useMemo<EventMakerDraft>(() => ({ slug, name, kind, stages, series }), [slug, name, kind, stages, series]);
+  const draft = useMemo<EventMakerDraft>(() => ({ slug, name, kind, sourceUrl: sourceUrl || undefined, stages, series }), [slug, name, kind, sourceUrl, stages, series]);
 
   useEffect(() => {
-    saveDraft({ name, slug, kind, stages, series });
-  }, [name, slug, kind, stages, series]);
+    saveDraft({ name, slug, kind, sourceUrl: sourceUrl || undefined, stages, series });
+  }, [name, slug, kind, sourceUrl, stages, series]);
 
   useEffect(() => () => { void cleanupNativeMakerSession(makerSession.current); }, []);
 
@@ -128,6 +132,7 @@ export function EventPackageMaker({ onNotice }: { onNotice: (message: string) =>
     setName("");
     setSlug("");
     setKind("tournament");
+    setSourceUrl("");
     setStages(stagesForPreset("major"));
     setSeries([]);
     releaseMakerSession();
@@ -269,6 +274,7 @@ export function EventPackageMaker({ onNotice }: { onNotice: (message: string) =>
       <div className="stu-veto-toolbar">
         <label>赛事名<input value={name} onChange={(event) => { setName(event.target.value); setSlug(slugifyEventName(event.target.value)); }} placeholder="Cologne Major 2026" /></label>
         <label>资源标识<input value={slug} readOnly placeholder="由赛事名自动生成" /></label>
+        <label>赛事页 URL<input value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="https://www.hltv.org/results?event=8301" /></label>
         <label>类型<select value={kind} onChange={(event) => setKind(event.target.value)}>
           {KIND_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
         </select></label>
@@ -331,6 +337,7 @@ export function EventPackageMaker({ onNotice }: { onNotice: (message: string) =>
             <div className="stu-veto-toolbar">
               <label>局制<select value={row.format} onChange={(event) => patchSeries(row.key, { format: event.target.value as SeriesFormat, veto: null })}>{(["bo1", "bo3", "bo5"] as const).map((format) => <option key={format} value={format}>{format.toUpperCase()}</option>)}</select></label>
               <label>状态<select value={row.status === "cancelled" ? "cancelled" : "finished"} onChange={(event) => patchSeries(row.key, { status: event.target.value as MakerSeriesDraft["status"] })}><option value="finished">已结束</option><option value="cancelled">取消</option></select></label>
+              <label>比赛 URL<input value={row.matchUrl ?? ""} onChange={(event) => patchSeries(row.key, { matchUrl: event.target.value || undefined })} placeholder="https://www.hltv.org/matches/..." /></label>
             </div>
             <p className="stu-muted">内部标识：<code>{row.key}</code> · 对阵（来自 demo）：{row.teamAName && row.teamBName ? `${row.teamAName} vs ${row.teamBName}` : "尚未附加 demo"} · 时间：{row.resources[0]?.occurredAt ? new Date(row.resources[0].occurredAt).toLocaleString("zh-CN") : "附加 demo 后自动读取文件时间"}</p>
             <div className="stu-chip-row">
@@ -345,6 +352,14 @@ export function EventPackageMaker({ onNotice }: { onNotice: (message: string) =>
         );
       })}
       {vetoRow && <VetoInputDialog seriesId={vetoRow.key} teamAName={vetoRow.teamAName} teamBName={vetoRow.teamBName} initialFormat={vetoRow.format} initialVeto={vetoRow.veto} onClose={() => setEditingVeto(null)} onSave={(veto: SeriesVeto) => patchSeries(vetoRow.key, { veto, format: veto.format })} />}
+
+      <details className="stu-card" style={{ marginTop: "1em" }}>
+        <summary className="stu-muted">高级：从 HLTV 批量爬取赛事</summary>
+        <p className="stu-muted">适用于主办方 / 高级用户从 HLTV 批量获取完整赛事数据（比赛列表 → 下载 demo → 提取 BP → 出包），全部在命令行完成。需要 Node.js + Chrome 浏览器。</p>
+        <p className="stu-muted">
+          <a href="https://github.com/Starfie1d1272/cs2-demo-analysis-kit/tree/main/scripts/hltv" target="_blank" rel="noreferrer">📖 查看完整教程与脚本 →</a>
+        </p>
+      </details>
     </details>
   );
 }

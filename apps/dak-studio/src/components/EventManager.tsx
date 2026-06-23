@@ -128,7 +128,7 @@ export function EventManager({
             const linked = rows.reduce((sum, row) => sum + (row.mapAssignments?.filter((map) => map.entryId).length ?? row.entryIds.length), 0);
             return (
               <tr key={event.id}>
-                <td>{event.name}</td>
+                <td>{event.sourceUrl ? <a href={event.sourceUrl} target="_blank" rel="noreferrer">{event.name} ↗</a> : event.name}</td>
                 <td>{kindLabel(event.kind)}</td>
                 <td>{event.stages.map((stage) => stage.name).join(" / ") || "—"}</td>
                 <td>{event.seriesIds.length}</td>

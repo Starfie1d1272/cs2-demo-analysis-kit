@@ -76,7 +76,7 @@ export function SeriesWorkspace({
       {series.veto && (
         <details className="stu-series-bp" open>
           <summary>BP 流程</summary>
-          <BpView veto={series.veto} />
+          <BpView veto={series.veto} matchUrl={series.matchUrl} />
         </details>
       )}
 
