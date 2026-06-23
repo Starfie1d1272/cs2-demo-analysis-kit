@@ -46,69 +46,12 @@ function parseArgs(raw) {
   return args;
 }
 
-/**
- * 从 event-package zip 内提取所用地图名集合。
- * 读取 zip 内 event-package.json → 遍历 stages/series/maps[].mapName。
- * 不需要完整解压——只需要 JSON 条目（UTF-8 文本）。
- * Node 24 没有内置 zip 模块，我们用同步 read + 简单 ZIP local file header 扫描
- * 找到 event-package.json 的 compressed data。
- * 回退：如无法解析则返回空集合（调用方应处理）。
- */
-function extractMapNamesFromEventZip(zipPath) {
-  const mapNames = new Set();
-  try {
-    // 用简单的 ZIP 扫描找到 event-package.json。
-    // ZIP 格式：local file header signature 0x04034b50，后面是 compressed data。
-    const buf = readFileSync(zipPath);
-    // 搜索 "event-package.json" 在文件中的出现（文件名在 local header 中）。
-    const needle = Buffer.from("event-package.json");
-    let idx = buf.indexOf(needle);
-    while (idx >= 0) {
-      // local file header 在文件名之前 26 字节处开始
-      const headerStart = idx - 26;
-      if (headerStart >= 0 && buf.readUInt32LE(headerStart) === 0x04034b50) {
-        // 文件名长度
-        const nameLen = buf.readUInt16LE(headerStart + 26);
-        const extraLen = buf.readUInt16LE(headerStart + 28);
-        const dataStart = headerStart + 30 + nameLen + extraLen;
-        const compSize = buf.readUInt32LE(headerStart + 18);
-        const compMethod = buf.readUInt16LE(headerStart + 8);
-        if (compMethod === 0 && compSize > 0 && dataStart + compSize <= buf.length) {
-          // Stored (no compression)
-          const raw = buf.subarray(dataStart, dataStart + compSize).toString("utf-8");
-          const pkg = JSON.parse(raw);
-          collectMapNames(pkg, mapNames);
-        } else {
-          // Deflated — 用简单的 inflate（Node 内置 zlib）
-          try {
-            const { inflateRawSync } = await_import_zlib();
-            const compressed = buf.subarray(dataStart, dataStart + compSize);
-            const raw = inflateRawSync(compressed).toString("utf-8");
-            const pkg = JSON.parse(raw);
-            collectMapNames(pkg, mapNames);
-          } catch {
-            // 解压失败，跳过这个 entry
-          }
-        }
-      }
-      idx = buf.indexOf(needle, idx + 1);
-    }
-  } catch (err) {
-    console.error(`   ⚠ 解析 event-package 地图失败 ${basename(zipPath)}: ${err.message}`);
-  }
-  return [...mapNames].sort();
-}
-
-// zlib 是内置模块，但在 ESM 中直接 import
+// zlib 是内置模块
 import { inflateRawSync } from "node:zlib";
-function await_import_zlib() {
-  return { inflateRawSync };
-}
 
-function collectMapNames(pkg, out) {
-
-/** 从 event-package zip 读取完整 event-package.json 对象。
- *  与 extractMapNamesFromEventZip 共用同一套 ZIP local file header 扫描逻辑。
+/**
+ * 从 event-package zip 读取完整 event-package.json 对象。
+ * 通过 ZIP local file header 扫描找到 event-package.json 条目并解析。
  */
 function readEventPackageJson(zipPath) {
   const buf = readFileSync(zipPath);

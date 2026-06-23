@@ -15,10 +15,11 @@
 // 长期演进：app 同级 bundled-assets/ + 首启注册到 userdata/。
 
 import { execSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { argv, cwd, exit, stderr } from "node:process";
 import { createHash } from "node:crypto";
+import { inflateRawSync } from "node:zlib";
 
 function parseArgs(raw) {
   const args = {};
@@ -91,7 +92,7 @@ function main() {
   // Runtime zip contains a single top-level dir (PyInstaller onedir) e.g. "dak-studio/"
   // Find the top-level dir
   const topDirs = readdirSync(workDir).filter((f) => {
-    try { return require("node:fs").statSync(join(workDir, f)).isDirectory(); } catch { return false; }
+    try { return statSync(join(workDir, f)).isDirectory(); } catch { return false; }
   });
   const appRoot = topDirs.length === 1 ? join(workDir, topDirs[0]) : workDir;
 
@@ -99,8 +100,7 @@ function main() {
   if (bundledEventsDir && existsSync(bundledEventsDir)) {
     const destDir = join(appRoot, "userdata", "bundled-events");
     mkdirSync(destDir, { recursive: true });
-    const { readdirSync: rds } = require("node:fs");
-    const subdirs = rds(bundledEventsDir, { withFileTypes: true })
+    const subdirs = readdirSync(bundledEventsDir, { withFileTypes: true })
       .filter((d) => d.isDirectory());
     const manifestEvents = [];
     for (const dir of subdirs) {
@@ -116,7 +116,6 @@ function main() {
       // 尝试从 event-package.json 读取名称
       let displayName = slug;
       try {
-        const { inflateRawSync: irs } = require("node:zlib");
         const buf = readFileSync(src);
         const needle = Buffer.from("event-package.json");
         let idx = buf.indexOf(needle);
@@ -128,7 +127,7 @@ function main() {
             const cs = buf.readUInt32LE(hs + 18);
             const cm = buf.readUInt16LE(hs + 8);
             if (cs > 0 && ds + cs <= buf.length) {
-              const raw = cm === 0 ? buf.subarray(ds, ds + cs).toString("utf-8") : irs(buf.subarray(ds, ds + cs)).toString("utf-8");
+              const raw = cm === 0 ? buf.subarray(ds, ds + cs).toString("utf-8") : inflateRawSync(buf.subarray(ds, ds + cs)).toString("utf-8");
               const pkg = JSON.parse(raw);
               displayName = pkg.event?.name || slug;
               break;
@@ -168,7 +167,7 @@ function main() {
         const dest = join(destDir, triName);
         copyFileSync(src, dest);
         copied++;
-        console.error(`  tri: ${triName} (${(require("node:fs").statSync(src).size / 1024 / 1024).toFixed(1)} MB)`);
+        console.error(`  tri: ${triName} (${(statSync(src).size / 1024 / 1024).toFixed(1)} MB)`);
       } else {
         console.error(`  ⚠ tri 缺失：${triName}（tris-dir 中不存在，full zip 将不含此文件）`);
       }
@@ -191,7 +190,7 @@ function main() {
   // 6. Cleanup
   rmSync(workDir, { recursive: true, force: true });
 
-  const { size } = require("node:fs").statSync(fullZipPath);
+  const { size } = statSync(fullZipPath);
   console.error(`done: ${fullZipPath} (${(size / 1024 / 1024).toFixed(0)} MB)`);
 }
 
