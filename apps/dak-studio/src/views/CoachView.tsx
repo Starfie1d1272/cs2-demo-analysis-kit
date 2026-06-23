@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
-import { EmptyState } from "@cs2dak/react";
+import { EmptyState, DataTable, STUDIO_TABLE_CLASSES, type DataTableColumn } from "@cs2dak/react";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getFactsStore, TACTICAL_FACT_VERSION, type TacticalRoundFact } from "../lib/facts";
@@ -18,7 +18,6 @@ import {
 } from "../lib/series";
 import { PatternExplorer } from "./coach/PatternExplorer";
 import { MapPoolTable } from "./coach/MapPoolTable";
-import { Pagination } from "../components/Pagination";
 
 type CoachTab = "patterns" | "playbook" | "playlist" | "anti";
 
@@ -344,32 +343,39 @@ function PlaybookTable({
   onRename: (clusterId: string, name: string) => Promise<void>;
 }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const PAGE_SIZE = 20;
-  const [page, setPage] = useState(0);
-  const totalPages = Math.max(1, Math.ceil(clusters.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages - 1);
-  const pageClusters = clusters.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+
+  const columns = useMemo<DataTableColumn<TacticalCluster>[]>(() => [
+    {
+      key: "name", label: "战术名",
+      render: (cluster) => {
+        const key = patternFingerprint(cluster);
+        const value = drafts[key] ?? playbook[key] ?? "";
+        return <input className="stu-input stu-input-sm" value={value} placeholder="命名战术" onChange={(event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))} />;
+      }
+    },
+    { key: "pattern", label: "打法模式", format: (c) => `${c.mapName} · ${SIDE_LABEL[c.side]} · ${autoName(c)}` },
+    { key: "rounds", label: "样本", numeric: true, sortable: true, sortValue: (c) => c.roundCount, format: (c) => c.roundCount },
+    {
+      key: "action", label: "",
+      render: (cluster) => {
+        const key = patternFingerprint(cluster);
+        const value = drafts[key] ?? playbook[key] ?? "";
+        return <button type="button" className="stu-button-sm" onClick={() => void onRename(key, value)}>保存</button>;
+      }
+    },
+  ], [drafts, playbook, onRename]);
+
   return (
     <div className="stu-card">
       <h3>战术本</h3>
-      <Pagination page={safePage} totalPages={totalPages} onChange={setPage} info={`${clusters.length} 个打法模式`} />
-      <table className="stu-mini-table">
-        <thead><tr><th>战术名</th><th>打法模式</th><th className="stu-num">样本</th><th /></tr></thead>
-        <tbody>
-          {pageClusters.map((cluster) => {
-            const key = patternFingerprint(cluster);
-            const value = drafts[key] ?? playbook[key] ?? "";
-            return (
-              <tr key={cluster.id}>
-                <td><input className="stu-input stu-input-sm" value={value} placeholder="命名战术" onChange={(event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))} /></td>
-                <td>{cluster.mapName} · {SIDE_LABEL[cluster.side]} · {autoName(cluster)}</td>
-                <td className="stu-num">{cluster.roundCount}</td>
-                <td><button type="button" className="stu-button-sm" onClick={() => void onRename(key, value)}>保存</button></td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <DataTable
+        classes={STUDIO_TABLE_CLASSES}
+        rows={clusters}
+        rowKey={(c) => c.id}
+        pageSize={20}
+        paginationInfo={(total) => `${total} 个打法模式`}
+        columns={columns}
+      />
     </div>
   );
 }
@@ -389,34 +395,33 @@ function PlaylistTable({
   if (items.length === 0) {
     return <EmptyState variant="insufficient" title="备战清单为空" hint="在开局模式的证据回合里点击加入。" />;
   }
+
+  const columns = useMemo<DataTableColumn<PlaylistItem>[]>(() => [
+    { key: "group", label: "分组", format: (item) => item.group },
+    { key: "source", label: "来源", render: (item) => <span title={item.matchId}>{item.mapName ? `${item.mapName} · ${item.matchId}` : item.matchId}</span> },
+    { key: "round", label: "回合", numeric: true, format: (item) => `R${item.roundNumber}` },
+    {
+      key: "note", label: "备注",
+      render: (item) => <input className="stu-input stu-input-sm" value={item.note} onChange={(event) => void onUpdate({ ...item, note: event.target.value })} />
+    },
+    {
+      key: "actions", label: "",
+      render: (item) => <>
+        <button type="button" className="stu-button-sm" onClick={() => onOpenMatch(item.matchId, item.roundNumber)}>回放</button>
+        <button type="button" className="stu-button-sm" onClick={() => void onRemove(item.id)}>删除</button>
+      </>
+    },
+  ], [onUpdate, onOpenMatch, onRemove]);
+
   return (
     <div className="stu-card">
       <h3>备战清单</h3>
-      <table className="stu-mini-table">
-        <thead>
-          <tr><th>分组</th><th>来源</th><th className="stu-num">回合</th><th>备注</th><th /></tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr key={item.id}>
-              <td>{item.group}</td>
-              <td title={item.matchId}>{item.mapName ? `${item.mapName} · ${item.matchId}` : item.matchId}</td>
-              <td className="stu-num">R{item.roundNumber}</td>
-              <td>
-                <input
-                  className="stu-input stu-input-sm"
-                  value={item.note}
-                  onChange={(event) => void onUpdate({ ...item, note: event.target.value })}
-                />
-              </td>
-              <td>
-                <button type="button" className="stu-button-sm" onClick={() => onOpenMatch(item.matchId, item.roundNumber)}>回放</button>
-                <button type="button" className="stu-button-sm" onClick={() => void onRemove(item.id)}>删除</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <DataTable
+        classes={STUDIO_TABLE_CLASSES}
+        rows={items}
+        rowKey={(item) => item.id}
+        columns={columns}
+      />
       <details className="stu-coach-report-details">
         <summary>Markdown 导出</summary>
         <textarea className="stu-coach-report" readOnly value={markdown} />
