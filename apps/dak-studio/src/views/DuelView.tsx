@@ -92,7 +92,7 @@ export function DuelView({
     );
   }
 
-  const summary = model ? summarizeDuels(model) : null;
+  const summary = useMemo(() => model ? summarizeDuels(model) : null, [model]);
 
   return (
     <div className="stu-view stu-duel-view">

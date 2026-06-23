@@ -4,7 +4,7 @@ import { listEventRecords, type StudioEventRecord } from "../lib/events";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import type { StudioDemoEntry } from "../lib/library";
 import { elimModelFromResults, swissModelFromResults } from "../lib/event-bracket";
-import { ElimBracket, SwissBracket, BracketConnections } from "@cs2dak/react";
+import { ElimBracket, SwissBracket } from "@cs2dak/react";
 import { BpView } from "./BpView";
 import { EmptyState } from "@cs2dak/react";
 
@@ -104,7 +104,7 @@ type StandingsKey = "played" | "wins" | "losses" | "diff";
 function RoundRobinStage(props: StageProps) {
   const [sortKey, setSortKey] = useState<StandingsKey>("wins");
   const [sortDesc, setSortDesc] = useState(true);
-  const base = standings(props.series);
+  const base = useMemo(() => standings(props.series), [props.series]);
   const diff = (row: ReturnType<typeof standings>[number]) => row.mapsFor - row.mapsAgainst;
   const table = [...base].sort((a, b) => {
     const dir = sortDesc ? 1 : -1;
@@ -136,13 +136,11 @@ function SwissStage(props: StageProps & { advanceCount: number }) {
 
 function EliminationStage(props: StageProps & { double: boolean; stage: EventStage }) {
   const model = elimModelFromResults(props.series, props.stage);
-  // 双败有胜者组/败者组 lane，用带晋级连线的 BracketConnections 才能正确表达；
-  // 单败单 lane，保留可点开 demo 的 ElimBracket。
-  const useLaneDiagram = props.double && (props.stage.bracketNodes?.length ?? 0) > 0;
+  // ElimBracket 内部按 model.nodes 有无自动选择渲染模式：
+  // 有 nodes → SVG lane-aware 布局 + 晋级连线（双败/GSL），
+  // 无 nodes → DOM 列布局（单败/旧资产），均可点击开 demo。
   return <>
-    {useLaneDiagram
-      ? <BracketConnections stage={props.stage} series={props.series} />
-      : <ElimBracket model={model} onOpenMatch={props.onOpenMatch} />}
+    <ElimBracket model={model} onOpenMatch={props.onOpenMatch} />
     <details className="stu-card"><summary className="stu-muted">详细列表与 BP</summary>
       <SeriesList {...props} />
     </details>

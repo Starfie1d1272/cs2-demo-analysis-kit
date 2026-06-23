@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import type { BracketCell, ElimModel, EventStage, SwissModel } from "@cs2dak/contract";
 import { frameworkSlots, type MakerSeriesDraft } from "../lib/event-maker";
 import { ElimBracket, SwissBracket } from "@cs2dak/react";
@@ -83,10 +84,11 @@ function buildElimModel(
  * 淘汰赛节点成 bracket、瑞士轮成战绩组，点击格子在下方编辑并附 demo，瑞士轮战绩组可"添加比赛"。
  */
 export function EventFrameworkBoard({ stages, series, selected, onSelect, onAddMatch }: EventFrameworkBoardProps) {
+  const slotsByStage = useMemo(() => new Map(stages.map((s) => [s.key, frameworkSlots(s)])), [stages]);
   return (
     <>
       {stages.map((stage) => {
-        const slots = frameworkSlots(stage);
+        const slots = slotsByStage.get(stage.key)!;
         const head = (
           <div className="stu-fb-stage-head">
             <b>{stage.name}</b>

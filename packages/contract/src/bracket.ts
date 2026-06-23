@@ -44,8 +44,21 @@ export interface ElimColumn {
   matches: BracketCell[];
 }
 
+/** 淘汰赛 bracket 中单个节点的元数据（双败 / GSL lane-aware 布局用）。 */
+export interface ElimNode {
+  id: string;
+  round: number;
+  lane: "winner" | "loser" | "grand" | "single";
+  label: string;
+  nextWinNodeId?: string | null;
+  nextLossNodeId?: string | null;
+}
+
 export interface ElimModel {
   columns: ElimColumn[];
+  /** Lane-aware 节点元数据（可选）。非空时 ElimBracket 渲染 SVG lane 布局 + 晋级连线；
+   *  缺失时走简单 DOM 列布局（单败 / 制作器）。 */
+  nodes?: ElimNode[];
 }
 
 /**

@@ -588,6 +588,7 @@ export function App() {
                 teamRenames={identityState.teamRenames}
                 onOpenMatch={openDemo}
                 onGoLibrary={() => setView("library")}
+                onGoEconomy={() => setView("economy")}
               />
             ) : (
               <EventsView entries={entries} onOpenMatch={openDemo} onGoManage={() => setView("management")} />

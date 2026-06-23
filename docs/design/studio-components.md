@@ -35,9 +35,9 @@ DAK Studio 是独立 `stu-*` 设计语言（CSS 在 `apps/dak-studio/src/studio.
 | `SeasonLeaderboard` | `@cs2dak/react` | 赛季/赛事选手排行榜（多视图 tab + 升/降排序）。 | 选手榜单。 |
 | `TeamComparisonPanel` | `@cs2dak/react` | 队伍对比（A/B 选队 + 雷达 + per-team 比赛列表）。赛前侦察口径，两队无需交手。 | 队伍并排对比表。 |
 | `ScoreboardTable` | `@cs2dak/react` | 单场记分板（队伍着色、可点选手）。 | 记分板。 |
-| `EmptyState` / `MetricInfo` / `EvidenceLink` | Studio `components/primitives.tsx`（**Tier A 下沉候选**） | 空态骨架 / 派生指标 ⓘ 口径 / 跳回放原语。 | 裸空 div、裸 `title=`、自绘回放按钮。 |
+| `EmptyState` / `MetricInfo` / `EvidenceLink` | `@cs2dak/react` | 空态骨架 / 派生指标 ⓘ 口径 / 跳回放原语。 | 裸空 div、裸 `title=`、自绘回放按钮。 |
 | `CohortScope` | Studio | 聚合范围透镜（地图/标签/队伍筛行）。绑 `StudioDemoEntry` + identity。 | 范围筛选条。 |
-| `BracketConnections` | Studio（`EventsView`） | lane-aware 双败/GSL bracket（胜者组/败者组/晋级连线）。 | 淘汰赛连线图（唯一正确实现，见 D6）。 |
+| `ElimBracket` / `SwissBracket` / `BracketConnections` | `@cs2dak/react` | 淘汰赛 bracket、瑞士轮 Buchholz 图、双败/GSL lane-aware 晋级连线。类型在 `@cs2dak/contract`。 | 淘汰赛渲染（唯一正确实现，见 D6）。 |
 
 ## 2. `DataTable` 用法
 
@@ -72,21 +72,21 @@ const COLUMNS: DataTableColumn<Row>[] = [
 | 表 | 位置 | 状态 |
 |---|---|---|
 | 赛事总览 地图盘面 / 武器击杀榜 | `TournamentDashboardView` | ✅ 已迁 DataTable |
-| 排行榜 升/降切换 | `SeasonLeaderboard` | ✅ 已修（暂未迁 DataTable，组件内修） |
-| 循环赛积分榜 | `EventsView` | ⏳ 待迁（已有 stu-col-sortable，逻辑可直接换 DataTable） |
-| 闪光榜 | `UtilityView` | ⏳ 待迁 |
-| 道具点位库（雷达 hover 联动） | `LineupView` | ⏳ 待迁（用 `rowProps` 接 hover） |
-| 经济矩阵 / 小枪翻盘排行 / 队伍明细矩阵 | `EconomyView` ×3 | ⏳ 待迁（明细矩阵带热力着色，用 `heat`） |
-| 战术本 ×2 | `CoachView` | ⏳ 待迁 |
-| 证据回合 | `PatternExplorer` | ⏳ 待迁（带分页 + 证据链单元格） |
+| 排行榜 升/降切换 | `SeasonLeaderboard` | ✅ 已修（升/降双向切换，组件内修） |
+| 循环赛积分榜 | `EventsView` | ⏳ 待迁（可换 DataTable，暂未动） |
+| 闪光榜 | `UtilityView` | ✅ 已迁 DataTable |
+| 道具点位库（雷达 hover 联动） | `LineupView` | ✅ 已迁 DataTable（`rowProps` 接 hover + 受控分页） |
+| 经济矩阵 / 小枪翻盘排行 / 队伍明细矩阵 | `EconomyView` ×3 | ✅ 已迁 DataTable（`heat` 热力着色） |
+| 战术本 ×2 | `CoachView` | ✅ 已迁 DataTable |
+| 证据回合 | `PatternExplorer` | ✅ 已迁 DataTable（受控分页 + 证据链单元格） |
 
 > 管理类列表（`LibraryView` / `EventManager` / `LibraryMaintenance` / `SeriesWorkspace` /
 > `MapPoolTable`）不是"数据榜"，可不强迁 DataTable。
 
 ## 4. 下沉到 React 的待办（Tier A）
 
-- `primitives.tsx` 的 `EmptyState` / `MetricInfo` / `EvidenceLink` → React（纯展示，仅需把 `stu-*` 类改 `dak-*` + CSS 迁 theme.css）。
-- Bracket 渲染器 `ElimBracket` / `SwissBracket` / `BracketConnections` → React，**需先把 `ElimModel` / `SwissModel` / `BracketCell` 类型从 Studio `lib/event-bracket` 移到 contract**。
+- ~~`primitives.tsx` 的 `EmptyState` / `MetricInfo` / `EvidenceLink` → React~~ ✅ 已下沉（2026-06-23），原 `stu-*` 类→`dak-*`，CSS 迁 `theme.css`
+- ~~Bracket 渲染器 `ElimBracket` / `SwissBracket` / `BracketConnections` → React~~ ✅ 已下沉（2026-06-23），`BracketCell`/`ElimModel`/`SwissModel` 类型已迁 `@cs2dak/contract`
 
 ## 5. 必须留 Studio（绑数据）
 

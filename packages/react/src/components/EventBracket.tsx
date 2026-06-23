@@ -1,4 +1,4 @@
-import type { BracketCell, BracketSeries, ElimModel, EventStage, SwissModel } from "@cs2dak/contract";
+import type { BracketCell, ElimModel, SwissModel } from "@cs2dak/contract";
 
 // ── 内部接口 ──────────────────────────────────────────────────────────────
 
@@ -8,7 +8,7 @@ interface CellHandlers {
   selectedKey?: string | null;
 }
 
-// ── MatchBox ──────────────────────────────────────────────────────────────
+// ── MatchBox（DOM 模式） ──────────────────────────────────────────────────
 
 function MatchBox({ cell, onOpenMatch, onSelectCell, selectedKey }: { cell: BracketCell } & CellHandlers) {
   if (cell.empty) {
@@ -89,8 +89,93 @@ export function SwissBracket({
 
 // ── ElimBracket ───────────────────────────────────────────────────────────
 
-/** 淘汰赛 bracket：按晋级轮次成列（决赛在右），列内居中排布，胜者高亮。 */
+const laneLabels = { single: "淘汰赛", winner: "胜者组", loser: "败者组", grand: "总决赛" } as const;
+
+/**
+ * 淘汰赛 bracket。
+ * - 无 nodes（单败 / 制作器）：DOM 列布局，MatchBox 可点击。
+ * - 有 nodes（双败 / GSL）：SVG lane-aware 布局 + 晋级连线，节点可点击。
+ */
 export function ElimBracket({ model, ...handlers }: { model: ElimModel } & CellHandlers) {
+  const { nodes } = model;
+
+  // ── SVG lane-aware 模式（双败 / GSL，有 bracketNodes） ──────────────────
+  if (nodes && nodes.length > 0) {
+    const rounds = [...new Set(nodes.map((node) => node.round))].sort((a, b) => a - b);
+    const roundIndex = new Map(rounds.map((round, index) => [round, index]));
+    const maxPerRound = Math.max(1, ...rounds.map((round) => nodes.filter((node) => node.round === round).length));
+    const lanes = (["winner", "loser", "grand", "single"] as const).filter((lane) => nodes.some((node) => node.lane === lane));
+    const laneMode = lanes.length > 1;
+    const laneHeight = Math.max(150, maxPerRound * 52);
+    const width = Math.max(520, rounds.length * 260 + (laneMode ? 86 : 0));
+    const height = laneMode ? lanes.length * laneHeight : Math.max(180, maxPerRound * 82);
+    const positions = new Map<string, { x: number; y: number }>();
+    for (const [laneIndex, lane] of lanes.entries()) {
+      for (const round of rounds) {
+        const rows = nodes.filter((node) => node.round === round && node.lane === lane);
+        rows.forEach((node, index) => positions.set(node.id, {
+          x: (roundIndex.get(round) ?? 0) * 260 + (laneMode ? 86 : 12),
+          y: laneMode ? laneIndex * laneHeight + ((index + 0.5) * laneHeight) / rows.length : ((index + 0.5) * height) / rows.length,
+        }));
+      }
+    }
+    // 按 node id 查找对应的 BracketCell（已在 columns 中）
+    const cellById = new Map<string, BracketCell>();
+    for (const col of model.columns) {
+      for (const cell of col.matches) cellById.set(cell.key, cell);
+    }
+    const label = model.columns.length > 0 ? model.columns.map((c) => c.label).join(" · ") : "淘汰赛";
+
+    return <div className="stu-bracket-diagram" role="img" aria-label={`${label} 胜败晋级关系`}>
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+        {laneMode && lanes.map((lane, index) => <g key={lane}>
+          {index > 0 && <line className="stu-bracket-lane-separator" x1="0" x2={width} y1={index * laneHeight} y2={index * laneHeight} />}
+          <text className="stu-bracket-lane-label" x="12" y={index * laneHeight + 24}>{laneLabels[lane]}</text>
+        </g>)}
+        {/* 晋级连线 */}
+        {nodes.flatMap((node) => {
+          const from = positions.get(node.id)!;
+          return ([{ target: node.nextWinNodeId, loss: false }, { target: node.nextLossNodeId, loss: true }] as const).flatMap(({ target, loss }) => {
+            const to = target ? positions.get(target) : null;
+            if (!to) return [];
+            const startX = from.x + 210;
+            const endX = to.x;
+            const midX = (startX + endX) / 2;
+            return <path key={`${node.id}-${target}-${loss ? "loss" : "win"}`} className={loss ? "stu-bracket-edge stu-bracket-edge-loss" : "stu-bracket-edge"} d={`M ${startX} ${from.y} C ${midX} ${from.y}, ${midX} ${to.y}, ${endX} ${to.y}`}><title>{`${node.label} ${loss ? "败者" : "胜者"}进入 ${nodes.find((item) => item.id === target)?.label ?? target}`}</title></path>;
+          });
+        })}
+        {/* 节点 */}
+        {nodes.map((node) => {
+          const position = positions.get(node.id)!;
+          const cell = cellById.get(node.id);
+          const openId = cell?.entryIds?.[0];
+          const interactive = Boolean((openId && handlers.onOpenMatch) || handlers.onSelectCell);
+          const score = cell
+            ? (cell.teamA || cell.teamB) ? `${cell.teamA ?? "—"} ${cell.scoreA ?? ""} : ${cell.teamB ?? "—"} ${cell.scoreB ?? ""}` : "待导入"
+            : "待导入";
+          const isSelected = handlers.selectedKey === node.id;
+          return <g
+            key={node.id}
+            transform={`translate(${position.x} ${position.y - 25})`}
+            role={interactive ? "button" : undefined}
+            tabIndex={interactive ? 0 : undefined}
+            style={{ cursor: interactive ? "pointer" : undefined }}
+            onClick={interactive ? () => {
+              if (openId && handlers.onOpenMatch) handlers.onOpenMatch(openId);
+              else handlers.onSelectCell?.(node.id);
+            } : undefined}
+          >
+            <rect className="stu-bracket-box" width="210" height="50" rx="4" />
+            <rect className={`stu-bracket-box${isSelected ? " stu-eb-box-sel" : ""}`} width="210" height="50" rx="4" fill="transparent" />
+            <text className="stu-bracket-box-title" x="10" y="19">{node.label}</text>
+            <text className="stu-bracket-box-match" x="10" y="38">{score}</text>
+          </g>;
+        })}
+      </svg>
+    </div>;
+  }
+
+  // ── DOM 列模式（单败 / 制作器，无 nodes） ───────────────────────────────
   return (
     <div className="stu-eb stu-eb-elim">
       {model.columns.map((col) => (
@@ -103,66 +188,4 @@ export function ElimBracket({ model, ...handlers }: { model: ElimModel } & CellH
       ))}
     </div>
   );
-}
-
-// ── BracketConnections ────────────────────────────────────────────────────
-
-const laneLabels = { single: "淘汰赛", winner: "胜者组", loser: "败者组", grand: "总决赛" } as const;
-
-/**
- * 双败 / GSL bracket 的晋级连线图：lane-aware 胜败组分段 + SVG 连线。
- * 纯展示：接受合约类型 `EventStage` + `BracketSeries[]`，无 Studio 依赖。
- */
-export function BracketConnections({ stage, series }: { stage: EventStage; series: BracketSeries[] }) {
-  const nodes = stage.bracketNodes ?? [];
-  const rounds = [...new Set(nodes.map((node) => node.round))].sort((a, b) => a - b);
-  const roundIndex = new Map(rounds.map((round, index) => [round, index]));
-  const maxPerRound = Math.max(1, ...rounds.map((round) => nodes.filter((node) => node.round === round).length));
-  const lanes = (["winner", "loser", "grand", "single"] as const).filter((lane) => nodes.some((node) => node.lane === lane));
-  const laneMode = lanes.length > 1;
-  const laneHeight = Math.max(150, maxPerRound * 52);
-  const width = Math.max(520, rounds.length * 260 + (laneMode ? 86 : 0));
-  const height = laneMode ? lanes.length * laneHeight : Math.max(180, maxPerRound * 82);
-  const positions = new Map<string, { x: number; y: number }>();
-  for (const [laneIndex, lane] of lanes.entries()) {
-    for (const round of rounds) {
-      const rows = nodes.filter((node) => node.round === round && node.lane === lane);
-      rows.forEach((node, index) => positions.set(node.id, {
-        x: (roundIndex.get(round) ?? 0) * 260 + (laneMode ? 86 : 12),
-        y: laneMode ? laneIndex * laneHeight + ((index + 0.5) * laneHeight) / rows.length : ((index + 0.5) * height) / rows.length,
-      }));
-    }
-  }
-  const scoreFor = (nodeId: string) => {
-    const match = series.find((row) => row.bracketNodeId === nodeId);
-    if (!match) return "待导入";
-    return match.status === "finished" ? `${match.teamAName} ${match.scoreA ?? 0}:${match.scoreB ?? 0} ${match.teamBName}` : `${match.teamAName} vs ${match.teamBName}`;
-  };
-  return <div className="stu-bracket-diagram" role="img" aria-label={`${stage.name} 胜败晋级关系`}>
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-      {laneMode && lanes.map((lane, index) => <g key={lane}>
-        {index > 0 && <line className="stu-bracket-lane-separator" x1="0" x2={width} y1={index * laneHeight} y2={index * laneHeight} />}
-        <text className="stu-bracket-lane-label" x="12" y={index * laneHeight + 24}>{laneLabels[lane]}</text>
-      </g>)}
-      {nodes.flatMap((node) => {
-        const from = positions.get(node.id)!;
-        return ([{ target: node.nextWinNodeId, loss: false }, { target: node.nextLossNodeId, loss: true }] as const).flatMap(({ target, loss }) => {
-          const to = target ? positions.get(target) : null;
-          if (!to) return [];
-          const startX = from.x + 210;
-          const endX = to.x;
-          const midX = (startX + endX) / 2;
-          return <path key={`${node.id}-${target}-${loss ? "loss" : "win"}`} className={loss ? "stu-bracket-edge stu-bracket-edge-loss" : "stu-bracket-edge"} d={`M ${startX} ${from.y} C ${midX} ${from.y}, ${midX} ${to.y}, ${endX} ${to.y}`}><title>{`${node.label} ${loss ? "败者" : "胜者"}进入 ${nodes.find((item) => item.id === target)?.label ?? target}`}</title></path>;
-        });
-      })}
-      {nodes.map((node) => {
-        const position = positions.get(node.id)!;
-        return <g key={node.id} transform={`translate(${position.x} ${position.y - 25})`}>
-          <rect className="stu-bracket-box" width="210" height="50" rx="4" />
-          <text className="stu-bracket-box-title" x="10" y="19">{node.label}</text>
-          <text className="stu-bracket-box-match" x="10" y="38">{scoreFor(node.id)}</text>
-        </g>;
-      })}
-    </svg>
-  </div>;
 }

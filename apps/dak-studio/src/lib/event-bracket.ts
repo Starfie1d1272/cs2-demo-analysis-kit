@@ -1,4 +1,4 @@
-import type { BracketCell, ElimModel, EventStage, SwissColumn, SwissModel } from "@cs2dak/contract";
+import type { BracketCell, ElimModel, ElimNode, EventStage, SwissColumn, SwissModel } from "@cs2dak/contract";
 import type { StudioSeriesRecord } from "./series";
 
 // 类型 BracketCell / SwissModel / ElimModel 等已下沉至 @cs2dak/contract，
@@ -93,6 +93,15 @@ export function elimModelFromResults(series: StudioSeriesRecord[], stage: EventS
   if (nodes.length > 0) {
     const rounds = [...new Set(nodes.map((node) => node.round))].sort((a, b) => a - b);
     const byNode = new Map(series.filter((row) => row.bracketNodeId).map((row) => [row.bracketNodeId!, row]));
+    // 映射 bracketNodes → ElimNode（lane-aware 布局元数据）
+    const elimNodes: ElimNode[] = nodes.map((node) => ({
+      id: node.id,
+      round: node.round,
+      lane: node.lane,
+      label: node.label,
+      nextWinNodeId: node.nextWinNodeId,
+      nextLossNodeId: node.nextLossNodeId,
+    }));
     return {
       columns: rounds.map((round) => ({
         round,
@@ -102,6 +111,7 @@ export function elimModelFromResults(series: StudioSeriesRecord[], stage: EventS
           return row ? cellFromSeries(row) : { key: node.id, teamA: null, teamB: null, scoreA: null, scoreB: null, winner: null, date: null };
         }),
       })),
+      nodes: elimNodes,
     };
   }
   const rounds = [...new Set(series.map((row) => row.round ?? 1))].sort((a, b) => a - b);

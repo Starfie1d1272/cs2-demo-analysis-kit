@@ -13,6 +13,7 @@ export interface TournamentDashboardViewProps {
   onScopeChange: (scope: CohortScopeState) => void;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
+  onGoEconomy?: () => void;
   identityOptions?: IdentityOptions;
   teamRenames?: Record<string, string>;
 }
@@ -43,6 +44,7 @@ export function TournamentDashboardView({
   onScopeChange,
   onOpenMatch,
   onGoLibrary,
+  onGoEconomy,
   identityOptions,
   teamRenames = {}
 }: TournamentDashboardViewProps) {
@@ -167,7 +169,9 @@ export function TournamentDashboardView({
               columns={WEAPON_COLUMNS}
             />
           </div>
-          <p className="stu-muted">队伍手枪局、经济对位胜率与 Eco/Semi 翻盘等经济维度，统一在「经济与节奏」页查看（避免重复）。</p>
+          <p className="stu-muted">队伍手枪局、经济对位胜率与 Eco/Semi 翻盘等经济维度，统一在
+            {onGoEconomy ? <button type="button" className="dak-evidence" onClick={onGoEconomy}>经济与节奏</button> : "「经济与节奏」"}页查看（避免重复）。
+          </p>
         </>
       )}
     </div>

@@ -6,6 +6,10 @@
 
 ### 1. 淘汰赛双渲染器统一
 
+> **2026-06-23 进展**：`ElimBracket`/`SwissBracket`/`BracketConnections` 已迁至 `@cs2dak/react`，
+> 类型 `BracketCell`/`ElimModel`/`SwissModel` 已迁至 `@cs2dak/contract`。
+> 但两套渲染器仍然独立——lane-aware SVG（`BracketConnections`）与可点开 demo 的 DOM（`ElimBracket`）未合并。
+
 `ElimBracket`（DOM/EventBracket.tsx）和 `BracketConnections`（SVG/EventsView.tsx）
 是两套完全独立的双败淘汰渲染组件，通过 `useLaneDiagram` boolean 分叉。
 
@@ -22,7 +26,10 @@
 
 ---
 
-### 2. 跨组件 hook 抽取
+### 2. 跨组件 hook 抽取 ✅ 已解决
+
+> **2026-06-23**：7 张表全部迁入 `DataTable`，`useSortable` / `usePagination` 内联模式
+> 已被 `DataTable<T>` 内置排序+分页取代，无需抽取 hook。剩余 1 张循环赛积分榜待迁。
 
 以下模式在代码库中重复 3-6 处，但每次都是内联实现。
 
@@ -41,7 +48,10 @@
 
 ## 中优先级
 
-### 3. Dead CSS 清理 (~130 行)
+### 3. Dead CSS 清理 (~130 行) 🟡 进行中
+
+> **2026-06-23**：已清理 `stu-sort-header`/`stu-empty`/`stu-info`/`stu-evidence`（随原语下沉和 TeamDetailMatrix 迁移）。
+> `.stu-fb-*` / `.stu-duel-evidence-*` / `.stu-pe-*` 待下次扫描。
 
 以下 CSS 规则仅在 `studio.css` 中定义，无任何 `.tsx` 文件引用：
 
@@ -77,7 +87,10 @@
 
 ## 低优先级
 
-### 6. 赛事总览经济表跳转不可点击
+### 6. 赛事总览经济表跳转不可点击 🟡 部分解决
+
+> **2026-06-23**：`EconomyPanel` 回合卡已支持 `onJumpRound` 回调 → 2D 回放跳转。
+> `TournamentDashboardView` 的静态提示文本仍未改为导航按钮。
 
 `TournamentDashboardView.tsx` 删除了 3 个经济表（手枪局/经济对位/Eco 翻盘），
 替换为纯文本提示"统一在「经济与节奏」页查看"。
