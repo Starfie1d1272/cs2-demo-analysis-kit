@@ -35,24 +35,37 @@ export function SeasonLeaderboard({ model, onPlayerClick }: SeasonLeaderboardPro
   const [viewKey, setViewKey] = useState<LeaderboardViewKey>(model.views[0]?.key ?? "core");
   const view = model.views.find((v) => v.key === viewKey) ?? model.views[0];
   const [sortKey, setSortKey] = useState<LeaderboardMetricKey>(view.defaultSort);
+  const [sortDesc, setSortDesc] = useState(true);
 
   function selectView(next: LeaderboardViewKey) {
     setViewKey(next);
     const nextView = model.views.find((v) => v.key === next);
-    if (nextView) setSortKey(nextView.defaultSort);
+    if (nextView) {
+      setSortKey(nextView.defaultSort);
+      setSortDesc(true);
+    }
   }
 
-  // 排序在客户端：降序，缺失（null）始终排在最后。
+  // 点同列切换升/降；换列默认降序。缺失（null）始终排在最后（与方向无关）。
+  function handleSort(key: LeaderboardMetricKey) {
+    if (key === sortKey) setSortDesc((d) => !d);
+    else {
+      setSortKey(key);
+      setSortDesc(true);
+    }
+  }
+
   const rows = useMemo(() => {
+    const dir = sortDesc ? 1 : -1;
     return [...model.rows].sort((a, b) => {
       const va = a.metrics[sortKey];
       const vb = b.metrics[sortKey];
       if (va == null && vb == null) return 0;
       if (va == null) return 1;
       if (vb == null) return -1;
-      return vb - va;
+      return (vb - va) * dir;
     });
-  }, [model.rows, sortKey]);
+  }, [model.rows, sortKey, sortDesc]);
 
   return (
     <div className="dak-leaderboard">
@@ -80,11 +93,12 @@ export function SeasonLeaderboard({ model, onPlayerClick }: SeasonLeaderboardPro
               <th
                 key={col.key}
                 title={col.description ?? undefined}
-                aria-sort={col.key === sortKey ? "descending" : undefined}
+                aria-sort={col.key === sortKey ? (sortDesc ? "descending" : "ascending") : undefined}
                 className={col.key === sortKey ? "dak-col-sorted" : "dak-col-sortable"}
-                onClick={() => setSortKey(col.key)}
+                onClick={() => handleSort(col.key)}
               >
                 {col.label}
+                {col.key === sortKey ? (sortDesc ? " ↓" : " ↑") : ""}
               </th>
             ))}
           </tr>
