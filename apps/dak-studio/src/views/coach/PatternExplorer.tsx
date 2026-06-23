@@ -475,11 +475,19 @@ function EvidenceTable({
   const [page, setPage] = useState(0);
   useEffect(() => { setPage(0); }, [cluster.id]);
 
+  // 预建 fact 查找表，避免每列每行重复线性扫描
+  const factByRound = useMemo(
+    () => new Map(facts.map((f) => [`${f.matchId}-${f.roundNumber}`, f] as const)),
+    [facts],
+  );
+  const findFact = (r: { matchId: string; roundNumber: number }) =>
+    factByRound.get(`${r.matchId}-${r.roundNumber}`);
+
   const columns = useMemo<DataTableColumn<TacticalCluster["rounds"][number]>[]>(() => [
     {
       key: "match", label: "比赛",
       render: (r) => {
-        const fact = facts.find((f) => f.matchId === r.matchId && f.roundNumber === r.roundNumber);
+        const fact = findFact(r);
         const entry = entryByMatchId.get(r.matchId);
         const label = entry ? `${entry.meta.teamAName} vs ${entry.meta.teamBName}` : r.matchId.length > 18 ? `${r.matchId.slice(0, 18)}…` : r.matchId;
         return (
@@ -501,21 +509,21 @@ function EvidenceTable({
     {
       key: "executeRemain", label: "执行剩余", numeric: true,
       format: (r) => {
-        const fact = facts.find((f) => f.matchId === r.matchId && f.roundNumber === r.roundNumber);
+        const fact = findFact(r);
         return fact?.executeRemainSec != null ? formatClockSeconds(fact.executeRemainSec) : "—";
       }
     },
     {
       key: "firstKill", label: "首杀",
       format: (r) => {
-        const fact = facts.find((f) => f.matchId === r.matchId && f.roundNumber === r.roundNumber);
+        const fact = findFact(r);
         return fact?.firstKillForTeam == null ? "—" : fact.firstKillForTeam ? "✓" : "✗";
       }
     },
     {
       key: "plant", label: "下包",
       format: (r) => {
-        const fact = facts.find((f) => f.matchId === r.matchId && f.roundNumber === r.roundNumber);
+        const fact = findFact(r);
         return fact?.plant ? `${fact.plant.site.toUpperCase()} ${formatClockSeconds(fact.plant.remainSec)}` : "—";
       }
     },
@@ -527,7 +535,7 @@ function EvidenceTable({
     {
       key: "actions", label: "",
       render: (r) => {
-        const fact = facts.find((f) => f.matchId === r.matchId && f.roundNumber === r.roundNumber);
+        const fact = findFact(r);
         const entry = entryByMatchId.get(r.matchId);
         return <>
           {fact && onAddToPlaylist && (
@@ -541,7 +549,7 @@ function EvidenceTable({
         </>;
       }
     },
-  ], [facts, entryByMatchId, onSelect, onOpenMatch, onAddToPlaylist, cluster]);
+  ], [factByRound, entryByMatchId, onSelect, onOpenMatch, onAddToPlaylist, cluster]);
 
   return (
     <div className="stu-pe-evidence">

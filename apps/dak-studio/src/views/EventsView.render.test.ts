@@ -24,7 +24,7 @@ describe("赛事 bracket 连线", () => {
     expect(html).toContain("胜者组");
     expect(html).toContain("败者组");
     expect(html).toContain("总决赛");
-    expect(html).toContain("stu-bracket-edge-loss");
+    expect(html).toContain("dak-bracket-edge-loss");
     expect(html).toContain("败者进入");
   });
 });

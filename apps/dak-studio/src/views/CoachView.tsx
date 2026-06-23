@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState, DataTable, STUDIO_TABLE_CLASSES, type DataTableColumn } from "@cs2dak/react";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
@@ -343,13 +343,22 @@ function PlaybookTable({
   onRename: (clusterId: string, name: string) => Promise<void>;
 }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  // ref 持有 drafts 最新值，避免按键时 columns useMemo 失效重建
+  const draftsRef = useRef(drafts);
+  draftsRef.current = drafts;
+
+  // 预计算 fingerprint，避免 name/action 两列重复计算
+  const fingerprints = useMemo(
+    () => new Map(clusters.map((c) => [c.id, patternFingerprint(c)] as const)),
+    [clusters],
+  );
 
   const columns = useMemo<DataTableColumn<TacticalCluster>[]>(() => [
     {
       key: "name", label: "战术名",
       render: (cluster) => {
-        const key = patternFingerprint(cluster);
-        const value = drafts[key] ?? playbook[key] ?? "";
+        const key = fingerprints.get(cluster.id)!;
+        const value = draftsRef.current[key] ?? playbook[key] ?? "";
         return <input className="stu-input stu-input-sm" value={value} placeholder="命名战术" onChange={(event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))} />;
       }
     },
@@ -358,12 +367,12 @@ function PlaybookTable({
     {
       key: "action", label: "",
       render: (cluster) => {
-        const key = patternFingerprint(cluster);
-        const value = drafts[key] ?? playbook[key] ?? "";
+        const key = fingerprints.get(cluster.id)!;
+        const value = draftsRef.current[key] ?? playbook[key] ?? "";
         return <button type="button" className="stu-button-sm" onClick={() => void onRename(key, value)}>保存</button>;
       }
     },
-  ], [drafts, playbook, onRename]);
+  ], [fingerprints, playbook, onRename]);
 
   return (
     <div className="stu-card">

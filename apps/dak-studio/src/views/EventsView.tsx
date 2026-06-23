@@ -4,7 +4,7 @@ import { listEventRecords, type StudioEventRecord } from "../lib/events";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import type { StudioDemoEntry } from "../lib/library";
 import { elimModelFromResults, swissModelFromResults } from "../lib/event-bracket";
-import { ElimBracket, SwissBracket } from "@cs2dak/react";
+import { ElimBracket, SwissBracket, useSortable } from "@cs2dak/react";
 import { BpView } from "./BpView";
 import { EmptyState } from "@cs2dak/react";
 
@@ -102,8 +102,7 @@ function standings(series: StudioSeriesRecord[]) {
 type StandingsKey = "played" | "wins" | "losses" | "diff";
 
 function RoundRobinStage(props: StageProps) {
-  const [sortKey, setSortKey] = useState<StandingsKey>("wins");
-  const [sortDesc, setSortDesc] = useState(true);
+  const { sortKey, sortDesc, handleSort } = useSortable<StandingsKey>("wins");
   const base = useMemo(() => standings(props.series), [props.series]);
   const diff = (row: ReturnType<typeof standings>[number]) => row.mapsFor - row.mapsAgainst;
   const table = [...base].sort((a, b) => {
@@ -112,10 +111,6 @@ function RoundRobinStage(props: StageProps) {
     const vb = sortKey === "diff" ? diff(b) : b[sortKey];
     return (vb - va) * dir || a.team.localeCompare(b.team);
   });
-  const handleSort = (key: StandingsKey) => {
-    if (sortKey === key) setSortDesc((d) => !d);
-    else { setSortKey(key); setSortDesc(true); }
-  };
   const arrow = (key: StandingsKey) => (sortKey === key ? (sortDesc ? " ↓" : " ↑") : "");
   const COLS: Array<{ key: StandingsKey; label: string }> = [
     { key: "played", label: "场" }, { key: "wins", label: "胜" }, { key: "losses", label: "负" }, { key: "diff", label: "图差" },

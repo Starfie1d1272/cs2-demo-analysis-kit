@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { formatPercent, type TournamentInsights } from "@cs2dak/presentation";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
-import { DataTable, STUDIO_TABLE_CLASSES, EmptyState, type DataTableColumn } from "@cs2dak/react";
+import { DataTable, STUDIO_TABLE_CLASSES, EmptyState, type DataTableColumn, type HeatTone } from "@cs2dak/react";
 import { getTournamentInsights, type IdentityOptions } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";
 
@@ -101,8 +101,7 @@ const TEAM_DETAIL_COLUMNS: DataTableColumn<TeamEconomySummary>[] = [
   { key: "pistol", label: "Pistol", title: "手枪局胜率", numeric: true, sortable: true, sortValue: (t) => t.pistol.winRatePercent, heat: (t) => toneForPercent(t.pistol.winRatePercent), render: (t) => renderPercentCell(t.pistol.winRatePercent, t.pistol.wins, t.pistol.rounds) },
   { key: "conv", label: "R2 Conv", title: "赢手枪局后拿下第二局", numeric: true, sortable: true, sortValue: (t) => t.round2.conversionPercent, heat: (t) => toneForPercent(t.round2.conversionPercent), render: (t) => renderPercentCell(t.round2.conversionPercent, t.round2.conversionWins, t.round2.conversionRounds) },
   { key: "break", label: "R2 Break", title: "输手枪局后扳回第二局", numeric: true, sortable: true, sortValue: (t) => t.round2.breakRatePercent, heat: (t) => toneForPercent(t.round2.breakRatePercent), render: (t) => renderPercentCell(t.round2.breakRatePercent, t.round2.breakWins, t.round2.breakRounds) },
-  ...([5, 4, 5, 3] as const).flatMap((adv, i) => {
-    const dis = [4, 5, 3, 5][i]!;
+  ...(([[5, 4], [4, 5], [5, 3], [3, 5]] as const)).flatMap(([adv, dis]) => {
     const manFn = (t: TeamEconomySummary) => t.manAdvantage.states.find((s) => s.advantageAlive === adv && s.disadvantageAlive === dis) ?? null;
     return [
       { key: `${adv}v${dis}`, label: `${adv}v${dis}`, title: `${adv}v${dis} 人数优势转化`, numeric: true as const, sortable: true, sortValue: (t: TeamEconomySummary) => manFn(t)?.advantageConversionPercent ?? null, heat: (t: TeamEconomySummary) => toneForPercent(manFn(t)?.advantageConversionPercent ?? null), render: (t: TeamEconomySummary) => { const s = manFn(t); return renderPercentCell(s?.advantageConversionPercent ?? null, s?.advantageWins ?? 0, s?.advantageOpportunities ?? 0); } },
@@ -219,8 +218,6 @@ function Callout({ label, value, detail, title }: { label: string; value: string
     </div>
   );
 }
-
-type HeatTone = "high" | "mid" | "low" | "neutral";
 
 function bestManState(
   insights: TournamentInsights,
