@@ -37,6 +37,7 @@ DAK Studio 是独立 `stu-*` 设计语言（CSS 在 `apps/dak-studio/src/studio.
 | `ScoreboardTable` | `@cs2dak/react` | 单场记分板（队伍着色、可点选手）。 | 记分板。 |
 | `EmptyState` / `MetricInfo` / `EvidenceLink` | `@cs2dak/react` | 空态骨架 / 派生指标 ⓘ 口径 / 跳回放原语。 | 裸空 div、裸 `title=`、自绘回放按钮。 |
 | `CohortScope` | Studio | 聚合范围透镜（地图/标签/队伍筛行）。绑 `StudioDemoEntry` + identity。 | 范围筛选条。 |
+| `FingerprintRadar` / `TrendChart` | Studio（`views/profile-widgets.tsx`） | PRISM 八维风格雷达 / 个人趋势柱状图（指标可切换 + min–max 参照）。纯展示，个人实验室与「我的主页」复用。 | 重画风格雷达 / 趋势图。 |
 | `ElimBracket` / `SwissBracket` / `BracketConnections` | `@cs2dak/react` | 淘汰赛 bracket、瑞士轮 Buchholz 图、双败/GSL lane-aware 晋级连线。类型在 `@cs2dak/contract`。 | 淘汰赛渲染（唯一正确实现，见 D6）。 |
 
 ## 2. `DataTable` 用法

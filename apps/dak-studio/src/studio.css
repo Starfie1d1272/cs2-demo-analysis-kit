@@ -737,51 +737,230 @@ body {
 
 /* ── 我的主页 ───────────────────────────────────────────── */
 
-.stu-home-head {
+/* ── 我的主页（密集仪表盘）────────────────────────────────── */
+
+.stu-home-hero {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 20px;
   flex-wrap: wrap;
 }
 
-.stu-home-head h2 {
-  margin: 0;
-  font-size: 18px;
+.stu-home-id h1 {
+  margin: 0 0 6px;
+  font-size: 20px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
 }
 
-.stu-home-head > button {
+.stu-home-id-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+}
+
+.stu-chip-team {
+  border-color: rgba(47, 224, 168, 0.5);
+  background: var(--dak-accent-soft);
+  color: var(--dak-accent);
+  cursor: default;
+  font-weight: 600;
+}
+.stu-home-id-meta .stu-chip {
+  cursor: default;
+}
+
+.stu-home-stats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-left: auto;
 }
 
-.stu-home-trends {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
+.stu-stat {
+  min-width: 88px;
+  padding: 8px 12px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius);
+  background: var(--dak-panel);
+  text-align: right;
 }
 
-.stu-home-spark {
+.stu-stat span {
+  display: block;
+  color: var(--dak-fg-dim);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stu-stat b {
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stu-stat-primary {
+  border-color: rgba(47, 224, 168, 0.45);
+  background: var(--dak-accent-soft);
+}
+.stu-stat-primary b {
+  color: var(--dak-accent);
+}
+
+.stu-home-cta {
+  flex-basis: 100%;
+}
+
+.stu-home-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.stu-card-sub {
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* 胜负点阵 */
+.stu-wl-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.stu-wl-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  background: var(--dak-border-hi);
+  display: inline-block;
+  flex: none;
+}
+.stu-wl-win { background: var(--dak-accent); }
+.stu-wl-loss { background: var(--dak-danger); }
+.stu-wl-tie { background: var(--dak-fg-dim); }
+
+/* 本周该练什么：横向证据卡 */
+.stu-practice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+.stu-practice-card {
+  padding: 11px 13px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-panel);
+}
+.stu-practice-card header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.stu-home-match-main {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
 }
 
-.stu-home-spark span {
+/* 空态：骨架占位 + 三步引导 */
+.stu-home-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.stu-home-steps {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.stu-home-steps li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border: 1px solid var(--dak-border);
+  border-radius: 999px;
+  background: var(--dak-panel);
+  color: var(--dak-fg-mid);
+  font-size: 12.5px;
+}
+.stu-home-steps b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--dak-accent-soft);
+  color: var(--dak-accent);
+  font-size: 11px;
+}
+.stu-home-skeleton {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+.stu-skel-card {
+  height: 96px;
+  display: flex;
+  align-items: flex-end;
+  padding: 12px;
+  border: 1px dashed var(--dak-border);
+  border-radius: var(--stu-radius);
+  background: linear-gradient(180deg, var(--dak-panel-hi), var(--dak-panel));
   color: var(--dak-fg-dim);
-  font-size: 11.5px;
-  letter-spacing: 0.08em;
+  font-size: 11px;
+  letter-spacing: 0.1em;
 }
 
-.stu-home-spark b {
-  font-family: var(--dak-mono);
+/* 未标记「这是我」：候选选手卡 */
+.stu-pickself-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.stu-pickself-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius);
+  background: var(--dak-panel);
+  color: var(--dak-fg);
+  cursor: pointer;
+  text-align: left;
+}
+.stu-pickself-card:hover {
+  border-color: var(--dak-border-hi);
+  background: var(--dak-panel-hi);
+}
+.stu-pickself-card b {
   font-size: 14px;
 }
 
-.stu-home-spark-line {
-  stroke: var(--dak-accent);
-  stroke-width: 1.5;
+@media (max-width: 980px) {
+  .stu-home-grid {
+    grid-template-columns: 1fr;
+  }
+  .stu-home-stats {
+    margin-left: 0;
+  }
 }
 
 .stu-home-matches {
