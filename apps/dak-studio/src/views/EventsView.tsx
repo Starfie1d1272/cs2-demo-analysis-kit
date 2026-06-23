@@ -4,7 +4,7 @@ import { listEventRecords, type StudioEventRecord } from "../lib/events";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import type { StudioDemoEntry } from "../lib/library";
 import { elimModelFromResults, swissModelFromResults } from "../lib/event-bracket";
-import { ElimBracket, SwissBracket } from "../components/EventBracket";
+import { ElimBracket, SwissBracket, BracketConnections } from "@cs2dak/react";
 import { BpView } from "./BpView";
 import { EmptyState } from "@cs2dak/react";
 
@@ -147,61 +147,6 @@ function EliminationStage(props: StageProps & { double: boolean; stage: EventSta
       <SeriesList {...props} />
     </details>
   </>;
-}
-
-export function BracketConnections({ stage, series }: { stage: EventStage; series: StudioSeriesRecord[] }) {
-  const nodes = stage.bracketNodes ?? [];
-  const rounds = [...new Set(nodes.map((node) => node.round))].sort((a, b) => a - b);
-  const roundIndex = new Map(rounds.map((round, index) => [round, index]));
-  const maxPerRound = Math.max(1, ...rounds.map((round) => nodes.filter((node) => node.round === round).length));
-  const laneLabels = { single: "淘汰赛", winner: "胜者组", loser: "败者组", grand: "总决赛" } as const;
-  const lanes = (["winner", "loser", "grand", "single"] as const).filter((lane) => nodes.some((node) => node.lane === lane));
-  const laneMode = lanes.length > 1;
-  const laneHeight = Math.max(150, maxPerRound * 52);
-  const width = Math.max(520, rounds.length * 260 + (laneMode ? 86 : 0));
-  const height = laneMode ? lanes.length * laneHeight : Math.max(180, maxPerRound * 82);
-  const positions = new Map<string, { x: number; y: number }>();
-  for (const [laneIndex, lane] of lanes.entries()) {
-    for (const round of rounds) {
-      const rows = nodes.filter((node) => node.round === round && node.lane === lane);
-      rows.forEach((node, index) => positions.set(node.id, {
-        x: (roundIndex.get(round) ?? 0) * 260 + (laneMode ? 86 : 12),
-        y: laneMode ? laneIndex * laneHeight + ((index + 0.5) * laneHeight) / rows.length : ((index + 0.5) * height) / rows.length,
-      }));
-    }
-  }
-  const scoreFor = (nodeId: string) => {
-    const match = series.find((row) => row.bracketNodeId === nodeId);
-    if (!match) return "待导入";
-    return match.status === "finished" ? `${match.teamAName} ${match.scoreA ?? 0}:${match.scoreB ?? 0} ${match.teamBName}` : `${match.teamAName} vs ${match.teamBName}`;
-  };
-  return <div className="stu-bracket-diagram" role="img" aria-label={`${stage.name} 胜败晋级关系`}>
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-      {laneMode && lanes.map((lane, index) => <g key={lane}>
-        {index > 0 && <line className="stu-bracket-lane-separator" x1="0" x2={width} y1={index * laneHeight} y2={index * laneHeight} />}
-        <text className="stu-bracket-lane-label" x="12" y={index * laneHeight + 24}>{laneLabels[lane]}</text>
-      </g>)}
-      {nodes.flatMap((node) => {
-        const from = positions.get(node.id)!;
-        return ([{ target: node.nextWinNodeId, loss: false }, { target: node.nextLossNodeId, loss: true }] as const).flatMap(({ target, loss }) => {
-          const to = target ? positions.get(target) : null;
-          if (!to) return [];
-          const startX = from.x + 210;
-          const endX = to.x;
-          const midX = (startX + endX) / 2;
-          return <path key={`${node.id}-${target}-${loss ? "loss" : "win"}`} className={loss ? "stu-bracket-edge stu-bracket-edge-loss" : "stu-bracket-edge"} d={`M ${startX} ${from.y} C ${midX} ${from.y}, ${midX} ${to.y}, ${endX} ${to.y}`}><title>{`${node.label} ${loss ? "败者" : "胜者"}进入 ${nodes.find((item) => item.id === target)?.label ?? target}`}</title></path>;
-        });
-      })}
-      {nodes.map((node) => {
-        const position = positions.get(node.id)!;
-        return <g key={node.id} transform={`translate(${position.x} ${position.y - 25})`}>
-          <rect className="stu-bracket-box" width="210" height="50" rx="4" />
-          <text className="stu-bracket-box-title" x="10" y="19">{node.label}</text>
-          <text className="stu-bracket-box-match" x="10" y="38">{scoreFor(node.id)}</text>
-        </g>;
-      })}
-    </svg>
-  </div>;
 }
 
 interface StageProps { series: StudioSeriesRecord[]; entries: StudioDemoEntry[]; onOpenMatch: (entryId: string) => void }

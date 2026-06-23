@@ -1,54 +1,8 @@
-import type { EventStage } from "@cs2dak/contract";
+import type { BracketCell, ElimModel, EventStage, SwissColumn, SwissModel } from "@cs2dak/contract";
 import type { StudioSeriesRecord } from "./series";
 
-/**
- * 赛事 bracket 的中性数据模型 —— 观看侧（从比赛结果推算）与制作器（从框架槽位）共用同一套
- * 渲染。瑞士轮按战绩组（Buchholz）成列 + 晋级/淘汰终列；淘汰赛按晋级轮次成列。
- */
-export interface BracketCell {
-  key: string;
-  teamA: string | null;
-  teamB: string | null;
-  scoreA: number | null;
-  scoreB: number | null;
-  winner: "A" | "B" | null;
-  date: string | null;
-  /** 观看侧：点开该场的 demo entry。 */
-  entryIds?: string[];
-  /** 制作器：待填槽位（点击附加 demo）。 */
-  empty?: boolean;
-}
-
-export interface SwissGroup {
-  /** 战绩组标签，如 "1-0"。 */
-  record: string;
-  matches: BracketCell[];
-  /** 制作器：该战绩组可继续添加比赛（携带 slot id）。 */
-  addSlotId?: string;
-}
-
-export interface SwissColumn {
-  round: number;
-  groups: SwissGroup[];
-}
-
-export interface SwissModel {
-  columns: SwissColumn[];
-  advanced: { team: string; record: string }[];
-  eliminated: { team: string; record: string }[];
-  winsTarget: number;
-  lossTarget: number;
-}
-
-export interface ElimColumn {
-  round: number;
-  label: string;
-  matches: BracketCell[];
-}
-
-export interface ElimModel {
-  columns: ElimColumn[];
-}
+// 类型 BracketCell / SwissModel / ElimModel 等已下沉至 @cs2dak/contract，
+// 本文件仅保留 Studio 侧模型推导函数（依赖 StudioSeriesRecord）。
 
 function winnerOf(scoreA: number | null, scoreB: number | null, finished: boolean): "A" | "B" | null {
   if (!finished || scoreA == null || scoreB == null || scoreA === scoreB) return null;

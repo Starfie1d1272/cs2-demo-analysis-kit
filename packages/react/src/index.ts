@@ -9,6 +9,7 @@ export { SeasonLeaderboard } from "./components/SeasonLeaderboard";
 export { TeamComparisonPanel } from "./components/TeamComparisonPanel";
 export { Pagination } from "./components/Pagination";
 export { EmptyState, EvidenceLink, MetricInfo } from "./components/Primitives";
+export { ElimBracket, SwissBracket, BracketConnections } from "./components/EventBracket";
 export {
   DataTable,
   STUDIO_TABLE_CLASSES,

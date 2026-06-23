@@ -1,7 +1,6 @@
-import type { EventStage } from "@cs2dak/contract";
+import type { BracketCell, ElimModel, EventStage, SwissModel } from "@cs2dak/contract";
 import { frameworkSlots, type MakerSeriesDraft } from "../lib/event-maker";
-import type { BracketCell, ElimModel, SwissModel } from "../lib/event-bracket";
-import { ElimBracket, SwissBracket } from "./EventBracket";
+import { ElimBracket, SwissBracket } from "@cs2dak/react";
 
 export interface FrameworkSelection {
   stageKey: string;

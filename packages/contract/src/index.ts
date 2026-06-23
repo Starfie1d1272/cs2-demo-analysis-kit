@@ -13,3 +13,4 @@ export * from "./trails.js";
 export * from "./duel.js";
 export * from "./veto.js";
 export * from "./event-package.js";
+export * from "./bracket.js";
