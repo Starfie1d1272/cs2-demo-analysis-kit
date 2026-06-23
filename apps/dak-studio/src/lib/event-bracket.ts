@@ -93,15 +93,8 @@ export function elimModelFromResults(series: StudioSeriesRecord[], stage: EventS
   if (nodes.length > 0) {
     const rounds = [...new Set(nodes.map((node) => node.round))].sort((a, b) => a - b);
     const byNode = new Map(series.filter((row) => row.bracketNodeId).map((row) => [row.bracketNodeId!, row]));
-    // 映射 bracketNodes → ElimNode（lane-aware 布局元数据）
-    const elimNodes: ElimNode[] = nodes.map((node) => ({
-      id: node.id,
-      round: node.round,
-      lane: node.lane,
-      label: node.label,
-      nextWinNodeId: node.nextWinNodeId,
-      nextLossNodeId: node.nextLossNodeId,
-    }));
+    // EventBracketNode 与 ElimNode 字段完全相同，直接复用
+    const elimNodes = nodes as ElimNode[];
     return {
       columns: rounds.map((round) => ({
         round,

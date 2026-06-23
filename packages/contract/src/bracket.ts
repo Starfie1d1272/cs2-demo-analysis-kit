@@ -56,20 +56,13 @@ export interface ElimNode {
 
 export interface ElimModel {
   columns: ElimColumn[];
-  /** Lane-aware 节点元数据（可选）。非空时 ElimBracket 渲染 SVG lane 布局 + 晋级连线；
-   *  缺失时走简单 DOM 列布局（单败 / 制作器）。 */
+  /**
+   * Lane-aware 节点元数据（可选）。**存在性决定渲染模式**：
+   * - 非空 → SVG lane-aware 布局（双败 / GSL），含晋级连线与 lane 分隔
+   * - undefined / [] → DOM 列布局（单败 / 旧资产 / 制作器），以 MatchBox 列展示
+   *
+   * 未来考虑改为显式 `renderMode?: "dom" | "svg-lane"` 以消除隐式联合类型。
+   */
   nodes?: ElimNode[];
 }
 
-/**
- * Bracket 渲染器所需的最小子集：一场系列赛的基本信息。
- * Studio 的 StudioSeriesRecord 与该接口兼容，无需额外适配。
- */
-export interface BracketSeries {
-  bracketNodeId?: string | null;
-  teamAName: string;
-  teamBName: string;
-  scoreA?: number | null;
-  scoreB?: number | null;
-  status?: string;
-}
