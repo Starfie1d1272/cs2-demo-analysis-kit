@@ -228,7 +228,7 @@ const teamComparisonCache = new Map<string, Promise<TeamComparisonModel>>();
 
 /** 选中选手的逐场洞察：只返回小结果，不把全量 DemoPackage 长期放进 React state。 */
 export function getPlayerSeasonDetails(entries: StudioDemoEntry[], steamIds: string[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<PlayerSeasonDetails> {
-  const key = `${keyOf(entries, identity?.version, selectedTeams)}:player:${[...steamIds].sort().join(",")}`;
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:player:v2:${[...steamIds].sort().join(",")}`;
   const cached = detailsCache.get(key);
   if (cached) return cached;
   const loading = (async () => {
