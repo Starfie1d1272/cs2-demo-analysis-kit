@@ -177,13 +177,13 @@ export function AssetHealthBanner() {
     }
   };
 
-  // not_installed
+  // not_installed（R2 不可达，无法自动修复）
   if (status.status === "not_installed") {
     return (
       <div className="stu-notice stu-notice-info">
-        <span>可安装官方示例资产（IEM Cologne Major 2026），获得完整的赛事分析体验。</span>
-        <button type="button" className="stu-button-sm" onClick={() => void installOfficial()}>
-          安装 Cologne 示例资产
+        <span>未安装官方赛事资产。请检查网络连接后重试，或使用 Full Portable Zip 版本。</span>
+        <button type="button" className="stu-button-sm" onClick={() => void check(false)}>
+          重试检查
         </button>
         <button type="button" className="stu-button-sm" onClick={() => setDismissed(true)}>
           以后再说

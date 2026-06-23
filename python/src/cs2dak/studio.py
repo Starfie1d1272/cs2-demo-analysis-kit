@@ -1171,16 +1171,39 @@ class StudioApi:
         return [{"slug": e["slug"], "name": e.get("name", e["slug"]), "size": e.get("size", 0)} for e in m["events"]]
 
     # --- asset health check（启动完整性校验 + 修复）----------------------------
+    _INSTALL_MANIFEST_URLS = [
+        "https://dakupdate.starfie1d.top/releases/install-manifest.json",
+    ]
+
+    _cached_remote_manifest: dict | None = None  # 类级缓存，启动期间只拉一次
+
     def _install_manifest(self) -> dict | None:
-        """读取 userdata/install-manifest.json。不存在返回 None。"""
+        """读取 userdata/install-manifest.json；不存在时尝试从 R2 拉取。
+
+        这样老用户 auto-update 到 0.7.0（无本地 manifest）也能通过
+        health check 发现可安装的官方资产列表并完成修复。
+        """
         path = self._userdata / "install-manifest.json"
-        if not path.is_file():
-            return None
-        try:
-            return json.loads(path.read_text("utf-8"))
-        except Exception as exc:  # noqa: BLE001
-            log.warning("读取 install-manifest 失败：%s", exc)
-            return None
+        if path.is_file():
+            try:
+                return json.loads(path.read_text("utf-8"))
+            except Exception as exc:  # noqa: BLE001
+                log.warning("读取 install-manifest 失败：%s", exc)
+
+        # Fallback: 从 R2 拉取（缓存类级别，同一进程只拉一次）
+        if self._cached_remote_manifest is not None:
+            return self._cached_remote_manifest
+        for url in self._INSTALL_MANIFEST_URLS:
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "DAK-Studio-HealthCheck"})
+                with urllib.request.urlopen(req, timeout=15) as resp:  # noqa: S310
+                    self._cached_remote_manifest = json.loads(resp.read().decode("utf-8"))
+                    log.info("从 R2 获取 install-manifest 成功")
+                    return self._cached_remote_manifest
+            except Exception as exc:  # noqa: BLE001
+                log.debug("从 %s 获取 install-manifest 失败：%s", url, exc)
+                continue
+        return None
 
     def check_assets(self, deep: bool = False) -> dict:
         """启动时校验预装资产完整性。
@@ -1203,6 +1226,8 @@ class StudioApi:
         }
         if manifest is None:
             result["status"] = "not_installed"
+            result["canRepair"] = False  # R2 不可达，无法修复
+            return result
             return result
 
         bundled_dir = self._userdata / "bundled-events"
@@ -1319,6 +1344,22 @@ class StudioApi:
                         )
                 except Exception as exc:  # noqa: BLE001
                     job["errors"].append(f"{item}: {exc}")
+
+            # 下载完成：写入本地 manifest（下次启动无需 R2）
+            if not job["errors"]:
+                try:
+                    dest = self._userdata / "install-manifest.json"
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    dest.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), "utf-8")
+                    # 同步写入 bundled-events manifest
+                    be_manifest = bundled_dir / "manifest.json"
+                    be_data = {
+                        "version": "cs2-demo-analysis-kit/events-manifest-1.0",
+                        "events": manifest.get("bundledEvents", []),
+                    }
+                    be_manifest.write_text(json.dumps(be_data, ensure_ascii=False, indent=2), "utf-8")
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("写入 install-manifest 失败：%s", exc)
 
             job["progress"] = 1.0
             job["current"] = len(items)
