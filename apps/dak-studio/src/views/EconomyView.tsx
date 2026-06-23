@@ -85,7 +85,7 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
         <MetricCard label="回合样本" value={String(insights.roundCount)} detail={`${insights.matchCount} 场 demo`} />
         <MetricCard label="T 胜率" value={`${insights.tWinRatePercent.toFixed(1)}%`} detail={`CT ${insights.ctWinRatePercent.toFixed(1)}%`} tone={toneForPercent(insights.tWinRatePercent)} />
         <MetricCard label="手枪转化" value={formatPercent(insights.pistolConversionPercent)} detail="赢手枪后的下一回合" tone={toneForPercent(insights.pistolConversionPercent)} />
-        <MetricCard label="小枪破局" value={bestSmallBuy ? formatPercent(bestSmallBuy.smallBuyUpset.winRatePercent) : "—"} detail={bestSmallBuy ? `${bestSmallBuy.teamName} · ${bestSmallBuy.smallBuyUpset.wins}/${bestSmallBuy.smallBuyUpset.opportunities}` : "无样本"} tone={toneForPercent(bestSmallBuy?.smallBuyUpset.winRatePercent ?? null)} title="Eco / 半起面对长枪局的胜率" />
+        <MetricCard label="小枪翻盘" value={bestSmallBuy ? formatPercent(bestSmallBuy.smallBuyUpset.winRatePercent) : "—"} detail={bestSmallBuy ? `${bestSmallBuy.teamName} · ${bestSmallBuy.smallBuyUpset.wins}/${bestSmallBuy.smallBuyUpset.opportunities}` : "无样本"} tone={toneForPercent(bestSmallBuy?.smallBuyUpset.winRatePercent ?? null)} title="Eco / 半起面对长枪局的胜率" />
       </section>
 
       <section className="stu-econ-grid">
@@ -117,7 +117,7 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
             <Callout label="反转换最好" value={bestBreak?.teamName ?? "—"} detail={bestBreak ? `${formatPercent(bestBreak.breakRatePercent)} · ${bestBreak.breakWins}/${bestBreak.breakRounds}` : "无样本"} />
             <Callout label="5v4 最稳" value={best5v4?.teamName ?? "—"} detail={best5v4 ? `${formatPercent(best5v4.value)} · ${best5v4.wins}/${best5v4.total}` : "无样本"} />
             <Callout label="4v5 最能翻" value={best4v5?.teamName ?? "—"} detail={best4v5 ? `${formatPercent(best4v5.value)} · ${best4v5.wins}/${best4v5.total}` : "无样本"} />
-            <Callout label="小枪破局" value={bestSmallBuy?.teamName ?? "—"} detail={bestSmallBuy ? `${formatPercent(bestSmallBuy.smallBuyUpset.winRatePercent)} · ${bestSmallBuy.smallBuyUpset.wins}/${bestSmallBuy.smallBuyUpset.opportunities}` : "无样本"} title="Eco / 半起面对长枪局的胜率" />
+            <Callout label="小枪翻盘" value={bestSmallBuy?.teamName ?? "—"} detail={bestSmallBuy ? `${formatPercent(bestSmallBuy.smallBuyUpset.winRatePercent)} · ${bestSmallBuy.smallBuyUpset.wins}/${bestSmallBuy.smallBuyUpset.opportunities}` : "无样本"} title="Eco / 半起面对长枪局的胜率" />
           </div>
         </article>
 
@@ -144,7 +144,7 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
         </article>
 
         <article className="stu-card stu-econ-card">
-          <h3>小枪破局排行</h3>
+          <h3>小枪翻盘排行</h3>
           <table className="stu-mini-table">
             <thead><tr><th>队伍</th><th className="stu-num">胜场</th><th className="stu-num">机会</th><th className="stu-num">胜率</th></tr></thead>
             <tbody>
@@ -248,7 +248,7 @@ const MATRIX_COLUMNS: MatrixColumn[] = [
   { key: "4v5", label: "4v5", title: "4v5 劣势翻盘", get: (t) => { const s = manState(t, 5, 4); return { percent: s?.disadvantageConversionPercent ?? null, wins: s?.disadvantageWins ?? 0, total: s?.disadvantageOpportunities ?? 0 }; } },
   { key: "5v3", label: "5v3", title: "5v3 人数优势转化", get: (t) => { const s = manState(t, 5, 3); return { percent: s?.advantageConversionPercent ?? null, wins: s?.advantageWins ?? 0, total: s?.advantageOpportunities ?? 0 }; } },
   { key: "3v5", label: "3v5", title: "3v5 劣势翻盘", get: (t) => { const s = manState(t, 5, 3); return { percent: s?.disadvantageConversionPercent ?? null, wins: s?.disadvantageWins ?? 0, total: s?.disadvantageOpportunities ?? 0 }; } },
-  { key: "upset", label: "小枪破局", title: "Eco / 半起面对长枪局的胜率", get: (t) => ({ percent: t.smallBuyUpset.winRatePercent, wins: t.smallBuyUpset.wins, total: t.smallBuyUpset.opportunities }) }
+  { key: "upset", label: "小枪翻盘", title: "Eco / 半起面对长枪局的胜率", get: (t) => ({ percent: t.smallBuyUpset.winRatePercent, wins: t.smallBuyUpset.wins, total: t.smallBuyUpset.opportunities }) }
 ];
 
 /** 队伍明细矩阵：点击列头排序（降序），胜率按高低热力着色。 */
