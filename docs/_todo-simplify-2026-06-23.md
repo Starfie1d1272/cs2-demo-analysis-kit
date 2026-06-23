@@ -4,11 +4,11 @@
 
 ## 高优先级
 
-### 1. 淘汰赛双渲染器统一
+### 1. 淘汰赛双渲染器统一 ✅ 已解决
 
-> **2026-06-23 进展**：`ElimBracket`/`SwissBracket`/`BracketConnections` 已迁至 `@cs2dak/react`，
-> 类型 `BracketCell`/`ElimModel`/`SwissModel` 已迁至 `@cs2dak/contract`。
-> 但两套渲染器仍然独立——lane-aware SVG（`BracketConnections`）与可点开 demo 的 DOM（`ElimBracket`）未合并。
+> **2026-06-23**：`ElimModel` 扩展 `nodes?: ElimNode[]`（lane-aware 布局元数据）。
+> `ElimBracket` 内部按 `model.nodes` 有无自动选择：有 nodes→SVG lane-aware + 晋级连线（可点击），
+> 无 nodes→DOM 列布局（兼容制作器/单败）。`BracketConnections` 已删除，双重渲染器合并为单组件。
 
 `ElimBracket`（DOM/EventBracket.tsx）和 `BracketConnections`（SVG/EventsView.tsx）
 是两套完全独立的双败淘汰渲染组件，通过 `useLaneDiagram` boolean 分叉。
@@ -48,10 +48,10 @@
 
 ## 中优先级
 
-### 3. Dead CSS 清理 (~130 行) 🟡 进行中
+### 3. Dead CSS 清理 (~130 行) ✅ 已完成
 
-> **2026-06-23**：已清理 `stu-sort-header`/`stu-empty`/`stu-info`/`stu-evidence`（随原语下沉和 TeamDetailMatrix 迁移）。
-> `.stu-fb-*` / `.stu-duel-evidence-*` / `.stu-pe-*` 待下次扫描。
+> **2026-06-23**：全部 ~130 行已清理——`stu-sort-header`/`stu-empty`/`stu-info`/`stu-evidence`（阶段一）
+> + `stu-fb-slot`/`stu-fb-round-label`/`stu-fb-lane-label`/`stu-fb-lane`/`stu-duel-evidence-*`/`stu-pe-tag`/`stu-pe-bucket`（阶段二）。
 
 以下 CSS 规则仅在 `studio.css` 中定义，无任何 `.tsx` 文件引用：
 
@@ -64,7 +64,11 @@
 
 **方向**: 全量 CSS 使用率扫描后一次性删除。注意排除动态拼接类名（如 `` `stu-fb-slot-${variant}` ``）。
 
-### 4. 缺失的 useMemo 优化
+### 4. 缺失的 useMemo 优化 ✅ 已完成
+
+> **2026-06-23**：4 处全部补上——DuelView `summarizeDuels`、EventsView `standings`、
+> EventFrameworkBoard `frameworkSlots`（pre-compute Map）、PatternExplorer `facts.find`
+> （随 DataTable 迁移自然解决）。
 
 本次 diff 未触及、但审查发现的重复计算：
 
@@ -87,10 +91,10 @@
 
 ## 低优先级
 
-### 6. 赛事总览经济表跳转不可点击 🟡 部分解决
+### 6. 赛事总览经济表跳转不可点击 ✅ 已解决
 
-> **2026-06-23**：`EconomyPanel` 回合卡已支持 `onJumpRound` 回调 → 2D 回放跳转。
-> `TournamentDashboardView` 的静态提示文本仍未改为导航按钮。
+> **2026-06-23**：`EconomyPanel` 回合卡已支持 `onJumpRound`→2D 回放；
+> `TournamentDashboardView` 新增 `onGoEconomy` prop，"经济与节奏"文本改为可点击按钮。
 
 `TournamentDashboardView.tsx` 删除了 3 个经济表（手枪局/经济对位/Eco 翻盘），
 替换为纯文本提示"统一在「经济与节奏」页查看"。
