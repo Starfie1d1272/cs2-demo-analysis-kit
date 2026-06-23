@@ -128,24 +128,58 @@ export function stagesForPreset(preset: EventPreset): EventStage[] {
     single_elim: "单败淘汰",
     double_elim: "双败淘汰",
   };
-  const bracketNodes = preset === "single_elim" ? singleEliminationNodes(8) : preset === "double_elim" ? doubleEliminationNodes() : undefined;
+  const bracketNodes = preset === "single_elim" ? singleEliminationNodes(8) : preset === "double_elim" ? doubleEliminationNodes(8) : undefined;
   return [{ key: "main", name: labels[preset], type: preset, teamCount: preset === "swiss" ? 16 : 8, advanceCount: preset === "round_robin" ? 4 : 1, matchFormat: "bo3", bracketNodes }];
 }
 
-function doubleEliminationNodes(): NonNullable<EventStage["bracketNodes"]> {
-  return [
-    ...[1, 2, 3, 4].map((index) => ({ id: `w1-m${index}`, label: `胜者组首轮 ${index}`, round: 1, lane: "winner" as const, nextWinNodeId: `w2-m${Math.ceil(index / 2)}`, nextLossNodeId: `l1-m${Math.ceil(index / 2)}` })),
-    { id: "l1-m1", label: "败者组首轮 1", round: 2, lane: "loser", nextWinNodeId: "l2-m1", nextLossNodeId: null },
-    { id: "l1-m2", label: "败者组首轮 2", round: 2, lane: "loser", nextWinNodeId: "l2-m2", nextLossNodeId: null },
-    { id: "w2-m1", label: "胜者组半决赛 1", round: 2, lane: "winner", nextWinNodeId: "w3-m1", nextLossNodeId: "l2-m2" },
-    { id: "w2-m2", label: "胜者组半决赛 2", round: 2, lane: "winner", nextWinNodeId: "w3-m1", nextLossNodeId: "l2-m1" },
-    { id: "l2-m1", label: "败者组第二轮 1", round: 3, lane: "loser", nextWinNodeId: "l3-m1", nextLossNodeId: null },
-    { id: "l2-m2", label: "败者组第二轮 2", round: 3, lane: "loser", nextWinNodeId: "l3-m1", nextLossNodeId: null },
-    { id: "l3-m1", label: "败者组半决赛", round: 4, lane: "loser", nextWinNodeId: "l4-m1", nextLossNodeId: null },
-    { id: "w3-m1", label: "胜者组决赛", round: 3, lane: "winner", nextWinNodeId: "g1", nextLossNodeId: "l4-m1" },
-    { id: "l4-m1", label: "败者组决赛", round: 5, lane: "loser", nextWinNodeId: "g1", nextLossNodeId: null },
-    { id: "g1", label: "总决赛", round: 6, lane: "grand", nextWinNodeId: null, nextLossNodeId: null },
-  ];
+/**
+ * 双败淘汰赛节点生成器。
+ * teamCount 必须是 2 的幂且 ≥ 4；传入其它值会向最近合法值取整。
+ * k = log2(teamCount)：胜者组 k 轮，败者组 2*(k-1) 轮，总决赛 1 场。
+ */
+function doubleEliminationNodes(teamCount: number): NonNullable<EventStage["bracketNodes"]> {
+  const k = Math.max(2, Math.round(Math.log2(Math.max(4, teamCount))));
+  const nodes: NonNullable<EventStage["bracketNodes"]> = [];
+  const totalLR = 2 * (k - 1);
+
+  // ── 胜者组 ───────────────────────────────────────────────────────────
+  for (let r = 1; r <= k; r++) {
+    const count = 2 ** (k - r);
+    for (let m = 1; m <= count; m++) {
+      const label =
+        count === 1 ? "胜者组决赛" :
+        count === 2 ? `胜者组半决赛 ${m}` :
+        r === 1 ? `胜者组首轮 ${m}` :
+        `胜者组第 ${r} 轮 ${m}`;
+      const nextWinNodeId = r === k ? "g1" : `w${r + 1}-m${Math.ceil(m / 2)}`;
+      // WR1 losers pair up → LR1；WRr (r≥2) losers → 交叉局 LR(2*(r-1))
+      const nextLossNodeId = r === 1 ? `l1-m${Math.ceil(m / 2)}` : `l${2 * (r - 1)}-m${m}`;
+      nodes.push({ id: `w${r}-m${m}`, label, round: r, lane: "winner" as const, nextWinNodeId, nextLossNodeId });
+    }
+  }
+
+  // ── 败者组 ───────────────────────────────────────────────────────────
+  // 奇数局（1,3,5,...）：败者组内部对决；偶数局（2,4,6,...）：引入对应 WR 轮败方
+  for (let lr = 1; lr <= totalLR; lr++) {
+    const j = Math.ceil(lr / 2);
+    const count = 2 ** (k - j - 1);
+    const isOdd = lr % 2 === 1;
+    const isLast = lr === totalLR;
+    for (let m = 1; m <= count; m++) {
+      const label =
+        isLast ? "败者组决赛" :
+        (lr === totalLR - 1 && count === 1) ? "败者组半决赛" :
+        lr === 1 ? (count === 1 ? "败者组首轮" : `败者组首轮 ${m}`) :
+        count === 1 ? `败者组第 ${lr} 轮` : `败者组第 ${lr} 轮 ${m}`;
+      const nextWinNodeId = isLast ? "g1" : isOdd ? `l${lr + 1}-m${m}` : `l${lr + 1}-m${Math.ceil(m / 2)}`;
+      nodes.push({ id: `l${lr}-m${m}`, label, round: lr + 1, lane: "loser" as const, nextWinNodeId, nextLossNodeId: null });
+    }
+  }
+
+  // ── 总决赛 ───────────────────────────────────────────────────────────
+  nodes.push({ id: "g1", label: "总决赛", round: 2 * k, lane: "grand" as const, nextWinNodeId: null, nextLossNodeId: null });
+
+  return nodes;
 }
 
 function singleEliminationNodes(teamCount: number): NonNullable<EventStage["bracketNodes"]> {
@@ -177,13 +211,11 @@ function gslGroupNodes(): NonNullable<EventStage["bracketNodes"]> {
 
 /**
  * 按阶段赛制取默认 bracketNodes；非淘汰类（单循环 / 瑞士轮）返回 undefined。
- *
- * NOTE: `teamCount` 仅 single_elim 使用——单败节点数随队伍数变化；
- * double_elim 固定 16 队节点（可容纳 ≤16 队），gsl_group 固定 4 队（GSL 定义如此）。
+ * `gsl_group` 固定 4 队（GSL 定义如此）。
  */
 export function bracketNodesForType(type: EventStage["type"], teamCount: number): EventStage["bracketNodes"] | undefined {
   if (type === "single_elim") return singleEliminationNodes(Math.max(2, teamCount));
-  if (type === "double_elim") return doubleEliminationNodes();
+  if (type === "double_elim") return doubleEliminationNodes(Math.max(4, teamCount));
   if (type === "gsl_group") return gslGroupNodes();
   return undefined;
 }

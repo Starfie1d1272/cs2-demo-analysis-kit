@@ -297,7 +297,10 @@ export function EventPackageMaker({ onNotice }: { onNotice: (message: string) =>
             <label>默认局制<select value={stage.matchFormat ?? "bo3"} onChange={(event) => patchStage(stage.key, { matchFormat: event.target.value as SeriesFormat })}>
               {(["bo1", "bo3", "bo5"] as const).map((format) => <option key={format} value={format}>{format.toUpperCase()}</option>)}
             </select></label>
-            <label>队伍数<input type="number" min={2} value={stage.teamCount} onChange={(event) => patchStage(stage.key, { teamCount: Number(event.target.value) || 2 })} /></label>
+            <label>队伍数<input type="number" min={2} value={stage.teamCount} onChange={(event) => {
+              const teamCount = Number(event.target.value) || 2;
+              patchStage(stage.key, { teamCount, bracketNodes: bracketNodesForType(stage.type, teamCount) });
+            }} /></label>
             <button className="stu-button-sm" type="button" disabled={stages.length <= 1} onClick={() => setStages((rows) => rows.filter((row) => row.key !== stage.key))}>删除</button>
           </div>
         ))}
