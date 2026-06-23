@@ -21,6 +21,43 @@ import { argv, cwd, exit, stderr } from "node:process";
 import { createHash } from "node:crypto";
 import { inflateRawSync } from "node:zlib";
 
+// ── 跨平台 zip 操作（首选 7z → fallback unzip/zip）───────────────────
+
+function hasCmd(cmd) {
+  try {
+    execSync(process.platform === "win32" ? `where ${cmd}` : `command -v ${cmd}`, { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 解压 zip 到 outDir（不依赖当前工作目录）。 */
+function extractZip(zipPath, outDir) {
+  if (hasCmd("7z")) {
+    execSync(`7z x -y "${zipPath}" -o"${outDir}" -bso0`, { stdio: "inherit" });
+    return;
+  }
+  if (hasCmd("unzip")) {
+    execSync(`unzip -q -o "${zipPath}" -d "${outDir}"`, { stdio: "inherit" });
+    return;
+  }
+  throw new Error("缺少解压工具：请安装 7-Zip（推荐）或确保 unzip 在 PATH 中。CI 中自带 7z。");
+}
+
+/** 将目录打包为 zip。zipPath 是输出文件路径，workDir 是打包的工作目录，rootName 是 zip 内顶层条目名。 */
+function createZip(workDir, zipPath, rootName) {
+  if (hasCmd("7z")) {
+    execSync(`cd "${workDir}" && 7z a -tzip -mx=5 "${zipPath}" "${rootName}" -bso0`, { stdio: "inherit" });
+    return;
+  }
+  if (hasCmd("zip")) {
+    execSync(`cd "${workDir}" && zip -q -r "${zipPath}" "${rootName}"`, { stdio: "inherit" });
+    return;
+  }
+  throw new Error("缺少打包工具：请安装 7-Zip（推荐）或确保 zip 在 PATH 中。CI 中自带 7z。");
+}
+
 function parseArgs(raw) {
   const args = {};
   const flags = ["--runtime-zip", "--bundled-events", "--tris-manifest", "--tris-dir", "--install-manifest", "--out"];
@@ -85,9 +122,9 @@ function main() {
   rmSync(workDir, { recursive: true, force: true });
   mkdirSync(workDir, { recursive: true });
 
-  // 1. Extract runtime zip to work dir（7z 跨平台，与 release.yml 一致）
+  // 1. Extract runtime zip to work dir
   console.error(`解压 runtime：${runtimeName} → ${workDir}/`);
-  execSync(`7z x "${runtimeZip}" -o"${workDir}" -y -bso0`, { stdio: "inherit" });
+  extractZip(runtimeZip, workDir);
 
   // Runtime zip contains a single top-level dir (PyInstaller onedir) e.g. "dak-studio/"
   // Find the top-level dir
@@ -181,10 +218,10 @@ function main() {
   copyFileSync(installManifestPath, join(appRoot, "userdata", "install-manifest.json"));
   console.error("  install-manifest.json");
 
-  // 5. Zip the work dir（7z 与 release.yml 一致，Windows runner 兼容）
+  // 5. Zip the work dir
   console.error(`打包：${fullZipName}…`);
   const zipRoot = topDirs.length === 1 ? topDirs[0] : ".";
-  execSync(`7z a -mx=5 "${fullZipPath}" "${workDir}/${zipRoot}/*" -bso0`, { stdio: "inherit" });
+  createZip(workDir, fullZipPath, zipRoot);
 
   // 6. Cleanup
   rmSync(workDir, { recursive: true, force: true });
