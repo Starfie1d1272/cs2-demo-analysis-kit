@@ -106,6 +106,9 @@ docs/                  # 架构与集成文档
 - **TypeScript**：pnpm workspace，vitest（node 环境），`tsc -b` 类型检查。测试与源码同目录 `*.test.ts`
 - **跨语言 seam**：v3 ZIP 是唯一耦合点。Python 和 TS 不互相 import
 - **组件导出**：公共组件从 `packages/react/src/index.ts` 统一导出
+- **组件复用**：新增 UI 前先查 [`docs/design/studio-components.md`](docs/design/studio-components.md)
+  组件登记表——能复用就复用，不要重造。表格一律用 `DataTable`（唯一排序表），
+  翻页用 `Pagination`。纯展示组件应下沉 `@cs2dak/react`（绑数据的才留 Studio）
 - **UI 设计语言**：DAK Studio 所有页面与组件必须遵守
   [`docs/design-language.md`](docs/design-language.md)（Tactical Slate：只用
   `--dak-*`/`stu-*` token，禁止裸色值与视图私有控件样式；统计证据可点击、
