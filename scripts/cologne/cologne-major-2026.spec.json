@@ -3,16 +3,46 @@
   "event": {
     "slug": "iem-cologne-major-2026",
     "name": "IEM Cologne Major 2026",
-    "kind": "major"
+    "kind": "major",
+    "sourceUrl": "https://www.hltv.org/results?event=8301"
   },
-  "_exportNote": "scripts/event-export.mjs 读此块：按阶段展开源 glob（~ 展开为家目录），逐源调用 event-export.sh。源命名按 HLTV 下载约定 iem-cologne-major-2026-<stage>-*.rar。可断点续跑；--reexport 先清空再全量重导。",
+  "_exportNote": "scripts/event-export.mjs 读此块：按阶段展开源 glob（~ 展开为家目录），逐源调用 event-export.sh，每源带 --research --compress-level（默认 9）。可断点续跑；--reexport 先清空再全量重导。Stage1/Stage2 在 HLTV 有独立 -stage-N slug，可按文件名过滤；Stage3+Playoff 共用 -major-2026 slug 无 stage 标记，统一从 _src/ 取，再按 pairs/excludePairs（归一化对阵 a|b，按字母序）路由——playoff 对阵清单待 bp-to-spec 重建真实结果后填入 Playoff.pairs。distribution: builtin=随 Studio 内置，r2=上传 dakupdate.starfie1d.top。",
   "export": {
     "outRoot": "fixtures/demos/pro/IEM-Cologne-Major-2026",
+    "compressLevel": 9,
     "stages": [
-      { "stage": "Stage1", "sources": ["~/Downloads/iem-cologne-major-2026-stage-1-*.rar"] },
-      { "stage": "Stage2", "sources": ["~/Downloads/iem-cologne-major-2026-stage-2-*.rar"] },
-      { "stage": "Stage3", "sources": ["~/Downloads/iem-cologne-major-2026-stage-3-*.rar"] },
-      { "stage": "Playoff", "sources": ["~/Downloads/iem-cologne-major-2026-playoff-*.rar"] }
+      {
+        "stage": "Stage1",
+        "distribution": "r2",
+        "sources": [
+          "fixtures/demos/pro/IEM-Cologne-Major-2026/_src/iem-cologne-major-2026-stage-1-*.rar",
+          "~/Downloads/iem-cologne-major-2026-stage-1-*.rar"
+        ]
+      },
+      {
+        "stage": "Stage2",
+        "distribution": "r2",
+        "sources": [
+          "fixtures/demos/pro/IEM-Cologne-Major-2026/_src/iem-cologne-major-2026-stage-2-*.rar",
+          "~/Downloads/iem-cologne-major-2026-stage-2-*.rar"
+        ]
+      },
+      {
+        "stage": "Stage3",
+        "distribution": "builtin",
+        "excludePairs": [],
+        "sources": [
+          "fixtures/demos/pro/IEM-Cologne-Major-2026/_src/iem-cologne-major-2026-*-bo*.rar"
+        ]
+      },
+      {
+        "stage": "Playoff",
+        "distribution": "builtin",
+        "pairs": [],
+        "sources": [
+          "fixtures/demos/pro/IEM-Cologne-Major-2026/_src/iem-cologne-major-2026-*-bo*.rar"
+        ]
+      }
     ]
   },
   "stages": [
@@ -3149,6 +3179,1886 @@
           null,
           "decider",
           "Dust2"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r1-m1",
+      "stage": "stage3",
+      "round": 1,
+      "entryRound": "0-0",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "9z",
+      "teamB": "PARIVISION",
+      "bp": [
+        [
+          "teamA",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Nuke"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Overpass"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Mirage"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Ancient"
+        ],
+        [
+          null,
+          "decider",
+          "Inferno"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r1-m2",
+      "stage": "stage3",
+      "round": 1,
+      "entryRound": "0-0",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "BetBoom",
+      "teamB": "The MongolZ",
+      "bp": [
+        [
+          "teamA",
+          "ban",
+          "Inferno"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Mirage"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Nuke"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Overpass"
+        ],
+        [
+          null,
+          "decider",
+          "Ancient"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r1-m3",
+      "stage": "stage3",
+      "round": 1,
+      "entryRound": "0-0",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "FUT",
+      "teamB": "Vitality",
+      "bp": [
+        [
+          "teamA",
+          "ban",
+          "Inferno"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Anubis"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Overpass"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Mirage"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Dust2"
+        ],
+        [
+          null,
+          "decider",
+          "Nuke"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r1-m4",
+      "stage": "stage3",
+      "round": 1,
+      "entryRound": "0-0",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "Legacy",
+      "teamB": "MOUZ",
+      "bp": [
+        [
+          "teamA",
+          "ban",
+          "Overpass"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Nuke"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Inferno"
+        ],
+        [
+          null,
+          "decider",
+          "Mirage"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r1-m5",
+      "stage": "stage3",
+      "round": 1,
+      "entryRound": "0-0",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "B8",
+      "teamB": "FURIA",
+      "bp": [
+        [
+          "teamA",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Mirage"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Inferno"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Dust2"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Overpass"
+        ],
+        [
+          null,
+          "decider",
+          "Nuke"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r1-m6",
+      "stage": "stage3",
+      "round": 1,
+      "entryRound": "0-0",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "G2",
+      "teamB": "Falcons",
+      "bp": [
+        [
+          "teamA",
+          "ban",
+          "Nuke"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Overpass"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Inferno"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Mirage"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Anubis"
+        ],
+        [
+          null,
+          "decider",
+          "Ancient"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r1-m7",
+      "stage": "stage3",
+      "round": 1,
+      "entryRound": "0-0",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "Monte",
+      "teamB": "Aurora",
+      "bp": [
+        [
+          "teamA",
+          "ban",
+          "Overpass"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Nuke"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Anubis"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Mirage"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Inferno"
+        ],
+        [
+          null,
+          "decider",
+          "Dust2"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r1-m8",
+      "stage": "stage3",
+      "round": 1,
+      "entryRound": "0-0",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "Spirit",
+      "teamB": "Natus Vincere",
+      "bp": [
+        [
+          "teamA",
+          "ban",
+          "Inferno"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Overpass"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Anubis"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Nuke"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Ancient"
+        ],
+        [
+          null,
+          "decider",
+          "Mirage"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r2-w1",
+      "stage": "stage3",
+      "round": 2,
+      "entryRound": "1-0",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "MOUZ",
+      "teamB": "FURIA",
+      "bp": [
+        [
+          "teamA",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Nuke"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Inferno"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Mirage"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Dust2"
+        ],
+        [
+          null,
+          "decider",
+          "Overpass"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r2-w2",
+      "stage": "stage3",
+      "round": 2,
+      "entryRound": "1-0",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "BetBoom",
+      "teamB": "Falcons",
+      "bp": [
+        [
+          "teamA",
+          "ban",
+          "Inferno"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Overpass"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Nuke"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Ancient"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Mirage"
+        ],
+        [
+          null,
+          "decider",
+          "Dust2"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r2-w3",
+      "stage": "stage3",
+      "round": 2,
+      "entryRound": "1-0",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "9z",
+      "teamB": "Vitality",
+      "bp": [
+        [
+          "teamA",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Inferno"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Mirage"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Nuke"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Overpass"
+        ],
+        [
+          null,
+          "decider",
+          "Dust2"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r2-w4",
+      "stage": "stage3",
+      "round": 2,
+      "entryRound": "1-0",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "Spirit",
+      "teamB": "Aurora",
+      "bp": [
+        [
+          "teamA",
+          "ban",
+          "Inferno"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Anubis"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Mirage"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Overpass"
+        ],
+        [
+          null,
+          "decider",
+          "Nuke"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r2-l1",
+      "stage": "stage3",
+      "round": 2,
+      "entryRound": "0-1",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "The MongolZ",
+      "teamB": "B8",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Inferno"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Mirage"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Overpass"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Nuke"
+        ],
+        [
+          null,
+          "decider",
+          "Dust2"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r2-l2",
+      "stage": "stage3",
+      "round": 2,
+      "entryRound": "0-1",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "PARIVISION",
+      "teamB": "Monte",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Overpass"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Nuke"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Mirage"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Dust2"
+        ],
+        [
+          null,
+          "decider",
+          "Inferno"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r2-l3",
+      "stage": "stage3",
+      "round": 2,
+      "entryRound": "0-1",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "FUT",
+      "teamB": "G2",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Nuke"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Inferno"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Overpass"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Dust2"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Anubis"
+        ],
+        [
+          null,
+          "decider",
+          "Mirage"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r2-l4",
+      "stage": "stage3",
+      "round": 2,
+      "entryRound": "0-1",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "Natus Vincere",
+      "teamB": "Legacy",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Overpass"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Inferno"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Dust2"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Nuke"
+        ],
+        [
+          null,
+          "decider",
+          "Mirage"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r3-a1",
+      "stage": "stage3",
+      "round": 3,
+      "entryRound": "2-0",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "BetBoom",
+      "teamB": "FURIA",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Inferno"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Overpass"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Mirage"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Anubis"
+        ],
+        [
+          null,
+          "decider",
+          "Nuke"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r3-a2",
+      "stage": "stage3",
+      "round": 3,
+      "entryRound": "2-0",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "Spirit",
+      "teamB": "9z",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Inferno"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Overpass"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Mirage"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Nuke"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          null,
+          "decider",
+          "Dust2"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r3-m1",
+      "stage": "stage3",
+      "round": 3,
+      "entryRound": "1-1",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "Natus Vincere",
+      "teamB": "The MongolZ",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Overpass"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Nuke"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Dust2"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Inferno"
+        ],
+        [
+          null,
+          "decider",
+          "Mirage"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r3-m2",
+      "stage": "stage3",
+      "round": 3,
+      "entryRound": "1-1",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "Falcons",
+      "teamB": "Monte",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Overpass"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Inferno"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Nuke"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Anubis"
+        ],
+        [
+          null,
+          "decider",
+          "Mirage"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r3-m3",
+      "stage": "stage3",
+      "round": 3,
+      "entryRound": "1-1",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "Aurora",
+      "teamB": "G2",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Nuke"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Overpass"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Anubis"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Mirage"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Dust2"
+        ],
+        [
+          null,
+          "decider",
+          "Inferno"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r3-m4",
+      "stage": "stage3",
+      "round": 3,
+      "entryRound": "1-1",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "Vitality",
+      "teamB": "MOUZ",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Mirage"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Nuke"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Overpass"
+        ],
+        [
+          null,
+          "decider",
+          "Inferno"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r3-e1",
+      "stage": "stage3",
+      "round": 3,
+      "entryRound": "0-2",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "B8",
+      "teamB": "FUT",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Inferno"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Mirage"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Overpass"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Nuke"
+        ],
+        [
+          null,
+          "decider",
+          "Ancient"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r3-e2",
+      "stage": "stage3",
+      "round": 3,
+      "entryRound": "0-2",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "PARIVISION",
+      "teamB": "Legacy",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Nuke"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Inferno"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Overpass"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          null,
+          "decider",
+          "Mirage"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r4-a1",
+      "stage": "stage3",
+      "round": 4,
+      "entryRound": "2-1",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "BetBoom",
+      "teamB": "Vitality",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Inferno"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Overpass"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Nuke"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Dust2"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Anubis"
+        ],
+        [
+          null,
+          "decider",
+          "Mirage"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r4-a2",
+      "stage": "stage3",
+      "round": 4,
+      "entryRound": "2-1",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "Aurora",
+      "teamB": "9z",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Nuke"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Overpass"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Mirage"
+        ],
+        [
+          null,
+          "decider",
+          "Inferno"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r4-a3",
+      "stage": "stage3",
+      "round": 4,
+      "entryRound": "2-1",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "Natus Vincere",
+      "teamB": "Falcons",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Inferno"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Nuke"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Mirage"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Overpass"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          null,
+          "decider",
+          "Anubis"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r4-e1",
+      "stage": "stage3",
+      "round": 4,
+      "entryRound": "1-2",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "MOUZ",
+      "teamB": "FUT",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Inferno"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Nuke"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Dust2"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Overpass"
+        ],
+        [
+          null,
+          "decider",
+          "Mirage"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r4-e2",
+      "stage": "stage3",
+      "round": 4,
+      "entryRound": "1-2",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "The MongolZ",
+      "teamB": "Monte",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Overpass"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Nuke"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Inferno"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Mirage"
+        ],
+        [
+          null,
+          "decider",
+          "Dust2"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r4-e3",
+      "stage": "stage3",
+      "round": 4,
+      "entryRound": "1-2",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "G2",
+      "teamB": "Legacy",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Nuke"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Overpass"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Mirage"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          null,
+          "decider",
+          "Inferno"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r5-d1",
+      "stage": "stage3",
+      "round": 5,
+      "entryRound": "2-2",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "9z",
+      "teamB": "The MongolZ",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Mirage"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Inferno"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Overpass"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Nuke"
+        ],
+        [
+          null,
+          "decider",
+          "Dust2"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r5-d2",
+      "stage": "stage3",
+      "round": 5,
+      "entryRound": "2-2",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "BetBoom",
+      "teamB": "FUT",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Nuke"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Mirage"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Inferno"
+        ],
+        [
+          null,
+          "decider",
+          "Overpass"
+        ]
+      ]
+    },
+    {
+      "key": "s3-r5-d3",
+      "stage": "stage3",
+      "round": 5,
+      "entryRound": "2-2",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "Natus Vincere",
+      "teamB": "G2",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Nuke"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Overpass"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Inferno"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          null,
+          "decider",
+          "Mirage"
+        ]
+      ]
+    },
+    {
+      "key": "p-r1-qf1",
+      "stage": "playoff",
+      "round": 1,
+      "entryRound": "quarter-final",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "9z",
+      "teamB": "FURIA",
+      "bp": [
+        [
+          "teamA",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Mirage"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Inferno"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Nuke"
+        ],
+        [
+          null,
+          "decider",
+          "Overpass"
+        ]
+      ]
+    },
+    {
+      "key": "p-r1-qf2",
+      "stage": "playoff",
+      "round": 1,
+      "entryRound": "quarter-final",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "Aurora",
+      "teamB": "BetBoom",
+      "bp": [
+        [
+          "teamB",
+          "ban",
+          "Inferno"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Nuke"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Anubis"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Mirage"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Overpass"
+        ],
+        [
+          null,
+          "decider",
+          "Dust2"
+        ]
+      ]
+    },
+    {
+      "key": "p-r1-qf3",
+      "stage": "playoff",
+      "round": 1,
+      "entryRound": "quarter-final",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "G2",
+      "teamB": "Spirit",
+      "bp": [
+        [
+          "teamA",
+          "ban",
+          "Nuke"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Inferno"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Overpass"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Anubis"
+        ],
+        [
+          null,
+          "decider",
+          "Mirage"
+        ]
+      ]
+    },
+    {
+      "key": "p-r1-qf4",
+      "stage": "playoff",
+      "round": 1,
+      "entryRound": "quarter-final",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "Falcons",
+      "teamB": "Vitality",
+      "bp": [
+        [
+          "teamA",
+          "ban",
+          "Overpass"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Anubis"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Inferno"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Mirage"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Nuke"
+        ],
+        [
+          null,
+          "decider",
+          "Dust2"
+        ]
+      ]
+    },
+    {
+      "key": "p-r2-sf1",
+      "stage": "playoff",
+      "round": 2,
+      "entryRound": "semi-final",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "Aurora",
+      "teamB": "FURIA",
+      "bp": [
+        [
+          "teamA",
+          "ban",
+          "Overpass"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Anubis"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Nuke"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Mirage"
+        ],
+        [
+          null,
+          "decider",
+          "Inferno"
+        ]
+      ]
+    },
+    {
+      "key": "p-r2-sf2",
+      "stage": "playoff",
+      "round": 2,
+      "entryRound": "semi-final",
+      "format": "bo3",
+      "status": "finished",
+      "teamA": "Spirit",
+      "teamB": "Falcons",
+      "bp": [
+        [
+          "teamA",
+          "ban",
+          "Overpass"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Inferno"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Anubis"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Mirage"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamA",
+          "ban",
+          "Nuke"
+        ],
+        [
+          null,
+          "decider",
+          "Dust2"
+        ]
+      ]
+    },
+    {
+      "key": "p-r3-gf1",
+      "stage": "playoff",
+      "round": 3,
+      "entryRound": "grand-final",
+      "format": "bo5",
+      "status": "finished",
+      "teamA": "FURIA",
+      "teamB": "Falcons",
+      "bp": [
+        [
+          "teamA",
+          "ban",
+          "Ancient"
+        ],
+        [
+          "teamB",
+          "ban",
+          "Overpass"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Mirage"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Anubis"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Inferno"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Dust2"
+        ],
+        [
+          null,
+          "decider",
+          "Nuke"
         ]
       ]
     }
