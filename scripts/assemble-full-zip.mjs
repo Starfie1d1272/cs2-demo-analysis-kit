@@ -85,9 +85,9 @@ function main() {
   rmSync(workDir, { recursive: true, force: true });
   mkdirSync(workDir, { recursive: true });
 
-  // 1. Extract runtime zip to work dir
+  // 1. Extract runtime zip to work dir（7z 跨平台，与 release.yml 一致）
   console.error(`解压 runtime：${runtimeName} → ${workDir}/`);
-  execSync(`unzip -q -o "${runtimeZip}" -d "${workDir}"`, { stdio: "inherit" });
+  execSync(`7z x "${runtimeZip}" -o"${workDir}" -y -bso0`, { stdio: "inherit" });
 
   // Runtime zip contains a single top-level dir (PyInstaller onedir) e.g. "dak-studio/"
   // Find the top-level dir
@@ -181,11 +181,10 @@ function main() {
   copyFileSync(installManifestPath, join(appRoot, "userdata", "install-manifest.json"));
   console.error("  install-manifest.json");
 
-  // 5. Zip the work dir
-  // Use the top-level dir name for the zip root so structure is consistent
+  // 5. Zip the work dir（7z 与 release.yml 一致，Windows runner 兼容）
   console.error(`打包：${fullZipName}…`);
   const zipRoot = topDirs.length === 1 ? topDirs[0] : ".";
-  execSync(`cd "${workDir}" && zip -q -r "${fullZipPath}" "${zipRoot}"`, { stdio: "inherit" });
+  execSync(`7z a -mx=5 "${fullZipPath}" "${workDir}/${zipRoot}/*" -bso0`, { stdio: "inherit" });
 
   // 6. Cleanup
   rmSync(workDir, { recursive: true, force: true });

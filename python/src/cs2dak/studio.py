@@ -1215,11 +1215,16 @@ class StudioApi:
         status: "ok" | "not_installed" | "incomplete" | "corrupt"
         """
         manifest = self._install_manifest()
+        # 完整列表（非仅缺失项），供前端显示 "2/2"、"7/7"
+        full_events = [e.get("slug") for e in manifest.get("bundledEvents", [])] if manifest else []
+        full_tris = list((manifest.get("requiredTris") or {}).keys()) if manifest else []
         result: dict = {
             "status": "ok",
             "noManifest": manifest is None,
             "checkedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "assetSet": manifest.get("assetSet") if manifest else None,
+            "bundledEventSlugs": full_events,
+            "requiredTriMaps": full_tris,
             "missingEvents": [],
             "missingTris": [],
             "canRepair": True,

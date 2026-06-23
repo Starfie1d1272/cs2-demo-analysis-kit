@@ -59,10 +59,13 @@ export function AssetsPanel({ entries, onLibraryChanged, onNotice = () => {} }: 
     [entries]
   );
 
+  // 使用完整 requiredTriMaps（非仅缺失项），这样 OK 时也能看到 7/7
   const requiredTrisMapNames = useMemo(
-    () => (assetStatus?.missingTris ?? []).map((t) => t.mapName),
+    () => assetStatus?.requiredTriMaps ?? [],
     [assetStatus]
   );
+  const eventTotal = assetStatus?.bundledEventSlugs?.length ?? 0;
+  const triTotal = requiredTrisMapNames.length;
   const allTriMaps = useMemo(
     () => [...new Set([...libraryMaps, ...requiredTrisMapNames])].sort(),
     [libraryMaps, requiredTrisMapNames]
@@ -216,16 +219,22 @@ export function AssetsPanel({ entries, onLibraryChanged, onNotice = () => {} }: 
               <tr><td>资产集</td><td>{assetStatus.assetSet || "—"}</td></tr>
               <tr><td>状态</td><td>{statusLabel(assetStatus)}</td></tr>
               <tr><td>赛事包</td>
-                <td>{assetStatus.status === "ok" ? "完整" : `${assetStatus.missingEvents?.length ?? "?"} 缺失`}
+                <td>{assetStatus.status === "ok"
+                  ? `完整（${eventTotal}/${eventTotal}）`
+                  : `${eventTotal - (assetStatus.missingEvents?.length ?? 0)}/${eventTotal} 已装`
+                }
                   {assetStatus.missingEvents && assetStatus.missingEvents.length > 0 && (
-                    <span className="stu-muted">（{assetStatus.missingEvents.map((e) => e.name || e.slug).join("、")}）</span>
+                    <span className="stu-muted">（缺：{assetStatus.missingEvents.map((e) => e.name || e.slug).join("、")}）</span>
                   )}
                 </td>
               </tr>
               <tr><td>地图数据</td>
-                <td>{assetStatus.status === "ok" ? "完整" : `${assetStatus.missingTris?.length ?? "?"} 缺失`}
+                <td>{assetStatus.status === "ok"
+                  ? `完整（${triTotal}/${triTotal}）`
+                  : `${triTotal - (assetStatus.missingTris?.length ?? 0)}/${triTotal} 已装`
+                }
                   {assetStatus.missingTris && assetStatus.missingTris.length > 0 && (
-                    <span className="stu-muted">（{assetStatus.missingTris.map((t) => `${t.mapName}←${t.requiredBy.join(",")}`).join("、")}）</span>
+                    <span className="stu-muted">（缺：{assetStatus.missingTris.map((t) => `${t.mapName}←${t.requiredBy.join(",")}`).join("、")}）</span>
                   )}
                 </td>
               </tr>

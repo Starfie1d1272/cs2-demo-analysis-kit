@@ -10,6 +10,10 @@ export interface AssetStatus {
   noManifest?: boolean;
   checkedAt?: string;
   assetSet?: string;
+  /** 官方资产集定义的完整 bundled event slug 列表（非仅缺失项） */
+  bundledEventSlugs?: string[];
+  /** 官方资产集定义的完整 required tri map 列表（非仅缺失项） */
+  requiredTriMaps?: string[];
   missingEvents?: Array<{ slug: string; name: string; reason: string }>;
   missingTris?: Array<{ mapName: string; requiredBy: string[]; reason: string }>;
   canRepair?: boolean;

@@ -30,6 +30,7 @@ export function AssetHealthBanner() {
   const check = useCallback(async (deep = false) => {
     const result = await checkAssets(deep);
     if (result) setStatus(result);
+    return result;
   }, []);
 
   useEffect(() => {
@@ -38,19 +39,25 @@ export function AssetHealthBanner() {
     return () => clearTimeout(timer);
   }, [available, check]);
 
-  if (!available || !status) return null;
+  // repairDone 成功提示 5s 后自动消失
+  useEffect(() => {
+    if (!repairDone) return;
+    const timer = setTimeout(() => { setRepairDone(false); setDismissed(true); }, 5000);
+    return () => clearTimeout(timer);
+  }, [repairDone]);
 
-  if (status.status === "ok" && !repairDone) return null;
-  if (status.status === "ok" && repairDone) {
-    setTimeout(() => { setRepairDone(false); setDismissed(true); }, 5000);
+  if (!available || !status) return null;
+  if (dismissed) return null;
+
+  // ok 状态：修复完成短暂提示，否则不显示
+  if (status.status === "ok") {
+    if (!repairDone) return null;
     return (
       <div className="stu-notice stu-notice-ok">
         <span>✓ 资产完整，所有内置赛事和地图数据就绪。</span>
       </div>
     );
   }
-
-  if (dismissed) return null;
 
   const missingEvents = status.missingEvents ?? [];
   const missingTris = status.missingTris ?? [];
@@ -60,11 +67,6 @@ export function AssetHealthBanner() {
     return (
       <div className="stu-notice stu-notice-info">
         <span>{repairProgress || "正在修复资产…"}</span>
-        {repairProgress.includes("完成") && (
-          <button type="button" className="stu-button-sm" onClick={() => { setRepairing(false); setRepairDone(true); void check(false); }}>
-            刷新状态
-          </button>
-        )}
       </div>
     );
   }
@@ -79,12 +81,13 @@ export function AssetHealthBanner() {
       ],
       (j) => setRepairProgress(`下载中 ${j.current + 1}/${j.total}…`),
     );
-    setRepairing(false);
-    if (job) {
-      setRepairProgress(job.errors.length ? `修复完成，${job.errors.length} 项失败` : "修复完成");
+    if (job && job.errors.length === 0) {
+      await check(false);
+      setRepairDone(true);
     } else {
-      setRepairProgress("修复失败");
+      setRepairProgress(job ? `修复完成，${job.errors.length} 项失败` : "修复失败");
     }
+    setRepairing(false);
   };
 
   if (status.status === "not_installed") {
