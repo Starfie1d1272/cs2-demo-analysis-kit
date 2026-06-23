@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatPercent, type TournamentInsights } from "@cs2dak/presentation";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
-import { EmptyState } from "../components/primitives";
+import { EmptyState } from "@cs2dak/react";
 import { getTournamentInsights, type IdentityOptions } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";
 

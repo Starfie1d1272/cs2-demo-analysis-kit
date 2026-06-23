@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SeasonCohortBundle } from "@cs2dak/contract";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
-import { EmptyState } from "../components/primitives";
+import { EmptyState } from "@cs2dak/react";
 import { LibraryMaintenance } from "../components/LibraryMaintenance";
 import { EventManager } from "../components/EventManager";
 import type { BuiltinEvent } from "../lib/builtin-events";

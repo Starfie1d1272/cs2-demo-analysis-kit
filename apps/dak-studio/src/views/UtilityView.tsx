@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
-import { EmptyState, EvidenceLink, MetricInfo } from "../components/primitives";
+import { EmptyState, EvidenceLink, MetricInfo } from "@cs2dak/react";
 import { getPlayerFlashSummaries, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { formatMatchLabel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { Pagination } from "../components/Pagination";

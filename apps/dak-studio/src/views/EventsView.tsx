@@ -6,7 +6,7 @@ import type { StudioDemoEntry } from "../lib/library";
 import { elimModelFromResults, swissModelFromResults } from "../lib/event-bracket";
 import { ElimBracket, SwissBracket } from "../components/EventBracket";
 import { BpView } from "./BpView";
-import { EmptyState } from "../components/primitives";
+import { EmptyState } from "@cs2dak/react";
 
 export function EventsView({
   entries,

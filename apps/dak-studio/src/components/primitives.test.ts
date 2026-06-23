@@ -1,7 +1,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { MetricInfo } from "./primitives";
+import { MetricInfo } from "@cs2dak/react";
 
 describe("MetricInfo", () => {
   it("没有说明内容时不渲染空信息按钮", () => {

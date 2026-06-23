@@ -2,7 +2,7 @@ import { FolderOpen, Play, RotateCw, Tag as TagIcon, Trash2 } from "lucide-react
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { entryDate, type StudioDemoEntry } from "../lib/library";
 import { parseTags } from "../lib/tags";
-import { EmptyState } from "../components/primitives";
+import { EmptyState } from "@cs2dak/react";
 
 export interface LibraryViewProps {
   entries: StudioDemoEntry[];

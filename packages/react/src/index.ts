@@ -8,6 +8,7 @@ export { QaReportPanel } from "./components/QaReportPanel";
 export { SeasonLeaderboard } from "./components/SeasonLeaderboard";
 export { TeamComparisonPanel } from "./components/TeamComparisonPanel";
 export { Pagination } from "./components/Pagination";
+export { EmptyState, EvidenceLink, MetricInfo } from "./components/Primitives";
 export {
   DataTable,
   STUDIO_TABLE_CLASSES,

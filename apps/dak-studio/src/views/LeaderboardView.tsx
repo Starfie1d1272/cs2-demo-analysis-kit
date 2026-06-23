@@ -4,7 +4,7 @@ import { SeasonLeaderboard } from "@cs2dak/react";
 import { getSeasonSummary, type IdentityOptions } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
-import { EmptyState } from "../components/primitives";
+import { EmptyState } from "@cs2dak/react";
 
 export interface LeaderboardViewProps {
   allEntries: StudioDemoEntry[];

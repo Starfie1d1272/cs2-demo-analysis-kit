@@ -68,7 +68,7 @@ describe("PatternExplorer", () => {
     expect(html).toContain("匪口（深入）");
     expect(html).toContain("常见进点路线");
     expect(html).toContain("覆盖 1/1（100.0%）");
-    expect(html).toContain("stu-info-tip");
+    expect(html).toContain("dak-info-tip");
     expect(html).not.toContain("胜回合站位");
     expect(html).not.toContain("▶ 回放");
     expect(html).not.toContain("88s");

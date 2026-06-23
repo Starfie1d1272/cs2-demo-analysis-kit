@@ -7,7 +7,7 @@ import type { EconomyEntry } from "@cs2dak/cohort";
 import { autoName, type TacticalCluster } from "../../lib/tactics.js";
 import { getFactsStore, type TacticalRoundFact } from "../../lib/facts.js";
 import { loadMatchWorkspaceModel, type StudioDemoEntry } from "../../lib/library.js";
-import { MetricInfo, EvidenceLink } from "../../components/primitives.js";
+import { MetricInfo, EvidenceLink } from "@cs2dak/react";
 import { Pagination } from "../../components/Pagination.js";
 
 export interface PatternExplorerProps {

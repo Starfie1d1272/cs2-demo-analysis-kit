@@ -7,7 +7,7 @@ import type { IdentityOptions } from "../lib/season";
 import { getPinnedPlayer } from "../lib/pin";
 import { getFactsStore } from "../lib/facts";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
-import { EmptyState } from "../components/primitives";
+import { EmptyState } from "@cs2dak/react";
 
 /**
  * 开局动线：选手在长枪局开局前 N 秒的走位 + 道具投掷叠加动画。

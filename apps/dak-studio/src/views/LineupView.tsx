@@ -8,7 +8,7 @@ import {
   type LineupGrenadeLike,
 } from "@cs2dak/maps";
 import { displayWeaponName } from "@cs2dak/presentation";
-import { EmptyState, MetricInfo, EvidenceLink } from "../components/primitives";
+import { EmptyState, MetricInfo, EvidenceLink } from "@cs2dak/react";
 import { Pagination } from "../components/Pagination";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { mapDisplayName } from "../lib/series";

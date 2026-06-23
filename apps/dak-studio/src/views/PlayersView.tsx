@@ -13,7 +13,7 @@ import { getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
-import { EmptyState, EvidenceLink, MetricInfo } from "../components/primitives";
+import { EmptyState, EvidenceLink, MetricInfo } from "@cs2dak/react";
 
 export interface PlayersViewProps {
   allEntries: StudioDemoEntry[];

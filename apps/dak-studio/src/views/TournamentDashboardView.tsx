@@ -4,7 +4,7 @@ import { DataTable, STUDIO_TABLE_CLASSES, TeamComparisonPanel, type DataTableCol
 import { getTeamComparison, getTournamentInsights, type IdentityOptions } from "../lib/season";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
-import { EmptyState, MetricInfo } from "../components/primitives";
+import { EmptyState, MetricInfo } from "@cs2dak/react";
 
 export interface TournamentDashboardViewProps {
   allEntries: StudioDemoEntry[];

@@ -5,7 +5,7 @@ import type { PlayerSeasonInsights } from "@cs2dak/presentation";
 import { getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, type PinnedPlayer } from "../lib/pin";
-import { EmptyState, EvidenceLink, MetricInfo } from "../components/primitives";
+import { EmptyState, EvidenceLink, MetricInfo } from "@cs2dak/react";
 
 export interface HomeViewProps {
   entries: StudioDemoEntry[];

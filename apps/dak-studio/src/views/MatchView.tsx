@@ -6,7 +6,7 @@ import { MatchWorkspace, QaReportPanel } from "@cs2dak/react";
 import { entryDate, loadMatchWorkspaceModel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getFactsStore } from "../lib/facts";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
-import { EmptyState } from "../components/primitives";
+import { EmptyState } from "@cs2dak/react";
 import { SeriesWorkspace } from "./SeriesWorkspace";
 
 export interface MatchViewProps {

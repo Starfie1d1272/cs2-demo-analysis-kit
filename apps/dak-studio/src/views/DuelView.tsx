@@ -3,7 +3,7 @@ import type { DuelFinderRow, DuelInsightsModel, PlayerMechanicsRow } from "@cs2d
 import { displayWeaponName, duelClassificationLabel } from "@cs2dak/presentation";
 import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
-import { EmptyState, MetricInfo } from "../components/primitives";
+import { EmptyState, MetricInfo } from "@cs2dak/react";
 import { displayTeamName } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getDuelInsights, type IdentityOptions } from "../lib/season";

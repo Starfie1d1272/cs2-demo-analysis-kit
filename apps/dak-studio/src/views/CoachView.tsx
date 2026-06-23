@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
-import { EmptyState } from "../components/primitives";
+import { EmptyState } from "@cs2dak/react";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getFactsStore, TACTICAL_FACT_VERSION, type TacticalRoundFact } from "../lib/facts";

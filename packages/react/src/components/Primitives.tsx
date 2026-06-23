@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
 
 /**
- * Tactical Slate 公共原语（docs/design-language.md §3/§4）。
- * 所有视图的空态、证据跳转与 ⓘ 口径说明必须经由本文件，禁止视图私有实现。
+ * 产品中立原语（docs/design-language.md §3/§4）。
+ * 所有产品的空态、证据跳转与 ⓘ 口径说明必须经由本文件，禁止各自私有实现。
  */
 
-/** 空态三件套：empty（无数据）/ insufficient（数据不足）/ error（失败）。加载中用 stu-loading。 */
+/** 空态三件套：empty（无数据）/ insufficient（数据不足）/ error（失败）。加载中用 dak-loading。 */
 export function EmptyState({
   variant = "empty",
   title,
@@ -22,8 +22,8 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className={`stu-empty stu-empty-${variant}`}>
-      {mark && <div className="stu-empty-mark">⌖</div>}
+    <div className={`dak-empty dak-empty-${variant}`}>
+      {mark && <div className="dak-empty-mark">⌖</div>}
       <h2>{title}</h2>
       {hint != null && <p>{hint}</p>}
       {action}
@@ -45,7 +45,7 @@ export function EvidenceLink({
   children: ReactNode;
 }) {
   return (
-    <button type="button" className="stu-evidence" disabled={disabled} onClick={onOpen} title={hint}>
+    <button type="button" className="dak-evidence" disabled={disabled} onClick={onOpen} title={hint}>
       {children}
     </button>
   );
@@ -55,8 +55,8 @@ export function EvidenceLink({
 export function MetricInfo({ note }: { note?: ReactNode }) {
   if (note == null || note === false || (typeof note === "string" && note.trim().length === 0)) return null;
   return (
-    <span className="stu-info" tabIndex={0} aria-label="口径说明">
-      ⓘ<span className="stu-info-tip" role="tooltip">{note}</span>
+    <span className="dak-info" tabIndex={0} aria-label="口径说明">
+      ⓘ<span className="dak-info-tip" role="tooltip">{note}</span>
     </span>
   );
 }
