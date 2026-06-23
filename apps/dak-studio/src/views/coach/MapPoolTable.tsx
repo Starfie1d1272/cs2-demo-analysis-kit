@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { autoName, buildTacticalClusters, withTacticalTeamIdentities, type TacticalCluster } from "../../lib/tactics.js";
+import { autoName, buildTacticalClusters, withTacticalTeamIdentities } from "../../lib/tactics.js";
 import type { TacticalRoundFact } from "../../lib/facts.js";
-import type { StudioDemoEntry } from "../../lib/library.js";
 import { displayTeamName } from "../../lib/identity.js";
 import { listMapPoolNotes, saveMapPoolNote } from "../../lib/series.js";
 
 export interface MapPoolTableProps {
-  clusters: TacticalCluster[];
   facts: TacticalRoundFact[];
-  entries: StudioDemoEntry[];
   myTeamName: string | null;
   opponentTeamName: string | null;
   teamRenames?: Record<string, string>;

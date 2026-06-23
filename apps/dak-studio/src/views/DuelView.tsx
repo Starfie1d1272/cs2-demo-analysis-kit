@@ -647,22 +647,6 @@ function OpeningDuelMap({
   );
 }
 
-function explainDuelRow(row: DuelFinderRow): string {
-  if (row.thirdParty) return "补枪：第三方在 ±2s 窗口内对受害者造成了关键伤害，TTK 不计入完整分布。";
-  if (row.hpBucket === "low_hp") {
-    const killer = row.killerHealthBefore == null ? "己方血量未知" : `己方 ${row.killerHealthBefore} HP`;
-    return `低血量对决：交手时受害者 ${row.victimHealthBefore} HP，${killer}；保留证据但不计入 full HP TTK。`;
-  }
-  if (row.ttkMs === 0 && row.oneShotKill) {
-    return row.classification === "contested_duel"
-      ? "0ms 表示击杀者这一组第一枪就是致命伤；对手在判定窗口内有开枪或伤害，所以仍归为正面对枪。"
-      : "0ms 表示击杀者这一组第一枪就是致命伤。";
-  }
-  if (row.classification === "caught_off_guard") return "侧背身击杀：对手未面向、转点或跑动中被击杀。";
-  if (row.classification === "suppressed_kill") return "先手压制击杀：对手面向击杀者，但未在窗口内开枪。";
-  return "对枪胜出：受害者在 ±1.5s 内还手。";
-}
-
 /** 主数值：null 显示 —，否则保留一位小数加单位。 */
 function formatMetricValue(metric: PlayerMechanicsRow["metrics"][number]): string {
   if (metric.value == null) return "—";
