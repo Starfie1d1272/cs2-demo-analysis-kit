@@ -724,79 +724,6 @@ body {
   color: var(--dak-danger);
 }
 
-.stu-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 80px 24px;
-  border: 1px dashed var(--dak-border-hi);
-  border-radius: var(--stu-radius);
-  text-align: center;
-}
-
-.stu-empty-mark {
-  font-size: 34px;
-  color: var(--dak-accent);
-}
-
-.stu-empty h2 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.stu-empty p {
-  margin: 0;
-  max-width: 460px;
-  color: var(--dak-fg-mid);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.stu-empty-error h2 {
-  color: var(--dak-danger);
-}
-
-/* ⓘ 口径说明（MetricInfo 原语） */
-.stu-info {
-  position: relative;
-  display: inline-block;
-  margin-left: 4px;
-  color: var(--dak-fg-dim);
-  font-size: 11px;
-  cursor: help;
-}
-
-.stu-info-tip {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 6px);
-  transform: translateX(-50%) translateY(2px);
-  z-index: 30;
-  width: max-content;
-  max-width: 300px;
-  padding: 8px 10px;
-  border: 1px solid var(--dak-border);
-  border-radius: var(--stu-radius-sm);
-  background: var(--dak-bg-subtle);
-  color: var(--dak-fg);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, .35);
-  font-size: 12px;
-  line-height: 1.45;
-  white-space: normal;
-  text-transform: none;
-  letter-spacing: normal;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .12s ease, transform .12s ease;
-}
-
-.stu-info:hover .stu-info-tip,
-.stu-info:focus-visible .stu-info-tip {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
 /* ── 我的主页 ───────────────────────────────────────────── */
 
 .stu-home-head {
@@ -1620,24 +1547,6 @@ td.stu-heat-cell.stu-heat-neutral {
   background: transparent;
 }
 
-.stu-sort-header {
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.stu-sort-header:hover {
-  color: var(--dak-fg);
-}
-
-.stu-sort-header-active {
-  color: var(--dak-fg);
-  font-weight: 700;
-}
-
 .stu-trend {
   display: flex;
   align-items: flex-end;
@@ -2304,26 +2213,6 @@ td.stu-heat-cell.stu-heat-neutral {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 8px;
-}
-
-.stu-evidence {
-  background: var(--dak-panel);
-  border: 1px solid var(--dak-border);
-  border-radius: var(--stu-radius-sm);
-  color: var(--dak-accent);
-  font-size: 12px;
-  padding: 4px 8px;
-  cursor: pointer;
-}
-
-.stu-evidence:hover:not(:disabled) {
-  border-color: var(--dak-border-hi);
-  background: var(--dak-panel-hi);
-}
-
-.stu-evidence:disabled {
-  opacity: 0.45;
-  cursor: default;
 }
 
 .stu-radar {
