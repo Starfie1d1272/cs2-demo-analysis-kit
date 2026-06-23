@@ -135,6 +135,19 @@ export function EventManager({
                 <td>{total > 0 ? `${linked} / ${total}` : "—"}</td>
                 <td>{sourceLabel(event.source)}{event.readOnly ? " · 只读" : ""}</td>
                 <td>
+                  {(() => {
+                    // r2 赛事可从 live manifest 按 slug 一键重新拉取（demo 被删/换机后补齐）。
+                    const slug = event.id.replace(/^event:/, "");
+                    const asset = manifest?.events.find((a) => a.slug === slug);
+                    return asset ? (
+                      <>
+                        <button type="button" className="stu-button-sm" disabled={busySlug != null} onClick={() => downloadOnline(asset)}>
+                          {busySlug === asset.slug ? "拉取中…" : "重新拉取"}
+                        </button>
+                        {" "}
+                      </>
+                    ) : null;
+                  })()}
                   <button type="button" className="stu-button-sm" onClick={() => {
                     if (!window.confirm(`移除赛事「${event.name}」的组织记录？\n\ndemo 档案会保留在资料库，可重新建立赛事。`)) return;
                     void deleteEventRecord(event).then(async () => { setEvents(await listEventRecords()); setSeries(await listSeriesRecords()); onNotice(`已移除赛事「${event.name}」（demo 保留）`); });
