@@ -30,7 +30,15 @@
       {
         "stage": "Stage3",
         "distribution": "builtin",
-        "excludePairs": [],
+        "excludePairs": [
+          "9z|furia",
+          "aurora|betboom",
+          "g2|spirit",
+          "falcons|vitality",
+          "aurora|furia",
+          "falcons|spirit",
+          "falcons|furia"
+        ],
         "sources": [
           "fixtures/demos/pro/IEM-Cologne-Major-2026/_src/iem-cologne-major-2026-*-bo*.rar"
         ]
@@ -38,7 +46,15 @@
       {
         "stage": "Playoff",
         "distribution": "builtin",
-        "pairs": [],
+        "pairs": [
+          "9z|furia",
+          "aurora|betboom",
+          "g2|spirit",
+          "falcons|vitality",
+          "aurora|furia",
+          "falcons|spirit",
+          "falcons|furia"
+        ],
         "sources": [
           "fixtures/demos/pro/IEM-Cologne-Major-2026/_src/iem-cologne-major-2026-*-bo*.rar"
         ]
@@ -1729,16 +1745,31 @@
       "key": "s2-r1-m3",
       "stage": "stage2",
       "round": 1,
-      "entryRound": "0-0",
+      "entryRound": "0-2",
       "format": "bo1",
       "status": "finished",
       "teamA": "B8",
       "teamB": "FUT",
       "bp": [
         [
+          "teamB",
+          "ban",
+          "Inferno"
+        ],
+        [
           "teamA",
           "ban",
           "Anubis"
+        ],
+        [
+          "teamB",
+          "pick",
+          "Dust2"
+        ],
+        [
+          "teamA",
+          "pick",
+          "Mirage"
         ],
         [
           "teamA",
@@ -1747,21 +1778,6 @@
         ],
         [
           "teamB",
-          "ban",
-          "Inferno"
-        ],
-        [
-          "teamB",
-          "ban",
-          "Mirage"
-        ],
-        [
-          "teamB",
-          "ban",
-          "Dust2"
-        ],
-        [
-          "teamA",
           "ban",
           "Nuke"
         ],
@@ -2394,14 +2410,19 @@
       "teamB": "9z",
       "bp": [
         [
+          "teamB",
+          "ban",
+          "Anubis"
+        ],
+        [
           "teamA",
           "ban",
           "Inferno"
         ],
         [
           "teamB",
-          "ban",
-          "Anubis"
+          "pick",
+          "Overpass"
         ],
         [
           "teamA",
@@ -2409,19 +2430,14 @@
           "Mirage"
         ],
         [
-          "teamB",
-          "pick",
+          "teamA",
+          "ban",
           "Nuke"
         ],
         [
           "teamB",
           "ban",
           "Ancient"
-        ],
-        [
-          "teamA",
-          "ban",
-          "Overpass"
         ],
         [
           null,
@@ -2434,17 +2450,12 @@
       "key": "s2-r3-a2",
       "stage": "stage2",
       "round": 3,
-      "entryRound": "2-0",
+      "entryRound": "0-1",
       "format": "bo3",
       "status": "finished",
       "teamA": "FUT",
       "teamB": "G2",
       "bp": [
-        [
-          "teamA",
-          "ban",
-          "Inferno"
-        ],
         [
           "teamB",
           "ban",
@@ -2452,8 +2463,8 @@
         ],
         [
           "teamA",
-          "pick",
-          "Anubis"
+          "ban",
+          "Inferno"
         ],
         [
           "teamB",
@@ -2461,9 +2472,9 @@
           "Overpass"
         ],
         [
-          "teamB",
-          "ban",
-          "Mirage"
+          "teamA",
+          "pick",
+          "Ancient"
         ],
         [
           "teamA",
@@ -2471,9 +2482,14 @@
           "Dust2"
         ],
         [
+          "teamB",
+          "ban",
+          "Anubis"
+        ],
+        [
           null,
           "decider",
-          "Ancient"
+          "Mirage"
         ]
       ]
     },
@@ -4979,32 +4995,32 @@
       "teamB": "Falcons",
       "bp": [
         [
-          "teamA",
+          "teamB",
           "ban",
           "Overpass"
         ],
         [
-          "teamB",
+          "teamA",
           "ban",
           "Inferno"
         ],
         [
-          "teamA",
+          "teamB",
           "pick",
           "Anubis"
         ],
         [
-          "teamB",
+          "teamA",
           "pick",
           "Mirage"
         ],
         [
-          "teamB",
+          "teamA",
           "ban",
           "Ancient"
         ],
         [
-          "teamA",
+          "teamB",
           "ban",
           "Nuke"
         ],
