@@ -53,6 +53,7 @@ const entry = {
   sha256,
   urls: [`${publicBase.replace(/\/$/, "")}/events/${slug}/${assetName}`],
   packageVersion: packageJson.version,
+  ...(packageJson.event.group ? { group: packageJson.event.group } : {}),
 };
 const manifestPath = join(output, "manifest.json");
 let manifest = { version: "cs2-demo-analysis-kit/events-manifest-1.0", generatedAt: new Date().toISOString(), events: [] };

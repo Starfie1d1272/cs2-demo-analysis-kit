@@ -73,6 +73,7 @@ export const eventPackageSchema = z.object({
     name: z.string().min(1),
     kind: z.string().min(1),
     sourceUrl: z.string().url().optional(), // 赛事来源页（如 HLTV results 页），展示层可链回
+    group: z.string().optional(), // 共享归组键：同一赛事按 stage 拆多包时共用，Gallery 折叠
     stages: z.array(eventStageSchema).default([]),
   }),
   teams: z.array(eventTeamSchema),
