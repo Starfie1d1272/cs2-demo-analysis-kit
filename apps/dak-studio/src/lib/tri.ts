@@ -48,6 +48,27 @@ async function fetchTriBuffer(mapName: string): Promise<ArrayBuffer | null> {
   return isValidTriBuffer(buffer) ? buffer : null;
 }
 
+/** 已持久化（blob 命名空间）的 .tri 地图名列表；用于资产管理的"已装/缺失"矩阵。 */
+export async function listInstalledTris(): Promise<string[]> {
+  try {
+    return (await triStore.keys()).sort();
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 浏览器/dev 端安装一张 .tri 到 blob 命名空间（资产管理"补全缺失"用）。
+ * 校验字节合法后落库，并清掉该图的会话内 BVH 缓存，使下次分析重建。
+ * @returns 是否成功写入。
+ */
+export async function installTriBuffer(mapName: string, buffer: ArrayBuffer): Promise<boolean> {
+  if (!isValidTriBuffer(buffer)) return false;
+  await writeTriBuffer(mapName, buffer);
+  bvhCache.delete(mapName);
+  return true;
+}
+
 export function loadMapTri(mapName: string): Promise<TriangleBvh | null> {
   const cached = bvhCache.get(mapName);
   if (cached) return cached;

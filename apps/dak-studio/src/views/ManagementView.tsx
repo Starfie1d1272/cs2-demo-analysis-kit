@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { SeasonCohortBundle } from "@cs2dak/contract";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState } from "@cs2dak/react";
-import { LibraryMaintenance } from "../components/LibraryMaintenance";
+import { AssetsPanel } from "../components/AssetsPanel";
 import { EventManager } from "../components/EventManager";
 import type { BuiltinEvent } from "../lib/builtin-events";
 import { getSeasonSummary, type IdentityOptions } from "../lib/season";
@@ -56,6 +56,7 @@ export function ManagementView({
   onLibraryChanged,
   onLoadBuiltin
 }: ManagementViewProps) {
+  const [tab, setTab] = useState<"identity" | "assets" | "events">("identity");
   const [bundle, setBundle] = useState<SeasonCohortBundle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -238,43 +239,51 @@ export function ManagementView({
     }
   }
 
-  // 资料库维护 + 赛事资产/制作器：与选手数据无关，空库也要可达（备份/恢复、导入赛事包）。
-  const toolsSection = (
-    <>
-      <LibraryMaintenance onNotice={onNotice} />
-      <EventManager entries={allEntries} onNotice={onNotice} onLibraryChanged={onLibraryChanged} onLoadBuiltin={onLoadBuiltin} />
-    </>
-  );
-
-  if (allEntries.length === 0) {
-    return (
-      <div className="stu-view">
-        <header className="stu-view-header">
-          <div>
-            <h1>管理</h1>
-            <p className="stu-view-sub">资料库维护 · 赛事资产 · 制作器</p>
-          </div>
-        </header>
-        {toolsSection}
-        <EmptyState
-          mark
-          title="还没有选手数据"
-          hint="先导入几场 demo，才能管理选手身份。"
-          action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
-        />
-      </div>
-    );
-  }
+  const MGMT_TABS = [
+    { key: "identity" as const, label: "身份" },
+    { key: "assets" as const, label: "资产" },
+    { key: "events" as const, label: "赛事" },
+  ];
 
   return (
     <div className="stu-view">
       <header className="stu-view-header">
         <div>
           <h1>管理</h1>
-          <p className="stu-view-sub">选手身份归并 · 别名 · 队伍改名 · 资料库维护 · 赛事资产</p>
+          <p className="stu-view-sub">选手与队伍身份 · 资产与存储 · 赛事</p>
         </div>
       </header>
-      {toolsSection}
+      <div className="stu-subtabs" role="tablist" aria-label="管理分区">
+        {MGMT_TABS.map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            className={tab === key ? "stu-subtab stu-subtab-active" : "stu-subtab"}
+            onClick={() => setTab(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "assets" && (
+        <AssetsPanel entries={allEntries} onLibraryChanged={onLibraryChanged} onNotice={onNotice} />
+      )}
+      {tab === "events" && (
+        <EventManager entries={allEntries} onNotice={onNotice} onLibraryChanged={onLibraryChanged} onLoadBuiltin={onLoadBuiltin} />
+      )}
+      {tab === "identity" && allEntries.length === 0 && (
+        <EmptyState
+          mark
+          title="还没有选手数据"
+          hint="先导入几场 demo，才能管理选手身份。"
+          action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
+        />
+      )}
+      {tab === "identity" && allEntries.length > 0 && (
+        <>
       <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />
       <div className="stu-view-body stu-mgmt-layout">
         {/* ── 选手身份 ── */}
@@ -534,6 +543,8 @@ export function ManagementView({
           </div>
         )}
       </section>
+        </>
+      )}
     </div>
   );
 }

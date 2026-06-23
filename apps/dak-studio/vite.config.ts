@@ -1,4 +1,4 @@
-import { createReadStream, createWriteStream, readFileSync } from "node:fs";
+import { createReadStream, createWriteStream, existsSync, readFileSync } from "node:fs";
 import { mkdtemp, rm, stat, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
@@ -78,6 +78,41 @@ function demExportPlugin(): Plugin {
   };
 }
 
+/**
+ * dev 模式的 .tri 资产代理：把 `/tris/<map>.tri` 与 `/tris/manifest.json` 落到本地 public/ 时
+ * 直接交给 Vite 静态服务（next()），否则服务端代理 R2（dakupdate.starfie1d.top/tris）。
+ *
+ * 浏览器直连 R2 会被 CORS 拦截（该域未配 Access-Control-Allow-Origin），服务端 fetch 不受限。
+ * 这同时让普通分析的 `./tris/<map>.tri` 在 dev 下也按需自动补全，与打包版 Python 静态服务行为一致。
+ */
+function trisProxyPlugin(): Plugin {
+  const R2_TRIS = "https://dakupdate.starfie1d.top/tris";
+  const PUBLIC_TRIS = resolve(__dirname, "public/tris");
+  return {
+    name: "cs2dak-tris-proxy",
+    configureServer(server) {
+      server.middlewares.use("/tris/", (req, res, next) => {
+        const fileName = basename(new URL(req.url ?? "", "http://localhost").pathname);
+        const isTri = fileName.endsWith(".tri");
+        const isManifest = fileName === "manifest.json";
+        if (!isTri && !isManifest) { next(); return; }
+        if (existsSync(join(PUBLIC_TRIS, fileName))) { next(); return; } // 本地优先
+        void (async () => {
+          const upstream = await fetch(`${R2_TRIS}/${fileName}`);
+          if (!upstream.ok) { res.statusCode = upstream.status; res.end(); return; }
+          const buf = Buffer.from(await upstream.arrayBuffer());
+          res.writeHead(200, {
+            "Content-Type": isManifest ? "application/json" : "application/octet-stream",
+            "Content-Length": buf.length,
+            "Cache-Control": "no-cache",
+          });
+          res.end(buf);
+        })().catch(() => { if (!res.headersSent) res.statusCode = 502; res.end(); });
+      });
+    },
+  };
+}
+
 export default defineConfig({
   base: "./",
   define: {
@@ -86,7 +121,7 @@ export default defineConfig({
       (JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")) as { version: string }).version
     ),
   },
-  plugins: [react(), demExportPlugin()],
+  plugins: [react(), demExportPlugin(), trisProxyPlugin()],
   server: {
     port: 5178,
   },
