@@ -354,10 +354,10 @@ export function EventPackageMaker({ onNotice }: { onNotice: (message: string) =>
       {vetoRow && <VetoInputDialog seriesId={vetoRow.key} teamAName={vetoRow.teamAName} teamBName={vetoRow.teamBName} initialFormat={vetoRow.format} initialVeto={vetoRow.veto} onClose={() => setEditingVeto(null)} onSave={(veto: SeriesVeto) => patchSeries(vetoRow.key, { veto, format: veto.format })} />}
 
       <details className="stu-card" style={{ marginTop: "1em" }}>
-        <summary className="stu-muted">高级：从 HLTV 批量爬取赛事</summary>
-        <p className="stu-muted">适用于主办方 / 高级用户从 HLTV 批量获取完整赛事数据（比赛列表 → 下载 demo → 提取 BP → 出包），全部在命令行完成。需要 Node.js + Chrome 浏览器。</p>
+        <summary className="stu-muted">高级：从 HLTV 批量制作赛事包</summary>
+        <p className="stu-muted">适合有命令行基础的用户（Node.js + 终端）批量下载 HLTV 比赛 demo、自动提取 BP、生成完整 event-package。不会命令行？到 <a href="https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues" target="_blank" rel="noreferrer">GitHub Issues</a> 提赛事名 + HLTV 链接，等维护者做完上传即可。</p>
         <p className="stu-muted">
-          <a href="https://github.com/Starfie1d1272/cs2-demo-analysis-kit/tree/main/scripts/hltv" target="_blank" rel="noreferrer">📖 查看完整教程与脚本 →</a>
+          <a href="https://github.com/Starfie1d1272/cs2-demo-analysis-kit/tree/main/scripts/hltv" target="_blank" rel="noreferrer">📖 查看完整教程（macOS / Windows 均适用）→</a>
         </p>
       </details>
     </details>
