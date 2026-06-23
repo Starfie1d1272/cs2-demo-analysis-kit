@@ -207,12 +207,17 @@ class SimpleInstaller:
             if self.cancelled:
                 return
 
-            # 3. Extract runtime
+            # 3. Extract runtime & resolve app root (where dak-studio.exe lives)
             self._update("解压运行时…", 50)
             self._extract_runtime(runtime_dest, install_dir)
+            app_root = self._app_root(install_dir)
+            if not app_root:
+                raise RuntimeError("解压后未找到 dak-studio.exe，安装包可能不完整")
+            self._launch_exe = os.path.join(app_root, "dak-studio.exe")
 
-            # 4. Download bundled events
-            bundled_dir = os.path.join(install_dir, "userdata", "bundled-events")
+            # 4. Download bundled events → app_root/userdata/
+            userdata = os.path.join(app_root, "userdata")
+            bundled_dir = os.path.join(userdata, "bundled-events")
             os.makedirs(bundled_dir, exist_ok=True)
             for idx, evt in enumerate(events):
                 if self.cancelled:
@@ -233,8 +238,8 @@ class SimpleInstaller:
             with open(os.path.join(bundled_dir, "manifest.json"), "w", encoding="utf-8") as f:
                 json.dump(events_manifest, f, ensure_ascii=False, indent=2)
 
-            # 5. Download required tris
-            tris_dir = os.path.join(install_dir, "userdata", "tris")
+            # 5. Download required tris → app_root/userdata/tris/
+            tris_dir = os.path.join(userdata, "tris")
             os.makedirs(tris_dir, exist_ok=True)
             tri_count = len(tris)
             for idx, (map_name, entry) in enumerate(tris.items()):
@@ -244,25 +249,22 @@ class SimpleInstaller:
                 dest = os.path.join(tris_dir, entry.get("name", f"{map_name}.tri"))
                 self._download_asset(entry, dest, map_name)
 
-            # 6. Write install-manifest.json
+            # 6. Write install-manifest.json → app_root/userdata/
             self._update("写入安装清单…", 95)
-            with open(os.path.join(install_dir, "userdata", "install-manifest.json"), "w", encoding="utf-8") as f:
+            with open(os.path.join(userdata, "install-manifest.json"), "w", encoding="utf-8") as f:
                 json.dump(manifest, f, ensure_ascii=False, indent=2)
 
-            # 7. Create shortcuts (Windows only)
-            if sys.platform == "win32":
+            # 7. Create shortcuts (Windows only) — use resolved app_root exe
+            if sys.platform == "win32" and self._launch_exe:
                 self._update("创建快捷方式…", 97)
-                exe_path = self._find_exe(install_dir)
-                if exe_path:
-                    start_menu = os.path.join(os.environ.get("APPDATA", ""), "Microsoft", "Windows", "Start Menu", "Programs")
-                    shortcut_dir = os.path.join(start_menu, "DAK Studio")
-                    os.makedirs(shortcut_dir, exist_ok=True)
-                    create_shortcut(exe_path, os.path.join(shortcut_dir, "DAK Studio.lnk"), "DAK Studio 战术分析工作台")
+                start_menu = os.path.join(os.environ.get("APPDATA", ""), "Microsoft", "Windows", "Start Menu", "Programs")
+                shortcut_dir = os.path.join(start_menu, "DAK Studio")
+                os.makedirs(shortcut_dir, exist_ok=True)
+                create_shortcut(self._launch_exe, os.path.join(shortcut_dir, "DAK Studio.lnk"), "DAK Studio 战术分析工作台")
 
             # Done
             self._update("安装完成！", 100)
             self.root.after(0, lambda: self._set_ui_state(installing=False, done=True))
-            self._launch_exe = self._find_exe(install_dir)
 
         except Exception as exc:
             self._update(f"安装失败：{exc}", 0)
@@ -341,16 +343,24 @@ class SimpleInstaller:
         #   install_dir/dak-studio/...
 
     @staticmethod
-    def _find_exe(install_dir: str) -> str | None:
-        """在安装目录树中查找 dak-studio.exe。"""
+    def _app_root(install_dir: str) -> str | None:
+        """解压 runtime zip 后找到 dak-studio.exe 所在目录。
+
+        runtime zip 内含一个顶层 onedir（如 dak-studio/），dak-studio.exe 在其中。
+        返回该目录的绝对路径，找不到则返回 None。
+        """
         for root, dirs, files in os.walk(install_dir):
             for f in files:
                 if f.lower() in ("dak-studio.exe", "dak studio.exe"):
-                    return os.path.join(root, f)
+                    return root
         return None
 
     def _launch(self):
-        exe = getattr(self, "_launch_exe", None) or self._find_exe(self.install_dir.get())
+        exe = getattr(self, "_launch_exe", None)
+        if not exe:
+            exe = self._app_root(self.install_dir.get())
+            if exe:
+                exe = os.path.join(exe, "dak-studio.exe")
         if exe and os.path.isfile(exe):
             subprocess.Popen([exe], cwd=os.path.dirname(exe))  # noqa: S603
         self.root.destroy()

@@ -95,25 +95,65 @@ function main() {
   });
   const appRoot = topDirs.length === 1 ? join(workDir, topDirs[0]) : workDir;
 
-  // 2. Copy bundled events
+  // 2. Copy bundled events — 扫描 dist/events/<slug>/<slug>.zip（与 R2 一致）
   if (bundledEventsDir && existsSync(bundledEventsDir)) {
     const destDir = join(appRoot, "userdata", "bundled-events");
     mkdirSync(destDir, { recursive: true });
-    const eventFiles = readdirSync(bundledEventsDir).filter((f) => f.endsWith(".zip"));
-    for (const f of eventFiles) {
-      const src = join(bundledEventsDir, f);
-      const dest = join(destDir, f);
+    const { readdirSync: rds } = require("node:fs");
+    const subdirs = rds(bundledEventsDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory());
+    const manifestEvents = [];
+    for (const dir of subdirs) {
+      const slug = dir.name;
+      const zipName = `${slug}.zip`;
+      const src = join(bundledEventsDir, slug, zipName);
+      if (!existsSync(src)) continue;
+      const dest = join(destDir, zipName);
       copyFileSync(src, dest);
-      console.error(`  bundled-event: ${f} (${(require("node:fs").statSync(src).size / 1024 / 1024).toFixed(1)} MB)`);
+      const size = statSync(src).size;
+      const hash = sha256(src);
+      console.error(`  bundled-event: ${slug} (${(size / 1024 / 1024).toFixed(1)} MB)`);
+      // 尝试从 event-package.json 读取名称
+      let displayName = slug;
+      try {
+        const { inflateRawSync: irs } = require("node:zlib");
+        const buf = readFileSync(src);
+        const needle = Buffer.from("event-package.json");
+        let idx = buf.indexOf(needle);
+        while (idx >= 0) {
+          const hs = idx - 26;
+          if (hs >= 0 && buf.readUInt32LE(hs) === 0x04034b50) {
+            const nl = buf.readUInt16LE(hs + 26), el = buf.readUInt16LE(hs + 28);
+            const ds = hs + 30 + nl + el;
+            const cs = buf.readUInt32LE(hs + 18);
+            const cm = buf.readUInt16LE(hs + 8);
+            if (cs > 0 && ds + cs <= buf.length) {
+              const raw = cm === 0 ? buf.subarray(ds, ds + cs).toString("utf-8") : irs(buf.subarray(ds, ds + cs)).toString("utf-8");
+              const pkg = JSON.parse(raw);
+              displayName = pkg.event?.name || slug;
+              break;
+            }
+          }
+          idx = buf.indexOf(needle, idx + 1);
+        }
+      } catch { /* fallback to slug */ }
+      manifestEvents.push({
+        slug,
+        name: displayName,
+        size,
+        sha256: hash,
+        urls: [`https://dakupdate.starfie1d.top/events/${slug}/${zipName}`],
+        packageVersion: "cs2-demo-analysis-kit/event-package-1.0",
+      });
     }
-    // Write manifest.json for bundled events
-    try {
-      const manifestFile = join(bundledEventsDir, "manifest.json");
-      if (existsSync(manifestFile)) {
-        copyFileSync(manifestFile, join(destDir, "manifest.json"));
-        console.error("  bundled-events/manifest.json");
-      }
-    } catch { /* optional */ }
+    // 写入本地 bundled-events manifest（供前端发现）
+    const beManifest = {
+      version: "cs2-demo-analysis-kit/events-manifest-1.0",
+      generatedAt: new Date().toISOString(),
+      events: manifestEvents,
+    };
+    writeFileSync(join(destDir, "manifest.json"), JSON.stringify(beManifest, null, 2));
+    console.error(`  bundled-events/manifest.json (${manifestEvents.length} events)`);
   }
 
   // 3. Copy required tris

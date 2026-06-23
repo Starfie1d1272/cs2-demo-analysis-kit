@@ -106,6 +106,38 @@ function await_import_zlib() {
 }
 
 function collectMapNames(pkg, out) {
+
+/** 从 event-package zip 读取完整 event-package.json 对象。
+ *  与 extractMapNamesFromEventZip 共用同一套 ZIP local file header 扫描逻辑。
+ */
+function readEventPackageJson(zipPath) {
+  const buf = readFileSync(zipPath);
+  const needle = Buffer.from("event-package.json");
+  let idx = buf.indexOf(needle);
+  while (idx >= 0) {
+    const headerStart = idx - 26;
+    if (headerStart >= 0 && buf.readUInt32LE(headerStart) === 0x04034b50) {
+      const nameLen = buf.readUInt16LE(headerStart + 26);
+      const extraLen = buf.readUInt16LE(headerStart + 28);
+      const dataStart = headerStart + 30 + nameLen + extraLen;
+      const compSize = buf.readUInt32LE(headerStart + 18);
+      const compMethod = buf.readUInt16LE(headerStart + 8);
+      if (compSize > 0 && dataStart + compSize <= buf.length) {
+        if (compMethod === 0) {
+          return JSON.parse(buf.subarray(dataStart, dataStart + compSize).toString("utf-8"));
+        }
+        try {
+          const compressed = buf.subarray(dataStart, dataStart + compSize);
+          return JSON.parse(inflateRawSync(compressed).toString("utf-8"));
+        } catch { /* fall through */ }
+      }
+    }
+    idx = buf.indexOf(needle, idx + 1);
+  }
+  throw new Error("event-package.json not found in zip");
+}
+
+function collectMapNames(pkg, out) {
   // event-package 结构：series[].maps[].mapName
   const series = pkg.series;
   if (!Array.isArray(series)) return;
@@ -155,32 +187,65 @@ function main() {
   };
   console.error(`runtime: ${runtimeName} (${(runtimeSize / 1024 / 1024).toFixed(1)} MB)`);
 
-  // 2. Bundled events
-  const eventFiles = readdirSync(eventPkgDir).filter((f) => f.endsWith(".zip")).sort();
+  // 2. Bundled events — 扫描 dist/events/<slug>/<slug>.zip（与 R2 路径一致）
   const bundledEvents = [];
-  for (const f of eventFiles) {
-    const full = `${eventPkgDir}/${f}`;
-    const slug = basename(f, ".zip");
-    const size = statSync(full).size;
-    const hash = sha256(full);
-    bundledEvents.push({
-      slug,
-      name: f,
-      size,
-      sha256: hash,
-      urls: [`${R2_BASE}/events/${slug}/${f}`],
-    });
-    console.error(`event:  ${slug} (${(size / 1024 / 1024).toFixed(1)} MB)`);
+  const subdirs = readdirSync(eventPkgDir, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .sort((a, b) => a.name.localeCompare(b.name));
+  for (const dir of subdirs) {
+    const slug = dir.name;
+    const zipName = `${slug}.zip`;
+    const full = `${eventPkgDir}/${slug}/${zipName}`;
+    try {
+      const st = statSync(full);
+      if (!st.isFile()) continue;
+      const size = st.size;
+      const hash = sha256(full);
+      // 从 event-package.json 读取真实名称/描述/分组
+      let displayName = slug;
+      let description = "";
+      let group = "";
+      try {
+        const pkg = readEventPackageJson(full);
+        displayName = pkg.event?.name || slug;
+        description = pkg.event?.description || "";
+        group = pkg.event?.group || "";
+      } catch {
+        // ZIP 内无 event-package.json 时退用 slug
+      }
+      bundledEvents.push({
+        slug,
+        name: displayName,
+        description: description || undefined,
+        group: group || undefined,
+        fileName: zipName,
+        size,
+        sha256: hash,
+        urls: [`${R2_BASE}/events/${slug}/${zipName}`],
+      });
+      console.error(`event:  ${slug} "${displayName}" (${(size / 1024 / 1024).toFixed(1)} MB)`);
+    } catch (err) {
+      console.error(`   ⚠ 跳过 ${slug}: ${err.message}`);
+    }
   }
 
-  // 3. Collect all map names from event packages
+  // 3. Collect all map names from event packages (use new nested path + JSON reader)
   const allMaps = new Set();
   for (const evt of bundledEvents) {
-    const full = `${eventPkgDir}/${evt.name}`;
-    const maps = extractMapNamesFromEventZip(full);
-    for (const m of maps) allMaps.add(m);
-    if (maps.length > 0) {
-      console.error(`  maps in ${evt.slug}: ${maps.join(", ")}`);
+    const full = `${eventPkgDir}/${evt.slug}/${evt.fileName}`;
+    try {
+      const pkg = readEventPackageJson(full);
+      const maps = [];
+      for (const s of (pkg.series || [])) {
+        for (const m of (s.maps || [])) {
+          if (m.mapName) { allMaps.add(m.mapName); maps.push(m.mapName); }
+        }
+      }
+      if (maps.length > 0) {
+        console.error(`  maps in ${evt.slug}: ${[...new Set(maps)].join(", ")}`);
+      }
+    } catch (err) {
+      console.error(`   ⚠ 读取 ${evt.slug} event-package 失败: ${err.message}`);
     }
   }
 
@@ -203,8 +268,10 @@ function main() {
       // 找出哪些 bundledEvents 需要此地图
       const requiredBy = bundledEvents
         .filter((evt) => {
-          const maps = extractMapNamesFromEventZip(`${eventPkgDir}/${evt.name}`);
-          return maps.includes(mapName);
+          try {
+            const pkg = readEventPackageJson(`${eventPkgDir}/${evt.slug}/${evt.fileName}`);
+            return (pkg.series || []).some((s) => (s.maps || []).some((m) => m.mapName === mapName));
+          } catch { return false; }
         })
         .map((e) => e.slug);
       requiredTris[mapName] = {
