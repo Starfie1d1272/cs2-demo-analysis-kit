@@ -140,7 +140,9 @@ jobs:
           # 生成 events manifest
           node scripts/build-event-asset.mjs --dir dist/events 2>/dev/null || true
 
-      # 0.7.0: 上传 event packages 到 R2（installer + health check repair 依赖）
+      # 0.7.0: 上传 event packages 到 R2（仅新增/更新的 zip，不覆盖 manifest）
+      # manifest 在 R2 上已有 Stage1/2 条目；新增 Stage3/Playoff 后需手动更新
+      # manifest 以包含全部 4 阶段，避免 CI 用不完整列表覆盖。
       - name: Upload event packages to R2
         if: runner.os == 'Windows'
         shell: bash
@@ -154,18 +156,14 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: |
           set -euo pipefail
-          # 先上传不可变 ZIP（--checksum-algorithm SHA256 匹配已有文件）
+          # 只同步不可变 ZIP（--size-only 跳过已存在且大小相同的），不碰 manifest.json。
+          # manifest 由手动 publish-event-assets 维护（包含全量赛事条目）。
           aws s3 sync dist/events "s3://${R2_BUCKET}/events/" \
             --endpoint-url "$R2_ENDPOINT" \
             --exclude "manifest.json" \
-            --checksum-algorithm SHA256 \
+            --size-only \
             --cache-control "public,max-age=31536000,immutable"
-          # 后上传短缓存 manifest（客户端尽快看到变化）
-          aws s3 cp dist/events/manifest.json "s3://${R2_BUCKET}/events/manifest.json" \
-            --endpoint-url "$R2_ENDPOINT" \
-            --checksum-algorithm SHA256 \
-            --cache-control "public,max-age=300"
-          echo "R2 events 同步完成：${R2_BUCKET}/events/"
+          echo "R2 events ZIP 同步完成（manifest 未更新）"
 
       # 0.7.0: 生成 install-manifest.json
       - name: Generate install manifest
