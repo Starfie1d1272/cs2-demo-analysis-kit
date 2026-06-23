@@ -81,6 +81,9 @@ export interface DataTableProps<T> {
   initialSortDirection?: SortDirection;
   /** 设置后启用分页。 */
   pageSize?: number;
+  /** 受控分页：外部指定当前页（用于 hover 联动等场景）。缺省走内部 state。 */
+  page?: number;
+  onPageChange?: (page: number) => void;
   paginationMaxButtons?: number;
   /** 分页信息文字生成器（接收行总数）。 */
   paginationInfo?: (total: number) => string;
@@ -100,6 +103,8 @@ export function DataTable<T>({
   initialSortKey,
   initialSortDirection = "desc",
   pageSize,
+  page,
+  onPageChange,
   paginationMaxButtons = 8,
   paginationInfo,
   onRowClick,
@@ -109,7 +114,10 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(initialSortKey ?? null);
   const [sortDesc, setSortDesc] = useState(initialSortDirection === "desc");
-  const [page, setPage] = useState(0);
+  const [internalPage, setInternalPage] = useState(0);
+  const controlled = page !== undefined;
+  const currentPage = controlled ? page : internalPage;
+  const setPage = controlled ? (onPageChange ?? (() => {})) : setInternalPage;
 
   function handleSort(key: string) {
     if (sortKey === key) setSortDesc((d) => !d);
@@ -139,7 +147,7 @@ export function DataTable<T>({
   }, [rows, columns, sortKey, sortDesc]);
 
   const totalPages = pageSize ? Math.max(1, Math.ceil(sortedRows.length / pageSize)) : 1;
-  const safePage = Math.min(page, totalPages - 1);
+  const safePage = Math.min(currentPage, totalPages - 1);
   const pageRows = pageSize
     ? sortedRows.slice(safePage * pageSize, (safePage + 1) * pageSize)
     : sortedRows;

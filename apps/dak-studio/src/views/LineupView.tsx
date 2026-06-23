@@ -8,8 +8,7 @@ import {
   type LineupGrenadeLike,
 } from "@cs2dak/maps";
 import { displayWeaponName } from "@cs2dak/presentation";
-import { EmptyState, MetricInfo, EvidenceLink } from "@cs2dak/react";
-import { Pagination } from "../components/Pagination";
+import { DataTable, STUDIO_TABLE_CLASSES, EmptyState, MetricInfo, EvidenceLink, type DataTableColumn } from "@cs2dak/react";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { mapDisplayName } from "../lib/series";
 import { getFactsStore } from "../lib/facts";
@@ -83,15 +82,8 @@ export function LineupView({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [sideFilter, setSideFilter] = useState<"t" | "ct" | null>(null);
-  const [sortKey, setSortKey] = useState<"count" | "winRate" | "demoCount">("count");
-  const [sortDesc, setSortDesc] = useState(true);
   const [page, setPage] = useState(0);
   const [radarTopN, setRadarTopN] = useState<TopNOption>(20);
-
-  function handleSort(key: typeof sortKey) {
-    if (sortKey === key) setSortDesc((d) => !d);
-    else { setSortKey(key); setSortDesc(true); }
-  }
 
   function handleClusterJump(cluster: LineupCluster) {
     const first = cluster.throws[0];
@@ -139,7 +131,6 @@ export function LineupView({
             grenades: group.grenades,
             roundWinners: group.winners,
             tickrate: group.tickrate,
-            // throwerTeam 不再传入；teamKey 已在 enrich 阶段预解析到每条 grenade 上
           });
           if (import.meta.env.DEV) {
             const counts = result.map((c) => c.count);
@@ -166,7 +157,7 @@ export function LineupView({
     };
   }, [entries]);
 
-  // ── 按地图分组 + 排序 + 类型筛选 + 分页 ──────────────────────────────────
+  // ── 按地图分组 + 类型筛选（排序交由 DataTable） ──────────────────────────
   const byMap = useMemo(() => {
     const groups = new Map<string, LineupCluster[]>();
     for (const cluster of clusters) {
@@ -177,18 +168,10 @@ export function LineupView({
     return [...groups.entries()]
       .map(([mapName, rows]) => {
         const filtered = typeFilter ? rows.filter((r) => r.grenade === typeFilter) : rows;
-        const sorted = [...filtered].sort((a, b) => {
-          const dir = sortDesc ? 1 : -1;
-          if (sortKey === "count") return (b.count - a.count) * dir;
-          if (sortKey === "demoCount") return (b.demoCount - a.demoCount) * dir;
-          const wa = a.winRatePercent ?? -1;
-          const wb = b.winRatePercent ?? -1;
-          return (wb - wa) * dir;
-        });
-        return { mapName, rows: sorted };
+        return { mapName, rows: filtered };
       })
       .sort((a, b) => b.rows.length - a.rows.length);
-  }, [clusters, typeFilter, sortKey, sortDesc]);
+  }, [clusters, typeFilter]);
 
   // ── 所有可用的 grenade 类型 ─────────────────────────────────────────────
   const availableTypes = useMemo(() => {
@@ -224,14 +207,11 @@ export function LineupView({
     );
   }
 
-  // ── 当前地图的分页数据（byMap 非空，current 安全） ───────────────────
+  // ── 当前地图数据（byMap 非空，current 安全） ─────────────────────────
   const current = byMap.find((group) => group.mapName === activeMap) ?? byMap[0]!;
   const sideFilteredRows = sideFilter
     ? current.rows.filter((r) => r.side === sideFilter)
     : current.rows;
-  const totalPages = Math.max(1, Math.ceil(sideFilteredRows.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages - 1);
-  const pageRows = sideFilteredRows.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
   const calibration = getMapCalibration(current.mapName);
   const radarSideFiltered = sideFilter
     ? current.rows.filter((r) => r.side === sideFilter)
@@ -241,6 +221,42 @@ export function LineupView({
   const radarClusters = selectedCluster && !radarRows.some((cluster) => cluster.id === selectedCluster.id)
     ? [...radarRows, selectedCluster]
     : radarRows;
+
+  const lineupColumns = useMemo<DataTableColumn<LineupCluster>[]>(() => [
+    {
+      key: "grenade", label: "道具",
+      render: (c) => <>
+        <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: GRENADE_COLOR[c.grenade] ?? "#888", marginRight: 6, verticalAlign: "middle" }} />
+        {GRENADE_LABEL[c.grenade] ?? displayWeaponName(c.grenade)}
+      </>
+    },
+    { key: "side", label: "方", format: (c) => c.side ? SIDE_LABEL[c.side] : "—" },
+    { key: "throwPlace", label: "投掷位", format: (c) => c.throwerPlaceName ? calloutName(c.mapName, c.throwerPlaceName) : "—" },
+    {
+      key: "effectPlace", label: "落点",
+      render: (c) => <span title={c.effectCalloutConfidence != null ? `confidence ${c.effectCalloutConfidence.toFixed(2)} · samples ${c.effectCalloutSamples ?? 0}` : undefined}>{c.effectCallout ? calloutName(c.mapName, c.effectCallout) : "—"}</span>,
+    },
+    { key: "time", label: "时间", format: (c) => c.throwTimeBucket ?? "—" },
+    { key: "rounds", label: "回合", format: (c) => `R${c.roundNumbers.slice(0, 3).join("/")}${c.roundNumbers.length > 3 ? "…" : ""}` },
+    { key: "count", label: "次数", numeric: true, sortable: true, sortValue: (c) => c.count, format: (c) => c.count },
+    { key: "demoCount", label: "场次", numeric: true, sortable: true, sortValue: (c) => c.demoCount, format: (c) => c.demoCount },
+    {
+      key: "winRate", label: <>胜率<MetricInfo note="该道具点位所在回合的本方胜率；样本小仅供参考" /></>, numeric: true, sortable: true,
+      sortValue: (c) => c.winRatePercent,
+      format: (c) => c.winRatePercent == null ? "—" : `${c.winRatePercent.toFixed(1)}%`,
+    },
+    {
+      key: "replay", label: "",
+      render: (c) => {
+        const firstThrow = c.throws[0];
+        return firstThrow ? (
+          <EvidenceLink hint="打开该场比赛复盘并定位该点位投掷" onOpen={() => onOpenMatch(c.entryIds[0] ?? "", { roundNumber: firstThrow.roundNumber, tick: firstThrow.tick })}>
+            回放
+          </EvidenceLink>
+        ) : null;
+      }
+    },
+  ], [onOpenMatch]);
 
   return (
     <div className="stu-lineup-layout">
@@ -385,14 +401,14 @@ export function LineupView({
                   <title>
                     {GRENADE_LABEL[cluster.grenade] ?? cluster.grenade} · ×{cluster.count} ·{" "}
                     {cluster.demoCount} 场 · 投掷位{" "}
-	                    {cluster.throwerPlaceName
-	                      ? calloutName(cluster.mapName, cluster.throwerPlaceName)
-	                      : "—"}{" "}
-	                    → 落点{" "}
-	                    {cluster.effectCallout
-	                      ? calloutName(cluster.mapName, cluster.effectCallout)
-	                      : "—"}{" "}
-	                    · 胜率{" "}
+                    {cluster.throwerPlaceName
+                      ? calloutName(cluster.mapName, cluster.throwerPlaceName)
+                      : "—"}{" "}
+                    → 落点{" "}
+                    {cluster.effectCallout
+                      ? calloutName(cluster.mapName, cluster.effectCallout)
+                      : "—"}{" "}
+                    · 胜率{" "}
                     {cluster.winRatePercent == null
                       ? "—"
                       : `${cluster.winRatePercent.toFixed(1)}%`}
@@ -435,105 +451,27 @@ export function LineupView({
         )}
       </div>
 
-      {/* ── 表格 + 分页 ──────────────────────────────────────────────── */}
+      {/* ── 表格（DataTable：受控分页 + rowProps hover 联动雷达） ──── */}
       <div className="stu-card">
         <h3>道具点位库 · {mapDisplayName(current.mapName)}</h3>
-        <Pagination
-          page={safePage}
-          totalPages={totalPages}
-          onChange={setPage}
-          info={`${sideFilteredRows.length} 条 · ${safePage + 1}/${totalPages} 页`}
+        <DataTable
+          classes={STUDIO_TABLE_CLASSES}
+          rows={sideFilteredRows}
+          rowKey={(c) => c.id}
+          initialSortKey="count"
+          pageSize={PAGE_SIZE}
+          page={page}
+          onPageChange={setPage}
+          paginationInfo={(total) => `${total} 条`}
+          rowProps={(cluster) => ({
+            className: hoveredId === cluster.id ? "stu-lineup-row-hovered" : "",
+            onMouseEnter: () => setHoveredId(cluster.id),
+            onMouseLeave: () => setHoveredId(null),
+            onFocus: () => setHoveredId(cluster.id),
+            onBlur: () => setHoveredId(null),
+          })}
+          columns={lineupColumns}
         />
-        <table className="stu-mini-table">
-          <thead>
-            <tr>
-              <th>道具</th>
-	              <th>方</th>
-	              <th>投掷位</th>
-	              <th>落点</th>
-	              <th>时间</th>
-              <th>回合</th>
-              <th className="stu-num stu-col-sortable" onClick={() => handleSort("count")}>
-                次数{sortKey === "count" ? (sortDesc ? " ↓" : " ↑") : ""}
-              </th>
-              <th className="stu-num stu-col-sortable" onClick={() => handleSort("demoCount")}>
-                场次{sortKey === "demoCount" ? (sortDesc ? " ↓" : " ↑") : ""}
-              </th>
-              <th className="stu-num stu-col-sortable" onClick={() => handleSort("winRate")}>
-                胜率<MetricInfo note="该道具点位所在回合的本方胜率；样本小仅供参考" />{sortKey === "winRate" ? (sortDesc ? " ↓" : " ↑") : ""}
-              </th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {pageRows.map((cluster) => {
-              const firstThrow = cluster.throws[0];
-	              const place = cluster.throwerPlaceName
-	                ? calloutName(cluster.mapName, cluster.throwerPlaceName)
-	                : null;
-	              const effectPlace = cluster.effectCallout
-	                ? calloutName(cluster.mapName, cluster.effectCallout)
-	                : null;
-	              const timeBucket = cluster.throwTimeBucket ?? null;
-
-              return (
-                <tr
-                  key={cluster.id}
-                  className={hoveredId === cluster.id ? "stu-lineup-row-hovered" : ""}
-                  onMouseEnter={() => setHoveredId(cluster.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  onFocus={() => setHoveredId(cluster.id)}
-                  onBlur={() => setHoveredId(null)}
-                >
-                  <td>
-                    <span
-                      style={{
-                        display: "inline-block",
-                        width: 10,
-                        height: 10,
-                        borderRadius: "50%",
-                        background: GRENADE_COLOR[cluster.grenade] ?? "#888",
-                        marginRight: 6,
-                        verticalAlign: "middle",
-                      }}
-                    />
-                    {GRENADE_LABEL[cluster.grenade] ?? displayWeaponName(cluster.grenade)}
-                  </td>
-	                  <td>{cluster.side ? SIDE_LABEL[cluster.side] : "—"}</td>
-	                  <td>{place ?? "—"}</td>
-	                  <td title={cluster.effectCalloutConfidence != null ? `confidence ${cluster.effectCalloutConfidence.toFixed(2)} · samples ${cluster.effectCalloutSamples ?? 0}` : undefined}>
-	                    {effectPlace ?? "—"}
-	                  </td>
-	                  <td>{timeBucket ?? "—"}</td>
-                  <td>
-                    R{cluster.roundNumbers.slice(0, 3).join("/")}
-                    {cluster.roundNumbers.length > 3 ? "…" : ""}
-                  </td>
-                  <td className="stu-num">{cluster.count}</td>
-                  <td className="stu-num">{cluster.demoCount}</td>
-                  <td className="stu-num">
-                    {cluster.winRatePercent == null ? "—" : `${cluster.winRatePercent.toFixed(1)}%`}
-                  </td>
-                  <td>
-                    {firstThrow && (
-                      <EvidenceLink
-                        hint="打开该场比赛复盘并定位该点位投掷"
-                        onOpen={() =>
-                          onOpenMatch(cluster.entryIds[0] ?? "", {
-                            roundNumber: firstThrow.roundNumber,
-                            tick: firstThrow.tick,
-                          })
-                        }
-                      >
-                        回放
-                      </EvidenceLink>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
       </div>
     </div>
   );
