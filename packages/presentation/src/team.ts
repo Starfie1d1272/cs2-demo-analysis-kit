@@ -149,25 +149,33 @@ export interface TeamComparisonPlayerRow {
   dpr: number | null;
 }
 
-export interface TeamComparisonEvidence {
+/** 该队某场比赛的概览（赛前侦察用，可点跳回放）。 */
+export interface TeamComparisonSideMatch {
   matchId: string;
-  roundNumber: number;
-  tick?: number;
-  label: string;
+  mapName: string;
+  opponent: string;
+  roundsWon: number;
+  roundsLost: number;
+  won: boolean;
 }
 
 export interface TeamComparisonSide {
   teamName: string;
+  matchCount: number;
   players: TeamComparisonPlayerRow[];
   weaponPreference: Array<{ weapon: string; label: string; kills: number; sharePercent: number }>;
   economyWinRate: Array<{ economyType: string; rounds: number; wins: number; winRatePercent: number | null }>;
+  /** 该队在 cohort 内打过的比赛（按场次自然序）。 */
+  matches: TeamComparisonSideMatch[];
 }
 
 export interface TeamComparisonModel {
-  version: "cs2-demo-analysis-kit/team-comparison-0.1";
+  /** 0.2：服务"赛前侦察"——两队各自跨全部己方比赛聚合，无需互相交手；去掉旧的噪声 evidence，改 per-team 比赛列表。 */
+  version: "cs2-demo-analysis-kit/team-comparison-0.2";
   teams: [TeamComparisonSide, TeamComparisonSide] | [];
   radar: Array<{ metric: string; label: string; a: number | null; b: number | null; delta: number | null }>;
-  evidence: TeamComparisonEvidence[];
+  /** cohort 内全部队伍（按场次降序），供 UI 选 A/B 两队。 */
+  availableTeams: Array<{ name: string; matches: number }>;
 }
 
 export interface TeamComparisonInput {
@@ -240,19 +248,62 @@ export function extractTeamComparisonFacts(input: TeamComparisonInput): TeamComp
   };
 }
 
-export function buildTeamComparisonFromFacts(inputs: TeamComparisonFacts[]): TeamComparisonModel {
-  const teamNames = [...new Set(inputs.flatMap((row) => [row.teams.teamA, row.teams.teamB]))].slice(0, 2);
-  if (teamNames.length < 2) {
-    return { version: "cs2-demo-analysis-kit/team-comparison-0.1", teams: [], radar: [], evidence: [] };
+/**
+ * @param inputs  cohort 内全部比赛的 facts
+ * @param requestedPair  指定要对比的两队名（如 UI 选了 A/B）；缺省取场次最多的两队。
+ *                       两队**无需互相交手**——各自跨全部己方比赛聚合，服务赛前侦察。
+ */
+export function buildTeamComparisonFromFacts(
+  inputs: TeamComparisonFacts[],
+  requestedPair?: [string, string]
+): TeamComparisonModel {
+  const matchCounts = new Map<string, number>();
+  for (const input of inputs) {
+    for (const teamName of [input.teams.teamA, input.teams.teamB]) {
+      matchCounts.set(teamName, (matchCounts.get(teamName) ?? 0) + 1);
+    }
   }
+  const availableTeams = [...matchCounts.entries()]
+    .map(([name, matches]) => ({ name, matches }))
+    .sort((a, b) => b.matches - a.matches || a.name.localeCompare(b.name));
+
+  const empty = (): TeamComparisonModel => ({
+    version: "cs2-demo-analysis-kit/team-comparison-0.2",
+    teams: [],
+    radar: [],
+    availableTeams
+  });
+
+  const valid = (name: string | undefined): name is string => name != null && matchCounts.has(name);
+  const teamNames =
+    requestedPair && valid(requestedPair[0]) && valid(requestedPair[1]) && requestedPair[0] !== requestedPair[1]
+      ? [requestedPair[0], requestedPair[1]]
+      : availableTeams.slice(0, 2).map((team) => team.name);
+  if (teamNames.length < 2) return empty();
+
   const sides = teamNames.map((name): TeamComparisonSide => {
     const playerRows = new Map<string, TeamComparisonPlayerRow & { rounds: number; kills: number; deaths: number; damage: number; kastRounds: number }>();
     const weaponKills = new Map<string, number>();
     const economy = new Map<string, { rounds: number; wins: number }>();
+    const matches: TeamComparisonSideMatch[] = [];
     for (const input of inputs) {
       const playerBySteam = new Map(input.players.map((player) => [player.steamId64, player]));
       for (const [teamKey, candidate] of [["teamA", input.teams.teamA], ["teamB", input.teams.teamB]] as const) {
         if (candidate !== name) continue;
+        let roundsWon = 0;
+        let roundsLost = 0;
+        for (const round of input.rounds) {
+          if (round.winnerTeamKey === teamKey) roundsWon += 1;
+          else roundsLost += 1;
+        }
+        matches.push({
+          matchId: input.matchId,
+          mapName: input.mapName,
+          opponent: teamKey === "teamA" ? input.teams.teamB : input.teams.teamA,
+          roundsWon,
+          roundsLost,
+          won: roundsWon > roundsLost
+        });
         for (const stat of input.playerStats) {
           const player = playerBySteam.get(stat.playerSteamId64);
           if (!player || player.teamKey !== teamKey) continue;
@@ -307,6 +358,7 @@ export function buildTeamComparisonFromFacts(inputs: TeamComparisonFacts[]): Tea
     const totalWeaponKills = [...weaponKills.values()].reduce((sum, value) => sum + value, 0);
     return {
       teamName: name,
+      matchCount: matches.length,
       players,
       weaponPreference: [...weaponKills.entries()]
         .map(([weapon, kills]) => ({ weapon, label: displayWeaponName(weapon), kills, sharePercent: totalWeaponKills > 0 ? round(kills / totalWeaponKills * 100, 1) : 0 }))
@@ -314,7 +366,8 @@ export function buildTeamComparisonFromFacts(inputs: TeamComparisonFacts[]): Tea
         .slice(0, 8),
       economyWinRate: [...economy.entries()]
         .map(([economyType, cell]) => ({ economyType, rounds: cell.rounds, wins: cell.wins, winRatePercent: cell.rounds > 0 ? round(cell.wins / cell.rounds * 100, 1) : null }))
-        .sort((a, b) => a.economyType.localeCompare(b.economyType))
+        .sort((a, b) => a.economyType.localeCompare(b.economyType)),
+      matches
     };
   }) as [TeamComparisonSide, TeamComparisonSide];
   const radar = [
@@ -324,19 +377,14 @@ export function buildTeamComparisonFromFacts(inputs: TeamComparisonFacts[]): Tea
     { metric: "kpr", label: "KPR", a: averageNullable(sides[0].players.map((row) => row.kpr)), b: averageNullable(sides[1].players.map((row) => row.kpr)) },
     { metric: "dpr", label: "DPR", a: averageNullable(sides[0].players.map((row) => row.dpr)), b: averageNullable(sides[1].players.map((row) => row.dpr)) }
   ].map((row) => ({ ...row, delta: row.a != null && row.b != null ? round(row.a - row.b, 2) : null }));
-  const evidence = inputs.flatMap((input) =>
-    input.kills.slice(0, 5).map((kill) => ({
-      matchId: input.matchId,
-      roundNumber: kill.roundNumber,
-      tick: kill.tick,
-      label: `${input.mapName} R${kill.roundNumber}`
-    }))
-  ).slice(0, 20);
-  return { version: "cs2-demo-analysis-kit/team-comparison-0.1", teams: sides, radar, evidence };
+  return { version: "cs2-demo-analysis-kit/team-comparison-0.2", teams: sides, radar, availableTeams };
 }
 
-export function buildTeamComparison(inputs: TeamComparisonInput[]): TeamComparisonModel {
-  return buildTeamComparisonFromFacts(inputs.map(extractTeamComparisonFacts));
+export function buildTeamComparison(
+  inputs: TeamComparisonInput[],
+  requestedPair?: [string, string]
+): TeamComparisonModel {
+  return buildTeamComparisonFromFacts(inputs.map(extractTeamComparisonFacts), requestedPair);
 }
 
 function killWeaponLabel(weapon: string): string {

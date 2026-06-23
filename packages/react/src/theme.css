@@ -422,18 +422,50 @@
   font-size: 11px;
 }
 
-.dak-team-evidence {
+/* 选队下拉（A vs B） */
+.dak-team-picker {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.dak-team-picker-vs {
+  color: var(--dak-fg-dim);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+
+.dak-team-select {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--dak-border);
+  border-radius: 3px;
+  background: var(--dak-bg-subtle);
+  color: var(--dak-fg);
+  font: inherit;
+  font-size: 12px;
+}
+
+.dak-team-select:disabled {
+  opacity: 0.7;
+}
+
+/* 该队比赛列表（赛前侦察素材，可点跳回放） */
+.dak-team-matches {
+  display: grid;
+  gap: 4px;
   margin-top: 10px;
 }
 
-.dak-team-evidence button {
-  display: inline-flex;
+.dak-team-match {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  min-height: 26px;
-  padding: 0 9px;
+  gap: 8px;
+  padding: 5px 8px;
   border: 1px solid var(--dak-border);
   border-radius: 3px;
   background: var(--dak-bg-subtle);
@@ -441,12 +473,38 @@
   cursor: pointer;
   font: inherit;
   font-size: 11px;
+  text-align: left;
 }
 
-.dak-team-evidence button:hover {
+.dak-team-match:hover:not(:disabled) {
   color: var(--dak-fg);
   border-color: var(--dak-border-hi);
   background: var(--dak-accent-soft);
+}
+
+.dak-team-match:disabled {
+  cursor: default;
+}
+
+.dak-team-match-opp {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dak-team-match small {
+  color: var(--dak-fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.dak-team-match-win {
+  color: var(--dak-pos, #4caf7d);
+  font-weight: 700;
+}
+
+.dak-team-match-loss {
+  color: var(--dak-neg, #d2685a);
+  font-weight: 700;
 }
 
 .dak-muted {

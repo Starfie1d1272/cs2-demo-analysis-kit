@@ -1,55 +1,119 @@
 import type { TeamComparisonModel } from "@cs2dak/presentation";
 
+/**
+ * 队伍对比（赛前侦察）：选 A/B 两队 → 各自跨全部己方比赛的状态对比。
+ * 两队**无需互相交手**。纯展示：选队与跳回放都通过回调上报，由容器接数据。
+ */
 export function TeamComparisonPanel({
   model,
-  onOpenEvidence
+  onSelectPair,
+  onOpenMatch
 }: {
   model: TeamComparisonModel;
-  onOpenEvidence?: (matchId: string, roundNumber: number, tick?: number) => void;
+  /** 选定 A/B 两队（触发重新聚合）；不传则下拉只读。 */
+  onSelectPair?: (a: string, b: string) => void;
+  /** 打开某场比赛回放。 */
+  onOpenMatch?: (matchId: string) => void;
 }) {
+  if (model.availableTeams.length < 2) {
+    return <div className="dak-empty">至少需要两个队伍的比赛才能生成对比。</div>;
+  }
+  const selectedA = model.teams[0]?.teamName ?? "";
+  const selectedB = model.teams[1]?.teamName ?? "";
+
+  const picker = (
+    <div className="dak-team-picker">
+      <TeamSelect
+        value={selectedA}
+        teams={model.availableTeams}
+        exclude={selectedB}
+        disabled={!onSelectPair}
+        onChange={(next) => onSelectPair?.(next, selectedB)}
+      />
+      <span className="dak-team-picker-vs">VS</span>
+      <TeamSelect
+        value={selectedB}
+        teams={model.availableTeams}
+        exclude={selectedA}
+        disabled={!onSelectPair}
+        onChange={(next) => onSelectPair?.(selectedA, next)}
+      />
+    </div>
+  );
+
   if (model.teams.length !== 2) {
-    return <div className="dak-empty">至少需要两个队伍才能生成对比。</div>;
+    return (
+      <div className="dak-team-compare">
+        {picker}
+        <div className="dak-empty">选择两个不同的队伍生成对比。</div>
+      </div>
+    );
   }
   const [a, b] = model.teams;
   return (
     <div className="dak-team-compare">
+      {picker}
       <div className="dak-team-compare-grid">
-        <TeamSide side={a} />
+        <TeamSide side={a} onOpenMatch={onOpenMatch} />
         <section className="dak-team-radar" aria-label="队伍差异">
           {model.radar.map((row) => (
             <div key={row.metric} className="dak-team-radar-row">
               <span>{row.label}</span>
               <b>{row.a == null ? "—" : row.a}</b>
-              <i style={{ ["--dak-radar-a" as string]: `${scale(row.a)}%`, ["--dak-radar-b" as string]: `${scale(row.b)}%` }} />
+              <i />
               <b>{row.b == null ? "—" : row.b}</b>
               <em>{row.delta == null ? "—" : row.delta > 0 ? `+${row.delta}` : row.delta}</em>
             </div>
           ))}
         </section>
-        <TeamSide side={b} />
+        <TeamSide side={b} onOpenMatch={onOpenMatch} />
       </div>
-      {model.evidence.length > 0 && (
-        <div className="dak-team-evidence">
-          {model.evidence.slice(0, 8).map((item) => (
-            <button
-              key={`${item.matchId}-${item.roundNumber}-${item.tick ?? 0}`}
-              type="button"
-              onClick={() => onOpenEvidence?.(item.matchId, item.roundNumber, item.tick)}
-              disabled={!onOpenEvidence}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
 
-function TeamSide({ side }: { side: TeamComparisonModel["teams"][number] }) {
+function TeamSelect({
+  value,
+  teams,
+  exclude,
+  disabled,
+  onChange
+}: {
+  value: string;
+  teams: TeamComparisonModel["availableTeams"];
+  exclude: string;
+  disabled?: boolean;
+  onChange: (next: string) => void;
+}) {
+  return (
+    <select
+      className="dak-team-select"
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value)}
+      aria-label="选择对比队伍"
+    >
+      {teams.map((team) => (
+        <option key={team.name} value={team.name} disabled={team.name === exclude}>
+          {team.name}（{team.matches} 场）
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function TeamSide({
+  side,
+  onOpenMatch
+}: {
+  side: TeamComparisonModel["teams"][number];
+  onOpenMatch?: (matchId: string) => void;
+}) {
   return (
     <section className="dak-team-side">
-      <h3>{side.teamName}</h3>
+      <h3>
+        {side.teamName} <small className="dak-muted">{side.matchCount} 场</small>
+      </h3>
       <table>
         <thead>
           <tr><th>选手</th><th>RR</th><th>ADR</th><th>KAST</th><th>KPR</th><th>DPR</th></tr>
@@ -77,6 +141,24 @@ function TeamSide({ side }: { side: TeamComparisonModel["teams"][number] }) {
           <span key={row.economyType}>{row.economyType}<b>{row.winRatePercent == null ? "—" : `${row.winRatePercent.toFixed(1)}%`}</b></span>
         ))}
       </div>
+      {side.matches.length > 0 && (
+        <div className="dak-team-matches">
+          {side.matches.map((match) => (
+            <button
+              key={match.matchId}
+              type="button"
+              className="dak-team-match"
+              disabled={!onOpenMatch}
+              onClick={() => onOpenMatch?.(match.matchId)}
+              title={`${match.mapName} · vs ${match.opponent} · ${match.roundsWon}-${match.roundsLost}`}
+            >
+              <span className={match.won ? "dak-team-match-win" : "dak-team-match-loss"}>{match.won ? "胜" : "负"}</span>
+              <span className="dak-team-match-opp">vs {match.opponent}</span>
+              <small>{match.mapName} · {match.roundsWon}-{match.roundsLost}</small>
+            </button>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -84,9 +166,3 @@ function TeamSide({ side }: { side: TeamComparisonModel["teams"][number] }) {
 function fmt(value: number | null): string {
   return value == null ? "—" : value.toFixed(value >= 10 ? 1 : 2);
 }
-
-function scale(value: number | null): number {
-  if (value == null) return 0;
-  return Math.max(4, Math.min(100, value >= 10 ? value : value * 40));
-}
-
