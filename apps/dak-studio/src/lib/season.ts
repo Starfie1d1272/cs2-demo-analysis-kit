@@ -320,8 +320,13 @@ export function getTournamentInsights(entries: StudioDemoEntry[], identity?: Ide
   return touchLimitedCache(tournamentInsightsCache, key, loading, SMALL_CACHE_LIMIT);
 }
 
-export async function getTeamComparison(entries: StudioDemoEntry[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<TeamComparisonModel> {
-  const key = `${keyOf(entries, identity?.version, selectedTeams)}:team-comparison`;
+/**
+ * 队伍对比（赛前侦察）：两队各自跨全部己方比赛聚合，无需互相交手。
+ * `pair` 指定要对比的 A/B 两队名（UI 选择）；缺省取场次最多的两队。
+ * 返回的 model.availableTeams 供 UI 填充选队下拉。
+ */
+export async function getTeamComparison(entries: StudioDemoEntry[], identity?: IdentityOptions, pair?: [string, string]): Promise<TeamComparisonModel> {
+  const key = `${keyOf(entries, identity?.version)}:team-comparison-v2:${pair ? `${pair[0]}__vs__${pair[1]}` : "auto"}`;
   const cached = teamComparisonCache.get(key);
   if (cached) return cached;
   const loading = (async () => {
@@ -331,7 +336,7 @@ export async function getTeamComparison(entries: StudioDemoEntry[], identity?: I
     const matchIds = entries.map(matchIdForEntry);
     const facts = withTeamRenames(await factsStore.getTeamComparisonFacts({ matchIds }), identity?.teamRenames);
     if (facts.length >= entries.length) {
-      const model = buildTeamComparisonFromFacts(facts);
+      const model = buildTeamComparisonFromFacts(facts, pair);
       void writePersistedValue(key, model);
       return model;
     }
