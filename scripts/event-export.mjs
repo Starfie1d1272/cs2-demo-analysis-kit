@@ -73,19 +73,31 @@ for (const stageDef of exp.stages) {
   }
 
   let sources = [...new Set((stageDef.sources ?? []).flatMap(expandGlob))];
-  // 同一 slug 的 Stage3/Playoff 无法靠文件名分阶段：按对阵清单路由。
-  // pairs（白名单）/excludePairs（黑名单）为归一化对阵 "a|b"（字母序）。pairs 已定义但为空 → 该阶段不取任何源（清单待填）。
+  // 路由规则（优先级降序）：
+  //   1. matchIds — 精确匹配 demo hash 或 URL slug 尾段（同一对阵多阶段时必用）
+  //   2. pairs（白名单）/excludePairs（黑名单）— 归一化对阵 "a|b"（字母序）
+  // 三者都未定义 → 该阶段收取全部匹配源。
+  //
+  // matchIds 与 pairs 的语义划分：
+  //   - 若同一对队伍在 Stage3 和 Playoff 各遇一次（对阵不唯一），仅靠 pairs 无法区分；
+  //     此时在 Playoff 段填 matchIds（HLTV match slug 或 demo hash），路由以此为准。
+  //   - 本次科隆 Major 无此情况，matchIds 不填即可。（matchIds 已定义但为空 → 当作未填、
+  //     回退到 pairs；pairs 已定义但为空 → 该阶段不取任何源，安全默认。）
   const normTeam = (s) => String(s).toLowerCase().replace(/\b(gaming|esports|team)\b/g, "").replace(/[^a-z0-9]/g, "");
-  const pairOf = (file) => {
-    const m = file.split("/").at(-1).match(/^iem-cologne-major-2026-(.+?)-bo\d-.+\.rar$/i);
-    if (!m) return null;
-    const vs = m[1].split("-vs-");
-    return vs.length === 2 ? [normTeam(vs[0]), normTeam(vs[1])].sort().join("|") : null;
-  };
-  if (Array.isArray(stageDef.pairs)) {
+  const slugOfRar = (f) => { const m = f.split("/").at(-1).match(/^iem-cologne-major-2026-(.+?)-bo\d-.+\.rar$/i); return m ? m[1] : null; };
+  const hashOfRar = (f) => { const m = f.split("/").at(-1).match(/-([^-]+)\.rar$/i); return m ? m[1] : null; };
+  const pairOf = (file) => { const s = slugOfRar(file); if (!s) return null; const vs = s.split("-vs-"); return vs.length === 2 ? [normTeam(vs[0]), normTeam(vs[1])].sort().join("|") : null; };
+  // 1) matchIds（精确；demo hash 或 slug "aurora-vs-g2"）
+  if (Array.isArray(stageDef.matchIds) && stageDef.matchIds.length > 0) {
+    const ids = new Set(stageDef.matchIds);
+    sources = sources.filter((s) => { const slug = slugOfRar(s), h = hashOfRar(s); return (slug && ids.has(slug)) || (h && ids.has(h)); });
+  }
+  // 2) pairs（对阵白名单；未定义或空则跳过此筛选）
+  if (Array.isArray(stageDef.pairs) && stageDef.pairs.length > 0) {
     const allow = new Set(stageDef.pairs.map((p) => p.split("|").map(normTeam).sort().join("|")));
     sources = sources.filter((s) => { const p = pairOf(s); return p && allow.has(p); });
   }
+  // 3) excludePairs（对阵黑名单）
   if (Array.isArray(stageDef.excludePairs) && stageDef.excludePairs.length > 0) {
     const deny = new Set(stageDef.excludePairs.map((p) => p.split("|").map(normTeam).sort().join("|")));
     sources = sources.filter((s) => { const p = pairOf(s); return !(p && deny.has(p)); });
