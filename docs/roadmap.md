@@ -97,13 +97,19 @@ presentation 已以 `targetEndTick = nextRound.startTick` 留出接口）。
   Event/Stage/Series/Map 合同、1–5 图系列赛、BP、资源管理、R2 下载校验及单循环/Swiss/单败/双败 UI
   已完成；从赛事框架、BP 与 1–5 场 `.dem` 生成资源包的制作器也已落地。
   剩余：科隆真实内容、RivalHub 文件导出、制作器草稿持久化，以及 Windows 真机下载/导出验证。
-- **`.tri` 资产包管理**：从 Release CI 现场打包（~30MB/图）改为版本化资产包或首次按图下载。
-  （🟡 `userdata/tris` overlay + `tri_download` 桥已落地，是去内置化地基；当前仍内置作回退。）
+- **资产管理中心**（✅ 已落地）：管理页重构为「身份 / 资产 / 赛事」三 Tab。资产 Tab 汇总存储占用
+  （桌面走 Python 精确分类 + 清理/备份；浏览器经 `navigator.storage.estimate()` + 各 IDB 命名空间计数
+  补齐总览）、Demo 资产（场次/原始 ZIP 占用/旧口径计数/缺 `.dem` 路径 + 批量重建）、`.tri` 已装/缺失矩阵。
+- **`.tri` 资产包管理**（✅ 已落地）：`userdata/tris` overlay + R2 tris-manifest（`dakupdate.starfie1d.top/tris/manifest.json`）。
+  桌面静态服务 GET 时按需下载；资产 Tab 展示已装/缺失矩阵并支持「下载」单图 /「补全全部缺失」——
+  桌面走 `tri_download` 桥写 overlay，浏览器/dev 走 R2 直链 + sha256 校验写 IndexedDB（`tri-assets.ts`）。
 - **签名与公证**：Windows 签名（去 SmartScreen 警告，让自动更新更可信）——优先级高于付费墙。
   （macOS 不再排期：CS2 仅 Windows 可玩，桌面端只面向 Windows。）
 - **崩溃诊断包** + 可选、匿名、明确授权的使用统计。
-- **统一 AnalysisManifest**：收敛分散的 `DERIVED_VERSION` / Duel cache version 等版本号
-  （`formatVersion` / `analysisVersion` / `cacheVersion` / `reportVersion` / `appVersion`）。
+- **统一 AnalysisManifest**（✅ 已落地）：`apps/dak-studio/src/lib/analysis-manifest.ts` 收敛派生版本号
+  （`formatVersion` / `analysisVersion`（跟随 `TACTICAL_FACT_VERSION`）/ `reportVersion` / `appVersion`）。
+  导入时写入 `entry.builtWith`；`analysisVersion` 落后即标记旧口径，**从已存 v3 ZIP 一键重建 facts**
+  （`rebuildFactsFromZip`，无需 `.dem` / cs2df）——彻底消除"加一个派生指标就要全量重导"。
 - Stable/Beta/Experimental 标签在 UI 全量落地（非 0.7 发布阻碍；新功能必须如实标注，历史页面逐步补齐）。
 
 ---
