@@ -1,6 +1,6 @@
 import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Settings, Swords, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { bulkUpdateTags, importDemoFile, listDemoEntries, removeDemo, removeDemos, updateDemoTags, type StudioDemoEntry } from "./lib/library";
+import { bulkUpdateTags, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { EMPTY_SCOPE, applyScope, type CohortScopeState } from "./components/CohortScope";
 import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems, triggerWindowsDropCapture, type ExportedDemoFile } from "./lib/dem";
 import { parseTags } from "./lib/tags";
@@ -330,6 +330,52 @@ export function App() {
     await reexportEntries(entries);
   }, [entries, reexportEntries]);
 
+  /** 从已存 ZIP 重榨 facts（不走 .dem / cs2df）；逐场串行，失败不打断，结束汇总。 */
+  const rebuildFactsForEntries = useCallback(async (targets: StudioDemoEntry[]) => {
+    if (targets.length === 0) return;
+    if (!window.confirm(`将用当前分析口径重建 ${targets.length} 场 facts（从已存 ZIP，无需原始 .dem），继续？`)) return;
+    setImporting(true);
+    let done = 0;
+    const failures: string[] = [];
+    for (const [index, entry] of targets.entries()) {
+      setNotice(`重建 facts（${index + 1}/${targets.length}）：${entry.fileName}…`);
+      try {
+        if (await rebuildFactsFromZip(entry.id)) done += 1;
+        else failures.push(`${entry.fileName}: 原始 ZIP 缺失`);
+      } catch (err) {
+        failures.push(err instanceof Error ? err.message : String(err));
+      }
+    }
+    setEntries(await listDemoEntries());
+    setNotice(
+      `重建完成：成功 ${done} 场` + (failures.length > 0 ? `，失败 ${failures.length} 场（${failures[0]}）` : "")
+    );
+    setImporting(false);
+  }, []);
+
+  const handleRebuildFacts = useCallback(async (id: string) => {
+    setImporting(true);
+    setNotice("正在从 ZIP 重建 facts…");
+    try {
+      const entry = await rebuildFactsFromZip(id);
+      setEntries(await listDemoEntries());
+      setNotice(entry ? `已重建 ${entry.fileName} 的 facts` : "重建失败：原始 ZIP 缺失");
+    } catch (err) {
+      setNotice(`重建失败：${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setImporting(false);
+    }
+  }, []);
+
+  const handleRebuildStale = useCallback(async () => {
+    await rebuildFactsForEntries(entries.filter(isFactsStale));
+  }, [entries, rebuildFactsForEntries]);
+
+  const handleRebuildSelected = useCallback(async (ids: string[]) => {
+    const idSet = new Set(ids);
+    await rebuildFactsForEntries(entries.filter((entry) => idSet.has(entry.id)));
+  }, [entries, rebuildFactsForEntries]);
+
   const handleReexportSelected = useCallback(async (ids: string[]) => {
     const idSet = new Set(ids);
     await reexportEntries(entries.filter((entry) => idSet.has(entry.id)));
@@ -448,6 +494,9 @@ export function App() {
             onReexportAll={handleReexportAll}
             onReexportSelected={handleReexportSelected}
             onRemoveMany={handleRemoveMany}
+            onRebuildFacts={handleRebuildFacts}
+            onRebuildStale={handleRebuildStale}
+            onRebuildSelected={handleRebuildSelected}
             onNotice={setNotice}
           />
         )}

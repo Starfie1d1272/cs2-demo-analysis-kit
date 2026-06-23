@@ -1,6 +1,6 @@
-import { FolderOpen, Play, RotateCw, Tag as TagIcon, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
-import { entryDate, type StudioDemoEntry } from "../lib/library";
+import { FileDown, FolderOpen, Play, RefreshCw, Tag as TagIcon, Trash2 } from "lucide-react";
+import { useMemo, useState, type ChangeEvent } from "react";
+import { entryDate, isFactsStale, type StudioDemoEntry } from "../lib/library";
 import { parseTags } from "../lib/tags";
 import { EmptyState } from "@cs2dak/react";
 
@@ -24,6 +24,12 @@ export interface LibraryViewProps {
   onReexportSelected?: (ids: string[]) => void;
   /** 批量删除选中条目。 */
   onRemoveMany?: (ids: string[]) => void;
+  /** 从已存 ZIP 重建单场 facts（不需原始 .dem）。 */
+  onRebuildFacts: (id: string) => void;
+  /** 重建所有旧口径（stale）facts。 */
+  onRebuildStale?: () => void;
+  /** 重建选中条目的 facts。 */
+  onRebuildSelected?: (ids: string[]) => void;
   onNotice?: (message: string) => void;
 }
 
@@ -53,6 +59,9 @@ export function LibraryView({
   onReexportAll,
   onReexportSelected,
   onRemoveMany,
+  onRebuildFacts,
+  onRebuildStale,
+  onRebuildSelected,
   onNotice = () => {}
 }: LibraryViewProps) {
   const [search, setSearch] = useState("");
@@ -112,6 +121,8 @@ export function LibraryView({
   const allVisibleSelected = filtered.length > 0 && filtered.every((entry) => selectedIds.has(entry.id));
   const selectedTags = [...new Set(selectedVisible.flatMap((entry) => entry.tags))].sort();
   const selectedReexportable = entries.filter((entry) => selectedIds.has(entry.id) && entry.sourceDemPath).length;
+  const staleCount = useMemo(() => entries.filter(isFactsStale).length, [entries]);
+  const selectedStale = entries.filter((entry) => selectedIds.has(entry.id) && isFactsStale(entry)).length;
 
   const toggleSelected = (id: string) => {
     setSelectedIds((current) => {
@@ -159,6 +170,17 @@ export function LibraryView({
           </p>
         </div>
         <div className="stu-header-actions">
+          {onRebuildStale && staleCount > 0 && (
+            <button
+              type="button"
+              className="stu-button stu-button-ghost"
+              onClick={onRebuildStale}
+              disabled={importing}
+              title="用当前分析口径，从已存 ZIP 重建所有旧口径 facts（无需原始 .dem）"
+            >
+              <RefreshCw size={15} /> 重建旧口径（{staleCount}）
+            </button>
+          )}
           {onReexportAll && entries.some((entry) => entry.sourceDemPath) && (
             <button
               type="button"
@@ -167,7 +189,7 @@ export function LibraryView({
               disabled={importing}
               title="逐场重新导出所有记录了原始 .dem 路径的条目（cs2df 升级后刷新数据）"
             >
-              <RotateCw size={15} /> 全部重新导出
+              <FileDown size={15} /> 全部重新导出
             </button>
           )}
           <input
@@ -230,7 +252,18 @@ export function LibraryView({
                   disabled={importing || selectedReexportable === 0}
                   title={selectedReexportable === 0 ? "选中条目都没有记录原始 .dem 路径" : `重新导出选中且有原始路径的 ${selectedReexportable} 场`}
                 >
-                  <RotateCw size={15} /> 重新导出（{selectedReexportable}）
+                  <FileDown size={15} /> 重新导出（{selectedReexportable}）
+                </button>
+              )}
+              {onRebuildSelected && (
+                <button
+                  type="button"
+                  className="stu-button stu-button-ghost"
+                  onClick={() => { onRebuildSelected([...selectedIds]); setSelectedIds(new Set()); }}
+                  disabled={importing}
+                  title="从已存 ZIP 重建选中条目的 facts（无需原始 .dem）"
+                >
+                  <RefreshCw size={15} /> 重建 facts（{selectedIds.size}）{selectedStale > 0 ? `· ${selectedStale} 旧` : ""}
                 </button>
               )}
               {onRemoveMany && (
@@ -395,6 +428,9 @@ export function LibraryView({
                           #{tag}
                         </span>
                       ))}
+                      {isFactsStale(entry) && (
+                        <span className="stu-tag stu-tag-warn" title="facts 为旧分析口径，可从 ZIP 重建">旧口径</span>
+                      )}
                     </div>
                     <small className="stu-filename">{entry.fileName}</small>
                   </td>
@@ -410,12 +446,21 @@ export function LibraryView({
                     </button>
                     <button
                       type="button"
+                      className={isFactsStale(entry) ? "stu-icon-button stu-icon-button-warn" : "stu-icon-button"}
+                      title="从已存 ZIP 重建 facts（无需原始 .dem）"
+                      disabled={importing}
+                      onClick={() => onRebuildFacts(entry.id)}
+                    >
+                      <RefreshCw size={14} />
+                    </button>
+                    <button
+                      type="button"
                       className="stu-icon-button"
-                      title={entry.sourceDemPath ? "重新导出并替换" : "未记录原始 .dem 路径"}
+                      title={entry.sourceDemPath ? "重新导出并替换（从 .dem）" : "未记录原始 .dem 路径"}
                       disabled={!entry.sourceDemPath || importing}
                       onClick={() => onReexportDemo(entry)}
                     >
-                      <RotateCw size={14} />
+                      <FileDown size={14} />
                     </button>
                     <button type="button" className="stu-icon-button" title="打开工作台" onClick={() => onOpenDemo(entry.id)}>
                       <Play size={14} />

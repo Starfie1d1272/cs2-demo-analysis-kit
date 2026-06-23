@@ -6,6 +6,7 @@ import { CALLOUT_GRID_URLS, loadStudioCalloutGrid } from "./callout-grid";
 import { metaFromPackage, type DemoMeta } from "./demo-meta";
 import { getStorage } from "./storage";
 import { loadTriLookup } from "./tri";
+import { currentBuiltWith, isAnalysisStale, type BuiltWith } from "./analysis-manifest";
 
 /**
  * DAK Studio 本地 Demo 库。
@@ -26,6 +27,10 @@ export interface StudioDemoEntry {
   tags: string[];
   /** 本机原始 .dem 路径，仅用于桌面端重新导出；浏览器/ZIP 导入为空。 */
   sourceDemPath?: string | null;
+  /** 榨 facts 时所用的分析版本（AnalysisManifest）；缺失=历史条目，视为旧口径。 */
+  builtWith?: BuiltWith;
+  /** 原始 v3 ZIP 字节数（导入时记录）；用于资产占用统计，免去读全部 blob。 */
+  sizeBytes?: number;
   meta: DemoMeta;
 }
 
@@ -45,8 +50,15 @@ function normalizeEntry(entry: StudioDemoEntry): StudioDemoEntry {
     importedAt: entry.importedAt,
     tags: entry.tags ?? [],
     sourceDemPath: entry.sourceDemPath ?? null,
+    builtWith: entry.builtWith,
+    sizeBytes: entry.sizeBytes,
     meta: { ...entry.meta, serverName: entry.meta.serverName ?? null, matchDate: entry.meta.matchDate ?? null }
   };
+}
+
+/** facts 是否旧口径（analysisVersion 落后于当前 AnalysisManifest）。 */
+export function isFactsStale(entry: StudioDemoEntry): boolean {
+  return isAnalysisStale(entry.builtWith);
 }
 
 /** facts 是查询加速层；写失败不破坏库完整性（ZIP+元数据已落盘，可后续重导补齐）。 */
@@ -299,6 +311,8 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     importedAt: Date.now(),
     tags: normalizeTags(tags),
     sourceDemPath,
+    builtWith: currentBuiltWith(),
+    sizeBytes: file.size,
     meta: matchDate ? { ...pkgMeta, matchDate } : pkgMeta,
   };
   if (replacement) {
@@ -314,6 +328,9 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
       ...existing,
       tags: mergedTags,
       sourceDemPath: sourceDemPath ?? existing.sourceDemPath ?? null,
+      // 重复导入会重榨 facts（下方 persistFacts），构建版本必须刷新到当前。
+      builtWith: currentBuiltWith(),
+      sizeBytes: existing.sizeBytes ?? file.size,
       meta: mergedMeta,
     };
     await meta.put(id, mergedEntry);
@@ -399,6 +416,31 @@ export async function removeDemos(
     await removeDemo(targets[i]!);
     onProgress?.(i + 1, targets.length);
   }
+}
+
+/**
+ * 从已持久化的 v3 ZIP 重榨 facts（用当前 AnalysisManifest 口径）。
+ *
+ * 关键：不需要 .dem / cs2df —— ZIP 字节本就在 blobs("demos")。把 blob 构造成 File 喂给
+ * importDemoFile，同字节 → 同 sha256 id → 幂等替换分支，重榨全部 facts 并刷新 entry.builtWith。
+ * 适用于所有来源（赛事包 / 浏览器导入 / 别人给的 ZIP，无需 sourceDemPath）。
+ *
+ * @returns 重建后的 entry；blob 或 meta 缺失返回 null。
+ */
+export async function rebuildFactsFromZip(id: string): Promise<StudioDemoEntry | null> {
+  const [entry, buffer] = await Promise.all([
+    demoMeta.get<StudioDemoEntry>(id),
+    demoBlobs.get(id)
+  ]);
+  if (!entry || !buffer) return null;
+  // 用副本构造 File：importDemoFile 会 transfer buffer 给 worker，原 blob 字节不可复用。
+  const file = new File([buffer.slice(0) as BlobPart], entry.fileName, { type: "application/zip" });
+  const result = await importDemoFile(file, {
+    tags: entry.tags,
+    sourceDemPath: entry.sourceDemPath ?? null,
+    lowMemory: true
+  });
+  return result.entry;
 }
 
 /** 取解析后的 DemoPackage：内存 → ZIP 重建。仅用于逐场证据/工作台，不作为聚合缓存。 */
