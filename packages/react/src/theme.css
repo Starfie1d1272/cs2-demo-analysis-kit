@@ -2209,6 +2209,15 @@
   color: var(--dak-ok);
 }
 
+.dak-economy-round-clickable {
+  cursor: pointer;
+}
+
+.dak-economy-round-clickable:hover {
+  border-color: var(--dak-border-hi);
+  background: var(--dak-panel);
+}
+
 .dak-economy-round-upset {
   border-color: rgba(255, 198, 77, 0.4);
   background: linear-gradient(135deg, rgba(255, 198, 77, 0.07), var(--dak-bg-subtle));

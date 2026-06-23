@@ -5,6 +5,8 @@ export interface EconomyPanelProps {
   points: EconomyPoint[];
   teamAName: string;
   teamBName: string;
+  /** 点击回合卡跳转到该回合的 2D 回放。 */
+  onJumpRound?: (roundNumber: number) => void;
 }
 
 const width = 760;
@@ -38,7 +40,7 @@ function getUpsetType(point: EconomyPoint): "eco" | "semi" | "force" | null {
   return winnerEco;
 }
 
-export function EconomyPanel({ points, teamAName, teamBName }: EconomyPanelProps) {
+export function EconomyPanel({ points, teamAName, teamBName, onJumpRound }: EconomyPanelProps) {
   const maxValue = Math.max(1, ...points.flatMap((point) => [point.teamA, point.teamB]));
   const xFor = (index: number) => pad.left + (index / Math.max(points.length - 1, 1)) * (width - pad.left - pad.right);
   const yFor = (value: number) => pad.top + (1 - value / maxValue) * (height - pad.top - pad.bottom);
@@ -112,8 +114,12 @@ export function EconomyPanel({ points, teamAName, teamBName }: EconomyPanelProps
           const upsetType = getUpsetType(point);
           return (
             <div
-              className={`dak-economy-round${upsetType ? " dak-economy-round-upset" : ""}`}
+              className={`dak-economy-round${upsetType ? " dak-economy-round-upset" : ""}${onJumpRound ? " dak-economy-round-clickable" : ""}`}
               key={point.roundNumber}
+              role={onJumpRound ? "button" : undefined}
+              tabIndex={onJumpRound ? 0 : undefined}
+              onClick={onJumpRound ? () => onJumpRound(point.roundNumber) : undefined}
+              onKeyDown={onJumpRound ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onJumpRound(point.roundNumber); } } : undefined}
             >
               <b>R{point.roundNumber}</b>
               {upsetType && (

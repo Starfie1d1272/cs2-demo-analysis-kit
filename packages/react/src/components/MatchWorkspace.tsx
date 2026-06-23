@@ -106,7 +106,7 @@ export function MatchWorkspace({ model, initialTarget }: MatchWorkspaceProps) {
           {view === "economy" && (
             <div className="dak-stack">
               <Panel title="经济走势">
-                <EconomyPanel points={model.economy} teamAName={model.teams.teamA.name} teamBName={model.teams.teamB.name} />
+                <EconomyPanel points={model.economy} teamAName={model.teams.teamA.name} teamBName={model.teams.teamB.name} onJumpRound={(roundNumber) => openReplay(roundNumber)} />
               </Panel>
               <BuyQualityPanel model={model} />
             </div>
