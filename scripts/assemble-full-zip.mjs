@@ -150,27 +150,27 @@ function main() {
       const size = statSync(src).size;
       const hash = sha256(src);
       console.error(`  bundled-event: ${slug} (${(size / 1024 / 1024).toFixed(1)} MB)`);
-      // 尝试从 event-package.json 读取名称
+      // 从 event-package.json 读取真实名称（扫描 local header 签名）
       let displayName = slug;
       try {
         const buf = readFileSync(src);
-        const needle = Buffer.from("event-package.json");
-        let idx = buf.indexOf(needle);
-        while (idx >= 0) {
-          const hs = idx - 26;
-          if (hs >= 0 && buf.readUInt32LE(hs) === 0x04034b50) {
-            const nl = buf.readUInt16LE(hs + 26), el = buf.readUInt16LE(hs + 28);
-            const ds = hs + 30 + nl + el;
-            const cs = buf.readUInt32LE(hs + 18);
-            const cm = buf.readUInt16LE(hs + 8);
-            if (cs > 0 && ds + cs <= buf.length) {
-              const raw = cm === 0 ? buf.subarray(ds, ds + cs).toString("utf-8") : inflateRawSync(buf.subarray(ds, ds + cs)).toString("utf-8");
-              const pkg = JSON.parse(raw);
-              displayName = pkg.event?.name || slug;
-              break;
-            }
-          }
-          idx = buf.indexOf(needle, idx + 1);
+        const limit = buf.length - 30;
+        for (let i = 0; i < limit; i++) {
+          if (buf.readUInt32LE(i) !== 0x04034b50) continue;
+          const nl = buf.readUInt16LE(i + 26);
+          const el = buf.readUInt16LE(i + 28);
+          const name = buf.subarray(i + 30, i + 30 + nl).toString("utf-8");
+          if (name !== "event-package.json") continue;
+          const cs = buf.readUInt32LE(i + 18);
+          const cm = buf.readUInt16LE(i + 8);
+          const ds = i + 30 + nl + el;
+          if (cs <= 0 || ds + cs > buf.length) continue;
+          const raw = cm === 0
+            ? buf.subarray(ds, ds + cs).toString("utf-8")
+            : inflateRawSync(buf.subarray(ds, ds + cs)).toString("utf-8");
+          const pkg = JSON.parse(raw);
+          displayName = pkg.event?.name || slug;
+          break;
         }
       } catch { /* fallback to slug */ }
       manifestEvents.push({

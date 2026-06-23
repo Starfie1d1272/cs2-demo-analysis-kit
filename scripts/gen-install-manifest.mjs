@@ -51,31 +51,29 @@ import { inflateRawSync } from "node:zlib";
 
 /**
  * 从 event-package zip 读取完整 event-package.json 对象。
- * 通过 ZIP local file header 扫描找到 event-package.json 条目并解析。
+ * 扫描 ZIP local file header（0x04034b50）找到目标条目并解析。
+ * 比搜索文件名再回退更可靠——JSZip 可能把文件放在 offset 0。
  */
 function readEventPackageJson(zipPath) {
   const buf = readFileSync(zipPath);
-  const needle = Buffer.from("event-package.json");
-  let idx = buf.indexOf(needle);
-  while (idx >= 0) {
-    const headerStart = idx - 26;
-    if (headerStart >= 0 && buf.readUInt32LE(headerStart) === 0x04034b50) {
-      const nameLen = buf.readUInt16LE(headerStart + 26);
-      const extraLen = buf.readUInt16LE(headerStart + 28);
-      const dataStart = headerStart + 30 + nameLen + extraLen;
-      const compSize = buf.readUInt32LE(headerStart + 18);
-      const compMethod = buf.readUInt16LE(headerStart + 8);
-      if (compSize > 0 && dataStart + compSize <= buf.length) {
-        if (compMethod === 0) {
-          return JSON.parse(buf.subarray(dataStart, dataStart + compSize).toString("utf-8"));
-        }
-        try {
-          const compressed = buf.subarray(dataStart, dataStart + compSize);
-          return JSON.parse(inflateRawSync(compressed).toString("utf-8"));
-        } catch { /* fall through */ }
-      }
+  const limit = buf.length - 30;
+  for (let i = 0; i < limit; i++) {
+    if (buf.readUInt32LE(i) !== 0x04034b50) continue;
+    const nameLen = buf.readUInt16LE(i + 26);
+    const extraLen = buf.readUInt16LE(i + 28);
+    const name = buf.subarray(i + 30, i + 30 + nameLen).toString("utf-8");
+    if (name !== "event-package.json") continue;
+    const compSize = buf.readUInt32LE(i + 18);
+    const compMethod = buf.readUInt16LE(i + 8);
+    const dataStart = i + 30 + nameLen + extraLen;
+    if (compSize <= 0 || dataStart + compSize > buf.length) continue;
+    if (compMethod === 0) {
+      return JSON.parse(buf.subarray(dataStart, dataStart + compSize).toString("utf-8"));
     }
-    idx = buf.indexOf(needle, idx + 1);
+    // DEFLATE (method 8)
+    try {
+      return JSON.parse(inflateRawSync(buf.subarray(dataStart, dataStart + compSize)).toString("utf-8"));
+    } catch { /* retry next */ }
   }
   throw new Error("event-package.json not found in zip");
 }
