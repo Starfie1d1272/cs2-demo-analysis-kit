@@ -4,10 +4,51 @@ DAK Studio 桌面应用及 `@cs2dak/*` 分析管道面向用户的变更记录�
 
 > 0.1.3 起面向 Studio 用户维护。`@cs2dak/*` npm 包版本由 changesets 独立管理（见各包的 CHANGELOG.md）；本文件聚焦 DAK Studio 桌面应用变更。
 
-## [Unreleased] — 0.7.0（开发中）
+## [0.7.0] — 2026-06-24
 
-> 大库稳定性验证、赛事资产库/赛事包导入（见 [`docs/design/event-packages.md`](docs/design/event-packages.md)）、
-> Windows 签名等仍在 [`docs/roadmap.md`](docs/roadmap.md) 0.7.0 排期中。
+### 新增
+
+- **科隆 Major 2026 内置赛事**：Stage3（Swiss BO3，33 场）与 Playoff（单败，7 场）由安装器预装到本地，Gallery 一键载入即完整分析（facts / LOS / 战术聚类）。Stage1/2（各 33 场）通过 R2 在线下载。四阶段共 106 场，含全量真实 BP。
+- **赛事画廊（EventGallery）**：内置、在线、示例三类赛事共用卡片；按 `group` 折叠为单张赛事卡（科隆四阶段 → 一张 "IEM Cologne Major 2026"）；管理页拆「获取赛事」/「已导入赛事」，kind/source 中文映射。
+- **资产管理中心**：管理页「身份 / 资产 / 赛事」三 Tab。Demo 资产（场次/原始 ZIP 占用/旧口径计数/缺 .dem 路径 + 批量重建）；`.tri` 已装/缺失矩阵 + 单图下载/补全全部缺失；桌面走 Python 精确分类存储，浏览器走 `navigator.storage.estimate()`。
+- **统一 AnalysisManifest**：收敛 `formatVersion` / `analysisVersion` / `reportVersion` / `appVersion`；导入写 `entry.builtWith`，旧口径标记 stale，**从已存 v3 ZIP 一键重建 facts**（无需 .dem 或 cs2df）。
+- **HLTV 来源链接**：赛事管理页、BP 流程、系列工作台、赛事制作器四处可点击外链到 HLTV results/match 页面。
+- **导入并行化**：facts 抽取（含 .tri LOS）从主线程移入 worker 池；批量导入滑动窗口并发，兼顾吞吐与内存。
+- **`.tri` 资产包按需下载**：首次用到某图时从 R2 自动下载到 `userdata/tris` overlay；资产 Tab 可查看矩阵并一键补全全部缺失。
+- **DataTable 通用数据表**：内置排序 hook + 分页组件，Coach/经济/道具/选手等视图全部迁入。
+- **赛事 bracket 可视化**：瑞士轮战绩图 + 单败/双败/GSL 淘汰赛 bracket，制作器与观看侧共用。
+- **RivalHub event-package 桥接**：`event-package/1.0` 合同落地，Event/Stage/Series/Map 四级结构，支持从 RivalHub 赛事数据一键生成 DAK 可用资源包。
+- **TeamComparison v0.2**：赛前侦察模式，地图池对比表（我方/对手胜率 + 高频打法）。
+- **教练聚类增强**：经济筛选入口、进点 evidence 展示、道具落点空间聚类。
+- **选手 Flash Value 排行**：排序、分页，闪光分析优化。
+- **r2 赛事一键重新拉取**：demo 被删或换机后从 live manifest 按 slug 补齐。
+- **赛季视图队伍筛选 + 赛季排行榜升降序切换**。
+
+### 变更
+
+- **`.tri` 外置 + 安装期预取**：不再打进安装包。Web Installer 安装阶段按需预取所需 `.tri` 到 `userdata/tris/`，首启即完整。运行时缺图自动按需下载兜底。
+- **Web Installer**：小 setup 下载器，安装阶段联网拉取 runtime + 内置赛事包 + 所需 `.tri`，sha256 校验，首启完整体验。
+- **cologne-build 按 stage 出独立包**：4 个 `{slug}-{stageKey}.zip`，各带共享 `group` 供 Gallery 折叠。Stage3/Playoff 由安装器预装，不再打进 Vite bundle。
+- **event-export 压缩等级 9**：`--compress-level` 透传，spec.export 可配，默认 9。
+- **contract 扩展**：`event.sourceUrl` / `event.group` / `series.matchUrl` 可选字段，`eventsManifest` 支持 `description` / `builtin` / `group`。
+- **管理页重构**：资料库维护与赛事入口合并为 ManagementView。
+- **导航文案统一**：Tab 名称与排序收敛。
+- **示例 event-package 化**：7 场职业决赛组装为 `sample-pro-finals-2026.zip`（7MB），与科隆同路径导入。旧 7 个 sample zip 保留供测试。
+- **导入性能**：跳过 replay/duels zod 深拷贝，峰值内存砍半；normalizeDemoPackage 幂等，workspace model 懒算。
+- **资料库日期收口**：`entryDate` 统一从 meta.matchDate 取，赛事包导入从 `series.completedAt` fallback。
+
+### 修复
+
+- **双败 bracket LR 镜像编号**：避免败者重遇胜者组对手。
+- **player:v2 缓存 key**：淘汰旧 `PlayerSeasonInsights`，`bestEnemyFlashes` 恢复正常。
+- **道具实验室黑屏**：LineupView Hook 顺序修复。
+- **赛事导入 sha256 全局优先匹配**：不被 demo 与包内队名拼写差异挡住。
+- **ratingSeed 放宽为 number**：被碾压方 rrBase 可为负。
+- **阵营筛选同步**：雷达卡片与表格同时过滤。
+- **bracket 列等高**：各轮次 stretch + 居中。
+- **event-export hash 含 dash 的正则**：修复 rar 文件名匹配漏 13 个文件。
+
+> 完整路线图见 [`docs/roadmap.md`](docs/roadmap.md)。
 
 ## [0.6.5] — 2026-06-16
 

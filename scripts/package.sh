@@ -30,11 +30,12 @@ STUDIO_WEB="python/src/cs2dak/studio_web"
 rm -rf "$STUDIO_WEB"
 cp -R apps/dak-studio/dist "$STUDIO_WEB"
 
-# .tri 碰撞几何（~30MB/图，~200MB 全量）自 0.6.4 起**不再内置**：安装包从
-# ~220MB 瘦到 ~20MB。运行时首次用到某图时由桌面壳按 tris-manifest 从镜像（R2）
-# 按需下载到 userdata/tris overlay（python/src/cs2dak/studio.py 的 _StudioStaticHandler）。
-# 资产由发版 CI（release.yml）上传到 R2；本地调试若想内置回退，手动把 .tri 放进
-# "$STUDIO_WEB/tris/" 即可（overlay 优先，内置为兜底）。
+# 0.7.0 起采用 Web Installer 模式：
+#   - 安装包很小（~20MB runtime），安装阶段从 R2 拉取内置赛事包 + 所需 .tri
+#   - .tri 放入 userdata/tris/ overlay，内置赛事放入 userdata/bundled-events/
+#   - 首启即完整体验，运行时缺图按需下载兜底
+#   - 资产由发版 CI（release.yml）上传到 R2
+# .tri 自 0.6.4 起不再打进安装包；内置赛事自 0.7.0 起也不再打进 Vite bundle。
 
 echo "==> [3/5] PyInstaller build (studio)"
 cd python

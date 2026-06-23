@@ -1,12 +1,11 @@
-// 内置赛事/示例 registry —— 打包进 App 的本地 event-package（不走 R2），与在线赛事共用同一条
-// 导入管线（importEventAssetArchive）与 EventGallery 卡片 UI。BP 直接写在包里（见
-// scripts/build-sample-event.mjs），不再按队名匹配回填——内置示例与真实赛事完全同一路径。
+// 内置赛事/示例 registry —— 与在线赛事共用同一条导入管线（importEventAssetArchive）
+// 与 EventGallery 卡片 UI。
 //
-// 往 BUILTIN_EVENTS 加一条（slug/name/description/group + Vite ?url import）即可让新内置赛事
-// 出现在画廊，无需改组件代码。注意：大文件（>10MB）不入 git —— 由 `scripts/cologne-build.mjs`
-// 产出后手工拷到 fixtures/input/，再加到 .gitignore。package.sh 构建前确保文件存在。
+// 0.7.0 迁移中：Stage3/Playoff 当前仍通过 Vite ?url import 打进 bundle（临时），
+// 下一步将迁至 installer 预装模式（放入 userdata/bundled-events/，
+// Python 静态服务暴露 /bundled-events/，前端通过本地 URL 加载）。
+// 完成后 BUILTIN_EVENTS 只保留小 sample，大赛事走 bundled-events 发现层。
 import samplePackageUrl from "../../../../fixtures/input/sample-pro-finals-2026.zip?url";
-// 科隆 Major 2026 内置阶段（cologne-build 产出后 cp 到 fixtures/input/，随仓库分发）
 import stage3PackageUrl from "../../../../fixtures/input/iem-cologne-major-2026-stage3.zip?url";
 import playoffPackageUrl from "../../../../fixtures/input/iem-cologne-major-2026-playoff.zip?url";
 

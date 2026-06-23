@@ -36,3 +36,5 @@ __pycache__/
 packages/maps/viz/
 # DAK Studio 桌面壳的前端构建产物（package.sh 生成）
 python/src/cs2dak/studio_web/
+scripts/hltv/.download-state.json
+scripts/hltv/.extract-state.json
