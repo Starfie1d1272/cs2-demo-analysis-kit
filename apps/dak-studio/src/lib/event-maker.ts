@@ -152,8 +152,8 @@ function doubleEliminationNodes(teamCount: number): NonNullable<EventStage["brac
         r === 1 ? `胜者组首轮 ${m}` :
         `胜者组第 ${r} 轮 ${m}`;
       const nextWinNodeId = r === k ? "g1" : `w${r + 1}-m${Math.ceil(m / 2)}`;
-      // WR1 losers pair up → LR1；WRr (r≥2) losers → 交叉局 LR(2*(r-1))
-      const nextLossNodeId = r === 1 ? `l1-m${Math.ceil(m / 2)}` : `l${2 * (r - 1)}-m${m}`;
+      // WR1 losers pair up → LR1；WRr (r≥2) losers → 交叉局 LR(2*(r-1))，镜像编号避免重遇
+      const nextLossNodeId = r === 1 ? `l1-m${Math.ceil(m / 2)}` : `l${2 * (r - 1)}-m${count + 1 - m}`;
       nodes.push({ id: `w${r}-m${m}`, label, round: r, lane: "winner" as const, nextWinNodeId, nextLossNodeId });
     }
   }
