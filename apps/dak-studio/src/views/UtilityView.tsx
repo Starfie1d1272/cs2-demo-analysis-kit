@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
-import { EmptyState, EvidenceLink, MetricInfo } from "@cs2dak/react";
+import { DataTable, STUDIO_TABLE_CLASSES, EmptyState, EvidenceLink, MetricInfo, type DataTableColumn } from "@cs2dak/react";
 import { getPlayerFlashSummaries, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { formatMatchLabel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
-import { Pagination } from "../components/Pagination";
 import { LineupView } from "./LineupView";
 
 export interface UtilityViewProps {
@@ -17,15 +16,25 @@ export interface UtilityViewProps {
   teamRenames?: Record<string, string>;
 }
 
+type FlashRow = {
+  playerKey: string;
+  name: string;
+  flashesThrown: number;
+  enemyBlindSeconds: number;
+  teamBlindSeconds: number;
+  netSecondsPerFlash: number | null;
+};
+
+const FLASH_COLUMNS: DataTableColumn<FlashRow>[] = [
+  { key: "name", label: "选手", format: (r) => r.name },
+  { key: "flashesThrown", label: "闪光", numeric: true, sortable: true, sortValue: (r) => r.flashesThrown, format: (r) => r.flashesThrown },
+  { key: "enemyBlindSeconds", label: "致盲敌方", numeric: true, sortable: true, sortValue: (r) => r.enemyBlindSeconds, format: (r) => `${r.enemyBlindSeconds.toFixed(1)}s` },
+  { key: "teamBlindSeconds", label: "致盲队友", numeric: true, sortable: true, sortValue: (r) => r.teamBlindSeconds, format: (r) => `${r.teamBlindSeconds.toFixed(1)}s` },
+  { key: "netSecondsPerFlash", label: <>净价值/颗<MetricInfo note="（致盲敌方秒数 − 致盲队友秒数）/ 投掷数；越高越好" /></>, numeric: true, sortable: true, sortValue: (r) => r.netSecondsPerFlash, format: (r) => r.netSecondsPerFlash == null ? "—" : `${r.netSecondsPerFlash.toFixed(2)}s` },
+];
+
 export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenMatch, onGoLibrary, identityOptions, teamRenames = {} }: UtilityViewProps) {
-  const [rows, setRows] = useState<{
-    playerKey: string;
-    name: string;
-    flashesThrown: number;
-    enemyBlindSeconds: number;
-    teamBlindSeconds: number;
-    netSecondsPerFlash: number | null;
-  }[] | null>(null);
+  const [rows, setRows] = useState<FlashRow[] | null>(null);
   const [incidents, setIncidents] = useState<{
     matchId: string;
     roundNumber: number;
@@ -35,31 +44,6 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
     totalSeconds: number;
   }[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [sortKey, setSortKey] = useState<"netSecondsPerFlash" | "flashesThrown" | "enemyBlindSeconds" | "teamBlindSeconds">("netSecondsPerFlash");
-  const [sortDesc, setSortDesc] = useState(true);
-  const [page, setPage] = useState(0);
-  const FLASH_PAGE_SIZE = 15;
-
-  function handleSort(key: typeof sortKey) {
-    if (sortKey === key) setSortDesc((d) => !d);
-    else { setSortKey(key); setSortDesc(true); }
-    setPage(0);
-  }
-
-  // ── 排序 + 分页 ──────────────────────────────────────────────────────────
-  const sortedRows = useMemo(() => {
-    if (!rows) return [];
-    return [...rows].sort((a, b) => {
-      const dir = sortDesc ? 1 : -1;
-      const va = a[sortKey] ?? -999;
-      const vb = b[sortKey] ?? -999;
-      return (vb - va) * dir;
-    });
-  }, [rows, sortKey, sortDesc]);
-
-  const flashTotalPages = Math.max(1, Math.ceil(sortedRows.length / FLASH_PAGE_SIZE));
-  const flashSafePage = Math.min(page, flashTotalPages - 1);
-  const pageRows = sortedRows.slice(flashSafePage * FLASH_PAGE_SIZE, (flashSafePage + 1) * FLASH_PAGE_SIZE);
 
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
 
@@ -147,42 +131,15 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
       {rows && (
         <div className="stu-card">
           <h3>闪光价值排行</h3>
-          <Pagination
-            page={flashSafePage}
-            totalPages={flashTotalPages}
-            onChange={setPage}
-            info={`${sortedRows.length} 人 · ${flashSafePage + 1}/${flashTotalPages} 页`}
+          <DataTable
+            classes={STUDIO_TABLE_CLASSES}
+            rows={rows}
+            rowKey={(r) => r.playerKey}
+            initialSortKey="netSecondsPerFlash"
+            pageSize={15}
+            paginationInfo={(total) => `${total} 人`}
+            columns={FLASH_COLUMNS}
           />
-          <table className="stu-mini-table">
-            <thead>
-              <tr>
-                <th>选手</th>
-                <th className="stu-num stu-col-sortable" onClick={() => handleSort("flashesThrown")}>
-                  闪光{sortKey === "flashesThrown" ? (sortDesc ? " ↓" : " ↑") : ""}
-                </th>
-                <th className="stu-num stu-col-sortable" onClick={() => handleSort("enemyBlindSeconds")}>
-                  致盲敌方{sortKey === "enemyBlindSeconds" ? (sortDesc ? " ↓" : " ↑") : ""}
-                </th>
-                <th className="stu-num stu-col-sortable" onClick={() => handleSort("teamBlindSeconds")}>
-                  致盲队友{sortKey === "teamBlindSeconds" ? (sortDesc ? " ↓" : " ↑") : ""}
-                </th>
-                <th className="stu-num stu-col-sortable" onClick={() => handleSort("netSecondsPerFlash")}>
-                  净价值/颗<MetricInfo note="（致盲敌方秒数 − 致盲队友秒数）/ 投掷数；越高越好" />{sortKey === "netSecondsPerFlash" ? (sortDesc ? " ↓" : " ↑") : ""}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.map((row) => (
-                <tr key={row.playerKey}>
-                  <td>{row.name}</td>
-                  <td className="stu-num">{row.flashesThrown}</td>
-                  <td className="stu-num">{row.enemyBlindSeconds.toFixed(1)}s</td>
-                  <td className="stu-num">{row.teamBlindSeconds.toFixed(1)}s</td>
-                  <td className="stu-num">{row.netSecondsPerFlash == null ? "—" : `${row.netSecondsPerFlash.toFixed(2)}s`}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       )}
       {incidents.length > 0 && (
