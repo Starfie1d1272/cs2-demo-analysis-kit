@@ -13,7 +13,7 @@ import { LibraryMaintenance } from "./LibraryMaintenance";
 import {
   checkAssets,
   repairAssets,
-  supportsAssetHealth,
+  useAssetHealthAvailable,
   type AssetStatus,
 } from "../lib/asset-health-bridge";
 
@@ -33,7 +33,7 @@ export interface AssetsPanelProps {
 
 export function AssetsPanel({ entries, onLibraryChanged, onNotice = () => {} }: AssetsPanelProps) {
   const desktop = hasLibraryMaintenance();
-  const assetAvailable = supportsAssetHealth();
+  const assetAvailable = useAssetHealthAvailable();
   const [browserOverview, setBrowserOverview] = useState<BrowserStorageOverview | null>(null);
   const [installedTris, setInstalledTris] = useState<string[]>([]);
   const [trisManifest, setTrisManifest] = useState<TrisManifest | null>(null);
@@ -80,7 +80,7 @@ export function AssetsPanel({ entries, onLibraryChanged, onNotice = () => {} }: 
     }
   }
 
-  useEffect(() => { void refresh(); }, [entries]);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void refresh(); }, [entries, assetAvailable]);  // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { void loadTrisManifest().then(setTrisManifest).catch(() => setTrisManifest(null)); }, []);
 
   // ── 修复官方资产 ──

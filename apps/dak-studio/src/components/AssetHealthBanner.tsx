@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   checkAssets,
   repairAssets,
-  supportsAssetHealth,
+  useAssetHealthAvailable,
   type AssetStatus,
 } from "../lib/asset-health-bridge";
 
@@ -25,7 +25,7 @@ export function AssetHealthBanner() {
   const [repairProgress, setRepairProgress] = useState("");
   const [repairDone, setRepairDone] = useState(false);
 
-  const available = supportsAssetHealth();
+  const available = useAssetHealthAvailable();
 
   const check = useCallback(async (deep = false) => {
     const result = await checkAssets(deep);

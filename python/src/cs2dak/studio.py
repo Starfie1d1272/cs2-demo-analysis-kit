@@ -1324,6 +1324,7 @@ class StudioApi:
             bundled_dir.mkdir(parents=True, exist_ok=True)
             tris_dir = self._userdata / "tris"
             tris_dir.mkdir(parents=True, exist_ok=True)
+            succeeded_events = set()
 
             for i, item in enumerate(items):
                 job["state"] = "downloading"
@@ -1343,6 +1344,7 @@ class StudioApi:
                             expected_sha256=evt.get("sha256"),
                             expected_size=evt.get("size"),
                         )
+                        succeeded_events.add(slug)
                     elif item.get("type") == "tri":
                         map_name = item["mapName"]
                         entry = (manifest.get("requiredTris") or {}).get(map_name)
@@ -1359,21 +1361,24 @@ class StudioApi:
                 except Exception as exc:  # noqa: BLE001
                     job["errors"].append(f"{item}: {exc}")
 
-            # 下载完成：写入本地 manifest（下次启动无需 R2）
-            if not job["errors"]:
-                try:
-                    dest = self._userdata / "install-manifest.json"
-                    dest.parent.mkdir(parents=True, exist_ok=True)
-                    dest.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), "utf-8")
-                    # 同步写入 bundled-events manifest
-                    be_manifest = bundled_dir / "manifest.json"
-                    be_data = {
-                        "version": "cs2-demo-analysis-kit/events-manifest-1.0",
-                        "events": manifest.get("bundledEvents", []),
-                    }
+            # 总是写 install-manifest（修复后下次启动不再依赖 R2）
+            try:
+                dest = self._userdata / "install-manifest.json"
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), "utf-8")
+            except Exception as exc:  # noqa: BLE001
+                log.warning("写入 install-manifest 失败：%s", exc)
+            # bundled-events manifest 只写成功下载的 event
+            try:
+                be_manifest = bundled_dir / "manifest.json"
+                be_data = {
+                    "version": "cs2-demo-analysis-kit/events-manifest-1.0",
+                    "events": [e for e in manifest.get("bundledEvents", []) if e.get("slug") in succeeded_events],
+                }
+                if be_data["events"]:
                     be_manifest.write_text(json.dumps(be_data, ensure_ascii=False, indent=2), "utf-8")
-                except Exception as exc:  # noqa: BLE001
-                    log.warning("写入 install-manifest 失败：%s", exc)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("写入 bundled-events manifest 失败：%s", exc)
 
             job["progress"] = 1.0
             job["current"] = len(items)

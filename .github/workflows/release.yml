@@ -123,7 +123,7 @@ jobs:
           uv run pyinstaller packaging/installer.spec --noconfirm --distpath dist
           cd ..
           VERSION="$(node -p "require('./package.json').version")"
-          cp python/dist/DAK-Studio-Setup.exe "python/dist/DAK-Studio-Setup-${VERSION}.exe" || true
+          mv python/dist/DAK-Studio-Setup.exe "python/dist/DAK-Studio-Setup-${VERSION}.exe"
 
       # 0.7.0: 准备 event packages（从 fixtures/input/ 复制，已是成品）。
       # 仅用于 gen-install-manifest（计算 sha256/size）和 assemble-full-zip（打包进 full zip）。

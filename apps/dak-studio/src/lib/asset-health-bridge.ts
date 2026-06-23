@@ -35,11 +35,40 @@ export interface NativeAssetApi {
   asset_repair_status(jobId: string): Promise<RepairJob | null>;
 }
 
-/** 仅 pywebview 桌面环境可用。 */
+import { useEffect, useState } from "react";
+
+/** 仅 pywebview 桌面环境可用（同步检查，可能 bridge 尚未 ready）。 */
 export function supportsAssetHealth(): boolean {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const api = typeof window === "undefined" ? undefined : (window as any).pywebview?.api;
   return typeof api?.check_assets === "function";
+}
+
+/**
+ * 轮询等待 pywebview bridge 就绪。
+ * 首次 render 时 supportsAssetHealth() 可能返回 false（bridge 尚未注入），
+ * 直接同步检查会导致 AssetHealthBanner 和 AssetsPanel 永远不加载官方资产 UI。
+ * 此 hook 在不可用时每 250ms 重试，最多 40 次（10s），就绪后返回 true。
+ */
+export function useAssetHealthAvailable(): boolean {
+  const [available, setAvailable] = useState(() => supportsAssetHealth());
+  useEffect(() => {
+    if (available) return;
+    let cancelled = false;
+    let tries = 0;
+    const tick = () => {
+      if (cancelled) return;
+      if (supportsAssetHealth()) {
+        setAvailable(true);
+        return;
+      }
+      tries += 1;
+      if (tries < 40) setTimeout(tick, 250);
+    };
+    tick();
+    return () => { cancelled = true; };
+  }, [available]);
+  return available;
 }
 
 function getApi(): NativeAssetApi | null {
