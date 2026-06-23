@@ -8,10 +8,12 @@ import {
   type LineupGrenadeLike,
 } from "@cs2dak/maps";
 import { displayWeaponName } from "@cs2dak/presentation";
-import { EmptyState } from "../components/primitives";
+import { EmptyState, MetricInfo, EvidenceLink } from "../components/primitives";
 import { Pagination } from "../components/Pagination";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { mapDisplayName } from "../lib/series";
 import { getFactsStore } from "../lib/facts";
+import { GRENADE_COLOR } from "../components/RadarTrails";
 
 // ── 常亮 ────────────────────────────────────────────────────────────────────
 
@@ -22,15 +24,6 @@ const GRENADE_LABEL: Record<string, string> = {
   incendiary: "火",
   hegrenade: "雷",
   decoy: "诱饵",
-};
-
-const GRENADE_COLOR: Record<string, string> = {
-  smoke: "#9b59b6",
-  flashbang: "#f1c40f",
-  molotov: "#e74c3c",
-  incendiary: "#e74c3c",
-  hegrenade: "#2ecc71",
-  decoy: "#95a5a6",
 };
 
 const SIDE_LABEL: Record<string, string> = { t: "T", ct: "CT" };
@@ -253,7 +246,7 @@ export function LineupView({
     <div className="stu-lineup-layout">
       {/* ── 雷达 ──────────────────────────────────────────────────────── */}
       <div className="stu-card">
-        <h3>Lineup 雷达 · {current.mapName.replace(/^de_/, "")}</h3>
+        <h3>道具点位雷达 · {mapDisplayName(current.mapName)}</h3>
 
         {byMap.length > 1 && (
           <div className="stu-chip-row" role="tablist" aria-label="地图选择">
@@ -271,7 +264,7 @@ export function LineupView({
                   setPage(0);
                 }}
               >
-                {group.mapName.replace(/^de_/, "")} · {group.rows.length}
+                {mapDisplayName(group.mapName)} · {group.rows.length}
               </button>
             ))}
           </div>
@@ -438,13 +431,13 @@ export function LineupView({
             })}
           </svg>
         ) : (
-          <p className="stu-muted">{current.mapName} 缺少雷达标定，仅显示列表。</p>
+          <p className="stu-muted">{mapDisplayName(current.mapName)} 缺少雷达标定，仅显示列表。</p>
         )}
       </div>
 
       {/* ── 表格 + 分页 ──────────────────────────────────────────────── */}
       <div className="stu-card">
-        <h3>常用道具库 · {current.mapName}</h3>
+        <h3>道具点位库 · {mapDisplayName(current.mapName)}</h3>
         <Pagination
           page={safePage}
           totalPages={totalPages}
@@ -467,7 +460,7 @@ export function LineupView({
                 场次{sortKey === "demoCount" ? (sortDesc ? " ↓" : " ↑") : ""}
               </th>
               <th className="stu-num stu-col-sortable" onClick={() => handleSort("winRate")}>
-                胜率{sortKey === "winRate" ? (sortDesc ? " ↓" : " ↑") : ""}
+                胜率<MetricInfo note="该道具点位所在回合的本方胜率；样本小仅供参考" />{sortKey === "winRate" ? (sortDesc ? " ↓" : " ↑") : ""}
               </th>
               <th />
             </tr>
@@ -523,10 +516,9 @@ export function LineupView({
                   </td>
                   <td>
                     {firstThrow && (
-                      <button
-                        type="button"
-                        className="stu-button-sm"
-                        onClick={() =>
+                      <EvidenceLink
+                        hint="打开该场比赛复盘并定位该点位投掷"
+                        onOpen={() =>
                           onOpenMatch(cluster.entryIds[0] ?? "", {
                             roundNumber: firstThrow.roundNumber,
                             tick: firstThrow.tick,
@@ -534,7 +526,7 @@ export function LineupView({
                         }
                       >
                         回放
-                      </button>
+                      </EvidenceLink>
                     )}
                   </td>
                 </tr>

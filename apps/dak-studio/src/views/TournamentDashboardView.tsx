@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatPercent, type TeamComparisonModel, type TournamentInsights } from "@cs2dak/presentation";
 import { TeamComparisonPanel } from "@cs2dak/react";
 import { getTeamComparison, getTournamentInsights, type IdentityOptions } from "../lib/season";
@@ -75,7 +75,7 @@ export function TournamentDashboardView({
   }
 
   const scopePanel = <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />;
-  const entryByMatchId = new Map(entries.map((entry) => [matchIdForEntry(entry), entry]));
+  const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
 
   return (
     <div className="stu-view">
@@ -163,81 +163,7 @@ export function TournamentDashboardView({
               </tbody>
             </table>
           </div>
-          <div className="stu-card">
-            <h3>队伍手枪局</h3>
-            <table className="stu-mini-table">
-              <thead>
-                <tr>
-                  <th>队伍</th>
-                  <th className="stu-num">手枪胜率</th>
-                  <th className="stu-num">第二局转化</th>
-                  <th className="stu-num">反转换<MetricInfo note="对手赢手枪局后，该队赢了下一回合（次局）的比率" /></th>
-                </tr>
-              </thead>
-              <tbody>
-                {insights.teamPistols.map((row) => (
-                  <tr key={row.teamName}>
-                    <td>{row.teamName}</td>
-                    <td className="stu-num">
-                      {formatPercent(row.winRatePercent)} ({row.pistolWins}/{row.pistolRounds})
-                    </td>
-                    <td className="stu-num">
-                      {formatPercent(row.conversionPercent)} ({row.conversionWins}/{row.conversionRounds})
-                    </td>
-                    <td className="stu-num" title="对手赢手枪局后，该队赢了下一回合的次数 / 机会数">
-                      {formatPercent(row.breakRatePercent)} ({row.breakWins}/{row.breakRounds})
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="stu-card">
-            <h3>经济对位胜率（按高低经济，非手枪局）</h3>
-            <table className="stu-mini-table">
-              <thead>
-                <tr>
-                  <th>低经济方</th>
-                  <th>高经济方</th>
-                  <th className="stu-num">样本</th>
-                  <th className="stu-num">低经济方胜率<MetricInfo note="同档对局对称，不出胜率" /></th>
-                </tr>
-              </thead>
-              <tbody>
-                {insights.economyMatrix.slice(0, 12).map((row) => (
-                  <tr key={`${row.lowEconomy}-${row.highEconomy}`} className={row.rounds < 5 ? "stu-row-muted" : undefined}>
-                    <td>{row.lowEconomy}</td>
-                    <td>{row.highEconomy}</td>
-                    <td className="stu-num">{row.rounds}</td>
-                    <td className="stu-num">{formatPercent(row.lowWinRatePercent)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="stu-card">
-            <h3>Eco / Semi 翻盘</h3>
-            <table className="stu-mini-table">
-              <thead>
-                <tr>
-                  <th>队伍</th>
-                  <th className="stu-num">翻盘</th>
-                  <th className="stu-num">机会</th>
-                  <th className="stu-num">胜率</th>
-                </tr>
-              </thead>
-              <tbody>
-                {insights.ecoUpsets.slice(0, 8).map((row) => (
-                  <tr key={row.teamName}>
-                    <td>{row.teamName}</td>
-                    <td className="stu-num">{row.wins}</td>
-                    <td className="stu-num">{row.opportunities}</td>
-                    <td className="stu-num">{formatPercent(row.winRatePercent)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <p className="stu-muted">队伍手枪局、经济对位胜率与 Eco/Semi 翻盘等经济维度，统一在「经济与节奏」页查看（避免重复）。</p>
         </>
       )}
     </div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
-import { EmptyState, EvidenceLink } from "../components/primitives";
+import { EmptyState, EvidenceLink, MetricInfo } from "../components/primitives";
 import { getPlayerFlashSummaries, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { formatMatchLabel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { Pagination } from "../components/Pagination";
@@ -131,16 +131,22 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
       <header className="stu-view-header">
         <div>
           <h1>道具实验室</h1>
-          <p>跨场 Flash Value 与负收益队闪证据，点击证据可回到对应回合/tick。</p>
+          <p>跨场闪光价值与负收益队闪证据，点击证据可回到对应回合/tick。</p>
         </div>
       </header>
       <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && !rows && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的道具数据…</div>}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
+      {entries.length > 0 && (
+        <section>
+          <h2 className="stu-section-title">道具点位库</h2>
+          <LineupView entries={entries} onOpenMatch={onOpenMatch} />
+        </section>
+      )}
       {rows && (
         <div className="stu-card">
-          <h3>Flash Value 排行</h3>
+          <h3>闪光价值排行</h3>
           <Pagination
             page={flashSafePage}
             totalPages={flashTotalPages}
@@ -161,7 +167,7 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
                   致盲队友{sortKey === "teamBlindSeconds" ? (sortDesc ? " ↓" : " ↑") : ""}
                 </th>
                 <th className="stu-num stu-col-sortable" onClick={() => handleSort("netSecondsPerFlash")}>
-                  净值/颗{sortKey === "netSecondsPerFlash" ? (sortDesc ? " ↓" : " ↑") : ""}
+                  净价值/颗<MetricInfo note="（致盲敌方秒数 − 致盲队友秒数）/ 投掷数；越高越好" />{sortKey === "netSecondsPerFlash" ? (sortDesc ? " ↓" : " ↑") : ""}
                 </th>
               </tr>
             </thead>
@@ -197,12 +203,6 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
             })}
           </div>
         </div>
-      )}
-      {rows && (
-        <section>
-          <h2 className="stu-section-title">Lineup Library</h2>
-          <LineupView entries={entries} onOpenMatch={onOpenMatch} />
-        </section>
       )}
     </div>
   );

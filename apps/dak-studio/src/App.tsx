@@ -47,10 +47,10 @@ const NAV: { key: StudioView; label: string; hint: string; icon: typeof LibraryB
   { key: "match", label: "比赛工作台", hint: "回合 / 地图 / 回放", icon: Film },
   { key: "players", label: "个人实验室", hint: "档案 / 开局动线", icon: UserRound },
   { key: "duel", label: "对枪实验室", hint: "对枪与机制分析", icon: Swords },
-  { key: "utility", label: "道具实验室", hint: "道具价值与落点", icon: Bomb },
+  { key: "utility", label: "道具实验室", hint: "闪光价值 / 道具点位", icon: Bomb },
   { key: "economy", label: "经济与节奏", hint: "买局质量 / 回合 swing", icon: Coins },
-  { key: "tournament", label: "赛事中台", hint: "排行榜 / 报表", icon: Trophy },
-  { key: "coach", label: "教练工作台", hint: "战术模式与战术本", icon: ClipboardList },
+  { key: "tournament", label: "赛事中台", hint: "赛事排行 / 总览 / 赛程", icon: Trophy },
+  { key: "coach", label: "教练工作台", hint: "开局模式 / 战术本 / 备战", icon: ClipboardList },
   { key: "management", label: "管理", hint: "身份归并 · 资料库维护 · 赛事资产", icon: Settings }
 ];
 
@@ -590,7 +590,7 @@ export function App() {
                 onGoLibrary={() => setView("library")}
               />
             ) : (
-              <EventsView entries={entries} onOpenMatch={openDemo} onGoLibrary={() => setView("library")} />
+              <EventsView entries={entries} onOpenMatch={openDemo} onGoManage={() => setView("management")} />
             )}
           </>
         )}

@@ -376,7 +376,7 @@ export function PlayersView({
 
             {selected.style && (
               <div className="stu-card">
-                <h3>Playstyle Fingerprint</h3>
+                <h3>打法风格</h3>
                 <FingerprintRadar axes={selected.style.axes} />
               </div>
             )}
@@ -390,7 +390,7 @@ export function PlayersView({
 
             {insights && (
               <div className="stu-card">
-                <h3>Flash Value</h3>
+                <h3>闪光价值</h3>
                 <div className="stu-metric-grid">
                   <div className="stu-metric"><span>投掷闪光</span><b>{insights.flash.flashesThrown}</b></div>
                   <div className="stu-metric" title="所有回合敌方致盲秒数累计（总量，不是单颗效果）">
@@ -431,7 +431,7 @@ export function PlayersView({
 
             {insights && (
               <div className="stu-card">
-                <h3>Mistake Review</h3>
+                <h3>失误复盘</h3>
                 <div className="stu-metric-grid">
                   <div className="stu-metric">
                     <span>长枪局首死<MetricInfo note="我方 full 局该选手首死——最值得复盘的失误信号" /></span>
@@ -750,7 +750,7 @@ function buildPlayerCardMarkdown(profile: PlayerSeasonProfile, insights: PlayerS
   }
   if (insights) {
     lines.push("");
-    lines.push(`**Flash Value**：投 ${insights.flash.flashesThrown} 颗，致盲敌方 ${insights.flash.enemyBlindSeconds.toFixed(1)}s / 队友 ${insights.flash.teamBlindSeconds.toFixed(1)}s` +
+    lines.push(`**闪光价值**：投 ${insights.flash.flashesThrown} 颗，致盲敌方 ${insights.flash.enemyBlindSeconds.toFixed(1)}s / 队友 ${insights.flash.teamBlindSeconds.toFixed(1)}s` +
       (insights.flash.netSecondsPerFlash != null ? `，净价值 ${insights.flash.netSecondsPerFlash.toFixed(2)}s/颗` : ""));
   }
   lines.push("");
