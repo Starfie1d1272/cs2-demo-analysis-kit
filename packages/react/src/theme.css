@@ -2787,3 +2787,255 @@
   opacity: 0.45;
   cursor: default;
 }
+
+/* ── Event Bracket（瑞士轮 + 淘汰赛，DOM + SVG 双模式） ─────────────────── */
+
+.dak-bracket-diagram {
+  overflow-x: auto;
+  margin: 10px 0 16px;
+  border: 1px solid var(--dak-border);
+  border-radius: 7px;
+  background: var(--dak-bg);
+}
+
+.dak-bracket-diagram svg {
+  display: block;
+}
+
+.dak-bracket-edge {
+  fill: none;
+  stroke: var(--dak-accent);
+  stroke-width: 2;
+}
+
+.dak-bracket-edge-loss {
+  stroke: var(--dak-fg-dim);
+  stroke-dasharray: 5 4;
+}
+
+.dak-bracket-box {
+  fill: var(--dak-panel);
+  stroke: var(--dak-border-hi);
+}
+
+.dak-bracket-box-title,
+.dak-bracket-box-match {
+  fill: var(--dak-fg);
+  font-family: var(--dak-sans);
+  font-size: 12px;
+}
+
+.dak-bracket-lane-separator {
+  stroke: var(--dak-border);
+  stroke-width: 1;
+}
+
+.dak-bracket-lane-label {
+  fill: var(--dak-fg-mid);
+  font-family: var(--dak-sans);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dak-bracket-box-match {
+  fill: var(--dak-fg-dim);
+  font-size: 10px;
+}
+
+.dak-bracket-round,
+.dak-bracket-links {
+  display: grid;
+  gap: 8px;
+}
+
+.dak-bracket-node {
+  border: 1px solid var(--dak-border);
+  border-radius: 7px;
+  background: var(--dak-panel);
+  padding: 10px;
+}
+
+.dak-bracket-links {
+  color: var(--dak-fg-dim);
+  font-size: 11px;
+}
+
+.dak-eb {
+  display: flex;
+  gap: 18px;
+  align-items: stretch;
+  overflow-x: auto;
+  padding: 6px 2px 12px;
+}
+
+.dak-eb-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 210px;
+  align-self: stretch;
+}
+
+.dak-eb-col-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+
+.dak-eb-elim {
+  align-items: stretch;
+}
+
+.dak-eb-elim-col .dak-eb-col-body {
+  justify-content: space-evenly;
+}
+
+.dak-eb-elim-matches {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+}
+
+.dak-eb-col-head {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--dak-fg-mid);
+}
+
+.dak-eb-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dak-eb-group-head {
+  font-family: var(--dak-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dak-fg-dim);
+}
+
+.dak-eb-box {
+  display: grid;
+  gap: 1px;
+  border: 1px solid var(--dak-border);
+  border-radius: 7px;
+  background: var(--dak-panel);
+  overflow: hidden;
+  text-align: left;
+  width: 100%;
+  padding: 0;
+}
+
+.dak-eb-box-click {
+  cursor: pointer;
+}
+
+.dak-eb-box-click:hover {
+  border-color: var(--dak-border-hi);
+}
+
+.dak-eb-box-sel {
+  border-color: var(--dak-accent);
+}
+
+.dak-eb-team {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  font-size: 13px;
+  color: var(--dak-fg-mid);
+  background: var(--dak-panel);
+}
+
+.dak-eb-team b {
+  font-family: var(--dak-mono);
+  color: var(--dak-fg);
+}
+
+.dak-eb-win {
+  color: var(--dak-fg);
+  font-weight: 700;
+  border-left: 3px solid var(--dak-ok);
+}
+
+.dak-eb-lose {
+  color: var(--dak-fg-dim);
+  border-left: 3px solid var(--dak-danger);
+}
+
+.dak-eb-date {
+  padding: 3px 9px;
+  font-size: 10px;
+  color: var(--dak-fg-dim);
+  border-top: 1px solid var(--dak-border);
+}
+
+.dak-eb-box-empty {
+  padding: 12px 9px;
+  border-style: dashed;
+  color: var(--dak-fg-dim);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.dak-eb-box-empty:hover {
+  border-color: var(--dak-accent);
+  color: var(--dak-accent);
+}
+
+.dak-eb-add {
+  border: 1px dashed var(--dak-border-hi);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--dak-fg-dim);
+  font-size: 11px;
+  padding: 5px;
+  cursor: pointer;
+}
+
+.dak-eb-add:hover {
+  border-color: var(--dak-accent);
+  color: var(--dak-accent);
+}
+
+.dak-eb-outcomes {
+  gap: 14px;
+}
+
+.dak-eb-outcome {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 7px;
+}
+
+.dak-eb-advanced {
+  background: color-mix(in srgb, var(--dak-ok) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dak-ok) 40%, transparent);
+}
+
+.dak-eb-eliminated {
+  background: color-mix(in srgb, var(--dak-danger) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dak-danger) 38%, transparent);
+}
+
+.dak-eb-outcome-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--dak-fg);
+}
+
+.dak-eb-outcome-row b {
+  font-family: var(--dak-mono);
+  color: var(--dak-fg-mid);
+}
