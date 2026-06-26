@@ -98,6 +98,8 @@ const MODE_LABEL: Record<string, string> = {
   ...(isDiff
     ? {
         "delta-ctVis": "CT视野偏移 (红↑/蓝↓)",
+        "delta-tVis": "T视野偏移 (红↑/蓝↓)",
+        "delta-ctPres": "CT位置偏移 (红↑/蓝↓)",
         "delta-tPres": "T位置偏移 (红↑/蓝↓)",
         "delta-info-diff": "信息差分偏移 (红↑/蓝↓)",
       } as Record<string, string>
@@ -203,7 +205,7 @@ ${panels}</svg>`;
 }
 
 const SINGLE_MODES = ["ctVis", "tVis", "tPres", "info-diff", "contested"];
-const DELTA_MODES = ["delta-ctVis", "delta-tPres", "delta-info-diff"];
+const DELTA_MODES = ["delta-ctVis", "delta-tVis", "delta-ctPres", "delta-tPres", "delta-info-diff"];
 for (const m of [...SINGLE_MODES, ...(isDiff ? DELTA_MODES : [])]) {
   writeFileSync(`${outBase}-${m}.svg`, renderSvg(m));
 }
@@ -238,7 +240,7 @@ const calib=${JSON.stringify({ posX: calib.posX, posY: calib.posY, scale: calib.
 const MODES=${JSON.stringify(MODE_LABEL)};
 const cv=document.getElementById('c'),cx=cv.getContext('2d'),img=new Image();img.src="data:image/png;base64,${radarB64}";
 const sel=document.getElementById('m');for(const k in MODES){const o=document.createElement('option');o.value=k;o.textContent=MODES[k];sel.appendChild(o);}sel.value='tPres';
-function fr(fields,sec){const W=2;const f=new Float64Array(G.length);let d=0;for(let s=Math.max(0,sec-W);s<=Math.min(maxSec-1,sec+W);s++){d+=DEN[s];for(let g=0;g<G.length;g++)f[g]+=fields[s][g];}if(d>0)for(let g=0;g<G.length;g++)f[g]/=d;return f;}
+function fr(fields,dn,sec){const W=2;const f=new Float64Array(G.length);let d=0;for(let s=Math.max(0,sec-W);s<=Math.min(maxSec-1,sec+W);s++){d+=dn[s];for(let g=0;g<G.length;g++)f[g]+=fields[s][g];}if(d>0)for(let g=0;g<G.length;g++)f[g]/=d;return f;}
 function seq(t,cap){return 'hsl('+Math.round(240-240*Math.min(1,t/cap))+' 95% 55%)';}
 function style(mode,gi,Q,QTeam){
  if(mode==='info-diff'){const d=Q.tVis[gi]-Q.ctVis[gi];if(Math.abs(d)<0.04)return null;return[d>0?'14':'208',0.2+0.7*Math.min(1,Math.abs(d)/0.4)];}
@@ -247,8 +249,8 @@ function style(mode,gi,Q,QTeam){
   if(m2==='info-diff'){const bd=Q.tVis[gi]-Q.ctVis[gi],td=QTeam.tVis[gi]-QTeam.ctVis[gi];const dv=td-bd;if(Math.abs(dv)<0.03)return null;return[dv>0?'14':'208',0.2+0.7*Math.min(1,Math.abs(dv)/0.25)];}
   const dv=tv-bv;if(Math.abs(dv)<0.02)return null;return[dv>0?'14':'208',0.3+0.6*Math.min(1,Math.abs(dv)/0.15)];}
  var cap=mode.endsWith('Pres')?0.3:0.5,v=Q[mode]?.[gi]??0;if(v<0.03)return null;return[String(Math.round(240-240*Math.min(1,v/cap))),0.25+0.65*Math.min(1,v/cap)];}
-function draw(){var sec=+t.value,mode=sel.value;var Q={ctVis:fr(BASE.ctVis,sec),tVis:fr(BASE.tVis,sec),ctPres:fr(BASE.ctPres,sec),tPres:fr(BASE.tPres,sec)};
- var QTeam=TEAM?{ctVis:fr(TEAM.ctVis,sec),tVis:fr(TEAM.tVis,sec),ctPres:fr(TEAM.ctPres,sec),tPres:fr(TEAM.tPres,sec)}:null;
+function draw(){var sec=+t.value,mode=sel.value;var Q={ctVis:fr(BASE.ctVis,DEN,sec),tVis:fr(BASE.tVis,DEN,sec),ctPres:fr(BASE.ctPres,DEN,sec),tPres:fr(BASE.tPres,DEN,sec)};
+ var QTeam=TEAM?{ctVis:fr(TEAM.ctVis,TEAM_DEN,sec),tVis:fr(TEAM.tVis,TEAM_DEN,sec),ctPres:fr(TEAM.ctPres,TEAM_DEN,sec),tPres:fr(TEAM.tPres,TEAM_DEN,sec)}:null;
  cx.clearRect(0,0,RS,RS);cx.globalAlpha=0.6;cx.drawImage(img,0,0,RS,RS);cx.globalAlpha=1;cx.globalCompositeOperation=mode.startsWith('delta-')?'source-over':'lighter';
  for(var g=0;g<G.length;g++){var st=style(mode,g,Q,QTeam);if(!st)continue;var px=(G[g][0]-calib.posX)/calib.scale,py=(calib.posY-G[g][1])/calib.scale;
   var grd=cx.createRadialGradient(px,py,0,px,py,R);grd.addColorStop(0,'hsla('+st[0]+' 90% 56% / '+st[1].toFixed(2)+')');grd.addColorStop(1,'hsla('+st[0]+' 90% 56% / 0)');
