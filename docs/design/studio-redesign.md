@@ -243,5 +243,45 @@ one tap 只对可一枪满血终结的武器展示，Glock/USP/M4 等不展示�
 | maps 3D callout 网格（calloutAt） | maps | `@cs2dak/maps` | ✅ 2026-06-16 |
 | 地面掉落拆弹器标注 | 2 | replay | ✅ 2026-06-16 |
 | 机制跨场聚合从 presentation 迁往 cohort | 架构债 | presentation → cohort | ⬜ 低优先 |
+| 雷达场子系统（视野覆盖 + 密度场 + A·B 差分） | 11 | core + maps + react + studio | ⬜ 0.8（见 §11） |
+| 数据驱动地图控制价值（取代 scalar v0 gate） | 11 | core | ⬜ 0.9+（待足够语料，见 §11） |
 
-下一个重点：模块 8 完整战术路线重设计（全程 zone 动线链，§8，v0.7）；其余缺口按需排期。
+下一个重点（0.8）：雷达场子系统（§11，想法 1+5 合一）+ 进游戏看回合 + BP 策略洞察 + 战术板 MVP；
+模块 8 完整战术路线（全程 zone 动线链，§8）顺延；其余缺口按需排期。
+
+---
+
+## 11. 雷达场子系统 + MapControl 演进（0.8 规划，2026-06-26 定框架）
+
+**回答**：把所有空间分析（防守盲区、活动/击杀/死亡范围、换人前后位置变化、跨赛事风格）
+收敛成**一个可复用原语**，而非每个功能各画一套雷达。
+
+### 一套原语，四个轴
+
+- **场来源**：`位置密度 / 击杀密度 / 死亡密度`（纯点聚合，无 LOS，最便宜）
+  ｜`视野覆盖`（视锥 ∩ `.tri` LOS ∩ 烟雾遮挡，复用 `core/duel-window.ts` 的
+  `isVisibleAt` / `smokeBlocksRay`，几何地基与口径见 §4）
+- **覆盖场算法**：用 `getMapNav` 的 nav area 质心做 grid-sample，逐 tick 测「任一防守者可见」
+  → 跨 N 个长枪局 frequency 叠加成热场。**不预设 route/动线**（盲区靠频率自然消隐，不需要
+  显式 control 阈值）；≥10–20 回合即可成图，七张 `.tri` 图可用。零假设是发现「系统性放空」
+  盲区的前提——一旦先过 route 过滤，只能重新发现 route 定义已编码的东西。
+- **聚合**：CohortScope 范围 + 可选按四阶段比赛时钟对齐（`replay-clock.ts`，1:55 起逐 tick 演化）
+- **模式**：单 / A·B 差分（隐藏可展开的对比视图；两个 scope 的场相减取 delta）
+- **渲染**：`HeatmapCanvas`（扩成吃栅格场）+ 枪线/trail 叠加。owner = dak-studio 容器
+  查 facts/聚合 + `@cs2dak/react` 纯渲染
+- **性能**：grid 降采样 + 覆盖采样 1–2Hz + worker 池 + IndexedDB 缓存（demo集合×identity，
+  沿用对枪 LOS 缓存）
+
+### MapControl 评分的演进（②→③→④）
+
+- **②** `core/spatial/mapcontrol.ts` 的 scalar gate（route-index 手调，接进 `signals.ts`
+  但只进 shadow / Trade 闭环，不进 RR）= **v0 代理，冻结，不再投精力打磨 gate**
+- **③** 本子系统的覆盖场 = 描述性、空间忠实，先落地（0.8）
+- **④** 数据驱动控制价值（roadmap 0.9+，**待细化**）：在 ③ 覆盖场上回归 round 结果，
+  学出 per-area × time 价值权重 → RR 地图控制账户，**取代 ② 手调 gate**；
+  控制价值 = Σ_覆盖区域 (该区学得价值 × contested 因子)；需数百+ 回合语料才稳
+
+### 战术板（独立功能，非雷达场）
+
+回放/雷达画布的**标注层**（箭头 / 道具图标 / 文字）→ 图文战术框架导出（PNG + Markdown）。
+无实时协作、无动画播放，本质是给现有画布加一层标注 + 导出，复用 `@cs2dak/maps` 坐标变换。

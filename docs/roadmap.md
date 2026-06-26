@@ -1,122 +1,111 @@
 # DAK Studio 路线图 / Roadmap
 
-> 2026-06 重订（取代 v0.4 八模块排期，已归档 `docs/archive/2026-06/roadmap-v0.4.md`）。
-> 本文只管**时间排序**；模块的完整设计与现状见
+> 本文只管**时间排序**；模块完整设计与现状见
 > [`docs/design/studio-redesign.md`](design/studio-redesign.md)（唯一设计真相源），
 > 各指标成熟度见 [`docs/stability-tiers.md`](stability-tiers.md)。
+> 发版机制见 [`docs/release.md`](release.md)：桌面随 `vX.Y.Z` git tag；npm 包独立走 changesets。
 
 三个高于一切排期的产品判断：
 1. **Query-first**：任何统计都能点回回合与 tick 的 2D 证据；
 2. **三层视角共用同一数据层**：个人 / 主办方 / 教练；
 3. **Pattern 可解释**：不做黑盒评分，展示由哪些位置/道具/时间/交火结构得出。
 
-现状：九模块主体已落地（详见 studio-redesign）。**0.6.0 已发布（2026-06-16）**——
-教练工作台战术聚类首版（`TacticalRoundFact`+`PatternExplorer`+`RadarTrails`+`MapPoolTable`+`Playlist`）
-+ maps 默认位资产 + 3D callout 网格 + `.tri` BVH 建树加速（quickselect，O(n log²n)→O(n log n)）。
-完整战术路线（MapRoute+zone 动线链）与资产管理/导入吞吐为 v0.7 方向。
+---
+
+## 已发布（精简存档）
+
+> 详细完成清单见 git 历史与 CHANGELOG；此处只留一句话索引，降低后续阅读负担。
+
+- **0.5.x**（2026-06）：当前成果冻结发版——Home、完整 Duel/Mechanics（`.tri` LOS）、
+  Coach 首版、Series/BP、Team Comparison、Lineup Library、StorageAdapter 解耦、
+  桌面 SQLite 后端、导出 `--research` 默认。
+- **0.6.0**（2026-06-16）：教练战术首版（`TacticalRoundFact` + `PatternExplorer` 三栏 +
+  `RadarTrails` + `MapPoolTable` + Round Playlist）+ facts 本地投影层（导入即落 facts 行、
+  `rebuildFactsFromZip` 免重导）+ maps 七图默认位资产 + 3D callout 网格 + `.tri` BVH 建树加速。
 
 ---
 
-## 0.5.0 — 稳定并正式发布当前成果
+## 0.7.0 — 成为可靠的长期桌面软件（工程线，主体已落地）
 
-**不再新增模块**，把 main 已有的成果冻结发版：Home、完整 Duel/Mechanics（含 `.tri` LOS）、
-Coach 首版、Series/BP、Team Comparison、Lineup Library 重写，以及所有性能与缓存修复。
+收尾项为主，无新产品模块：
 
-已发布内容（v0.5.0–v0.5.3）：
-- [x] 文档与代码状态同步（README v2→v3 全面重写、integration 分阶段接缝、本路线图收敛、stability-tiers）
-- [x] StorageAdapter 解耦：业务层读写统一经 `records()` / `blobs()`，IndexedDB 后端可替换
-- [x] Windows 打包从 onefile 改为 onedir，Release zip 整个 `dak-studio/` 目录
-- [x] 桌面静态服务缓存修复：`.tri` / 雷达图 / hashed assets 可缓存，避免反复拉大文件
-- [x] Lineup Library 小修：默认聚类容差调大，雷达 Top 20/40/60 切换且选中项临时绘制
-- [x] 2D 回放接口预留 `targetEndTick`，优先对齐下一回合 `startTick`
-- [x] CHANGELOG 与版本同步（v0.5.0–v0.5.3 条目）
-- [x] `pnpm typecheck` + `pnpm test` 全绿
-- [x] cs2df 3.0.3 升级 + sample ZIP 重导（--research --compress-level 9）
-- [x] 导出默认启用 `--research`（急停/反应/预瞄恢复正常）
-- [x] pywebview→SQLite 存储后端接入（桌面版资料库落盘到 `userdata/studio.sqlite`）
-
-已发布（v0.6.0）：
-- [x] facts 本地持久化投影层：`extractMatchFacts` + `FactsStore`，导入即落 facts 行
-- [x] season.ts + 各重型视图（TrailsView/CoachView/LineupView/MatchView）全切投影读取
-- [x] 清除死代码：`rrInputs` 投影与 `MATCH_FACTS_VERSION` 只写不读字段移除
-- [x] 教练首版 0.6.0：TacticalRoundFact + PatternExplorer 三栏 + RadarTrails + MapPoolTable + Playlist
-- [x] maps 默认位资产（七图阵营专属默认位固化）
-- [x] maps 3D callout 网格 + calloutAt() 接口
-- [x] `.tri` BVH 建树加速（quickselect，大图首次加载尖峰 ~18s→~6s）
-- [x] macOS / Windows 冒烟测试 → 打 `v0.6.0` tag（2026-06-16）
-
-挂账到 v0.7（发版时未完成）：
-- [ ] 对枪人工验证集首版（对枪三分类 Beta→Stable 的闸门，见 stability-tiers）
-- [ ] 50 / 200 / 500 场资料库性能抽测 + 导入吞吐并行化（facts 抽取移入 worker 池，离开主线程）
-
-> 发版机制见 [`docs/release.md`](release.md)：桌面随 `vX.Y.Z` git tag；npm 包独立走 changesets。
-
-上游待办（`cs2df`）：回放捕获窗口延到下一回合 freeze/start 边界
-（[`cs2-demo-format#3`](https://github.com/Starfie1d1272/cs2-demo-format/issues/3)；本仓库
-presentation 已以 `targetEndTick = nextRound.startTick` 留出接口）。
+- ✅ 导入吞吐并行化（facts 抽取 + `.tri` LOS 移入 worker 池，滑动窗口并发 2）
+- ✅ 用户可见 Library 目录 + 维护工具（备份/恢复/完整性检查/孤儿修复/压缩）
+- ✅ 资产管理中心（身份/资产/赛事三 Tab + `.tri` 已装/缺失矩阵 + overlay 按需下载）
+- ✅ 统一 `AnalysisManifest`（口径落后即标记 + 从已存 ZIP 一键重建 facts）
+- 🟡 自动更新 + 国内可达分发（R2 镜像 `dakupdate.starfie1d.top` 已接入；
+  **剩**：发一次 tag 验证上传链路 + Windows 真机接力替换验证）
+- 🟡 赛事资产库 + 赛事包导入（消费端 + 制作器已落地；
+  **剩**：科隆真实内容、RivalHub 文件导出、制作器草稿持久化、Windows 真机验证）
+- ⬜ 50 / 200 / 500 场大库稳定性抽测
+- ⬜ Windows 签名与公证（去 SmartScreen，让自动更新更可信。macOS 不排期：CS2 仅 Windows 可玩）
+- ⬜ 对枪三分类人工验证集（Beta→Stable 闸门，见 stability-tiers）
+- ⬜ Stable/Beta/Experimental 标签 UI 全量落地（历史页面逐步补齐）
 
 ---
 
-## 0.6.0 — 教练战术首版 + maps 资产落地
+## 0.8.0 — 教练与战术深化（产品功能线 · 规划中）
 
-### 已完成（2026-06-16）
+> 框架于 2026-06-26 与产品讨论确定；设计细节见 [`studio-redesign.md §11`](design/studio-redesign.md)。
+> 标「待定」的为方向已认可、细节待细化的条目。
 
-- **TacticalRoundFact 提取**：替换旧 OpeningPatternFact，双层站位（defaults/advanced）+ 双点投入 + 倒计时节奏桶 + 首杀 + 经济。
-- **PatternExplorer 三栏**：簇列表/雷达快照/数据摘要+证据回合表；`autoName` 模板命名。
-- **RadarTrails**：从 TrailsView 抽出的共享雷达叠加渲染器。
-- **CT/T 视角切换 + 页内回放 + 对手抽象**。
-- **MapPoolTable**：地图池比较表（我方/对手胜率+高频打法+备注）。
-- **Round Playlist**：备战清单持久化 + Markdown 导出。
-- **Maps 默认位资产**：七图阵营专属默认位（110 场数据驱动 + 人工抽查）。
-- **Maps 3D callout 网格**：`calloutAt()` 三维空间查 callout。
+### 雷达场子系统（统一原语，想法 1+5 合一）
 
-### 未完成（v0.7+）
+一套渲染器 + 一套聚合骨架覆盖多个空间分析功能，避免各 view 重造雷达：
 
-- **完整战术路线**（开局站位 → zone 动线链 → 进包执行）：需扩展 Pattern 向量为全回合 zone 轨迹。现有 `TacticalRoundFact.snapshots[]` 已预留多切片扩展。
-- **道具实验室 lineup 聚类作为路线节点证据源**。
-- **8d ban/pick 建议表**（纯统计）。
+- **场来源**：`位置密度 / 击杀密度 / 死亡密度`（纯点聚合，无 LOS，最便宜）
+  ｜`视野覆盖`（视锥 ∩ `.tri` LOS ∩ 烟雾遮挡，复用 `core/duel-window.ts` 的 `isVisibleAt`）
+- **覆盖场算法**：nav area 质心做 grid-sample，逐 tick 测「任一防守者可见」→ frequency 叠加
+  N 个长枪局（≥10–20 回合即可成图）→ 热场。**不预设 route/动线**：盲区靠频率自然消隐、
+  免 route 标定、七张 `.tri` 图即可用（零假设是发现「系统性放空」盲区的前提）
+- **聚合轴**：CohortScope 范围筛选 + 可选按四阶段比赛时钟对齐（`replay-clock.ts`，1:55 起逐 tick 演化）
+- **模式**：单场景 ｜ A·B 双 scope **差分**（平时隐藏、按需展开的对比视图；
+  换人前后谁让位置 / 跨赛事自由度 = 两个场相减取 delta）
+- **渲染**：`HeatmapCanvas` 从「吃点」扩成「吃栅格场」+ 枪线 / trail 叠加
+- **性能**：grid 降采样到 nav area + 覆盖采样 1–2Hz + worker 池 + 按 demo集合×identity 缓存
+  IndexedDB（沿用对枪 LOS 缓存的同一套）
+- 落点：想法 1 = 防守盲区可视化（Overpass 长管用例）；想法 5 = 选手活动/击杀/死亡范围 + A·B 差分
 
-### 并行（不占 Coach 主线）
-集成 Phase 1 数据 API（[`integration.md`](integration.md) §2），
-让赛事数据在 RivalHub ↔ DAK 之间流起来。
+### 其余功能
+
+- **进游戏看回合 / 学瞄点**（Windows）：回合 / lineup 一键 `playdemo` 跳 tick；
+  接道具库「进游戏练这个点」。补上唯一硬竞品差距（CS Demo Manager 的杀手锏）。**待定**：
+  Steam/CS2 路径检测 + tick→demo 跳转的桥实现
+- **BP 策略洞察**（收编旧 8d ban/pick 建议表）：首 ban / 首 pick 倾向 +
+  选自己强图 vs 点菜对方弱图判定 + 双方地图池胜率支撑的 BP 建议
+- **个人地图池**：个人实验室新增「选手×地图」tab——每图胜率 / RR / 常驻 callout / 开局动线缩略
+- **战术板 MVP**（无实时协作 / 无动画）：回放·雷达画布加标注层（箭头 / 道具图标 / 文字）
+  → 图文（PNG + Markdown）战术框架导出。复用 `@cs2dak/maps` 坐标变换；与雷达场是两个独立功能
+
+### 前置基础重构（动新功能前先做）
+
+- **CohortScope 抽成 App 级常驻顶栏**（现 9 个视图各自渲染，违背设计 §0）
+- **侧边栏重新设计**：10+ 项纯竖排不美观也不可扩展——改分组（单场 / 跨场 / 工具）+ 可折叠，
+  给雷达场 / 战术板新一级入口留位
+- 删死代码 `ComingSoonView`
 
 ---
 
-## 0.7.0 — 成为可靠的长期桌面软件
+## 0.9+ / 后续 — 数据驱动地图控制价值（④，待细化）
 
-- **大库稳定性验证**：StorageAdapter 解耦（`records()` / `blobs()` 接缝）已在 0.5.1 完成，pywebview→SQLite 后端已在桌面版生产运行；0.7 重点改为 200–500 场规模的稳定性抽测与数据库迁移工具。
-- **导入吞吐并行化**（✅ 已落地）：facts 抽取（含 `.tri` LOS 遍历）已从主线程移入导入 worker 池——worker 内解析 + 建 BVH + 榨 facts，只回传紧凑 `{meta, facts}`，输出与主线程逐字节等价、异常回退主线程。批量导入改滑动窗口并发（并发 2，兼顾吞吐与渲染器内存峰值）。剩余：大库规模下的并发调参与 facts 抽取本身的算法优化。
-- **用户可见 Library 目录 + 维护工具**（✅ 已落地）：展示持久化目录与分类占用；一键备份/恢复
-  SQLite、组织数据与原始 ZIP；按类清理可重建缓存；完整性检查、孤儿资源修复与压缩。
-- **自动更新 + 国内可达分发**（🟡 主体已落地，见 [`docs/design/auto-update.md`](design/auto-update.md)）：
-  manifest + 镜像失败转移的更新检查（替代 `api.github.com`）、Windows 应用内一键更新
-  （下载+sha256 校验+side-by-side 接力替换）、CI 自动生成 `latest.json`。
-  ✅ **Cloudflare R2 镜像已接入**（`dakupdate.starfie1d.top`，最高优先级，CI 上传 zip+manifest）。
-  **剩**：发一次 tag 验证 R2 上传链路 + Windows 真机冒烟验证接力替换路径（RC still required）。
-- **赛事资产库 + 赛事包导入**（🟡 消费端已落地，见 [`docs/design/event-packages.md`](design/event-packages.md)）：
-  Event/Stage/Series/Map 合同、1–5 图系列赛、BP、资源管理、R2 下载校验及单循环/Swiss/单败/双败 UI
-  已完成；从赛事框架、BP 与 1–5 场 `.dem` 生成资源包的制作器也已落地。
-  剩余：科隆真实内容、RivalHub 文件导出、制作器草稿持久化，以及 Windows 真机下载/导出验证。
-- **资产管理中心**（✅ 已落地）：管理页重构为「身份 / 资产 / 赛事」三 Tab。资产 Tab 汇总存储占用
-  （桌面走 Python 精确分类 + 清理/备份；浏览器经 `navigator.storage.estimate()` + 各 IDB 命名空间计数
-  补齐总览）、Demo 资产（场次/原始 ZIP 占用/旧口径计数/缺 `.dem` 路径 + 批量重建）、`.tri` 已装/缺失矩阵。
-- **`.tri` 资产包管理**（✅ 已落地）：`userdata/tris` overlay + R2 tris-manifest（`dakupdate.starfie1d.top/tris/manifest.json`）。
-  桌面静态服务 GET 时按需下载；资产 Tab 展示已装/缺失矩阵并支持「下载」单图 /「补全全部缺失」——
-  桌面走 `tri_download` 桥写 overlay，浏览器/dev 走 R2 直链 + sha256 校验写 IndexedDB（`tri-assets.ts`）。
-- **签名与公证**：Windows 签名（去 SmartScreen 警告，让自动更新更可信）——优先级高于付费墙。
-  （macOS 不再排期：CS2 仅 Windows 可玩，桌面端只面向 Windows。）
-- **崩溃诊断包** + 可选、匿名、明确授权的使用统计。
-- **统一 AnalysisManifest**（✅ 已落地）：`apps/dak-studio/src/lib/analysis-manifest.ts` 收敛派生版本号
-  （`formatVersion` / `analysisVersion`（跟随 `TACTICAL_FACT_VERSION`）/ `reportVersion` / `appVersion`）。
-  导入时写入 `entry.builtWith`；`analysisVersion` 落后即标记旧口径，**从已存 v3 ZIP 一键重建 facts**
-  （`rebuildFactsFromZip`，无需 `.dem` / cs2df）——彻底消除"加一个派生指标就要全量重导"。
-- Stable/Beta/Experimental 标签在 UI 全量落地（非 0.7 发布阻碍；新功能必须如实标注，历史页面逐步补齐）。
+> **②③④ 关系**：现有 scalar `buildOfficialMapControl`（route-index 手调 gate，
+> 接进 `signals.ts` 但只进 shadow、不进 RR）是 **v0 代理，冻结不再投精力打磨 gate**；
+> 先做描述性覆盖场（③，0.8）；本项是 ③ 之上的经验价值模型，**最终取代 v0 gate** 喂 RR 地图控制账户。
+
+思路（待校准，需足够语料）：
+
+- 覆盖场给出每 `(图, side, 回合时刻, 栅格点)` 的**经验覆盖频率**（描述性先验）
+- **控制价值 ≠ 覆盖频率**，而是「控住该区域与赢回合 / 拒止进点 / 拿首杀的相关性」——
+  用语料回归 round 结果学出 **per-area × time 的价值权重**
+- 每回合控制价值 = Σ_覆盖区域 (该区学得的价值 × contested 因子) → RR 地图控制账户输入；
+  自然包住现有 `soloPressure` / `denial`，但把手调 gate 换成语料学出来的值
+- **门槛**：描述性覆盖场 10–20 回合即稳；价值模型需数百+ 回合语料，故排在 0.8 之后
 
 ---
 
 ## 后续方向（暂不排期）
 
-- 回合 swing / 动量（待资料库规模上来，有校准依据再立项）。
+- 回合 swing / 动量（待语料规模 + 校准依据）。
 - Save / exit kill 识别、AWP 投资回报、经济交换链。
 - Analyst Data 订阅（完整 Tactical Route + 职业 demo 库成熟后）。
 - 集成 Phase 2：`@cs2dak/*` 发布为构建产物后，presentation 合同与只读组件共享。
