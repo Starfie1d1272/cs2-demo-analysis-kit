@@ -198,7 +198,7 @@ def apply_windows_update(
         ["cmd", "/c", str(bat_path)],
         creationflags=DETACHED | NEW_GROUP,
         close_fds=True,
-        cwd=str(work_dir),
+        cwd=str(stage_root),
     )
     return bat_path
 

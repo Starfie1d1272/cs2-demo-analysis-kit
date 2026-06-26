@@ -7,6 +7,8 @@ macOS/CI 端到端验证；这里只测 _find_app_root 与 _relaunch_bat 的构�
 from __future__ import annotations
 
 import hashlib
+import subprocess
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -95,3 +97,30 @@ def test_relaunch_bat_mentions_pid_and_paths(tmp_path: Path) -> None:
     assert str(install) in bat
     assert "userdata" in bat  # 便携式数据搬迁
     assert "del " in bat  # 自删脚本
+
+
+def test_apply_windows_update_launches_relay_from_stage_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    install = tmp_path / "dak-studio"
+    install.mkdir()
+    zip_path = tmp_path / "update.zip"
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.writestr("dak-studio/dak-studio.exe", b"MZ")
+
+    calls: list[dict] = []
+
+    def fake_popen(args: list[str], **kwargs: object) -> object:
+        calls.append({"args": args, **kwargs})
+        return object()
+
+    monkeypatch.setattr(updater.sys, "platform", "win32")
+    monkeypatch.setattr(updater.time, "strftime", lambda _fmt: "20260627010101")
+    monkeypatch.setattr(subprocess, "Popen", fake_popen)
+
+    bat_path = updater.apply_windows_update(zip_path, install, "dak-studio.exe", 4321)
+
+    stage_root = tmp_path / ".dak-update-20260627010101"
+    assert bat_path == stage_root / "apply-update.bat"
+    assert bat_path.exists()
+    assert calls
+    assert calls[0]["args"] == ["cmd", "/c", str(bat_path)]
+    assert calls[0]["cwd"] == str(stage_root)

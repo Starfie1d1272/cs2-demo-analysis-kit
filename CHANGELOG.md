@@ -4,6 +4,16 @@ DAK Studio 桌面应用及 `@cs2dak/*` 分析管道面向用户的变更记录�
 
 > 0.1.3 起面向 Studio 用户维护。`@cs2dak/*` npm 包版本由 changesets 独立管理（见各包的 CHANGELOG.md）；本文件聚焦 DAK Studio 桌面应用变更。
 
+## [0.7.2] — 2026-06-27
+
+### 修复
+
+- **Windows 一键更新重启失败**：修复接力替换阶段 `name 'work_dir' is not defined`，更新包解压后会从 staging 目录启动 `apply-update.bat`，避免在“正在重启”时中断。
+
+### 说明
+
+- 受影响版本（含 0.7.0 / 0.7.1）的旧 updater 会在执行替换前报错，因此这些版本无法可靠地通过一键更新自修复。请手动下载 `0.7.2` 的 Web Installer 或 full portable zip 安装一次；从 0.7.2 起后续一键更新恢复。
+
 ## [0.7.1] — 2026-06-27
 
 ### 修复
