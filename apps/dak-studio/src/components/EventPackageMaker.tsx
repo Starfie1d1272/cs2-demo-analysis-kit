@@ -12,6 +12,7 @@ import {
   resourceFromNativePath,
   seriesForSlot,
   seriesSkeletonForPreset,
+  slugifyEventName,
   startNativeMakerSession,
   stagesForPreset,
   vetoMapMismatch,
@@ -33,19 +34,6 @@ const PRESETS: Array<{ id: EventPreset; label: string }> = [
   { id: "double_elim", label: "双败淘汰" },
   { id: "major", label: "Major：三阶段瑞士轮 + 单败" },
 ];
-
-export function slugifyEventName(value: string): string {
-  const normalized = value.trim().toLowerCase();
-  if (!normalized) return "";
-  const ascii = normalized.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  if (ascii) return ascii;
-  let hash = 2166136261;
-  for (let index = 0; index < normalized.length; index += 1) {
-    hash ^= normalized.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return `event-${(hash >>> 0).toString(36).padStart(7, "0")}`;
-}
 
 // 草稿自动保存：只持久化录入数据（赛事框架、阶段、系列赛骨架/BP/赛制/时间），
 // 不持久化附加的 .dem/ZIP（二进制不入草稿，刷新后重新附加；队伍由 demo 派生）。

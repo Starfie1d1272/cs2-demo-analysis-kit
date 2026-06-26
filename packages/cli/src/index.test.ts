@@ -9,12 +9,15 @@ import { fileURLToPath } from "node:url";
 
 const execFileAsync = promisify(execFile);
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
-const TSX = resolve(__dirname, "../../../node_modules/.bin/tsx");
+const ROOT = resolve(__dirname, "../../..");
 const CLI = resolve(__dirname, "index.ts");
 const FIXTURE_ZIP = resolve(__dirname, "../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip");
 
 async function runCli(...args: string[]): Promise<{ stdout: string; stderr: string; code: number }> {
-  return execFileAsync(TSX, [CLI, ...args], { env: { ...process.env, NODE_NO_WARNINGS: "1" } })
+  return execFileAsync("pnpm", ["--filter", "@cs2dak/cli", "exec", "tsx", CLI, ...args], {
+    cwd: ROOT,
+    env: { ...process.env, NODE_NO_WARNINGS: "1" }
+  })
     .then(({ stdout, stderr }) => ({ stdout, stderr, code: 0 }))
     .catch((err: NodeJS.ErrnoException & { stdout?: string; stderr?: string; code?: number }) => ({
       stdout: err.stdout ?? "",

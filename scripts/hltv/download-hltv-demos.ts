@@ -15,7 +15,7 @@
  *   2. 在该 Chrome 里打开 HLTV，手动通过一次 CF 验证
  *   3. 另开终端运行脚本：
  *      cd ~/hltv-demo-downloader
- *      npx tsx download-hltv-demos.ts
+ *      npx tsx download-hltv-demos.ts --matches fixtures/events/<event>/data/matches.txt --download-dir fixtures/demos/pro/<Event>/_src
  *   4. Chrome 保持打开，脚本跑完后手动关闭即可
  */
 
@@ -25,10 +25,15 @@ import path from "node:path";
 import { createInterface } from "node:readline/promises";
 
 // ── 配置 ──────────────────────────────────────────────
-const MATCHES_FILE = "matches.txt";
-const CDP_URL = "http://127.0.0.1:9222";
-const DOWNLOAD_DIR = path.resolve("demos");
-const STATE_FILE = ".download-state.json";
+function argValue(name: string): string | null {
+  const index = process.argv.indexOf(name);
+  return index >= 0 ? process.argv[index + 1] ?? null : null;
+}
+
+const MATCHES_FILE = argValue("--matches") ?? "matches.txt";
+const CDP_URL = argValue("--cdp") ?? "http://127.0.0.1:9222";
+const DOWNLOAD_DIR = path.resolve(argValue("--download-dir") ?? "demos");
+const STATE_FILE = argValue("--state") ?? ".download-state.json";
 const DELAY_BASE_MS = 10_000;
 const DELAY_JITTER_MS = 5_000;
 const MAX_ACTIVE_DOWNLOADS = 3;

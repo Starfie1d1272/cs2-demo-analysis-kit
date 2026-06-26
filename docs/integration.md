@@ -76,7 +76,7 @@ RivalHub（发布：公开排行榜 / 嵌入官网 / 赛事页）
 2. `@cs2dak/presentation` 输出的 View Model 合同稳定。
 
 届时共享顺序：**先共享 presentation View Model（JSON 合同），两边各自原生渲染**；
-确有必要再嵌**只读卡片组件**（如 EconomyConversionPanel），不共享有状态视图。
+确有必要再嵌**只读卡片组件**，不共享有状态视图。
 `release/2.0.0` 的「代码集成」方向据此从「Vercel 端跑 core」调整为「消费 artifact + 选择性只读组件」。
 
 > 注意：DAK Studio 是 Tactical Slate 设计语言、RivalHub 是 Tactical Grid，组件视觉不通用；
@@ -95,13 +95,12 @@ RivalHub（发布：公开排行榜 / 嵌入官网 / 赛事页）
 
 | 能力 | DAK owner |
 |---|---|
-| 经济转化 | `@cs2dak/core` `buildEconomyConversion` |
 | half-side 胜率 | `@cs2dak/core` `buildTeamSideWinRates` |
 | 武器榜 | `@cs2dak/core` weapon highlights + `@cs2dak/cohort` |
 | 选手 demo 统计 | `@cs2dak/cohort` + `@cs2dak/presentation` |
 | RR 输入派生 | `@cs2dak/core` `deriveRRIndicators` |
 | 赛季评分重算 | `@cs2dak/cohort` `buildSeasonCohort` |
-| 队伍首杀/残局摘要 | `@cs2dak/presentation` `buildTeamCohortSummary` |
+| 队伍赛前侦察对比 | `@cs2dak/presentation` `buildTeamComparisonFromFacts` |
 | 地图标定 / world→radar / zone | `@cs2dak/maps` |
 | 展示标签（武器/经济/side） | `@cs2dak/presentation` |
 

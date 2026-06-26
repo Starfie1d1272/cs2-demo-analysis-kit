@@ -1,19 +1,9 @@
 import type { DemoPackage } from "@cs2dak/contract";
+export { groupBy } from "@cs2dak/core";
 
 export function round(value: number, digits = 3): number {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
-}
-
-export function groupBy<T, K>(rows: T[], keyFor: (row: T) => K): Map<K, T[]> {
-  const grouped = new Map<K, T[]>();
-  for (const row of rows) {
-    const key = keyFor(row);
-    const current = grouped.get(key);
-    if (current) current.push(row);
-    else grouped.set(key, [row]);
-  }
-  return grouped;
 }
 
 export function normalizeWeapon(weapon: string): string {

@@ -9,6 +9,7 @@ import {
 import { downloadTri, listAvailableTris, loadTrisManifest, type TrisManifest } from "../lib/tri-assets";
 import { hasLibraryMaintenance } from "../lib/library-maintenance";
 import { loadBrowserStorageOverview, type BrowserStorageOverview } from "../lib/storage-overview";
+import { bytesLabel } from "../lib/format";
 import { LibraryMaintenance } from "./LibraryMaintenance";
 import {
   checkAssets,
@@ -16,14 +17,6 @@ import {
   useAssetHealthAvailable,
   type AssetStatus,
 } from "../lib/asset-health-bridge";
-
-function bytesLabel(bytes: number | null): string {
-  if (bytes == null) return "—";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-  return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
-}
 
 export interface AssetsPanelProps {
   entries: StudioDemoEntry[];

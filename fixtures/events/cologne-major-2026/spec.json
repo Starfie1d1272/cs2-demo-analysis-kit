@@ -1,5 +1,5 @@
 {
-  "_note": "科隆 Major 2026 赛事制作 spec。bp: [teamA|teamB|null, ban|pick|decider, 地图显示名]，按真实 veto 顺序。format 逐系列指定（Swiss 阶段勝ち抜け/淘汰局 BO3，其余 BO1）。装配器 scripts/cologne-build.mjs 按 ZIP 内 match.json 的队伍/地图匹配，缺 demo 的系列自动跳过（增量）。entryRound = 进入该系列时的战绩。",
+  "_note": "科隆 Major 2026 赛事制作 spec。bp: [teamA|teamB|null, ban|pick|decider, 地图显示名]，按真实 veto 顺序。format 逐系列指定（Swiss 阶段勝ち抜け/淘汰局 BO3，其余 BO1）。装配器 scripts/build-event-package.mjs 按 ZIP 内 match.json 的队伍/地图匹配，缺 demo 的系列自动跳过（增量）。entryRound = 进入该系列时的战绩。",
   "event": {
     "slug": "iem-cologne-major-2026",
     "name": "IEM Cologne Major 2026",

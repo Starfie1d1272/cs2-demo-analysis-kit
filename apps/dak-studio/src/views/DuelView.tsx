@@ -3,11 +3,10 @@ import type { DuelFinderRow, DuelInsightsModel, PlayerMechanicsRow } from "@cs2d
 import { displayWeaponName, duelClassificationLabel } from "@cs2dak/presentation";
 import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
 import { CohortScope, type CohortScopeState } from "../components/CohortScope";
-import { EmptyState, MetricInfo } from "@cs2dak/react";
+import { EmptyState, MetricInfo, Pagination } from "@cs2dak/react";
 import { displayTeamName } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getDuelInsights, type IdentityOptions } from "../lib/season";
-import { Pagination } from "../components/Pagination";
 
 type DuelTab = "records" | "opening" | "mechanics";
 type EvidenceFilter = "contested_duel" | "suppressed_kill" | "caught_off_guard" | "low_hp" | "third_party" | "all";
@@ -224,6 +223,7 @@ function PlayerMechanicsGrid({
         page={mechSafePage}
         totalPages={mechTotalPages}
         onChange={setMechPage}
+        className="stu-pagination"
         info={`${grouped.length} 人 · ${mechSafePage + 1}/${mechTotalPages} 页`}
       />
       <div className="stu-duel-player-grid">
@@ -434,7 +434,7 @@ function EvidenceCards({
             );
           })}
         </div>
-        <Pagination page={page} totalPages={totalPages} onChange={setPage} maxButtons={6} info={`${rows.length} 条`} />
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} maxButtons={6} className="stu-pagination" info={`${rows.length} 条`} />
       </section>
     );
   }
@@ -511,7 +511,7 @@ function EvidenceCards({
               );
             })}
           </div>
-          <Pagination page={page} totalPages={totalPages} onChange={setPage} info={`${activeRows.length} 条 · ${safePage + 1}/${totalPages} 页`} />
+          <Pagination page={page} totalPages={totalPages} onChange={setPage} className="stu-pagination" info={`${activeRows.length} 条 · ${safePage + 1}/${totalPages} 页`} />
         </>
       )}
     </section>

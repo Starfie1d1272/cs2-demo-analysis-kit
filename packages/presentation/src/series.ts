@@ -1,9 +1,7 @@
 import {
-  mvpRecommendationSchema,
   seriesSummarySchema,
   type MatchWorkspaceModel,
   type MvpCandidate,
-  type MvpRecommendation,
   type SeriesMatchInput,
   type SeriesPlayerRow,
   type SeriesSummary
@@ -46,23 +44,6 @@ function rankMvpCandidates(sources: MvpSource[]): MvpCandidate[] {
       || b.hltvRating - a.hltvRating
     )
     .slice(0, MVP_CANDIDATE_LIMIT);
-}
-
-export function recommendMatchMvp(model: MatchWorkspaceModel): MvpRecommendation {
-  const candidates = rankMvpCandidates(model.scoreboard.map((row) => ({
-    playerKey: row.steamId64,
-    name: row.name,
-    teamName: model.teams[row.teamKey].name,
-    rivalhubRR: row.accountRR,
-    hltvRating: row.rr,
-    confidence: row.confidence
-  })));
-  if (candidates.length === 0) throw new Error("match MVP recommendation requires at least one player");
-  return mvpRecommendationSchema.parse({
-    version: "cs2-demo-analysis-kit/mvp-recommendation-0.1",
-    recommended: candidates[0],
-    candidates
-  });
 }
 
 interface SeriesAccumulator {

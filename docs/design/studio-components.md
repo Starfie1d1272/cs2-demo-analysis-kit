@@ -31,7 +31,7 @@ DAK Studio 是独立 `stu-*` 设计语言（CSS 在 `apps/dak-studio/src/studio.
 | 组件 | 归属 | 用途 | 不要再造的东西 |
 |---|---|---|---|
 | **`DataTable<T>`** | `@cs2dak/react` | 通用数据表：列配置 → 客户端排序（升/降切换）→ 可选分页 → 渲染。热力着色、自定义单元格、行点击、hover 联动均支持。 | 任何 `<table>` + 手搓 `sortKey/sortDesc/handleSort`。**这是仓库唯一排序表实现。** |
-| **`Pagination`** | `@cs2dak/react` | 页码 + 前后翻页 + 信息文字。`className` 决定样式。 | 任何手搓 `page/totalPages/slice` 翻页条。Studio 经 `components/Pagination.tsx` 薄包装传 `stu-pagination`。 |
+| **`Pagination`** | `@cs2dak/react` | 页码 + 前后翻页 + 信息文字。`className` 决定样式。Studio 直接传 `className="stu-pagination"`。 | 任何手搓 `page/totalPages/slice` 翻页条。 |
 | `SeasonLeaderboard` | `@cs2dak/react` | 赛季/赛事选手排行榜（多视图 tab + 升/降排序）。 | 选手榜单。 |
 | `TeamComparisonPanel` | `@cs2dak/react` | 队伍对比（A/B 选队 + 雷达 + per-team 比赛列表）。赛前侦察口径，两队无需交手。 | 队伍并排对比表。 |
 | `ScoreboardTable` | `@cs2dak/react` | 单场记分板（队伍着色、可点选手）。 | 记分板。 |

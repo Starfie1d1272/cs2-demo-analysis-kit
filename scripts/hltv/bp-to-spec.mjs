@@ -2,13 +2,13 @@
 // BP 文本 → spec.series 片段转换器。
 //
 // 把 extract-bp.ts 爬下来的 veto 文本（bp-output.txt / stage3-bp-complete.txt）解析成
-// cologne-major-2026.spec.json 的 series 形状：teamA/teamB + bp[[teamKey, action, 地图显示名]]。
+// event spec 的 series 形状：teamA/teamB + bp[[teamKey, action, 地图显示名]]。
 // 这是「文本 → spec 手抄」断裂的那一环；爬取本身没问题，问题在转换。
 //
 // 用法：
-//   node scripts/hltv/bp-to-spec.mjs scripts/hltv/bp-output.txt scripts/hltv/stage3-bp-complete.txt
+//   node scripts/hltv/bp-to-spec.mjs fixtures/events/<event>/data/bp-output.txt
 //     → 打印 series 片段 JSON 到 stdout（人工核对后粘进 spec.series 覆盖预测对阵/BP）
-//   node scripts/hltv/bp-to-spec.mjs <文件...> --merge scripts/cologne/cologne-major-2026.spec.json
+//   node scripts/hltv/bp-to-spec.mjs <文件...> --merge fixtures/events/<event>/spec.json
 //     → 按归一化对阵就地覆盖 spec.series[].bp（写回原文件），未匹配的片段告警列出
 //   附 --matches scripts/hltv/matches.txt 时尽量回填 series.matchUrl
 //
@@ -21,14 +21,22 @@ const mergeIdx = args.indexOf("--merge");
 const specPath = mergeIdx >= 0 ? args[mergeIdx + 1] : null;
 const matchesIdx = args.indexOf("--matches");
 const matchesPath = matchesIdx >= 0 ? args[matchesIdx + 1] : null;
-const valueIdx = new Set([mergeIdx >= 0 ? mergeIdx + 1 : -1, matchesIdx >= 0 ? matchesIdx + 1 : -1]);
+const eventSlugIdx = args.indexOf("--event-slug");
+const explicitEventSlug = eventSlugIdx >= 0 ? args[eventSlugIdx + 1] : null;
+const valueIdx = new Set([
+  mergeIdx >= 0 ? mergeIdx + 1 : -1,
+  matchesIdx >= 0 ? matchesIdx + 1 : -1,
+  eventSlugIdx >= 0 ? eventSlugIdx + 1 : -1,
+]);
 const files = args.filter((a, i) => !a.startsWith("--") && !valueIdx.has(i));
 if (files.length === 0) {
-  console.error("用法：node scripts/hltv/bp-to-spec.mjs <bp.txt...> [--merge spec.json] [--matches matches.txt]");
+  console.error("用法：node scripts/hltv/bp-to-spec.mjs <bp.txt...> [--merge spec.json] [--matches matches.txt] [--event-slug slug]");
   process.exit(2);
 }
+const mergeSpec = specPath ? JSON.parse(readFileSync(specPath, "utf8")) : null;
+const eventSlug = explicitEventSlug ?? mergeSpec?.event?.slug ?? null;
 
-// 与 cologne-build.mjs 同口径，确保对阵能对齐。
+// 与 build-event-package.mjs 同口径，确保对阵能对齐。
 const normTeam = (s) => String(s).toLowerCase().replace(/\b(gaming|esports|team)\b/g, "").replace(/[^a-z0-9]/g, "");
 const pairKey = (a, b) => [normTeam(a), normTeam(b)].sort().join("|");
 // 地图显示名规范化（首字母大写，Dust2 特例），与 spec 的显示名口径一致。
@@ -44,16 +52,18 @@ if (matchesPath) {
   }
 }
 
-// 从 block 头解析两队显示名。支持 "# 9z vs PARIVISION" 与 "# the-mongolz-vs-b8-iem-cologne-major-2026"。
+// 从 block 头解析两队显示名。支持 "# 9z vs PARIVISION" 与 "# the-mongolz-vs-b8-<event-slug>"。
 function parseHeader(header) {
   const raw = header.replace(/^#\s*/, "").trim();
   if (/ vs /i.test(raw)) {
     const [a, b] = raw.split(/ vs /i);
     return { teamA: a.trim(), teamB: b.trim(), slug: null };
   }
-  // slug 形态：去掉末尾的 -iem-cologne-major-2026，再按 -vs- 切
+  // slug 形态：去掉末尾的 -<event-slug>，再按 -vs- 切
   const slug = raw;
-  const core = raw.replace(/-iem-cologne-major-2026.*$/i, "");
+  const core = eventSlug
+    ? raw.replace(new RegExp(`-${eventSlug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}.*$`, "i"), "")
+    : raw;
   const parts = core.split("-vs-");
   if (parts.length === 2) return { teamA: parts[0], teamB: parts[1], slug };
   return null;
@@ -125,7 +135,7 @@ if (!specPath) {
   process.stdout.write(JSON.stringify(fragments, null, 2) + "\n");
   console.error(`\n共 ${fragments.length} 个系列片段。核对后覆盖 spec.series 的对应对阵。`);
 } else {
-  const spec = JSON.parse(readFileSync(specPath, "utf8"));
+  const spec = mergeSpec;
   const byPair = new Map(fragments.map((f) => [pairKey(f.teamA, f.teamB), f]));
   let merged = 0;
   const usedPairs = new Set();

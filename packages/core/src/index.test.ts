@@ -5,7 +5,7 @@ import type { DemoPackage } from "@cs2dak/contract";
 import {
   analyzeDemoPackage,
   computeAccountRatingsV2,
-  deriveAccountSignalsV2,
+  deriveRRSignals,
   derivePlayerWeaponHighlights,
   deriveRRIndicators,
   loadDemoPackageFromZip
@@ -40,7 +40,7 @@ describe("analyzeDemoPackage", () => {
   });
 
   it("derives RR six-account signals and computes six-account RR from the v3 fixture", () => {
-    const signals = deriveAccountSignalsV2(pkg);
+    const signals = deriveRRSignals(pkg);
     const ratings = computeAccountRatingsV2(pkg);
 
     expect(signals).toHaveLength(10);
@@ -151,12 +151,12 @@ describe("analyzeDemoPackage", () => {
 
   it("emits null context buckets (not zero) when the data source is missing", () => {
     // 剥离经济源 → buyDelta 降级为 null（而非零桶）；manState 仍可用
-    const noEconomy = deriveAccountSignalsV2({ ...pkg, playerEconomies: [] });
+    const noEconomy = deriveRRSignals({ ...pkg, playerEconomies: [] });
     expect(noEconomy[0]?.combat.killsByBuyDelta).toBeNull();
     expect(noEconomy[0]?.combat.killsByManState).not.toBeNull();
 
     // 剥离回合源 → manState 降级为 null
-    const noRounds = deriveAccountSignalsV2({ ...pkg, rounds: [] });
+    const noRounds = deriveRRSignals({ ...pkg, rounds: [] });
     expect(noRounds[0]?.combat.killsByManState).toBeNull();
   });
 

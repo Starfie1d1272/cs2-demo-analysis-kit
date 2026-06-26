@@ -118,8 +118,6 @@ export function deriveRRSignals(input: unknown): RRSignals[] {
   });
 }
 
-export const deriveAccountSignalsV2 = deriveRRSignals;
-
 export function computeAccountRatingsV2(input: unknown): Array<{ signals: RRSignals; rr: AccountRatingResult }> {
   const weights = rrSixAccountWeightsV1 as unknown as RRSixAccountWeights;
   const baseline = rrSixAccountProBaselineV0 as unknown as ProBaselineConfig;

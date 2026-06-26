@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import JSZip from "jszip";
-import { buildEventPackage, deriveEventTeams, resourceFromFile, seriesSkeletonForPreset, stagesForPreset, swissBuckets } from "./event-maker";
-import { slugifyEventName } from "../components/EventPackageMaker";
+import { buildEventPackage, deriveEventTeams, resourceFromFile, seriesSkeletonForPreset, slugifyEventName, stagesForPreset, swissBuckets } from "./event-maker";
 
 describe("赛事资源制作器", () => {
   it("中文赛事名使用稳定非空 fallback slug", () => {

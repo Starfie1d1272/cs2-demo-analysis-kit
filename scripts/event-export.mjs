@@ -5,7 +5,7 @@
 //
 // 用法：
 //   node scripts/event-export.mjs <spec.json> [--stage <Name>] [--reexport]
-//   pnpm event:export scripts/cologne/cologne-major-2026.spec.json --stage Stage3
+//   pnpm event:export fixtures/events/cologne-major-2026/spec.json --stage Stage3
 //
 // spec.export 形如：
 //   { "outRoot": "fixtures/demos/pro/IEM-Cologne-Major-2026",
@@ -84,13 +84,32 @@ for (const stageDef of exp.stages) {
   //   - 本次科隆 Major 无此情况，matchIds 不填即可。（matchIds 已定义但为空 → 当作未填、
   //     回退到 pairs；pairs 已定义但为空 → 该阶段不取任何源，安全默认。）
   const normTeam = (s) => String(s).toLowerCase().replace(/\b(gaming|esports|team)\b/g, "").replace(/[^a-z0-9]/g, "");
-  const slugOfRar = (f) => { const m = f.split("/").at(-1).match(/^iem-cologne-major-2026-(.+?)-bo\d-.+\.rar$/i); return m ? m[1] : null; };
-  const hashOfRar = (f) => { const m = f.split("/").at(-1).match(/-([^-]+)\.rar$/i); return m ? m[1] : null; };
-  const pairOf = (file) => { const s = slugOfRar(file); if (!s) return null; const vs = s.split("-vs-"); return vs.length === 2 ? [normTeam(vs[0]), normTeam(vs[1])].sort().join("|") : null; };
+  const archiveStem = (f) => f.split("/").at(-1).replace(/\.(rar|dem)$/i, "");
+  const eventSlug = spec.event?.slug ?? "";
+  const eventPrefix = eventSlug ? new RegExp(`^${eventSlug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-`, "i") : null;
+  const eventSuffix = eventSlug ? new RegExp(`-${eventSlug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}.*$`, "i") : null;
+  const matchSlugOf = (f) => {
+    let stem = archiveStem(f);
+    if (eventPrefix) stem = stem.replace(eventPrefix, "");
+    stem = stem.replace(/-bo\d.*$/i, "");
+    if (eventSuffix) stem = stem.replace(eventSuffix, "");
+    return stem;
+  };
+  const hashOfArchive = (f) => { const m = archiveStem(f).match(/-([a-f0-9]{6,})$/i); return m ? m[1] : null; };
+  const pairOf = (file) => {
+    const slug = matchSlugOf(file);
+    if (!slug.includes("-vs-")) return null;
+    const [a, b] = slug.split("-vs-");
+    if (!a || !b) return null;
+    return [normTeam(a), normTeam(b)].sort().join("|");
+  };
   // 1) matchIds（精确；demo hash 或 slug "aurora-vs-g2"）
   if (Array.isArray(stageDef.matchIds) && stageDef.matchIds.length > 0) {
     const ids = new Set(stageDef.matchIds);
-    sources = sources.filter((s) => { const slug = slugOfRar(s), h = hashOfRar(s); return (slug && ids.has(slug)) || (h && ids.has(h)); });
+    sources = sources.filter((s) => {
+      const slug = matchSlugOf(s), stem = archiveStem(s), h = hashOfArchive(s);
+      return ids.has(slug) || ids.has(stem) || (h && ids.has(h));
+    });
   }
   // 2) pairs（对阵白名单；未定义或空则跳过此筛选）
   if (Array.isArray(stageDef.pairs) && stageDef.pairs.length > 0) {

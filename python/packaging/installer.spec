@@ -32,7 +32,6 @@ a = Analysis(
         "matplotlib",
         "PIL",
         "cv2",
-        "scipy",
         "sklearn",
     ],
     no_warn=False,

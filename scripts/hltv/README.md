@@ -40,24 +40,27 @@ node scripts/hltv/extract-stage-urls.mjs --stage stage1
 
 # 2. 下载 demo（各阶段 matches 文件名见下表）
 #    Chrome 保持 9222 端口，另开终端
-cd scripts/hltv              # 或独立目录，playwright 不进仓库 node_modules
-npx -y -p @playwright/test -p tsx tsx download-hltv-demos.ts
+npx -y -p @playwright/test -p tsx tsx scripts/hltv/download-hltv-demos.ts \
+  --matches fixtures/events/cologne-major-2026/data/matches-stage1.txt \
+  --download-dir fixtures/demos/pro/IEM-Cologne-Major-2026/_src
 
 # 3. 提取 BP
-npx -y -p @playwright/test -p tsx tsx extract-bp.ts
+npx -y -p @playwright/test -p tsx tsx scripts/hltv/extract-bp.ts \
+  --matches fixtures/events/cologne-major-2026/data/matches-stage1.txt \
+  --out fixtures/events/cologne-major-2026/data/bp-output.txt
 
 # 4. BP → spec
-node bp-to-spec.mjs ../cologne/data/stage3-bp-complete.txt \
-  --matches ../cologne/data/matches.txt
-node bp-to-spec.mjs ../cologne/data/*.txt \
-  --matches ../cologne/data/matches.txt \
-  --merge ../cologne/cologne-major-2026.spec.json
+node scripts/hltv/bp-to-spec.mjs fixtures/events/cologne-major-2026/data/stage3-bp-complete.txt \
+  --matches fixtures/events/cologne-major-2026/data/matches.txt
+node scripts/hltv/bp-to-spec.mjs fixtures/events/cologne-major-2026/data/*.txt \
+  --matches fixtures/events/cologne-major-2026/data/matches.txt \
+  --merge fixtures/events/cologne-major-2026/spec.json
 
 # 5. 导出（回到仓库根目录）
-node scripts/event-export.mjs scripts/cologne/cologne-major-2026.spec.json
+node scripts/event-export.mjs fixtures/events/cologne-major-2026/spec.json
 
 # 6. 装配
-node scripts/cologne-build.mjs
+node scripts/build-event-package.mjs fixtures/events/cologne-major-2026/spec.json
 ```
 
 ## Windows 上手
@@ -98,7 +101,7 @@ copy([...document.querySelectorAll('a[href*="/matches/"]')]
 //   （不要加 stage 后缀——这页两个阶段混在一起，导出时由 spec 的 pairs 自动分开）
 ```
 
-`copy()` 会把 URL 列表拷到剪贴板，粘到 `scripts/cologne/data/matches-{stage}.txt` 即可。
+`copy()` 会把 URL 列表拷到剪贴板，粘到对应赛事的 `fixtures/events/<event>/data/matches-{stage}.txt` 即可。
 
 ## 命令速查
 
@@ -108,27 +111,27 @@ node scripts/hltv/extract-stage-urls.mjs                   # 全 stage
 node scripts/hltv/extract-stage-urls.mjs --stage stage1    # 单 stage
 
 # 下载 + 提取 BP（需 Chrome CDP + npx 临时拉 playwright）
-npx -y -p @playwright/test -p tsx tsx scripts/hltv/download-hltv-demos.ts
-npx -y -p @playwright/test -p tsx tsx scripts/hltv/extract-bp.ts
+npx -y -p @playwright/test -p tsx tsx scripts/hltv/download-hltv-demos.ts --matches fixtures/events/<event>/data/matches.txt --download-dir fixtures/demos/pro/<Event>/_src
+npx -y -p @playwright/test -p tsx tsx scripts/hltv/extract-bp.ts --matches fixtures/events/<event>/data/matches.txt --out fixtures/events/<event>/data/bp-output.txt
 
 # BP 文本 → spec
-node scripts/hltv/bp-to-spec.mjs scripts/cologne/data/stage3-bp-complete.txt \
-  --matches scripts/cologne/data/matches.txt
-node scripts/hltv/bp-to-spec.mjs scripts/cologne/data/*.txt \
-  --matches scripts/cologne/data/matches.txt \
-  --merge scripts/cologne/cologne-major-2026.spec.json
+node scripts/hltv/bp-to-spec.mjs fixtures/events/cologne-major-2026/data/stage3-bp-complete.txt \
+  --matches fixtures/events/cologne-major-2026/data/matches.txt
+node scripts/hltv/bp-to-spec.mjs fixtures/events/cologne-major-2026/data/*.txt \
+  --matches fixtures/events/cologne-major-2026/data/matches.txt \
+  --merge fixtures/events/cologne-major-2026/spec.json
 
 # 导出 + 装配
-node scripts/event-export.mjs scripts/cologne/cologne-major-2026.spec.json
-node scripts/cologne-build.mjs
+node scripts/event-export.mjs fixtures/events/cologne-major-2026/spec.json
+node scripts/build-event-package.mjs fixtures/events/cologne-major-2026/spec.json
 ```
 
 ## 科隆 Major 2026 数据文件参考
 
 | 文件 | 内容 |
 |---|---|
-| `scripts/cologne/data/matches-stage1.txt` | Stage 1 的 33 个 HLTV match URL |
-| `scripts/cologne/data/matches-stage2.txt` | Stage 2 的 33 个 HLTV match URL |
-| `scripts/cologne/data/matches.txt` | Stage 3 + Playoff 的 28 个 HLTV match URL |
-| `scripts/cologne/data/stage3-bp-complete.txt` | 40 场 BP 全量（33 stage3 + 7 playoff） |
-| `scripts/cologne/data/bp-output.txt` | 早期爬取输出（可能不全，以 complete 为准） |
+| `fixtures/events/cologne-major-2026/data/matches-stage1.txt` | Stage 1 的 33 个 HLTV match URL |
+| `fixtures/events/cologne-major-2026/data/matches-stage2.txt` | Stage 2 的 33 个 HLTV match URL |
+| `fixtures/events/cologne-major-2026/data/matches.txt` | Stage 3 + Playoff 的 28 个 HLTV match URL |
+| `fixtures/events/cologne-major-2026/data/stage3-bp-complete.txt` | 40 场 BP 全量（33 stage3 + 7 playoff） |
+| `fixtures/events/cologne-major-2026/data/bp-output.txt` | 早期爬取输出（可能不全，以 complete 为准） |

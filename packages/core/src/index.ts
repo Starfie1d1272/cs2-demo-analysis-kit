@@ -10,20 +10,14 @@ export { loadDemoPackageFromZip } from "./loader.js";
 export { normalizeDemoPackage } from "./normalize.js";
 export { createPlayerResolver, createResolverFromPackage } from "./resolve.js";
 export type { PlayerResolver } from "./resolve.js";
-export { deriveRRSignals, deriveAccountSignalsV2, computeAccountRatingsV2 } from "./signals.js";
-export { activeDamages, isActiveRoundTick } from "./utils.js";
+export { deriveRRSignals, computeAccountRatingsV2 } from "./signals.js";
+export { activeDamages, groupBy } from "./utils.js";
 export * from "./spatial/index.js";
 export { deriveRRIndicators } from "./scoreboard.js";
 export { derivePlayerWeaponHighlights } from "./weapon-highlights.js";
-export { buildEconomyConversion } from "./economy.js";
 export { buildTeamSideWinRates } from "./side-win-rate.js";
 export { buildDuelsSignals, deriveDuels, deriveOpeningDuels } from "./duels.js";
 export { buildMechanicsSignals, counterStrafeThresholdForWeapon, derivePlayerMechanics } from "./mechanics.js";
-export type {
-  EconomyTypeStats,
-  EconomyConversion,
-  MatchEconomyConversion,
-} from "./economy.js";
 export type { SideWinRateStats, TeamSideWinRates } from "./side-win-rate.js";
 export type { DuelClassification, DuelHpBucket, DuelRecord, DuelSignals, TtkDistribution } from "./duels.js";
 export type {

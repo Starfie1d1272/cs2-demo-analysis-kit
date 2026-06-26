@@ -171,12 +171,3 @@ export function buildAllPlayerSeasonProfiles(bundle: SeasonCohortBundle): Player
     return profileFromRow(player, metrics, bundle.weightsVersion, strengths, weaknesses);
   });
 }
-
-/** 取单个选手档案；playerKey 不存在时抛错。 */
-export function buildPlayerSeasonProfile(bundle: SeasonCohortBundle, playerKey: string): PlayerSeasonProfile {
-  const profile = buildAllPlayerSeasonProfiles(bundle).find((p) => p.playerKey === playerKey);
-  if (!profile) {
-    throw new Error(`playerKey not found in cohort: ${playerKey}`);
-  }
-  return profile;
-}

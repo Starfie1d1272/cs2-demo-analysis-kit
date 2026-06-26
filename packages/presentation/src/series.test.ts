@@ -2,29 +2,13 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { loadDemoPackageFromZip } from "@cs2dak/core";
-import { mvpRecommendationSchema, seriesSummarySchema } from "@cs2dak/contract";
-import { buildMatchWorkspaceModel, buildSeriesSummary, recommendMatchMvp } from "./index";
+import { seriesSummarySchema } from "@cs2dak/contract";
+import { buildMatchWorkspaceModel, buildSeriesSummary } from "./index";
 
 async function buildWorkspace() {
   const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url)));
   return buildMatchWorkspaceModel(await loadDemoPackageFromZip(zip));
 }
-
-describe("recommendMatchMvp", () => {
-  it("ranks candidates from accountRR, HLTV Rating 2.0 and confidence", async () => {
-    const model = await buildWorkspace();
-    const recommendation = recommendMatchMvp(model);
-
-    expect(() => mvpRecommendationSchema.parse(recommendation)).not.toThrow();
-    expect(recommendation.candidates.length).toBeGreaterThan(0);
-    expect(recommendation.recommended.playerKey).toBe(recommendation.candidates[0]?.playerKey);
-    expect(recommendation.candidates.map((row) => row.recommendationScore)).toEqual(
-      [...recommendation.candidates.map((row) => row.recommendationScore)].sort((a, b) => b - a)
-    );
-    expect(recommendation.recommended.explanation).toHaveLength(3);
-    expect(recommendation).not.toHaveProperty("winnerUserId");
-  });
-});
 
 describe("buildSeriesSummary", () => {
   it("aggregates counts and round-weighted rates across maps", async () => {

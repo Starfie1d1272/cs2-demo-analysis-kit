@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { loadDemoPackageFromZip } from "../loader.js";
-import { deriveAccountSignalsV2 } from "../signals.js";
+import { deriveRRSignals } from "../signals.js";
 
 /**
  * SP2 Trade 闭环端到端：de_ancient fixture 含 replay + 现役图动线，
@@ -15,7 +15,7 @@ describe("strategicIsolationDeaths wiring (de_ancient fixture)", () => {
       fileURLToPath(new URL("../../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url)),
     );
     const pkg = await loadDemoPackageFromZip(zip);
-    const signals = deriveAccountSignalsV2(pkg);
+    const signals = deriveRRSignals(pkg);
 
     expect(signals).toHaveLength(10);
     for (const s of signals) {
@@ -32,7 +32,7 @@ describe("strategicIsolationDeaths wiring (de_ancient fixture)", () => {
     );
     const pkg = await loadDemoPackageFromZip(zip);
     const { replay: _, ...stripped } = pkg;
-    const signals = deriveAccountSignalsV2(stripped);
+    const signals = deriveRRSignals(stripped);
     for (const s of signals) expect(s.trade.strategicIsolationDeaths).toBeNull();
   });
 });

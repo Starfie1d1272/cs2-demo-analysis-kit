@@ -15,7 +15,7 @@
 import type { DemoPackage } from "@cs2dak/contract";
 import { routeIndex, type MapRoute, type MapRoutes } from "@cs2dak/maps";
 import { createResolverFromPackage, type PlayerResolver } from "../resolve.js";
-import { groupBy } from "../utils.js";
+import { clamp, groupBy } from "../utils.js";
 import { annotatePositions, type SpatialAssets, type AnnotatedSample } from "./annotate.js";
 import { inferRoundPhases, phaseAtTick } from "./phase.js";
 import { isOfficialScoringPhase, type RoundPhase, type RoundPhaseModel } from "./types.js";
@@ -271,10 +271,6 @@ function plantTicks(pkg: DemoPackage): Map<number, number> {
     if (bomb.type === "planted" && !out.has(bomb.roundNumber)) out.set(bomb.roundNumber, bomb.tick);
   }
   return out;
-}
-
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, v));
 }
 
 function round3(v: number): number {

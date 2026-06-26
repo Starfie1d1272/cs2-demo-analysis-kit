@@ -1,24 +1,45 @@
 #!/usr/bin/env node
-// 科隆 Major 赛事包增量装配器 —— per-stage 版。
+// 通用赛事包增量装配器 —— per-stage 版。
 //
-//   node scripts/cologne-build.mjs
+//   node scripts/build-event-package.mjs <spec.json> [--demos-root <dir>] [--out <dir>] [--stage <stageKey>]
 //
-// 读取 scripts/cologne/cologne-major-2026.spec.json + fixtures/demos/pro/IEM-Cologne-Major-2026/<Stage>/*.zip，
+// 读取 event-package 制作 spec + <demos-root>/<Stage>/*.zip，
 // 按队伍名归一化匹配每个系列赛的 demo，按 stage 产出独立 event-package（共享 group 供 Gallery 折叠）：
-//   fixtures/demos/pro/IEM-Cologne-Major-2026/_build/{slug}-stage1.zip … {slug}-playoff.zip。
+//   <out>/{slug}-stage1.zip … {slug}-playoff.zip。
 // 没有对应 demo 的系列自动跳过（增量）——下完一场重跑一次即可。
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, copyFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { homedir } from "node:os";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const SPEC = join(ROOT, "scripts/cologne/cologne-major-2026.spec.json");
-const DEMOS = join(ROOT, "fixtures/demos/pro/IEM-Cologne-Major-2026");
-const OUT = join(DEMOS, "_build");
-const STAGES = ["Stage1", "Stage2", "Stage3", "Playoff"];
-const MAP_POOL = ["de_ancient", "de_anubis", "de_dust2", "de_inferno", "de_mirage", "de_nuke", "de_overpass"];
+
+function fail(message) {
+  console.error(message);
+  console.error("用法：node scripts/build-event-package.mjs <spec.json> [--demos-root <dir>] [--out <dir>] [--stage <stageKey>]");
+  process.exit(2);
+}
+
+const args = process.argv.slice(2);
+const valueOf = (name) => {
+  const i = args.indexOf(name);
+  return i >= 0 ? args[i + 1] : null;
+};
+const positional = args.filter((a, i) => !a.startsWith("--") && !args[i - 1]?.startsWith("--"));
+const specArg = positional[0];
+if (!specArg) fail("缺少 spec.json");
+
+const expandHome = (p) => p.startsWith("~") ? join(homedir(), p.slice(1)) : p;
+const resolveFromRoot = (p) => resolve(ROOT, expandHome(p));
+const SPEC = resolveFromRoot(specArg);
+const spec = JSON.parse(readFileSync(SPEC, "utf8"));
+const DEMOS = valueOf("--demos-root")
+  ? resolveFromRoot(valueOf("--demos-root"))
+  : resolveFromRoot(spec.export?.outRoot ?? dirname(SPEC));
+const OUT = valueOf("--out") ? resolveFromRoot(valueOf("--out")) : join(DEMOS, "_build");
+const ONLY_STAGE = valueOf("--stage");
 
 // 队名归一化：小写 + 去非字母数字 + 去常见后缀，吸收 HLTV/demo 命名差异
 // （"Lynn Vision Gaming" ↔ "Lynn Vision"、"B8 Esports" ↔ "B8"、"THUNDER dOWNUNDER" ↔ "THUNDERdOWNUNDER"）。
@@ -27,6 +48,13 @@ const normTeam = (s) => String(s).toLowerCase().replace(/\b(gaming|esports|team)
 const deMap = (s) => (String(s).startsWith("de_") ? String(s) : "de_" + String(s).toLowerCase().replace(/[^a-z0-9]/g, ""));
 // spec stage key → 目录名：stage1→Stage1, playoff→Playoff
 const stageDirName = (k) => k.startsWith("stage") ? "Stage" + k.slice(5) : k.charAt(0).toUpperCase() + k.slice(1);
+const stageKeyFromDirName = (stage) => String(stage).toLowerCase();
+const mapPool = () => {
+  const fromSpec = Array.isArray(spec.mapPool) ? spec.mapPool : [];
+  const fromBp = (spec.series ?? []).flatMap((s) => (s.bp ?? []).map((b) => b[2]));
+  return [...new Set([...fromSpec, ...fromBp].filter(Boolean).map(deMap))].sort();
+};
+const MAP_POOL = mapPool();
 
 const sha256 = (buf) => createHash("sha256").update(buf).digest("hex");
 const readMatchJson = (zip) => JSON.parse(execFileSync("unzip", ["-p", zip, "match.json"]).toString());
@@ -81,7 +109,11 @@ function buildVeto(s) {
 
 // ── 1. 扫描各 Stage 子文件夹里的 ZIP，读出 demo 元数据 ──
 const demos = [];
-for (const stage of STAGES) {
+const scanStages = [...new Set([
+  ...(spec.export?.stages ?? []).map((stage) => stage.stage),
+  ...(spec.stages ?? []).map((stage) => stageDirName(stage.key)),
+])];
+for (const stage of scanStages) {
   const dir = join(DEMOS, stage);
   if (!existsSync(dir)) continue;
   for (const f of readdirSync(dir)) {
@@ -97,12 +129,11 @@ for (const stage of STAGES) {
   }
 }
 
-const spec = JSON.parse(readFileSync(SPEC, "utf8"));
-
 // ── 2. 按 stage 分组 series ──
 const seriesByStage = new Map();
 for (const s of spec.series) {
   const k = s.stage ?? "_unknown";
+  if (ONLY_STAGE && k !== ONLY_STAGE) continue;
   if (!seriesByStage.has(k)) seriesByStage.set(k, []);
   seriesByStage.get(k).push(s);
 }
@@ -144,7 +175,7 @@ for (const [stageKey, stageSeries] of seriesByStage) {
       return true;
     };
 
-    const sameStage = demos.filter((d) => d.stage === stageDir);
+    const sameStage = demos.filter((d) => stageKeyFromDirName(d.stage) === stageKeyFromDirName(stageDir));
     const hits = sameStage.filter(match);
     if (hits.length > 0) return hits;
     return demos.filter(match);

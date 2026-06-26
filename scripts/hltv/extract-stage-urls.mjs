@@ -3,25 +3,42 @@
 // 不依赖 Playwright，仅 Node 24 内置 WebSocket。
 //
 // 用法（先确保 Chrome --remote-debugging-port=9222 已启动并已登录 HLTV）：
-//   node scripts/hltv/extract-stage-urls.mjs
-//   node scripts/hltv/extract-stage-urls.mjs --stage stage1  # 只爬一个
+//   node scripts/hltv/extract-stage-urls.mjs --url https://www.hltv.org/results?event=9028 --filter iem-cologne-major-2026-stage-1 --out fixtures/events/cologne-major-2026/data/matches-stage1.txt
+//   node scripts/hltv/extract-stage-urls.mjs --stage stage1  # 使用内置 Cologne 示例配置
 import { writeFileSync } from "node:fs";
 
-const CDP = "http://127.0.0.1:9222";
-const STAGES = [
+const args = process.argv.slice(2);
+const valueOf = (name) => {
+  const i = args.indexOf(name);
+  return i >= 0 ? args[i + 1] : null;
+};
+const CDP = valueOf("--cdp") ?? "http://127.0.0.1:9222";
+const DEFAULT_STAGES = [
   {
     key: "stage1",
     url: "https://www.hltv.org/results?event=9028",
     filter: "iem-cologne-major-2026-stage-1",
+    out: "fixtures/events/cologne-major-2026/data/matches-stage1.txt",
   },
   {
     key: "stage2",
     url: "https://www.hltv.org/results?event=9029",
     filter: "iem-cologne-major-2026-stage-2",
+    out: "fixtures/events/cologne-major-2026/data/matches-stage2.txt",
   },
 ];
 
-const only = process.argv.includes("--stage") ? process.argv[process.argv.indexOf("--stage") + 1] : null;
+const customUrl = valueOf("--url");
+const customFilter = valueOf("--filter");
+const customOut = valueOf("--out");
+const only = valueOf("--stage");
+const stages = customUrl || customFilter || customOut
+  ? [{ key: only ?? "custom", url: customUrl, filter: customFilter ?? "", out: customOut ?? "matches.txt" }]
+  : DEFAULT_STAGES;
+if (stages.some((stage) => !stage.url)) {
+  console.error("用法：extract-stage-urls.mjs --url <results-url> [--filter <substring>] [--out <file>] [--cdp <url>]");
+  process.exit(2);
+}
 
 // CDP helpers over a single WS connection
 class CdpClient {
@@ -113,7 +130,7 @@ async function main() {
         console.log(`  💡 提示：可能需要手动在页面选择 stage filter。`);
         // 尽力：如果全部 URL 数量合理（<80），直接保存让用户筛选
         if (allUrls.length <= 80) {
-          const out = `scripts/hltv/matches-${stage.key}.txt`;
+          const out = stage.out;
           writeFileSync(out, allUrls.join("\n") + "\n", "utf8");
           console.log(`  📄 已保存全部 ${allUrls.length} URL → ${out}`);
         }
@@ -121,7 +138,7 @@ async function main() {
       continue;
     }
 
-    const out = `scripts/hltv/matches-${stage.key}.txt`;
+    const out = stage.out;
     writeFileSync(out, urls.join("\n") + "\n", "utf8");
     console.log(`  ✅ ${urls.length} URL → ${out}`);
   }

@@ -22,6 +22,10 @@ export const ECONOMY_ENTRY_CN: Record<EconomyEntry, string> = {
   eco: "Eco",
 };
 
+export function sideLabel(side: string): string {
+  return side === "t" ? "进攻方" : "防守方";
+}
+
 function chokeCn(mapName: string, chokeId: string): string {
   const def = SITE_ENTRY_SEMANTICS[mapName]?.entries.find((entry) => entry.id === chokeId);
   for (const callout of def?.entryCallouts ?? []) {

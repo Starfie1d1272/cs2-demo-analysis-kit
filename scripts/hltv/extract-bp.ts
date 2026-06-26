@@ -10,7 +10,7 @@
  *   2. 在 Chrome 里手动登录 HLTV，通过一次 CF 验证
  *   3. 另开终端：
  *      cd ~/hltv-demo-downloader
- *      npx tsx extract-bp.ts
+ *      npx tsx extract-bp.ts --matches fixtures/events/<event>/data/matches.txt --out fixtures/events/<event>/data/bp-output.txt
  *
  * 特性：
  *   - 通过 CDP 接管真实 Chrome，避免 Playwright 自动化检测
@@ -24,10 +24,15 @@ import fs from "node:fs/promises";
 import { createInterface } from "node:readline/promises";
 
 // ── 配置 ──────────────────────────────────────────────
-const MATCHES_FILE = "matches.txt";
-const CDP_URL = "http://127.0.0.1:9222";
-const OUT_FILE = "bp-output.txt";
-const STATE_FILE = ".extract-state.json"; // 记录已处理的 URL
+function argValue(name: string): string | null {
+  const index = process.argv.indexOf(name);
+  return index >= 0 ? process.argv[index + 1] ?? null : null;
+}
+
+const MATCHES_FILE = argValue("--matches") ?? "matches.txt";
+const CDP_URL = argValue("--cdp") ?? "http://127.0.0.1:9222";
+const OUT_FILE = argValue("--out") ?? "bp-output.txt";
+const STATE_FILE = argValue("--state") ?? ".extract-state.json"; // 记录已处理的 URL
 
 function delay(ms: number) {
   return new Promise((r) => setTimeout(r, ms));

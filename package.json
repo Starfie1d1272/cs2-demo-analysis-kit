@@ -29,6 +29,7 @@
     "events:build": "node scripts/build-event-asset.mjs",
     "events:publish": "bash scripts/publish-event-assets.sh",
     "event:export": "node scripts/event-export.mjs",
+    "event:package": "node scripts/build-event-package.mjs",
     "event:submissions": "node scripts/promote-event-submission.mjs list",
     "event:promote": "node scripts/promote-event-submission.mjs"
   },
@@ -37,10 +38,7 @@
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.0.0",
-    "tsx": "^4.20.0",
     "typescript": "^5.9.0",
-    "vite": "^7.0.0",
     "vitest": "^4.1.8"
   },
   "dependencies": {

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { playerSeasonProfileSchema } from "@cs2dak/contract";
-import { buildAllPlayerSeasonProfiles, buildPlayerSeasonProfile } from "./index";
+import { buildAllPlayerSeasonProfiles } from "./index";
 import { buildTestSeasonCohortBundle } from "./test-fixtures";
 
-describe("buildPlayerSeasonProfile", () => {
+describe("buildAllPlayerSeasonProfiles", () => {
   it("derives a per-player profile covering rating, metrics, style and trend", () => {
     const bundle = buildTestSeasonCohortBundle();
     const profiles = buildAllPlayerSeasonProfiles(bundle);
@@ -14,7 +14,7 @@ describe("buildPlayerSeasonProfile", () => {
     }
 
     const source = bundle.players[0];
-    const profile = buildPlayerSeasonProfile(bundle, source.playerKey);
+    const profile = profiles.find((row) => row.playerKey === source.playerKey)!;
 
     // 元信息与评分透传（不重算）
     expect(profile.version).toBe("cs2-demo-analysis-kit/player-profile-0.1");
@@ -76,10 +76,5 @@ describe("buildPlayerSeasonProfile", () => {
         }
       }
     }
-  });
-
-  it("throws for an unknown playerKey", () => {
-    const bundle = buildTestSeasonCohortBundle();
-    expect(() => buildPlayerSeasonProfile(bundle, "steam:does-not-exist")).toThrow(/not found/);
   });
 });

@@ -1,17 +1,15 @@
 export { buildDemoViewModel, buildMatchWorkspaceModel } from "./workspace.js";
 export { buildOpeningTrails, type OpeningTrailsOptions } from "./trails.js";
 export { buildSeasonLeaderboardModel } from "./leaderboard.js";
-export { buildPlayerSeasonProfile, buildAllPlayerSeasonProfiles } from "./player.js";
+export { buildAllPlayerSeasonProfiles } from "./player.js";
 export {
-  buildTeamCohortSummary,
   buildTeamComparison,
   buildTeamComparisonFromFacts,
   extractTeamComparisonFacts,
   type TeamComparisonFacts,
   type TeamComparisonModel
 } from "./team.js";
-export { buildSeriesSummary, recommendMatchMvp } from "./series.js";
-export { buildAntiStratMarkdownFromPatterns, buildPlaybookRows, type PlaybookPatternRow } from "./patterns.js";
+export { buildSeriesSummary } from "./series.js";
 export {
   buildDuelInsights,
   buildDuelInsightsFromFacts,
@@ -55,7 +53,5 @@ export {
 } from "./insights.js";
 export { displayWeaponName } from "./weapons.js";
 export { economyLabelCn, ECONOMY_LABEL_SHORT } from "./economy.js";
-export { sideLabel } from "./labels.js";
-export type { EconomyConversion, EconomyTypeStats, MatchEconomyConversion } from "@cs2dak/core";
 export * from "./tactical-labels.js";
 export * from "./replay-clock.js";
