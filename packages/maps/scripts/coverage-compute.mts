@@ -32,8 +32,9 @@ function pToSeg(p: Vec3, a: Vec3, b: Vec3): number {
   return Math.hypot(p.x - (a.x + abx * t), p.y - (a.y + aby * t), p.z - (a.z + abz * t));
 }
 
-const [mapName = "de_inferno", zipDir = "", outJson = "part.json", shardIdx = "0", shardCnt = "1"] = process.argv.slice(2);
+const [mapName = "de_inferno", zipDir = "", outJson = "part.json", shardIdx = "0", shardCnt = "1", teamFilter = ""] = process.argv.slice(2);
 const si = Number(shardIdx), sc = Number(shardCnt);
+const tf = teamFilter.toLowerCase(); // 非空 = 只统计该队作为 CT 满买的回合（队伍防守视角）
 const repoRoot = join(import.meta.dirname, "..", "..", "..");
 
 const triPath = process.env.AWPY_TRIS_DIR ? join(process.env.AWPY_TRIS_DIR, `${mapName}.tri`) : join(homedir(), ".awpy", "tris", `${mapName}.tri`);
@@ -94,7 +95,12 @@ function markPresence(players: Track[], i: number, out: Float64Array): void {
 for (const zf of zips) {
   const zip = await JSZip.loadAsync(readFileSync(join(zipDir, zf)));
   const rd = async (n: string) => JSON.parse(await zip.file(n)!.async("string"));
-  const replay = await rd("replay.json"), rounds = await rd("rounds.json"), players = await rd("players.json"), grenades = await rd("grenades.json");
+  const replay = await rd("replay.json"), rounds = await rd("rounds.json"), players = await rd("players.json"), grenades = await rd("grenades.json"), match = await rd("match.json");
+  // 队伍过滤：match.json teamA/teamB.name 匹配 tf → 确定该队是 teamA 或 teamB
+  if (tf) {
+    const ta = (match.teamA?.name ?? "").toLowerCase(), tb = (match.teamB?.name ?? "").toLowerCase();
+    if (!ta.includes(tf) && !tb.includes(tf)) continue; // 这场没目标队
+  }
   const coordScale = replay.meta.coordScale, angleScale = replay.meta.angleScale;
   const teamByIndex: string[] = players.map((p: any) => p.teamKey);
   const roundRow = new Map<number, any>(rounds.map((r: any) => [r.roundNumber, r]));
@@ -103,6 +109,12 @@ for (const zf of zips) {
   for (const rr of replay.rounds) {
     const meta = roundRow.get(rr.roundNumber); if (!meta) continue;
     const ctTeam = meta.teamASide === "ct" ? "teamA" : "teamB";
+    // 队伍过滤：只取目标队在 CT 侧的回合
+    if (tf) {
+      const ta2 = (match.teamA?.name ?? "").toLowerCase(), tb2 = (match.teamB?.name ?? "").toLowerCase();
+      const targetTeamKey = ta2.includes(tf) ? "teamA" : "teamB";
+      if (ctTeam !== targetTeamKey) continue;
+    }
     if ((ctTeam === "teamA" ? meta.teamAEconomy : meta.teamBEconomy) !== CT_ECON_LABEL) continue;
     gunRounds += 1;
     const tickStep = rr.tickStep, startTick = rr.startTick, freezeEnd = meta.freezeEndTick;
