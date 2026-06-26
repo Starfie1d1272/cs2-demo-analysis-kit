@@ -132,11 +132,11 @@ importers:
   packages/contract:
     dependencies:
       '@rivalhub/rival-rating':
-        specifier: ^0.2.0
-        version: 0.2.0
+        specifier: ^0.3.0
+        version: 0.3.0
       cs2-demo-format:
-        specifier: ^3.0.4
-        version: 3.0.4(zod@3.25.76)
+        specifier: ^3.1.0
+        version: 3.1.0(zod@3.25.76)
       zod:
         specifier: ^3.25.0
         version: 3.25.76
@@ -160,6 +160,9 @@ importers:
 
   packages/presentation:
     dependencies:
+      '@cs2dak/cohort':
+        specifier: workspace:*
+        version: link:../cohort
       '@cs2dak/contract':
         specifier: workspace:*
         version: link:../contract
@@ -172,10 +175,6 @@ importers:
       '@rivalhub/rival-rating':
         specifier: ^0.3.0
         version: 0.3.0
-    devDependencies:
-      '@cs2dak/cohort':
-        specifier: workspace:*
-        version: link:../cohort
 
   packages/react:
     dependencies:
@@ -697,9 +696,6 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@rivalhub/rival-rating@0.2.0':
-    resolution: {integrity: sha512-U2gu9orDVknnuDch59IjCrfHggEvMLaS+n7VdlwsN6f7qJFUb7RsDa/3DJsfxIMSiNRslh1KqJUuQO/zRjaQCw==}
-
   '@rivalhub/rival-rating@0.3.0':
     resolution: {integrity: sha512-EP2XgFC7IFxrkuM0a+Za0TZEoW+OU3he5KC6J+D1CLLnneXS391wgVzq5Gj1/j6sWck3btkPgAH+jst3Ax7xrA==}
 
@@ -980,8 +976,8 @@ packages:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
 
-  cs2-demo-format@3.0.4:
-    resolution: {integrity: sha512-tEQ3BSABViq7ewUMfl7nilln5FgEe3M2+QRRLo50i3wWrNK1ZH+ZCxEnckc/o2BKz6/1AfXceSR99TvFnZo8mw==}
+  cs2-demo-format@3.1.0:
+    resolution: {integrity: sha512-o998DZl5slsTPYea4hUdJ/S6b2TE4joIuslO8E2X7k+Dazd63guf1o2EftGlZb2CD2uzn2sILLM4tIAreNgu6w==}
     peerDependencies:
       zod: '>=3.0.0'
 
@@ -2015,8 +2011,6 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
 
-  '@rivalhub/rival-rating@0.2.0': {}
-
   '@rivalhub/rival-rating@0.3.0': {}
 
   '@rolldown/pluginutils@1.0.0-rc.3': {}
@@ -2245,7 +2239,7 @@ snapshots:
       shebang-command: 2.0.0
       which: 2.0.2
 
-  cs2-demo-format@3.0.4(zod@3.25.76):
+  cs2-demo-format@3.1.0(zod@3.25.76):
     dependencies:
       jszip: 3.10.1
       zod: 3.25.76

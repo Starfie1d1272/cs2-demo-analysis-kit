@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "pnpm dev:studio",
     "dev:studio": "pnpm --filter @cs2dak/dak-studio dev",
-    "analyze:sample": "pnpm --filter @cs2dak/cli analyze ../../fixtures/input/cs2dak-sanitized-de_ancient.zip --out ../../fixtures/output/sample",
+    "analyze:sample": "pnpm --filter @cs2dak/cli analyze ../../fixtures/input/cologne-major-2026-stage3-smoke-de_nuke.zip --out ../../fixtures/output/sample",
     "python:test": "cd python && uv run --extra dev pytest",
     "export:demo": "mkdir -p fixtures/output/nju-rivals-2026 && cd python && uv run cs2df export ../fixtures/demos/nju-rivals-2026/3671816592_1000003075.dem -o ../fixtures/output/nju-rivals-2026/3671816592_1000003075.zip",
     "export:pro": "cd python && uv run cs2df export-batch ../fixtures/demos/pro/ --out ../fixtures/output/pro.zip --descriptive",

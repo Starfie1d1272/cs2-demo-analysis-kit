@@ -22,7 +22,7 @@ pnpm test                 # vitest（packages/**/*.test.ts，node 环境）
 pnpm python:test          # Python 测试（uv run pytest）
 
 # 分析
-pnpm analyze:sample       # CLI 分析 fixtures/input/cs2dak-sanitized-de_ancient.zip → fixtures/output/sample/
+pnpm analyze:sample       # CLI 分析 fixtures/input/cologne-major-2026-stage3-smoke-de_nuke.zip → fixtures/output/sample/
 # 导出使用 cs2df CLI（无需本仓库 Python 壳）：
 #   cs2df export <demo.dem>                              # 单场
 #   cs2df export-batch <dir> --out bundle.zip --descriptive  # 批量
@@ -89,7 +89,8 @@ fixtures/
     nju-rivals-2026/   # 55 场 NJU 联赛
     pro/               # 24 场职业比赛
   input/               # 提交的测试输入
-    cs2dak-sanitized-de_ancient.zip   # CLI 分析样本
+    cologne-major-2026-stage3-smoke-de_nuke.zip # CLI / invariant smoke 样本（cs2df 3.1.0）
+    cs2dak-sanitized-de_ancient.zip   # legacy compact ancient 样本
     cohort/            # 3 场 cohort/cli 测试
     sample-*.zip       # Studio 与测试使用的精简 v3 ZIP 样本
   output/              # 生成的 v3 ZIP（gitignored）
@@ -100,7 +101,7 @@ docs/                  # 架构与集成文档（索引见 docs/README.md）
 
 详细架构见 `docs/architecture.md`。分发架构见 `docs/design/distribution.md`。
 
-> **已迁移**：cs2-demo-format 3.0.4（2026-06）。TS 管线全部使用 v3 合同，
+> **已迁移**：cs2-demo-format 3.1.0 / cs2df 3.1.0（2026-06）。TS 管线全部使用 v3 合同，
 > Python exporter 切换为 PyPI `cs2df`（本仓库只留 Studio 桌面壳）。
 > v3 迁移与 fixture 重导均已完成（归档见 `docs/archive/2026-06/v3-migration.md`）。
 > Studio 最终形态设计见 [`docs/design/studio-redesign.md`](docs/design/studio-redesign.md)。
