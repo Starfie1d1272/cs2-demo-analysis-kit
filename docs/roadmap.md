@@ -51,20 +51,28 @@
 
 ### 雷达场子系统（统一原语，想法 1+5 合一）
 
+> **技术可行性 2026-06-26 已用 202 场真实 Major 数据验证**（原型
+> `packages/maps/scripts/coverage-{compute,render}.mts`，未进产品）。完整发现与方法论见
+> [`research/map-control-model.md §10`](research/map-control-model.md)。
+
 一套渲染器 + 一套聚合骨架覆盖多个空间分析功能，避免各 view 重造雷达：
 
-- **场来源**：`位置密度 / 击杀密度 / 死亡密度`（纯点聚合，无 LOS，最便宜）
-  ｜`视野覆盖`（视锥 ∩ `.tri` LOS ∩ 烟雾遮挡，复用 `core/duel-window.ts` 的 `isVisibleAt`）
-- **覆盖场算法**：nav area 质心做 grid-sample，逐 tick 测「任一防守者可见」→ frequency 叠加
-  N 个长枪局（≥10–20 回合即可成图）→ 热场。**不预设 route/动线**：盲区靠频率自然消隐、
-  免 route 标定、七张 `.tri` 图即可用（零假设是发现「系统性放空」盲区的前提）
-- **聚合轴**：CohortScope 范围筛选 + 可选按四阶段比赛时钟对齐（`replay-clock.ts`，1:55 起逐 tick 演化）
-- **模式**：单场景 ｜ A·B 双 scope **差分**（平时隐藏、按需展开的对比视图；
-  换人前后谁让位置 / 跨赛事自由度 = 两个场相减取 delta）
-- **渲染**：`HeatmapCanvas` 从「吃点」扩成「吃栅格场」+ 枪线 / trail 叠加
-- **性能**：grid 降采样到 nav area + 覆盖采样 1–2Hz + worker 池 + 按 demo集合×identity 缓存
-  IndexedDB（沿用对枪 LOS 缓存的同一套）
-- 落点：想法 1 = 防守盲区可视化（Overpass 长管用例）；想法 5 = 选手活动/击杀/死亡范围 + A·B 差分
+- **四个基础场**：`CT/T × 视野/位置` —— `视野覆盖`（视锥 40° ∩ `.tri` LOS ∩ 烟雾，
+  复用 `duel-window` 原语）｜`位置占据`（落最近 nav 格，无 LOS，便宜）。另含 `击杀/死亡密度`。
+- **合成视图**（render 层组合，已验证）：**信息差分** `tVis−ctVis`（T 优势暖 / CT 预警冷，
+  = L3 信息控制层可视化）｜**对拼线** `min(tVis,ctVis)`（双方互见 = 真实交火点）｜
+  T 侧重 `位置/推进波前`（非视野）。
+- **覆盖场算法**：nav 质心 grid-sample，逐 tick 测「任一玩家可见/占据」→ frequency 叠加
+  N 个满买长枪局 → 热场。**不预设 route**：盲区靠频率自然消隐、七张 `.tri` 图即可用。
+- **聚合轴**：CohortScope 范围筛选 + 按比赛时钟逐秒对齐（**回合 1:55 = 115s**）。
+  **样本量决定性质**：数百局=地图客观真相/分块基线；10–20 局=主体倾向/盲区。
+- **差分模式**：**队伍 − 联赛基线**（A·B 差分的正确用法，比两场对比统计更稳）→
+  风格/倾向/薄弱点。只需「队伍过滤」（`match.json` 队名 + `players.json` teamKey）。
+- **渲染**：柔化圆 blob + 高斯模糊（真热力图观感，非方格）+ 裁剪到 radar 框；
+  **逐秒 + 进度条拖动**（已原型）+ mode 下拉切场；接回放时间轴同理。
+- **性能**：必须走 **worker 池 + 共享同一份 BVH + 按回合分片**（原型单线程只用 1 核、
+  8 进程各建 BVH 仅 ~3.7×；产品形态接近线性 + 内存省 8×）。按 demo集合×identity 缓存 IndexedDB。
+- 落点：想法 1 = 防守盲区可视化（Overpass 长管）；想法 5 = 活动/击杀/死亡范围 + 队伍差分。
 
 ### 其余功能
 
@@ -100,6 +108,10 @@
 - 每回合控制价值 = Σ_覆盖区域 (该区学得的价值 × contested 因子) → RR 地图控制账户输入；
   自然包住现有 `soloPressure` / `denial`，但把手调 gate 换成语料学出来的值
 - **门槛**：描述性覆盖场 10–20 回合即稳；价值模型需数百+ 回合语料，故排在 0.8 之后
+- **数据可行性已确认**（2026-06-26）：「控制事件→outcome（推进/进点/下包/CT 调动/T 受影响）」
+  关联所需数据全在 v3 ZIP（`kills/bombs/grenades/replay` presence），**不需改导出器**。
+  先做描述性条件概率对照验证信号强度，再上回归。字段映射见
+  [`research/map-control-model.md §10.7`](research/map-control-model.md)。
 
 ---
 
