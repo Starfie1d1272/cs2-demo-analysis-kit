@@ -19,6 +19,7 @@ export interface EventImportProgress {
 }
 
 interface NativeEventApi {
+  events_manifest?(): Promise<unknown>;
   event_package_pick(): Promise<{ ok: boolean; cancelled?: boolean; error?: string; sessionId?: string; eventPackage?: unknown; maps?: Array<{ name: string; size: number }> }>;
   event_package_map_chunk(sessionId: string, member: string, offset: number, size: number): Promise<{ ok: boolean; data?: string; done?: boolean; error?: string }>;
   event_package_close(sessionId: string): Promise<void>;
@@ -33,11 +34,25 @@ function nativeEventApi(): NativeEventApi | null {
   return api?.event_package_pick && api.event_package_map_chunk && api.event_package_close ? api as NativeEventApi : null;
 }
 
+function nativeEventsManifestApi(): Pick<NativeEventApi, "events_manifest"> | null {
+  const api = typeof window === "undefined" ? undefined : (window as unknown as { pywebview?: { api?: Partial<NativeEventApi> } }).pywebview?.api;
+  return api?.events_manifest ? api as Pick<NativeEventApi, "events_manifest"> : null;
+}
+
 export function supportsNativeEventImport(): boolean {
   return nativeEventApi() != null;
 }
 
 export async function loadEventsManifest(): Promise<EventsManifest> {
+  const api = nativeEventsManifestApi();
+  if (api?.events_manifest) {
+    try {
+      const raw = await api.events_manifest();
+      return eventsManifestSchema.parse(raw);
+    } catch {
+      // Fall through to browser fetch. Desktop uses the bridge to avoid WebView CORS/proxy failures.
+    }
+  }
   const response = await fetch(EVENTS_MANIFEST_URL, { cache: "no-cache" });
   if (!response.ok) throw new Error(`赛事清单请求失败：HTTP ${response.status}`);
   return eventsManifestSchema.parse(await response.json());

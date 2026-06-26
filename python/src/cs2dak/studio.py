@@ -18,7 +18,6 @@
 from __future__ import annotations
 
 import base64
-import datetime
 import json
 import logging
 import os
@@ -33,7 +32,7 @@ import urllib.parse
 import urllib.request
 import uuid
 import zipfile
-from datetime import datetime
+from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -51,6 +50,8 @@ else:
 # 资产与清单托管在自建 R2（与更新包同一镜像层）；缺失只降级（LOS 口径退化），不报错。
 TRIS_MANIFEST_URL = "https://dakupdate.starfie1d.top/tris/manifest.json"
 TRIS_MANIFEST_TIMEOUT_S = 8
+EVENTS_MANIFEST_URL = "https://dakupdate.starfie1d.top/events/manifest.json"
+EVENTS_MANIFEST_TIMEOUT_S = 8
 
 # 更新检查引用的镜像源（优先级：R2 → GitHub 直连 → ghproxy×3，与前端 update.ts 一致）。
 _MANIFEST_URLS = [
@@ -1149,6 +1150,16 @@ class StudioApi:
         return None
 
     # --- bundled-events 资产管理（本地预装赛事包发现）--------------------------
+    def events_manifest(self) -> dict | None:
+        """通过桌面桥拉取 R2 在线赛事清单，避免 WebView 直接 fetch 的 CORS/代理问题。"""
+        try:
+            req = urllib.request.Request(EVENTS_MANIFEST_URL, headers={"User-Agent": "DAK-Studio-Events"})
+            with urllib.request.urlopen(req, timeout=EVENTS_MANIFEST_TIMEOUT_S) as resp:  # noqa: S310 - https
+                return json.loads(resp.read().decode("utf-8"))
+        except Exception as exc:  # noqa: BLE001 - online gallery is best-effort
+            log.warning("读取在线赛事清单失败：%s", exc)
+            return None
+
     def _bundled_events_manifest_path(self) -> Path:
         return self._userdata / "bundled-events" / "manifest.json"
 
@@ -1231,7 +1242,7 @@ class StudioApi:
             "status": "ok",
             "noManifest": manifest is None,
             "manifestSource": self._manifest_source,  # "local" | "remote" | "none"
-            "checkedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "checkedAt": datetime.now(timezone.utc).isoformat(),
             "assetSet": manifest.get("assetSet") if manifest else None,
             "bundledEventSlugs": full_events,
             "requiredTriMaps": full_tris,
@@ -1409,6 +1420,10 @@ class StudioApi:
             if base.is_dir():
                 names.update(p.stem for p in base.glob("*.tri"))
         return sorted(names)
+
+    def tris_manifest(self) -> dict | None:
+        """通过桌面桥拉取 .tri 清单，供资产页显示官方文件大小。"""
+        return _StudioStaticHandler._tris_manifest_load()
 
     def tri_download(self, map_name: str, urls: list[str], sha256: str | None = None) -> dict:
         """按需下载某图 .tri 到 overlay（镜像失败转移 + 可选 sha256 校验）。

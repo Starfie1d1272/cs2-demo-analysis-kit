@@ -25,6 +25,7 @@ export interface TrisManifest {
 
 interface NativeTriApi {
   tri_present(): Promise<string[]>;
+  tris_manifest?(): Promise<unknown>;
 }
 
 function nativeTriApi(): NativeTriApi | null {
@@ -53,6 +54,15 @@ export async function listAvailableTris(): Promise<string[]> {
 
 /** 清单仅用于显示尺寸（best-effort）：dev 经 Vite 代理可达；桌面/静态托管不一定有，失败返回 null。 */
 export async function loadTrisManifest(): Promise<TrisManifest | null> {
+  const api = nativeTriApi();
+  if (api?.tris_manifest) {
+    try {
+      const raw = await api.tris_manifest();
+      if (raw && typeof raw === "object") return raw as TrisManifest;
+    } catch {
+      // Fall through to same-origin fetch.
+    }
+  }
   try {
     const response = await fetch("./tris/manifest.json", { cache: "no-cache" });
     if (!response.ok) return null;

@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
-import { downloadAndImportEvent, importEventAssetArchive } from "./event-assets";
+import { downloadAndImportEvent, importEventAssetArchive, loadEventsManifest } from "./event-assets";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -20,6 +20,20 @@ async function archiveWithMaps(names: string[]): Promise<ArrayBuffer> {
 }
 
 describe("赛事包渐进导入", () => {
+  it("桌面端通过 Python bridge 加载在线赛事清单，避免 WebView 直接跨域 fetch", async () => {
+    const manifest = {
+      version: "cs2-demo-analysis-kit/events-manifest-1.0",
+      generatedAt: "2026-06-26T00:00:00.000Z",
+      events: []
+    };
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("window", { pywebview: { api: { events_manifest: vi.fn().mockResolvedValue(manifest) } } });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await expect(loadEventsManifest()).resolves.toEqual(manifest);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("单图失败会记录错误并继续，不丢失赛事 checkpoint", async () => {
     const progress: string[] = [];
     const result = await importEventAssetArchive(await archiveWithMaps(["a.zip", "b.zip"]), [], "checkpoint", { onProgress: (message) => progress.push(message) });
