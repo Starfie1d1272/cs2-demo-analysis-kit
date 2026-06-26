@@ -30,7 +30,7 @@ const FLASH_COLUMNS: DataTableColumn<FlashRow>[] = [
   { key: "flashesThrown", label: "闪光", numeric: true, sortable: true, sortValue: (r) => r.flashesThrown, format: (r) => r.flashesThrown },
   { key: "enemyBlindSeconds", label: "致盲敌方", numeric: true, sortable: true, sortValue: (r) => r.enemyBlindSeconds, format: (r) => `${r.enemyBlindSeconds.toFixed(1)}s` },
   { key: "teamBlindSeconds", label: "致盲队友", numeric: true, sortable: true, sortValue: (r) => r.teamBlindSeconds, format: (r) => `${r.teamBlindSeconds.toFixed(1)}s` },
-  { key: "netSecondsPerFlash", label: <>净价值/颗<MetricInfo note="（致盲敌方秒数 − 致盲队友秒数）/ 投掷数；越高越好" /></>, numeric: true, sortable: true, sortValue: (r) => r.netSecondsPerFlash, format: (r) => r.netSecondsPerFlash == null ? "—" : `${r.netSecondsPerFlash.toFixed(2)}s` },
+  { key: "netSecondsPerFlash", label: <>闪光净收益/颗<MetricInfo note="（致盲敌方秒数 − 致盲队友秒数）/ 投掷数；越高越好" /></>, numeric: true, sortable: true, sortValue: (r) => r.netSecondsPerFlash, format: (r) => r.netSecondsPerFlash == null ? "—" : `${r.netSecondsPerFlash.toFixed(2)}s` },
 ];
 
 type BestFlash = {

@@ -383,7 +383,7 @@ function isCleanDuelRecord(record: DuelRecord): boolean {
  * 对枪三分类（视野时间线版）：用「受害者 → 击杀者」可见性判定，比旧的 ±1.5s 任意开枪更准。
  * - contested_duel：受害者在交火中对击杀者造成伤害，或在 [击杀者首发, 击杀] 间「看得到击杀者」时开过枪。
  * - suppressed_kill：受害者死前曾有「看得到击杀者」的机会，但没有有效还手。
- * - caught_off_guard：受害者死前从未获得有效可见机会（侧背身 / 被预瞄）。
+ * - caught_off_guard：受害者死前从未获得有效可见机会（无有效视野 / 被预瞄）。
  * 可见性用 duels 满 tick 窗口的视野锥 + hp + flash + 烟雾 + 静态 LOS（调用方传入 .tri 时）。
  * 无窗口时回退启发式。
  */

@@ -171,13 +171,13 @@ describe("buildDuelInsights", () => {
     expect(akRows[0]!.metrics.find((metric) => metric.key === "killsPerMatch")?.value).toBe(2 / 2);
     // 爆头率：两场都是爆头击杀
     expect(akRows[0]!.metrics.find((metric) => metric.key === "headshot")?.value).toBe(100);
-    // 步枪类别展示扫射命中率，而狙击会隐藏 TTK/预瞄（此处验证步枪保留 sprayHit）
+    // 步枪类别展示扫射命中率，而狙击会隐藏击杀耗时/预瞄（此处验证步枪保留 sprayHit）
     const keys = akRows[0]!.metrics.map((metric) => metric.key);
     expect(keys).toContain("sprayHit");
     expect(keys).toContain("headshot");
   });
 
-  it("does not show one tap for weapons that cannot one-shot full HP", () => {
+  it("does not show one tap for weapons that cannot one-shot full-health targets", () => {
     const demo = pkg(buildShots([{ tick: 100, playerIndex: AI, weaponIndex: 1 }, { tick: 120, playerIndex: AI, weaponIndex: 1 }]));
     demo.kills = [kill({ tick: 120, killerIndex: AI, victimIndex: BI, weapon: "glock", killerActiveWeapon: "glock" })];
     demo.damages = [damage({ tick: 120, attackerIndex: AI, victimIndex: BI, weapon: "glock" })];

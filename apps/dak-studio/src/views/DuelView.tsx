@@ -13,11 +13,11 @@ type DuelTab = "records" | "opening" | "mechanics";
 type EvidenceFilter = "contested_duel" | "suppressed_kill" | "caught_off_guard" | "low_hp" | "third_party" | "all";
 
 const EVIDENCE_FILTERS: Array<{ key: EvidenceFilter; label: string; description: string }> = [
-  { key: "contested_duel", label: "对枪胜出", description: "受害者造成伤害，或可见击杀者时开火" },
+  { key: "contested_duel", label: "正面对枪击杀", description: "受害者造成伤害，或可见击杀者时开火" },
   { key: "suppressed_kill", label: "先手压制", description: "受害者死前获得过有效可见机会但没有有效还手" },
-  { key: "caught_off_guard", label: "侧背身", description: "受害者死前没有获得有效可见机会" },
-  { key: "low_hp", label: "低血量", description: "victimHealthBefore < 80，保留证据但不进 full HP TTK" },
-  { key: "third_party", label: "补枪", description: "第三方在 ±2s 内造成关键伤害，TTK 不计入分布" },
+  { key: "caught_off_guard", label: "无有效视野击杀", description: "受害者死前没有获得有效可见机会" },
+  { key: "low_hp", label: "非满血", description: "受害者死亡前血量低于 80，保留证据但不进满血击杀耗时分布" },
+  { key: "third_party", label: "补枪干扰", description: "第三方在 ±2s 内造成关键伤害，击杀耗时不计入分布" },
   { key: "all", label: "全部", description: "保留全部证据队列" }
 ];
 
@@ -39,9 +39,9 @@ const TABS: Array<{ key: DuelTab; label: string }> = [
 ];
 
 const CLASS_TONE: Record<string, string> = {
-  contested_duel: "对枪胜出",
+  contested_duel: "正面对枪击杀",
   suppressed_kill: "先手压制击杀",
-  caught_off_guard: "侧背身击杀"
+  caught_off_guard: "无有效视野击杀"
 };
 
 export function DuelView({
@@ -117,12 +117,12 @@ export function DuelView({
             <small>{summary.fullHealthRate.toFixed(1)}%</small>
           </div>
           <div>
-            <span>中位 TTK</span>
+            <span>中位击杀耗时</span>
             <strong>{summary.medianTtk == null ? "—" : `${summary.medianTtk}ms`}</strong>
-            <small>连发第一枪 → 击杀</small>
+            <small>击杀开火段第一枪 → 击杀</small>
           </div>
           <div>
-            <span>对枪胜出样本</span>
+            <span>正面对枪击杀样本</span>
             <strong>{summary.contestedDuels}</strong>
             <small>有来有回</small>
           </div>
@@ -245,7 +245,7 @@ function PlayerMechanicsGrid({
             </header>
             <div className="stu-duel-card-stats">
               <MetricPill label="主武器" value={topWeapon ? displayWeaponName(topWeapon.weapon) : "—"} />
-              <MetricPill label="对枪胜出" value={String(contested)} />
+              <MetricPill label="正面对枪击杀" value={String(contested)} />
               <MetricPill label="先手压制" value={String(suppressed)} />
             </div>
             <div className="stu-duel-weapon-stack">
@@ -302,11 +302,11 @@ const CAT_LABEL: Record<WeaponCategory | "其他" | "全部", string> = {
   步枪: "步枪", 狙击: "狙击", 手枪: "手枪", 冲锋枪: "冲锋枪", 霰弹机枪: "霰弹机枪", 其他: "其他", 全部: "全部"
 };
 
-/** 统一 TTK 列标签：有合法 TTK 显示数值，低血量 / 补枪分别标注。 */
+/** 统一击杀耗时列标签：有合法数值显示数值，非满血 / 补枪干扰分别标注。 */
 function ttkLabel(row: DuelFinderRow): string {
   if (row.ttkMs != null) return `${row.ttkMs}ms`;
-  if (row.hpBucket === "low_hp") return "低血量";
-  if (row.thirdParty) return "补枪";
+  if (row.hpBucket === "low_hp") return "非满血";
+  if (row.thirdParty) return "补枪干扰";
   return "—";
 }
 
@@ -525,7 +525,7 @@ function ttkTone(row: DuelFinderRow): "ok" | "warn" | "danger" | undefined {
   return undefined;
 }
 
-/** TTK 色条宽度（满宽度对应 1000ms，超过或补枪/低血量固定 100%）。 */
+/** 击杀耗时色条宽度（满宽度对应 1000ms，超过或补枪干扰/非满血固定 100%）。 */
 function ttkBarWidth(row: DuelFinderRow): string {
   if (row.ttkMs == null) return "100%";
   return `${Math.min(100, Math.round(row.ttkMs / 1000 * 100))}%`;
@@ -636,9 +636,9 @@ function OpeningDuelMap({
           })}
         </svg>
         <div className="stu-duel-legend">
-          <span><i className="stu-duel-dot contested" />对枪胜出</span>
+          <span><i className="stu-duel-dot contested" />正面对枪击杀</span>
           <span><i className="stu-duel-dot outaimed" />先手压制</span>
-          <span><i className="stu-duel-dot caught" />侧背身</span>
+          <span><i className="stu-duel-dot caught" />无有效视野击杀</span>
           <span><i className="stu-duel-dot-killer" />击杀方</span>
         </div>
       </div>
@@ -675,14 +675,14 @@ function MechanicsMetricItem({ metric }: { metric: PlayerMechanicsRow["metrics"]
 }
 
 function metricInfoNote(key: string): string {
-  if (key === "firstShotHit") return "clean combat burst 第一发命中 / clean combat burst 数；排除第三方、穿烟和穿墙终结。";
-  if (key === "sprayHit") return "clean 全自动 burst≥5 的第 4 发起命中率；排除第三方、穿烟和穿墙终结。";
-  if (key === "counterStrafe") return "clean combat burst 中，开枪前确实在移动且开枪时已降到武器站立精准速度内的比例。";
-  if (key === "oneTap") return "可一枪满血终结武器中，clean 满血击杀的 lethal burst 仅一发比例。";
-  if (key === "ttk") return "clean 满血击杀的 lethal burst 第一枪到击杀中位耗时，越低越好。";
-  if (key === "reaction") return "clean 击杀中，敌人进入有效视野(锥+静态LOS+无烟+未被闪)到首发开枪的中位耗时；首发即击杀用上一帧仍存活的可见状态。";
-  if (key === "preaim") return "clean 击杀中，捕获前 1~3 帧准星与目标三维夹角中位，附 ≤5° 比例。";
-  if (key === "headshot") return "clean 爆头击杀 / clean 击杀。";
+  if (key === "firstShotHit") return "干净交火开火段第一发命中 / 干净交火开火段数；排除第三方、穿烟和穿墙终结。";
+  if (key === "sprayHit") return "干净全自动开火段长度 ≥5 时，从第 4 发起的命中率；排除第三方、穿烟和穿墙终结。";
+  if (key === "counterStrafe") return "干净交火开火段中，开枪前确实在移动且开枪时已降到该武器判定用最大移动速度约 34% 以下的比例；AWP 按常见开镜开枪口径取 100u/s，其他开镜武器暂按基础移速口径展示。";
+  if (key === "oneTap") return "在可一枪满血击杀的武器中，满血干净击杀是否由终结开火段的第一发直接完成。";
+  if (key === "ttk") return "满血干净击杀中，击杀开火段第一枪到击杀的中位耗时，越低越好。";
+  if (key === "reaction") return "敌人进入有效视野到首发开枪的中位耗时；受预瞄、架点、信息、动画与 demo tick 影响，不等同于人体反应速度。";
+  if (key === "preaim") return "干净击杀中，捕获前 1~3 帧准星与目标三维夹角中位，附 ≤5° 比例。";
+  if (key === "headshot") return "干净爆头击杀 / 干净击杀。";
   if (key === "killsPerMatch") return "该武器击杀数 / 选手参与场数。";
   return "当前范围百分位，不输出 A/B/C。";
 }

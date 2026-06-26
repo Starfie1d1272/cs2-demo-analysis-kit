@@ -440,7 +440,7 @@ export function PlayersView({
                   </div>
                   <div className="stu-metric" title="所有回合队友致盲秒数累计"><span>致盲队友·总</span><b>{insights.flash.teamBlindSeconds.toFixed(1)}s</b></div>
                   <div className="stu-metric" title="（敌方 - 友方）致盲秒数 / 投掷数">
-                    <span>净价值/颗</span>
+                    <span>闪光净收益/颗</span>
                     <b>{insights.flash.netSecondsPerFlash == null ? "—" : `${insights.flash.netSecondsPerFlash.toFixed(2)}s`}</b>
                   </div>
                   <div className="stu-metric"><span>闪光助攻</span><b>{insights.flash.flashAssists}</b></div>
@@ -517,10 +517,10 @@ export function PlayersView({
                   </div>
                   <div className="stu-metric"><span>残局失利</span><b>{insights.mistakes.clutchLosses.count}</b></div>
                   <div className="stu-metric">
-                    <span>死亡分布<MetricInfo note="开局 20 秒内 / 中段 / 50 秒后" /></span>
+                    <span>死亡分布<MetricInfo note="按回合倒计时分段：1:30 前 / 1:30-1:00 / 1:00 后。分别对应开局送首杀或被前顶清掉、默认过程中没卡住、被反清或执行过程死亡。" /></span>
                     <b>
                       {insights.mistakes.deathTiming.total > 0
-                        ? `${insights.mistakes.deathTiming.early}早/${insights.mistakes.deathTiming.mid}中/${insights.mistakes.deathTiming.late}晚`
+                        ? `${insights.mistakes.deathTiming.early}开局/${insights.mistakes.deathTiming.mid}默认/${insights.mistakes.deathTiming.late}后段`
                         : "—"}
                     </b>
                   </div>
@@ -641,14 +641,14 @@ function mechanicsKeysFor(weapon: string): MechanicsMetricKey[] {
 
 function mechanicsMetricCell(key: MechanicsMetricKey, row: PlayerMechanicsProfile["weapons"][number]) {
   switch (key) {
-    case "firstShotHit": return <MechanicsMetric key={key} label="首发命中率" value={row.firstShotAccuracyPercent} unit="%" note="clean combat burst 第一发命中 / clean combat burst 数。" percentile={row.percentile.firstShotAccuracy} />;
-    case "sprayHit": return <MechanicsMetric key={key} label="扫射命中率" value={row.sprayAccuracyPercent} unit="%" note="clean 全自动 burst≥5 的第 4 发起命中率。" percentile={row.percentile.sprayAccuracy} />;
-    case "counterStrafe": return <MechanicsMetric key={key} label="急停成功率" value={row.counterStrafeSuccessPercent} unit="%" note="clean combat burst 中，开枪前在移动且开枪时已停稳的比例。" percentile={row.percentile.counterStrafe} />;
-    case "oneTap": return <MechanicsMetric key={key} label="one tap 率" value={row.oneTapRatePercent} unit="%" note="可一枪满血终结武器中，clean 满血击杀的单发终结比例。" percentile={row.percentile.oneTapRate} />;
-    case "ttk": return <MechanicsMetric key={key} label="TTK" value={row.medianTtkMs} unit="ms" note="clean 满血击杀的 lethal burst 第一枪到击杀中位，越低越好。" percentile={row.percentile.medianTtk} />;
-    case "reaction": return <MechanicsMetric key={key} label="反应时间" value={row.visualReactionMs} unit="ms" note="clean 击杀中，敌人进入有效视野到首发开枪的中位耗时。" percentile={row.percentile.visualReaction} />;
-    case "preaim": return <MechanicsMetric key={key} label="预瞄误差" value={row.preaimErrorDegrees} unit="°" note="clean 击杀中，捕获前准星与目标三维夹角中位。" percentile={row.percentile.preaimError} />;
-    case "headshot": return <MechanicsMetric key={key} label="爆头率" value={row.headshotPercent} unit="%" note="clean 爆头击杀 / clean 击杀。" percentile={null} />;
+    case "firstShotHit": return <MechanicsMetric key={key} label="首发命中率" value={row.firstShotAccuracyPercent} unit="%" note="干净交火开火段第一发命中 / 干净交火开火段数。" percentile={row.percentile.firstShotAccuracy} />;
+    case "sprayHit": return <MechanicsMetric key={key} label="扫射命中率" value={row.sprayAccuracyPercent} unit="%" note="干净全自动开火段长度 ≥5 时，从第 4 发起的命中率。" percentile={row.percentile.sprayAccuracy} />;
+    case "counterStrafe": return <MechanicsMetric key={key} label="急停成功率" value={row.counterStrafeSuccessPercent} unit="%" note="干净交火开火段中，开枪前在移动且开枪时已降到该武器判定用最大移动速度约 34% 以下的比例；AWP 按常见开镜开枪口径取 100u/s，其他开镜武器暂按基础移速口径展示。" percentile={row.percentile.counterStrafe} />;
+    case "oneTap": return <MechanicsMetric key={key} label="one tap 率" value={row.oneTapRatePercent} unit="%" note="在可一枪满血击杀的武器中，满血干净击杀是否由终结开火段的第一发直接完成。" percentile={row.percentile.oneTapRate} />;
+    case "ttk": return <MechanicsMetric key={key} label="击杀耗时" value={row.medianTtkMs} unit="ms" note="满血干净击杀中，击杀开火段第一枪到击杀的中位耗时，越低越好。" percentile={row.percentile.medianTtk} />;
+    case "reaction": return <MechanicsMetric key={key} label="反应时间" value={row.visualReactionMs} unit="ms" note="敌人进入有效视野到首发开枪的中位耗时；受预瞄、架点、信息、动画与 demo tick 影响，不等同于人体反应速度。" percentile={row.percentile.visualReaction} />;
+    case "preaim": return <MechanicsMetric key={key} label="预瞄误差" value={row.preaimErrorDegrees} unit="°" note="干净击杀中，捕获前准星与目标三维夹角中位。" percentile={row.percentile.preaimError} />;
+    case "headshot": return <MechanicsMetric key={key} label="爆头率" value={row.headshotPercent} unit="%" note="干净爆头击杀 / 干净击杀。" percentile={null} />;
     case "killsPerMatch": return <MechanicsMetric key={key} label="场均击杀" value={row.killsPerMatch} unit="" note="该武器击杀 / 参与场数。" percentile={null} />;
   }
 }

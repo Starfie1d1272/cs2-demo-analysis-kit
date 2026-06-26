@@ -98,7 +98,7 @@ export interface MistakeReview {
   fullBuyFirstDeaths: FirstDeathStat;
   /** Anti-eco 首死：对手 eco/semi 时我方首死。 */
   antiEcoFirstDeaths: FirstDeathStat;
-  /** 死亡时间分布（相对 freeze end 的秒数）。 */
+  /** 死亡时间分布（相对 freeze end 的秒数）：开局 25s / 25-55s / 55s 后。 */
   deathTiming: { early: number; mid: number; late: number; total: number };
   /** 残局失利（1vN 没打赢）。 */
   clutchLosses: { count: number; evidence: MistakeEvidence[] };
@@ -159,8 +159,8 @@ export interface PlayerFlashSummary {
   bestEnemyFlashes: EnemyFlashIncident[];
 }
 
-const DEATH_EARLY_SECONDS = 20;
-const DEATH_LATE_SECONDS = 50;
+const DEATH_EARLY_SECONDS = 25; // 1:55 -> 1:30
+const DEATH_LATE_SECONDS = 55; // 1:30 -> 1:00；之后为 1:00 后
 const LOW_BUY_TYPES = new Set(["eco", "semi", "force"]);
 const MAX_EVIDENCE = 10;
 /** 最佳闪光候选集容量：因 netSeconds ≤ enemySeconds，按敌方秒数取 Top-N 必含净收益 Top。 */
