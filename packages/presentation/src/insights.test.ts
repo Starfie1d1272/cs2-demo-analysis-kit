@@ -186,6 +186,13 @@ describe("buildTournamentInsights", () => {
       expect(teamStates.reduce((sum, state) => sum + state.disadvantageOpportunities, 0)).toBe(global.opportunities);
       expect(teamStates.reduce((sum, state) => sum + state.disadvantageWins, 0)).toBe(global.disadvantageWins);
     }
+
+    const teamStateKeys = insights.teamEconomySummaries.flatMap((team) =>
+      team.manAdvantage.states.map((state) => `${state.advantageAlive}:${state.disadvantageAlive}`)
+    );
+    expect(new Set(teamStateKeys)).toEqual(new Set(["5:4", "5:3"]));
+    expect(teamStateKeys).not.toContain("4:5");
+    expect(teamStateKeys).not.toContain("3:5");
   });
 
   it("builds team economy summaries with maps, round win rate and sample counts", async () => {
