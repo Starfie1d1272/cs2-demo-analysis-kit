@@ -122,7 +122,7 @@ export function aimErrorDegrees(yawDeg: number, pitchDeg: number, eye: Vec3, tar
 }
 
 /** 目标是否落在视野锥内（半角 VIEW_CONE_HALF_DEGREES）。 */
-function insideViewCone(yawDeg: number, pitchDeg: number, eye: Vec3, target: Vec3): boolean {
+export function insideViewCone(yawDeg: number, pitchDeg: number, eye: Vec3, target: Vec3): boolean {
   const err = aimErrorDegrees(yawDeg, pitchDeg, eye, target);
   return err != null && err <= VIEW_CONE_HALF_DEGREES;
 }

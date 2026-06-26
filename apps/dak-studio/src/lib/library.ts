@@ -1,11 +1,12 @@
-import { loadDemoPackageFromZip } from "@cs2dak/core";
+import { loadDemoPackageFromZip, buildMatchRadarField } from "@cs2dak/core";
 import { buildMatchWorkspaceModel } from "@cs2dak/presentation";
-import type { DemoPackage, MatchWorkspaceModel } from "@cs2dak/contract";
+import { buildRadarFieldGrid } from "@cs2dak/maps";
+import type { DemoPackage, MatchWorkspaceModel, RadarField } from "@cs2dak/contract";
 import { extractMatchFacts, getFactsStore, type MatchFacts } from "./facts";
 import { CALLOUT_GRID_URLS, loadStudioCalloutGrid } from "./callout-grid";
 import { metaFromPackage, type DemoMeta } from "./demo-meta";
 import { getStorage } from "./storage";
-import { loadTriLookup } from "./tri";
+import { loadTriLookup, loadMapTri } from "./tri";
 import { currentBuiltWith, isAnalysisStale, type BuiltWith } from "./analysis-manifest";
 
 /**
@@ -135,19 +136,23 @@ export interface ImportWorkerResult {
   facts: MatchFacts;
 }
 
+type PoolResult = DemoPackage | ImportWorkerResult | RadarField[];
+
 type WorkerReply =
   | { id: number; ok: true; pkg: DemoPackage }
   | { id: number; ok: true; meta: DemoMeta; facts: MatchFacts }
+  | { id: number; ok: true; radarFields: RadarField[] }
   | { id: number; ok: false; error: string };
 
 interface PoolTask {
-  op: "parse" | "import";
+  op: "parse" | "import" | "radarField";
   buffer: ArrayBuffer;          // 转移给 worker（转移后 detach）
   fallbackBuffer: ArrayBuffer | null; // worker 失败时回主线程用的副本；大包可禁用
-  matchId?: string;             // op === "import" 时必有
-  resolve: (result: DemoPackage | ImportWorkerResult) => void;
+  matchId?: string;             // op === "import" | "radarField" 时必有
+  economy?: "gun" | "all";      // op === "radarField" 时用
+  resolve: (result: PoolResult) => void;
   reject: (err: Error) => void;
-  fallback: (buffer: ArrayBuffer) => Promise<DemoPackage | ImportWorkerResult>;
+  fallback: (buffer: ArrayBuffer) => Promise<PoolResult>;
 }
 
 interface PoolWorker {
@@ -179,8 +184,11 @@ function makePoolWorker(): PoolWorker {
     const task = pw.task;
     pw.task = null;
     const reply = event.data;
-    if (reply.ok) task.resolve("pkg" in reply ? reply.pkg : { meta: reply.meta, facts: reply.facts });
-    else settleWithFallback(task);
+    if (reply.ok) {
+      if ("pkg" in reply) task.resolve(reply.pkg);
+      else if ("radarFields" in reply) task.resolve(reply.radarFields);
+      else task.resolve({ meta: reply.meta, facts: reply.facts });
+    } else settleWithFallback(task);
     dispatchTasks();
   };
   pw.worker.onerror = () => {
@@ -214,7 +222,9 @@ function dispatchTasks(): void {
     const message =
       task.op === "parse"
         ? { id, op: "parse", buffer: task.buffer }
-        : { id, op: "import", buffer: task.buffer, matchId: task.matchId, triBaseUrl: triBaseUrl(), calloutUrls: CALLOUT_GRID_URLS };
+        : task.op === "radarField"
+          ? { id, op: "radarField", buffer: task.buffer, matchId: task.matchId, triBaseUrl: triBaseUrl(), economy: task.economy ?? "gun" }
+          : { id, op: "import", buffer: task.buffer, matchId: task.matchId, triBaseUrl: triBaseUrl(), calloutUrls: CALLOUT_GRID_URLS };
     idle.worker.postMessage(message, [task.buffer]);
   }
 }
@@ -229,7 +239,7 @@ function parseZipInWorker(buffer: ArrayBuffer): Promise<DemoPackage> {
       op: "parse",
       buffer,
       fallbackBuffer,
-      resolve: resolve as (r: DemoPackage | ImportWorkerResult) => void,
+      resolve: resolve as (r: PoolResult) => void,
       reject,
       fallback: (buf) => loadDemoPackageFromZip(buf)
     });
@@ -249,9 +259,42 @@ function importInWorker(buffer: ArrayBuffer, matchId: string, keepFallback = tru
       buffer,
       fallbackBuffer,
       matchId,
-      resolve: resolve as (r: DemoPackage | ImportWorkerResult) => void,
+      resolve: resolve as (r: PoolResult) => void,
       reject,
       fallback: (buf) => importOnMainThread(buf, matchId)
+    });
+    dispatchTasks();
+  });
+}
+
+/** 主线程兜底算雷达场（无 Worker / node 测试）。 */
+async function radarFieldOnMainThread(buffer: ArrayBuffer, matchId: string, economy: "gun" | "all"): Promise<RadarField[]> {
+  const pkg = await loadDemoPackageFromZip(buffer);
+  const grid = buildRadarFieldGrid(pkg.match.mapName);
+  if (!grid) return [];
+  const bvh = await loadMapTri(pkg.match.mapName);
+  return buildMatchRadarField(pkg, { matchId, grid, bvh, economy });
+}
+
+/**
+ * 在 worker 池里算一场的雷达场贡献（[teamA, teamB]）；无 Worker 时回主线程。
+ * 重活（逐 tick LOS 遍历）放 worker，与导入同池，共享 BVH 缓存、按池大小并发。
+ */
+export function radarFieldInWorker(buffer: ArrayBuffer, matchId: string, economy: "gun" | "all"): Promise<RadarField[]> {
+  if (typeof Worker === "undefined" || typeof document === "undefined") {
+    return radarFieldOnMainThread(buffer, matchId, economy);
+  }
+  const fallbackBuffer = buffer.slice(0);
+  return new Promise<RadarField[]>((resolve, reject) => {
+    taskQueue.push({
+      op: "radarField",
+      buffer,
+      fallbackBuffer,
+      matchId,
+      economy,
+      resolve: resolve as (r: PoolResult) => void,
+      reject,
+      fallback: (buf) => radarFieldOnMainThread(buf, matchId, economy)
     });
     dispatchTasks();
   });

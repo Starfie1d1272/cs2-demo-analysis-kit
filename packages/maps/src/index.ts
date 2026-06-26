@@ -7,6 +7,7 @@ export * from "./site-entry-lexicon.js";
 export * from "./geometry-assets.js";
 export * from "./nav.js";
 export * from "./visibility.js";
+export * from "./radar-grid.js";
 export * from "./lineups.js";
 export * from "./default-positions.js";
 export {

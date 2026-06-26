@@ -18,6 +18,8 @@ export { derivePlayerWeaponHighlights } from "./weapon-highlights.js";
 export { buildTeamSideWinRates } from "./side-win-rate.js";
 export { buildDuelsSignals, deriveDuels, deriveOpeningDuels } from "./duels.js";
 export { buildMechanicsSignals, counterStrafeThresholdForWeapon, derivePlayerMechanics } from "./mechanics.js";
+export { buildMatchRadarField, aggregateRadarFields, RADAR_FIELD_VERSION } from "./radar-field.js";
+export type { BuildMatchRadarFieldOptions } from "./radar-field.js";
 export type { SideWinRateStats, TeamSideWinRates } from "./side-win-rate.js";
 export type { DuelClassification, DuelHpBucket, DuelRecord, DuelSignals, TtkDistribution } from "./duels.js";
 export type {

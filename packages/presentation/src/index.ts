@@ -55,3 +55,11 @@ export { displayWeaponName } from "./weapons.js";
 export { economyLabelCn, ECONOMY_LABEL_SHORT } from "./economy.js";
 export * from "./tactical-labels.js";
 export * from "./replay-clock.js";
+export {
+  RADAR_FIELD_MODES,
+  radarModeFrame,
+  radarFieldRoundCount,
+  type RadarFieldMode,
+  type RadarModeOption,
+  type RadarModeFrame
+} from "./radar-field.js";

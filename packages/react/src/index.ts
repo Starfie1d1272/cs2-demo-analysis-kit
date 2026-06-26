@@ -3,6 +3,7 @@ export { ScoreboardTable } from "./components/ScoreboardTable";
 export { RoundTimeline } from "./components/RoundTimeline";
 export { EconomyPanel } from "./components/EconomyPanel";
 export { HeatmapCanvas } from "./components/HeatmapCanvas";
+export { RadarFieldCanvas, type RadarFieldCanvasProps } from "./components/RadarFieldCanvas";
 export { KillFeed } from "./components/KillFeed";
 export { QaReportPanel } from "./components/QaReportPanel";
 export { SeasonLeaderboard } from "./components/SeasonLeaderboard";

@@ -1,4 +1,4 @@
-import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Settings, Swords, Trophy, UserRound } from "lucide-react";
+import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Radar, Settings, Swords, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { bulkUpdateTags, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { EMPTY_SCOPE, applyScope, type CohortScopeState } from "./components/CohortScope";
@@ -25,6 +25,7 @@ import { EconomyView } from "./views/EconomyView";
 import { ManagementView } from "./views/ManagementView";
 import { DuelView } from "./views/DuelView";
 import { CoachView } from "./views/CoachView";
+import { RadarFieldView } from "./views/RadarFieldView";
 import { loadIdentityState, buildCohortIdentityMap, type IdentityStoreState } from "./lib/identity";
 import type { IdentityOptions } from "./lib/season";
 import { BUILTIN_EVENTS, type BuiltinEvent } from "./lib/builtin-events";
@@ -40,6 +41,7 @@ type StudioView =
   | "economy"
   | "tournament"
   | "coach"
+  | "control"
   | "management";
 
 const NAV: { key: StudioView; label: string; hint: string; icon: typeof LibraryBig; wip?: boolean }[] = [
@@ -52,6 +54,7 @@ const NAV: { key: StudioView; label: string; hint: string; icon: typeof LibraryB
   { key: "economy", label: "经济与节奏", hint: "买局质量 / 回合 swing", icon: Coins },
   { key: "tournament", label: "赛事中台", hint: "赛事排行 / 总览 / 赛程", icon: Trophy },
   { key: "coach", label: "教练工作台", hint: "开局模式 / 战术本 / 备战", icon: ClipboardList },
+  { key: "control", label: "控图", hint: "覆盖场 / 防守漏洞 / 倾向", icon: Radar },
   { key: "management", label: "管理", hint: "身份归并 · 资料库维护 · 赛事资产", icon: Settings }
 ];
 
@@ -601,6 +604,9 @@ export function App() {
             onGoLibrary={() => setView("library")}
             teamRenames={identityState.teamRenames}
           />
+        )}
+        {view === "control" && (
+          <RadarFieldView entries={entries} teamRenames={identityState.teamRenames} />
         )}
         {view === "tournament" && (
           <>

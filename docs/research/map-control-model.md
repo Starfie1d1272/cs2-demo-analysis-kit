@@ -333,6 +333,45 @@ B 执行成功率 X% vs X'%、CT 提前 rotate 概率 Y%、plant 率 Z%」。信
 
 ---
 
+## 11. 产品落地（2026-06-27，RadarField 原语进生产）
+
+把 §10 原型迁进产品计算路径，分层落地（原型脚本保留作离线验证，不再演进）：
+
+- **合同** `@cs2dak/contract` `radar-field.ts`：`RadarField`（手写 interface，非 Zod——TS 侧计算产物，
+  不跨 v3 ZIP seam）。承重墙=**四基础场存原始计数（Int32Array）+ 按 side 分的 denomCt/denomT**，
+  不存概率/合成视图。加性 → 合并 scope = 逐元素相加。身份字段 `computeVersion`（算法指纹）/
+  `calibrationVersion`/`triAvailability` 驱动缓存失效与「可否合并」。
+- **计算** `@cs2dak/core` `radar-field.ts`：`buildMatchRadarField` 每场产出**两份按队归属**的加性贡献
+  （X 的 ctVis/ctPres 来自 X 作 CT 的回合、tVis/tPres 来自 X 作 T 的回合——**T/CT 完全拆开，各看各的**）。
+  几何判定**复用对枪实验室同款原语**（`insideViewCone`/`staticLineOfSight`/`smokeBlocksRay` + 共享常量），
+  消除原型里重复且已漂移的 LOS 实现（原型 TARGET_HEIGHT=40 vs 生产 56）。`aggregateRadarFields` 逐元素合并。
+- **栅格** `@cs2dak/maps` `radar-grid.ts`：`buildRadarFieldGrid`——由 nav 质心桶成的**确定性规则可行走格**
+  （128u，同图任意 demo 同序同 index，故可跨场相加）。
+- **渲染期合成** `@cs2dak/presentation` `radar-field.ts`：`radarModeFrame` 归一化（计数/对应 side denom）+
+  模式合成。模式：CT/T 视野·位置、信息差分、对拼线、**CT/T 盲区**、以及传 baseline 时的队伍−联赛差分。
+- **渲染** `@cs2dak/react` `RadarFieldCanvas`：移植原型柔化径向 blob，逐秒 scrubber + 模式切换 + 双层。
+- **编排/缓存** Studio `lib/radar-field.ts`：per-match 贡献**持久化到 blobs 命名空间**（紧凑二进制，
+  header 带版本号校验，IDB/桌面 SQLite 都按字节存——绕开 records 的 JSON 序列化、Int32Array 无损）。
+  因加性，换 scope 复用同批缓存只内存重聚合（毫秒）；worker 池（复用导入池，加 `radarField` op、
+  共享 BVH、按 demo 分发）首次算某图一次，之后所有 scope/所有会话秒开。**会话内重算不可接受**
+  （200 场单图首开几十秒每会话都付），故必须持久化。
+- **入口** Studio 顶层「控图」模块（`RadarFieldView`）：地图选择 + 赛事基线/各队 + scrubber。
+
+**盲区口径修正（重要）**：防守漏洞**不是**「低于联赛平均的格」，是**绝对的视线盲区**——
+某 side 在某秒视线覆盖频率低（`max(0, 0.5 − visNorm)`）的可行走格，**不掺 tPres**、不比联赛。
+是不是进攻口子由用户在雷达图上直观判断，算法不替他揉进定义。差分（队伍−联赛）单独作「倾向」用途。
+
+三个核心用途：① 赛事全量基线（地图客观可视性，基础场 league）② 队伍防守漏洞（队伍 ct-blind）
+③ 队伍进攻/防守倾向（队伍 − 联赛差分）。后续可拓展：控图习惯/换防节奏（presence 跨区迁移）、
+道具 ROI、个人 vs 团队归因、子区价值学习（§7 第三步）。
+
+**子区划分（§10.6 落地计划，待做）**：复用本 field——全量聚合每格「被守概率随时间×side」特征向量，
+nav 邻接约束的空间聚类（scikit-learn `AgglomerativeClustering` + connectivity）→ 子区边界涌现，
+主导 callout + 时间签名自动命名 → 人审冻结成 `region-assets.ts`（照 default-positions/routes 模式）。
+解释层只读 field 不回写。不必重采数据。
+
+---
+
 ## 附：写进设计的总定义
 
 > **地图控制 = side-specific、time-dependent 的空间行动权。** 由 presence / visibility /

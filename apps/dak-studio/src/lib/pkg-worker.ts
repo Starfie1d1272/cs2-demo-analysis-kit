@@ -1,5 +1,5 @@
-import { loadDemoPackageFromZip } from "@cs2dak/core";
-import { buildTriangleBvh, parseAwpyTri, type TriangleBvh } from "@cs2dak/maps";
+import { loadDemoPackageFromZip, buildMatchRadarField } from "@cs2dak/core";
+import { buildTriangleBvh, parseAwpyTri, buildRadarFieldGrid, type TriangleBvh } from "@cs2dak/maps";
 import { loadCalloutGridBrowser } from "@cs2dak/maps/callout-grid-browser";
 import { extractMatchFacts } from "./facts";
 import { metaFromPackage } from "./demo-meta";
@@ -31,7 +31,16 @@ interface ImportMsg {
   calloutUrls: Record<string, string>;
 }
 
-type InMsg = ParseMsg | ImportMsg;
+interface RadarFieldMsg {
+  id: number;
+  op: "radarField";
+  buffer: ArrayBuffer;
+  matchId: string;
+  triBaseUrl: string;
+  economy: "gun" | "all";
+}
+
+type InMsg = ParseMsg | ImportMsg | RadarFieldMsg;
 
 // BVH 树构建较重；同一 worker 处理同图的多场时复用（按图缓存）。
 const bvhByMap = new Map<string, Promise<TriangleBvh | null>>();
@@ -63,6 +72,18 @@ self.onmessage = async (event: MessageEvent<InMsg>) => {
     const pkg = await loadDemoPackageFromZip(msg.buffer);
     if (msg.op === "parse") {
       self.postMessage({ id: msg.id, ok: true, pkg });
+      return;
+    }
+    if (msg.op === "radarField") {
+      const mapName = pkg.match.mapName;
+      const grid = buildRadarFieldGrid(mapName);
+      if (!grid) {
+        self.postMessage({ id: msg.id, ok: true, radarFields: [] });
+        return;
+      }
+      const bvh = await loadTriBvh(mapName, msg.triBaseUrl);
+      const radarFields = buildMatchRadarField(pkg, { matchId: msg.matchId, grid, bvh, economy: msg.economy });
+      self.postMessage({ id: msg.id, ok: true, radarFields });
       return;
     }
     const mapName = pkg.match.mapName;

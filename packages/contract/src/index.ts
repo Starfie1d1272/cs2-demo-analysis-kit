@@ -14,3 +14,4 @@ export * from "./duel.js";
 export * from "./veto.js";
 export * from "./event-package.js";
 export * from "./bracket.js";
+export * from "./radar-field.js";
