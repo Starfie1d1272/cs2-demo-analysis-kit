@@ -74,7 +74,7 @@ pnpm release:npm          # build + test + typecheck + changeset publish（自�
 git push --follow-tags
 ```
 
-`@cs2dak/cli` 与 demo-lab 在 changesets ignore 列表中，不发 npm。
+`@cs2dak/cli` 是私有工作区应用，不发 npm。
 
 ## tag 规则
 

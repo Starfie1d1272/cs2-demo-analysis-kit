@@ -30,7 +30,6 @@ This repository owns the product-neutral analysis pipeline from a `cs2-demo-form
 | `@cs2dak/presentation` | Product-neutral view models, labels, stories, and workspace composition. |
 | `@cs2dak/react` | Product-neutral preview components that consume presentation contracts only. |
 | `@cs2dak/cli` | Language-neutral filesystem/automation wrapper around TypeScript packages. |
-| `apps/demo-lab` | Component preview, fixture acceptance, and visual regression entrypoint. |
 | `apps/dak-studio` | Local demo library and analysis workbench. Stores ZIP bytes locally; `.dem` import is exported through `cs2df`. |
 
 ### The v3 ZIP seam
@@ -92,7 +91,6 @@ Formula ownership stays in `@rivalhub/rival-rating`. This kit only derives signa
 | `@cs2dak/presentation` | 产品中立 View Model、标签、叙事与 workspace 编排。 |
 | `@cs2dak/react` | 只消费 presentation 合同的产品中立组件。 |
 | `@cs2dak/cli` | TypeScript 包的文件系统/自动化入口。 |
-| `apps/demo-lab` | 组件预览、fixture 人工验收与视觉回归入口。 |
 | `apps/dak-studio` | 本地 Demo 库和分析工作台；本地保存 ZIP 字节，`.dem` 导入通过 `cs2df` 导出。 |
 
 ### v3 ZIP seam

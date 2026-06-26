@@ -7,9 +7,9 @@
 
 | 层 | 回答的问题 | 粒度 | 设计文档 |
 |---|---|---|---|
-| **RR v1** | 这场数据产出如何 | 单场 | [rr-v1.md](design/rr-v1.md) |
+| **RR v1** | 这场数据产出如何 | 单场 | [rr-model.md](design/rr-model.md) |
 | **RR 六账户** | 这场/赛季里你的贡献值多少（含上下文） | 单场 / cohort | [rr-model.md](design/rr-model.md) |
-| **PRISM** | 你是什么风格 | 跨场 cohort | [prism.md](design/prism.md) |
+| **PRISM** | 你是什么风格 | 跨场 cohort | [rr-model.md](design/rr-model.md) |
 
 铁律：**不让任何一个数同时承担「单场表现 / 长期实力 / 风格 / 胜负贡献」四件事。**
 公式所有权在 [`@rivalhub/rival-rating`](https://github.com/Starfie1d1272/rival-rating)；
@@ -46,7 +46,7 @@
   - 删除代码里"等导出器产出后填入"等**过时注释**。
 - **表达去原创化**：v1 定位为兼容基线（box-score baseline），不承担原创叙事；v2 明确标 `lite / uncalibrated / per-match`。
 - **`confidence` 字段**：数据完整度 + 样本量，前端据此显示"未启用 / 无样本 / beta"。
-- 字段表达入口：[field-expression.md](design/field-expression.md)。
+- 字段表达已并入 [rr-model.md](design/rr-model.md)。
 - **数据体检（导出器侧）**：已定位并修复当前 fixture（13:8 de_ancient）里的 2 个
   `kills.tick_outside_round`：导出器曾把 freeze 期前的 `world` self-death 当作有效 death/kills 统计。
   新 fixture 由修复后的导出器重导，QA error 为 0。

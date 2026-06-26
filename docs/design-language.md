@@ -11,8 +11,7 @@
   电子战术板。信息密度高、对比克制、无装饰性渐变与阴影堆叠。
 - **证据感**：所有数字都是「可质询的证据」——可点击的统计值有 accent 色与
   hover 反馈；不可点击的纯陈述用中性灰。Query-first 是交互语言的一部分。
-- **与 demo-lab 区分**：demo-lab 是橙色蓝图风（开发预览用），Studio 永远不用
-  橙色作为主 accent。
+- **与历史原型区分**：旧 demo-lab 原型使用过橙色蓝图风；Studio 永远不用橙色作为主 accent。
 
 ## 2. 设计 Token（唯一来源：`apps/dak-studio/src/studio.css` `:root`）
 

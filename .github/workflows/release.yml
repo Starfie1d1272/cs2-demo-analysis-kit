@@ -125,7 +125,7 @@ jobs:
           VERSION="$(node -p "require('./package.json').version")"
           mv python/dist/DAK-Studio-Setup.exe "python/dist/DAK-Studio-Setup-${VERSION}.exe"
 
-      # 0.7.0: 准备 event packages（从 fixtures/input/ 复制，已是成品）。
+      # 0.7.0: 准备 event packages（从 R2 取已发布成品）。
       # 仅用于 gen-install-manifest（计算 sha256/size）和 assemble-full-zip（打包进 full zip）。
       # 上传到 R2 由 pnpm events:publish 单独完成，与 app 发版周期解耦。
       - name: Prepare event packages
@@ -133,10 +133,10 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist/events
-          for zip in fixtures/input/iem-cologne-major-2026-*.zip; do
-            slug="$(basename "$zip" .zip)"
+          for slug in iem-cologne-major-2026-stage3 iem-cologne-major-2026-playoff; do
             mkdir -p "dist/events/${slug}"
-            cp "$zip" "dist/events/${slug}/${slug}.zip"
+            curl -fL "https://dakupdate.starfie1d.top/events/${slug}/${slug}.zip" \
+              -o "dist/events/${slug}/${slug}.zip"
             echo "event: ${slug}"
           done
 

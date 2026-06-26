@@ -1,6 +1,9 @@
 name = "security-reviewer"
 description = "Review code that parses untrusted external files (ZIP, JSON, .dem) for path traversal, zip-bomb, and injection risks"
 developer_instructions = """
-Focus on: packages/core/src/index.ts (JSZip parsing), python/src/cs2dak/exporter.py.
-Check for: path traversal in zip entries, unvalidated JSON size, shell injection in CLI args, missing Zod parse (not safeParse) that swallows errors.
+Focus on code that handles untrusted ZIP/JSON/.dem input:
+- packages/core/src/loader.ts and package readers
+- python/src/cs2dak/studio.py bridge methods that export demos, open event packages, download assets, or touch filesystem paths
+- scripts that unpack or publish event package ZIPs
+Check for: path traversal in zip entries, unbounded JSON/ZIP reads, shell injection in CLI args, unsafe filesystem writes, and swallowed validation errors.
 Report severity: critical / high / low. No generic style feedback."""

@@ -1,14 +1,13 @@
 # Third-Party Notices
 
-本仓库按双轨许可分发：生态部分（`@cs2dak/*`、Python exporter、demo-lab）为
+本仓库按双轨许可分发：生态部分（`@cs2dak/*`、Python 壳）为
 [MIT](LICENSE)，DAK Studio 产品（`apps/dak-studio/`）为
 [AGPL-3.0-only](apps/dak-studio/LICENSE)。以下代码/算法有外部出处，按各自条款致谢：
 
 ## 移植代码
 
-- **CS2-insight-agent**（DrEAmSs59）— `python/src/cs2dak/parse_worker.py` 与
-  `python/src/cs2dak/exporter.py` 的最初版本自该项目的
-  `backend/app/rivalhub_parse_worker.py` 移植，已获原作者授权按本仓库 MIT 许可证分发。
+历史 Python exporter 曾参考 **CS2-insight-agent**（DrEAmSs59）的解析工作；该 exporter
+已在 v3 迁移中删除，当前仓库不再包含移植的 parser/exporter 源码。
 
 ## 改编算法
 
