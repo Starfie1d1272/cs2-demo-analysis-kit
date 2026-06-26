@@ -826,6 +826,44 @@ body {
   letter-spacing: 0;
 }
 
+.stu-home-trail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.stu-home-trail-head h3 {
+  margin-bottom: 0;
+}
+
+.stu-home-trail-select {
+  width: min(220px, 100%);
+}
+
+.stu-home-trail-player {
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius);
+  background: var(--dak-bg-subtle);
+  overflow: hidden;
+}
+
+.stu-home-trail-player .stu-trail-stage {
+  min-height: 260px;
+  max-height: 420px;
+}
+
+.stu-home-trail-playbar {
+  padding: 8px 10px;
+}
+
+.stu-home-trail-count {
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
 /* 胜负点阵 */
 .stu-wl-row {
   display: flex;
@@ -2949,7 +2987,7 @@ td.stu-heat-cell.stu-heat-neutral {
   font-size: 13px;
 }
 
-/* TTK 值颜色分类：ok=合法数值 / warn=低血量 / danger=补枪 */
+/* 击杀耗时颜色分类：ok=合法数值 / warn=非满血 / danger=补枪干扰 */
 .stu-duel-pill-ok b { color: var(--dak-ok); }
 .stu-duel-pill-warn b { color: var(--dak-warn); }
 .stu-duel-pill-danger b { color: var(--dak-danger); }
@@ -3372,10 +3410,11 @@ td.stu-heat-cell.stu-heat-neutral {
 
 .stu-coach-pattern-explorer {
   display: grid;
-  grid-template-columns: 220px minmax(680px, 1fr) minmax(300px, 360px);
+  grid-template-columns: minmax(180px, 220px) minmax(680px, 1fr) minmax(280px, 360px);
   gap: 14px;
   margin-top: 14px;
   align-items: stretch;
+  min-width: 0;
 }
 
 /* 左栏：簇列表 */
@@ -3465,6 +3504,13 @@ td.stu-heat-cell.stu-heat-neutral {
   display: grid;
   align-content: start;
   gap: 8px;
+  overflow: hidden;
+}
+
+.stu-pe-replay-frame {
+  width: 100%;
+  min-width: 0;
+  justify-self: center;
 }
 
 .stu-pe-replay-bar {
@@ -3609,9 +3655,9 @@ td.stu-heat-cell.stu-heat-neutral {
   cursor: default;
 }
 
-@media (max-width: 1560px) {
+@media (max-width: 1800px) {
   .stu-coach-pattern-explorer {
-    grid-template-columns: 200px minmax(680px, 1fr);
+    grid-template-columns: minmax(180px, 220px) minmax(680px, 1fr);
   }
 
   .stu-pe-detail {

@@ -1,6 +1,6 @@
-import { Star } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import type { PlayerSeasonProfile, TeamKey } from "@cs2dak/contract";
+import { Pause, Play, RotateCcw, Star } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { OpeningTrailRound, OpeningTrailsModel, PlayerSeasonProfile, TeamKey } from "@cs2dak/contract";
 import { SEASON_STAT_VIEWS, type PlayerSeasonInsights } from "@cs2dak/presentation";
 import { getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
@@ -19,6 +19,16 @@ export interface HomeViewProps {
 }
 
 const CORE_VIEW = SEASON_STAT_VIEWS.find((view) => view.key === "core")!;
+const OPENING_WINDOW_SECONDS = 30;
+const OPENING_MATCH_LIMIT = 5;
+const EFFECT_DURATION_SECONDS: Partial<Record<string, number>> = {
+  smoke: 18,
+  molotov: 7,
+  incendiary: 7,
+  hegrenade: 0.7,
+  flashbang: 0.7,
+  decoy: 15
+};
 // 抬头大数字只挑最能说明状态的几项（RR / Rating 已单列），其余取核心视图前几列。
 const HERO_METRIC_COLUMNS = CORE_VIEW.columns
   .filter((col) => col.key !== "maps" && col.key !== "rivalhubRR" && col.key !== "hltvRating")
@@ -77,7 +87,8 @@ export function HomeView({ entries, onOpenMatch, onGoPlayers, onGoLibrary, ident
   const [profiles, setProfiles] = useState<PlayerSeasonProfile[] | null>(null);
   const [insights, setInsights] = useState<PlayerSeasonInsights | null>(null);
   const [matchStats, setMatchStats] = useState<PlayerMatchStatsFact[] | null>(null);
-  const [trailRounds, setTrailRounds] = useState<{ mapName: string; trails: RadarTrail[]; grenades: RadarGrenadeOverlay[] } | null>(null);
+  const [trailModels, setTrailModels] = useState<OpeningTrailsModel[] | null>(null);
+  const [homeTrailMap, setHomeTrailMap] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pinned, setPinned] = useState<PinnedPlayer | null>(null);
   const [pinnedLoaded, setPinnedLoaded] = useState(false);
@@ -148,47 +159,62 @@ export function HomeView({ entries, onOpenMatch, onGoPlayers, onGoLibrary, ident
     [me, entries, insights]
   );
   const latestMatch = myMatches[0] ?? null;
-  const latestMatchId = latestMatch ? matchIdForEntry(latestMatch) : null;
 
-  // 开局动线：拉最近一场的长枪局起手轨迹（静态全展开，非播放）。
+  const homeTrailMapOptions = useMemo(() => {
+    const counts = new Map<string, { count: number; firstIndex: number }>();
+    myMatches.forEach((entry, index) => {
+      const current = counts.get(entry.meta.mapName);
+      if (current) current.count += 1;
+      else counts.set(entry.meta.mapName, { count: 1, firstIndex: index });
+    });
+    return [...counts.entries()].sort((a, b) => a[1].firstIndex - b[1].firstIndex);
+  }, [myMatches]);
+
   useEffect(() => {
-    if (!me || !latestMatchId || !latestMatch) {
-      setTrailRounds(null);
+    setHomeTrailMap((current) =>
+      current && homeTrailMapOptions.some(([map]) => map === current)
+        ? current
+        : (homeTrailMapOptions[0]?.[0] ?? null)
+    );
+  }, [homeTrailMapOptions]);
+
+  const homeTrailEntries = useMemo(() => {
+    if (!homeTrailMap) return [];
+    return myMatches
+      .filter((entry) => entry.meta.mapName === homeTrailMap)
+      .slice(0, OPENING_MATCH_LIMIT);
+  }, [myMatches, homeTrailMap]);
+
+  useEffect(() => {
+    if (!me || homeTrailEntries.length === 0) {
+      setTrailModels(null);
       return;
     }
     let cancelled = false;
+    setTrailModels(null);
     getFactsStore()
-      .getOpeningTrails({ matchIds: [latestMatchId], steamIds: me.steamIds })
+      .getOpeningTrails({
+        matchIds: homeTrailEntries.map(matchIdForEntry),
+        playerKeys: [me.playerKey],
+        steamIds: me.steamIds
+      })
       .then((facts) => {
-        if (cancelled) return;
-        const rounds = facts.flatMap((fact) => (fact.row.available ? fact.row.rounds : []));
-        const trails: RadarTrail[] = rounds.map((round, i) => ({
-          id: `r${round.roundNumber}-${i}`,
-          points: round.points.map((p) => ({ x: p.x, y: p.y })),
-          color: trailColor(i),
-          opacity: 0.55,
-        }));
-        const grenades: RadarGrenadeOverlay[] = rounds.flatMap((round, ri) =>
-          round.grenades.map((g, gi) => ({
-            trailId: `r${ri}-g${gi}`,
-            type: g.grenade,
-            x: g.x,
-            y: g.y,
-            ex: g.effectX,
-            ey: g.effectY,
-            showEffect: true,
-            effectActive: false,
-          }))
-        );
-        setTrailRounds({ mapName: latestMatch.meta.mapName, trails, grenades });
+        if (!cancelled) setTrailModels(facts.map((fact) => fact.row));
       })
       .catch(() => {
-        if (!cancelled) setTrailRounds(null);
+        if (!cancelled) setTrailModels([]);
       });
     return () => {
       cancelled = true;
     };
-  }, [me?.playerKey, latestMatchId]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [me?.playerKey, homeTrailEntries]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  const homeTrailRounds = useMemo(
+    () => (trailModels ?? [])
+      .filter((model) => model.available && model.mapName === homeTrailMap)
+      .flatMap((model) => model.rounds),
+    [trailModels, homeTrailMap]
+  );
 
   // 自适应身份：从逐场队属推「我的队伍」（队名相同即可，占位名→无队伍）+ 战绩。
   const identity = useMemo<TeamIdentity | null>(() => {
@@ -373,11 +399,22 @@ export function HomeView({ entries, onOpenMatch, onGoPlayers, onGoLibrary, ident
           {/* ④ 开局动线 + 最近比赛 */}
           <div className="stu-home-grid">
             <div className="stu-card">
-              <h3>开局动线{latestMatch && <span className="stu-card-sub stu-dim"> · {latestMatch.meta.mapName}</span>}</h3>
-              {trailRounds && trailRounds.trails.length > 0 ? (
-                <RadarTrails mapName={trailRounds.mapName} trails={trailRounds.trails} grenades={trailRounds.grenades} trailOpacity={0.55} />
+              <div className="stu-home-trail-head">
+                <h3>开局动线{homeTrailMap && <span className="stu-card-sub stu-dim"> · 最近 {homeTrailEntries.length} 场</span>}</h3>
+                {homeTrailMapOptions.length > 1 && (
+                  <select className="stu-select stu-home-trail-select" value={homeTrailMap ?? ""} onChange={(e) => setHomeTrailMap(e.target.value || null)}>
+                    {homeTrailMapOptions.map(([map, meta]) => (
+                      <option key={map} value={map}>{map}（{meta.count} 场）</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              {trailModels == null && homeTrailEntries.length > 0 ? (
+                <div className="stu-loading">提取 {homeTrailEntries.length} 场开局动线…</div>
+              ) : homeTrailMap && homeTrailRounds.length > 0 ? (
+                <HomeOpeningTrails mapName={homeTrailMap} rounds={homeTrailRounds} />
               ) : (
-                <p className="stu-dim">最近一场没有长枪局起手轨迹（缺回放流或无长枪局）。完整动线见个人实验室 · 开局动线。</p>
+                <p className="stu-dim">最近 {OPENING_MATCH_LIMIT} 场同图比赛没有长枪局起手轨迹（缺回放流或无长枪局）。完整动线见个人实验室 · 开局动线。</p>
               )}
             </div>
 
@@ -412,7 +449,7 @@ export function HomeView({ entries, onOpenMatch, onGoPlayers, onGoLibrary, ident
                 <div className="stu-metric"><span>投掷闪光</span><b>{insights.flash.flashesThrown}</b></div>
                 <div className="stu-metric" title="所有回合敌方致盲秒数累计"><span>致盲敌方·总</span><b>{insights.flash.enemyBlindSeconds.toFixed(1)}s</b></div>
                 <div className="stu-metric" title="敌方致盲秒数 / 投掷数"><span>均致盲/颗</span><b>{insights.flash.enemySecondsPerFlash == null ? "—" : `${insights.flash.enemySecondsPerFlash.toFixed(2)}s`}</b></div>
-                <div className="stu-metric" title="（敌方 - 友方）致盲秒数 / 投掷数"><span>净价值/颗</span><b>{insights.flash.netSecondsPerFlash == null ? "—" : `${insights.flash.netSecondsPerFlash.toFixed(2)}s`}</b></div>
+                <div className="stu-metric" title="（敌方 - 友方）致盲秒数 / 投掷数"><span>闪光净收益/颗</span><b>{insights.flash.netSecondsPerFlash == null ? "—" : `${insights.flash.netSecondsPerFlash.toFixed(2)}s`}</b></div>
                 <div className="stu-metric"><span>闪光助攻</span><b>{insights.flash.flashAssists}</b></div>
               </div>
               {(insights.flash.bestEnemyFlashes?.length ?? 0) > 0 && (
@@ -471,6 +508,106 @@ function buildPracticeCards(insights: PlayerSeasonInsights): PracticeCard[] {
       evidence: mistakes.clutchLosses.evidence[0] ?? null
     }
   ].filter((card) => card.evidence || card.count !== "0/0 局");
+}
+
+function HomeOpeningTrails({ mapName, rounds }: { mapName: string; rounds: OpeningTrailRound[] }) {
+  const [time, setTime] = useState(OPENING_WINDOW_SECONDS);
+  const [playing, setPlaying] = useState(false);
+  const rafRef = useRef<number | null>(null);
+  const lastTsRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    setTime(OPENING_WINDOW_SECONDS);
+    setPlaying(false);
+  }, [mapName, rounds]);
+
+  useEffect(() => {
+    if (!playing) {
+      lastTsRef.current = null;
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+      return;
+    }
+    const step = (ts: number) => {
+      const last = lastTsRef.current;
+      lastTsRef.current = ts;
+      if (last != null) {
+        setTime((current) => {
+          const next = current + ((ts - last) / 1000) * 2;
+          if (next >= OPENING_WINDOW_SECONDS) {
+            setPlaying(false);
+            return OPENING_WINDOW_SECONDS;
+          }
+          return next;
+        });
+      }
+      rafRef.current = requestAnimationFrame(step);
+    };
+    rafRef.current = requestAnimationFrame(step);
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [playing]);
+
+  const restart = () => {
+    setTime(0);
+    setPlaying(true);
+  };
+
+  const prepared = useMemo(
+    () => rounds.map((round, index) => ({ round, color: trailColor(index), key: `${round.matchId}#R${round.roundNumber}` })),
+    [rounds]
+  );
+  const trails: RadarTrail[] = prepared.map((item) => ({
+    id: item.key,
+    points: item.round.points.filter((p) => p.t <= time).map((p) => ({ x: p.x, y: p.y })),
+    color: item.color,
+    opacity: 0.52,
+  }));
+  const grenades: RadarGrenadeOverlay[] = prepared.flatMap((item) =>
+    item.round.grenades
+      .filter((g) => g.t <= time)
+      .map((g, gi) => {
+        const effectEnd = g.destroyT ?? g.effectT + (EFFECT_DURATION_SECONDS[g.grenade] ?? 0);
+        return {
+          trailId: `${item.key}-g${gi}`,
+          type: g.grenade,
+          x: g.x,
+          y: g.y,
+          ex: g.effectX,
+          ey: g.effectY,
+          showEffect: time >= g.effectT,
+          effectActive: time >= g.effectT && time <= effectEnd,
+        };
+      })
+  );
+
+  return (
+    <div className="stu-home-trail-player">
+      <RadarTrails mapName={mapName} trails={trails} grenades={grenades} trailOpacity={0.52} />
+      <div className="stu-trail-playbar stu-home-trail-playbar">
+        <button type="button" className="stu-icon-button" onClick={() => (time >= OPENING_WINDOW_SECONDS ? restart() : setPlaying((v) => !v))} aria-label={playing ? "暂停" : "播放"}>
+          {playing ? <Pause size={15} /> : <Play size={15} />}
+        </button>
+        <button type="button" className="stu-icon-button" onClick={restart} aria-label="重播">
+          <RotateCcw size={14} />
+        </button>
+        <input
+          className="stu-trail-scrubber"
+          type="range"
+          min={0}
+          max={OPENING_WINDOW_SECONDS}
+          step={0.1}
+          value={time}
+          onChange={(e) => {
+            setPlaying(false);
+            setTime(Number(e.target.value));
+          }}
+        />
+        <span className="stu-trail-clock">{time.toFixed(1)}s / {OPENING_WINDOW_SECONDS}s</span>
+        <span className="stu-dim stu-home-trail-count">{rounds.length} 回合</span>
+      </div>
+    </div>
+  );
 }
 
 /** 资料库为空的引导空态：品牌标 + 骨架占位卡网格 + 三步引导。 */

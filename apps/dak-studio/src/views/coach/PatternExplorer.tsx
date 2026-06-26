@@ -282,7 +282,7 @@ function CoachReplayStage({ fact, entryByMatchId, cache }: {
       ) : !model.replay.available ? (
         <div className="stu-pe-radar-empty">本场导出未附带 2D 回放流。</div>
       ) : (
-        <div style={{ maxWidth: radarMaxWidth }}>
+        <div className="stu-pe-replay-frame" style={{ maxWidth: radarMaxWidth }}>
           <ReplayViewer
             replay={model.replay}
             map={model.map.view}
@@ -351,16 +351,16 @@ function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: T
         </div>
         {isT && (
           <div>
-            <dt>执行时钟（中位）<MetricInfo note="第二名队员进入目标包点时的 1:55 回合倒计时中位数" /></dt>
+            <dt>进点时间（中位）<MetricInfo note="第二名队员进入目标包点时的 1:55 回合倒计时中位数" /></dt>
             <dd>{execMedian != null ? formatClockSeconds(execMedian) : "—"}</dd>
           </div>
         )}
         <div>
-          <dt>首杀率 <MetricInfo note="该模式中本方取得回合首个击杀的比例；没有击杀的回合不进入分母" /></dt>
+          <dt>首杀率 <MetricInfo note="该模式中本方拿到回合首杀的比例；没有击杀的回合不进入分母" /></dt>
           <dd>{firstKillValid > 0 ? `${((firstKillCount / firstKillValid) * 100).toFixed(1)}%` : "—"}</dd>
         </div>
         <div>
-          <dt>开局推进 <MetricInfo note="离开本方默认位后进入前方战术区域；深入表示已进入对方默认位覆盖区域" /></dt>
+          <dt>开局推进 <MetricInfo note="离开默认位后进入前压/控图区的深度；深入表示已进入对方默认位覆盖区域。" /></dt>
           <dd>{pressureLabels.length > 0 ? pressureLabels.slice(0, 3).join(" / ") : "—"}</dd>
         </div>
         {isT && c4Routes.length > 0 && (
