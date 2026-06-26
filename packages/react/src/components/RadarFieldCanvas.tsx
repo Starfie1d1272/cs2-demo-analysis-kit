@@ -20,6 +20,25 @@ import { useEffect, useRef, useState } from "react";
 
 const CANVAS_SIZE = 1024;
 
+// 顺序色阶：品牌双 accent（深蓝 → accent-b 蓝 → 青 → 琥珀 → accent 橙），6 档离散分层。
+// 避开彩虹 jet，贴合 Tactical Slate；分档让「核心架点 vs 偶尔扫一眼」的层次可读。
+const HEAT_BANDS: Array<[number, string]> = [
+  [0.06, "23,58,94"],
+  [0.18, "47,127,181"],
+  [0.34, "73,182,255"],
+  [0.54, "98,216,196"],
+  [0.76, "255,198,77"],
+  [1.01, "255,122,33"],
+];
+const REVEAL_RGB = "73,182,255"; // accent-b 青蓝
+const DIFF_POS_RGB = "255,90,114"; // --dak-danger
+const DIFF_NEG_RGB = "73,182,255"; // --dak-accent-b
+
+function heatBand(t: number): string {
+  for (const [hi, rgb] of HEAT_BANDS) if (t <= hi) return rgb;
+  return "255,122,33";
+}
+
 export interface RadarFieldCanvasProps {
   field: RadarField;
   /** 非空 = 差分模式（队伍 − 联赛基线）：防守漏洞 / 进攻防守倾向。 */
@@ -76,11 +95,12 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
       if (radar.outOfBounds) continue;
       const x = radar.x * px2canvas;
       const y = radar.y * px2canvas;
-      const op = (useReveal ? 0.3 : 0.2) + 0.7 * Math.min(1, mag / frame.cap);
-      const hue = useReveal ? 170 : frame.signed ? (v > 0 ? 14 : 208) : Math.round(240 - 240 * Math.min(1, v / frame.cap));
+      const t = Math.min(1, mag / frame.cap);
+      const op = (useReveal ? 0.3 : 0.32) + 0.5 * t;
+      const rgb = useReveal ? REVEAL_RGB : frame.signed ? (v > 0 ? DIFF_POS_RGB : DIFF_NEG_RGB) : heatBand(t);
       const grd = ctx.createRadialGradient(x, y, 0, x, y, blobR);
-      grd.addColorStop(0, `hsla(${hue} 90% 56% / ${op.toFixed(2)})`);
-      grd.addColorStop(1, `hsla(${hue} 90% 56% / 0)`);
+      grd.addColorStop(0, `rgba(${rgb},${op.toFixed(2)})`);
+      grd.addColorStop(1, `rgba(${rgb},0)`);
       ctx.fillStyle = grd;
       ctx.beginPath();
       ctx.arc(x, y, blobR, 0, Math.PI * 2);
