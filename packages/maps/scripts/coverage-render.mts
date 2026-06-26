@@ -241,7 +241,6 @@ const MODES=${JSON.stringify(MODE_LABEL)};
 const cv=document.getElementById('c'),cx=cv.getContext('2d'),img=new Image();img.src="data:image/png;base64,${radarB64}";
 const sel=document.getElementById('m');for(const k in MODES){const o=document.createElement('option');o.value=k;o.textContent=MODES[k];sel.appendChild(o);}sel.value='tPres';
 function fr(fields,dn,sec){const W=2;const f=new Float64Array(G.length);let d=0;for(let s=Math.max(0,sec-W);s<=Math.min(maxSec-1,sec+W);s++){d+=dn[s];for(let g=0;g<G.length;g++)f[g]+=fields[s][g];}if(d>0)for(let g=0;g<G.length;g++)f[g]/=d;return f;}
-function seq(t,cap){return 'hsl('+Math.round(240-240*Math.min(1,t/cap))+' 95% 55%)';}
 function style(mode,gi,Q,QTeam){
  if(mode==='info-diff'){const d=Q.tVis[gi]-Q.ctVis[gi];if(Math.abs(d)<0.04)return null;return[d>0?'14':'208',0.2+0.7*Math.min(1,Math.abs(d)/0.4)];}
  if(mode==='contested'){const c=Math.min(Q.tVis[gi],Q.ctVis[gi]);if(c<0.03)return null;return['46',0.25+0.65*Math.min(1,c/0.3)];}

@@ -66,7 +66,7 @@ function decode(t: any, coordScale: number, angleScale: number): Track {
   return { x: decodeDelta(t.x).map((v) => v * coordScale), y: decodeDelta(t.y).map((v) => v * coordScale), z: decodeDelta(t.z).map((v) => v * coordScale),
     yaw: decodeDelta(t.yaw).map((v) => v / angleScale), pitch: decodeDelta(t.pitch).map((v) => v / angleScale), hp: t.hp, flash: t.flash };
 }
-function markVision(viewers: Track[], i: number, out: Float64Array, active: any[], roundNumber: number): void {
+function markVision(viewers: Track[], i: number, out: Float64Array, active: any[]): void {
   for (let g = 0; g < gl; g++) {
     const G = grid[g]!; let seen = false;
     for (const v of viewers) {
@@ -96,25 +96,17 @@ for (const zf of zips) {
   const zip = await JSZip.loadAsync(readFileSync(join(zipDir, zf)));
   const rd = async (n: string) => JSON.parse(await zip.file(n)!.async("string"));
   const replay = await rd("replay.json"), rounds = await rd("rounds.json"), players = await rd("players.json"), grenades = await rd("grenades.json"), match = await rd("match.json");
-  // 队伍过滤：match.json teamA/teamB.name 匹配 tf → 确定该队是 teamA 或 teamB
-  if (tf) {
-    const ta = (match.teamA?.name ?? "").toLowerCase(), tb = (match.teamB?.name ?? "").toLowerCase();
-    if (!ta.includes(tf) && !tb.includes(tf)) continue; // 这场没目标队
-  }
   const coordScale = replay.meta.coordScale, angleScale = replay.meta.angleScale;
   const teamByIndex: string[] = players.map((p: any) => p.teamKey);
   const roundRow = new Map<number, any>(rounds.map((r: any) => [r.roundNumber, r]));
   const smokes = grenades.filter((g: any) => g.grenade === "smoke");
+  // 队伍过滤：只取目标队在 CT 侧的回合
+  const targetTeamKey = tf ? ((match.teamA?.name ?? "").toLowerCase().includes(tf) ? "teamA" : "teamB") : null;
 
   for (const rr of replay.rounds) {
     const meta = roundRow.get(rr.roundNumber); if (!meta) continue;
     const ctTeam = meta.teamASide === "ct" ? "teamA" : "teamB";
-    // 队伍过滤：只取目标队在 CT 侧的回合
-    if (tf) {
-      const ta2 = (match.teamA?.name ?? "").toLowerCase(), tb2 = (match.teamB?.name ?? "").toLowerCase();
-      const targetTeamKey = ta2.includes(tf) ? "teamA" : "teamB";
-      if (ctTeam !== targetTeamKey) continue;
-    }
+    if (targetTeamKey && ctTeam !== targetTeamKey) continue;
     if ((ctTeam === "teamA" ? meta.teamAEconomy : meta.teamBEconomy) !== CT_ECON_LABEL) continue;
     gunRounds += 1;
     const tickStep = rr.tickStep, startTick = rr.startTick, freezeEnd = meta.freezeEndTick;
@@ -127,8 +119,8 @@ for (const zf of zips) {
       const tick = startTick + i * tickStep;
       denom[sec]! += 1;
       const active = smokes.filter((g: any) => g.roundNumber === rr.roundNumber && g.effectTick <= tick && (g.destroyTick == null || tick <= g.destroyTick));
-      markVision(cts, i, ctVis[sec]!, active, rr.roundNumber);
-      markVision(ts, i, tVis[sec]!, active, rr.roundNumber);
+      markVision(cts, i, ctVis[sec]!, active);
+      markVision(ts, i, tVis[sec]!, active);
       markPresence(cts, i, ctPres[sec]!);
       markPresence(ts, i, tPres[sec]!);
     }
