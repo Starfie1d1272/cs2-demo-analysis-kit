@@ -5,7 +5,7 @@
  * 7 图约 207MB，太大不进 git。通过 `awpy get tris` 下载到本地目录后，
  * 本模块按需读取、解析、构建 BVH 并缓存。
  *
- * demo-lab（浏览器）不经过此路径；届时需要预构建 BVH 或通过 HTTP 按需加载。
+ * DAK Studio 浏览器端不经过此 Node 路径；开发/桌面端通过 HTTP 按需加载 `.tri`。
  */
 
 import { readFileSync } from "node:fs";

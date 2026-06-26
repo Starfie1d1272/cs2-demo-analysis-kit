@@ -15,7 +15,7 @@ from matplotlib import font_manager
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-RADAR = f"{ROOT}/apps/demo-lab/public/maps/radars"
+RADAR = f"{ROOT}/apps/dak-studio/public/maps/radars"
 VIZ = f"{ROOT}/packages/maps/viz"
 CJK = font_manager.FontProperties(fname="/System/Library/Fonts/STHeiti Medium.ttc")
 

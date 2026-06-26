@@ -17,6 +17,7 @@
 - [稳定性等级](stability-tiers.md)：各指标 Stable / Beta / Experimental。
 - [RR 评分模型](design/rr-model.md)：RR v1 / 六账户 / PRISM 唯一设计文档。
 - [RR / PRISM Roadmap](rr-roadmap.md)：评分阶段顺序与现状速查。
+- [HLTV Rating 3.0 科隆参考表](research/hltv-rating-3.0-iem-cologne-major-2026.md)：外部评分对照数据，供后续 RR 校准参考。
 
 ## 功能模块设计
 

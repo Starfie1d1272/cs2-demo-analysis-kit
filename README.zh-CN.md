@@ -75,7 +75,6 @@
 | `@cs2dak/react` | 只消费 presentation 合同的 React 组件。 |
 | `@cs2dak/cli` | 把 `core` 接到文件系统的薄 CLI。 |
 | `apps/dak-studio` | DAK Studio：本地 demo 工作台（IndexedDB 资料库）。 |
-| `apps/demo-lab` | 组件预览与 fixture 验收应用（开发用）。 |
 | `python/src/cs2dak` | 围绕 `cs2df` 的 Python 壳：pywebview GUI + Studio 桥 + PyInstaller 打包。无 parser/exporter 逻辑。 |
 
 ## 开发
@@ -83,7 +82,7 @@
 ```bash
 pnpm install
 pnpm dev:studio        # DAK Studio（端口 5178，.dem 导入走本地 uv 环境）
-pnpm dev               # demo-lab 组件预览
+pnpm dev               # pnpm dev:studio 的别名
 pnpm test              # 快速 vitest（排除 integration 与 season 验证）
 pnpm test:integration  # cohort / spatial / season 真实 ZIP 验证
 pnpm test:all          # 全量
@@ -126,7 +125,7 @@ DAK 是**产品中立的分析层**。产品负责业务逻辑、身份、持久
 
 按「生态 / 产品」双轨许可：
 
-- **生态 —— MIT**：全部 `@cs2dak/*` 包、Python 壳（`python/`）、`apps/demo-lab`。与 `cs2-demo-format`、`@rivalhub/rival-rating` 同侧——欢迎任何人基于格式与管道构建自己的工具。
+- **生态 —— MIT**：全部 `@cs2dak/*` 包、Python 壳（`python/`）。与 `cs2-demo-format`、`@rivalhub/rival-rating` 同侧——欢迎任何人基于格式与管道构建自己的工具。
 - **产品 —— AGPL-3.0-only**：`apps/dak-studio`（DAK Studio 桌面应用，见 [apps/dak-studio/LICENSE](apps/dak-studio/LICENSE)）。自用与修改自由；分发或以网络服务提供衍生版本时必须开源。
 
 边界纪律与模块规则一致：产品代码（AGPL）可依赖生态包（MIT）；生态包绝不回流引用产品代码。第三方移植与改编出处见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。

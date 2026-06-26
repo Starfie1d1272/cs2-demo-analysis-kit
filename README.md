@@ -75,7 +75,6 @@ The **v3 ZIP is the only seam** between Python and TypeScript — neither side i
 | `@cs2dak/react` | React components that consume presentation contracts only. |
 | `@cs2dak/cli` | Thin CLI wiring `core` to the filesystem. |
 | `apps/dak-studio` | DAK Studio: local demo workbench (IndexedDB library). |
-| `apps/demo-lab` | Component preview & fixture-review app (development). |
 | `python/src/cs2dak` | Python shell around `cs2df`: pywebview GUI + Studio bridge + PyInstaller packaging. No parser/exporter logic. |
 
 ## Develop
@@ -83,7 +82,7 @@ The **v3 ZIP is the only seam** between Python and TypeScript — neither side i
 ```bash
 pnpm install
 pnpm dev:studio        # DAK Studio (port 5178, .dem import via local uv env)
-pnpm dev               # demo-lab component preview
+pnpm dev               # alias for pnpm dev:studio
 pnpm test              # fast vitest (excludes integration + season validation)
 pnpm test:integration  # cohort / spatial / season validation against real ZIPs
 pnpm test:all          # everything
@@ -126,7 +125,7 @@ DAK is the **product-neutral analysis layer**. Products own business logic, iden
 
 Dual-licensed along the ecosystem / product line:
 
-- **Ecosystem — MIT**: all `@cs2dak/*` packages, the Python shell (`python/`), and `apps/demo-lab`. Same side as `cs2-demo-format` and `@rivalhub/rival-rating` — anyone is welcome to build their own tools on the format and pipeline.
+- **Ecosystem — MIT**: all `@cs2dak/*` packages and the Python shell (`python/`). Same side as `cs2-demo-format` and `@rivalhub/rival-rating` — anyone is welcome to build their own tools on the format and pipeline.
 - **Product — AGPL-3.0-only**: `apps/dak-studio` (the DAK Studio desktop app, see [apps/dak-studio/LICENSE](apps/dak-studio/LICENSE)). Free to use and modify; distributing or offering a derivative as a network service requires releasing the source.
 
 Boundary discipline matches the module rules: product code (AGPL) may depend on ecosystem packages (MIT); ecosystem packages never reference product code. Third-party ports and adaptations are credited in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

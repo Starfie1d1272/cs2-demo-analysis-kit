@@ -25,7 +25,7 @@ from matplotlib.patches import Rectangle, Polygon as MplPolygon
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-RADAR = f"{ROOT}/apps/demo-lab/public/maps/radars"
+RADAR = f"{ROOT}/apps/dak-studio/public/maps/radars"
 VIZ = f"{ROOT}/packages/maps/viz"
 
 # 中文字体

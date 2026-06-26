@@ -6,7 +6,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter @cs2dak/demo-lab dev",
+    "dev": "pnpm dev:studio",
     "dev:studio": "pnpm --filter @cs2dak/dak-studio dev",
     "analyze:sample": "pnpm --filter @cs2dak/cli analyze ../../fixtures/input/cs2dak-sanitized-de_ancient.zip --out ../../fixtures/output/sample",
     "python:test": "cd python && uv run --extra dev pytest",

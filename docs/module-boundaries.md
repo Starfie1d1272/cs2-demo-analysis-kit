@@ -31,7 +31,6 @@
 | `@cs2dak/presentation`   | 将 core/cohort 结果转换为比赛、选手、队伍、赛季和排行榜展示模型 | 解析、评分公式、数据库、React               | 产品中立 View Models        |
 | `@cs2dak/react`          | 渲染 presentation 合同和基础可视化组件                          | 数据库查询、分析、评分、产品业务规则        | React 组件与样式            |
 | Node CLI                 | 将 TypeScript 包接入本地文件系统和自动化流程                    | 复制核心分析逻辑                            | 命令行输出与文件产物        |
-| `apps/demo-lab`          | 组件开发、fixture 预览和人工验收                                | 个人 Demo 管理、共享逻辑所有权              | 开发测试应用                |
 | DAK Studio（`apps/dak-studio`） | 本地 Demo 管理、导入、检索、比较和个人档案               | RivalHub 赛事业务、共享分析公式             | 独立本地产品                |
 | RivalHub                 | 赛事、赛季、身份、权限、持久化和公开展示                        | 复制 DAK 分析与评分逻辑                     | 赛事产品                    |
 | CS2 Insight Agent        | 高光录制软件，复用本仓库 demo 展示模块                          | 复制 Demo 解析与评分逻辑                    | 产品                        |
