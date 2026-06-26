@@ -183,6 +183,10 @@ jobs:
             in_section && /^## \[/ { exit }
             in_section { print }
           ' CHANGELOG.md > /tmp/changelog-notes.txt
+          if ! grep -q '[^[:space:]]' /tmp/changelog-notes.txt; then
+            echo "::error::CHANGELOG.md is missing non-empty notes for v${VERSION}"
+            exit 1
+          fi
           node scripts/gen-update-manifest.mjs "$VERSION" \
             "python/dist/dak-studio-windows-${VERSION}.zip" \
             "python/dist/latest.json" \
@@ -219,6 +223,10 @@ jobs:
             in_section && /^## \[/ { exit }
             in_section { print }
           ' CHANGELOG.md)
+          if ! printf '%s\n' "$SECTION" | grep -q '[^[:space:]]'; then
+            echo "::error::CHANGELOG.md is missing non-empty notes for v${VERSION}"
+            exit 1
+          fi
           # Write to env file for the next step
           echo "changelog<<EOF" >> "$GITHUB_OUTPUT"
           echo "$SECTION" >> "$GITHUB_OUTPUT"

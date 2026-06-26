@@ -14,14 +14,27 @@ Changesets 管理的公共包。
 ## 桌面应用发布（vX.Y.Z）
 
 1. 确认 main 上 CI 全绿；
-2. 同步版本号并提交：
+2. 在根 `CHANGELOG.md` 维护本次桌面版本段，并确认能被发版 CI 抽取：
+
+   ```bash
+   VERSION=0.2.0
+   awk -v ver="$VERSION" '
+     BEGIN { in_section=0 }
+     $0 ~ "^## \\[" ver "\\]" { in_section=1; next }
+     in_section && /^## \[/ { exit }
+     in_section { print }
+   ' CHANGELOG.md | tee /tmp/changelog-notes.txt
+   grep -q '[^[:space:]]' /tmp/changelog-notes.txt
+   ```
+
+3. 同步版本号并提交：
 
    ```bash
    node scripts/sync-version.mjs 0.2.0
    git commit -am "chore(release): 0.2.0"
    ```
 
-3. 打 tag 推送，Release CI 自动构建并发布：
+4. 打 tag 推送，Release CI 自动构建并发布：
 
    ```bash
    git tag v0.2.0
@@ -33,7 +46,7 @@ Changesets 管理的公共包。
    附安装说明发到 GitHub Release。纯导出器 cs2dak 不进 Release（本地需要时
    `PACKAGE_EXPORTER=1 bash scripts/package.sh`）。
 
-4. 发布后无需额外通知。Release CI 会随产物生成 `latest.json` 更新 manifest，
+5. 发布后无需额外通知。Release CI 会随产物生成 `latest.json` 更新 manifest，
    同时发到 GitHub Release **并上传到 Cloudflare R2**
    （`R2_*` secrets，`aws s3 cp --endpoint-url`）。DAK Studio 启动时按
    **R2 → GitHub → ghproxy** 顺序拉取 manifest（失败转移，绕开 `api.github.com`），
