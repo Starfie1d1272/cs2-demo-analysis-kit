@@ -28,8 +28,10 @@ export interface RadarFieldCanvasProps {
 }
 
 export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanvasProps) {
-  const [mode, setMode] = useState<RadarFieldMode>("tPres");
+  const [mode, setMode] = useState<RadarFieldMode>("ctVis");
   const [sec, setSec] = useState(20);
+  // 照亮模式：压暗底图、视野覆盖发青光，暗处即盲区（读负空间最直观）。
+  const [reveal, setReveal] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const calibration = getMapCalibration(map.name);
@@ -52,7 +54,16 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
     const px2canvas = CANVAS_SIZE / cal.radarSize;
     const blobR = (field.grid.cellSize / cal.scale) * 2.2 * px2canvas;
 
+    // 照亮模式只对顺序场（视野/位置）生效；差分/信息差分仍用发散色。
+    const useReveal = reveal && !frame.signed;
+
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    if (useReveal) {
+      // 压暗 CSS 底图（canvas 在底图之上），让覆盖区发光、未覆盖区变暗 = 盲区。
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = "rgba(8,11,16,0.8)";
+      ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    }
     ctx.globalCompositeOperation = frame.signed ? "source-over" : "lighter";
 
     for (let g = 0; g < cells.length; g++) {
@@ -65,8 +76,8 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
       if (radar.outOfBounds) continue;
       const x = radar.x * px2canvas;
       const y = radar.y * px2canvas;
-      const op = 0.2 + 0.7 * Math.min(1, mag / frame.cap);
-      const hue = frame.signed ? (v > 0 ? 14 : 208) : Math.round(240 - 240 * Math.min(1, v / frame.cap));
+      const op = (useReveal ? 0.3 : 0.2) + 0.7 * Math.min(1, mag / frame.cap);
+      const hue = useReveal ? 170 : frame.signed ? (v > 0 ? 14 : 208) : Math.round(240 - 240 * Math.min(1, v / frame.cap));
       const grd = ctx.createRadialGradient(x, y, 0, x, y, blobR);
       grd.addColorStop(0, `hsla(${hue} 90% 56% / ${op.toFixed(2)})`);
       grd.addColorStop(1, `hsla(${hue} 90% 56% / 0)`);
@@ -76,12 +87,12 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
       ctx.fill();
     }
     ctx.globalCompositeOperation = "source-over";
-  }, [field, baseline, mode, sec, level, calibration, dualLevel]);
+  }, [field, baseline, mode, sec, level, reveal, calibration, dualLevel]);
 
   const bgUrl = dualLevel && level === "lower" ? map.lowerRadarImageUrl : map.radarImageUrl;
-  const blindMode = mode === "ct-blind" || mode === "t-blind";
-  const legend = blindMode
-    ? `红 = 几乎无${mode === "ct-blind" ? "CT" : "T"}视线覆盖（盲区）`
+  const sequential = mode !== "info-diff" && !isDiff;
+  const legend = reveal && sequential
+    ? "亮 = 有视线覆盖 · 暗 = 盲区（空虚区）"
     : isDiff
       ? "红 = 高于联赛平均 · 蓝 = 低于平均"
       : mode === "info-diff"
@@ -106,6 +117,15 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
               {opt.label}
             </button>
           ))}
+          <button
+            type="button"
+            aria-pressed={reveal}
+            className={reveal ? "dak-sf-chip dak-sf-chip-active" : "dak-sf-chip"}
+            title="压暗底图、覆盖区发光，暗处即盲区"
+            onClick={() => setReveal((r) => !r)}
+          >
+            照亮
+          </button>
           {dualLevel && (
             <div className="dak-heatmap-side-filter" role="radiogroup" aria-label="地图层级">
               {(["upper", "lower"] as const).map((next) => (

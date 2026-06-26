@@ -9,28 +9,25 @@
  */
 import type { RadarField, RadarFieldBase } from "@cs2dak/contract";
 
-export type RadarFieldMode = RadarFieldBase | "info-diff" | "contested" | "ct-blind" | "t-blind";
+export type RadarFieldMode = RadarFieldBase | "info-diff" | "contested";
 
 export interface RadarModeOption {
   value: RadarFieldMode;
   label: string;
 }
 
-/** 模式选项与中文标签（沿用现有 UI 文案：视野 / 位置 / 信息差分 / 对拼线）。 */
+/**
+ * 模式选项与中文标签（沿用现有 UI 文案：视野 / 位置 / 信息差分 / 对拼线）。
+ * 盲区不单列模式——画视野覆盖、空白即盲区（配合 canvas「照亮模式」读负空间更直观）。
+ */
 export const RADAR_FIELD_MODES: RadarModeOption[] = [
   { value: "ctVis", label: "CT 视野" },
   { value: "tVis", label: "T 视野" },
   { value: "ctPres", label: "CT 位置" },
   { value: "tPres", label: "T 位置" },
-  { value: "ct-blind", label: "CT 盲区" },
-  { value: "t-blind", label: "T 盲区" },
   { value: "info-diff", label: "信息差分" },
   { value: "contested", label: "对拼线" },
 ];
-
-/** 盲区阈值：该 side 视线覆盖频率低于此值的可行走格视为盲区，越低越严重。 */
-const BLIND_GAP = 0.5;
-const BLIND_MODES = new Set<RadarFieldMode>(["ct-blind", "t-blind"]);
 
 /** 各模式的颜色强度归一化上限（与原型一致）。 */
 const MODE_CAP: Record<RadarFieldMode, number> = {
@@ -40,8 +37,6 @@ const MODE_CAP: Record<RadarFieldMode, number> = {
   tPres: 0.3,
   "info-diff": 0.4,
   contested: 0.3,
-  "ct-blind": BLIND_GAP,
-  "t-blind": BLIND_GAP,
 };
 const DELTA_CAP = 0.15;
 
@@ -87,13 +82,6 @@ function modeFreq(field: RadarField, mode: RadarFieldMode, sec: number, window: 
     for (let g = 0; g < t.length; g++) out[g]! = Math.min(t[g]!, c[g]!);
     return out;
   }
-  if (mode === "ct-blind" || mode === "t-blind") {
-    // 绝对盲区：该 side 视线覆盖频率低于 BLIND_GAP 的可行走格，越低越亮。
-    const vis = freqAt(field, mode === "ct-blind" ? "ctVis" : "tVis", sec, window);
-    const out = new Float64Array(vis.length);
-    for (let g = 0; g < vis.length; g++) out[g]! = Math.max(0, BLIND_GAP - vis[g]!);
-    return out;
-  }
   return freqAt(field, mode, sec, window);
 }
 
@@ -109,8 +97,7 @@ export function radarModeFrame(
   smoothWindow = 2
 ): RadarModeFrame {
   const team = modeFreq(field, mode, sec, smoothWindow);
-  // 盲区是绝对量（视线覆盖本身），不做队伍−联赛差分。
-  if (!baseline || BLIND_MODES.has(mode)) {
+  if (!baseline) {
     return { values: team, signed: mode === "info-diff", cap: MODE_CAP[mode] };
   }
   const base = modeFreq(baseline, mode, sec, smoothWindow);
