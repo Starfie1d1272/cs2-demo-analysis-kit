@@ -41,7 +41,7 @@ const WEAPON_DISPLAY_NAMES: Record<string, string> = {
   cz75a: "CZ75-Auto",
   cz75: "CZ75-Auto",
   elite: "Dual Berettas",
-  // SMGs
+  // 冲锋枪
   mp9: "MP9",
   mp7: "MP7",
   mp5sd: "MP5-SD",

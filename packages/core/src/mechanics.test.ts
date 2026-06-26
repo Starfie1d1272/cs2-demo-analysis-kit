@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DemoPackage, Duels, PackageDamage, PackageKill, PackageShots } from "@cs2dak/contract";
-import { buildMechanicsSignals, derivePlayerMechanics } from "./mechanics.js";
+import { buildMechanicsSignals, counterStrafeThresholdForWeapon, derivePlayerMechanics } from "./mechanics.js";
 
 const A = "76561198000000001";
 const AI = 0;
@@ -129,6 +129,14 @@ function pkg(overrides: Partial<DemoPackage>): DemoPackage {
 }
 
 describe("derivePlayerMechanics", () => {
+  it("derives counter-strafe thresholds from weapon movement speed", () => {
+    expect(counterStrafeThresholdForWeapon("ak47")).toMatchObject({ weapon: "ak47", weaponMaxSpeed: 215, maxSpeed: 73.1, source: "weapon" });
+    expect(counterStrafeThresholdForWeapon("m4a1_silencer")).toMatchObject({ weapon: "m4a1_silencer", weaponMaxSpeed: 225, maxSpeed: 76.5, source: "weapon" });
+    expect(counterStrafeThresholdForWeapon("awp")).toMatchObject({ weapon: "awp", weaponMaxSpeed: 100, maxSpeed: 34, source: "weapon" });
+    expect(counterStrafeThresholdForWeapon("ump45")).toMatchObject({ weapon: "ump45", weaponMaxSpeed: 230, maxSpeed: 78.2, source: "weapon" });
+    expect(counterStrafeThresholdForWeapon("mp9")).toMatchObject({ weapon: "mp9", weaponMaxSpeed: 240, maxSpeed: 81.6, source: "weapon" });
+  });
+
   it("splits bursts and computes first-shot, spray, rhythm, and counter-strafe metrics", () => {
     const demo = pkg({
       shots: buildShots([
@@ -262,7 +270,7 @@ describe("derivePlayerMechanics with duels window", () => {
     });
 
     const row = derivePlayerMechanics(demo)[0]!;
-    // 急停：开枪前在移动（>100 u/s），开枪时停稳（≤ ak 阈值 73）→ 成功一次
+    // 急停：开枪前在移动（>100 u/s），开枪时停稳（≤ AK 判定用最大移速 34%）→ 成功一次
     expect(row.counterStrafe).toEqual({ value: 100, successes: 1, attempts: 1 });
     // 反应：onset = tick 186（被闪恢复），首发 196 → (196-186)/64*1000 = 156.3ms
     expect(row.reaction.sampleSize).toBe(1);
@@ -272,7 +280,7 @@ describe("derivePlayerMechanics with duels window", () => {
     expect(row.preaim.withinFiveCount).toBe(1);
     expect(row.preaim.medianDegrees).not.toBeNull();
     expect(row.preaim.medianDegrees!).toBeLessThan(5);
-    // 首发命中（196 命中）+ TTK（196→200）
+    // 首发命中（196 命中）+ 击杀耗时（196→200）
     expect(row.firstShotHit).toEqual({ value: 100, successes: 1, attempts: 1 });
     expect(row.ttk).toEqual({ value: 62.5, sampleSize: 1 });
   });
@@ -347,7 +355,7 @@ describe("derivePlayerMechanics with duels window", () => {
     expect(derivePlayerMechanics(demo)[0]!.counterStrafe).toEqual({ value: 100, successes: 1, attempts: 1 });
   });
 
-  it("excludes through-smoke and wallbang kills from clean TTK and one-tap samples", () => {
+  it("excludes through-smoke and wallbang kills from clean kill-time and one-tap samples", () => {
     const demo = pkg({
       shots: buildShots([
         { tick: 100, playerIndex: AI, weaponIndex: 0 },

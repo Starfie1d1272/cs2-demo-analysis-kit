@@ -22,9 +22,9 @@ export interface DuelInsightsOptions {
 }
 
 const CLASSIFICATION_LABEL: Record<string, string> = {
-  contested_duel: "对枪胜出",
+  contested_duel: "正面对枪击杀",
   suppressed_kill: "先手压制击杀",
-  caught_off_guard: "侧背身击杀"
+  caught_off_guard: "无有效视野击杀"
 };
 
 function nameFor(pkg: DemoPackage, steamId64: string): string {
@@ -111,12 +111,12 @@ function rankLabel(value: number | null, values: number[], higherIsBetter = true
 // ── 武器分类 → 定制展示指标集（参考 5E「武器分析」：每类武器只展示有意义的特征）──
 export type MechanicsMetricKey = "firstShotHit" | "sprayHit" | "counterStrafe" | "oneTap" | "ttk" | "reaction" | "preaim" | "headshot" | "killsPerMatch";
 type MetricKey = MechanicsMetricKey;
-export type WeaponCategory = "rifle" | "sniper" | "pistol" | "smg" | "shotgun_lmg" | "other";
+export type WeaponCategory = "rifle" | "sniper" | "pistol" | "submachine_gun" | "shotgun_lmg" | "other";
 
 const RIFLES = new Set(["ak47", "m4a1", "m4a4", "m4a1_silencer", "aug", "sg556", "sg553", "famas", "galilar", "galil"]);
 const SNIPERS = new Set(["awp", "ssg08", "scar20", "g3sg1"]);
 const PISTOLS = new Set(["deagle", "revolver", "glock", "usp_silencer", "usp", "hkp2000", "p2000", "p250", "fiveseven", "tec9", "cz75a", "cz75", "elite"]);
-const SMGS = new Set(["mp9", "mp7", "mp5sd", "ump45", "p90", "bizon", "mac10"]);
+const SUBMACHINE_GUNS = new Set(["mp9", "mp7", "mp5sd", "ump45", "p90", "bizon", "mac10"]);
 const SHOTGUNS_LMG = new Set(["nova", "xm1014", "mag7", "sawedoff", "m249", "negev"]);
 const ONE_TAP_CAPABLE = new Set(["ak47", "sg556", "sg553", "deagle", "revolver", "awp", "ssg08", "scar20", "g3sg1"]);
 
@@ -125,17 +125,17 @@ export function weaponCategory(weapon: string): WeaponCategory {
   if (RIFLES.has(w)) return "rifle";
   if (SNIPERS.has(w)) return "sniper";
   if (PISTOLS.has(w)) return "pistol";
-  if (SMGS.has(w)) return "smg";
+  if (SUBMACHINE_GUNS.has(w)) return "submachine_gun";
   if (SHOTGUNS_LMG.has(w)) return "shotgun_lmg";
   return "other";
 }
 
-// 狙击：去 TTK(≈0)/扫射/one tap(恒满)/预瞄(多为架枪)；手枪：去扫射；冲锋枪：弱化预瞄。
+// 狙击：去击杀耗时(≈0)/扫射/one tap(恒满)/预瞄(多为架枪)；手枪：去扫射；冲锋枪：弱化预瞄。
 export const CATEGORY_METRICS: Record<WeaponCategory, MetricKey[]> = {
   rifle: ["firstShotHit", "sprayHit", "counterStrafe", "ttk", "oneTap", "reaction", "preaim", "headshot", "killsPerMatch"],
   sniper: ["firstShotHit", "counterStrafe", "reaction", "headshot", "killsPerMatch"],
   pistol: ["firstShotHit", "counterStrafe", "ttk", "oneTap", "reaction", "headshot", "killsPerMatch"],
-  smg: ["firstShotHit", "sprayHit", "counterStrafe", "ttk", "reaction", "headshot", "killsPerMatch"],
+  submachine_gun: ["firstShotHit", "sprayHit", "counterStrafe", "ttk", "reaction", "headshot", "killsPerMatch"],
   shotgun_lmg: ["firstShotHit", "counterStrafe", "ttk", "reaction", "headshot", "killsPerMatch"],
   other: ["firstShotHit", "counterStrafe", "reaction", "headshot", "killsPerMatch"]
 };
@@ -199,7 +199,7 @@ function buildMetric(key: MetricKey, agg: AggMechanics, allAggs: AggMechanics[],
     case "sprayHit": return { ...base, label: "扫射命中率", unit: "%", successes: agg.sprayHit?.successes, attempts: agg.sprayHit?.attempts };
     case "counterStrafe": return { ...base, label: "急停成功率", unit: "%", successes: agg.counterStrafe.successes, attempts: agg.counterStrafe.attempts };
     case "oneTap": return { ...base, label: "one tap 率", unit: "%", successes: agg.oneTap.successes, attempts: agg.oneTap.attempts };
-    case "ttk": return { ...base, label: "TTK", unit: "ms", sampleSize: agg.ttkSamples.length };
+    case "ttk": return { ...base, label: "击杀耗时", unit: "ms", sampleSize: agg.ttkSamples.length };
     case "reaction": return { ...base, label: "反应时间", unit: "ms", sampleSize: agg.reactionSamples.length };
     case "preaim": {
       const withinFive = agg.preaimSamples.filter((value) => value <= 5).length;
@@ -218,7 +218,7 @@ function buildMetric(key: MetricKey, agg: AggMechanics, allAggs: AggMechanics[],
 
 /**
  * 单条武器画像：按武器类别只展示有意义的指标。命中率类带分子/分母，中位类带样本数；
- * TTK / 反应时间 / 预瞄误差 越低越好。
+ * 击杀耗时 / 反应时间 / 预瞄误差 越低越好。
  */
 function mechanicsRow(agg: AggMechanics, allAggs: AggMechanics[], matchesByPlayer: Map<string, number>): PlayerMechanicsRow {
   const metrics: MechanicsMetric[] = mechanicsMetricsForWeapon(agg.weapon).map((key) => buildMetric(key, agg, allAggs, matchesByPlayer));
@@ -335,14 +335,14 @@ export function buildDuelInsightsFromFacts(facts: DuelInsightsFacts[]): DuelInsi
     openingRows,
     mechanicsRows,
     notes: [
-      "枪法质量指标使用 clean gunfight gate：排除第三方伤害、穿烟击杀和穿墙击杀；标题击杀数仍保留真实武器产出。",
-      "首发命中率只统计 clean combat burst（造成敌方伤害，或首发开枪时视野锥+LOS 内有活敌）的第一发，排除打门/预开枪。",
-      "扫射命中率仅对 clean 全自动武器、长度≥5 的 burst 从第 4 发起统计；手枪/狙击/霰弹显示 —。",
-      "急停成功率为 clean「移动后停稳」口径：用 duels 连续轨迹判断开枪前 200ms 是否在移动，只把移动样本计入分母，开枪时速度低于武器站立精准阈值记为成功；ZIP 无按键输入，不区分反向键。",
-      "one tap 率仅对可一枪满血终结的武器展示，分母为 clean 满血(100HP)击杀。",
-      "TTK 取 clean 满血击杀中 lethal burst 第一枪到击杀的中位，AK 一枪头可接近 0ms。",
-      "反应时间从 clean 击杀者首发反向找当前连续可见段 onset（需 hp>0、未被闪、视野锥内、静态LOS通透、无烟）；首发即击杀时用上一帧仍存活的可见状态作为 anchor；窗口首帧已可见(左截断)、prefire、可见>1s(跟踪) 均剔除。",
-      "预瞄误差取 clean onset 前 1~3 帧准星与目标的三维(yaw+pitch)夹角中位，并给出 ≤5° 比例。",
+      "枪法质量指标只看干净交火：排除第三方伤害、穿烟击杀和穿墙击杀；标题击杀数仍保留真实武器产出。",
+      "首发命中率只统计干净交火开火段（造成敌方伤害，或首发开枪时视野锥+LOS 内有活敌）的第一发，排除打门/预开枪。",
+      "扫射命中率仅对干净全自动武器、长度≥5 的开火段从第 4 发起统计；手枪/狙击/霰弹显示 —。",
+      "急停成功率为干净「移动后停稳」口径：用 duels 连续轨迹判断开枪前 200ms 是否在移动，只把移动样本计入分母；开枪时速度低于该武器判定用最大移动速度约 34% 的停稳阈值记为成功。ZIP 无按键输入与开镜状态；AWP 按常见开镜开枪口径取 100u/s，其他开镜武器暂按基础移速口径展示。",
+      "one tap 率仅对可一枪满血终结的武器展示，分母为干净满血(100HP)击杀。",
+      "击杀耗时取干净满血击杀中，击杀开火段第一枪到击杀的中位耗时，AK 一枪头可接近 0ms。",
+      "反应时间从干净击杀者首发反向找当前连续可见段起点（需 hp>0、未被闪、视野锥内、静态LOS通透、无烟）；首发即击杀时用上一帧仍存活的可见状态；窗口首帧已可见、预开枪、可见>1s 的跟踪样本均剔除。",
+      "预瞄误差取干净可见段起点前 1~3 帧准星与目标的三维(yaw+pitch)夹角中位，并给出 ≤5° 比例。",
       "百分位标签基于当前聚合范围；未接入固定联赛基线时不输出 A/B/C。"
     ]
   });

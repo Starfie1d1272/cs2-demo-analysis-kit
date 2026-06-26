@@ -29,7 +29,8 @@ const MOVEMENT_THRESHOLD = 100;
 const MAX_REACTION_MS = 1000;
 /** 预瞄误差「命中」阈值（度）。 */
 const PREAIM_WITHIN_DEGREES = 5;
-/** 急停「停稳」要求：开枪时速度需低于该比例的武器站立精准速度。 */
+/** 急停「停稳」要求：开枪时速度需低于该比例的武器判定用最大移动速度。 */
+const ACCURATE_MOVE_RATIO = 0.34;
 
 export interface BurstLengthBuckets {
   single: number;
@@ -40,8 +41,13 @@ export interface BurstLengthBuckets {
 
 export interface WeaponCounterStrafeThreshold {
   weapon: string;
+  /** 该武器用于急停判定的最大移动速度（游戏单位/s）；AWP 按常见开镜开枪口径取 100。 */
+  weaponMaxSpeed: number | null;
+  /** 移动精度阈值比例；社区机制分析中常用约 34% 作为停稳近似。 */
+  accurateMoveRatio: number;
+  /** 停稳速度阈值（兼容旧字段名）：weaponMaxSpeed × accurateMoveRatio。 */
   maxSpeed: number;
-  source: "weapon" | "class" | "fallback";
+  source: "weapon" | "fallback";
 }
 
 /** 命中/尝试型指标：value 为百分比（successes/attempts×100），attempts=0 时 value=null。 */
@@ -66,7 +72,7 @@ export interface PreaimSample {
 }
 
 export interface MechanicsMetricSet {
-  /** 首发命中率：combat burst 第一发命中 / combat burst 数。 */
+  /** 首发命中率：交火开火段第一发命中 / 交火开火段数。 */
   firstShotHit: RateSample;
   /** 扫射命中率：自动武器、burst≥5 的第 4 发起命中 / 总数；非自动武器为 null。 */
   sprayHit: RateSample | null;
@@ -74,7 +80,7 @@ export interface MechanicsMetricSet {
   counterStrafe: RateSample;
   /** one tap 率：满血单发终结 / 满血无第三方击杀。 */
   oneTap: RateSample;
-  /** TTK：lethal burst 第一枪到击杀的中位耗时（ms）。 */
+  /** 击杀耗时：击杀开火段第一枪到击杀的中位耗时（ms）。 */
   ttk: MedianSample;
   /** 反应时间：敌人进入有效视野到首发开枪的中位耗时（ms）。 */
   reaction: MedianSample;
@@ -131,23 +137,48 @@ interface FlatShot {
   pitch: number;
 }
 
-const WEAPON_ACCURATE_SPEED: Record<string, number> = {
-  ak47: 73,
-  m4a1: 76,
-  m4a4: 76,
-  m4a1_silencer: 76,
-  awp: 68,
-  ssg08: 78,
-  deagle: 78,
-  revolver: 66
+const WEAPON_COUNTER_STRAFE_MAX_SPEED: Record<string, number> = {
+  ak47: 215,
+  galilar: 215,
+  galil: 215,
+  m4a1: 225,
+  m4a4: 225,
+  m4a1_silencer: 225,
+  famas: 220,
+  aug: 220,
+  sg556: 210,
+  sg553: 210,
+  awp: 100,
+  ssg08: 230,
+  scar20: 215,
+  g3sg1: 215,
+  deagle: 230,
+  revolver: 220,
+  glock: 240,
+  usp: 240,
+  usp_silencer: 240,
+  hkp2000: 240,
+  p2000: 240,
+  p250: 240,
+  fiveseven: 240,
+  tec9: 240,
+  cz75a: 240,
+  cz75: 240,
+  elite: 240,
+  mac10: 240,
+  mp9: 240,
+  bizon: 240,
+  ump45: 230,
+  p90: 230,
+  mp7: 220,
+  mp5sd: 235,
+  nova: 220,
+  xm1014: 215,
+  mag7: 225,
+  sawedoff: 210,
+  m249: 195,
+  negev: 150
 };
-
-const WEAPON_CLASS_SPEED: Array<{ test: (weapon: string) => boolean; maxSpeed: number }> = [
-  { test: (weapon) => ["glock", "usp", "usp_silencer", "hkp2000", "p2000", "p250", "fiveseven", "tec9", "cz75a", "elite"].includes(weapon), maxSpeed: 80 },
-  { test: (weapon) => ["mp9", "mac10", "bizon", "ump45", "p90", "mp7", "mp5sd"].includes(weapon), maxSpeed: 85 },
-  { test: (weapon) => ["nova", "xm1014", "mag7", "sawedoff"].includes(weapon), maxSpeed: 75 },
-  { test: (weapon) => ["m249", "negev"].includes(weapon), maxSpeed: 60 }
-];
 
 const FIREARM_WEAPONS = new Set([
   "ak47", "m4a1", "m4a4", "m4a1_silencer", "aug", "sg556", "sg553", "famas", "galilar", "galil",
@@ -197,11 +228,11 @@ function planarSpeed(vx: number, vy: number): number {
 
 export function counterStrafeThresholdForWeapon(weaponName: string): WeaponCounterStrafeThreshold {
   const weapon = normalizeWeapon(weaponName);
-  const exact = WEAPON_ACCURATE_SPEED[weapon];
-  if (exact != null) return { weapon, maxSpeed: exact, source: "weapon" };
-  const klass = WEAPON_CLASS_SPEED.find((row) => row.test(weapon));
-  if (klass) return { weapon, maxSpeed: klass.maxSpeed, source: "class" };
-  return { weapon, maxSpeed: 80, source: "fallback" };
+  const weaponMaxSpeed = WEAPON_COUNTER_STRAFE_MAX_SPEED[weapon] ?? null;
+  if (weaponMaxSpeed != null) {
+    return { weapon, weaponMaxSpeed, accurateMoveRatio: ACCURATE_MOVE_RATIO, maxSpeed: round(weaponMaxSpeed * ACCURATE_MOVE_RATIO, 1), source: "weapon" };
+  }
+  return { weapon, weaponMaxSpeed: null, accurateMoveRatio: ACCURATE_MOVE_RATIO, maxSpeed: 80, source: "fallback" };
 }
 
 function isFirearmWeapon(weapon: string): boolean {
@@ -347,8 +378,8 @@ function trackSpeedAtShot(ctx: VisibilityContext, shot: FlatShot, tickrate: numb
 }
 
 /** 
- * 急停成功率（移动后停稳口径）：对每个 combat burst 第一发，若开枪前确实在移动则计一次尝试，
- * 开枪时速度已降到武器站立精准阈值内则计一次成功。只把 attempt=true 的样本放入分母。
+ * 急停成功率（移动后停稳口径）：对每个交火开火段第一发，若开枪前确实在移动则计一次尝试，
+ * 开枪时速度已降到武器判定用最大移动速度约 34% 以下则计一次成功。只把 attempt=true 的样本放入分母。
  */
 function counterStrafeRate(ctx: VisibilityContext, combatBursts: FlatShot[][], weapon: string, tickrate: number): RateSample {
   const threshold = counterStrafeThresholdForWeapon(weapon).maxSpeed;
@@ -492,7 +523,7 @@ export function buildMechanicsSignals(
   const damages = activeDamages(pkg);
   const allZeroVelocity = shots.length > 0 && shots.every((shot) => shot.vx === 0 && shot.vy === 0);
 
-  // duels 按 killerIndex + weapon 归并，供 TTK / one tap / 反应 / 预瞄 join。
+  // duels 按 killerIndex + weapon 归并，供击杀耗时 / one tap / 反应 / 预瞄 join。
   const duelsByKey = new Map<string, DuelRecord[]>();
   for (const duel of duels) {
     const key = `${duel.killerIndex}:${normalizeWeapon(duel.weapon)}`;
@@ -523,7 +554,7 @@ export function buildMechanicsSignals(
     const cleanPlayerDuels = playerDuels.filter(isCleanGunfightKill);
     const cleanCombatBursts = combatBursts.filter((burst) => isCleanBurstForMechanics(burst, playerDuels));
 
-    // 首发命中率（combat burst 第一发）
+    // 首发命中率（交火开火段第一发）
     const firstShotHit = rate(
       cleanCombatBursts.filter((burst) => hasDamageMatch(damages, burst[0]!)).length,
       cleanCombatBursts.length
@@ -544,7 +575,7 @@ export function buildMechanicsSignals(
     const oneTapCandidates = cleanFullHp.filter(isOneTapEligible);
     const oneTap = rate(oneTapCandidates.filter((duel) => duel.oneShotKill).length, oneTapCandidates.length);
 
-    // TTK 中位（lethal burst 第一枪 → 击杀）
+    // 击杀耗时中位（击杀开火段第一枪 → 击杀）
     const ttkSamples = cleanPlayerDuels
       .map((duel) => duel.ttkMs)
       .filter((value): value is number => value != null);
