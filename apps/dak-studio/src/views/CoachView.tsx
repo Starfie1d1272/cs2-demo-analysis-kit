@@ -140,7 +140,7 @@ export function CoachView({
   );
 
   return (
-    <div className="stu-view">
+    <div className="stu-view stu-coach-view">
       <header className="stu-view-header">
         <div>
           <h1>教练工作台</h1>

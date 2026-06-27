@@ -145,10 +145,18 @@ export function AssetsPanel({ entries, onLibraryChanged, onNotice = () => {} }: 
     const inLib = libraryMaps.includes(map);
     const inReq = requiredTrisMapNames.includes(map);
     let source: string;
-    if (inLib && inReq) source = "二者都需要";
-    else if (inReq) source = "官方赛事需要";
-    else source = "资料库需要";
-    return { map, installed, source, isOfficial: inReq };
+    let sourceHint: string;
+    if (inLib && inReq) {
+      source = "资料库 + 官方赛事";
+      sourceHint = "你的资料库里有这张图，官方赛事包也需要它";
+    } else if (inReq) {
+      source = "官方赛事包";
+      sourceHint = "内置赛事/示例资产需要这张图的墙体数据";
+    } else {
+      source = "当前资料库";
+      sourceHint = "你的资料库里有这张图，相关分析会用到墙体数据";
+    }
+    return { map, installed, source, sourceHint, isOfficial: inReq };
   });
   const missingMaps = triRows.filter((r) => !r.installed);
 
@@ -287,6 +295,9 @@ export function AssetsPanel({ entries, onLibraryChanged, onNotice = () => {} }: 
           用于反应时间 / 预瞄的静态墙体 LOS。缺失只降级（仍保留视野锥/烟雾约束），不报错。
           {missingMaps.length > 0 && ` ${missingMaps.length} 张图缺 .tri，可一键补全。`}
         </p>
+        <p className="stu-muted">
+          “来源”表示这张图为什么出现在清单里：来自当前资料库、官方赛事包，或两边都需要。
+        </p>
         {triRows.length === 0 ? (
           <p className="stu-muted">资料库为空，且未检测到官方资产集所需的 .tri。</p>
         ) : (
@@ -298,7 +309,7 @@ export function AssetsPanel({ entries, onLibraryChanged, onNotice = () => {} }: 
                 <tr key={r.map}>
                   <td>{r.map}{r.isOfficial && <span className="stu-tag stu-tag-ok" style={{ marginLeft: 4 }}>官方</span>}</td>
                   <td>{r.installed ? <span className="stu-tag stu-tag-ok">已装</span> : <span className="stu-tag stu-tag-warn">缺失</span>}</td>
-                  <td className="stu-muted">{r.source}</td>
+                  <td className="stu-muted" title={r.sourceHint}>{r.source}</td>
                   <td>{entry ? bytesLabel(entry.size) : "—"}</td>
                   <td>{!r.installed && (
                     <button type="button" className="stu-button-sm" disabled={downloadingTri != null}

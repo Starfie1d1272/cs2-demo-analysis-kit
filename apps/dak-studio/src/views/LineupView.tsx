@@ -180,13 +180,6 @@ export function LineupView({
     return [...types].sort();
   }, [clusters]);
 
-  // 地图 hover 时自动翻到对应页（all hooks before early returns）
-  useEffect(() => {
-    if (!hoveredId || byMap.length === 0) return;
-    const idx = byMap[0]!.rows.findIndex((r) => r.id === hoveredId);
-    if (idx >= 0) setPage(Math.floor(idx / PAGE_SIZE));
-  }, [hoveredId, byMap]);
-
   // 列定义：必须在所有 early return 之前声明，否则 Hook 数量随 loading 态变化导致崩溃
   const lineupColumns = useMemo<DataTableColumn<LineupCluster>[]>(() => [
     {
@@ -203,7 +196,16 @@ export function LineupView({
       render: (c) => <span title={c.effectCalloutConfidence != null ? `confidence ${c.effectCalloutConfidence.toFixed(2)} · samples ${c.effectCalloutSamples ?? 0}` : undefined}>{c.effectCallout ? calloutName(c.mapName, c.effectCallout) : "—"}</span>,
     },
     { key: "time", label: "时间", format: (c) => c.throwTimeBucket ?? "—" },
-    { key: "rounds", label: "回合", format: (c) => `R${c.roundNumbers.slice(0, 3).join("/")}${c.roundNumbers.length > 3 ? "…" : ""}` },
+    {
+      key: "rounds",
+      label: "出现回合",
+      render: (c) => (
+        <span className="stu-lineup-rounds" title={`全部回合：${c.roundNumbers.map((n) => `R${n}`).join("、")}`}>
+          <b>{c.roundNumbers.length} 回合</b>
+          <small>{formatRoundNumbers(c.roundNumbers)}</small>
+        </span>
+      )
+    },
     { key: "count", label: "次数", numeric: true, sortable: true, sortValue: (c) => c.count, format: (c) => c.count },
     { key: "demoCount", label: "场次", numeric: true, sortable: true, sortValue: (c) => c.demoCount, format: (c) => c.demoCount },
     {
@@ -476,4 +478,10 @@ export function LineupView({
       </div>
     </div>
   );
+}
+
+function formatRoundNumbers(roundNumbers: number[]): string {
+  const sorted = [...new Set(roundNumbers)].sort((a, b) => a - b);
+  const head = sorted.slice(0, 5).map((n) => `R${n}`).join(" / ");
+  return sorted.length > 5 ? `${head} / …` : head || "—";
 }

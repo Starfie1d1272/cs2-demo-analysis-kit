@@ -89,6 +89,9 @@ export function HomeView({ entries, onOpenMatch, onGoPlayers, onGoLibrary, ident
   const [matchStats, setMatchStats] = useState<PlayerMatchStatsFact[] | null>(null);
   const [trailModels, setTrailModels] = useState<OpeningTrailsModel[] | null>(null);
   const [homeTrailMap, setHomeTrailMap] = useState<string | null>(null);
+  const [homeTrailSide, setHomeTrailSide] = useState<"t" | "ct">("t");
+  const [homeTrailShowTrails, setHomeTrailShowTrails] = useState(true);
+  const [homeTrailShowGrenades, setHomeTrailShowGrenades] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pinned, setPinned] = useState<PinnedPlayer | null>(null);
   const [pinnedLoaded, setPinnedLoaded] = useState(false);
@@ -212,8 +215,9 @@ export function HomeView({ entries, onOpenMatch, onGoPlayers, onGoLibrary, ident
   const homeTrailRounds = useMemo(
     () => (trailModels ?? [])
       .filter((model) => model.available && model.mapName === homeTrailMap)
-      .flatMap((model) => model.rounds),
-    [trailModels, homeTrailMap]
+      .flatMap((model) => model.rounds)
+      .filter((round) => round.side === homeTrailSide),
+    [trailModels, homeTrailMap, homeTrailSide]
   );
 
   // 自适应身份：从逐场队属推「我的队伍」（队名相同即可，占位名→无队伍）+ 战绩。
@@ -401,20 +405,57 @@ export function HomeView({ entries, onOpenMatch, onGoPlayers, onGoLibrary, ident
             <div className="stu-card">
               <div className="stu-home-trail-head">
                 <h3>开局动线{homeTrailMap && <span className="stu-card-sub stu-dim"> · 最近 {homeTrailEntries.length} 场</span>}</h3>
-                {homeTrailMapOptions.length > 1 && (
-                  <select className="stu-select stu-home-trail-select" value={homeTrailMap ?? ""} onChange={(e) => setHomeTrailMap(e.target.value || null)}>
-                    {homeTrailMapOptions.map(([map, meta]) => (
-                      <option key={map} value={map}>{map}（{meta.count} 场）</option>
+                <div className="stu-home-trail-controls">
+                  {homeTrailMapOptions.length > 1 && (
+                    <select className="stu-select stu-home-trail-select" value={homeTrailMap ?? ""} onChange={(e) => setHomeTrailMap(e.target.value || null)}>
+                      {homeTrailMapOptions.map(([map, meta]) => (
+                        <option key={map} value={map}>{map}（{meta.count} 场）</option>
+                      ))}
+                    </select>
+                  )}
+                  <div className="stu-side-toggle" role="radiogroup" aria-label="主页开局动线阵营">
+                    {(["t", "ct"] as const).map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        role="radio"
+                        aria-checked={homeTrailSide === value}
+                        className={homeTrailSide === value ? "stu-chip stu-chip-active" : "stu-chip"}
+                        onClick={() => setHomeTrailSide(value)}
+                      >
+                        {value.toUpperCase()}
+                      </button>
                     ))}
-                  </select>
-                )}
+                  </div>
+                  <div className="stu-speed-toggle" role="group" aria-label="主页开局动线图层">
+                    <button
+                      type="button"
+                      className={homeTrailShowTrails ? "stu-chip stu-chip-active" : "stu-chip"}
+                      onClick={() => setHomeTrailShowTrails((value) => !value)}
+                    >
+                      轨迹
+                    </button>
+                    <button
+                      type="button"
+                      className={homeTrailShowGrenades ? "stu-chip stu-chip-active" : "stu-chip"}
+                      onClick={() => setHomeTrailShowGrenades((value) => !value)}
+                    >
+                      道具
+                    </button>
+                  </div>
+                </div>
               </div>
               {trailModels == null && homeTrailEntries.length > 0 ? (
                 <div className="stu-loading">提取 {homeTrailEntries.length} 场开局动线…</div>
               ) : homeTrailMap && homeTrailRounds.length > 0 ? (
-                <HomeOpeningTrails mapName={homeTrailMap} rounds={homeTrailRounds} />
+                <HomeOpeningTrails
+                  mapName={homeTrailMap}
+                  rounds={homeTrailRounds}
+                  showTrails={homeTrailShowTrails}
+                  showGrenades={homeTrailShowGrenades}
+                />
               ) : (
-                <p className="stu-dim">最近 {OPENING_MATCH_LIMIT} 场同图比赛没有长枪局起手轨迹（缺回放流或无长枪局）。完整动线见个人实验室 · 开局动线。</p>
+                <p className="stu-dim">最近 {OPENING_MATCH_LIMIT} 场同图比赛没有 {homeTrailSide.toUpperCase()} 方长枪局起手轨迹（缺回放流或无长枪局）。完整动线见个人实验室 · 开局动线。</p>
               )}
             </div>
 
@@ -510,7 +551,17 @@ function buildPracticeCards(insights: PlayerSeasonInsights): PracticeCard[] {
   ].filter((card) => card.evidence || card.count !== "0/0 局");
 }
 
-function HomeOpeningTrails({ mapName, rounds }: { mapName: string; rounds: OpeningTrailRound[] }) {
+function HomeOpeningTrails({
+  mapName,
+  rounds,
+  showTrails,
+  showGrenades,
+}: {
+  mapName: string;
+  rounds: OpeningTrailRound[];
+  showTrails: boolean;
+  showGrenades: boolean;
+}) {
   const [time, setTime] = useState(OPENING_WINDOW_SECONDS);
   const [playing, setPlaying] = useState(false);
   const rafRef = useRef<number | null>(null);
@@ -583,7 +634,14 @@ function HomeOpeningTrails({ mapName, rounds }: { mapName: string; rounds: Openi
 
   return (
     <div className="stu-home-trail-player">
-      <RadarTrails mapName={mapName} trails={trails} grenades={grenades} trailOpacity={0.52} />
+      <RadarTrails
+        mapName={mapName}
+        trails={trails}
+        grenades={grenades}
+        showTrails={showTrails}
+        showGrenades={showGrenades}
+        trailOpacity={0.52}
+      />
       <div className="stu-trail-playbar stu-home-trail-playbar">
         <button type="button" className="stu-icon-button" onClick={() => (time >= OPENING_WINDOW_SECONDS ? restart() : setPlaying((v) => !v))} aria-label={playing ? "暂停" : "播放"}>
           {playing ? <Pause size={15} /> : <Play size={15} />}

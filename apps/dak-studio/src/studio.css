@@ -839,6 +839,14 @@ body {
   margin-bottom: 0;
 }
 
+.stu-home-trail-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+}
+
 .stu-home-trail-select {
   width: min(220px, 100%);
 }
@@ -3362,6 +3370,30 @@ td.stu-heat-cell.stu-heat-neutral {
   outline-offset: -1px;
 }
 
+.stu-lineup-rounds {
+  display: grid;
+  gap: 2px;
+  min-width: 96px;
+}
+
+.stu-lineup-rounds b,
+.stu-lineup-rounds small {
+  display: block;
+  white-space: nowrap;
+}
+
+.stu-lineup-rounds b {
+  color: var(--dak-fg);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.stu-lineup-rounds small {
+  color: var(--dak-fg-dim);
+  font-family: var(--dak-mono);
+  font-size: 10.5px;
+}
+
 /* 可点击排序的表头 */
 .stu-col-sortable {
   cursor: pointer;
@@ -3404,6 +3436,10 @@ td.stu-heat-cell.stu-heat-neutral {
   background: var(--dak-panel);
   color: var(--dak-fg);
   padding: 0 8px;
+}
+
+.stu-coach-view {
+  gap: 14px;
 }
 
 /* ── 教练·战术聚类 PatternExplorer（列表 / 常驻回放 / 证据） ─────────────── */
@@ -3511,6 +3547,7 @@ td.stu-heat-cell.stu-heat-neutral {
   width: 100%;
   min-width: 0;
   justify-self: center;
+  container-type: inline-size;
 }
 
 .stu-pe-replay-bar {
@@ -3543,9 +3580,12 @@ td.stu-heat-cell.stu-heat-neutral {
   display: grid;
   gap: 12px;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .stu-pe-summary {
+  min-width: 0;
   padding: 14px;
   border: 1px solid var(--dak-border);
   border-radius: var(--stu-radius);
@@ -3572,6 +3612,7 @@ td.stu-heat-cell.stu-heat-neutral {
 }
 
 .stu-pe-stats > div {
+  min-width: 0;
   padding: 7px 10px;
   border-radius: var(--stu-radius-sm);
   background: var(--dak-bg-subtle);
@@ -3580,6 +3621,7 @@ td.stu-heat-cell.stu-heat-neutral {
 .stu-pe-stats dt {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
   font-size: 10.5px;
   color: var(--dak-fg-dim);
@@ -3670,6 +3712,72 @@ td.stu-heat-cell.stu-heat-neutral {
   .stu-coach-pattern-explorer {
     height: calc(100dvh - 130px);
     min-height: 600px;
+  }
+}
+
+@media (min-width: 1041px) and (max-width: 1800px) {
+  .stu-coach-pattern-explorer {
+    height: auto;
+    min-height: 0;
+    align-items: start;
+  }
+
+  .stu-pe-list,
+  .stu-pe-replay-main {
+    height: max(360px, calc(100dvh - 390px));
+  }
+
+  .stu-pe-detail {
+    align-self: start;
+  }
+}
+
+@container (max-width: 980px) {
+  .stu-pe-replay-frame .dak-replay-layout {
+    grid-template-areas:
+      "stage"
+      "controls"
+      "roster-left"
+      "roster-right";
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .stu-pe-replay-frame .dak-replay-controlbar,
+  .stu-pe-replay-frame .dak-replay-togglebar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stu-pe-replay-frame .dak-replay-statusline {
+    justify-content: flex-start;
+  }
+
+  .stu-pe-replay-frame .dak-replay-stage {
+    min-width: 0;
+    width: min(100%, clamp(300px, calc(100dvh - 430px), 620px));
+  }
+}
+
+@media (max-height: 820px) and (min-width: 1041px) {
+  .stu-coach-view {
+    gap: 10px;
+  }
+
+  .stu-coach-view .stu-view-header p {
+    display: none;
+  }
+
+  .stu-coach-view > .stu-subtabs {
+    margin-bottom: 4px;
+  }
+
+  .stu-pe-side-toggle {
+    margin-bottom: 4px;
+  }
+
+  .stu-coach-pattern-explorer {
+    margin-top: 8px;
+    min-height: 360px;
   }
 }
 
