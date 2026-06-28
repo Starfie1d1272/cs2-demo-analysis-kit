@@ -1,10 +1,11 @@
 import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Radar, Settings, Swords, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { bulkUpdateTags, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoTags, type StudioDemoEntry } from "./lib/library";
-import { EMPTY_SCOPE, applyScope, type CohortScopeState } from "./components/CohortScope";
+import { CohortScope, EMPTY_SCOPE, applyScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
 import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems, triggerWindowsDropCapture, type ExportedDemoFile } from "./lib/dem";
 import { parseTags } from "./lib/tags";
-import { pruneOrphanSeries } from "./lib/series";
+import { listSeriesRecords, pruneOrphanSeries, type StudioSeriesRecord } from "./lib/series";
+import { listEventRecords, type StudioEventRecord } from "./lib/events";
 import { importEventAssetArchive } from "./lib/event-assets";
 import { APP_VERSION, checkForUpdateOnChannel, type UpdateChannel, type UpdateInfo } from "./lib/update";
 import { checkForUpdateViaBridge } from "./lib/updater-bridge";
@@ -88,6 +89,8 @@ export function App() {
   const [importing, setImporting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [scope, setScope] = useState<CohortScopeState>(EMPTY_SCOPE);
+  const [eventRecords, setEventRecords] = useState<StudioEventRecord[]>([]);
+  const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
   const [identityState, setIdentityState] = useState<IdentityStoreState>({ version: 0, mappings: [], teamRenames: {} });
   // 导入标签输入放在 App：全窗口拖拽导入也要带上
   const [importTagsRaw, setImportTagsRaw] = useState("");
@@ -120,10 +123,21 @@ export function App() {
     setShowLatestMsg(false);
   }
 
+  const eventScopes = useMemo<CohortScopeEvent[]>(() => {
+    const seriesById = new Map(seriesRecords.map((series) => [series.id, series]));
+    return eventRecords
+      .map((event) => ({
+        id: event.id,
+        name: event.name,
+        entryIds: [...new Set(event.seriesIds.flatMap((id) => seriesById.get(id)?.entryIds ?? []))]
+      }))
+      .filter((event) => event.entryIds.length > 0);
+  }, [eventRecords, seriesRecords]);
+
   // 稳定数组标识：避免 App 无关重渲染触发档案/排行榜重新聚合
   const scopedEntries = useMemo(
-    () => applyScope(entries, scope),
-    [entries, scope]
+    () => applyScope(entries, scope, eventScopes),
+    [entries, scope, eventScopes]
   );
   const identityOptions = useMemo<IdentityOptions | undefined>(
     () => identityState.version > 0
@@ -132,17 +146,24 @@ export function App() {
     [identityState.version, identityState.mappings, identityState.teamRenames]
   );
 
+  const refreshEventRecords = useCallback(async () => {
+    const [nextEvents, nextSeries] = await Promise.all([listEventRecords(), listSeriesRecords()]);
+    setEventRecords(nextEvents);
+    setSeriesRecords(nextSeries);
+  }, []);
+
   useEffect(() => {
     listDemoEntries()
       .then(async (loaded) => {
         setEntries(loaded);
         // 启动时清理历史遗留的孤儿系列赛（删过 demo 但 record 残留，会造成 records>suggestions 计数错位）。
         await pruneOrphanSeries(new Set(loaded.map((entry) => entry.id))).catch(() => 0);
+        await refreshEventRecords();
       })
       .catch((err) => setNotice(`读取本地资料库失败：${err instanceof Error ? err.message : String(err)}`));
     doCheckUpdate();
     void loadIdentityState().then(setIdentityState);
-  }, []);
+  }, [refreshEventRecords]);
 
   const importFiles = useCallback(async (files: Iterable<File | ExportedDemoFile>, tags: string[] = [], initialErrors: string[] = []) => {
     const fileList = [...files];
@@ -236,6 +257,7 @@ export function App() {
       const existing = await listDemoEntries();
       const result = await importEventAssetArchive(bytes, existing, builtin.slug, { onProgress: setNotice });
       setEntries(await listDemoEntries());
+      await refreshEventRecords();
       setNotice(`已载入「${result.event.event.name}」：匹配 ${result.event.matchedMaps} 图${result.errors.length ? `；${result.errors.length} 图失败` : ""}`);
     } catch (err) {
       setNotice(`载入失败：${err instanceof Error ? err.message : String(err)}`);
@@ -492,6 +514,15 @@ export function App() {
               ✕
             </button>
           </div>
+        )}
+        {entries.length > 0 && view !== "home" && view !== "library" && view !== "match" && view !== "management" && (
+          <CohortScope
+            entries={entries}
+            scope={scope}
+            onChange={setScope}
+            teamRenames={identityState.teamRenames}
+            events={eventScopes}
+          />
         )}
         {view === "home" && (
           <HomeView

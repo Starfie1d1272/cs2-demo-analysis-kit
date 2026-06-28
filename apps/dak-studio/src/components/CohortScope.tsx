@@ -17,6 +17,8 @@ import { displayTeamName, teamRenameGroups } from "../lib/identity";
  *   重选 demo。
  */
 export interface CohortScopeState {
+  /** 语料层·赛事；空数组 = 全部 demo。 */
+  eventIds: string[];
   /** 语料层·地图；空数组 = 不按地图过滤。 */
   maps: string[];
   /** 语料层·标签（任一命中即可）；空数组 = 不按标签过滤。 */
@@ -27,16 +29,27 @@ export interface CohortScopeState {
   excludedIds: string[];
 }
 
-export const EMPTY_SCOPE: CohortScopeState = { maps: [], tags: [], teams: [], excludedIds: [] };
+export const EMPTY_SCOPE: CohortScopeState = { eventIds: [], maps: [], tags: [], teams: [], excludedIds: [] };
+
+export interface CohortScopeEvent {
+  id: string;
+  name: string;
+  entryIds: string[];
+}
 
 /** 只按语料层（地图/标签/排除）窄化 demo 集合；队伍是透镜，不在此过滤。 */
 export function applyScope(
   entries: StudioDemoEntry[],
-  scope: CohortScopeState
+  scope: CohortScopeState,
+  events: CohortScopeEvent[] = []
 ): StudioDemoEntry[] {
   const excluded = new Set(scope.excludedIds);
+  const scopedEventIds = scope.eventIds.length > 0 && events.length > 0
+    ? new Set(events.filter((event) => scope.eventIds.includes(event.id)).flatMap((event) => event.entryIds))
+    : null;
   return entries.filter(
     (entry) =>
+      (!scopedEventIds || scopedEventIds.has(entry.id)) &&
       (scope.maps.length === 0 || scope.maps.includes(entry.meta.mapName)) &&
       (scope.tags.length === 0 || entry.tags.some((tag) => scope.tags.includes(tag))) &&
       !excluded.has(entry.id)
@@ -48,9 +61,10 @@ export interface CohortScopeProps {
   scope: CohortScopeState;
   onChange: (scope: CohortScopeState) => void;
   teamRenames?: Record<string, string>;
+  events?: CohortScopeEvent[];
 }
 
-export function CohortScope({ entries, scope, onChange, teamRenames = {} }: CohortScopeProps) {
+export function CohortScope({ entries, scope, onChange, teamRenames = {}, events = [] }: CohortScopeProps) {
   const [expanded, setExpanded] = useState(false);
   const maps = useMemo(() => [...new Set(entries.map((e) => e.meta.mapName))].sort(), [entries]);
   const tags = useMemo(() => [...new Set(entries.flatMap((e) => e.tags))].sort(), [entries]);
@@ -58,9 +72,15 @@ export function CohortScope({ entries, scope, onChange, teamRenames = {} }: Coho
     () => teamRenameGroups(entries.map((e) => ({ teamA: e.meta.teamAName, teamB: e.meta.teamBName })), teamRenames),
     [entries, teamRenames]
   );
-  const effective = applyScope(entries, scope);
+  const effective = applyScope(entries, scope, events);
   const filtered = effective.length !== entries.length;
 
+  const toggleEvent = (eventId: string) => {
+    const next = scope.eventIds.includes(eventId)
+      ? scope.eventIds.filter((id) => id !== eventId)
+      : [...scope.eventIds, eventId];
+    onChange({ ...scope, eventIds: next });
+  };
   const toggleMap = (map: string) => {
     const next = scope.maps.includes(map) ? scope.maps.filter((m) => m !== map) : [...scope.maps, map];
     onChange({ ...scope, maps: next });
@@ -87,6 +107,28 @@ export function CohortScope({ entries, scope, onChange, teamRenames = {} }: Coho
           <Filter size={13} />
           聚合范围 <b>{effective.length}</b>/{entries.length} 场
         </span>
+        {events.length > 0 && (
+          <div className="stu-chip-row">
+            <button
+              type="button"
+              className={scope.eventIds.length === 0 ? "stu-chip stu-chip-active" : "stu-chip"}
+              onClick={() => onChange({ ...scope, eventIds: [] })}
+            >
+              全部 demo
+            </button>
+            {events.map((event) => (
+              <button
+                key={event.id}
+                type="button"
+                className={scope.eventIds.includes(event.id) ? "stu-chip stu-chip-active" : "stu-chip"}
+                title={`${event.entryIds.length} 场`}
+                onClick={() => toggleEvent(event.id)}
+              >
+                {event.name}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="stu-chip-row">
           <button
             type="button"
