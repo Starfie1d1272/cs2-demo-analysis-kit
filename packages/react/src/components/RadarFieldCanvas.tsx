@@ -1,7 +1,7 @@
 /**
  * RadarFieldCanvas —— 雷达覆盖场渲染（描述性，不上评分）。
  *
- * 吃聚合后的 RadarField（联赛基线或单队），逐秒 scrubber + 模式切换 + 队伍−联赛差分。
+ * 吃聚合后的 RadarField（赛事基线或单队），逐秒 scrubber + 模式切换 + 队伍−基线差分。
  * 渲染移植自已验证原型（coverage-render）：每格柔化径向 blob，顺序场叠加成热力、
  * 差分场红↑/蓝↓。合成/归一化在 @cs2dak/presentation（react 不跑分析），这里只画。
  *
@@ -41,7 +41,7 @@ function heatBand(t: number): string {
 
 export interface RadarFieldCanvasProps {
   field: RadarField;
-  /** 非空 = 差分模式（队伍 − 联赛基线）：防守漏洞 / 进攻防守倾向。 */
+  /** 非空 = 差分模式（队伍 − 赛事地图基线）：防守漏洞 / 进攻防守倾向。 */
   baseline?: RadarField | null;
   map: { name: string; radarImageUrl?: string | null; lowerRadarImageUrl?: string | null };
 }
@@ -114,7 +114,7 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
   const legend = reveal && sequential
     ? "亮 = 有视线覆盖 · 暗 = 盲区（空虚区）"
     : isDiff
-      ? "红 = 高于联赛平均 · 蓝 = 低于平均"
+      ? "红 = 高于赛事基线 · 蓝 = 低于基线"
       : mode === "info-diff"
         ? "暖 = T 信息优势 · 冷 = CT 预警"
         : mode === "contested"
@@ -170,7 +170,7 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
         {!calibration && <div className="dak-heatmap-empty">该地图暂无雷达标定</div>}
         <div className="dak-heatmap-legend">
           <span>
-            {field.scope.kind === "team" ? field.scope.team : "赛事基线"}
+            {field.scope.kind === "team" ? field.scope.team : "赛事地图基线"}
             <small> · {field.scope.roundCount} 长枪局{isDiff ? ` vs 联赛 ${baseline!.scope.roundCount}` : ""}</small>
           </span>
           <span className="dak-heatmap-legend-scale">{legend}</span>

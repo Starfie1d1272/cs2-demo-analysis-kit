@@ -243,18 +243,22 @@ one tap 只对可一枪满血终结的武器展示，Glock/USP/M4 等不展示�
 | maps 3D callout 网格（calloutAt） | maps | `@cs2dak/maps` | ✅ 2026-06-16 |
 | 地面掉落拆弹器标注 | 2 | replay | ✅ 2026-06-16 |
 | 机制跨场聚合从 presentation 迁往 cohort | 架构债 | presentation → cohort | ⬜ 低优先 |
-| 雷达场子系统（视野覆盖 + 密度场 + A·B 差分） | 11 | core + maps + react + studio | ⬜ 0.8（见 §11） |
+| 雷达场子系统（视野覆盖 + 密度场 + A·B 差分） | 11 | core + maps + react + studio | 🟡 首版已落地，待产品验证（见 §11） |
 | 数据驱动地图控制价值（取代 scalar v0 gate） | 11 | core | ⬜ 0.9+（待足够语料，见 §11） |
 
-下一个重点（0.8）：雷达场子系统（§11，想法 1+5 合一）+ 进游戏看回合 + BP 策略洞察 + 战术板 MVP；
+下一个重点（0.8）：雷达场首版产品验证/打磨（§11）+ 进游戏看回合 + BP 策略洞察 + 战术板 MVP；
 模块 8 完整战术路线（全程 zone 动线链，§8）顺延；其余缺口按需排期。
 
 ---
 
-## 11. 雷达场子系统 + MapControl 演进（0.8 规划，2026-06-26 定框架）
+## 11. 雷达场子系统 + MapControl 演进（0.8 首版落地，2026-06-27 更新）
 
 **回答**：把所有空间分析（防守盲区、活动/击杀/死亡范围、换人前后位置变化、跨赛事风格）
 收敛成**一个可复用原语**，而非每个功能各画一套雷达。
+
+当前状态：`RadarField` 合同、core 计算、maps 栅格、presentation 合成、React 画布、Studio「控图」
+入口与 per-match 缓存已进产品路径；仍需真实赛事语料做 Windows 桌面首开性能、缓存命中、队伍/基线
+解释与视觉语言验证。落地细节见 [`../research/map-control-model.md §11`](../research/map-control-model.md)。
 
 ### 一套原语，四个轴
 

@@ -3,7 +3,7 @@
  *
  * per-match 贡献（[teamA, teamB] 两份加性场）持久化到 blobs 命名空间——字节存储，
  * IndexedDB / 桌面 SQLite 后端都按字节处理（不走 records 的 JSON 序列化，Int32Array 无损）。
- * 因为场加性：换 scope（联赛基线 / 各队）复用同一批 per-match 缓存，只在内存重聚合（毫秒）；
+ * 因为场加性：换 scope（赛事基线 / 各队）复用同一批 per-match 缓存，只在内存重聚合（毫秒）；
  * 首次算某图（worker 池并行逐 tick LOS）一次，之后所有 scope、所有会话秒开。
  *
  * 缓存 key 不含版本号，版本写进 blob header；读时校验 computeVersion/calibrationVersion
@@ -17,6 +17,7 @@ import { getStorage } from "./storage";
 
 const FIELD_BASES: RadarFieldBase[] = ["ctVis", "tVis", "ctPres", "tPres"];
 const SERIAL_FORMAT = 1;
+const RADAR_FIELD_LOAD_CONCURRENCY = 2;
 
 const fieldBlobs = getStorage().blobs("radar_field");
 // 会话内已反序列化的场，避免重复读盘 / 解码。
@@ -163,19 +164,35 @@ export interface RadarScopeRequest {
   onProgress?: (done: number, total: number) => void;
 }
 
-/** 聚合一个 scope 的雷达场（联赛基线或单队）。worker 池并发算缺失场，命中缓存秒回。 */
+async function mapLimit<T, R>(
+  items: T[],
+  limit: number,
+  run: (item: T) => Promise<R>
+): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (;;) {
+      const index = next++;
+      if (index >= items.length) return;
+      out[index] = await run(items[index]!);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+/** 聚合一个 scope 的雷达场（赛事基线或单队）。worker 池并发算缺失场，命中缓存秒回。 */
 export async function buildScopeRadarField(req: RadarScopeRequest): Promise<RadarField | null> {
   const economy = req.economy ?? "gun";
   const total = req.matchIds.length;
   let done = 0;
-  const perMatch = await Promise.all(
-    req.matchIds.map(async (id) => {
-      const fields = await getMatchRadarFields(id, economy);
-      done += 1;
-      req.onProgress?.(done, total);
-      return fields;
-    })
-  );
+  const perMatch = await mapLimit(req.matchIds, RADAR_FIELD_LOAD_CONCURRENCY, async (id) => {
+    const fields = await getMatchRadarFields(id, economy);
+    done += 1;
+    req.onProgress?.(done, total);
+    return fields;
+  });
   const contributions: RadarField[] = [];
   for (const fields of perMatch) {
     for (const f of fields) {

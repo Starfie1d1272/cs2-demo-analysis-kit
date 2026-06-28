@@ -23,7 +23,7 @@ export interface RadarFieldGrid {
 }
 
 export interface RadarFieldScope {
-  /** league = 赛事全量基线；team = 单队（identity 归并后的显示名）。 */
+  /** league = 赛事/当前范围基线；team = 单队（identity 归并后的显示名）。 */
   kind: "league" | "team";
   team: string | null;
   /** gun = 长枪局（双方 full/conversion）；all = 全部回合。 */
