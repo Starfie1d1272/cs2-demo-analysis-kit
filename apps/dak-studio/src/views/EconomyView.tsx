@@ -96,8 +96,8 @@ const TEAM_DETAIL_COLUMNS: DataTableColumn<TeamEconomySummary>[] = [
   { key: "record", label: "Won - Lost", numeric: true, format: (t) => `${t.roundWins} - ${t.rounds - t.roundWins}` },
   { key: "rw", label: "RW%", title: "回合胜率", numeric: true, sortable: true, sortValue: (t) => t.roundWinPercent, heat: (t) => toneForPercent(t.roundWinPercent), render: (t) => renderPercentCell(t.roundWinPercent, t.roundWins, t.rounds) },
   { key: "pistol", label: "Pistol", title: "手枪局胜率", numeric: true, sortable: true, sortValue: (t) => t.pistol.winRatePercent, heat: (t) => toneForPercent(t.pistol.winRatePercent), render: (t) => renderPercentCell(t.pistol.winRatePercent, t.pistol.wins, t.pistol.rounds) },
-  { key: "conv", label: "R2 Conv", title: "赢手枪局后拿下第二局", numeric: true, sortable: true, sortValue: (t) => t.round2.conversionPercent, heat: (t) => toneForPercent(t.round2.conversionPercent), render: (t) => renderPercentCell(t.round2.conversionPercent, t.round2.conversionWins, t.round2.conversionRounds) },
-  { key: "break", label: "R2 Break", title: "输手枪局后扳回第二局", numeric: true, sortable: true, sortValue: (t) => t.round2.breakRatePercent, heat: (t) => toneForPercent(t.round2.breakRatePercent), render: (t) => renderPercentCell(t.round2.breakRatePercent, t.round2.breakWins, t.round2.breakRounds) },
+  { key: "conv", label: "R2 Conv", title: "R2 Conv", numeric: true, sortable: true, sortValue: (t) => t.round2.conversionPercent, heat: (t) => toneForPercent(t.round2.conversionPercent), render: (t) => renderPercentCell(t.round2.conversionPercent, t.round2.conversionWins, t.round2.conversionRounds) },
+  { key: "break", label: "R2 Break", title: "R2 Break", numeric: true, sortable: true, sortValue: (t) => t.round2.breakRatePercent, heat: (t) => toneForPercent(t.round2.breakRatePercent), render: (t) => renderPercentCell(t.round2.breakRatePercent, t.round2.breakWins, t.round2.breakRounds) },
   ...(([[5, 4], [5, 3]] as const)).flatMap(([adv, dis]) => {
     const manFn = (t: TeamEconomySummary) => t.manAdvantage.states.find((s) => s.advantageAlive === adv && s.disadvantageAlive === dis) ?? null;
     return [
@@ -118,6 +118,7 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
   const best5v3 = bestManState(insights, "advantage", 5, 3);
   const best4v5 = bestManState(insights, "disadvantage", 5, 4);
   const best3v5 = bestManState(insights, "disadvantage", 5, 3);
+  const pistolConversion = aggregatePistolConversion(insights);
   const pistolBreak = aggregatePistolBreak(insights);
 
   return (
@@ -137,12 +138,12 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
           <div className="stu-econ-state-grid">
             <div className="stu-econ-state">
               <div>
-                <span>赢手枪局后拿下第二局</span>
+                <span>R2 Conv</span>
                 <b>{formatPercent(insights.pistolConversionPercent)}</b>
-                <small>手枪转化</small>
+                <small>{pistolConversion.wins}/{pistolConversion.total} 手枪转化</small>
               </div>
               <div>
-                <span>输手枪局后扳回第二局</span>
+                <span>R2 Break</span>
                 <b>{formatPercent(pistolBreak.percent)}</b>
                 <small>{pistolBreak.wins}/{pistolBreak.total} 反转换</small>
               </div>
@@ -237,6 +238,12 @@ function Callout({ label, value, detail, title }: { label: string; value: string
   );
 }
 
+function aggregatePistolConversion(insights: TournamentInsights): { wins: number; total: number; percent: number | null } {
+  const total = insights.teamPistols.reduce((sum, row) => sum + row.conversionRounds, 0);
+  const wins = insights.teamPistols.reduce((sum, row) => sum + row.conversionWins, 0);
+  return { wins, total, percent: total > 0 ? (wins / total) * 100 : null };
+}
+
 function aggregatePistolBreak(insights: TournamentInsights): { wins: number; total: number; percent: number | null } {
   const total = insights.teamPistols.reduce((sum, row) => sum + row.breakRounds, 0);
   const wins = insights.teamPistols.reduce((sum, row) => sum + row.breakWins, 0);
@@ -257,17 +264,17 @@ function bestManState(
       if (!state) return null;
       return mode === "advantage"
         ? {
-            teamName: team.teamName,
-            value: state.advantageConversionPercent,
-            wins: state.advantageWins,
-            total: state.advantageOpportunities
-          }
+          teamName: team.teamName,
+          value: state.advantageConversionPercent,
+          wins: state.advantageWins,
+          total: state.advantageOpportunities
+        }
         : {
-            teamName: team.teamName,
-            value: state.disadvantageConversionPercent,
-            wins: state.disadvantageWins,
-            total: state.disadvantageOpportunities
-          };
+          teamName: team.teamName,
+          value: state.disadvantageConversionPercent,
+          wins: state.disadvantageWins,
+          total: state.disadvantageOpportunities
+        };
     })
     .filter((row): row is { teamName: string; value: number | null; wins: number; total: number } => row != null && row.total > 0);
   return candidates.sort((a, b) => (b.value ?? -1) - (a.value ?? -1) || b.total - a.total)[0] ?? null;
