@@ -42,8 +42,8 @@ export function EconomyView({ allEntries, entries, scope, onGoLibrary, identityO
       <div className="stu-view">
         <EmptyState
           mark
-          title="还没有经济数据"
-          hint="先导入 demo，再查看经济矩阵、手枪转化和 eco 翻盘。"
+          title="还没有转化数据"
+          hint="先导入 demo，再查看手枪转化、人数优势转换和小枪翻盘。"
           action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
         />
       </div>
@@ -54,12 +54,12 @@ export function EconomyView({ allEntries, entries, scope, onGoLibrary, identityO
     <div className="stu-view">
       <header className="stu-view-header">
         <div>
-          <h1>经济与节奏</h1>
-          <p>跨场经济类型胜率矩阵、手枪局转化和 eco/semi 对 full 的破局。</p>
+          <h1>转化与节奏</h1>
+          <p>看队伍如何把优势变成回合胜利：手枪转化、5v4/5v3 转化、劣势翻盘和小枪破局。</p>
         </div>
       </header>
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
-      {!error && !insights && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的经济数据…</div>}
+      {!error && !insights && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的转化数据…</div>}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
       {insights && (
         <EconomyDashboard insights={insights} />
@@ -114,14 +114,17 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
   const bestBreak = [...insights.teamPistols].sort((a, b) => (b.breakRatePercent ?? -1) - (a.breakRatePercent ?? -1))[0] ?? null;
   const bestSmallBuy = [...insights.teamEconomySummaries].sort((a, b) => (b.smallBuyUpset.winRatePercent ?? -1) - (a.smallBuyUpset.winRatePercent ?? -1))[0] ?? null;
   const best5v4 = bestManState(insights, "advantage", 5, 4);
+  const best5v3 = bestManState(insights, "advantage", 5, 3);
   const best4v5 = bestManState(insights, "disadvantage", 5, 4);
 
   return (
     <div className="stu-econ-dashboard">
       <section className="stu-econ-hero">
         <MetricCard label="回合样本" value={String(insights.roundCount)} detail={`${insights.matchCount} 场 demo`} />
-        <MetricCard label="T 胜率" value={`${insights.tWinRatePercent.toFixed(1)}%`} detail={`CT ${insights.ctWinRatePercent.toFixed(1)}%`} tone={toneForPercent(insights.tWinRatePercent)} />
         <MetricCard label="手枪转化" value={formatPercent(insights.pistolConversionPercent)} detail="赢手枪后的下一回合" tone={toneForPercent(insights.pistolConversionPercent)} />
+        <MetricCard label="5v4 转化" value={best5v4 ? formatPercent(best5v4.value) : "—"} detail={best5v4 ? `${best5v4.teamName} · ${best5v4.wins}/${best5v4.total}` : "无样本"} tone={toneForPercent(best5v4?.value ?? null)} />
+        <MetricCard label="5v3 转化" value={best5v3 ? formatPercent(best5v3.value) : "—"} detail={best5v3 ? `${best5v3.teamName} · ${best5v3.wins}/${best5v3.total}` : "无样本"} tone={toneForPercent(best5v3?.value ?? null)} />
+        <MetricCard label="4v5 翻盘" value={best4v5 ? formatPercent(best4v5.value) : "—"} detail={best4v5 ? `${best4v5.teamName} · ${best4v5.wins}/${best4v5.total}` : "无样本"} tone={toneForPercent(best4v5?.value ?? null)} />
         <MetricCard label="小枪翻盘" value={bestSmallBuy ? formatPercent(bestSmallBuy.smallBuyUpset.winRatePercent) : "—"} detail={bestSmallBuy ? `${bestSmallBuy.teamName} · ${bestSmallBuy.smallBuyUpset.wins}/${bestSmallBuy.smallBuyUpset.opportunities}` : "无样本"} tone={toneForPercent(bestSmallBuy?.smallBuyUpset.winRatePercent ?? null)} title="Eco / 半起面对长枪局的胜率" />
       </section>
 
@@ -153,6 +156,7 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
             <Callout label="转化最好" value={bestConversion?.teamName ?? "—"} detail={bestConversion ? `${formatPercent(bestConversion.conversionPercent)} · ${bestConversion.conversionWins}/${bestConversion.conversionRounds}` : "无样本"} />
             <Callout label="反转换最好" value={bestBreak?.teamName ?? "—"} detail={bestBreak ? `${formatPercent(bestBreak.breakRatePercent)} · ${bestBreak.breakWins}/${bestBreak.breakRounds}` : "无样本"} />
             <Callout label="5v4 最稳" value={best5v4?.teamName ?? "—"} detail={best5v4 ? `${formatPercent(best5v4.value)} · ${best5v4.wins}/${best5v4.total}` : "无样本"} />
+            <Callout label="5v3 最稳" value={best5v3?.teamName ?? "—"} detail={best5v3 ? `${formatPercent(best5v3.value)} · ${best5v3.wins}/${best5v3.total}` : "无样本"} />
             <Callout label="4v5 最能翻" value={best4v5?.teamName ?? "—"} detail={best4v5 ? `${formatPercent(best4v5.value)} · ${best4v5.wins}/${best4v5.total}` : "无样本"} />
             <Callout label="小枪翻盘" value={bestSmallBuy?.teamName ?? "—"} detail={bestSmallBuy ? `${formatPercent(bestSmallBuy.smallBuyUpset.winRatePercent)} · ${bestSmallBuy.smallBuyUpset.wins}/${bestSmallBuy.smallBuyUpset.opportunities}` : "无样本"} title="Eco / 半起面对长枪局的胜率" />
           </div>
