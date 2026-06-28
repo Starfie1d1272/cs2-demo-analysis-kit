@@ -3,21 +3,19 @@ import type { SeasonLeaderboardModel } from "@cs2dak/contract";
 import { SeasonLeaderboard } from "@cs2dak/react";
 import { getSeasonSummary, type IdentityOptions } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";
-import { CohortScope, type CohortScopeState } from "../components/CohortScope";
+import type { CohortScopeState } from "../components/CohortScope";
 import { EmptyState } from "@cs2dak/react";
 
 export interface LeaderboardViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   scope: CohortScopeState;
-  onScopeChange: (scope: CohortScopeState) => void;
   onPlayerClick: (playerKey: string) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
-  teamRenames?: Record<string, string>;
 }
 
-export function LeaderboardView({ allEntries, entries, scope, onScopeChange, onPlayerClick, onGoLibrary, identityOptions, teamRenames = {} }: LeaderboardViewProps) {
+export function LeaderboardView({ allEntries, entries, scope, onPlayerClick, onGoLibrary, identityOptions }: LeaderboardViewProps) {
   const [model, setModel] = useState<SeasonLeaderboardModel | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,8 +52,6 @@ export function LeaderboardView({ allEntries, entries, scope, onScopeChange, onP
     );
   }
 
-  const scopePanel = <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />;
-
   return (
     <div className="stu-view">
       <header className="stu-view-header">
@@ -67,7 +63,6 @@ export function LeaderboardView({ allEntries, entries, scope, onScopeChange, onP
           </p>
         </div>
       </header>
-      {scopePanel}
       {error ? (
         <EmptyState variant="error" title="聚合失败" hint={error} />
       ) : entries.length === 0 ? (

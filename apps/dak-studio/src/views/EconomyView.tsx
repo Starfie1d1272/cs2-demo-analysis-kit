@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { formatPercent, type TournamentInsights } from "@cs2dak/presentation";
-import { CohortScope, type CohortScopeState } from "../components/CohortScope";
+import type { CohortScopeState } from "../components/CohortScope";
 import { DataTable, STUDIO_TABLE_CLASSES, EmptyState, type DataTableColumn, type HeatTone } from "@cs2dak/react";
 import { getTournamentInsights, type IdentityOptions } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";
@@ -9,13 +9,11 @@ export interface EconomyViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   scope: CohortScopeState;
-  onScopeChange: (scope: CohortScopeState) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
-  teamRenames?: Record<string, string>;
 }
 
-export function EconomyView({ allEntries, entries, scope, onScopeChange, onGoLibrary, identityOptions, teamRenames = {} }: EconomyViewProps) {
+export function EconomyView({ allEntries, entries, scope, onGoLibrary, identityOptions }: EconomyViewProps) {
   const [insights, setInsights] = useState<TournamentInsights | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,7 +58,6 @@ export function EconomyView({ allEntries, entries, scope, onScopeChange, onGoLib
           <p>跨场经济类型胜率矩阵、手枪局转化和 eco/semi 对 full 的破局。</p>
         </div>
       </header>
-      <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && !insights && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的经济数据…</div>}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}

@@ -12,8 +12,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { StudioDemoEntry } from "../lib/library";
 import { buildScopeRadarField } from "../lib/radar-field";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
-import { listEventRecords, type StudioEventRecord } from "../lib/events";
-import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 
 export interface RadarFieldViewProps {
   entries: StudioDemoEntry[];
@@ -21,45 +19,21 @@ export interface RadarFieldViewProps {
 }
 
 const LEAGUE = "__league__";
-const ALL_ENTRIES = "__all__";
 
 export function RadarFieldView({ entries, teamRenames = {} }: RadarFieldViewProps) {
-  const [events, setEvents] = useState<StudioEventRecord[]>([]);
-  const [series, setSeries] = useState<StudioSeriesRecord[]>([]);
-  const [eventId, setEventId] = useState<string>(ALL_ENTRIES);
-
-  useEffect(() => {
-    void Promise.all([listEventRecords(), listSeriesRecords()]).then(([nextEvents, nextSeries]) => {
-      setEvents(nextEvents);
-      setSeries(nextSeries);
-      if (nextEvents.length > 0) setEventId((current) => current === ALL_ENTRIES ? nextEvents[0]!.id : current);
-    });
-  }, [entries]);
-
-  const entryById = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);
-  const selectedEvent = events.find((event) => event.id === eventId) ?? null;
-  const eventEntries = useMemo(() => {
-    if (!selectedEvent) return entries;
-    const ids = new Set(
-      series
-        .filter((row) => selectedEvent.seriesIds.includes(row.id))
-        .flatMap((row) => row.entryIds)
-    );
-    return [...ids].flatMap((id) => entryById.get(id) ? [entryById.get(id)!] : []);
-  }, [selectedEvent, series, entries, entryById]);
   const maps = useMemo(() => {
     const set = new Map<string, number>();
-    for (const e of eventEntries) if (getMapCalibration(e.meta.mapName)) set.set(e.meta.mapName, (set.get(e.meta.mapName) ?? 0) + 1);
+    for (const e of entries) if (getMapCalibration(e.meta.mapName)) set.set(e.meta.mapName, (set.get(e.meta.mapName) ?? 0) + 1);
     return [...set.entries()].sort((a, b) => b[1] - a[1]);
-  }, [eventEntries]);
+  }, [entries]);
 
   const [mapName, setMapName] = useState<string | null>(null);
   const activeMap = mapName ?? maps[0]?.[0] ?? null;
   const [scopeSel, setScopeSel] = useState<string>(LEAGUE);
 
   const entriesOfMap = useMemo(
-    () => (activeMap ? eventEntries.filter((e) => e.meta.mapName === activeMap) : []),
-    [eventEntries, activeMap]
+    () => (activeMap ? entries.filter((e) => e.meta.mapName === activeMap) : []),
+    [entries, activeMap]
   );
   const teams = useMemo(
     () => teamRenameGroups(entriesOfMap.map((e) => ({ teamA: e.meta.teamAName, teamB: e.meta.teamBName })), teamRenames),
@@ -132,36 +106,11 @@ export function RadarFieldView({ entries, teamRenames = {} }: RadarFieldViewProp
         <div>
           <h3>控图覆盖场</h3>
           <p className="stu-muted">
-            基线 = {selectedEvent ? selectedEvent.name : "全部导入 demo"} 中 {activeMap} 的 {entriesOfMap.length} 场；
+            基线 = 当前全局范围中 {activeMap} 的 {entriesOfMap.length} 场；
             队伍视图 = 该队在这些场次里的贡献。
           </p>
         </div>
         <span className="stu-radar-field-badge">首次计算后会缓存</span>
-      </div>
-
-      <div className="stu-card stu-radar-field-scope" aria-label="赛事">
-        <span className="stu-muted">赛事</span>
-        {events.length === 0 ? (
-          <span className="stu-muted">暂无赛事记录，暂用全部导入 demo</span>
-        ) : (
-          events.map((event) => (
-            <button
-              key={event.id}
-              type="button"
-              className={eventId === event.id ? "stu-chip stu-chip-active" : "stu-chip"}
-              onClick={() => { setEventId(event.id); setMapName(null); setScopeSel(LEAGUE); }}
-            >
-              {event.name}
-            </button>
-          ))
-        )}
-        <button
-          type="button"
-          className={eventId === ALL_ENTRIES ? "stu-chip stu-chip-active" : "stu-chip"}
-          onClick={() => { setEventId(ALL_ENTRIES); setMapName(null); setScopeSel(LEAGUE); }}
-        >
-          全部导入
-        </button>
       </div>
 
       <div className="stu-subtabs" role="tablist" aria-label="地图">
@@ -185,7 +134,7 @@ export function RadarFieldView({ entries, teamRenames = {} }: RadarFieldViewProp
           type="button"
           className={scopeSel === LEAGUE ? "stu-chip stu-chip-active" : "stu-chip"}
           onClick={() => setScopeSel(LEAGUE)}
-          title={`${selectedEvent ? selectedEvent.name : "全部导入 demo"} · ${activeMap} · ${entriesOfMap.length} 场`}
+          title={`当前全局范围 · ${activeMap} · ${entriesOfMap.length} 场`}
         >
           赛事地图基线 <small>{entriesOfMap.length}</small>
         </button>

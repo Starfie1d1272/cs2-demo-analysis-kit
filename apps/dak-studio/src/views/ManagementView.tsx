@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SeasonCohortBundle } from "@cs2dak/contract";
-import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState } from "@cs2dak/react";
 import { AssetsPanel } from "../components/AssetsPanel";
 import { EventManager } from "../components/EventManager";
@@ -20,10 +19,7 @@ import {
 import type { StudioDemoEntry } from "../lib/library";
 
 export interface ManagementViewProps {
-  allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
-  scope: CohortScopeState;
-  onScopeChange: (scope: CohortScopeState) => void;
   identity: IdentityStoreState;
   onIdentityChange: (state: IdentityStoreState) => void;
   identityOptions?: IdentityOptions;
@@ -43,10 +39,7 @@ interface AuditRow {
 }
 
 export function ManagementView({
-  allEntries,
   entries,
-  scope,
-  onScopeChange,
   identity,
   onIdentityChange,
   identityOptions,
@@ -78,11 +71,11 @@ export function ManagementView({
     setBundle(null);
     setError(null);
     setSelected(new Set());
-    getSeasonSummary(entries, identityOptions, scope.teams)
+    getSeasonSummary(entries, identityOptions)
       .then((s) => { if (!cancelled) setBundle(s.bundle); })
       .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); });
     return () => { cancelled = true; };
-  }, [entries, identityOptions?.version, scope.teams]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entries, identityOptions?.version]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // 加载审计记录
   useEffect(() => {
@@ -93,8 +86,8 @@ export function ManagementView({
 
   // 唯一队伍名
   const teamGroups = useMemo(
-    () => teamRenameGroups(allEntries.map((entry) => ({ teamA: entry.meta.teamAName, teamB: entry.meta.teamBName })), teamRenames),
-    [allEntries, teamRenames]
+    () => teamRenameGroups(entries.map((entry) => ({ teamA: entry.meta.teamAName, teamB: entry.meta.teamBName })), teamRenames),
+    [entries, teamRenames]
   );
 
   const selectedList = bundle?.players.filter((p) => selected.has(p.playerKey)) ?? [];
@@ -269,12 +262,12 @@ export function ManagementView({
       </div>
 
       {tab === "assets" && (
-        <AssetsPanel entries={allEntries} onLibraryChanged={onLibraryChanged} onNotice={onNotice} />
+        <AssetsPanel entries={entries} onLibraryChanged={onLibraryChanged} onNotice={onNotice} />
       )}
       {tab === "events" && (
-        <EventManager entries={allEntries} onNotice={onNotice} onLibraryChanged={onLibraryChanged} onLoadBuiltin={onLoadBuiltin} />
+        <EventManager entries={entries} onNotice={onNotice} onLibraryChanged={onLibraryChanged} onLoadBuiltin={onLoadBuiltin} />
       )}
-      {tab === "identity" && allEntries.length === 0 && (
+      {tab === "identity" && entries.length === 0 && (
         <EmptyState
           mark
           title="还没有选手数据"
@@ -282,9 +275,8 @@ export function ManagementView({
           action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
         />
       )}
-      {tab === "identity" && allEntries.length > 0 && (
+      {tab === "identity" && entries.length > 0 && (
         <>
-      <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />
       <div className="stu-view-body stu-mgmt-layout">
         {/* ── 选手身份 ── */}
         <section className="stu-mgmt-players">

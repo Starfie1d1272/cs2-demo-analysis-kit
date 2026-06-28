@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState, DataTable, STUDIO_TABLE_CLASSES, type DataTableColumn } from "@cs2dak/react";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
@@ -24,8 +23,6 @@ type CoachTab = "patterns" | "playbook" | "playlist" | "anti";
 export interface CoachViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
-  scope: CohortScopeState;
-  onScopeChange: (scope: CohortScopeState) => void;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   teamRenames?: Record<string, string>;
@@ -43,8 +40,6 @@ const SIDE_LABEL: Record<string, string> = { t: "T 方", ct: "CT 方" };
 export function CoachView({
   allEntries,
   entries,
-  scope,
-  onScopeChange,
   onOpenMatch,
   onGoLibrary,
   teamRenames = {}
@@ -185,7 +180,6 @@ export function CoachView({
           </label>
         </div>
       </header>
-      <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />
       <div className="stu-subtabs" role="tablist" aria-label="教练工作台">
         {TABS.map((item) => (
           <button

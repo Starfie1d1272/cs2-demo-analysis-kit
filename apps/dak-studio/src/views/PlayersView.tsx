@@ -12,7 +12,7 @@ import {
 import { getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
-import { CohortScope, type CohortScopeState } from "../components/CohortScope";
+import type { CohortScopeState } from "../components/CohortScope";
 import { FingerprintRadar, TrendChart } from "./profile-widgets";
 import { EmptyState, EvidenceLink, MetricInfo } from "@cs2dak/react";
 
@@ -20,13 +20,11 @@ export interface PlayersViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   scope: CohortScopeState;
-  onScopeChange: (scope: CohortScopeState) => void;
   selectedPlayerKey: string | null;
   onSelectPlayer: (playerKey: string) => void;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
-  teamRenames?: Record<string, string>;
 }
 
 const CORE_VIEW = SEASON_STAT_VIEWS.find((view) => view.key === "core")!;
@@ -52,13 +50,11 @@ export function PlayersView({
   allEntries,
   entries,
   scope,
-  onScopeChange,
   selectedPlayerKey,
   onSelectPlayer,
   onOpenMatch,
   onGoLibrary,
-  identityOptions,
-  teamRenames = {}
+  identityOptions
 }: PlayersViewProps) {
   const [profiles, setProfiles] = useState<PlayerSeasonProfile[] | null>(null);
   const [insights, setInsights] = useState<PlayerSeasonInsights | null>(null);
@@ -164,12 +160,9 @@ export function PlayersView({
     );
   }
 
-  const scopePanel = <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />;
-
   if (error) {
     return (
       <div className="stu-view">
-        {scopePanel}
         <EmptyState variant="error" title="聚合失败" hint={error} />
       </div>
     );
@@ -177,7 +170,6 @@ export function PlayersView({
   if (entries.length === 0) {
     return (
       <div className="stu-view">
-        {scopePanel}
         <EmptyState variant="insufficient" title="聚合范围为空" hint="当前过滤条件没有命中任何 demo，请调整聚合范围。" />
       </div>
     );
@@ -185,7 +177,6 @@ export function PlayersView({
   if (!orderedProfiles || !selected) {
     return (
       <div className="stu-view">
-        {scopePanel}
         <div className="stu-loading">聚合 {entries.length} 场 demo，构建选手档案…</div>
       </div>
     );
@@ -223,8 +214,6 @@ export function PlayersView({
           </p>
         </div>
       </header>
-
-      {scopePanel}
 
       <div className="stu-split">
         <aside className="stu-roster">

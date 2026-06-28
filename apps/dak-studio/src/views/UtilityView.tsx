@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CohortScope, type CohortScopeState } from "../components/CohortScope";
+import type { CohortScopeState } from "../components/CohortScope";
 import { DataTable, STUDIO_TABLE_CLASSES, EmptyState, EvidenceLink, MetricInfo, type DataTableColumn } from "@cs2dak/react";
 import { getPlayerFlashSummaries, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { formatMatchLabel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
@@ -9,11 +9,9 @@ export interface UtilityViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   scope: CohortScopeState;
-  onScopeChange: (scope: CohortScopeState) => void;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
-  teamRenames?: Record<string, string>;
 }
 
 type FlashRow = {
@@ -44,7 +42,7 @@ type BestFlash = {
   netSeconds: number;
 };
 
-export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenMatch, onGoLibrary, identityOptions, teamRenames = {} }: UtilityViewProps) {
+export function UtilityView({ allEntries, entries, scope, onOpenMatch, onGoLibrary, identityOptions }: UtilityViewProps) {
   const [rows, setRows] = useState<FlashRow[] | null>(null);
   const [bestFlashes, setBestFlashes] = useState<BestFlash[]>([]);
   const [bestMode, setBestMode] = useState<"net" | "enemy">("net");
@@ -147,7 +145,6 @@ export function UtilityView({ allEntries, entries, scope, onScopeChange, onOpenM
           <p>跨场闪光价值与最佳闪光证据，点击证据可回到对应回合/tick。</p>
         </div>
       </header>
-      <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && !rows && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的道具数据…</div>}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}

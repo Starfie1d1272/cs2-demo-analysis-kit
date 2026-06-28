@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { DuelFinderRow, DuelInsightsModel, PlayerMechanicsRow } from "@cs2dak/contract";
 import { displayWeaponName, duelClassificationLabel } from "@cs2dak/presentation";
 import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
-import { CohortScope, type CohortScopeState } from "../components/CohortScope";
+import type { CohortScopeState } from "../components/CohortScope";
 import { EmptyState, MetricInfo, Pagination } from "@cs2dak/react";
 import { displayTeamName } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
@@ -24,7 +24,6 @@ export interface DuelViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   scope: CohortScopeState;
-  onScopeChange: (scope: CohortScopeState) => void;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
@@ -47,7 +46,6 @@ export function DuelView({
   allEntries,
   entries,
   scope,
-  onScopeChange,
   onOpenMatch,
   onGoLibrary,
   identityOptions,
@@ -101,8 +99,6 @@ export function DuelView({
           <p>先看选手和武器画像，再钻到具体回合证据。指标只来自当前聚合范围。</p>
         </div>
       </header>
-      <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />
-
       {summary && (
         <section className="stu-duel-hero">
           <div>

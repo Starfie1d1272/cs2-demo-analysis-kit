@@ -618,22 +618,17 @@ export function App() {
                 allEntries={entries}
                 entries={scopedEntries}
                 scope={scope}
-                onScopeChange={setScope}
                 selectedPlayerKey={selectedPlayerKey}
                 onSelectPlayer={setSelectedPlayerKey}
                 onOpenMatch={openDemo}
                 identityOptions={identityOptions}
-                teamRenames={identityState.teamRenames}
                 onGoLibrary={() => setView("library")}
               />
             ) : (
               <TrailsView
                 allEntries={entries}
                 entries={scopedEntries}
-                scope={scope}
-                onScopeChange={setScope}
                 identityOptions={identityOptions}
-                teamRenames={identityState.teamRenames}
                 onGoLibrary={() => setView("library")}
               />
             )}
@@ -644,7 +639,6 @@ export function App() {
             allEntries={entries}
             entries={scopedEntries}
             scope={scope}
-            onScopeChange={setScope}
             onOpenMatch={openDemo}
             onGoLibrary={() => setView("library")}
             identityOptions={identityOptions}
@@ -656,10 +650,8 @@ export function App() {
             allEntries={entries}
             entries={scopedEntries}
             scope={scope}
-            onScopeChange={setScope}
             onOpenMatch={openDemo}
             identityOptions={identityOptions}
-            teamRenames={identityState.teamRenames}
             onGoLibrary={() => setView("library")}
           />
         )}
@@ -668,9 +660,7 @@ export function App() {
             allEntries={entries}
             entries={scopedEntries}
             scope={scope}
-            onScopeChange={setScope}
             identityOptions={identityOptions}
-            teamRenames={identityState.teamRenames}
             onGoLibrary={() => setView("library")}
           />
         )}
@@ -678,15 +668,13 @@ export function App() {
           <CoachView
             allEntries={entries}
             entries={scopedEntries}
-            scope={scope}
-            onScopeChange={setScope}
             onOpenMatch={openDemo}
             onGoLibrary={() => setView("library")}
             teamRenames={identityState.teamRenames}
           />
         )}
         {view === "control" && (
-          <RadarFieldView entries={entries} teamRenames={identityState.teamRenames} />
+          <RadarFieldView entries={scopedEntries} teamRenames={identityState.teamRenames} />
         )}
         {view === "tournament" && (
           <>
@@ -709,10 +697,8 @@ export function App() {
                 allEntries={entries}
                 entries={scopedEntries}
                 scope={scope}
-                onScopeChange={setScope}
                 onPlayerClick={openPlayer}
                 identityOptions={identityOptions}
-                teamRenames={identityState.teamRenames}
                 onGoLibrary={() => setView("library")}
               />
             ) : tournamentTab === "dashboard" ? (
@@ -720,9 +706,7 @@ export function App() {
                 allEntries={entries}
                 entries={scopedEntries}
                 scope={scope}
-                onScopeChange={setScope}
                 identityOptions={identityOptions}
-                teamRenames={identityState.teamRenames}
                 onOpenMatch={openDemo}
                 onGoLibrary={() => setView("library")}
                 onGoEconomy={() => setView("economy")}
@@ -734,10 +718,7 @@ export function App() {
         )}
         {view === "management" && (
           <ManagementView
-            allEntries={entries}
-            entries={scopedEntries}
-            scope={scope}
-            onScopeChange={setScope}
+            entries={entries}
             identity={identityState}
             onIdentityChange={setIdentityState}
             identityOptions={identityOptions}

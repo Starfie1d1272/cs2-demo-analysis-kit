@@ -6,7 +6,6 @@ import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import type { IdentityOptions } from "../lib/season";
 import { getPinnedPlayer } from "../lib/pin";
 import { getFactsStore } from "../lib/facts";
-import { CohortScope, type CohortScopeState } from "../components/CohortScope";
 import { EmptyState } from "@cs2dak/react";
 
 /**
@@ -17,11 +16,8 @@ import { EmptyState } from "@cs2dak/react";
 export interface TrailsViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
-  scope: CohortScopeState;
-  onScopeChange: (scope: CohortScopeState) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
-  teamRenames?: Record<string, string>;
 }
 
 const WINDOW_SECONDS = 30;
@@ -59,7 +55,7 @@ const EFFECT_DURATION_SECONDS: Partial<Record<string, number>> = {
   decoy: 15
 };
 
-export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibrary, identityOptions, teamRenames = {} }: TrailsViewProps) {
+export function TrailsView({ allEntries, entries, onGoLibrary, identityOptions }: TrailsViewProps) {
   // 业务流程：① 选手 → ② 地图（该选手出场的图）→ ③ 最近 N 场（该选手在该图）
   const [rangeN, setRangeN] = useState<number>(5);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -228,8 +224,6 @@ export function TrailsView({ allEntries, entries, scope, onScopeChange, onGoLibr
           </p>
         </div>
       </header>
-
-      <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />
 
       <div className="stu-trail-controls">
         <label>

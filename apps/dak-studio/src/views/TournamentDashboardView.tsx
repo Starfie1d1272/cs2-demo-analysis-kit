@@ -3,19 +3,17 @@ import { formatPercent, type TeamComparisonModel, type TournamentInsights } from
 import { DataTable, STUDIO_TABLE_CLASSES, TeamComparisonPanel, type DataTableColumn } from "@cs2dak/react";
 import { getTeamComparison, getTournamentInsights, type IdentityOptions } from "../lib/season";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
-import { CohortScope, type CohortScopeState } from "../components/CohortScope";
+import type { CohortScopeState } from "../components/CohortScope";
 import { EmptyState, MetricInfo } from "@cs2dak/react";
 
 export interface TournamentDashboardViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   scope: CohortScopeState;
-  onScopeChange: (scope: CohortScopeState) => void;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   onGoEconomy?: () => void;
   identityOptions?: IdentityOptions;
-  teamRenames?: Record<string, string>;
 }
 
 type MapRow = TournamentInsights["maps"][number];
@@ -41,12 +39,10 @@ export function TournamentDashboardView({
   allEntries,
   entries,
   scope,
-  onScopeChange,
   onOpenMatch,
   onGoLibrary,
   onGoEconomy,
-  identityOptions,
-  teamRenames = {}
+  identityOptions
 }: TournamentDashboardViewProps) {
   const [insights, setInsights] = useState<TournamentInsights | null>(null);
   const [teamComparison, setTeamComparison] = useState<TeamComparisonModel | null>(null);
@@ -106,7 +102,6 @@ export function TournamentDashboardView({
     );
   }
 
-  const scopePanel = <CohortScope entries={allEntries} scope={scope} onChange={onScopeChange} teamRenames={teamRenames} />;
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
 
   return (
@@ -117,7 +112,6 @@ export function TournamentDashboardView({
           <p>当前聚合范围内的地图使用与攻防节奏。最佳选手榜见「排行榜」子页。</p>
         </div>
       </header>
-      {scopePanel}
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && !insights && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo…</div>}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
