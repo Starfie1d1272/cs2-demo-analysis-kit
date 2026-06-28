@@ -4,6 +4,26 @@ DAK Studio 桌面应用及 `@cs2dak/*` 分析管道面向用户的变更记录�
 
 > 0.1.3 起面向 Studio 用户维护。`@cs2dak/*` npm 包版本由 changesets 独立管理（见各包的 CHANGELOG.md）；本文件聚焦 DAK Studio 桌面应用变更。
 
+## [0.7.3] — 2026-06-28
+
+### 新增
+
+- **控图 / 雷达场首版**：新增 RadarField 覆盖场原语与「控图」入口，支持 CT/T 视野、CT/T 位置、信息差分、对拼线与盲区视图；按 demo 缓存 per-match 贡献，切换范围时复用缓存聚合。
+- **更新通道**：左下角新增正式版 / 测试版通道。正式用户默认 stable；测试机可切到 beta，读取独立的 R2 beta manifest。
+- **前端增量更新**：应用内更新 manifest 可优先下发 `studio_web` 小包，前端增量安装到 `userdata/studio-web` overlay；涉及 Python bridge / 依赖 / 打包链路时自动退回完整 runtime 更新。
+
+### 变更
+
+- **发布流水线分层**：新增 Windows-only Beta Update workflow，测试版只上传 beta runtime 或 web patch，不构建 macOS、installer、full zip、events、tris。
+- **更新包策略**：新增 `release-update-policy.json`，根据变更路径自动选择 web patch 或 runtime；未知路径保守走 runtime。
+- **Release 安装说明**：区分已安装用户应用内更新、首次联网安装、离线 Full Zip 与开发者 Core Zip。
+
+### 修复
+
+- **安装包体积回归**：打包时移除 Vite 构建产物里的 `tris/`，避免本地 `public/tris` 符号链接被复制进 runtime 包。
+- **Studio 工作台 UI 问题**：修复资产面板、主页、教练页与道具页的若干布局与展示问题。
+- **雷达场口径**：盲区改为绝对视线盲区，配色改用 DAK 分层色阶，避免彩虹热力图干扰判断。
+
 ## [0.7.2] — 2026-06-27
 
 ### 修复
