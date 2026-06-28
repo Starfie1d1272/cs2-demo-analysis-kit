@@ -96,6 +96,9 @@ def test_relaunch_bat_mentions_pid_and_paths(tmp_path: Path) -> None:
     assert "4321" in bat
     assert str(install) in bat
     assert "userdata" in bat  # 便携式数据搬迁
+    assert "apply-update.log" in bat
+    assert ":moveold" in bat and ":movenew" in bat
+    assert "old move failed, restart existing app" in bat
     assert "del " in bat  # 自删脚本
 
 

@@ -130,6 +130,8 @@ def _relaunch_bat(pid: int, install_dir: Path, new_dir: Path, exe_name: str) -> 
     target_exe = install_dir / exe_name
     return f"""@echo off
 setlocal
+set "LOG=%~dp0apply-update.log"
+echo [%date% %time%] start update relay >> "%LOG%"
 rem 等当前进程退出（最多 ~30s）
 set /a tries=0
 :waitloop
@@ -140,24 +142,45 @@ if %tries% geq 60 goto exited
 timeout /t 1 /nobreak >nul
 goto waitloop
 :exited
+timeout /t 2 /nobreak >nul
 rem 1) 旧目录改名（释放后可改名）
-move "{install_dir}" "{old_dir}" >nul 2>&1
-if errorlevel 1 goto fail
+echo [%date% %time%] move old "{install_dir}" to "{old_dir}" >> "%LOG%"
+set /a tries=0
+:moveold
+move "{install_dir}" "{old_dir}" >> "%LOG%" 2>&1
+if not errorlevel 1 goto oldmoved
+set /a tries+=1
+if %tries% geq 30 goto fail
+timeout /t 1 /nobreak >nul
+goto moveold
+:oldmoved
 rem 2) 新目录移到原位
-move "{new_dir}" "{install_dir}" >nul 2>&1
-if errorlevel 1 goto rollback
+echo [%date% %time%] move new "{new_dir}" to "{install_dir}" >> "%LOG%"
+set /a tries=0
+:movenew
+move "{new_dir}" "{install_dir}" >> "%LOG%" 2>&1
+if not errorlevel 1 goto newmoved
+set /a tries+=1
+if %tries% geq 30 goto rollback
+timeout /t 1 /nobreak >nul
+goto movenew
+:newmoved
 rem 3) 搬回 userdata（便携式数据不能丢）
 if exist "{old_dir}\\userdata" move "{old_dir}\\userdata" "{install_dir}\\userdata" >nul 2>&1
 rem 4) 启动新版本
+echo [%date% %time%] start "{target_exe}" >> "%LOG%"
 start "" "{target_exe}"
 rem 5) 清理旧目录
 rmdir /s /q "{old_dir}" >nul 2>&1
 goto done
 :rollback
+echo [%date% %time%] new move failed, rollback >> "%LOG%"
 move "{old_dir}" "{install_dir}" >nul 2>&1
 start "" "{target_exe}"
 goto done
 :fail
+echo [%date% %time%] old move failed, restart existing app >> "%LOG%"
+start "" "{target_exe}"
 :done
 del "%~f0" >nul 2>&1
 """
