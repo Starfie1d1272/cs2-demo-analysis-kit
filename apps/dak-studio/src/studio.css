@@ -104,7 +104,25 @@ body {
 .stu-nav {
   display: flex;
   flex-direction: column;
+  gap: 12px;
+}
+
+.stu-nav-section {
+  display: flex;
+  flex-direction: column;
   gap: 4px;
+}
+
+.stu-nav-section-label {
+  padding: 0 10px;
+  color: var(--dak-fg-dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.stu-sidebar-foot .stu-nav-item {
+  margin-bottom: 8px;
 }
 
 .stu-nav-item {
@@ -2164,6 +2182,14 @@ td.stu-heat-cell.stu-heat-neutral {
     flex-direction: row;
   }
 
+  .stu-nav-section {
+    flex-direction: row;
+  }
+
+  .stu-nav-section-label {
+    display: none;
+  }
+
   .stu-nav-item small,
   .stu-sidebar-foot {
     display: none;
@@ -2277,77 +2303,6 @@ td.stu-heat-cell.stu-heat-neutral {
   margin-left: 4px;
   color: var(--dak-fg-dim);
   font-family: var(--dak-mono);
-}
-
-/* --- 制作中模块 --- */
-.stu-wip-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-left: 6px;
-  border-radius: 50%;
-  background: var(--dak-fg-dim);
-  vertical-align: middle;
-  opacity: 0.7;
-}
-
-.stu-wip-badge {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 2px 8px;
-  border: 1px solid var(--dak-border);
-  border-radius: 999px;
-  color: var(--dak-fg-dim);
-  font-size: 11px;
-  font-weight: 500;
-  vertical-align: middle;
-}
-
-.stu-coming {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 48px 24px;
-  border: 1px dashed var(--dak-border);
-  border-radius: var(--stu-radius);
-  background: var(--dak-bg-subtle);
-  text-align: center;
-}
-
-.stu-coming-mark {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: var(--dak-panel);
-  color: var(--dak-fg-dim);
-}
-
-.stu-coming h2 {
-  margin: 0;
-  font-size: 16px;
-}
-
-.stu-coming-list {
-  margin-top: 12px;
-  text-align: left;
-}
-
-.stu-coming-list h3 {
-  margin: 0 0 6px;
-  color: var(--dak-fg-mid);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.stu-coming-list ul {
-  margin: 0;
-  padding-left: 18px;
-  color: var(--dak-fg-dim);
-  font-size: 12.5px;
-  line-height: 1.9;
 }
 
 .stu-trail-layout {

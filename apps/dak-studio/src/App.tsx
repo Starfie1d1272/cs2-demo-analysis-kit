@@ -31,7 +31,6 @@ import { loadIdentityState, buildCohortIdentityMap, type IdentityStoreState } fr
 import type { IdentityOptions } from "./lib/season";
 import { BUILTIN_EVENTS, type BuiltinEvent } from "./lib/builtin-events";
 
-// 八模块信息架构（docs/roadmap.md），未实现的模块以「制作中」占位展示
 type StudioView =
   | "home"
   | "library"
@@ -45,19 +44,40 @@ type StudioView =
   | "control"
   | "management";
 
-const NAV: { key: StudioView; label: string; hint: string; icon: typeof LibraryBig; wip?: boolean }[] = [
-  { key: "home", label: "我的主页", hint: "近期状态 / 该练什么", icon: House },
-  { key: "library", label: "资料库", hint: "导入与管理 Demo", icon: LibraryBig },
-  { key: "match", label: "比赛工作台", hint: "回合 / 地图 / 回放", icon: Film },
-  { key: "players", label: "个人实验室", hint: "档案 / 开局动线", icon: UserRound },
-  { key: "duel", label: "对枪实验室", hint: "对枪与机制分析", icon: Swords },
-  { key: "utility", label: "道具实验室", hint: "闪光价值 / 道具点位", icon: Bomb },
-  { key: "economy", label: "经济与节奏", hint: "买局质量 / 回合 swing", icon: Coins },
-  { key: "tournament", label: "赛事中台", hint: "赛事排行 / 总览 / 赛程", icon: Trophy },
-  { key: "coach", label: "教练工作台", hint: "开局模式 / 战术本 / 备战", icon: ClipboardList },
-  { key: "control", label: "控图", hint: "覆盖场 / 防守漏洞 / 倾向", icon: Radar },
-  { key: "management", label: "管理", hint: "身份归并 · 资料库维护 · 赛事资产", icon: Settings }
+type NavItem = { key: StudioView; label: string; hint: string; icon: typeof LibraryBig };
+const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
+  {
+    label: "开始",
+    items: [
+      { key: "home", label: "我的主页", hint: "近期状态 / 该练什么", icon: House },
+      { key: "library", label: "资料库", hint: "导入与管理 Demo", icon: LibraryBig },
+      { key: "match", label: "比赛工作台", hint: "回合 / 地图 / 回放", icon: Film }
+    ]
+  },
+  {
+    label: "选手复盘",
+    items: [
+      { key: "players", label: "选手档案", hint: "画像 / 开局动线", icon: UserRound },
+      { key: "duel", label: "对枪实验室", hint: "对枪与机制分析", icon: Swords }
+    ]
+  },
+  {
+    label: "赛事与队伍",
+    items: [
+      { key: "tournament", label: "赛事与队伍", hint: "赛事排行 / 总览 / 赛程", icon: Trophy },
+      { key: "economy", label: "转化与节奏", hint: "转化 / 翻盘 / 经济对位", icon: Coins },
+      { key: "utility", label: "道具实验室", hint: "闪光价值 / 道具点位", icon: Bomb },
+      { key: "control", label: "控图", hint: "覆盖场 / 防守漏洞 / 倾向", icon: Radar }
+    ]
+  },
+  {
+    label: "备战",
+    items: [
+      { key: "coach", label: "教练工作台", hint: "开局模式 / 战术本 / 备战", icon: ClipboardList }
+    ]
+  }
 ];
+const MANAGEMENT_NAV: NavItem = { key: "management", label: "管理", hint: "身份归并 · 资料库维护 · 赛事资产", icon: Settings };
 
 const PLAYER_TABS = [
   { key: "profile", label: "选手档案" },
@@ -76,6 +96,23 @@ const UPDATE_CHANNEL_KEY = "dak:update-channel";
 
 function initialUpdateChannel(): UpdateChannel {
   return localStorage.getItem(UPDATE_CHANNEL_KEY) === "beta" ? "beta" : "stable";
+}
+
+function NavButton({ item, active, onClick }: { item: NavItem; active: boolean; onClick: () => void }) {
+  const Icon = item.icon;
+  return (
+    <button
+      type="button"
+      className={active ? "stu-nav-item stu-nav-item-active" : "stu-nav-item"}
+      onClick={onClick}
+    >
+      <Icon size={16} />
+      <span>
+        <b>{item.label}</b>
+        <small>{item.hint}</small>
+      </span>
+    </button>
+  );
 }
 
 export function App() {
@@ -463,25 +500,17 @@ export function App() {
           </div>
         </div>
         <nav className="stu-nav">
-          {NAV.map(({ key, label, hint, icon: Icon, wip }) => (
-            <button
-              key={key}
-              type="button"
-              className={view === key ? "stu-nav-item stu-nav-item-active" : "stu-nav-item"}
-              onClick={() => setView(key)}
-            >
-              <Icon size={16} />
-              <span>
-                <b>
-                  {label}
-                  {wip && <i className="stu-wip-dot" title="制作中" />}
-                </b>
-                <small>{hint}</small>
-              </span>
-            </button>
+          {NAV_GROUPS.map((group) => (
+            <section key={group.label} className="stu-nav-section" aria-label={group.label}>
+              <span className="stu-nav-section-label">{group.label}</span>
+              {group.items.map((item) => (
+                <NavButton key={item.key} item={item} active={view === item.key} onClick={() => setView(item.key)} />
+              ))}
+            </section>
           ))}
         </nav>
         <div className="stu-sidebar-foot">
+          <NavButton item={MANAGEMENT_NAV} active={view === "management"} onClick={() => setView("management")} />
           <span>{entries.length} 场 demo</span>
           <small>v{APP_VERSION} · v3 ZIP · 本地存储</small>
           <label className="stu-update-channel">
