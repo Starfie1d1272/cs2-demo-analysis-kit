@@ -3,7 +3,6 @@ import type { CohortScopeState } from "../components/CohortScope";
 import { DataTable, STUDIO_TABLE_CLASSES, EmptyState, EvidenceLink, MetricInfo, type DataTableColumn } from "@cs2dak/react";
 import { getPlayerFlashSummaries, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { formatMatchLabel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
-import { LineupView } from "./LineupView";
 
 export interface UtilityViewProps {
   allEntries: StudioDemoEntry[];
@@ -129,7 +128,7 @@ export function UtilityView({ allEntries, entries, scope, onOpenMatch, onGoLibra
       <div className="stu-view">
         <EmptyState
           mark
-          title="还没有道具数据"
+          title="还没有闪光数据"
           hint="先导入 demo，再查看跨场 Flash Value 与最佳闪光。"
           action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
         />
@@ -141,19 +140,13 @@ export function UtilityView({ allEntries, entries, scope, onOpenMatch, onGoLibra
     <div className="stu-view">
       <header className="stu-view-header">
         <div>
-          <h1>道具实验室</h1>
-          <p>跨场闪光价值与最佳闪光证据，点击证据可回到对应回合/tick。</p>
+          <h1>闪光价值</h1>
+          <p>跨场闪光收益、最佳闪光与负收益队闪证据，点击证据可回到对应回合/tick。</p>
         </div>
       </header>
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && !rows && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的道具数据…</div>}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
-      {entries.length > 0 && (
-        <section>
-          <h2 className="stu-section-title">道具点位库</h2>
-          <LineupView entries={entries} onOpenMatch={onOpenMatch} />
-        </section>
-      )}
       {rows && (
         <div className="stu-card">
           <h3>闪光价值排行</h3>

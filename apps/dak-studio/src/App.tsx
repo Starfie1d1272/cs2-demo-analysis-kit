@@ -22,6 +22,7 @@ import { TrailsView } from "./views/TrailsView";
 import { TournamentDashboardView } from "./views/TournamentDashboardView";
 import { EventsView } from "./views/EventsView";
 import { UtilityView } from "./views/UtilityView";
+import { LineupsView } from "./views/LineupsView";
 import { EconomyView } from "./views/EconomyView";
 import { ManagementView } from "./views/ManagementView";
 import { DuelView } from "./views/DuelView";
@@ -38,6 +39,7 @@ type StudioView =
   | "players"
   | "duel"
   | "utility"
+  | "lineups"
   | "economy"
   | "tournament"
   | "coach"
@@ -66,7 +68,8 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
     items: [
       { key: "tournament", label: "赛事与队伍", hint: "赛事排行 / 总览 / 赛程", icon: Trophy },
       { key: "economy", label: "转化与节奏", hint: "转化 / 翻盘 / 经济对位", icon: Coins },
-      { key: "utility", label: "道具实验室", hint: "闪光价值 / 道具点位", icon: Bomb },
+      { key: "utility", label: "闪光价值", hint: "收益 / 最佳闪 / 队闪", icon: Bomb },
+      { key: "lineups", label: "道具点位库", hint: "出手点 / 落点 / 证据", icon: Bomb },
       { key: "control", label: "控图", hint: "覆盖场 / 防守漏洞 / 倾向", icon: Radar }
     ]
   },
@@ -652,6 +655,14 @@ export function App() {
             scope={scope}
             onOpenMatch={openDemo}
             identityOptions={identityOptions}
+            onGoLibrary={() => setView("library")}
+          />
+        )}
+        {view === "lineups" && (
+          <LineupsView
+            allEntries={entries}
+            entries={scopedEntries}
+            onOpenMatch={openDemo}
             onGoLibrary={() => setView("library")}
           />
         )}
