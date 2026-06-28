@@ -13,6 +13,7 @@ export interface LibraryViewProps {
   /** 桌面壳（pywebview）下提供：用原生对话框代替浏览器 file input */
   onNativeImport?: () => void;
   onLoadSample: () => void;
+  onGoManage: () => void;
   onOpenDemo: (id: string) => void;
   onRemoveDemo: (id: string) => void;
   onUpdateTags: (id: string, tags: string[]) => void;
@@ -51,6 +52,7 @@ export function LibraryView({
   onImportFiles,
   onNativeImport,
   onLoadSample,
+  onGoManage,
   onOpenDemo,
   onRemoveDemo,
   onUpdateTags,
@@ -376,11 +378,16 @@ export function LibraryView({
         <EmptyState
           mark
           title="资料库为空"
-          hint="把 .dem 或 v3 ZIP 拖进窗口，或点右上角「导入 demo」。"
+          hint="把 .dem 或 v3 ZIP 拖进窗口，或点右上角「导入 demo」。小示例是 7 图职业决赛；科隆 Major 等大赛事在「管理 > 赛事资产」里加载。"
           action={
-            <button type="button" className="stu-button stu-button-ghost" onClick={onLoadSample} disabled={importing}>
-              加载示例
-            </button>
+            <span className="stu-empty-actions">
+              <button type="button" className="stu-button stu-button-ghost" onClick={onLoadSample} disabled={importing}>
+                加载 7 图示例
+              </button>
+              <button type="button" className="stu-button stu-button-ghost" onClick={onGoManage}>
+                去赛事资产
+              </button>
+            </span>
           }
         />
       ) : (
@@ -490,4 +497,3 @@ export function LibraryView({
     </div>
   );
 }
-

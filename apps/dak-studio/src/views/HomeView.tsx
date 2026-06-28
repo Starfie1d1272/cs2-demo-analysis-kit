@@ -284,8 +284,8 @@ export function HomeView({ entries, onOpenMatch, onGoPlayers, onGoLibrary, ident
         <EmptyState
           variant="insufficient"
           title={`当前资料库里没有 ${pinned.name} 的比赛`}
-          hint="导入包含你参赛记录的 demo，或在个人实验室重新标记「这是我」。"
-          action={<button type="button" className="stu-button" onClick={onGoPlayers}>去个人实验室</button>}
+          hint="导入包含你参赛记录的 demo，或在选手档案重新标记「这是我」。"
+          action={<button type="button" className="stu-button" onClick={onGoPlayers}>去选手档案</button>}
         />
       )}
 
@@ -455,7 +455,7 @@ export function HomeView({ entries, onOpenMatch, onGoPlayers, onGoLibrary, ident
                   showGrenades={homeTrailShowGrenades}
                 />
               ) : (
-                <p className="stu-dim">最近 {OPENING_MATCH_LIMIT} 场同图比赛没有 {homeTrailSide.toUpperCase()} 方长枪局起手轨迹（缺回放流或无长枪局）。完整动线见个人实验室 · 开局动线。</p>
+                <p className="stu-dim">最近 {OPENING_MATCH_LIMIT} 场同图比赛没有 {homeTrailSide.toUpperCase()} 方长枪局起手轨迹（缺回放流或无长枪局）。完整动线见侧边栏「开局动线」。</p>
               )}
             </div>
 
@@ -668,7 +668,16 @@ function HomeOpeningTrails({
   );
 }
 
-/** 资料库为空的引导空态：品牌标 + 骨架占位卡网格 + 三步引导。 */
+const HOME_PREVIEW_ITEMS = [
+  ["选手状态", "RR、Rating、近期趋势"],
+  ["该练什么", "从失误和短板生成复盘方向"],
+  ["开局动线", "默认位、出门路线、道具习惯"],
+  ["最近比赛", "点回回合和 tick 证据"],
+  ["闪光价值", "最佳闪与负收益队闪"],
+  ["转化节奏", "手枪转化、5v4、翻盘率"]
+] as const;
+
+/** 资料库为空的引导空态：三步引导 + 导入后会点亮的主页模块。 */
 function HomeEmpty({ title, hint, action }: { title: string; hint: string; action: ReactNode }) {
   return (
     <div className="stu-home-empty">
@@ -678,16 +687,19 @@ function HomeEmpty({ title, hint, action }: { title: string; hint: string; actio
         <li><b>2</b> 标记「这是我」</li>
         <li><b>3</b> 回主页看复盘</li>
       </ol>
-      <div className="stu-home-skeleton" aria-hidden="true">
-        {["雷达", "趋势", "该练什么", "开局动线", "最近比赛", "道具"].map((label) => (
-          <div key={label} className="stu-skel-card"><span>{label}</span></div>
+      <div className="stu-home-preview">
+        {HOME_PREVIEW_ITEMS.map(([label, desc]) => (
+          <div key={label} className="stu-home-preview-card">
+            <span>{label}</span>
+            <small>{desc}</small>
+          </div>
         ))}
       </div>
     </div>
   );
 }
 
-/** 未标记「这是我」：列出资料库里最常出现的选手，一键就地标记（跳个人实验室完成）。 */
+/** 未标记「这是我」：列出资料库里最常出现的选手，一键跳选手档案标记。 */
 function PickSelf({
   profiles,
   error,
@@ -707,13 +719,13 @@ function PickSelf({
       <EmptyState
         mark
         title="先标记「这是我」"
-        hint={<>主页会围绕你的数据展开。在下面挑出你自己，或去个人实验室点名字旁的 <Star size={12} style={{ verticalAlign: "-2px" }} /> 标记。</>}
-        action={<button type="button" className="stu-button" onClick={onGoPlayers}>去个人实验室</button>}
+        hint={<>主页会围绕你的数据展开。在下面挑出你自己，或去选手档案点名字旁的 <Star size={12} style={{ verticalAlign: "-2px" }} /> 标记。</>}
+        action={<button type="button" className="stu-button" onClick={onGoPlayers}>去选手档案</button>}
       />
       {top.length > 0 && (
         <div className="stu-pickself-grid">
           {top.map((p) => (
-            <button key={p.playerKey} type="button" className="stu-pickself-card" onClick={onGoPlayers} title="去个人实验室标记此人为「这是我」">
+            <button key={p.playerKey} type="button" className="stu-pickself-card" onClick={onGoPlayers} title="去选手档案标记此人为「这是我」">
               <b>{p.name}</b>
               <small className="stu-dim">{p.mapCount} 场 · RR {p.rating.rivalhubRR.toFixed(2)}</small>
             </button>

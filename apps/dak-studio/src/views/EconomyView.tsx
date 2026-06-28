@@ -112,10 +112,13 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
   const bestPistol = [...insights.teamPistols].sort((a, b) => (b.winRatePercent ?? -1) - (a.winRatePercent ?? -1))[0] ?? null;
   const bestConversion = [...insights.teamPistols].sort((a, b) => (b.conversionPercent ?? -1) - (a.conversionPercent ?? -1))[0] ?? null;
   const bestBreak = [...insights.teamPistols].sort((a, b) => (b.breakRatePercent ?? -1) - (a.breakRatePercent ?? -1))[0] ?? null;
+  const bestRoundWin = [...insights.teamEconomySummaries].sort((a, b) => (b.roundWinPercent ?? -1) - (a.roundWinPercent ?? -1))[0] ?? null;
   const bestSmallBuy = [...insights.teamEconomySummaries].sort((a, b) => (b.smallBuyUpset.winRatePercent ?? -1) - (a.smallBuyUpset.winRatePercent ?? -1))[0] ?? null;
   const best5v4 = bestManState(insights, "advantage", 5, 4);
   const best5v3 = bestManState(insights, "advantage", 5, 3);
   const best4v5 = bestManState(insights, "disadvantage", 5, 4);
+  const best3v5 = bestManState(insights, "disadvantage", 5, 3);
+  const pistolBreak = aggregatePistolBreak(insights);
 
   return (
     <div className="stu-econ-dashboard">
@@ -130,8 +133,20 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
 
       <section className="stu-econ-grid">
         <article className="stu-card stu-econ-card">
-          <h3>人数优势转换</h3>
+          <h3>优势转换与翻盘</h3>
           <div className="stu-econ-state-grid">
+            <div className="stu-econ-state">
+              <div>
+                <span>赢手枪局后拿下第二局</span>
+                <b>{formatPercent(insights.pistolConversionPercent)}</b>
+                <small>手枪转化</small>
+              </div>
+              <div>
+                <span>输手枪局后扳回第二局</span>
+                <b>{formatPercent(pistolBreak.percent)}</b>
+                <small>{pistolBreak.wins}/{pistolBreak.total} 反转换</small>
+              </div>
+            </div>
             {insights.manAdvantageConversions.map((row) => (
               <div className="stu-econ-state" key={row.advantageLabel}>
                 <div>
@@ -152,12 +167,14 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
         <article className="stu-card stu-econ-card">
           <h3>队伍亮点</h3>
           <div className="stu-econ-callouts">
+            <Callout label="回合胜率最高" value={bestRoundWin?.teamName ?? "—"} detail={bestRoundWin ? `${formatPercent(bestRoundWin.roundWinPercent)} · ${bestRoundWin.roundWins}/${bestRoundWin.rounds}` : "无样本"} />
             <Callout label="手枪最稳" value={bestPistol?.teamName ?? "—"} detail={bestPistol ? `${formatPercent(bestPistol.winRatePercent)} · ${bestPistol.pistolWins}/${bestPistol.pistolRounds}` : "无样本"} />
             <Callout label="转化最好" value={bestConversion?.teamName ?? "—"} detail={bestConversion ? `${formatPercent(bestConversion.conversionPercent)} · ${bestConversion.conversionWins}/${bestConversion.conversionRounds}` : "无样本"} />
             <Callout label="反转换最好" value={bestBreak?.teamName ?? "—"} detail={bestBreak ? `${formatPercent(bestBreak.breakRatePercent)} · ${bestBreak.breakWins}/${bestBreak.breakRounds}` : "无样本"} />
             <Callout label="5v4 最稳" value={best5v4?.teamName ?? "—"} detail={best5v4 ? `${formatPercent(best5v4.value)} · ${best5v4.wins}/${best5v4.total}` : "无样本"} />
             <Callout label="5v3 最稳" value={best5v3?.teamName ?? "—"} detail={best5v3 ? `${formatPercent(best5v3.value)} · ${best5v3.wins}/${best5v3.total}` : "无样本"} />
             <Callout label="4v5 最能翻" value={best4v5?.teamName ?? "—"} detail={best4v5 ? `${formatPercent(best4v5.value)} · ${best4v5.wins}/${best4v5.total}` : "无样本"} />
+            <Callout label="3v5 最能翻" value={best3v5?.teamName ?? "—"} detail={best3v5 ? `${formatPercent(best3v5.value)} · ${best3v5.wins}/${best3v5.total}` : "无样本"} />
             <Callout label="小枪翻盘" value={bestSmallBuy?.teamName ?? "—"} detail={bestSmallBuy ? `${formatPercent(bestSmallBuy.smallBuyUpset.winRatePercent)} · ${bestSmallBuy.smallBuyUpset.wins}/${bestSmallBuy.smallBuyUpset.opportunities}` : "无样本"} title="Eco / 半起面对长枪局的胜率" />
           </div>
         </article>
@@ -218,6 +235,12 @@ function Callout({ label, value, detail, title }: { label: string; value: string
       <small>{detail}</small>
     </div>
   );
+}
+
+function aggregatePistolBreak(insights: TournamentInsights): { wins: number; total: number; percent: number | null } {
+  const total = insights.teamPistols.reduce((sum, row) => sum + row.breakRounds, 0);
+  const wins = insights.teamPistols.reduce((sum, row) => sum + row.breakWins, 0);
+  return { wins, total, percent: total > 0 ? wins / total * 100 : null };
 }
 
 function bestManState(

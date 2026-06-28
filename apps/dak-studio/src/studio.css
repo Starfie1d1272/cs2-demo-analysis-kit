@@ -992,22 +992,43 @@ body {
   color: var(--dak-accent);
   font-size: 11px;
 }
-.stu-home-skeleton {
+.stu-home-preview {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
 }
-.stu-skel-card {
+.stu-home-preview-card {
   height: 96px;
   display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   align-items: flex-end;
+  gap: 7px;
   padding: 12px;
-  border: 1px dashed var(--dak-border);
+  border: 1px solid var(--dak-border);
   border-radius: var(--stu-radius);
-  background: linear-gradient(180deg, var(--dak-panel-hi), var(--dak-panel));
+  background: var(--dak-panel);
+}
+
+.stu-home-preview-card span {
   color: var(--dak-fg-dim);
   font-size: 11px;
   letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.stu-home-preview-card small {
+  width: 100%;
+  color: var(--dak-fg-mid);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.stu-empty-actions {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 /* 未标记「这是我」：候选选手卡 */
@@ -1773,12 +1794,22 @@ body {
   background: rgba(11, 14, 16, 0.56);
 }
 
+.stu-econ-callout {
+  min-height: 86px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
 .stu-econ-state b,
 .stu-econ-callout b {
   display: block;
   margin-top: 4px;
   font-size: 18px;
   font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .stu-econ-callouts {
@@ -2232,7 +2263,7 @@ td.stu-heat-cell.stu-heat-neutral {
   gap: 6px;
 }
 
-/* --- 模块子页签（个人实验室：档案 / 开局动线） --- */
+/* --- 模块子页签 --- */
 .stu-subtabs {
   display: flex;
   gap: 6px;

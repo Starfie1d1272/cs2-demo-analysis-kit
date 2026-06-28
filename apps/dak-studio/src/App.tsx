@@ -37,6 +37,7 @@ type StudioView =
   | "library"
   | "match"
   | "players"
+  | "trails"
   | "duel"
   | "duelOverview"
   | "utility"
@@ -60,7 +61,8 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "选手复盘",
     items: [
-      { key: "players", label: "选手档案", hint: "画像 / 开局动线", icon: UserRound },
+      { key: "players", label: "选手档案", hint: "画像 / 趋势 / 机制", icon: UserRound },
+      { key: "trails", label: "开局动线", hint: "默认位 / 出门路线", icon: Radar },
       { key: "duel", label: "对枪复盘", hint: "证据队列 / 枪法机制", icon: Swords }
     ]
   },
@@ -83,12 +85,6 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
   }
 ];
 const MANAGEMENT_NAV: NavItem = { key: "management", label: "管理", hint: "身份归并 · 资料库维护 · 赛事资产", icon: Settings };
-
-const PLAYER_TABS = [
-  { key: "profile", label: "选手档案" },
-  { key: "trails", label: "开局动线" }
-] as const;
-type PlayerTab = (typeof PLAYER_TABS)[number]["key"];
 
 const TOURNAMENT_TABS = [
   { key: "leaderboard", label: "排行榜" },
@@ -123,7 +119,6 @@ function NavButton({ item, active, onClick }: { item: NavItem; active: boolean; 
 export function App() {
   const [entries, setEntries] = useState<StudioDemoEntry[]>([]);
   const [view, setView] = useState<StudioView>("home");
-  const [playerTab, setPlayerTab] = useState<PlayerTab>("profile");
   const [tournamentTab, setTournamentTab] = useState<TournamentTab>("leaderboard");
   const [selectedDemoId, setSelectedDemoId] = useState<string | null>(null);
   const [matchDeepLink, setMatchDeepLink] = useState<MatchDeepLink | null>(null);
@@ -319,7 +314,6 @@ export function App() {
 
   const openPlayer = useCallback((playerKey: string) => {
     setSelectedPlayerKey(playerKey);
-    setPlayerTab("profile");
     setView("players");
   }, []);
 
@@ -562,7 +556,7 @@ export function App() {
           <HomeView
             entries={entries}
             onOpenMatch={openDemo}
-            onGoPlayers={() => { setPlayerTab("profile"); setView("players"); }}
+            onGoPlayers={() => setView("players")}
             onGoLibrary={() => setView("library")}
             identityOptions={identityOptions}
           />
@@ -576,6 +570,7 @@ export function App() {
             onImportFiles={importFiles}
             onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined}
             onLoadSample={loadSample}
+            onGoManage={() => setView("management")}
             onOpenDemo={openDemo}
             onRemoveDemo={handleRemove}
             onUpdateTags={handleUpdateTags}
@@ -603,41 +598,24 @@ export function App() {
           />
         )}
         {view === "players" && (
-          <>
-            <div className="stu-subtabs" role="tablist" aria-label="个人实验室">
-              {PLAYER_TABS.map(({ key, label }) => (
-                <button
-                  key={key}
-                  type="button"
-                  role="tab"
-                  aria-selected={playerTab === key}
-                  className={playerTab === key ? "stu-subtab stu-subtab-active" : "stu-subtab"}
-                  onClick={() => setPlayerTab(key)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {playerTab === "profile" ? (
-              <PlayersView
-                allEntries={entries}
-                entries={scopedEntries}
-                scope={scope}
-                selectedPlayerKey={selectedPlayerKey}
-                onSelectPlayer={setSelectedPlayerKey}
-                onOpenMatch={openDemo}
-                identityOptions={identityOptions}
-                onGoLibrary={() => setView("library")}
-              />
-            ) : (
-              <TrailsView
-                allEntries={entries}
-                entries={scopedEntries}
-                identityOptions={identityOptions}
-                onGoLibrary={() => setView("library")}
-              />
-            )}
-          </>
+          <PlayersView
+            allEntries={entries}
+            entries={scopedEntries}
+            scope={scope}
+            selectedPlayerKey={selectedPlayerKey}
+            onSelectPlayer={setSelectedPlayerKey}
+            onOpenMatch={openDemo}
+            identityOptions={identityOptions}
+            onGoLibrary={() => setView("library")}
+          />
+        )}
+        {view === "trails" && (
+          <TrailsView
+            allEntries={entries}
+            entries={scopedEntries}
+            identityOptions={identityOptions}
+            onGoLibrary={() => setView("library")}
+          />
         )}
         {view === "duel" && (
           <DuelView
