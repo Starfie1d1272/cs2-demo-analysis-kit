@@ -6,7 +6,7 @@ import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems, trigger
 import { parseTags } from "./lib/tags";
 import { pruneOrphanSeries } from "./lib/series";
 import { importEventAssetArchive } from "./lib/event-assets";
-import { APP_VERSION, checkForUpdate, type UpdateInfo } from "./lib/update";
+import { APP_VERSION, checkForUpdateOnChannel, type UpdateChannel, type UpdateInfo } from "./lib/update";
 import { checkForUpdateViaBridge } from "./lib/updater-bridge";
 import { UpdateControl } from "./components/UpdateControl";
 import { UpdateModal } from "./components/UpdateModal";
@@ -71,6 +71,11 @@ const TOURNAMENT_TABS = [
 ] as const;
 type TournamentTab = (typeof TOURNAMENT_TABS)[number]["key"];
 type MatchDeepLink = { roundNumber: number; tick?: number };
+const UPDATE_CHANNEL_KEY = "dak:update-channel";
+
+function initialUpdateChannel(): UpdateChannel {
+  return localStorage.getItem(UPDATE_CHANNEL_KEY) === "beta" ? "beta" : "stable";
+}
 
 export function App() {
   const [entries, setEntries] = useState<StudioDemoEntry[]>([]);
@@ -90,13 +95,14 @@ export function App() {
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
   const [showLatestMsg, setShowLatestMsg] = useState(false);
+  const [updateChannel, setUpdateChannel] = useState<UpdateChannel>(initialUpdateChannel);
 
   async function doCheckUpdate() {
     setCheckingUpdate(true);
     setShowLatestMsg(false);
     try {
       // 桌面壳优先走 Python 桥（urllib，无 CORS），dev 退浏览器 fetch。
-      const info = (await checkForUpdateViaBridge()) ?? (await checkForUpdate());
+      const info = (await checkForUpdateViaBridge(updateChannel)) ?? (await checkForUpdateOnChannel(updateChannel));
       setUpdate(info);
       if (!info) {
         setShowLatestMsg(true);
@@ -105,6 +111,13 @@ export function App() {
     } finally {
       setCheckingUpdate(false);
     }
+  }
+
+  function changeUpdateChannel(channel: UpdateChannel) {
+    setUpdateChannel(channel);
+    localStorage.setItem(UPDATE_CHANNEL_KEY, channel);
+    setUpdate(null);
+    setShowLatestMsg(false);
   }
 
   // 稳定数组标识：避免 App 无关重渲染触发档案/排行榜重新聚合
@@ -449,6 +462,13 @@ export function App() {
         <div className="stu-sidebar-foot">
           <span>{entries.length} 场 demo</span>
           <small>v{APP_VERSION} · v3 ZIP · 本地存储</small>
+          <label className="stu-update-channel">
+            <span>更新通道</span>
+            <select value={updateChannel} onChange={(e) => changeUpdateChannel(e.target.value === "beta" ? "beta" : "stable")}>
+              <option value="stable">正式版</option>
+              <option value="beta">测试版</option>
+            </select>
+          </label>
           <div className="stu-foot-actions">
             <LibraryDirButton onError={setNotice} />
             <button type="button" className="stu-check-update-btn" onClick={doCheckUpdate} disabled={checkingUpdate}>

@@ -29,6 +29,7 @@ pnpm --filter @cs2dak/dak-studio build
 STUDIO_WEB="python/src/cs2dak/studio_web"
 rm -rf "$STUDIO_WEB"
 cp -R apps/dak-studio/dist "$STUDIO_WEB"
+rm -rf "$STUDIO_WEB/tris"
 
 # 0.7.0 起采用 Web Installer 模式：
 #   - 安装包很小（~20MB runtime），安装阶段从 R2 拉取内置赛事包 + 所需 .tri

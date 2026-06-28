@@ -1,0 +1,136 @@
+name: Beta Update
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Numeric beta version, e.g. 0.8.0 or 0.7.99"
+        required: true
+      update_kind:
+        description: "auto, web, or runtime"
+        required: true
+        default: auto
+        type: choice
+        options: [auto, web, runtime]
+      base_ref:
+        description: "Diff base for auto policy"
+        required: false
+        default: origin/main
+
+permissions:
+  contents: read
+
+jobs:
+  beta:
+    runs-on: windows-latest
+    steps:
+      - name: Exclude workspace from Windows Defender
+        shell: pwsh
+        run: |
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE" -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath "$env:RUNNER_TEMP" -ErrorAction SilentlyContinue
+
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 23
+          cache: pnpm
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          python-version: "3.12"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Decide update kind
+        id: kind
+        shell: bash
+        run: |
+          set -euo pipefail
+          KIND="${{ inputs.update_kind }}"
+          if [ "$KIND" = "auto" ]; then
+            git fetch origin main --tags
+            KIND="$(node scripts/decide-update-kind.mjs "${{ inputs.base_ref }}" HEAD | tail -n1)"
+          fi
+          echo "kind=$KIND" >> "$GITHUB_OUTPUT"
+          echo "Beta update kind: $KIND"
+
+      - name: Build web patch
+        if: steps.kind.outputs.kind == 'web'
+        shell: bash
+        run: node scripts/build-web-patch.mjs "${{ inputs.version }}" dist
+
+      - name: Build runtime package
+        if: steps.kind.outputs.kind == 'runtime'
+        shell: bash
+        run: |
+          node scripts/sync-version.mjs "${{ inputs.version }}"
+          PACKAGE_SKIP_VERSION_SYNC=1 bash scripts/package.sh
+          cd python/dist
+          7z a -mx=5 "dak-studio-windows-${{ inputs.version }}.zip" dak-studio
+          cd ../..
+
+      - name: Generate beta manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ inputs.version }}"
+          mkdir -p dist
+          NOTES="Beta build ${GITHUB_RUN_NUMBER} (${GITHUB_SHA})"
+          printf '%s\n' "$NOTES" > /tmp/beta-notes.txt
+          if [ "${{ steps.kind.outputs.kind }}" = "web" ]; then
+            node scripts/gen-update-manifest.mjs "$VERSION" - "dist/latest.json" \
+              --channel beta \
+              --web-zip "dist/dak-studio-web-${VERSION}.zip" \
+              --notes-file /tmp/beta-notes.txt
+          else
+            node scripts/gen-update-manifest.mjs "$VERSION" "python/dist/dak-studio-windows-${VERSION}.zip" "dist/latest.json" \
+              --channel beta \
+              --notes-file /tmp/beta-notes.txt
+          fi
+
+      - name: Upload beta assets to R2
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ inputs.version }}"
+          TAG="v${VERSION}"
+          if [ "${{ steps.kind.outputs.kind }}" = "web" ]; then
+            ASSET="dist/dak-studio-web-${VERSION}.zip"
+          else
+            ASSET="python/dist/dak-studio-windows-${VERSION}.zip"
+          fi
+          aws s3 cp "$ASSET" "s3://${R2_BUCKET}/releases/beta/${TAG}/$(basename "$ASSET")" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type application/zip \
+            --cache-control "public, max-age=31536000, immutable"
+          aws s3 cp "dist/latest.json" "s3://${R2_BUCKET}/releases/beta/latest.json" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type application/json \
+            --cache-control "public, max-age=60"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: beta-${{ steps.kind.outputs.kind }}-${{ inputs.version }}
+          compression-level: 0
+          path: |
+            dist/latest.json
+            dist/dak-studio-web-*.zip
+            python/dist/dak-studio-windows-*.zip
+          if-no-files-found: ignore

@@ -105,6 +105,17 @@ jobs:
         run: PACKAGE_SKIP_VERSION_SYNC=1 bash scripts/package.sh
         shell: bash
 
+      - name: Decide in-app update kind
+        id: update_kind
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo HEAD~1)"
+          KIND="$(node scripts/decide-update-kind.mjs "$BASE" HEAD | tail -n1)"
+          echo "kind=$KIND" >> "$GITHUB_OUTPUT"
+          echo "In-app update kind: $KIND (base: $BASE)"
+
       - name: Zip Windows onedir app
         if: runner.os == 'Windows'
         shell: bash
@@ -112,6 +123,13 @@ jobs:
           VERSION="$(node -p "require('./package.json').version")"
           cd python/dist
           7z a -mx=5 "dak-studio-windows-${VERSION}.zip" dak-studio
+
+      - name: Build web patch
+        if: runner.os == 'Windows' && steps.update_kind.outputs.kind == 'web'
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          node scripts/build-web-patch.mjs "$VERSION" python/dist
 
       # 0.7.0: Web Installer（极简 tkinter，onefile ~15MB）
       - name: Build Web Installer
@@ -187,10 +205,15 @@ jobs:
             echo "::error::CHANGELOG.md is missing non-empty notes for v${VERSION}"
             exit 1
           fi
+          WEB_ARGS=()
+          if [ -f "python/dist/dak-studio-web-${VERSION}.zip" ]; then
+            WEB_ARGS=(--web-zip "python/dist/dak-studio-web-${VERSION}.zip")
+          fi
           node scripts/gen-update-manifest.mjs "$VERSION" \
             "python/dist/dak-studio-windows-${VERSION}.zip" \
             "python/dist/latest.json" \
-            --notes-file /tmp/changelog-notes.txt
+            --notes-file /tmp/changelog-notes.txt \
+            "${WEB_ARGS[@]}"
 
       - uses: actions/upload-artifact@v7
         with:
@@ -254,6 +277,7 @@ jobs:
           VERSION="${GITHUB_REF#refs/tags/v}"
           TAG="v${VERSION}"
           ZIP="dist/dak-studio-windows-${VERSION}.zip"
+          WEB_ZIP="dist/dak-studio-web-${VERSION}.zip"
           INSTALLER="dist/DAK-Studio-Setup-${VERSION}.exe"
           FULL_ZIP="dist/dak-studio-windows-${VERSION}-full.zip"
           INSTALL_MANIFEST="dist/install-manifest.json"
@@ -270,6 +294,16 @@ jobs:
             --content-type application/zip \
             --cache-control "public, max-age=31536000, immutable"
           echo "R2: runtime zip ✓"
+
+          # 1b. Frontend-only web patch（可选；应用内更新优先用它）
+          if [ -f "$WEB_ZIP" ]; then
+            aws s3 cp "$WEB_ZIP" \
+              "s3://${R2_BUCKET}/releases/${TAG}/dak-studio-web-${VERSION}.zip" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --content-type application/zip \
+              --cache-control "public, max-age=31536000, immutable"
+            echo "R2: web patch ✓"
+          fi
 
           # 2. Web Installer exe（不可变）
           if [ -f "$INSTALLER" ]; then
@@ -327,6 +361,10 @@ jobs:
           body: |
             **安装说明**
 
+            ### 已安装用户（推荐：应用内更新）
+            打开 DAK Studio，左下角点「检查更新」。应用会优先使用小体积前端增量包；
+            如本次涉及运行时或依赖变更，会自动退回完整 runtime 更新。
+
             ### Windows（推荐：Web Installer）
             下载 `DAK-Studio-Setup-<version>.exe`，运行后选择安装目录，联网自动下载运行时 +
             内置赛事 + 地图数据。安装完成后首次启动即完整体验。
@@ -337,7 +375,7 @@ jobs:
 
             ### Windows（开发者：Core Zip）
             下载 `dak-studio-windows-<version>.zip`，仅运行时，不含大赛事和地图数据。
-            启动后可从 "获取赛事" 在线下载，或在管理页安装官方资产。
+            主要用于排查或手动覆盖安装；普通用户优先使用 Web Installer 或应用内更新。
 
             ### macOS
             1. 打开 DMG，把 **DAK Studio** 拖到右侧的 **Applications** 文件夹。

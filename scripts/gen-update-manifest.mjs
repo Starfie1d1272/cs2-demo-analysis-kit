@@ -4,7 +4,7 @@
 //   https://github.com/<owner>/<repo>/releases/latest/download/latest.json
 // 客户端（apps/dak-studio/src/lib/update.ts）按镜像顺序拉取它。
 //
-//   node scripts/gen-update-manifest.mjs <version> <windows-zip> [out.json] [--notes-file FILE]
+//   node scripts/gen-update-manifest.mjs <version> <windows-zip> [out.json] [--notes-file FILE] [--channel stable|beta] [--web-zip FILE]
 //
 // 只产出 Windows 资产（CS2 仅 Windows 可玩，桌面端只面向 Windows）。
 
@@ -31,12 +31,13 @@ function sha256(path) {
 }
 
 // 顺序即优先级：R2（自建）→ GitHub 直连 → ghproxy×3。
-function assetUrls(version, name) {
+function assetUrls(version, name, channel = "stable") {
   const tag = `v${version}`;
-  const r2 = `${R2_BASE}/releases/${tag}/${name}`;
+  const releaseBase = channel === "beta" ? `releases/beta/${tag}` : `releases/${tag}`;
+  const r2 = `${R2_BASE}/${releaseBase}/${name}`;
   const raw = `https://github.com/${OWNER_REPO}/releases/download/${tag}/${name}`;
   const ghproxied = BINARY_MIRROR_PREFIXES.map((p) => (p ? (p.endsWith("/") ? p + raw : `${p}/${raw}`) : raw));
-  return [r2, ...ghproxied];
+  return channel === "beta" ? [r2] : [r2, ...ghproxied];
 }
 
 function main() {
@@ -51,29 +52,53 @@ function main() {
     }
     args.splice(notesIdx, 2);
   }
+  const channelIdx = args.indexOf("--channel");
+  let channel = "stable";
+  if (channelIdx >= 0) {
+    channel = args[channelIdx + 1] === "beta" ? "beta" : "stable";
+    args.splice(channelIdx, 2);
+  }
+  const webIdx = args.indexOf("--web-zip");
+  let webZipPath = "";
+  if (webIdx >= 0) {
+    webZipPath = args[webIdx + 1] || "";
+    args.splice(webIdx, 2);
+  }
   const [version, zipPath, outArg] = args;
-  if (!version || !zipPath) {
-    console.error("用法: gen-update-manifest.mjs <version> <windows-zip> [out.json] [--notes-file FILE]");
+  if (!version || (!zipPath && !webZipPath)) {
+    console.error("用法: gen-update-manifest.mjs <version> <windows-zip> [out.json] [--notes-file FILE] [--channel stable|beta] [--web-zip FILE]");
     process.exit(1);
   }
   const ver = version.replace(/^v/, "");
-  const name = basename(zipPath);
+  const assets = {};
+  if (zipPath && zipPath !== "-") {
+    const name = basename(zipPath);
+    assets.windows = {
+      name,
+      size: statSync(zipPath).size,
+      sha256: sha256(zipPath),
+      urls: assetUrls(ver, name, channel)
+    };
+  }
+  if (webZipPath) {
+    const name = basename(webZipPath);
+    assets.web = {
+      name,
+      size: statSync(webZipPath).size,
+      sha256: sha256(webZipPath),
+      urls: assetUrls(ver, name, channel)
+    };
+  }
   const manifest = {
     version: ver,
+    channel,
     notes: notes || undefined,
     publishedAt: new Date().toISOString(),
-    assets: {
-      windows: {
-        name,
-        size: statSync(zipPath).size,
-        sha256: sha256(zipPath),
-        urls: assetUrls(ver, name)
-      }
-    }
+    assets
   };
   const out = outArg || join(dirname(zipPath), "latest.json");
   writeFileSync(out, JSON.stringify(manifest, null, 2) + "\n");
-  console.error(`wrote ${out} (windows ${name}, ${manifest.assets.windows.size} bytes)`);
+  console.error(`wrote ${out} (${Object.keys(assets).join(", ")})`);
 }
 
 main();

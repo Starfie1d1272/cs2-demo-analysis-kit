@@ -30,10 +30,15 @@ const RELEASES_LATEST_API = `https://api.github.com/repos/${OWNER_REPO}/releases
  * 二进制资产路径由发版 CI（gen-update-manifest.mjs）写入 manifest 的 asset.urls。
  */
 export const R2_BASE = "https://dakupdate.starfie1d.top";
-const MANIFEST_R2 = `${R2_BASE}/releases/latest.json`;
 
 /** manifest 在 GitHub Release 上的稳定地址（权威源/兜底）。 */
-const MANIFEST_CANONICAL = `https://github.com/${OWNER_REPO}/releases/latest/download/latest.json`;
+const MANIFEST_CANONICAL_STABLE = `https://github.com/${OWNER_REPO}/releases/latest/download/latest.json`;
+
+export type UpdateChannel = "stable" | "beta";
+
+export function updateManifestPath(channel: UpdateChannel): string {
+  return channel === "beta" ? "releases/beta/latest.json" : "releases/latest.json";
+}
 
 /**
  * 镜像前缀：拼到 github.com 原始 URL 前形成代理 URL。
@@ -51,14 +56,17 @@ export const MANIFEST_MIRRORS: readonly string[] = [
  * manifest 拉取来源（完整 URL），顺序即优先级：
  *   R2（自建，国内可达）→ GitHub 直连 → ghproxy×3。
  */
-export function manifestSources(): string[] {
-  return [MANIFEST_R2, ...MANIFEST_MIRRORS.map((prefix) => withMirror(prefix, MANIFEST_CANONICAL))];
+export function manifestSources(channel: UpdateChannel = "stable"): string[] {
+  const r2 = `${R2_BASE}/${updateManifestPath(channel)}`;
+  if (channel === "beta") return [r2];
+  return [r2, ...MANIFEST_MIRRORS.map((prefix) => withMirror(prefix, MANIFEST_CANONICAL_STABLE))];
 }
 
 /** 单个镜像 fetch 的超时（ms）。 */
 const FETCH_TIMEOUT_MS = 8000;
 
 export interface UpdateAsset {
+  kind?: "runtime" | "web";
   /** 文件名，如 dak-studio-windows-0.7.0.zip */
   name: string;
   /** 字节数（用于进度条与完整性粗校验）。 */
@@ -75,7 +83,7 @@ export interface UpdateManifest {
   notes?: string;
   publishedAt?: string;
   /** 平台 → 资产。当前只发 Windows。 */
-  assets: Partial<Record<"windows" | "macos", UpdateAsset>>;
+  assets: Partial<Record<"windows" | "macos" | "web", UpdateAsset>>;
 }
 
 export interface UpdateInfo {
@@ -111,7 +119,7 @@ export function parseManifest(raw: unknown): UpdateManifest | null {
   if (!/^\d+\.\d+\.\d+/.test(version)) return null;
   const assetsRaw = (m.assets ?? {}) as Record<string, unknown>;
   const assets: UpdateManifest["assets"] = {};
-  for (const key of ["windows", "macos"] as const) {
+  for (const key of ["windows", "macos", "web"] as const) {
     const a = assetsRaw[key] as Record<string, unknown> | undefined;
     if (
       a &&
@@ -121,6 +129,7 @@ export function parseManifest(raw: unknown): UpdateManifest | null {
       a.urls.every((u) => typeof u === "string")
     ) {
       assets[key] = {
+        kind: key === "web" ? "web" : "runtime",
         name: a.name,
         size: typeof a.size === "number" ? a.size : 0,
         sha256: a.sha256.toLowerCase(),
@@ -151,8 +160,8 @@ async function fetchJson(url: string): Promise<unknown | null> {
 }
 
 /** 依次尝试各来源拉取并解析 manifest，第一份成功的即返回。 */
-async function fetchManifest(): Promise<UpdateManifest | null> {
-  for (const url of manifestSources()) {
+async function fetchManifest(channel: UpdateChannel = "stable"): Promise<UpdateManifest | null> {
+  for (const url of manifestSources(channel)) {
     const raw = await fetchJson(url);
     const manifest = parseManifest(raw);
     if (manifest) return manifest;
@@ -176,13 +185,18 @@ function currentPlatform(): "windows" | "macos" | null {
  * 本函数供 dev/浏览器模式及桥失败的降级使用。
  */
 export async function checkForUpdate(): Promise<UpdateInfo | null> {
-  const manifest = await fetchManifest();
+  return checkForUpdateOnChannel("stable");
+}
+
+export async function checkForUpdateOnChannel(channel: UpdateChannel = "stable"): Promise<UpdateInfo | null> {
+  const manifest = await fetchManifest(channel);
   if (manifest) {
     if (!semverLess(APP_VERSION, manifest.version)) return null;
     const platform = currentPlatform();
-    const asset = platform ? manifest.assets[platform] : undefined;
+    const asset = manifest.assets.web ?? (platform ? manifest.assets[platform] : undefined);
     return { latest: manifest.version, url: RELEASES_PAGE, notes: manifest.notes, asset };
   }
+  if (channel === "beta") return null;
   // 所有镜像都失败 → 退回 GitHub API（直连成功的网络仍可用）。
   return checkViaGitHubApi();
 }

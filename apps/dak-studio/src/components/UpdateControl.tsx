@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { UpdateInfo } from "../lib/update";
 import { RELEASES_PAGE } from "../lib/update";
-import { applyUpdate, canSelfUpdate, downloadUpdate, type UpdateJobStatus } from "../lib/updater-bridge";
+import { applyUpdate, applyWebUpdate, canSelfUpdate, downloadUpdate, type UpdateJobStatus } from "../lib/updater-bridge";
 
 /**
  * 侧栏更新入口。
@@ -32,11 +32,14 @@ export function UpdateControl({ update }: { update: UpdateInfo }) {
         setBusy(false);
         return;
       }
-      // ready → 应用并重启（成功不返回；进程被接力脚本替换）。
-      const applied = await applyUpdate(result.jobId);
+      const applied = asset.kind === "web"
+        ? await applyWebUpdate(result.jobId, update.latest)
+        : await applyUpdate(result.jobId);
       if (!applied.ok) {
         setFailed(applied.error ?? "替换失败");
         setBusy(false);
+      } else if (asset.kind === "web") {
+        window.location.reload();
       }
     } catch (err) {
       setFailed(err instanceof Error ? err.message : String(err));
@@ -50,7 +53,7 @@ export function UpdateControl({ update }: { update: UpdateInfo }) {
     : job?.state === "verifying"
       ? "校验中…"
       : job?.state === "applying" || job?.state === "ready"
-        ? "正在重启…"
+        ? asset.kind === "web" ? "正在刷新…" : "正在重启…"
         : pct != null
           ? `下载中 ${pct}%`
           : "准备中…";
@@ -58,7 +61,7 @@ export function UpdateControl({ update }: { update: UpdateInfo }) {
   return (
     <div className="stu-update-control">
       <button type="button" className="stu-update-link" onClick={run} disabled={busy}>
-        {label}
+        {asset.kind === "web" && !busy ? `增量更新到 v${update.latest}` : label}
       </button>
       {job?.stage && busy && <small className="stu-dim">{job.stage}</small>}
       {failed && (

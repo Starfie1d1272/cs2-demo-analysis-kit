@@ -119,5 +119,17 @@ Studio 启动时自动运行轻检查（存在 + size），不 hash 避免拖慢
 | userdata 处理 | 保留（bat relay 搬迁） | installer 初次写入 |
 | 适用对象 | 已有安装的老用户 | 全新安装 |
 
-两者不互相替代——installer 做首次安装，auto-update 做增量更新。
+两者不互相替代——installer 做首次安装，auto-update 做运行时更新。
 Health check 桥接两者：auto-update 后缺失资产 → health check 修复。
+
+## 应用内更新包选择
+
+应用内更新现在分两类：
+
+| 类型 | 内容 | 适用 |
+|---|---|---|
+| `web` patch | `studio_web` 前端构建产物 | 只改 Studio 前端、TS 分析/展示代码时；已安装用户下载小包后刷新生效 |
+| `runtime` zip | PyInstaller onedir runtime | 改 Python bridge、updater、installer、PyInstaller、依赖或未知路径时 |
+
+判断规则在仓库根的 `release-update-policy.json`。workflow 默认自动判断；手动 beta workflow 可强制
+`web` 或 `runtime`。未知路径默认 runtime，避免小包漏更新。

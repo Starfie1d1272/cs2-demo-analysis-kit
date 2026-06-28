@@ -173,6 +173,25 @@ body {
   margin-top: 6px;
 }
 
+.stu-update-channel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--dak-fg-dim);
+  font-size: 10.5px;
+}
+
+.stu-update-channel select {
+  min-width: 72px;
+  height: 22px;
+  border: 1px solid var(--dak-border);
+  border-radius: 4px;
+  background: var(--dak-surface);
+  color: var(--dak-fg-mid);
+  font-size: 11px;
+}
+
 .stu-check-update-btn {
   padding: 0;
   border: 0;

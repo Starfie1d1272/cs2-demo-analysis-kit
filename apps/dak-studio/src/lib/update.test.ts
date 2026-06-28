@@ -8,6 +8,7 @@ const {
   withMirror,
   parseManifest,
   checkForUpdate,
+  checkForUpdateOnChannel,
   manifestSources,
   MANIFEST_MIRRORS,
   R2_BASE
@@ -48,6 +49,10 @@ describe("manifestSources", () => {
     expect(sources[1]).toContain("github.com");
     expect(sources[1]).not.toContain("ghproxy");
   });
+
+  it("beta 只读 R2 beta manifest", () => {
+    expect(manifestSources("beta")).toEqual([`${R2_BASE}/releases/beta/latest.json`]);
+  });
 });
 
 describe("parseManifest", () => {
@@ -69,6 +74,16 @@ describe("parseManifest", () => {
     expect(m?.version).toBe("0.7.0");
     expect(m?.assets.windows?.sha256).toBe("abc123");
     expect(m?.assets.windows?.urls).toHaveLength(1);
+    expect(m?.assets.windows?.kind).toBe("runtime");
+  });
+
+  it("解析 web patch 资产", () => {
+    const m = parseManifest({
+      version: "0.7.0",
+      assets: { web: { name: "dak-studio-web-0.7.0.zip", size: 1, sha256: "AB", urls: ["https://x/web.zip"] } }
+    });
+    expect(m?.assets.web?.kind).toBe("web");
+    expect(m?.assets.web?.sha256).toBe("ab");
   });
 
   it("version 非法或缺失结构 → null", () => {
@@ -143,6 +158,42 @@ describe("checkForUpdate", () => {
     const info = await checkForUpdate();
     expect(info?.latest).toBe("0.7.0");
     expect(info?.asset).toBeUndefined();
+  });
+
+  it("有 web patch 时优先返回 web 资产", async () => {
+    vi.stubGlobal("navigator", { userAgent: "windows nt" });
+    stubFetchSequence(() => new Response(JSON.stringify({
+      version: "0.7.0",
+      assets: {
+        windows: { name: "runtime.zip", size: 1, sha256: "aa", urls: ["https://x/runtime.zip"] },
+        web: { name: "web.zip", size: 1, sha256: "bb", urls: ["https://x/web.zip"] }
+      }
+    }), { status: 200 }));
+    const info = await checkForUpdate();
+    expect(info?.asset?.kind).toBe("web");
+    expect(info?.asset?.name).toBe("web.zip");
+  });
+
+  it("beta channel 命中 beta manifest", async () => {
+    vi.stubGlobal("navigator", { userAgent: "windows nt" });
+    const seen: string[] = [];
+    stubFetchSequence((url) => {
+      seen.push(url);
+      return new Response(manifestBody, { status: 200 });
+    });
+    await checkForUpdateOnChannel("beta");
+    expect(seen[0]).toBe(`${R2_BASE}/releases/beta/latest.json`);
+  });
+
+  it("beta channel manifest 失败时不退 GitHub API", async () => {
+    vi.stubGlobal("navigator", { userAgent: "windows nt" });
+    stubFetchSequence((url) => {
+      if (url.includes("api.github.com")) {
+        return new Response(JSON.stringify({ tag_name: "v0.7.0", html_url: "https://gh/page" }), { status: 200 });
+      }
+      return null;
+    });
+    expect(await checkForUpdateOnChannel("beta")).toBeNull();
   });
 
   it("所有镜像失败 → 退回 GitHub API 兜底", async () => {

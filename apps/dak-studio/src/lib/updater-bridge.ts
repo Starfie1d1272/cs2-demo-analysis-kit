@@ -10,7 +10,7 @@
  *   本模块只转发调用。
  */
 
-import type { UpdateAsset, UpdateInfo } from "./update";
+import type { UpdateAsset, UpdateChannel, UpdateInfo } from "./update";
 import { APP_VERSION, semverLess, RELEASES_PAGE } from "./update";
 
 export type UpdateJobState = "downloading" | "verifying" | "ready" | "applying" | "error";
@@ -32,11 +32,14 @@ export interface UpdateJobStatus {
  */
 interface PywebviewApi {
   /** Python 端 urllib 拉取 manifest（无 CORS），返回 {version, notes, assets} 或 None。 */
-  check_update?(): Promise<Record<string, unknown> | null>;
+  check_update?(channel?: UpdateChannel): Promise<Record<string, unknown> | null>;
   update_start?(urls: string[], sha256: string, size: number, name: string): Promise<{ jobId: string }>;
   update_status?(jobId: string): Promise<UpdateJobStatus>;
   update_apply?(jobId: string): Promise<{ ok: boolean; error?: string }>;
+  update_apply_web?(jobId: string, version: string): Promise<{ ok: boolean; error?: string }>;
 }
+
+type RuntimeUpdaterApi = Required<Pick<PywebviewApi, "update_start" | "update_status" | "update_apply">>;
 
 /** 获取 pywebview API 对象（无桥时返回 null）。 */
 function getPywebviewApi(): PywebviewApi | null {
@@ -47,10 +50,10 @@ function getPywebviewApi(): PywebviewApi | null {
 }
 
 /** 获取支持一键更新（下载+替换）的 API 句柄（仅 Windows 桌面壳）。 */
-export function getUpdaterApi(): Required<PywebviewApi> | null {
+export function getUpdaterApi(): RuntimeUpdaterApi | null {
   const api = getPywebviewApi();
   if (!api?.update_start || !api.update_status || !api.update_apply) return null;
-  return api as Required<PywebviewApi>;
+  return api as RuntimeUpdaterApi;
 }
 
 /** 当前环境是否支持应用内一键更新（桌面壳 + 有当前平台资产）。 */
@@ -64,25 +67,28 @@ export function canSelfUpdate(asset: UpdateAsset | undefined): asset is UpdateAs
  *
  * 返回的 UpdateInfo 带 asset（manifest 命中时），前端据此显示一键更新按钮。
  */
-export async function checkForUpdateViaBridge(): Promise<UpdateInfo | null> {
+export async function checkForUpdateViaBridge(channel: UpdateChannel = "stable"): Promise<UpdateInfo | null> {
   const api = getPywebviewApi();
   if (!api?.check_update) return null;
   try {
-    const raw = await api.check_update();
+    const raw = await api.check_update(channel);
     if (!raw || typeof raw.version !== "string") return null;
     const version = raw.version.replace(/^v/, "");
     if (!semverLess(APP_VERSION, version)) return null;
     const notes = typeof raw.notes === "string" ? raw.notes : undefined;
-    // 解析资产：检查 assets.windows（桌面端只发 Windows）
+    // 解析资产：web patch 优先，缺失时退 runtime。
     const assets = raw.assets as Record<string, unknown> | undefined;
+    const webAsset = assets?.web as Record<string, unknown> | undefined;
     const winAsset = assets?.windows as Record<string, unknown> | undefined;
+    const rawAsset = webAsset && typeof webAsset.name === "string" && Array.isArray(webAsset.urls) ? webAsset : winAsset;
     const asset: UpdateAsset | undefined =
-      winAsset && typeof winAsset.name === "string" && Array.isArray(winAsset.urls)
+      rawAsset && typeof rawAsset.name === "string" && Array.isArray(rawAsset.urls)
         ? {
-            name: winAsset.name as string,
-            size: typeof winAsset.size === "number" ? (winAsset.size as number) : 0,
-            sha256: (typeof winAsset.sha256 === "string" ? (winAsset.sha256 as string) : "").toLowerCase(),
-            urls: winAsset.urls as string[],
+            kind: rawAsset === webAsset ? "web" : "runtime",
+            name: rawAsset.name as string,
+            size: typeof rawAsset.size === "number" ? (rawAsset.size as number) : 0,
+            sha256: (typeof rawAsset.sha256 === "string" ? (rawAsset.sha256 as string) : "").toLowerCase(),
+            urls: rawAsset.urls as string[],
           }
         : undefined;
     return { latest: version, url: RELEASES_PAGE, notes, asset };
@@ -116,4 +122,10 @@ export async function applyUpdate(jobId: string): Promise<{ ok: boolean; error?:
   const api = getUpdaterApi();
   if (!api) return { ok: false, error: "当前环境不支持应用内更新" };
   return api.update_apply(jobId);
+}
+
+export async function applyWebUpdate(jobId: string, version: string): Promise<{ ok: boolean; error?: string }> {
+  const api = getPywebviewApi();
+  if (!api?.update_apply_web) return { ok: false, error: "当前环境不支持前端增量更新" };
+  return api.update_apply_web(jobId, version);
 }

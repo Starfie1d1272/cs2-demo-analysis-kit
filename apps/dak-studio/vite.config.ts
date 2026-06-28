@@ -9,6 +9,8 @@ import react from "@vitejs/plugin-react";
 
 const PYTHON_ROOT = resolve(__dirname, "../../python");
 const EXPORT_TIMEOUT_MS = 10 * 60 * 1000;
+const APP_VERSION = process.env.DAK_APP_VERSION ??
+  (JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")) as { version: string }).version;
 
 /**
  * dev 模式的 .dem 导入后端：POST /api/export-dem 收 .dem 字节流，
@@ -117,9 +119,7 @@ export default defineConfig({
   base: "./",
   define: {
     // 桌面应用版本随 vX.Y.Z tag（scripts/sync-version.mjs 写入 package.json）
-    __APP_VERSION__: JSON.stringify(
-      (JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")) as { version: string }).version
-    ),
+    __APP_VERSION__: JSON.stringify(APP_VERSION),
   },
   plugins: [react(), demExportPlugin(), trisProxyPlugin()],
   server: {

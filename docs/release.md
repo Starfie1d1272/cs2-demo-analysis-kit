@@ -42,9 +42,8 @@ Changesets 管理的公共包。
    ```
 
    `release.yml` 在 macOS / Windows runner 上跑 `scripts/package.sh`，只产出
-   DAK Studio 两个产物：`dak-studio-X.Y.Z.dmg` 与 `dak-studio-windows-X.Y.Z.zip`，
-   附安装说明发到 GitHub Release。纯导出器 cs2dak 不进 Release（本地需要时
-   `PACKAGE_EXPORTER=1 bash scripts/package.sh`）。
+   DAK Studio 产物：`dak-studio-X.Y.Z.dmg`、`dak-studio-windows-X.Y.Z.zip`、
+   Web Installer、Full Portable Zip。纯导出器 cs2dak 不进 Release。
 
 5. 发布后无需额外通知。Release CI 会随产物生成 `latest.json` 更新 manifest，
    同时发到 GitHub Release **并上传到 Cloudflare R2**
@@ -52,6 +51,8 @@ Changesets 管理的公共包。
    **R2 → GitHub → ghproxy** 顺序拉取 manifest（失败转移，绕开 `api.github.com`），
    旧版本侧栏出现更新入口：桌面壳（Windows）显示"更新到 vX.Y.Z"一键更新，否则退回手动下载链接。
    机制详见 [`docs/design/auto-update.md`](design/auto-update.md)。
+   应用内更新会按 `release-update-policy.json` 自动决定优先发前端 `web` 小包还是完整
+   `runtime` zip；未知路径保守走 runtime。
 
    **发版后验证（R2 链路）**：
 
@@ -74,6 +75,23 @@ Changesets 管理的公共包。
 bash scripts/package.sh 0.2.0
 open "python/dist/DAK Studio.app"
 ```
+
+## Windows 测试版更新
+
+不打正式 tag。手动触发 GitHub Actions 的 **Beta Update** workflow：
+
+- `version`：填一个比当前测试机版本大的数字版本（例如 `0.7.99` 或 `0.8.0`）；
+- `update_kind`：默认 `auto`，也可强制 `web` / `runtime`；
+- `base_ref`：auto 判断的 diff 基准，默认 `origin/main`。
+
+workflow 只面向 Windows 应用内测试：
+
+- `web`：只上传 `dak-studio-web-<version>.zip` 和 `releases/beta/latest.json`；
+- `runtime`：只上传 `dak-studio-windows-<version>.zip` 和 `releases/beta/latest.json`；
+- 不构建 macOS、installer、full zip、events、tris。
+
+Studio 里把「更新通道」切到「测试版」后，检查更新会读
+`https://dakupdate.starfie1d.top/releases/beta/latest.json`。
 
 ## npm 包发布（@cs2dak/*，Changesets）
 

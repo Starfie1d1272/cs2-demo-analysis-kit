@@ -21,6 +21,7 @@ import base64
 import json
 import logging
 import os
+import re
 import shutil
 import socket
 import sqlite3
@@ -61,11 +62,15 @@ _MANIFEST_URLS = [
     "https://gh-proxy.com/https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/latest/download/latest.json",
     "https://ghproxy.net/https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/latest/download/latest.json",
 ]
+_BETA_MANIFEST_URLS = [
+    "https://dakupdate.starfie1d.top/releases/beta/latest.json",
+]
 _MANIFEST_TIMEOUT_S = 8
 
 
 def _version_tuple(v: str) -> tuple[int, ...]:
-    return tuple(int(x) for x in v.split(".")[:3])
+    parts = re.findall(r"\d+", v)[:3]
+    return tuple(int(x) for x in parts)
 
 
 def _sanitize(s: str) -> str:
@@ -155,6 +160,7 @@ class _StudioStaticHandler(SimpleHTTPRequestHandler):
 
     overlay_tris: Path | None = None
     overlay_bundled_events: Path | None = None
+    overlay_web: Path | None = None
     _tri_locks: dict[str, threading.Lock] = {}
     _tri_locks_guard = threading.Lock()
     _tris_manifest: dict | None = None
@@ -224,6 +230,14 @@ class _StudioStaticHandler(SimpleHTTPRequestHandler):
         default = super().translate_path(path)
         urlpath = urllib.parse.urlparse(path).path
 
+        # 前端增量包 overlay：完整 dist 解压到 userdata/studio-web 后优先提供。
+        overlay_web = self.overlay_web
+        if overlay_web is not None:
+            rel = "index.html" if urlpath in ("", "/") else urlpath.lstrip("/")
+            candidate = overlay_web / rel
+            if candidate.is_file():
+                return str(candidate)
+
         # /tris/ overlay：userdata/tris 优先于内置
         overlay = self.overlay_tris
         if overlay is not None and urlpath.startswith("/tris/"):
@@ -270,7 +284,12 @@ def _find_static_port(start: int = 51780) -> int:
         return int(sock.getsockname()[1])
 
 
-def _start_static_server(root: Path, overlay_tris: Path | None = None, overlay_bundled_events: Path | None = None) -> tuple[ThreadingHTTPServer, str]:
+def _start_static_server(
+    root: Path,
+    overlay_tris: Path | None = None,
+    overlay_bundled_events: Path | None = None,
+    overlay_web: Path | None = None,
+) -> tuple[ThreadingHTTPServer, str]:
     from functools import partial
 
     port = _find_static_port()
@@ -279,6 +298,8 @@ def _start_static_server(root: Path, overlay_tris: Path | None = None, overlay_b
         _StudioStaticHandler.overlay_tris = overlay_tris
     if overlay_bundled_events is not None:
         _StudioStaticHandler.overlay_bundled_events = overlay_bundled_events
+    if overlay_web is not None:
+        _StudioStaticHandler.overlay_web = overlay_web
     handler = partial(_StudioStaticHandler, directory=str(root))
     server = ThreadingHTTPServer(("127.0.0.1", port), handler)
     thread = threading.Thread(target=server.serve_forever, name="dak-studio-static", daemon=True)
@@ -286,6 +307,18 @@ def _start_static_server(root: Path, overlay_tris: Path | None = None, overlay_b
     url = f"http://127.0.0.1:{port}/index.html"
     log.info("static server: %s -> %s", url, root)
     return server, url
+
+
+def _valid_web_overlay(path: Path) -> Path | None:
+    if not (path / "index.html").is_file():
+        return None
+    try:
+        version = json.loads((path / "version.json").read_text(encoding="utf-8")).get("version")
+        if isinstance(version, str) and _version_tuple(version) >= _version_tuple(__version__):
+            return path
+    except Exception:
+        return None
+    return None
 
 
 def _setup_logging(userdata: Path) -> None:
@@ -1122,8 +1155,53 @@ class StudioApi:
         threading.Thread(target=_quit, daemon=True).start()
         return {"ok": True}
 
+    def update_apply_web(self, job_id: str, version: str) -> dict:
+        """Install a frontend-only update into userdata/studio-web.
+
+        The zip is a complete Vite dist directory. The static server checks this
+        overlay before the bundled studio_web, so a page reload is enough.
+        """
+        job = self._update_jobs.get(job_id)
+        if job is None or job.staged_path is None or job.state != "ready":
+            return {"ok": False, "error": "更新包尚未就绪"}
+        if _version_tuple(version) < _version_tuple(__version__):
+            return {"ok": False, "error": "前端增量包版本低于当前运行时"}
+        target = self._userdata / "studio-web"
+        stage = self._userdata / f".studio-web-{int(time.time())}"
+        try:
+            if stage.exists():
+                shutil.rmtree(stage)
+            stage.mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(job.staged_path) as zf:
+                zf.extractall(stage)
+            root = stage
+            if not (root / "index.html").is_file():
+                dirs = [p for p in stage.iterdir() if p.is_dir() and (p / "index.html").is_file()]
+                if len(dirs) == 1:
+                    root = dirs[0]
+                else:
+                    raise RuntimeError("增量包内未找到 index.html")
+            (root / "version.json").write_text(
+                json.dumps({"version": version, "installedAt": datetime.now(timezone.utc).isoformat()}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            backup = self._userdata / ".studio-web-old"
+            if backup.exists():
+                shutil.rmtree(backup)
+            if target.exists():
+                target.replace(backup)
+            root.replace(target)
+            _StudioStaticHandler.overlay_web = target
+            shutil.rmtree(stage, ignore_errors=True)
+            shutil.rmtree(backup, ignore_errors=True)
+            return {"ok": True}
+        except Exception as exc:  # noqa: BLE001
+            shutil.rmtree(stage, ignore_errors=True)
+            log.exception("web update apply %s failed", job_id)
+            return {"ok": False, "error": str(exc)}
+
     # --- update check bridge（服务端拉 manifest，消除 webview CORS 问题）---
-    def check_update(self) -> dict | None:
+    def check_update(self, channel: str = "stable") -> dict | None:
         """通过服务端 HTTP（无 CORS）拉取更新 manifest。
 
         前端直接消费返回的 { version, notes, publishedAt, assets }。
@@ -1133,8 +1211,17 @@ class StudioApi:
         """
         from cs2dak import __version__ as local_ver
 
-        local_ver_t = _version_tuple(local_ver)
-        for url in _MANIFEST_URLS:
+        effective_ver = local_ver
+        web_version_path = self._userdata / "studio-web" / "version.json"
+        try:
+            web_version = json.loads(web_version_path.read_text(encoding="utf-8")).get("version")
+            if isinstance(web_version, str) and _version_tuple(web_version) > _version_tuple(effective_ver):
+                effective_ver = web_version
+        except Exception:
+            pass
+        local_ver_t = _version_tuple(effective_ver)
+        urls = _BETA_MANIFEST_URLS if channel == "beta" else _MANIFEST_URLS
+        for url in urls:
             try:
                 req = urllib.request.Request(url, headers={"User-Agent": "DAK-Studio-Updater"})
                 with urllib.request.urlopen(req, timeout=_MANIFEST_TIMEOUT_S) as resp:  # noqa: S310 - https
@@ -1494,7 +1581,13 @@ def main() -> None:
     # bundled-events overlay：userdata/bundled-events（installer 预装或 health check 修复）。
     overlay_bundled_events = storage / "bundled-events"
     overlay_bundled_events.mkdir(parents=True, exist_ok=True)
-    _server, index_url = _start_static_server(WEB_DIR, overlay_tris=overlay_tris, overlay_bundled_events=overlay_bundled_events)
+    overlay_web = storage / "studio-web"
+    _server, index_url = _start_static_server(
+        WEB_DIR,
+        overlay_tris=overlay_tris,
+        overlay_bundled_events=overlay_bundled_events,
+        overlay_web=_valid_web_overlay(overlay_web),
+    )
     api = StudioApi()
     window = webview.create_window(
         title=f"DAK Studio {__version__}",

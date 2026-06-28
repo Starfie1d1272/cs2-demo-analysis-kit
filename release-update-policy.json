@@ -1,0 +1,25 @@
+{
+  "ignored": [
+    "CHANGELOG.md",
+    "README.md",
+    "AGENTS.md",
+    "docs/**"
+  ],
+  "webPatch": [
+    "apps/dak-studio/src/**",
+    "packages/contract/src/**",
+    "packages/core/src/**",
+    "packages/maps/src/**",
+    "packages/presentation/src/**",
+    "packages/react/src/**"
+  ],
+  "runtime": [
+    ".github/workflows/**",
+    "apps/dak-studio/public/**",
+    "apps/dak-studio/vite.config.ts",
+    "package.json",
+    "pnpm-lock.yaml",
+    "python/**",
+    "scripts/**"
+  ]
+}

@@ -19,8 +19,9 @@
 下载：UpdateControl ──桥──> StudioApi.update_start ──> updater.download_with_fallback
        (前端)                (Python)                   镜像顺序试 + .part 暂存 + sha256 校验
                                         ↓ ready
-替换：UpdateControl ──桥──> StudioApi.update_apply ──> updater.apply_windows_update
-                                                        解压旁目录 + 写接力 .bat + 退出进程
+替换：runtime ──> StudioApi.update_apply ──> updater.apply_windows_update
+      web patch ─> StudioApi.update_apply_web ──> userdata/studio-web overlay + reload
+                                                        runtime 解压旁目录 + 写接力 .bat + 退出进程
                                         ↓ .bat 接管
        等本进程退出 → 旧目录改名 → 新目录就位 → 搬回 userdata → 重启 → 清理 → 自删
 ```
@@ -35,7 +36,10 @@
 - **失败转移**：按上面顺序尝试，单个 8s 超时切下一个。
 - **兜底**：所有来源失败 → 退回 GitHub API（直连成功的网络仍可用），老发布（无 manifest）也能给出“去下载”链接。
 - manifest 由发版 CI 生成：[`scripts/gen-update-manifest.mjs`](../../scripts/gen-update-manifest.mjs)（算 sha256/size，
-  写 `asset.urls` 列表，顺序同样是 **R2 → GitHub → ghproxy**）。
+  写 `asset.urls` 列表，顺序同样是 **R2 → GitHub → ghproxy**）。manifest 可同时包含
+  `assets.web`（前端增量包，优先）和 `assets.windows`（完整 runtime zip，兜底）。
+- 更新通道：stable 读 `releases/latest.json`；beta 读 `releases/beta/latest.json`，只走 R2，
+  用于 Windows 真机测试。
 
 #### R2 镜像（Cloudflare R2）
 
@@ -91,11 +95,11 @@ Windows 无法删除/覆盖正在运行的 exe。`apply_windows_update`：
 - **本地调试**：想要内置回退就手动把 `.tri` 放进 `studio_web/tris/`（overlay 优先，
   内置兜底）；dev（vite）仍走 `apps/dak-studio/public/tris/` 符号链接。
 
-## 与 churn 拆分的协同（后续）
+## 与 churn 拆分的协同
 
-把高频变更（前端 dist）与低频变更（Python 壳/依赖/`.tri`）拆开后，
-高频更新可走更轻的前端热更新包（几 MB，走 CDN），全量 app 更新变罕见——
-镜像失败转移这条重路径只在依赖变更时才走。前端热更新尚未实现，是 0.7 后续项。
+高频变更（前端 dist）与低频变更（Python 壳/依赖/`.tri`）已经拆开：
+高频更新走 `dak-studio-web-<version>.zip`，解压到 `userdata/studio-web` overlay；
+低频变更继续走完整 runtime zip。`.tri` 与赛事包仍由独立资产 manifest 管理。
 
 ---
 
