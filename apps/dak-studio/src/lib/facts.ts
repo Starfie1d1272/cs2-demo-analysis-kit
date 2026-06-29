@@ -17,16 +17,19 @@ import {
   buildOpeningTrails,
   buildPlayerMechanicsProfileFromRows,
   buildPlayerSeasonInsights,
+  buildUtilityValueSummary,
   extractDuelInsightsFacts,
   extractTeamComparisonFacts,
   extractTournamentFacts,
+  mergeUtilityValueSummaries,
   displayWeaponName,
   type DuelInsightsFacts,
   type PlayerMechanicsProfile,
   type PlayerSeasonInsights,
   type PlayerWeaponStat,
   type TeamComparisonFacts,
-  type TournamentFacts
+  type TournamentFacts,
+  type UtilityValueSummary
 } from "@cs2dak/presentation";
 import { getStorage, type RecordStore, type StorageAdapter } from "./storage";
 
@@ -123,6 +126,10 @@ export interface LineupFact extends MatchFactBase {
   tickrate: number;
 }
 
+export interface UtilityValueFact extends MatchFactBase {
+  row: UtilityValueSummary;
+}
+
 export { TACTICAL_FACT_VERSION };
 export type {
   C4RouteFact,
@@ -148,6 +155,7 @@ export interface MatchFacts {
   openingTrails: OpeningTrailFact[];
   lineups: LineupFact[];
   tacticalRounds: TacticalRoundFact[];
+  utilityValueFacts: UtilityValueFact[];
 }
 
 export interface ExtractMatchFactsOptions {
@@ -184,6 +192,7 @@ export interface FactsStore {
   getOpeningTrails(scope?: FactsScope): Promise<OpeningTrailFact[]>;
   getLineups(scope?: FactsScope): Promise<LineupFact[]>;
   getTacticalRounds(scope?: FactsScope): Promise<TacticalRoundFact[]>;
+  getUtilityValueFacts(scope?: FactsScope): Promise<UtilityValueSummary[]>;
   deleteMatchFacts(matchId: string): Promise<void>;
 }
 
@@ -199,6 +208,12 @@ export interface PlayerSeasonDetailsFromFacts {
 
 export interface PlayerFlashSummariesFactsOptions extends FactsScope {
   players: Array<{ playerKey: string; name: string; steamIds: string[] }>;
+}
+
+export interface UtilityValueFactsOptions extends FactsScope {
+  players: Array<{ playerKey: string; name: string; steamIds: string[] }>;
+  teamRenames?: Record<string, string>;
+  selectedTeams?: string[];
 }
 
 function defaultPlayerKey(player: { steamId64: string }): string {
@@ -388,6 +403,11 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
   const visibilityFor = options.visibilityFor?.(mapName) ?? null;
   const calloutGrid = options.calloutGrid ?? null;
   const input = { matchId: options.matchId, pkg };
+  const utilityPlayers = pkg.players.map((player) => ({
+    playerKey: playerKeyFor(player),
+    name: player.name,
+    steamIds: [player.steamId64]
+  }));
   const openingTrails = pkg.players.map((player) => ({    matchId: options.matchId,
     mapName,
     playerKey: playerKeyFor(player),
@@ -419,7 +439,14 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
     matchWorkspace: [],
     openingTrails,
     lineups: [extractLineupFact(pkg, options.matchId, calloutGrid)],
-    tacticalRounds: extractTacticalRoundFacts(pkg, { matchId: options.matchId, calloutGrid })
+    tacticalRounds: extractTacticalRoundFacts(pkg, { matchId: options.matchId, calloutGrid }),
+    utilityValueFacts: [
+      {
+        matchId: options.matchId,
+        mapName,
+        row: buildUtilityValueSummary([input], utilityPlayers)
+      }
+    ]
   };
 }
 
@@ -473,6 +500,7 @@ export function createFactsStore(adapter: StorageAdapter, namespace = "facts"): 
   const openingTrails = adapter.records(`${namespace}:opening_trails`);
   const lineups = adapter.records(`${namespace}:lineups`);
   const tacticalRounds = adapter.records(`${namespace}:tactical_rounds`);
+  const utilityValueFacts = adapter.records(`${namespace}:utility_value`);
 
   return {
     async putMatchFacts(facts) {
@@ -535,6 +563,11 @@ export function createFactsStore(adapter: StorageAdapter, namespace = "facts"): 
         replaceRows(
           tacticalRounds,
           facts.tacticalRounds.map((row) => [rowKey(row.matchId, String(row.roundNumber), row.side), row]),
+          facts.matchId
+        ),
+        replaceRows(
+          utilityValueFacts,
+          facts.utilityValueFacts.map((row) => [row.matchId, row]),
           facts.matchId
         )
       ]);
@@ -608,11 +641,17 @@ export function createFactsStore(adapter: StorageAdapter, namespace = "facts"): 
         .filter((row) => inScope(row, scope))
         .sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.side.localeCompare(b.side));
     },
+    async getUtilityValueFacts(scope) {
+      return (await utilityValueFacts.getAll<UtilityValueFact>())
+        .filter((row) => inScope(row, scope))
+        .sort((a, b) => a.matchId.localeCompare(b.matchId))
+        .map((row) => row.row);
+    },
     async deleteMatchFacts(matchId) {
       await Promise.all(
         [playerStats, playerInsights, playerWeapons, mechanics,
          cohortRows, tournamentFacts, teamComparisonFacts, duelFacts,
-         matchWorkspace, openingTrails, lineups, tacticalRounds]
+         matchWorkspace, openingTrails, lineups, tacticalRounds, utilityValueFacts]
           .map((store) => store.deleteByPrefix(matchId))
       );
     }
@@ -765,4 +804,17 @@ export async function buildPlayerFlashSummariesFromFacts(
       ...merged.flash
     };
   }));
+}
+
+export async function buildUtilityValueSummaryFromFacts(
+  store: FactsStore,
+  options: UtilityValueFactsOptions
+): Promise<UtilityValueSummary> {
+  const summary = mergeUtilityValueSummaries(await store.getUtilityValueFacts(options), {
+    players: options.players,
+    teamRenames: options.teamRenames
+  });
+  return options.selectedTeams && options.selectedTeams.length > 0
+    ? { ...summary, teams: summary.teams.filter((row) => options.selectedTeams!.includes(row.name)) }
+    : summary;
 }

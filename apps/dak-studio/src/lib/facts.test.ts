@@ -14,9 +14,10 @@ import {
   buildTeamComparison,
   buildTeamComparisonFromFacts,
   buildTournamentInsights,
-  buildTournamentInsightsFromFacts
+  buildTournamentInsightsFromFacts,
+  buildUtilityValueSummary
 } from "@cs2dak/presentation";
-import { TACTICAL_FACT_VERSION, buildPlayerSeasonDetailsFromFacts, createFactsStore, extractMatchFacts } from "./facts";
+import { TACTICAL_FACT_VERSION, buildPlayerSeasonDetailsFromFacts, buildUtilityValueSummaryFromFacts, createFactsStore, extractMatchFacts } from "./facts";
 import type { ExecuteBucket } from "./facts";
 import { createIdbAdapter } from "./storage/idb-adapter";
 
@@ -131,6 +132,22 @@ describe("MatchFacts", () => {
 
     expect(buildDuelInsightsFromFacts(await store.getDuelFacts({ matchIds: [matchId] }))).toEqual(
       buildDuelInsights([{ matchId, pkg }])
+    );
+  });
+
+  it("projects persisted utility value facts without reopening the demo package", async () => {
+    const pkg = await loadFixture();
+    const matchId = "m1";
+    const store = createFactsStore(createIdbAdapter(), "facts-utility-equivalence");
+    await store.putMatchFacts(extractMatchFacts(pkg, { matchId }));
+    const players = pkg.players.map((player) => ({
+      playerKey: `steam:${player.steamId64}`,
+      name: player.name,
+      steamIds: [player.steamId64]
+    }));
+
+    expect(await buildUtilityValueSummaryFromFacts(store, { matchIds: [matchId], players })).toEqual(
+      buildUtilityValueSummary([{ matchId, pkg }], players)
     );
   });
 

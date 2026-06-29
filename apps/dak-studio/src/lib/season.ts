@@ -5,7 +5,6 @@ import {
   buildSeasonLeaderboardModel,
   buildTournamentInsightsFromFacts,
   buildTeamComparisonFromFacts,
-  buildUtilityValueSummary,
   type PlayerFlashSummary,
   type PlayerSeasonInsights,
   type PlayerMechanicsProfile,
@@ -19,6 +18,7 @@ import { touchLimitedCache } from "./idb";
 import {
   buildPlayerFlashSummariesFromFacts,
   buildPlayerSeasonDetailsFromFacts,
+  buildUtilityValueSummaryFromFacts,
   getFactsStore
 } from "./facts";
 import { getStorage } from "./storage";
@@ -28,7 +28,7 @@ import type {
   SeasonCohortBundle,
   SeasonLeaderboardModel
 } from "@cs2dak/contract";
-import { getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "./library";
+import { matchIdForEntry, type StudioDemoEntry } from "./library";
 import { originalTeamNamesForDisplay } from "./identity";
 
 export interface IdentityOptions {
@@ -306,22 +306,26 @@ export function getUtilityValueSummary(
   selectedTeams: string[] = [],
 ): Promise<UtilityValueSummary> {
   const playerKey = players.map((p) => `${p.playerKey}=${p.steamIds.join(",")}`).sort().join("|");
-  const key = `${keyOf(entries, identity?.version, selectedTeams)}:utility-value:v1:${playerKey}`;
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:utility-value:v2:${playerKey}`;
   const cached = utilityValueCache.get(key);
   if (cached) return cached;
   const loading = (async () => {
     const persisted = await readPersistedValue<UtilityValueSummary>(key);
     if (persisted) return persisted;
-    const demos = await Promise.all(entries.map(async (entry) => ({
-      matchId: matchIdForEntry(entry),
-      pkg: await getDemoPackage(entry.id),
-    })));
-    const summary = buildUtilityValueSummary(demos, players, { teamRenames: identity?.teamRenames });
-    const filtered = selectedTeams.length > 0
-      ? { ...summary, teams: summary.teams.filter((row) => selectedTeams.includes(row.name)) }
-      : summary;
-    void writePersistedValue(key, filtered);
-    return filtered;
+    const factsStore = getFactsStore();
+    const matchIds = entries.map(matchIdForEntry);
+    const facts = await factsStore.getUtilityValueFacts({ matchIds });
+    if (facts.length >= entries.length) {
+      const summary = await buildUtilityValueSummaryFromFacts(factsStore, {
+        matchIds,
+        players,
+        teamRenames: identity?.teamRenames,
+        selectedTeams
+      });
+      void writePersistedValue(key, summary);
+      return summary;
+    }
+    throw missingFactsError("道具价值");
   })();
   return touchLimitedCache(utilityValueCache, key, loading, SMALL_CACHE_LIMIT);
 }

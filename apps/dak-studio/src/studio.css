@@ -56,14 +56,19 @@ body {
 .stu-app {
   display: grid;
   grid-template-columns: var(--stu-sidebar-w) minmax(0, 1fr);
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .stu-sidebar {
   position: sticky;
   top: 0;
   align-self: start;
-  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -2361,6 +2366,12 @@ td.stu-heat-cell.stu-heat-neutral {
   margin-left: 4px;
   color: var(--dak-fg-dim);
   font-family: var(--dak-mono);
+}
+
+.stu-radar-field .dak-heatmap-wrap {
+  width: min(100%, clamp(360px, calc(100dvh - 300px), 760px));
+  height: auto;
+  margin: 0 auto;
 }
 
 .stu-trail-layout {

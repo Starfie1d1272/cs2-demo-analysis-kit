@@ -20,7 +20,7 @@ import { buildPlayerTacticalSegments } from "./segments.js";
 import { deriveOpeningPattern, deriveOpeningPressure } from "./formations.js";
 import type { OpeningPattern, OpeningPressureEvent, TacticalFrameSample } from "./types.js";
 
-export const TACTICAL_FACT_VERSION = 6;
+export const TACTICAL_FACT_VERSION = 7;
 export type ExecuteBucket = "rush" | "fast" | "mid" | "late";
 
 export interface SiteEntryOccurrence {

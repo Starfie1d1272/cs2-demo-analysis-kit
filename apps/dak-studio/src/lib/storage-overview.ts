@@ -24,12 +24,13 @@ export interface BrowserStorageOverview {
   categories: BrowserStorageCategory[];
 }
 
-/** facts 投影的 12 个命名空间（与 createFactsStore 一致）。 */
+/** facts 投影的命名空间（与 createFactsStore 一致）。 */
 const FACTS_NAMESPACES = [
   "facts:player_match_stats", "facts:player_insights", "facts:player_weapons",
   "facts:mechanics_samples", "facts:cohort_rows", "facts:tournament_facts",
   "facts:team_comparison_facts", "facts:duel_facts", "facts:match_workspace",
   "facts:opening_trails", "facts:lineups", "facts:tactical_rounds",
+  "facts:utility_value",
 ];
 
 /** 资料库元数据/设置等"数据库"类命名空间（非派生缓存、非原始字节）。 */

@@ -24,6 +24,7 @@ export { SEASON_STAT_VIEWS, formatPercent } from "./season-metrics.js";
 export {
   buildPlayerSeasonInsights,
   buildUtilityValueSummary,
+  mergeUtilityValueSummaries,
   buildPlayerMechanicsProfile,
   buildPlayerMechanicsProfileFromRows,
   buildPlayerWeaponStats,

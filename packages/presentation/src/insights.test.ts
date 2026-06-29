@@ -8,6 +8,7 @@ import {
   buildPlayerFlashSummaries,
   buildPlayerSeasonInsights,
   buildUtilityValueSummary,
+  mergeUtilityValueSummaries,
   buildTournamentInsights,
   buildTournamentInsightsFromFacts,
   extractTournamentFacts
@@ -130,6 +131,29 @@ describe("buildUtilityValueSummary", () => {
       expect(evidence.damage).toBeGreaterThan(0);
       expect(evidence.victimCount).toBeGreaterThan(0);
     }
+  });
+
+  it("merges persisted per-match utility summaries by identity", async () => {
+    const pkg = await loadFixture();
+    const players = pkg.players.slice(0, 2).map((player) => ({
+      playerKey: `steam:${player.steamId64}`,
+      name: player.name,
+      steamIds: [player.steamId64]
+    }));
+    const mergedPlayer = {
+      playerKey: "merged",
+      name: "Merged Player",
+      steamIds: players.flatMap((player) => player.steamIds)
+    };
+    const summary = buildUtilityValueSummary([{ matchId: "m1", pkg }], players);
+    const merged = mergeUtilityValueSummaries([summary], { players: [mergedPlayer] });
+    const expectedRounds = summary.players.reduce((total, row) => total + row.rounds, 0);
+    const expectedFlashAssists = summary.players.reduce((total, row) => total + row.flashAssists, 0);
+
+    expect(merged.players).toHaveLength(1);
+    expect(merged.players[0]?.id).toBe("merged");
+    expect(merged.players[0]?.rounds).toBe(expectedRounds);
+    expect(merged.players[0]?.flashAssists).toBe(expectedFlashAssists);
   });
 });
 

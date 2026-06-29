@@ -168,8 +168,10 @@ export interface UtilityValueRow {
   rounds: number;
   flashesThrown: number;
   enemyBlindSeconds: number;
+  enemyBlindSecondsRaw?: number;
   enemyBlindSecondsPerFlash: number | null;
   enemyBlindSecondsPerRound: number | null;
+  flashAssists: number;
   flashAssistsPerRound: number | null;
   heThrows: number;
   heDamage: number;
@@ -188,6 +190,7 @@ export interface UtilityDamageEvidence {
   matchId: string;
   roundNumber: number;
   tick?: number;
+  playerId?: string;
   playerName: string;
   victimCount: number;
   damage: number;
@@ -196,7 +199,7 @@ export interface UtilityDamageEvidence {
 export interface UtilityValueSummary {
   players: UtilityValueRow[];
   teams: UtilityValueRow[];
-  bestFlashes: Array<EnemyFlashIncident & { playerName: string }>;
+  bestFlashes: Array<EnemyFlashIncident & { playerId?: string; playerName: string }>;
   bestDamageRounds: UtilityDamageEvidence[];
 }
 
@@ -228,6 +231,7 @@ function utilityRow(id: string, name: string): UtilityValueRow {
     enemyBlindSeconds: 0,
     enemyBlindSecondsPerFlash: null,
     enemyBlindSecondsPerRound: null,
+    flashAssists: 0,
     flashAssistsPerRound: null,
     heThrows: 0,
     heDamage: 0,
@@ -242,13 +246,15 @@ function utilityRow(id: string, name: string): UtilityValueRow {
   };
 }
 
-function finalizeUtilityRow(row: UtilityValueRow, flashAssists = 0): UtilityValueRow {
+function finalizeUtilityRow(row: UtilityValueRow): UtilityValueRow {
+  const enemyBlindSecondsRaw = row.enemyBlindSecondsRaw ?? row.enemyBlindSeconds;
   return {
     ...row,
-    enemyBlindSeconds: round(row.enemyBlindSeconds, 1),
-    enemyBlindSecondsPerFlash: row.flashesThrown > 0 ? round(row.enemyBlindSeconds / row.flashesThrown, 2) : null,
-    enemyBlindSecondsPerRound: row.rounds > 0 ? round(row.enemyBlindSeconds / row.rounds, 2) : null,
-    flashAssistsPerRound: row.rounds > 0 ? round(flashAssists / row.rounds, 3) : null,
+    enemyBlindSecondsRaw,
+    enemyBlindSeconds: round(enemyBlindSecondsRaw, 1),
+    enemyBlindSecondsPerFlash: row.flashesThrown > 0 ? round(enemyBlindSecondsRaw / row.flashesThrown, 2) : null,
+    enemyBlindSecondsPerRound: row.rounds > 0 ? round(enemyBlindSecondsRaw / row.rounds, 2) : null,
+    flashAssistsPerRound: row.rounds > 0 ? round(row.flashAssists / row.rounds, 3) : null,
     heDamagePerThrow: row.heThrows > 0 ? round(row.heDamage / row.heThrows, 2) : null,
     heDamagePerRound: row.rounds > 0 ? round(row.heDamage / row.rounds, 2) : null,
     fireDamagePerThrow: row.fireThrows > 0 ? round(row.fireDamage / row.fireThrows, 2) : null,
@@ -264,9 +270,7 @@ export function buildUtilityValueSummary(
 ): UtilityValueSummary {
   const bySteamId = new Map<string, PlayerFlashSummaryInput>();
   const playerRows = new Map<string, UtilityValueRow>();
-  const playerFlashAssists = new Map<string, number>();
   const teamRows = new Map<string, UtilityValueRow>();
-  const teamFlashAssists = new Map<string, number>();
   const bestFlashes: UtilityValueSummary["bestFlashes"] = [];
   const damageEvidence = new Map<string, UtilityDamageEvidence & { victims: Set<string> }>();
 
@@ -296,12 +300,11 @@ export function buildUtilityValueSummary(
       if (!player) continue;
       const row = playerRows.get(player.playerKey)!;
       row.rounds += stat.rounds;
-      const assists = (playerFlashAssists.get(player.playerKey) ?? 0) + stat.flashAssistCount;
-      playerFlashAssists.set(player.playerKey, assists);
+      row.flashAssists += stat.flashAssistCount;
       const teamKey = pkg.players[stat.playerIndex]?.teamKey;
       if (teamKey) {
         const team = ensureTeam(pkg, teamKey);
-        teamFlashAssists.set(team.id, (teamFlashAssists.get(team.id) ?? 0) + stat.flashAssistCount);
+        team.flashAssists += stat.flashAssistCount;
       }
     }
 
@@ -354,6 +357,7 @@ export function buildUtilityValueSummary(
       if (cell.enemySeconds <= 0 || !cell.playerKey) continue;
       bestFlashes.push({
         playerName: cell.playerName,
+        playerId: cell.playerKey,
         matchId,
         roundNumber: cell.roundNumber,
         tick: cell.tick,
@@ -387,6 +391,7 @@ export function buildUtilityValueSummary(
           matchId,
           roundNumber: damage.roundNumber,
           tick: damage.tick,
+          playerId: player.playerKey,
           playerName: player.name,
           victimCount: 0,
           victims: new Set<string>(),
@@ -403,16 +408,96 @@ export function buildUtilityValueSummary(
 
   return {
     players: [...playerRows.values()]
-      .map((row) => finalizeUtilityRow(row, playerFlashAssists.get(row.id) ?? 0))
+      .map(finalizeUtilityRow)
       .sort((a, b) => (b.heDamagePerRound ?? 0) + (b.fireDamagePerRound ?? 0) - ((a.heDamagePerRound ?? 0) + (a.fireDamagePerRound ?? 0))),
     teams: [...teamRows.values()]
-      .map((row) => finalizeUtilityRow(row, teamFlashAssists.get(row.id) ?? 0))
+      .map(finalizeUtilityRow)
       .sort((a, b) => (b.heDamagePerRound ?? 0) + (b.fireDamagePerRound ?? 0) - ((a.heDamagePerRound ?? 0) + (a.fireDamagePerRound ?? 0))),
     bestFlashes: bestFlashes.sort((a, b) => b.enemySeconds - a.enemySeconds).slice(0, MAX_BEST_FLASH),
     bestDamageRounds: [...damageEvidence.values()]
       .sort((a, b) => b.damage - a.damage)
       .slice(0, MAX_EVIDENCE)
       .map(({ victims: _victims, ...row }) => row),
+  };
+}
+
+function addUtilityRow(target: UtilityValueRow, source: UtilityValueRow): void {
+  target.rounds += source.rounds;
+  target.flashesThrown += source.flashesThrown;
+  target.enemyBlindSeconds += source.enemyBlindSecondsRaw ?? source.enemyBlindSeconds;
+  target.flashAssists += source.flashAssists ?? 0;
+  target.heThrows += source.heThrows;
+  target.heDamage += source.heDamage;
+  target.fireThrows += source.fireThrows;
+  target.fireDamage += source.fireDamage;
+  target.smokesThrown += source.smokesThrown;
+}
+
+function sortUtilityRows(rows: UtilityValueRow[]): UtilityValueRow[] {
+  return rows
+    .map(finalizeUtilityRow)
+    .sort((a, b) => (b.heDamagePerRound ?? 0) + (b.fireDamagePerRound ?? 0) - ((a.heDamagePerRound ?? 0) + (a.fireDamagePerRound ?? 0)));
+}
+
+export function mergeUtilityValueSummaries(
+  summaries: UtilityValueSummary[],
+  options: { players?: PlayerFlashSummaryInput[]; teamRenames?: Record<string, string> } = {}
+): UtilityValueSummary {
+  const playerRows = new Map<string, UtilityValueRow>();
+  const playerTargetBySource = new Map<string, PlayerFlashSummaryInput>();
+  if (options.players) {
+    for (const player of options.players) {
+      playerRows.set(player.playerKey, utilityRow(player.playerKey, player.name));
+      playerTargetBySource.set(player.playerKey, player);
+      for (const steamId of player.steamIds) playerTargetBySource.set(`steam:${steamId}`, player);
+    }
+  }
+  const teamRows = new Map<string, UtilityValueRow>();
+
+  const ensurePlayer = (row: UtilityValueRow): UtilityValueRow | null => {
+    const target = options.players ? playerTargetBySource.get(row.id) : { playerKey: row.id, name: row.name, steamIds: [] };
+    if (!target) return null;
+    const existing = playerRows.get(target.playerKey) ?? utilityRow(target.playerKey, target.name);
+    playerRows.set(target.playerKey, existing);
+    return existing;
+  };
+  const ensureTeam = (row: UtilityValueRow): UtilityValueRow => {
+    const name = options.teamRenames?.[row.name] ?? row.name;
+    const existing = teamRows.get(name) ?? utilityRow(name, name);
+    teamRows.set(name, existing);
+    return existing;
+  };
+
+  const keepPlayerEvidence = <T extends { playerId?: string; playerName: string }>(row: T): T | null => {
+    if (!options.players) return row;
+    const target = row.playerId ? playerTargetBySource.get(row.playerId) : null;
+    return target ? { ...row, playerId: target.playerKey, playerName: target.name } : null;
+  };
+
+  const bestFlashes: UtilityValueSummary["bestFlashes"] = [];
+  const bestDamageRounds: UtilityDamageEvidence[] = [];
+
+  for (const summary of summaries) {
+    for (const row of summary.players) {
+      const target = ensurePlayer(row);
+      if (target) addUtilityRow(target, row);
+    }
+    for (const row of summary.teams) addUtilityRow(ensureTeam(row), row);
+    for (const flash of summary.bestFlashes) {
+      const kept = keepPlayerEvidence(flash);
+      if (kept) bestFlashes.push(kept);
+    }
+    for (const damage of summary.bestDamageRounds) {
+      const kept = keepPlayerEvidence(damage);
+      if (kept) bestDamageRounds.push(kept);
+    }
+  }
+
+  return {
+    players: sortUtilityRows([...playerRows.values()]),
+    teams: sortUtilityRows([...teamRows.values()]),
+    bestFlashes: bestFlashes.sort((a, b) => b.enemySeconds - a.enemySeconds).slice(0, MAX_BEST_FLASH),
+    bestDamageRounds: bestDamageRounds.sort((a, b) => b.damage - a.damage).slice(0, MAX_EVIDENCE),
   };
 }
 
