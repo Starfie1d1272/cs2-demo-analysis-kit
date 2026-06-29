@@ -1742,6 +1742,33 @@ body {
   scrollbar-width: thin;
 }
 
+.stu-utility-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.stu-utility-section {
+  min-width: 0;
+}
+
+.stu-utility-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.stu-utility-table {
+  min-width: 0;
+}
+
+.stu-utility-table h4 {
+  margin: 0 0 8px;
+  color: var(--dak-fg-mid);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .stu-econ-detail-table {
   min-width: 1040px;
 }
@@ -2261,13 +2288,6 @@ td.stu-heat-cell.stu-heat-neutral {
 .stu-speed-toggle {
   display: flex;
   gap: 6px;
-}
-
-.stu-utility-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
 }
 
 /* --- 模块子页签 --- */
