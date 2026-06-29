@@ -15,21 +15,51 @@ export interface UtilityViewProps {
 }
 
 type BestFlash = UtilityValueSummary["bestFlashes"][number];
+type DamageMode = "perThrow" | "perRound";
 
 const fmt = (value: number | null, digits = 2, suffix = "") => value == null ? "—" : `${value.toFixed(digits)}${suffix}`;
-const damagePerRound = (row: UtilityValueRow) => (row.heDamagePerRound ?? 0) + (row.fireDamagePerRound ?? 0);
 
-const VALUE_COLUMNS: DataTableColumn<UtilityValueRow>[] = [
+function orderColumns(columns: DataTableColumn<UtilityValueRow>[], order: string[]) {
+  const byKey = new Map(columns.map((column) => [column.key, column]));
+  return order.map((key) => byKey.get(key)).filter((column): column is DataTableColumn<UtilityValueRow> => column != null);
+}
+
+const HE_COLUMNS: DataTableColumn<UtilityValueRow>[] = [
   { key: "name", label: "对象", format: (r) => r.name },
   { key: "rounds", label: "回合", numeric: true, sortable: true, sortValue: (r) => r.rounds, format: (r) => r.rounds },
+  { key: "heThrows", label: "HE 数", numeric: true, sortable: true, sortValue: (r) => r.heThrows, format: (r) => r.heThrows },
   {
-    key: "damagePerRound",
-    label: <>雷火伤害/回合<MetricInfo note="HE 手雷 + 火造成的敌方有效生命伤害 / 回合数；只算敌方，不算队友。" /></>,
+    key: "heDamagePerThrow",
+    label: <>HE/颗<MetricInfo note="HE 手雷造成的敌方有效生命伤害 / HE 投掷数；用于看谁的雷更疼、更准。" /></>,
     numeric: true,
     sortable: true,
-    sortValue: damagePerRound,
-    format: (r) => fmt(damagePerRound(r), 2)
+    sortValue: (r) => r.heDamagePerThrow,
+    format: (r) => fmt(r.heDamagePerThrow, 2)
   },
+  { key: "heDamagePerRound", label: "HE/回合", numeric: true, sortable: true, sortValue: (r) => r.heDamagePerRound, format: (r) => fmt(r.heDamagePerRound, 2) },
+  { key: "heDamage", label: "HE 总伤害", numeric: true, sortable: true, sortValue: (r) => r.heDamage, format: (r) => r.heDamage },
+];
+
+const FIRE_COLUMNS: DataTableColumn<UtilityValueRow>[] = [
+  { key: "name", label: "对象", format: (r) => r.name },
+  { key: "rounds", label: "回合", numeric: true, sortable: true, sortValue: (r) => r.rounds, format: (r) => r.rounds },
+  { key: "fireThrows", label: "火数", numeric: true, sortable: true, sortValue: (r) => r.fireThrows, format: (r) => r.fireThrows },
+  {
+    key: "fireDamagePerThrow",
+    label: <>火/颗<MetricInfo note="燃烧弹/燃烧瓶造成的敌方有效生命伤害 / 火投掷数；用于看谁的火更疼、更准。" /></>,
+    numeric: true,
+    sortable: true,
+    sortValue: (r) => r.fireDamagePerThrow,
+    format: (r) => fmt(r.fireDamagePerThrow, 2)
+  },
+  { key: "fireDamagePerRound", label: "火/回合", numeric: true, sortable: true, sortValue: (r) => r.fireDamagePerRound, format: (r) => fmt(r.fireDamagePerRound, 2) },
+  { key: "fireDamage", label: "火总伤害", numeric: true, sortable: true, sortValue: (r) => r.fireDamage, format: (r) => r.fireDamage },
+];
+
+const FLASH_COLUMNS: DataTableColumn<UtilityValueRow>[] = [
+  { key: "name", label: "对象", format: (r) => r.name },
+  { key: "rounds", label: "回合", numeric: true, sortable: true, sortValue: (r) => r.rounds, format: (r) => r.rounds },
+  { key: "flashesThrown", label: "闪光数", numeric: true, sortable: true, sortValue: (r) => r.flashesThrown, format: (r) => r.flashesThrown },
   {
     key: "enemyBlindSecondsPerRound",
     label: <>敌白/回合<MetricInfo note="闪光造成的敌方致盲秒数 / 回合数；不把队友短暂被白作为主指标。" /></>,
@@ -46,17 +76,32 @@ const VALUE_COLUMNS: DataTableColumn<UtilityValueRow>[] = [
     sortValue: (r) => r.enemyBlindSecondsPerFlash,
     format: (r) => fmt(r.enemyBlindSecondsPerFlash, 2, "s")
   },
-  { key: "heDamagePerThrow", label: "HE/颗", numeric: true, sortable: true, sortValue: (r) => r.heDamagePerThrow, format: (r) => fmt(r.heDamagePerThrow, 2) },
-  { key: "heDamagePerRound", label: "HE/回合", numeric: true, sortable: true, sortValue: (r) => r.heDamagePerRound, format: (r) => fmt(r.heDamagePerRound, 2) },
-  { key: "fireDamagePerThrow", label: "火/颗", numeric: true, sortable: true, sortValue: (r) => r.fireDamagePerThrow, format: (r) => fmt(r.fireDamagePerThrow, 2) },
-  { key: "fireDamagePerRound", label: "火/回合", numeric: true, sortable: true, sortValue: (r) => r.fireDamagePerRound, format: (r) => fmt(r.fireDamagePerRound, 2) },
+  { key: "flashAssistsPerRound", label: "闪助/回合", numeric: true, sortable: true, sortValue: (r) => r.flashAssistsPerRound, format: (r) => fmt(r.flashAssistsPerRound, 3) },
+];
+
+const SMOKE_COLUMNS: DataTableColumn<UtilityValueRow>[] = [
+  { key: "name", label: "对象", format: (r) => r.name },
+  { key: "rounds", label: "回合", numeric: true, sortable: true, sortValue: (r) => r.rounds, format: (r) => r.rounds },
+  { key: "smokesThrown", label: "烟数", numeric: true, sortable: true, sortValue: (r) => r.smokesThrown, format: (r) => r.smokesThrown },
   { key: "smokesPerRound", label: "烟/回合", numeric: true, sortable: true, sortValue: (r) => r.smokesPerRound, format: (r) => fmt(r.smokesPerRound, 3) },
 ];
 
 export function UtilityView({ allEntries, entries, scope, onOpenMatch, onGoLibrary, identityOptions }: UtilityViewProps) {
   const [summary, setSummary] = useState<UtilityValueSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [damageMode, setDamageMode] = useState<DamageMode>("perThrow");
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
+  const heColumns = useMemo(() => orderColumns(HE_COLUMNS, damageMode === "perRound"
+    ? ["name", "rounds", "heThrows", "heDamagePerRound", "heDamagePerThrow", "heDamage"]
+    : ["name", "rounds", "heThrows", "heDamagePerThrow", "heDamagePerRound", "heDamage"]
+  ), [damageMode]);
+  const fireColumns = useMemo(() => orderColumns(FIRE_COLUMNS, damageMode === "perRound"
+    ? ["name", "rounds", "fireThrows", "fireDamagePerRound", "fireDamagePerThrow", "fireDamage"]
+    : ["name", "rounds", "fireThrows", "fireDamagePerThrow", "fireDamagePerRound", "fireDamage"]
+  ), [damageMode]);
+  const heSortKey = damageMode === "perRound" ? "heDamagePerRound" : "heDamagePerThrow";
+  const fireSortKey = damageMode === "perRound" ? "fireDamagePerRound" : "fireDamagePerThrow";
+  const damageModeLabel = damageMode === "perRound" ? "每回合贡献" : "每颗效率";
 
   useEffect(() => {
     if (entries.length === 0) {
@@ -107,13 +152,43 @@ export function UtilityView({ allEntries, entries, scope, onOpenMatch, onGoLibra
           <p>按回合和投掷数归一：闪光看敌方致盲，HE/火看敌方伤害，烟只看每回合投入。</p>
         </div>
       </header>
+      <div className="stu-utility-toolbar">
+        <span className="stu-muted">HE / 火榜单排序口径</span>
+        <div className="stu-speed-toggle" role="radiogroup" aria-label="HE 和火伤害榜单排序口径">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={damageMode === "perThrow"}
+            className={damageMode === "perThrow" ? "stu-chip stu-chip-active" : "stu-chip"}
+            onClick={() => setDamageMode("perThrow")}
+          >
+            每颗
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={damageMode === "perRound"}
+            className={damageMode === "perRound" ? "stu-chip stu-chip-active" : "stu-chip"}
+            onClick={() => setDamageMode("perRound")}
+          >
+            每回合
+          </button>
+        </div>
+        <span className="stu-muted">当前 HE / 火榜按{damageModeLabel}排序。</span>
+      </div>
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && !summary && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的道具数据…</div>}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
       {summary && (
         <>
-          <UtilityTable title="选手道具价值" rows={summary.players} empty="当前范围内没有选手道具数据。" pageSize={15} />
-          <UtilityTable title="队伍道具价值" rows={summary.teams} empty="当前范围内没有队伍道具数据。" pageSize={10} />
+          <UtilityTable title="选手 HE 手雷榜" rows={summary.players.filter((row) => row.heThrows > 0)} columns={heColumns} initialSortKey={heSortKey} empty="当前范围内没有 HE 手雷伤害数据。" pageSize={10} />
+          <UtilityTable title="队伍 HE 手雷榜" rows={summary.teams.filter((row) => row.heThrows > 0)} columns={heColumns} initialSortKey={heSortKey} empty="当前范围内没有队伍 HE 手雷伤害数据。" pageSize={10} />
+          <UtilityTable title="选手燃烧弹榜" rows={summary.players.filter((row) => row.fireThrows > 0)} columns={fireColumns} initialSortKey={fireSortKey} empty="当前范围内没有火伤害数据。" pageSize={10} />
+          <UtilityTable title="队伍燃烧弹榜" rows={summary.teams.filter((row) => row.fireThrows > 0)} columns={fireColumns} initialSortKey={fireSortKey} empty="当前范围内没有队伍火伤害数据。" pageSize={10} />
+          <UtilityTable title="选手闪光榜" rows={summary.players.filter((row) => row.flashesThrown > 0)} columns={FLASH_COLUMNS} initialSortKey="enemyBlindSecondsPerRound" empty="当前范围内没有闪光数据。" pageSize={10} />
+          <UtilityTable title="队伍闪光榜" rows={summary.teams.filter((row) => row.flashesThrown > 0)} columns={FLASH_COLUMNS} initialSortKey="enemyBlindSecondsPerRound" empty="当前范围内没有队伍闪光数据。" pageSize={10} />
+          <UtilityTable title="选手烟雾使用榜" rows={summary.players.filter((row) => row.smokesThrown > 0)} columns={SMOKE_COLUMNS} initialSortKey="smokesPerRound" empty="当前范围内没有烟雾数据。" pageSize={10} />
+          <UtilityTable title="队伍烟雾使用榜" rows={summary.teams.filter((row) => row.smokesThrown > 0)} columns={SMOKE_COLUMNS} initialSortKey="smokesPerRound" empty="当前范围内没有队伍烟雾数据。" pageSize={10} />
           <BestFlashList flashes={summary.bestFlashes.slice(0, 12)} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} />
           <DamageEvidenceList rows={summary.bestDamageRounds} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} />
         </>
@@ -122,7 +197,14 @@ export function UtilityView({ allEntries, entries, scope, onOpenMatch, onGoLibra
   );
 }
 
-function UtilityTable({ title, rows, empty, pageSize }: { title: string; rows: UtilityValueRow[]; empty: string; pageSize: number }) {
+function UtilityTable({ title, rows, columns, initialSortKey, empty, pageSize }: {
+  title: string;
+  rows: UtilityValueRow[];
+  columns: DataTableColumn<UtilityValueRow>[];
+  initialSortKey: string;
+  empty: string;
+  pageSize: number;
+}) {
   if (rows.length === 0) {
     return <EmptyState variant="insufficient" title={title} hint={empty} />;
   }
@@ -130,13 +212,15 @@ function UtilityTable({ title, rows, empty, pageSize }: { title: string; rows: U
     <div className="stu-card">
       <h3>{title}</h3>
       <DataTable
+        key={`${title}-${initialSortKey}`}
         classes={STUDIO_TABLE_CLASSES}
         rows={rows}
         rowKey={(r) => r.id}
-        initialSortKey="damagePerRound"
+        initialSortKey={initialSortKey}
         pageSize={pageSize}
         paginationInfo={(total) => `${total} 项`}
-        columns={VALUE_COLUMNS}
+        showRank
+        columns={columns}
       />
     </div>
   );

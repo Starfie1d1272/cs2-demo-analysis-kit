@@ -2263,6 +2263,13 @@ td.stu-heat-cell.stu-heat-neutral {
   gap: 6px;
 }
 
+.stu-utility-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 /* --- 模块子页签 --- */
 .stu-subtabs {
   display: flex;
@@ -3588,7 +3595,7 @@ td.stu-heat-cell.stu-heat-neutral {
   display: grid;
   align-content: start;
   gap: 8px;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .stu-pe-replay-frame {
@@ -3783,8 +3790,8 @@ td.stu-heat-cell.stu-heat-neutral {
 @container (max-width: 980px) {
   .stu-pe-replay-frame .dak-replay-layout {
     grid-template-areas:
-      "stage"
       "controls"
+      "stage"
       "roster-left"
       "roster-right";
     grid-template-columns: minmax(0, 1fr);

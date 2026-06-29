@@ -225,29 +225,6 @@ function CoachReplayStage({ fact, entryByMatchId, cache }: {
   const [error, setError] = useState<string | null>(null);
   const model = loaded?.matchId === matchId ? loaded.model : null;
 
-  // ResizeObserver：测量中间列真实可用空间，算雷达最大尺寸
-  const mainRef = useRef<HTMLDivElement>(null);
-  const barRef = useRef<HTMLDivElement>(null);
-  const [radarMaxWidth, setRadarMaxWidth] = useState(660);
-
-  useEffect(() => {
-    const main = mainRef.current;
-    const bar = barRef.current;
-    if (!main || !bar) return;
-    const measure = () => {
-      const w = main.clientWidth;
-      const h = main.clientHeight;
-      const barH = bar.offsetHeight;
-      const gap = 8;
-      // 雷达最大 = min(列宽, 列高 − bar − gap, 绝对上限 660)
-      setRadarMaxWidth(Math.max(200, Math.min(w, h - barH - gap, 660)));
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(main);
-    return () => observer.disconnect();
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
     setError(null);
@@ -270,8 +247,8 @@ function CoachReplayStage({ fact, entryByMatchId, cache }: {
     : `${fact.teamName} vs ${fact.opponentName} · R${fact.roundNumber}`;
 
   return (
-    <div className="stu-pe-replay-main" ref={mainRef}>
-      <div className="stu-pe-replay-bar" ref={barRef}>
+    <div className="stu-pe-replay-main">
+      <div className="stu-pe-replay-bar">
         <span className="stu-pe-replay-kicker">代表回合</span>
         <span className="stu-pe-replay-label">{label}</span>
       </div>
@@ -282,7 +259,7 @@ function CoachReplayStage({ fact, entryByMatchId, cache }: {
       ) : !model.replay.available ? (
         <div className="stu-pe-radar-empty">本场导出未附带 2D 回放流。</div>
       ) : (
-        <div className="stu-pe-replay-frame" style={{ maxWidth: radarMaxWidth }}>
+        <div className="stu-pe-replay-frame">
           <ReplayViewer
             replay={model.replay}
             map={model.map.view}
