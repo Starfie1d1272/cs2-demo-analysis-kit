@@ -4,6 +4,19 @@ DAK Studio 桌面应用及 `@cs2dak/*` 分析管道面向用户的变更记录�
 
 > 0.1.3 起面向 Studio 用户维护。`@cs2dak/*` npm 包版本由 changesets 独立管理（见各包的 CHANGELOG.md）；本文件聚焦 DAK Studio 桌面应用变更。
 
+## [0.7.6] — 2026-06-29
+
+### 变更
+
+- **用户数据目录拆分**：`userdata/` 只保留资料库、原始 ZIP、备份与报告；官方赛事包、`.tri`、安装清单、缓存、日志、前端增量包和更新暂存分别迁到 `assets/`、`cache/`、`updates/`，避免用户清理资料库时误删更新与官方资产。
+- **安装与更新保留目录**：Web Installer 与 Full Portable Zip 改为把官方资产写入 `assets/`；Windows 一键更新会保留 `userdata/`、`assets/`、`cache/`、`updates/` 四类持久目录。
+
+### 修复
+
+- **控图计算性能与内存**：优化 RadarField 视野场热路径，减少重复视锥计算、烟雾扫描与 BVH 相交分配；同一 Nuke 基准下无 BVH 路径约 12 倍、完整 LOS 路径约 4.6 倍提速，并避免 Worker fallback 额外保留一份 ZIP buffer。
+- **教练工作台回放高度**：代表回合回放改为完整高度展示，左侧回合列表跟随右侧回放区域高度，减少回放页内部滚动。
+- **R2 赛事来源标记**：从 R2 构建的赛事资产会把 `event-package.json.source` 修正为 `r2`，避免 Stage 1 / Stage 2 下载后仍显示“本地制作”。
+
 ## [0.7.5] — 2026-06-29
 
 ### 修复
