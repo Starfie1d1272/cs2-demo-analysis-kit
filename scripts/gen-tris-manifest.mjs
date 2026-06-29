@@ -4,7 +4,7 @@
 //   https://dakupdate.starfie1d.top/tris/manifest.json   （短缓存）
 //   https://dakupdate.starfie1d.top/tris/<map>.tri        （不可变长缓存）
 // 桌面壳（python/src/cs2dak/studio.py 的 _StudioStaticHandler）在某图 .tri
-// 首次缺失时按本清单的 urls + sha256 下载到 userdata/tris overlay。
+// 首次缺失时按本清单的 urls + sha256 下载到 assets/tris overlay。
 //
 //   node scripts/gen-tris-manifest.mjs <tris-dir> [out.json]
 //

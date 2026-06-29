@@ -1,5 +1,5 @@
 export interface StorageCategory {
-  id: "database" | "demos" | "cache" | "tris" | "updates" | "reports" | "logs" | "backups";
+  id: "database" | "demos" | "cache" | "bundledEvents" | "tris" | "updates" | "reports" | "logs" | "backups";
   bytes: number;
   files: number;
   path: string;

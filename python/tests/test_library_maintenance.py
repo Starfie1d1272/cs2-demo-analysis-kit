@@ -45,5 +45,28 @@ def test_repair_removes_orphans_and_overview_reports_usage(tmp_path):
 
     overview = api.storage_overview()
     assert overview["ok"] is True
-    assert {row["id"] for row in overview["categories"]} >= {"database", "demos", "cache", "tris"}
+    assert {row["id"] for row in overview["categories"]} >= {"database", "demos", "cache", "bundledEvents", "tris"}
     assert sqlite3.connect(tmp_path / "studio.sqlite").execute("pragma integrity_check").fetchone()[0] == "ok"
+
+
+def test_storage_layout_migrates_assets_out_of_userdata(tmp_path):
+    legacy = tmp_path / "userdata"
+    (legacy / "bundled-events").mkdir(parents=True)
+    (legacy / "bundled-events" / "manifest.json").write_text("{}", encoding="utf-8")
+    (legacy / "tris").mkdir()
+    (legacy / "tris" / "de_nuke.tri").write_bytes(b"tri")
+    (legacy / "install-manifest.json").write_text("{}", encoding="utf-8")
+    (legacy / "updates").mkdir()
+    (legacy / "updates" / "patch.zip").write_bytes(b"zip")
+    (legacy / "studio.log").write_text("log", encoding="utf-8")
+
+    api = _api(legacy)
+    from cs2dak.studio import _migrate_storage_layout
+    _migrate_storage_layout(api._userdata)
+
+    assert not (legacy / "bundled-events").exists()
+    assert (tmp_path / "assets" / "bundled-events" / "manifest.json").is_file()
+    assert (tmp_path / "assets" / "tris" / "de_nuke.tri").is_file()
+    assert (tmp_path / "assets" / "install-manifest.json").is_file()
+    assert (tmp_path / "updates" / "downloads" / "patch.zip").is_file()
+    assert (tmp_path / "cache" / "logs" / "studio.log").is_file()

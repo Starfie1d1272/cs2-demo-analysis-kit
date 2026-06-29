@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 组装 Full Portable Zip。
 // 输入 runtime zip + bundled events + tris → 输出 dak-studio-windows-<version>-full.zip。
-// 目录结构与 installer 安装结果一致（assets 直放 userdata/）。
+// 目录结构与 installer 安装结果一致（assets 与 userdata 分离）。
 //
 //   node scripts/assemble-full-zip.mjs \
 //     --runtime-zip dak-studio-windows-0.7.0.zip \
@@ -11,8 +11,7 @@
 //     --install-manifest install-manifest.json \
 //     --out dist/
 //
-// 0.7.0 pragmatic：assets 直放 userdata/，与 installer 结果一致。
-// 长期演进：app 同级 bundled-assets/ + 首启注册到 userdata/。
+// 0.8 起：官方资产放 app 同级 assets/，userdata/ 只放用户资料库。
 
 import { execSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -135,7 +134,7 @@ function main() {
 
   // 2. Copy bundled events — 扫描 dist/events/<slug>/<slug>.zip（与 R2 一致）
   if (bundledEventsDir && existsSync(bundledEventsDir)) {
-    const destDir = join(appRoot, "userdata", "bundled-events");
+    const destDir = join(appRoot, "assets", "bundled-events");
     mkdirSync(destDir, { recursive: true });
     const subdirs = readdirSync(bundledEventsDir, { withFileTypes: true })
       .filter((d) => d.isDirectory());
@@ -194,7 +193,7 @@ function main() {
 
   // 3. Copy required tris
   if (trisDir && existsSync(trisDir)) {
-    const destDir = join(appRoot, "userdata", "tris");
+    const destDir = join(appRoot, "assets", "tris");
     mkdirSync(destDir, { recursive: true });
     let copied = 0;
     for (const [mapName, entry] of Object.entries(requiredTris)) {
@@ -215,7 +214,9 @@ function main() {
   }
 
   // 4. Copy install-manifest.json
-  copyFileSync(installManifestPath, join(appRoot, "userdata", "install-manifest.json"));
+  mkdirSync(join(appRoot, "userdata"), { recursive: true });
+  mkdirSync(join(appRoot, "assets"), { recursive: true });
+  copyFileSync(installManifestPath, join(appRoot, "assets", "install-manifest.json"));
   console.error("  install-manifest.json");
 
   // 5. Zip the work dir

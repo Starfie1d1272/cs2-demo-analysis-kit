@@ -8,10 +8,8 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import sys
-import tempfile
 import threading
 import tkinter as tk
 import tkinter.filedialog
@@ -215,9 +213,11 @@ class SimpleInstaller:
                 raise RuntimeError("解压后未找到 dak-studio.exe，安装包可能不完整")
             self._launch_exe = os.path.join(app_root, "dak-studio.exe")
 
-            # 4. Download bundled events → app_root/userdata/
+            # 4. Download bundled events → app_root/assets/
             userdata = os.path.join(app_root, "userdata")
-            bundled_dir = os.path.join(userdata, "bundled-events")
+            assets = os.path.join(app_root, "assets")
+            os.makedirs(userdata, exist_ok=True)
+            bundled_dir = os.path.join(assets, "bundled-events")
             os.makedirs(bundled_dir, exist_ok=True)
             for idx, evt in enumerate(events):
                 if self.cancelled:
@@ -238,8 +238,8 @@ class SimpleInstaller:
             with open(os.path.join(bundled_dir, "manifest.json"), "w", encoding="utf-8") as f:
                 json.dump(events_manifest, f, ensure_ascii=False, indent=2)
 
-            # 5. Download required tris → app_root/userdata/tris/
-            tris_dir = os.path.join(userdata, "tris")
+            # 5. Download required tris → app_root/assets/tris/
+            tris_dir = os.path.join(assets, "tris")
             os.makedirs(tris_dir, exist_ok=True)
             tri_count = len(tris)
             for idx, (map_name, entry) in enumerate(tris.items()):
@@ -249,9 +249,9 @@ class SimpleInstaller:
                 dest = os.path.join(tris_dir, entry.get("name", f"{map_name}.tri"))
                 self._download_asset(entry, dest, map_name)
 
-            # 6. Write install-manifest.json → app_root/userdata/
+            # 6. Write install-manifest.json → app_root/assets/
             self._update("写入安装清单…", 95)
-            with open(os.path.join(userdata, "install-manifest.json"), "w", encoding="utf-8") as f:
+            with open(os.path.join(assets, "install-manifest.json"), "w", encoding="utf-8") as f:
                 json.dump(manifest, f, ensure_ascii=False, indent=2)
 
             # 7. Create shortcuts (Windows only) — use resolved app_root exe
@@ -312,7 +312,6 @@ class SimpleInstaller:
             try:
                 def _progress(dl, total):
                     if total > 0:
-                        pct = (dl / total) * 100
                         self.root.after(0, lambda: self.detail_var.set(
                             f"  {label}：{dl / 1024 / 1024:.1f}/{total / 1024 / 1024:.1f} MB"
                         ))

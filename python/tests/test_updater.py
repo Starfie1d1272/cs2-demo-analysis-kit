@@ -29,7 +29,7 @@ def test_sha256_file(tmp_path: Path) -> None:
 
 def test_updates_dir_created(tmp_path: Path) -> None:
     d = updater.updates_dir(tmp_path)
-    assert d.exists() and d.name == "updates"
+    assert d.exists() and d == tmp_path / "downloads"
 
 
 def test_download_failover_and_verify(tmp_path: Path) -> None:
@@ -96,6 +96,7 @@ def test_relaunch_bat_mentions_pid_and_paths(tmp_path: Path) -> None:
     assert "4321" in bat
     assert str(install) in bat
     assert "userdata" in bat  # 便携式数据搬迁
+    assert "assets" in bat and "cache" in bat and "updates" in bat
     assert "apply-update.log" in bat
     assert ":moveold" in bat and ":movenew" in bat
     assert "old move failed, restart existing app" in bat

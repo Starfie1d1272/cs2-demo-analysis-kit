@@ -2,7 +2,7 @@
  * bundled-events 发现层。
  *
  * 0.7.0 起，Stage3/Playoff 等大赛事包不再打进 Vite bundle（Vite ?url import），
- * 改由 installer 预装到 userdata/bundled-events/，Python 静态服务通过
+ * 改由 installer 预装到 assets/bundled-events/，Python 静态服务通过
  * /bundled-events/ overlay 提供。前端通过本模块发现并加载本地预装赛事。
  *
  * CORS-proof：JS 一律走相对路径 `./bundled-events/<slug>.zip`（同源），绝不直连 R2。

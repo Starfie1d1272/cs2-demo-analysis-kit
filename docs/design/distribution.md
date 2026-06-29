@@ -16,7 +16,12 @@ installer 预装资产 + health check 修复。
 ```
 DAK Studio/
   dak-studio.exe / _internal/      # PyInstaller onedir runtime
-  userdata/                         # 用户数据（运行期产生 + 预装资产）
+  userdata/                         # 用户数据（运行期产生）
+    studio.sqlite                   # 资料库 + facts
+    demos/                          # 原始 ZIP
+    backups/                        # 本机备份
+    reports/                        # 导出报告
+  assets/                           # 官方/外置可重下资产
     bundled-events/                 # 预装赛事包（installer 写入）
       iem-cologne-major-2026-stage3.zip
       iem-cologne-major-2026-playoff.zip
@@ -24,18 +29,14 @@ DAK Studio/
     tris/                           # 碰撞几何 overlay
       de_ancient.tri ...
     install-manifest.json           # 安装时写入，供 health check 校验
-    *.sqlite                        # 资料库 + facts
-    logs/                           # 运行日志
+  cache/                            # 可重建缓存、前端增量 overlay、日志
+  updates/                          # 更新下载暂存
 ```
 
-> **0.7.0 pragmatic choice**: Full portable zip 直接把 assets 放入 `userdata/`，
-> 与 installer 安装结果一致。
->
-> **长期演进（0.8）**: app 同级新增 `bundled-assets/` 作为资产源，
-> 首启复制/注册到 `userdata/`，实现资产与用户数据干净分离：
-> - 用户删 `userdata/` 不会丢失预装资产；
-> - 更新 runtime 不重复携带大资产；
-> - 支持多 assetSet（full / playoff-only / 未来大赛包）。
+`userdata/` 只放用户资料库；官方资产、缓存和更新暂存按生命周期拆到 sibling
+目录。升级自 0.7.x 时，启动迁移会把旧 `userdata/bundled-events`、
+`userdata/tris`、`userdata/install-manifest.json`、`userdata/cache`、
+`userdata/updates` 挪到新目录。
 
 ## Web Installer
 
@@ -48,8 +49,8 @@ DAK Studio/
 1. 选择安装目录
 2. 拉取 `install-manifest.json` 显示总大小
 3. 下载 runtime zip → 解压
-4. 下载 bundled events → 写入 `userdata/bundled-events/`
-5. 下载 required tris → 写入 `userdata/tris/`
+4. 下载 bundled events → 写入 `assets/bundled-events/`
+5. 下载 required tris → 写入 `assets/tris/`
 6. 写入 manifest、创建快捷方式
 7. 启动 Studio
 
@@ -116,7 +117,7 @@ Studio 启动时自动运行轻检查（存在 + size），不 hash 避免拖慢
 |---|---|---|
 | 触发 | Studio 内检查更新 | 用户下载 setup.exe |
 | 替换内容 | 仅 runtime | runtime + events + tris |
-| userdata 处理 | 保留（bat relay 搬迁） | installer 初次写入 |
+| userdata 处理 | 保留 userdata/assets/cache/updates | installer 初次写入 assets |
 | 适用对象 | 已有安装的老用户 | 全新安装 |
 
 两者不互相替代——installer 做首次安装，auto-update 做运行时更新。

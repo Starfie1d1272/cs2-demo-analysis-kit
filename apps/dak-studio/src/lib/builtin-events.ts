@@ -1,7 +1,7 @@
 // 内置赛事/示例 registry —— 与在线赛事共用同一条导入管线（importEventAssetArchive）
 // 与 EventGallery 卡片 UI。
 //
-// 0.7.0：Stage3/Playoff 已迁至 installer 预装模式（放入 userdata/bundled-events/，
+// 0.7.0：Stage3/Playoff 已迁至 installer 预装模式（放入 assets/bundled-events/，
 // Python 静态服务暴露 /bundled-events/，前端通过本地 URL 加载）。
 // BUILTIN_EVENTS 只保留小 sample；大赛事走 bundled-events 发现层 + R2 在线清单。
 import samplePackageUrl from "../../../../fixtures/input/sample-pro-finals-2026.zip?url";

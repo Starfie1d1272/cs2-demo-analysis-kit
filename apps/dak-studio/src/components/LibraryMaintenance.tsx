@@ -15,13 +15,14 @@ const LABELS: Record<StorageCategory["id"], string> = {
   database: "资料库数据库",
   demos: "原始 ZIP",
   cache: "派生缓存",
+  bundledEvents: "官方赛事包",
   tris: ".tri 地图资产",
   updates: "更新暂存",
   reports: "报告",
   logs: "日志",
   backups: "本机备份",
 };
-const CLEANABLE = new Set<StorageCategory["id"]>(["cache", "tris", "updates", "reports", "logs"]);
+const CLEANABLE = new Set<StorageCategory["id"]>(["cache", "bundledEvents", "tris", "updates", "reports", "logs"]);
 
 export function LibraryMaintenance({ onNotice }: { onNotice: (message: string) => void }) {
   const [overview, setOverview] = useState<StorageOverview | null>(null);
@@ -48,7 +49,7 @@ export function LibraryMaintenance({ onNotice }: { onNotice: (message: string) =
   return (
     <details className="stu-card">
       <summary><b>资料库备份与存储维护</b></summary>
-      <p className="stu-muted">备份包含 SQLite 中的标签、身份、BP、Playbook、设置与原始 ZIP；缓存和 .tri 可重新生成，不进入备份。</p>
+      <p className="stu-muted">备份包含 SQLite 中的标签、身份、BP、Playbook、设置与原始 ZIP；缓存和官方资产可重新生成或下载，不进入备份。</p>
       <div className="stu-header-actions">
         <button className="stu-button stu-button-ghost" type="button" disabled={busy} onClick={() => void run(backupLibrary, "资料库备份已写入 backups 目录")}>创建备份</button>
         <button className="stu-button stu-button-ghost" type="button" disabled={busy} onClick={() => {

@@ -4,8 +4,8 @@ import { canOpenLibraryDir, getLibraryDir, openLibraryDir } from "../lib/library
 
 /**
  * 侧栏「打开数据目录」入口。仅桌面壳（pywebview）显示——浏览器无本地目录概念。
- * 点击在系统文件管理器中打开 userdata 目录（资料库 / blobs / 缓存 / 日志 / `.tri`），
- * 便于用户手动备份与排错。路径作为 tooltip 展示。
+ * 点击在系统文件管理器中打开 userdata 目录（资料库 / 原始 ZIP / 备份），便于用户手动备份与排错。
+ * 路径作为 tooltip 展示。
  */
 export function LibraryDirButton({ onError }: { onError?: (msg: string) => void }) {
   const [available] = useState(() => canOpenLibraryDir());

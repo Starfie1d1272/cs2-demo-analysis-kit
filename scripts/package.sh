@@ -33,7 +33,7 @@ rm -rf "$STUDIO_WEB/tris"
 
 # 0.7.0 起采用 Web Installer 模式：
 #   - 安装包很小（~20MB runtime），安装阶段从 R2 拉取内置赛事包 + 所需 .tri
-#   - .tri 放入 userdata/tris/ overlay，内置赛事放入 userdata/bundled-events/
+#   - .tri 放入 assets/tris/ overlay，内置赛事放入 assets/bundled-events/
 #   - 首启即完整体验，运行时缺图按需下载兜底
 #   - 资产由发版 CI（release.yml）上传到 R2
 # .tri 自 0.6.4 起不再打进安装包；内置赛事自 0.7.0 起也不再打进 Vite bundle。

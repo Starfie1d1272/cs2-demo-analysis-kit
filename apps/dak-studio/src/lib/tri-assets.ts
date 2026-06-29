@@ -6,7 +6,7 @@ import { installTriBuffer, listInstalledTris } from "./tri";
  * CORS-proof：JS 一律走相对路径 `./tris/<map>.tri`（同源），绝不直连 R2——
  * 该域未配 `Access-Control-Allow-Origin`，浏览器直连会被拦截。两端各自把相对路径落到能下载的地方：
  * - 桌面（pywebview）：Python 静态服务拦截 `/tris/<map>.tri`，缺失时按 tris-manifest 下到
- *   userdata/tris overlay 再回传；已装检测走 `tri_present`（overlay + 内置，权威）。
+ *   assets/tris overlay 再回传；已装检测走 `tri_present`（overlay + 内置，权威）。
  * - dev（pnpm dev:studio）：Vite 中间件 `trisProxyPlugin` 服务端代理 R2；已装检测走 IDB。
  * 取回的字节同时写入 IndexedDB（installTriBuffer），作为浏览器端的持久缓存。
  */

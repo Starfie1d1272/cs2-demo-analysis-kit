@@ -47,7 +47,7 @@ else:
     WEB_DIR = Path(__file__).parent / "studio_web"
 
 # .tri 碰撞几何资产外置（0.6.4 起）：打包不再内嵌 ~200MB，安装包从 ~220MB 瘦到 ~20MB。
-# 运行时首次用到某图时按需从镜像下载到 userdata/tris overlay（见 _StudioStaticHandler）。
+# 运行时首次用到某图时按需从镜像下载到 assets/tris overlay（见 _StudioStaticHandler）。
 # 资产与清单托管在自建 R2（与更新包同一镜像层）；缺失只降级（LOS 口径退化），不报错。
 TRIS_MANIFEST_URL = "https://dakupdate.starfie1d.top/tris/manifest.json"
 TRIS_MANIFEST_TIMEOUT_S = 8
@@ -111,13 +111,11 @@ def _appdata_userdata() -> Path:
 
 
 def _studio_userdata() -> Path:
-    """Persistent directory for cookies / IndexedDB / localStorage.
+    """Persistent user library directory.
 
-    Windows 打包版 → exe 同目录 userdata/（便携式：数据跟应用走，直观可见、
-                     换电脑拷目录即迁移）。目录不可写（如装进 Program Files）
-                     时回退 %APPDATA%/DAK Studio/userdata。
+    Windows 打包版 → exe 同目录 userdata/（便携式：资料库跟应用走，直观可见、
+                     换电脑拷目录即迁移）。目录不可写时回退系统目录。
     macOS   → ~/Library/Application Support/DAK Studio/userdata
-              （.app 内部不可写且受 translocation 影响，不做便携式）
     其他/开发模式 → 沿用系统目录。
 
     首次切换到便携目录时，自动把旧 %APPDATA% 数据整体拷贝过来，
@@ -142,6 +140,64 @@ def _studio_userdata() -> Path:
     return path
 
 
+def _sibling_dir(userdata: Path, name: str) -> Path:
+    return userdata.parent / name if userdata.name == "userdata" else userdata / name
+
+
+def _assets_dir_for(userdata: Path) -> Path:
+    return _sibling_dir(userdata, "assets")
+
+
+def _cache_dir_for(userdata: Path) -> Path:
+    return _sibling_dir(userdata, "cache")
+
+
+def _updates_dir_for(userdata: Path) -> Path:
+    return _sibling_dir(userdata, "updates")
+
+
+def _logs_dir_for(userdata: Path) -> Path:
+    return _cache_dir_for(userdata) / "logs"
+
+
+def _move_missing(src: Path, dst: Path) -> None:
+    try:
+        if not src.exists() or src.resolve() == dst.resolve():
+            return
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if not dst.exists():
+            shutil.move(str(src), str(dst))
+            return
+        if src.is_dir() and dst.is_dir():
+            for child in src.iterdir():
+                target = dst / child.name
+                if not target.exists():
+                    shutil.move(str(child), str(target))
+            try:
+                src.rmdir()
+            except OSError:
+                pass
+    except OSError:
+        pass
+
+
+def _migrate_storage_layout(userdata: Path) -> None:
+    """Move pre-0.8 mixed userdata children into lifecycle-specific siblings."""
+    assets = _assets_dir_for(userdata)
+    cache = _cache_dir_for(userdata)
+    updates = _updates_dir_for(userdata)
+    _move_missing(userdata / "bundled-events", assets / "bundled-events")
+    _move_missing(userdata / "tris", assets / "tris")
+    _move_missing(userdata / "install-manifest.json", assets / "install-manifest.json")
+    _move_missing(userdata / "cache", cache)
+    _move_missing(userdata / "updates", updates / "downloads")
+    _move_missing(userdata / "studio-web", cache / "studio-web")
+    _move_missing(userdata / ".studio-web-old", cache / ".studio-web-old")
+    for stage in userdata.glob(".studio-web-*"):
+        _move_missing(stage, cache / stage.name)
+    _move_missing(userdata / "studio.log", _logs_dir_for(userdata) / "studio.log")
+
+
 log = logging.getLogger("cs2dak.studio")
 
 
@@ -149,12 +205,12 @@ class _StudioStaticHandler(SimpleHTTPRequestHandler):
     """Static file handler with real cache headers for large immutable assets.
 
     `/tris/<map>.tri` 支持 overlay + 按需下载：
-      1. userdata/tris 下存在同名文件 → 优先提供（外置资产，手动放置或已下载）；
+      1. assets/tris 下存在同名文件 → 优先提供（外置资产，手动放置或已下载）；
       2. 打包内置（去内置化后通常不存在）→ 回退提供；
       3. 都没有 → 命中 GET 时按 tris-manifest 从镜像下载到 overlay，再提供。
     下载失败只降级（跳过静态墙体 LOS），不报错。同图多场并行导入按文件名加锁去重。
 
-    `/bundled-events/` overlay：userdata/bundled-events 优先，回退 WEB_DIR/bundled-events。
+    `/bundled-events/` overlay：assets/bundled-events 优先，回退 WEB_DIR/bundled-events。
     不做按需下载（events 由 installer 预装或 health check 修复）。
     """
 
@@ -230,7 +286,7 @@ class _StudioStaticHandler(SimpleHTTPRequestHandler):
         default = super().translate_path(path)
         urlpath = urllib.parse.urlparse(path).path
 
-        # 前端增量包 overlay：完整 dist 解压到 userdata/studio-web 后优先提供。
+        # 前端增量包 overlay：完整 dist 解压到 cache/studio-web 后优先提供。
         overlay_web = self.overlay_web
         if overlay_web is not None:
             rel = "index.html" if urlpath in ("", "/") else urlpath.lstrip("/")
@@ -238,7 +294,7 @@ class _StudioStaticHandler(SimpleHTTPRequestHandler):
             if candidate.is_file():
                 return str(candidate)
 
-        # /tris/ overlay：userdata/tris 优先于内置
+        # /tris/ overlay：assets/tris 优先于内置
         overlay = self.overlay_tris
         if overlay is not None and urlpath.startswith("/tris/"):
             name = os.path.basename(urlpath)
@@ -246,7 +302,7 @@ class _StudioStaticHandler(SimpleHTTPRequestHandler):
             if candidate.is_file():
                 return str(candidate)
 
-        # /bundled-events/ overlay：userdata/bundled-events 优先于内置
+        # /bundled-events/ overlay：assets/bundled-events 优先于内置
         overlay_be = self.overlay_bundled_events
         if overlay_be is not None and urlpath.startswith("/bundled-events/"):
             name = os.path.basename(urlpath)
@@ -321,12 +377,13 @@ def _valid_web_overlay(path: Path) -> Path | None:
     return None
 
 
-def _setup_logging(userdata: Path) -> None:
-    """File log in the userdata dir + stderr. The log is the user-facing
+def _setup_logging(logs_dir: Path) -> None:
+    """File log in cache/logs + stderr. The log is the user-facing
     answer to "解析到底开始了没有" when the UI looks stuck."""
     handlers: list[logging.Handler] = [logging.StreamHandler()]
     try:
-        handlers.append(logging.FileHandler(userdata / "studio.log", encoding="utf-8"))
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        handlers.append(logging.FileHandler(logs_dir / "studio.log", encoding="utf-8"))
     except OSError:
         pass
     logging.basicConfig(
@@ -403,8 +460,30 @@ class StudioApi:
         self._event_download_jobs: dict[str, _UpdateJob] = {}
         self._event_maker_sessions: dict[str, Path] = {}
         self._userdata = _studio_userdata()
+        _migrate_storage_layout(self._userdata)
         self._db_lock = threading.Lock()
         self._db: sqlite3.Connection | None = None
+
+    def _assets_dir(self) -> Path:
+        return _assets_dir_for(self._userdata)
+
+    def _cache_dir(self) -> Path:
+        return _cache_dir_for(self._userdata)
+
+    def _updates_dir(self) -> Path:
+        return _updates_dir_for(self._userdata)
+
+    def _logs_dir(self) -> Path:
+        return _logs_dir_for(self._userdata)
+
+    def _bundled_events_dir(self) -> Path:
+        return self._assets_dir() / "bundled-events"
+
+    def _install_manifest_path(self) -> Path:
+        return self._assets_dir() / "install-manifest.json"
+
+    def _web_overlay_dir(self) -> Path:
+        return self._cache_dir() / "studio-web"
 
     # --- native storage -------------------------------------------------
     # 待桌面验证：CI/沙箱没有真实 pywebview 桌面壳。TS 侧已保留 IndexedDB fallback。
@@ -479,7 +558,7 @@ class StudioApi:
         if namespace == "demos":
             path = self._userdata / "demos"
         else:
-            path = self._userdata / "cache" / "blobs" / _sanitize(namespace)
+            path = self._cache_dir() / "blobs" / _sanitize(namespace)
         path.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -540,11 +619,12 @@ class StudioApi:
         paths = {
             "database": self._userdata / "studio.sqlite",
             "demos": self._userdata / "demos",
-            "cache": self._userdata / "cache",
-            "tris": self._userdata / "tris",
-            "updates": self._userdata / "updates",
+            "cache": self._cache_dir(),
+            "bundledEvents": self._bundled_events_dir(),
+            "tris": self._assets_dir() / "tris",
+            "updates": self._updates_dir(),
             "reports": self._userdata / "reports",
-            "logs": self._userdata / "studio.log",
+            "logs": self._logs_dir() / "studio.log",
             "backups": self._userdata / "backups",
         }
         for category, path in paths.items():
@@ -638,11 +718,12 @@ class StudioApi:
     def storage_cleanup(self, category: str) -> dict:
         """Delete only explicitly rebuildable storage categories."""
         targets = {
-            "cache": self._userdata / "cache",
-            "tris": self._userdata / "tris",
-            "updates": self._userdata / "updates",
+            "cache": self._cache_dir(),
+            "bundledEvents": self._bundled_events_dir(),
+            "tris": self._assets_dir() / "tris",
+            "updates": self._updates_dir(),
             "reports": self._userdata / "reports",
-            "logs": self._userdata / "studio.log",
+            "logs": self._logs_dir() / "studio.log",
         }
         target = targets.get(category)
         if target is None:
@@ -804,7 +885,7 @@ class StudioApi:
         return {"jobId": job.id}
 
     def _run_event_download(self, job: _UpdateJob) -> None:
-        directory = self._userdata / "cache" / "events"
+        directory = self._cache_dir() / "events"
         directory.mkdir(parents=True, exist_ok=True)
         partial = directory / f"{job.id}.part"
         destination = directory / f"{job.id}.zip"
@@ -1080,7 +1161,7 @@ class StudioApi:
         return {"jobId": job.id}
 
     def _run_update_job(self, job: _UpdateJob) -> None:
-        dest = updater.updates_dir(self._userdata) / job.name
+        dest = updater.updates_dir(self._updates_dir()) / job.name
 
         def on_progress(received: int) -> None:
             job.received = received
@@ -1128,7 +1209,7 @@ class StudioApi:
         try:
             job.state = "applying"
             # apply_windows_update 自行在 install_dir.parent 下创建 staging 目录，
-            # 不再使用 install_dir/userdata/updates（否则 bat 第一步 move 后路径失效）
+            # 不再使用安装目录内部暂存（否则 bat 第一步 move 后路径失效）
             updater.apply_windows_update(
                 job.staged_path,
                 updater.current_install_dir(),
@@ -1156,7 +1237,7 @@ class StudioApi:
         return {"ok": True}
 
     def update_apply_web(self, job_id: str, version: str) -> dict:
-        """Install a frontend-only update into userdata/studio-web.
+        """Install a frontend-only update into cache/studio-web.
 
         The zip is a complete Vite dist directory. The static server checks this
         overlay before the bundled studio_web, so a page reload is enough.
@@ -1166,8 +1247,8 @@ class StudioApi:
             return {"ok": False, "error": "更新包尚未就绪"}
         if _version_tuple(version) < _version_tuple(__version__):
             return {"ok": False, "error": "前端增量包版本低于当前运行时"}
-        target = self._userdata / "studio-web"
-        stage = self._userdata / f".studio-web-{int(time.time())}"
+        target = self._web_overlay_dir()
+        stage = self._cache_dir() / f".studio-web-{int(time.time())}"
         try:
             if stage.exists():
                 shutil.rmtree(stage)
@@ -1185,7 +1266,7 @@ class StudioApi:
                 json.dumps({"version": version, "installedAt": datetime.now(timezone.utc).isoformat()}, ensure_ascii=False),
                 encoding="utf-8",
             )
-            backup = self._userdata / ".studio-web-old"
+            backup = self._cache_dir() / ".studio-web-old"
             if backup.exists():
                 shutil.rmtree(backup)
             if target.exists():
@@ -1212,7 +1293,7 @@ class StudioApi:
         from cs2dak import __version__ as local_ver
 
         effective_ver = local_ver
-        web_version_path = self._userdata / "studio-web" / "version.json"
+        web_version_path = self._web_overlay_dir() / "version.json"
         try:
             web_version = json.loads(web_version_path.read_text(encoding="utf-8")).get("version")
             if isinstance(web_version, str) and _version_tuple(web_version) > _version_tuple(effective_ver):
@@ -1248,10 +1329,10 @@ class StudioApi:
             return None
 
     def _bundled_events_manifest_path(self) -> Path:
-        return self._userdata / "bundled-events" / "manifest.json"
+        return self._bundled_events_dir() / "manifest.json"
 
     def bundled_events_manifest(self) -> dict | None:
-        """返回 userdata/bundled-events/manifest.json 内容。
+        """返回 assets/bundled-events/manifest.json 内容。
 
         manifest 是唯一真相源——不存在则返回 None，不做动态扫描。
         """
@@ -1280,13 +1361,13 @@ class StudioApi:
     _manifest_source: str = "none"  # "local" | "remote" | "none"
 
     def _install_manifest(self) -> dict | None:
-        """读取 userdata/install-manifest.json；不存在时尝试从 R2 拉取。
+        """读取 assets/install-manifest.json；不存在时尝试从 R2 拉取。
 
         这样老用户 auto-update 到 0.7.0（无本地 manifest）也能通过
         health check 发现可安装的官方资产列表并完成修复。
         同时记录 _manifest_source 供 check_assets 返回。
         """
-        path = self._userdata / "install-manifest.json"
+        path = self._install_manifest_path()
         if path.is_file():
             try:
                 self._manifest_source = "local"
@@ -1342,7 +1423,7 @@ class StudioApi:
             result["canRepair"] = False  # R2 不可达，无法修复
             return result
 
-        bundled_dir = self._userdata / "bundled-events"
+        bundled_dir = self._bundled_events_dir()
         for event in manifest.get("bundledEvents", []):
             slug = event.get("slug", "")
             name = event.get("name", slug)
@@ -1364,7 +1445,7 @@ class StudioApi:
                 except Exception:  # noqa: BLE001
                     result["missingEvents"].append({"slug": slug, "name": name, "reason": "hash_mismatch"})
 
-        tris_dir = self._userdata / "tris"
+        tris_dir = self._assets_dir() / "tris"
         for map_name, entry in (manifest.get("requiredTris", {}) or {}).items():
             fpath = tris_dir / entry.get("name", f"{map_name}.tri")
             expected_size = entry.get("size")
@@ -1418,11 +1499,10 @@ class StudioApi:
             self._repair_jobs[job_id] = job
 
         def run():
-            bundled_dir = self._userdata / "bundled-events"
+            bundled_dir = self._bundled_events_dir()
             bundled_dir.mkdir(parents=True, exist_ok=True)
-            tris_dir = self._userdata / "tris"
+            tris_dir = self._assets_dir() / "tris"
             tris_dir.mkdir(parents=True, exist_ok=True)
-            succeeded_events = set()
 
             for i, item in enumerate(items):
                 job["state"] = "downloading"
@@ -1442,7 +1522,6 @@ class StudioApi:
                             expected_sha256=evt.get("sha256"),
                             expected_size=evt.get("size"),
                         )
-                        succeeded_events.add(slug)
                     elif item.get("type") == "tri":
                         map_name = item["mapName"]
                         entry = (manifest.get("requiredTris") or {}).get(map_name)
@@ -1461,17 +1540,21 @@ class StudioApi:
 
             # 总是写 install-manifest（修复后下次启动不再依赖 R2）
             try:
-                dest = self._userdata / "install-manifest.json"
+                dest = self._install_manifest_path()
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), "utf-8")
             except Exception as exc:  # noqa: BLE001
                 log.warning("写入 install-manifest 失败：%s", exc)
-            # bundled-events manifest 只写成功下载的 event
+            # bundled-events manifest 记录当前已安装的官方赛事，避免局部修复覆盖掉旧条目。
             try:
                 be_manifest = bundled_dir / "manifest.json"
+                installed_events = [
+                    e for e in manifest.get("bundledEvents", [])
+                    if (bundled_dir / f"{e.get('slug')}.zip").is_file()
+                ]
                 be_data = {
                     "version": "cs2-demo-analysis-kit/events-manifest-1.0",
-                    "events": [e for e in manifest.get("bundledEvents", []) if e.get("slug") in succeeded_events],
+                    "events": installed_events,
                 }
                 if be_data["events"]:
                     be_manifest.write_text(json.dumps(be_data, ensure_ascii=False, indent=2), "utf-8")
@@ -1492,12 +1575,12 @@ class StudioApi:
 
     # --- .tri 资产管理（外置 overlay + 按需下载）-----------------------------
     def _tri_overlay_dir(self) -> Path:
-        path = self._userdata / "tris"
+        path = self._assets_dir() / "tris"
         path.mkdir(parents=True, exist_ok=True)
         return path
 
     def tri_dir(self) -> str:
-        """userdata 下的 .tri overlay 目录（供 UI 显示/打开/手动放置资产）。"""
+        """assets 下的 .tri overlay 目录（供 UI 显示/打开/手动放置资产）。"""
         return str(self._tri_overlay_dir())
 
     def tri_present(self) -> list[str]:
@@ -1527,7 +1610,7 @@ class StudioApi:
 
     # --- Library 目录（用户可见数据目录：显示路径 / 在文件管理器打开）-------------
     def userdata_dir(self) -> str:
-        """用户数据目录绝对路径（资料库 SQLite + demo blobs + 缓存 + 日志 + .tri overlay）。"""
+        """用户数据目录绝对路径（资料库 SQLite + 原始 ZIP + 备份）。"""
         return str(self._userdata)
 
     def open_userdata_dir(self) -> dict:
@@ -1564,8 +1647,12 @@ def main() -> None:
     _dnd_state["num_listeners"] = max(_dnd_state["num_listeners"], 1)
 
     storage = _studio_userdata()
-    _setup_logging(storage)
-    log.info("DAK Studio %s 启动，userdata=%s", __version__, storage)
+    _migrate_storage_layout(storage)
+    assets = _assets_dir_for(storage)
+    cache = _cache_dir_for(storage)
+    updates = _updates_dir_for(storage)
+    _setup_logging(_logs_dir_for(storage))
+    log.info("DAK Studio %s 启动，userdata=%s assets=%s cache=%s updates=%s", __version__, storage, assets, cache, updates)
 
     index = WEB_DIR / "index.html"
     if not index.exists():
@@ -1575,13 +1662,13 @@ def main() -> None:
             f"{WEB_DIR}"
         )
 
-    # .tri overlay：userdata/tris 优先于内置（外置资产管理）。
-    overlay_tris = storage / "tris"
+    # .tri overlay：assets/tris 优先于内置（外置资产管理）。
+    overlay_tris = assets / "tris"
     overlay_tris.mkdir(parents=True, exist_ok=True)
-    # bundled-events overlay：userdata/bundled-events（installer 预装或 health check 修复）。
-    overlay_bundled_events = storage / "bundled-events"
+    # bundled-events overlay：assets/bundled-events（installer 预装或 health check 修复）。
+    overlay_bundled_events = assets / "bundled-events"
     overlay_bundled_events.mkdir(parents=True, exist_ok=True)
-    overlay_web = storage / "studio-web"
+    overlay_web = cache / "studio-web"
     _server, index_url = _start_static_server(
         WEB_DIR,
         overlay_tris=overlay_tris,

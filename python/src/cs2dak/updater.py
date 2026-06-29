@@ -11,7 +11,7 @@
     1. 等当前进程 PID 退出；
     2. 把旧安装目录改名为 *.old-<ts>；
     3. 把新目录移到原位；
-    4. 从 *.old 把 userdata/ 搬回新目录（便携式数据不能丢）；
+    4. 从 *.old 把 userdata/assets/cache/updates 搬回新目录（便携式数据不能丢）；
     5. 启动新 exe；6. 删除 *.old；7. 自删脚本。
   任一步失败回滚（把 *.old 改回原名），保证不变砖。
 
@@ -48,9 +48,9 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def updates_dir(userdata: Path) -> Path:
-    """暂存目录：放在 userdata 下，不污染安装目录、且与资料库同盘（move 无跨盘拷贝）。"""
-    path = userdata / "updates"
+def updates_dir(updates_root: Path) -> Path:
+    """下载暂存目录：放在 updates/downloads，不污染用户资料库。"""
+    path = updates_root / "downloads"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -124,7 +124,7 @@ def _find_app_root(extract_dir: Path, exe_name: str) -> Path:
 
 
 def _relaunch_bat(pid: int, install_dir: Path, new_dir: Path, exe_name: str) -> str:
-    """生成接力替换批处理脚本内容。保留 install_dir/userdata。"""
+    """生成接力替换批处理脚本内容。保留用户数据、资产、缓存与更新暂存。"""
     ts = time.strftime("%Y%m%d%H%M%S")
     old_dir = install_dir.parent / f"{install_dir.name}.old-{ts}"
     target_exe = install_dir / exe_name
@@ -165,8 +165,11 @@ if %tries% geq 30 goto rollback
 timeout /t 1 /nobreak >nul
 goto movenew
 :newmoved
-rem 3) 搬回 userdata（便携式数据不能丢）
-if exist "{old_dir}\\userdata" move "{old_dir}\\userdata" "{install_dir}\\userdata" >nul 2>&1
+	rem 3) 搬回持久目录（便携式数据不能丢）
+	if exist "{old_dir}\\userdata" move "{old_dir}\\userdata" "{install_dir}\\userdata" >nul 2>&1
+	if exist "{old_dir}\\assets" move "{old_dir}\\assets" "{install_dir}\\assets" >nul 2>&1
+	if exist "{old_dir}\\cache" move "{old_dir}\\cache" "{install_dir}\\cache" >nul 2>&1
+	if exist "{old_dir}\\updates" move "{old_dir}\\updates" "{install_dir}\\updates" >nul 2>&1
 rem 4) 启动新版本
 echo [%date% %time%] start "{target_exe}" >> "%LOG%"
 start "" "{target_exe}"

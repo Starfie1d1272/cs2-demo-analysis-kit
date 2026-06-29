@@ -20,10 +20,10 @@
        (前端)                (Python)                   镜像顺序试 + .part 暂存 + sha256 校验
                                         ↓ ready
 替换：runtime ──> StudioApi.update_apply ──> updater.apply_windows_update
-      web patch ─> StudioApi.update_apply_web ──> userdata/studio-web overlay + reload
+      web patch ─> StudioApi.update_apply_web ──> cache/studio-web overlay + reload
                                                         runtime 解压旁目录 + 写接力 .bat + 退出进程
                                         ↓ .bat 接管
-       等本进程退出 → 旧目录改名 → 新目录就位 → 搬回 userdata → 重启 → 清理 → 自删
+       等本进程退出 → 旧目录改名 → 新目录就位 → 搬回 userdata/assets/cache/updates → 重启 → 清理 → 自删
 ```
 
 ### 1. 检查（manifest 驱动）
@@ -60,7 +60,7 @@ R2 上传路径与 manifest `asset.urls` 里的 R2 URL **必须一致**，否则
 ### 2. 下载 + 校验（Python）
 
 - [`python/src/cs2dak/updater.py`](../../python/src/cs2dak/updater.py) `download_with_fallback`：
-  按 manifest 的 `asset.urls` 顺序尝试，下到 `userdata/updates/<name>.part`，
+  按 manifest 的 `asset.urls` 顺序尝试，下到 `updates/downloads/<name>.part`，
   校验 size + **sha256**（第三方代理不可信，校验是硬要求），通过后原子改名。
 - 桥：`StudioApi.update_start/update_status`（后台任务 + 轮询，仿导出 job）。
 
@@ -68,7 +68,7 @@ R2 上传路径与 manifest `asset.urls` 里的 R2 URL **必须一致**，否则
 
 Windows 无法删除/覆盖正在运行的 exe。`apply_windows_update`：
 
-1. 解压更新包到 `userdata/updates/extract/`；
+1. 下载更新包到 `updates/downloads/`；
 2. 写 `apply-update.bat`：等当前进程 PID 退出 → 旧目录改名 `*.old-<ts>` →
    新目录移到原位 → **从 `*.old` 搬回 `userdata/`**（便携式数据不能丢）→
    启动新 exe → 删旧目录 → 自删脚本；
@@ -78,7 +78,7 @@ Windows 无法删除/覆盖正在运行的 exe。`apply_windows_update`：
 
 ### 4. `.tri` 资产外置（0.6.4 已去内置化，安装包 ~220MB → ~20MB）
 
-- 静态服务 `/tris/` 支持 `userdata/tris` **overlay**：外置/手动放置/下载的 `.tri`
+- 静态服务 `/tris/` 支持 `assets/tris` **overlay**：外置/手动放置/下载的 `.tri`
   优先于打包内置（[`python/src/cs2dak/studio.py`](../../python/src/cs2dak/studio.py)
   `_StudioStaticHandler.translate_path`）。
 - 桥：`tri_dir`（overlay 目录）/ `tri_present`（已有图）/ `tri_download`（按需下载，复用 updater）。
@@ -98,7 +98,7 @@ Windows 无法删除/覆盖正在运行的 exe。`apply_windows_update`：
 ## 与 churn 拆分的协同
 
 高频变更（前端 dist）与低频变更（Python 壳/依赖/`.tri`）已经拆开：
-高频更新走 `dak-studio-web-<version>.zip`，解压到 `userdata/studio-web` overlay；
+高频更新走 `dak-studio-web-<version>.zip`，解压到 `cache/studio-web` overlay；
 低频变更继续走完整 runtime zip。`.tri` 与赛事包仍由独立资产 manifest 管理。
 
 ---
