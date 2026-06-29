@@ -669,6 +669,27 @@
   accent-color: var(--dak-accent);
 }
 
+.dak-radar-timebar {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.dak-radar-play-button {
+  width: 36px;
+  height: 36px;
+}
+
+.dak-radar-time-slider {
+  min-width: 0;
+}
+
+.dak-radar-time-meta {
+  color: var(--dak-fg-dim);
+  font-family: var(--dak-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .dak-mode {
   display: inline-flex;
   align-items: center;

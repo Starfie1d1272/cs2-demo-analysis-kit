@@ -16,6 +16,7 @@ import {
   levelAt,
   type MapLevel,
 } from "@cs2dak/maps";
+import { Pause, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 const CANVAS_SIZE = 1024;
@@ -49,6 +50,7 @@ export interface RadarFieldCanvasProps {
 export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanvasProps) {
   const [mode, setMode] = useState<RadarFieldMode>("ctVis");
   const [sec, setSec] = useState(20);
+  const [playing, setPlaying] = useState(false);
   // 照亮模式：压暗底图、视野覆盖发青光，暗处即盲区（读负空间最直观）。
   const [reveal, setReveal] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -58,6 +60,25 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
   const [level, setLevel] = useState<MapLevel>("upper");
 
   const isDiff = !!baseline;
+  const maxSec = Math.max(0, field.maxSec - 1);
+
+  useEffect(() => {
+    setSec((value) => Math.min(value, maxSec));
+  }, [maxSec]);
+
+  useEffect(() => {
+    if (!playing || maxSec <= 0) return undefined;
+    const timer = window.setInterval(() => {
+      setSec((value) => {
+        if (value >= maxSec) {
+          setPlaying(false);
+          return maxSec;
+        }
+        return value + 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [playing, maxSec]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -177,11 +198,36 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
         </div>
       </div>
 
-      <div className="dak-heatmap-tuning" aria-label="时间轴">
-        <label>
+      <div className="dak-heatmap-tuning dak-radar-timebar" aria-label="时间轴">
+        <button
+          type="button"
+          className="dak-play-button dak-radar-play-button"
+          aria-label={playing ? "暂停控图播放" : "播放控图变化"}
+          onClick={() => {
+            if (playing) {
+              setPlaying(false);
+              return;
+            }
+            if (sec >= maxSec) setSec(0);
+            setPlaying(maxSec > 0);
+          }}
+        >
+          {playing ? <Pause size={18} /> : <Play size={18} />}
+        </button>
+        <label className="dak-radar-time-slider">
           freeze 后 {sec}s
-          <input type="range" min={0} max={field.maxSec - 1} value={sec} onChange={(e) => setSec(Number(e.target.value))} />
+          <input
+            type="range"
+            min={0}
+            max={maxSec}
+            value={sec}
+            onChange={(e) => {
+              setPlaying(false);
+              setSec(Number(e.target.value));
+            }}
+          />
         </label>
+        <span className="dak-radar-time-meta">0-{maxSec}s</span>
       </div>
     </div>
   );
