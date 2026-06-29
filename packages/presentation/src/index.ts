@@ -23,6 +23,7 @@ export type { DuelInsightsFacts, MechanicsMetricKey, WeaponCategory } from "./du
 export { SEASON_STAT_VIEWS, formatPercent } from "./season-metrics.js";
 export {
   buildPlayerSeasonInsights,
+  buildUtilityValueSummary,
   buildPlayerMechanicsProfile,
   buildPlayerMechanicsProfileFromRows,
   buildPlayerWeaponStats,
@@ -38,6 +39,10 @@ export {
   type PlayerMechanicsWeaponProfile,
   type PlayerWeaponStat,
   type PlayerFlashSummary,
+  type UtilityValueSummary,
+  type UtilityValueRow,
+  type UtilityDamageEvidence,
+  type UtilityDamageKind,
   type PlayerTrendPoint,
   type FlashValueSummary,
   type TeamFlashIncident,

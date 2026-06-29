@@ -72,7 +72,7 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
       { key: "tournament", label: "赛事与队伍", hint: "赛事排行 / 总览 / 赛程", icon: Trophy },
       { key: "duelOverview", label: "对枪概览", hint: "首杀热点 / 对枪态势", icon: Swords },
       { key: "economy", label: "转化与节奏", hint: "转化 / 翻盘 / 经济对位", icon: Coins },
-      { key: "utility", label: "闪光价值", hint: "收益 / 最佳闪 / 队闪", icon: Bomb },
+      { key: "utility", label: "道具价值", hint: "闪光 / 雷火 / 烟", icon: Bomb },
       { key: "lineups", label: "道具点位库", hint: "出手点 / 落点 / 证据", icon: Bomb },
       { key: "control", label: "控图", hint: "覆盖场 / 防守漏洞 / 倾向", icon: Radar }
     ]

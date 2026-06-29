@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import type { UtilityDamageEvidence, UtilityValueRow, UtilityValueSummary } from "@cs2dak/presentation";
 import type { CohortScopeState } from "../components/CohortScope";
-import { DataTable, STUDIO_TABLE_CLASSES, EmptyState, EvidenceLink, MetricInfo, type DataTableColumn } from "@cs2dak/react";
-import { getPlayerFlashSummaries, getSeasonSummary, type IdentityOptions } from "../lib/season";
-import { formatMatchLabel, matchDateFromFileName, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { DataTable, EmptyState, EvidenceLink, MetricInfo, STUDIO_TABLE_CLASSES, type DataTableColumn } from "@cs2dak/react";
+import { getSeasonSummary, getUtilityValueSummary, type IdentityOptions } from "../lib/season";
+import { formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 
 export interface UtilityViewProps {
   allEntries: StudioDemoEntry[];
@@ -13,123 +14,85 @@ export interface UtilityViewProps {
   identityOptions?: IdentityOptions;
 }
 
-type FlashRow = {
-  playerKey: string;
-  name: string;
-  flashesThrown: number;
-  enemyBlindSeconds: number;
-  teamBlindSeconds: number;
-  netSecondsPerFlash: number | null;
-};
+type BestFlash = UtilityValueSummary["bestFlashes"][number];
 
-const FLASH_COLUMNS: DataTableColumn<FlashRow>[] = [
-  { key: "name", label: "选手", format: (r) => r.name },
-  { key: "flashesThrown", label: "闪光", numeric: true, sortable: true, sortValue: (r) => r.flashesThrown, format: (r) => r.flashesThrown },
-  { key: "enemyBlindSeconds", label: "致盲敌方", numeric: true, sortable: true, sortValue: (r) => r.enemyBlindSeconds, format: (r) => `${r.enemyBlindSeconds.toFixed(1)}s` },
-  { key: "teamBlindSeconds", label: "致盲队友", numeric: true, sortable: true, sortValue: (r) => r.teamBlindSeconds, format: (r) => `${r.teamBlindSeconds.toFixed(1)}s` },
-  { key: "netSecondsPerFlash", label: <>闪光净收益/颗<MetricInfo note="（致盲敌方秒数 − 致盲队友秒数）/ 投掷数；越高越好" /></>, numeric: true, sortable: true, sortValue: (r) => r.netSecondsPerFlash, format: (r) => r.netSecondsPerFlash == null ? "—" : `${r.netSecondsPerFlash.toFixed(2)}s` },
+const fmt = (value: number | null, digits = 2, suffix = "") => value == null ? "—" : `${value.toFixed(digits)}${suffix}`;
+const damagePerRound = (row: UtilityValueRow) => (row.heDamagePerRound ?? 0) + (row.fireDamagePerRound ?? 0);
+
+const VALUE_COLUMNS: DataTableColumn<UtilityValueRow>[] = [
+  { key: "name", label: "对象", format: (r) => r.name },
+  { key: "rounds", label: "回合", numeric: true, sortable: true, sortValue: (r) => r.rounds, format: (r) => r.rounds },
+  {
+    key: "damagePerRound",
+    label: <>雷火伤害/回合<MetricInfo note="HE 手雷 + 火造成的敌方有效生命伤害 / 回合数；只算敌方，不算队友。" /></>,
+    numeric: true,
+    sortable: true,
+    sortValue: damagePerRound,
+    format: (r) => fmt(damagePerRound(r), 2)
+  },
+  {
+    key: "enemyBlindSecondsPerRound",
+    label: <>敌白/回合<MetricInfo note="闪光造成的敌方致盲秒数 / 回合数；不把队友短暂被白作为主指标。" /></>,
+    numeric: true,
+    sortable: true,
+    sortValue: (r) => r.enemyBlindSecondsPerRound,
+    format: (r) => fmt(r.enemyBlindSecondsPerRound, 2, "s")
+  },
+  {
+    key: "enemyBlindSecondsPerFlash",
+    label: <>敌白/闪<MetricInfo note="闪光造成的敌方致盲秒数 / 闪光投掷数。" /></>,
+    numeric: true,
+    sortable: true,
+    sortValue: (r) => r.enemyBlindSecondsPerFlash,
+    format: (r) => fmt(r.enemyBlindSecondsPerFlash, 2, "s")
+  },
+  { key: "heDamagePerThrow", label: "HE/颗", numeric: true, sortable: true, sortValue: (r) => r.heDamagePerThrow, format: (r) => fmt(r.heDamagePerThrow, 2) },
+  { key: "heDamagePerRound", label: "HE/回合", numeric: true, sortable: true, sortValue: (r) => r.heDamagePerRound, format: (r) => fmt(r.heDamagePerRound, 2) },
+  { key: "fireDamagePerThrow", label: "火/颗", numeric: true, sortable: true, sortValue: (r) => r.fireDamagePerThrow, format: (r) => fmt(r.fireDamagePerThrow, 2) },
+  { key: "fireDamagePerRound", label: "火/回合", numeric: true, sortable: true, sortValue: (r) => r.fireDamagePerRound, format: (r) => fmt(r.fireDamagePerRound, 2) },
+  { key: "smokesPerRound", label: "烟/回合", numeric: true, sortable: true, sortValue: (r) => r.smokesPerRound, format: (r) => fmt(r.smokesPerRound, 3) },
 ];
 
-type BestFlash = {
-  matchId: string;
-  roundNumber: number;
-  tick?: number;
-  playerName: string;
-  victimCount: number;
-  enemySeconds: number;
-  teamSeconds: number;
-  netSeconds: number;
-};
-
 export function UtilityView({ allEntries, entries, scope, onOpenMatch, onGoLibrary, identityOptions }: UtilityViewProps) {
-  const [rows, setRows] = useState<FlashRow[] | null>(null);
-  const [bestFlashes, setBestFlashes] = useState<BestFlash[]>([]);
-  const [bestMode, setBestMode] = useState<"net" | "enemy">("net");
-  const [incidents, setIncidents] = useState<{
-    matchId: string;
-    roundNumber: number;
-    tick?: number;
-    playerName: string;
-    victimCount: number;
-    totalSeconds: number;
-  }[]>([]);
-  const [showWorst, setShowWorst] = useState(false);
+  const [summary, setSummary] = useState<UtilityValueSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
-
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
-
-  const sortedBest = useMemo(() => {
-    const sorted = [...bestFlashes].sort((a, b) =>
-      bestMode === "net" ? b.netSeconds - a.netSeconds : b.enemySeconds - a.enemySeconds
-    );
-    return sorted.slice(0, 12);
-  }, [bestFlashes, bestMode]);
 
   useEffect(() => {
     if (entries.length === 0) {
-      setRows(null);
-      setBestFlashes([]);
-      setIncidents([]);
+      setSummary(null);
       return;
     }
     let cancelled = false;
-    setRows(null);
+    setSummary(null);
     setError(null);
     getSeasonSummary(entries, identityOptions, scope.teams)
-      .then(async (summary) => {
-        if (cancelled) return;
-        const flashes = await getPlayerFlashSummaries(
-          entries,
-          summary.profiles.map((profile) => ({
-            playerKey: profile.playerKey,
-            name: profile.name,
-            steamIds: profile.steamIds
-          })),
-          identityOptions,
-          scope.teams,
-        );
-        if (cancelled) return;
-        const nextRows = flashes.map((flash) => {
-          return {
-            playerKey: flash.playerKey,
-            name: flash.name,
-            flashesThrown: flash.flashesThrown,
-            enemyBlindSeconds: flash.enemyBlindSeconds,
-            teamBlindSeconds: flash.teamBlindSeconds,
-            netSecondsPerFlash: flash.netSecondsPerFlash
-          };
-        }).sort((a, b) => (b.netSecondsPerFlash ?? -999) - (a.netSecondsPerFlash ?? -999));
-        const nextIncidents = flashes.flatMap((flash) => {
-          return flash.worstTeamFlashes.map((incident) => ({
-            ...incident,
-            playerName: flash.name
-          }));
-        }).sort((a, b) => b.totalSeconds - a.totalSeconds).slice(0, 12);
-        const nextBest = flashes.flatMap((flash) =>
-          (flash.bestEnemyFlashes ?? []).map((incident) => ({
-            ...incident,
-            playerName: flash.name
-          }))
-        );
-        setRows(nextRows);
-        setBestFlashes(nextBest);
-        setIncidents(nextIncidents);
+      .then((season) => getUtilityValueSummary(
+        entries,
+        season.profiles.map((profile) => ({
+          playerKey: profile.playerKey,
+          name: profile.name,
+          steamIds: profile.steamIds,
+        })),
+        identityOptions,
+        scope.teams,
+      ))
+      .then((next) => {
+        if (!cancelled) setSummary(next);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [entries, identityOptions?.version, scope.teams]);  // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { cancelled = true; };
+  }, [entries, identityOptions?.version, scope.teams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (allEntries.length === 0) {
     return (
       <div className="stu-view">
         <EmptyState
           mark
-          title="还没有闪光数据"
-          hint="先导入 demo，再查看跨场 Flash Value 与最佳闪光。"
+          title="还没有道具数据"
+          hint="先导入 demo，再查看闪光、HE、火和烟的跨场价值。"
           action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
         />
       </div>
@@ -140,107 +103,97 @@ export function UtilityView({ allEntries, entries, scope, onOpenMatch, onGoLibra
     <div className="stu-view">
       <header className="stu-view-header">
         <div>
-          <h1>闪光价值</h1>
-          <p>跨场闪光收益、最佳闪光与负收益队闪证据，点击证据可回到对应回合/tick。</p>
+          <h1>道具价值</h1>
+          <p>按回合和投掷数归一：闪光看敌方致盲，HE/火看敌方伤害，烟只看每回合投入。</p>
         </div>
       </header>
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
-      {!error && !rows && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的道具数据…</div>}
+      {!error && !summary && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的道具数据…</div>}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
-      {rows && (
-        <div className="stu-card">
-          <h3>闪光价值排行</h3>
-          <DataTable
-            classes={STUDIO_TABLE_CLASSES}
-            rows={rows}
-            rowKey={(r) => r.playerKey}
-            initialSortKey="netSecondsPerFlash"
-            pageSize={15}
-            paginationInfo={(total) => `${total} 人`}
-            columns={FLASH_COLUMNS}
-          />
-        </div>
+      {summary && (
+        <>
+          <UtilityTable title="选手道具价值" rows={summary.players} empty="当前范围内没有选手道具数据。" pageSize={15} />
+          <UtilityTable title="队伍道具价值" rows={summary.teams} empty="当前范围内没有队伍道具数据。" pageSize={10} />
+          <BestFlashList flashes={summary.bestFlashes.slice(0, 12)} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} />
+          <DamageEvidenceList rows={summary.bestDamageRounds} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} />
+        </>
       )}
-      {bestFlashes.length > 0 && (
-        <div className="stu-card">
-          <div className="stu-card-head">
-            <h3>最佳闪光 Top</h3>
-            <div className="stu-chip-row" role="tablist" aria-label="最佳闪光排序">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={bestMode === "net"}
-                className={bestMode === "net" ? "stu-chip stu-chip-active" : "stu-chip"}
-                onClick={() => setBestMode("net")}
-              >
-                净收益最高
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={bestMode === "enemy"}
-                className={bestMode === "enemy" ? "stu-chip stu-chip-active" : "stu-chip"}
-                onClick={() => setBestMode("enemy")}
-              >
-                致盲最久
-              </button>
-            </div>
-          </div>
-          <p className="stu-muted">
-            {bestMode === "net"
-              ? "单颗闪净收益（致盲敌方秒数 − 同颗误盲队友秒数）最高的闪光。"
-              : "不计误盲队友，单颗闪致盲敌方时间最久的闪光。"}
-          </p>
-          <div className="stu-evidence-list">
-            {sortedBest.map((flash, index) => {
-              const entry = entryByMatchId.get(flash.matchId);
-              const metric = bestMode === "net"
-                ? `净 ${flash.netSeconds.toFixed(1)}s（致盲 ${flash.enemySeconds.toFixed(1)}s${flash.teamSeconds > 0 ? ` · 误盲队友 ${flash.teamSeconds.toFixed(1)}s` : ""}）`
-                : `致盲 ${flash.enemySeconds.toFixed(1)}s`;
-              return (
-                <EvidenceLink
-                  key={`${flash.matchId}-${flash.roundNumber}-${index}`}
-                  disabled={!entry}
-                  onOpen={() => entry && onOpenMatch(entry.id, { roundNumber: flash.roundNumber, tick: flash.tick })}
-                >
-                  {flash.playerName} · {entry ? formatMatchLabel(entry) : flash.matchId} · R{flash.roundNumber} · {flash.victimCount} 人 · {metric}
-                </EvidenceLink>
-              );
-            })}
-          </div>
-        </div>
-      )}
-      {incidents.length > 0 && (
-        <div className="stu-card">
-          <div className="stu-card-head">
-            <h3>负收益队闪 Top</h3>
-            <button
-              type="button"
-              className="stu-button stu-button-ghost"
-              aria-expanded={showWorst}
-              onClick={() => setShowWorst((v) => !v)}
+    </div>
+  );
+}
+
+function UtilityTable({ title, rows, empty, pageSize }: { title: string; rows: UtilityValueRow[]; empty: string; pageSize: number }) {
+  if (rows.length === 0) {
+    return <EmptyState variant="insufficient" title={title} hint={empty} />;
+  }
+  return (
+    <div className="stu-card">
+      <h3>{title}</h3>
+      <DataTable
+        classes={STUDIO_TABLE_CLASSES}
+        rows={rows}
+        rowKey={(r) => r.id}
+        initialSortKey="damagePerRound"
+        pageSize={pageSize}
+        paginationInfo={(total) => `${total} 项`}
+        columns={VALUE_COLUMNS}
+      />
+    </div>
+  );
+}
+
+function BestFlashList({ flashes, entryByMatchId, onOpenMatch }: {
+  flashes: BestFlash[];
+  entryByMatchId: Map<string, StudioDemoEntry>;
+  onOpenMatch: UtilityViewProps["onOpenMatch"];
+}) {
+  if (flashes.length === 0) return null;
+  return (
+    <div className="stu-card">
+      <h3>最佳闪光 Top</h3>
+      <p className="stu-muted">按单颗闪造成的敌方致盲秒数排序；队友短暂被白只作为参考，不进入主榜。</p>
+      <div className="stu-evidence-list">
+        {flashes.map((flash, index) => {
+          const entry = entryByMatchId.get(flash.matchId);
+          const teamFlashNote = flash.teamSeconds >= 1 ? ` · 队友白参考 ${flash.teamSeconds.toFixed(1)}s` : "";
+          return (
+            <EvidenceLink
+              key={`${flash.matchId}-${flash.roundNumber}-${index}`}
+              disabled={!entry}
+              onOpen={() => entry && onOpenMatch(entry.id, { roundNumber: flash.roundNumber, tick: flash.tick })}
             >
-              {showWorst ? "收起" : `展开（${incidents.length}）`}
-            </button>
-          </div>
-          {showWorst && (
-            <div className="stu-evidence-list">
-              {incidents.map((incident, index) => {
-                const entry = entryByMatchId.get(incident.matchId);
-                return (
-                  <EvidenceLink
-                    key={`${incident.matchId}-${incident.roundNumber}-${index}`}
-                    disabled={!entry}
-                    onOpen={() => entry && onOpenMatch(entry.id, { roundNumber: incident.roundNumber, tick: incident.tick })}
-                  >
-                    {incident.playerName} · {entry ? formatMatchLabel(entry) : incident.matchId} · R{incident.roundNumber} · {incident.victimCount} 人 {incident.totalSeconds.toFixed(1)}s
-                  </EvidenceLink>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+              {flash.playerName} · {entry ? formatMatchLabel(entry) : flash.matchId} · R{flash.roundNumber} · {flash.victimCount} 人 · 敌白 {flash.enemySeconds.toFixed(1)}s{teamFlashNote}
+            </EvidenceLink>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DamageEvidenceList({ rows, entryByMatchId, onOpenMatch }: {
+  rows: UtilityDamageEvidence[];
+  entryByMatchId: Map<string, StudioDemoEntry>;
+  onOpenMatch: UtilityViewProps["onOpenMatch"];
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="stu-card">
+      <h3>最高伤害道具回合</h3>
+      <div className="stu-evidence-list">
+        {rows.map((row, index) => {
+          const entry = entryByMatchId.get(row.matchId);
+          return (
+            <EvidenceLink
+              key={`${row.kind}-${row.matchId}-${row.roundNumber}-${index}`}
+              disabled={!entry}
+              onOpen={() => entry && onOpenMatch(entry.id, { roundNumber: row.roundNumber, tick: row.tick })}
+            >
+              {row.playerName} · {row.kind === "he" ? "HE 手雷" : "火"} · {entry ? formatMatchLabel(entry) : row.matchId} · R{row.roundNumber} · {row.victimCount} 人 · {row.damage} 伤害
+            </EvidenceLink>
+          );
+        })}
+      </div>
     </div>
   );
 }

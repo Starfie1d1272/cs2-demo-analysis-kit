@@ -3,6 +3,7 @@ import { derivePlayerMechanics, type PlayerMechanicsFact } from "@cs2dak/core";
 import type { TriangleBvh } from "@cs2dak/maps";
 import { round } from "./season-metrics.js";
 import { displayWeaponName } from "./weapons.js";
+import { normalizeWeapon } from "./workspace-utils.js";
 
 /**
  * v0.3 洞察派生：个人趋势 / Flash Value / Mistake Review / Buy Quality /
@@ -159,6 +160,46 @@ export interface PlayerFlashSummary {
   bestEnemyFlashes: EnemyFlashIncident[];
 }
 
+export type UtilityDamageKind = "he" | "fire";
+
+export interface UtilityValueRow {
+  id: string;
+  name: string;
+  rounds: number;
+  flashesThrown: number;
+  enemyBlindSeconds: number;
+  enemyBlindSecondsPerFlash: number | null;
+  enemyBlindSecondsPerRound: number | null;
+  flashAssistsPerRound: number | null;
+  heThrows: number;
+  heDamage: number;
+  heDamagePerThrow: number | null;
+  heDamagePerRound: number | null;
+  fireThrows: number;
+  fireDamage: number;
+  fireDamagePerThrow: number | null;
+  fireDamagePerRound: number | null;
+  smokesThrown: number;
+  smokesPerRound: number | null;
+}
+
+export interface UtilityDamageEvidence {
+  kind: UtilityDamageKind;
+  matchId: string;
+  roundNumber: number;
+  tick?: number;
+  playerName: string;
+  victimCount: number;
+  damage: number;
+}
+
+export interface UtilityValueSummary {
+  players: UtilityValueRow[];
+  teams: UtilityValueRow[];
+  bestFlashes: Array<EnemyFlashIncident & { playerName: string }>;
+  bestDamageRounds: UtilityDamageEvidence[];
+}
+
 const DEATH_EARLY_SECONDS = 25; // 1:55 -> 1:30
 const DEATH_LATE_SECONDS = 55; // 1:30 -> 1:00；之后为 1:00 后
 const LOW_BUY_TYPES = new Set(["eco", "semi", "force"]);
@@ -168,6 +209,211 @@ const MAX_BEST_FLASH = 15;
 
 function tickrateOf(pkg: DemoPackage): number {
   return pkg.match.tickrate ?? 64;
+}
+
+function isHeDamageWeapon(weapon: string): boolean {
+  return normalizeWeapon(weapon) === "hegrenade";
+}
+
+function isFireDamageWeapon(weapon: string): boolean {
+  return ["inferno", "molotov", "incgrenade", "incendiary"].includes(normalizeWeapon(weapon));
+}
+
+function utilityRow(id: string, name: string): UtilityValueRow {
+  return {
+    id,
+    name,
+    rounds: 0,
+    flashesThrown: 0,
+    enemyBlindSeconds: 0,
+    enemyBlindSecondsPerFlash: null,
+    enemyBlindSecondsPerRound: null,
+    flashAssistsPerRound: null,
+    heThrows: 0,
+    heDamage: 0,
+    heDamagePerThrow: null,
+    heDamagePerRound: null,
+    fireThrows: 0,
+    fireDamage: 0,
+    fireDamagePerThrow: null,
+    fireDamagePerRound: null,
+    smokesThrown: 0,
+    smokesPerRound: null,
+  };
+}
+
+function finalizeUtilityRow(row: UtilityValueRow, flashAssists = 0): UtilityValueRow {
+  return {
+    ...row,
+    enemyBlindSeconds: round(row.enemyBlindSeconds, 1),
+    enemyBlindSecondsPerFlash: row.flashesThrown > 0 ? round(row.enemyBlindSeconds / row.flashesThrown, 2) : null,
+    enemyBlindSecondsPerRound: row.rounds > 0 ? round(row.enemyBlindSeconds / row.rounds, 2) : null,
+    flashAssistsPerRound: row.rounds > 0 ? round(flashAssists / row.rounds, 3) : null,
+    heDamagePerThrow: row.heThrows > 0 ? round(row.heDamage / row.heThrows, 2) : null,
+    heDamagePerRound: row.rounds > 0 ? round(row.heDamage / row.rounds, 2) : null,
+    fireDamagePerThrow: row.fireThrows > 0 ? round(row.fireDamage / row.fireThrows, 2) : null,
+    fireDamagePerRound: row.rounds > 0 ? round(row.fireDamage / row.rounds, 2) : null,
+    smokesPerRound: row.rounds > 0 ? round(row.smokesThrown / row.rounds, 3) : null,
+  };
+}
+
+export function buildUtilityValueSummary(
+  demos: SeasonInsightsDemo[],
+  players: PlayerFlashSummaryInput[],
+  options: { teamRenames?: Record<string, string> } = {}
+): UtilityValueSummary {
+  const bySteamId = new Map<string, PlayerFlashSummaryInput>();
+  const playerRows = new Map<string, UtilityValueRow>();
+  const playerFlashAssists = new Map<string, number>();
+  const teamRows = new Map<string, UtilityValueRow>();
+  const teamFlashAssists = new Map<string, number>();
+  const bestFlashes: UtilityValueSummary["bestFlashes"] = [];
+  const damageEvidence = new Map<string, UtilityDamageEvidence & { victims: Set<string> }>();
+
+  for (const player of players) {
+    playerRows.set(player.playerKey, utilityRow(player.playerKey, player.name));
+    for (const steamId of player.steamIds) bySteamId.set(steamId, player);
+  }
+
+  const teamName = (pkg: DemoPackage, teamKey: TeamKey): string => {
+    const raw = teamKey === "teamA" ? (pkg.match.teamA.name ?? "Team A") : (pkg.match.teamB.name ?? "Team B");
+    return options.teamRenames?.[raw] ?? raw;
+  };
+  const ensureTeam = (pkg: DemoPackage, teamKey: TeamKey) => {
+    const name = teamName(pkg, teamKey);
+    const row = teamRows.get(name) ?? utilityRow(name, name);
+    teamRows.set(name, row);
+    return row;
+  };
+
+  for (const { matchId, pkg } of demos) {
+    for (const key of ["teamA", "teamB"] as const) {
+      ensureTeam(pkg, key).rounds += pkg.rounds.length;
+    }
+
+    for (const stat of pkg.playerStats) {
+      const player = bySteamId.get(pkg.players[stat.playerIndex]?.steamId64 ?? "");
+      if (!player) continue;
+      const row = playerRows.get(player.playerKey)!;
+      row.rounds += stat.rounds;
+      const assists = (playerFlashAssists.get(player.playerKey) ?? 0) + stat.flashAssistCount;
+      playerFlashAssists.set(player.playerKey, assists);
+      const teamKey = pkg.players[stat.playerIndex]?.teamKey;
+      if (teamKey) {
+        const team = ensureTeam(pkg, teamKey);
+        teamFlashAssists.set(team.id, (teamFlashAssists.get(team.id) ?? 0) + stat.flashAssistCount);
+      }
+    }
+
+    for (const grenade of pkg.grenades) {
+      const thrower = pkg.players[grenade.throwerIndex];
+      if (!thrower) continue;
+      const player = bySteamId.get(thrower.steamId64);
+      const rows = [
+        player ? playerRows.get(player.playerKey) ?? null : null,
+        ensureTeam(pkg, thrower.teamKey),
+      ].filter((row): row is UtilityValueRow => row != null);
+      for (const row of rows) {
+        if (grenade.grenade === "flashbang") row.flashesThrown += 1;
+        else if (grenade.grenade === "hegrenade") row.heThrows += 1;
+        else if (grenade.grenade === "molotov" || grenade.grenade === "incendiary") row.fireThrows += 1;
+        else if (grenade.grenade === "smoke") row.smokesThrown += 1;
+      }
+    }
+
+    type FlashCell = { playerKey: string; playerName: string; roundNumber: number; tick: number; victims: Set<string>; enemySeconds: number; teamSeconds: number };
+    const flashCells = new Map<string, FlashCell>();
+    for (const blind of pkg.blinds) {
+      const flasher = pkg.players[blind.flasherIndex];
+      const flashed = pkg.players[blind.flashedIndex];
+      if (!flasher || !flashed) continue;
+      const player = bySteamId.get(flasher.steamId64);
+      const key = `${player?.playerKey ?? `team:${flasher.teamKey}`}:${blind.flashId ?? `${blind.roundNumber}-${Math.round(blind.tick / 16)}`}`;
+      const cell = flashCells.get(key) ?? {
+        playerKey: player?.playerKey ?? "",
+        playerName: player?.name ?? flasher.name,
+        roundNumber: blind.roundNumber,
+        tick: blind.tick,
+        victims: new Set<string>(),
+        enemySeconds: 0,
+        teamSeconds: 0,
+      };
+      cell.tick = Math.min(cell.tick, blind.tick);
+      if (flasher.teamKey !== flashed.teamKey) {
+        cell.enemySeconds += blind.durationSeconds;
+        cell.victims.add(flashed.steamId64);
+        const playerRow = player ? playerRows.get(player.playerKey) : null;
+        if (playerRow) playerRow.enemyBlindSeconds += blind.durationSeconds;
+        ensureTeam(pkg, flasher.teamKey).enemyBlindSeconds += blind.durationSeconds;
+      } else if (flasher.steamId64 !== flashed.steamId64) {
+        cell.teamSeconds += blind.durationSeconds;
+      }
+      flashCells.set(key, cell);
+    }
+    for (const cell of flashCells.values()) {
+      if (cell.enemySeconds <= 0 || !cell.playerKey) continue;
+      bestFlashes.push({
+        playerName: cell.playerName,
+        matchId,
+        roundNumber: cell.roundNumber,
+        tick: cell.tick,
+        victimCount: cell.victims.size,
+        enemySeconds: round(cell.enemySeconds, 2),
+        teamSeconds: round(cell.teamSeconds, 2),
+        netSeconds: round(cell.enemySeconds - cell.teamSeconds, 2),
+      });
+    }
+
+    for (const damage of pkg.damages) {
+      if (damage.attackerIndex == null) continue;
+      const attacker = pkg.players[damage.attackerIndex];
+      const victim = pkg.players[damage.victimIndex];
+      if (!attacker || !victim || attacker.teamKey === victim.teamKey) continue;
+      const kind: UtilityDamageKind | null = isHeDamageWeapon(damage.weapon) ? "he" : isFireDamageWeapon(damage.weapon) ? "fire" : null;
+      if (!kind || damage.healthDamage <= 0) continue;
+      const player = bySteamId.get(attacker.steamId64);
+      const playerRow = player ? playerRows.get(player.playerKey) : null;
+      const teamRow = ensureTeam(pkg, attacker.teamKey);
+      for (const row of [playerRow, teamRow]) {
+        if (!row) continue;
+        if (kind === "he") row.heDamage += damage.healthDamage;
+        else row.fireDamage += damage.healthDamage;
+      }
+      if (player) {
+        const bucket = kind === "he" ? Math.round(damage.tick / 16) : damage.roundNumber;
+        const key = `${kind}:${matchId}:${damage.roundNumber}:${player.playerKey}:${bucket}`;
+        const cell = damageEvidence.get(key) ?? {
+          kind,
+          matchId,
+          roundNumber: damage.roundNumber,
+          tick: damage.tick,
+          playerName: player.name,
+          victimCount: 0,
+          victims: new Set<string>(),
+          damage: 0,
+        };
+        cell.tick = Math.min(cell.tick ?? damage.tick, damage.tick);
+        cell.damage += damage.healthDamage;
+        cell.victims.add(victim.steamId64);
+        cell.victimCount = cell.victims.size;
+        damageEvidence.set(key, cell);
+      }
+    }
+  }
+
+  return {
+    players: [...playerRows.values()]
+      .map((row) => finalizeUtilityRow(row, playerFlashAssists.get(row.id) ?? 0))
+      .sort((a, b) => (b.heDamagePerRound ?? 0) + (b.fireDamagePerRound ?? 0) - ((a.heDamagePerRound ?? 0) + (a.fireDamagePerRound ?? 0))),
+    teams: [...teamRows.values()]
+      .map((row) => finalizeUtilityRow(row, teamFlashAssists.get(row.id) ?? 0))
+      .sort((a, b) => (b.heDamagePerRound ?? 0) + (b.fireDamagePerRound ?? 0) - ((a.heDamagePerRound ?? 0) + (a.fireDamagePerRound ?? 0))),
+    bestFlashes: bestFlashes.sort((a, b) => b.enemySeconds - a.enemySeconds).slice(0, MAX_BEST_FLASH),
+    bestDamageRounds: [...damageEvidence.values()]
+      .sort((a, b) => b.damage - a.damage)
+      .slice(0, MAX_EVIDENCE)
+      .map(({ victims: _victims, ...row }) => row),
+  };
 }
 
 /** 单选手跨场洞察。steamIds 来自 PlayerSeasonProfile（cohort 已做身份归并）。 */

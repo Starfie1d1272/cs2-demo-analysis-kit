@@ -7,6 +7,7 @@ import {
   buildMatchReportMarkdown,
   buildPlayerFlashSummaries,
   buildPlayerSeasonInsights,
+  buildUtilityValueSummary,
   buildTournamentInsights,
   buildTournamentInsightsFromFacts,
   extractTournamentFacts
@@ -95,6 +96,39 @@ describe("buildPlayerFlashSummaries", () => {
       expect(actual?.netSecondsPerFlash).toBe(expected.netSecondsPerFlash);
       expect(actual?.flashAssists).toBe(expected.flashAssists);
       expect(actual?.worstTeamFlashes).toEqual(expected.worstTeamFlashes);
+    }
+  });
+});
+
+describe("buildUtilityValueSummary", () => {
+  it("normalizes flash, HE, fire and smoke value by rounds or throws", async () => {
+    const pkg = await loadFixture();
+    const players = pkg.players.slice(0, 4).map((player) => ({
+      playerKey: `steam:${player.steamId64}`,
+      name: player.name,
+      steamIds: [player.steamId64]
+    }));
+    const summary = buildUtilityValueSummary([{ matchId: "m1", pkg }], players);
+
+    expect(summary.players).toHaveLength(players.length);
+    expect(summary.teams).toHaveLength(2);
+
+    for (const row of [...summary.players, ...summary.teams]) {
+      if (row.rounds > 0) {
+        expect(row.enemyBlindSecondsPerRound).toBeCloseTo(row.enemyBlindSeconds > 0 ? row.enemyBlindSeconds / row.rounds : 0, 1);
+        expect(row.smokesPerRound).toBe(Math.round((row.smokesThrown / row.rounds) * 1000) / 1000);
+        expect(row.heDamagePerRound).toBe(Math.round((row.heDamage / row.rounds) * 100) / 100);
+        expect(row.fireDamagePerRound).toBe(Math.round((row.fireDamage / row.rounds) * 100) / 100);
+      }
+      if (row.flashesThrown > 0) expect(row.enemyBlindSecondsPerFlash).toBeCloseTo(row.enemyBlindSeconds / row.flashesThrown, 1);
+      else expect(row.enemyBlindSecondsPerFlash).toBeNull();
+      expect(row.heDamagePerThrow).toBe(row.heThrows > 0 ? Math.round((row.heDamage / row.heThrows) * 100) / 100 : null);
+      expect(row.fireDamagePerThrow).toBe(row.fireThrows > 0 ? Math.round((row.fireDamage / row.fireThrows) * 100) / 100 : null);
+    }
+
+    for (const evidence of summary.bestDamageRounds) {
+      expect(evidence.damage).toBeGreaterThan(0);
+      expect(evidence.victimCount).toBeGreaterThan(0);
     }
   });
 });

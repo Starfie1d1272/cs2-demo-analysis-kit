@@ -5,10 +5,12 @@ import {
   buildSeasonLeaderboardModel,
   buildTournamentInsightsFromFacts,
   buildTeamComparisonFromFacts,
+  buildUtilityValueSummary,
   type PlayerFlashSummary,
   type PlayerSeasonInsights,
   type PlayerMechanicsProfile,
   type PlayerWeaponStat,
+  type UtilityValueSummary,
   type TournamentInsights,
   type TeamComparisonModel,
   type DuelInsightsFacts
@@ -26,7 +28,7 @@ import type {
   SeasonCohortBundle,
   SeasonLeaderboardModel
 } from "@cs2dak/contract";
-import { matchIdForEntry, type StudioDemoEntry } from "./library";
+import { getDemoPackage, matchIdForEntry, type StudioDemoEntry } from "./library";
 import { originalTeamNamesForDisplay } from "./identity";
 
 export interface IdentityOptions {
@@ -223,6 +225,7 @@ const DETAILS_CACHE_LIMIT = 6;
 const SMALL_CACHE_LIMIT = 3;
 const detailsCache = new Map<string, Promise<PlayerSeasonDetails>>();
 const flashCache = new Map<string, Promise<PlayerFlashSummary[]>>();
+const utilityValueCache = new Map<string, Promise<UtilityValueSummary>>();
 const duelInsightsCache = new Map<string, Promise<DuelInsightsModel>>();
 const teamComparisonCache = new Map<string, Promise<TeamComparisonModel>>();
 
@@ -294,6 +297,33 @@ export function getPlayerFlashSummaries(
     throw missingFactsError("Flash Value");
   })();
   return touchLimitedCache(flashCache, key, loading, SMALL_CACHE_LIMIT);
+}
+
+export function getUtilityValueSummary(
+  entries: StudioDemoEntry[],
+  players: Array<{ playerKey: string; name: string; steamIds: string[] }>,
+  identity?: IdentityOptions,
+  selectedTeams: string[] = [],
+): Promise<UtilityValueSummary> {
+  const playerKey = players.map((p) => `${p.playerKey}=${p.steamIds.join(",")}`).sort().join("|");
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:utility-value:v1:${playerKey}`;
+  const cached = utilityValueCache.get(key);
+  if (cached) return cached;
+  const loading = (async () => {
+    const persisted = await readPersistedValue<UtilityValueSummary>(key);
+    if (persisted) return persisted;
+    const demos = await Promise.all(entries.map(async (entry) => ({
+      matchId: matchIdForEntry(entry),
+      pkg: await getDemoPackage(entry.id),
+    })));
+    const summary = buildUtilityValueSummary(demos, players, { teamRenames: identity?.teamRenames });
+    const filtered = selectedTeams.length > 0
+      ? { ...summary, teams: summary.teams.filter((row) => selectedTeams.includes(row.name)) }
+      : summary;
+    void writePersistedValue(key, filtered);
+    return filtered;
+  })();
+  return touchLimitedCache(utilityValueCache, key, loading, SMALL_CACHE_LIMIT);
 }
 
 const tournamentInsightsCache = new Map<string, Promise<TournamentInsights | null>>();
