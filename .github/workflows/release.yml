@@ -36,11 +36,11 @@ jobs:
         with:
           fetch-depth: 0 # sync-version.mjs 需要 git tag
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 11
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 23
           cache: pnpm
@@ -56,7 +56,7 @@ jobs:
       # 0.6.4 起**不再内置**进安装包，而是上传到 R2，客户端首次用到某图时按需下载
       # 到 userdata/tris overlay（缺失只降级：反应时间/预瞄退化口径）。
       - name: Cache awpy tris
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.awpy/tris
           key: awpy-tris-${{ runner.os }}-v1
