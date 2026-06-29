@@ -124,7 +124,7 @@ function deserializeMatchRadarFields(buf: ArrayBuffer): RadarField[] | null {
 async function computeAndCache(matchId: string, economy: "gun" | "all"): Promise<RadarField[]> {
   const buffer = await getStorage().blobs("demos").get(matchId);
   if (!buffer) return [];
-  const fields = await radarFieldInWorker(buffer, matchId, economy);
+  const fields = await radarFieldInWorker(buffer, matchId, economy, false);
   try {
     await fieldBlobs.put(cacheKey(matchId, economy), serializeMatchRadarFields(fields));
   } catch {

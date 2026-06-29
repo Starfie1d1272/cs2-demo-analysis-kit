@@ -10,7 +10,7 @@
  *   - 单队场 = 该队所有贡献相加（该队 CT 回合看哪、T 回合站哪）
  * denom 按 side 分（每回合恰一个 CT 一个 T 队），归一化 = 计数 / 对应 side denom。
  */
-import type { DemoPackage, RadarField, RadarFieldBase } from "@cs2dak/contract";
+import type { DemoPackage, PackageGrenade, RadarField, RadarFieldBase } from "@cs2dak/contract";
 import { RADAR_FIELD_SCHEMA_VERSION, RADAR_FIELD_MAX_SEC, decodeDelta } from "@cs2dak/contract";
 import {
   type RadarFieldGridIndex,
@@ -23,8 +23,6 @@ import {
 import {
   EYE_HEIGHT,
   TARGET_HEIGHT,
-  insideViewCone,
-  smokeBlocksRay,
 } from "./duel-window.js";
 
 /** 算法参数指纹；锥角/采样率/格大小/眼高/MAX_DIST 任一变更即 +1，使旧缓存场失效。 */
@@ -32,7 +30,13 @@ export const RADAR_FIELD_VERSION = 1;
 
 /** 视野判定最大距离（世界单位），超出直接跳过 LOS。 */
 const MAX_DIST = 4096;
+const MAX_DIST_SQ = MAX_DIST * MAX_DIST;
+const VIEW_CONE_HALF_DEGREES = 40;
+const VIEW_CONE_COS = Math.cos((VIEW_CONE_HALF_DEGREES * Math.PI) / 180);
+const SMOKE_RADIUS = 144;
 const GUN_ECONOMY = new Set(["full", "conversion"]);
+const SMOKE_TYPES = new Set(["smoke", "smokegrenade"]);
+const EMPTY_SMOKES: SmokeGrenade[] = [];
 
 const FIELD_BASES: RadarFieldBase[] = ["ctVis", "tVis", "ctPres", "tPres"];
 
@@ -45,6 +49,15 @@ interface Track {
   hp: number[];
   flash: number[];
 }
+
+interface ActiveViewer {
+  eye: Vec3;
+  fx: number;
+  fy: number;
+  fz: number;
+}
+
+type SmokeGrenade = PackageGrenade & { effectPosition: Vec3 };
 
 interface Contribution {
   team: string;
@@ -88,6 +101,59 @@ function decodeTrack(t: { x: number[]; y: number[]; z: number[]; yaw: number[]; 
   };
 }
 
+function activeViewersAt(viewers: Track[], i: number): ActiveViewer[] {
+  const out: ActiveViewer[] = [];
+  for (const v of viewers) {
+    if ((v.hp[i] ?? 0) <= 0 || (v.flash[i] ?? 0) > 0) continue;
+    const yaw = (v.yaw[i]! * Math.PI) / 180;
+    const pitch = (v.pitch[i]! * Math.PI) / 180;
+    const cp = Math.cos(pitch);
+    out.push({
+      eye: { x: v.x[i]!, y: v.y[i]!, z: v.z[i]! + EYE_HEIGHT },
+      fx: cp * Math.cos(yaw),
+      fy: cp * Math.sin(yaw),
+      fz: -Math.sin(pitch),
+    });
+  }
+  return out;
+}
+
+function activeSmokesAt(smokes: SmokeGrenade[], tick: number): SmokeGrenade[] {
+  let out: SmokeGrenade[] | null = null;
+  for (const grenade of smokes) {
+    if (grenade.effectTick <= tick && (grenade.destroyTick == null || tick <= grenade.destroyTick)) {
+      (out ??= []).push(grenade);
+    }
+  }
+  return out ?? EMPTY_SMOKES;
+}
+
+function pointToSegmentDistance(point: Vec3, a: Vec3, b: Vec3): number {
+  const abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z;
+  const apx = point.x - a.x, apy = point.y - a.y, apz = point.z - a.z;
+  const denom = abx * abx + aby * aby + abz * abz;
+  const t = denom < 1e-6 ? 0 : Math.max(0, Math.min(1, (apx * abx + apy * aby + apz * abz) / denom));
+  const cx = a.x + abx * t, cy = a.y + aby * t, cz = a.z + abz * t;
+  return Math.hypot(point.x - cx, point.y - cy, point.z - cz);
+}
+
+function smokeBlocksActiveRay(smokes: SmokeGrenade[], from: Vec3, to: Vec3): boolean {
+  for (const smoke of smokes) {
+    if (pointToSegmentDistance(smoke.effectPosition, from, to) <= SMOKE_RADIUS) return true;
+  }
+  return false;
+}
+
+function insideViewConeFast(viewer: ActiveViewer, target: Vec3): boolean {
+  const dx = target.x - viewer.eye.x;
+  const dy = target.y - viewer.eye.y;
+  const dz = target.z - viewer.eye.z;
+  const distSq = dx * dx + dy * dy + dz * dz;
+  if (distSq <= 1e-6 || distSq > MAX_DIST_SQ) return false;
+  const dot = viewer.fx * dx + viewer.fy * dy + viewer.fz * dz;
+  return dot > 0 && dot * dot >= VIEW_CONE_COS * VIEW_CONE_COS * distSq;
+}
+
 export interface BuildMatchRadarFieldOptions {
   matchId: string;
   grid: RadarFieldGridIndex;
@@ -115,6 +181,13 @@ export function buildMatchRadarField(pkg: DemoPackage, options: BuildMatchRadarF
 
   const teamKeyByIndex = pkg.players.map((p) => p.teamKey);
   const roundMeta = new Map(pkg.rounds.map((r) => [r.roundNumber, r]));
+  const smokesByRound = new Map<number, SmokeGrenade[]>();
+  for (const grenade of pkg.grenades ?? []) {
+    if (!SMOKE_TYPES.has(grenade.grenade) || !grenade.effectPosition) continue;
+    const bucket = smokesByRound.get(grenade.roundNumber) ?? [];
+    bucket.push(grenade as SmokeGrenade);
+    smokesByRound.set(grenade.roundNumber, bucket);
+  }
   const teamNameByKey = { teamA: pkg.match.teamA.name ?? "Team A", teamB: pkg.match.teamB.name ?? "Team B" } as const;
 
   const contributions: Record<"teamA" | "teamB", Contribution> = {
@@ -122,17 +195,15 @@ export function buildMatchRadarField(pkg: DemoPackage, options: BuildMatchRadarF
     teamB: makeContribution(teamNameByKey.teamB, matchId, maxSec, nCells),
   };
 
-  const markVision = (viewers: Track[], i: number, out: Int32Array, roundNumber: number, tick: number) => {
+  const markVision = (viewers: Track[], i: number, out: Int32Array, activeSmokes: SmokeGrenade[]) => {
+    const activeViewers = activeViewersAt(viewers, i);
+    if (activeViewers.length === 0) return;
     for (let g = 0; g < nCells; g++) {
       const target = targets[g]!;
-      for (const v of viewers) {
-        if ((v.hp[i] ?? 0) <= 0 || (v.flash[i] ?? 0) > 0) continue;
-        const eye: Vec3 = { x: v.x[i]!, y: v.y[i]!, z: v.z[i]! + EYE_HEIGHT };
-        const dx = target.x - eye.x, dy = target.y - eye.y, dz = target.z - eye.z;
-        if (dx * dx + dy * dy + dz * dz > MAX_DIST * MAX_DIST) continue;
-        if (!insideViewCone(v.yaw[i]!, v.pitch[i]!, eye, target)) continue;
-        if (smokeBlocksRay(pkg.grenades, roundNumber, tick, eye, target)) continue;
-        if (bvh && !staticLineOfSight(bvh, eye, target)) continue;
+      for (const viewer of activeViewers) {
+        if (!insideViewConeFast(viewer, target)) continue;
+        if (activeSmokes.length > 0 && smokeBlocksActiveRay(activeSmokes, viewer.eye, target)) continue;
+        if (bvh && !staticLineOfSight(bvh, viewer.eye, target)) continue;
         out[g]! += 1;
         break;
       }
@@ -172,10 +243,11 @@ export function buildMatchRadarField(pkg: DemoPackage, options: BuildMatchRadarF
       const tick = rr.startTick + i * rr.tickStep;
       const sec = Math.floor((tick - meta.freezeEndTick) / tickrate);
       if (sec < 0 || sec >= maxSec) continue;
+      const activeSmokes = activeSmokesAt(smokesByRound.get(rr.roundNumber) ?? EMPTY_SMOKES, tick);
       ctContrib.denomCt[sec]! += 1;
       tContrib.denomT[sec]! += 1;
-      markVision(cts, i, ctContrib.fields.ctVis[sec]!, rr.roundNumber, tick);
-      markVision(ts, i, tContrib.fields.tVis[sec]!, rr.roundNumber, tick);
+      markVision(cts, i, ctContrib.fields.ctVis[sec]!, activeSmokes);
+      markVision(ts, i, tContrib.fields.tVis[sec]!, activeSmokes);
       markPresence(cts, i, ctContrib.fields.ctPres[sec]!);
       markPresence(ts, i, tContrib.fields.tPres[sec]!);
     }

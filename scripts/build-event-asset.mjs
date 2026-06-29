@@ -21,9 +21,13 @@ if (extname(source).toLowerCase() === ".zip") {
   const packageFile = input.file("event-package.json");
   if (!packageFile) throw new Error("event asset is missing event-package.json");
   packageJson = JSON.parse(await packageFile.async("string"));
+  packageJson = { ...packageJson, source: "r2" };
+  input.file("event-package.json", JSON.stringify(packageJson, null, 2));
+  bytes = await input.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 3 } });
   mapCount = Object.keys(input.files).filter((name) => /^maps\/.*\.zip$/i.test(name)).length;
 } else {
   packageJson = JSON.parse(await readFile(join(source, "event-package.json"), "utf8"));
+  packageJson = { ...packageJson, source: "r2" };
   const archive = new JSZip();
   archive.file("event-package.json", JSON.stringify(packageJson, null, 2));
   const mapsDir = join(source, "maps");

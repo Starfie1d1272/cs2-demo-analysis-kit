@@ -3626,7 +3626,7 @@ td.stu-heat-cell.stu-heat-neutral {
   display: grid;
   align-content: start;
   gap: 8px;
-  overflow: auto;
+  overflow: visible;
 }
 
 .stu-pe-replay-frame {
@@ -3796,7 +3796,6 @@ td.stu-heat-cell.stu-heat-neutral {
 
 @media (min-width: 1041px) {
   .stu-coach-pattern-explorer {
-    height: calc(100dvh - 130px);
     min-height: 600px;
   }
 }
@@ -3806,11 +3805,6 @@ td.stu-heat-cell.stu-heat-neutral {
     height: auto;
     min-height: 0;
     align-items: start;
-  }
-
-  .stu-pe-list,
-  .stu-pe-replay-main {
-    height: max(360px, calc(100dvh - 390px));
   }
 
   .stu-pe-detail {

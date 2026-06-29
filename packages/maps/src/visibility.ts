@@ -124,7 +124,10 @@ function boundsForCentroidTriangles(items: CentroidTriangle[]): Bounds {
 function segmentHitsNode(node: TriangleBvh, start: Vec3, end: Vec3): boolean {
   if (!segmentHitsBounds(start, end, node.bounds)) return false;
   if (node.triangles) {
-    return node.triangles.some((triangle) => segmentHitsTriangle(start, end, triangle));
+    for (const triangle of node.triangles) {
+      if (segmentHitsTriangle(start, end, triangle)) return true;
+    }
+    return false;
   }
   return (
     (node.left !== undefined && segmentHitsNode(node.left, start, end)) ||
@@ -135,16 +138,49 @@ function segmentHitsNode(node: TriangleBvh, start: Vec3, end: Vec3): boolean {
 function segmentHitsBounds(start: Vec3, end: Vec3, bounds: Bounds): boolean {
   let minT = 0;
   let maxT = 1;
-  for (const axis of ["x", "y", "z"] as const) {
-    const delta = end[axis] - start[axis];
-    if (Math.abs(delta) < EPSILON) {
-      if (start[axis] < bounds.min[axis] || start[axis] > bounds.max[axis]) return false;
-      continue;
+  const sx = start.x, sy = start.y, sz = start.z;
+  const dx = end.x - sx, dy = end.y - sy, dz = end.z - sz;
+  if (Math.abs(dx) < EPSILON) {
+    if (sx < bounds.min.x || sx > bounds.max.x) return false;
+  } else {
+    const inv = 1 / dx;
+    let first = (bounds.min.x - sx) * inv;
+    let second = (bounds.max.x - sx) * inv;
+    if (first > second) {
+      const tmp = first;
+      first = second;
+      second = tmp;
     }
-    const inverse = 1 / delta;
-    let first = (bounds.min[axis] - start[axis]) * inverse;
-    let second = (bounds.max[axis] - start[axis]) * inverse;
-    if (first > second) [first, second] = [second, first];
+    minT = Math.max(minT, first);
+    maxT = Math.min(maxT, second);
+    if (minT > maxT) return false;
+  }
+  if (Math.abs(dy) < EPSILON) {
+    if (sy < bounds.min.y || sy > bounds.max.y) return false;
+  } else {
+    const inv = 1 / dy;
+    let first = (bounds.min.y - sy) * inv;
+    let second = (bounds.max.y - sy) * inv;
+    if (first > second) {
+      const tmp = first;
+      first = second;
+      second = tmp;
+    }
+    minT = Math.max(minT, first);
+    maxT = Math.min(maxT, second);
+    if (minT > maxT) return false;
+  }
+  if (Math.abs(dz) < EPSILON) {
+    if (sz < bounds.min.z || sz > bounds.max.z) return false;
+  } else {
+    const inv = 1 / dz;
+    let first = (bounds.min.z - sz) * inv;
+    let second = (bounds.max.z - sz) * inv;
+    if (first > second) {
+      const tmp = first;
+      first = second;
+      second = tmp;
+    }
     minT = Math.max(minT, first);
     maxT = Math.min(maxT, second);
     if (minT > maxT) return false;
@@ -153,23 +189,33 @@ function segmentHitsBounds(start: Vec3, end: Vec3, bounds: Bounds): boolean {
 }
 
 function segmentHitsTriangle(start: Vec3, end: Vec3, triangle: Triangle): boolean {
-  const direction = subtract(end, start);
-  const edge1 = subtract(triangle.b, triangle.a);
-  const edge2 = subtract(triangle.c, triangle.a);
-  const h = cross(direction, edge2);
-  const determinant = dot(edge1, h);
+  const dirX = end.x - start.x, dirY = end.y - start.y, dirZ = end.z - start.z;
+  const edge1X = triangle.b.x - triangle.a.x;
+  const edge1Y = triangle.b.y - triangle.a.y;
+  const edge1Z = triangle.b.z - triangle.a.z;
+  const edge2X = triangle.c.x - triangle.a.x;
+  const edge2Y = triangle.c.y - triangle.a.y;
+  const edge2Z = triangle.c.z - triangle.a.z;
+  const hX = dirY * edge2Z - dirZ * edge2Y;
+  const hY = dirZ * edge2X - dirX * edge2Z;
+  const hZ = dirX * edge2Y - dirY * edge2X;
+  const determinant = edge1X * hX + edge1Y * hY + edge1Z * hZ;
   if (Math.abs(determinant) < EPSILON) return false;
 
   const inverse = 1 / determinant;
-  const s = subtract(start, triangle.a);
-  const u = inverse * dot(s, h);
+  const sX = start.x - triangle.a.x;
+  const sY = start.y - triangle.a.y;
+  const sZ = start.z - triangle.a.z;
+  const u = inverse * (sX * hX + sY * hY + sZ * hZ);
   if (u < 0 || u > 1) return false;
 
-  const q = cross(s, edge1);
-  const v = inverse * dot(direction, q);
+  const qX = sY * edge1Z - sZ * edge1Y;
+  const qY = sZ * edge1X - sX * edge1Z;
+  const qZ = sX * edge1Y - sY * edge1X;
+  const v = inverse * (dirX * qX + dirY * qY + dirZ * qZ);
   if (v < 0 || u + v > 1) return false;
 
-  const t = inverse * dot(edge2, q);
+  const t = inverse * (edge2X * qX + edge2Y * qY + edge2Z * qZ);
   return t > EPSILON && t < 1 - EPSILON;
 }
 

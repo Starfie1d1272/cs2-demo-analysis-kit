@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { MatchWorkspaceModel } from "@cs2dak/contract";
 import { ReplayViewer } from "@cs2dak/react";
 import { economyLabelCn, formatClockSeconds, ECONOMY_ENTRY_CN, formatEntryEvidenceLabel, formatTacticalClusterShortName } from "@cs2dak/presentation";
@@ -36,6 +36,8 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
   const [selectedEvidenceKey, setSelectedEvidenceKey] = useState<string | null>(null);
   const localReplayCache = useRef(new Map<string, MatchWorkspaceModel>());
   const replayCache = replayModelCache ?? localReplayCache.current;
+  const replayMainRef = useRef<HTMLDivElement | null>(null);
+  const [replayHeight, setReplayHeight] = useState<number | null>(null);
 
   const sideCounts = useMemo(() => ({
     t: clusters.filter((c) => c.side === "t").length,
@@ -83,6 +85,19 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
     () => selectedFacts.find((fact) => evidenceKey(fact) === selectedEvidenceKey) ?? selectedFacts[0] ?? null,
     [selectedFacts, selectedEvidenceKey]
   );
+
+  useEffect(() => {
+    const node = replayMainRef.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    const sync = () => {
+      const next = Math.ceil(node.getBoundingClientRect().height);
+      setReplayHeight((current) => current === next ? current : next);
+    };
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [activeFact]);
 
   if (clusters.length === 0) {
     return <div className="stu-coach-pattern-explorer stu-empty">暂无聚类数据，请导入更多 demo。</div>;
@@ -140,7 +155,7 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
       ) : (
         <div className="stu-coach-pattern-explorer">
           {/* 左栏：大分类 → 小聚类双层列表 */}
-          <aside className="stu-pe-list">
+          <aside className="stu-pe-list" style={replayHeight ? { height: replayHeight } : undefined}>
             {groupedClusters.map(([category, cats]) => (
               <div key={category} className="stu-pe-group">
                 <div className="stu-pe-group-header">{category}</div>
@@ -168,7 +183,7 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
           </aside>
 
           {/* 中栏：常驻统一回放。模式与证据选择只改变它的当前回合。 */}
-          <CoachReplayStage fact={activeFact} entryByMatchId={entryByMatchId} cache={replayCache} />
+          <CoachReplayStage fact={activeFact} entryByMatchId={entryByMatchId} cache={replayCache} mainRef={replayMainRef} />
 
           {/* 右栏：数据摘要 + 证据回合 */}
           <div className="stu-pe-detail">
@@ -212,10 +227,11 @@ function replayTargetSeq(matchId: string, roundNumber: number): number {
 }
 
 /** 教练页常驻回放主画布：只按当前证据的 matchId 懒加载单场 workspace。 */
-function CoachReplayStage({ fact, entryByMatchId, cache }: {
+function CoachReplayStage({ fact, entryByMatchId, cache, mainRef }: {
   fact: TacticalRoundFact | null;
   entryByMatchId: Map<string, StudioDemoEntry>;
   cache: Map<string, MatchWorkspaceModel>;
+  mainRef?: RefObject<HTMLDivElement | null>;
 }) {
   const matchId = fact?.matchId ?? null;
   const cachedModel = matchId ? cache.get(matchId) ?? null : null;
@@ -240,14 +256,14 @@ function CoachReplayStage({ fact, entryByMatchId, cache }: {
     return () => { cancelled = true; };
   }, [matchId, cache, entryByMatchId]);
 
-  if (!fact) return <div className="stu-pe-replay-main stu-pe-radar-empty">该模式没有可用证据回合。</div>;
+  if (!fact) return <div ref={mainRef} className="stu-pe-replay-main stu-pe-radar-empty">该模式没有可用证据回合。</div>;
   const entry = entryByMatchId.get(fact.matchId);
   const label = entry
     ? `${entry.meta.teamAName} vs ${entry.meta.teamBName} · R${fact.roundNumber}`
     : `${fact.teamName} vs ${fact.opponentName} · R${fact.roundNumber}`;
 
   return (
-    <div className="stu-pe-replay-main">
+    <div ref={mainRef} className="stu-pe-replay-main">
       <div className="stu-pe-replay-bar">
         <span className="stu-pe-replay-kicker">代表回合</span>
         <span className="stu-pe-replay-label">{label}</span>

@@ -280,11 +280,11 @@ async function radarFieldOnMainThread(buffer: ArrayBuffer, matchId: string, econ
  * 在 worker 池里算一场的雷达场贡献（[teamA, teamB]）；无 Worker 时回主线程。
  * 重活（逐 tick LOS 遍历）放 worker，与导入同池，共享 BVH 缓存、按池大小并发。
  */
-export function radarFieldInWorker(buffer: ArrayBuffer, matchId: string, economy: "gun" | "all"): Promise<RadarField[]> {
+export function radarFieldInWorker(buffer: ArrayBuffer, matchId: string, economy: "gun" | "all", keepFallback = true): Promise<RadarField[]> {
   if (typeof Worker === "undefined" || typeof document === "undefined") {
     return radarFieldOnMainThread(buffer, matchId, economy);
   }
-  const fallbackBuffer = buffer.slice(0);
+  const fallbackBuffer = keepFallback ? buffer.slice(0) : null;
   return new Promise<RadarField[]>((resolve, reject) => {
     taskQueue.push({
       op: "radarField",
