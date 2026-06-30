@@ -6,13 +6,15 @@ import { getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, type PinnedPlayer } from "../lib/pin";
 import { getFactsStore, type PlayerMatchStatsFact } from "../lib/facts";
-import { EmptyState, EvidenceLink, MetricInfo } from "@cs2dak/react";
+import { EmptyState, MetricInfo } from "@cs2dak/react";
 import { FingerprintRadar, TrendChart } from "./profile-widgets";
 import { RadarTrails, type RadarGrenadeOverlay, type RadarTrail } from "../components/RadarTrails";
+import { EvidenceActions } from "../components/EvidenceActions";
 
 export interface HomeViewProps {
   entries: StudioDemoEntry[];
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoPlayers: () => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
@@ -83,7 +85,7 @@ interface TeamIdentity {
 }
 
 /** 我的主页：模块 3/5/6 既有 view model 的编排视图，零新信号（docs/design/studio-redesign.md §9）。 */
-export function HomeView({ entries, onOpenMatch, onGoPlayers, onGoLibrary, identityOptions }: HomeViewProps) {
+export function HomeView({ entries, onOpenMatch, onWatchDemo, onGoPlayers, onGoLibrary, identityOptions }: HomeViewProps) {
   const [profiles, setProfiles] = useState<PlayerSeasonProfile[] | null>(null);
   const [insights, setInsights] = useState<PlayerSeasonInsights | null>(null);
   const [matchStats, setMatchStats] = useState<PlayerMatchStatsFact[] | null>(null);
@@ -382,15 +384,14 @@ export function HomeView({ entries, onOpenMatch, onGoPlayers, onGoLibrary, ident
                       <span className="stu-dim">{card.count}</span>
                     </header>
                     {card.evidence ? (
-                      <EvidenceLink
-                        disabled={!entryByMatchId.get(card.evidence.matchId)}
-                        onOpen={() => {
-                          const entry = entryByMatchId.get(card.evidence!.matchId);
-                          if (entry) onOpenMatch(entry.id, { roundNumber: card.evidence!.roundNumber, tick: card.evidence!.tick });
-                        }}
+                      <EvidenceActions
+                        entry={entryByMatchId.get(card.evidence.matchId)}
+                        target={{ roundNumber: card.evidence.roundNumber, tick: card.evidence.tick }}
+                        onOpenMatch={onOpenMatch}
+                        onWatchDemo={onWatchDemo}
                       >
                         {entryByMatchId.has(card.evidence.matchId) ? formatMatchLabel(entryByMatchId.get(card.evidence.matchId)!) : card.evidence.matchId} · R{card.evidence.roundNumber} · {card.evidence.detail}
-                      </EvidenceLink>
+                      </EvidenceActions>
                     ) : (
                       <p className="stu-dim">暂无证据回合。</p>
                     )}
@@ -503,13 +504,15 @@ export function HomeView({ entries, onOpenMatch, onGoPlayers, onGoLibrary, ident
                       .map((flash, i) => {
                         const e = entryByMatchId.get(flash.matchId);
                         return (
-                          <EvidenceLink
+                          <EvidenceActions
                             key={`${flash.matchId}-${flash.roundNumber}-${i}`}
-                            disabled={!e}
-                            onOpen={() => { if (e) onOpenMatch(e.id, { roundNumber: flash.roundNumber, tick: flash.tick }); }}
+                            entry={e}
+                            target={{ roundNumber: flash.roundNumber, tick: flash.tick }}
+                            onOpenMatch={onOpenMatch}
+                            onWatchDemo={onWatchDemo}
                           >
                             {e ? formatMatchLabel(e) : flash.matchId} · R{flash.roundNumber} · 致盲 {flash.victimCount} 人 · 净 {flash.netSeconds.toFixed(1)}s
-                          </EvidenceLink>
+                          </EvidenceActions>
                         );
                       })}
                   </div>

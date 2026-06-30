@@ -599,6 +599,7 @@ export function App() {
           <HomeView
             entries={entries}
             onOpenMatch={openDemo}
+            onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoPlayers={() => setView("players")}
             onGoLibrary={() => setView("library")}
             identityOptions={identityOptions}
@@ -638,6 +639,7 @@ export function App() {
               setSelectedDemoId(id);
               setMatchDeepLink(null);
             }}
+            onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoLibrary={() => setView("library")}
           />
         )}
@@ -649,6 +651,7 @@ export function App() {
             selectedPlayerKey={selectedPlayerKey}
             onSelectPlayer={setSelectedPlayerKey}
             onOpenMatch={openDemo}
+            onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             identityOptions={identityOptions}
             onGoLibrary={() => setView("library")}
           />
@@ -667,6 +670,7 @@ export function App() {
             entries={scopedEntries}
             scope={scope}
             onOpenMatch={openDemo}
+            onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoLibrary={() => setView("library")}
             identityOptions={identityOptions}
             teamRenames={identityState.teamRenames}
@@ -678,6 +682,7 @@ export function App() {
             entries={scopedEntries}
             scope={scope}
             onOpenMatch={openDemo}
+            onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoLibrary={() => setView("library")}
             identityOptions={identityOptions}
             teamRenames={identityState.teamRenames}
@@ -690,6 +695,7 @@ export function App() {
             entries={scopedEntries}
             scope={scope}
             onOpenMatch={openDemo}
+            onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             identityOptions={identityOptions}
             onGoLibrary={() => setView("library")}
           />
@@ -699,7 +705,7 @@ export function App() {
             allEntries={entries}
             entries={scopedEntries}
             onOpenMatch={openDemo}
-            onWatchDemo={watchRawDemo}
+            onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoLibrary={() => setView("library")}
           />
         )}
@@ -717,6 +723,7 @@ export function App() {
             allEntries={entries}
             entries={scopedEntries}
             onOpenMatch={openDemo}
+            onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoLibrary={() => setView("library")}
             teamRenames={identityState.teamRenames}
           />

@@ -3488,6 +3488,13 @@ td.stu-heat-cell.stu-heat-neutral {
   justify-content: flex-end;
 }
 
+.stu-evidence-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
 /* 可点击排序的表头 */
 .stu-col-sortable {
   cursor: pointer;

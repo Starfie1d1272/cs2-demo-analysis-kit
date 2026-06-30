@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { UtilityDamageEvidence, UtilityValueRow, UtilityValueSummary } from "@cs2dak/presentation";
 import type { CohortScopeState } from "../components/CohortScope";
-import { DataTable, EmptyState, EvidenceLink, MetricInfo, STUDIO_TABLE_CLASSES, type DataTableColumn } from "@cs2dak/react";
+import { DataTable, EmptyState, MetricInfo, STUDIO_TABLE_CLASSES, type DataTableColumn } from "@cs2dak/react";
 import { getSeasonSummary, getUtilityValueSummary, type IdentityOptions } from "../lib/season";
 import { formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { EvidenceActions } from "../components/EvidenceActions";
 
 export interface UtilityViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   scope: CohortScopeState;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
 }
@@ -80,7 +82,7 @@ const SMOKE_COLUMNS: DataTableColumn<UtilityValueRow>[] = [
   { key: "smokesPerRound", label: "烟/回合", numeric: true, sortable: true, sortValue: (r) => r.smokesPerRound, format: (r) => fmt(r.smokesPerRound, 3) },
 ];
 
-export function UtilityView({ allEntries, entries, scope, onOpenMatch, onGoLibrary, identityOptions }: UtilityViewProps) {
+export function UtilityView({ allEntries, entries, scope, onOpenMatch, onWatchDemo, onGoLibrary, identityOptions }: UtilityViewProps) {
   const [summary, setSummary] = useState<UtilityValueSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
@@ -159,8 +161,8 @@ export function UtilityView({ allEntries, entries, scope, onOpenMatch, onGoLibra
             player={<UtilityTable title="选手榜" rows={summary.players.filter((row) => row.smokesThrown > 0)} columns={SMOKE_COLUMNS} initialSortKey="smokesPerRound" empty="当前范围内没有烟雾数据。" pageSize={10} />}
             team={<UtilityTable title="队伍榜" rows={summary.teams.filter((row) => row.smokesThrown > 0)} columns={SMOKE_COLUMNS} initialSortKey="smokesPerRound" empty="当前范围内没有队伍烟雾数据。" pageSize={10} />}
           />
-          <BestFlashList flashes={summary.bestFlashes.slice(0, 12)} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} />
-          <DamageEvidenceList rows={summary.bestDamageRounds} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} />
+          <BestFlashList flashes={summary.bestFlashes.slice(0, 12)} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} onWatchDemo={onWatchDemo} />
+          <DamageEvidenceList rows={summary.bestDamageRounds} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} onWatchDemo={onWatchDemo} />
         </div>
       )}
     </div>
@@ -209,10 +211,11 @@ function UtilityTable({ title, rows, columns, initialSortKey, empty, pageSize }:
   );
 }
 
-function BestFlashList({ flashes, entryByMatchId, onOpenMatch }: {
+function BestFlashList({ flashes, entryByMatchId, onOpenMatch, onWatchDemo }: {
   flashes: BestFlash[];
   entryByMatchId: Map<string, StudioDemoEntry>;
   onOpenMatch: UtilityViewProps["onOpenMatch"];
+  onWatchDemo?: UtilityViewProps["onWatchDemo"];
 }) {
   if (flashes.length === 0) return null;
   return (
@@ -224,13 +227,15 @@ function BestFlashList({ flashes, entryByMatchId, onOpenMatch }: {
           const entry = entryByMatchId.get(flash.matchId);
           const teamFlashNote = flash.teamSeconds >= 1 ? ` · 队友致盲参考 ${flash.teamSeconds.toFixed(1)}s` : "";
           return (
-            <EvidenceLink
+            <EvidenceActions
               key={`${flash.matchId}-${flash.roundNumber}-${index}`}
-              disabled={!entry}
-              onOpen={() => entry && onOpenMatch(entry.id, { roundNumber: flash.roundNumber, tick: flash.tick })}
+              entry={entry}
+              target={{ roundNumber: flash.roundNumber, tick: flash.tick }}
+              onOpenMatch={onOpenMatch}
+              onWatchDemo={onWatchDemo}
             >
               {flash.playerName} · {entry ? formatMatchLabel(entry) : flash.matchId} · R{flash.roundNumber} · {flash.victimCount} 人 · 闪光时间 {flash.enemySeconds.toFixed(1)}s{teamFlashNote}
-            </EvidenceLink>
+            </EvidenceActions>
           );
         })}
       </div>
@@ -238,10 +243,11 @@ function BestFlashList({ flashes, entryByMatchId, onOpenMatch }: {
   );
 }
 
-function DamageEvidenceList({ rows, entryByMatchId, onOpenMatch }: {
+function DamageEvidenceList({ rows, entryByMatchId, onOpenMatch, onWatchDemo }: {
   rows: UtilityDamageEvidence[];
   entryByMatchId: Map<string, StudioDemoEntry>;
   onOpenMatch: UtilityViewProps["onOpenMatch"];
+  onWatchDemo?: UtilityViewProps["onWatchDemo"];
 }) {
   if (rows.length === 0) return null;
   return (
@@ -251,13 +257,15 @@ function DamageEvidenceList({ rows, entryByMatchId, onOpenMatch }: {
         {rows.map((row, index) => {
           const entry = entryByMatchId.get(row.matchId);
           return (
-            <EvidenceLink
+            <EvidenceActions
               key={`${row.kind}-${row.matchId}-${row.roundNumber}-${index}`}
-              disabled={!entry}
-              onOpen={() => entry && onOpenMatch(entry.id, { roundNumber: row.roundNumber, tick: row.tick })}
+              entry={entry}
+              target={{ roundNumber: row.roundNumber, tick: row.tick }}
+              onOpenMatch={onOpenMatch}
+              onWatchDemo={onWatchDemo}
             >
               {row.playerName} · {row.kind === "he" ? "HE 手雷" : "火焰"} · {entry ? formatMatchLabel(entry) : row.matchId} · R{row.roundNumber} · {row.victimCount} 人 · {row.damage} 伤害
-            </EvidenceLink>
+            </EvidenceActions>
           );
         })}
       </div>

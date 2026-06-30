@@ -14,6 +14,7 @@ export interface PatternExplorerProps {
   facts: TacticalRoundFact[];
   entryByMatchId: Map<string, StudioDemoEntry>;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onAddToPlaylist?: (cluster: TacticalCluster, fact: TacticalRoundFact) => void;
   /** 回放缓存：传入则与上层复用；未传时组件生命周期内保持同一个缓存。 */
   replayModelCache?: Map<string, MatchWorkspaceModel>;
@@ -27,7 +28,7 @@ export function resolveEconomyFilter(
   return available[0] ?? "all";
 }
 
-export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, onAddToPlaylist, replayModelCache }: PatternExplorerProps) {
+export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, onWatchDemo, onAddToPlaylist, replayModelCache }: PatternExplorerProps) {
   // 顶部视角切换：T 进攻语境 / CT 防守语境分开看，避免两个 side 的簇混在一列。
   const [side, setSide] = useState<"t" | "ct">("t");
   // 一级经济入口筛选：手枪/长枪/Anti-eco/强起/半起/Eco，默认看长枪局。
@@ -196,6 +197,7 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
                   entryByMatchId={entryByMatchId}
                   activeFact={activeFact}
                   onOpenMatch={onOpenMatch}
+                  onWatchDemo={onWatchDemo}
                   onSelect={setSelectedEvidenceKey}
                   onAddToPlaylist={onAddToPlaylist}
                 />
@@ -453,6 +455,7 @@ function EvidenceTable({
   entryByMatchId,
   activeFact,
   onOpenMatch,
+  onWatchDemo,
   onSelect,
   onAddToPlaylist,
 }: {
@@ -461,6 +464,7 @@ function EvidenceTable({
   entryByMatchId: Map<string, StudioDemoEntry>;
   activeFact: TacticalRoundFact | null;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onSelect: (key: string) => void;
   onAddToPlaylist?: (cluster: TacticalCluster, fact: TacticalRoundFact) => void;
 }) {
@@ -539,10 +543,15 @@ function EvidenceTable({
               工作台 ↗
             </EvidenceLink>
           )}
+          {entry?.sourceDemPath && onWatchDemo && (
+            <button type="button" className="stu-button-sm" onClick={() => onWatchDemo(entry.id, { roundNumber: r.roundNumber, tick: fact ? jumpTickFor(fact) : undefined })}>
+              进游戏
+            </button>
+          )}
         </>;
       }
     },
-  ], [factByRound, entryByMatchId, onSelect, onOpenMatch, onAddToPlaylist, cluster]);
+  ], [factByRound, entryByMatchId, onSelect, onOpenMatch, onWatchDemo, onAddToPlaylist, cluster]);
 
   return (
     <div className="stu-pe-evidence">

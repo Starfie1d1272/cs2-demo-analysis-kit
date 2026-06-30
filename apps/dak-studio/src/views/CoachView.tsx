@@ -24,6 +24,7 @@ export interface CoachViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   teamRenames?: Record<string, string>;
 }
@@ -41,6 +42,7 @@ export function CoachView({
   allEntries,
   entries,
   onOpenMatch,
+  onWatchDemo,
   onGoLibrary,
   teamRenames = {}
 }: CoachViewProps) {
@@ -219,6 +221,7 @@ export function CoachView({
           facts={facts}
           entryByMatchId={entryByMatchId}
           onOpenMatch={onOpenMatch}
+          onWatchDemo={onWatchDemo}
           onAddToPlaylist={async (cluster, fact) => {
             const entry = entryByMatchId.get(fact.matchId);
             const item: PlaylistItem = {
@@ -249,6 +252,7 @@ export function CoachView({
       {tab === "playlist" && (
         <PlaylistTable
           items={playlist}
+          entryByMatchId={entryByMatchId}
           onUpdate={async (item) => {
             await savePlaylistItem(item);
             setPlaylist(await listPlaylist());
@@ -261,6 +265,10 @@ export function CoachView({
             const entry = entryByMatchId.get(matchId);
             if (entry) onOpenMatch(entry.id, { roundNumber });
           }}
+          onWatchMatch={onWatchDemo ? (matchId, roundNumber) => {
+            const entry = entryByMatchId.get(matchId);
+            if (entry) onWatchDemo(entry.id, { roundNumber });
+          } : undefined}
         />
       )}
       {!loading && clusters.length > 0 && tab === "anti" && (
@@ -385,14 +393,18 @@ function PlaybookTable({
 
 function PlaylistTable({
   items,
+  entryByMatchId,
   onUpdate,
   onRemove,
   onOpenMatch,
+  onWatchMatch,
 }: {
   items: PlaylistItem[];
+  entryByMatchId: Map<string, StudioDemoEntry>;
   onUpdate: (item: PlaylistItem) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onOpenMatch: (matchId: string, roundNumber: number) => void;
+  onWatchMatch?: (matchId: string, roundNumber: number) => void;
 }) {
   const markdown = playlistToMarkdown("备战清单", items);
   if (items.length === 0) {
@@ -409,12 +421,16 @@ function PlaylistTable({
     },
     {
       key: "actions", label: "",
-      render: (item) => <>
-        <button type="button" className="stu-button-sm" onClick={() => onOpenMatch(item.matchId, item.roundNumber)}>回放</button>
-        <button type="button" className="stu-button-sm" onClick={() => void onRemove(item.id)}>删除</button>
-      </>
+      render: (item) => {
+        const entry = entryByMatchId.get(item.matchId);
+        return <>
+          <button type="button" className="stu-button-sm" onClick={() => onOpenMatch(item.matchId, item.roundNumber)}>回放</button>
+          {entry?.sourceDemPath && onWatchMatch && <button type="button" className="stu-button-sm" onClick={() => onWatchMatch(item.matchId, item.roundNumber)}>进游戏</button>}
+          <button type="button" className="stu-button-sm" onClick={() => void onRemove(item.id)}>删除</button>
+        </>;
+      }
     },
-  ], [onUpdate, onOpenMatch, onRemove]);
+  ], [entryByMatchId, onUpdate, onOpenMatch, onWatchMatch, onRemove]);
 
   return (
     <div className="stu-card">
