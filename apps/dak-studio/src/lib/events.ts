@@ -99,6 +99,7 @@ export async function importEventPackage(input: unknown, entries: StudioDemoEntr
       scheduledAt: external.scheduledAt ?? null,
       completedAt: external.completedAt ?? null,
       matchUrl: external.matchUrl ?? null,
+      rawDemoHint: external.rawDemoHint ?? null,
       mapAssignments: assignments,
     }));
   }

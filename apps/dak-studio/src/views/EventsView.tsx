@@ -146,5 +146,37 @@ interface StageProps { series: StudioSeriesRecord[]; entries: StudioDemoEntry[];
 
 function SeriesList({ series, entries, onOpenMatch, showRecord = false }: StageProps & { showRecord?: boolean }) {
   const entryById = new Map(entries.map((entry) => [entry.id, entry]));
-  return <div>{series.map((match) => <details key={match.id} className="stu-card"><summary><b>{match.teamAName}</b> {match.status === "finished" ? `${match.scoreA ?? 0}:${match.scoreB ?? 0}` : "vs"} <b>{match.teamBName}</b> · {match.format.toUpperCase()}{showRecord && (match.teamARecordBefore || match.teamBRecordBefore) ? ` · ${match.teamARecordBefore ?? "-"} / ${match.teamBRecordBefore ?? "-"}` : ""}</summary><p className="stu-muted">{match.completedAt ? `完成于 ${new Date(match.completedAt).toLocaleString("zh-CN")}` : match.scheduledAt ? `计划于 ${new Date(match.scheduledAt).toLocaleString("zh-CN")}` : match.status === "finished" ? "完成时间未知" : "未排期"} · {match.mapAssignments?.filter((map) => map.entryId).length ?? match.entryIds.length}/{match.mapAssignments?.length ?? match.entryIds.length} 图已有资源</p><div className="stu-chip-row">{match.entryIds.map((id) => { const entry = entryById.get(id); return entry ? <button key={id} className="stu-chip" onClick={() => onOpenMatch(id)}>{entry.meta.mapName} {entry.meta.teamAScore}:{entry.meta.teamBScore}</button> : null; })}</div>{match.veto && <BpView veto={match.veto} matchUrl={match.matchUrl} />}</details>)}</div>;
+  return (
+    <div>
+      {series.map((match) => (
+        <details key={match.id} className="stu-card">
+          <summary>
+            <b>{match.teamAName}</b> {match.status === "finished" ? `${match.scoreA ?? 0}:${match.scoreB ?? 0}` : "vs"} <b>{match.teamBName}</b> · {match.format.toUpperCase()}
+            {showRecord && (match.teamARecordBefore || match.teamBRecordBefore) ? ` · ${match.teamARecordBefore ?? "-"} / ${match.teamBRecordBefore ?? "-"}` : ""}
+          </summary>
+          <p className="stu-muted">
+            {match.completedAt ? `完成于 ${new Date(match.completedAt).toLocaleString("zh-CN")}` : match.scheduledAt ? `计划于 ${new Date(match.scheduledAt).toLocaleString("zh-CN")}` : match.status === "finished" ? "完成时间未知" : "未排期"} · {match.mapAssignments?.filter((map) => map.entryId).length ?? match.entryIds.length}/{match.mapAssignments?.length ?? match.entryIds.length} 图已有资源
+          </p>
+          {(match.rawDemoHint?.downloadUrl || match.matchUrl) && (
+            <p className="stu-muted">
+              原始 demo：{match.rawDemoHint?.downloadUrl ? (
+                <a href={match.rawDemoHint.downloadUrl} target="_blank" rel="noreferrer">
+                  {match.rawDemoHint.fileName ?? "下载链接"}
+                </a>
+              ) : (
+                <a href={match.matchUrl ?? undefined} target="_blank" rel="noreferrer">HLTV 来源页</a>
+              )}
+            </p>
+          )}
+          <div className="stu-chip-row">
+            {match.entryIds.map((id) => {
+              const entry = entryById.get(id);
+              return entry ? <button key={id} className="stu-chip" onClick={() => onOpenMatch(id)}>{entry.meta.mapName} {entry.meta.teamAScore}:{entry.meta.teamBScore}</button> : null;
+            })}
+          </div>
+          {match.veto && <BpView veto={match.veto} matchUrl={match.matchUrl} />}
+        </details>
+      ))}
+    </div>
+  );
 }

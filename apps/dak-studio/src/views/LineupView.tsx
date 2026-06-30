@@ -5,6 +5,7 @@ import {
   worldToRadar,
   calloutCn,
   type LineupCluster,
+  type LineupClusterMode,
   type LineupGrenadeLike,
 } from "@cs2dak/maps";
 import { displayWeaponName } from "@cs2dak/presentation";
@@ -26,6 +27,10 @@ const GRENADE_LABEL: Record<string, string> = {
 };
 
 const SIDE_LABEL: Record<string, string> = { t: "T", ct: "CT" };
+const MODE_LABEL: Record<LineupClusterMode, { label: string; hint: string }> = {
+  strict: { label: "精聚类", hint: "固定站位 + 固定落点，用来找可学习的高频道具。" },
+  loose: { label: "粗聚类", hint: "只看落点区域，用来回答这类道具大概打哪里。" },
+};
 
 const PAGE_SIZE = 20;
 const TOP_N_OPTIONS = [20, 40, 60] as const;
@@ -70,9 +75,11 @@ function calloutName(mapName: string, place: string): string {
 export function LineupView({
   entries,
   onOpenMatch,
+  onWatchDemo,
 }: {
   entries: StudioDemoEntry[];
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
 }) {
   const [clusters, setClusters] = useState<LineupCluster[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -84,10 +91,25 @@ export function LineupView({
   const [sideFilter, setSideFilter] = useState<"t" | "ct" | null>(null);
   const [page, setPage] = useState(0);
   const [radarTopN, setRadarTopN] = useState<TopNOption>(20);
+  const [clusterMode, setClusterMode] = useState<LineupClusterMode>("strict");
+  const [copiedClusterId, setCopiedClusterId] = useState<string | null>(null);
+  const entryById = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);
 
   function handleClusterJump(cluster: LineupCluster) {
     const first = cluster.throws[0];
-    if (first) onOpenMatch(cluster.entryIds[0] ?? "", { roundNumber: first.roundNumber, tick: first.tick });
+    if (first) onOpenMatch(first.entryId, { roundNumber: first.roundNumber, tick: first.tick });
+  }
+
+  async function handleCopyPractice(cluster: LineupCluster) {
+    const command = practiceCommandForCluster(cluster);
+    if (!command) return;
+    try {
+      await navigator.clipboard.writeText(command);
+    } catch {
+      window.prompt("复制练习命令", command);
+    }
+    setCopiedClusterId(cluster.id);
+    window.setTimeout(() => setCopiedClusterId((current) => current === cluster.id ? null : current), 1400);
   }
 
   // ── 加载：分批 → 按地图分组 → 跨场聚类 ──────────────────────────────────
@@ -130,6 +152,7 @@ export function LineupView({
             mapName,
             grenades: group.grenades,
             roundWinners: group.winners,
+            mode: clusterMode,
             tickrate: group.tickrate,
           });
           if (import.meta.env.DEV) {
@@ -155,7 +178,7 @@ export function LineupView({
     return () => {
       cancelled = true;
     };
-  }, [entries]);
+  }, [entries, clusterMode]);
 
   // ── 按地图分组 + 类型筛选（排序交由 DataTable） ──────────────────────────
   const byMap = useMemo(() => {
@@ -217,14 +240,28 @@ export function LineupView({
       key: "replay", label: "",
       render: (c) => {
         const firstThrow = c.throws[0];
+        const watchThrow = c.throws.find((row) => entryById.get(row.entryId)?.sourceDemPath);
+        const practiceCommand = practiceCommandForCluster(c);
         return firstThrow ? (
-          <EvidenceLink hint="打开该场比赛复盘并定位该点位投掷" onOpen={() => onOpenMatch(c.entryIds[0] ?? "", { roundNumber: firstThrow.roundNumber, tick: firstThrow.tick })}>
-            回放
-          </EvidenceLink>
+          <span className="stu-lineup-actions">
+            <EvidenceLink hint="打开该场比赛复盘并定位该点位投掷" onOpen={() => onOpenMatch(firstThrow.entryId, { roundNumber: firstThrow.roundNumber, tick: firstThrow.tick })}>
+              回放
+            </EvidenceLink>
+            {practiceCommand && (
+              <button type="button" className="stu-button-sm" title={practiceCommand} onClick={() => void handleCopyPractice(c)}>
+                {copiedClusterId === c.id ? "已复制" : "练习命令"}
+              </button>
+            )}
+            {watchThrow && onWatchDemo && (
+              <button type="button" className="stu-button-sm" onClick={() => onWatchDemo(watchThrow.entryId, { roundNumber: watchThrow.roundNumber, tick: watchThrow.tick })}>
+                进游戏
+              </button>
+            )}
+          </span>
         ) : null;
       }
     },
-  ], [onOpenMatch]);
+  ], [copiedClusterId, entryById, onOpenMatch, onWatchDemo]);
 
   // ── 渲染（空态提前返回） ──────────────────────────────────────────────
 
@@ -266,6 +303,26 @@ export function LineupView({
       {/* ── 雷达 ──────────────────────────────────────────────────────── */}
       <div className="stu-card">
         <h3>道具点位雷达 · {mapDisplayName(current.mapName)}</h3>
+
+        <div className="stu-chip-row" role="tablist" aria-label="聚类模式">
+          {(["strict", "loose"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              role="tab"
+              aria-selected={clusterMode === mode}
+              className={clusterMode === mode ? "stu-chip stu-chip-active" : "stu-chip"}
+              title={MODE_LABEL[mode].hint}
+              onClick={() => {
+                setClusterMode(mode);
+                setPage(0);
+              }}
+            >
+              {MODE_LABEL[mode].label}
+            </button>
+          ))}
+          <span className="stu-muted stu-chip-row-label">{MODE_LABEL[clusterMode].hint}</span>
+        </div>
 
         {byMap.length > 1 && (
           <div className="stu-chip-row" role="tablist" aria-label="地图选择">
@@ -457,6 +514,7 @@ export function LineupView({
       {/* ── 表格（DataTable：受控分页 + rowProps hover 联动雷达） ──── */}
       <div className="stu-card">
         <h3>道具点位库 · {mapDisplayName(current.mapName)}</h3>
+        <p className="stu-muted">练习命令复现投掷 tick 的玩家站位和视角；跑动、跳投和组合键细节仍建议点“回放”或“进游戏”核对原始 demo。</p>
         <DataTable
           classes={STUDIO_TABLE_CLASSES}
           rows={sideFilteredRows}
@@ -478,6 +536,35 @@ export function LineupView({
       </div>
     </div>
   );
+}
+
+function weaponForGrenade(grenade: string): string {
+  const value = grenade.toLowerCase();
+  if (value.includes("smoke")) return "weapon_smokegrenade";
+  if (value.includes("molotov")) return "weapon_molotov";
+  if (value.includes("incendiary") || value.includes("incgrenade")) return "weapon_incgrenade";
+  if (value.includes("flash")) return "weapon_flashbang";
+  if (value.includes("he")) return "weapon_hegrenade";
+  return `weapon_${value}`;
+}
+
+function formatCommandNumber(value: number): string {
+  return Number.isFinite(value) ? value.toFixed(2) : "0";
+}
+
+function practiceCommandForCluster(cluster: LineupCluster): string | null {
+  const sample = cluster.throws.find((row) => row.practicePose);
+  const pose = sample?.practicePose;
+  if (!pose) return null;
+  return [
+    "sv_cheats 1",
+    "bot_kick",
+    "sv_infinite_ammo 1",
+    "sv_grenade_trajectory_prac_pipreview 1",
+    `give ${weaponForGrenade(cluster.grenade)}`,
+    `setpos_exact ${formatCommandNumber(pose.position.x)} ${formatCommandNumber(pose.position.y)} ${formatCommandNumber(pose.position.z)}`,
+    `setang ${formatCommandNumber(pose.pitch)} ${formatCommandNumber(pose.yaw)} 0`,
+  ].join("; ");
 }
 
 function formatRoundNumbers(roundNumbers: number[]): string {

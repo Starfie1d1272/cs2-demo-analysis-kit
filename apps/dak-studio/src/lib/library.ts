@@ -421,6 +421,15 @@ export async function updateDemoTags(id: string, tags: string[]): Promise<void> 
   }
 }
 
+/** 只更新本机原始 .dem 路径；用于给 ZIP/赛事包导入的条目补绑 raw demo。 */
+export async function updateDemoSourcePath(id: string, sourceDemPath: string | null): Promise<void> {
+  const meta = demoMeta;
+  const record = await meta.get<StudioDemoEntry>(id);
+  if (record) {
+    await meta.put(id, normalizeEntry({ ...record, sourceDemPath }));
+  }
+}
+
 export async function bulkUpdateTags(ids: string[], add: string[] = [], remove: string[] = []): Promise<void> {
   const targetIds = [...new Set(ids)];
   if (targetIds.length === 0) return;

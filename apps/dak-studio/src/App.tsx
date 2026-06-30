@@ -1,8 +1,8 @@
 import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Radar, Settings, Swords, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { bulkUpdateTags, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoTags, type StudioDemoEntry } from "./lib/library";
+import { bulkUpdateTags, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { CohortScope, EMPTY_SCOPE, applyScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
-import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems, triggerWindowsDropCapture, type ExportedDemoFile } from "./lib/dem";
+import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems, pickDemPaths, triggerWindowsDropCapture, watchDemoPath, type ExportedDemoFile } from "./lib/dem";
 import { parseTags } from "./lib/tags";
 import { listSeriesRecords, pruneOrphanSeries, type StudioSeriesRecord } from "./lib/series";
 import { listEventRecords, type StudioEventRecord } from "./lib/events";
@@ -312,6 +312,49 @@ export function App() {
     setView("match");
   }, []);
 
+  const handleLinkRawDemo = useCallback(async (entry: StudioDemoEntry) => {
+    try {
+      const paths = await pickDemPaths();
+      const path = paths.find((candidate) => candidate.toLowerCase().endsWith(".dem")) ?? null;
+      if (!path) {
+        setNotice(paths.length > 0 ? "请选择 .dem 文件作为原始 demo 路径" : null);
+        return;
+      }
+      await updateDemoSourcePath(entry.id, path);
+      setEntries(await listDemoEntries());
+      setNotice(`已关联原始 demo：${entry.fileName}`);
+    } catch (err) {
+      setNotice(`关联原始 demo 失败：${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, []);
+
+  const watchRawDemo = useCallback(async (entryId: string, target?: MatchDeepLink) => {
+    try {
+      const entry = entries.find((row) => row.id === entryId);
+      if (!entry) {
+        setNotice("打开游戏失败：资料库条目不存在");
+        return;
+      }
+      if (!entry.sourceDemPath) {
+        setNotice("打开游戏失败：该条目还没有关联原始 .dem 路径");
+        return;
+      }
+      const api = window.pywebview?.api;
+      if (typeof api?.path_exists === "function" && !(await api.path_exists(entry.sourceDemPath))) {
+        setNotice(`打开游戏失败：原始 demo 不存在（${entry.sourceDemPath}）`);
+        return;
+      }
+      const result = await watchDemoPath(entry.sourceDemPath, target?.tick);
+      if (result.ok) {
+        setNotice(result.warning ?? `已请求 CS2 播放 ${entry.fileName}`);
+      } else {
+        setNotice(`打开游戏失败：${result.error}`);
+      }
+    } catch (err) {
+      setNotice(`打开游戏失败：${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, [entries]);
+
   const openPlayer = useCallback((playerKey: string) => {
     setSelectedPlayerKey(playerKey);
     setView("players");
@@ -575,6 +618,8 @@ export function App() {
             onRemoveDemo={handleRemove}
             onUpdateTags={handleUpdateTags}
             onBulkUpdateTags={handleBulkUpdateTags}
+            onLinkRawDemo={nativeImportAvailable ? handleLinkRawDemo : undefined}
+            onWatchRawDemo={nativeImportAvailable ? (entry) => void watchRawDemo(entry.id) : undefined}
             onReexportDemo={handleReexportDemo}
             onReexportAll={handleReexportAll}
             onReexportSelected={handleReexportSelected}
@@ -654,6 +699,7 @@ export function App() {
             allEntries={entries}
             entries={scopedEntries}
             onOpenMatch={openDemo}
+            onWatchDemo={watchRawDemo}
             onGoLibrary={() => setView("library")}
           />
         )}

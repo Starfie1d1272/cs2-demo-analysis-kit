@@ -1,4 +1,4 @@
-import type { SeriesFormat, SeriesVeto, SeriesVetoStep } from "@cs2dak/contract";
+import type { RawDemoHint, SeriesFormat, SeriesVeto, SeriesVetoStep } from "@cs2dak/contract";
 import type { PlaylistItem } from "./playlist";
 import { ACTIVE_DUTY_MAPS } from "@cs2dak/maps";
 import { entryDate, type StudioDemoEntry } from "./library";
@@ -32,6 +32,7 @@ export interface StudioSeriesRecord {
   scoreA?: number | null;
   scoreB?: number | null;
   matchUrl?: string | null;
+  rawDemoHint?: RawDemoHint;
   teamARecordBefore?: string | null;
   teamBRecordBefore?: string | null;
   scheduledAt?: string | null;

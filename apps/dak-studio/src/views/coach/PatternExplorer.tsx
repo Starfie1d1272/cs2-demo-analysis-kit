@@ -403,7 +403,7 @@ function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: T
 
 /**
  * 目标点道具落点聚合：保留"落点大区 == 本回合目标包点"的过滤，烟与火分别用
- * 验证过的 buildLineupClusters 做空间聚类（按落点 + 投掷位置容差合并近似点位，
+ * 验证过的 buildLineupClusters 做 loose 空间聚类（按落点合并近似点位，
  * 落点 callout 走多数表决），再按簇内回合数排序取 Top。
  */
 function buildUtilityLanding(facts: TacticalRoundFact[], mapName: string) {
@@ -437,7 +437,7 @@ function buildUtilityLanding(facts: TacticalRoundFact[], mapName: string) {
     }
   }
   const top = (grenades: LineupGrenadeLike[]) =>
-    buildLineupClusters({ mapName, grenades })
+    buildLineupClusters({ mapName, grenades, mode: "loose" })
       .sort((a, b) => b.count - a.count)
       .slice(0, 4)
       .map((c) => ({

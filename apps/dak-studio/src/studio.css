@@ -3480,6 +3480,14 @@ td.stu-heat-cell.stu-heat-neutral {
   font-size: 10.5px;
 }
 
+.stu-lineup-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
 /* 可点击排序的表头 */
 .stu-col-sortable {
   cursor: pointer;

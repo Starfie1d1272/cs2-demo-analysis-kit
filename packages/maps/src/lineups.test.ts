@@ -25,8 +25,8 @@ describe("buildLineupClusters", () => {
     expect(main.count).toBe(2);
     expect(main.roundNumbers).toEqual([1, 3]);
     expect(main.throws).toEqual([
-      { roundNumber: 1, tick: 1000 },
-      { roundNumber: 3, tick: 3000 }
+      { entryId: "d1", roundNumber: 1, tick: 1000, practicePose: null },
+      { entryId: "d1", roundNumber: 3, tick: 3000, practicePose: null }
     ]);
     expect(main.winRatePercent).toBe(50);
   });
@@ -36,7 +36,7 @@ describe("buildLineupClusters", () => {
     expect(clusters[0]!.winRatePercent).toBeNull();
   });
 
-  it("默认容差会合并更宽松的同类投掷", () => {
+  it("默认 strict 会区分相同落点但站位偏差大的投掷", () => {
     const clusters = buildLineupClusters({
       mapName: "de_mirage",
       grenades: [
@@ -45,8 +45,36 @@ describe("buildLineupClusters", () => {
       ]
     });
 
+    expect(clusters).toHaveLength(2);
+  });
+
+  it("loose 只按落点聚合，用于统计大致打哪里", () => {
+    const clusters = buildLineupClusters({
+      mapName: "de_mirage",
+      mode: "loose",
+      grenades: [
+        throwAt(1, 1000, 0, 500),
+        throwAt(2, 2000, 180, 620)
+      ]
+    });
+
     expect(clusters).toHaveLength(1);
     expect(clusters[0]!.count).toBe(2);
+  });
+
+  it("保留练习命令所需的玩家站位视角证据", () => {
+    const practicePose = { position: { x: 10, y: 20, z: 30 }, yaw: 90, pitch: -12 };
+    const clusters = buildLineupClusters({
+      mapName: "de_mirage",
+      grenades: [{ ...throwAt(1, 1000, 0, 500), practicePose }]
+    });
+
+    expect(clusters[0]!.throws[0]).toEqual({
+      entryId: "d1",
+      roundNumber: 1,
+      tick: 1000,
+      practicePose
+    });
   });
 
   it("聚合 effectPosition 对应的落点 callout", () => {
