@@ -49,21 +49,6 @@ function parseArgs(raw) {
   return args;
 }
 
-function collectMapNames(pkg, out) {
-  // event-package 结构：series[].maps[].mapName
-  const series = pkg.series;
-  if (!Array.isArray(series)) return;
-  for (const s of series) {
-    const maps = s.maps;
-    if (!Array.isArray(maps)) continue;
-    for (const m of maps) {
-      if (m.mapName && typeof m.mapName === "string") {
-        out.add(m.mapName);
-      }
-    }
-  }
-}
-
 function assetUrls(type, version, name) {
   const tag = `v${version}`;
   if (type === "runtime") {
