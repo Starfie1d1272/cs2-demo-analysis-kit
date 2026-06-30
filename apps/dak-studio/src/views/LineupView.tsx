@@ -248,13 +248,13 @@ export function LineupView({
               回放
             </EvidenceLink>
             {practiceCommand && (
-              <button type="button" className="stu-button-sm" title={practiceCommand} onClick={() => void handleCopyPractice(c)}>
-                {copiedClusterId === c.id ? "已复制" : "练习命令"}
+              <button type="button" className="stu-button-sm" title={practiceCommand} aria-label="复制练习命令" onClick={() => void handleCopyPractice(c)}>
+                {copiedClusterId === c.id ? "已复制" : "命令"}
               </button>
             )}
             {watchThrow && onWatchDemo && (
-              <button type="button" className="stu-button-sm" onClick={() => onWatchDemo(watchThrow.entryId, { roundNumber: watchThrow.roundNumber, tick: watchThrow.tick })}>
-                进游戏
+              <button type="button" className="stu-button-sm" title="在 CS2 中打开原始 demo" onClick={() => onWatchDemo(watchThrow.entryId, { roundNumber: watchThrow.roundNumber, tick: watchThrow.tick })}>
+                游戏
               </button>
             )}
           </span>

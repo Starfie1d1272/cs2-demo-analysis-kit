@@ -3436,6 +3436,13 @@ td.stu-heat-cell.stu-heat-neutral {
   }
 }
 
+@media (min-width: 1001px) {
+  .stu-lineup-layout > .stu-card:first-child {
+    position: sticky;
+    top: 12px;
+  }
+}
+
 /* SVG 交互元素 */
 .stu-lineup-g {
   cursor: pointer;
@@ -3482,10 +3489,11 @@ td.stu-heat-cell.stu-heat-neutral {
 
 .stu-lineup-actions {
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
   align-items: center;
   justify-content: flex-end;
+  white-space: nowrap;
 }
 
 .stu-evidence-actions {
