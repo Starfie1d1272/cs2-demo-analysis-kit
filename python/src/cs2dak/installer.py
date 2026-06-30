@@ -19,8 +19,8 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-# 安装器自身版本（与 app 版本无关；硬编码固定）
-INSTALLER_VERSION = "0.7.0"
+from cs2dak import __version__ as INSTALLER_VERSION
+from cs2dak import updater
 
 # R2 端点（稳定，不随版本变化）
 MANIFEST_URL_LATEST = "https://dakupdate.starfie1d.top/releases/install-manifest.json"
@@ -35,39 +35,47 @@ def fmt_mb(n: int) -> str:
 
 def download_with_progress(url: str, dest: str, expected_sha256: str | None = None,
                           expected_size: int | None = None,
-                          on_progress=None) -> None:
-    """单文件下载（无镜像 fallback——installer 仅从 R2 拉）。"""
+                          on_progress=None, should_cancel=None) -> None:
+    """单文件下载；镜像 fallback 由调用方遍历 urls[]。"""
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
     with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310
         total = int(resp.headers.get("Content-Length", 0))
         downloaded = 0
         part = dest + ".part"
-        with open(part, "wb") as f:
-            while True:
-                chunk = resp.read(1 << 20)  # 1 MiB
-                if not chunk:
-                    break
-                f.write(chunk)
-                downloaded += len(chunk)
-                if on_progress and total > 0:
-                    on_progress(downloaded, total)
-        # sha256 校验
-        if expected_sha256:
-            import hashlib
-            actual = hashlib.sha256()
-            with open(part, "rb") as f:
+        try:
+            with open(part, "wb") as f:
                 while True:
-                    chunk = f.read(1 << 20)
+                    if should_cancel and should_cancel():
+                        raise RuntimeError("已取消")
+                    chunk = resp.read(1 << 20)  # 1 MiB
                     if not chunk:
                         break
-                    actual.update(chunk)
-            if actual.hexdigest() != expected_sha256:
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if on_progress and total > 0:
+                        on_progress(downloaded, total)
+            # sha256 校验
+            if expected_sha256:
+                import hashlib
+                actual = hashlib.sha256()
+                with open(part, "rb") as f:
+                    while True:
+                        chunk = f.read(1 << 20)
+                        if not chunk:
+                            break
+                        actual.update(chunk)
+                if actual.hexdigest() != expected_sha256:
+                    os.unlink(part)
+                    raise RuntimeError(f"sha256 校验失败：{url}")
+            if expected_size and os.path.getsize(part) != expected_size:
                 os.unlink(part)
-                raise RuntimeError(f"sha256 校验失败：{url}")
-        if expected_size and os.path.getsize(part) != expected_size:
-            os.unlink(part)
-            raise RuntimeError(f"文件大小不匹配：{url}")
-        os.replace(part, dest)
+                raise RuntimeError(f"文件大小不匹配：{url}")
+            os.replace(part, dest)
+        except Exception:
+            if os.path.exists(part):
+                os.unlink(part)
+            raise
 
 
 def create_shortcut(target: str, shortcut_path: str, description: str = "") -> None:
@@ -92,51 +100,80 @@ class SimpleInstaller:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title(f"DAK Studio v{INSTALLER_VERSION} 安装器")
-        self.root.geometry("560x440")
+        self.root.geometry("640x500")
         self.root.resizable(False, False)
+        self.root.configure(bg="#0f1720")
+        self._setup_style()
         self.manifest = None
         self.install_dir = tk.StringVar(value="")
         self.cancelled = False
 
         # 头
-        header = ttk.Frame(self.root)
-        header.pack(pady=(20, 10))
-        ttk.Label(header, text="DAK Studio 安装器", font=("", 16, "bold")).pack()
-        ttk.Label(header, text=f"v{INSTALLER_VERSION} • 联网安装，约需下载数百 MB 资产").pack()
+        header = ttk.Frame(self.root, style="Panel.TFrame")
+        header.pack(fill="x", padx=28, pady=(24, 12))
+        ttk.Label(header, text="DAK Studio", style="Title.TLabel").pack(anchor="w", padx=18, pady=(16, 2))
+        ttk.Label(header, text="本地 demo 工作台安装器", style="Subtitle.TLabel").pack(anchor="w", padx=18)
+        ttk.Label(header, text=f"安装器 v{INSTALLER_VERSION} · 从官方镜像下载运行时、赛事包和地图数据", style="Muted.TLabel").pack(anchor="w", padx=18, pady=(8, 16))
 
         # 目录选择
-        dir_frame = ttk.Frame(self.root)
-        dir_frame.pack(fill="x", padx=40, pady=(10, 5))
-        ttk.Label(dir_frame, text="安装目录：").pack(side="left")
-        ttk.Entry(dir_frame, textvariable=self.install_dir, width=40).pack(side="left", padx=(5, 5))
-        ttk.Button(dir_frame, text="浏览…", command=self._pick_dir).pack(side="left")
+        dir_frame = ttk.Frame(self.root, style="App.TFrame")
+        dir_frame.pack(fill="x", padx=28, pady=(8, 5))
+        ttk.Label(dir_frame, text="安装目录", style="Label.TLabel").pack(anchor="w")
+        path_row = ttk.Frame(dir_frame, style="App.TFrame")
+        path_row.pack(fill="x", pady=(6, 0))
+        ttk.Entry(path_row, textvariable=self.install_dir, width=54).pack(side="left", fill="x", expand=True, padx=(0, 8))
+        ttk.Button(path_row, text="浏览…", command=self._pick_dir).pack(side="left")
 
         # 状态/进度区域
         self.status_var = tk.StringVar(value="准备好安装")
         self.progress_var = tk.DoubleVar(value=0)
         self.detail_var = tk.StringVar(value="")
 
-        ttk.Label(self.root, textvariable=self.status_var).pack(pady=(15, 5))
-        self.progress_bar = ttk.Progressbar(self.root, variable=self.progress_var, maximum=100, length=480)
-        self.progress_bar.pack(padx=40)
-        ttk.Label(self.root, textvariable=self.detail_var, foreground="gray").pack(pady=(2, 10))
+        status_frame = ttk.Frame(self.root, style="Panel.TFrame")
+        status_frame.pack(fill="x", padx=28, pady=(14, 8))
+        ttk.Label(status_frame, textvariable=self.status_var, style="Status.TLabel", wraplength=560, justify="left").pack(anchor="w", padx=18, pady=(16, 8))
+        self.progress_bar = ttk.Progressbar(status_frame, variable=self.progress_var, maximum=100, length=560)
+        self.progress_bar.pack(fill="x", padx=18)
+        ttk.Label(status_frame, textvariable=self.detail_var, style="Muted.TLabel", wraplength=560).pack(anchor="w", padx=18, pady=(8, 16))
 
         # 按钮
-        btn_frame = ttk.Frame(self.root)
-        btn_frame.pack(pady=(10, 20))
+        btn_frame = ttk.Frame(self.root, style="App.TFrame")
+        btn_frame.pack(fill="x", padx=28, pady=(10, 20))
         self.start_btn = ttk.Button(btn_frame, text="开始安装", command=self._start_install)
-        self.start_btn.pack(side="left", padx=5)
+        self.start_btn.pack(side="left", padx=(0, 8))
         self.cancel_btn = ttk.Button(btn_frame, text="取消", command=self._cancel, state="disabled")
-        self.cancel_btn.pack(side="left", padx=5)
+        self.cancel_btn.pack(side="left", padx=8)
         self.launch_btn = ttk.Button(btn_frame, text="启动 DAK Studio", command=self._launch, state="disabled")
-        self.launch_btn.pack(side="left", padx=5)
+        self.launch_btn.pack(side="right")
 
         # 默认安装目录
         if sys.platform == "win32":
-            default_dir = os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"), "DAK Studio")
+            local = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+            default_dir = os.path.join(local, "Programs", "DAK Studio")
         else:
             default_dir = os.path.join(str(Path.home()), "DAK-Studio")
         self.install_dir.set(default_dir)
+
+    def _setup_style(self):
+        style = ttk.Style(self.root)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+        bg = "#0f1720"
+        panel = "#17212b"
+        text = "#e8edf2"
+        muted = "#96a3af"
+        accent = "#60d394"
+        style.configure("App.TFrame", background=bg)
+        style.configure("Panel.TFrame", background=panel)
+        style.configure("Title.TLabel", background=panel, foreground=text, font=("", 22, "bold"))
+        style.configure("Subtitle.TLabel", background=panel, foreground=text, font=("", 11, "bold"))
+        style.configure("Muted.TLabel", background=panel, foreground=muted)
+        style.configure("Label.TLabel", background=bg, foreground=text, font=("", 10, "bold"))
+        style.configure("Status.TLabel", background=panel, foreground=text)
+        style.configure("TButton", padding=(12, 6))
+        style.configure("Horizontal.TProgressbar", troughcolor="#0b1118", background=accent, bordercolor="#0b1118", lightcolor=accent, darkcolor=accent)
 
     def _pick_dir(self):
         path = tkinter.filedialog.askdirectory(title="选择 DAK Studio 安装目录")
@@ -175,12 +212,14 @@ class SimpleInstaller:
             self.manifest = manifest
 
             runtime = manifest["runtime"]
+            app_version = manifest.get("appVersion", INSTALLER_VERSION)
             events = manifest.get("bundledEvents", [])
             tris = manifest.get("requiredTris", {})
             total_size = runtime["size"] + sum(e["size"] for e in events) + sum(t["size"] for t in tris.values())
 
             # Show summary
             summary = (
+                f"版本:          DAK Studio v{app_version}\n"
                 f"运行时:        {fmt_mb(runtime['size'])}\n"
                 f"内置赛事:     {fmt_mb(sum(e['size'] for e in events))}  ({len(events)} 个包)\n"
                 f"地图数据:     {fmt_mb(sum(t['size'] for t in tris.values()))}  ({len(tris)} 张地图)\n"
@@ -315,8 +354,14 @@ class SimpleInstaller:
                         self.root.after(0, lambda: self.detail_var.set(
                             f"  {label}：{dl / 1024 / 1024:.1f}/{total / 1024 / 1024:.1f} MB"
                         ))
-                download_with_progress(url, dest, expected_sha256=expected_sha256,
-                                       expected_size=expected_size, on_progress=_progress)
+                download_with_progress(
+                    url,
+                    dest,
+                    expected_sha256=expected_sha256,
+                    expected_size=expected_size,
+                    on_progress=_progress,
+                    should_cancel=lambda: self.cancelled,
+                )
                 return
             except Exception as exc:  # noqa: BLE001
                 last_err = exc
@@ -327,16 +372,7 @@ class SimpleInstaller:
     def _extract_runtime(zip_path: str, install_dir: str) -> None:
         """解压 runtime zip 到安装目录。zip 内有一个顶层 onedir。"""
         with zipfile.ZipFile(zip_path) as zf:
-            # 找到顶层目录名（如 "dak-studio/"）
-            names = zf.namelist()
-            top = None
-            for n in names:
-                parts = n.split("/")
-                if len(parts) >= 1 and parts[0]:
-                    if top is None:
-                        top = parts[0]
-                    # 检查是否所有文件都在同一顶层目录下
-            zf.extractall(install_dir)
+            updater.safe_extract_zip(zf, Path(install_dir))
         # 如果所有内容在单个子目录中，不 flatten（保持 onedir 结构）
         # 运行时 zip 的顶层就是 onedir 目录，extractall 到 install_dir 后结构：
         #   install_dir/dak-studio/...

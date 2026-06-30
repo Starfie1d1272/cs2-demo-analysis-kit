@@ -23,6 +23,8 @@ import { argv, exit, stderr } from "node:process";
 
 // 与 gen-update-manifest.mjs / gen-tris-manifest.mjs 的 R2_BASE 保持一致。
 const R2_BASE = "https://dakupdate.starfie1d.top";
+const OWNER_REPO = "Starfie1d1272/cs2-demo-analysis-kit";
+const BINARY_MIRROR_PREFIXES = ["", "https://ghfast.top/", "https://gh-proxy.com/", "https://ghproxy.net/"];
 
 function sha256(path) {
   const h = createHash("sha256");
@@ -96,7 +98,10 @@ function collectMapNames(pkg, out) {
 function assetUrls(type, version, name) {
   const tag = `v${version}`;
   if (type === "runtime") {
-    return [`${R2_BASE}/releases/${tag}/${name}`];
+    const r2 = `${R2_BASE}/releases/${tag}/${name}`;
+    const raw = `https://github.com/${OWNER_REPO}/releases/download/${tag}/${name}`;
+    const mirrors = BINARY_MIRROR_PREFIXES.map((prefix) => (prefix ? `${prefix}${raw}` : raw));
+    return [r2, ...mirrors];
   }
   if (type === "event") {
     // events/<slug>/<slug>.zip

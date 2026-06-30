@@ -11,7 +11,7 @@ import {
  *
  * 四种状态：
  * - ok           不显示（修复完成后短暂绿色提示）
- * - not_installed 蓝色横幅（R2 不可达）
+ * - not_installed 蓝色横幅（安装清单不可达）
  * - incomplete   黄色横幅 "资产缺失，部分分析可能降级"
  * - corrupt      红色横幅 "资产校验失败"
  *
@@ -93,8 +93,8 @@ export function AssetHealthBanner() {
   if (status.status === "not_installed") {
     return (
       <div className="stu-notice stu-notice-info">
-        <span>未安装官方赛事资产。请检查网络连接后重试，或使用 Full Portable Zip 版本。</span>
-        <button type="button" className="stu-button-sm" onClick={() => void check(false)}>重试检查</button>
+        <span>无法获取官方资产清单。请检查网络后重试；离线使用可下载 Full Portable Zip。</span>
+        <button type="button" className="stu-button-sm" onClick={() => void check(false)}>重新获取清单</button>
         <button type="button" className="stu-button-sm" onClick={() => setDismissed(true)}>以后再说</button>
       </div>
     );

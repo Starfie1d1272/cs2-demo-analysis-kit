@@ -47,7 +47,7 @@ function extractZip(zipPath, outDir) {
 /** 将目录打包为 zip。zipPath 是输出文件路径，workDir 是打包的工作目录，rootName 是 zip 内顶层条目名。 */
 function createZip(workDir, zipPath, rootName) {
   if (hasCmd("7z")) {
-    execSync(`cd "${workDir}" && 7z a -tzip -mx=5 "${zipPath}" "${rootName}" -bso0`, { stdio: "inherit" });
+    execSync(`cd "${workDir}" && 7z a -tzip -mx=9 "${zipPath}" "${rootName}" -bso0`, { stdio: "inherit" });
     return;
   }
   if (hasCmd("zip")) {

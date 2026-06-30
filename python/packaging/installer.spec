@@ -7,7 +7,7 @@
 
 a = Analysis(
     ["../src/cs2dak/installer.py"],
-    pathex=[],
+    pathex=["../src"],
     binaries=[],
     datas=[],
     hiddenimports=[
@@ -15,6 +15,8 @@ a = Analysis(
         "tkinter.ttk",
         "tkinter.filedialog",
         "tkinter.messagebox",
+        "cs2dak",
+        "cs2dak.updater",
     ],
     hookspath=[],
     hooksconfig={},

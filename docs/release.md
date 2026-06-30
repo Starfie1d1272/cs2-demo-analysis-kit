@@ -42,8 +42,9 @@ Changesets 管理的公共包。
    ```
 
    `release.yml` 在 macOS / Windows runner 上跑 `scripts/package.sh`，只产出
-   DAK Studio 产物：`dak-studio-X.Y.Z.dmg`、`dak-studio-windows-X.Y.Z.zip`、
-   Web Installer、Full Portable Zip。纯导出器 cs2dak 不进 Release。
+   DAK Studio 产物：`dak-studio-X.Y.Z.dmg`、`DAK-Studio-Setup-X.Y.Z.exe`、
+   `dak-studio-windows-X.Y.Z-full.zip`、`dak-studio-windows-X.Y.Z.zip`。
+   纯导出器 cs2dak 不进 Release。
 
 5. 发布后无需额外通知。Release CI 会随产物生成 `latest.json` 更新 manifest，
    同时发到 GitHub Release **并上传到 Cloudflare R2**
@@ -54,7 +55,8 @@ Changesets 管理的公共包。
    应用内更新会按 `release-update-policy.json` 自动决定优先发前端 `web` 小包还是完整
    `runtime` zip；未知路径保守走 runtime。
 
-   **发版后验证（R2 链路）**：
+   **发版后验证（R2 链路）**：Release CI 会自动核 `latest.json` /
+   `install-manifest.json` 的版本和 R2 runtime 的 size/sha256；本地手动复核可跑：
 
    ```bash
    # 1) R2 上的 manifest 可访问

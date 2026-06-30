@@ -7,9 +7,9 @@ installer 预装资产 + health check 修复。
 
 | 产物 | 内容 | 受众 | 大小 |
 |------|------|------|------|
-| `DAK-Studio-Setup-X.Y.Z.exe` | 仅安装逻辑，联网拉取一切 | 默认推荐 | ~15MB |
-| `dak-studio-windows-X.Y.Z-full.zip` | runtime + events + tris 预装 | 离线/手动 | ~400MB |
-| `dak-studio-windows-X.Y.Z.zip` | 仅 runtime（无 events/tris） | 开发者 | ~80MB |
+| `DAK-Studio-Setup-X.Y.Z.exe` | 仅安装逻辑，联网拉取一切 | 默认推荐 | ~12MB |
+| `dak-studio-windows-X.Y.Z-full.zip` | runtime + events + tris 预装 | 离线/手动 | ~285MB |
+| `dak-studio-windows-X.Y.Z.zip` | 仅 runtime（无 events/tris） | 排障/开发者 | ~130MB |
 
 ## 安装后目录结构
 
@@ -40,13 +40,13 @@ DAK Studio/
 
 ## Web Installer
 
-`DAK-Studio-Setup-X.Y.Z.exe` 是 PyInstaller onefile（~15MB），仅包含：
+`DAK-Studio-Setup-X.Y.Z.exe` 是 PyInstaller onefile（~12MB），仅包含：
 - tkinter 极简 GUI
 - `updater.download_with_fallback()` 下载逻辑
 - 无 studio_web/、cs2df、awpy 等重依赖
 
 安装流程：
-1. 选择安装目录
+1. 选择安装目录（默认 `%LOCALAPPDATA%/Programs/DAK Studio`，无需管理员权限）
 2. 拉取 `install-manifest.json` 显示总大小
 3. 下载 runtime zip → 解压
 4. 下载 bundled events → 写入 `assets/bundled-events/`

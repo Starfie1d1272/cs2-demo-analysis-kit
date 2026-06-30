@@ -89,6 +89,15 @@ def test_find_app_root_missing_raises(tmp_path: Path) -> None:
         updater._find_app_root(tmp_path, "dak-studio.exe")
 
 
+def test_safe_extract_rejects_path_traversal(tmp_path: Path) -> None:
+    zip_path = tmp_path / "bad.zip"
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.writestr("../escape.txt", b"nope")
+    with zipfile.ZipFile(zip_path) as zf, pytest.raises(updater.UpdateError):
+        updater.safe_extract_zip(zf, tmp_path / "out")
+    assert not (tmp_path / "escape.txt").exists()
+
+
 def test_relaunch_bat_mentions_pid_and_paths(tmp_path: Path) -> None:
     install = tmp_path / "dak-studio"
     new = tmp_path / "extract" / "dak-studio"

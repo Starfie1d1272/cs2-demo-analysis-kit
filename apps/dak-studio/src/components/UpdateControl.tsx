@@ -21,6 +21,7 @@ export function UpdateControl({ update }: { update: UpdateInfo }) {
     );
   }
   const asset = update.asset;
+  const manualUrl = asset.kind === "runtime" ? (asset.urls[0] ?? update.url ?? RELEASES_PAGE) : (update.url || RELEASES_PAGE);
 
   async function run() {
     setBusy(true);
@@ -67,7 +68,7 @@ export function UpdateControl({ update }: { update: UpdateInfo }) {
       {failed && (
         <small className="stu-update-failed">
           {failed} ·{" "}
-          <a href={update.url || RELEASES_PAGE} target="_blank" rel="noreferrer">手动下载</a>
+          <a href={manualUrl} target="_blank" rel="noreferrer">手动下载</a>
         </small>
       )}
     </div>

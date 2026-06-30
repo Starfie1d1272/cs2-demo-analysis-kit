@@ -30,7 +30,10 @@ Grab the latest build from [**Releases**](https://github.com/Starfie1d1272/cs2-d
 | Platform | File | First launch |
 |---|---|---|
 | macOS | `dak-studio-X.Y.Z.dmg` | Drag to Applications → System Settings → Privacy & Security → **Open Anyway** (currently unsigned) |
-| Windows | `dak-studio-windows-X.Y.Z.zip` | Unzip, run `dak-studio.exe`, click **Run anyway** on SmartScreen |
+| Windows | `DAK-Studio-Setup-X.Y.Z.exe` | Run the installer, choose an install folder, click **Run anyway** on SmartScreen |
+
+Windows offline/portable users can use `dak-studio-windows-X.Y.Z-full.zip`. The smaller
+`dak-studio-windows-X.Y.Z.zip` is runtime-only and mainly for troubleshooting.
 
 The exporter is built in — click **导入 demo**, pick `.dem` files (or v3 ZIPs), and parsing happens locally. No extra tooling required.
 

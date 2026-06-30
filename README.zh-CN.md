@@ -30,7 +30,10 @@
 | 平台 | 文件 | 首次打开 |
 |---|---|---|
 | macOS | `dak-studio-X.Y.Z.dmg` | 拖入 Applications → 系统设置 → 隐私与安全性 → **仍要打开**（当前未签名） |
-| Windows | `dak-studio-windows-X.Y.Z.zip` | 解压，运行 `dak-studio.exe`，SmartScreen 选 **仍要运行** |
+| Windows | `DAK-Studio-Setup-X.Y.Z.exe` | 运行安装器，选择安装目录，SmartScreen 选 **仍要运行** |
+
+Windows 离线/便携使用 `dak-studio-windows-X.Y.Z-full.zip`。较小的
+`dak-studio-windows-X.Y.Z.zip` 只含运行时，主要用于排障。
 
 应用内置 exporter——点 **导入 demo**，选 `.dem`（或 v3 ZIP），本机解析入库，无需其他工具。
 

@@ -122,7 +122,7 @@ jobs:
         run: |
           VERSION="$(node -p "require('./package.json').version")"
           cd python/dist
-          7z a -mx=5 "dak-studio-windows-${VERSION}.zip" dak-studio
+          7z a -mx=9 "dak-studio-windows-${VERSION}.zip" dak-studio
 
       - name: Build web patch
         if: runner.os == 'Windows' && steps.update_kind.outputs.kind == 'web'
@@ -349,6 +349,38 @@ jobs:
           echo "R2: latest.json ✓"
 
           echo "R2 上传完成"
+
+      - name: Verify R2 release manifests
+        run: |
+          set -euo pipefail
+          export VERSION="${GITHUB_REF#refs/tags/v}"
+          curl -fsSL "https://dakupdate.starfie1d.top/releases/latest.json?run=${GITHUB_RUN_ID}" -o latest.json
+          curl -fsSL "https://dakupdate.starfie1d.top/releases/install-manifest.json?run=${GITHUB_RUN_ID}" -o install-manifest.json
+          node - <<'NODE'
+          const fs = require("fs");
+          const latest = JSON.parse(fs.readFileSync("latest.json", "utf8"));
+          const install = JSON.parse(fs.readFileSync("install-manifest.json", "utf8"));
+          const version = process.env.VERSION;
+          if (latest.version !== version) throw new Error(`latest.json version ${latest.version} != ${version}`);
+          if (install.appVersion !== version) throw new Error(`install appVersion ${install.appVersion} != ${version}`);
+          for (const [label, asset] of Object.entries({ runtime: latest.assets.windows, installRuntime: install.runtime })) {
+            if (!asset?.urls?.[0]?.startsWith("https://dakupdate.starfie1d.top/")) throw new Error(`${label} first URL is not R2`);
+            if (!asset.sha256 || !asset.size) throw new Error(`${label} missing sha256/size`);
+          }
+          console.log("manifest metadata OK");
+          NODE
+          URL="$(node -p "require('./latest.json').assets.windows.urls[0]")"
+          curl -fsSL "$URL" -o dak-runtime.zip
+          node - <<'NODE'
+          const fs = require("fs");
+          const crypto = require("crypto");
+          const asset = require("./latest.json").assets.windows;
+          const buf = fs.readFileSync("dak-runtime.zip");
+          const sha = crypto.createHash("sha256").update(buf).digest("hex");
+          if (buf.length !== asset.size) throw new Error(`runtime size ${buf.length} != ${asset.size}`);
+          if (sha !== asset.sha256) throw new Error(`runtime sha256 ${sha} != ${asset.sha256}`);
+          console.log("R2 runtime OK", buf.length);
+          NODE
 
       - uses: softprops/action-gh-release@v3
         with:

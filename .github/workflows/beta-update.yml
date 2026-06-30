@@ -75,7 +75,7 @@ jobs:
           node scripts/sync-version.mjs "${{ inputs.version }}"
           PACKAGE_SKIP_VERSION_SYNC=1 bash scripts/package.sh
           cd python/dist
-          7z a -mx=5 "dak-studio-windows-${{ inputs.version }}.zip" dak-studio
+          7z a -mx=9 "dak-studio-windows-${{ inputs.version }}.zip" dak-studio
           cd ../..
 
       - name: Generate beta manifest

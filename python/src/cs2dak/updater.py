@@ -55,6 +55,16 @@ def updates_dir(updates_root: Path) -> Path:
     return path
 
 
+def safe_extract_zip(zf: zipfile.ZipFile, dest: Path) -> None:
+    """Extract a zip without allowing entries to escape ``dest``."""
+    root = dest.resolve()
+    for member in zf.infolist():
+        target = (dest / member.filename).resolve()
+        if target != root and root not in target.parents:
+            raise UpdateError(f"更新包包含非法路径：{member.filename}")
+    zf.extractall(dest)
+
+
 def _download_one(url: str, dest: Path, on_progress: Callable[[int], None] | None) -> None:
     received = 0
     req = urllib.request.Request(url, headers={"User-Agent": "DAK-Studio-Updater"})
@@ -210,7 +220,7 @@ def apply_windows_update(
     extract_dir = stage_root / "extract"
     extract_dir.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(zip_path) as zf:
-        zf.extractall(extract_dir)
+        safe_extract_zip(zf, extract_dir)
     new_dir = _find_app_root(extract_dir, exe_name)
     bat_text = _relaunch_bat(pid, install_dir, new_dir, exe_name)
     bat_path = stage_root / "apply-update.bat"

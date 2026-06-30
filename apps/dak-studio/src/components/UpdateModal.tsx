@@ -1,6 +1,6 @@
 import { X, Download, ExternalLink } from "lucide-react";
 import { type UpdateInfo, RELEASES_PAGE } from "../lib/update";
-import { applyUpdate, canSelfUpdate, downloadUpdate, type UpdateJobStatus } from "../lib/updater-bridge";
+import { applyUpdate, applyWebUpdate, canSelfUpdate, downloadUpdate, type UpdateJobStatus } from "../lib/updater-bridge";
 import { useState, useCallback } from "react";
 import { Changelog } from "./Changelog";
 
@@ -21,6 +21,7 @@ export function UpdateModal({ update, onDismiss }: Props) {
 
   const canAuto = canSelfUpdate(update.asset);
   const asset = update.asset;
+  const manualUrl = asset?.kind === "runtime" ? (asset.urls[0] ?? update.url ?? RELEASES_PAGE) : (update.url || RELEASES_PAGE);
 
   const runUpdate = useCallback(async () => {
     if (!asset) return;
@@ -33,10 +34,14 @@ export function UpdateModal({ update, onDismiss }: Props) {
         setBusy(false);
         return;
       }
-      const applied = await applyUpdate(result.jobId);
+      const applied = asset.kind === "web"
+        ? await applyWebUpdate(result.jobId, update.latest)
+        : await applyUpdate(result.jobId);
       if (!applied.ok) {
         setFailed(applied.error ?? "替换失败");
         setBusy(false);
+      } else if (asset.kind === "web") {
+        window.location.reload();
       }
     } catch (err) {
       setFailed(err instanceof Error ? err.message : String(err));
@@ -48,11 +53,11 @@ export function UpdateModal({ update, onDismiss }: Props) {
   const actionLabel = !canAuto
     ? "手动下载"
     : !busy
-      ? `更新到 v${update.latest}`
+      ? asset?.kind === "web" ? `增量更新到 v${update.latest}` : `更新到 v${update.latest}`
       : job?.state === "verifying"
         ? "校验中…"
         : job?.state === "applying" || job?.state === "ready"
-          ? "正在重启…"
+          ? asset?.kind === "web" ? "正在刷新…" : "正在重启…"
           : pct != null
             ? `下载中 ${pct}%`
             : "准备中…";
@@ -86,7 +91,7 @@ export function UpdateModal({ update, onDismiss }: Props) {
                 {actionLabel}
               </button>
             ) : (
-              <a className="stu-btn stu-btn-primary" href={update.url || RELEASES_PAGE} target="_blank" rel="noreferrer">
+              <a className="stu-btn stu-btn-primary" href={manualUrl} target="_blank" rel="noreferrer">
                 <ExternalLink size={14} /> 手动下载
               </a>
             )}
