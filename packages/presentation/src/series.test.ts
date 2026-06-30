@@ -5,14 +5,14 @@ import { loadDemoPackageFromZip } from "@cs2dak/core";
 import { seriesSummarySchema } from "@cs2dak/contract";
 import { buildMatchWorkspaceModel, buildSeriesSummary } from "./index";
 
-async function buildWorkspace() {
+const workspaceFixture = (async () => {
   const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url)));
   return buildMatchWorkspaceModel(await loadDemoPackageFromZip(zip));
-}
+})();
 
 describe("buildSeriesSummary", () => {
   it("aggregates counts and round-weighted rates across maps", async () => {
-    const model = await buildWorkspace();
+    const model = await workspaceFixture;
     const summary = buildSeriesSummary([
       { matchId: "map-1", model },
       { matchId: "map-2", model }
@@ -39,7 +39,7 @@ describe("buildSeriesSummary", () => {
   });
 
   it("accepts an external team map instead of owning team identity", async () => {
-    const model = await buildWorkspace();
+    const model = await workspaceFixture;
     const renamed = {
       ...model,
       teams: {

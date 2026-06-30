@@ -15,16 +15,14 @@ import {
 } from "./insights";
 import { buildMatchWorkspaceModel } from "./workspace";
 
-async function loadFixture() {
-  const zip = await readFile(
-    fileURLToPath(new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url))
-  );
-  return loadDemoPackageFromZip(zip);
-}
+const fixture = (async () => loadDemoPackageFromZip(await readFile(
+  fileURLToPath(new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url))
+)))();
+const workspaceFixture = fixture.then(buildMatchWorkspaceModel);
 
 describe("buildPlayerSeasonInsights", () => {
   it("derives trend, flash value and mistakes from one match", async () => {
-    const pkg = await loadFixture();
+    const pkg = await fixture;
     const steamId64 = pkg.players[pkg.playerStats[0].playerIndex]?.steamId64 ?? "";
     const insights = buildPlayerSeasonInsights([{ matchId: "m1", pkg }], [steamId64]);
 
@@ -67,7 +65,7 @@ describe("buildPlayerSeasonInsights", () => {
   });
 
   it("returns empty insights for unknown player", async () => {
-    const pkg = await loadFixture();
+    const pkg = await fixture;
     const insights = buildPlayerSeasonInsights([{ matchId: "m1", pkg }], ["76561190000000000"]);
     expect(insights.trend).toHaveLength(0);
     expect(insights.mistakes.deathTiming.total).toBe(0);
@@ -76,7 +74,7 @@ describe("buildPlayerSeasonInsights", () => {
 
 describe("buildPlayerFlashSummaries", () => {
   it("matches the existing per-player flash value derivation", async () => {
-    const pkg = await loadFixture();
+    const pkg = await fixture;
     const players = pkg.players.slice(0, 4).map((player) => ({
       playerKey: `steam:${player.steamId64}`,
       name: player.name,
@@ -103,7 +101,7 @@ describe("buildPlayerFlashSummaries", () => {
 
 describe("buildUtilityValueSummary", () => {
   it("normalizes flash, HE, fire and smoke value by rounds or throws", async () => {
-    const pkg = await loadFixture();
+    const pkg = await fixture;
     const players = pkg.players.slice(0, 4).map((player) => ({
       playerKey: `steam:${player.steamId64}`,
       name: player.name,
@@ -134,7 +132,7 @@ describe("buildUtilityValueSummary", () => {
   });
 
   it("merges persisted per-match utility summaries by identity", async () => {
-    const pkg = await loadFixture();
+    const pkg = await fixture;
     const players = pkg.players.slice(0, 2).map((player) => ({
       playerKey: `steam:${player.steamId64}`,
       name: player.name,
@@ -159,8 +157,7 @@ describe("buildUtilityValueSummary", () => {
 
 describe("buildMatchBuyQuality", () => {
   it("win counts never exceed round counts and pistol rounds exist", async () => {
-    const pkg = await loadFixture();
-    const model = buildMatchWorkspaceModel(pkg);
+    const model = await workspaceFixture;
     const quality = buildMatchBuyQuality(model.economy);
 
     for (const row of [...quality.teamA, ...quality.teamB]) {
@@ -174,7 +171,7 @@ describe("buildMatchBuyQuality", () => {
 
 describe("buildTournamentInsights", () => {
   it("builds the same model from persisted tournament facts", async () => {
-    const pkg = await loadFixture();
+    const pkg = await fixture;
     const demos = [
       { matchId: "m1", pkg },
       { matchId: "m2", pkg }
@@ -184,7 +181,7 @@ describe("buildTournamentInsights", () => {
   });
 
   it("aggregates round-level rates across demos", async () => {
-    const pkg = await loadFixture();
+    const pkg = await fixture;
     const insights = buildTournamentInsights([
       { matchId: "m1", pkg },
       { matchId: "m2", pkg }
@@ -213,7 +210,7 @@ describe("buildTournamentInsights", () => {
   });
 
   it("tracks first 5v4 and 5v3 round-state conversion opportunities", async () => {
-    const pkg = await loadFixture();
+    const pkg = await fixture;
     const insights = buildTournamentInsights([{ matchId: "m1", pkg }]);
     const expected = expectedManAdvantageRows(pkg);
 
@@ -254,7 +251,7 @@ describe("buildTournamentInsights", () => {
   });
 
   it("builds team economy summaries with maps, round win rate and sample counts", async () => {
-    const pkg = await loadFixture();
+    const pkg = await fixture;
     const insights = buildTournamentInsights([{ matchId: "m1", pkg }]);
     const teamAName = pkg.match.teamA.name ?? "Team A";
     const teamBName = pkg.match.teamB.name ?? "Team B";
@@ -281,7 +278,7 @@ describe("buildTournamentInsights", () => {
   });
 });
 
-function expectedManAdvantageRows(pkg: Awaited<ReturnType<typeof loadFixture>>) {
+function expectedManAdvantageRows(pkg: Awaited<typeof fixture>) {
   const targetPairs = new Map(["5:4", "5:3"].map((key) => [key, {
     advantageAlive: Number(key[0]),
     disadvantageAlive: Number(key[2]),
@@ -330,8 +327,7 @@ function expectedManAdvantageRows(pkg: Awaited<ReturnType<typeof loadFixture>>) 
 
 describe("buildMatchReportMarkdown", () => {
   it("renders a markdown report with scoreboard and rounds", async () => {
-    const pkg = await loadFixture();
-    const model = buildMatchWorkspaceModel(pkg);
+    const model = await workspaceFixture;
     const md = buildMatchReportMarkdown(model);
 
     expect(md).toContain(`# ${model.title}`);

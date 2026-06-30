@@ -4,12 +4,19 @@ import { fileURLToPath } from "node:url";
 import { analyzeDemoPackage, loadDemoPackageFromZip } from "@cs2dak/core";
 import { buildDemoViewModel, buildMatchWorkspaceModel } from "./index";
 
+const fixturePath = fileURLToPath(new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url));
+const workspaceFixture = (async () => {
+  const pkg = await loadDemoPackageFromZip(await readFile(fixturePath));
+  return {
+    pkg,
+    view: buildDemoViewModel(analyzeDemoPackage(pkg)),
+    workspace: buildMatchWorkspaceModel(pkg)
+  };
+})();
+
 describe("@cs2dak/presentation", () => {
   it("builds view and workspace models from canonical core analysis", async () => {
-    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url)));
-    const pkg = await loadDemoPackageFromZip(zip);
-    const view = buildDemoViewModel(analyzeDemoPackage(pkg));
-    const workspace = buildMatchWorkspaceModel(pkg);
+    const { view, workspace } = await workspaceFixture;
 
     expect(view.scoreline).toBe("13:10");
     expect(workspace.title).toBe("Team Spirit vs Team Falcons");
@@ -18,9 +25,7 @@ describe("@cs2dak/presentation", () => {
   });
 
   it("uses round-persistent loadout facts for replay weapons and utility", async () => {
-    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url)));
-    const pkg = await loadDemoPackageFromZip(zip);
-    const workspace = buildMatchWorkspaceModel(pkg);
+    const { pkg, workspace } = await workspaceFixture;
     const economy = pkg.playerEconomies.find((row) => row.roundNumber === 2 && row.primaryWeapon && row.grenadeCount > 0);
     expect(economy).toBeTruthy();
 
@@ -34,9 +39,7 @@ describe("@cs2dak/presentation", () => {
   });
 
   it("uses next round start tick as replay target end when available", async () => {
-    const zip = await readFile(fileURLToPath(new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url)));
-    const pkg = await loadDemoPackageFromZip(zip);
-    const workspace = buildMatchWorkspaceModel(pkg);
+    const { pkg, workspace } = await workspaceFixture;
     const firstReplayRound = workspace.replay.rounds[0]!;
     const firstPackageRound = pkg.rounds.find((round) => round.roundNumber === firstReplayRound.roundNumber)!;
     const nextPackageRound = pkg.rounds

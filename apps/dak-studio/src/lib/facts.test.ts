@@ -21,12 +21,11 @@ import { TACTICAL_FACT_VERSION, buildPlayerSeasonDetailsFromFacts, buildUtilityV
 import type { ExecuteBucket } from "./facts";
 import { createIdbAdapter } from "./storage/idb-adapter";
 
-async function loadFixture() {
-  const zip = await readFile(
-    fileURLToPath(new URL("../../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url))
-  );
-  return loadDemoPackageFromZip(zip);
-}
+const fixture = (async () => loadDemoPackageFromZip(await readFile(
+  fileURLToPath(new URL("../../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url))
+)))();
+const m1Facts = fixture.then((pkg) => extractMatchFacts(pkg, { matchId: "m1" }));
+const m2Facts = fixture.then((pkg) => extractMatchFacts(pkg, { matchId: "m2" }));
 
 function stableNumbers<T>(value: T): T {
   if (typeof value === "number") return Number(value.toFixed(12)) as T;
@@ -41,9 +40,9 @@ function stableNumbers<T>(value: T): T {
 
 describe("MatchFacts", () => {
   it("projects persisted mechanics facts to the same profile as the existing package path", async () => {
-    const pkg = await loadFixture();
+    const pkg = await fixture;
     const matchId = "m1";
-    const facts = extractMatchFacts(pkg, { matchId });
+    const facts = await m1Facts;
     const store = createFactsStore(createIdbAdapter(), "facts-equivalence");
     await store.putMatchFacts(facts);
 
@@ -66,9 +65,9 @@ describe("MatchFacts", () => {
   });
 
   it("projects persisted facts to the same player details as the existing package path", async () => {
-    const pkg = await loadFixture();
+    const pkg = await fixture;
     const matchId = "m1";
-    const facts = extractMatchFacts(pkg, { matchId });
+    const facts = await m1Facts;
     const store = createFactsStore(createIdbAdapter(), "facts-details-equivalence");
     await store.putMatchFacts(facts);
 
@@ -86,10 +85,10 @@ describe("MatchFacts", () => {
   });
 
   it("projects persisted cohort rows to the same season cohort as the existing package path", async () => {
-    const pkg = await loadFixture();
+    const pkg = await fixture;
     const matchId = "m1";
     const store = createFactsStore(createIdbAdapter(), "facts-cohort-equivalence");
-    await store.putMatchFacts(extractMatchFacts(pkg, { matchId }));
+    await store.putMatchFacts(await m1Facts);
 
     const rows = await store.getCohortRows({ matchIds: [matchId] });
 
@@ -103,10 +102,10 @@ describe("MatchFacts", () => {
   });
 
   it("projects persisted tournament facts to the same tournament insights as the existing package path", async () => {
-    const pkg = await loadFixture();
+    const pkg = await fixture;
     const matchId = "m1";
     const store = createFactsStore(createIdbAdapter(), "facts-tournament-equivalence");
-    await store.putMatchFacts(extractMatchFacts(pkg, { matchId }));
+    await store.putMatchFacts(await m1Facts);
 
     expect(buildTournamentInsightsFromFacts(await store.getTournamentFacts({ matchIds: [matchId] }))).toEqual(
       buildTournamentInsights([{ matchId, pkg }])
@@ -114,10 +113,10 @@ describe("MatchFacts", () => {
   });
 
   it("projects persisted team comparison facts to the same model as the existing package path", async () => {
-    const pkg = await loadFixture();
+    const pkg = await fixture;
     const matchId = "m1";
     const store = createFactsStore(createIdbAdapter(), "facts-team-equivalence");
-    await store.putMatchFacts(extractMatchFacts(pkg, { matchId }));
+    await store.putMatchFacts(await m1Facts);
 
     expect(buildTeamComparisonFromFacts(await store.getTeamComparisonFacts({ matchIds: [matchId] }))).toEqual(
       buildTeamComparison([{ matchId, pkg }])
@@ -125,10 +124,10 @@ describe("MatchFacts", () => {
   });
 
   it("projects persisted duel facts to the same model as the existing package path", async () => {
-    const pkg = await loadFixture();
+    const pkg = await fixture;
     const matchId = "m1";
     const store = createFactsStore(createIdbAdapter(), "facts-duel-equivalence");
-    await store.putMatchFacts(extractMatchFacts(pkg, { matchId }));
+    await store.putMatchFacts(await m1Facts);
 
     expect(buildDuelInsightsFromFacts(await store.getDuelFacts({ matchIds: [matchId] }))).toEqual(
       buildDuelInsights([{ matchId, pkg }])
@@ -136,10 +135,10 @@ describe("MatchFacts", () => {
   });
 
   it("projects persisted utility value facts without reopening the demo package", async () => {
-    const pkg = await loadFixture();
+    const pkg = await fixture;
     const matchId = "m1";
     const store = createFactsStore(createIdbAdapter(), "facts-utility-equivalence");
-    await store.putMatchFacts(extractMatchFacts(pkg, { matchId }));
+    await store.putMatchFacts(await m1Facts);
     const players = pkg.players.map((player) => ({
       playerKey: `steam:${player.steamId64}`,
       name: player.name,
@@ -152,8 +151,7 @@ describe("MatchFacts", () => {
   });
 
   it("提取 TacticalRoundFact：每回合每存活 side 一行，字段完整", async () => {
-    const pkg = await loadFixture();
-    const facts = extractMatchFacts(pkg, { matchId: "m1" });
+    const facts = await m1Facts;
     expect(facts.tacticalRounds.length).toBeGreaterThan(0);
     const f = facts.tacticalRounds[0]!;
     expect("snapshots" in f).toBe(false);
@@ -180,8 +178,7 @@ describe("MatchFacts", () => {
   });
 
   it("提取 C4 轨迹与进点入口（A1/A2）字段", async () => {
-    const pkg = await loadFixture();
-    const facts = extractMatchFacts(pkg, { matchId: "m1" });
+    const facts = await m1Facts;
     const t = facts.tacticalRounds.filter((f) => f.side === "t");
     expect(t.length).toBeGreaterThan(0);
     // 版本号写入
@@ -200,9 +197,8 @@ describe("MatchFacts", () => {
   });
 
   it("TacticalRoundFact store 读写：putMatchFacts 后 getTacticalRounds 返回相同数据", async () => {
-    const pkg = await loadFixture();
     const matchId = "m1";
-    const facts = extractMatchFacts(pkg, { matchId });
+    const facts = await m1Facts;
     const store = createFactsStore(createIdbAdapter(), "facts-tactical-rounds");
     await store.putMatchFacts(facts);
     const rows = await store.getTacticalRounds({ matchIds: [matchId] });
@@ -211,9 +207,8 @@ describe("MatchFacts", () => {
   });
 
   it("workspace 不随导入持久化（单场 ~35MB、整包全量分析的导入大头），改为打开时懒算", async () => {
-    const pkg = await loadFixture();
     const store = createFactsStore(createIdbAdapter(), "facts-no-workspace");
-    const facts = extractMatchFacts(pkg, { matchId: "m1" });
+    const facts = await m1Facts;
     expect(facts.matchWorkspace).toEqual([]);
     await store.putMatchFacts(facts);
     // 导入不再写 workspace，直读返回 null；视图改用 loadMatchWorkspaceModel 从 ZIP 懒算。
@@ -221,10 +216,9 @@ describe("MatchFacts", () => {
   });
 
   it("replaceRows：删除一场只动该场，另一场完整保留（key 前缀删除，不全量反序列化）", async () => {
-    const pkg = await loadFixture();
     const store = createFactsStore(createIdbAdapter(), "facts-replace-isolation");
-    await store.putMatchFacts(extractMatchFacts(pkg, { matchId: "m1" }));
-    await store.putMatchFacts(extractMatchFacts(pkg, { matchId: "m2" }));
+    await store.putMatchFacts(await m1Facts);
+    await store.putMatchFacts(await m2Facts);
 
     // 两场并存
     const m2Tactical = (await store.getTacticalRounds({ matchIds: ["m2"] })).length;
@@ -239,9 +233,8 @@ describe("MatchFacts", () => {
   });
 
   it("replaceRows：重复 put 同一场幂等，不产生重复行", async () => {
-    const pkg = await loadFixture();
     const store = createFactsStore(createIdbAdapter(), "facts-replace-idempotent");
-    const facts = extractMatchFacts(pkg, { matchId: "m1" });
+    const facts = await m1Facts;
     await store.putMatchFacts(facts);
     await store.putMatchFacts(facts);
     expect((await store.getTacticalRounds({ matchIds: ["m1"] })).length).toBe(facts.tacticalRounds.length);

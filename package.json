@@ -18,7 +18,7 @@
     "typecheck": "tsc -b --pretty",
     "test": "pnpm test:fast",
     "test:fast": "vitest run --pool=forks --exclude '**/*.integration.test.ts' --exclude '**/season-validation.test.ts'",
-    "test:integration": "vitest run --pool=forks packages/cli/src/cohort.integration.test.ts packages/core/src/spatial/utility.integration.test.ts packages/presentation/src/season-validation.test.ts",
+    "test:integration": "vitest run --pool=forks packages/cli/src/index.integration.test.ts packages/cli/src/cohort.integration.test.ts packages/core/src/spatial/utility.integration.test.ts packages/presentation/src/season-validation.test.ts",
     "test:all": "vitest run --pool=forks",
     "build": "pnpm -r --if-present build",
     "changeset": "changeset",

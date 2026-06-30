@@ -6,14 +6,14 @@ import { getFactsStore } from "./facts";
 import { importDemoFile, isFactsStale, listDemoEntries, matchIdForEntry, rebuildFactsFromZip } from "./library";
 import { ANALYSIS_MANIFEST, isAnalysisStale } from "./analysis-manifest";
 
+const samplePath = fileURLToPath(
+  new URL("../../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url)
+);
+const sampleBytes = readFile(samplePath);
+const sampleName = "sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip";
+
 async function sampleFile(): Promise<File> {
-  const path = fileURLToPath(
-    new URL("../../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url)
-  );
-  const bytes = await readFile(path);
-  return new File([bytes], "sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", {
-    type: "application/zip"
-  });
+  return new File([await sampleBytes], sampleName, { type: "application/zip" });
 }
 
 describe("importDemoFile", () => {
