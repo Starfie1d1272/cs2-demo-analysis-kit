@@ -1,4 +1,4 @@
-import { FileDown, FolderOpen, Play, RefreshCw, Tag as TagIcon, Trash2 } from "lucide-react";
+import { FileDown, Film, FolderOpen, Play, RefreshCw, Tag as TagIcon, Trash2 } from "lucide-react";
 import { useMemo, useState, type ChangeEvent } from "react";
 import { entryDate, isFactsStale, type StudioDemoEntry } from "../lib/library";
 import { parseTags } from "../lib/tags";
@@ -18,6 +18,8 @@ export interface LibraryViewProps {
   onRemoveDemo: (id: string) => void;
   onUpdateTags: (id: string, tags: string[]) => void;
   onBulkUpdateTags: (ids: string[], add: string[], remove: string[]) => void;
+  onLinkRawDemo?: (entry: StudioDemoEntry) => void;
+  onWatchRawDemo?: (entry: StudioDemoEntry) => void;
   onReexportDemo: (entry: StudioDemoEntry) => void;
   /** 批量重新导出所有有原始 .dem 路径的条目。 */
   onReexportAll?: () => void;
@@ -56,6 +58,8 @@ export function LibraryView({
   onRemoveDemo,
   onUpdateTags,
   onBulkUpdateTags,
+  onLinkRawDemo,
+  onWatchRawDemo,
   onReexportDemo,
   onReexportAll,
   onReexportSelected,
@@ -467,6 +471,28 @@ export function LibraryView({
                     >
                       <FileDown size={14} />
                     </button>
+                    {onLinkRawDemo && (
+                      <button
+                        type="button"
+                        className="stu-icon-button"
+                        title={entry.sourceDemPath ? `重新关联原始 .dem：${entry.sourceDemPath}` : "关联原始 .dem 路径"}
+                        disabled={importing}
+                        onClick={() => onLinkRawDemo(entry)}
+                      >
+                        <FolderOpen size={14} />
+                      </button>
+                    )}
+                    {onWatchRawDemo && (
+                      <button
+                        type="button"
+                        className="stu-icon-button"
+                        title={entry.sourceDemPath ? "在 CS2 中播放原始 demo" : "未记录原始 .dem 路径"}
+                        disabled={!entry.sourceDemPath || importing}
+                        onClick={() => onWatchRawDemo(entry)}
+                      >
+                        <Film size={14} />
+                      </button>
+                    )}
                     <button type="button" className="stu-icon-button" title="打开工作台" onClick={() => onOpenDemo(entry.id)}>
                       <Play size={14} />
                     </button>

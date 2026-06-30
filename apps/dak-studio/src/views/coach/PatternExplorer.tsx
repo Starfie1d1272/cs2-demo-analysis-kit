@@ -14,6 +14,7 @@ export interface PatternExplorerProps {
   facts: TacticalRoundFact[];
   entryByMatchId: Map<string, StudioDemoEntry>;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onAddToPlaylist?: (cluster: TacticalCluster, fact: TacticalRoundFact) => void;
   /** 回放缓存：传入则与上层复用；未传时组件生命周期内保持同一个缓存。 */
   replayModelCache?: Map<string, MatchWorkspaceModel>;
@@ -27,7 +28,7 @@ export function resolveEconomyFilter(
   return available[0] ?? "all";
 }
 
-export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, onAddToPlaylist, replayModelCache }: PatternExplorerProps) {
+export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, onWatchDemo, onAddToPlaylist, replayModelCache }: PatternExplorerProps) {
   // 顶部视角切换：T 进攻语境 / CT 防守语境分开看，避免两个 side 的簇混在一列。
   const [side, setSide] = useState<"t" | "ct">("t");
   // 一级经济入口筛选：手枪/长枪/Anti-eco/强起/半起/Eco，默认看长枪局。
@@ -196,6 +197,7 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
                   entryByMatchId={entryByMatchId}
                   activeFact={activeFact}
                   onOpenMatch={onOpenMatch}
+                  onWatchDemo={onWatchDemo}
                   onSelect={setSelectedEvidenceKey}
                   onAddToPlaylist={onAddToPlaylist}
                 />
@@ -403,7 +405,7 @@ function ClusterSummary({ cluster, facts }: { cluster: TacticalCluster; facts: T
 
 /**
  * 目标点道具落点聚合：保留"落点大区 == 本回合目标包点"的过滤，烟与火分别用
- * 验证过的 buildLineupClusters 做空间聚类（按落点 + 投掷位置容差合并近似点位，
+ * 验证过的 buildLineupClusters 做 loose 空间聚类（按落点合并近似点位，
  * 落点 callout 走多数表决），再按簇内回合数排序取 Top。
  */
 function buildUtilityLanding(facts: TacticalRoundFact[], mapName: string) {
@@ -437,7 +439,7 @@ function buildUtilityLanding(facts: TacticalRoundFact[], mapName: string) {
     }
   }
   const top = (grenades: LineupGrenadeLike[]) =>
-    buildLineupClusters({ mapName, grenades })
+    buildLineupClusters({ mapName, grenades, mode: "loose" })
       .sort((a, b) => b.count - a.count)
       .slice(0, 4)
       .map((c) => ({
@@ -453,6 +455,7 @@ function EvidenceTable({
   entryByMatchId,
   activeFact,
   onOpenMatch,
+  onWatchDemo,
   onSelect,
   onAddToPlaylist,
 }: {
@@ -461,6 +464,7 @@ function EvidenceTable({
   entryByMatchId: Map<string, StudioDemoEntry>;
   activeFact: TacticalRoundFact | null;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onSelect: (key: string) => void;
   onAddToPlaylist?: (cluster: TacticalCluster, fact: TacticalRoundFact) => void;
 }) {
@@ -539,10 +543,15 @@ function EvidenceTable({
               工作台 ↗
             </EvidenceLink>
           )}
+          {entry?.sourceDemPath && onWatchDemo && (
+            <button type="button" className="stu-button-sm" onClick={() => onWatchDemo(entry.id, { roundNumber: r.roundNumber, tick: fact ? jumpTickFor(fact) : undefined })}>
+              进游戏
+            </button>
+          )}
         </>;
       }
     },
-  ], [factByRound, entryByMatchId, onSelect, onOpenMatch, onAddToPlaylist, cluster]);
+  ], [factByRound, entryByMatchId, onSelect, onOpenMatch, onWatchDemo, onAddToPlaylist, cluster]);
 
   return (
     <div className="stu-pe-evidence">

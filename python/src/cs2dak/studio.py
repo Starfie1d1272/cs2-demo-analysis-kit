@@ -38,6 +38,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from cs2dak import __version__, updater
+from cs2dak.cs2_playback import launch_demo
 
 # PyInstaller 打包后 __file__ 指向 Contents/Frameworks/（不含数据文件），
 # 实际资源在 sys._MEIPASS 临时目录。未打包时回退到源码目录。
@@ -771,6 +772,10 @@ class StudioApi:
 
     def path_exists(self, path: str) -> bool:
         return Path(path).exists()
+
+    def watch_demo(self, path: str, tick: int | None = None) -> dict:
+        """Launch CS2 and load a local .dem."""
+        return launch_demo(Path(path), tick)
 
     # --- .dem import ----------------------------------------------------
     def pick_dems(self) -> list[str]:

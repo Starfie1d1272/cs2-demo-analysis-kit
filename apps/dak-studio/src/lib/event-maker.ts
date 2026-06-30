@@ -42,6 +42,7 @@ export interface MakerSeriesDraft {
   scheduledAt: string;
   veto: SeriesVeto | null;
   matchUrl?: string;
+  rawDemoUrl?: string;
   resources: MakerMapResource[];
 }
 
@@ -114,6 +115,17 @@ export function deriveEventTeams(series: MakerSeriesDraft[]): string[] {
     }
   }
   return names;
+}
+
+function fileNameFromUrl(value: string | undefined): string | null {
+  if (!value) return null;
+  try {
+    const pathname = new URL(value).pathname;
+    const name = pathname.split("/").filter(Boolean).pop();
+    return name ? decodeURIComponent(name) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** BP 与已附 demo 地图集合是否相符；返回不一致说明（空数组=相符或无法判定）。 */
@@ -348,6 +360,10 @@ async function compileEventPackage(draft: EventMakerDraft): Promise<EventPackage
       completedAt: row.resources.map((resource) => resource.occurredAt).find(Boolean) ?? null,
       veto: row.veto,
       matchUrl: row.matchUrl ?? null,
+      rawDemoHint: row.rawDemoUrl ? {
+        downloadUrl: row.rawDemoUrl,
+        fileName: fileNameFromUrl(row.rawDemoUrl),
+      } : null,
       maps,
     };
   }));

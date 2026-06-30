@@ -9,7 +9,7 @@ import {
   type TacticalRoundFact,
 } from "@cs2dak/core";
 import type { SeasonCohortFactRow } from "@cs2dak/cohort";
-import type { DemoPackage, MatchWorkspaceModel, OpeningTrailsModel, Side, TeamKey } from "@cs2dak/contract";
+import { decodeDelta, type DemoPackage, type MatchWorkspaceModel, type OpeningTrailsModel, type Side, type TeamKey } from "@cs2dak/contract";
 import type { TriangleBvh, CalloutGrid, Vec3 } from "@cs2dak/maps";
 import type { LineupGrenadeLike } from "@cs2dak/maps";
 import { calloutNear } from "@cs2dak/maps";
@@ -247,6 +247,40 @@ function throwerPlaceAt(pkg: DemoPackage, roundNumber: number, playerIndex: numb
   return replay.placeDict[placeIndex] || null;
 }
 
+function throwerPracticePoseAt(
+  pkg: DemoPackage,
+  roundNumber: number,
+  playerIndex: number,
+  tick: number
+): LineupGrenadeLike["practicePose"] {
+  const replay = pkg.replay;
+  if (!replay) return null;
+  const replayRound = replay.rounds.find((row) => row.roundNumber === roundNumber);
+  if (!replayRound) return null;
+  const track = replayRound.players.find((player) => player.playerIndex === playerIndex);
+  if (!track) return null;
+  const frameIndex = Math.max(
+    0,
+    Math.min(replayRound.frameCount - 1, Math.round((tick - replayRound.startTick) / replayRound.tickStep))
+  );
+  const coordScale = replay.meta.coordScale || 1;
+  const angleScale = replay.meta.angleScale || 1;
+  const xs = decodeDelta(track.x);
+  const ys = decodeDelta(track.y);
+  const zs = decodeDelta(track.z);
+  const yaws = decodeDelta(track.yaw);
+  const pitches = decodeDelta(track.pitch ?? []);
+  return {
+    position: {
+      x: (xs[frameIndex] ?? 0) * coordScale,
+      y: (ys[frameIndex] ?? 0) * coordScale,
+      z: (zs[frameIndex] ?? 0) * coordScale,
+    },
+    yaw: (yaws[frameIndex] ?? 0) / angleScale,
+    pitch: (pitches[frameIndex] ?? 0) / angleScale,
+  };
+}
+
 function effectCalloutFor(grid: CalloutGrid | null, point: Vec3): {
   callout: string | null;
   confidence: number | null;
@@ -270,14 +304,16 @@ function extractLineupFact(pkg: DemoPackage, matchId: string, grid: CalloutGrid 
     grenades: (pkg.grenades ?? []).map((grenade) => {
       const round = roundsByNumber.get(grenade.roundNumber);
       const player = pkg.players[grenade.throwerIndex];
+      const practicePose = throwerPracticePoseAt(pkg, grenade.roundNumber, grenade.throwerIndex, grenade.throwTick);
       const effect = effectCalloutFor(grid, grenade.effectPosition);
       return {
         roundNumber: grenade.roundNumber,
         grenade: grenade.grenade,
         throwerIndex: grenade.throwerIndex,
         throwTick: grenade.throwTick,
-        throwPosition: grenade.throwPosition,
+        throwPosition: practicePose?.position ?? grenade.throwPosition,
         effectPosition: grenade.effectPosition,
+        practicePose,
         entryId: matchId,
         freezeEndTick: round?.freezeEndTick ?? 0,
         throwerPlaceName: throwerPlaceAt(pkg, grenade.roundNumber, grenade.throwerIndex, grenade.throwTick),

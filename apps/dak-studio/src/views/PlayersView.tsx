@@ -14,7 +14,8 @@ import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } fr
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
 import type { CohortScopeState } from "../components/CohortScope";
 import { FingerprintRadar, TrendChart } from "./profile-widgets";
-import { EmptyState, EvidenceLink, MetricInfo } from "@cs2dak/react";
+import { EmptyState, MetricInfo } from "@cs2dak/react";
+import { EvidenceActions } from "../components/EvidenceActions";
 
 export interface PlayersViewProps {
   allEntries: StudioDemoEntry[];
@@ -23,6 +24,7 @@ export interface PlayersViewProps {
   selectedPlayerKey: string | null;
   onSelectPlayer: (playerKey: string) => void;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
 }
@@ -53,6 +55,7 @@ export function PlayersView({
   selectedPlayerKey,
   onSelectPlayer,
   onOpenMatch,
+  onWatchDemo,
   onGoLibrary,
   identityOptions
 }: PlayersViewProps) {
@@ -457,13 +460,15 @@ export function PlayersView({
                             ? `净 ${flash.netSeconds.toFixed(1)}s`
                             : `致盲 ${flash.enemySeconds.toFixed(1)}s`;
                           return (
-                            <EvidenceLink
+                            <EvidenceActions
                               key={`${flash.matchId}-${flash.roundNumber}-${i}`}
-                              disabled={!e}
-                              onOpen={() => { if (e) onOpenMatch(e.id, { roundNumber: flash.roundNumber, tick: flash.tick }); }}
+                              entry={e}
+                              target={{ roundNumber: flash.roundNumber, tick: flash.tick }}
+                              onOpenMatch={onOpenMatch}
+                              onWatchDemo={onWatchDemo}
                             >
                               {e ? formatMatchLabel(e) : flash.matchId} · R{flash.roundNumber} · 致盲 {flash.victimCount} 人 · {metric}
-                            </EvidenceLink>
+                            </EvidenceActions>
                           );
                         })}
                     </div>
@@ -473,15 +478,20 @@ export function PlayersView({
                   <>
                     <h4 className="stu-subhead">最严重队闪</h4>
                     <div className="stu-evidence-list">
-                      {insights.flash.worstTeamFlashes.slice(0, 3).map((incident, i) => (
-                        <EvidenceLink
-                          key={`${incident.matchId}-${incident.roundNumber}-${i}`}
-                          disabled={!entryByMatchId.get(incident.matchId)}
-                          onOpen={() => { const e = entryByMatchId.get(incident.matchId); if (e) onOpenMatch(e.id, { roundNumber: incident.roundNumber, tick: incident.tick }); }}
-                        >
-                          {formatMatchLabel(entryByMatchId.get(incident.matchId)!)} · R{incident.roundNumber} · 闪到 {incident.victimCount} 名队友 {incident.totalSeconds.toFixed(1)}s
-                        </EvidenceLink>
-                      ))}
+                      {insights.flash.worstTeamFlashes.slice(0, 3).map((incident, i) => {
+                        const e = entryByMatchId.get(incident.matchId);
+                        return (
+                          <EvidenceActions
+                            key={`${incident.matchId}-${incident.roundNumber}-${i}`}
+                            entry={e}
+                            target={{ roundNumber: incident.roundNumber, tick: incident.tick }}
+                            onOpenMatch={onOpenMatch}
+                            onWatchDemo={onWatchDemo}
+                          >
+                            {e ? formatMatchLabel(e) : incident.matchId} · R{incident.roundNumber} · 闪到 {incident.victimCount} 名队友 {incident.totalSeconds.toFixed(1)}s
+                          </EvidenceActions>
+                        );
+                      })}
                     </div>
                   </>
                 )}
@@ -516,15 +526,20 @@ export function PlayersView({
                 </div>
                 {[...insights.mistakes.fullBuyFirstDeaths.evidence, ...insights.mistakes.antiEcoFirstDeaths.evidence, ...insights.mistakes.clutchLosses.evidence].length > 0 && (
                   <div className="stu-evidence-list">
-                    {[...insights.mistakes.fullBuyFirstDeaths.evidence.slice(0, 3), ...insights.mistakes.antiEcoFirstDeaths.evidence.slice(0, 3), ...insights.mistakes.clutchLosses.evidence.slice(0, 3)].map((evidence, i) => (
-                      <EvidenceLink
-                        key={`${evidence.matchId}-${evidence.roundNumber}-${i}`}
-                        disabled={!entryByMatchId.get(evidence.matchId)}
-                        onOpen={() => { const e = entryByMatchId.get(evidence.matchId); if (e) onOpenMatch(e.id, { roundNumber: evidence.roundNumber, tick: evidence.tick }); }}
-                      >
-                        {formatMatchLabel(entryByMatchId.get(evidence.matchId)!)} · R{evidence.roundNumber} · {evidence.detail}
-                      </EvidenceLink>
-                    ))}
+                    {[...insights.mistakes.fullBuyFirstDeaths.evidence.slice(0, 3), ...insights.mistakes.antiEcoFirstDeaths.evidence.slice(0, 3), ...insights.mistakes.clutchLosses.evidence.slice(0, 3)].map((evidence, i) => {
+                      const e = entryByMatchId.get(evidence.matchId);
+                      return (
+                        <EvidenceActions
+                          key={`${evidence.matchId}-${evidence.roundNumber}-${i}`}
+                          entry={e}
+                          target={{ roundNumber: evidence.roundNumber, tick: evidence.tick }}
+                          onOpenMatch={onOpenMatch}
+                          onWatchDemo={onWatchDemo}
+                        >
+                          {e ? formatMatchLabel(e) : evidence.matchId} · R{evidence.roundNumber} · {evidence.detail}
+                        </EvidenceActions>
+                      );
+                    })}
                   </div>
                 )}
               </div>

@@ -14,6 +14,7 @@ export interface MatchViewProps {
   demoId: string | null;
   deepLink?: { roundNumber: number; tick?: number } | null;
   onSelectDemo: (id: string) => void;
+  onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
 }
 
@@ -29,7 +30,7 @@ async function loadModel(id: string, matchId: string): Promise<MatchWorkspaceMod
   return model;
 }
 
-export function MatchView({ entries, demoId, deepLink, onSelectDemo, onGoLibrary }: MatchViewProps) {
+export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary }: MatchViewProps) {
   const activeId = demoId ?? entries[0]?.id ?? null;
   const activeEntry = activeId ? entries.find((entry) => entry.id === activeId) ?? null : null;
   const [model, setModel] = useState<MatchWorkspaceModel | null>(activeId ? modelCache.get(activeId) ?? null : null);
@@ -154,6 +155,11 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onGoLibrary
             </optgroup>
           ))}
         </select>
+        {activeEntry?.sourceDemPath && onWatchDemo && (
+          <button type="button" className="stu-button-sm" onClick={() => onWatchDemo(activeEntry.id, deepLink ?? undefined)}>
+            进游戏
+          </button>
+        )}
         {model && (
           <button
             type="button"

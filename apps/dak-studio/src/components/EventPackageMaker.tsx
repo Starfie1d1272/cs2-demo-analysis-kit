@@ -61,7 +61,7 @@ function loadDraft(): PersistedDraft | null {
       sourceUrl: parsed.sourceUrl ?? undefined,
       stages: Array.isArray(parsed.stages) && parsed.stages.length > 0 ? parsed.stages : stagesForPreset("major"),
       // 恢复时 resources 一律清空：二进制不入草稿。teamAName/teamBName 是 demo 派生缓存，一并清空。
-      // matchUrl 保留（字符串，可持久化）。
+      // matchUrl/rawDemoUrl 保留（字符串，可持久化）。
       series: Array.isArray(parsed.series) ? parsed.series.map((row) => ({ ...row, status: row.status === "cancelled" ? "cancelled" : "finished", resources: [], teamAName: "", teamBName: "" })) : [],
     };
   } catch {
@@ -326,6 +326,7 @@ export function EventPackageMaker({ onNotice }: { onNotice: (message: string) =>
               <label>局制<select value={row.format} onChange={(event) => patchSeries(row.key, { format: event.target.value as SeriesFormat, veto: null })}>{(["bo1", "bo3", "bo5"] as const).map((format) => <option key={format} value={format}>{format.toUpperCase()}</option>)}</select></label>
               <label>状态<select value={row.status === "cancelled" ? "cancelled" : "finished"} onChange={(event) => patchSeries(row.key, { status: event.target.value as MakerSeriesDraft["status"] })}><option value="finished">已结束</option><option value="cancelled">取消</option></select></label>
               <label>比赛 URL<input value={row.matchUrl ?? ""} onChange={(event) => patchSeries(row.key, { matchUrl: event.target.value || undefined })} placeholder="https://www.hltv.org/matches/..." /></label>
+              <label>原始 demo 直链<input value={row.rawDemoUrl ?? ""} onChange={(event) => patchSeries(row.key, { rawDemoUrl: event.target.value || undefined })} placeholder="https://r2-demos.hltv.org/demos/..." /></label>
             </div>
             <p className="stu-muted">内部标识：<code>{row.key}</code> · 对阵（来自 demo）：{row.teamAName && row.teamBName ? `${row.teamAName} vs ${row.teamBName}` : "尚未附加 demo"} · 时间：{row.resources[0]?.occurredAt ? new Date(row.resources[0].occurredAt).toLocaleString("zh-CN") : "附加 demo 后自动读取文件时间"}</p>
             <div className="stu-chip-row">

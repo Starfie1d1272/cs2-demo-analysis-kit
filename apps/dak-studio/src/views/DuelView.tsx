@@ -26,6 +26,7 @@ export interface DuelViewProps {
   entries: StudioDemoEntry[];
   scope: CohortScopeState;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
   teamRenames?: Record<string, string>;
@@ -57,6 +58,7 @@ export function DuelView({
   entries,
   scope,
   onOpenMatch,
+  onWatchDemo,
   onGoLibrary,
   identityOptions,
   teamRenames = {},
@@ -166,7 +168,7 @@ export function DuelView({
       {!error && !model && entries.length > 0 && <div className="stu-loading">分析 {entries.length} 场 demo 的逐枪与伤害事件…</div>}
 
       {model && tab === "records" && (
-        <EvidenceCards rows={model.duelRows} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} />
+        <EvidenceCards rows={model.duelRows} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} onWatchDemo={onWatchDemo} />
       )}
 
       {model && tab === "mechanics" && (
@@ -181,7 +183,7 @@ export function DuelView({
       )}
 
       {model && tab === "opening" && (
-        <OpeningDuelMap rows={model.openingRows} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} />
+        <OpeningDuelMap rows={model.openingRows} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} onWatchDemo={onWatchDemo} />
       )}
     </div>
   );
@@ -332,6 +334,7 @@ function EvidenceCards({
   rows,
   entryByMatchId,
   onOpenMatch,
+  onWatchDemo,
   compact = false,
   hoveredId,
   onHoverChange,
@@ -342,6 +345,7 @@ function EvidenceCards({
   rows: DuelInsightsModel["duelRows"];
   entryByMatchId: Map<string, StudioDemoEntry>;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   compact?: boolean;
   hoveredId?: string | null;
   onHoverChange?: (id: string | null) => void;
@@ -441,6 +445,11 @@ function EvidenceCards({
                       回放
                     </button>
                   )}
+                  {entry?.sourceDemPath && onWatchDemo && (
+                    <button type="button" className="stu-button-sm" onClick={(e) => { e.stopPropagation(); onWatchDemo(entry.id, { roundNumber: row.roundNumber, tick: row.tick }); }}>
+                      进游戏
+                    </button>
+                  )}
                 </div>
                 <div className="stu-duel-compact-row2">
                   <span className="stu-duel-compact-match">{matchLabel}</span>
@@ -525,6 +534,11 @@ function EvidenceCards({
                       {ttkLabel(row)}
                     </span>
                   </div>
+                  {entry?.sourceDemPath && onWatchDemo && (
+                    <button type="button" className="stu-button-sm" onClick={(e) => { e.stopPropagation(); onWatchDemo(entry.id, { roundNumber: row.roundNumber, tick: row.tick }); }}>
+                      进游戏
+                    </button>
+                  )}
                 </article>
               );
             })}
@@ -560,11 +574,13 @@ function MetricPill({ label, value, tone }: { label: string; value: string; tone
 function OpeningDuelMap({
   rows,
   entryByMatchId,
-  onOpenMatch
+  onOpenMatch,
+  onWatchDemo
 }: {
   rows: DuelInsightsModel["openingRows"];
   entryByMatchId: Map<string, StudioDemoEntry>;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [listPage, setListPage] = useState(0);
@@ -660,7 +676,7 @@ function OpeningDuelMap({
           <span><i className="stu-duel-dot-killer" />击杀方</span>
         </div>
       </div>
-      <EvidenceCards rows={mapRows} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} compact hoveredId={hoveredId} onHoverChange={setHoveredId} page={listPage} onPageChange={setListPage} pageSize={LIST_PAGE_SIZE} />
+      <EvidenceCards rows={mapRows} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} onWatchDemo={onWatchDemo} compact hoveredId={hoveredId} onHoverChange={setHoveredId} page={listPage} onPageChange={setListPage} pageSize={LIST_PAGE_SIZE} />
     </section>
   );
 }

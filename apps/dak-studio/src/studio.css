@@ -3436,6 +3436,13 @@ td.stu-heat-cell.stu-heat-neutral {
   }
 }
 
+@media (min-width: 1001px) {
+  .stu-lineup-layout > .stu-card:first-child {
+    position: sticky;
+    top: 12px;
+  }
+}
+
 /* SVG 交互元素 */
 .stu-lineup-g {
   cursor: pointer;
@@ -3478,6 +3485,22 @@ td.stu-heat-cell.stu-heat-neutral {
   color: var(--dak-fg-dim);
   font-family: var(--dak-mono);
   font-size: 10.5px;
+}
+
+.stu-lineup-actions {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+.stu-evidence-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
 }
 
 /* 可点击排序的表头 */

@@ -43,6 +43,11 @@ export const eventMapSchema = z.object({
   }).nullable().optional(),
 });
 
+export const rawDemoHintSchema = z.object({
+  downloadUrl: z.string().url().nullable().optional(),
+  fileName: z.string().nullable().optional(),
+}).nullable().optional();
+
 export const eventSeriesSchema = z.object({
   key: z.string().min(1),
   stage: z.string().nullable().optional(),
@@ -54,6 +59,7 @@ export const eventSeriesSchema = z.object({
   teamBRecordBefore: z.string().nullable().optional(),
   format: z.enum(["bo1", "bo3", "bo5"]),
   matchUrl: z.string().url().nullable().optional(), // 该系列来源页（HLTV match 页），展示层可链回
+  rawDemoHint: rawDemoHintSchema, // 可选：打包侧已知的原始 demo 包直链（如 HLTV r2-demos rar）
   teamAKey: z.string().min(1),
   teamBKey: z.string().min(1),
   scoreA: z.number().int().nonnegative().nullable().optional(),
@@ -135,6 +141,7 @@ export type EventStage = z.infer<typeof eventStageSchema>;
 export type EventBracketNode = z.infer<typeof eventBracketNodeSchema>;
 export type EventTeam = z.infer<typeof eventTeamSchema>;
 export type EventSeries = z.infer<typeof eventSeriesSchema>;
+export type RawDemoHint = z.infer<typeof rawDemoHintSchema>;
 
 export const eventsManifestSchema = z.object({
   version: z.literal("cs2-demo-analysis-kit/events-manifest-1.0"),

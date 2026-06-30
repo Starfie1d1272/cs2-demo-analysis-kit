@@ -23,6 +23,9 @@ interface ExportJobStatus {
 interface PywebviewStudioApi {
   pick_dems: () => Promise<string[]>;
   path_exists?: (path: string) => Promise<boolean>;
+  watch_demo?: (path: string, tick?: number | null) => Promise<
+    { ok: true; warning?: string } | { ok: false; error: string }
+  >;
   export_dem_path: (path: string) => Promise<
     { ok: true; fileName: string; dataBase64: string } | { ok: false; error: string }
   >;
@@ -86,6 +89,20 @@ export async function detectDemBackend(): Promise<DemBackend> {
 
 export function isDemFile(file: File): boolean {
   return file.name.toLowerCase().endsWith(".dem");
+}
+
+export async function pickDemPaths(): Promise<string[]> {
+  const api = window.pywebview?.api;
+  if (!api?.pick_dems) throw new Error("桌面壳不可用，无法选择本机 demo");
+  return api.pick_dems();
+}
+
+export async function watchDemoPath(path: string, tick?: number): Promise<{ ok: true; warning?: string } | { ok: false; error: string }> {
+  const api = window.pywebview?.api;
+  if (!api?.watch_demo) {
+    return { ok: false, error: "当前环境不支持直接打开 CS2，请使用桌面版 DAK Studio" };
+  }
+  return api.watch_demo(path, tick ?? null);
 }
 
 /** dev 模式：把 .dem 字节流交给 Vite 中间件，拿回导出的 ZIP。 */

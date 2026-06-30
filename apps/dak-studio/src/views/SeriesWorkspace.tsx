@@ -47,6 +47,14 @@ function seriesScore(entries: StudioDemoEntry[]): { teamA: string; teamB: string
   return { teamA, teamB, winsA, winsB };
 }
 
+function copyRawDemoUrl(url: string): void {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(url).catch(() => window.prompt("复制原始 demo 链接", url));
+  } else {
+    window.prompt("复制原始 demo 链接", url);
+  }
+}
+
 export function SeriesWorkspace({
   series,
   entries,
@@ -78,6 +86,24 @@ export function SeriesWorkspace({
           <summary>BP 流程</summary>
           <BpView veto={series.veto} matchUrl={series.matchUrl} />
         </details>
+      )}
+
+      {(series.rawDemoHint?.downloadUrl || series.matchUrl) && (
+        <div className="stu-series-bp">
+          <span className="stu-muted">原始 demo：</span>
+          {series.rawDemoHint?.downloadUrl ? (
+            <>
+              <a href={series.rawDemoHint.downloadUrl} target="_blank" rel="noreferrer">
+                {series.rawDemoHint.fileName ?? "下载链接"}
+              </a>
+              <button type="button" className="stu-button-sm" onClick={() => copyRawDemoUrl(series.rawDemoHint!.downloadUrl!)}>
+                复制直链
+              </button>
+            </>
+          ) : series.matchUrl ? (
+            <a href={series.matchUrl} target="_blank" rel="noreferrer">打开 HLTV 来源页</a>
+          ) : null}
+        </div>
       )}
 
       <nav className="stu-series-tabs" aria-label="系列赛地图">
