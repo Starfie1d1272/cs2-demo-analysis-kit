@@ -35,7 +35,7 @@ function chokeCn(mapName: string, chokeId: string): string {
   return chokeId;
 }
 
-function structuralEntryName(mapName: string, site: "a" | "b", combo: string): string {
+function structuralEntryName(mapName: string, combo: string): string {
   const ids = combo.split("+");
   const names = ids.map((id) => chokeCn(mapName, id));
   if (ids.length === 1) return names[0]!;
@@ -44,7 +44,7 @@ function structuralEntryName(mapName: string, site: "a" | "b", combo: string): s
 
 /** 进点路线只用于 evidence 文案；词典不会参与主簇命名。 */
 export function formatEntryEvidenceLabel(mapName: string, site: "a" | "b", combo: string): string {
-  return entryRouteCn(mapName, site, combo) || structuralEntryName(mapName, site, combo);
+  return entryRouteCn(mapName, site, combo) || structuralEntryName(mapName, combo);
 }
 
 /** 兼容旧展示调用；不得将此函数用于主簇名称。 */

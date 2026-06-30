@@ -368,7 +368,7 @@ function hasThirdPartyImpact(damages: PackageDamage[], pkg: DemoPackage, kill: P
   );
 }
 
-function isEnemyKill(pkg: DemoPackage, resolver: PlayerResolver, kill: PackageKill): kill is PackageKill & { killerIndex: number } {
+function isEnemyKill(resolver: PlayerResolver, kill: PackageKill): kill is PackageKill & { killerIndex: number } {
   if (kill.killerIndex === null || kill.killerIndex === kill.victimIndex) return false;
   const killer = resolver.byIndexOrNull(kill.killerIndex);
   const victim = resolver.byIndexOrNull(kill.victimIndex);
@@ -436,7 +436,7 @@ export function buildDuelsSignals(input: DemoPackage, options: DuelSignalsOption
   const damages = activeDamages(pkg);
   const engagements = buildEngagements(damages, pkg, shots, tickrate);
   const records = pkg.kills
-    .filter((kill) => isEnemyKill(pkg, resolver, kill))
+    .filter((kill) => isEnemyKill(resolver, kill))
     .map((kill, index): DuelRecord => {
       const killer = resolver.byIndex(kill.killerIndex!);
       const victim = resolver.byIndex(kill.victimIndex);

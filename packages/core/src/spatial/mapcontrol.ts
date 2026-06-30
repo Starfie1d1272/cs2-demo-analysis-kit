@@ -91,7 +91,7 @@ export function buildOfficialMapControl(
       const solo = new Set<string>();
       const denial = new Set<string>();
       for (const [route, byTeam] of presence) {
-        deriveSoloAndDenial(route, byTeam, defenderTeam, ph, solo, denial, perRoundSolo, perRoundDenial, SAMPLE_SECONDS);
+        deriveSoloAndDenial(byTeam, defenderTeam, ph, solo, denial, perRoundSolo, perRoundDenial, SAMPLE_SECONDS);
         // firstMeaningfulControlEvents：T 首次到达关键段（neutral/key index）
         recordFirstControl(route, byTeam, sides.t, takenRoutes, firstControlEvents, ph);
       }
@@ -151,7 +151,6 @@ function routePresence(
 }
 
 function deriveSoloAndDenial(
-  route: MapRoute,
   byTeam: Map<Team, { id: string; index: number }[]>,
   defenderTeam: Team | null,
   phase: RoundPhase,

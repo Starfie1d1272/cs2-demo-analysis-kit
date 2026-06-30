@@ -43,11 +43,11 @@ interface LoadedGrenades {
 
 async function loadAllGrenades(
   entries: StudioDemoEntry[],
-  onProgress?: (done: number, total: number) => void
+  onProgress?: (done: number) => void
 ): Promise<LoadedGrenades[]> {
   const facts = await getFactsStore().getLineups({ matchIds: entries.map(matchIdForEntry) });
   const entryIdByMatchId = new Map(entries.map((entry) => [matchIdForEntry(entry), entry.id]));
-  onProgress?.(facts.length, entries.length);
+  onProgress?.(facts.length);
   return facts.map((fact) => {
     const entryId = entryIdByMatchId.get(fact.matchId) ?? fact.matchId;
     return {
@@ -100,7 +100,7 @@ export function LineupView({
     if (entries.length === 0) return;
     setLoading(true);
 
-    loadAllGrenades(entries, (done, total) => {
+    loadAllGrenades(entries, (done) => {
       if (!cancelled) setProgress(done);
     })
       .then((loaded) => {

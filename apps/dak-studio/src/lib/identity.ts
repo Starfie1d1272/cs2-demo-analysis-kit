@@ -224,7 +224,7 @@ export async function setTeamRename(
 }
 
 /** 撤销最近一次操作，返回恢复后的状态；无可撤销时返回 null。 */
-export async function undoLastAction(current: IdentityStoreState): Promise<IdentityStoreState | null> {
+export async function undoLastAction(): Promise<IdentityStoreState | null> {
   try {
     const all = await auditStore.getAll<AuditEntry>();
     if (all.length === 0) return null;

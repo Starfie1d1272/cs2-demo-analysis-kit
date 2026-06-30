@@ -6,7 +6,6 @@ import { EventManager } from "../components/EventManager";
 import type { BuiltinEvent } from "../lib/builtin-events";
 import { getSeasonSummary, type IdentityOptions } from "../lib/season";
 import {
-  buildCohortIdentityMap,
   listAuditEntries,
   mergeIdentities,
   renamePlayer,
@@ -224,7 +223,7 @@ export function ManagementView({
   async function handleUndo() {
     setWorking(true);
     try {
-      const prev = await undoLastAction(identity);
+      const prev = await undoLastAction();
       if (!prev) return;
       onIdentityChange(prev);
     } finally {

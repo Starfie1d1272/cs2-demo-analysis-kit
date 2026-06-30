@@ -3,8 +3,6 @@ import type { DemoPackage, Replay } from "@cs2dak/contract";
 import { loadSpatialAssets } from "./annotate.js";
 import { buildOfficialMapControl } from "./mapcontrol.js";
 
-const TICKS = [150, 214, 278, 342];
-
 function deltaArr(values: number[]): number[] {
   const out: number[] = [];
   let prev = 0;

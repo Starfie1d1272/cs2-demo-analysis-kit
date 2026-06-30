@@ -42,7 +42,7 @@ export interface DuelWindowView {
 
 const viewCache = new WeakMap<DuelWindow, DuelWindowView>();
 
-function decodeTrack(window: DuelWindow, track: DuelWindow["players"][number], coordScale: number, angleScale: number): DecodedTrack {
+function decodeTrack(track: DuelWindow["players"][number], coordScale: number, angleScale: number): DecodedTrack {
   const scale = (arr: number[], by: number) => arr.map((value) => value / by);
   return {
     playerIndex: track.playerIndex,
@@ -63,7 +63,7 @@ export function decodeDuelWindow(pkg: DemoPackage, window: DuelWindow): DuelWind
   const coordScale = pkg.duels?.meta.coordScale ?? 1;
   const angleScale = pkg.duels?.meta.angleScale ?? 10;
   const tracks = new Map<number, DecodedTrack>();
-  for (const track of window.players) tracks.set(track.playerIndex, decodeTrack(window, track, coordScale, angleScale));
+  for (const track of window.players) tracks.set(track.playerIndex, decodeTrack(track, coordScale, angleScale));
   const view: DuelWindowView = {
     window,
     startTick: window.startTick,

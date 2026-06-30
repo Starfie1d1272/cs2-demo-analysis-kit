@@ -1,4 +1,4 @@
-import { computeSeasonMetrics, round } from "./season-metrics.js";
+import { round } from "./season-metrics.js";
 import { displayWeaponName } from "./weapons.js";
 import type { DemoPackage } from "@cs2dak/contract";
 
