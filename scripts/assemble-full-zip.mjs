@@ -16,9 +16,9 @@
 import { execSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import { argv, cwd, exit, stderr } from "node:process";
+import { argv, exit } from "node:process";
 import { createHash } from "node:crypto";
-import { inflateRawSync } from "node:zlib";
+import { readEventPackageJson } from "./lib/event-package-json.mjs";
 
 // ── 跨平台 zip 操作（首选 7z → fallback unzip/zip）───────────────────
 
@@ -149,28 +149,9 @@ function main() {
       const size = statSync(src).size;
       const hash = sha256(src);
       console.error(`  bundled-event: ${slug} (${(size / 1024 / 1024).toFixed(1)} MB)`);
-      // 从 event-package.json 读取真实名称（扫描 local header 签名）
       let displayName = slug;
       try {
-        const buf = readFileSync(src);
-        const limit = buf.length - 30;
-        for (let i = 0; i < limit; i++) {
-          if (buf.readUInt32LE(i) !== 0x04034b50) continue;
-          const nl = buf.readUInt16LE(i + 26);
-          const el = buf.readUInt16LE(i + 28);
-          const name = buf.subarray(i + 30, i + 30 + nl).toString("utf-8");
-          if (name !== "event-package.json") continue;
-          const cs = buf.readUInt32LE(i + 18);
-          const cm = buf.readUInt16LE(i + 8);
-          const ds = i + 30 + nl + el;
-          if (cs <= 0 || ds + cs > buf.length) continue;
-          const raw = cm === 0
-            ? buf.subarray(ds, ds + cs).toString("utf-8")
-            : inflateRawSync(buf.subarray(ds, ds + cs)).toString("utf-8");
-          const pkg = JSON.parse(raw);
-          displayName = pkg.event?.name || slug;
-          break;
-        }
+        displayName = readEventPackageJson(src).event?.name || slug;
       } catch { /* fallback to slug */ }
       manifestEvents.push({
         slug,
