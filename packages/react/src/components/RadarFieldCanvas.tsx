@@ -20,24 +20,60 @@ import { Pause, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 const CANVAS_SIZE = 1024;
+const PLAYBACK_INTERVAL_MS = 250;
+const MIN_VISIBLE_MAG = 0.005;
+const MIN_VISIBLE_PRESENCE_MAG = 0.003;
+const WEAK_ZONE_MAX = 0.06;
 
-// 顺序色阶：品牌双 accent（深蓝 → accent-b 蓝 → 青 → 琥珀 → accent 橙），6 档离散分层。
-// 避开彩虹 jet，贴合 Tactical Slate；分档让「核心架点 vs 偶尔扫一眼」的层次可读。
+// 按真实频率分档，而不是按 cap 后透明度硬撑；低频边界也必须可读。
 const HEAT_BANDS: Array<[number, string]> = [
-  [0.06, "23,58,94"],
-  [0.18, "47,127,181"],
-  [0.34, "73,182,255"],
-  [0.54, "98,216,196"],
-  [0.76, "255,198,77"],
-  [1.01, "255,122,33"],
+  [0.005, "52,67,154"],
+  [0.01, "71,94,180"],
+  [0.02, "54,139,210"],
+  [0.04, "45,190,205"],
+  [0.07, "82,218,158"],
+  [0.12, "184,214,94"],
+  [0.2, "255,196,77"],
+  [0.35, "255,132,68"],
+  [1.01, "255,90,114"],
 ];
-const REVEAL_RGB = "73,182,255"; // accent-b 青蓝
+const CONTESTED_BANDS: Array<[number, string]> = [
+  [0.005, "52,67,154"],
+  [0.01, "71,94,180"],
+  [0.02, "54,139,210"],
+  [0.035, "45,190,205"],
+  [0.05, "82,218,158"],
+  [0.08, "184,214,94"],
+  [0.12, "255,196,77"],
+  [0.2, "255,132,68"],
+  [1.01, "255,102,54"],
+];
+const PRESENCE_BANDS: Array<[number, string]> = [
+  [0.005, "71,94,180"],
+  [0.01, "54,139,210"],
+  [0.02, "45,190,205"],
+  [0.03, "82,218,158"],
+  [0.05, "184,214,94"],
+  [0.08, "255,196,77"],
+  [0.12, "255,132,68"],
+  [1.01, "255,90,114"],
+];
+const WEAK_RGB = "255,90,114"; // --dak-danger
 const DIFF_POS_RGB = "255,90,114"; // --dak-danger
 const DIFF_NEG_RGB = "73,182,255"; // --dak-accent-b
 
-function heatBand(t: number): string {
-  for (const [hi, rgb] of HEAT_BANDS) if (t <= hi) return rgb;
-  return "255,122,33";
+function heatBand(mode: RadarFieldMode, mag: number): string {
+  const bands = mode === "ctPres" || mode === "tPres"
+    ? PRESENCE_BANDS
+    : mode === "contested"
+      ? CONTESTED_BANDS
+      : HEAT_BANDS;
+  for (const [hi, rgb] of bands) if (mag <= hi) return rgb;
+  return "255,102,54";
+}
+
+function minVisibleMag(mode: RadarFieldMode): number {
+  return mode === "ctPres" || mode === "tPres" ? MIN_VISIBLE_PRESENCE_MAG : MIN_VISIBLE_MAG;
 }
 
 export interface RadarFieldCanvasProps {
@@ -51,8 +87,7 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
   const [mode, setMode] = useState<RadarFieldMode>("ctVis");
   const [sec, setSec] = useState(20);
   const [playing, setPlaying] = useState(false);
-  // 照亮模式：压暗底图、视野覆盖发青光，暗处即盲区（读负空间最直观）。
-  const [reveal, setReveal] = useState(false);
+  const [weakZones, setWeakZones] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const calibration = getMapCalibration(map.name);
@@ -76,7 +111,7 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
         }
         return value + 1;
       });
-    }, 1000);
+    }, PLAYBACK_INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, [playing, maxSec]);
 
@@ -94,22 +129,21 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
     const px2canvas = CANVAS_SIZE / cal.radarSize;
     const blobR = (field.grid.cellSize / cal.scale) * 2.2 * px2canvas;
 
-    // 照亮模式只对顺序场（视野/位置）生效；差分/信息差分仍用发散色。
-    const useReveal = reveal && !frame.signed;
+    const showWeakZones = weakZones && !frame.signed && (mode === "ctVis" || mode === "tVis");
 
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    if (useReveal) {
-      // 压暗 CSS 底图（canvas 在底图之上），让覆盖区发光、未覆盖区变暗 = 盲区。
+    if (showWeakZones) {
       ctx.globalCompositeOperation = "source-over";
-      ctx.fillStyle = "rgba(8,11,16,0.8)";
+      ctx.fillStyle = "rgba(8,11,16,0.72)";
       ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
     }
-    ctx.globalCompositeOperation = frame.signed ? "source-over" : "lighter";
+    ctx.globalCompositeOperation = frame.signed || showWeakZones ? "source-over" : "lighter";
 
     for (let g = 0; g < cells.length; g++) {
       const v = frame.values[g]!;
       const mag = Math.abs(v);
-      if (mag < 0.03) continue;
+      if (!showWeakZones && mag < minVisibleMag(mode)) continue;
+      if (showWeakZones && mag > WEAK_ZONE_MAX) continue;
       const cell = cells[g]!;
       if (dualLevel && levelAt(cell[2], cal) !== level) continue;
       const radar = worldToRadar({ x: cell[0], y: cell[1] }, cal);
@@ -117,8 +151,8 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
       const x = radar.x * px2canvas;
       const y = radar.y * px2canvas;
       const t = Math.min(1, mag / frame.cap);
-      const op = (useReveal ? 0.3 : 0.32) + 0.5 * t;
-      const rgb = useReveal ? REVEAL_RGB : frame.signed ? (v > 0 ? DIFF_POS_RGB : DIFF_NEG_RGB) : heatBand(t);
+      const op = showWeakZones ? 0.72 - 0.42 * Math.min(1, mag / WEAK_ZONE_MAX) : 0.38 + 0.5 * Math.pow(t, 0.55);
+      const rgb = showWeakZones ? WEAK_RGB : frame.signed ? (v > 0 ? DIFF_POS_RGB : DIFF_NEG_RGB) : heatBand(mode, mag);
       const grd = ctx.createRadialGradient(x, y, 0, x, y, blobR);
       grd.addColorStop(0, `rgba(${rgb},${op.toFixed(2)})`);
       grd.addColorStop(1, `rgba(${rgb},0)`);
@@ -128,18 +162,21 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
       ctx.fill();
     }
     ctx.globalCompositeOperation = "source-over";
-  }, [field, baseline, mode, sec, level, reveal, calibration, dualLevel]);
+  }, [field, baseline, mode, sec, level, weakZones, calibration, dualLevel]);
 
   const bgUrl = dualLevel && level === "lower" ? map.lowerRadarImageUrl : map.radarImageUrl;
   const sequential = mode !== "info-diff" && !isDiff;
-  const legend = reveal && sequential
-    ? "亮 = 有视线覆盖 · 暗 = 盲区（空虚区）"
+  const canShowWeakZones = sequential && (mode === "ctVis" || mode === "tVis");
+  const legend = weakZones && canShowWeakZones
+    ? "红 = 低频 / 薄弱区（≤6%）"
     : isDiff
       ? "红 = 高于赛事基线 · 蓝 = 低于基线"
       : mode === "info-diff"
         ? "暖 = T 信息优势 · 冷 = CT 预警"
         : mode === "contested"
           ? "双方都看到 = 对拼线 / 交火点"
+          : mode === "ctPres" || mode === "tPres"
+            ? "冷 → 热 = 站人频率低 → 高"
           : "冷 → 热 = 频率低 → 高";
 
   return (
@@ -160,12 +197,13 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
           ))}
           <button
             type="button"
-            aria-pressed={reveal}
-            className={reveal ? "dak-sf-chip dak-sf-chip-active" : "dak-sf-chip"}
-            title="压暗底图、覆盖区发光，暗处即盲区"
-            onClick={() => setReveal((r) => !r)}
+            aria-pressed={weakZones}
+            disabled={!canShowWeakZones}
+            className={weakZones && canShowWeakZones ? "dak-sf-chip dak-sf-chip-active" : "dak-sf-chip"}
+            title={canShowWeakZones ? "压暗底图，只标出低频视野覆盖格" : "仅 CT/T 视野模式可用"}
+            onClick={() => setWeakZones((r) => !r)}
           >
-            照亮
+            薄弱区
           </button>
           {dualLevel && (
             <div className="dak-heatmap-side-filter" role="radiogroup" aria-label="地图层级">
@@ -192,9 +230,12 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
         <div className="dak-heatmap-legend">
           <span>
             {field.scope.kind === "team" ? field.scope.team : "赛事地图基线"}
-            <small> · {field.scope.roundCount} 长枪局{isDiff ? ` vs 联赛 ${baseline!.scope.roundCount}` : ""}</small>
+            <small> · {field.scope.roundCount} 长枪局{isDiff ? ` vs 赛事基线 ${baseline!.scope.roundCount}` : ""}</small>
           </span>
-          <span className="dak-heatmap-legend-scale">{legend}</span>
+          <span className="dak-heatmap-legend-scale">
+            <i className={weakZones && canShowWeakZones ? "dak-legend-weak" : "dak-legend-radar-field"} />
+            {legend}
+          </span>
         </div>
       </div>
 
@@ -227,7 +268,7 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
             }}
           />
         </label>
-        <span className="dak-radar-time-meta">0-{maxSec}s</span>
+        <span className="dak-radar-time-meta">4x · 0-{maxSec}s</span>
       </div>
     </div>
   );

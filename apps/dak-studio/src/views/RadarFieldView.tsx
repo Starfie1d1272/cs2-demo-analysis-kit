@@ -153,7 +153,7 @@ export function RadarFieldView({ entries, teamRenames = {} }: RadarFieldViewProp
 
       {progress && (
         <div className="stu-notice" role="status">
-          计算覆盖场 {progress.done}/{progress.total} 场（首次较慢，结果已缓存，之后秒开）…
+          计算 {activeMap} 覆盖场 {progress.done}/{progress.total} 场（首次较慢，结果已缓存，之后秒开）…
         </div>
       )}
 

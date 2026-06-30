@@ -637,6 +637,11 @@
 
 .dak-sf-chip:hover { color: var(--dak-fg); border-color: rgba(255,255,255,0.24); }
 
+.dak-sf-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
 .dak-sf-chip-active {
   color: var(--dak-fg);
   border-color: rgba(255,255,255,0.35);
@@ -960,6 +965,21 @@
   height: 6px;
   border-radius: 3px;
   background: linear-gradient(to right, blue, cyan, lime, yellow, red);
+}
+
+.dak-legend-radar-field,
+.dak-legend-weak {
+  width: 44px;
+  height: 6px;
+  border-radius: 999px;
+}
+
+.dak-legend-radar-field {
+  background: linear-gradient(to right, rgb(71,94,180), rgb(45,190,205), rgb(82,218,158), rgb(255,196,77), rgb(255,102,54));
+}
+
+.dak-legend-weak {
+  background: linear-gradient(to right, rgba(255,90,114,0.75), rgba(255,90,114,0.18));
 }
 
 .dak-legend-warm { display: none; }
