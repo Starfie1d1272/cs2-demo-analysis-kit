@@ -6,7 +6,6 @@ import {
   analysisBundleSchema,
   timelineEventSchema,
   economyPointSchema,
-  heatmapPointSchema,
   playerScoreboardRowSchema,
   playerRoundFactSchema,
   mapViewSchema,
