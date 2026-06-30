@@ -5,6 +5,8 @@
  * AssetHealthBanner（自动提醒）和 AssetsPanel（手动管理）共用。
  */
 
+import { useEffect, useState } from "react";
+
 export interface AssetStatus {
   status: "ok" | "not_installed" | "incomplete" | "corrupt";
   noManifest?: boolean;
@@ -34,8 +36,6 @@ export interface NativeAssetApi {
   repair_assets(items: Array<{ type: string; slug?: string; mapName?: string }>): Promise<string>;
   asset_repair_status(jobId: string): Promise<RepairJob | null>;
 }
-
-import { useEffect, useState } from "react";
 
 /** 仅 pywebview 桌面环境可用（同步检查，可能 bridge 尚未 ready）。 */
 export function supportsAssetHealth(): boolean {
