@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { EvidenceLink } from "@cs2dak/react";
 import type { StudioDemoEntry } from "../lib/library";
 
-export type MatchTarget = { roundNumber: number; tick?: number };
+type MatchTarget = { roundNumber: number; tick?: number };
 
 export function EvidenceActions({
   entry,

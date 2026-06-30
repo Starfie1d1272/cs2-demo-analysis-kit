@@ -265,10 +265,7 @@ export function CoachView({
             const entry = entryByMatchId.get(matchId);
             if (entry) onOpenMatch(entry.id, { roundNumber });
           }}
-          onWatchMatch={onWatchDemo ? (matchId, roundNumber) => {
-            const entry = entryByMatchId.get(matchId);
-            if (entry) onWatchDemo(entry.id, { roundNumber });
-          } : undefined}
+          onWatchDemo={onWatchDemo}
         />
       )}
       {!loading && clusters.length > 0 && tab === "anti" && (
@@ -397,14 +394,14 @@ function PlaylistTable({
   onUpdate,
   onRemove,
   onOpenMatch,
-  onWatchMatch,
+  onWatchDemo,
 }: {
   items: PlaylistItem[];
   entryByMatchId: Map<string, StudioDemoEntry>;
   onUpdate: (item: PlaylistItem) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onOpenMatch: (matchId: string, roundNumber: number) => void;
-  onWatchMatch?: (matchId: string, roundNumber: number) => void;
+  onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
 }) {
   const markdown = playlistToMarkdown("备战清单", items);
   if (items.length === 0) {
@@ -425,12 +422,12 @@ function PlaylistTable({
         const entry = entryByMatchId.get(item.matchId);
         return <>
           <button type="button" className="stu-button-sm" onClick={() => onOpenMatch(item.matchId, item.roundNumber)}>回放</button>
-          {entry?.sourceDemPath && onWatchMatch && <button type="button" className="stu-button-sm" onClick={() => onWatchMatch(item.matchId, item.roundNumber)}>进游戏</button>}
+          {entry?.sourceDemPath && onWatchDemo && <button type="button" className="stu-button-sm" onClick={() => onWatchDemo(entry.id, { roundNumber: item.roundNumber })}>进游戏</button>}
           <button type="button" className="stu-button-sm" onClick={() => void onRemove(item.id)}>删除</button>
         </>;
       }
     },
-  ], [entryByMatchId, onUpdate, onOpenMatch, onWatchMatch, onRemove]);
+  ], [entryByMatchId, onUpdate, onOpenMatch, onWatchDemo, onRemove]);
 
   return (
     <div className="stu-card">

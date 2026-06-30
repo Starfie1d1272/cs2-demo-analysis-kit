@@ -46,8 +46,6 @@ export const eventMapSchema = z.object({
 export const rawDemoHintSchema = z.object({
   downloadUrl: z.string().url().nullable().optional(),
   fileName: z.string().nullable().optional(),
-  sha256: z.string().regex(/^[a-fA-F0-9]{64}$/).nullable().optional(),
-  verifiedAt: z.string().datetime().nullable().optional(),
 }).nullable().optional();
 
 export const eventSeriesSchema = z.object({

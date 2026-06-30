@@ -248,13 +248,19 @@ export function LineupView({
               回放
             </EvidenceLink>
             {practiceCommand && (
-              <button type="button" className="stu-button-sm" title={practiceCommand} aria-label="复制练习命令" onClick={() => void handleCopyPractice(c)}>
-                {copiedClusterId === c.id ? "已复制" : "命令"}
+              <button
+                type="button"
+                className="stu-button-sm"
+                title={`复制跑图练习命令：传送到投掷站位并设置视角\n${practiceCommand}`}
+                aria-label="复制跑图练习命令"
+                onClick={() => void handleCopyPractice(c)}
+              >
+                {copiedClusterId === c.id ? "已复制" : "复制命令"}
               </button>
             )}
             {watchThrow && onWatchDemo && (
-              <button type="button" className="stu-button-sm" title="在 CS2 中打开原始 demo" onClick={() => onWatchDemo(watchThrow.entryId, { roundNumber: watchThrow.roundNumber, tick: watchThrow.tick })}>
-                游戏
+              <button type="button" className="stu-button-sm" title="在 CS2 中打开原始 demo，并尝试跳到该投掷 tick" onClick={() => onWatchDemo(watchThrow.entryId, { roundNumber: watchThrow.roundNumber, tick: watchThrow.tick })}>
+                进游戏
               </button>
             )}
           </span>
