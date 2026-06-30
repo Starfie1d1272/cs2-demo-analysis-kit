@@ -582,7 +582,6 @@ export function App() {
             onRebuildFacts={handleRebuildFacts}
             onRebuildStale={handleRebuildStale}
             onRebuildSelected={handleRebuildSelected}
-            onNotice={setNotice}
           />
         )}
         {view === "match" && (

@@ -31,7 +31,6 @@ export interface LibraryViewProps {
   onRebuildStale?: () => void;
   /** 重建选中条目的 facts。 */
   onRebuildSelected?: (ids: string[]) => void;
-  onNotice?: (message: string) => void;
 }
 
 function formatDuration(seconds: number): string {
@@ -64,7 +63,6 @@ export function LibraryView({
   onRebuildFacts,
   onRebuildStale,
   onRebuildSelected,
-  onNotice = () => {}
 }: LibraryViewProps) {
   const [search, setSearch] = useState("");
   const [mapFilter, setMapFilter] = useState<string | null>(null);
