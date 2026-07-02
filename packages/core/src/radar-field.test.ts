@@ -28,6 +28,8 @@ describe("buildMatchRadarField", () => {
       expect(f.denomCt).toHaveLength(f.maxSec);
       expect(f.denomT).toHaveLength(f.maxSec);
       expect(f.fields.ctVis).toHaveLength(f.maxSec);
+      expect(f.fields.ctAim).toHaveLength(f.maxSec);
+      expect(f.fields.ctSound).toHaveLength(f.maxSec);
       expect(f.fields.ctVis[0]!).toHaveLength(f.grid.cells.length);
     }
     // 至少有一个回合被采样（denom 有非零），且有视野/位置计数。
@@ -35,6 +37,8 @@ describe("buildMatchRadarField", () => {
     expect(totalDenom).toBeGreaterThan(0);
     const totalVis = fields.reduce((s, f) => s + f.fields.tPres.reduce((a, row) => a + row.reduce((x, y) => x + y, 0), 0), 0);
     expect(totalVis).toBeGreaterThan(0);
+    const totalSound = fields.reduce((s, f) => s + f.fields.tSound.reduce((a, row) => a + row.reduce((x, y) => x + y, 0), 0), 0);
+    expect(totalSound).toBeGreaterThan(0);
   });
 
   it("aggregateRadarFields 是逐元素加法（联赛基线 = 各贡献之和）", () => {

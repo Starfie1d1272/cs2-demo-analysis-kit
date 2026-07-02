@@ -10,13 +10,14 @@
  * 不符即当未命中重算覆盖（无泄漏）。算法/标定变更 → core 的 RADAR_FIELD_VERSION +1 即可。
  */
 import type { RadarField, RadarFieldBase } from "@cs2dak/contract";
+import { RADAR_FIELD_BASES } from "@cs2dak/contract";
 import { aggregateRadarFields, RADAR_FIELD_VERSION } from "@cs2dak/core";
 import { MAP_CALIBRATION_VERSION } from "@cs2dak/maps";
 import { radarFieldInWorker } from "./library";
 import { getStorage } from "./storage";
 
-const FIELD_BASES: RadarFieldBase[] = ["ctVis", "tVis", "ctPres", "tPres"];
-const SERIAL_FORMAT = 1;
+const FIELD_BASES: readonly RadarFieldBase[] = RADAR_FIELD_BASES;
+const SERIAL_FORMAT = 2;
 const RADAR_FIELD_LOAD_CONCURRENCY = 2;
 
 const fieldBlobs = getStorage().blobs("radar_field");
@@ -29,7 +30,7 @@ function cacheKey(matchId: string, economy: "gun" | "all"): string {
 
 // ── 紧凑二进制序列化 ──
 // [uint32 headerByteLen][header JSON utf8][Int32 payload]
-// payload 逐贡献：denomCt(maxSec) denomT(maxSec) ctVis/tVis/ctPres/tPres(各 maxSec*nCells)
+// payload 逐贡献：denomCt(maxSec) denomT(maxSec) + RADAR_FIELD_BASES(各 maxSec*nCells)
 
 interface SerialHeader {
   fmt: number;
@@ -90,6 +91,7 @@ function deserializeMatchRadarFields(buf: ArrayBuffer): RadarField[] | null {
   if (buf.byteLength < 4) return null;
   const headerLen = new DataView(buf).getUint32(0, true);
   const header = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, headerLen))) as SerialHeader;
+  if (header.fmt !== SERIAL_FORMAT) return null;
   if (header.computeVersion !== RADAR_FIELD_VERSION || header.calibrationVersion !== MAP_CALIBRATION_VERSION) return null;
   if (header.contributions.length === 0) return [];
 

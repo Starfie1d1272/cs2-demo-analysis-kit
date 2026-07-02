@@ -1,19 +1,34 @@
 /**
  * RadarField —— 雷达覆盖场合同（描述性地图控制原语）。
  *
- * 四个「基础场」逐秒 × 逐格存原始计数（不存概率、不存合成视图），因为原始计数是
+ * 「基础场」逐秒 × 逐格存原始计数（不存概率、不存合成视图），因为原始计数是
  * 加性的：合并两个 scope = 四场逐元素相加 + denom 相加。这一条承重墙撑起 per-match
  * 缓存、scope 聚合、队伍−联赛差分、未来价值学习——全是廉价派生。
  *
- * 归一化（count / denom = 该秒该格被看到/占据的回合占比）、信息差分（tVis−ctVis）、
+ * 归一化（count / denom = 该秒该格被看到/占据/听到的采样占比）、信息差分（tVis−ctVis）、
  * 对拼线（min(tVis,ctVis)）、推进波前都在渲染期合成，底层场不污染。
  *
  * 这是 TS 侧计算产物，不跨 Python↔TS 的 v3 ZIP seam，故用手写 interface（非 Zod）。
  * 字段列用 Int32Array：结构化克隆（worker postMessage / IndexedDB）下紧凑且无损。
  */
 
-/** 四个基础场名。Vis = 视野覆盖（视锥∩LOS∩烟）；Pres = 位置占据（最近 nav 格，无 LOS）。 */
-export type RadarFieldBase = "ctVis" | "tVis" | "ctPres" | "tPres";
+/**
+ * 基础场名。
+ * Vis = 4:3 屏幕可见（矩形视锥 ∩ LOS ∩ 烟）；Aim = 准星/注意力覆盖（30°圆锥 ∩ LOS ∩ 烟）；
+ * Pres = 位置占据（最近 nav 格，无 LOS）；Sound = 在该格发声会被对面听到的风险（800u 半径）。
+ */
+export type RadarFieldBase =
+  | "ctVis" | "tVis"
+  | "ctAim" | "tAim"
+  | "ctPres" | "tPres"
+  | "ctSound" | "tSound";
+
+export const RADAR_FIELD_BASES: readonly RadarFieldBase[] = [
+  "ctVis", "tVis",
+  "ctAim", "tAim",
+  "ctPres", "tPres",
+  "ctSound", "tSound",
+] as const;
 
 export interface RadarFieldGrid {
   /** 规则栅格边长（世界单位）。 */
@@ -48,9 +63,9 @@ export interface RadarField {
   /** 采样秒上界（一回合 1:55 = 115s）。 */
   maxSec: number;
   /**
-   * 归一化分母，按 side 分（每回合恰有一个 CT 队、一个 T 队，故 CT/T 观测数可不同）。
-   * denomCt[sec] = scope 内、CT 侧、到达该秒的回合数；ctVis/ctPres 除以它。
-   * denomT 同理给 tVis/tPres。
+   * 归一化分母，按 source side 分。当前计算每秒采样一次：
+   * denomCt[sec] = scope 内、CT 侧、到达该秒的 side-frame 数；ct* 基础场除以它。
+   * denomT 同理给 t* 基础场。
    */
   denomCt: Int32Array;
   denomT: Int32Array;

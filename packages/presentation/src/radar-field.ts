@@ -1,8 +1,9 @@
 /**
  * 雷达场渲染期合成 —— 把 RadarField 的原始计数归一化、按模式合成、可选差分。
  *
- * 纯函数，供 react 画布逐秒调用（scrubber）。底层四基础场不动，所有视图都是这里的派生：
- *   ctVis/tVis/ctPres/tPres = 归一化频率（计数 / 对应 side denom）
+ * 纯函数，供 react 画布逐秒调用（scrubber）。底层基础场不动，所有视图都是这里的派生：
+ *   ctVis/tVis = 4:3 屏幕可见；ctAim/tAim = 30°准星覆盖；
+ *   ctPres/tPres = 位置占据；ctSound/tSound = 发声风险。
  *   info-diff = tVis − ctVis（T 信息优势暖 / CT 预警冷）
  *   contested = min(tVis, ctVis)（双方都看到 = 对拼线 / 真实交火点）
  * 给定 baseline（联赛场）则输出「队伍 − 联赛」偏移（队伍倾向 / 防守漏洞）。
@@ -21,10 +22,14 @@ export interface RadarModeOption {
  * 盲区不单列模式——画视野覆盖、空白即盲区（配合 canvas「照亮模式」读负空间更直观）。
  */
 export const RADAR_FIELD_MODES: RadarModeOption[] = [
-  { value: "ctVis", label: "CT 视野" },
-  { value: "tVis", label: "T 视野" },
+  { value: "ctVis", label: "CT 屏幕可见" },
+  { value: "tVis", label: "T 屏幕可见" },
+  { value: "ctAim", label: "CT 准星覆盖" },
+  { value: "tAim", label: "T 准星覆盖" },
   { value: "ctPres", label: "CT 位置" },
   { value: "tPres", label: "T 位置" },
+  { value: "ctSound", label: "CT 发声风险" },
+  { value: "tSound", label: "T 发声风险" },
   { value: "info-diff", label: "信息差分" },
   { value: "contested", label: "对拼线" },
 ];
@@ -33,8 +38,12 @@ export const RADAR_FIELD_MODES: RadarModeOption[] = [
 const MODE_CAP: Record<RadarFieldMode, number> = {
   ctVis: 0.5,
   tVis: 0.5,
+  ctAim: 0.35,
+  tAim: 0.35,
   ctPres: 0.3,
   tPres: 0.3,
+  ctSound: 1,
+  tSound: 1,
   "info-diff": 0.4,
   contested: 0.3,
 };
@@ -53,7 +62,7 @@ export interface RadarModeFrame {
 function freqAt(field: RadarField, base: RadarFieldBase, sec: number, window: number): Float64Array {
   const nCells = field.grid.cells.length;
   const out = new Float64Array(nCells);
-  const denomArr = base === "ctVis" || base === "ctPres" ? field.denomCt : field.denomT;
+  const denomArr = base.startsWith("ct") ? field.denomCt : field.denomT;
   let denom = 0;
   const lo = Math.max(0, sec - window);
   const hi = Math.min(field.maxSec - 1, sec + window);

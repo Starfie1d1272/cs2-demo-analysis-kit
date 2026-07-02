@@ -25,55 +25,128 @@ const MIN_VISIBLE_MAG = 0.005;
 const MIN_VISIBLE_PRESENCE_MAG = 0.003;
 const WEAK_ZONE_MAX = 0.06;
 
+type Band = [number, string];
+type BandKind = "screen" | "aim" | "presence" | "sound" | "contested";
+
 // 按真实频率分档，而不是按 cap 后透明度硬撑；低频边界也必须可读。
-const HEAT_BANDS: Array<[number, string]> = [
-  [0.005, "52,67,154"],
-  [0.01, "71,94,180"],
-  [0.02, "54,139,210"],
-  [0.04, "45,190,205"],
-  [0.07, "82,218,158"],
-  [0.12, "184,214,94"],
-  [0.2, "255,196,77"],
-  [0.35, "255,132,68"],
-  [1.01, "255,90,114"],
-];
-const CONTESTED_BANDS: Array<[number, string]> = [
-  [0.005, "52,67,154"],
-  [0.01, "71,94,180"],
-  [0.02, "54,139,210"],
-  [0.035, "45,190,205"],
-  [0.05, "82,218,158"],
-  [0.08, "184,214,94"],
-  [0.12, "255,196,77"],
-  [0.2, "255,132,68"],
-  [1.01, "255,102,54"],
-];
-const PRESENCE_BANDS: Array<[number, string]> = [
-  [0.005, "71,94,180"],
-  [0.01, "54,139,210"],
-  [0.02, "45,190,205"],
-  [0.03, "82,218,158"],
-  [0.05, "184,214,94"],
-  [0.08, "255,196,77"],
-  [0.12, "255,132,68"],
-  [1.01, "255,90,114"],
-];
+const BAND_COLORS = [
+  "52,67,154",
+  "71,94,180",
+  "54,139,210",
+  "45,190,205",
+  "82,218,158",
+  "184,214,94",
+  "255,196,77",
+  "255,132,68",
+  "255,90,114",
+] as const;
+
+function band(...limits: number[]): Band[] {
+  return limits.map((limit, index) => [limit, BAND_COLORS[Math.min(index, BAND_COLORS.length - 1)]!]);
+}
+
+const SCREEN_BANDS = band(0.005, 0.015, 0.04, 0.08, 0.14, 0.23, 0.31, 0.5, 1.01);
+const AIM_BANDS = band(0.005, 0.01, 0.03, 0.07, 0.12, 0.2, 0.27, 0.42, 1.01);
+const CONTESTED_BANDS = band(0.005, 0.01, 0.02, 0.06, 0.09, 0.12, 0.15, 0.2, 1.01);
+const PRESENCE_BANDS = band(0.005, 0.01, 0.015, 0.045, 0.065, 0.105, 0.14, 0.25, 1.01);
+const SOUND_BANDS = band(0.05, 0.1, 0.28, 0.35, 0.56, 0.75, 0.85, 0.95, 1.01);
+const DEFAULT_BANDS: Record<BandKind, Band[]> = {
+  screen: SCREEN_BANDS,
+  aim: AIM_BANDS,
+  presence: PRESENCE_BANDS,
+  sound: SOUND_BANDS,
+  contested: CONTESTED_BANDS,
+};
+const MAP_BANDS: Partial<Record<string, Partial<Record<BandKind, Band[]>>>> = {
+  de_ancient: {
+    screen: band(0.005, 0.02, 0.05, 0.085, 0.13, 0.185, 0.23, 0.405, 1.01),
+    aim: band(0.005, 0.015, 0.04, 0.07, 0.11, 0.155, 0.185, 0.325, 1.01),
+    presence: band(0.005, 0.01, 0.015, 0.045, 0.065, 0.11, 0.16, 0.255, 1.01),
+    sound: band(0.05, 0.14, 0.315, 0.335, 0.48, 0.655, 0.77, 0.955, 1.01),
+    contested: band(0.005, 0.01, 0.025, 0.065, 0.09, 0.115, 0.13, 0.16, 1.01),
+  },
+  de_anubis: {
+    screen: band(0.005, 0.015, 0.04, 0.085, 0.155, 0.24, 0.31, 0.475, 1.01),
+    aim: band(0.005, 0.01, 0.03, 0.075, 0.13, 0.2, 0.26, 0.4, 1.01),
+    presence: band(0.005, 0.01, 0.015, 0.045, 0.065, 0.1, 0.125, 0.24, 1.01),
+    sound: band(0.05, 0.08, 0.29, 0.35, 0.57, 0.77, 0.855, 0.98, 1.01),
+    contested: band(0.005, 0.01, 0.02, 0.06, 0.08, 0.11, 0.125, 0.155, 1.01),
+  },
+  de_dust2: {
+    screen: band(0.005, 0.015, 0.05, 0.105, 0.175, 0.265, 0.34, 0.51, 1.01),
+    aim: band(0.005, 0.015, 0.035, 0.085, 0.14, 0.215, 0.28, 0.41, 1.01),
+    presence: band(0.005, 0.01, 0.015, 0.045, 0.065, 0.105, 0.135, 0.205, 1.01),
+    sound: band(0.05, 0.065, 0.26, 0.33, 0.515, 0.71, 0.795, 0.95, 1.01),
+    contested: band(0.005, 0.01, 0.025, 0.065, 0.095, 0.12, 0.135, 0.19, 1.01),
+  },
+  de_inferno: {
+    screen: band(0.005, 0.01, 0.035, 0.095, 0.17, 0.27, 0.345, 0.59, 1.01),
+    aim: band(0.005, 0.01, 0.03, 0.08, 0.135, 0.22, 0.28, 0.485, 1.01),
+    presence: band(0.005, 0.01, 0.015, 0.05, 0.07, 0.115, 0.145, 0.245, 1.01),
+    sound: band(0.05, 0.07, 0.275, 0.345, 0.56, 0.775, 0.885, 0.89, 1.01),
+    contested: band(0.005, 0.01, 0.015, 0.065, 0.095, 0.13, 0.155, 0.195, 1.01),
+  },
+  de_mirage: {
+    screen: band(0.005, 0.015, 0.045, 0.085, 0.145, 0.225, 0.29, 0.475, 1.01),
+    aim: band(0.005, 0.015, 0.035, 0.07, 0.12, 0.19, 0.235, 0.385, 1.01),
+    presence: band(0.005, 0.01, 0.015, 0.045, 0.065, 0.105, 0.135, 0.245, 1.01),
+    sound: band(0.05, 0.14, 0.35, 0.375, 0.545, 0.71, 0.805, 0.93, 1.01),
+    contested: band(0.005, 0.01, 0.02, 0.06, 0.095, 0.135, 0.165, 0.21, 1.01),
+  },
+  de_nuke: {
+    screen: band(0.005, 0.01, 0.03, 0.065, 0.11, 0.2, 0.275, 0.575, 1.01),
+    aim: band(0.005, 0.01, 0.02, 0.055, 0.09, 0.165, 0.225, 0.465, 1.01),
+    presence: band(0.005, 0.01, 0.015, 0.045, 0.06, 0.1, 0.14, 0.275, 1.01),
+    sound: band(0.05, 0.145, 0.425, 0.49, 0.705, 0.84, 0.92, 0.925, 1.01),
+    contested: band(0.005, 0.01, 0.02, 0.05, 0.07, 0.095, 0.11, 0.155, 1.01),
+  },
+  de_overpass: {
+    screen: band(0.005, 0.015, 0.04, 0.085, 0.145, 0.23, 0.31, 0.48, 1.01),
+    aim: band(0.005, 0.015, 0.03, 0.075, 0.12, 0.185, 0.24, 0.39, 1.01),
+    presence: band(0.005, 0.01, 0.015, 0.045, 0.065, 0.11, 0.14, 0.24, 1.01),
+    sound: band(0.05, 0.085, 0.265, 0.31, 0.56, 0.74, 0.845, 0.965, 1.01),
+    contested: band(0.005, 0.01, 0.025, 0.055, 0.08, 0.105, 0.12, 0.155, 1.01),
+  },
+};
 const WEAK_RGB = "255,90,114"; // --dak-danger
 const DIFF_POS_RGB = "255,90,114"; // --dak-danger
 const DIFF_NEG_RGB = "73,182,255"; // --dak-accent-b
 
-function heatBand(mode: RadarFieldMode, mag: number): string {
-  const bands = mode === "ctPres" || mode === "tPres"
-    ? PRESENCE_BANDS
-    : mode === "contested"
-      ? CONTESTED_BANDS
-      : HEAT_BANDS;
+function bandKind(mode: RadarFieldMode): BandKind {
+  if (mode === "ctAim" || mode === "tAim") return "aim";
+  if (mode === "ctPres" || mode === "tPres") return "presence";
+  if (mode === "ctSound" || mode === "tSound") return "sound";
+  if (mode === "contested") return "contested";
+  return "screen";
+}
+
+function bandsForMode(mapName: string, mode: RadarFieldMode): Band[] {
+  const kind = bandKind(mode);
+  return MAP_BANDS[mapName]?.[kind] ?? DEFAULT_BANDS[kind];
+}
+
+function heatBand(mapName: string, mode: RadarFieldMode, mag: number): string {
+  const bands = bandsForMode(mapName, mode);
   for (const [hi, rgb] of bands) if (mag <= hi) return rgb;
   return "255,102,54";
 }
 
 function minVisibleMag(mode: RadarFieldMode): number {
   return mode === "ctPres" || mode === "tPres" ? MIN_VISIBLE_PRESENCE_MAG : MIN_VISIBLE_MAG;
+}
+
+function formatPct(value: number): string {
+  const pct = value * 100;
+  return pct >= 10 ? `${Math.round(pct)}%` : `${Number(pct.toFixed(1))}%`;
+}
+
+function bandLegend(mapName: string, mode: RadarFieldMode): string {
+  return bandsForMode(mapName, mode).slice(0, -1).map(([hi]) => formatPct(hi)).join(" / ");
+}
+
+function formatClock(seconds: number): string {
+  const clamped = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(clamped / 60)}:${String(clamped % 60).padStart(2, "0")}`;
 }
 
 export interface RadarFieldCanvasProps {
@@ -129,7 +202,7 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
     const px2canvas = CANVAS_SIZE / cal.radarSize;
     const blobR = (field.grid.cellSize / cal.scale) * 2.2 * px2canvas;
 
-    const showWeakZones = weakZones && !frame.signed && (mode === "ctVis" || mode === "tVis");
+    const showWeakZones = weakZones && !frame.signed && (mode === "ctVis" || mode === "tVis" || mode === "ctAim" || mode === "tAim");
 
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
     if (showWeakZones) {
@@ -152,7 +225,7 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
       const y = radar.y * px2canvas;
       const t = Math.min(1, mag / frame.cap);
       const op = showWeakZones ? 0.72 - 0.42 * Math.min(1, mag / WEAK_ZONE_MAX) : 0.38 + 0.5 * Math.pow(t, 0.55);
-      const rgb = showWeakZones ? WEAK_RGB : frame.signed ? (v > 0 ? DIFF_POS_RGB : DIFF_NEG_RGB) : heatBand(mode, mag);
+      const rgb = showWeakZones ? WEAK_RGB : frame.signed ? (v > 0 ? DIFF_POS_RGB : DIFF_NEG_RGB) : heatBand(map.name, mode, mag);
       const grd = ctx.createRadialGradient(x, y, 0, x, y, blobR);
       grd.addColorStop(0, `rgba(${rgb},${op.toFixed(2)})`);
       grd.addColorStop(1, `rgba(${rgb},0)`);
@@ -166,7 +239,8 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
 
   const bgUrl = dualLevel && level === "lower" ? map.lowerRadarImageUrl : map.radarImageUrl;
   const sequential = mode !== "info-diff" && !isDiff;
-  const canShowWeakZones = sequential && (mode === "ctVis" || mode === "tVis");
+  const signedLegend = isDiff || mode === "info-diff";
+  const canShowWeakZones = sequential && (mode === "ctVis" || mode === "tVis" || mode === "ctAim" || mode === "tAim");
   const legend = weakZones && canShowWeakZones
     ? "红 = 低频 / 薄弱区（≤6%）"
     : isDiff
@@ -177,7 +251,14 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
           ? "双方都看到 = 对拼线 / 交火点"
           : mode === "ctPres" || mode === "tPres"
             ? "冷 → 热 = 站人频率低 → 高"
-          : "冷 → 热 = 频率低 → 高";
+            : mode === "ctAim" || mode === "tAim"
+              ? "冷 → 热 = 准星覆盖低 → 高"
+              : mode === "ctSound" || mode === "tSound"
+                ? "冷 → 热 = 发声被对面听到概率低 → 高"
+                : "冷 → 热 = 4:3 屏幕可见低 → 高";
+  const legendText = signedLegend || (weakZones && canShowWeakZones) ? legend : `${legend} · 分档 ${bandLegend(map.name, mode)}`;
+  const clock = formatClock(field.maxSec - sec);
+  const endClock = formatClock(field.maxSec - maxSec);
 
   return (
     <div className="dak-heatmap-wrap" aria-label={`${map.name} radar field`}>
@@ -234,7 +315,7 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
           </span>
           <span className="dak-heatmap-legend-scale">
             <i className={weakZones && canShowWeakZones ? "dak-legend-weak" : "dak-legend-radar-field"} />
-            {legend}
+            {legendText}
           </span>
         </div>
       </div>
@@ -256,7 +337,7 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
           {playing ? <Pause size={18} /> : <Play size={18} />}
         </button>
         <label className="dak-radar-time-slider">
-          freeze 后 {sec}s
+          回合时间 {clock}
           <input
             type="range"
             min={0}
@@ -268,7 +349,7 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
             }}
           />
         </label>
-        <span className="dak-radar-time-meta">4x · 0-{maxSec}s</span>
+        <span className="dak-radar-time-meta">4x · 1:55-{endClock}</span>
       </div>
     </div>
   );

@@ -2,16 +2,12 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { RadarField, RadarFieldBase } from "@cs2dak/contract";
+import { RADAR_FIELD_BASES } from "@cs2dak/contract";
 import { RadarFieldCanvas } from "./RadarFieldCanvas";
 
 const maxSec = 115;
 const rows = Array.from({ length: maxSec }, () => new Int32Array([0]));
-const fields: Record<RadarFieldBase, Int32Array[]> = {
-  ctVis: rows,
-  tVis: rows,
-  ctPres: rows,
-  tPres: rows,
-};
+const fields = Object.fromEntries(RADAR_FIELD_BASES.map((base) => [base, rows])) as Record<RadarFieldBase, Int32Array[]>;
 
 const field: RadarField = {
   schemaVersion: 1,
@@ -36,7 +32,8 @@ describe("RadarFieldCanvas", () => {
       }),
     );
     expect(html).toContain("薄弱区");
-    expect(html).toContain("4x · 0-114s");
+    expect(html).toContain("4x · 1:55-0:01");
+    expect(html).toContain("分档");
     expect(html).toContain("赛事地图基线");
   });
 });
