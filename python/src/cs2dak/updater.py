@@ -145,8 +145,9 @@ echo [%date% %time%] start update relay >> "%LOG%"
 rem 等当前进程退出（最多 ~30s）
 set /a tries=0
 :waitloop
-tasklist /FI "PID eq {pid}" 2>nul | find "{pid}" >nul
-if errorlevel 1 goto exited
+set "DAK_PID_FOUND="
+for /f "tokens=1,2 delims=," %%A in ('tasklist /FI "PID eq {pid}" /FO CSV /NH 2^>nul') do if "%%~B"=="{pid}" set "DAK_PID_FOUND=1"
+if not defined DAK_PID_FOUND goto exited
 set /a tries+=1
 if %tries% geq 60 goto exited
 timeout /t 1 /nobreak >nul
@@ -228,11 +229,11 @@ def apply_windows_update(
 
     import subprocess
 
-    DETACHED = 0x00000008  # DETACHED_PROCESS
+    NO_WINDOW = 0x08000000  # CREATE_NO_WINDOW
     NEW_GROUP = 0x00000200  # CREATE_NEW_PROCESS_GROUP
     subprocess.Popen(  # noqa: S603 - 受控本地脚本
         ["cmd", "/c", str(bat_path)],
-        creationflags=DETACHED | NEW_GROUP,
+        creationflags=NO_WINDOW | NEW_GROUP,
         close_fds=True,
         cwd=str(stage_root),
     )

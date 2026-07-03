@@ -107,6 +107,8 @@ def test_relaunch_bat_mentions_pid_and_paths(tmp_path: Path) -> None:
     assert "userdata" in bat  # 便携式数据搬迁
     assert "assets" in bat and "cache" in bat and "updates" in bat
     assert "apply-update.log" in bat
+    assert "| find" not in bat
+    assert "DAK_PID_FOUND" in bat and "/FO CSV" in bat
     assert ":moveold" in bat and ":movenew" in bat
     assert "old move failed, restart existing app" in bat
     assert "del " in bat  # 自删脚本
@@ -137,3 +139,5 @@ def test_apply_windows_update_launches_relay_from_stage_root(tmp_path: Path, mon
     assert calls
     assert calls[0]["args"] == ["cmd", "/c", str(bat_path)]
     assert calls[0]["cwd"] == str(stage_root)
+    assert calls[0]["creationflags"] & 0x08000000  # CREATE_NO_WINDOW
+    assert not calls[0]["creationflags"] & 0x00000008  # DETACHED_PROCESS
