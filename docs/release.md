@@ -14,7 +14,26 @@ Changesets 管理的公共包。
 ## 桌面应用发布（vX.Y.Z）
 
 1. 确认 main 上 CI 全绿；
-2. 在根 `CHANGELOG.md` 维护本次桌面版本段，并确认能被发版 CI 抽取：
+2. 先确认本次 release 覆盖范围。`CHANGELOG.md` 必须按上一个桌面 tag 到当前
+   release commit 的完整提交归纳，不按当前对话或单个任务记忆写：
+
+   ```bash
+   PREV=v0.7.6
+   git fetch origin --tags
+   git log --oneline "$PREV"..HEAD
+   git diff --stat "$PREV"..HEAD
+   ```
+
+3. 在根 `CHANGELOG.md` 维护本次桌面版本段，并确认能被发版 CI 抽取：
+
+   Changelog 维护规则：
+
+   - 只写用户、安装/更新、集成方或维护者实际会感知的变化；纯过程 commit、临时探针、
+     WIP 修补和没有行为差异的机械改动不单列。
+   - 多个提交属于同一体验或同一问题时合并成一条，按结果写，不按提交历史逐条抄。
+   - 用户可见的新能力放「新增」，体验/口径/布局变化放「变更」，bug、兼容性、
+     性能与缓存失效放「修复」，测试瘦身、删除死代码、脚本整理等放「内部与维护」。
+   - 每条用用户能理解的名词开头，说明影响面和结果；避免写“调整若干文件”“继续优化”这类过程话。
 
    ```bash
    VERSION=0.2.0
@@ -30,14 +49,14 @@ Changesets 管理的公共包。
    grep -q '[^[:space:]]' /tmp/changelog-notes.txt
    ```
 
-3. 同步版本号并提交：
+4. 同步版本号并提交：
 
    ```bash
    node scripts/sync-version.mjs 0.2.0
    git commit -am "chore(release): 0.2.0"
    ```
 
-4. 打 tag 推送，Release CI 自动构建并发布：
+5. 打 tag 推送，Release CI 自动构建并发布：
 
    ```bash
    git tag v0.2.0
@@ -49,7 +68,7 @@ Changesets 管理的公共包。
    `dak-studio-windows-X.Y.Z-full.zip`、`dak-studio-windows-X.Y.Z.zip`。
    纯导出器 cs2dak 不进 Release。
 
-5. 发布后无需额外通知。Release CI 会随产物生成 `latest.json` 更新 manifest，
+6. 发布后无需额外通知。Release CI 会随产物生成 `latest.json` 更新 manifest，
    同时发到 GitHub Release **并上传到 Cloudflare R2**
    （`R2_*` secrets，`aws s3 cp --endpoint-url`）。DAK Studio 启动时按
    **R2 → GitHub → ghproxy** 顺序拉取 manifest（失败转移，绕开 `api.github.com`），
