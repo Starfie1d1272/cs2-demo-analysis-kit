@@ -594,6 +594,20 @@
   overflow: hidden;
 }
 
+.dak-radar-field-map {
+  background-color: #0f151d;
+}
+
+.dak-radar-field-map::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
 /* ── Heatmap wrap: vertical layout (filters / radar / tuning) ── */
 .dak-heatmap-wrap {
   display: flex;
@@ -975,11 +989,11 @@
 }
 
 .dak-legend-radar-field {
-  background: linear-gradient(to right, rgb(71,94,180), rgb(45,190,205), rgb(82,218,158), rgb(255,196,77), rgb(255,102,54));
+  background: linear-gradient(to right, rgb(34,47,86), rgb(48,91,145), rgb(48,145,176), rgb(103,188,146), rgb(220,174,82), rgb(245,128,86));
 }
 
 .dak-legend-weak {
-  background: linear-gradient(to right, rgba(255,90,114,0.75), rgba(255,90,114,0.18));
+  background: linear-gradient(to right, rgba(255,116,96,0.62), rgba(255,116,96,0.16));
 }
 
 .dak-legend-warm { display: none; }

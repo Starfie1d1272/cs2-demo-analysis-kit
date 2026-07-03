@@ -30,16 +30,16 @@ type BandKind = "screen" | "aim" | "presence" | "sound" | "contested";
 
 // 按去 0 后的真实 decile 分档；低频边界是控图的主要信息。
 const BAND_COLORS = [
-  "52,67,154",
-  "71,94,180",
-  "54,139,210",
-  "45,190,205",
-  "82,218,158",
-  "184,214,94",
-  "255,196,77",
-  "255,132,68",
-  "255,90,114",
-  "255,54,94",
+  "34,47,86",
+  "42,67,115",
+  "48,91,145",
+  "50,118,165",
+  "48,145,176",
+  "64,170,170",
+  "103,188,146",
+  "166,195,104",
+  "220,174,82",
+  "245,128,86",
 ] as const;
 
 function band(...limits: number[]): Band[] {
@@ -109,7 +109,7 @@ const MAP_BANDS: Partial<Record<string, Partial<Record<BandKind, Band[]>>>> = {
     contested: band(0.003, 0.006, 0.01, 0.015, 0.021, 0.029, 0.039, 0.053, 0.077, 1.01),
   },
 };
-const WEAK_RGB = "255,90,114"; // --dak-danger
+const WEAK_RGB = "255,116,96";
 const DIFF_POS_RGB = "255,90,114"; // --dak-danger
 const DIFF_NEG_RGB = "73,182,255"; // --dak-accent-b
 
@@ -134,15 +134,6 @@ function heatBand(mapName: string, mode: RadarFieldMode, mag: number): string {
 
 function minVisibleMag(mode: RadarFieldMode): number {
   return mode === "ctPres" || mode === "tPres" ? MIN_VISIBLE_PRESENCE_MAG : MIN_VISIBLE_MAG;
-}
-
-function formatPct(value: number): string {
-  const pct = value * 100;
-  return pct >= 10 ? `${Math.round(pct)}%` : `${Number(pct.toFixed(1))}%`;
-}
-
-function bandLegend(mapName: string, mode: RadarFieldMode): string {
-  return bandsForMode(mapName, mode).slice(0, -1).map(([hi]) => formatPct(hi)).join(" / ");
 }
 
 function formatClock(seconds: number): string {
@@ -201,17 +192,17 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
     const frame = radarModeFrame(field, baseline, mode, sec);
     const cells = field.grid.cells;
     const px2canvas = CANVAS_SIZE / cal.radarSize;
-    const blobR = (field.grid.cellSize / cal.scale) * 2.2 * px2canvas;
+    const blobR = (field.grid.cellSize / cal.scale) * 1.35 * px2canvas;
 
     const showWeakZones = weakZones && !frame.signed && (mode === "ctVis" || mode === "tVis" || mode === "ctAim" || mode === "tAim");
 
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
     if (showWeakZones) {
       ctx.globalCompositeOperation = "source-over";
-      ctx.fillStyle = "rgba(8,11,16,0.72)";
+      ctx.fillStyle = "rgba(8,11,16,0.38)";
       ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
     }
-    ctx.globalCompositeOperation = frame.signed || showWeakZones ? "source-over" : "lighter";
+    ctx.globalCompositeOperation = "source-over";
 
     for (let g = 0; g < cells.length; g++) {
       const v = frame.values[g]!;
@@ -225,7 +216,7 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
       const x = radar.x * px2canvas;
       const y = radar.y * px2canvas;
       const t = Math.min(1, mag / frame.cap);
-      const op = showWeakZones ? 0.72 - 0.42 * Math.min(1, mag / WEAK_ZONE_MAX) : 0.38 + 0.5 * Math.pow(t, 0.55);
+      const op = showWeakZones ? 0.44 - 0.26 * Math.min(1, mag / WEAK_ZONE_MAX) : 0.12 + 0.36 * Math.pow(t, 0.72);
       const rgb = showWeakZones ? WEAK_RGB : frame.signed ? (v > 0 ? DIFF_POS_RGB : DIFF_NEG_RGB) : heatBand(map.name, mode, mag);
       const grd = ctx.createRadialGradient(x, y, 0, x, y, blobR);
       grd.addColorStop(0, `rgba(${rgb},${op.toFixed(2)})`);
@@ -240,10 +231,9 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
 
   const bgUrl = dualLevel && level === "lower" ? map.lowerRadarImageUrl : map.radarImageUrl;
   const sequential = mode !== "info-diff" && !isDiff;
-  const signedLegend = isDiff || mode === "info-diff";
   const canShowWeakZones = sequential && (mode === "ctVis" || mode === "tVis" || mode === "ctAim" || mode === "tAim");
   const legend = weakZones && canShowWeakZones
-    ? "红 = 低频 / 薄弱区（≤6%）"
+    ? "红 = 低覆盖区域"
     : isDiff
       ? "红 = 高于赛事基线 · 蓝 = 低于基线"
       : mode === "info-diff"
@@ -257,7 +247,7 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
               : mode === "ctSound" || mode === "tSound"
                 ? "冷 → 热 = 发声被对面听到概率低 → 高"
                 : "冷 → 热 = 4:3 屏幕可见低 → 高";
-  const legendText = signedLegend || (weakZones && canShowWeakZones) ? legend : `${legend} · 分档 ${bandLegend(map.name, mode)}`;
+  const legendText = legend;
   const clock = formatClock(field.maxSec - sec);
   const endClock = formatClock(field.maxSec - maxSec);
 
@@ -306,7 +296,7 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
         </div>
       </div>
 
-      <div className="dak-heatmap" style={bgUrl ? { backgroundImage: `url(${bgUrl})` } : undefined}>
+      <div className="dak-heatmap dak-radar-field-map" style={bgUrl ? { backgroundImage: `url(${bgUrl})` } : undefined}>
         <canvas ref={canvasRef} className="dak-heatmap-canvas" aria-hidden="true" />
         {!calibration && <div className="dak-heatmap-empty">该地图暂无雷达标定</div>}
         <div className="dak-heatmap-legend">

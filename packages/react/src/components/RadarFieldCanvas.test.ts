@@ -33,7 +33,7 @@ describe("RadarFieldCanvas", () => {
     );
     expect(html).toContain("薄弱区");
     expect(html).toContain("4x · 1:55-0:01");
-    expect(html).toContain("分档");
+    expect(html).toContain("冷 → 热 = 4:3 屏幕可见低 → 高");
     expect(html).toContain("赛事地图基线");
   });
 });
