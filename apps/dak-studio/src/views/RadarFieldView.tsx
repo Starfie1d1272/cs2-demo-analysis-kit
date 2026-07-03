@@ -10,7 +10,7 @@ import { getMapCalibration } from "@cs2dak/maps";
 import type { RadarField } from "@cs2dak/contract";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { StudioDemoEntry } from "../lib/library";
-import { buildScopeRadarField } from "../lib/radar-field";
+import { buildScopeRadarFields } from "../lib/radar-field";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
 
 export interface RadarFieldViewProps {
@@ -69,31 +69,35 @@ export function RadarFieldView({ entries, teamRenames = {} }: RadarFieldViewProp
       return;
     }
     const token = ++reqToken.current;
+    const abort = new AbortController();
     const matchIds = entriesOfMap.map((e) => e.id);
     const isTeam = scopeSel !== LEAGUE;
     setProgress({ done: 0, total: matchIds.length });
 
     void (async () => {
-      const league = await buildScopeRadarField({
-        matchIds,
-        scope: { kind: "league", team: null },
-        onProgress: (done, total) => {
-          if (token === reqToken.current) setProgress({ done, total });
-        },
-      });
-      let team: RadarField | null = null;
-      if (isTeam) {
-        team = await buildScopeRadarField({
+      try {
+        const { league, team } = await buildScopeRadarFields({
           matchIds,
-          scope: { kind: "team", team: scopeSel },
-          includeTeam: (raw) => displayTeamName(raw, teamRenames) === scopeSel,
+          team: isTeam
+            ? { name: scopeSel, includeTeam: (raw) => displayTeamName(raw, teamRenames) === scopeSel }
+            : undefined,
+          signal: abort.signal,
+          onProgress: (done, total) => {
+            if (token === reqToken.current && !abort.signal.aborted) setProgress({ done, total });
+          },
         });
+        if (token !== reqToken.current || abort.signal.aborted) return;
+        setField(team ?? league);
+        setBaseline(team ? league : null);
+        setProgress(null);
+      } catch {
+        if (token !== reqToken.current || abort.signal.aborted) return;
+        setField(null);
+        setBaseline(null);
+        setProgress(null);
       }
-      if (token !== reqToken.current) return;
-      setField(team ?? league);
-      setBaseline(team ? league : null);
-      setProgress(null);
     })();
+    return () => abort.abort();
   }, [activeMap, scopeSel, entriesOfMap, teamRenames]);
 
   if (maps.length === 0) {

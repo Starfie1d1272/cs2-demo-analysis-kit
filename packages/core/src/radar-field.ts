@@ -164,28 +164,6 @@ function smokeBlocksActiveRay(smokes: SmokeGrenade[], from: Vec3, to: Vec3): boo
   return false;
 }
 
-function targetVector(viewer: ActiveViewer, target: Vec3): { dx: number; dy: number; dz: number; distSq: number; forward: number } | null {
-  const dx = target.x - viewer.eye.x;
-  const dy = target.y - viewer.eye.y;
-  const dz = target.z - viewer.eye.z;
-  const distSq = dx * dx + dy * dy + dz * dz;
-  if (distSq <= 1e-6 || distSq > MAX_DIST_SQ) return null;
-  const forward = viewer.fx * dx + viewer.fy * dy + viewer.fz * dz;
-  return forward > 0 ? { dx, dy, dz, distSq, forward } : null;
-}
-
-function insideScreen4x3(viewer: ActiveViewer, target: Vec3): { dx: number; dy: number; dz: number; distSq: number; forward: number } | null {
-  const v = targetVector(viewer, target);
-  if (!v) return null;
-  const x = viewer.rx * v.dx + viewer.ry * v.dy;
-  const y = viewer.ux * v.dx + viewer.uy * v.dy + viewer.uz * v.dz;
-  return Math.abs(x) <= v.forward * SCREEN_4X3_TAN_H && Math.abs(y) <= v.forward * SCREEN_4X3_TAN_V ? v : null;
-}
-
-function insideAimCone(v: { distSq: number; forward: number }): boolean {
-  return v.forward * v.forward >= AIM_CONE_COS * AIM_CONE_COS * v.distSq;
-}
-
 export interface BuildMatchRadarFieldOptions {
   matchId: string;
   grid: RadarFieldGridIndex;
@@ -208,8 +186,24 @@ export function buildMatchRadarField(pkg: DemoPackage, options: BuildMatchRadarF
   const nCells = grid.cells.length;
   const { coordScale, angleScale, sampleRate, tickrate } = replay.meta;
 
-  // 预算每格的视线目标点（含靶高）。
-  const targets: Vec3[] = grid.cells.map(([x, y, z]) => ({ x, y, z: z + TARGET_HEIGHT }));
+  // 预算每格的坐标；每个采样帧会重复扫，避免在热循环里拆 tuple / 建对象。
+  const targets: Vec3[] = new Array(nCells);
+  const targetX = new Float64Array(nCells);
+  const targetY = new Float64Array(nCells);
+  const targetZ = new Float64Array(nCells);
+  for (let g = 0; g < nCells; g++) {
+    const [x, y, z] = grid.cells[g]!;
+    const target = { x, y, z: z + TARGET_HEIGHT };
+    targets[g] = target;
+    targetX[g] = target.x;
+    targetY[g] = target.y;
+    targetZ[g] = target.z;
+  }
+  const aimConeCosSq = AIM_CONE_COS * AIM_CONE_COS;
+  const presenceSeen = new Uint32Array(nCells);
+  const soundAliveX = new Float64Array(Math.max(1, pkg.players.length));
+  const soundAliveY = new Float64Array(Math.max(1, pkg.players.length));
+  let presenceSeq = 0;
 
   const teamKeyByIndex = pkg.players.map((p) => p.teamKey);
   const roundMeta = new Map(pkg.rounds.map((r) => [r.roundNumber, r]));
@@ -231,26 +225,47 @@ export function buildMatchRadarField(pkg: DemoPackage, options: BuildMatchRadarF
     const activeViewers = activeViewersAt(viewers, i);
     if (activeViewers.length === 0) return;
     for (let g = 0; g < nCells; g++) {
-      const target = targets[g]!;
+      const tx = targetX[g]!;
+      const ty = targetY[g]!;
+      const tz = targetZ[g]!;
       for (const viewer of activeViewers) {
-        const view = insideScreen4x3(viewer, target);
-        if (!view) continue;
-        if (activeSmokes.length > 0 && smokeBlocksActiveRay(activeSmokes, viewer.eye, target)) continue;
-        if (bvh && !staticLineOfSight(bvh, viewer.eye, target)) continue;
+        const eye = viewer.eye;
+        const dx = tx - eye.x;
+        const dy = ty - eye.y;
+        const dz = tz - eye.z;
+        const distSq = dx * dx + dy * dy + dz * dz;
+        if (distSq <= 1e-6 || distSq > MAX_DIST_SQ) continue;
+        const forward = viewer.fx * dx + viewer.fy * dy + viewer.fz * dz;
+        if (forward <= 0) continue;
+        const screenX = viewer.rx * dx + viewer.ry * dy;
+        if (Math.abs(screenX) > forward * SCREEN_4X3_TAN_H) continue;
+        const screenY = viewer.ux * dx + viewer.uy * dy + viewer.uz * dz;
+        if (Math.abs(screenY) > forward * SCREEN_4X3_TAN_V) continue;
+        const target = targets[g]!;
+        if (activeSmokes.length > 0 && smokeBlocksActiveRay(activeSmokes, eye, target)) continue;
+        if (bvh && !staticLineOfSight(bvh, eye, target)) continue;
         screenOut[g]! += 1;
-        if (insideAimCone(view)) aimOut[g]! += 1;
+        if (forward * forward >= aimConeCosSq * distSq) aimOut[g]! += 1;
         break;
       }
     }
   };
 
   const markSoundRisk = (listeners: Track[], i: number, out: Int32Array) => {
-    const alive: Array<[number, number]> = [];
-    for (const p of listeners) if ((p.hp[i] ?? 0) > 0) alive.push([p.x[i]!, p.y[i]!]);
-    if (alive.length === 0) return;
+    let alive = 0;
+    for (const p of listeners) {
+      if ((p.hp[i] ?? 0) <= 0) continue;
+      soundAliveX[alive] = p.x[i]!;
+      soundAliveY[alive] = p.y[i]!;
+      alive += 1;
+    }
+    if (alive === 0) return;
     for (let g = 0; g < nCells; g++) {
-      const [x, y] = grid.cells[g]!;
-      for (const [lx, ly] of alive) {
+      const x = targetX[g]!;
+      const y = targetY[g]!;
+      for (let j = 0; j < alive; j++) {
+        const lx = soundAliveX[j]!;
+        const ly = soundAliveY[j]!;
         const dx = x - lx, dy = y - ly;
         if (dx * dx + dy * dy <= SOUND_RADIUS_SQ) {
           out[g]! += 1;
@@ -261,13 +276,15 @@ export function buildMatchRadarField(pkg: DemoPackage, options: BuildMatchRadarF
   };
 
   const markPresence = (players: Track[], i: number, out: Int32Array) => {
-    const hit = new Set<number>();
+    const stamp = ++presenceSeq;
     for (const p of players) {
       if ((p.hp[i] ?? 0) <= 0) continue;
       const idx = radarFieldCellAt(grid, p.x[i] ?? 0, p.y[i] ?? 0);
-      if (idx >= 0) hit.add(idx);
+      if (idx >= 0 && presenceSeen[idx] !== stamp) {
+        presenceSeen[idx] = stamp;
+        out[idx]! += 1;
+      }
     }
-    for (const idx of hit) out[idx]! += 1;
   };
 
   for (const rr of replay.rounds) {

@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 import { buildRadarFieldGrid } from "@cs2dak/maps";
-import type { DemoPackage } from "@cs2dak/contract";
+import { RADAR_FIELD_BASES, type DemoPackage } from "@cs2dak/contract";
 import { loadDemoPackageFromZip } from "./loader.js";
 import { buildMatchRadarField, aggregateRadarFields } from "./radar-field.js";
 
@@ -14,6 +15,21 @@ beforeAll(async () => {
   );
   pkg = await loadDemoPackageFromZip(zip);
 });
+
+function radarFieldDigest(fields: ReturnType<typeof buildMatchRadarField>): string {
+  const hash = createHash("sha256");
+  for (const field of fields) {
+    hash.update(field.scope.team ?? "");
+    hash.update(Buffer.from(field.denomCt.buffer, field.denomCt.byteOffset, field.denomCt.byteLength));
+    hash.update(Buffer.from(field.denomT.buffer, field.denomT.byteOffset, field.denomT.byteLength));
+    for (const base of RADAR_FIELD_BASES) {
+      for (const row of field.fields[base]) {
+        hash.update(Buffer.from(row.buffer, row.byteOffset, row.byteLength));
+      }
+    }
+  }
+  return hash.digest("hex");
+}
 
 describe("buildMatchRadarField", () => {
   it("每场产出两份按队归属的加性场贡献", () => {
@@ -39,6 +55,12 @@ describe("buildMatchRadarField", () => {
     expect(totalVis).toBeGreaterThan(0);
     const totalSound = fields.reduce((s, f) => s + f.fields.tSound.reduce((a, row) => a + row.reduce((x, y) => x + y, 0), 0), 0);
     expect(totalSound).toBeGreaterThan(0);
+  });
+
+  it("sample 输出指纹保持稳定", () => {
+    const grid = buildRadarFieldGrid("de_ancient")!;
+    const fields = buildMatchRadarField(pkg, { matchId: "snapshot", grid, bvh: null });
+    expect(radarFieldDigest(fields)).toBe("0405c90078d54c7ce4a391a1140a9cf2dc6bd3c9a28b4aace3be5d5be3bc8319");
   });
 
   it("aggregateRadarFields 是逐元素加法（联赛基线 = 各贡献之和）", () => {
