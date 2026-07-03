@@ -18,12 +18,15 @@ Changesets 管理的公共包。
 
    ```bash
    VERSION=0.2.0
-   awk -v ver="$VERSION" '
-     BEGIN { in_section=0 }
-     $0 ~ "^## \\[" ver "\\]" { in_section=1; next }
-     in_section && /^## \[/ { exit }
-     in_section { print }
-   ' CHANGELOG.md | tee /tmp/changelog-notes.txt
+   VERSION="$VERSION" node - <<'NODE' | tee /tmp/changelog-notes.txt
+   const fs = require("node:fs");
+   const version = process.env.VERSION;
+   const text = fs.readFileSync("CHANGELOG.md", "utf8");
+   const escaped = version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+   const match = text.match(new RegExp(`^## \\\\[${escaped}\\\\].*\\\\n([\\\\s\\\\S]*?)(?=^## \\\\[|\\\\z)`, "m"));
+   if (!match || !match[1].trim()) process.exit(1);
+   process.stdout.write(match[1]);
+   NODE
    grep -q '[^[:space:]]' /tmp/changelog-notes.txt
    ```
 
