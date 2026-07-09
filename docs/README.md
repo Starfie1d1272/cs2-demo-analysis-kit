@@ -20,6 +20,11 @@
 - [HLTV Rating 3.0 科隆参考表](research/hltv-rating-3.0-iem-cologne-major-2026.md)：外部评分对照数据，供后续 RR 校准参考。
 - [地图控制数据模型](research/map-control-model.md)：四层控制 / T·CT 语义不对称 / 雷达场→区域→解释 / 真实数据可行性（活文档）。
 
+## 产品发现与决策
+
+- [Discovery Inbox](product/discovery-inbox.md)：开发中发现但本轮不做的 Invalidation / Improvement / Idea。
+- [Decision Log](decisions/)：影响产品方向、模块边界、数据口径或发布策略的重要决定。
+
 ## 功能模块设计
 
 - [赛事资源包](design/event-packages.md)：Event Package 格式、Gallery 与 Maker 工作流。

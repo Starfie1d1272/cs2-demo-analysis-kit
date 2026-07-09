@@ -112,6 +112,13 @@ docs/                  # 架构与集成文档（索引见 docs/README.md）
 为准。新增、迁移或删除功能前必须先确定唯一 owner；允许删除违反该边界的旧 API，
 不得为错误职责长期维护兼容层。
 
+### 工作流分流
+
+- 中大型实现任务（跨文件、改变产品行为、可能引出设计判断）使用全局 `$delivery-task`；小修、只读审计和纯讨论不强套流程。
+- 设计文档是当前假设，改动前先核真实代码、数据合同和现有入口；如果实现证据推翻原假设，先显式决策再扩 scope。
+- 开发中发现的新内容先分类：Blocker 立即处理；Invalidation 暂停决策；Improvement / New Idea 记录到 [`docs/product/discovery-inbox.md`](docs/product/discovery-inbox.md)。
+- 影响产品方向、模块边界、数据口径或发布策略的决定记录到 [`docs/decisions/`](docs/decisions/)。
+
 ## 4. Conventions
 
 - **Python**：uv 管理依赖，`ruff` lint。禁止装系统 python / conda base。`uv run` 跑脚本
