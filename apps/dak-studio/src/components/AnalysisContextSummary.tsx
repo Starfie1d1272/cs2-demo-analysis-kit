@@ -6,10 +6,12 @@ export function AnalysisContextSummary({
   context,
   entries,
   events,
+  onEdit,
 }: {
   context: AnalysisContext;
   entries: readonly StudioDemoEntry[];
   events: readonly AnalysisEventScope[];
+  onEdit?: () => void;
 }) {
   const summary = summarizeAnalysisContextParts(context, entries, events);
   return (
@@ -19,6 +21,7 @@ export function AnalysisContextSummary({
       {summary.roles && <span><small>关系</small>{summary.roles}</span>}
       <span><small>基线</small>{summary.baseline}</span>
       <span><small>目标</small>{summary.goal}</span>
+      {onEdit && <button type="button" className="stu-context-edit" onClick={onEdit}>修改</button>}
     </div>
   );
 }
