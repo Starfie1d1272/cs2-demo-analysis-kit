@@ -184,6 +184,26 @@ body {
   font-size: 12px;
 }
 
+@media (max-height: 800px) {
+  .stu-sidebar {
+    gap: 6px;
+    padding-block: 10px;
+  }
+
+  .stu-sidebar-foot {
+    margin-top: 0;
+    padding: 6px 0 0;
+  }
+
+  .stu-sidebar-foot > span,
+  .stu-sidebar-foot > small,
+  .stu-sidebar-foot > label,
+  .stu-sidebar-foot > .stu-foot-actions,
+  .stu-sidebar-foot > .stu-update-control {
+    display: none;
+  }
+}
+
 .stu-sidebar-foot small {
   display: block;
   color: var(--dak-fg-dim);
