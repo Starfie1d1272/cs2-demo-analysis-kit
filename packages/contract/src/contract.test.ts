@@ -24,6 +24,7 @@ import {
   mapViewSchema,
   analysisProvenanceSchema,
   analysisBundleSchema,
+  evidenceRefSchema,
   // cohort
   seasonCohortBundleSchema,
   // workspace
@@ -34,6 +35,13 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 // 复用 fixtures
 // ─────────────────────────────────────────────────────────────────────────────
+
+describe("evidenceRefSchema", () => {
+  it("requires a human-readable reason", () => {
+    expect(evidenceRefSchema.safeParse({ matchId: "m1", roundNumber: 12, reason: "复核该回合的首死" }).success).toBe(true);
+    expect(evidenceRefSchema.safeParse({ matchId: "m1", roundNumber: 12 }).success).toBe(false);
+  });
+});
 
 const qaReport = {
   ok: true,

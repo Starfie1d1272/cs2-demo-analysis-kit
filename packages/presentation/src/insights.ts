@@ -1,4 +1,4 @@
-import type { DemoPackage, MatchWorkspaceModel, TeamKey } from "@cs2dak/contract";
+import type { DemoPackage, EvidenceRef, MatchWorkspaceModel, TeamKey } from "@cs2dak/contract";
 import { derivePlayerMechanics, type PlayerMechanicsFact } from "@cs2dak/core";
 import type { TriangleBvh } from "@cs2dak/maps";
 import { round } from "./season-metrics.js";
@@ -37,19 +37,13 @@ export interface PlayerTrendPoint {
 
 // ── Flash Value ─────────────────────────────────────────────────────────────
 
-export interface TeamFlashIncident {
-  matchId: string;
-  roundNumber: number;
-  tick?: number;
+export interface TeamFlashIncident extends EvidenceRef {
   victimCount: number;
   totalSeconds: number;
 }
 
 /** 单颗（按 flashId 归并）致盲敌方的闪光事件，含同颗队闪秒数与净收益。 */
-export interface EnemyFlashIncident {
-  matchId: string;
-  roundNumber: number;
-  tick?: number;
+export interface EnemyFlashIncident extends EvidenceRef {
   /** 被这颗闪致盲的敌方人数。 */
   victimCount: number;
   /** 这颗闪致盲敌方总秒数。 */
@@ -79,10 +73,7 @@ export interface FlashValueSummary {
 
 // ── Mistake Review ──────────────────────────────────────────────────────────
 
-export interface MistakeEvidence {
-  matchId: string;
-  roundNumber: number;
-  tick?: number;
+export interface MistakeEvidence extends EvidenceRef {
   detail: string;
 }
 
@@ -185,11 +176,8 @@ export interface UtilityValueRow {
   smokesPerRound: number | null;
 }
 
-export interface UtilityDamageEvidence {
+export interface UtilityDamageEvidence extends EvidenceRef {
   kind: UtilityDamageKind;
-  matchId: string;
-  roundNumber: number;
-  tick?: number;
   playerId?: string;
   playerName: string;
   victimCount: number;
@@ -361,6 +349,8 @@ export function buildUtilityValueSummary(
         matchId,
         roundNumber: cell.roundNumber,
         tick: cell.tick,
+        reason: "该闪光造成的敌方致盲时间位于当前样本前列",
+        role: "example",
         victimCount: cell.victims.size,
         enemySeconds: round(cell.enemySeconds, 2),
         teamSeconds: round(cell.teamSeconds, 2),
@@ -391,6 +381,8 @@ export function buildUtilityValueSummary(
           matchId,
           roundNumber: damage.roundNumber,
           tick: damage.tick,
+          reason: `${kind === "he" ? "HE 手雷" : "火焰"}伤害事件位于当前样本前列`,
+          role: "example",
           playerId: player.playerKey,
           playerName: player.name,
           victimCount: 0,
@@ -579,6 +571,8 @@ export function buildPlayerSeasonInsights(
         matchId,
         roundNumber: cell.roundNumber,
         tick: cell.tick,
+        reason: "该闪光误盲队友的时长位于当前样本前列",
+        role: "example",
         victimCount: cell.victims.size,
         totalSeconds: round(cell.seconds, 2)
       });
@@ -606,6 +600,8 @@ export function buildPlayerSeasonInsights(
         matchId,
         roundNumber: cell.roundNumber,
         tick: cell.tick,
+        reason: "该闪光造成的敌方致盲时间位于当前样本前列",
+        role: "example",
         victimCount: cell.victims.size,
         enemySeconds: round(cell.seconds, 2),
         teamSeconds: round(teamSeconds, 2),
@@ -652,15 +648,15 @@ export function buildPlayerSeasonInsights(
       if (isAntiEco) antiEco.attempts += 1;
       if (meFirstDead && isLowBuy) {
         lowBuy.count += 1;
-        lowBuy.evidence.push({ matchId, roundNumber, tick: firstDeath.tick, detail: `${economy} 局首死` });
+        lowBuy.evidence.push({ matchId, roundNumber, tick: firstDeath.tick, detail: `${economy} 局首死`, reason: `${economy} 局首死`, role: "example" });
       }
       if (meFirstDead && isFullBuy) {
         fullBuy.count += 1;
-        fullBuy.evidence.push({ matchId, roundNumber, tick: firstDeath.tick, detail: "长枪局首死" });
+        fullBuy.evidence.push({ matchId, roundNumber, tick: firstDeath.tick, detail: "长枪局首死", reason: "长枪局首死", role: "example" });
       }
       if (meFirstDead && isAntiEco) {
         antiEco.count += 1;
-        antiEco.evidence.push({ matchId, roundNumber, tick: firstDeath.tick, detail: `对手 ${opponentEconomy} 局首死` });
+        antiEco.evidence.push({ matchId, roundNumber, tick: firstDeath.tick, detail: `对手 ${opponentEconomy} 局首死`, reason: `对手 ${opponentEconomy} 局首死`, role: "example" });
       }
       // 死亡时间分布
       for (const kill of sorted) {
@@ -684,7 +680,9 @@ export function buildPlayerSeasonInsights(
       clutchLossEvidence.push({
         matchId,
         roundNumber: clutch.roundNumber,
-        detail: `1v${clutch.opponentCount} 失利（${clutch.killCount} 杀）`
+        detail: `1v${clutch.opponentCount} 失利（${clutch.killCount} 杀）`,
+        reason: `1v${clutch.opponentCount} 残局失利`,
+        role: "example"
       });
     }
   }
@@ -1013,6 +1011,8 @@ export function buildPlayerFlashSummaries(
         matchId,
         roundNumber: cell.roundNumber,
         tick: cell.tick,
+        reason: "该闪光误盲队友的时长位于当前样本前列",
+        role: "example",
         victimCount: cell.victims.size,
         totalSeconds: round(cell.seconds, 2)
       });
@@ -1023,6 +1023,8 @@ export function buildPlayerFlashSummaries(
         matchId,
         roundNumber: cell.roundNumber,
         tick: cell.tick,
+        reason: "该闪光造成的敌方致盲时间位于当前样本前列",
+        role: "example",
         victimCount: cell.victims.size,
         enemySeconds: round(cell.seconds, 2),
         teamSeconds: round(teamSeconds, 2),

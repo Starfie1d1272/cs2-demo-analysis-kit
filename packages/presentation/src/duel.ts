@@ -70,7 +70,13 @@ function duelRow(input: DuelInsightsInput, fact: ReturnType<typeof deriveDuels>[
     killerPosition: fact.killerPosition,
     victimPosition: fact.victimPosition,
     roundTimeLabel: roundTimeLabelFor(input, fact),
-    evidence: { matchId: input.matchId, roundNumber: fact.roundNumber, tick: fact.tick }
+    evidence: {
+      matchId: input.matchId,
+      roundNumber: fact.roundNumber,
+      tick: fact.tick,
+      reason: CLASSIFICATION_LABEL[fact.classification] ?? "对枪事件",
+      role: "example"
+    }
   };
 }
 
