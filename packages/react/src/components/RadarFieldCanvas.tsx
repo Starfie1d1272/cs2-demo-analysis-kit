@@ -23,7 +23,6 @@ const CANVAS_SIZE = 1024;
 const PLAYBACK_INTERVAL_MS = 250;
 const MIN_VISIBLE_MAG = 0.005;
 const MIN_VISIBLE_PRESENCE_MAG = 0.003;
-const WEAK_ZONE_MAX = 0.06;
 
 type Band = [number, string];
 type BandKind = "screen" | "aim" | "presence" | "sound" | "contested";
@@ -109,7 +108,6 @@ const MAP_BANDS: Partial<Record<string, Partial<Record<BandKind, Band[]>>>> = {
     contested: band(0.003, 0.006, 0.01, 0.015, 0.021, 0.029, 0.039, 0.053, 0.077, 1.01),
   },
 };
-const WEAK_RGB = "255,116,96";
 const DIFF_POS_RGB = "255,90,114"; // --dak-danger
 const DIFF_NEG_RGB = "73,182,255"; // --dak-accent-b
 
@@ -152,7 +150,6 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
   const [mode, setMode] = useState<RadarFieldMode>("ctVis");
   const [sec, setSec] = useState(20);
   const [playing, setPlaying] = useState(false);
-  const [weakZones, setWeakZones] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const calibration = getMapCalibration(map.name);
@@ -194,21 +191,13 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
     const px2canvas = CANVAS_SIZE / cal.radarSize;
     const blobR = (field.grid.cellSize / cal.scale) * 1.35 * px2canvas;
 
-    const showWeakZones = weakZones && !frame.signed && (mode === "ctVis" || mode === "tVis" || mode === "ctAim" || mode === "tAim");
-
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    if (showWeakZones) {
-      ctx.globalCompositeOperation = "source-over";
-      ctx.fillStyle = "rgba(8,11,16,0.38)";
-      ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    }
     ctx.globalCompositeOperation = "source-over";
 
     for (let g = 0; g < cells.length; g++) {
       const v = frame.values[g]!;
       const mag = Math.abs(v);
-      if (!showWeakZones && mag < minVisibleMag(mode)) continue;
-      if (showWeakZones && mag > WEAK_ZONE_MAX) continue;
+      if (mag < minVisibleMag(mode)) continue;
       const cell = cells[g]!;
       if (dualLevel && levelAt(cell[2], cal) !== level) continue;
       const radar = worldToRadar({ x: cell[0], y: cell[1] }, cal);
@@ -216,8 +205,8 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
       const x = radar.x * px2canvas;
       const y = radar.y * px2canvas;
       const t = Math.min(1, mag / frame.cap);
-      const op = showWeakZones ? 0.44 - 0.26 * Math.min(1, mag / WEAK_ZONE_MAX) : 0.12 + 0.36 * Math.pow(t, 0.72);
-      const rgb = showWeakZones ? WEAK_RGB : frame.signed ? (v > 0 ? DIFF_POS_RGB : DIFF_NEG_RGB) : heatBand(map.name, mode, mag);
+      const op = 0.12 + 0.36 * Math.pow(t, 0.72);
+      const rgb = frame.signed ? (v > 0 ? DIFF_POS_RGB : DIFF_NEG_RGB) : heatBand(map.name, mode, mag);
       const grd = ctx.createRadialGradient(x, y, 0, x, y, blobR);
       grd.addColorStop(0, `rgba(${rgb},${op.toFixed(2)})`);
       grd.addColorStop(1, `rgba(${rgb},0)`);
@@ -227,16 +216,12 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
       ctx.fill();
     }
     ctx.globalCompositeOperation = "source-over";
-  }, [field, baseline, mode, sec, level, weakZones, calibration, dualLevel]);
+  }, [field, baseline, mode, sec, level, calibration, dualLevel]);
 
   const bgUrl = dualLevel && level === "lower" ? map.lowerRadarImageUrl : map.radarImageUrl;
-  const sequential = mode !== "info-diff" && !isDiff;
-  const canShowWeakZones = sequential && (mode === "ctVis" || mode === "tVis" || mode === "ctAim" || mode === "tAim");
-  const legend = weakZones && canShowWeakZones
-    ? "红 = 低覆盖区域"
-    : isDiff
-      ? "红 = 高于赛事基线 · 蓝 = 低于基线"
-      : mode === "info-diff"
+  const legend = isDiff
+    ? "红 = 高于赛事基线 · 蓝 = 低于基线"
+    : mode === "info-diff"
         ? "暖 = T 信息优势 · 冷 = CT 预警"
         : mode === "contested"
           ? "双方都看到 = 对拼线 / 交火点"
@@ -267,16 +252,6 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
               {opt.label}
             </button>
           ))}
-          <button
-            type="button"
-            aria-pressed={weakZones}
-            disabled={!canShowWeakZones}
-            className={weakZones && canShowWeakZones ? "dak-sf-chip dak-sf-chip-active" : "dak-sf-chip"}
-            title={canShowWeakZones ? "压暗底图，只标出低频视野覆盖格" : "仅 CT/T 视野模式可用"}
-            onClick={() => setWeakZones((r) => !r)}
-          >
-            薄弱区
-          </button>
           {dualLevel && (
             <div className="dak-heatmap-side-filter" role="radiogroup" aria-label="地图层级">
               {(["upper", "lower"] as const).map((next) => (
@@ -305,7 +280,7 @@ export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanv
             <small> · {field.scope.roundCount} 长枪局{isDiff ? ` vs 赛事基线 ${baseline!.scope.roundCount}` : ""}</small>
           </span>
           <span className="dak-heatmap-legend-scale">
-            <i className={weakZones && canShowWeakZones ? "dak-legend-weak" : "dak-legend-radar-field"} />
+            <i className="dak-legend-radar-field" />
             {legendText}
           </span>
         </div>

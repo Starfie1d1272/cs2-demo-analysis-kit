@@ -1030,8 +1030,7 @@
   background: linear-gradient(to right, blue, cyan, lime, yellow, red);
 }
 
-.dak-legend-radar-field,
-.dak-legend-weak {
+.dak-legend-radar-field {
   width: 44px;
   height: 6px;
   border-radius: 999px;
@@ -1039,10 +1038,6 @@
 
 .dak-legend-radar-field {
   background: linear-gradient(to right, rgb(34,47,86), rgb(48,91,145), rgb(48,145,176), rgb(103,188,146), rgb(220,174,82), rgb(245,128,86));
-}
-
-.dak-legend-weak {
-  background: linear-gradient(to right, rgba(255,116,96,0.62), rgba(255,116,96,0.16));
 }
 
 .dak-legend-warm { display: none; }
