@@ -82,5 +82,16 @@ describe("series grouping", () => {
     expect(veto.maps.banned.length).toBe(4);
     expect(veto.maps.decider).toBeTruthy();
   });
-});
 
+  it("PICK 地图由选图方的对手选择开局阵营", () => {
+    const steps = [
+      { stepOrder: 1, actionType: "pick" as const, teamKey: "teamA" as const, mapName: "de_nuke", side: "ct" as const },
+      { stepOrder: 2, actionType: "pick" as const, teamKey: "teamB" as const, mapName: "de_mirage", side: "t" as const }
+    ];
+
+    expect(deriveVetoSummary(steps).sideChoices).toEqual([
+      { mapName: "de_nuke", teamKey: "teamB", side: "ct" },
+      { mapName: "de_mirage", teamKey: "teamA", side: "t" }
+    ]);
+  });
+});
