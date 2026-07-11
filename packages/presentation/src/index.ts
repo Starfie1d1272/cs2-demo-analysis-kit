@@ -59,6 +59,16 @@ export {
 } from "./insights.js";
 export { displayWeaponName } from "./weapons.js";
 export { economyLabelCn, ECONOMY_LABEL_SHORT } from "./economy.js";
+export {
+  buildMistakeFindings,
+  findingFromDuel,
+  findingFromUtilityDamage,
+  findingFromUtilityFlash,
+  findingFromTacticalCluster,
+  type AnalysisFinding,
+  type FindingOrigin,
+  type FindingSubject,
+} from "./findings.js";
 export * from "./tactical-labels.js";
 export * from "./replay-clock.js";
 export {

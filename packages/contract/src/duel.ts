@@ -1,10 +1,7 @@
 import { z } from "zod";
+import { evidenceRefSchema } from "./evidence.js";
 
-export const duelEvidenceSchema = z.object({
-  matchId: z.string(),
-  roundNumber: z.number().int().positive(),
-  tick: z.number().int().positive().optional()
-});
+export const duelEvidenceSchema = evidenceRefSchema;
 
 export const duelPointSchema = z.object({
   x: z.number(),

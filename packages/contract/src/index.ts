@@ -15,3 +15,4 @@ export * from "./veto.js";
 export * from "./event-package.js";
 export * from "./bracket.js";
 export * from "./radar-field.js";
+export * from "./evidence.js";
