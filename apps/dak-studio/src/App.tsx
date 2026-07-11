@@ -18,7 +18,6 @@ import { HomeView } from "./views/HomeView";
 import { LibraryView } from "./views/LibraryView";
 import { MatchView } from "./views/MatchView";
 import { PlayersView } from "./views/PlayersView";
-import { LeaderboardView } from "./views/LeaderboardView";
 import { TrailsView } from "./views/TrailsView";
 import { TournamentDashboardView } from "./views/TournamentDashboardView";
 import { TeamView } from "./views/TeamView";
@@ -55,7 +54,7 @@ type StudioView =
   | "utility"
   | "lineups"
   | "economy"
-  | "tournament"
+  | "events"
   | "coach"
   | "control"
   | "management";
@@ -79,10 +78,10 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
     ]
   },
   {
-    label: "赛事与队伍",
+    label: "对象分析",
     items: [
       { key: "teams", label: "队伍", hint: "基础盘面 / 专项入口", icon: UserRound },
-      { key: "tournament", label: "赛事与队伍", hint: "赛事排行 / 总览 / 赛程", icon: Trophy },
+      { key: "events", label: "赛事", hint: "目录 / 总览 / 赛程", icon: Trophy },
       { key: "duelOverview", label: "对枪概览", hint: "首杀热点 / 对枪态势", icon: Swords },
       { key: "economy", label: "转化与节奏", hint: "转化 / 翻盘 / 经济对位", icon: Coins },
       { key: "utility", label: "道具价值", hint: "闪光 / 雷火 / 烟", icon: Bomb },
@@ -99,12 +98,7 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
 ];
 const MANAGEMENT_NAV: NavItem = { key: "management", label: "管理", hint: "身份归并 · 资料库维护 · 赛事资产", icon: Settings };
 
-const TOURNAMENT_TABS = [
-  { key: "leaderboard", label: "排行榜" },
-  { key: "dashboard", label: "赛事总览" },
-  { key: "events", label: "赛事合集" }
-] as const;
-type TournamentTab = (typeof TOURNAMENT_TABS)[number]["key"];
+type EventMode = "directory" | "overview";
 type MatchDeepLink = { roundNumber: number; tick?: number };
 const UPDATE_CHANNEL_KEY = "dak:update-channel";
 
@@ -132,7 +126,7 @@ function NavButton({ item, active, onClick }: { item: NavItem; active: boolean; 
 export function App() {
   const [entries, setEntries] = useState<StudioDemoEntry[]>([]);
   const [view, setView] = useState<StudioView>("home");
-  const [tournamentTab, setTournamentTab] = useState<TournamentTab>("leaderboard");
+  const [eventMode, setEventMode] = useState<EventMode>("directory");
   const [selectedDemoId, setSelectedDemoId] = useState<string | null>(null);
   const [matchDeepLink, setMatchDeepLink] = useState<MatchDeepLink | null>(null);
   const [importing, setImporting] = useState(false);
@@ -437,8 +431,8 @@ export function App() {
       focus: { kind: "event", eventId: event.id, label: event.name },
       baseline: { kind: "event-peers", eventId: event.id },
     }));
-    setTournamentTab("dashboard");
-    setView("tournament");
+    setEventMode("overview");
+    setView("events");
   }, []);
 
   const handleRemove = useCallback(
@@ -627,7 +621,7 @@ export function App() {
             <section key={group.label} className="stu-nav-section" aria-label={group.label}>
               <span className="stu-nav-section-label">{group.label}</span>
               {group.items.map((item) => (
-                <NavButton key={item.key} item={item} active={view === item.key} onClick={() => setView(item.key)} />
+                <NavButton key={item.key} item={item} active={view === item.key} onClick={() => { if (item.key === "events") setEventMode("directory"); setView(item.key); }} />
               ))}
             </section>
           ))}
@@ -834,46 +828,21 @@ export function App() {
         {view === "control" && (
           <RadarFieldView entries={scopedEntries} teamRenames={identityState.teamRenames} />
         )}
-        {view === "tournament" && (
-          <>
-            <div className="stu-subtabs" role="tablist" aria-label="赛事中台">
-              {TOURNAMENT_TABS.map(({ key, label }) => (
-                <button
-                  key={key}
-                  type="button"
-                  role="tab"
-                  aria-selected={tournamentTab === key}
-                  className={tournamentTab === key ? "stu-subtab stu-subtab-active" : "stu-subtab"}
-                  onClick={() => setTournamentTab(key)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {tournamentTab === "leaderboard" ? (
-              <LeaderboardView
-                allEntries={entries}
-                entries={scopedEntries}
-                scope={legacyScope}
-                onPlayerClick={openPlayer}
-                identityOptions={identityOptions}
-                onGoLibrary={() => setView("library")}
-              />
-            ) : tournamentTab === "dashboard" ? (
-              <TournamentDashboardView
-                allEntries={entries}
-                entries={scopedEntries}
-                scope={legacyScope}
-                identityOptions={identityOptions}
-                onOpenMatch={openDemo}
-                onGoLibrary={() => setView("library")}
-                onGoEconomy={() => setView("economy")}
-              />
-            ) : (
-              <EventsView entries={entries} onOpenMatch={openDemo} onAnalyzeEvent={startEventAnalysis} onGoLibrary={() => setView("library")} />
-            )}
-          </>
-        )}
+        {view === "events" && (eventMode === "overview" ? (
+          <TournamentDashboardView
+            allEntries={entries}
+            entries={scopedEntries}
+            scope={legacyScope}
+            identityOptions={identityOptions}
+            onOpenMatch={openDemo}
+            onOpenTeam={openTeam}
+            onGoLibrary={() => setView("library")}
+            onGoEconomy={() => setView("economy")}
+            onGoDirectory={() => setEventMode("directory")}
+          />
+        ) : (
+          <EventsView entries={entries} onOpenMatch={openDemo} onAnalyzeEvent={startEventAnalysis} onGoLibrary={() => setView("library")} />
+        ))}
         {view === "management" && (
           <ManagementView
             entries={entries}
