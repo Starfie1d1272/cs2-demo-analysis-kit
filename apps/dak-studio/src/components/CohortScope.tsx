@@ -62,9 +62,11 @@ export interface CohortScopeProps {
   onChange: (scope: CohortScopeState) => void;
   teamRenames?: Record<string, string>;
   events?: CohortScopeEvent[];
+  /** AnalysisContext 只允许一个 Team focus；旧多选透镜不再作为 App owner。 */
+  teamSelection?: "multiple" | "single-focus";
 }
 
-export function CohortScope({ entries, scope, onChange, teamRenames = {}, events = [] }: CohortScopeProps) {
+export function CohortScope({ entries, scope, onChange, teamRenames = {}, events = [], teamSelection = "multiple" }: CohortScopeProps) {
   const [expanded, setExpanded] = useState(false);
   const maps = useMemo(() => [...new Set(entries.map((e) => e.meta.mapName))].sort(), [entries]);
   const tags = useMemo(() => [...new Set(entries.flatMap((e) => e.tags))].sort(), [entries]);
@@ -90,7 +92,9 @@ export function CohortScope({ entries, scope, onChange, teamRenames = {}, events
     onChange({ ...scope, tags: next });
   };
   const toggleTeam = (team: string) => {
-    const next = scope.teams.includes(team) ? scope.teams.filter((t) => t !== team) : [...scope.teams, team];
+    const next = scope.teams.includes(team)
+      ? scope.teams.filter((t) => t !== team)
+      : teamSelection === "single-focus" ? [team] : [...scope.teams, team];
     onChange({ ...scope, teams: next });
   };
   const toggleEntry = (id: string) => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { EmptyState, DataTable, STUDIO_TABLE_CLASSES, type DataTableColumn } from "@cs2dak/react";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
@@ -13,10 +13,10 @@ import {
   saveCoachSettings,
   savePlaylistItem,
   savePlaybookName,
-  type CoachSettings
 } from "../lib/series";
 import { PatternExplorer } from "./coach/PatternExplorer";
 import { MapPoolTable } from "./coach/MapPoolTable";
+import type { AnalysisContext, AnalysisRoleRef } from "../lib/analysis-context";
 
 type CoachTab = "patterns" | "playbook" | "playlist" | "anti";
 
@@ -27,6 +27,8 @@ export interface CoachViewProps {
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   teamRenames?: Record<string, string>;
+  analysisContext: AnalysisContext;
+  onAnalysisContextChange: Dispatch<SetStateAction<AnalysisContext>>;
 }
 
 const TABS: Array<{ key: CoachTab; label: string }> = [
@@ -38,22 +40,25 @@ const TABS: Array<{ key: CoachTab; label: string }> = [
 
 const SIDE_LABEL: Record<string, string> = { t: "T 方", ct: "CT 方" };
 
+function teamRole(label: string): AnalysisRoleRef {
+  return { kind: "team", id: label.trim().toLowerCase(), label };
+}
+
 export function CoachView({
   allEntries,
   entries,
   onOpenMatch,
   onWatchDemo,
   onGoLibrary,
-  teamRenames = {}
+  teamRenames = {},
+  analysisContext,
+  onAnalysisContextChange,
 }: CoachViewProps) {
   const [tab, setTab] = useState<CoachTab>("patterns");
   const [allFacts, setAllFacts] = useState<TacticalRoundFact[]>([]);
   const [hasValidFacts, setHasValidFacts] = useState(false);
   // loading=true 初始值：防止首帧渲染时 clusters=[] && !loading 导致闪出空态
   const [loading, setLoading] = useState(true);
-  const [settings, setSettings] = useState<CoachSettings>({ myTeamName: null, opponentTeamName: null });
-  // 视角：己方复盘（主体=我的队伍）/ 敌方侦察（主体=对手队伍）。两者复用同一套分析。
-  const [mode, setMode] = useState<"own" | "scout">("own");
   const [playbook, setPlaybook] = useState<Record<string, string>>({});
   const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +67,9 @@ export function CoachView({
     () => teamRenameGroups(allEntries.map((entry) => ({ teamA: entry.meta.teamAName, teamB: entry.meta.teamBName })), teamRenames),
     [allEntries, teamRenames]
   );
-  const subjectTeam = mode === "own" ? settings.myTeamName : settings.opponentTeamName;
+  // 视角和主体均由共同 AnalysisContext 持有；Coach 不再拥有平行 team/role state。
+  const mode = analysisContext.goal === "opponent-prep" ? "scout" : "own";
+  const subjectTeam = mode === "own" ? analysisContext.roles.beneficiary?.label ?? null : analysisContext.roles.opponent?.label ?? null;
 
   // facts：filterBySubjectTeam 过滤后的子集（给开局模式/战术本）；allFacts：全量（给备战报告，两支队伍各自跨对手聚合）。
   const facts = useMemo(
@@ -75,10 +82,24 @@ export function CoachView({
   );
 
   useEffect(() => {
-    void loadCoachSettings().then(setSettings);
+    let cancelled = false;
+    void loadCoachSettings().then((settings) => {
+      if (cancelled) return;
+      onAnalysisContextChange((current) => {
+        if (current.goal === "own-review" || current.goal === "opponent-prep" || current.roles.beneficiary || current.roles.opponent) return current;
+        const beneficiary = settings.myTeamName ? teamRole(settings.myTeamName) : undefined;
+        const opponent = settings.opponentTeamName ? teamRole(settings.opponentTeamName) : undefined;
+        return {
+          ...current,
+          goal: opponent ? "opponent-prep" : "own-review",
+          roles: { ...current.roles, ...(beneficiary ? { beneficiary } : {}), ...(opponent ? { opponent } : {}) },
+        };
+      });
+    });
     void listPlaybookNames().then(setPlaybook);
     void listPlaylist().then(setPlaylist);
-  }, []);
+    return () => { cancelled = true; };
+  }, [onAnalysisContextChange]);
 
   useEffect(() => {
     if (entries.length === 0) {
@@ -108,14 +129,22 @@ export function CoachView({
     return () => { cancelled = true; };
   }, [entries, teamRenames]); // subjectTeam 变化时不回库——useMemo 派生即可
 
-  async function setMyTeam(teamName: string) {
-    const next = await saveCoachSettings({ ...settings, myTeamName: teamName || null });
-    setSettings(next);
+  function setMode(next: "own" | "scout") {
+    onAnalysisContextChange((current) => ({ ...current, goal: next === "own" ? "own-review" : "opponent-prep" }));
   }
 
-  async function setOpponentTeam(teamName: string) {
-    const next = await saveCoachSettings({ ...settings, opponentTeamName: teamName || null });
-    setSettings(next);
+  async function setTeamRole(kind: "beneficiary" | "opponent", teamName: string) {
+    const settings = await loadCoachSettings();
+    await saveCoachSettings({
+      ...settings,
+      ...(kind === "beneficiary" ? { myTeamName: teamName || null } : { opponentTeamName: teamName || null }),
+    });
+    onAnalysisContextChange((current) => {
+      const roles = { ...current.roles };
+      if (teamName) roles[kind] = teamRole(teamName);
+      else delete roles[kind];
+      return { ...current, roles };
+    });
   }
 
   if (allEntries.length === 0) {
@@ -168,14 +197,14 @@ export function CoachView({
           </div>
           <label className={mode === "own" ? "stu-coach-team-picker stu-coach-team-picker-active" : "stu-coach-team-picker"}>
             我的队伍
-            <select value={settings.myTeamName ?? ""} onChange={(event) => void setMyTeam(event.target.value)}>
+            <select value={analysisContext.roles.beneficiary?.label ?? ""} onChange={(event) => void setTeamRole("beneficiary", event.target.value)}>
               <option value="">全部队伍</option>
               {teamGroups.map((team) => <option key={team.displayName} value={team.displayName}>{team.displayName}</option>)}
             </select>
           </label>
           <label className={mode === "scout" ? "stu-coach-team-picker stu-coach-team-picker-active" : "stu-coach-team-picker"}>
             对手队伍
-            <select value={settings.opponentTeamName ?? ""} onChange={(event) => void setOpponentTeam(event.target.value)}>
+            <select value={analysisContext.roles.opponent?.label ?? ""} onChange={(event) => void setTeamRole("opponent", event.target.value)}>
               <option value="">未选择</option>
               {teamGroups.map((team) => <option key={team.displayName} value={team.displayName}>{team.displayName}</option>)}
             </select>
@@ -272,8 +301,8 @@ export function CoachView({
         <>
           <MapPoolTable
             facts={allFacts}
-            myTeamName={settings.myTeamName}
-            opponentTeamName={settings.opponentTeamName}
+            myTeamName={analysisContext.roles.beneficiary?.label ?? null}
+            opponentTeamName={analysisContext.roles.opponent?.label ?? null}
             teamRenames={teamRenames}
           />
           <details className="stu-card stu-coach-report-details">

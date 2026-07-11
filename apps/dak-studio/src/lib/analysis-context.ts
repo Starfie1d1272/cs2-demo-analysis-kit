@@ -63,6 +63,15 @@ export interface AnalysisEventScope {
   entryIds: string[];
 }
 
+/** 仅供尚未迁移的页面消费；它不是第二份可写状态。 */
+export interface CohortScopeProjection {
+  eventIds: string[];
+  maps: string[];
+  tags: string[];
+  excludedIds: string[];
+  teams: string[];
+}
+
 export const EMPTY_ANALYSIS_CORPUS: AnalysisCorpus = {
   eventIds: [],
   entryIds: [],
@@ -130,6 +139,37 @@ export function withAnalysisBaseline(context: AnalysisContext, baseline: Analysi
 
 export function withAnalysisGoal(context: AnalysisContext, goal: AnalysisGoal): AnalysisContext {
   return { ...context, goal };
+}
+
+export function cohortScopeProjection(context: AnalysisContext): CohortScopeProjection {
+  return {
+    eventIds: [...context.corpus.eventIds],
+    maps: [...context.corpus.maps],
+    tags: [...context.corpus.tags],
+    excludedIds: [...context.corpus.excludedEntryIds],
+    teams: context.focus.kind === "team" ? [context.focus.teamName] : [],
+  };
+}
+
+/** 将旧 CohortScope 的用户操作映射回唯一 context owner。 */
+export function applyCohortScopeProjection(context: AnalysisContext, next: CohortScopeProjection): AnalysisContext {
+  const selectedTeam = next.teams[0] ?? null;
+  const clearedTeamFocus = context.focus.kind === "team" && !selectedTeam;
+  return {
+    ...context,
+    goal: selectedTeam && context.goal === "explore"
+      ? "team-analysis"
+      : clearedTeamFocus && context.goal === "team-analysis" ? "explore" : context.goal,
+    corpus: {
+      eventIds: [...next.eventIds],
+      entryIds: [...context.corpus.entryIds],
+      matchIds: [...context.corpus.matchIds],
+      maps: [...next.maps],
+      tags: [...next.tags],
+      excludedEntryIds: [...next.excludedIds],
+    },
+    focus: selectedTeam ? { kind: "team", teamName: selectedTeam } : clearedTeamFocus ? { kind: "aggregate" } : context.focus,
+  };
 }
 
 /**

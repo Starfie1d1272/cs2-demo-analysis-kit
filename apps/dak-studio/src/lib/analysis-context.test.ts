@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   createAnalysisContext,
   createAnalysisContextPreset,
+  applyCohortScopeProjection,
+  cohortScopeProjection,
   filterCorpusEntriesByTeam,
   missingAnalysisCoordinates,
   resolveAnalysisCorpus,
@@ -51,6 +53,20 @@ describe("AnalysisContext", () => {
 
     expect(resolveAnalysisCorpus(entries, context.corpus, events).map((item) => item.id)).toEqual(["e1", "e2", "e3"]);
     expect(filterCorpusEntriesByTeam(entries, "FURIA").map((item) => item.id)).toEqual(["e1", "e2"]);
+  });
+
+  it("projects legacy scope controls from, and only back into, the AnalysisContext owner", () => {
+    const context = createAnalysisContextPreset("explore");
+    const next = applyCohortScopeProjection(context, {
+      eventIds: ["event:cologne"], maps: ["de_inferno"], tags: [], excludedIds: ["e3"], teams: ["FURIA"],
+    });
+
+    expect(next).toMatchObject({
+      goal: "team-analysis",
+      focus: { kind: "team", teamName: "FURIA" },
+      corpus: { eventIds: ["event:cologne"], maps: ["de_inferno"], excludedEntryIds: ["e3"] },
+    });
+    expect(cohortScopeProjection(next)).toMatchObject({ teams: ["FURIA"], eventIds: ["event:cologne"] });
   });
 
   it("resolves Event corpus together with maps, tags and manual exclusions", () => {

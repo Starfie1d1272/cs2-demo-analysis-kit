@@ -22,7 +22,7 @@ export interface PlayersViewProps {
   entries: StudioDemoEntry[];
   scope: CohortScopeState;
   selectedPlayerKey: string | null;
-  onSelectPlayer: (playerKey: string) => void;
+  onSelectPlayer: (playerKey: string, label?: string) => void;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
@@ -225,7 +225,7 @@ export function PlayersView({
               key={profile.playerKey}
               type="button"
               className={profile.playerKey === selected.playerKey ? "stu-roster-item stu-roster-item-active" : "stu-roster-item"}
-              onClick={() => onSelectPlayer(profile.playerKey)}
+              onClick={() => onSelectPlayer(profile.playerKey, profile.name)}
             >
               <span className="stu-roster-name">
                 {isPinned(profile) && <Star size={11} className="stu-pin-star" />}

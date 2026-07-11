@@ -1,7 +1,7 @@
 import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Radar, Settings, Swords, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { bulkUpdateTags, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
-import { CohortScope, EMPTY_SCOPE, applyScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
+import { CohortScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
 import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems, pickDemPaths, triggerWindowsDropCapture, watchDemoPath, type ExportedDemoFile } from "./lib/dem";
 import { parseTags } from "./lib/tags";
 import { listSeriesRecords, pruneOrphanSeries, type StudioSeriesRecord } from "./lib/series";
@@ -31,6 +31,13 @@ import { RadarFieldView } from "./views/RadarFieldView";
 import { loadIdentityState, buildCohortIdentityMap, type IdentityStoreState } from "./lib/identity";
 import type { IdentityOptions } from "./lib/season";
 import { BUILTIN_EVENTS, type BuiltinEvent } from "./lib/builtin-events";
+import {
+  applyCohortScopeProjection,
+  cohortScopeProjection,
+  createAnalysisContextPreset,
+  resolveAnalysisCorpus,
+  type AnalysisContext,
+} from "./lib/analysis-context";
 
 type StudioView =
   | "home"
@@ -122,10 +129,9 @@ export function App() {
   const [tournamentTab, setTournamentTab] = useState<TournamentTab>("leaderboard");
   const [selectedDemoId, setSelectedDemoId] = useState<string | null>(null);
   const [matchDeepLink, setMatchDeepLink] = useState<MatchDeepLink | null>(null);
-  const [selectedPlayerKey, setSelectedPlayerKey] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [scope, setScope] = useState<CohortScopeState>(EMPTY_SCOPE);
+  const [analysisContext, setAnalysisContext] = useState<AnalysisContext>(() => createAnalysisContextPreset("explore"));
   const [eventRecords, setEventRecords] = useState<StudioEventRecord[]>([]);
   const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
   const [identityState, setIdentityState] = useState<IdentityStoreState>({ version: 0, mappings: [], teamRenames: {} });
@@ -173,9 +179,17 @@ export function App() {
 
   // 稳定数组标识：避免 App 无关重渲染触发档案/排行榜重新聚合
   const scopedEntries = useMemo(
-    () => applyScope(entries, scope, eventScopes),
-    [entries, scope, eventScopes]
+    () => resolveAnalysisCorpus(entries, analysisContext.corpus, eventScopes),
+    [entries, analysisContext.corpus, eventScopes]
   );
+  /** 旧页面短期仍读 CohortScopeState；其值完全由 AnalysisContext 投影，不再拥有 App state。 */
+  const legacyScope = useMemo<CohortScopeState>(() => cohortScopeProjection(analysisContext), [analysisContext]);
+  const selectedPlayerKey = analysisContext.focus.kind === "self" || analysisContext.focus.kind === "player"
+    ? analysisContext.focus.playerKey
+    : null;
+  const updateLegacyScope = useCallback((next: CohortScopeState) => {
+    setAnalysisContext((current) => applyCohortScopeProjection(current, next));
+  }, []);
   const identityOptions = useMemo<IdentityOptions | undefined>(
     () => identityState.version > 0
       ? { version: identityState.version, map: buildCohortIdentityMap(identityState.mappings), teamRenames: identityState.teamRenames }
@@ -355,8 +369,12 @@ export function App() {
     }
   }, [entries]);
 
-  const openPlayer = useCallback((playerKey: string) => {
-    setSelectedPlayerKey(playerKey);
+  const openPlayer = useCallback((playerKey: string, label = playerKey) => {
+    setAnalysisContext((current) => ({
+      ...current,
+      goal: "player-analysis",
+      focus: { kind: "player", playerKey, label },
+    }));
     setView("players");
   }, []);
 
@@ -589,10 +607,11 @@ export function App() {
         {entries.length > 0 && view !== "home" && view !== "library" && view !== "match" && view !== "management" && (
           <CohortScope
             entries={entries}
-            scope={scope}
-            onChange={setScope}
+            scope={legacyScope}
+            onChange={updateLegacyScope}
             teamRenames={identityState.teamRenames}
             events={eventScopes}
+            teamSelection="single-focus"
           />
         )}
         {view === "home" && (
@@ -647,9 +666,9 @@ export function App() {
           <PlayersView
             allEntries={entries}
             entries={scopedEntries}
-            scope={scope}
+            scope={legacyScope}
             selectedPlayerKey={selectedPlayerKey}
-            onSelectPlayer={setSelectedPlayerKey}
+            onSelectPlayer={openPlayer}
             onOpenMatch={openDemo}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             identityOptions={identityOptions}
@@ -668,7 +687,7 @@ export function App() {
           <DuelView
             allEntries={entries}
             entries={scopedEntries}
-            scope={scope}
+            scope={legacyScope}
             onOpenMatch={openDemo}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoLibrary={() => setView("library")}
@@ -680,7 +699,7 @@ export function App() {
           <DuelView
             allEntries={entries}
             entries={scopedEntries}
-            scope={scope}
+            scope={legacyScope}
             onOpenMatch={openDemo}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoLibrary={() => setView("library")}
@@ -693,7 +712,7 @@ export function App() {
           <UtilityView
             allEntries={entries}
             entries={scopedEntries}
-            scope={scope}
+            scope={legacyScope}
             onOpenMatch={openDemo}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             identityOptions={identityOptions}
@@ -713,7 +732,7 @@ export function App() {
           <EconomyView
             allEntries={entries}
             entries={scopedEntries}
-            scope={scope}
+            scope={legacyScope}
             identityOptions={identityOptions}
             onGoLibrary={() => setView("library")}
           />
@@ -726,6 +745,8 @@ export function App() {
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoLibrary={() => setView("library")}
             teamRenames={identityState.teamRenames}
+            analysisContext={analysisContext}
+            onAnalysisContextChange={setAnalysisContext}
           />
         )}
         {view === "control" && (
@@ -751,7 +772,7 @@ export function App() {
               <LeaderboardView
                 allEntries={entries}
                 entries={scopedEntries}
-                scope={scope}
+                scope={legacyScope}
                 onPlayerClick={openPlayer}
                 identityOptions={identityOptions}
                 onGoLibrary={() => setView("library")}
@@ -760,7 +781,7 @@ export function App() {
               <TournamentDashboardView
                 allEntries={entries}
                 entries={scopedEntries}
-                scope={scope}
+                scope={legacyScope}
                 identityOptions={identityOptions}
                 onOpenMatch={openDemo}
                 onGoLibrary={() => setView("library")}
