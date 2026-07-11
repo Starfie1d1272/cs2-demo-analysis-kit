@@ -14,6 +14,7 @@ import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { mapDisplayName } from "../lib/series";
 import { getFactsStore } from "../lib/facts";
 import { GRENADE_COLOR } from "../components/RadarTrails";
+import { savePracticeLineup } from "../lib/practice-lineups";
 
 // ── 常亮 ────────────────────────────────────────────────────────────────────
 
@@ -93,6 +94,7 @@ export function LineupView({
   const [radarTopN, setRadarTopN] = useState<TopNOption>(20);
   const [clusterMode, setClusterMode] = useState<LineupClusterMode>("strict");
   const [copiedClusterId, setCopiedClusterId] = useState<string | null>(null);
+  const [savedClusterId, setSavedClusterId] = useState<string | null>(null);
   const entryById = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);
 
   function handleClusterJump(cluster: LineupCluster) {
@@ -110,6 +112,11 @@ export function LineupView({
     }
     setCopiedClusterId(cluster.id);
     window.setTimeout(() => setCopiedClusterId((current) => current === cluster.id ? null : current), 1400);
+  }
+
+  async function handleSavePractice(cluster: LineupCluster) {
+    await savePracticeLineup(cluster, practiceCommandForCluster(cluster));
+    setSavedClusterId(cluster.id);
   }
 
   // ── 加载：分批 → 按地图分组 → 跨场聚类 ──────────────────────────────────
@@ -258,6 +265,9 @@ export function LineupView({
                 {copiedClusterId === c.id ? "已复制" : "复制命令"}
               </button>
             )}
+            <button type="button" className="stu-button-sm" title="保存为本地点位练习素材；不会把普通浏览自动写入资料库" onClick={() => void handleSavePractice(c)}>
+              {savedClusterId === c.id ? "已保存" : "保存点位"}
+            </button>
             {watchThrow && onWatchDemo && (
               <button type="button" className="stu-button-sm" title="在 CS2 中打开原始 demo，并尝试跳到该投掷 tick" onClick={() => onWatchDemo(watchThrow.entryId, { roundNumber: watchThrow.roundNumber, tick: watchThrow.tick })}>
                 进游戏
@@ -267,7 +277,7 @@ export function LineupView({
         ) : null;
       }
     },
-  ], [copiedClusterId, entryById, onOpenMatch, onWatchDemo]);
+  ], [copiedClusterId, savedClusterId, entryById, onOpenMatch, onWatchDemo]);
 
   // ── 渲染（空态提前返回） ──────────────────────────────────────────────
 

@@ -135,7 +135,7 @@ export function UtilityView({ allEntries, entries, scope, onOpenMatch, onOpenEvi
       <header className="stu-view-header">
         <div>
           <h1>道具价值</h1>
-          <p>按回合和投掷数归一：闪光看敌方致盲时间，HE/火看敌方伤害，烟只看每回合投入。</p>
+          <p>按回合和投掷数归一：闪光看敌方致盲时间，HE/火看敌方伤害，烟只看每回合投入；不把关联数据表述为对胜负的因果贡献。</p>
         </div>
       </header>
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
