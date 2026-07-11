@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import type { EvidenceRef } from "@cs2dak/contract";
+import type { AnalysisFinding } from "@cs2dak/presentation";
 
 /**
  * 产品中立原语（docs/design-language.md §3/§4）。
@@ -58,5 +60,44 @@ export function MetricInfo({ note }: { note?: ReactNode }) {
     <span className="dak-info" tabIndex={0} aria-label="口径说明">
       ⓘ<span className="dak-info-tip" role="tooltip">{note}</span>
     </span>
+  );
+}
+
+/** 一行的解释边界；Finding 与 observation 都可复用。 */
+export function LimitNote({ children }: { children: ReactNode }) {
+  return <p className="dak-limit-note"><b>限制</b>{children}</p>;
+}
+
+/** 系统 Finding 的纯展示外壳；证据定位与用户动作由 Studio container 注入。 */
+export function FindingPanel({
+  finding,
+  onOpenEvidence,
+  action,
+}: {
+  finding: AnalysisFinding;
+  onOpenEvidence?: (evidence: EvidenceRef, finding: AnalysisFinding) => void;
+  action?: ReactNode;
+}) {
+  return (
+    <article className="dak-finding-panel">
+      <div className="dak-finding-head">
+        <div>
+          <small>{finding.capability}</small>
+          <h3>{finding.title}</h3>
+        </div>
+        {action}
+      </div>
+      <p>{finding.statement}</p>
+      <div className="dak-finding-meta">
+        <span>{finding.sample.label}{finding.sample.numerator != null ? ` · ${finding.sample.numerator}${finding.sample.denominator != null ? `/${finding.sample.denominator}` : ""}` : ""}</span>
+        <span>{finding.baseline ? `参照：${finding.baseline}` : "仅描述性样本"}</span>
+      </div>
+      {finding.evidence.length > 0 && onOpenEvidence && (
+        <button type="button" className="dak-evidence" onClick={() => onOpenEvidence(finding.evidence[0]!, finding)}>
+          查看证据 · R{finding.evidence[0]!.roundNumber}
+        </button>
+      )}
+      {finding.limitations[0] && <LimitNote>{finding.limitations[0]}</LimitNote>}
+    </article>
   );
 }

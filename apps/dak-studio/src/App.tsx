@@ -38,6 +38,7 @@ import {
   cohortScopeProjection,
   createAnalysisContextPreset,
   resolveAnalysisCorpus,
+  summarizeAnalysisContext,
   type AnalysisContext,
 } from "./lib/analysis-context";
 
@@ -678,6 +679,7 @@ export function App() {
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoPlayers={(player) => player ? openPlayer(player.playerKey, player.name) : setView("players")}
             onGoLibrary={() => setView("library")}
+            contextSummary={summarizeAnalysisContext(analysisContext, entries, eventScopes)}
             identityOptions={identityOptions}
           />
         )}

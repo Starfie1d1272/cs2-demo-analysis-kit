@@ -1163,6 +1163,60 @@ body {
   font-size: 12px;
 }
 
+.stu-home-actions-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
+  border-top: 1px solid var(--dak-border);
+  border-bottom: 1px solid var(--dak-border);
+}
+
+.stu-home-actions-grid section,
+.stu-home-finding-list,
+.stu-home-focus-list,
+.stu-focus-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.stu-training-focus {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-panel);
+}
+
+.stu-training-focus header,
+.stu-focus-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.stu-training-focus p,
+.stu-training-focus small {
+  margin: 0;
+}
+
+.stu-training-focus small,
+.stu-focus-meta {
+  color: var(--dak-fg-dim);
+  font-size: 11px;
+}
+
+.stu-focus-meta {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+@media (max-width: 900px) {
+  .stu-home-actions-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 .stu-select {
   max-width: 480px;
   padding: 7px 10px;
