@@ -385,6 +385,13 @@ export function App() {
     return () => window.cancelAnimationFrame(frame);
   }, [returningEvidence, view]);
 
+  // 一级页面是新的工作面：普通切页从页首开始，避免把上一页的深滚动位置
+  // 泄漏到新页面。证据返回是唯一例外，由上面的 continuation 精确恢复来源锚点。
+  useEffect(() => {
+    if (!returningEvidence) window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    // 只在 view 真正变化时判断；returningEvidence 清空不能再次把已恢复的锚点拉回页首。
+  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleLinkRawDemo = useCallback(async (entry: StudioDemoEntry) => {
     try {
       const paths = await pickDemPaths();
