@@ -4,14 +4,14 @@ import { displayTeamName, teamRenameGroups } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getFactsStore, TACTICAL_FACT_VERSION, type TacticalRoundFact } from "../lib/facts";
 import { buildTacticalClusters, autoName, withTacticalTeamIdentities, type TacticalCluster } from "../lib/tactics";
-import { playlistToMarkdown, type PlaylistItem } from "../lib/playlist";
+import { prepItemsToMarkdown, type PrepItem } from "../lib/playlist";
 import {
   listPlaybookNames,
-  listPlaylist,
+  listPrepItems,
   loadCoachSettings,
-  removePlaylistItem,
+  removePrepItem,
   saveCoachSettings,
-  savePlaylistItem,
+  savePrepItem,
   savePlaybookName,
 } from "../lib/series";
 import { PatternExplorer } from "./coach/PatternExplorer";
@@ -60,7 +60,7 @@ export function CoachView({
   // loading=true 初始值：防止首帧渲染时 clusters=[] && !loading 导致闪出空态
   const [loading, setLoading] = useState(true);
   const [playbook, setPlaybook] = useState<Record<string, string>>({});
-  const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
+  const [playlist, setPlaylist] = useState<PrepItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
   const teamGroups = useMemo(
@@ -97,7 +97,7 @@ export function CoachView({
       });
     });
     void listPlaybookNames().then(setPlaybook);
-    void listPlaylist().then(setPlaylist);
+    void listPrepItems().then(setPlaylist);
     return () => { cancelled = true; };
   }, [onAnalysisContextChange]);
 
@@ -253,7 +253,7 @@ export function CoachView({
           onWatchDemo={onWatchDemo}
           onAddToPlaylist={async (cluster, fact) => {
             const entry = entryByMatchId.get(fact.matchId);
-            const item: PlaylistItem = {
+            const item: PrepItem = {
               id: `${cluster.id}:${fact.matchId}:${fact.roundNumber}`,
               group: autoName(cluster) || `${cluster.mapName} ${cluster.side.toUpperCase()}`,
               matchId: fact.matchId,
@@ -261,10 +261,12 @@ export function CoachView({
               roundNumber: fact.roundNumber,
               clusterId: cluster.id,
               patternFingerprint: patternFingerprint(cluster),
+              source: "tactical-pattern",
+              coverage: `${cluster.roundCount} 回合 · ${cluster.mapName} · ${SIDE_LABEL[cluster.side]}`,
               note: entry ? `${entry.meta.teamAName} ${entry.meta.teamAScore}:${entry.meta.teamBScore} ${entry.meta.teamBName}` : "",
             };
-            await savePlaylistItem(item);
-            setPlaylist(await listPlaylist());
+            await savePrepItem(item);
+            setPlaylist(await listPrepItems());
           }}
         />
       )}
@@ -283,12 +285,12 @@ export function CoachView({
           items={playlist}
           entryByMatchId={entryByMatchId}
           onUpdate={async (item) => {
-            await savePlaylistItem(item);
-            setPlaylist(await listPlaylist());
+            await savePrepItem(item);
+            setPlaylist(await listPrepItems());
           }}
           onRemove={async (id) => {
-            await removePlaylistItem(id);
-            setPlaylist(await listPlaylist());
+            await removePrepItem(id);
+            setPlaylist(await listPrepItems());
           }}
           onOpenMatch={(matchId, roundNumber) => {
             const entry = entryByMatchId.get(matchId);
@@ -425,21 +427,21 @@ function PlaylistTable({
   onOpenMatch,
   onWatchDemo,
 }: {
-  items: PlaylistItem[];
+  items: PrepItem[];
   entryByMatchId: Map<string, StudioDemoEntry>;
-  onUpdate: (item: PlaylistItem) => Promise<void>;
+  onUpdate: (item: PrepItem) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onOpenMatch: (matchId: string, roundNumber: number) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
 }) {
-  const markdown = playlistToMarkdown("备战清单", items);
+  const markdown = prepItemsToMarkdown("备战清单", items);
   if (items.length === 0) {
     return <EmptyState variant="insufficient" title="备战清单为空" hint="在开局模式的证据回合里点击加入。" />;
   }
 
-  const columns = useMemo<DataTableColumn<PlaylistItem>[]>(() => [
+  const columns = useMemo<DataTableColumn<PrepItem>[]>(() => [
     { key: "group", label: "分组", format: (item) => item.group },
-    { key: "source", label: "来源", render: (item) => <span title={item.matchId}>{item.mapName ? `${item.mapName} · ${item.matchId}` : item.matchId}</span> },
+    { key: "source", label: "来源", render: (item) => <span title={item.coverage ?? item.matchId}>{item.source === "user" ? "用户判断" : item.mapName ? `${item.mapName} · ${item.matchId}` : item.matchId}</span> },
     { key: "round", label: "回合", numeric: true, format: (item) => `R${item.roundNumber}` },
     {
       key: "note", label: "备注",
