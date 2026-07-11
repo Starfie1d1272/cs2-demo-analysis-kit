@@ -1,7 +1,8 @@
 import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Radar, Settings, Swords, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { bulkUpdateTags, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
+import { bulkUpdateTags, formatMatchLabel, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { CohortScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
+import { AnalysisContextSummary } from "./components/AnalysisContextSummary";
 import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems, pickDemPaths, triggerWindowsDropCapture, watchDemoPath, type ExportedDemoFile } from "./lib/dem";
 import { parseTags } from "./lib/tags";
 import { listSeriesRecords, pruneOrphanSeries, type StudioSeriesRecord } from "./lib/series";
@@ -321,10 +322,17 @@ export function App() {
   const loadSample = useCallback(() => loadBuiltinEvent(BUILTIN_EVENTS[0]), [loadBuiltinEvent]);
 
   const openDemo = useCallback((id: string, target?: MatchDeepLink) => {
+    const entry = entries.find((row) => row.id === id);
+    if (entry) {
+      setAnalysisContext(createAnalysisContextPreset("match-review", {
+        corpus: { eventIds: [], entryIds: [id], matchIds: [], maps: [], tags: [], excludedEntryIds: [] },
+        focus: { kind: "match", entryId: id, label: formatMatchLabel(entry) },
+      }));
+    }
     setSelectedDemoId(id);
     setMatchDeepLink(target ?? null);
     setView("match");
-  }, []);
+  }, [entries]);
 
   const handleLinkRawDemo = useCallback(async (entry: StudioDemoEntry) => {
     try {
@@ -376,6 +384,16 @@ export function App() {
       focus: { kind: "player", playerKey, label },
     }));
     setView("players");
+  }, []);
+
+  const startEventAnalysis = useCallback((event: StudioEventRecord) => {
+    setAnalysisContext(createAnalysisContextPreset("event-analysis", {
+      corpus: { eventIds: [event.id], entryIds: [], matchIds: [], maps: [], tags: [], excludedEntryIds: [] },
+      focus: { kind: "event", eventId: event.id, label: event.name },
+      baseline: { kind: "event-peers", eventId: event.id },
+    }));
+    setTournamentTab("dashboard");
+    setView("tournament");
   }, []);
 
   const handleRemove = useCallback(
@@ -614,12 +632,15 @@ export function App() {
             teamSelection="single-focus"
           />
         )}
+        {entries.length > 0 && view !== "library" && view !== "management" && (
+          <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} />
+        )}
         {view === "home" && (
           <HomeView
             entries={entries}
             onOpenMatch={openDemo}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
-            onGoPlayers={() => setView("players")}
+            onGoPlayers={(player) => player ? openPlayer(player.playerKey, player.name) : setView("players")}
             onGoLibrary={() => setView("library")}
             identityOptions={identityOptions}
           />
@@ -654,10 +675,7 @@ export function App() {
             entries={entries}
             demoId={selectedDemoId}
             deepLink={matchDeepLink}
-            onSelectDemo={(id) => {
-              setSelectedDemoId(id);
-              setMatchDeepLink(null);
-            }}
+            onSelectDemo={(id) => openDemo(id)}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoLibrary={() => setView("library")}
           />
@@ -788,7 +806,7 @@ export function App() {
                 onGoEconomy={() => setView("economy")}
               />
             ) : (
-              <EventsView entries={entries} onOpenMatch={openDemo} onGoManage={() => setView("management")} />
+              <EventsView entries={entries} onOpenMatch={openDemo} onAnalyzeEvent={startEventAnalysis} onGoManage={() => setView("management")} />
             )}
           </>
         )}

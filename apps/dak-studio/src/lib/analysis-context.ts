@@ -254,15 +254,44 @@ const GOAL_LABEL: Record<AnalysisGoal, string> = {
   "opponent-prep": "对手备战",
 };
 
+export interface AnalysisContextSummaryParts {
+  corpus: string;
+  focus: string;
+  roles: string | null;
+  baseline: string;
+  goal: string;
+}
+
+/** 面向壳层的独立字段，避免把 corpus、focus 与关系压成一个含糊 chip。 */
+export function summarizeAnalysisContextParts(
+  context: AnalysisContext,
+  entries: readonly StudioDemoEntry[],
+  events: readonly AnalysisEventScope[] = [],
+): AnalysisContextSummaryParts {
+  const corpus = resolveAnalysisCorpus(entries, context.corpus, events);
+  const corpusLabel = context.corpus.eventIds.length === 1
+    ? events.find((event) => event.id === context.corpus.eventIds[0])?.name ?? `${corpus.length} 场`
+    : `${corpus.length} 场`;
+  const roleParts = [
+    context.roles.beneficiary ? `我方：${context.roles.beneficiary.label}` : null,
+    context.roles.opponent ? `对手：${context.roles.opponent.label}` : null,
+    context.roles.comparison ? `对照：${context.roles.comparison.label}` : null,
+  ].filter((value): value is string => value != null);
+  return {
+    corpus: corpusLabel,
+    focus: focusLabel(context.focus),
+    roles: roleParts.length > 0 ? roleParts.join(" · ") : null,
+    baseline: baselineLabel(context.baseline),
+    goal: GOAL_LABEL[context.goal],
+  };
+}
+
 /** 供壳层/行动快照复用的可读上下文，不暴露内部 id。 */
 export function summarizeAnalysisContext(
   context: AnalysisContext,
   entries: readonly StudioDemoEntry[],
   events: readonly AnalysisEventScope[] = [],
 ): string {
-  const corpus = resolveAnalysisCorpus(entries, context.corpus, events);
-  const corpusLabel = context.corpus.eventIds.length === 1
-    ? events.find((event) => event.id === context.corpus.eventIds[0])?.name ?? `${corpus.length} 场`
-    : `${corpus.length} 场`;
-  return [focusLabel(context.focus), corpusLabel, baselineLabel(context.baseline), GOAL_LABEL[context.goal]].join(" · ");
+  const summary = summarizeAnalysisContextParts(context, entries, events);
+  return [summary.focus, summary.corpus, summary.roles, summary.baseline, summary.goal].filter(Boolean).join(" · ");
 }

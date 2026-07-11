@@ -15,7 +15,7 @@ export interface HomeViewProps {
   entries: StudioDemoEntry[];
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
-  onGoPlayers: () => void;
+  onGoPlayers: (player?: { playerKey: string; name: string }) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
 }
@@ -287,7 +287,7 @@ export function HomeView({ entries, onOpenMatch, onWatchDemo, onGoPlayers, onGoL
           variant="insufficient"
           title={`当前资料库里没有 ${pinned.name} 的比赛`}
           hint="导入包含你参赛记录的 demo，或在选手档案重新标记「这是我」。"
-          action={<button type="button" className="stu-button" onClick={onGoPlayers}>去选手档案</button>}
+          action={<button type="button" className="stu-button" onClick={() => onGoPlayers()}>去选手档案</button>}
         />
       )}
 
@@ -712,7 +712,7 @@ function PickSelf({
   profiles: PlayerSeasonProfile[] | null;
   error: string | null;
   entriesCount: number;
-  onGoPlayers: () => void;
+  onGoPlayers: (player?: { playerKey: string; name: string }) => void;
 }) {
   if (error) return <EmptyState variant="error" title="聚合失败" hint={error} />;
   if (!profiles) return <div className="stu-loading">聚合 {entriesCount} 场 demo…</div>;
@@ -723,12 +723,12 @@ function PickSelf({
         mark
         title="先标记「这是我」"
         hint={<>主页会围绕你的数据展开。在下面挑出你自己，或去选手档案点名字旁的 <Star size={12} style={{ verticalAlign: "-2px" }} /> 标记。</>}
-        action={<button type="button" className="stu-button" onClick={onGoPlayers}>去选手档案</button>}
+        action={<button type="button" className="stu-button" onClick={() => onGoPlayers()}>去选手档案</button>}
       />
       {top.length > 0 && (
         <div className="stu-pickself-grid">
           {top.map((p) => (
-            <button key={p.playerKey} type="button" className="stu-pickself-card" onClick={onGoPlayers} title="去选手档案标记此人为「这是我」">
+            <button key={p.playerKey} type="button" className="stu-pickself-card" onClick={() => onGoPlayers({ playerKey: p.playerKey, name: p.name })} title="去选手档案标记此人为「这是我」">
               <b>{p.name}</b>
               <small className="stu-dim">{p.mapCount} 场 · RR {p.rating.rivalhubRR.toFixed(2)}</small>
             </button>

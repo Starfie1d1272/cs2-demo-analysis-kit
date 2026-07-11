@@ -1126,6 +1126,31 @@ body {
   text-transform: uppercase;
 }
 
+.stu-analysis-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--dak-border);
+  background: var(--dak-panel);
+  color: var(--dak-fg);
+  font-size: 12px;
+}
+
+.stu-analysis-context > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 3px 7px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius-sm);
+}
+
+.stu-analysis-context small {
+  color: var(--dak-fg-dim);
+  font-size: 10px;
+}
+
 .stu-select {
   max-width: 480px;
   padding: 7px 10px;
