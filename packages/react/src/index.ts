@@ -9,7 +9,7 @@ export { QaReportPanel } from "./components/QaReportPanel";
 export { SeasonLeaderboard } from "./components/SeasonLeaderboard";
 export { TeamComparisonPanel } from "./components/TeamComparisonPanel";
 export { Pagination } from "./components/Pagination";
-export { EmptyState, EvidenceLink, MetricInfo } from "./components/Primitives";
+export { EmptyState, EvidenceLink, FindingPanel, LimitNote, MetricInfo } from "./components/Primitives";
 export { ElimBracket, SwissBracket } from "./components/EventBracket";
 export {
   DataTable,
