@@ -1185,6 +1185,18 @@ body {
   font-size: 12px;
 }
 
+.stu-context-edit {
+  margin-left: auto;
+  padding: 3px 8px;
+  border: 1px solid var(--dak-border-hi);
+  border-radius: var(--stu-radius-sm);
+  background: transparent;
+  color: var(--dak-accent);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
 .stu-analysis-context > span {
   display: inline-flex;
   align-items: baseline;

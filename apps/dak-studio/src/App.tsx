@@ -140,6 +140,7 @@ export function App() {
   const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
   const [showLatestMsg, setShowLatestMsg] = useState(false);
   const [updateChannel, setUpdateChannel] = useState<UpdateChannel>(initialUpdateChannel);
+  const [contextEditorOpen, setContextEditorOpen] = useState(false);
 
   async function doCheckUpdate() {
     setCheckingUpdate(true);
@@ -664,7 +665,7 @@ export function App() {
             </button>
           </div>
         )}
-        {entries.length > 0 && view !== "home" && view !== "library" && view !== "match" && view !== "management" && view !== "teams" && (
+        {entries.length > 0 && contextEditorOpen && view !== "library" && view !== "management" && (
           <CohortScope
             entries={entries}
             scope={legacyScope}
@@ -675,7 +676,7 @@ export function App() {
           />
         )}
         {entries.length > 0 && view !== "library" && view !== "management" && (
-          <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} />
+          <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} onEdit={() => setContextEditorOpen((current) => !current)} />
         )}
         {view === "home" && (
           <HomeView
