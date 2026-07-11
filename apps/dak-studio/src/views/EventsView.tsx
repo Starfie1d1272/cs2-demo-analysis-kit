@@ -46,7 +46,7 @@ export function EventsView({
       {active && (
         <>
           <section className="stu-card">
-            <div className="stu-section-head"><h2>{active.name}</h2><button type="button" className="stu-button-sm" onClick={() => onAnalyzeEvent(active)}>分析此赛事</button></div>
+            <div className="stu-section-head"><h2>{active.name}</h2><button type="button" className="stu-button-sm" onClick={() => onAnalyzeEvent(active)}>查看总览</button></div>
             <p className="stu-muted">{active.kind} · {eventSeries.length} 个系列 · {active.source}{active.readOnly ? " · 只读资产" : ""}</p>
           </section>
           {active.stages.map((stage) => (

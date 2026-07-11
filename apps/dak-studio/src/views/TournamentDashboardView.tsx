@@ -13,6 +13,8 @@ export interface TournamentDashboardViewProps {
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   onGoEconomy?: () => void;
+  onOpenTeam?: (teamName: string) => void;
+  onGoDirectory?: () => void;
   identityOptions?: IdentityOptions;
 }
 
@@ -42,6 +44,8 @@ export function TournamentDashboardView({
   onOpenMatch,
   onGoLibrary,
   onGoEconomy,
+  onOpenTeam,
+  onGoDirectory,
   identityOptions
 }: TournamentDashboardViewProps) {
   const [insights, setInsights] = useState<TournamentInsights | null>(null);
@@ -109,8 +113,9 @@ export function TournamentDashboardView({
       <header className="stu-view-header">
         <div>
           <h1>赛事总览</h1>
-          <p>当前聚合范围内的地图使用与攻防节奏。最佳选手榜见「排行榜」子页。</p>
+          <p>当前赛事语料的地图、队伍与经济观察；只有底层提供依据时才会形成 Finding。</p>
         </div>
+        {onGoDirectory && <button type="button" className="stu-button-sm" onClick={onGoDirectory}>返回赛事目录</button>}
       </header>
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && !insights && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo…</div>}
@@ -141,6 +146,11 @@ export function TournamentDashboardView({
               />
             ) : (
               <p className="stu-dim">至少需要两个队伍的 demo 才能生成对比。</p>
+            )}
+            {teamComparison && onOpenTeam && (
+              <div className="stu-chip-row">
+                {teamComparison.availableTeams.map((team) => <button key={team.name} type="button" className="stu-chip" onClick={() => onOpenTeam(team.name)}>{team.name} · {team.matches} 场</button>)}
+              </div>
             )}
           </div>
           <div className="stu-card">
