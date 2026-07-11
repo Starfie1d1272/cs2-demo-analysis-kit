@@ -21,6 +21,7 @@ import { PlayersView } from "./views/PlayersView";
 import { LeaderboardView } from "./views/LeaderboardView";
 import { TrailsView } from "./views/TrailsView";
 import { TournamentDashboardView } from "./views/TournamentDashboardView";
+import { TeamView } from "./views/TeamView";
 import { EventsView } from "./views/EventsView";
 import { UtilityView } from "./views/UtilityView";
 import { LineupsView } from "./views/LineupsView";
@@ -47,6 +48,7 @@ type StudioView =
   | "library"
   | "match"
   | "players"
+  | "teams"
   | "trails"
   | "duel"
   | "duelOverview"
@@ -79,6 +81,7 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "赛事与队伍",
     items: [
+      { key: "teams", label: "队伍", hint: "基础盘面 / 专项入口", icon: UserRound },
       { key: "tournament", label: "赛事与队伍", hint: "赛事排行 / 总览 / 赛程", icon: Trophy },
       { key: "duelOverview", label: "对枪概览", hint: "首杀热点 / 对枪态势", icon: Swords },
       { key: "economy", label: "转化与节奏", hint: "转化 / 翻盘 / 经济对位", icon: Coins },
@@ -419,6 +422,15 @@ export function App() {
     setView("players");
   }, []);
 
+  const openTeam = useCallback((teamName: string) => {
+    setAnalysisContext((current) => ({
+      ...current,
+      goal: "team-analysis",
+      focus: { kind: "team", teamName },
+    }));
+    setView("teams");
+  }, []);
+
   const startEventAnalysis = useCallback((event: StudioEventRecord) => {
     setAnalysisContext(createAnalysisContextPreset("event-analysis", {
       corpus: { eventIds: [event.id], entryIds: [], matchIds: [], maps: [], tags: [], excludedEntryIds: [] },
@@ -731,6 +743,17 @@ export function App() {
             returnEvidenceKey={returningEvidence?.sourceView === "players" ? returningEvidence.sourceKey : undefined}
             identityOptions={identityOptions}
             onGoLibrary={() => setView("library")}
+          />
+        )}
+        {view === "teams" && (
+          <TeamView
+            entries={scopedEntries}
+            selectedTeam={analysisContext.focus.kind === "team" ? analysisContext.focus.teamName : null}
+            onSelectTeam={openTeam}
+            onOpenMatch={openDemo}
+            onOpenCapability={setView}
+            onGoLibrary={() => setView("library")}
+            identityOptions={identityOptions}
           />
         )}
         {view === "trails" && (

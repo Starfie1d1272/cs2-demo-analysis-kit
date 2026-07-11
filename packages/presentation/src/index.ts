@@ -5,9 +5,11 @@ export { buildAllPlayerSeasonProfiles } from "./player.js";
 export {
   buildTeamComparison,
   buildTeamComparisonFromFacts,
+  buildTeamOverviewFromFacts,
   extractTeamComparisonFacts,
   type TeamComparisonFacts,
-  type TeamComparisonModel
+  type TeamComparisonModel,
+  type TeamOverviewModel
 } from "./team.js";
 export { buildSeriesSummary } from "./series.js";
 export {

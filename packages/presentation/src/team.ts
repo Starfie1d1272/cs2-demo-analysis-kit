@@ -42,6 +42,22 @@ export interface TeamComparisonModel {
   availableTeams: Array<{ name: string; matches: number }>;
 }
 
+/** 队伍总览只编排已有跨场事实；不推导强弱项、因果或对策。 */
+export interface TeamOverviewModel {
+  version: "cs2-demo-analysis-kit/team-overview-0.1";
+  teamName: string;
+  matchCount: number;
+  wins: number;
+  losses: number;
+  roundsWon: number;
+  roundsLost: number;
+  maps: Array<{ mapName: string; matches: number; wins: number; losses: number; roundsWon: number; roundsLost: number }>;
+  roster: TeamComparisonPlayerRow[];
+  weaponPreference: TeamComparisonSide["weaponPreference"];
+  economyWinRate: TeamComparisonSide["economyWinRate"];
+  matches: TeamComparisonSideMatch[];
+}
+
 export interface TeamComparisonInput {
   matchId: string;
   pkg: DemoPackage;
@@ -249,6 +265,45 @@ export function buildTeamComparison(
   requestedPair?: [string, string]
 ): TeamComparisonModel {
   return buildTeamComparisonFromFacts(inputs.map(extractTeamComparisonFacts), requestedPair);
+}
+
+export function buildTeamOverviewFromFacts(inputs: TeamComparisonFacts[], teamName: string): TeamOverviewModel | null {
+  const opponent = inputs
+    .flatMap((input) => [input.teams.teamA, input.teams.teamB])
+    .find((name) => name !== teamName);
+  if (!opponent) return null;
+  const comparison = buildTeamComparisonFromFacts(inputs, [teamName, opponent]);
+  const side = comparison.teams.find((row) => row.teamName === teamName);
+  if (!side) return null;
+
+  const maps = new Map<string, { mapName: string; matches: number; wins: number; losses: number; roundsWon: number; roundsLost: number }>();
+  let roundsWon = 0;
+  let roundsLost = 0;
+  for (const match of side.matches) {
+    const row = maps.get(match.mapName) ?? { mapName: match.mapName, matches: 0, wins: 0, losses: 0, roundsWon: 0, roundsLost: 0 };
+    row.matches += 1;
+    row.wins += match.won ? 1 : 0;
+    row.losses += match.won ? 0 : 1;
+    row.roundsWon += match.roundsWon;
+    row.roundsLost += match.roundsLost;
+    roundsWon += match.roundsWon;
+    roundsLost += match.roundsLost;
+    maps.set(match.mapName, row);
+  }
+  return {
+    version: "cs2-demo-analysis-kit/team-overview-0.1",
+    teamName,
+    matchCount: side.matchCount,
+    wins: side.matches.filter((match) => match.won).length,
+    losses: side.matches.filter((match) => !match.won).length,
+    roundsWon,
+    roundsLost,
+    maps: [...maps.values()].sort((a, b) => b.matches - a.matches || a.mapName.localeCompare(b.mapName)),
+    roster: side.players,
+    weaponPreference: side.weaponPreference,
+    economyWinRate: side.economyWinRate,
+    matches: side.matches,
+  };
 }
 
 function killWeaponLabel(weapon: string): string {
