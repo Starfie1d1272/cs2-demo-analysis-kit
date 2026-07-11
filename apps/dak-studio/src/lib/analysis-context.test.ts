@@ -90,7 +90,7 @@ describe("AnalysisContext", () => {
     });
 
     expect(resolveAnalysisCorpus(entries, context.corpus, events).map((item) => item.id)).toEqual(["e2"]);
-    expect(summarizeAnalysisContext(context, entries, events)).toBe("Cologne · Cologne · 赛事同侪 · 赛事分析");
+    expect(summarizeAnalysisContext(context, entries, events)).toBe("Cologne · Cologne · 赛事整体 · 赛事分析");
   });
 
   it("requires an explicit beneficiary and opponent only for opponent preparation", () => {
@@ -118,7 +118,7 @@ describe("AnalysisContext", () => {
     });
 
     expect(summarizeAnalysisContextParts(context, entries, events)).toEqual({
-      corpus: "Cologne", focus: "Spirit", roles: "我方：FURIA · 对手：Spirit", baseline: "赛事同侪", goal: "对手备战",
+      corpus: "Cologne", focus: "Spirit", roles: "我方：FURIA · 对手：Spirit", baseline: "赛事整体", goal: "对手备战",
     });
   });
 });

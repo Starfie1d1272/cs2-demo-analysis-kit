@@ -58,7 +58,6 @@ export function MatchWorkspace({ model, initialTarget }: MatchWorkspaceProps) {
       <div className="dak-workspace">
         <header className="dak-header dak-workspace-header">
           <div>
-            <div className="dak-eyebrow">Match Workspace</div>
             <h1 className="dak-title">{model.title}</h1>
             <p className="dak-subtitle">{model.subtitle}</p>
           </div>

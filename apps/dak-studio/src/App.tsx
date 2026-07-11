@@ -86,7 +86,7 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
       { key: "economy", label: "经济与转化", hint: "手枪 / 人数优势 / 经济对位", icon: Coins },
       { key: "utility", label: "道具价值", hint: "闪光 / 雷火 / 烟", icon: Bomb },
       { key: "lineups", label: "道具点位", hint: "出手 / 落点 / 练习", icon: Bomb },
-      { key: "control", label: "控图", hint: "覆盖场 / 防守漏洞 / 倾向", icon: Radar }
+      { key: "control", label: "控图", hint: "覆盖场 / 赛事基线 / 队伍差分", icon: Radar }
     ]
   },
   {
@@ -368,13 +368,21 @@ export function App() {
 
   useEffect(() => {
     if (!returningEvidence || view !== returningEvidence.sourceView) return;
-    const timer = window.setTimeout(() => {
-      if (returningEvidence.sourceKey) {
-        document.getElementById(returningEvidence.sourceKey)?.scrollIntoView({ block: "center" });
+    let frame = 0;
+    let attempts = 0;
+    const restoreSource = () => {
+      const anchor = returningEvidence.sourceKey ? document.getElementById(returningEvidence.sourceKey) : null;
+      if (anchor) {
+        anchor.scrollIntoView({ block: "center" });
+        setReturningEvidence(null);
+        return;
       }
-      setReturningEvidence(null);
-    }, 0);
-    return () => window.clearTimeout(timer);
+      if (attempts++ < 8) frame = window.requestAnimationFrame(restoreSource);
+      else setReturningEvidence(null);
+    };
+    // 来源视图可能先挂壳、后完成异步 facts 渲染；等下一帧再找真实 DOM anchor。
+    frame = window.requestAnimationFrame(restoreSource);
+    return () => window.cancelAnimationFrame(frame);
   }, [returningEvidence, view]);
 
   const handleLinkRawDemo = useCallback(async (entry: StudioDemoEntry) => {
@@ -681,6 +689,9 @@ export function App() {
             </button>
           </div>
         )}
+        {entries.length > 0 && view !== "library" && view !== "management" && (
+          <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} onEdit={() => setContextEditorOpen((current) => !current)} />
+        )}
         {entries.length > 0 && contextEditorOpen && view !== "library" && view !== "management" && (
           <CohortScope
             entries={entries}
@@ -690,9 +701,6 @@ export function App() {
             events={eventScopes}
             teamSelection="single-focus"
           />
-        )}
-        {entries.length > 0 && view !== "library" && view !== "management" && (
-          <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} onEdit={() => setContextEditorOpen((current) => !current)} />
         )}
         {capabilityAvailability && <CapabilityBar availability={capabilityAvailability} />}
         {view === "home" && (
