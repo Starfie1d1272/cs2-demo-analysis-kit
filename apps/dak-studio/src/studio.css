@@ -1760,6 +1760,127 @@ body {
 .stu-series-bp-list { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
 .stu-series-bp-item strong { display: block; margin-bottom: 6px; font-size: 13px; }
 
+/* ── 赛事目录：稳定主从浏览，不再用全宽大卡片堆叠层级 ─────────── */
+.stu-event-directory {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.stu-event-list {
+  position: sticky;
+  top: 12px;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius);
+  background: var(--dak-bg-subtle);
+}
+
+.stu-event-list-label {
+  padding: 5px 8px 8px;
+  color: var(--dak-fg-dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.stu-event-list-item {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: var(--stu-radius-sm);
+  background: transparent;
+  color: var(--dak-fg-mid);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stu-event-list-item:hover {
+  border-color: var(--dak-border);
+  background: var(--dak-panel);
+  color: var(--dak-fg);
+}
+
+.stu-event-list-item-active,
+.stu-event-list-item-active:hover {
+  border-color: color-mix(in srgb, var(--dak-accent) 35%, transparent);
+  background: var(--dak-accent-soft);
+  color: var(--dak-fg);
+}
+
+.stu-event-list-item b {
+  font-size: 13px;
+}
+
+.stu-event-list-item span {
+  color: var(--dak-fg-dim);
+  font-size: 11px;
+}
+
+.stu-event-content {
+  min-width: 0;
+  display: grid;
+  gap: 18px;
+}
+
+.stu-event-content-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 0 14px;
+  border-bottom: 1px solid var(--dak-border);
+}
+
+.stu-event-content-head h2,
+.stu-event-content-head p,
+.stu-event-stage h2 {
+  margin: 0;
+}
+
+.stu-event-content-head p {
+  margin-top: 5px;
+  color: var(--dak-fg-dim);
+  font-size: 12px;
+}
+
+.stu-event-stage {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.stu-event-stage > h2 {
+  font-size: 16px;
+}
+
+.stu-event-stage > h2 small {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+@media (max-width: 900px) {
+  .stu-event-directory {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stu-event-list {
+    position: static;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+
+  .stu-event-list-label {
+    grid-column: 1 / -1;
+  }
+}
+
 /* 机制画像武器卡：击杀数前 6 + 其他，真实武器名 */
 .stu-mechanics-grid {
   display: grid;
