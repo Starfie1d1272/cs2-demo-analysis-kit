@@ -81,7 +81,7 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
     items: [
       { key: "teams", label: "队伍", hint: "基础盘面 / 专项入口", icon: UserRound },
       { key: "events", label: "赛事", hint: "目录 / 总览 / 赛程", icon: Trophy },
-      { key: "economy", label: "转化与节奏", hint: "转化 / 翻盘 / 经济对位", icon: Coins },
+      { key: "economy", label: "经济与转化", hint: "手枪 / 人数优势 / 经济对位", icon: Coins },
       { key: "utility", label: "道具价值", hint: "闪光 / 雷火 / 烟", icon: Bomb },
       { key: "lineups", label: "道具点位库", hint: "出手点 / 落点 / 证据", icon: Bomb },
       { key: "control", label: "控图", hint: "覆盖场 / 防守漏洞 / 倾向", icon: Radar }
