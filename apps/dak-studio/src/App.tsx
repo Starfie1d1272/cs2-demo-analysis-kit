@@ -243,7 +243,9 @@ export function App() {
         await refreshEventRecords();
       })
       .catch((err) => setNotice(`读取本地资料库失败：${err instanceof Error ? err.message : String(err)}`));
-    doCheckUpdate();
+    // 自动更新属于桌面壳职责。浏览器开发入口没有跨域桥，启动时主动请求发布源
+    // 只会制造 CORS 错误；需要时仍可由用户手动检查。
+    if (window.pywebview?.api) void doCheckUpdate();
     void loadIdentityState().then(setIdentityState);
   }, [refreshEventRecords]);
 
