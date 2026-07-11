@@ -174,7 +174,14 @@ export function deriveVetoSummary(steps: SeriesVetoStep[]): Pick<SeriesVeto, "ma
     },
     sideChoices: steps
       .filter((step): step is SeriesVetoStep & { side: "t" | "ct" } => step.side != null)
-      .map((step) => ({ mapName: step.mapName, teamKey: step.teamKey, side: step.side }))
+      .map((step) => ({
+        mapName: step.mapName,
+        // PICK 步骤的 actor 是选图方；按赛事 BP 规则由对手选择该图的开局阵营。
+        teamKey: step.actionType === "pick"
+          ? step.teamKey === "teamA" ? "teamB" : step.teamKey === "teamB" ? "teamA" : null
+          : step.teamKey,
+        side: step.side
+      }))
   };
 }
 

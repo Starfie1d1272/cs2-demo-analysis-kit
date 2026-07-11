@@ -26,7 +26,11 @@ export function BpView({ veto, matchUrl }: { veto: SeriesVeto; matchUrl?: string
         const sideChoice = step.actionType === "pick"
           ? veto.sideChoices.find((row) => row.mapName === step.mapName)
           : undefined;
-        const sideChooser = sideChoice ? teamName(veto, sideChoice.teamKey) : null;
+        // 兼容旧赛事包中 sideChoices.teamKey 曾被写成选图方：展示层按 PICK 规则明确取对手。
+        const sideChooserKey = step.actionType === "pick"
+          ? step.teamKey === "teamA" ? "teamB" : step.teamKey === "teamB" ? "teamA" : null
+          : sideChoice?.teamKey ?? null;
+        const sideChooser = sideChoice ? teamName(veto, sideChooserKey) : null;
         return (
           <li key={step.stepOrder} className="stu-bp-step">
             <span className="stu-bp-order">{step.stepOrder}.</span>
