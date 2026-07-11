@@ -54,8 +54,8 @@ export function EconomyView({ allEntries, entries, scope, onGoLibrary, identityO
     <div className="stu-view">
       <header className="stu-view-header">
         <div>
-          <h1>转化与节奏</h1>
-          <p>看队伍如何把优势变成回合胜利：手枪转化、5v4/5v3 转化、劣势翻盘和小枪破局。</p>
+          <h1>经济与转化</h1>
+          <p>查看手枪转化、5v4/5v3 转化、劣势翻盘和小枪破局。当前结果为描述性聚合，尚不自动生成 Finding。</p>
         </div>
       </header>
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
@@ -166,17 +166,17 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
         </article>
 
         <article className="stu-card stu-econ-card">
-          <h3>队伍亮点</h3>
+          <h3>当前样本对照</h3>
           <div className="stu-econ-callouts">
-            <Callout label="回合胜率最高" value={bestRoundWin?.teamName ?? "—"} detail={bestRoundWin ? `${formatPercent(bestRoundWin.roundWinPercent)} · ${bestRoundWin.roundWins}/${bestRoundWin.rounds}` : "无样本"} />
-            <Callout label="手枪最稳" value={bestPistol?.teamName ?? "—"} detail={bestPistol ? `${formatPercent(bestPistol.winRatePercent)} · ${bestPistol.pistolWins}/${bestPistol.pistolRounds}` : "无样本"} />
-            <Callout label="转化最好" value={bestConversion?.teamName ?? "—"} detail={bestConversion ? `${formatPercent(bestConversion.conversionPercent)} · ${bestConversion.conversionWins}/${bestConversion.conversionRounds}` : "无样本"} />
-            <Callout label="反转换最好" value={bestBreak?.teamName ?? "—"} detail={bestBreak ? `${formatPercent(bestBreak.breakRatePercent)} · ${bestBreak.breakWins}/${bestBreak.breakRounds}` : "无样本"} />
-            <Callout label="5v4 最稳" value={best5v4?.teamName ?? "—"} detail={best5v4 ? `${formatPercent(best5v4.value)} · ${best5v4.wins}/${best5v4.total}` : "无样本"} />
-            <Callout label="5v3 最稳" value={best5v3?.teamName ?? "—"} detail={best5v3 ? `${formatPercent(best5v3.value)} · ${best5v3.wins}/${best5v3.total}` : "无样本"} />
-            <Callout label="4v5 最能翻" value={best4v5?.teamName ?? "—"} detail={best4v5 ? `${formatPercent(best4v5.value)} · ${best4v5.wins}/${best4v5.total}` : "无样本"} />
-            <Callout label="3v5 最能翻" value={best3v5?.teamName ?? "—"} detail={best3v5 ? `${formatPercent(best3v5.value)} · ${best3v5.wins}/${best3v5.total}` : "无样本"} />
-            <Callout label="小枪翻盘" value={bestSmallBuy?.teamName ?? "—"} detail={bestSmallBuy ? `${formatPercent(bestSmallBuy.smallBuyUpset.winRatePercent)} · ${bestSmallBuy.smallBuyUpset.wins}/${bestSmallBuy.smallBuyUpset.opportunities}` : "无样本"} title="Eco / 半起面对长枪局的胜率" />
+            <Callout label="最高回合胜率" value={bestRoundWin?.teamName ?? "—"} detail={bestRoundWin ? `${formatPercent(bestRoundWin.roundWinPercent)} · ${bestRoundWin.roundWins}/${bestRoundWin.rounds}` : "无样本"} />
+            <Callout label="最高手枪局胜率" value={bestPistol?.teamName ?? "—"} detail={bestPistol ? `${formatPercent(bestPistol.winRatePercent)} · ${bestPistol.pistolWins}/${bestPistol.pistolRounds}` : "无样本"} />
+            <Callout label="最高 R2 转化率" value={bestConversion?.teamName ?? "—"} detail={bestConversion ? `${formatPercent(bestConversion.conversionPercent)} · ${bestConversion.conversionWins}/${bestConversion.conversionRounds}` : "无样本"} />
+            <Callout label="最高 R2 反转换率" value={bestBreak?.teamName ?? "—"} detail={bestBreak ? `${formatPercent(bestBreak.breakRatePercent)} · ${bestBreak.breakWins}/${bestBreak.breakRounds}` : "无样本"} />
+            <Callout label="最高 5v4 转化率" value={best5v4?.teamName ?? "—"} detail={best5v4 ? `${formatPercent(best5v4.value)} · ${best5v4.wins}/${best5v4.total}` : "无样本"} />
+            <Callout label="最高 5v3 转化率" value={best5v3?.teamName ?? "—"} detail={best5v3 ? `${formatPercent(best5v3.value)} · ${best5v3.wins}/${best5v3.total}` : "无样本"} />
+            <Callout label="最高 4v5 翻盘率" value={best4v5?.teamName ?? "—"} detail={best4v5 ? `${formatPercent(best4v5.value)} · ${best4v5.wins}/${best4v5.total}` : "无样本"} />
+            <Callout label="最高 3v5 翻盘率" value={best3v5?.teamName ?? "—"} detail={best3v5 ? `${formatPercent(best3v5.value)} · ${best3v5.wins}/${best3v5.total}` : "无样本"} />
+            <Callout label="最高小枪翻盘率" value={bestSmallBuy?.teamName ?? "—"} detail={bestSmallBuy ? `${formatPercent(bestSmallBuy.smallBuyUpset.winRatePercent)} · ${bestSmallBuy.smallBuyUpset.wins}/${bestSmallBuy.smallBuyUpset.opportunities}` : "无样本"} title="Eco / 半起面对长枪局的胜率" />
           </div>
         </article>
 
