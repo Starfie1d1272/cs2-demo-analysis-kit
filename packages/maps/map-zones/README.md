@@ -1,7 +1,8 @@
 # map-zones — 地图区域多边形标定
 
-P4 空间分析（Area / Utility Block）的唯一人工输入。每张现役图一个 `<map>.json`，
-定义若干**世界坐标多边形**区域。几何消费见 `@cs2dak/maps` 的 `zoneAt()`。
+Legacy 手标多边形资产。当前控图/战术语义真相源不是这里，而是 replay place
+生成的 callout grid；这些 JSON 只保留给旧的 shadow spatial/utility 路径做几何辅助。
+几何消费见 `@cs2dak/maps` 的 `zoneAt()`。
 
 ## 文件格式
 

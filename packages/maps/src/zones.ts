@@ -1,14 +1,14 @@
 /**
- * map-zones — 地图区域语义层（P4 空间分析的基础）
+ * map-zones — legacy 手标多边形辅助层
  *
- * 定位：把世界坐标的一个点映射到一个**有名字、有角色**的区域（A 点 / mid / banana …），
- * 供 Area（区域占有）、Utility Block（道具封锁）等空间指标使用。
+ * 当前控图/战术语义真相源不是这里，而是 replay place 生成的 callout grid。
+ * 本文件只保留给旧的 shadow spatial/utility 路径做几何辅助，新增控图判定不要用 zone 当语义来源。
  *
  * 坐标系：多边形顶点用**世界坐标 XY**（与 v3 replay 的 position 同系），
  * 分辨率无关、无需 radar 标定。多层地图（nuke / vertigo）用可选 [zMin, zMax] 区分上下层。
  *
- * 边界：本文件只做「点 → 区域」的几何归属，不算任何指标，不依赖 demo 数据。
- * 真实多边形坐标由人工在 `map-zones/<map>.json` 标定（这是唯一需要人工的一步）。
+ * 边界：本文件只做「点 → 手标多边形」的几何归属，不算任何指标，不依赖 demo 数据。
+ * 这些多边形不是当前地图理解的真相源。
  */
 
 /** 区域角色：决定该区域在分析里的语义分类（不限定地图）。 */
@@ -78,7 +78,7 @@ export function zoneAt(zones: MapZones, x: number, y: number, z?: number): MapZo
   return null;
 }
 
-/** 当前 CS2 现役图池（train 已移除）。zone 标定与 P4 分析的优先地图。 */
+/** 当前 CS2 现役图池（train 已移除）。保留给 legacy zone 资产枚举。 */
 export const ACTIVE_DUTY_MAPS = [
   "de_ancient",
   "de_anubis",

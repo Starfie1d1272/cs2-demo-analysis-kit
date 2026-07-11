@@ -1,7 +1,8 @@
 /**
  * Official UtilitySpatial actual-effect 派生（严格重建 SP3 v2）。设计见 rr-model.md §3.4、§14、§18。
  *
- * 解锁前提：zone 多边形标定（4/7 图）+ nav 拓扑（7 图）+ tri-BVH 静态视线（按需，分析侧）。
+ * 解锁前提：legacy zone 多边形（4/7 图）+ nav 拓扑（7 图）+ tri-BVH 静态视线（按需，分析侧）。
+ * 注意：zone 只服务本 shadow utility 几何路径，不是当前控图/战术语义真相源。
  *
  * 手雷归属（doc §18）：effectPosition → zoneAt（非「最近 player」proxy）。
  *

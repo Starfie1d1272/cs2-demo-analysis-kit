@@ -2,8 +2,8 @@
  * Raw evidence 地基：位置标注 + 空间资产装载（严格重建 SP1）。
  * 设计见 docs/design/rr-model.md §3、§5（计算流程）。
  *
- * 标注优先级（doc §2.2）：manual zone polygon > callout projection > nearest nav area。
- * 当前 zone 多边形标定仅用于 utility 几何（`utility.ts` 的 `effectPosition → zoneAt`），annotate 层暂不接入 zone，保留 callout 路径。
+ * 当前控图/战术语义真相源是 replay place 生成的 callout grid，不是手标 zone polygon。
+ * zone 字段只保留给旧 shadow spatial/utility 几何路径；新增控图 finding 不应消费 zoneId。
  * 这些是 official MapControl gate（SP2：solo pressure 的 nav 距离、denial 的 LOS）的输入底座。
  *
  * v3 replay 8Hz 流替代了 v2 的 positions-1s。每帧解码后转换：
@@ -74,7 +74,7 @@ export interface AnnotatedSample {
   position: Vec3;
   /** callout（replay placeDict）；缺失为 null。 */
   callout: string | null;
-  /** 标定 zone id（zone > callout，doc §2.2）；无 zone 资产或未命中为 null。 */
+  /** legacy 手标 zone id；当前控图/战术语义不要把它当真相源。 */
   zoneId: string | null;
   /** zone 语义角色（site/mid/connector/lane…）；无 zone 为 null。 */
   zoneRole: ZoneRole | null;
@@ -161,4 +161,3 @@ export function groupSamplesByRoundTick(
   }
   return out;
 }
-

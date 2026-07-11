@@ -225,7 +225,7 @@ export function getDefaultAnchor(
   return { id, ...defaults.anchors[id] };
 }
 
-/** 只组合两个静态真相源；推进、争夺、终点等动态语义由 core 时间线推导。 */
+/** 只组合 callout 标签与手工默认位锚点；推进、争夺、终点等动态语义由 core 时间线推导。 */
 export function classifyTacticalLocation(
   mapName: string,
   side: DefaultPositionSide,
