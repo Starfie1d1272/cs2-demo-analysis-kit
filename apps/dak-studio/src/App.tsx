@@ -50,7 +50,6 @@ type StudioView =
   | "teams"
   | "trails"
   | "duel"
-  | "duelOverview"
   | "utility"
   | "lineups"
   | "economy"
@@ -82,7 +81,6 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
     items: [
       { key: "teams", label: "队伍", hint: "基础盘面 / 专项入口", icon: UserRound },
       { key: "events", label: "赛事", hint: "目录 / 总览 / 赛程", icon: Trophy },
-      { key: "duelOverview", label: "对枪概览", hint: "首杀热点 / 对枪态势", icon: Swords },
       { key: "economy", label: "转化与节奏", hint: "转化 / 翻盘 / 经济对位", icon: Coins },
       { key: "utility", label: "道具价值", hint: "闪光 / 雷火 / 烟", icon: Bomb },
       { key: "lineups", label: "道具点位库", hint: "出手点 / 落点 / 证据", icon: Bomb },
@@ -768,19 +766,7 @@ export function App() {
             onGoLibrary={() => setView("library")}
             identityOptions={identityOptions}
             teamRenames={identityState.teamRenames}
-          />
-        )}
-        {view === "duelOverview" && (
-          <DuelView
-            allEntries={entries}
-            entries={scopedEntries}
-            scope={legacyScope}
-            onOpenMatch={openDemo}
-            onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
-            onGoLibrary={() => setView("library")}
-            identityOptions={identityOptions}
-            teamRenames={identityState.teamRenames}
-            variant="overview"
+            initialTab={analysisContext.goal === "personal-review" ? "records" : "opening"}
           />
         )}
         {view === "utility" && (
