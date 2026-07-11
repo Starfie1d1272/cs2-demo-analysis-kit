@@ -664,7 +664,7 @@ export function App() {
             </button>
           </div>
         )}
-        {entries.length > 0 && view !== "home" && view !== "library" && view !== "match" && view !== "management" && (
+        {entries.length > 0 && view !== "home" && view !== "library" && view !== "match" && view !== "management" && view !== "teams" && (
           <CohortScope
             entries={entries}
             scope={legacyScope}

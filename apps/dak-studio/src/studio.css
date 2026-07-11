@@ -477,6 +477,32 @@ body {
   letter-spacing: 0.01em;
 }
 
+.stu-team-picker {
+  display: grid;
+  gap: 5px;
+  min-width: 210px;
+  color: var(--dak-fg-dim);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.stu-team-picker select {
+  min-height: 34px;
+  padding: 6px 30px 6px 10px;
+  border: 1px solid var(--dak-border-hi);
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-panel);
+  color: var(--dak-fg);
+  font: inherit;
+  letter-spacing: 0;
+}
+
+.stu-team-picker select:focus-visible {
+  outline: 2px solid var(--dak-accent);
+  outline-offset: 2px;
+}
+
 .stu-view-header p {
   margin: 6px 0 0;
   max-width: 640px;
