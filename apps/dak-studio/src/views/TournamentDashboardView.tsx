@@ -176,7 +176,7 @@ export function TournamentDashboardView({
               columns={WEAPON_COLUMNS}
             />
           </div>
-          {onOpenPlayer && <LeaderboardView allEntries={allEntries} entries={entries} scope={scope} identityOptions={identityOptions} onPlayerClick={onOpenPlayer} onGoLibrary={onGoLibrary} />}
+          {onOpenPlayer && <LeaderboardView embedded allEntries={allEntries} entries={entries} scope={scope} identityOptions={identityOptions} onPlayerClick={onOpenPlayer} onGoLibrary={onGoLibrary} />}
           <p className="stu-muted">队伍手枪局、经济对位胜率与 Eco/Semi 翻盘等经济维度，统一在
             {onGoEconomy ? <button type="button" className="dak-evidence" onClick={onGoEconomy}>经济与节奏</button> : "「经济与节奏」"}页查看（避免重复）。
           </p>

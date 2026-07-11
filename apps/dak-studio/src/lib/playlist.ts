@@ -13,9 +13,6 @@ export interface PrepItem {
   addedAt?: number;
 }
 
-/** 旧本地 `playlist` 记录的读取兼容形状；迁移后只写 PrepItem。 */
-export type PlaylistItem = PrepItem;
-
 export function prepItemsToMarkdown(title: string, items: PrepItem[]): string {
   const groups = new Map<string, PrepItem[]>();
   for (const item of items) {
@@ -34,5 +31,3 @@ export function prepItemsToMarkdown(title: string, items: PrepItem[]): string {
 
   return `# ${title}\n\n${sections.join("\n\n")}`;
 }
-
-export const playlistToMarkdown = prepItemsToMarkdown;

@@ -35,11 +35,11 @@ export function EventsView({
     [active, series],
   );
   if (events.length === 0) {
-    return <div className="stu-view"><EmptyState title="还没有赛事合集" hint="在资料库获取内置/在线赛事，或导入本地 event-package/1.0 资源包。" action={<button className="stu-button" onClick={onGoLibrary}>去资料库</button>} /></div>;
+    return <div className="stu-view"><EmptyState title="还没有赛事目录" hint="在资料库获取内置/在线赛事，或导入本地 event-package/1.0 资源包。" action={<button className="stu-button" onClick={onGoLibrary}>去资料库</button>} /></div>;
   }
   return (
     <div className="stu-view stu-reading-view">
-      <header className="stu-view-header"><div><h1>赛事合集</h1><p>Event → Stage → Series → Map 的本地只读赛事视图。</p></div></header>
+      <header className="stu-view-header"><div><h1>赛事目录</h1><p>按 Event → Stage → Series → Map 浏览本地赛事，并从当前赛事进入总览。</p></div></header>
       <div className="stu-chip-row">
         {events.map((event) => <button key={event.id} className={event.id === activeId ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => setActiveId(event.id)}>{event.name}</button>)}
       </div>

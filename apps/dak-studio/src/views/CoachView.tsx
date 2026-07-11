@@ -281,23 +281,32 @@ export function CoachView({
         />
       )}
       {tab === "playlist" && (
-        <PlaylistTable
-          items={playlist}
-          entryByMatchId={entryByMatchId}
-          onUpdate={async (item) => {
-            await savePrepItem(item);
-            setPlaylist(await listPrepItems());
-          }}
-          onRemove={async (id) => {
-            await removePrepItem(id);
-            setPlaylist(await listPrepItems());
-          }}
-          onOpenMatch={(matchId, roundNumber) => {
-            const entry = entryByMatchId.get(matchId);
-            if (entry) onOpenMatch(entry.id, { roundNumber });
-          }}
-          onWatchDemo={onWatchDemo}
-        />
+        <>
+          <UserPrepItemForm
+            facts={facts}
+            onSave={async (item) => {
+              await savePrepItem(item);
+              setPlaylist(await listPrepItems());
+            }}
+          />
+          <PlaylistTable
+            items={playlist}
+            entryByMatchId={entryByMatchId}
+            onUpdate={async (item) => {
+              await savePrepItem(item);
+              setPlaylist(await listPrepItems());
+            }}
+            onRemove={async (id) => {
+              await removePrepItem(id);
+              setPlaylist(await listPrepItems());
+            }}
+            onOpenMatch={(matchId, roundNumber) => {
+              const entry = entryByMatchId.get(matchId);
+              if (entry) onOpenMatch(entry.id, { roundNumber });
+            }}
+            onWatchDemo={onWatchDemo}
+          />
+        </>
       )}
       {!loading && clusters.length > 0 && tab === "anti" && (
         <>
@@ -360,6 +369,43 @@ function isCurrentTacticalRoundFact(row: TacticalRoundFact): boolean {
     typeof event.callout === "string" &&
     typeof event.calloutLabel === "string" &&
     (event.kind === "forward" || event.kind === "deep")
+  );
+}
+
+function UserPrepItemForm({ facts, onSave }: { facts: TacticalRoundFact[]; onSave: (item: PrepItem) => Promise<void> }) {
+  const [factKey, setFactKey] = useState("");
+  const [group, setGroup] = useState("用户判断");
+  const [note, setNote] = useState("");
+  const evidenceFacts = facts.slice(0, 100);
+  const selected = evidenceFacts.find((fact) => `${fact.matchId}:${fact.roundNumber}` === factKey) ?? evidenceFacts[0] ?? null;
+
+  return (
+    <section className="stu-card">
+      <h3>记录用户判断</h3>
+      <p className="stu-muted">从描述性观察进入备战时，写下自己的判断并附上一条已有回合证据；它不会伪装成系统 Finding。</p>
+      {selected ? (
+        <div className="stu-form-row">
+          <label>分组<input className="stu-input" value={group} onChange={(event) => setGroup(event.target.value)} /></label>
+          <label>证据回合<select className="stu-input" value={factKey || `${selected.matchId}:${selected.roundNumber}`} onChange={(event) => setFactKey(event.target.value)}>
+            {evidenceFacts.map((fact) => <option key={`${fact.matchId}:${fact.roundNumber}`} value={`${fact.matchId}:${fact.roundNumber}`}>{fact.mapName} · R{fact.roundNumber} · {SIDE_LABEL[fact.side]}</option>)}
+          </select></label>
+          <label className="stu-form-row-wide">判断 / 备注<input className="stu-input" value={note} placeholder="例如：B 区 1:00 后覆盖偏低，需在下次对局复核" onChange={(event) => setNote(event.target.value)} /></label>
+          <button type="button" className="stu-button-sm" disabled={!note.trim()} onClick={() => {
+            const evidence = evidenceFacts.find((fact) => `${fact.matchId}:${fact.roundNumber}` === factKey) ?? selected;
+            void onSave({
+              id: `user:${evidence.matchId}:${evidence.roundNumber}:${Date.now()}`,
+              group: group.trim() || "用户判断",
+              matchId: evidence.matchId,
+              mapName: evidence.mapName,
+              roundNumber: evidence.roundNumber,
+              source: "user",
+              coverage: `用户判断 · ${facts.length} 个可用战术回合 · ${evidence.mapName}`,
+              note: note.trim(),
+            }).then(() => setNote(""));
+          }}>加入备战清单</button>
+        </div>
+      ) : <p className="stu-muted">当前没有可附入的战术回合；重建教练 facts 后可记录用户判断。</p>}
+    </section>
   );
 }
 

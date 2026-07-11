@@ -237,7 +237,7 @@ function focusLabel(focus: AnalysisFocus): string {
 function baselineLabel(baseline: AnalysisBaseline): string {
   if (baseline.label) return baseline.label;
   if (baseline.kind === "corpus") return "当前样本";
-  if (baseline.kind === "event-peers") return "赛事同侪";
+  if (baseline.kind === "event-peers") return "赛事整体";
   if (baseline.kind === "personal-history") return "个人历史";
   if (baseline.kind === "specified") return baseline.subject.label;
   return "仅描述";

@@ -13,9 +13,10 @@ export interface LeaderboardViewProps {
   onPlayerClick: (playerKey: string) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
+  embedded?: boolean;
 }
 
-export function LeaderboardView({ allEntries, entries, scope, onPlayerClick, onGoLibrary, identityOptions }: LeaderboardViewProps) {
+export function LeaderboardView({ allEntries, entries, scope, onPlayerClick, onGoLibrary, identityOptions, embedded = false }: LeaderboardViewProps) {
   const [model, setModel] = useState<SeasonLeaderboardModel | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,10 +54,10 @@ export function LeaderboardView({ allEntries, entries, scope, onPlayerClick, onG
   }
 
   return (
-    <div className="stu-view">
-      <header className="stu-view-header">
+    <div className={embedded ? "stu-card" : "stu-view"}>
+      <header className={embedded ? "stu-section-head" : "stu-view-header"}>
         <div>
-          <h1>排行榜</h1>
+          {embedded ? <h3>排行榜</h3> : <h1>排行榜</h1>}
           <p>
             {model ? `${model.matchCount} 场 · 权重 ${model.weightsVersion} · ` : ""}
             点击选手跳转个人档案。

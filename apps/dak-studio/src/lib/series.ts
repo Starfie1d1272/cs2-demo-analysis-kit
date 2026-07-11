@@ -1,10 +1,9 @@
 import type { RawDemoHint, SeriesFormat, SeriesVeto, SeriesVetoStep } from "@cs2dak/contract";
-import type { PlaylistItem } from "./playlist";
 import type { PrepItem } from "./playlist";
 import { ACTIVE_DUTY_MAPS } from "@cs2dak/maps";
 import { entryDate, type StudioDemoEntry } from "./library";
 import { displayTeamName } from "./identity";
-import { getStorage } from "./storage";
+import { getStorage, type RecordStore } from "./storage";
 
 /** BP 录入默认图池：CS2 现役 7 张（de_ 形式，与 entry.meta.mapName 对齐）。 */
 export const SERIES_MAP_POOL: string[] = [...ACTIVE_DUTY_MAPS];
@@ -62,7 +61,6 @@ const SETTINGS_KEY = "coach";
 const seriesStore = getStorage().records("series");
 const settingsStore = getStorage().records("series-settings");
 const playbookStore = getStorage().records("playbook");
-const playlistStore = getStorage().records("playlist");
 const prepItemsStore = getStorage().records("prep-items");
 const mapPoolNotesStore = getStorage().records("map-pool-notes");
 
@@ -248,41 +246,30 @@ export async function savePlaybookName(clusterId: string, name: string): Promise
   await playbookStore.put(clusterId, name.trim());
 }
 
-export async function listPlaylist(): Promise<PlaylistItem[]> {
-  try {
-    const rows = await playlistStore.getAll<PlaylistItem>();
-    return rows.sort((a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0));
-  } catch {
-    return [];
-  }
+/** Coach 备战清单的唯一持久化 owner。首次读取会原子地搬迁旧 playlist 数据并删除旧记录。 */
+export function createPrepItemsStore(records: RecordStore, legacyRecords?: RecordStore) {
+  return {
+    async list(): Promise<PrepItem[]> {
+      const current = await records.getAll<PrepItem>();
+      if (current.length > 0 || !legacyRecords) return current.sort((a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0));
+      const legacy = await legacyRecords.getAll<PrepItem>();
+      if (legacy.length === 0) return [];
+      const migrated = legacy.map((item) => ({ ...item, source: item.source ?? "tactical-pattern" as const }));
+      await Promise.all(migrated.map((item) => records.put(item.id, item)));
+      await Promise.all(legacy.map((item) => legacyRecords.delete(item.id)));
+      return migrated.sort((a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0));
+    },
+    async save(item: PrepItem): Promise<void> {
+      await records.put(item.id, { ...item, source: item.source ?? "tactical-pattern", addedAt: item.addedAt ?? Date.now() });
+    },
+    async remove(id: string): Promise<void> { await records.delete(id); },
+  };
 }
 
-export async function savePlaylistItem(item: PlaylistItem): Promise<void> {
-  await playlistStore.put(item.id, { ...item, addedAt: item.addedAt ?? Date.now() });
-}
-
-export async function removePlaylistItem(id: string): Promise<void> {
-  await playlistStore.delete(id);
-}
-
-/** 新 owner：读取时一次性吸收旧 playlist；之后只写 prep-items。 */
-export async function listPrepItems(): Promise<PrepItem[]> {
-  const current = await prepItemsStore.getAll<PrepItem>();
-  if (current.length > 0) return current.sort((a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0));
-  const legacy = await listPlaylist();
-  if (legacy.length === 0) return [];
-  const migrated = legacy.map((item) => ({ ...item, source: item.source ?? "tactical-pattern" }));
-  await Promise.all(migrated.map((item) => prepItemsStore.put(item.id, item)));
-  return migrated;
-}
-
-export async function savePrepItem(item: PrepItem): Promise<void> {
-  await prepItemsStore.put(item.id, { ...item, source: item.source ?? "tactical-pattern", addedAt: item.addedAt ?? Date.now() });
-}
-
-export async function removePrepItem(id: string): Promise<void> {
-  await prepItemsStore.delete(id);
-}
+const prepItems = createPrepItemsStore(prepItemsStore, getStorage().records("playlist"));
+export const listPrepItems = prepItems.list;
+export const savePrepItem = prepItems.save;
+export const removePrepItem = prepItems.remove;
 
 export async function listMapPoolNotes(): Promise<Record<string, string>> {
   try {
