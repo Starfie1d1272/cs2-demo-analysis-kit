@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { bulkUpdateTags, formatMatchLabel, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { CohortScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
 import { AnalysisContextSummary } from "./components/AnalysisContextSummary";
+import { CapabilityBar } from "./components/CapabilityBar";
 import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems, pickDemPaths, triggerWindowsDropCapture, watchDemoPath, type ExportedDemoFile } from "./lib/dem";
 import { parseTags } from "./lib/tags";
 import { listSeriesRecords, pruneOrphanSeries, type StudioSeriesRecord } from "./lib/series";
@@ -41,6 +42,7 @@ import {
   summarizeAnalysisContext,
   type AnalysisContext,
 } from "./lib/analysis-context";
+import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type StudioCapability } from "./lib/capability-availability";
 
 type StudioView =
   | "home"
@@ -99,6 +101,9 @@ const MANAGEMENT_NAV: NavItem = { key: "management", label: "管理", hint: "身
 type EventMode = "directory" | "overview";
 type MatchDeepLink = { roundNumber: number; tick?: number };
 const UPDATE_CHANNEL_KEY = "dak:update-channel";
+const CAPABILITY_BY_VIEW: Partial<Record<StudioView, StudioCapability>> = {
+  home: "personal-review", duel: "duel", economy: "economy", utility: "utility", lineups: "lineup", control: "control", coach: "tactical",
+};
 
 function initialUpdateChannel(): UpdateChannel {
   return localStorage.getItem(UPDATE_CHANNEL_KEY) === "beta" ? "beta" : "stable";
@@ -141,6 +146,7 @@ export function App() {
   const [showLatestMsg, setShowLatestMsg] = useState(false);
   const [updateChannel, setUpdateChannel] = useState<UpdateChannel>(initialUpdateChannel);
   const [contextEditorOpen, setContextEditorOpen] = useState(false);
+  const [capabilityAvailability, setCapabilityAvailability] = useState<CapabilityAvailability | null>(null);
 
   async function doCheckUpdate() {
     setCheckingUpdate(true);
@@ -195,6 +201,16 @@ export function App() {
       : undefined,
     [identityState.version, identityState.mappings, identityState.teamRenames]
   );
+
+  useEffect(() => {
+    const capability = CAPABILITY_BY_VIEW[view];
+    if (!capability || scopedEntries.length === 0) { setCapabilityAvailability(null); return; }
+    let cancelled = false;
+    void loadCapabilityAvailabilityInputs(scopedEntries)
+      .then((inputs) => { if (!cancelled) setCapabilityAvailability(deriveCapabilityAvailability(scopedEntries, capability, inputs)); })
+      .catch(() => { if (!cancelled) setCapabilityAvailability(null); });
+    return () => { cancelled = true; };
+  }, [view, scopedEntries]);
 
   const refreshEventRecords = useCallback(async () => {
     const [nextEvents, nextSeries] = await Promise.all([listEventRecords(), listSeriesRecords()]);
@@ -678,6 +694,7 @@ export function App() {
         {entries.length > 0 && view !== "library" && view !== "management" && (
           <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} onEdit={() => setContextEditorOpen((current) => !current)} />
         )}
+        {capabilityAvailability && <CapabilityBar availability={capabilityAvailability} />}
         {view === "home" && (
           <HomeView
             entries={scopedEntries}

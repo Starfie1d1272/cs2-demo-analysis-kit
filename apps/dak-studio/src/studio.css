@@ -1197,6 +1197,20 @@ body {
   cursor: pointer;
 }
 
+.stu-capability-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 6px 20px;
+  border-bottom: 1px solid var(--dak-border);
+  background: var(--dak-panel);
+  color: var(--dak-fg-mid);
+  font-size: 11px;
+}
+.stu-capability-bar b { color: var(--dak-ok); }
+.stu-capability-partial b { color: var(--dak-warn); }
+.stu-capability-unavailable b { color: var(--dak-danger); }
+
 .stu-analysis-context > span {
   display: inline-flex;
   align-items: baseline;
