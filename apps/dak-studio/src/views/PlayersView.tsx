@@ -16,6 +16,7 @@ import type { CohortScopeState } from "../components/CohortScope";
 import { FingerprintRadar, TrendChart } from "./profile-widgets";
 import { EmptyState, MetricInfo } from "@cs2dak/react";
 import { EvidenceActions } from "../components/EvidenceActions";
+import type { OpenEvidence } from "../lib/evidence-continuation";
 
 export interface PlayersViewProps {
   allEntries: StudioDemoEntry[];
@@ -24,6 +25,8 @@ export interface PlayersViewProps {
   selectedPlayerKey: string | null;
   onSelectPlayer: (playerKey: string, label?: string) => void;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onOpenEvidence: OpenEvidence;
+  returnEvidenceKey?: string;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
@@ -55,6 +58,8 @@ export function PlayersView({
   selectedPlayerKey,
   onSelectPlayer,
   onOpenMatch,
+  onOpenEvidence,
+  returnEvidenceKey,
   onWatchDemo,
   onGoLibrary,
   identityOptions
@@ -67,7 +72,7 @@ export function PlayersView({
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [pinned, setPinned] = useState<PinnedPlayer | null>(null);
   const [compareKey, setCompareKey] = useState<string | null>(null);
-  const [profileTab, setProfileTab] = useState<ProfileTab>("overview");
+  const [profileTab, setProfileTab] = useState<ProfileTab>(() => returnEvidenceKey ? "utility" : "overview");
   const [flashMode, setFlashMode] = useState<"net" | "enemy">("net");
 
   useEffect(() => {
@@ -465,7 +470,10 @@ export function PlayersView({
                               entry={e}
                               target={{ roundNumber: flash.roundNumber, tick: flash.tick }}
                               onOpenMatch={onOpenMatch}
+                              onOpenEvidence={onOpenEvidence}
                               onWatchDemo={onWatchDemo}
+                              reason={flash.reason}
+                              sourceKey={`players:flash:${flash.matchId}:${flash.roundNumber}:${i}`}
                             >
                               {e ? formatMatchLabel(e) : flash.matchId} · R{flash.roundNumber} · 致盲 {flash.victimCount} 人 · {metric}
                             </EvidenceActions>
@@ -486,7 +494,10 @@ export function PlayersView({
                             entry={e}
                             target={{ roundNumber: incident.roundNumber, tick: incident.tick }}
                             onOpenMatch={onOpenMatch}
+                            onOpenEvidence={onOpenEvidence}
                             onWatchDemo={onWatchDemo}
+                            reason={incident.reason}
+                            sourceKey={`players:team-flash:${incident.matchId}:${incident.roundNumber}:${i}`}
                           >
                             {e ? formatMatchLabel(e) : incident.matchId} · R{incident.roundNumber} · 闪到 {incident.victimCount} 名队友 {incident.totalSeconds.toFixed(1)}s
                           </EvidenceActions>
@@ -534,7 +545,10 @@ export function PlayersView({
                           entry={e}
                           target={{ roundNumber: evidence.roundNumber, tick: evidence.tick }}
                           onOpenMatch={onOpenMatch}
+                          onOpenEvidence={onOpenEvidence}
                           onWatchDemo={onWatchDemo}
+                          reason={evidence.reason}
+                          sourceKey={`players:mistake:${evidence.matchId}:${evidence.roundNumber}:${i}`}
                         >
                           {e ? formatMatchLabel(e) : evidence.matchId} · R{evidence.roundNumber} · {evidence.detail}
                         </EvidenceActions>

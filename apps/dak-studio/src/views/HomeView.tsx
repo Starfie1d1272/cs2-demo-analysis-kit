@@ -10,10 +10,12 @@ import { EmptyState, MetricInfo } from "@cs2dak/react";
 import { FingerprintRadar, TrendChart } from "./profile-widgets";
 import { RadarTrails, type RadarGrenadeOverlay, type RadarTrail } from "../components/RadarTrails";
 import { EvidenceActions } from "../components/EvidenceActions";
+import type { OpenEvidence } from "../lib/evidence-continuation";
 
 export interface HomeViewProps {
   entries: StudioDemoEntry[];
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onOpenEvidence: OpenEvidence;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoPlayers: (player?: { playerKey: string; name: string }) => void;
   onGoLibrary: () => void;
@@ -85,7 +87,7 @@ interface TeamIdentity {
 }
 
 /** 我的主页：模块 3/5/6 既有 view model 的编排视图，零新信号（docs/design/studio-redesign.md §9）。 */
-export function HomeView({ entries, onOpenMatch, onWatchDemo, onGoPlayers, onGoLibrary, identityOptions }: HomeViewProps) {
+export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, onGoPlayers, onGoLibrary, identityOptions }: HomeViewProps) {
   const [profiles, setProfiles] = useState<PlayerSeasonProfile[] | null>(null);
   const [insights, setInsights] = useState<PlayerSeasonInsights | null>(null);
   const [matchStats, setMatchStats] = useState<PlayerMatchStatsFact[] | null>(null);
@@ -388,7 +390,10 @@ export function HomeView({ entries, onOpenMatch, onWatchDemo, onGoPlayers, onGoL
                         entry={entryByMatchId.get(card.evidence.matchId)}
                         target={{ roundNumber: card.evidence.roundNumber, tick: card.evidence.tick }}
                         onOpenMatch={onOpenMatch}
+                        onOpenEvidence={onOpenEvidence}
                         onWatchDemo={onWatchDemo}
+                        reason={card.evidence.detail}
+                        sourceKey={`home:mistake:${card.label}:${card.evidence.matchId}:${card.evidence.roundNumber}`}
                       >
                         {entryByMatchId.has(card.evidence.matchId) ? formatMatchLabel(entryByMatchId.get(card.evidence.matchId)!) : card.evidence.matchId} · R{card.evidence.roundNumber} · {card.evidence.detail}
                       </EvidenceActions>
@@ -509,7 +514,10 @@ export function HomeView({ entries, onOpenMatch, onWatchDemo, onGoPlayers, onGoL
                             entry={e}
                             target={{ roundNumber: flash.roundNumber, tick: flash.tick }}
                             onOpenMatch={onOpenMatch}
+                            onOpenEvidence={onOpenEvidence}
                             onWatchDemo={onWatchDemo}
+                            reason={flash.reason}
+                            sourceKey={`home:flash:${flash.matchId}:${flash.roundNumber}:${i}`}
                           >
                             {e ? formatMatchLabel(e) : flash.matchId} · R{flash.roundNumber} · 致盲 {flash.victimCount} 人 · 净 {flash.netSeconds.toFixed(1)}s
                           </EvidenceActions>

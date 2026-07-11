@@ -8,6 +8,7 @@ import { getFactsStore } from "../lib/facts";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import { EmptyState } from "@cs2dak/react";
 import { SeriesWorkspace } from "./SeriesWorkspace";
+import type { EvidenceContinuation } from "../lib/evidence-continuation";
 
 export interface MatchViewProps {
   entries: StudioDemoEntry[];
@@ -16,6 +17,8 @@ export interface MatchViewProps {
   onSelectDemo: (id: string) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
+  evidenceContinuation?: EvidenceContinuation | null;
+  onReturnToSource?: () => void;
 }
 
 const modelCache = new Map<string, MatchWorkspaceModel>();
@@ -30,7 +33,7 @@ async function loadModel(id: string, matchId: string): Promise<MatchWorkspaceMod
   return model;
 }
 
-export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary }: MatchViewProps) {
+export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceContinuation, onReturnToSource }: MatchViewProps) {
   const activeId = demoId ?? entries[0]?.id ?? null;
   const activeEntry = activeId ? entries.find((entry) => entry.id === activeId) ?? null : null;
   const [model, setModel] = useState<MatchWorkspaceModel | null>(activeId ? modelCache.get(activeId) ?? null : null);
@@ -172,6 +175,12 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
           </button>
         )}
       </div>
+      {evidenceContinuation && (
+        <div className="stu-evidence-review" role="status">
+          <span>正在复核：{evidenceContinuation.finding?.title ?? evidenceContinuation.evidence.reason} · R{evidenceContinuation.evidence.roundNumber}</span>
+          {onReturnToSource && <button type="button" className="stu-button-sm" onClick={onReturnToSource}>返回来源</button>}
+        </div>
+      )}
       {model && showQa && (
         <div className="stu-embed stu-qa-panel">
           <QaReportPanel report={model.adminQa} />
