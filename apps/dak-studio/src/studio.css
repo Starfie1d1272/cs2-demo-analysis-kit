@@ -3855,30 +3855,57 @@ td.stu-heat-cell.stu-heat-neutral {
 
 /* ── Lineup 道具库 ──────────────────────────────────────────── */
 
+.stu-lineup-page,
 .stu-lineup-layout {
-  display: flex;
-  flex-direction: row;
+  display: grid;
   gap: 16px;
   align-items: flex-start;
 }
 
-.stu-lineup-layout > .stu-card {
-  flex: 1;
+.stu-lineup-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.stu-lineup-layout > .stu-card,
+.stu-lineup-table-card {
   min-width: 0;
 }
+
+.stu-lineup-saved {
+  width: auto;
+}
+
+.stu-lineup-saved summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.stu-lineup-saved summary span {
+  color: var(--dak-fg);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.stu-lineup-saved summary small {
+  color: var(--dak-fg-dim);
+  font-weight: 400;
+}
+
+.stu-lineup-saved[open] summary { margin-bottom: 10px; }
 
 .stu-lineup-topn {
   margin-top: 8px;
 }
 
-@media (max-width: 1000px) {
+@media (min-width: 1800px) {
   .stu-lineup-layout {
-    flex-direction: column;
+    grid-template-columns: minmax(430px, 38fr) minmax(0, 62fr);
   }
-}
 
-@media (min-width: 1001px) {
-  .stu-lineup-layout > .stu-card:first-child {
+  .stu-lineup-radar-card {
     position: sticky;
     top: 12px;
   }
@@ -3910,6 +3937,50 @@ td.stu-heat-cell.stu-heat-neutral {
   min-width: 96px;
 }
 
+.stu-lineup-table-scroll {
+  overscroll-behavior-x: contain;
+}
+
+.stu-lineup-table-scroll .stu-mini-table {
+  min-width: 900px;
+}
+
+.stu-lineup-cell-nowrap,
+.stu-lineup-place,
+.stu-lineup-action-cell {
+  white-space: nowrap;
+}
+
+.stu-lineup-place {
+  max-width: 150px;
+}
+
+.stu-lineup-place > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stu-lineup-sample {
+  min-width: 102px;
+  white-space: nowrap;
+}
+
+.stu-lineup-sample b,
+.stu-lineup-sample small {
+  display: block;
+}
+
+.stu-lineup-sample small {
+  margin-top: 2px;
+  color: var(--dak-fg-dim);
+  font-size: 10.5px;
+}
+
+.stu-lineup-action-cell {
+  min-width: 220px;
+}
+
 .stu-lineup-rounds b,
 .stu-lineup-rounds small {
   display: block;
@@ -3930,11 +4001,11 @@ td.stu-heat-cell.stu-heat-neutral {
 
 .stu-lineup-actions {
   display: inline-flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 6px;
   align-items: center;
   justify-content: flex-end;
-  white-space: nowrap;
+  width: 100%;
 }
 
 .stu-evidence-actions {
