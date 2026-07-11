@@ -7,6 +7,12 @@
 >
 > UI 约定见 [`docs/design-language.md`](../design-language.md)（强制）。
 > 模块 owner 边界见 [`docs/module-boundaries.md`](../module-boundaries.md)（强制）。
+>
+> **2026-07 已收口：** 本文保留早期数据能力和组件来历；当前产品导航、页面职责、
+> `AnalysisContext`、Finding/Evidence continuation 与行动条目边界，以
+> [`07-final-product-review.md`](../audit/2026-07-product-review/07-final-product-review.md)
+> 和 [`08-page-level-ui-ux-implementation.md`](../audit/2026-07-product-review/08-page-level-ui-ux-implementation.md)
+> 为准。不得按下文旧导航、App 级 `CohortScope` 或 `PlaylistItem` 叙述回退实现。
 
 ## 0. 全局结构
 
@@ -46,7 +52,7 @@
 - 「赛事与队伍」服务关注赛事、队伍强弱与整体趋势的用户；经济/转化、闪光价值和控图都属于队伍/赛事层，不放进个人复盘。
 - 「备战」服务有固定队伍的教练/IGL；全局范围只定义语料池，主体仍由「我的队伍 / 对手队伍」控制。
 - 管理工具不参与产品主任务分类，放侧边栏底部。
-- 单场组共享「当前比赛」上下文；跨场/赛事/备战组共享 App 级 CohortScope。上下文常驻顶栏，不在各视图内重复。
+- 所有分析页共享 App 唯一持有的 `AnalysisContext`；上下文常驻顶栏，范围编辑只是该 context 的单向适配，不在各视图内重复。
 
 ### App 级范围模型
 
@@ -69,7 +75,7 @@
 | EvidenceLink | 统计值 → 回合列表 / 2D 回放定位 tick 的统一跳转 | ✅ 分散在 TrailsView 等处，需抽公共原语 |
 | RoundFilterBar | 回合多维筛选（地图/side/经济/首杀/clutch/…） | ✅ 已有，需做成可嵌入任意视图 |
 | ReplayCanvas | 2D 回放（双层雷达、图层开关、时间轴锚点、投掷物弧线） | ✅ 已有；v3 后吃 replay 8Hz 全状态流 |
-| CohortScope | App 级范围选择：赛事 / 地图 / 队伍透镜 / 标签 / 排除场次 | ✅ 已有组件，需补赛事结构并上移到 App 顶栏 |
+| AnalysisContext + CohortScope adapter | App 级语料、focus/role、baseline 与目标；编辑时投影地图/标签/排除场次 | ✅ `AnalysisContext` 是唯一 owner；`CohortScope` 仅为短期编辑适配 |
 | MetricInfo (ⓘ) | 口径说明 tooltip | ✅ 已抽公共原语 |
 | StatCard / DataTable / EmptyState | 基础展示原语 | 🟡 样式分散，需收敛进 studio.css 公共段 |
 | ExportButton | Markdown / PNG 报表导出 | ✅ 已有导出逻辑，需统一入口样式 |
@@ -232,8 +238,8 @@ one tap 只对可一枪满血终结的武器展示，Glock/USP/M4 等不展示�
 - 8d Series/BP/Veto Lite：series 分组 ✅ + BP 录入/展示 ✅（`SeriesVeto`
   schema + `VetoInputDialog` + `SeriesWorkspace` 系列赛工作台含各图 tab/比分/跨图记分板）
   + `MapPoolTable`（地图池比较表：我方/对手样本胜率 + 对手高频打法）✅ 2026-06-15。
-- 8e Round Playlist：备战清单持久化（`PlaylistItem` + IndexedDB `playlist`
-  namespace）+ Markdown 导出（`playlistToMarkdown`）✅ 2026-06-15。
+- 8e PrepItem：备战清单持久化（`PrepItem` + IndexedDB `prep-items`
+  namespace）+ Markdown 导出（`prepItemsToMarkdown`）；首次读取会迁移并删除旧 `playlist` 记录。
 - **道具点位库**：归备战素材库，供 lineup 练习、战术本和战术板复用；不再作为旧「道具实验室」的一部分。
 - **战术板 MVP**：回放/雷达画布标注层（箭头 / 道具图标 / 文字）→ PNG + Markdown 导出；
   无实时协作、无动画播放。
