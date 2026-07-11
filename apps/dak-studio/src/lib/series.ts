@@ -1,5 +1,6 @@
 import type { RawDemoHint, SeriesFormat, SeriesVeto, SeriesVetoStep } from "@cs2dak/contract";
 import type { PlaylistItem } from "./playlist";
+import type { PrepItem } from "./playlist";
 import { ACTIVE_DUTY_MAPS } from "@cs2dak/maps";
 import { entryDate, type StudioDemoEntry } from "./library";
 import { displayTeamName } from "./identity";
@@ -62,6 +63,7 @@ const seriesStore = getStorage().records("series");
 const settingsStore = getStorage().records("series-settings");
 const playbookStore = getStorage().records("playbook");
 const playlistStore = getStorage().records("playlist");
+const prepItemsStore = getStorage().records("prep-items");
 const mapPoolNotesStore = getStorage().records("map-pool-notes");
 
 /** 按 demo 数量推断初始赛制（用户可在 UI 中手动调整）。
@@ -261,6 +263,25 @@ export async function savePlaylistItem(item: PlaylistItem): Promise<void> {
 
 export async function removePlaylistItem(id: string): Promise<void> {
   await playlistStore.delete(id);
+}
+
+/** 新 owner：读取时一次性吸收旧 playlist；之后只写 prep-items。 */
+export async function listPrepItems(): Promise<PrepItem[]> {
+  const current = await prepItemsStore.getAll<PrepItem>();
+  if (current.length > 0) return current.sort((a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0));
+  const legacy = await listPlaylist();
+  if (legacy.length === 0) return [];
+  const migrated = legacy.map((item) => ({ ...item, source: item.source ?? "tactical-pattern" }));
+  await Promise.all(migrated.map((item) => prepItemsStore.put(item.id, item)));
+  return migrated;
+}
+
+export async function savePrepItem(item: PrepItem): Promise<void> {
+  await prepItemsStore.put(item.id, { ...item, source: item.source ?? "tactical-pattern", addedAt: item.addedAt ?? Date.now() });
+}
+
+export async function removePrepItem(id: string): Promise<void> {
+  await prepItemsStore.delete(id);
 }
 
 export async function listMapPoolNotes(): Promise<Record<string, string>> {
