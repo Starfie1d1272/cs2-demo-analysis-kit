@@ -72,7 +72,7 @@ export function TeamView({
   }
 
   return (
-    <div className="stu-view">
+    <div className="stu-view stu-reading-view">
       <header className="stu-view-header">
         <div><h1>队伍</h1><p>用当前语料查看一支队伍的基础盘面，并在同一上下文继续专项分析。</p></div>
         <label className="stu-team-picker">切换队伍

@@ -464,6 +464,11 @@ body {
   gap: 16px;
 }
 
+.stu-reading-view {
+  width: min(100%, 1680px);
+  margin-inline: auto;
+}
+
 .stu-view-header {
   display: flex;
   align-items: flex-end;
