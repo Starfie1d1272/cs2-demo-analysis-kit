@@ -643,7 +643,10 @@ export function App() {
               <span className="stu-nav-section-label">{group.label}</span>
               {group.items.map((item) => (
                 <NavButton key={item.key} item={item} active={view === item.key} onClick={() => {
-                  if (item.key === "events") setEventMode("directory");
+                  if (item.key === "events") {
+                    setEventMode("directory");
+                    setAnalysisContext((current) => createAnalysisContextPreset("explore", { corpus: current.corpus }));
+                  }
                   if (item.key === "teams" && analysisContext.focus.kind !== "team") {
                     const firstTeam = entries[0] ? (identityState.teamRenames[entries[0].meta.teamAName] ?? entries[0].meta.teamAName) : null;
                     if (firstTeam) setAnalysisContext((current) => createAnalysisContextPreset("team-analysis", { corpus: current.corpus, focus: { kind: "team", teamName: firstTeam }, baseline: current.baseline }));
