@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { PlayerStyle } from "@cs2dak/contract";
 import type { PlayerSeasonInsights } from "@cs2dak/presentation";
 import { formatMatchLabel, type StudioDemoEntry } from "../lib/library";
 
@@ -7,8 +8,9 @@ import { formatMatchLabel, type StudioDemoEntry } from "../lib/library";
  * 避免雷达/趋势两套实现（见 docs/design/studio-components.md）。纯展示、零数据依赖。
  */
 
-/** PRISM 八维风格雷达（SVG 多边形）。 */
-export function FingerprintRadar({ axes }: { axes: { key: string; label: string; percentile: number }[] }) {
+/** PRISM 八维打法画像：形状表示行为倾向，第二层轮廓表示执行效率，主色由 RR 档位决定。 */
+export function FingerprintRadar({ style }: { style: PlayerStyle }) {
+  const { axes, rrPercentile } = style;
   const size = 220;
   const center = size / 2;
   const radius = size / 2 - 34;
@@ -18,27 +20,38 @@ export function FingerprintRadar({ axes }: { axes: { key: string; label: string;
   };
   const ringPath = (fraction: number) =>
     axes.map((_, i) => point(i, fraction).join(",")).join(" ");
-  const valuePath = axes.map((axis, i) => point(i, Math.max(0.04, axis.percentile / 100)).join(",")).join(" ");
+  const pathFor = (field: "involvementPercentile" | "efficiencyPercentile") => axes
+    .map((axis, i) => point(i, Math.max(0.04, (axis[field] ?? 0) / 100)).join(","))
+    .join(" ");
+  const rrTone = rrPercentile >= 75 ? "high" : rrPercentile >= 40 ? "mid" : "low";
 
   return (
-    <svg viewBox={`0 0 ${size} ${size}`} className="stu-radar" role="img" aria-label="风格雷达">
-      {[0.25, 0.5, 0.75, 1].map((fraction) => (
-        <polygon key={fraction} className="stu-radar-ring" points={ringPath(fraction)} />
-      ))}
-      {axes.map((_, i) => {
-        const [x, y] = point(i, 1);
-        return <line key={i} className="stu-radar-spoke" x1={center} y1={center} x2={x} y2={y} />;
-      })}
-      <polygon className="stu-radar-value" points={valuePath} />
-      {axes.map((axis, i) => {
-        const [x, y] = point(i, 1.16);
-        return (
-          <text key={axis.key} className="stu-radar-label" x={x} y={y} textAnchor="middle" dominantBaseline="middle">
-            {axis.label} P{axis.percentile.toFixed(0)}
-          </text>
-        );
-      })}
-    </svg>
+    <div className={`stu-prism-radar stu-prism-radar-${rrTone}`}>
+      <svg viewBox={`0 0 ${size} ${size}`} className="stu-radar" role="img" aria-label={`PRISM 八维打法画像，RR 样本内 P${rrPercentile.toFixed(0)}`}>
+        {[0.25, 0.5, 0.75, 1].map((fraction) => (
+          <polygon key={fraction} className="stu-radar-ring" points={ringPath(fraction)} />
+        ))}
+        {axes.map((_, i) => {
+          const [x, y] = point(i, 1);
+          return <line key={i} className="stu-radar-spoke" x1={center} y1={center} x2={x} y2={y} />;
+        })}
+        <polygon className="stu-radar-value" points={pathFor("involvementPercentile")} />
+        <polygon className="stu-radar-efficiency" points={pathFor("efficiencyPercentile")} />
+        {axes.map((axis, i) => {
+          const [x, y] = point(i, 1.16);
+          return (
+            <text key={axis.key} className={axis.status === "ready" ? "stu-radar-label" : "stu-radar-label stu-radar-label-muted"} x={x} y={y} textAnchor="middle" dominantBaseline="middle">
+              {axis.label}
+            </text>
+          );
+        })}
+      </svg>
+      <div className="stu-prism-legend" aria-label="图例">
+        <span><i className="stu-prism-key stu-prism-key-involvement" />行为倾向</span>
+        <span><i className="stu-prism-key stu-prism-key-efficiency" />执行效率</span>
+        <b>RR · 样本内 P{rrPercentile.toFixed(0)}</b>
+      </div>
+    </div>
   );
 }
 

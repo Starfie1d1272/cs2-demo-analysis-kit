@@ -71,10 +71,28 @@ describe("buildAllPlayerSeasonProfiles", () => {
           "entry"
         ]);
         for (const axis of profile.style!.axes) {
-          expect(axis.percentile).toBeGreaterThanOrEqual(0);
-          expect(axis.percentile).toBeLessThanOrEqual(100);
+          expect(axis.status).toBe("ready");
+          expect(axis.involvementPercentile).toBeGreaterThanOrEqual(0);
+          expect(axis.involvementPercentile).toBeLessThanOrEqual(100);
+          expect(axis.efficiencyPercentile).toBeGreaterThanOrEqual(0);
+          expect(axis.efficiencyPercentile).toBeLessThanOrEqual(100);
+          expect(axis.signalCoverage).toBe(1);
         }
       }
     }
+  });
+
+  it("does not expose precise axis percentiles when PRISM signal coverage is partial", () => {
+    const bundle = buildTestSeasonCohortBundle();
+    const source = bundle.players.find((player) => player.prism != null)!;
+    source.prism!.axes.entry.availableSignalWeight = 0.5;
+
+    const profile = buildAllPlayerSeasonProfiles(bundle).find((item) => item.playerKey === source.playerKey)!;
+    const entry = profile.style!.axes.find((axis) => axis.key === "entry")!;
+
+    expect(entry.status).toBe("partial");
+    expect(entry.involvementPercentile).toBeNull();
+    expect(entry.efficiencyPercentile).toBeNull();
+    expect(entry.combinedPercentile).toBeNull();
   });
 });

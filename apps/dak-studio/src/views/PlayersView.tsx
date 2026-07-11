@@ -362,18 +362,28 @@ export function PlayersView({
             </div>
 
             <div className="stu-card">
-              <h3>PRISM 风格八维</h3>
+              <div className="stu-section-head">
+                <h3>PRISM 八维打法画像</h3>
+                <MetricInfo note="行为倾向与执行效率分别按当前分析范围内的选手排名；不是职业数据库排名，也不代表固定角色或绝对能力。" />
+              </div>
               {selected.style ? (
-                <div className="stu-bars">
+                <div className="stu-prism-axis-list">
                   {selected.style.axes.map((axis) => (
-                    <div className="stu-bar-row" key={axis.key}>
-                      <span>{axis.label}</span>
-                      <div className="stu-bar-track">
-                        <div className="stu-bar stu-bar-style" style={{ width: `${axis.percentile}%` }} />
-                      </div>
-                      <b>P{axis.percentile.toFixed(0)}</b>
+                    <div className={`stu-prism-axis stu-prism-axis-${axis.status}`} key={axis.key}>
+                      <span className="stu-prism-axis-name">{axis.label}</span>
+                      {axis.status === "ready" ? (
+                        <>
+                          <span className="stu-prism-axis-value"><small>行为</small><b>P{axis.involvementPercentile!.toFixed(0)}</b></span>
+                          <span className="stu-prism-axis-value"><small>效率</small><b>P{axis.efficiencyPercentile!.toFixed(0)}</b></span>
+                        </>
+                      ) : (
+                        <span className="stu-prism-axis-status">
+                          {axis.status === "partial" ? "部分信号" : "不可用"} · 覆盖 {(axis.signalCoverage * 100).toFixed(0)}%
+                        </span>
+                      )}
                     </div>
                   ))}
+                  <p className="stu-dim stu-prism-note">P 值均为当前 {selected.mapCount} 图分析范围内的相对位置；信号覆盖低于 75% 时不展示精确排名。</p>
                 </div>
               ) : (
                 <p className="stu-dim">该聚合范围无 PRISM 结果。</p>
@@ -382,8 +392,8 @@ export function PlayersView({
 
             {selected.style && (
               <div className="stu-card">
-                <h3>打法风格</h3>
-                <FingerprintRadar axes={selected.style.axes} />
+                <h3>倾向与效率</h3>
+                <FingerprintRadar style={selected.style} />
               </div>
             )}
           </div>
@@ -732,7 +742,10 @@ function buildPlayerCardMarkdown(profile: PlayerSeasonProfile, insights: PlayerS
   }
   if (profile.style) {
     lines.push("");
-    lines.push("**PRISM 风格**：" + profile.style.axes.map((axis) => `${axis.label} P${axis.percentile.toFixed(0)}`).join(" · "));
+    lines.push("**PRISM 打法画像（当前样本内）**：" + profile.style.axes.map((axis) => axis.status === "ready"
+      ? `${axis.label} 行为 P${axis.involvementPercentile!.toFixed(0)} / 效率 P${axis.efficiencyPercentile!.toFixed(0)}`
+      : `${axis.label} ${axis.status === "partial" ? "部分信号" : "不可用"}`
+    ).join(" · "));
   }
   if (insights) {
     lines.push("");
@@ -760,12 +773,13 @@ function CompareCard({ left, right }: { left: PlayerSeasonProfile; right: Player
       format: "rating"
     })),
     ...(left.style && right.style
-      ? left.style.axes.map((axis) => ({
-          label: axis.label,
-          a: axis.percentile,
-          b: right.style!.axes.find((x) => x.key === axis.key)?.percentile ?? null,
-          format: "percent"
-        }))
+      ? left.style.axes.flatMap((axis) => {
+          const other = right.style!.axes.find((x) => x.key === axis.key);
+          return [
+            { label: `${axis.label} · 行为`, a: axis.involvementPercentile, b: other?.involvementPercentile ?? null, format: "percent" },
+            { label: `${axis.label} · 效率`, a: axis.efficiencyPercentile, b: other?.efficiencyPercentile ?? null, format: "percent" }
+          ];
+        })
       : [])
   ];
 
