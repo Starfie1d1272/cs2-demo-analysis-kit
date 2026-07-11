@@ -394,7 +394,7 @@ export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, on
             {me.style && (
               <div className="stu-card">
                 <h3>打法风格</h3>
-                <FingerprintRadar axes={me.style.axes} />
+                <FingerprintRadar style={me.style} />
               </div>
             )}
 
