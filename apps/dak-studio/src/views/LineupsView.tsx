@@ -29,7 +29,7 @@ export function LineupsView({ allEntries, entries, onOpenMatch, onWatchDemo, onG
       <header className="stu-view-header">
         <div>
           <h1>道具点位库</h1>
-          <p>按地图聚类常用投掷物，沉淀出手点、落点与可回看的证据回合。</p>
+          <p>按地图聚类常用投掷物，提供出手点、落点、回放与一次性练习；是否有效仍需在比赛证据中核对。</p>
         </div>
       </header>
       {entries.length === 0 ? (
