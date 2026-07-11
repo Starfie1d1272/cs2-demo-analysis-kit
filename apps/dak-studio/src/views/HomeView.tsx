@@ -426,6 +426,7 @@ export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, on
                   {mistakeFindings.slice(0, 3).map((finding) => (
                     <FindingPanel
                       key={finding.key}
+                      id={`home:finding:${finding.key}`}
                       finding={finding}
                       onOpenEvidence={() => openFindingEvidence(finding)}
                       action={<button type="button" className="stu-button-sm" onClick={() => void addTrainingFocus(finding)}>加入训练重点</button>}

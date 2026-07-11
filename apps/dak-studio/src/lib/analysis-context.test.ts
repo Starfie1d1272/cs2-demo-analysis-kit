@@ -56,6 +56,16 @@ describe("AnalysisContext", () => {
     expect(filterCorpusEntriesByTeam(entries, "FURIA").map((item) => item.id)).toEqual(["e1", "e2"]);
   });
 
+  it("preserves an explicit corpus when an object entry creates its Team preset", () => {
+    const context = createAnalysisContextPreset("team-analysis", {
+      corpus: { eventIds: ["event:cologne"], entryIds: [], matchIds: [], maps: [], tags: [], excludedEntryIds: [] },
+      focus: { kind: "team", teamName: "FURIA" },
+    });
+
+    expect(context.focus).toEqual({ kind: "team", teamName: "FURIA" });
+    expect(resolveAnalysisCorpus(entries, context.corpus, events).map((entry) => entry.id)).toEqual(["e1", "e2"]);
+  });
+
   it("projects legacy scope controls from, and only back into, the AnalysisContext owner", () => {
     const context = createAnalysisContextPreset("explore");
     const next = applyCohortScopeProjection(context, {

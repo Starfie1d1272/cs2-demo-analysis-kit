@@ -70,16 +70,18 @@ export function LimitNote({ children }: { children: ReactNode }) {
 
 /** 系统 Finding 的纯展示外壳；证据定位与用户动作由 Studio container 注入。 */
 export function FindingPanel({
+  id,
   finding,
   onOpenEvidence,
   action,
 }: {
+  id?: string;
   finding: AnalysisFinding;
   onOpenEvidence?: (evidence: EvidenceRef, finding: AnalysisFinding) => void;
   action?: ReactNode;
 }) {
   return (
-    <article className="dak-finding-panel">
+    <article id={id} className="dak-finding-panel">
       <div className="dak-finding-head">
         <div>
           <small>{finding.capability}</small>
