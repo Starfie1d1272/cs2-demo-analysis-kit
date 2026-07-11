@@ -82,7 +82,7 @@ export function SeriesWorkspace({
       </header>
 
       {series.veto && (
-        <details className="stu-series-bp" open>
+        <details className="stu-series-bp">
           <summary>BP 流程</summary>
           <BpView veto={series.veto} matchUrl={series.matchUrl} />
         </details>
