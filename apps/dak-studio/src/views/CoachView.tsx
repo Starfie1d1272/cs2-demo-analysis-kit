@@ -18,7 +18,7 @@ import { PatternExplorer } from "./coach/PatternExplorer";
 import { MapPoolTable } from "./coach/MapPoolTable";
 import type { AnalysisContext, AnalysisRoleRef } from "../lib/analysis-context";
 
-type CoachTab = "patterns" | "playbook" | "playlist" | "anti";
+type CoachTab = "patterns" | "playlist" | "anti";
 
 export interface CoachViewProps {
   allEntries: StudioDemoEntry[];
@@ -32,10 +32,9 @@ export interface CoachViewProps {
 }
 
 const TABS: Array<{ key: CoachTab; label: string }> = [
-  { key: "patterns", label: "开局模式" },
-  { key: "playbook", label: "战术本" },
-  { key: "playlist", label: "备战清单" },
-  { key: "anti", label: "备战报告" }
+  { key: "patterns", label: "战术模式" },
+  { key: "playlist", label: "备战材料" },
+  { key: "anti", label: "报告" }
 ];
 
 const SIDE_LABEL: Record<string, string> = { t: "T 方", ct: "CT 方" };
@@ -71,9 +70,9 @@ export function CoachView({
   const mode = analysisContext.goal === "opponent-prep" ? "scout" : "own";
   const subjectTeam = mode === "own" ? analysisContext.roles.beneficiary?.label ?? null : analysisContext.roles.opponent?.label ?? null;
 
-  // facts：filterBySubjectTeam 过滤后的子集（给开局模式/战术本）；allFacts：全量（给备战报告，两支队伍各自跨对手聚合）。
+  // 没有明确主体时不能把全部队伍混成一个“模式”；直接入口只要求用户补一次队伍。
   const facts = useMemo(
-    () => filterBySubjectTeam(allFacts, subjectTeam, teamRenames),
+    () => subjectTeam ? filterBySubjectTeam(allFacts, subjectTeam, teamRenames) : [],
     [allFacts, subjectTeam, teamRenames]
   );
   const clusters = useMemo(
@@ -153,7 +152,7 @@ export function CoachView({
         <EmptyState
           mark
           title="还没有教练数据"
-          hint="先导入多场 demo，再沉淀开局模式、战术本和备战报告。"
+          hint="先导入多场 demo，再整理战术模式、备战材料和报告。"
           action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
         />
       </div>
@@ -192,20 +191,20 @@ export function CoachView({
               onClick={() => setMode("scout")}
               title="侦察即将交手的对手：跨所有对手聚合其打法（不限是否与我方交手过）"
             >
-              敌方侦察
+              对手备战
             </button>
           </div>
           <label className={mode === "own" ? "stu-coach-team-picker stu-coach-team-picker-active" : "stu-coach-team-picker"}>
             我的队伍
             <select value={analysisContext.roles.beneficiary?.label ?? ""} onChange={(event) => void setTeamRole("beneficiary", event.target.value)}>
-              <option value="">全部队伍</option>
+              <option value="">请选择己方队伍</option>
               {teamGroups.map((team) => <option key={team.displayName} value={team.displayName}>{team.displayName}</option>)}
             </select>
           </label>
           <label className={mode === "scout" ? "stu-coach-team-picker stu-coach-team-picker-active" : "stu-coach-team-picker"}>
             对手队伍
             <select value={analysisContext.roles.opponent?.label ?? ""} onChange={(event) => void setTeamRole("opponent", event.target.value)}>
-              <option value="">未选择</option>
+              <option value="">请选择对手队伍</option>
               {teamGroups.map((team) => <option key={team.displayName} value={team.displayName}>{team.displayName}</option>)}
             </select>
           </label>
@@ -245,40 +244,43 @@ export function CoachView({
         />
       )}
       {!loading && clusters.length > 0 && tab === "patterns" && (
-        <PatternExplorer
-          clusters={clusters}
-          facts={facts}
-          entryByMatchId={entryByMatchId}
-          onOpenMatch={onOpenMatch}
-          onWatchDemo={onWatchDemo}
-          onAddToPlaylist={async (cluster, fact) => {
-            const entry = entryByMatchId.get(fact.matchId);
-            const item: PrepItem = {
-              id: `${cluster.id}:${fact.matchId}:${fact.roundNumber}`,
-              group: autoName(cluster) || `${cluster.mapName} ${cluster.side.toUpperCase()}`,
-              matchId: fact.matchId,
-              mapName: fact.mapName,
-              roundNumber: fact.roundNumber,
-              clusterId: cluster.id,
-              patternFingerprint: patternFingerprint(cluster),
-              source: "tactical-pattern",
-              coverage: `${cluster.roundCount} 回合 · ${cluster.mapName} · ${SIDE_LABEL[cluster.side]}`,
-              note: entry ? `${entry.meta.teamAName} ${entry.meta.teamAScore}:${entry.meta.teamBScore} ${entry.meta.teamBName}` : "",
-            };
-            await savePrepItem(item);
-            setPlaylist(await listPrepItems());
-          }}
-        />
-      )}
-      {!loading && clusters.length > 0 && tab === "playbook" && (
-        <PlaybookTable
-          clusters={clusters}
-          playbook={playbook}
-          onRename={async (patternKey, name) => {
-            await savePlaybookName(patternKey, name);
-            setPlaybook(await listPlaybookNames());
-          }}
-        />
+        <>
+          <PatternExplorer
+            clusters={clusters}
+            facts={facts}
+            entryByMatchId={entryByMatchId}
+            onOpenMatch={onOpenMatch}
+            onWatchDemo={onWatchDemo}
+            onAddToPlaylist={async (cluster, fact) => {
+              const entry = entryByMatchId.get(fact.matchId);
+              const item: PrepItem = {
+                id: `${cluster.id}:${fact.matchId}:${fact.roundNumber}`,
+                group: autoName(cluster) || `${cluster.mapName} ${cluster.side.toUpperCase()}`,
+                matchId: fact.matchId,
+                mapName: fact.mapName,
+                roundNumber: fact.roundNumber,
+                clusterId: cluster.id,
+                patternFingerprint: patternFingerprint(cluster),
+                source: "tactical-pattern",
+                coverage: `${cluster.roundCount} 回合 · ${cluster.mapName} · ${SIDE_LABEL[cluster.side]}`,
+                note: entry ? `${entry.meta.teamAName} ${entry.meta.teamAScore}:${entry.meta.teamBScore} ${entry.meta.teamBName}` : "",
+              };
+              await savePrepItem(item);
+              setPlaylist(await listPrepItems());
+            }}
+          />
+          <details className="stu-card stu-coach-pattern-names">
+            <summary>模式命名与备注</summary>
+            <PlaybookTable
+              clusters={clusters}
+              playbook={playbook}
+              onRename={async (patternKey, name) => {
+                await savePlaybookName(patternKey, name);
+                setPlaybook(await listPlaybookNames());
+              }}
+            />
+          </details>
+        </>
       )}
       {tab === "playlist" && (
         <>

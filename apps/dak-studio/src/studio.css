@@ -3773,6 +3773,22 @@ td.stu-heat-cell.stu-heat-neutral {
   gap: 14px;
 }
 
+.stu-coach-pattern-names {
+  margin-top: 2px;
+}
+
+.stu-coach-pattern-names > summary {
+  cursor: pointer;
+  color: var(--dak-fg-mid);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stu-coach-pattern-names[open] > summary {
+  margin-bottom: 12px;
+  color: var(--dak-fg);
+}
+
 /* ── 教练·战术聚类 PatternExplorer（列表 / 常驻回放 / 证据） ─────────────── */
 
 .stu-coach-pattern-explorer {

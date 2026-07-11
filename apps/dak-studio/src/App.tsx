@@ -192,6 +192,22 @@ export function App() {
   const selectedPlayerKey = analysisContext.focus.kind === "self" || analysisContext.focus.kind === "player"
     ? analysisContext.focus.playerKey
     : null;
+  const displayedCapabilityAvailability = useMemo<CapabilityAvailability | null>(() => {
+    if (view !== "coach" || !capabilityAvailability) return capabilityAvailability;
+    const requiredRole = analysisContext.goal === "opponent-prep" ? analysisContext.roles.opponent : analysisContext.roles.beneficiary;
+    if (requiredRole) return capabilityAvailability;
+    return {
+      ...capabilityAvailability,
+      status: "unavailable",
+      eligibleMatches: 0,
+      excluded: [{
+        reason: analysisContext.goal === "opponent-prep" ? "请选择对手队伍" : "请选择己方队伍",
+        count: scopedEntries.length,
+        entryIds: scopedEntries.map((entry) => entry.id),
+      }],
+      repairActions: [],
+    };
+  }, [analysisContext.goal, analysisContext.roles.beneficiary, analysisContext.roles.opponent, capabilityAvailability, scopedEntries, view]);
   const updateLegacyScope = useCallback((next: CohortScopeState) => {
     setAnalysisContext((current) => applyCohortScopeProjection(current, next));
   }, []);
@@ -712,7 +728,7 @@ export function App() {
             teamSelection="single-focus"
           />
         )}
-        {capabilityAvailability && <CapabilityBar availability={capabilityAvailability} />}
+        {displayedCapabilityAvailability && <CapabilityBar availability={displayedCapabilityAvailability} />}
         {view === "home" && (
           <HomeView
             entries={scopedEntries}
