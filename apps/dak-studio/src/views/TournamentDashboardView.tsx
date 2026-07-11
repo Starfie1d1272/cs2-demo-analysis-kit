@@ -112,7 +112,7 @@ export function TournamentDashboardView({
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
 
   return (
-    <div className="stu-view">
+    <div className="stu-view stu-reading-view">
       <header className="stu-view-header">
         <div>
           <h1>赛事总览</h1>
