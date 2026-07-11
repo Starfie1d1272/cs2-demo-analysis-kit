@@ -43,6 +43,7 @@ import {
   type AnalysisContext,
 } from "./lib/analysis-context";
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type StudioCapability } from "./lib/capability-availability";
+import { getPinnedPlayer } from "./lib/pin";
 
 type StudioView =
   | "home"
@@ -247,6 +248,14 @@ export function App() {
     // 只会制造 CORS 错误；需要时仍可由用户手动检查。
     if (window.pywebview?.api) void doCheckUpdate();
     void loadIdentityState().then(setIdentityState);
+    void getPinnedPlayer().then((pinned) => {
+      if (!pinned) return;
+      setAnalysisContext((current) => current.goal === "explore" && current.focus.kind === "aggregate"
+        ? createAnalysisContextPreset("personal-review", {
+            focus: { kind: "self", playerKey: pinned.playerKey, label: pinned.name },
+          })
+        : current);
+    });
   }, [refreshEventRecords]);
 
   const importFiles = useCallback(async (files: Iterable<File | ExportedDemoFile>, tags: string[] = [], initialErrors: string[] = []) => {
@@ -406,7 +415,10 @@ export function App() {
   // 一级页面是新的工作面：普通切页从页首开始，避免把上一页的深滚动位置
   // 泄漏到新页面。证据返回是唯一例外，由上面的 continuation 精确恢复来源锚点。
   useEffect(() => {
-    if (!returningEvidence) window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    if (!returningEvidence) {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      document.querySelector<HTMLElement>(".stu-sidebar")?.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
     // 只在 view 真正变化时判断；returningEvidence 清空不能再次把已恢复的锚点拉回页首。
   }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -668,6 +680,32 @@ export function App() {
               <span className="stu-nav-section-label">{group.label}</span>
               {group.items.map((item) => (
                 <NavButton key={item.key} item={item} active={view === item.key} onClick={() => {
+                  if (item.key === "home") {
+                    setAnalysisContext((current) => createAnalysisContextPreset("personal-review", {
+                      focus: current.focus.kind === "self" || current.focus.kind === "player"
+                        ? { kind: "self", playerKey: current.focus.playerKey, label: current.focus.label }
+                        : { kind: "aggregate" },
+                    }));
+                    void getPinnedPlayer().then((pinned) => {
+                      if (!pinned) return;
+                      setAnalysisContext((current) => current.goal === "personal-review"
+                        ? createAnalysisContextPreset("personal-review", {
+                            focus: { kind: "self", playerKey: pinned.playerKey, label: pinned.name },
+                          })
+                        : current);
+                    });
+                  }
+                  if (item.key === "match") {
+                    const entry = entries.find((row) => row.id === selectedDemoId) ?? entries[0];
+                    if (entry) {
+                      setSelectedDemoId(entry.id);
+                      setMatchDeepLink(null);
+                      setAnalysisContext(createAnalysisContextPreset("match-review", {
+                        corpus: { eventIds: [], entryIds: [entry.id], matchIds: [], maps: [], tags: [], excludedEntryIds: [] },
+                        focus: { kind: "match", entryId: entry.id, label: formatMatchLabel(entry) },
+                      }));
+                    }
+                  }
                   if (item.key === "events") {
                     setEventMode("directory");
                     setAnalysisContext((current) => createAnalysisContextPreset("explore", { corpus: current.corpus }));
