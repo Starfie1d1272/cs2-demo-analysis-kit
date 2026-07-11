@@ -26,12 +26,12 @@ function pickBadge(series: StudioSeriesRecord, mapName: string): string | null {
   return who ? `${who} PICK` : "PICK";
 }
 
-/** 系列比分：按队名统计各图胜负。 */
-function seriesScore(entries: StudioDemoEntry[]): { teamA: string; teamB: string; winsA: number; winsB: number } | null {
-  const first = entries[0];
-  if (!first) return null;
-  const teamA = first.meta.teamAName;
-  const teamB = first.meta.teamBName;
+/** 系列比分：始终按 series 的 A/B 顺序统计，不能继承某张地图里可能反转的 teamA/teamB。 */
+export function seriesScore(
+  series: Pick<StudioSeriesRecord, "teamAName" | "teamBName">,
+  entries: StudioDemoEntry[]
+): { winsA: number; winsB: number } | null {
+  if (entries.length === 0) return null;
   let winsA = 0;
   let winsB = 0;
   for (const entry of entries) {
@@ -41,10 +41,10 @@ function seriesScore(entries: StudioDemoEntry[]): { teamA: string; teamB: string
     const aName = entry.meta.teamAName;
     if (a === b) continue;
     const winnerName = a > b ? aName : entry.meta.teamBName;
-    if (winnerName === teamA) winsA += 1;
-    else if (winnerName === teamB) winsB += 1;
+    if (winnerName === series.teamAName) winsA += 1;
+    else if (winnerName === series.teamBName) winsB += 1;
   }
-  return { teamA, teamB, winsA, winsB };
+  return { winsA, winsB };
 }
 
 function copyRawDemoUrl(url: string): void {
@@ -65,7 +65,7 @@ export function SeriesWorkspace({
   onShowSummary,
   children
 }: SeriesWorkspaceProps) {
-  const score = seriesScore(entries);
+  const score = seriesScore(series, entries);
   const sortedEntries = useMemo(
     () => series.veto ? sortEntriesByVeto(entries, series.veto) : entries,
     [entries, series.veto]

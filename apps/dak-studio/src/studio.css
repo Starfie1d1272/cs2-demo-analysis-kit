@@ -1353,6 +1353,23 @@ body {
   padding: 6px 0 0;
 }
 
+/* MatchWorkspace 嵌入 Studio 后服从壳层的桌面信息层级，不沿用独立预览页的 hero 标题。 */
+.stu-embed .dak-workspace-header {
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+}
+
+.stu-embed .dak-title {
+  margin-top: 0;
+  font-size: clamp(24px, 2.2vw, 30px);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+.stu-embed .dak-scoreline {
+  font-size: clamp(30px, 2.8vw, 38px);
+}
+
 /* ── 选手档案 ───────────────────────────────────────────── */
 
 .stu-split {
