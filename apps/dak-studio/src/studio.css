@@ -26,7 +26,7 @@
   --dak-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 
   /* Studio 自有 token */
-  --stu-sidebar-w: 218px;
+  --stu-sidebar-w: 192px;
   --stu-radius: 10px;
   --stu-radius-sm: 7px;
 
@@ -71,8 +71,8 @@ body {
   scrollbar-width: thin;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 18px 14px;
+  gap: 10px;
+  padding: 14px 10px;
   background: linear-gradient(180deg, #0e1316, #0b0e10 70%);
   border-right: 1px solid var(--dak-border);
 }
@@ -109,13 +109,13 @@ body {
 .stu-nav {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .stu-nav-section {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .stu-nav-section-label {
@@ -135,9 +135,10 @@ body {
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 9px 10px;
+  min-height: 36px;
+  padding: 7px 9px;
   border: 1px solid transparent;
-  border-radius: var(--stu-radius-sm);
+  border-radius: 0 var(--stu-radius-sm) var(--stu-radius-sm) 0;
   background: transparent;
   color: var(--dak-fg-mid);
   font-family: inherit;
@@ -154,7 +155,8 @@ body {
 .stu-nav-item-active,
 .stu-nav-item-active:hover {
   background: var(--dak-accent-soft);
-  border-color: rgba(47, 224, 168, 0.35);
+  border-color: transparent;
+  border-left-color: var(--dak-accent);
   color: var(--dak-fg);
 }
 
@@ -169,7 +171,7 @@ body {
 }
 
 .stu-nav-item small {
-  display: block;
+  display: none;
   font-size: 11px;
   color: var(--dak-fg-dim);
 }
