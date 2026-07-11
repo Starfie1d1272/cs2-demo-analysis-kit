@@ -96,6 +96,7 @@ export function LineupView({
   const [copiedClusterId, setCopiedClusterId] = useState<string | null>(null);
   const [savedClusterId, setSavedClusterId] = useState<string | null>(null);
   const [savedLineups, setSavedLineups] = useState<PracticeLineup[]>([]);
+  const [savedDetailsOpen, setSavedDetailsOpen] = useState(true);
   const entryById = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);
 
   function handleClusterJump(cluster: LineupCluster) {
@@ -218,18 +219,22 @@ export function LineupView({
   const lineupColumns = useMemo<DataTableColumn<LineupCluster>[]>(() => [
     {
       key: "grenade", label: "道具",
+      cellClassName: () => "stu-lineup-cell-nowrap",
       render: (c) => <>
         <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: GRENADE_COLOR[c.grenade] ?? "#888", marginRight: 6, verticalAlign: "middle" }} />
         {GRENADE_LABEL[c.grenade] ?? displayWeaponName(c.grenade)}
       </>
     },
-    { key: "side", label: "方", format: (c) => c.side ? SIDE_LABEL[c.side] : "—" },
-    { key: "throwPlace", label: "投掷位", format: (c) => c.throwerPlaceName ? calloutName(c.mapName, c.throwerPlaceName) : "—" },
+    { key: "side", label: "方", cellClassName: () => "stu-lineup-cell-nowrap", format: (c) => c.side ? SIDE_LABEL[c.side] : "—" },
     {
-      key: "effectPlace", label: "落点",
+      key: "throwPlace", label: "投掷位", cellClassName: () => "stu-lineup-place",
+      render: (c) => <span title={c.throwerPlaceName ? calloutName(c.mapName, c.throwerPlaceName) : undefined}>{c.throwerPlaceName ? calloutName(c.mapName, c.throwerPlaceName) : "—"}</span>
+    },
+    {
+      key: "effectPlace", label: "落点", cellClassName: () => "stu-lineup-place",
       render: (c) => <span title={c.effectCalloutConfidence != null ? `confidence ${c.effectCalloutConfidence.toFixed(2)} · samples ${c.effectCalloutSamples ?? 0}` : undefined}>{c.effectCallout ? calloutName(c.mapName, c.effectCallout) : "—"}</span>,
     },
-    { key: "time", label: "时间", format: (c) => c.throwTimeBucket ?? "—" },
+    { key: "time", label: "时间", cellClassName: () => "stu-lineup-cell-nowrap", format: (c) => c.throwTimeBucket ?? "—" },
     {
       key: "rounds",
       label: "出现回合",
@@ -240,15 +245,13 @@ export function LineupView({
         </span>
       )
     },
-    { key: "count", label: "次数", numeric: true, sortable: true, sortValue: (c) => c.count, format: (c) => c.count },
-    { key: "demoCount", label: "场次", numeric: true, sortable: true, sortValue: (c) => c.demoCount, format: (c) => c.demoCount },
     {
-      key: "winRate", label: <>胜率<MetricInfo note="该道具点位所在回合的本方胜率；样本小仅供参考" /></>, numeric: true, sortable: true,
-      sortValue: (c) => c.winRatePercent,
-      format: (c) => c.winRatePercent == null ? "—" : `${c.winRatePercent.toFixed(1)}%`,
+      key: "sample", label: <>样本<MetricInfo note="次数 / 涉及场次 / 该点位所在回合的本方胜率；小样本仅供参考" /></>,
+      sortable: true, sortValue: (c) => c.count, cellClassName: () => "stu-lineup-sample",
+      render: (c) => <><b>{c.count} 次 · {c.demoCount} 场</b><small>{c.winRatePercent == null ? "胜率 —" : `胜率 ${c.winRatePercent.toFixed(1)}%`}</small></>
     },
     {
-      key: "replay", label: "",
+      key: "replay", label: "操作", cellClassName: () => "stu-lineup-action-cell",
       render: (c) => {
         const firstThrow = c.throws[0];
         const watchThrow = c.throws.find((row) => entryById.get(row.entryId)?.sourceDemPath);
@@ -317,12 +320,30 @@ export function LineupView({
   const radarClusters = selectedCluster && !radarRows.some((cluster) => cluster.id === selectedCluster.id)
     ? [...radarRows, selectedCluster]
     : radarRows;
+  const savedForCurrentMap = savedLineups.filter((item) => item.mapName === current.mapName);
 
   return (
-    <div className="stu-lineup-layout">
-      {savedLineups.length > 0 && <section className="stu-card"><div className="stu-section-head"><h3>已保存练习点位</h3><small className="stu-muted">用户明确保存，facts 重建不会删除。</small></div><div className="stu-chip-row">{savedLineups.filter((item) => item.mapName === current.mapName).map((item) => <span key={item.id} className="stu-chip">{item.label}<button type="button" className="stu-button-sm" onClick={() => void removePracticeLineup(item.id).then(async () => setSavedLineups(await listPracticeLineups()))}>删除</button></span>)}</div></section>}
+    <div className="stu-lineup-page">
+      {savedLineups.length > 0 && (
+        <details
+          className="stu-card stu-lineup-saved"
+          open={savedDetailsOpen}
+          onToggle={(event) => setSavedDetailsOpen(event.currentTarget.open)}
+        >
+          <summary>
+            <span>已保存练习点位 · {mapDisplayName(current.mapName)}</span>
+            <small>{savedForCurrentMap.length} 个 · 用户明确保存，facts 重建不会删除</small>
+          </summary>
+          {savedForCurrentMap.length > 0 ? (
+            <div className="stu-chip-row">
+              {savedForCurrentMap.map((item) => <span key={item.id} className="stu-chip">{item.label}<button type="button" className="stu-button-sm" onClick={() => void removePracticeLineup(item.id).then(async () => setSavedLineups(await listPracticeLineups()))}>删除</button></span>)}
+            </div>
+          ) : <p className="stu-muted">当前地图还没有保存的练习点位。</p>}
+        </details>
+      )}
+      <div className="stu-lineup-layout">
       {/* ── 雷达 ──────────────────────────────────────────────────────── */}
-      <div className="stu-card">
+      <div className="stu-card stu-lineup-radar-card">
         <h3>道具点位雷达 · {mapDisplayName(current.mapName)}</h3>
 
         <div className="stu-chip-row" role="tablist" aria-label="聚类模式">
@@ -533,27 +554,30 @@ export function LineupView({
       </div>
 
       {/* ── 表格（DataTable：受控分页 + rowProps hover 联动雷达） ──── */}
-      <div className="stu-card">
+      <div className="stu-card stu-lineup-table-card">
         <h3>道具点位库 · {mapDisplayName(current.mapName)}</h3>
         <p className="stu-muted">练习命令复现投掷 tick 的玩家站位和视角；跑动、跳投和组合键细节仍建议点“回放”或“进游戏”核对原始 demo。</p>
-        <DataTable
-          classes={STUDIO_TABLE_CLASSES}
-          rows={sideFilteredRows}
-          rowKey={(c) => c.id}
-          initialSortKey="count"
-          pageSize={PAGE_SIZE}
-          page={page}
-          onPageChange={setPage}
-          paginationInfo={(total) => `${total} 条`}
-          rowProps={(cluster) => ({
-            className: hoveredId === cluster.id ? "stu-lineup-row-hovered" : "",
-            onMouseEnter: () => setHoveredId(cluster.id),
-            onMouseLeave: () => setHoveredId(null),
-            onFocus: () => setHoveredId(cluster.id),
-            onBlur: () => setHoveredId(null),
-          })}
-          columns={lineupColumns}
-        />
+        <div className="stu-table-scroll stu-lineup-table-scroll" tabIndex={0} aria-label="道具点位表格，可横向滚动查看完整列">
+          <DataTable
+            classes={STUDIO_TABLE_CLASSES}
+            rows={sideFilteredRows}
+            rowKey={(c) => c.id}
+            initialSortKey="sample"
+            pageSize={PAGE_SIZE}
+            page={page}
+            onPageChange={setPage}
+            paginationInfo={(total) => `${total} 条`}
+            rowProps={(cluster) => ({
+              className: hoveredId === cluster.id ? "stu-lineup-row-hovered" : "",
+              onMouseEnter: () => setHoveredId(cluster.id),
+              onMouseLeave: () => setHoveredId(null),
+              onFocus: () => setHoveredId(cluster.id),
+              onBlur: () => setHoveredId(null),
+            })}
+            columns={lineupColumns}
+          />
+        </div>
+      </div>
       </div>
     </div>
   );
