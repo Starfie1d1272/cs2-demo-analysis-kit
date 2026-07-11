@@ -193,6 +193,8 @@ export interface FactsStore {
   getLineups(scope?: FactsScope): Promise<LineupFact[]>;
   getTacticalRounds(scope?: FactsScope): Promise<TacticalRoundFact[]>;
   getUtilityValueFacts(scope?: FactsScope): Promise<UtilityValueSummary[]>;
+  /** 只读 utility facts 的逐场可用性；不加载或重算完整 DemoPackage。 */
+  getUtilityValueFactMatchIds(scope?: FactsScope): Promise<string[]>;
   deleteMatchFacts(matchId: string): Promise<void>;
 }
 
@@ -682,6 +684,13 @@ export function createFactsStore(adapter: StorageAdapter, namespace = "facts"): 
         .filter((row) => inScope(row, scope))
         .sort((a, b) => a.matchId.localeCompare(b.matchId))
         .map((row) => row.row);
+    },
+    async getUtilityValueFactMatchIds(scope) {
+      return [...new Set(
+        (await utilityValueFacts.getAll<UtilityValueFact>())
+          .filter((row) => inScope(row, scope))
+          .map((row) => row.matchId)
+      )].sort();
     },
     async deleteMatchFacts(matchId) {
       await Promise.all(
