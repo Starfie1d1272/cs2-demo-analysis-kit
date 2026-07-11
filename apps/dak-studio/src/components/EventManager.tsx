@@ -118,10 +118,10 @@ export function EventManager({
   }
 
   return <>
-    {/* 获取赛事：下载内置/在线赛事，或导入本地资源包。与「已导入赛事」管理分开。 */}
+  {/* 资料库的赛事包入口：下载、导入、移除都在数据生命周期内完成。 */}
     <details className="stu-card" open>
-      <summary><b>获取赛事</b></summary>
-      <p className="stu-muted">下载内置示例或在线赛事，或导入本地赛事资源包 <code>&lt;slug&gt;.zip</code>（含 event-package.json + 各图 ZIP）。导入后自动建立赛事 → 系列 → 地图并配对 demo。</p>
+      <summary><b>导入赛事资源包</b></summary>
+      <p className="stu-muted">下载内置示例或在线赛事，或导入本地赛事资源包（含 event-package.json 与各图 ZIP）。导入后自动建立赛事、系列和地图关联。</p>
       <EventGallery
         builtins={BUILTIN_EVENTS}
         bundledManifest={bundledManifest}
@@ -142,7 +142,7 @@ export function EventManager({
       {!nativeImport && <p className="stu-muted">浏览器降级入口会把整个赛事包载入内存后逐图导入；桌面端走原生低内存路径，更适合大型赛事包。</p>}
     </details>
 
-    {/* 已导入赛事：管理与删除。 */}
+    {/* 已写入资料库的赛事组织记录；赛事页只负责浏览，不承担这些数据操作。 */}
     {events.length > 0 && (
       <details className="stu-card" open>
         <summary><b>已导入赛事（{events.length}）</b></summary>

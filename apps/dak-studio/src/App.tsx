@@ -31,7 +31,7 @@ import { CoachView } from "./views/CoachView";
 import { RadarFieldView } from "./views/RadarFieldView";
 import { loadIdentityState, buildCohortIdentityMap, type IdentityStoreState } from "./lib/identity";
 import type { IdentityOptions } from "./lib/season";
-import { BUILTIN_EVENTS, type BuiltinEvent } from "./lib/builtin-events";
+import type { BuiltinEvent } from "./lib/builtin-events";
 import { createEvidenceContinuation, type EvidenceContinuation, type OpenEvidence } from "./lib/evidence-continuation";
 import {
   applyCohortScopeProjection,
@@ -321,9 +321,6 @@ export function App() {
       setImporting(false);
     }
   }, []);
-
-  // 兼容旧入口：LibraryView 的「加载示例」载入首个内置条目（示例职业局）。
-  const loadSample = useCallback(() => loadBuiltinEvent(BUILTIN_EVENTS[0]), [loadBuiltinEvent]);
 
   const openDemo = useCallback((id: string, target?: MatchDeepLink) => {
     const entry = entries.find((row) => row.id === id);
@@ -691,8 +688,9 @@ export function App() {
             onImportTagsChange={setImportTagsRaw}
             onImportFiles={importFiles}
             onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined}
-            onLoadSample={loadSample}
-            onGoManage={() => setView("management")}
+            onNotice={setNotice}
+            onLibraryChanged={setEntries}
+            onLoadBuiltin={loadBuiltinEvent}
             onOpenDemo={openDemo}
             onRemoveDemo={handleRemove}
             onUpdateTags={handleUpdateTags}
@@ -849,7 +847,7 @@ export function App() {
                 onGoEconomy={() => setView("economy")}
               />
             ) : (
-              <EventsView entries={entries} onOpenMatch={openDemo} onAnalyzeEvent={startEventAnalysis} onGoManage={() => setView("management")} />
+              <EventsView entries={entries} onOpenMatch={openDemo} onAnalyzeEvent={startEventAnalysis} onGoLibrary={() => setView("library")} />
             )}
           </>
         )}
@@ -863,7 +861,6 @@ export function App() {
             onGoLibrary={() => setView("library")}
             onNotice={setNotice}
             onLibraryChanged={setEntries}
-            onLoadBuiltin={loadBuiltinEvent}
           />
         )}
       </main>

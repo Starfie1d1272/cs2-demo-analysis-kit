@@ -3,6 +3,8 @@ import { useMemo, useState, type ChangeEvent } from "react";
 import { entryDate, isFactsStale, type StudioDemoEntry } from "../lib/library";
 import { parseTags } from "../lib/tags";
 import { EmptyState } from "@cs2dak/react";
+import { EventManager } from "../components/EventManager";
+import type { BuiltinEvent } from "../lib/builtin-events";
 
 export interface LibraryViewProps {
   entries: StudioDemoEntry[];
@@ -12,8 +14,9 @@ export interface LibraryViewProps {
   onImportFiles: (files: Iterable<File>, tags: string[]) => void;
   /** 桌面壳（pywebview）下提供：用原生对话框代替浏览器 file input */
   onNativeImport?: () => void;
-  onLoadSample: () => void;
-  onGoManage: () => void;
+  onNotice: (message: string) => void;
+  onLibraryChanged: (entries: StudioDemoEntry[]) => void;
+  onLoadBuiltin: (builtin: BuiltinEvent) => Promise<void> | void;
   onOpenDemo: (id: string) => void;
   onRemoveDemo: (id: string) => void;
   onUpdateTags: (id: string, tags: string[]) => void;
@@ -52,8 +55,9 @@ export function LibraryView({
   onImportTagsChange,
   onImportFiles,
   onNativeImport,
-  onLoadSample,
-  onGoManage,
+  onNotice,
+  onLibraryChanged,
+  onLoadBuiltin,
   onOpenDemo,
   onRemoveDemo,
   onUpdateTags,
@@ -218,6 +222,8 @@ export function LibraryView({
         </div>
       </header>
 
+      <EventManager entries={entries} onNotice={onNotice} onLibraryChanged={onLibraryChanged} onLoadBuiltin={onLoadBuiltin} />
+
       <div className="stu-stat-strip">
         <div className="stu-stat">
           <b>{entries.length}</b>
@@ -380,17 +386,7 @@ export function LibraryView({
         <EmptyState
           mark
           title="资料库为空"
-          hint="把 .dem 或 v3 ZIP 拖进窗口，或点右上角「导入 demo」。小示例是 7 图职业决赛；科隆 Major 等大赛事在「管理 > 赛事资产」里加载。"
-          action={
-            <span className="stu-empty-actions">
-              <button type="button" className="stu-button stu-button-ghost" onClick={onLoadSample} disabled={importing}>
-                加载 7 图示例
-              </button>
-              <button type="button" className="stu-button stu-button-ghost" onClick={onGoManage}>
-                去赛事资产
-              </button>
-            </span>
-          }
+          hint="把 .dem 或 v3 ZIP 拖进窗口，或点右上角「导入 demo」。上方也可加载内置/在线赛事，或导入本地赛事资源包。"
         />
       ) : (
         <div className="stu-table-wrap">
