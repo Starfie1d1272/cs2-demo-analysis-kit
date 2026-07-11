@@ -8,6 +8,7 @@ import {
   missingAnalysisCoordinates,
   resolveAnalysisCorpus,
   summarizeAnalysisContext,
+  summarizeAnalysisContextParts,
 } from "./analysis-context.js";
 import type { StudioDemoEntry } from "./library.js";
 
@@ -92,5 +93,22 @@ describe("AnalysisContext", () => {
 
     expect(missingAnalysisCoordinates(context, "coach")).toEqual(["对手"]);
     expect(missingAnalysisCoordinates({ ...context, roles: { ...context.roles, opponent: { kind: "team", id: "spirit", label: "Spirit" } } }, "coach")).toEqual([]);
+  });
+
+  it("keeps corpus, focus, roles and baseline as separately readable context fields", () => {
+    const context = createAnalysisContext({
+      goal: "opponent-prep",
+      corpus: { eventIds: ["event:cologne"], entryIds: [], matchIds: [], maps: [], tags: [], excludedEntryIds: [] },
+      focus: { kind: "team", teamName: "Spirit" },
+      roles: {
+        beneficiary: { kind: "team", id: "furia", label: "FURIA" },
+        opponent: { kind: "team", id: "spirit", label: "Spirit" },
+      },
+      baseline: { kind: "event-peers", eventId: "event:cologne" },
+    });
+
+    expect(summarizeAnalysisContextParts(context, entries, events)).toEqual({
+      corpus: "Cologne", focus: "Spirit", roles: "我方：FURIA · 对手：Spirit", baseline: "赛事同侪", goal: "对手备战",
+    });
   });
 });
