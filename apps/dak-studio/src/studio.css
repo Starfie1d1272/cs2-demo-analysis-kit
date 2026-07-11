@@ -1151,6 +1151,18 @@ body {
   font-size: 10px;
 }
 
+.stu-evidence-review {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--dak-border-hi);
+  background: var(--dak-panel-hi);
+  color: var(--dak-fg);
+  font-size: 12px;
+}
+
 .stu-select {
   max-width: 480px;
   padding: 7px 10px;

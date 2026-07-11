@@ -32,6 +32,7 @@ import { RadarFieldView } from "./views/RadarFieldView";
 import { loadIdentityState, buildCohortIdentityMap, type IdentityStoreState } from "./lib/identity";
 import type { IdentityOptions } from "./lib/season";
 import { BUILTIN_EVENTS, type BuiltinEvent } from "./lib/builtin-events";
+import { createEvidenceContinuation, type EvidenceContinuation, type OpenEvidence } from "./lib/evidence-continuation";
 import {
   applyCohortScopeProjection,
   cohortScopeProjection,
@@ -133,6 +134,8 @@ export function App() {
   const [importing, setImporting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [analysisContext, setAnalysisContext] = useState<AnalysisContext>(() => createAnalysisContextPreset("explore"));
+  const [evidenceContinuation, setEvidenceContinuation] = useState<EvidenceContinuation | null>(null);
+  const [returningEvidence, setReturningEvidence] = useState<EvidenceContinuation | null>(null);
   const [eventRecords, setEventRecords] = useState<StudioEventRecord[]>([]);
   const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
   const [identityState, setIdentityState] = useState<IdentityStoreState>({ version: 0, mappings: [], teamRenames: {} });
@@ -333,6 +336,38 @@ export function App() {
     setMatchDeepLink(target ?? null);
     setView("match");
   }, [entries]);
+
+  const openEvidence = useCallback<OpenEvidence>((id, evidence, sourceKey, finding) => {
+    setEvidenceContinuation(createEvidenceContinuation({
+      sourceView: view,
+      context: analysisContext,
+      sourceKey,
+      evidence,
+      finding,
+    }));
+    setSelectedDemoId(id);
+    setMatchDeepLink({ roundNumber: evidence.roundNumber, tick: evidence.tick });
+    setView("match");
+  }, [analysisContext, view]);
+
+  const returnFromEvidence = useCallback(() => {
+    if (!evidenceContinuation) return;
+    setAnalysisContext(evidenceContinuation.context);
+    setView(evidenceContinuation.sourceView as StudioView);
+    setReturningEvidence(evidenceContinuation);
+    setEvidenceContinuation(null);
+  }, [evidenceContinuation]);
+
+  useEffect(() => {
+    if (!returningEvidence || view !== returningEvidence.sourceView) return;
+    const timer = window.setTimeout(() => {
+      if (returningEvidence.sourceKey) {
+        document.getElementById(returningEvidence.sourceKey)?.scrollIntoView({ block: "center" });
+      }
+      setReturningEvidence(null);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [returningEvidence, view]);
 
   const handleLinkRawDemo = useCallback(async (entry: StudioDemoEntry) => {
     try {
@@ -639,6 +674,7 @@ export function App() {
           <HomeView
             entries={entries}
             onOpenMatch={openDemo}
+            onOpenEvidence={openEvidence}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoPlayers={(player) => player ? openPlayer(player.playerKey, player.name) : setView("players")}
             onGoLibrary={() => setView("library")}
@@ -678,6 +714,8 @@ export function App() {
             onSelectDemo={(id) => openDemo(id)}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoLibrary={() => setView("library")}
+            evidenceContinuation={evidenceContinuation}
+            onReturnToSource={returnFromEvidence}
           />
         )}
         {view === "players" && (
@@ -688,7 +726,9 @@ export function App() {
             selectedPlayerKey={selectedPlayerKey}
             onSelectPlayer={openPlayer}
             onOpenMatch={openDemo}
+            onOpenEvidence={openEvidence}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
+            returnEvidenceKey={returningEvidence?.sourceView === "players" ? returningEvidence.sourceKey : undefined}
             identityOptions={identityOptions}
             onGoLibrary={() => setView("library")}
           />
@@ -732,6 +772,7 @@ export function App() {
             entries={scopedEntries}
             scope={legacyScope}
             onOpenMatch={openDemo}
+            onOpenEvidence={openEvidence}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             identityOptions={identityOptions}
             onGoLibrary={() => setView("library")}
