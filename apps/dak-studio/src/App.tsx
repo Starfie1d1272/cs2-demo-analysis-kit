@@ -812,7 +812,11 @@ export function App() {
           />
         )}
         {view === "control" && (
-          <RadarFieldView entries={scopedEntries} teamRenames={identityState.teamRenames} />
+          <RadarFieldView
+            entries={scopedEntries}
+            teamRenames={identityState.teamRenames}
+            selectedTeam={analysisContext.focus.kind === "team" ? analysisContext.focus.teamName : null}
+          />
         )}
         {view === "events" && (eventMode === "overview" ? (
           <TournamentDashboardView

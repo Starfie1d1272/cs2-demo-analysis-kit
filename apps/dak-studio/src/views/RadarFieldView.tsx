@@ -16,11 +16,12 @@ import { displayTeamName, teamRenameGroups } from "../lib/identity";
 export interface RadarFieldViewProps {
   entries: StudioDemoEntry[];
   teamRenames?: Record<string, string>;
+  selectedTeam?: string | null;
 }
 
 const LEAGUE = "__league__";
 
-export function RadarFieldView({ entries, teamRenames = {} }: RadarFieldViewProps) {
+export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null }: RadarFieldViewProps) {
   const maps = useMemo(() => {
     const set = new Map<string, number>();
     for (const e of entries) if (getMapCalibration(e.meta.mapName)) set.set(e.meta.mapName, (set.get(e.meta.mapName) ?? 0) + 1);
@@ -50,6 +51,10 @@ export function RadarFieldView({ entries, teamRenames = {} }: RadarFieldViewProp
     }
     return counts;
   }, [entriesOfMap, teamRenames]);
+
+  useEffect(() => {
+    if (selectedTeam && teams.some((team) => team.displayName === selectedTeam)) setScopeSel(selectedTeam);
+  }, [selectedTeam, teams]);
 
   useEffect(() => {
     if (activeMap && maps.some(([name]) => name === activeMap)) return;
@@ -111,7 +116,7 @@ export function RadarFieldView({ entries, teamRenames = {} }: RadarFieldViewProp
           <h3>控图覆盖场</h3>
           <p className="stu-muted">
             基线 = 当前全局范围中 {activeMap} 的 {entriesOfMap.length} 场；
-            队伍视图 = 该队在这些场次里的贡献。
+            队伍视图 = 该队在这些场次里的贡献。覆盖场仅作描述性观察，不自动识别弱区或生成对策。
           </p>
         </div>
         <span className="stu-radar-field-badge">首次计算后会缓存</span>
