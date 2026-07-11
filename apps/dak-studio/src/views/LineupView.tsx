@@ -14,7 +14,7 @@ import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { mapDisplayName } from "../lib/series";
 import { getFactsStore } from "../lib/facts";
 import { GRENADE_COLOR } from "../components/RadarTrails";
-import { savePracticeLineup } from "../lib/practice-lineups";
+import { listPracticeLineups, removePracticeLineup, savePracticeLineup, type PracticeLineup } from "../lib/practice-lineups";
 
 // ── 常亮 ────────────────────────────────────────────────────────────────────
 
@@ -95,6 +95,7 @@ export function LineupView({
   const [clusterMode, setClusterMode] = useState<LineupClusterMode>("strict");
   const [copiedClusterId, setCopiedClusterId] = useState<string | null>(null);
   const [savedClusterId, setSavedClusterId] = useState<string | null>(null);
+  const [savedLineups, setSavedLineups] = useState<PracticeLineup[]>([]);
   const entryById = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);
 
   function handleClusterJump(cluster: LineupCluster) {
@@ -117,7 +118,10 @@ export function LineupView({
   async function handleSavePractice(cluster: LineupCluster) {
     await savePracticeLineup(cluster, practiceCommandForCluster(cluster));
     setSavedClusterId(cluster.id);
+    setSavedLineups(await listPracticeLineups());
   }
+
+  useEffect(() => { void listPracticeLineups().then(setSavedLineups); }, []);
 
   // ── 加载：分批 → 按地图分组 → 跨场聚类 ──────────────────────────────────
   useEffect(() => {
@@ -316,6 +320,7 @@ export function LineupView({
 
   return (
     <div className="stu-lineup-layout">
+      {savedLineups.length > 0 && <section className="stu-card"><div className="stu-section-head"><h3>已保存练习点位</h3><small className="stu-muted">用户明确保存，facts 重建不会删除。</small></div><div className="stu-chip-row">{savedLineups.filter((item) => item.mapName === current.mapName).map((item) => <span key={item.id} className="stu-chip">{item.label}<button type="button" className="stu-button-sm" onClick={() => void removePracticeLineup(item.id).then(async () => setSavedLineups(await listPracticeLineups()))}>删除</button></span>)}</div></section>}
       {/* ── 雷达 ──────────────────────────────────────────────────────── */}
       <div className="stu-card">
         <h3>道具点位雷达 · {mapDisplayName(current.mapName)}</h3>

@@ -38,8 +38,11 @@ export function createPracticeLineupStore(records: RecordStore) {
     async list(): Promise<PracticeLineup[]> {
       return (await records.getAll<PracticeLineup>()).sort((a, b) => b.updatedAt - a.updatedAt);
     },
+    async remove(id: string): Promise<void> { await records.delete(id); },
   };
 }
 
 const practiceLineupStore = createPracticeLineupStore(getStorage().records("practice-lineups"));
 export const savePracticeLineup = practiceLineupStore.save;
+export const listPracticeLineups = practiceLineupStore.list;
+export const removePracticeLineup = practiceLineupStore.remove;

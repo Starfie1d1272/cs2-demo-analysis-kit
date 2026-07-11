@@ -619,7 +619,14 @@ export function App() {
             <section key={group.label} className="stu-nav-section" aria-label={group.label}>
               <span className="stu-nav-section-label">{group.label}</span>
               {group.items.map((item) => (
-                <NavButton key={item.key} item={item} active={view === item.key} onClick={() => { if (item.key === "events") setEventMode("directory"); setView(item.key); }} />
+                <NavButton key={item.key} item={item} active={view === item.key} onClick={() => {
+                  if (item.key === "events") setEventMode("directory");
+                  if (item.key === "teams" && analysisContext.focus.kind !== "team") {
+                    const firstTeam = entries[0] ? (identityState.teamRenames[entries[0].meta.teamAName] ?? entries[0].meta.teamAName) : null;
+                    if (firstTeam) setAnalysisContext((current) => createAnalysisContextPreset("team-analysis", { corpus: current.corpus, focus: { kind: "team", teamName: firstTeam }, baseline: current.baseline }));
+                  }
+                  setView(item.key);
+                }} />
               ))}
             </section>
           ))}
@@ -674,7 +681,7 @@ export function App() {
         )}
         {view === "home" && (
           <HomeView
-            entries={entries}
+            entries={scopedEntries}
             onOpenMatch={openDemo}
             onOpenEvidence={openEvidence}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
@@ -816,6 +823,11 @@ export function App() {
             entries={scopedEntries}
             teamRenames={identityState.teamRenames}
             selectedTeam={analysisContext.focus.kind === "team" ? analysisContext.focus.teamName : null}
+            onSelectTeam={(teamName) => setAnalysisContext((current) => ({
+              ...current,
+              goal: teamName ? "team-analysis" : current.goal === "team-analysis" ? "explore" : current.goal,
+              focus: teamName ? { kind: "team", teamName } : current.focus.kind === "team" ? { kind: "aggregate" } : current.focus,
+            }))}
           />
         )}
         {view === "events" && (eventMode === "overview" ? (
@@ -826,6 +838,7 @@ export function App() {
             identityOptions={identityOptions}
             onOpenMatch={openDemo}
             onOpenTeam={openTeam}
+            onOpenPlayer={openPlayer}
             onGoLibrary={() => setView("library")}
             onGoEconomy={() => setView("economy")}
             onGoDirectory={() => setEventMode("directory")}

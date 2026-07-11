@@ -17,11 +17,12 @@ export interface RadarFieldViewProps {
   entries: StudioDemoEntry[];
   teamRenames?: Record<string, string>;
   selectedTeam?: string | null;
+  onSelectTeam?: (teamName: string | null) => void;
 }
 
 const LEAGUE = "__league__";
 
-export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null }: RadarFieldViewProps) {
+export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null, onSelectTeam }: RadarFieldViewProps) {
   const maps = useMemo(() => {
     const set = new Map<string, number>();
     for (const e of entries) if (getMapCalibration(e.meta.mapName)) set.set(e.meta.mapName, (set.get(e.meta.mapName) ?? 0) + 1);
@@ -142,7 +143,7 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null 
         <button
           type="button"
           className={scopeSel === LEAGUE ? "stu-chip stu-chip-active" : "stu-chip"}
-          onClick={() => setScopeSel(LEAGUE)}
+          onClick={() => { setScopeSel(LEAGUE); onSelectTeam?.(null); }}
           title={`当前全局范围 · ${activeMap} · ${entriesOfMap.length} 场`}
         >
           赛事地图基线 <small>{entriesOfMap.length}</small>
@@ -153,7 +154,7 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null 
             type="button"
             className={scopeSel === t.displayName ? "stu-chip stu-chip-active" : "stu-chip"}
             title={t.originals.length > 1 ? `已合并：${t.originals.join(" / ")}` : undefined}
-            onClick={() => setScopeSel(t.displayName)}
+            onClick={() => { setScopeSel(t.displayName); onSelectTeam?.(t.displayName); }}
           >
             {t.displayName} <small>{teamMatchCounts.get(t.displayName) ?? 0}</small>
           </button>

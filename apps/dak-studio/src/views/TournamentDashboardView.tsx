@@ -5,6 +5,7 @@ import { getTeamComparison, getTournamentInsights, type IdentityOptions } from "
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import type { CohortScopeState } from "../components/CohortScope";
 import { EmptyState, MetricInfo } from "@cs2dak/react";
+import { LeaderboardView } from "./LeaderboardView";
 
 export interface TournamentDashboardViewProps {
   allEntries: StudioDemoEntry[];
@@ -15,6 +16,7 @@ export interface TournamentDashboardViewProps {
   onGoEconomy?: () => void;
   onOpenTeam?: (teamName: string) => void;
   onGoDirectory?: () => void;
+  onOpenPlayer?: (playerKey: string) => void;
   identityOptions?: IdentityOptions;
 }
 
@@ -46,6 +48,7 @@ export function TournamentDashboardView({
   onGoEconomy,
   onOpenTeam,
   onGoDirectory,
+  onOpenPlayer,
   identityOptions
 }: TournamentDashboardViewProps) {
   const [insights, setInsights] = useState<TournamentInsights | null>(null);
@@ -173,6 +176,7 @@ export function TournamentDashboardView({
               columns={WEAPON_COLUMNS}
             />
           </div>
+          {onOpenPlayer && <LeaderboardView allEntries={allEntries} entries={entries} scope={scope} identityOptions={identityOptions} onPlayerClick={onOpenPlayer} onGoLibrary={onGoLibrary} />}
           <p className="stu-muted">队伍手枪局、经济对位胜率与 Eco/Semi 翻盘等经济维度，统一在
             {onGoEconomy ? <button type="button" className="dak-evidence" onClick={onGoEconomy}>经济与节奏</button> : "「经济与节奏」"}页查看（避免重复）。
           </p>
