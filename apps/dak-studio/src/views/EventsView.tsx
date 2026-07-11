@@ -12,12 +12,12 @@ export function EventsView({
   entries,
   onOpenMatch,
   onAnalyzeEvent,
-  onGoManage,
+  onGoLibrary,
 }: {
   entries: StudioDemoEntry[];
   onOpenMatch: (entryId: string) => void;
   onAnalyzeEvent: (event: StudioEventRecord) => void;
-  onGoManage: () => void;
+  onGoLibrary: () => void;
 }) {
   const [events, setEvents] = useState<StudioEventRecord[]>([]);
   const [series, setSeries] = useState<StudioSeriesRecord[]>([]);
@@ -35,7 +35,7 @@ export function EventsView({
     [active, series],
   );
   if (events.length === 0) {
-    return <div className="stu-view"><EmptyState title="还没有赛事合集" hint="去「管理 → 赛事资产」下载内置/在线赛事，或导入本地 event-package/1.0 资源包。" action={<button className="stu-button" onClick={onGoManage}>去管理</button>} /></div>;
+    return <div className="stu-view"><EmptyState title="还没有赛事合集" hint="在资料库获取内置/在线赛事，或导入本地 event-package/1.0 资源包。" action={<button className="stu-button" onClick={onGoLibrary}>去资料库</button>} /></div>;
   }
   return (
     <div className="stu-view">
