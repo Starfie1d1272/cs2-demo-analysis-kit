@@ -63,17 +63,17 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "开始",
     items: [
-      { key: "home", label: "我的主页", hint: "近期状态 / 该练什么", icon: House },
+      { key: "home", label: "我的复盘", hint: "个人状态与待复核", icon: House },
       { key: "library", label: "资料库", hint: "导入与管理 Demo", icon: LibraryBig },
-      { key: "match", label: "比赛工作台", hint: "回合 / 地图 / 回放", icon: Film }
+      { key: "match", label: "比赛复盘", hint: "回合 / 地图 / 回放", icon: Film }
     ]
   },
   {
     label: "选手复盘",
     items: [
-      { key: "players", label: "选手档案", hint: "画像 / 趋势 / 机制", icon: UserRound },
+      { key: "players", label: "选手", hint: "画像 / 趋势 / 机制", icon: UserRound },
       { key: "trails", label: "开局动线", hint: "默认位 / 出门路线", icon: Radar },
-      { key: "duel", label: "对枪复盘", hint: "证据队列 / 枪法机制", icon: Swords }
+      { key: "duel", label: "对枪", hint: "证据 / 态势 / 机制", icon: Swords }
     ]
   },
   {
@@ -83,14 +83,14 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
       { key: "events", label: "赛事", hint: "目录 / 总览 / 赛程", icon: Trophy },
       { key: "economy", label: "经济与转化", hint: "手枪 / 人数优势 / 经济对位", icon: Coins },
       { key: "utility", label: "道具价值", hint: "闪光 / 雷火 / 烟", icon: Bomb },
-      { key: "lineups", label: "道具点位库", hint: "出手点 / 落点 / 证据", icon: Bomb },
+      { key: "lineups", label: "道具点位", hint: "出手 / 落点 / 练习", icon: Bomb },
       { key: "control", label: "控图", hint: "覆盖场 / 防守漏洞 / 倾向", icon: Radar }
     ]
   },
   {
     label: "备战",
     items: [
-      { key: "coach", label: "教练工作台", hint: "开局模式 / 战术本 / 备战", icon: ClipboardList }
+      { key: "coach", label: "Coach", hint: "模式 / 清单 / 报告", icon: ClipboardList }
     ]
   }
 ];
@@ -111,12 +111,10 @@ function NavButton({ item, active, onClick }: { item: NavItem; active: boolean; 
       type="button"
       className={active ? "stu-nav-item stu-nav-item-active" : "stu-nav-item"}
       onClick={onClick}
+      title={item.hint}
     >
       <Icon size={16} />
-      <span>
-        <b>{item.label}</b>
-        <small>{item.hint}</small>
-      </span>
+      <span><b>{item.label}</b><small>{item.hint}</small></span>
     </button>
   );
 }
