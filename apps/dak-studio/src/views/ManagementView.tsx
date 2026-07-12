@@ -2,8 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { SeasonCohortBundle } from "@cs2dak/contract";
 import { EmptyState } from "@cs2dak/react";
 import { AssetsPanel } from "../components/AssetsPanel";
-import { EventManager } from "../components/EventManager";
-import type { BuiltinEvent } from "../lib/builtin-events";
 import { getSeasonSummary, type IdentityOptions } from "../lib/season";
 import {
   listAuditEntries,
@@ -26,7 +24,6 @@ export interface ManagementViewProps {
   teamRenames?: Record<string, string>;
   onNotice?: (message: string) => void;
   onLibraryChanged?: (entries: StudioDemoEntry[]) => void;
-  onLoadBuiltin: (builtin: BuiltinEvent) => Promise<void> | void;
 }
 
 type BundlePlayer = SeasonCohortBundle["players"][number];
@@ -45,10 +42,9 @@ export function ManagementView({
   onGoLibrary,
   teamRenames = identity.teamRenames,
   onNotice = () => {},
-  onLibraryChanged,
-  onLoadBuiltin
+  onLibraryChanged
 }: ManagementViewProps) {
-  const [tab, setTab] = useState<"identity" | "assets" | "events">("identity");
+  const [tab, setTab] = useState<"identity" | "assets">("identity");
   const [bundle, setBundle] = useState<SeasonCohortBundle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -234,7 +230,6 @@ export function ManagementView({
   const MGMT_TABS = [
     { key: "identity" as const, label: "身份" },
     { key: "assets" as const, label: "资产" },
-    { key: "events" as const, label: "赛事" },
   ];
 
   return (
@@ -242,7 +237,7 @@ export function ManagementView({
       <header className="stu-view-header">
         <div>
           <h1>管理</h1>
-          <p className="stu-view-sub">选手与队伍身份 · 资产与存储 · 赛事</p>
+          <p className="stu-view-sub">选手与队伍身份 · 资产、存储与修复</p>
         </div>
       </header>
       <div className="stu-subtabs" role="tablist" aria-label="管理分区">
@@ -262,9 +257,6 @@ export function ManagementView({
 
       {tab === "assets" && (
         <AssetsPanel entries={entries} onLibraryChanged={onLibraryChanged} onNotice={onNotice} />
-      )}
-      {tab === "events" && (
-        <EventManager entries={entries} onNotice={onNotice} onLibraryChanged={onLibraryChanged} onLoadBuiltin={onLoadBuiltin} />
       )}
       {tab === "identity" && entries.length === 0 && (
         <EmptyState

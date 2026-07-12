@@ -8,6 +8,7 @@ import { getFactsStore } from "../lib/facts";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import { EmptyState } from "@cs2dak/react";
 import { SeriesWorkspace } from "./SeriesWorkspace";
+import type { EvidenceContinuation } from "../lib/evidence-continuation";
 
 export interface MatchViewProps {
   entries: StudioDemoEntry[];
@@ -16,9 +17,22 @@ export interface MatchViewProps {
   onSelectDemo: (id: string) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
+  evidenceContinuation?: EvidenceContinuation | null;
+  onReturnToSource?: () => void;
 }
 
 const modelCache = new Map<string, MatchWorkspaceModel>();
+const MAX_MODEL_CACHE_ENTRIES = 5;
+
+function cacheModel(id: string, model: MatchWorkspaceModel): void {
+  modelCache.delete(id);
+  modelCache.set(id, model);
+  while (modelCache.size > MAX_MODEL_CACHE_ENTRIES) {
+    const oldest = modelCache.keys().next().value;
+    if (oldest === undefined) break;
+    modelCache.delete(oldest);
+  }
+}
 
 async function loadModel(id: string, matchId: string): Promise<MatchWorkspaceModel> {
   const cached = modelCache.get(id);
@@ -26,11 +40,11 @@ async function loadModel(id: string, matchId: string): Promise<MatchWorkspaceMod
   // 旧库可能仍有持久化 workspace（向后兼容直接用）；新导入不再持久化，按需从 ZIP 懒算。
   const stored = await getFactsStore().getMatchWorkspace(matchId);
   const model = stored?.row ?? (await loadMatchWorkspaceModel(id));
-  modelCache.set(id, model);
+  cacheModel(id, model);
   return model;
 }
 
-export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary }: MatchViewProps) {
+export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceContinuation, onReturnToSource }: MatchViewProps) {
   const activeId = demoId ?? entries[0]?.id ?? null;
   const activeEntry = activeId ? entries.find((entry) => entry.id === activeId) ?? null : null;
   const [model, setModel] = useState<MatchWorkspaceModel | null>(activeId ? modelCache.get(activeId) ?? null : null);
@@ -172,6 +186,12 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
           </button>
         )}
       </div>
+      {evidenceContinuation && (
+        <div className="stu-evidence-review" role="status">
+          <span>正在复核：{evidenceContinuation.finding?.title ?? evidenceContinuation.evidence.reason} · R{evidenceContinuation.evidence.roundNumber}</span>
+          {onReturnToSource && <button type="button" className="stu-button-sm" onClick={onReturnToSource}>返回来源</button>}
+        </div>
+      )}
       {model && showQa && (
         <div className="stu-embed stu-qa-panel">
           <QaReportPanel report={model.adminQa} />

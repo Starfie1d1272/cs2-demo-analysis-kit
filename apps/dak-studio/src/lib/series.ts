@@ -1,9 +1,9 @@
 import type { RawDemoHint, SeriesFormat, SeriesVeto, SeriesVetoStep } from "@cs2dak/contract";
-import type { PlaylistItem } from "./playlist";
+import type { PrepItem } from "./playlist";
 import { ACTIVE_DUTY_MAPS } from "@cs2dak/maps";
 import { entryDate, type StudioDemoEntry } from "./library";
 import { displayTeamName } from "./identity";
-import { getStorage } from "./storage";
+import { getStorage, type RecordStore } from "./storage";
 
 /** BP 录入默认图池：CS2 现役 7 张（de_ 形式，与 entry.meta.mapName 对齐）。 */
 export const SERIES_MAP_POOL: string[] = [...ACTIVE_DUTY_MAPS];
@@ -61,7 +61,7 @@ const SETTINGS_KEY = "coach";
 const seriesStore = getStorage().records("series");
 const settingsStore = getStorage().records("series-settings");
 const playbookStore = getStorage().records("playbook");
-const playlistStore = getStorage().records("playlist");
+const prepItemsStore = getStorage().records("prep-items");
 const mapPoolNotesStore = getStorage().records("map-pool-notes");
 
 /** 按 demo 数量推断初始赛制（用户可在 UI 中手动调整）。
@@ -161,6 +161,28 @@ export function sortEntriesByVeto(entries: StudioDemoEntry[], veto: SeriesVeto):
   );
 }
 
+export function oppositeSide(side: "t" | "ct"): "t" | "ct" {
+  return side === "t" ? "ct" : "t";
+}
+
+function opposingTeamKey(teamKey: SeriesVetoStep["teamKey"]): SeriesVetoStep["teamKey"] {
+  return teamKey === "teamA" ? "teamB" : teamKey === "teamB" ? "teamA" : null;
+}
+
+/**
+ * 将原始 BP step 规范为用户可见的选边事实。
+ * PICK 的 `side` 记录选图方从哪一侧开局，因此展示对手选边时必须同时换队伍和阵营。
+ * DECIDER 没有固定的选图方/对手关系，保留原始记录。
+ */
+export function deriveSideChoice(step: SeriesVetoStep): SeriesVeto["sideChoices"][number] | null {
+  if (step.side == null) return null;
+  return {
+    mapName: step.mapName,
+    teamKey: step.actionType === "pick" ? opposingTeamKey(step.teamKey) : step.teamKey,
+    side: step.actionType === "pick" ? oppositeSide(step.side) : step.side
+  };
+}
+
 export function deriveVetoSummary(steps: SeriesVetoStep[]): Pick<SeriesVeto, "maps" | "sideChoices"> {
   return {
     maps: {
@@ -173,8 +195,8 @@ export function deriveVetoSummary(steps: SeriesVetoStep[]): Pick<SeriesVeto, "ma
       decider: steps.find((step) => step.actionType === "decider")?.mapName ?? null
     },
     sideChoices: steps
-      .filter((step): step is SeriesVetoStep & { side: "t" | "ct" } => step.side != null)
-      .map((step) => ({ mapName: step.mapName, teamKey: step.teamKey, side: step.side }))
+      .map(deriveSideChoice)
+      .filter((choice): choice is SeriesVeto["sideChoices"][number] => choice != null)
   };
 }
 
@@ -246,22 +268,35 @@ export async function savePlaybookName(clusterId: string, name: string): Promise
   await playbookStore.put(clusterId, name.trim());
 }
 
-export async function listPlaylist(): Promise<PlaylistItem[]> {
-  try {
-    const rows = await playlistStore.getAll<PlaylistItem>();
-    return rows.sort((a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0));
-  } catch {
-    return [];
-  }
+/** Coach 备战清单的唯一持久化 owner。每次读取都幂等搬迁残留的旧 playlist 数据。 */
+export function createPrepItemsStore(records: RecordStore, legacyRecords?: RecordStore) {
+  return {
+    async list(): Promise<PrepItem[]> {
+      const current = await records.getAll<PrepItem>();
+      if (!legacyRecords) return current.sort((a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0));
+      const legacy = await legacyRecords.getAll<PrepItem>();
+      const byId = new Map(current.map((item) => [item.id, item]));
+      for (const item of legacy) {
+        if (!byId.has(item.id)) {
+          const migrated = { ...item, source: item.source ?? "tactical-pattern" as const };
+          await records.put(item.id, migrated);
+          byId.set(item.id, migrated);
+        }
+        await legacyRecords.delete(item.id);
+      }
+      return [...byId.values()].sort((a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0));
+    },
+    async save(item: PrepItem): Promise<void> {
+      await records.put(item.id, { ...item, source: item.source ?? "tactical-pattern", addedAt: item.addedAt ?? Date.now() });
+    },
+    async remove(id: string): Promise<void> { await records.delete(id); },
+  };
 }
 
-export async function savePlaylistItem(item: PlaylistItem): Promise<void> {
-  await playlistStore.put(item.id, { ...item, addedAt: item.addedAt ?? Date.now() });
-}
-
-export async function removePlaylistItem(id: string): Promise<void> {
-  await playlistStore.delete(id);
-}
+const prepItems = createPrepItemsStore(prepItemsStore, getStorage().records("playlist"));
+export const listPrepItems = prepItems.list;
+export const savePrepItem = prepItems.save;
+export const removePrepItem = prepItems.remove;
 
 export async function listMapPoolNotes(): Promise<Record<string, string>> {
   try {

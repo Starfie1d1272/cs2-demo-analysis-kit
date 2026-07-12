@@ -1,7 +1,9 @@
 import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Radar, Settings, Swords, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { bulkUpdateTags, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
-import { CohortScope, EMPTY_SCOPE, applyScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
+import { bulkUpdateTags, formatMatchLabel, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
+import { CohortScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
+import { AnalysisContextSummary } from "./components/AnalysisContextSummary";
+import { CapabilityBar } from "./components/CapabilityBar";
 import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems, pickDemPaths, triggerWindowsDropCapture, watchDemoPath, type ExportedDemoFile } from "./lib/dem";
 import { parseTags } from "./lib/tags";
 import { listSeriesRecords, pruneOrphanSeries, type StudioSeriesRecord } from "./lib/series";
@@ -17,9 +19,9 @@ import { HomeView } from "./views/HomeView";
 import { LibraryView } from "./views/LibraryView";
 import { MatchView } from "./views/MatchView";
 import { PlayersView } from "./views/PlayersView";
-import { LeaderboardView } from "./views/LeaderboardView";
 import { TrailsView } from "./views/TrailsView";
 import { TournamentDashboardView } from "./views/TournamentDashboardView";
+import { TeamView } from "./views/TeamView";
 import { EventsView } from "./views/EventsView";
 import { UtilityView } from "./views/UtilityView";
 import { LineupsView } from "./views/LineupsView";
@@ -30,20 +32,31 @@ import { CoachView } from "./views/CoachView";
 import { RadarFieldView } from "./views/RadarFieldView";
 import { loadIdentityState, buildCohortIdentityMap, type IdentityStoreState } from "./lib/identity";
 import type { IdentityOptions } from "./lib/season";
-import { BUILTIN_EVENTS, type BuiltinEvent } from "./lib/builtin-events";
+import type { BuiltinEvent } from "./lib/builtin-events";
+import { createEvidenceContinuation, type EvidenceContinuation, type OpenEvidence } from "./lib/evidence-continuation";
+import {
+  applyCohortScopeProjection,
+  cohortScopeProjection,
+  createAnalysisContextPreset,
+  resolveAnalysisCorpus,
+  summarizeAnalysisContext,
+  type AnalysisContext,
+} from "./lib/analysis-context";
+import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
+import { getPinnedPlayer } from "./lib/pin";
 
 type StudioView =
   | "home"
   | "library"
   | "match"
   | "players"
+  | "teams"
   | "trails"
   | "duel"
-  | "duelOverview"
   | "utility"
   | "lineups"
   | "economy"
-  | "tournament"
+  | "events"
   | "coach"
   | "control"
   | "management";
@@ -53,47 +66,45 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "开始",
     items: [
-      { key: "home", label: "我的主页", hint: "近期状态 / 该练什么", icon: House },
+      { key: "home", label: "我的复盘", hint: "个人状态与待复核", icon: House },
       { key: "library", label: "资料库", hint: "导入与管理 Demo", icon: LibraryBig },
-      { key: "match", label: "比赛工作台", hint: "回合 / 地图 / 回放", icon: Film }
+      { key: "match", label: "比赛复盘", hint: "回合 / 地图 / 回放", icon: Film }
     ]
   },
   {
     label: "选手复盘",
     items: [
-      { key: "players", label: "选手档案", hint: "画像 / 趋势 / 机制", icon: UserRound },
+      { key: "players", label: "选手", hint: "画像 / 趋势 / 机制", icon: UserRound },
       { key: "trails", label: "开局动线", hint: "默认位 / 出门路线", icon: Radar },
-      { key: "duel", label: "对枪复盘", hint: "证据队列 / 枪法机制", icon: Swords }
+      { key: "duel", label: "对枪", hint: "证据 / 态势 / 机制", icon: Swords }
     ]
   },
   {
-    label: "赛事与队伍",
+    label: "对象分析",
     items: [
-      { key: "tournament", label: "赛事与队伍", hint: "赛事排行 / 总览 / 赛程", icon: Trophy },
-      { key: "duelOverview", label: "对枪概览", hint: "首杀热点 / 对枪态势", icon: Swords },
-      { key: "economy", label: "转化与节奏", hint: "转化 / 翻盘 / 经济对位", icon: Coins },
+      { key: "teams", label: "队伍", hint: "基础盘面 / 专项入口", icon: UserRound },
+      { key: "events", label: "赛事", hint: "目录 / 总览 / 赛程", icon: Trophy },
+      { key: "economy", label: "经济与转化", hint: "手枪 / 人数优势 / 经济对位", icon: Coins },
       { key: "utility", label: "道具价值", hint: "闪光 / 雷火 / 烟", icon: Bomb },
-      { key: "lineups", label: "道具点位库", hint: "出手点 / 落点 / 证据", icon: Bomb },
-      { key: "control", label: "控图", hint: "覆盖场 / 防守漏洞 / 倾向", icon: Radar }
+      { key: "lineups", label: "道具点位", hint: "出手 / 落点 / 练习", icon: Bomb },
+      { key: "control", label: "控图", hint: "覆盖场 / 赛事基线 / 队伍差分", icon: Radar }
     ]
   },
   {
     label: "备战",
     items: [
-      { key: "coach", label: "教练工作台", hint: "开局模式 / 战术本 / 备战", icon: ClipboardList }
+      { key: "coach", label: "Coach", hint: "模式 / 清单 / 报告", icon: ClipboardList }
     ]
   }
 ];
 const MANAGEMENT_NAV: NavItem = { key: "management", label: "管理", hint: "身份归并 · 资料库维护 · 赛事资产", icon: Settings };
 
-const TOURNAMENT_TABS = [
-  { key: "leaderboard", label: "排行榜" },
-  { key: "dashboard", label: "赛事总览" },
-  { key: "events", label: "赛事合集" }
-] as const;
-type TournamentTab = (typeof TOURNAMENT_TABS)[number]["key"];
+type EventMode = "directory" | "overview";
 type MatchDeepLink = { roundNumber: number; tick?: number };
 const UPDATE_CHANNEL_KEY = "dak:update-channel";
+const CAPABILITY_BY_VIEW: Partial<Record<StudioView, StudioCapability>> = {
+  home: "personal-review", duel: "duel", economy: "economy", utility: "utility", lineups: "lineup", control: "control", coach: "tactical",
+};
 
 function initialUpdateChannel(): UpdateChannel {
   return localStorage.getItem(UPDATE_CHANNEL_KEY) === "beta" ? "beta" : "stable";
@@ -106,12 +117,10 @@ function NavButton({ item, active, onClick }: { item: NavItem; active: boolean; 
       type="button"
       className={active ? "stu-nav-item stu-nav-item-active" : "stu-nav-item"}
       onClick={onClick}
+      title={item.hint}
     >
       <Icon size={16} />
-      <span>
-        <b>{item.label}</b>
-        <small>{item.hint}</small>
-      </span>
+      <span><b>{item.label}</b><small>{item.hint}</small></span>
     </button>
   );
 }
@@ -119,13 +128,14 @@ function NavButton({ item, active, onClick }: { item: NavItem; active: boolean; 
 export function App() {
   const [entries, setEntries] = useState<StudioDemoEntry[]>([]);
   const [view, setView] = useState<StudioView>("home");
-  const [tournamentTab, setTournamentTab] = useState<TournamentTab>("leaderboard");
+  const [eventMode, setEventMode] = useState<EventMode>("directory");
   const [selectedDemoId, setSelectedDemoId] = useState<string | null>(null);
   const [matchDeepLink, setMatchDeepLink] = useState<MatchDeepLink | null>(null);
-  const [selectedPlayerKey, setSelectedPlayerKey] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [scope, setScope] = useState<CohortScopeState>(EMPTY_SCOPE);
+  const [analysisContext, setAnalysisContext] = useState<AnalysisContext>(() => createAnalysisContextPreset("explore"));
+  const [evidenceContinuation, setEvidenceContinuation] = useState<EvidenceContinuation | null>(null);
+  const [returningEvidence, setReturningEvidence] = useState<EvidenceContinuation | null>(null);
   const [eventRecords, setEventRecords] = useState<StudioEventRecord[]>([]);
   const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
   const [identityState, setIdentityState] = useState<IdentityStoreState>({ version: 0, mappings: [], teamRenames: {} });
@@ -136,6 +146,8 @@ export function App() {
   const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
   const [showLatestMsg, setShowLatestMsg] = useState(false);
   const [updateChannel, setUpdateChannel] = useState<UpdateChannel>(initialUpdateChannel);
+  const [contextEditorOpen, setContextEditorOpen] = useState(false);
+  const [capabilityAvailability, setCapabilityAvailability] = useState<CapabilityAvailability | null>(null);
 
   async function doCheckUpdate() {
     setCheckingUpdate(true);
@@ -173,15 +185,60 @@ export function App() {
 
   // 稳定数组标识：避免 App 无关重渲染触发档案/排行榜重新聚合
   const scopedEntries = useMemo(
-    () => applyScope(entries, scope, eventScopes),
-    [entries, scope, eventScopes]
+    () => resolveAnalysisCorpus(entries, analysisContext.corpus, eventScopes),
+    [entries, analysisContext.corpus, eventScopes]
   );
+  /** 旧页面短期仍读 CohortScopeState；其值完全由 AnalysisContext 投影，不再拥有 App state。 */
+  const legacyScope = useMemo<CohortScopeState>(() => cohortScopeProjection(analysisContext), [analysisContext]);
+  const selectedPlayerKey = analysisContext.focus.kind === "self" || analysisContext.focus.kind === "player"
+    ? analysisContext.focus.playerKey
+    : null;
+  const selectedTeam = analysisContext.focus.kind === "team" ? analysisContext.focus.teamName : null;
+  const displayedCapabilityAvailability = useMemo<CapabilityAvailability | null>(() => {
+    if (view !== "coach" || !capabilityAvailability) return capabilityAvailability;
+    const requiredRole = analysisContext.goal === "opponent-prep" ? analysisContext.roles.opponent : analysisContext.roles.beneficiary;
+    if (requiredRole) return capabilityAvailability;
+    return {
+      ...capabilityAvailability,
+      status: "unavailable",
+      eligibleMatches: 0,
+      excluded: [{
+        reason: analysisContext.goal === "opponent-prep" ? "请选择对手队伍" : "请选择己方队伍",
+        count: scopedEntries.length,
+        entryIds: scopedEntries.map((entry) => entry.id),
+      }],
+      repairActions: [],
+    };
+  }, [analysisContext.goal, analysisContext.roles.beneficiary, analysisContext.roles.opponent, capabilityAvailability, scopedEntries, view]);
+  const updateLegacyScope = useCallback((next: CohortScopeState) => {
+    setAnalysisContext((current) => applyCohortScopeProjection(current, next));
+  }, []);
   const identityOptions = useMemo<IdentityOptions | undefined>(
     () => identityState.version > 0
       ? { version: identityState.version, map: buildCohortIdentityMap(identityState.mappings), teamRenames: identityState.teamRenames }
       : undefined,
     [identityState.version, identityState.mappings, identityState.teamRenames]
   );
+  const openCapabilityRepair = useCallback((action: CapabilityRepairAction) => {
+    setView(action === "install-tri" ? "management" : "library");
+  }, []);
+  const selectRadarTeam = useCallback((teamName: string | null) => {
+    setAnalysisContext((current) => ({
+      ...current,
+      goal: teamName ? "team-analysis" : current.goal === "team-analysis" ? "explore" : current.goal,
+      focus: teamName ? { kind: "team", teamName } : current.focus.kind === "team" ? { kind: "aggregate" } : current.focus,
+    }));
+  }, []);
+
+  useEffect(() => {
+    const capability = CAPABILITY_BY_VIEW[view];
+    if (!capability || scopedEntries.length === 0) { setCapabilityAvailability(null); return; }
+    let cancelled = false;
+    void loadCapabilityAvailabilityInputs(scopedEntries)
+      .then((inputs) => { if (!cancelled) setCapabilityAvailability(deriveCapabilityAvailability(scopedEntries, capability, inputs)); })
+      .catch(() => { if (!cancelled) setCapabilityAvailability(null); });
+    return () => { cancelled = true; };
+  }, [view, scopedEntries]);
 
   const refreshEventRecords = useCallback(async () => {
     const [nextEvents, nextSeries] = await Promise.all([listEventRecords(), listSeriesRecords()]);
@@ -198,8 +255,18 @@ export function App() {
         await refreshEventRecords();
       })
       .catch((err) => setNotice(`读取本地资料库失败：${err instanceof Error ? err.message : String(err)}`));
-    doCheckUpdate();
+    // 自动更新属于桌面壳职责。浏览器开发入口没有跨域桥，启动时主动请求发布源
+    // 只会制造 CORS 错误；需要时仍可由用户手动检查。
+    if (window.pywebview?.api) void doCheckUpdate();
     void loadIdentityState().then(setIdentityState);
+    void getPinnedPlayer().then((pinned) => {
+      if (!pinned) return;
+      setAnalysisContext((current) => current.goal === "explore" && current.focus.kind === "aggregate"
+        ? createAnalysisContextPreset("personal-review", {
+            focus: { kind: "self", playerKey: pinned.playerKey, label: pinned.name },
+          })
+        : current);
+    });
   }, [refreshEventRecords]);
 
   const importFiles = useCallback(async (files: Iterable<File | ExportedDemoFile>, tags: string[] = [], initialErrors: string[] = []) => {
@@ -303,14 +370,68 @@ export function App() {
     }
   }, []);
 
-  // 兼容旧入口：LibraryView 的「加载示例」载入首个内置条目（示例职业局）。
-  const loadSample = useCallback(() => loadBuiltinEvent(BUILTIN_EVENTS[0]), [loadBuiltinEvent]);
-
   const openDemo = useCallback((id: string, target?: MatchDeepLink) => {
+    const entry = entries.find((row) => row.id === id);
+    if (entry) {
+      setAnalysisContext(createAnalysisContextPreset("match-review", {
+        corpus: { eventIds: [], entryIds: [id], matchIds: [], maps: [], tags: [], excludedEntryIds: [] },
+        focus: { kind: "match", entryId: id, label: formatMatchLabel(entry) },
+      }));
+    }
     setSelectedDemoId(id);
     setMatchDeepLink(target ?? null);
     setView("match");
-  }, []);
+  }, [entries]);
+
+  const openEvidence = useCallback<OpenEvidence>((id, evidence, sourceKey, finding) => {
+    setEvidenceContinuation(createEvidenceContinuation({
+      sourceView: view,
+      context: analysisContext,
+      sourceKey,
+      evidence,
+      finding,
+    }));
+    setSelectedDemoId(id);
+    setMatchDeepLink({ roundNumber: evidence.roundNumber, tick: evidence.tick });
+    setView("match");
+  }, [analysisContext, view]);
+
+  const returnFromEvidence = useCallback(() => {
+    if (!evidenceContinuation) return;
+    setAnalysisContext(evidenceContinuation.context);
+    setView(evidenceContinuation.sourceView as StudioView);
+    setReturningEvidence(evidenceContinuation);
+    setEvidenceContinuation(null);
+  }, [evidenceContinuation]);
+
+  useEffect(() => {
+    if (!returningEvidence || view !== returningEvidence.sourceView) return;
+    let frame = 0;
+    let attempts = 0;
+    const restoreSource = () => {
+      const anchor = returningEvidence.sourceKey ? document.getElementById(returningEvidence.sourceKey) : null;
+      if (anchor) {
+        anchor.scrollIntoView({ block: "center" });
+        setReturningEvidence(null);
+        return;
+      }
+      if (attempts++ < 8) frame = window.requestAnimationFrame(restoreSource);
+      else setReturningEvidence(null);
+    };
+    // 来源视图可能先挂壳、后完成异步 facts 渲染；等下一帧再找真实 DOM anchor。
+    frame = window.requestAnimationFrame(restoreSource);
+    return () => window.cancelAnimationFrame(frame);
+  }, [returningEvidence, view]);
+
+  // 一级页面是新的工作面：普通切页从页首开始，避免把上一页的深滚动位置
+  // 泄漏到新页面。证据返回是唯一例外，由上面的 continuation 精确恢复来源锚点。
+  useEffect(() => {
+    if (!returningEvidence) {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      document.querySelector<HTMLElement>(".stu-sidebar")?.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
+    // 只在 view 真正变化时判断；returningEvidence 清空不能再次把已恢复的锚点拉回页首。
+  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLinkRawDemo = useCallback(async (entry: StudioDemoEntry) => {
     try {
@@ -355,9 +476,32 @@ export function App() {
     }
   }, [entries]);
 
-  const openPlayer = useCallback((playerKey: string) => {
-    setSelectedPlayerKey(playerKey);
+  const openPlayer = useCallback((playerKey: string, label = playerKey) => {
+    setAnalysisContext((current) => ({
+      ...current,
+      goal: "player-analysis",
+      focus: { kind: "player", playerKey, label },
+    }));
     setView("players");
+  }, []);
+
+  const openTeam = useCallback((teamName: string) => {
+    setAnalysisContext((current) => ({
+      ...current,
+      goal: "team-analysis",
+      focus: { kind: "team", teamName },
+    }));
+    setView("teams");
+  }, []);
+
+  const startEventAnalysis = useCallback((event: StudioEventRecord) => {
+    setAnalysisContext(createAnalysisContextPreset("event-analysis", {
+      corpus: { eventIds: [event.id], entryIds: [], matchIds: [], maps: [], tags: [], excludedEntryIds: [] },
+      focus: { kind: "event", eventId: event.id, label: event.name },
+      baseline: { kind: "event-peers", eventId: event.id },
+    }));
+    setEventMode("overview");
+    setView("events");
   }, []);
 
   const handleRemove = useCallback(
@@ -546,7 +690,43 @@ export function App() {
             <section key={group.label} className="stu-nav-section" aria-label={group.label}>
               <span className="stu-nav-section-label">{group.label}</span>
               {group.items.map((item) => (
-                <NavButton key={item.key} item={item} active={view === item.key} onClick={() => setView(item.key)} />
+                <NavButton key={item.key} item={item} active={view === item.key} onClick={() => {
+                  if (item.key === "home") {
+                    setAnalysisContext((current) => createAnalysisContextPreset("personal-review", {
+                      focus: current.focus.kind === "self" || current.focus.kind === "player"
+                        ? { kind: "self", playerKey: current.focus.playerKey, label: current.focus.label }
+                        : { kind: "aggregate" },
+                    }));
+                    void getPinnedPlayer().then((pinned) => {
+                      if (!pinned) return;
+                      setAnalysisContext((current) => current.goal === "personal-review"
+                        ? createAnalysisContextPreset("personal-review", {
+                            focus: { kind: "self", playerKey: pinned.playerKey, label: pinned.name },
+                          })
+                        : current);
+                    });
+                  }
+                  if (item.key === "match") {
+                    const entry = entries.find((row) => row.id === selectedDemoId) ?? entries[0];
+                    if (entry) {
+                      setSelectedDemoId(entry.id);
+                      setMatchDeepLink(null);
+                      setAnalysisContext(createAnalysisContextPreset("match-review", {
+                        corpus: { eventIds: [], entryIds: [entry.id], matchIds: [], maps: [], tags: [], excludedEntryIds: [] },
+                        focus: { kind: "match", entryId: entry.id, label: formatMatchLabel(entry) },
+                      }));
+                    }
+                  }
+                  if (item.key === "events") {
+                    setEventMode("directory");
+                    setAnalysisContext((current) => createAnalysisContextPreset("explore", { corpus: current.corpus }));
+                  }
+                  if (item.key === "teams" && analysisContext.focus.kind !== "team") {
+                    const firstTeam = entries[0] ? (identityState.teamRenames[entries[0].meta.teamAName] ?? entries[0].meta.teamAName) : null;
+                    if (firstTeam) setAnalysisContext((current) => createAnalysisContextPreset("team-analysis", { corpus: current.corpus, focus: { kind: "team", teamName: firstTeam }, baseline: current.baseline }));
+                  }
+                  setView(item.key);
+                }} />
               ))}
             </section>
           ))}
@@ -586,22 +766,29 @@ export function App() {
             </button>
           </div>
         )}
-        {entries.length > 0 && view !== "home" && view !== "library" && view !== "match" && view !== "management" && (
+        {entries.length > 0 && view !== "library" && view !== "management" && (
+          <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} onEdit={() => setContextEditorOpen((current) => !current)} />
+        )}
+        {entries.length > 0 && contextEditorOpen && view !== "library" && view !== "management" && (
           <CohortScope
             entries={entries}
-            scope={scope}
-            onChange={setScope}
+            scope={legacyScope}
+            onChange={updateLegacyScope}
             teamRenames={identityState.teamRenames}
             events={eventScopes}
+            teamSelection="single-focus"
           />
         )}
+        {displayedCapabilityAvailability && <CapabilityBar availability={displayedCapabilityAvailability} onRepair={openCapabilityRepair} />}
         {view === "home" && (
           <HomeView
-            entries={entries}
+            entries={scopedEntries}
             onOpenMatch={openDemo}
+            onOpenEvidence={openEvidence}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
-            onGoPlayers={() => setView("players")}
+            onGoPlayers={(player) => player ? openPlayer(player.playerKey, player.name) : setView("players")}
             onGoLibrary={() => setView("library")}
+            contextSummary={summarizeAnalysisContext(analysisContext, entries, eventScopes)}
             identityOptions={identityOptions}
           />
         )}
@@ -613,8 +800,9 @@ export function App() {
             onImportTagsChange={setImportTagsRaw}
             onImportFiles={importFiles}
             onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined}
-            onLoadSample={loadSample}
-            onGoManage={() => setView("management")}
+            onNotice={setNotice}
+            onLibraryChanged={setEntries}
+            onLoadBuiltin={loadBuiltinEvent}
             onOpenDemo={openDemo}
             onRemoveDemo={handleRemove}
             onUpdateTags={handleUpdateTags}
@@ -635,25 +823,37 @@ export function App() {
             entries={entries}
             demoId={selectedDemoId}
             deepLink={matchDeepLink}
-            onSelectDemo={(id) => {
-              setSelectedDemoId(id);
-              setMatchDeepLink(null);
-            }}
+            onSelectDemo={(id) => openDemo(id)}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoLibrary={() => setView("library")}
+            evidenceContinuation={evidenceContinuation}
+            onReturnToSource={returnFromEvidence}
           />
         )}
         {view === "players" && (
           <PlayersView
             allEntries={entries}
             entries={scopedEntries}
-            scope={scope}
+            selectedTeam={selectedTeam}
             selectedPlayerKey={selectedPlayerKey}
-            onSelectPlayer={setSelectedPlayerKey}
+            onSelectPlayer={openPlayer}
             onOpenMatch={openDemo}
+            onOpenEvidence={openEvidence}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
+            returnEvidenceKey={returningEvidence?.sourceView === "players" ? returningEvidence.sourceKey : undefined}
             identityOptions={identityOptions}
             onGoLibrary={() => setView("library")}
+          />
+        )}
+        {view === "teams" && (
+          <TeamView
+            entries={scopedEntries}
+            selectedTeam={analysisContext.focus.kind === "team" ? analysisContext.focus.teamName : null}
+            onSelectTeam={openTeam}
+            onOpenMatch={openDemo}
+            onOpenCapability={setView}
+            onGoLibrary={() => setView("library")}
+            identityOptions={identityOptions}
           />
         )}
         {view === "trails" && (
@@ -668,33 +868,22 @@ export function App() {
           <DuelView
             allEntries={entries}
             entries={scopedEntries}
-            scope={scope}
+            selectedTeam={selectedTeam}
             onOpenMatch={openDemo}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoLibrary={() => setView("library")}
             identityOptions={identityOptions}
             teamRenames={identityState.teamRenames}
-          />
-        )}
-        {view === "duelOverview" && (
-          <DuelView
-            allEntries={entries}
-            entries={scopedEntries}
-            scope={scope}
-            onOpenMatch={openDemo}
-            onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
-            onGoLibrary={() => setView("library")}
-            identityOptions={identityOptions}
-            teamRenames={identityState.teamRenames}
-            variant="overview"
+            initialTab={analysisContext.goal === "personal-review" ? "records" : "opening"}
           />
         )}
         {view === "utility" && (
           <UtilityView
             allEntries={entries}
             entries={scopedEntries}
-            scope={scope}
+            selectedTeam={selectedTeam}
             onOpenMatch={openDemo}
+            onOpenEvidence={openEvidence}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             identityOptions={identityOptions}
             onGoLibrary={() => setView("library")}
@@ -713,7 +902,7 @@ export function App() {
           <EconomyView
             allEntries={entries}
             entries={scopedEntries}
-            scope={scope}
+            selectedTeam={selectedTeam}
             identityOptions={identityOptions}
             onGoLibrary={() => setView("library")}
           />
@@ -726,51 +915,34 @@ export function App() {
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoLibrary={() => setView("library")}
             teamRenames={identityState.teamRenames}
+            analysisContext={analysisContext}
+            onAnalysisContextChange={setAnalysisContext}
           />
         )}
         {view === "control" && (
-          <RadarFieldView entries={scopedEntries} teamRenames={identityState.teamRenames} />
+          <RadarFieldView
+            entries={scopedEntries}
+            teamRenames={identityState.teamRenames}
+            selectedTeam={selectedTeam}
+            onSelectTeam={selectRadarTeam}
+          />
         )}
-        {view === "tournament" && (
-          <>
-            <div className="stu-subtabs" role="tablist" aria-label="赛事中台">
-              {TOURNAMENT_TABS.map(({ key, label }) => (
-                <button
-                  key={key}
-                  type="button"
-                  role="tab"
-                  aria-selected={tournamentTab === key}
-                  className={tournamentTab === key ? "stu-subtab stu-subtab-active" : "stu-subtab"}
-                  onClick={() => setTournamentTab(key)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {tournamentTab === "leaderboard" ? (
-              <LeaderboardView
-                allEntries={entries}
-                entries={scopedEntries}
-                scope={scope}
-                onPlayerClick={openPlayer}
-                identityOptions={identityOptions}
-                onGoLibrary={() => setView("library")}
-              />
-            ) : tournamentTab === "dashboard" ? (
-              <TournamentDashboardView
-                allEntries={entries}
-                entries={scopedEntries}
-                scope={scope}
-                identityOptions={identityOptions}
-                onOpenMatch={openDemo}
-                onGoLibrary={() => setView("library")}
-                onGoEconomy={() => setView("economy")}
-              />
-            ) : (
-              <EventsView entries={entries} onOpenMatch={openDemo} onGoManage={() => setView("management")} />
-            )}
-          </>
-        )}
+        {view === "events" && (eventMode === "overview" ? (
+          <TournamentDashboardView
+            allEntries={entries}
+            entries={scopedEntries}
+            selectedTeam={selectedTeam}
+            identityOptions={identityOptions}
+            onOpenMatch={openDemo}
+            onOpenTeam={openTeam}
+            onOpenPlayer={openPlayer}
+            onGoLibrary={() => setView("library")}
+            onGoEconomy={() => setView("economy")}
+            onGoDirectory={() => setEventMode("directory")}
+          />
+        ) : (
+          <EventsView entries={entries} onOpenMatch={openDemo} onAnalyzeEvent={startEventAnalysis} onGoLibrary={() => setView("library")} />
+        ))}
         {view === "management" && (
           <ManagementView
             entries={entries}
@@ -781,7 +953,6 @@ export function App() {
             onGoLibrary={() => setView("library")}
             onNotice={setNotice}
             onLibraryChanged={setEntries}
-            onLoadBuiltin={loadBuiltinEvent}
           />
         )}
       </main>

@@ -148,6 +148,7 @@ describe("MatchFacts", () => {
     expect(await buildUtilityValueSummaryFromFacts(store, { matchIds: [matchId], players })).toEqual(
       buildUtilityValueSummary([{ matchId, pkg }], players)
     );
+    expect(await store.getUtilityValueFactMatchIds({ matchIds: [matchId] })).toEqual([matchId]);
   });
 
   it("提取 TacticalRoundFact：每回合每存活 side 一行，字段完整", async () => {

@@ -12,18 +12,20 @@ import {
 import { getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
-import type { CohortScopeState } from "../components/CohortScope";
 import { FingerprintRadar, TrendChart } from "./profile-widgets";
 import { EmptyState, MetricInfo } from "@cs2dak/react";
 import { EvidenceActions } from "../components/EvidenceActions";
+import type { OpenEvidence } from "../lib/evidence-continuation";
 
 export interface PlayersViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
-  scope: CohortScopeState;
+  selectedTeam?: string | null;
   selectedPlayerKey: string | null;
-  onSelectPlayer: (playerKey: string) => void;
+  onSelectPlayer: (playerKey: string, label?: string) => void;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onOpenEvidence: OpenEvidence;
+  returnEvidenceKey?: string;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
@@ -51,10 +53,12 @@ function formatMetric(value: number | null, format: string): string {
 export function PlayersView({
   allEntries,
   entries,
-  scope,
+  selectedTeam = null,
   selectedPlayerKey,
   onSelectPlayer,
   onOpenMatch,
+  onOpenEvidence,
+  returnEvidenceKey,
   onWatchDemo,
   onGoLibrary,
   identityOptions
@@ -67,7 +71,7 @@ export function PlayersView({
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [pinned, setPinned] = useState<PinnedPlayer | null>(null);
   const [compareKey, setCompareKey] = useState<string | null>(null);
-  const [profileTab, setProfileTab] = useState<ProfileTab>("overview");
+  const [profileTab, setProfileTab] = useState<ProfileTab>(() => returnEvidenceKey ? "utility" : "overview");
   const [flashMode, setFlashMode] = useState<"net" | "enemy">("net");
 
   useEffect(() => {
@@ -84,7 +88,7 @@ export function PlayersView({
     let cancelled = false;
     setProfiles(null);
     setError(null);
-    getSeasonSummary(entries, identityOptions, scope.teams)
+    getSeasonSummary(entries, identityOptions, selectedTeam ? [selectedTeam] : [])
       .then((summary) => {
         if (!cancelled) {
           setProfiles([...summary.profiles].sort((a, b) => b.rating.rivalhubRR - a.rating.rivalhubRR));
@@ -96,7 +100,7 @@ export function PlayersView({
     return () => {
       cancelled = true;
     };
-  }, [entries, identityOptions?.version, scope.teams]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entries, identityOptions?.version, selectedTeam]);
 
   // 关注选手置顶；其余按 RR 降序
   const orderedProfiles = useMemo(() => {
@@ -107,8 +111,8 @@ export function PlayersView({
   }, [profiles, pinned]);
 
   const selected = useMemo(() => {
-    if (!orderedProfiles || orderedProfiles.length === 0) return null;
-    return orderedProfiles.find((p) => p.playerKey === selectedPlayerKey) ?? orderedProfiles[0];
+    if (!orderedProfiles || orderedProfiles.length === 0 || !selectedPlayerKey) return null;
+    return orderedProfiles.find((p) => p.playerKey === selectedPlayerKey) ?? null;
   }, [orderedProfiles, selectedPlayerKey]);
 
   const compare = useMemo(() => {
@@ -135,7 +139,7 @@ export function PlayersView({
     setWeaponStats([]);
     setMechanics(null);
     setDetailsError(null);
-    getPlayerSeasonDetails(entries, selected.steamIds, identityOptions, scope.teams)
+    getPlayerSeasonDetails(entries, selected.steamIds, identityOptions, selectedTeam ? [selectedTeam] : [])
       .then((details) => {
         if (cancelled) return;
         setInsights(details.insights);
@@ -148,7 +152,7 @@ export function PlayersView({
     return () => {
       cancelled = true;
     };
-  }, [entries, selected?.playerKey, identityOptions?.version, scope.teams]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entries, selected?.playerKey, identityOptions?.version, selectedTeam]);
 
   if (allEntries.length === 0) {
     return (
@@ -177,10 +181,17 @@ export function PlayersView({
       </div>
     );
   }
-  if (!orderedProfiles || !selected) {
+  if (!orderedProfiles) {
     return (
       <div className="stu-view">
         <div className="stu-loading">聚合 {entries.length} 场 demo，构建选手档案…</div>
+      </div>
+    );
+  }
+  if (!selected) {
+    return (
+      <div className="stu-view">
+        <EmptyState variant="insufficient" title="当前选手不在语料中" hint="请从选手入口选择当前语料中的选手。" />
       </div>
     );
   }
@@ -225,7 +236,7 @@ export function PlayersView({
               key={profile.playerKey}
               type="button"
               className={profile.playerKey === selected.playerKey ? "stu-roster-item stu-roster-item-active" : "stu-roster-item"}
-              onClick={() => onSelectPlayer(profile.playerKey)}
+              onClick={() => onSelectPlayer(profile.playerKey, profile.name)}
             >
               <span className="stu-roster-name">
                 {isPinned(profile) && <Star size={11} className="stu-pin-star" />}
@@ -357,18 +368,32 @@ export function PlayersView({
             </div>
 
             <div className="stu-card">
-              <h3>PRISM 风格八维</h3>
+              <div className="stu-section-head">
+                <h3>PRISM 八维打法画像</h3>
+                <MetricInfo note="行为倾向与执行效率分别按当前分析范围内的选手排名；不是职业数据库排名，也不代表固定角色或绝对能力。" />
+              </div>
               {selected.style ? (
-                <div className="stu-bars">
+                <div className="stu-prism-axis-list">
                   {selected.style.axes.map((axis) => (
-                    <div className="stu-bar-row" key={axis.key}>
-                      <span>{axis.label}</span>
-                      <div className="stu-bar-track">
-                        <div className="stu-bar stu-bar-style" style={{ width: `${axis.percentile}%` }} />
-                      </div>
-                      <b>P{axis.percentile.toFixed(0)}</b>
+                    <div className={`stu-prism-axis stu-prism-axis-${axis.status}`} key={axis.key}>
+                      <span className="stu-prism-axis-name">{axis.label}</span>
+                      {axis.status === "ready" ? (
+                        <>
+                          <span className="stu-prism-axis-value"><small>行为</small><b>P{axis.involvementPercentile!.toFixed(0)}</b></span>
+                          <span className="stu-prism-axis-value"><small>效率</small><b>P{axis.efficiencyPercentile!.toFixed(0)}</b></span>
+                        </>
+                      ) : (
+                        <span className="stu-prism-axis-status">
+                          {axis.status === "partial"
+                            ? `部分信号 · 覆盖 ${(axis.signalCoverage * 100).toFixed(0)}%`
+                            : axis.status === "insufficient"
+                              ? `样本不足 · ${axis.comparisonCount} 人`
+                              : "不可用"}
+                        </span>
+                      )}
                     </div>
                   ))}
+                  <p className="stu-dim stu-prism-note">P 值均为当前 {selected.mapCount} 图分析范围内的相对位置；信号覆盖低于 75% 或有效对比少于 5 人时不展示精确排名。</p>
                 </div>
               ) : (
                 <p className="stu-dim">该聚合范围无 PRISM 结果。</p>
@@ -377,8 +402,8 @@ export function PlayersView({
 
             {selected.style && (
               <div className="stu-card">
-                <h3>打法风格</h3>
-                <FingerprintRadar axes={selected.style.axes} />
+                <h3>倾向与效率</h3>
+                <FingerprintRadar style={selected.style} />
               </div>
             )}
           </div>
@@ -465,7 +490,10 @@ export function PlayersView({
                               entry={e}
                               target={{ roundNumber: flash.roundNumber, tick: flash.tick }}
                               onOpenMatch={onOpenMatch}
+                              onOpenEvidence={onOpenEvidence}
                               onWatchDemo={onWatchDemo}
+                              reason={flash.reason}
+                              sourceKey={`players:flash:${flash.matchId}:${flash.roundNumber}:${i}`}
                             >
                               {e ? formatMatchLabel(e) : flash.matchId} · R{flash.roundNumber} · 致盲 {flash.victimCount} 人 · {metric}
                             </EvidenceActions>
@@ -486,7 +514,10 @@ export function PlayersView({
                             entry={e}
                             target={{ roundNumber: incident.roundNumber, tick: incident.tick }}
                             onOpenMatch={onOpenMatch}
+                            onOpenEvidence={onOpenEvidence}
                             onWatchDemo={onWatchDemo}
+                            reason={incident.reason}
+                            sourceKey={`players:team-flash:${incident.matchId}:${incident.roundNumber}:${i}`}
                           >
                             {e ? formatMatchLabel(e) : incident.matchId} · R{incident.roundNumber} · 闪到 {incident.victimCount} 名队友 {incident.totalSeconds.toFixed(1)}s
                           </EvidenceActions>
@@ -534,7 +565,10 @@ export function PlayersView({
                           entry={e}
                           target={{ roundNumber: evidence.roundNumber, tick: evidence.tick }}
                           onOpenMatch={onOpenMatch}
+                          onOpenEvidence={onOpenEvidence}
                           onWatchDemo={onWatchDemo}
+                          reason={evidence.reason}
+                          sourceKey={`players:mistake:${evidence.matchId}:${evidence.roundNumber}:${i}`}
                         >
                           {e ? formatMatchLabel(e) : evidence.matchId} · R{evidence.roundNumber} · {evidence.detail}
                         </EvidenceActions>
@@ -718,7 +752,10 @@ function buildPlayerCardMarkdown(profile: PlayerSeasonProfile, insights: PlayerS
   }
   if (profile.style) {
     lines.push("");
-    lines.push("**PRISM 风格**：" + profile.style.axes.map((axis) => `${axis.label} P${axis.percentile.toFixed(0)}`).join(" · "));
+    lines.push("**PRISM 打法画像（当前样本内）**：" + profile.style.axes.map((axis) => axis.status === "ready"
+      ? `${axis.label} 行为 P${axis.involvementPercentile!.toFixed(0)} / 效率 P${axis.efficiencyPercentile!.toFixed(0)}`
+      : `${axis.label} ${axis.status === "partial" ? "部分信号" : axis.status === "insufficient" ? `样本不足（${axis.comparisonCount} 人）` : "不可用"}`
+    ).join(" · "));
   }
   if (insights) {
     lines.push("");
@@ -746,12 +783,13 @@ function CompareCard({ left, right }: { left: PlayerSeasonProfile; right: Player
       format: "rating"
     })),
     ...(left.style && right.style
-      ? left.style.axes.map((axis) => ({
-          label: axis.label,
-          a: axis.percentile,
-          b: right.style!.axes.find((x) => x.key === axis.key)?.percentile ?? null,
-          format: "percent"
-        }))
+      ? left.style.axes.flatMap((axis) => {
+          const other = right.style!.axes.find((x) => x.key === axis.key);
+          return [
+            { label: `${axis.label} · 行为`, a: axis.involvementPercentile, b: other?.involvementPercentile ?? null, format: "percent" },
+            { label: `${axis.label} · 效率`, a: axis.efficiencyPercentile, b: other?.efficiencyPercentile ?? null, format: "percent" }
+          ];
+        })
       : [])
   ];
 

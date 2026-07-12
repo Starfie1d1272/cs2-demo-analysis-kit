@@ -24,14 +24,14 @@ const field: RadarField = {
 };
 
 describe("RadarFieldCanvas", () => {
-  it("renders 4x playback and weak-zone controls", () => {
+  it("renders 4x playback without inventing weak-zone detection", () => {
     const html = renderToStaticMarkup(
       React.createElement(RadarFieldCanvas, {
         field,
         map: { name: "de_mirage", radarImageUrl: "./maps/radars/de_mirage.png" },
       }),
     );
-    expect(html).toContain("薄弱区");
+    expect(html).not.toContain("薄弱区");
     expect(html).toContain("4x · 1:55-0:01");
     expect(html).toContain("冷 → 热 = 4:3 屏幕可见低 → 高");
     expect(html).toContain("赛事地图基线");

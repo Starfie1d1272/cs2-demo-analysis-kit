@@ -5,6 +5,7 @@ import {
   buildSeasonLeaderboardModel,
   buildTournamentInsightsFromFacts,
   buildTeamComparisonFromFacts,
+  buildTeamOverviewFromFacts,
   type PlayerFlashSummary,
   type PlayerSeasonInsights,
   type PlayerMechanicsProfile,
@@ -12,6 +13,7 @@ import {
   type UtilityValueSummary,
   type TournamentInsights,
   type TeamComparisonModel,
+  type TeamOverviewModel,
   type DuelInsightsFacts
 } from "@cs2dak/presentation";
 import { touchLimitedCache } from "./idb";
@@ -48,7 +50,7 @@ export interface IdentityOptions {
  */
 
 /** 聚合算法/口径变化时 +1，旧缓存自动失效重算。 */
-const CACHE_VERSION = 8;
+export const CACHE_VERSION = 9;
 
 export interface SeasonSummary {
   bundle: SeasonCohortBundle;
@@ -57,11 +59,13 @@ export interface SeasonSummary {
   insights: TournamentInsights | null;
 }
 
-function keyOf(entries: StudioDemoEntry[], identityVersion?: number, selectedTeams: string[] = []): string {
+export function seasonCacheKey(entries: StudioDemoEntry[], identityVersion?: number, selectedTeams: string[] = []): string {
   const idPart = identityVersion ? `:idv${identityVersion}` : "";
   const teamPart = selectedTeams.length > 0 ? `:teams=${[...selectedTeams].sort().join(",")}` : "";
   return `v${CACHE_VERSION}${idPart}${teamPart}:` + entries.map((entry) => entry.id).sort().join("|");
 }
+
+const keyOf = seasonCacheKey;
 
 function selectedOriginalTeams(selectedTeams: string[], renames?: Record<string, string>): Set<string> {
   return new Set(selectedTeams.flatMap((team) => originalTeamNamesForDisplay(team, renames ?? {})));
@@ -228,6 +232,7 @@ const flashCache = new Map<string, Promise<PlayerFlashSummary[]>>();
 const utilityValueCache = new Map<string, Promise<UtilityValueSummary>>();
 const duelInsightsCache = new Map<string, Promise<DuelInsightsModel>>();
 const teamComparisonCache = new Map<string, Promise<TeamComparisonModel>>();
+const teamOverviewCache = new Map<string, Promise<TeamOverviewModel | null>>();
 
 /** 选中选手的逐场洞察：只返回小结果，不把全量 DemoPackage 长期放进 React state。 */
 export function getPlayerSeasonDetails(entries: StudioDemoEntry[], steamIds: string[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<PlayerSeasonDetails> {
@@ -377,6 +382,25 @@ export async function getTeamComparison(entries: StudioDemoEntry[], identity?: I
     throw missingFactsError("队伍对比");
   })();
   return touchLimitedCache(teamComparisonCache, key, loading, SMALL_CACHE_LIMIT);
+}
+
+/** 队伍对象页：从可重建 comparison facts 编排摘要，不在页面层重新解析 ZIP。 */
+export async function getTeamOverview(entries: StudioDemoEntry[], teamName: string, identity?: IdentityOptions): Promise<TeamOverviewModel | null> {
+  const key = `${keyOf(entries, identity?.version)}:team-overview-v1:${teamName}`;
+  const cached = teamOverviewCache.get(key);
+  if (cached) return cached;
+  const loading = (async () => {
+    const persisted = await readPersistedValue<TeamOverviewModel | null>(key);
+    if (persisted !== undefined) return persisted;
+    const factsStore = getFactsStore();
+    const matchIds = entries.map(matchIdForEntry);
+    const facts = withTeamRenames(await factsStore.getTeamComparisonFacts({ matchIds }), identity?.teamRenames);
+    if (facts.length < entries.length) throw missingFactsError("队伍总览");
+    const overview = buildTeamOverviewFromFacts(facts, teamName);
+    void writePersistedValue(key, overview);
+    return overview;
+  })();
+  return touchLimitedCache(teamOverviewCache, key, loading, SMALL_CACHE_LIMIT);
 }
 
 const seasonSummaryCache = new Map<string, Promise<SeasonSummary>>();

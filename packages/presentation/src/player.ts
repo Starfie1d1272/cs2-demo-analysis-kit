@@ -20,17 +20,21 @@ const RR_BREAKDOWN_LABEL: Record<RRBreakdownEntry["key"], string> = {
   utility: "Utility"
 };
 
-/** PRISM 八维中文标签。 */
+/** PRISM 八维打法画像标签；不把单根轴命名成绝对能力或固定角色。 */
 const PRISM_AXIS_LABEL: Record<PrismAxisKey, string> = {
-  firepower: "火力",
-  opening: "首杀",
-  clutch: "残局",
-  sniping: "狙击",
-  survival: "生存",
-  utility: "道具",
-  trading: "补枪",
-  entry: "突破"
+  firepower: "火力输出",
+  opening: "开局对枪",
+  clutch: "残局参与",
+  sniping: "AWP 使用",
+  survival: "生存选择",
+  utility: "道具投入",
+  trading: "补枪协同",
+  entry: "突破参与"
 };
+
+const MIN_STYLE_SIGNAL_COVERAGE = 0.75;
+/** 小于此人数的 cohort 只能用于浏览原始数据，不能给出精确的相对排名。 */
+const MIN_COHORT_FOR_STYLE_PERCENTILE = 5;
 
 /** 用于强项/弱项判定的技能类指标（高 = 好）。不含纯风格标签（如 AWP）。 */
 const SKILL_METRICS: { key: LeaderboardMetricKey; label: string }[] = [
@@ -54,17 +58,47 @@ function percentileOf(value: number, distribution: number[]): number {
   return round((atOrBelow / distribution.length) * 100, 1);
 }
 
-function buildStyle(player: SeasonPlayerRow): PlayerSeasonProfile["style"] {
+type PrismDistributions = Record<PrismAxisKey, { involvement: number[]; efficiency: number[] }>;
+
+/** 并列值取中位秩；全员相同时返回 P50，避免小 cohort 中把并列都显示成 P100。 */
+function relativePercentileOf(value: number, distribution: number[]): number | null {
+  if (distribution.length === 0) return null;
+  const lower = distribution.filter((item) => item < value).length;
+  const equal = distribution.filter((item) => item === value).length;
+  return round(((lower + equal / 2) / distribution.length) * 100, 1);
+}
+
+function buildStyle(player: SeasonPlayerRow, distributions: PrismDistributions): PlayerSeasonProfile["style"] {
   const prism = player.prism;
   if (!prism) return null;
   return {
     weightsVersion: prism.weightsVersion,
     rrPercentile: prism.rrPercentile,
-    axes: PRISM_AXIS_ORDER.map((key) => ({
-      key,
-      label: PRISM_AXIS_LABEL[key],
-      percentile: prism.axes[key].percentile
-    }))
+    axes: PRISM_AXIS_ORDER.map((key) => {
+      const axis = prism.axes[key];
+      const comparisonCount = distributions[key].involvement.length;
+      const status = !axis.hasSignal
+        ? "unavailable" as const
+        : axis.availableSignalWeight < MIN_STYLE_SIGNAL_COVERAGE
+          ? "partial" as const
+          : comparisonCount < MIN_COHORT_FOR_STYLE_PERCENTILE
+            ? "insufficient" as const
+            : "ready" as const;
+      return {
+        key,
+        label: PRISM_AXIS_LABEL[key],
+        involvementPercentile: status === "ready"
+          ? relativePercentileOf(axis.involvementRaw, distributions[key].involvement)
+          : null,
+        efficiencyPercentile: status === "ready"
+          ? relativePercentileOf(axis.efficiencyRaw, distributions[key].efficiency)
+          : null,
+        combinedPercentile: status === "ready" ? axis.percentile : null,
+        signalCoverage: axis.availableSignalWeight,
+        comparisonCount,
+        status
+      };
+    })
   };
 }
 
@@ -73,13 +107,14 @@ function profileFromRow(
   metrics: Record<LeaderboardMetricKey, number | null>,
   weightsVersion: string,
   strengths: string[],
-  weaknesses: string[]
+  weaknesses: string[],
+  prismDistributions: PrismDistributions
 ): PlayerSeasonProfile {
   const percent = (count: number, total: number): number | null =>
     total > 0 ? round((count / total) * 100, 1) : null;
 
   return playerSeasonProfileSchema.parse({
-    version: "cs2-demo-analysis-kit/player-profile-0.1",
+    version: "cs2-demo-analysis-kit/player-profile-0.2",
     weightsVersion,
     playerKey: player.playerKey,
     name: player.name,
@@ -118,7 +153,7 @@ function profileFromRow(
         : null
     })),
     highlights: player.weaponHighlights.highlights,
-    style: buildStyle(player),
+    style: buildStyle(player, prismDistributions),
     perMatch: [...player.perMatch]
       .sort((a, b) => a.matchId.localeCompare(b.matchId))
       .map((m) => ({ matchId: m.matchId, rivalhubRR: m.accountRR, hltvRating: m.rrV1 })),
@@ -145,6 +180,17 @@ export function buildAllPlayerSeasonProfiles(bundle: SeasonCohortBundle): Player
   );
 
   const cohortLargeEnough = bundle.players.length >= MIN_COHORT_FOR_NARRATIVE;
+  const prismDistributions = Object.fromEntries(PRISM_AXIS_ORDER.map((key) => {
+    const usable = bundle.players
+      .map((player) => player.prism?.axes[key] ?? null)
+      .filter((axis): axis is NonNullable<typeof axis> =>
+        axis != null && axis.hasSignal && axis.availableSignalWeight >= MIN_STYLE_SIGNAL_COVERAGE
+      );
+    return [key, {
+      involvement: usable.map((axis) => axis.involvementRaw),
+      efficiency: usable.map((axis) => axis.efficiencyRaw)
+    }];
+  })) as PrismDistributions;
 
   return bundle.players.map((player) => {
     const metrics = metricsByKey.get(player.playerKey)!;
@@ -168,6 +214,6 @@ export function buildAllPlayerSeasonProfiles(bundle: SeasonCohortBundle): Player
       .slice(0, MAX_NARRATIVE_ITEMS)
       .map((r) => r.label);
 
-    return profileFromRow(player, metrics, bundle.weightsVersion, strengths, weaknesses);
+    return profileFromRow(player, metrics, bundle.weightsVersion, strengths, weaknesses, prismDistributions);
   });
 }

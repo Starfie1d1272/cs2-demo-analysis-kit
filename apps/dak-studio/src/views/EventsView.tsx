@@ -11,11 +11,13 @@ import { EmptyState } from "@cs2dak/react";
 export function EventsView({
   entries,
   onOpenMatch,
-  onGoManage,
+  onAnalyzeEvent,
+  onGoLibrary,
 }: {
   entries: StudioDemoEntry[];
   onOpenMatch: (entryId: string) => void;
-  onGoManage: () => void;
+  onAnalyzeEvent: (event: StudioEventRecord) => void;
+  onGoLibrary: () => void;
 }) {
   const [events, setEvents] = useState<StudioEventRecord[]>([]);
   const [series, setSeries] = useState<StudioSeriesRecord[]>([]);
@@ -33,32 +35,52 @@ export function EventsView({
     [active, series],
   );
   if (events.length === 0) {
-    return <div className="stu-view"><EmptyState title="还没有赛事合集" hint="去「管理 → 赛事资产」下载内置/在线赛事，或导入本地 event-package/1.0 资源包。" action={<button className="stu-button" onClick={onGoManage}>去管理</button>} /></div>;
+    return <div className="stu-view"><EmptyState title="还没有赛事目录" hint="在资料库获取内置/在线赛事，或导入本地 event-package/1.0 资源包。" action={<button className="stu-button" onClick={onGoLibrary}>去资料库</button>} /></div>;
   }
   return (
-    <div className="stu-view">
-      <header className="stu-view-header"><div><h1>赛事合集</h1><p>Event → Stage → Series → Map 的本地只读赛事视图。</p></div></header>
-      <div className="stu-chip-row">
-        {events.map((event) => <button key={event.id} className={event.id === activeId ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => setActiveId(event.id)}>{event.name}</button>)}
-      </div>
-      {active && (
-        <>
-          <section className="stu-card">
-            <h2>{active.name}</h2>
-            <p className="stu-muted">{active.kind} · {eventSeries.length} 个系列 · {active.source}{active.readOnly ? " · 只读资产" : ""}</p>
+    <div className="stu-view stu-reading-view">
+      <header className="stu-view-header"><div><h1>赛事目录</h1><p>按 Event → Stage → Series → Map 浏览本地赛事，并从当前赛事进入总览。</p></div></header>
+      <div className="stu-event-directory">
+        <aside className="stu-event-list" aria-label="本地赛事">
+          <span className="stu-event-list-label">本地赛事 · {events.length}</span>
+          {events.map((event) => {
+            const linkedSeries = series.filter((row) => row.eventId === event.id);
+            const linkedMaps = linkedSeries.reduce((sum, row) => sum + row.entryIds.length, 0);
+            return (
+              <button
+                key={event.id}
+                type="button"
+                className={event.id === activeId ? "stu-event-list-item stu-event-list-item-active" : "stu-event-list-item"}
+                onClick={() => setActiveId(event.id)}
+              >
+                <b>{event.name}</b>
+                <span>{linkedSeries.length} 个系列 · {linkedMaps} 图</span>
+              </button>
+            );
+          })}
+        </aside>
+        {active && (
+          <section className="stu-event-content">
+            <header className="stu-event-content-head">
+              <div>
+                <h2>{active.name}</h2>
+                <p>{active.kind} · {eventSeries.length} 个系列 · {active.source}{active.readOnly ? " · 只读资产" : ""}</p>
+              </div>
+              <button type="button" className="stu-button" onClick={() => onAnalyzeEvent(active)}>查看赛事总览</button>
+            </header>
+            {active.stages.map((stage) => (
+              <EventStageSection
+                key={stage.key}
+                stage={stage}
+                series={eventSeries.filter((row) => row.stageKey === stage.key)}
+                entries={entries}
+                onOpenMatch={onOpenMatch}
+              />
+            ))}
+            {eventSeries.some((row) => !row.stageKey) && <EventStageSection stage={{ key: "other", name: "未分阶段", type: "round_robin", teamCount: 2, advanceCount: 0 }} series={eventSeries.filter((row) => !row.stageKey)} entries={entries} onOpenMatch={onOpenMatch} />}
           </section>
-          {active.stages.map((stage) => (
-            <EventStageSection
-              key={stage.key}
-              stage={stage}
-              series={eventSeries.filter((row) => row.stageKey === stage.key)}
-              entries={entries}
-              onOpenMatch={onOpenMatch}
-            />
-          ))}
-          {eventSeries.some((row) => !row.stageKey) && <EventStageSection stage={{ key: "other", name: "未分阶段", type: "round_robin", teamCount: 2, advanceCount: 0 }} series={eventSeries.filter((row) => !row.stageKey)} entries={entries} onOpenMatch={onOpenMatch} />}
-        </>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -75,7 +97,7 @@ function renderStageContent(stage: EventStage, series: StudioSeriesRecord[], ent
 
 function EventStageSection({ stage, series, entries, onOpenMatch }: { stage: EventStage; series: StudioSeriesRecord[]; entries: StudioDemoEntry[]; onOpenMatch: (entryId: string) => void }) {
   return (
-    <section className="stu-card">
+    <section className="stu-event-stage">
       <h2>{stage.name} <small className="stu-muted">{stage.type} · {stage.teamCount} 队</small></h2>
       {renderStageContent(stage, series, entries, onOpenMatch)}
       {series.length === 0 && <p className="stu-muted">该阶段暂无系列赛。</p>}

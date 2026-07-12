@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { PlayerStyle } from "@cs2dak/contract";
 import type { PlayerSeasonInsights } from "@cs2dak/presentation";
 import { formatMatchLabel, type StudioDemoEntry } from "../lib/library";
 
@@ -7,8 +8,9 @@ import { formatMatchLabel, type StudioDemoEntry } from "../lib/library";
  * 避免雷达/趋势两套实现（见 docs/design/studio-components.md）。纯展示、零数据依赖。
  */
 
-/** PRISM 八维风格雷达（SVG 多边形）。 */
-export function FingerprintRadar({ axes }: { axes: { key: string; label: string; percentile: number }[] }) {
+/** PRISM 八维打法画像：形状表示行为倾向，第二层轮廓表示执行效率，主色由 RR 档位决定。 */
+export function FingerprintRadar({ style }: { style: PlayerStyle }) {
+  const { axes, rrPercentile } = style;
   const size = 220;
   const center = size / 2;
   const radius = size / 2 - 34;
@@ -18,27 +20,62 @@ export function FingerprintRadar({ axes }: { axes: { key: string; label: string;
   };
   const ringPath = (fraction: number) =>
     axes.map((_, i) => point(i, fraction).join(",")).join(" ");
-  const valuePath = axes.map((axis, i) => point(i, Math.max(0.04, axis.percentile / 100)).join(",")).join(" ");
+  const pathFor = (field: "involvementPercentile" | "efficiencyPercentile"): string | null => {
+    const points = axes.map((axis, i) => {
+      const value = axis[field];
+      return value == null ? null : point(i, Math.max(0.04, value / 100)).join(",");
+    });
+    return points.every((value): value is string => value != null) ? points.join(" ") : null;
+  };
+  const involvementPath = pathFor("involvementPercentile");
+  const efficiencyPath = pathFor("efficiencyPercentile");
+  const hasCompleteFingerprint = involvementPath != null && efficiencyPath != null;
+  const rrTone = rrPercentile >= 75 ? "high" : rrPercentile >= 40 ? "mid" : "low";
 
   return (
-    <svg viewBox={`0 0 ${size} ${size}`} className="stu-radar" role="img" aria-label="风格雷达">
-      {[0.25, 0.5, 0.75, 1].map((fraction) => (
-        <polygon key={fraction} className="stu-radar-ring" points={ringPath(fraction)} />
-      ))}
-      {axes.map((_, i) => {
-        const [x, y] = point(i, 1);
-        return <line key={i} className="stu-radar-spoke" x1={center} y1={center} x2={x} y2={y} />;
-      })}
-      <polygon className="stu-radar-value" points={valuePath} />
-      {axes.map((axis, i) => {
-        const [x, y] = point(i, 1.16);
-        return (
-          <text key={axis.key} className="stu-radar-label" x={x} y={y} textAnchor="middle" dominantBaseline="middle">
-            {axis.label} P{axis.percentile.toFixed(0)}
+    <div className={`stu-prism-radar stu-prism-radar-${rrTone}`}>
+      <svg viewBox={`0 0 ${size} ${size}`} className="stu-radar" role="img" aria-label={hasCompleteFingerprint
+        ? `PRISM 八维打法画像，RR 样本内 P${rrPercentile.toFixed(0)}`
+        : `PRISM 八维打法画像部分可用，RR 样本内 P${rrPercentile.toFixed(0)}`}
+      >
+        {[0.25, 0.5, 0.75, 1].map((fraction) => (
+          <polygon key={fraction} className="stu-radar-ring" points={ringPath(fraction)} />
+        ))}
+        {axes.map((_, i) => {
+          const [x, y] = point(i, 1);
+          return <line key={i} className="stu-radar-spoke" x1={center} y1={center} x2={x} y2={y} />;
+        })}
+        {hasCompleteFingerprint ? (
+          <>
+            <polygon className="stu-radar-value" points={involvementPath} />
+            <polygon className="stu-radar-efficiency" points={efficiencyPath} />
+          </>
+        ) : (
+          <text className="stu-radar-partial-note" x={center} y={center - 5} textAnchor="middle">
+            部分画像
           </text>
-        );
-      })}
-    </svg>
+        )}
+        {!hasCompleteFingerprint && (
+          <text className="stu-radar-partial-detail" x={center} y={center + 11} textAnchor="middle">
+            请以轴列表为准
+          </text>
+        )}
+        {axes.map((axis, i) => {
+          const [x, y] = point(i, 1.16);
+          return (
+            <text key={axis.key} className={axis.status === "ready" ? "stu-radar-label" : "stu-radar-label stu-radar-label-muted"} x={x} y={y} textAnchor="middle" dominantBaseline="middle">
+              {axis.label}
+            </text>
+          );
+        })}
+      </svg>
+      <div className="stu-prism-legend" aria-label="图例">
+        <span><i className="stu-prism-key stu-prism-key-involvement" />行为倾向</span>
+        <span><i className="stu-prism-key stu-prism-key-efficiency" />执行效率</span>
+        <b>RR · 样本内 P{rrPercentile.toFixed(0)}</b>
+        {!hasCompleteFingerprint && <span className="stu-prism-legend-partial">部分信号不绘制闭合画像</span>}
+      </div>
+    </div>
   );
 }
 

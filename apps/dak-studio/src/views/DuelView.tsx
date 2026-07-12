@@ -2,14 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import type { DuelFinderRow, DuelInsightsModel, PlayerMechanicsRow } from "@cs2dak/contract";
 import { displayWeaponName, duelClassificationLabel } from "@cs2dak/presentation";
 import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
-import type { CohortScopeState } from "../components/CohortScope";
 import { EmptyState, MetricInfo, Pagination } from "@cs2dak/react";
 import { displayTeamName } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getDuelInsights, type IdentityOptions } from "../lib/season";
 
 type DuelTab = "records" | "opening" | "mechanics";
-type DuelVariant = "review" | "overview";
 type EvidenceFilter = "contested_duel" | "suppressed_kill" | "caught_off_guard" | "low_hp" | "third_party" | "all";
 
 const EVIDENCE_FILTERS: Array<{ key: EvidenceFilter; label: string; description: string }> = [
@@ -24,28 +22,20 @@ const EVIDENCE_FILTERS: Array<{ key: EvidenceFilter; label: string; description:
 export interface DuelViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
-  scope: CohortScopeState;
+  selectedTeam?: string | null;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
   teamRenames?: Record<string, string>;
-  variant?: DuelVariant;
+  initialTab?: DuelTab;
 }
 
-const TABS_BY_VARIANT: Record<DuelVariant, Array<{ key: DuelTab; label: string }>> = {
-  review: [
-    { key: "records", label: "对枪记录" },
-    { key: "mechanics", label: "枪法机制" }
-  ],
-  overview: [
-    { key: "opening", label: "首杀热点" }
-  ]
-};
-
-function defaultTab(variant: DuelVariant): DuelTab {
-  return variant === "overview" ? "opening" : "records";
-}
+const DUEL_TABS: Array<{ key: DuelTab; label: string }> = [
+  { key: "records", label: "证据复盘" },
+  { key: "opening", label: "整体态势" },
+  { key: "mechanics", label: "机制" },
+];
 
 const CLASS_TONE: Record<string, string> = {
   contested_duel: "正面对枪击杀",
@@ -56,23 +46,21 @@ const CLASS_TONE: Record<string, string> = {
 export function DuelView({
   allEntries,
   entries,
-  scope,
+  selectedTeam = null,
   onOpenMatch,
   onWatchDemo,
   onGoLibrary,
   identityOptions,
   teamRenames = {},
-  variant = "review"
+  initialTab = "records",
 }: DuelViewProps) {
-  const [tab, setTab] = useState<DuelTab>(() => defaultTab(variant));
+  const [tab, setTab] = useState<DuelTab>(initialTab);
   const [model, setModel] = useState<DuelInsightsModel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
-  const tabs = TABS_BY_VARIANT[variant];
-
   useEffect(() => {
-    setTab(defaultTab(variant));
-  }, [variant]);
+    setTab(initialTab);
+  }, [initialTab]);
 
   useEffect(() => {
     if (entries.length === 0) {
@@ -82,7 +70,7 @@ export function DuelView({
     let cancelled = false;
     setModel(null);
     setError(null);
-    getDuelInsights(entries, identityOptions, scope.teams)
+    getDuelInsights(entries, identityOptions, selectedTeam ? [selectedTeam] : [])
       .then((next) => {
         if (!cancelled) setModel(next);
       })
@@ -92,7 +80,9 @@ export function DuelView({
     return () => {
       cancelled = true;
     };
-  }, [entries, identityOptions?.version, scope.teams]);
+  }, [entries, identityOptions?.version, selectedTeam]);
+
+  const summary = useMemo(() => model ? summarizeDuels(model) : null, [model]);
 
   if (allEntries.length === 0) {
     return (
@@ -107,18 +97,12 @@ export function DuelView({
     );
   }
 
-  const summary = useMemo(() => model ? summarizeDuels(model) : null, [model]);
-
   return (
     <div className="stu-view stu-duel-view">
       <header className="stu-view-header">
         <div>
-          <h1>{variant === "overview" ? "对枪概览" : "对枪复盘"}</h1>
-          <p>
-            {variant === "overview"
-              ? "按地图、阵营和时间段查看首杀热点，判断当前范围内的整体对枪态势。"
-              : "把逐枪证据和枪法机制组织成可回看的复盘队列。指标只来自当前聚合范围。"}
-          </p>
+          <h1>对枪</h1>
+          <p>在同一分析上下文中查看证据复盘、整体态势与机制覆盖；指标只来自当前聚合范围。</p>
         </div>
       </header>
       {summary && (
@@ -146,9 +130,8 @@ export function DuelView({
         </section>
       )}
 
-      {tabs.length > 1 && (
-        <div className="stu-subtabs" role="tablist" aria-label={variant === "overview" ? "对枪概览" : "对枪复盘"}>
-          {tabs.map((item) => (
+      <div className="stu-subtabs" role="tablist" aria-label="对枪">
+          {DUEL_TABS.map((item) => (
             <button
               key={item.key}
               type="button"
@@ -161,7 +144,6 @@ export function DuelView({
             </button>
           ))}
         </div>
-      )}
 
       {error && <EmptyState variant="error" title="分析失败" hint={error} />}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}

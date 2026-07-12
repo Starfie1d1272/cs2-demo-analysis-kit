@@ -310,11 +310,11 @@ function sideLabelZh(side: "ct" | "t" | null): string {
 const STORY_COPY = {
   headline: {
     /** 比分差 → 动词。 */
-    verb: (margin: number) => (margin >= 8 ? "碾压" : margin <= 2 ? "险胜" : "拿下"),
+    verb: (margin: number) => (margin >= 8 ? "大比分战胜" : margin <= 2 ? "险胜" : "战胜"),
     comeback: (firstHalf: number, secondHalf: number) =>
-      `上半场只拿到 ${firstHalf} 分被压着打，换边后连下 ${secondHalf} 分完成翻盘`,
+      `上半场拿到 ${firstHalf} 分，换边后取得 ${secondHalf} 分完成比分反超`,
     frontRunner: (firstHalf: number, secondHalf: number) =>
-      `上半场就先声夺人拿下 ${firstHalf} 分，下半场再补 ${secondHalf} 分锁死悬念`,
+      `上半场拿到 ${firstHalf} 分，下半场再取得 ${secondHalf} 分`,
     even: (firstHalf: number, secondHalf: number) =>
       `上半场拿 ${firstHalf} 分、下半场再添 ${secondHalf} 分`,
     overtime: (overtimeWins: number) => `，加时又咬下 ${overtimeWins} 分才分出胜负`,
@@ -326,26 +326,26 @@ const STORY_COPY = {
     context: (sideLabel: string, crossSwitch: boolean, ownedByWinner: boolean) =>
       !ownedByWinner ? "" : crossSwitch ? "横跨换边" : `靠 ${sideLabel} 半场`,
     line: (startRound: number, endRound: number, length: number, team: string, context: string) =>
-      `真正拉开差距的是 R${startRound}-R${endRound} 那波 ${length} 连胜，${team}${context}借此锁定胜局。`
+      `${team} 在 R${startRound}-R${endRound} 取得 ${length} 连胜${context ? `（${context}）` : ""}，这是本场最长连胜段。`
   },
   pistol: {
-    sweep: "这场比赛几乎已经拿下一半。",
-    none: "这场胜利完全是靠后面一分分追回来的。",
-    split: "另一个交还给对手，靠后续长枪局把节奏拉了回来。",
+    sweep: "两次手枪局均取胜。",
+    none: "两次手枪局均未取胜，胜局来自后续回合。",
+    split: "双方各取一次手枪局。",
     line: (total: number, winner: string, wins: number, tail: string) =>
       `${total} 个手枪局 ${winner} 拿下 ${wins} 个，${tail}`
   },
   clutch: {
     line: (who: string, teamTag: string, round: number, opponents: number) =>
-      `最精彩的残局是 ${who}${teamTag}在 R${round} 的 1v${opponents} 残局翻盘，这种回合最能鼓舞士气。`
+      `样本中人数规模最大的残局是 ${who}${teamTag}在 R${round} 完成的 1v${opponents}。`
   },
   entry: {
     line: (name: string, entryKills: number) =>
-      `${name} 是队里首杀最多的选手，${entryKills} 次首杀大多由他先行完成。`
+      `${name} 记录到 ${entryKills} 次首杀，为队内最多。`
   },
   lowBuy: {
     line: (winner: string, count: number, round: number) =>
-      `${winner} 还在 ${count} 个eco或半起中完成了对对手的翻盘（如 R${round}），这种以弱胜强是对对手经济的严重打击。`
+      `${winner} 在 ${count} 个低经济回合中取胜，代表回合为 R${round}。`
   },
   closeout: {
     reason: {
@@ -356,22 +356,22 @@ const STORY_COPY = {
       target_saved: "拖到时间耗尽"
     } as Record<string, string>,
     line: (winner: string, count: number, total: number, reason: string) =>
-      `${winner} 的胜局里有 ${count}/${total} 个靠${reason}收尾，打法偏好相当鲜明。`
+      `${winner} 的胜局中有 ${count}/${total} 个以${reason}结束。`
   },
   mvp: {
     dom: {
-      combat: "纯粹的枪法压制",
-      trade: "默契的补枪联动",
-      mapControl: "地图空间的控制",
-      clutch: "残局里的收割能力",
-      objective: "对包点目标的推进",
-      utility: "道具开路的支援"
+      combat: "Combat 项",
+      trade: "Trade 项",
+      mapControl: "MapControl 项",
+      clutch: "Clutch 项",
+      objective: "Objective 项",
+      utility: "Utility 项"
     } as Record<string, string>,
     winnerAdrTail: (name: string, adr: string) => `；场均伤害最高的则是 ${name}（ADR ${adr}）`,
     winner: (name: string, kda: string, adr: string, rr: string, dom: string, adrTail: string) =>
-      `胜者这边 ${name} 打得最稳，${kda}、场均 ${adr} 伤害，全场最高的 RR ${rr} 主要来自${dom}${adrTail}。`,
+      `胜方 RR 最高的是 ${name}（${kda}、ADR ${adr}、RR ${rr}），六账户分解中${dom}最突出${adrTail}。`,
     loser: (rr: string, kda: string, name: string, team: string, dom: string) =>
-      `值得一提的是，全场 RR 最高（${rr}，${kda}）的 ${name} 来自落败的 ${team}，凭${dom}撑起了大部分火力，可惜独木难支。`
+      `全场 RR 最高的是落败方 ${team} 的 ${name}（${rr}，${kda}），六账户分解中${dom}最突出。`
   }
 } as const;
 

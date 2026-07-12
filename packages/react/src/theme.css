@@ -151,6 +151,55 @@
   background: linear-gradient(180deg, rgba(255, 122, 33, 0.2), rgba(255, 122, 33, 0.08));
 }
 
+.dak-finding-panel {
+  display: grid;
+  gap: 9px;
+  padding: 14px;
+  border: 1px solid var(--dak-border-hi);
+  border-radius: 8px;
+  background: var(--dak-panel);
+}
+
+.dak-finding-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dak-finding-head small,
+.dak-finding-meta,
+.dak-limit-note {
+  color: var(--dak-fg-dim);
+  font-size: 11px;
+}
+
+.dak-finding-head h3,
+.dak-finding-panel p {
+  margin: 0;
+}
+
+.dak-finding-head h3 {
+  margin-top: 3px;
+  font-size: 14px;
+}
+
+.dak-finding-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.dak-limit-note {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.dak-limit-note b {
+  margin-right: 6px;
+  color: var(--dak-fg-mid);
+}
+
 .dak-leaderboard .dak-col-sortable {
   cursor: pointer;
 }
@@ -981,8 +1030,7 @@
   background: linear-gradient(to right, blue, cyan, lime, yellow, red);
 }
 
-.dak-legend-radar-field,
-.dak-legend-weak {
+.dak-legend-radar-field {
   width: 44px;
   height: 6px;
   border-radius: 999px;
@@ -990,10 +1038,6 @@
 
 .dak-legend-radar-field {
   background: linear-gradient(to right, rgb(34,47,86), rgb(48,91,145), rgb(48,145,176), rgb(103,188,146), rgb(220,174,82), rgb(245,128,86));
-}
-
-.dak-legend-weak {
-  background: linear-gradient(to right, rgba(255,116,96,0.62), rgba(255,116,96,0.16));
 }
 
 .dak-legend-warm { display: none; }

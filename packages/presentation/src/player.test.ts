@@ -17,7 +17,7 @@ describe("buildAllPlayerSeasonProfiles", () => {
     const profile = profiles.find((row) => row.playerKey === source.playerKey)!;
 
     // 元信息与评分透传（不重算）
-    expect(profile.version).toBe("cs2-demo-analysis-kit/player-profile-0.1");
+    expect(profile.version).toBe("cs2-demo-analysis-kit/player-profile-0.2");
     expect(profile.rating.rivalhubRR).toBe(source.accountRR);
     expect(profile.rating.hltvRating).toBe(source.rrV1);
     expect(profile.rating.hltvPercentile).toBe(source.rrV1Percentile);
@@ -71,10 +71,75 @@ describe("buildAllPlayerSeasonProfiles", () => {
           "entry"
         ]);
         for (const axis of profile.style!.axes) {
-          expect(axis.percentile).toBeGreaterThanOrEqual(0);
-          expect(axis.percentile).toBeLessThanOrEqual(100);
+          expect(axis.status).toBe("ready");
+          expect(axis.involvementPercentile).toBeGreaterThanOrEqual(0);
+          expect(axis.involvementPercentile).toBeLessThanOrEqual(100);
+          expect(axis.efficiencyPercentile).toBeGreaterThanOrEqual(0);
+          expect(axis.efficiencyPercentile).toBeLessThanOrEqual(100);
+          expect(axis.signalCoverage).toBe(1);
+          expect(axis.comparisonCount).toBe(5);
         }
       }
+    }
+  });
+
+  it("does not expose precise axis percentiles when PRISM signal coverage is partial", () => {
+    const bundle = buildTestSeasonCohortBundle();
+    const source = bundle.players.find((player) => player.prism != null)!;
+    source.prism!.axes.entry.availableSignalWeight = 0.5;
+
+    const profile = buildAllPlayerSeasonProfiles(bundle).find((item) => item.playerKey === source.playerKey)!;
+    const entry = profile.style!.axes.find((axis) => axis.key === "entry")!;
+
+    expect(entry.status).toBe("partial");
+    expect(entry.involvementPercentile).toBeNull();
+    expect(entry.efficiencyPercentile).toBeNull();
+    expect(entry.combinedPercentile).toBeNull();
+  });
+
+  it("does not expose precise PRISM percentiles for a one-player cohort", () => {
+    const bundle = buildTestSeasonCohortBundle();
+    bundle.players = bundle.players.slice(0, 1);
+
+    const profile = buildAllPlayerSeasonProfiles(bundle)[0];
+    const axis = profile.style!.axes.find((item) => item.key === "firepower")!;
+
+    expect(axis.status).toBe("insufficient");
+    expect(axis.comparisonCount).toBe(1);
+    expect(axis.involvementPercentile).toBeNull();
+    expect(axis.efficiencyPercentile).toBeNull();
+    expect(axis.combinedPercentile).toBeNull();
+  });
+
+  it("does not expose precise PRISM percentiles for a small cohort", () => {
+    const bundle = buildTestSeasonCohortBundle();
+    bundle.players = bundle.players.slice(0, 2);
+
+    const profile = buildAllPlayerSeasonProfiles(bundle)[0];
+    const axis = profile.style!.axes.find((item) => item.key === "firepower")!;
+
+    expect(axis.status).toBe("insufficient");
+    expect(axis.comparisonCount).toBe(2);
+    expect(axis.involvementPercentile).toBeNull();
+    expect(axis.efficiencyPercentile).toBeNull();
+  });
+
+  it("uses midpoint ranks when all valid PRISM values tie", () => {
+    const bundle = buildTestSeasonCohortBundle();
+    for (const player of bundle.players) {
+      if (!player.prism) continue;
+      player.prism.axes.sniping.involvementRaw = 4;
+      player.prism.axes.sniping.efficiencyRaw = 2;
+    }
+
+    const axes = buildAllPlayerSeasonProfiles(bundle)
+      .flatMap((profile) => profile.style?.axes.filter((axis) => axis.key === "sniping") ?? []);
+
+    expect(axes).toHaveLength(5);
+    for (const axis of axes) {
+      expect(axis.status).toBe("ready");
+      expect(axis.involvementPercentile).toBe(50);
+      expect(axis.efficiencyPercentile).toBe(50);
     }
   });
 });

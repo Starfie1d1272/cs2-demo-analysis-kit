@@ -1,4 +1,5 @@
-export interface PlaylistItem {
+/** Coach 的具体用户行动条目，不是通用 Finding 仓库。 */
+export interface PrepItem {
   id: string;
   group: string;
   matchId: string;
@@ -6,12 +7,14 @@ export interface PlaylistItem {
   roundNumber: number;
   clusterId?: string;
   patternFingerprint?: string;
+  source?: "tactical-pattern" | "user";
+  coverage?: string;
   note: string;
   addedAt?: number;
 }
 
-export function playlistToMarkdown(title: string, items: PlaylistItem[]): string {
-  const groups = new Map<string, PlaylistItem[]>();
+export function prepItemsToMarkdown(title: string, items: PrepItem[]): string {
+  const groups = new Map<string, PrepItem[]>();
   for (const item of items) {
     const list = groups.get(item.group) ?? [];
     list.push(item);

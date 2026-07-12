@@ -82,5 +82,28 @@ describe("series grouping", () => {
     expect(veto.maps.banned.length).toBe(4);
     expect(veto.maps.decider).toBeTruthy();
   });
-});
 
+  it("PICK 记录选图方 T 开时，teamA/teamB 的对手均展示为选择 CT", () => {
+    const steps = [
+      { stepOrder: 1, actionType: "pick" as const, teamKey: "teamA" as const, mapName: "de_nuke", side: "t" as const },
+      { stepOrder: 2, actionType: "pick" as const, teamKey: "teamB" as const, mapName: "de_mirage", side: "t" as const }
+    ];
+
+    expect(deriveVetoSummary(steps).sideChoices).toEqual([
+      { mapName: "de_nuke", teamKey: "teamB", side: "ct" },
+      { mapName: "de_mirage", teamKey: "teamA", side: "ct" }
+    ]);
+  });
+
+  it("PICK 记录选图方 CT 开时，对手展示为选择 T；decider 不反向", () => {
+    const steps = [
+      { stepOrder: 1, actionType: "pick" as const, teamKey: "teamA" as const, mapName: "de_nuke", side: "ct" as const },
+      { stepOrder: 2, actionType: "decider" as const, teamKey: "teamB" as const, mapName: "de_mirage", side: "ct" as const }
+    ];
+
+    expect(deriveVetoSummary(steps).sideChoices).toEqual([
+      { mapName: "de_nuke", teamKey: "teamB", side: "t" },
+      { mapName: "de_mirage", teamKey: "teamB", side: "ct" }
+    ]);
+  });
+});

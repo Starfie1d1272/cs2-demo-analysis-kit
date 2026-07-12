@@ -1,8 +1,8 @@
 /**
  * 雷达覆盖场（控图）——描述性地图控制，不上评分。
  *
- * 三个核心用途：① 赛事地图基线（地图客观可视性）② 队伍防守漏洞（绝对盲区）
- * ③ 队伍进攻/防守倾向（队伍 − 联赛差分）。底层四基础场加性、持久化缓存，换 scope 秒切。
+ * 两个核心用途：① 赛事地图基线（地图可视性描述）② 队伍对基线的贡献差分。
+ * 底层四基础场加性、持久化缓存，换 scope 秒切；不推导弱区、意图或对策。
  */
 import { EmptyState } from "@cs2dak/react";
 import { RadarFieldCanvas } from "@cs2dak/react";
@@ -16,11 +16,11 @@ import { displayTeamName, teamRenameGroups } from "../lib/identity";
 export interface RadarFieldViewProps {
   entries: StudioDemoEntry[];
   teamRenames?: Record<string, string>;
+  selectedTeam?: string | null;
+  onSelectTeam?: (teamName: string | null) => void;
 }
 
-const LEAGUE = "__league__";
-
-export function RadarFieldView({ entries, teamRenames = {} }: RadarFieldViewProps) {
+export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null, onSelectTeam }: RadarFieldViewProps) {
   const maps = useMemo(() => {
     const set = new Map<string, number>();
     for (const e of entries) if (getMapCalibration(e.meta.mapName)) set.set(e.meta.mapName, (set.get(e.meta.mapName) ?? 0) + 1);
@@ -29,7 +29,6 @@ export function RadarFieldView({ entries, teamRenames = {} }: RadarFieldViewProp
 
   const [mapName, setMapName] = useState<string | null>(null);
   const activeMap = mapName ?? maps[0]?.[0] ?? null;
-  const [scopeSel, setScopeSel] = useState<string>(LEAGUE);
 
   const entriesOfMap = useMemo(
     () => (activeMap ? entries.filter((e) => e.meta.mapName === activeMap) : []),
@@ -51,11 +50,13 @@ export function RadarFieldView({ entries, teamRenames = {} }: RadarFieldViewProp
     return counts;
   }, [entriesOfMap, teamRenames]);
 
+  const activeTeam = selectedTeam && teams.some((team) => team.displayName === selectedTeam) ? selectedTeam : null;
+
   useEffect(() => {
     if (activeMap && maps.some(([name]) => name === activeMap)) return;
     setMapName(null);
-    setScopeSel(LEAGUE);
-  }, [activeMap, maps]);
+    onSelectTeam?.(null);
+  }, [activeMap, maps, onSelectTeam]);
 
   const [field, setField] = useState<RadarField | null>(null);
   const [baseline, setBaseline] = useState<RadarField | null>(null);
@@ -71,7 +72,7 @@ export function RadarFieldView({ entries, teamRenames = {} }: RadarFieldViewProp
     const token = ++reqToken.current;
     const abort = new AbortController();
     const matchIds = entriesOfMap.map((e) => e.id);
-    const isTeam = scopeSel !== LEAGUE;
+    const isTeam = activeTeam !== null;
     setProgress({ done: 0, total: matchIds.length });
 
     void (async () => {
@@ -79,7 +80,7 @@ export function RadarFieldView({ entries, teamRenames = {} }: RadarFieldViewProp
         const { league, team } = await buildScopeRadarFields({
           matchIds,
           team: isTeam
-            ? { name: scopeSel, includeTeam: (raw) => displayTeamName(raw, teamRenames) === scopeSel }
+            ? { name: activeTeam, includeTeam: (raw) => displayTeamName(raw, teamRenames) === activeTeam }
             : undefined,
           signal: abort.signal,
           onProgress: (done, total) => {
@@ -98,7 +99,7 @@ export function RadarFieldView({ entries, teamRenames = {} }: RadarFieldViewProp
       }
     })();
     return () => abort.abort();
-  }, [activeMap, scopeSel, entriesOfMap, teamRenames]);
+  }, [activeMap, activeTeam, entriesOfMap, teamRenames]);
 
   if (maps.length === 0) {
     return <EmptyState title="暂无可分析地图" hint="先导入若干含回放（replay）的 demo，再来看覆盖场。" />;
@@ -111,7 +112,7 @@ export function RadarFieldView({ entries, teamRenames = {} }: RadarFieldViewProp
           <h3>控图覆盖场</h3>
           <p className="stu-muted">
             基线 = 当前全局范围中 {activeMap} 的 {entriesOfMap.length} 场；
-            队伍视图 = 该队在这些场次里的贡献。
+            队伍视图 = 该队在这些场次里的贡献。覆盖场仅作描述性观察，不自动识别弱区或生成对策。
           </p>
         </div>
         <span className="stu-radar-field-badge">首次计算后会缓存</span>
@@ -125,7 +126,7 @@ export function RadarFieldView({ entries, teamRenames = {} }: RadarFieldViewProp
             role="tab"
             aria-selected={activeMap === m}
             className={activeMap === m ? "stu-subtab stu-subtab-active" : "stu-subtab"}
-            onClick={() => { setMapName(m); setScopeSel(LEAGUE); }}
+            onClick={() => { setMapName(m); onSelectTeam?.(null); }}
           >
             {m} <small>{n}</small>
           </button>
@@ -136,8 +137,8 @@ export function RadarFieldView({ entries, teamRenames = {} }: RadarFieldViewProp
         <span className="stu-muted">对象</span>
         <button
           type="button"
-          className={scopeSel === LEAGUE ? "stu-chip stu-chip-active" : "stu-chip"}
-          onClick={() => setScopeSel(LEAGUE)}
+          className={activeTeam === null ? "stu-chip stu-chip-active" : "stu-chip"}
+          onClick={() => onSelectTeam?.(null)}
           title={`当前全局范围 · ${activeMap} · ${entriesOfMap.length} 场`}
         >
           赛事地图基线 <small>{entriesOfMap.length}</small>
@@ -146,9 +147,9 @@ export function RadarFieldView({ entries, teamRenames = {} }: RadarFieldViewProp
           <button
             key={t.displayName}
             type="button"
-            className={scopeSel === t.displayName ? "stu-chip stu-chip-active" : "stu-chip"}
+            className={activeTeam === t.displayName ? "stu-chip stu-chip-active" : "stu-chip"}
             title={t.originals.length > 1 ? `已合并：${t.originals.join(" / ")}` : undefined}
-            onClick={() => setScopeSel(t.displayName)}
+            onClick={() => onSelectTeam?.(t.displayName)}
           >
             {t.displayName} <small>{teamMatchCounts.get(t.displayName) ?? 0}</small>
           </button>

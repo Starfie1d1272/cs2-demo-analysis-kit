@@ -1,22 +1,26 @@
 import { Pause, Play, RotateCcw, Star } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { OpeningTrailRound, OpeningTrailsModel, PlayerSeasonProfile, TeamKey } from "@cs2dak/contract";
-import { SEASON_STAT_VIEWS, type PlayerSeasonInsights } from "@cs2dak/presentation";
+import { buildMistakeFindings, SEASON_STAT_VIEWS, type AnalysisFinding, type PlayerSeasonInsights } from "@cs2dak/presentation";
 import { getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, type PinnedPlayer } from "../lib/pin";
 import { getFactsStore, type PlayerMatchStatsFact } from "../lib/facts";
-import { EmptyState, MetricInfo } from "@cs2dak/react";
+import { EmptyState, FindingPanel, MetricInfo } from "@cs2dak/react";
 import { FingerprintRadar, TrendChart } from "./profile-widgets";
 import { RadarTrails, type RadarGrenadeOverlay, type RadarTrail } from "../components/RadarTrails";
 import { EvidenceActions } from "../components/EvidenceActions";
+import type { OpenEvidence } from "../lib/evidence-continuation";
+import { createTrainingFocus, listTrainingFocus, removeTrainingFocus, updateTrainingFocus, type TrainingFocus } from "../lib/training-focus";
 
 export interface HomeViewProps {
   entries: StudioDemoEntry[];
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onOpenEvidence: OpenEvidence;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
-  onGoPlayers: () => void;
+  onGoPlayers: (player?: { playerKey: string; name: string }) => void;
   onGoLibrary: () => void;
+  contextSummary: string;
   identityOptions?: IdentityOptions;
 }
 
@@ -85,7 +89,7 @@ interface TeamIdentity {
 }
 
 /** 我的主页：模块 3/5/6 既有 view model 的编排视图，零新信号（docs/design/studio-redesign.md §9）。 */
-export function HomeView({ entries, onOpenMatch, onWatchDemo, onGoPlayers, onGoLibrary, identityOptions }: HomeViewProps) {
+export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, onGoPlayers, onGoLibrary, contextSummary, identityOptions }: HomeViewProps) {
   const [profiles, setProfiles] = useState<PlayerSeasonProfile[] | null>(null);
   const [insights, setInsights] = useState<PlayerSeasonInsights | null>(null);
   const [matchStats, setMatchStats] = useState<PlayerMatchStatsFact[] | null>(null);
@@ -97,6 +101,10 @@ export function HomeView({ entries, onOpenMatch, onWatchDemo, onGoPlayers, onGoL
   const [error, setError] = useState<string | null>(null);
   const [pinned, setPinned] = useState<PinnedPlayer | null>(null);
   const [pinnedLoaded, setPinnedLoaded] = useState(false);
+  const [trainingFocuses, setTrainingFocuses] = useState<TrainingFocus[]>([]);
+  const [editingFocus, setEditingFocus] = useState<string | null>(null);
+  const [focusNote, setFocusNote] = useState("");
+  const [focusReviewCondition, setFocusReviewCondition] = useState("");
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
 
   useEffect(() => {
@@ -124,6 +132,22 @@ export function HomeView({ entries, onOpenMatch, onWatchDemo, onGoPlayers, onGoL
   }, [entries, identityOptions?.version]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const me = useMemo(() => matchPinned(pinned, profiles ?? []), [pinned, profiles]);
+  const mistakeFindings = useMemo(
+    () => insights && me ? buildMistakeFindings(insights.mistakes, { id: me.playerKey, label: me.name }) : [],
+    [insights, me?.playerKey, me?.name]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!me) {
+      setTrainingFocuses([]);
+      return;
+    }
+    void listTrainingFocus(me.playerKey).then((items) => {
+      if (!cancelled) setTrainingFocuses(items);
+    });
+    return () => { cancelled = true; };
+  }, [me?.playerKey]);
 
   useEffect(() => {
     if (!me || entries.length === 0) {
@@ -254,7 +278,7 @@ export function HomeView({ entries, onOpenMatch, onWatchDemo, onGoPlayers, onGoL
       <div className="stu-view">
         <HomeEmpty
           title="欢迎来到 DAK Studio"
-          hint="先导入 .dem 或 v3 ZIP，主页会汇总你的近期状态与该练什么。"
+          hint="先导入 .dem 或 v3 ZIP，主页会汇总近期状态与可复核的比赛证据。"
           action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
         />
       </div>
@@ -275,7 +299,35 @@ export function HomeView({ entries, onOpenMatch, onWatchDemo, onGoPlayers, onGoL
     : null;
   const perMatchRR = new Map(me?.perMatch.map((m) => [m.matchId, m.rivalhubRR]) ?? []);
   const outcomeByMatch = new Map(identity?.ordered.map((o) => [o.matchId, o.outcome]) ?? []);
-  const practiceCards = insights ? buildPracticeCards(insights) : [];
+
+  const openFindingEvidence = (finding: AnalysisFinding) => {
+    const evidence = finding.evidence[0];
+    const entry = evidence ? entryByMatchId.get(evidence.matchId) : null;
+    if (entry && evidence) onOpenEvidence(entry.id, evidence, `home:finding:${finding.key}`, finding);
+  };
+
+  const addTrainingFocus = async (finding: AnalysisFinding) => {
+    if (!me) return;
+    const created = await createTrainingFocus({
+      playerKey: me.playerKey,
+      finding,
+      evidence: finding.evidence,
+      contextSummary,
+    });
+    setTrainingFocuses((current) => [created, ...current]);
+  };
+
+  const beginEditFocus = (focus: TrainingFocus) => {
+    setEditingFocus(focus.id);
+    setFocusNote(focus.note);
+    setFocusReviewCondition(focus.reviewCondition);
+  };
+
+  const saveFocus = async (focus: TrainingFocus) => {
+    const updated = await updateTrainingFocus(focus.id, { note: focusNote, reviewCondition: focusReviewCondition });
+    if (updated) setTrainingFocuses((current) => current.map((item) => item.id === updated.id ? updated : item));
+    setEditingFocus(null);
+  };
 
   return (
     <div className="stu-view">
@@ -287,7 +339,7 @@ export function HomeView({ entries, onOpenMatch, onWatchDemo, onGoPlayers, onGoL
           variant="insufficient"
           title={`当前资料库里没有 ${pinned.name} 的比赛`}
           hint="导入包含你参赛记录的 demo，或在选手档案重新标记「这是我」。"
-          action={<button type="button" className="stu-button" onClick={onGoPlayers}>去选手档案</button>}
+          action={<button type="button" className="stu-button" onClick={() => onGoPlayers()}>去选手档案</button>}
         />
       )}
 
@@ -342,7 +394,7 @@ export function HomeView({ entries, onOpenMatch, onWatchDemo, onGoPlayers, onGoL
             {me.style && (
               <div className="stu-card">
                 <h3>打法风格</h3>
-                <FingerprintRadar axes={me.style.axes} />
+                <FingerprintRadar style={me.style} />
               </div>
             )}
 
@@ -363,43 +415,52 @@ export function HomeView({ entries, onOpenMatch, onWatchDemo, onGoPlayers, onGoL
             </div>
           </div>
 
-          {/* ③ 本周该练什么 */}
-          <section className="stu-card">
-            <h3>本周该练什么</h3>
-            {me.weaknesses.length > 0 && (
-              <div className="stu-traits">
-                {me.weaknesses.slice(0, 3).map((w) => (
-                  <span key={w} className="stu-tag stu-tag-warn">弱 · {w}</span>
-                ))}
-              </div>
-            )}
-            {practiceCards.length === 0 ? (
-              <p className="stu-muted">当前范围没有可复盘的失误证据——保持状态。</p>
-            ) : (
-              <div className="stu-practice-grid">
-                {practiceCards.map((card) => (
-                  <article key={card.label} className="stu-practice-card">
-                    <header>
-                      <b>{card.label}</b>
-                      <span className="stu-dim">{card.count}</span>
-                    </header>
-                    {card.evidence ? (
-                      <EvidenceActions
-                        entry={entryByMatchId.get(card.evidence.matchId)}
-                        target={{ roundNumber: card.evidence.roundNumber, tick: card.evidence.tick }}
-                        onOpenMatch={onOpenMatch}
-                        onWatchDemo={onWatchDemo}
-                      >
-                        {entryByMatchId.has(card.evidence.matchId) ? formatMatchLabel(entryByMatchId.get(card.evidence.matchId)!) : card.evidence.matchId} · R{card.evidence.roundNumber} · {card.evidence.detail}
-                      </EvidenceActions>
-                    ) : (
-                      <p className="stu-dim">暂无证据回合。</p>
-                    )}
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
+          {/* ③ 有规则与证据的待复核 Finding；训练重点只在用户明确确认后持久化。 */}
+          <div className="stu-home-actions-grid">
+            <section>
+              <div className="stu-section-head"><h3>待复核</h3><small className="stu-dim">仅显示有规则与证据的结论</small></div>
+              {mistakeFindings.length === 0 ? (
+                <p className="stu-muted">当前样本没有可自动提出的复盘结论。</p>
+              ) : (
+                <div className="stu-home-finding-list">
+                  {mistakeFindings.slice(0, 3).map((finding) => (
+                    <FindingPanel
+                      key={finding.key}
+                      id={`home:finding:${finding.key}`}
+                      finding={finding}
+                      onOpenEvidence={() => openFindingEvidence(finding)}
+                      action={<button type="button" className="stu-button-sm" onClick={() => void addTrainingFocus(finding)}>加入训练重点</button>}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+            <section>
+              <div className="stu-section-head"><h3>训练重点</h3><small className="stu-dim">仅保存已确认内容</small></div>
+              {trainingFocuses.length === 0 ? (
+                <p className="stu-muted">确认一个待复核结论后，可在这里保存复盘重点与复查条件。</p>
+              ) : (
+                <div className="stu-home-focus-list">
+                  {trainingFocuses.map((focus) => (
+                    <article key={focus.id} className="stu-training-focus">
+                      <header><b>{focus.finding.title}</b><button type="button" className="stu-button-sm" onClick={() => void removeTrainingFocus(focus.id).then(() => setTrainingFocuses((items) => items.filter((item) => item.id !== focus.id)))}>删除</button></header>
+                      <p>{focus.finding.statement}</p>
+                      <small>{focus.contextSummary}</small>
+                      {editingFocus === focus.id ? (
+                        <div className="stu-focus-editor">
+                          <input className="stu-input" value={focusNote} onChange={(event) => setFocusNote(event.target.value)} placeholder="你的复盘备注" />
+                          <input className="stu-input" value={focusReviewCondition} onChange={(event) => setFocusReviewCondition(event.target.value)} placeholder="复查条件" />
+                          <div><button type="button" className="stu-button-sm" onClick={() => void saveFocus(focus)}>保存</button><button type="button" className="stu-button-sm" onClick={() => setEditingFocus(null)}>取消</button></div>
+                        </div>
+                      ) : (
+                        <div className="stu-focus-meta"><span>{focus.note || "未添加备注"}</span><span>{focus.reviewCondition || "未设置复查条件"}</span><button type="button" className="stu-button-sm" onClick={() => beginEditFocus(focus)}>编辑</button></div>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
 
           {/* ④ 开局动线 + 最近比赛 */}
           <div className="stu-home-grid">
@@ -509,7 +570,10 @@ export function HomeView({ entries, onOpenMatch, onWatchDemo, onGoPlayers, onGoL
                             entry={e}
                             target={{ roundNumber: flash.roundNumber, tick: flash.tick }}
                             onOpenMatch={onOpenMatch}
+                            onOpenEvidence={onOpenEvidence}
                             onWatchDemo={onWatchDemo}
+                            reason={flash.reason}
+                            sourceKey={`home:flash:${flash.matchId}:${flash.roundNumber}:${i}`}
                           >
                             {e ? formatMatchLabel(e) : flash.matchId} · R{flash.roundNumber} · 致盲 {flash.victimCount} 人 · 净 {flash.netSeconds.toFixed(1)}s
                           </EvidenceActions>
@@ -524,34 +588,6 @@ export function HomeView({ entries, onOpenMatch, onWatchDemo, onGoPlayers, onGoL
       )}
     </div>
   );
-}
-
-interface PracticeCard {
-  label: string;
-  count: string;
-  evidence: { matchId: string; roundNumber: number; tick?: number; detail: string } | null;
-}
-
-/** Mistake Review Top3：长枪局首死 / Anti-eco 首死 / 残局失利，各取最近一条证据。 */
-function buildPracticeCards(insights: PlayerSeasonInsights): PracticeCard[] {
-  const { mistakes } = insights;
-  return [
-    {
-      label: "长枪局首死",
-      count: `${mistakes.fullBuyFirstDeaths.count}/${mistakes.fullBuyFirstDeaths.attempts} 局`,
-      evidence: mistakes.fullBuyFirstDeaths.evidence[0] ?? null
-    },
-    {
-      label: "Anti-eco 首死",
-      count: `${mistakes.antiEcoFirstDeaths.count}/${mistakes.antiEcoFirstDeaths.attempts} 局`,
-      evidence: mistakes.antiEcoFirstDeaths.evidence[0] ?? null
-    },
-    {
-      label: "残局失利",
-      count: `${mistakes.clutchLosses.count} 次`,
-      evidence: mistakes.clutchLosses.evidence[0] ?? null
-    }
-  ].filter((card) => card.evidence || card.count !== "0/0 局");
 }
 
 function HomeOpeningTrails({
@@ -673,7 +709,8 @@ function HomeOpeningTrails({
 
 const HOME_PREVIEW_ITEMS = [
   ["选手状态", "RR、Rating、近期趋势"],
-  ["该练什么", "从失误和短板生成复盘方向"],
+  ["待复核", "从可定位证据开始核对"],
+  ["训练重点", "只保存你明确确认的练习项"],
   ["开局动线", "默认位、出门路线、道具习惯"],
   ["最近比赛", "点回回合和 tick 证据"],
   ["闪光价值", "最佳闪与负收益队闪"],
@@ -712,7 +749,7 @@ function PickSelf({
   profiles: PlayerSeasonProfile[] | null;
   error: string | null;
   entriesCount: number;
-  onGoPlayers: () => void;
+  onGoPlayers: (player?: { playerKey: string; name: string }) => void;
 }) {
   if (error) return <EmptyState variant="error" title="聚合失败" hint={error} />;
   if (!profiles) return <div className="stu-loading">聚合 {entriesCount} 场 demo…</div>;
@@ -723,12 +760,12 @@ function PickSelf({
         mark
         title="先标记「这是我」"
         hint={<>主页会围绕你的数据展开。在下面挑出你自己，或去选手档案点名字旁的 <Star size={12} style={{ verticalAlign: "-2px" }} /> 标记。</>}
-        action={<button type="button" className="stu-button" onClick={onGoPlayers}>去选手档案</button>}
+        action={<button type="button" className="stu-button" onClick={() => onGoPlayers()}>去选手档案</button>}
       />
       {top.length > 0 && (
         <div className="stu-pickself-grid">
           {top.map((p) => (
-            <button key={p.playerKey} type="button" className="stu-pickself-card" onClick={onGoPlayers} title="去选手档案标记此人为「这是我」">
+            <button key={p.playerKey} type="button" className="stu-pickself-card" onClick={() => onGoPlayers({ playerKey: p.playerKey, name: p.name })} title="去选手档案标记此人为「这是我」">
               <b>{p.name}</b>
               <small className="stu-dim">{p.mapCount} 场 · RR {p.rating.rivalhubRR.toFixed(2)}</small>
             </button>

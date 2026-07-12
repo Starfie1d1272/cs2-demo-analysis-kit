@@ -1,4 +1,5 @@
 import type { SeriesVeto } from "@cs2dak/contract";
+import { deriveSideChoice } from "../lib/series";
 
 const ACTION_LABEL: Record<string, string> = { ban: "BAN", pick: "PICK", decider: "DECIDER" };
 const ACTION_VERB: Record<string, string> = { ban: "removed", pick: "picked", decider: "was left over" };
@@ -23,9 +24,8 @@ export function BpView({ veto, matchUrl }: { veto: SeriesVeto; matchUrl?: string
     <ol className="stu-bp-flow">
       {veto.steps.map((step) => {
         const actor = teamName(veto, step.teamKey);
-        const sideChoice = step.actionType === "pick"
-          ? veto.sideChoices.find((row) => row.mapName === step.mapName)
-          : undefined;
+        // sideChoices 是兼容缓存；始终按原始 steps 重新派生，旧已导入赛事也立即纠正。
+        const sideChoice = deriveSideChoice(step);
         const sideChooser = sideChoice ? teamName(veto, sideChoice.teamKey) : null;
         return (
           <li key={step.stepOrder} className="stu-bp-step">

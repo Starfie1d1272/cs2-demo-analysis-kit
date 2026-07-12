@@ -5,9 +5,11 @@ export { buildAllPlayerSeasonProfiles } from "./player.js";
 export {
   buildTeamComparison,
   buildTeamComparisonFromFacts,
+  buildTeamOverviewFromFacts,
   extractTeamComparisonFacts,
   type TeamComparisonFacts,
-  type TeamComparisonModel
+  type TeamComparisonModel,
+  type TeamOverviewModel
 } from "./team.js";
 export { buildSeriesSummary } from "./series.js";
 export {
@@ -59,6 +61,16 @@ export {
 } from "./insights.js";
 export { displayWeaponName } from "./weapons.js";
 export { economyLabelCn, ECONOMY_LABEL_SHORT } from "./economy.js";
+export {
+  buildMistakeFindings,
+  findingFromDuel,
+  findingFromUtilityDamage,
+  findingFromUtilityFlash,
+  findingFromTacticalCluster,
+  type AnalysisFinding,
+  type FindingOrigin,
+  type FindingSubject,
+} from "./findings.js";
 export * from "./tactical-labels.js";
 export * from "./replay-clock.js";
 export {
