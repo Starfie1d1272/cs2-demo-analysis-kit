@@ -161,6 +161,28 @@ export function sortEntriesByVeto(entries: StudioDemoEntry[], veto: SeriesVeto):
   );
 }
 
+export function oppositeSide(side: "t" | "ct"): "t" | "ct" {
+  return side === "t" ? "ct" : "t";
+}
+
+function opposingTeamKey(teamKey: SeriesVetoStep["teamKey"]): SeriesVetoStep["teamKey"] {
+  return teamKey === "teamA" ? "teamB" : teamKey === "teamB" ? "teamA" : null;
+}
+
+/**
+ * 将原始 BP step 规范为用户可见的选边事实。
+ * PICK 的 `side` 记录选图方从哪一侧开局，因此展示对手选边时必须同时换队伍和阵营。
+ * DECIDER 没有固定的选图方/对手关系，保留原始记录。
+ */
+export function deriveSideChoice(step: SeriesVetoStep): SeriesVeto["sideChoices"][number] | null {
+  if (step.side == null) return null;
+  return {
+    mapName: step.mapName,
+    teamKey: step.actionType === "pick" ? opposingTeamKey(step.teamKey) : step.teamKey,
+    side: step.actionType === "pick" ? oppositeSide(step.side) : step.side
+  };
+}
+
 export function deriveVetoSummary(steps: SeriesVetoStep[]): Pick<SeriesVeto, "maps" | "sideChoices"> {
   return {
     maps: {
@@ -173,15 +195,8 @@ export function deriveVetoSummary(steps: SeriesVetoStep[]): Pick<SeriesVeto, "ma
       decider: steps.find((step) => step.actionType === "decider")?.mapName ?? null
     },
     sideChoices: steps
-      .filter((step): step is SeriesVetoStep & { side: "t" | "ct" } => step.side != null)
-      .map((step) => ({
-        mapName: step.mapName,
-        // PICK 步骤的 actor 是选图方；按赛事 BP 规则由对手选择该图的开局阵营。
-        teamKey: step.actionType === "pick"
-          ? step.teamKey === "teamA" ? "teamB" : step.teamKey === "teamB" ? "teamA" : null
-          : step.teamKey,
-        side: step.side
-      }))
+      .map(deriveSideChoice)
+      .filter((choice): choice is SeriesVeto["sideChoices"][number] => choice != null)
   };
 }
 

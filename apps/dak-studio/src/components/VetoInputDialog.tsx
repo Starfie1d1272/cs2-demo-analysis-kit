@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { SeriesFormat, SeriesVeto, SeriesVetoStep } from "@cs2dak/contract";
-import { deriveVetoSummary, mapDisplayName, SERIES_MAP_POOL, vetoSkeleton } from "../lib/series";
+import { deriveVetoSummary, mapDisplayName, oppositeSide, SERIES_MAP_POOL, vetoSkeleton } from "../lib/series";
 
 type TeamKey = "teamA" | "teamB";
 type Side = "t" | "ct";
@@ -161,8 +161,8 @@ export function VetoInputDialog({
               {step.actionType === "pick" && step.teamKey && (
                 <SidePick
                   label={`→ ${teamName(step.teamKey === "teamA" ? "teamB" : "teamA")} 选边`}
-                  side={step.side}
-                  onChange={(side) => updateStep(index, { side })}
+                  side={step.side ? oppositeSide(step.side) : null}
+                  onChange={(side) => updateStep(index, { side: side ? oppositeSide(side) : null })}
                 />
               )}
               {step.actionType === "decider" && (
