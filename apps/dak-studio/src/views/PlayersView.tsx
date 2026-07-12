@@ -126,6 +126,13 @@ export function PlayersView({
     [entries]
   );
 
+  const isPinned = (profile: PlayerSeasonProfile) => matchPinned(pinned, [profile]) != null;
+  const togglePin = (profile: PlayerSeasonProfile) => {
+    const next = isPinned(profile) ? null : { playerKey: profile.playerKey, steamIds: profile.steamIds, name: profile.name };
+    setPinned(next);
+    void setPinnedPlayer(next);
+  };
+
   useEffect(() => {
     if (!selected || entries.length === 0) {
       setInsights(null);
@@ -191,17 +198,41 @@ export function PlayersView({
   if (!selected) {
     return (
       <div className="stu-view">
-        <EmptyState variant="insufficient" title="当前选手不在语料中" hint="请从选手入口选择当前语料中的选手。" />
+        <header className="stu-view-header">
+          <div>
+            <h1>选手档案</h1>
+            <p>基于 {entries.length} 场 demo 的跨场画像。请先从名单中选择要查看的选手。</p>
+          </div>
+        </header>
+        <div className="stu-split">
+          <aside className="stu-roster">
+            {orderedProfiles.map((profile) => (
+              <button
+                key={profile.playerKey}
+                type="button"
+                className="stu-roster-item"
+                onClick={() => onSelectPlayer(profile.playerKey, profile.name)}
+              >
+                <span className="stu-roster-name">
+                  {isPinned(profile) && <Star size={11} className="stu-pin-star" />}
+                  {profile.name}
+                </span>
+                <span className="stu-roster-meta">{profile.mapCount} maps</span>
+                <b className="stu-roster-rr">{profile.rating.rivalhubRR.toFixed(2)}</b>
+              </button>
+            ))}
+          </aside>
+          <section className="stu-profile">
+            <EmptyState
+              variant="insufficient"
+              title={selectedPlayerKey ? "当前选手不在语料中" : "请选择选手"}
+              hint={selectedPlayerKey ? "当前语料不包含该选手，请从左侧名单重新选择。" : "从左侧名单选择一名选手后查看档案。"}
+            />
+          </section>
+        </div>
       </div>
     );
   }
-
-  const isPinned = (p: PlayerSeasonProfile) => matchPinned(pinned, [p]) != null;
-  const togglePin = (p: PlayerSeasonProfile) => {
-    const next = isPinned(p) ? null : { playerKey: p.playerKey, steamIds: p.steamIds, name: p.name };
-    setPinned(next);
-    void setPinnedPlayer(next);
-  };
 
   const trendMax = Math.max(...selected.perMatch.map((m) => m.rivalhubRR), 0.01);
   const playerMatches = [...selected.perMatch].reverse();

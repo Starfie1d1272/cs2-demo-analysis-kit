@@ -24,7 +24,10 @@ export interface ManagementViewProps {
   teamRenames?: Record<string, string>;
   onNotice?: (message: string) => void;
   onLibraryChanged?: (entries: StudioDemoEntry[]) => void;
+  initialTab?: ManagementTab;
 }
+
+export type ManagementTab = "identity" | "assets";
 
 type BundlePlayer = SeasonCohortBundle["players"][number];
 
@@ -42,9 +45,10 @@ export function ManagementView({
   onGoLibrary,
   teamRenames = identity.teamRenames,
   onNotice = () => {},
-  onLibraryChanged
+  onLibraryChanged,
+  initialTab = "identity"
 }: ManagementViewProps) {
-  const [tab, setTab] = useState<"identity" | "assets">("identity");
+  const [tab, setTab] = useState<ManagementTab>(initialTab);
   const [bundle, setBundle] = useState<SeasonCohortBundle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -57,6 +61,10 @@ export function ManagementView({
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
   const [working, setWorking] = useState(false);
   const cancelRef = useRef(false);
+
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab]);
 
   // 加载 bundle
   useEffect(() => {

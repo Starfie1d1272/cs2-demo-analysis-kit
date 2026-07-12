@@ -26,7 +26,7 @@ import { EventsView } from "./views/EventsView";
 import { UtilityView } from "./views/UtilityView";
 import { LineupsView } from "./views/LineupsView";
 import { EconomyView } from "./views/EconomyView";
-import { ManagementView } from "./views/ManagementView";
+import { ManagementView, type ManagementTab } from "./views/ManagementView";
 import { DuelView } from "./views/DuelView";
 import { CoachView } from "./views/CoachView";
 import { RadarFieldView } from "./views/RadarFieldView";
@@ -148,6 +148,7 @@ export function App() {
   const [updateChannel, setUpdateChannel] = useState<UpdateChannel>(initialUpdateChannel);
   const [contextEditorOpen, setContextEditorOpen] = useState(false);
   const [capabilityAvailability, setCapabilityAvailability] = useState<CapabilityAvailability | null>(null);
+  const [managementInitialTab, setManagementInitialTab] = useState<ManagementTab>("identity");
 
   async function doCheckUpdate() {
     setCheckingUpdate(true);
@@ -220,7 +221,12 @@ export function App() {
     [identityState.version, identityState.mappings, identityState.teamRenames]
   );
   const openCapabilityRepair = useCallback((action: CapabilityRepairAction) => {
-    setView(action === "install-tri" ? "management" : "library");
+    if (action === "install-tri") {
+      setManagementInitialTab("assets");
+      setView("management");
+      return;
+    }
+    setView("library");
   }, []);
   const selectRadarTeam = useCallback((teamName: string | null) => {
     setAnalysisContext((current) => ({
@@ -732,7 +738,7 @@ export function App() {
           ))}
         </nav>
         <div className="stu-sidebar-foot">
-          <NavButton item={MANAGEMENT_NAV} active={view === "management"} onClick={() => setView("management")} />
+          <NavButton item={MANAGEMENT_NAV} active={view === "management"} onClick={() => { setManagementInitialTab("identity"); setView("management"); }} />
           <span>{entries.length} 场 demo</span>
           <small>v{APP_VERSION} · v3 ZIP · 本地存储</small>
           <label className="stu-update-channel">
@@ -953,6 +959,7 @@ export function App() {
             onGoLibrary={() => setView("library")}
             onNotice={setNotice}
             onLibraryChanged={setEntries}
+            initialTab={managementInitialTab}
           />
         )}
       </main>

@@ -51,6 +51,7 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
   }, [entriesOfMap, teamRenames]);
 
   const activeTeam = selectedTeam && teams.some((team) => team.displayName === selectedTeam) ? selectedTeam : null;
+  const invalidTeamForMap = selectedTeam !== null && activeTeam === null;
 
   useEffect(() => {
     if (activeMap && maps.some(([name]) => name === activeMap)) return;
@@ -64,9 +65,10 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
   const reqToken = useRef(0);
 
   useEffect(() => {
-    if (!activeMap || entriesOfMap.length === 0) {
+    if (!activeMap || entriesOfMap.length === 0 || invalidTeamForMap) {
       setField(null);
       setBaseline(null);
+      setProgress(null);
       return;
     }
     const token = ++reqToken.current;
@@ -99,7 +101,7 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
       }
     })();
     return () => abort.abort();
-  }, [activeMap, activeTeam, entriesOfMap, teamRenames]);
+  }, [activeMap, activeTeam, entriesOfMap, invalidTeamForMap, teamRenames]);
 
   if (maps.length === 0) {
     return <EmptyState title="暂无可分析地图" hint="先导入若干含回放（replay）的 demo，再来看覆盖场。" />;
@@ -126,7 +128,7 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
             role="tab"
             aria-selected={activeMap === m}
             className={activeMap === m ? "stu-subtab stu-subtab-active" : "stu-subtab"}
-            onClick={() => { setMapName(m); onSelectTeam?.(null); }}
+            onClick={() => setMapName(m)}
           >
             {m} <small>{n}</small>
           </button>
@@ -137,7 +139,7 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
         <span className="stu-muted">对象</span>
         <button
           type="button"
-          className={activeTeam === null ? "stu-chip stu-chip-active" : "stu-chip"}
+          className={selectedTeam === null ? "stu-chip stu-chip-active" : "stu-chip"}
           onClick={() => onSelectTeam?.(null)}
           title={`当前全局范围 · ${activeMap} · ${entriesOfMap.length} 场`}
         >
@@ -156,14 +158,22 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
         ))}
       </div>
 
-      {progress && (
+      {invalidTeamForMap && (
+        <EmptyState
+          variant="insufficient"
+          title="当前队伍在此地图没有样本"
+          hint="请选择该地图中的其他队伍，或明确切回赛事地图基线。"
+        />
+      )}
+
+      {!invalidTeamForMap && progress && (
         <div className="stu-notice" role="status">
           计算 {activeMap} 覆盖场 {progress.done}/{progress.total} 场（首次较慢，结果已缓存，之后秒开）…
         </div>
       )}
 
-      {!progress && field && <RadarFieldCanvas field={field} baseline={baseline} map={{ name: activeMap!, radarImageUrl: `./maps/radars/${activeMap}.png` }} />}
-      {!progress && !field && activeMap && (
+      {!invalidTeamForMap && !progress && field && <RadarFieldCanvas field={field} baseline={baseline} map={{ name: activeMap!, radarImageUrl: `./maps/radars/${activeMap}.png` }} />}
+      {!invalidTeamForMap && !progress && !field && activeMap && (
         <EmptyState title="该地图暂无覆盖场数据" hint="所选范围内没有含回放的长枪局。" />
       )}
     </div>
