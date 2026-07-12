@@ -163,7 +163,7 @@ function player(index: number, overrides: Partial<SeasonPlayerRow> = {}): Season
       buyDelta: "available",
       manState: "available"
     },
-    prism: index === 5 ? null : prism(index, steamId64, 2 + index),
+    prism: index === 6 ? null : prism(index, steamId64, 2 + index),
     confidence: 0.6 + index * 0.05,
     perMatch: [
       { matchId: "m2", steamId64, accountRR: 1 + index * 0.1, rrV1: 0.9 + index * 0.08 },
@@ -178,7 +178,7 @@ export function buildTestSeasonCohortBundle(): SeasonCohortBundle {
     version: "cs2-demo-analysis-kit/cohort-1.0",
     matchCount: 2,
     weightsVersion: "test-weights",
-    players: [1, 2, 3, 4, 5].map((i) => player(i)),
+    players: [1, 2, 3, 4, 5, 6].map((i) => player(i)),
     provenance: {
       cohortVersion: "cs2-demo-analysis-kit/cohort-1.0",
       sourceSchemaVersion: "cs2-demo-format/3.0",

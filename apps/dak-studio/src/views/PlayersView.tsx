@@ -378,12 +378,16 @@ export function PlayersView({
                         </>
                       ) : (
                         <span className="stu-prism-axis-status">
-                          {axis.status === "partial" ? "部分信号" : "不可用"} · 覆盖 {(axis.signalCoverage * 100).toFixed(0)}%
+                          {axis.status === "partial"
+                            ? `部分信号 · 覆盖 ${(axis.signalCoverage * 100).toFixed(0)}%`
+                            : axis.status === "insufficient"
+                              ? `样本不足 · ${axis.comparisonCount} 人`
+                              : "不可用"}
                         </span>
                       )}
                     </div>
                   ))}
-                  <p className="stu-dim stu-prism-note">P 值均为当前 {selected.mapCount} 图分析范围内的相对位置；信号覆盖低于 75% 时不展示精确排名。</p>
+                  <p className="stu-dim stu-prism-note">P 值均为当前 {selected.mapCount} 图分析范围内的相对位置；信号覆盖低于 75% 或有效对比少于 5 人时不展示精确排名。</p>
                 </div>
               ) : (
                 <p className="stu-dim">该聚合范围无 PRISM 结果。</p>
@@ -744,7 +748,7 @@ function buildPlayerCardMarkdown(profile: PlayerSeasonProfile, insights: PlayerS
     lines.push("");
     lines.push("**PRISM 打法画像（当前样本内）**：" + profile.style.axes.map((axis) => axis.status === "ready"
       ? `${axis.label} 行为 P${axis.involvementPercentile!.toFixed(0)} / 效率 P${axis.efficiencyPercentile!.toFixed(0)}`
-      : `${axis.label} ${axis.status === "partial" ? "部分信号" : "不可用"}`
+      : `${axis.label} ${axis.status === "partial" ? "部分信号" : axis.status === "insufficient" ? `样本不足（${axis.comparisonCount} 人）` : "不可用"}`
     ).join(" · "));
   }
   if (insights) {

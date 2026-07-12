@@ -20,14 +20,24 @@ export function FingerprintRadar({ style }: { style: PlayerStyle }) {
   };
   const ringPath = (fraction: number) =>
     axes.map((_, i) => point(i, fraction).join(",")).join(" ");
-  const pathFor = (field: "involvementPercentile" | "efficiencyPercentile") => axes
-    .map((axis, i) => point(i, Math.max(0.04, (axis[field] ?? 0) / 100)).join(","))
-    .join(" ");
+  const pathFor = (field: "involvementPercentile" | "efficiencyPercentile"): string | null => {
+    const points = axes.map((axis, i) => {
+      const value = axis[field];
+      return value == null ? null : point(i, Math.max(0.04, value / 100)).join(",");
+    });
+    return points.every((value): value is string => value != null) ? points.join(" ") : null;
+  };
+  const involvementPath = pathFor("involvementPercentile");
+  const efficiencyPath = pathFor("efficiencyPercentile");
+  const hasCompleteFingerprint = involvementPath != null && efficiencyPath != null;
   const rrTone = rrPercentile >= 75 ? "high" : rrPercentile >= 40 ? "mid" : "low";
 
   return (
     <div className={`stu-prism-radar stu-prism-radar-${rrTone}`}>
-      <svg viewBox={`0 0 ${size} ${size}`} className="stu-radar" role="img" aria-label={`PRISM 八维打法画像，RR 样本内 P${rrPercentile.toFixed(0)}`}>
+      <svg viewBox={`0 0 ${size} ${size}`} className="stu-radar" role="img" aria-label={hasCompleteFingerprint
+        ? `PRISM 八维打法画像，RR 样本内 P${rrPercentile.toFixed(0)}`
+        : `PRISM 八维打法画像部分可用，RR 样本内 P${rrPercentile.toFixed(0)}`}
+      >
         {[0.25, 0.5, 0.75, 1].map((fraction) => (
           <polygon key={fraction} className="stu-radar-ring" points={ringPath(fraction)} />
         ))}
@@ -35,8 +45,21 @@ export function FingerprintRadar({ style }: { style: PlayerStyle }) {
           const [x, y] = point(i, 1);
           return <line key={i} className="stu-radar-spoke" x1={center} y1={center} x2={x} y2={y} />;
         })}
-        <polygon className="stu-radar-value" points={pathFor("involvementPercentile")} />
-        <polygon className="stu-radar-efficiency" points={pathFor("efficiencyPercentile")} />
+        {hasCompleteFingerprint ? (
+          <>
+            <polygon className="stu-radar-value" points={involvementPath} />
+            <polygon className="stu-radar-efficiency" points={efficiencyPath} />
+          </>
+        ) : (
+          <text className="stu-radar-partial-note" x={center} y={center - 5} textAnchor="middle">
+            部分画像
+          </text>
+        )}
+        {!hasCompleteFingerprint && (
+          <text className="stu-radar-partial-detail" x={center} y={center + 11} textAnchor="middle">
+            请以轴列表为准
+          </text>
+        )}
         {axes.map((axis, i) => {
           const [x, y] = point(i, 1.16);
           return (
@@ -50,6 +73,7 @@ export function FingerprintRadar({ style }: { style: PlayerStyle }) {
         <span><i className="stu-prism-key stu-prism-key-involvement" />行为倾向</span>
         <span><i className="stu-prism-key stu-prism-key-efficiency" />执行效率</span>
         <b>RR · 样本内 P{rrPercentile.toFixed(0)}</b>
+        {!hasCompleteFingerprint && <span className="stu-prism-legend-partial">部分信号不绘制闭合画像</span>}
       </div>
     </div>
   );

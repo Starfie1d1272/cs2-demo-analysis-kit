@@ -28,7 +28,9 @@ export const playerStyleAxisSchema = z.object({
   combinedPercentile: z.number().min(0).max(100).nullable(),
   /** 上游配置中可用信号权重占比，0–1。 */
   signalCoverage: z.number().min(0).max(1),
-  status: z.enum(["ready", "partial", "unavailable"])
+  /** 可供当前 cohort 排名的有效选手数；不足 5 人时不展示精确 P 值。 */
+  comparisonCount: z.number().int().nonnegative(),
+  status: z.enum(["ready", "partial", "unavailable", "insufficient"])
 });
 
 export const playerStyleSchema = z.object({
@@ -59,7 +61,8 @@ export const playerWeaponProfileEntrySchema = z.object({
 });
 
 export const playerSeasonProfileSchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/player-profile-0.1"),
+  /** 0.2：PRISM 轴拆分为行为倾向、执行效率，并附带信号/样本可用性。 */
+  version: z.literal("cs2-demo-analysis-kit/player-profile-0.2"),
   weightsVersion: z.string(),
   playerKey: z.string(),
   name: z.string(),

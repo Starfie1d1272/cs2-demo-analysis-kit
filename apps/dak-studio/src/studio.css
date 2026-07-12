@@ -2930,6 +2930,17 @@ td.stu-heat-cell.stu-heat-neutral {
   opacity: .42;
 }
 
+.stu-radar-partial-note {
+  fill: var(--dak-warn);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.stu-radar-partial-detail {
+  fill: var(--dak-fg-dim);
+  font-size: 9px;
+}
+
 .stu-prism-radar {
   --stu-prism-color: var(--dak-warn);
 }
@@ -2955,6 +2966,10 @@ td.stu-heat-cell.stu-heat-neutral {
 }
 
 .stu-prism-legend b { color: var(--stu-prism-color); }
+
+.stu-prism-legend-partial {
+  color: var(--dak-warn);
+}
 
 .stu-prism-key {
   width: 13px;
