@@ -3,20 +3,19 @@ import type { SeasonLeaderboardModel } from "@cs2dak/contract";
 import { SeasonLeaderboard } from "@cs2dak/react";
 import { getSeasonSummary, type IdentityOptions } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";
-import type { CohortScopeState } from "../components/CohortScope";
 import { EmptyState } from "@cs2dak/react";
 
 export interface LeaderboardViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
-  scope: CohortScopeState;
+  selectedTeam?: string | null;
   onPlayerClick: (playerKey: string) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
   embedded?: boolean;
 }
 
-export function LeaderboardView({ allEntries, entries, scope, onPlayerClick, onGoLibrary, identityOptions, embedded = false }: LeaderboardViewProps) {
+export function LeaderboardView({ allEntries, entries, selectedTeam = null, onPlayerClick, onGoLibrary, identityOptions, embedded = false }: LeaderboardViewProps) {
   const [model, setModel] = useState<SeasonLeaderboardModel | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,7 +27,7 @@ export function LeaderboardView({ allEntries, entries, scope, onPlayerClick, onG
     let cancelled = false;
     setModel(null);
     setError(null);
-    getSeasonSummary(entries, identityOptions, scope.teams)
+    getSeasonSummary(entries, identityOptions, selectedTeam ? [selectedTeam] : [])
       .then((summary) => {
         if (!cancelled) setModel(summary.leaderboard);
       })
@@ -38,7 +37,7 @@ export function LeaderboardView({ allEntries, entries, scope, onPlayerClick, onG
     return () => {
       cancelled = true;
     };
-  }, [entries, identityOptions?.version, scope.teams]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entries, identityOptions?.version, selectedTeam]);
 
   if (allEntries.length === 0) {
     return (

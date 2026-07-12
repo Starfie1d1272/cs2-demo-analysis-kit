@@ -50,7 +50,7 @@ export interface IdentityOptions {
  */
 
 /** 聚合算法/口径变化时 +1，旧缓存自动失效重算。 */
-const CACHE_VERSION = 8;
+export const CACHE_VERSION = 9;
 
 export interface SeasonSummary {
   bundle: SeasonCohortBundle;
@@ -59,11 +59,13 @@ export interface SeasonSummary {
   insights: TournamentInsights | null;
 }
 
-function keyOf(entries: StudioDemoEntry[], identityVersion?: number, selectedTeams: string[] = []): string {
+export function seasonCacheKey(entries: StudioDemoEntry[], identityVersion?: number, selectedTeams: string[] = []): string {
   const idPart = identityVersion ? `:idv${identityVersion}` : "";
   const teamPart = selectedTeams.length > 0 ? `:teams=${[...selectedTeams].sort().join(",")}` : "";
   return `v${CACHE_VERSION}${idPart}${teamPart}:` + entries.map((entry) => entry.id).sort().join("|");
 }
+
+const keyOf = seasonCacheKey;
 
 function selectedOriginalTeams(selectedTeams: string[], renames?: Record<string, string>): Set<string> {
   return new Set(selectedTeams.flatMap((team) => originalTeamNamesForDisplay(team, renames ?? {})));

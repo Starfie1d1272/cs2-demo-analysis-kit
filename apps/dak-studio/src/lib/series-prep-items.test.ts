@@ -25,4 +25,17 @@ describe("PrepItemsStore", () => {
     await store.remove("prep:legacy");
     await expect(store.list()).resolves.toMatchObject([{ id: "prep:user", source: "user" }]);
   });
+
+  it("已有新记录时仍会逐条搬迁并删除残留旧记录", async () => {
+    const adapter = createIdbAdapter();
+    const current = adapter.records("prep-items-partial-test");
+    const legacy = adapter.records("legacy-playlist-partial-test");
+    await current.put("existing", { ...legacyItem, id: "existing" });
+    await legacy.put(legacyItem.id, legacyItem);
+
+    const items = await createPrepItemsStore(current, legacy).list();
+
+    expect(items.map((item) => item.id).sort()).toEqual(["existing", legacyItem.id].sort());
+    expect(await legacy.getAll()).toEqual([]);
+  });
 });

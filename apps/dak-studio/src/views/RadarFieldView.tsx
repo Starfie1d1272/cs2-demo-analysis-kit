@@ -20,8 +20,6 @@ export interface RadarFieldViewProps {
   onSelectTeam?: (teamName: string | null) => void;
 }
 
-const LEAGUE = "__league__";
-
 export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null, onSelectTeam }: RadarFieldViewProps) {
   const maps = useMemo(() => {
     const set = new Map<string, number>();
@@ -31,7 +29,6 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
 
   const [mapName, setMapName] = useState<string | null>(null);
   const activeMap = mapName ?? maps[0]?.[0] ?? null;
-  const [scopeSel, setScopeSel] = useState<string>(LEAGUE);
 
   const entriesOfMap = useMemo(
     () => (activeMap ? entries.filter((e) => e.meta.mapName === activeMap) : []),
@@ -53,15 +50,13 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
     return counts;
   }, [entriesOfMap, teamRenames]);
 
-  useEffect(() => {
-    if (selectedTeam && teams.some((team) => team.displayName === selectedTeam)) setScopeSel(selectedTeam);
-  }, [selectedTeam, teams]);
+  const activeTeam = selectedTeam && teams.some((team) => team.displayName === selectedTeam) ? selectedTeam : null;
 
   useEffect(() => {
     if (activeMap && maps.some(([name]) => name === activeMap)) return;
     setMapName(null);
-    setScopeSel(LEAGUE);
-  }, [activeMap, maps]);
+    onSelectTeam?.(null);
+  }, [activeMap, maps, onSelectTeam]);
 
   const [field, setField] = useState<RadarField | null>(null);
   const [baseline, setBaseline] = useState<RadarField | null>(null);
@@ -77,7 +72,7 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
     const token = ++reqToken.current;
     const abort = new AbortController();
     const matchIds = entriesOfMap.map((e) => e.id);
-    const isTeam = scopeSel !== LEAGUE;
+    const isTeam = activeTeam !== null;
     setProgress({ done: 0, total: matchIds.length });
 
     void (async () => {
@@ -85,7 +80,7 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
         const { league, team } = await buildScopeRadarFields({
           matchIds,
           team: isTeam
-            ? { name: scopeSel, includeTeam: (raw) => displayTeamName(raw, teamRenames) === scopeSel }
+            ? { name: activeTeam, includeTeam: (raw) => displayTeamName(raw, teamRenames) === activeTeam }
             : undefined,
           signal: abort.signal,
           onProgress: (done, total) => {
@@ -104,7 +99,7 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
       }
     })();
     return () => abort.abort();
-  }, [activeMap, scopeSel, entriesOfMap, teamRenames]);
+  }, [activeMap, activeTeam, entriesOfMap, teamRenames]);
 
   if (maps.length === 0) {
     return <EmptyState title="暂无可分析地图" hint="先导入若干含回放（replay）的 demo，再来看覆盖场。" />;
@@ -131,7 +126,7 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
             role="tab"
             aria-selected={activeMap === m}
             className={activeMap === m ? "stu-subtab stu-subtab-active" : "stu-subtab"}
-            onClick={() => { setMapName(m); setScopeSel(LEAGUE); }}
+            onClick={() => { setMapName(m); onSelectTeam?.(null); }}
           >
             {m} <small>{n}</small>
           </button>
@@ -142,8 +137,8 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
         <span className="stu-muted">对象</span>
         <button
           type="button"
-          className={scopeSel === LEAGUE ? "stu-chip stu-chip-active" : "stu-chip"}
-          onClick={() => { setScopeSel(LEAGUE); onSelectTeam?.(null); }}
+          className={activeTeam === null ? "stu-chip stu-chip-active" : "stu-chip"}
+          onClick={() => onSelectTeam?.(null)}
           title={`当前全局范围 · ${activeMap} · ${entriesOfMap.length} 场`}
         >
           赛事地图基线 <small>{entriesOfMap.length}</small>
@@ -152,9 +147,9 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
           <button
             key={t.displayName}
             type="button"
-            className={scopeSel === t.displayName ? "stu-chip stu-chip-active" : "stu-chip"}
+            className={activeTeam === t.displayName ? "stu-chip stu-chip-active" : "stu-chip"}
             title={t.originals.length > 1 ? `已合并：${t.originals.join(" / ")}` : undefined}
-            onClick={() => { setScopeSel(t.displayName); onSelectTeam?.(t.displayName); }}
+            onClick={() => onSelectTeam?.(t.displayName)}
           >
             {t.displayName} <small>{teamMatchCounts.get(t.displayName) ?? 0}</small>
           </button>

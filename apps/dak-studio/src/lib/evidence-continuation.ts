@@ -7,7 +7,6 @@ export interface EvidenceContinuation {
   sourceView: string;
   context: AnalysisContext;
   sourceKey?: string;
-  localState?: Record<string, string | number | boolean | null>;
   evidence: EvidenceRef;
   finding?: Pick<AnalysisFinding, "key" | "title" | "statement">;
 }
@@ -28,7 +27,6 @@ export function createEvidenceContinuation(input: EvidenceContinuation): Evidenc
       roles: { ...input.context.roles },
     },
     evidence: { ...input.evidence },
-    localState: input.localState ? { ...input.localState } : undefined,
     finding: input.finding ? { ...input.finding } : undefined,
   };
 }

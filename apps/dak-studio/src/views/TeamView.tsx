@@ -49,7 +49,7 @@ export function TeamView({
       .map(([name, matches]) => ({ name, matches }))
       .sort((a, b) => b.matches - a.matches || a.name.localeCompare(b.name));
   }, [entries, identityOptions?.version]);
-  const activeTeam = selectedTeam && teams.some((team) => team.name === selectedTeam) ? selectedTeam : teams[0]?.name ?? null;
+  const activeTeam = selectedTeam && teams.some((team) => team.name === selectedTeam) ? selectedTeam : null;
   const [overview, setOverview] = useState<TeamOverviewModel | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,8 +81,9 @@ export function TeamView({
           </select>
         </label>
       </header>
+      {!activeTeam && <EmptyState variant="insufficient" title="当前队伍不在语料中" hint="请从上方选择当前语料中的队伍。" />}
       {error && <EmptyState variant="error" title="队伍总览不可用" hint={error} />}
-      {!error && !overview && <div className="stu-loading">聚合队伍事实…</div>}
+      {!error && activeTeam && !overview && <div className="stu-loading">聚合队伍事实…</div>}
       {overview && (
         <>
           <section className="stu-card">

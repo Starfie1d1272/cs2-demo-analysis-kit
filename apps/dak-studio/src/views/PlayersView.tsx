@@ -12,7 +12,6 @@ import {
 import { getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
-import type { CohortScopeState } from "../components/CohortScope";
 import { FingerprintRadar, TrendChart } from "./profile-widgets";
 import { EmptyState, MetricInfo } from "@cs2dak/react";
 import { EvidenceActions } from "../components/EvidenceActions";
@@ -21,7 +20,7 @@ import type { OpenEvidence } from "../lib/evidence-continuation";
 export interface PlayersViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
-  scope: CohortScopeState;
+  selectedTeam?: string | null;
   selectedPlayerKey: string | null;
   onSelectPlayer: (playerKey: string, label?: string) => void;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
@@ -54,7 +53,7 @@ function formatMetric(value: number | null, format: string): string {
 export function PlayersView({
   allEntries,
   entries,
-  scope,
+  selectedTeam = null,
   selectedPlayerKey,
   onSelectPlayer,
   onOpenMatch,
@@ -89,7 +88,7 @@ export function PlayersView({
     let cancelled = false;
     setProfiles(null);
     setError(null);
-    getSeasonSummary(entries, identityOptions, scope.teams)
+    getSeasonSummary(entries, identityOptions, selectedTeam ? [selectedTeam] : [])
       .then((summary) => {
         if (!cancelled) {
           setProfiles([...summary.profiles].sort((a, b) => b.rating.rivalhubRR - a.rating.rivalhubRR));
@@ -101,7 +100,7 @@ export function PlayersView({
     return () => {
       cancelled = true;
     };
-  }, [entries, identityOptions?.version, scope.teams]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entries, identityOptions?.version, selectedTeam]);
 
   // 关注选手置顶；其余按 RR 降序
   const orderedProfiles = useMemo(() => {
@@ -112,8 +111,8 @@ export function PlayersView({
   }, [profiles, pinned]);
 
   const selected = useMemo(() => {
-    if (!orderedProfiles || orderedProfiles.length === 0) return null;
-    return orderedProfiles.find((p) => p.playerKey === selectedPlayerKey) ?? orderedProfiles[0];
+    if (!orderedProfiles || orderedProfiles.length === 0 || !selectedPlayerKey) return null;
+    return orderedProfiles.find((p) => p.playerKey === selectedPlayerKey) ?? null;
   }, [orderedProfiles, selectedPlayerKey]);
 
   const compare = useMemo(() => {
@@ -140,7 +139,7 @@ export function PlayersView({
     setWeaponStats([]);
     setMechanics(null);
     setDetailsError(null);
-    getPlayerSeasonDetails(entries, selected.steamIds, identityOptions, scope.teams)
+    getPlayerSeasonDetails(entries, selected.steamIds, identityOptions, selectedTeam ? [selectedTeam] : [])
       .then((details) => {
         if (cancelled) return;
         setInsights(details.insights);
@@ -153,7 +152,7 @@ export function PlayersView({
     return () => {
       cancelled = true;
     };
-  }, [entries, selected?.playerKey, identityOptions?.version, scope.teams]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entries, selected?.playerKey, identityOptions?.version, selectedTeam]);
 
   if (allEntries.length === 0) {
     return (
@@ -182,10 +181,17 @@ export function PlayersView({
       </div>
     );
   }
-  if (!orderedProfiles || !selected) {
+  if (!orderedProfiles) {
     return (
       <div className="stu-view">
         <div className="stu-loading">聚合 {entries.length} 场 demo，构建选手档案…</div>
+      </div>
+    );
+  }
+  if (!selected) {
+    return (
+      <div className="stu-view">
+        <EmptyState variant="insufficient" title="当前选手不在语料中" hint="请从选手入口选择当前语料中的选手。" />
       </div>
     );
   }

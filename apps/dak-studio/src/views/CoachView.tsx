@@ -146,6 +146,11 @@ export function CoachView({
     });
   }
 
+  const antiMarkdown = useMemo(
+    () => (tab === "anti" ? buildAntiStratMarkdown(clusters, subjectTeam) : ""),
+    [tab, clusters, subjectTeam],
+  );
+
   if (allEntries.length === 0) {
     return (
       <div className="stu-view">
@@ -158,11 +163,6 @@ export function CoachView({
       </div>
     );
   }
-
-  const antiMarkdown = useMemo(
-    () => (tab === "anti" ? buildAntiStratMarkdown(clusters, subjectTeam) : ""),
-    [tab, clusters, subjectTeam],
-  );
 
   return (
     <div className="stu-view stu-coach-view">

@@ -3,14 +3,13 @@ import { formatPercent, type TeamComparisonModel, type TournamentInsights } from
 import { DataTable, STUDIO_TABLE_CLASSES, TeamComparisonPanel, type DataTableColumn } from "@cs2dak/react";
 import { getTeamComparison, getTournamentInsights, type IdentityOptions } from "../lib/season";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
-import type { CohortScopeState } from "../components/CohortScope";
 import { EmptyState, MetricInfo } from "@cs2dak/react";
 import { LeaderboardView } from "./LeaderboardView";
 
 export interface TournamentDashboardViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
-  scope: CohortScopeState;
+  selectedTeam?: string | null;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   onGoEconomy?: () => void;
@@ -42,7 +41,7 @@ const WEAPON_COLUMNS: DataTableColumn<WeaponRow>[] = [
 export function TournamentDashboardView({
   allEntries,
   entries,
-  scope,
+  selectedTeam = null,
   onOpenMatch,
   onGoLibrary,
   onGoEconomy,
@@ -55,6 +54,7 @@ export function TournamentDashboardView({
   const [teamComparison, setTeamComparison] = useState<TeamComparisonModel | null>(null);
   const [comparePair, setComparePair] = useState<[string, string] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
 
   useEffect(() => {
     if (entries.length === 0) {
@@ -64,7 +64,7 @@ export function TournamentDashboardView({
     let cancelled = false;
     setInsights(null);
     setError(null);
-    getTournamentInsights(entries, identityOptions, scope.teams)
+    getTournamentInsights(entries, identityOptions, selectedTeam ? [selectedTeam] : [])
       .then((result) => {
         if (!cancelled) setInsights(result);
       })
@@ -74,7 +74,7 @@ export function TournamentDashboardView({
     return () => {
       cancelled = true;
     };
-  }, [entries, identityOptions?.version, scope.teams]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entries, identityOptions?.version, selectedTeam]);
 
   // 队伍对比独立加载：A/B 两队跨全部己方比赛聚合，无需互相交手。comparePair 缺省时
   // 由构建器取场次最多的两队；选队后只换 pair 重查（availableTeams 不变）。
@@ -108,8 +108,6 @@ export function TournamentDashboardView({
       </div>
     );
   }
-
-  const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
 
   return (
     <div className="stu-view stu-reading-view">
@@ -176,7 +174,7 @@ export function TournamentDashboardView({
               columns={WEAPON_COLUMNS}
             />
           </div>
-          {onOpenPlayer && <LeaderboardView embedded allEntries={allEntries} entries={entries} scope={scope} identityOptions={identityOptions} onPlayerClick={onOpenPlayer} onGoLibrary={onGoLibrary} />}
+          {onOpenPlayer && <LeaderboardView embedded allEntries={allEntries} entries={entries} selectedTeam={selectedTeam} identityOptions={identityOptions} onPlayerClick={onOpenPlayer} onGoLibrary={onGoLibrary} />}
           <p className="stu-muted">队伍手枪局、经济对位胜率与 Eco/Semi 翻盘等经济维度，统一在
             {onGoEconomy ? <button type="button" className="dak-evidence" onClick={onGoEconomy}>经济与节奏</button> : "「经济与节奏」"}页查看（避免重复）。
           </p>

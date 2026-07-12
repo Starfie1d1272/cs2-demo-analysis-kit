@@ -42,7 +42,7 @@ import {
   summarizeAnalysisContext,
   type AnalysisContext,
 } from "./lib/analysis-context";
-import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type StudioCapability } from "./lib/capability-availability";
+import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
 import { getPinnedPlayer } from "./lib/pin";
 
 type StudioView =
@@ -193,6 +193,7 @@ export function App() {
   const selectedPlayerKey = analysisContext.focus.kind === "self" || analysisContext.focus.kind === "player"
     ? analysisContext.focus.playerKey
     : null;
+  const selectedTeam = analysisContext.focus.kind === "team" ? analysisContext.focus.teamName : null;
   const displayedCapabilityAvailability = useMemo<CapabilityAvailability | null>(() => {
     if (view !== "coach" || !capabilityAvailability) return capabilityAvailability;
     const requiredRole = analysisContext.goal === "opponent-prep" ? analysisContext.roles.opponent : analysisContext.roles.beneficiary;
@@ -218,6 +219,16 @@ export function App() {
       : undefined,
     [identityState.version, identityState.mappings, identityState.teamRenames]
   );
+  const openCapabilityRepair = useCallback((action: CapabilityRepairAction) => {
+    setView(action === "install-tri" ? "management" : "library");
+  }, []);
+  const selectRadarTeam = useCallback((teamName: string | null) => {
+    setAnalysisContext((current) => ({
+      ...current,
+      goal: teamName ? "team-analysis" : current.goal === "team-analysis" ? "explore" : current.goal,
+      focus: teamName ? { kind: "team", teamName } : current.focus.kind === "team" ? { kind: "aggregate" } : current.focus,
+    }));
+  }, []);
 
   useEffect(() => {
     const capability = CAPABILITY_BY_VIEW[view];
@@ -768,7 +779,7 @@ export function App() {
             teamSelection="single-focus"
           />
         )}
-        {displayedCapabilityAvailability && <CapabilityBar availability={displayedCapabilityAvailability} />}
+        {displayedCapabilityAvailability && <CapabilityBar availability={displayedCapabilityAvailability} onRepair={openCapabilityRepair} />}
         {view === "home" && (
           <HomeView
             entries={scopedEntries}
@@ -823,7 +834,7 @@ export function App() {
           <PlayersView
             allEntries={entries}
             entries={scopedEntries}
-            scope={legacyScope}
+            selectedTeam={selectedTeam}
             selectedPlayerKey={selectedPlayerKey}
             onSelectPlayer={openPlayer}
             onOpenMatch={openDemo}
@@ -857,7 +868,7 @@ export function App() {
           <DuelView
             allEntries={entries}
             entries={scopedEntries}
-            scope={legacyScope}
+            selectedTeam={selectedTeam}
             onOpenMatch={openDemo}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoLibrary={() => setView("library")}
@@ -870,7 +881,7 @@ export function App() {
           <UtilityView
             allEntries={entries}
             entries={scopedEntries}
-            scope={legacyScope}
+            selectedTeam={selectedTeam}
             onOpenMatch={openDemo}
             onOpenEvidence={openEvidence}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
@@ -891,7 +902,7 @@ export function App() {
           <EconomyView
             allEntries={entries}
             entries={scopedEntries}
-            scope={legacyScope}
+            selectedTeam={selectedTeam}
             identityOptions={identityOptions}
             onGoLibrary={() => setView("library")}
           />
@@ -912,19 +923,15 @@ export function App() {
           <RadarFieldView
             entries={scopedEntries}
             teamRenames={identityState.teamRenames}
-            selectedTeam={analysisContext.focus.kind === "team" ? analysisContext.focus.teamName : null}
-            onSelectTeam={(teamName) => setAnalysisContext((current) => ({
-              ...current,
-              goal: teamName ? "team-analysis" : current.goal === "team-analysis" ? "explore" : current.goal,
-              focus: teamName ? { kind: "team", teamName } : current.focus.kind === "team" ? { kind: "aggregate" } : current.focus,
-            }))}
+            selectedTeam={selectedTeam}
+            onSelectTeam={selectRadarTeam}
           />
         )}
         {view === "events" && (eventMode === "overview" ? (
           <TournamentDashboardView
             allEntries={entries}
             entries={scopedEntries}
-            scope={legacyScope}
+            selectedTeam={selectedTeam}
             identityOptions={identityOptions}
             onOpenMatch={openDemo}
             onOpenTeam={openTeam}

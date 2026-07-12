@@ -268,18 +268,23 @@ export async function savePlaybookName(clusterId: string, name: string): Promise
   await playbookStore.put(clusterId, name.trim());
 }
 
-/** Coach 备战清单的唯一持久化 owner。首次读取会原子地搬迁旧 playlist 数据并删除旧记录。 */
+/** Coach 备战清单的唯一持久化 owner。每次读取都幂等搬迁残留的旧 playlist 数据。 */
 export function createPrepItemsStore(records: RecordStore, legacyRecords?: RecordStore) {
   return {
     async list(): Promise<PrepItem[]> {
       const current = await records.getAll<PrepItem>();
-      if (current.length > 0 || !legacyRecords) return current.sort((a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0));
+      if (!legacyRecords) return current.sort((a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0));
       const legacy = await legacyRecords.getAll<PrepItem>();
-      if (legacy.length === 0) return [];
-      const migrated = legacy.map((item) => ({ ...item, source: item.source ?? "tactical-pattern" as const }));
-      await Promise.all(migrated.map((item) => records.put(item.id, item)));
-      await Promise.all(legacy.map((item) => legacyRecords.delete(item.id)));
-      return migrated.sort((a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0));
+      const byId = new Map(current.map((item) => [item.id, item]));
+      for (const item of legacy) {
+        if (!byId.has(item.id)) {
+          const migrated = { ...item, source: item.source ?? "tactical-pattern" as const };
+          await records.put(item.id, migrated);
+          byId.set(item.id, migrated);
+        }
+        await legacyRecords.delete(item.id);
+      }
+      return [...byId.values()].sort((a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0));
     },
     async save(item: PrepItem): Promise<void> {
       await records.put(item.id, { ...item, source: item.source ?? "tactical-pattern", addedAt: item.addedAt ?? Date.now() });

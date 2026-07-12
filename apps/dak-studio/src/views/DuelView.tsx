@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { DuelFinderRow, DuelInsightsModel, PlayerMechanicsRow } from "@cs2dak/contract";
 import { displayWeaponName, duelClassificationLabel } from "@cs2dak/presentation";
 import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
-import type { CohortScopeState } from "../components/CohortScope";
 import { EmptyState, MetricInfo, Pagination } from "@cs2dak/react";
 import { displayTeamName } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
@@ -23,7 +22,7 @@ const EVIDENCE_FILTERS: Array<{ key: EvidenceFilter; label: string; description:
 export interface DuelViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
-  scope: CohortScopeState;
+  selectedTeam?: string | null;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
@@ -47,7 +46,7 @@ const CLASS_TONE: Record<string, string> = {
 export function DuelView({
   allEntries,
   entries,
-  scope,
+  selectedTeam = null,
   onOpenMatch,
   onWatchDemo,
   onGoLibrary,
@@ -71,7 +70,7 @@ export function DuelView({
     let cancelled = false;
     setModel(null);
     setError(null);
-    getDuelInsights(entries, identityOptions, scope.teams)
+    getDuelInsights(entries, identityOptions, selectedTeam ? [selectedTeam] : [])
       .then((next) => {
         if (!cancelled) setModel(next);
       })
@@ -81,7 +80,9 @@ export function DuelView({
     return () => {
       cancelled = true;
     };
-  }, [entries, identityOptions?.version, scope.teams]);
+  }, [entries, identityOptions?.version, selectedTeam]);
+
+  const summary = useMemo(() => model ? summarizeDuels(model) : null, [model]);
 
   if (allEntries.length === 0) {
     return (
@@ -95,8 +96,6 @@ export function DuelView({
       </div>
     );
   }
-
-  const summary = useMemo(() => model ? summarizeDuels(model) : null, [model]);
 
   return (
     <div className="stu-view stu-duel-view">

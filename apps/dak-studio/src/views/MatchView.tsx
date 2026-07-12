@@ -22,6 +22,17 @@ export interface MatchViewProps {
 }
 
 const modelCache = new Map<string, MatchWorkspaceModel>();
+const MAX_MODEL_CACHE_ENTRIES = 5;
+
+function cacheModel(id: string, model: MatchWorkspaceModel): void {
+  modelCache.delete(id);
+  modelCache.set(id, model);
+  while (modelCache.size > MAX_MODEL_CACHE_ENTRIES) {
+    const oldest = modelCache.keys().next().value;
+    if (oldest === undefined) break;
+    modelCache.delete(oldest);
+  }
+}
 
 async function loadModel(id: string, matchId: string): Promise<MatchWorkspaceModel> {
   const cached = modelCache.get(id);
@@ -29,7 +40,7 @@ async function loadModel(id: string, matchId: string): Promise<MatchWorkspaceMod
   // 旧库可能仍有持久化 workspace（向后兼容直接用）；新导入不再持久化，按需从 ZIP 懒算。
   const stored = await getFactsStore().getMatchWorkspace(matchId);
   const model = stored?.row ?? (await loadMatchWorkspaceModel(id));
-  modelCache.set(id, model);
+  cacheModel(id, model);
   return model;
 }
 
