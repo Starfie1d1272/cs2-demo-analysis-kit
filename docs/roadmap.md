@@ -1,150 +1,260 @@
-# DAK Studio 路线图 / Roadmap
+# DAK Studio Roadmap
 
-> 本文只管**时间排序**；模块完整设计与现状见
-> [`docs/design/studio-redesign.md`](design/studio-redesign.md)（唯一设计真相源），
-> 各指标成熟度见 [`docs/stability-tiers.md`](stability-tiers.md)。
-> 发版机制见 [`docs/release.md`](release.md)：桌面随 `vX.Y.Z` git tag；npm 包独立走 changesets。
+> 本文只管理产品版本顺序、范围与出口条件，不重复设计细节或研究论证。
+>
+> - 产品职责真相源：[`07-final-product-review.md`](audit/2026-07-product-review/07-final-product-review.md)
+> - 页面实施参考：[`08-page-level-ui-ux-implementation.md`](audit/2026-07-product-review/08-page-level-ui-ux-implementation.md)
+> - 模块边界：[`module-boundaries.md`](module-boundaries.md)
+> - 指标成熟度：[`stability-tiers.md`](stability-tiers.md)
+> - 发布流程：[`release.md`](release.md)
+> - 用户可见历史：[`CHANGELOG.md`](../CHANGELOG.md)
 
-三个高于一切排期的产品判断：
-1. **Query-first**：任何统计都能点回回合与 tick 的 2D 证据；
-2. **四类任务流共用同一数据层**：开始 / 选手复盘 / 赛事与队伍 / 备战；
-3. **Pattern 可解释**：不做黑盒评分，展示由哪些位置/道具/时间/交火结构得出。
+## 产品原则
 
----
+1. **Evidence-first**：可下结论的分析必须说明样本、依据、限制，并能回到比赛、回合和 tick 证据。
+2. **AnalysisContext 唯一持有当前分析**：语料、对象/角色、基线和目标不由各页面重复拥有。
+3. **观察不冒充结论**：描述性结果可以浏览、收藏或备注；只有满足证据与成熟度条件的 Finding 才进入行动系统。
+4. **行动产物保持具体**：个人问题进入 `TrainingFocus`，队伍/对手材料进入 `PrepItem`，点位练习进入 `PracticeLineup`；不建设万能 Finding 仓库。
+5. **先发布与验证，再扩功能**：真实 Windows 更新、长期资料库和用户使用证据优先于新增评分或复杂工作流。
 
-## 已发布（精简存档）
+## 当前产品基线
 
-> 详细完成清单见 git 历史与 CHANGELOG；此处只留一句话索引，降低后续阅读负担。
+当前桌面版本为 **0.8.0**。`v0.7.8..v0.8.0` 完成了一次完整产品重构：
 
-- **0.5.x**（2026-06）：当前成果冻结发版——Home、完整 Duel/Mechanics（`.tri` LOS）、
-  Coach 首版、Series/BP、Team Comparison、Lineup Library、StorageAdapter 解耦、
-  桌面 SQLite 后端、导出 `--research` 默认。
-- **0.6.0**（2026-06-16）：教练战术首版（`TacticalRoundFact` + `PatternExplorer` 三栏 +
-  `RadarTrails` + `MapPoolTable` + Round Playlist）+ facts 本地投影层（导入即落 facts 行、
-  `rebuildFactsFromZip` 免重导）+ maps 七图默认位资产 + 3D callout 网格 + `.tri` BVH 建树加速。
+- `AnalysisContext` 成为唯一产品上下文 owner，旧 `CohortScope` 仅保留为范围编辑适配层；
+- 导航、Home、Team、Event、Duel、Utility、Lineup、Economy、Coach、RadarField 和 Management 职责重新收口；
+- Home → Finding → Evidence → Match → 返回来源的证据闭环已建立；
+- `TrainingFocus`、`PrepItem`、`PracticeLineup` 分别持有个人训练、备战材料和点位练习；
+- `CapabilityAvailability` 统一表达数据资格、降级原因与修复入口；
+- PRISM 拆分行为倾向、执行效率、样本覆盖与可用性；
+- BP 选图后的对手选边语义已校正；
+- 页面级响应式布局、空态、对象选择和入口边缘状态已完成一轮验收。
 
----
+当前明确限制：
 
-## 0.7.0 — 成为可靠的长期桌面软件（工程线，主体已落地）
-
-收尾项为主，无新产品模块：
-
-- ✅ 导入吞吐并行化（facts 抽取 + `.tri` LOS 移入 worker 池，滑动窗口并发 2）
-- ✅ 用户可见 Library 目录 + 维护工具（备份/恢复/完整性检查/孤儿修复/压缩）
-- ✅ 资产管理中心（身份/资产/赛事三 Tab + `.tri` 已装/缺失矩阵 + overlay 按需下载）
-- ✅ 统一 `AnalysisManifest`（口径落后即标记 + 从已存 ZIP 一键重建 facts）
-- 🟡 自动更新 + 国内可达分发（R2 镜像 `dakupdate.starfie1d.top` 已接入；
-  **剩**：发一次 tag 验证上传链路 + Windows 真机接力替换验证）
-- 🟡 赛事资产库 + 赛事包导入（消费端 + 制作器已落地；
-  **剩**：科隆真实内容、RivalHub 文件导出、制作器草稿持久化、Windows 真机验证）
-- ⬜ 50 / 200 / 500 场大库稳定性抽测
-- ⬜ Windows 签名与公证（去 SmartScreen，让自动更新更可信。macOS 不排期：CS2 仅 Windows 可玩）
-- ⬜ 对枪三分类人工验证集（Beta→Stable 闸门，见 stability-tiers）
-- ⬜ Stable/Beta/Experimental 标签 UI 全量落地（历史页面逐步补齐）
+- RadarField 是描述性空间观察，不自动输出弱区、意图、对策或 RR 地图控制价值；
+- Economy/赛事聚合等页面并非每个数字都有 Finding 资格；
+- 专项分析进入 `TrainingFocus` / `PrepItem` 的交接仍不完整；
+- Windows 长期使用、更新恢复和 50/200/500 场资料库尚缺系统验证；
+- GitHub 主线尚缺最小 CI 作为本地测试之外的第二份证明。
 
 ---
 
-## 0.8.0 — 教练与战术深化（产品功能线 · 已开工）
+## 0.8.0 — Evidence-first Analysis Workbench
 
-> 框架于 2026-06-26 与产品讨论确定；设计细节见 [`studio-redesign.md §11`](design/studio-redesign.md)。
-> 标「待定」的为方向已认可、细节待细化的条目。
+**用户结果：** 发布当前完整产品重构，让个人、队伍、赛事和备战分析共享同一上下文，并能从 Finding 查看证据后返回原问题。
 
-### 雷达场子系统（统一原语，想法 1+5 合一）
+### 范围
 
-> **首版已进产品路径**：合同、core 计算、maps 栅格、presentation 合成、React 画布、
-> Studio「控图」入口与 per-match 缓存已落地；方法论与落地记录见
-> [`research/map-control-model.md §10-11`](research/map-control-model.md)。当前剩余是产品验证、
-> 性能打磨与 App 级范围/导航收口。
+- `AnalysisContext` 唯一 owner 与统一上下文摘要/编辑入口；
+- 新导航以及 Team / Event 页面职责；
+- Home → Finding → Evidence → Match → 返回闭环；
+- `TrainingFocus`、`PrepItem`、`PracticeLineup` 用户数据合同与迁移；
+- Duel 合并，Utility / Lineup 分离，Economy 转化叙事收口；
+- PRISM 行为倾向与效率拆分；
+- BP 选边修复；
+- `CapabilityAvailability` 与 facts/replay/shots/`.tri` 修复入口；
+- 完整页面级 UI、响应式布局、空态和上下文边缘状态收口。
 
-一套渲染器 + 一套聚合骨架覆盖多个空间分析功能，避免各 view 重造雷达：
+### 非目标
 
-- **四个基础场**：`CT/T × 视野/位置` —— `视野覆盖`（视锥 40° ∩ `.tri` LOS ∩ 烟雾，
-  复用 `duel-window` 原语）｜`位置占据`（落最近 nav 格，无 LOS，便宜）。另含 `击杀/死亡密度`。
-- **合成视图**（render 层组合，已验证）：**信息差分** `tVis−ctVis`（T 优势暖 / CT 预警冷，
-  = L3 信息控制层可视化）｜**对拼线** `min(tVis,ctVis)`（双方互见 = 真实交火点）｜
-  T 侧重 `位置/推进波前`（非视野）。
-- **覆盖场算法**：nav 质心 grid-sample，逐 tick 测「任一玩家可见/占据」→ frequency 叠加
-  N 个满买长枪局 → 热场。**不预设 route**：盲区靠频率自然消隐、七张 `.tri` 图即可用。
-- **聚合轴**：CohortScope 范围筛选 + 按比赛时钟逐秒对齐（**回合 1:55 = 115s**）。
-  **样本量决定性质**：数百局=地图客观真相/分块基线；10–20 局=主体倾向/盲区。
-- **差分模式**：**队伍 − 赛事地图基线**（A·B 差分的正确用法，比两场对比统计更稳）→
-  风格/倾向/薄弱点。只需「队伍过滤」（`match.json` 队名 + `players.json` teamKey）。
-- **渲染**：柔化圆 blob + 高斯模糊（真热力图观感，非方格）+ 裁剪到 radar 框；
-  **逐秒 + 进度条拖动**（已原型）+ mode 下拉切场；接回放时间轴同理。
-- **性能**：首版已走 worker 池 + per-match blob 缓存；仍需 Windows 桌面真实语料验证首开耗时、
-  进度反馈与缓存命中体验。
-- 落点：想法 1 = 防守盲区可视化（Overpass 长管）；想法 5 = 活动/击杀/死亡范围 + 队伍差分。
+- BP 策略算法；
+- 战术板；
+- 个人地图池与枪位画像；
+- 新评分模型；
+- 自动弱区/战术意图识别；
+- 控制价值回归或 RR 地图控制账户改造。
 
-### 其余功能
+### 出口条件
 
-- **进游戏看回合 / 学瞄点**（Windows）：回合 / lineup 一键 `playdemo` 跳 tick；
-  接道具库「进游戏练这个点」。补上唯一硬竞品差距（CS Demo Manager 的杀手锏）。**待定**：
-  Steam/CS2 路径检测 + tick→demo 跳转的桥实现
-- **BP 策略洞察**（收编旧 8d ban/pick 建议表）：首 ban / 首 pick 倾向 +
-  选自己强图 vs 点菜对方弱图判定 + 双方地图池胜率支撑的 BP 建议
-- **个人地图池**：选手复盘新增「选手×地图」tab——每图胜率 / RR / 常驻 callout / 开局动线缩略
-- **对枪拆分：对枪复盘 + 对枪概览**：现「对枪记录 / 首杀分析」信息密度低，先不新增评分模型，
-  而是把已有 `DuelSignals` / `MechanicsSignals` 组织成可复盘的工作流：
-  **对枪复盘**归选手复盘，改为复盘队列（按满血输枪、首死、关键回合、重复位置、补枪失败等 review value 排序，
-  每项给问题标签 + 回合/tick 证据入口）；
-  **对枪概览**归赛事与队伍，展示首杀热点、对枪分布和队伍风格（按地图/阵营/时间段聚合位置、盈亏、主要选手与证据队列），
-  避免继续展示用户看不出下一步动作的原始分类表。
-- **道具拆分：闪光价值 + 道具点位库**：旧「道具实验室」不再作为一级叙事。
-  闪光价值归赛事与队伍，展示闪光收益、最佳闪与负收益队闪；道具点位库归备战，
-  作为 lineup 练习、战术本和战术板的素材库。
-- **转化与节奏首屏重排**：旧「经济与节奏」归赛事与队伍，改为围绕手枪转化、小枪翻盘、
-  5v4/5v3 转化、4v5/3v5 翻盘与经济对位组织；它回答队伍/赛事回合转换能力，不回答个人发挥。
-- **战术板 MVP**（无实时协作 / 无动画）：回放·雷达画布加标注层（箭头 / 道具图标 / 文字）
-  → 图文（PNG + Markdown）战术框架导出。复用 `@cs2dak/maps` 坐标变换；与雷达场是两个独立功能
-
-### 前置基础重构（动新功能前先做）
-
-- **CohortScope 抽成 App 级常驻顶栏**（现多个视图各自渲染，违背设计 §0）：
-  `赛事 / 全部 demo → 地图 → 队伍透镜 → 标签 → 手动排除场次`。
-  赛事是 `EventRecord` / `SeriesRecord` / map assignment 的结构化范围，不复用标签体系；
-  标签继续作为自由备注筛选。
-- **侧边栏重新设计**：10+ 项纯竖排不美观也不可扩展——改为「开始 / 选手复盘 / 赛事与队伍 / 备战」四组，
-  管理沉底为系统工具；给控图 / 战术板等新入口留位。
-- **控图接入 App 级赛事范围**：消费全局赛事/地图范围，但保留页内对象选择与懒加载计算，
-  避免进入普通页面时触发覆盖场重任务。
-- **旧页面拆分与命名收口**：对枪实验室拆成对枪复盘 / 对枪概览；道具实验室拆成闪光价值 / 道具点位库；
-  经济与节奏改为转化与节奏。
-- 删死代码 `ComingSoonView`
+- `pnpm test:all`；
+- `pnpm python:test`；
+- `pnpm typecheck`；
+- `pnpm build`；
+- 按 `v0.7.8..v0.8.0` 的完整用户影响重写 `CHANGELOG.md`；
+- 桌面版本同步为 `0.8.0`；
+- tag 后 GitHub Release、R2 `latest.json`、`install-manifest.json` 与下载包 size/sha256 一致。
 
 ---
 
-## 0.9+ / 后续 — 数据驱动地图控制价值（④，待细化）
+## 0.8.1 — Stability and Distribution
 
-> **②③④ 关系**：现有 scalar `buildOfficialMapControl`（route-index 手调 gate，
-> 接进 `signals.ts` 但只进 shadow、不进 RR）是 **v0 代理，冻结不再投精力打磨 gate**；
-> 先做描述性覆盖场（③，0.8）；本项是 ③ 之上的经验价值模型，**最终取代 v0 gate** 喂 RR 地图控制账户。
+**用户结果：** 不增加产品模块，证明 0.8 能在 Windows 和长期资料库中可靠运行、更新与恢复。
 
-思路（待校准，需足够语料）：
+### 范围
 
-- 覆盖场给出每 `(图, side, 回合时刻, 栅格点)` 的**经验覆盖频率**（描述性先验）
-- **控制价值 ≠ 覆盖频率**，而是「控住该区域与赢回合 / 拒止进点 / 拿首杀的相关性」——
-  用语料回归 round 结果学出 **per-area × time 的价值权重**
-- 每回合控制价值 = Σ_覆盖区域 (该区学得的价值 × contested 因子) → RR 地图控制账户输入；
-  自然包住现有 `soloPressure` / `denial`，但把手调 gate 换成语料学出来的值
-- **门槛**：描述性覆盖场 10–20 回合即稳；价值模型需数百+ 回合语料，故排在 0.8 之后
-- **数据可行性已确认**（2026-06-26）：「控制事件→outcome（推进/进点/下包/CT 调动/T 受影响）」
-  关联所需数据全在 v3 ZIP（`kills/bombs/grenades/replay` presence），**不需改导出器**。
-  先做描述性条件概率对照验证信号强度，再上回归。字段映射见
-  [`research/map-control-model.md §10.7`](research/map-control-model.md)。
+- 50 / 200 / 500 场资料库抽测；
+- Windows 真机安装、首次导入、RadarField 首开与缓存重开；
+- web patch、runtime 更新、失败恢复和旧版本升级；
+- 建立内存、首开时间、页面切换和重任务耗时基准；
+- 验证 `player-profile-0.1 → 0.2`、facts cache `v8 → v9`、`PrepItem` 幂等迁移；
+- 验证 event package、`.tri` 下载、备份/恢复、完整性检查；
+- Stable / Beta / Experimental 用户可见标签收口；
+- 建立最小 GitHub CI，至少覆盖 typecheck、快速测试与构建。
+
+### 可测标准
+
+- **50 场**：所有页面可常规使用；
+- **200 场**：聚合页可打开，无 OOM；
+- **500 场**：资料库可管理；重任务允许慢，但必须有进度、取消或明确失败反馈；
+- 产品不得冻结、崩溃或在失败后丢失用户数据。
 
 ---
 
-## 后续方向（暂不排期）
+## 0.9.0 — Actionable Review
 
-- 回合 swing / 动量（待语料规模 + 校准依据；未来并入转化与节奏）。
-- Save / exit kill 识别、AWP 投资回报、经济交换链。
-- Analyst Data 订阅（完整 Tactical Route + 职业 demo 库成熟后）。
-- 集成 Phase 2：`@cs2dak/*` 发布为构建产物后，presentation 合同与只读组件共享。
+**用户结果：** 用户能从重复问题进入多条证据，形成下一场可复核的行动，并在后续比赛检查变化。
 
-## 商业验证（与版本并行）
+### 1. 跨能力行动合同
 
-先找两类核心用户而非追下载量：10–20 名长期导入自己 demo 的玩家、2–3 个高校赛事/队伍运营或教练/IGL。
-重点观察：首场导入成功率、一周后留存、选手复盘是否能定位下一场该练什么、赛事与队伍页是否能形成报告、
-EvidenceLink 点击频率、备战页是否能从 Pattern 得出可执行结论。
-出现「持续使用且愿为协作/托管/省人工付费」的证据后，再建支付与订阅（落在 RivalHub 云层，
-而非本地 `if(isPro)`）。
+```text
+可靠个人 Finding     → TrainingFocus
+可靠队伍/对手 Finding → PrepItem
+描述性观察            → 收藏/备注，不自动升级为行动结论
+```
+
+- 不给所有数据行机械增加“加入训练”；
+- 只有满足样本、证据、限制和能力成熟度的 Finding 才能进入行动系统；
+- `TrainingFocus` 支持复查条件和后续比赛证据；
+- `PrepItem` 保留来源能力、对象关系和 match/round/tick provenance。
+
+### 2. 对枪复盘队列
+
+- 满血输枪、首死、关键人数局输枪、重复位置失误、补枪失败；
+- 按相同武器、位置与问题类型聚合重复模式；
+- 每项直接进入多条证据，可建立 `TrainingFocus`；
+- 支持待复核、已复核、忽略、待重看等轻量复盘状态；
+- 不新增黑盒对枪评分。
+
+### 3. 队伍级对枪概览
+
+- 首杀热点与易丢首死位置；
+- T/CT 对枪净值、主要对枪者和重复发生区域；
+- 地图、阵营、时间段与选手维度过滤；
+- 对应证据队列和样本覆盖说明。
+
+### 4. 个人地图池
+
+- 每图场次、胜率、RR、ADR、开局对枪、主要武器；
+- 常驻区域、开局动线和当前 `TrainingFocus`；
+- 明确样本不足与地图版本边界。
+
+### 5. 枪位画像：常站与最强枪位
+
+新增独立页面，以高精度空间坐标回答“常在哪里架、哪些枪位样本内对枪效果最好”。它是个人/队伍复盘能力，不是 RadarField 控图评分。
+
+- 从 replay/duels 提取稳定 world coordinate，并投影到雷达高精度点位；
+- 识别长时间低速/静止、持续保持观察方向的架点片段，区分路过、转点和真正持枪架位；
+- 聚合常站时长、使用回合数、遭遇数、首枪/首杀、击杀、死亡与对枪胜率；
+- 按地图、阵营、经济层、武器、选手/队伍筛选；
+- 使用空间聚类吸收轻微站位抖动，同时保留代表点、半径和原始样本；
+- “最强枪位”必须设置最小回合/遭遇门槛和置信区间，禁止用 1/1、2/2 之类小样本排序冒充高胜率；
+- 点位可回到多条 match/round/tick 证据，并显示对手、武器、观察方向和交火结果；
+- 先输出描述性“样本内高胜率枪位”，不自动宣称地图最优站位，不进入 RR。
+
+### 出口条件
+
+个人用户能够完成：
+
+```text
+发现重复问题或高频枪位
+→ 查看多条证据
+→ 建立 TrainingFocus
+→ 在后续比赛复核
+```
+
+---
+
+## 0.10.0 — Coach Preparation
+
+**用户结果：** 把可信分析和用户判断组织成可复核、可导出的真实赛前准备材料。
+
+### BP 策略洞察
+
+第一阶段只提供事实：首 ban/pick 频率、地图出场和胜率、选图后的开局边、近期地图偏好、双方地图池交集、样本范围与阵容变化。
+
+第二阶段才允许生成可解释建议；每条建议必须列依据、样本范围、阵容/版本限制和对应证据，不直接输出黑盒“最佳 BP”。
+
+### 战术板 MVP
+
+- 雷达/回放截图；
+- 箭头、路线、文字、道具图标与图层；
+- PNG 和 Markdown 导出；
+- 引用 `PracticeLineup` 与 `PrepItem`；
+- 不做实时协作、动画时间轴或完整战术模拟器。
+
+### Coach 行动闭环
+
+```text
+Pattern / Finding
+→ PrepItem
+→ 战术板或 PracticeLineup
+→ 报告
+→ Match 证据
+```
+
+完整战术路线只在战术板 MVP 有真实使用证据后再决定是否进入 0.10.x；不预先建设复杂路线编辑、版本协作或云同步。
+
+---
+
+## Research Gates
+
+研究方向不绑定确定产品版本。满足闸门前只保留研究、shadow 计算或描述性展示。
+
+### RadarField 产品验证
+
+- Windows 真机首开性能与缓存体验；
+- 用户能否正确理解赛事基线和队伍差分；
+- 队伍差分是否真实帮助复盘；
+- 10–20 回合下哪些文案和比较安全；
+- 不自动生成弱区、意图、对策或强弱评分。
+
+### 控制价值模型
+
+只有同时满足以下条件才进入产品开发：
+
+- 有足够职业语料并跨赛事验证；
+- 控制区域与 outcome 的条件相关性稳定；
+- 对阵容、地图版本、阵营、经济状态等混杂因素做控制；
+- 能解释失败案例，并证明不只是拟合胜负；
+- 冻结数据集、口径与回归验证流程可复现。
+
+否则 RadarField 保持描述性，不进入 RR。具体方法假设保留在 [`research/map-control-model.md`](research/map-control-model.md)。
+
+### 其他研究方向
+
+- 回合 swing / 动量；
+- Save / exit kill 识别；
+- AWP 投资回报与经济交换链；
+- 数据驱动完整战术路线；
+- Analyst Data 托管与订阅。
+
+---
+
+## Product Validation
+
+先验证两类核心用户：
+
+- 10–20 名长期导入自己 demo 的个人玩家；
+- 2–3 个高校赛事/队伍运营、教练或 IGL。
+
+关键行为指标：
+
+- 首场导入成功率与一周后继续导入率；
+- Finding → Evidence 点击率与返回来源完成率；
+- `TrainingFocus` 建立后被后续比赛再次复核的比例；
+- `PrepItem` 进入报告或赛前材料的比例；
+- 枪位画像是否帮助用户找到可复核的重复站位，而不是只看热图；
+- Windows 更新成功率、失败恢复率和长期资料库错误率。
+
+出现持续使用且愿意为协作、托管或节省人工付费的证据后，再在 RivalHub 云层验证商业化；本地 Studio 不增加 `if (isPro)` 式功能锁。
+
+---
+
+## 已完成版本
+
+- **0.8.0**（2026-07-13）：Evidence-first Analysis Workbench——统一 AnalysisContext、Finding/Evidence 返回闭环、具体行动产物、对象页面职责与完整页面级 UI 重构。
+- **0.7.8**（2026-07-03）：RadarField 大库聚合、计算热路径与显示优化；修复 Windows 一键更新重启。
+- **0.7.x**（2026-06 至 2026-07）：长期桌面软件基础、资产/赛事/更新系统、全局范围、页面初步拆分与 RadarField 首版。详见 [`CHANGELOG.md`](../CHANGELOG.md)。
+- **0.6.0**（2026-06-16）：Coach 战术聚类首版、facts 本地投影、默认位与 callout grid。
+- **0.5.x**（2026-06）：Home、Duel/Mechanics、Series/BP、Lineup、SQLite 桌面后端等基础能力冻结。
