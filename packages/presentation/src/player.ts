@@ -33,6 +33,8 @@ const PRISM_AXIS_LABEL: Record<PrismAxisKey, string> = {
 };
 
 const MIN_STYLE_SIGNAL_COVERAGE = 0.75;
+/** 小于此人数的 cohort 只能用于浏览原始数据，不能给出精确的相对排名。 */
+const MIN_COHORT_FOR_STYLE_PERCENTILE = 5;
 
 /** 用于强项/弱项判定的技能类指标（高 = 好）。不含纯风格标签（如 AWP）。 */
 const SKILL_METRICS: { key: LeaderboardMetricKey; label: string }[] = [
@@ -74,11 +76,14 @@ function buildStyle(player: SeasonPlayerRow, distributions: PrismDistributions):
     rrPercentile: prism.rrPercentile,
     axes: PRISM_AXIS_ORDER.map((key) => {
       const axis = prism.axes[key];
+      const comparisonCount = distributions[key].involvement.length;
       const status = !axis.hasSignal
         ? "unavailable" as const
         : axis.availableSignalWeight < MIN_STYLE_SIGNAL_COVERAGE
           ? "partial" as const
-          : "ready" as const;
+          : comparisonCount < MIN_COHORT_FOR_STYLE_PERCENTILE
+            ? "insufficient" as const
+            : "ready" as const;
       return {
         key,
         label: PRISM_AXIS_LABEL[key],
@@ -90,6 +95,7 @@ function buildStyle(player: SeasonPlayerRow, distributions: PrismDistributions):
           : null,
         combinedPercentile: status === "ready" ? axis.percentile : null,
         signalCoverage: axis.availableSignalWeight,
+        comparisonCount,
         status
       };
     })
@@ -108,7 +114,7 @@ function profileFromRow(
     total > 0 ? round((count / total) * 100, 1) : null;
 
   return playerSeasonProfileSchema.parse({
-    version: "cs2-demo-analysis-kit/player-profile-0.1",
+    version: "cs2-demo-analysis-kit/player-profile-0.2",
     weightsVersion,
     playerKey: player.playerKey,
     name: player.name,
