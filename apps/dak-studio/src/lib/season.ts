@@ -32,6 +32,7 @@ import {
   buildUtilityValueSummaryFromFacts,
 } from "./facts-projections";
 import { getFactsStore } from "./facts-store";
+import { getDerivedCacheStore } from "./derived-cache";
 import { getStorage } from "./storage";
 import { FACTS_REVISION } from "./analysis-manifest";
 import type {
@@ -67,7 +68,7 @@ export interface IdentityOptions {
  */
 
 /** 聚合算法/口径变化时 +1，旧缓存自动失效重算。 */
-export const CACHE_VERSION = 11;
+export const CACHE_VERSION = 12;
 
 export interface SeasonSummary {
   bundle: SeasonCohortBundle;
@@ -277,7 +278,7 @@ function roleTeamIdentityMap(entries: StudioDemoEntry[], identity?: IdentityOpti
 export function getMapRoleEvidence(entries: StudioDemoEntry[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<MapRoleEvidenceSummary> {
   const teamIdentityMap = roleTeamIdentityMap(entries, identity);
   const teamMappingKey = Object.entries(teamIdentityMap).sort(([a], [b]) => a.localeCompare(b)).map(([raw, canonical]) => `${raw}=${canonical}`).join("|");
-  const key = `${keyOf(entries, identity?.version, selectedTeams)}:map-role-evidence:v2:team-map=${teamMappingKey}`;
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:map-role-evidence:v3:team-map=${teamMappingKey}`;
   const cached = mapRoleEvidenceCache.get(key);
   if (cached) return cached;
   const loading = (async () => {
@@ -350,7 +351,7 @@ export async function getPlayerMapPool(entries: StudioDemoEntry[], playerKey: st
   for (const [steamId, mapped] of Object.entries(identity?.map ?? {})) if ((typeof mapped === "string" ? mapped : mapped.playerKey) === playerKey) steamIds.add(steamId);
   const factsStore = getFactsStore();
   const matchIds = entries.map(matchIdForEntry);
-  const [cohortRows, weapons] = await Promise.all([factsStore.getCohortRows({ matchIds, steamIds: [...steamIds] }), factsStore.getPlayerWeapons({ matchIds, steamIds: [...steamIds] })]);
+  const [cohortRows, weapons] = await Promise.all([factsStore.getRrSignalRows({ matchIds, steamIds: [...steamIds] }), factsStore.getPlayerWeapons({ matchIds, steamIds: [...steamIds] })]);
   const entryByMatch = new Map(entries.map((entry) => [matchIdForEntry(entry), entry]));
   const rowsByMap = new Map<string, typeof cohortRows>();
   for (const row of cohortRows) {
@@ -386,10 +387,11 @@ export function getPlayerSeasonDetails(entries: StudioDemoEntry[], steamIds: str
     if (persisted) return persisted;
     const factsStore = getFactsStore();
     const factsScope = { matchIds: entries.map(matchIdForEntry), steamIds };
-    const factRows = await factsStore.getPlayerInsights(factsScope);
+    const derived = getDerivedCacheStore();
+    const factRows = await derived.getPlayerInsights(factsScope);
     const mechanicRows = await factsStore.getMechanicsRows(factsScope);
     if (factRows.length > 0 || mechanicRows.length > 0) {
-      const details = await buildPlayerSeasonDetailsFromFacts(factsStore, factsScope);
+      const details = await buildPlayerSeasonDetailsFromFacts(factsStore, derived, factsScope);
       void writePersistedValue(key, details);
       return details;
     }
@@ -409,7 +411,7 @@ export function getDuelInsights(entries: StudioDemoEntry[], identity?: IdentityO
     if (persisted) return persisted;
     const factsStore = getFactsStore();
     const matchIds = entries.map(matchIdForEntry);
-    const duelFacts = filterDuelFactsByTeam(await factsStore.getDuelFacts({ matchIds }), selectedTeams, identity?.teamRenames);
+    const duelFacts = filterDuelFactsByTeam(await getDerivedCacheStore().getDuels({ matchIds }), selectedTeams, identity?.teamRenames);
     if (duelFacts.length >= entries.length) {
       const model = buildDuelInsightsFromFacts(duelFacts);
       void writePersistedValue(key, model);
@@ -435,9 +437,10 @@ export function getPlayerFlashSummaries(
     if (persisted) return persisted;
     const factsStore = getFactsStore();
     const matchIds = entries.map(matchIdForEntry);
-    const factRows = await factsStore.getPlayerInsights({ matchIds });
+    const derived = getDerivedCacheStore();
+    const factRows = await derived.getPlayerInsights({ matchIds });
     if (factRows.length > 0) {
-      const summaries = await buildPlayerFlashSummariesFromFacts(factsStore, { matchIds, players });
+      const summaries = await buildPlayerFlashSummariesFromFacts(derived, { matchIds, players });
       void writePersistedValue(key, summaries);
       return summaries;
     }
@@ -461,9 +464,10 @@ export function getUtilityValueSummary(
     if (persisted) return persisted;
     const factsStore = getFactsStore();
     const matchIds = entries.map(matchIdForEntry);
-    const facts = await factsStore.getUtilityValueFacts({ matchIds });
+    const derived = getDerivedCacheStore();
+    const facts = await derived.getUtilityValue({ matchIds });
     if (facts.length >= entries.length) {
-      const summary = await buildUtilityValueSummaryFromFacts(factsStore, {
+      const summary = await buildUtilityValueSummaryFromFacts(derived, {
         matchIds,
         players,
         teamRenames: identity?.teamRenames,
@@ -489,7 +493,7 @@ export function getTournamentInsights(entries: StudioDemoEntry[], identity?: Ide
     if (persisted !== undefined) return persisted;
     const factsStore = getFactsStore();
     const matchIds = entries.map(matchIdForEntry);
-    const facts = withTeamRenames(await factsStore.getTournamentFacts({ matchIds }), identity?.teamRenames);
+    const facts = withTeamRenames(await getDerivedCacheStore().getTournament({ matchIds }), identity?.teamRenames);
     if (facts.length >= entries.length) {
       const built = facts.length > 0 ? buildTournamentInsightsFromFacts(facts) : null;
       const insights = built ? filterTournamentInsightsByTeam(built, selectedTeams) : null;
@@ -515,7 +519,7 @@ export async function getTeamComparison(entries: StudioDemoEntry[], identity?: I
     if (persisted) return persisted;
     const factsStore = getFactsStore();
     const matchIds = entries.map(matchIdForEntry);
-    const facts = withTeamRenames(await factsStore.getTeamComparisonFacts({ matchIds }), identity?.teamRenames);
+    const facts = withTeamRenames(await getDerivedCacheStore().getTeamComparison({ matchIds }), identity?.teamRenames);
     if (facts.length >= entries.length) {
       const model = buildTeamComparisonFromFacts(facts, pair);
       void writePersistedValue(key, model);
@@ -536,7 +540,7 @@ export async function getTeamOverview(entries: StudioDemoEntry[], teamName: stri
     if (persisted !== undefined) return persisted;
     const factsStore = getFactsStore();
     const matchIds = entries.map(matchIdForEntry);
-    const facts = withTeamRenames(await factsStore.getTeamComparisonFacts({ matchIds }), identity?.teamRenames);
+    const facts = withTeamRenames(await getDerivedCacheStore().getTeamComparison({ matchIds }), identity?.teamRenames);
     if (facts.length < entries.length) throw missingFactsError("队伍总览");
     const roleEvidence = await getMapRoleEvidence(entries, identity);
     const matrices = buildTeamMapRoleMatrices(roleEvidence.teamEvidence, buildPlayerMapRoleProfiles(roleEvidence.playerEvidence));
@@ -563,13 +567,13 @@ export function getSeasonSummary(entries: StudioDemoEntry[], identity?: Identity
     const matchIds = entries.map(matchIdForEntry);
     // 队伍透镜（行级）：不窄化 demo 语料，只按 teamKey 过滤 cohort 行。内层 row.teamKey 新旧 facts 皆有。
     const allowed = allowedTeamKeysByMatch(entries, selectedTeams, identity?.teamRenames);
-    const cohortRows = (await factsStore.getCohortRows({ matchIds })).filter((row) =>
+    const cohortRows = (await factsStore.getRrSignalRows({ matchIds })).filter((row) =>
       !allowed || allowed.get(row.matchId)?.has(row.teamKey),
     );
     if (cohortRows.length > 0) {
       const cohortOpts = identity?.version ? { identityMap: identity.map } : {};
       const bundle = buildSeasonCohortFromRows(cohortRows, { ...cohortOpts, matchCount: entries.length });
-      const tournamentFacts = withTeamRenames(await factsStore.getTournamentFacts({ matchIds }), identity?.teamRenames);
+      const tournamentFacts = withTeamRenames(await getDerivedCacheStore().getTournament({ matchIds }), identity?.teamRenames);
       const summary: SeasonSummary = {
         bundle,
         leaderboard: buildSeasonLeaderboardModel(bundle),

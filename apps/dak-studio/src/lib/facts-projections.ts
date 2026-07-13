@@ -10,11 +10,11 @@ import {
 import type {
   FactsStore,
   PlayerFlashSummariesFactsOptions,
-  PlayerInsightFact,
   PlayerSeasonDetailsFactsOptions,
   PlayerSeasonDetailsFromFacts,
   UtilityValueFactsOptions,
 } from "./fact-types";
+import type { DerivedCacheStore, DerivedPlayerInsight } from "./derived-cache";
 
 function round1(value: number): number {
   return Math.round(value * 10) / 10;
@@ -48,7 +48,7 @@ function emptyInsights(): PlayerSeasonInsights {
   };
 }
 
-function mergeInsights(rows: PlayerInsightFact[]): PlayerSeasonInsights {
+function mergeInsights(rows: DerivedPlayerInsight[]): PlayerSeasonInsights {
   if (rows.length === 1) return rows[0]!.insight;
   const out = emptyInsights();
   for (const row of rows) {
@@ -113,10 +113,11 @@ function mergeWeaponStats(rows: import("./fact-types").PlayerWeaponFact[], match
 
 export async function buildPlayerSeasonDetailsFromFacts(
   store: FactsStore,
+  derived: DerivedCacheStore,
   options: PlayerSeasonDetailsFactsOptions,
 ): Promise<PlayerSeasonDetailsFromFacts> {
   const [insights, weapons, mechanics] = await Promise.all([
-    store.getPlayerInsights(options),
+    derived.getPlayerInsights(options),
     store.getPlayerWeapons(options),
     store.getMechanicsRows(options),
   ]);
@@ -128,7 +129,7 @@ export async function buildPlayerSeasonDetailsFromFacts(
 }
 
 export async function buildPlayerFlashSummariesFromFacts(
-  store: FactsStore,
+  derived: DerivedCacheStore,
   options: PlayerFlashSummariesFactsOptions,
 ): Promise<Array<{
   playerKey: string;
@@ -144,7 +145,7 @@ export async function buildPlayerFlashSummariesFromFacts(
   bestEnemyFlashes: PlayerSeasonInsights["flash"]["bestEnemyFlashes"];
 }>> {
   return Promise.all(options.players.map(async (player) => {
-    const merged = mergeInsights(await store.getPlayerInsights({
+    const merged = mergeInsights(await derived.getPlayerInsights({
       matchIds: options.matchIds,
       mapNames: options.mapNames,
       playerKeys: [player.playerKey],
@@ -159,10 +160,10 @@ export async function buildPlayerFlashSummariesFromFacts(
 }
 
 export async function buildUtilityValueSummaryFromFacts(
-  store: FactsStore,
+  derived: DerivedCacheStore,
   options: UtilityValueFactsOptions,
 ): Promise<UtilityValueSummary> {
-  const summary = mergeUtilityValueSummaries(await store.getUtilityValueFacts(options), {
+  const summary = mergeUtilityValueSummaries(await derived.getUtilityValue(options), {
     players: options.players,
     teamRenames: options.teamRenames,
   });

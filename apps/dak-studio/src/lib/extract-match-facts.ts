@@ -17,16 +17,15 @@ import {
   extractTournamentFacts,
 } from "@cs2dak/presentation";
 import type {
-  CohortFact,
   ExtractMatchFactsOptions,
   LineupFact,
   MatchFacts,
   MechanicsSamplesFact,
-  OpeningTrailFact,
-  PlayerInsightFact,
   PlayerMatchStatsFact,
+  PlayerRrFact,
   PlayerWeaponFact,
 } from "./fact-types";
+import type { DerivedOpeningTrail, DerivedPlayerInsight, MatchDerivedCache } from "./derived-cache";
 
 function defaultPlayerKey(player: { steamId64: string }): string {
   return `steam:${player.steamId64}`;
@@ -146,7 +145,9 @@ function rowKey(...parts: string[]): string {
   return parts.join(ROW_KEY_SEP);
 }
 
-export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOptions): MatchFacts {
+export interface ExtractedMatchData { facts: MatchFacts; derived: MatchDerivedCache }
+
+export function extractMatchData(pkg: DemoPackage, options: ExtractMatchFactsOptions): ExtractedMatchData {
   const playerKeyFor = options.playerKeyFor ?? defaultPlayerKey;
   const playerStats = pkg.playerStats.map((stats): PlayerMatchStatsFact | null => {
     const player = pkg.players[stats.playerIndex];
@@ -199,7 +200,7 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
     steamId64: player.steamId64,
     playerName: player.name,
     insight: buildPlayerSeasonInsights([{ matchId: options.matchId, pkg }], [player.steamId64]),
-  } satisfies PlayerInsightFact));
+  } satisfies DerivedPlayerInsight));
 
   const weaponCells = new Map<string, PlayerWeaponFact>();
   for (const kill of pkg.kills) {
@@ -237,7 +238,7 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
     } satisfies MechanicsSamplesFact;
   });
 
-  const cohortRows = pkg.players.map((player): CohortFact | null => {
+  const rrSignalRows = pkg.players.map((player): PlayerRrFact | null => {
     const signals = signalBySteamId.get(player.steamId64);
     const indicators = indicatorBySteamId.get(player.steamId64);
     if (!signals || !indicators) return null;
@@ -246,18 +247,13 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
       playerKey: playerKeyFor(player),
       steamId64: player.steamId64,
       playerName: player.name,
-      row: {
-        matchId: options.matchId,
-        sourceDemoHash: pkg.manifest.demo?.hash ?? null,
-        steamId64: player.steamId64,
-        playerName: player.name,
-        teamKey: player.teamKey,
-        signals,
-        indicators,
-        weaponHighlight: weaponBySteamId.get(player.steamId64) ?? null,
-      },
+      sourceDemoHash: pkg.manifest.demo?.hash ?? null,
+      teamKey: player.teamKey,
+      signals,
+      indicators,
+      weaponHighlight: weaponBySteamId.get(player.steamId64) ?? null,
     };
-  }).filter((row): row is CohortFact => row != null);
+  }).filter((row): row is PlayerRrFact => row != null);
 
   const mapName = pkg.match.mapName;
   const visibilityFor = options.visibilityFor?.(mapName) ?? null;
@@ -274,7 +270,7 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
     playerKey: playerKeyFor(player),
     steamId64: player.steamId64,
     row: buildOpeningTrails(pkg, options.matchId, player.steamId64, { windowSeconds: 30 }),
-  } satisfies OpeningTrailFact));
+  } satisfies DerivedOpeningTrail));
   // core 内部组合 facade 共享短生命周期 replay context；Studio 只接收紧凑 facts。
   const replayFacts = extractMatchTacticalAndMapIntelligenceFacts(pkg, {
     matchId: options.matchId,
@@ -282,25 +278,19 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
   });
 
   return {
-    matchId: options.matchId,
-    mapName,
-    playerMatchStats: playerStats,
-    playerInsights,
-    playerWeapons,
-    mechanicsSamples,
-    cohortRows,
-    tournamentFacts: [{ matchId: options.matchId, mapName, row: extractTournamentFacts(input) }],
-    teamComparisonFacts: [{ matchId: options.matchId, mapName, row: extractTeamComparisonFacts(input) }],
-    duelFacts: [{ matchId: options.matchId, mapName, row: extractDuelInsightsFacts(input, { visibilityFor: () => visibilityFor }) }],
-    // workspace model 不再随导入持久化（单场 ~35MB、整包全量分析，是导入内存/耗时大头）；
-    // 打开单场工作台/教练回放时由 loadMatchWorkspaceModel 从 ZIP 懒算。
-    matchWorkspace: [],
-    openingTrails,
-    lineups: [extractLineupFact(pkg, options.matchId, calloutGrid)],
-    tacticalRounds: replayFacts.tacticalRounds,
-    playerPositionRounds: replayFacts.mapIntelligence.playerPositionRounds,
-    teamShapeRounds: replayFacts.mapIntelligence.teamShapeRounds,
-    teamAwpRounds: replayFacts.mapIntelligence.teamAwpRounds,
-    utilityValueFacts: [{ matchId: options.matchId, mapName, row: buildUtilityValueSummary([input], utilityPlayers) }],
+    facts: {
+      matchId: options.matchId, mapName, playerMatchStats: playerStats, playerWeapons, mechanicsSamples, rrSignalRows,
+      lineups: [extractLineupFact(pkg, options.matchId, calloutGrid)], tacticalRounds: replayFacts.tacticalRounds,
+      playerPositionRounds: replayFacts.mapIntelligence.playerPositionRounds, teamShapeRounds: replayFacts.mapIntelligence.teamShapeRounds,
+      teamAwpRounds: replayFacts.mapIntelligence.teamAwpRounds,
+    },
+    derived: {
+      matchId: options.matchId, playerInsights,
+      tournament: [{ matchId: options.matchId, mapName, row: extractTournamentFacts(input) }],
+      teamComparison: [{ matchId: options.matchId, mapName, row: extractTeamComparisonFacts(input) }],
+      duels: [{ matchId: options.matchId, mapName, row: extractDuelInsightsFacts(input, { visibilityFor: () => visibilityFor }) }],
+      openingTrails,
+      utilityValue: [{ matchId: options.matchId, mapName, row: buildUtilityValueSummary([input], utilityPlayers) }],
+    },
   };
 }

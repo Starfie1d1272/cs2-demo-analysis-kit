@@ -19,15 +19,18 @@ import {
   buildUtilityValueSummary
 } from "@cs2dak/presentation";
 import { buildPlayerSeasonDetailsFromFacts, buildUtilityValueSummaryFromFacts } from "./facts-projections";
-import { DERIVED_CACHE_RECORD_NAMESPACES, FACTS_RECORD_NAMESPACES, createFactsStore } from "./facts-store";
-import { extractMatchFacts } from "./extract-match-facts";
+import { FACTS_RECORD_NAMESPACES, createFactsStore } from "./facts-store";
+import { DERIVED_CACHE_RECORD_NAMESPACES, createDerivedCacheStore } from "./derived-cache";
+import { extractMatchData } from "./extract-match-facts";
 import { createIdbAdapter } from "./storage/idb-adapter";
 
 const fixture = (async () => loadDemoPackageFromZip(await readFile(
   fileURLToPath(new URL("../../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url))
 )))();
-const m1Facts = fixture.then((pkg) => extractMatchFacts(pkg, { matchId: "m1" }));
-const m2Facts = fixture.then((pkg) => extractMatchFacts(pkg, { matchId: "m2" }));
+const m1Data = fixture.then((pkg) => extractMatchData(pkg, { matchId: "m1" }));
+const m2Data = fixture.then((pkg) => extractMatchData(pkg, { matchId: "m2" }));
+const m1Facts = m1Data.then((data) => data.facts);
+const m2Facts = m2Data.then((data) => data.facts);
 
 function stableNumbers<T>(value: T): T {
   if (typeof value === "number") return Number(value.toFixed(12)) as T;
@@ -43,8 +46,9 @@ function stableNumbers<T>(value: T): T {
 describe("MatchFacts", () => {
   it("keeps cohort/presentation outputs outside the facts namespace", () => {
     expect(FACTS_RECORD_NAMESPACES).toContain("facts:team_awp_rounds");
-    expect(FACTS_RECORD_NAMESPACES.some((name) => /player_insights|tournament|team_comparison|duel_facts|opening_trails|utility_value/.test(name))).toBe(false);
-    expect(DERIVED_CACHE_RECORD_NAMESPACES.every((name) => name.startsWith("derived:match-v3-map2:"))).toBe(true);
+    expect(FACTS_RECORD_NAMESPACES).toContain("facts:rr_signal_rows");
+    expect(FACTS_RECORD_NAMESPACES.some((name) => /cohort|player_insights|tournament|team_comparison|duel|opening_trails|utility_value/.test(name))).toBe(false);
+    expect(DERIVED_CACHE_RECORD_NAMESPACES.every((name) => name.startsWith("derived:match-v4:"))).toBe(true);
   });
 
   it("persists the same compact AWP round facts produced by the direct core pipeline", async () => {
@@ -83,11 +87,14 @@ describe("MatchFacts", () => {
     const pkg = await fixture;
     const matchId = "m1";
     const facts = await m1Facts;
-    const store = createFactsStore(createIdbAdapter(), "facts-details-equivalence");
+    const adapter = createIdbAdapter();
+    const store = createFactsStore(adapter, "facts-details-equivalence");
+    const derived = createDerivedCacheStore(adapter, "derived-details-equivalence");
     await store.putMatchFacts(facts);
+    await derived.putMatchDerived((await m1Data).derived);
 
     const steamId64 = pkg.players[pkg.playerStats[0]!.playerIndex]!.steamId64;
-    const details = await buildPlayerSeasonDetailsFromFacts(store, {
+    const details = await buildPlayerSeasonDetailsFromFacts(store, derived, {
       steamIds: [steamId64],
       matchIds: [matchId]
     });
@@ -105,7 +112,7 @@ describe("MatchFacts", () => {
     const store = createFactsStore(createIdbAdapter(), "facts-cohort-equivalence");
     await store.putMatchFacts(await m1Facts);
 
-    const rows = await store.getCohortRows({ matchIds: [matchId] });
+    const rows = await store.getRrSignalRows({ matchIds: [matchId] });
 
     const fromRows = buildSeasonCohortFromRows(rows, { matchCount: 1 });
     const fromPackages = buildSeasonCohort([{ matchId, pkg }]);
@@ -119,10 +126,10 @@ describe("MatchFacts", () => {
   it("projects persisted tournament facts to the same tournament insights as the existing package path", async () => {
     const pkg = await fixture;
     const matchId = "m1";
-    const store = createFactsStore(createIdbAdapter(), "facts-tournament-equivalence");
-    await store.putMatchFacts(await m1Facts);
+    const derived = createDerivedCacheStore(createIdbAdapter(), "derived-tournament-equivalence");
+    await derived.putMatchDerived((await m1Data).derived);
 
-    expect(buildTournamentInsightsFromFacts(await store.getTournamentFacts({ matchIds: [matchId] }))).toEqual(
+    expect(buildTournamentInsightsFromFacts(await derived.getTournament({ matchIds: [matchId] }))).toEqual(
       buildTournamentInsights([{ matchId, pkg }])
     );
   });
@@ -130,10 +137,10 @@ describe("MatchFacts", () => {
   it("projects persisted team comparison facts to the same model as the existing package path", async () => {
     const pkg = await fixture;
     const matchId = "m1";
-    const store = createFactsStore(createIdbAdapter(), "facts-team-equivalence");
-    await store.putMatchFacts(await m1Facts);
+    const derived = createDerivedCacheStore(createIdbAdapter(), "derived-team-equivalence");
+    await derived.putMatchDerived((await m1Data).derived);
 
-    expect(buildTeamComparisonFromFacts(await store.getTeamComparisonFacts({ matchIds: [matchId] }))).toEqual(
+    expect(buildTeamComparisonFromFacts(await derived.getTeamComparison({ matchIds: [matchId] }))).toEqual(
       buildTeamComparison([{ matchId, pkg }])
     );
   });
@@ -141,10 +148,10 @@ describe("MatchFacts", () => {
   it("projects persisted duel facts to the same model as the existing package path", async () => {
     const pkg = await fixture;
     const matchId = "m1";
-    const store = createFactsStore(createIdbAdapter(), "facts-duel-equivalence");
-    await store.putMatchFacts(await m1Facts);
+    const derived = createDerivedCacheStore(createIdbAdapter(), "derived-duel-equivalence");
+    await derived.putMatchDerived((await m1Data).derived);
 
-    expect(buildDuelInsightsFromFacts(await store.getDuelFacts({ matchIds: [matchId] }))).toEqual(
+    expect(buildDuelInsightsFromFacts(await derived.getDuels({ matchIds: [matchId] }))).toEqual(
       buildDuelInsights([{ matchId, pkg }])
     );
   });
@@ -152,18 +159,18 @@ describe("MatchFacts", () => {
   it("projects persisted utility value facts without reopening the demo package", async () => {
     const pkg = await fixture;
     const matchId = "m1";
-    const store = createFactsStore(createIdbAdapter(), "facts-utility-equivalence");
-    await store.putMatchFacts(await m1Facts);
+    const derived = createDerivedCacheStore(createIdbAdapter(), "derived-utility-equivalence");
+    await derived.putMatchDerived((await m1Data).derived);
     const players = pkg.players.map((player) => ({
       playerKey: `steam:${player.steamId64}`,
       name: player.name,
       steamIds: [player.steamId64]
     }));
 
-    expect(await buildUtilityValueSummaryFromFacts(store, { matchIds: [matchId], players })).toEqual(
+    expect(await buildUtilityValueSummaryFromFacts(derived, { matchIds: [matchId], players })).toEqual(
       buildUtilityValueSummary([{ matchId, pkg }], players)
     );
-    expect(await store.getUtilityValueFactMatchIds({ matchIds: [matchId] })).toEqual([matchId]);
+    expect(await derived.getUtilityValueMatchIds({ matchIds: [matchId] })).toEqual([matchId]);
   });
 
   it("提取 TacticalRoundFact：每回合每存活 side 一行，字段完整", async () => {
@@ -235,13 +242,23 @@ describe("MatchFacts", () => {
     expect(shapes.every((row) => row.windows.every((window) => window.componentPlayerIndices.length > 0))).toBe(true);
   });
 
-  it("workspace 不随导入持久化（单场 ~35MB、整包全量分析的导入大头），改为打开时懒算", async () => {
-    const store = createFactsStore(createIdbAdapter(), "facts-no-workspace");
-    const facts = await m1Facts;
-    expect(facts.matchWorkspace).toEqual([]);
-    await store.putMatchFacts(facts);
-    // 导入不再写 workspace，直读返回 null；视图改用 loadMatchWorkspaceModel 从 ZIP 懒算。
-    expect(await store.getMatchWorkspace("m1")).toBeNull();
+  it("workspace 不进入 facts 或 derived cache，打开时从 ZIP 懒算", async () => {
+    const data = await m1Data;
+    expect("matchWorkspace" in data.facts).toBe(false);
+    expect("matchWorkspace" in data.derived).toBe(false);
+  });
+
+  it("derived cache 可独立删除并由同一 ZIP 提取结果重建，不影响单场 facts", async () => {
+    const adapter = createIdbAdapter();
+    const factsStore = createFactsStore(adapter, "facts-derived-isolation");
+    const derivedStore = createDerivedCacheStore(adapter, "derived-isolation");
+    const data = await m1Data;
+    await Promise.all([factsStore.putMatchFacts(data.facts), derivedStore.putMatchDerived(data.derived)]);
+    await derivedStore.deleteMatch("m1");
+    expect(await derivedStore.getTournament({ matchIds: ["m1"] })).toEqual([]);
+    expect(await factsStore.getRrSignalRows({ matchIds: ["m1"] })).not.toHaveLength(0);
+    await derivedStore.putMatchDerived(data.derived);
+    expect(await derivedStore.getTournament({ matchIds: ["m1"] })).not.toHaveLength(0);
   });
 
   it("replaceRows：删除一场只动该场，另一场完整保留（key 前缀删除，不全量反序列化）", async () => {

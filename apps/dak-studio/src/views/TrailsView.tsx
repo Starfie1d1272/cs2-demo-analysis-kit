@@ -6,6 +6,7 @@ import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import type { IdentityOptions } from "../lib/season";
 import { getPinnedPlayer } from "../lib/pin";
 import { getFactsStore } from "../lib/facts-store";
+import { getDerivedCacheStore } from "../lib/derived-cache";
 import { EmptyState } from "@cs2dak/react";
 
 /**
@@ -168,7 +169,7 @@ export function TrailsView({ allEntries, entries, onGoLibrary, identityOptions }
     let cancelled = false;
     setModels(null);
     setError(null);
-    getFactsStore().getOpeningTrails({
+    getDerivedCacheStore().getOpeningTrails({
       matchIds: rangeEntries.map(matchIdForEntry),
       playerKeys: [selected.playerKey],
       steamIds: selected.steamIds

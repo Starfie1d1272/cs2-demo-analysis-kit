@@ -2,9 +2,9 @@ import { loadDemoPackageFromZip, buildMatchRadarField } from "@cs2dak/core";
 import { buildMatchWorkspaceModel } from "@cs2dak/presentation";
 import { buildRadarFieldGrid } from "@cs2dak/maps";
 import type { DemoPackage, MatchWorkspaceModel, RadarField } from "@cs2dak/contract";
-import { extractMatchFacts } from "./extract-match-facts";
+import { extractMatchData, type ExtractedMatchData } from "./extract-match-facts";
 import { getFactsStore } from "./facts-store";
-import type { MatchFacts } from "./fact-types";
+import { getDerivedCacheStore } from "./derived-cache";
 import { CALLOUT_GRID_URLS, loadStudioCalloutGrid } from "./callout-grid";
 import { metaFromPackage, type DemoMeta } from "./demo-meta";
 import { getStorage } from "./storage";
@@ -64,10 +64,15 @@ export function isFactsStale(entry: StudioDemoEntry): boolean {
   return isAnalysisStale(entry.builtWith);
 }
 
-/** facts 是查询加速层；写失败不破坏库完整性（ZIP+元数据已落盘，可后续重导补齐）。 */
-async function persistFacts(facts: MatchFacts): Promise<void> {
+/** facts / derived cache 是查询加速层；写失败不破坏库完整性（ZIP+元数据已落盘，可后续重建）。 */
+async function persistAnalysis(data: ExtractedMatchData): Promise<void> {
   try {
-    await getFactsStore().putMatchFacts(facts);
+    await Promise.all([
+      getFactsStore().putMatchFacts(data.facts),
+      getDerivedCacheStore().putMatchDerived(data.derived),
+      // storage:3 以前误放在 facts namespace 的 cohort 聚合行只做一次清理，不再读取或生产。
+      getStorage().records("facts:cohort_rows").deleteByPrefix(data.facts.matchId),
+    ]);
   } catch {
     // 吞掉：facts 缺失只降级聚合查询。
   }
@@ -83,8 +88,8 @@ async function importOnMainThread(buffer: ArrayBuffer, matchId: string): Promise
     loadTriLookup([pkg.match.mapName]),
     loadStudioCalloutGrid(pkg.match.mapName)
   ]);
-  const facts = extractMatchFacts(pkg, { matchId, visibilityFor, calloutGrid });
-  return { meta: metaFromPackage(pkg), facts };
+  const data = extractMatchData(pkg, { matchId, visibilityFor, calloutGrid });
+  return { meta: metaFromPackage(pkg), data };
 }
 
 async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
@@ -135,14 +140,14 @@ const WORKER_POOL_SIZE = 4;
 
 export interface ImportWorkerResult {
   meta: DemoMeta;
-  facts: MatchFacts;
+  data: ExtractedMatchData;
 }
 
 type PoolResult = DemoPackage | ImportWorkerResult | RadarField[];
 
 type WorkerReply =
   | { id: number; ok: true; pkg: DemoPackage }
-  | { id: number; ok: true; meta: DemoMeta; facts: MatchFacts }
+  | { id: number; ok: true; meta: DemoMeta; data: ExtractedMatchData }
   | { id: number; ok: true; radarFields: RadarField[] }
   | { id: number; ok: false; error: string };
 
@@ -189,7 +194,7 @@ function makePoolWorker(): PoolWorker {
     if (reply.ok) {
       if ("pkg" in reply) task.resolve(reply.pkg);
       else if ("radarFields" in reply) task.resolve(reply.radarFields);
-      else task.resolve({ meta: reply.meta, facts: reply.facts });
+      else task.resolve({ meta: reply.meta, data: reply.data });
     } else settleWithFallback(task);
     dispatchTasks();
   };
@@ -347,7 +352,7 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
   } catch (err) {
     throw new Error(`${file.name}: ${err instanceof Error ? err.message : String(err)}`);
   }
-  const { meta: pkgMeta, facts } = result;
+  const { meta: pkgMeta, data } = result;
   if (buffer.byteLength === 0) buffer = await file.arrayBuffer();
 
   const entry: StudioDemoEntry = {
@@ -373,13 +378,13 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
       ...existing,
       tags: mergedTags,
       sourceDemPath: sourceDemPath ?? existing.sourceDemPath ?? null,
-      // 重复导入会重榨 facts（下方 persistFacts），构建版本必须刷新到当前。
+    // 重复导入会重榨 facts 与 derived cache，构建版本必须刷新到当前。
       builtWith: currentBuiltWith(),
       sizeBytes: existing.sizeBytes ?? file.size,
       meta: mergedMeta,
     };
     await meta.put(id, mergedEntry);
-    await persistFacts(facts);
+    await persistAnalysis(data);
     if (replacement && replacement.id !== id) {
       await Promise.all([
         meta.delete(replacement.id),
@@ -387,6 +392,7 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
       ]);
       pkgCache.delete(replacement.id);
       void getFactsStore().deleteMatchFacts(matchIdForEntry(replacement));
+      void getDerivedCacheStore().deleteMatch(matchIdForEntry(replacement));
     }
     return {
       entry: mergedEntry,
@@ -406,11 +412,12 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     ]);
     pkgCache.delete(replacement.id);
     void getFactsStore().deleteMatchFacts(matchIdForEntry(replacement));
+    void getDerivedCacheStore().deleteMatch(matchIdForEntry(replacement));
   }
   // facts 已在 worker 里榨好；后续聚合走 facts 投影，不再反序列化整包 derived。
   // 注意：不把整包放进 pkgCache —— 批量导入会让每场 DemoPackage（含完整 replay）常驻内存
   // 导致 OOM。需要整包时由 getDemoPackage 按需从 ZIP 懒加载即可。
-  await persistFacts(facts);
+  await persistAnalysis(data);
   return { entry, duplicate: false, replaced: Boolean(replacement), replacedId: replacement?.id };
 }
 
@@ -454,7 +461,11 @@ export async function removeDemo(id: string): Promise<void> {
     demoBlobs.delete(id)
   ]);
   pkgCache.delete(id);
-  if (record) await getFactsStore().deleteMatchFacts(matchIdForEntry(record));
+  if (record) await Promise.all([
+    getFactsStore().deleteMatchFacts(matchIdForEntry(record)),
+    getDerivedCacheStore().deleteMatch(matchIdForEntry(record)),
+    getStorage().records("facts:cohort_rows").deleteByPrefix(matchIdForEntry(record)),
+  ]);
 }
 
 /**

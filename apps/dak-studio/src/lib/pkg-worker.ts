@@ -1,11 +1,11 @@
 import { loadDemoPackageFromZip, buildMatchRadarField } from "@cs2dak/core";
 import { buildTriangleBvh, parseAwpyTri, buildRadarFieldGrid, type TriangleBvh } from "@cs2dak/maps";
 import { loadCalloutGridBrowser } from "@cs2dak/maps/callout-grid-browser";
-import { extractMatchFacts } from "./extract-match-facts";
+import { extractMatchData } from "./extract-match-facts";
 import { metaFromPackage } from "./demo-meta";
 
 /**
- * 导入 worker：解析 v3 ZIP，并（import 模式下）就地把 DemoPackage 榨成 facts。
+ * 导入 worker：解析 v3 ZIP，并（import 模式下）就地生成可重建 facts 与 derived cache。
  *
  * facts 抽取是导入管线最重的一步（视野锥/LOS 遍历），原先在主线程串行跑会冻结 UI；
  * 移进 worker 后多场可在 worker 池里真正并行。输出按构造与主线程等价：
@@ -91,13 +91,13 @@ self.onmessage = async (event: MessageEvent<InMsg>) => {
       loadTriBvh(mapName, msg.triBaseUrl),
       loadCalloutGridBrowser(mapName, { urls: msg.calloutUrls })
     ]);
-    const facts = extractMatchFacts(pkg, {
+    const data = extractMatchData(pkg, {
       matchId: msg.matchId,
       visibilityFor: (name) => (name === mapName ? bvh : null),
       calloutGrid
     });
     const meta = metaFromPackage(pkg);
-    self.postMessage({ id: msg.id, ok: true, meta, facts });
+    self.postMessage({ id: msg.id, ok: true, meta, data });
   } catch (err) {
     self.postMessage({
       id: msg.id,

@@ -6,6 +6,7 @@ import { getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, type PinnedPlayer } from "../lib/pin";
 import { getFactsStore } from "../lib/facts-store";
+import { getDerivedCacheStore } from "../lib/derived-cache";
 import type { PlayerMatchStatsFact } from "../lib/fact-types";
 import { EmptyState, FindingPanel, MetricInfo } from "@cs2dak/react";
 import { FingerprintRadar, TrendChart } from "./profile-widgets";
@@ -222,7 +223,7 @@ export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, on
     }
     let cancelled = false;
     setTrailModels(null);
-    getFactsStore()
+    getDerivedCacheStore()
       .getOpeningTrails({
         matchIds: homeTrailEntries.map(matchIdForEntry),
         playerKeys: [me.playerKey],

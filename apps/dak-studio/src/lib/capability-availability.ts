@@ -1,6 +1,7 @@
 import { isAnalysisStale } from "./analysis-manifest.js";
 import { getFactsStore } from "./facts-store.js";
 import type { FactsStore } from "./fact-types.js";
+import { getDerivedCacheStore, type DerivedCacheStore } from "./derived-cache.js";
 import { matchIdForEntry, type StudioDemoEntry } from "./library.js";
 import { listAvailableTris } from "./tri-assets.js";
 
@@ -178,14 +179,15 @@ function idsOf<T extends { matchId: string }>(rows: readonly T[]): Set<string> {
 export async function loadCapabilityAvailabilityInputs(
   entries: readonly StudioDemoEntry[],
   factsStore: FactsStore = getFactsStore(),
+  derivedStore: DerivedCacheStore = getDerivedCacheStore(),
   availableTris?: readonly string[],
 ): Promise<Map<string, EntryCapabilityFacts>> {
   const matchIds = entries.map(matchIdForEntry);
   const [insights, duels, economy, utilityMatchIds, lineups, tactical, playerPositions, teamShapes, mechanics] = await Promise.all([
-    factsStore.getPlayerInsights({ matchIds }),
-    factsStore.getDuelFacts({ matchIds }),
-    factsStore.getTournamentFacts({ matchIds }),
-    factsStore.getUtilityValueFactMatchIds({ matchIds }),
+    derivedStore.getPlayerInsights({ matchIds }),
+    derivedStore.getDuels({ matchIds }),
+    derivedStore.getTournament({ matchIds }),
+    derivedStore.getUtilityValueMatchIds({ matchIds }),
     factsStore.getLineups({ matchIds }),
     factsStore.getTacticalRounds({ matchIds }),
     factsStore.getPlayerPositionRounds({ matchIds }),

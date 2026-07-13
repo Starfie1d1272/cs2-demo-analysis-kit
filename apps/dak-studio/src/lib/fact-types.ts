@@ -1,16 +1,7 @@
 import type { C4RouteFact, ExecuteBucket, PlayerPositionRoundFact, SiteEntryFact, TacticalGrenadeOccurrence, TacticalPlantFact, TacticalRoundFact, TeamAwpRoundFact, TeamShapeRoundFact } from "@cs2dak/core";
-import type { SeasonCohortFactRow } from "@cs2dak/cohort";
-import type { DemoPackage, MatchWorkspaceModel, OpeningTrailsModel, Side, TeamKey } from "@cs2dak/contract";
+import type { DemoPackage, PlayerWeaponHighlightFacts, RRIndicators, RRSignals, Side, TeamKey } from "@cs2dak/contract";
 import type { CalloutGrid, LineupGrenadeLike, TriangleBvh, Vec3 } from "@cs2dak/maps";
-import type {
-  DuelInsightsFacts,
-  PlayerMechanicsProfile,
-  PlayerSeasonInsights,
-  PlayerWeaponStat,
-  TeamComparisonFacts,
-  TournamentFacts,
-  UtilityValueSummary,
-} from "@cs2dak/presentation";
+import type { PlayerMechanicsProfile, PlayerSeasonInsights, PlayerWeaponStat } from "@cs2dak/presentation";
 
 interface FactBase {
   matchId: string;
@@ -56,10 +47,6 @@ export interface PlayerMatchStatsFact extends PlayerFactBase {
   vsFiveWonCount: number;
 }
 
-export interface PlayerInsightFact extends PlayerFactBase {
-  insight: PlayerSeasonInsights;
-}
-
 export interface PlayerWeaponFact extends PlayerFactBase {
   weapon: string;
   kills: number;
@@ -71,30 +58,12 @@ export interface MechanicsSamplesFact extends PlayerFactBase {
   row: import("@cs2dak/core").PlayerMechanicsFact;
 }
 
-export interface CohortFact extends PlayerFactBase {
-  row: SeasonCohortFactRow;
-}
-
-export interface TournamentFact extends MatchFactBase {
-  row: TournamentFacts;
-}
-
-export interface TeamComparisonFact extends MatchFactBase {
-  row: TeamComparisonFacts;
-}
-
-export interface DuelFact extends MatchFactBase {
-  row: DuelInsightsFacts;
-}
-
-export interface MatchWorkspaceFact extends MatchFactBase {
-  row: MatchWorkspaceModel;
-}
-
-export interface OpeningTrailFact extends MatchFactBase {
-  playerKey: string;
-  steamId64: string;
-  row: OpeningTrailsModel;
+export interface PlayerRrFact extends PlayerFactBase {
+  sourceDemoHash: string | null;
+  teamKey: TeamKey;
+  signals: RRSignals;
+  indicators: RRIndicators;
+  weaponHighlight: PlayerWeaponHighlightFacts | null;
 }
 
 export interface LineupFact extends MatchFactBase {
@@ -103,29 +72,18 @@ export interface LineupFact extends MatchFactBase {
   tickrate: number;
 }
 
-export interface UtilityValueFact extends MatchFactBase {
-  row: UtilityValueSummary;
-}
-
 export interface MatchFacts {
   matchId: string;
   mapName: string;
   playerMatchStats: PlayerMatchStatsFact[];
-  playerInsights: PlayerInsightFact[];
   playerWeapons: PlayerWeaponFact[];
   mechanicsSamples: MechanicsSamplesFact[];
-  cohortRows: CohortFact[];
-  tournamentFacts: TournamentFact[];
-  teamComparisonFacts: TeamComparisonFact[];
-  duelFacts: DuelFact[];
-  matchWorkspace: MatchWorkspaceFact[];
-  openingTrails: OpeningTrailFact[];
+  rrSignalRows: PlayerRrFact[];
   lineups: LineupFact[];
   tacticalRounds: TacticalRoundFact[];
   playerPositionRounds: PlayerPositionRoundFact[];
   teamShapeRounds: TeamShapeRoundFact[];
   teamAwpRounds: TeamAwpRoundFact[];
-  utilityValueFacts: UtilityValueFact[];
 }
 
 export interface ExtractMatchFactsOptions {
@@ -150,24 +108,14 @@ export interface ProjectedMechanicsRows {
 export interface FactsStore {
   putMatchFacts(facts: MatchFacts): Promise<void>;
   getPlayerMatchStats(scope?: FactsScope): Promise<PlayerMatchStatsFact[]>;
-  getPlayerInsights(scope?: FactsScope): Promise<PlayerInsightFact[]>;
   getPlayerWeapons(scope?: FactsScope): Promise<PlayerWeaponFact[]>;
   getMechanicsRows(scope?: FactsScope): Promise<ProjectedMechanicsRows[]>;
-  getCohortRows(scope?: FactsScope): Promise<SeasonCohortFactRow[]>;
-  getTournamentFacts(scope?: FactsScope): Promise<TournamentFacts[]>;
-  getTeamComparisonFacts(scope?: FactsScope): Promise<TeamComparisonFacts[]>;
-  getDuelFacts(scope?: FactsScope): Promise<DuelInsightsFacts[]>;
-  /** 单场 workspace：仅读旧库残留（新导入不再持久化，由 loadMatchWorkspaceModel 懒算）。 */
-  getMatchWorkspace(matchId: string): Promise<MatchWorkspaceFact | null>;
-  getOpeningTrails(scope?: FactsScope): Promise<OpeningTrailFact[]>;
+  getRrSignalRows(scope?: FactsScope): Promise<PlayerRrFact[]>;
   getLineups(scope?: FactsScope): Promise<LineupFact[]>;
   getTacticalRounds(scope?: FactsScope): Promise<TacticalRoundFact[]>;
   getPlayerPositionRounds(scope?: FactsScope): Promise<PlayerPositionRoundFact[]>;
   getTeamShapeRounds(scope?: FactsScope): Promise<TeamShapeRoundFact[]>;
   getTeamAwpRounds(scope?: FactsScope): Promise<TeamAwpRoundFact[]>;
-  getUtilityValueFacts(scope?: FactsScope): Promise<UtilityValueSummary[]>;
-  /** 只读 utility facts 的逐场可用性；不加载或重算完整 DemoPackage。 */
-  getUtilityValueFactMatchIds(scope?: FactsScope): Promise<string[]>;
   deleteMatchFacts(matchId: string): Promise<void>;
 }
 

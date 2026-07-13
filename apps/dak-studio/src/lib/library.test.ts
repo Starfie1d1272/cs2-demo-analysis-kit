@@ -26,7 +26,7 @@ describe("importDemoFile", () => {
     const duplicate = await importDemoFile(await sampleFile(), { tags: ["reimport"] });
 
     expect(duplicate.duplicate).toBe(true);
-    expect(await factsStore.getCohortRows({ matchIds: [matchId] })).not.toHaveLength(0);
+    expect(await factsStore.getRrSignalRows({ matchIds: [matchId] })).not.toHaveLength(0);
     expect(await factsStore.getPlayerPositionRounds({ matchIds: [matchId] })).not.toHaveLength(0);
     expect(await factsStore.getTeamShapeRounds({ matchIds: [matchId] })).not.toHaveLength(0);
     expect(await factsStore.getTacticalRounds({ matchIds: [matchId] })).not.toHaveLength(0);
@@ -64,7 +64,7 @@ describe("rebuildFactsFromZip", () => {
 
     expect(rebuilt?.id).toBe(id);
     expect(rebuilt?.builtWith?.factsRevision).toBe(ANALYSIS_MANIFEST.factsRevision);
-    expect(await factsStore.getCohortRows({ matchIds: [matchId] })).not.toHaveLength(0);
+    expect(await factsStore.getRrSignalRows({ matchIds: [matchId] })).not.toHaveLength(0);
     // entry 仍在库中且非 stale
     const entries = await listDemoEntries();
     expect(entries.find((e) => e.id === id)?.builtWith?.factsRevision).toBe(ANALYSIS_MANIFEST.factsRevision);

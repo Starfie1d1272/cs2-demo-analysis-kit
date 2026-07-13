@@ -8,8 +8,8 @@ import { CACHE_VERSION, seasonCacheKey } from "./season";
 
 describe("season aggregate cache version", () => {
   it("does not reuse v10 persisted profile caches", () => {
-    expect(CACHE_VERSION).toBe(11);
-    expect(seasonCacheKey([])).toBe(`v11:facts=${FACTS_REVISION}:`);
+    expect(CACHE_VERSION).toBe(12);
+    expect(seasonCacheKey([])).toBe(`v12:facts=${FACTS_REVISION}:`);
     expect(seasonCacheKey([])).not.toMatch(/^v10:/);
   });
 

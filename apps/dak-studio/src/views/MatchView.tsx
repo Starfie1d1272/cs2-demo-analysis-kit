@@ -4,7 +4,6 @@ import { buildSeriesSummary } from "@cs2dak/presentation";
 import type { MatchWorkspaceModel, SeriesSummary } from "@cs2dak/contract";
 import { MatchWorkspace, QaReportPanel } from "@cs2dak/react";
 import { entryDate, loadMatchWorkspaceModel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
-import { getFactsStore } from "../lib/facts-store";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import { EmptyState } from "@cs2dak/react";
 import { SeriesWorkspace } from "./SeriesWorkspace";
@@ -34,12 +33,10 @@ function cacheModel(id: string, model: MatchWorkspaceModel): void {
   }
 }
 
-async function loadModel(id: string, matchId: string): Promise<MatchWorkspaceModel> {
+async function loadModel(id: string): Promise<MatchWorkspaceModel> {
   const cached = modelCache.get(id);
   if (cached) return cached;
-  // 旧库可能仍有持久化 workspace（向后兼容直接用）；新导入不再持久化，按需从 ZIP 懒算。
-  const stored = await getFactsStore().getMatchWorkspace(matchId);
-  const model = stored?.row ?? (await loadMatchWorkspaceModel(id));
+  const model = await loadMatchWorkspaceModel(id);
   cacheModel(id, model);
   return model;
 }
@@ -108,7 +105,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     let cancelled = false;
     setModel(null);
     setError(null);
-    loadModel(activeId, matchIdForEntry(activeEntry))
+    loadModel(activeId)
       .then((built) => { if (!cancelled) setModel(built); })
       .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); });
     return () => { cancelled = true; };
@@ -119,7 +116,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     if (!summaryMode || !activeSeries || seriesEntries.length === 0) return;
     let cancelled = false;
     setSummary(null);
-    Promise.all(seriesEntries.map(async (entry) => ({ matchId: matchIdForEntry(entry), model: await loadModel(entry.id, matchIdForEntry(entry)) })))
+    Promise.all(seriesEntries.map(async (entry) => ({ matchId: matchIdForEntry(entry), model: await loadModel(entry.id) })))
       .then((matches) => { if (!cancelled) setSummary(buildSeriesSummary(matches)); })
       .catch(() => { if (!cancelled) setSummary(null); });
     return () => { cancelled = true; };

@@ -5,7 +5,6 @@ import { economyLabelCn, formatClockSeconds, ECONOMY_ENTRY_CN, formatEntryEviden
 import { calloutCn, buildLineupClusters, type LineupGrenadeLike } from "@cs2dak/maps";
 import type { EconomyEntry } from "@cs2dak/cohort";
 import { autoName, type TacticalCluster } from "../../lib/tactics.js";
-import { getFactsStore } from "../../lib/facts-store.js";
 import type { TacticalRoundFact } from "../../lib/fact-types.js";
 import { loadMatchWorkspaceModel, type StudioDemoEntry } from "../../lib/library.js";
 import { MetricInfo, EvidenceLink, DataTable, STUDIO_TABLE_CLASSES, type DataTableColumn } from "@cs2dak/react";
@@ -215,9 +214,7 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
 async function loadReplayModel(matchId: string, demoId: string | null, cache: Map<string, MatchWorkspaceModel>): Promise<MatchWorkspaceModel> {
   const cached = cache.get(matchId);
   if (cached) return cached;
-  // 旧库可能仍有持久化 workspace；新导入不再持久化，按 demo id 从 ZIP 懒算。
-  const stored = await getFactsStore().getMatchWorkspace(matchId);
-  const model = stored?.row ?? (demoId ? await loadMatchWorkspaceModel(demoId) : null);
+  const model = demoId ? await loadMatchWorkspaceModel(demoId) : null;
   if (!model) throw new Error("本场没有可用回放，请重新导入或重建该场。");
   cache.set(matchId, model);
   return model;

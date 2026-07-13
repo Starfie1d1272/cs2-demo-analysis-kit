@@ -1,5 +1,6 @@
 import { getStorage } from "./storage";
-import { DERIVED_CACHE_RECORD_NAMESPACES, FACTS_RECORD_NAMESPACES } from "./facts-store";
+import { FACTS_RECORD_NAMESPACES } from "./facts-store";
+import { DERIVED_CACHE_RECORD_NAMESPACES } from "./derived-cache";
 
 /**
  * 浏览器端（IndexedDB 后端）存储总览。
