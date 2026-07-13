@@ -42,13 +42,17 @@ function globalWeaponDuty(rows: PlayerMapRoleEvidence[]): WeaponDuty | null {
   const qualified = usable.reduce((sum, row) => sum + row.awp.qualifiedLongGunRounds, 0);
   const freeze = usable.reduce((sum, row) => sum + row.awp.freezeOwnershipRounds, 0);
   const active = usable.reduce((sum, row) => sum + (row.awp.activeSeconds ?? 0), 0);
+  const shots = usable.some((row) => row.awp.shots != null) ? usable.reduce((sum, row) => sum + (row.awp.shots ?? 0), 0) : null;
+  const kills = usable.some((row) => row.awp.kills != null) ? usable.reduce((sum, row) => sum + (row.awp.kills ?? 0), 0) : null;
   const share = weighted(usable, (row) => row.awp.teamActiveShare ?? 0);
   const consistency = weighted(usable, (row) => row.awp.matchConsistency ?? 0);
-  const matches = new Set(usable.flatMap((row) => row.representativeRounds.map((ref) => ref.matchId))).size;
+  const matches = new Set(usable.flatMap((row) => row.matchIds)).size;
   const maps = new Set(usable.filter((row) => row.awp.duty !== "rifler").map((row) => row.mapName)).size;
   const ownership = qualified > 0 ? freeze / qualified : 0;
-  if (qualified >= 20 && matches >= 3 && maps >= 2 && ownership >= 0.38 && share >= 0.52 && consistency >= 0.55) return "primary_awper";
-  if (qualified >= 10 && matches >= 2 && ownership >= 0.18 && share >= 0.2 && consistency >= 0.45) return "secondary_awper";
+  const primaryAction = active >= 60 || (shots ?? 0) >= 10 || (kills ?? 0) >= 4;
+  const secondaryAction = active >= 20 || (shots ?? 0) >= 4 || (kills ?? 0) >= 2;
+  if (qualified >= 20 && matches >= 3 && maps >= 2 && ownership >= 0.38 && share >= 0.52 && consistency >= 0.55 && primaryAction) return "primary_awper";
+  if (qualified >= 10 && matches >= 2 && ownership >= 0.18 && share >= 0.2 && consistency >= 0.45 && secondaryAction) return "secondary_awper";
   return freeze > 0 || active > 0 ? "situational_awper" : "rifler";
 }
 
@@ -75,15 +79,13 @@ function rankScores(scores: Record<InferredMapRole, number>): Array<[InferredMap
 }
 
 function declarationApplies(declaration: RoleDeclaration, rows: PlayerMapRoleEvidence[], matchTimes: Record<string, string | null>): boolean {
-  const teams = new Set(rows.map((row) => row.teamKey));
-  const maps = new Set(rows.map((row) => row.mapName));
-  if (declaration.teamKey != null && !teams.has(declaration.teamKey)) return false;
-  if (declaration.mapName != null && !maps.has(declaration.mapName)) return false;
+  const scopedRows = rows.filter((row) => (declaration.teamKey == null || row.teamKey === declaration.teamKey)
+    && (declaration.mapName == null || row.mapName === declaration.mapName));
+  if (scopedRows.length === 0) return false;
   if (declaration.validFrom == null && declaration.validTo == null) return true;
-  const ids = new Set(rows.flatMap((row) => row.representativeRounds.map((ref) => ref.matchId)));
-  const times = [...ids].map((id) => matchTimes[id]).filter((time): time is string => time != null);
-  if (times.length === 0) return true;
-  return times.some((time) => (declaration.validFrom == null || time >= declaration.validFrom) && (declaration.validTo == null || time <= declaration.validTo));
+  const times = [...new Set(scopedRows.flatMap((row) => row.matchIds))].map((id) => matchTimes[id]);
+  if (times.some((time) => time == null)) return true;
+  return times.some((time) => time != null && (declaration.validFrom == null || time >= declaration.validFrom) && (declaration.validTo == null || time <= declaration.validTo));
 }
 
 function alignment(declarations: RoleDeclaration[], inferred: InferredMapRole | null, scores: Record<InferredMapRole, number>, rows: PlayerMapRoleEvidence[]) {
@@ -131,9 +133,12 @@ export function buildPlayerMapRoleProfiles(evidenceRows: PlayerMapRoleEvidence[]
     const quality = weighted(rows, (row) => row.sample.dataQuality);
     const stability = weighted(rows, (row) => row.awp.matchConsistency ?? row.spatial.dominantGroupStability ?? 0.5);
     const confidence = status === "unknown" ? 0 : rounded(clamp(volume * 0.3 + quality * 0.3 + margin * 0.25 + stability * 0.15));
-    const hasUnverifiableTimeScope = applicable.some((declaration) => (declaration.validFrom || declaration.validTo) && rows.flatMap((row) => row.representativeRounds).every((ref) => (options.matchTimes ?? {})[ref.matchId] == null));
+    const hasUnverifiableTimeScope = applicable.some((declaration) => (declaration.validFrom || declaration.validTo) && rows
+      .filter((row) => (declaration.teamKey == null || row.teamKey === declaration.teamKey) && (declaration.mapName == null || row.mapName === declaration.mapName))
+      .flatMap((row) => row.matchIds)
+      .some((matchId) => (options.matchTimes ?? {})[matchId] == null));
     return playerMapRoleProfileSchema.parse({
-      version: "cs2-demo-analysis-kit/player-map-role-profile-2.0", playerKey,
+      version: "cs2-demo-analysis-kit/player-map-role-profile-3.0", playerKey,
       teamKeys: [...new Set(rows.map((row) => row.teamKey))].sort(), declaredRoles: applicable,
       inferredPrimaryRole, runnerUpRole: sufficient ? runnerUp : null, separationMargin: sufficient ? margin : null, roleSimilarities,
       headlineRole, status, confidence, weaponDuty,
@@ -158,7 +163,7 @@ function dynamic(row: PlayerMapRoleEvidence): "stable" | "isolated" | "rotating"
 export function buildTeamMapRoleMatrices(evidenceRows: TeamMapResponsibilityEvidence[], profiles: PlayerMapRoleProfile[]): TeamMapRoleMatrix[] {
   const profileByKey = new Map(profiles.map((profile) => [profile.playerKey, profile]));
   return evidenceRows.map((row) => teamMapRoleMatrixSchema.parse({
-    version: "cs2-demo-analysis-kit/team-map-role-matrix-2.0", teamKey: row.teamKey, mapName: row.mapName, side: row.side,
+    version: "cs2-demo-analysis-kit/team-map-role-matrix-3.0", teamKey: row.teamKey, mapName: row.mapName, side: row.side,
     status: row.status, confidence: row.confidence,
     players: row.players.map((player) => ({
       playerKey: player.playerKey,

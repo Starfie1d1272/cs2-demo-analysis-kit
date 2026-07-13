@@ -21,7 +21,10 @@ export function extractTeamAwpRoundFacts(pkg: DemoPackage, matchId: string, cont
     if (context) for (let frameIndex = 0; frameIndex < context.frameCount; frameIndex += 1) {
       const tick = context.startTick + frameIndex * context.tickStep;
       if (tick < round.freezeEndTick || tick > round.endTick) continue;
-      const active = context.tracks.filter((track) => track.teamKey === teamKey && ((track.flags[frameIndex] ?? 0) & FLAG_ALIVE) !== 0 && isAwp(replayWeaponAt(context, track, frameIndex))).length;
+      const active = context.tracks.filter((track) => track.teamKey === teamKey
+        && ((track.flags[frameIndex] ?? 0) & FLAG_ALIVE) !== 0
+        && [track.x[frameIndex], track.y[frameIndex], track.z[frameIndex]].every((value) => value != null && Number.isFinite(value))
+        && isAwp(replayWeaponAt(context, track, frameIndex))).length;
       if (active >= 2) doubleFrames += 1;
     }
     const lastFrame = context ? Math.max(0, Math.min(context.frameCount - 1, Math.floor((round.endTick - context.startTick) / context.tickStep))) : -1;

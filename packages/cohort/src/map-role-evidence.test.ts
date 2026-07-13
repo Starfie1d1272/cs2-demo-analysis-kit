@@ -4,15 +4,15 @@ import { buildPlayerMapRoleEvidence, buildTeamMapResponsibilityEvidence } from "
 
 function row(playerIndex: number, roundNumber: number, overrides: Partial<PlayerPositionRoundFact> = {}): PlayerPositionRoundFact {
   return {
-    analysisVersion: 2, matchId: "m1", mapName: "de_ancient", roundNumber, teamKey: "teamA", side: "ct",
+    analysisVersion: 3, matchId: "m1", mapName: "de_ancient", roundNumber, teamKey: "teamA", side: "ct",
     playerIndex, steamId64: `7656119800000000${playerIndex + 1}`, eligibleSeconds: 20,
     economyType: "full", openingWindow: { version: 1, startTick: 100, endTick: 1380, configuredSeconds: 20 },
     openingEligibleSeconds: 20, openingPositionGroupDwell: [{ positionGroupId: playerIndex === 0 ? "a_anchor" : "b_anchor", seconds: 16, share: 0.8 }],
-    openingMeanComponentSize: 3, openingIsolationSeconds: 0,
+    openingMeanComponentSize: 3, openingIsolationSeconds: 0, openingUtilityUseCount: 0,
     openingPath: [],
     positionGroupDwell: [{ positionGroupId: playerIndex === 0 ? "a_anchor" : "b_anchor", seconds: 16, share: 0.8 }],
     unresolvedCalloutSeconds: 0, calloutCoverage: 1, meanNearestTeammateDistance: 200, meanTeamCentroidDistance: 300,
-    meanComponentSize: 3, isolationSegments: [], rejoinTicks: [], movementSync: 0.6,
+    meanComponentSize: 3, isolationSegments: [], rejoinTicks: [], movementSync: 0.6, utilityUseCount: 0,
     freezeAwpOwnership: playerIndex === 0, activeAwpSeconds: playerIndex === 0 ? 12 : 0, awpShots: playerIndex === 0 ? 2 : 0, awpKills: playerIndex === 0 ? 1 : 0,
     availability: { replay: "available", nav: "available", callouts: "available", shots: "available" },
     ...overrides,
@@ -51,7 +51,7 @@ describe("map role evidence", () => {
   it("consumes opening component membership and formation continuity from TeamShapeRoundFact", () => {
     const rows = Array.from({ length: 6 }, (_, index) => [row(0, index + 1), row(4, index + 1)]).flat();
     const shapes: TeamShapeRoundFact[] = Array.from({ length: 6 }, (_, index) => ({
-      analysisVersion: 2, matchId: "m1", mapName: "de_ancient", roundNumber: index + 1, teamKey: "teamA", side: "ct",
+      analysisVersion: 3, matchId: "m1", mapName: "de_ancient", roundNumber: index + 1, teamKey: "teamA", side: "ct",
       openingWindow: { version: 1, startTick: 100, endTick: 1380, configuredSeconds: 20 },
       openingWindows: [{ startTick: 100, endTick: 1380, coverageSeconds: 20, componentSizes: [4, 1], partition: "4+1", componentPlayerIndices: [[0, 1, 2, 3], [4]] }],
       coverageSeconds: 40, windows: [{ startTick: 100, endTick: 2660, coverageSeconds: 40, componentSizes: [4, 1], partition: "4+1", componentPlayerIndices: [[0, 1, 2, 3], [4]] }],
@@ -60,5 +60,18 @@ describe("map role evidence", () => {
     const evidence = buildPlayerMapRoleEvidence({ playerPositionRounds: rows, teamShapeRounds: shapes });
     expect(evidence.find((item) => item.playerKey.endsWith("1"))?.spatial).toMatchObject({ openingMainComponentShare: 1, formationShares: { "4+1": 1 } });
     expect(evidence.find((item) => item.playerKey.endsWith("5"))?.spatial.openingIsolatedShare).toBe(1);
+  });
+
+  it("produces support responsibilities only from observable utility timing and team coordination", () => {
+    const shapes: TeamShapeRoundFact[] = Array.from({ length: 6 }, (_, index) => ({
+      analysisVersion: 3, matchId: "m1", mapName: "de_ancient", roundNumber: index + 1, teamKey: "teamA", side: "t",
+      openingWindow: { version: 1, startTick: 100, endTick: 1380, configuredSeconds: 20 },
+      openingWindows: [{ startTick: 100, endTick: 1380, coverageSeconds: 20, componentSizes: [5], partition: "5", componentPlayerIndices: [[0, 1, 2, 3, 4]] }],
+      coverageSeconds: 20, windows: [], availability: { replay: "available", nav: "available", callouts: "available", shots: "available" },
+    }));
+    const supported = Array.from({ length: 6 }, (_, index) => row(0, index + 1, { side: "t", utilityUseCount: 1, openingUtilityUseCount: 1 }));
+    expect(buildPlayerMapRoleEvidence({ playerPositionRounds: supported, teamShapeRounds: shapes })[0]?.responsibility).toBe("support");
+    expect(buildPlayerMapRoleEvidence({ playerPositionRounds: supported.map((item) => ({ ...item, utilityUseCount: 0, openingUtilityUseCount: 0 })), teamShapeRounds: shapes })[0]?.responsibility).not.toBe("support");
+    expect(buildPlayerMapRoleEvidence({ playerPositionRounds: supported.map((item) => ({ ...item, side: "ct" })), teamShapeRounds: shapes })[0]?.responsibility).toBe("supportive");
   });
 });

@@ -61,12 +61,25 @@ export function extractPlayerPositionRoundFacts(
   hasNav: boolean,
 ): PlayerPositionRoundFact[] {
   const economyType = (teamKey: "teamA" | "teamB") => teamKey === "teamA" ? round.teamAEconomy : round.teamBEconomy;
+  const configuredOpeningWindow = openingResponsibilityWindow(round, pkg.match.tickrate || 64);
+  const utilityCounts = (playerIndex: number) => {
+    const events = pkg.grenades.filter((grenade) => grenade.roundNumber === round.roundNumber && grenade.throwerIndex === playerIndex);
+    const tickOf = (grenade: (typeof events)[number]) => grenade.throwTick ?? grenade.effectTick;
+    return {
+      utilityUseCount: events.length,
+      openingUtilityUseCount: events.filter((grenade) => {
+        const tick = tickOf(grenade);
+        return tick >= configuredOpeningWindow.startTick && tick < configuredOpeningWindow.endTick;
+      }).length,
+    };
+  };
   if (!context) {
     return pkg.players.map((player, playerIndex) => ({
       analysisVersion: MAP_INTELLIGENCE_FACT_VERSION, matchId, mapName: pkg.match.mapName, roundNumber: round.roundNumber,
       teamKey: player.teamKey, side: player.teamKey === "teamA" ? round.teamASide : round.teamBSide,
       playerIndex, steamId64: player.steamId64, economyType: economyType(player.teamKey), openingWindow: null,
       openingEligibleSeconds: null, openingPositionGroupDwell: [], openingMeanComponentSize: null, openingIsolationSeconds: null,
+      ...utilityCounts(playerIndex),
       openingPath: [],
       eligibleSeconds: null, positionGroupDwell: [],
       unresolvedCalloutSeconds: null, calloutCoverage: null, meanNearestTeammateDistance: null, meanTeamCentroidDistance: null,
@@ -84,6 +97,7 @@ export function extractPlayerPositionRoundFacts(
         analysisVersion: MAP_INTELLIGENCE_FACT_VERSION, matchId, mapName: pkg.match.mapName, roundNumber: round.roundNumber,
         teamKey: player.teamKey, side, playerIndex, steamId64: player.steamId64, economyType: economyType(player.teamKey), openingWindow: null,
         openingEligibleSeconds: null, openingPositionGroupDwell: [], openingMeanComponentSize: null, openingIsolationSeconds: null,
+        ...utilityCounts(playerIndex),
         openingPath: [],
         eligibleSeconds: null, positionGroupDwell: [],
         unresolvedCalloutSeconds: null, calloutCoverage: null, meanNearestTeammateDistance: null, meanTeamCentroidDistance: null,
@@ -93,7 +107,7 @@ export function extractPlayerPositionRoundFacts(
       } satisfies PlayerPositionRoundFact;
     }
     const ownFrames = frames.filter((frame) => frame.teamKey === player.teamKey && frame.players.some((row) => row.playerIndex === playerIndex));
-    const openingWindow = openingResponsibilityWindow(round, pkg.match.tickrate || 64);
+    const openingWindow = configuredOpeningWindow;
     const openingFrames = ownFrames.filter((frame) => frame.tick >= openingWindow.startTick && frame.tick < openingWindow.endTick);
     const dwell = new Map<string, number>();
     let unresolved = 0;
@@ -155,6 +169,7 @@ export function extractPlayerPositionRoundFacts(
       openingPositionGroupDwell: [...openingDwell.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([positionGroupId, seconds]) => ({ positionGroupId, seconds: rounded(seconds)!, share: openingEligibleSeconds === 0 ? 0 : rounded(seconds / openingEligibleSeconds)! })),
       openingMeanComponentSize: rounded(mean(openingComponents)),
       openingIsolationSeconds: rounded(openingIsolatedFrames * frameSeconds),
+      ...utilityCounts(playerIndex),
       openingPath,
       eligibleSeconds: rounded(eligibleSeconds),
       positionGroupDwell: [...dwell.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([positionGroupId, seconds]) => ({ positionGroupId, seconds: rounded(seconds)!, share: eligibleSeconds === 0 ? 0 : rounded(seconds / eligibleSeconds)! })),

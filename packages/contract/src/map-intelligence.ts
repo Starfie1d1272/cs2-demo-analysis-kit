@@ -2,7 +2,7 @@ import { z } from "zod";
 import { playerIndexSchema, sideSchema, steamId64Schema, teamKeySchema } from "./upstream.js";
 
 /** Bump when the compact map-intelligence producer changes its factual meaning. */
-export const MAP_INTELLIGENCE_FACT_VERSION = 2;
+export const MAP_INTELLIGENCE_FACT_VERSION = 3;
 export const OPENING_RESPONSIBILITY_WINDOW_VERSION = 1;
 
 const availabilitySchema = z.enum(["available", "degraded", "missing"]);
@@ -56,6 +56,7 @@ export const playerPositionRoundFactSchema = z.object({
   openingPositionGroupDwell: z.array(positionGroupDwellSchema),
   openingMeanComponentSize: z.number().positive().nullable(),
   openingIsolationSeconds: z.number().nonnegative().nullable(),
+  openingUtilityUseCount: z.number().int().nonnegative(),
   openingPath: z.array(openingPathPointSchema).max(8),
   /** Full-round movement/action coverage, from freeze end until death or round end. */
   eligibleSeconds: z.number().nonnegative().nullable(),
@@ -68,6 +69,7 @@ export const playerPositionRoundFactSchema = z.object({
   isolationSegments: z.array(isolationSegmentSchema),
   rejoinTicks: z.array(z.number().int().nonnegative()),
   movementSync: z.number().min(-1).max(1).nullable(),
+  utilityUseCount: z.number().int().nonnegative(),
   freezeAwpOwnership: z.boolean().nullable(),
   activeAwpSeconds: z.number().nonnegative().nullable(),
   awpShots: z.number().int().nonnegative().nullable(),

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { evidenceRefSchema } from "./evidence.js";
 
 /** Bump when aggregation or role-selection semantics change. */
-export const MAP_ROLE_EVIDENCE_VERSION = 2;
+export const MAP_ROLE_EVIDENCE_VERSION = 3;
 
 /** The supported active-duty pool. Unknown maps are deliberately not generalized. */
 export const supportedMapNameSchema = z.enum([
@@ -73,6 +73,8 @@ export const playerMapRoleEvidenceSchema = z.object({
     dataQuality: z.number().min(0).max(1),
     coverage: z.number().min(0).max(1).nullable(),
   }),
+  /** Complete compact match coverage for aggregation and declaration time scope; not an evidence sample. */
+  matchIds: z.array(z.string().min(1)),
   positionGroups: z.array(mapPositionGroupEvidenceSchema),
   spatial: z.object({
     dominantGroupStability: z.number().min(0).max(1).nullable(),
@@ -84,6 +86,12 @@ export const playerMapRoleEvidenceSchema = z.object({
     openingMainComponentShare: z.number().min(0).max(1).nullable(),
     openingIsolatedShare: z.number().min(0).max(1).nullable(),
     formationShares: z.record(z.number().min(0).max(1)),
+  }),
+  support: z.object({
+    utilityUses: z.number().int().nonnegative(),
+    openingUtilityUses: z.number().int().nonnegative(),
+    utilityUsePerRound: z.number().nonnegative(),
+    openingUtilityUsePerRound: z.number().nonnegative(),
   }),
   responsibility: teamResponsibilitySchema,
   awp: awpResponsibilityEvidenceSchema,
@@ -109,7 +117,7 @@ export const teamMapResponsibilityEvidenceSchema = z.object({
 });
 
 export const playerMapRoleProfileSchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/player-map-role-profile-2.0"),
+  version: z.literal("cs2-demo-analysis-kit/player-map-role-profile-3.0"),
   playerKey: z.string().min(1),
   teamKeys: z.array(z.string().min(1)),
   declaredRoles: z.array(roleDeclarationSchema),
@@ -146,7 +154,7 @@ export const playerMapRoleProfileSchema = z.object({
 });
 
 export const teamMapRoleMatrixSchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/team-map-role-matrix-2.0"),
+  version: z.literal("cs2-demo-analysis-kit/team-map-role-matrix-3.0"),
   teamKey: z.string().min(1),
   mapName: supportedMapNameSchema,
   side: z.enum(["t", "ct"]),
