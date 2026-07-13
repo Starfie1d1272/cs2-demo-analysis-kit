@@ -19,7 +19,7 @@ import {
   buildUtilityValueSummary
 } from "@cs2dak/presentation";
 import { buildPlayerSeasonDetailsFromFacts, buildUtilityValueSummaryFromFacts } from "./facts-projections";
-import { createFactsStore } from "./facts-store";
+import { DERIVED_CACHE_RECORD_NAMESPACES, FACTS_RECORD_NAMESPACES, createFactsStore } from "./facts-store";
 import { extractMatchFacts } from "./extract-match-facts";
 import { createIdbAdapter } from "./storage/idb-adapter";
 
@@ -41,6 +41,19 @@ function stableNumbers<T>(value: T): T {
 }
 
 describe("MatchFacts", () => {
+  it("keeps cohort/presentation outputs outside the facts namespace", () => {
+    expect(FACTS_RECORD_NAMESPACES).toContain("facts:team_awp_rounds");
+    expect(FACTS_RECORD_NAMESPACES.some((name) => /player_insights|tournament|team_comparison|duel_facts|opening_trails|utility_value/.test(name))).toBe(false);
+    expect(DERIVED_CACHE_RECORD_NAMESPACES.every((name) => name.startsWith("derived:match-v3-map2:"))).toBe(true);
+  });
+
+  it("persists the same compact AWP round facts produced by the direct core pipeline", async () => {
+    const facts = await m1Facts;
+    const store = createFactsStore(createIdbAdapter(), "facts-awp-parity");
+    await store.putMatchFacts(facts);
+    expect(await store.getTeamAwpRounds({ matchIds: ["m1"] })).toEqual(facts.teamAwpRounds);
+  });
+
   it("projects persisted mechanics facts to the same profile as the existing package path", async () => {
     const pkg = await fixture;
     const matchId = "m1";

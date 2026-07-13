@@ -26,7 +26,7 @@ import type {
 import type { PlayerPositionRoundFact, TacticalRoundFact, TeamAwpRoundFact, TeamShapeRoundFact } from "@cs2dak/core";
 
 export const FACTS_NAMESPACE = "facts";
-export const DERIVED_MATCH_NAMESPACE = "derived:match-v1";
+export const DERIVED_MATCH_NAMESPACE = "derived:match-v3-map2";
 
 const FACT_TABLES = [
   "player_match_stats",
@@ -76,22 +76,23 @@ function rowKey(...parts: string[]): string {
 }
 
 export function createFactsStore(adapter: StorageAdapter, namespace = FACTS_NAMESPACE): FactsStore {
+  const derivedNamespace = namespace === FACTS_NAMESPACE ? DERIVED_MATCH_NAMESPACE : `${namespace}:derived-match-v3-map2`;
   const playerStats = adapter.records(`${namespace}:player_match_stats`);
-  const playerInsights = adapter.records(`${DERIVED_MATCH_NAMESPACE}:player_insights`);
+  const playerInsights = adapter.records(`${derivedNamespace}:player_insights`);
   const playerWeapons = adapter.records(`${namespace}:player_weapons`);
   const mechanics = adapter.records(`${namespace}:mechanics_samples`);
   const cohortRows = adapter.records(`${namespace}:cohort_rows`);
-  const tournamentFacts = adapter.records(`${DERIVED_MATCH_NAMESPACE}:tournament_facts`);
-  const teamComparisonFacts = adapter.records(`${DERIVED_MATCH_NAMESPACE}:team_comparison_facts`);
-  const duelFacts = adapter.records(`${DERIVED_MATCH_NAMESPACE}:duel_facts`);
-  const matchWorkspace = adapter.records(`${DERIVED_MATCH_NAMESPACE}:match_workspace`);
-  const openingTrails = adapter.records(`${DERIVED_MATCH_NAMESPACE}:opening_trails`);
+  const tournamentFacts = adapter.records(`${derivedNamespace}:tournament_facts`);
+  const teamComparisonFacts = adapter.records(`${derivedNamespace}:team_comparison_facts`);
+  const duelFacts = adapter.records(`${derivedNamespace}:duel_facts`);
+  const matchWorkspace = adapter.records(`${derivedNamespace}:match_workspace`);
+  const openingTrails = adapter.records(`${derivedNamespace}:opening_trails`);
   const lineups = adapter.records(`${namespace}:lineups`);
   const tacticalRounds = adapter.records(`${namespace}:tactical_rounds`);
   const playerPositionRounds = adapter.records(`${namespace}:player_position_rounds`);
   const teamShapeRounds = adapter.records(`${namespace}:team_shape_rounds`);
   const teamAwpRounds = adapter.records(`${namespace}:team_awp_rounds`);
-  const utilityValueFacts = adapter.records(`${DERIVED_MATCH_NAMESPACE}:utility_value`);
+  const utilityValueFacts = adapter.records(`${derivedNamespace}:utility_value`);
 
   return {
     async putMatchFacts(facts) {
