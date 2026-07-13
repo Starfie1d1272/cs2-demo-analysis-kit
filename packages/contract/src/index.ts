@@ -17,3 +17,4 @@ export * from "./bracket.js";
 export * from "./radar-field.js";
 export * from "./evidence.js";
 export * from "./map-intelligence.js";
+export * from "./map-role.js";

@@ -26,6 +26,7 @@ import {
   analysisBundleSchema,
   evidenceRefSchema,
   matchMapIntelligenceFactsSchema,
+  roleDeclarationSchema,
   // cohort
   seasonCohortBundleSchema,
   // workspace
@@ -41,6 +42,13 @@ describe("evidenceRefSchema", () => {
   it("requires a human-readable reason", () => {
     expect(evidenceRefSchema.safeParse({ matchId: "m1", roundNumber: 12, reason: "复核该回合的首死" }).success).toBe(true);
     expect(evidenceRefSchema.safeParse({ matchId: "m1", roundNumber: 12 }).success).toBe(false);
+  });
+});
+
+describe("roleDeclarationSchema", () => {
+  it("accepts portable declarations and excludes storage-only fields", () => {
+    expect(roleDeclarationSchema.safeParse({ playerKey: "p1", role: "igl", source: "trusted_metadata", mapName: "de_ancient", provenance: "team roster" }).success).toBe(true);
+    expect(roleDeclarationSchema.safeParse({ playerKey: "p1", role: "igl", source: "user", provenance: "" }).success).toBe(false);
   });
 });
 
