@@ -54,6 +54,8 @@ export type {
 export {
   buildPlayerMapRoleEvidence,
   buildTeamMapResponsibilityEvidence,
+  MAP_ROLE_MODEL_VERSION,
+  MAP_ROLE_THRESHOLDS,
   type MapRoleEvidenceFacts,
   type MapRoleEvidenceOptions,
 } from "./map-role-evidence.js";

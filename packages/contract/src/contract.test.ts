@@ -47,8 +47,8 @@ describe("evidenceRefSchema", () => {
 
 describe("roleDeclarationSchema", () => {
   it("accepts portable declarations and excludes storage-only fields", () => {
-    expect(roleDeclarationSchema.safeParse({ playerKey: "p1", role: "igl", source: "trusted_metadata", mapName: "de_ancient", provenance: "team roster" }).success).toBe(true);
-    expect(roleDeclarationSchema.safeParse({ playerKey: "p1", role: "igl", source: "user", provenance: "" }).success).toBe(false);
+    expect(roleDeclarationSchema.safeParse({ playerKey: "p1", role: "igl", priority: "primary", source: "trusted_metadata", mapName: "de_ancient", provenance: "team roster" }).success).toBe(true);
+    expect(roleDeclarationSchema.safeParse({ playerKey: "p1", role: "igl", priority: "primary", source: "user", provenance: "" }).success).toBe(false);
   });
 });
 

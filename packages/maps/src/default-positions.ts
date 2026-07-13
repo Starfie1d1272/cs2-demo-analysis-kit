@@ -225,6 +225,21 @@ export function getDefaultPositionGroup(
   return { id, ...defaults.groups[id] };
 }
 
+export interface PositionGroupDisplay {
+  id: string;
+  displayName: string;
+  officialName: string | null;
+  resolved: boolean;
+}
+
+/** Product-neutral display adapter. Unknown ids stay explicit instead of leaking internal ids as labels. */
+export function positionGroupDisplay(mapName: string, side: DefaultPositionSide, positionGroupId: string): PositionGroupDisplay {
+  const group = sideDefaults(mapName, side)?.groups[positionGroupId];
+  return group
+    ? { id: positionGroupId, displayName: group.name, officialName: group.callouts[0] ?? null, resolved: true }
+    : { id: positionGroupId, displayName: "未映射位置", officialName: null, resolved: false };
+}
+
 /** 只组合 callout 标签与手工默认位置组；推进、争夺、终点等动态语义由 core 时间线推导。 */
 export function classifyTacticalLocation(
   mapName: string,

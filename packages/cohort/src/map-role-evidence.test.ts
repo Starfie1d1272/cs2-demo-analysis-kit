@@ -4,8 +4,11 @@ import { buildPlayerMapRoleEvidence, buildTeamMapResponsibilityEvidence } from "
 
 function row(playerIndex: number, roundNumber: number, overrides: Partial<PlayerPositionRoundFact> = {}): PlayerPositionRoundFact {
   return {
-    analysisVersion: 1, matchId: "m1", mapName: "de_ancient", roundNumber, teamKey: "teamA", side: "ct",
+    analysisVersion: 2, matchId: "m1", mapName: "de_ancient", roundNumber, teamKey: "teamA", side: "ct",
     playerIndex, steamId64: `7656119800000000${playerIndex + 1}`, eligibleSeconds: 20,
+    economyType: "full", openingWindow: { version: 1, startTick: 100, endTick: 1380, configuredSeconds: 20 },
+    openingEligibleSeconds: 20, openingPositionGroupDwell: [{ positionGroupId: playerIndex === 0 ? "a_anchor" : "b_anchor", seconds: 16, share: 0.8 }],
+    openingMeanComponentSize: 3, openingIsolationSeconds: 0,
     positionGroupDwell: [{ positionGroupId: playerIndex === 0 ? "a_anchor" : "b_anchor", seconds: 16, share: 0.8 }],
     unresolvedCalloutSeconds: 0, calloutCoverage: 1, meanNearestTeammateDistance: 200, meanTeamCentroidDistance: 300,
     meanComponentSize: 3, isolationSegments: [], rejoinTicks: [], movementSync: 0.6,
@@ -27,7 +30,7 @@ describe("map role evidence", () => {
     const awper = players.find((player) => player.playerKey === "player:one")!;
     expect(players).toHaveLength(2);
     expect(awper.teamKey).toBe("Team One");
-    expect(awper.awp.duty).toBe("primary_awper");
+    expect(awper.awp.duty).toBe("secondary_awper");
     expect(awper.spatial.teamRelativeGroupShare).toBeGreaterThan(0);
 
     const teams = buildTeamMapResponsibilityEvidence({ playerPositionRounds: rows, teamShapeRounds: [] }, options);

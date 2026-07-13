@@ -2,7 +2,7 @@ import { z } from "zod";
 import { evidenceRefSchema } from "./evidence.js";
 
 /** Bump when aggregation or role-selection semantics change. */
-export const MAP_ROLE_EVIDENCE_VERSION = 1;
+export const MAP_ROLE_EVIDENCE_VERSION = 2;
 
 /** The supported active-duty pool. Unknown maps are deliberately not generalized. */
 export const supportedMapNameSchema = z.enum([
@@ -12,16 +12,22 @@ export const mapRoleStatusSchema = z.enum(["ready", "mixed", "insufficient", "un
 export const inferredMapRoleSchema = z.enum(["awper", "anchor", "opener", "closer"]);
 export const declaredRoleSchema = z.enum(["igl", "awper", "anchor", "opener", "closer"]);
 export const weaponDutySchema = z.enum(["primary_awper", "secondary_awper", "situational_awper", "rifler"]);
+export const teamResponsibilitySchema = z.enum([
+  "core_pack", "map_control", "extremity", "lurk_late_join", "support", "anchor", "rotator", "active_control", "supportive", "mixed", "unknown",
+]);
 
 /** Product-neutral input. Storage ids, namespaces and timestamps intentionally do not belong here. */
 export const roleDeclarationSchema = z.object({
   playerKey: z.string().min(1),
   role: declaredRoleSchema,
-  source: z.enum(["user", "trusted_metadata"]),
+  priority: z.enum(["primary", "secondary"]),
+  source: z.enum(["user", "self_report", "organizer", "event_package", "trusted_metadata"]),
   mapName: supportedMapNameSchema.optional(),
   teamKey: z.string().min(1).optional(),
+  validFrom: z.string().datetime().optional(),
+  validTo: z.string().datetime().optional(),
   provenance: z.string().min(1),
-});
+}).refine((value) => value.validFrom == null || value.validTo == null || value.validFrom <= value.validTo, { message: "validFrom must not be after validTo" });
 
 export const roleEvidenceLocatorSchema = z.object({
   matchId: z.string().min(1),
@@ -44,7 +50,10 @@ export const awpResponsibilityEvidenceSchema = z.object({
   shots: z.number().int().nonnegative().nullable(),
   kills: z.number().int().nonnegative().nullable(),
   teamActiveShare: z.number().min(0).max(1).nullable(),
-  mapStability: z.number().min(0).max(1).nullable(),
+  /** Concentration/exclusivity of observed AWP active time inside this team/map/side cell. */
+  usageConcentration: z.number().min(0).max(1).nullable(),
+  matchConsistency: z.number().min(0).max(1).nullable(),
+  qualifiedLongGunRounds: z.number().int().nonnegative(),
 });
 
 /** One identity × canonical team × map × side evidence cell. No role conclusion is stored here. */
@@ -59,7 +68,9 @@ export const playerMapRoleEvidenceSchema = z.object({
   sample: z.object({
     observedRounds: z.number().int().nonnegative(),
     eligibleRounds: z.number().int().nonnegative(),
+    eligibleSeconds: z.number().nonnegative(),
     matchCount: z.number().int().nonnegative(),
+    dataQuality: z.number().min(0).max(1),
     coverage: z.number().min(0).max(1).nullable(),
   }),
   positionGroups: z.array(mapPositionGroupEvidenceSchema),
@@ -70,7 +81,11 @@ export const playerMapRoleEvidenceSchema = z.object({
     isolationShare: z.number().min(0).max(1).nullable(),
     rejoinCount: z.number().int().nonnegative().nullable(),
     movementSync: z.number().min(-1).max(1).nullable(),
+    openingMainComponentShare: z.number().min(0).max(1).nullable(),
+    openingIsolatedShare: z.number().min(0).max(1).nullable(),
+    formationShares: z.record(z.number().min(0).max(1)),
   }),
+  responsibility: teamResponsibilitySchema,
   awp: awpResponsibilityEvidenceSchema,
   representativeRounds: z.array(roleEvidenceLocatorSchema).max(5),
   basis: z.array(z.string()),
@@ -94,15 +109,36 @@ export const teamMapResponsibilityEvidenceSchema = z.object({
 });
 
 export const playerMapRoleProfileSchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/player-map-role-profile-1.0"),
+  version: z.literal("cs2-demo-analysis-kit/player-map-role-profile-2.0"),
   playerKey: z.string().min(1),
   teamKeys: z.array(z.string().min(1)),
   declaredRoles: z.array(roleDeclarationSchema),
   inferredPrimaryRole: inferredMapRoleSchema.nullable(),
+  runnerUpRole: inferredMapRoleSchema.nullable(),
+  separationMargin: z.number().min(0).max(1).nullable(),
+  roleSimilarities: z.object({ awper: z.number().min(0).max(1), anchor: z.number().min(0).max(1), opener: z.number().min(0).max(1), closer: z.number().min(0).max(1) }),
   headlineRole: z.union([inferredMapRoleSchema, z.literal("IGL"), z.literal("IGL / AWPer")]).nullable(),
   status: mapRoleStatusSchema,
   confidence: z.number().min(0).max(1),
   weaponDuty: weaponDutySchema.nullable(),
+  positionGroupDisplay: z.array(z.object({
+    mapName: supportedMapNameSchema,
+    side: z.enum(["t", "ct"]),
+    positionGroupId: z.string().min(1),
+    displayName: z.string().min(1),
+    officialName: z.string().nullable(),
+    resolved: z.boolean(),
+  })),
+  alignment: z.object({
+    declaredPrimary: declaredRoleSchema.nullable(),
+    declaredSecondary: z.array(declaredRoleSchema),
+    inferredPrimary: inferredMapRoleSchema.nullable(),
+    overall: z.enum(["aligned", "partially_aligned", "different_observation", "not_comparable"]),
+    tSide: z.string(),
+    ctSide: z.string(),
+    disagreementReasons: z.array(z.string()),
+    sampleLimitations: z.array(z.string()),
+  }),
   perMapEvidence: z.array(playerMapRoleEvidenceSchema),
   evidence: z.array(evidenceRefSchema),
   basis: z.array(z.string()),
@@ -110,7 +146,7 @@ export const playerMapRoleProfileSchema = z.object({
 });
 
 export const teamMapRoleMatrixSchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/team-map-role-matrix-1.0"),
+  version: z.literal("cs2-demo-analysis-kit/team-map-role-matrix-2.0"),
   teamKey: z.string().min(1),
   mapName: supportedMapNameSchema,
   side: z.enum(["t", "ct"]),
@@ -118,8 +154,9 @@ export const teamMapRoleMatrixSchema = z.object({
   confidence: z.number().min(0).max(1),
   players: z.array(z.object({
     playerKey: z.string().min(1),
-    primaryPositionGroups: z.array(mapPositionGroupEvidenceSchema),
+    primaryPositionGroups: z.array(mapPositionGroupEvidenceSchema.extend({ displayName: z.string().min(1), officialName: z.string().nullable(), resolved: z.boolean() })),
     dynamicResponsibility: z.enum(["stable", "isolated", "rotating", "mixed", "unknown"]),
+    responsibility: teamResponsibilitySchema,
     sampleRounds: z.number().int().nonnegative(),
     confidence: z.number().min(0).max(1),
     weaponDuty: weaponDutySchema.nullable(),
@@ -138,6 +175,7 @@ export type MapRoleStatus = z.infer<typeof mapRoleStatusSchema>;
 export type InferredMapRole = z.infer<typeof inferredMapRoleSchema>;
 export type DeclaredRole = z.infer<typeof declaredRoleSchema>;
 export type WeaponDuty = z.infer<typeof weaponDutySchema>;
+export type TeamResponsibility = z.infer<typeof teamResponsibilitySchema>;
 export type RoleDeclaration = z.infer<typeof roleDeclarationSchema>;
 export type RoleEvidenceLocator = z.infer<typeof roleEvidenceLocatorSchema>;
 export type PlayerMapRoleEvidence = z.infer<typeof playerMapRoleEvidenceSchema>;

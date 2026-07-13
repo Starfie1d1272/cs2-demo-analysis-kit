@@ -43,7 +43,7 @@ import type {
   TeamMapRoleMatrix,
   TeamMapResponsibilityEvidence,
 } from "@cs2dak/contract";
-import { matchIdForEntry, type StudioDemoEntry } from "./library";
+import { entryDate, matchIdForEntry, type StudioDemoEntry } from "./library";
 import { displayTeamName, originalTeamNamesForDisplay } from "./identity";
 
 export interface IdentityOptions {
@@ -63,7 +63,7 @@ export interface IdentityOptions {
  */
 
 /** 聚合算法/口径变化时 +1，旧缓存自动失效重算。 */
-export const CACHE_VERSION = 10;
+export const CACHE_VERSION = 11;
 
 export interface SeasonSummary {
   bundle: SeasonCohortBundle;
@@ -273,7 +273,7 @@ function roleTeamIdentityMap(entries: StudioDemoEntry[], identity?: IdentityOpti
 export function getMapRoleEvidence(entries: StudioDemoEntry[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<MapRoleEvidenceSummary> {
   const teamIdentityMap = roleTeamIdentityMap(entries, identity);
   const teamMappingKey = Object.entries(teamIdentityMap).sort(([a], [b]) => a.localeCompare(b)).map(([raw, canonical]) => `${raw}=${canonical}`).join("|");
-  const key = `${keyOf(entries, identity?.version, selectedTeams)}:map-role-evidence:v1:team-map=${teamMappingKey}`;
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:map-role-evidence:v2:team-map=${teamMappingKey}`;
   const cached = mapRoleEvidenceCache.get(key);
   if (cached) return cached;
   const loading = (async () => {
@@ -306,7 +306,10 @@ export async function getPlayerMapRoleProfiles(
   selectedTeams: string[] = [],
 ): Promise<PlayerMapRoleProfile[]> {
   const evidence = await getMapRoleEvidence(entries, identity, selectedTeams);
-  return buildPlayerMapRoleProfiles(evidence.playerEvidence, declarations);
+  return buildPlayerMapRoleProfiles(evidence.playerEvidence, declarations, { matchTimes: Object.fromEntries(entries.map((entry) => {
+    const date = entryDate(entry);
+    return [matchIdForEntry(entry), date ? `${date}T00:00:00.000Z` : null];
+  })) });
 }
 
 export async function getTeamMapRoleMatrices(
@@ -316,7 +319,10 @@ export async function getTeamMapRoleMatrices(
   selectedTeams: string[] = [],
 ): Promise<TeamMapRoleMatrix[]> {
   const evidence = await getMapRoleEvidence(entries, identity, selectedTeams);
-  return buildTeamMapRoleMatrices(evidence.teamEvidence, buildPlayerMapRoleProfiles(evidence.playerEvidence, declarations));
+  return buildTeamMapRoleMatrices(evidence.teamEvidence, buildPlayerMapRoleProfiles(evidence.playerEvidence, declarations, { matchTimes: Object.fromEntries(entries.map((entry) => {
+    const date = entryDate(entry);
+    return [matchIdForEntry(entry), date ? `${date}T00:00:00.000Z` : null];
+  })) }));
 }
 
 /** 选中选手的逐场洞察：只返回小结果，不把全量 DemoPackage 长期放进 React state。 */
