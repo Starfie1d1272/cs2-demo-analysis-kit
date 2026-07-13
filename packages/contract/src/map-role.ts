@@ -170,6 +170,45 @@ export const teamMapRoleMatrixSchema = z.object({
   limitations: z.array(z.string()),
 });
 
+const countBreakdownSchema = z.object({ key: z.string().min(1), rounds: z.number().int().nonnegative() });
+export const doubleAwpAnalysisSchema = z.object({
+  version: z.literal("cs2-demo-analysis-kit/double-awp-analysis-1.0"),
+  teamKey: z.string().min(1),
+  side: z.enum(["t", "ct"]),
+  status: mapRoleStatusSchema,
+  qualifiedRoundCount: z.number().int().nonnegative(),
+  doubleAwpRoundCount: z.number().int().nonnegative(),
+  eligibleRoundShare: z.number().min(0).max(1).nullable(),
+  combinations: z.array(z.object({ playerKeys: z.array(z.string().min(1)).min(2), rounds: z.number().int().positive() })),
+  mapDistribution: z.array(countBreakdownSchema),
+  scorePhaseDistribution: z.array(countBreakdownSchema),
+  economyDistribution: z.array(countBreakdownSchema),
+  opponentEconomyDistribution: z.array(countBreakdownSchema),
+  wins: z.number().int().nonnegative(),
+  winRate: z.number().min(0).max(1).nullable(),
+  openingKills: z.number().int().nonnegative(),
+  openingDeaths: z.number().int().nonnegative(),
+  saves: z.number().int().nonnegative(),
+  roundStartAwpOwnerships: z.number().int().nonnegative(),
+  activeAwpSeconds: z.number().nonnegative().nullable(),
+  doubleAwpActiveSeconds: z.number().nonnegative().nullable(),
+  awpKills: z.number().int().nonnegative().nullable(),
+  awpDamage: z.number().nonnegative().nullable(),
+  evidence: z.array(evidenceRefSchema),
+  basis: z.array(z.string()),
+  limitations: z.array(z.string()),
+});
+
+export const playerMapPoolRowSchema = z.object({
+  mapName: supportedMapNameSchema,
+  matchCount: z.number().int().nonnegative(), roundCount: z.number().int().nonnegative(), wins: z.number().int().nonnegative(), losses: z.number().int().nonnegative(), winRate: z.number().min(0).max(1).nullable(),
+  rr: z.number().nonnegative().nullable(), adr: z.number().nonnegative().nullable(), kast: z.number().min(0).max(100).nullable(),
+  openingKills: z.number().int().nonnegative(), openingDeaths: z.number().int().nonnegative(),
+  mainWeapon: z.string().nullable(), globalWeaponDuty: weaponDutySchema.nullable(), mapSideAwpUsage: z.array(z.object({ side: z.enum(["t", "ct"]), duty: weaponDutySchema, qualifiedRounds: z.number().int().nonnegative(), activeSeconds: z.number().nonnegative().nullable() })),
+  tPositionGroup: z.string().nullable(), ctPositionGroup: z.string().nullable(), tResponsibility: teamResponsibilitySchema, ctResponsibility: teamResponsibilitySchema,
+  sampleQuality: z.number().min(0).max(1), confidence: z.number().min(0).max(1), evidence: z.array(evidenceRefSchema),
+});
+
 export type SupportedMapName = z.infer<typeof supportedMapNameSchema>;
 export type MapRoleStatus = z.infer<typeof mapRoleStatusSchema>;
 export type InferredMapRole = z.infer<typeof inferredMapRoleSchema>;
@@ -182,3 +221,5 @@ export type PlayerMapRoleEvidence = z.infer<typeof playerMapRoleEvidenceSchema>;
 export type TeamMapResponsibilityEvidence = z.infer<typeof teamMapResponsibilityEvidenceSchema>;
 export type PlayerMapRoleProfile = z.infer<typeof playerMapRoleProfileSchema>;
 export type TeamMapRoleMatrix = z.infer<typeof teamMapRoleMatrixSchema>;
+export type DoubleAwpAnalysis = z.infer<typeof doubleAwpAnalysisSchema>;
+export type PlayerMapPoolRow = z.infer<typeof playerMapPoolRowSchema>;

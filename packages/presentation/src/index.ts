@@ -3,6 +3,8 @@ export { buildOpeningTrails, type OpeningTrailsOptions } from "./trails.js";
 export { buildSeasonLeaderboardModel } from "./leaderboard.js";
 export { buildAllPlayerSeasonProfiles } from "./player.js";
 export { buildPlayerMapRoleProfiles, buildTeamMapRoleMatrices } from "./map-roles.js";
+export { buildDoubleAwpAnalyses, type DoubleAwpAnalysisOptions } from "./double-awp.js";
+export { buildPlayerMapPool, type PlayerMapPerformanceInput } from "./player-map-pool.js";
 export {
   buildTeamComparison,
   buildTeamComparisonFromFacts,

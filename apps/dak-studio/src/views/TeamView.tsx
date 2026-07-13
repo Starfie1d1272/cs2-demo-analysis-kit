@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { DataTable, EmptyState, STUDIO_TABLE_CLASSES, TeamMapRoleMatrixPanel, type DataTableColumn } from "@cs2dak/react";
-import type { RoleDeclaration, TeamMapRoleMatrix } from "@cs2dak/contract";
+import { DataTable, DoubleAwpAnalysisPanel, EmptyState, STUDIO_TABLE_CLASSES, TeamMapRoleMatrixPanel, type DataTableColumn } from "@cs2dak/react";
+import type { DoubleAwpAnalysis, RoleDeclaration, TeamMapRoleMatrix } from "@cs2dak/contract";
 import type { TeamOverviewModel } from "@cs2dak/presentation";
-import { getTeamMapRoleMatrices, getTeamOverview, type IdentityOptions } from "../lib/season";
+import { getDoubleAwpAnalysis, getTeamMapRoleMatrices, getTeamOverview, type IdentityOptions } from "../lib/season";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import type { OpenEvidence } from "../lib/evidence-continuation";
 import { loadRoleDeclarations } from "../lib/role-declarations";
@@ -61,6 +61,7 @@ export function TeamView({
   const [error, setError] = useState<string | null>(null);
   const [matrices, setMatrices] = useState<TeamMapRoleMatrix[] | null>(null);
   const [matrixError, setMatrixError] = useState<string | null>(null);
+  const [doubleAwp, setDoubleAwp] = useState<DoubleAwpAnalysis[] | null>(null);
   const [matrixMap, setMatrixMap] = useState<string | null>(null);
   const returningMatrix = /^team:map-roles:(de_[^:]+):(t|ct)$/.exec(returnEvidenceKey ?? "");
   const [matrixSide, setMatrixSide] = useState<"t" | "ct">(returningMatrix?.[2] === "t" ? "t" : "ct");
@@ -88,6 +89,13 @@ export function TeamView({
       .catch((reason) => { if (!cancelled) setMatrixError(reason instanceof Error ? reason.message : String(reason)); });
     return () => { cancelled = true; };
   }, [entries, activeTeam, identityOptions?.version, returnEvidenceKey]);
+
+  useEffect(() => {
+    if (!activeTeam || entries.length === 0) { setDoubleAwp(null); return; }
+    let cancelled = false;
+    void getDoubleAwpAnalysis(entries, identityOptions, [activeTeam]).then((models) => { if (!cancelled) setDoubleAwp(models); }).catch(() => { if (!cancelled) setDoubleAwp([]); });
+    return () => { cancelled = true; };
+  }, [entries, activeTeam, identityOptions?.version]);
 
   useEffect(() => {
     if (returningMatrix?.[2]) setMatrixSide(returningMatrix[2] as "t" | "ct");
@@ -132,6 +140,10 @@ export function TeamView({
           <section className="stu-card" id="team:map-roles">
             <div className="stu-card-head"><h3>地图位置职责</h3><div className="stu-chip-row" role="tablist" aria-label="职责矩阵筛选">{matrixMaps.map((map) => <button key={map} type="button" className={matrixMap === map ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => setMatrixMap(map)}>{map.replace("de_", "")}</button>)}{(["t", "ct"] as const).map((side) => <button key={side} type="button" className={matrixSide === side ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => setMatrixSide(side)}>{side.toUpperCase()}</button>)}</div></div>
             {matrixError ? <EmptyState variant="error" title="职责矩阵不可用" hint={matrixError} /> : matrices === null ? <div className="stu-loading">读取地图位置事实…</div> : <TeamMapRoleMatrixPanel matrix={activeMatrix} playerNames={playerNames} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry && matrixMap) onOpenEvidence(entry.id, evidence, `team:map-roles:${matrixMap}:${matrixSide}`); }} />}
+          </section>
+          <section className="stu-card" id="team:double-awp">
+            <div className="stu-card-head"><h3>双 AWP 条件统计</h3></div>
+            {doubleAwp === null ? <div className="stu-loading">读取 AWP 回合事实…</div> : <DoubleAwpAnalysisPanel model={doubleAwp.find((row) => row.side === matrixSide) ?? null} playerNames={playerNames} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence(entry.id, evidence, "team:double-awp"); }} />}
           </section>
           <div className="stu-home-grid">
             <section className="stu-card"><h3>经济样本</h3>{overview.economyWinRate.length === 0 ? <p className="stu-muted">当前范围没有可用经济事实。</p> : <div className="stu-chip-row">{overview.economyWinRate.map((row) => <span key={row.economyType} className="stu-chip">{row.economyType} · {row.wins}/{row.rounds}</span>)}</div>}</section>

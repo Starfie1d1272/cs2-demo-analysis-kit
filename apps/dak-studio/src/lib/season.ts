@@ -6,7 +6,9 @@ import {
 } from "@cs2dak/cohort";
 import {
   buildAllPlayerSeasonProfiles,
+  buildDoubleAwpAnalyses,
   buildPlayerMapRoleProfiles,
+  buildPlayerMapPool,
   buildTeamMapRoleMatrices,
   buildDuelInsightsFromFacts,
   buildSeasonLeaderboardModel,
@@ -34,11 +36,13 @@ import { getStorage } from "./storage";
 import { FACTS_REVISION } from "./analysis-manifest";
 import type {
   DuelInsightsModel,
+  DoubleAwpAnalysis,
   PlayerSeasonProfile,
   SeasonCohortBundle,
   SeasonLeaderboardModel,
   PlayerMapRoleEvidence,
   PlayerMapRoleProfile,
+  PlayerMapPoolRow,
   RoleDeclaration,
   TeamMapRoleMatrix,
   TeamMapResponsibilityEvidence,
@@ -323,6 +327,53 @@ export async function getTeamMapRoleMatrices(
     const date = entryDate(entry);
     return [matchIdForEntry(entry), date ? `${date}T00:00:00.000Z` : null];
   })) }));
+}
+
+export async function getDoubleAwpAnalysis(entries: StudioDemoEntry[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<DoubleAwpAnalysis[]> {
+  const factsStore = getFactsStore();
+  const matchIds = entries.map(matchIdForEntry);
+  const [rows, positions] = await Promise.all([factsStore.getTeamAwpRounds({ matchIds }), factsStore.getPlayerPositionRounds({ matchIds })]);
+  const teams = roleTeamIdentityMap(entries, identity);
+  const players = new Map(positions.map((row) => [`${row.matchId}:${row.playerIndex}`, (() => {
+    const mapped = identity?.map[row.steamId64];
+    return mapped == null ? `steam:${row.steamId64}` : typeof mapped === "string" ? mapped : mapped.playerKey;
+  })()]));
+  return buildDoubleAwpAnalyses(rows, {
+    teamKeyFor: (matchId, rawTeamKey) => teams[`${matchId}:${rawTeamKey}`] ?? `${matchId}:${rawTeamKey}`,
+    playerKeyFor: (matchId, playerIndex) => players.get(`${matchId}:${playerIndex}`) ?? `${matchId}:player:${playerIndex}`,
+  }).filter((row) => selectedTeams.length === 0 || selectedTeams.includes(row.teamKey));
+}
+
+export async function getPlayerMapPool(entries: StudioDemoEntry[], playerKey: string, roleProfile: PlayerMapRoleProfile | null, identity?: IdentityOptions): Promise<PlayerMapPoolRow[]> {
+  const steamIds = new Set<string>();
+  if (playerKey.startsWith("steam:")) steamIds.add(playerKey.slice(6));
+  for (const [steamId, mapped] of Object.entries(identity?.map ?? {})) if ((typeof mapped === "string" ? mapped : mapped.playerKey) === playerKey) steamIds.add(steamId);
+  const factsStore = getFactsStore();
+  const matchIds = entries.map(matchIdForEntry);
+  const [cohortRows, weapons] = await Promise.all([factsStore.getCohortRows({ matchIds, steamIds: [...steamIds] }), factsStore.getPlayerWeapons({ matchIds, steamIds: [...steamIds] })]);
+  const entryByMatch = new Map(entries.map((entry) => [matchIdForEntry(entry), entry]));
+  const rowsByMap = new Map<string, typeof cohortRows>();
+  for (const row of cohortRows) {
+    const mapName = entryByMatch.get(row.matchId)?.meta.mapName;
+    if (mapName) rowsByMap.set(mapName, [...(rowsByMap.get(mapName) ?? []), row]);
+  }
+  return buildPlayerMapPool([...rowsByMap.entries()].filter(([mapName]) => ["de_ancient", "de_anubis", "de_dust2", "de_inferno", "de_mirage", "de_nuke", "de_overpass"].includes(mapName)).map(([mapName, rows]) => {
+    const matches = [...new Set(rows.map((row) => row.matchId))];
+    const bundle = buildSeasonCohortFromRows(rows, { identityMap: identity?.map, matchCount: matches.length });
+    const profile = buildAllPlayerSeasonProfiles(bundle).find((candidate) => candidate.playerKey === playerKey) ?? null;
+    let wins = 0;
+    for (const matchId of matches) {
+      const entry = entryByMatch.get(matchId); const playerRow = rows.find((row) => row.matchId === matchId);
+      if (!entry || !playerRow) continue;
+      const won = playerRow.teamKey === "teamA" ? entry.meta.teamAScore > entry.meta.teamBScore : entry.meta.teamBScore > entry.meta.teamAScore;
+      if (won) wins += 1;
+    }
+    const weaponCounts = new Map<string, number>();
+    for (const weapon of weapons.filter((weapon) => entryByMatch.get(weapon.matchId)?.meta.mapName === mapName)) weaponCounts.set(weapon.weapon, (weaponCounts.get(weapon.weapon) ?? 0) + weapon.kills);
+    const mainWeapon = [...weaponCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? null;
+    const indicators = bundle.players.find((candidate) => candidate.playerKey === playerKey)?.indicators;
+    return { mapName: mapName as import("@cs2dak/contract").SupportedMapName, matchCount: matches.length, roundCount: indicators?.totalRounds ?? 0, wins, losses: matches.length - wins, rr: profile?.rating.rivalhubRR ?? null, adr: indicators?.adr ?? null, kast: indicators?.kast ?? null, openingKills: indicators?.firstKillCount ?? 0, openingDeaths: indicators?.firstDeathCount ?? 0, mainWeapon };
+  }), roleProfile);
 }
 
 /** 选中选手的逐场洞察：只返回小结果，不把全量 DemoPackage 长期放进 React state。 */

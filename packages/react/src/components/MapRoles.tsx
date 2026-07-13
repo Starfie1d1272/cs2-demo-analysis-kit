@@ -1,4 +1,4 @@
-import type { EvidenceRef, PlayerMapRoleProfile, TeamMapRoleMatrix } from "@cs2dak/contract";
+import type { DoubleAwpAnalysis, EvidenceRef, PlayerMapPoolRow, PlayerMapRoleProfile, TeamMapRoleMatrix } from "@cs2dak/contract";
 import { DataTable, DAK_TABLE_CLASSES, type DataTableColumn } from "./DataTable";
 import { EmptyState, EvidenceLink, LimitNote, MetricInfo } from "./Primitives";
 
@@ -88,4 +88,33 @@ export function TeamMapRoleMatrixPanel({
       {matrix.limitations[0] && <LimitNote>{matrix.limitations[0]}</LimitNote>}
     </section>
   );
+}
+
+export function DoubleAwpAnalysisPanel({ model, playerNames = {}, onOpenEvidence }: { model: DoubleAwpAnalysis | null; playerNames?: Record<string, string>; onOpenEvidence?: (evidence: EvidenceRef) => void }) {
+  if (!model) return <EmptyState variant="insufficient" title="双 AWP 样本不可用" hint="需要逐回合 AWP 与经济 facts；T/CT 会分别统计。" />;
+  return <section className="dak-role-panel">
+    <div className="dak-role-head"><div><h3>{model.side.toUpperCase()} 双 AWP</h3><p>仅描述 qualified full-buy / long-gun round 的观测指标，不作因果归因。</p></div><Status value={model.status} /></div>
+    <div className="dak-role-summary"><span>双 AWP 回合 <b>{model.doubleAwpRoundCount}/{model.qualifiedRoundCount}</b></span><span>占比 <b>{model.eligibleRoundShare == null ? "—" : `${Math.round(model.eligibleRoundShare * 100)}%`}</b></span><span>战绩 <b>{model.wins}/{model.doubleAwpRoundCount}</b></span><span>开局 <b>{model.openingKills}:{model.openingDeaths}</b></span><span>保狙 <b>{model.saves}</b></span><span>AWP kills <b>{model.awpKills ?? "—"}</b></span></div>
+    <div className="dak-role-declarations"><b>常见组合</b>{model.combinations.map((combo) => <span key={combo.playerKeys.join("|")} className="dak-role-tag">{combo.playerKeys.map((key) => playerNames[key] ?? key).join(" + ")} · {combo.rounds}</span>)}{model.combinations.length === 0 && <span>无</span>}</div>
+    {model.evidence.length > 0 && <div className="dak-role-evidence"><b>代表回合</b><Evidence evidence={model.evidence} onOpenEvidence={onOpenEvidence} /></div>}
+    {model.limitations.map((item) => <LimitNote key={item}>{item}</LimitNote>)}
+  </section>;
+}
+
+export function PlayerMapPoolPanel({ rows, onOpenEvidence }: { rows: PlayerMapPoolRow[]; onOpenEvidence?: (evidence: EvidenceRef) => void }) {
+  const columns: DataTableColumn<PlayerMapPoolRow>[] = [
+    { key: "map", label: "地图", format: (row) => row.mapName.replace("de_", "") },
+    { key: "record", label: "场次 / 战绩", sortable: true, sortValue: (row) => row.matchCount, format: (row) => `${row.matchCount} · ${row.wins}胜 ${row.losses}负` },
+    { key: "rounds", label: "回合", numeric: true, sortable: true, sortValue: (row) => row.roundCount, format: (row) => row.roundCount },
+    { key: "rr", label: "RR", numeric: true, sortable: true, sortValue: (row) => row.rr, format: (row) => row.rr?.toFixed(2) ?? "—" },
+    { key: "adr", label: "ADR", numeric: true, sortable: true, sortValue: (row) => row.adr, format: (row) => row.adr?.toFixed(1) ?? "—" },
+    { key: "kast", label: "KAST", numeric: true, sortable: true, sortValue: (row) => row.kast, format: (row) => row.kast == null ? "—" : `${row.kast.toFixed(1)}%` },
+    { key: "opening", label: "Opening", format: (row) => `${row.openingKills}:${row.openingDeaths}` },
+    { key: "weapon", label: "主武器 / 全局职责", format: (row) => `${row.mainWeapon ?? "—"} · ${row.globalWeaponDuty ? DUTY_LABEL[row.globalWeaponDuty] : "—"}` },
+    { key: "position", label: "T / CT 位置", format: (row) => `${row.tPositionGroup ?? "—"} / ${row.ctPositionGroup ?? "—"}` },
+    { key: "responsibility", label: "T / CT 职责", format: (row) => `${RESPONSIBILITY_LABEL[row.tResponsibility]} / ${RESPONSIBILITY_LABEL[row.ctResponsibility]}` },
+    { key: "quality", label: "样本 / 置信度", format: (row) => `${Math.round(row.sampleQuality * 100)}% / ${Math.round(row.confidence * 100)}%` },
+    { key: "evidence", label: "证据", render: (row) => <Evidence evidence={row.evidence} onOpenEvidence={onOpenEvidence} /> },
+  ];
+  return rows.length ? <DataTable classes={DAK_TABLE_CLASSES} rows={rows} rowKey={(row) => row.mapName} columns={columns} initialSortKey="record" /> : <EmptyState variant="insufficient" title="地图池样本不足" hint="当前选手没有可聚合的地图级 facts。" />;
 }

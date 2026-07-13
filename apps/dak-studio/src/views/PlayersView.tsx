@@ -1,6 +1,6 @@
 import { Star } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { DeclaredRole, PlayerMapRoleProfile, PlayerSeasonProfile } from "@cs2dak/contract";
+import type { DeclaredRole, PlayerMapPoolRow, PlayerMapRoleProfile, PlayerSeasonProfile } from "@cs2dak/contract";
 import {
   SEASON_STAT_VIEWS,
   mechanicsMetricsForWeapon,
@@ -9,11 +9,11 @@ import {
   type PlayerSeasonInsights,
   type PlayerWeaponStat
 } from "@cs2dak/presentation";
-import { getPlayerMapRoleProfiles, getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
+import { getPlayerMapPool, getPlayerMapRoleProfiles, getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
 import { FingerprintRadar, TrendChart } from "./profile-widgets";
-import { EmptyState, MetricInfo, PlayerMapRoleProfilePanel } from "@cs2dak/react";
+import { EmptyState, MetricInfo, PlayerMapPoolPanel, PlayerMapRoleProfilePanel } from "@cs2dak/react";
 import { EvidenceActions } from "../components/EvidenceActions";
 import type { OpenEvidence } from "../lib/evidence-continuation";
 import { loadRoleDeclarations, removeRoleDeclaration, upsertRoleDeclaration, type RoleDeclarationsState } from "../lib/role-declarations";
@@ -75,6 +75,7 @@ export function PlayersView({
   const [profileTab, setProfileTab] = useState<ProfileTab>(() => returnEvidenceKey?.startsWith("players:map-roles") ? "overview" : returnEvidenceKey ? "utility" : "overview");
   const [flashMode, setFlashMode] = useState<"net" | "enemy">("net");
   const [roleProfiles, setRoleProfiles] = useState<PlayerMapRoleProfile[] | null>(null);
+  const [mapPool, setMapPool] = useState<PlayerMapPoolRow[]>([]);
   const [roleError, setRoleError] = useState<string | null>(null);
   const [roleDeclarations, setRoleDeclarations] = useState<RoleDeclarationsState | null>(null);
   const [roleEditorOpen, setRoleEditorOpen] = useState(false);
@@ -182,6 +183,14 @@ export function PlayersView({
       .catch((reason) => { if (!cancelled) setRoleError(reason instanceof Error ? reason.message : String(reason)); });
     return () => { cancelled = true; };
   }, [entries, selected?.playerKey, roleDeclarations, identityOptions?.version, selectedTeam]);
+
+  useEffect(() => {
+    if (!selected || !roleProfiles) { setMapPool([]); return; }
+    let cancelled = false;
+    const roleProfile = roleProfiles.find((profile) => profile.playerKey === selected.playerKey) ?? null;
+    void getPlayerMapPool(entries, selected.playerKey, roleProfile, identityOptions).then((rows) => { if (!cancelled) setMapPool(rows); }).catch(() => { if (!cancelled) setMapPool([]); });
+    return () => { cancelled = true; };
+  }, [entries, selected?.playerKey, roleProfiles, identityOptions?.version]);
 
   if (allEntries.length === 0) {
     return (
@@ -408,6 +417,7 @@ export function PlayersView({
                 if (entry) onOpenEvidence(entry.id, evidence, "players:map-roles");
               }} />}
             </div>
+            <div className="stu-card stu-card-wide" id="players:map-pool"><h3>完整个人地图池</h3><PlayerMapPoolPanel rows={mapPool} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence(entry.id, evidence, "players:map-pool"); }} /></div>
             <div className="stu-card">
               <h3>核心指标</h3>
               <div className="stu-metric-grid">
