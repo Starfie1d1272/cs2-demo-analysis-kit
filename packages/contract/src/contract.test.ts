@@ -25,6 +25,7 @@ import {
   analysisProvenanceSchema,
   analysisBundleSchema,
   evidenceRefSchema,
+  matchMapIntelligenceFactsSchema,
   // cohort
   seasonCohortBundleSchema,
   // workspace
@@ -40,6 +41,38 @@ describe("evidenceRefSchema", () => {
   it("requires a human-readable reason", () => {
     expect(evidenceRefSchema.safeParse({ matchId: "m1", roundNumber: 12, reason: "复核该回合的首死" }).success).toBe(true);
     expect(evidenceRefSchema.safeParse({ matchId: "m1", roundNumber: 12 }).success).toBe(false);
+  });
+});
+
+describe("matchMapIntelligenceFactsSchema", () => {
+  const base = {
+    analysisVersion: 1 as const,
+    matchId: "m1",
+    mapName: "de_anubis",
+    playerPositionRounds: [{
+      analysisVersion: 1 as const,
+      matchId: "m1", mapName: "de_anubis", roundNumber: 1, teamKey: "teamA" as const, side: "t" as const,
+      playerIndex: 0, steamId64: "76561198000000001", eligibleSeconds: null, positionGroupDwell: [],
+      unresolvedCalloutSeconds: null, calloutCoverage: null, meanNearestTeammateDistance: null,
+      meanTeamCentroidDistance: null, meanComponentSize: null, isolationSegments: [], rejoinTicks: [],
+      movementSync: null, freezeAwpOwnership: null, activeAwpSeconds: null, awpShots: null, awpKills: null,
+      availability: { replay: "missing" as const, nav: "missing" as const, callouts: "missing" as const, shots: "missing" as const },
+    }],
+    teamShapeRounds: [{
+      analysisVersion: 1 as const,
+      matchId: "m1", mapName: "de_anubis", roundNumber: 1, teamKey: "teamA" as const, side: "t" as const,
+      coverageSeconds: null, windows: [],
+      availability: { replay: "missing" as const, nav: "missing" as const, callouts: "missing" as const, shots: "missing" as const },
+    }],
+  };
+
+  it("keeps missing replay facts explicitly null rather than inventing zero", () => {
+    expect(matchMapIntelligenceFactsSchema.parse(base).playerPositionRounds[0]?.activeAwpSeconds).toBeNull();
+  });
+
+  it("rejects invalid coverage and malformed shape windows", () => {
+    expect(matchMapIntelligenceFactsSchema.safeParse({ ...base, playerPositionRounds: [{ ...base.playerPositionRounds[0], calloutCoverage: 2 }] }).success).toBe(false);
+    expect(matchMapIntelligenceFactsSchema.safeParse({ ...base, teamShapeRounds: [{ ...base.teamShapeRounds[0], windows: [{ startTick: 1, endTick: 2, coverageSeconds: 1, componentSizes: [], partition: "", componentPlayerIndices: [] }] }] }).success).toBe(false);
   });
 });
 
