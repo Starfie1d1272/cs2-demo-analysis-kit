@@ -43,4 +43,13 @@ describe("role declaration state", () => {
     const migrated = await migrateRoleDeclarationsForIdentity({ version: 1, teamRenames: {}, mappings: [{ playerKey: "steam:a", displayName: "A", steamIds: ["a", "b"], updatedAt: 0 }] });
     expect(migrated.declarations.find((row) => row.id === "merge")?.declaration.playerKey).toBe("steam:a");
   });
+
+  it("demotes duplicate primaries when identity merge collapses two scopes", async () => {
+    let state: RoleDeclarationsState = { version: 2, declarations: [] };
+    state = await upsertRoleDeclaration(state, { playerKey: "steam:a", role: "anchor", priority: "primary", source: "user", provenance: "first" }, "a");
+    await upsertRoleDeclaration(state, { playerKey: "steam:b", role: "igl", priority: "primary", source: "user", provenance: "second" }, "b");
+    const migrated = await migrateRoleDeclarationsForIdentity({ version: 1, teamRenames: {}, mappings: [{ playerKey: "player:merged", displayName: "Merged", steamIds: ["a", "b"], updatedAt: 0 }] });
+    expect(migrated.declarations.filter((row) => row.declaration.priority === "primary")).toHaveLength(1);
+    expect(migrated.declarations.filter((row) => row.declaration.priority === "secondary")).toHaveLength(1);
+  });
 });

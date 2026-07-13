@@ -92,12 +92,28 @@ export async function migrateRoleDeclarationsForIdentity(identity: IdentityStore
   const current = await loadRoleDeclarations();
   const playerKeyBySteamId = new Map(identity.mappings.flatMap((mapping) => mapping.steamIds.map((id) => [id, mapping.playerKey] as const)));
   let changed = false;
+  const migratedAt = Date.now();
   const declarations = current.declarations.map((row) => {
     const steamId = row.declaration.playerKey.startsWith("steam:") ? row.declaration.playerKey.slice(6) : null;
     const playerKey = steamId ? playerKeyBySteamId.get(steamId) : undefined;
     if (!playerKey || playerKey === row.declaration.playerKey) return row;
     changed = true;
-    return { ...row, updatedAt: Date.now(), declaration: { ...row.declaration, playerKey } };
+    return { ...row, updatedAt: migratedAt, declaration: { ...row.declaration, playerKey } };
   });
+  const primaryByScope = new Map<string, StoredRoleDeclaration[]>();
+  for (const row of declarations) {
+    if (row.declaration.priority !== "primary") continue;
+    const key = scopeKey(row.declaration);
+    primaryByScope.set(key, [...(primaryByScope.get(key) ?? []), row]);
+  }
+  for (const rows of primaryByScope.values()) {
+    if (rows.length < 2) continue;
+    rows.sort((a, b) => b.updatedAt - a.updatedAt || b.createdAt - a.createdAt || b.id.localeCompare(a.id));
+    for (const row of rows.slice(1)) {
+      row.updatedAt = migratedAt;
+      row.declaration = { ...row.declaration, priority: "secondary" };
+      changed = true;
+    }
+  }
   return changed ? save({ ...current, declarations }) : current;
 }
