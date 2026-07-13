@@ -51,6 +51,12 @@ export type {
   TacticalExecuteBucket,
   TacticalPatternRow,
 } from "./tactical-clusters.js";
+export {
+  buildPlayerMapRoleEvidence,
+  buildTeamMapResponsibilityEvidence,
+  type MapRoleEvidenceFacts,
+  type MapRoleEvidenceOptions,
+} from "./map-role-evidence.js";
 
 
 /**
