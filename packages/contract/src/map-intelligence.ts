@@ -2,7 +2,8 @@ import { z } from "zod";
 import { playerIndexSchema, sideSchema, steamId64Schema, teamKeySchema } from "./upstream.js";
 
 /** Bump when the compact map-intelligence producer changes its factual meaning. */
-export const MAP_INTELLIGENCE_FACT_VERSION = 1;
+export const MAP_INTELLIGENCE_FACT_VERSION = 2;
+export const OPENING_RESPONSIBILITY_WINDOW_VERSION = 1;
 
 const availabilitySchema = z.enum(["available", "degraded", "missing"]);
 
@@ -17,6 +18,13 @@ export const positionGroupDwellSchema = z.object({
   positionGroupId: z.string().min(1),
   seconds: z.number().nonnegative(),
   share: z.number().min(0).max(1),
+});
+
+export const responsibilityWindowSchema = z.object({
+  version: z.literal(OPENING_RESPONSIBILITY_WINDOW_VERSION),
+  startTick: z.number().int().nonnegative(),
+  endTick: z.number().int().nonnegative(),
+  configuredSeconds: z.number().positive(),
 });
 
 /** A compact, locatable period where a player was separated from their team component. */
@@ -35,6 +43,13 @@ export const playerPositionRoundFactSchema = z.object({
   side: sideSchema,
   playerIndex: playerIndexSchema,
   steamId64: steamId64Schema,
+  economyType: z.enum(["pistol", "eco", "semi", "force", "full"]).nullable(),
+  openingWindow: responsibilityWindowSchema.nullable(),
+  openingEligibleSeconds: z.number().nonnegative().nullable(),
+  openingPositionGroupDwell: z.array(positionGroupDwellSchema),
+  openingMeanComponentSize: z.number().positive().nullable(),
+  openingIsolationSeconds: z.number().nonnegative().nullable(),
+  /** Full-round movement/action coverage, from freeze end until death or round end. */
   eligibleSeconds: z.number().nonnegative().nullable(),
   positionGroupDwell: z.array(positionGroupDwellSchema),
   unresolvedCalloutSeconds: z.number().nonnegative().nullable(),
@@ -69,6 +84,9 @@ export const teamShapeRoundFactSchema = z.object({
   roundNumber: z.number().int().positive(),
   teamKey: teamKeySchema,
   side: sideSchema,
+  openingWindow: responsibilityWindowSchema.nullable(),
+  openingWindows: z.array(teamShapeWindowSchema),
+  /** Full-round component continuity windows. */
   coverageSeconds: z.number().nonnegative().nullable(),
   windows: z.array(teamShapeWindowSchema),
   availability: mapIntelligenceAvailabilitySchema,
@@ -85,6 +103,7 @@ export const matchMapIntelligenceFactsSchema = z.object({
 
 export type MapIntelligenceAvailability = z.infer<typeof mapIntelligenceAvailabilitySchema>;
 export type PositionGroupDwell = z.infer<typeof positionGroupDwellSchema>;
+export type ResponsibilityWindow = z.infer<typeof responsibilityWindowSchema>;
 export type IsolationSegment = z.infer<typeof isolationSegmentSchema>;
 export type PlayerPositionRoundFact = z.infer<typeof playerPositionRoundFactSchema>;
 export type TeamShapeWindow = z.infer<typeof teamShapeWindowSchema>;

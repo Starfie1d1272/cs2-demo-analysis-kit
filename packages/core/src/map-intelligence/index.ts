@@ -12,6 +12,7 @@ import { buildRoundSpatialFrames } from "./spatial.js";
 import { extractTeamShapeRoundFacts } from "./team-shape.js";
 
 export { MAP_INTELLIGENCE_FACT_VERSION } from "@cs2dak/contract";
+export { OPENING_RESPONSIBILITY_SECONDS } from "./opening-window.js";
 export type { MatchMapIntelligenceFacts, PlayerPositionRoundFact, TeamShapeRoundFact } from "@cs2dak/contract";
 
 export interface ExtractMatchMapIntelligenceFactsOptions {

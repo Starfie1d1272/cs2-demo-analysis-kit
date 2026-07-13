@@ -2,6 +2,7 @@ import { MAP_INTELLIGENCE_FACT_VERSION, type MapIntelligenceAvailability, type T
 import type { CalloutGrid } from "@cs2dak/maps";
 import type { ReplayRoundContext } from "../tactics/replay-round-context.js";
 import { rounded, type TeamSpatialFrame } from "./spatial.js";
+import { openingResponsibilityWindow } from "./opening-window.js";
 
 function availability(context: ReplayRoundContext | null, grid: CalloutGrid | null, hasNav: boolean, hasShots: boolean): MapIntelligenceAvailability {
   return { replay: context ? "available" : "missing", nav: hasNav ? "available" : "missing", callouts: context && (context.placeDict.length > 0 || grid) ? "available" : context ? "degraded" : "missing", shots: hasShots ? "available" : "missing" };
@@ -30,8 +31,7 @@ export function extractTeamShapeRoundFacts(
   hasNav: boolean,
 ): TeamShapeRoundFact[] {
   const frameSeconds = context ? context.tickStep / (pkg.match.tickrate || 64) : 0;
-  return (["teamA", "teamB"] as const).map((teamKey) => {
-    const teamFrames = smoothed(frames.filter((frame) => frame.teamKey === teamKey));
+  const compactWindows = (teamFrames: readonly TeamSpatialFrame[]): TeamShapeRoundFact["windows"] => {
     const windows: TeamShapeRoundFact["windows"] = [];
     for (let start = 0; start < teamFrames.length;) {
       const first = teamFrames[start]!;
@@ -44,7 +44,15 @@ export function extractTeamShapeRoundFacts(
       windows.push({ startTick: first.tick, endTick: last.tick + context!.tickStep, coverageSeconds: rounded((last.tick + context!.tickStep - first.tick) / (pkg.match.tickrate || 64))!, componentSizes, partition: componentSizes.join("+"), componentPlayerIndices });
       start = end;
     }
+    return windows;
+  };
+  return (["teamA", "teamB"] as const).map((teamKey) => {
+    const teamFrames = smoothed(frames.filter((frame) => frame.teamKey === teamKey));
+    const window = context ? openingResponsibilityWindow(context.round, pkg.match.tickrate || 64) : null;
+    const openingFrames = window ? teamFrames.filter((frame) => frame.tick >= window.startTick && frame.tick < window.endTick) : [];
+    const windows = compactWindows(teamFrames);
+    const openingWindows = compactWindows(openingFrames);
     const side = teamKey === "teamA" ? round.teamASide : round.teamBSide;
-    return { analysisVersion: MAP_INTELLIGENCE_FACT_VERSION, matchId, mapName: pkg.match.mapName, roundNumber: round.roundNumber, teamKey, side, coverageSeconds: teamFrames.length ? rounded(teamFrames.length * frameSeconds) : null, windows, availability: availability(context, grid, hasNav, Boolean(pkg.shots)) } satisfies TeamShapeRoundFact;
+    return { analysisVersion: MAP_INTELLIGENCE_FACT_VERSION, matchId, mapName: pkg.match.mapName, roundNumber: round.roundNumber, teamKey, side, openingWindow: window, openingWindows, coverageSeconds: teamFrames.length ? rounded(teamFrames.length * frameSeconds) : null, windows, availability: availability(context, grid, hasNav, Boolean(pkg.shots)) } satisfies TeamShapeRoundFact;
   });
 }

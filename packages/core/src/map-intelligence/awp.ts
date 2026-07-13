@@ -1,4 +1,4 @@
-import { decodeDelta, type DemoPackage } from "@cs2dak/contract";
+import { decodeDelta, FLAG_ALIVE, type DemoPackage } from "@cs2dak/contract";
 import { replayWeaponAt, type ReplayRoundContext, type ReplayRoundTrack } from "../tactics/replay-round-context.js";
 
 function isAwp(weapon: string | null | undefined): boolean {
@@ -30,6 +30,8 @@ export function extractAwpRoundFacts(
   for (let index = 0; index < context.frameCount; index += 1) {
     const tick = context.startTick + index * context.tickStep;
     if (tick < context.round.freezeEndTick || tick > context.round.endTick) continue;
+    if (((track.flags[index] ?? 0) & FLAG_ALIVE) === 0) continue;
+    if (![track.x[index], track.y[index], track.z[index]].every((value) => value != null && Number.isFinite(value))) continue;
     if (isAwp(replayWeaponAt(context, track, index))) activeFrames += 1;
   }
   const shotTrack = pkg.shots?.tracks.find((row) => row.roundNumber === roundNumber && row.playerIndex === playerIndex);

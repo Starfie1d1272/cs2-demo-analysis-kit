@@ -8,6 +8,7 @@ import { positionGroupOf, type CalloutGrid } from "@cs2dak/maps";
 import { extractAwpRoundFacts } from "./awp.js";
 import { mean, rounded, type TeamSpatialFrame } from "./spatial.js";
 import type { ReplayRoundContext, ReplayRoundTrack } from "../tactics/replay-round-context.js";
+import { openingResponsibilityWindow } from "./opening-window.js";
 
 function availability(context: ReplayRoundContext | null, track: ReplayRoundTrack | null, grid: CalloutGrid | null, hasNav: boolean, hasShots: boolean): MapIntelligenceAvailability {
   return {
@@ -59,11 +60,14 @@ export function extractPlayerPositionRoundFacts(
   grid: CalloutGrid | null,
   hasNav: boolean,
 ): PlayerPositionRoundFact[] {
+  const economyType = (teamKey: "teamA" | "teamB") => teamKey === "teamA" ? round.teamAEconomy : round.teamBEconomy;
   if (!context) {
     return pkg.players.map((player, playerIndex) => ({
       analysisVersion: MAP_INTELLIGENCE_FACT_VERSION, matchId, mapName: pkg.match.mapName, roundNumber: round.roundNumber,
       teamKey: player.teamKey, side: player.teamKey === "teamA" ? round.teamASide : round.teamBSide,
-      playerIndex, steamId64: player.steamId64, eligibleSeconds: null, positionGroupDwell: [],
+      playerIndex, steamId64: player.steamId64, economyType: economyType(player.teamKey), openingWindow: null,
+      openingEligibleSeconds: null, openingPositionGroupDwell: [], openingMeanComponentSize: null, openingIsolationSeconds: null,
+      eligibleSeconds: null, positionGroupDwell: [],
       unresolvedCalloutSeconds: null, calloutCoverage: null, meanNearestTeammateDistance: null, meanTeamCentroidDistance: null,
       meanComponentSize: null, isolationSegments: [], rejoinTicks: [], movementSync: null,
       freezeAwpOwnership: null, activeAwpSeconds: null, awpShots: null, awpKills: null,
@@ -77,7 +81,9 @@ export function extractPlayerPositionRoundFacts(
     if (!track) {
       return {
         analysisVersion: MAP_INTELLIGENCE_FACT_VERSION, matchId, mapName: pkg.match.mapName, roundNumber: round.roundNumber,
-        teamKey: player.teamKey, side, playerIndex, steamId64: player.steamId64, eligibleSeconds: null, positionGroupDwell: [],
+        teamKey: player.teamKey, side, playerIndex, steamId64: player.steamId64, economyType: economyType(player.teamKey), openingWindow: null,
+        openingEligibleSeconds: null, openingPositionGroupDwell: [], openingMeanComponentSize: null, openingIsolationSeconds: null,
+        eligibleSeconds: null, positionGroupDwell: [],
         unresolvedCalloutSeconds: null, calloutCoverage: null, meanNearestTeammateDistance: null, meanTeamCentroidDistance: null,
         meanComponentSize: null, isolationSegments: [], rejoinTicks: [], movementSync: null,
         freezeAwpOwnership: null, activeAwpSeconds: null, awpShots: null, awpKills: null,
@@ -85,6 +91,8 @@ export function extractPlayerPositionRoundFacts(
       } satisfies PlayerPositionRoundFact;
     }
     const ownFrames = frames.filter((frame) => frame.teamKey === player.teamKey && frame.players.some((row) => row.playerIndex === playerIndex));
+    const openingWindow = openingResponsibilityWindow(round, pkg.match.tickrate || 64);
+    const openingFrames = ownFrames.filter((frame) => frame.tick >= openingWindow.startTick && frame.tick < openingWindow.endTick);
     const dwell = new Map<string, number>();
     let unresolved = 0;
     const nearest: number[] = [];
@@ -119,10 +127,27 @@ export function extractPlayerPositionRoundFacts(
       if (seconds >= 0.5) isolationSegments.push({ startTick, endTick, seconds: rounded(seconds)! });
     }
     const eligibleSeconds = ownFrames.length * frameSeconds;
+    const openingEligibleSeconds = openingFrames.length * frameSeconds;
+    const openingDwell = new Map<string, number>();
+    const openingComponents: number[] = [];
+    let openingIsolatedFrames = 0;
+    for (const frame of openingFrames) {
+      const sample = frame.players.find((row) => row.playerIndex === playerIndex)!;
+      const group = positionGroupOf(pkg.match.mapName, side, sample.callout ?? "");
+      if (group) openingDwell.set(group, (openingDwell.get(group) ?? 0) + frameSeconds);
+      const componentSize = distances(frame, playerIndex).componentSize;
+      if (componentSize != null) openingComponents.push(componentSize);
+      if (componentSize === 1 && frame.players.length > 1) openingIsolatedFrames += 1;
+    }
     const awp = extractAwpRoundFacts(pkg, context, track);
     return {
       analysisVersion: MAP_INTELLIGENCE_FACT_VERSION, matchId, mapName: pkg.match.mapName, roundNumber: round.roundNumber,
-      teamKey: player.teamKey, side, playerIndex, steamId64: player.steamId64,
+      teamKey: player.teamKey, side, playerIndex, steamId64: player.steamId64, economyType: economyType(player.teamKey),
+      openingWindow,
+      openingEligibleSeconds: rounded(openingEligibleSeconds),
+      openingPositionGroupDwell: [...openingDwell.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([positionGroupId, seconds]) => ({ positionGroupId, seconds: rounded(seconds)!, share: openingEligibleSeconds === 0 ? 0 : rounded(seconds / openingEligibleSeconds)! })),
+      openingMeanComponentSize: rounded(mean(openingComponents)),
+      openingIsolationSeconds: rounded(openingIsolatedFrames * frameSeconds),
       eligibleSeconds: rounded(eligibleSeconds),
       positionGroupDwell: [...dwell.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([positionGroupId, seconds]) => ({ positionGroupId, seconds: rounded(seconds)!, share: eligibleSeconds === 0 ? 0 : rounded(seconds / eligibleSeconds)! })),
       unresolvedCalloutSeconds: rounded(unresolved), calloutCoverage: eligibleSeconds === 0 ? null : rounded(1 - unresolved / eligibleSeconds),
