@@ -2,6 +2,7 @@ export { buildDemoViewModel, buildMatchWorkspaceModel } from "./workspace.js";
 export { buildOpeningTrails, type OpeningTrailsOptions } from "./trails.js";
 export { buildSeasonLeaderboardModel } from "./leaderboard.js";
 export { buildAllPlayerSeasonProfiles } from "./player.js";
+export { buildPlayerMapRoleProfiles, buildTeamMapRoleMatrices } from "./map-roles.js";
 export {
   buildTeamComparison,
   buildTeamComparisonFromFacts,

@@ -1,6 +1,6 @@
 import { round } from "./season-metrics.js";
 import { displayWeaponName } from "./weapons.js";
-import type { DemoPackage } from "@cs2dak/contract";
+import type { DemoPackage, TeamMapRoleMatrix } from "@cs2dak/contract";
 
 export interface TeamComparisonPlayerRow {
   teamName: string;
@@ -44,7 +44,7 @@ export interface TeamComparisonModel {
 
 /** 队伍总览只编排已有跨场事实；不推导强弱项、因果或对策。 */
 export interface TeamOverviewModel {
-  version: "cs2-demo-analysis-kit/team-overview-0.1";
+  version: "cs2-demo-analysis-kit/team-overview-0.2";
   teamName: string;
   matchCount: number;
   wins: number;
@@ -56,6 +56,8 @@ export interface TeamOverviewModel {
   weaponPreference: TeamComparisonSide["weaponPreference"];
   economyWinRate: TeamComparisonSide["economyWinRate"];
   matches: TeamComparisonSideMatch[];
+  /** Declaration-neutral map/side responsibility summary; consumers may render the full matrices separately. */
+  roleMatrixSummary: Array<{ mapName: string; side: "t" | "ct"; status: TeamMapRoleMatrix["status"]; responsibilityConflict: boolean; unstableCoverage: boolean }>;
 }
 
 export interface TeamComparisonInput {
@@ -267,7 +269,7 @@ export function buildTeamComparison(
   return buildTeamComparisonFromFacts(inputs.map(extractTeamComparisonFacts), requestedPair);
 }
 
-export function buildTeamOverviewFromFacts(inputs: TeamComparisonFacts[], teamName: string): TeamOverviewModel | null {
+export function buildTeamOverviewFromFacts(inputs: TeamComparisonFacts[], teamName: string, roleMatrices: TeamMapRoleMatrix[] = []): TeamOverviewModel | null {
   const opponent = inputs
     .flatMap((input) => [input.teams.teamA, input.teams.teamB])
     .find((name) => name !== teamName);
@@ -291,7 +293,7 @@ export function buildTeamOverviewFromFacts(inputs: TeamComparisonFacts[], teamNa
     maps.set(match.mapName, row);
   }
   return {
-    version: "cs2-demo-analysis-kit/team-overview-0.1",
+    version: "cs2-demo-analysis-kit/team-overview-0.2",
     teamName,
     matchCount: side.matchCount,
     wins: side.matches.filter((match) => match.won).length,
@@ -303,6 +305,10 @@ export function buildTeamOverviewFromFacts(inputs: TeamComparisonFacts[], teamNa
     weaponPreference: side.weaponPreference,
     economyWinRate: side.economyWinRate,
     matches: side.matches,
+    roleMatrixSummary: roleMatrices
+      .filter((matrix) => matrix.teamKey === teamName)
+      .map((matrix) => ({ mapName: matrix.mapName, side: matrix.side, status: matrix.status, responsibilityConflict: matrix.responsibilityConflict, unstableCoverage: matrix.unstableCoverage }))
+      .sort((a, b) => a.mapName.localeCompare(b.mapName) || a.side.localeCompare(b.side)),
   };
 }
 
