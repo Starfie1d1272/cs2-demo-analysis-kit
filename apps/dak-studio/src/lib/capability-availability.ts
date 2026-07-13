@@ -11,7 +11,8 @@ export type StudioCapability =
   | "utility"
   | "lineup"
   | "control"
-  | "tactical";
+  | "tactical"
+  | "map-role";
 
 export type CapabilityStatus = "ready" | "partial" | "unavailable";
 export type CapabilityOutputLevel = "observation" | "system-finding";
@@ -66,6 +67,7 @@ const REQUIREMENTS: Record<StudioCapability, CapabilityRequirement> = {
   lineup: { requiredFacts: ["lineup"], optionalDependencies: ["replay"], outputLevel: "observation" },
   control: { requiredDependencies: ["replay"], optionalDependencies: ["tri"], outputLevel: "observation" },
   tactical: { requiredFacts: ["tactical", "map-intelligence"], optionalDependencies: ["replay"], outputLevel: "system-finding" },
+  "map-role": { requiredFacts: ["map-intelligence"], outputLevel: "observation" },
 };
 
 const DEPENDENCY_LABEL: Record<CapabilityDependencyAvailability["key"], string> = {

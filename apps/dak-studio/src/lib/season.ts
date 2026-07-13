@@ -40,6 +40,7 @@ import type {
   PlayerMapRoleEvidence,
   PlayerMapRoleProfile,
   RoleDeclaration,
+  TeamMapRoleMatrix,
   TeamMapResponsibilityEvidence,
 } from "@cs2dak/contract";
 import { matchIdForEntry, type StudioDemoEntry } from "./library";
@@ -306,6 +307,16 @@ export async function getPlayerMapRoleProfiles(
 ): Promise<PlayerMapRoleProfile[]> {
   const evidence = await getMapRoleEvidence(entries, identity, selectedTeams);
   return buildPlayerMapRoleProfiles(evidence.playerEvidence, declarations);
+}
+
+export async function getTeamMapRoleMatrices(
+  entries: StudioDemoEntry[],
+  declarations: RoleDeclaration[] = [],
+  identity?: IdentityOptions,
+  selectedTeams: string[] = [],
+): Promise<TeamMapRoleMatrix[]> {
+  const evidence = await getMapRoleEvidence(entries, identity, selectedTeams);
+  return buildTeamMapRoleMatrices(evidence.teamEvidence, buildPlayerMapRoleProfiles(evidence.playerEvidence, declarations));
 }
 
 /** 选中选手的逐场洞察：只返回小结果，不把全量 DemoPackage 长期放进 React state。 */

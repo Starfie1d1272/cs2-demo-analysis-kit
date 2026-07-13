@@ -85,4 +85,11 @@ describe("CapabilityAvailability", () => {
       excluded: [{ reason: "地图位置 facts 缺失", count: 1 }],
     });
   });
+
+  it("marks map role output unavailable when map-intelligence facts are stale or missing", () => {
+    const availability = deriveCapabilityAvailability([entry("missing")], "map-role", new Map([
+      ["missing", { facts: {}, hasReplay: true, hasShots: false, hasTri: false }],
+    ]));
+    expect(availability).toMatchObject({ status: "unavailable", outputLevel: "observation", excluded: [{ reason: "地图位置 facts 缺失", count: 1 }] });
+  });
 });

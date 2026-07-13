@@ -103,7 +103,7 @@ type EventMode = "directory" | "overview";
 type MatchDeepLink = { roundNumber: number; tick?: number };
 const UPDATE_CHANNEL_KEY = "dak:update-channel";
 const CAPABILITY_BY_VIEW: Partial<Record<StudioView, StudioCapability>> = {
-  home: "personal-review", duel: "duel", economy: "economy", utility: "utility", lineups: "lineup", control: "control", coach: "tactical",
+  home: "personal-review", players: "map-role", teams: "map-role", duel: "duel", economy: "economy", utility: "utility", lineups: "lineup", control: "control", coach: "tactical",
 };
 
 function initialUpdateChannel(): UpdateChannel {
@@ -858,6 +858,8 @@ export function App() {
             onSelectTeam={openTeam}
             onOpenMatch={openDemo}
             onOpenCapability={setView}
+            onOpenEvidence={openEvidence}
+            returnEvidenceKey={returningEvidence?.sourceView === "teams" ? returningEvidence.sourceKey : undefined}
             onGoLibrary={() => setView("library")}
             identityOptions={identityOptions}
           />

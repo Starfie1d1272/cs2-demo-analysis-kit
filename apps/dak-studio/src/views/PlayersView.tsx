@@ -1,6 +1,6 @@
 import { Star } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { PlayerSeasonProfile } from "@cs2dak/contract";
+import type { DeclaredRole, PlayerMapRoleProfile, PlayerSeasonProfile } from "@cs2dak/contract";
 import {
   SEASON_STAT_VIEWS,
   mechanicsMetricsForWeapon,
@@ -9,13 +9,14 @@ import {
   type PlayerSeasonInsights,
   type PlayerWeaponStat
 } from "@cs2dak/presentation";
-import { getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
+import { getPlayerMapRoleProfiles, getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
 import { FingerprintRadar, TrendChart } from "./profile-widgets";
-import { EmptyState, MetricInfo } from "@cs2dak/react";
+import { EmptyState, MetricInfo, PlayerMapRoleProfilePanel } from "@cs2dak/react";
 import { EvidenceActions } from "../components/EvidenceActions";
 import type { OpenEvidence } from "../lib/evidence-continuation";
+import { loadRoleDeclarations, removeRoleDeclaration, upsertRoleDeclaration, type RoleDeclarationsState } from "../lib/role-declarations";
 
 export interface PlayersViewProps {
   allEntries: StudioDemoEntry[];
@@ -71,14 +72,21 @@ export function PlayersView({
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [pinned, setPinned] = useState<PinnedPlayer | null>(null);
   const [compareKey, setCompareKey] = useState<string | null>(null);
-  const [profileTab, setProfileTab] = useState<ProfileTab>(() => returnEvidenceKey ? "utility" : "overview");
+  const [profileTab, setProfileTab] = useState<ProfileTab>(() => returnEvidenceKey?.startsWith("players:map-roles") ? "overview" : returnEvidenceKey ? "utility" : "overview");
   const [flashMode, setFlashMode] = useState<"net" | "enemy">("net");
+  const [roleProfiles, setRoleProfiles] = useState<PlayerMapRoleProfile[] | null>(null);
+  const [roleError, setRoleError] = useState<string | null>(null);
+  const [roleDeclarations, setRoleDeclarations] = useState<RoleDeclarationsState | null>(null);
+  const [roleEditorOpen, setRoleEditorOpen] = useState(false);
+  const [declaredRole, setDeclaredRole] = useState<DeclaredRole>("awper");
 
   useEffect(() => {
     let cancelled = false;
     getPinnedPlayer().then((p) => { if (!cancelled) setPinned(p); });
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => { void loadRoleDeclarations().then(setRoleDeclarations); }, []);
 
   useEffect(() => {
     if (entries.length === 0) {
@@ -161,6 +169,16 @@ export function PlayersView({
     };
   }, [entries, selected?.playerKey, identityOptions?.version, selectedTeam]);
 
+  useEffect(() => {
+    if (!selected || !roleDeclarations) { setRoleProfiles(null); return; }
+    let cancelled = false;
+    setRoleProfiles(null); setRoleError(null);
+    void getPlayerMapRoleProfiles(entries, roleDeclarations.declarations.map((row) => row.declaration), identityOptions, selectedTeam ? [selectedTeam] : [])
+      .then((next) => { if (!cancelled) setRoleProfiles(next); })
+      .catch((reason) => { if (!cancelled) setRoleError(reason instanceof Error ? reason.message : String(reason)); });
+    return () => { cancelled = true; };
+  }, [entries, selected?.playerKey, roleDeclarations, identityOptions?.version, selectedTeam]);
+
   if (allEntries.length === 0) {
     return (
       <div className="stu-view">
@@ -236,6 +254,14 @@ export function PlayersView({
 
   const trendMax = Math.max(...selected.perMatch.map((m) => m.rivalhubRR), 0.01);
   const playerMatches = [...selected.perMatch].reverse();
+  const selectedRoleProfile = roleProfiles?.find((profile) => profile.playerKey === selected.playerKey) ?? null;
+  const selectedDeclarations = roleDeclarations?.declarations.filter((row) => row.declaration.playerKey === selected.playerKey) ?? [];
+
+  async function saveRoleDeclaration() {
+    if (!roleDeclarations || !selected) return;
+    const next = await upsertRoleDeclaration(roleDeclarations, { playerKey: selected.playerKey, role: declaredRole, source: "user", provenance: "用户声明" });
+    setRoleDeclarations(next); setRoleEditorOpen(false);
+  }
 
   const exportPlayerCard = () => {
     const md = buildPlayerCardMarkdown(selected, insights);
@@ -364,6 +390,13 @@ export function PlayersView({
 
           {profileTab === "overview" && (
           <div className="stu-profile-grid">
+            <div className="stu-card stu-card-wide" id="players:map-roles">
+              <div className="stu-card-head"><h3>地图 / 位置</h3><button type="button" className="stu-button-sm" onClick={() => setRoleEditorOpen(true)}>编辑声明</button></div>
+              {roleError ? <EmptyState variant="error" title="地图角色不可用" hint={roleError} /> : <PlayerMapRoleProfilePanel profile={selectedRoleProfile} onOpenEvidence={(evidence) => {
+                const entry = entryByMatchId.get(evidence.matchId);
+                if (entry) onOpenEvidence(entry.id, evidence, "players:map-roles");
+              }} />}
+            </div>
             <div className="stu-card">
               <h3>核心指标</h3>
               <div className="stu-metric-grid">
@@ -438,6 +471,18 @@ export function PlayersView({
               </div>
             )}
           </div>
+          )}
+
+          {roleEditorOpen && (
+            <div className="stu-modal-backdrop" role="dialog" aria-modal="true" aria-label="编辑角色声明" onClick={() => setRoleEditorOpen(false)}>
+              <div className="stu-modal" onClick={(event) => event.stopPropagation()}>
+                <header className="stu-modal-head"><h3>角色声明 · {selected.name}</h3><button type="button" className="stu-modal-close" onClick={() => setRoleEditorOpen(false)} aria-label="关闭">✕</button></header>
+                <div className="stu-modal-body"><p className="stu-muted">只保存用户声明；自动推断始终独立。trusted metadata 当前未提供。</p><label>声明角色 <select value={declaredRole} onChange={(event) => setDeclaredRole(event.target.value as DeclaredRole)}>{(["igl", "awper", "anchor", "opener", "closer"] as const).map((role) => <option key={role} value={role}>{role}</option>)}</select></label>
+                  {selectedDeclarations.length > 0 && <div className="stu-chip-row">{selectedDeclarations.map((row) => <span key={row.id} className="stu-chip">{row.declaration.role}<button type="button" className="stu-button-sm" onClick={() => void removeRoleDeclaration(roleDeclarations!, row.id).then(setRoleDeclarations)}>清除</button></span>)}</div>}
+                </div>
+                <footer className="stu-modal-foot"><span className="stu-muted">声明不会写入 facts 或自动证据缓存。</span><div className="stu-modal-actions"><button type="button" className="stu-button" onClick={() => setRoleEditorOpen(false)}>取消</button><button type="button" className="stu-button stu-button-primary" onClick={() => void saveRoleDeclaration()}>保存声明</button></div></footer>
+              </div>
+            </div>
           )}
 
           {profileTab === "aim" && (
