@@ -1,6 +1,13 @@
-import { buildSeasonCohortFromRows, type PlayerIdentityMap } from "@cs2dak/cohort";
+import {
+  buildPlayerMapRoleEvidence,
+  buildSeasonCohortFromRows,
+  buildTeamMapResponsibilityEvidence,
+  type PlayerIdentityMap,
+} from "@cs2dak/cohort";
 import {
   buildAllPlayerSeasonProfiles,
+  buildPlayerMapRoleProfiles,
+  buildTeamMapRoleMatrices,
   buildDuelInsightsFromFacts,
   buildSeasonLeaderboardModel,
   buildTournamentInsightsFromFacts,
@@ -29,10 +36,14 @@ import type {
   DuelInsightsModel,
   PlayerSeasonProfile,
   SeasonCohortBundle,
-  SeasonLeaderboardModel
+  SeasonLeaderboardModel,
+  PlayerMapRoleEvidence,
+  PlayerMapRoleProfile,
+  RoleDeclaration,
+  TeamMapResponsibilityEvidence,
 } from "@cs2dak/contract";
 import { matchIdForEntry, type StudioDemoEntry } from "./library";
-import { originalTeamNamesForDisplay } from "./identity";
+import { displayTeamName, originalTeamNamesForDisplay } from "./identity";
 
 export interface IdentityOptions {
   /** 与 IdentityStoreState.version 一致；0 表示无自定义映射。 */
@@ -51,7 +62,7 @@ export interface IdentityOptions {
  */
 
 /** 聚合算法/口径变化时 +1，旧缓存自动失效重算。 */
-export const CACHE_VERSION = 9;
+export const CACHE_VERSION = 10;
 
 export interface SeasonSummary {
   bundle: SeasonCohortBundle;
@@ -240,6 +251,62 @@ const utilityValueCache = new Map<string, Promise<UtilityValueSummary>>();
 const duelInsightsCache = new Map<string, Promise<DuelInsightsModel>>();
 const teamComparisonCache = new Map<string, Promise<TeamComparisonModel>>();
 const teamOverviewCache = new Map<string, Promise<TeamOverviewModel | null>>();
+const mapRoleEvidenceCache = new Map<string, Promise<MapRoleEvidenceSummary>>();
+
+/** Persistable, declaration-independent role evidence. Declarations are intentionally merged only at presentation call time. */
+export interface MapRoleEvidenceSummary {
+  playerEvidence: PlayerMapRoleEvidence[];
+  teamEvidence: TeamMapResponsibilityEvidence[];
+}
+
+function roleTeamIdentityMap(entries: StudioDemoEntry[], identity?: IdentityOptions): Record<string, string> {
+  return Object.fromEntries(entries.flatMap((entry) => {
+    const matchId = matchIdForEntry(entry);
+    return [
+      [`${matchId}:teamA`, displayTeamName(entry.meta.teamAName, identity?.teamRenames)],
+      [`${matchId}:teamB`, displayTeamName(entry.meta.teamBName, identity?.teamRenames)],
+    ];
+  }));
+}
+
+export function getMapRoleEvidence(entries: StudioDemoEntry[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<MapRoleEvidenceSummary> {
+  const teamIdentityMap = roleTeamIdentityMap(entries, identity);
+  const teamMappingKey = Object.entries(teamIdentityMap).sort(([a], [b]) => a.localeCompare(b)).map(([raw, canonical]) => `${raw}=${canonical}`).join("|");
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:map-role-evidence:v1:team-map=${teamMappingKey}`;
+  const cached = mapRoleEvidenceCache.get(key);
+  if (cached) return cached;
+  const loading = (async () => {
+    const persisted = await readPersistedValue<MapRoleEvidenceSummary>(key);
+    if (persisted) return persisted;
+    const factsStore = getFactsStore();
+    const matchIds = entries.map(matchIdForEntry);
+    const [playerPositionRounds, teamShapeRounds] = await Promise.all([
+      factsStore.getPlayerPositionRounds({ matchIds }),
+      factsStore.getTeamShapeRounds({ matchIds }),
+    ]);
+    if (playerPositionRounds.length === 0 && teamShapeRounds.length === 0) throw missingFactsError("地图职责证据");
+    const options = { identityMap: identity?.map, teamIdentityMap };
+    const playerEvidence = buildPlayerMapRoleEvidence({ playerPositionRounds, teamShapeRounds }, options)
+      .filter((row) => selectedTeams.length === 0 || selectedTeams.includes(row.teamKey));
+    const teamEvidence = buildTeamMapResponsibilityEvidence({ playerPositionRounds, teamShapeRounds }, options)
+      .filter((row) => selectedTeams.length === 0 || selectedTeams.includes(row.teamKey));
+    const summary = { playerEvidence, teamEvidence };
+    void writePersistedValue(key, summary);
+    return summary;
+  })();
+  return touchLimitedCache(mapRoleEvidenceCache, key, loading, SMALL_CACHE_LIMIT);
+}
+
+/** Declarations are input only: they never enter persisted evidence/cache keys and never overwrite automatic inference. */
+export async function getPlayerMapRoleProfiles(
+  entries: StudioDemoEntry[],
+  declarations: RoleDeclaration[] = [],
+  identity?: IdentityOptions,
+  selectedTeams: string[] = [],
+): Promise<PlayerMapRoleProfile[]> {
+  const evidence = await getMapRoleEvidence(entries, identity, selectedTeams);
+  return buildPlayerMapRoleProfiles(evidence.playerEvidence, declarations);
+}
 
 /** 选中选手的逐场洞察：只返回小结果，不把全量 DemoPackage 长期放进 React state。 */
 export function getPlayerSeasonDetails(entries: StudioDemoEntry[], steamIds: string[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<PlayerSeasonDetails> {
@@ -393,7 +460,7 @@ export async function getTeamComparison(entries: StudioDemoEntry[], identity?: I
 
 /** 队伍对象页：从可重建 comparison facts 编排摘要，不在页面层重新解析 ZIP。 */
 export async function getTeamOverview(entries: StudioDemoEntry[], teamName: string, identity?: IdentityOptions): Promise<TeamOverviewModel | null> {
-  const key = `${keyOf(entries, identity?.version)}:team-overview-v1:${teamName}`;
+  const key = `${keyOf(entries, identity?.version)}:team-overview-v2:${teamName}`;
   const cached = teamOverviewCache.get(key);
   if (cached) return cached;
   const loading = (async () => {
@@ -403,7 +470,9 @@ export async function getTeamOverview(entries: StudioDemoEntry[], teamName: stri
     const matchIds = entries.map(matchIdForEntry);
     const facts = withTeamRenames(await factsStore.getTeamComparisonFacts({ matchIds }), identity?.teamRenames);
     if (facts.length < entries.length) throw missingFactsError("队伍总览");
-    const overview = buildTeamOverviewFromFacts(facts, teamName);
+    const roleEvidence = await getMapRoleEvidence(entries, identity);
+    const matrices = buildTeamMapRoleMatrices(roleEvidence.teamEvidence, buildPlayerMapRoleProfiles(roleEvidence.playerEvidence));
+    const overview = buildTeamOverviewFromFacts(facts, teamName, matrices);
     void writePersistedValue(key, overview);
     return overview;
   })();

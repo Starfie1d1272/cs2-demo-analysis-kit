@@ -7,10 +7,10 @@ import {
 import { CACHE_VERSION, seasonCacheKey } from "./season";
 
 describe("season aggregate cache version", () => {
-  it("does not reuse v8 persisted profile caches", () => {
-    expect(CACHE_VERSION).toBe(9);
-    expect(seasonCacheKey([])).toBe(`v9:facts=${FACTS_REVISION}:`);
-    expect(seasonCacheKey([])).not.toMatch(/^v8:/);
+  it("does not reuse v9 persisted profile caches", () => {
+    expect(CACHE_VERSION).toBe(10);
+    expect(seasonCacheKey([])).toBe(`v10:facts=${FACTS_REVISION}:`);
+    expect(seasonCacheKey([])).not.toMatch(/^v9:/);
   });
 
   it("facts revision 变化时不复用已持久化聚合", () => {
