@@ -9,6 +9,7 @@ function row(playerIndex: number, roundNumber: number, overrides: Partial<Player
     economyType: "full", openingWindow: { version: 1, startTick: 100, endTick: 1380, configuredSeconds: 20 },
     openingEligibleSeconds: 20, openingPositionGroupDwell: [{ positionGroupId: playerIndex === 0 ? "a_anchor" : "b_anchor", seconds: 16, share: 0.8 }],
     openingMeanComponentSize: 3, openingIsolationSeconds: 0,
+    openingPath: [],
     positionGroupDwell: [{ positionGroupId: playerIndex === 0 ? "a_anchor" : "b_anchor", seconds: 16, share: 0.8 }],
     unresolvedCalloutSeconds: 0, calloutCoverage: 1, meanNearestTeammateDistance: 200, meanTeamCentroidDistance: 300,
     meanComponentSize: 3, isolationSegments: [], rejoinTicks: [], movementSync: 0.6,

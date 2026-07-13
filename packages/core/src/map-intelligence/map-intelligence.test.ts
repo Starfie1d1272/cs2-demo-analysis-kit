@@ -14,6 +14,7 @@ describe("extractMatchMapIntelligenceFacts", () => {
     const facts = extractMatchMapIntelligenceFacts(pkg, { matchId: "ancient" });
     expect(facts.playerPositionRounds).toHaveLength(pkg.rounds.length * pkg.players.length);
     expect(facts.teamShapeRounds).toHaveLength(pkg.rounds.length * 2);
+    expect(facts.teamAwpRounds).toHaveLength(pkg.rounds.length * 2);
     expect(facts.playerPositionRounds.some((row) => row.positionGroupDwell.length > 0)).toBe(true);
     expect(facts.playerPositionRounds.some((row) => row.openingPositionGroupDwell.length > 0)).toBe(true);
     expect(facts.playerPositionRounds.every((row) => row.openingEligibleSeconds == null || row.eligibleSeconds == null || row.openingEligibleSeconds <= row.eligibleSeconds)).toBe(true);
@@ -38,6 +39,7 @@ describe("extractMatchMapIntelligenceFacts", () => {
     const missing = extractMatchMapIntelligenceFacts(noReplay, { matchId: "missing" });
     expect(missing.playerPositionRounds.every((row) => row.openingEligibleSeconds === null && row.eligibleSeconds === null && row.activeAwpSeconds === null && row.availability.replay === "missing")).toBe(true);
     expect(missing.teamShapeRounds.every((row) => row.openingWindows.length === 0 && row.windows.length === 0 && row.coverageSeconds === null)).toBe(true);
+    expect(missing.teamAwpRounds.every((row) => row.awpActiveSeconds === null && row.availability.replay === "missing")).toBe(true);
 
     const anubis = extractMatchMapIntelligenceFacts({ ...pkg, match: { ...pkg.match, mapName: "de_anubis" } }, { matchId: "anubis", nav: null });
     expect(anubis.teamShapeRounds.every((row) => row.availability.nav === "missing")).toBe(true);

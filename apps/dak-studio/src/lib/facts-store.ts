@@ -23,30 +23,27 @@ import type {
   TournamentFacts,
   UtilityValueSummary,
 } from "@cs2dak/presentation";
-import type { PlayerPositionRoundFact, TacticalRoundFact, TeamShapeRoundFact } from "@cs2dak/core";
+import type { PlayerPositionRoundFact, TacticalRoundFact, TeamAwpRoundFact, TeamShapeRoundFact } from "@cs2dak/core";
 
 export const FACTS_NAMESPACE = "facts";
+export const DERIVED_MATCH_NAMESPACE = "derived:match-v1";
 
 const FACT_TABLES = [
   "player_match_stats",
-  "player_insights",
   "player_weapons",
   "mechanics_samples",
   "cohort_rows",
-  "tournament_facts",
-  "team_comparison_facts",
-  "duel_facts",
-  "match_workspace",
-  "opening_trails",
   "lineups",
   "tactical_rounds",
   "player_position_rounds",
   "team_shape_rounds",
-  "utility_value",
+  "team_awp_rounds",
 ] as const;
+const DERIVED_TABLES = ["player_insights", "tournament_facts", "team_comparison_facts", "duel_facts", "match_workspace", "opening_trails", "utility_value"] as const;
 
 /** Studio storage overview 使用的 facts 记录命名空间清单。 */
 export const FACTS_RECORD_NAMESPACES = FACT_TABLES.map((table) => `${FACTS_NAMESPACE}:${table}`);
+export const DERIVED_CACHE_RECORD_NAMESPACES = DERIVED_TABLES.map((table) => `${DERIVED_MATCH_NAMESPACE}:${table}`);
 
 function inScope(row: { matchId: string; playerKey?: string; mapName?: string; steamId64?: string }, scope?: FactsScope): boolean {
   if (!scope) return true;
@@ -80,20 +77,21 @@ function rowKey(...parts: string[]): string {
 
 export function createFactsStore(adapter: StorageAdapter, namespace = FACTS_NAMESPACE): FactsStore {
   const playerStats = adapter.records(`${namespace}:player_match_stats`);
-  const playerInsights = adapter.records(`${namespace}:player_insights`);
+  const playerInsights = adapter.records(`${DERIVED_MATCH_NAMESPACE}:player_insights`);
   const playerWeapons = adapter.records(`${namespace}:player_weapons`);
   const mechanics = adapter.records(`${namespace}:mechanics_samples`);
   const cohortRows = adapter.records(`${namespace}:cohort_rows`);
-  const tournamentFacts = adapter.records(`${namespace}:tournament_facts`);
-  const teamComparisonFacts = adapter.records(`${namespace}:team_comparison_facts`);
-  const duelFacts = adapter.records(`${namespace}:duel_facts`);
-  const matchWorkspace = adapter.records(`${namespace}:match_workspace`);
-  const openingTrails = adapter.records(`${namespace}:opening_trails`);
+  const tournamentFacts = adapter.records(`${DERIVED_MATCH_NAMESPACE}:tournament_facts`);
+  const teamComparisonFacts = adapter.records(`${DERIVED_MATCH_NAMESPACE}:team_comparison_facts`);
+  const duelFacts = adapter.records(`${DERIVED_MATCH_NAMESPACE}:duel_facts`);
+  const matchWorkspace = adapter.records(`${DERIVED_MATCH_NAMESPACE}:match_workspace`);
+  const openingTrails = adapter.records(`${DERIVED_MATCH_NAMESPACE}:opening_trails`);
   const lineups = adapter.records(`${namespace}:lineups`);
   const tacticalRounds = adapter.records(`${namespace}:tactical_rounds`);
   const playerPositionRounds = adapter.records(`${namespace}:player_position_rounds`);
   const teamShapeRounds = adapter.records(`${namespace}:team_shape_rounds`);
-  const utilityValueFacts = adapter.records(`${namespace}:utility_value`);
+  const teamAwpRounds = adapter.records(`${namespace}:team_awp_rounds`);
+  const utilityValueFacts = adapter.records(`${DERIVED_MATCH_NAMESPACE}:utility_value`);
 
   return {
     async putMatchFacts(facts) {
@@ -112,6 +110,7 @@ export function createFactsStore(adapter: StorageAdapter, namespace = FACTS_NAME
         replaceRows(tacticalRounds, facts.tacticalRounds.map((row) => [rowKey(row.matchId, String(row.roundNumber), row.side), row]), facts.matchId),
         replaceRows(playerPositionRounds, facts.playerPositionRounds.map((row) => [rowKey(row.matchId, String(row.roundNumber), row.teamKey, String(row.playerIndex)), row]), facts.matchId),
         replaceRows(teamShapeRounds, facts.teamShapeRounds.map((row) => [rowKey(row.matchId, String(row.roundNumber), row.teamKey), row]), facts.matchId),
+        replaceRows(teamAwpRounds, facts.teamAwpRounds.map((row) => [rowKey(row.matchId, String(row.roundNumber), row.teamKey), row]), facts.matchId),
         replaceRows(utilityValueFacts, facts.utilityValueFacts.map((row) => [row.matchId, row]), facts.matchId),
       ]);
     },
@@ -194,6 +193,11 @@ export function createFactsStore(adapter: StorageAdapter, namespace = FACTS_NAME
         .filter((row) => inScope(row, scope))
         .sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.teamKey.localeCompare(b.teamKey));
     },
+    async getTeamAwpRounds(scope) {
+      return (await teamAwpRounds.getAll<TeamAwpRoundFact>())
+        .filter((row) => inScope(row, scope))
+        .sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.teamKey.localeCompare(b.teamKey));
+    },
     async getUtilityValueFacts(scope) {
       return (await utilityValueFacts.getAll<UtilityValueFact>())
         .filter((row) => inScope(row, scope))
@@ -223,6 +227,7 @@ export function createFactsStore(adapter: StorageAdapter, namespace = FACTS_NAME
         tacticalRounds,
         playerPositionRounds,
         teamShapeRounds,
+        teamAwpRounds,
         utilityValueFacts,
       ].map((store) => store.deleteByPrefix(matchId)));
     },

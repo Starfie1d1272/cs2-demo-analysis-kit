@@ -27,6 +27,13 @@ export const responsibilityWindowSchema = z.object({
   configuredSeconds: z.number().positive(),
 });
 
+export const openingPathPointSchema = z.object({
+  tick: z.number().int().nonnegative(),
+  callout: z.string().nullable(),
+  positionGroupId: z.string().nullable(),
+  x: z.number(), y: z.number(), z: z.number(),
+});
+
 /** A compact, locatable period where a player was separated from their team component. */
 export const isolationSegmentSchema = z.object({
   startTick: z.number().int().nonnegative(),
@@ -49,6 +56,7 @@ export const playerPositionRoundFactSchema = z.object({
   openingPositionGroupDwell: z.array(positionGroupDwellSchema),
   openingMeanComponentSize: z.number().positive().nullable(),
   openingIsolationSeconds: z.number().nonnegative().nullable(),
+  openingPath: z.array(openingPathPointSchema).max(8),
   /** Full-round movement/action coverage, from freeze end until death or round end. */
   eligibleSeconds: z.number().nonnegative().nullable(),
   positionGroupDwell: z.array(positionGroupDwellSchema),
@@ -92,6 +100,29 @@ export const teamShapeRoundFactSchema = z.object({
   availability: mapIntelligenceAvailabilitySchema,
 });
 
+export const teamAwpRoundFactSchema = z.object({
+  analysisVersion: z.literal(MAP_INTELLIGENCE_FACT_VERSION),
+  matchId: z.string().min(1),
+  mapName: z.string().min(1),
+  roundNumber: z.number().int().positive(),
+  teamKey: teamKeySchema,
+  side: sideSchema,
+  economyType: z.enum(["pistol", "eco", "semi", "force", "full"]),
+  opponentEconomyType: z.enum(["pistol", "eco", "semi", "force", "full"]),
+  scorePhase: z.enum(["first_half", "second_half", "overtime"]),
+  won: z.boolean(),
+  roundStartAwpPlayerIndices: z.array(playerIndexSchema),
+  doubleAwpActiveSeconds: z.number().nonnegative().nullable(),
+  awpActiveSeconds: z.number().nonnegative().nullable(),
+  awpShots: z.number().int().nonnegative().nullable(),
+  awpKills: z.number().int().nonnegative().nullable(),
+  awpDamage: z.number().nonnegative().nullable(),
+  openingKills: z.number().int().nonnegative(),
+  openingDeaths: z.number().int().nonnegative(),
+  savedAwpPlayerIndices: z.array(playerIndexSchema),
+  availability: mapIntelligenceAvailabilitySchema,
+});
+
 /** Compact per-match replay-derived map facts. It intentionally contains no role conclusion. */
 export const matchMapIntelligenceFactsSchema = z.object({
   analysisVersion: z.literal(MAP_INTELLIGENCE_FACT_VERSION),
@@ -99,6 +130,7 @@ export const matchMapIntelligenceFactsSchema = z.object({
   mapName: z.string().min(1),
   playerPositionRounds: z.array(playerPositionRoundFactSchema),
   teamShapeRounds: z.array(teamShapeRoundFactSchema),
+  teamAwpRounds: z.array(teamAwpRoundFactSchema),
 });
 
 export type MapIntelligenceAvailability = z.infer<typeof mapIntelligenceAvailabilitySchema>;
@@ -108,4 +140,5 @@ export type IsolationSegment = z.infer<typeof isolationSegmentSchema>;
 export type PlayerPositionRoundFact = z.infer<typeof playerPositionRoundFactSchema>;
 export type TeamShapeWindow = z.infer<typeof teamShapeWindowSchema>;
 export type TeamShapeRoundFact = z.infer<typeof teamShapeRoundFactSchema>;
+export type TeamAwpRoundFact = z.infer<typeof teamAwpRoundFactSchema>;
 export type MatchMapIntelligenceFacts = z.infer<typeof matchMapIntelligenceFactsSchema>;

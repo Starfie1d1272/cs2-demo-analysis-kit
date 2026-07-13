@@ -62,6 +62,7 @@ describe("matchMapIntelligenceFactsSchema", () => {
       matchId: "m1", mapName: "de_anubis", roundNumber: 1, teamKey: "teamA" as const, side: "t" as const,
       playerIndex: 0, steamId64: "76561198000000001", economyType: null, openingWindow: null,
       openingEligibleSeconds: null, openingPositionGroupDwell: [], openingMeanComponentSize: null, openingIsolationSeconds: null,
+      openingPath: [],
       eligibleSeconds: null, positionGroupDwell: [],
       unresolvedCalloutSeconds: null, calloutCoverage: null, meanNearestTeammateDistance: null,
       meanTeamCentroidDistance: null, meanComponentSize: null, isolationSegments: [], rejoinTicks: [],
@@ -74,6 +75,7 @@ describe("matchMapIntelligenceFactsSchema", () => {
       openingWindow: null, openingWindows: [], coverageSeconds: null, windows: [],
       availability: { replay: "missing" as const, nav: "missing" as const, callouts: "missing" as const, shots: "missing" as const },
     }],
+    teamAwpRounds: [],
   };
 
   it("keeps missing replay facts explicitly null rather than inventing zero", () => {

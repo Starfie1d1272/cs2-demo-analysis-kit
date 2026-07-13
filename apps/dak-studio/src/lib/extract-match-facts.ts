@@ -300,6 +300,7 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
     tacticalRounds: replayFacts.tacticalRounds,
     playerPositionRounds: replayFacts.mapIntelligence.playerPositionRounds,
     teamShapeRounds: replayFacts.mapIntelligence.teamShapeRounds,
+    teamAwpRounds: replayFacts.mapIntelligence.teamAwpRounds,
     utilityValueFacts: [{ matchId: options.matchId, mapName, row: buildUtilityValueSummary([input], utilityPlayers) }],
   };
 }

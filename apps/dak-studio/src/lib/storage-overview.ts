@@ -1,5 +1,5 @@
 import { getStorage } from "./storage";
-import { FACTS_RECORD_NAMESPACES } from "./facts-store";
+import { DERIVED_CACHE_RECORD_NAMESPACES, FACTS_RECORD_NAMESPACES } from "./facts-store";
 
 /**
  * 浏览器端（IndexedDB 后端）存储总览。
@@ -31,7 +31,7 @@ const DATABASE_NAMESPACES = [
   "playbook", "playlist", "map-pool-notes", "events", "kv",
 ];
 
-const CACHE_NAMESPACES = [...FACTS_RECORD_NAMESPACES, "cache", "cache-meta"];
+const CACHE_NAMESPACES = [...FACTS_RECORD_NAMESPACES, ...DERIVED_CACHE_RECORD_NAMESPACES, "cache", "cache-meta"];
 
 async function countKeys(namespaces: string[]): Promise<number> {
   const storage = getStorage();

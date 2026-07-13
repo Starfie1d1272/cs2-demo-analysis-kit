@@ -1,4 +1,4 @@
-import type { C4RouteFact, ExecuteBucket, PlayerPositionRoundFact, SiteEntryFact, TacticalGrenadeOccurrence, TacticalPlantFact, TacticalRoundFact, TeamShapeRoundFact } from "@cs2dak/core";
+import type { C4RouteFact, ExecuteBucket, PlayerPositionRoundFact, SiteEntryFact, TacticalGrenadeOccurrence, TacticalPlantFact, TacticalRoundFact, TeamAwpRoundFact, TeamShapeRoundFact } from "@cs2dak/core";
 import type { SeasonCohortFactRow } from "@cs2dak/cohort";
 import type { DemoPackage, MatchWorkspaceModel, OpeningTrailsModel, Side, TeamKey } from "@cs2dak/contract";
 import type { CalloutGrid, LineupGrenadeLike, TriangleBvh, Vec3 } from "@cs2dak/maps";
@@ -124,6 +124,7 @@ export interface MatchFacts {
   tacticalRounds: TacticalRoundFact[];
   playerPositionRounds: PlayerPositionRoundFact[];
   teamShapeRounds: TeamShapeRoundFact[];
+  teamAwpRounds: TeamAwpRoundFact[];
   utilityValueFacts: UtilityValueFact[];
 }
 
@@ -163,6 +164,7 @@ export interface FactsStore {
   getTacticalRounds(scope?: FactsScope): Promise<TacticalRoundFact[]>;
   getPlayerPositionRounds(scope?: FactsScope): Promise<PlayerPositionRoundFact[]>;
   getTeamShapeRounds(scope?: FactsScope): Promise<TeamShapeRoundFact[]>;
+  getTeamAwpRounds(scope?: FactsScope): Promise<TeamAwpRoundFact[]>;
   getUtilityValueFacts(scope?: FactsScope): Promise<UtilityValueSummary[]>;
   /** 只读 utility facts 的逐场可用性；不加载或重算完整 DemoPackage。 */
   getUtilityValueFactMatchIds(scope?: FactsScope): Promise<string[]>;
@@ -189,6 +191,6 @@ export interface UtilityValueFactsOptions extends FactsScope {
   selectedTeams?: string[];
 }
 
-export type { C4RouteFact, ExecuteBucket, PlayerPositionRoundFact, SiteEntryFact, TacticalGrenadeOccurrence, TacticalPlantFact, TacticalRoundFact, TeamShapeRoundFact };
+export type { C4RouteFact, ExecuteBucket, PlayerPositionRoundFact, SiteEntryFact, TacticalGrenadeOccurrence, TacticalPlantFact, TacticalRoundFact, TeamAwpRoundFact, TeamShapeRoundFact };
 export type { DemoPackage, Side, TeamKey };
 export type { Vec3 };
