@@ -10,6 +10,7 @@ export * from "./visibility.js";
 export * from "./radar-grid.js";
 export * from "./lineups.js";
 export * from "./default-positions.js";
+export * from "./position-candidates.js";
 export {
   CALLOUT_DICT, CALLOUT_MAPS,
   calloutBelongsToRegion, calloutCn,

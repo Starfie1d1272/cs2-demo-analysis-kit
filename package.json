@@ -29,6 +29,7 @@
     "package": "bash scripts/package.sh",
     "events:build": "node scripts/build-event-asset.mjs",
     "events:publish": "bash scripts/publish-event-assets.sh",
+    "maps:candidates": "pnpm --filter @cs2dak/maps exec tsx scripts/review-position-candidates.ts",
     "event:export": "node scripts/event-export.mjs",
     "event:package": "node scripts/build-event-package.mjs",
     "event:submissions": "node scripts/promote-event-submission.mjs list",
