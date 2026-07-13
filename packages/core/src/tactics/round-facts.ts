@@ -351,12 +351,21 @@ function teamName(pkg: DemoPackage, teamKey: TeamKey): string {
 
 export function extractTacticalRoundFacts(
   pkg: DemoPackage,
-  options: { matchId: string; calloutGrid?: CalloutGrid | null; replayContexts?: ReadonlyMap<number, ReplayRoundContext> },
+  options: { matchId: string; calloutGrid?: CalloutGrid | null },
+): TacticalRoundFact[] {
+  return extractTacticalRoundFactsWithContexts(pkg, options, undefined);
+}
+
+/** Internal composition seam: contexts never cross the @cs2dak/core public boundary. */
+export function extractTacticalRoundFactsWithContexts(
+  pkg: DemoPackage,
+  options: { matchId: string; calloutGrid?: CalloutGrid | null },
+  replayContexts: ReadonlyMap<number, ReplayRoundContext> | undefined,
 ): TacticalRoundFact[] {
   const tickrate = pkg.match.tickrate || 64;
   const out: TacticalRoundFact[] = [];
   for (const round of pkg.rounds) {
-    const decoded = options.replayContexts?.get(round.roundNumber) ?? createReplayRoundContext(pkg, round);
+    const decoded = replayContexts?.get(round.roundNumber) ?? createReplayRoundContext(pkg, round);
     const plant = plantFor(pkg, round, tickrate);
     for (const side of ["t", "ct"] as const) {
       if (!decoded?.tracks.some((track) => track.side === side)) continue;
