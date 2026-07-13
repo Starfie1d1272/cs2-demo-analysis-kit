@@ -14,6 +14,7 @@ import {
   type IdentityStoreState
 } from "../lib/identity";
 import type { StudioDemoEntry } from "../lib/library";
+import { migrateRoleDeclarationsForIdentity } from "../lib/role-declarations";
 
 export interface ManagementViewProps {
   entries: StudioDemoEntry[];
@@ -126,6 +127,7 @@ export function ManagementView({
       const primarySteamId = primary.steamIds[0];
       const secondaryIds = rest.flatMap((p) => p.steamIds);
       const next = await mergeIdentities(identity, primarySteamId, secondaryIds, mergeDisplayName.trim());
+      await migrateRoleDeclarationsForIdentity(next);
       onIdentityChange(next);
       setSelected(new Set());
     } finally {
