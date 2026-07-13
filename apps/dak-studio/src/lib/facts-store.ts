@@ -23,7 +23,7 @@ import type {
   TournamentFacts,
   UtilityValueSummary,
 } from "@cs2dak/presentation";
-import type { TacticalRoundFact } from "@cs2dak/core";
+import type { PlayerPositionRoundFact, TacticalRoundFact, TeamShapeRoundFact } from "@cs2dak/core";
 
 export const FACTS_NAMESPACE = "facts";
 
@@ -40,6 +40,8 @@ const FACT_TABLES = [
   "opening_trails",
   "lineups",
   "tactical_rounds",
+  "player_position_rounds",
+  "team_shape_rounds",
   "utility_value",
 ] as const;
 
@@ -89,6 +91,8 @@ export function createFactsStore(adapter: StorageAdapter, namespace = FACTS_NAME
   const openingTrails = adapter.records(`${namespace}:opening_trails`);
   const lineups = adapter.records(`${namespace}:lineups`);
   const tacticalRounds = adapter.records(`${namespace}:tactical_rounds`);
+  const playerPositionRounds = adapter.records(`${namespace}:player_position_rounds`);
+  const teamShapeRounds = adapter.records(`${namespace}:team_shape_rounds`);
   const utilityValueFacts = adapter.records(`${namespace}:utility_value`);
 
   return {
@@ -106,6 +110,8 @@ export function createFactsStore(adapter: StorageAdapter, namespace = FACTS_NAME
         replaceRows(openingTrails, facts.openingTrails.map((row) => [rowKey(row.matchId, row.playerKey), row]), facts.matchId),
         replaceRows(lineups, facts.lineups.map((row) => [row.matchId, row]), facts.matchId),
         replaceRows(tacticalRounds, facts.tacticalRounds.map((row) => [rowKey(row.matchId, String(row.roundNumber), row.side), row]), facts.matchId),
+        replaceRows(playerPositionRounds, facts.playerPositionRounds.map((row) => [rowKey(row.matchId, String(row.roundNumber), row.teamKey, String(row.playerIndex)), row]), facts.matchId),
+        replaceRows(teamShapeRounds, facts.teamShapeRounds.map((row) => [rowKey(row.matchId, String(row.roundNumber), row.teamKey), row]), facts.matchId),
         replaceRows(utilityValueFacts, facts.utilityValueFacts.map((row) => [row.matchId, row]), facts.matchId),
       ]);
     },
@@ -178,6 +184,16 @@ export function createFactsStore(adapter: StorageAdapter, namespace = FACTS_NAME
         .filter((row) => inScope(row, scope))
         .sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.side.localeCompare(b.side));
     },
+    async getPlayerPositionRounds(scope) {
+      return (await playerPositionRounds.getAll<PlayerPositionRoundFact>())
+        .filter((row) => inScope(row, scope))
+        .sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.teamKey.localeCompare(b.teamKey) || a.playerIndex - b.playerIndex);
+    },
+    async getTeamShapeRounds(scope) {
+      return (await teamShapeRounds.getAll<TeamShapeRoundFact>())
+        .filter((row) => inScope(row, scope))
+        .sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.teamKey.localeCompare(b.teamKey));
+    },
     async getUtilityValueFacts(scope) {
       return (await utilityValueFacts.getAll<UtilityValueFact>())
         .filter((row) => inScope(row, scope))
@@ -205,6 +221,8 @@ export function createFactsStore(adapter: StorageAdapter, namespace = FACTS_NAME
         openingTrails,
         lineups,
         tacticalRounds,
+        playerPositionRounds,
+        teamShapeRounds,
         utilityValueFacts,
       ].map((store) => store.deleteByPrefix(matchId)));
     },

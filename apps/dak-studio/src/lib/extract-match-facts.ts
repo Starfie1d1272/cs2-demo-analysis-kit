@@ -3,6 +3,8 @@ import {
   derivePlayerWeaponHighlights,
   deriveRRIndicators,
   deriveRRSignals,
+  createReplayRoundContexts,
+  extractMatchMapIntelligenceFacts,
   extractTacticalRoundFacts,
 } from "@cs2dak/core";
 import { decodeDelta, type DemoPackage, type Side } from "@cs2dak/contract";
@@ -275,6 +277,13 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
     steamId64: player.steamId64,
     row: buildOpeningTrails(pkg, options.matchId, player.steamId64, { windowSeconds: 30 }),
   } satisfies OpeningTrailFact));
+  // tactical 与地图位置事实共享同一批短生命周期 replay context；绝不写入 MatchFacts。
+  const replayContexts = createReplayRoundContexts(pkg);
+  const mapIntelligence = extractMatchMapIntelligenceFacts(pkg, {
+    matchId: options.matchId,
+    calloutGrid,
+    replayContexts,
+  });
 
   return {
     matchId: options.matchId,
@@ -292,7 +301,9 @@ export function extractMatchFacts(pkg: DemoPackage, options: ExtractMatchFactsOp
     matchWorkspace: [],
     openingTrails,
     lineups: [extractLineupFact(pkg, options.matchId, calloutGrid)],
-    tacticalRounds: extractTacticalRoundFacts(pkg, { matchId: options.matchId, calloutGrid }),
+    tacticalRounds: extractTacticalRoundFacts(pkg, { matchId: options.matchId, calloutGrid, replayContexts }),
+    playerPositionRounds: mapIntelligence.playerPositionRounds,
+    teamShapeRounds: mapIntelligence.teamShapeRounds,
     utilityValueFacts: [{ matchId: options.matchId, mapName, row: buildUtilityValueSummary([input], utilityPlayers) }],
   };
 }

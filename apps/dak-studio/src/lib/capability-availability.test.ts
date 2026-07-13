@@ -73,4 +73,16 @@ describe("CapabilityAvailability", () => {
 
     expect(availability).toMatchObject({ status: "ready", eligibleMatches: 1, excluded: [] });
   });
+
+  it("keeps tactical output unavailable until both tactical and map-intelligence facts exist", () => {
+    const entries = [entry("partial")];
+    const availability = deriveCapabilityAvailability(entries, "tactical", new Map([
+      ["partial", { facts: { tactical: true }, hasReplay: true, hasShots: false, hasTri: false }],
+    ]));
+
+    expect(availability).toMatchObject({
+      status: "unavailable",
+      excluded: [{ reason: "地图位置 facts 缺失", count: 1 }],
+    });
+  });
 });

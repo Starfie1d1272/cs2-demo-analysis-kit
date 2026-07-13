@@ -27,6 +27,8 @@ describe("importDemoFile", () => {
 
     expect(duplicate.duplicate).toBe(true);
     expect(await factsStore.getCohortRows({ matchIds: [matchId] })).not.toHaveLength(0);
+    expect(await factsStore.getPlayerPositionRounds({ matchIds: [matchId] })).not.toHaveLength(0);
+    expect(await factsStore.getTeamShapeRounds({ matchIds: [matchId] })).not.toHaveLength(0);
     expect(await factsStore.getTacticalRounds({ matchIds: [matchId] })).not.toHaveLength(0);
   });
 

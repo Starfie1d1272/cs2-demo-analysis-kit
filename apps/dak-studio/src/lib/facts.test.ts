@@ -209,6 +209,19 @@ describe("MatchFacts", () => {
     expect(rows[0]?.openingPattern.coarseSignature).toBeTruthy();
   });
 
+  it("地图位置 facts 以 teamKey 入键，读写后保留位置与队形两层事实", async () => {
+    const facts = await m1Facts;
+    const store = createFactsStore(createIdbAdapter(), "facts-map-intelligence");
+    await store.putMatchFacts(facts);
+    const positions = await store.getPlayerPositionRounds({ matchIds: ["m1"] });
+    const shapes = await store.getTeamShapeRounds({ matchIds: ["m1"] });
+
+    expect(positions).toHaveLength(facts.playerPositionRounds.length);
+    expect(shapes).toHaveLength(facts.teamShapeRounds.length);
+    expect(new Set(positions.map((row) => `${row.roundNumber}:${row.teamKey}:${row.playerIndex}`)).size).toBe(positions.length);
+    expect(shapes.every((row) => row.windows.every((window) => window.componentPlayerIndices.length > 0))).toBe(true);
+  });
+
   it("workspace 不随导入持久化（单场 ~35MB、整包全量分析的导入大头），改为打开时懒算", async () => {
     const store = createFactsStore(createIdbAdapter(), "facts-no-workspace");
     const facts = await m1Facts;
@@ -241,5 +254,7 @@ describe("MatchFacts", () => {
     await store.putMatchFacts(facts);
     await store.putMatchFacts(facts);
     expect((await store.getTacticalRounds({ matchIds: ["m1"] })).length).toBe(facts.tacticalRounds.length);
+    expect((await store.getPlayerPositionRounds({ matchIds: ["m1"] })).length).toBe(facts.playerPositionRounds.length);
+    expect((await store.getTeamShapeRounds({ matchIds: ["m1"] })).length).toBe(facts.teamShapeRounds.length);
   });
 });

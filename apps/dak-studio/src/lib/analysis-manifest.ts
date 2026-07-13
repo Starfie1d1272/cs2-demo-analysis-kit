@@ -1,4 +1,4 @@
-import { TACTICAL_FACT_VERSION } from "@cs2dak/core";
+import { MAP_INTELLIGENCE_FACT_VERSION, TACTICAL_FACT_VERSION } from "@cs2dak/core";
 
 /**
  * 分析能力的版本中枢：把 ZIP 合同、facts 存储布局和各 facts producer 分开记录。
@@ -18,11 +18,12 @@ declare const __APP_VERSION__: string;
 const appVersion = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0-dev";
 
 /** facts 行/命名空间布局版本；改变存储形状或键规则时递增。 */
-export const FACTS_STORAGE_VERSION = 1;
+export const FACTS_STORAGE_VERSION = 2;
 
 /** 当前 facts producer 版本集合；新增 producer 时在此显式登记。 */
 export const FACTS_PRODUCER_VERSIONS = {
   tactical: TACTICAL_FACT_VERSION,
+  mapIntelligence: MAP_INTELLIGENCE_FACT_VERSION,
 } as const;
 
 /** 显式组合 storage version 与所有 producer versions，作为 facts 的唯一 revision。 */

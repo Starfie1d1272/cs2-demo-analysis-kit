@@ -17,7 +17,7 @@ export type CapabilityStatus = "ready" | "partial" | "unavailable";
 export type CapabilityOutputLevel = "observation" | "system-finding";
 export type CapabilityRepairAction = "rebuild-facts" | "reimport-with-replay" | "reimport-with-shots" | "install-tri";
 
-type FactKind = "insights" | "duel" | "economy" | "utility" | "lineup" | "tactical";
+type FactKind = "insights" | "duel" | "economy" | "utility" | "lineup" | "tactical" | "map-intelligence";
 
 export interface EntryCapabilityFacts {
   facts: Partial<Record<FactKind, boolean>>;
@@ -65,7 +65,7 @@ const REQUIREMENTS: Record<StudioCapability, CapabilityRequirement> = {
   utility: { requiredFacts: ["utility"], outputLevel: "system-finding" },
   lineup: { requiredFacts: ["lineup"], optionalDependencies: ["replay"], outputLevel: "observation" },
   control: { requiredDependencies: ["replay"], optionalDependencies: ["tri"], outputLevel: "observation" },
-  tactical: { requiredFacts: ["tactical"], optionalDependencies: ["replay"], outputLevel: "system-finding" },
+  tactical: { requiredFacts: ["tactical", "map-intelligence"], optionalDependencies: ["replay"], outputLevel: "system-finding" },
 };
 
 const DEPENDENCY_LABEL: Record<CapabilityDependencyAvailability["key"], string> = {
@@ -81,6 +81,7 @@ const FACT_LABEL: Record<FactKind, string> = {
   utility: "道具 facts",
   lineup: "点位 facts",
   tactical: "战术 facts",
+  "map-intelligence": "地图位置 facts",
 };
 
 function hasDependency(input: EntryCapabilityFacts, dependency: CapabilityDependencyAvailability["key"]): boolean {
@@ -178,13 +179,15 @@ export async function loadCapabilityAvailabilityInputs(
   availableTris?: readonly string[],
 ): Promise<Map<string, EntryCapabilityFacts>> {
   const matchIds = entries.map(matchIdForEntry);
-  const [insights, duels, economy, utilityMatchIds, lineups, tactical, mechanics] = await Promise.all([
+  const [insights, duels, economy, utilityMatchIds, lineups, tactical, playerPositions, teamShapes, mechanics] = await Promise.all([
     factsStore.getPlayerInsights({ matchIds }),
     factsStore.getDuelFacts({ matchIds }),
     factsStore.getTournamentFacts({ matchIds }),
     factsStore.getUtilityValueFactMatchIds({ matchIds }),
     factsStore.getLineups({ matchIds }),
     factsStore.getTacticalRounds({ matchIds }),
+    factsStore.getPlayerPositionRounds({ matchIds }),
+    factsStore.getTeamShapeRounds({ matchIds }),
     factsStore.getMechanicsRows({ matchIds }),
   ]);
   const factSets = {
@@ -194,6 +197,7 @@ export async function loadCapabilityAvailabilityInputs(
     utility: new Set(utilityMatchIds),
     lineup: idsOf(lineups),
     tactical: idsOf(tactical),
+    "map-intelligence": new Set([...idsOf(playerPositions)].filter((matchId) => idsOf(teamShapes).has(matchId))),
     mechanics: new Set(mechanics.map((row) => row.matchId)),
   };
   const tris = new Set(availableTris ?? await listAvailableTris());
@@ -207,6 +211,7 @@ export async function loadCapabilityAvailabilityInputs(
         utility: factSets.utility.has(matchId),
         lineup: factSets.lineup.has(matchId),
         tactical: factSets.tactical.has(matchId),
+        "map-intelligence": factSets["map-intelligence"].has(matchId),
       },
       hasReplay: entry.meta.hasReplay,
       hasShots: factSets.mechanics.has(matchId),
