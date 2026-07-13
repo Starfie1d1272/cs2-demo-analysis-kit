@@ -1,12 +1,14 @@
 import { positionGroupDisplay } from "./default-positions.js";
 
-export const MAP_POSITION_CANDIDATE_VERSION = 1;
+export const MAP_POSITION_CANDIDATE_VERSION = 2;
 export type PositionCandidateType = "stable_spatial_position" | "responsibility_group" | "opening_action" | "transit" | "unresolved" | "unclassifiable";
 export type PositionCandidateReviewAction = "keep" | "rename" | "merge" | "split" | "opening_action" | "transit" | "unclassifiable" | "unresolved";
 
 export interface OpeningPositionCandidateInput {
   matchId: string; mapName: string; roundNumber: number; teamKey: string; side: "t" | "ct"; playerIndex: number; steamId64: string;
   openingEligibleSeconds: number | null;
+  openingMeanComponentSize?: number | null;
+  openingIsolationSeconds?: number | null;
   openingPositionGroupDwell: Array<{ positionGroupId: string; seconds: number; share: number }>;
   openingPath: Array<{ tick: number; callout: string | null; positionGroupId: string | null; x: number; y: number; z: number }>;
 }
@@ -16,53 +18,97 @@ export interface MapPositionCandidate {
   proposedId: string; proposedDisplayName: string; callouts: string[];
   trajectorySummary: { start: { x: number; y: number; z: number } | null; end: { x: number; y: number; z: number } | null; dwellSeconds: number; pathSamples: number };
   sampleCount: number; teamCount: number; playerCount: number; assignmentStability: number | null; overlap: number | null;
+  teamKeys: string[];
+  componentSummary: { meanOpeningComponentSize: number | null; isolatedShare: number | null };
   representativeEvidence: Array<{ matchId: string; roundNumber: number; playerIndex: number }>;
   confidence: number; limitations: string[];
 }
 
 function rounded(value: number): number { return Number(value.toFixed(3)); }
 
+function distance(first: { x: number; y: number; z: number }, second: { x: number; y: number; z: number }): number {
+  return Math.hypot(first.x - second.x, first.y - second.y, first.z - second.z);
+}
+
+function pathClass(row: OpeningPositionCandidateInput): "stationary" | "opening_action" | "transit" | "no_path" {
+  const start = row.openingPath[0];
+  const end = row.openingPath.at(-1);
+  if (!start || !end) return "no_path";
+  const displacement = distance(start, end);
+  if (displacement >= 900) return "transit";
+  if (displacement >= 400 && new Set(row.openingPath.map((point) => point.callout).filter(Boolean)).size >= 2) return "opening_action";
+  return "stationary";
+}
+
+function unresolvedSpatialKey(row: OpeningPositionCandidateInput): string {
+  const point = row.openingPath.at(-1) ?? row.openingPath[0];
+  if (!point) return "no_path";
+  return [pathClass(row), Math.round(point.x / 384), Math.round(point.y / 384), Math.round(point.z / 192)].join(":");
+}
+
+function meanPoint(points: Array<{ x: number; y: number; z: number }>): { x: number; y: number; z: number } | null {
+  if (points.length === 0) return null;
+  return {
+    x: rounded(points.reduce((sum, point) => sum + point.x, 0) / points.length),
+    y: rounded(points.reduce((sum, point) => sum + point.y, 0) / points.length),
+    z: rounded(points.reduce((sum, point) => sum + point.z, 0) / points.length),
+  };
+}
+
 export function generateMapPositionCandidates(rows: OpeningPositionCandidateInput[]): MapPositionCandidate[] {
   const groups = new Map<string, Array<{ row: OpeningPositionCandidateInput; dwell: OpeningPositionCandidateInput["openingPositionGroupDwell"][number] | null }>>();
   for (const row of rows) {
     const dwell = row.openingPositionGroupDwell.length ? [...row.openingPositionGroupDwell].sort((a, b) => b.seconds - a.seconds || a.positionGroupId.localeCompare(b.positionGroupId))[0]! : null;
-    const groupId = dwell?.positionGroupId ?? "unresolved";
+    const groupId = dwell?.positionGroupId ?? `unresolved:${unresolvedSpatialKey(row)}`;
     const key = `${row.mapName}\t${row.side}\t${groupId}`;
     groups.set(key, [...(groups.get(key) ?? []), { row, dwell }]);
   }
   return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, items], index) => {
     items.sort((a, b) => a.row.matchId.localeCompare(b.row.matchId) || a.row.roundNumber - b.row.roundNumber || a.row.playerIndex - b.row.playerIndex);
     const [mapName, side, groupId] = key.split("\t") as [string, "t" | "ct", string];
-    const display = positionGroupDisplay(mapName, side, groupId);
+    const unresolved = groupId.startsWith("unresolved:");
+    const display = unresolved ? { resolved: false, displayName: "未命名候选", officialName: null } : positionGroupDisplay(mapName, side, groupId);
     const paths = items.flatMap((item) => item.row.openingPath);
     const shares = items.map((item) => item.dwell?.share ?? 0);
-    const assignmentStability = shares.length ? rounded(shares.reduce((sum, value) => sum + value, 0) / shares.length) : null;
+    const endPoints = items.map((item) => item.row.openingPath.at(-1)).filter((point): point is NonNullable<typeof point> => point != null);
+    const center = meanPoint(endPoints);
+    const spatialStability = center && endPoints.length ? rounded(Math.max(0, 1 - endPoints.reduce((sum, point) => sum + distance(point, center), 0) / endPoints.length / 600)) : null;
+    const assignmentStability = unresolved ? spatialStability : shares.length ? rounded(shares.reduce((sum, value) => sum + value, 0) / shares.length) : null;
     const roundAssignments = new Map<string, number>();
     for (const item of items) {
       const roundKey = `${item.row.matchId}:${item.row.roundNumber}:${item.row.teamKey}`;
       roundAssignments.set(roundKey, (roundAssignments.get(roundKey) ?? 0) + 1);
     }
     const overlap = roundAssignments.size ? rounded([...roundAssignments.values()].filter((count) => count > 1).length / roundAssignments.size) : null;
-    const type: PositionCandidateType = groupId === "unresolved" ? "unresolved" : (assignmentStability ?? 0) >= 0.55 ? "stable_spatial_position" : "responsibility_group";
+    const motion = pathClass(items[0]!.row);
+    const type: PositionCandidateType = unresolved
+      ? motion === "transit" ? "transit" : motion === "opening_action" ? "opening_action" : (assignmentStability ?? 0) >= 0.55 && items.length >= 2 ? "stable_spatial_position" : "unresolved"
+      : (assignmentStability ?? 0) >= 0.55 ? "stable_spatial_position" : "responsibility_group";
+    const starts = items.map((item) => item.row.openingPath[0]).filter((point): point is NonNullable<typeof point> => point != null);
+    const openingSeconds = items.reduce((sum, item) => sum + (item.row.openingEligibleSeconds ?? 0), 0);
+    const isolatedSeconds = items.reduce((sum, item) => sum + (item.row.openingIsolationSeconds ?? 0), 0);
+    const componentValues = items.map((item) => item.row.openingMeanComponentSize).filter((value): value is number => value != null);
     return {
       version: MAP_POSITION_CANDIDATE_VERSION, id: `${mapName}:${side}:${String(index + 1).padStart(3, "0")}`, mapName, side, type,
-      proposedId: groupId === "unresolved" ? `${side}_candidate_${String(index + 1).padStart(2, "0")}` : groupId,
+      proposedId: unresolved ? `${side}_candidate_${String(index + 1).padStart(2, "0")}` : groupId,
       proposedDisplayName: display.resolved ? display.displayName : "未命名候选",
       callouts: [...new Set(paths.map((point) => point.callout).filter((value): value is string => value != null))].sort(),
-      trajectorySummary: { start: paths[0] ? { x: paths[0].x, y: paths[0].y, z: paths[0].z } : null, end: paths.at(-1) ? { x: paths.at(-1)!.x, y: paths.at(-1)!.y, z: paths.at(-1)!.z } : null, dwellSeconds: rounded(items.reduce((sum, item) => sum + (item.dwell?.seconds ?? 0), 0)), pathSamples: paths.length },
+      trajectorySummary: { start: meanPoint(starts), end: meanPoint(endPoints), dwellSeconds: rounded(items.reduce((sum, item) => sum + (item.dwell?.seconds ?? (motion === "stationary" ? item.row.openingEligibleSeconds ?? 0 : 0)), 0)), pathSamples: paths.length },
       sampleCount: new Set(items.map((item) => `${item.row.matchId}:${item.row.roundNumber}`)).size,
       teamCount: new Set(items.map((item) => `${item.row.matchId}:${item.row.teamKey}`)).size,
       playerCount: new Set(items.map((item) => item.row.steamId64)).size,
+      teamKeys: [...new Set(items.map((item) => item.row.teamKey))].sort(),
+      componentSummary: { meanOpeningComponentSize: componentValues.length ? rounded(componentValues.reduce((sum, value) => sum + value, 0) / componentValues.length) : null, isolatedShare: openingSeconds > 0 ? rounded(isolatedSeconds / openingSeconds) : null },
       assignmentStability, overlap,
       representativeEvidence: items.slice(0, 5).map((item) => ({ matchId: item.row.matchId, roundNumber: item.row.roundNumber, playerIndex: item.row.playerIndex })),
       confidence: rounded(Math.min(1, items.length / 20) * (assignmentStability ?? 0.25) * (1 - (overlap ?? 0))),
-      limitations: [...(paths.length === 0 ? ["缺少 opening path/coordinates。"] : []), ...(groupId === "unresolved" ? ["无法从当前地图资产解析 position group；保持 unresolved，不自动猜名。"] : [])],
+      limitations: [...(paths.length === 0 ? ["缺少 opening path/coordinates。"] : []), ...(unresolved ? ["无法从当前地图资产解析 position group；候选名称保持未命名，需审阅后才能写入资产。"] : [])],
     };
   });
 }
 
 export interface PositionCandidateReview { candidateId: string; action: PositionCandidateReviewAction; displayName?: string; targetId?: string; note?: string }
-export interface ReviewedPositionAsset { version: 1; mapName: string; side: "t" | "ct"; groups: Array<{ id: string; name: string; callouts: string[] }>; unresolvedCandidateIds: string[]; provenance: { candidateVersion: number; reviewedAt: string; reviewer: string; decisions: PositionCandidateReview[] } }
+export interface ReviewedPositionAsset { version: 2; mapName: string; side: "t" | "ct"; groups: Array<{ id: string; name: string; callouts: string[] }>; unresolvedCandidateIds: string[]; provenance: { candidateVersion: number; reviewedAt: string; reviewer: string; decisions: PositionCandidateReview[] } }
 
 export function materializeReviewedPositionAsset(candidates: MapPositionCandidate[], decisions: PositionCandidateReview[], input: { mapName: string; side: "t" | "ct"; reviewedAt: string; reviewer: string }): ReviewedPositionAsset {
   const decisionById = new Map(decisions.map((decision) => [decision.candidateId, decision]));
@@ -78,5 +124,5 @@ export function materializeReviewedPositionAsset(candidates: MapPositionCandidat
     for (const callout of candidate.callouts) current.callouts.add(callout);
     groups.set(id, current);
   }
-  return { version: 1, mapName: input.mapName, side: input.side, groups: [...groups.values()].map((group) => ({ ...group, callouts: [...group.callouts].sort() })).sort((a, b) => a.id.localeCompare(b.id)), unresolvedCandidateIds: unresolvedCandidateIds.sort(), provenance: { candidateVersion: MAP_POSITION_CANDIDATE_VERSION, reviewedAt: input.reviewedAt, reviewer: input.reviewer, decisions: [...decisions].sort((a, b) => a.candidateId.localeCompare(b.candidateId)) } };
+  return { version: 2, mapName: input.mapName, side: input.side, groups: [...groups.values()].map((group) => ({ ...group, callouts: [...group.callouts].sort() })).sort((a, b) => a.id.localeCompare(b.id)), unresolvedCandidateIds: unresolvedCandidateIds.sort(), provenance: { candidateVersion: MAP_POSITION_CANDIDATE_VERSION, reviewedAt: input.reviewedAt, reviewer: input.reviewer, decisions: [...decisions].sort((a, b) => a.candidateId.localeCompare(b.candidateId)) } };
 }
