@@ -1,8 +1,8 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { PlayerMapRoleProfile, TeamMapRoleMatrix } from "@cs2dak/contract";
-import { PlayerMapRoleProfilePanel, TeamMapRoleMatrixPanel } from "./MapRoles";
+import type { PlayerMapPoolRow, PlayerMapRoleProfile, TeamMapRoleMatrix } from "@cs2dak/contract";
+import { PlayerMapPoolPanel, PlayerMapRoleProfilePanel, TeamMapRoleMatrixPanel } from "./MapRoles";
 
 const profile = {
   version: "cs2-demo-analysis-kit/player-map-role-profile-2.0", playerKey: "p1", teamKeys: ["T"],
@@ -32,6 +32,17 @@ describe("Map role display", () => {
   it("renders an honest insufficient matrix state", () => {
     const html = renderToStaticMarkup(React.createElement(TeamMapRoleMatrixPanel, { matrix: null }));
     expect(html).toContain("该地图暂无职责矩阵");
+  });
+  it("contains the wide player map pool table inside a horizontal scroll region", () => {
+    const row = {
+      mapName: "de_mirage", matchCount: 1, roundCount: 12, wins: 1, losses: 0, winRate: 1,
+      rr: 1.2, adr: 80, kast: 75, openingKills: 2, openingDeaths: 1, mainWeapon: "ak47",
+      globalWeaponDuty: "rifler", mapSideAwpUsage: [], tPositionGroup: "中路", ctPositionGroup: "A包",
+      tResponsibility: "map_control", ctResponsibility: "anchor", sampleQuality: 1, confidence: 0.8,
+      evidence: [],
+    } satisfies PlayerMapPoolRow;
+    const html = renderToStaticMarkup(React.createElement(PlayerMapPoolPanel, { rows: [row] }));
+    expect(html).toContain('class="dak-table-scroll"');
   });
   void ({} as TeamMapRoleMatrix);
 });
