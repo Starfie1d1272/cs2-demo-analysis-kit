@@ -1,4 +1,4 @@
-import { calloutCn, entryRouteCn, SITE_ENTRY_SEMANTICS, DEFAULT_POSITIONS } from "@cs2dak/maps";
+import { calloutCn, entryRouteCn, SITE_ENTRY_SEMANTICS, DEFAULT_POSITION_GROUPS } from "@cs2dak/maps";
 
 export type EconomyEntry = "pistol" | "gun" | "anti_eco" | "force" | "semi" | "eco";
 
@@ -10,7 +10,7 @@ export interface TacticalClusterLabelInput {
     regionCounts: { a: number; b: number; mid: number; unknown: number };
     spread: string;
   };
-  defaultAnchorCounts: Readonly<Record<string, number>>;
+  positionGroupCounts: Readonly<Record<string, number>>;
 }
 
 export const ECONOMY_ENTRY_CN: Record<EconomyEntry, string> = {
@@ -57,18 +57,18 @@ function formationLabel(input: TacticalClusterLabelInput): string {
   return `${a}A-${mid}中-${b}B`;
 }
 
-function anchorLabels(input: TacticalClusterLabelInput): string[] {
-  const anchors = DEFAULT_POSITIONS[input.mapName]?.[input.side].anchors ?? {};
-  return Object.entries(input.defaultAnchorCounts)
+function positionGroupLabels(input: TacticalClusterLabelInput): string[] {
+  const groups = DEFAULT_POSITION_GROUPS[input.mapName]?.[input.side].groups ?? {};
+  return Object.entries(input.positionGroupCounts)
     .filter(([, count]) => count > 0)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([id, count]) => `${anchors[id]?.name ?? id}×${count}`);
+    .map(([id, count]) => `${groups[id]?.name ?? id}×${count}`);
 }
 
 /** 左栏短名显式保留 formation，禁止用字符串 regex 截断完整名称。 */
 export function formatTacticalClusterShortName(cluster: TacticalClusterLabelInput): string {
-  const anchors = anchorLabels(cluster);
-  const structure = anchors.length > 0 ? anchors.join(" / ") : formationLabel(cluster);
+  const groups = positionGroupLabels(cluster);
+  const structure = groups.length > 0 ? groups.join(" / ") : formationLabel(cluster);
   return `${formationLabel(cluster)} · ${structure}`;
 }
 

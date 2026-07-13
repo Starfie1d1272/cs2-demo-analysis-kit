@@ -33,8 +33,8 @@ describe("tactical spatial kernel", () => {
       ["TopofMid", 256, 256],
       ["TopofMid", 640, 640],
     ]);
-    expect(segments[0]).toMatchObject({ primaryRegion: "a", defaultAnchorId: "a_ramp" });
-    expect(segments[2]).toMatchObject({ primaryRegion: "mid", defaultAnchorId: "top_mid" });
+    expect(segments[0]).toMatchObject({ primaryRegion: "a", positionGroupId: "a_ramp" });
+    expect(segments[2]).toMatchObject({ primaryRegion: "mid", positionGroupId: "top_mid" });
   });
 
   it("阵型快照对未知 callout 保持 unknown，不进行名称猜测", () => {
@@ -46,7 +46,7 @@ describe("tactical spatial kernel", () => {
 
     expect(timeline).toHaveLength(1);
     expect(timeline[0]?.regionCounts).toEqual({ a: 1, b: 0, mid: 0, unknown: 2 });
-    expect(timeline[0]?.defaultAnchorCounts).toEqual({ a_ramp: 1 });
+    expect(timeline[0]?.positionGroupCounts).toEqual({ a_ramp: 1 });
   });
 
   it("开局粗签名只看区域结构，详细签名保留默认位", () => {
@@ -86,7 +86,7 @@ describe("tactical spatial kernel", () => {
 
     const opening = deriveOpeningPattern(segments, { side: "t", startTick: 0, endTick: 320 });
     expect(opening.regionCounts).toEqual({ a: 1, b: 0, mid: 0, unknown: 0 });
-    expect(opening.defaultAnchorCounts).toEqual({ a_ramp: 1 });
+    expect(opening.positionGroupCounts).toEqual({ a_ramp: 1 });
   });
 
   it("CT 快速进入 T 默认位时标记深度前压，并保留中文 callout 证据", () => {
@@ -106,7 +106,7 @@ describe("tactical spatial kernel", () => {
       callout: "Outside",
       calloutLabel: "匪口",
       kind: "deep",
-      opposingDefaultAnchorId: "t_outside",
+      opposingPositionGroupId: "t_outside",
     })]);
   });
 });

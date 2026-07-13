@@ -1,27 +1,27 @@
 import { getCalloutTendencies, getPrimaryCalloutRegion, type TacticalRegion } from "./callout-names.js";
 
-export interface DefaultAnchor {
+export interface DefaultPositionGroup {
   /** 展示名（社区叫法），如 "A1"。 */
   name: string;
-  /** 归并到该 anchor 的原始 callout id 列表。 */
+  /** 归并到该 group 的原始 callout id 列表。 */
   callouts: string[];
 }
 
 export interface SideDefaults {
-  /** anchorId -> anchor（有序：决定 basis 展示顺序）。 */
-  anchors: Record<string, DefaultAnchor>;
+  /** positionGroupId -> group（有序：决定 basis 展示顺序）。 */
+  groups: Record<string, DefaultPositionGroup>;
 }
 
 export interface MapDefaults {
-  /** T 默认位：按开局默认展开方向划分，一个 anchor 可覆盖连续且战术含义一致的多个 callout。 */
+  /** T 默认位：按开局默认展开方向划分，一个 group 可覆盖连续且战术含义一致的多个 callout。 */
   t: SideDefaults;
-  /** CT 默认位：按具体防守站位划分，尽量一个 anchor 对应一个明确位置。 */
+  /** CT 默认位：按具体防守站位划分，尽量一个 group 对应一个明确位置。 */
   ct: SideDefaults;
 }
 
 export type DefaultPositionSide = "t" | "ct";
 
-export interface DefaultAnchorMatch extends DefaultAnchor {
+export interface DefaultPositionGroupMatch extends DefaultPositionGroup {
   id: string;
 }
 
@@ -29,14 +29,14 @@ export interface TacticalLocation {
   callout: string | null;
   tendencies: readonly TacticalRegion[];
   primaryRegion: TacticalRegion | null;
-  defaultAnchorId: string | null;
+  positionGroupId: string | null;
   isDefaultPosition: boolean;
 }
 
-export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
+export const DEFAULT_POSITION_GROUPS: Record<string, MapDefaults> = {
   de_ancient: {
     t: {
-      anchors: {
+      groups: {
         t_outside: { name: "匪口", callouts: ["Outside"] },
         a_hall: { name: "A厅", callouts: ["MainHall"] },
         mid: { name: "中路/跳台", callouts: ["TSideUpper", "Middle"] },
@@ -45,7 +45,7 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
       },
     },
     ct: {
-      anchors: {
+      groups: {
         a_site: { name: "A包", callouts: ["BombsiteA"] },
         donut: { name: "甜甜圈", callouts: ["SideHall"] },
         mid: { name: "中路", callouts: ["Middle"] },
@@ -58,7 +58,7 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
   },
   de_anubis: {
     t: {
-      anchors: {
+      groups: {
         b_long: { name: "B外", callouts: ["Ruins", "OutsideLong"] },
         mid_bridge: { name: "中桥", callouts: ["Bridge"] },
         street: { name: "匪梯", callouts: ["Street", "TStairs"] },
@@ -67,7 +67,7 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
       },
     },
     ct: {
-      anchors: {
+      groups: {
         a_main: { name: "A厅", callouts: ["Main"] },
         a_site: { name: "A包", callouts: ["BombsiteA"] },
         a_connector: { name: "A连", callouts: ["Walkway"] },
@@ -84,7 +84,7 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
   },
   de_dust2: {
     t: {
-      anchors: {
+      groups: {
         a_doors: { name: "A门外/A门", callouts: ["OutsideLong", "LongDoors"] },
         top_mid: { name: "中远", callouts: ["TopofMid"] },
         b1: { name: "B1", callouts: ["LowerTunnel"] },
@@ -92,7 +92,7 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
       },
     },
     ct: {
-      anchors: {
+      groups: {
         a_long: { name: "A大", callouts: ["LongA"] },
         pit: { name: "大坑", callouts: ["Pit"] },
         catwalk: { name: "A小", callouts: ["Catwalk", "ShortStairs", "ExtendedA"] },
@@ -105,7 +105,7 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
   },
   de_inferno: {
     t: {
-      anchors: {
+      groups: {
         banana: { name: "香蕉道", callouts: ["Banana"] },
         t_mid: { name: "匪口/中路", callouts: ["LowerMid", "TRamp", "Middle"] },
         second_mid: { name: "侧道", callouts: ["SecondMid"] },
@@ -113,7 +113,7 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
       },
     },
     ct: {
-      anchors: {
+      groups: {
         a_site: { name: "A包", callouts: ["BombsiteA"] },
         pit: { name: "大坑", callouts: ["Pit"] },
         quad: { name: "马棚", callouts: ["Quad"] },
@@ -130,7 +130,7 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
   },
   de_mirage: {
     t: {
-      anchors: {
+      groups: {
         a_ramp: { name: "A1", callouts: ["PalaceAlley", "TRamp"] },
         a_palace: { name: "A二楼", callouts: ["PalaceInterior"] },
         top_mid: { name: "匪口/中远", callouts: ["SideAlley", "TopofMid"] },
@@ -139,7 +139,7 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
       },
     },
     ct: {
-      anchors: {
+      groups: {
         a_site: { name: "A包", callouts: ["BombsiteA"] },
         stairs: { name: "跳台", callouts: ["Stairs"] },
         jungle: { name: "Jungle", callouts: ["Jungle"] },
@@ -155,13 +155,13 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
   },
   de_nuke: {
     t: {
-      anchors: {
+      groups: {
         outside: { name: "外场", callouts: ["Outside", "Roof", "Silo"] },
         lobby: { name: "匪厅", callouts: ["Lobby", "Squeaky", "Trophy", "Vending"] },
       },
     },
     ct: {
-      anchors: {
+      groups: {
         outside: { name: "外场", callouts: ["Outside"] },
         garage: { name: "大仓", callouts: ["Garage"] },
         mini: { name: "正门", callouts: ["Mini"] },
@@ -176,7 +176,7 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
   },
   de_overpass: {
     t: {
-      anchors: {
+      groups: {
         underpass: { name: "下水道", callouts: ["Tunnels"] },
         fountain: { name: "喷泉/游乐园", callouts: ["Fountain", "Playground"] },
         b_long: { name: "B外/长管", callouts: ["Alley", "Canal"] },
@@ -184,7 +184,7 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
       },
     },
     ct: {
-      anchors: {
+      groups: {
         restroom: { name: "厕所", callouts: ["Restroom", "UpperPark", "LowerPark"] },
         a_site: { name: "A包", callouts: ["BombsiteA"] },
         b_site: { name: "B包", callouts: ["BombsiteB"] },
@@ -199,33 +199,33 @@ export const DEFAULT_POSITIONS: Record<string, MapDefaults> = {
 };
 
 function sideDefaults(mapName: string, side: DefaultPositionSide): SideDefaults | null {
-  return DEFAULT_POSITIONS[mapName]?.[side] ?? null;
+  return DEFAULT_POSITION_GROUPS[mapName]?.[side] ?? null;
 }
 
-function calloutInAnchors(defaults: SideDefaults | null, callout: string): string | null {
+function calloutInGroups(defaults: SideDefaults | null, callout: string): string | null {
   if (!defaults) return null;
-  for (const [anchorId, anchor] of Object.entries(defaults.anchors)) {
-    if (anchor.callouts.includes(callout)) return anchorId;
+  for (const [positionGroupId, group] of Object.entries(defaults.groups)) {
+    if (group.callouts.includes(callout)) return positionGroupId;
   }
   return null;
 }
 
-export function anchorOf(mapName: string, side: DefaultPositionSide, callout: string): string | null {
-  return calloutInAnchors(sideDefaults(mapName, side), callout);
+export function positionGroupOf(mapName: string, side: DefaultPositionSide, callout: string): string | null {
+  return calloutInGroups(sideDefaults(mapName, side), callout);
 }
 
-export function getDefaultAnchor(
+export function getDefaultPositionGroup(
   mapName: string,
   side: DefaultPositionSide,
   callout: string,
-): DefaultAnchorMatch | null {
+): DefaultPositionGroupMatch | null {
   const defaults = sideDefaults(mapName, side);
-  const id = calloutInAnchors(defaults, callout);
+  const id = calloutInGroups(defaults, callout);
   if (!defaults || !id) return null;
-  return { id, ...defaults.anchors[id] };
+  return { id, ...defaults.groups[id] };
 }
 
-/** 只组合 callout 标签与手工默认位锚点；推进、争夺、终点等动态语义由 core 时间线推导。 */
+/** 只组合 callout 标签与手工默认位置组；推进、争夺、终点等动态语义由 core 时间线推导。 */
 export function classifyTacticalLocation(
   mapName: string,
   side: DefaultPositionSide,
@@ -236,16 +236,16 @@ export function classifyTacticalLocation(
       callout: null,
       tendencies: [],
       primaryRegion: null,
-      defaultAnchorId: null,
+      positionGroupId: null,
       isDefaultPosition: false,
     };
   }
-  const defaultAnchorId = anchorOf(mapName, side, callout);
+  const positionGroupId = positionGroupOf(mapName, side, callout);
   return {
     callout,
     tendencies: getCalloutTendencies(mapName, callout) ?? [],
     primaryRegion: getPrimaryCalloutRegion(mapName, callout),
-    defaultAnchorId,
-    isDefaultPosition: defaultAnchorId != null,
+    positionGroupId,
+    isDefaultPosition: positionGroupId != null,
   };
 }

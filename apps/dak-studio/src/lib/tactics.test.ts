@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   defaultsBasisKey,
   advancedBasisKey,
-  defaultAnchorSetKey,
+  positionGroupSetKey,
   tacticalClusterKey,
   buildTacticalClusters,
   withTacticalTeamIdentities,
@@ -28,7 +28,7 @@ function fact(p: Partial<TacticalRoundFact> = {}): TacticalRoundFact {
     openingPattern: {
       side: "t",
       regionCounts: { a: 3, b: 0, mid: 2, unknown: 0 },
-      defaultAnchorCounts: { a_ramp: 3, top_mid: 2 },
+      positionGroupCounts: { a_ramp: 3, top_mid: 2 },
       spread: "split",
       coarseSignature: "T:3A-2MID-0B:split",
       detailedSignature: "T:a_ramp:3|top_mid:2",
@@ -82,8 +82,8 @@ describe("basis 序列化", () => {
     expect(advancedBasisKey({ Catwalk: 1, Connector: 1 })).toBe("Catwalk:1|Connector:1");
   });
   it("聚类默认位身份保留精确人数结构", () => {
-    expect(defaultAnchorSetKey({ a_ramp: 3, top_mid: 2 })).toBe("a_ramp:3|top_mid:2");
-    expect(defaultAnchorSetKey({ a_ramp: 1, top_mid: 4 })).toBe("a_ramp:1|top_mid:4");
+    expect(positionGroupSetKey({ a_ramp: 3, top_mid: 2 })).toBe("a_ramp:3|top_mid:2");
+    expect(positionGroupSetKey({ a_ramp: 1, top_mid: 4 })).toBe("a_ramp:1|top_mid:4");
   });
 });
 
@@ -125,11 +125,11 @@ describe("tactical 聚类", () => {
     expect(clusters[0]!.roundCount).toBe(2);
   });
   it("不同默认位集合分属不同簇", () => {
-    const other = fact({ openingPattern: { ...fact().openingPattern, defaultAnchorCounts: { a_palace: 1, top_mid: 4 } } });
+    const other = fact({ openingPattern: { ...fact().openingPattern, positionGroupCounts: { a_palace: 1, top_mid: 4 } } });
     expect(buildTacticalClusters([fact(), other])).toHaveLength(2);
   });
   it("相同 anchor 不同人数结构分属不同簇", () => {
-    const shifted = fact({ openingPattern: { ...fact().openingPattern, defaultAnchorCounts: { a_ramp: 1, top_mid: 4 } } });
+    const shifted = fact({ openingPattern: { ...fact().openingPattern, positionGroupCounts: { a_ramp: 1, top_mid: 4 } } });
     expect(buildTacticalClusters([fact(), shifted])).toHaveLength(2);
   });
   it("全部队伍视角不会把不同 identity 合并，并保留真实对手集合", () => {
@@ -200,7 +200,7 @@ describe("tactical 聚类", () => {
     const rows = [
       fact({ roundNumber: 1, executeBucket: "mid" }),
       fact({ roundNumber: 2, executeBucket: "mid" }),
-      fact({ roundNumber: 3, openingPattern: { ...fact().openingPattern, defaultAnchorCounts: { b_apps: 5 } } }),
+      fact({ roundNumber: 3, openingPattern: { ...fact().openingPattern, positionGroupCounts: { b_apps: 5 } } }),
     ];
     const clusters = buildTacticalClusters(rows);
     expect(clusters[0]!.roundCount).toBeGreaterThanOrEqual(clusters[1]!.roundCount);
@@ -214,7 +214,7 @@ describe("展示命名", () => {
       side: "t",
       economyEntry: "gun",
       openingIntent: fact().openingPattern,
-      defaultAnchorCounts: { a_ramp: 3, top_mid: 2 },
+      positionGroupCounts: { a_ramp: 3, top_mid: 2 },
     });
     expect(name).toBe("长枪局 · 3A-2中-0B · A1×3 / 匪口/中远×2");
     expect(name).not.toMatch(/A2|进点|走|夹A/);
@@ -225,7 +225,7 @@ describe("展示命名", () => {
       side: "ct",
       economyEntry: "gun",
       openingIntent: fact().openingPattern,
-      defaultAnchorCounts: { a_site: 3, connector: 2 },
+      positionGroupCounts: { a_site: 3, connector: 2 },
     })).toBe("CT 长枪局 · 3A-2中-0B · A包×3 / 拱门×2");
   });
 });

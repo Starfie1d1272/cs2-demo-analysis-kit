@@ -35,7 +35,7 @@ export function buildPlayerTacticalSegments(
         callout: active.callout,
         tendencies: location.tendencies,
         primaryRegion: location.primaryRegion,
-        defaultAnchorId: location.defaultAnchorId,
+        positionGroupId: location.positionGroupId,
         evidence: {
           type: "dwell",
           tick: active.tick,
@@ -66,4 +66,3 @@ export function buildPlayerTacticalSegments(
 
   return segments.sort((a, b) => a.startTick - b.startTick || a.playerIndex - b.playerIndex);
 }
-

@@ -128,7 +128,7 @@ interface TacticalLocation {
   callout: string | null;
   tendencies: readonly TacticalRegion[];      // 从 callout-names 读取
   primaryRegion: TacticalRegion | null;
-  defaultAnchorId: string | null;             // 从 default-positions 读取
+  positionGroupId: string | null;              // 从 default-positions 读取
   isDefaultPosition: boolean;
 }
 ```

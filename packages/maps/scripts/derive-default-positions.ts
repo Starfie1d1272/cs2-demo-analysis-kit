@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { loadDemoPackageFromZip } from "../../core/src/index.ts";
 import { FLAG_ALIVE, type DemoPackage } from "../../contract/src/index.ts";
 import { CALLOUT_DICT, calloutCn, getCalloutTendencies } from "../src/callout-names.js";
-import { DEFAULT_POSITIONS, type DefaultAnchor } from "../src/default-positions.js";
+import { DEFAULT_POSITION_GROUPS, type DefaultPositionGroup } from "../src/default-positions.js";
 
 const WINDOW_SEC = 30;
 const DWELL_5_SEC = 5;
@@ -234,21 +234,21 @@ function knownCallouts(mapName: string): Set<string> {
   return new Set(Object.keys(CALLOUT_DICT[mapName] ?? {}));
 }
 
-function renderAnchors(mapName: string, side: Side): Record<string, DefaultAnchor> {
-  const sourceAnchors = DEFAULT_POSITIONS[mapName]?.[side].anchors ?? {};
+function renderPositionGroups(mapName: string, side: Side): Record<string, DefaultPositionGroup> {
+  const sourceGroups = DEFAULT_POSITION_GROUPS[mapName]?.[side].groups ?? {};
   const known = knownCallouts(mapName);
   return Object.fromEntries(
-    Object.entries(sourceAnchors)
-      .map(([anchorId, anchor]) => [
-        anchorId,
-        { name: anchor.name, callouts: anchor.callouts.filter((callout) => known.has(callout)) },
+    Object.entries(sourceGroups)
+      .map(([positionGroupId, group]) => [
+        positionGroupId,
+        { name: group.name, callouts: group.callouts.filter((callout) => known.has(callout)) },
       ] as const)
-      .filter(([, anchor]) => anchor.callouts.length > 0),
+      .filter(([, group]) => group.callouts.length > 0),
   );
 }
 
 function renderTsObject(mapName: string): string {
-  const defaults = DEFAULT_POSITIONS[mapName];
+  const defaults = DEFAULT_POSITION_GROUPS[mapName];
   return defaults ? `${mapName}: ${JSON.stringify(defaults, null, 2)},` : "";
 }
 
@@ -306,17 +306,17 @@ function topOccupancy(mapName: string, occ: Occ, side: Side, limit = 8): string[
   ];
 }
 
-function renderAnchorReview(mapName: string, side: Side, evidence: MapEvidence): string[] {
-  const anchors = renderAnchors(mapName, side);
+function renderPositionGroupReview(mapName: string, side: Side, evidence: MapEvidence): string[] {
+  const groups = renderPositionGroups(mapName, side);
   const lines = [`#### ${side === "t" ? "T 默认位" : "CT 默认位"}`];
-  for (const [anchorId, anchor] of Object.entries(anchors)) {
-    const callouts = anchor.callouts
+  for (const [positionGroupId, group] of Object.entries(groups)) {
+    const callouts = group.callouts
       .filter((callout) => {
         const counts = evidence.occupancy.get(callout);
         return (counts?.t ?? 0) + (counts?.ct ?? 0) > 0;
       })
       .map((callout) => formatDetailedEvidence(mapName, callout, side, evidence))
-    lines.push(`- ${anchorId} / ${anchor.name}:`);
+    lines.push(`- ${positionGroupId} / ${group.name}:`);
     if (callouts.length === 0) {
       lines.push("  - 无样本命中");
     } else {
@@ -327,11 +327,11 @@ function renderAnchorReview(mapName: string, side: Side, evidence: MapEvidence):
 }
 
 function defaultCallouts(mapName: string): Set<string> {
-  const defaults = DEFAULT_POSITIONS[mapName];
+  const defaults = DEFAULT_POSITION_GROUPS[mapName];
   if (!defaults) return new Set();
   return new Set(
     (["t", "ct"] as const).flatMap((side) =>
-      Object.values(defaults[side].anchors).flatMap((anchor) => anchor.callouts),
+      Object.values(defaults[side].groups).flatMap((group) => group.callouts),
     ),
   );
 }
@@ -418,9 +418,9 @@ function renderMapReview(mapName: string, evidence: MapEvidence): string {
     `样本 ZIP：${evidence.zipCount}`,
     "",
     "### 当前 runtime 默认位（最终确认版）",
-    ...renderAnchorReview(mapName, "t", evidence),
+    ...renderPositionGroupReview(mapName, "t", evidence),
     "",
-    ...renderAnchorReview(mapName, "ct", evidence),
+    ...renderPositionGroupReview(mapName, "ct", evidence),
     "",
     "### 数据证据：高频占有",
     ...topOccupancy(mapName, evidence.occupancy, "t"),

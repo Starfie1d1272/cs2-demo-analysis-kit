@@ -56,7 +56,7 @@ export interface TacticalCluster {
   /** 真实 OpeningPattern 的区域人数与 spread，不含任何最终打点事实。 */
   openingIntent: Pick<OpeningPattern, "regionCounts" | "spread">;
   /** 真实默认位人数结构；精确人数是开局身份的一部分。 */
-  defaultAnchorCounts: Record<string, number>;
+  positionGroupCounts: Record<string, number>;
   primaryCategory: string;
   openingSignature: string;
   entryEvidence: TacticalEntryEvidence;
@@ -83,9 +83,9 @@ export function defaultsBasisKey(defaults: Record<string, number>): string {
 }
 export const advancedBasisKey = defaultsBasisKey;
 
-/** 稳定默认位身份：按 anchor id 排序，并保留真实人数结构。 */
-export function defaultAnchorSetKey(defaults: Record<string, number>): string {
-  return defaultsBasisKey(defaults);
+/** 稳定默认位身份：按位置责任组 id 排序，并保留真实人数结构。 */
+export function positionGroupSetKey(groups: Record<string, number>): string {
+  return defaultsBasisKey(groups);
 }
 
 export function openingIntentKey(pattern: OpeningPattern): string {
@@ -102,7 +102,7 @@ function opponentIdentityOf(row: TacticalPatternRow): string {
 }
 
 export function openingPatternKey(row: TacticalPatternRow): string {
-  return [row.mapName, row.side, openingIntentKey(row.openingPattern), defaultAnchorSetKey(row.openingPattern.defaultAnchorCounts)].join(":");
+  return [row.mapName, row.side, openingIntentKey(row.openingPattern), positionGroupSetKey(row.openingPattern.positionGroupCounts)].join(":");
 }
 
 /** 单回合真实进点证据。缺少目标点或入口时返回 null，不用 fallback 猜测。 */
@@ -132,7 +132,7 @@ export function tacticalClusterKey(row: TacticalPatternRow): string {
     teamIdentityOf(row),
     economyEntryOf(row.economy, row.opponentEconomy),
     openingIntentKey(row.openingPattern),
-    defaultAnchorSetKey(row.openingPattern.defaultAnchorCounts) || "-",
+    positionGroupSetKey(row.openingPattern.positionGroupCounts) || "-",
   ].join("|");
 }
 
@@ -161,7 +161,7 @@ export function buildTacticalClusters(rows: readonly TacticalPatternRow[]): Tact
         regionCounts: { ...row.openingPattern.regionCounts },
         spread: row.openingPattern.spread,
       },
-      defaultAnchorCounts: { ...row.openingPattern.defaultAnchorCounts },
+      positionGroupCounts: { ...row.openingPattern.positionGroupCounts },
       primaryCategory: primaryCategoryOf(row.openingPattern),
       openingSignature: openingPatternKey(row),
       entryEvidence: { coveredRounds: 0, totalRounds: 0, coveragePercent: 0, routes: [] },

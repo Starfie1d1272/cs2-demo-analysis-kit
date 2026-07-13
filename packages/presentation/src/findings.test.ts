@@ -49,7 +49,7 @@ describe("AnalysisFinding adapters", () => {
     const cluster = {
       id: "cluster-1", mapName: "de_nuke", side: "t", economyEntry: "gun", teamIdentity: "furia", teamName: "FURIA",
       opponentNames: ["Spirit"], opponentIdentities: ["spirit"], openingIntent: { regionCounts: { a: 2, mid: 1, b: 2, unknown: 0 }, spread: "split" },
-      defaultAnchorCounts: {}, primaryCategory: "均衡控图", openingSignature: "test",
+      positionGroupCounts: {}, primaryCategory: "均衡控图", openingSignature: "test",
       entryEvidence: { coveredRounds: 3, totalRounds: 4, coveragePercent: 75, routes: [] }, roundCount: 4,
       winRatePercent: 50, plantRatePercent: 50,
       rounds: [{ matchId: "m1", roundNumber: 5, teamKey: "teamA", won: true, economy: "full", planted: true }],

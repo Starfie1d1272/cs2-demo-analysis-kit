@@ -17,7 +17,7 @@ describe("PatternExplorer", () => {
       opponentNames: ["Team B"],
       opponentIdentities: ["team b"],
       openingIntent: { regionCounts: { a: 3, mid: 1, b: 1, unknown: 0 }, spread: "split" },
-      defaultAnchorCounts: { a_hall: 3, b_outer: 1, mid: 1 },
+      positionGroupCounts: { a_hall: 3, b_outer: 1, mid: 1 },
       primaryCategory: "A侧控图",
       openingSignature: "de_ancient:t:3A-1MID-1B:split:a_hall+b_outer+mid",
       entryEvidence: {

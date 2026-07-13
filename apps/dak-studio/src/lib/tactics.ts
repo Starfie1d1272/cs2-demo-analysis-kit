@@ -19,9 +19,9 @@ export function withTacticalTeamIdentities<T extends { teamName: string; opponen
 export {
   advancedBasisKey,
   buildTacticalClusters,
-  defaultAnchorSetKey,
   defaultsBasisKey,
   openingPatternKey,
+  positionGroupSetKey,
   tacticalClusterKey,
   type TacticalCluster,
 } from "@cs2dak/cohort";

@@ -25,7 +25,7 @@ export interface PlayerTacticalSegment {
   callout: string;
   tendencies: readonly TacticalRegion[];
   primaryRegion: TacticalRegion | null;
-  defaultAnchorId: string | null;
+  positionGroupId: string | null;
   evidence: TacticalEvidenceRef;
 }
 
@@ -40,19 +40,19 @@ export interface TacticalFormationSnapshot {
   tick: number;
   side: DefaultPositionSide;
   regionCounts: TacticalRegionCounts;
-  defaultAnchorCounts: Record<string, number>;
+  positionGroupCounts: Record<string, number>;
   playerLocations: Array<{
     playerIndex: number;
     callout: string | null;
     primaryRegion: TacticalRegion | null;
-    defaultAnchorId: string | null;
+    positionGroupId: string | null;
   }>;
 }
 
 export interface OpeningPattern {
   side: DefaultPositionSide;
   regionCounts: TacticalRegionCounts;
-  defaultAnchorCounts: Record<string, number>;
+  positionGroupCounts: Record<string, number>;
   spread: "stacked" | "split" | "balanced" | "unknown";
   coarseSignature: string;
   detailedSignature: string;
@@ -68,6 +68,6 @@ export interface OpeningPressureEvent {
   calloutLabel: string;
   primaryRegion: TacticalRegion | null;
   kind: "forward" | "deep";
-  opposingDefaultAnchorId: string | null;
+  opposingPositionGroupId: string | null;
   evidence: TacticalEvidenceRef;
 }

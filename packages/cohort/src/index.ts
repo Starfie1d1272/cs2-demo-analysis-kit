@@ -35,12 +35,12 @@ export {
   advancedBasisKey,
   buildTacticalClusters,
   chokeComboOf,
-  defaultAnchorSetKey,
   defaultsBasisKey,
   economyEntryOf,
   entryEvidenceKey,
   openingIntentKey,
   openingPatternKey,
+  positionGroupSetKey,
   tacticalClusterKey,
 } from "./tactical-clusters.js";
 export type {

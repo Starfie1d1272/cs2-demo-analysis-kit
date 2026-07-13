@@ -54,7 +54,7 @@
 - CT 在 1:30 仍保有 banana 车位/沙袋 = **防守方控制收益**；
 - 某队连续 20 个长枪局在 1:25 左右完全放弃 banana = **不是单回合选择，而是体系倾向**。
 
-> 现有 `DEFAULT_POSITIONS` 资产（maps，七图）里的 `T默认 / CT默认 / contested` 三组口径，
+> 现有 `DEFAULT_POSITION_GROUPS` 资产（maps，七图）里的 `T默认 / CT默认 / contested` 三组口径，
 > 就是这套先验的雏形（基于同一 callout 集合、110 场数据驱动归并）。可作为先验区域的种子。
 
 ---
@@ -147,7 +147,7 @@ banana」，而在「我拿过 banana，所以现在可以少放人，且仍不�
 | `callout-grid/*.json`（7 图） | 10-unit 3D 格点 × 110 场多数表决，inferno 24 词 / 62k 格 | **已是数据驱动区域图**，但词表粗（Banana 是整块） |
 | `map-nav/*.json`（7 图） | CompactNav，inferno 3060 个 area（含 centroid/corners/neighbors） | 覆盖场 grid-sample 的天然采样点 + 连通性 |
 | `map-zones/*.json`（legacy） | 手标多边形 + `grid-to-zones.py` 派生（auto-<map>.json） | 旧 shadow spatial/utility 辅助；当前控图真相源不用它 |
-| `DEFAULT_POSITIONS`（7 图） | T默认/CT默认/contested 三组口径 | 三类先验区域的种子 |
+| `DEFAULT_POSITION_GROUPS`（7 图） | T默认/CT默认/contested 三组口径 | 三类先验区域的种子 |
 | `core/duel-window.ts` | `isVisibleAt`（视锥 40° / `.tri` LOS / 烟雾 / flash / HP），**生产就绪** | **L2 覆盖场算法直接复用** |
 | `core/spatial/mapcontrol.ts` | scalar `buildOfficialMapControl`（route-index 手调 gate，只进 shadow 不进 RR） | **v0 代理，冻结**，将被价值模型取代 |
 

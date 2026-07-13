@@ -1,4 +1,4 @@
-import { anchorOf, calloutCn, classifyTacticalLocation, type DefaultPositionSide } from "@cs2dak/maps";
+import { calloutCn, classifyTacticalLocation, positionGroupOf, type DefaultPositionSide } from "@cs2dak/maps";
 import type {
   OpeningPattern,
   OpeningPressureEvent,
@@ -30,11 +30,11 @@ export function deriveOpeningPressure(
       && segment.startTick <= options.endTick
       && segment.endTick >= options.startTick
       && segment.durationSec >= minDwellSec
-      && segment.defaultAnchorId == null,
+      && segment.positionGroupId == null,
     )
     .map((segment): OpeningPressureEvent | null => {
-      const opposingDefaultAnchorId = anchorOf(options.mapName, opposingSide, segment.callout);
-      if (!opposingDefaultAnchorId && !segment.primaryRegion) return null;
+      const opposingPositionGroupId = positionGroupOf(options.mapName, opposingSide, segment.callout);
+      if (!opposingPositionGroupId && !segment.primaryRegion) return null;
       return {
         playerIndex: segment.playerIndex,
         side: segment.side,
@@ -43,8 +43,8 @@ export function deriveOpeningPressure(
         callout: segment.callout,
         calloutLabel: calloutCn(options.mapName, segment.callout) || segment.callout,
         primaryRegion: segment.primaryRegion,
-        kind: opposingDefaultAnchorId ? "deep" : "forward",
-        opposingDefaultAnchorId,
+        kind: opposingPositionGroupId ? "deep" : "forward",
+        opposingPositionGroupId,
         evidence: segment.evidence,
       };
     })
@@ -68,22 +68,22 @@ export function buildFormationTimeline(
     .map((rows) => {
       const first = rows[0]!;
       const regionCounts = emptyRegionCounts();
-      const defaultAnchorCounts: Record<string, number> = {};
+      const positionGroupCounts: Record<string, number> = {};
       const playerLocations = rows.map((sample) => {
         const location = classifyTacticalLocation(options.mapName, sample.side, sample.callout);
         if (location.primaryRegion) regionCounts[location.primaryRegion] += 1;
         else regionCounts.unknown += 1;
-        if (location.defaultAnchorId) {
-          defaultAnchorCounts[location.defaultAnchorId] = (defaultAnchorCounts[location.defaultAnchorId] ?? 0) + 1;
+        if (location.positionGroupId) {
+          positionGroupCounts[location.positionGroupId] = (positionGroupCounts[location.positionGroupId] ?? 0) + 1;
         }
         return {
           playerIndex: sample.playerIndex,
           callout: sample.callout,
           primaryRegion: location.primaryRegion,
-          defaultAnchorId: location.defaultAnchorId,
+          positionGroupId: location.positionGroupId,
         };
       });
-      return { tick: first.tick, side: first.side, regionCounts, defaultAnchorCounts, playerLocations };
+      return { tick: first.tick, side: first.side, regionCounts, positionGroupCounts, playerLocations };
     })
     .sort((a, b) => a.tick - b.tick || a.side.localeCompare(b.side));
 }
@@ -114,8 +114,8 @@ export function deriveOpeningPattern(
 
   const minDefaultDwellSec = options.minDefaultDwellSec ?? 1;
   const selected = [...byPlayer.values()].map((rows) => rows.sort((a, b) => {
-    const aDefault = a.defaultAnchorId != null && a.durationSec >= minDefaultDwellSec ? 1 : 0;
-    const bDefault = b.defaultAnchorId != null && b.durationSec >= minDefaultDwellSec ? 1 : 0;
+    const aDefault = a.positionGroupId != null && a.durationSec >= minDefaultDwellSec ? 1 : 0;
+    const bDefault = b.positionGroupId != null && b.durationSec >= minDefaultDwellSec ? 1 : 0;
     const aKnown = a.primaryRegion != null ? 1 : 0;
     const bKnown = b.primaryRegion != null ? 1 : 0;
     return bDefault - aDefault
@@ -124,28 +124,28 @@ export function deriveOpeningPattern(
       || a.startTick - b.startTick;
   })[0]!);
   const regionCounts = emptyRegionCounts();
-  const defaultAnchorCounts: Record<string, number> = {};
+  const positionGroupCounts: Record<string, number> = {};
   for (const segment of selected) {
     if (segment.primaryRegion) regionCounts[segment.primaryRegion] += 1;
     else regionCounts.unknown += 1;
-    if (segment.defaultAnchorId) {
-      defaultAnchorCounts[segment.defaultAnchorId] = (defaultAnchorCounts[segment.defaultAnchorId] ?? 0) + 1;
+    if (segment.positionGroupId) {
+      positionGroupCounts[segment.positionGroupId] = (positionGroupCounts[segment.positionGroupId] ?? 0) + 1;
     }
   }
   const spread = spreadOf(regionCounts);
   const sideLabel = options.side.toUpperCase();
   const coarseSignature = `${sideLabel}:${regionCounts.a}A-${regionCounts.mid}MID-${regionCounts.b}B:${spread}`;
-  const anchors = Object.entries(defaultAnchorCounts)
+  const groups = Object.entries(positionGroupCounts)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([id, count]) => `${id}:${count}`)
     .join("|");
   return {
     side: options.side,
     regionCounts,
-    defaultAnchorCounts,
+    positionGroupCounts,
     spread,
     coarseSignature,
-    detailedSignature: `${sideLabel}:${anchors || "-"}`,
+    detailedSignature: `${sideLabel}:${groups || "-"}`,
     evidence: selected.map((segment) => segment.evidence),
   };
 }
