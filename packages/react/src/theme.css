@@ -2887,6 +2887,18 @@
   cursor: default;
 }
 
+/* ── Map roles ───────────────────────────────────────────────────────── */
+.dak-role-panel { display: grid; gap: 12px; }
+.dak-role-head { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.dak-role-head h3 { margin: 0; }
+.dak-role-head p, .dak-role-note { margin: 4px 0 0; color: var(--dak-fg-dim); font-size: 12px; line-height: 1.5; }
+.dak-role-summary, .dak-role-declarations, .dak-role-evidence { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; color: var(--dak-fg-mid); font-size: 12px; }
+.dak-role-summary b, .dak-role-declarations b, .dak-role-evidence b { color: var(--dak-fg); }
+.dak-role-tag, .dak-role-status { border: 1px solid var(--dak-border); border-radius: 2px; padding: 2px 6px; font-size: 11px; }
+.dak-role-status-ready { color: var(--dak-ok); }
+.dak-role-status-mixed { color: var(--dak-warn); }
+.dak-role-status-insufficient, .dak-role-status-unknown { color: var(--dak-fg-dim); }
+
 /* ── Event Bracket（瑞士轮 + 淘汰赛，DOM + SVG 双模式） ─────────────────── */
 
 .dak-bracket-diagram {
