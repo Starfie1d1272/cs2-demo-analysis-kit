@@ -1,7 +1,6 @@
 import {
   FLAG_ALIVE,
   FLAG_HAS_BOMB,
-  decodeDelta,
   type DemoPackage,
   type EconomyType,
   type Side,
@@ -18,6 +17,7 @@ import {
 } from "@cs2dak/maps";
 import { buildPlayerTacticalSegments } from "./segments.js";
 import { deriveOpeningPattern, deriveOpeningPressure } from "./formations.js";
+import { createReplayRoundContext, replayCalloutAt, replayTickAt, type ReplayRoundContext } from "./replay-round-context.js";
 import type { OpeningPattern, OpeningPressureEvent, TacticalFrameSample } from "./types.js";
 
 export const TACTICAL_FACT_VERSION = 9;
@@ -106,69 +106,9 @@ export interface TacticalRoundFact {
   grenadeOccurrenceIds: string[];
 }
 
-interface DecodedTrack {
-  playerIndex: number;
-  side: Side | null;
-  x: number[];
-  y: number[];
-  z: number[];
-  flags: number[];
-  place: number[];
-}
-
-interface DecodedRound {
-  startTick: number;
-  tickStep: number;
-  frameCount: number;
-  tracks: DecodedTrack[];
-  placeDict: string[];
-}
-
-function decodeRound(pkg: DemoPackage, round: DemoPackage["rounds"][number]): DecodedRound | null {
-  const replayRound = pkg.replay?.rounds.find((row) => row.roundNumber === round.roundNumber);
-  if (!pkg.replay || !replayRound) return null;
-  const scale = pkg.replay.meta.coordScale;
-  return {
-    startTick: replayRound.startTick,
-    tickStep: replayRound.tickStep,
-    frameCount: replayRound.frameCount,
-    placeDict: pkg.replay.placeDict ?? [],
-    tracks: replayRound.players.map((track) => {
-      const player = pkg.players[track.playerIndex];
-      const side = player
-        ? (player.teamKey === "teamA" ? round.teamASide : round.teamBSide)
-        : null;
-      return {
-        playerIndex: track.playerIndex,
-        side,
-        x: decodeDelta(track.x).map((value) => value * scale),
-        y: decodeDelta(track.y).map((value) => value * scale),
-        z: decodeDelta(track.z).map((value) => value * scale),
-        flags: track.flags,
-        place: track.place,
-      };
-    }),
-  };
-}
-
 function locateGrid(grid: CalloutGrid | null, point: Vec3) {
   if (!grid) return null;
   return calloutNear(grid, point, { horizontalRadius: 20, verticalRadius: 40 });
-}
-
-function calloutAtFrame(
-  decoded: DecodedRound,
-  track: DecodedTrack,
-  index: number,
-  grid: CalloutGrid | null,
-): string | null {
-  const place = decoded.placeDict[track.place[index] ?? -1] ?? null;
-  if (place) return place;
-  return locateGrid(grid, {
-    x: track.x[index] ?? 0,
-    y: track.y[index] ?? 0,
-    z: track.z[index] ?? 0,
-  })?.callout ?? null;
 }
 
 const ROUND_SECONDS = 115;
@@ -203,7 +143,7 @@ function emptySiteEntry(): SiteEntryFact {
 }
 
 function openingAnalysisFor(
-  decoded: DecodedRound | null,
+  decoded: ReplayRoundContext | null,
   round: DemoPackage["rounds"][number],
   mapName: string,
   side: Side,
@@ -215,7 +155,7 @@ function openingAnalysisFor(
   for (const track of decoded?.tracks ?? []) {
     if (track.side !== side) continue;
     for (let index = 0; index < (decoded?.frameCount ?? 0); index += 1) {
-      const tick = decoded!.startTick + index * decoded!.tickStep;
+      const tick = replayTickAt(decoded!, index);
       if (tick < round.freezeEndTick) continue;
       if (tick > endTick) break;
       const alive = ((track.flags[index] ?? 0) & FLAG_ALIVE) !== 0;
@@ -224,7 +164,7 @@ function openingAnalysisFor(
         playerIndex: track.playerIndex,
         side,
         alive,
-        callout: alive ? calloutAtFrame(decoded!, track, index, grid) : null,
+        callout: alive ? replayCalloutAt(decoded!, track, index, grid) : null,
       });
     }
   }
@@ -240,7 +180,7 @@ function openingAnalysisFor(
 }
 
 function siteEntriesFor(
-  decoded: DecodedRound | null,
+  decoded: ReplayRoundContext | null,
   round: DemoPackage["rounds"][number],
   mapName: string,
   side: Side,
@@ -257,10 +197,10 @@ function siteEntriesFor(
     const seen = new Set<"a" | "b">();
     const trajectory: string[] = [];
     for (let index = 0; index < decoded.frameCount; index += 1) {
-      const tick = decoded.startTick + index * decoded.tickStep;
+      const tick = replayTickAt(decoded, index);
       if (tick < round.freezeEndTick || tick > round.endTick) continue;
       if (((track.flags[index] ?? 0) & FLAG_ALIVE) === 0) break;
-      const callout = calloutAtFrame(decoded, track, index, grid);
+      const callout = replayCalloutAt(decoded, track, index, grid);
       if (!callout) continue;
       if (callout !== trajectory.at(-1)) trajectory.push(callout);
       const site = callout === "BombsiteA" ? "a" : callout === "BombsiteB" ? "b" : null;
@@ -365,7 +305,7 @@ function grenadesFor(
 }
 
 function c4RouteFor(
-  decoded: DecodedRound | null,
+  decoded: ReplayRoundContext | null,
   round: DemoPackage["rounds"][number],
   mapName: string,
   plant: TacticalPlantFact | null,
@@ -375,7 +315,7 @@ function c4RouteFor(
   const callouts: string[] = [];
   let carrierIndex = -1;
   for (let index = 0; index < decoded.frameCount; index += 1) {
-    const tick = decoded.startTick + index * decoded.tickStep;
+    const tick = replayTickAt(decoded, index);
     if (tick < round.freezeEndTick || tick > round.endTick) continue;
     const cached = decoded.tracks[carrierIndex];
     if (!cached || ((cached.flags[index] ?? 0) & FLAG_ALIVE) === 0 || ((cached.flags[index] ?? 0) & FLAG_HAS_BOMB) === 0) {
@@ -384,7 +324,7 @@ function c4RouteFor(
       );
     }
     if (carrierIndex < 0) continue;
-    const callout = calloutAtFrame(decoded, decoded.tracks[carrierIndex]!, index, grid);
+    const callout = replayCalloutAt(decoded, decoded.tracks[carrierIndex]!, index, grid);
     if (callout && callout !== callouts.at(-1)) callouts.push(callout);
   }
   if (callouts.length === 0) return null;
@@ -411,12 +351,12 @@ function teamName(pkg: DemoPackage, teamKey: TeamKey): string {
 
 export function extractTacticalRoundFacts(
   pkg: DemoPackage,
-  options: { matchId: string; calloutGrid?: CalloutGrid | null },
+  options: { matchId: string; calloutGrid?: CalloutGrid | null; replayContexts?: ReadonlyMap<number, ReplayRoundContext> },
 ): TacticalRoundFact[] {
   const tickrate = pkg.match.tickrate || 64;
   const out: TacticalRoundFact[] = [];
   for (const round of pkg.rounds) {
-    const decoded = decodeRound(pkg, round);
+    const decoded = options.replayContexts?.get(round.roundNumber) ?? createReplayRoundContext(pkg, round);
     const plant = plantFor(pkg, round, tickrate);
     for (const side of ["t", "ct"] as const) {
       if (!decoded?.tracks.some((track) => track.side === side)) continue;
