@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PlayerPositionRoundFact } from "@cs2dak/contract";
+import type { PlayerPositionRoundFact, TeamShapeRoundFact } from "@cs2dak/contract";
 import { buildPlayerMapRoleEvidence, buildTeamMapResponsibilityEvidence } from "./index.js";
 
 function row(playerIndex: number, roundNumber: number, overrides: Partial<PlayerPositionRoundFact> = {}): PlayerPositionRoundFact {
@@ -46,5 +46,19 @@ describe("map role evidence", () => {
     });
     const evidence = buildPlayerMapRoleEvidence({ playerPositionRounds: [missing], teamShapeRounds: [] });
     expect(evidence[0]).toMatchObject({ status: "unknown", awp: { activeSeconds: null, teamActiveShare: null } });
+  });
+
+  it("consumes opening component membership and formation continuity from TeamShapeRoundFact", () => {
+    const rows = Array.from({ length: 6 }, (_, index) => [row(0, index + 1), row(4, index + 1)]).flat();
+    const shapes: TeamShapeRoundFact[] = Array.from({ length: 6 }, (_, index) => ({
+      analysisVersion: 2, matchId: "m1", mapName: "de_ancient", roundNumber: index + 1, teamKey: "teamA", side: "ct",
+      openingWindow: { version: 1, startTick: 100, endTick: 1380, configuredSeconds: 20 },
+      openingWindows: [{ startTick: 100, endTick: 1380, coverageSeconds: 20, componentSizes: [4, 1], partition: "4+1", componentPlayerIndices: [[0, 1, 2, 3], [4]] }],
+      coverageSeconds: 40, windows: [{ startTick: 100, endTick: 2660, coverageSeconds: 40, componentSizes: [4, 1], partition: "4+1", componentPlayerIndices: [[0, 1, 2, 3], [4]] }],
+      availability: { replay: "available", nav: "available", callouts: "available", shots: "available" },
+    }));
+    const evidence = buildPlayerMapRoleEvidence({ playerPositionRounds: rows, teamShapeRounds: shapes });
+    expect(evidence.find((item) => item.playerKey.endsWith("1"))?.spatial).toMatchObject({ openingMainComponentShare: 1, formationShares: { "4+1": 1 } });
+    expect(evidence.find((item) => item.playerKey.endsWith("5"))?.spatial.openingIsolatedShare).toBe(1);
   });
 });

@@ -42,4 +42,29 @@ describe("map role presentation", () => {
     expect(matrix).toMatchObject({ responsibilityConflict: true, unstableCoverage: true });
     expect(matrix.players).toHaveLength(2);
   });
+
+  it("returns mixed rather than ready with a null role when candidates are not separated", () => {
+    const rifle = { ...evidence("p1").awp, duty: "rifler" as const, qualifiedLongGunRounds: 20, freezeOwnershipRounds: 0, activeSeconds: 0, teamActiveShare: 0, matchConsistency: 0 };
+    const profile = buildPlayerMapRoleProfiles([
+      evidence("p1", { side: "ct", responsibility: "anchor", awp: rifle }),
+      evidence("p1", { side: "t", mapName: "de_mirage", responsibility: "core_pack", awp: rifle }),
+    ])[0]!;
+    expect(profile.status).toBe("mixed");
+    expect(profile.inferredPrimaryRole).toBeNull();
+    expect(profile.runnerUpRole).not.toBeNull();
+  });
+
+  it("does not promote one-map AWP usage to global Primary AWPer", () => {
+    const profile = buildPlayerMapRoleProfiles([evidence("p1")])[0]!;
+    expect(profile.weaponDuty).toBe("secondary_awper");
+    expect(profile.weaponDuty).not.toBe("primary_awper");
+  });
+
+  it("matches declaration time scope by match occurrence time and preserves missing-time limitations", () => {
+    const declaration = { playerKey: "p1", role: "anchor", priority: "primary", source: "self_report", provenance: "public interview", validFrom: "2026-06-01T00:00:00.000Z", validTo: "2026-06-30T23:59:59.000Z" } as const;
+    expect(buildPlayerMapRoleProfiles([evidence("p1")], [declaration], { matchTimes: { m1: "2026-05-01T00:00:00.000Z", m2: "2026-05-02T00:00:00.000Z", m3: "2026-05-03T00:00:00.000Z" } })[0]?.declaredRoles).toHaveLength(0);
+    const missingTime = buildPlayerMapRoleProfiles([evidence("p1")], [declaration])[0]!;
+    expect(missingTime.declaredRoles).toHaveLength(1);
+    expect(missingTime.limitations).toContain("比赛时间缺失，声明时间作用域无法严格验证。");
+  });
 });

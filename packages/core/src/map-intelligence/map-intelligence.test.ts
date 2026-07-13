@@ -33,6 +33,16 @@ describe("extractMatchMapIntelligenceFacts", () => {
     expect(facts.teamShapeRounds.every((row) => row.availability.nav === "available")).toBe(true);
   });
 
+  it.each([
+    "sample-2026-02-09_de_inferno_Team_Vitality_13-8_FURIA.zip",
+    "sample-2026-02-09_de_overpass_Team_Vitality_13-10_FURIA.zip",
+  ])("retains opening path and multi-route position evidence for %s", async (name) => {
+    const pkg = await fixture(name);
+    const facts = extractMatchMapIntelligenceFacts(pkg, { matchId: name });
+    expect(facts.playerPositionRounds.some((row) => row.openingPath.length > 1)).toBe(true);
+    expect(new Set(facts.playerPositionRounds.flatMap((row) => row.openingPositionGroupDwell.map((group) => group.positionGroupId))).size).toBeGreaterThan(1);
+  });
+
   it("uses explicit missing/unknown state when replay is unavailable and degrades Anubis without nav", async () => {
     const pkg = await fixture("sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip");
     const noReplay = { ...pkg, replay: undefined };
