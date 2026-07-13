@@ -3,7 +3,7 @@ import type { IdentityStoreState } from "./identity";
 import { getStorage } from "./storage";
 
 /** 独立于 facts / identity summary 的用户声明存储。 */
-export const ROLE_DECLARATIONS_SCHEMA_VERSION = 1;
+export const ROLE_DECLARATIONS_SCHEMA_VERSION = 2;
 const STATE_KEY = "current";
 const store = getStorage().records("role-declarations");
 
@@ -21,9 +21,31 @@ export interface RoleDeclarationsState {
 
 const EMPTY: RoleDeclarationsState = { version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations: [] };
 
+function scopeKey(declaration: Pick<RoleDeclaration, "playerKey" | "teamKey" | "mapName" | "validFrom" | "validTo">): string {
+  return [declaration.playerKey, declaration.teamKey ?? "", declaration.mapName ?? "", declaration.validFrom ?? "", declaration.validTo ?? ""].join("\t");
+}
+
+function migrateV1(value: { version?: unknown; declarations?: unknown }): RoleDeclarationsState | null {
+  if (value.version !== 1 || !Array.isArray(value.declarations)) return null;
+  const primaries = new Set<string>();
+  const declarations: StoredRoleDeclaration[] = [];
+  for (const raw of [...value.declarations].sort((a, b) => Number((a as StoredRoleDeclaration).createdAt ?? 0) - Number((b as StoredRoleDeclaration).createdAt ?? 0))) {
+    const row = raw as Partial<StoredRoleDeclaration> & { declaration?: Partial<RoleDeclaration> };
+    if (typeof row.id !== "string" || typeof row.createdAt !== "number" || typeof row.updatedAt !== "number" || !row.declaration) continue;
+    const key = scopeKey(row.declaration as RoleDeclaration);
+    const priority = primaries.has(key) ? "secondary" : "primary";
+    primaries.add(key);
+    const parsed = roleDeclarationSchema.safeParse({ ...row.declaration, priority });
+    if (parsed.success) declarations.push({ id: row.id, createdAt: row.createdAt, updatedAt: row.updatedAt, declaration: parsed.data });
+  }
+  return { version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations };
+}
+
 function valid(value: unknown): RoleDeclarationsState | null {
   if (!value || typeof value !== "object") return null;
   const state = value as Partial<RoleDeclarationsState>;
+  const migrated = migrateV1(state);
+  if (migrated) return migrated;
   if (state.version !== ROLE_DECLARATIONS_SCHEMA_VERSION || !Array.isArray(state.declarations)) return null;
   const declarations = state.declarations.filter((row): row is StoredRoleDeclaration => {
     const candidate = row as Partial<StoredRoleDeclaration>;
@@ -34,7 +56,12 @@ function valid(value: unknown): RoleDeclarationsState | null {
 }
 
 export async function loadRoleDeclarations(): Promise<RoleDeclarationsState> {
-  try { return valid(await store.get<unknown>(STATE_KEY)) ?? EMPTY; } catch { return EMPTY; }
+  try {
+    const raw = await store.get<unknown>(STATE_KEY);
+    const state = valid(raw) ?? EMPTY;
+    if ((raw as { version?: unknown } | null)?.version === 1) await store.put(STATE_KEY, state);
+    return state;
+  } catch { return EMPTY; }
 }
 
 async function save(state: RoleDeclarationsState): Promise<RoleDeclarationsState> {
@@ -48,7 +75,12 @@ export async function upsertRoleDeclaration(current: RoleDeclarationsState, inpu
   const nextId = id ?? `${now}-${Math.random().toString(36).slice(2, 8)}`;
   const existing = current.declarations.find((row) => row.id === nextId);
   const row: StoredRoleDeclaration = { id: nextId, createdAt: existing?.createdAt ?? now, updatedAt: now, declaration };
-  return save({ ...current, declarations: [...current.declarations.filter((item) => item.id !== nextId), row] });
+  const declarations = current.declarations.filter((item) => item.id !== nextId).map((item) =>
+    declaration.priority === "primary" && item.declaration.priority === "primary" && scopeKey(item.declaration) === scopeKey(declaration)
+      ? { ...item, updatedAt: now, declaration: { ...item.declaration, priority: "secondary" as const } }
+      : item
+  );
+  return save({ ...current, declarations: [...declarations, row] });
 }
 
 export async function removeRoleDeclaration(current: RoleDeclarationsState, id: string): Promise<RoleDeclarationsState> {

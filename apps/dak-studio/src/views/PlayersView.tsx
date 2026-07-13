@@ -79,6 +79,10 @@ export function PlayersView({
   const [roleDeclarations, setRoleDeclarations] = useState<RoleDeclarationsState | null>(null);
   const [roleEditorOpen, setRoleEditorOpen] = useState(false);
   const [declaredRole, setDeclaredRole] = useState<DeclaredRole>("awper");
+  const [declaredPriority, setDeclaredPriority] = useState<"primary" | "secondary">("primary");
+  const [declaredMap, setDeclaredMap] = useState("");
+  const [declaredValidFrom, setDeclaredValidFrom] = useState("");
+  const [declaredValidTo, setDeclaredValidTo] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -259,7 +263,14 @@ export function PlayersView({
 
   async function saveRoleDeclaration() {
     if (!roleDeclarations || !selected) return;
-    const next = await upsertRoleDeclaration(roleDeclarations, { playerKey: selected.playerKey, role: declaredRole, source: "user", provenance: "用户声明" });
+    const toIso = (value: string) => value ? new Date(`${value}T00:00:00.000Z`).toISOString() : undefined;
+    const next = await upsertRoleDeclaration(roleDeclarations, {
+      playerKey: selected.playerKey, role: declaredRole, priority: declaredPriority, source: "user", provenance: "Studio 用户声明",
+      ...(selectedTeam ? { teamKey: selectedTeam } : {}),
+      ...(declaredMap ? { mapName: declaredMap as import("@cs2dak/contract").SupportedMapName } : {}),
+      ...(declaredValidFrom ? { validFrom: toIso(declaredValidFrom) } : {}),
+      ...(declaredValidTo ? { validTo: toIso(declaredValidTo) } : {}),
+    });
     setRoleDeclarations(next); setRoleEditorOpen(false);
   }
 
@@ -477,8 +488,13 @@ export function PlayersView({
             <div className="stu-modal-backdrop" role="dialog" aria-modal="true" aria-label="编辑角色声明" onClick={() => setRoleEditorOpen(false)}>
               <div className="stu-modal" onClick={(event) => event.stopPropagation()}>
                 <header className="stu-modal-head"><h3>角色声明 · {selected.name}</h3><button type="button" className="stu-modal-close" onClick={() => setRoleEditorOpen(false)} aria-label="关闭">✕</button></header>
-                <div className="stu-modal-body"><p className="stu-muted">只保存用户声明；自动推断始终独立。trusted metadata 当前未提供。</p><label>声明角色 <select value={declaredRole} onChange={(event) => setDeclaredRole(event.target.value as DeclaredRole)}>{(["igl", "awper", "anchor", "opener", "closer"] as const).map((role) => <option key={role} value={role}>{role}</option>)}</select></label>
-                  {selectedDeclarations.length > 0 && <div className="stu-chip-row">{selectedDeclarations.map((row) => <span key={row.id} className="stu-chip">{row.declaration.role}<button type="button" className="stu-button-sm" onClick={() => void removeRoleDeclaration(roleDeclarations!, row.id).then(setRoleDeclarations)}>清除</button></span>)}</div>}
+                <div className="stu-modal-body"><p className="stu-muted">只保存用户声明；自动推断始终独立。primary / secondary 表示同一作用域内的声明优先级，不是自动置信度。</p>
+                  <label>声明角色 <select value={declaredRole} onChange={(event) => setDeclaredRole(event.target.value as DeclaredRole)}>{(["igl", "awper", "anchor", "opener", "closer"] as const).map((role) => <option key={role} value={role}>{role}</option>)}</select></label>
+                  <label>优先级 <select value={declaredPriority} onChange={(event) => setDeclaredPriority(event.target.value as "primary" | "secondary")}><option value="primary">Primary</option><option value="secondary">Secondary</option></select></label>
+                  <label>地图作用域 <select value={declaredMap} onChange={(event) => setDeclaredMap(event.target.value)}><option value="">全部地图</option>{[...new Set(entries.map((entry) => entry.meta.mapName))].sort().map((map) => <option key={map} value={map}>{map.replace("de_", "")}</option>)}</select></label>
+                  <label>生效日期 <input type="date" value={declaredValidFrom} onChange={(event) => setDeclaredValidFrom(event.target.value)} /></label>
+                  <label>失效日期 <input type="date" value={declaredValidTo} onChange={(event) => setDeclaredValidTo(event.target.value)} /></label>
+                  {selectedDeclarations.length > 0 && <div className="stu-chip-row">{selectedDeclarations.map((row) => <span key={row.id} className="stu-chip">{row.declaration.priority} · {row.declaration.role}{row.declaration.mapName ? ` · ${row.declaration.mapName.replace("de_", "")}` : ""}<button type="button" className="stu-button-sm" onClick={() => void removeRoleDeclaration(roleDeclarations!, row.id).then(setRoleDeclarations)}>清除</button></span>)}</div>}
                 </div>
                 <footer className="stu-modal-foot"><span className="stu-muted">声明不会写入 facts 或自动证据缓存。</span><div className="stu-modal-actions"><button type="button" className="stu-button" onClick={() => setRoleEditorOpen(false)}>取消</button><button type="button" className="stu-button stu-button-primary" onClick={() => void saveRoleDeclaration()}>保存声明</button></div></footer>
               </div>
