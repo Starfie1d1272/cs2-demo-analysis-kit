@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateActio
 import { EmptyState, DataTable, STUDIO_TABLE_CLASSES, type DataTableColumn } from "@cs2dak/react";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
-import { getFactsStore, TACTICAL_FACT_VERSION, type TacticalRoundFact } from "../lib/facts";
+import { TACTICAL_FACT_VERSION } from "@cs2dak/core";
+import { getFactsStore } from "../lib/facts-store";
+import type { TacticalRoundFact } from "../lib/fact-types";
 import { buildTacticalClusters, autoName, withTacticalTeamIdentities, type TacticalCluster } from "../lib/tactics";
 import { prepItemsToMarkdown, type PrepItem } from "../lib/playlist";
 import {

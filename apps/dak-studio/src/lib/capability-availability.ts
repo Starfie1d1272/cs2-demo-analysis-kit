@@ -1,5 +1,6 @@
 import { isAnalysisStale } from "./analysis-manifest.js";
-import { getFactsStore, type FactsStore } from "./facts.js";
+import { getFactsStore } from "./facts-store.js";
+import type { FactsStore } from "./fact-types.js";
 import { matchIdForEntry, type StudioDemoEntry } from "./library.js";
 import { listAvailableTris } from "./tri-assets.js";
 

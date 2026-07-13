@@ -5,7 +5,8 @@ import { economyLabelCn, formatClockSeconds, ECONOMY_ENTRY_CN, formatEntryEviden
 import { calloutCn, buildLineupClusters, type LineupGrenadeLike } from "@cs2dak/maps";
 import type { EconomyEntry } from "@cs2dak/cohort";
 import { autoName, type TacticalCluster } from "../../lib/tactics.js";
-import { getFactsStore, type TacticalRoundFact } from "../../lib/facts.js";
+import { getFactsStore } from "../../lib/facts-store.js";
+import type { TacticalRoundFact } from "../../lib/fact-types.js";
 import { loadMatchWorkspaceModel, type StudioDemoEntry } from "../../lib/library.js";
 import { MetricInfo, EvidenceLink, DataTable, STUDIO_TABLE_CLASSES, type DataTableColumn } from "@cs2dak/react";
 

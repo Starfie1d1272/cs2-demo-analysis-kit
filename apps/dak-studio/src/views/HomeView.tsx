@@ -5,7 +5,8 @@ import { buildMistakeFindings, SEASON_STAT_VIEWS, type AnalysisFinding, type Pla
 import { getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, type PinnedPlayer } from "../lib/pin";
-import { getFactsStore, type PlayerMatchStatsFact } from "../lib/facts";
+import { getFactsStore } from "../lib/facts-store";
+import type { PlayerMatchStatsFact } from "../lib/fact-types";
 import { EmptyState, FindingPanel, MetricInfo } from "@cs2dak/react";
 import { FingerprintRadar, TrendChart } from "./profile-widgets";
 import { RadarTrails, type RadarGrenadeOverlay, type RadarTrail } from "../components/RadarTrails";

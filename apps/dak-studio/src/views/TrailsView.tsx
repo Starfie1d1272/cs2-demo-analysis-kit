@@ -5,7 +5,7 @@ import { RadarTrails, GRENADE_COLOR, type RadarTrail, type RadarGrenadeOverlay }
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import type { IdentityOptions } from "../lib/season";
 import { getPinnedPlayer } from "../lib/pin";
-import { getFactsStore } from "../lib/facts";
+import { getFactsStore } from "../lib/facts-store";
 import { EmptyState } from "@cs2dak/react";
 
 /**

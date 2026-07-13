@@ -8,7 +8,7 @@ import {
   withTacticalTeamIdentities,
   autoName,
 } from "./tactics.js";
-import type { TacticalRoundFact } from "./facts.js";
+import type { TacticalRoundFact } from "./fact-types.js";
 
 function fact(p: Partial<TacticalRoundFact> = {}): TacticalRoundFact {
   return {

@@ -2,7 +2,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { TacticalCluster } from "../../lib/tactics";
-import type { TacticalRoundFact } from "../../lib/facts";
+import type { TacticalRoundFact } from "../../lib/fact-types";
 import { PatternExplorer, resolveEconomyFilter } from "./PatternExplorer";
 
 describe("PatternExplorer", () => {

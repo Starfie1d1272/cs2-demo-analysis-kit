@@ -12,7 +12,7 @@ import { displayWeaponName } from "@cs2dak/presentation";
 import { DataTable, STUDIO_TABLE_CLASSES, EmptyState, MetricInfo, EvidenceLink, type DataTableColumn } from "@cs2dak/react";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { mapDisplayName } from "../lib/series";
-import { getFactsStore } from "../lib/facts";
+import { getFactsStore } from "../lib/facts-store";
 import { GRENADE_COLOR } from "../components/RadarTrails";
 import { listPracticeLineups, removePracticeLineup, savePracticeLineup, type PracticeLineup } from "../lib/practice-lineups";
 

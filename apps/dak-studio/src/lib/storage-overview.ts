@@ -1,4 +1,5 @@
 import { getStorage } from "./storage";
+import { FACTS_RECORD_NAMESPACES } from "./facts-store";
 
 /**
  * 浏览器端（IndexedDB 后端）存储总览。
@@ -24,22 +25,13 @@ export interface BrowserStorageOverview {
   categories: BrowserStorageCategory[];
 }
 
-/** facts 投影的命名空间（与 createFactsStore 一致）。 */
-const FACTS_NAMESPACES = [
-  "facts:player_match_stats", "facts:player_insights", "facts:player_weapons",
-  "facts:mechanics_samples", "facts:cohort_rows", "facts:tournament_facts",
-  "facts:team_comparison_facts", "facts:duel_facts", "facts:match_workspace",
-  "facts:opening_trails", "facts:lineups", "facts:tactical_rounds",
-  "facts:utility_value",
-];
-
 /** 资料库元数据/设置等"数据库"类命名空间（非派生缓存、非原始字节）。 */
 const DATABASE_NAMESPACES = [
   "demos", "identity", "identity-audit", "series", "series-settings",
   "playbook", "playlist", "map-pool-notes", "events", "kv",
 ];
 
-const CACHE_NAMESPACES = [...FACTS_NAMESPACES, "cache", "cache-meta"];
+const CACHE_NAMESPACES = [...FACTS_RECORD_NAMESPACES, "cache", "cache-meta"];
 
 async function countKeys(namespaces: string[]): Promise<number> {
   const storage = getStorage();

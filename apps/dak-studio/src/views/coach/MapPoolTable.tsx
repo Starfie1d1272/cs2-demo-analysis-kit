@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { autoName, buildTacticalClusters, withTacticalTeamIdentities } from "../../lib/tactics.js";
-import type { TacticalRoundFact } from "../../lib/facts.js";
+import type { TacticalRoundFact } from "../../lib/fact-types.js";
 import { displayTeamName } from "../../lib/identity.js";
 import { listMapPoolNotes, saveMapPoolNote } from "../../lib/series.js";
 

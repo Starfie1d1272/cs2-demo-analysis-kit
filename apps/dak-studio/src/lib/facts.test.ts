@@ -2,7 +2,8 @@ import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { loadDemoPackageFromZip } from "@cs2dak/core";
+import { loadDemoPackageFromZip, TACTICAL_FACT_VERSION } from "@cs2dak/core";
+import type { ExecuteBucket } from "@cs2dak/core";
 import { buildSeasonCohort, buildSeasonCohortFromRows } from "@cs2dak/cohort";
 import {
   buildPlayerMechanicsProfile,
@@ -17,8 +18,9 @@ import {
   buildTournamentInsightsFromFacts,
   buildUtilityValueSummary
 } from "@cs2dak/presentation";
-import { TACTICAL_FACT_VERSION, buildPlayerSeasonDetailsFromFacts, buildUtilityValueSummaryFromFacts, createFactsStore, extractMatchFacts } from "./facts";
-import type { ExecuteBucket } from "./facts";
+import { buildPlayerSeasonDetailsFromFacts, buildUtilityValueSummaryFromFacts } from "./facts-projections";
+import { createFactsStore } from "./facts-store";
+import { extractMatchFacts } from "./extract-match-facts";
 import { createIdbAdapter } from "./storage/idb-adapter";
 
 const fixture = (async () => loadDemoPackageFromZip(await readFile(

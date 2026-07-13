@@ -21,9 +21,10 @@ import {
   buildPlayerFlashSummariesFromFacts,
   buildPlayerSeasonDetailsFromFacts,
   buildUtilityValueSummaryFromFacts,
-  getFactsStore
-} from "./facts";
+} from "./facts-projections";
+import { getFactsStore } from "./facts-store";
 import { getStorage } from "./storage";
+import { FACTS_REVISION } from "./analysis-manifest";
 import type {
   DuelInsightsModel,
   PlayerSeasonProfile,
@@ -59,10 +60,16 @@ export interface SeasonSummary {
   insights: TournamentInsights | null;
 }
 
-export function seasonCacheKey(entries: StudioDemoEntry[], identityVersion?: number, selectedTeams: string[] = []): string {
+export function seasonCacheKey(
+  entries: StudioDemoEntry[],
+  identityVersion?: number,
+  selectedTeams: string[] = [],
+  factsRevision = FACTS_REVISION,
+): string {
+  const factsPart = `:facts=${factsRevision}`;
   const idPart = identityVersion ? `:idv${identityVersion}` : "";
   const teamPart = selectedTeams.length > 0 ? `:teams=${[...selectedTeams].sort().join(",")}` : "";
-  return `v${CACHE_VERSION}${idPart}${teamPart}:` + entries.map((entry) => entry.id).sort().join("|");
+  return `v${CACHE_VERSION}${factsPart}${idPart}${teamPart}:` + entries.map((entry) => entry.id).sort().join("|");
 }
 
 const keyOf = seasonCacheKey;

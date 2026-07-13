@@ -1,7 +1,7 @@
 import { loadDemoPackageFromZip, buildMatchRadarField } from "@cs2dak/core";
 import { buildTriangleBvh, parseAwpyTri, buildRadarFieldGrid, type TriangleBvh } from "@cs2dak/maps";
 import { loadCalloutGridBrowser } from "@cs2dak/maps/callout-grid-browser";
-import { extractMatchFacts } from "./facts";
+import { extractMatchFacts } from "./extract-match-facts";
 import { metaFromPackage } from "./demo-meta";
 
 /**

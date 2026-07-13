@@ -9,7 +9,7 @@ function entry(id: string, options: { replay?: boolean; stale?: boolean; built?:
     fileName: `${id}.zip`,
     importedAt: 0,
     tags: [],
-    ...(options.built === false ? {} : { builtWith: options.stale ? { analysisVersion: 0, formatVersion: "cs2-demo-format/3.0" } : currentBuiltWith() }),
+    ...(options.built === false ? {} : { builtWith: options.stale ? { factsRevision: "stale", formatVersion: "cs2-demo-format/3.0" } : currentBuiltWith() }),
     meta: {
       mapName: "de_inferno",
       teamAName: "FURIA",

@@ -2,7 +2,9 @@ import { loadDemoPackageFromZip, buildMatchRadarField } from "@cs2dak/core";
 import { buildMatchWorkspaceModel } from "@cs2dak/presentation";
 import { buildRadarFieldGrid } from "@cs2dak/maps";
 import type { DemoPackage, MatchWorkspaceModel, RadarField } from "@cs2dak/contract";
-import { extractMatchFacts, getFactsStore, type MatchFacts } from "./facts";
+import { extractMatchFacts } from "./extract-match-facts";
+import { getFactsStore } from "./facts-store";
+import type { MatchFacts } from "./fact-types";
 import { CALLOUT_GRID_URLS, loadStudioCalloutGrid } from "./callout-grid";
 import { metaFromPackage, type DemoMeta } from "./demo-meta";
 import { getStorage } from "./storage";
@@ -28,7 +30,7 @@ export interface StudioDemoEntry {
   tags: string[];
   /** 本机原始 .dem 路径，仅用于桌面端重新导出；浏览器/ZIP 导入为空。 */
   sourceDemPath?: string | null;
-  /** 榨 facts 时所用的分析版本（AnalysisManifest）；缺失=历史条目，视为旧口径。 */
+  /** 榨 facts 时所用的 facts revision（AnalysisManifest）；缺失=历史条目，视为旧口径。 */
   builtWith?: BuiltWith;
   /** 原始 v3 ZIP 字节数（导入时记录）；用于资产占用统计，免去读全部 blob。 */
   sizeBytes?: number;
@@ -57,7 +59,7 @@ function normalizeEntry(entry: StudioDemoEntry): StudioDemoEntry {
   };
 }
 
-/** facts 是否旧口径（analysisVersion 落后于当前 AnalysisManifest）。 */
+/** facts 是否旧口径（factsRevision 与当前 AnalysisManifest 不一致）。 */
 export function isFactsStale(entry: StudioDemoEntry): boolean {
   return isAnalysisStale(entry.builtWith);
 }

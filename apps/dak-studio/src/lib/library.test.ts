@@ -2,7 +2,7 @@ import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { getFactsStore } from "./facts";
+import { getFactsStore } from "./facts-store";
 import { importDemoFile, isFactsStale, listDemoEntries, matchIdForEntry, rebuildFactsFromZip } from "./library";
 import { ANALYSIS_MANIFEST, isAnalysisStale } from "./analysis-manifest";
 
@@ -32,7 +32,7 @@ describe("importDemoFile", () => {
 
   it("stamps current AnalysisManifest version on import", async () => {
     const result = await importDemoFile(await sampleFile(), { tags: ["versioned"] });
-    expect(result.entry.builtWith?.analysisVersion).toBe(ANALYSIS_MANIFEST.analysisVersion);
+    expect(result.entry.builtWith?.factsRevision).toBe(ANALYSIS_MANIFEST.factsRevision);
     expect(result.entry.builtWith?.formatVersion).toBe(ANALYSIS_MANIFEST.formatVersion);
     expect(isFactsStale(result.entry)).toBe(false);
   });
@@ -44,9 +44,9 @@ describe("isAnalysisStale", () => {
     expect(isAnalysisStale(null)).toBe(true);
   });
 
-  it("flags entries built with an older analysisVersion", () => {
-    expect(isAnalysisStale({ analysisVersion: ANALYSIS_MANIFEST.analysisVersion - 1, formatVersion: "x" })).toBe(true);
-    expect(isAnalysisStale({ analysisVersion: ANALYSIS_MANIFEST.analysisVersion, formatVersion: "x" })).toBe(false);
+  it("flags entries built with an older factsRevision", () => {
+    expect(isAnalysisStale({ factsRevision: "stale", formatVersion: "x" })).toBe(true);
+    expect(isAnalysisStale({ factsRevision: ANALYSIS_MANIFEST.factsRevision, formatVersion: "x" })).toBe(false);
   });
 });
 
@@ -61,11 +61,11 @@ describe("rebuildFactsFromZip", () => {
     const rebuilt = await rebuildFactsFromZip(id);
 
     expect(rebuilt?.id).toBe(id);
-    expect(rebuilt?.builtWith?.analysisVersion).toBe(ANALYSIS_MANIFEST.analysisVersion);
+    expect(rebuilt?.builtWith?.factsRevision).toBe(ANALYSIS_MANIFEST.factsRevision);
     expect(await factsStore.getCohortRows({ matchIds: [matchId] })).not.toHaveLength(0);
     // entry 仍在库中且非 stale
     const entries = await listDemoEntries();
-    expect(entries.find((e) => e.id === id)?.builtWith?.analysisVersion).toBe(ANALYSIS_MANIFEST.analysisVersion);
+    expect(entries.find((e) => e.id === id)?.builtWith?.factsRevision).toBe(ANALYSIS_MANIFEST.factsRevision);
   });
 
   it("returns null for an unknown id", async () => {

@@ -4,7 +4,7 @@ import { buildSeriesSummary } from "@cs2dak/presentation";
 import type { MatchWorkspaceModel, SeriesSummary } from "@cs2dak/contract";
 import { MatchWorkspace, QaReportPanel } from "@cs2dak/react";
 import { entryDate, loadMatchWorkspaceModel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
-import { getFactsStore } from "../lib/facts";
+import { getFactsStore } from "../lib/facts-store";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import { EmptyState } from "@cs2dak/react";
 import { SeriesWorkspace } from "./SeriesWorkspace";
