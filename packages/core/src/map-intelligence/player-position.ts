@@ -51,6 +51,72 @@ function movementSync(frames: readonly TeamSpatialFrame[], playerIndex: number):
   return rounded(mean(values));
 }
 
+const MIN_DELAYED_ISOLATION_SECONDS = 2;
+const MIN_TARGET_STABILITY_SECONDS = 1;
+const MIN_CONVERGENCE_PERSISTENCE_SECONDS = 2;
+
+function samePlayers(first: TeamSpatialFrame, second: TeamSpatialFrame): boolean {
+  const a = first.players.map((row) => row.playerIndex).sort((x, y) => x - y);
+  const b = second.players.map((row) => row.playerIndex).sort((x, y) => x - y);
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+/** Conservative per-round convergence evidence; raw rejoin ticks remain separately available. */
+export function detectDelayedConvergences(
+  frames: readonly TeamSpatialFrame[],
+  playerIndex: number,
+  tickrate: number,
+  tickStep: number,
+): PlayerPositionRoundFact["delayedConvergences"] {
+  const result: PlayerPositionRoundFact["delayedConvergences"] = [];
+  let isolatedSince: number | null = null;
+  for (let index = 0; index < frames.length; index += 1) {
+    const frame = frames[index]!;
+    const component = frame.components.find((group) => group.includes(playerIndex));
+    const isolated = component?.length === 1 && frame.players.length > 1;
+    if (isolated) {
+      isolatedSince ??= frame.tick;
+      continue;
+    }
+    if (isolatedSince == null || !component || component.length < 3 || index === 0) {
+      isolatedSince = null;
+      continue;
+    }
+    const priorIsolationSeconds = (frame.tick - isolatedSince) / tickrate;
+    const before = frames[index - 1]!;
+    if (priorIsolationSeconds < MIN_DELAYED_ISOLATION_SECONDS || !samePlayers(before, frame)) {
+      isolatedSince = null;
+      continue;
+    }
+    const target = component.filter((member) => member !== playerIndex);
+    const priorStartTick = frame.tick - MIN_TARGET_STABILITY_SECONDS * tickrate;
+    const priorFrames = frames.slice(0, index).filter((candidate) => candidate.tick >= priorStartTick);
+    const hasPriorCoverage = priorFrames.length > 0 && frame.tick - priorFrames[0]!.tick + tickStep >= MIN_TARGET_STABILITY_SECONDS * tickrate;
+    const targetWasStable = hasPriorCoverage && priorFrames.every((candidate) => {
+      const group = candidate.components.find((members) => members.includes(target[0]!));
+      return group != null && target.every((member) => group.includes(member));
+    });
+    if (!targetWasStable) {
+      isolatedSince = null;
+      continue;
+    }
+    let persistedFrames = 0;
+    for (let cursor = index; cursor < frames.length; cursor += 1) {
+      const candidate = frames[cursor]!;
+      if (!samePlayers(frame, candidate)) break;
+      const joined = candidate.components.find((group) => group.includes(playerIndex));
+      if (!joined || target.filter((member) => joined.includes(member)).length < 2) break;
+      persistedFrames += 1;
+    }
+    const persistenceSeconds = persistedFrames * tickStep / tickrate;
+    if (persistenceSeconds >= MIN_CONVERGENCE_PERSISTENCE_SECONDS) {
+      result.push({ tick: frame.tick, priorIsolationSeconds: rounded(priorIsolationSeconds)!, joinedComponentSize: component.length, persistenceSeconds: rounded(persistenceSeconds)! });
+    }
+    isolatedSince = null;
+  }
+  return result;
+}
+
 export function extractPlayerPositionRoundFacts(
   pkg: DemoPackage,
   matchId: string,
@@ -83,7 +149,7 @@ export function extractPlayerPositionRoundFacts(
       openingPath: [],
       eligibleSeconds: null, positionGroupDwell: [],
       unresolvedCalloutSeconds: null, calloutCoverage: null, meanNearestTeammateDistance: null, meanTeamCentroidDistance: null,
-      meanComponentSize: null, isolationSegments: [], rejoinTicks: [], movementSync: null,
+      meanComponentSize: null, isolationSegments: [], rejoinTicks: [], delayedConvergences: [], movementSync: null,
       freezeAwpOwnership: null, activeAwpSeconds: null, awpShots: null, awpKills: null,
       availability: availability(null, null, grid, hasNav, Boolean(pkg.shots)),
     }));
@@ -101,7 +167,7 @@ export function extractPlayerPositionRoundFacts(
         openingPath: [],
         eligibleSeconds: null, positionGroupDwell: [],
         unresolvedCalloutSeconds: null, calloutCoverage: null, meanNearestTeammateDistance: null, meanTeamCentroidDistance: null,
-        meanComponentSize: null, isolationSegments: [], rejoinTicks: [], movementSync: null,
+        meanComponentSize: null, isolationSegments: [], rejoinTicks: [], delayedConvergences: [], movementSync: null,
         freezeAwpOwnership: null, activeAwpSeconds: null, awpShots: null, awpKills: null,
         availability: availability(context, null, grid, hasNav, Boolean(pkg.shots)),
       } satisfies PlayerPositionRoundFact;
@@ -175,7 +241,9 @@ export function extractPlayerPositionRoundFacts(
       positionGroupDwell: [...dwell.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([positionGroupId, seconds]) => ({ positionGroupId, seconds: rounded(seconds)!, share: eligibleSeconds === 0 ? 0 : rounded(seconds / eligibleSeconds)! })),
       unresolvedCalloutSeconds: rounded(unresolved), calloutCoverage: eligibleSeconds === 0 ? null : rounded(1 - unresolved / eligibleSeconds),
       meanNearestTeammateDistance: rounded(mean(nearest)), meanTeamCentroidDistance: rounded(mean(centroid)), meanComponentSize: rounded(mean(components)),
-      isolationSegments, rejoinTicks, movementSync: movementSync(ownFrames, playerIndex), ...awp,
+      isolationSegments, rejoinTicks,
+      delayedConvergences: detectDelayedConvergences(ownFrames, playerIndex, pkg.match.tickrate || 64, context.tickStep),
+      movementSync: movementSync(ownFrames, playerIndex), ...awp,
       availability: availability(context, track, grid, hasNav, Boolean(pkg.shots)),
     } satisfies PlayerPositionRoundFact;
   });

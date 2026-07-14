@@ -2,7 +2,7 @@ import { z } from "zod";
 import { playerIndexSchema, sideSchema, steamId64Schema, teamKeySchema } from "./upstream.js";
 
 /** Bump when the compact map-intelligence producer changes its factual meaning. */
-export const MAP_INTELLIGENCE_FACT_VERSION = 4;
+export const MAP_INTELLIGENCE_FACT_VERSION = 5;
 export const OPENING_RESPONSIBILITY_WINDOW_VERSION = 1;
 
 const availabilitySchema = z.enum(["available", "degraded", "missing"]);
@@ -41,6 +41,14 @@ export const isolationSegmentSchema = z.object({
   seconds: z.number().nonnegative(),
 });
 
+/** A conservative isolated-to-stable-group transition inside one round. */
+export const delayedConvergenceSchema = z.object({
+  tick: z.number().int().nonnegative(),
+  priorIsolationSeconds: z.number().nonnegative(),
+  joinedComponentSize: z.number().int().min(3),
+  persistenceSeconds: z.number().positive(),
+});
+
 export const playerPositionRoundFactSchema = z.object({
   analysisVersion: z.literal(MAP_INTELLIGENCE_FACT_VERSION),
   matchId: z.string().min(1),
@@ -68,6 +76,7 @@ export const playerPositionRoundFactSchema = z.object({
   meanComponentSize: z.number().positive().nullable(),
   isolationSegments: z.array(isolationSegmentSchema),
   rejoinTicks: z.array(z.number().int().nonnegative()),
+  delayedConvergences: z.array(delayedConvergenceSchema),
   movementSync: z.number().min(-1).max(1).nullable(),
   utilityUseCount: z.number().int().nonnegative(),
   freezeAwpOwnership: z.boolean().nullable(),
@@ -121,7 +130,6 @@ export const teamAwpRoundFactSchema = z.object({
   awpDamage: z.number().nonnegative().nullable(),
   openingKills: z.number().int().nonnegative(),
   openingDeaths: z.number().int().nonnegative(),
-  savedAwpPlayerIndices: z.array(playerIndexSchema),
   availability: mapIntelligenceAvailabilitySchema,
 });
 
@@ -139,6 +147,7 @@ export type MapIntelligenceAvailability = z.infer<typeof mapIntelligenceAvailabi
 export type PositionGroupDwell = z.infer<typeof positionGroupDwellSchema>;
 export type ResponsibilityWindow = z.infer<typeof responsibilityWindowSchema>;
 export type IsolationSegment = z.infer<typeof isolationSegmentSchema>;
+export type DelayedConvergence = z.infer<typeof delayedConvergenceSchema>;
 export type PlayerPositionRoundFact = z.infer<typeof playerPositionRoundFactSchema>;
 export type TeamShapeWindow = z.infer<typeof teamShapeWindowSchema>;
 export type TeamShapeRoundFact = z.infer<typeof teamShapeRoundFactSchema>;

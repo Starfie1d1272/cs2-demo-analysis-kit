@@ -39,9 +39,7 @@ export function extractTeamAwpRoundFacts(pkg: DemoPackage, matchId: string, cont
         && isAwp(replayWeaponAt(context, track, frameIndex))).length;
       if (active >= 2) doubleFrames += 1;
     }
-    const lastFrame = context ? Math.max(0, Math.min(context.frameCount - 1, Math.floor((round.endTick - context.startTick) / context.tickStep))) : -1;
     const won = round.winnerTeamKey === teamKey;
-    const savedAwpPlayerIndices = !won && context ? context.tracks.filter((track) => track.teamKey === teamKey && ((track.flags[lastFrame] ?? 0) & FLAG_ALIVE) !== 0 && isAwp(replayWeaponAt(context, track, lastFrame))).map((track) => track.playerIndex).sort((a, b) => a - b) : [];
     const firstKillerTeam = firstKill?.killerIndex == null ? null : pkg.players[firstKill.killerIndex]?.teamKey ?? null;
     const firstVictimTeam = pkg.players[firstKill?.victimIndex ?? -1]?.teamKey ?? null;
     const available = teamRows.some((row) => row.activeAwpSeconds != null);
@@ -55,7 +53,7 @@ export function extractTeamAwpRoundFacts(pkg: DemoPackage, matchId: string, cont
       awpShots: teamRows.some((row) => row.awpShots != null) ? teamRows.reduce((sum, row) => sum + (row.awpShots ?? 0), 0) : null,
       awpKills: teamRows.some((row) => row.awpKills != null) ? teamRows.reduce((sum, row) => sum + (row.awpKills ?? 0), 0) : null,
       awpDamage: awpDamageForTeam(pkg, round, teamKey),
-      openingKills: firstKillerTeam === teamKey ? 1 : 0, openingDeaths: firstVictimTeam === teamKey ? 1 : 0, savedAwpPlayerIndices,
+      openingKills: firstKillerTeam === teamKey ? 1 : 0, openingDeaths: firstVictimTeam === teamKey ? 1 : 0,
       availability: teamRows[0]?.availability ?? { replay: "missing", nav: "missing", callouts: "missing", shots: "missing" },
     };
   });

@@ -5,6 +5,7 @@ import {
   type MatchMapIntelligenceFacts,
   type PlayerMapRoleEvidence,
   type PlayerPositionRoundFact,
+  type RoleModifier,
   type SupportedMapName,
   type TeamMapResponsibilityEvidence,
   type TeamResponsibility,
@@ -13,7 +14,7 @@ import {
 } from "@cs2dak/contract";
 import type { PlayerIdentityMap } from "./index.js";
 
-export const MAP_ROLE_MODEL_VERSION = "cs2-demo-analysis-kit/map-role-model-4.0";
+export const MAP_ROLE_MODEL_VERSION = "cs2-demo-analysis-kit/map-role-model-5.0";
 export const MAP_ROLE_THRESHOLDS = Object.freeze({
   minimumEligibleRounds: 6,
   reliableEligibleRounds: 12,
@@ -23,8 +24,6 @@ export const MAP_ROLE_THRESHOLDS = Object.freeze({
   responsibilitySeparation: 0.12,
   supportUtilityUsesPerRound: 0.4,
   supportOpeningUtilityUsesPerRound: 0.16,
-  supportMainComponentShare: 0.5,
-  supportMovementSync: 0.04,
 });
 
 const SUPPORTED_MAPS = new Set<SupportedMapName>([
@@ -97,6 +96,7 @@ function locators(rows: PlayerPositionRoundFact[]): Array<{ matchId: string; rou
 
 interface ShapeSummary {
   mainShare: number | null;
+  noUniqueCoreShare: number | null;
   isolatedShare: number | null;
   formationShares: Record<string, number>;
 }
@@ -104,6 +104,7 @@ interface ShapeSummary {
 function shapeSummary(rows: PlayerPositionRoundFact[], shapeByRound: Map<string, TeamShapeRoundFact>): ShapeSummary {
   let covered = 0;
   let main = 0;
+  let noUniqueCore = 0;
   let isolated = 0;
   const formations = new Map<string, number>();
   for (const row of rows) {
@@ -114,41 +115,49 @@ function shapeSummary(rows: PlayerPositionRoundFact[], shapeByRound: Map<string,
       if (!component) continue;
       covered += window.coverageSeconds;
       const largest = Math.max(...window.componentSizes);
-      if (component.length === largest && component.length > 1) main += window.coverageSeconds;
+      const uniqueCore = largest >= 3 && window.componentSizes.filter((size) => size === largest).length === 1 && largest > window.componentSizes.reduce((sum, size) => sum + size, 0) / 2
+        ? window.componentPlayerIndices.find((members) => members.length === largest) ?? null
+        : null;
+      if (uniqueCore?.includes(row.playerIndex)) main += window.coverageSeconds;
+      if (uniqueCore == null) noUniqueCore += window.coverageSeconds;
       if (component.length === 1) isolated += window.coverageSeconds;
       formations.set(window.partition, (formations.get(window.partition) ?? 0) + window.coverageSeconds);
     }
   }
   return {
     mainShare: covered > 0 ? rounded(main / covered) : null,
+    noUniqueCoreShare: covered > 0 ? rounded(noUniqueCore / covered) : null,
     isolatedShare: covered > 0 ? rounded(isolated / covered) : null,
     formationShares: Object.fromEntries([...formations.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => [key, rounded(value / Math.max(covered, 1))!])),
   };
 }
 
-function responsibility(side: "t" | "ct", input: { stability: number | null; relative: number | null; openingMain: number | null; openingIsolated: number | null; rejoin: number | null; movementSync: number | null; utilityPerRound: number; openingUtilityPerRound: number }): TeamResponsibility {
+function responsibility(side: "t" | "ct", input: { stability: number | null; relative: number | null; openingMain: number | null; openingIsolated: number | null; delayedConvergenceShare: number | null }): TeamResponsibility {
   const stable = input.stability ?? 0;
   const main = input.openingMain ?? 0;
   const isolated = input.openingIsolated ?? 0;
-  const sync = input.movementSync ?? 0;
-  const rejoin = input.rejoin ?? 0;
-  const observableSupport = input.utilityPerRound >= MAP_ROLE_THRESHOLDS.supportUtilityUsesPerRound
-    && input.openingUtilityPerRound >= MAP_ROLE_THRESHOLDS.supportOpeningUtilityUsesPerRound
-    && main >= MAP_ROLE_THRESHOLDS.supportMainComponentShare
-    && sync >= MAP_ROLE_THRESHOLDS.supportMovementSync;
+  const converged = (input.delayedConvergenceShare ?? 0) > 0;
   if (side === "t") {
-    if (isolated >= 0.28 && rejoin >= 1) return "lurk_late_join";
+    if (isolated >= 0.28 && converged) return "late_joining";
     if (isolated >= 0.32 && stable >= 0.45) return "extremity";
-    if (observableSupport) return "support";
-    if (main >= 0.68 && sync >= 0.08) return "core_pack";
-    if (stable >= 0.45 && main >= 0.25) return "map_control";
+    if (main >= 0.68) return "pack";
+    if (stable >= 0.45) return "stable_default";
     return "mixed";
   }
-  if (observableSupport) return "supportive";
-  if (stable >= 0.6 && (input.relative ?? 0) >= 0.08 && (isolated >= 0.12 || main >= 0.35)) return "anchor";
-  if (rejoin >= 2 && stable < 0.55) return "rotator";
-  if (isolated >= 0.2 && sync >= 0.05) return "active_control";
+  if (stable >= 0.6 && (input.relative ?? 0) >= 0.08 && (isolated >= 0.12 || main >= 0.35)) return "anchor_tendency";
+  if (converged && stable < 0.55) return "component_mobile";
+  if (isolated >= 0.2) return "independent_mobile";
+  if (stable >= 0.55) return "stable_position";
   return "mixed";
+}
+
+function modifiers(input: { stability: number | null; openingIsolated: number | null; delayedConvergenceShare: number | null; utilityPerRound: number; openingUtilityPerRound: number }): RoleModifier[] {
+  const result: RoleModifier[] = [];
+  if (input.utilityPerRound >= MAP_ROLE_THRESHOLDS.supportUtilityUsesPerRound && input.openingUtilityPerRound >= MAP_ROLE_THRESHOLDS.supportOpeningUtilityUsesPerRound) result.push("utility_supportive");
+  if ((input.stability ?? 0) >= 0.55) result.push("positionally_stable");
+  if ((input.openingIsolated ?? 0) >= 0.2) result.push("spatially_isolated");
+  if ((input.delayedConvergenceShare ?? 0) > 0) result.push("component_mobile");
+  return result;
 }
 
 export function buildPlayerMapRoleEvidence(facts: MapRoleEvidenceFacts | MatchMapIntelligenceFacts[], options: MapRoleEvidenceOptions = {}): PlayerMapRoleEvidence[] {
@@ -197,8 +206,10 @@ export function buildPlayerMapRoleEvidence(facts: MapRoleEvidenceFacts | MatchMa
       isolationSeconds: fullSeconds > 0 ? rounded(isolationSeconds, 2) : null,
       isolationShare: fullSeconds > 0 ? rounded(isolationSeconds / fullSeconds) : null,
       rejoinCount: fullSeconds > 0 ? eligibleRows.reduce((sum, row) => sum + row.rejoinTicks.length, 0) : null,
+      delayedConvergenceRoundShare: fullSeconds > 0 ? rounded(eligibleRows.filter((row) => row.delayedConvergences.length > 0).length / Math.max(eligibleRows.length, 1)) : null,
       movementSync: rounded(mean(eligibleRows.map((row) => row.movementSync))),
       openingMainComponentShare: shape.mainShare,
+      openingNoUniqueCoreShare: shape.noUniqueCoreShare,
       openingIsolatedShare: shape.isolatedShare,
       formationShares: shape.formationShares,
     };
@@ -217,16 +228,17 @@ export function buildPlayerMapRoleEvidence(facts: MapRoleEvidenceFacts | MatchMa
       sample: { observedRounds: rows.length, eligibleRounds: eligibleRows.length, eligibleSeconds: rounded(eligibleSeconds, 2)!, matchCount: new Set(rows.map((row) => row.matchId)).size, dataQuality: quality, coverage: rounded(mean(rows.map((row) => row.calloutCoverage))) },
       matchIds: [matchId],
       positionGroups, spatial, support,
-      responsibility: responsibility(side, { stability: spatial.dominantGroupStability, relative: spatial.teamRelativeGroupShare, openingMain: shape.mainShare, openingIsolated: shape.isolatedShare, rejoin: spatial.rejoinCount, movementSync: spatial.movementSync, utilityPerRound: support.utilityUsePerRound, openingUtilityPerRound: support.openingUtilityUsePerRound }),
+      responsibility: responsibility(side, { stability: spatial.dominantGroupStability, relative: spatial.teamRelativeGroupShare, openingMain: shape.mainShare, openingIsolated: shape.isolatedShare, delayedConvergenceShare: spatial.delayedConvergenceRoundShare }),
+      modifiers: modifiers({ stability: spatial.dominantGroupStability, openingIsolated: shape.isolatedShare, delayedConvergenceShare: spatial.delayedConvergenceRoundShare, utilityPerRound: support.utilityUsePerRound, openingUtilityPerRound: support.openingUtilityUsePerRound }),
       awp: { duty: "rifler" as WeaponDuty, eligibleRounds: eligibleRows.length, qualifiedLongGunRounds: qualified.length, freezeOwnershipRounds: qualified.filter((row) => row.freezeAwpOwnership === true).length, activeSeconds: rounded(active, 2), shots, kills, teamActiveShare: null as number | null, usageConcentration: null as number | null, matchConsistency },
       representativeRounds: locators(rows),
       basis: [`${MAP_ROLE_MODEL_VERSION}：opening position/component 用于默认职责，full-round movement 用于轮转、分离和回归解释。`],
-      limitations: ["职责是观察性描述，不是固定五槽；Support/Supportive 不会由低输出代理推断。"],
+      limitations: ["主结构职责与 utility / stability / isolation modifiers 分开；标签只描述可观察空间行为。"],
     };
   });
 
   for (const cell of cells) {
-    const peers = cells.filter((peer) => peer.teamKey === cell.teamKey && peer.mapName === cell.mapName && peer.side === cell.side);
+    const peers = cells.filter((peer) => peer.teamKey === cell.teamKey && peer.mapName === cell.mapName && peer.side === cell.side && peer.matchIds[0] === cell.matchIds[0]);
     const group = cell.positionGroups[0]?.positionGroupId;
     if (group) {
       const values = peers.filter((peer) => peer.playerKey !== cell.playerKey).map((peer) => peer.positionGroups.find((item) => item.positionGroupId === group)?.share ?? 0);
@@ -236,34 +248,111 @@ export function buildPlayerMapRoleEvidence(facts: MapRoleEvidenceFacts | MatchMa
     cell.awp.teamActiveShare = cell.awp.activeSeconds == null || total === 0 ? null : rounded(cell.awp.activeSeconds / total);
     cell.awp.usageConcentration = total === 0 ? null : rounded(Math.max(...peers.map((peer) => peer.awp.activeSeconds ?? 0)) / total);
     cell.awp.duty = localAwpDuty({ qualified: cell.awp.qualifiedLongGunRounds, active: cell.awp.activeSeconds, freeze: cell.awp.freezeOwnershipRounds, share: cell.awp.teamActiveShare, consistency: cell.awp.matchConsistency });
-    cell.responsibility = responsibility(cell.side, { stability: cell.spatial.dominantGroupStability, relative: cell.spatial.teamRelativeGroupShare, openingMain: cell.spatial.openingMainComponentShare, openingIsolated: cell.spatial.openingIsolatedShare, rejoin: cell.spatial.rejoinCount, movementSync: cell.spatial.movementSync, utilityPerRound: cell.support.utilityUsePerRound, openingUtilityPerRound: cell.support.openingUtilityUsePerRound });
+    cell.responsibility = responsibility(cell.side, { stability: cell.spatial.dominantGroupStability, relative: cell.spatial.teamRelativeGroupShare, openingMain: cell.spatial.openingMainComponentShare, openingIsolated: cell.spatial.openingIsolatedShare, delayedConvergenceShare: cell.spatial.delayedConvergenceRoundShare });
+    cell.modifiers = modifiers({ stability: cell.spatial.dominantGroupStability, openingIsolated: cell.spatial.openingIsolatedShare, delayedConvergenceShare: cell.spatial.delayedConvergenceRoundShare, utilityPerRound: cell.support.utilityUsePerRound, openingUtilityPerRound: cell.support.openingUtilityUsePerRound });
   }
   return cells.map((cell) => playerMapRoleEvidenceSchema.parse(cell));
 }
 
 export function buildTeamMapResponsibilityEvidence(facts: MapRoleEvidenceFacts | MatchMapIntelligenceFacts[], options: MapRoleEvidenceOptions = {}): TeamMapResponsibilityEvidence[] {
-  const players = buildPlayerMapRoleEvidence(facts, options);
+  const matchPlayers = buildPlayerMapRoleEvidence(facts, options);
   const groups = new Map<string, PlayerMapRoleEvidence[]>();
-  for (const player of players) groups.set([player.teamKey, player.mapName, player.side].join("\t"), [...(groups.get([player.teamKey, player.mapName, player.side].join("\t")) ?? []), player]);
-  return [...groups.entries()].map(([key, rows]) => {
+  for (const player of matchPlayers) groups.set([player.teamKey, player.mapName, player.side].join("\t"), [...(groups.get([player.teamKey, player.mapName, player.side].join("\t")) ?? []), player]);
+  return [...groups.entries()].map(([key, matchRows]) => {
     const [teamKey, mapName, side] = key.split("\t") as [string, SupportedMapName, "t" | "ct"];
+    const byPlayer = new Map<string, PlayerMapRoleEvidence[]>();
+    for (const row of matchRows) byPlayer.set(row.playerKey, [...(byPlayer.get(row.playerKey) ?? []), row]);
+    const rows = [...byPlayer.entries()].map(([playerKey, playerRows]) => {
+      const eligibleRounds = playerRows.reduce((sum, row) => sum + row.sample.eligibleRounds, 0);
+      const eligibleSeconds = playerRows.reduce((sum, row) => sum + row.sample.eligibleSeconds, 0);
+      const weight = (pick: (row: PlayerMapRoleEvidence) => number | null, by: "rounds" | "seconds" = "seconds") => {
+        const usable = playerRows.filter((row) => pick(row) != null);
+        const denominator = usable.reduce((sum, row) => sum + (by === "rounds" ? row.sample.eligibleRounds : row.sample.eligibleSeconds), 0);
+        return denominator === 0 ? null : rounded(usable.reduce((sum, row) => sum + pick(row)! * (by === "rounds" ? row.sample.eligibleRounds : row.sample.eligibleSeconds), 0) / denominator);
+      };
+      const dwell = new Map<string, { seconds: number; rounds: number }>();
+      for (const row of playerRows) for (const group of row.positionGroups) {
+        const current = dwell.get(group.positionGroupId) ?? { seconds: 0, rounds: 0 };
+        current.seconds += group.seconds;
+        current.rounds += group.roundCount;
+        dwell.set(group.positionGroupId, current);
+      }
+      const positionGroups = [...dwell.entries()].map(([positionGroupId, value]) => ({
+        positionGroupId, seconds: rounded(value.seconds, 2)!, share: eligibleSeconds > 0 ? rounded(value.seconds / eligibleSeconds)! : 0, roundCount: value.rounds,
+      })).sort((a, b) => b.seconds - a.seconds || a.positionGroupId.localeCompare(b.positionGroupId));
+      const formations = new Set(playerRows.flatMap((row) => Object.keys(row.spatial.formationShares)));
+      const utilityUses = playerRows.reduce((sum, row) => sum + row.support.utilityUses, 0);
+      const openingUtilityUses = playerRows.reduce((sum, row) => sum + row.support.openingUtilityUses, 0);
+      const quality = weight((row) => row.sample.dataQuality) ?? 0;
+      const spatial = {
+        dominantGroupStability: positionGroups[0] == null ? null : rounded(positionGroups[0].roundCount / Math.max(eligibleRounds, 1)),
+        teamRelativeGroupShare: null as number | null,
+        isolationSeconds: playerRows.some((row) => row.spatial.isolationSeconds != null) ? rounded(playerRows.reduce((sum, row) => sum + (row.spatial.isolationSeconds ?? 0), 0), 2) : null,
+        isolationShare: weight((row) => row.spatial.isolationShare),
+        rejoinCount: playerRows.some((row) => row.spatial.rejoinCount != null) ? playerRows.reduce((sum, row) => sum + (row.spatial.rejoinCount ?? 0), 0) : null,
+        delayedConvergenceRoundShare: weight((row) => row.spatial.delayedConvergenceRoundShare, "rounds"),
+        movementSync: weight((row) => row.spatial.movementSync),
+        openingMainComponentShare: weight((row) => row.spatial.openingMainComponentShare),
+        openingNoUniqueCoreShare: weight((row) => row.spatial.openingNoUniqueCoreShare),
+        openingIsolatedShare: weight((row) => row.spatial.openingIsolatedShare),
+        formationShares: Object.fromEntries([...formations].sort().map((formation) => [formation, weight((row) => row.spatial.formationShares[formation] ?? 0) ?? 0])),
+      };
+      const support = { utilityUses, openingUtilityUses, utilityUsePerRound: rounded(utilityUses / Math.max(eligibleRounds, 1))!, openingUtilityUsePerRound: rounded(openingUtilityUses / Math.max(eligibleRounds, 1))! };
+      const active = playerRows.some((row) => row.awp.activeSeconds != null) ? rounded(playerRows.reduce((sum, row) => sum + (row.awp.activeSeconds ?? 0), 0), 2) : null;
+      const awp = {
+        duty: "rifler" as WeaponDuty,
+        eligibleRounds,
+        qualifiedLongGunRounds: playerRows.reduce((sum, row) => sum + row.awp.qualifiedLongGunRounds, 0),
+        freezeOwnershipRounds: playerRows.reduce((sum, row) => sum + row.awp.freezeOwnershipRounds, 0),
+        activeSeconds: active,
+        shots: playerRows.some((row) => row.awp.shots != null) ? playerRows.reduce((sum, row) => sum + (row.awp.shots ?? 0), 0) : null,
+        kills: playerRows.some((row) => row.awp.kills != null) ? playerRows.reduce((sum, row) => sum + (row.awp.kills ?? 0), 0) : null,
+        teamActiveShare: null as number | null,
+        usageConcentration: null as number | null,
+        matchConsistency: playerRows.length === 0 ? null : rounded(playerRows.filter((row) => row.awp.freezeOwnershipRounds > 0 || (row.awp.activeSeconds ?? 0) >= 3).length / playerRows.length),
+      };
+      const status = playerRows.every((row) => row.status === "unknown") ? "unknown" : eligibleRounds < MAP_ROLE_THRESHOLDS.minimumEligibleRounds ? "insufficient" : quality < 0.72 ? "mixed" : "ready";
+      return {
+        version: MAP_ROLE_EVIDENCE_VERSION, playerKey, teamKey, mapName, side, status,
+        confidence: rounded(Math.min(1, eligibleRounds / MAP_ROLE_THRESHOLDS.reliableEligibleRounds) * quality)!,
+        sample: { observedRounds: playerRows.reduce((sum, row) => sum + row.sample.observedRounds, 0), eligibleRounds, eligibleSeconds: rounded(eligibleSeconds, 2)!, matchCount: new Set(playerRows.flatMap((row) => row.matchIds)).size, dataQuality: quality, coverage: weight((row) => row.sample.coverage) },
+        matchIds: [...new Set(playerRows.flatMap((row) => row.matchIds))].sort(), positionGroups, spatial, support,
+        responsibility: responsibility(side, { stability: spatial.dominantGroupStability, relative: null, openingMain: spatial.openingMainComponentShare, openingIsolated: spatial.openingIsolatedShare, delayedConvergenceShare: spatial.delayedConvergenceRoundShare }),
+        modifiers: modifiers({ stability: spatial.dominantGroupStability, openingIsolated: spatial.openingIsolatedShare, delayedConvergenceShare: spatial.delayedConvergenceRoundShare, utilityPerRound: support.utilityUsePerRound, openingUtilityPerRound: support.openingUtilityUsePerRound }),
+        awp,
+        representativeRounds: playerRows.flatMap((row) => row.representativeRounds).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber).slice(0, 5),
+        basis: [`${MAP_ROLE_MODEL_VERSION}：team matrix 先聚合为唯一 player × team × map × side cell。`],
+        limitations: ["位置重叠是描述性 concentration，不自动解释为职责冲突。"],
+      } satisfies PlayerMapRoleEvidence;
+    });
+    for (const player of rows) {
+      const peers = rows.filter((peer) => peer.playerKey !== player.playerKey);
+      const group = player.positionGroups[0]?.positionGroupId;
+      if (group && peers.length) player.spatial.teamRelativeGroupShare = rounded(player.positionGroups[0]!.share - peers.reduce((sum, peer) => sum + (peer.positionGroups.find((item) => item.positionGroupId === group)?.share ?? 0), 0) / peers.length);
+      const total = rows.reduce((sum, peer) => sum + (peer.awp.activeSeconds ?? 0), 0);
+      player.awp.teamActiveShare = player.awp.activeSeconds == null || total === 0 ? null : rounded(player.awp.activeSeconds / total);
+      player.awp.usageConcentration = total === 0 ? null : rounded(Math.max(...rows.map((peer) => peer.awp.activeSeconds ?? 0)) / total);
+      player.awp.duty = localAwpDuty({ qualified: player.awp.qualifiedLongGunRounds, active: player.awp.activeSeconds, freeze: player.awp.freezeOwnershipRounds, share: player.awp.teamActiveShare, consistency: player.awp.matchConsistency });
+      player.responsibility = responsibility(side, { stability: player.spatial.dominantGroupStability, relative: player.spatial.teamRelativeGroupShare, openingMain: player.spatial.openingMainComponentShare, openingIsolated: player.spatial.openingIsolatedShare, delayedConvergenceShare: player.spatial.delayedConvergenceRoundShare });
+      player.modifiers = modifiers({ stability: player.spatial.dominantGroupStability, openingIsolated: player.spatial.openingIsolatedShare, delayedConvergenceShare: player.spatial.delayedConvergenceRoundShare, utilityPerRound: player.support.utilityUsePerRound, openingUtilityPerRound: player.support.openingUtilityUsePerRound });
+    }
     const overlap = new Map<string, string[]>();
     for (const player of rows) {
       const primary = player.positionGroups[0];
       if (primary && primary.share >= 0.35) overlap.set(primary.positionGroupId, [...(overlap.get(primary.positionGroupId) ?? []), player.playerKey]);
     }
-    const positionOverlap = [...overlap.entries()].filter(([, keys]) => keys.length >= 2).map(([positionGroupId, playerKeys]) => ({ positionGroupId, playerKeys: playerKeys.sort(), share: rounded(playerKeys.length / Math.max(rows.length, 1))! })).sort((a, b) => a.positionGroupId.localeCompare(b.positionGroupId));
+    const positionOverlap = [...overlap.entries()].filter(([, keys]) => keys.length >= 2).map(([positionGroupId, playerKeys]) => ({ positionGroupId, playerKeys: [...new Set(playerKeys)].sort(), share: rounded(new Set(playerKeys).size / Math.max(rows.length, 1))! })).sort((a, b) => a.positionGroupId.localeCompare(b.positionGroupId));
+    const positionConcentration = overlap.size === 0 ? null : rounded(Math.max(...[...overlap.values()].map((keys) => new Set(keys).size)) / Math.max(rows.length, 1));
     const usable = rows.filter((row) => row.status === "ready" || row.status === "mixed");
-    const responsibilityConflict = positionOverlap.some((row) => row.share >= 0.6);
     const unstableCoverage = usable.length > 0 && (usable.some((row) => (row.spatial.dominantGroupStability ?? 1) < 0.45) || usable.filter((row) => row.status === "mixed").length / usable.length >= 0.5);
-    const status = usable.length === 0 ? rows.some((row) => row.status === "unknown") ? "unknown" : "insufficient" : usable.length < 2 ? "insufficient" : responsibilityConflict || unstableCoverage ? "mixed" : "ready";
+    const status = usable.length === 0 ? rows.some((row) => row.status === "unknown") ? "unknown" : "insufficient" : usable.length < 2 ? "insufficient" : unstableCoverage ? "mixed" : "ready";
     return teamMapResponsibilityEvidenceSchema.parse({
       version: MAP_ROLE_EVIDENCE_VERSION, teamKey, mapName, side, status,
       confidence: rounded(rows.reduce((sum, row) => sum + row.confidence * row.sample.eligibleSeconds, 0) / Math.max(rows.reduce((sum, row) => sum + row.sample.eligibleSeconds, 0), 1))!,
-      players: rows.sort((a, b) => a.playerKey.localeCompare(b.playerKey)), positionOverlap, responsibilityConflict, unstableCoverage,
+      players: rows.map((row) => playerMapRoleEvidenceSchema.parse(row)).sort((a, b) => a.playerKey.localeCompare(b.playerKey)), positionOverlap, positionConcentration, unstableCoverage,
       representativeRounds: rows.flatMap((row) => row.representativeRounds).slice(0, 5),
       basis: ["逐回合 opening component membership、position group 与 full-round continuity 共同形成描述性职责。"],
-      limitations: ["不强制五个位置或职责覆盖；缺少 utility/trade 证据时不强推 Support/Supportive。"],
+      limitations: ["不强制五个位置或职责覆盖；position overlap / concentration 只描述多人常驻同组。"],
     });
   }).sort((a, b) => a.teamKey.localeCompare(b.teamKey) || a.mapName.localeCompare(b.mapName) || a.side.localeCompare(b.side));
 }

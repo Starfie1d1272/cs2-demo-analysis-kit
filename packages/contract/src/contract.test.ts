@@ -56,11 +56,11 @@ describe("roleDeclarationSchema", () => {
 
 describe("matchMapIntelligenceFactsSchema", () => {
   const base = {
-    analysisVersion: 4 as const,
+    analysisVersion: 5 as const,
     matchId: "m1",
     mapName: "de_anubis",
     playerPositionRounds: [{
-      analysisVersion: 4 as const,
+      analysisVersion: 5 as const,
       matchId: "m1", mapName: "de_anubis", roundNumber: 1, teamKey: "teamA" as const, side: "t" as const,
       playerIndex: 0, steamId64: "76561198000000001", economyType: null, openingWindow: null,
       openingEligibleSeconds: null, openingPositionGroupDwell: [], openingMeanComponentSize: null, openingIsolationSeconds: null,
@@ -68,12 +68,12 @@ describe("matchMapIntelligenceFactsSchema", () => {
       openingPath: [],
       eligibleSeconds: null, positionGroupDwell: [],
       unresolvedCalloutSeconds: null, calloutCoverage: null, meanNearestTeammateDistance: null,
-      meanTeamCentroidDistance: null, meanComponentSize: null, isolationSegments: [], rejoinTicks: [],
+      meanTeamCentroidDistance: null, meanComponentSize: null, isolationSegments: [], rejoinTicks: [], delayedConvergences: [],
       movementSync: null, utilityUseCount: 0, freezeAwpOwnership: null, activeAwpSeconds: null, awpShots: null, awpKills: null,
       availability: { replay: "missing" as const, nav: "missing" as const, callouts: "missing" as const, shots: "missing" as const },
     }],
     teamShapeRounds: [{
-      analysisVersion: 4 as const,
+      analysisVersion: 5 as const,
       matchId: "m1", mapName: "de_anubis", roundNumber: 1, teamKey: "teamA" as const, side: "t" as const,
       openingWindow: null, openingWindows: [], coverageSeconds: null, windows: [],
       availability: { replay: "missing" as const, nav: "missing" as const, callouts: "missing" as const, shots: "missing" as const },

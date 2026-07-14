@@ -58,20 +58,23 @@ function globalWeaponDuty(rows: PlayerMapRoleEvidence[]): WeaponDuty | null {
   return freeze > 0 || active > 0 ? "situational_awper" : "rifler";
 }
 
-function similarities(rows: PlayerMapRoleEvidence[], weaponDuty: WeaponDuty | null): Record<InferredMapRole, number> {
+function evidenceScores(rows: PlayerMapRoleEvidence[], weaponDuty: WeaponDuty | null): Record<InferredMapRole, number> {
   const awper = weaponDuty == null ? 0 : ({ primary_awper: 1, secondary_awper: 0.72, situational_awper: 0.3, rifler: 0 } as const)[weaponDuty];
   const anchor = weighted(rows.filter((row) => row.side === "ct"), (row) => {
-    const duty = row.responsibility === "anchor" ? 1 : row.responsibility === "active_control" ? 0.35 : 0;
-    return clamp(duty * 0.65 + (row.spatial.dominantGroupStability ?? 0) * 0.25 + Math.max(0, row.spatial.teamRelativeGroupShare ?? 0) * 0.1);
+    const relative = clamp(Math.max(0, row.spatial.teamRelativeGroupShare ?? 0) / 0.3);
+    const positionShare = row.positionGroups[0]?.share ?? 0;
+    return clamp((row.spatial.dominantGroupStability ?? 0) * 0.45 + relative * 0.3 + positionShare * 0.25);
   });
-  const opener = weighted(rows.filter((row) => row.side === "t"), (row) => {
-    const responsibility = row.responsibility === "core_pack" || row.responsibility === "map_control" ? 0.65 : 0.15;
-    return clamp(responsibility + Math.max(0, row.spatial.movementSync ?? 0) * 0.2 + (row.spatial.openingMainComponentShare ?? 0) * 0.15);
-  });
-  const closer = weighted(rows.filter((row) => row.side === "t"), (row) => {
-    const responsibility = row.responsibility === "lurk_late_join" ? 0.75 : row.responsibility === "extremity" ? 0.5 : 0.1;
-    return clamp(responsibility + Math.min(1, (row.spatial.rejoinCount ?? 0) / Math.max(row.sample.eligibleRounds, 1)) * 0.25);
-  });
+  const opener = weighted(rows.filter((row) => row.side === "t"), (row) => clamp(
+    (row.spatial.openingMainComponentShare ?? 0) * 0.55
+    + (1 - (row.spatial.openingIsolatedShare ?? 1)) * 0.25
+    + (row.spatial.dominantGroupStability ?? 0) * 0.2,
+  ));
+  const closer = weighted(rows.filter((row) => row.side === "t"), (row) => clamp(
+    (row.spatial.openingIsolatedShare ?? 0) * 0.35
+    + (row.spatial.delayedConvergenceRoundShare ?? 0) * 0.4
+    + (row.spatial.dominantGroupStability ?? 0) * 0.25,
+  ));
   const headlineCap = weaponDuty === "primary_awper" ? 0.75 : 1;
   return { awper: rounded(awper), anchor: rounded(anchor * headlineCap), opener: rounded(opener * headlineCap), closer: rounded(closer * headlineCap) };
 }
@@ -133,11 +136,11 @@ export interface BuildPlayerMapRoleProfilesOptions { matchTimes?: Record<string,
 
 function infer(rows: PlayerMapRoleEvidence[]) {
   const weaponDuty = globalWeaponDuty(rows);
-  const roleSimilarities = similarities(rows, weaponDuty);
+  const roleEvidenceScores = evidenceScores(rows, weaponDuty);
   // AWP resemblance remains useful evidence, but only a reliable primary AWP
   // duty is eligible to win the public main-role headline.
-  const headlineSimilarities = { ...roleSimilarities, awper: weaponDuty === "primary_awper" ? roleSimilarities.awper : 0 };
-  const ranked = rankScores(headlineSimilarities);
+  const headlineScores = { ...roleEvidenceScores, awper: weaponDuty === "primary_awper" ? roleEvidenceScores.awper : 0 };
+  const ranked = rankScores(headlineScores);
   const [winner, winnerScore] = ranked[0]!;
   const [runnerUp, runnerScore] = ranked[1]!;
   const margin = rounded(winnerScore - runnerScore);
@@ -145,7 +148,7 @@ function infer(rows: PlayerMapRoleEvidence[]) {
   const sufficient = rows.some((row) => row.status === "ready" || row.status === "mixed");
   const reliableWinner = sufficient && winnerScore >= 0.55 && margin >= MAP_ROLE_THRESHOLDS.responsibilitySeparation;
   const status: MapRoleStatus = baseStatus === "unknown" || baseStatus === "insufficient" ? baseStatus : reliableWinner ? "ready" : "mixed";
-  return { weaponDuty, roleSimilarities, winner, runnerUp, margin, sufficient, status, inferredPrimaryRole: status === "ready" ? winner : null };
+  return { weaponDuty, roleEvidenceScores, winner, runnerUp, margin, sufficient, status, inferredPrimaryRole: status === "ready" ? winner : null };
 }
 
 export function buildPlayerMapRoleProfiles(evidenceRows: PlayerMapRoleEvidence[], declarations: RoleDeclaration[] = [], options: BuildPlayerMapRoleProfilesOptions = {}): PlayerMapRoleProfile[] {
@@ -163,7 +166,7 @@ export function buildPlayerMapRoleProfiles(evidenceRows: PlayerMapRoleEvidence[]
     const declaredRoles = scopedDeclarations.filter((item): item is { declaration: MainRoleDeclaration; scope: ScopedEvidence } => item.declaration.kind === "main_role").map((item) => item.declaration);
     const declaredWeaponDuties = scopedDeclarations.filter((item): item is { declaration: WeaponDutyDeclaration; scope: ScopedEvidence } => item.declaration.kind === "weapon_duty").map((item) => item.declaration);
     const automatic = infer(rows);
-    const { weaponDuty, roleSimilarities, winner, runnerUp, margin, sufficient, status, inferredPrimaryRole } = automatic;
+    const { weaponDuty, roleEvidenceScores, winner, runnerUp, margin, sufficient, status, inferredPrimaryRole } = automatic;
     const declaredIgl = scopedDeclarations.some((item) => item.declaration.kind === "main_role" && item.declaration.priority === "primary" && item.declaration.role === "igl" && item.declaration.mapName == null && item.declaration.validFrom == null && item.declaration.validTo == null);
     const headlineRole = declaredIgl ? inferredPrimaryRole === "awper" ? "IGL / AWPer" : "IGL" : inferredPrimaryRole;
     const volume = clamp(rows.reduce((sum, row) => sum + row.sample.eligibleRounds, 0) / 40);
@@ -174,7 +177,7 @@ export function buildPlayerMapRoleProfiles(evidenceRows: PlayerMapRoleEvidence[]
       .filter((item): item is { declaration: MainRoleDeclaration; scope: ScopedEvidence } => item.declaration.kind === "main_role")
       .map(({ declaration, scope }) => {
         const observed = scope.rows.length ? infer(scope.rows) : null;
-        return alignment(declaration, observed?.inferredPrimaryRole ?? null, observed?.roleSimilarities ?? roleSimilarities, scope.rows, scope.limitations);
+        return alignment(declaration, observed?.inferredPrimaryRole ?? null, observed?.roleEvidenceScores ?? roleEvidenceScores, scope.rows, scope.limitations);
       });
     const weaponDutyAlignments = scopedDeclarations
       .filter((item): item is { declaration: WeaponDutyDeclaration; scope: ScopedEvidence } => item.declaration.kind === "weapon_duty")
@@ -183,41 +186,33 @@ export function buildPlayerMapRoleProfiles(evidenceRows: PlayerMapRoleEvidence[]
         return { declaration, observedWeaponDuty: observed, overall: observed == null ? "not_comparable" : observed === declaration.weaponDuty ? "aligned" : "different_observation", sampleLimitations: scope.limitations } as const;
       });
     return playerMapRoleProfileSchema.parse({
-      version: "cs2-demo-analysis-kit/player-map-role-profile-4.0", playerKey, teamKey,
+      version: "cs2-demo-analysis-kit/player-map-role-profile-5.0", playerKey, teamKey,
       declaredRoles, declaredWeaponDuties,
-      inferredPrimaryRole, runnerUpRole: sufficient ? runnerUp : null, separationMargin: sufficient ? margin : null, roleSimilarities,
+      inferredPrimaryRole, runnerUpRole: sufficient ? runnerUp : null, separationMargin: sufficient ? margin : null, roleEvidenceScores,
       headlineRole, status, confidence, weaponDuty,
       positionGroupDisplay: rows.flatMap((row) => row.positionGroups.map((group) => ({ mapName: row.mapName, side: row.side, positionGroupId: group.positionGroupId, ...positionGroupDisplay(row.mapName, row.side, group.positionGroupId) }))),
       roleAlignments, weaponDutyAlignments,
       perMapEvidence: rows.sort((a, b) => a.teamKey.localeCompare(b.teamKey) || a.mapName.localeCompare(b.mapName) || a.side.localeCompare(b.side)),
       evidence: evidence(rows),
-      basis: [`${MAP_ROLE_MODEL_VERSION}：按 eligible seconds、数据完整性、队内 separation 与跨样本一致性加权。`, "人工声明与自动观察独立保存；自动优先级为 AWPer → Anchor → Opener / Closer。"],
+      basis: [`${MAP_ROLE_MODEL_VERSION}：headline 直接由连续 evidence 计算，不重复叠加离散职责标签。`, "倾向分不是概率；人工声明与自动观察独立保存。"],
       limitations: ["IGL 无法由 demo 统计验证。", ...[...new Set(scopedDeclarations.flatMap((item) => item.scope.limitations))]],
     });
   }).sort((a, b) => a.playerKey.localeCompare(b.playerKey) || a.teamKey.localeCompare(b.teamKey));
 }
 
-function dynamic(row: PlayerMapRoleEvidence): "stable" | "isolated" | "rotating" | "mixed" | "unknown" {
-  if (row.status === "unknown" || row.status === "insufficient") return "unknown";
-  if ((row.spatial.isolationShare ?? 0) >= 0.2) return "isolated";
-  if ((row.spatial.rejoinCount ?? 0) >= 2) return "rotating";
-  if ((row.spatial.dominantGroupStability ?? 0) >= 0.55) return "stable";
-  return "mixed";
-}
-
 export function buildTeamMapRoleMatrices(evidenceRows: TeamMapResponsibilityEvidence[], profiles: PlayerMapRoleProfile[]): TeamMapRoleMatrix[] {
   const profileByKey = new Map(profiles.map((profile) => [`${profile.playerKey}\t${profile.teamKey}`, profile]));
   return evidenceRows.map((row) => teamMapRoleMatrixSchema.parse({
-    version: "cs2-demo-analysis-kit/team-map-role-matrix-3.0", teamKey: row.teamKey, mapName: row.mapName, side: row.side,
+    version: "cs2-demo-analysis-kit/team-map-role-matrix-4.0", teamKey: row.teamKey, mapName: row.mapName, side: row.side,
     status: row.status, confidence: row.confidence,
     players: row.players.map((player) => ({
       playerKey: player.playerKey,
       primaryPositionGroups: player.positionGroups.slice(0, 3).map((group) => ({ ...group, ...positionGroupDisplay(row.mapName, row.side, group.positionGroupId) })),
-      dynamicResponsibility: dynamic(player), responsibility: player.responsibility,
+      responsibility: player.responsibility, modifiers: player.modifiers,
       sampleRounds: player.sample.eligibleRounds, confidence: player.confidence,
       weaponDuty: profileByKey.get(`${player.playerKey}\t${row.teamKey}`)?.weaponDuty ?? null, evidence: evidence([player]),
     })),
-    positionOverlap: row.positionOverlap, responsibilityConflict: row.responsibilityConflict, unstableCoverage: row.unstableCoverage,
+    positionOverlap: row.positionOverlap, positionConcentration: row.positionConcentration, unstableCoverage: row.unstableCoverage,
     representativeRounds: row.representativeRounds.map((ref) => ({ ...ref, reason: `${row.mapName} ${row.side.toUpperCase()} 队伍职责代表回合`, role: "example" as const })),
     basis: row.basis, limitations: row.limitations,
   })).sort((a, b) => a.teamKey.localeCompare(b.teamKey) || a.mapName.localeCompare(b.mapName) || a.side.localeCompare(b.side));

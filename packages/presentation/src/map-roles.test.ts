@@ -4,13 +4,13 @@ import { buildPlayerMapRoleProfiles, buildTeamMapRoleMatrices } from "./index.js
 
 function evidence(playerKey: string, overrides: Partial<PlayerMapRoleEvidence> = {}): PlayerMapRoleEvidence {
   return {
-    version: 3, playerKey, teamKey: "Team One", mapName: "de_ancient", side: "ct", status: "ready", confidence: 0.9,
+    version: 4, playerKey, teamKey: "Team One", mapName: "de_ancient", side: "ct", status: "ready", confidence: 0.9,
     sample: { observedRounds: 16, eligibleRounds: 16, eligibleSeconds: 320, matchCount: 3, dataQuality: 1, coverage: 1 },
     matchIds: ["m1", "m2", "m3"],
     positionGroups: [{ positionGroupId: "a_anchor", seconds: 120, share: 0.7, roundCount: 7 }],
-    spatial: { dominantGroupStability: 0.875, teamRelativeGroupShare: 0.3, isolationSeconds: 4, isolationShare: 0.03, rejoinCount: 0, movementSync: 0.6, openingMainComponentShare: 0.4, openingIsolatedShare: 0.4, formationShares: { "4+1": 1 } },
+    spatial: { dominantGroupStability: 0.875, teamRelativeGroupShare: 0.3, isolationSeconds: 4, isolationShare: 0.03, rejoinCount: 0, delayedConvergenceRoundShare: 0, movementSync: 0.6, openingMainComponentShare: 0.4, openingNoUniqueCoreShare: 0, openingIsolatedShare: 0.4, formationShares: { "4+1": 1 } },
     support: { utilityUses: 0, openingUtilityUses: 0, utilityUsePerRound: 0, openingUtilityUsePerRound: 0 },
-    responsibility: "anchor",
+    responsibility: "anchor_tendency", modifiers: ["positionally_stable"],
     awp: { duty: "primary_awper", eligibleRounds: 16, qualifiedLongGunRounds: 16, freezeOwnershipRounds: 12, activeSeconds: 160, shots: 24, kills: 10, teamActiveShare: 0.8, usageConcentration: 0.8, matchConsistency: 1 },
     representativeRounds: [{ matchId: "m1", roundNumber: 1, positionGroupId: "a_anchor" }, { matchId: "m2", roundNumber: 1 }, { matchId: "m3", roundNumber: 1 }], basis: ["facts"], limitations: ["approximation"],
     ...overrides,
@@ -35,21 +35,22 @@ describe("map role presentation", () => {
     const first = evidence("p1");
     const second = evidence("p2", { awp: { ...evidence("p2").awp, duty: "rifler", activeSeconds: 0, teamActiveShare: 0 }, positionGroups: [{ positionGroupId: "a_anchor", seconds: 100, share: 0.6, roundCount: 7 }] });
     const team: TeamMapResponsibilityEvidence = {
-      version: 3, teamKey: "Team One", mapName: "de_ancient", side: "ct", status: "mixed", confidence: 0.7,
+      version: 4, teamKey: "Team One", mapName: "de_ancient", side: "ct", status: "mixed", confidence: 0.7,
       players: [first, second], positionOverlap: [{ positionGroupId: "a_anchor", playerKeys: ["p1", "p2"], share: 1 }],
-      responsibilityConflict: true, unstableCoverage: true, representativeRounds: first.representativeRounds, basis: ["facts"], limitations: ["no slots"],
+      positionConcentration: 1, unstableCoverage: true, representativeRounds: first.representativeRounds, basis: ["facts"], limitations: ["no slots"],
     };
     const profiles = buildPlayerMapRoleProfiles([first, second]);
     const matrix = buildTeamMapRoleMatrices([team], profiles)[0]!;
-    expect(matrix).toMatchObject({ responsibilityConflict: true, unstableCoverage: true });
+    expect(matrix).toMatchObject({ positionConcentration: 1, unstableCoverage: true });
     expect(matrix.players).toHaveLength(2);
   });
 
   it("returns mixed rather than ready with a null role when candidates are not separated", () => {
     const rifle = { ...evidence("p1").awp, duty: "rifler" as const, qualifiedLongGunRounds: 20, freezeOwnershipRounds: 0, activeSeconds: 0, teamActiveShare: 0, matchConsistency: 0 };
+    const ambiguousSpatial = { ...evidence("p1").spatial, dominantGroupStability: 0.4, teamRelativeGroupShare: 0 };
     const profile = buildPlayerMapRoleProfiles([
-      evidence("p1", { side: "ct", responsibility: "anchor", awp: rifle }),
-      evidence("p1", { side: "t", mapName: "de_mirage", responsibility: "core_pack", awp: rifle }),
+      evidence("p1", { side: "ct", responsibility: "anchor_tendency", spatial: ambiguousSpatial, awp: rifle }),
+      evidence("p1", { side: "t", mapName: "de_mirage", responsibility: "pack", spatial: ambiguousSpatial, awp: rifle }),
     ])[0]!;
     expect(profile.status).toBe("mixed");
     expect(profile.inferredPrimaryRole).toBeNull();
@@ -66,7 +67,7 @@ describe("map role presentation", () => {
     const secondary = { ...evidence("p1").awp, duty: "secondary_awper" as const, qualifiedLongGunRounds: 12, freezeOwnershipRounds: 4, activeSeconds: 40, shots: 6, kills: 3, teamActiveShare: 0.3, matchConsistency: 0.6 };
     const anchor = buildPlayerMapRoleProfiles([evidence("p1", { awp: secondary })])[0]!;
     expect(anchor.weaponDuty).toBe("secondary_awper");
-    expect(anchor.roleSimilarities.awper).toBeGreaterThan(0.55);
+    expect(anchor.roleEvidenceScores.awper).toBeGreaterThan(0.55);
     expect(anchor.inferredPrimaryRole).toBe("anchor");
     const situational = buildPlayerMapRoleProfiles([evidence("p1", { awp: { ...secondary, duty: "situational_awper", qualifiedLongGunRounds: 1, freezeOwnershipRounds: 1 } })])[0]!;
     expect(situational.inferredPrimaryRole).toBe("anchor");
@@ -105,8 +106,8 @@ describe("map role presentation", () => {
   });
 
   it("isolates the same player across canonical team identities and aligns declarations only with their scoped rows", () => {
-    const teamOne = evidence("p1", { teamKey: "Team One", mapName: "de_ancient", responsibility: "anchor" });
-    const teamTwo = evidence("p1", { teamKey: "Team Two", mapName: "de_mirage", side: "t", responsibility: "lurk_late_join", awp: { ...evidence("p1").awp, duty: "rifler", activeSeconds: 0, teamActiveShare: 0, matchConsistency: 0 } });
+    const teamOne = evidence("p1", { teamKey: "Team One", mapName: "de_ancient", responsibility: "anchor_tendency" });
+    const teamTwo = evidence("p1", { teamKey: "Team Two", mapName: "de_mirage", side: "t", responsibility: "late_joining", awp: { ...evidence("p1").awp, duty: "rifler", activeSeconds: 0, teamActiveShare: 0, matchConsistency: 0 } });
     const declaration = { kind: "main_role", playerKey: "p1", teamKey: "Team Two", mapName: "de_mirage", role: "closer", priority: "primary", source: "user", provenance: "coach" } as const;
     const profiles = buildPlayerMapRoleProfiles([teamOne, teamTwo], [declaration]);
     expect(profiles).toHaveLength(2);

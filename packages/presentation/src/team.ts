@@ -57,7 +57,7 @@ export interface TeamOverviewModel {
   economyWinRate: TeamComparisonSide["economyWinRate"];
   matches: TeamComparisonSideMatch[];
   /** Declaration-neutral map/side responsibility summary; consumers may render the full matrices separately. */
-  roleMatrixSummary: Array<{ mapName: string; side: "t" | "ct"; status: TeamMapRoleMatrix["status"]; responsibilityConflict: boolean; unstableCoverage: boolean }>;
+  roleMatrixSummary: Array<{ mapName: string; side: "t" | "ct"; status: TeamMapRoleMatrix["status"]; positionConcentration: number | null; unstableCoverage: boolean }>;
 }
 
 export interface TeamComparisonInput {
@@ -307,7 +307,7 @@ export function buildTeamOverviewFromFacts(inputs: TeamComparisonFacts[], teamNa
     matches: side.matches,
     roleMatrixSummary: roleMatrices
       .filter((matrix) => matrix.teamKey === teamName)
-      .map((matrix) => ({ mapName: matrix.mapName, side: matrix.side, status: matrix.status, responsibilityConflict: matrix.responsibilityConflict, unstableCoverage: matrix.unstableCoverage }))
+      .map((matrix) => ({ mapName: matrix.mapName, side: matrix.side, status: matrix.status, positionConcentration: matrix.positionConcentration, unstableCoverage: matrix.unstableCoverage }))
       .sort((a, b) => a.mapName.localeCompare(b.mapName) || a.side.localeCompare(b.side)),
   };
 }
