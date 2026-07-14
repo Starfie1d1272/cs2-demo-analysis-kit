@@ -259,7 +259,7 @@ export function EventPackageMaker({ onNotice }: { onNotice: (message: string) =>
       <summary><b>赛事资源制作器</b></summary>
       <p className="stu-muted">选定赛制即生成赛程框架——点击框架中的任一格子（淘汰赛节点 / 瑞士轮战绩组），在下方逐场附加 1–5 张原始 .dem/v3 ZIP，队伍/地图/比分自动从 demo 识别，再录 BP，生成可导入或发布的 <code>&lt;slug&gt;.zip</code> 资源包。附加的 demo 不入草稿，刷新后需重附。</p>
 
-      <div className="stu-veto-toolbar">
+      <div className="stu-event-form-grid">
         <label>赛事名<input value={name} onChange={(event) => { setName(event.target.value); setSlug(slugifyEventName(event.target.value)); }} placeholder="Cologne Major 2026" /></label>
         <label>资源标识<input value={slug} readOnly placeholder="由赛事名自动生成" /></label>
         <label>赛事页 URL<input value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="https://www.hltv.org/results?event=8301" /></label>
@@ -279,7 +279,7 @@ export function EventPackageMaker({ onNotice }: { onNotice: (message: string) =>
           <button className="stu-button-sm" type="button" onClick={() => setStages((rows) => [...rows, newStage(rows.length + 1)])}>添加阶段</button>
         </div>
         {stages.map((stage) => (
-          <div key={stage.key} className="stu-veto-toolbar">
+          <div key={stage.key} className="stu-event-form-grid stu-event-form-grid-compact">
             <label>名称<input value={stage.name} onChange={(event) => patchStage(stage.key, { name: event.target.value })} /></label>
             <label>赛制<select value={stage.type} onChange={(event) => {
               const type = event.target.value as EventStage["type"];
@@ -322,7 +322,7 @@ export function EventPackageMaker({ onNotice }: { onNotice: (message: string) =>
         return (
           <div key={row.key} className="stu-card">
             {/* 阶段/轮次/组别由框架槽位自动绑定，无需手填；这里只调局制与状态 */}
-            <div className="stu-veto-toolbar">
+            <div className="stu-event-form-grid stu-event-form-grid-compact">
               <label>局制<select value={row.format} onChange={(event) => patchSeries(row.key, { format: event.target.value as SeriesFormat, veto: null })}>{(["bo1", "bo3", "bo5"] as const).map((format) => <option key={format} value={format}>{format.toUpperCase()}</option>)}</select></label>
               <label>状态<select value={row.status === "cancelled" ? "cancelled" : "finished"} onChange={(event) => patchSeries(row.key, { status: event.target.value as MakerSeriesDraft["status"] })}><option value="finished">已结束</option><option value="cancelled">取消</option></select></label>
               <label>比赛 URL<input value={row.matchUrl ?? ""} onChange={(event) => patchSeries(row.key, { matchUrl: event.target.value || undefined })} placeholder="https://www.hltv.org/matches/..." /></label>

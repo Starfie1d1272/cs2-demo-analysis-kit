@@ -64,7 +64,7 @@ export function UpdateModal({ update, onDismiss }: Props) {
 
   return (
     <div className="stu-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onDismiss(); }}>
-      <div className="stu-modal" role="dialog" aria-label="发现新版本">
+      <div className="stu-dialog stu-dialog-update" role="dialog" aria-label="发现新版本">
         <div className="stu-modal-header">
           <Download size={18} />
           <span>新版本 v{update.latest} 可用</span>

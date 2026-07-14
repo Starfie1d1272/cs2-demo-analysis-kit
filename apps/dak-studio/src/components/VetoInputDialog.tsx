@@ -117,7 +117,7 @@ export function VetoInputDialog({
 
   return (
     <div className="stu-modal-backdrop" role="dialog" aria-modal="true" aria-label="录入 BP" onClick={onClose}>
-      <div className="stu-modal" onClick={(event) => event.stopPropagation()}>
+      <div className="stu-dialog stu-dialog-wide" onClick={(event) => event.stopPropagation()}>
         <header className="stu-modal-head">
           <h3>BP 选图 · {teamAName} vs {teamBName}</h3>
           <button type="button" className="stu-modal-close" onClick={onClose} aria-label="关闭">✕</button>
@@ -126,7 +126,7 @@ export function VetoInputDialog({
         <div className="stu-veto-toolbar">
           <label>
             赛制
-            <select value={format} onChange={(event) => changeFormat(event.target.value as SeriesFormat)}>
+            <select className="stu-form-control" value={format} onChange={(event) => changeFormat(event.target.value as SeriesFormat)}>
               {FORMATS.map((item) => <option key={item} value={item}>{item.toUpperCase()}</option>)}
             </select>
           </label>
@@ -151,7 +151,7 @@ export function VetoInputDialog({
                 >B</button>
               </div>
               <select
-                className="stu-veto-map"
+                className="stu-veto-map stu-form-control"
                 value={step.mapName}
                 onChange={(event) => updateStep(index, { mapName: event.target.value })}
               >
@@ -200,7 +200,7 @@ function SidePick({
   return (
     <span className="stu-veto-side">
       <small>{label}</small>
-      <select value={side ?? ""} onChange={(event) => onChange((event.target.value || null) as Side | null)}>
+      <select className="stu-form-control" value={side ?? ""} onChange={(event) => onChange((event.target.value || null) as Side | null)}>
         <option value="">边</option>
         <option value="t">T 方</option>
         <option value="ct">CT 方</option>
