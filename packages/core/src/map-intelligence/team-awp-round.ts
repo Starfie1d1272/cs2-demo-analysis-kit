@@ -4,6 +4,18 @@ import { rounded } from "./spatial.js";
 
 function isAwp(value: string | null): boolean { return value?.trim().toLowerCase().replace(/^weapon_/, "") === "awp"; }
 
+function awpDamageForTeam(pkg: DemoPackage, round: DemoPackage["rounds"][number], teamKey: "teamA" | "teamB"): number | null {
+  // A valid v3 manifest always names damages.json. Keep null only for a genuinely
+  // unavailable package rather than turning an unknown fact into zero.
+  if (!pkg.manifest?.files?.damages) return null;
+  return pkg.damages
+    .filter((damage) => damage.roundNumber === round.roundNumber && damage.tick >= round.freezeEndTick && damage.tick <= round.endTick)
+    .filter((damage) => damage.attackerIndex != null && pkg.players[damage.attackerIndex]?.teamKey === teamKey)
+    .filter((damage) => pkg.players[damage.victimIndex]?.teamKey !== teamKey)
+    .filter((damage) => isAwp(damage.weapon))
+    .reduce((sum, damage) => sum + damage.healthDamage, 0);
+}
+
 function phase(roundNumber: number): TeamAwpRoundFact["scorePhase"] {
   return roundNumber <= 12 ? "first_half" : roundNumber <= 24 ? "second_half" : "overtime";
 }
@@ -42,7 +54,7 @@ export function extractTeamAwpRoundFacts(pkg: DemoPackage, matchId: string, cont
       awpActiveSeconds: available ? rounded(teamRows.reduce((sum, row) => sum + (row.activeAwpSeconds ?? 0), 0)) : null,
       awpShots: teamRows.some((row) => row.awpShots != null) ? teamRows.reduce((sum, row) => sum + (row.awpShots ?? 0), 0) : null,
       awpKills: teamRows.some((row) => row.awpKills != null) ? teamRows.reduce((sum, row) => sum + (row.awpKills ?? 0), 0) : null,
-      awpDamage: null,
+      awpDamage: awpDamageForTeam(pkg, round, teamKey),
       openingKills: firstKillerTeam === teamKey ? 1 : 0, openingDeaths: firstVictimTeam === teamKey ? 1 : 0, savedAwpPlayerIndices,
       availability: teamRows[0]?.availability ?? { replay: "missing", nav: "missing", callouts: "missing", shots: "missing" },
     };

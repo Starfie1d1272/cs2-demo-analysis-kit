@@ -27,6 +27,10 @@ function distance(a: Vec3, b: Vec3): number {
   return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 }
 
+function finitePoint(point: Vec3): boolean {
+  return Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z);
+}
+
 function navConnected(nav: CompactNav, first: number, second: number): boolean {
   const key = first < second ? `${first}:${second}` : `${second}:${first}`;
   const cache = navConnectivityCache.get(nav) ?? new Map<string, boolean>();
@@ -84,6 +88,7 @@ export function buildRoundSpatialFrames(
         .filter((track) => track.side === side && ((track.flags[frameIndex] ?? 0) & FLAG_ALIVE) !== 0)
         .map((track) => {
           const point = replayPointAt(track, frameIndex);
+          if (!finitePoint(point)) return null;
           return {
             playerIndex: track.playerIndex,
             track,
@@ -91,7 +96,7 @@ export function buildRoundSpatialFrames(
             callout: replayCalloutAt(context, track, frameIndex, grid),
             navAreaId: nav ? nearestNavArea(nav, point)?.id ?? null : null,
           };
-        });
+        }).filter((player): player is SpatialPlayerSample => player != null);
       if (players.length > 0) frames.push({ tick, teamKey, side, players, components: components(players, nav) });
     }
   }

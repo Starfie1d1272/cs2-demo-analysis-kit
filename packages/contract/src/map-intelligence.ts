@@ -2,7 +2,7 @@ import { z } from "zod";
 import { playerIndexSchema, sideSchema, steamId64Schema, teamKeySchema } from "./upstream.js";
 
 /** Bump when the compact map-intelligence producer changes its factual meaning. */
-export const MAP_INTELLIGENCE_FACT_VERSION = 3;
+export const MAP_INTELLIGENCE_FACT_VERSION = 4;
 export const OPENING_RESPONSIBILITY_WINDOW_VERSION = 1;
 
 const availabilitySchema = z.enum(["available", "degraded", "missing"]);

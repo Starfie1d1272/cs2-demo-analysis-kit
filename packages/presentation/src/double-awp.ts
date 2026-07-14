@@ -43,8 +43,8 @@ export function buildDoubleAwpAnalyses(rows: TeamAwpRoundFact[], options: Double
       saves: double.reduce((sum, row) => sum + row.savedAwpPlayerIndices.length, 0), roundStartAwpOwnerships: double.reduce((sum, row) => sum + row.roundStartAwpPlayerIndices.length, 0),
       activeAwpSeconds: sumNullable((row) => row.awpActiveSeconds), doubleAwpActiveSeconds: sumNullable((row) => row.doubleAwpActiveSeconds), awpKills: sumNullable((row) => row.awpKills), awpDamage: sumNullable((row) => row.awpDamage),
       evidence: double.slice(0, 8).map((row) => ({ matchId: row.matchId, roundNumber: row.roundNumber, reason: `${row.mapName} ${row.side.toUpperCase()} 双 AWP 长枪局`, role: "example" as const })),
-      basis: ["仅按逐回合 round-start AWP ownership 与存活 active time 描述双 AWP 使用；CT/T 分开。"],
-      limitations: ["胜率和开局数据是条件统计，不表示双 AWP 导致结果。", ...(double.some((row) => row.awpDamage == null) ? ["当前 v3 事实没有可靠的逐回合 AWP damage，保持 null。"] : [])],
+      basis: ["仅按逐回合 round-start AWP ownership、存活 active time 和有效生命伤害描述双 AWP 使用；CT/T 分开。"],
+      limitations: ["胜率和开局数据是条件统计，不表示双 AWP 导致结果。", "末帧持狙仅表示败方存活且最后可用 replay frame 手持 AWP；v3 没有回合末完整 inventory，不能称为精确保枪。", ...(double.some((row) => row.awpDamage == null) ? ["当前 ZIP 缺少可用 damages 数据，AWP damage 保持 null。"] : [])],
     });
   }).sort((a, b) => a.teamKey.localeCompare(b.teamKey) || a.side.localeCompare(b.side));
 }

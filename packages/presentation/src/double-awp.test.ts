@@ -4,7 +4,7 @@ import { buildDoubleAwpAnalyses } from "./double-awp.js";
 
 function row(roundNumber: number, overrides: Partial<TeamAwpRoundFact> = {}): TeamAwpRoundFact {
   return {
-    analysisVersion: 3, matchId: `m${Math.ceil(roundNumber / 3)}`, mapName: roundNumber % 2 ? "de_nuke" : "de_inferno", roundNumber,
+    analysisVersion: 4, matchId: `m${Math.ceil(roundNumber / 3)}`, mapName: roundNumber % 2 ? "de_nuke" : "de_inferno", roundNumber,
     teamKey: "teamA", side: "ct", economyType: "full", opponentEconomyType: "full", scorePhase: "first_half", won: roundNumber % 2 === 0,
     roundStartAwpPlayerIndices: [0, 1], doubleAwpActiveSeconds: 12, awpActiveSeconds: 28, awpShots: 4, awpKills: 2, awpDamage: null,
     openingKills: 1, openingDeaths: 0, savedAwpPlayerIndices: roundNumber % 2 ? [0] : [],
