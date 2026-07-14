@@ -5,13 +5,13 @@ import type { PlayerMapPoolRow, PlayerMapRoleProfile, TeamMapRoleMatrix } from "
 import { PlayerMapPoolPanel, PlayerMapRoleProfilePanel, TeamMapRoleMatrixPanel } from "./MapRoles";
 
 const profile = {
-  version: "cs2-demo-analysis-kit/player-map-role-profile-3.0", playerKey: "p1", teamKeys: ["T"],
-  declaredRoles: [{ playerKey: "p1", role: "igl", priority: "primary", source: "user", provenance: "user" }],
+  version: "cs2-demo-analysis-kit/player-map-role-profile-4.0", playerKey: "p1", teamKey: "T",
+  declaredRoles: [{ kind: "main_role", playerKey: "p1", role: "igl", priority: "primary", source: "user", provenance: "user" }], declaredWeaponDuties: [],
   inferredPrimaryRole: "awper", runnerUpRole: "anchor", separationMargin: 0.4,
   roleSimilarities: { awper: 0.9, anchor: 0.5, opener: 0.2, closer: 0.1 },
   headlineRole: "IGL / AWPer", status: "ready", confidence: 0.8, weaponDuty: "primary_awper",
   positionGroupDisplay: [{ mapName: "de_mirage", side: "ct", positionGroupId: "a_site", displayName: "A包", officialName: "BombsiteA", resolved: true }],
-  alignment: { declaredPrimary: "igl", declaredSecondary: [], inferredPrimary: "awper", overall: "not_comparable", tSide: "T 方观察职责：unknown", ctSide: "CT 方观察职责：anchor", disagreementReasons: [], sampleLimitations: [] },
+  roleAlignments: [{ declaration: { kind: "main_role", playerKey: "p1", role: "igl", priority: "primary", source: "user", provenance: "user" }, declaredPrimary: "igl", declaredSecondary: [], inferredPrimary: "awper", overall: "not_comparable", tSide: "T 方观察职责：unknown", ctSide: "CT 方观察职责：anchor", disagreementReasons: [], sampleLimitations: [] }], weaponDutyAlignments: [],
   perMapEvidence: [{
     version: 3, playerKey: "p1", teamKey: "T", mapName: "de_mirage", side: "ct", status: "ready", confidence: 0.8,
     sample: { observedRounds: 12, eligibleRounds: 12, eligibleSeconds: 240, matchCount: 3, dataQuality: 1, coverage: 1 },

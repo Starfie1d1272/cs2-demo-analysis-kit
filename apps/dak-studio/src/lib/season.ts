@@ -278,7 +278,7 @@ function roleTeamIdentityMap(entries: StudioDemoEntry[], identity?: IdentityOpti
 export function getMapRoleEvidence(entries: StudioDemoEntry[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<MapRoleEvidenceSummary> {
   const teamIdentityMap = roleTeamIdentityMap(entries, identity);
   const teamMappingKey = Object.entries(teamIdentityMap).sort(([a], [b]) => a.localeCompare(b)).map(([raw, canonical]) => `${raw}=${canonical}`).join("|");
-  const key = `${keyOf(entries, identity?.version, selectedTeams)}:map-role-evidence:v3:team-map=${teamMappingKey}`;
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:map-role-evidence:v4:team-map=${teamMappingKey}`;
   const cached = mapRoleEvidenceCache.get(key);
   if (cached) return cached;
   const loading = (async () => {

@@ -7,49 +7,57 @@ describe("role declaration state", () => {
   beforeEach(async () => { await getStorage().records("role-declarations").delete("current"); });
 
   it("persists CRUD independently from facts namespaces", async () => {
-    expect(ROLE_DECLARATIONS_SCHEMA_VERSION).toBe(2);
-    let state: RoleDeclarationsState = { version: 2, declarations: [] };
-    state = await upsertRoleDeclaration(state, { playerKey: "steam:a", role: "igl", priority: "primary", source: "user", provenance: "用户声明" }, "crud");
+    expect(ROLE_DECLARATIONS_SCHEMA_VERSION).toBe(3);
+    let state: RoleDeclarationsState = { version: 3, declarations: [] };
+    state = await upsertRoleDeclaration(state, { kind: "main_role", playerKey: "steam:a", role: "igl", priority: "primary", source: "user", provenance: "用户声明" }, "crud");
     await getStorage().records("facts:player_position_rounds").put("m1", { disposable: true });
     await getStorage().records("facts:player_position_rounds").deleteByPrefix("m1");
     expect((await loadRoleDeclarations()).declarations).toHaveLength(1);
     expect((await removeRoleDeclaration(state, "crud")).declarations).toEqual([]);
   });
 
-  it("migrates v1 rows without losing ids, timestamps or user data", async () => {
-    await getStorage().records("role-declarations").put("current", { version: 1, declarations: [
-      { id: "d1", createdAt: 1, updatedAt: 2, declaration: { playerKey: "steam:a", role: "igl", source: "user", provenance: "用户声明" } },
-      { id: "d2", createdAt: 3, updatedAt: 4, declaration: { playerKey: "steam:a", role: "anchor", source: "user", provenance: "用户声明" } },
+  it("migrates v1 and v2 main-role rows without losing ids, timestamps or user data", async () => {
+    await getStorage().records("role-declarations").put("current", { version: 2, declarations: [
+      { id: "d1", createdAt: 1, updatedAt: 2, declaration: { playerKey: "steam:a", role: "igl", priority: "primary", source: "user", provenance: "用户声明" } },
+      { id: "d2", createdAt: 3, updatedAt: 4, declaration: { playerKey: "steam:a", role: "anchor", priority: "secondary", source: "user", provenance: "用户声明" } },
     ] });
     const migrated = await loadRoleDeclarations();
-    expect(migrated.version).toBe(2);
+    expect(migrated.version).toBe(3);
     expect(migrated.declarations).toMatchObject([
-      { id: "d1", createdAt: 1, updatedAt: 2, declaration: { role: "igl", priority: "primary" } },
-      { id: "d2", createdAt: 3, updatedAt: 4, declaration: { role: "anchor", priority: "secondary" } },
+      { id: "d1", createdAt: 1, updatedAt: 2, declaration: { kind: "main_role", role: "igl", priority: "primary" } },
+      { id: "d2", createdAt: 3, updatedAt: 4, declaration: { kind: "main_role", role: "anchor", priority: "secondary" } },
     ]);
   });
 
   it("keeps at most one primary per player/team/map/time scope", async () => {
-    let state: RoleDeclarationsState = { version: 2, declarations: [] };
-    state = await upsertRoleDeclaration(state, { playerKey: "p", role: "anchor", priority: "primary", source: "user", provenance: "first" }, "first");
-    state = await upsertRoleDeclaration(state, { playerKey: "p", role: "igl", priority: "primary", source: "user", provenance: "second" }, "second");
-    expect(state.declarations.filter((row) => row.declaration.priority === "primary")).toHaveLength(1);
-    expect(state.declarations.find((row) => row.id === "first")?.declaration.priority).toBe("secondary");
+    let state: RoleDeclarationsState = { version: 3, declarations: [] };
+    state = await upsertRoleDeclaration(state, { kind: "main_role", playerKey: "p", role: "anchor", priority: "primary", source: "user", provenance: "first" }, "first");
+    state = await upsertRoleDeclaration(state, { kind: "main_role", playerKey: "p", role: "igl", priority: "primary", source: "user", provenance: "second" }, "second");
+    expect(state.declarations.filter((row) => row.declaration.kind === "main_role" && row.declaration.priority === "primary")).toHaveLength(1);
+    expect(state.declarations.find((row) => row.id === "first")?.declaration).toMatchObject({ priority: "secondary" });
   });
 
   it("migrates declarations by steamId intersection after an identity merge", async () => {
-    const state: RoleDeclarationsState = { version: 2, declarations: [] };
-    await upsertRoleDeclaration(state, { playerKey: "steam:b", role: "awper", priority: "secondary", source: "user", provenance: "用户声明" }, "merge");
+    const state: RoleDeclarationsState = { version: 3, declarations: [] };
+    await upsertRoleDeclaration(state, { kind: "main_role", playerKey: "steam:b", role: "awper", priority: "secondary", source: "user", provenance: "用户声明" }, "merge");
     const migrated = await migrateRoleDeclarationsForIdentity({ version: 1, teamRenames: {}, mappings: [{ playerKey: "steam:a", displayName: "A", steamIds: ["a", "b"], updatedAt: 0 }] });
     expect(migrated.declarations.find((row) => row.id === "merge")?.declaration.playerKey).toBe("steam:a");
   });
 
   it("demotes duplicate primaries when identity merge collapses two scopes", async () => {
-    let state: RoleDeclarationsState = { version: 2, declarations: [] };
-    state = await upsertRoleDeclaration(state, { playerKey: "steam:a", role: "anchor", priority: "primary", source: "user", provenance: "first" }, "a");
-    await upsertRoleDeclaration(state, { playerKey: "steam:b", role: "igl", priority: "primary", source: "user", provenance: "second" }, "b");
+    let state: RoleDeclarationsState = { version: 3, declarations: [] };
+    state = await upsertRoleDeclaration(state, { kind: "main_role", playerKey: "steam:a", role: "anchor", priority: "primary", source: "user", provenance: "first" }, "a");
+    await upsertRoleDeclaration(state, { kind: "main_role", playerKey: "steam:b", role: "igl", priority: "primary", source: "user", provenance: "second" }, "b");
     const migrated = await migrateRoleDeclarationsForIdentity({ version: 1, teamRenames: {}, mappings: [{ playerKey: "player:merged", displayName: "Merged", steamIds: ["a", "b"], updatedAt: 0 }] });
-    expect(migrated.declarations.filter((row) => row.declaration.priority === "primary")).toHaveLength(1);
-    expect(migrated.declarations.filter((row) => row.declaration.priority === "secondary")).toHaveLength(1);
+    expect(migrated.declarations.filter((row) => row.declaration.kind === "main_role" && row.declaration.priority === "primary")).toHaveLength(1);
+    expect(migrated.declarations.filter((row) => row.declaration.kind === "main_role" && row.declaration.priority === "secondary")).toHaveLength(1);
+  });
+
+  it("keeps one weapon-duty declaration per scope and preserves it through identity migration", async () => {
+    let state: RoleDeclarationsState = { version: 3, declarations: [] };
+    state = await upsertRoleDeclaration(state, { kind: "weapon_duty", playerKey: "steam:a", weaponDuty: "secondary_awper", source: "user", provenance: "first" }, "first");
+    state = await upsertRoleDeclaration(state, { kind: "weapon_duty", playerKey: "steam:a", weaponDuty: "rifler", source: "user", provenance: "second" }, "second");
+    expect(state.declarations).toHaveLength(1);
+    expect(state.declarations[0]?.declaration).toMatchObject({ kind: "weapon_duty", weaponDuty: "rifler" });
   });
 });

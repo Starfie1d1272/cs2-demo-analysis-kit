@@ -44,6 +44,7 @@ export function PlayerMapRoleProfilePanel({
     <section className="dak-role-panel">
       <div className="dak-role-head"><div><h3>地图 / 位置</h3><p>自动推断与人工声明并列展示；不会互相覆盖。</p></div><Status value={profile.status} /></div>
       <div className="dak-role-summary">
+        <span>队伍：<b>{profile.teamKey}</b></span>
         <span>自动画像：<b>{profile.inferredPrimaryRole ?? "—"}</b></span>
         <span>标题角色：<b>{profile.headlineRole ?? "—"}</b></span>
         <span>武器职责：<b>{profile.weaponDuty ? DUTY_LABEL[profile.weaponDuty] : "—"}</b></span>
@@ -51,9 +52,10 @@ export function PlayerMapRoleProfilePanel({
         <span>区分度：<b>{profile.separationMargin == null ? "—" : `${Math.round(profile.separationMargin * 100)}%`}</b></span>
       </div>
       <div className="dak-role-summary"><span>AWPer 相似度 <b>{Math.round(profile.roleSimilarities.awper * 100)}%</b></span><span>Anchor 相似度 <b>{Math.round(profile.roleSimilarities.anchor * 100)}%</b></span><span>Opener 相似度 <b>{Math.round(profile.roleSimilarities.opener * 100)}%</b></span><span>Closer 相似度 <b>{Math.round(profile.roleSimilarities.closer * 100)}%</b></span></div>
-      <div className="dak-role-declarations"><b>用户声明</b>{profile.declaredRoles.filter((row) => row.source === "user").map((row, index) => <span key={`user-${row.role}-${index}`} className="dak-role-tag">{row.role}{row.mapName ? ` · ${row.mapName.replace("de_", "")}` : ""}{row.teamKey ? ` · ${row.teamKey}` : ""}</span>)}{!profile.declaredRoles.some((row) => row.source === "user") && <span>未提供</span>}<b>可信元数据</b>{profile.declaredRoles.filter((row) => row.source === "trusted_metadata").map((row, index) => <span key={`metadata-${row.role}-${index}`} className="dak-role-tag">{row.role}</span>)}{!profile.declaredRoles.some((row) => row.source === "trusted_metadata") && <span>未提供</span>}</div>
+      <div className="dak-role-declarations"><b>用户主角色</b>{profile.declaredRoles.filter((row) => row.source === "user").map((row, index) => <span key={`user-${row.role}-${index}`} className="dak-role-tag">{row.priority} · {row.role}{row.mapName ? ` · ${row.mapName.replace("de_", "")}` : ""}</span>)}{!profile.declaredRoles.some((row) => row.source === "user") && <span>未提供</span>}<b>用户武器职责</b>{profile.declaredWeaponDuties.filter((row) => row.source === "user").map((row, index) => <span key={`weapon-${row.weaponDuty}-${index}`} className="dak-role-tag">{DUTY_LABEL[row.weaponDuty]}{row.mapName ? ` · ${row.mapName.replace("de_", "")}` : ""}</span>)}{!profile.declaredWeaponDuties.some((row) => row.source === "user") && <span>未提供</span>}</div>
       {rows.length ? <DataTable classes={DAK_TABLE_CLASSES} rows={rows} rowKey={(row) => `${row.teamKey}:${row.mapName}:${row.side}`} columns={columns} initialSortKey="sample" /> : <EmptyState variant="insufficient" title="没有可用地图样本" hint="当前范围没有满足角色证据条件的地图 / 阵营数据。" />}
-      <p className="dak-role-note"><b>声明与观察</b>{profile.alignment.tSide}；{profile.alignment.ctSide}</p>
+      {profile.roleAlignments.map((alignment, index) => <p className="dak-role-note" key={`role-alignment-${index}`}><b>声明与观察</b>{alignment.tSide}；{alignment.ctSide}{alignment.sampleLimitations[0] ? `；${alignment.sampleLimitations[0]}` : ""}</p>)}
+      {profile.weaponDutyAlignments.map((alignment, index) => <p className="dak-role-note" key={`weapon-alignment-${index}`}><b>武器职责声明与观察</b>{DUTY_LABEL[alignment.declaration.weaponDuty]} / {alignment.observedWeaponDuty ? DUTY_LABEL[alignment.observedWeaponDuty] : "—"}</p>)}
       {profile.basis[0] && <p className="dak-role-note"><b>依据</b>{profile.basis[0]}</p>}
       {profile.limitations[0] && <LimitNote>{profile.limitations[0]}</LimitNote>}
     </section>
@@ -94,7 +96,7 @@ export function DoubleAwpAnalysisPanel({ model, playerNames = {}, onOpenEvidence
   if (!model) return <EmptyState variant="insufficient" title="双 AWP 样本不可用" hint="需要逐回合 AWP 与经济 facts；T/CT 会分别统计。" />;
   return <section className="dak-role-panel">
     <div className="dak-role-head"><div><h3>{model.side.toUpperCase()} 双 AWP</h3><p>仅描述 qualified full-buy / long-gun round 的观测指标，不作因果归因。</p></div><Status value={model.status} /></div>
-    <div className="dak-role-summary"><span>双 AWP 回合 <b>{model.doubleAwpRoundCount}/{model.qualifiedRoundCount}</b></span><span>占比 <b>{model.eligibleRoundShare == null ? "—" : `${Math.round(model.eligibleRoundShare * 100)}%`}</b></span><span>战绩 <b>{model.wins}/{model.doubleAwpRoundCount}</b></span><span>开局 <b>{model.openingKills}:{model.openingDeaths}</b></span><span>保狙 <b>{model.saves}</b></span><span>AWP kills <b>{model.awpKills ?? "—"}</b></span></div>
+    <div className="dak-role-summary"><span>双 AWP 回合 <b>{model.doubleAwpRoundCount}/{model.qualifiedRoundCount}</b></span><span>占比 <b>{model.eligibleRoundShare == null ? "—" : `${Math.round(model.eligibleRoundShare * 100)}%`}</b></span><span>战绩 <b>{model.wins}/{model.doubleAwpRoundCount}</b></span><span>开局 <b>{model.openingKills}:{model.openingDeaths}</b></span><span>末帧持狙 <b>{model.saves}</b></span><span>AWP kills <b>{model.awpKills ?? "—"}</b></span><span>AWP damage <b>{model.awpDamage ?? "—"}</b></span></div>
     <div className="dak-role-declarations"><b>常见组合</b>{model.combinations.map((combo) => <span key={combo.playerKeys.join("|")} className="dak-role-tag">{combo.playerKeys.map((key) => playerNames[key] ?? key).join(" + ")} · {combo.rounds}</span>)}{model.combinations.length === 0 && <span>无</span>}</div>
     {model.evidence.length > 0 && <div className="dak-role-evidence"><b>代表回合</b><Evidence evidence={model.evidence} onOpenEvidence={onOpenEvidence} /></div>}
     {model.limitations.map((item) => <LimitNote key={item}>{item}</LimitNote>)}

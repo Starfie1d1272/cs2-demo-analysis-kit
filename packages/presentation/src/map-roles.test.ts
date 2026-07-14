@@ -19,14 +19,14 @@ function evidence(playerKey: string, overrides: Partial<PlayerMapRoleEvidence> =
 
 describe("map role presentation", () => {
   it("never infers IGL and retains a conflicting declaration beside AWPer inference", () => {
-    const profiles = buildPlayerMapRoleProfiles([evidence("p1"), evidence("p1", { mapName: "de_mirage" })], [{ playerKey: "p1", role: "igl", priority: "primary", source: "user", provenance: "coach roster" }]);
+    const profiles = buildPlayerMapRoleProfiles([evidence("p1"), evidence("p1", { mapName: "de_mirage" })], [{ kind: "main_role", playerKey: "p1", role: "igl", priority: "primary", source: "user", provenance: "coach roster" }]);
     expect(profiles[0]).toMatchObject({ inferredPrimaryRole: "awper", headlineRole: "IGL / AWPer" });
     expect(profiles[0]?.declaredRoles).toHaveLength(1);
     expect(profiles[0]?.inferredPrimaryRole).not.toBe("igl");
   });
 
   it("uses inferred headline without declared IGL and never lets non-IGL declarations replace it", () => {
-    const profile = buildPlayerMapRoleProfiles([evidence("p1"), evidence("p1", { mapName: "de_mirage" })], [{ playerKey: "p1", role: "anchor", priority: "primary", source: "trusted_metadata", provenance: "roster" }])[0]!;
+    const profile = buildPlayerMapRoleProfiles([evidence("p1"), evidence("p1", { mapName: "de_mirage" })], [{ kind: "main_role", playerKey: "p1", role: "anchor", priority: "primary", source: "trusted_metadata", provenance: "roster" }])[0]!;
     expect(profile.headlineRole).toBe("awper");
     expect(profile.inferredPrimaryRole).toBe("awper");
   });
@@ -62,6 +62,22 @@ describe("map role presentation", () => {
     expect(profile.weaponDuty).not.toBe("primary_awper");
   });
 
+  it("keeps secondary and situational AWP as evidence rather than public headline eligibility", () => {
+    const secondary = { ...evidence("p1").awp, duty: "secondary_awper" as const, qualifiedLongGunRounds: 12, freezeOwnershipRounds: 4, activeSeconds: 40, shots: 6, kills: 3, teamActiveShare: 0.3, matchConsistency: 0.6 };
+    const anchor = buildPlayerMapRoleProfiles([evidence("p1", { awp: secondary })])[0]!;
+    expect(anchor.weaponDuty).toBe("secondary_awper");
+    expect(anchor.roleSimilarities.awper).toBeGreaterThan(0.55);
+    expect(anchor.inferredPrimaryRole).toBe("anchor");
+    const situational = buildPlayerMapRoleProfiles([evidence("p1", { awp: { ...secondary, duty: "situational_awper", qualifiedLongGunRounds: 1, freezeOwnershipRounds: 1 } })])[0]!;
+    expect(situational.inferredPrimaryRole).toBe("anchor");
+  });
+
+  it("keeps a reliable primary AWP eligible for the headline", () => {
+    const profile = buildPlayerMapRoleProfiles([evidence("p1"), evidence("p1", { mapName: "de_mirage" })])[0]!;
+    expect(profile.inferredPrimaryRole).toBe("awper");
+    expect(profile.headlineRole).toBe("awper");
+  });
+
   it("uses complete match coverage rather than the capped representative evidence sample for global AWP duty", () => {
     const first = evidence("p1", { representativeRounds: [{ matchId: "m1", roundNumber: 1 }] });
     const second = evidence("p1", { mapName: "de_mirage", representativeRounds: [{ matchId: "m1", roundNumber: 2 }] });
@@ -69,17 +85,46 @@ describe("map role presentation", () => {
   });
 
   it("matches declaration time scope by match occurrence time and preserves missing-time limitations", () => {
-    const declaration = { playerKey: "p1", role: "anchor", priority: "primary", source: "self_report", provenance: "public interview", validFrom: "2026-06-01T00:00:00.000Z", validTo: "2026-06-30T23:59:59.000Z" } as const;
+    const declaration = { kind: "main_role", playerKey: "p1", role: "anchor", priority: "primary", source: "self_report", provenance: "public interview", validFrom: "2026-06-01T00:00:00.000Z", validTo: "2026-06-30T23:59:59.000Z" } as const;
     expect(buildPlayerMapRoleProfiles([evidence("p1")], [declaration], { matchTimes: { m1: "2026-05-01T00:00:00.000Z", m2: "2026-05-02T00:00:00.000Z", m3: "2026-05-03T00:00:00.000Z" } })[0]?.declaredRoles).toHaveLength(0);
     const missingTime = buildPlayerMapRoleProfiles([evidence("p1")], [declaration])[0]!;
     expect(missingTime.declaredRoles).toHaveLength(1);
-    expect(missingTime.limitations).toContain("比赛时间缺失，声明时间作用域无法严格验证。");
+    expect(missingTime.limitations).toContain("比赛时间缺失；该声明未与时间未知的 evidence 对齐。");
   });
 
-  it("matches time-scoped declarations against all covered matches, not representative rounds", () => {
-    const declaration = { playerKey: "p1", role: "anchor", priority: "primary", source: "self_report", provenance: "public interview", validFrom: "2026-06-01T00:00:00.000Z", validTo: "2026-06-30T23:59:59.000Z" } as const;
-    const row = evidence("p1", { matchIds: ["m1", "m4"], representativeRounds: [{ matchId: "m1", roundNumber: 1 }] });
-    const profile = buildPlayerMapRoleProfiles([row], [declaration], { matchTimes: { m1: "2026-05-01T00:00:00.000Z", m4: "2026-06-15T00:00:00.000Z" } })[0]!;
+  it("only aligns time-scoped declarations with rows fully inside the declared interval", () => {
+    const declaration = { kind: "main_role", playerKey: "p1", role: "anchor", priority: "primary", source: "self_report", provenance: "public interview", validFrom: "2026-06-01T00:00:00.000Z", validTo: "2026-06-30T23:59:59.000Z" } as const;
+    const before = evidence("p1", { matchIds: ["m1"], representativeRounds: [{ matchId: "m1", roundNumber: 1 }], side: "ct" });
+    const within = evidence("p1", { matchIds: ["m4"], representativeRounds: [{ matchId: "m4", roundNumber: 1 }], side: "t" });
+    const profile = buildPlayerMapRoleProfiles([before, within], [declaration], { matchTimes: { m1: "2026-05-01T00:00:00.000Z", m4: "2026-06-15T00:00:00.000Z" } })[0]!;
     expect(profile.declaredRoles).toHaveLength(1);
+    expect(profile.roleAlignments[0]?.ctSide).toContain("unknown");
+
+    const mixed = buildPlayerMapRoleProfiles([evidence("p1", { matchIds: ["m1", "m4"] })], [declaration], { matchTimes: { m1: "2026-05-01T00:00:00.000Z", m4: "2026-06-15T00:00:00.000Z" } })[0]!;
+    expect(mixed.roleAlignments[0]?.sampleLimitations).toContain("聚合 evidence 跨越声明日期；为避免混入期外样本，未纳入该行。");
+  });
+
+  it("isolates the same player across canonical team identities and aligns declarations only with their scoped rows", () => {
+    const teamOne = evidence("p1", { teamKey: "Team One", mapName: "de_ancient", responsibility: "anchor" });
+    const teamTwo = evidence("p1", { teamKey: "Team Two", mapName: "de_mirage", side: "t", responsibility: "lurk_late_join", awp: { ...evidence("p1").awp, duty: "rifler", activeSeconds: 0, teamActiveShare: 0, matchConsistency: 0 } });
+    const declaration = { kind: "main_role", playerKey: "p1", teamKey: "Team Two", mapName: "de_mirage", role: "closer", priority: "primary", source: "user", provenance: "coach" } as const;
+    const profiles = buildPlayerMapRoleProfiles([teamOne, teamTwo], [declaration]);
+    expect(profiles).toHaveLength(2);
+    expect(profiles.find((profile) => profile.teamKey === "Team One")?.declaredRoles).toHaveLength(0);
+    const second = profiles.find((profile) => profile.teamKey === "Team Two")!;
+    expect(second.declaredRoles).toHaveLength(1);
+    expect(second.roleAlignments[0]?.ctSide).toContain("unknown");
+  });
+
+  it("does not let a secondary IGL declaration override an AWP headline", () => {
+    const profile = buildPlayerMapRoleProfiles([evidence("p1"), evidence("p1", { mapName: "de_mirage" })], [{ kind: "main_role", playerKey: "p1", role: "igl", priority: "secondary", source: "user", provenance: "coach" }])[0]!;
+    expect(profile.headlineRole).toBe("awper");
+  });
+
+  it("keeps declared weapon duty independent from inferred weapon duty", () => {
+    const profile = buildPlayerMapRoleProfiles([evidence("p1"), evidence("p1", { mapName: "de_mirage" })], [{ kind: "weapon_duty", playerKey: "p1", weaponDuty: "secondary_awper", source: "user", provenance: "coach" }])[0]!;
+    expect(profile.declaredWeaponDuties[0]?.weaponDuty).toBe("secondary_awper");
+    expect(profile.weaponDuty).toBe("primary_awper");
+    expect(profile.weaponDutyAlignments[0]?.overall).toBe("different_observation");
   });
 });

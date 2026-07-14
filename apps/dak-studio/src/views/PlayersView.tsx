@@ -1,6 +1,6 @@
 import { Star } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import type { DeclaredRole, PlayerMapPoolRow, PlayerMapRoleProfile, PlayerSeasonProfile } from "@cs2dak/contract";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { DeclaredRole, PlayerMapPoolRow, PlayerMapRoleProfile, PlayerSeasonProfile, WeaponDuty } from "@cs2dak/contract";
 import {
   SEASON_STAT_VIEWS,
   mechanicsMetricsForWeapon,
@@ -81,9 +81,12 @@ export function PlayersView({
   const [roleEditorOpen, setRoleEditorOpen] = useState(false);
   const [declaredRole, setDeclaredRole] = useState<DeclaredRole>("awper");
   const [declaredPriority, setDeclaredPriority] = useState<"primary" | "secondary">("primary");
+  const [declaredWeaponDuty, setDeclaredWeaponDuty] = useState<WeaponDuty>("rifler");
   const [declaredMap, setDeclaredMap] = useState("");
   const [declaredValidFrom, setDeclaredValidFrom] = useState("");
   const [declaredValidTo, setDeclaredValidTo] = useState("");
+  const [roleFormError, setRoleFormError] = useState<string | null>(null);
+  const roleDialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,6 +95,14 @@ export function PlayersView({
   }, []);
 
   useEffect(() => { void loadRoleDeclarations().then(setRoleDeclarations); }, []);
+
+  useEffect(() => {
+    if (!roleEditorOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setRoleEditorOpen(false); };
+    window.addEventListener("keydown", closeOnEscape);
+    roleDialogRef.current?.querySelector<HTMLElement>("select, input, button")?.focus();
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [roleEditorOpen]);
 
   useEffect(() => {
     if (entries.length === 0) {
@@ -187,10 +198,10 @@ export function PlayersView({
   useEffect(() => {
     if (!selected || !roleProfiles) { setMapPool([]); return; }
     let cancelled = false;
-    const roleProfile = roleProfiles.find((profile) => profile.playerKey === selected.playerKey) ?? null;
+    const roleProfile = roleProfiles.find((profile) => profile.playerKey === selected.playerKey && (selectedTeam == null || profile.teamKey === selectedTeam)) ?? null;
     void getPlayerMapPool(entries, selected.playerKey, roleProfile, identityOptions).then((rows) => { if (!cancelled) setMapPool(rows); }).catch(() => { if (!cancelled) setMapPool([]); });
     return () => { cancelled = true; };
-  }, [entries, selected?.playerKey, roleProfiles, identityOptions?.version]);
+  }, [entries, selected?.playerKey, selectedTeam, roleProfiles, identityOptions?.version]);
 
   if (allEntries.length === 0) {
     return (
@@ -267,20 +278,36 @@ export function PlayersView({
 
   const trendMax = Math.max(...selected.perMatch.map((m) => m.rivalhubRR), 0.01);
   const playerMatches = [...selected.perMatch].reverse();
-  const selectedRoleProfile = roleProfiles?.find((profile) => profile.playerKey === selected.playerKey) ?? null;
+  const selectedRoleProfile = roleProfiles?.find((profile) => profile.playerKey === selected.playerKey && (selectedTeam == null || profile.teamKey === selectedTeam)) ?? null;
   const selectedDeclarations = roleDeclarations?.declarations.filter((row) => row.declaration.playerKey === selected.playerKey) ?? [];
+  const roleDateError = declaredValidFrom && declaredValidTo && declaredValidFrom > declaredValidTo ? "生效日期不能晚于失效日期。" : null;
+
+  function openRoleEditor() {
+    setDeclaredRole("awper"); setDeclaredPriority("primary"); setDeclaredWeaponDuty("rifler");
+    setDeclaredMap(""); setDeclaredValidFrom(""); setDeclaredValidTo(""); setRoleFormError(null); setRoleEditorOpen(true);
+  }
 
   async function saveRoleDeclaration() {
     if (!roleDeclarations || !selected) return;
+    if (roleDateError) {
+      setRoleFormError(roleDateError);
+      return;
+    }
     const toIso = (value: string) => value ? new Date(`${value}T00:00:00.000Z`).toISOString() : undefined;
-    const next = await upsertRoleDeclaration(roleDeclarations, {
-      playerKey: selected.playerKey, role: declaredRole, priority: declaredPriority, source: "user", provenance: "Studio 用户声明",
+    const scope = {
+      playerKey: selected.playerKey, source: "user" as const, provenance: "Studio 用户声明",
       ...(selectedTeam ? { teamKey: selectedTeam } : {}),
       ...(declaredMap ? { mapName: declaredMap as import("@cs2dak/contract").SupportedMapName } : {}),
       ...(declaredValidFrom ? { validFrom: toIso(declaredValidFrom) } : {}),
       ...(declaredValidTo ? { validTo: toIso(declaredValidTo) } : {}),
-    });
-    setRoleDeclarations(next); setRoleEditorOpen(false);
+    };
+    try {
+      const main = await upsertRoleDeclaration(roleDeclarations, { ...scope, kind: "main_role", role: declaredRole, priority: declaredPriority });
+      const next = await upsertRoleDeclaration(main, { ...scope, kind: "weapon_duty", weaponDuty: declaredWeaponDuty });
+      setRoleDeclarations(next); setRoleEditorOpen(false);
+    } catch (reason) {
+      setRoleFormError(reason instanceof Error ? reason.message : "保存声明失败，请检查字段后重试。");
+    }
   }
 
   const exportPlayerCard = () => {
@@ -411,7 +438,7 @@ export function PlayersView({
           {profileTab === "overview" && (
           <div className="stu-profile-grid">
             <div className="stu-card stu-card-wide" id="players:map-roles">
-              <div className="stu-card-head"><h3>地图 / 位置</h3><button type="button" className="stu-button-sm" onClick={() => setRoleEditorOpen(true)}>编辑声明</button></div>
+              <div className="stu-card-head"><h3>地图 / 位置</h3><button type="button" className="stu-button-sm" onClick={openRoleEditor}>编辑声明</button></div>
               {roleError ? <EmptyState variant="error" title="地图角色不可用" hint={roleError} /> : <PlayerMapRoleProfilePanel profile={selectedRoleProfile} onOpenEvidence={(evidence) => {
                 const entry = entryByMatchId.get(evidence.matchId);
                 if (entry) onOpenEvidence(entry.id, evidence, "players:map-roles");
@@ -496,17 +523,21 @@ export function PlayersView({
 
           {roleEditorOpen && (
             <div className="stu-modal-backdrop" role="dialog" aria-modal="true" aria-label="编辑角色声明" onClick={() => setRoleEditorOpen(false)}>
-              <div className="stu-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="stu-dialog stu-dialog-form" ref={roleDialogRef} onClick={(event) => event.stopPropagation()}>
                 <header className="stu-modal-head"><h3>角色声明 · {selected.name}</h3><button type="button" className="stu-modal-close" onClick={() => setRoleEditorOpen(false)} aria-label="关闭">✕</button></header>
-                <div className="stu-modal-body"><p className="stu-muted">只保存用户声明；自动推断始终独立。primary / secondary 表示同一作用域内的声明优先级，不是自动置信度。</p>
-                  <label>声明角色 <select value={declaredRole} onChange={(event) => setDeclaredRole(event.target.value as DeclaredRole)}>{(["igl", "awper", "anchor", "opener", "closer"] as const).map((role) => <option key={role} value={role}>{role}</option>)}</select></label>
-                  <label>优先级 <select value={declaredPriority} onChange={(event) => setDeclaredPriority(event.target.value as "primary" | "secondary")}><option value="primary">Primary</option><option value="secondary">Secondary</option></select></label>
-                  <label>地图作用域 <select value={declaredMap} onChange={(event) => setDeclaredMap(event.target.value)}><option value="">全部地图</option>{[...new Set(entries.map((entry) => entry.meta.mapName))].sort().map((map) => <option key={map} value={map}>{map.replace("de_", "")}</option>)}</select></label>
-                  <label>生效日期 <input type="date" value={declaredValidFrom} onChange={(event) => setDeclaredValidFrom(event.target.value)} /></label>
-                  <label>失效日期 <input type="date" value={declaredValidTo} onChange={(event) => setDeclaredValidTo(event.target.value)} /></label>
-                  {selectedDeclarations.length > 0 && <div className="stu-chip-row">{selectedDeclarations.map((row) => <span key={row.id} className="stu-chip">{row.declaration.priority} · {row.declaration.role}{row.declaration.mapName ? ` · ${row.declaration.mapName.replace("de_", "")}` : ""}<button type="button" className="stu-button-sm" onClick={() => void removeRoleDeclaration(roleDeclarations!, row.id).then(setRoleDeclarations)}>清除</button></span>)}</div>}
+                <div className="stu-modal-body"><p className="stu-muted">主角色与武器职责分别保存；自动推断始终独立。primary / secondary 只表示主角色优先级。</p>
+                  <div className="stu-form-grid">
+                    <label className="stu-form-field"><span className="stu-form-label">主角色</span><select className="stu-form-control" value={declaredRole} onChange={(event) => setDeclaredRole(event.target.value as DeclaredRole)}>{(["igl", "awper", "anchor", "opener", "closer"] as const).map((role) => <option key={role} value={role}>{role}</option>)}</select></label>
+                    <label className="stu-form-field"><span className="stu-form-label">主角色优先级</span><select className="stu-form-control" value={declaredPriority} onChange={(event) => setDeclaredPriority(event.target.value as "primary" | "secondary")}><option value="primary">Primary</option><option value="secondary">Secondary</option></select></label>
+                    <label className="stu-form-field"><span className="stu-form-label">武器职责</span><select className="stu-form-control" value={declaredWeaponDuty} onChange={(event) => setDeclaredWeaponDuty(event.target.value as WeaponDuty)}>{(["primary_awper", "secondary_awper", "situational_awper", "rifler"] as const).map((duty) => <option key={duty} value={duty}>{duty}</option>)}</select></label>
+                    <label className="stu-form-field"><span className="stu-form-label">地图作用域</span><select className="stu-form-control" value={declaredMap} onChange={(event) => setDeclaredMap(event.target.value)}><option value="">全部地图</option>{[...new Set(entries.map((entry) => entry.meta.mapName))].sort().map((map) => <option key={map} value={map}>{map.replace("de_", "")}</option>)}</select></label>
+                    <label className="stu-form-field"><span className="stu-form-label">生效日期</span><input className="stu-form-control" type="date" value={declaredValidFrom} onChange={(event) => setDeclaredValidFrom(event.target.value)} /></label>
+                    <label className="stu-form-field"><span className="stu-form-label">失效日期</span><input className="stu-form-control" type="date" value={declaredValidTo} onChange={(event) => setDeclaredValidTo(event.target.value)} /></label>
+                  </div>
+                  {(roleDateError ?? roleFormError) && <p className="stu-form-error" role="alert">{roleDateError ?? roleFormError}</p>}
+                  {selectedDeclarations.length > 0 && <section className="stu-declaration-list"><h4>已有声明</h4>{selectedDeclarations.map((row) => <div key={row.id} className="stu-declaration-row"><span>{row.declaration.kind === "main_role" ? `${row.declaration.priority} · ${row.declaration.role}` : row.declaration.weaponDuty}{row.declaration.mapName ? ` · ${row.declaration.mapName.replace("de_", "")}` : ""}</span><button type="button" className="stu-button-sm" onClick={() => void removeRoleDeclaration(roleDeclarations!, row.id).then(setRoleDeclarations)}>清除</button></div>)}</section>}
                 </div>
-                <footer className="stu-modal-foot"><span className="stu-muted">声明不会写入 facts 或自动证据缓存。</span><div className="stu-modal-actions"><button type="button" className="stu-button" onClick={() => setRoleEditorOpen(false)}>取消</button><button type="button" className="stu-button stu-button-primary" onClick={() => void saveRoleDeclaration()}>保存声明</button></div></footer>
+                <footer className="stu-modal-foot"><span className="stu-muted">声明不会写入 facts 或自动证据缓存。</span><div className="stu-modal-actions"><button type="button" className="stu-button" onClick={() => setRoleEditorOpen(false)}>取消</button><button type="button" className="stu-button stu-button-primary" disabled={roleDateError != null} onClick={() => void saveRoleDeclaration()}>保存声明</button></div></footer>
               </div>
             </div>
           )}

@@ -4,7 +4,7 @@ import { buildPlayerMapRoleEvidence, buildTeamMapResponsibilityEvidence } from "
 
 function row(playerIndex: number, roundNumber: number, overrides: Partial<PlayerPositionRoundFact> = {}): PlayerPositionRoundFact {
   return {
-    analysisVersion: 3, matchId: "m1", mapName: "de_ancient", roundNumber, teamKey: "teamA", side: "ct",
+    analysisVersion: 4, matchId: "m1", mapName: "de_ancient", roundNumber, teamKey: "teamA", side: "ct",
     playerIndex, steamId64: `7656119800000000${playerIndex + 1}`, eligibleSeconds: 20,
     economyType: "full", openingWindow: { version: 1, startTick: 100, endTick: 1380, configuredSeconds: 20 },
     openingEligibleSeconds: 20, openingPositionGroupDwell: [{ positionGroupId: playerIndex === 0 ? "a_anchor" : "b_anchor", seconds: 16, share: 0.8 }],
@@ -51,7 +51,7 @@ describe("map role evidence", () => {
   it("consumes opening component membership and formation continuity from TeamShapeRoundFact", () => {
     const rows = Array.from({ length: 6 }, (_, index) => [row(0, index + 1), row(4, index + 1)]).flat();
     const shapes: TeamShapeRoundFact[] = Array.from({ length: 6 }, (_, index) => ({
-      analysisVersion: 3, matchId: "m1", mapName: "de_ancient", roundNumber: index + 1, teamKey: "teamA", side: "ct",
+      analysisVersion: 4, matchId: "m1", mapName: "de_ancient", roundNumber: index + 1, teamKey: "teamA", side: "ct",
       openingWindow: { version: 1, startTick: 100, endTick: 1380, configuredSeconds: 20 },
       openingWindows: [{ startTick: 100, endTick: 1380, coverageSeconds: 20, componentSizes: [4, 1], partition: "4+1", componentPlayerIndices: [[0, 1, 2, 3], [4]] }],
       coverageSeconds: 40, windows: [{ startTick: 100, endTick: 2660, coverageSeconds: 40, componentSizes: [4, 1], partition: "4+1", componentPlayerIndices: [[0, 1, 2, 3], [4]] }],
@@ -64,7 +64,7 @@ describe("map role evidence", () => {
 
   it("produces support responsibilities only from observable utility timing and team coordination", () => {
     const shapes: TeamShapeRoundFact[] = Array.from({ length: 6 }, (_, index) => ({
-      analysisVersion: 3, matchId: "m1", mapName: "de_ancient", roundNumber: index + 1, teamKey: "teamA", side: "t",
+      analysisVersion: 4, matchId: "m1", mapName: "de_ancient", roundNumber: index + 1, teamKey: "teamA", side: "t",
       openingWindow: { version: 1, startTick: 100, endTick: 1380, configuredSeconds: 20 },
       openingWindows: [{ startTick: 100, endTick: 1380, coverageSeconds: 20, componentSizes: [5], partition: "5", componentPlayerIndices: [[0, 1, 2, 3, 4]] }],
       coverageSeconds: 20, windows: [], availability: { replay: "available", nav: "available", callouts: "available", shots: "available" },

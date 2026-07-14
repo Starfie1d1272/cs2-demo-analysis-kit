@@ -3,7 +3,7 @@ import type { IdentityStoreState } from "./identity";
 import { getStorage } from "./storage";
 
 /** 独立于 facts / identity summary 的用户声明存储。 */
-export const ROLE_DECLARATIONS_SCHEMA_VERSION = 2;
+export const ROLE_DECLARATIONS_SCHEMA_VERSION = 3;
 const STATE_KEY = "current";
 const store = getStorage().records("role-declarations");
 
@@ -25,17 +25,17 @@ function scopeKey(declaration: Pick<RoleDeclaration, "playerKey" | "teamKey" | "
   return [declaration.playerKey, declaration.teamKey ?? "", declaration.mapName ?? "", declaration.validFrom ?? "", declaration.validTo ?? ""].join("\t");
 }
 
-function migrateV1(value: { version?: unknown; declarations?: unknown }): RoleDeclarationsState | null {
-  if (value.version !== 1 || !Array.isArray(value.declarations)) return null;
+function migrateLegacy(value: { version?: unknown; declarations?: unknown }): RoleDeclarationsState | null {
+  if ((value.version !== 1 && value.version !== 2) || !Array.isArray(value.declarations)) return null;
   const primaries = new Set<string>();
   const declarations: StoredRoleDeclaration[] = [];
   for (const raw of [...value.declarations].sort((a, b) => Number((a as StoredRoleDeclaration).createdAt ?? 0) - Number((b as StoredRoleDeclaration).createdAt ?? 0))) {
-    const row = raw as Partial<StoredRoleDeclaration> & { declaration?: Partial<RoleDeclaration> };
+    const row = raw as Partial<StoredRoleDeclaration> & { declaration?: Partial<RoleDeclaration> & { role?: unknown; priority?: unknown } };
     if (typeof row.id !== "string" || typeof row.createdAt !== "number" || typeof row.updatedAt !== "number" || !row.declaration) continue;
     const key = scopeKey(row.declaration as RoleDeclaration);
-    const priority = primaries.has(key) ? "secondary" : "primary";
-    primaries.add(key);
-    const parsed = roleDeclarationSchema.safeParse({ ...row.declaration, priority });
+    const priority = value.version === 1 ? (primaries.has(key) ? "secondary" : "primary") : row.declaration.priority;
+    if (priority === "primary") primaries.add(key);
+    const parsed = roleDeclarationSchema.safeParse({ ...row.declaration, kind: "main_role", priority });
     if (parsed.success) declarations.push({ id: row.id, createdAt: row.createdAt, updatedAt: row.updatedAt, declaration: parsed.data });
   }
   return { version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations };
@@ -44,7 +44,7 @@ function migrateV1(value: { version?: unknown; declarations?: unknown }): RoleDe
 function valid(value: unknown): RoleDeclarationsState | null {
   if (!value || typeof value !== "object") return null;
   const state = value as Partial<RoleDeclarationsState>;
-  const migrated = migrateV1(state);
+  const migrated = migrateLegacy(state);
   if (migrated) return migrated;
   if (state.version !== ROLE_DECLARATIONS_SCHEMA_VERSION || !Array.isArray(state.declarations)) return null;
   const declarations = state.declarations.filter((row): row is StoredRoleDeclaration => {
@@ -59,7 +59,7 @@ export async function loadRoleDeclarations(): Promise<RoleDeclarationsState> {
   try {
     const raw = await store.get<unknown>(STATE_KEY);
     const state = valid(raw) ?? EMPTY;
-    if ((raw as { version?: unknown } | null)?.version === 1) await store.put(STATE_KEY, state);
+    if ([1, 2].includes(Number((raw as { version?: unknown } | null)?.version))) await store.put(STATE_KEY, state);
     return state;
   } catch { return EMPTY; }
 }
@@ -76,11 +76,11 @@ export async function upsertRoleDeclaration(current: RoleDeclarationsState, inpu
   const existing = current.declarations.find((row) => row.id === nextId);
   const row: StoredRoleDeclaration = { id: nextId, createdAt: existing?.createdAt ?? now, updatedAt: now, declaration };
   const declarations = current.declarations.filter((item) => item.id !== nextId).map((item) =>
-    declaration.priority === "primary" && item.declaration.priority === "primary" && scopeKey(item.declaration) === scopeKey(declaration)
+    declaration.kind === "main_role" && declaration.priority === "primary" && item.declaration.kind === "main_role" && item.declaration.priority === "primary" && scopeKey(item.declaration) === scopeKey(declaration)
       ? { ...item, updatedAt: now, declaration: { ...item.declaration, priority: "secondary" as const } }
       : item
-  );
-  return save({ ...current, declarations: [...declarations, row] });
+  ).filter((item) => declaration.kind !== "weapon_duty" || item.declaration.kind !== "weapon_duty" || scopeKey(item.declaration) !== scopeKey(declaration));
+  return save({ ...current, version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations: [...declarations, row] });
 }
 
 export async function removeRoleDeclaration(current: RoleDeclarationsState, id: string): Promise<RoleDeclarationsState> {
@@ -101,19 +101,28 @@ export async function migrateRoleDeclarationsForIdentity(identity: IdentityStore
     return { ...row, updatedAt: migratedAt, declaration: { ...row.declaration, playerKey } };
   });
   const primaryByScope = new Map<string, StoredRoleDeclaration[]>();
+  const weaponDutyByScope = new Map<string, StoredRoleDeclaration[]>();
   for (const row of declarations) {
-    if (row.declaration.priority !== "primary") continue;
     const key = scopeKey(row.declaration);
-    primaryByScope.set(key, [...(primaryByScope.get(key) ?? []), row]);
+    if (row.declaration.kind === "main_role" && row.declaration.priority === "primary") primaryByScope.set(key, [...(primaryByScope.get(key) ?? []), row]);
+    if (row.declaration.kind === "weapon_duty") weaponDutyByScope.set(key, [...(weaponDutyByScope.get(key) ?? []), row]);
   }
   for (const rows of primaryByScope.values()) {
     if (rows.length < 2) continue;
     rows.sort((a, b) => b.updatedAt - a.updatedAt || b.createdAt - a.createdAt || b.id.localeCompare(a.id));
     for (const row of rows.slice(1)) {
+      if (row.declaration.kind !== "main_role") continue;
       row.updatedAt = migratedAt;
       row.declaration = { ...row.declaration, priority: "secondary" };
       changed = true;
     }
   }
-  return changed ? save({ ...current, declarations }) : current;
+  const discarded = new Set<string>();
+  for (const rows of weaponDutyByScope.values()) {
+    if (rows.length < 2) continue;
+    rows.sort((a, b) => b.updatedAt - a.updatedAt || b.createdAt - a.createdAt || b.id.localeCompare(a.id));
+    for (const row of rows.slice(1)) { discarded.add(row.id); changed = true; }
+  }
+  const next = discarded.size ? declarations.filter((row) => !discarded.has(row.id)) : declarations;
+  return changed ? save({ ...current, version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations: next }) : current;
 }

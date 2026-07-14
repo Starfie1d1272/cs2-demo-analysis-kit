@@ -16,18 +16,33 @@ export const teamResponsibilitySchema = z.enum([
   "core_pack", "map_control", "extremity", "lurk_late_join", "support", "anchor", "rotator", "active_control", "supportive", "mixed", "unknown",
 ]);
 
-/** Product-neutral input. Storage ids, namespaces and timestamps intentionally do not belong here. */
-export const roleDeclarationSchema = z.object({
+/** Product-neutral declaration scope. Storage ids, namespaces and timestamps intentionally do not belong here. */
+const declarationScopeSchema = z.object({
   playerKey: z.string().min(1),
-  role: declaredRoleSchema,
-  priority: z.enum(["primary", "secondary"]),
   source: z.enum(["user", "self_report", "organizer", "event_package", "trusted_metadata"]),
   mapName: supportedMapNameSchema.optional(),
   teamKey: z.string().min(1).optional(),
   validFrom: z.string().datetime().optional(),
   validTo: z.string().datetime().optional(),
   provenance: z.string().min(1),
-}).refine((value) => value.validFrom == null || value.validTo == null || value.validFrom <= value.validTo, { message: "validFrom must not be after validTo" });
+}).strict();
+
+/** A declared tactical role. priority belongs only to this kind of declaration. */
+export const mainRoleDeclarationSchema = declarationScopeSchema.extend({
+  kind: z.literal("main_role"),
+  role: declaredRoleSchema,
+  priority: z.enum(["primary", "secondary"]),
+});
+
+/** A declared weapon duty. It is deliberately independent from tactical-role priority. */
+export const weaponDutyDeclarationSchema = declarationScopeSchema.extend({
+  kind: z.literal("weapon_duty"),
+  weaponDuty: weaponDutySchema,
+});
+
+export const roleDeclarationSchema = z.discriminatedUnion("kind", [mainRoleDeclarationSchema, weaponDutyDeclarationSchema]).superRefine((value, context) => {
+  if (value.validFrom != null && value.validTo != null && value.validFrom > value.validTo) context.addIssue({ code: z.ZodIssueCode.custom, message: "validFrom must not be after validTo" });
+});
 
 export const roleEvidenceLocatorSchema = z.object({
   matchId: z.string().min(1),
@@ -117,10 +132,11 @@ export const teamMapResponsibilityEvidenceSchema = z.object({
 });
 
 export const playerMapRoleProfileSchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/player-map-role-profile-3.0"),
+  version: z.literal("cs2-demo-analysis-kit/player-map-role-profile-4.0"),
   playerKey: z.string().min(1),
-  teamKeys: z.array(z.string().min(1)),
-  declaredRoles: z.array(roleDeclarationSchema),
+  teamKey: z.string().min(1),
+  declaredRoles: z.array(mainRoleDeclarationSchema),
+  declaredWeaponDuties: z.array(weaponDutyDeclarationSchema),
   inferredPrimaryRole: inferredMapRoleSchema.nullable(),
   runnerUpRole: inferredMapRoleSchema.nullable(),
   separationMargin: z.number().min(0).max(1).nullable(),
@@ -137,7 +153,8 @@ export const playerMapRoleProfileSchema = z.object({
     officialName: z.string().nullable(),
     resolved: z.boolean(),
   })),
-  alignment: z.object({
+  roleAlignments: z.array(z.object({
+    declaration: mainRoleDeclarationSchema,
     declaredPrimary: declaredRoleSchema.nullable(),
     declaredSecondary: z.array(declaredRoleSchema),
     inferredPrimary: inferredMapRoleSchema.nullable(),
@@ -146,7 +163,13 @@ export const playerMapRoleProfileSchema = z.object({
     ctSide: z.string(),
     disagreementReasons: z.array(z.string()),
     sampleLimitations: z.array(z.string()),
-  }),
+  })),
+  weaponDutyAlignments: z.array(z.object({
+    declaration: weaponDutyDeclarationSchema,
+    observedWeaponDuty: weaponDutySchema.nullable(),
+    overall: z.enum(["aligned", "different_observation", "not_comparable"]),
+    sampleLimitations: z.array(z.string()),
+  })),
   perMapEvidence: z.array(playerMapRoleEvidenceSchema),
   evidence: z.array(evidenceRefSchema),
   basis: z.array(z.string()),
@@ -224,6 +247,8 @@ export type DeclaredRole = z.infer<typeof declaredRoleSchema>;
 export type WeaponDuty = z.infer<typeof weaponDutySchema>;
 export type TeamResponsibility = z.infer<typeof teamResponsibilitySchema>;
 export type RoleDeclaration = z.infer<typeof roleDeclarationSchema>;
+export type MainRoleDeclaration = z.infer<typeof mainRoleDeclarationSchema>;
+export type WeaponDutyDeclaration = z.infer<typeof weaponDutyDeclarationSchema>;
 export type RoleEvidenceLocator = z.infer<typeof roleEvidenceLocatorSchema>;
 export type PlayerMapRoleEvidence = z.infer<typeof playerMapRoleEvidenceSchema>;
 export type TeamMapResponsibilityEvidence = z.infer<typeof teamMapResponsibilityEvidenceSchema>;

@@ -13,7 +13,7 @@ import {
 } from "@cs2dak/contract";
 import type { PlayerIdentityMap } from "./index.js";
 
-export const MAP_ROLE_MODEL_VERSION = "cs2-demo-analysis-kit/map-role-model-3.0";
+export const MAP_ROLE_MODEL_VERSION = "cs2-demo-analysis-kit/map-role-model-4.0";
 export const MAP_ROLE_THRESHOLDS = Object.freeze({
   minimumEligibleRounds: 6,
   reliableEligibleRounds: 12,
@@ -159,12 +159,14 @@ export function buildPlayerMapRoleEvidence(facts: MapRoleEvidenceFacts | MatchMa
   const groups = new Map<string, PlayerPositionRoundFact[]>();
   for (const row of input.playerPositionRounds) {
     if (!SUPPORTED_MAPS.has(row.mapName as SupportedMapName)) continue;
-    const key = [identityKey(row.steamId64, identityMap), canonicalTeam(row, teamIdentityMap), row.mapName, row.side].join("\t");
+    // Keep match granularity here. Presentation owns corpus aggregation, while scoped
+    // declarations need an exact match-time boundary rather than a mixed row.
+    const key = [identityKey(row.steamId64, identityMap), canonicalTeam(row, teamIdentityMap), row.matchId, row.mapName, row.side].join("\t");
     groups.set(key, [...(groups.get(key) ?? []), row]);
   }
 
   const cells = [...groups.entries()].map(([key, rows]) => {
-    const [playerKey, teamKey, mapName, side] = key.split("\t") as [string, string, SupportedMapName, "t" | "ct"];
+    const [playerKey, teamKey, matchId, mapName, side] = key.split("\t") as [string, string, string, SupportedMapName, "t" | "ct"];
     const eligibleRows = rows.filter((row) => (row.openingEligibleSeconds ?? 0) > 0);
     const eligibleSeconds = eligibleRows.reduce((sum, row) => sum + (row.openingEligibleSeconds ?? 0), 0);
     const quality = dataQuality(rows);
@@ -213,7 +215,7 @@ export function buildPlayerMapRoleEvidence(facts: MapRoleEvidenceFacts | MatchMa
       status: evidenceStatus(rows, eligibleRows.length, quality),
       confidence: rounded(Math.min(1, eligibleRows.length / MAP_ROLE_THRESHOLDS.reliableEligibleRounds) * quality)!,
       sample: { observedRounds: rows.length, eligibleRounds: eligibleRows.length, eligibleSeconds: rounded(eligibleSeconds, 2)!, matchCount: new Set(rows.map((row) => row.matchId)).size, dataQuality: quality, coverage: rounded(mean(rows.map((row) => row.calloutCoverage))) },
-      matchIds: [...new Set(rows.map((row) => row.matchId))].sort(),
+      matchIds: [matchId],
       positionGroups, spatial, support,
       responsibility: responsibility(side, { stability: spatial.dominantGroupStability, relative: spatial.teamRelativeGroupShare, openingMain: shape.mainShare, openingIsolated: shape.isolatedShare, rejoin: spatial.rejoinCount, movementSync: spatial.movementSync, utilityPerRound: support.utilityUsePerRound, openingUtilityPerRound: support.openingUtilityUsePerRound }),
       awp: { duty: "rifler" as WeaponDuty, eligibleRounds: eligibleRows.length, qualifiedLongGunRounds: qualified.length, freezeOwnershipRounds: qualified.filter((row) => row.freezeAwpOwnership === true).length, activeSeconds: rounded(active, 2), shots, kills, teamActiveShare: null as number | null, usageConcentration: null as number | null, matchConsistency },

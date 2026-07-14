@@ -47,18 +47,20 @@ describe("evidenceRefSchema", () => {
 
 describe("roleDeclarationSchema", () => {
   it("accepts portable declarations and excludes storage-only fields", () => {
-    expect(roleDeclarationSchema.safeParse({ playerKey: "p1", role: "igl", priority: "primary", source: "trusted_metadata", mapName: "de_ancient", provenance: "team roster" }).success).toBe(true);
-    expect(roleDeclarationSchema.safeParse({ playerKey: "p1", role: "igl", priority: "primary", source: "user", provenance: "" }).success).toBe(false);
+    expect(roleDeclarationSchema.safeParse({ kind: "main_role", playerKey: "p1", role: "igl", priority: "primary", source: "trusted_metadata", mapName: "de_ancient", provenance: "team roster" }).success).toBe(true);
+    expect(roleDeclarationSchema.safeParse({ kind: "weapon_duty", playerKey: "p1", weaponDuty: "secondary_awper", source: "user", provenance: "self report" }).success).toBe(true);
+    expect(roleDeclarationSchema.safeParse({ kind: "weapon_duty", playerKey: "p1", weaponDuty: "secondary_awper", priority: "primary", source: "user", provenance: "self report" }).success).toBe(false);
+    expect(roleDeclarationSchema.safeParse({ kind: "main_role", playerKey: "p1", role: "igl", priority: "primary", source: "user", provenance: "" }).success).toBe(false);
   });
 });
 
 describe("matchMapIntelligenceFactsSchema", () => {
   const base = {
-    analysisVersion: 3 as const,
+    analysisVersion: 4 as const,
     matchId: "m1",
     mapName: "de_anubis",
     playerPositionRounds: [{
-      analysisVersion: 3 as const,
+      analysisVersion: 4 as const,
       matchId: "m1", mapName: "de_anubis", roundNumber: 1, teamKey: "teamA" as const, side: "t" as const,
       playerIndex: 0, steamId64: "76561198000000001", economyType: null, openingWindow: null,
       openingEligibleSeconds: null, openingPositionGroupDwell: [], openingMeanComponentSize: null, openingIsolationSeconds: null,
@@ -71,7 +73,7 @@ describe("matchMapIntelligenceFactsSchema", () => {
       availability: { replay: "missing" as const, nav: "missing" as const, callouts: "missing" as const, shots: "missing" as const },
     }],
     teamShapeRounds: [{
-      analysisVersion: 3 as const,
+      analysisVersion: 4 as const,
       matchId: "m1", mapName: "de_anubis", roundNumber: 1, teamKey: "teamA" as const, side: "t" as const,
       openingWindow: null, openingWindows: [], coverageSeconds: null, windows: [],
       availability: { replay: "missing" as const, nav: "missing" as const, callouts: "missing" as const, shots: "missing" as const },
