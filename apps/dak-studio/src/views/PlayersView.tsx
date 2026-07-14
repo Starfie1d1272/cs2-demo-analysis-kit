@@ -80,11 +80,8 @@ export function PlayersView({
   const [roleDeclarations, setRoleDeclarations] = useState<RoleDeclarationsState | null>(null);
   const [roleEditorOpen, setRoleEditorOpen] = useState(false);
   const [declaredRole, setDeclaredRole] = useState<DeclaredRole>("awper");
-  const [declaredPriority, setDeclaredPriority] = useState<"primary" | "secondary">("primary");
-  const [declaredWeaponDuty, setDeclaredWeaponDuty] = useState<WeaponDuty>("rifler");
-  const [declaredMap, setDeclaredMap] = useState("");
-  const [declaredValidFrom, setDeclaredValidFrom] = useState("");
-  const [declaredValidTo, setDeclaredValidTo] = useState("");
+  const [declaredSecondaryRole, setDeclaredSecondaryRole] = useState<DeclaredRole | "">("");
+  const [declaredWeaponDuty, setDeclaredWeaponDuty] = useState<WeaponDuty | "">("");
   const [roleFormError, setRoleFormError] = useState<string | null>(null);
   const roleDialogRef = useRef<HTMLDivElement>(null);
 
@@ -279,31 +276,30 @@ export function PlayersView({
   const trendMax = Math.max(...selected.perMatch.map((m) => m.rivalhubRR), 0.01);
   const playerMatches = [...selected.perMatch].reverse();
   const selectedRoleProfile = roleProfiles?.find((profile) => profile.playerKey === selected.playerKey && (selectedTeam == null || profile.teamKey === selectedTeam)) ?? null;
-  const selectedDeclarations = roleDeclarations?.declarations.filter((row) => row.declaration.playerKey === selected.playerKey) ?? [];
-  const roleDateError = declaredValidFrom && declaredValidTo && declaredValidFrom > declaredValidTo ? "生效日期不能晚于失效日期。" : null;
+  const declarationTeam = selectedTeam ?? selectedRoleProfile?.teamKey ?? null;
+  const selectedDeclarations = roleDeclarations?.declarations.filter((row) => row.declaration.source === "user" && row.declaration.playerKey === selected.playerKey && (declarationTeam == null || row.declaration.teamKey === declarationTeam)) ?? [];
 
   function openRoleEditor() {
-    setDeclaredRole("awper"); setDeclaredPriority("primary"); setDeclaredWeaponDuty("rifler");
-    setDeclaredMap(""); setDeclaredValidFrom(""); setDeclaredValidTo(""); setRoleFormError(null); setRoleEditorOpen(true);
+    setDeclaredRole("awper"); setDeclaredSecondaryRole(""); setDeclaredWeaponDuty("");
+    setRoleFormError(null); setRoleEditorOpen(true);
   }
 
   async function saveRoleDeclaration() {
     if (!roleDeclarations || !selected) return;
-    if (roleDateError) {
-      setRoleFormError(roleDateError);
-      return;
-    }
-    const toIso = (value: string) => value ? new Date(`${value}T00:00:00.000Z`).toISOString() : undefined;
     const scope = {
       playerKey: selected.playerKey, source: "user" as const, provenance: "Studio 用户声明",
-      ...(selectedTeam ? { teamKey: selectedTeam } : {}),
-      ...(declaredMap ? { mapName: declaredMap as import("@cs2dak/contract").SupportedMapName } : {}),
-      ...(declaredValidFrom ? { validFrom: toIso(declaredValidFrom) } : {}),
-      ...(declaredValidTo ? { validTo: toIso(declaredValidTo) } : {}),
+      ...(declarationTeam ? { teamKey: declarationTeam } : {}),
     };
     try {
-      const main = await upsertRoleDeclaration(roleDeclarations, { ...scope, kind: "main_role", role: declaredRole, priority: declaredPriority });
-      const next = await upsertRoleDeclaration(main, { ...scope, kind: "weapon_duty", weaponDuty: declaredWeaponDuty });
+      let next = roleDeclarations;
+      const ordinaryUserDeclarations = next.declarations.filter((row) => row.declaration.playerKey === selected.playerKey
+        && row.declaration.source === "user"
+        && (row.declaration.teamKey ?? null) === declarationTeam
+        && row.declaration.mapName == null && row.declaration.validFrom == null && row.declaration.validTo == null);
+      for (const row of ordinaryUserDeclarations) next = await removeRoleDeclaration(next, row.id);
+      next = await upsertRoleDeclaration(next, { ...scope, kind: "main_role", role: declaredRole, priority: "primary" });
+      if (declaredSecondaryRole) next = await upsertRoleDeclaration(next, { ...scope, kind: "main_role", role: declaredSecondaryRole, priority: "secondary" });
+      if (declaredWeaponDuty) next = await upsertRoleDeclaration(next, { ...scope, kind: "weapon_duty", weaponDuty: declaredWeaponDuty });
       setRoleDeclarations(next); setRoleEditorOpen(false);
     } catch (reason) {
       setRoleFormError(reason instanceof Error ? reason.message : "保存声明失败，请检查字段后重试。");
@@ -525,19 +521,16 @@ export function PlayersView({
             <div className="stu-modal-backdrop" role="dialog" aria-modal="true" aria-label="编辑角色声明" onClick={() => setRoleEditorOpen(false)}>
               <div className="stu-dialog stu-dialog-form" ref={roleDialogRef} onClick={(event) => event.stopPropagation()}>
                 <header className="stu-modal-head"><h3>角色声明 · {selected.name}</h3><button type="button" className="stu-modal-close" onClick={() => setRoleEditorOpen(false)} aria-label="关闭">✕</button></header>
-                <div className="stu-modal-body"><p className="stu-muted">主角色与武器职责分别保存；自动推断始终独立。primary / secondary 只表示主角色优先级。</p>
+                <div className="stu-modal-body"><p className="stu-muted">只声明当前队伍下的通常职责；副角色和武器职责都可留空。地图与日期由可信赛事/阵容元数据管理。</p>
                   <div className="stu-form-grid">
-                    <label className="stu-form-field"><span className="stu-form-label">主角色</span><select className="stu-form-control" value={declaredRole} onChange={(event) => setDeclaredRole(event.target.value as DeclaredRole)}>{(["igl", "awper", "anchor", "opener", "closer"] as const).map((role) => <option key={role} value={role}>{role}</option>)}</select></label>
-                    <label className="stu-form-field"><span className="stu-form-label">主角色优先级</span><select className="stu-form-control" value={declaredPriority} onChange={(event) => setDeclaredPriority(event.target.value as "primary" | "secondary")}><option value="primary">Primary</option><option value="secondary">Secondary</option></select></label>
-                    <label className="stu-form-field"><span className="stu-form-label">武器职责</span><select className="stu-form-control" value={declaredWeaponDuty} onChange={(event) => setDeclaredWeaponDuty(event.target.value as WeaponDuty)}>{(["primary_awper", "secondary_awper", "situational_awper", "rifler"] as const).map((duty) => <option key={duty} value={duty}>{duty}</option>)}</select></label>
-                    <label className="stu-form-field"><span className="stu-form-label">地图作用域</span><select className="stu-form-control" value={declaredMap} onChange={(event) => setDeclaredMap(event.target.value)}><option value="">全部地图</option>{[...new Set(entries.map((entry) => entry.meta.mapName))].sort().map((map) => <option key={map} value={map}>{map.replace("de_", "")}</option>)}</select></label>
-                    <label className="stu-form-field"><span className="stu-form-label">生效日期</span><input className="stu-form-control" type="date" value={declaredValidFrom} onChange={(event) => setDeclaredValidFrom(event.target.value)} /></label>
-                    <label className="stu-form-field"><span className="stu-form-label">失效日期</span><input className="stu-form-control" type="date" value={declaredValidTo} onChange={(event) => setDeclaredValidTo(event.target.value)} /></label>
+                    <label className="stu-form-field"><span className="stu-form-label">主角色</span><select className="stu-form-control" value={declaredRole} onChange={(event) => { const role = event.target.value as DeclaredRole; setDeclaredRole(role); if (declaredSecondaryRole === role) setDeclaredSecondaryRole(""); }}>{(["igl", "awper", "anchor", "opener", "closer"] as const).map((role) => <option key={role} value={role}>{role}</option>)}</select></label>
+                    <label className="stu-form-field"><span className="stu-form-label">副角色（可选）</span><select className="stu-form-control" value={declaredSecondaryRole} onChange={(event) => setDeclaredSecondaryRole(event.target.value as DeclaredRole | "")}><option value="">不声明</option>{(["igl", "awper", "anchor", "opener", "closer"] as const).filter((role) => role !== declaredRole).map((role) => <option key={role} value={role}>{role}</option>)}</select></label>
+                    <label className="stu-form-field"><span className="stu-form-label">武器职责（可选）</span><select className="stu-form-control" value={declaredWeaponDuty} onChange={(event) => setDeclaredWeaponDuty(event.target.value as WeaponDuty | "")}><option value="">不声明</option>{(["primary_awper", "secondary_awper", "situational_awper", "rifler"] as const).map((duty) => <option key={duty} value={duty}>{duty}</option>)}</select></label>
                   </div>
-                  {(roleDateError ?? roleFormError) && <p className="stu-form-error" role="alert">{roleDateError ?? roleFormError}</p>}
+                  {roleFormError && <p className="stu-form-error" role="alert">{roleFormError}</p>}
                   {selectedDeclarations.length > 0 && <section className="stu-declaration-list"><h4>已有声明</h4>{selectedDeclarations.map((row) => <div key={row.id} className="stu-declaration-row"><span>{row.declaration.kind === "main_role" ? `${row.declaration.priority} · ${row.declaration.role}` : row.declaration.weaponDuty}{row.declaration.mapName ? ` · ${row.declaration.mapName.replace("de_", "")}` : ""}</span><button type="button" className="stu-button-sm" onClick={() => void removeRoleDeclaration(roleDeclarations!, row.id).then(setRoleDeclarations)}>清除</button></div>)}</section>}
                 </div>
-                <footer className="stu-modal-foot"><span className="stu-muted">声明不会写入 facts 或自动证据缓存。</span><div className="stu-modal-actions"><button type="button" className="stu-button" onClick={() => setRoleEditorOpen(false)}>取消</button><button type="button" className="stu-button stu-button-primary" disabled={roleDateError != null} onClick={() => void saveRoleDeclaration()}>保存声明</button></div></footer>
+                <footer className="stu-modal-foot"><span className="stu-muted">声明不会写入 facts 或自动证据缓存。</span><div className="stu-modal-actions"><button type="button" className="stu-button" onClick={() => setRoleEditorOpen(false)}>取消</button><button type="button" className="stu-button stu-button-primary" onClick={() => void saveRoleDeclaration()}>保存声明</button></div></footer>
               </div>
             </div>
           )}
