@@ -32,4 +32,31 @@ describe("map position candidates", () => {
     expect(new Set(candidates.map((candidate) => candidate.proposedId)).size).toBe(candidates.length);
     expect(candidates.every((candidate) => candidate.proposedDisplayName === "未命名候选")).toBe(true);
   });
+
+  it("keeps semantic candidate ids stable when unrelated candidates are added", () => {
+    const base = generateMapPositionCandidates(rows);
+    const extended = generateMapPositionCandidates([...rows, { ...rows[0]!, playerIndex: 9, steamId64: "p9", openingPositionGroupDwell: [{ positionGroupId: "alt", seconds: 16, share: 0.8 }], openingPath: [{ tick: 100, callout: "Alt", positionGroupId: "alt", x: 900, y: 2, z: 3 }] }]);
+    expect(extended.find((candidate) => candidate.proposedId === "banana")?.id).toBe(base.find((candidate) => candidate.proposedId === "banana")?.id);
+  });
+
+  it("materializes a reviewer-specified split as independently reviewable children", () => {
+    const input = [
+      { ...rows[0]!, roundNumber: 1 },
+      { ...rows[0]!, roundNumber: 2 },
+      { ...rows[0]!, roundNumber: 3 },
+    ];
+    const candidate = generateMapPositionCandidates(input)[0]!;
+    const groups = candidate.representativeEvidence.map((evidence, index) => ({ id: index === 0 ? "left" : "right", evidence: [evidence] }));
+    const asset = materializeReviewedPositionAsset([candidate], [{ candidateId: candidate.id, action: "split", splitGroups: [groups[0]!, { id: "right", evidence: groups.slice(1).flatMap((group) => group.evidence) }] }], { mapName: "de_inferno", side: "t", reviewedAt: "2026-07-14T00:00:00.000Z", reviewer: "test" });
+    expect(asset.splitCandidates).toHaveLength(2);
+    expect(asset.splitCandidates.every((child) => child.parentCandidateId === candidate.id)).toBe(true);
+    expect(asset.unresolvedCandidateIds).toEqual(asset.splitCandidates.map((child) => child.id).sort());
+    expect(() => materializeReviewedPositionAsset([candidate], [{ candidateId: candidate.id, action: "split" }], { mapName: "de_inferno", side: "t", reviewedAt: "2026-07-14T00:00:00.000Z", reviewer: "test" })).toThrow("至少需要两个");
+  });
+
+  it("surfaces legacy review ids that no longer match stable candidates", () => {
+    const candidate = generateMapPositionCandidates(rows)[0]!;
+    const asset = materializeReviewedPositionAsset([candidate], [{ candidateId: "de_inferno:t:001", action: "rename", displayName: "旧编号" }], { mapName: "de_inferno", side: "t", reviewedAt: "2026-07-14T00:00:00.000Z", reviewer: "test" });
+    expect(asset.unmatchedDecisionIds).toEqual(["de_inferno:t:001"]);
+  });
 });
