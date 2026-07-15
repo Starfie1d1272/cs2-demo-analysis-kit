@@ -18,7 +18,7 @@ declare const __APP_VERSION__: string;
 const appVersion = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0-dev";
 
 /** facts 行/命名空间布局版本；改变存储形状或键规则时递增。 */
-export const FACTS_STORAGE_VERSION = 4;
+export const FACTS_STORAGE_VERSION = 5;
 
 /** 当前 facts producer 版本集合；新增 producer 时在此显式登记。 */
 export const FACTS_PRODUCER_VERSIONS = {

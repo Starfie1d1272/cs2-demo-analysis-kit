@@ -2,8 +2,9 @@ import { z } from "zod";
 import { playerIndexSchema, sideSchema, steamId64Schema, teamKeySchema } from "./upstream.js";
 
 /** Bump when the compact map-intelligence producer changes its factual meaning. */
-export const MAP_INTELLIGENCE_FACT_VERSION = 5;
+export const MAP_INTELLIGENCE_FACT_VERSION = 6;
 export const OPENING_RESPONSIBILITY_WINDOW_VERSION = 1;
+export const CT_ROTATION_FACT_VERSION = 1;
 
 const availabilitySchema = z.enum(["available", "degraded", "missing"]);
 
@@ -12,6 +13,11 @@ export const mapIntelligenceAvailabilitySchema = z.object({
   nav: availabilitySchema,
   callouts: availabilitySchema,
   shots: availabilitySchema,
+});
+
+const tacticalRegionSchema = z.enum(["a", "b", "mid"]);
+export const ctRotationAvailabilitySchema = mapIntelligenceAvailabilitySchema.extend({
+  combatTimeline: availabilitySchema,
 });
 
 export const positionGroupDwellSchema = z.object({
@@ -133,6 +139,42 @@ export const teamAwpRoundFactSchema = z.object({
   availability: mapIntelligenceAvailabilitySchema,
 });
 
+/** One CT player-round observation. It records response facts, never a role label. */
+export const ctRotationRoundFactSchema = z.object({
+  analysisVersion: z.literal(MAP_INTELLIGENCE_FACT_VERSION),
+  factVersion: z.literal(CT_ROTATION_FACT_VERSION),
+  matchId: z.string().min(1),
+  mapName: z.string().min(1),
+  roundNumber: z.number().int().positive(),
+  teamKey: teamKeySchema,
+  side: z.literal("ct"),
+  playerIndex: playerIndexSchema,
+  steamId64: steamId64Schema,
+  initialPositionGroupId: z.string().min(1).nullable(),
+  initialRegion: tacticalRegionSchema.nullable(),
+  initialPositionGroupShare: z.number().min(0).max(1).nullable(),
+  initialResponsibilityResolved: z.boolean(),
+  initialWindowEligibleSeconds: z.number().nonnegative().nullable(),
+  firstOwnAreaContactTick: z.number().int().nonnegative().nullable(),
+  firstOtherAreaContactTick: z.number().int().nonnegative().nullable(),
+  firstTeamContactTick: z.number().int().nonnegative().nullable(),
+  leftInitialAreaTick: z.number().int().nonnegative().nullable(),
+  leaveDelayAfterFirstOtherAreaContactSeconds: z.number().nonnegative().nullable(),
+  responseTargetPositionGroupId: z.string().min(1).nullable(),
+  responseTargetRegion: tacticalRegionSchema.nullable(),
+  crossedResponsibilityArea: z.boolean().nullable(),
+  returnedToInitialArea: z.boolean().nullable(),
+  responsePathEligibleSeconds: z.number().nonnegative().nullable(),
+  rotationStartOrder: z.number().int().positive().nullable(),
+  firstResponder: z.boolean().nullable(),
+  teammatesAlreadyRotating: z.number().int().nonnegative().nullable(),
+  initialAreaStillCovered: z.boolean().nullable(),
+  deathTick: z.number().int().nonnegative().nullable(),
+  censoredByDeath: z.boolean().nullable(),
+  roundEndTick: z.number().int().nonnegative(),
+  availability: ctRotationAvailabilitySchema,
+});
+
 /** Compact per-match replay-derived map facts. It intentionally contains no role conclusion. */
 export const matchMapIntelligenceFactsSchema = z.object({
   analysisVersion: z.literal(MAP_INTELLIGENCE_FACT_VERSION),
@@ -141,6 +183,7 @@ export const matchMapIntelligenceFactsSchema = z.object({
   playerPositionRounds: z.array(playerPositionRoundFactSchema),
   teamShapeRounds: z.array(teamShapeRoundFactSchema),
   teamAwpRounds: z.array(teamAwpRoundFactSchema),
+  ctRotationRounds: z.array(ctRotationRoundFactSchema),
 });
 
 export type MapIntelligenceAvailability = z.infer<typeof mapIntelligenceAvailabilitySchema>;
@@ -152,4 +195,6 @@ export type PlayerPositionRoundFact = z.infer<typeof playerPositionRoundFactSche
 export type TeamShapeWindow = z.infer<typeof teamShapeWindowSchema>;
 export type TeamShapeRoundFact = z.infer<typeof teamShapeRoundFactSchema>;
 export type TeamAwpRoundFact = z.infer<typeof teamAwpRoundFactSchema>;
+export type CtRotationAvailability = z.infer<typeof ctRotationAvailabilitySchema>;
+export type CtRotationRoundFact = z.infer<typeof ctRotationRoundFactSchema>;
 export type MatchMapIntelligenceFacts = z.infer<typeof matchMapIntelligenceFactsSchema>;

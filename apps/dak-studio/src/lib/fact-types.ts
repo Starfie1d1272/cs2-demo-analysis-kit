@@ -1,4 +1,4 @@
-import type { C4RouteFact, ExecuteBucket, PlayerPositionRoundFact, SiteEntryFact, TacticalGrenadeOccurrence, TacticalPlantFact, TacticalRoundFact, TeamAwpRoundFact, TeamShapeRoundFact } from "@cs2dak/core";
+import type { C4RouteFact, CtRotationRoundFact, ExecuteBucket, PlayerPositionRoundFact, SiteEntryFact, TacticalGrenadeOccurrence, TacticalPlantFact, TacticalRoundFact, TeamAwpRoundFact, TeamShapeRoundFact } from "@cs2dak/core";
 import type { DemoPackage, PlayerWeaponHighlightFacts, RRIndicators, RRSignals, Side, TeamKey } from "@cs2dak/contract";
 import type { CalloutGrid, LineupGrenadeLike, TriangleBvh, Vec3 } from "@cs2dak/maps";
 import type { PlayerMechanicsProfile, PlayerSeasonInsights, PlayerWeaponStat } from "@cs2dak/presentation";
@@ -84,6 +84,7 @@ export interface MatchFacts {
   playerPositionRounds: PlayerPositionRoundFact[];
   teamShapeRounds: TeamShapeRoundFact[];
   teamAwpRounds: TeamAwpRoundFact[];
+  ctRotationRounds: CtRotationRoundFact[];
 }
 
 export interface ExtractMatchFactsOptions {
@@ -116,6 +117,7 @@ export interface FactsStore {
   getPlayerPositionRounds(scope?: FactsScope): Promise<PlayerPositionRoundFact[]>;
   getTeamShapeRounds(scope?: FactsScope): Promise<TeamShapeRoundFact[]>;
   getTeamAwpRounds(scope?: FactsScope): Promise<TeamAwpRoundFact[]>;
+  getCtRotationRounds(scope?: FactsScope): Promise<CtRotationRoundFact[]>;
   deleteMatchFacts(matchId: string): Promise<void>;
 }
 
@@ -139,6 +141,6 @@ export interface UtilityValueFactsOptions extends FactsScope {
   selectedTeams?: string[];
 }
 
-export type { C4RouteFact, ExecuteBucket, PlayerPositionRoundFact, SiteEntryFact, TacticalGrenadeOccurrence, TacticalPlantFact, TacticalRoundFact, TeamAwpRoundFact, TeamShapeRoundFact };
+export type { C4RouteFact, CtRotationRoundFact, ExecuteBucket, PlayerPositionRoundFact, SiteEntryFact, TacticalGrenadeOccurrence, TacticalPlantFact, TacticalRoundFact, TeamAwpRoundFact, TeamShapeRoundFact };
 export type { DemoPackage, Side, TeamKey };
 export type { Vec3 };

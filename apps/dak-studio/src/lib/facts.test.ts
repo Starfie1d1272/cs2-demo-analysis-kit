@@ -46,6 +46,7 @@ function stableNumbers<T>(value: T): T {
 describe("MatchFacts", () => {
   it("keeps cohort/presentation outputs outside the facts namespace", () => {
     expect(FACTS_RECORD_NAMESPACES).toContain("facts:team_awp_rounds");
+    expect(FACTS_RECORD_NAMESPACES).toContain("facts:ct_rotation_rounds");
     expect(FACTS_RECORD_NAMESPACES).toContain("facts:rr_signal_rows");
     expect(FACTS_RECORD_NAMESPACES.some((name) => /cohort|player_insights|tournament|team_comparison|duel|opening_trails|utility_value/.test(name))).toBe(false);
     expect(DERIVED_CACHE_RECORD_NAMESPACES.every((name) => name.startsWith("derived:match-v4:"))).toBe(true);
@@ -56,6 +57,13 @@ describe("MatchFacts", () => {
     const store = createFactsStore(createIdbAdapter(), "facts-awp-parity");
     await store.putMatchFacts(facts);
     expect(await store.getTeamAwpRounds({ matchIds: ["m1"] })).toEqual(facts.teamAwpRounds);
+  });
+
+  it("persists the same compact CT rotation facts produced by the direct core pipeline", async () => {
+    const facts = await m1Facts;
+    const store = createFactsStore(createIdbAdapter(), "facts-ct-rotation-parity");
+    await store.putMatchFacts(facts);
+    expect(await store.getCtRotationRounds({ matchIds: ["m1"] })).toEqual(facts.ctRotationRounds);
   });
 
   it("projects persisted mechanics facts to the same profile as the existing package path", async () => {
@@ -235,11 +243,14 @@ describe("MatchFacts", () => {
     await store.putMatchFacts(facts);
     const positions = await store.getPlayerPositionRounds({ matchIds: ["m1"] });
     const shapes = await store.getTeamShapeRounds({ matchIds: ["m1"] });
+    const rotations = await store.getCtRotationRounds({ matchIds: ["m1"] });
 
     expect(positions).toHaveLength(facts.playerPositionRounds.length);
     expect(shapes).toHaveLength(facts.teamShapeRounds.length);
+    expect(rotations).toHaveLength(facts.ctRotationRounds.length);
     expect(new Set(positions.map((row) => `${row.roundNumber}:${row.teamKey}:${row.playerIndex}`)).size).toBe(positions.length);
     expect(shapes.every((row) => row.windows.every((window) => window.componentPlayerIndices.length > 0))).toBe(true);
+    expect(new Set(rotations.map((row) => `${row.roundNumber}:${row.teamKey}:${row.playerIndex}`)).size).toBe(rotations.length);
   });
 
   it("workspace 不进入 facts 或 derived cache，打开时从 ZIP 懒算", async () => {

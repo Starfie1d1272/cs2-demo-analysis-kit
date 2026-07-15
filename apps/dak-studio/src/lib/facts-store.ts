@@ -9,7 +9,7 @@ import type {
 } from "./fact-types";
 import { getStorage, type RecordStore, type StorageAdapter } from "./storage";
 import type { PlayerMechanicsFact } from "@cs2dak/core";
-import type { PlayerPositionRoundFact, TacticalRoundFact, TeamAwpRoundFact, TeamShapeRoundFact } from "@cs2dak/core";
+import type { CtRotationRoundFact, PlayerPositionRoundFact, TacticalRoundFact, TeamAwpRoundFact, TeamShapeRoundFact } from "@cs2dak/core";
 
 export const FACTS_NAMESPACE = "facts";
 const FACT_TABLES = [
@@ -22,6 +22,7 @@ const FACT_TABLES = [
   "player_position_rounds",
   "team_shape_rounds",
   "team_awp_rounds",
+  "ct_rotation_rounds",
 ] as const;
 /** Studio storage overview 使用的 facts 记录命名空间清单。 */
 export const FACTS_RECORD_NAMESPACES = FACT_TABLES.map((table) => `${FACTS_NAMESPACE}:${table}`);
@@ -66,6 +67,7 @@ export function createFactsStore(adapter: StorageAdapter, namespace = FACTS_NAME
   const playerPositionRounds = adapter.records(`${namespace}:player_position_rounds`);
   const teamShapeRounds = adapter.records(`${namespace}:team_shape_rounds`);
   const teamAwpRounds = adapter.records(`${namespace}:team_awp_rounds`);
+  const ctRotationRounds = adapter.records(`${namespace}:ct_rotation_rounds`);
 
   return {
     async putMatchFacts(facts) {
@@ -79,6 +81,7 @@ export function createFactsStore(adapter: StorageAdapter, namespace = FACTS_NAME
         replaceRows(playerPositionRounds, facts.playerPositionRounds.map((row) => [rowKey(row.matchId, String(row.roundNumber), row.teamKey, String(row.playerIndex)), row]), facts.matchId),
         replaceRows(teamShapeRounds, facts.teamShapeRounds.map((row) => [rowKey(row.matchId, String(row.roundNumber), row.teamKey), row]), facts.matchId),
         replaceRows(teamAwpRounds, facts.teamAwpRounds.map((row) => [rowKey(row.matchId, String(row.roundNumber), row.teamKey), row]), facts.matchId),
+        replaceRows(ctRotationRounds, facts.ctRotationRounds.map((row) => [rowKey(row.matchId, String(row.roundNumber), row.teamKey, String(row.playerIndex)), row]), facts.matchId),
       ]);
     },
     async getPlayerMatchStats(scope) {
@@ -133,6 +136,11 @@ export function createFactsStore(adapter: StorageAdapter, namespace = FACTS_NAME
         .filter((row) => inScope(row, scope))
         .sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.teamKey.localeCompare(b.teamKey));
     },
+    async getCtRotationRounds(scope) {
+      return (await ctRotationRounds.getAll<CtRotationRoundFact>())
+        .filter((row) => inScope(row, scope))
+        .sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.teamKey.localeCompare(b.teamKey) || a.playerIndex - b.playerIndex);
+    },
     async deleteMatchFacts(matchId) {
       await Promise.all([
         playerStats,
@@ -144,6 +152,7 @@ export function createFactsStore(adapter: StorageAdapter, namespace = FACTS_NAME
         playerPositionRounds,
         teamShapeRounds,
         teamAwpRounds,
+        ctRotationRounds,
       ].map((store) => store.deleteByPrefix(matchId)));
     },
   };

@@ -56,11 +56,11 @@ describe("roleDeclarationSchema", () => {
 
 describe("matchMapIntelligenceFactsSchema", () => {
   const base = {
-    analysisVersion: 5 as const,
+    analysisVersion: 6 as const,
     matchId: "m1",
     mapName: "de_anubis",
     playerPositionRounds: [{
-      analysisVersion: 5 as const,
+      analysisVersion: 6 as const,
       matchId: "m1", mapName: "de_anubis", roundNumber: 1, teamKey: "teamA" as const, side: "t" as const,
       playerIndex: 0, steamId64: "76561198000000001", economyType: null, openingWindow: null,
       openingEligibleSeconds: null, openingPositionGroupDwell: [], openingMeanComponentSize: null, openingIsolationSeconds: null,
@@ -73,12 +73,13 @@ describe("matchMapIntelligenceFactsSchema", () => {
       availability: { replay: "missing" as const, nav: "missing" as const, callouts: "missing" as const, shots: "missing" as const },
     }],
     teamShapeRounds: [{
-      analysisVersion: 5 as const,
+      analysisVersion: 6 as const,
       matchId: "m1", mapName: "de_anubis", roundNumber: 1, teamKey: "teamA" as const, side: "t" as const,
       openingWindow: null, openingWindows: [], coverageSeconds: null, windows: [],
       availability: { replay: "missing" as const, nav: "missing" as const, callouts: "missing" as const, shots: "missing" as const },
     }],
     teamAwpRounds: [],
+    ctRotationRounds: [],
   };
 
   it("keeps missing replay facts explicitly null rather than inventing zero", () => {

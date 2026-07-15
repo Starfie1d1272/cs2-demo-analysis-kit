@@ -23,7 +23,7 @@ const LUCHOV_FEATURES: TResponsibilityResearchFeatures = {
 
 function row(playerIndex: number, roundNumber: number, overrides: Partial<PlayerPositionRoundFact> = {}): PlayerPositionRoundFact {
   return {
-    analysisVersion: 5,
+    analysisVersion: 6,
     matchId: "m1",
     mapName: "de_ancient",
     roundNumber,
@@ -73,7 +73,7 @@ function shape(roundNumber: number): TeamShapeRoundFact {
     componentPlayerIndices: [[0, 1], [2, 3], [4]],
   };
   return {
-    analysisVersion: 5,
+    analysisVersion: 6,
     matchId: "m1",
     mapName: "de_ancient",
     roundNumber,

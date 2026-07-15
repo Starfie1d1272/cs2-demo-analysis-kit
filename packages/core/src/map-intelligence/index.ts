@@ -11,10 +11,13 @@ import { extractPlayerPositionRoundFacts } from "./player-position.js";
 import { buildRoundSpatialFrames } from "./spatial.js";
 import { extractTeamShapeRoundFacts } from "./team-shape.js";
 import { extractTeamAwpRoundFacts } from "./team-awp-round.js";
+import { extractCtRotationRoundFacts } from "./ct-rotation.js";
 
 export { MAP_INTELLIGENCE_FACT_VERSION } from "@cs2dak/contract";
 export { OPENING_RESPONSIBILITY_SECONDS } from "./opening-window.js";
-export type { MatchMapIntelligenceFacts, PlayerPositionRoundFact, TeamAwpRoundFact, TeamShapeRoundFact } from "@cs2dak/contract";
+export { CT_ROTATION_FACT_VERSION } from "@cs2dak/contract";
+export { CT_ROTATION_RESPONSE_PERSISTENCE_SECONDS } from "./ct-rotation.js";
+export type { CtRotationRoundFact, MatchMapIntelligenceFacts, PlayerPositionRoundFact, TeamAwpRoundFact, TeamShapeRoundFact } from "@cs2dak/contract";
 
 export interface ExtractMatchMapIntelligenceFactsOptions {
   matchId: string;
@@ -41,6 +44,7 @@ function extractMapIntelligenceWithContexts(
   const playerPositionRounds = [];
   const teamShapeRounds = [];
   const teamAwpRounds = [];
+  const ctRotationRounds = [];
   for (const round of pkg.rounds) {
     const context = contexts.get(round.roundNumber) ?? null;
     const frames = context ? buildRoundSpatialFrames(context, options.calloutGrid ?? null, nav) : [];
@@ -48,8 +52,9 @@ function extractMapIntelligenceWithContexts(
     playerPositionRounds.push(...positionRows);
     teamShapeRounds.push(...extractTeamShapeRoundFacts(pkg, options.matchId, context, round, frames, options.calloutGrid ?? null, nav != null));
     teamAwpRounds.push(...extractTeamAwpRoundFacts(pkg, options.matchId, context, positionRows));
+    ctRotationRounds.push(...extractCtRotationRoundFacts(pkg, options.matchId, context, round, frames, options.calloutGrid ?? null, nav != null));
   }
-  return matchMapIntelligenceFactsSchema.parse({ analysisVersion: MAP_INTELLIGENCE_FACT_VERSION, matchId: options.matchId, mapName: pkg.match.mapName, playerPositionRounds, teamShapeRounds, teamAwpRounds });
+  return matchMapIntelligenceFactsSchema.parse({ analysisVersion: MAP_INTELLIGENCE_FACT_VERSION, matchId: options.matchId, mapName: pkg.match.mapName, playerPositionRounds, teamShapeRounds, teamAwpRounds, ctRotationRounds });
 }
 
 

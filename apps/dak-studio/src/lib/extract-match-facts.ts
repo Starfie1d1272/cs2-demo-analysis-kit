@@ -283,6 +283,7 @@ export function extractMatchData(pkg: DemoPackage, options: ExtractMatchFactsOpt
       lineups: [extractLineupFact(pkg, options.matchId, calloutGrid)], tacticalRounds: replayFacts.tacticalRounds,
       playerPositionRounds: replayFacts.mapIntelligence.playerPositionRounds, teamShapeRounds: replayFacts.mapIntelligence.teamShapeRounds,
       teamAwpRounds: replayFacts.mapIntelligence.teamAwpRounds,
+      ctRotationRounds: replayFacts.mapIntelligence.ctRotationRounds,
     },
     derived: {
       matchId: options.matchId, playerInsights,
