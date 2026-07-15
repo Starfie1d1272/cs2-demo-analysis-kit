@@ -17,6 +17,7 @@
 - [`identity-provenance-audit.json`](identity-provenance-audit.json)：直接身份、名称变体、来源文本纠正与替补槽位代理审计。
 - [`fl4mus-roster-proxy-sensitivity.json`](fl4mus-roster-proxy-sensitivity.json)：包含/排除替补代理的敏感性结果。
 - [`t-pack-lurker-candidate-spec.md`](t-pack-lurker-candidate-spec.md)：T 方并行研究投影的语义和验证门槛。
+- [`t-projection-implementation-audit.json`](t-projection-implementation-audit.json)：生产实现对冻结 15 特征的复现误差与同赛事 full-fit 诊断；不得替代队伍留出结果。
 - [`ct-rotation-minimum-facts-spec.md`](ct-rotation-minimum-facts-spec.md)：CT 轮转最小事实合同草案。
 
 大型 notebook、逐选手特征矩阵和原始 202 ZIP 不进入仓库。冻结 JSON 中的 SHA-256 用于核对研究时的输入；路径已归一化为文件名，原始研究工作区不构成长期依赖。

@@ -46,12 +46,12 @@ function flatten(facts: MapRoleEvidenceFacts | MatchMapIntelligenceFacts[]): Map
     : facts;
 }
 
-function identityKey(steamId64: string, map: PlayerIdentityMap): string {
+export function mapRolePlayerKey(steamId64: string, map: PlayerIdentityMap): string {
   const mapped = map[steamId64];
   return mapped == null ? `steam:${steamId64}` : typeof mapped === "string" ? mapped : mapped.playerKey;
 }
 
-function canonicalTeam(row: { matchId: string; teamKey: string }, map: Record<string, string>): string {
+export function mapRoleTeamKey(row: { matchId: string; teamKey: string }, map: Record<string, string>): string {
   return map[`${row.matchId}:${row.teamKey}`] ?? `${row.matchId}:${row.teamKey}`;
 }
 
@@ -170,7 +170,7 @@ export function buildPlayerMapRoleEvidence(facts: MapRoleEvidenceFacts | MatchMa
     if (!SUPPORTED_MAPS.has(row.mapName as SupportedMapName)) continue;
     // Keep match granularity here. Presentation owns corpus aggregation, while scoped
     // declarations need an exact match-time boundary rather than a mixed row.
-    const key = [identityKey(row.steamId64, identityMap), canonicalTeam(row, teamIdentityMap), row.matchId, row.mapName, row.side].join("\t");
+    const key = [mapRolePlayerKey(row.steamId64, identityMap), mapRoleTeamKey(row, teamIdentityMap), row.matchId, row.mapName, row.side].join("\t");
     groups.set(key, [...(groups.get(key) ?? []), row]);
   }
 

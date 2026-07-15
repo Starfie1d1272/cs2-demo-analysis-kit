@@ -3,6 +3,7 @@ import { evidenceRefSchema } from "./evidence.js";
 
 /** Bump when aggregation or role-selection semantics change. */
 export const MAP_ROLE_EVIDENCE_VERSION = 4;
+export const T_RESPONSIBILITY_RESEARCH_PROJECTION_VERSION = "cs2-demo-analysis-kit/t-responsibility-research-projection-1.0";
 
 /** The supported active-duty pool. Unknown maps are deliberately not generalized. */
 export const supportedMapNameSchema = z.enum([
@@ -18,6 +19,25 @@ export const teamResponsibilitySchema = z.enum([
   "mixed", "unknown",
 ]);
 export const roleModifierSchema = z.enum(["utility_supportive", "positionally_stable", "spatially_isolated", "component_mobile"]);
+export const tResponsibilityResearchCandidateSchema = z.enum(["pack", "lurker", "flexible"]);
+
+export const tResponsibilityResearchFeaturesSchema = z.object({
+  dominantGroupStability: z.number().min(0).max(1).nullable(),
+  teamRelativeGroupShare: z.number().min(-1).max(1).nullable(),
+  openingIsolatedShare: z.number().min(0).max(1).nullable(),
+  isolationShare: z.number().min(0).max(1).nullable(),
+  delayedConvergenceShare: z.number().min(0).max(1).nullable(),
+  movementSync: z.number().min(-1).max(1).nullable(),
+  positionTopShare: z.number().min(0).max(1).nullable(),
+  openingLargestShare: z.number().min(0).max(1).nullable(),
+  fullLargestShare: z.number().min(0).max(1).nullable(),
+  meanTeamCentroidDistance: z.number().nonnegative().nullable(),
+  openingPathDisplacement: z.number().nonnegative().nullable(),
+  openingPathTransitions: z.number().nonnegative().nullable(),
+  openingPositionEntropy: z.number().min(0).max(1).nullable(),
+  fullPositionEntropy: z.number().min(0).max(1).nullable(),
+  rejoinsPerMinute: z.number().nonnegative().nullable(),
+});
 
 /** Product-neutral declaration scope. Storage ids, namespaces and timestamps intentionally do not belong here. */
 const declarationScopeSchema = z.object({
@@ -51,6 +71,36 @@ export const roleEvidenceLocatorSchema = z.object({
   matchId: z.string().min(1),
   roundNumber: z.number().int().positive(),
   positionGroupId: z.string().min(1).optional(),
+});
+
+/**
+ * Same-event research projection. It is intentionally separate from
+ * PlayerMapRoleEvidence.responsibility and is not a production role conclusion.
+ */
+export const tResponsibilityResearchProjectionSchema = z.object({
+  version: z.literal(T_RESPONSIBILITY_RESEARCH_PROJECTION_VERSION),
+  modelId: z.literal("cologne-major-2026/parsimonious-v1-full-fit"),
+  playerKey: z.string().min(1),
+  teamKey: z.string().min(1),
+  side: z.literal("t"),
+  status: mapRoleStatusSchema,
+  candidate: tResponsibilityResearchCandidateSchema.nullable(),
+  packScore: z.number().min(0).max(1).nullable(),
+  lurkerScore: z.number().min(0).max(1).nullable(),
+  confidence: z.number().min(0).max(1).nullable(),
+  sample: z.object({
+    observedRounds: z.number().int().nonnegative(),
+    eligibleRounds: z.number().int().nonnegative(),
+    eligibleSeconds: z.number().nonnegative(),
+    matchCount: z.number().int().nonnegative(),
+    mapCount: z.number().int().nonnegative(),
+    dataQuality: z.number().min(0).max(1).nullable(),
+  }),
+  features: tResponsibilityResearchFeaturesSchema,
+  matchIds: z.array(z.string().min(1)),
+  representativeRounds: z.array(roleEvidenceLocatorSchema).max(8),
+  basis: z.array(z.string()),
+  limitations: z.array(z.string()),
 });
 
 export const mapPositionGroupEvidenceSchema = z.object({
@@ -252,6 +302,9 @@ export type DeclaredRole = z.infer<typeof declaredRoleSchema>;
 export type WeaponDuty = z.infer<typeof weaponDutySchema>;
 export type TeamResponsibility = z.infer<typeof teamResponsibilitySchema>;
 export type RoleModifier = z.infer<typeof roleModifierSchema>;
+export type TResponsibilityResearchCandidate = z.infer<typeof tResponsibilityResearchCandidateSchema>;
+export type TResponsibilityResearchFeatures = z.infer<typeof tResponsibilityResearchFeaturesSchema>;
+export type TResponsibilityResearchProjection = z.infer<typeof tResponsibilityResearchProjectionSchema>;
 export type RoleDeclaration = z.infer<typeof roleDeclarationSchema>;
 export type MainRoleDeclaration = z.infer<typeof mainRoleDeclarationSchema>;
 export type WeaponDutyDeclaration = z.infer<typeof weaponDutyDeclarationSchema>;

@@ -59,6 +59,12 @@ export {
   type MapRoleEvidenceFacts,
   type MapRoleEvidenceOptions,
 } from "./map-role-evidence.js";
+export {
+  buildTResponsibilityResearchProjections,
+  scoreFrozenTResponsibilityFeatures,
+  T_RESPONSIBILITY_RESEARCH_MODEL_ID,
+  T_RESPONSIBILITY_RESEARCH_THRESHOLD,
+} from "./t-role-research-projection.js";
 
 
 /**

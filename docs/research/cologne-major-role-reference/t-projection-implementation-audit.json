@@ -1,0 +1,43 @@
+{
+  "audit_id": "cologne-major-2026/t-responsibility-research-projection-v1",
+  "model_id": "cologne-major-2026/parsimonious-v1-full-fit",
+  "status": "same_event_reproduction_only",
+  "production_responsibility_replaced": false,
+  "external_validation": "deferred",
+  "inputs": {
+    "map_zip_count": 202,
+    "event_profiles": 160,
+    "individual_reference_eligible": 159,
+    "evaluated_non_primary_awper_t_profiles": 127
+  },
+  "implementation_reproduction": {
+    "projection_count": 160,
+    "maximum_absolute_feature_difference": 5.000000001254001e-7,
+    "feature_tolerance": 0.000002,
+    "passed": true
+  },
+  "same_event_full_fit_diagnostics": {
+    "default_confidence_threshold": 0.6,
+    "prediction_counts": {
+      "Pack": 74,
+      "Lurker": 45,
+      "Flexible": 8
+    },
+    "core_macro_f1": 0.8454417952314166,
+    "core_coverage": 0.9439252336448598,
+    "covered_agreement": 0.8712871287128713,
+    "confusion_truth_by_prediction": {
+      "Pack": { "Pack": 49, "Lurker": 5, "Flexible": 4 },
+      "Lurker": { "Pack": 8, "Lurker": 39, "Flexible": 2 },
+      "Flex": { "Pack": 17, "Lurker": 1, "Flexible": 2 }
+    }
+  },
+  "comparison_boundary": "The 0.8454 value is a same-event full-fit implementation diagnostic. The frozen 0.8157 result is leave-one-complete-team-out agreement and remains the primary research estimate; the two values are not interchangeable.",
+  "implementation_owner": "packages/cohort/src/t-role-research-projection.ts",
+  "limitations": [
+    "The model has not been validated on a new event.",
+    "Scores are not calibrated probabilities.",
+    "Primary AWPer filtering remains an independent weapon-duty concern.",
+    "The projection is not consumed by presentation or Studio."
+  ]
+}
