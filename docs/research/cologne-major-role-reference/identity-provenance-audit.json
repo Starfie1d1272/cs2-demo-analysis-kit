@@ -1,0 +1,70 @@
+{
+  "freeze_id": "cologne-major-2026-role-research-v1",
+  "event_profile_rows": 160,
+  "individual_reference_eligible_rows": 159,
+  "excluded_roster_slot_proxy_rows": 1,
+  "alignment_counts": {
+    "direct": 155,
+    "name_variant": 3,
+    "roster_substitution_proxy": 1,
+    "source_text_correction": 1
+  },
+  "non_direct_records": [
+    {
+      "playerKey": "steam:76561198014259134",
+      "player": "FL4MUS",
+      "team": "BetBoom Team",
+      "source_reference_name": "s1ren",
+      "reference_name": "s1ren",
+      "identity_alignment": "roster_substitution_proxy",
+      "evaluation_eligible": false,
+      "alignment_note": "HLTV reference names s1ren while the event demo profile is FL4MUS; retain for sensitivity only, not individual agreement."
+    },
+    {
+      "playerKey": "steam:76561198218265253",
+      "player": "venomzera",
+      "team": "MIBR",
+      "source_reference_name": "ven0mzera",
+      "reference_name": "ven0mzera",
+      "identity_alignment": "name_variant",
+      "evaluation_eligible": true,
+      "alignment_note": "Research-only normalized name variant: ven0mzera to venomzera."
+    },
+    {
+      "playerKey": "steam:76561198966340160",
+      "player": "Techno4K",
+      "team": "The MongolZ",
+      "source_reference_name": "Techno",
+      "reference_name": "Techno",
+      "identity_alignment": "name_variant",
+      "evaluation_eligible": true,
+      "alignment_note": "Research-only normalized name variant: Techno to Techno4K."
+    },
+    {
+      "playerKey": "steam:76561198011732823",
+      "player": "v$m",
+      "team": "paiN Gaming",
+      "source_reference_name": "vsm",
+      "reference_name": "vsm",
+      "identity_alignment": "name_variant",
+      "evaluation_eligible": true,
+      "alignment_note": "Research-only normalized name variant: vsm to v$m."
+    },
+    {
+      "playerKey": "steam:76561198342718168",
+      "player": "susp",
+      "team": "HEROIC",
+      "source_reference_name": "sjuush",
+      "reference_name": "susp",
+      "identity_alignment": "source_text_correction",
+      "evaluation_eligible": true,
+      "alignment_note": "HLTV card represents susp; the intermediate research text misidentified the displayed name as sjuush."
+    }
+  ],
+  "policy": {
+    "direct": "Included in individual agreement.",
+    "source_text_correction": "Included after documented correction of the intermediate research text.",
+    "name_variant": "Included after deterministic research-only normalization.",
+    "roster_substitution_proxy": "Excluded from individual agreement; retained only for sensitivity reporting."
+  }
+}

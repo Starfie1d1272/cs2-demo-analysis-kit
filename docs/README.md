@@ -18,6 +18,7 @@
 - [RR 评分模型](design/rr-model.md)：RR v1 / 六账户 / PRISM 唯一设计文档。
 - [RR / PRISM Roadmap](rr-roadmap.md)：评分阶段顺序与现状速查。
 - [HLTV Rating 3.0 科隆参考表](research/hltv-rating-3.0-iem-cologne-major-2026.md)：外部评分对照数据，供后续 RR 校准参考。
+- [科隆 Major CT/T 职责研究冻结](research/cologne-major-role-reference/)：202 地图职责特征充分性、身份口径、候选规格与外部验证边界。
 - [地图控制数据模型](research/map-control-model.md)：四层控制 / T·CT 语义不对称 / 雷达场→区域→解释 / 真实数据可行性（活文档）。
 
 ## 产品发现与决策

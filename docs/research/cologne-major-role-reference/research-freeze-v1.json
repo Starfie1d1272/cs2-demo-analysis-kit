@@ -1,0 +1,285 @@
+{
+  "freeze_id": "cologne-major-2026-role-research-v1",
+  "frozen_at": "2026-07-15T17:44:59.019777+00:00",
+  "status": "frozen_for_external_validation",
+  "source_commit": "9602d8276259864e1a55f0b4f380cf92c17cfc4c",
+  "external_validation": {
+    "status": "deferred_by_user",
+    "protocol": [
+      "Apply the exact frozen feature list, preprocessing, model parameters, identity eligibility, and default threshold without tuning on the new event.",
+      "Do not select features, weights, or thresholds after viewing new-event labels or player-level disagreements.",
+      "Report the full frozen threshold grid as risk-coverage diagnostics while retaining 0.60 as the predeclared default.",
+      "Group evaluation by complete team and report stage, map, team, class, collapse, and abstention diagnostics."
+    ]
+  },
+  "population": {
+    "event_profiles": 160,
+    "identity_confirmed_for_agreement": 159,
+    "excluded_proxy_player_key": "steam:76561198014259134",
+    "weapon_exclusion": "weapon_duty == primary_awper",
+    "ct_classes": [
+      "Anchor",
+      "Rotator",
+      "Mixed"
+    ],
+    "t_classes": [
+      "Pack",
+      "Lurker",
+      "Flex"
+    ],
+    "ambiguous_semantics": "Mixed/Flex is an abstention target and low-confidence output, not a learned symmetric third class."
+  },
+  "identity_policy": {
+    "direct": "Included in individual agreement.",
+    "source_text_correction": "Included after documented correction of the intermediate research text.",
+    "name_variant": "Included after deterministic research-only normalization.",
+    "roster_substitution_proxy": "Excluded from individual agreement; retained only for sensitivity reporting."
+  },
+  "feature_set": {
+    "name": "parsimonious_v1",
+    "count": 15,
+    "ordered_features": [
+      "dominant_group_stability",
+      "team_relative_group_share",
+      "opening_isolated_share",
+      "isolation_share",
+      "delayed_convergence_share",
+      "movement_sync",
+      "position_top_share",
+      "opening_largest_share",
+      "full_largest_share",
+      "mean_team_centroid_distance",
+      "opening_path_displacement",
+      "opening_path_transitions",
+      "opening_position_entropy",
+      "full_position_entropy",
+      "rejoins_per_minute"
+    ]
+  },
+  "aggregation": {
+    "player_side_grain": "playerKey x team x side over the frozen 202-map event corpus",
+    "match_evidence_weight": "eligibleRounds",
+    "round_spatial_weight": "eligibleSeconds; opening path metrics use openingEligibleSeconds",
+    "component_shares": "coverage-seconds weighted over observed component windows",
+    "position_entropy": "normalized entropy over map-qualified position-group dwell seconds",
+    "map_mix": "eligible-round share per map"
+  },
+  "preprocessing": {
+    "numeric_missing": "SimpleImputer(strategy=median), fitted within each training fold",
+    "scaling": "StandardScaler, fitted within each training fold",
+    "categorical_features": "none in the frozen parsimonious model"
+  },
+  "model": {
+    "family": "LogisticRegression",
+    "C": 0.25,
+    "class_weight": "balanced",
+    "max_iter": 2000,
+    "random_state": 20260715,
+    "fit_population": "identity-eligible, non-primary-AWPer core classes only"
+  },
+  "validation": {
+    "primary": "LeaveOneGroupOut grouped by complete team",
+    "repeated_group": {
+      "splits": 80,
+      "test_size": 0.25,
+      "random_state": 20260715
+    },
+    "stage_holdout": "train on two stages, test on the held-out stage",
+    "permutation_null": {
+      "iterations": 30,
+      "shuffle": "core labels within team",
+      "random_state": 20260715
+    },
+    "leakage_checks": [
+      "random 5-fold expanded",
+      "expanded plus team identity",
+      "map and sample only"
+    ]
+  },
+  "abstention": {
+    "confidence": "maximum predicted core-class probability",
+    "default_threshold": 0.6,
+    "predeclared_reporting_grid": [
+      0.5,
+      0.55,
+      0.6,
+      0.65,
+      0.7,
+      0.75,
+      0.8,
+      0.85,
+      0.9
+    ],
+    "fallback_label": {
+      "ct": "Mixed",
+      "t": "Flex"
+    }
+  },
+  "metrics": {
+    "core_macro_f1": "Unweighted F1 over Anchor/Rotator or Pack/Lurker, including abstentions as errors.",
+    "core_coverage": "Share of core reference cases not abstained.",
+    "covered_core_accuracy": "Reference agreement among covered core cases.",
+    "ambiguous_abstention_recall": "Share of Mixed/Flex reference cases output as abstention.",
+    "terminology": "Agreement with the external editorial reference, never ground-truth accuracy."
+  },
+  "frozen_default_results": [
+    {
+      "scenario": "excluded_from_individual_agreement",
+      "side": "ct",
+      "model": "logistic_parsimonious",
+      "threshold": 0.6,
+      "macro_f1_all": 0.5625226645644462,
+      "core_macro_f1": 0.7734449760765549,
+      "core_coverage": 0.8235294117647058,
+      "covered_core_accuracy": 0.8690476190476191,
+      "ambiguous_abstention_recall": 0.28,
+      "max_prediction_share": 0.4566929133858268,
+      "median_confidence": 0.7961709942082101,
+      "team_fold_accuracy_median": 0.75,
+      "team_fold_accuracy_iqr": [
+        0.5,
+        0.75
+      ],
+      "confusion": [
+        [
+          27,
+          4,
+          11
+        ],
+        [
+          7,
+          46,
+          7
+        ],
+        [
+          10,
+          8,
+          7
+        ]
+      ],
+      "per_class": {
+        "Anchor": {
+          "precision": 0.6136363636363636,
+          "recall": 0.6428571428571429,
+          "f1": 0.627906976744186,
+          "support": 42
+        },
+        "Rotator": {
+          "precision": 0.7931034482758621,
+          "recall": 0.7666666666666667,
+          "f1": 0.7796610169491526,
+          "support": 60
+        },
+        "Mixed": {
+          "precision": 0.28,
+          "recall": 0.28,
+          "f1": 0.28,
+          "support": 25
+        }
+      }
+    },
+    {
+      "scenario": "excluded_from_individual_agreement",
+      "side": "t",
+      "model": "logistic_parsimonious",
+      "threshold": 0.6,
+      "macro_f1_all": 0.5924202127659575,
+      "core_macro_f1": 0.8156817965553336,
+      "core_coverage": 0.9252336448598131,
+      "covered_core_accuracy": 0.8484848484848485,
+      "ambiguous_abstention_recall": 0.2,
+      "max_prediction_share": 0.5511811023622047,
+      "median_confidence": 0.8326683968465461,
+      "team_fold_accuracy_median": 0.75,
+      "team_fold_accuracy_iqr": [
+        0.5,
+        0.75
+      ],
+      "confusion": [
+        [
+          46,
+          6,
+          6
+        ],
+        [
+          9,
+          38,
+          2
+        ],
+        [
+          15,
+          1,
+          4
+        ]
+      ],
+      "per_class": {
+        "Pack": {
+          "precision": 0.6571428571428571,
+          "recall": 0.7931034482758621,
+          "f1": 0.71875,
+          "support": 58
+        },
+        "Lurker": {
+          "precision": 0.8444444444444444,
+          "recall": 0.7755102040816326,
+          "f1": 0.8085106382978723,
+          "support": 49
+        },
+        "Flex": {
+          "precision": 0.3333333333333333,
+          "recall": 0.2,
+          "f1": 0.25,
+          "support": 20
+        }
+      }
+    }
+  ],
+  "roster_proxy_sensitivity": {
+    "artifact": "fl4mus-roster-proxy-sensitivity.json",
+    "deltas": [
+      {
+        "side": "ct",
+        "model": "logistic_parsimonious",
+        "threshold": 0.6,
+        "core_macro_f1_delta_excluding_proxy": 0.005379708011286843,
+        "macro_f1_all_delta_excluding_proxy": 0.016914895652272666,
+        "core_coverage_delta_excluding_proxy": -0.0017133066818960652,
+        "ambiguous_recall_delta_excluding_proxy": 0.040000000000000036
+      },
+      {
+        "side": "t",
+        "model": "logistic_parsimonious",
+        "threshold": 0.6,
+        "core_macro_f1_delta_excluding_proxy": -0.005558804948425866,
+        "macro_f1_all_delta_excluding_proxy": 0.019503546099290836,
+        "core_coverage_delta_excluding_proxy": 0.008566978193146446,
+        "ambiguous_recall_delta_excluding_proxy": 0.05000000000000002
+      }
+    ]
+  },
+  "behavior_style_boundary": {
+    "role_model_independent": true,
+    "utility": "most mature descriptive percentile candidate",
+    "opening_and_first_contact": "directionally useful with sample size and uncertainty",
+    "firepower": "performance-oriented, moderate event split-half stability",
+    "clutching": "requires multi-event shrinkage",
+    "trading": "proxy only; missing opportunity denominator and spatial closure"
+  },
+  "known_limitations": [
+    "CT separation relies on aggregate spatial and route proxies rather than explicit response/rotation events.",
+    "Mixed/Flex is not a stable learned third class.",
+    "The Cologne labels were used for discovery and model comparison, so they cannot serve as an external validation event.",
+    "HLTV is an editorial same-event reference, not an absolute truth source."
+  ],
+  "sha256": {
+    "cologne-role-facts-v5.json": "e290cdd166fca64a658a334a1d13b516265135f19c2fb7f3a85ccbd213ce447a",
+    "ct-t-role-feature-audit.py": "6a031264d900a9c06bbc499f5cf62714877721463f3b24003b529f21cb9cb690",
+    "ct-t-player-features-frozen-v1.csv": "eba04744e454ba3894197bca5cb53121162850a768fa6dd5708fd28447302d38",
+    "hltv-role-reference-frozen-v1.csv": "803e2f02ba198db590d88013c71e5a34420c60c2b1ced116ea4f73a38fceeb36",
+    "ct-t-feature-effects-frozen-v1.csv": "a94b32f67cf61c8d4ac12aa21e8dff927077ca6cfd42e408299bf743aa1919ed",
+    "ct-t-model-metrics-frozen-v1.csv": "3a66f7975b4b4ed9311e76e25acb3ac78d9e1e2e0641221b965fe2cc064e8418",
+    "fl4mus-roster-proxy-sensitivity.json": "3d03099e0aea0fbe9e2bd9ca6e40087552826affef77c966c1ae24c437b7ba9a",
+    "behavior-style-projection-audit.json": "a0493b75ee8b2e76928f2b3f611d7a695210fcba0259ffa491e757ebbb31a618",
+    "player-roles.md": "58e5aea75e0799844ec037fee9e7d081518ff86ee280dbe8c22a592e698664cc"
+  }
+}
