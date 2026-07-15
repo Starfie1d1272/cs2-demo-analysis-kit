@@ -218,16 +218,16 @@ export function extractCtRotationRoundFacts(
       firstOwnAreaContactTick: null,
       firstOtherAreaContactTick: null,
       firstTeamContactTick: null,
-      leftInitialAreaTick: null,
+      leftInitialPositionGroupTick: null,
       leaveDelayAfterFirstOtherAreaContactSeconds: null,
-      responseTargetPositionGroupId: null,
-      responseTargetRegion: null,
+      firstStableDestinationPositionGroupId: null,
+      firstStableDestinationRegion: null,
       crossedResponsibilityArea: null,
-      returnedToInitialArea: null,
-      responsePathEligibleSeconds: null,
-      rotationStartOrder: null,
-      firstResponder: null,
-      teammatesAlreadyRotating: null,
+      returnedToInitialPositionGroup: null,
+      transitToStableDestinationSeconds: null,
+      crossAreaDepartureOrder: null,
+      firstCrossAreaDeparture: null,
+      priorCrossAreaDeparturesAlive: null,
       initialAreaStillCovered: null,
       deathTick: deaths.get(playerIndex) ?? null,
       censoredByDeath: null,
@@ -267,9 +267,10 @@ export function extractCtRotationRoundFacts(
       tickrate,
       context.tickStep,
     );
-    const firstTeamContact = contacts[0]?.tick ?? null;
-    const firstOwnContact = initialRegion == null ? null : contacts.find((row) => row.region === initialRegion)?.tick ?? null;
-    const firstOtherContact = initialRegion == null ? null : contacts.find((row) => row.region !== initialRegion)?.tick ?? null;
+    const observableContacts = deathTick == null ? contacts : contacts.filter((contact) => contact.tick <= deathTick);
+    const firstTeamContact = observableContacts[0]?.tick ?? null;
+    const firstOwnContact = initialRegion == null ? null : observableContacts.find((row) => row.region === initialRegion)?.tick ?? null;
+    const firstOtherContact = initialRegion == null ? null : observableContacts.find((row) => row.region !== initialRegion)?.tick ?? null;
     const crossed = response && initialRegion && response.targetRegion
       ? response.targetRegion !== initialRegion
       : response == null && deathTick == null && initialGroup != null && initialRegion != null
@@ -293,16 +294,16 @@ export function extractCtRotationRoundFacts(
       firstOwnAreaContactTick: firstOwnContact,
       firstOtherAreaContactTick: firstOtherContact,
       firstTeamContactTick: firstTeamContact,
-      leftInitialAreaTick: response?.leftTick ?? null,
-      leaveDelayAfterFirstOtherAreaContactSeconds: response && firstOtherContact != null && response.leftTick >= firstOtherContact ? rounded((response.leftTick - firstOtherContact) / tickrate) : null,
-      responseTargetPositionGroupId: response?.targetGroup ?? null,
-      responseTargetRegion: response?.targetRegion ?? null,
+      leftInitialPositionGroupTick: response?.leftTick ?? null,
+      leaveDelayAfterFirstOtherAreaContactSeconds: response && firstOtherContact != null ? rounded((response.leftTick - firstOtherContact) / tickrate) : null,
+      firstStableDestinationPositionGroupId: response?.targetGroup ?? null,
+      firstStableDestinationRegion: response?.targetRegion ?? null,
       crossedResponsibilityArea: crossed,
-      returnedToInitialArea: response?.returned ?? null,
-      responsePathEligibleSeconds: response == null ? null : rounded(response.pathSeconds),
-      rotationStartOrder: null,
-      firstResponder: null,
-      teammatesAlreadyRotating: null,
+      returnedToInitialPositionGroup: response?.returned ?? null,
+      transitToStableDestinationSeconds: response == null ? null : rounded(response.pathSeconds),
+      crossAreaDepartureOrder: null,
+      firstCrossAreaDeparture: null,
+      priorCrossAreaDeparturesAlive: null,
       initialAreaStillCovered: response?.initialAreaStillCovered ?? null,
       deathTick,
       censoredByDeath: track == null ? null : deathTick == null ? false : response == null || deathTick <= response.resolvedTick,
@@ -311,13 +312,13 @@ export function extractCtRotationRoundFacts(
     };
   });
 
-  const crossArea = rows.filter((row) => row.crossedResponsibilityArea === true && row.leftInitialAreaTick != null);
+  const crossArea = rows.filter((row) => row.crossedResponsibilityArea === true && row.leftInitialPositionGroupTick != null);
   for (const row of crossArea) {
-    const earlier = crossArea.filter((candidate) => candidate.leftInitialAreaTick! < row.leftInitialAreaTick!).length;
-    row.teammatesAlreadyRotating = crossArea.filter((candidate) => candidate.leftInitialAreaTick! < row.leftInitialAreaTick!
-      && (candidate.deathTick == null || candidate.deathTick > row.leftInitialAreaTick!)).length;
-    row.rotationStartOrder = earlier + 1;
-    row.firstResponder = earlier === 0;
+    const earlier = crossArea.filter((candidate) => candidate.leftInitialPositionGroupTick! < row.leftInitialPositionGroupTick!).length;
+    row.priorCrossAreaDeparturesAlive = crossArea.filter((candidate) => candidate.leftInitialPositionGroupTick! < row.leftInitialPositionGroupTick!
+      && (candidate.deathTick == null || candidate.deathTick > row.leftInitialPositionGroupTick!)).length;
+    row.crossAreaDepartureOrder = earlier + 1;
+    row.firstCrossAreaDeparture = earlier === 0;
   }
   return rows;
 }

@@ -49,6 +49,10 @@ function rounded(value: number | null, digits = 6): number | null {
   return value == null ? null : Number(value.toFixed(digits));
 }
 
+function researchFeature(value: number | null): number | null {
+  return rounded(value, 12);
+}
+
 function weighted<T>(rows: readonly T[], value: (row: T) => number | null, weight: (row: T) => number): number | null {
   const usable = rows.flatMap((row) => {
     const candidate = value(row);
@@ -186,21 +190,21 @@ export function buildTResponsibilityResearchProjections(
     }
     const totalEligibleSeconds = rounds.reduce((sum, row) => sum + (row.eligibleSeconds ?? 0), 0);
     const features: TResponsibilityResearchFeatures = {
-      dominantGroupStability: rounded(weighted(evidenceRows, (row) => row.spatial.dominantGroupStability, (row) => row.sample.eligibleRounds)),
-      teamRelativeGroupShare: rounded(weighted(evidenceRows, (row) => row.spatial.teamRelativeGroupShare, (row) => row.sample.eligibleRounds)),
-      openingIsolatedShare: rounded(weighted(evidenceRows, (row) => row.spatial.openingIsolatedShare, (row) => row.sample.eligibleRounds)),
-      isolationShare: rounded(weighted(evidenceRows, (row) => row.spatial.isolationShare, (row) => row.sample.eligibleRounds)),
-      delayedConvergenceShare: rounded(weighted(evidenceRows, (row) => row.spatial.delayedConvergenceRoundShare, (row) => row.sample.eligibleRounds)),
-      movementSync: rounded(weighted(evidenceRows, (row) => row.spatial.movementSync, (row) => row.sample.eligibleRounds)),
-      positionTopShare: rounded(weighted(evidenceRows, (row) => row.positionGroups[0]?.share ?? null, (row) => row.sample.eligibleRounds)),
-      openingLargestShare: openingComponents.covered === 0 ? null : rounded(openingComponents.largest / openingComponents.covered),
-      fullLargestShare: fullComponents.covered === 0 ? null : rounded(fullComponents.largest / fullComponents.covered),
-      meanTeamCentroidDistance: rounded(weighted(rounds, (row) => row.meanTeamCentroidDistance, (row) => row.eligibleSeconds ?? 0)),
-      openingPathDisplacement: rounded(weighted(paths, (row) => row.displacement, (row) => row.row.openingEligibleSeconds ?? 0)),
-      openingPathTransitions: rounded(weighted(paths, (row) => row.transitions, (row) => row.row.openingEligibleSeconds ?? 0)),
-      openingPositionEntropy: rounded(entropy(openingDwell)),
-      fullPositionEntropy: rounded(entropy(fullDwell)),
-      rejoinsPerMinute: totalEligibleSeconds === 0 ? null : rounded(60 * rounds.reduce((sum, row) => sum + row.rejoinTicks.length, 0) / totalEligibleSeconds),
+      dominantGroupStability: researchFeature(weighted(evidenceRows, (row) => row.spatial.dominantGroupStability, (row) => row.sample.eligibleRounds)),
+      teamRelativeGroupShare: researchFeature(weighted(evidenceRows, (row) => row.spatial.teamRelativeGroupShare, (row) => row.sample.eligibleRounds)),
+      openingIsolatedShare: researchFeature(weighted(evidenceRows, (row) => row.spatial.openingIsolatedShare, (row) => row.sample.eligibleRounds)),
+      isolationShare: researchFeature(weighted(evidenceRows, (row) => row.spatial.isolationShare, (row) => row.sample.eligibleRounds)),
+      delayedConvergenceShare: researchFeature(weighted(evidenceRows, (row) => row.spatial.delayedConvergenceRoundShare, (row) => row.sample.eligibleRounds)),
+      movementSync: researchFeature(weighted(evidenceRows, (row) => row.spatial.movementSync, (row) => row.sample.eligibleRounds)),
+      positionTopShare: researchFeature(weighted(evidenceRows, (row) => row.positionGroups[0]?.share ?? null, (row) => row.sample.eligibleRounds)),
+      openingLargestShare: openingComponents.covered === 0 ? null : researchFeature(openingComponents.largest / openingComponents.covered),
+      fullLargestShare: fullComponents.covered === 0 ? null : researchFeature(fullComponents.largest / fullComponents.covered),
+      meanTeamCentroidDistance: researchFeature(weighted(rounds, (row) => row.meanTeamCentroidDistance, (row) => row.eligibleSeconds ?? 0)),
+      openingPathDisplacement: researchFeature(weighted(paths, (row) => row.displacement, (row) => row.row.openingEligibleSeconds ?? 0)),
+      openingPathTransitions: researchFeature(weighted(paths, (row) => row.transitions, (row) => row.row.openingEligibleSeconds ?? 0)),
+      openingPositionEntropy: researchFeature(entropy(openingDwell)),
+      fullPositionEntropy: researchFeature(entropy(fullDwell)),
+      rejoinsPerMinute: totalEligibleSeconds === 0 ? null : researchFeature(60 * rounds.reduce((sum, row) => sum + row.rejoinTicks.length, 0) / totalEligibleSeconds),
     };
     const status = projectionStatus(evidenceRows, rounds);
     const score = status === "unknown" || status === "insufficient" ? null : scoreFrozenTResponsibilityFeatures(features);

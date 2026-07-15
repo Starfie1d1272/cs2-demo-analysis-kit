@@ -27,7 +27,9 @@ Date: 2026-07-16
 - 敌方正数生命伤害构成 contact，kill 作为后备；优先用 T 方参与者的 replay callout 定位接触区域。
 - 离区只有在玩家随后稳定进入另一个 Position Group 至少两秒时才成立；允许中间经过未解析区域。
 - `crossedResponsibilityArea` 仅在目标的地图区域与初始区域不同时为真，不使用未经校准的距离阈值。
-- 记录队内响应顺序、初始区域是否仍有人覆盖、回区情况和死亡截尾；缺失或被截尾的结论保持 `null`，完整存活观察且没有跨区响应则明确记录 `false`。
+- 记录可观察的跨区离位顺序、初始区域是否仍有人覆盖、回区情况和死亡截尾，不把移动命名成已确认的战术响应；同 tick 离位共享名次。
+- 对侧接触到离位的时间差允许为负，表示离位先于接触；玩家死亡后的团队接触不进入该玩家的个人可观察窗口。
+- 缺失或被截尾的结论保持 `null`，完整存活观察且没有跨区离位则明确记录 `false`。
 - core 只输出 `CtRotationRoundFact`，不输出 Anchor / Rotator。Studio 持久化紧凑事实，但不增加 UI。
 - map-intelligence producer 与 Studio facts storage 同步升版，旧事实从已保存的 v3 ZIP 重建，无需重新导出 `.dem`。
 

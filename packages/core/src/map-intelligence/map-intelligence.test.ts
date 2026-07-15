@@ -23,6 +23,7 @@ describe("extractMatchMapIntelligenceFacts", () => {
     expect(facts.teamShapeRounds.some((row) => row.openingWindows.length > 0)).toBe(true);
     expect(facts.ctRotationRounds.some((row) => row.initialResponsibilityResolved)).toBe(true);
     expect(facts.ctRotationRounds.every((row) => row.side === "ct" && !("role" in row))).toBe(true);
+    expect(extractMatchMapIntelligenceFacts(pkg, { matchId: "ancient" }).ctRotationRounds).toEqual(facts.ctRotationRounds);
     const serialized = JSON.stringify(facts);
     expect(serialized).not.toContain('"frameCount"');
     expect(serialized).not.toContain('"pairwise"');

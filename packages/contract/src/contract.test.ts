@@ -90,6 +90,11 @@ describe("matchMapIntelligenceFactsSchema", () => {
     expect(matchMapIntelligenceFactsSchema.safeParse({ ...base, playerPositionRounds: [{ ...base.playerPositionRounds[0], calloutCoverage: 2 }] }).success).toBe(false);
     expect(matchMapIntelligenceFactsSchema.safeParse({ ...base, teamShapeRounds: [{ ...base.teamShapeRounds[0], windows: [{ startTick: 1, endTick: 2, coverageSeconds: 1, componentSizes: [], partition: "", componentPlayerIndices: [] }] }] }).success).toBe(false);
   });
+
+  it("rejects pre-v6 map facts that omit CT rotation rows instead of defaulting them", () => {
+    const { ctRotationRounds: _, ...historic } = base;
+    expect(matchMapIntelligenceFactsSchema.safeParse(historic).success).toBe(false);
+  });
 });
 
 const qaReport = {

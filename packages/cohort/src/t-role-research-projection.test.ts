@@ -110,6 +110,17 @@ describe("T responsibility research projection", () => {
     expect(projection[0]?.basis[0]).toContain("正式 responsibility 保持不变");
   });
 
+  it("preserves research feature precision until final score serialization", () => {
+    const rows = Array.from({ length: 12 }, (_, index) => row(0, index + 1, {
+      meanTeamCentroidDistance: index % 2 === 0 ? 500.1234567891234 : 500.9876543219876,
+    }));
+
+    const projection = buildTResponsibilityResearchProjections({ playerPositionRounds: rows, teamShapeRounds: [] })[0]!;
+    expect(projection.features.meanTeamCentroidDistance).toBeCloseTo(500.5555555555555, 11);
+    expect(projection.features.meanTeamCentroidDistance).not.toBe(500.555556);
+    expect(projection.packScore?.toString().split(".")[1]?.length ?? 0).toBeLessThanOrEqual(6);
+  });
+
   it("keeps missing replay and unobserved features unknown instead of imputing a role", () => {
     const missing = row(0, 1, {
       openingWindow: null,

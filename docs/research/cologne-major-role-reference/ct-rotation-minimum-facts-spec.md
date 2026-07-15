@@ -32,23 +32,24 @@ Version 1 defines contact as enemy health damage with positive raw damage, with 
 
 ### Leaving and response
 
-- `leftInitialAreaTick`: first observed exit from the initial position group that leads to a stable different position group after the responsibility window.
-- `leaveDelayAfterFirstOtherAreaContact`: nullable duration from other-area contact to sustained exit.
-- `responseTargetPositionGroupId`: first stable destination after leaving.
+- `leftInitialPositionGroupTick`: first observed exit from the initial position group that leads to a stable different position group after the responsibility window.
+- `leaveDelayAfterFirstOtherAreaContactSeconds`: nullable signed duration from other-area contact to sustained exit; negative means departure came first.
+- `firstStableDestinationPositionGroupId`: first stable destination after leaving.
+- `firstStableDestinationRegion`: map-owned region of that destination.
 - `crossedResponsibilityArea`: whether the destination belongs to a different defended area rather than an adjacent local adjustment.
-- `returnedToInitialArea`: whether the player later re-established meaningful dwell in the initial area.
-- `responsePathEligibleSeconds`: observed movement time used for the response path.
+- `returnedToInitialPositionGroup`: whether the player later re-established meaningful dwell in the initial position group.
+- `transitToStableDestinationSeconds`: observed movement time from departure to the first stable destination.
 
 A response target must remain in the same resolved position group for at least two seconds. Unresolved transit may occur between the departure and target; short jiggles and unresolved-only movement do not count. Version 1 intentionally does not add a distance threshold: cross-area movement is owned by the map's `a` / `b` / `mid` semantics.
 
 ### Relative team order
 
-- `rotationStartOrder`: order among alive CT players who begin a resolved cross-area response.
-- `firstResponder`: whether the player is first among eligible teammates.
-- `teammatesAlreadyRotating`: count of alive teammates whose response began earlier.
+- `crossAreaDepartureOrder`: competition rank among resolved CT players with a stable cross-area departure; simultaneous ticks share a rank.
+- `firstCrossAreaDeparture`: whether no resolved teammate departed cross-area at an earlier tick; simultaneous earliest players are all true.
+- `priorCrossAreaDeparturesAlive`: count of strictly earlier cross-area movers still alive at this player's departure tick.
 - `initialAreaStillCovered`: whether another alive teammate retained responsibility when the player left.
 
-These are relative observational facts. They do not assert that the rotation was correct.
+These are relative observational facts. They compare only players who themselves have a resolved cross-area departure; they do not assert tactical eligibility, contact causality, or that the movement was correct.
 
 ### Censoring and availability
 
@@ -89,3 +90,17 @@ These measures may support Anchor/Rotator evidence only after map and team group
 3. Fixture tests verify compact extraction and explicit missing replay behavior.
 4. Stable connector versus site-player direction, representative timeline review, and complete-team/map comparison remain required before any Anchor/Rotator classifier.
 5. A later classifier must consume aggregated facts outside core and retain an abstention path.
+
+## 202-map closeout result
+
+Version 1 was re-extracted over all 202 frozen Cologne map ZIPs after the signed-delay and observational-name cleanup:
+
+- 21,810 CT player-round rows, matching `rounds × 5` exactly;
+- zero extraction failures and duplicate grains;
+- 21,652 resolved initial responsibilities;
+- 4,917 stable cross-area departures;
+- 12,222 observed no-cross-area rows;
+- 4,602 death-censored rows and 4,671 unknown rows;
+- no death-censored row materialized a boolean, and no resolved uncensored row remained unknown.
+
+The added aggregates show stable class direction under complete-team leave-out, but an augmented linear diagnostic reduces Mixed abstention recall from `0.28` to `0.08` and median team-fold agreement from `0.75` to `0.50`. Therefore v1 is accepted as an explanatory fact layer only. It does not authorize a CT research projection or formal Anchor/Rotator replacement.

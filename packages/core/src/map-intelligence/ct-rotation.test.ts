@@ -35,10 +35,13 @@ function track(
   };
 }
 
-function scenario(options: { dieDuringResponse?: boolean } = {}) {
+function scenario(options: { deathTick?: number; otherContactTick?: number; secondRotates?: boolean; deathWithoutEnemyContact?: boolean } = {}) {
+  const deathTick = options.deathTick ?? null;
+  const otherContactTick = options.otherContactTick ?? 305;
   const rotatingFlags = Array(frameCount).fill(FLAG_ALIVE);
-  if (options.dieDuringResponse) rotatingFlags.fill(0, 23);
+  if (deathTick != null) rotatingFlags.fill(0, Math.floor((deathTick - 100) / 10) + 1);
   const rotatingPlaces = Array.from({ length: frameCount }, (_, index) => index <= 20 ? 0 : index < 30 ? 1 : 2);
+  const otherContactFrame = Math.round((otherContactTick - 100) / 10);
   const context: ReplayRoundContext = {
     round,
     startTick: 100,
@@ -48,8 +51,8 @@ function scenario(options: { dieDuringResponse?: boolean } = {}) {
     weaponDict: [],
     tracks: [
       track(0, "teamA", "ct", rotatingPlaces, rotatingFlags),
-      track(1, "teamA", "ct", Array(frameCount).fill(0)),
-      track(2, "teamB", "t", Array.from({ length: frameCount }, (_, index) => index <= 20 ? 3 : 4)),
+      track(1, "teamA", "ct", options.secondRotates ? rotatingPlaces : Array(frameCount).fill(0)),
+      track(2, "teamB", "t", Array.from({ length: frameCount }, (_, index) => index < otherContactFrame ? 3 : 4)),
     ],
   };
   const pkg = {
@@ -62,9 +65,9 @@ function scenario(options: { dieDuringResponse?: boolean } = {}) {
     ],
     damages: [
       { roundNumber: 1, tick: 250, attackerIndex: 2, victimIndex: 0, healthDamageRaw: 10 },
-      { roundNumber: 1, tick: 305, attackerIndex: 2, victimIndex: 0, healthDamageRaw: 10 },
+      { roundNumber: 1, tick: otherContactTick, attackerIndex: 2, victimIndex: 0, healthDamageRaw: 10 },
     ],
-    kills: options.dieDuringResponse ? [{ roundNumber: 1, tick: 330, killerIndex: 2, victimIndex: 0 }] : [],
+    kills: deathTick == null ? [] : [{ roundNumber: 1, tick: deathTick, killerIndex: options.deathWithoutEnemyContact ? null : 2, victimIndex: 0 }],
     shots: undefined,
   } as unknown as DemoPackage;
   const frames = buildRoundSpatialFrames(context, null, null);
@@ -83,16 +86,16 @@ describe("extractCtRotationRoundFacts", () => {
       firstOwnAreaContactTick: 250,
       firstOtherAreaContactTick: 305,
       firstTeamContactTick: 250,
-      leftInitialAreaTick: 310,
+      leftInitialPositionGroupTick: 310,
       leaveDelayAfterFirstOtherAreaContactSeconds: 0.5,
-      responseTargetPositionGroupId: "b_site",
-      responseTargetRegion: "b",
+      firstStableDestinationPositionGroupId: "b_site",
+      firstStableDestinationRegion: "b",
       crossedResponsibilityArea: true,
-      returnedToInitialArea: false,
-      responsePathEligibleSeconds: 9,
-      rotationStartOrder: 1,
-      firstResponder: true,
-      teammatesAlreadyRotating: 0,
+      returnedToInitialPositionGroup: false,
+      transitToStableDestinationSeconds: 9,
+      crossAreaDepartureOrder: 1,
+      firstCrossAreaDeparture: true,
+      priorCrossAreaDeparturesAlive: 0,
       initialAreaStillCovered: true,
       censoredByDeath: false,
     });
@@ -100,14 +103,14 @@ describe("extractCtRotationRoundFacts", () => {
   });
 
   it("keeps an unfinished response unknown when death truncates observation", () => {
-    const row = scenario({ dieDuringResponse: true }).find((candidate) => candidate.playerIndex === 0)!;
+    const row = scenario({ deathTick: 330 }).find((candidate) => candidate.playerIndex === 0)!;
 
     expect(row.deathTick).toBe(330);
     expect(row.censoredByDeath).toBe(true);
-    expect(row.leftInitialAreaTick).toBeNull();
-    expect(row.responseTargetPositionGroupId).toBeNull();
+    expect(row.leftInitialPositionGroupTick).toBeNull();
+    expect(row.firstStableDestinationPositionGroupId).toBeNull();
     expect(row.crossedResponsibilityArea).toBeNull();
-    expect(row.rotationStartOrder).toBeNull();
+    expect(row.crossAreaDepartureOrder).toBeNull();
   });
 
   it("records an observed full-round stay as false rather than unknown", () => {
@@ -117,5 +120,30 @@ describe("extractCtRotationRoundFacts", () => {
     expect(row.deathTick).toBeNull();
     expect(row.censoredByDeath).toBe(false);
     expect(row.crossedResponsibilityArea).toBe(false);
+  });
+
+  it("uses signed contact delay instead of hiding a departure that came first", () => {
+    const row = scenario({ otherContactTick: 350 }).find((candidate) => candidate.playerIndex === 0)!;
+
+    expect(row.leftInitialPositionGroupTick).toBe(310);
+    expect(row.firstOtherAreaContactTick).toBe(350);
+    expect(row.leaveDelayAfterFirstOtherAreaContactSeconds).toBe(-4);
+  });
+
+  it("clips team contacts to the player's observable lifetime", () => {
+    const row = scenario({ deathTick: 190, deathWithoutEnemyContact: true }).find((candidate) => candidate.playerIndex === 0)!;
+
+    expect(row.censoredByDeath).toBe(true);
+    expect(row.firstTeamContactTick).toBeNull();
+    expect(row.firstOwnAreaContactTick).toBeNull();
+    expect(row.firstOtherAreaContactTick).toBeNull();
+  });
+
+  it("preserves simultaneous departures as deterministic shared ranks", () => {
+    const rows = scenario({ secondRotates: true }).filter((candidate) => candidate.playerIndex < 2);
+
+    expect(rows.map((row) => row.crossAreaDepartureOrder)).toEqual([1, 1]);
+    expect(rows.map((row) => row.firstCrossAreaDeparture)).toEqual([true, true]);
+    expect(rows.map((row) => row.priorCrossAreaDeparturesAlive)).toEqual([0, 0]);
   });
 });

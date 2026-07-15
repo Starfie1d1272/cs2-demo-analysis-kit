@@ -469,7 +469,7 @@ export async function removeDemo(id: string): Promise<void> {
 }
 
 /**
- * 批量删除。逐场串行（每场要删 ZIP blob + 12 个 facts 命名空间的行），
+ * 批量删除。逐场串行（每场要删 ZIP blob + facts/derived 命名空间的行），
  * 串行避免删除时的瞬时内存/IO 尖峰；onProgress 驱动界面提示。
  */
 export async function removeDemos(

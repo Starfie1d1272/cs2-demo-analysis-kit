@@ -12,8 +12,14 @@
   },
   "implementation_reproduction": {
     "projection_count": 160,
-    "maximum_absolute_feature_difference": 5.000000001254001e-7,
+    "maximum_absolute_feature_difference": 1.8189894035458565e-12,
     "feature_tolerance": 0.000002,
+    "missing_value_mismatch_count": 0,
+    "score_rows_compared": 160,
+    "maximum_absolute_score_difference": 4.933983599464398e-7,
+    "score_tolerance": 0.000002,
+    "candidate_mismatch_count": 0,
+    "independent_reference": "sklearn full-event diagnostic refit over frozen v1 feature CSV",
     "passed": true
   },
   "same_event_full_fit_diagnostics": {

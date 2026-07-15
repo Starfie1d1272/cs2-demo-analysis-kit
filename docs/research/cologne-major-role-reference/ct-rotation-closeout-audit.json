@@ -1,0 +1,97 @@
+{
+  "audit_id": "cologne-major-2026/ct-rotation-closeout-v1",
+  "status": "ready_with_caveats",
+  "source": {
+    "map_zip_count": 202,
+    "ct_player_round_count": 21810,
+    "expected_ct_player_round_count": 21810,
+    "player_profiles": 160,
+    "model_population": 127,
+    "extraction_failures": 0,
+    "map_intelligence_version": 6,
+    "ct_rotation_fact_version": 1
+  },
+  "invariants": {
+    "passed": true,
+    "duplicate_grain_rows": 0,
+    "unique_grain_rows": 21810,
+    "resolved_uncensored_unknown_rows": 0,
+    "death_censored_boolean_rows": 0,
+    "post_death_contact_rows": 0,
+    "maximum_signed_delay_reconciliation_error": 0.0005000000000023874
+  },
+  "overall_distribution": {
+    "resolved_initial": 21652,
+    "cross_area_departures": 4917,
+    "observed_no_cross_area": 12222,
+    "death_censored": 4602,
+    "unknown": 4671
+  },
+  "model_protocol": {
+    "validation": "LeaveOneGroupOut by complete team",
+    "model": "median imputation + StandardScaler + LogisticRegression(C=0.25, class_weight=balanced)",
+    "threshold": 0.6,
+    "threshold_tuned": false,
+    "added_features": [
+      "ct_cross_area_departure_share",
+      "ct_other_contact_cross_area_share",
+      "ct_first_cross_area_departure_share",
+      "ct_initial_area_covered_on_departure_share",
+      "ct_returned_to_initial_group_share",
+      "ct_median_other_contact_delay_seconds"
+    ]
+  },
+  "baseline": {
+    "core_macro_f1": 0.7734449760765549,
+    "core_coverage": 0.8235294117647058,
+    "covered_core_agreement": 0.8690476190476191,
+    "ambiguous_abstention_recall": 0.28,
+    "team_fold_accuracy_median": 0.75,
+    "max_prediction_share": 0.4566929133858268
+  },
+  "augmented": {
+    "core_macro_f1": 0.8009581881533101,
+    "core_coverage": 0.9019607843137255,
+    "covered_core_agreement": 0.8478260869565217,
+    "ambiguous_abstention_recall": 0.08,
+    "team_fold_accuracy_median": 0.5,
+    "max_prediction_share": 0.48031496062992124
+  },
+  "delta_augmented_minus_baseline": {
+    "core_macro_f1": 0.027513212076755167,
+    "core_coverage": 0.07843137254901966,
+    "covered_core_agreement": -0.02122153209109734,
+    "ambiguous_abstention_recall": -0.2,
+    "team_fold_accuracy_median": -0.25,
+    "max_prediction_share": 0.023622047244094446
+  },
+  "rotation_coefficient_stability": [
+    { "feature": "ct_cross_area_departure_share", "median_toward_rotator": 0.828019964054657, "p10": 0.7881541818489303, "p90": 0.8627617657690148, "positive_fold_share": 1.0 },
+    { "feature": "ct_other_contact_cross_area_share", "median_toward_rotator": 0.35204536207300663, "p10": 0.32371215994644065, "p90": 0.39928090628682184, "positive_fold_share": 1.0 },
+    { "feature": "ct_first_cross_area_departure_share", "median_toward_rotator": 0.2625318093595876, "p10": 0.21699198769714773, "p90": 0.3113276421317763, "positive_fold_share": 1.0 },
+    { "feature": "ct_initial_area_covered_on_departure_share", "median_toward_rotator": -0.07057403408818853, "p10": -0.10930072176817997, "p90": -0.03968824886305985, "positive_fold_share": 0.09375 },
+    { "feature": "ct_returned_to_initial_group_share", "median_toward_rotator": 0.29737126350818066, "p10": 0.2653935513961883, "p90": 0.3294024514285873, "positive_fold_share": 1.0 },
+    { "feature": "ct_median_other_contact_delay_seconds", "median_toward_rotator": -0.10196237350012735, "p10": -0.12805958361644082, "p90": -0.07962094722791506, "positive_fold_share": 0.03125 }
+  ],
+  "high_mobility_position_examples": [
+    { "map": "de_mirage", "position_group": "vip", "known_rounds": 703, "cross_area_share": 0.8349928876244666 },
+    { "map": "de_ancient", "position_group": "vip", "known_rounds": 357, "cross_area_share": 0.803921568627451 },
+    { "map": "de_inferno", "position_group": "top_mid", "known_rounds": 399, "cross_area_share": 0.7619047619047619 },
+    { "map": "de_anubis", "position_group": "mid", "known_rounds": 400, "cross_area_share": 0.7375 },
+    { "map": "de_nuke", "position_group": "outside", "known_rounds": 750, "cross_area_share": 0.6826666666666666 },
+    { "map": "de_dust2", "position_group": "mid_doors", "known_rounds": 594, "cross_area_share": 0.5656565656565656 }
+  ],
+  "verdict": {
+    "facts": "retain_as_explanatory_evidence",
+    "ct_research_projection": "do_not_implement_yet",
+    "formal_role_selector": "unchanged",
+    "reason": "Rotation facts add stable class direction but the augmented classifier materially weakens abstention, covered agreement, and median team-fold performance.",
+    "next_reopen_condition": "new-event validation or a separately justified abstention design"
+  },
+  "limitations": [
+    "HLTV labels are a same-event editorial reference, not ground truth.",
+    "Map region semantics remain coarse for connector and vertical maps.",
+    "No threshold or feature search was performed after viewing the augmented result.",
+    "The executed notebook and raw eight-shard extracts remain in the local frozen research workspace."
+  ]
+}

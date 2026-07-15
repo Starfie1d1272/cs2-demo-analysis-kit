@@ -29,6 +29,7 @@ describe("importDemoFile", () => {
     expect(await factsStore.getRrSignalRows({ matchIds: [matchId] })).not.toHaveLength(0);
     expect(await factsStore.getPlayerPositionRounds({ matchIds: [matchId] })).not.toHaveLength(0);
     expect(await factsStore.getTeamShapeRounds({ matchIds: [matchId] })).not.toHaveLength(0);
+    expect(await factsStore.getCtRotationRounds({ matchIds: [matchId] })).not.toHaveLength(0);
     expect(await factsStore.getTacticalRounds({ matchIds: [matchId] })).not.toHaveLength(0);
   });
 
@@ -48,6 +49,7 @@ describe("isAnalysisStale", () => {
 
   it("flags entries built with an older factsRevision", () => {
     expect(isAnalysisStale({ factsRevision: "stale", formatVersion: "x" })).toBe(true);
+    expect(isAnalysisStale({ factsRevision: "storage:4|mapIntelligence:5|tactical:5", formatVersion: ANALYSIS_MANIFEST.formatVersion })).toBe(true);
     expect(isAnalysisStale({ factsRevision: ANALYSIS_MANIFEST.factsRevision, formatVersion: "x" })).toBe(false);
   });
 });
@@ -65,6 +67,7 @@ describe("rebuildFactsFromZip", () => {
     expect(rebuilt?.id).toBe(id);
     expect(rebuilt?.builtWith?.factsRevision).toBe(ANALYSIS_MANIFEST.factsRevision);
     expect(await factsStore.getRrSignalRows({ matchIds: [matchId] })).not.toHaveLength(0);
+    expect(await factsStore.getCtRotationRounds({ matchIds: [matchId] })).not.toHaveLength(0);
     // entry 仍在库中且非 stale
     const entries = await listDemoEntries();
     expect(entries.find((e) => e.id === id)?.builtWith?.factsRevision).toBe(ANALYSIS_MANIFEST.factsRevision);
