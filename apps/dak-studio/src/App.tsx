@@ -289,6 +289,7 @@ export function App() {
     setNotice(null);
     let imported = 0;
     let duplicates = 0;
+    let degradedProducers = 0;
     const errors: string[] = [...initialErrors];
 
     // .dem 先经 exporter 转 ZIP（数据库只存 ZIP）
@@ -318,6 +319,7 @@ export function App() {
           const result = await importDemoFile(item.file, { tags, sourceDemPath: item.sourceDemPath });
           if (result.duplicate) duplicates += 1;
           else imported += 1;
+          degradedProducers += result.producers.filter((producer) => producer.status !== "current").length;
         } catch (err) {
           errors.push(err instanceof Error ? err.message : String(err));
         } finally {
@@ -331,6 +333,7 @@ export function App() {
     const parts: string[] = [];
     if (imported > 0) parts.push(`导入 ${imported} 场`);
     if (duplicates > 0) parts.push(`跳过重复 ${duplicates} 场`);
+    if (degradedProducers > 0) parts.push(`${degradedProducers} 个 producer 可稍后重建`);
     if (errors.length > 0) parts.push(`失败 ${errors.length} 场（${errors[0]}）`);
     setNotice(parts.join("，") || null);
     setImporting(false);

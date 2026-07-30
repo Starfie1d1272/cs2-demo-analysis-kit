@@ -38,6 +38,7 @@ describe("importDemoFile", () => {
     expect(result.entry.builtWith?.factsRevision).toBe(ANALYSIS_MANIFEST.factsRevision);
     expect(result.entry.builtWith?.formatVersion).toBe(ANALYSIS_MANIFEST.formatVersion);
     expect(isFactsStale(result.entry)).toBe(false);
+    expect(result.producers.every((producer) => producer.status === "current")).toBe(true);
   });
 });
 

@@ -76,7 +76,7 @@ export function isFactsStale(entry: StudioDemoEntry): boolean {
 }
 
 const PERSISTED_PRODUCERS = ["base-facts", "duel", "tactical", "map-intelligence", "utility"] as const;
-type PersistedProducer = (typeof PERSISTED_PRODUCERS)[number];
+export type PersistedProducer = (typeof PERSISTED_PRODUCERS)[number];
 
 export interface ProducerPersistResult {
   producer: PersistedProducer;
@@ -88,11 +88,15 @@ export interface ProducerPersistResult {
  * facts 与 derived 先各自写到同名 candidate generation；只有两边都通过表级校验后，
  * 一个 manifest 指针才将该 producer 切为可见。失败保留旧 generation，并显式记录 stale/failed。
  */
-async function persistAnalysis(data: ExtractedMatchData, sourcePackageHash: string): Promise<ProducerPersistResult[]> {
+async function persistAnalysis(
+  data: ExtractedMatchData,
+  sourcePackageHash: string,
+  targets: readonly PersistedProducer[] = PERSISTED_PRODUCERS,
+): Promise<ProducerPersistResult[]> {
   const factsStore = getFactsStore();
   const derivedStore = getDerivedCacheStore();
   const manifests = createProducerManifestStore(getStorage());
-  const results = await Promise.allSettled(PERSISTED_PRODUCERS.map(async (producer): Promise<ProducerPersistResult> => {
+  const results = await Promise.allSettled(targets.map(async (producer): Promise<ProducerPersistResult> => {
     const startedAt = Date.now();
     const generation = newProducerGeneration();
     const previous = await manifests.get(data.facts.matchId, producer);
@@ -137,7 +141,7 @@ async function persistAnalysis(data: ExtractedMatchData, sourcePackageHash: stri
   // allSettled 保证某个 optional producer 失败不会丢掉其它 producer 的完成结果。
   const resolved = results.map((result, index) => result.status === "fulfilled"
     ? result.value
-    : { producer: PERSISTED_PRODUCERS[index]!, status: "failed" as const, error: String(result.reason) });
+    : { producer: targets[index]!, status: "failed" as const, error: String(result.reason) });
   await getStorage().records("facts:cohort_rows").deleteByPrefix(data.facts.matchId);
   return resolved;
 }
@@ -385,6 +389,7 @@ export interface ImportResult {
   duplicate: boolean;
   replaced: boolean;
   replacedId?: string;
+  producers: ProducerPersistResult[];
 }
 
 export interface ImportDemoOptions {
@@ -473,7 +478,8 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
       entry: completedEntry,
       duplicate: true,
       replaced: Boolean(replacement),
-      replacedId: replacement?.id
+      replacedId: replacement?.id,
+      producers: results,
     };
   }
   await Promise.all([
@@ -501,7 +507,7 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     builtWith: producerState["base-facts"] === "current" ? currentBuiltWith() : undefined,
   };
   await meta.put(id, completedEntry);
-  return { entry: completedEntry, duplicate: false, replaced: Boolean(replacement), replacedId: replacement?.id };
+  return { entry: completedEntry, duplicate: false, replaced: Boolean(replacement), replacedId: replacement?.id, producers: results };
 }
 
 /** 更新某条 demo 的标签。 */
@@ -590,6 +596,22 @@ export async function rebuildFactsFromZip(id: string): Promise<StudioDemoEntry |
     lowMemory: true
   });
   return result.entry;
+}
+
+/** 仅重建失败/过期 producer：仍从同一 ZIP 重新提取，但绝不触碰其它 active generation。 */
+export async function rebuildProducerFromZip(id: string, producer: PersistedProducer): Promise<ProducerPersistResult | null> {
+  const [entry, buffer] = await Promise.all([demoMeta.get<StudioDemoEntry>(id), demoBlobs.get(id)]);
+  if (!entry || !buffer) return null;
+  const result = await importInWorker(buffer.slice(0), matchIdForEntry(entry), false);
+  const [persisted] = await persistAnalysis(result.data, id, [producer]);
+  if (!persisted) return null;
+  const statuses = { ...entry.producerStatuses, [producer]: persisted.status };
+  await demoMeta.put(id, normalizeEntry({
+    ...entry,
+    producerStatuses: statuses,
+    builtWith: statuses["base-facts"] === "current" ? currentBuiltWith() : undefined,
+  }));
+  return persisted;
 }
 
 /** 取解析后的 DemoPackage：内存 → ZIP 重建。仅用于逐场证据/工作台，不作为聚合缓存。 */

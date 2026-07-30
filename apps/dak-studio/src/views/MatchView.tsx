@@ -8,6 +8,7 @@ import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import { EmptyState } from "@cs2dak/react";
 import { SeriesWorkspace } from "./SeriesWorkspace";
 import type { EvidenceContinuation, ReplaySessionState } from "../lib/evidence-continuation";
+import { ReplayModelCache } from "../lib/replay-model-cache";
 
 export interface MatchViewProps {
   entries: StudioDemoEntry[];
@@ -21,25 +22,10 @@ export interface MatchViewProps {
   onReplaySessionChange?: (session: ReplaySessionState) => void;
 }
 
-const modelCache = new Map<string, MatchWorkspaceModel>();
-const MAX_MODEL_CACHE_ENTRIES = 5;
-
-function cacheModel(id: string, model: MatchWorkspaceModel): void {
-  modelCache.delete(id);
-  modelCache.set(id, model);
-  while (modelCache.size > MAX_MODEL_CACHE_ENTRIES) {
-    const oldest = modelCache.keys().next().value;
-    if (oldest === undefined) break;
-    modelCache.delete(oldest);
-  }
-}
+const modelCache = new ReplayModelCache<MatchWorkspaceModel>();
 
 async function loadModel(id: string): Promise<MatchWorkspaceModel> {
-  const cached = modelCache.get(id);
-  if (cached) return cached;
-  const model = await loadMatchWorkspaceModel(id);
-  cacheModel(id, model);
-  return model;
+  return modelCache.load(id, () => loadMatchWorkspaceModel(id));
 }
 
 export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceContinuation, onReturnToSource, onReplaySessionChange }: MatchViewProps) {
@@ -92,6 +78,11 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
   // 切换当前 demo 时退出汇总模式
   useEffect(() => {
     setSummaryMode(false);
+  }, [activeId]);
+
+  useEffect(() => {
+    modelCache.setActive(activeId);
+    return () => modelCache.setActive(null);
   }, [activeId]);
 
   useEffect(() => {
