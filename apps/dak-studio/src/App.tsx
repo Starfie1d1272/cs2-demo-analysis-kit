@@ -1,6 +1,6 @@
 import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Radar, Settings, Swords, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { bulkUpdateTags, formatMatchLabel, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
+import { bulkUpdateTags, formatMatchLabel, importDemoFile, isFactsStale, listDemoEntries, matchIdForEntry, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { CohortScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
 import { AnalysisContextSummary } from "./components/AnalysisContextSummary";
 import { CapabilityBar } from "./components/CapabilityBar";
@@ -16,6 +16,7 @@ import { UpdateModal } from "./components/UpdateModal";
 import { AssetHealthBanner } from "./components/AssetHealthBanner";
 import { LibraryDirButton } from "./components/LibraryDirButton";
 import { HomeView } from "./views/HomeView";
+import { captureFindingSnapshot } from "./lib/finding-snapshot";
 import { LibraryView } from "./views/LibraryView";
 import { MatchView } from "./views/MatchView";
 import { PlayersView } from "./views/PlayersView";
@@ -390,17 +391,28 @@ export function App() {
   }, [entries]);
 
   const openEvidence = useCallback<OpenEvidence>((id, evidence, sourceKey, finding) => {
-    setEvidenceContinuation(createEvidenceContinuation({
+    const continuation = createEvidenceContinuation({
       sourceView: view,
       context: analysisContext,
       sourceKey,
       evidence,
       finding,
-    }));
+    });
+    setEvidenceContinuation(continuation);
+    if (finding && "capability" in finding && "producerVersion" in finding) {
+      const snapshotFinding = finding as import("@cs2dak/presentation").AnalysisFinding;
+      void captureFindingSnapshot(
+        snapshotFinding,
+        analysisContext,
+        Object.fromEntries(snapshotFinding.evidence.map((item) => [item.matchId, entries.find((entry) => matchIdForEntry(entry) === item.matchId)?.id ?? null])),
+      ).then((snapshot) => setEvidenceContinuation((current) => current === continuation
+        ? createEvidenceContinuation({ ...continuation, snapshot })
+        : current));
+    }
     setSelectedDemoId(id);
     setMatchDeepLink({ roundNumber: evidence.roundNumber, tick: evidence.tick });
     setView("match");
-  }, [analysisContext, view]);
+  }, [analysisContext, entries, view]);
 
   const returnFromEvidence = useCallback(() => {
     if (!evidenceContinuation) return;
@@ -795,6 +807,7 @@ export function App() {
             onGoPlayers={(player) => player ? openPlayer(player.playerKey, player.name) : setView("players")}
             onGoLibrary={() => setView("library")}
             contextSummary={summarizeAnalysisContext(analysisContext, entries, eventScopes)}
+            analysisContext={analysisContext}
             identityOptions={identityOptions}
           />
         )}

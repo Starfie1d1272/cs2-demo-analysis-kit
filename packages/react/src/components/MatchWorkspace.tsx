@@ -2,7 +2,7 @@ import type { MatchWorkspaceModel, WorkspaceReplayFrame, WorkspaceReplayLoadout,
 import { displayWeaponName, sideLabel, economyLabelCn, buildMatchBuyQuality, buildMatchReportMarkdown, deriveReplayClock } from "@cs2dak/presentation";
 import { getMapCalibration, worldToRadar, hasLowerLevel, levelAt, type MapLevel } from "@cs2dak/maps";
 import { Activity, BarChart3, ChevronLeft, ChevronRight, Crosshair, Film, Gauge, ListChecks, Map as MapIcon, Pause, Play, ShieldCheck, Swords, Table2, Users } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { EconomyPanel } from "./EconomyPanel";
 import { HeatmapCanvas } from "./HeatmapCanvas";
 import { KillFeed } from "./KillFeed";
@@ -672,6 +672,7 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
   });
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
+  const playbackRaf = useRef<number | null>(null);
   const [layers, setLayers] = useState<ReplayLayerState>({ trace: false, killLines: true, grenades: true });
   // de_nuke / de_vertigo：上下双层雷达。当前层实心、另一层半透明幽灵显示，
   // 道具效果与 C4 只画在所属层。
@@ -710,18 +711,26 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
 
   useEffect(() => {
     if (!playing || !round || targetEndFrameIndex <= 0) return undefined;
-    const msPerFrame = Math.max(35, 1000 / ((replay.sampleRate ?? 8) * speed));
-    const timer = window.setInterval(() => {
+    let previous = performance.now();
+    const advance = (now: number) => {
+      const elapsedSeconds = Math.max(0, (now - previous) / 1000);
+      previous = now;
       setFrameIndex((value) => {
-        if (value >= targetEndFrameIndex) {
+        const next = value + elapsedSeconds * (replay.sampleRate ?? 8) * speed;
+        if (next >= targetEndFrameIndex) {
           setPlaying(false);
           return targetEndFrameIndex;
         }
-        return value + 1;
+        return next;
       });
-    }, msPerFrame);
-    return () => window.clearInterval(timer);
-  }, [playing, replay.sampleRate, targetEndFrameIndex, speed]);
+      playbackRaf.current = window.requestAnimationFrame(advance);
+    };
+    playbackRaf.current = window.requestAnimationFrame(advance);
+    return () => {
+      if (playbackRaf.current != null) window.cancelAnimationFrame(playbackRaf.current);
+      playbackRaf.current = null;
+    };
+  }, [playing, replay.sampleRate, targetEndFrameIndex, speed, round]);
 
   // Stable per-player numbers: teamA → 1-5, teamB → 6-0.
   // Computed from round.players order so the mapping is consistent across frames.
@@ -739,7 +748,7 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
 
   const currentFrameIndex = Math.min(frameIndex, targetEndFrameIndex);
   // 数据帧 clamp：超出实际录制帧数时冻结在最后一帧
-  const dataFrameIndex = Math.min(currentFrameIndex, lastDataFrameIndex);
+  const dataFrameIndex = Math.min(Math.round(currentFrameIndex), lastDataFrameIndex);
   const currentTick = round.startTick + currentFrameIndex * round.tickStep;
   const endTick = round.startTick + targetEndFrameIndex * round.tickStep;
   const replayClock = deriveReplayClock(round, currentTick, replay.tickrate ?? 64);
@@ -760,6 +769,20 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
     setPlaying(false);
     setFrameIndex(Math.max(0, Math.min(targetEndFrameIndex, Math.round((tick - round.startTick) / round.tickStep))));
   };
+  const seekSeconds = (seconds: number) => {
+    setPlaying(false);
+    seekTick(currentTick + seconds * Math.max(replay.tickrate ?? 64, 1));
+  };
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement) return;
+      if (event.code === "Space") { event.preventDefault(); setPlaying((value) => !value); }
+      if (event.key === "ArrowLeft") { event.preventDefault(); seekSeconds(event.shiftKey ? -5 : -1); }
+      if (event.key === "ArrowRight") { event.preventDefault(); seekSeconds(event.shiftKey ? 5 : 1); }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [currentTick, replay.tickrate, targetEndFrameIndex]);
   // 帧数据访问用 dataFrameIndex（clamp 到实际录制范围），让超出部分冻结在最后帧
   const currentPlayers = round.players
     .map((player) => ({ player, frame: player.frames[dataFrameIndex] ?? player.frames.find((frame) => frame.alive) ?? player.frames[0] }))
@@ -851,7 +874,7 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
           <button className="dak-play-button" type="button" onClick={() => setPlaying((value) => !value)} aria-label={playing ? "暂停" : "播放"}>
             {playing ? <Pause size={18} /> : <Play size={18} />}
           </button>
-          <button className="dak-icon-button" type="button" onClick={() => setFrameIndex((value) => Math.max(0, value - Math.max(1, Math.round((replay.sampleRate ?? 8) / 2))))} aria-label="后退">
+          <button className="dak-icon-button" type="button" onClick={() => seekSeconds(-5)} aria-label="后退 5 秒" title="后退 5 秒（Shift+←）">
             <ChevronLeft size={17} />
           </button>
           <div className="dak-scrubber-wrap">
@@ -876,7 +899,7 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
               onChange={(event) => setFrameIndex(Number(event.target.value))}
             />
           </div>
-          <button className="dak-icon-button" type="button" onClick={() => setFrameIndex((value) => Math.min(targetEndFrameIndex, value + Math.max(1, Math.round((replay.sampleRate ?? 8) / 2))))} aria-label="前进">
+          <button className="dak-icon-button" type="button" onClick={() => seekSeconds(5)} aria-label="前进 5 秒" title="前进 5 秒（Shift+→）">
             <ChevronRight size={17} />
           </button>
         </div>

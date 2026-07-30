@@ -7,7 +7,7 @@ export interface PrepItem {
   roundNumber: number;
   clusterId?: string;
   patternFingerprint?: string;
-  source?: "tactical-pattern" | "user";
+  source?: "tactical-pattern" | "system-finding" | "user";
   coverage?: string;
   note: string;
   addedAt?: number;

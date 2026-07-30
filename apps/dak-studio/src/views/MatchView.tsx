@@ -185,7 +185,12 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
       </div>
       {evidenceContinuation && (
         <div className="stu-evidence-review" role="status">
-          <span>正在复核：{evidenceContinuation.finding?.title ?? evidenceContinuation.evidence.reason} · R{evidenceContinuation.evidence.roundNumber}</span>
+          <span>
+            正在复核：{evidenceContinuation.snapshot?.finding.title ?? evidenceContinuation.finding?.title ?? evidenceContinuation.evidence.reason}
+            {" · "}证据 {(evidenceContinuation.evidenceIndex ?? 0) + 1}/1 · R{evidenceContinuation.evidence.roundNumber}
+            {evidenceContinuation.evidence.tick != null ? ` · Tick ${evidenceContinuation.evidence.tick}` : ""}
+            {evidenceContinuation.snapshot && " · 历史快照"}
+          </span>
           {onReturnToSource && <button type="button" className="stu-button-sm" onClick={onReturnToSource}>返回来源</button>}
         </div>
       )}

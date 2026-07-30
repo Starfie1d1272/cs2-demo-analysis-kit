@@ -1,12 +1,15 @@
 import type { EvidenceRef } from "@cs2dak/contract";
 import type { AnalysisFinding } from "@cs2dak/presentation";
 import { getStorage, type RecordStore } from "./storage";
+import type { FindingSnapshotV1 } from "./finding-snapshot";
 
 /** 用户明确确认的个人复盘重点；独立于可删除、可重建的 facts。 */
 export interface TrainingFocus {
   id: string;
   playerKey: string;
   finding: Pick<AnalysisFinding, "key" | "capability" | "title" | "statement" | "sample" | "baseline" | "basis" | "limitations" | "producerVersion" | "origin">;
+  snapshot?: FindingSnapshotV1;
+  origin?: "system" | "user";
   evidence: EvidenceRef[];
   contextSummary: string;
   note: string;
@@ -18,6 +21,8 @@ export interface TrainingFocus {
 export interface CreateTrainingFocusInput {
   playerKey: string;
   finding: TrainingFocus["finding"];
+  snapshot?: FindingSnapshotV1;
+  origin?: "system" | "user";
   evidence: EvidenceRef[];
   contextSummary: string;
   note?: string;
@@ -49,6 +54,8 @@ export function createTrainingFocusStore(records: RecordStore): TrainingFocusSto
         id: newId(),
         playerKey: input.playerKey,
         finding: { ...input.finding },
+        snapshot: input.snapshot ? structuredClone(input.snapshot) : undefined,
+        origin: input.origin ?? "system",
         evidence: input.evidence.map((evidence) => ({ ...evidence })),
         contextSummary: input.contextSummary,
         note: input.note?.trim() ?? "",
