@@ -4,8 +4,10 @@ interface PywebviewStorageApi {
   storage_record_get(namespace: string, key: string): Promise<unknown>;
   storage_record_get_all(namespace: string): Promise<unknown[]>;
   storage_record_entries(namespace: string): Promise<Array<[string, unknown]>>;
+  storage_record_get_prefix(namespace: string, prefix: string): Promise<Array<[string, unknown]>>;
   storage_record_keys(namespace: string): Promise<string[]>;
   storage_record_put(namespace: string, key: string, value: unknown): Promise<void>;
+  storage_record_put_many(namespace: string, rows: Array<[string, unknown]>): Promise<void>;
   storage_record_delete(namespace: string, key: string): Promise<void>;
   storage_record_delete_prefix(namespace: string, prefix: string): Promise<void>;
   storage_blob_get(namespace: string, key: string): Promise<string | null>;
@@ -47,8 +49,12 @@ export function createPywebviewAdapter(api: PywebviewStorageApi): StorageAdapter
           async entries<T>() {
             return (await api.storage_record_entries(namespace)) as Array<[string, T]>;
           },
+          async getByPrefix<T>(prefix: string) {
+            return (await api.storage_record_get_prefix(namespace, prefix)) as Array<[string, T]>;
+          },
           keys: () => api.storage_record_keys(namespace),
           put: (key, value) => api.storage_record_put(namespace, key, value),
+          putMany: (rows) => api.storage_record_put_many(namespace, rows),
           delete: (key) => api.storage_record_delete(namespace, key),
           deleteByPrefix: (prefix) => api.storage_record_delete_prefix(namespace, prefix),
         };

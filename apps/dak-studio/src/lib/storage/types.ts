@@ -18,8 +18,12 @@ export interface RecordStore {
   getAll<T>(): Promise<T[]>;
   /** 取该命名空间全部 [key, value] 对（无序）。 */
   entries<T>(): Promise<Array<[string, T]>>;
+  /** 取 key 以 prefix 开头的 [key, value] 对（含精确匹配）。 */
+  getByPrefix<T>(prefix: string): Promise<Array<[string, T]>>;
   keys(): Promise<string[]>;
   put<T>(key: string, value: T): Promise<void>;
+  /** 在同一命名空间内批量写入。实现应尽量映射到后端的单事务。 */
+  putMany<T>(rows: Array<[string, T]>): Promise<void>;
   delete(key: string): Promise<void>;
   /** 删除所有 key 以 prefix 开头的记录（含精确匹配）。 */
   deleteByPrefix(prefix: string): Promise<void>;

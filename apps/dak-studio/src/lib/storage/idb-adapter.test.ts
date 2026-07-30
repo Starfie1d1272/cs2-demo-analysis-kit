@@ -29,6 +29,20 @@ describe("createIdbAdapter", () => {
     expect(await store.keys()).toEqual(["b"]);
   });
 
+  it("records: prefix query 与 batch write 保持命名空间和键范围", async () => {
+    const store = createIdbAdapter().records("t-records-prefix");
+    await store.putMany([
+      ["m1:g1:a", { row: 1 }],
+      ["m1:g1:b", { row: 2 }],
+      ["m2:g1:a", { row: 3 }],
+    ]);
+
+    expect(new Map(await store.getByPrefix<{ row: number }>("m1:g1:"))).toEqual(new Map([
+      ["m1:g1:a", { row: 1 }],
+      ["m1:g1:b", { row: 2 }],
+    ]));
+  });
+
   it("blobs: ArrayBuffer 字节按 key 原样往返", async () => {
     const blobs = createIdbAdapter().blobs("t-blobs");
     const bytes = new Uint8Array([1, 2, 3, 4, 255, 0, 128]).buffer;

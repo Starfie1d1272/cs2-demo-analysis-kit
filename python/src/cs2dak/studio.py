@@ -524,6 +524,14 @@ class StudioApi:
             ).fetchall()
         return [[key, json.loads(value)] for key, value in rows]
 
+    def storage_record_get_prefix(self, namespace: str, prefix: str) -> list:
+        with self._db_lock:
+            rows = self._conn().execute(
+                "select key, value from records where namespace=? and (key=? or key like ? || '%')",
+                (namespace, prefix, prefix),
+            ).fetchall()
+        return [[key, json.loads(value)] for key, value in rows]
+
     def storage_record_keys(self, namespace: str) -> list[str]:
         with self._db_lock:
             rows = self._conn().execute(
@@ -539,6 +547,21 @@ class StudioApi:
                 "insert into records(namespace, key, value) values(?, ?, ?) "
                 "on conflict(namespace, key) do update set value=excluded.value",
                 (namespace, key, data),
+            )
+            self._conn().commit()
+
+    def storage_record_put_many(self, namespace: str, rows: list[list]) -> None:
+        if not rows:
+            return
+        encoded = [
+            (namespace, key, json.dumps(value, ensure_ascii=False, separators=(",", ":")))
+            for key, value in rows
+        ]
+        with self._db_lock:
+            self._conn().executemany(
+                "insert into records(namespace, key, value) values(?, ?, ?) "
+                "on conflict(namespace, key) do update set value=excluded.value",
+                encoded,
             )
             self._conn().commit()
 

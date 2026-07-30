@@ -31,6 +31,17 @@ def test_backup_restore_round_trip(tmp_path):
     assert api.storage_blob_get("demos", "demo-1") == "AQID"
 
 
+def test_record_prefix_and_batch_write_are_scoped_and_atomic(tmp_path):
+    api = _api(tmp_path)
+    api.storage_record_put_many("facts", [["m1:a", {"row": 1}], ["m1:b", {"row": 2}]])
+    api.storage_record_put("facts", "m2:a", {"row": 3})
+
+    assert api.storage_record_get_prefix("facts", "m1:") == [
+        ["m1:a", {"row": 1}],
+        ["m1:b", {"row": 2}],
+    ]
+
+
 def test_repair_removes_orphans_and_overview_reports_usage(tmp_path):
     api = _api(tmp_path)
     api.storage_record_put("demos", "missing", {"id": "missing"})
