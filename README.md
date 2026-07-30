@@ -19,7 +19,7 @@ English · [简体中文](./README.zh-CN.md)
 
 **DAK Studio** is a desktop workbench that turns a CS2 `.dem` into a full analysis session: a 2D replay, per-player profiles, duel & mechanics breakdowns, utility and economy labs, a tournament hub, and a coach workbench. Everything runs and stays on your machine — no account, no upload, no server.
 
-This repository is also the product-neutral pipeline **behind** Studio: a set of `@cs2dak/*` packages that take a `cs2-demo-format/3.x` ZIP and produce reusable analysis and view models, consumed by Studio and by other products such as RivalHub and CS2 Insight Agent.
+This repository is also the product-neutral pipeline **behind** Studio: a set of `@cs2dak/*` packages that take a `cs2-demo-format/3.x` ZIP and produce reusable analysis and view models. Studio consumes them today; RivalHub and CS2 Insight Agent are compatible external integration targets rather than assumed runtime consumers.
 
 > **Query-first, no black boxes.** Every number in Studio links back to the exact match, round, and tick — and you can watch it happen in the 2D replay. We derive signals transparently; we never ship a score you can't trace.
 
@@ -46,9 +46,9 @@ Nine modules over one shared evidence layer (2D replay · round filters · evide
 | **Home** | "How have *I* been playing, and what should I practice this week?" |
 | **Library** | Where are my demos, how good is the data, how is it organized? (import, hash-dedup, tags, series grouping, QA) |
 | **Match workspace** | What happened this match, and which round and tick proves it? (replay, scoreboard, kill feed, economy, RR breakdown) |
-| **Duel & Mechanics Lab** | Why did I lose that gunfight — aim, positioning, or reaction? (`.tri` line-of-sight TTK, first-shot / spray / counter-strafe / preaim) |
+| **Duel & Mechanics Lab** *(Studio-internal module)* | Why did I lose that gunfight — aim, positioning, or reaction? (`.tri` line-of-sight TTK, first-shot / spray / counter-strafe / preaim) |
 | **Player** | What's this player's style, are they improving, where are the mistakes? |
-| **Utility Lab** | Was that nade worth it, did I learn the standard lineups? |
+| **Utility Lab** *(Studio-internal module)* | Was that nade worth it, did I learn the standard lineups? |
 | **Economy & Round Flow** | Was the money spent right, where did the tempo break? |
 | **Tournament Hub** | Who's strong, what maps are popular, how do I publish the report? |
 | **Coach Workbench** | What will the opponent run, what do we prepare? *(early — see stability tiers)* |
@@ -77,7 +77,7 @@ The **v3 ZIP is the only seam** between Python and TypeScript — neither side i
 | `@cs2dak/presentation` | Product-neutral view models, labels, workspace orchestration. |
 | `@cs2dak/react` | React components that consume presentation contracts only. |
 | `@cs2dak/cli` | Thin CLI wiring `core` to the filesystem. |
-| `apps/dak-studio` | DAK Studio: local demo workbench (IndexedDB library). |
+| `apps/dak-studio` | DAK Studio: local demo workbench (browser/dev uses IndexedDB; desktop uses the pywebview bridge with SQLite records and filesystem blobs). |
 | `python/src/cs2dak` | Python shell around `cs2df`: pywebview GUI + Studio bridge + PyInstaller packaging. No parser/exporter logic. |
 
 ## Develop
@@ -107,7 +107,7 @@ uv run cs2df export-batch <dir> --out bundle.zip --descriptive
 DAK is the **product-neutral analysis layer**. Products own business logic, identity, persistence, and branded UI — and must not rebuild the scoring / aggregation / presentation formulas.
 
 - **RivalHub** (cloud tournament platform) integrates over a **versioned data seam**, not shared source at runtime — phased plan in [docs/integration.md](docs/integration.md) (data API first, selective package sharing later).
-- **CS2 Insight Agent** produces raw `.dem`, exports v3 ZIPs with `cs2df`, then runs `cs2dak analyze` for conversational analysis.
+- **CS2 Insight Agent** currently has its own replay/analysis runtime. The planned integration is a versioned v3 ZIP / analysis-artifact seam; this README does not assume it already runs `cs2df` or `cs2dak`.
 - **rival-rating** owns the RR/PRISM formulas and calibration; this kit only derives signals and wires them in.
 - **cs2-demo-format** owns the v3 ZIP contract; the contract package re-exports it, never forks it.
 
