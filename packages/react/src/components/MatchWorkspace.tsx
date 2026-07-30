@@ -2,7 +2,7 @@ import type { MatchWorkspaceModel, WorkspaceReplayFrame, WorkspaceReplayLoadout,
 import { displayWeaponName, sideLabel, economyLabelCn, buildMatchBuyQuality, buildMatchReportMarkdown, deriveReplayClock } from "@cs2dak/presentation";
 import { getMapCalibration, worldToRadar, hasLowerLevel, levelAt, type MapLevel } from "@cs2dak/maps";
 import { Activity, BarChart3, ChevronLeft, ChevronRight, Crosshair, Film, Gauge, ListChecks, Map as MapIcon, Pause, Play, ShieldCheck, Swords, Table2, Users } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent as ReactWheelEvent } from "react";
 import { EconomyPanel } from "./EconomyPanel";
 import { HeatmapCanvas } from "./HeatmapCanvas";
 import { KillFeed } from "./KillFeed";
@@ -673,6 +673,10 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const playbackRaf = useRef<number | null>(null);
+  const [labelMode, setLabelMode] = useState<"number" | "short" | "full">("number");
+  const [selectedSteamId, setSelectedSteamId] = useState<string | null>(null);
+  const [camera, setCamera] = useState({ zoom: 1, panX: 0, panY: 0 });
+  const cameraDrag = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number } | null>(null);
   const [layers, setLayers] = useState<ReplayLayerState>({ trace: false, killLines: true, grenades: true });
   // de_nuke / de_vertigo：上下双层雷达。当前层实心、另一层半透明幽灵显示，
   // 道具效果与 C4 只画在所属层。
@@ -702,6 +706,11 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
       ? replayFrameIndexAtTick(selectedRound, explicitTick)
       : replayInitialFrameIndex(selectedRound, replay.tickrate ?? 64, initialClockSeconds));
   }, [roundNumber, target?.seq, replay.rounds, replay.tickrate, initialClockSeconds]);
+
+  useEffect(() => {
+    setSelectedSteamId(null);
+    setCamera({ zoom: 1, panX: 0, panY: 0 });
+  }, [roundNumber, map.name]);
 
   useEffect(() => {
     if (target && replay.rounds.some((row) => row.roundNumber === target.roundNumber)) {
@@ -803,6 +812,29 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
         return (na === 0 ? 10 : na) - (nb === 0 ? 10 : nb);
       })
   }));
+  const playerLabel = (player: WorkspaceReplayRound["players"][number]) => {
+    if (labelMode === "full") return player.name;
+    if (labelMode === "short") return player.name.slice(0, 3);
+    return playerNumbers[player.steamId64] ?? "?";
+  };
+  const resetCamera = () => setCamera({ zoom: 1, panX: 0, panY: 0 });
+  const onCameraWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setCamera((current) => ({ ...current, zoom: Math.max(1, Math.min(2.5, current.zoom + (event.deltaY < 0 ? 0.12 : -0.12))) }));
+  };
+  const onCameraPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (camera.zoom <= 1) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    cameraDrag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, panX: camera.panX, panY: camera.panY };
+  };
+  const onCameraPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = cameraDrag.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    setCamera((current) => ({ ...current, panX: drag.panX + event.clientX - drag.x, panY: drag.panY + event.clientY - drag.y }));
+  };
+  const onCameraPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (cameraDrag.current?.pointerId === event.pointerId) cameraDrag.current = null;
+  };
   const renderRosterTeam = (team: typeof rosterTeams[number]) => (
     <section className="dak-roster-team" key={team.teamKey} aria-label={`${team.teamKey} 当前状态`}>
       <div className="dak-roster-team-head">
@@ -824,9 +856,13 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
           const pickedUp = heldGunLabel != null && heldGunLabel !== primaryLabel && heldGunLabel !== secondaryLabel;
           const primary = pickedUp ? heldGunLabel : primaryLabel;
           return (
-            <div
-              className={`dak-frame-player-row${!frame.alive ? " dak-frame-player-row-dead" : ""}`}
+            <button
+              type="button"
+              className={`dak-frame-player-row${!frame.alive ? " dak-frame-player-row-dead" : ""}${selectedSteamId === player.steamId64 ? " dak-frame-player-row-selected" : ""}`}
               key={player.steamId64}
+              onClick={() => setSelectedSteamId(player.steamId64)}
+              aria-pressed={selectedSteamId === player.steamId64}
+              aria-label={`聚焦 ${player.name} 的地图位置`}
             >
               <span className="dak-frame-player-num">{playerNumbers[player.steamId64] ?? "?"}</span>
               <span className="dak-frame-player-name">{player.name}</span>
@@ -844,7 +880,7 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
                 <small className="dak-frame-weapon">阵亡</small>
               )}
               {renderHpArmor(frame)}
-            </div>
+            </button>
           );
         })}
       </div>
@@ -959,6 +995,13 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
               </button>
             ))}
           </div>
+          <div className="dak-speed-group dak-speed-group-compact" role="group" aria-label="人物标签">
+            {(["number", "short", "full"] as const).map((nextMode) => (
+              <button key={nextMode} type="button" className={labelMode === nextMode ? "dak-speed dak-speed-active" : "dak-speed"} onClick={() => setLabelMode(nextMode)}>
+                {{ number: "编号", short: "简称", full: "全名" }[nextMode]}
+              </button>
+            ))}
+          </div>
         </div>
       </section>
       <aside className="dak-replay-roster-panel dak-replay-roster-left">
@@ -967,13 +1010,28 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
         </div>
       </aside>
       <section className="dak-replay-stage-panel" aria-label={`R${round.roundNumber} 2D 回放`}>
+        <div className="dak-replay-stage-tools" role="group" aria-label="地图镜头">
+          <span>{camera.zoom > 1 ? `${camera.zoom.toFixed(1)}×` : "全图"}</span>
+          <button type="button" className="dak-speed" onClick={resetCamera} disabled={camera.zoom === 1 && camera.panX === 0 && camera.panY === 0}>重置镜头</button>
+        </div>
         <div
-          className="dak-replay-stage"
-          style={(() => {
-            const url = dualLevel && level === "lower" ? map.lowerRadarImageUrl : map.radarImageUrl;
-            return url ? { backgroundImage: `url(${url})` } : undefined;
-          })()}
+          className={`dak-replay-stage-viewport${camera.zoom > 1 ? " dak-replay-stage-viewport-zoomed" : ""}`}
+          onWheel={onCameraWheel}
+          onPointerDown={onCameraPointerDown}
+          onPointerMove={onCameraPointerMove}
+          onPointerUp={onCameraPointerUp}
+          onPointerCancel={onCameraPointerUp}
         >
+          <div
+            className="dak-replay-stage"
+            style={(() => {
+            const url = dualLevel && level === "lower" ? map.lowerRadarImageUrl : map.radarImageUrl;
+            return {
+              ...(url ? { backgroundImage: `url(${url})` } : {}),
+              transform: `translate(${camera.panX}px, ${camera.panY}px) scale(${camera.zoom})`,
+            };
+          })()}
+          >
           <div className="dak-replay-gridlines" aria-hidden="true" />
           <KillFeed kills={round.kills} currentTick={currentTick} tickrate={replay.tickrate} />
           {layers.trace && (
@@ -1045,12 +1103,16 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
           {currentPlayers.map(({ player, frame }) => (
             <div
               key={player.steamId64}
-              className={`dak-replay-token dak-replay-token-${player.teamKey}${!frame.alive ? " dak-replay-token-dead" : ""}${frame.flashed ? " dak-replay-token-flashed" : ""}${dualLevel && levelOf(frame.z) !== level ? " dak-replay-token-offlevel" : ""}`}
+              className={`dak-replay-token dak-replay-token-${player.teamKey}${!frame.alive ? " dak-replay-token-dead" : ""}${frame.flashed ? " dak-replay-token-flashed" : ""}${selectedSteamId === player.steamId64 ? " dak-replay-token-selected" : ""}${dualLevel && levelOf(frame.z) !== level ? " dak-replay-token-offlevel" : ""}`}
               style={{ ...replayFramePosition(frame, map), transform: `translate(-50%, -50%) rotate(${90 - frame.yaw}deg)` }}
               title={`${playerNumbers[player.steamId64] ?? "?"} ${player.name} · ${frame.hp} HP${frame.hasDefuseKit ? " · 拆弹器" : ""}${frame.flashed ? ` · 白 ${frame.flashRemainingSeconds.toFixed(1)}s` : ""}`}
+              onClick={() => setSelectedSteamId(player.steamId64)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedSteamId(player.steamId64); } }}
             >
               {frame.alive ? (
-                <span style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>{playerNumbers[player.steamId64] ?? "?"}</span>
+                <span style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>{playerLabel(player)}</span>
               ) : (
                 <svg className="dak-replay-dead-x" viewBox="0 0 10 10" width="14" height="14" aria-hidden="true" style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>
                   <line x1="1.5" y1="1.5" x2="8.5" y2="8.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -1061,6 +1123,7 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
               {frame.hasBomb && <i className="dak-replay-c4-tag" style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>c4</i>}
             </div>
           ))}
+          </div>
         </div>
       </section>
       <aside className="dak-replay-roster-panel dak-replay-roster-right">
