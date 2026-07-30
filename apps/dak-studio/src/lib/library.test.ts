@@ -66,6 +66,39 @@ describe("importDemoFile", () => {
     expect(manifest?.active?.sourcePackageHash).toBe(replaced.entry.id);
     expect((await listDemoEntries()).some((entry) => entry.id === first.entry.id)).toBe(false);
   });
+
+  it("keeps the old entry, blob, and active base generation when replacement base facts fail", async () => {
+    const first = await importDemoFile(await sampleFile(), { tags: ["replace-failure-old"] });
+    const matchId = matchIdForEntry(first.entry);
+    const factsStore = getFactsStore();
+    const manifests = createProducerManifestStore(getStorage());
+    const oldManifest = await manifests.get(matchId, "base-facts");
+    const originalStage = factsStore.stageMatchFacts;
+    factsStore.stageMatchFacts = async (facts, producer, generation) => {
+      if (producer === "base-facts") throw new Error("injected base-facts failure");
+      return originalStage(facts, producer, generation);
+    };
+
+    try {
+      const attempted = await importDemoFile(await replacementSampleFile(), {
+        replaceId: first.entry.id,
+        tags: ["replace-failure-new"],
+      });
+      const entries = await listDemoEntries();
+      const currentManifest = await manifests.get(matchId, "base-facts");
+
+      expect(attempted.replaced).toBe(false);
+      expect(attempted.replacedId).toBeUndefined();
+      expect(attempted.entry.producerStatuses?.["base-facts"]).toBe("stale");
+      expect(entries.some((entry) => entry.id === first.entry.id)).toBe(true);
+      expect(entries.some((entry) => entry.id === attempted.entry.id)).toBe(true);
+      expect(await getStorage().blobs("demos").get(first.entry.id)).toBeDefined();
+      expect(currentManifest?.active?.generation).toBe(oldManifest?.active?.generation);
+      expect(currentManifest?.lastAttempt?.outcome).toBe("failed");
+    } finally {
+      factsStore.stageMatchFacts = originalStage;
+    }
+  });
 });
 
 describe("isAnalysisStale", () => {

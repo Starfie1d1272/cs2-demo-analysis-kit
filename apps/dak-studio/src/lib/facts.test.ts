@@ -298,4 +298,28 @@ describe("MatchFacts", () => {
     expect((await store.getPlayerPositionRounds({ matchIds: ["m1"] })).length).toBe(facts.playerPositionRounds.length);
     expect((await store.getTeamShapeRounds({ matchIds: ["m1"] })).length).toBe(facts.teamShapeRounds.length);
   });
+
+  it("0.8 旧库行在 manifest 建立前可读，重建后只读取 active generation", async () => {
+    const adapter = createIdbAdapter();
+    const store = createFactsStore(adapter);
+    const facts = await m1Facts;
+    const current = facts.playerMatchStats[0]!;
+    const legacy = { ...current, kills: current.kills + 1000 };
+
+    // 0.8.x 直接以 `${matchId}\t...` 写入 facts namespace，没有 producer manifest。
+    await adapter.records("facts:player_match_stats").put(
+      `${legacy.matchId}\t${legacy.playerKey}`,
+      legacy,
+    );
+    await expect(store.getPlayerMatchStats({ matchIds: ["m1"], playerKeys: [legacy.playerKey] }))
+      .resolves.toEqual([legacy]);
+
+    // 首次重建写入 candidate 并切换 active 后，旧行仍可留作迁移恢复证据，
+    // 但正常查询只能看到 active generation，不能重复聚合旧布局。
+    await store.putMatchFacts(facts);
+    await expect(store.getPlayerMatchStats({ matchIds: ["m1"], playerKeys: [legacy.playerKey] }))
+      .resolves.toEqual([current]);
+    await expect(store.getPlayerMatchStats())
+      .resolves.not.toContainEqual(legacy);
+  });
 });

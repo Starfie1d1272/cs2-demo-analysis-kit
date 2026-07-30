@@ -50,6 +50,7 @@ def test_record_prefix_treats_match_separator_and_wildcards_literally(tmp_path):
             ["m1\trow", {"row": "m1"}],
             ["m10\trow", {"row": "m10"}],
             ["a_b\trow", {"row": "underscore"}],
+            ["A_b\trow", {"row": "uppercase"}],
             ["aXb\trow", {"row": "plain"}],
             ["a%b\trow", {"row": "percent"}],
         ],
@@ -59,12 +60,16 @@ def test_record_prefix_treats_match_separator_and_wildcards_literally(tmp_path):
     assert api.storage_record_get_prefix("facts", "a_b\t") == [
         ["a_b\trow", {"row": "underscore"}]
     ]
+    assert api.storage_record_get_prefix("facts", "A_b\t") == [
+        ["A_b\trow", {"row": "uppercase"}]
+    ]
     assert api.storage_record_get_prefix("facts", "a%b\t") == [
         ["a%b\trow", {"row": "percent"}]
     ]
 
     api.storage_record_delete_prefix("facts", "a_b\t")
     assert api.storage_record_get("facts", "a_b\trow") is None
+    assert api.storage_record_get("facts", "A_b\trow") == {"row": "uppercase"}
     assert api.storage_record_get("facts", "aXb\trow") == {"row": "plain"}
     assert api.storage_record_get("facts", "a%b\trow") == {"row": "percent"}
 

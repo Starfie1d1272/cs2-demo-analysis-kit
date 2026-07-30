@@ -525,15 +525,12 @@ class StudioApi:
         return [[key, json.loads(value)] for key, value in rows]
 
     def storage_record_get_prefix(self, namespace: str, prefix: str) -> list:
-        pattern = (
-            prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            + "%"
-        )
         with self._db_lock:
             rows = self._conn().execute(
                 "select key, value from records "
-                "where namespace=? and key like ? escape '\\'",
-                (namespace, pattern),
+                "where namespace=? "
+                "and substr(key, 1, length(?)) = ? collate binary",
+                (namespace, prefix, prefix),
             ).fetchall()
         return [[key, json.loads(value)] for key, value in rows]
 
@@ -576,14 +573,11 @@ class StudioApi:
             self._conn().commit()
 
     def storage_record_delete_prefix(self, namespace: str, prefix: str) -> None:
-        pattern = (
-            prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            + "%"
-        )
         with self._db_lock:
             self._conn().execute(
-                "delete from records where namespace=? and key like ? escape '\\'",
-                (namespace, pattern),
+                "delete from records where namespace=? "
+                "and substr(key, 1, length(?)) = ? collate binary",
+                (namespace, prefix, prefix),
             )
             self._conn().commit()
 
@@ -1715,7 +1709,7 @@ def main() -> None:
     api = StudioApi()
     window = webview.create_window(
         title=f"DAK Studio {__version__}",
-        url=index_url,
+        url=f"{index_url}?desktop=1",
         js_api=api,
         width=1440,
         height=920,

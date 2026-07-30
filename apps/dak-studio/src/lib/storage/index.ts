@@ -2,8 +2,8 @@
  * 存储接缝单例。业务层一律 `getStorage().records(...)` / `.blobs(...)`，
  * 永不直接 `indexedDB`。
  *
- * 换后端只动这一处：未来检测到 `window.pywebview.api`（桌面壳）时返回
- * bridge + SQLite/文件系统 适配器；浏览器/dev 仍走 IndexedDB。
+ * 桌面入口会先等待 `pywebviewready`，因此这里检测到 bridge 后返回
+ * SQLite/文件系统适配器；浏览器/dev 仍走 IndexedDB。
  */
 
 import { createIdbAdapter } from "./idb-adapter";
