@@ -910,8 +910,8 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
           </div>
           <div className="dak-replay-techline" aria-label="回放技术信息">
             <span>R{round.roundNumber}</span>
-            <span>Tick {currentTick}</span>
-            <span>帧 {currentFrameIndex + 1}/{round.frameCount}</span>
+            <span>Tick {Math.round(currentTick)}</span>
+            <span>帧 {Math.round(currentFrameIndex) + 1}/{round.frameCount}</span>
             <span>{replay.sampleRate ?? 0} Hz</span>
           </div>
         </div>
