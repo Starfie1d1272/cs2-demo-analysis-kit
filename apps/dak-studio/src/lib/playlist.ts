@@ -1,3 +1,5 @@
+import type { FindingSnapshotV1 } from "./finding-snapshot";
+
 /** Coach 的具体用户行动条目，不是通用 Finding 仓库。 */
 export interface PrepItem {
   id: string;
@@ -9,6 +11,8 @@ export interface PrepItem {
   patternFingerprint?: string;
   source?: "tactical-pattern" | "system-finding" | "user";
   coverage?: string;
+  /** 系统 Finding 必须冻结历史身份；用户判断不伪造系统 snapshot。 */
+  snapshot?: FindingSnapshotV1;
   note: string;
   addedAt?: number;
 }

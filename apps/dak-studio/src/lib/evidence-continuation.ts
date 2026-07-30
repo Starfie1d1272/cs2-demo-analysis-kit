@@ -14,7 +14,7 @@ export interface EvidenceContinuation {
   context: AnalysisContext;
   sourceKey?: string;
   evidence: EvidenceRef;
-  finding?: Pick<AnalysisFinding, "key" | "title" | "statement">;
+  finding?: Pick<AnalysisFinding, "key" | "title" | "statement"> | AnalysisFinding;
   snapshot?: FindingSnapshotV1;
   evidenceIndex?: number;
   replaySession?: ReplaySessionState;
@@ -24,7 +24,7 @@ export type OpenEvidence = (
   entryId: string,
   evidence: EvidenceRef,
   sourceKey?: string,
-  finding?: Pick<AnalysisFinding, "key" | "title" | "statement">,
+  finding?: AnalysisFinding,
 ) => void;
 
 export function createEvidenceContinuation(input: EvidenceContinuation): EvidenceContinuation {

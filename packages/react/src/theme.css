@@ -1887,7 +1887,83 @@
 .dak-scrubber-anchor-firstkill { background: var(--dak-ok); }
 .dak-scrubber-anchor-kill { background: var(--dak-danger); }
 .dak-scrubber-anchor-bomb { background: var(--dak-warn); }
-.dak-scrubber-anchor-defuse { background: #4db8ff; }
+.dak-scrubber-anchor-defuse { background: var(--dak-accent-b); }
+.dak-scrubber-anchor-grenade { background: var(--dak-accent-b); }
+.dak-scrubber-anchor-effect { background: var(--dak-warn); }
+.dak-scrubber-anchor-evidence {
+  width: 10px;
+  height: 10px;
+  top: -2px;
+  border: 2px solid var(--dak-fg);
+  background: var(--dak-accent);
+}
+
+.dak-scrubber-tooltip,
+.dak-hud-icon::after,
+.dak-replay-token::after {
+  position: absolute;
+  z-index: 20;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  min-width: max-content;
+  max-width: 280px;
+  padding: 6px 8px;
+  border: 1px solid var(--dak-border-hi);
+  border-radius: 4px;
+  background: var(--dak-panel-hi);
+  color: var(--dak-fg);
+  font-family: var(--dak-font);
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: left;
+  transform: translateX(-50%);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--dak-bg) 72%, transparent);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.dak-scrubber-anchor:hover .dak-scrubber-tooltip,
+.dak-scrubber-anchor:focus-visible .dak-scrubber-tooltip {
+  opacity: 1;
+}
+
+.dak-event-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.dak-event-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--dak-border);
+  border-radius: 3px;
+  background: var(--dak-bg-subtle);
+  color: var(--dak-fg-dim);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.dak-event-filter i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dak-border-hi);
+}
+
+.dak-event-filter-active {
+  color: var(--dak-fg);
+  border-color: var(--dak-border-hi);
+}
+
+.dak-event-filter-kill i { background: var(--dak-danger); }
+.dak-event-filter-grenade i { background: var(--dak-accent-b); }
+.dak-event-filter-objective i { background: var(--dak-warn); }
+.dak-event-filter-evidence i { background: var(--dak-accent); }
 
 /* v0.3：比赛报告导出按钮 */
 .dak-report-button {
@@ -2084,7 +2160,12 @@
   padding: 10px 12px;
   border: 1px solid var(--dak-border);
   border-radius: 6px;
-  background: var(--dak-bg-subtle);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--dak-ok) 11%, var(--dak-bg-subtle)) 0 var(--dak-player-hp, 0%),
+      var(--dak-bg-subtle) var(--dak-player-hp, 0%)
+    );
   font-size: 12px;
   color: inherit;
   font: inherit;
@@ -2096,6 +2177,15 @@
 .dak-frame-player-row-selected {
   border-color: color-mix(in srgb, var(--dak-accent) 65%, var(--dak-border));
   background: rgba(255, 122, 33, 0.11);
+}
+
+.dak-frame-player-row-evidence {
+  border-color: var(--dak-accent);
+  box-shadow: inset 3px 0 0 var(--dak-accent);
+}
+
+.dak-frame-player-row-dimmed {
+  opacity: 0.46;
 }
 
 .dak-frame-player-row:focus-visible,
@@ -2185,6 +2275,144 @@
   background: rgba(9, 11, 15, 0.34);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.dak-hud-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 18px;
+  padding: 1px 4px;
+  border: 1px solid var(--dak-border);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--dak-bg) 66%, transparent);
+}
+
+.dak-hud-icon img {
+  display: block;
+  width: auto;
+  max-width: 46px;
+  height: 13px;
+  object-fit: contain;
+}
+
+.dak-hud-icon::after,
+.dak-replay-token::after {
+  content: attr(data-tooltip);
+}
+
+.dak-hud-icon:hover::after,
+.dak-hud-icon:focus-visible::after,
+.dak-replay-token:hover::after,
+.dak-replay-token:focus-visible::after {
+  opacity: 1;
+}
+
+.dak-hud-text {
+  color: var(--dak-fg-mid);
+}
+
+.dak-frame-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.dak-frame-loadout .dak-frame-primary,
+.dak-frame-loadout .dak-hud-status {
+  max-width: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.dak-hud-secondary,
+.dak-hud-utility {
+  opacity: 0.72;
+}
+
+.dak-hud-objective {
+  border-color: var(--dak-warn);
+  background: color-mix(in srgb, var(--dak-warn) 12%, var(--dak-bg-subtle));
+}
+
+.dak-hud-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.dak-hud-status b,
+.dak-hud-picked {
+  color: var(--dak-fg-mid);
+  font-size: 9px;
+  font-style: normal;
+}
+
+.dak-hud-flash {
+  color: var(--dak-fg);
+  border-color: var(--dak-fg-mid);
+  background: color-mix(in srgb, var(--dak-fg) 18%, var(--dak-bg-subtle));
+}
+
+.dak-roster-team-teamB .dak-frame-player-row {
+  grid-template-columns: minmax(0, 1fr) 22px;
+  text-align: right;
+}
+
+.dak-roster-team-teamB .dak-frame-player-num {
+  grid-column: 2;
+}
+
+.dak-roster-team-teamB .dak-frame-player-name,
+.dak-roster-team-teamB .dak-frame-loadout,
+.dak-roster-team-teamB .dak-frame-weapon,
+.dak-roster-team-teamB .dak-hp-bar-wrap {
+  grid-column: 1;
+}
+
+.dak-roster-team-teamB .dak-frame-loadout {
+  justify-content: flex-end;
+}
+
+.dak-replay-token-evidence {
+  box-shadow: 0 0 0 3px var(--dak-accent), 0 0 18px color-mix(in srgb, var(--dak-accent) 68%, transparent);
+}
+
+.dak-replay-token-dimmed {
+  opacity: 0.26;
+}
+
+.dak-replay-techline {
+  position: relative;
+}
+
+.dak-replay-techline summary {
+  cursor: pointer;
+  color: var(--dak-fg-dim);
+  list-style: none;
+}
+
+.dak-replay-techline summary::-webkit-details-marker {
+  display: none;
+}
+
+.dak-replay-techline[open] > div {
+  position: absolute;
+  z-index: 12;
+  top: calc(100% + 5px);
+  right: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 280px;
+  padding: 6px;
+  border: 1px solid var(--dak-border);
+  border-radius: 4px;
+  background: var(--dak-panel-hi);
 }
 
 .dak-frame-loadout .dak-frame-primary {

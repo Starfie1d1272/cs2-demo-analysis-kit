@@ -15,6 +15,9 @@ import {
   ReplayModelCache,
 } from "../lib/replay-model-cache";
 import type { ReplayViewerSession } from "@cs2dak/react";
+import type { AnalysisFinding } from "@cs2dak/presentation";
+import { createTrainingFocus } from "../lib/training-focus";
+import { savePrepItem } from "../lib/series";
 
 export interface MatchViewProps {
   entries: StudioDemoEntry[];
@@ -25,6 +28,7 @@ export interface MatchViewProps {
   onGoLibrary: () => void;
   evidenceContinuation?: EvidenceContinuation | null;
   onReturnToSource?: () => void;
+  onSelectEvidence?: (index: number) => void;
   onReplaySessionChange?: (session: ReplaySessionState) => void;
 }
 
@@ -62,7 +66,14 @@ async function loadModel(id: string): Promise<MatchWorkspaceModel> {
   return modelCache.load(id, () => loadMatchWorkspaceModel(id));
 }
 
-export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceContinuation, onReturnToSource, onReplaySessionChange }: MatchViewProps) {
+function fullFinding(continuation: EvidenceContinuation | null | undefined): AnalysisFinding | null {
+  if (continuation?.snapshot?.finding) return continuation.snapshot.finding;
+  return continuation?.finding && "evidence" in continuation.finding
+    ? continuation.finding
+    : null;
+}
+
+export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceContinuation, onReturnToSource, onSelectEvidence, onReplaySessionChange }: MatchViewProps) {
   const activeId = demoId ?? entries[0]?.id ?? null;
   const activeEntry = activeId ? entries.find((entry) => entry.id === activeId) ?? null : null;
   const [model, setModel] = useState<MatchWorkspaceModel | null>(activeId ? modelCache.get(activeId) ?? null : null);
@@ -73,6 +84,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
   const [summary, setSummary] = useState<SeriesSummary | null>(null);
   // 50+ 场时纯下拉不可用：搜索过滤（队名/地图/日期/文件名）+ 按地图分组
   const [matchSearch, setMatchSearch] = useState("");
+  const [evidenceSaveStatus, setEvidenceSaveStatus] = useState<string | null>(null);
   const [localReplaySessionState, setLocalReplaySessionState] = useState<{
     demoId: string;
     session: ReplayViewerSession;
@@ -86,6 +98,49 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     if (localReplaySessionState?.demoId === activeId) return localReplaySessionState.session;
     return readReplaySession(activeId);
   }, [activeId, localReplaySessionState]);
+  const finding = fullFinding(evidenceContinuation);
+  const evidenceSequence = finding?.evidence ?? (evidenceContinuation ? [evidenceContinuation.evidence] : []);
+  const evidenceIndex = Math.max(0, Math.min(evidenceSequence.length - 1, evidenceContinuation?.evidenceIndex ?? 0));
+  const focusPlayerIds = useMemo(() => {
+    const subjectId = finding?.subject.id;
+    if (!subjectId || !model) return [];
+    return model.replay.rounds.some((round) => round.players.some((player) => player.steamId64 === subjectId))
+      ? [subjectId]
+      : [];
+  }, [finding?.subject.id, model]);
+
+  useEffect(() => {
+    setEvidenceSaveStatus(null);
+  }, [evidenceContinuation?.evidenceIndex, evidenceContinuation?.finding?.key]);
+
+  const saveEvidenceAction = async () => {
+    if (!finding || !evidenceContinuation?.snapshot) return;
+    if (finding.capability === "tactical") {
+      await savePrepItem({
+        id: `finding:${finding.key}:${Date.now()}`,
+        group: finding.title,
+        matchId: evidenceContinuation.evidence.matchId,
+        mapName: activeEntry?.meta.mapName,
+        roundNumber: evidenceContinuation.evidence.roundNumber,
+        source: "system-finding",
+        coverage: finding.sample.coverage ?? finding.sample.label,
+        snapshot: evidenceContinuation.snapshot,
+        note: finding.statement,
+      });
+      setEvidenceSaveStatus("已加入备战清单");
+      return;
+    }
+    if (!finding.subject.id) return;
+    await createTrainingFocus({
+      playerKey: finding.subject.id,
+      finding,
+      snapshot: evidenceContinuation.snapshot,
+      origin: "system",
+      evidence: finding.evidence,
+      contextSummary: [finding.sample.label, finding.baseline].filter(Boolean).join(" · "),
+    });
+    setEvidenceSaveStatus("已保存为训练重点");
+  };
 
   useEffect(() => {
     void listSeriesRecords().then(setSeriesRecords);
@@ -183,6 +238,8 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
         model={model}
         initialTarget={deepLink}
         replaySession={evidenceContinuation?.replaySession ?? localReplaySession}
+        hudAssetBaseUrl="/hud-death-notice"
+        replayFocusPlayerIds={focusPlayerIds}
         onReplaySessionChange={(session) => {
           if (activeId) setLocalReplaySessionState({ demoId: activeId, session });
           if (activeId && typeof sessionStorage !== "undefined") {
@@ -235,15 +292,46 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
         )}
       </div>
       {evidenceContinuation && (
-        <div className="stu-evidence-review" role="status">
-          <span>
-            正在复核：{evidenceContinuation.snapshot?.finding.title ?? evidenceContinuation.finding?.title ?? evidenceContinuation.evidence.reason}
-            {" · "}证据 {(evidenceContinuation.evidenceIndex ?? 0) + 1}/1 · R{evidenceContinuation.evidence.roundNumber}
-            {evidenceContinuation.evidence.tick != null ? ` · Tick ${evidenceContinuation.evidence.tick}` : ""}
-            {evidenceContinuation.snapshot && " · 历史快照"}
-          </span>
-          {onReturnToSource && <button type="button" className="stu-button-sm" onClick={onReturnToSource}>返回来源</button>}
-        </div>
+        <section className="stu-evidence-review" aria-label="当前 Finding 证据">
+          <div className="stu-evidence-review-main">
+            <span className="stu-evidence-kicker">正在复核</span>
+            <strong>{finding?.title ?? evidenceContinuation.finding?.title ?? evidenceContinuation.evidence.reason}</strong>
+            <p>{finding?.statement ?? evidenceContinuation.finding?.statement ?? evidenceContinuation.evidence.reason}</p>
+          </div>
+          <div className="stu-evidence-review-meta">
+            <b>证据 {evidenceIndex + 1}/{Math.max(1, evidenceSequence.length)}</b>
+            <span>R{evidenceContinuation.evidence.roundNumber}</span>
+            {evidenceContinuation.evidence.tick != null && <span>Tick {evidenceContinuation.evidence.tick}</span>}
+            {evidenceContinuation.snapshot && <span>已冻结快照</span>}
+            {evidenceContinuation.snapshot?.sourcePackageHashes[evidenceContinuation.evidence.matchId] === null && <span className="stu-evidence-warning">来源比赛已删除</span>}
+          </div>
+          {finding && (
+            <details className="stu-evidence-details">
+              <summary>依据与限制</summary>
+              <div>
+                <span>样本：{finding.sample.label}{finding.sample.coverage ? ` · ${finding.sample.coverage}` : ""}</span>
+                <span>基线：{finding.baseline ?? "未设置"}</span>
+                <span>依据：{finding.basis.join("；")}</span>
+                <span>限制：{finding.limitations.join("；")}</span>
+              </div>
+            </details>
+          )}
+          <div className="stu-evidence-review-actions">
+            {onReturnToSource && <button type="button" className="stu-button-sm" onClick={onReturnToSource}>返回来源</button>}
+            <button type="button" className="stu-button-sm" disabled={evidenceIndex <= 0} onClick={() => onSelectEvidence?.(evidenceIndex - 1)}>上一证据</button>
+            <button type="button" className="stu-button-sm" disabled={evidenceIndex >= evidenceSequence.length - 1} onClick={() => onSelectEvidence?.(evidenceIndex + 1)}>下一证据</button>
+            {finding && (finding.capability === "tactical" || finding.subject.id) && (
+              <button
+                type="button"
+                className="stu-button"
+                disabled={!evidenceContinuation.snapshot || evidenceSaveStatus != null}
+                onClick={() => void saveEvidenceAction()}
+              >
+                {evidenceSaveStatus ?? (finding.capability === "tactical" ? "加入备战清单" : "保存为训练重点")}
+              </button>
+            )}
+          </div>
+        </section>
       )}
       {model && showQa && (
         <div className="stu-embed stu-qa-panel">

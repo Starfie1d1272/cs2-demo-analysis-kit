@@ -394,28 +394,62 @@ export function App() {
   }, [entries]);
 
   const openEvidence = useCallback<OpenEvidence>((id, evidence, sourceKey, finding) => {
+    const evidenceIndex = finding?.evidence.findIndex((item) =>
+      item.matchId === evidence.matchId
+      && item.roundNumber === evidence.roundNumber
+      && item.tick === evidence.tick
+      && item.eventKey === evidence.eventKey
+    ) ?? 0;
     const continuation = createEvidenceContinuation({
       sourceView: view,
       context: analysisContext,
       sourceKey,
       evidence,
       finding,
+      evidenceIndex: Math.max(0, evidenceIndex),
     });
     setEvidenceContinuation(continuation);
-    if (finding && "capability" in finding && "producerVersion" in finding) {
-      const snapshotFinding = finding as import("@cs2dak/presentation").AnalysisFinding;
+    if (finding) {
       void captureFindingSnapshot(
-        snapshotFinding,
+        finding,
         analysisContext,
-        Object.fromEntries(snapshotFinding.evidence.map((item) => [item.matchId, entries.find((entry) => matchIdForEntry(entry) === item.matchId)?.id ?? null])),
-      ).then((snapshot) => setEvidenceContinuation((current) => current === continuation
-        ? createEvidenceContinuation({ ...continuation, snapshot })
+        Object.fromEntries(finding.evidence.map((item) => [item.matchId, entries.find((entry) => matchIdForEntry(entry) === item.matchId)?.id ?? null])),
+      ).then((snapshot) => setEvidenceContinuation((current) => current?.finding?.key === finding.key
+        ? createEvidenceContinuation({ ...current, snapshot })
         : current));
     }
     setSelectedDemoId(id);
     setMatchDeepLink({ roundNumber: evidence.roundNumber, tick: evidence.tick });
     setView("match");
   }, [analysisContext, entries, view]);
+
+  const selectEvidence = useCallback((index: number) => {
+    setEvidenceContinuation((current) => {
+      if (!current) return current;
+      const finding = current.snapshot?.finding
+        ?? (current.finding && "evidence" in current.finding ? current.finding : null);
+      const sequence = finding?.evidence ?? [current.evidence];
+      const bounded = Math.max(0, Math.min(sequence.length - 1, index));
+      const evidence = sequence[bounded];
+      if (!evidence) return current;
+      const entry = entries.find((candidate) => matchIdForEntry(candidate) === evidence.matchId);
+      if (!entry) {
+        setNotice(`证据来源比赛已删除：${evidence.matchId}`);
+        return current;
+      }
+      setSelectedDemoId(entry.id);
+      setMatchDeepLink({ roundNumber: evidence.roundNumber, tick: evidence.tick });
+      setView("match");
+      return createEvidenceContinuation({
+        ...current,
+        evidence,
+        evidenceIndex: bounded,
+        replaySession: current.replaySession
+          ? { ...current.replaySession, selectedEvidenceIndex: bounded }
+          : undefined,
+      });
+    });
+  }, [entries]);
 
   const returnFromEvidence = useCallback(() => {
     if (!evidenceContinuation) return;
@@ -850,6 +884,7 @@ export function App() {
             onGoLibrary={() => setView("library")}
             evidenceContinuation={evidenceContinuation}
             onReturnToSource={returnFromEvidence}
+            onSelectEvidence={selectEvidence}
             onReplaySessionChange={(replaySession) => setEvidenceContinuation((current) => current ? createEvidenceContinuation({ ...current, replaySession }) : current)}
           />
         )}

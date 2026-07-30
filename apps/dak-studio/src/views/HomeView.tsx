@@ -1,7 +1,7 @@
 import { Pause, Play, RotateCcw, Star } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { OpeningTrailRound, OpeningTrailsModel, PlayerSeasonProfile, TeamKey } from "@cs2dak/contract";
-import { buildMistakeFindings, SEASON_STAT_VIEWS, type AnalysisFinding, type PlayerSeasonInsights } from "@cs2dak/presentation";
+import { buildMistakeFindings, findingFromUtilityFlash, SEASON_STAT_VIEWS, type AnalysisFinding, type PlayerSeasonInsights } from "@cs2dak/presentation";
 import { getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, type PinnedPlayer } from "../lib/pin";
@@ -574,6 +574,11 @@ export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, on
                       .slice(0, 3)
                       .map((flash, i) => {
                         const e = entryByMatchId.get(flash.matchId);
+                        const finding = findingFromUtilityFlash({
+                          ...flash,
+                          playerId: me.playerKey,
+                          playerName: me.name,
+                        });
                         return (
                           <EvidenceActions
                             key={`${flash.matchId}-${flash.roundNumber}-${i}`}
@@ -584,6 +589,7 @@ export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, on
                             onWatchDemo={onWatchDemo}
                             reason={flash.reason}
                             sourceKey={`home:flash:${flash.matchId}:${flash.roundNumber}:${i}`}
+                            finding={finding}
                           >
                             {e ? formatMatchLabel(e) : flash.matchId} · R{flash.roundNumber} · 致盲 {flash.victimCount} 人 · 净 {flash.netSeconds.toFixed(1)}s
                           </EvidenceActions>

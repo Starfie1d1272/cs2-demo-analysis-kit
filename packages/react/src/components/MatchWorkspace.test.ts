@@ -155,6 +155,33 @@ describe("MatchWorkspace", () => {
     expect(html).not.toContain("闪");
   });
 
+  it("renders licensed HUD assets and distinct throw/effect/evidence timeline events", () => {
+    const replay = {
+      ...model.replay,
+      rounds: [{
+        ...model.replay.rounds[0]!,
+        frameCount: 2,
+        targetEndTick: 180,
+        grenades: [{
+          ...model.replay.rounds[0]!.grenades[0]!,
+          throwTick: 108,
+          effectTick: 116,
+        }],
+      }],
+    };
+    const html = renderToStaticMarkup(React.createElement(ReplayViewer, {
+      replay,
+      map: model.map.view,
+      hudAssetBaseUrl: "/hud-death-notice",
+      target: { roundNumber: 1, tick: 124, seq: 1 },
+    }));
+
+    expect(html).toContain("/hud-death-notice/ak47.svg");
+    expect(html).toContain("烟雾弹 · 投掷");
+    expect(html).toContain("烟雾弹 · 生效");
+    expect(html).toContain("当前 Finding 证据目标");
+  });
+
   it("colors replay smoke by current side instead of team identity", () => {
     const html = renderToStaticMarkup(React.createElement(ReplayViewer, {
       replay: model.replay,
