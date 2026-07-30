@@ -73,16 +73,27 @@ async function rowsForScope<T extends { matchId: string }>(
   producer: ProducerId,
   scope: FactsScope | undefined,
   generationFor: (matchId: string, producer: ProducerId) => Promise<string | undefined>,
+  activeGenerationsFor: (producer: ProducerId) => Promise<Array<{ matchId: string; generation: string }>>,
 ): Promise<T[]> {
   const matchIds = scope?.matchIds;
   if (!matchIds) {
-    // 旧布局只在按 matchId 的惰性迁移路径读取；新查询只扫描 active generation。
-    return (await store.getAll<T>()).filter((row) => inScope(row, scope));
+    const active = await activeGenerationsFor(producer);
+    const groups = await Promise.all(active.map(async ({ matchId, generation }) =>
+      (await store.getByPrefix<T>(producerGenerationKey(matchId, generation))).map(([, row]) => row)
+    ));
+    return groups.flat().filter((row) => inScope(row, scope));
   }
   const groups = await Promise.all(matchIds.map(async (matchId) => {
     const generation = await generationFor(matchId, producer);
     if (generation) return (await store.getByPrefix<T>(producerGenerationKey(matchId, generation))).map(([, row]) => row);
-    return (await store.getByPrefix<T>(matchId)).filter(([key]) => !key.startsWith(`${matchId}\tg:`)).map(([, row]) => row);
+    const [exact, nested] = await Promise.all([
+      store.get<T>(matchId),
+      store.getByPrefix<T>(`${matchId}\t`),
+    ]);
+    return [
+      ...(exact ? [exact] : []),
+      ...nested.filter(([key]) => !key.startsWith(`${matchId}\tg:`)).map(([, row]) => row),
+    ];
   }));
   return groups.flat().filter((row) => inScope(row, scope));
 }
@@ -91,6 +102,12 @@ export function createFactsStore(adapter: StorageAdapter, namespace = FACTS_NAME
   const stores = Object.fromEntries(FACT_TABLES.map((table) => [table, adapter.records(`${namespace}:${table}`)])) as FactStores;
   const manifests = createProducerManifestStore(adapter, namespace === FACTS_NAMESPACE ? undefined : `${namespace}:producer-manifests`);
   const generationFor = async (matchId: string, producer: ProducerId) => (await manifests.get(matchId, producer))?.active?.storageGenerations?.facts;
+  const activeGenerationsFor = async (producer: ProducerId) => (await manifests.getAll())
+    .filter((record) => record.producer === producer && record.active?.storageGenerations?.facts)
+    .map((record) => ({
+      matchId: record.matchId,
+      generation: record.active!.storageGenerations!.facts!,
+    }));
 
   async function stage(facts: MatchFacts, producer: Exclude<ProducerId, "radar-field">, generation: string): Promise<Record<string, number>> {
     const rows = tableRows(facts);
@@ -126,6 +143,11 @@ export function createFactsStore(adapter: StorageAdapter, namespace = FACTS_NAME
         await Promise.all(FACT_PRODUCERS[producer].map((table) => stores[table].deleteByPrefix(producerGenerationKey(facts.matchId, oldGeneration))));
       }
     } catch (error) {
+      await Promise.allSettled([
+        ...FACT_PRODUCERS[producer].map((table) =>
+          stores[table].deleteByPrefix(producerGenerationKey(facts.matchId, generation))
+        ),
+      ]);
       await manifests.fail(facts.matchId, producer, PRODUCER_REVISIONS[producer], startedAt, error);
       throw error;
     }
@@ -139,23 +161,28 @@ export function createFactsStore(adapter: StorageAdapter, namespace = FACTS_NAME
     async cleanupMatchFactsGeneration(matchId, producer, generation) {
       await Promise.all(FACT_PRODUCERS[producer].map((table) => stores[table].deleteByPrefix(producerGenerationKey(matchId, generation))));
     },
-    async getPlayerMatchStats(scope) { return (await rowsForScope<PlayerMatchStatsFact>(stores.player_match_stats, "base-facts", scope, generationFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.playerName.localeCompare(b.playerName)); },
-    async getPlayerWeapons(scope) { return (await rowsForScope<PlayerWeaponFact>(stores.player_weapons, "base-facts", scope, generationFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.weapon.localeCompare(b.weapon)); },
+    async getPlayerMatchStats(scope) { return (await rowsForScope<PlayerMatchStatsFact>(stores.player_match_stats, "base-facts", scope, generationFor, activeGenerationsFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.playerName.localeCompare(b.playerName)); },
+    async getPlayerWeapons(scope) { return (await rowsForScope<PlayerWeaponFact>(stores.player_weapons, "base-facts", scope, generationFor, activeGenerationsFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.weapon.localeCompare(b.weapon)); },
     async getMechanicsRows(scope) {
       const byMatch = new Map<string, PlayerMechanicsFact[]>();
-      for (const row of (await rowsForScope<MechanicsSamplesFact>(stores.mechanics_samples, "duel", scope, generationFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.playerKey.localeCompare(b.playerKey) || a.weapon.localeCompare(b.weapon))) {
+      for (const row of (await rowsForScope<MechanicsSamplesFact>(stores.mechanics_samples, "duel", scope, generationFor, activeGenerationsFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.playerKey.localeCompare(b.playerKey) || a.weapon.localeCompare(b.weapon))) {
         const bucket = byMatch.get(row.matchId) ?? []; bucket.push(row.row); byMatch.set(row.matchId, bucket);
       }
       return [...byMatch.entries()].map(([matchId, rows]) => ({ matchId, rows }));
     },
-    async getRrSignalRows(scope) { return (await rowsForScope<PlayerRrFact>(stores.rr_signal_rows, "base-facts", scope, generationFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.playerKey.localeCompare(b.playerKey)); },
-    async getLineups(scope) { return (await rowsForScope<LineupFact>(stores.lineups, "utility", scope, generationFor)).sort((a, b) => a.matchId.localeCompare(b.matchId)); },
-    async getTacticalRounds(scope) { return (await rowsForScope<TacticalRoundFact>(stores.tactical_rounds, "tactical", scope, generationFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.side.localeCompare(b.side)); },
-    async getPlayerPositionRounds(scope) { return (await rowsForScope<PlayerPositionRoundFact>(stores.player_position_rounds, "map-intelligence", scope, generationFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.teamKey.localeCompare(b.teamKey) || a.playerIndex - b.playerIndex); },
-    async getTeamShapeRounds(scope) { return (await rowsForScope<TeamShapeRoundFact>(stores.team_shape_rounds, "map-intelligence", scope, generationFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.teamKey.localeCompare(b.teamKey)); },
-    async getTeamAwpRounds(scope) { return (await rowsForScope<TeamAwpRoundFact>(stores.team_awp_rounds, "map-intelligence", scope, generationFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.teamKey.localeCompare(b.teamKey)); },
-    async getCtRotationRounds(scope) { return (await rowsForScope<CtRotationRoundFact>(stores.ct_rotation_rounds, "map-intelligence", scope, generationFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.teamKey.localeCompare(b.teamKey) || a.playerIndex - b.playerIndex); },
-    async deleteMatchFacts(matchId) { await Promise.all(Object.values(stores).map((store) => store.deleteByPrefix(matchId))); },
+    async getRrSignalRows(scope) { return (await rowsForScope<PlayerRrFact>(stores.rr_signal_rows, "base-facts", scope, generationFor, activeGenerationsFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.playerKey.localeCompare(b.playerKey)); },
+    async getLineups(scope) { return (await rowsForScope<LineupFact>(stores.lineups, "utility", scope, generationFor, activeGenerationsFor)).sort((a, b) => a.matchId.localeCompare(b.matchId)); },
+    async getTacticalRounds(scope) { return (await rowsForScope<TacticalRoundFact>(stores.tactical_rounds, "tactical", scope, generationFor, activeGenerationsFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.side.localeCompare(b.side)); },
+    async getPlayerPositionRounds(scope) { return (await rowsForScope<PlayerPositionRoundFact>(stores.player_position_rounds, "map-intelligence", scope, generationFor, activeGenerationsFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.teamKey.localeCompare(b.teamKey) || a.playerIndex - b.playerIndex); },
+    async getTeamShapeRounds(scope) { return (await rowsForScope<TeamShapeRoundFact>(stores.team_shape_rounds, "map-intelligence", scope, generationFor, activeGenerationsFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.teamKey.localeCompare(b.teamKey)); },
+    async getTeamAwpRounds(scope) { return (await rowsForScope<TeamAwpRoundFact>(stores.team_awp_rounds, "map-intelligence", scope, generationFor, activeGenerationsFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.teamKey.localeCompare(b.teamKey)); },
+    async getCtRotationRounds(scope) { return (await rowsForScope<CtRotationRoundFact>(stores.ct_rotation_rounds, "map-intelligence", scope, generationFor, activeGenerationsFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.teamKey.localeCompare(b.teamKey) || a.playerIndex - b.playerIndex); },
+    async deleteMatchFacts(matchId) {
+      await Promise.all(Object.values(stores).flatMap((store) => [
+        store.delete(matchId),
+        store.deleteByPrefix(`${matchId}\t`),
+      ]));
+    },
   };
 }
 

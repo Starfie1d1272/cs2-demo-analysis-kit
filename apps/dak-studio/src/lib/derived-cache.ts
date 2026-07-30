@@ -67,12 +67,26 @@ async function rowsForScope<T extends ScopedRow>(
   producer: ProducerId,
   scope: FactsScope | undefined,
   generationFor: (matchId: string, producer: ProducerId) => Promise<string | undefined>,
+  activeGenerationsFor: (producer: ProducerId) => Promise<Array<{ matchId: string; generation: string }>>,
 ): Promise<T[]> {
-  if (!scope?.matchIds) return (await store.getAll<T>()).filter((row) => inScope(row, scope));
+  if (!scope?.matchIds) {
+    const active = await activeGenerationsFor(producer);
+    const groups = await Promise.all(active.map(async ({ matchId, generation }) =>
+      (await store.getByPrefix<T>(producerGenerationKey(matchId, generation))).map(([, row]) => row)
+    ));
+    return groups.flat().filter((row) => inScope(row, scope));
+  }
   const groups = await Promise.all(scope.matchIds.map(async (matchId) => {
     const generation = await generationFor(matchId, producer);
     if (generation) return (await store.getByPrefix<T>(producerGenerationKey(matchId, generation))).map(([, row]) => row);
-    return (await store.getByPrefix<T>(matchId)).filter(([key]) => !key.startsWith(`${matchId}\tg:`)).map(([, row]) => row);
+    const [exact, nested] = await Promise.all([
+      store.get<T>(matchId),
+      store.getByPrefix<T>(`${matchId}\t`),
+    ]);
+    return [
+      ...(exact ? [exact] : []),
+      ...nested.filter(([key]) => !key.startsWith(`${matchId}\tg:`)).map(([, row]) => row),
+    ];
   }));
   return groups.flat().filter((row) => inScope(row, scope));
 }
@@ -95,6 +109,12 @@ export function createDerivedCacheStore(adapter: StorageAdapter, namespace = DER
   const stores = Object.fromEntries(TABLES.map((table) => [table, adapter.records(`${namespace}:${table}`)])) as DerivedStores;
   const manifests = createProducerManifestStore(adapter, namespace === DERIVED_MATCH_NAMESPACE ? undefined : `${namespace}:producer-manifests`);
   const generationFor = async (matchId: string, producer: ProducerId) => (await manifests.get(matchId, producer))?.active?.storageGenerations?.derived;
+  const activeGenerationsFor = async (producer: ProducerId) => (await manifests.getAll())
+    .filter((record) => record.producer === producer && record.active?.storageGenerations?.derived)
+    .map((record) => ({
+      matchId: record.matchId,
+      generation: record.active!.storageGenerations!.derived!,
+    }));
   const legacyStores = namespace === DERIVED_MATCH_NAMESPACE
     ? ["player_insights", "tournament_facts", "team_comparison_facts", "duel_facts", "match_workspace", "opening_trails", "utility_value"].map((table) => adapter.records(`derived:match-v3-map2:${table}`))
     : [];
@@ -125,6 +145,9 @@ export function createDerivedCacheStore(adapter: StorageAdapter, namespace = DER
       const oldGeneration = previous?.active?.storageGenerations?.derived;
       if (oldGeneration && oldGeneration !== generation) await Promise.all(DERIVED_PRODUCERS[producer].map((table) => stores[table].deleteByPrefix(producerGenerationKey(value.matchId, oldGeneration))));
     } catch (error) {
+      await Promise.allSettled(DERIVED_PRODUCERS[producer].map((table) =>
+        stores[table].deleteByPrefix(producerGenerationKey(value.matchId, generation))
+      ));
       await manifests.fail(value.matchId, producer, PRODUCER_REVISIONS[producer], startedAt, error);
       throw error;
     }
@@ -133,20 +156,28 @@ export function createDerivedCacheStore(adapter: StorageAdapter, namespace = DER
   return {
     async putMatchDerived(value) {
       for (const producer of Object.keys(DERIVED_PRODUCERS) as Array<keyof typeof DERIVED_PRODUCERS>) await activateStandalone(value, producer);
-      await Promise.all(legacyStores.map((store) => store.deleteByPrefix(value.matchId)));
+      await Promise.all(legacyStores.flatMap((store) => [
+        store.delete(value.matchId),
+        store.deleteByPrefix(`${value.matchId}\t`),
+      ]));
     },
     stageMatchDerived: stage,
     async cleanupMatchDerivedGeneration(matchId, producer, generation) {
       await Promise.all(DERIVED_PRODUCERS[producer].map((table) => stores[table].deleteByPrefix(producerGenerationKey(matchId, generation))));
     },
-    async getPlayerInsights(scope) { return (await rowsForScope<DerivedPlayerInsight>(stores.player_insights, "base-facts", scope, generationFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.playerName.localeCompare(b.playerName)); },
-    async getTournament(scope) { return (await rowsForScope<DerivedTournament>(stores.tournament, "base-facts", scope, generationFor)).sort((a, b) => a.matchId.localeCompare(b.matchId)).map((row) => row.row); },
-    async getTeamComparison(scope) { return (await rowsForScope<DerivedTeamComparison>(stores.team_comparison, "base-facts", scope, generationFor)).sort((a, b) => a.matchId.localeCompare(b.matchId)).map((row) => row.row); },
-    async getDuels(scope) { return (await rowsForScope<DerivedDuel>(stores.duels, "duel", scope, generationFor)).sort((a, b) => a.matchId.localeCompare(b.matchId)).map((row) => row.row); },
-    async getOpeningTrails(scope) { return (await rowsForScope<DerivedOpeningTrail>(stores.opening_trails, "duel", scope, generationFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.playerKey.localeCompare(b.playerKey)); },
-    async getUtilityValue(scope) { return (await rowsForScope<DerivedUtilityValue>(stores.utility_value, "utility", scope, generationFor)).sort((a, b) => a.matchId.localeCompare(b.matchId)).map((row) => row.row); },
-    async getUtilityValueMatchIds(scope) { return [...new Set((await rowsForScope<DerivedUtilityValue>(stores.utility_value, "utility", scope, generationFor)).map((row) => row.matchId))].sort(); },
-    async deleteMatch(matchId) { await Promise.all([...Object.values(stores), ...legacyStores].map((store) => store.deleteByPrefix(matchId))); },
+    async getPlayerInsights(scope) { return (await rowsForScope<DerivedPlayerInsight>(stores.player_insights, "base-facts", scope, generationFor, activeGenerationsFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.playerName.localeCompare(b.playerName)); },
+    async getTournament(scope) { return (await rowsForScope<DerivedTournament>(stores.tournament, "base-facts", scope, generationFor, activeGenerationsFor)).sort((a, b) => a.matchId.localeCompare(b.matchId)).map((row) => row.row); },
+    async getTeamComparison(scope) { return (await rowsForScope<DerivedTeamComparison>(stores.team_comparison, "base-facts", scope, generationFor, activeGenerationsFor)).sort((a, b) => a.matchId.localeCompare(b.matchId)).map((row) => row.row); },
+    async getDuels(scope) { return (await rowsForScope<DerivedDuel>(stores.duels, "duel", scope, generationFor, activeGenerationsFor)).sort((a, b) => a.matchId.localeCompare(b.matchId)).map((row) => row.row); },
+    async getOpeningTrails(scope) { return (await rowsForScope<DerivedOpeningTrail>(stores.opening_trails, "duel", scope, generationFor, activeGenerationsFor)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.playerKey.localeCompare(b.playerKey)); },
+    async getUtilityValue(scope) { return (await rowsForScope<DerivedUtilityValue>(stores.utility_value, "utility", scope, generationFor, activeGenerationsFor)).sort((a, b) => a.matchId.localeCompare(b.matchId)).map((row) => row.row); },
+    async getUtilityValueMatchIds(scope) { return [...new Set((await rowsForScope<DerivedUtilityValue>(stores.utility_value, "utility", scope, generationFor, activeGenerationsFor)).map((row) => row.matchId))].sort(); },
+    async deleteMatch(matchId) {
+      await Promise.all([...Object.values(stores), ...legacyStores].flatMap((store) => [
+        store.delete(matchId),
+        store.deleteByPrefix(`${matchId}\t`),
+      ]));
+    },
   };
 }
 

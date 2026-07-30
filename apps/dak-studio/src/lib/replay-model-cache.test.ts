@@ -21,4 +21,18 @@ describe("ReplayModelCache", () => {
     await cache.load("other", async () => ({ payload: "y".repeat(100) }));
     expect(cache.get("active")).toBeDefined();
   });
+
+  it("supports explicit invalidation without serializing the cached value", async () => {
+    let estimates = 0;
+    const cache = new ReplayModelCache<{ frames: number[] }>(3, 1024, (value) => {
+      estimates += 1;
+      return value.frames.length * 8;
+    });
+    await cache.load("match", async () => ({ frames: [1, 2, 3] }));
+    expect(cache.estimatedBytes).toBe(24);
+    expect(estimates).toBe(1);
+
+    cache.invalidate("match");
+    expect(cache.get("match")).toBeUndefined();
+  });
 });

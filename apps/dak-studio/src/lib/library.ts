@@ -130,6 +130,12 @@ async function persistAnalysis(
       ]).catch(() => undefined);
       return { producer, status: "current" };
     } catch (error) {
+      await Promise.allSettled([
+        factsStore.cleanupMatchFactsGeneration(data.facts.matchId, producer, generation),
+        ...(producer === "base-facts" || producer === "duel" || producer === "utility"
+          ? [derivedStore.cleanupMatchDerivedGeneration(data.facts.matchId, producer, generation)]
+          : []),
+      ]);
       const record = await manifests.fail(data.facts.matchId, producer, PRODUCER_REVISIONS[producer], startedAt, error);
       return {
         producer,
@@ -142,7 +148,11 @@ async function persistAnalysis(
   const resolved = results.map((result, index) => result.status === "fulfilled"
     ? result.value
     : { producer: targets[index]!, status: "failed" as const, error: String(result.reason) });
-  await getStorage().records("facts:cohort_rows").deleteByPrefix(data.facts.matchId);
+  const cohortRows = getStorage().records("facts:cohort_rows");
+  await Promise.all([
+    cohortRows.delete(data.facts.matchId),
+    cohortRows.deleteByPrefix(`${data.facts.matchId}\t`),
+  ]);
   return resolved;
 }
 
@@ -195,11 +205,23 @@ export function formatMatchLabel(entry: StudioDemoEntry): string {
   ].filter(Boolean).join(" · ");
 }
 
-const pkgCache = new Map<string, Promise<DemoPackage>>();
+const pkgInFlight = new Map<string, Promise<DemoPackage>>();
+const cacheInvalidators = new Set<(demoId: string) => void>();
 
-/** 释放内存中的 DemoPackage 缓存。聚合完成后调用以降低峰值内存。 */
+/** 注册产品侧大对象缓存失效器；删除、替换或重建同一 demo 时统一通知。 */
+export function registerDemoCacheInvalidator(invalidator: (demoId: string) => void): () => void {
+  cacheInvalidators.add(invalidator);
+  return () => cacheInvalidators.delete(invalidator);
+}
+
+function invalidateDemoCaches(id: string): void {
+  pkgInFlight.delete(id);
+  for (const invalidate of cacheInvalidators) invalidate(id);
+}
+
+/** 释放尚在解析中的 DemoPackage single-flight 引用。 */
 export function clearPkgCache(): void {
-  pkgCache.clear();
+  pkgInFlight.clear();
 }
 
 // ── 导入 worker pool ──
@@ -402,6 +424,31 @@ export interface ImportDemoOptions {
   matchDate?: string | null;
 }
 
+async function cleanupReplacement(
+  replacement: StudioDemoEntry | undefined,
+  newId: string,
+  newMatchId: string,
+): Promise<boolean> {
+  if (!replacement || replacement.id === newId) return Boolean(replacement);
+  await Promise.all([
+    demoMeta.delete(replacement.id),
+    demoBlobs.delete(replacement.id),
+  ]);
+  invalidateDemoCaches(replacement.id);
+  const oldMatchId = matchIdForEntry(replacement);
+  if (oldMatchId !== newMatchId) {
+    const cohortRows = getStorage().records("facts:cohort_rows");
+    await Promise.all([
+      getFactsStore().deleteMatchFacts(oldMatchId),
+      getDerivedCacheStore().deleteMatch(oldMatchId),
+      cohortRows.delete(oldMatchId),
+      cohortRows.deleteByPrefix(`${oldMatchId}\t`),
+      createProducerManifestStore(getStorage()).deleteMatch(oldMatchId),
+    ]);
+  }
+  return true;
+}
+
 /**
  * 导入一个 v3 ZIP；以内容哈希为 id，重复导入幂等（标签做并集）。
  * 解析失败抛错（带文件名）。
@@ -464,21 +511,15 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
       builtWith: producerState["base-facts"] === "current" ? currentBuiltWith() : undefined,
     };
     await meta.put(id, completedEntry);
-    if (replacement && replacement.id !== id) {
-      await Promise.all([
-        meta.delete(replacement.id),
-        blobs.delete(replacement.id)
-      ]);
-      pkgCache.delete(replacement.id);
-      void getFactsStore().deleteMatchFacts(matchIdForEntry(replacement));
-      void getDerivedCacheStore().deleteMatch(matchIdForEntry(replacement));
-      void createProducerManifestStore(getStorage()).deleteMatch(matchIdForEntry(replacement));
-    }
+    invalidateDemoCaches(id);
+    const replaced = producerState["base-facts"] === "current"
+      ? await cleanupReplacement(replacement, id, matchId)
+      : false;
     return {
       entry: completedEntry,
       duplicate: true,
-      replaced: Boolean(replacement),
-      replacedId: replacement?.id,
+      replaced,
+      replacedId: replaced ? replacement?.id : undefined,
       producers: results,
     };
   }
@@ -486,18 +527,8 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     blobs.put(id, buffer),
     meta.put(id, entry)
   ]);
-  if (replacement && replacement.id !== id) {
-    await Promise.all([
-      meta.delete(replacement.id),
-      blobs.delete(replacement.id)
-    ]);
-    pkgCache.delete(replacement.id);
-    void getFactsStore().deleteMatchFacts(matchIdForEntry(replacement));
-    void getDerivedCacheStore().deleteMatch(matchIdForEntry(replacement));
-    void createProducerManifestStore(getStorage()).deleteMatch(matchIdForEntry(replacement));
-  }
   // facts 已在 worker 里榨好；后续聚合走 facts 投影，不再反序列化整包 derived。
-  // 注意：不把整包放进 pkgCache —— 批量导入会让每场 DemoPackage（含完整 replay）常驻内存
+  // 注意：不把整包放进长期缓存 —— 批量导入会让每场 DemoPackage（含完整 replay）常驻内存
   // 导致 OOM。需要整包时由 getDemoPackage 按需从 ZIP 懒加载即可。
   const results = await persistAnalysis(data, id);
   const producerState = producerStatuses(results);
@@ -507,7 +538,11 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     builtWith: producerState["base-facts"] === "current" ? currentBuiltWith() : undefined,
   };
   await meta.put(id, completedEntry);
-  return { entry: completedEntry, duplicate: false, replaced: Boolean(replacement), replacedId: replacement?.id, producers: results };
+  invalidateDemoCaches(id);
+  const replaced = producerState["base-facts"] === "current"
+    ? await cleanupReplacement(replacement, id, matchId)
+    : false;
+  return { entry: completedEntry, duplicate: false, replaced, replacedId: replaced ? replacement?.id : undefined, producers: results };
 }
 
 /** 更新某条 demo 的标签。 */
@@ -549,11 +584,12 @@ export async function removeDemo(id: string): Promise<void> {
     demoMeta.delete(id),
     demoBlobs.delete(id)
   ]);
-  pkgCache.delete(id);
+  invalidateDemoCaches(id);
   if (record) await Promise.all([
     getFactsStore().deleteMatchFacts(matchIdForEntry(record)),
     getDerivedCacheStore().deleteMatch(matchIdForEntry(record)),
-    getStorage().records("facts:cohort_rows").deleteByPrefix(matchIdForEntry(record)),
+    getStorage().records("facts:cohort_rows").delete(matchIdForEntry(record)),
+    getStorage().records("facts:cohort_rows").deleteByPrefix(`${matchIdForEntry(record)}\t`),
     createProducerManifestStore(getStorage()).deleteMatch(matchIdForEntry(record)),
   ]);
 }
@@ -616,15 +652,18 @@ export async function rebuildProducerFromZip(id: string, producer: PersistedProd
 
 /** 取解析后的 DemoPackage：内存 → ZIP 重建。仅用于逐场证据/工作台，不作为聚合缓存。 */
 export function getDemoPackage(id: string): Promise<DemoPackage> {
-  const cached = pkgCache.get(id);
+  const cached = pkgInFlight.get(id);
   if (cached) return cached;
   const loading = (async () => {
     const buffer = await demoBlobs.get(id);
     if (!buffer) throw new Error("demo 不存在或已被删除");
     return parseZipInWorker(buffer);
   })();
-  pkgCache.set(id, loading);
-  loading.catch(() => pkgCache.delete(id));
+  pkgInFlight.set(id, loading);
+  void loading.then(
+    () => { if (pkgInFlight.get(id) === loading) pkgInFlight.delete(id); },
+    () => { if (pkgInFlight.get(id) === loading) pkgInFlight.delete(id); },
+  );
   return loading;
 }
 

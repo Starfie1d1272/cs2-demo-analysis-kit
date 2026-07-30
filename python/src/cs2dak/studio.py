@@ -525,10 +525,15 @@ class StudioApi:
         return [[key, json.loads(value)] for key, value in rows]
 
     def storage_record_get_prefix(self, namespace: str, prefix: str) -> list:
+        pattern = (
+            prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            + "%"
+        )
         with self._db_lock:
             rows = self._conn().execute(
-                "select key, value from records where namespace=? and (key=? or key like ? || '%')",
-                (namespace, prefix, prefix),
+                "select key, value from records "
+                "where namespace=? and key like ? escape '\\'",
+                (namespace, pattern),
             ).fetchall()
         return [[key, json.loads(value)] for key, value in rows]
 
@@ -571,10 +576,14 @@ class StudioApi:
             self._conn().commit()
 
     def storage_record_delete_prefix(self, namespace: str, prefix: str) -> None:
+        pattern = (
+            prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            + "%"
+        )
         with self._db_lock:
             self._conn().execute(
-                "delete from records where namespace=? and (key=? or key like ? || '%')",
-                (namespace, prefix, prefix),
+                "delete from records where namespace=? and key like ? escape '\\'",
+                (namespace, pattern),
             )
             self._conn().commit()
 

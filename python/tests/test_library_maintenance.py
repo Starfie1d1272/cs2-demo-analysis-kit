@@ -42,6 +42,33 @@ def test_record_prefix_and_batch_write_are_scoped_and_atomic(tmp_path):
     ]
 
 
+def test_record_prefix_treats_match_separator_and_wildcards_literally(tmp_path):
+    api = _api(tmp_path)
+    api.storage_record_put_many(
+        "facts",
+        [
+            ["m1\trow", {"row": "m1"}],
+            ["m10\trow", {"row": "m10"}],
+            ["a_b\trow", {"row": "underscore"}],
+            ["aXb\trow", {"row": "plain"}],
+            ["a%b\trow", {"row": "percent"}],
+        ],
+    )
+
+    assert api.storage_record_get_prefix("facts", "m1\t") == [["m1\trow", {"row": "m1"}]]
+    assert api.storage_record_get_prefix("facts", "a_b\t") == [
+        ["a_b\trow", {"row": "underscore"}]
+    ]
+    assert api.storage_record_get_prefix("facts", "a%b\t") == [
+        ["a%b\trow", {"row": "percent"}]
+    ]
+
+    api.storage_record_delete_prefix("facts", "a_b\t")
+    assert api.storage_record_get("facts", "a_b\trow") is None
+    assert api.storage_record_get("facts", "aXb\trow") == {"row": "plain"}
+    assert api.storage_record_get("facts", "a%b\trow") == {"row": "percent"}
+
+
 def test_repair_removes_orphans_and_overview_reports_usage(tmp_path):
     api = _api(tmp_path)
     api.storage_record_put("demos", "missing", {"id": "missing"})

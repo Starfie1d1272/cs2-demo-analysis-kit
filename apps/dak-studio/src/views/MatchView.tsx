@@ -3,12 +3,18 @@ import { useEffect, useMemo, useState } from "react";
 import { buildSeriesSummary } from "@cs2dak/presentation";
 import type { MatchWorkspaceModel, SeriesSummary } from "@cs2dak/contract";
 import { MatchWorkspace, QaReportPanel } from "@cs2dak/react";
-import { entryDate, loadMatchWorkspaceModel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { entryDate, loadMatchWorkspaceModel, matchIdForEntry, registerDemoCacheInvalidator, type StudioDemoEntry } from "../lib/library";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import { EmptyState } from "@cs2dak/react";
 import { SeriesWorkspace } from "./SeriesWorkspace";
 import type { EvidenceContinuation, ReplaySessionState } from "../lib/evidence-continuation";
-import { ReplayModelCache } from "../lib/replay-model-cache";
+import {
+  estimateMatchWorkspaceModelBytes,
+  REPLAY_MODEL_CACHE_BYTE_LIMIT,
+  REPLAY_MODEL_CACHE_ENTRY_LIMIT,
+  ReplayModelCache,
+} from "../lib/replay-model-cache";
+import type { ReplayViewerSession } from "@cs2dak/react";
 
 export interface MatchViewProps {
   entries: StudioDemoEntry[];
@@ -22,7 +28,35 @@ export interface MatchViewProps {
   onReplaySessionChange?: (session: ReplaySessionState) => void;
 }
 
-const modelCache = new ReplayModelCache<MatchWorkspaceModel>();
+const modelCache = new ReplayModelCache<MatchWorkspaceModel>(
+  REPLAY_MODEL_CACHE_ENTRY_LIMIT,
+  REPLAY_MODEL_CACHE_BYTE_LIMIT,
+  estimateMatchWorkspaceModelBytes,
+);
+registerDemoCacheInvalidator((demoId) => modelCache.invalidate(demoId));
+
+function replaySessionStorageKey(demoId: string): string {
+  return `dak:replay-session:${demoId}`;
+}
+
+function readReplaySession(demoId: string): ReplayViewerSession | null {
+  try {
+    if (typeof sessionStorage === "undefined") return null;
+    const raw = sessionStorage.getItem(replaySessionStorageKey(demoId));
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<ReplayViewerSession>;
+    return typeof value.roundNumber === "number"
+      && typeof value.playheadSeconds === "number"
+      && typeof value.playbackRate === "number"
+      && value.layers != null
+      && value.cameraByMap != null
+      && (value.labelMode === "number" || value.labelMode === "short" || value.labelMode === "full")
+      ? value as ReplayViewerSession
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 async function loadModel(id: string): Promise<MatchWorkspaceModel> {
   return modelCache.load(id, () => loadMatchWorkspaceModel(id));
@@ -39,6 +73,19 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
   const [summary, setSummary] = useState<SeriesSummary | null>(null);
   // 50+ 场时纯下拉不可用：搜索过滤（队名/地图/日期/文件名）+ 按地图分组
   const [matchSearch, setMatchSearch] = useState("");
+  const [localReplaySessionState, setLocalReplaySessionState] = useState<{
+    demoId: string;
+    session: ReplayViewerSession;
+  } | null>(() => {
+    if (!activeId) return null;
+    const session = readReplaySession(activeId);
+    return session ? { demoId: activeId, session } : null;
+  });
+  const localReplaySession = useMemo(() => {
+    if (!activeId) return null;
+    if (localReplaySessionState?.demoId === activeId) return localReplaySessionState.session;
+    return readReplaySession(activeId);
+  }, [activeId, localReplaySessionState]);
 
   useEffect(() => {
     void listSeriesRecords().then(setSeriesRecords);
@@ -132,10 +179,17 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     : !model
       ? <div className="stu-loading">读取本地持久化工作台…</div>
       : <MatchWorkspace
+        key={activeId}
         model={model}
         initialTarget={deepLink}
-        replaySession={evidenceContinuation?.replaySession ?? null}
-        onReplaySessionChange={onReplaySessionChange ? (session) => onReplaySessionChange({ ...session, selectedEvidenceIndex: evidenceContinuation?.evidenceIndex ?? null }) : undefined}
+        replaySession={evidenceContinuation?.replaySession ?? localReplaySession}
+        onReplaySessionChange={(session) => {
+          if (activeId) setLocalReplaySessionState({ demoId: activeId, session });
+          if (activeId && typeof sessionStorage !== "undefined") {
+            sessionStorage.setItem(replaySessionStorageKey(activeId), JSON.stringify(session));
+          }
+          onReplaySessionChange?.({ ...session, selectedEvidenceIndex: evidenceContinuation?.evidenceIndex ?? null });
+        }}
       />;
 
   return (

@@ -2,7 +2,7 @@ import React from "react";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { MatchWorkspaceModel } from "@cs2dak/contract";
-import { MatchWorkspace, ReplayViewer, replayInitialFrameIndex } from "./MatchWorkspace";
+import { MatchWorkspace, ReplayViewer, replayFrameSampleAt, replayInitialFrameIndex } from "./MatchWorkspace";
 import { RoundTimeline } from "./RoundTimeline";
 
 const model: MatchWorkspaceModel = {
@@ -182,6 +182,32 @@ describe("MatchWorkspace", () => {
     }));
     expect(html).toContain("回合时间");
     expect(html).toContain("1:35");
+  });
+
+  it("keeps discrete replay state on the previous source frame while interpolating pose", () => {
+    const first = model.replay.rounds[0]!.players[0]!.frames[0]!;
+    const second = {
+      ...first,
+      tick: first.tick + 8,
+      x: 11,
+      y: 22,
+      yaw: 110,
+      hp: 35,
+      weapon: "deagle",
+      alive: false,
+    };
+
+    const beforeBoundary = replayFrameSampleAt([first, second], 0.999)!;
+    expect(beforeBoundary.state.hp).toBe(100);
+    expect(beforeBoundary.state.weapon).toBe("ak47");
+    expect(beforeBoundary.state.alive).toBe(true);
+    expect(beforeBoundary.pose.x).toBeCloseTo(10.99);
+    expect(beforeBoundary.pose.yaw).toBeCloseTo(109.98);
+
+    const atBoundary = replayFrameSampleAt([first, second], 1)!;
+    expect(atBoundary.state.hp).toBe(35);
+    expect(atBoundary.state.weapon).toBe("deagle");
+    expect(atBoundary.state.alive).toBe(false);
   });
 
   it("renders truncated timelines with an explicit expand control", () => {

@@ -2,7 +2,7 @@ import type { MatchWorkspaceModel, WorkspaceReplayFrame, WorkspaceReplayLoadout,
 import { displayWeaponName, sideLabel, economyLabelCn, buildMatchBuyQuality, buildMatchReportMarkdown, deriveReplayClock } from "@cs2dak/presentation";
 import { getMapCalibration, worldToRadar, hasLowerLevel, levelAt, type MapLevel } from "@cs2dak/maps";
 import { Activity, BarChart3, ChevronLeft, ChevronRight, Crosshair, Film, Gauge, ListChecks, Map as MapIcon, Pause, Play, ShieldCheck, Swords, Table2, Users } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent as ReactWheelEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { EconomyPanel } from "./EconomyPanel";
 import { HeatmapCanvas } from "./HeatmapCanvas";
 import { KillFeed } from "./KillFeed";
@@ -653,7 +653,7 @@ function replayFrameIndexAtTick(round: WorkspaceReplayRound, tick: number): numb
   const endIndex = targetEndTick != null
     ? Math.max(round.frameCount - 1, Math.round((targetEndTick - round.startTick) / round.tickStep))
     : Math.max(round.frameCount - 1, 0);
-  const index = Math.round((tick - round.startTick) / round.tickStep);
+  const index = (tick - round.startTick) / round.tickStep;
   return Math.max(0, Math.min(endIndex, index));
 }
 
@@ -664,6 +664,40 @@ export function replayInitialFrameIndex(
 ): number {
   const elapsedSeconds = Math.max(0, STANDARD_ROUND_SECONDS - initialClockSeconds);
   return replayFrameIndexAtTick(round, round.freezeEndTick + elapsedSeconds * Math.max(tickrate, 1));
+}
+
+export interface ReplayFrameSample {
+  state: WorkspaceReplayFrame;
+  pose: Pick<WorkspaceReplayFrame, "x" | "y" | "z" | "yaw">;
+  stateIndex: number;
+}
+
+function interpolateYaw(from: number, to: number, alpha: number): number {
+  const delta = ((to - from + 540) % 360) - 180;
+  return from + delta * alpha;
+}
+
+/** 离散状态固定取前一个 source frame；只有位置与朝向在相邻帧间连续插值。 */
+export function replayFrameSampleAt(
+  frames: readonly WorkspaceReplayFrame[],
+  frameIndex: number,
+): ReplayFrameSample | null {
+  if (frames.length === 0) return null;
+  const bounded = Math.max(0, Math.min(frameIndex, frames.length - 1));
+  const stateIndex = Math.floor(bounded);
+  const state = frames[stateIndex]!;
+  const next = frames[Math.min(stateIndex + 1, frames.length - 1)]!;
+  const alpha = bounded - stateIndex;
+  return {
+    state,
+    stateIndex,
+    pose: {
+      x: state.x + (next.x - state.x) * alpha,
+      y: state.y + (next.y - state.y) * alpha,
+      z: state.z + (next.z - state.z) * alpha,
+      yaw: interpolateYaw(state.yaw, next.yaw, alpha),
+    },
+  };
 }
 
 export function ReplayViewer({ replay, map, target = null, initialClockSeconds = STANDARD_ROUND_SECONDS, initialSession = null, onSessionChange }: {
@@ -691,19 +725,42 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
   const [labelMode, setLabelMode] = useState<"number" | "short" | "full">(initialSession?.labelMode ?? "number");
   const [selectedSteamId, setSelectedSteamId] = useState<string | null>(null);
   const [camera, setCamera] = useState(() => initialSession?.cameraByMap[map.name] ?? { zoom: 1, panX: 0, panY: 0 });
+  const cameraViewport = useRef<HTMLDivElement | null>(null);
   const cameraDrag = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number } | null>(null);
   const [layers, setLayers] = useState<ReplayLayerState>({ trace: initialSession?.layers.trace ?? false, killLines: initialSession?.layers.killLines ?? true, grenades: initialSession?.layers.grenades ?? true });
   // de_nuke / de_vertigo：上下双层雷达。当前层实心、另一层半透明幽灵显示，
   // 道具效果与 C4 只画在所属层。
   const calibration = getMapCalibration(map.name);
   const dualLevel = !!(calibration && hasLowerLevel(calibration) && map.lowerRadarImageUrl);
-  const [level, setLevel] = useState<MapLevel>("upper");
+  const [level, setLevel] = useState<MapLevel>(initialSession?.cameraByMap[map.name]?.floor ?? "upper");
   const levelOf = (z: number): MapLevel => (calibration ? levelAt(z, calibration) : "upper");
   const round = replay.rounds.find((row) => row.roundNumber === roundNumber) ?? replay.rounds[0];
   const latestSession = useRef<ReplayViewerSession | null>(null);
-  useEffect(() => () => {
-    if (latestSession.current) onSessionChange?.(latestSession.current);
+  const onSessionChangeRef = useRef(onSessionChange);
+  useEffect(() => {
+    onSessionChangeRef.current = onSessionChange;
   }, [onSessionChange]);
+  const initialSessionApplied = useRef(false);
+  const lastLocationKey = useRef<string | null>(null);
+  useEffect(() => () => {
+    if (latestSession.current) onSessionChangeRef.current?.(latestSession.current);
+  }, []);
+  useEffect(() => {
+    const publishSession = () => {
+      if (latestSession.current) onSessionChangeRef.current?.(latestSession.current);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "hidden") return;
+      setPlaying(false);
+      publishSession();
+    };
+    window.addEventListener("pagehide", publishSession);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("pagehide", publishSession);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
 
   // 有效帧范围：数据实际帧数；targetEndTick 优先延伸到下一回合 freeze/start 边界。
   const lastDataFrameIndex = round ? Math.max(round.frameCount - 1, 0) : 0;
@@ -719,22 +776,33 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
   useEffect(() => {
     const selectedRound = replay.rounds.find((row) => row.roundNumber === roundNumber);
     if (!selectedRound) return;
+    const locationKey = `${roundNumber}:${target?.seq ?? "direct"}`;
+    if (lastLocationKey.current === locationKey) return;
+    lastLocationKey.current = locationKey;
     setPlaying(false);
     const explicitTick = target?.roundNumber === roundNumber ? target.tick : undefined;
-    setFrameIndex(explicitTick != null
-      ? replayFrameIndexAtTick(selectedRound, explicitTick)
-      : replayInitialFrameIndex(selectedRound, replay.tickrate ?? 64, initialClockSeconds));
-  }, [roundNumber, target?.seq, replay.rounds, replay.tickrate, initialClockSeconds]);
+    const shouldRestore = explicitTick == null
+      && !initialSessionApplied.current
+      && initialSession?.roundNumber === roundNumber;
+    setFrameIndex(
+      explicitTick != null
+        ? replayFrameIndexAtTick(selectedRound, explicitTick)
+        : shouldRestore
+          ? initialSession.playheadSeconds * Math.max(replay.sampleRate ?? 8, 1)
+          : replayInitialFrameIndex(selectedRound, replay.tickrate ?? 64, initialClockSeconds)
+    );
+    initialSessionApplied.current = true;
+  }, [roundNumber, target?.seq, replay.rounds, replay.tickrate, replay.sampleRate, initialClockSeconds, initialSession]);
 
   useEffect(() => {
     setSelectedSteamId(null);
-    setCamera({ zoom: 1, panX: 0, panY: 0 });
-  }, [roundNumber, map.name]);
+  }, [roundNumber]);
 
   useEffect(() => {
     if (!initialSession || target) return;
     const restored = initialSession.cameraByMap[map.name];
     if (restored) setCamera(restored);
+    if (restored?.floor) setLevel(restored.floor);
     setLabelMode(initialSession.labelMode);
     setSpeed(initialSession.playbackRate);
     setLayers((current) => ({ ...current, ...initialSession.layers }));
@@ -768,6 +836,19 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
       playbackRaf.current = null;
     };
   }, [playing, replay.sampleRate, targetEndFrameIndex, speed, round]);
+  useEffect(() => {
+    const viewport = cameraViewport.current;
+    if (!viewport) return;
+    const onCameraWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      setCamera((current) => ({
+        ...current,
+        zoom: Math.max(1, Math.min(2.5, current.zoom + (event.deltaY < 0 ? 0.12 : -0.12))),
+      }));
+    };
+    viewport.addEventListener("wheel", onCameraWheel, { passive: false });
+    return () => viewport.removeEventListener("wheel", onCameraWheel);
+  }, [replay.available]);
 
   // Stable per-player numbers: teamA → 1-5, teamB → 6-0.
   // Computed from round.players order so the mapping is consistent across frames.
@@ -785,7 +866,7 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
 
   const currentFrameIndex = Math.min(frameIndex, targetEndFrameIndex);
   // 数据帧 clamp：超出实际录制帧数时冻结在最后一帧
-  const dataFrameIndex = Math.min(Math.round(currentFrameIndex), lastDataFrameIndex);
+  const dataFrameIndex = Math.min(Math.floor(currentFrameIndex), lastDataFrameIndex);
   const currentTick = round.startTick + currentFrameIndex * round.tickStep;
   const endTick = round.startTick + targetEndFrameIndex * round.tickStep;
   const replayClock = deriveReplayClock(round, currentTick, replay.tickrate ?? 64);
@@ -795,7 +876,10 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
     playbackRate: speed,
     layers: { ...layers },
     labelMode,
-    cameraByMap: { [map.name]: { ...camera, floor: level } },
+    cameraByMap: {
+      ...initialSession?.cameraByMap,
+      [map.name]: { ...camera, floor: level },
+    },
   };
 
   // 2D 时间轴锚点：首杀 / 每次击杀 / 下包拆包（freeze end = 起点本身）
@@ -812,7 +896,7 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
   }, [round, endTick]);
   const seekTick = (tick: number) => {
     setPlaying(false);
-    setFrameIndex(Math.max(0, Math.min(targetEndFrameIndex, Math.round((tick - round.startTick) / round.tickStep))));
+    setFrameIndex(replayFrameIndexAtTick(round, tick));
   };
   const seekSeconds = (seconds: number) => {
     setPlaying(false);
@@ -830,8 +914,15 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
   }, [currentTick, replay.tickrate, targetEndFrameIndex]);
   // 帧数据访问用 dataFrameIndex（clamp 到实际录制范围），让超出部分冻结在最后帧
   const currentPlayers = round.players
-    .map((player) => ({ player, frame: player.frames[dataFrameIndex] ?? player.frames.find((frame) => frame.alive) ?? player.frames[0] }))
-    .filter((row): row is { player: WorkspaceReplayRound["players"][number]; frame: WorkspaceReplayFrame } => Boolean(row.frame));
+    .map((player) => {
+      const sample = replayFrameSampleAt(player.frames, Math.min(currentFrameIndex, lastDataFrameIndex));
+      return sample ? { player, frame: sample.state, pose: sample.pose } : null;
+    })
+    .filter((row): row is {
+      player: WorkspaceReplayRound["players"][number];
+      frame: WorkspaceReplayFrame;
+      pose: ReplayFrameSample["pose"];
+    } => row != null);
   const selectedRoundIndex = Math.max(0, replay.rounds.findIndex((row) => row.roundNumber === round.roundNumber));
   const seekRoundByOffset = (offset: number) => {
     const next = replay.rounds[Math.max(0, Math.min(replay.rounds.length - 1, selectedRoundIndex + offset))];
@@ -854,10 +945,6 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
     return playerNumbers[player.steamId64] ?? "?";
   };
   const resetCamera = () => setCamera({ zoom: 1, panX: 0, panY: 0 });
-  const onCameraWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setCamera((current) => ({ ...current, zoom: Math.max(1, Math.min(2.5, current.zoom + (event.deltaY < 0 ? 0.12 : -0.12))) }));
-  };
   const onCameraPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (camera.zoom <= 1) return;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -983,7 +1070,7 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
           <div className="dak-replay-techline" aria-label="回放技术信息">
             <span>R{round.roundNumber}</span>
             <span>Tick {Math.round(currentTick)}</span>
-            <span>帧 {Math.round(currentFrameIndex) + 1}/{round.frameCount}</span>
+            <span>帧 {dataFrameIndex + 1}/{round.frameCount}</span>
             <span>{replay.sampleRate ?? 0} Hz</span>
           </div>
         </div>
@@ -1051,8 +1138,8 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
           <button type="button" className="dak-speed" onClick={resetCamera} disabled={camera.zoom === 1 && camera.panX === 0 && camera.panY === 0}>重置镜头</button>
         </div>
         <div
+          ref={cameraViewport}
           className={`dak-replay-stage-viewport${camera.zoom > 1 ? " dak-replay-stage-viewport-zoomed" : ""}`}
-          onWheel={onCameraWheel}
           onPointerDown={onCameraPointerDown}
           onPointerMove={onCameraPointerMove}
           onPointerUp={onCameraPointerUp}
@@ -1136,11 +1223,11 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
               </span>
             );
           })}
-          {currentPlayers.map(({ player, frame }) => (
+          {currentPlayers.map(({ player, frame, pose }) => (
             <div
               key={player.steamId64}
-              className={`dak-replay-token dak-replay-token-${player.teamKey}${!frame.alive ? " dak-replay-token-dead" : ""}${frame.flashed ? " dak-replay-token-flashed" : ""}${selectedSteamId === player.steamId64 ? " dak-replay-token-selected" : ""}${dualLevel && levelOf(frame.z) !== level ? " dak-replay-token-offlevel" : ""}`}
-              style={{ ...replayFramePosition(frame, map), transform: `translate(-50%, -50%) rotate(${90 - frame.yaw}deg)` }}
+              className={`dak-replay-token dak-replay-token-${player.teamKey}${!frame.alive ? " dak-replay-token-dead" : ""}${frame.flashed ? " dak-replay-token-flashed" : ""}${selectedSteamId === player.steamId64 ? " dak-replay-token-selected" : ""}${dualLevel && levelOf(pose.z) !== level ? " dak-replay-token-offlevel" : ""}`}
+              style={{ ...replayFramePosition(pose, map), transform: `translate(-50%, -50%) rotate(${90 - pose.yaw}deg)` }}
               title={`${playerNumbers[player.steamId64] ?? "?"} ${player.name} · ${frame.hp} HP${frame.hasDefuseKit ? " · 拆弹器" : ""}${frame.flashed ? ` · 白 ${frame.flashRemainingSeconds.toFixed(1)}s` : ""}`}
               onClick={() => setSelectedSteamId(player.steamId64)}
               role="button"
@@ -1148,15 +1235,15 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
               onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedSteamId(player.steamId64); } }}
             >
               {frame.alive ? (
-                <span style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>{playerLabel(player)}</span>
+                <span style={{ transform: `rotate(${pose.yaw - 90}deg)` }}>{playerLabel(player)}</span>
               ) : (
-                <svg className="dak-replay-dead-x" viewBox="0 0 10 10" width="14" height="14" aria-hidden="true" style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>
+                <svg className="dak-replay-dead-x" viewBox="0 0 10 10" width="14" height="14" aria-hidden="true" style={{ transform: `rotate(${pose.yaw - 90}deg)` }}>
                   <line x1="1.5" y1="1.5" x2="8.5" y2="8.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                   <line x1="8.5" y1="1.5" x2="1.5" y2="8.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
               )}
-              {frame.hasDefuseKit && <i style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>kit</i>}
-              {frame.hasBomb && <i className="dak-replay-c4-tag" style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>c4</i>}
+              {frame.hasDefuseKit && <i style={{ transform: `rotate(${pose.yaw - 90}deg)` }}>kit</i>}
+              {frame.hasBomb && <i className="dak-replay-c4-tag" style={{ transform: `rotate(${pose.yaw - 90}deg)` }}>c4</i>}
             </div>
           ))}
           </div>
