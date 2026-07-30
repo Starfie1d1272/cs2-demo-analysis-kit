@@ -54,7 +54,7 @@ describe("withTeamRenames", () => {
 });
 
 describe("team row filtering", () => {
-  it("keeps only duels involving the selected team and removes opponent mechanics rows", () => {
+  it("keeps focus-team duels with opponent context, while removing opponent mechanics rows", () => {
     const facts = [{
       matchId: "m1",
       teamNamesBySteamId: { a: "Alpha", b: "Bravo", c: "Bravo" },
@@ -69,6 +69,6 @@ describe("team row filtering", () => {
     const filtered = filterDuelFactsByTeam(facts, ["Alpha"]);
     expect(filtered[0]!.duelRows.map((row) => row.id)).toEqual(["keep"]);
     expect(filtered[0]!.mechanicsRows.map((row) => row.steamId64)).toEqual(["a"]);
-    expect(filtered[0]!.teamNamesBySteamId).toEqual({ a: "Alpha" });
+    expect(filtered[0]!.teamNamesBySteamId).toEqual({ a: "Alpha", b: "Bravo", c: "Bravo" });
   });
 });

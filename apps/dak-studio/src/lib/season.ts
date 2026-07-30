@@ -128,7 +128,9 @@ export function filterDuelFactsByTeam(
       duelRows: fact.duelRows.filter(involvedInDuel),
       openingRows: fact.openingRows.filter(involvedInDuel),
       mechanicsRows: fact.mechanicsRows.filter((row) => selectedSteamIds.has(row.steamId64)),
-      teamNamesBySteamId: Object.fromEntries(Object.entries(fact.teamNamesBySteamId).filter(([steamId]) => selectedSteamIds.has(steamId))),
+      // 对枪投影只缩窄焦点队的机制聚合；保留下来的击杀仍需要对手队伍
+      // 上下文，不能把 victim/killer 的队名映射一并删除。
+      teamNamesBySteamId: fact.teamNamesBySteamId,
     };
   });
 }
