@@ -108,6 +108,9 @@ export interface ProjectedMechanicsRows {
 
 export interface FactsStore {
   putMatchFacts(facts: MatchFacts): Promise<void>;
+  /** 将 producer 的 facts 写入不可见 generation；由调用者在完整校验后切换 manifest。 */
+  stageMatchFacts(facts: MatchFacts, producer: Exclude<import("./producer-manifest").ProducerId, "radar-field">, generation: string): Promise<Record<string, number>>;
+  cleanupMatchFactsGeneration(matchId: string, producer: Exclude<import("./producer-manifest").ProducerId, "radar-field">, generation: string): Promise<void>;
   getPlayerMatchStats(scope?: FactsScope): Promise<PlayerMatchStatsFact[]>;
   getPlayerWeapons(scope?: FactsScope): Promise<PlayerWeaponFact[]>;
   getMechanicsRows(scope?: FactsScope): Promise<ProjectedMechanicsRows[]>;
