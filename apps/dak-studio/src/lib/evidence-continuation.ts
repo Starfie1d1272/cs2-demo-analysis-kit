@@ -2,15 +2,10 @@ import type { EvidenceRef } from "@cs2dak/contract";
 import type { AnalysisFinding } from "@cs2dak/presentation";
 import type { AnalysisContext } from "./analysis-context.js";
 import type { FindingSnapshotV1 } from "./finding-snapshot";
+import type { ReplayViewerSession } from "@cs2dak/react";
 
-export interface ReplaySessionState {
-  roundNumber: number;
-  playheadSeconds: number;
+export interface ReplaySessionState extends ReplayViewerSession {
   selectedEvidenceIndex: number | null;
-  playbackRate: number;
-  layers: Record<string, boolean>;
-  labelMode: "number" | "short" | "full";
-  cameraByMap: Record<string, { zoom: number; panX: number; panY: number; floor?: "upper" | "lower" }>;
 }
 
 /** 当前导航历史中的证据返回点；不写 facts 或用户数据。 */

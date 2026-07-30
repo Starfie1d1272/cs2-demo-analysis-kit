@@ -11,6 +11,18 @@ import { ScoreboardTable } from "./ScoreboardTable";
 export interface MatchWorkspaceProps {
   model: MatchWorkspaceModel;
   initialTarget?: { roundNumber: number; tick?: number } | null;
+  replaySession?: ReplayViewerSession | null;
+  onReplaySessionChange?: (session: ReplayViewerSession) => void;
+}
+
+/** 产品持有的可序列化回放会话；React 只读取/回传，不持久化。 */
+export interface ReplayViewerSession {
+  roundNumber: number;
+  playheadSeconds: number;
+  playbackRate: number;
+  layers: Record<string, boolean>;
+  labelMode: "number" | "short" | "full";
+  cameraByMap: Record<string, { zoom: number; panX: number; panY: number; floor?: "upper" | "lower" }>;
 }
 
 type WorkspaceView = MatchWorkspaceModel["tabs"][number]["key"];
@@ -36,7 +48,7 @@ const WORKSPACE_NAV: Array<{ key: WorkspaceView; label: string }> = [
   { key: "map", label: "地图" }
 ];
 
-export function MatchWorkspace({ model, initialTarget }: MatchWorkspaceProps) {
+export function MatchWorkspace({ model, initialTarget, replaySession, onReplaySessionChange }: MatchWorkspaceProps) {
   // 顶部横向分段导航 + 单一全宽主区：一次只显示一个视图，避免宽回放与其它视图争抢宽度。
   // 回放是默认首项（无回放流时退化为概览）；EvidenceLink 跳转自动切到回放并定位 tick。
   // 落地视图固定为概览仪表盘（KPI / 计分板 / 快捷入口）；带 initialTarget 打开时才经 useEffect 跳到回放。
@@ -97,7 +109,7 @@ export function MatchWorkspace({ model, initialTarget }: MatchWorkspaceProps) {
 
         <section className="dak-ws-main">
           {view === "replay" && model.replay.available && (
-            <ReplayViewer replay={model.replay} map={model.map.view} target={replayTarget} />
+          <ReplayViewer replay={model.replay} map={model.map.view} target={replayTarget} initialSession={replaySession} onSessionChange={onReplaySessionChange} />
           )}
           {view === "overview" && <OverviewView model={model} onNavigate={setView} />}
           {view === "rounds" && <RoundExplorer model={model} onOpenReplay={replayHandler} />}
@@ -654,30 +666,33 @@ export function replayInitialFrameIndex(
   return replayFrameIndexAtTick(round, round.freezeEndTick + elapsedSeconds * Math.max(tickrate, 1));
 }
 
-export function ReplayViewer({ replay, map, target = null, initialClockSeconds = STANDARD_ROUND_SECONDS }: {
+export function ReplayViewer({ replay, map, target = null, initialClockSeconds = STANDARD_ROUND_SECONDS, initialSession = null, onSessionChange }: {
   replay: MatchWorkspaceModel["replay"];
   map: MatchWorkspaceModel["map"]["view"];
   /** 统计跳回放：定位到某回合（可选定位 tick）。 */
   target?: ReplayTarget | null;
   /** 未指定 tick 时的初始比赛时钟；比赛工作台 1:55，教练工作台 1:35。 */
   initialClockSeconds?: number;
+  initialSession?: ReplayViewerSession | null;
+  onSessionChange?: (session: ReplayViewerSession) => void;
 }) {
-  const initialRoundNumber = target?.roundNumber ?? replay.rounds[0]?.roundNumber ?? 1;
+  const initialRoundNumber = target?.roundNumber ?? initialSession?.roundNumber ?? replay.rounds[0]?.roundNumber ?? 1;
   const initialRound = replay.rounds.find((row) => row.roundNumber === initialRoundNumber) ?? replay.rounds[0];
   const [roundNumber, setRoundNumber] = useState(initialRoundNumber);
   const [frameIndex, setFrameIndex] = useState(() => {
     if (!initialRound) return 0;
     if (target?.tick != null) return replayFrameIndexAtTick(initialRound, target.tick);
+    if (initialSession?.roundNumber === initialRound.roundNumber) return initialSession.playheadSeconds * (replay.sampleRate ?? 8);
     return replayInitialFrameIndex(initialRound, replay.tickrate ?? 64, initialClockSeconds);
   });
   const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(1);
+  const [speed, setSpeed] = useState(initialSession?.playbackRate ?? 1);
   const playbackRaf = useRef<number | null>(null);
-  const [labelMode, setLabelMode] = useState<"number" | "short" | "full">("number");
+  const [labelMode, setLabelMode] = useState<"number" | "short" | "full">(initialSession?.labelMode ?? "number");
   const [selectedSteamId, setSelectedSteamId] = useState<string | null>(null);
-  const [camera, setCamera] = useState({ zoom: 1, panX: 0, panY: 0 });
+  const [camera, setCamera] = useState(() => initialSession?.cameraByMap[map.name] ?? { zoom: 1, panX: 0, panY: 0 });
   const cameraDrag = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number } | null>(null);
-  const [layers, setLayers] = useState<ReplayLayerState>({ trace: false, killLines: true, grenades: true });
+  const [layers, setLayers] = useState<ReplayLayerState>({ trace: initialSession?.layers.trace ?? false, killLines: initialSession?.layers.killLines ?? true, grenades: initialSession?.layers.grenades ?? true });
   // de_nuke / de_vertigo：上下双层雷达。当前层实心、另一层半透明幽灵显示，
   // 道具效果与 C4 只画在所属层。
   const calibration = getMapCalibration(map.name);
@@ -685,6 +700,10 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
   const [level, setLevel] = useState<MapLevel>("upper");
   const levelOf = (z: number): MapLevel => (calibration ? levelAt(z, calibration) : "upper");
   const round = replay.rounds.find((row) => row.roundNumber === roundNumber) ?? replay.rounds[0];
+  const latestSession = useRef<ReplayViewerSession | null>(null);
+  useEffect(() => () => {
+    if (latestSession.current) onSessionChange?.(latestSession.current);
+  }, [onSessionChange]);
 
   // 有效帧范围：数据实际帧数；targetEndTick 优先延伸到下一回合 freeze/start 边界。
   const lastDataFrameIndex = round ? Math.max(round.frameCount - 1, 0) : 0;
@@ -711,6 +730,15 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
     setSelectedSteamId(null);
     setCamera({ zoom: 1, panX: 0, panY: 0 });
   }, [roundNumber, map.name]);
+
+  useEffect(() => {
+    if (!initialSession || target) return;
+    const restored = initialSession.cameraByMap[map.name];
+    if (restored) setCamera(restored);
+    setLabelMode(initialSession.labelMode);
+    setSpeed(initialSession.playbackRate);
+    setLayers((current) => ({ ...current, ...initialSession.layers }));
+  }, [initialSession, map.name, target]);
 
   useEffect(() => {
     if (target && replay.rounds.some((row) => row.roundNumber === target.roundNumber)) {
@@ -761,6 +789,14 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
   const currentTick = round.startTick + currentFrameIndex * round.tickStep;
   const endTick = round.startTick + targetEndFrameIndex * round.tickStep;
   const replayClock = deriveReplayClock(round, currentTick, replay.tickrate ?? 64);
+  latestSession.current = {
+    roundNumber,
+    playheadSeconds: currentFrameIndex / Math.max(replay.sampleRate ?? 8, 1),
+    playbackRate: speed,
+    layers: { ...layers },
+    labelMode,
+    cameraByMap: { [map.name]: { ...camera, floor: level } },
+  };
 
   // 2D 时间轴锚点：首杀 / 每次击杀 / 下包拆包（freeze end = 起点本身）
   const anchors = useMemo(() => {

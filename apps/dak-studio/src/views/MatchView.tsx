@@ -7,7 +7,7 @@ import { entryDate, loadMatchWorkspaceModel, matchIdForEntry, type StudioDemoEnt
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import { EmptyState } from "@cs2dak/react";
 import { SeriesWorkspace } from "./SeriesWorkspace";
-import type { EvidenceContinuation } from "../lib/evidence-continuation";
+import type { EvidenceContinuation, ReplaySessionState } from "../lib/evidence-continuation";
 
 export interface MatchViewProps {
   entries: StudioDemoEntry[];
@@ -18,6 +18,7 @@ export interface MatchViewProps {
   onGoLibrary: () => void;
   evidenceContinuation?: EvidenceContinuation | null;
   onReturnToSource?: () => void;
+  onReplaySessionChange?: (session: ReplaySessionState) => void;
 }
 
 const modelCache = new Map<string, MatchWorkspaceModel>();
@@ -41,7 +42,7 @@ async function loadModel(id: string): Promise<MatchWorkspaceModel> {
   return model;
 }
 
-export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceContinuation, onReturnToSource }: MatchViewProps) {
+export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceContinuation, onReturnToSource, onReplaySessionChange }: MatchViewProps) {
   const activeId = demoId ?? entries[0]?.id ?? null;
   const activeEntry = activeId ? entries.find((entry) => entry.id === activeId) ?? null : null;
   const [model, setModel] = useState<MatchWorkspaceModel | null>(activeId ? modelCache.get(activeId) ?? null : null);
@@ -139,7 +140,12 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     ? <EmptyState variant="error" title="加载失败" hint={error} />
     : !model
       ? <div className="stu-loading">读取本地持久化工作台…</div>
-      : <MatchWorkspace model={model} initialTarget={deepLink} />;
+      : <MatchWorkspace
+        model={model}
+        initialTarget={deepLink}
+        replaySession={evidenceContinuation?.replaySession ?? null}
+        onReplaySessionChange={onReplaySessionChange ? (session) => onReplaySessionChange({ ...session, selectedEvidenceIndex: evidenceContinuation?.evidenceIndex ?? null }) : undefined}
+      />;
 
   return (
     <div className="stu-view stu-view-flush">

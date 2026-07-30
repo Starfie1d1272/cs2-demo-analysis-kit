@@ -847,6 +847,7 @@ export function App() {
             onGoLibrary={() => setView("library")}
             evidenceContinuation={evidenceContinuation}
             onReturnToSource={returnFromEvidence}
+            onReplaySessionChange={(replaySession) => setEvidenceContinuation((current) => current ? createEvidenceContinuation({ ...current, replaySession }) : current)}
           />
         )}
         {view === "players" && (

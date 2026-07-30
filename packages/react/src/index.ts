@@ -1,4 +1,5 @@
 export { MatchWorkspace, ReplayViewer } from "./components/MatchWorkspace";
+export type { ReplayViewerSession } from "./components/MatchWorkspace";
 export { ScoreboardTable } from "./components/ScoreboardTable";
 export { RoundTimeline } from "./components/RoundTimeline";
 export { EconomyPanel } from "./components/EconomyPanel";
