@@ -29,6 +29,28 @@ export interface ReplayViewerSession {
   cameraByMap: Record<string, { zoom: number; panX: number; panY: number; floor?: "upper" | "lower" }>;
 }
 
+/** 以外部连续 playhead 为准生成可持久化会话，避免保存成上一 source frame 的整数边界。 */
+export function replaySessionAtPlayhead(
+  session: ReplayViewerSession,
+  playheadFrame: number,
+  sampleRate: number,
+): ReplayViewerSession {
+  return {
+    ...session,
+    playheadSeconds: Math.max(0, playheadFrame) / Math.max(sampleRate, 1),
+  };
+}
+
+export function replayFrameIndexFromSession(
+  session: ReplayViewerSession | null | undefined,
+  roundNumber: number,
+  sampleRate: number,
+): number | null {
+  return session?.roundNumber === roundNumber
+    ? Math.max(0, session.playheadSeconds) * Math.max(sampleRate, 1)
+    : null;
+}
+
 type WorkspaceView = MatchWorkspaceModel["tabs"][number]["key"];
 type HeatmapLayer = Extract<WorkspaceSpatialPoint["kind"], "death" | "kill" | "grenade">;
 
@@ -823,7 +845,8 @@ export function ReplayViewer({
   const initialFrameIndex = (() => {
     if (!initialRound) return 0;
     if (target?.tick != null) return replayFrameIndexAtTick(initialRound, target.tick);
-    if (initialSession?.roundNumber === initialRound.roundNumber) return initialSession.playheadSeconds * (replay.sampleRate ?? 8);
+    const restored = replayFrameIndexFromSession(initialSession, initialRound.roundNumber, replay.sampleRate ?? 8);
+    if (restored != null) return restored;
     return replayInitialFrameIndex(initialRound, replay.tickrate ?? 64, initialClockSeconds);
   })();
   const [roundNumber, setRoundNumber] = useState(initialRoundNumber);
@@ -834,6 +857,8 @@ export function ReplayViewer({
   const playbackRaf = useRef<number | null>(null);
   const [labelMode, setLabelMode] = useState<"number" | "short" | "full">(initialSession?.labelMode ?? "number");
   const [selectedSteamId, setSelectedSteamId] = useState<string | null>(null);
+  const [eventFocusPlayerIds, setEventFocusPlayerIds] = useState<string[]>([]);
+  const [selectedAnchorKey, setSelectedAnchorKey] = useState<string | null>(null);
   const [camera, setCamera] = useState(() => initialSession?.cameraByMap[map.name] ?? { zoom: 1, panX: 0, panY: 0 });
   const cameraViewport = useRef<HTMLDivElement | null>(null);
   const cameraDrag = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number } | null>(null);
@@ -903,7 +928,7 @@ export function ReplayViewer({
     const nextFrameIndex = explicitTick != null
         ? replayFrameIndexAtTick(selectedRound, explicitTick)
         : shouldRestore
-          ? initialSession.playheadSeconds * Math.max(replay.sampleRate ?? 8, 1)
+          ? replayFrameIndexFromSession(initialSession, roundNumber, replay.sampleRate ?? 8)!
           : replayInitialFrameIndex(selectedRound, replay.tickrate ?? 64, initialClockSeconds);
     playheadStore.set(nextFrameIndex);
     setFrameIndex(Math.floor(nextFrameIndex));
@@ -912,6 +937,8 @@ export function ReplayViewer({
 
   useEffect(() => {
     setSelectedSteamId(null);
+    setEventFocusPlayerIds([]);
+    setSelectedAnchorKey(null);
   }, [roundNumber]);
 
   useEffect(() => {
@@ -941,10 +968,14 @@ export function ReplayViewer({
         playheadStore.getSnapshot() + elapsedSeconds * (replay.sampleRate ?? 8) * speed,
       );
       playheadStore.set(next);
+      if (latestSession.current) {
+        latestSession.current = replaySessionAtPlayhead(latestSession.current, next, replay.sampleRate ?? 8);
+      }
       const sourceFrame = Math.floor(next);
       setFrameIndex((current) => current === sourceFrame ? current : sourceFrame);
       if (next >= targetEndFrameIndex) {
         setPlaying(false);
+        if (latestSession.current) onSessionChangeRef.current?.(latestSession.current);
         return;
       }
       playbackRaf.current = window.requestAnimationFrame(advance);
@@ -989,9 +1020,9 @@ export function ReplayViewer({
   const currentTick = round.startTick + currentFrameIndex * round.tickStep;
   const endTick = round.startTick + targetEndFrameIndex * round.tickStep;
   const replayClock = deriveReplayClock(round, currentTick, replay.tickrate ?? 64);
-  latestSession.current = {
+  latestSession.current = replaySessionAtPlayhead({
     roundNumber,
-    playheadSeconds: currentFrameIndex / Math.max(replay.sampleRate ?? 8, 1),
+    playheadSeconds: 0,
     playbackRate: speed,
     layers: { ...layers },
     labelMode,
@@ -999,7 +1030,7 @@ export function ReplayViewer({
       ...initialSession?.cameraByMap,
       [map.name]: { ...camera, floor: level },
     },
-  };
+  }, playheadStore.getSnapshot(), replay.sampleRate ?? 8);
 
   const roundMetaByNumber = useMemo(
     () => new Map(roundDetails.map((item) => [item.roundNumber, item])),
@@ -1008,49 +1039,91 @@ export function ReplayViewer({
 
   // 证据型事件轨：投掷与生效保持独立 timing，不把 throwTick 冒充 effectTick。
   const anchors = useMemo(() => {
-    const list: Array<{ tick: number; kind: ReplayEventKind; tone: string; label: string }> = [];
+    const list: Array<{
+      key: string;
+      tick: number;
+      kind: ReplayEventKind;
+      tone: string;
+      label: string;
+      participantIds: string[];
+      points: Array<{ x: number; y: number; z?: number }>;
+    }> = [];
     round.kills.forEach((kill, i) => {
+      const points: Array<{ x: number; y: number; z?: number }> = [];
+      if (kill.killerX != null && kill.killerY != null) {
+        points.push({ x: kill.killerX, y: kill.killerY, ...(kill.killerZ != null ? { z: kill.killerZ } : {}) });
+      }
+      if (kill.victimX != null && kill.victimY != null) {
+        points.push({ x: kill.victimX, y: kill.victimY, ...(kill.victimZ != null ? { z: kill.victimZ } : {}) });
+      }
       list.push({
+        key: kill.id,
         tick: kill.tick,
         kind: "kill",
         tone: i === 0 ? "firstkill" : "kill",
         label: `${i === 0 ? "首杀" : "击杀"} · ${kill.killerName ?? "未知"} → ${kill.victimName}`,
+        participantIds: [kill.killerSteamId64, kill.victimSteamId64].filter((id): id is string => Boolean(id)),
+        points,
       });
     });
-    round.grenades.forEach((grenade) => {
+    round.grenades.forEach((grenade, index) => {
       const label = grenadeLabel(grenade.grenade);
+      const thrower = round.players.find((player) => player.steamId64 === grenade.throwerSteamId64)?.name;
       list.push({
+        key: `grenade:${index}:throw`,
         tick: grenade.throwTick,
         kind: "grenade",
         tone: "grenade",
-        label: `${label} · 投掷`,
+        label: `${thrower ? `${thrower} · ` : ""}${label} · 投掷`,
+        participantIds: grenade.throwerSteamId64 ? [grenade.throwerSteamId64] : [],
+        points: [{ x: grenade.throwX, y: grenade.throwY }],
       });
       if (grenade.effectTick !== grenade.throwTick) {
         list.push({
+          key: `grenade:${index}:effect`,
           tick: grenade.effectTick,
           kind: "grenade",
           tone: "effect",
           label: `${label} · 生效`,
+          participantIds: grenade.throwerSteamId64 ? [grenade.throwerSteamId64] : [],
+          points: [{ x: grenade.effectX, y: grenade.effectY, z: grenade.effectZ }],
         });
       }
     });
     if (round.bomb) {
-      list.push({ tick: round.bomb.plantTick, kind: "objective", tone: "bomb", label: "C4 · 下包" });
-      if (round.bomb.defuseTick != null) list.push({ tick: round.bomb.defuseTick, kind: "objective", tone: "defuse", label: "C4 · 拆除" });
-      if (round.bomb.explodeTick != null) list.push({ tick: round.bomb.explodeTick, kind: "objective", tone: "bomb", label: "C4 · 爆炸" });
+      const points = [{ x: round.bomb.x, y: round.bomb.y, z: round.bomb.z }];
+      list.push({ key: "bomb:plant", tick: round.bomb.plantTick, kind: "objective", tone: "bomb", label: "C4 · 下包", participantIds: [], points });
+      if (round.bomb.defuseTick != null) list.push({ key: "bomb:defuse", tick: round.bomb.defuseTick, kind: "objective", tone: "defuse", label: "C4 · 拆除", participantIds: [], points });
+      if (round.bomb.explodeTick != null) list.push({ key: "bomb:explode", tick: round.bomb.explodeTick, kind: "objective", tone: "bomb", label: "C4 · 爆炸", participantIds: [], points });
     }
     if (target?.roundNumber === round.roundNumber && target.tick != null) {
-      list.push({ tick: target.tick, kind: "evidence", tone: "evidence", label: "当前 Finding 证据目标" });
+      const targetFrame = replayFrameIndexAtTick(round, target.tick);
+      const points = round.players
+        .filter((player) => focusPlayerIds.includes(player.steamId64))
+        .map((player) => replayFrameSampleAt(player.frames, targetFrame)?.pose ?? null)
+        .filter((point): point is ReplayFrameSample["pose"] => point != null);
+      list.push({
+        key: "evidence:current",
+        tick: target.tick,
+        kind: "evidence",
+        tone: "evidence",
+        label: "当前 Finding 证据目标",
+        participantIds: [...focusPlayerIds],
+        points,
+      });
     }
     return list
       .filter((item) => item.tick >= round.startTick && item.tick <= endTick)
       .sort((left, right) => left.tick - right.tick);
-  }, [round, endTick, target?.roundNumber, target?.tick]);
+  }, [round, endTick, target?.roundNumber, target?.tick, focusPlayerIds]);
   const visibleAnchors = anchors.filter((anchor) => eventFilters[anchor.kind]);
   const seekTick = (tick: number) => {
     setPlaying(false);
     const next = replayFrameIndexAtTick(round, tick);
     playheadStore.set(next);
+    if (latestSession.current) {
+      latestSession.current = replaySessionAtPlayhead(latestSession.current, next, replay.sampleRate ?? 8);
+    }
     setFrameIndex(Math.floor(next));
   };
   const seekSeconds = (seconds: number) => {
@@ -1060,13 +1133,17 @@ export function ReplayViewer({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement) return;
-      if (event.code === "Space") { event.preventDefault(); setPlaying((value) => !value); }
+      if (event.code === "Space") {
+        event.preventDefault();
+        if (playing && latestSession.current) onSessionChangeRef.current?.(latestSession.current);
+        setPlaying((value) => !value);
+      }
       if (event.key === "ArrowLeft") { event.preventDefault(); seekSeconds(event.shiftKey ? -5 : -1); }
       if (event.key === "ArrowRight") { event.preventDefault(); seekSeconds(event.shiftKey ? 5 : 1); }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [currentTick, replay.tickrate, targetEndFrameIndex]);
+  }, [currentTick, replay.tickrate, targetEndFrameIndex, playing]);
   // 帧数据访问用 dataFrameIndex（clamp 到实际录制范围），让超出部分冻结在最后帧
   const currentPlayers = round.players
     .map((player) => {
@@ -1095,24 +1172,49 @@ export function ReplayViewer({
       })
   }));
   const resetCamera = () => setCamera({ zoom: 1, panX: 0, panY: 0 });
-  const fitPlayers = (steamIds: string[]) => {
+  const fitEvidence = (
+    steamIds: string[],
+    spatialPoints: Array<{ x: number; y: number; z?: number }> = [],
+    tick = currentTick,
+  ) => {
     const viewport = cameraViewport.current;
-    const visible = currentPlayers.filter(({ player }) => steamIds.includes(player.steamId64));
-    if (!viewport || visible.length === 0) return;
-    const points = visible.map(({ pose }) => replayPointPercent(pose, map));
-    const center = points.reduce((sum, point) => ({ x: sum.x + point.x, y: sum.y + point.y }), { x: 0, y: 0 });
-    center.x /= points.length;
-    center.y /= points.length;
+    if (!viewport) return;
+    const frameAtTick = replayFrameIndexAtTick(round, tick);
+    const participantPoints = round.players
+      .filter((player) => steamIds.includes(player.steamId64))
+      .map((player) => replayFrameSampleAt(player.frames, frameAtTick)?.pose ?? null)
+      .filter((point): point is ReplayFrameSample["pose"] => point != null);
+    const worldPoints = spatialPoints.length > 0 ? spatialPoints : participantPoints;
+    if (worldPoints.length === 0) return;
+    const points = worldPoints.map((point) => replayPointPercent(point, map));
+    const minX = Math.min(...points.map((point) => point.x));
+    const maxX = Math.max(...points.map((point) => point.x));
+    const minY = Math.min(...points.map((point) => point.y));
+    const maxY = Math.max(...points.map((point) => point.y));
+    const center = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+    const span = Math.max(maxX - minX, maxY - minY);
     const rect = viewport.getBoundingClientRect();
     setCamera({
-      zoom: visible.length === 1 ? 1.85 : 1.55,
+      zoom: Math.max(1, Math.min(2.35, span < 1 ? 2.05 : 68 / Math.max(span, 18))),
       panX: ((50 - center.x) / 100) * rect.width,
       panY: ((50 - center.y) / 100) * rect.height,
     });
+    const firstWithLevel = worldPoints.find((point) => point.z != null);
+    if (dualLevel && firstWithLevel?.z != null) setLevel(levelOf(firstWithLevel.z));
   };
+  const fitPlayers = (steamIds: string[]) => fitEvidence(steamIds);
   const selectPlayer = (steamId64: string) => {
+    setEventFocusPlayerIds([steamId64]);
+    setSelectedAnchorKey(null);
     setSelectedSteamId(steamId64);
     fitPlayers([steamId64]);
+  };
+  const focusAnchor = (anchor: typeof anchors[number]) => {
+    seekTick(anchor.tick);
+    setSelectedAnchorKey(anchor.key);
+    setEventFocusPlayerIds(anchor.participantIds);
+    setSelectedSteamId(anchor.participantIds[0] ?? null);
+    fitEvidence(anchor.participantIds, anchor.points, anchor.tick);
   };
   const onCameraPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (camera.zoom <= 1) return;
@@ -1144,8 +1246,9 @@ export function ReplayViewer({
           const secondaryLabel = player.loadout.secondaryWeapon ? displayWeaponName(player.loadout.secondaryWeapon) : null;
           const pickedUp = heldGunLabel != null && heldGunLabel !== primaryLabel && heldGunLabel !== secondaryLabel;
           const primary = pickedUp ? heldGunLabel : primaryLabel;
-          const focused = focusPlayerIds.includes(player.steamId64);
-          const dimmed = focusPlayerIds.length > 0 && !focused;
+          const activeFocus = eventFocusPlayerIds.length > 0 ? eventFocusPlayerIds : focusPlayerIds;
+          const focused = activeFocus.includes(player.steamId64);
+          const dimmed = activeFocus.length > 0 && !focused;
           const hpStyle = { "--dak-player-hp": `${Math.max(0, Math.min(100, frame.hp))}%` } as CSSProperties;
           return (
             <button
@@ -1240,7 +1343,10 @@ export function ReplayViewer({
           </button>
         </div>
         <div className="dak-playback">
-          <button className="dak-play-button" type="button" onClick={() => setPlaying((value) => !value)} aria-label={playing ? "暂停" : "播放"}>
+          <button className="dak-play-button" type="button" onClick={() => {
+            if (playing && latestSession.current) onSessionChangeRef.current?.(latestSession.current);
+            setPlaying((value) => !value);
+          }} aria-label={playing ? "暂停" : "播放"}>
             {playing ? <Pause size={18} /> : <Play size={18} />}
           </button>
           <button className="dak-icon-button" type="button" onClick={() => seekSeconds(-5)} aria-label="后退 5 秒（Shift+←）">
@@ -1254,10 +1360,10 @@ export function ReplayViewer({
                 <button
                   key={`${anchor.tick}-${i}`}
                   type="button"
-                  className={`dak-scrubber-anchor dak-scrubber-anchor-${anchor.tone}`}
+                  className={`dak-scrubber-anchor dak-scrubber-anchor-${anchor.tone}${selectedAnchorKey === anchor.key ? " dak-scrubber-anchor-selected" : ""}`}
                   style={{ left: `${endTick > round.startTick ? ((anchor.tick - round.startTick) / (endTick - round.startTick)) * 100 : 0}%` }}
                   aria-label={tooltip}
-                  onClick={() => seekTick(anchor.tick)}
+                  onClick={() => focusAnchor(anchor)}
                 >
                   <span className="dak-scrubber-tooltip" role="tooltip">{tooltip}</span>
                 </button>
@@ -1273,6 +1379,9 @@ export function ReplayViewer({
               onChange={(event) => {
                 const next = Number(event.target.value);
                 playheadStore.set(next);
+                if (latestSession.current) {
+                  latestSession.current = replaySessionAtPlayhead(latestSession.current, next, replay.sampleRate ?? 8);
+                }
                 setFrameIndex(Math.floor(next));
               }}
             />
@@ -1376,7 +1485,11 @@ export function ReplayViewer({
       <section className="dak-replay-stage-panel" aria-label={`R${round.roundNumber} 2D 回放`}>
         <div className="dak-replay-stage-tools" role="group" aria-label="地图镜头">
           <span>{camera.zoom > 1 ? `${camera.zoom.toFixed(1)}×` : "全图"}</span>
-          {focusPlayerIds.length > 0 && <button type="button" className="dak-speed" onClick={() => fitPlayers(focusPlayerIds)}>适配证据</button>}
+          {(eventFocusPlayerIds.length > 0 || focusPlayerIds.length > 0) && (
+            <button type="button" className="dak-speed" onClick={() => fitPlayers(eventFocusPlayerIds.length > 0 ? eventFocusPlayerIds : focusPlayerIds)}>
+              适配证据
+            </button>
+          )}
           <button type="button" className="dak-speed" onClick={resetCamera} disabled={camera.zoom === 1 && camera.panX === 0 && camera.panY === 0}>重置镜头</button>
         </div>
         <div
@@ -1480,7 +1593,7 @@ export function ReplayViewer({
             playerNumbers={playerNumbers}
             labelMode={labelMode}
             selectedSteamId={selectedSteamId}
-            focusPlayerIds={focusPlayerIds}
+            focusPlayerIds={eventFocusPlayerIds.length > 0 ? eventFocusPlayerIds : focusPlayerIds}
             onSelect={selectPlayer}
           />
           </div>

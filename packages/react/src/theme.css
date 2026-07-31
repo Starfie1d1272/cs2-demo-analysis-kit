@@ -1898,6 +1898,13 @@
   background: var(--dak-accent);
 }
 
+.dak-scrubber-anchor-selected {
+  z-index: 4;
+  outline: 2px solid var(--dak-fg);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--dak-accent) 20%, transparent);
+}
+
 .dak-scrubber-tooltip,
 .dak-hud-icon::after,
 .dak-replay-token::after {

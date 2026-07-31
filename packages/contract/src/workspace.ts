@@ -192,6 +192,10 @@ export const workspaceReplayPlayerSchema = z.object({
 export const workspaceKillEventSchema = z.object({
   id: z.string(),
   tick: z.number().int().positive(),
+  /** 仅由 v3 player index 唯一解析；world/无法解析时保持 null。 */
+  killerSteamId64: z.string().nullable().optional().default(null),
+  /** 仅由 v3 victim index 唯一解析；无法解析时保持 null。 */
+  victimSteamId64: z.string().nullable().optional().default(null),
   killerName: z.string().nullable(),
   killerTeamKey: teamKeySchema.nullable(),
   victimName: z.string(),
@@ -214,6 +218,8 @@ export const workspaceKillEventSchema = z.object({
 /** 回合内一颗道具的完整生命周期（world 坐标），来自 grenades.json。 */
 export const workspaceReplayGrenadeSchema = z.object({
   grenade: grenadeTypeSchema,
+  /** 仅由 v3 thrower index 唯一解析；无法解析时保持 null。 */
+  throwerSteamId64: z.string().nullable().optional().default(null),
   /** 投掷者在该回合的阵营；烟雾边框按 T/CT 着色，而不是固定 teamA/teamB。 */
   throwerSide: sideSchema.nullable().optional().default(null),
   throwTick: z.number().int().positive(),

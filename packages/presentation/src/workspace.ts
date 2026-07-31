@@ -767,6 +767,7 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
       kills: buildRoundKills(pkg, killsByRound.get(roundRow.roundNumber) ?? []),
       grenades: (grenadesByRound.get(roundRow.roundNumber) ?? []).map((row) => ({
         grenade: row.grenade,
+        throwerSteamId64: pkg.players[row.throwerIndex]?.steamId64 ?? null,
         throwerSide: sideForTeam(pkg.players[row.throwerIndex]?.teamKey),
         throwTick: row.throwTick,
         effectTick: row.effectTick,
@@ -987,6 +988,8 @@ function buildRoundKills(pkg: DemoPackage, kills: DemoPackage["kills"]): Workspa
     return {
       id: `kf-${kill.roundNumber}-${kill.tick}-${index}`,
       tick: kill.tick,
+      killerSteamId64: killerSteamId || null,
+      victimSteamId64: victimSteamId || null,
       killerName: nameForSteamId(pkg, killerSteamId),
       killerTeamKey,
       victimName: nameForSteamId(pkg, victimSteamId) ?? victimSteamId,

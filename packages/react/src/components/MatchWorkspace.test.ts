@@ -2,7 +2,7 @@ import React from "react";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { MatchWorkspaceModel } from "@cs2dak/contract";
-import { MatchWorkspace, ReplayViewer, replayFrameSampleAt, replayInitialFrameIndex } from "./MatchWorkspace";
+import { MatchWorkspace, ReplayViewer, replayFrameIndexFromSession, replayFrameSampleAt, replayInitialFrameIndex, replaySessionAtPlayhead } from "./MatchWorkspace";
 import { RoundTimeline } from "./RoundTimeline";
 
 const model: MatchWorkspaceModel = {
@@ -85,6 +85,7 @@ const model: MatchWorkspaceModel = {
         grenades: [
           {
             grenade: "smoke",
+            throwerSteamId64: "76561198000000001",
             throwerSide: "ct",
             throwTick: 90,
             effectTick: 100,
@@ -235,6 +236,20 @@ describe("MatchWorkspace", () => {
     expect(atBoundary.state.hp).toBe(35);
     expect(atBoundary.state.weapon).toBe("deagle");
     expect(atBoundary.state.alive).toBe(false);
+  });
+
+  it("persists and restores the fractional external playhead without snapping to a source frame", () => {
+    const session = replaySessionAtPlayhead({
+      roundNumber: 1,
+      playheadSeconds: 0,
+      playbackRate: 1,
+      layers: { trace: false, killLines: true, grenades: true },
+      labelMode: "number",
+      cameraByMap: {},
+    }, 10.75, 8);
+
+    expect(session.playheadSeconds).toBe(1.34375);
+    expect(replayFrameIndexFromSession(session, 1, 8)).toBe(10.75);
   });
 
   it("renders truncated timelines with an explicit expand control", () => {

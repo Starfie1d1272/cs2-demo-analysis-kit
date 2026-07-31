@@ -18,6 +18,7 @@ import type { ReplayViewerSession } from "@cs2dak/react";
 import type { AnalysisFinding } from "@cs2dak/presentation";
 import { createTrainingFocus } from "../lib/training-focus";
 import { savePrepItem } from "../lib/series";
+import { replayEvidenceParticipantIds } from "../lib/replay-evidence-focus";
 
 export interface MatchViewProps {
   entries: StudioDemoEntry[];
@@ -102,12 +103,9 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
   const evidenceSequence = finding?.evidence ?? (evidenceContinuation ? [evidenceContinuation.evidence] : []);
   const evidenceIndex = Math.max(0, Math.min(evidenceSequence.length - 1, evidenceContinuation?.evidenceIndex ?? 0));
   const focusPlayerIds = useMemo(() => {
-    const subjectId = finding?.subject.id;
-    if (!subjectId || !model) return [];
-    return model.replay.rounds.some((round) => round.players.some((player) => player.steamId64 === subjectId))
-      ? [subjectId]
-      : [];
-  }, [finding?.subject.id, model]);
+    if (!model || !evidenceContinuation) return [];
+    return replayEvidenceParticipantIds(model.replay, evidenceContinuation.evidence, finding?.subject.id);
+  }, [evidenceContinuation, finding?.subject.id, model]);
 
   useEffect(() => {
     setEvidenceSaveStatus(null);
