@@ -41,7 +41,11 @@ export function createPywebviewAdapter(api: PywebviewStorageApi): StorageAdapter
       if (!store) {
         store = {
           async get<T>(key: string) {
-            return (await api.storage_record_get(namespace, key)) as T | undefined;
+            const value = await api.storage_record_get(namespace, key);
+            // Python bridge serializes sqlite “no row” (None) as null, while
+            // RecordStore uses undefined for a missing key. Normalize the seam
+            // so desktop and IndexedDB backends have identical lookup semantics.
+            return value == null ? undefined : value as T;
           },
           async getAll<T>() {
             return (await api.storage_record_get_all(namespace)) as T[];
