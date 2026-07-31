@@ -1,10 +1,10 @@
 import "fake-indexeddb/auto";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import JSZip from "jszip";
 import { getFactsStore } from "./facts-store";
-import { importDemoFile, isFactsStale, listDemoEntries, matchIdForEntry, rebuildFactsFromZip } from "./library";
+import { importDemoFile, isFactsStale, listDemoEntries, matchIdForEntry, rebuildFactsFromZip, removeDemo } from "./library";
 import { ANALYSIS_MANIFEST, isAnalysisStale } from "./analysis-manifest";
 import { createProducerManifestStore } from "./producer-manifest";
 import { getStorage } from "./storage";
@@ -25,6 +25,10 @@ async function replacementSampleFile(): Promise<File> {
   const bytes = await zip.generateAsync({ type: "arraybuffer" });
   return new File([bytes], sampleName, { type: "application/zip" });
 }
+
+beforeEach(async () => {
+  for (const entry of await listDemoEntries()) await removeDemo(entry.id);
+});
 
 describe("importDemoFile", () => {
   it("rebuilds facts when re-importing an existing demo", async () => {
@@ -67,12 +71,15 @@ describe("importDemoFile", () => {
     expect((await listDemoEntries()).some((entry) => entry.id === first.entry.id)).toBe(false);
   });
 
-  it("keeps the old entry, blob, and active base generation when replacement base facts fail", async () => {
+  it("keeps one formal entry, the old blob, and every old active generation when replacement base facts fail", async () => {
     const first = await importDemoFile(await sampleFile(), { tags: ["replace-failure-old"] });
     const matchId = matchIdForEntry(first.entry);
     const factsStore = getFactsStore();
     const manifests = createProducerManifestStore(getStorage());
-    const oldManifest = await manifests.get(matchId, "base-facts");
+    const oldManifests = await manifests.getForMatch(matchId);
+    const replacement = await replacementSampleFile();
+    const replacementId = await crypto.subtle.digest("SHA-256", await replacement.arrayBuffer())
+      .then((digest) => [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join(""));
     const originalStage = factsStore.stageMatchFacts;
     factsStore.stageMatchFacts = async (facts, producer, generation) => {
       if (producer === "base-facts") throw new Error("injected base-facts failure");
@@ -80,24 +87,48 @@ describe("importDemoFile", () => {
     };
 
     try {
-      const attempted = await importDemoFile(await replacementSampleFile(), {
+      await expect(importDemoFile(replacement, {
         replaceId: first.entry.id,
         tags: ["replace-failure-new"],
-      });
+      })).rejects.toThrow("base-facts 写入失败，已保留原比赛");
       const entries = await listDemoEntries();
-      const currentManifest = await manifests.get(matchId, "base-facts");
+      const currentManifests = await manifests.getForMatch(matchId);
 
-      expect(attempted.replaced).toBe(false);
-      expect(attempted.replacedId).toBeUndefined();
-      expect(attempted.entry.producerStatuses?.["base-facts"]).toBe("stale");
-      expect(entries.some((entry) => entry.id === first.entry.id)).toBe(true);
-      expect(entries.some((entry) => entry.id === attempted.entry.id)).toBe(true);
+      expect(entries).toHaveLength(1);
+      expect(entries[0]?.id).toBe(first.entry.id);
       expect(await getStorage().blobs("demos").get(first.entry.id)).toBeDefined();
-      expect(currentManifest?.active?.generation).toBe(oldManifest?.active?.generation);
-      expect(currentManifest?.lastAttempt?.outcome).toBe("failed");
+      expect(await getStorage().blobs("demos").get(replacementId)).toBeUndefined();
+      expect(Object.fromEntries(currentManifests.map((record) => [record.producer, record.active?.generation])))
+        .toEqual(Object.fromEntries(oldManifests.map((record) => [record.producer, record.active?.generation])));
+      expect(currentManifests.find((record) => record.producer === "base-facts")?.lastAttempt?.outcome).toBe("failed");
     } finally {
       factsStore.stageMatchFacts = originalStage;
     }
+  });
+
+  it("rejects a second package with the same matchId unless replacement is explicit", async () => {
+    const first = await importDemoFile(await sampleFile(), { tags: ["single-match-id"] });
+    const replacement = await replacementSampleFile();
+    const replacementId = await crypto.subtle.digest("SHA-256", await replacement.arrayBuffer())
+      .then((digest) => [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join(""));
+
+    await expect(importDemoFile(replacement)).rejects.toThrow("同名比赛已存在，请使用“替换”");
+
+    expect((await listDemoEntries()).map((entry) => entry.id)).toEqual([first.entry.id]);
+    expect(await getStorage().blobs("demos").get(replacementId)).toBeUndefined();
+  });
+
+  it("does not delete shared match data when removing a historic duplicate entry", async () => {
+    const first = await importDemoFile(await sampleFile(), { tags: ["historic-duplicate"] });
+    const matchId = matchIdForEntry(first.entry);
+    const duplicateId = `historic-${first.entry.id}`;
+    await getStorage().records("demos").put(duplicateId, { ...first.entry, id: duplicateId });
+
+    await removeDemo(first.entry.id);
+
+    expect(await getFactsStore().getRrSignalRows({ matchIds: [matchId] })).not.toHaveLength(0);
+    expect((await createProducerManifestStore(getStorage()).get(matchId, "base-facts"))?.active).toBeDefined();
+    expect((await listDemoEntries()).map((entry) => entry.id)).toContain(duplicateId);
   });
 });
 

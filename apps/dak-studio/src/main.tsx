@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { waitForNativeStorageBridge } from "./lib/storage/bootstrap";
+import { migrateLegacyDesktopStorage } from "./lib/storage/legacy-idb-migration";
 import "@cs2dak/react/theme.css";
 import "./studio.css";
 
@@ -8,6 +9,12 @@ const rootElement = document.getElementById("root") as HTMLElement;
 
 waitForNativeStorageBridge()
   .then(async () => {
+    const migration = await migrateLegacyDesktopStorage((message) => {
+      rootElement.textContent = message;
+    });
+    if (migration.status === "failed") {
+      console.error(`旧资料库迁移未完成，将在下次启动重试：${migration.error}`);
+    }
     // App 的依赖里有若干模块级 store。必须在 bridge 就绪后再加载整个模块图，
     // 否则静态 import 会早于上面的等待执行，并把存储单例锁定为 IndexedDB。
     const { App } = await import("./App");

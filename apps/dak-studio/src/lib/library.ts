@@ -466,6 +466,13 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
   // facts 的 matchId 必须等于最终持久化条目的 matchId：重复导入沿用既有条目的 fileName，
   // 否则用本次文件名。故先定 matchId 再榨 facts（在 worker 里，含 replay 的整包不回主线程）。
   const matchId = matchIdForEntry({ fileName: existing?.fileName ?? file.name });
+  if (!replacement && !existing) {
+    const collision = (await meta.getAll<StudioDemoEntry>())
+      .find((candidate) => candidate.id !== id && matchIdForEntry(candidate) === matchId);
+    if (collision) {
+      throw new Error(`${file.name}: 同名比赛已存在，请使用“替换”以保留单一 matchId`);
+    }
+  }
   let result: ImportWorkerResult;
   try {
     result = await importInWorker(lowMemory ? buffer : buffer.slice(0), matchId, !lowMemory);
@@ -523,6 +530,43 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
       producers: results,
     };
   }
+  if (replacement) {
+    // replacement 是一次逻辑提交：新 ZIP 可以先落为孤立 blob，但 base-facts 失败时
+    // 不得创建第二条正式 entry，也不得触碰旧条目或旧 active generation。
+    await blobs.put(id, buffer);
+    const baseResults = await persistAnalysis(data, id, ["base-facts"]);
+    const base = baseResults[0];
+    if (base?.status !== "current") {
+      await blobs.delete(id).catch(() => undefined);
+      if (matchIdForEntry(replacement) !== matchId) {
+        await createProducerManifestStore(getStorage()).deleteMatch(matchId).catch(() => undefined);
+      }
+      invalidateDemoCaches(id);
+      throw new Error(`${file.name}: base-facts 写入失败，已保留原比赛${base?.error ? `（${base.error}）` : ""}`);
+    }
+    const optionalResults = await persistAnalysis(
+      data,
+      id,
+      PERSISTED_PRODUCERS.filter((producer) => producer !== "base-facts"),
+    );
+    const results = [...baseResults, ...optionalResults];
+    const producerState = producerStatuses(results);
+    const completedEntry: StudioDemoEntry = {
+      ...entry,
+      producerStatuses: producerState,
+      builtWith: currentBuiltWith(),
+    };
+    await meta.put(id, completedEntry);
+    invalidateDemoCaches(id);
+    const replaced = await cleanupReplacement(replacement, id, matchId);
+    return {
+      entry: completedEntry,
+      duplicate: false,
+      replaced,
+      replacedId: replaced ? replacement.id : undefined,
+      producers: results,
+    };
+  }
   await Promise.all([
     blobs.put(id, buffer),
     meta.put(id, entry)
@@ -539,10 +583,7 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
   };
   await meta.put(id, completedEntry);
   invalidateDemoCaches(id);
-  const replaced = producerState["base-facts"] === "current"
-    ? await cleanupReplacement(replacement, id, matchId)
-    : false;
-  return { entry: completedEntry, duplicate: false, replaced, replacedId: replaced ? replacement?.id : undefined, producers: results };
+  return { entry: completedEntry, duplicate: false, replaced: false, producers: results };
 }
 
 /** 更新某条 demo 的标签。 */
@@ -585,12 +626,19 @@ export async function removeDemo(id: string): Promise<void> {
     demoBlobs.delete(id)
   ]);
   invalidateDemoCaches(id);
-  if (record) await Promise.all([
-    getFactsStore().deleteMatchFacts(matchIdForEntry(record)),
-    getDerivedCacheStore().deleteMatch(matchIdForEntry(record)),
-    getStorage().records("facts:cohort_rows").delete(matchIdForEntry(record)),
-    getStorage().records("facts:cohort_rows").deleteByPrefix(`${matchIdForEntry(record)}\t`),
-    createProducerManifestStore(getStorage()).deleteMatch(matchIdForEntry(record)),
+  if (!record) return;
+  // 防御历史坏状态：若另一条正式 entry 仍共享 matchId，只删当前条目与 blob，
+  // 不得把仍被引用的 facts / manifest 一并清空。
+  const matchId = matchIdForEntry(record);
+  const stillReferenced = (await demoMeta.getAll<StudioDemoEntry>())
+    .some((candidate) => candidate.id !== id && matchIdForEntry(candidate) === matchId);
+  if (stillReferenced) return;
+  await Promise.all([
+    getFactsStore().deleteMatchFacts(matchId),
+    getDerivedCacheStore().deleteMatch(matchId),
+    getStorage().records("facts:cohort_rows").delete(matchId),
+    getStorage().records("facts:cohort_rows").deleteByPrefix(`${matchId}\t`),
+    createProducerManifestStore(getStorage()).deleteMatch(matchId),
   ]);
 }
 

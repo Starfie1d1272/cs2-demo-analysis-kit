@@ -45,6 +45,7 @@ import {
 } from "./lib/analysis-context";
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
 import { getPinnedPlayer } from "./lib/pin";
+import { getLegacyIdbMigrationResult } from "./lib/storage/legacy-idb-migration";
 
 type StudioView =
   | "home"
@@ -133,7 +134,13 @@ export function App() {
   const [selectedDemoId, setSelectedDemoId] = useState<string | null>(null);
   const [matchDeepLink, setMatchDeepLink] = useState<MatchDeepLink | null>(null);
   const [importing, setImporting] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(() => {
+    const migration = getLegacyIdbMigrationResult();
+    if (migration?.status === "migrated") {
+      return `已安全迁移旧资料库：${migration.marker.sourceDemoCount} 场 Demo；分析数据可按需重建`;
+    }
+    return migration?.status === "failed" ? `旧资料库迁移未完成，下次启动将重试：${migration.error}` : null;
+  });
   const [analysisContext, setAnalysisContext] = useState<AnalysisContext>(() => createAnalysisContextPreset("explore"));
   const [evidenceContinuation, setEvidenceContinuation] = useState<EvidenceContinuation | null>(null);
   const [returningEvidence, setReturningEvidence] = useState<EvidenceContinuation | null>(null);
