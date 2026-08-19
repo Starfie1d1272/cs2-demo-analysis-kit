@@ -10,6 +10,14 @@ import { metaFromPackage, type DemoMeta } from "./demo-meta";
 import { getStorage } from "./storage";
 import { loadTriLookup, loadMapTri } from "./tri";
 import { currentBuiltWith, isAnalysisStale, type BuiltWith } from "./analysis-manifest";
+import {
+  createProducerManifestStore,
+  newProducerGeneration,
+  producerStatus,
+  type ProducerId,
+  type ProducerStatus,
+  PRODUCER_REVISIONS,
+} from "./producer-manifest";
 
 /**
  * DAK Studio 本地 Demo 库。
@@ -34,6 +42,8 @@ export interface StudioDemoEntry {
   builtWith?: BuiltWith;
   /** 原始 v3 ZIP 字节数（导入时记录）；用于资产占用统计，免去读全部 blob。 */
   sizeBytes?: number;
+  /** 每个 producer 的最后一次可见状态；manifest 才是可恢复性的事实来源。 */
+  producerStatuses?: Partial<Record<ProducerId, ProducerStatus>>;
   meta: DemoMeta;
 }
 
@@ -55,27 +65,99 @@ function normalizeEntry(entry: StudioDemoEntry): StudioDemoEntry {
     sourceDemPath: entry.sourceDemPath ?? null,
     builtWith: entry.builtWith,
     sizeBytes: entry.sizeBytes,
+    producerStatuses: entry.producerStatuses,
     meta: { ...entry.meta, serverName: entry.meta.serverName ?? null, matchDate: entry.meta.matchDate ?? null }
   };
 }
 
 /** facts 是否旧口径（factsRevision 与当前 AnalysisManifest 不一致）。 */
 export function isFactsStale(entry: StudioDemoEntry): boolean {
-  return isAnalysisStale(entry.builtWith);
+  return isAnalysisStale(entry.builtWith) || entry.producerStatuses?.["base-facts"] !== "current";
 }
 
-/** facts / derived cache 是查询加速层；写失败不破坏库完整性（ZIP+元数据已落盘，可后续重建）。 */
-async function persistAnalysis(data: ExtractedMatchData): Promise<void> {
-  try {
-    await Promise.all([
-      getFactsStore().putMatchFacts(data.facts),
-      getDerivedCacheStore().putMatchDerived(data.derived),
-      // storage:3 以前误放在 facts namespace 的 cohort 聚合行只做一次清理，不再读取或生产。
-      getStorage().records("facts:cohort_rows").deleteByPrefix(data.facts.matchId),
-    ]);
-  } catch {
-    // 吞掉：facts 缺失只降级聚合查询。
-  }
+const PERSISTED_PRODUCERS = ["base-facts", "duel", "tactical", "map-intelligence", "utility"] as const;
+export type PersistedProducer = (typeof PERSISTED_PRODUCERS)[number];
+
+export interface ProducerPersistResult {
+  producer: PersistedProducer;
+  status: ProducerStatus;
+  error?: string;
+}
+
+/**
+ * facts 与 derived 先各自写到同名 candidate generation；只有两边都通过表级校验后，
+ * 一个 manifest 指针才将该 producer 切为可见。失败保留旧 generation，并显式记录 stale/failed。
+ */
+async function persistAnalysis(
+  data: ExtractedMatchData,
+  sourcePackageHash: string,
+  targets: readonly PersistedProducer[] = PERSISTED_PRODUCERS,
+): Promise<ProducerPersistResult[]> {
+  const factsStore = getFactsStore();
+  const derivedStore = getDerivedCacheStore();
+  const manifests = createProducerManifestStore(getStorage());
+  const results = await Promise.allSettled(targets.map(async (producer): Promise<ProducerPersistResult> => {
+    const startedAt = Date.now();
+    const generation = newProducerGeneration();
+    const previous = await manifests.get(data.facts.matchId, producer);
+    try {
+      const writes: Array<Promise<Record<string, number>>> = [factsStore.stageMatchFacts(data.facts, producer, generation)];
+      if (producer === "base-facts" || producer === "duel" || producer === "utility") {
+        writes.push(derivedStore.stageMatchDerived(data.derived, producer, generation));
+      }
+      const [factRows, derivedRows] = await Promise.all(writes);
+      await manifests.activate(data.facts.matchId, producer, {
+        generation,
+        producerRevision: PRODUCER_REVISIONS[producer],
+        sourcePackageHash,
+        rowCounts: { ...factRows, ...derivedRows },
+        storageGenerations: {
+          facts: generation,
+          ...(derivedRows ? { derived: generation } : {}),
+        },
+        startedAt,
+      });
+      const oldFactsGeneration = previous?.active?.storageGenerations?.facts;
+      const oldDerivedGeneration = previous?.active?.storageGenerations?.derived;
+      // 可见指针已切换，清理只能 best-effort，绝不能反过来影响新快照。
+      void Promise.all([
+        oldFactsGeneration && oldFactsGeneration !== generation
+          ? factsStore.cleanupMatchFactsGeneration(data.facts.matchId, producer, oldFactsGeneration)
+          : Promise.resolve(),
+        oldDerivedGeneration && oldDerivedGeneration !== generation && (producer === "base-facts" || producer === "duel" || producer === "utility")
+          ? derivedStore.cleanupMatchDerivedGeneration(data.facts.matchId, producer, oldDerivedGeneration)
+          : Promise.resolve(),
+      ]).catch(() => undefined);
+      return { producer, status: "current" };
+    } catch (error) {
+      await Promise.allSettled([
+        factsStore.cleanupMatchFactsGeneration(data.facts.matchId, producer, generation),
+        ...(producer === "base-facts" || producer === "duel" || producer === "utility"
+          ? [derivedStore.cleanupMatchDerivedGeneration(data.facts.matchId, producer, generation)]
+          : []),
+      ]);
+      const record = await manifests.fail(data.facts.matchId, producer, PRODUCER_REVISIONS[producer], startedAt, error);
+      return {
+        producer,
+        status: producerStatus(record, sourcePackageHash, PRODUCER_REVISIONS[producer]),
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }));
+  // allSettled 保证某个 optional producer 失败不会丢掉其它 producer 的完成结果。
+  const resolved = results.map((result, index) => result.status === "fulfilled"
+    ? result.value
+    : { producer: targets[index]!, status: "failed" as const, error: String(result.reason) });
+  const cohortRows = getStorage().records("facts:cohort_rows");
+  await Promise.all([
+    cohortRows.delete(data.facts.matchId),
+    cohortRows.deleteByPrefix(`${data.facts.matchId}\t`),
+  ]);
+  return resolved;
+}
+
+function producerStatuses(results: readonly ProducerPersistResult[]): Partial<Record<ProducerId, ProducerStatus>> {
+  return Object.fromEntries(results.map(({ producer, status }) => [producer, status]));
 }
 
 /**
@@ -123,11 +205,23 @@ export function formatMatchLabel(entry: StudioDemoEntry): string {
   ].filter(Boolean).join(" · ");
 }
 
-const pkgCache = new Map<string, Promise<DemoPackage>>();
+const pkgInFlight = new Map<string, Promise<DemoPackage>>();
+const cacheInvalidators = new Set<(demoId: string) => void>();
 
-/** 释放内存中的 DemoPackage 缓存。聚合完成后调用以降低峰值内存。 */
+/** 注册产品侧大对象缓存失效器；删除、替换或重建同一 demo 时统一通知。 */
+export function registerDemoCacheInvalidator(invalidator: (demoId: string) => void): () => void {
+  cacheInvalidators.add(invalidator);
+  return () => cacheInvalidators.delete(invalidator);
+}
+
+function invalidateDemoCaches(id: string): void {
+  pkgInFlight.delete(id);
+  for (const invalidate of cacheInvalidators) invalidate(id);
+}
+
+/** 释放尚在解析中的 DemoPackage single-flight 引用。 */
 export function clearPkgCache(): void {
-  pkgCache.clear();
+  pkgInFlight.clear();
 }
 
 // ── 导入 worker pool ──
@@ -317,6 +411,7 @@ export interface ImportResult {
   duplicate: boolean;
   replaced: boolean;
   replacedId?: string;
+  producers: ProducerPersistResult[];
 }
 
 export interface ImportDemoOptions {
@@ -327,6 +422,31 @@ export interface ImportDemoOptions {
   lowMemory?: boolean;
   /** 比赛日期（YYYY-MM-DD）；事件包导入时由 series.completedAt 传入。 */
   matchDate?: string | null;
+}
+
+async function cleanupReplacement(
+  replacement: StudioDemoEntry | undefined,
+  newId: string,
+  newMatchId: string,
+): Promise<boolean> {
+  if (!replacement || replacement.id === newId) return Boolean(replacement);
+  await Promise.all([
+    demoMeta.delete(replacement.id),
+    demoBlobs.delete(replacement.id),
+  ]);
+  invalidateDemoCaches(replacement.id);
+  const oldMatchId = matchIdForEntry(replacement);
+  if (oldMatchId !== newMatchId) {
+    const cohortRows = getStorage().records("facts:cohort_rows");
+    await Promise.all([
+      getFactsStore().deleteMatchFacts(oldMatchId),
+      getDerivedCacheStore().deleteMatch(oldMatchId),
+      cohortRows.delete(oldMatchId),
+      cohortRows.deleteByPrefix(`${oldMatchId}\t`),
+      createProducerManifestStore(getStorage()).deleteMatch(oldMatchId),
+    ]);
+  }
+  return true;
 }
 
 /**
@@ -346,6 +466,13 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
   // facts 的 matchId 必须等于最终持久化条目的 matchId：重复导入沿用既有条目的 fileName，
   // 否则用本次文件名。故先定 matchId 再榨 facts（在 worker 里，含 replay 的整包不回主线程）。
   const matchId = matchIdForEntry({ fileName: existing?.fileName ?? file.name });
+  if (!replacement && !existing) {
+    const collision = (await meta.getAll<StudioDemoEntry>())
+      .find((candidate) => candidate.id !== id && matchIdForEntry(candidate) === matchId);
+    if (collision) {
+      throw new Error(`${file.name}: 同名比赛已存在，请使用“替换”以保留单一 matchId`);
+    }
+  }
   let result: ImportWorkerResult;
   try {
     result = await importInWorker(lowMemory ? buffer : buffer.slice(0), matchId, !lowMemory);
@@ -361,7 +488,8 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     importedAt: Date.now(),
     tags: normalizeTags(tags),
     sourceDemPath,
-    builtWith: currentBuiltWith(),
+    // 只有 base-facts candidate 成功切换后才写 current；不能在持久化前提前宣称数据可用。
+    builtWith: undefined,
     sizeBytes: file.size,
     meta: matchDate ? { ...pkgMeta, matchDate } : pkgMeta,
   };
@@ -378,47 +506,84 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
       ...existing,
       tags: mergedTags,
       sourceDemPath: sourceDemPath ?? existing.sourceDemPath ?? null,
-    // 重复导入会重榨 facts 与 derived cache，构建版本必须刷新到当前。
-      builtWith: currentBuiltWith(),
+      builtWith: undefined,
       sizeBytes: existing.sizeBytes ?? file.size,
       meta: mergedMeta,
     };
-    await meta.put(id, mergedEntry);
-    await persistAnalysis(data);
-    if (replacement && replacement.id !== id) {
-      await Promise.all([
-        meta.delete(replacement.id),
-        blobs.delete(replacement.id)
-      ]);
-      pkgCache.delete(replacement.id);
-      void getFactsStore().deleteMatchFacts(matchIdForEntry(replacement));
-      void getDerivedCacheStore().deleteMatch(matchIdForEntry(replacement));
-    }
+    const results = await persistAnalysis(data, id);
+    const producerState = producerStatuses(results);
+    const completedEntry: StudioDemoEntry = {
+      ...mergedEntry,
+      producerStatuses: producerState,
+      builtWith: producerState["base-facts"] === "current" ? currentBuiltWith() : undefined,
+    };
+    await meta.put(id, completedEntry);
+    invalidateDemoCaches(id);
+    const replaced = producerState["base-facts"] === "current"
+      ? await cleanupReplacement(replacement, id, matchId)
+      : false;
     return {
-      entry: mergedEntry,
+      entry: completedEntry,
       duplicate: true,
-      replaced: Boolean(replacement),
-      replacedId: replacement?.id
+      replaced,
+      replacedId: replaced ? replacement?.id : undefined,
+      producers: results,
+    };
+  }
+  if (replacement) {
+    // replacement 是一次逻辑提交：新 ZIP 可以先落为孤立 blob，但 base-facts 失败时
+    // 不得创建第二条正式 entry，也不得触碰旧条目或旧 active generation。
+    await blobs.put(id, buffer);
+    const baseResults = await persistAnalysis(data, id, ["base-facts"]);
+    const base = baseResults[0];
+    if (base?.status !== "current") {
+      await blobs.delete(id).catch(() => undefined);
+      if (matchIdForEntry(replacement) !== matchId) {
+        await createProducerManifestStore(getStorage()).deleteMatch(matchId).catch(() => undefined);
+      }
+      invalidateDemoCaches(id);
+      throw new Error(`${file.name}: base-facts 写入失败，已保留原比赛${base?.error ? `（${base.error}）` : ""}`);
+    }
+    const optionalResults = await persistAnalysis(
+      data,
+      id,
+      PERSISTED_PRODUCERS.filter((producer) => producer !== "base-facts"),
+    );
+    const results = [...baseResults, ...optionalResults];
+    const producerState = producerStatuses(results);
+    const completedEntry: StudioDemoEntry = {
+      ...entry,
+      producerStatuses: producerState,
+      builtWith: currentBuiltWith(),
+    };
+    await meta.put(id, completedEntry);
+    invalidateDemoCaches(id);
+    const replaced = await cleanupReplacement(replacement, id, matchId);
+    return {
+      entry: completedEntry,
+      duplicate: false,
+      replaced,
+      replacedId: replaced ? replacement.id : undefined,
+      producers: results,
     };
   }
   await Promise.all([
     blobs.put(id, buffer),
     meta.put(id, entry)
   ]);
-  if (replacement && replacement.id !== id) {
-    await Promise.all([
-      meta.delete(replacement.id),
-      blobs.delete(replacement.id)
-    ]);
-    pkgCache.delete(replacement.id);
-    void getFactsStore().deleteMatchFacts(matchIdForEntry(replacement));
-    void getDerivedCacheStore().deleteMatch(matchIdForEntry(replacement));
-  }
   // facts 已在 worker 里榨好；后续聚合走 facts 投影，不再反序列化整包 derived。
-  // 注意：不把整包放进 pkgCache —— 批量导入会让每场 DemoPackage（含完整 replay）常驻内存
+  // 注意：不把整包放进长期缓存 —— 批量导入会让每场 DemoPackage（含完整 replay）常驻内存
   // 导致 OOM。需要整包时由 getDemoPackage 按需从 ZIP 懒加载即可。
-  await persistAnalysis(data);
-  return { entry, duplicate: false, replaced: Boolean(replacement), replacedId: replacement?.id };
+  const results = await persistAnalysis(data, id);
+  const producerState = producerStatuses(results);
+  const completedEntry: StudioDemoEntry = {
+    ...entry,
+    producerStatuses: producerState,
+    builtWith: producerState["base-facts"] === "current" ? currentBuiltWith() : undefined,
+  };
+  await meta.put(id, completedEntry);
+  invalidateDemoCaches(id);
+  return { entry: completedEntry, duplicate: false, replaced: false, producers: results };
 }
 
 /** 更新某条 demo 的标签。 */
@@ -460,11 +625,20 @@ export async function removeDemo(id: string): Promise<void> {
     demoMeta.delete(id),
     demoBlobs.delete(id)
   ]);
-  pkgCache.delete(id);
-  if (record) await Promise.all([
-    getFactsStore().deleteMatchFacts(matchIdForEntry(record)),
-    getDerivedCacheStore().deleteMatch(matchIdForEntry(record)),
-    getStorage().records("facts:cohort_rows").deleteByPrefix(matchIdForEntry(record)),
+  invalidateDemoCaches(id);
+  if (!record) return;
+  // 防御历史坏状态：若另一条正式 entry 仍共享 matchId，只删当前条目与 blob，
+  // 不得把仍被引用的 facts / manifest 一并清空。
+  const matchId = matchIdForEntry(record);
+  const stillReferenced = (await demoMeta.getAll<StudioDemoEntry>())
+    .some((candidate) => candidate.id !== id && matchIdForEntry(candidate) === matchId);
+  if (stillReferenced) return;
+  await Promise.all([
+    getFactsStore().deleteMatchFacts(matchId),
+    getDerivedCacheStore().deleteMatch(matchId),
+    getStorage().records("facts:cohort_rows").delete(matchId),
+    getStorage().records("facts:cohort_rows").deleteByPrefix(`${matchId}\t`),
+    createProducerManifestStore(getStorage()).deleteMatch(matchId),
   ]);
 }
 
@@ -508,17 +682,36 @@ export async function rebuildFactsFromZip(id: string): Promise<StudioDemoEntry |
   return result.entry;
 }
 
+/** 仅重建失败/过期 producer：仍从同一 ZIP 重新提取，但绝不触碰其它 active generation。 */
+export async function rebuildProducerFromZip(id: string, producer: PersistedProducer): Promise<ProducerPersistResult | null> {
+  const [entry, buffer] = await Promise.all([demoMeta.get<StudioDemoEntry>(id), demoBlobs.get(id)]);
+  if (!entry || !buffer) return null;
+  const result = await importInWorker(buffer.slice(0), matchIdForEntry(entry), false);
+  const [persisted] = await persistAnalysis(result.data, id, [producer]);
+  if (!persisted) return null;
+  const statuses = { ...entry.producerStatuses, [producer]: persisted.status };
+  await demoMeta.put(id, normalizeEntry({
+    ...entry,
+    producerStatuses: statuses,
+    builtWith: statuses["base-facts"] === "current" ? currentBuiltWith() : undefined,
+  }));
+  return persisted;
+}
+
 /** 取解析后的 DemoPackage：内存 → ZIP 重建。仅用于逐场证据/工作台，不作为聚合缓存。 */
 export function getDemoPackage(id: string): Promise<DemoPackage> {
-  const cached = pkgCache.get(id);
+  const cached = pkgInFlight.get(id);
   if (cached) return cached;
   const loading = (async () => {
     const buffer = await demoBlobs.get(id);
     if (!buffer) throw new Error("demo 不存在或已被删除");
     return parseZipInWorker(buffer);
   })();
-  pkgCache.set(id, loading);
-  loading.catch(() => pkgCache.delete(id));
+  pkgInFlight.set(id, loading);
+  void loading.then(
+    () => { if (pkgInFlight.get(id) === loading) pkgInFlight.delete(id); },
+    () => { if (pkgInFlight.get(id) === loading) pkgInFlight.delete(id); },
+  );
   return loading;
 }
 

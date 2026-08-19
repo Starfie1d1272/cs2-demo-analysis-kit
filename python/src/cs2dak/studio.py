@@ -524,6 +524,16 @@ class StudioApi:
             ).fetchall()
         return [[key, json.loads(value)] for key, value in rows]
 
+    def storage_record_get_prefix(self, namespace: str, prefix: str) -> list:
+        with self._db_lock:
+            rows = self._conn().execute(
+                "select key, value from records "
+                "where namespace=? "
+                "and substr(key, 1, length(?)) = ? collate binary",
+                (namespace, prefix, prefix),
+            ).fetchall()
+        return [[key, json.loads(value)] for key, value in rows]
+
     def storage_record_keys(self, namespace: str) -> list[str]:
         with self._db_lock:
             rows = self._conn().execute(
@@ -542,6 +552,21 @@ class StudioApi:
             )
             self._conn().commit()
 
+    def storage_record_put_many(self, namespace: str, rows: list[list]) -> None:
+        if not rows:
+            return
+        encoded = [
+            (namespace, key, json.dumps(value, ensure_ascii=False, separators=(",", ":")))
+            for key, value in rows
+        ]
+        with self._db_lock:
+            self._conn().executemany(
+                "insert into records(namespace, key, value) values(?, ?, ?) "
+                "on conflict(namespace, key) do update set value=excluded.value",
+                encoded,
+            )
+            self._conn().commit()
+
     def storage_record_delete(self, namespace: str, key: str) -> None:
         with self._db_lock:
             self._conn().execute("delete from records where namespace=? and key=?", (namespace, key))
@@ -550,7 +575,8 @@ class StudioApi:
     def storage_record_delete_prefix(self, namespace: str, prefix: str) -> None:
         with self._db_lock:
             self._conn().execute(
-                "delete from records where namespace=? and (key=? or key like ? || '%')",
+                "delete from records where namespace=? "
+                "and substr(key, 1, length(?)) = ? collate binary",
                 (namespace, prefix, prefix),
             )
             self._conn().commit()
@@ -1683,7 +1709,7 @@ def main() -> None:
     api = StudioApi()
     window = webview.create_window(
         title=f"DAK Studio {__version__}",
-        url=index_url,
+        url=f"{index_url}?desktop=1",
         js_api=api,
         width=1440,
         height=920,

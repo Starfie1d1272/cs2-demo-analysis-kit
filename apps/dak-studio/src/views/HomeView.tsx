@@ -1,7 +1,7 @@
 import { Pause, Play, RotateCcw, Star } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { OpeningTrailRound, OpeningTrailsModel, PlayerSeasonProfile, TeamKey } from "@cs2dak/contract";
-import { buildMistakeFindings, SEASON_STAT_VIEWS, type AnalysisFinding, type PlayerSeasonInsights } from "@cs2dak/presentation";
+import { buildMistakeFindings, findingFromUtilityFlash, SEASON_STAT_VIEWS, type AnalysisFinding, type PlayerSeasonInsights } from "@cs2dak/presentation";
 import { getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, type PinnedPlayer } from "../lib/pin";
@@ -14,6 +14,8 @@ import { RadarTrails, type RadarGrenadeOverlay, type RadarTrail } from "../compo
 import { EvidenceActions } from "../components/EvidenceActions";
 import type { OpenEvidence } from "../lib/evidence-continuation";
 import { createTrainingFocus, listTrainingFocus, removeTrainingFocus, updateTrainingFocus, type TrainingFocus } from "../lib/training-focus";
+import type { AnalysisContext } from "../lib/analysis-context";
+import { captureFindingSnapshot } from "../lib/finding-snapshot";
 
 export interface HomeViewProps {
   entries: StudioDemoEntry[];
@@ -23,6 +25,7 @@ export interface HomeViewProps {
   onGoPlayers: (player?: { playerKey: string; name: string }) => void;
   onGoLibrary: () => void;
   contextSummary: string;
+  analysisContext: AnalysisContext;
   identityOptions?: IdentityOptions;
 }
 
@@ -91,7 +94,7 @@ interface TeamIdentity {
 }
 
 /** 我的主页：模块 3/5/6 既有 view model 的编排视图，零新信号（docs/design/studio-redesign.md §9）。 */
-export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, onGoPlayers, onGoLibrary, contextSummary, identityOptions }: HomeViewProps) {
+export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, onGoPlayers, onGoLibrary, contextSummary, analysisContext, identityOptions }: HomeViewProps) {
   const [profiles, setProfiles] = useState<PlayerSeasonProfile[] | null>(null);
   const [insights, setInsights] = useState<PlayerSeasonInsights | null>(null);
   const [matchStats, setMatchStats] = useState<PlayerMatchStatsFact[] | null>(null);
@@ -313,6 +316,11 @@ export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, on
     const created = await createTrainingFocus({
       playerKey: me.playerKey,
       finding,
+      snapshot: await captureFindingSnapshot(
+        finding,
+        analysisContext,
+        Object.fromEntries(finding.evidence.map((evidence) => [evidence.matchId, entryByMatchId.get(evidence.matchId)?.id ?? null])),
+      ),
       evidence: finding.evidence,
       contextSummary,
     });
@@ -566,6 +574,11 @@ export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, on
                       .slice(0, 3)
                       .map((flash, i) => {
                         const e = entryByMatchId.get(flash.matchId);
+                        const finding = findingFromUtilityFlash({
+                          ...flash,
+                          playerId: me.playerKey,
+                          playerName: me.name,
+                        });
                         return (
                           <EvidenceActions
                             key={`${flash.matchId}-${flash.roundNumber}-${i}`}
@@ -576,6 +589,7 @@ export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, on
                             onWatchDemo={onWatchDemo}
                             reason={flash.reason}
                             sourceKey={`home:flash:${flash.matchId}:${flash.roundNumber}:${i}`}
+                            finding={finding}
                           >
                             {e ? formatMatchLabel(e) : flash.matchId} · R{flash.roundNumber} · 致盲 {flash.victimCount} 人 · 净 {flash.netSeconds.toFixed(1)}s
                           </EvidenceActions>

@@ -1267,15 +1267,110 @@ body {
 }
 
 .stu-evidence-review {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(260px, 1.4fr) auto minmax(240px, 0.8fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 20px;
+  gap: 10px 16px;
+  padding: 12px 20px;
   border-bottom: 1px solid var(--dak-border-hi);
-  background: var(--dak-panel-hi);
+  box-shadow: inset 3px 0 0 var(--dak-accent);
+  background:
+    linear-gradient(90deg, var(--dak-accent-soft), transparent 36%),
+    var(--dak-panel-hi);
   color: var(--dak-fg);
   font-size: 12px;
+}
+
+.stu-evidence-review-main {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.stu-evidence-kicker {
+  color: var(--dak-accent);
+  font-family: var(--dak-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.stu-evidence-review-main strong {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stu-evidence-review-main p {
+  margin: 0;
+  color: var(--dak-fg-mid);
+}
+
+.stu-evidence-review-meta,
+.stu-evidence-review-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.stu-evidence-review-meta span,
+.stu-evidence-review-meta b {
+  padding: 3px 6px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-bg-subtle);
+  font-family: var(--dak-mono);
+  font-size: 10px;
+}
+
+.stu-evidence-review-meta .stu-evidence-warning {
+  color: var(--dak-warn);
+  border-color: var(--dak-warn);
+}
+
+.stu-evidence-details {
+  color: var(--dak-fg-dim);
+}
+
+.stu-evidence-details summary {
+  cursor: pointer;
+}
+
+.stu-evidence-details div {
+  position: absolute;
+  z-index: 20;
+  right: 18px;
+  width: min(680px, calc(100vw - 48px));
+  display: grid;
+  gap: 6px;
+  margin-top: 7px;
+  padding: 10px;
+  border: 1px solid var(--dak-border-hi);
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-panel-hi);
+  color: var(--dak-fg-mid);
+}
+
+@media (max-width: 1200px) {
+  .stu-evidence-review {
+    grid-template-columns: minmax(240px, 1fr) auto;
+  }
+
+  .stu-evidence-review-actions {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 720px) {
+  .stu-evidence-review {
+    grid-template-columns: 1fr;
+  }
+
+  .stu-evidence-review-actions {
+    justify-content: flex-start;
+  }
 }
 
 .stu-home-actions-grid {

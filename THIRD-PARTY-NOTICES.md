@@ -15,6 +15,15 @@
   `packages/react/src/components/HeatmapCanvas.tsx` 的两段式热力图渲染算法改编自
   simpleheat，并参考了 CS Demo Manager（MIT）的参数默认值。
 
+## 展示资产
+
+- **CS2 HUD / death-notice SVG 图标** —
+  `apps/dak-studio/public/hud-death-notice/` 来自 CS2 Insight Agent
+  `frontend/public/hud-death-notice/`，经该项目作者明确许可后用于 DAK Studio
+  的回放展示。文件命名沿用 HLAE / One Studio CS:GO HUD generator 资产集；
+  目录内 [`NOTICE.md`](apps/dak-studio/public/hud-death-notice/NOTICE.md) 保留
+  更具体的来源说明。Counter-Strike 及相关商标、游戏美术归 Valve 所有。
+
 ## 设计借鉴（无代码复制）
 
 - [CS Demo Manager](https://github.com/akiver/cs-demo-manager)（MIT）— 工作台信息架构。

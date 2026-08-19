@@ -1,6 +1,6 @@
 import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Radar, Settings, Swords, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { bulkUpdateTags, formatMatchLabel, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
+import { bulkUpdateTags, formatMatchLabel, importDemoFile, isFactsStale, listDemoEntries, matchIdForEntry, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { CohortScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
 import { AnalysisContextSummary } from "./components/AnalysisContextSummary";
 import { CapabilityBar } from "./components/CapabilityBar";
@@ -16,6 +16,7 @@ import { UpdateModal } from "./components/UpdateModal";
 import { AssetHealthBanner } from "./components/AssetHealthBanner";
 import { LibraryDirButton } from "./components/LibraryDirButton";
 import { HomeView } from "./views/HomeView";
+import { captureFindingSnapshot } from "./lib/finding-snapshot";
 import { LibraryView } from "./views/LibraryView";
 import { MatchView } from "./views/MatchView";
 import { PlayersView } from "./views/PlayersView";
@@ -44,6 +45,7 @@ import {
 } from "./lib/analysis-context";
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
 import { getPinnedPlayer } from "./lib/pin";
+import { getLegacyIdbMigrationResult } from "./lib/storage/legacy-idb-migration";
 
 type StudioView =
   | "home"
@@ -132,7 +134,13 @@ export function App() {
   const [selectedDemoId, setSelectedDemoId] = useState<string | null>(null);
   const [matchDeepLink, setMatchDeepLink] = useState<MatchDeepLink | null>(null);
   const [importing, setImporting] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(() => {
+    const migration = getLegacyIdbMigrationResult();
+    if (migration?.status === "migrated") {
+      return `已安全迁移旧资料库：${migration.marker.sourceDemoCount} 场 Demo；分析数据可按需重建`;
+    }
+    return migration?.status === "failed" ? `旧资料库迁移未完成，下次启动将重试：${migration.error}` : null;
+  });
   const [analysisContext, setAnalysisContext] = useState<AnalysisContext>(() => createAnalysisContextPreset("explore"));
   const [evidenceContinuation, setEvidenceContinuation] = useState<EvidenceContinuation | null>(null);
   const [returningEvidence, setReturningEvidence] = useState<EvidenceContinuation | null>(null);
@@ -288,6 +296,7 @@ export function App() {
     setNotice(null);
     let imported = 0;
     let duplicates = 0;
+    let degradedProducers = 0;
     const errors: string[] = [...initialErrors];
 
     // .dem 先经 exporter 转 ZIP（数据库只存 ZIP）
@@ -317,6 +326,7 @@ export function App() {
           const result = await importDemoFile(item.file, { tags, sourceDemPath: item.sourceDemPath });
           if (result.duplicate) duplicates += 1;
           else imported += 1;
+          degradedProducers += result.producers.filter((producer) => producer.status !== "current").length;
         } catch (err) {
           errors.push(err instanceof Error ? err.message : String(err));
         } finally {
@@ -330,6 +340,7 @@ export function App() {
     const parts: string[] = [];
     if (imported > 0) parts.push(`导入 ${imported} 场`);
     if (duplicates > 0) parts.push(`跳过重复 ${duplicates} 场`);
+    if (degradedProducers > 0) parts.push(`${degradedProducers} 个 producer 可稍后重建`);
     if (errors.length > 0) parts.push(`失败 ${errors.length} 场（${errors[0]}）`);
     setNotice(parts.join("，") || null);
     setImporting(false);
@@ -390,17 +401,62 @@ export function App() {
   }, [entries]);
 
   const openEvidence = useCallback<OpenEvidence>((id, evidence, sourceKey, finding) => {
-    setEvidenceContinuation(createEvidenceContinuation({
+    const evidenceIndex = finding?.evidence.findIndex((item) =>
+      item.matchId === evidence.matchId
+      && item.roundNumber === evidence.roundNumber
+      && item.tick === evidence.tick
+      && item.eventKey === evidence.eventKey
+    ) ?? 0;
+    const continuation = createEvidenceContinuation({
       sourceView: view,
       context: analysisContext,
       sourceKey,
       evidence,
       finding,
-    }));
+      evidenceIndex: Math.max(0, evidenceIndex),
+    });
+    setEvidenceContinuation(continuation);
+    if (finding) {
+      void captureFindingSnapshot(
+        finding,
+        analysisContext,
+        Object.fromEntries(finding.evidence.map((item) => [item.matchId, entries.find((entry) => matchIdForEntry(entry) === item.matchId)?.id ?? null])),
+      ).then((snapshot) => setEvidenceContinuation((current) => current?.finding?.key === finding.key
+        ? createEvidenceContinuation({ ...current, snapshot })
+        : current));
+    }
     setSelectedDemoId(id);
     setMatchDeepLink({ roundNumber: evidence.roundNumber, tick: evidence.tick });
     setView("match");
-  }, [analysisContext, view]);
+  }, [analysisContext, entries, view]);
+
+  const selectEvidence = useCallback((index: number) => {
+    setEvidenceContinuation((current) => {
+      if (!current) return current;
+      const finding = current.snapshot?.finding
+        ?? (current.finding && "evidence" in current.finding ? current.finding : null);
+      const sequence = finding?.evidence ?? [current.evidence];
+      const bounded = Math.max(0, Math.min(sequence.length - 1, index));
+      const evidence = sequence[bounded];
+      if (!evidence) return current;
+      const entry = entries.find((candidate) => matchIdForEntry(candidate) === evidence.matchId);
+      if (!entry) {
+        setNotice(`证据来源比赛已删除：${evidence.matchId}`);
+        return current;
+      }
+      setSelectedDemoId(entry.id);
+      setMatchDeepLink({ roundNumber: evidence.roundNumber, tick: evidence.tick });
+      setView("match");
+      return createEvidenceContinuation({
+        ...current,
+        evidence,
+        evidenceIndex: bounded,
+        replaySession: current.replaySession
+          ? { ...current.replaySession, selectedEvidenceIndex: bounded }
+          : undefined,
+      });
+    });
+  }, [entries]);
 
   const returnFromEvidence = useCallback(() => {
     if (!evidenceContinuation) return;
@@ -795,6 +851,7 @@ export function App() {
             onGoPlayers={(player) => player ? openPlayer(player.playerKey, player.name) : setView("players")}
             onGoLibrary={() => setView("library")}
             contextSummary={summarizeAnalysisContext(analysisContext, entries, eventScopes)}
+            analysisContext={analysisContext}
             identityOptions={identityOptions}
           />
         )}
@@ -834,6 +891,8 @@ export function App() {
             onGoLibrary={() => setView("library")}
             evidenceContinuation={evidenceContinuation}
             onReturnToSource={returnFromEvidence}
+            onSelectEvidence={selectEvidence}
+            onReplaySessionChange={(replaySession) => setEvidenceContinuation((current) => current ? createEvidenceContinuation({ ...current, replaySession }) : current)}
           />
         )}
         {view === "players" && (

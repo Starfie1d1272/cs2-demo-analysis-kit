@@ -557,7 +557,7 @@ const seasonSummaryCache = new Map<string, Promise<SeasonSummary>>();
 
 /** 聚合摘要：优先持久缓存命中（不触碰 ZIP），未命中才全量解析并回写。
  *  传入 identity 时将其并入缓存 key，identityMap 作为归并参数传给 buildSeasonCohort。
- *  teamRenames 在加载阶段应用，同名队伍自动合并。聚合后释放 pkgCache 降低峰值内存。 */
+ *  teamRenames 在加载阶段应用，同名队伍自动合并。 */
 export function getSeasonSummary(entries: StudioDemoEntry[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<SeasonSummary> {
   const key = keyOf(entries, identity?.version, selectedTeams);
   const cached = seasonSummaryCache.get(key);

@@ -29,6 +29,40 @@ describe("createIdbAdapter", () => {
     expect(await store.keys()).toEqual(["b"]);
   });
 
+  it("records: prefix query 与 batch write 保持命名空间和键范围", async () => {
+    const store = createIdbAdapter().records("t-records-prefix");
+    await store.putMany([
+      ["m1:g1:a", { row: 1 }],
+      ["m1:g1:b", { row: 2 }],
+      ["m2:g1:a", { row: 3 }],
+    ]);
+
+    expect(new Map(await store.getByPrefix<{ row: number }>("m1:g1:"))).toEqual(new Map([
+      ["m1:g1:a", { row: 1 }],
+      ["m1:g1:b", { row: 2 }],
+    ]));
+  });
+
+  it("records: match 分隔符和通配符字符不会扩大 prefix 范围", async () => {
+    const store = createIdbAdapter().records("t-records-exact-prefix");
+    await store.putMany([
+      ["m1\trow", { row: "m1" }],
+      ["m10\trow", { row: "m10" }],
+      ["a_b\trow", { row: "underscore" }],
+      ["aXb\trow", { row: "plain" }],
+      ["a%b\trow", { row: "percent" }],
+    ]);
+
+    expect((await store.getByPrefix<{ row: string }>("m1\t")).map(([key]) => key)).toEqual(["m1\trow"]);
+    expect((await store.getByPrefix<{ row: string }>("a_b\t")).map(([key]) => key)).toEqual(["a_b\trow"]);
+    expect((await store.getByPrefix<{ row: string }>("a%b\t")).map(([key]) => key)).toEqual(["a%b\trow"]);
+
+    await store.deleteByPrefix("a_b\t");
+    expect(await store.get("a_b\trow")).toBeUndefined();
+    expect(await store.get("aXb\trow")).toEqual({ row: "plain" });
+    expect(await store.get("a%b\trow")).toEqual({ row: "percent" });
+  });
+
   it("blobs: ArrayBuffer 字节按 key 原样往返", async () => {
     const blobs = createIdbAdapter().blobs("t-blobs");
     const bytes = new Uint8Array([1, 2, 3, 4, 255, 0, 128]).buffer;

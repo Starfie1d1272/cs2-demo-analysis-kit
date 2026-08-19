@@ -28,7 +28,7 @@ function entry(id: string, options: { replay?: boolean; stale?: boolean; built?:
 }
 
 describe("CapabilityAvailability", () => {
-  it("keeps stale facts out of the eligible denominator and reports optional coverage", () => {
+  it("keeps stale active facts available but marks the capability partial", () => {
     const entries = [entry("ready"), entry("stale", { stale: true }), entry("degraded", { replay: false })];
     const inputs = new Map([
       ["ready", { facts: { duel: true }, hasReplay: true, hasShots: true, hasTri: true }],
@@ -38,12 +38,12 @@ describe("CapabilityAvailability", () => {
 
     expect(deriveCapabilityAvailability(entries, "duel", inputs)).toMatchObject({
       status: "partial",
-      eligibleMatches: 2,
+      eligibleMatches: 3,
       totalMatches: 3,
-      excluded: [{ reason: "facts 需要重建", count: 1, entryIds: ["stale"] }],
+      excluded: [],
       dependencies: [
-        { key: "shots", available: 1, totalEligible: 2, required: false },
-        { key: "tri", available: 1, totalEligible: 2, required: false },
+        { key: "shots", available: 2, totalEligible: 3, required: false },
+        { key: "tri", available: 2, totalEligible: 3, required: false },
       ],
       repairActions: ["rebuild-facts", "reimport-with-shots", "install-tri"],
       outputLevel: "system-finding",

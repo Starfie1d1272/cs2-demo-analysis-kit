@@ -37,6 +37,16 @@ function makeKv(dbName: string) {
       const vals = await txRequest(valsReq);
       return rawKeys.map((key, i) => [String(key), vals[i] as T]);
     },
+    async getByPrefix<T>(prefix: string): Promise<Array<[string, T]>> {
+      const db = await open();
+      const store = db.transaction("kv", "readonly").objectStore("kv");
+      const range = IDBKeyRange.bound(prefix, prefix + "\uffff");
+      const keysReq = store.getAllKeys(range) as IDBRequest<IDBValidKey[]>;
+      const valsReq = store.getAll(range) as IDBRequest<T[]>;
+      const rawKeys = await txRequest(keysReq);
+      const vals = await txRequest(valsReq);
+      return rawKeys.map((key, i) => [String(key), vals[i] as T]);
+    },
     async keys(): Promise<string[]> {
       const db = await open();
       const raw = await txRequest(
@@ -47,6 +57,18 @@ function makeKv(dbName: string) {
     async put(key: string, value: unknown): Promise<void> {
       const db = await open();
       await txRequest(db.transaction("kv", "readwrite").objectStore("kv").put(value, key));
+    },
+    async putMany(rows: Array<[string, unknown]>): Promise<void> {
+      if (rows.length === 0) return;
+      const db = await open();
+      const transaction = db.transaction("kv", "readwrite");
+      const store = transaction.objectStore("kv");
+      await new Promise<void>((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onabort = () => reject(transaction.error);
+        transaction.onerror = () => reject(transaction.error);
+        for (const [key, value] of rows) store.put(value, key);
+      });
     },
     async delete(key: string): Promise<void> {
       const db = await open();
@@ -73,8 +95,10 @@ export function createIdbAdapter(): StorageAdapter {
           get: (key) => kv.get(key),
           getAll: () => kv.getAll(),
           entries: () => kv.entries(),
+          getByPrefix: (prefix) => kv.getByPrefix(prefix),
           keys: () => kv.keys(),
           put: (key, value) => kv.put(key, value),
+          putMany: (rows) => kv.putMany(rows),
           delete: (key) => kv.delete(key),
           deleteByPrefix: (prefix) => kv.deleteByPrefix(prefix),
         };

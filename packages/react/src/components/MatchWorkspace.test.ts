@@ -2,7 +2,7 @@ import React from "react";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { MatchWorkspaceModel } from "@cs2dak/contract";
-import { MatchWorkspace, ReplayViewer, replayInitialFrameIndex } from "./MatchWorkspace";
+import { MatchWorkspace, ReplayViewer, replayFrameIndexFromSession, replayFrameSampleAt, replayInitialFrameIndex, replaySessionAtPlayhead } from "./MatchWorkspace";
 import { RoundTimeline } from "./RoundTimeline";
 
 const model: MatchWorkspaceModel = {
@@ -85,6 +85,7 @@ const model: MatchWorkspaceModel = {
         grenades: [
           {
             grenade: "smoke",
+            throwerSteamId64: "76561198000000001",
             throwerSide: "ct",
             throwTick: 90,
             effectTick: 100,
@@ -155,6 +156,33 @@ describe("MatchWorkspace", () => {
     expect(html).not.toContain("闪");
   });
 
+  it("renders licensed HUD assets and distinct throw/effect/evidence timeline events", () => {
+    const replay = {
+      ...model.replay,
+      rounds: [{
+        ...model.replay.rounds[0]!,
+        frameCount: 2,
+        targetEndTick: 180,
+        grenades: [{
+          ...model.replay.rounds[0]!.grenades[0]!,
+          throwTick: 108,
+          effectTick: 116,
+        }],
+      }],
+    };
+    const html = renderToStaticMarkup(React.createElement(ReplayViewer, {
+      replay,
+      map: model.map.view,
+      hudAssetBaseUrl: "/hud-death-notice",
+      target: { roundNumber: 1, tick: 124, seq: 1 },
+    }));
+
+    expect(html).toContain("/hud-death-notice/ak47.svg");
+    expect(html).toContain("烟雾弹 · 投掷");
+    expect(html).toContain("烟雾弹 · 生效");
+    expect(html).toContain("当前 Finding 证据目标");
+  });
+
   it("colors replay smoke by current side instead of team identity", () => {
     const html = renderToStaticMarkup(React.createElement(ReplayViewer, {
       replay: model.replay,
@@ -182,6 +210,46 @@ describe("MatchWorkspace", () => {
     }));
     expect(html).toContain("回合时间");
     expect(html).toContain("1:35");
+  });
+
+  it("keeps discrete replay state on the previous source frame while interpolating pose", () => {
+    const first = model.replay.rounds[0]!.players[0]!.frames[0]!;
+    const second = {
+      ...first,
+      tick: first.tick + 8,
+      x: 11,
+      y: 22,
+      yaw: 110,
+      hp: 35,
+      weapon: "deagle",
+      alive: false,
+    };
+
+    const beforeBoundary = replayFrameSampleAt([first, second], 0.999)!;
+    expect(beforeBoundary.state.hp).toBe(100);
+    expect(beforeBoundary.state.weapon).toBe("ak47");
+    expect(beforeBoundary.state.alive).toBe(true);
+    expect(beforeBoundary.pose.x).toBeCloseTo(10.99);
+    expect(beforeBoundary.pose.yaw).toBeCloseTo(109.98);
+
+    const atBoundary = replayFrameSampleAt([first, second], 1)!;
+    expect(atBoundary.state.hp).toBe(35);
+    expect(atBoundary.state.weapon).toBe("deagle");
+    expect(atBoundary.state.alive).toBe(false);
+  });
+
+  it("persists and restores the fractional external playhead without snapping to a source frame", () => {
+    const session = replaySessionAtPlayhead({
+      roundNumber: 1,
+      playheadSeconds: 0,
+      playbackRate: 1,
+      layers: { trace: false, killLines: true, grenades: true },
+      labelMode: "number",
+      cameraByMap: {},
+    }, 10.75, 8);
+
+    expect(session.playheadSeconds).toBe(1.34375);
+    expect(replayFrameIndexFromSession(session, 1, 8)).toBe(10.75);
   });
 
   it("renders truncated timelines with an explicit expand control", () => {

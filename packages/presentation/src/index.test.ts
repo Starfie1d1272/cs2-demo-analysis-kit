@@ -49,4 +49,23 @@ describe("@cs2dak/presentation", () => {
     expect(firstReplayRound.targetEndTick).toBe(nextPackageRound.startTick);
     expect(firstReplayRound.freezeEndTick).toBe(firstPackageRound.freezeEndTick);
   });
+
+  it("exposes only player-index-resolved replay participant identities", async () => {
+    const { pkg, workspace } = await workspaceFixture;
+    const sourceKill = pkg.kills.find((kill) => kill.killerIndex != null);
+    const sourceGrenade = pkg.grenades[0];
+    expect(sourceKill).toBeTruthy();
+    expect(sourceGrenade).toBeTruthy();
+
+    const replayKill = workspace.replay.rounds
+      .find((round) => round.roundNumber === sourceKill!.roundNumber)
+      ?.kills.find((kill) => kill.tick === sourceKill!.tick);
+    const replayGrenade = workspace.replay.rounds
+      .find((round) => round.roundNumber === sourceGrenade!.roundNumber)
+      ?.grenades.find((grenade) => grenade.throwTick === sourceGrenade!.throwTick);
+
+    expect(replayKill?.killerSteamId64).toBe(pkg.players[sourceKill!.killerIndex!]?.steamId64 ?? null);
+    expect(replayKill?.victimSteamId64).toBe(pkg.players[sourceKill!.victimIndex]?.steamId64 ?? null);
+    expect(replayGrenade?.throwerSteamId64).toBe(pkg.players[sourceGrenade!.throwerIndex]?.steamId64 ?? null);
+  });
 });

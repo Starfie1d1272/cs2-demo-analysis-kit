@@ -28,7 +28,7 @@ export function EvidenceActions({
   hint?: string;
   reason?: string;
   sourceKey?: string;
-  finding?: Pick<AnalysisFinding, "key" | "title" | "statement">;
+  finding?: AnalysisFinding;
 }) {
   const evidence: EvidenceRef | null = entry
     ? { matchId: matchIdForEntry(entry), ...target, reason: reason ?? hint ?? "查看当前分析证据", role: "example" }

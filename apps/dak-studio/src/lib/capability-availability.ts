@@ -4,6 +4,8 @@ import type { FactsStore } from "./fact-types.js";
 import { getDerivedCacheStore, type DerivedCacheStore } from "./derived-cache.js";
 import { matchIdForEntry, type StudioDemoEntry } from "./library.js";
 import { listAvailableTris } from "./tri-assets.js";
+import { createProducerManifestStore, producerStatus, type ProducerId, type ProducerStatus, PRODUCER_REVISIONS } from "./producer-manifest.js";
+import { getStorage } from "./storage";
 
 export type StudioCapability =
   | "personal-review"
@@ -23,6 +25,7 @@ type FactKind = "insights" | "duel" | "economy" | "utility" | "lineup" | "tactic
 
 export interface EntryCapabilityFacts {
   facts: Partial<Record<FactKind, boolean>>;
+  producers?: Partial<Record<ProducerId, ProducerStatus>>;
   hasReplay: boolean;
   hasShots: boolean;
   hasTri: boolean;
@@ -87,6 +90,16 @@ const FACT_LABEL: Record<FactKind, string> = {
   "map-intelligence": "地图位置 facts",
 };
 
+const FACT_PRODUCER: Record<FactKind, ProducerId> = {
+  insights: "base-facts",
+  duel: "duel",
+  economy: "base-facts",
+  utility: "utility",
+  lineup: "utility",
+  tactical: "tactical",
+  "map-intelligence": "map-intelligence",
+};
+
 function hasDependency(input: EntryCapabilityFacts, dependency: CapabilityDependencyAvailability["key"]): boolean {
   if (dependency === "replay") return input.hasReplay;
   if (dependency === "shots") return input.hasShots;
@@ -118,20 +131,26 @@ export function deriveCapabilityAvailability(
   const requirement = REQUIREMENTS[capability];
   const exclusions = new Map<string, string[]>();
   const eligible: Array<{ entry: StudioDemoEntry; input: EntryCapabilityFacts }> = [];
+  let staleCoverage = 0;
 
   for (const entry of entries) {
     const input = inputsByEntryId.get(entry.id) ?? {
       facts: {}, hasReplay: entry.meta.hasReplay, hasShots: false, hasTri: false,
     };
     let reason: string | null = null;
-    if (requirement.requiredFacts && isAnalysisStale(entry.builtWith)) reason = "facts 需要重建";
+    const missingFact = requirement.requiredFacts?.find((fact) => !input.facts[fact]);
+    const unavailableProducer = requirement.requiredFacts?.find((fact) => {
+      const status = input.producers?.[FACT_PRODUCER[fact]];
+      return status === "missing" || status === "failed";
+    });
+    const usesStaleProducer = input.producers
+      ? requirement.requiredFacts?.some((fact) => input.producers?.[FACT_PRODUCER[fact]] === "stale") ?? false
+      : requirement.requiredFacts != null && isAnalysisStale(entry.builtWith);
+    if (unavailableProducer) reason = `${FACT_LABEL[unavailableProducer]} 缺失`;
+    else if (missingFact) reason = `${FACT_LABEL[missingFact]} 缺失`;
     else {
-      const missingFact = requirement.requiredFacts?.find((fact) => !input.facts[fact]);
-      if (missingFact) reason = `${FACT_LABEL[missingFact]} 缺失`;
-      else {
-        const missingDependency = requirement.requiredDependencies?.find((dependency) => !hasDependency(input, dependency));
-        if (missingDependency) reason = `${DEPENDENCY_LABEL[missingDependency]} 缺失`;
-      }
+      const missingDependency = requirement.requiredDependencies?.find((dependency) => !hasDependency(input, dependency));
+      if (missingDependency) reason = `${DEPENDENCY_LABEL[missingDependency]} 缺失`;
     }
     if (reason) {
       const ids = exclusions.get(reason) ?? [];
@@ -139,6 +158,7 @@ export function deriveCapabilityAvailability(
       exclusions.set(reason, ids);
     } else {
       eligible.push({ entry, input });
+      if (usesStaleProducer) staleCoverage += 1;
     }
   }
 
@@ -153,9 +173,10 @@ export function deriveCapabilityAvailability(
   const optionalMissing = dependencies.some((dependency) => !dependency.required && dependency.available < dependency.totalEligible);
   const status: CapabilityStatus = eligible.length === 0
     ? "unavailable"
-    : eligible.length < entries.length || optionalMissing ? "partial" : "ready";
+    : eligible.length < entries.length || optionalMissing || staleCoverage > 0 ? "partial" : "ready";
   const repairActions = [...new Set([
     ...[...exclusions.keys()].map(repairForReason),
+    ...(staleCoverage > 0 ? ["rebuild-facts" as const] : []),
     ...dependencies.filter((dependency) => dependency.available < dependency.totalEligible).map((dependency) => repairForDependency(dependency.key)),
   ].filter((action): action is CapabilityRepairAction => action != null))];
 
@@ -183,6 +204,7 @@ export async function loadCapabilityAvailabilityInputs(
   availableTris?: readonly string[],
 ): Promise<Map<string, EntryCapabilityFacts>> {
   const matchIds = entries.map(matchIdForEntry);
+  const manifests = createProducerManifestStore(getStorage());
   const [insights, duels, economy, utilityMatchIds, lineups, tactical, playerPositions, teamShapes, mechanics] = await Promise.all([
     derivedStore.getPlayerInsights({ matchIds }),
     derivedStore.getDuels({ matchIds }),
@@ -205,8 +227,13 @@ export async function loadCapabilityAvailabilityInputs(
     mechanics: new Set(mechanics.map((row) => row.matchId)),
   };
   const tris = new Set(availableTris ?? await listAvailableTris());
-  return new Map(entries.map((entry) => {
+  return new Map(await Promise.all(entries.map(async (entry) => {
     const matchId = matchIdForEntry(entry);
+    const producerRecords = await manifests.getForMatch(matchId);
+    const producers = producerRecords.length === 0 ? undefined : Object.fromEntries(producerRecords.map((record) => [
+      record.producer,
+      producerStatus(record, entry.id, PRODUCER_REVISIONS[record.producer]),
+    ]));
     return [entry.id, {
       facts: {
         insights: factSets.insights.has(matchId),
@@ -217,9 +244,10 @@ export async function loadCapabilityAvailabilityInputs(
         tactical: factSets.tactical.has(matchId),
         "map-intelligence": factSets["map-intelligence"].has(matchId),
       },
+      producers,
       hasReplay: entry.meta.hasReplay,
       hasShots: factSets.mechanics.has(matchId),
       hasTri: tris.has(entry.meta.mapName),
     } satisfies EntryCapabilityFacts] as const;
-  }));
+  })));
 }

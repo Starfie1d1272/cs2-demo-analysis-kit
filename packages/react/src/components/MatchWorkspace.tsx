@@ -2,15 +2,53 @@ import type { MatchWorkspaceModel, WorkspaceReplayFrame, WorkspaceReplayLoadout,
 import { displayWeaponName, sideLabel, economyLabelCn, buildMatchBuyQuality, buildMatchReportMarkdown, deriveReplayClock } from "@cs2dak/presentation";
 import { getMapCalibration, worldToRadar, hasLowerLevel, levelAt, type MapLevel } from "@cs2dak/maps";
 import { Activity, BarChart3, ChevronLeft, ChevronRight, Crosshair, Film, Gauge, ListChecks, Map as MapIcon, Pause, Play, ShieldCheck, Swords, Table2, Users } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { EconomyPanel } from "./EconomyPanel";
 import { HeatmapCanvas } from "./HeatmapCanvas";
 import { KillFeed } from "./KillFeed";
 import { ScoreboardTable } from "./ScoreboardTable";
+import { ReplayHudIcon } from "./replay-hud";
+import { createReplayPlayheadStore, type ReplayPlayheadStore } from "./replay-playhead";
 
 export interface MatchWorkspaceProps {
   model: MatchWorkspaceModel;
   initialTarget?: { roundNumber: number; tick?: number } | null;
+  replaySession?: ReplayViewerSession | null;
+  onReplaySessionChange?: (session: ReplayViewerSession) => void;
+  hudAssetBaseUrl?: string | null;
+  replayFocusPlayerIds?: string[];
+}
+
+/** 产品持有的可序列化回放会话；React 只读取/回传，不持久化。 */
+export interface ReplayViewerSession {
+  roundNumber: number;
+  playheadSeconds: number;
+  playbackRate: number;
+  layers: Record<string, boolean>;
+  labelMode: "number" | "short" | "full";
+  cameraByMap: Record<string, { zoom: number; panX: number; panY: number; floor?: "upper" | "lower" }>;
+}
+
+/** 以外部连续 playhead 为准生成可持久化会话，避免保存成上一 source frame 的整数边界。 */
+export function replaySessionAtPlayhead(
+  session: ReplayViewerSession,
+  playheadFrame: number,
+  sampleRate: number,
+): ReplayViewerSession {
+  return {
+    ...session,
+    playheadSeconds: Math.max(0, playheadFrame) / Math.max(sampleRate, 1),
+  };
+}
+
+export function replayFrameIndexFromSession(
+  session: ReplayViewerSession | null | undefined,
+  roundNumber: number,
+  sampleRate: number,
+): number | null {
+  return session?.roundNumber === roundNumber
+    ? Math.max(0, session.playheadSeconds) * Math.max(sampleRate, 1)
+    : null;
 }
 
 type WorkspaceView = MatchWorkspaceModel["tabs"][number]["key"];
@@ -36,7 +74,7 @@ const WORKSPACE_NAV: Array<{ key: WorkspaceView; label: string }> = [
   { key: "map", label: "地图" }
 ];
 
-export function MatchWorkspace({ model, initialTarget }: MatchWorkspaceProps) {
+export function MatchWorkspace({ model, initialTarget, replaySession, onReplaySessionChange, hudAssetBaseUrl, replayFocusPlayerIds }: MatchWorkspaceProps) {
   // 顶部横向分段导航 + 单一全宽主区：一次只显示一个视图，避免宽回放与其它视图争抢宽度。
   // 回放是默认首项（无回放流时退化为概览）；EvidenceLink 跳转自动切到回放并定位 tick。
   // 落地视图固定为概览仪表盘（KPI / 计分板 / 快捷入口）；带 initialTarget 打开时才经 useEffect 跳到回放。
@@ -97,7 +135,16 @@ export function MatchWorkspace({ model, initialTarget }: MatchWorkspaceProps) {
 
         <section className="dak-ws-main">
           {view === "replay" && model.replay.available && (
-            <ReplayViewer replay={model.replay} map={model.map.view} target={replayTarget} />
+          <ReplayViewer
+            replay={model.replay}
+            map={model.map.view}
+            roundDetails={model.rounds}
+            target={replayTarget}
+            initialSession={replaySession}
+            onSessionChange={onReplaySessionChange}
+            hudAssetBaseUrl={hudAssetBaseUrl}
+            focusPlayerIds={replayFocusPlayerIds}
+          />
           )}
           {view === "overview" && <OverviewView model={model} onNavigate={setView} />}
           {view === "rounds" && <RoundExplorer model={model} onOpenReplay={replayHandler} />}
@@ -634,6 +681,8 @@ interface ReplayLayerState {
   grenades: boolean;
 }
 
+type ReplayEventKind = "kill" | "grenade" | "objective" | "evidence";
+
 const STANDARD_ROUND_SECONDS = 115;
 
 function replayFrameIndexAtTick(round: WorkspaceReplayRound, tick: number): number {
@@ -641,7 +690,7 @@ function replayFrameIndexAtTick(round: WorkspaceReplayRound, tick: number): numb
   const endIndex = targetEndTick != null
     ? Math.max(round.frameCount - 1, Math.round((targetEndTick - round.startTick) / round.tickStep))
     : Math.max(round.frameCount - 1, 0);
-  const index = Math.round((tick - round.startTick) / round.tickStep);
+  const index = (tick - round.startTick) / round.tickStep;
   return Math.max(0, Math.min(endIndex, index));
 }
 
@@ -654,32 +703,205 @@ export function replayInitialFrameIndex(
   return replayFrameIndexAtTick(round, round.freezeEndTick + elapsedSeconds * Math.max(tickrate, 1));
 }
 
-export function ReplayViewer({ replay, map, target = null, initialClockSeconds = STANDARD_ROUND_SECONDS }: {
+export interface ReplayFrameSample {
+  state: WorkspaceReplayFrame;
+  pose: Pick<WorkspaceReplayFrame, "x" | "y" | "z" | "yaw">;
+  stateIndex: number;
+}
+
+function interpolateYaw(from: number, to: number, alpha: number): number {
+  const delta = ((to - from + 540) % 360) - 180;
+  return from + delta * alpha;
+}
+
+/** 离散状态固定取前一个 source frame；只有位置与朝向在相邻帧间连续插值。 */
+export function replayFrameSampleAt(
+  frames: readonly WorkspaceReplayFrame[],
+  frameIndex: number,
+): ReplayFrameSample | null {
+  if (frames.length === 0) return null;
+  const bounded = Math.max(0, Math.min(frameIndex, frames.length - 1));
+  const stateIndex = Math.floor(bounded);
+  const state = frames[stateIndex]!;
+  const next = frames[Math.min(stateIndex + 1, frames.length - 1)]!;
+  const alpha = bounded - stateIndex;
+  return {
+    state,
+    stateIndex,
+    pose: {
+      x: state.x + (next.x - state.x) * alpha,
+      y: state.y + (next.y - state.y) * alpha,
+      z: state.z + (next.z - state.z) * alpha,
+      yaw: interpolateYaw(state.yaw, next.yaw, alpha),
+    },
+  };
+}
+
+function ReplayPlayerTokens({
+  round,
+  map,
+  playheadStore,
+  lastDataFrameIndex,
+  dualLevel,
+  level,
+  levelOf,
+  playerNumbers,
+  labelMode,
+  selectedSteamId,
+  focusPlayerIds,
+  onSelect,
+}: {
+  round: WorkspaceReplayRound;
+  map: MatchWorkspaceModel["map"]["view"];
+  playheadStore: ReplayPlayheadStore;
+  lastDataFrameIndex: number;
+  dualLevel: boolean;
+  level: MapLevel;
+  levelOf: (z: number) => MapLevel;
+  playerNumbers: Record<string, string>;
+  labelMode: "number" | "short" | "full";
+  selectedSteamId: string | null;
+  focusPlayerIds: string[];
+  onSelect: (steamId64: string) => void;
+}) {
+  const playhead = useSyncExternalStore(
+    playheadStore.subscribe,
+    playheadStore.getSnapshot,
+    playheadStore.getSnapshot,
+  );
+  const focus = new Set(focusPlayerIds);
+  const hasFocus = focus.size > 0;
+  return (
+    <>
+      {round.players.map((player) => {
+        const sample = replayFrameSampleAt(player.frames, Math.min(playhead, lastDataFrameIndex));
+        if (!sample) return null;
+        const { state: frame, pose } = sample;
+        const label = labelMode === "full"
+          ? player.name
+          : labelMode === "short"
+            ? player.name.slice(0, 3)
+            : playerNumbers[player.steamId64] ?? "?";
+        const focused = focus.has(player.steamId64);
+        return (
+          <div
+            key={player.steamId64}
+            className={`dak-replay-token dak-replay-token-${player.teamKey}${!frame.alive ? " dak-replay-token-dead" : ""}${frame.flashed ? " dak-replay-token-flashed" : ""}${selectedSteamId === player.steamId64 ? " dak-replay-token-selected" : ""}${focused ? " dak-replay-token-evidence" : ""}${hasFocus && !focused ? " dak-replay-token-dimmed" : ""}${dualLevel && levelOf(pose.z) !== level ? " dak-replay-token-offlevel" : ""}`}
+            style={{ ...replayFramePosition(pose, map), transform: `translate(-50%, -50%) rotate(${90 - pose.yaw}deg)` }}
+            aria-label={`${playerNumbers[player.steamId64] ?? "?"} ${player.name} · ${frame.hp} HP${frame.hasDefuseKit ? " · 拆弹器" : ""}${frame.flashed ? ` · 白 ${frame.flashRemainingSeconds.toFixed(1)} 秒` : ""}`}
+            data-tooltip={`${player.name} · ${frame.hp} HP · ${displayWeaponName(frame.weapon ?? "") || "无武器"}`}
+            onClick={() => onSelect(player.steamId64)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onSelect(player.steamId64);
+              }
+            }}
+          >
+            {frame.alive ? (
+              <span style={{ transform: `rotate(${pose.yaw - 90}deg)` }}>{label}</span>
+            ) : (
+              <svg className="dak-replay-dead-x" viewBox="0 0 10 10" width="14" height="14" aria-hidden="true" style={{ transform: `rotate(${pose.yaw - 90}deg)` }}>
+                <line x1="1.5" y1="1.5" x2="8.5" y2="8.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <line x1="8.5" y1="1.5" x2="1.5" y2="8.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            )}
+            {frame.hasDefuseKit && <i style={{ transform: `rotate(${pose.yaw - 90}deg)` }}>kit</i>}
+            {frame.hasBomb && <i className="dak-replay-c4-tag" style={{ transform: `rotate(${pose.yaw - 90}deg)` }}>c4</i>}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+export function ReplayViewer({
+  replay,
+  map,
+  roundDetails = [],
+  target = null,
+  initialClockSeconds = STANDARD_ROUND_SECONDS,
+  initialSession = null,
+  onSessionChange,
+  hudAssetBaseUrl = null,
+  focusPlayerIds = [],
+}: {
   replay: MatchWorkspaceModel["replay"];
   map: MatchWorkspaceModel["map"]["view"];
+  roundDetails?: MatchWorkspaceModel["rounds"];
   /** 统计跳回放：定位到某回合（可选定位 tick）。 */
   target?: ReplayTarget | null;
   /** 未指定 tick 时的初始比赛时钟；比赛工作台 1:55，教练工作台 1:35。 */
   initialClockSeconds?: number;
+  initialSession?: ReplayViewerSession | null;
+  onSessionChange?: (session: ReplayViewerSession) => void;
+  hudAssetBaseUrl?: string | null;
+  focusPlayerIds?: string[];
 }) {
-  const initialRoundNumber = target?.roundNumber ?? replay.rounds[0]?.roundNumber ?? 1;
+  const initialRoundNumber = target?.roundNumber ?? initialSession?.roundNumber ?? replay.rounds[0]?.roundNumber ?? 1;
   const initialRound = replay.rounds.find((row) => row.roundNumber === initialRoundNumber) ?? replay.rounds[0];
-  const [roundNumber, setRoundNumber] = useState(initialRoundNumber);
-  const [frameIndex, setFrameIndex] = useState(() => {
+  const initialFrameIndex = (() => {
     if (!initialRound) return 0;
     if (target?.tick != null) return replayFrameIndexAtTick(initialRound, target.tick);
+    const restored = replayFrameIndexFromSession(initialSession, initialRound.roundNumber, replay.sampleRate ?? 8);
+    if (restored != null) return restored;
     return replayInitialFrameIndex(initialRound, replay.tickrate ?? 64, initialClockSeconds);
-  });
+  })();
+  const [roundNumber, setRoundNumber] = useState(initialRoundNumber);
+  const [frameIndex, setFrameIndex] = useState(Math.floor(initialFrameIndex));
+  const playheadStore = useRef<ReplayPlayheadStore>(createReplayPlayheadStore(initialFrameIndex)).current;
   const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(1);
-  const [layers, setLayers] = useState<ReplayLayerState>({ trace: false, killLines: true, grenades: true });
+  const [speed, setSpeed] = useState(initialSession?.playbackRate ?? 1);
+  const playbackRaf = useRef<number | null>(null);
+  const [labelMode, setLabelMode] = useState<"number" | "short" | "full">(initialSession?.labelMode ?? "number");
+  const [selectedSteamId, setSelectedSteamId] = useState<string | null>(null);
+  const [eventFocusPlayerIds, setEventFocusPlayerIds] = useState<string[]>([]);
+  const [selectedAnchorKey, setSelectedAnchorKey] = useState<string | null>(null);
+  const [camera, setCamera] = useState(() => initialSession?.cameraByMap[map.name] ?? { zoom: 1, panX: 0, panY: 0 });
+  const cameraViewport = useRef<HTMLDivElement | null>(null);
+  const cameraDrag = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number } | null>(null);
+  const [layers, setLayers] = useState<ReplayLayerState>({ trace: initialSession?.layers.trace ?? false, killLines: initialSession?.layers.killLines ?? true, grenades: initialSession?.layers.grenades ?? true });
+  const [eventFilters, setEventFilters] = useState<Record<ReplayEventKind, boolean>>({
+    kill: true,
+    grenade: true,
+    objective: true,
+    evidence: true,
+  });
   // de_nuke / de_vertigo：上下双层雷达。当前层实心、另一层半透明幽灵显示，
   // 道具效果与 C4 只画在所属层。
   const calibration = getMapCalibration(map.name);
   const dualLevel = !!(calibration && hasLowerLevel(calibration) && map.lowerRadarImageUrl);
-  const [level, setLevel] = useState<MapLevel>("upper");
+  const [level, setLevel] = useState<MapLevel>(initialSession?.cameraByMap[map.name]?.floor ?? "upper");
   const levelOf = (z: number): MapLevel => (calibration ? levelAt(z, calibration) : "upper");
   const round = replay.rounds.find((row) => row.roundNumber === roundNumber) ?? replay.rounds[0];
+  const latestSession = useRef<ReplayViewerSession | null>(null);
+  const onSessionChangeRef = useRef(onSessionChange);
+  useEffect(() => {
+    onSessionChangeRef.current = onSessionChange;
+  }, [onSessionChange]);
+  const initialSessionApplied = useRef(false);
+  const lastLocationKey = useRef<string | null>(null);
+  useEffect(() => () => {
+    if (latestSession.current) onSessionChangeRef.current?.(latestSession.current);
+  }, []);
+  useEffect(() => {
+    const publishSession = () => {
+      if (latestSession.current) onSessionChangeRef.current?.(latestSession.current);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "hidden") return;
+      setPlaying(false);
+      publishSession();
+    };
+    window.addEventListener("pagehide", publishSession);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("pagehide", publishSession);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
 
   // 有效帧范围：数据实际帧数；targetEndTick 优先延伸到下一回合 freeze/start 边界。
   const lastDataFrameIndex = round ? Math.max(round.frameCount - 1, 0) : 0;
@@ -695,12 +917,39 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
   useEffect(() => {
     const selectedRound = replay.rounds.find((row) => row.roundNumber === roundNumber);
     if (!selectedRound) return;
+    const locationKey = `${roundNumber}:${target?.seq ?? "direct"}`;
+    if (lastLocationKey.current === locationKey) return;
+    lastLocationKey.current = locationKey;
     setPlaying(false);
     const explicitTick = target?.roundNumber === roundNumber ? target.tick : undefined;
-    setFrameIndex(explicitTick != null
-      ? replayFrameIndexAtTick(selectedRound, explicitTick)
-      : replayInitialFrameIndex(selectedRound, replay.tickrate ?? 64, initialClockSeconds));
-  }, [roundNumber, target?.seq, replay.rounds, replay.tickrate, initialClockSeconds]);
+    const shouldRestore = explicitTick == null
+      && !initialSessionApplied.current
+      && initialSession?.roundNumber === roundNumber;
+    const nextFrameIndex = explicitTick != null
+        ? replayFrameIndexAtTick(selectedRound, explicitTick)
+        : shouldRestore
+          ? replayFrameIndexFromSession(initialSession, roundNumber, replay.sampleRate ?? 8)!
+          : replayInitialFrameIndex(selectedRound, replay.tickrate ?? 64, initialClockSeconds);
+    playheadStore.set(nextFrameIndex);
+    setFrameIndex(Math.floor(nextFrameIndex));
+    initialSessionApplied.current = true;
+  }, [roundNumber, target?.seq, replay.rounds, replay.tickrate, replay.sampleRate, initialClockSeconds, initialSession, playheadStore]);
+
+  useEffect(() => {
+    setSelectedSteamId(null);
+    setEventFocusPlayerIds([]);
+    setSelectedAnchorKey(null);
+  }, [roundNumber]);
+
+  useEffect(() => {
+    if (!initialSession || target) return;
+    const restored = initialSession.cameraByMap[map.name];
+    if (restored) setCamera(restored);
+    if (restored?.floor) setLevel(restored.floor);
+    setLabelMode(initialSession.labelMode);
+    setSpeed(initialSession.playbackRate);
+    setLayers((current) => ({ ...current, ...initialSession.layers }));
+  }, [initialSession, map.name, target]);
 
   useEffect(() => {
     if (target && replay.rounds.some((row) => row.roundNumber === target.roundNumber)) {
@@ -710,18 +959,46 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
 
   useEffect(() => {
     if (!playing || !round || targetEndFrameIndex <= 0) return undefined;
-    const msPerFrame = Math.max(35, 1000 / ((replay.sampleRate ?? 8) * speed));
-    const timer = window.setInterval(() => {
-      setFrameIndex((value) => {
-        if (value >= targetEndFrameIndex) {
-          setPlaying(false);
-          return targetEndFrameIndex;
-        }
-        return value + 1;
-      });
-    }, msPerFrame);
-    return () => window.clearInterval(timer);
-  }, [playing, replay.sampleRate, targetEndFrameIndex, speed]);
+    let previous = performance.now();
+    const advance = (now: number) => {
+      const elapsedSeconds = Math.max(0, (now - previous) / 1000);
+      previous = now;
+      const next = Math.min(
+        targetEndFrameIndex,
+        playheadStore.getSnapshot() + elapsedSeconds * (replay.sampleRate ?? 8) * speed,
+      );
+      playheadStore.set(next);
+      if (latestSession.current) {
+        latestSession.current = replaySessionAtPlayhead(latestSession.current, next, replay.sampleRate ?? 8);
+      }
+      const sourceFrame = Math.floor(next);
+      setFrameIndex((current) => current === sourceFrame ? current : sourceFrame);
+      if (next >= targetEndFrameIndex) {
+        setPlaying(false);
+        if (latestSession.current) onSessionChangeRef.current?.(latestSession.current);
+        return;
+      }
+      playbackRaf.current = window.requestAnimationFrame(advance);
+    };
+    playbackRaf.current = window.requestAnimationFrame(advance);
+    return () => {
+      if (playbackRaf.current != null) window.cancelAnimationFrame(playbackRaf.current);
+      playbackRaf.current = null;
+    };
+  }, [playing, replay.sampleRate, targetEndFrameIndex, speed, round, playheadStore]);
+  useEffect(() => {
+    const viewport = cameraViewport.current;
+    if (!viewport) return;
+    const onCameraWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      setCamera((current) => ({
+        ...current,
+        zoom: Math.max(1, Math.min(2.5, current.zoom + (event.deltaY < 0 ? 0.12 : -0.12))),
+      }));
+    };
+    viewport.addEventListener("wheel", onCameraWheel, { passive: false });
+    return () => viewport.removeEventListener("wheel", onCameraWheel);
+  }, [replay.available]);
 
   // Stable per-player numbers: teamA → 1-5, teamB → 6-0.
   // Computed from round.players order so the mapping is consistent across frames.
@@ -739,31 +1016,145 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
 
   const currentFrameIndex = Math.min(frameIndex, targetEndFrameIndex);
   // 数据帧 clamp：超出实际录制帧数时冻结在最后一帧
-  const dataFrameIndex = Math.min(currentFrameIndex, lastDataFrameIndex);
+  const dataFrameIndex = Math.min(Math.floor(currentFrameIndex), lastDataFrameIndex);
   const currentTick = round.startTick + currentFrameIndex * round.tickStep;
   const endTick = round.startTick + targetEndFrameIndex * round.tickStep;
   const replayClock = deriveReplayClock(round, currentTick, replay.tickrate ?? 64);
+  latestSession.current = replaySessionAtPlayhead({
+    roundNumber,
+    playheadSeconds: 0,
+    playbackRate: speed,
+    layers: { ...layers },
+    labelMode,
+    cameraByMap: {
+      ...initialSession?.cameraByMap,
+      [map.name]: { ...camera, floor: level },
+    },
+  }, playheadStore.getSnapshot(), replay.sampleRate ?? 8);
 
-  // 2D 时间轴锚点：首杀 / 每次击杀 / 下包拆包（freeze end = 起点本身）
+  const roundMetaByNumber = useMemo(
+    () => new Map(roundDetails.map((item) => [item.roundNumber, item])),
+    [roundDetails],
+  );
+
+  // 证据型事件轨：投掷与生效保持独立 timing，不把 throwTick 冒充 effectTick。
   const anchors = useMemo(() => {
-    const list: { tick: number; kind: string; label: string }[] = [];
+    const list: Array<{
+      key: string;
+      tick: number;
+      kind: ReplayEventKind;
+      tone: string;
+      label: string;
+      participantIds: string[];
+      points: Array<{ x: number; y: number; z?: number }>;
+    }> = [];
     round.kills.forEach((kill, i) => {
-      list.push({ tick: kill.tick, kind: i === 0 ? "firstkill" : "kill", label: `${i === 0 ? "首杀" : "击杀"}：${kill.killerName ?? "?"} → ${kill.victimName}` });
+      const points: Array<{ x: number; y: number; z?: number }> = [];
+      if (kill.killerX != null && kill.killerY != null) {
+        points.push({ x: kill.killerX, y: kill.killerY, ...(kill.killerZ != null ? { z: kill.killerZ } : {}) });
+      }
+      if (kill.victimX != null && kill.victimY != null) {
+        points.push({ x: kill.victimX, y: kill.victimY, ...(kill.victimZ != null ? { z: kill.victimZ } : {}) });
+      }
+      list.push({
+        key: kill.id,
+        tick: kill.tick,
+        kind: "kill",
+        tone: i === 0 ? "firstkill" : "kill",
+        label: `${i === 0 ? "首杀" : "击杀"} · ${kill.killerName ?? "未知"} → ${kill.victimName}`,
+        participantIds: [kill.killerSteamId64, kill.victimSteamId64].filter((id): id is string => Boolean(id)),
+        points,
+      });
+    });
+    round.grenades.forEach((grenade, index) => {
+      const label = grenadeLabel(grenade.grenade);
+      const thrower = round.players.find((player) => player.steamId64 === grenade.throwerSteamId64)?.name;
+      list.push({
+        key: `grenade:${index}:throw`,
+        tick: grenade.throwTick,
+        kind: "grenade",
+        tone: "grenade",
+        label: `${thrower ? `${thrower} · ` : ""}${label} · 投掷`,
+        participantIds: grenade.throwerSteamId64 ? [grenade.throwerSteamId64] : [],
+        points: [{ x: grenade.throwX, y: grenade.throwY }],
+      });
+      if (grenade.effectTick !== grenade.throwTick) {
+        list.push({
+          key: `grenade:${index}:effect`,
+          tick: grenade.effectTick,
+          kind: "grenade",
+          tone: "effect",
+          label: `${label} · 生效`,
+          participantIds: grenade.throwerSteamId64 ? [grenade.throwerSteamId64] : [],
+          points: [{ x: grenade.effectX, y: grenade.effectY, z: grenade.effectZ }],
+        });
+      }
     });
     if (round.bomb) {
-      list.push({ tick: round.bomb.plantTick, kind: "bomb", label: "下包" });
-      if (round.bomb.defuseTick != null) list.push({ tick: round.bomb.defuseTick, kind: "defuse", label: "拆包" });
+      const points = [{ x: round.bomb.x, y: round.bomb.y, z: round.bomb.z }];
+      list.push({ key: "bomb:plant", tick: round.bomb.plantTick, kind: "objective", tone: "bomb", label: "C4 · 下包", participantIds: [], points });
+      if (round.bomb.defuseTick != null) list.push({ key: "bomb:defuse", tick: round.bomb.defuseTick, kind: "objective", tone: "defuse", label: "C4 · 拆除", participantIds: [], points });
+      if (round.bomb.explodeTick != null) list.push({ key: "bomb:explode", tick: round.bomb.explodeTick, kind: "objective", tone: "bomb", label: "C4 · 爆炸", participantIds: [], points });
     }
-    return list.filter((a) => a.tick >= round.startTick && a.tick <= endTick);
-  }, [round, endTick]);
+    if (target?.roundNumber === round.roundNumber && target.tick != null) {
+      const targetFrame = replayFrameIndexAtTick(round, target.tick);
+      const points = round.players
+        .filter((player) => focusPlayerIds.includes(player.steamId64))
+        .map((player) => replayFrameSampleAt(player.frames, targetFrame)?.pose ?? null)
+        .filter((point): point is ReplayFrameSample["pose"] => point != null);
+      list.push({
+        key: "evidence:current",
+        tick: target.tick,
+        kind: "evidence",
+        tone: "evidence",
+        label: "当前 Finding 证据目标",
+        participantIds: [...focusPlayerIds],
+        points,
+      });
+    }
+    return list
+      .filter((item) => item.tick >= round.startTick && item.tick <= endTick)
+      .sort((left, right) => left.tick - right.tick);
+  }, [round, endTick, target?.roundNumber, target?.tick, focusPlayerIds]);
+  const visibleAnchors = anchors.filter((anchor) => eventFilters[anchor.kind]);
   const seekTick = (tick: number) => {
     setPlaying(false);
-    setFrameIndex(Math.max(0, Math.min(targetEndFrameIndex, Math.round((tick - round.startTick) / round.tickStep))));
+    const next = replayFrameIndexAtTick(round, tick);
+    playheadStore.set(next);
+    if (latestSession.current) {
+      latestSession.current = replaySessionAtPlayhead(latestSession.current, next, replay.sampleRate ?? 8);
+    }
+    setFrameIndex(Math.floor(next));
   };
+  const seekSeconds = (seconds: number) => {
+    setPlaying(false);
+    seekTick(currentTick + seconds * Math.max(replay.tickrate ?? 64, 1));
+  };
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement) return;
+      if (event.code === "Space") {
+        event.preventDefault();
+        if (playing && latestSession.current) onSessionChangeRef.current?.(latestSession.current);
+        setPlaying((value) => !value);
+      }
+      if (event.key === "ArrowLeft") { event.preventDefault(); seekSeconds(event.shiftKey ? -5 : -1); }
+      if (event.key === "ArrowRight") { event.preventDefault(); seekSeconds(event.shiftKey ? 5 : 1); }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [currentTick, replay.tickrate, targetEndFrameIndex, playing]);
   // 帧数据访问用 dataFrameIndex（clamp 到实际录制范围），让超出部分冻结在最后帧
   const currentPlayers = round.players
-    .map((player) => ({ player, frame: player.frames[dataFrameIndex] ?? player.frames.find((frame) => frame.alive) ?? player.frames[0] }))
-    .filter((row): row is { player: WorkspaceReplayRound["players"][number]; frame: WorkspaceReplayFrame } => Boolean(row.frame));
+    .map((player) => {
+      const sample = replayFrameSampleAt(player.frames, Math.min(currentFrameIndex, lastDataFrameIndex));
+      return sample ? { player, frame: sample.state, pose: sample.pose } : null;
+    })
+    .filter((row): row is {
+      player: WorkspaceReplayRound["players"][number];
+      frame: WorkspaceReplayFrame;
+      pose: ReplayFrameSample["pose"];
+    } => row != null);
   const selectedRoundIndex = Math.max(0, replay.rounds.findIndex((row) => row.roundNumber === round.roundNumber));
   const seekRoundByOffset = (offset: number) => {
     const next = replay.rounds[Math.max(0, Math.min(replay.rounds.length - 1, selectedRoundIndex + offset))];
@@ -780,8 +1171,66 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
         return (na === 0 ? 10 : na) - (nb === 0 ? 10 : nb);
       })
   }));
+  const resetCamera = () => setCamera({ zoom: 1, panX: 0, panY: 0 });
+  const fitEvidence = (
+    steamIds: string[],
+    spatialPoints: Array<{ x: number; y: number; z?: number }> = [],
+    tick = currentTick,
+  ) => {
+    const viewport = cameraViewport.current;
+    if (!viewport) return;
+    const frameAtTick = replayFrameIndexAtTick(round, tick);
+    const participantPoints = round.players
+      .filter((player) => steamIds.includes(player.steamId64))
+      .map((player) => replayFrameSampleAt(player.frames, frameAtTick)?.pose ?? null)
+      .filter((point): point is ReplayFrameSample["pose"] => point != null);
+    const worldPoints = spatialPoints.length > 0 ? spatialPoints : participantPoints;
+    if (worldPoints.length === 0) return;
+    const points = worldPoints.map((point) => replayPointPercent(point, map));
+    const minX = Math.min(...points.map((point) => point.x));
+    const maxX = Math.max(...points.map((point) => point.x));
+    const minY = Math.min(...points.map((point) => point.y));
+    const maxY = Math.max(...points.map((point) => point.y));
+    const center = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+    const span = Math.max(maxX - minX, maxY - minY);
+    const rect = viewport.getBoundingClientRect();
+    setCamera({
+      zoom: Math.max(1, Math.min(2.35, span < 1 ? 2.05 : 68 / Math.max(span, 18))),
+      panX: ((50 - center.x) / 100) * rect.width,
+      panY: ((50 - center.y) / 100) * rect.height,
+    });
+    const firstWithLevel = worldPoints.find((point) => point.z != null);
+    if (dualLevel && firstWithLevel?.z != null) setLevel(levelOf(firstWithLevel.z));
+  };
+  const fitPlayers = (steamIds: string[]) => fitEvidence(steamIds);
+  const selectPlayer = (steamId64: string) => {
+    setEventFocusPlayerIds([steamId64]);
+    setSelectedAnchorKey(null);
+    setSelectedSteamId(steamId64);
+    fitPlayers([steamId64]);
+  };
+  const focusAnchor = (anchor: typeof anchors[number]) => {
+    seekTick(anchor.tick);
+    setSelectedAnchorKey(anchor.key);
+    setEventFocusPlayerIds(anchor.participantIds);
+    setSelectedSteamId(anchor.participantIds[0] ?? null);
+    fitEvidence(anchor.participantIds, anchor.points, anchor.tick);
+  };
+  const onCameraPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (camera.zoom <= 1) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    cameraDrag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, panX: camera.panX, panY: camera.panY };
+  };
+  const onCameraPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = cameraDrag.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    setCamera((current) => ({ ...current, panX: drag.panX + event.clientX - drag.x, panY: drag.panY + event.clientY - drag.y }));
+  };
+  const onCameraPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (cameraDrag.current?.pointerId === event.pointerId) cameraDrag.current = null;
+  };
   const renderRosterTeam = (team: typeof rosterTeams[number]) => (
-    <section className="dak-roster-team" key={team.teamKey} aria-label={`${team.teamKey} 当前状态`}>
+    <section className={`dak-roster-team dak-roster-team-${team.teamKey}`} key={team.teamKey} aria-label={`${team.teamKey} 当前状态`}>
       <div className="dak-roster-team-head">
         <span className={`dak-team-dot dak-team-dot-${team.teamKey}`} />
         <b>{team.side ? team.side.toUpperCase() : team.teamKey}</b>
@@ -790,9 +1239,6 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
       <div className="dak-frame-player-list">
         {team.rows.map(({ player, frame }) => {
           // 装备严格跟随逐帧数据：道具丢出后即消失，捡/传枪后主武器即替换（不回退到开局 loadout）
-          const heldUtility = frame.grenades.length > 0
-            ? heldUtilityLabel({ ...player.loadout, grenadeCount: frame.grenades.length, grenades: frame.grenades })
-            : null;
           const heldGun = frame.weapon && isGunWeapon(frame.weapon) ? frame.weapon : null;
           // frame.weapon 是武器原始 key，loadout 可能存展示名；统一到展示名空间再比较与渲染，避免误判「捡枪」并显示原始 key。
           const heldGunLabel = heldGun ? displayWeaponName(heldGun) : null;
@@ -800,28 +1246,70 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
           const secondaryLabel = player.loadout.secondaryWeapon ? displayWeaponName(player.loadout.secondaryWeapon) : null;
           const pickedUp = heldGunLabel != null && heldGunLabel !== primaryLabel && heldGunLabel !== secondaryLabel;
           const primary = pickedUp ? heldGunLabel : primaryLabel;
+          const activeFocus = eventFocusPlayerIds.length > 0 ? eventFocusPlayerIds : focusPlayerIds;
+          const focused = activeFocus.includes(player.steamId64);
+          const dimmed = activeFocus.length > 0 && !focused;
+          const hpStyle = { "--dak-player-hp": `${Math.max(0, Math.min(100, frame.hp))}%` } as CSSProperties;
           return (
-            <div
-              className={`dak-frame-player-row${!frame.alive ? " dak-frame-player-row-dead" : ""}`}
+            <button
+              type="button"
+              className={`dak-frame-player-row${!frame.alive ? " dak-frame-player-row-dead" : ""}${selectedSteamId === player.steamId64 ? " dak-frame-player-row-selected" : ""}${focused ? " dak-frame-player-row-evidence" : ""}${dimmed ? " dak-frame-player-row-dimmed" : ""}`}
               key={player.steamId64}
+              style={hpStyle}
+              onClick={() => selectPlayer(player.steamId64)}
+              aria-pressed={selectedSteamId === player.steamId64}
+              aria-label={`聚焦 ${player.name} 的地图位置`}
             >
               <span className="dak-frame-player-num">{playerNumbers[player.steamId64] ?? "?"}</span>
               <span className="dak-frame-player-name">{player.name}</span>
               {frame.alive ? (
                 <small className="dak-frame-loadout">
-                  <span className="dak-frame-primary">{primary}{pickedUp ? "*" : ""}</span>
-                  {player.loadout.primaryWeapon && secondaryLabel && !pickedUp && <span>{secondaryLabel}</span>}
-                  {heldUtility && <span>{heldUtility}</span>}
-                  {frame.armor > 0 && <span>{frame.hasHelmet ? "全甲" : "半甲"}</span>}
-                  {frame.hasDefuseKit && <span>kit</span>}
-                  {frame.hasBomb && <span>C4</span>}
-                  {frame.flashed && <span>白 {frame.flashRemainingSeconds.toFixed(1)}s</span>}
+                  {primary && (
+                    <span className="dak-frame-primary">
+                      <ReplayHudIcon
+                        kind={pickedUp ? heldGun : player.loadout.primaryWeapon ?? player.loadout.secondaryWeapon}
+                        label={primary}
+                        assetBaseUrl={hudAssetBaseUrl}
+                      />
+                      {pickedUp && <i className="dak-hud-picked" aria-label="本回合捡取武器">↺</i>}
+                    </span>
+                  )}
+                  {player.loadout.primaryWeapon && secondaryLabel && (
+                    <ReplayHudIcon
+                      kind={player.loadout.secondaryWeapon}
+                      label={secondaryLabel}
+                      assetBaseUrl={hudAssetBaseUrl}
+                      className="dak-hud-secondary"
+                    />
+                  )}
+                  {frame.grenades.map((grenade, index) => (
+                    <ReplayHudIcon
+                      key={`${grenade}-${index}`}
+                      kind={grenade}
+                      label={grenadeLabel(grenade)}
+                      assetBaseUrl={hudAssetBaseUrl}
+                      className="dak-hud-utility"
+                    />
+                  ))}
+                  {frame.armor > 0 && (
+                    <span className="dak-hud-status">
+                      <ReplayHudIcon
+                        kind={frame.hasHelmet ? "armor_helmet" : "armor"}
+                        label={frame.hasHelmet ? "头盔与护甲" : "护甲"}
+                        assetBaseUrl={hudAssetBaseUrl}
+                      />
+                      <b>{frame.armor}</b>
+                    </span>
+                  )}
+                  {frame.hasDefuseKit && <ReplayHudIcon kind="defuser" label="拆弹器" assetBaseUrl={hudAssetBaseUrl} className="dak-hud-objective" />}
+                  {frame.hasBomb && <ReplayHudIcon kind="c4" label="携带 C4" assetBaseUrl={hudAssetBaseUrl} className="dak-hud-objective" />}
+                  {frame.flashed && <span className="dak-hud-flash">白 {frame.flashRemainingSeconds.toFixed(1)}s</span>}
                 </small>
               ) : (
-                <small className="dak-frame-weapon">阵亡</small>
+                <small className="dak-frame-weapon" aria-label="阵亡">×</small>
               )}
               {renderHpArmor(frame)}
-            </div>
+            </button>
           );
         })}
       </div>
@@ -839,7 +1327,14 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
             <span>回合</span>
             <select className="dak-round-select" value={round.roundNumber} onChange={(event) => setRoundNumber(Number(event.target.value))}>
               {replay.rounds.map((row) => (
-                <option key={row.roundNumber} value={row.roundNumber}>R{row.roundNumber} · {row.frameCount} 帧</option>
+                <option key={row.roundNumber} value={row.roundNumber}>
+                  {(() => {
+                    const details = roundMetaByNumber.get(row.roundNumber);
+                    return details
+                      ? `R${row.roundNumber} · ${details.scoreBefore} · ${details.winnerSide.toUpperCase()} 胜`
+                      : `R${row.roundNumber} · ${row.frameCount} 帧`;
+                  })()}
+                </option>
               ))}
             </select>
           </label>
@@ -848,24 +1343,32 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
           </button>
         </div>
         <div className="dak-playback">
-          <button className="dak-play-button" type="button" onClick={() => setPlaying((value) => !value)} aria-label={playing ? "暂停" : "播放"}>
+          <button className="dak-play-button" type="button" onClick={() => {
+            if (playing && latestSession.current) onSessionChangeRef.current?.(latestSession.current);
+            setPlaying((value) => !value);
+          }} aria-label={playing ? "暂停" : "播放"}>
             {playing ? <Pause size={18} /> : <Play size={18} />}
           </button>
-          <button className="dak-icon-button" type="button" onClick={() => setFrameIndex((value) => Math.max(0, value - Math.max(1, Math.round((replay.sampleRate ?? 8) / 2))))} aria-label="后退">
+          <button className="dak-icon-button" type="button" onClick={() => seekSeconds(-5)} aria-label="后退 5 秒（Shift+←）">
             <ChevronLeft size={17} />
           </button>
           <div className="dak-scrubber-wrap">
-            <div className="dak-scrubber-anchors" aria-hidden="true">
-              {anchors.map((anchor, i) => (
+            <div className="dak-scrubber-anchors">
+              {visibleAnchors.map((anchor, i) => {
+                const tooltip = `${formatReplayEventTime(anchor.tick, round.startTick, replay.tickrate ?? 64)} · ${anchor.label}`;
+                return (
                 <button
                   key={`${anchor.tick}-${i}`}
                   type="button"
-                  className={`dak-scrubber-anchor dak-scrubber-anchor-${anchor.kind}`}
+                  className={`dak-scrubber-anchor dak-scrubber-anchor-${anchor.tone}${selectedAnchorKey === anchor.key ? " dak-scrubber-anchor-selected" : ""}`}
                   style={{ left: `${endTick > round.startTick ? ((anchor.tick - round.startTick) / (endTick - round.startTick)) * 100 : 0}%` }}
-                  title={anchor.label}
-                  onClick={() => seekTick(anchor.tick)}
-                />
-              ))}
+                  aria-label={tooltip}
+                  onClick={() => focusAnchor(anchor)}
+                >
+                  <span className="dak-scrubber-tooltip" role="tooltip">{tooltip}</span>
+                </button>
+                );
+              })}
             </div>
             <input
               className="dak-scrubber"
@@ -873,10 +1376,17 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
               min={0}
               max={targetEndFrameIndex}
               value={currentFrameIndex}
-              onChange={(event) => setFrameIndex(Number(event.target.value))}
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                playheadStore.set(next);
+                if (latestSession.current) {
+                  latestSession.current = replaySessionAtPlayhead(latestSession.current, next, replay.sampleRate ?? 8);
+                }
+                setFrameIndex(Math.floor(next));
+              }}
             />
           </div>
-          <button className="dak-icon-button" type="button" onClick={() => setFrameIndex((value) => Math.min(targetEndFrameIndex, value + Math.max(1, Math.round((replay.sampleRate ?? 8) / 2))))} aria-label="前进">
+          <button className="dak-icon-button" type="button" onClick={() => seekSeconds(5)} aria-label="前进 5 秒（Shift+→）">
             <ChevronRight size={17} />
           </button>
         </div>
@@ -885,14 +1395,36 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
             <span>{replayClock.label === "回合" ? "回合时间" : replayClock.label}</span>
             <strong>{replayClock.display}</strong>
           </div>
-          <div className="dak-replay-techline" aria-label="回放技术信息">
-            <span>R{round.roundNumber}</span>
-            <span>Tick {currentTick}</span>
-            <span>帧 {currentFrameIndex + 1}/{round.frameCount}</span>
-            <span>{replay.sampleRate ?? 0} Hz</span>
-          </div>
+          <details className="dak-replay-techline">
+            <summary>技术信息</summary>
+            <div aria-label="回放技术信息">
+              <span>R{round.roundNumber}</span>
+              <span>Tick {Math.round(currentTick)}</span>
+              <span>帧 {dataFrameIndex + 1}/{round.frameCount}</span>
+              <span>{replay.sampleRate ?? 0} Hz</span>
+            </div>
+          </details>
         </div>
         <div className="dak-replay-togglebar">
+          <div className="dak-event-legend" role="group" aria-label="时间轴事件筛选">
+            {([
+              ["kill", "击杀"],
+              ["grenade", "道具"],
+              ["objective", "目标"],
+              ["evidence", "证据"],
+            ] as const).map(([kind, label]) => (
+              <button
+                key={kind}
+                type="button"
+                className={`dak-event-filter dak-event-filter-${kind}${eventFilters[kind] ? " dak-event-filter-active" : ""}`}
+                aria-pressed={eventFilters[kind]}
+                onClick={() => setEventFilters((current) => ({ ...current, [kind]: !current[kind] }))}
+              >
+                <i aria-hidden="true" />
+                {label}
+              </button>
+            ))}
+          </div>
           <div className="dak-speed-group" role="group" aria-label="叠加图层">
             {([
               ["trace", "走位轨迹"],
@@ -936,6 +1468,13 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
               </button>
             ))}
           </div>
+          <div className="dak-speed-group dak-speed-group-compact" role="group" aria-label="人物标签">
+            {(["number", "short", "full"] as const).map((nextMode) => (
+              <button key={nextMode} type="button" className={labelMode === nextMode ? "dak-speed dak-speed-active" : "dak-speed"} onClick={() => setLabelMode(nextMode)}>
+                {{ number: "编号", short: "简称", full: "全名" }[nextMode]}
+              </button>
+            ))}
+          </div>
         </div>
       </section>
       <aside className="dak-replay-roster-panel dak-replay-roster-left">
@@ -944,13 +1483,34 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
         </div>
       </aside>
       <section className="dak-replay-stage-panel" aria-label={`R${round.roundNumber} 2D 回放`}>
+        <div className="dak-replay-stage-tools" role="group" aria-label="地图镜头">
+          <span>{camera.zoom > 1 ? `${camera.zoom.toFixed(1)}×` : "全图"}</span>
+          {(eventFocusPlayerIds.length > 0 || focusPlayerIds.length > 0) && (
+            <button type="button" className="dak-speed" onClick={() => fitPlayers(eventFocusPlayerIds.length > 0 ? eventFocusPlayerIds : focusPlayerIds)}>
+              适配证据
+            </button>
+          )}
+          <button type="button" className="dak-speed" onClick={resetCamera} disabled={camera.zoom === 1 && camera.panX === 0 && camera.panY === 0}>重置镜头</button>
+        </div>
         <div
-          className="dak-replay-stage"
-          style={(() => {
-            const url = dualLevel && level === "lower" ? map.lowerRadarImageUrl : map.radarImageUrl;
-            return url ? { backgroundImage: `url(${url})` } : undefined;
-          })()}
+          ref={cameraViewport}
+          className={`dak-replay-stage-viewport${camera.zoom > 1 ? " dak-replay-stage-viewport-zoomed" : ""}`}
+          onPointerDown={onCameraPointerDown}
+          onPointerMove={onCameraPointerMove}
+          onPointerUp={onCameraPointerUp}
+          onPointerCancel={onCameraPointerUp}
+          onDoubleClick={resetCamera}
         >
+          <div
+            className="dak-replay-stage"
+            style={(() => {
+            const url = dualLevel && level === "lower" ? map.lowerRadarImageUrl : map.radarImageUrl;
+            return {
+              ...(url ? { backgroundImage: `url(${url})` } : {}),
+              transform: `translate(${camera.panX}px, ${camera.panY}px) scale(${camera.zoom})`,
+            };
+          })()}
+          >
           <div className="dak-replay-gridlines" aria-hidden="true" />
           <KillFeed kills={round.kills} currentTick={currentTick} tickrate={replay.tickrate} />
           {layers.trace && (
@@ -958,8 +1518,11 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
               {currentPlayers.map(({ player, frame }) => {
                 if (!frame.alive) return null;
                 if (dualLevel && levelOf(frame.z) !== level) return null;
-                // 最近 ~10 秒的走位轨迹（8 Hz × 80 帧）；clamp 到实际录制范围
-                const traceFrames = player.frames.slice(Math.max(0, dataFrameIndex - 80), dataFrameIndex + 1).filter((f) => f.alive);
+                // 最近 10 秒的走位轨迹；窗口按真实采样率计算。
+                const traceFrames = player.frames.slice(
+                  Math.max(0, dataFrameIndex - Math.max(replay.sampleRate ?? 8, 1) * 10),
+                  dataFrameIndex + 1,
+                ).filter((f) => f.alive);
                 if (traceFrames.length < 2) return null;
                 const points = traceFrames.map((f) => {
                   const pos = replayPointPercent(f, map);
@@ -1019,25 +1582,21 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
               </span>
             );
           })}
-          {currentPlayers.map(({ player, frame }) => (
-            <div
-              key={player.steamId64}
-              className={`dak-replay-token dak-replay-token-${player.teamKey}${!frame.alive ? " dak-replay-token-dead" : ""}${frame.flashed ? " dak-replay-token-flashed" : ""}${dualLevel && levelOf(frame.z) !== level ? " dak-replay-token-offlevel" : ""}`}
-              style={{ ...replayFramePosition(frame, map), transform: `translate(-50%, -50%) rotate(${90 - frame.yaw}deg)` }}
-              title={`${playerNumbers[player.steamId64] ?? "?"} ${player.name} · ${frame.hp} HP${frame.hasDefuseKit ? " · 拆弹器" : ""}${frame.flashed ? ` · 白 ${frame.flashRemainingSeconds.toFixed(1)}s` : ""}`}
-            >
-              {frame.alive ? (
-                <span style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>{playerNumbers[player.steamId64] ?? "?"}</span>
-              ) : (
-                <svg className="dak-replay-dead-x" viewBox="0 0 10 10" width="14" height="14" aria-hidden="true" style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>
-                  <line x1="1.5" y1="1.5" x2="8.5" y2="8.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                  <line x1="8.5" y1="1.5" x2="1.5" y2="8.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
-              )}
-              {frame.hasDefuseKit && <i style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>kit</i>}
-              {frame.hasBomb && <i className="dak-replay-c4-tag" style={{ transform: `rotate(${frame.yaw - 90}deg)` }}>c4</i>}
-            </div>
-          ))}
+          <ReplayPlayerTokens
+            round={round}
+            map={map}
+            playheadStore={playheadStore}
+            lastDataFrameIndex={lastDataFrameIndex}
+            dualLevel={dualLevel}
+            level={level}
+            levelOf={levelOf}
+            playerNumbers={playerNumbers}
+            labelMode={labelMode}
+            selectedSteamId={selectedSteamId}
+            focusPlayerIds={eventFocusPlayerIds.length > 0 ? eventFocusPlayerIds : focusPlayerIds}
+            onSelect={selectPlayer}
+          />
+          </div>
         </div>
       </section>
       <aside className="dak-replay-roster-panel dak-replay-roster-right">
@@ -1360,7 +1919,7 @@ function renderHpArmor(frame: WorkspaceReplayFrame) {
   const armorColor = fullArmor ? "var(--dak-accent)" : "var(--dak-accent-b)";
   const armorLabel = !frame.hasHelmet ? "半甲" : frame.armor >= 100 ? "全甲" : `甲 ${frame.armor}`;
   return (
-    <div className="dak-hp-bar-wrap" title={`${frame.hp} HP · ${armorLabel}`}>
+    <div className="dak-hp-bar-wrap" aria-label={`${frame.hp} HP · ${armorLabel}`}>
       <div className="dak-hp-bar-track">
         <div className="dak-hp-bar" style={{ width: `${frame.hp}%`, background: hpBarColor(frame.hp) }} />
       </div>
@@ -1390,25 +1949,29 @@ function primaryLoadoutLabel(loadout: WorkspaceReplayLoadout): string {
   return weapon ? displayWeaponName(weapon) : "—";
 }
 
-function heldUtilityLabel(loadout: WorkspaceReplayLoadout): string {
-  if (loadout.grenades.length === 0) {
-    return `道具 x${loadout.grenadeCount}`;
-  }
-  const counts = new Map<WorkspaceReplayLoadout["grenades"][number], number>();
-  for (const grenade of loadout.grenades) {
-    counts.set(grenade, (counts.get(grenade) ?? 0) + 1);
-  }
-  return [...counts.entries()]
-    .map(([grenade, count]) => `${grenadeShortLabel(grenade)}${count > 1 ? count : ""}`)
-    .join(" ");
-}
-
 function grenadeShortLabel(grenade: WorkspaceReplayLoadout["grenades"][number]): string {
   if (grenade === "flashbang") return "闪";
   if (grenade === "smoke") return "烟";
   if (grenade === "molotov" || grenade === "incendiary") return "火";
   if (grenade === "hegrenade") return "雷";
   return "诱";
+}
+
+function grenadeLabel(grenade: WorkspaceReplayLoadout["grenades"][number]): string {
+  if (grenade === "flashbang") return "闪光弹";
+  if (grenade === "smoke") return "烟雾弹";
+  if (grenade === "molotov") return "燃烧瓶";
+  if (grenade === "incendiary") return "燃烧弹";
+  if (grenade === "hegrenade") return "高爆手雷";
+  return "诱饵弹";
+}
+
+function formatReplayEventTime(tick: number, startTick: number, tickrate: number): string {
+  const elapsed = Math.max(0, (tick - startTick) / Math.max(tickrate, 1));
+  const minutes = Math.floor(elapsed / 60);
+  const seconds = Math.floor(elapsed % 60);
+  const tenths = Math.floor((elapsed % 1) * 10);
+  return `${minutes}:${String(seconds).padStart(2, "0")}.${tenths}`;
 }
 
 function replayPointPercent(frame: { x: number; y: number }, map: MatchWorkspaceModel["map"]["view"]) {
