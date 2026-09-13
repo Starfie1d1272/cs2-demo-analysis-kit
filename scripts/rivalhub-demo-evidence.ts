@@ -1,5 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { analyzeDemoPackage, buildPlayerRoundFacts, buildPlayerRoundUtilityFacts, demoSourceAvailability, loadDemoPackageFromZip } from "../packages/core/src/index.ts";
+import { analyzeDemoPackage, buildPlayerRoundFacts, buildPlayerRoundUtilityFacts, buildTeamSideWinRates, demoSourceAvailability, loadDemoPackageFromZip } from "../packages/core/src/index.ts";
 import type { DemoPackage } from "../packages/contract/src/index.ts";
 import { buildTournamentInsightsFromFacts, extractTournamentFacts } from "../packages/presentation/src/index.ts";
 
@@ -71,6 +71,7 @@ export function buildRivalHubDemoEvidenceV1(pkg: DemoPackage, target: RivalHubEv
   const analysis = analyzeDemoPackage(pkg);
   const facts = buildPlayerRoundFacts(pkg);
   const utilityFacts = new Map(buildPlayerRoundUtilityFacts(pkg).map((fact) => [`${fact.roundNumber}:${fact.steamId64}`, fact]));
+  const sideWinRates = buildTeamSideWinRates(pkg);
   const playerIndex = new Map(pkg.players.map((player, index) => [player.steamId64, index]));
   const roundSeq = new Map(pkg.rounds.map((round, index) => [round.roundNumber, index + 1]));
   const playerRounds = facts.map((fact) => {
@@ -128,7 +129,12 @@ export function buildRivalHubDemoEvidenceV1(pkg: DemoPackage, target: RivalHubEv
     semanticFacts: { playerRounds, economyMatrix: conversions.economyMatrix, teamConversions: conversions.teams },
     summaries: {
       playerMaps, playerWeapons: [...weapons.values()],
-      teamMaps: (["teamA", "teamB"] as const).map((teamKey) => { const rounds = pkg.rounds.filter((row) => true); const side = (row: typeof pkg.rounds[number]) => teamKey === "teamA" ? row.teamASide : row.teamBSide; return { teamKey, rounds: rounds.length, roundWins: rounds.filter((row) => row.winnerTeamKey === teamKey).length, tRounds: rounds.filter((row) => side(row) === "t").length, tWins: rounds.filter((row) => side(row) === "t" && row.winnerTeamKey === teamKey).length, ctRounds: rounds.filter((row) => side(row) === "ct").length, ctWins: rounds.filter((row) => side(row) === "ct" && row.winnerTeamKey === teamKey).length }; }),
+      teamMaps: (["teamA", "teamB"] as const).map((teamKey) => {
+        const sideRates = sideWinRates[teamKey];
+        const t = sideRates.t ?? { played: 0, won: 0 };
+        const ct = sideRates.ct ?? { played: 0, won: 0 };
+        return { teamKey, rounds: pkg.rounds.length, roundWins: t.won + ct.won, tRounds: t.played, tWins: t.won, ctRounds: ct.played, ctWins: ct.won };
+      }),
     },
     extensions: {},
   };
