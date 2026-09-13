@@ -92,7 +92,7 @@ async function readCredential(baseUrl: string): Promise<string | null> {
 async function saveCredential(baseUrl: string, token: string): Promise<void> {
   const api = nativeApi();
   if (api?.rivalhub_credential_set) {
-    if (!await api.rivalhub_credential_set(CREDENTIAL_SERVICE, CREDENTIAL_ACCOUNT, token)) throw new Error("无法写入系统钥匙串，连接未保存");
+    if (!await api.rivalhub_credential_set(CREDENTIAL_SERVICE, CREDENTIAL_ACCOUNT, token)) throw new Error("无法写入系统安全存储，连接未保存");
     return;
   }
   // 浏览器开发环境只保存在当前 JS 进程内；不写入 IndexedDB/localStorage。

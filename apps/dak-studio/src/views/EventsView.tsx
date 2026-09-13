@@ -4,6 +4,7 @@ import { listEventRecords, type StudioEventRecord } from "../lib/events";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import type { StudioDemoEntry } from "../lib/library";
 import type { RivalHubConnectionState } from "../lib/rivalhub";
+import type { RivalHubRemoteMap } from "../lib/rivalhub-contract";
 import { elimModelFromResults, swissModelFromResults } from "../lib/event-bracket";
 import { ElimBracket, SwissBracket, useSortable } from "@cs2dak/react";
 import { BpView } from "./BpView";
@@ -65,12 +66,9 @@ export function EventsView({
               {rivalHubConnection?.lastSyncAt ? <small>· {new Date(rivalHubConnection.lastSyncAt).toLocaleTimeString("zh-CN")} 已刷新</small> : null}
             </div>
             <div className="stu-rivalhub-connection-actions">
-              <input aria-label="RivalHub 地址" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="https://rivalhub.example" />
+              <input aria-label="RivalHub 地址" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} readOnly={rivalHubConnection?.status === "connected"} placeholder="https://rivalhub.example" />
               {rivalHubConnection?.status === "connected" ? (
-                <>
-                  <button type="button" className="stu-button" onClick={() => void onRefreshRivalHub?.()}>刷新赛事</button>
-                  <button type="button" className="stu-button stu-button-ghost" onClick={() => setBaseUrl("")}>更换地址</button>
-                </>
+                <button type="button" className="stu-button" onClick={() => void onRefreshRivalHub?.()}>刷新赛事</button>
               ) : (
                 <button type="button" className="stu-button" onClick={() => void onConnectRivalHub(baseUrl)} disabled={rivalHubConnection?.status === "connecting" || !baseUrl.trim()}>连接 RivalHub</button>
               )}
@@ -132,6 +130,7 @@ export function EventsView({
 export interface OnlineImportContext {
   series: StudioSeriesRecord;
   mapAssignments: NonNullable<StudioSeriesRecord["mapAssignments"]>;
+  candidates?: Array<{ series: StudioSeriesRecord; map: RivalHubRemoteMap }>;
 }
 
 /** 按阶段赛制选择渲染组件。GSL 小组有 bracketNodes 时走 lane-aware bracket，缺节点的旧资产降级为积分榜。 */
@@ -148,9 +147,41 @@ function EventStageSection({ stage, series, entries, onOpenMatch, onImportOnline
   return (
     <section className="stu-event-stage">
       <h2>{stage.name} <small className="stu-muted">{stage.type} · {stage.teamCount} 队</small></h2>
+      <StageOnlineDropZone series={series} onImportOnlineFiles={onImportOnlineFiles} />
       {renderStageContent(stage, series, entries, onOpenMatch, onImportOnlineFiles)}
       {series.length === 0 && <p className="stu-muted">该阶段暂无系列赛。</p>}
     </section>
+  );
+}
+
+function StageOnlineDropZone({ series, onImportOnlineFiles }: { series: StudioSeriesRecord[]; onImportOnlineFiles?: (files: Iterable<File>, context: OnlineImportContext) => Promise<void> }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const candidates = series.flatMap((row) => (row.mapAssignments ?? [])
+    .filter((assignment): assignment is typeof assignment & { rivalHub: RivalHubRemoteMap } => assignment.rivalHub?.demoStatus === "finished_pending_demo" || assignment.rivalHub?.demoStatus === "needs_attention")
+    .map((assignment) => ({ series: row, map: assignment.rivalHub })));
+  if (!onImportOnlineFiles || candidates.length === 0 || !series[0]) return null;
+  const context: OnlineImportContext = {
+    series: series[0],
+    mapAssignments: candidates.map(({ map }) => ({ order: map.order, mapName: map.mapName, entryId: null, rivalHub: map })),
+    candidates,
+  };
+  return (
+    <>
+      <input ref={inputRef} type="file" accept=".dem,.zip,application/zip" multiple hidden onChange={(event) => {
+        const files = event.currentTarget.files;
+        event.currentTarget.value = "";
+        if (files) void onImportOnlineFiles(files, context);
+      }} />
+      <button
+        type="button"
+        className="stu-online-drop-zone"
+        onClick={() => inputRef.current?.click()}
+        onDragOver={(event) => { event.preventDefault(); event.stopPropagation(); }}
+        onDrop={(event) => { event.preventDefault(); event.stopPropagation(); void onImportOnlineFiles(event.dataTransfer.files, context); }}
+      >
+        阶段批量入口：将多张 .dem 拖到这里，自动匹配本阶段待接收地图
+      </button>
+    </>
   );
 }
 

@@ -30,13 +30,27 @@ export type RivalHubMatchedParticipant = {
   entryId: string;
 };
 
+type RivalHubReviewResolution =
+  | { status: "matched"; userId: string; eventRosterMemberId: string; entryId: string }
+  | { status: "unresolved" }
+  | { status: "conflict"; userId?: string; eventRosterMemberId?: string; entryId?: string };
+
+export type RivalHubReviewParticipant = {
+  steamId64: string;
+  nameSnapshot: string;
+  resolution: RivalHubReviewResolution;
+};
+
+export type RivalHubParticipantIdentity = RivalHubMatchedParticipant | RivalHubReviewParticipant;
+
 function normalize(value: string): string {
   return value.trim().toLocaleLowerCase();
 }
 
 /**
- * 用 remote lineup 的 Steam64 做唯一匹配。队名/昵称只用于展示与队伍方向校验，
- * 不参与身份回退；缺少成员、重复成员或队伍方向不明时直接交给 UI 处理。
+ * 用 remote lineup 的 Steam64 做唯一匹配，并以 RivalHub 返回的 canonical
+ * entryId 验证 Demo 的 observed team。Demo 自己的 teamKey 只表达观察方向，
+ * 不能反过来决定 canonical Entry 归属。
  */
 export function matchRivalHubParticipants(
   pkg: DemoPackage,
@@ -47,45 +61,130 @@ export function matchRivalHubParticipants(
   const packagePlayers = new Map(pkg.players.map((player) => [player.steamId64, player]));
   if (packagePlayers.size !== pkg.players.length) throw new Error("Demo 中存在重复 Steam64，暂不能自动提交");
   const identities = new Map<string, RivalHubMatchedParticipant>();
+  let teamACount = 0;
+  let teamBCount = 0;
   for (const remote of lineup) {
     const player = packagePlayers.get(remote.steamId64);
     if (!player) throw new Error(`Demo 缺少在线名单成员 ${remote.name}`);
-    const entryId = player.teamKey === "teamA" ? target.entryAId : player.teamKey === "teamB" ? target.entryBId : null;
-    if (!entryId) throw new Error(`Demo 选手 ${remote.name} 的队伍无法对应在线赛事`);
+    const expectedTeam = remote.entryId === target.entryAId
+      ? "teamA"
+      : remote.entryId === target.entryBId
+        ? "teamB"
+        : null;
+    if (!expectedTeam) throw new Error(`在线名单选手 ${remote.name} 不属于目标 Canonical Entry`);
+    if (player.teamKey !== expectedTeam) throw new Error(`Demo 选手 ${remote.name} 的队伍与 Canonical Entry 不一致`);
+    if (expectedTeam === "teamA") teamACount += 1;
+    else teamBCount += 1;
     if (identities.has(remote.steamId64)) throw new Error("在线名单存在重复 Steam64");
     identities.set(remote.steamId64, {
       steamId64: remote.steamId64,
       nameSnapshot: remote.name,
       userId: remote.userId,
       eventRosterMemberId: remote.eventRosterMemberId,
-      entryId,
+      entryId: remote.entryId,
     });
   }
   if (identities.size !== packagePlayers.size || [...packagePlayers.keys()].some((id) => !identities.has(id))) {
     throw new Error("Demo 选手集合与在线 Canonical MatchRoster 不一致");
   }
+  if (teamACount !== 5 || teamBCount !== 5) throw new Error("在线赛事缺少双方各 5 名可校验首发，暂不能自动提交");
   return identities;
+}
+
+/**
+ * 为唯一目标地图保留可审计的冲突 evidence。它不把不可信选手提升为
+ * matched；服务端会据此写入 needs_attention，而不是让批量导入提前丢弃冲突。
+ */
+export function matchRivalHubParticipantsForReview(
+  pkg: DemoPackage,
+  target: RivalHubEvidenceTarget,
+  lineup: RivalHubRemotePlayer[],
+): Map<string, RivalHubReviewParticipant> {
+  const remoteBySteam = new Map<string, RivalHubRemotePlayer>();
+  const duplicateSteam = new Set<string>();
+  for (const remote of lineup) {
+    if (remoteBySteam.has(remote.steamId64)) duplicateSteam.add(remote.steamId64);
+    else remoteBySteam.set(remote.steamId64, remote);
+  }
+  const entries: Array<[string, RivalHubReviewParticipant]> = pkg.players.map((player) => {
+    const remote = remoteBySteam.get(player.steamId64);
+    if (!remote) {
+      return [player.steamId64, {
+        steamId64: player.steamId64,
+        nameSnapshot: player.name,
+        resolution: { status: "unresolved" },
+      } satisfies RivalHubReviewParticipant];
+    }
+    const expectedTeam = remote.entryId === target.entryAId
+      ? "teamA"
+      : remote.entryId === target.entryBId
+        ? "teamB"
+        : null;
+    if (duplicateSteam.has(remote.steamId64) || expectedTeam !== player.teamKey) {
+      return [player.steamId64, {
+        steamId64: player.steamId64,
+        nameSnapshot: remote.name,
+        resolution: { status: "conflict", userId: remote.userId, eventRosterMemberId: remote.eventRosterMemberId, entryId: remote.entryId },
+      } satisfies RivalHubReviewParticipant];
+    }
+    return [player.steamId64, {
+      steamId64: remote.steamId64,
+      nameSnapshot: remote.name,
+      resolution: { status: "matched", userId: remote.userId, eventRosterMemberId: remote.eventRosterMemberId, entryId: remote.entryId },
+    } satisfies RivalHubReviewParticipant];
+  });
+  return new Map(entries);
 }
 
 export function selectRivalHubMap(
   pkg: DemoPackage,
   candidates: Array<{ series: { teamAName: string; teamBName: string }; map: RivalHubRemoteMap }>,
 ): { series: { teamAName: string; teamBName: string }; map: RivalHubRemoteMap } {
-  const demoTeams = [pkg.match.teamA.name ?? "Team A", pkg.match.teamB.name ?? "Team B"].map(normalize).sort();
-  const matches = candidates.filter(({ series, map }) => {
+  const evidenceTarget = (map: RivalHubRemoteMap): RivalHubEvidenceTarget => {
+    const { stageRunId, ...rest } = map.target;
+    return stageRunId == null ? rest : { ...rest, stageRunId };
+  };
+  const targetMatches = candidates.filter(({ map }) => {
     if (normalize(map.mapName) !== normalize(pkg.match.mapName)) return false;
-    const seriesTeams = [series.teamAName, series.teamBName].map(normalize).sort();
-    if (seriesTeams[0] !== demoTeams[0] || seriesTeams[1] !== demoTeams[1]) return false;
-    if (map.scoreA == null || map.scoreB == null) return true;
-    const sameDirection = normalize(series.teamAName) === normalize(pkg.match.teamA.name ?? "Team A");
-    const expectedA = sameDirection ? map.scoreA : map.scoreB;
-    const expectedB = sameDirection ? map.scoreB : map.scoreA;
-    return expectedA === pkg.match.teamA.score && expectedB === pkg.match.teamB.score;
+    if (normalize(map.target.expectedMapName) !== normalize(pkg.match.mapName)) return false;
+    if (map.target.matchMapId !== map.id || map.target.mapOrder !== map.order) return false;
+    return true;
   });
-  if (matches.length !== 1) {
-    throw new Error(matches.length === 0 ? "没有唯一匹配的在线赛事地图" : "在线赛事地图匹配不唯一，请选择目标地图");
+  const lineupMatches = targetMatches.filter(({ map }) => {
+    try {
+      // This verifies the canonical Steam64 set and every observed team side.
+      matchRivalHubParticipants(pkg, evidenceTarget(map), map.lineup);
+    } catch {
+      return false;
+    }
+    return true;
+  });
+  const strongMatches = lineupMatches.filter(({ map }) => {
+    if (map.scoreA != null && map.scoreB != null) {
+      if (pkg.match.teamA.score == null || pkg.match.teamB.score == null) return false;
+      if (map.scoreA !== pkg.match.teamA.score || map.scoreB !== pkg.match.teamB.score) return false;
+    }
+    return true;
+  });
+  if (strongMatches.length === 1) return strongMatches[0]!;
+  if (strongMatches.length > 1) {
+    // Display names are only a weak tie-break after canonical identity, map,
+    // target and official score evidence have already matched.
+    const namedMatches = strongMatches.filter(({ series }) =>
+      normalize(series.teamAName) === normalize(pkg.match.teamA.name ?? "Team A") &&
+      normalize(series.teamBName) === normalize(pkg.match.teamB.name ?? "Team B"),
+    );
+    if (namedMatches.length === 1) return namedMatches[0]!;
+    throw new Error("在线赛事地图匹配不唯一，请选择目标地图");
   }
-  return matches[0]!;
+
+  // A unique canonical lineup with a conflicting score is still submitted so
+  // RivalHub can persist the exact conflict as needs_attention.
+  if (lineupMatches.length === 1) return lineupMatches[0]!;
+  // If the lineup itself conflicts, a single target map is still reviewable;
+  // multiple target maps remain ambiguous and must not be guessed.
+  if (targetMatches.length === 1) return targetMatches[0]!;
+  throw new Error("在线赛事地图匹配不唯一，请选择目标地图");
 }
 
 export function fixtureTarget(): RivalHubEvidenceTarget {
@@ -109,7 +208,7 @@ export function fixtureIdentity(player: DemoPackage["players"][number], index: n
   };
 }
 
-function mappedSteam(pkg: DemoPackage, identities: Map<string, RivalHubMatchedParticipant>, playerIndex: number | null): string | null {
+function mappedSteam(pkg: DemoPackage, identities: Map<string, RivalHubParticipantIdentity>, playerIndex: number | null): string | null {
   if (playerIndex === null) return null;
   const player = pkg.players[playerIndex];
   return player ? identities.get(player.steamId64)?.steamId64 ?? null : null;
@@ -146,7 +245,7 @@ function teamConversions(pkg: DemoPackage) {
 export function buildRivalHubDemoEvidenceV1(
   pkg: DemoPackage,
   target: RivalHubEvidenceTarget,
-  identities: Map<string, RivalHubMatchedParticipant>,
+  identities: Map<string, RivalHubParticipantIdentity>,
 ): Record<string, unknown> {
   const demoSha256 = pkg.manifest.demo?.hash;
   if (!demoSha256 || !/^[a-f0-9]{64}$/.test(demoSha256)) {
@@ -213,7 +312,10 @@ export function buildRivalHubDemoEvidenceV1(
     quality: { qa: { ok: analysis.qa.ok, ...analysis.qa.summary }, capabilities: demoSourceAvailability(pkg) },
     participants: pkg.players.map((player) => {
       const identity = identities.get(player.steamId64)!;
-      return { steamId64: identity.steamId64, nameSnapshot: identity.nameSnapshot, observedTeamKey: player.teamKey, resolution: { status: "matched", userId: identity.userId, eventRosterMemberId: identity.eventRosterMemberId, entryId: identity.entryId } };
+      const resolution = "resolution" in identity
+        ? identity.resolution
+        : { status: "matched" as const, userId: identity.userId, eventRosterMemberId: identity.eventRosterMemberId, entryId: identity.entryId };
+      return { steamId64: identity.steamId64, nameSnapshot: identity.nameSnapshot, observedTeamKey: player.teamKey, resolution };
     }),
     sourceFacts: {
       rounds: pkg.rounds.map((row, index) => ({ roundSeq: index + 1, sourceRoundNumber: row.roundNumber, phase: row.roundNumber <= 24 ? "regulation" : "overtime", startTick: row.startTick, freezeEndTick: row.freezeEndTick, endTick: row.endTick, teamASide: row.teamASide, teamBSide: row.teamBSide, teamAScoreBefore: row.teamAScoreBefore, teamBScoreBefore: row.teamBScoreBefore, teamAEconomy: row.teamAEconomy, teamBEconomy: row.teamBEconomy, winnerTeamKey: row.winnerTeamKey, winnerSide: row.winnerSide, endReason: row.endReason })),

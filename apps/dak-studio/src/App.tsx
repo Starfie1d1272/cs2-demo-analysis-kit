@@ -44,7 +44,7 @@ import {
 } from "./lib/analysis-context";
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
 import { getPinnedPlayer } from "./lib/pin";
-import { buildRivalHubDemoEvidenceV1, matchRivalHubParticipants, selectRivalHubMap, type RivalHubEvidenceTarget } from "./lib/rivalhub-evidence";
+import { buildRivalHubDemoEvidenceV1, matchRivalHubParticipants, matchRivalHubParticipantsForReview, selectRivalHubMap, type RivalHubEvidenceTarget } from "./lib/rivalhub-evidence";
 import { connectRivalHub, fetchRivalHubEvents, loadRivalHubConnection, submitRivalHubEvidence, type RivalHubConnectionState } from "./lib/rivalhub";
 import type { OnlineImportContext } from "./views/EventsView";
 
@@ -380,30 +380,63 @@ export function App() {
   const importOnlineFiles = useCallback(async (files: Iterable<File>, context: OnlineImportContext) => {
     setImporting(true);
     setNotice("正在导入并分析在线赛事 Demo…");
+    const inputFiles = [...files];
     let synced = 0;
     let needsAttention = 0;
+    let failed = 0;
+    const failureMessages: string[] = [];
     try {
-      const importedEntries = await importFiles(files, [], []);
-      const remoteMaps = context.mapAssignments.filter((assignment) => assignment.rivalHub).map((assignment) => ({
+      let importedEntries: StudioDemoEntry[] = [];
+      try {
+        importedEntries = await importFiles(inputFiles, [], []);
+      } catch (error) {
+        failed = inputFiles.length;
+        failureMessages.push(error instanceof Error ? error.message : String(error));
+      }
+      setImporting(true);
+      failed += Math.max(inputFiles.length - importedEntries.length, 0);
+      const remoteMaps = context.candidates ?? context.mapAssignments.filter((assignment) => assignment.rivalHub).map((assignment) => ({
         series: context.series,
         map: assignment.rivalHub!,
       }));
-      if (remoteMaps.length === 0) throw new Error("当前在线系列赛没有可接收的地图");
-      for (const entry of importedEntries) {
-        const pkg = await getDemoPackage(entry.id);
-        const selected = selectRivalHubMap(pkg, remoteMaps);
-        const remoteMap = selected.map;
-        const { stageRunId, ...targetWithoutStageRun } = remoteMap.target;
-        const target: RivalHubEvidenceTarget = stageRunId ? { ...targetWithoutStageRun, stageRunId } : targetWithoutStageRun;
-        const identities = matchRivalHubParticipants(pkg, target, remoteMap.lineup);
-        const evidence = buildRivalHubDemoEvidenceV1(pkg, target, identities);
-        const demoSha256 = pkg.manifest.demo?.hash ?? entry.id;
-        const result = await submitRivalHubEvidence(evidence, `dak:${remoteMap.id}:${demoSha256}`);
-        if (result.status === "synced") synced += 1;
-        else needsAttention += 1;
+      if (remoteMaps.length === 0) {
+        failed += importedEntries.length;
+        failureMessages.push("当前在线赛事范围没有可接收的地图");
+      } else {
+        for (const entry of importedEntries) {
+          try {
+            const pkg = await getDemoPackage(entry.id);
+            const selected = selectRivalHubMap(pkg, remoteMaps);
+            const remoteMap = selected.map;
+            const { stageRunId, ...targetWithoutStageRun } = remoteMap.target;
+            const target: RivalHubEvidenceTarget = stageRunId ? { ...targetWithoutStageRun, stageRunId } : targetWithoutStageRun;
+            let identities;
+            try {
+              identities = matchRivalHubParticipants(pkg, target, remoteMap.lineup);
+            } catch {
+              identities = matchRivalHubParticipantsForReview(pkg, target, remoteMap.lineup);
+            }
+            const evidence = buildRivalHubDemoEvidenceV1(pkg, target, identities);
+            const demoSha256 = pkg.manifest.demo?.hash ?? entry.id;
+            const result = await submitRivalHubEvidence(evidence, `dak:${remoteMap.id}:${demoSha256}`);
+            if (result.status === "synced") synced += 1;
+            else needsAttention += 1;
+          } catch (error) {
+            failed += 1;
+            failureMessages.push(`${entry.fileName}: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }
       }
-      await refreshRivalHub();
-      const status = [synced > 0 ? `已同步 ${synced} 场` : "", needsAttention > 0 ? `${needsAttention} 场需要处理` : ""].filter(Boolean).join("，");
+      try {
+        await refreshRivalHub();
+      } catch (error) {
+        failureMessages.push(`刷新 RivalHub 赛事失败：${error instanceof Error ? error.message : String(error)}`);
+      }
+      const status = [
+        synced > 0 ? `已同步 ${synced} 场` : "",
+        needsAttention > 0 ? `${needsAttention} 场需要处理` : "",
+        failed > 0 ? `失败 ${failed} 场${failureMessages[0] ? `（${failureMessages[0]}）` : ""}` : "",
+      ].filter(Boolean).join("，");
       setNotice(status || "Demo 已导入本地资料库，但没有形成可提交的证据");
     } catch (error) {
       setNotice(`在线 Demo 处理失败：${error instanceof Error ? error.message : String(error)}`);
