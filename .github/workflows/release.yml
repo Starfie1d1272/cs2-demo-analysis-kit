@@ -373,6 +373,7 @@ jobs:
 
       - uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
           files: |
             dist/*.dmg
             dist/*.zip
