@@ -340,11 +340,20 @@ jobs:
           echo "R2 上传完成"
 
       - name: Verify R2 release manifests
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: |
           set -euo pipefail
           export VERSION="${RELEASE_TAG#v}"
-          curl -fsSL "https://dakupdate.starfie1d.top/releases/latest.json?run=${GITHUB_RUN_ID}" -o latest.json
-          curl -fsSL "https://dakupdate.starfie1d.top/releases/install-manifest.json?run=${GITHUB_RUN_ID}" -o install-manifest.json
+          TAG="v${VERSION}"
+          aws s3 cp "s3://${R2_BUCKET}/releases/latest.json" latest.json --endpoint-url "$R2_ENDPOINT"
+          aws s3 cp "s3://${R2_BUCKET}/releases/install-manifest.json" install-manifest.json --endpoint-url "$R2_ENDPOINT"
           node - <<'NODE'
           const fs = require("fs");
           const latest = JSON.parse(fs.readFileSync("latest.json", "utf8"));
@@ -358,8 +367,7 @@ jobs:
           }
           console.log("manifest metadata OK");
           NODE
-          URL="$(node -p "require('./latest.json').assets.windows.urls[0]")"
-          curl -fsSL "$URL" -o dak-runtime.zip
+          aws s3 cp "s3://${R2_BUCKET}/releases/${TAG}/dak-studio-windows-${VERSION}.zip" dak-runtime.zip --endpoint-url "$R2_ENDPOINT"
           node - <<'NODE'
           const fs = require("fs");
           const crypto = require("crypto");
