@@ -72,6 +72,9 @@ Changesets 管理的公共包。
    再从 `main` 手动 dispatch **Release** 并输入该既有 `vX.Y.Z` tag 安全重试；不得移动、
    删除或重新指向该 tag。
 
+   `.tri` 碰撞几何由独立资产发布路径维护。桌面版 release 复用已发布 R2 manifest，
+   不在每次应用发版时重新生成或上传；客户端按需下载，缺失时按既有能力提示降级。
+
 6. 发布后无需额外通知。Release CI 会随产物生成 `latest.json` 更新 manifest，
    同时发到 GitHub Release **并上传到 Cloudflare R2**
    （`R2_*` secrets，`aws s3 cp --endpoint-url`）。DAK Studio 启动时按
