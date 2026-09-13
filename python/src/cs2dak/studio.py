@@ -25,6 +25,7 @@ import re
 import shutil
 import socket
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import threading
@@ -32,6 +33,7 @@ import time
 import urllib.parse
 import urllib.request
 import uuid
+import webbrowser
 import zipfile
 from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -67,6 +69,9 @@ _BETA_MANIFEST_URLS = [
     "https://dakupdate.starfie1d.top/releases/beta/latest.json",
 ]
 _MANIFEST_TIMEOUT_S = 8
+
+RIVALHUB_CREDENTIAL_SERVICE = "com.starfie1d.dak-studio.rivalhub"
+RIVALHUB_CREDENTIAL_ACCOUNT = "access-token"
 
 
 def _version_tuple(v: str) -> tuple[int, ...]:
@@ -554,6 +559,65 @@ class StudioApi:
                 (namespace, prefix, prefix),
             )
             self._conn().commit()
+
+    # --- RivalHub connection ------------------------------------------
+    # The access token never enters the SQLite records table. On macOS the
+    # native bridge delegates storage to Keychain; browser/dev mode keeps it
+    # only in the frontend process memory.
+    @staticmethod
+    def _valid_rivalhub_credential_key(service: str, account: str) -> bool:
+        return service == RIVALHUB_CREDENTIAL_SERVICE and account == RIVALHUB_CREDENTIAL_ACCOUNT
+
+    def rivalhub_open_external_url(self, url: str) -> bool:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
+            return False
+        try:
+            return bool(webbrowser.open(url, new=0, autoraise=True))
+        except OSError:
+            return False
+
+    def rivalhub_credential_get(self, service: str, account: str) -> str | None:
+        if sys.platform != "darwin" or not self._valid_rivalhub_credential_key(service, account):
+            return None
+        try:
+            result = subprocess.run(
+                ["/usr/bin/security", "find-generic-password", "-s", service, "-a", account, "-w"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError:
+            return None
+        return result.stdout.rstrip("\r\n") if result.returncode == 0 else None
+
+    def rivalhub_credential_set(self, service: str, account: str, value: str) -> bool:
+        if sys.platform != "darwin" or not self._valid_rivalhub_credential_key(service, account) or not value:
+            return False
+        try:
+            result = subprocess.run(
+                ["/usr/bin/security", "add-generic-password", "-U", "-s", service, "-a", account, "-w", value],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError:
+            return False
+        return result.returncode == 0
+
+    def rivalhub_credential_delete(self, service: str, account: str) -> bool:
+        if sys.platform != "darwin" or not self._valid_rivalhub_credential_key(service, account):
+            return False
+        try:
+            result = subprocess.run(
+                ["/usr/bin/security", "delete-generic-password", "-s", service, "-a", account],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError:
+            return False
+        return result.returncode == 0
 
     def _blob_dir(self, namespace: str) -> Path:
         if namespace == "demos":

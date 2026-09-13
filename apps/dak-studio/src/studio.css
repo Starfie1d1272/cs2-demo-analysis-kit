@@ -1929,6 +1929,64 @@ body {
   font-weight: 500;
 }
 
+.stu-rivalhub-connection {
+  display: grid;
+  gap: 8px;
+  min-width: min(420px, 100%);
+  padding: 10px 12px;
+  border: 1px solid var(--dak-border);
+  border-radius: var(--stu-radius);
+  background: var(--dak-bg-subtle);
+}
+
+.stu-rivalhub-connection-row,
+.stu-rivalhub-connection-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stu-rivalhub-connection-row small { color: var(--dak-fg-dim); }
+.stu-rivalhub-connection-actions input {
+  min-width: 0;
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--dak-border-hi);
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-bg);
+  color: var(--dak-fg);
+  font: 12px var(--stu-mono, ui-monospace, monospace);
+}
+.stu-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dak-fg-dim);
+}
+.stu-status-dot-ok { background: var(--dak-ok); }
+.stu-error-text { color: var(--dak-danger); }
+.stu-online-map-status { display: flex; flex-wrap: wrap; gap: 8px; }
+.stu-online-map-status-item { display: grid; gap: 4px; }
+.stu-online-issue { max-width: 420px; color: var(--dak-fg-dim); font-size: 11px; }
+.stu-online-issue summary { cursor: pointer; color: var(--dak-danger); }
+.stu-online-issue ul { margin: 4px 0; padding-left: 18px; }
+.stu-online-drop-zone {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px dashed color-mix(in srgb, var(--dak-accent) 55%, var(--dak-border));
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-accent-soft);
+  color: var(--dak-fg-mid);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.stu-online-drop-zone:hover,
+.stu-online-drop-zone:focus-visible {
+  border-color: var(--dak-accent);
+  color: var(--dak-fg);
+}
+
 @media (max-width: 900px) {
   .stu-event-directory {
     grid-template-columns: minmax(0, 1fr);
@@ -1942,6 +2000,8 @@ body {
   .stu-event-list-label {
     grid-column: 1 / -1;
   }
+
+  .stu-rivalhub-connection { min-width: 0; }
 }
 
 /* 机制画像武器卡：击杀数前 6 + 其他，真实武器名 */

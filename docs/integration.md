@@ -56,18 +56,19 @@ RivalHub（发布：公开排行榜 / 嵌入官网 / 赛事页）
 - **算力留在本地**（符合 local-first + AGPL），**只有协作/索引/发布上云**。
 - RivalHub **不在 Vercel 端跑分析**，而是消费 DAK 产出的 JSON artifact。
 
-### Phase 1（短期）：数据 API 接缝
+### 当前接缝：RivalHub 赛事目录与 Demo Evidence V1
 
-定义两个版本化契约：
+当前 #268 接缝仍是数据接缝，不把 RivalHub shell 或 DAK 分析算法搬进另一仓库：
 
 | 端点 | 方向 | 载荷 |
 |---|---|---|
-| `GET /api/season/{slug}/export` | RivalHub → DAK | matches 元数据 + roster + identityMap（JSON） |
-| `POST /api/season/{slug}/analysis` | DAK → RivalHub | AnalysisBundle / player-card artifact（带 `analysisVersion`） |
+| `POST /api/integrations/dak/pairing/start` + `POST .../poll` | DAK Studio ↔ RivalHub | 系统浏览器一次性授权后返回可撤销设备 credential |
+| `GET /api/integrations/dak/events` | RivalHub → DAK Studio | season/event、stage、CompetitionEntry、Canonical MatchRoster、match/map/series/veto、revision 与 Demo 状态 |
+| `POST /api/integrations/dak/evidence` | DAK Studio → RivalHub | `rivalhub-demo-evidence/1`；服务端硬校验、幂等、不可变 artifact、SQL projection 与 audit |
 
-- DAK 侧消费 ① 的 identityMap 直接喂 `buildSeasonCohort`，无需 RivalHub 重建聚合。
-- ② 的 artifact 是版本化只读产物；RivalHub 存档并渲染，不反推、不改算法。
-- 主办方/赛事产品化（报告自动发布、选手图卡、嵌入官网）即是这两个 API 的产品化。
+DAK Studio 复用现有一级 `赛事` / `EventsView`，把在线 RivalHub 事件排在本地事件之前；连接后只手动刷新，断开时保留并标记缓存过期。在线地图上下文直接进入现有 `.dem → cs2-demo-format/3.x → @cs2dak/core` 导入链，支持单个或批量 Demo。身份匹配只接受 Steam64 与 Canonical MatchRoster 的稳定对应，不能用昵称回退；匹配不唯一时交给用户处理。
+
+RivalHub 只拥有 target、赛事/名单身份、revision、算术/交叉校验、持久化、投影与审计；DAK 只拥有 Demo QA、round/KDA/damage/HS/KAST/opening/trade/clutch/utility/weapon 与 conversion 语义。正常提交不需要管理员二次点击；可选 Broadcast/OCR 缺失不阻塞，冲突进入轻量 needs-attention。原始 `.dem` 永不上传，长期 token 不进入 Studio 普通记录存储。
 
 ### Phase 2（长期）：选择性包/组件共享
 

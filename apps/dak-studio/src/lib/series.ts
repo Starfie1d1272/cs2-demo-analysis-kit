@@ -4,6 +4,7 @@ import { ACTIVE_DUTY_MAPS } from "@cs2dak/maps";
 import { entryDate, type StudioDemoEntry } from "./library";
 import { displayTeamName } from "./identity";
 import { getStorage, type RecordStore } from "./storage";
+import type { RivalHubRemoteMap } from "./rivalhub-contract";
 
 /** BP 录入默认图池：CS2 现役 7 张（de_ 形式，与 entry.meta.mapName 对齐）。 */
 export const SERIES_MAP_POOL: string[] = [...ACTIVE_DUTY_MAPS];
@@ -37,7 +38,21 @@ export interface StudioSeriesRecord {
   teamBRecordBefore?: string | null;
   scheduledAt?: string | null;
   completedAt?: string | null;
-  mapAssignments?: Array<{ order: number; mapName: string; entryId: string | null }>;
+  mapAssignments?: Array<{
+    order: number;
+    mapName: string;
+    entryId: string | null;
+    /** Remote map snapshot; local entry linkage remains independently editable/retained. */
+    rivalHub?: RivalHubRemoteMap;
+  }>;
+  rivalHub?: {
+    seasonId: string;
+    matchId: string;
+    stageRunId: string | null;
+    entryAId: string;
+    entryBId: string;
+    revision: string;
+  };
   createdAt: number;
   updatedAt: number;
 }
