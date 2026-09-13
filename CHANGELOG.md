@@ -4,6 +4,18 @@ DAK Studio 桌面应用及 `@cs2dak/*` 分析管道面向用户的变更记录�
 
 > 0.1.3 起面向 Studio 用户维护。`@cs2dak/*` npm 包版本由 changesets 独立管理（见各包的 CHANGELOG.md）；本文件聚焦 DAK Studio 桌面应用变更。
 
+## [0.8.1] — 2026-09-14
+
+### 新增
+
+- **RivalHub 在线赛事与 Demo 同步**：DAK Studio 可通过浏览器设备配对读取授权赛事，并在 Event / Stage / Series 范围导入单个或批量 Demo，自动匹配官方 MatchMap 后提交 Demo Evidence；原始 `.dem` 不会上传。
+- **受控赛果回写**：同步会按官方阵容、地图、比分和可选 OCR 证据校验；无法可靠匹配的 Demo 保持待人工处理，批量任务中单个失败不会阻断其余文件。
+
+### 修复 / 变更
+
+- **在线同步可靠性与安全性**：配对凭据改由 macOS Keychain 或 Windows Credential Manager 保存；撤销设备后在线赛事缓存会标记为过期。重试会复用相同 Evidence 请求的幂等身份，官方上下文更新后可重新生成并提交同一 Demo 的新证据版本。
+- **赛果归属与展示**：按 Steam64 与官方 roster 识别队伍正反方向，保留 Demo 中实际观察到的选手昵称；地图级状态不再把整场比赛状态误投到每一张地图。
+
 ## [0.8.0] — 2026-07-13
 
 ### 新增
