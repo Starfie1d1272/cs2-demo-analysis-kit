@@ -10,6 +10,7 @@ import { normalizeDemoPackage } from "./normalize.js";
 import { loadSpatialAssets } from "./spatial/annotate.js";
 import { buildOfficialMapControl } from "./spatial/mapcontrol.js";
 import { createResolverFromPackage, type PlayerResolver } from "./resolve.js";
+import { buildPlayerRoundUtilityFacts } from "./utility-facts.js";
 import {
   type BuyDeltaBuckets,
   type ManStateBuckets,
@@ -38,7 +39,7 @@ export function deriveRRSignals(input: unknown): RRSignals[] {
   const killsByManState = buildKillsByManState(pkg, resolver);
   const tradedOpeningDeaths = buildTradedOpeningDeaths(pkg, resolver);
   const objective = buildObjectiveSignals(pkg, resolver);
-  const utility = buildUtilitySignals(pkg, statsMap, resolver);
+  const utility = buildUtilitySignals(pkg, statsMap);
 
   const buyDeltaAvailable = pkg.playerEconomies.length > 0;
   const manStateAvailable = pkg.rounds.length > 0;
@@ -238,46 +239,31 @@ function buildObjectiveSignals(pkg: DemoPackage, resolver: PlayerResolver): Map<
   return out;
 }
 
-function buildUtilitySignals(pkg: DemoPackage, statsMap: Map<number, DemoPackage["playerStats"][number]>, resolver: PlayerResolver): Map<string, UtilityBuckets> {
-  const out = new Map<string, UtilityBuckets>();
-
-  pkg.players.forEach((player, playerIdx) => {
-    const stats = statsMap.get(playerIdx);
-    out.set(player.steamId64, {
-      flashAssists: stats?.flashAssistCount ?? pkg.kills.filter((kill) => kill.flashAssisterIndex === playerIdx).length,
-      effectiveEnemyFlashSeconds: stats?.enemyFlashDurationSeconds ?? 0,
-      teamFlashSuppressionSeconds: stats?.teamFlashDurationSeconds ?? 0,
-      smokeProtectedCrossings: null,
-      smokeSightlineDenialSeconds: null,
-      smokeIsolationSeconds: null,
-      incendiaryPathDelayUnits: null,
-      incendiaryDisplacementEvents: null,
-      utilityDamage: stats?.utilityDamage ?? 0
-    });
-  });
-
-  for (const blind of pkg.blinds) {
-    const flasherPlayer = resolver.byIndexOrNull(blind.flasherIndex);
-    if (!flasherPlayer) continue;
-    const buckets = getOrInit(out, flasherPlayer.steamId64, () => ({
-      flashAssists: 0,
-      effectiveEnemyFlashSeconds: 0,
-      teamFlashSuppressionSeconds: 0,
-      smokeProtectedCrossings: null,
-      smokeSightlineDenialSeconds: null,
-      smokeIsolationSeconds: null,
-      incendiaryPathDelayUnits: null,
-      incendiaryDisplacementEvents: null,
-      utilityDamage: 0
-    }));
-    const flashedPlayer = resolver.byIndexOrNull(blind.flashedIndex);
-    if (!flashedPlayer) continue;
-    if (flasherPlayer.teamKey !== flashedPlayer.teamKey) {
-      buckets.effectiveEnemyFlashSeconds = round((buckets.effectiveEnemyFlashSeconds ?? 0) + blind.durationSeconds, 3);
-    } else if (blind.flashedIndex !== blind.flasherIndex) {
-      buckets.teamFlashSuppressionSeconds = round((buckets.teamFlashSuppressionSeconds ?? 0) + blind.durationSeconds, 3);
-    }
+function buildUtilitySignals(pkg: DemoPackage, statsMap: Map<number, DemoPackage["playerStats"][number]>): Map<string, UtilityBuckets> {
+  const utilityFacts = buildPlayerRoundUtilityFacts(pkg);
+  const totals = new Map<string, { flashAssists: number; enemyBlindSeconds: number; teamBlindSeconds: number; utilityDamage: number }>();
+  for (const fact of utilityFacts) {
+    const total = totals.get(fact.steamId64) ?? { flashAssists: 0, enemyBlindSeconds: 0, teamBlindSeconds: 0, utilityDamage: 0 };
+    total.flashAssists += fact.flashAssists;
+    total.enemyBlindSeconds += fact.enemyBlindSeconds;
+    total.teamBlindSeconds += fact.teamBlindSeconds;
+    total.utilityDamage += fact.utilityDamage;
+    totals.set(fact.steamId64, total);
   }
 
-  return out;
+  return new Map(pkg.players.map((player, playerIdx) => {
+    const stats = statsMap.get(playerIdx);
+    const fact = totals.get(player.steamId64) ?? { flashAssists: 0, enemyBlindSeconds: 0, teamBlindSeconds: 0, utilityDamage: 0 };
+    return [player.steamId64, {
+      flashAssists: stats?.flashAssistCount ?? fact.flashAssists,
+      effectiveEnemyFlashSeconds: stats?.enemyFlashDurationSeconds ?? round(fact.enemyBlindSeconds, 3),
+      teamFlashSuppressionSeconds: stats?.teamFlashDurationSeconds ?? round(fact.teamBlindSeconds, 3),
+      smokeProtectedCrossings: null,
+      smokeSightlineDenialSeconds: null,
+      smokeIsolationSeconds: null,
+      incendiaryPathDelayUnits: null,
+      incendiaryDisplacementEvents: null,
+      utilityDamage: stats?.utilityDamage ?? fact.utilityDamage
+    } satisfies UtilityBuckets];
+  }));
 }

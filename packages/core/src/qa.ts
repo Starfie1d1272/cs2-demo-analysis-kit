@@ -3,6 +3,11 @@ import { isNamedWeapon, normalizeWeapon, round } from "./utils.js";
 
 export type ScoreboardFieldAvailability = PlayerScoreboardRow["fieldAvailability"];
 
+export type DemoSourceAvailability = ScoreboardFieldAvailability & {
+  utility: "available";
+  clutches: "available";
+};
+
 export function buildQaReport(pkg: DemoPackage): QaReport {
   const issues: QaIssue[] = [];
   const roundNumbers = pkg.rounds.map((round) => round.roundNumber).sort((a, b) => a - b);
@@ -177,13 +182,32 @@ export function buildQaReport(pkg: DemoPackage): QaReport {
 }
 
 export function fieldAvailability(pkg: DemoPackage): ScoreboardFieldAvailability {
+  const availability = demoSourceAvailability(pkg);
   return {
-    playerStats: pkg.playerStats.length > 0 ? "available" : "missing",
-    economy: pkg.playerEconomies.length > 0 ? "available" : "missing",
-    rounds: pkg.rounds.length > 0 ? "available" : "missing",
+    playerStats: availability.playerStats,
+    economy: availability.economy,
+    rounds: availability.rounds,
+    richKills: availability.richKills,
+    damages: availability.damages,
+    bombs: availability.bombs,
+  };
+}
+
+/**
+ * Source capability is determined by the validated v3 contract, never by
+ * whether a particular match happened to produce an event. The loader rejects
+ * absent required files before this function can run.
+ */
+export function demoSourceAvailability(pkg: DemoPackage): DemoSourceAvailability {
+  return {
+    playerStats: "available",
+    economy: "available",
+    rounds: "available",
     richKills: richKillAvailability(pkg),
-    damages: pkg.damages.length > 0 ? "available" : "missing",
-    bombs: pkg.bombs.length > 0 ? "available" : "missing"
+    damages: "available",
+    bombs: "available",
+    utility: "available",
+    clutches: "available",
   };
 }
 
@@ -200,7 +224,8 @@ export function fieldConfidence(availability: ScoreboardFieldAvailability): numb
 }
 
 function richKillAvailability(pkg: DemoPackage): ScoreboardFieldAvailability["richKills"] {
-  if (pkg.kills.length === 0) return "missing";
+  // A legal empty kills.json is an observed zero, not an unavailable source.
+  if (pkg.kills.length === 0) return "available";
   const hasFlags = pkg.kills.some((kill) => "throughSmoke" in kill && "noScope" in kill && "penetratedObjects" in kill);
   const activeWeaponsAreNames = pkg.kills.some((kill) => kill.killerActiveWeapon && isNamedWeapon(normalizeWeapon(kill.killerActiveWeapon)));
   if (hasFlags && activeWeaponsAreNames) return "available";

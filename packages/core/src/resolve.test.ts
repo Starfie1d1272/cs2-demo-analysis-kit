@@ -68,4 +68,33 @@ describe("loadDemoPackageFromZip version gate", () => {
     const bytes = await zip.generateAsync({ type: "uint8array" });
     await expect(loadDemoPackageFromZip(bytes)).rejects.toThrow(/不支持的包版本/);
   });
+
+  it("does not treat a missing v3 required source file as an empty event array", async () => {
+    const zip = new JSZip();
+    zip.file("manifest.json", JSON.stringify({
+      schemaVersion: "cs2-demo-format/3.0",
+      exporter: { name: "test", version: "0" },
+      parser: { name: "test", version: "0" },
+      demo: { hash: null, sourceFileName: null },
+      mapName: "de_mirage",
+      tickrate: 64,
+      exportedAt: "2026-01-01T00:00:00Z",
+      files: {
+        match: "match.json",
+        players: "players.json",
+        rounds: "rounds.json",
+        playerStats: "player-stats.json",
+        playerEconomies: "player-economies.json",
+        kills: "kills.json",
+        damages: "damages.json",
+        blinds: "blinds.json",
+        bombs: "bombs.json",
+        grenades: "grenades.json",
+        clutches: "clutches.json",
+      },
+    }));
+    for (const file of ["match.json", "players.json", "rounds.json", "player-economies.json"]) zip.file(file, "{}");
+    const bytes = await zip.generateAsync({ type: "uint8array" });
+    await expect(loadDemoPackageFromZip(bytes)).rejects.toThrow(/Missing player-stats\.json/);
+  });
 });
