@@ -68,6 +68,10 @@ Changesets 管理的公共包。
    `dak-studio-windows-X.Y.Z-full.zip`、`dak-studio-windows-X.Y.Z.zip`。
    纯导出器 cs2dak 不进 Release。
 
+   若已发布 tag 的 Release workflow 因流水线故障失败，先通过普通 PR 修复 workflow，
+   再从 `main` 手动 dispatch **Release** 并输入该既有 `vX.Y.Z` tag 安全重试；不得移动、
+   删除或重新指向该 tag。
+
 6. 发布后无需额外通知。Release CI 会随产物生成 `latest.json` 更新 manifest，
    同时发到 GitHub Release **并上传到 Cloudflare R2**
    （`R2_*` secrets，`aws s3 cp --endpoint-url`）。DAK Studio 启动时按
