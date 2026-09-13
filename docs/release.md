@@ -69,8 +69,8 @@ Changesets 管理的公共包。
    纯导出器 cs2dak 不进 Release。
 
    若已发布 tag 的 Release workflow 因流水线故障失败，先通过普通 PR 修复 workflow，
-   再从 `main` 手动 dispatch **Release** 并输入该既有 `vX.Y.Z` tag 安全重试；不得移动、
-   删除或重新指向该 tag。
+   再从 `main` 手动 dispatch **Release** 并输入该既有 `vX.Y.Z` tag 安全重试；工作流会显式
+   用该输入创建/更新对应 GitHub Release。不得移动、删除或重新指向该 tag。
 
    `.tri` 碰撞几何由独立资产发布路径维护。桌面版 release 复用已发布 R2 manifest，
    不在每次应用发版时重新生成或上传；客户端按需下载，缺失时按既有能力提示降级。
