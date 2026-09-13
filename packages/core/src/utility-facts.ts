@@ -1,5 +1,5 @@
 import type { DemoPackage } from "@cs2dak/contract";
-import { isUtilityWeapon, normalizeWeapon } from "./utils.js";
+import { activeDamages, isUtilityWeapon, normalizeWeapon } from "./utils.js";
 
 /**
  * 每位选手、每回合的低维道具 sufficient facts。
@@ -53,6 +53,7 @@ function emptyFact(): MutableUtilityFact {
 /** Returns one row for every known player and round, including real zeroes. */
 export function buildPlayerRoundUtilityFacts(pkg: DemoPackage): PlayerRoundUtilityFact[] {
   const rows = new Map<string, MutableUtilityFact>();
+  const damages = activeDamages(pkg);
   const keyFor = (roundNumber: number, playerIndex: number) => `${roundNumber}:${playerIndex}`;
   const factFor = (roundNumber: number, playerIndex: number): MutableUtilityFact | null => {
     if (!pkg.players[playerIndex]) return null;
@@ -92,7 +93,7 @@ export function buildPlayerRoundUtilityFacts(pkg: DemoPackage): PlayerRoundUtili
     }
   }
 
-  for (const damage of pkg.damages) {
+  for (const damage of damages) {
     if (damage.attackerIndex === null) continue;
     const attacker = pkg.players[damage.attackerIndex];
     const victim = pkg.players[damage.victimIndex];

@@ -38,4 +38,18 @@ describe("buildPlayerRoundUtilityFacts", () => {
       expect(totals.flashAssists).toBe(stats.flashAssistCount);
     }
   });
+
+  it("uses the same active round window as core damage facts", async () => {
+    const pkg = await fixture();
+    const firstRound = pkg.rounds[0]!;
+    const sourceDamage = pkg.damages[0]!;
+    const withFreezeDamage = {
+      ...pkg,
+      damages: [...pkg.damages, { ...sourceDamage, roundNumber: firstRound.roundNumber, tick: firstRound.freezeEndTick - 1 }],
+    };
+    const baseline = buildPlayerRoundUtilityFacts(pkg);
+    const actual = buildPlayerRoundUtilityFacts(withFreezeDamage);
+
+    expect(actual).toEqual(baseline);
+  });
 });
