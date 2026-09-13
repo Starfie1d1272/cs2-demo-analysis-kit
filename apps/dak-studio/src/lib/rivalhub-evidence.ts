@@ -5,7 +5,7 @@ import {
   buildTeamSideWinRates,
   demoSourceAvailability,
 } from "../../../../packages/core/src/index";
-import type { DemoPackage } from "../../../../packages/contract/src/index";
+import type { DemoPackage, TeamKey } from "../../../../packages/contract/src/index";
 import { buildTournamentInsightsFromFacts, extractTournamentFacts } from "../../../../packages/presentation/src/index";
 import type { RivalHubRemoteMap, RivalHubRemotePlayer } from "./rivalhub-contract";
 
@@ -21,6 +21,8 @@ export type RivalHubEvidenceTarget = {
   expectedMapName: string;
   evidenceRevision: string;
 };
+
+export type RivalHubTeamOrientation = "direct" | "reversed";
 
 export type RivalHubMatchedParticipant = {
   steamId64: string;
@@ -47,38 +49,71 @@ function normalize(value: string): string {
   return value.trim().toLocaleLowerCase();
 }
 
+function entryForDemoTeam(target: RivalHubEvidenceTarget, teamKey: TeamKey, orientation: RivalHubTeamOrientation): string {
+  if (orientation === "direct") return teamKey === "teamA" ? target.entryAId : target.entryBId;
+  return teamKey === "teamA" ? target.entryBId : target.entryAId;
+}
+
+function inferTeamOrientation(
+  pkg: DemoPackage,
+  target: RivalHubEvidenceTarget,
+  remoteBySteam: Map<string, RivalHubRemotePlayer>,
+): RivalHubTeamOrientation | null {
+  let directVotes = 0;
+  let reversedVotes = 0;
+  for (const player of pkg.players) {
+    const remote = remoteBySteam.get(player.steamId64);
+    if (!remote) continue;
+    if (remote.entryId === entryForDemoTeam(target, player.teamKey, "direct")) directVotes += 1;
+    if (remote.entryId === entryForDemoTeam(target, player.teamKey, "reversed")) reversedVotes += 1;
+  }
+  if (directVotes === 0 && reversedVotes === 0) return null;
+  if (directVotes === reversedVotes) return null;
+  return directVotes > reversedVotes ? "direct" : "reversed";
+}
+
+function remoteLineupBySteam(lineup: RivalHubRemotePlayer[]): {
+  remoteBySteam: Map<string, RivalHubRemotePlayer>;
+  duplicateSteam: Set<string>;
+} {
+  const remoteBySteam = new Map<string, RivalHubRemotePlayer>();
+  const duplicateSteam = new Set<string>();
+  for (const remote of lineup) {
+    if (remoteBySteam.has(remote.steamId64)) duplicateSteam.add(remote.steamId64);
+    else remoteBySteam.set(remote.steamId64, remote);
+  }
+  return { remoteBySteam, duplicateSteam };
+}
+
 /**
  * 用 remote lineup 的 Steam64 做唯一匹配，并以 RivalHub 返回的 canonical
  * entryId 验证 Demo 的 observed team。Demo 自己的 teamKey 只表达观察方向，
  * 不能反过来决定 canonical Entry 归属。
  */
-export function matchRivalHubParticipants(
+export function resolveRivalHubParticipants(
   pkg: DemoPackage,
   target: RivalHubEvidenceTarget,
   lineup: RivalHubRemotePlayer[],
-): Map<string, RivalHubMatchedParticipant> {
+): { identities: Map<string, RivalHubMatchedParticipant>; orientation: RivalHubTeamOrientation } {
   if (lineup.length !== 10) throw new Error("在线赛事缺少双方各 5 名可校验首发，暂不能自动提交");
   const packagePlayers = new Map(pkg.players.map((player) => [player.steamId64, player]));
   if (packagePlayers.size !== pkg.players.length) throw new Error("Demo 中存在重复 Steam64，暂不能自动提交");
+  if (pkg.players.filter((player) => player.teamKey === "teamA").length !== 5 || pkg.players.filter((player) => player.teamKey === "teamB").length !== 5) {
+    throw new Error("Demo 缺少双方各 5 名可校验选手，暂不能自动提交");
+  }
+  const { remoteBySteam, duplicateSteam } = remoteLineupBySteam(lineup);
+  if (duplicateSteam.size > 0) throw new Error("在线名单存在重复 Steam64");
+  const orientation = inferTeamOrientation(pkg, target, remoteBySteam);
+  if (!orientation) throw new Error("无法从 Canonical Entry 确定 Demo 队伍方向");
   const identities = new Map<string, RivalHubMatchedParticipant>();
-  let teamACount = 0;
-  let teamBCount = 0;
   for (const remote of lineup) {
     const player = packagePlayers.get(remote.steamId64);
     if (!player) throw new Error(`Demo 缺少在线名单成员 ${remote.name}`);
-    const expectedTeam = remote.entryId === target.entryAId
-      ? "teamA"
-      : remote.entryId === target.entryBId
-        ? "teamB"
-        : null;
-    if (!expectedTeam) throw new Error(`在线名单选手 ${remote.name} 不属于目标 Canonical Entry`);
-    if (player.teamKey !== expectedTeam) throw new Error(`Demo 选手 ${remote.name} 的队伍与 Canonical Entry 不一致`);
-    if (expectedTeam === "teamA") teamACount += 1;
-    else teamBCount += 1;
-    if (identities.has(remote.steamId64)) throw new Error("在线名单存在重复 Steam64");
+    const expectedEntryId = entryForDemoTeam(target, player.teamKey, orientation);
+    if (remote.entryId !== expectedEntryId) throw new Error(`Demo 选手 ${remote.name} 的队伍与 Canonical Entry 不一致`);
     identities.set(remote.steamId64, {
       steamId64: remote.steamId64,
-      nameSnapshot: remote.name,
+      nameSnapshot: player.name,
       userId: remote.userId,
       eventRosterMemberId: remote.eventRosterMemberId,
       entryId: remote.entryId,
@@ -87,25 +122,28 @@ export function matchRivalHubParticipants(
   if (identities.size !== packagePlayers.size || [...packagePlayers.keys()].some((id) => !identities.has(id))) {
     throw new Error("Demo 选手集合与在线 Canonical MatchRoster 不一致");
   }
-  if (teamACount !== 5 || teamBCount !== 5) throw new Error("在线赛事缺少双方各 5 名可校验首发，暂不能自动提交");
-  return identities;
+  return { identities, orientation };
+}
+
+export function matchRivalHubParticipants(
+  pkg: DemoPackage,
+  target: RivalHubEvidenceTarget,
+  lineup: RivalHubRemotePlayer[],
+): Map<string, RivalHubMatchedParticipant> {
+  return resolveRivalHubParticipants(pkg, target, lineup).identities;
 }
 
 /**
  * 为唯一目标地图保留可审计的冲突 evidence。它不把不可信选手提升为
  * matched；服务端会据此写入 needs_attention，而不是让批量导入提前丢弃冲突。
  */
-export function matchRivalHubParticipantsForReview(
+export function resolveRivalHubParticipantsForReview(
   pkg: DemoPackage,
   target: RivalHubEvidenceTarget,
   lineup: RivalHubRemotePlayer[],
-): Map<string, RivalHubReviewParticipant> {
-  const remoteBySteam = new Map<string, RivalHubRemotePlayer>();
-  const duplicateSteam = new Set<string>();
-  for (const remote of lineup) {
-    if (remoteBySteam.has(remote.steamId64)) duplicateSteam.add(remote.steamId64);
-    else remoteBySteam.set(remote.steamId64, remote);
-  }
+): { identities: Map<string, RivalHubReviewParticipant>; orientation: RivalHubTeamOrientation | null } {
+  const { remoteBySteam, duplicateSteam } = remoteLineupBySteam(lineup);
+  const orientation = inferTeamOrientation(pkg, target, remoteBySteam);
   const entries: Array<[string, RivalHubReviewParticipant]> = pkg.players.map((player) => {
     const remote = remoteBySteam.get(player.steamId64);
     if (!remote) {
@@ -115,25 +153,59 @@ export function matchRivalHubParticipantsForReview(
         resolution: { status: "unresolved" },
       } satisfies RivalHubReviewParticipant];
     }
-    const expectedTeam = remote.entryId === target.entryAId
-      ? "teamA"
-      : remote.entryId === target.entryBId
-        ? "teamB"
-        : null;
-    if (duplicateSteam.has(remote.steamId64) || expectedTeam !== player.teamKey) {
+    const expectedEntryId = orientation ? entryForDemoTeam(target, player.teamKey, orientation) : null;
+    if (duplicateSteam.has(remote.steamId64) || expectedEntryId == null || remote.entryId !== expectedEntryId) {
       return [player.steamId64, {
         steamId64: player.steamId64,
-        nameSnapshot: remote.name,
+        nameSnapshot: player.name,
         resolution: { status: "conflict", userId: remote.userId, eventRosterMemberId: remote.eventRosterMemberId, entryId: remote.entryId },
       } satisfies RivalHubReviewParticipant];
     }
     return [player.steamId64, {
       steamId64: remote.steamId64,
-      nameSnapshot: remote.name,
+      nameSnapshot: player.name,
       resolution: { status: "matched", userId: remote.userId, eventRosterMemberId: remote.eventRosterMemberId, entryId: remote.entryId },
     } satisfies RivalHubReviewParticipant];
   });
-  return new Map(entries);
+  return { identities: new Map(entries), orientation };
+}
+
+export function matchRivalHubParticipantsForReview(
+  pkg: DemoPackage,
+  target: RivalHubEvidenceTarget,
+  lineup: RivalHubRemotePlayer[],
+): Map<string, RivalHubReviewParticipant> {
+  return resolveRivalHubParticipantsForReview(pkg, target, lineup).identities;
+}
+
+function flipTeamKey(teamKey: TeamKey): TeamKey {
+  return teamKey === "teamA" ? "teamB" : "teamA";
+}
+
+/** Normalize Demo-owned A/B slots to RivalHub entryA/entryB before deriving
+ * every evidence fact. This keeps round, team, summary and conversion fields
+ * in one canonical orientation instead of swapping only the final score. */
+export function normalizeRivalHubDemoPackage(pkg: DemoPackage, orientation: RivalHubTeamOrientation | null): DemoPackage {
+  if (orientation === "direct" || orientation == null) return pkg;
+  return {
+    ...pkg,
+    match: {
+      ...pkg.match,
+      teamA: { ...pkg.match.teamB, teamKey: "teamA" },
+      teamB: { ...pkg.match.teamA, teamKey: "teamB" },
+    },
+    players: pkg.players.map((player) => ({ ...player, teamKey: flipTeamKey(player.teamKey) })),
+    rounds: pkg.rounds.map((round) => ({
+      ...round,
+      teamASide: round.teamBSide,
+      teamBSide: round.teamASide,
+      teamAScoreBefore: round.teamBScoreBefore,
+      teamBScoreBefore: round.teamAScoreBefore,
+      teamAEconomy: round.teamBEconomy,
+      teamBEconomy: round.teamAEconomy,
+      winnerTeamKey: flipTeamKey(round.winnerTeamKey),
+    })),
+  };
 }
 
 export function selectRivalHubMap(
@@ -150,19 +222,21 @@ export function selectRivalHubMap(
     if (map.target.matchMapId !== map.id || map.target.mapOrder !== map.order) return false;
     return true;
   });
-  const lineupMatches = targetMatches.filter(({ map }) => {
+  const lineupMatches = targetMatches.flatMap(({ series, map }) => {
     try {
       // This verifies the canonical Steam64 set and every observed team side.
-      matchRivalHubParticipants(pkg, evidenceTarget(map), map.lineup);
+      const participantMatch = resolveRivalHubParticipants(pkg, evidenceTarget(map), map.lineup);
+      return [{ series, map, orientation: participantMatch.orientation }];
     } catch {
-      return false;
+      return [];
     }
-    return true;
   });
-  const strongMatches = lineupMatches.filter(({ map }) => {
+  const strongMatches = lineupMatches.filter(({ map, orientation }) => {
     if (map.scoreA != null && map.scoreB != null) {
-      if (pkg.match.teamA.score == null || pkg.match.teamB.score == null) return false;
-      if (map.scoreA !== pkg.match.teamA.score || map.scoreB !== pkg.match.teamB.score) return false;
+      const canonicalScoreA = orientation === "direct" ? pkg.match.teamA.score : pkg.match.teamB.score;
+      const canonicalScoreB = orientation === "direct" ? pkg.match.teamB.score : pkg.match.teamA.score;
+      if (canonicalScoreA == null || canonicalScoreB == null) return false;
+      if (map.scoreA !== canonicalScoreA || map.scoreB !== canonicalScoreB) return false;
     }
     return true;
   });
@@ -170,10 +244,14 @@ export function selectRivalHubMap(
   if (strongMatches.length > 1) {
     // Display names are only a weak tie-break after canonical identity, map,
     // target and official score evidence have already matched.
-    const namedMatches = strongMatches.filter(({ series }) =>
-      normalize(series.teamAName) === normalize(pkg.match.teamA.name ?? "Team A") &&
-      normalize(series.teamBName) === normalize(pkg.match.teamB.name ?? "Team B"),
-    );
+    const namedMatches = strongMatches.filter(({ series, orientation }) => {
+      const canonicalTeamAName = orientation === "direct" ? pkg.match.teamA.name : pkg.match.teamB.name;
+      const canonicalTeamBName = orientation === "direct" ? pkg.match.teamB.name : pkg.match.teamA.name;
+      return (
+        normalize(series.teamAName) === normalize(canonicalTeamAName ?? "Team A") &&
+        normalize(series.teamBName) === normalize(canonicalTeamBName ?? "Team B")
+      );
+    });
     if (namedMatches.length === 1) return namedMatches[0]!;
     throw new Error("在线赛事地图匹配不唯一，请选择目标地图");
   }
@@ -243,10 +321,12 @@ function teamConversions(pkg: DemoPackage) {
 }
 
 export function buildRivalHubDemoEvidenceV1(
-  pkg: DemoPackage,
+  inputPkg: DemoPackage,
   target: RivalHubEvidenceTarget,
   identities: Map<string, RivalHubParticipantIdentity>,
+  orientation: RivalHubTeamOrientation | null = "direct",
 ): Record<string, unknown> {
+  const pkg = normalizeRivalHubDemoPackage(inputPkg, orientation);
   const demoSha256 = pkg.manifest.demo?.hash;
   if (!demoSha256 || !/^[a-f0-9]{64}$/.test(demoSha256)) {
     throw new Error("DemoPackage manifest.demo.hash 必须提供有效的 64 位小写 SHA-256");

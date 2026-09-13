@@ -65,7 +65,6 @@ const remoteMapSchema = z.object({
   id: uuidSchema,
   order: z.number().int().positive().max(5),
   mapName: z.string().min(1),
-  status: z.enum(["scheduled", "in_progress", "finished", "cancelled"]),
   scoreA: z.number().int().nonnegative().nullable(),
   scoreB: z.number().int().nonnegative().nullable(),
   completedAt: z.string().datetime().nullable(),

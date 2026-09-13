@@ -44,8 +44,8 @@ import {
 } from "./lib/analysis-context";
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
 import { getPinnedPlayer } from "./lib/pin";
-import { buildRivalHubDemoEvidenceV1, matchRivalHubParticipants, matchRivalHubParticipantsForReview, selectRivalHubMap, type RivalHubEvidenceTarget } from "./lib/rivalhub-evidence";
-import { connectRivalHub, fetchRivalHubEvents, loadRivalHubConnection, submitRivalHubEvidence, type RivalHubConnectionState } from "./lib/rivalhub";
+import { buildRivalHubDemoEvidenceV1, resolveRivalHubParticipants, resolveRivalHubParticipantsForReview, selectRivalHubMap, type RivalHubEvidenceTarget } from "./lib/rivalhub-evidence";
+import { connectRivalHub, fetchRivalHubEvents, loadRivalHubConnection, revokeRivalHubPairing, submitRivalHubEvidence, type RivalHubConnectionState } from "./lib/rivalhub";
 import type { OnlineImportContext } from "./views/EventsView";
 
 type StudioView =
@@ -141,7 +141,7 @@ export function App() {
   const [returningEvidence, setReturningEvidence] = useState<EvidenceContinuation | null>(null);
   const [eventRecords, setEventRecords] = useState<StudioEventRecord[]>([]);
   const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
-  const [rivalHubConnection, setRivalHubConnection] = useState<RivalHubConnectionState>({ baseUrl: "", connectedAt: 0, lastSyncAt: null, status: "disconnected", error: null });
+  const [rivalHubConnection, setRivalHubConnection] = useState<RivalHubConnectionState>({ baseUrl: "", pairingId: null, connectedAt: 0, lastSyncAt: null, status: "disconnected", error: null });
   const [rivalHubRefreshToken, setRivalHubRefreshToken] = useState(0);
   const [identityState, setIdentityState] = useState<IdentityStoreState>({ version: 0, mappings: [], teamRenames: {} });
   // 导入标签输入放在 App：全窗口拖拽导入也要带上
@@ -377,6 +377,21 @@ export function App() {
     }
   }, [refreshRivalHub]);
 
+  const handleRevokeRivalHub = useCallback(async () => {
+    if (!window.confirm("将断开 RivalHub 并撤销此设备的访问凭据，之后需要重新授权才能连接。继续？")) return;
+    try {
+      await revokeRivalHubPairing();
+      setRivalHubConnection(await loadRivalHubConnection());
+      setRivalHubRefreshToken((current) => current + 1);
+      setNotice("已断开 RivalHub，并撤销此设备的访问凭据");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const current = await loadRivalHubConnection().catch(() => rivalHubConnection);
+      setRivalHubConnection({ ...current, status: current.status === "disconnected" ? "disconnected" : "error", error: message });
+      setNotice(`断开并撤销 RivalHub 失败：${message}`);
+    }
+  }, [rivalHubConnection]);
+
   const importOnlineFiles = useCallback(async (files: Iterable<File>, context: OnlineImportContext) => {
     setImporting(true);
     setNotice("正在导入并分析在线赛事 Demo…");
@@ -410,13 +425,13 @@ export function App() {
             const remoteMap = selected.map;
             const { stageRunId, ...targetWithoutStageRun } = remoteMap.target;
             const target: RivalHubEvidenceTarget = stageRunId ? { ...targetWithoutStageRun, stageRunId } : targetWithoutStageRun;
-            let identities;
+            let participantMatch;
             try {
-              identities = matchRivalHubParticipants(pkg, target, remoteMap.lineup);
+              participantMatch = resolveRivalHubParticipants(pkg, target, remoteMap.lineup);
             } catch {
-              identities = matchRivalHubParticipantsForReview(pkg, target, remoteMap.lineup);
+              participantMatch = resolveRivalHubParticipantsForReview(pkg, target, remoteMap.lineup);
             }
-            const evidence = buildRivalHubDemoEvidenceV1(pkg, target, identities);
+            const evidence = buildRivalHubDemoEvidenceV1(pkg, target, participantMatch.identities, participantMatch.orientation);
             const demoSha256 = pkg.manifest.demo?.hash ?? entry.id;
             const result = await submitRivalHubEvidence(evidence, `dak:${remoteMap.id}:${demoSha256}`);
             if (result.status === "synced") synced += 1;
@@ -1066,6 +1081,7 @@ export function App() {
             onGoLibrary={() => setView("library")}
             rivalHubConnection={rivalHubConnection}
             onConnectRivalHub={handleConnectRivalHub}
+            onRevokeRivalHub={handleRevokeRivalHub}
             onRefreshRivalHub={refreshRivalHub}
             onImportOnlineFiles={importOnlineFiles}
             refreshToken={rivalHubRefreshToken}

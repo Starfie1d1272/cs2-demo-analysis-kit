@@ -17,6 +17,7 @@ export function EventsView({
   onGoLibrary,
   rivalHubConnection,
   onConnectRivalHub,
+  onRevokeRivalHub,
   onRefreshRivalHub,
   onImportOnlineFiles,
   refreshToken = 0,
@@ -27,6 +28,7 @@ export function EventsView({
   onGoLibrary: () => void;
   rivalHubConnection?: RivalHubConnectionState;
   onConnectRivalHub?: (baseUrl: string) => Promise<void>;
+  onRevokeRivalHub?: () => Promise<void>;
   onRefreshRivalHub?: () => Promise<void>;
   onImportOnlineFiles?: (files: Iterable<File>, context: OnlineImportContext) => Promise<void>;
   refreshToken?: number;
@@ -68,7 +70,10 @@ export function EventsView({
             <div className="stu-rivalhub-connection-actions">
               <input aria-label="RivalHub 地址" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} readOnly={rivalHubConnection?.status === "connected"} placeholder="https://rivalhub.example" />
               {rivalHubConnection?.status === "connected" ? (
-                <button type="button" className="stu-button" onClick={() => void onRefreshRivalHub?.()}>刷新赛事</button>
+                <>
+                  <button type="button" className="stu-button" onClick={() => void onRefreshRivalHub?.()}>刷新赛事</button>
+                  {rivalHubConnection.pairingId && onRevokeRivalHub ? <button type="button" className="stu-button" onClick={() => void onRevokeRivalHub()}>断开并撤销此设备</button> : null}
+                </>
               ) : (
                 <button type="button" className="stu-button" onClick={() => void onConnectRivalHub(baseUrl)} disabled={rivalHubConnection?.status === "connecting" || !baseUrl.trim()}>连接 RivalHub</button>
               )}

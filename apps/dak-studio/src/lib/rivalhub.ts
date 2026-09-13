@@ -15,6 +15,7 @@ const connectionStore = getStorage().records("rivalhub");
 
 export interface RivalHubConnectionRecord {
   baseUrl: string;
+  pairingId: string | null;
   connectedAt: number;
   lastSyncAt: number | null;
 }
@@ -115,9 +116,10 @@ async function openExternalUrl(url: string): Promise<void> {
   if (!popup) throw new Error("浏览器阻止了连接授权页面，请允许打开新窗口后重试");
 }
 
-async function saveConnection(baseUrl: string, previous?: RivalHubConnectionRecord): Promise<RivalHubConnectionRecord> {
+async function saveConnection(baseUrl: string, pairingId: string | null, previous?: RivalHubConnectionRecord): Promise<RivalHubConnectionRecord> {
   const record: RivalHubConnectionRecord = {
     baseUrl,
+    pairingId: pairingId ?? previous?.pairingId ?? null,
     connectedAt: previous?.connectedAt ?? Date.now(),
     lastSyncAt: previous?.lastSyncAt ?? null,
   };
@@ -128,15 +130,16 @@ async function saveConnection(baseUrl: string, previous?: RivalHubConnectionReco
 async function clearUnauthorizedConnection(state: RivalHubConnectionState, error: unknown): Promise<void> {
   if (!(error instanceof RivalHubHttpError) || error.status !== 401) return;
   await deleteCredential();
-  await connectionStore.put(CONNECTION_KEY, { baseUrl: state.baseUrl, connectedAt: state.connectedAt, lastSyncAt: state.lastSyncAt });
+  await connectionStore.put(CONNECTION_KEY, { baseUrl: state.baseUrl, pairingId: state.pairingId, connectedAt: state.connectedAt, lastSyncAt: state.lastSyncAt });
 }
 
 export async function loadRivalHubConnection(): Promise<RivalHubConnectionState> {
   const record = await connectionStore.get<RivalHubConnectionRecord>(CONNECTION_KEY);
-  if (!record?.baseUrl) return { baseUrl: "", connectedAt: 0, lastSyncAt: null, status: "disconnected", error: null };
+  if (!record?.baseUrl) return { baseUrl: "", pairingId: null, connectedAt: 0, lastSyncAt: null, status: "disconnected", error: null };
   const baseUrl = normalizeBaseUrl(record.baseUrl);
+  const pairingId = typeof record.pairingId === "string" && record.pairingId ? record.pairingId : null;
   const token = await readCredential(baseUrl);
-  return { ...record, baseUrl, status: token ? "connected" : "disconnected", error: null };
+  return { ...record, baseUrl, pairingId, status: token ? "connected" : "disconnected", error: null };
 }
 
 export async function connectRivalHub(
@@ -156,7 +159,7 @@ export async function connectRivalHub(
     });
     if (poll.status === "authorized" && poll.accessToken) {
       await saveCredential(baseUrl, poll.accessToken);
-      const record = await saveConnection(baseUrl);
+      const record = await saveConnection(baseUrl, start.pairingId);
       return { ...record, status: "connected", error: null };
     }
     if (poll.status === "expired" || Date.now() >= expiresAt) throw new Error("连接授权已过期，请重新发起");
@@ -174,7 +177,7 @@ export async function fetchRivalHubEvents(): Promise<RivalHubEventsResponse> {
       headers: { Authorization: `Bearer ${token}` },
     });
     const parsed = rivalHubEventsResponseSchema.parse(response);
-    await connectionStore.put(CONNECTION_KEY, { baseUrl: state.baseUrl, connectedAt: state.connectedAt, lastSyncAt: Date.now() });
+    await connectionStore.put(CONNECTION_KEY, { baseUrl: state.baseUrl, pairingId: state.pairingId, connectedAt: state.connectedAt, lastSyncAt: Date.now() });
     return parsed;
   } catch (error) {
     await clearUnauthorizedConnection(state, error);
@@ -204,6 +207,24 @@ export async function submitRivalHubEvidence(
     await clearUnauthorizedConnection(state, error);
     throw error;
   }
+}
+
+export async function revokeRivalHubPairing(): Promise<void> {
+  const state = await loadRivalHubConnection();
+  if (!state.baseUrl || state.status !== "connected") throw new Error("尚未连接 RivalHub");
+  if (!state.pairingId) throw new Error("当前连接缺少配对标识，请重新连接后再撤销此设备");
+  const token = await readCredential(state.baseUrl);
+  if (!token) throw new Error("RivalHub 连接凭据不存在，请重新连接");
+  try {
+    await requestJson<unknown>(`${state.baseUrl}/api/integrations/dak/pairings/${encodeURIComponent(state.pairingId)}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (error) {
+    await clearUnauthorizedConnection(state, error);
+    throw error;
+  }
+  await disconnectRivalHub();
 }
 
 export async function disconnectRivalHub(): Promise<void> {
