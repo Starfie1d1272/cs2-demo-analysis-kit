@@ -25,6 +25,7 @@ import re
 import shutil
 import socket
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import threading
@@ -32,6 +33,7 @@ import time
 import urllib.parse
 import urllib.request
 import uuid
+import webbrowser
 import zipfile
 from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -67,6 +69,116 @@ _BETA_MANIFEST_URLS = [
     "https://dakupdate.starfie1d.top/releases/beta/latest.json",
 ]
 _MANIFEST_TIMEOUT_S = 8
+
+RIVALHUB_CREDENTIAL_SERVICE = "com.starfie1d.dak-studio.rivalhub"
+RIVALHUB_CREDENTIAL_ACCOUNT = "access-token"
+
+
+def _windows_credential_target(service: str, account: str) -> str:
+    return f"{service}:{account}"
+
+
+def _windows_credential_get(service: str, account: str) -> str | None:
+    """Read a generic credential from the per-user Windows Credential Manager."""
+    import ctypes
+    from ctypes import wintypes
+
+    class _FileTime(ctypes.Structure):
+        _fields_ = [("low", wintypes.DWORD), ("high", wintypes.DWORD)]
+
+    class _Credential(ctypes.Structure):
+        _fields_ = [
+            ("flags", wintypes.DWORD),
+            ("type", wintypes.DWORD),
+            ("target_name", wintypes.LPWSTR),
+            ("comment", wintypes.LPWSTR),
+            ("last_written", _FileTime),
+            ("blob_size", wintypes.DWORD),
+            ("blob", ctypes.POINTER(ctypes.c_ubyte)),
+            ("persist", wintypes.DWORD),
+            ("attribute_count", wintypes.DWORD),
+            ("attributes", ctypes.c_void_p),
+            ("target_alias", wintypes.LPWSTR),
+            ("user_name", wintypes.LPWSTR),
+        ]
+
+    api = ctypes.WinDLL("Advapi32.dll", use_last_error=True)
+    read = api.CredReadW
+    read.argtypes = [
+        wintypes.LPWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        ctypes.POINTER(ctypes.POINTER(_Credential)),
+    ]
+    read.restype = wintypes.BOOL
+    credential = ctypes.POINTER(_Credential)()
+    if not read(_windows_credential_target(service, account), 1, 0, ctypes.byref(credential)):
+        return None
+    try:
+        size = credential.contents.blob_size
+        if size == 0:
+            return ""
+        return ctypes.string_at(credential.contents.blob, size).decode("utf-16-le")
+    except (UnicodeDecodeError, ValueError):
+        return None
+    finally:
+        api.CredFree(credential)
+
+
+def _windows_credential_set(service: str, account: str, value: str) -> bool:
+    """Write a generic credential to the per-user Windows Credential Manager."""
+    import ctypes
+    from ctypes import wintypes
+
+    class _FileTime(ctypes.Structure):
+        _fields_ = [("low", wintypes.DWORD), ("high", wintypes.DWORD)]
+
+    class _Credential(ctypes.Structure):
+        _fields_ = [
+            ("flags", wintypes.DWORD),
+            ("type", wintypes.DWORD),
+            ("target_name", wintypes.LPWSTR),
+            ("comment", wintypes.LPWSTR),
+            ("last_written", _FileTime),
+            ("blob_size", wintypes.DWORD),
+            ("blob", ctypes.POINTER(ctypes.c_ubyte)),
+            ("persist", wintypes.DWORD),
+            ("attribute_count", wintypes.DWORD),
+            ("attributes", ctypes.c_void_p),
+            ("target_alias", wintypes.LPWSTR),
+            ("user_name", wintypes.LPWSTR),
+        ]
+
+    encoded = value.encode("utf-16-le")
+    blob = (ctypes.c_ubyte * len(encoded)).from_buffer_copy(encoded)
+    credential = _Credential()
+    credential.type = 1  # CRED_TYPE_GENERIC
+    credential.target_name = _windows_credential_target(service, account)
+    credential.blob_size = len(encoded)
+    credential.blob = ctypes.cast(blob, ctypes.POINTER(ctypes.c_ubyte))
+    credential.persist = 2  # CRED_PERSIST_LOCAL_MACHINE, encrypted per user
+    credential.user_name = account
+
+    api = ctypes.WinDLL("Advapi32.dll", use_last_error=True)
+    write = api.CredWriteW
+    write.argtypes = [ctypes.POINTER(_Credential), wintypes.DWORD]
+    write.restype = wintypes.BOOL
+    return bool(write(ctypes.byref(credential), 0))
+
+
+def _windows_credential_delete(service: str, account: str) -> bool:
+    """Delete a generic credential from the per-user Windows Credential Manager."""
+    import ctypes
+    from ctypes import wintypes
+
+    api = ctypes.WinDLL("Advapi32.dll", use_last_error=True)
+    delete = api.CredDeleteW
+    delete.argtypes = [wintypes.LPWSTR, wintypes.DWORD, wintypes.DWORD]
+    delete.restype = wintypes.BOOL
+    if delete(_windows_credential_target(service, account), 1, 0):
+        return True
+    # Deleting an already absent item is idempotent for disconnect/reconnect.
+    return ctypes.get_last_error() == 1168  # ERROR_NOT_FOUND
 
 
 def _version_tuple(v: str) -> tuple[int, ...]:
@@ -554,6 +666,77 @@ class StudioApi:
                 (namespace, prefix, prefix),
             )
             self._conn().commit()
+
+    # --- RivalHub connection ------------------------------------------
+    # The access token never enters the SQLite records table. The native bridge
+    # delegates storage to macOS Keychain or Windows Credential Manager;
+    # browser/dev mode keeps it only in the frontend process memory.
+    @staticmethod
+    def _valid_rivalhub_credential_key(service: str, account: str) -> bool:
+        return service == RIVALHUB_CREDENTIAL_SERVICE and account == RIVALHUB_CREDENTIAL_ACCOUNT
+
+    def rivalhub_open_external_url(self, url: str) -> bool:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
+            return False
+        try:
+            return bool(webbrowser.open(url, new=0, autoraise=True))
+        except OSError:
+            return False
+
+    def rivalhub_credential_get(self, service: str, account: str) -> str | None:
+        if not self._valid_rivalhub_credential_key(service, account):
+            return None
+        if sys.platform == "win32":
+            return _windows_credential_get(service, account)
+        if sys.platform != "darwin":
+            return None
+        try:
+            result = subprocess.run(
+                ["/usr/bin/security", "find-generic-password", "-s", service, "-a", account, "-w"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError:
+            return None
+        return result.stdout.rstrip("\r\n") if result.returncode == 0 else None
+
+    def rivalhub_credential_set(self, service: str, account: str, value: str) -> bool:
+        if not self._valid_rivalhub_credential_key(service, account) or not value:
+            return False
+        if sys.platform == "win32":
+            return _windows_credential_set(service, account, value)
+        if sys.platform != "darwin":
+            return False
+        try:
+            result = subprocess.run(
+                ["/usr/bin/security", "add-generic-password", "-U", "-s", service, "-a", account, "-w", value],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError:
+            return False
+        return result.returncode == 0
+
+    def rivalhub_credential_delete(self, service: str, account: str) -> bool:
+        if not self._valid_rivalhub_credential_key(service, account):
+            return False
+        if sys.platform == "win32":
+            return _windows_credential_delete(service, account)
+        if sys.platform != "darwin":
+            return False
+        try:
+            result = subprocess.run(
+                ["/usr/bin/security", "delete-generic-password", "-s", service, "-a", account],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError:
+            return False
+        return result.returncode == 0
 
     def _blob_dir(self, namespace: str) -> Path:
         if namespace == "demos":

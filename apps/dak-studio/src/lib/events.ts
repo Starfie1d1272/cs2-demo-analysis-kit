@@ -1,7 +1,8 @@
 import { eventPackageSchema, type EventPackage, type EventStage } from "@cs2dak/contract";
 import { getStorage } from "./storage";
-import { deleteSeriesRecord, saveSeriesRecord, type StudioSeriesRecord } from "./series";
+import { deleteSeriesRecord, listSeriesRecords, saveSeriesRecord, type StudioSeriesRecord } from "./series";
 import type { StudioDemoEntry } from "./library";
+import type { RivalHubEventsResponse, RivalHubRemoteMap, RivalHubRemoteSeries } from "./rivalhub-contract";
 
 export interface StudioEventRecord {
   id: string;
@@ -15,6 +16,13 @@ export interface StudioEventRecord {
   readOnly: boolean;
   importedAt: number;
   updatedAt: number;
+  /** 远程赛事同步元数据是现有 Event record 的增量字段，不另建 RivalHubEventRecord。 */
+  rivalHub?: {
+    seasonId: string;
+    revision: string;
+    lastSyncedAt: number;
+    stale: boolean;
+  };
 }
 
 export interface EventImportResult {
@@ -34,6 +42,29 @@ function sameTeams(entry: StudioDemoEntry, teamA: string, teamB: string): boolea
   const actual = [normalized(entry.meta.teamAName), normalized(entry.meta.teamBName)].sort();
   const expected = [normalized(teamA), normalized(teamB)].sort();
   return actual[0] === expected[0] && actual[1] === expected[1];
+}
+
+function sameRemoteMap(entry: StudioDemoEntry, series: RivalHubRemoteSeries, map: RivalHubRemoteMap): boolean {
+  if (normalized(entry.meta.mapName) !== normalized(map.mapName)) return false;
+  if (!sameTeams(entry, series.teamAName, series.teamBName)) return false;
+  if (map.scoreA == null || map.scoreB == null) return true;
+  const direct = normalized(entry.meta.teamAName) === normalized(series.teamAName);
+  return direct
+    ? entry.meta.teamAScore === map.scoreA && entry.meta.teamBScore === map.scoreB
+    : entry.meta.teamAScore === map.scoreB && entry.meta.teamBScore === map.scoreA;
+}
+
+function matchRemoteMap(
+  entries: StudioDemoEntry[],
+  series: RivalHubRemoteSeries,
+  map: RivalHubRemoteMap,
+  used: Set<string>,
+  previousId?: string | null,
+): string | null {
+  const previous = previousId ? entries.find((entry) => entry.id === previousId) : undefined;
+  if (previous && !used.has(previous.id) && sameRemoteMap(previous, series, map)) return previous.id;
+  const candidates = entries.filter((entry) => !used.has(entry.id) && sameRemoteMap(entry, series, map));
+  return candidates.length === 1 ? candidates[0]!.id : null;
 }
 
 export async function listEventRecords(): Promise<StudioEventRecord[]> {
@@ -126,4 +157,124 @@ export async function importEventPackage(input: unknown, entries: StudioDemoEntr
 export async function deleteEventRecord(event: StudioEventRecord): Promise<void> {
   await Promise.all(event.seriesIds.map(deleteSeriesRecord));
   await eventStore.delete(event.id);
+}
+
+function stageFromRemote(stage: RivalHubEventsResponse["events"][number]["stages"][number]): EventStage {
+  return {
+    key: stage.key,
+    name: stage.name,
+    type: stage.type,
+    teamCount: stage.teamCount,
+    advanceCount: stage.advanceCount,
+    ...(stage.matchFormat ? { matchFormat: stage.matchFormat } : {}),
+    ...(stage.finalFormat ? { finalFormat: stage.finalFormat } : {}),
+    ...(stage.bracketNodes ? { bracketNodes: stage.bracketNodes } : {}),
+  };
+}
+
+/**
+ * 把 RivalHub 远程赛事增量写入现有 Event/Series/Map record。
+ * 本地 Demo 仍由 library owner 管理；这里只做 stable target/status 元数据的 upsert。
+ */
+export async function upsertRivalHubEvents(
+  response: RivalHubEventsResponse,
+  entries: StudioDemoEntry[],
+): Promise<void> {
+  const [previousEvents, previousSeries] = await Promise.all([listEventRecords(), listSeriesRecords()]);
+  const previousSeriesById = new Map(previousSeries.map((row) => [row.id, row]));
+  const nextEventIds = new Set<string>();
+  for (const remote of response.events) {
+    const eventId = `event:rivalhub:${remote.seasonId}`;
+    nextEventIds.add(eventId);
+    const previousEvent = previousEvents.find((event) => event.id === eventId);
+    const savedSeries: StudioSeriesRecord[] = [];
+    for (const external of remote.series) {
+      const id = `${eventId}:series:${external.id}`;
+      const previous = previousSeriesById.get(id);
+      const used = new Set<string>();
+      const assignments = external.maps
+        .slice()
+        .sort((a, b) => a.order - b.order)
+        .map((map) => {
+          const previousAssignment = previous?.mapAssignments?.find((assignment) => assignment.rivalHub?.id === map.id);
+          const entryId = matchRemoteMap(entries, external, map, used, previousAssignment?.entryId);
+          if (entryId) used.add(entryId);
+          return {
+            order: map.order,
+            mapName: map.mapName,
+            entryId,
+            rivalHub: map,
+          };
+        });
+      const veto = external.veto ? { ...external.veto, seriesId: id } : null;
+      savedSeries.push(await saveSeriesRecord({
+        id,
+        name: `${external.teamAName} vs ${external.teamBName}`,
+        entryIds: assignments.flatMap((assignment) => assignment.entryId ? [assignment.entryId] : []),
+        format: external.format,
+        teamAName: external.teamAName,
+        teamBName: external.teamBName,
+        veto,
+        eventId,
+        externalKey: external.key,
+        stageKey: external.stageKey,
+        round: external.round,
+        entryRound: external.entryRound,
+        bracketNodeId: external.bracketNodeId,
+        status: external.status,
+        scoreA: external.scoreA,
+        scoreB: external.scoreB,
+        teamARecordBefore: external.teamARecordBefore,
+        teamBRecordBefore: external.teamBRecordBefore,
+        scheduledAt: external.scheduledAt,
+        completedAt: external.completedAt,
+        matchUrl: null,
+        rawDemoHint: null,
+        mapAssignments: assignments,
+        rivalHub: {
+          seasonId: remote.seasonId,
+          matchId: external.id,
+          stageRunId: external.stageKey ? (external.maps[0]?.target.stageRunId ?? null) : null,
+          entryAId: external.entryAId,
+          entryBId: external.entryBId,
+          revision: remote.revision,
+        },
+      }));
+    }
+    const nextSeriesIds = new Set(savedSeries.map((row) => row.id));
+    await Promise.all((previousEvent?.seriesIds ?? []).filter((id) => !nextSeriesIds.has(id)).map(deleteSeriesRecord));
+    const now = Date.now();
+    await eventStore.put(eventId, {
+      id: eventId,
+      slug: remote.slug,
+      name: remote.name,
+      kind: remote.kind,
+      source: "rivalhub",
+      sourceUrl: null,
+      stages: remote.stages.map(stageFromRemote),
+      seriesIds: savedSeries.map((row) => row.id),
+      readOnly: true,
+      importedAt: previousEvent?.importedAt ?? now,
+      updatedAt: now,
+      rivalHub: { seasonId: remote.seasonId, revision: remote.revision, lastSyncedAt: now, stale: false },
+    } satisfies StudioEventRecord);
+  }
+
+  // A successful refresh is authoritative for the connected season scope.
+  // Remove only remote records absent from the response; local Demo entries are
+  // owned by the library and remain untouched.
+  await Promise.all(previousEvents
+    .filter((event) => event.source === "rivalhub" && event.rivalHub && !nextEventIds.has(event.id))
+    .map(async (event) => {
+      await Promise.all(event.seriesIds.map(deleteSeriesRecord));
+      await eventStore.delete(event.id);
+    }));
+}
+
+export async function markRivalHubEventsStale(): Promise<void> {
+  const events = await listEventRecords();
+  await Promise.all(events.filter((event) => event.source === "rivalhub" && event.rivalHub).map((event) => eventStore.put(event.id, {
+    ...event,
+    rivalHub: { ...event.rivalHub!, stale: true },
+  })));
 }

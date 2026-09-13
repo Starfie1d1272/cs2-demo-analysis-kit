@@ -1,13 +1,13 @@
 import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Radar, Settings, Swords, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { bulkUpdateTags, formatMatchLabel, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
+import { bulkUpdateTags, formatMatchLabel, getDemoPackage, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { CohortScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
 import { AnalysisContextSummary } from "./components/AnalysisContextSummary";
 import { CapabilityBar } from "./components/CapabilityBar";
 import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems, pickDemPaths, triggerWindowsDropCapture, watchDemoPath, type ExportedDemoFile } from "./lib/dem";
 import { parseTags } from "./lib/tags";
 import { listSeriesRecords, pruneOrphanSeries, type StudioSeriesRecord } from "./lib/series";
-import { listEventRecords, type StudioEventRecord } from "./lib/events";
+import { listEventRecords, markRivalHubEventsStale, upsertRivalHubEvents, type StudioEventRecord } from "./lib/events";
 import { importEventAssetArchive } from "./lib/event-assets";
 import { APP_VERSION, checkForUpdateOnChannel, type UpdateChannel, type UpdateInfo } from "./lib/update";
 import { checkForUpdateViaBridge } from "./lib/updater-bridge";
@@ -44,6 +44,9 @@ import {
 } from "./lib/analysis-context";
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
 import { getPinnedPlayer } from "./lib/pin";
+import { buildRivalHubDemoEvidenceV1, resolveRivalHubParticipants, resolveRivalHubParticipantsForReview, selectRivalHubMap, type RivalHubEvidenceTarget } from "./lib/rivalhub-evidence";
+import { connectRivalHub, fetchRivalHubEvents, loadRivalHubConnection, revokeRivalHubPairing, rivalHubEvidenceIdempotencyKey, submitRivalHubEvidence, type RivalHubConnectionState } from "./lib/rivalhub";
+import type { OnlineImportContext } from "./views/EventsView";
 
 type StudioView =
   | "home"
@@ -138,6 +141,8 @@ export function App() {
   const [returningEvidence, setReturningEvidence] = useState<EvidenceContinuation | null>(null);
   const [eventRecords, setEventRecords] = useState<StudioEventRecord[]>([]);
   const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
+  const [rivalHubConnection, setRivalHubConnection] = useState<RivalHubConnectionState>({ baseUrl: "", pairingId: null, connectedAt: 0, lastSyncAt: null, status: "disconnected", error: null });
+  const [rivalHubRefreshToken, setRivalHubRefreshToken] = useState(0);
   const [identityState, setIdentityState] = useState<IdentityStoreState>({ version: 0, mappings: [], teamRenames: {} });
   // 导入标签输入放在 App：全窗口拖拽导入也要带上
   const [importTagsRaw, setImportTagsRaw] = useState("");
@@ -264,6 +269,7 @@ export function App() {
     // 自动更新属于桌面壳职责。浏览器开发入口没有跨域桥，启动时主动请求发布源
     // 只会制造 CORS 错误；需要时仍可由用户手动检查。
     if (window.pywebview?.api) void doCheckUpdate();
+    void loadRivalHubConnection().then(setRivalHubConnection).catch(() => undefined);
     void loadIdentityState().then(setIdentityState);
     void getPinnedPlayer().then((pinned) => {
       if (!pinned) return;
@@ -275,20 +281,21 @@ export function App() {
     });
   }, [refreshEventRecords]);
 
-  const importFiles = useCallback(async (files: Iterable<File | ExportedDemoFile>, tags: string[] = [], initialErrors: string[] = []) => {
+  const importFiles = useCallback(async (files: Iterable<File | ExportedDemoFile>, tags: string[] = [], initialErrors: string[] = []): Promise<StudioDemoEntry[]> => {
     const fileList = [...files];
     const items = fileList.map((item) => item instanceof File ? { file: item, sourceDemPath: null } : item);
     const zips = items.filter((item) => item.file.name.toLowerCase().endsWith(".zip"));
     const dems = items.filter((item) => isDemFile(item.file));
     if (zips.length === 0 && dems.length === 0 && initialErrors.length === 0) {
       setNotice("请选择 .dem 或 cs2-demo-format/3.x ZIP 文件");
-      return;
+      return [];
     }
     setImporting(true);
     setNotice(null);
     let imported = 0;
     let duplicates = 0;
     const errors: string[] = [...initialErrors];
+    const importedEntries: StudioDemoEntry[] = [];
 
     // .dem 先经 exporter 转 ZIP（数据库只存 ZIP）
     if (dems.length > 0) {
@@ -315,6 +322,7 @@ export function App() {
       for (let item = queue.shift(); item; item = queue.shift()) {
         try {
           const result = await importDemoFile(item.file, { tags, sourceDemPath: item.sourceDemPath });
+          importedEntries.push(result.entry);
           if (result.duplicate) duplicates += 1;
           else imported += 1;
         } catch (err) {
@@ -333,7 +341,123 @@ export function App() {
     if (errors.length > 0) parts.push(`失败 ${errors.length} 场（${errors[0]}）`);
     setNotice(parts.join("，") || null);
     setImporting(false);
+    return importedEntries;
   }, []);
+
+  const refreshRivalHub = useCallback(async () => {
+    setRivalHubConnection((current) => ({ ...current, status: "connecting", error: null }));
+    try {
+      const response = await fetchRivalHubEvents();
+      await upsertRivalHubEvents(response, await listDemoEntries());
+      await refreshEventRecords();
+      const connected = await loadRivalHubConnection();
+      setRivalHubConnection({ ...connected, status: "connected", error: null });
+      setRivalHubRefreshToken((current) => current + 1);
+      setNotice(`已刷新 RivalHub 赛事：${response.events.length} 个赛事`);
+    } catch (error) {
+      await markRivalHubEventsStale().catch(() => undefined);
+      await refreshEventRecords().catch(() => undefined);
+      const current = await loadRivalHubConnection().catch(() => rivalHubConnection);
+      const message = error instanceof Error ? error.message : String(error);
+      setRivalHubConnection({ ...current, status: "error", error: message });
+      setNotice(`RivalHub 刷新失败：${message}`);
+    }
+  }, [refreshEventRecords, rivalHubConnection]);
+
+  const handleConnectRivalHub = useCallback(async (baseUrl: string) => {
+    setRivalHubConnection((current) => ({ ...current, baseUrl: baseUrl.trim(), status: "connecting", error: null }));
+    try {
+      const connected = await connectRivalHub(baseUrl, setNotice);
+      setRivalHubConnection(connected);
+      await refreshRivalHub();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setRivalHubConnection((current) => ({ ...current, status: "error", error: message }));
+      setNotice(`RivalHub 连接失败：${message}`);
+    }
+  }, [refreshRivalHub]);
+
+  const handleRevokeRivalHub = useCallback(async () => {
+    if (!window.confirm("将断开 RivalHub 并撤销此设备的访问凭据，之后需要重新授权才能连接。继续？")) return;
+    try {
+      await revokeRivalHubPairing();
+      setRivalHubConnection(await loadRivalHubConnection());
+      setRivalHubRefreshToken((current) => current + 1);
+      setNotice("已断开 RivalHub，并撤销此设备的访问凭据");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const current = await loadRivalHubConnection().catch(() => rivalHubConnection);
+      setRivalHubConnection({ ...current, status: current.status === "disconnected" ? "disconnected" : "error", error: message });
+      setNotice(`断开并撤销 RivalHub 失败：${message}`);
+    }
+  }, [rivalHubConnection]);
+
+  const importOnlineFiles = useCallback(async (files: Iterable<File>, context: OnlineImportContext) => {
+    setImporting(true);
+    setNotice("正在导入并分析在线赛事 Demo…");
+    const inputFiles = [...files];
+    let synced = 0;
+    let needsAttention = 0;
+    let failed = 0;
+    const failureMessages: string[] = [];
+    try {
+      let importedEntries: StudioDemoEntry[] = [];
+      try {
+        importedEntries = await importFiles(inputFiles, [], []);
+      } catch (error) {
+        failed = inputFiles.length;
+        failureMessages.push(error instanceof Error ? error.message : String(error));
+      }
+      setImporting(true);
+      failed += Math.max(inputFiles.length - importedEntries.length, 0);
+      const remoteMaps = context.candidates ?? context.mapAssignments.filter((assignment) => assignment.rivalHub).map((assignment) => ({
+        series: context.series,
+        map: assignment.rivalHub!,
+      }));
+      if (remoteMaps.length === 0) {
+        failed += importedEntries.length;
+        failureMessages.push("当前在线赛事范围没有可接收的地图");
+      } else {
+        for (const entry of importedEntries) {
+          try {
+            const pkg = await getDemoPackage(entry.id);
+            const selected = selectRivalHubMap(pkg, remoteMaps);
+            const remoteMap = selected.map;
+            const { stageRunId, ...targetWithoutStageRun } = remoteMap.target;
+            const target: RivalHubEvidenceTarget = stageRunId ? { ...targetWithoutStageRun, stageRunId } : targetWithoutStageRun;
+            let participantMatch;
+            try {
+              participantMatch = resolveRivalHubParticipants(pkg, target, remoteMap.lineup);
+            } catch {
+              participantMatch = resolveRivalHubParticipantsForReview(pkg, target, remoteMap.lineup);
+            }
+            const evidence = buildRivalHubDemoEvidenceV1(pkg, target, participantMatch.identities, participantMatch.orientation);
+            const result = await submitRivalHubEvidence(evidence, await rivalHubEvidenceIdempotencyKey(remoteMap.id, evidence));
+            if (result.status === "synced") synced += 1;
+            else needsAttention += 1;
+          } catch (error) {
+            failed += 1;
+            failureMessages.push(`${entry.fileName}: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }
+      }
+      try {
+        await refreshRivalHub();
+      } catch (error) {
+        failureMessages.push(`刷新 RivalHub 赛事失败：${error instanceof Error ? error.message : String(error)}`);
+      }
+      const status = [
+        synced > 0 ? `已同步 ${synced} 场` : "",
+        needsAttention > 0 ? `${needsAttention} 场需要处理` : "",
+        failed > 0 ? `失败 ${failed} 场${failureMessages[0] ? `（${failureMessages[0]}）` : ""}` : "",
+      ].filter(Boolean).join("，");
+      setNotice(status || "Demo 已导入本地资料库，但没有形成可提交的证据");
+    } catch (error) {
+      setNotice(`在线 Demo 处理失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setImporting(false);
+    }
+  }, [importFiles, refreshRivalHub]);
 
   // 桌面壳：原生文件对话框选 .dem/.zip → 本机 exporter 转 ZIP → 入库
   const importViaNativeDialog = useCallback(async () => {
@@ -949,7 +1073,18 @@ export function App() {
             onGoDirectory={() => setEventMode("directory")}
           />
         ) : (
-          <EventsView entries={entries} onOpenMatch={openDemo} onAnalyzeEvent={startEventAnalysis} onGoLibrary={() => setView("library")} />
+          <EventsView
+            entries={entries}
+            onOpenMatch={openDemo}
+            onAnalyzeEvent={startEventAnalysis}
+            onGoLibrary={() => setView("library")}
+            rivalHubConnection={rivalHubConnection}
+            onConnectRivalHub={handleConnectRivalHub}
+            onRevokeRivalHub={handleRevokeRivalHub}
+            onRefreshRivalHub={refreshRivalHub}
+            onImportOnlineFiles={importOnlineFiles}
+            refreshToken={rivalHubRefreshToken}
+          />
         ))}
         {view === "management" && (
           <ManagementView
