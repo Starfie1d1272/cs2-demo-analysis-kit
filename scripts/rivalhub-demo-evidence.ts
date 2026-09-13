@@ -68,6 +68,10 @@ function teamConversions(pkg: DemoPackage) {
 }
 
 export function buildRivalHubDemoEvidenceV1(pkg: DemoPackage, target: RivalHubEvidenceTarget, identities: Map<string, RivalHubMatchedParticipant>) {
+  const demoSha256 = pkg.manifest.demo?.hash;
+  if (!demoSha256 || !/^[a-f0-9]{64}$/.test(demoSha256)) {
+    throw new Error("DemoPackage manifest.demo.hash 必须提供有效的 64 位小写 SHA-256");
+  }
   const analysis = analyzeDemoPackage(pkg);
   const facts = buildPlayerRoundFacts(pkg);
   const utilityFacts = new Map(buildPlayerRoundUtilityFacts(pkg).map((fact) => [`${fact.roundNumber}:${fact.steamId64}`, fact]));
@@ -118,7 +122,7 @@ export function buildRivalHubDemoEvidenceV1(pkg: DemoPackage, target: RivalHubEv
   return {
     contract: { contractVersion: "rivalhub-demo-evidence/1", semanticProfile: "dak-stable/1", analysisVersion: analysis.provenance.analysisVersion },
     target,
-    source: { demoSha256: pkg.manifest.demo?.hash ?? "0".repeat(64), mapName: pkg.match.mapName, tickRateHz: pkg.match.tickrate, sourceSchemaVersion: pkg.manifest.schemaVersion, exporterVersion: `${pkg.manifest.exporter.name}/${pkg.manifest.exporter.version}`, parserVersion: `${pkg.manifest.parser.name}/${pkg.manifest.parser.version}`, assistantVersion: "rivalhub-demo-assistant/0.1.0-fixture", generatedAt: new Date(pkg.manifest.exportedAt).toISOString() },
+    source: { demoSha256, mapName: pkg.match.mapName, tickRateHz: pkg.match.tickrate, sourceSchemaVersion: pkg.manifest.schemaVersion, exporterVersion: `${pkg.manifest.exporter.name}/${pkg.manifest.exporter.version}`, parserVersion: `${pkg.manifest.parser.name}/${pkg.manifest.parser.version}`, producerVersion: "cs2dak-rivalhub-evidence/0.1.0", generatedAt: new Date(pkg.manifest.exportedAt).toISOString() },
     quality: { qa: { ok: analysis.qa.ok, ...analysis.qa.summary }, capabilities: demoSourceAvailability(pkg) },
     participants: pkg.players.map((player) => { const identity = identities.get(player.steamId64)!; return { steamId64: identity.steamId64, nameSnapshot: identity.nameSnapshot, observedTeamKey: player.teamKey, resolution: { status: "matched", userId: identity.userId, eventRosterMemberId: identity.eventRosterMemberId, entryId: identity.entryId } }; }),
     sourceFacts: {
