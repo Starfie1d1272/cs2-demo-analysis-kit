@@ -1,4 +1,5 @@
 import { getStorage } from "./storage";
+import { markRivalHubEventsStale } from "./events";
 import {
   RIVALHUB_EVENTS_CONTRACT,
   rivalHubEventsResponseSchema,
@@ -54,12 +55,38 @@ function nativeApi(): NativeRivalHubApi | null {
   return ((window as unknown as { pywebview?: { api?: NativeRivalHubApi } }).pywebview?.api) ?? null;
 }
 
-function normalizeBaseUrl(value: string): string {
+export function normalizeBaseUrl(value: string): string {
   const parsed = new URL(value.trim());
-  if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || !parsed.hostname || parsed.username || parsed.password) {
-    throw new Error("RivalHub 地址必须使用不含账号密码的 http 或 https 地址");
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("RivalHub 地址必须使用 HTTPS；HTTP 仅允许本机开发地址");
   }
+  if (!parsed.hostname || parsed.username || parsed.password) throw new Error("RivalHub 地址不能包含账号密码");
+  const hostname = parsed.hostname.toLowerCase();
+  const isLoopback = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]" || hostname === "::1";
+  if (parsed.protocol === "http:" && !isLoopback) throw new Error("RivalHub 远程地址必须使用 HTTPS；HTTP 仅允许 localhost、127.0.0.1 或 ::1");
   return parsed.origin;
+}
+
+function stableSerialize(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    const serialized = JSON.stringify(value);
+    if (serialized === undefined) throw new Error("Evidence payload 无法稳定序列化");
+    return serialized;
+  }
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(",")}]`;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, item]) => item !== undefined)
+    .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+  return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stableSerialize(item)}`).join(",")}}`;
+}
+
+export async function rivalHubEvidenceIdempotencyKey(
+  remoteMapId: string,
+  evidence: RivalHubEvidenceSubmission,
+): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(stableSerialize(evidence)));
+  const hash = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `dak:${remoteMapId}:${hash}`;
 }
 
 class RivalHubHttpError extends Error {
@@ -224,6 +251,7 @@ export async function revokeRivalHubPairing(): Promise<void> {
     await clearUnauthorizedConnection(state, error);
     throw error;
   }
+  await markRivalHubEventsStale();
   await disconnectRivalHub();
 }
 

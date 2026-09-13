@@ -45,7 +45,7 @@ import {
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
 import { getPinnedPlayer } from "./lib/pin";
 import { buildRivalHubDemoEvidenceV1, resolveRivalHubParticipants, resolveRivalHubParticipantsForReview, selectRivalHubMap, type RivalHubEvidenceTarget } from "./lib/rivalhub-evidence";
-import { connectRivalHub, fetchRivalHubEvents, loadRivalHubConnection, revokeRivalHubPairing, submitRivalHubEvidence, type RivalHubConnectionState } from "./lib/rivalhub";
+import { connectRivalHub, fetchRivalHubEvents, loadRivalHubConnection, revokeRivalHubPairing, rivalHubEvidenceIdempotencyKey, submitRivalHubEvidence, type RivalHubConnectionState } from "./lib/rivalhub";
 import type { OnlineImportContext } from "./views/EventsView";
 
 type StudioView =
@@ -432,8 +432,7 @@ export function App() {
               participantMatch = resolveRivalHubParticipantsForReview(pkg, target, remoteMap.lineup);
             }
             const evidence = buildRivalHubDemoEvidenceV1(pkg, target, participantMatch.identities, participantMatch.orientation);
-            const demoSha256 = pkg.manifest.demo?.hash ?? entry.id;
-            const result = await submitRivalHubEvidence(evidence, `dak:${remoteMap.id}:${demoSha256}`);
+            const result = await submitRivalHubEvidence(evidence, await rivalHubEvidenceIdempotencyKey(remoteMap.id, evidence));
             if (result.status === "synced") synced += 1;
             else needsAttention += 1;
           } catch (error) {
