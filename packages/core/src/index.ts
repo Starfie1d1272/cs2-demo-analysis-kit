@@ -14,6 +14,7 @@ export { deriveRRSignals, computeAccountRatingsV2 } from "./signals.js";
 export { activeDamages, groupBy } from "./utils.js";
 export * from "./spatial/index.js";
 export { deriveRRIndicators } from "./scoreboard.js";
+export { buildPlayerRoundFacts } from "./scoreboard.js";
 export { derivePlayerWeaponHighlights } from "./weapon-highlights.js";
 export { buildTeamSideWinRates } from "./side-win-rate.js";
 export { buildDuelsSignals, deriveDuels, deriveOpeningDuels } from "./duels.js";
