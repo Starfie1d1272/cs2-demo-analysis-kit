@@ -1,5 +1,5 @@
 import type { DemoPackage, EvidenceRef, MatchWorkspaceModel, TeamKey } from "@cs2dak/contract";
-import { derivePlayerMechanics, type PlayerMechanicsFact } from "@cs2dak/core";
+import { buildPlayerRoundUtilityFacts, derivePlayerMechanics, type PlayerMechanicsFact } from "@cs2dak/core";
 import type { TriangleBvh } from "@cs2dak/maps";
 import { round } from "./season-metrics.js";
 import { displayWeaponName } from "./weapons.js";
@@ -288,27 +288,26 @@ export function buildUtilityValueSummary(
       if (!player) continue;
       const row = playerRows.get(player.playerKey)!;
       row.rounds += stat.rounds;
-      row.flashAssists += stat.flashAssistCount;
-      const teamKey = pkg.players[stat.playerIndex]?.teamKey;
-      if (teamKey) {
-        const team = ensureTeam(pkg, teamKey);
-        team.flashAssists += stat.flashAssistCount;
-      }
     }
 
-    for (const grenade of pkg.grenades) {
-      const thrower = pkg.players[grenade.throwerIndex];
-      if (!thrower) continue;
-      const player = bySteamId.get(thrower.steamId64);
-      const rows = [
-        player ? playerRows.get(player.playerKey) ?? null : null,
-        ensureTeam(pkg, thrower.teamKey),
-      ].filter((row): row is UtilityValueRow => row != null);
-      for (const row of rows) {
-        if (grenade.grenade === "flashbang") row.flashesThrown += 1;
-        else if (grenade.grenade === "hegrenade") row.heThrows += 1;
-        else if (grenade.grenade === "molotov" || grenade.grenade === "incendiary") row.fireThrows += 1;
-        else if (grenade.grenade === "smoke") row.smokesThrown += 1;
+    // Base utility totals are shared with every DAK consumer, including
+    // external product adapters. This view only adds presentation evidence.
+    for (const utility of buildPlayerRoundUtilityFacts(pkg)) {
+      const player = bySteamId.get(utility.steamId64);
+      const packagePlayer = pkg.players.find((candidate) => candidate.steamId64 === utility.steamId64);
+      if (!packagePlayer) continue;
+      const playerRow = player ? playerRows.get(player.playerKey) : null;
+      const teamRow = ensureTeam(pkg, packagePlayer.teamKey);
+      for (const row of [playerRow, teamRow]) {
+        if (!row) continue;
+        row.flashesThrown += utility.flashesThrown;
+        row.enemyBlindSeconds += utility.enemyBlindSeconds;
+        row.flashAssists += utility.flashAssists;
+        row.heThrows += utility.heThrows;
+        row.heDamage += utility.heDamage;
+        row.fireThrows += utility.fireThrows;
+        row.fireDamage += utility.fireDamage;
+        row.smokesThrown += utility.smokesThrown;
       }
     }
 
@@ -333,9 +332,6 @@ export function buildUtilityValueSummary(
       if (flasher.teamKey !== flashed.teamKey) {
         cell.enemySeconds += blind.durationSeconds;
         cell.victims.add(flashed.steamId64);
-        const playerRow = player ? playerRows.get(player.playerKey) : null;
-        if (playerRow) playerRow.enemyBlindSeconds += blind.durationSeconds;
-        ensureTeam(pkg, flasher.teamKey).enemyBlindSeconds += blind.durationSeconds;
       } else if (flasher.steamId64 !== flashed.steamId64) {
         cell.teamSeconds += blind.durationSeconds;
       }
@@ -366,13 +362,6 @@ export function buildUtilityValueSummary(
       const kind: UtilityDamageKind | null = isHeDamageWeapon(damage.weapon) ? "he" : isFireDamageWeapon(damage.weapon) ? "fire" : null;
       if (!kind || damage.healthDamage <= 0) continue;
       const player = bySteamId.get(attacker.steamId64);
-      const playerRow = player ? playerRows.get(player.playerKey) : null;
-      const teamRow = ensureTeam(pkg, attacker.teamKey);
-      for (const row of [playerRow, teamRow]) {
-        if (!row) continue;
-        if (kind === "he") row.heDamage += damage.healthDamage;
-        else row.fireDamage += damage.healthDamage;
-      }
       if (player) {
         const bucket = kind === "he" ? Math.round(damage.tick / 16) : damage.roundNumber;
         const key = `${kind}:${matchId}:${damage.roundNumber}:${player.playerKey}:${bucket}`;
@@ -522,6 +511,9 @@ export function buildPlayerSeasonInsights(
     if (stats.length === 0) continue;
     const sum = (f: (row: (typeof stats)[number]) => number) => stats.reduce((acc, row) => acc + f(row), 0);
     const rounds = Math.max(1, ...stats.map((row) => row.rounds));
+    const utilityFacts = buildPlayerRoundUtilityFacts(pkg).filter((fact) => ids.has(fact.steamId64));
+    const utilitySum = (key: "utilityDamage" | "enemyBlindSeconds" | "teamBlindSeconds" | "flashAssists" | "flashesThrown" | "enemyBlindVictims") =>
+      utilityFacts.reduce((total, fact) => total + fact[key], 0);
 
     const clutchAttempts = sum((r) => r.vsOneCount + r.vsTwoCount + r.vsThreeCount + r.vsFourCount + r.vsFiveCount);
     const clutchWins = sum((r) => r.vsOneWonCount + r.vsTwoWonCount + r.vsThreeWonCount + r.vsFourWonCount + r.vsFiveWonCount);
@@ -531,24 +523,18 @@ export function buildPlayerSeasonInsights(
       adr: round(sum((r) => r.damageHealth) / rounds, 1),
       kast: round(sum((r) => r.kastRounds) / rounds * 100, 1),
       fkMinusFd: sum((r) => r.firstKillCount) - sum((r) => r.firstDeathCount),
-      utilityDamagePerRound: round(sum((r) => r.utilityDamage) / rounds, 2),
+      utilityDamagePerRound: round(utilitySum("utilityDamage") / rounds, 2),
       clutchAttempts,
       clutchWins,
       kills: sum((r) => r.kills),
       deaths: sum((r) => r.deaths)
     });
 
-    enemyBlindSeconds += sum((r) => r.enemyFlashDurationSeconds);
-    teamBlindSeconds += sum((r) => r.teamFlashDurationSeconds);
-    flashAssists += sum((r) => r.flashAssistCount);
-    flashesThrown += pkg.grenades.filter(
-      (g) => g.grenade === "flashbang" && ids.has(pkg.players[g.throwerIndex]?.steamId64 ?? "")
-    ).length;
-    enemyBlindVictims += pkg.blinds.filter((b) => {
-      const flasher = pkg.players[b.flasherIndex];
-      const flashed = pkg.players[b.flashedIndex];
-      return flasher != null && flashed != null && ids.has(flasher.steamId64) && flasher.teamKey !== flashed.teamKey;
-    }).length;
+    enemyBlindSeconds += utilitySum("enemyBlindSeconds");
+    teamBlindSeconds += utilitySum("teamBlindSeconds");
+    flashAssists += utilitySum("flashAssists");
+    flashesThrown += utilitySum("flashesThrown");
+    enemyBlindVictims += utilitySum("enemyBlindVictims");
 
     // 队闪事件：同 (round, tick±8) 的同投掷者致盲友方行归并为一颗闪
     const teamBlindRows = pkg.blinds.filter((b) => {
@@ -957,21 +943,15 @@ export function buildPlayerFlashSummaries(
   }
 
   for (const { matchId, pkg } of demos) {
-    for (const stat of pkg.playerStats) {
-      const player = bySteamId.get(pkg.players[stat.playerIndex]?.steamId64 ?? "");
+    for (const utility of buildPlayerRoundUtilityFacts(pkg)) {
+      const player = bySteamId.get(utility.steamId64);
       if (!player) continue;
       const row = rows.get(player.playerKey)!;
-      row.enemyBlindSeconds += stat.enemyFlashDurationSeconds;
-      row.teamBlindSeconds += stat.teamFlashDurationSeconds;
-      row.flashAssists += stat.flashAssistCount;
-    }
-
-    for (const grenade of pkg.grenades) {
-      if (grenade.grenade !== "flashbang") continue;
-      const thrower = pkg.players[grenade.throwerIndex];
-      if (!thrower) continue;
-      const player = bySteamId.get(thrower.steamId64);
-      if (player) rows.get(player.playerKey)!.flashesThrown += 1;
+      row.flashesThrown += utility.flashesThrown;
+      row.enemyBlindSeconds += utility.enemyBlindSeconds;
+      row.teamBlindSeconds += utility.teamBlindSeconds;
+      row.enemyBlindVictims += utility.enemyBlindVictims;
+      row.flashAssists += utility.flashAssists;
     }
 
     type FlashCell = { playerKey: string; roundNumber: number; tick: number; victims: Set<string>; seconds: number };
@@ -983,7 +963,6 @@ export function buildPlayerFlashSummaries(
       if (!flasher || !flashed) continue;
       const player = bySteamId.get(flasher.steamId64);
       if (!player) continue;
-      const row = rows.get(player.playerKey)!;
       const key = `${player.playerKey}:${blind.flashId ?? `${blind.roundNumber}-${Math.round(blind.tick / 16)}`}`;
       const accumulate = (map: Map<string, FlashCell>) => {
         const cell = map.get(key) ?? {
@@ -999,7 +978,6 @@ export function buildPlayerFlashSummaries(
         map.set(key, cell);
       };
       if (flasher.teamKey !== flashed.teamKey) {
-        row.enemyBlindVictims += 1;
         accumulate(enemyGrouped);
         continue;
       }
@@ -1157,6 +1135,8 @@ export interface TournamentEconomyMatrixCell {
   lowEconomy: string;
   highEconomy: string;
   rounds: number;
+  /** 低经济方获胜的原始次数；供非展示 consumer 重建比例。 */
+  lowEconomyWins: number;
   lowWinRatePercent: number | null;
 }
 
@@ -1526,6 +1506,7 @@ export function buildTournamentInsightsFromFacts(demos: TournamentFacts[]): Tour
         lowEconomy: row.lowEconomy,
         highEconomy: row.highEconomy,
         rounds: row.rounds,
+        lowEconomyWins: row.lowWins,
         // 同档对局对称，没有“低经济方”可言
         lowWinRatePercent: !row.symmetric && row.rounds > 0 ? round((row.lowWins / row.rounds) * 100, 1) : null
       }))

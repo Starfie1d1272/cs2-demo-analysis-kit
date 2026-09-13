@@ -19,9 +19,10 @@ import type {
 import type { RRSignals } from "@rivalhub/rival-rating";
 import type { AccountRatingResult } from "./signals.js";
 import { normalizeDemoPackage } from "./normalize.js";
-import { activeDamages, round, firstKillMap, clutchSplit, isUtilityWeapon, killWeaponName } from "./utils.js";
+import { activeDamages, round, firstKillMap, clutchSplit, killWeaponName } from "./utils.js";
 import { createResolverFromPackage } from "./resolve.js";
 import { fieldAvailability, fieldConfidence } from "./qa.js";
+import { buildPlayerRoundUtilityFacts } from "./utility-facts.js";
 
 export function deriveRRIndicators(input: unknown): RRIndicators[] {
   const pkg = normalizeDemoPackage(input);
@@ -32,13 +33,17 @@ export function buildPlayerRoundFacts(pkg: DemoPackage): PlayerRoundFact[] {
   const resolver = createResolverFromPackage(pkg);
   const firstKillByRound = firstKillMap(pkg);
   const damageRows = activeDamages(pkg);
+  const utilityFacts = new Map(buildPlayerRoundUtilityFacts(pkg).map((fact) => [`${fact.roundNumber}:${fact.steamId64}`, fact]));
 
   return pkg.rounds.flatMap((roundRow) =>
     pkg.players.map((player, playerIdx) => {
       const kills = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.killerIndex === playerIdx);
       const deaths = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.victimIndex === playerIdx);
       const assists = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.assisterIndex === playerIdx);
-      const flashAssists = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.flashAssisterIndex === playerIdx);
+      // Keep the existing PlayerRoundFact assist/KAST semantics (the
+      // flashAssists field itself is supplied by the shared utility helper).
+      const flashAssistRows = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.flashAssisterIndex === playerIdx);
+      const utility = utilityFacts.get(`${roundRow.roundNumber}:${player.steamId64}`)!;
       const playerDamageRows = damageRows.filter((row) =>
         row.roundNumber === roundRow.roundNumber &&
         row.attackerIndex === playerIdx &&
@@ -50,7 +55,7 @@ export function buildPlayerRoundFacts(pkg: DemoPackage): PlayerRoundFact[] {
       const kastTags = new Set<PlayerRoundFact["kastTags"][number]>();
 
       if (kills.length > 0) kastTags.add("kill");
-      if (assists.length > 0 || flashAssists.length > 0) kastTags.add("assist");
+      if (assists.length > 0 || flashAssistRows.length > 0) kastTags.add("assist");
       if (deaths.length === 0) kastTags.add("survive");
       if (deaths.some((death) => death.tradeDeath)) kastTags.add("trade");
 
@@ -63,10 +68,10 @@ export function buildPlayerRoundFacts(pkg: DemoPackage): PlayerRoundFact[] {
         survived: deaths.length === 0,
         kills: kills.length,
         deaths: deaths.length,
-        assists: assists.length + flashAssists.length,
+        assists: assists.length + flashAssistRows.length,
         damage: playerDamageRows.reduce((sum, row) => sum + row.healthDamage, 0),
-        utilityDamage: playerDamageRows.filter((row) => isUtilityWeapon(row.weapon)).reduce((sum, row) => sum + row.healthDamage, 0),
-        flashAssists: flashAssists.length + kills.filter((kill) => kill.flashAssist).length,
+        utilityDamage: utility.utilityDamage,
+        flashAssists: utility.flashAssists,
         tradeKills: kills.filter((kill) => kill.tradeKill).length,
         tradedDeaths: deaths.filter((death) => death.tradeDeath).length,
         openingDuel: firstKill?.killerIndex === playerIdx ? "won" : firstKill?.victimIndex === playerIdx ? "lost" : "none",
@@ -80,6 +85,20 @@ export function buildPlayerRoundFacts(pkg: DemoPackage): PlayerRoundFact[] {
 
 export function buildPlayerIndicators(pkg: DemoPackage, facts: PlayerRoundFact[]): PlayerIndicatorRow[] {
   const statsMap = new Map(pkg.playerStats.map((row) => [row.playerIndex, row]));
+  const utilityTotals = new Map<string, {
+    utilityDamage: number;
+    flashAssists: number;
+    enemyBlindSeconds: number;
+    teamBlindSeconds: number;
+  }>();
+  for (const fact of buildPlayerRoundUtilityFacts(pkg)) {
+    const total = utilityTotals.get(fact.steamId64) ?? { utilityDamage: 0, flashAssists: 0, enemyBlindSeconds: 0, teamBlindSeconds: 0 };
+    total.utilityDamage += fact.utilityDamage;
+    total.flashAssists += fact.flashAssists;
+    total.enemyBlindSeconds += fact.enemyBlindSeconds;
+    total.teamBlindSeconds += fact.teamBlindSeconds;
+    utilityTotals.set(fact.steamId64, total);
+  }
 
   const indicators = pkg.players.map((player, playerIdx) => {
     const stats = statsMap.get(playerIdx);
@@ -88,7 +107,7 @@ export function buildPlayerIndicators(pkg: DemoPackage, facts: PlayerRoundFact[]
     const playerDeaths = pkg.kills.filter((kill) => kill.victimIndex === playerIdx);
     const playerEconomies = pkg.playerEconomies.filter((row) => row.playerIndex === playerIdx);
     const playerClutches = pkg.clutches.filter((row) => row.clutcherIndex === playerIdx);
-    const playerBlinds = pkg.blinds.filter((row) => row.flasherIndex === playerIdx);
+    const utility = utilityTotals.get(player.steamId64) ?? { utilityDamage: 0, flashAssists: 0, enemyBlindSeconds: 0, teamBlindSeconds: 0 };
     const totalRounds = Math.max(playerFacts.length, 1);
     const killsByRound = new Map<number, number>();
     for (const kill of playerKills) {
@@ -100,21 +119,10 @@ export function buildPlayerIndicators(pkg: DemoPackage, facts: PlayerRoundFact[]
     const openingDuels = firstKillCount + firstDeathCount;
     const awpKills = playerKills.filter((kill) => killWeaponName(kill) === "awp").length;
     const sniperKills = playerKills.filter((kill) => ["awp", "ssg08", "scout"].includes(killWeaponName(kill))).length;
-    const utilityDamage = stats?.utilityDamage ?? playerFacts.reduce((sum, fact) => sum + fact.utilityDamage, 0);
-    const flashAssistCount = stats?.flashAssistCount ?? playerFacts.reduce((sum, fact) => sum + fact.flashAssists, 0);
-    const resolver = createResolverFromPackage(pkg);
-    const enemyFlashDurationSeconds = stats?.enemyFlashDurationSeconds ?? playerBlinds
-      .filter((blind) => {
-        const flashedPlayer = resolver.byIndexOrNull(blind.flashedIndex);
-        return flashedPlayer != null && flashedPlayer.teamKey !== player.teamKey;
-      })
-      .reduce((sum, blind) => sum + blind.durationSeconds, 0);
-    const teamFlashDurationSeconds = stats?.teamFlashDurationSeconds ?? playerBlinds
-      .filter((blind) => {
-        const flashedPlayer = resolver.byIndexOrNull(blind.flashedIndex);
-        return flashedPlayer?.teamKey === player.teamKey && blind.flashedIndex !== playerIdx;
-      })
-      .reduce((sum, blind) => sum + blind.durationSeconds, 0);
+    const utilityDamage = stats?.utilityDamage ?? utility.utilityDamage;
+    const flashAssistCount = stats?.flashAssistCount ?? utility.flashAssists;
+    const enemyFlashDurationSeconds = stats?.enemyFlashDurationSeconds ?? utility.enemyBlindSeconds;
+    const teamFlashDurationSeconds = stats?.teamFlashDurationSeconds ?? utility.teamBlindSeconds;
     const grenadeCount = pkg.grenades.filter((grenade) => grenade.throwerIndex === playerIdx).length;
     const deaths = stats?.deaths ?? playerDeaths.length;
     const kills = stats?.kills ?? playerKills.length;

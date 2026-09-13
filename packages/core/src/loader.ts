@@ -25,20 +25,19 @@ export async function loadDemoPackageFromZip(bytes: ArrayBuffer | Uint8Array): P
 
   const optional = async (name: string | undefined): Promise<unknown> =>
     name ? readJson<unknown>(name).catch(() => undefined) : undefined;
-  const required = async (name: string, fallback: unknown): Promise<unknown> =>
-    readJson<unknown>(name).catch(() => fallback);
-
   const match = await readJson<unknown>(files.match);
   const players = await readJson<unknown>(files.players);
   const rounds = await readJson<unknown>(files.rounds);
-  const playerEconomies = await required(files.playerEconomies, []);
-  const playerStats = await required(files.playerStats, []);
-  const kills = await required(files.kills, []);
-  const damages = await required(files.damages, []);
-  const blinds = await required(files.blinds, []);
-  const bombs = await required(files.bombs, []);
-  const grenades = await required(files.grenades, []);
-  const clutches = await required(files.clutches, []);
+  // cs2-demo-format/3.x requires these files. An empty, valid array means no
+  // event occurred; a missing or invalid file is a malformed package, not [] .
+  const playerEconomies = await readJson<unknown>(files.playerEconomies);
+  const playerStats = await readJson<unknown>(files.playerStats);
+  const kills = await readJson<unknown>(files.kills);
+  const damages = await readJson<unknown>(files.damages);
+  const blinds = await readJson<unknown>(files.blinds);
+  const bombs = await readJson<unknown>(files.bombs);
+  const grenades = await readJson<unknown>(files.grenades);
+  const clutches = await readJson<unknown>(files.clutches);
   const shots = await optional(files.shots);
   const replay = await optional(files.replay);
   const duels = await optional(files.duels);

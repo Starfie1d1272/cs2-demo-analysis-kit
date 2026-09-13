@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DemoPackage, PackageDamage } from "@cs2dak/contract";
 import { activeDamages } from "./utils.js";
-import { buildQaReport } from "./qa.js";
+import { buildQaReport, demoSourceAvailability } from "./qa.js";
 
 function damage(tick: number): PackageDamage {
   return {
@@ -83,6 +83,18 @@ function pkg(overrides: Partial<DemoPackage>): DemoPackage {
 }
 
 describe("buildQaReport", () => {
+  it("reports v3 required event families as available when a valid match has zero events", () => {
+    const availability = demoSourceAvailability(pkg({ kills: [], damages: [], blinds: [], bombs: [], grenades: [], clutches: [] }));
+
+    expect(availability).toMatchObject({
+      damages: "available",
+      bombs: "available",
+      utility: "available",
+      clutches: "available",
+      richKills: "available",
+    });
+  });
+
   it("accepts pre-freeze damage rows but excludes them from active damage analytics", () => {
     const demo = pkg({ damages: [damage(50), damage(120)] });
 

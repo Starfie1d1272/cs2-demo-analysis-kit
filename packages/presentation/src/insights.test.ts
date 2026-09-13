@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { loadDemoPackageFromZip } from "@cs2dak/core";
+import { buildPlayerRoundUtilityFacts, loadDemoPackageFromZip } from "@cs2dak/core";
 import {
   buildMatchBuyQuality,
   buildMatchReportMarkdown,
@@ -84,6 +84,8 @@ describe("buildPlayerFlashSummaries", () => {
     const summaries = buildPlayerFlashSummaries(demos, players);
 
     for (const player of players) {
+      const playerIndex = pkg.players.findIndex((candidate) => candidate.steamId64 === player.steamIds[0]);
+      const stats = pkg.playerStats.find((row) => row.playerIndex === playerIndex)!;
       const expected = buildPlayerSeasonInsights(demos, player.steamIds).flash;
       const actual = summaries.find((row) => row.playerKey === player.playerKey);
       expect(actual).toBeDefined();
@@ -95,11 +97,46 @@ describe("buildPlayerFlashSummaries", () => {
       expect(actual?.netSecondsPerFlash).toBe(expected.netSecondsPerFlash);
       expect(actual?.flashAssists).toBe(expected.flashAssists);
       expect(actual?.worstTeamFlashes).toEqual(expected.worstTeamFlashes);
+      expect(actual?.enemyBlindSeconds).toBe(Math.round(stats.enemyFlashDurationSeconds * 10) / 10);
+      expect(actual?.teamBlindSeconds).toBe(Math.round(stats.teamFlashDurationSeconds * 10) / 10);
+      expect(actual?.flashAssists).toBe(stats.flashAssistCount);
+      expect(actual?.enemyBlindVictims).toBe(pkg.blinds.filter((blind) => blind.flasherIndex === playerIndex
+        && pkg.players[blind.flashedIndex]?.teamKey !== pkg.players[playerIndex]?.teamKey).length);
     }
   });
 });
 
 describe("buildUtilityValueSummary", () => {
+  it("uses the shared core utility facts without changing Studio totals", async () => {
+    const pkg = await fixture;
+    const players = pkg.players.slice(0, 4).map((player) => ({
+      playerKey: `steam:${player.steamId64}`,
+      name: player.name,
+      steamIds: [player.steamId64]
+    }));
+    const summary = buildUtilityValueSummary([{ matchId: "m1", pkg }], players);
+    const facts = buildPlayerRoundUtilityFacts(pkg);
+
+    for (const player of players) {
+      const playerIndex = pkg.players.findIndex((candidate) => candidate.steamId64 === player.steamIds[0]);
+      const stats = pkg.playerStats.find((row) => row.playerIndex === playerIndex)!;
+      const expected = facts.filter((fact) => fact.steamId64 === player.steamIds[0]).reduce((total, fact) => ({
+        flashesThrown: total.flashesThrown + fact.flashesThrown,
+        enemyBlindSeconds: total.enemyBlindSeconds + fact.enemyBlindSeconds,
+        flashAssists: total.flashAssists + fact.flashAssists,
+        heThrows: total.heThrows + fact.heThrows,
+        heDamage: total.heDamage + fact.heDamage,
+        fireThrows: total.fireThrows + fact.fireThrows,
+        fireDamage: total.fireDamage + fact.fireDamage,
+        smokesThrown: total.smokesThrown + fact.smokesThrown,
+      }), { flashesThrown: 0, enemyBlindSeconds: 0, flashAssists: 0, heThrows: 0, heDamage: 0, fireThrows: 0, fireDamage: 0, smokesThrown: 0 });
+      const actual = summary.players.find((row) => row.id === player.playerKey);
+      expect(actual).toMatchObject({ ...expected, enemyBlindSeconds: Math.round(expected.enemyBlindSeconds * 10) / 10 });
+      expect(actual?.enemyBlindSeconds).toBe(Math.round(stats.enemyFlashDurationSeconds * 10) / 10);
+      expect(actual?.flashAssists).toBe(stats.flashAssistCount);
+    }
+  });
+
   it("normalizes flash, HE, fire and smoke value by rounds or throws", async () => {
     const pkg = await fixture;
     const players = pkg.players.slice(0, 4).map((player) => ({
@@ -198,6 +235,10 @@ describe("buildTournamentInsights", () => {
       expect(cell.highEconomy).not.toBe("pistol");
       if (cell.lowEconomy === cell.highEconomy) expect(cell.lowWinRatePercent).toBeNull();
       else expect(cell.lowWinRatePercent).not.toBeNull();
+      expect(cell.lowEconomyWins).toBeLessThanOrEqual(cell.rounds);
+      if (cell.lowWinRatePercent != null) {
+        expect(cell.lowWinRatePercent).toBe(Math.round((cell.lowEconomyWins / cell.rounds) * 1000) / 10);
+      }
     }
 
     // 反转换：机会数 ≥ 成功数，全队 breakRounds 总和 = 全队 conversionRounds 总和

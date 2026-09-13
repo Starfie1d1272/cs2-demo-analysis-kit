@@ -1,6 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { analyzeDemoPackage, buildPlayerRoundFacts, loadDemoPackageFromZip } from "../packages/core/src/index.ts";
-import type { DemoPackage, TeamKey } from "../packages/contract/src/index.ts";
+import { analyzeDemoPackage, buildPlayerRoundFacts, buildPlayerRoundUtilityFacts, demoSourceAvailability, loadDemoPackageFromZip } from "../packages/core/src/index.ts";
+import type { DemoPackage } from "../packages/contract/src/index.ts";
 import { buildTournamentInsightsFromFacts, extractTournamentFacts } from "../packages/presentation/src/index.ts";
 
 export type RivalHubEvidenceTarget = {
@@ -37,46 +37,15 @@ function mappedSteam(pkg: DemoPackage, identities: Map<string, RivalHubMatchedPa
   return player ? identities.get(player.steamId64)?.steamId64 ?? null : null;
 }
 
-function utilityForRound(pkg: DemoPackage, playerIndex: number, roundNumber: number) {
-  const player = pkg.players[playerIndex]!;
-  const kills = pkg.kills.filter((row) => row.roundNumber === roundNumber && row.killerIndex === playerIndex);
-  const blinds = pkg.blinds.filter((row) => row.roundNumber === roundNumber && row.flasherIndex === playerIndex);
-  const enemyBlinds = blinds.filter((row) => pkg.players[row.flashedIndex]?.teamKey !== player.teamKey);
-  const teamBlinds = blinds.filter((row) => pkg.players[row.flashedIndex]?.teamKey === player.teamKey && row.flashedIndex !== playerIndex);
-  const damages = pkg.damages.filter((row) => row.roundNumber === roundNumber && row.attackerIndex === playerIndex && pkg.players[row.victimIndex]?.teamKey !== player.teamKey);
-  const grenades = pkg.grenades.filter((row) => row.roundNumber === roundNumber && row.throwerIndex === playerIndex);
-  const isFire = (weapon: string) => ["inferno", "molotov", "incgrenade", "incendiary"].includes(weapon.toLowerCase());
-  const isUtility = (weapon: string) => weapon.toLowerCase() === "hegrenade" || isFire(weapon);
-  return {
-    flashesThrown: grenades.filter((row) => row.grenade === "flashbang").length,
-    enemyBlindSeconds: enemyBlinds.reduce((sum, row) => sum + row.durationSeconds, 0),
-    teamBlindSeconds: teamBlinds.reduce((sum, row) => sum + row.durationSeconds, 0),
-    enemyBlindVictims: new Set(enemyBlinds.map((row) => `${row.flashId ?? row.tick}:${row.flashedIndex}`)).size,
-    heThrows: grenades.filter((row) => row.grenade === "hegrenade").length,
-    heDamage: damages.filter((row) => row.weapon.toLowerCase() === "hegrenade").reduce((sum, row) => sum + row.healthDamage, 0),
-    fireThrows: grenades.filter((row) => row.grenade === "molotov" || row.grenade === "incendiary").length,
-    fireDamage: damages.filter((row) => isFire(row.weapon)).reduce((sum, row) => sum + row.healthDamage, 0),
-    smokesThrown: grenades.filter((row) => row.grenade === "smoke").length,
-    utilityKills: kills.filter((row) => isUtility(row.weapon)).length,
-  };
-}
-
 function teamConversions(pkg: DemoPackage) {
   const insights = buildTournamentInsightsFromFacts([extractTournamentFacts({ matchId: "fixture", pkg })]);
-  const names: Record<TeamKey, string> = { teamA: pkg.match.teamA.name ?? "Team A", teamB: pkg.match.teamB.name ?? "Team B" };
-  const matrix = pkg.rounds.filter((row) => row.teamAEconomy !== "pistol" && row.teamBEconomy !== "pistol").reduce((cells, row) => {
-    const rank: Record<string, number> = { eco: 0, semi: 1, force: 2, full: 3 };
-    const lowIsA = rank[row.teamAEconomy] <= rank[row.teamBEconomy];
-    const lowEconomy = lowIsA ? row.teamAEconomy : row.teamBEconomy;
-    const highEconomy = lowIsA ? row.teamBEconomy : row.teamAEconomy;
-    const key = `${lowEconomy}:${highEconomy}`;
-    const cell = cells.get(key) ?? { lowEconomy, highEconomy, rounds: 0, lowEconomyWins: 0 };
-    cell.rounds += 1;
-    if (row.winnerTeamKey === (lowIsA ? "teamA" : "teamB")) cell.lowEconomyWins += 1;
-    cells.set(key, cell);
-    return cells;
-  }, new Map<string, { lowEconomy: string; highEconomy: string; rounds: number; lowEconomyWins: number }>());
-  return { economyMatrix: [...matrix.values()], teams: (["teamA", "teamB"] as const).map((teamKey) => {
+  const names = { teamA: pkg.match.teamA.name ?? "Team A", teamB: pkg.match.teamB.name ?? "Team B" };
+  return { economyMatrix: insights.economyMatrix.map((row) => ({
+    lowEconomy: row.lowEconomy,
+    highEconomy: row.highEconomy,
+    rounds: row.rounds,
+    lowEconomyWins: row.lowEconomyWins,
+  })), teams: (["teamA", "teamB"] as const).map((teamKey) => {
     const summary = insights.teamEconomySummaries.find((row) => row.teamName === names[teamKey])!;
     const states = new Map(summary.manAdvantage.states.map((row) => [`${row.advantageAlive}v${row.disadvantageAlive}`, row]));
     const state = (label: "5v4" | "5v3") => states.get(label);
@@ -101,12 +70,13 @@ function teamConversions(pkg: DemoPackage) {
 export function buildRivalHubDemoEvidenceV1(pkg: DemoPackage, target: RivalHubEvidenceTarget, identities: Map<string, RivalHubMatchedParticipant>) {
   const analysis = analyzeDemoPackage(pkg);
   const facts = buildPlayerRoundFacts(pkg);
+  const utilityFacts = new Map(buildPlayerRoundUtilityFacts(pkg).map((fact) => [`${fact.roundNumber}:${fact.steamId64}`, fact]));
   const playerIndex = new Map(pkg.players.map((player, index) => [player.steamId64, index]));
   const roundSeq = new Map(pkg.rounds.map((round, index) => [round.roundNumber, index + 1]));
   const playerRounds = facts.map((fact) => {
     const index = playerIndex.get(fact.steamId64)!;
-    const source = pkg.rounds.find((round) => round.roundNumber === fact.roundNumber)!;
     const clutch = pkg.clutches.find((row) => row.roundNumber === fact.roundNumber && row.clutcherIndex === index);
+    const utility = utilityFacts.get(`${fact.roundNumber}:${fact.steamId64}`)!;
     return {
       roundSeq: roundSeq.get(fact.roundNumber)!, steamId64: identities.get(fact.steamId64)!.steamId64, teamKey: fact.teamKey, side: fact.side,
       survived: fact.survived, kills: fact.kills, deaths: fact.deaths, assists: fact.assists, damage: fact.damage,
@@ -114,7 +84,19 @@ export function buildRivalHubDemoEvidenceV1(pkg: DemoPackage, target: RivalHubEv
       tradeKills: fact.tradeKills, tradedDeaths: fact.tradedDeaths, openingDuel: fact.openingDuel, kast: fact.kastTags.length > 0,
       economyType: fact.economyType, equipmentValue: fact.equipmentValue,
       clutch: clutch ? { opponentCount: clutch.opponentCount, won: clutch.won } : null,
-      utility: { ...utilityForRound(pkg, index, fact.roundNumber), flashAssists: fact.flashAssists },
+      utility: {
+        flashesThrown: utility.flashesThrown,
+        enemyBlindSeconds: utility.enemyBlindSeconds,
+        teamBlindSeconds: utility.teamBlindSeconds,
+        enemyBlindVictims: utility.enemyBlindVictims,
+        flashAssists: utility.flashAssists,
+        heThrows: utility.heThrows,
+        heDamage: utility.heDamage,
+        fireThrows: utility.fireThrows,
+        fireDamage: utility.fireDamage,
+        smokesThrown: utility.smokesThrown,
+        utilityKills: utility.utilityKills,
+      },
     };
   });
   const playerMaps = pkg.players.map((player) => {
@@ -136,7 +118,7 @@ export function buildRivalHubDemoEvidenceV1(pkg: DemoPackage, target: RivalHubEv
     contract: { contractVersion: "rivalhub-demo-evidence/1", semanticProfile: "dak-stable/1", analysisVersion: analysis.provenance.analysisVersion },
     target,
     source: { demoSha256: pkg.manifest.demo?.hash ?? "0".repeat(64), mapName: pkg.match.mapName, tickRateHz: pkg.match.tickrate, sourceSchemaVersion: pkg.manifest.schemaVersion, exporterVersion: `${pkg.manifest.exporter.name}/${pkg.manifest.exporter.version}`, parserVersion: `${pkg.manifest.parser.name}/${pkg.manifest.parser.version}`, assistantVersion: "rivalhub-demo-assistant/0.1.0-fixture", generatedAt: new Date(pkg.manifest.exportedAt).toISOString() },
-    quality: { qa: { ok: analysis.qa.ok, ...analysis.qa.summary }, capabilities: { ...analysis.scoreboard[0]!.fieldAvailability, utility: pkg.grenades.length > 0 && pkg.blinds.length > 0 ? "available" : "missing", clutches: pkg.clutches.length > 0 ? "available" : "missing" }, normalConfirmable: analysis.qa.ok },
+    quality: { qa: { ok: analysis.qa.ok, ...analysis.qa.summary }, capabilities: demoSourceAvailability(pkg) },
     participants: pkg.players.map((player) => { const identity = identities.get(player.steamId64)!; return { steamId64: identity.steamId64, nameSnapshot: identity.nameSnapshot, observedTeamKey: player.teamKey, resolution: { status: "matched", userId: identity.userId, eventRosterMemberId: identity.eventRosterMemberId, entryId: identity.entryId } }; }),
     sourceFacts: {
       rounds: pkg.rounds.map((row, index) => ({ roundSeq: index + 1, sourceRoundNumber: row.roundNumber, phase: row.roundNumber <= 24 ? "regulation" : "overtime", startTick: row.startTick, freezeEndTick: row.freezeEndTick, endTick: row.endTick, teamASide: row.teamASide, teamBSide: row.teamBSide, teamAScoreBefore: row.teamAScoreBefore, teamBScoreBefore: row.teamBScoreBefore, teamAEconomy: row.teamAEconomy, teamBEconomy: row.teamBEconomy, winnerTeamKey: row.winnerTeamKey, winnerSide: row.winnerSide, endReason: row.endReason })),
