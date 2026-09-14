@@ -97,7 +97,7 @@ export function rivalHubBatchCompletionMessage(session: RivalHubBatchSession, re
 interface RivalHubBatchDependencies {
   exportDem: (file: File, onProgress?: (message: string) => void) => Promise<ExportedDemoFile>;
   importDemo: typeof importDemoFile;
-  loadPackage: (id: string) => Promise<DemoPackage>;
+  loadPackage: (id: string, sourceFile?: File) => Promise<DemoPackage>;
   matchMap: typeof matchRivalHubMap;
   submit: typeof submitRivalHubEvidence;
   idempotencyKey: typeof rivalHubEvidenceIdempotencyKey;
@@ -300,14 +300,14 @@ export async function runRivalHubBatch(
       const hashMatches = context.candidates.filter(({ map }) => map.demoSha256?.toLowerCase() === localEntry!.demoSha256!.toLowerCase());
       let match: RivalHubMatchResult;
       if (context.fixedMatchMapId) {
-        pkg = await deps.loadPackage(localEntry.id);
+        pkg = await deps.loadPackage(localEntry.id, exported.file);
         match = deps.matchMap(pkg, context.candidates, { fixedMatchMapId: context.fixedMatchMapId, demoDate: entryDate(localEntry) });
       } else if (hashMatches.length === 1) {
         match = { status: "matched", candidate: hashMatches[0]!, mode: "remote_demo_sha" };
       } else if (hashMatches.length > 1) {
         match = { status: "needs_target", candidates: hashMatches, reason: "同一个 raw Demo hash 对应多个 RivalHub Map，服务端上下文不一致" };
       } else {
-        pkg = await deps.loadPackage(localEntry.id);
+        pkg = await deps.loadPackage(localEntry.id, exported.file);
         match = deps.matchMap(pkg, context.candidates, { demoSha256: localEntry.demoSha256, demoDate: entryDate(localEntry) });
       }
       if (match.status === "needs_target") {
@@ -347,7 +347,7 @@ export async function runRivalHubBatch(
       }
 
       const selected = match.candidate;
-      pkg ??= await deps.loadPackage(localEntry.id);
+      pkg ??= await deps.loadPackage(localEntry.id, exported.file);
       updateItem(index, { ...replacementResult(session.items[index]!, match), phase: "building_evidence", message: messageForPhase("building_evidence"), targetCandidates: undefined });
       const target = evidenceTargetFromRemoteMap(selected.map);
       let participantMatch: ReturnType<typeof resolveRivalHubParticipants> | ReturnType<typeof resolveRivalHubParticipantsFromEventRoster> | ReturnType<typeof resolveRivalHubParticipantsForReview>;

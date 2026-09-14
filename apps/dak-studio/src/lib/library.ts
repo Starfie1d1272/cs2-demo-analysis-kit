@@ -662,9 +662,9 @@ export function getDemoPackage(id: string): Promise<DemoPackage> {
   return loading;
 }
 
-/** 在线批量专用：从持久化 ZIP 解析一场，不进入 pkgCache，也不保留 worker 回退副本。 */
-export async function loadDemoPackageTransient(id: string): Promise<DemoPackage> {
-  const buffer = await demoBlobs.get(id);
+/** 在线批量专用：从当前 ZIP File 或持久化 ZIP 解析一场，不进入 pkgCache，也不保留 worker 回退副本。 */
+export async function loadDemoPackageTransient(id: string, sourceFile?: File): Promise<DemoPackage> {
+  const buffer = sourceFile ? await sourceFile.arrayBuffer() : await demoBlobs.get(id);
   if (!buffer) throw new Error("demo 不存在或已被删除");
   return parseZipInWorker(buffer, false, "evidence");
 }

@@ -23,7 +23,7 @@ UI 约定：Beta 指标在标题旁标 `Beta`，Experimental 标 `实验`；两�
 - **经济矩阵 / 手枪转化 / eco-semi 翻盘 / Buy Quality 单图事实**：`@cs2dak/core` 经济模块，fixture 覆盖。
 - **Tournament 跨图经济与转化 merge**：`@cs2dak/tournament` 消费 `dak-stable/1` frozen counts，
   identity 只认 entity key，`rate` 保留原始分子/分母；当前 Evidence producer provenance 为
-  `cs2-demo-analysis-kit/1.0.1`。这只是 merge owner 的收敛，不会把 Beta / Experimental 指标升为 Stable。
+  `cs2-demo-analysis-kit/1.0.2`。这只是 merge owner 的收敛，不会把 Beta / Experimental 指标升为 Stable。
 - **RR v1 单场数据线**：frozen pro baseline（`1.0 = 职业基线`），单场口径稳定。
 - **2D 回放与 EvidenceLink**：回放帧、锚点、统计跳转——基础设施级。
 - **QA 报告**：damage/freeze 伪影规则已冻结（见 `studio-redesign.md` §1）。

@@ -128,6 +128,15 @@ describe("RivalHub serial batch import", () => {
     expect(exportDem.mock.calls[0]?.[0]).toBe(nativeFile);
   });
 
+  it("loads the transient evidence package from the current ZIP File instead of storage", async () => {
+    const dependencies = baseDependencies();
+    const source = new File(["zip"], "fresh.zip", { type: "application/zip" });
+
+    await runWith([source], dependencies);
+
+    expect(dependencies.loadPackage).toHaveBeenCalledWith("entry:fresh.zip", source);
+  });
+
   it("processes files in order and keeps local duplicate non-terminal", async () => {
     const phases: string[] = [];
     const dependencies = baseDependencies({

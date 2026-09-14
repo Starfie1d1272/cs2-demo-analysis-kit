@@ -107,6 +107,14 @@ describe("rebuildFactsFromZip", () => {
 });
 
 describe("transient RivalHub package loading", () => {
+  it("can parse the current ZIP File without reading the persisted blob", async () => {
+    const transient = await loadDemoPackageTransient("not-persisted", await sampleFile());
+
+    expect(transient.replay).toBeUndefined();
+    expect(transient.shots).toBeUndefined();
+    expect(transient.duels).toBeUndefined();
+  });
+
   it("uses the evidence profile outside the normal full-package cache", async () => {
     const imported = await importDemoFile(await sampleFile(), { tags: ["transient-test"] });
     clearPkgCache();
