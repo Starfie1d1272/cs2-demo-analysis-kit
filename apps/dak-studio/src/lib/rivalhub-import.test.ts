@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { DemoPackage } from "@cs2dak/contract";
 import type { StudioDemoEntry } from "./library";
 import type { RivalHubRemoteMap, RivalHubRemoteTeam } from "./rivalhub-contract";
-import { runRivalHubBatch, type RivalHubBatchCallbacks, type RivalHubMatchCandidate } from "./rivalhub-import";
+import { rivalHubBatchCompletionMessage, runRivalHubBatch, type RivalHubBatchCallbacks, type RivalHubMatchCandidate } from "./rivalhub-import";
+import { fileFromNativePath, nativePathForFile } from "./dem";
 
 const demoSha256 = "a".repeat(64);
 const fakePackage = {} as DemoPackage;
@@ -109,6 +110,33 @@ function runWith(
 }
 
 describe("RivalHub serial batch import", () => {
+  it("routes a path-backed native selection through the existing export owner", async () => {
+    const dependencies = baseDependencies();
+    const exportDem = vi.fn(async (file: File) => ({
+      file: new File(["zip"], "native.zip", { type: "application/zip" }),
+      sourceDemPath: null,
+    }));
+    const nativeFile = fileFromNativePath("/demos/native.zip");
+
+    await runRivalHubBatch([nativeFile], { scope: "event", eventId: "event-1", candidates: [candidate("target")] }, {
+      exportDem,
+      dependencies,
+    });
+
+    expect(nativePathForFile(nativeFile)).toBe("/demos/native.zip");
+    expect(exportDem).toHaveBeenCalledOnce();
+    expect(exportDem.mock.calls[0]?.[0]).toBe(nativeFile);
+  });
+
+  it("loads the transient evidence package from the current ZIP File instead of storage", async () => {
+    const dependencies = baseDependencies();
+    const source = new File(["zip"], "fresh.zip", { type: "application/zip" });
+
+    await runWith([source], dependencies);
+
+    expect(dependencies.loadPackage).toHaveBeenCalledWith("entry:fresh.zip", source);
+  });
+
   it("processes files in order and keeps local duplicate non-terminal", async () => {
     const phases: string[] = [];
     const dependencies = baseDependencies({
@@ -173,6 +201,54 @@ describe("RivalHub serial batch import", () => {
 
     expect(session.items[0]).toMatchObject({ phase: "needs_attention", matchedMapId: "target" });
     expect(dependencies.submit).toHaveBeenCalledOnce();
+  });
+
+  it("records a server submission error as failed and never links locally", async () => {
+    const dependencies = baseDependencies({
+      submit: vi.fn(async () => { throw new Error("server unavailable"); }),
+    });
+
+    const session = await runWith([new File(["zip"], "server-error.zip")], dependencies);
+
+    expect(session.items[0]).toMatchObject({ phase: "failed", detail: "server unavailable" });
+    expect(dependencies.submit).toHaveBeenCalledOnce();
+    expect(dependencies.linkMap).not.toHaveBeenCalled();
+    expect(rivalHubBatchCompletionMessage(session)).toContain("失败 1");
+  });
+
+  it("does not report success or create a local link when matching stops before submit", async () => {
+    const dependencies = baseDependencies({
+      matchMap: vi.fn(() => ({ status: "not_found" as const, reason: "no official target" })),
+    });
+
+    const session = await runWith([new File(["zip"], "not-found.zip")], dependencies);
+
+    expect(session.items[0]).toMatchObject({ phase: "failed", detail: "no official target" });
+    expect(dependencies.submit).not.toHaveBeenCalled();
+    expect(dependencies.linkMap).not.toHaveBeenCalled();
+    expect(session.counts.synced).toBe(0);
+  });
+
+  it("links only after the server returns its terminal needs_attention result", async () => {
+    const order: string[] = [];
+    const dependencies = baseDependencies({
+      submit: vi.fn(async (): Promise<Awaited<ReturnType<BatchSubmit>>> => {
+        order.push("submit");
+        return {
+          status: "needs_attention",
+          importId: null,
+          matchMapId: "target",
+          demoSha256,
+          issues: [{ code: "REVIEW", message: "人工复核" }],
+        };
+      }),
+    });
+    dependencies.linkMap = vi.fn(async () => { order.push("link"); });
+
+    const session = await runWith([new File(["zip"], "needs-attention.zip")], dependencies);
+
+    expect(session.items[0]).toMatchObject({ phase: "needs_attention", detail: "人工复核" });
+    expect(order).toEqual(["submit", "link"]);
   });
 
   it("resumes after a target picker without repeating export or local import", async () => {
@@ -243,7 +319,7 @@ describe("RivalHub serial batch import", () => {
 
     expect(dependencies.importDemo).toHaveBeenCalledOnce();
     expect(session.items[0]?.phase).toBe("synced");
-    expect(session.items.slice(1).every((item) => item.phase === "queued")).toBe(true);
+    expect(session.items.slice(1).every((item) => item.phase === "skipped")).toBe(true);
     expect(states).toContain("stopping");
     expect(session.status).toBe("completed");
   });

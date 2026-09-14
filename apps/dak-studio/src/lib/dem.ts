@@ -56,6 +56,22 @@ export interface ExportedDemoFile {
   sourceDemPath?: string | null;
 }
 
+type PathBackedFile = File & { pywebviewFullPath?: string };
+
+/** Create a lightweight File handle whose bytes are intentionally unused by the desktop exporter. */
+export function fileFromNativePath(path: string): File {
+  const name = path.split(/[\\/]/).pop() ?? path;
+  const file = new File([], name) as PathBackedFile;
+  file.pywebviewFullPath = path;
+  return file;
+}
+
+/** Return the path attached by the existing pywebview desktop acquisition path. */
+export function nativePathForFile(file: File): string | null {
+  const path = (file as PathBackedFile).pywebviewFullPath;
+  return typeof path === "string" && path.length > 0 ? path : null;
+}
+
 let devProbe: Promise<boolean> | null = null;
 
 /**
@@ -124,14 +140,14 @@ async function exportViaDev(file: File): Promise<File> {
  *  解析本机路径；再不行才走字节回退。前两级覆盖了绝大多数场景，
  *  字节回退仅当桌面壳版本过旧且不提供 get_drop_path 时触发。 */
 async function exportViaPywebview(file: File, onProgress?: (message: string) => void): Promise<ExportedDemoFile> {
-  const path = (file as File & { pywebviewFullPath?: string }).pywebviewFullPath;
-  if (path) return { file: await exportPathViaPywebview(path, file.name, onProgress), sourceDemPath: path };
+  const path = nativePathForFile(file);
+  if (path) return { file: await exportPathViaPywebview(path, file.name, onProgress), sourceDemPath: isDemFile(file) ? path : null };
 
   // 拖拽时 pywebviewFullPath 可能缺失（标准浏览器 drop 事件，非 pywebview DOM 系统），
   // 尝试通过 Python 端 _dnd_state 解析本机路径。
   const api = window.pywebview!.api;
   const resolvedPath = await api.get_drop_path?.(file.name);
-  if (resolvedPath) return { file: await exportPathViaPywebview(resolvedPath, file.name, onProgress), sourceDemPath: resolvedPath };
+  if (resolvedPath) return { file: await exportPathViaPywebview(resolvedPath, file.name, onProgress), sourceDemPath: isDemFile(file) ? resolvedPath : null };
 
   // 无文件系统路径：仅剩字节传输。走到这里说明桌面壳版本过旧
   // （不提供 get_drop_path），或文件来自浏览器 <input type="file">
@@ -181,14 +197,16 @@ async function exportPathViaJob(
   }
   const final = await api.get_export_status!(jobId);
   onProgress?.(`${displayName}：传输结果…`);
-  let b64 = "";
+  // Decode each bridge chunk as it arrives. Keeping one full base64 string in
+  // addition to the ZIP bytes needlessly adds ~33% to the single-demo peak.
+  const byteParts: BlobPart[] = [];
   for (let offset = 0; ; offset += RESULT_CHUNK_SIZE) {
     const chunk = await api.get_export_result_chunk!(jobId, offset, RESULT_CHUNK_SIZE);
     if (!chunk.ok) throw new Error(`${displayName}: ${chunk.error}`);
-    b64 += chunk.data;
+    byteParts.push(base64ToBytes(chunk.data) as BlobPart);
     if (chunk.done) break;
   }
-  return new File([base64ToBytes(b64) as BlobPart], final.fileName ?? displayName.replace(/\.dem$/i, ".zip"), {
+  return new File(byteParts, final.fileName ?? displayName.replace(/\.dem$/i, ".zip"), {
     type: "application/zip"
   });
 }

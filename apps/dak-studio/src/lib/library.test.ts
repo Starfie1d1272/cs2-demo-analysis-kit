@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { getFactsStore } from "./facts-store";
-import { importDemoFile, isFactsStale, listDemoEntries, matchIdForEntry, rebuildFactsFromZip, removeDemo, updateDemoSourcePath, updateDemoTags } from "./library";
+import { clearPkgCache, getDemoPackage, importDemoFile, isFactsStale, listDemoEntries, loadDemoPackageTransient, matchIdForEntry, rebuildFactsFromZip, removeDemo, updateDemoSourcePath, updateDemoTags } from "./library";
 import { ANALYSIS_MANIFEST, isAnalysisStale } from "./analysis-manifest";
 
 const samplePath = fileURLToPath(
@@ -103,5 +103,40 @@ describe("rebuildFactsFromZip", () => {
 
   it("returns null for an unknown id", async () => {
     expect(await rebuildFactsFromZip("does-not-exist")).toBeNull();
+  });
+});
+
+describe("transient RivalHub package loading", () => {
+  it("can parse the current ZIP File without reading the persisted blob", async () => {
+    const transient = await loadDemoPackageTransient("not-persisted", await sampleFile());
+
+    expect(transient.replay).toBeUndefined();
+    expect(transient.shots).toBeUndefined();
+    expect(transient.duels).toBeUndefined();
+  });
+
+  it("uses the evidence profile outside the normal full-package cache", async () => {
+    const imported = await importDemoFile(await sampleFile(), { tags: ["transient-test"] });
+    clearPkgCache();
+    try {
+      const transient = await loadDemoPackageTransient(imported.entry.id);
+      expect(transient.replay).toBeUndefined();
+      expect(transient.shots).toBeUndefined();
+      expect(transient.duels).toBeUndefined();
+
+      const full = await getDemoPackage(imported.entry.id);
+      expect(full).not.toBe(transient);
+      expect(full.replay).toBeDefined();
+      expect(full.shots).toBeDefined();
+      expect(full.duels).toBeDefined();
+      expect(await getDemoPackage(imported.entry.id)).toBe(full);
+
+      const secondTransient = await loadDemoPackageTransient(imported.entry.id);
+      expect(secondTransient).not.toBe(full);
+      expect(secondTransient).not.toBe(transient);
+    } finally {
+      clearPkgCache();
+      await removeDemo(imported.entry.id);
+    }
   });
 });

@@ -9,6 +9,8 @@ import type { RivalHubRemoteMap, RivalHubRemoteTeam } from "../lib/rivalhub-cont
 import type { RivalHubBatchPhase, RivalHubImportContext, RivalHubMatchCandidate } from "../lib/rivalhub-import";
 import { candidateFromSeriesMap } from "../lib/rivalhub-match";
 import { rivalHubStatusPresentation } from "../lib/rivalhub-status";
+import { RIVALHUB_DROP_ZONE_ATTRIBUTE } from "../lib/rivalhub-acquisition";
+import { triggerWindowsDropCapture } from "../lib/dem";
 import { elimModelFromResults, swissModelFromResults } from "../lib/event-bracket";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import { SeriesInspector } from "./SeriesInspector";
@@ -37,11 +39,13 @@ function ImportDropZone({
   label,
   context,
   onImport,
+  onPick,
   secondary = false,
 }: {
   label: string;
   context: RivalHubImportContext;
   onImport?: (files: Iterable<File>, context: RivalHubImportContext) => Promise<void>;
+  onPick?: (context: RivalHubImportContext) => Promise<void>;
   secondary?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -55,10 +59,11 @@ function ImportDropZone({
       }} />
       <button
         type="button"
+        {...{ [RIVALHUB_DROP_ZONE_ATTRIBUTE]: "" }}
         className={secondary ? "stu-online-drop-zone stu-online-drop-zone-secondary" : "stu-online-drop-zone"}
-        onClick={() => inputRef.current?.click()}
+        onClick={() => { if (onPick) void onPick(context); else inputRef.current?.click(); }}
         onDragOver={(event) => { event.preventDefault(); event.stopPropagation(); }}
-        onDrop={(event) => { event.preventDefault(); event.stopPropagation(); if (event.dataTransfer.files.length > 0) void onImport(event.dataTransfer.files, context); }}
+        onDrop={(event) => { triggerWindowsDropCapture(event.dataTransfer.files); event.preventDefault(); event.stopPropagation(); if (event.dataTransfer.files.length > 0) void onImport(event.dataTransfer.files, context); }}
       >
         {label}
       </button>
@@ -152,7 +157,7 @@ export function StageContent({ stage, series, remote, onSelectSeries }: { stage:
   return <ElimBracket model={model} onSelectCell={(key) => { const id = stageSeriesId(key, series); if (id) onSelectSeries(id); }} />;
 }
 
-function EventStageSection({ eventId, stage, series, entries, candidates, remote, onOpenMatch, onImportOnlineFiles }: { eventId: string; stage: EventStage; series: StudioSeriesRecord[]; entries: StudioDemoEntry[]; candidates: RivalHubMatchCandidate[]; remote: boolean; onOpenMatch: (entryId: string) => void; onImportOnlineFiles?: (files: Iterable<File>, context: RivalHubImportContext) => Promise<void> }) {
+function EventStageSection({ eventId, stage, series, entries, candidates, remote, onOpenMatch, onImportOnlineFiles, onPickOnlineFiles }: { eventId: string; stage: EventStage; series: StudioSeriesRecord[]; entries: StudioDemoEntry[]; candidates: RivalHubMatchCandidate[]; remote: boolean; onOpenMatch: (entryId: string) => void; onImportOnlineFiles?: (files: Iterable<File>, context: RivalHubImportContext) => Promise<void>; onPickOnlineFiles?: (context: RivalHubImportContext) => Promise<void> }) {
   const [selectedSeriesId, setSelectedSeriesId] = useState<string | null>(series[0]?.id ?? null);
   useEffect(() => { setSelectedSeriesId(series[0]?.id ?? null); }, [stage.key, series.map((row) => row.id).join("|")]);
   const selectedSeries = series.find((row) => row.id === selectedSeriesId) ?? null;
@@ -161,11 +166,11 @@ function EventStageSection({ eventId, stage, series, entries, candidates, remote
     <section className="stu-event-stage" aria-labelledby={`stage-${eventId}-${stage.key}`}>
       <header className="stu-event-stage-head">
         <div><h3 id={`stage-${eventId}-${stage.key}`}>{stage.name}</h3><span className="stu-muted">{stage.type} · {stage.teamCount} 队 · {series.length} 个系列</span></div>
-        {onImportOnlineFiles && stageCandidates.length > 0 && <ImportDropZone label="仅导入本阶段" secondary context={{ scope: "stage", eventId, candidates: stageCandidates }} onImport={onImportOnlineFiles} />}
+        {onImportOnlineFiles && stageCandidates.length > 0 && <ImportDropZone label="仅导入本阶段" secondary context={{ scope: "stage", eventId, candidates: stageCandidates }} onImport={onImportOnlineFiles} onPick={onPickOnlineFiles} />}
       </header>
       <StageContent stage={stage} series={series} remote={remote} onSelectSeries={setSelectedSeriesId} />
       <MatchIndex series={series} selectedId={selectedSeriesId} onSelect={setSelectedSeriesId} />
-      <SeriesInspector series={selectedSeries} entries={entries} eventId={eventId} candidates={stageCandidates} onOpenMatch={onOpenMatch} onImportOnlineFiles={onImportOnlineFiles} />
+      <SeriesInspector series={selectedSeries} entries={entries} eventId={eventId} candidates={stageCandidates} onOpenMatch={onOpenMatch} onImportOnlineFiles={onImportOnlineFiles} onPickOnlineFiles={onPickOnlineFiles} />
     </section>
   );
 }
@@ -174,7 +179,7 @@ function stageCandidatesFor(series: StudioSeriesRecord[], eventTeams: RivalHubRe
   return series.flatMap((row) => remoteMapsForSeries(row).map(({ series: candidateSeries, map }) => candidateFromSeriesMap(candidateSeries, map, eventTeams)));
 }
 
-export function EventsView({ entries, onOpenMatch, onAnalyzeEvent, onGoLibrary, rivalHubConnection, onConnectRivalHub, onRevokeRivalHub, onRefreshRivalHub, onImportOnlineFiles, refreshToken = 0 }: {
+export function EventsView({ entries, onOpenMatch, onAnalyzeEvent, onGoLibrary, rivalHubConnection, onConnectRivalHub, onRevokeRivalHub, onRefreshRivalHub, onImportOnlineFiles, onPickOnlineFiles, refreshToken = 0 }: {
   entries: StudioDemoEntry[];
   onOpenMatch: (entryId: string) => void;
   onAnalyzeEvent: (event: StudioEventRecord) => void;
@@ -182,8 +187,9 @@ export function EventsView({ entries, onOpenMatch, onAnalyzeEvent, onGoLibrary, 
   rivalHubConnection?: RivalHubConnectionState;
   onConnectRivalHub?: (baseUrl: string) => Promise<void>;
   onRevokeRivalHub?: () => Promise<void>;
-  onRefreshRivalHub?: () => Promise<void>;
+  onRefreshRivalHub?: () => Promise<void | boolean>;
   onImportOnlineFiles?: (files: Iterable<File>, context: RivalHubImportContext) => Promise<void>;
+  onPickOnlineFiles?: (context: RivalHubImportContext) => Promise<void>;
   refreshToken?: number;
 }) {
   const [events, setEvents] = useState<StudioEventRecord[]>([]);
@@ -227,7 +233,7 @@ export function EventsView({ entries, onOpenMatch, onAnalyzeEvent, onGoLibrary, 
       </header>
       {events.length === 0 ? <EmptyState title="还没有赛事目录" hint="连接 RivalHub 获取在线赛事，或在资料库导入本地 event-package/1.0 资源包。" action={<button className="stu-button" onClick={onGoLibrary}>去资料库</button>} /> : <div className="stu-event-directory">
         <aside className="stu-event-list" aria-label="赛事列表"><span className="stu-event-list-label">在线赛事优先 · {orderedEvents.length}</span>{orderedEvents.map((event) => { const linkedSeries = series.filter((row) => row.eventId === event.id); const linked = linkedSeries.reduce((sum, row) => sum + (row.mapAssignments?.filter((map) => map.entryId).length ?? row.entryIds.length), 0); const remote = linkedSeries.flatMap((row) => row.mapAssignments?.flatMap((map) => map.rivalHub ? [map.rivalHub] : []) ?? []); return <button key={event.id} type="button" className={event.id === activeId ? "stu-event-list-item stu-event-list-item-active" : "stu-event-list-item"} onClick={() => setActiveId(event.id)}><b>{event.name}</b><span>{event.source === "rivalhub" ? "RivalHub" : "本地"} · 本地已关联 {linked} 图 · 远程已同步 {remote.filter((map) => map.demoStatus === "synced").length}{event.rivalHub?.stale ? " · 缓存已过期" : ""}</span></button>; })}</aside>
-        {active && <section className="stu-event-content"><header className="stu-event-content-head"><div><h2>{active.name}</h2><p>{active.kind} · {eventSeries.length} 个系列 · {active.source}{active.readOnly ? " · 只读资产" : ""}</p><div className="stu-event-sync-summary"><span>本地已关联 {localLinked}/{totalMaps} 图</span>{active.source === "rivalhub" && <><span>远程已同步 {remoteSynced}/{eventCandidates.length} 图</span><span>需要处理 {remoteNeedsAttention}</span>{active.rivalHub?.lastSyncedAt && <span>上次同步 {new Date(active.rivalHub.lastSyncedAt).toLocaleString("zh-CN")}{active.rivalHub.stale ? " · 缓存已过期" : ""}</span>}</>}</div></div><button type="button" className="stu-button" onClick={() => onAnalyzeEvent(active)}>查看赛事总览</button></header>{onImportOnlineFiles && active.source === "rivalhub" && eventCandidates.length > 0 && <ImportDropZone label="将本赛事 Demo 拖到这里；可混合排位赛 / 正赛，自动匹配。" context={{ scope: "event", eventId: active.id, candidates: eventCandidates }} onImport={onImportOnlineFiles} />}{stageOptions.length > 0 && <div className="stu-stage-tabs" role="tablist" aria-label="赛事阶段">{stageOptions.map((stage) => <button key={stage.key} type="button" role="tab" aria-selected={activeStage?.key === stage.key} className={activeStage?.key === stage.key ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => setActiveStageKey(stage.key)}>{stage.name}</button>)}</div>}{activeStage && <EventStageSection eventId={active.id} stage={activeStage} series={activeStageSeries} entries={entries} candidates={eventCandidates} remote={active.source === "rivalhub"} onOpenMatch={onOpenMatch} onImportOnlineFiles={onImportOnlineFiles} />}</section>}
+        {active && <section className="stu-event-content"><header className="stu-event-content-head"><div><h2>{active.name}</h2><p>{active.kind} · {eventSeries.length} 个系列 · {active.source}{active.readOnly ? " · 只读资产" : ""}</p><div className="stu-event-sync-summary"><span>本地已关联 {localLinked}/{totalMaps} 图</span>{active.source === "rivalhub" && <><span>远程已同步 {remoteSynced}/{eventCandidates.length} 图</span><span>需要处理 {remoteNeedsAttention}</span>{active.rivalHub?.lastSyncedAt && <span>上次同步 {new Date(active.rivalHub.lastSyncedAt).toLocaleString("zh-CN")}{active.rivalHub.stale ? " · 缓存已过期" : ""}</span>}</>}</div></div><button type="button" className="stu-button" onClick={() => onAnalyzeEvent(active)}>查看赛事总览</button></header>{onImportOnlineFiles && active.source === "rivalhub" && eventCandidates.length > 0 && <ImportDropZone label="将本赛事 Demo 拖到这里；可混合排位赛 / 正赛，自动匹配。" context={{ scope: "event", eventId: active.id, candidates: eventCandidates }} onImport={onImportOnlineFiles} onPick={onPickOnlineFiles} />}{stageOptions.length > 0 && <div className="stu-stage-tabs" role="tablist" aria-label="赛事阶段">{stageOptions.map((stage) => <button key={stage.key} type="button" role="tab" aria-selected={activeStage?.key === stage.key} className={activeStage?.key === stage.key ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => setActiveStageKey(stage.key)}>{stage.name}</button>)}</div>}{activeStage && <EventStageSection eventId={active.id} stage={activeStage} series={activeStageSeries} entries={entries} candidates={eventCandidates} remote={active.source === "rivalhub"} onOpenMatch={onOpenMatch} onImportOnlineFiles={onImportOnlineFiles} onPickOnlineFiles={onPickOnlineFiles} />}</section>}
       </div>}
     </div>
   );

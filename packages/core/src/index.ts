@@ -7,7 +7,7 @@ import { buildTimeline, buildEconomy, buildHeatmap } from "./timeline.js";
 import { buildPlayerWeaponHighlights } from "./weapon-highlights.js";
 
 export { loadDemoManifestFromZip, loadDemoPackageFromZip } from "./loader.js";
-export type { DemoManifest } from "./loader.js";
+export type { DemoManifest, DemoPackageLoadOptions, DemoPackageLoadProfile } from "./loader.js";
 export { normalizeDemoPackage } from "./normalize.js";
 export { createPlayerResolver, createResolverFromPackage } from "./resolve.js";
 export type { PlayerResolver } from "./resolve.js";
@@ -52,7 +52,7 @@ export function analyzeDemoPackage(input: unknown): AnalysisBundle {
     version: "cs2-demo-analysis-kit/1.0",
     sourceSchemaVersion: pkg.manifest.schemaVersion,
     provenance: {
-      analysisVersion: "cs2-demo-analysis-kit/1.0.1",
+      analysisVersion: "cs2-demo-analysis-kit/1.0.2",
       sourceSchemaVersion: pkg.manifest.schemaVersion,
       sourceDemoHash: pkg.manifest.demo?.hash ?? null,
       exporter: pkg.manifest.exporter,

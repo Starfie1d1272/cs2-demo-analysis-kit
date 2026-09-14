@@ -72,6 +72,7 @@ _MANIFEST_TIMEOUT_S = 8
 
 RIVALHUB_CREDENTIAL_SERVICE = "com.starfie1d.dak-studio.rivalhub"
 RIVALHUB_CREDENTIAL_ACCOUNT = "access-token"
+MAX_EXPORT_RESULT_CHUNK_SIZE = 1024 * 1024
 
 
 def _windows_credential_target(service: str, account: str) -> str:
@@ -506,10 +507,23 @@ def _setup_logging(logs_dir: Path) -> None:
     )
 
 
+def _stage_export_result(data: bytes) -> Path:
+    """Stage one export result on disk for bounded bridge reads."""
+    fd, raw_path = tempfile.mkstemp(prefix="dak-studio-export-", suffix=".zip")
+    path = Path(raw_path)
+    try:
+        with os.fdopen(fd, "wb") as output:
+            output.write(data)
+    except Exception:
+        path.unlink(missing_ok=True)
+        raise
+    return path
+
+
 class _ExportJob:
     """One background .dem→ZIP export. Status is polled over the JS bridge
-    with tiny payloads; the resulting ZIP is fetched in bounded base64 chunks
-    so no single bridge message can grow with file size."""
+    with tiny payloads; the resulting ZIP is staged on disk and fetched in
+    bounded base64 chunks so Python never retains a second full representation."""
 
     def __init__(self, path: str) -> None:
         self.id = uuid.uuid4().hex
@@ -520,7 +534,8 @@ class _ExportJob:
         self.progress = 0.0
         self.error: str | None = None
         self.file_name: str | None = None
-        self.result_b64: str | None = None
+        self.result_path: Path | None = None
+        self.result_size = 0
 
     def status(self) -> dict:
         return {
@@ -531,7 +546,7 @@ class _ExportJob:
             "elapsedSeconds": round(time.monotonic() - self.started, 1),
             "error": self.error,
             "fileName": self.file_name,
-            "resultSize": len(self.result_b64) if self.result_b64 else 0,
+            "resultSize": self.result_size,
         }
 
 
@@ -1231,13 +1246,19 @@ class StudioApi:
 
                 data, match_meta = export_demo(str(dem), research=True, progress=on_progress)
                 job.file_name = _build_zip_name(dem, match_meta)
-            job.result_b64 = base64.b64encode(data).decode("ascii")
+            job.result_path = _stage_export_result(data)
+            job.result_size = len(data)
+            del data
             job.progress = 1.0
             job.state = "done"
             job.stage = "完成"
             log.info("export job %s done: %s (%.1fs, %d bytes)", job.id,
-                     job.file_name, time.monotonic() - job.started, len(data))
+                     job.file_name, time.monotonic() - job.started, job.result_size)
         except Exception as exc:  # noqa: BLE001 - surface parse failures to the UI
+            if job.result_path is not None:
+                job.result_path.unlink(missing_ok=True)
+                job.result_path = None
+                job.result_size = 0
             job.state = "error"
             job.error = str(exc)
             log.exception("export job %s failed: %s", job.id, job.path)
@@ -1251,15 +1272,29 @@ class StudioApi:
         return job.status()
 
     def get_export_result_chunk(self, job_id: str, offset: int, size: int) -> dict:
-        """Return base64 substring [offset, offset+size); chunked so each
-        bridge message stays small. The job is dropped after the last chunk."""
+        """Return raw ZIP bytes [offset, offset+size) as bounded base64.
+
+        ``offset`` and ``size`` are byte offsets; the temporary result file and
+        its job record are removed after the final chunk is read.
+        """
         job = self._jobs.get(job_id)
-        if job is None or job.result_b64 is None:
+        if job is None or job.result_path is None or job.state != "done":
             return {"ok": False, "error": "任务结果不存在"}
-        chunk = job.result_b64[offset: offset + size]
-        done = offset + size >= len(job.result_b64)
+        if offset < 0 or offset > job.result_size or size <= 0:
+            return {"ok": False, "error": "无效的结果分块范围"}
+        try:
+            with job.result_path.open("rb") as result:
+                result.seek(offset)
+                data = result.read(min(size, MAX_EXPORT_RESULT_CHUNK_SIZE))
+        except OSError as exc:
+            return {"ok": False, "error": f"读取任务结果失败：{exc}"}
+        if not data and offset < job.result_size:
+            return {"ok": False, "error": "任务结果分块为空"}
+        done = offset + len(data) >= job.result_size
+        chunk = base64.b64encode(data).decode("ascii")
         if done:
             self._jobs.pop(job_id, None)
+            job.result_path.unlink(missing_ok=True)
         return {"ok": True, "data": chunk, "done": done}
 
     def export_dem_path(self, path: str) -> dict:

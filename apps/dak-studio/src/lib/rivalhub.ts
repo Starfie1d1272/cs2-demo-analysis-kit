@@ -13,6 +13,7 @@ export const OFFICIAL_RIVALHUB_URL = "https://match.starfie1d.top";
 const CREDENTIAL_SERVICE = "com.starfie1d.dak-studio.rivalhub";
 const CREDENTIAL_ACCOUNT = "access-token";
 const POLL_INTERVAL_MS = 1000;
+const BROWSER_PAIRING_WINDOW_NAME = "dak-rivalhub-pairing";
 const connectionStore = getStorage().records("rivalhub");
 
 export interface RivalHubConnectionRecord {
@@ -134,14 +135,55 @@ async function deleteCredential(): Promise<void> {
   memoryCredential = null;
 }
 
-async function openExternalUrl(url: string): Promise<void> {
+function preopenBrowserPairingWindow(): Window {
+  let popup: Window | null = null;
+  try {
+    // Must run synchronously while the click activation is live. Do not pass
+    // noopener/noreferrer here: those features can intentionally discard the
+    // WindowProxy that we need to navigate after pairing/start returns.
+    popup = window.open("about:blank", BROWSER_PAIRING_WINDOW_NAME);
+  } catch {
+    popup = null;
+  }
+  if (!popup) throw new Error("浏览器阻止了连接授权页面，请允许打开新窗口后重试");
+  try {
+    // about:blank is still same-origin here. Remove the child page's opener
+    // capability while retaining our WindowProxy for the later navigation.
+    popup.opener = null;
+  } catch {
+    // Some browser implementations expose opener as non-writable; retaining a
+    // single user-activated WindowProxy is still safer than an async re-open.
+  }
+  return popup;
+}
+
+function closeBrowserPairingWindow(popup: Window | null): void {
+  if (!popup) return;
+  try {
+    if (!popup.closed) popup.close();
+  } catch {
+    // The browser may have discarded the opener reference already.
+  }
+}
+
+function navigateBrowserPairingWindow(url: string, preopened: Window | null): void {
+  if (!preopened || preopened.closed) {
+    throw new Error("RivalHub 授权窗口已关闭，请重新发起连接");
+  }
+  try {
+    preopened.location.replace(url);
+  } catch {
+    throw new Error("无法打开 RivalHub 授权页面，请重新发起连接");
+  }
+}
+
+async function openExternalUrl(url: string, preopenedBrowserWindow: Window | null = null): Promise<void> {
   const api = nativeApi();
   if (api?.rivalhub_open_external_url) {
     if (!await api.rivalhub_open_external_url(url)) throw new Error("无法打开系统浏览器");
     return;
   }
-  const popup = window.open(url, "_blank", "noopener,noreferrer");
-  if (!popup) throw new Error("浏览器阻止了连接授权页面，请允许打开新窗口后重试");
+  navigateBrowserPairingWindow(url, preopenedBrowserWindow);
 }
 
 async function saveConnection(baseUrl: string, pairingId: string | null, previous?: RivalHubConnectionRecord): Promise<RivalHubConnectionRecord> {
@@ -175,23 +217,30 @@ export async function connectRivalHub(
   onProgress?: (message: string) => void,
 ): Promise<RivalHubConnectionState> {
   const baseUrl = normalizeBaseUrl(inputBaseUrl);
-  const start = await requestJson<PairingStartResponse>(`${baseUrl}/api/integrations/dak/pairing/start`, { method: "POST" });
-  onProgress?.("请在系统浏览器中确认 RivalHub 赛事权限…");
-  await openExternalUrl(start.authorizeUrl);
-  const expiresAt = new Date(start.expiresAt).getTime();
-  for (;;) {
-    const poll = await requestJson<PairingPollResponse>(`${baseUrl}/api/integrations/dak/pairing/poll`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pairingId: start.pairingId, pollToken: start.pollToken }),
-    });
-    if (poll.status === "authorized" && poll.accessToken) {
-      await saveCredential(baseUrl, poll.accessToken);
-      const record = await saveConnection(baseUrl, start.pairingId);
-      return { ...record, status: "connected", error: null };
+  const native = nativeApi();
+  const preopenedBrowserWindow = native?.rivalhub_open_external_url ? null : preopenBrowserPairingWindow();
+  try {
+    const start = await requestJson<PairingStartResponse>(`${baseUrl}/api/integrations/dak/pairing/start`, { method: "POST" });
+    onProgress?.("请在系统浏览器中确认 RivalHub 赛事权限…");
+    await openExternalUrl(start.authorizeUrl, preopenedBrowserWindow);
+    const expiresAt = new Date(start.expiresAt).getTime();
+    for (;;) {
+      const poll = await requestJson<PairingPollResponse>(`${baseUrl}/api/integrations/dak/pairing/poll`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pairingId: start.pairingId, pollToken: start.pollToken }),
+      });
+      if (poll.status === "authorized" && poll.accessToken) {
+        await saveCredential(baseUrl, poll.accessToken);
+        const record = await saveConnection(baseUrl, start.pairingId);
+        return { ...record, status: "connected", error: null };
+      }
+      if (poll.status === "expired" || Date.now() >= expiresAt) throw new Error("连接授权已过期，请重新发起");
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
-    if (poll.status === "expired" || Date.now() >= expiresAt) throw new Error("连接授权已过期，请重新发起");
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  } catch (error) {
+    closeBrowserPairingWindow(preopenedBrowserWindow);
+    throw error;
   }
 }
 

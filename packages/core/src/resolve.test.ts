@@ -1,8 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
 import type { PackagePlayer, PackageRound } from "@cs2dak/contract";
 import { createPlayerResolver } from "./resolve.js";
 import { loadDemoManifestFromZip, loadDemoPackageFromZip } from "./loader.js";
+
+const evidenceFixture = fileURLToPath(
+  new URL("../../../fixtures/input/cologne-major-2026-stage3-smoke-de_nuke.zip", import.meta.url)
+);
 
 const players: PackagePlayer[] = [
   { steamId64: "76561198000000001", name: "Alpha", teamKey: "teamA" },
@@ -128,5 +134,41 @@ describe("loadDemoPackageFromZip version gate", () => {
     for (const file of ["match.json", "players.json", "rounds.json", "player-economies.json"]) zip.file(file, "{}");
     const bytes = await zip.generateAsync({ type: "uint8array" });
     await expect(loadDemoPackageFromZip(bytes)).rejects.toThrow(/Missing player-stats\.json/);
+  });
+
+  it("uses the evidence profile without reading optional replay, shots, or duels", async () => {
+    const bytes = await readFile(evidenceFixture);
+    const zip = await JSZip.loadAsync(bytes);
+    const manifest = JSON.parse(await zip.file("manifest.json")!.async("text")) as { files: { replay?: string; shots?: string; duels?: string } };
+    const fileSpy = vi.spyOn(zip, "file");
+    const loadSpy = vi.spyOn(JSZip, "loadAsync").mockResolvedValue(zip);
+
+    try {
+      const pkg = await loadDemoPackageFromZip(bytes, { profile: "evidence" });
+      const requested = fileSpy.mock.calls.map(([name]) => name);
+
+      expect(pkg.replay).toBeUndefined();
+      expect(pkg.shots).toBeUndefined();
+      expect(pkg.duels).toBeUndefined();
+      for (const optionalFile of [manifest.files.replay, manifest.files.shots, manifest.files.duels]) {
+        if (optionalFile) expect(requested).not.toContain(optionalFile);
+      }
+      expect(requested).toEqual(expect.arrayContaining([
+        "match.json",
+        "players.json",
+        "rounds.json",
+        "player-economies.json",
+        "player-stats.json",
+        "kills.json",
+        "damages.json",
+        "blinds.json",
+        "bombs.json",
+        "grenades.json",
+        "clutches.json",
+      ]));
+    } finally {
+      loadSpy.mockRestore();
+      fileSpy.mockRestore();
+    }
   });
 });

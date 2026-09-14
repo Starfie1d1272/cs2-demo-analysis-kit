@@ -1,4 +1,4 @@
-import { loadDemoManifestFromZip, loadDemoPackageFromZip, buildMatchRadarField } from "@cs2dak/core";
+import { loadDemoManifestFromZip, loadDemoPackageFromZip, buildMatchRadarField, type DemoPackageLoadProfile } from "@cs2dak/core";
 import { buildMatchWorkspaceModel } from "@cs2dak/presentation";
 import { buildRadarFieldGrid } from "@cs2dak/maps";
 import type { DemoPackage, MatchWorkspaceModel, RadarField } from "@cs2dak/contract";
@@ -278,6 +278,7 @@ interface PoolTask {
   fallbackBuffer: ArrayBuffer | null; // worker 失败时回主线程用的副本；大包可禁用
   matchId?: string;             // op === "import" | "radarField" 时必有
   economy?: "gun" | "all";      // op === "radarField" 时用
+  profile?: DemoPackageLoadProfile; // op === "parse" 时选择 package load profile
   resolve: (result: PoolResult) => void;
   reject: (err: Error) => void;
   fallback: (buffer: ArrayBuffer) => Promise<PoolResult>;
@@ -349,7 +350,7 @@ function dispatchTasks(): void {
     const id = idle.taskId;
     const message =
       task.op === "parse"
-        ? { id, op: "parse", buffer: task.buffer }
+        ? { id, op: "parse", buffer: task.buffer, profile: task.profile ?? "full" }
         : task.op === "radarField"
           ? { id, op: "radarField", buffer: task.buffer, matchId: task.matchId, triBaseUrl: triBaseUrl(), economy: task.economy ?? "gun" }
           : { id, op: "import", buffer: task.buffer, matchId: task.matchId, triBaseUrl: triBaseUrl(), calloutUrls: CALLOUT_GRID_URLS };
@@ -357,9 +358,9 @@ function dispatchTasks(): void {
   }
 }
 
-function parseZipInWorker(buffer: ArrayBuffer, keepFallback = true): Promise<DemoPackage> {
+function parseZipInWorker(buffer: ArrayBuffer, keepFallback = true, profile: DemoPackageLoadProfile = "full"): Promise<DemoPackage> {
   if (typeof Worker === "undefined") {
-    return loadDemoPackageFromZip(buffer);
+    return loadDemoPackageFromZip(buffer, { profile });
   }
   const fallbackBuffer = keepFallback ? buffer.slice(0) : null;
   return new Promise<DemoPackage>((resolve, reject) => {
@@ -367,9 +368,10 @@ function parseZipInWorker(buffer: ArrayBuffer, keepFallback = true): Promise<Dem
       op: "parse",
       buffer,
       fallbackBuffer,
+      profile,
       resolve: resolve as (r: PoolResult) => void,
       reject,
-      fallback: (buf) => loadDemoPackageFromZip(buf)
+      fallback: (buf) => loadDemoPackageFromZip(buf, { profile })
     });
     dispatchTasks();
   });
@@ -660,11 +662,11 @@ export function getDemoPackage(id: string): Promise<DemoPackage> {
   return loading;
 }
 
-/** 在线批量专用：从持久化 ZIP 解析一场，不进入 pkgCache，也不保留 worker 回退副本。 */
-export async function loadDemoPackageTransient(id: string): Promise<DemoPackage> {
-  const buffer = await demoBlobs.get(id);
+/** 在线批量专用：从当前 ZIP File 或持久化 ZIP 解析一场，不进入 pkgCache，也不保留 worker 回退副本。 */
+export async function loadDemoPackageTransient(id: string, sourceFile?: File): Promise<DemoPackage> {
+  const buffer = sourceFile ? await sourceFile.arrayBuffer() : await demoBlobs.get(id);
   if (!buffer) throw new Error("demo 不存在或已被删除");
-  return parseZipInWorker(buffer, false);
+  return parseZipInWorker(buffer, false, "evidence");
 }
 
 /**

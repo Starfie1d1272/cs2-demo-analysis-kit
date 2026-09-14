@@ -4,7 +4,7 @@ import { bulkUpdateTags, formatMatchLabel, importDemoFile, isFactsStale, listDem
 import { CohortScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
 import { AnalysisContextSummary } from "./components/AnalysisContextSummary";
 import { CapabilityBar } from "./components/CapabilityBar";
-import { detectDemBackend, exportDemToZip, isDemFile, pickAndExportDems, pickDemPaths, triggerWindowsDropCapture, watchDemoPath, type ExportedDemoFile } from "./lib/dem";
+import { detectDemBackend, exportDemToZip, fileFromNativePath, isDemFile, pickAndExportDems, pickDemPaths, triggerWindowsDropCapture, watchDemoPath, type ExportedDemoFile } from "./lib/dem";
 import { parseTags } from "./lib/tags";
 import { listSeriesRecords, pruneOrphanSeries, type StudioSeriesRecord } from "./lib/series";
 import { listEventRecords, markRivalHubEventsStale, upsertRivalHubEvents, type StudioEventRecord } from "./lib/events";
@@ -45,8 +45,9 @@ import {
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
 import { getPinnedPlayer } from "./lib/pin";
 import { connectRivalHub, fetchRivalHubEvents, loadRivalHubConnection, revokeRivalHubPairing, type RivalHubConnectionState } from "./lib/rivalhub";
-import { runRivalHubBatch, type RivalHubBatchItem, type RivalHubBatchSession, type RivalHubImportContext } from "./lib/rivalhub-import";
+import { rivalHubBatchCompletionMessage, runRivalHubBatch, type RivalHubBatchItem, type RivalHubBatchSession, type RivalHubImportContext } from "./lib/rivalhub-import";
 import { RivalHubBatchImportPanel } from "./components/RivalHubBatchImportPanel";
+import { importRivalHubFromNativePicker, isRivalHubDropTarget, shouldHandleOrdinaryDrop } from "./lib/rivalhub-acquisition";
 
 type StudioView =
   | "home"
@@ -347,7 +348,8 @@ export function App() {
     return importedEntries;
   }, []);
 
-  const refreshRivalHub = useCallback(async () => {
+  const refreshRivalHub = useCallback(async (options: { announce?: boolean } = {}): Promise<boolean> => {
+    const announce = options.announce !== false;
     setRivalHubConnection((current) => ({ ...current, status: "connecting", error: null }));
     try {
       const response = await fetchRivalHubEvents();
@@ -356,14 +358,16 @@ export function App() {
       const connected = await loadRivalHubConnection();
       setRivalHubConnection({ ...connected, status: "connected", error: null });
       setRivalHubRefreshToken((current) => current + 1);
-      setNotice(`已刷新 RivalHub 赛事：${response.events.length} 个赛事`);
+      if (announce) setNotice(`已刷新 RivalHub 赛事：${response.events.length} 个赛事`);
+      return true;
     } catch (error) {
       await markRivalHubEventsStale().catch(() => undefined);
       await refreshEventRecords().catch(() => undefined);
       const current = await loadRivalHubConnection().catch(() => rivalHubConnection);
       const message = error instanceof Error ? error.message : String(error);
       setRivalHubConnection({ ...current, status: "error", error: message });
-      setNotice(`RivalHub 刷新失败：${message}`);
+      if (announce) setNotice(`RivalHub 刷新失败：${message}`);
+      return false;
     }
   }, [refreshEventRecords, rivalHubConnection]);
 
@@ -397,7 +401,7 @@ export function App() {
 
   const importOnlineFiles = useCallback(async (files: Iterable<File>, context: RivalHubImportContext) => {
     if (importing) return;
-    const inputFiles = [...files];
+    let inputFiles = [...files];
     if (inputFiles.length === 0) return;
     batchStopRequested.current = false;
     batchTargetResolvers.current.clear();
@@ -406,7 +410,7 @@ export function App() {
     setNotice("正在启动 RivalHub Demo 批处理…");
     let demBackend: Awaited<ReturnType<typeof detectDemBackend>> | undefined;
     try {
-      const session = await runRivalHubBatch(inputFiles, context, {
+      const batchPromise = runRivalHubBatch(inputFiles, context, {
         exportDem: async (file, onProgress) => {
           demBackend ??= await detectDemBackend();
           return exportDemToZip(file, demBackend, onProgress);
@@ -421,15 +425,20 @@ export function App() {
           setNotice(current ? `${current.fileName}：${current.message}` : null);
         },
       });
+      // runRivalHubBatch copies the iterable synchronously before its first
+      // await; do not keep a second batch-wide File array in the App closure.
+      inputFiles = [];
+      const session = await batchPromise;
+      const remoteRefreshSucceeded = await refreshRivalHub({ announce: false });
       setBatchSession(session);
-      await refreshRivalHub().catch((error) => setNotice(`批处理已结束，但刷新 RivalHub 失败：${error instanceof Error ? error.message : String(error)}`));
       setEntries(await listDemoEntries());
       await refreshEventRecords();
-      setNotice(`批处理完成：已同步 ${session.counts.synced}，已存在 ${session.counts.alreadySynced}，需处理 ${session.counts.needsAttention}，待目标 ${session.counts.needsTarget}，已跳过 ${session.counts.skipped}，失败 ${session.counts.failed}`);
+      setNotice(rivalHubBatchCompletionMessage(session, remoteRefreshSucceeded));
     } catch (error) {
       setNotice(`在线 Demo 批处理失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
       batchTargetResolvers.current.clear();
+      inputFiles = [];
       setImporting(false);
     }
   }, [importing, refreshEventRecords, refreshRivalHub]);
@@ -440,6 +449,15 @@ export function App() {
     batchTargetResolvers.current.clear();
     setBatchSession((current) => current ? { ...current, status: "stopping" } : current);
   }, []);
+
+  const pickRivalHubFiles = useCallback(async (context: RivalHubImportContext) => {
+    try {
+      const started = await importRivalHubFromNativePicker(context, importOnlineFiles);
+      if (!started) setNotice(null);
+    } catch (error) {
+      setNotice(`选择 RivalHub Demo 失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, [importOnlineFiles]);
 
   const selectRivalHubBatchTarget = useCallback((itemId: string, matchMapId: string) => {
     const resolve = batchTargetResolvers.current.get(itemId);
@@ -652,9 +670,7 @@ export function App() {
       throw new Error(`${entry.fileName}：原始文件不存在（${entry.sourceDemPath}）`);
     }
     const backend = await detectDemBackend();
-    const demName = entry.sourceDemPath.split(/[\\/]/).pop() ?? entry.fileName.replace(/\.zip$/i, ".dem");
-    const demFile = new File([], demName);
-    (demFile as File & { pywebviewFullPath?: string }).pywebviewFullPath = entry.sourceDemPath;
+    const demFile = fileFromNativePath(entry.sourceDemPath);
     const exported = await exportDemToZip(demFile, backend, setNotice);
     const result = await importDemoFile(exported.file, {
       tags: entry.tags,
@@ -783,8 +799,9 @@ export function App() {
   return (
     <div
       className="stu-app"
-      onDragOver={(e) => e.preventDefault()}
+      onDragOver={(e) => { if (!isRivalHubDropTarget(e.target)) e.preventDefault(); }}
       onDrop={async (e) => {
+        if (!shouldHandleOrdinaryDrop(e.target, e.defaultPrevented)) return;
         e.preventDefault();
         if (e.dataTransfer.files.length > 0) {
           // Windows EdgeChromium：主动把 File 引用发给 Python
@@ -885,7 +902,7 @@ export function App() {
             </button>
           </div>
         )}
-        <RivalHubBatchImportPanel session={batchSession} onStop={stopRivalHubBatch} onSelectTarget={selectRivalHubBatchTarget} />
+        <RivalHubBatchImportPanel session={batchSession} onStop={stopRivalHubBatch} onSelectTarget={selectRivalHubBatchTarget} onDismiss={() => setBatchSession(null)} />
         {entries.length > 0 && view !== "library" && view !== "management" && (
           <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} onEdit={() => setContextEditorOpen((current) => !current)} />
         )}
@@ -1073,6 +1090,7 @@ export function App() {
             onRevokeRivalHub={handleRevokeRivalHub}
             onRefreshRivalHub={refreshRivalHub}
             onImportOnlineFiles={importOnlineFiles}
+            onPickOnlineFiles={nativeImportAvailable ? pickRivalHubFiles : undefined}
             refreshToken={rivalHubRefreshToken}
           />
         ))}

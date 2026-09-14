@@ -53,10 +53,12 @@ export function RivalHubBatchImportPanel({
   session,
   onStop,
   onSelectTarget,
+  onDismiss,
 }: {
   session: RivalHubBatchSession | null;
   onStop?: () => void;
   onSelectTarget?: (itemId: string, matchMapId: string) => void;
+  onDismiss?: () => void;
 }) {
   const current = useMemo(() => currentRivalHubBatchItem(session), [session]);
   if (!session) return null;
@@ -67,9 +69,11 @@ export function RivalHubBatchImportPanel({
       <header className="stu-rivalhub-batch-head">
         <div>
           <b>RivalHub Demo 批处理</b>
-          <span className="stu-muted">{finished}/{session.total} 文件已完成</span>
+          <span className="stu-muted">{session.status === "completed" ? `已完成 · ${finished}/${session.total} 文件` : `${finished}/${session.total} 文件已完成`}</span>
         </div>
-        {session.status !== "completed" && (
+        {session.status === "completed" ? (
+          <button type="button" className="stu-button stu-button-ghost" onClick={onDismiss}>关闭结果</button>
+        ) : (
           <button type="button" className="stu-button stu-button-ghost" onClick={onStop} disabled={session.status === "stopping"}>
             {session.status === "stopping" ? "当前文件完成后停止…" : "当前文件完成后停止"}
           </button>
