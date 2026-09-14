@@ -63,6 +63,60 @@ beforeAll(async () => {
 });
 
 describe("RivalHub online Demo matching", () => {
+  it("keeps published tournament semantic facts exact after the owner migration", () => {
+    const stable = analyzeDemoPackage(stableFixture);
+    const target = fixtureTarget();
+    const identities = new Map(stableFixture.players.map((player, index) => [player.steamId64, fixtureIdentity(player, index, target)]));
+    const evidence = buildRivalHubDemoEvidenceV1(stableFixture, target, identities) as {
+      contract: { semanticProfile: string; analysisVersion: string };
+      semanticFacts: {
+        economyMatrix: Array<{ lowEconomy: string; highEconomy: string; rounds: number; lowEconomyWins: number }>;
+        teamConversions: Array<{
+          teamKey: string;
+          pistol: { opportunities: number; wins: number };
+          round2: { conversion: { opportunities: number; wins: number }; break: { opportunities: number; wins: number } };
+          ecoSemiUpset: { opportunities: number; wins: number };
+          manAdvantage: Array<{ advantage: string; opportunities: number; wins: number }>;
+        }>;
+      };
+    };
+
+    expect(evidence.contract).toEqual({ contractVersion: "rivalhub-demo-evidence/1", semanticProfile: "dak-stable/1", analysisVersion: "cs2-demo-analysis-kit/1.0.1" });
+    expect(evidence.semanticFacts.economyMatrix).toEqual([
+      { lowEconomy: "full", highEconomy: "full", rounds: 10, lowEconomyWins: 6 },
+      { lowEconomy: "force", highEconomy: "full", rounds: 4, lowEconomyWins: 4 },
+      { lowEconomy: "eco", highEconomy: "full", rounds: 3, lowEconomyWins: 0 },
+      { lowEconomy: "semi", highEconomy: "full", rounds: 3, lowEconomyWins: 1 },
+      { lowEconomy: "force", highEconomy: "force", rounds: 1, lowEconomyWins: 0 },
+    ]);
+    expect(evidence.semanticFacts.teamConversions).toEqual([
+      {
+        teamKey: "teamA",
+        pistol: { opportunities: 2, wins: 2 },
+        round2: { conversion: { opportunities: 2, wins: 1 }, break: { opportunities: 0, wins: 0 } },
+        ecoSemiUpset: { opportunities: 3, wins: 1 },
+        manAdvantage: [
+          { advantage: "5v4", opportunities: 17, wins: 12 },
+          { advantage: "4v5", opportunities: 6, wins: 1 },
+          { advantage: "5v3", opportunities: 4, wins: 3 },
+          { advantage: "3v5", opportunities: 5, wins: 1 },
+        ],
+      },
+      {
+        teamKey: "teamB",
+        pistol: { opportunities: 2, wins: 0 },
+        round2: { conversion: { opportunities: 0, wins: 0 }, break: { opportunities: 2, wins: 1 } },
+        ecoSemiUpset: { opportunities: 3, wins: 0 },
+        manAdvantage: [
+          { advantage: "5v4", opportunities: 6, wins: 5 },
+          { advantage: "4v5", opportunities: 17, wins: 5 },
+          { advantage: "5v3", opportunities: 5, wins: 4 },
+          { advantage: "3v5", opportunities: 4, wins: 1 },
+        ],
+      },
+    ]);
+  });
+
   it("keeps FK, multi-kill and clutch hard-blocker values aligned with DAK stable scoreboard semantics", () => {
     const stable = analyzeDemoPackage(stableFixture);
     const target = fixtureTarget();

@@ -9,10 +9,8 @@ import {
   buildPlayerSeasonInsights,
   buildUtilityValueSummary,
   mergeUtilityValueSummaries,
-  buildTournamentInsights,
-  buildTournamentInsightsFromFacts,
-  extractTournamentFacts
 } from "./insights";
+import { buildTournamentInsights, buildTournamentInsightsFromFacts, extractTournamentFacts, type TournamentFacts } from "./tournament-compat";
 import { buildMatchWorkspaceModel } from "./workspace";
 
 const fixture = (async () => loadDemoPackageFromZip(await readFile(
@@ -217,6 +215,110 @@ describe("buildTournamentInsights", () => {
     expect(buildTournamentInsightsFromFacts(demos.map(extractTournamentFacts))).toEqual(buildTournamentInsights(demos));
   });
 
+  it("preserves the Ancient fixture counts through the shared tournament owner", async () => {
+    const pkg = await fixture;
+    const facts = extractTournamentFacts({ matchId: "m1", pkg });
+    const fromDemo = buildTournamentInsights([{ matchId: "m1", pkg }]);
+    const fromFacts = buildTournamentInsightsFromFacts([facts]);
+    const selectStableFields = (insights: ReturnType<typeof buildTournamentInsights>) => ({
+      maps: insights.maps,
+      teamPistols: insights.teamPistols,
+      economyMatrix: insights.economyMatrix,
+      ecoUpsets: insights.ecoUpsets,
+      manAdvantageConversions: insights.manAdvantageConversions,
+      teamManAdvantageConversions: insights.teamManAdvantageConversions,
+      teamEconomySummaries: insights.teamEconomySummaries,
+      weaponKills: insights.weaponKills,
+      tWinRatePercent: insights.tWinRatePercent,
+      ctWinRatePercent: insights.ctWinRatePercent,
+      pistolConversionPercent: insights.pistolConversionPercent,
+    });
+    const expected = {
+      maps: [{ mapName: "de_ancient", matches: 1, tWinRatePercent: 69.6, ctWinRatePercent: 30.4, pistolTWinRatePercent: 50 }],
+      teamPistols: [
+        { teamName: "Team Spirit", pistolRounds: 2, pistolWins: 2, winRatePercent: 100, conversionRounds: 2, conversionWins: 1, conversionPercent: 50, breakRounds: 0, breakWins: 0, breakRatePercent: null },
+        { teamName: "Team Falcons", pistolRounds: 2, pistolWins: 0, winRatePercent: 0, conversionRounds: 0, conversionWins: 0, conversionPercent: null, breakRounds: 2, breakWins: 1, breakRatePercent: 50 },
+      ],
+      economyMatrix: [
+        { lowEconomy: "full", highEconomy: "full", rounds: 10, lowEconomyWins: 6, lowWinRatePercent: null },
+        { lowEconomy: "force", highEconomy: "full", rounds: 4, lowEconomyWins: 4, lowWinRatePercent: 100 },
+        { lowEconomy: "eco", highEconomy: "full", rounds: 3, lowEconomyWins: 0, lowWinRatePercent: 0 },
+        { lowEconomy: "semi", highEconomy: "full", rounds: 3, lowEconomyWins: 1, lowWinRatePercent: 33.3 },
+        { lowEconomy: "force", highEconomy: "force", rounds: 1, lowEconomyWins: 0, lowWinRatePercent: null },
+      ],
+      ecoUpsets: [
+        { teamName: "Team Spirit", opportunities: 3, wins: 1, winRatePercent: 33.3 },
+        { teamName: "Team Falcons", opportunities: 3, wins: 0, winRatePercent: 0 },
+      ],
+      manAdvantageConversions: [
+        { advantageAlive: 5, disadvantageAlive: 4, advantageLabel: "5v4", disadvantageLabel: "4v5", opportunities: 23, advantageWins: 17, advantageConversionPercent: 73.9, disadvantageWins: 6, disadvantageConversionPercent: 26.1 },
+        { advantageAlive: 5, disadvantageAlive: 3, advantageLabel: "5v3", disadvantageLabel: "3v5", opportunities: 9, advantageWins: 7, advantageConversionPercent: 77.8, disadvantageWins: 2, disadvantageConversionPercent: 22.2 },
+      ],
+      teamManAdvantageConversions: [
+        {
+          teamName: "Team Falcons",
+          states: [
+            { advantageAlive: 5, disadvantageAlive: 4, advantageLabel: "5v4", disadvantageLabel: "4v5", advantageOpportunities: 6, advantageWins: 5, advantageConversionPercent: 83.3, disadvantageOpportunities: 17, disadvantageWins: 5, disadvantageConversionPercent: 29.4 },
+            { advantageAlive: 5, disadvantageAlive: 3, advantageLabel: "5v3", disadvantageLabel: "3v5", advantageOpportunities: 5, advantageWins: 4, advantageConversionPercent: 80, disadvantageOpportunities: 4, disadvantageWins: 1, disadvantageConversionPercent: 25 },
+          ],
+        },
+        {
+          teamName: "Team Spirit",
+          states: [
+            { advantageAlive: 5, disadvantageAlive: 4, advantageLabel: "5v4", disadvantageLabel: "4v5", advantageOpportunities: 17, advantageWins: 12, advantageConversionPercent: 70.6, disadvantageOpportunities: 6, disadvantageWins: 1, disadvantageConversionPercent: 16.7 },
+            { advantageAlive: 5, disadvantageAlive: 3, advantageLabel: "5v3", disadvantageLabel: "3v5", advantageOpportunities: 4, advantageWins: 3, advantageConversionPercent: 75, disadvantageOpportunities: 5, disadvantageWins: 1, disadvantageConversionPercent: 20 },
+          ],
+        },
+      ],
+      teamEconomySummaries: [
+        {
+          teamName: "Team Spirit", maps: 1, rounds: 23, roundWins: 13, roundWinPercent: 56.5,
+          pistol: { rounds: 2, wins: 2, winRatePercent: 100 },
+          round2: { conversionRounds: 2, conversionWins: 1, conversionPercent: 50, breakRounds: 0, breakWins: 0, breakRatePercent: null },
+          manAdvantage: {
+            teamName: "Team Spirit",
+            states: [
+              { advantageAlive: 5, disadvantageAlive: 4, advantageLabel: "5v4", disadvantageLabel: "4v5", advantageOpportunities: 17, advantageWins: 12, advantageConversionPercent: 70.6, disadvantageOpportunities: 6, disadvantageWins: 1, disadvantageConversionPercent: 16.7 },
+              { advantageAlive: 5, disadvantageAlive: 3, advantageLabel: "5v3", disadvantageLabel: "3v5", advantageOpportunities: 4, advantageWins: 3, advantageConversionPercent: 75, disadvantageOpportunities: 5, disadvantageWins: 1, disadvantageConversionPercent: 20 },
+            ],
+          },
+          smallBuyUpset: { opportunities: 3, wins: 1, winRatePercent: 33.3 },
+        },
+        {
+          teamName: "Team Falcons", maps: 1, rounds: 23, roundWins: 10, roundWinPercent: 43.5,
+          pistol: { rounds: 2, wins: 0, winRatePercent: 0 },
+          round2: { conversionRounds: 0, conversionWins: 0, conversionPercent: null, breakRounds: 2, breakWins: 1, breakRatePercent: 50 },
+          manAdvantage: {
+            teamName: "Team Falcons",
+            states: [
+              { advantageAlive: 5, disadvantageAlive: 4, advantageLabel: "5v4", disadvantageLabel: "4v5", advantageOpportunities: 6, advantageWins: 5, advantageConversionPercent: 83.3, disadvantageOpportunities: 17, disadvantageWins: 5, disadvantageConversionPercent: 29.4 },
+              { advantageAlive: 5, disadvantageAlive: 3, advantageLabel: "5v3", disadvantageLabel: "3v5", advantageOpportunities: 5, advantageWins: 4, advantageConversionPercent: 80, disadvantageOpportunities: 4, disadvantageWins: 1, disadvantageConversionPercent: 25 },
+            ],
+          },
+          smallBuyUpset: { opportunities: 3, wins: 0, winRatePercent: 0 },
+        },
+      ],
+      weaponKills: [
+        { weapon: "ak47", label: "AK-47", kills: 60, headshotPercent: 56.7, topPlayerName: "donk", topPlayerKills: 19 },
+        { weapon: "m4a1", label: "M4A4", kills: 19, headshotPercent: 21.1, topPlayerName: "kyousuke", topPlayerKills: 6 },
+        { weapon: "m4a1_silencer", label: "M4A1-S", kills: 19, headshotPercent: 26.3, topPlayerName: "zont1x", topPlayerKills: 8 },
+        { weapon: "awp", label: "AWP", kills: 14, headshotPercent: 0, topPlayerName: "m0NESY", topPlayerKills: 9 },
+        { weapon: "usp_silencer", label: "USP-S", kills: 9, headshotPercent: 66.7, topPlayerName: "donk", topPlayerKills: 3 },
+        { weapon: "galilar", label: "Galil AR", kills: 7, headshotPercent: 42.9, topPlayerName: "NiKo", topPlayerKills: 2 },
+        { weapon: "glock", label: "Glock-18", kills: 7, headshotPercent: 100, topPlayerName: "kyousuke", topPlayerKills: 2 },
+        { weapon: "tec9", label: "Tec-9", kills: 4, headshotPercent: 75, topPlayerName: "karrigan", topPlayerKills: 2 },
+        { weapon: "deagle", label: "Desert Eagle", kills: 3, headshotPercent: 33.3, topPlayerName: "sh1ro", topPlayerKills: 2 },
+        { weapon: "mp9", label: "MP9", kills: 3, headshotPercent: 33.3, topPlayerName: "magixx", topPlayerKills: 3 },
+      ],
+      tWinRatePercent: 69.6,
+      ctWinRatePercent: 30.4,
+      pistolConversionPercent: 50,
+    };
+
+    expect(selectStableFields(fromDemo)).toEqual(expected);
+    expect(selectStableFields(fromFacts)).toEqual(expected);
+  });
+
   it("aggregates round-level rates across demos", async () => {
     const pkg = await fixture;
     const insights = buildTournamentInsights([
@@ -289,6 +391,43 @@ describe("buildTournamentInsights", () => {
     expect(new Set(teamStateKeys)).toEqual(new Set(["5:4", "5:3"]));
     expect(teamStateKeys).not.toContain("4:5");
     expect(teamStateKeys).not.toContain("3:5");
+  });
+
+  it("ignores a post-round tail kill for manpower conversion detection", () => {
+    const players = [
+      ...Array.from({ length: 5 }, (_, index) => ({ steamId64: `a${index + 1}`, name: `A${index + 1}`, teamKey: "teamA" as const })),
+      ...Array.from({ length: 5 }, (_, index) => ({ steamId64: `b${index + 1}`, name: `B${index + 1}`, teamKey: "teamB" as const })),
+    ];
+    const base: TournamentFacts = {
+      matchId: "tail-regression",
+      mapName: "de_ancient",
+      teams: { teamA: "Alpha", teamB: "Bravo" },
+      players,
+      kills: [],
+      rounds: [{
+        roundNumber: 1,
+        winnerSide: "t",
+        winnerTeamKey: "teamA",
+        teamAEconomy: "full",
+        teamBEconomy: "full",
+        teamASide: "t",
+        teamBSide: "ct",
+        freezeEndTick: 100,
+        endTick: 200,
+      }],
+    };
+    const withTail: TournamentFacts = {
+      ...base,
+      kills: [{ roundNumber: 1, tick: 201, killerSteamId64: "a1", victimSteamId64: "b1", weapon: "ak47", headshot: false }],
+    };
+    const withoutTail = buildTournamentInsightsFromFacts([base]);
+    const tailed = buildTournamentInsightsFromFacts([withTail]);
+
+    expect(tailed.manAdvantageConversions).toEqual(withoutTail.manAdvantageConversions);
+    expect(tailed.teamManAdvantageConversions).toEqual(withoutTail.teamManAdvantageConversions);
+    expect(tailed.teamEconomySummaries.map((team) => team.manAdvantage)).toEqual(
+      withoutTail.teamEconomySummaries.map((team) => team.manAdvantage),
+    );
   });
 
   it("builds team economy summaries with maps, round win rate and sample counts", async () => {
