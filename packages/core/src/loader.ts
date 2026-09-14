@@ -3,8 +3,29 @@ import type { DemoPackage } from "@cs2dak/contract";
 import { manifestSchema } from "@cs2dak/contract";
 import { normalizeDemoPackage, parsePackageJson } from "./normalize.js";
 
-export async function loadDemoPackageFromZip(bytes: ArrayBuffer | Uint8Array): Promise<DemoPackage> {
+export type DemoManifest = ReturnType<typeof manifestSchema.parse>;
+
+async function readManifest(bytes: ArrayBuffer | Uint8Array) {
   const zip = await JSZip.loadAsync(bytes);
+  const file = zip.file("manifest.json");
+  if (!file) throw new Error("Missing manifest.json in demo package");
+  const rawManifest = parsePackageJson(await file.async("string")) as { schemaVersion?: string };
+  const version = rawManifest?.schemaVersion ?? "unknown";
+  if (!version.startsWith("cs2-demo-format/3.")) {
+    throw new Error(
+      `不支持的包版本 ${version}：本版本只读取 cs2-demo-format/3.x，请用 cs2df 重新导出该 demo`
+    );
+  }
+  return { zip, manifest: manifestSchema.parse(rawManifest) };
+}
+
+/** 只读取并校验 manifest.json；不会解压 match、replay 或其它大文件。 */
+export async function loadDemoManifestFromZip(bytes: ArrayBuffer | Uint8Array): Promise<DemoManifest> {
+  return (await readManifest(bytes)).manifest;
+}
+
+export async function loadDemoPackageFromZip(bytes: ArrayBuffer | Uint8Array): Promise<DemoPackage> {
+  const { zip, manifest } = await readManifest(bytes);
   const readJson = async <T>(name: string): Promise<T> => {
     const file = zip.file(name);
     if (!file) {
@@ -12,15 +33,6 @@ export async function loadDemoPackageFromZip(bytes: ArrayBuffer | Uint8Array): P
     }
     return parsePackageJson(await file.async("string")) as T;
   };
-
-  const rawManifest = await readJson<{ schemaVersion?: string }>("manifest.json");
-  const version = rawManifest?.schemaVersion ?? "unknown";
-  if (!version.startsWith("cs2-demo-format/3.")) {
-    throw new Error(
-      `不支持的包版本 ${version}：本版本只读取 cs2-demo-format/3.x，请用 cs2df 重新导出该 demo`
-    );
-  }
-  const manifest = manifestSchema.parse(rawManifest);
   const files = manifest.files;
 
   const optional = async (name: string | undefined): Promise<unknown> =>

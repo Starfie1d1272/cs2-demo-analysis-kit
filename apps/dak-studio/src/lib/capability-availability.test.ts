@@ -8,6 +8,7 @@ function entry(id: string, options: { replay?: boolean; stale?: boolean; built?:
     id,
     fileName: `${id}.zip`,
     importedAt: 0,
+    demoSha256: null,
     tags: [],
     ...(options.built === false ? {} : { builtWith: options.stale ? { factsRevision: "stale", formatVersion: "cs2-demo-format/3.0" } : currentBuiltWith() }),
     meta: {

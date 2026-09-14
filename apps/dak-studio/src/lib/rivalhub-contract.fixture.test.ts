@@ -8,4 +8,16 @@ describe("rivalhub-dak-events/1 fixture", () => {
     const fixture = JSON.parse(readFileSync(resolve(process.cwd(), "fixtures/contracts/rivalhub-dak-events-1.json"), "utf8"));
     expect(rivalHubEventsResponseSchema.parse(fixture)).toEqual(fixture);
   });
+
+  it("accepts historical event data without a projected MatchRoster lineup", () => {
+    const fixture = JSON.parse(readFileSync(resolve(process.cwd(), "fixtures/contracts/rivalhub-dak-events-1.json"), "utf8")) as {
+      events: Array<{ series: Array<{ maps: Array<Record<string, unknown>> }> }>;
+    };
+    for (const event of fixture.events) {
+      for (const series of event.series) {
+        for (const map of series.maps) delete map.lineup;
+      }
+    }
+    expect(() => rivalHubEventsResponseSchema.parse(fixture)).not.toThrow();
+  });
 });

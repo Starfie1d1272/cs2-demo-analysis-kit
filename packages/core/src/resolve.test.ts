@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import JSZip from "jszip";
 import type { PackagePlayer, PackageRound } from "@cs2dak/contract";
 import { createPlayerResolver } from "./resolve.js";
-import { loadDemoPackageFromZip } from "./loader.js";
+import { loadDemoManifestFromZip, loadDemoPackageFromZip } from "./loader.js";
 
 const players: PackagePlayer[] = [
   { steamId64: "76561198000000001", name: "Alpha", teamKey: "teamA" },
@@ -55,6 +55,38 @@ describe("createPlayerResolver", () => {
 });
 
 describe("loadDemoPackageFromZip version gate", () => {
+  it("loads a valid manifest without requiring the full package files", async () => {
+    const zip = new JSZip();
+    zip.file("manifest.json", JSON.stringify({
+      schemaVersion: "cs2-demo-format/3.0",
+      exporter: { name: "test", version: "0" },
+      parser: { name: "test", version: "0" },
+      demo: { hash: "a".repeat(64), sourceFileName: "fixture.dem" },
+      mapName: "de_mirage",
+      tickrate: 64,
+      exportedAt: "2026-01-01T00:00:00Z",
+      files: {
+        match: "match.json",
+        players: "players.json",
+        rounds: "rounds.json",
+        playerStats: "player-stats.json",
+        playerEconomies: "player-economies.json",
+        kills: "kills.json",
+        damages: "damages.json",
+        blinds: "blinds.json",
+        bombs: "bombs.json",
+        grenades: "grenades.json",
+        clutches: "clutches.json",
+      },
+    }));
+    const bytes = await zip.generateAsync({ type: "uint8array" });
+
+    await expect(loadDemoManifestFromZip(bytes)).resolves.toMatchObject({
+      schemaVersion: "cs2-demo-format/3.0",
+      demo: { hash: "a".repeat(64) },
+    });
+  });
+
   it("rejects v2 packages with a re-export hint", async () => {
     const zip = new JSZip();
     zip.file("manifest.json", JSON.stringify({ schemaVersion: "cs2-demo-format/2.3" }));

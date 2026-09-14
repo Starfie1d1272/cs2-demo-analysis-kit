@@ -232,6 +232,31 @@ export async function saveSeriesRecord(record: Omit<StudioSeriesRecord, "created
   return next;
 }
 
+/** 身份修复唯一允许触碰 series 的入口：替换 Demo id，并保持原有顺序且去重。 */
+export async function replaceDemoEntryReferences(replacements: Map<string, string> | Record<string, string>): Promise<number> {
+  const replacementMap = replacements instanceof Map ? replacements : new Map(Object.entries(replacements));
+  if (replacementMap.size === 0) return 0;
+  const records = await listSeriesRecords();
+  let rewired = 0;
+  for (const record of records) {
+    const entryIds = [...new Set(record.entryIds.map((id) => replacementMap.get(id) ?? id))];
+    const mapAssignments = record.mapAssignments?.map((assignment) => ({
+      ...assignment,
+      entryId: assignment.entryId ? replacementMap.get(assignment.entryId) ?? assignment.entryId : null,
+    }));
+    const mapEntryIds = mapAssignments?.flatMap((assignment) => assignment.entryId ? [assignment.entryId] : []) ?? [];
+    const nextEntryIds = [...new Set([...entryIds, ...mapEntryIds])];
+    const changed = nextEntryIds.length !== record.entryIds.length
+      || nextEntryIds.some((id, index) => id !== record.entryIds[index])
+      || mapAssignments?.some((assignment, index) => assignment.entryId !== record.mapAssignments?.[index]?.entryId) === true;
+    if (!changed) continue;
+    const { createdAt: _createdAt, updatedAt: _updatedAt, ...editable } = record;
+    await saveSeriesRecord({ ...editable, entryIds: nextEntryIds, mapAssignments });
+    rewired += 1;
+  }
+  return rewired;
+}
+
 export async function deleteSeriesRecord(id: string): Promise<void> {
   await seriesStore.delete(id);
 }

@@ -8,6 +8,7 @@ function entry(id: string, mapName: string): StudioDemoEntry {
     id,
     fileName: `${mapName}.zip`,
     importedAt: 1,
+    demoSha256: null,
     tags: [],
     sourceDemPath: null,
     meta: {
