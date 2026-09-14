@@ -4,6 +4,18 @@ DAK Studio 桌面应用及 `@cs2dak/*` 分析管道面向用户的变更记录�
 
 > 0.1.3 起面向 Studio 用户维护。`@cs2dak/*` npm 包版本由 changesets 独立管理（见各包的 CHANGELOG.md）；本文件聚焦 DAK Studio 桌面应用变更。
 
+## [0.8.2] — 2026-09-14
+
+### 新增
+
+- **RivalHub Demo 导入稳定性**：补齐原始 Demo 去重与修复、低内存批量导入、可恢复的进度会话和目标跳过状态；单个待人工处理项不会阻断整批任务。
+- **赛事视图降级反馈**：远程 Swiss / Round Robin 优先展示 RivalHub 官方 standings，远程淘汰赛优先展示官方 bracket；官方结构缺失时明确提示并保留 compact match index。
+
+### 修复 / 变更
+
+- **官方赛果匹配**：以 EventRoster 的 Steam64 membership 负责 canonical team identity 与正反方向，MatchRoster 仅在目标已识别后校验单场 lineup；远程阵容缺失或不一致时进入 `needs_attention`，不再误判为地图匹配不唯一。
+- **资料库元数据一致性**：身份索引只缓存 ID / hash，标签、来源路径、批量操作和重分析会读取最新 metadata，避免 stale facts 覆盖已有来源信息。
+
 ## [0.8.1] — 2026-09-14
 
 ### 新增

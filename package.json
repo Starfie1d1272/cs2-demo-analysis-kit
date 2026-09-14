@@ -1,6 +1,6 @@
 {
   "name": "cs2-demo-analysis-kit",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "private": true,
   "packageManager": "pnpm@11.7.0",
   "description": "Reusable CS2 demo analysis models, QA reports, and previewable UI components.",
