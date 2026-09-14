@@ -45,7 +45,7 @@ import {
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
 import { getPinnedPlayer } from "./lib/pin";
 import { connectRivalHub, fetchRivalHubEvents, loadRivalHubConnection, revokeRivalHubPairing, type RivalHubConnectionState } from "./lib/rivalhub";
-import { runRivalHubBatch, type RivalHubBatchItem, type RivalHubBatchSession, type RivalHubImportContext } from "./lib/rivalhub-import";
+import { rivalHubBatchCompletionMessage, runRivalHubBatch, type RivalHubBatchItem, type RivalHubBatchSession, type RivalHubImportContext } from "./lib/rivalhub-import";
 import { RivalHubBatchImportPanel } from "./components/RivalHubBatchImportPanel";
 import { importRivalHubFromNativePicker, isRivalHubDropTarget, shouldHandleOrdinaryDrop } from "./lib/rivalhub-acquisition";
 
@@ -348,7 +348,8 @@ export function App() {
     return importedEntries;
   }, []);
 
-  const refreshRivalHub = useCallback(async () => {
+  const refreshRivalHub = useCallback(async (options: { announce?: boolean } = {}): Promise<boolean> => {
+    const announce = options.announce !== false;
     setRivalHubConnection((current) => ({ ...current, status: "connecting", error: null }));
     try {
       const response = await fetchRivalHubEvents();
@@ -357,14 +358,16 @@ export function App() {
       const connected = await loadRivalHubConnection();
       setRivalHubConnection({ ...connected, status: "connected", error: null });
       setRivalHubRefreshToken((current) => current + 1);
-      setNotice(`已刷新 RivalHub 赛事：${response.events.length} 个赛事`);
+      if (announce) setNotice(`已刷新 RivalHub 赛事：${response.events.length} 个赛事`);
+      return true;
     } catch (error) {
       await markRivalHubEventsStale().catch(() => undefined);
       await refreshEventRecords().catch(() => undefined);
       const current = await loadRivalHubConnection().catch(() => rivalHubConnection);
       const message = error instanceof Error ? error.message : String(error);
       setRivalHubConnection({ ...current, status: "error", error: message });
-      setNotice(`RivalHub 刷新失败：${message}`);
+      if (announce) setNotice(`RivalHub 刷新失败：${message}`);
+      return false;
     }
   }, [refreshEventRecords, rivalHubConnection]);
 
@@ -426,11 +429,11 @@ export function App() {
       // await; do not keep a second batch-wide File array in the App closure.
       inputFiles = [];
       const session = await batchPromise;
+      const remoteRefreshSucceeded = await refreshRivalHub({ announce: false });
       setBatchSession(session);
-      await refreshRivalHub().catch((error) => setNotice(`批处理已结束，但刷新 RivalHub 失败：${error instanceof Error ? error.message : String(error)}`));
       setEntries(await listDemoEntries());
       await refreshEventRecords();
-      setNotice(`批处理完成：已同步 ${session.counts.synced}，已存在 ${session.counts.alreadySynced}，需处理 ${session.counts.needsAttention}，待目标 ${session.counts.needsTarget}，已跳过 ${session.counts.skipped}，失败 ${session.counts.failed}`);
+      setNotice(rivalHubBatchCompletionMessage(session, remoteRefreshSucceeded));
     } catch (error) {
       setNotice(`在线 Demo 批处理失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -899,7 +902,7 @@ export function App() {
             </button>
           </div>
         )}
-        <RivalHubBatchImportPanel session={batchSession} onStop={stopRivalHubBatch} onSelectTarget={selectRivalHubBatchTarget} />
+        <RivalHubBatchImportPanel session={batchSession} onStop={stopRivalHubBatch} onSelectTarget={selectRivalHubBatchTarget} onDismiss={() => setBatchSession(null)} />
         {entries.length > 0 && view !== "library" && view !== "management" && (
           <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} onEdit={() => setContextEditorOpen((current) => !current)} />
         )}

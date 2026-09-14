@@ -187,7 +187,7 @@ export function EventsView({ entries, onOpenMatch, onAnalyzeEvent, onGoLibrary, 
   rivalHubConnection?: RivalHubConnectionState;
   onConnectRivalHub?: (baseUrl: string) => Promise<void>;
   onRevokeRivalHub?: () => Promise<void>;
-  onRefreshRivalHub?: () => Promise<void>;
+  onRefreshRivalHub?: () => Promise<void | boolean>;
   onImportOnlineFiles?: (files: Iterable<File>, context: RivalHubImportContext) => Promise<void>;
   onPickOnlineFiles?: (context: RivalHubImportContext) => Promise<void>;
   refreshToken?: number;

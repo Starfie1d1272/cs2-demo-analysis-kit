@@ -1,5 +1,7 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { currentRivalHubBatchItem } from "./RivalHubBatchImportPanel";
+import { currentRivalHubBatchItem, RivalHubBatchImportPanel } from "./RivalHubBatchImportPanel";
 import type { RivalHubBatchSession } from "../lib/rivalhub-import";
 
 function session(overrides: Partial<RivalHubBatchSession> = {}): RivalHubBatchSession {
@@ -23,5 +25,23 @@ describe("RivalHub batch current item", () => {
   it("follows awaitingTargetItemId instead of an earlier needs_target item", () => {
     expect(currentRivalHubBatchItem(session())?.id).toBe("current");
     expect(currentRivalHubBatchItem(session({ awaitingTargetItemId: "target", currentIndex: 2 }))?.id).toBe("target");
+  });
+
+  it("keeps terminal results visible and exposes an explicit dismiss action", () => {
+    const html = renderToStaticMarkup(createElement(RivalHubBatchImportPanel, {
+      session: session({
+        status: "completed",
+        currentIndex: 0,
+        total: 1,
+        items: [{ id: "failed", fileName: "failed.dem", phase: "failed", message: "失败", detail: "server unavailable" }],
+        counts: { synced: 0, alreadySynced: 0, needsAttention: 0, needsTarget: 0, skipped: 0, failed: 1, reusedLocal: 0 },
+      }),
+      onDismiss: () => undefined,
+    }));
+
+    expect(html).toContain("已完成 · 1/1 文件");
+    expect(html).toContain("关闭结果");
+    expect(html).toContain("server unavailable");
+    expect(html).not.toContain("当前文件完成后停止");
   });
 });

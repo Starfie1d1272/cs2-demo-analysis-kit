@@ -89,6 +89,11 @@ export interface RivalHubBatchSession {
   };
 }
 
+export function rivalHubBatchCompletionMessage(session: RivalHubBatchSession, remoteRefreshSucceeded = true): string {
+  const message = `批处理完成：已同步 ${session.counts.synced}，已存在 ${session.counts.alreadySynced}，需处理 ${session.counts.needsAttention}，待目标 ${session.counts.needsTarget}，已跳过 ${session.counts.skipped}，失败 ${session.counts.failed}`;
+  return remoteRefreshSucceeded ? message : `${message}；远程状态刷新失败，请点击「刷新赛事」重试`;
+}
+
 interface RivalHubBatchDependencies {
   exportDem: (file: File, onProgress?: (message: string) => void) => Promise<ExportedDemoFile>;
   importDemo: typeof importDemoFile;
@@ -243,7 +248,14 @@ export async function runRivalHubBatch(
 
   for (let index = 0; index < files.length; index += 1) {
     if (callbacks.shouldStop?.()) {
-      session = { ...session, status: "stopping", currentIndex: index };
+      session = recount({
+        ...session,
+        status: "stopping",
+        currentIndex: index,
+        items: session.items.map((item, itemIndex) => itemIndex >= index && item.phase === "queued"
+          ? { ...item, phase: "skipped", message: messageForPhase("skipped"), detail: "用户停止批处理" }
+          : item),
+      });
       emit();
       break;
     }

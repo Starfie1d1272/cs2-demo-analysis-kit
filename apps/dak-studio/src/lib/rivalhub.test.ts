@@ -17,7 +17,7 @@ vi.mock("./storage", () => ({
   }),
 }));
 
-import { normalizeBaseUrl, revokeRivalHubPairing, rivalHubEvidenceIdempotencyKey } from "./rivalhub";
+import { connectRivalHub, normalizeBaseUrl, revokeRivalHubPairing, rivalHubEvidenceIdempotencyKey } from "./rivalhub";
 
 describe("RivalHub pairing revocation", () => {
   beforeEach(() => {
@@ -95,5 +95,72 @@ describe("RivalHub pairing revocation", () => {
     expect(await rivalHubEvidenceIdempotencyKey("map-1", samePayloadWithDifferentKeyOrder)).toBe(first);
     expect(await rivalHubEvidenceIdempotencyKey("map-1", changedPayload)).not.toBe(first);
     expect(first).toMatch(/^dak:map-1:[a-f0-9]{64}$/);
+  });
+});
+
+describe("RivalHub browser pairing", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function startResponse() {
+    return {
+      pairingId: "10000000-0000-4000-8000-000000000001",
+      pollToken: "poll-token",
+      authorizeUrl: "https://rivalhub.test/authorize?pairing=1",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+  }
+
+  it("preopens during the click call and navigates the same window after pairing/start", async () => {
+    const order: string[] = [];
+    const popup = {
+      closed: false,
+      location: { replace: vi.fn() },
+      close: vi.fn(),
+    };
+    const open = vi.fn((url: string) => {
+      order.push(`open:${url}`);
+      return popup;
+    });
+    vi.stubGlobal("window", { open });
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      order.push(`fetch:${url}`);
+      return url.endsWith("/pairing/start")
+        ? new Response(JSON.stringify(startResponse()), { status: 200 })
+        : new Response(JSON.stringify({ status: "authorized", accessToken: "browser-token", expiresAt: startResponse().expiresAt }), { status: 200 });
+    }));
+
+    const pending = connectRivalHub("https://rivalhub.test");
+    expect(order[0]).toBe("open:about:blank");
+    const connected = await pending;
+
+    expect(connected.status).toBe("connected");
+    expect(popup.location.replace).toHaveBeenCalledWith(startResponse().authorizeUrl);
+    expect(order[1]).toBe("fetch:https://rivalhub.test/api/integrations/dak/pairing/start");
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not treat a null noopener return as proof that the preopened window failed", async () => {
+    const open = vi.fn(() => null);
+    vi.stubGlobal("window", { open });
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => url.endsWith("/pairing/start")
+      ? new Response(JSON.stringify(startResponse()), { status: 200 })
+      : new Response(JSON.stringify({ status: "authorized", accessToken: "browser-token", expiresAt: startResponse().expiresAt }), { status: 200 })));
+
+    await expect(connectRivalHub("https://rivalhub.test")).resolves.toMatchObject({ status: "connected" });
+    expect(open).toHaveBeenNthCalledWith(1, "about:blank", "dak-rivalhub-pairing", "noopener,noreferrer");
+    expect(open).toHaveBeenNthCalledWith(2, startResponse().authorizeUrl, "dak-rivalhub-pairing", "noopener,noreferrer");
+  });
+
+  it("closes the preopened browser window when pairing/start fails", async () => {
+    const popup = { closed: false, location: { replace: vi.fn() }, close: vi.fn() };
+    const open = vi.fn(() => popup);
+    vi.stubGlobal("window", { open });
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("pairing unavailable"); }));
+
+    await expect(connectRivalHub("https://rivalhub.test")).rejects.toThrow("pairing unavailable");
+    expect(popup.close).toHaveBeenCalledOnce();
+    expect(popup.location.replace).not.toHaveBeenCalled();
   });
 });
