@@ -163,6 +163,9 @@ importers:
       '@cs2dak/maps':
         specifier: workspace:*
         version: link:../maps
+      '@cs2dak/tournament':
+        specifier: workspace:*
+        version: link:../tournament
       '@rivalhub/rival-rating':
         specifier: ^0.3.0
         version: 0.3.0
@@ -187,6 +190,8 @@ importers:
       react-dom:
         specifier: '>=18'
         version: 19.2.6(react@19.2.6)
+
+  packages/tournament: {}
 
 packages:
 

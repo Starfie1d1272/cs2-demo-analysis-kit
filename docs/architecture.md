@@ -13,7 +13,8 @@ This repository owns the product-neutral analysis pipeline from a `cs2-demo-form
        ├─ box-score / HLTV baseline / RR six-account / PRISM  (via @rivalhub/rival-rating)
        └─ replay / shots / duels decoding through cs2-demo-format helpers
   -> @cs2dak/cohort       (cross-match aggregation + identity map)
-  -> @cs2dak/presentation (product-neutral view models)
+  -> @cs2dak/presentation (single-map adapters + product-neutral view models)
+       └─> @cs2dak/tournament (frozen Tournament facts -> cross-map analytics)
   -> @cs2dak/react / product adapters (RivalHub, CS2 Insight Agent)
 ```
 
@@ -27,7 +28,8 @@ This repository owns the product-neutral analysis pipeline from a `cs2-demo-form
 | `@cs2dak/core` | Deterministic single-match analysis, RR/PRISM signal derivation, QA. No product side effects. |
 | `@cs2dak/cohort` | Cross-match aggregation and identity merging. No product ranking rules. |
 | `@cs2dak/maps` | Map calibration + world-to-radar transform + attack routes (`MapRoute`) + zone geometry (`zoneAt` / `pointInPolygon`) + callout mappings. |
-| `@cs2dak/presentation` | Product-neutral view models, labels, stories, and workspace composition. |
+| `@cs2dak/tournament` | Zero-runtime-dependency frozen sufficient-fact DTOs, identity-safe cross-map merge, rates, deterministic ordering, and invariant guards. |
+| `@cs2dak/presentation` | Product-neutral view models, labels, stories, workspace composition, and legacy single-map Tournament adapters. |
 | `@cs2dak/react` | Product-neutral preview components that consume presentation contracts only. |
 | `@cs2dak/cli` | Language-neutral filesystem/automation wrapper around TypeScript packages. |
 | `apps/dak-studio` | Local demo library and analysis workbench. Stores ZIP bytes locally; `.dem` import is exported through `cs2df`. |
@@ -48,6 +50,26 @@ Important v3 semantics:
 - `positions-1s.json` is gone; spatial consumers read the 8 Hz replay stream and `place` column.
 - Columnar streams are delta encoded; consumers use `decodeDelta()` from `cs2-demo-format`.
 - Missing derived data remains `null`, not coerced to `0`.
+
+### Tournament frozen-fact boundary
+
+Tournament analytics deliberately has a narrower runtime boundary than the general
+presentation package:
+
+```text
+core single-map detection
+  -> presentation legacy adapter / Evidence producer
+  -> @cs2dak/tournament frozen-fact merge
+  -> DAK Studio / RivalHub consumers
+```
+
+`@cs2dak/tournament` owns only the public `TournamentMapFacts` DTO and the
+cross-map `TournamentAnalytics` merge. It does not parse demos, redetect events,
+resolve RivalHub scope, access storage, or own scoreboard/rating formulas. Entity
+keys are the only aggregation identity; display labels are injected at the final
+projection step. Its published runtime contains compiled ESM and declarations,
+with no dependency on `@cs2dak/core`, `@cs2dak/contract`, `@cs2dak/cohort`, maps,
+React, Zod, or RivalHub code.
 
 ### Rating layers
 
@@ -74,7 +96,8 @@ Formula ownership stays in `@rivalhub/rival-rating`. This kit only derives signa
        ├─ box-score / HLTV baseline / RR 六账户 / PRISM（经 @rivalhub/rival-rating）
        └─ replay / shots / duels 通过 cs2-demo-format helper 解码
   -> @cs2dak/cohort       （跨场聚合 + identity map）
-  -> @cs2dak/presentation （产品中立 View Model）
+  -> @cs2dak/presentation （单图适配 + 产品中立 View Model）
+       └─> @cs2dak/tournament （frozen Tournament facts -> 跨图分析）
   -> @cs2dak/react / 产品适配层（RivalHub、CS2 Insight Agent）
 ```
 
@@ -88,7 +111,8 @@ Formula ownership stays in `@rivalhub/rival-rating`. This kit only derives signa
 | `@cs2dak/core` | 单场确定性分析、RR/PRISM 信号派生、QA；无产品副作用。 |
 | `@cs2dak/cohort` | 跨场聚合与身份归并，不拥有产品排行榜规则。 |
 | `@cs2dak/maps` | 地图标定、world-to-radar 转换、进攻动线、zone 几何与 callout 映射。 |
-| `@cs2dak/presentation` | 产品中立 View Model、标签、叙事与 workspace 编排。 |
+| `@cs2dak/tournament` | 零 runtime 依赖的 frozen sufficient-fact DTO、identity-safe 跨图 merge、rate、确定性排序与 invariant guard。 |
+| `@cs2dak/presentation` | 产品中立 View Model、标签、叙事、workspace 编排和 Tournament 单图 legacy adapter。 |
 | `@cs2dak/react` | 只消费 presentation 合同的产品中立组件。 |
 | `@cs2dak/cli` | TypeScript 包的文件系统/自动化入口。 |
 | `apps/dak-studio` | 本地 Demo 库和分析工作台；本地保存 ZIP 字节，`.dem` 导入通过 `cs2df` 导出。 |
@@ -109,6 +133,23 @@ v3 包包含：
 - `positions-1s.json` 已删除；空间消费者改读 8 Hz replay 流和 `place` 列。
 - 列式流为 delta 编码；消费者使用 `cs2-demo-format` 导出的 `decodeDelta()`。
 - 缺失派生数据保持 `null`，不得伪造为 `0`。
+
+### Tournament frozen-fact 边界
+
+赛事统计的链路固定为：
+
+```text
+core 单场 detection
+  -> presentation legacy adapter / Evidence producer
+  -> @cs2dak/tournament frozen-fact merge
+  -> DAK Studio / RivalHub consumer
+```
+
+`@cs2dak/tournament` 只拥有窄 public `TournamentMapFacts` DTO 与跨图
+`TournamentAnalytics` merge；不解析 Demo、不重新检测事件、不解析 RivalHub scope、
+不访问存储，也不拥有 scoreboard 或评分公式。聚合只认 entity key，display label
+仅在最终 projection 注入。发布产物是编译后的 ESM + declaration，runtime 不依赖
+`@cs2dak/core`、`@cs2dak/contract`、`@cs2dak/cohort`、maps、React、Zod 或 RivalHub。
 
 ### 评分三层
 

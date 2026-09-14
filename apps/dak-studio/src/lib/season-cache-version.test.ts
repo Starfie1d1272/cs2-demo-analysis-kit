@@ -17,6 +17,7 @@ describe("season aggregate cache version", () => {
     expect(FACTS_REVISION).toContain(`storage:${FACTS_STORAGE_VERSION}`);
     expect(FACTS_REVISION).toContain(`tactical:${TACTICAL_FACT_VERSION}`);
     expect(FACTS_REVISION).toContain(`mapIntelligence:${MAP_INTELLIGENCE_FACT_VERSION}`);
+    expect(FACTS_REVISION).toContain("tournament:cs2-demo-analysis-kit/1.0.1");
     expect(seasonCacheKey([], undefined, [], "stale")).not.toBe(seasonCacheKey([]));
   });
 });
