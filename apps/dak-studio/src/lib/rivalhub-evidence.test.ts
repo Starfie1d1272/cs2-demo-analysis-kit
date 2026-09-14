@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { DemoPackage } from "@cs2dak/contract";
 import { analyzeDemoPackage, loadDemoPackageFromZip } from "../../../../packages/core/src/index";
 import { buildRivalHubDemoEvidenceV1, fixtureIdentity, fixtureTarget, matchRivalHubParticipants, matchRivalHubParticipantsForReview, normalizeRivalHubDemoPackage, resolveRivalHubParticipants, resolveRivalHubParticipantsFromEventRoster, resolveRivalHubParticipantsForReview, selectRivalHubMap, type RivalHubEvidenceTarget, type RivalHubTeamOrientation } from "./rivalhub-evidence";
+import { matchRivalHubMap, type RivalHubMatchCandidate } from "./rivalhub-match";
 import type { RivalHubRemoteMap, RivalHubRemotePlayer, RivalHubRemoteTeam } from "./rivalhub-contract";
 
 const target: RivalHubEvidenceTarget = {
@@ -74,9 +75,12 @@ function remoteMap(id: string, scoreA: number | null = 13, scoreB: number | null
 }
 
 let stableFixture: DemoPackage;
+let evidenceFixture: DemoPackage;
 
 beforeAll(async () => {
-  stableFixture = await loadDemoPackageFromZip(await readFile(resolve(process.cwd(), "fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip")));
+  const bytes = await readFile(resolve(process.cwd(), "fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip"));
+  stableFixture = await loadDemoPackageFromZip(bytes);
+  evidenceFixture = await loadDemoPackageFromZip(bytes, { profile: "evidence" });
 });
 
 describe("RivalHub online Demo matching", () => {
@@ -132,6 +136,34 @@ describe("RivalHub online Demo matching", () => {
         ],
       },
     ]);
+  });
+
+  it("keeps Evidence V1 output byte-for-byte equivalent while omitting optional streams", () => {
+    const target = fixtureTarget();
+    const identities = new Map(stableFixture.players.map((player, index) => [player.steamId64, fixtureIdentity(player, index, target)]));
+    const fullEvidence = buildRivalHubDemoEvidenceV1(stableFixture, target, identities);
+    const selectiveEvidence = buildRivalHubDemoEvidenceV1(evidenceFixture, target, identities);
+
+    expect(evidenceFixture.replay).toBeUndefined();
+    expect(evidenceFixture.shots).toBeUndefined();
+    expect(evidenceFixture.duels).toBeUndefined();
+    expect(JSON.stringify(selectiveEvidence)).toBe(JSON.stringify(fullEvidence));
+  });
+
+  it("keeps matcher output unchanged with the evidence-oriented package", () => {
+    const candidate: RivalHubMatchCandidate = {
+      series: {
+        id: "series-matcher",
+        stageKey: "stage",
+        teamAName: "Renamed A",
+        teamBName: "Renamed B",
+        completedAt: "2026-09-13T00:00:00.000Z",
+        status: "finished",
+      },
+      map: remoteMap("matcher", stableFixture.match.teamA.score, stableFixture.match.teamB.score),
+    };
+
+    expect(matchRivalHubMap(evidenceFixture, [candidate])).toEqual(matchRivalHubMap(stableFixture, [candidate]));
   });
 
   it("keeps FK, multi-kill and clutch hard-blocker values aligned with DAK stable scoreboard semantics", () => {

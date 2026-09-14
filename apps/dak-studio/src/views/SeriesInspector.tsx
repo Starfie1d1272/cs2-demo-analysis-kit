@@ -5,6 +5,8 @@ import type { RivalHubImportContext } from "../lib/rivalhub-import";
 import type { RivalHubMatchCandidate } from "../lib/rivalhub-match";
 import { mapDisplayName, type StudioSeriesRecord } from "../lib/series";
 import { rivalHubStatusPresentation } from "../lib/rivalhub-status";
+import { RIVALHUB_DROP_ZONE_ATTRIBUTE } from "../lib/rivalhub-acquisition";
+import { triggerWindowsDropCapture } from "../lib/dem";
 import { BpView } from "./BpView";
 
 function mapsForSeries(series: StudioSeriesRecord): NonNullable<StudioSeriesRecord["mapAssignments"]> {
@@ -28,11 +30,13 @@ function MapDrop({
   eventId,
   candidates,
   onImport,
+  onPick,
 }: {
   map: NonNullable<StudioSeriesRecord["mapAssignments"]>[number];
   eventId: string;
   candidates: RivalHubMatchCandidate[];
   onImport?: (files: Iterable<File>, context: RivalHubImportContext) => Promise<void>;
+  onPick?: (context: RivalHubImportContext) => Promise<void>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const scopedCandidates = candidates.filter((candidate) => candidate.map.id === map.rivalHub?.id);
@@ -56,9 +60,10 @@ function MapDrop({
       <button
         type="button"
         className="stu-button-sm"
-        onClick={() => inputRef.current?.click()}
+        {...{ [RIVALHUB_DROP_ZONE_ATTRIBUTE]: "" }}
+        onClick={() => { if (onPick) void onPick(context); else inputRef.current?.click(); }}
         onDragOver={(event) => { event.preventDefault(); event.stopPropagation(); }}
-        onDrop={(event) => { event.preventDefault(); event.stopPropagation(); start(event.dataTransfer.files); }}
+        onDrop={(event) => { triggerWindowsDropCapture(event.dataTransfer.files); event.preventDefault(); event.stopPropagation(); start(event.dataTransfer.files); }}
       >
         选择 / 拖入 Demo
       </button>
@@ -73,6 +78,7 @@ export function SeriesInspector({
   candidates,
   onOpenMatch,
   onImportOnlineFiles,
+  onPickOnlineFiles,
 }: {
   series: StudioSeriesRecord | null;
   entries: StudioDemoEntry[];
@@ -80,6 +86,7 @@ export function SeriesInspector({
   candidates: RivalHubMatchCandidate[];
   onOpenMatch: (entryId: string) => void;
   onImportOnlineFiles?: (files: Iterable<File>, context: RivalHubImportContext) => Promise<void>;
+  onPickOnlineFiles?: (context: RivalHubImportContext) => Promise<void>;
 }) {
   const [activeMapOrder, setActiveMapOrder] = useState<number | null>(null);
   if (!series) return <div className="stu-card stu-muted">选择一场系列赛查看地图、Demo 与 BP。</div>;
@@ -111,7 +118,7 @@ export function SeriesInspector({
                 {entry ? <span className="stu-rivalhub-status stu-rivalhub-status-synced"><i />本地 Demo 已关联</span> : <span className="stu-muted">本地未关联</span>}
                 {remoteStatus && <span className={remoteStatus.className}><i />{remoteStatus.label}</span>}
                 {entry && <button type="button" className="stu-button-sm" onClick={() => onOpenMatch(entry.id)}>打开 Demo</button>}
-                <MapDrop map={map} eventId={eventId} candidates={candidates} onImport={onImportOnlineFiles} />
+                <MapDrop map={map} eventId={eventId} candidates={candidates} onImport={onImportOnlineFiles} onPick={onPickOnlineFiles} />
               </div>
             </div>
           );

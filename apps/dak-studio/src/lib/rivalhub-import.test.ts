@@ -4,6 +4,7 @@ import type { DemoPackage } from "@cs2dak/contract";
 import type { StudioDemoEntry } from "./library";
 import type { RivalHubRemoteMap, RivalHubRemoteTeam } from "./rivalhub-contract";
 import { runRivalHubBatch, type RivalHubBatchCallbacks, type RivalHubMatchCandidate } from "./rivalhub-import";
+import { fileFromNativePath, nativePathForFile } from "./dem";
 
 const demoSha256 = "a".repeat(64);
 const fakePackage = {} as DemoPackage;
@@ -109,6 +110,24 @@ function runWith(
 }
 
 describe("RivalHub serial batch import", () => {
+  it("routes a path-backed native selection through the existing export owner", async () => {
+    const dependencies = baseDependencies();
+    const exportDem = vi.fn(async (file: File) => ({
+      file: new File(["zip"], "native.zip", { type: "application/zip" }),
+      sourceDemPath: null,
+    }));
+    const nativeFile = fileFromNativePath("/demos/native.zip");
+
+    await runRivalHubBatch([nativeFile], { scope: "event", eventId: "event-1", candidates: [candidate("target")] }, {
+      exportDem,
+      dependencies,
+    });
+
+    expect(nativePathForFile(nativeFile)).toBe("/demos/native.zip");
+    expect(exportDem).toHaveBeenCalledOnce();
+    expect(exportDem.mock.calls[0]?.[0]).toBe(nativeFile);
+  });
+
   it("processes files in order and keeps local duplicate non-terminal", async () => {
     const phases: string[] = [];
     const dependencies = baseDependencies({

@@ -5,6 +5,17 @@ import { normalizeDemoPackage, parsePackageJson } from "./normalize.js";
 
 export type DemoManifest = ReturnType<typeof manifestSchema.parse>;
 
+export type DemoPackageLoadProfile = "full" | "evidence";
+
+export interface DemoPackageLoadOptions {
+  /**
+   * `full` preserves the normal workspace/replay package. `evidence` reads
+   * only the manifest and fact files consumed by an evidence-oriented
+   * matcher/producer; optional replay, shots, and duels are not read.
+   */
+  profile?: DemoPackageLoadProfile;
+}
+
 async function readManifest(bytes: ArrayBuffer | Uint8Array) {
   const zip = await JSZip.loadAsync(bytes);
   const file = zip.file("manifest.json");
@@ -24,7 +35,10 @@ export async function loadDemoManifestFromZip(bytes: ArrayBuffer | Uint8Array): 
   return (await readManifest(bytes)).manifest;
 }
 
-export async function loadDemoPackageFromZip(bytes: ArrayBuffer | Uint8Array): Promise<DemoPackage> {
+export async function loadDemoPackageFromZip(
+  bytes: ArrayBuffer | Uint8Array,
+  options: DemoPackageLoadOptions = {},
+): Promise<DemoPackage> {
   const { zip, manifest } = await readManifest(bytes);
   const readJson = async <T>(name: string): Promise<T> => {
     const file = zip.file(name);
@@ -35,8 +49,8 @@ export async function loadDemoPackageFromZip(bytes: ArrayBuffer | Uint8Array): P
   };
   const files = manifest.files;
 
-  const optional = async (name: string | undefined): Promise<unknown> =>
-    name ? readJson<unknown>(name).catch(() => undefined) : undefined;
+  const optional = async (name: string | undefined, enabled = true): Promise<unknown> =>
+    enabled && name ? readJson<unknown>(name).catch(() => undefined) : undefined;
   const match = await readJson<unknown>(files.match);
   const players = await readJson<unknown>(files.players);
   const rounds = await readJson<unknown>(files.rounds);
@@ -50,9 +64,10 @@ export async function loadDemoPackageFromZip(bytes: ArrayBuffer | Uint8Array): P
   const bombs = await readJson<unknown>(files.bombs);
   const grenades = await readJson<unknown>(files.grenades);
   const clutches = await readJson<unknown>(files.clutches);
-  const shots = await optional(files.shots);
-  const replay = await optional(files.replay);
-  const duels = await optional(files.duels);
+  const evidenceProfile = options.profile === "evidence";
+  const shots = await optional(files.shots, !evidenceProfile);
+  const replay = await optional(files.replay, !evidenceProfile);
+  const duels = await optional(files.duels, !evidenceProfile);
 
   return normalizeDemoPackage({
     manifest,

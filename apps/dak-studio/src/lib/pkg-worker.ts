@@ -1,4 +1,4 @@
-import { loadDemoPackageFromZip, buildMatchRadarField } from "@cs2dak/core";
+import { loadDemoPackageFromZip, buildMatchRadarField, type DemoPackageLoadProfile } from "@cs2dak/core";
 import { buildTriangleBvh, parseAwpyTri, buildRadarFieldGrid, type TriangleBvh } from "@cs2dak/maps";
 import { loadCalloutGridBrowser } from "@cs2dak/maps/callout-grid-browser";
 import { extractMatchData } from "./extract-match-facts";
@@ -20,6 +20,7 @@ interface ParseMsg {
   id: number;
   op: "parse";
   buffer: ArrayBuffer;
+  profile?: DemoPackageLoadProfile;
 }
 
 interface ImportMsg {
@@ -69,7 +70,7 @@ function loadTriBvh(mapName: string, triBaseUrl: string): Promise<TriangleBvh | 
 self.onmessage = async (event: MessageEvent<InMsg>) => {
   const msg = event.data;
   try {
-    const pkg = await loadDemoPackageFromZip(msg.buffer);
+    const pkg = await loadDemoPackageFromZip(msg.buffer, msg.op === "parse" ? { profile: msg.profile ?? "full" } : {});
     if (msg.op === "parse") {
       self.postMessage({ id: msg.id, ok: true, pkg });
       return;

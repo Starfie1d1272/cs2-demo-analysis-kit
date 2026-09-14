@@ -1,5 +1,5 @@
 import type { DemoPackage } from "@cs2dak/contract";
-import type { ExportedDemoFile } from "./dem";
+import { nativePathForFile, type ExportedDemoFile } from "./dem";
 import { entryDate, importDemoFile, loadDemoPackageTransient, type StudioDemoEntry } from "./library";
 import { linkDemoToRivalHubMap } from "./events";
 import {
@@ -166,6 +166,10 @@ function isDem(file: File): boolean {
   return file.name.toLowerCase().endsWith(".dem");
 }
 
+function needsDesktopExport(file: File): boolean {
+  return isDem(file) || nativePathForFile(file) !== null;
+}
+
 function freshSession(files: File[]): RivalHubBatchSession {
   return {
     id: sessionId(),
@@ -204,7 +208,7 @@ export async function runRivalHubBatch(
   context: RivalHubImportContext,
   callbacks: RivalHubBatchCallbacks,
 ): Promise<RivalHubBatchSession> {
-  const files = [...filesInput];
+  const files: Array<File | null> = [...filesInput];
   const deps: RivalHubBatchDependencies = {
     exportDem: callbacks.exportDem,
     importDemo: importDemoFile,
@@ -219,7 +223,7 @@ export async function runRivalHubBatch(
     buildEvidence: buildRivalHubDemoEvidenceV1,
     ...callbacks.dependencies,
   };
-  let session = freshSession(files);
+  let session = freshSession(files.filter((file): file is File => file !== null));
   const emit = () => callbacks.onUpdate?.(recount(session));
   const updateItem = (index: number, patch: Partial<RivalHubBatchItem>) => {
     const currentItem = session.items[index];
@@ -243,16 +247,23 @@ export async function runRivalHubBatch(
       emit();
       break;
     }
-    const input = files[index]!;
+    let input = files[index];
+    if (!input) continue;
     let localEntry: StudioDemoEntry | null = null;
+    let pkg: DemoPackage | null = null;
+    let exported: ExportedDemoFile | null = null;
     try {
-      let exported: ExportedDemoFile;
-      if (isDem(input)) {
+      if (needsDesktopExport(input)) {
         updateItem(index, { phase: "exporting", message: messageForPhase("exporting") });
         exported = await deps.exportDem(input, (message) => updateItem(index, { detail: message }));
       } else {
         exported = { file: input, sourceDemPath: null };
       }
+      if (!exported) throw new Error("Demo 导出结果为空");
+      // The exported ZIP is the only representation needed from this point;
+      // release the dropped/input File before parsing the ZIP into the library.
+      files[index] = null;
+      input = null;
       updateItem(index, { phase: "importing", message: messageForPhase("importing"), detail: undefined });
       const imported = await deps.importDemo(exported.file, {
         lowMemory: true,
@@ -276,7 +287,6 @@ export async function runRivalHubBatch(
 
       const hashMatches = context.candidates.filter(({ map }) => map.demoSha256?.toLowerCase() === localEntry!.demoSha256!.toLowerCase());
       let match: RivalHubMatchResult;
-      let pkg: DemoPackage | null = null;
       if (context.fixedMatchMapId) {
         pkg = await deps.loadPackage(localEntry.id);
         match = deps.matchMap(pkg, context.candidates, { fixedMatchMapId: context.fixedMatchMapId, demoDate: entryDate(localEntry) });
@@ -369,6 +379,14 @@ export async function runRivalHubBatch(
       });
     } catch (error) {
       updateItem(index, { phase: "failed", message: messageForPhase("failed"), detail: error instanceof Error ? error.message : String(error) });
+    } finally {
+      // The batch is deliberately serial. Drop the completed input/package
+      // references before advancing so one Demo cannot remain retained by the
+      // session while the next one is processed.
+      exported = null;
+      pkg = null;
+      input = null;
+      files[index] = null;
     }
   }
   session = recount({ ...session, status: "completed" });
