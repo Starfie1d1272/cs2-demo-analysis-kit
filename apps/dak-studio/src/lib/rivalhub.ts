@@ -14,7 +14,6 @@ const CREDENTIAL_SERVICE = "com.starfie1d.dak-studio.rivalhub";
 const CREDENTIAL_ACCOUNT = "access-token";
 const POLL_INTERVAL_MS = 1000;
 const BROWSER_PAIRING_WINDOW_NAME = "dak-rivalhub-pairing";
-const BROWSER_PAIRING_WINDOW_FEATURES = "noopener,noreferrer";
 const connectionStore = getStorage().records("rivalhub");
 
 export interface RivalHubConnectionRecord {
@@ -136,15 +135,26 @@ async function deleteCredential(): Promise<void> {
   memoryCredential = null;
 }
 
-function preopenBrowserPairingWindow(): Window | null {
+function preopenBrowserPairingWindow(): Window {
+  let popup: Window | null = null;
   try {
-    // This runs before pairing/start's first await while the click activation is
-    // still live. A null return is not a reliable popup-blocker signal when
-    // noopener is requested, so it is intentionally only a best-effort handle.
-    return window.open("about:blank", BROWSER_PAIRING_WINDOW_NAME, BROWSER_PAIRING_WINDOW_FEATURES);
+    // Must run synchronously while the click activation is live. Do not pass
+    // noopener/noreferrer here: those features can intentionally discard the
+    // WindowProxy that we need to navigate after pairing/start returns.
+    popup = window.open("about:blank", BROWSER_PAIRING_WINDOW_NAME);
   } catch {
-    return null;
+    popup = null;
   }
+  if (!popup) throw new Error("浏览器阻止了连接授权页面，请允许打开新窗口后重试");
+  try {
+    // about:blank is still same-origin here. Remove the child page's opener
+    // capability while retaining our WindowProxy for the later navigation.
+    popup.opener = null;
+  } catch {
+    // Some browser implementations expose opener as non-writable; retaining a
+    // single user-activated WindowProxy is still safer than an async re-open.
+  }
+  return popup;
 }
 
 function closeBrowserPairingWindow(popup: Window | null): void {
@@ -157,20 +167,13 @@ function closeBrowserPairingWindow(popup: Window | null): void {
 }
 
 function navigateBrowserPairingWindow(url: string, preopened: Window | null): void {
-  if (preopened) {
-    try {
-      preopened.location.replace(url);
-      return;
-    } catch {
-      // Fall through to the named-window navigation below.
-    }
+  if (!preopened || preopened.closed) {
+    throw new Error("RivalHub 授权窗口已关闭，请重新发起连接");
   }
-  // Valid noopener windows may make window.open return null. Route by the
-  // stable target name and do not infer success from the returned handle.
   try {
-    window.open(url, BROWSER_PAIRING_WINDOW_NAME, BROWSER_PAIRING_WINDOW_FEATURES);
+    preopened.location.replace(url);
   } catch {
-    // Pairing polling will surface expiry/authorization failure to the caller.
+    throw new Error("无法打开 RivalHub 授权页面，请重新发起连接");
   }
 }
 
