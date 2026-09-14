@@ -8,6 +8,7 @@ function entry(id: string, date: string, teamAName: string, teamBName: string): 
     id,
     fileName: `${date}_de_mirage_${teamAName}-vs-${teamBName}.zip`,
     importedAt: 0,
+    demoSha256: null,
     tags: [],
     sourceDemPath: null,
     meta: {

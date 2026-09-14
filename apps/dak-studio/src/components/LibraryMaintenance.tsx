@@ -10,6 +10,8 @@ import {
   type StorageOverview,
 } from "../lib/library-maintenance";
 import { bytesLabel } from "../lib/format";
+import { listDemoEntries } from "../lib/library";
+import { repairDemoIdentityAndDuplicates } from "../lib/library-repair";
 
 const LABELS: Record<StorageCategory["id"], string> = {
   database: "资料库数据库",
@@ -24,7 +26,7 @@ const LABELS: Record<StorageCategory["id"], string> = {
 };
 const CLEANABLE = new Set<StorageCategory["id"]>(["cache", "bundledEvents", "tris", "updates", "reports", "logs"]);
 
-export function LibraryMaintenance({ onNotice }: { onNotice: (message: string) => void }) {
+export function LibraryMaintenance({ onNotice, onLibraryChanged }: { onNotice: (message: string) => void; onLibraryChanged?: (entries: Awaited<ReturnType<typeof listDemoEntries>>) => void }) {
   const [overview, setOverview] = useState<StorageOverview | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -33,7 +35,7 @@ export function LibraryMaintenance({ onNotice }: { onNotice: (message: string) =
   }
 
   useEffect(() => { void refresh(); }, []);
-  if (!hasLibraryMaintenance()) return null;
+  const desktop = hasLibraryMaintenance();
 
   async function run(action: () => Promise<{ ok: boolean; error?: string }>, success: string) {
     setBusy(true);
@@ -46,16 +48,33 @@ export function LibraryMaintenance({ onNotice }: { onNotice: (message: string) =
     }
   }
 
+  async function repairIdentities() {
+    setBusy(true);
+    try {
+      const result = await repairDemoIdentityAndDuplicates();
+      onLibraryChanged?.(await listDemoEntries());
+      const summary = `Demo 身份修复完成：回填 ${result.backfilled}，合并 ${result.duplicateGroups} 组重复，移除 ${result.removed} 条，重连 ${result.rewiredSeries} 个系列`;
+      onNotice(result.errors.length > 0 ? `${summary}；${result.errors.length} 项需注意（${result.errors[0]}）` : summary);
+    } catch (error) {
+      onNotice(`Demo 身份修复失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <details className="stu-card">
       <summary><b>资料库备份与存储维护</b></summary>
-      <p className="stu-muted">备份包含 SQLite 中的标签、身份、BP、Playbook、设置与原始 ZIP；缓存和官方资产可重新生成或下载，不进入备份。</p>
+      {desktop && <p className="stu-muted">备份包含 SQLite 中的标签、身份、BP、Playbook、设置与原始 ZIP；缓存和官方资产可重新生成或下载，不进入备份。</p>}
       <div className="stu-header-actions">
-        <button className="stu-button stu-button-ghost" type="button" disabled={busy} onClick={() => void run(backupLibrary, "资料库备份已写入 backups 目录")}>创建备份</button>
-        <button className="stu-button stu-button-ghost" type="button" disabled={busy} onClick={() => {
-          if (window.confirm("恢复会替换当前资料库，完成后需要重启 Studio。继续？")) void run(restoreLibrary, "备份已恢复，请重启 Studio");
-        }}>恢复备份</button>
-        <button className="stu-button stu-button-ghost" type="button" disabled={busy} onClick={() => void run(repairLibrary, "资料库一致性检查与修复完成")}>检查并修复</button>
+        {desktop && <>
+          <button className="stu-button stu-button-ghost" type="button" disabled={busy} onClick={() => void run(backupLibrary, "资料库备份已写入 backups 目录")}>创建备份</button>
+          <button className="stu-button stu-button-ghost" type="button" disabled={busy} onClick={() => {
+            if (window.confirm("恢复会替换当前资料库，完成后需要重启 Studio。继续？")) void run(restoreLibrary, "备份已恢复，请重启 Studio");
+          }}>恢复备份</button>
+          <button className="stu-button stu-button-ghost" type="button" disabled={busy} onClick={() => void run(repairLibrary, "资料库一致性检查与修复完成")}>检查并修复</button>
+        </>}
+        <button className="stu-button stu-button-ghost" type="button" disabled={busy} onClick={() => void repairIdentities()}>修复 Demo 身份与重复</button>
       </div>
       {overview && (
         <table className="stu-mini-table">

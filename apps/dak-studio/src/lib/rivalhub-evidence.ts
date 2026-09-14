@@ -225,7 +225,7 @@ export function selectRivalHubMap(
   const lineupMatches = targetMatches.flatMap(({ series, map }) => {
     try {
       // This verifies the canonical Steam64 set and every observed team side.
-      const participantMatch = resolveRivalHubParticipants(pkg, evidenceTarget(map), map.lineup);
+      const participantMatch = resolveRivalHubParticipants(pkg, evidenceTarget(map), map.lineup ?? []);
       return [{ series, map, orientation: participantMatch.orientation }];
     } catch {
       return [];

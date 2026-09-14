@@ -10,6 +10,21 @@ export const eventBracketNodeSchema = z.object({
   nextLossNodeId: z.string().nullable().optional(),
 });
 
+/** Official standings facts supplied by the event owner; DAK never derives remote rank. */
+export const eventStandingSchema = z.object({
+  entryId: z.string().min(1),
+  teamName: z.string().min(1).optional(),
+  rank: z.number().int().positive(),
+  wins: z.number().int().nonnegative(),
+  losses: z.number().int().nonnegative(),
+  roundWins: z.number().int().nonnegative().optional(),
+  roundLosses: z.number().int().nonnegative().optional(),
+  roundDiff: z.number().int().optional(),
+  tiebreakFacts: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+  status: z.string().min(1).optional(),
+  outcome: z.string().min(1).optional(),
+}).strict();
+
 export const eventStageSchema = z.object({
   key: z.string().min(1),
   name: z.string().min(1),
@@ -19,6 +34,7 @@ export const eventStageSchema = z.object({
   matchFormat: z.enum(["bo1", "bo3", "bo5"]).optional(),
   finalFormat: z.enum(["bo3", "bo5"]).optional(),
   bracketNodes: z.array(eventBracketNodeSchema).optional(),
+  standings: z.array(eventStandingSchema).optional(),
 });
 
 export const eventTeamSchema = z.object({
@@ -139,6 +155,7 @@ export const eventPackageSchema = z.object({
 export type EventPackage = z.infer<typeof eventPackageSchema>;
 export type EventStage = z.infer<typeof eventStageSchema>;
 export type EventBracketNode = z.infer<typeof eventBracketNodeSchema>;
+export type EventStanding = z.infer<typeof eventStandingSchema>;
 export type EventTeam = z.infer<typeof eventTeamSchema>;
 export type EventSeries = z.infer<typeof eventSeriesSchema>;
 export type RawDemoHint = z.infer<typeof rawDemoHintSchema>;

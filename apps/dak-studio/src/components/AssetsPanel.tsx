@@ -180,7 +180,7 @@ export function AssetsPanel({ entries, onLibraryChanged, onNotice = () => {} }: 
     <div className="stu-view-body" style={{ display: "grid", gap: "var(--dak-gap, 16px)" }}>
       {/* ── 存储总览 ── */}
       {desktop ? (
-        <LibraryMaintenance onNotice={onNotice} />
+        <LibraryMaintenance onNotice={onNotice} onLibraryChanged={onLibraryChanged} />
       ) : (
         <div className="stu-card">
           <b>存储占用</b>

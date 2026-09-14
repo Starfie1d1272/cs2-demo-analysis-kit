@@ -1,4 +1,4 @@
-import { loadDemoPackageFromZip, buildMatchRadarField } from "@cs2dak/core";
+import { loadDemoManifestFromZip, loadDemoPackageFromZip, buildMatchRadarField } from "@cs2dak/core";
 import { buildMatchWorkspaceModel } from "@cs2dak/presentation";
 import { buildRadarFieldGrid } from "@cs2dak/maps";
 import type { DemoPackage, MatchWorkspaceModel, RadarField } from "@cs2dak/contract";
@@ -26,6 +26,8 @@ export interface StudioDemoEntry {
   id: string;
   fileName: string;
   importedAt: number;
+  /** cs2df 写入的 raw .dem SHA-256；与本地 ZIP record id 有意分离。 */
+  demoSha256: string | null;
   /** 用户标签（赛事、阶段等），导入时附加，可后续编辑。 */
   tags: string[];
   /** 本机原始 .dem 路径，仅用于桌面端重新导出；浏览器/ZIP 导入为空。 */
@@ -45,18 +47,131 @@ function normalizeTags(tags: string[]): string[] {
 const demoMeta = getStorage().records("demos"); // StudioDemoEntry by id
 const demoBlobs = getStorage().blobs("demos"); // ZIP 原始字节 by id
 
+interface DemoIdentityIndex {
+  byId: Map<string, StudioDemoEntry>;
+  byDemoSha256: Map<string, StudioDemoEntry[]>;
+  errors: string[];
+}
+
+let identityIndex: DemoIdentityIndex | null = null;
+let identityIndexPromise: Promise<DemoIdentityIndex> | null = null;
+
 /** demo 元数据补默认值（tags / sourceDemPath 为后加字段）。 */
 function normalizeEntry(entry: StudioDemoEntry): StudioDemoEntry {
   return {
     id: entry.id,
     fileName: entry.fileName,
     importedAt: entry.importedAt,
+    demoSha256: typeof entry.demoSha256 === "string" ? entry.demoSha256.toLowerCase() : null,
     tags: entry.tags ?? [],
     sourceDemPath: entry.sourceDemPath ?? null,
     builtWith: entry.builtWith,
     sizeBytes: entry.sizeBytes,
     meta: { ...entry.meta, serverName: entry.meta.serverName ?? null, matchDate: entry.meta.matchDate ?? null }
   };
+}
+
+function addToIdentityIndex(index: DemoIdentityIndex, entry: StudioDemoEntry): void {
+  const previous = index.byId.get(entry.id);
+  if (previous?.demoSha256) {
+    const previousRows = index.byDemoSha256.get(previous.demoSha256) ?? [];
+    index.byDemoSha256.set(previous.demoSha256, previousRows.filter((row) => row.id !== entry.id));
+  }
+  index.byId.set(entry.id, entry);
+  if (entry.demoSha256) {
+    const rows = index.byDemoSha256.get(entry.demoSha256) ?? [];
+    index.byDemoSha256.set(entry.demoSha256, [...rows.filter((row) => row.id !== entry.id), entry]);
+  }
+}
+
+async function buildDemoIdentityIndex(): Promise<DemoIdentityIndex> {
+  const index: DemoIdentityIndex = { byId: new Map(), byDemoSha256: new Map(), errors: [] };
+  const records = (await demoMeta.getAll<StudioDemoEntry>()).map(normalizeEntry);
+  for (const entry of records) {
+    let normalized = entry;
+    if (!entry.demoSha256) {
+      const buffer = await demoBlobs.get(entry.id);
+      if (!buffer) {
+        index.errors.push(`${entry.fileName}：原始 ZIP 缺失，无法回填 canonical raw Demo hash`);
+      } else {
+        try {
+          const manifest = await loadDemoManifestFromZip(buffer);
+          const demoSha256 = manifest.demo.hash?.toLowerCase() ?? null;
+          if (demoSha256) {
+            normalized = { ...entry, demoSha256 };
+            await demoMeta.put(entry.id, normalized);
+          }
+        } catch (error) {
+          index.errors.push(`${entry.fileName}：${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+    }
+    addToIdentityIndex(index, normalized);
+  }
+  return index;
+}
+
+async function ensureDemoIdentityIndex(): Promise<DemoIdentityIndex> {
+  if (identityIndex) return identityIndex;
+  if (!identityIndexPromise) {
+    identityIndexPromise = buildDemoIdentityIndex().then((index) => {
+      identityIndex = index;
+      identityIndexPromise = null;
+      return index;
+    }, (error) => {
+      identityIndexPromise = null;
+      throw error;
+    });
+  }
+  return identityIndexPromise;
+}
+
+/** 维护入口使用：强制重扫历史条目并回填缺失的 raw Demo hash。 */
+export async function backfillDemoIdentities(): Promise<{ entries: StudioDemoEntry[]; backfilled: number; errors: string[] }> {
+  const before = await demoMeta.getAll<StudioDemoEntry>();
+  const missingBefore = before.filter((entry) => !entry.demoSha256).length;
+  const index = await buildDemoIdentityIndex();
+  identityIndex = index;
+  const entries = [...index.byId.values()];
+  return {
+    entries,
+    backfilled: missingBefore - entries.filter((entry) => !entry.demoSha256).length,
+    errors: [...index.errors],
+  };
+}
+
+export async function loadStoredDemoManifest(id: string): Promise<Awaited<ReturnType<typeof loadDemoManifestFromZip>> | null> {
+  const buffer = await demoBlobs.get(id);
+  return buffer ? loadDemoManifestFromZip(buffer) : null;
+}
+
+export async function saveDemoEntry(entry: StudioDemoEntry): Promise<void> {
+  const normalized = normalizeEntry(entry);
+  await demoMeta.put(normalized.id, normalized);
+  if (identityIndex) addToIdentityIndex(identityIndex, normalized);
+}
+
+/** 删除 raw duplicate 的 meta/blob；调用方随后负责重建 survivor facts。 */
+export async function removeDemoStorageOnly(id: string): Promise<void> {
+  await Promise.all([demoMeta.delete(id), demoBlobs.delete(id)]);
+  pkgCache.delete(id);
+  if (identityIndex) {
+    const previous = identityIndex.byId.get(id);
+    identityIndex.byId.delete(id);
+    if (previous?.demoSha256) {
+      const rows = identityIndex.byDemoSha256.get(previous.demoSha256) ?? [];
+      identityIndex.byDemoSha256.set(previous.demoSha256, rows.filter((row) => row.id !== id));
+    }
+  }
+}
+
+/** 删除某条 Demo 的 facts/derived 投影；调用方负责确认 matchId 不与 survivor 共享。 */
+export async function removeDemoAnalysis(matchId: string): Promise<void> {
+  await Promise.all([
+    getFactsStore().deleteMatchFacts(matchId),
+    getDerivedCacheStore().deleteMatch(matchId),
+    getStorage().records("facts:cohort_rows").deleteByPrefix(matchId),
+  ]);
 }
 
 /** facts 是否旧口径（factsRevision 与当前 AnalysisManifest 不一致）。 */
@@ -76,6 +191,11 @@ async function persistAnalysis(data: ExtractedMatchData): Promise<void> {
   } catch {
     // 吞掉：facts 缺失只降级聚合查询。
   }
+}
+
+async function hasPersistedFacts(entry: StudioDemoEntry): Promise<boolean> {
+  const rows = await getFactsStore().getLineups({ matchIds: [matchIdForEntry(entry)] });
+  return rows.length > 0;
 }
 
 /**
@@ -109,7 +229,7 @@ export function matchDateFromFileName(fileName: string): string | null {
 }
 
 /** 比赛日期统一收口：优先文件名，不命中则 fallback 到 meta.matchDate（事件包导入写入）。 */
-export function entryDate(entry: StudioDemoEntry): string | null {
+export function entryDate(entry: Pick<StudioDemoEntry, "fileName" | "meta">): string | null {
   return matchDateFromFileName(entry.fileName) ?? entry.meta.matchDate ?? null;
 }
 
@@ -236,11 +356,11 @@ function dispatchTasks(): void {
   }
 }
 
-function parseZipInWorker(buffer: ArrayBuffer): Promise<DemoPackage> {
+function parseZipInWorker(buffer: ArrayBuffer, keepFallback = true): Promise<DemoPackage> {
   if (typeof Worker === "undefined") {
     return loadDemoPackageFromZip(buffer);
   }
-  const fallbackBuffer = buffer.slice(0);
+  const fallbackBuffer = keepFallback ? buffer.slice(0) : null;
   return new Promise<DemoPackage>((resolve, reject) => {
     taskQueue.push({
       op: "parse",
@@ -327,6 +447,8 @@ export interface ImportDemoOptions {
   lowMemory?: boolean;
   /** 比赛日期（YYYY-MM-DD）；事件包导入时由 series.completedAt 传入。 */
   matchDate?: string | null;
+  /** 内部重建入口：即使 raw hash 已存在且 facts 当前，也必须重新抽取。 */
+  forceReanalyze?: boolean;
 }
 
 /**
@@ -334,14 +456,50 @@ export interface ImportDemoOptions {
  * 解析失败抛错（带文件名）。
  */
 export async function importDemoFile(file: File, options: ImportDemoOptions | string[] = []): Promise<ImportResult> {
-  const { tags = [], sourceDemPath = null, replaceId, lowMemory = false, matchDate = null } = Array.isArray(options) ? { tags: options } : options;
+  const { tags = [], sourceDemPath = null, replaceId, lowMemory = false, matchDate = null, forceReanalyze = false } = Array.isArray(options) ? { tags: options } : options;
   let buffer = await file.arrayBuffer();
   const id = await sha256Hex(buffer);
 
   const meta = demoMeta;
   const blobs = demoBlobs;
   const replacement = replaceId ? await meta.get<StudioDemoEntry>(replaceId) : undefined;
-  const existing = await meta.get<StudioDemoEntry>(id);
+  let manifest;
+  try {
+    manifest = await loadDemoManifestFromZip(buffer);
+  } catch (err) {
+    throw new Error(`${file.name}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  const demoSha256 = manifest.demo.hash?.toLowerCase() ?? null;
+  const index = await ensureDemoIdentityIndex();
+  const identityMatch = demoSha256
+    ? [...(index.byDemoSha256.get(demoSha256) ?? [])]
+      .sort((a, b) => b.importedAt - a.importedAt || a.id.localeCompare(b.id))[0]
+    : undefined;
+  const existing = identityMatch ?? index.byId.get(id) ?? await meta.get<StudioDemoEntry>(id);
+
+  const mergeDuplicateEntry = (current: StudioDemoEntry): StudioDemoEntry => normalizeEntry({
+    ...current,
+    demoSha256: current.demoSha256 ?? demoSha256,
+    tags: normalizeTags([...(current.tags ?? []), ...tags]),
+    sourceDemPath: sourceDemPath ?? current.sourceDemPath ?? null,
+    sizeBytes: current.sizeBytes ?? file.size,
+    // duplicate import only backfills an absent event-package date; it does not
+    // replace the survivor's canonical metadata with a new parse.
+    meta: current.meta.matchDate || !matchDate ? current.meta : { ...current.meta, matchDate },
+  });
+
+  // raw Demo identity is the dedupe key. A current facts revision can be reused
+  // without parsing the full package; repair/rebuild opts into forceReanalyze.
+  if (existing && !forceReanalyze && !isFactsStale(existing) && await hasPersistedFacts(existing)) {
+    const mergedEntry = mergeDuplicateEntry(existing);
+    await saveDemoEntry(mergedEntry);
+    return {
+      entry: mergedEntry,
+      duplicate: true,
+      replaced: Boolean(replacement && replacement.id !== existing.id),
+      replacedId: replacement?.id,
+    };
+  }
 
   // facts 的 matchId 必须等于最终持久化条目的 matchId：重复导入沿用既有条目的 fileName，
   // 否则用本次文件名。故先定 matchId 再榨 facts（在 worker 里，含 replay 的整包不回主线程）。
@@ -355,37 +513,27 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
   const { meta: pkgMeta, data } = result;
   if (buffer.byteLength === 0) buffer = await file.arrayBuffer();
 
-  const entry: StudioDemoEntry = {
-    id,
-    fileName: file.name,
-    importedAt: Date.now(),
-    tags: normalizeTags(tags),
+  const persistedId = existing?.id ?? id;
+  const entry: StudioDemoEntry = normalizeEntry({
+    id: persistedId,
+    fileName: existing?.fileName ?? file.name,
+    importedAt: existing?.importedAt ?? Date.now(),
+    demoSha256,
+    tags: normalizeTags([...(existing?.tags ?? []), ...tags]),
     sourceDemPath,
     builtWith: currentBuiltWith(),
     sizeBytes: file.size,
     meta: matchDate ? { ...pkgMeta, matchDate } : pkgMeta,
-  };
+  });
   if (replacement) {
     entry.tags = normalizeTags([...(replacement.tags ?? []), ...entry.tags]);
     entry.sourceDemPath = sourceDemPath ?? replacement.sourceDemPath ?? null;
   }
 
   if (existing) {
-    const mergedTags = normalizeTags([...(existing.tags ?? []), ...entry.tags]);
-    // 重复导入时合并 matchDate：已有不覆盖，没有则从新 entry 补（事件包回填日期）
-    const mergedMeta = existing.meta.matchDate ? existing.meta : { ...existing.meta, matchDate: entry.meta.matchDate ?? null };
-    const mergedEntry: StudioDemoEntry = {
-      ...existing,
-      tags: mergedTags,
-      sourceDemPath: sourceDemPath ?? existing.sourceDemPath ?? null,
-    // 重复导入会重榨 facts 与 derived cache，构建版本必须刷新到当前。
-      builtWith: currentBuiltWith(),
-      sizeBytes: existing.sizeBytes ?? file.size,
-      meta: mergedMeta,
-    };
-    await meta.put(id, mergedEntry);
+    await Promise.all([blobs.put(persistedId, buffer), saveDemoEntry(entry)]);
     await persistAnalysis(data);
-    if (replacement && replacement.id !== id) {
+    if (replacement && replacement.id !== persistedId) {
       await Promise.all([
         meta.delete(replacement.id),
         blobs.delete(replacement.id)
@@ -395,17 +543,17 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
       void getDerivedCacheStore().deleteMatch(matchIdForEntry(replacement));
     }
     return {
-      entry: mergedEntry,
+      entry,
       duplicate: true,
-      replaced: Boolean(replacement),
+      replaced: Boolean(replacement && replacement.id !== persistedId),
       replacedId: replacement?.id
     };
   }
   await Promise.all([
-    blobs.put(id, buffer),
-    meta.put(id, entry)
+    blobs.put(persistedId, buffer),
+    saveDemoEntry(entry)
   ]);
-  if (replacement && replacement.id !== id) {
+  if (replacement && replacement.id !== persistedId) {
     await Promise.all([
       meta.delete(replacement.id),
       blobs.delete(replacement.id)
@@ -418,7 +566,7 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
   // 注意：不把整包放进 pkgCache —— 批量导入会让每场 DemoPackage（含完整 replay）常驻内存
   // 导致 OOM。需要整包时由 getDemoPackage 按需从 ZIP 懒加载即可。
   await persistAnalysis(data);
-  return { entry, duplicate: false, replaced: Boolean(replacement), replacedId: replacement?.id };
+  return { entry, duplicate: false, replaced: Boolean(replacement && replacement.id !== persistedId), replacedId: replacement?.id };
 }
 
 /** 更新某条 demo 的标签。 */
@@ -461,11 +609,7 @@ export async function removeDemo(id: string): Promise<void> {
     demoBlobs.delete(id)
   ]);
   pkgCache.delete(id);
-  if (record) await Promise.all([
-    getFactsStore().deleteMatchFacts(matchIdForEntry(record)),
-    getDerivedCacheStore().deleteMatch(matchIdForEntry(record)),
-    getStorage().records("facts:cohort_rows").deleteByPrefix(matchIdForEntry(record)),
-  ]);
+  if (record) await removeDemoAnalysis(matchIdForEntry(record));
 }
 
 /**
@@ -503,7 +647,8 @@ export async function rebuildFactsFromZip(id: string): Promise<StudioDemoEntry |
   const result = await importDemoFile(file, {
     tags: entry.tags,
     sourceDemPath: entry.sourceDemPath ?? null,
-    lowMemory: true
+    lowMemory: true,
+    forceReanalyze: true,
   });
   return result.entry;
 }
@@ -520,6 +665,13 @@ export function getDemoPackage(id: string): Promise<DemoPackage> {
   pkgCache.set(id, loading);
   loading.catch(() => pkgCache.delete(id));
   return loading;
+}
+
+/** 在线批量专用：从持久化 ZIP 解析一场，不进入 pkgCache，也不保留 worker 回退副本。 */
+export async function loadDemoPackageTransient(id: string): Promise<DemoPackage> {
+  const buffer = await demoBlobs.get(id);
+  if (!buffer) throw new Error("demo 不存在或已被删除");
+  return parseZipInWorker(buffer, false);
 }
 
 /**

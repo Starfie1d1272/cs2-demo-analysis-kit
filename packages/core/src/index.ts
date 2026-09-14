@@ -6,7 +6,8 @@ import { computeAccountRatingsV2 } from "./signals.js";
 import { buildTimeline, buildEconomy, buildHeatmap } from "./timeline.js";
 import { buildPlayerWeaponHighlights } from "./weapon-highlights.js";
 
-export { loadDemoPackageFromZip } from "./loader.js";
+export { loadDemoManifestFromZip, loadDemoPackageFromZip } from "./loader.js";
+export type { DemoManifest } from "./loader.js";
 export { normalizeDemoPackage } from "./normalize.js";
 export { createPlayerResolver, createResolverFromPackage } from "./resolve.js";
 export type { PlayerResolver } from "./resolve.js";

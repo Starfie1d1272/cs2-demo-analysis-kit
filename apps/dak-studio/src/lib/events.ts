@@ -2,7 +2,7 @@ import { eventPackageSchema, type EventPackage, type EventStage } from "@cs2dak/
 import { getStorage } from "./storage";
 import { deleteSeriesRecord, listSeriesRecords, saveSeriesRecord, type StudioSeriesRecord } from "./series";
 import type { StudioDemoEntry } from "./library";
-import type { RivalHubEventsResponse, RivalHubRemoteMap, RivalHubRemoteSeries } from "./rivalhub-contract";
+import type { RivalHubEventsResponse, RivalHubRemoteMap, RivalHubRemoteSeries, RivalHubRemoteTeam } from "./rivalhub-contract";
 
 export interface StudioEventRecord {
   id: string;
@@ -22,6 +22,8 @@ export interface StudioEventRecord {
     revision: string;
     lastSyncedAt: number;
     stale: boolean;
+    /** EventRoster projection used for canonical Demo team identity. */
+    teams?: RivalHubRemoteTeam[];
   };
 }
 
@@ -169,7 +171,23 @@ function stageFromRemote(stage: RivalHubEventsResponse["events"][number]["stages
     ...(stage.matchFormat ? { matchFormat: stage.matchFormat } : {}),
     ...(stage.finalFormat ? { finalFormat: stage.finalFormat } : {}),
     ...(stage.bracketNodes ? { bracketNodes: stage.bracketNodes } : {}),
+    ...(stage.standings ? { standings: stage.standings } : {}),
   };
+}
+
+/** 只更新指定 RivalHub Map 的本地 Demo 引用；远程 map 状态仍归 RivalHub 所有。 */
+export async function linkDemoToRivalHubMap(seriesId: string, matchMapId: string, entryId: string): Promise<void> {
+  const record = (await listSeriesRecords()).find((series) => series.id === seriesId);
+  if (!record?.mapAssignments) throw new Error("本地赛事系列不存在或缺少地图分配");
+  const assignments = record.mapAssignments.map((assignment) => assignment.rivalHub?.id === matchMapId
+    ? { ...assignment, entryId }
+    : assignment);
+  if (!assignments.some((assignment) => assignment.rivalHub?.id === matchMapId)) {
+    throw new Error("本地赛事系列中不存在指定 RivalHub Map");
+  }
+  const entryIds = [...new Set(assignments.flatMap((assignment) => assignment.entryId ? [assignment.entryId] : []))];
+  const { createdAt: _createdAt, updatedAt: _updatedAt, ...editable } = record;
+  await saveSeriesRecord({ ...editable, entryIds, mapAssignments: assignments });
 }
 
 /**
@@ -256,7 +274,7 @@ export async function upsertRivalHubEvents(
       readOnly: true,
       importedAt: previousEvent?.importedAt ?? now,
       updatedAt: now,
-      rivalHub: { seasonId: remote.seasonId, revision: remote.revision, lastSyncedAt: now, stale: false },
+      rivalHub: { seasonId: remote.seasonId, revision: remote.revision, lastSyncedAt: now, stale: false, teams: remote.teams },
     } satisfies StudioEventRecord);
   }
 

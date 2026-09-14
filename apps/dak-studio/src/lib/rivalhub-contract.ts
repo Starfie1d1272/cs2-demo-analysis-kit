@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { seriesVetoSchema } from "@cs2dak/contract";
+import { eventStandingSchema, seriesVetoSchema } from "@cs2dak/contract";
 
 export const RIVALHUB_EVENTS_CONTRACT = "rivalhub-dak-events/1" as const;
 export const RIVALHUB_EVIDENCE_CONTRACT = "rivalhub-demo-evidence/1" as const;
@@ -28,6 +28,12 @@ const remotePlayerSchema = z.object({
   steamId64: z.string().regex(/^\d{17}$/),
   name: z.string().min(1),
   isStarter: z.boolean(),
+}).strict();
+
+const remoteTeamSchema = z.object({
+  key: uuidSchema,
+  name: z.string().min(1),
+  players: z.array(remotePlayerSchema),
 }).strict();
 
 const remoteTargetSchema = z.object({
@@ -59,6 +65,8 @@ const remoteStageSchema = z.object({
     nextWinNodeId: z.string().nullable(),
     nextLossNodeId: z.string().nullable(),
   }).strict()).optional(),
+  /** RivalHub-owned standings; rank and tiebreak facts are never recomputed in DAK. */
+  standings: z.array(eventStandingSchema).optional(),
 }).strict();
 
 const remoteMapSchema = z.object({
@@ -70,7 +78,8 @@ const remoteMapSchema = z.object({
   completedAt: z.string().datetime().nullable(),
   evidenceRevision: z.string().min(1),
   target: remoteTargetSchema,
-  lineup: z.array(remotePlayerSchema),
+  /** Optional MatchRoster projection; historical/partial events may not expose it. */
+  lineup: z.array(remotePlayerSchema).optional(),
   demoStatus: rivalHubDemoSyncStatusSchema,
   demoIssues: z.array(integrationIssueSchema),
   importId: uuidSchema.nullable(),
@@ -110,7 +119,7 @@ const remoteEventSchema = z.object({
   kind: z.string().min(1),
   revision: z.string().min(1),
   stages: z.array(remoteStageSchema),
-  teams: z.array(z.object({ key: uuidSchema, name: z.string().min(1), players: z.array(remotePlayerSchema) }).strict()),
+  teams: z.array(remoteTeamSchema),
   series: z.array(remoteSeriesSchema),
 }).strict();
 
@@ -121,6 +130,7 @@ export const rivalHubEventsResponseSchema = z.object({
 }).strict();
 
 export type RivalHubRemotePlayer = z.infer<typeof remotePlayerSchema>;
+export type RivalHubRemoteTeam = z.infer<typeof remoteTeamSchema>;
 export type RivalHubRemoteStage = z.infer<typeof remoteStageSchema>;
 export type RivalHubRemoteMap = z.infer<typeof remoteMapSchema>;
 export type RivalHubRemoteSeries = z.infer<typeof remoteSeriesSchema>;

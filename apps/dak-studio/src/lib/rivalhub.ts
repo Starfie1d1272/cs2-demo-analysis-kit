@@ -9,6 +9,7 @@ import {
 } from "./rivalhub-contract";
 
 const CONNECTION_KEY = "connection";
+export const OFFICIAL_RIVALHUB_URL = "https://match.starfie1d.top";
 const CREDENTIAL_SERVICE = "com.starfie1d.dak-studio.rivalhub";
 const CREDENTIAL_ACCOUNT = "access-token";
 const POLL_INTERVAL_MS = 1000;

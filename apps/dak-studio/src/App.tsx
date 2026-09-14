@@ -1,6 +1,6 @@
 import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Radar, Settings, Swords, Trophy, UserRound } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { bulkUpdateTags, formatMatchLabel, getDemoPackage, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { bulkUpdateTags, formatMatchLabel, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { CohortScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
 import { AnalysisContextSummary } from "./components/AnalysisContextSummary";
 import { CapabilityBar } from "./components/CapabilityBar";
@@ -44,9 +44,9 @@ import {
 } from "./lib/analysis-context";
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
 import { getPinnedPlayer } from "./lib/pin";
-import { buildRivalHubDemoEvidenceV1, resolveRivalHubParticipants, resolveRivalHubParticipantsForReview, selectRivalHubMap, type RivalHubEvidenceTarget } from "./lib/rivalhub-evidence";
-import { connectRivalHub, fetchRivalHubEvents, loadRivalHubConnection, revokeRivalHubPairing, rivalHubEvidenceIdempotencyKey, submitRivalHubEvidence, type RivalHubConnectionState } from "./lib/rivalhub";
-import type { OnlineImportContext } from "./views/EventsView";
+import { connectRivalHub, fetchRivalHubEvents, loadRivalHubConnection, revokeRivalHubPairing, type RivalHubConnectionState } from "./lib/rivalhub";
+import { runRivalHubBatch, type RivalHubBatchItem, type RivalHubBatchSession, type RivalHubImportContext } from "./lib/rivalhub-import";
+import { RivalHubBatchImportPanel } from "./components/RivalHubBatchImportPanel";
 
 type StudioView =
   | "home"
@@ -143,6 +143,9 @@ export function App() {
   const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
   const [rivalHubConnection, setRivalHubConnection] = useState<RivalHubConnectionState>({ baseUrl: "", pairingId: null, connectedAt: 0, lastSyncAt: null, status: "disconnected", error: null });
   const [rivalHubRefreshToken, setRivalHubRefreshToken] = useState(0);
+  const [batchSession, setBatchSession] = useState<RivalHubBatchSession | null>(null);
+  const batchStopRequested = useRef(false);
+  const batchTargetResolvers = useRef(new Map<string, (matchMapId: string | null) => void>());
   const [identityState, setIdentityState] = useState<IdentityStoreState>({ version: 0, mappings: [], teamRenames: {} });
   // 导入标签输入放在 App：全窗口拖拽导入也要带上
   const [importTagsRaw, setImportTagsRaw] = useState("");
@@ -392,72 +395,58 @@ export function App() {
     }
   }, [rivalHubConnection]);
 
-  const importOnlineFiles = useCallback(async (files: Iterable<File>, context: OnlineImportContext) => {
-    setImporting(true);
-    setNotice("正在导入并分析在线赛事 Demo…");
+  const importOnlineFiles = useCallback(async (files: Iterable<File>, context: RivalHubImportContext) => {
+    if (importing) return;
     const inputFiles = [...files];
-    let synced = 0;
-    let needsAttention = 0;
-    let failed = 0;
-    const failureMessages: string[] = [];
+    if (inputFiles.length === 0) return;
+    batchStopRequested.current = false;
+    batchTargetResolvers.current.clear();
+    setBatchSession(null);
+    setImporting(true);
+    setNotice("正在启动 RivalHub Demo 批处理…");
+    let demBackend: Awaited<ReturnType<typeof detectDemBackend>> | undefined;
     try {
-      let importedEntries: StudioDemoEntry[] = [];
-      try {
-        importedEntries = await importFiles(inputFiles, [], []);
-      } catch (error) {
-        failed = inputFiles.length;
-        failureMessages.push(error instanceof Error ? error.message : String(error));
-      }
-      setImporting(true);
-      failed += Math.max(inputFiles.length - importedEntries.length, 0);
-      const remoteMaps = context.candidates ?? context.mapAssignments.filter((assignment) => assignment.rivalHub).map((assignment) => ({
-        series: context.series,
-        map: assignment.rivalHub!,
-      }));
-      if (remoteMaps.length === 0) {
-        failed += importedEntries.length;
-        failureMessages.push("当前在线赛事范围没有可接收的地图");
-      } else {
-        for (const entry of importedEntries) {
-          try {
-            const pkg = await getDemoPackage(entry.id);
-            const selected = selectRivalHubMap(pkg, remoteMaps);
-            const remoteMap = selected.map;
-            const { stageRunId, ...targetWithoutStageRun } = remoteMap.target;
-            const target: RivalHubEvidenceTarget = stageRunId ? { ...targetWithoutStageRun, stageRunId } : targetWithoutStageRun;
-            let participantMatch;
-            try {
-              participantMatch = resolveRivalHubParticipants(pkg, target, remoteMap.lineup);
-            } catch {
-              participantMatch = resolveRivalHubParticipantsForReview(pkg, target, remoteMap.lineup);
-            }
-            const evidence = buildRivalHubDemoEvidenceV1(pkg, target, participantMatch.identities, participantMatch.orientation);
-            const result = await submitRivalHubEvidence(evidence, await rivalHubEvidenceIdempotencyKey(remoteMap.id, evidence));
-            if (result.status === "synced") synced += 1;
-            else needsAttention += 1;
-          } catch (error) {
-            failed += 1;
-            failureMessages.push(`${entry.fileName}: ${error instanceof Error ? error.message : String(error)}`);
-          }
-        }
-      }
-      try {
-        await refreshRivalHub();
-      } catch (error) {
-        failureMessages.push(`刷新 RivalHub 赛事失败：${error instanceof Error ? error.message : String(error)}`);
-      }
-      const status = [
-        synced > 0 ? `已同步 ${synced} 场` : "",
-        needsAttention > 0 ? `${needsAttention} 场需要处理` : "",
-        failed > 0 ? `失败 ${failed} 场${failureMessages[0] ? `（${failureMessages[0]}）` : ""}` : "",
-      ].filter(Boolean).join("，");
-      setNotice(status || "Demo 已导入本地资料库，但没有形成可提交的证据");
+      const session = await runRivalHubBatch(inputFiles, context, {
+        exportDem: async (file, onProgress) => {
+          demBackend ??= await detectDemBackend();
+          return exportDemToZip(file, demBackend, onProgress);
+        },
+        shouldStop: () => batchStopRequested.current,
+        resolveTarget: async (item: RivalHubBatchItem) => new Promise<string | null>((resolve) => {
+          batchTargetResolvers.current.set(item.id, resolve);
+        }),
+        onUpdate: (next) => {
+          setBatchSession(next);
+          const current = next.items[next.currentIndex];
+          setNotice(current ? `${current.fileName}：${current.message}` : null);
+        },
+      });
+      setBatchSession(session);
+      await refreshRivalHub().catch((error) => setNotice(`批处理已结束，但刷新 RivalHub 失败：${error instanceof Error ? error.message : String(error)}`));
+      setEntries(await listDemoEntries());
+      await refreshEventRecords();
+      setNotice(`批处理完成：已同步 ${session.counts.synced}，已存在 ${session.counts.alreadySynced}，需处理 ${session.counts.needsAttention}，待目标 ${session.counts.needsTarget}，失败 ${session.counts.failed}`);
     } catch (error) {
-      setNotice(`在线 Demo 处理失败：${error instanceof Error ? error.message : String(error)}`);
+      setNotice(`在线 Demo 批处理失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
+      batchTargetResolvers.current.clear();
       setImporting(false);
     }
-  }, [importFiles, refreshRivalHub]);
+  }, [importing, refreshEventRecords, refreshRivalHub]);
+
+  const stopRivalHubBatch = useCallback(() => {
+    batchStopRequested.current = true;
+    batchTargetResolvers.current.forEach((resolve) => resolve(null));
+    batchTargetResolvers.current.clear();
+    setBatchSession((current) => current ? { ...current, status: "stopping" } : current);
+  }, []);
+
+  const selectRivalHubBatchTarget = useCallback((itemId: string, matchMapId: string) => {
+    const resolve = batchTargetResolvers.current.get(itemId);
+    if (!resolve) return;
+    batchTargetResolvers.current.delete(itemId);
+    resolve(matchMapId || null);
+  }, []);
 
   // 桌面壳：原生文件对话框选 .dem/.zip → 本机 exporter 转 ZIP → 入库
   const importViaNativeDialog = useCallback(async () => {
@@ -896,6 +885,7 @@ export function App() {
             </button>
           </div>
         )}
+        <RivalHubBatchImportPanel session={batchSession} onStop={stopRivalHubBatch} onSelectTarget={selectRivalHubBatchTarget} />
         {entries.length > 0 && view !== "library" && view !== "management" && (
           <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} onEdit={() => setContextEditorOpen((current) => !current)} />
         )}
