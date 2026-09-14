@@ -2,6 +2,15 @@ import { useMemo } from "react";
 import type { RivalHubBatchItem, RivalHubBatchSession } from "../lib/rivalhub-import";
 import { rivalHubStatusPresentation } from "../lib/rivalhub-status";
 
+const ACTIVE_BATCH_PHASES = new Set(["exporting", "importing", "matching", "building_evidence", "submitting"]);
+
+export function currentRivalHubBatchItem(session: RivalHubBatchSession | null): RivalHubBatchItem | null {
+  if (!session) return null;
+  if (session.awaitingTargetItemId) return session.items.find((item) => item.id === session.awaitingTargetItemId) ?? null;
+  const item = session.items[session.currentIndex];
+  return item && ACTIVE_BATCH_PHASES.has(item.phase) ? item : null;
+}
+
 function ItemRow({ item, onSelectTarget }: { item: RivalHubBatchItem; onSelectTarget?: (itemId: string, matchMapId: string) => void }) {
   const status = rivalHubStatusPresentation(item.phase);
   return (
@@ -49,9 +58,9 @@ export function RivalHubBatchImportPanel({
   onStop?: () => void;
   onSelectTarget?: (itemId: string, matchMapId: string) => void;
 }) {
-  const current = useMemo(() => session?.items.find((item) => ["exporting", "importing", "matching", "building_evidence", "submitting", "needs_target"].includes(item.phase)) ?? null, [session]);
+  const current = useMemo(() => currentRivalHubBatchItem(session), [session]);
   if (!session) return null;
-  const finished = session.total === 0 ? 0 : session.items.filter((item) => ["synced", "needs_attention", "already_synced", "failed"].includes(item.phase)).length;
+  const finished = session.total === 0 ? 0 : session.items.filter((item) => ["synced", "needs_attention", "already_synced", "skipped", "failed"].includes(item.phase)).length;
   const currentStatus = current ? rivalHubStatusPresentation(current.phase) : null;
   return (
     <section className="stu-card stu-rivalhub-batch-panel" aria-live="polite" aria-label="RivalHub Demo 批处理进度">
@@ -79,6 +88,7 @@ export function RivalHubBatchImportPanel({
         <span className="stu-chip">已存在 {session.counts.alreadySynced}</span>
         <span className="stu-chip">需处理 {session.counts.needsAttention}</span>
         <span className="stu-chip">待目标 {session.counts.needsTarget}</span>
+        <span className="stu-chip">已跳过 {session.counts.skipped}</span>
         <span className="stu-chip">失败 {session.counts.failed}</span>
         {session.counts.reusedLocal > 0 && <span className="stu-chip">复用本地 {session.counts.reusedLocal}</span>}
       </div>

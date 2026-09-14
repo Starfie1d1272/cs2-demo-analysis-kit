@@ -3,8 +3,8 @@ import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { DemoPackage } from "@cs2dak/contract";
 import { analyzeDemoPackage, loadDemoPackageFromZip } from "../../../../packages/core/src/index";
-import { buildRivalHubDemoEvidenceV1, fixtureIdentity, fixtureTarget, matchRivalHubParticipants, matchRivalHubParticipantsForReview, normalizeRivalHubDemoPackage, resolveRivalHubParticipants, resolveRivalHubParticipantsForReview, selectRivalHubMap, type RivalHubEvidenceTarget, type RivalHubTeamOrientation } from "./rivalhub-evidence";
-import type { RivalHubRemoteMap, RivalHubRemotePlayer } from "./rivalhub-contract";
+import { buildRivalHubDemoEvidenceV1, fixtureIdentity, fixtureTarget, matchRivalHubParticipants, matchRivalHubParticipantsForReview, normalizeRivalHubDemoPackage, resolveRivalHubParticipants, resolveRivalHubParticipantsFromEventRoster, resolveRivalHubParticipantsForReview, selectRivalHubMap, type RivalHubEvidenceTarget, type RivalHubTeamOrientation } from "./rivalhub-evidence";
+import type { RivalHubRemoteMap, RivalHubRemotePlayer, RivalHubRemoteTeam } from "./rivalhub-contract";
 
 const target: RivalHubEvidenceTarget = {
   seasonId: "00000000-0000-4000-8000-000000000001",
@@ -35,6 +35,23 @@ function lineup(ids: string[], orientation: RivalHubTeamOrientation = "direct"):
     entryId: orientation === "direct"
       ? (index < 5 ? target.entryAId : target.entryBId)
       : (index < 5 ? target.entryBId : target.entryAId),
+  }));
+}
+
+function eventRosterTeams(ids: string[], orientation: RivalHubTeamOrientation = "direct"): RivalHubRemoteTeam[] {
+  return ["teamA", "teamB"].map((teamKey, teamIndex) => ({
+    key: `00000000-0000-4000-8000-${String(teamIndex + 10).padStart(12, "0")}`,
+    name: `Event Team ${teamIndex}`,
+    players: ids.slice(teamIndex * 5, teamIndex * 5 + 5).map((steamId64, index) => ({
+      steamId64,
+      name: `Event Player ${teamIndex * 5 + index}`,
+      userId: `10000000-0000-4000-8000-${String(teamIndex * 5 + index + 1).padStart(12, "0")}`,
+      eventRosterMemberId: `20000000-0000-4000-8000-${String(teamIndex * 5 + index + 1).padStart(12, "0")}`,
+      isStarter: false,
+      entryId: orientation === "direct"
+        ? (teamKey === "teamA" ? target.entryAId : target.entryBId)
+        : (teamKey === "teamA" ? target.entryBId : target.entryAId),
+    })),
   }));
 }
 
@@ -118,6 +135,20 @@ describe("RivalHub online Demo matching", () => {
       teamASide: "ct", teamBSide: "t", teamAScoreBefore: 7, teamBScoreBefore: 4,
       teamAEconomy: "full", teamBEconomy: "eco", winnerTeamKey: "teamB",
     });
+  });
+
+  it("resolves participant identity and reversed orientation from EventRoster without MatchRoster", () => {
+    const ids = Array.from({ length: 10 }, (_, index) => `765611980000000${String(index + 1).padStart(2, "0")}`);
+    const resolved = resolveRivalHubParticipantsFromEventRoster(packageFor(ids), target, eventRosterTeams(ids, "reversed"));
+
+    expect(resolved.orientation).toBe("reversed");
+    expect(resolved.identities.get(ids[0])).toMatchObject({
+      steamId64: ids[0],
+      userId: "10000000-0000-4000-8000-000000000001",
+      eventRosterMemberId: "20000000-0000-4000-8000-000000000001",
+      entryId: target.entryBId,
+    });
+    expect(resolved.identities.get(ids[9])).toMatchObject({ entryId: target.entryAId });
   });
 
   it("matches one map by canonical lineup, target and score without requiring display names", () => {

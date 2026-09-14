@@ -425,7 +425,7 @@ export function App() {
       await refreshRivalHub().catch((error) => setNotice(`批处理已结束，但刷新 RivalHub 失败：${error instanceof Error ? error.message : String(error)}`));
       setEntries(await listDemoEntries());
       await refreshEventRecords();
-      setNotice(`批处理完成：已同步 ${session.counts.synced}，已存在 ${session.counts.alreadySynced}，需处理 ${session.counts.needsAttention}，待目标 ${session.counts.needsTarget}，失败 ${session.counts.failed}`);
+      setNotice(`批处理完成：已同步 ${session.counts.synced}，已存在 ${session.counts.alreadySynced}，需处理 ${session.counts.needsAttention}，待目标 ${session.counts.needsTarget}，已跳过 ${session.counts.skipped}，失败 ${session.counts.failed}`);
     } catch (error) {
       setNotice(`在线 Demo 批处理失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {

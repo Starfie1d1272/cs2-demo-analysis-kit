@@ -2,7 +2,7 @@ import "fake-indexeddb/auto";
 import { describe, expect, it, vi } from "vitest";
 import type { DemoPackage } from "@cs2dak/contract";
 import type { StudioDemoEntry } from "./library";
-import type { RivalHubRemoteMap } from "./rivalhub-contract";
+import type { RivalHubRemoteMap, RivalHubRemoteTeam } from "./rivalhub-contract";
 import { runRivalHubBatch, type RivalHubBatchCallbacks, type RivalHubMatchCandidate } from "./rivalhub-import";
 
 const demoSha256 = "a".repeat(64);
@@ -37,10 +37,11 @@ function remoteMap(id: string, options: { demoSha256?: string | null; demoStatus
   } as RivalHubRemoteMap;
 }
 
-function candidate(id: string, options: { demoSha256?: string | null; demoStatus?: RivalHubRemoteMap["demoStatus"] } = {}): RivalHubMatchCandidate {
+function candidate(id: string, options: { demoSha256?: string | null; demoStatus?: RivalHubRemoteMap["demoStatus"] } = {}, eventTeams: RivalHubRemoteTeam[] = []): RivalHubMatchCandidate {
   return {
     series: { id: `series-${id}`, stageKey: "stage", teamAName: "A", teamBName: "B", completedAt: "2026-09-13T00:00:00.000Z", status: "finished" },
     map: remoteMap(id, options),
+    eventTeams,
   };
 }
 
@@ -79,6 +80,7 @@ function baseDependencies(options: {
   importDemo?: BatchImport;
   matchMap?: BatchMatch;
   submit?: BatchSubmit;
+  resolveParticipantsFromEventRoster?: NonNullable<BatchDependencies["resolveParticipantsFromEventRoster"]>;
 } = {}) {
   const importDemo = options.importDemo ?? vi.fn(async (file: File) => ({ entry: localEntry(file.name), duplicate: false, replaced: false }));
   const matchMap = options.matchMap ?? vi.fn((): ReturnType<BatchMatch> => ({ status: "matched", candidate: candidate("target"), mode: "review_fallback" }));
@@ -87,9 +89,10 @@ function baseDependencies(options: {
   const linkMap = vi.fn(async () => undefined);
   const idempotencyKey = vi.fn(async () => "dak:test:key");
   const resolveParticipants = vi.fn(() => ({ identities: new Map(), orientation: "direct" as const }));
+  const resolveParticipantsFromEventRoster = options.resolveParticipantsFromEventRoster ?? vi.fn(() => ({ identities: new Map(), orientation: "direct" as const }));
   const resolveParticipantsForReview = vi.fn(() => ({ identities: new Map(), orientation: "direct" as const }));
   const buildEvidence = vi.fn(() => ({ contract: "test" }));
-  return { importDemo, matchMap, submit, loadPackage, linkMap, idempotencyKey, resolveParticipants, resolveParticipantsForReview, buildEvidence };
+  return { importDemo, matchMap, submit, loadPackage, linkMap, idempotencyKey, resolveParticipants, resolveParticipantsFromEventRoster, resolveParticipantsForReview, buildEvidence };
 }
 
 function runWith(
@@ -190,6 +193,41 @@ describe("RivalHub serial batch import", () => {
     expect(dependencies.importDemo).toHaveBeenCalledOnce();
     expect(dependencies.loadPackage).toHaveBeenCalledOnce();
     expect(resolveTarget).toHaveBeenCalledOnce();
+  });
+
+  it("closes a skipped target as a stable terminal item and advances the session", async () => {
+    const first = candidate("target-a");
+    const second = candidate("target-b");
+    const matchMap = vi.fn(() => matchMap.mock.calls.length === 1
+      ? { status: "needs_target" as const, candidates: [first, second], reason: "ambiguous" }
+      : { status: "matched" as const, candidate: second, mode: "review_fallback" as const });
+    const dependencies = baseDependencies({ matchMap });
+    const awaiting: Array<string | null> = [];
+    const session = await runWith([new File(["zip"], "first.zip"), new File(["zip"], "second.zip")], dependencies, [first, second], {
+      resolveTarget: vi.fn(async () => null),
+      onUpdate: (next) => awaiting.push(next.awaitingTargetItemId),
+    });
+
+    expect(session.items[0]).toMatchObject({ phase: "skipped", targetCandidates: undefined, detail: "用户跳过目标，保留待后续处理" });
+    expect(session.items[1]).toMatchObject({ phase: "synced", matchedMapId: "target-b" });
+    expect(session.counts).toMatchObject({ skipped: 1, needsTarget: 0, synced: 1 });
+    expect(awaiting).toContain("item-0-first.zip");
+    expect(awaiting.at(-1)).toBeNull();
+  });
+
+  it("uses EventRoster identities and orientation for evidence while MatchRoster stays validation-only", async () => {
+    const eventTeams = [{ key: "event-team", name: "Canonical", players: [] }] as RivalHubRemoteTeam[];
+    const target = candidate("event-roster-target", {}, eventTeams);
+    const identities = new Map([["steam", { steamId64: "steam", nameSnapshot: "Player", userId: "user", eventRosterMemberId: "member", entryId: "entry-b" }]]);
+    const resolveParticipantsFromEventRoster = vi.fn(() => ({ identities, orientation: "reversed" as const }));
+    const matchMap = vi.fn(() => ({ status: "matched" as const, candidate: target, mode: "event_roster" as const }));
+    const dependencies = baseDependencies({ matchMap, resolveParticipantsFromEventRoster });
+
+    await runWith([new File(["zip"], "event-roster.zip")], dependencies, [target]);
+
+    expect(resolveParticipantsFromEventRoster).toHaveBeenCalledWith(fakePackage, expect.objectContaining({ matchMapId: "event-roster-target" }), eventTeams);
+    expect(dependencies.resolveParticipants).not.toHaveBeenCalled();
+    expect(dependencies.buildEvidence).toHaveBeenCalledWith(fakePackage, expect.objectContaining({ matchMapId: "event-roster-target" }), identities, "reversed");
   });
 
   it("stops dispatching after the current item", async () => {

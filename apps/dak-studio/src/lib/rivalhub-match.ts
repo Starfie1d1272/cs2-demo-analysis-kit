@@ -53,7 +53,14 @@ function exactLineup(pkg: DemoPackage, candidate: RivalHubMatchCandidate): boole
   return lineupOverlap(pkg, candidate) === 10;
 }
 
-type EventRosterIdentity = { entryAId: string; entryBId: string };
+export type RivalHubEventRosterResolution = {
+  /** Demo observed team A/B 的 canonical Entry；只用于 discovery/orientation。 */
+  entryAId: string;
+  entryBId: string;
+  /** EventRoster member identity，按 Steam64 索引；不是本场 MatchRoster。 */
+  membersBySteam: Map<string, RivalHubRemoteTeam["players"][number]>;
+  duplicateSteam: Set<string>;
+};
 
 /**
  * Resolve only stable team identity from EventRoster membership. `isStarter` is
@@ -61,8 +68,10 @@ type EventRosterIdentity = { entryAId: string; entryBId: string };
  * MatchRoster declaration. A small unknown bound keeps partial historical
  * projections from becoming an unsafe identity guess.
  */
-function eventRosterIdentity(pkg: DemoPackage, candidate: RivalHubMatchCandidate): EventRosterIdentity | null {
-  const eventTeams = candidate.eventTeams ?? [];
+export function resolveRivalHubEventRoster(
+  pkg: DemoPackage,
+  eventTeams: RivalHubRemoteTeam[],
+): RivalHubEventRosterResolution | null {
   if (eventTeams.length === 0 || pkg.players.length !== 10 || new Set(pkg.players.map((player) => player.steamId64)).size !== 10) return null;
   const sidePlayers = {
     teamA: pkg.players.filter((player) => player.teamKey === "teamA"),
@@ -71,11 +80,15 @@ function eventRosterIdentity(pkg: DemoPackage, candidate: RivalHubMatchCandidate
   if (sidePlayers.teamA.length !== 5 || sidePlayers.teamB.length !== 5) return null;
 
   const entriesBySteam = new Map<string, Set<string>>();
+  const membersBySteam = new Map<string, RivalHubRemoteTeam["players"][number]>();
+  const duplicateSteam = new Set<string>();
   for (const team of eventTeams) {
     for (const player of team.players) {
       const entries = entriesBySteam.get(player.steamId64) ?? new Set<string>();
       entries.add(player.entryId);
       entriesBySteam.set(player.steamId64, entries);
+      if (membersBySteam.has(player.steamId64)) duplicateSteam.add(player.steamId64);
+      else membersBySteam.set(player.steamId64, player);
     }
   }
 
@@ -100,7 +113,14 @@ function eventRosterIdentity(pkg: DemoPackage, candidate: RivalHubMatchCandidate
   const entryAId = entryForSide(sidePlayers.teamA);
   const entryBId = entryForSide(sidePlayers.teamB);
   if (!entryAId || !entryBId || entryAId === entryBId || unknownPlayers > MAX_UNKNOWN_EVENT_ROSTER_PLAYERS) return null;
-  return { entryAId, entryBId };
+  return { entryAId, entryBId, membersBySteam, duplicateSteam };
+}
+
+type EventRosterIdentity = { entryAId: string; entryBId: string };
+
+function eventRosterIdentity(pkg: DemoPackage, candidate: RivalHubMatchCandidate): EventRosterIdentity | null {
+  const resolution = resolveRivalHubEventRoster(pkg, candidate.eventTeams ?? []);
+  return resolution ? { entryAId: resolution.entryAId, entryBId: resolution.entryBId } : null;
 }
 
 function sameEntryPair(left: EventRosterIdentity, candidate: RivalHubMatchCandidate): boolean {

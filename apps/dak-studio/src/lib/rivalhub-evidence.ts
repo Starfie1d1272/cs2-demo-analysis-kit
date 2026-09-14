@@ -7,7 +7,8 @@ import {
 } from "../../../../packages/core/src/index";
 import type { DemoPackage, TeamKey } from "../../../../packages/contract/src/index";
 import { buildTournamentInsightsFromFacts, extractTournamentFacts } from "../../../../packages/presentation/src/index";
-import type { RivalHubRemoteMap, RivalHubRemotePlayer } from "./rivalhub-contract";
+import type { RivalHubRemoteMap, RivalHubRemotePlayer, RivalHubRemoteTeam } from "./rivalhub-contract";
+import { resolveRivalHubEventRoster } from "./rivalhub-match";
 
 export type RivalHubEvidenceTarget = {
   seasonId: string;
@@ -121,6 +122,56 @@ export function resolveRivalHubParticipants(
   }
   if (identities.size !== packagePlayers.size || [...packagePlayers.keys()].some((id) => !identities.has(id))) {
     throw new Error("Demo 选手集合与在线 Canonical MatchRoster 不一致");
+  }
+  return { identities, orientation };
+}
+
+/**
+ * EventRoster 是跨本场稳定的 Steam64 → canonical Entry identity owner。
+ * 它同时提供 Demo A/B 与 target entryA/entryB 的方向，以及可复用的
+ * userId/eventRosterMemberId；MatchRoster 不能替换这层 identity。
+ */
+export function resolveRivalHubParticipantsFromEventRoster(
+  pkg: DemoPackage,
+  target: RivalHubEvidenceTarget,
+  eventTeams: RivalHubRemoteTeam[],
+): { identities: Map<string, RivalHubParticipantIdentity>; orientation: RivalHubTeamOrientation } {
+  const roster = resolveRivalHubEventRoster(pkg, eventTeams);
+  if (!roster) throw new Error("EventRoster 无法确定 Demo 两侧 Canonical Entry");
+  const orientation: RivalHubTeamOrientation | null = roster.entryAId === target.entryAId && roster.entryBId === target.entryBId
+    ? "direct"
+    : roster.entryAId === target.entryBId && roster.entryBId === target.entryAId
+      ? "reversed"
+      : null;
+  if (!orientation) throw new Error("EventRoster canonical Entry pair 与目标不一致");
+
+  const identities = new Map<string, RivalHubParticipantIdentity>();
+  for (const player of pkg.players) {
+    const remote = roster.membersBySteam.get(player.steamId64);
+    if (!remote) {
+      identities.set(player.steamId64, {
+        steamId64: player.steamId64,
+        nameSnapshot: player.name,
+        resolution: { status: "unresolved" },
+      });
+      continue;
+    }
+    const expectedEntryId = entryForDemoTeam(target, player.teamKey, orientation);
+    if (roster.duplicateSteam.has(player.steamId64) || remote.entryId !== expectedEntryId) {
+      identities.set(player.steamId64, {
+        steamId64: player.steamId64,
+        nameSnapshot: player.name,
+        resolution: { status: "conflict", userId: remote.userId, eventRosterMemberId: remote.eventRosterMemberId, entryId: remote.entryId },
+      });
+      continue;
+    }
+    identities.set(player.steamId64, {
+      steamId64: player.steamId64,
+      nameSnapshot: player.name,
+      userId: remote.userId,
+      eventRosterMemberId: remote.eventRosterMemberId,
+      entryId: remote.entryId,
+    });
   }
   return { identities, orientation };
 }

@@ -48,8 +48,9 @@ const demoMeta = getStorage().records("demos"); // StudioDemoEntry by id
 const demoBlobs = getStorage().blobs("demos"); // ZIP 原始字节 by id
 
 interface DemoIdentityIndex {
-  byId: Map<string, StudioDemoEntry>;
-  byDemoSha256: Map<string, StudioDemoEntry[]>;
+  /** Indexes are intentionally identifiers only; metadata is always read fresh. */
+  byId: Map<string, string | null>;
+  byDemoSha256: Map<string, string[]>;
   errors: string[];
 }
 
@@ -72,15 +73,15 @@ function normalizeEntry(entry: StudioDemoEntry): StudioDemoEntry {
 }
 
 function addToIdentityIndex(index: DemoIdentityIndex, entry: StudioDemoEntry): void {
-  const previous = index.byId.get(entry.id);
-  if (previous?.demoSha256) {
-    const previousRows = index.byDemoSha256.get(previous.demoSha256) ?? [];
-    index.byDemoSha256.set(previous.demoSha256, previousRows.filter((row) => row.id !== entry.id));
+  const previousDemoSha256 = index.byId.get(entry.id);
+  if (previousDemoSha256) {
+    const previousRows = index.byDemoSha256.get(previousDemoSha256) ?? [];
+    index.byDemoSha256.set(previousDemoSha256, previousRows.filter((row) => row !== entry.id));
   }
-  index.byId.set(entry.id, entry);
+  index.byId.set(entry.id, entry.demoSha256);
   if (entry.demoSha256) {
     const rows = index.byDemoSha256.get(entry.demoSha256) ?? [];
-    index.byDemoSha256.set(entry.demoSha256, [...rows.filter((row) => row.id !== entry.id), entry]);
+    index.byDemoSha256.set(entry.demoSha256, [...rows.filter((row) => row !== entry.id), entry.id]);
   }
 }
 
@@ -132,7 +133,7 @@ export async function backfillDemoIdentities(): Promise<{ entries: StudioDemoEnt
   const missingBefore = before.filter((entry) => !entry.demoSha256).length;
   const index = await buildDemoIdentityIndex();
   identityIndex = index;
-  const entries = [...index.byId.values()];
+  const entries = (await demoMeta.getAll<StudioDemoEntry>()).map(normalizeEntry);
   return {
     entries,
     backfilled: missingBefore - entries.filter((entry) => !entry.demoSha256).length,
@@ -156,11 +157,11 @@ export async function removeDemoStorageOnly(id: string): Promise<void> {
   await Promise.all([demoMeta.delete(id), demoBlobs.delete(id)]);
   pkgCache.delete(id);
   if (identityIndex) {
-    const previous = identityIndex.byId.get(id);
+    const previousDemoSha256 = identityIndex.byId.get(id);
     identityIndex.byId.delete(id);
-    if (previous?.demoSha256) {
-      const rows = identityIndex.byDemoSha256.get(previous.demoSha256) ?? [];
-      identityIndex.byDemoSha256.set(previous.demoSha256, rows.filter((row) => row.id !== id));
+    if (previousDemoSha256) {
+      const rows = identityIndex.byDemoSha256.get(previousDemoSha256) ?? [];
+      identityIndex.byDemoSha256.set(previousDemoSha256, rows.filter((row) => row !== id));
     }
   }
 }
@@ -471,11 +472,16 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
   }
   const demoSha256 = manifest.demo.hash?.toLowerCase() ?? null;
   const index = await ensureDemoIdentityIndex();
-  const identityMatch = demoSha256
-    ? [...(index.byDemoSha256.get(demoSha256) ?? [])]
-      .sort((a, b) => b.importedAt - a.importedAt || a.id.localeCompare(b.id))[0]
-    : undefined;
-  const existing = identityMatch ?? index.byId.get(id) ?? await meta.get<StudioDemoEntry>(id);
+  const identityEntries = demoSha256
+    ? (await Promise.all((index.byDemoSha256.get(demoSha256) ?? []).map((entryId) => meta.get<StudioDemoEntry>(entryId))))
+      .filter((entry): entry is StudioDemoEntry => entry != null)
+      .map(normalizeEntry)
+      .filter((entry) => entry.demoSha256 === demoSha256)
+    : [];
+  const identityMatch = identityEntries
+    .sort((a, b) => b.importedAt - a.importedAt || a.id.localeCompare(b.id))[0];
+  const existingById = await meta.get<StudioDemoEntry>(id);
+  const existing = identityMatch ?? (existingById ? normalizeEntry(existingById) : undefined);
 
   const mergeDuplicateEntry = (current: StudioDemoEntry): StudioDemoEntry => normalizeEntry({
     ...current,
@@ -504,6 +510,8 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
   // facts 的 matchId 必须等于最终持久化条目的 matchId：重复导入沿用既有条目的 fileName，
   // 否则用本次文件名。故先定 matchId 再榨 facts（在 worker 里，含 replay 的整包不回主线程）。
   const matchId = matchIdForEntry({ fileName: existing?.fileName ?? file.name });
+  const preservedSourceDemPath = sourceDemPath ?? existing?.sourceDemPath ?? replacement?.sourceDemPath ?? null;
+  const preservedMatchDate = matchDate ?? existing?.meta.matchDate ?? replacement?.meta.matchDate ?? null;
   let result: ImportWorkerResult;
   try {
     result = await importInWorker(lowMemory ? buffer : buffer.slice(0), matchId, !lowMemory);
@@ -520,10 +528,10 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     importedAt: existing?.importedAt ?? Date.now(),
     demoSha256,
     tags: normalizeTags([...(existing?.tags ?? []), ...tags]),
-    sourceDemPath,
+    sourceDemPath: preservedSourceDemPath,
     builtWith: currentBuiltWith(),
     sizeBytes: file.size,
-    meta: matchDate ? { ...pkgMeta, matchDate } : pkgMeta,
+    meta: { ...pkgMeta, matchDate: preservedMatchDate },
   });
   if (replacement) {
     entry.tags = normalizeTags([...(replacement.tags ?? []), ...entry.tags]);
@@ -534,11 +542,7 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     await Promise.all([blobs.put(persistedId, buffer), saveDemoEntry(entry)]);
     await persistAnalysis(data);
     if (replacement && replacement.id !== persistedId) {
-      await Promise.all([
-        meta.delete(replacement.id),
-        blobs.delete(replacement.id)
-      ]);
-      pkgCache.delete(replacement.id);
+      await removeDemoStorageOnly(replacement.id);
       void getFactsStore().deleteMatchFacts(matchIdForEntry(replacement));
       void getDerivedCacheStore().deleteMatch(matchIdForEntry(replacement));
     }
@@ -554,11 +558,7 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     saveDemoEntry(entry)
   ]);
   if (replacement && replacement.id !== persistedId) {
-    await Promise.all([
-      meta.delete(replacement.id),
-      blobs.delete(replacement.id)
-    ]);
-    pkgCache.delete(replacement.id);
+    await removeDemoStorageOnly(replacement.id);
     void getFactsStore().deleteMatchFacts(matchIdForEntry(replacement));
     void getDerivedCacheStore().deleteMatch(matchIdForEntry(replacement));
   }
@@ -571,19 +571,17 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
 
 /** 更新某条 demo 的标签。 */
 export async function updateDemoTags(id: string, tags: string[]): Promise<void> {
-  const meta = demoMeta;
-  const record = await meta.get<StudioDemoEntry>(id);
+  const record = await demoMeta.get<StudioDemoEntry>(id);
   if (record) {
-    await meta.put(id, { ...record, tags: normalizeTags(tags) });
+    await saveDemoEntry({ ...record, tags: normalizeTags(tags) });
   }
 }
 
 /** 只更新本机原始 .dem 路径；用于给 ZIP/赛事包导入的条目补绑 raw demo。 */
 export async function updateDemoSourcePath(id: string, sourceDemPath: string | null): Promise<void> {
-  const meta = demoMeta;
-  const record = await meta.get<StudioDemoEntry>(id);
+  const record = await demoMeta.get<StudioDemoEntry>(id);
   if (record) {
-    await meta.put(id, normalizeEntry({ ...record, sourceDemPath }));
+    await saveDemoEntry({ ...record, sourceDemPath });
   }
 }
 
@@ -592,23 +590,18 @@ export async function bulkUpdateTags(ids: string[], add: string[] = [], remove: 
   if (targetIds.length === 0) return;
   const addSet = normalizeTags(add);
   const removeSet = new Set(normalizeTags(remove));
-  const meta = demoMeta;
-  const records = await Promise.all(targetIds.map((id) => meta.get<StudioDemoEntry>(id)));
+  const records = await Promise.all(targetIds.map((id) => demoMeta.get<StudioDemoEntry>(id)));
   await Promise.all(
     records.filter((r): r is StudioDemoEntry => r != null).map((record) => {
       const nextTags = normalizeTags([...(record.tags ?? []).filter((tag) => !removeSet.has(tag)), ...addSet]);
-      return meta.put(record.id, { ...record, tags: nextTags });
+      return saveDemoEntry({ ...record, tags: nextTags });
     })
   );
 }
 
 export async function removeDemo(id: string): Promise<void> {
   const record = await demoMeta.get<StudioDemoEntry>(id);
-  await Promise.all([
-    demoMeta.delete(id),
-    demoBlobs.delete(id)
-  ]);
-  pkgCache.delete(id);
+  await removeDemoStorageOnly(id);
   if (record) await removeDemoAnalysis(matchIdForEntry(record));
 }
 
@@ -685,15 +678,14 @@ export async function loadMatchWorkspaceModel(demoId: string): Promise<MatchWork
 
 /** 批量替换资料库中所有匹配 originalName 的队伍名为 displayName。 */
 export async function renameTeamInLibrary(originalName: string, displayName: string): Promise<void> {
-  const meta = demoMeta;
-  const all = await meta.getAll<StudioDemoEntry>();
+  const all = await listDemoEntries();
   await Promise.all(
     all.map((record) => {
       let recordMut = record;
       let changed = false;
       if (recordMut.meta.teamAName === originalName) { recordMut = { ...recordMut, meta: { ...recordMut.meta, teamAName: displayName } }; changed = true; }
       if (recordMut.meta.teamBName === originalName) { recordMut = { ...recordMut, meta: { ...recordMut.meta, teamBName: displayName } }; changed = true; }
-      return changed ? meta.put(recordMut.id, recordMut) : Promise.resolve();
+      return changed ? saveDemoEntry(recordMut) : Promise.resolve();
     })
   );
 }

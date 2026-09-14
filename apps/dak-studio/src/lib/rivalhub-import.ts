@@ -5,6 +5,7 @@ import { linkDemoToRivalHubMap } from "./events";
 import {
   buildRivalHubDemoEvidenceV1,
   resolveRivalHubParticipants,
+  resolveRivalHubParticipantsFromEventRoster,
   resolveRivalHubParticipantsForReview,
 } from "./rivalhub-evidence";
 import {
@@ -29,6 +30,7 @@ export type RivalHubBatchPhase =
   | "needs_attention"
   | "already_synced"
   | "needs_target"
+  | "skipped"
   | "failed";
 
 export type RivalHubImportScope = "event" | "stage" | "series" | "map";
@@ -72,6 +74,8 @@ export interface RivalHubBatchSession {
   id: string;
   status: "running" | "stopping" | "completed";
   currentIndex: number;
+  /** Only non-null while resolveTarget is awaiting the user's decision. */
+  awaitingTargetItemId: string | null;
   total: number;
   items: RivalHubBatchItem[];
   counts: {
@@ -79,6 +83,7 @@ export interface RivalHubBatchSession {
     needsAttention: number;
     alreadySynced: number;
     needsTarget: number;
+    skipped: number;
     failed: number;
     reusedLocal: number;
   };
@@ -93,6 +98,7 @@ interface RivalHubBatchDependencies {
   idempotencyKey: typeof rivalHubEvidenceIdempotencyKey;
   linkMap: typeof linkDemoToRivalHubMap;
   resolveParticipants: typeof resolveRivalHubParticipants;
+  resolveParticipantsFromEventRoster: typeof resolveRivalHubParticipantsFromEventRoster;
   resolveParticipantsForReview: typeof resolveRivalHubParticipantsForReview;
   buildEvidence: typeof buildRivalHubDemoEvidenceV1;
 }
@@ -135,6 +141,7 @@ function messageForPhase(phase: RivalHubBatchPhase): string {
     needs_attention: "需要处理",
     already_synced: "已存在同步结果",
     needs_target: "等待选择目标",
+    skipped: "已跳过",
     failed: "失败",
   }[phase];
 }
@@ -164,9 +171,10 @@ function freshSession(files: File[]): RivalHubBatchSession {
     id: sessionId(),
     status: "running",
     currentIndex: 0,
+    awaitingTargetItemId: null,
     total: files.length,
     items: files.map(newItem),
-    counts: { synced: 0, needsAttention: 0, alreadySynced: 0, needsTarget: 0, failed: 0, reusedLocal: 0 },
+    counts: { synced: 0, needsAttention: 0, alreadySynced: 0, needsTarget: 0, skipped: 0, failed: 0, reusedLocal: 0 },
   };
 }
 
@@ -179,6 +187,7 @@ function recount(session: RivalHubBatchSession): RivalHubBatchSession {
       needsAttention: terminal.filter((item) => item.phase === "needs_attention").length,
       alreadySynced: terminal.filter((item) => item.phase === "already_synced").length,
       needsTarget: terminal.filter((item) => item.phase === "needs_target").length,
+      skipped: terminal.filter((item) => item.phase === "skipped").length,
       failed: terminal.filter((item) => item.phase === "failed").length,
       reusedLocal: terminal.filter((item) => item.reusedLocal).length,
     },
@@ -205,6 +214,7 @@ export async function runRivalHubBatch(
     idempotencyKey: rivalHubEvidenceIdempotencyKey,
     linkMap: linkDemoToRivalHubMap,
     resolveParticipants: resolveRivalHubParticipants,
+    resolveParticipantsFromEventRoster: resolveRivalHubParticipantsFromEventRoster,
     resolveParticipantsForReview: resolveRivalHubParticipantsForReview,
     buildEvidence: buildRivalHubDemoEvidenceV1,
     ...callbacks.dependencies,
@@ -212,7 +222,17 @@ export async function runRivalHubBatch(
   let session = freshSession(files);
   const emit = () => callbacks.onUpdate?.(recount(session));
   const updateItem = (index: number, patch: Partial<RivalHubBatchItem>) => {
-    session = recount({ ...session, currentIndex: index, items: session.items.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item) });
+    const currentItem = session.items[index];
+    const nextPhase = patch.phase ?? currentItem?.phase;
+    const awaitingTargetItemId = nextPhase === "needs_target"
+      ? currentItem?.id ?? null
+      : session.awaitingTargetItemId === currentItem?.id ? null : session.awaitingTargetItemId;
+    session = recount({
+      ...session,
+      currentIndex: index,
+      awaitingTargetItemId,
+      items: session.items.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item),
+    });
     emit();
   };
   emit();
@@ -278,6 +298,12 @@ export async function runRivalHubBatch(
         const selectedId = await callbacks.resolveTarget?.(session.items[index]!, match.candidates) ?? null;
         const selected = selectedId ? match.candidates.find((candidate) => candidate.map.id === selectedId) : undefined;
         if (!selected) {
+          updateItem(index, {
+            phase: "skipped",
+            message: messageForPhase("skipped"),
+            detail: "用户跳过目标，保留待后续处理",
+            targetCandidates: undefined,
+          });
           continue;
         }
         match = { status: "matched", candidate: selected, mode: "fixed" };
@@ -302,11 +328,34 @@ export async function runRivalHubBatch(
       pkg ??= await deps.loadPackage(localEntry.id);
       updateItem(index, { ...replacementResult(session.items[index]!, match), phase: "building_evidence", message: messageForPhase("building_evidence"), targetCandidates: undefined });
       const target = evidenceTargetFromRemoteMap(selected.map);
-      let participantMatch: ReturnType<typeof resolveRivalHubParticipants> | ReturnType<typeof resolveRivalHubParticipantsForReview>;
-      try {
-        participantMatch = deps.resolveParticipants(pkg, target, selected.map.lineup ?? []);
-      } catch {
-        participantMatch = deps.resolveParticipantsForReview(pkg, target, selected.map.lineup ?? []);
+      let participantMatch: ReturnType<typeof resolveRivalHubParticipants> | ReturnType<typeof resolveRivalHubParticipantsFromEventRoster> | ReturnType<typeof resolveRivalHubParticipantsForReview>;
+      let eventRosterMatch: ReturnType<typeof resolveRivalHubParticipantsFromEventRoster> | null = null;
+      if (selected.eventTeams && selected.eventTeams.length > 0) {
+        try {
+          eventRosterMatch = deps.resolveParticipantsFromEventRoster(pkg, target, selected.eventTeams);
+        } catch {
+          // A partial/mismatched EventRoster cannot establish identity; retain
+          // the pre-existing MatchRoster validation/review fallback below.
+        }
+      }
+      if (eventRosterMatch) {
+        // EventRoster owns the base identity and orientation. MatchRoster is
+        // only an after-target per-match check; its result never replaces this
+        // canonical resolution, and the server records any mismatch.
+        if ((selected.map.lineup?.length ?? 0) > 0) {
+          try {
+            deps.resolveParticipants(pkg, target, selected.map.lineup ?? []);
+          } catch {
+            // Keep EventRoster participant identity/orientation for evidence.
+          }
+        }
+        participantMatch = eventRosterMatch;
+      } else {
+        try {
+          participantMatch = deps.resolveParticipants(pkg, target, selected.map.lineup ?? []);
+        } catch {
+          participantMatch = deps.resolveParticipantsForReview(pkg, target, selected.map.lineup ?? []);
+        }
       }
       const evidence = deps.buildEvidence(pkg, target, participantMatch.identities, participantMatch.orientation);
       updateItem(index, { phase: "submitting", message: messageForPhase("submitting") });

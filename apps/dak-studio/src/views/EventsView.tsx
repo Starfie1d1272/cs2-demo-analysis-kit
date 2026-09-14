@@ -131,8 +131,18 @@ function stageSeriesId(key: string, series: StudioSeriesRecord[]): string | null
   return series.find((row) => row.id === key || row.bracketNodeId === key)?.id ?? null;
 }
 
-function StageContent({ stage, series, remote, onSelectSeries }: { stage: EventStage; series: StudioSeriesRecord[]; remote: boolean; onSelectSeries: (id: string) => void }) {
+function RemoteStageStructureUnavailable() {
+  return <div className="stu-card stu-stage-empty"><b>RivalHub 尚未提供官方 bracket 结构</b><p className="stu-muted">该阶段的 compact match index 仍可用于逐场查看；官方拓扑补齐后才显示 bracket。</p></div>;
+}
+
+export function StageContent({ stage, series, remote, onSelectSeries }: { stage: EventStage; series: StudioSeriesRecord[]; remote: boolean; onSelectSeries: (id: string) => void }) {
   const hasNodes = (stage.bracketNodes?.length ?? 0) > 0;
+  if (remote) {
+    if (stage.type === "round_robin" || stage.type === "swiss" || (stage.type === "gsl_group" && !hasNodes)) {
+      return <StandingsTable stage={stage} series={series} remote />;
+    }
+    if (!hasNodes) return <RemoteStageStructureUnavailable />;
+  }
   if (stage.type === "round_robin" || (stage.type === "gsl_group" && !hasNodes)) return <StandingsTable stage={stage} series={series} remote={remote} />;
   if (stage.type === "swiss") {
     const model = swissModelFromResults(series);
