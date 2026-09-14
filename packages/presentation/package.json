@@ -1,6 +1,6 @@
 {
   "name": "@cs2dak/presentation",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "license": "MIT",
   "exports": {
@@ -11,6 +11,7 @@
     "@cs2dak/cohort": "workspace:*",
     "@cs2dak/core": "workspace:*",
     "@cs2dak/maps": "workspace:*",
+    "@cs2dak/tournament": "workspace:*",
     "@rivalhub/rival-rating": "^0.3.0"
   },
   "devDependencies": {},

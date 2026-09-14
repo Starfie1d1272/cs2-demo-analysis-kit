@@ -8,7 +8,6 @@
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "ignore": [
-    "@cs2dak/cli",
-    "@cs2dak/demo-lab"
+    "@cs2dak/cli"
   ]
 }

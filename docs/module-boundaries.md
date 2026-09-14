@@ -12,6 +12,7 @@
        ├─> @cs2dak/cohort
        ├─> CS2 Insight Agent
        └─> @cs2dak/presentation <─ @cs2dak/cohort / @cs2dak/maps
+              └─> @cs2dak/tournament（frozen Tournament facts 跨图聚合）
               -> @cs2dak/react
               -> RivalHub / DAK Studio
 ```
@@ -28,7 +29,8 @@
 | `@cs2dak/cohort`         | 跨场聚合、身份归并、赛季级 RR/PRISM 输入与结果整形              | 单场解析、数据库、产品 UI                   | `CohortBundle`              |
 | `@rivalhub/rival-rating` | RR、PRISM 及相关评分公式                                        | Demo 信号提取、持久化、展示                 | 评分结果                    |
 | `@cs2dak/maps`           | 地图标定、坐标变换、callout 语义/grid、默认位、包点入口、区域几何 | 评分公式、产品 UI、战术结论、静态完整战术库 | 地图与空间能力              |
-| `@cs2dak/presentation`   | 将 core/cohort 结果转换为比赛、选手、队伍、赛季和排行榜展示模型 | 解析、评分公式、数据库、React               | 产品中立 View Models        |
+| `@cs2dak/tournament`     | frozen Tournament sufficient-fact DTO、identity-safe 跨图 merge、rate 与 invariant 校验 | Demo 解析/detection、RivalHub scope、数据库、React、评分公式 | `TournamentAnalytics`       |
+| `@cs2dak/presentation`   | 将 core/cohort 结果转换为比赛、选手、队伍、赛季和排行榜展示模型；提供 Tournament 单图 legacy adapter | 解析、评分公式、数据库、React、Tournament 跨图 merge | 产品中立 View Models        |
 | `@cs2dak/react`          | 渲染 presentation 合同和基础可视化组件                          | 数据库查询、分析、评分、产品业务规则        | React 组件与样式            |
 | Node CLI                 | 将 TypeScript 包接入本地文件系统和自动化流程                    | 复制核心分析逻辑                            | 命令行输出与文件产物        |
 | DAK Studio（`apps/dak-studio`） | 本地 Demo 管理、导入、检索、比较和个人档案               | RivalHub 赛事业务、共享分析公式             | 独立本地产品                |
@@ -46,8 +48,8 @@ DAK Studio 已落地为 `apps/dak-studio`（资料库 / 比赛工作台 / 选手
 | 个人实验室 | 选手档案、趋势、武器分布、证据跳转 | `@cs2dak/cohort` + `@cs2dak/presentation` |
 | 对枪实验室 | duels/mechanics 信号聚合、三分类对枪、TTK、机制画像（含 .tri LOS 反应时间/预瞄） | `@cs2dak/core` + `@cs2dak/presentation` |
 | 道具实验室 | 跨场 Flash Value、负收益队闪、道具证据 | `@cs2dak/presentation` |
-| 经济与节奏 | 经济矩阵、手枪转化、eco/semi 翻盘 | `@cs2dak/presentation` / core economy |
-| 赛事中台 | 跨队横向对比、地图盘面、武器榜、报表 | `@cs2dak/cohort` + `@cs2dak/presentation` |
+| 经济与节奏 | 经济矩阵、手枪转化、eco/semi 翻盘 | `@cs2dak/tournament`（单图事实由 presentation adapter 生成） |
+| 赛事中台 | 跨队横向对比、地图盘面、武器榜、报表 | `@cs2dak/cohort` + `@cs2dak/presentation` + `@cs2dak/tournament` |
 | 教练工作台 | pattern/playbook/anti-strat 的本地查询与编排 | `@cs2dak/maps` 静态地图语义 + `@cs2dak/core` 回合推导 + `@cs2dak/cohort` 聚合 + `@cs2dak/presentation` 展示模型 |
 
 RR 口径统一使用 `@rivalhub/rival-rating` 的 frozen pro baseline：单场和跨场聚合都以
@@ -66,6 +68,7 @@ PRISM 风格、强弱项等“相对当前范围”的判断可以继续使用 c
 8. View Model 不包含数据库、权限或产品路由语义。
 9. 允许破坏性重构和删除旧 API；不为错误职责边界长期维护兼容层。
 10. 跨模块行为必须由公开合同和 fixture 验证，不依赖内部文件结构。
+11. `@cs2dak/tournament` 自己拥有窄 public DTO；不得把 `@cs2dak/contract` 的 DemoFormat、Zod 或 RR 依赖拖入其 runtime。
 
 ## 边界变更规则
 

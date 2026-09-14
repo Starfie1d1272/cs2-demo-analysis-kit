@@ -19,6 +19,10 @@ v3 ZIP（cs2-demo-format/3.x，由 cs2df 导出）
   → 产品路由、筛选与品牌 UI
 ```
 
+赛事/经济统计走窄的 frozen-facts 接缝：DAK 单图 adapter 或已确认的 Evidence
+先生成 `TournamentMapFacts`，再由发布后的 `@cs2dak/tournament` 负责跨图 merge；
+这条 runtime 不需要安装整个 `@cs2dak/presentation`。
+
 CLI 路径（无需在产品里复刻分析模型）：
 
 ```bash
@@ -70,15 +74,17 @@ DAK Studio 复用现有一级 `赛事` / `EventsView`，把在线 RivalHub 事�
 
 RivalHub 只拥有 target、赛事/名单身份、revision、算术/交叉校验、持久化、投影与审计；DAK 只拥有 Demo QA、round/KDA/damage/HS/KAST/opening/trade/clutch/utility/weapon 与 conversion 语义。正常提交不需要管理员二次点击；可选 Broadcast/OCR 缺失不阻塞，冲突进入轻量 needs-attention。原始 `.dem` 永不上传，长期 token 不进入 Studio 普通记录存储。
 
-### Phase 2（长期）：选择性包/组件共享
+### Phase 2（当前）：共享 `@cs2dak/tournament` build artifact
 
-仅在以下前提满足后再做，避免 Phase 1 之前的耦合坑：
-1. `@cs2dak/*` 以**构建产物**（非裸 TS monorepo 子包）形式发布到 npm，依赖图自洽。
-2. `@cs2dak/presentation` 输出的 View Model 合同稳定。
+RivalHub #608 的赛事统计只消费正式发布后的 `@cs2dak/tournament` npm build
+artifact（`dist/index.js` + `dist/index.d.ts`），不安装 `@cs2dak/presentation`，
+也不把 DAK monorepo 裸 TS 源码接入 Vercel。该 package 只接收已冻结的
+`TournamentMapFacts`，所以 RivalHub 保持自己的身份、scope、持久化和 UI owner。
 
-届时共享顺序：**先共享 presentation View Model（JSON 合同），两边各自原生渲染**；
-确有必要再嵌**只读卡片组件**，不共享有状态视图。
-`release/2.0.0` 的「代码集成」方向据此从「Vercel 端跑 core」调整为「消费 artifact + 选择性只读组件」。
+未来如需共享更高层的 presentation View Model，仍须先确认其以**构建产物**发布且
+依赖图自洽；两边各自原生渲染，确有必要再嵌**只读卡片组件**，不共享有状态视图。
+`release/2.0.0` 的代码集成方向固定为「消费 artifact + 选择性只读组件」，不是
+「Vercel 端跑 core」。
 
 > 注意：DAK Studio 是 Tactical Slate 设计语言、RivalHub 是 Tactical Grid，组件视觉不通用；
 > 共享的价值在数据合同，不在像素。
@@ -102,6 +108,7 @@ RivalHub 只拥有 target、赛事/名单身份、revision、算术/交叉校验
 | RR 输入派生 | `@cs2dak/core` `deriveRRIndicators` |
 | 赛季评分重算 | `@cs2dak/cohort` `buildSeasonCohort` |
 | 队伍赛前侦察对比 | `@cs2dak/presentation` `buildTeamComparisonFromFacts` |
+| Tournament frozen-fact 跨图 merge | `@cs2dak/tournament` `buildTournamentAnalytics` |
 | 地图标定 / world→radar / zone | `@cs2dak/maps` |
 | 展示标签（武器/经济/side） | `@cs2dak/presentation` |
 

@@ -35,9 +35,6 @@ export {
   buildPlayerWeaponStats,
   buildPlayerFlashSummaries,
   buildMatchBuyQuality,
-  buildTournamentInsights,
-  buildTournamentInsightsFromFacts,
-  extractTournamentFacts,
   buildMatchReportMarkdown,
   type SeasonInsightsDemo,
   type PlayerSeasonInsights,
@@ -56,12 +53,23 @@ export {
   type MistakeReview,
   type MistakeEvidence,
   type MatchBuyQuality,
+} from "./insights.js";
+export {
+  buildTournamentInsights,
+  buildTournamentInsightsFromFacts,
+  extractTournamentFacts,
+  type TournamentEcoUpsetStat,
+  type TournamentEconomyMatrixCell,
+  type TournamentFacts,
+  type TournamentInsights,
   type TournamentManAdvantageStat,
+  type TournamentMapStat,
   type TournamentTeamEconomySummary,
   type TournamentTeamManAdvantageStat,
-  type TournamentFacts,
-  type TournamentInsights
-} from "./insights.js";
+  type TournamentTeamManAdvantageState,
+  type TournamentTeamPistolStat,
+  type TournamentWeaponStat,
+} from "./tournament-compat.js";
 export { displayWeaponName } from "./weapons.js";
 export { economyLabelCn, ECONOMY_LABEL_SHORT } from "./economy.js";
 export {

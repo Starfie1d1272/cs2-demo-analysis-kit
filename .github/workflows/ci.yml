@@ -33,6 +33,20 @@ jobs:
 
       - run: pnpm build
 
+      - name: Smoke compiled tournament package
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --filter @cs2dak/tournament exec node --input-type=module -e \
+            "const m = await import('@cs2dak/tournament'); if (typeof m.buildTournamentAnalytics !== 'function') process.exit(1)"
+          PACK_DIR="$RUNNER_TEMP/cs2dak-tournament-pack"
+          mkdir -p "$PACK_DIR"
+          pnpm --filter @cs2dak/tournament pack --pack-destination "$PACK_DIR"
+          TARBALL="$(find "$PACK_DIR" -maxdepth 1 -type f -name '*.tgz' -print -quit)"
+          test -n "$TARBALL"
+          tar -tzf "$TARBALL" | grep -Eq '(^|/)dist/index\.js$'
+          tar -tzf "$TARBALL" | grep -Eq '(^|/)dist/index\.d\.ts$'
+
   typescript-integration:
     name: TypeScript (integration tests)
     runs-on: ubuntu-latest
@@ -49,6 +63,8 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @cs2dak/tournament build
 
       - run: pnpm test:integration
 
