@@ -1,6 +1,8 @@
 import {
   aggregatePlayerRoundPerformanceFacts,
+  assertPlayerStatsParity,
   buildPlayerRoundPerformanceFacts,
+  CORE_ANALYSIS_VERSION,
   type PlayerRoundPerformanceFacts,
 } from "@cs2dak/core";
 import type { DemoPackage, TeamKey } from "@cs2dak/contract";
@@ -15,7 +17,6 @@ import {
 import type { SeasonInsightsDemo } from "./insights.js";
 
 const TEAM_KEYS = ["teamA", "teamB"] as const satisfies readonly TeamKey[];
-const ANALYSIS_VERSION = "cs2-demo-analysis-kit/1.0.1";
 const SEMANTIC_PROFILE = "dak-stable/1";
 
 export interface TournamentPerformanceAdapterOptions {
@@ -110,6 +111,7 @@ export function extractTournamentPerformanceMapFacts(
 ): TournamentPerformanceMapFacts {
   const { pkg } = input;
   const performanceFacts = input.performanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
+  assertPlayerStatsParity(pkg, performanceFacts);
   const performanceBySteamId = aggregatePlayerRoundPerformanceFacts(performanceFacts);
   const teamEntityKeys = {
     teamA: teamEntityKeyFor(input.matchId, "teamA", options),
@@ -147,7 +149,7 @@ export function extractTournamentPerformanceMapFacts(
 
   return {
     semanticProfile: SEMANTIC_PROFILE,
-    analysisVersion: ANALYSIS_VERSION,
+    analysisVersion: CORE_ANALYSIS_VERSION,
     mapKey: `legacy-map:${input.matchId}:${pkg.match.mapName}`,
     matchKey: input.matchId,
     mapName: pkg.match.mapName,

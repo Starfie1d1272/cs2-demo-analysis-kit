@@ -265,6 +265,21 @@ export interface TournamentPerformanceOpeningSummary {
   comebackRateAfterLosingOpeningDuel: TournamentRateSample;
 }
 
+/**
+ * Map/global opening conversion is round-based. It deliberately does not
+ * expose player duel attempts, which would count both sides of one duel.
+ */
+export interface TournamentPerformanceOpeningConversionSummary {
+  /** All rounds in the map/global scope; the coverage denominator. */
+  openingRounds: number;
+  /** Rounds containing one validated opening duel. */
+  roundsWithOpening: number;
+  openingWinnerTeamRoundWins: number;
+  openingLoserTeamComebacks: number;
+  conversionRate: TournamentRateSample;
+  comebackRate: TournamentRateSample;
+}
+
 export interface TournamentPerformanceTradeSummary {
   tradeKills: number;
   tradedDeaths: number;
@@ -381,7 +396,7 @@ export interface TournamentPerformanceMapSummary {
   matchCount: number;
   mapCount: number;
   roundCount: number;
-  opening: TournamentPerformanceOpeningSummary;
+  opening: TournamentPerformanceOpeningConversionSummary;
   utility: TournamentPerformanceUtilitySummary;
   objective: TournamentPerformanceObjectiveSummary;
 }
@@ -395,7 +410,7 @@ export interface TournamentPerformanceAnalytics {
     matchCount: number;
     mapCount: number;
     roundCount: number;
-    opening: TournamentPerformanceOpeningSummary;
+    opening: TournamentPerformanceOpeningConversionSummary;
     utility: TournamentPerformanceUtilitySummary;
     objective: TournamentPerformanceObjectiveSummary;
   };

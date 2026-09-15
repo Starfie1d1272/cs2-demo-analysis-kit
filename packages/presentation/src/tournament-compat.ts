@@ -1,7 +1,9 @@
 import type { DemoPackage, TeamKey } from "@cs2dak/contract";
 import {
   aggregatePlayerRoundPerformanceFacts,
+  assertPlayerStatsParity,
   buildPlayerRoundPerformanceFacts,
+  CORE_ANALYSIS_VERSION,
   type PlayerRoundManStateFact,
 } from "@cs2dak/core";
 import {
@@ -186,7 +188,6 @@ export interface TournamentFacts {
   manState?: PlayerRoundManStateFact[];
 }
 
-const ANALYSIS_VERSION = "cs2-demo-analysis-kit/1.0.1";
 const SEMANTIC_PROFILE = "dak-stable/1";
 const ECONOMY_RANK: Record<string, number> = { eco: 0, semi: 1, force: 2, full: 3 };
 const MAN_ADVANTAGE_KEYS = ["5v4", "4v5", "5v3", "3v5"] as const satisfies readonly TournamentManAdvantage[];
@@ -201,6 +202,7 @@ export function extractTournamentFacts(
 ): TournamentFacts {
   const { pkg } = input;
   const performanceFacts = suppliedPerformanceFacts ?? input.performanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
+  assertPlayerStatsParity(pkg, performanceFacts);
   const performanceBySteamId = aggregatePlayerRoundPerformanceFacts(performanceFacts);
   return {
     matchId: input.matchId,
@@ -398,7 +400,7 @@ function toTournamentMapFacts(facts: TournamentFacts): { facts: TournamentMapFac
   return {
     facts: {
       semanticProfile: SEMANTIC_PROFILE,
-      analysisVersion: ANALYSIS_VERSION,
+      analysisVersion: CORE_ANALYSIS_VERSION,
       mapKey: `legacy-map:${facts.matchId}:${facts.mapName}`,
       matchKey: facts.matchId,
       mapName: facts.mapName,

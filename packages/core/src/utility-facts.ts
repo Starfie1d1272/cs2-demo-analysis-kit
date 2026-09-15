@@ -2,6 +2,7 @@ import type { DemoPackage } from "@cs2dak/contract";
 import {
   buildPlayerRoundPerformanceFacts,
   type PlayerRoundPerformanceUtilityFact,
+  type PlayerRoundPerformanceFacts,
 } from "./performance-facts.js";
 
 /**
@@ -14,10 +15,17 @@ export type PlayerRoundUtilityFact = PlayerRoundPerformanceUtilityFact & {
   steamId64: string;
 };
 
-export function buildPlayerRoundUtilityFacts(pkg: DemoPackage): PlayerRoundUtilityFact[] {
-  return buildPlayerRoundPerformanceFacts(pkg).playerRounds.map((row) => ({
+export function toPlayerRoundUtilityFacts(performanceFacts: PlayerRoundPerformanceFacts): PlayerRoundUtilityFact[] {
+  return performanceFacts.playerRounds.map((row) => ({
     roundNumber: row.roundNumber,
     steamId64: row.steamId64,
     ...row.utility,
   }));
+}
+
+export function buildPlayerRoundUtilityFacts(
+  pkg: DemoPackage,
+  performanceFacts: PlayerRoundPerformanceFacts = buildPlayerRoundPerformanceFacts(pkg),
+): PlayerRoundUtilityFact[] {
+  return toPlayerRoundUtilityFacts(performanceFacts);
 }

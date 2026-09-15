@@ -440,6 +440,10 @@ export function buildRivalHubDemoEvidenceV1(
   const performanceBySteamId = aggregatePlayerRoundPerformanceFacts(performanceFacts);
   const playerMaps = projectPlayerMaps(pkg, identities, performanceBySteamId);
   const analysis = analyzeDemoPackage(pkg, performanceFacts);
+  const qaErrors = analysis.qa.issues.filter((issue) => issue.severity === "error");
+  if (qaErrors.length > 0) {
+    throw new Error(`Evidence blocked by Core QA: ${qaErrors.map((issue) => issue.code).join(", ")}`);
+  }
   const sideWinRates = buildTeamSideWinRates(pkg);
   const roundSeq = new Map(pkg.rounds.map((round, index) => [round.roundNumber, index + 1]));
   const playerRounds = performanceFacts.playerRounds.map((fact) => {

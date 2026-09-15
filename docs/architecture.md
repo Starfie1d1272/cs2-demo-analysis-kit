@@ -55,7 +55,9 @@ Important v3 semantics:
 `buildPlayerRoundPerformanceFacts()` converts the frozen event annotations into
 player-round Assist, Damage, Opening, Trade, KAST, Clutch, Utility, Objective,
 Weapon, and man-state facts. `playerStats` remains a reference aggregate used for
-strict parity validation only; cohort, tournament, presentation, and Evidence
+strict parity validation only; `analyzeDemoPackage()` records comparable drift as
+a QA error, while Opening rows affected by world death, suicide, or teamkill are
+explicitly marked not comparable. Cohort, tournament, presentation, and Evidence
 adapters aggregate or project the Core facts and do not recreate event rules.
 
 ### Tournament frozen-fact boundary
@@ -147,8 +149,9 @@ v3 包包含：
 `buildPlayerRoundPerformanceFacts()` 将冻结的事件标注统一转换为 player-round
 层的 Assist、Damage、Opening、Trade、KAST、Clutch、Utility、Objective、Weapon
 与 man-state facts。`playerStats` 仅作为 reference aggregate 做严格 parity
-validation；cohort、tournament、presentation 和 Evidence 适配器只聚合或投影
-Core facts，不重新实现事件规则。
+validation；`analyzeDemoPackage()` 将可比 mismatch 写入 QA error，Opening 前出现
+世界伤害、自杀或队友击杀的回合则明确标记为不可比。cohort、tournament、
+presentation 和 Evidence 适配器只聚合或投影 Core facts，不重新实现事件规则。
 
 ### Tournament frozen-fact 边界
 

@@ -87,6 +87,8 @@ export interface PlayerRoundManStateFact {
   tick: number;
   killerSteamId64: string;
   killerTeamKey: TeamKey;
+  victimSteamId64: string;
+  victimTeamKey: TeamKey;
   /** State after this kill; used by conversion projections. */
   advantageTeamKey: TeamKey | null;
   advantageAlive: number;
@@ -105,6 +107,10 @@ export interface PlayerRoundManStateFact {
 export interface PlayerRoundPerformanceFacts {
   playerRounds: PlayerRoundPerformanceFact[];
   manState: PlayerRoundManStateFact[];
+  /** Rounds where the frozen playerStats opening oracle is not comparable. */
+  openingParity?: {
+    nonComparableRounds: number[];
+  };
 }
 
 export interface PlayerPerformanceWeaponAggregate extends PlayerRoundPerformanceWeaponFact {}
@@ -166,6 +172,21 @@ function playerAt(pkg: DemoPackage, playerIndex: number, context: string): DemoP
   const player = pkg.players[playerIndex];
   if (!player) throw new Error(`Core performance fact ${context} references unknown playerIndex=${playerIndex}`);
   return player;
+}
+
+function isPlayerKill(
+  kill: DemoPackage["kills"][number],
+  killer: DemoPackage["players"][number] | null,
+): killer is DemoPackage["players"][number] {
+  return killer !== null && kill.killerIndex !== kill.victimIndex;
+}
+
+function isEnemyPlayerKill(
+  kill: DemoPackage["kills"][number],
+  killer: DemoPackage["players"][number] | null,
+  victim: DemoPackage["players"][number],
+): killer is DemoPackage["players"][number] {
+  return isPlayerKill(kill, killer) && killer.teamKey !== victim.teamKey;
 }
 
 function roundAt(pkg: DemoPackage, roundNumber: number, context: string): DemoPackage["rounds"][number] {
@@ -284,7 +305,7 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
   const players = pkg.players ?? [];
   const roundsByNumber = new Map(rounds.map((round) => [round.roundNumber, round]));
   const rows = new Map<string, MutablePlayerRound>();
-  if (rounds.length === 0) return { playerRounds: [], manState: [] };
+  if (rounds.length === 0) return { playerRounds: [], manState: [], openingParity: { nonComparableRounds: [] } };
   for (const round of rounds) {
     for (const [playerIndex, player] of players.entries()) {
       rows.set(keyFor(round.roundNumber, playerIndex), emptyRoundFact(pkg, round, player, playerIndex));
@@ -301,17 +322,34 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
 
   const sortedKills = sortKills(pkg);
   const openingByRound = new Map<number, DemoPackage["kills"][number]>();
+  const nonComparableOpeningRounds = new Set<number>();
+  const aliveByRound = new Map<number, { teamA: Set<number>; teamB: Set<number> }>();
+  for (const round of rounds) {
+    aliveByRound.set(round.roundNumber, {
+      teamA: new Set(players.flatMap((player, index) => player.teamKey === "teamA" ? [index] : [])),
+      teamB: new Set(players.flatMap((player, index) => player.teamKey === "teamB" ? [index] : [])),
+    });
+  }
+  const manState: PlayerRoundManStateFact[] = [];
   for (const { kill } of sortedKills) {
     const killer = kill.killerIndex === null ? null : playerAt(pkg, kill.killerIndex, "kills");
     const victim = playerAt(pkg, kill.victimIndex, "kills");
-    // cs2df playerStats defines the opening event as the first kill with a
-    // player killer. Keep teammate/world deaths out only when the killer is
-    // absent; do not invent a cross-team-only opening rule here.
-    if (killer && !openingByRound.has(kill.roundNumber)) {
+    const playerKill = isPlayerKill(kill, killer);
+    const enemyKill = isEnemyPlayerKill(kill, killer, victim);
+    if (!openingByRound.has(kill.roundNumber) && !enemyKill) {
+      nonComparableOpeningRounds.add(kill.roundNumber);
+    }
+    // Tournament opening-duel semantics require the first valid enemy-player
+    // kill. World deaths, suicides and teamkills update death state but are
+    // not an opening duel.
+    if (enemyKill && !openingByRound.has(kill.roundNumber)) {
       openingByRound.set(kill.roundNumber, kill);
     }
 
-    if (killer) {
+    // The frozen playerStats aggregate attributes every non-suicide player
+    // killer event, including teamkills, to K/D/A and weapon buckets. The
+    // stricter enemyKill rule below is reserved for opening and man-state.
+    if (playerKill) {
       const killerRow = rowFor(kill.roundNumber, kill.killerIndex!, "kills");
       killerRow.kills += 1;
       if (kill.headshot) killerRow.headshots += 1;
@@ -329,22 +367,55 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
 
     const victimRow = rowFor(kill.roundNumber, kill.victimIndex, "kills");
     victimRow.deaths += 1;
-    if (kill.killerIndex === null) victimRow.bombDeaths += 1;
+    if (killer === null || kill.killerIndex === kill.victimIndex) victimRow.bombDeaths += 1;
     else victimRow.combatDeaths += 1;
     if (kill.tradeDeath) victimRow.tradedDeaths += 1;
 
-    if (kill.assisterIndex !== null) {
-      const assisterRow = rowFor(kill.roundNumber, kill.assisterIndex, "kills.assisterIndex");
-      assisterRow.assists += 1;
-      if (kill.flashAssist) {
-        if (kill.flashAssisterIndex !== kill.assisterIndex) {
-          throw new Error(`Core performance fact flash assist mismatch at round=${kill.roundNumber}, tick=${kill.tick}`);
+    if (playerKill) {
+      if (kill.assisterIndex !== null) {
+        const assisterRow = rowFor(kill.roundNumber, kill.assisterIndex, "kills.assisterIndex");
+        assisterRow.assists += 1;
+        if (kill.flashAssist) {
+          if (kill.flashAssisterIndex !== kill.assisterIndex) {
+            throw new Error(`Core performance fact flash assist mismatch at round=${kill.roundNumber}, tick=${kill.tick}`);
+          }
+          assisterRow.utility.flashAssists += 1;
         }
-        assisterRow.utility.flashAssists += 1;
+      } else if (kill.flashAssist || kill.flashAssisterIndex !== null) {
+        throw new Error(`Core performance fact flash assist has no canonical assister at round=${kill.roundNumber}, tick=${kill.tick}`);
       }
-    } else if (kill.flashAssist || kill.flashAssisterIndex !== null) {
-      throw new Error(`Core performance fact flash assist has no canonical assister at round=${kill.roundNumber}, tick=${kill.tick}`);
     }
+
+    const alive = aliveByRound.get(kill.roundNumber);
+    if (!alive) throw new Error(`Core performance fact manState has unknown round=${kill.roundNumber}`);
+    const preTeamAAlive = alive.teamA.size;
+    const preTeamBAlive = alive.teamB.size;
+    const preAdvantageTeamKey: TeamKey | null = preTeamAAlive === preTeamBAlive
+      ? null
+      : preTeamAAlive > preTeamBAlive ? "teamA" : "teamB";
+    const preAdvantageAlive = Math.max(preTeamAAlive, preTeamBAlive);
+    const preDisadvantageAlive = Math.min(preTeamAAlive, preTeamBAlive);
+    alive[victim.teamKey].delete(kill.victimIndex);
+    if (!enemyKill) continue;
+    const teamAAlive = alive.teamA.size;
+    const teamBAlive = alive.teamB.size;
+    const advantageTeamKey: TeamKey | null = teamAAlive === teamBAlive
+      ? null
+      : teamAAlive > teamBAlive ? "teamA" : "teamB";
+    manState.push({
+      roundNumber: kill.roundNumber,
+      tick: kill.tick,
+      killerSteamId64: killer.steamId64,
+      killerTeamKey: killer.teamKey,
+      victimSteamId64: victim.steamId64,
+      victimTeamKey: victim.teamKey,
+      advantageTeamKey,
+      advantageAlive: Math.max(teamAAlive, teamBAlive),
+      disadvantageAlive: Math.min(teamAAlive, teamBAlive),
+      preAdvantageTeamKey,
+      preAdvantageAlive,
+      preDisadvantageAlive,
+    });
   }
 
   for (const damage of pkg.damages ?? []) {
@@ -399,48 +470,6 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
     else row.objective.defuses += 1;
   }
 
-  const aliveByRound = new Map<number, { teamA: Set<number>; teamB: Set<number> }>();
-  for (const round of rounds) {
-    aliveByRound.set(round.roundNumber, {
-      teamA: new Set(players.flatMap((player, index) => player.teamKey === "teamA" ? [index] : [])),
-      teamB: new Set(players.flatMap((player, index) => player.teamKey === "teamB" ? [index] : [])),
-    });
-  }
-  const manState: PlayerRoundManStateFact[] = [];
-  for (const { kill } of sortedKills) {
-    if (kill.killerIndex === null) continue;
-    const killer = playerAt(pkg, kill.killerIndex, "manState.killerIndex");
-    const victim = playerAt(pkg, kill.victimIndex, "manState.victimIndex");
-    if (killer.teamKey === victim.teamKey) continue;
-    const alive = aliveByRound.get(kill.roundNumber);
-    if (!alive) throw new Error(`Core performance fact manState has unknown round=${kill.roundNumber}`);
-    const preTeamAAlive = alive.teamA.size;
-    const preTeamBAlive = alive.teamB.size;
-    const preAdvantageTeamKey: TeamKey | null = preTeamAAlive === preTeamBAlive
-      ? null
-      : preTeamAAlive > preTeamBAlive ? "teamA" : "teamB";
-    const preAdvantageAlive = Math.max(preTeamAAlive, preTeamBAlive);
-    const preDisadvantageAlive = Math.min(preTeamAAlive, preTeamBAlive);
-    alive[victim.teamKey].delete(kill.victimIndex);
-    const teamAAlive = alive.teamA.size;
-    const teamBAlive = alive.teamB.size;
-    const advantageTeamKey: TeamKey | null = teamAAlive === teamBAlive
-      ? null
-      : teamAAlive > teamBAlive ? "teamA" : "teamB";
-    manState.push({
-      roundNumber: kill.roundNumber,
-      tick: kill.tick,
-      killerSteamId64: killer.steamId64,
-      killerTeamKey: killer.teamKey,
-      advantageTeamKey,
-      advantageAlive: Math.max(teamAAlive, teamBAlive),
-      disadvantageAlive: Math.min(teamAAlive, teamBAlive),
-      preAdvantageTeamKey,
-      preAdvantageAlive,
-      preDisadvantageAlive,
-    });
-  }
-
   for (const [roundNumber, kill] of openingByRound) {
     if (kill.killerIndex !== null) {
       const winner = rowFor(roundNumber, kill.killerIndex, "opening");
@@ -470,7 +499,11 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
     if (round.teamASide === round.teamBSide) throw new Error(`Core performance fact round=${round.roundNumber} has identical sides`);
   }
 
-  return { playerRounds, manState };
+  return {
+    playerRounds,
+    manState,
+    openingParity: { nonComparableRounds: [...nonComparableOpeningRounds].sort((a, b) => a - b) },
+  };
 }
 
 /** Backwards-compatible 1.0 projection; it contains no independent rules. */
@@ -608,7 +641,7 @@ export function aggregatePlayerRoundPerformanceFacts(
     if (row.kills === 2) aggregate.twoKillRounds += 1;
     if (row.kills === 3) aggregate.threeKillRounds += 1;
     if (row.kills === 4) aggregate.fourKillRounds += 1;
-    if (row.kills === 5) aggregate.fiveKillRounds += 1;
+    if (row.kills >= 5) aggregate.fiveKillRounds += 1;
     addUtility(aggregate.utility, row.utility);
     aggregate.objective.plants += row.objective.plants;
     aggregate.objective.defuses += row.objective.defuses;

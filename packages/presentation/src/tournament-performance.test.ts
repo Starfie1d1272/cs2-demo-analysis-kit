@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import {
   aggregatePlayerRoundPerformanceFacts,
   buildPlayerRoundPerformanceFacts,
+  CORE_ANALYSIS_VERSION,
   loadDemoPackageFromZip,
 } from "@cs2dak/core";
 import { buildSeasonCohort } from "@cs2dak/cohort";
@@ -31,6 +32,7 @@ describe("tournament performance adapter", () => {
     })));
 
     expect(facts.playerRounds).toHaveLength(pkg.rounds.length * pkg.players.length);
+    expect(facts.analysisVersion).toBe(CORE_ANALYSIS_VERSION);
     expect(facts.teamEntityKeys).toEqual({ teamA: "observed-team:m1:teamA", teamB: "observed-team:m1:teamB" });
     expect(result.totals).toMatchObject({ matchCount: 1, mapCount: 1, roundCount: pkg.rounds.length });
     expect(result.players).toHaveLength(pkg.players.length);
@@ -88,6 +90,19 @@ describe("tournament performance adapter", () => {
     const defused = pkg.bombs.filter((row) => row.type === "defused").length;
     expect(result.totals.objective.plants).toBe(planted);
     expect(result.totals.objective.defuses).toBe(defused);
+  });
+
+  it("blocks parity drift before publishing tournament facts", async () => {
+    const pkg = await fixture;
+    const statsTruth = pkg.playerStats[0]!;
+    const mismatchedPkg = {
+      ...pkg,
+      playerStats: pkg.playerStats.map((row) => row.playerIndex === statsTruth.playerIndex
+        ? { ...row, deaths: row.deaths + 1 }
+        : row),
+    };
+
+    expect(() => extractTournamentPerformanceMapFacts({ matchId: "mismatch", pkg: mismatchedPkg })).toThrow(/Core performance parity failed/);
   });
 
   it("uses consumer-owned identities without changing frozen metric counts", async () => {

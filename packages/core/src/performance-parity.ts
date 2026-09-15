@@ -12,6 +12,9 @@ export interface PlayerStatsParityMismatch {
   field: string;
   expected: number;
   actual: number;
+  /** False means the two sources intentionally use different semantics. */
+  comparable?: boolean;
+  reason?: string;
 }
 
 function compare(
@@ -45,6 +48,11 @@ export function findPlayerStatsParityMismatches(
   const summaries = aggregatePlayerRoundPerformanceFacts(performanceFacts);
   const statsByPlayerIndex = new Map(pkg.playerStats.map((row) => [row.playerIndex, row]));
   const mismatches: PlayerStatsParityMismatch[] = [];
+  const nonComparableOpeningRounds = performanceFacts.openingParity?.nonComparableRounds ?? [];
+  const openingParityComparable = nonComparableOpeningRounds.length === 0;
+  const openingParityReason = nonComparableOpeningRounds.length > 0
+    ? `rounds ${nonComparableOpeningRounds.join(", ")} contain a world death, suicide, or teamkill before the first enemy-player kill`
+    : null;
 
   for (const [playerIndex, player] of pkg.players.entries()) {
     const stats = statsByPlayerIndex.get(playerIndex);
@@ -60,8 +68,29 @@ export function findPlayerStatsParityMismatches(
     compare(mismatches, playerIndex, player.name, "assists", stats.assists, summary.assists);
     compare(mismatches, playerIndex, player.name, "damageHealth", stats.damageHealth, summary.damage);
     compare(mismatches, playerIndex, player.name, "headshotCount", stats.headshotCount, summary.headshots);
-    compare(mismatches, playerIndex, player.name, "firstKillCount", stats.firstKillCount, summary.firstKills);
-    compare(mismatches, playerIndex, player.name, "firstDeathCount", stats.firstDeathCount, summary.firstDeaths);
+    if (openingParityComparable) {
+      compare(mismatches, playerIndex, player.name, "firstKillCount", stats.firstKillCount, summary.firstKills);
+      compare(mismatches, playerIndex, player.name, "firstDeathCount", stats.firstDeathCount, summary.firstDeaths);
+    } else {
+      mismatches.push({
+        playerIndex,
+        playerName: player.name,
+        field: "firstKillCount",
+        expected: stats.firstKillCount,
+        actual: summary.firstKills,
+        comparable: false,
+        reason: openingParityReason ?? undefined,
+      });
+      mismatches.push({
+        playerIndex,
+        playerName: player.name,
+        field: "firstDeathCount",
+        expected: stats.firstDeathCount,
+        actual: summary.firstDeaths,
+        comparable: false,
+        reason: openingParityReason ?? undefined,
+      });
+    }
     compare(mismatches, playerIndex, player.name, "tradeKillCount", stats.tradeKillCount, summary.tradeKills);
     compare(mismatches, playerIndex, player.name, "tradeDeathCount", stats.tradeDeathCount, summary.tradedDeaths);
     compare(mismatches, playerIndex, player.name, "combatDeathCount", stats.combatDeathCount, summary.combatDeaths);
@@ -103,7 +132,7 @@ export function assertPlayerStatsParity(
   pkg: DemoPackage,
   performanceFacts?: PlayerRoundPerformanceFacts,
 ): void {
-  const mismatches = findPlayerStatsParityMismatches(pkg, performanceFacts);
+  const mismatches = findPlayerStatsParityMismatches(pkg, performanceFacts).filter((mismatch) => mismatch.comparable !== false);
   if (mismatches.length === 0) return;
   const details = mismatches
     .map((row) => `${row.playerName}[${row.playerIndex}].${row.field}: expected=${row.expected}, actual=${row.actual}`)

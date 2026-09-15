@@ -3,7 +3,9 @@ import type { DuelInsightsFacts, PlayerSeasonInsights, TeamComparisonFacts, Tour
 import type { FactsScope } from "./fact-types";
 import { getStorage, type RecordStore, type StorageAdapter } from "./storage";
 
-export const DERIVED_MATCH_NAMESPACE = "derived:match-v4";
+// v5 invalidates v4 rows because the persisted TournamentFacts payload now
+// depends on canonical manState and playerWeapons fields.
+export const DERIVED_MATCH_NAMESPACE = "derived:match-v5";
 const TABLES = ["player_insights", "tournament", "team_comparison", "duels", "opening_trails", "utility_value"] as const;
 export const DERIVED_CACHE_RECORD_NAMESPACES = TABLES.map((table) => `${DERIVED_MATCH_NAMESPACE}:${table}`);
 

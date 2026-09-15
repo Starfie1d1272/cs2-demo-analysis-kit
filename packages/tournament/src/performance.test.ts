@@ -131,7 +131,14 @@ describe("buildTournamentPerformanceAnalytics", () => {
       maps: [],
       weapons: [],
     });
-    expect(result.totals.opening.successRate).toEqual({ successes: 0, attempts: 0, rate: null });
+    expect(result.totals.opening).toEqual({
+      openingRounds: 0,
+      roundsWithOpening: 0,
+      openingWinnerTeamRoundWins: 0,
+      openingLoserTeamComebacks: 0,
+      conversionRate: { successes: 0, attempts: 0, rate: null },
+      comebackRate: { successes: 0, attempts: 0, rate: null },
+    });
     expect(result.totals.utility.heDamagePerThrow.rate).toBeNull();
     expect(result.totals.objective.plantConversions.rate).toBeNull();
   });
@@ -143,14 +150,13 @@ describe("buildTournamentPerformanceAnalytics", () => {
 
     expect(result.provenance).toEqual({ semanticProfile: "evidence-v1/1.0", analysisVersions: ["dak/1.1.0"] });
     expect(result.totals).toMatchObject({ matchCount: 1, mapCount: 1, roundCount: 2 });
-    expect(result.totals.opening).toMatchObject({
-      firstKills: 1,
-      firstDeaths: 1,
-      attempts: 2,
-      successRate: { successes: 1, attempts: 2, rate: 0.5 },
-      attemptRate: { successes: 2, attempts: 2, rate: 1 },
-      roundWinsAfterWinningOpeningDuel: 1,
-      winRateAfterWinningOpeningDuel: { successes: 1, attempts: 1, rate: 1 },
+    expect(result.totals.opening).toEqual({
+      openingRounds: 2,
+      roundsWithOpening: 1,
+      openingWinnerTeamRoundWins: 1,
+      openingLoserTeamComebacks: 0,
+      conversionRate: { successes: 1, attempts: 1, rate: 1 },
+      comebackRate: { successes: 0, attempts: 1, rate: 0 },
     });
     expect(result.totals.utility).toMatchObject({
       flashesThrown: 1,
@@ -200,7 +206,20 @@ describe("buildTournamentPerformanceAnalytics", () => {
     expect(teamA.slices.ct.sample.rounds).toBe(1);
     expect(teamA.slices.overall.objective).toMatchObject({ plants: 1, plantsConverted: 1 });
 
-    expect(result.maps).toEqual([expect.objectContaining({ mapName: "de_ancient", matchCount: 1, mapCount: 1, roundCount: 2 })]);
+    expect(result.maps).toEqual([expect.objectContaining({
+      mapName: "de_ancient",
+      matchCount: 1,
+      mapCount: 1,
+      roundCount: 2,
+      opening: {
+        openingRounds: 2,
+        roundsWithOpening: 1,
+        openingWinnerTeamRoundWins: 1,
+        openingLoserTeamComebacks: 0,
+        conversionRate: { successes: 1, attempts: 1, rate: 1 },
+        comebackRate: { successes: 0, attempts: 1, rate: 0 },
+      },
+    })]);
     expect(result.weapons[0]).toMatchObject({
       weapon: "ak47",
       kills: 3,

@@ -10,6 +10,7 @@ import type {
   TournamentPerformanceObjectiveFact,
   TournamentPerformanceObjectiveSummary,
   TournamentPerformanceOpeningSummary,
+  TournamentPerformanceOpeningConversionSummary,
   TournamentPerformancePlayerRoundFact,
   TournamentPerformancePlayerSlice,
   TournamentPerformancePlayerSummary,
@@ -49,6 +50,12 @@ interface MutableOpening {
   firstDeaths: number;
   roundWinsAfterWinningOpeningDuel: number;
   roundWinsAfterLosingOpeningDuel: number;
+}
+
+interface MutableOpeningConversion {
+  roundsWithOpening: Set<string>;
+  openingWinnerTeamRoundWins: number;
+  openingLoserTeamComebacks: number;
 }
 
 interface MutableTrade {
@@ -115,6 +122,7 @@ interface MutableMap {
   mapKeys: Set<string>;
   matchKeys: Set<string>;
   shared: MutableSharedSlice;
+  opening: MutableOpeningConversion;
 }
 
 interface RoundValidation {
@@ -371,6 +379,10 @@ function emptyOpening(): MutableOpening {
   return { firstKills: 0, firstDeaths: 0, roundWinsAfterWinningOpeningDuel: 0, roundWinsAfterLosingOpeningDuel: 0 };
 }
 
+function emptyOpeningConversion(): MutableOpeningConversion {
+  return { roundsWithOpening: new Set(), openingWinnerTeamRoundWins: 0, openingLoserTeamComebacks: 0 };
+}
+
 function emptyTrade(): MutableTrade {
   return { tradeKills: 0, tradedDeaths: 0, tradedOpeningDeaths: 0, deaths: 0 };
 }
@@ -421,7 +433,7 @@ function emptyTeam(): MutableTeam {
 }
 
 function emptyMap(): MutableMap {
-  return { mapKeys: new Set(), matchKeys: new Set(), shared: emptySharedSlice() };
+  return { mapKeys: new Set(), matchKeys: new Set(), shared: emptySharedSlice(), opening: emptyOpeningConversion() };
 }
 
 function addUtility(target: MutableUtility, source: TournamentPerformanceUtilityFact): void {
@@ -439,12 +451,14 @@ function addUtility(target: MutableUtility, source: TournamentPerformanceUtility
   target.utilityDamage += source.utilityDamage;
 }
 
-function addSharedPlayerRound(target: MutableSharedSlice, row: TournamentPerformancePlayerRoundFact, roundKey: string): void {
+function addSharedPlayerRound(target: MutableSharedSlice, row: TournamentPerformancePlayerRoundFact, roundKey: string, includeOpening = true): void {
   target.roundKeys.add(roundKey);
-  if (row.openingDuel === "won") target.opening.firstKills += 1;
-  if (row.openingDuel === "lost") target.opening.firstDeaths += 1;
-  if (row.openingDuel === "won" && row.teamWonRound) target.opening.roundWinsAfterWinningOpeningDuel += 1;
-  if (row.openingDuel === "lost" && row.teamWonRound) target.opening.roundWinsAfterLosingOpeningDuel += 1;
+  if (includeOpening) {
+    if (row.openingDuel === "won") target.opening.firstKills += 1;
+    if (row.openingDuel === "lost") target.opening.firstDeaths += 1;
+    if (row.openingDuel === "won" && row.teamWonRound) target.opening.roundWinsAfterWinningOpeningDuel += 1;
+    if (row.openingDuel === "lost" && row.teamWonRound) target.opening.roundWinsAfterLosingOpeningDuel += 1;
+  }
   target.trade.tradeKills += row.tradeKills;
   target.trade.tradedDeaths += row.tradedDeaths;
   target.trade.tradedOpeningDeaths += row.openingDuel === "lost" ? row.tradedDeaths : 0;
@@ -457,6 +471,16 @@ function addSharedPlayerRound(target: MutableSharedSlice, row: TournamentPerform
     if (row.clutch.won) split.successes += 1;
   }
   addUtility(target.utility, row.utility);
+}
+
+function addOpeningConversion(target: MutableOpeningConversion, row: TournamentPerformancePlayerRoundFact, roundKey: string): void {
+  if (row.openingDuel === "won") {
+    target.roundsWithOpening.add(roundKey);
+    if (row.teamWonRound) target.openingWinnerTeamRoundWins += 1;
+  } else if (row.openingDuel === "lost") {
+    target.roundsWithOpening.add(roundKey);
+    if (row.teamWonRound) target.openingLoserTeamComebacks += 1;
+  }
 }
 
 function addPlayerRound(target: MutablePlayerSlice, row: TournamentPerformancePlayerRoundFact, roundKey: string): void {
@@ -522,6 +546,18 @@ function finalizeOpening(value: MutableOpening, rounds: number): TournamentPerfo
     winRateAfterWinningOpeningDuel: rate(value.roundWinsAfterWinningOpeningDuel, value.firstKills),
     roundWinsAfterLosingOpeningDuel: value.roundWinsAfterLosingOpeningDuel,
     comebackRateAfterLosingOpeningDuel: rate(value.roundWinsAfterLosingOpeningDuel, value.firstDeaths),
+  };
+}
+
+function finalizeOpeningConversion(value: MutableOpeningConversion, rounds: number): TournamentPerformanceOpeningConversionSummary {
+  const roundsWithOpening = value.roundsWithOpening.size;
+  return {
+    openingRounds: rounds,
+    roundsWithOpening,
+    openingWinnerTeamRoundWins: value.openingWinnerTeamRoundWins,
+    openingLoserTeamComebacks: value.openingLoserTeamComebacks,
+    conversionRate: rate(value.openingWinnerTeamRoundWins, roundsWithOpening),
+    comebackRate: rate(value.openingLoserTeamComebacks, roundsWithOpening),
   };
 }
 
@@ -665,13 +701,14 @@ function sortedWeapons(rows: readonly TournamentPerformancePlayerWeaponFact[]): 
 
 function zeroPerformanceModel(): TournamentPerformanceAnalytics {
   const shared = emptySharedSlice();
+  const opening = emptyOpeningConversion();
   return {
     provenance: { semanticProfile: null, analysisVersions: [] },
     totals: {
       matchCount: 0,
       mapCount: 0,
       roundCount: 0,
-      opening: finalizeOpening(shared.opening, 0),
+      opening: finalizeOpeningConversion(opening, 0),
       utility: finalizeUtility(shared.utility, 0),
       objective: finalizeObjective(shared.objective),
     },
@@ -709,6 +746,7 @@ export function buildTournamentPerformanceAnalytics(
   }).sort((a, b) => lexicalCompare(a.mapFacts.mapKey, b.mapFacts.mapKey));
 
   const global = emptySharedSlice();
+  const globalOpening = emptyOpeningConversion();
   const players = new Map<string, MutablePlayer>();
   const teams = new Map<string, MutableTeam>();
   const maps = new Map<string, MutableMap>();
@@ -735,8 +773,10 @@ export function buildTournamentPerformanceAnalytics(
 
     for (const row of sortedPlayerRounds(mapFacts.playerRounds)) {
       const key = roundIdentity(mapFacts.mapKey, row.roundSeq);
-      addSharedPlayerRound(mapRow.shared, row, key);
-      addSharedPlayerRound(global, row, key);
+      addSharedPlayerRound(mapRow.shared, row, key, false);
+      addOpeningConversion(mapRow.opening, row, key);
+      addSharedPlayerRound(global, row, key, false);
+      addOpeningConversion(globalOpening, row, key);
 
       const player = players.get(row.playerEntityKey) ?? emptyPlayer();
       player.mapKeys.add(mapFacts.mapKey);
@@ -825,7 +865,7 @@ export function buildTournamentPerformanceAnalytics(
         matchCount: value.matchKeys.size,
         mapCount: value.mapKeys.size,
         roundCount: rounds,
-        opening: finalizeOpening(value.shared.opening, rounds),
+        opening: finalizeOpeningConversion(value.opening, rounds),
         utility: finalizeUtility(value.shared.utility, rounds),
         objective: finalizeObjective(value.shared.objective),
       };
@@ -847,7 +887,7 @@ export function buildTournamentPerformanceAnalytics(
       matchCount: matchKeys.size,
       mapCount: mapKeys.size,
       roundCount: global.roundKeys.size,
-      opening: finalizeOpening(global.opening, global.roundKeys.size),
+      opening: finalizeOpeningConversion(globalOpening, global.roundKeys.size),
       utility: finalizeUtility(global.utility, global.roundKeys.size),
       objective: finalizeObjective(global.objective),
     },

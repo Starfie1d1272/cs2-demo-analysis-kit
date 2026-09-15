@@ -9,7 +9,6 @@ import type { CohortAccountResult, ProBaselineConfig, RRSixAccountResult } from 
 import { normalizeDemoPackage } from "./normalize.js";
 import { loadSpatialAssets } from "./spatial/annotate.js";
 import { buildOfficialMapControl } from "./spatial/mapcontrol.js";
-import { createResolverFromPackage, type PlayerResolver } from "./resolve.js";
 import {
   aggregatePlayerRoundPerformanceFacts,
   buildPlayerRoundPerformanceFacts,
@@ -37,8 +36,7 @@ export function deriveRRSignals(input: unknown, performanceFacts?: PlayerRoundPe
   const pkg = normalizeDemoPackage(input);
   const facts = performanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
   const summaries = aggregatePlayerRoundPerformanceFacts(facts);
-  const resolver = createResolverFromPackage(pkg);
-  const killsByBuyDelta = buildKillsByBuyDelta(pkg, resolver);
+  const killsByBuyDelta = buildKillsByBuyDelta(pkg, facts.manState);
   const killsByManState = buildKillsByManState(facts.manState);
   const tradedOpeningDeaths = buildTradedOpeningDeaths(facts.playerRounds);
   const objective = buildObjectiveSignals(facts.playerRounds);
@@ -141,19 +139,20 @@ export function computeAccountRatingsV2(input: unknown, performanceFacts?: Playe
   });
 }
 
-function buildKillsByBuyDelta(pkg: DemoPackage, resolver: PlayerResolver): Map<string, BuyDeltaBuckets> {
+function buildKillsByBuyDelta(pkg: DemoPackage, rows: PlayerRoundManStateFact[]): Map<string, BuyDeltaBuckets> {
   const out = new Map<string, BuyDeltaBuckets>();
+  const playerIndexBySteamId = new Map(pkg.players.map((player, index) => [player.steamId64, index]));
   const economyByPlayerRound = new Map(pkg.playerEconomies.map((row) => [`${row.roundNumber}:${row.playerIndex}`, row]));
 
-  for (const kill of pkg.kills) {
-    if (kill.killerIndex === null) continue;
-    const killerEconomy = economyByPlayerRound.get(`${kill.roundNumber}:${kill.killerIndex}`);
-    const victimEconomy = economyByPlayerRound.get(`${kill.roundNumber}:${kill.victimIndex}`);
+  for (const row of rows) {
+    const killerIndex = playerIndexBySteamId.get(row.killerSteamId64);
+    const victimIndex = playerIndexBySteamId.get(row.victimSteamId64);
+    if (killerIndex == null || victimIndex == null) continue;
+    const killerEconomy = economyByPlayerRound.get(`${row.roundNumber}:${killerIndex}`);
+    const victimEconomy = economyByPlayerRound.get(`${row.roundNumber}:${victimIndex}`);
     if (!killerEconomy || !victimEconomy) continue;
 
-    const killerSteamId = resolver.steamIdOf(kill.killerIndex);
-    if (!killerSteamId) continue;
-    const buckets = getOrInit(out, killerSteamId, zeroBuyDelta);
+    const buckets = getOrInit(out, row.killerSteamId64, zeroBuyDelta);
     const delta = killerEconomy.equipmentValue - victimEconomy.equipmentValue;
     if (delta <= -BUY_DELTA_EVEN_THRESHOLD) {
       buckets.disadvantage += 1;

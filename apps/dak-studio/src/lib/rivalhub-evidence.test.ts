@@ -212,6 +212,20 @@ describe("RivalHub online Demo matching", () => {
     })).toThrow(/playerStats\.playerIndex/);
   });
 
+  it("blocks Evidence when Core parity QA reports semantic drift", () => {
+    const target = fixtureTarget();
+    const identities = new Map(stableFixture.players.map((player, index) => [player.steamId64, fixtureIdentity(player, index, target)]));
+    const statsTruth = stableFixture.playerStats[0]!;
+    const mismatched = {
+      ...stableFixture,
+      playerStats: stableFixture.playerStats.map((stats) => stats.playerIndex === statsTruth.playerIndex
+        ? { ...stats, deaths: stats.deaths + 1 }
+        : stats),
+    };
+
+    expect(() => buildRivalHubDemoEvidenceV1(mismatched, target, identities)).toThrow("Evidence blocked by Core QA: performance.parity_mismatch");
+  });
+
   it("uses the canonical Steam64 lineup and rejects a missing member", () => {
     const ids = Array.from({ length: 10 }, (_, index) => `765611980000000${String(index + 1).padStart(2, "0")}`);
     const result = matchRivalHubParticipants(packageFor(ids), target, lineup(ids));

@@ -23,8 +23,10 @@ v3 ZIP（cs2-demo-format/3.x，由 cs2df 导出）
 先生成 `TournamentMapFacts` / `TournamentPerformanceMapFacts`，再由发布后的
 `@cs2dak/tournament` 负责跨图 merge；这条 runtime 不需要安装整个
 `@cs2dak/presentation`。单图 performance 先由 `@cs2dak/core` 的
-`buildPlayerRoundPerformanceFacts` 统一派生，`playerStats` 只用于 parity
-validation，不作为第二个 runtime source。
+`buildPlayerRoundPerformanceFacts` 统一派生，`@cs2dak/core` 导出的
+`CORE_ANALYSIS_VERSION` 是所有 performance facts 出口的 provenance owner；
+`playerStats` 只用于 parity validation，不作为第二个 runtime source。可比
+mismatch 会进入 Core QA error，Evidence/Tournament adapter 不会发布这类结果。
 
 CLI 路径（无需在产品里复刻分析模型）：
 
@@ -85,7 +87,9 @@ artifact（`dist/index.js` + `dist/index.d.ts`），不安装 `@cs2dak/presentat
 `TournamentMapFacts` 或 `TournamentPerformanceMapFacts`，所以 RivalHub 保持自己的
 身份、scope、持久化和 UI owner。1.1 performance surface 保留 player 的
 overall/T/CT slices，所有 rate 携带 numerator/denominator，team per-round
-denominator 按去重后的 team-round 计算。`TournamentPerformanceMapFacts` 的
+denominator 按去重后的 team-round 计算。Map/global opening 使用 round-based
+conversion（不把一场 opening duel 的两名玩家计作两次 attempts）。
+`TournamentPerformanceMapFacts` 的
 player-round 是 Core canonical 逐回合 source；`playerStats` 只作为 frozen aggregate
 parity oracle，不能反推或覆盖 side-aware round rows。旧 `RRIndicators`/#381
 scoreboard projection 仍按其既有 aggregate contract 运行，不能与 performance DTO

@@ -26,6 +26,7 @@ export type {
   TournamentPerformanceObjectiveFact,
   TournamentPerformanceObjectiveSummary,
   TournamentPerformanceOpeningSummary,
+  TournamentPerformanceOpeningConversionSummary,
   TournamentPerformancePlayerRoundFact,
   TournamentPerformancePlayerSlice,
   TournamentPerformancePlayerSummary,

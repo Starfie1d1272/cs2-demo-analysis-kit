@@ -10,6 +10,8 @@ import {
   toPlayerRoundFacts,
   type PlayerRoundPerformanceFacts,
 } from "./performance-facts.js";
+import { CORE_ANALYSIS_VERSION } from "./version.js";
+import { findPlayerStatsParityMismatches } from "./performance-parity.js";
 
 export { loadDemoManifestFromZip, loadDemoPackageFromZip } from "./loader.js";
 export type { DemoManifest, DemoPackageLoadOptions, DemoPackageLoadProfile } from "./loader.js";
@@ -22,7 +24,7 @@ export { activeDamages, activePhaseDamages, groupBy } from "./utils.js";
 export * from "./spatial/index.js";
 export { deriveRRIndicators } from "./scoreboard.js";
 export { buildPlayerRoundFacts } from "./scoreboard.js";
-export { buildPlayerRoundUtilityFacts, type PlayerRoundUtilityFact } from "./utility-facts.js";
+export { buildPlayerRoundUtilityFacts, toPlayerRoundUtilityFacts, type PlayerRoundUtilityFact } from "./utility-facts.js";
 export { derivePlayerWeaponHighlights } from "./weapon-highlights.js";
 export {
   aggregatePlayerRoundPerformanceFacts,
@@ -44,6 +46,7 @@ export type {
 } from "./performance-facts.js";
 export { assertPlayerStatsParity, findPlayerStatsParityMismatches } from "./performance-parity.js";
 export type { PlayerStatsParityMismatch } from "./performance-parity.js";
+export { CORE_ANALYSIS_VERSION } from "./version.js";
 export { buildTeamSideWinRates } from "./side-win-rate.js";
 export { buildDuelsSignals, deriveDuels, deriveOpeningDuels } from "./duels.js";
 export { buildMechanicsSignals, counterStrafeThresholdForWeapon, derivePlayerMechanics } from "./mechanics.js";
@@ -63,8 +66,16 @@ export type {
 
 export function analyzeDemoPackage(input: unknown, suppliedPerformanceFacts?: PlayerRoundPerformanceFacts): AnalysisBundle {
   const pkg = normalizeDemoPackage(input);
-  const qa = buildQaReport(pkg);
   const performanceFacts = suppliedPerformanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
+  const parityMismatches = findPlayerStatsParityMismatches(pkg, performanceFacts);
+  const qa = buildQaReport(pkg, parityMismatches.map((mismatch) => ({
+    severity: mismatch.comparable === false ? "warning" as const : "error" as const,
+    code: mismatch.comparable === false ? "performance.parity_not_comparable" : "performance.parity_mismatch",
+    message: mismatch.comparable === false
+      ? `Frozen playerStats ${mismatch.field} is not comparable for ${mismatch.playerName} (playerIndex=${mismatch.playerIndex}): ${mismatch.reason ?? "opening semantics differ"}.`
+      : `Frozen playerStats ${mismatch.field} disagrees for ${mismatch.playerName} (playerIndex=${mismatch.playerIndex}): expected=${mismatch.expected}, actual=${mismatch.actual}.`,
+    path: `playerStats.${mismatch.field}`,
+  })));
   const playerRoundFacts = toPlayerRoundFacts(performanceFacts);
   const playerIndicators = buildPlayerIndicators(pkg, performanceFacts);
   const accountRatings = computeAccountRatingsV2(pkg, performanceFacts);
@@ -78,7 +89,7 @@ export function analyzeDemoPackage(input: unknown, suppliedPerformanceFacts?: Pl
     version: "cs2-demo-analysis-kit/1.0",
     sourceSchemaVersion: pkg.manifest.schemaVersion,
     provenance: {
-      analysisVersion: "cs2-demo-analysis-kit/1.0.2",
+      analysisVersion: CORE_ANALYSIS_VERSION,
       sourceSchemaVersion: pkg.manifest.schemaVersion,
       sourceDemoHash: pkg.manifest.demo?.hash ?? null,
       exporter: pkg.manifest.exporter,

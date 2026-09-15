@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { buildPlayerRoundPerformanceFacts } from "./performance-facts.js";
 import { loadDemoPackageFromZip } from "./loader.js";
 import { buildPlayerRoundFacts } from "./scoreboard.js";
-import { buildPlayerRoundUtilityFacts } from "./utility-facts.js";
+import { buildPlayerRoundUtilityFacts, toPlayerRoundUtilityFacts } from "./utility-facts.js";
 
 const fixture = async () => loadDemoPackageFromZip(await readFile(fileURLToPath(
   new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url)
@@ -13,7 +13,9 @@ const fixture = async () => loadDemoPackageFromZip(await readFile(fileURLToPath(
 describe("buildPlayerRoundUtilityFacts", () => {
   it("owns the per-round utility values consumed by PlayerRoundFact", async () => {
     const pkg = await fixture();
-    const utilityFacts = buildPlayerRoundUtilityFacts(pkg);
+    const performanceFacts = buildPlayerRoundPerformanceFacts(pkg);
+    const utilityFacts = buildPlayerRoundUtilityFacts(pkg, performanceFacts);
+    expect(utilityFacts).toEqual(toPlayerRoundUtilityFacts(performanceFacts));
     const playerRounds = buildPlayerRoundFacts(pkg);
 
     expect(utilityFacts).toHaveLength(pkg.rounds.length * pkg.players.length);

@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
+import type { DemoPackage, PackageKill } from "@cs2dak/contract";
 import {
   aggregatePlayerRoundPerformanceFacts,
   assertPlayerStatsParity,
@@ -26,6 +27,62 @@ const REAL_FIXTURES = [
 
 let fixturePackages: Array<{ path: string; pkg: Awaited<ReturnType<typeof loadDemoPackageFromZip>> }>;
 
+function syntheticPackage(playerCount: number, kills: PackageKill[], teamASize = 4): DemoPackage {
+  const players = Array.from({ length: playerCount }, (_, index) => ({
+    steamId64: `synthetic-${index}`,
+    name: `Synthetic ${index}`,
+    teamKey: index < teamASize ? "teamA" : "teamB",
+  }));
+  return {
+    match: {
+      mapName: "de_synthetic",
+      tickrate: 64,
+      teamA: { name: "Synthetic A", score: 1 },
+      teamB: { name: "Synthetic B", score: 0 },
+    },
+    players,
+    rounds: [{
+      roundNumber: 1,
+      startTick: 0,
+      freezeEndTick: 10,
+      endTick: 1000,
+      teamASide: "t",
+      teamBSide: "ct",
+      winnerTeamKey: "teamA",
+      winnerSide: "t",
+    }],
+    kills,
+    damages: [],
+    blinds: [],
+    bombs: [],
+    grenades: [],
+    clutches: [],
+    playerEconomies: [],
+    playerStats: [],
+  } as unknown as DemoPackage;
+}
+
+function syntheticKill(overrides: Partial<PackageKill>): PackageKill {
+  return {
+    roundNumber: 1,
+    tick: 100,
+    killerIndex: null,
+    victimIndex: 0,
+    weapon: "ak47",
+    headshot: false,
+    tradeKill: false,
+    tradeDeath: false,
+    noScope: false,
+    throughSmoke: false,
+    penetratedObjects: 0,
+    assisterIndex: null,
+    flashAssist: false,
+    flashAssisterIndex: null,
+    victimPosition: { x: 0, y: 0, z: 0 },
+    ...overrides,
+  } as PackageKill;
+}
+
 beforeAll(async () => {
   fixturePackages = await Promise.all(REAL_FIXTURES.map(async (path) => ({
     path,
@@ -37,7 +94,7 @@ describe("canonical player-round performance facts", () => {
   it("matches the frozen playerStats aggregate across every standalone real fixture", () => {
     for (const { path, pkg } of fixturePackages) {
       const facts = buildPlayerRoundPerformanceFacts(pkg);
-      expect(findPlayerStatsParityMismatches(pkg, facts), path).toEqual([]);
+      expect(findPlayerStatsParityMismatches(pkg, facts).filter((mismatch) => mismatch.comparable !== false), path).toEqual([]);
       expect(() => assertPlayerStatsParity(pkg, facts), path).not.toThrow();
     }
   });
@@ -78,5 +135,60 @@ describe("canonical player-round performance facts", () => {
     };
 
     expect(() => assertPlayerStatsParity(mismatched)).toThrow(/damageHealth/);
+  });
+
+  it("keeps suicide out of performance attribution and advances man-state past every death", () => {
+    const pkg = syntheticPackage(10, [
+      syntheticKill({ tick: 100, killerIndex: null, victimIndex: 2 }),
+      syntheticKill({ tick: 110, killerIndex: 0, victimIndex: 1 }),
+      syntheticKill({ tick: 120, killerIndex: 0, victimIndex: 0, headshot: true }),
+      syntheticKill({ tick: 130, killerIndex: 4, victimIndex: 3, headshot: true }),
+    ]);
+
+    const facts = buildPlayerRoundPerformanceFacts(pkg);
+    const summaries = aggregatePlayerRoundPerformanceFacts(facts);
+    const playerA = summaries.get("synthetic-0")!;
+    const playerB = summaries.get("synthetic-1")!;
+    const playerC = summaries.get("synthetic-2")!;
+    const playerD = summaries.get("synthetic-3")!;
+    const playerE = summaries.get("synthetic-4")!;
+
+    expect(playerA).toMatchObject({ kills: 1, deaths: 1, bombDeaths: 1, weapons: [expect.objectContaining({ weapon: "ak47", kills: 1 })] });
+    expect(playerB).toMatchObject({ kills: 0, deaths: 1, combatDeaths: 1 });
+    expect(playerC).toMatchObject({ kills: 0, deaths: 1, bombDeaths: 1 });
+    expect(playerD).toMatchObject({ kills: 0, deaths: 1, firstDeaths: 1, headshots: 0 });
+    expect(playerE).toMatchObject({ kills: 1, deaths: 0, firstKills: 1, headshots: 1 });
+    expect(facts.openingParity).toEqual({ nonComparableRounds: [1] });
+    const parityPkg = {
+      ...pkg,
+      playerStats: pkg.players.map((_, playerIndex) => ({ playerIndex })) as DemoPackage["playerStats"],
+    };
+    const parityIssues = findPlayerStatsParityMismatches(parityPkg);
+    expect(parityIssues.filter((issue) => issue.comparable === false)).toHaveLength(pkg.players.length * 2);
+    expect(() => assertPlayerStatsParity(parityPkg)).not.toThrow();
+    expect(facts.manState).toHaveLength(1);
+    expect(facts.manState[0]).toMatchObject({
+      killerSteamId64: "synthetic-4",
+      victimSteamId64: "synthetic-3",
+      preAdvantageTeamKey: "teamB",
+      preAdvantageAlive: 6,
+      preDisadvantageAlive: 1,
+      advantageTeamKey: "teamB",
+      advantageAlive: 6,
+      disadvantageAlive: 0,
+    });
+  });
+
+  it("matches the exporter five-kill bucket for six or more kills in one round", () => {
+    const pkg = syntheticPackage(7, [1, 2, 3, 4, 5, 6].map((victimIndex) => syntheticKill({
+      tick: 100 + victimIndex,
+      killerIndex: 0,
+      victimIndex,
+    })), 1);
+    const summary = aggregatePlayerRoundPerformanceFacts(buildPlayerRoundPerformanceFacts(pkg)).get("synthetic-0")!;
+
+    expect(summary.kills).toBe(6);
+    expect(summary.fiveKillRounds).toBe(1);
+    expect(summary.weapons).toEqual([expect.objectContaining({ weapon: "ak47", kills: 6 })]);
   });
 });

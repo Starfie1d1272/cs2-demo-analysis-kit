@@ -94,6 +94,13 @@ describe("analyzeDemoPackage", () => {
       expect.objectContaining({ playerIndex: statsTruth.playerIndex, field: "combatDeathCount" }),
       expect.objectContaining({ playerIndex: statsTruth.playerIndex, field: "bombDeathCount" }),
     ]));
+    const analysis = analyzeDemoPackage(patchedPkg);
+    expect(analysis.qa.ok).toBe(false);
+    expect(analysis.qa.issues).toContainEqual(expect.objectContaining({
+      code: "performance.parity_mismatch",
+      path: "playerStats.deaths",
+      severity: "error",
+    }));
   });
 
   it("surfaces account breakdown and context status on the scoreboard", () => {
