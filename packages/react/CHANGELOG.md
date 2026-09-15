@@ -1,5 +1,12 @@
 # @cs2dak/react
 
+## 1.1.1
+
+### Patch Changes
+
+- Updated dependencies [532faf7]
+  - @cs2dak/presentation@2.1.0
+
 ## 1.1.0
 
 ### Minor Changes

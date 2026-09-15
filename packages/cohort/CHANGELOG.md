@@ -1,5 +1,12 @@
 # @cs2dak/cohort
 
+## 2.0.1
+
+### Patch Changes
+
+- Updated dependencies [532faf7]
+  - @cs2dak/core@2.0.1
+
 ## 2.0.0
 
 ### Major Changes
