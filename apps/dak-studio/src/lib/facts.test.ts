@@ -49,7 +49,7 @@ describe("MatchFacts", () => {
     expect(FACTS_RECORD_NAMESPACES).toContain("facts:ct_rotation_rounds");
     expect(FACTS_RECORD_NAMESPACES).toContain("facts:rr_signal_rows");
     expect(FACTS_RECORD_NAMESPACES.some((name) => /cohort|player_insights|tournament|team_comparison|duel|opening_trails|utility_value/.test(name))).toBe(false);
-    expect(DERIVED_CACHE_RECORD_NAMESPACES.every((name) => name.startsWith("derived:match-v4:"))).toBe(true);
+    expect(DERIVED_CACHE_RECORD_NAMESPACES.every((name) => name.startsWith("derived:match-v5:"))).toBe(true);
   });
 
   it("persists the same compact AWP round facts produced by the direct core pipeline", async () => {

@@ -1,5 +1,13 @@
 import type { DemoPackage, EvidenceRef, MatchWorkspaceModel, TeamKey } from "@cs2dak/contract";
-import { buildPlayerRoundUtilityFacts, derivePlayerMechanics, type PlayerMechanicsFact } from "@cs2dak/core";
+import {
+  aggregatePlayerRoundPerformanceFacts,
+  buildPlayerRoundPerformanceFacts,
+  derivePlayerMechanics,
+  type PlayerMechanicsFact,
+  type PlayerRoundPerformanceFact,
+  type PlayerRoundPerformanceFacts,
+  type PlayerRoundPerformanceUtilityFact,
+} from "@cs2dak/core";
 import type { TriangleBvh } from "@cs2dak/maps";
 import { round } from "./season-metrics.js";
 import { displayWeaponName } from "./weapons.js";
@@ -17,6 +25,12 @@ import { normalizeWeapon } from "./workspace-utils.js";
 export interface SeasonInsightsDemo {
   matchId: string;
   pkg: DemoPackage;
+  /** Optional shared Core facts for callers that already built the package once. */
+  performanceFacts?: PlayerRoundPerformanceFacts;
+}
+
+function performanceFactsFor(demo: SeasonInsightsDemo): PlayerRoundPerformanceFacts {
+  return demo.performanceFacts ?? buildPlayerRoundPerformanceFacts(demo.pkg);
 }
 
 // ── 个人趋势 ────────────────────────────────────────────────────────────────
@@ -278,26 +292,27 @@ export function buildUtilityValueSummary(
     return row;
   };
 
-  for (const { matchId, pkg } of demos) {
+  for (const demo of demos) {
+    const { matchId, pkg } = demo;
+    const performanceFacts = performanceFactsFor(demo);
     for (const key of ["teamA", "teamB"] as const) {
       ensureTeam(pkg, key).rounds += pkg.rounds.length;
     }
 
-    for (const stat of pkg.playerStats) {
-      const player = bySteamId.get(pkg.players[stat.playerIndex]?.steamId64 ?? "");
+    for (const fact of performanceFacts.playerRounds) {
+      const player = bySteamId.get(fact.steamId64);
       if (!player) continue;
       const row = playerRows.get(player.playerKey)!;
-      row.rounds += stat.rounds;
+      row.rounds += 1;
     }
 
     // Base utility totals are shared with every DAK consumer, including
     // external product adapters. This view only adds presentation evidence.
-    for (const utility of buildPlayerRoundUtilityFacts(pkg)) {
-      const player = bySteamId.get(utility.steamId64);
-      const packagePlayer = pkg.players.find((candidate) => candidate.steamId64 === utility.steamId64);
-      if (!packagePlayer) continue;
+    for (const fact of performanceFacts.playerRounds) {
+      const utility = fact.utility;
+      const player = bySteamId.get(fact.steamId64);
       const playerRow = player ? playerRows.get(player.playerKey) : null;
-      const teamRow = ensureTeam(pkg, packagePlayer.teamKey);
+      const teamRow = ensureTeam(pkg, fact.teamKey);
       for (const row of [playerRow, teamRow]) {
         if (!row) continue;
         row.flashesThrown += utility.flashesThrown;
@@ -503,26 +518,24 @@ export function buildPlayerSeasonInsights(
   const clutchLossEvidence: MistakeEvidence[] = [];
   let clutchLosses = 0;
 
-  for (const { matchId, pkg } of demos) {
-    const stats = pkg.playerStats.filter((row) => {
-      const player = pkg.players[row.playerIndex];
-      return player != null && ids.has(player.steamId64);
-    });
-    if (stats.length === 0) continue;
-    const sum = (f: (row: (typeof stats)[number]) => number) => stats.reduce((acc, row) => acc + f(row), 0);
-    const rounds = Math.max(1, ...stats.map((row) => row.rounds));
-    const utilityFacts = buildPlayerRoundUtilityFacts(pkg).filter((fact) => ids.has(fact.steamId64));
-    const utilitySum = (key: "utilityDamage" | "enemyBlindSeconds" | "teamBlindSeconds" | "flashAssists" | "flashesThrown" | "enemyBlindVictims") =>
-      utilityFacts.reduce((total, fact) => total + fact[key], 0);
+  for (const demo of demos) {
+    const { matchId, pkg } = demo;
+    const performanceFacts = performanceFactsFor(demo);
+    const playerRounds = performanceFacts.playerRounds.filter((row) => ids.has(row.steamId64));
+    if (playerRounds.length === 0) continue;
+    const sum = (f: (row: PlayerRoundPerformanceFact) => number) => playerRounds.reduce((acc, row) => acc + f(row), 0);
+    const rounds = Math.max(1, pkg.rounds.length);
+    const utilitySum = (key: keyof PlayerRoundPerformanceUtilityFact) =>
+      playerRounds.reduce((total, fact) => total + fact.utility[key], 0);
 
-    const clutchAttempts = sum((r) => r.vsOneCount + r.vsTwoCount + r.vsThreeCount + r.vsFourCount + r.vsFiveCount);
-    const clutchWins = sum((r) => r.vsOneWonCount + r.vsTwoWonCount + r.vsThreeWonCount + r.vsFourWonCount + r.vsFiveWonCount);
+    const clutchAttempts = playerRounds.reduce((total, row) => total + (row.clutch ? 1 : 0), 0);
+    const clutchWins = playerRounds.reduce((total, row) => total + (row.clutch?.won ? 1 : 0), 0);
     trend.push({
       matchId,
       mapName: pkg.match.mapName,
-      adr: round(sum((r) => r.damageHealth) / rounds, 1),
-      kast: round(sum((r) => r.kastRounds) / rounds * 100, 1),
-      fkMinusFd: sum((r) => r.firstKillCount) - sum((r) => r.firstDeathCount),
+      adr: round(sum((r) => r.damage) / rounds, 1),
+      kast: round(playerRounds.filter((row) => row.kast).length / rounds * 100, 1),
+      fkMinusFd: playerRounds.filter((row) => row.openingDuel === "won").length - playerRounds.filter((row) => row.openingDuel === "lost").length,
       utilityDamagePerRound: round(utilitySum("utilityDamage") / rounds, 2),
       clutchAttempts,
       clutchWins,
@@ -610,6 +623,11 @@ export function buildPlayerSeasonInsights(
       list.push(kill);
       killsByRound.set(kill.roundNumber, list);
     }
+    const openingLossByRound = new Map(
+      playerRounds
+        .filter((row) => row.openingDuel === "lost")
+        .map((row) => [row.roundNumber, row])
+    );
     const freezeByRound = new Map(pkg.rounds.map((row) => [row.roundNumber, row.freezeEndTick]));
     const roundEconomies = new Map(
       pkg.rounds.map((row) => [row.roundNumber, { a: row.teamAEconomy, b: row.teamBEconomy }])
@@ -624,8 +642,9 @@ export function buildPlayerSeasonInsights(
       const opponentEconomy =
         economy != null && pair != null ? (economy === pair.a ? pair.b : pair.a) : null;
       const firstDeath = sorted[0];
-      const firstDeadVictim = firstDeath != null ? pkg.players[firstDeath.victimIndex] : undefined;
-      const meFirstDead = firstDeath != null && firstDeadVictim != null && ids.has(firstDeadVictim.steamId64);
+      const openingLoss = openingLossByRound.get(roundNumber);
+      const meFirstDead = openingLoss != null;
+      const openingTick = openingLoss?.openingTick ?? firstDeath?.tick ?? null;
       const isLowBuy = economy != null && LOW_BUY_TYPES.has(economy);
       const isFullBuy = economy === "full";
       const isAntiEco = opponentEconomy === "eco" || opponentEconomy === "semi";
@@ -634,15 +653,15 @@ export function buildPlayerSeasonInsights(
       if (isAntiEco) antiEco.attempts += 1;
       if (meFirstDead && isLowBuy) {
         lowBuy.count += 1;
-        lowBuy.evidence.push({ matchId, roundNumber, tick: firstDeath.tick, detail: `${economy} 局首死`, reason: `${economy} 局首死`, role: "example" });
+        lowBuy.evidence.push({ matchId, roundNumber, tick: openingTick, detail: `${economy} 局首死`, reason: `${economy} 局首死`, role: "example" });
       }
       if (meFirstDead && isFullBuy) {
         fullBuy.count += 1;
-        fullBuy.evidence.push({ matchId, roundNumber, tick: firstDeath.tick, detail: "长枪局首死", reason: "长枪局首死", role: "example" });
+        fullBuy.evidence.push({ matchId, roundNumber, tick: openingTick, detail: "长枪局首死", reason: "长枪局首死", role: "example" });
       }
       if (meFirstDead && isAntiEco) {
         antiEco.count += 1;
-        antiEco.evidence.push({ matchId, roundNumber, tick: firstDeath.tick, detail: `对手 ${opponentEconomy} 局首死`, reason: `对手 ${opponentEconomy} 局首死`, role: "example" });
+        antiEco.evidence.push({ matchId, roundNumber, tick: openingTick, detail: `对手 ${opponentEconomy} 局首死`, reason: `对手 ${opponentEconomy} 局首死`, role: "example" });
       }
       // 死亡时间分布
       for (const kill of sorted) {
@@ -658,14 +677,14 @@ export function buildPlayerSeasonInsights(
       }
     }
 
-    // 残局失利
-    for (const clutch of pkg.clutches) {
-      const clutcher = pkg.players[clutch.clutcherIndex];
-      if (!clutcher || !ids.has(clutcher.steamId64) || clutch.won) continue;
+    // 残局失利：复用 Core 的 canonical clutch facts；这里仅补证据文案。
+    for (const playerRound of playerRounds) {
+      const clutch = playerRound.clutch;
+      if (!clutch || clutch.won) continue;
       clutchLosses += 1;
       clutchLossEvidence.push({
         matchId,
-        roundNumber: clutch.roundNumber,
+        roundNumber: playerRound.roundNumber,
         detail: `1v${clutch.opponentCount} 失利（${clutch.killCount} 杀）`,
         reason: `1v${clutch.opponentCount} 残局失利`,
         role: "example"
@@ -883,18 +902,19 @@ export function buildPlayerWeaponStats(
   const ids = new Set(steamIds);
   const rows = new Map<string, { weapon: string; kills: number; headshots: number }>();
   let matchCount = 0;
-  for (const { pkg } of demos) {
+  for (const demo of demos) {
+    const summaries = aggregatePlayerRoundPerformanceFacts(performanceFactsFor(demo));
     let appeared = false;
-    for (const kill of pkg.kills) {
-      if (kill.killerIndex == null) continue;
-      const killer = pkg.players[kill.killerIndex];
-      if (!killer || !ids.has(killer.steamId64)) continue;
+    for (const steamId of ids) {
+      const summary = summaries.get(steamId);
+      if (!summary || summary.kills === 0) continue;
       appeared = true;
-      const weapon = kill.weapon || "unknown";
-      const row = rows.get(weapon) ?? { weapon, kills: 0, headshots: 0 };
-      row.kills += 1;
-      if (kill.headshot) row.headshots += 1;
-      rows.set(weapon, row);
+      for (const weapon of summary.weapons) {
+        const row = rows.get(weapon.weapon) ?? { weapon: weapon.weapon, kills: 0, headshots: 0 };
+        row.kills += weapon.kills;
+        row.headshots += weapon.headshotKills;
+        rows.set(weapon.weapon, row);
+      }
     }
     if (appeared) matchCount += 1;
   }
@@ -942,9 +962,12 @@ export function buildPlayerFlashSummaries(
     for (const steamId of player.steamIds) bySteamId.set(steamId, player);
   }
 
-  for (const { matchId, pkg } of demos) {
-    for (const utility of buildPlayerRoundUtilityFacts(pkg)) {
-      const player = bySteamId.get(utility.steamId64);
+  for (const demo of demos) {
+    const { matchId, pkg } = demo;
+    const performanceFacts = performanceFactsFor(demo);
+    for (const fact of performanceFacts.playerRounds) {
+      const utility = fact.utility;
+      const player = bySteamId.get(fact.steamId64);
       if (!player) continue;
       const row = rows.get(player.playerKey)!;
       row.flashesThrown += utility.flashesThrown;

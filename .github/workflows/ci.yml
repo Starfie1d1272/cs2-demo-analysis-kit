@@ -38,14 +38,21 @@ jobs:
         run: |
           set -euo pipefail
           pnpm --filter @cs2dak/tournament exec node --input-type=module -e \
-            "const m = await import('@cs2dak/tournament'); if (typeof m.buildTournamentAnalytics !== 'function') process.exit(1)"
+            "const m = await import('@cs2dak/tournament'); if (typeof m.buildTournamentAnalytics !== 'function' || typeof m.buildTournamentPerformanceAnalytics !== 'function') process.exit(1)"
           PACK_DIR="$RUNNER_TEMP/cs2dak-tournament-pack"
           mkdir -p "$PACK_DIR"
           pnpm --filter @cs2dak/tournament pack --pack-destination "$PACK_DIR"
           TARBALL="$(find "$PACK_DIR" -maxdepth 1 -type f -name '*.tgz' -print -quit)"
           test -n "$TARBALL"
-          tar -tzf "$TARBALL" | grep -Eq '(^|/)dist/index\.js$'
-          tar -tzf "$TARBALL" | grep -Eq '(^|/)dist/index\.d\.ts$'
+          TARBALL_CONTENTS="$RUNNER_TEMP/cs2dak-tournament-pack-contents.txt"
+          tar -tzf "$TARBALL" > "$TARBALL_CONTENTS"
+          grep -Eq '(^|/)dist/index\.js$' "$TARBALL_CONTENTS"
+          grep -Eq '(^|/)dist/index\.d\.ts$' "$TARBALL_CONTENTS"
+          CONSUMER_DIR="$RUNNER_TEMP/cs2dak-tournament-consumer"
+          mkdir -p "$CONSUMER_DIR"
+          npm install --prefix "$CONSUMER_DIR" --no-save "$TARBALL"
+          CONSUMER_DIR="$CONSUMER_DIR" node --input-type=module -e \
+            "import { join } from 'node:path'; import { pathToFileURL } from 'node:url'; const root = join(process.env.CONSUMER_DIR, 'node_modules', '@cs2dak', 'tournament'); const m = await import(pathToFileURL(join(root, 'dist', 'index.js')).href); if (typeof m.buildTournamentAnalytics !== 'function' || typeof m.buildTournamentPerformanceAnalytics !== 'function') process.exit(1)"
 
   typescript-integration:
     name: TypeScript (integration tests)

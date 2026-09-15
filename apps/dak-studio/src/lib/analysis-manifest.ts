@@ -1,4 +1,4 @@
-import { MAP_INTELLIGENCE_FACT_VERSION, TACTICAL_FACT_VERSION } from "@cs2dak/core";
+import { CORE_ANALYSIS_VERSION, MAP_INTELLIGENCE_FACT_VERSION, TACTICAL_FACT_VERSION } from "@cs2dak/core";
 
 /**
  * 分析能力的版本中枢：把 ZIP 合同、facts 存储布局和各 facts producer 分开记录。
@@ -24,7 +24,7 @@ export const FACTS_STORAGE_VERSION = 5;
 export const FACTS_PRODUCER_VERSIONS = {
   tactical: TACTICAL_FACT_VERSION,
   mapIntelligence: MAP_INTELLIGENCE_FACT_VERSION,
-  tournament: "cs2-demo-analysis-kit/1.0.1",
+  tournament: CORE_ANALYSIS_VERSION,
 } as const;
 
 /** 显式组合 storage version 与所有 producer versions，作为 facts 的唯一 revision。 */

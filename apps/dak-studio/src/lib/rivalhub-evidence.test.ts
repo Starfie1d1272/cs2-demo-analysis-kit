@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { DemoPackage } from "@cs2dak/contract";
-import { loadDemoPackageFromZip } from "../../../../packages/core/src/index";
+import { aggregatePlayerRoundPerformanceFacts, buildPlayerRoundPerformanceFacts, loadDemoPackageFromZip } from "../../../../packages/core/src/index";
 import { buildRivalHubDemoEvidenceV1, fixtureIdentity, fixtureTarget, matchRivalHubParticipants, matchRivalHubParticipantsForReview, normalizeRivalHubDemoPackage, resolveRivalHubParticipants, resolveRivalHubParticipantsFromEventRoster, resolveRivalHubParticipantsForReview, selectRivalHubMap, type RivalHubEvidenceTarget, type RivalHubTeamOrientation } from "./rivalhub-evidence";
 import { matchRivalHubMap, type RivalHubMatchCandidate } from "./rivalhub-match";
 import type { RivalHubRemoteMap, RivalHubRemotePlayer, RivalHubRemoteTeam } from "./rivalhub-contract";
@@ -101,7 +101,7 @@ describe("RivalHub online Demo matching", () => {
       };
     };
 
-    expect(evidence.contract).toEqual({ contractVersion: "rivalhub-demo-evidence/1", semanticProfile: "dak-stable/1", analysisVersion: "cs2-demo-analysis-kit/1.0.2" });
+    expect(evidence.contract).toEqual({ contractVersion: "rivalhub-demo-evidence/1", semanticProfile: "dak-stable/2", analysisVersion: "cs2-demo-analysis-kit/1.0.2" });
     expect(evidence.semanticFacts.economyMatrix).toEqual([
       { lowEconomy: "full", highEconomy: "full", rounds: 10, lowEconomyWins: 6 },
       { lowEconomy: "force", highEconomy: "full", rounds: 4, lowEconomyWins: 4 },
@@ -165,36 +165,36 @@ describe("RivalHub online Demo matching", () => {
     expect(matchRivalHubMap(evidenceFixture, [candidate])).toEqual(matchRivalHubMap(stableFixture, [candidate]));
   });
 
-  it("projects every whole-map player summary directly from v3 playerStats", () => {
+  it("projects every whole-map player summary from Core canonical performance facts", () => {
     const target = fixtureTarget();
     const identities = new Map(stableFixture.players.map((player, index) => [player.steamId64, fixtureIdentity(player, index, target)]));
     const evidence = buildRivalHubDemoEvidenceV1(stableFixture, target, identities) as {
       summaries: { playerMaps: Array<Record<string, unknown>> };
     };
 
-    const statsByPlayerIndex = new Map(stableFixture.playerStats.map((stats) => [stats.playerIndex, stats]));
-    expect(evidence.summaries.playerMaps).toEqual(stableFixture.players.map((player, playerIndex) => {
-      const stats = statsByPlayerIndex.get(playerIndex)!;
+    const performanceBySteamId = aggregatePlayerRoundPerformanceFacts(buildPlayerRoundPerformanceFacts(stableFixture));
+    expect(evidence.summaries.playerMaps).toEqual(stableFixture.players.map((player) => {
+      const summary = performanceBySteamId.get(player.steamId64)!;
       const identity = identities.get(player.steamId64)!;
       return {
         steamId64: identity.steamId64,
         teamKey: player.teamKey,
-        rounds: stats.rounds,
-        kills: stats.kills,
-        deaths: stats.deaths,
-        assists: stats.assists,
-        damage: stats.damageHealth,
-        kastRounds: stats.kastRounds,
-        headshots: stats.headshotCount,
-        firstKills: stats.firstKillCount,
-        firstDeaths: stats.firstDeathCount,
-        tradeKills: stats.tradeKillCount,
-        twoKillRounds: stats.twoKillCount,
-        threeKillRounds: stats.threeKillCount,
-        fourKillRounds: stats.fourKillCount,
-        fiveKillRounds: stats.fiveKillCount,
-        clutchAttempts: stats.vsOneCount + stats.vsTwoCount + stats.vsThreeCount + stats.vsFourCount + stats.vsFiveCount,
-        clutchWins: stats.vsOneWonCount + stats.vsTwoWonCount + stats.vsThreeWonCount + stats.vsFourWonCount + stats.vsFiveWonCount,
+        rounds: summary.rounds,
+        kills: summary.kills,
+        deaths: summary.deaths,
+        assists: summary.assists,
+        damage: summary.damage,
+        kastRounds: summary.kastRounds,
+        headshots: summary.headshots,
+        firstKills: summary.firstKills,
+        firstDeaths: summary.firstDeaths,
+        tradeKills: summary.tradeKills,
+        twoKillRounds: summary.twoKillRounds,
+        threeKillRounds: summary.threeKillRounds,
+        fourKillRounds: summary.fourKillRounds,
+        fiveKillRounds: summary.fiveKillRounds,
+        clutchAttempts: summary.clutch.attempts,
+        clutchWins: summary.clutch.wins,
       };
     }));
   });
@@ -210,6 +210,20 @@ describe("RivalHub online Demo matching", () => {
       ...stableFixture,
       playerStats: stableFixture.playerStats.map((stats, index) => index === 0 ? { ...stats, playerIndex: 99 } : stats),
     })).toThrow(/playerStats\.playerIndex/);
+  });
+
+  it("blocks Evidence when Core parity QA reports semantic drift", () => {
+    const target = fixtureTarget();
+    const identities = new Map(stableFixture.players.map((player, index) => [player.steamId64, fixtureIdentity(player, index, target)]));
+    const statsTruth = stableFixture.playerStats[0]!;
+    const mismatched = {
+      ...stableFixture,
+      playerStats: stableFixture.playerStats.map((stats) => stats.playerIndex === statsTruth.playerIndex
+        ? { ...stats, deaths: stats.deaths + 1 }
+        : stats),
+    };
+
+    expect(() => buildRivalHubDemoEvidenceV1(mismatched, target, identities)).toThrow("Evidence blocked by Core QA: performance.parity_mismatch");
   });
 
   it("uses the canonical Steam64 lineup and rejects a missing member", () => {

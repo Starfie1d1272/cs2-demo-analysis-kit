@@ -1,4 +1,6 @@
 import {
+  aggregatePlayerRoundPerformanceFacts,
+  buildPlayerRoundPerformanceFacts,
   derivePlayerMechanics,
   derivePlayerWeaponHighlights,
   deriveRRIndicators,
@@ -139,19 +141,16 @@ function extractLineupFact(pkg: DemoPackage, matchId: string, grid: CalloutGrid 
   };
 }
 
-const ROW_KEY_SEP = "\t";
-
-function rowKey(...parts: string[]): string {
-  return parts.join(ROW_KEY_SEP);
-}
-
 export interface ExtractedMatchData { facts: MatchFacts; derived: MatchDerivedCache }
 
 export function extractMatchData(pkg: DemoPackage, options: ExtractMatchFactsOptions): ExtractedMatchData {
   const playerKeyFor = options.playerKeyFor ?? defaultPlayerKey;
-  const playerStats = pkg.playerStats.map((stats): PlayerMatchStatsFact | null => {
-    const player = pkg.players[stats.playerIndex];
-    if (!player) return null;
+  const performanceFacts = buildPlayerRoundPerformanceFacts(pkg);
+  const performanceBySteamId = aggregatePlayerRoundPerformanceFacts(performanceFacts);
+  const playerStats = pkg.players.map((player): PlayerMatchStatsFact | null => {
+    const summary = performanceBySteamId.get(player.steamId64);
+    if (!summary) return null;
+    const clutch = (count: 1 | 2 | 3 | 4 | 5) => summary.clutch.byOpponentCount[String(count) as "1" | "2" | "3" | "4" | "5"];
     return {
       matchId: options.matchId,
       playerKey: playerKeyFor(player),
@@ -159,38 +158,38 @@ export function extractMatchData(pkg: DemoPackage, options: ExtractMatchFactsOpt
       playerName: player.name,
       teamKey: player.teamKey,
       mapName: pkg.match.mapName,
-      rounds: stats.rounds,
-      kills: stats.kills,
-      deaths: stats.deaths,
-      assists: stats.assists,
-      damageHealth: stats.damageHealth,
-      kastRounds: stats.kastRounds,
-      firstKillCount: stats.firstKillCount,
-      firstDeathCount: stats.firstDeathCount,
-      flashAssistCount: stats.flashAssistCount,
-      enemyFlashDurationSeconds: stats.enemyFlashDurationSeconds,
-      teamFlashDurationSeconds: stats.teamFlashDurationSeconds,
-      utilityDamage: stats.utilityDamage,
-      tradeKillCount: stats.tradeKillCount,
-      tradeDeathCount: stats.tradeDeathCount,
-      headshotCount: stats.headshotCount,
-      vsOneCount: stats.vsOneCount,
-      vsOneWonCount: stats.vsOneWonCount,
-      vsTwoCount: stats.vsTwoCount,
-      vsTwoWonCount: stats.vsTwoWonCount,
-      vsThreeCount: stats.vsThreeCount,
-      vsThreeWonCount: stats.vsThreeWonCount,
-      vsFourCount: stats.vsFourCount,
-      vsFourWonCount: stats.vsFourWonCount,
-      vsFiveCount: stats.vsFiveCount,
-      vsFiveWonCount: stats.vsFiveWonCount,
+      rounds: summary.rounds,
+      kills: summary.kills,
+      deaths: summary.deaths,
+      assists: summary.assists,
+      damageHealth: summary.damage,
+      kastRounds: summary.kastRounds,
+      firstKillCount: summary.firstKills,
+      firstDeathCount: summary.firstDeaths,
+      flashAssistCount: summary.utility.flashAssists,
+      enemyFlashDurationSeconds: summary.utility.enemyBlindSeconds,
+      teamFlashDurationSeconds: summary.utility.teamBlindSeconds,
+      utilityDamage: summary.utility.utilityDamage,
+      tradeKillCount: summary.tradeKills,
+      tradeDeathCount: summary.tradedDeaths,
+      headshotCount: summary.headshots,
+      vsOneCount: clutch(1).attempts,
+      vsOneWonCount: clutch(1).wins,
+      vsTwoCount: clutch(2).attempts,
+      vsTwoWonCount: clutch(2).wins,
+      vsThreeCount: clutch(3).attempts,
+      vsThreeWonCount: clutch(3).wins,
+      vsFourCount: clutch(4).attempts,
+      vsFourWonCount: clutch(4).wins,
+      vsFiveCount: clutch(5).attempts,
+      vsFiveWonCount: clutch(5).wins,
     } satisfies PlayerMatchStatsFact;
   }).filter((row): row is PlayerMatchStatsFact => row != null);
 
   const players = playerBySteamId(pkg);
-  const rrSignals = deriveRRSignals(pkg);
-  const rrIndicators = deriveRRIndicators(pkg);
-  const weaponHighlights = derivePlayerWeaponHighlights(pkg);
+  const rrSignals = deriveRRSignals(pkg, performanceFacts);
+  const rrIndicators = deriveRRIndicators(pkg, performanceFacts);
+  const weaponHighlights = derivePlayerWeaponHighlights(pkg, performanceFacts);
   const signalBySteamId = new Map(rrSignals.map((row) => [row.steamId64, row]));
   const indicatorBySteamId = new Map(rrIndicators.map((row) => [row.steamId64, row]));
   const weaponBySteamId = new Map(weaponHighlights.map((row) => [row.steamId64, row]));
@@ -199,30 +198,21 @@ export function extractMatchData(pkg: DemoPackage, options: ExtractMatchFactsOpt
     playerKey: playerKeyFor(player),
     steamId64: player.steamId64,
     playerName: player.name,
-    insight: buildPlayerSeasonInsights([{ matchId: options.matchId, pkg }], [player.steamId64]),
+    insight: buildPlayerSeasonInsights([{ matchId: options.matchId, pkg, performanceFacts }], [player.steamId64]),
   } satisfies DerivedPlayerInsight));
 
-  const weaponCells = new Map<string, PlayerWeaponFact>();
-  for (const kill of pkg.kills) {
-    if (kill.killerIndex == null) continue;
-    const killer = pkg.players[kill.killerIndex];
-    if (!killer) continue;
-    const weapon = kill.weapon || "unknown";
-    const key = rowKey(options.matchId, killer.steamId64, weapon);
-    const cell = weaponCells.get(key) ?? {
+  const playerWeapons = pkg.players.flatMap((player) => {
+    const summary = performanceBySteamId.get(player.steamId64);
+    return summary?.weapons.map((weapon): PlayerWeaponFact => ({
       matchId: options.matchId,
-      playerKey: playerKeyFor(killer),
-      steamId64: killer.steamId64,
-      playerName: killer.name,
-      weapon,
-      kills: 0,
-      headshots: 0,
-    };
-    cell.kills += 1;
-    if (kill.headshot) cell.headshots += 1;
-    weaponCells.set(key, cell);
-  }
-  const playerWeapons = [...weaponCells.values()];
+      playerKey: playerKeyFor(player),
+      steamId64: player.steamId64,
+      playerName: player.name,
+      weapon: weapon.weapon,
+      kills: weapon.kills,
+      headshots: weapon.headshotKills,
+    })) ?? [];
+  });
 
   const mechanicsSamples = derivePlayerMechanics(pkg, {
     visibility: options.visibilityFor?.(pkg.match.mapName) ?? null,
@@ -258,7 +248,7 @@ export function extractMatchData(pkg: DemoPackage, options: ExtractMatchFactsOpt
   const mapName = pkg.match.mapName;
   const visibilityFor = options.visibilityFor?.(mapName) ?? null;
   const calloutGrid = options.calloutGrid ?? null;
-  const input = { matchId: options.matchId, pkg };
+  const input = { matchId: options.matchId, pkg, performanceFacts };
   const utilityPlayers = pkg.players.map((player) => ({
     playerKey: playerKeyFor(player),
     name: player.name,
@@ -275,6 +265,7 @@ export function extractMatchData(pkg: DemoPackage, options: ExtractMatchFactsOpt
   const replayFacts = extractMatchTacticalAndMapIntelligenceFacts(pkg, {
     matchId: options.matchId,
     calloutGrid,
+    performanceFacts,
   });
 
   return {

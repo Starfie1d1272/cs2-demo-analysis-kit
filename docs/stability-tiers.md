@@ -21,9 +21,11 @@ UI 约定：Beta 指标在标题旁标 `Beta`，Experimental 标 `实验`；两�
 - **基础事实**：击杀、助攻、trade、HS、首杀/首死、残局 1vN（来自 v3 事件，确定性派生）。
 - **ADR / KAST / K-D**：fixture 校验，口径冻结。
 - **经济矩阵 / 手枪转化 / eco-semi 翻盘 / Buy Quality 单图事实**：`@cs2dak/core` 经济模块，fixture 覆盖。
-- **Tournament 跨图经济与转化 merge**：`@cs2dak/tournament` 消费 `dak-stable/1` frozen counts，
+- **Tournament 跨图经济与转化 merge**：新的 canonical performance facts 使用 `dak-stable/2`；
+  该 profile 收口并修正 Assist / Damage / Opening / KAST 等 Stable performance 语义，旧 `dak-stable/1`
+  只作为历史 artifact / legacy compatibility profile 保留，不与 `/2` 静默混合。`@cs2dak/tournament`
   identity 只认 entity key，`rate` 保留原始分子/分母；当前 Evidence producer provenance 为
-  `cs2-demo-analysis-kit/1.0.2`。这只是 merge owner 的收敛，不会把 Beta / Experimental 指标升为 Stable。
+  `cs2-demo-analysis-kit/1.0.2`。
 - **RR v1 单场数据线**：frozen pro baseline（`1.0 = 职业基线`），单场口径稳定。
 - **2D 回放与 EvidenceLink**：回放帧、锚点、统计跳转——基础设施级。
 - **QA 报告**：damage/freeze 伪影规则已冻结（见 `studio-redesign.md` §1）。

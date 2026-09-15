@@ -3,7 +3,7 @@ import type { TriangleBvh } from "@cs2dak/maps";
 import { decodeDelta } from "@cs2dak/contract";
 import { decodeDuelWindow, frameIndexForTick, isVisibleAt, type VisibilityContext } from "./duel-window.js";
 import { createResolverFromPackage, type PlayerResolver } from "./resolve.js";
-import { activeDamages, killWeaponName, normalizeWeapon, round } from "./utils.js";
+import { activePhaseDamages, killWeaponName, normalizeWeapon, round } from "./utils.js";
 
 const ENGAGEMENT_GAP_SECONDS = 1.5;
 const CONTESTED_WINDOW_SECONDS = 1.5;
@@ -433,7 +433,7 @@ export function buildDuelsSignals(input: DemoPackage, options: DuelSignalsOption
   const tickrate = tickrateOf(pkg);
   const ctx: VisibilityContext = { pkg, visibility: options.visibility };
   const shots = flattenShots(pkg.shots);
-  const damages = activeDamages(pkg);
+  const damages = activePhaseDamages(pkg);
   const engagements = buildEngagements(damages, pkg, shots, tickrate);
   const records = pkg.kills
     .filter((kill) => isEnemyKill(resolver, kill))

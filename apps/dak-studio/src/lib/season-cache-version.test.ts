@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAP_INTELLIGENCE_FACT_VERSION, TACTICAL_FACT_VERSION } from "@cs2dak/core";
+import { CORE_ANALYSIS_VERSION, MAP_INTELLIGENCE_FACT_VERSION, TACTICAL_FACT_VERSION } from "@cs2dak/core";
 import {
   FACTS_REVISION,
   FACTS_STORAGE_VERSION,
@@ -17,7 +17,7 @@ describe("season aggregate cache version", () => {
     expect(FACTS_REVISION).toContain(`storage:${FACTS_STORAGE_VERSION}`);
     expect(FACTS_REVISION).toContain(`tactical:${TACTICAL_FACT_VERSION}`);
     expect(FACTS_REVISION).toContain(`mapIntelligence:${MAP_INTELLIGENCE_FACT_VERSION}`);
-    expect(FACTS_REVISION).toContain("tournament:cs2-demo-analysis-kit/1.0.1");
+    expect(FACTS_REVISION).toContain(`tournament:${CORE_ANALYSIS_VERSION}`);
     expect(seasonCacheKey([], undefined, [], "stale")).not.toBe(seasonCacheKey([]));
   });
 });

@@ -19,7 +19,6 @@ import type { RoundPhase, RoundPhaseModel } from "./types.js";
 
 type Round = DemoPackage["rounds"][number];
 type PositionRow = { roundNumber: number; tick: number; steamId64: string; lastPlaceName?: string | null };
-type Kill = DemoPackage["kills"][number];
 
 export function inferRoundPhases(pkg: DemoPackage): Map<number, RoundPhaseModel> {
   const routes = getMapRoutes(pkg.match?.mapName ?? "");
@@ -29,11 +28,9 @@ export function inferRoundPhases(pkg: DemoPackage): Map<number, RoundPhaseModel>
   const hasRoutes = routes != null;
 
   const teamByPlayer = new Map(pkg.players.map((p) => [p.steamId64, p.teamKey]));
-  const teamSize = countByTeam(pkg);
 
   const posByRound = groupBy(positions, (row) => row.roundNumber);
-  const killsByRound = groupBy(pkg.kills, (k) => k.roundNumber);
-  const playerTeams = pkg.players.map((p) => p.teamKey);
+  const clutchesByRound = groupBy(pkg.clutches ?? [], (clutch) => clutch.roundNumber);
   const plantByRound = new Map<number, number>();
   for (const bomb of pkg.bombs) {
     if (bomb.type === "planted" && !plantByRound.has(bomb.roundNumber)) {
@@ -45,7 +42,9 @@ export function inferRoundPhases(pkg: DemoPackage): Map<number, RoundPhaseModel>
   for (const round of pkg.rounds) {
     const tTeam = round.teamASide === "t" ? "teamA" : round.teamBSide === "t" ? "teamB" : null;
     const plantTick = plantByRound.get(round.roundNumber) ?? null;
-    const clutchStartTick = computeClutchStart(killsByRound.get(round.roundNumber) ?? [], teamSize, playerTeams);
+    const clutchStartTick = [...(clutchesByRound.get(round.roundNumber) ?? [])]
+      .sort((a, b) => a.tick - b.tick)
+      .at(0)?.tick ?? null;
     const { takeTick, executeTick } = computeTakeExecute(
       round,
       tTeam,
@@ -77,32 +76,6 @@ export function phaseAtTick(model: RoundPhaseModel, tick: number): RoundPhase {
   if (model.executeTick != null && tick >= model.executeTick) return "execute";
   if (model.takeTick != null && tick >= model.takeTick) return "take";
   return "default";
-}
-
-function countByTeam(pkg: DemoPackage): { teamA: number; teamB: number } {
-  let teamA = 0;
-  let teamB = 0;
-  for (const p of pkg.players) {
-    if (p.teamKey === "teamA") teamA += 1;
-    else if (p.teamKey === "teamB") teamB += 1;
-  }
-  return { teamA, teamB };
-}
-
-/** 一方存活降到 1（另一方 ≥ 1）的首个 tick。 */
-function computeClutchStart(kills: Kill[], teamSize: { teamA: number; teamB: number }, playerTeams: string[]): number | null {
-  let aliveA = teamSize.teamA;
-  let aliveB = teamSize.teamB;
-  if (aliveA === 0 || aliveB === 0) return null;
-  for (const kill of [...kills].sort((a, b) => a.tick - b.tick)) {
-    const victimTeam = playerTeams[kill.victimIndex];
-    if (victimTeam === "teamA") aliveA = Math.max(0, aliveA - 1);
-    else if (victimTeam === "teamB") aliveB = Math.max(0, aliveB - 1);
-    if ((aliveA === 1 && aliveB >= 1) || (aliveB === 1 && aliveA >= 1)) {
-      return kill.tick;
-    }
-  }
-  return null;
 }
 
 function computeTakeExecute(

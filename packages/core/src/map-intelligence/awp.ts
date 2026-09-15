@@ -40,6 +40,6 @@ export function extractAwpRoundFacts(
     : pkg.shots ? 0 : null;
   const awpKills = pkg.kills
     .filter((kill) => kill.roundNumber === roundNumber && kill.killerIndex === playerIndex)
-    .filter((kill) => isAwp(kill.killerActiveWeapon) || isAwp(kill.weapon)).length;
+    .filter((kill) => isAwp(kill.weapon)).length;
   return { freezeAwpOwnership, activeAwpSeconds: activeFrames * frameSeconds, awpShots, awpKills };
 }

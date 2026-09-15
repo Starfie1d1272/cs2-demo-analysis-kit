@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DemoPackage, PackageDamage } from "@cs2dak/contract";
-import { activeDamages } from "./utils.js";
+import { activePhaseDamages } from "./utils.js";
 import { buildQaReport, demoSourceAvailability } from "./qa.js";
 
 function damage(tick: number): PackageDamage {
@@ -101,7 +101,7 @@ describe("buildQaReport", () => {
     expect(buildQaReport(demo).issues).not.toContainEqual(expect.objectContaining({
       code: "damages.tick_outside_round"
     }));
-    expect(activeDamages(demo).map((row) => row.tick)).toEqual([120]);
+    expect(activePhaseDamages(demo).map((row) => row.tick)).toEqual([120]);
   });
 
   it("still reports damage rows before the round start", () => {

@@ -28,8 +28,8 @@ This repository owns the product-neutral analysis pipeline from a `cs2-demo-form
 | `@cs2dak/core` | Deterministic single-match analysis, RR/PRISM signal derivation, QA. No product side effects. |
 | `@cs2dak/cohort` | Cross-match aggregation and identity merging. No product ranking rules. |
 | `@cs2dak/maps` | Map calibration + world-to-radar transform + attack routes (`MapRoute`) + zone geometry (`zoneAt` / `pointInPolygon`) + callout mappings. |
-| `@cs2dak/tournament` | Zero-runtime-dependency frozen sufficient-fact DTOs, identity-safe cross-map merge, rates, deterministic ordering, and invariant guards. |
-| `@cs2dak/presentation` | Product-neutral view models, labels, stories, workspace composition, and legacy single-map Tournament adapters. |
+| `@cs2dak/tournament` | Zero-runtime-dependency frozen sufficient-fact DTOs, identity-safe cross-map merge for 1.0 economy/team facts and 1.1 performance facts, denominator-aware rates, deterministic ordering, and invariant guards. |
+| `@cs2dak/presentation` | Product-neutral view models, labels, stories, workspace composition, and single-map Tournament fact adapters. |
 | `@cs2dak/react` | Product-neutral preview components that consume presentation contracts only. |
 | `@cs2dak/cli` | Language-neutral filesystem/automation wrapper around TypeScript packages. |
 | `apps/dak-studio` | Local demo library and analysis workbench. Stores ZIP bytes locally; `.dem` import is exported through `cs2df`. |
@@ -51,6 +51,15 @@ Important v3 semantics:
 - Columnar streams are delta encoded; consumers use `decodeDelta()` from `cs2-demo-format`.
 - Missing derived data remains `null`, not coerced to `0`.
 
+`@cs2dak/core` is the sole owner of DAK performance semantics. Its
+`buildPlayerRoundPerformanceFacts()` converts the frozen event annotations into
+player-round Assist, Damage, Opening, Trade, KAST, Clutch, Utility, Objective,
+Weapon, and man-state facts. `playerStats` remains a reference aggregate used for
+strict parity validation only; `analyzeDemoPackage()` records comparable drift as
+a QA error, while Opening rows affected by world death, suicide, or teamkill are
+explicitly marked not comparable. Cohort, tournament, presentation, and Evidence
+adapters aggregate or project the Core facts and do not recreate event rules.
+
 ### Tournament frozen-fact boundary
 
 Tournament analytics deliberately has a narrower runtime boundary than the general
@@ -63,13 +72,15 @@ core single-map detection
   -> DAK Studio / RivalHub consumers
 ```
 
-`@cs2dak/tournament` owns only the public `TournamentMapFacts` DTO and the
-cross-map `TournamentAnalytics` merge. It does not parse demos, redetect events,
-resolve RivalHub scope, access storage, or own scoreboard/rating formulas. Entity
-keys are the only aggregation identity; display labels are injected at the final
-projection step. Its published runtime contains compiled ESM and declarations,
-with no dependency on `@cs2dak/core`, `@cs2dak/contract`, `@cs2dak/cohort`, maps,
-React, Zod, or RivalHub code.
+`@cs2dak/tournament` owns the public `TournamentMapFacts` / `TournamentAnalytics`
+1.0 surface and the additive `TournamentPerformanceMapFacts` /
+`TournamentPerformanceAnalytics` 1.1 surface. The performance builder consumes
+already-frozen player-round, objective, and weapon facts; it does not parse demos
+or redetect events. It does not resolve RivalHub scope, access storage, or own
+scoreboard/rating formulas. Entity keys are the only aggregation identity; display
+labels are injected at the final projection step. Its published runtime contains
+compiled ESM and declarations, with no dependency on `@cs2dak/core`,
+`@cs2dak/contract`, `@cs2dak/cohort`, maps, React, Zod, or RivalHub code.
 
 ### Rating layers
 
@@ -111,8 +122,8 @@ Formula ownership stays in `@rivalhub/rival-rating`. This kit only derives signa
 | `@cs2dak/core` | 单场确定性分析、RR/PRISM 信号派生、QA；无产品副作用。 |
 | `@cs2dak/cohort` | 跨场聚合与身份归并，不拥有产品排行榜规则。 |
 | `@cs2dak/maps` | 地图标定、world-to-radar 转换、进攻动线、zone 几何与 callout 映射。 |
-| `@cs2dak/tournament` | 零 runtime 依赖的 frozen sufficient-fact DTO、identity-safe 跨图 merge、rate、确定性排序与 invariant guard。 |
-| `@cs2dak/presentation` | 产品中立 View Model、标签、叙事、workspace 编排和 Tournament 单图 legacy adapter。 |
+| `@cs2dak/tournament` | 零 runtime 依赖的 frozen sufficient-fact DTO、identity-safe 跨图 merge、透明 performance aggregation、rate、确定性排序与 invariant guard。 |
+| `@cs2dak/presentation` | 产品中立 View Model、标签、叙事、workspace 编排和 Tournament 单图 fact adapter。 |
 | `@cs2dak/react` | 只消费 presentation 合同的产品中立组件。 |
 | `@cs2dak/cli` | TypeScript 包的文件系统/自动化入口。 |
 | `apps/dak-studio` | 本地 Demo 库和分析工作台；本地保存 ZIP 字节，`.dem` 导入通过 `cs2df` 导出。 |
@@ -134,6 +145,14 @@ v3 包包含：
 - 列式流为 delta 编码；消费者使用 `cs2-demo-format` 导出的 `decodeDelta()`。
 - 缺失派生数据保持 `null`，不得伪造为 `0`。
 
+`@cs2dak/core` 是 DAK performance semantics 的唯一 owner。其
+`buildPlayerRoundPerformanceFacts()` 将冻结的事件标注统一转换为 player-round
+层的 Assist、Damage、Opening、Trade、KAST、Clutch、Utility、Objective、Weapon
+与 man-state facts。`playerStats` 仅作为 reference aggregate 做严格 parity
+validation；`analyzeDemoPackage()` 将可比 mismatch 写入 QA error，Opening 前出现
+世界伤害、自杀或队友击杀的回合则明确标记为不可比。cohort、tournament、
+presentation 和 Evidence 适配器只聚合或投影 Core facts，不重新实现事件规则。
+
 ### Tournament frozen-fact 边界
 
 赛事统计的链路固定为：
@@ -145,11 +164,14 @@ core 单场 detection
   -> DAK Studio / RivalHub consumer
 ```
 
-`@cs2dak/tournament` 只拥有窄 public `TournamentMapFacts` DTO 与跨图
-`TournamentAnalytics` merge；不解析 Demo、不重新检测事件、不解析 RivalHub scope、
-不访问存储，也不拥有 scoreboard 或评分公式。聚合只认 entity key，display label
-仅在最终 projection 注入。发布产物是编译后的 ESM + declaration，runtime 不依赖
-`@cs2dak/core`、`@cs2dak/contract`、`@cs2dak/cohort`、maps、React、Zod 或 RivalHub。
+`@cs2dak/tournament` 只拥有窄 public `TournamentMapFacts` / `TournamentAnalytics`
+1.0 DTO 与 additive `TournamentPerformanceMapFacts` /
+`TournamentPerformanceAnalytics` 1.1 merge；performance surface 只消费已冻结的
+player-round、objective、weapon sufficient facts，不重新 detection。不解析 Demo、
+不解析 RivalHub scope、不访问存储，也不拥有 scoreboard 或评分公式。聚合只认
+entity key，display label 仅在最终 projection 注入。发布产物是编译后的 ESM +
+declaration，runtime 不依赖 `@cs2dak/core`、`@cs2dak/contract`、`@cs2dak/cohort`、
+maps、React、Zod 或 RivalHub。
 
 ### 评分三层
 

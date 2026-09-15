@@ -1,9 +1,11 @@
 import {
+  aggregatePlayerRoundPerformanceFacts,
   analyzeDemoPackage,
-  buildPlayerRoundFacts,
-  buildPlayerRoundUtilityFacts,
+  buildPlayerRoundPerformanceFacts,
   buildTeamSideWinRates,
+  CORE_SEMANTIC_PROFILE,
   demoSourceAvailability,
+  type PlayerPerformanceAggregate,
 } from "../../../../packages/core/src/index";
 import type { DemoPackage, TeamKey } from "../../../../packages/contract/src/index";
 import { buildTournamentInsightsFromFacts, extractTournamentFacts } from "../../../../packages/presentation/src/index";
@@ -343,8 +345,8 @@ function mappedSteam(pkg: DemoPackage, identities: Map<string, RivalHubParticipa
   return player ? identities.get(player.steamId64)?.steamId64 ?? null : null;
 }
 
-function teamConversions(pkg: DemoPackage) {
-  const insights = buildTournamentInsightsFromFacts([extractTournamentFacts({ matchId: "fixture", pkg })]);
+function teamConversions(pkg: DemoPackage, performanceFacts: ReturnType<typeof buildPlayerRoundPerformanceFacts>) {
+  const insights = buildTournamentInsightsFromFacts([extractTournamentFacts({ matchId: "fixture", pkg }, performanceFacts)]);
   const names = { teamA: pkg.match.teamA.name ?? "Team A", teamB: pkg.match.teamB.name ?? "Team B" };
   return {
     economyMatrix: insights.economyMatrix.map((row) => ({ lowEconomy: row.lowEconomy, highEconomy: row.highEconomy, rounds: row.rounds, lowEconomyWins: row.lowEconomyWins })),
@@ -374,6 +376,7 @@ function teamConversions(pkg: DemoPackage) {
 function projectPlayerMaps(
   pkg: DemoPackage,
   identities: Map<string, RivalHubParticipantIdentity>,
+  performanceBySteamId: Map<string, PlayerPerformanceAggregate>,
 ): Array<Record<string, unknown>> {
   const stats = pkg.playerStats;
   if (!Array.isArray(stats) || stats.length !== pkg.players.length) {
@@ -393,31 +396,32 @@ function projectPlayerMaps(
   if (statsByPlayerIndex.size !== pkg.players.length) {
     throw new Error("Evidence 的 v3 playerStats 未覆盖全部 Demo 选手");
   }
-
   return pkg.players.map((player, playerIndex) => {
     const playerStats = statsByPlayerIndex.get(playerIndex);
     if (!playerStats) throw new Error(`Evidence 缺少 playerIndex=${playerIndex} 的 v3 playerStats`);
     const identity = identities.get(player.steamId64);
     if (!identity) throw new Error(`Evidence 缺少选手 ${player.steamId64} 的 canonical identity`);
+    const summary = performanceBySteamId.get(player.steamId64);
+    if (!summary) throw new Error(`Evidence 缺少选手 ${player.steamId64} 的 Core performance summary`);
     return {
       steamId64: identity.steamId64,
       teamKey: player.teamKey,
-      rounds: playerStats.rounds,
-      kills: playerStats.kills,
-      deaths: playerStats.deaths,
-      assists: playerStats.assists,
-      damage: playerStats.damageHealth,
-      kastRounds: playerStats.kastRounds,
-      headshots: playerStats.headshotCount,
-      firstKills: playerStats.firstKillCount,
-      firstDeaths: playerStats.firstDeathCount,
-      tradeKills: playerStats.tradeKillCount,
-      twoKillRounds: playerStats.twoKillCount,
-      threeKillRounds: playerStats.threeKillCount,
-      fourKillRounds: playerStats.fourKillCount,
-      fiveKillRounds: playerStats.fiveKillCount,
-      clutchAttempts: playerStats.vsOneCount + playerStats.vsTwoCount + playerStats.vsThreeCount + playerStats.vsFourCount + playerStats.vsFiveCount,
-      clutchWins: playerStats.vsOneWonCount + playerStats.vsTwoWonCount + playerStats.vsThreeWonCount + playerStats.vsFourWonCount + playerStats.vsFiveWonCount,
+      rounds: summary.rounds,
+      kills: summary.kills,
+      deaths: summary.deaths,
+      assists: summary.assists,
+      damage: summary.damage,
+      kastRounds: summary.kastRounds,
+      headshots: summary.headshots,
+      firstKills: summary.firstKills,
+      firstDeaths: summary.firstDeaths,
+      tradeKills: summary.tradeKills,
+      twoKillRounds: summary.twoKillRounds,
+      threeKillRounds: summary.threeKillRounds,
+      fourKillRounds: summary.fourKillRounds,
+      fiveKillRounds: summary.fiveKillRounds,
+      clutchAttempts: summary.clutch.attempts,
+      clutchWins: summary.clutch.wins,
     };
   });
 }
@@ -433,45 +437,44 @@ export function buildRivalHubDemoEvidenceV1(
   if (!demoSha256 || !/^[a-f0-9]{64}$/.test(demoSha256)) {
     throw new Error("DemoPackage manifest.demo.hash 必须提供有效的 64 位小写 SHA-256");
   }
-  const playerMaps = projectPlayerMaps(pkg, identities);
-  const analysis = analyzeDemoPackage(pkg);
-  const facts = buildPlayerRoundFacts(pkg);
-  const utilityFacts = new Map(buildPlayerRoundUtilityFacts(pkg).map((fact) => [`${fact.roundNumber}:${fact.steamId64}`, fact]));
+  const performanceFacts = buildPlayerRoundPerformanceFacts(pkg);
+  const performanceBySteamId = aggregatePlayerRoundPerformanceFacts(performanceFacts);
+  const playerMaps = projectPlayerMaps(pkg, identities, performanceBySteamId);
+  const analysis = analyzeDemoPackage(pkg, performanceFacts);
+  const qaErrors = analysis.qa.issues.filter((issue) => issue.severity === "error");
+  if (qaErrors.length > 0) {
+    throw new Error(`Evidence blocked by Core QA: ${qaErrors.map((issue) => issue.code).join(", ")}`);
+  }
   const sideWinRates = buildTeamSideWinRates(pkg);
-  const playerIndex = new Map(pkg.players.map((player, index) => [player.steamId64, index]));
   const roundSeq = new Map(pkg.rounds.map((round, index) => [round.roundNumber, index + 1]));
-  const playerRounds = facts.map((fact) => {
-    const index = playerIndex.get(fact.steamId64)!;
-    const clutch = pkg.clutches.find((row) => row.roundNumber === fact.roundNumber && row.clutcherIndex === index);
-    const utility = utilityFacts.get(`${fact.roundNumber}:${fact.steamId64}`)!;
+  const playerRounds = performanceFacts.playerRounds.map((fact) => {
+    const identity = identities.get(fact.steamId64);
+    if (!identity) throw new Error(`Evidence 缺少选手 ${fact.steamId64} 的 canonical identity`);
+    const { grenadesThrown: _grenadesThrown, utilityDamage: _utilityDamage, ...utility } = fact.utility;
     return {
-      roundSeq: roundSeq.get(fact.roundNumber)!, steamId64: identities.get(fact.steamId64)!.steamId64, teamKey: fact.teamKey, side: fact.side,
+      roundSeq: roundSeq.get(fact.roundNumber)!, steamId64: identity.steamId64, teamKey: fact.teamKey, side: fact.side,
       survived: fact.survived, kills: fact.kills, deaths: fact.deaths, assists: fact.assists, damage: fact.damage,
-      headshots: pkg.kills.filter((row) => row.roundNumber === fact.roundNumber && row.killerIndex === index && row.headshot).length,
-      tradeKills: fact.tradeKills, tradedDeaths: fact.tradedDeaths, openingDuel: fact.openingDuel, kast: fact.kastTags.length > 0,
+      headshots: fact.headshots,
+      tradeKills: fact.tradeKills, tradedDeaths: fact.tradedDeaths, openingDuel: fact.openingDuel, kast: fact.kast,
       economyType: fact.economyType, equipmentValue: fact.equipmentValue,
-      clutch: clutch ? { opponentCount: clutch.opponentCount, won: clutch.won } : null,
-      utility: {
-        flashesThrown: utility.flashesThrown, enemyBlindSeconds: utility.enemyBlindSeconds, teamBlindSeconds: utility.teamBlindSeconds,
-        enemyBlindVictims: utility.enemyBlindVictims, flashAssists: utility.flashAssists, heThrows: utility.heThrows,
-        heDamage: utility.heDamage, fireThrows: utility.fireThrows, fireDamage: utility.fireDamage,
-        smokesThrown: utility.smokesThrown, utilityKills: utility.utilityKills,
-      },
+      clutch: fact.clutch ? { opponentCount: fact.clutch.opponentCount, won: fact.clutch.won } : null,
+      utility,
     };
   });
-  const weapons = new Map<string, { steamId64: string; weapon: string; kills: number; headshotKills: number }>();
-  for (const kill of pkg.kills) {
-    const steamId64 = mappedSteam(pkg, identities, kill.killerIndex);
-    if (!steamId64) continue;
-    const key = `${steamId64}:${kill.weapon}`;
-    const row = weapons.get(key) ?? { steamId64, weapon: kill.weapon, kills: 0, headshotKills: 0 };
-    row.kills += 1;
-    if (kill.headshot) row.headshotKills += 1;
-    weapons.set(key, row);
-  }
-  const conversions = teamConversions(pkg);
+  const weapons = pkg.players.flatMap((player) => {
+    const identity = identities.get(player.steamId64);
+    const summary = performanceBySteamId.get(player.steamId64);
+    if (!identity || !summary) return [];
+    return summary.weapons.map((weapon) => ({
+      steamId64: identity.steamId64,
+      weapon: weapon.weapon,
+      kills: weapon.kills,
+      headshotKills: weapon.headshotKills,
+    }));
+  });
+  const conversions = teamConversions(pkg, performanceFacts);
   return {
-    contract: { contractVersion: "rivalhub-demo-evidence/1", semanticProfile: "dak-stable/1", analysisVersion: analysis.provenance.analysisVersion },
+    contract: { contractVersion: "rivalhub-demo-evidence/1", semanticProfile: CORE_SEMANTIC_PROFILE, analysisVersion: analysis.provenance.analysisVersion },
     target,
     source: {
       demoSha256, mapName: pkg.match.mapName, tickRateHz: pkg.match.tickrate, sourceSchemaVersion: pkg.manifest.schemaVersion,
@@ -493,7 +496,7 @@ export function buildRivalHubDemoEvidenceV1(
     },
     semanticFacts: { playerRounds, economyMatrix: conversions.economyMatrix, teamConversions: conversions.teams },
     summaries: {
-      playerMaps, playerWeapons: [...weapons.values()],
+      playerMaps, playerWeapons: weapons,
       teamMaps: (["teamA", "teamB"] as const).map((teamKey) => {
         const sideRates = sideWinRates[teamKey];
         const t = sideRates.t ?? { played: 0, won: 0 };

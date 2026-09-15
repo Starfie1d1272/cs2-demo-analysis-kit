@@ -8,8 +8,8 @@ export type DemoSourceAvailability = ScoreboardFieldAvailability & {
   clutches: "available";
 };
 
-export function buildQaReport(pkg: DemoPackage): QaReport {
-  const issues: QaIssue[] = [];
+export function buildQaReport(pkg: DemoPackage, additionalIssues: readonly QaIssue[] = []): QaReport {
+  const issues: QaIssue[] = [...additionalIssues];
   const roundNumbers = pkg.rounds.map((round) => round.roundNumber).sort((a, b) => a - b);
   const roundsByNumber = new Map(pkg.rounds.map((round) => [round.roundNumber, round]));
   // 3.0.3+: 非最终回合的事件窗口延伸到下一回合 startTick 前

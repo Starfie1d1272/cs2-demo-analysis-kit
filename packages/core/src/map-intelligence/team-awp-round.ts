@@ -1,5 +1,7 @@
 import { FLAG_ALIVE, MAP_INTELLIGENCE_FACT_VERSION, type DemoPackage, type PlayerPositionRoundFact, type TeamAwpRoundFact } from "@cs2dak/contract";
 import { replayWeaponAt, type ReplayRoundContext } from "../tactics/replay-round-context.js";
+import { buildPlayerRoundPerformanceFacts, type PlayerRoundPerformanceFacts } from "../performance-facts.js";
+import { activePhaseDamages } from "../utils.js";
 import { rounded } from "./spatial.js";
 
 function isAwp(value: string | null): boolean { return value?.trim().toLowerCase().replace(/^weapon_/, "") === "awp"; }
@@ -8,8 +10,8 @@ function awpDamageForTeam(pkg: DemoPackage, round: DemoPackage["rounds"][number]
   // A valid v3 manifest always names damages.json. Keep null only for a genuinely
   // unavailable package rather than turning an unknown fact into zero.
   if (!pkg.manifest?.files?.damages) return null;
-  return pkg.damages
-    .filter((damage) => damage.roundNumber === round.roundNumber && damage.tick >= round.freezeEndTick && damage.tick <= round.endTick)
+  return activePhaseDamages(pkg)
+    .filter((damage) => damage.roundNumber === round.roundNumber)
     .filter((damage) => damage.attackerIndex != null && pkg.players[damage.attackerIndex]?.teamKey === teamKey)
     .filter((damage) => pkg.players[damage.victimIndex]?.teamKey !== teamKey)
     .filter((damage) => isAwp(damage.weapon))
@@ -20,10 +22,17 @@ function phase(roundNumber: number): TeamAwpRoundFact["scorePhase"] {
   return roundNumber <= 12 ? "first_half" : roundNumber <= 24 ? "second_half" : "overtime";
 }
 
-export function extractTeamAwpRoundFacts(pkg: DemoPackage, matchId: string, context: ReplayRoundContext | null, rows: PlayerPositionRoundFact[]): TeamAwpRoundFact[] {
+export function extractTeamAwpRoundFacts(
+  pkg: DemoPackage,
+  matchId: string,
+  context: ReplayRoundContext | null,
+  rows: PlayerPositionRoundFact[],
+  performanceFacts: PlayerRoundPerformanceFacts = buildPlayerRoundPerformanceFacts(pkg),
+): TeamAwpRoundFact[] {
   const round = context?.round ?? pkg.rounds.find((candidate) => candidate.roundNumber === rows[0]?.roundNumber);
   if (!round) return [];
-  const firstKill = [...pkg.kills].filter((kill) => kill.roundNumber === round.roundNumber).sort((a, b) => a.tick - b.tick)[0] ?? null;
+  const openingWinner = performanceFacts.playerRounds.find((row) => row.roundNumber === round.roundNumber && row.openingDuel === "won") ?? null;
+  const openingLoser = performanceFacts.playerRounds.find((row) => row.roundNumber === round.roundNumber && row.openingDuel === "lost") ?? null;
   const frameSeconds = context ? context.tickStep / (pkg.match.tickrate || 64) : 0;
   return (["teamA", "teamB"] as const).map((teamKey) => {
     const side = teamKey === "teamA" ? round.teamASide : round.teamBSide;
@@ -40,8 +49,8 @@ export function extractTeamAwpRoundFacts(pkg: DemoPackage, matchId: string, cont
       if (active >= 2) doubleFrames += 1;
     }
     const won = round.winnerTeamKey === teamKey;
-    const firstKillerTeam = firstKill?.killerIndex == null ? null : pkg.players[firstKill.killerIndex]?.teamKey ?? null;
-    const firstVictimTeam = pkg.players[firstKill?.victimIndex ?? -1]?.teamKey ?? null;
+    const firstKillerTeam = openingWinner?.teamKey ?? null;
+    const firstVictimTeam = openingLoser?.teamKey ?? null;
     const available = teamRows.some((row) => row.activeAwpSeconds != null);
     return {
       analysisVersion: MAP_INTELLIGENCE_FACT_VERSION, matchId, mapName: pkg.match.mapName, roundNumber: round.roundNumber, teamKey, side,
