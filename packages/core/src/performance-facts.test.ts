@@ -159,13 +159,57 @@ describe("canonical player-round performance facts", () => {
     expect(playerD).toMatchObject({ kills: 0, deaths: 1, firstDeaths: 1, headshots: 0 });
     expect(playerE).toMatchObject({ kills: 1, deaths: 0, firstKills: 1, headshots: 1 });
     expect(facts.openingParity).toEqual({ nonComparableRounds: [1] });
+
     const parityPkg = {
       ...pkg,
-      playerStats: pkg.players.map((_, playerIndex) => ({ playerIndex })) as DemoPackage["playerStats"],
+      playerStats: pkg.players.map((player, playerIndex) => {
+        const summary = summaries.get(player.steamId64)!;
+        return {
+          playerIndex,
+          rounds: summary.rounds,
+          kills: summary.kills,
+          deaths: summary.deaths,
+          assists: summary.assists,
+          damageHealth: summary.damage,
+          headshotCount: summary.headshots,
+          firstKillCount: 0,
+          firstDeathCount: 0,
+          tradeKillCount: summary.tradeKills,
+          tradeDeathCount: summary.tradedDeaths,
+          combatDeathCount: summary.combatDeaths,
+          bombDeathCount: summary.bombDeaths,
+          kastRounds: summary.kastRounds,
+          flashAssistCount: summary.utility.flashAssists,
+          utilityDamage: summary.utility.utilityDamage,
+          bombPlantCount: summary.objective.plants,
+          bombDefuseCount: summary.objective.defuses,
+          oneKillCount: summary.oneKillRounds,
+          twoKillCount: summary.twoKillRounds,
+          threeKillCount: summary.threeKillRounds,
+          fourKillCount: summary.fourKillRounds,
+          fiveKillCount: summary.fiveKillRounds,
+          vsOneCount: summary.clutch.byOpponentCount["1"].attempts,
+          vsOneWonCount: summary.clutch.byOpponentCount["1"].wins,
+          vsTwoCount: summary.clutch.byOpponentCount["2"].attempts,
+          vsTwoWonCount: summary.clutch.byOpponentCount["2"].wins,
+          vsThreeCount: summary.clutch.byOpponentCount["3"].attempts,
+          vsThreeWonCount: summary.clutch.byOpponentCount["3"].wins,
+          vsFourCount: summary.clutch.byOpponentCount["4"].attempts,
+          vsFourWonCount: summary.clutch.byOpponentCount["4"].wins,
+          vsFiveCount: summary.clutch.byOpponentCount["5"].attempts,
+          vsFiveWonCount: summary.clutch.byOpponentCount["5"].wins,
+          wallbangKillCount: summary.weapons.reduce((sum, row) => sum + row.wallbangKills, 0),
+          noScopeKillCount: summary.weapons.reduce((sum, row) => sum + row.noScopeKills, 0),
+          enemyFlashDurationSeconds: summary.utility.enemyBlindSeconds,
+          teamFlashDurationSeconds: summary.utility.teamBlindSeconds,
+        } as DemoPackage["playerStats"][number];
+      }),
     };
-    const parityIssues = findPlayerStatsParityMismatches(parityPkg);
+    const parityIssues = findPlayerStatsParityMismatches(parityPkg, facts);
     expect(parityIssues.filter((issue) => issue.comparable === false)).toHaveLength(pkg.players.length * 2);
-    expect(() => assertPlayerStatsParity(parityPkg)).not.toThrow();
+    expect(parityIssues.filter((issue) => issue.comparable !== false)).toEqual([]);
+    expect(() => assertPlayerStatsParity(parityPkg, facts)).not.toThrow();
+
     expect(facts.manState).toHaveLength(1);
     expect(facts.manState[0]).toMatchObject({
       killerSteamId64: "synthetic-4",
