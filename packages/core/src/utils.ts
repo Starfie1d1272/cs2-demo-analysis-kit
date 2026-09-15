@@ -1,5 +1,4 @@
 import type { DemoPackage, RRSignals } from "@cs2dak/contract";
-import { createResolverFromPackage } from "./resolve.js";
 
 export type BuyDeltaBuckets = NonNullable<RRSignals["combat"]["killsByBuyDelta"]>;
 export type ManStateBuckets = NonNullable<RRSignals["combat"]["killsByManState"]>;
@@ -51,17 +50,12 @@ export function zeroManState(): ManStateBuckets {
   return { manDown: 0, even: 0, manUp: 0 };
 }
 
-export function firstKillMap(pkg: DemoPackage): Map<number, DemoPackage["kills"][number]> {
-  const firstKillByRound = new Map<number, DemoPackage["kills"][number]>();
-  for (const kill of [...pkg.kills].sort((a, b) => a.tick - b.tick)) {
-    if (!firstKillByRound.has(kill.roundNumber)) {
-      firstKillByRound.set(kill.roundNumber, kill);
-    }
-  }
-  return firstKillByRound;
-}
-
-export function activeDamages(pkg: DemoPackage): DemoPackage["damages"] {
+/**
+ * Phase-specific damage window for mechanics/duel consumers. Performance
+ * facts deliberately do not use this filter: the frozen v3 damage section is
+ * the canonical input for aggregate player damage.
+ */
+export function activePhaseDamages(pkg: DemoPackage): DemoPackage["damages"] {
   if (pkg.rounds.length === 0) return pkg.damages;
   const roundsByNumber = new Map(pkg.rounds.map((r) => [r.roundNumber, r]));
   return pkg.damages.filter((damage) => {
@@ -70,44 +64,9 @@ export function activeDamages(pkg: DemoPackage): DemoPackage["damages"] {
   });
 }
 
-export function sumDamageForPlayer(pkg: DemoPackage, playerIndex: number): number {
-  const resolver = createResolverFromPackage(pkg);
-  const playerTeam = resolver.byIndex(playerIndex).teamKey;
-  return activeDamages(pkg)
-    .filter((damage) =>
-      damage.attackerIndex === playerIndex &&
-      resolver.byIndexOrNull(damage.victimIndex)?.teamKey !== playerTeam
-    )
-    .reduce((sum, damage) => sum + damage.healthDamage, 0);
-}
-
-export function openingKillsForPlayer(pkg: DemoPackage, playerIndex: number): number {
-  return [...firstKillMap(pkg).values()].filter((kill) => kill.killerIndex === playerIndex).length;
-}
-
-export function openingDeathsForPlayer(pkg: DemoPackage, playerIndex: number): number {
-  return [...firstKillMap(pkg).values()].filter((kill) => kill.victimIndex === playerIndex).length;
-}
-
-export function multiKillRounds(kills: DemoPackage["kills"], target: number): number {
-  const counts = new Map<number, number>();
-  for (const kill of kills) {
-    counts.set(kill.roundNumber, (counts.get(kill.roundNumber) ?? 0) + 1);
-  }
-  return [...counts.values()].filter((count) => (target === 5 ? count >= 5 : count === target)).length;
-}
-
-export function clutchSplit(
-  count: number | undefined,
-  won: number | undefined,
-  rows: DemoPackage["clutches"],
-  opponentCount: number
-) {
-  const filtered = rows.filter((row) => row.opponentCount === opponentCount);
-  return {
-    count: count ?? filtered.length,
-    won: won ?? filtered.filter((row) => row.won).length
-  };
+/** @deprecated Use activePhaseDamages; this name remains for package users. */
+export function activeDamages(pkg: DemoPackage): DemoPackage["damages"] {
+  return activePhaseDamages(pkg);
 }
 
 export function normalizeWeapon(weapon: string): string {
@@ -122,9 +81,9 @@ export function isUtilityWeapon(weapon: string): boolean {
   return ["hegrenade", "inferno", "molotov", "incgrenade"].includes(normalizeWeapon(weapon));
 }
 
+/** Compatibility name; weapon attribution is always sourced from kill.weapon. */
 export function killWeaponName(kill: DemoPackage["kills"][number]): string {
-  const active = kill.killerActiveWeapon ? normalizeWeapon(kill.killerActiveWeapon) : "";
-  return isNamedWeapon(active) ? active : normalizeWeapon(kill.weapon);
+  return normalizeWeapon(kill.weapon);
 }
 
 export function nameForSteamId(pkg: DemoPackage, steamId: string | null): string | null {

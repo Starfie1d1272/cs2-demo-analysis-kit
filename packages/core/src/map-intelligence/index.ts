@@ -12,6 +12,7 @@ import { buildRoundSpatialFrames } from "./spatial.js";
 import { extractTeamShapeRoundFacts } from "./team-shape.js";
 import { extractTeamAwpRoundFacts } from "./team-awp-round.js";
 import { extractCtRotationRoundFacts } from "./ct-rotation.js";
+import { buildPlayerRoundPerformanceFacts, type PlayerRoundPerformanceFacts } from "../performance-facts.js";
 
 export { MAP_INTELLIGENCE_FACT_VERSION } from "@cs2dak/contract";
 export { OPENING_RESPONSIBILITY_SECONDS } from "./opening-window.js";
@@ -23,6 +24,7 @@ export interface ExtractMatchMapIntelligenceFactsOptions {
   matchId: string;
   calloutGrid?: CalloutGrid | null;
   nav?: CompactNav | null;
+  performanceFacts?: PlayerRoundPerformanceFacts;
 }
 
 /**
@@ -32,13 +34,15 @@ export function extractMatchMapIntelligenceFacts(
   pkg: DemoPackage,
   options: ExtractMatchMapIntelligenceFactsOptions,
 ): MatchMapIntelligenceFacts {
-  return extractMapIntelligenceWithContexts(pkg, options, createReplayRoundContexts(pkg));
+  const performanceFacts = options.performanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
+  return extractMapIntelligenceWithContexts(pkg, options, createReplayRoundContexts(pkg), performanceFacts);
 }
 
 function extractMapIntelligenceWithContexts(
   pkg: DemoPackage,
   options: ExtractMatchMapIntelligenceFactsOptions,
   contexts: ReadonlyMap<number, ReplayRoundContext>,
+  performanceFacts: PlayerRoundPerformanceFacts = buildPlayerRoundPerformanceFacts(pkg),
 ): MatchMapIntelligenceFacts {
   const nav = options.nav === undefined ? getMapNav(pkg.match.mapName) : options.nav;
   const playerPositionRounds = [];
@@ -51,7 +55,7 @@ function extractMapIntelligenceWithContexts(
     const positionRows = extractPlayerPositionRoundFacts(pkg, options.matchId, context, round, frames, options.calloutGrid ?? null, nav != null);
     playerPositionRounds.push(...positionRows);
     teamShapeRounds.push(...extractTeamShapeRoundFacts(pkg, options.matchId, context, round, frames, options.calloutGrid ?? null, nav != null));
-    teamAwpRounds.push(...extractTeamAwpRoundFacts(pkg, options.matchId, context, positionRows));
+    teamAwpRounds.push(...extractTeamAwpRoundFacts(pkg, options.matchId, context, positionRows, performanceFacts));
     ctRotationRounds.push(...extractCtRotationRoundFacts(pkg, options.matchId, context, round, frames, options.calloutGrid ?? null, nav != null));
   }
   return matchMapIntelligenceFactsSchema.parse({ analysisVersion: MAP_INTELLIGENCE_FACT_VERSION, matchId: options.matchId, mapName: pkg.match.mapName, playerPositionRounds, teamShapeRounds, teamAwpRounds, ctRotationRounds });
@@ -67,8 +71,9 @@ export function extractMatchTacticalAndMapIntelligenceFacts(
   options: ExtractMatchMapIntelligenceFactsOptions,
 ): { tacticalRounds: TacticalRoundFact[]; mapIntelligence: MatchMapIntelligenceFacts } {
   const contexts = createReplayRoundContexts(pkg);
+  const performanceFacts = options.performanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
   return {
-    tacticalRounds: extractTacticalRoundFactsWithContexts(pkg, options, contexts),
-    mapIntelligence: extractMapIntelligenceWithContexts(pkg, options, contexts),
+    tacticalRounds: extractTacticalRoundFactsWithContexts(pkg, options, contexts, performanceFacts),
+    mapIntelligence: extractMapIntelligenceWithContexts(pkg, options, contexts, performanceFacts),
   };
 }

@@ -1,10 +1,15 @@
 import { analysisBundleSchema, type AnalysisBundle } from "@cs2dak/contract";
 import { normalizeDemoPackage } from "./normalize.js";
 import { buildQaReport } from "./qa.js";
-import { buildPlayerRoundFacts, buildPlayerIndicators, buildScoreboard } from "./scoreboard.js";
+import { buildPlayerIndicators, buildScoreboard } from "./scoreboard.js";
 import { computeAccountRatingsV2 } from "./signals.js";
 import { buildTimeline, buildEconomy, buildHeatmap } from "./timeline.js";
 import { buildPlayerWeaponHighlights } from "./weapon-highlights.js";
+import {
+  buildPlayerRoundPerformanceFacts,
+  toPlayerRoundFacts,
+  type PlayerRoundPerformanceFacts,
+} from "./performance-facts.js";
 
 export { loadDemoManifestFromZip, loadDemoPackageFromZip } from "./loader.js";
 export type { DemoManifest, DemoPackageLoadOptions, DemoPackageLoadProfile } from "./loader.js";
@@ -13,12 +18,32 @@ export { createPlayerResolver, createResolverFromPackage } from "./resolve.js";
 export type { PlayerResolver } from "./resolve.js";
 export { demoSourceAvailability, type DemoSourceAvailability } from "./qa.js";
 export { deriveRRSignals, computeAccountRatingsV2 } from "./signals.js";
-export { activeDamages, groupBy } from "./utils.js";
+export { activeDamages, activePhaseDamages, groupBy } from "./utils.js";
 export * from "./spatial/index.js";
 export { deriveRRIndicators } from "./scoreboard.js";
 export { buildPlayerRoundFacts } from "./scoreboard.js";
 export { buildPlayerRoundUtilityFacts, type PlayerRoundUtilityFact } from "./utility-facts.js";
 export { derivePlayerWeaponHighlights } from "./weapon-highlights.js";
+export {
+  aggregatePlayerRoundPerformanceFacts,
+  buildPlayerRoundPerformanceFacts,
+  toPlayerRoundFacts,
+} from "./performance-facts.js";
+export type {
+  PlayerPerformanceAggregate,
+  PlayerPerformanceClutchAggregate,
+  PlayerPerformanceWeaponAggregate,
+  PlayerRoundManStateFact,
+  PlayerRoundPerformanceClutchFact,
+  PlayerRoundPerformanceFact,
+  PlayerRoundPerformanceFacts,
+  PlayerRoundPerformanceKastTag,
+  PlayerRoundPerformanceObjectiveFact,
+  PlayerRoundPerformanceUtilityFact,
+  PlayerRoundPerformanceWeaponFact,
+} from "./performance-facts.js";
+export { assertPlayerStatsParity, findPlayerStatsParityMismatches } from "./performance-parity.js";
+export type { PlayerStatsParityMismatch } from "./performance-parity.js";
 export { buildTeamSideWinRates } from "./side-win-rate.js";
 export { buildDuelsSignals, deriveDuels, deriveOpeningDuels } from "./duels.js";
 export { buildMechanicsSignals, counterStrafeThresholdForWeapon, derivePlayerMechanics } from "./mechanics.js";
@@ -36,14 +61,15 @@ export type {
   RateSample,
 } from "./mechanics.js";
 
-export function analyzeDemoPackage(input: unknown): AnalysisBundle {
+export function analyzeDemoPackage(input: unknown, suppliedPerformanceFacts?: PlayerRoundPerformanceFacts): AnalysisBundle {
   const pkg = normalizeDemoPackage(input);
   const qa = buildQaReport(pkg);
-  const playerRoundFacts = buildPlayerRoundFacts(pkg);
-  const playerIndicators = buildPlayerIndicators(pkg, playerRoundFacts);
-  const accountRatings = computeAccountRatingsV2(pkg);
-  const scoreboard = buildScoreboard(pkg, playerIndicators, accountRatings);
-  const playerWeaponHighlights = buildPlayerWeaponHighlights(pkg);
+  const performanceFacts = suppliedPerformanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
+  const playerRoundFacts = toPlayerRoundFacts(performanceFacts);
+  const playerIndicators = buildPlayerIndicators(pkg, performanceFacts);
+  const accountRatings = computeAccountRatingsV2(pkg, performanceFacts);
+  const scoreboard = buildScoreboard(pkg, playerIndicators, accountRatings, performanceFacts);
+  const playerWeaponHighlights = buildPlayerWeaponHighlights(pkg, performanceFacts);
   const timeline = buildTimeline(pkg);
   const economy = buildEconomy(pkg);
   const heatmap = buildHeatmap(pkg);

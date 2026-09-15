@@ -22,7 +22,9 @@ v3 ZIP（cs2-demo-format/3.x，由 cs2df 导出）
 赛事/经济统计走窄的 frozen-facts 接缝：DAK 单图 adapter 或已确认的 Evidence
 先生成 `TournamentMapFacts` / `TournamentPerformanceMapFacts`，再由发布后的
 `@cs2dak/tournament` 负责跨图 merge；这条 runtime 不需要安装整个
-`@cs2dak/presentation`。
+`@cs2dak/presentation`。单图 performance 先由 `@cs2dak/core` 的
+`buildPlayerRoundPerformanceFacts` 统一派生，`playerStats` 只用于 parity
+validation，不作为第二个 runtime source。
 
 CLI 路径（无需在产品里复刻分析模型）：
 
@@ -84,9 +86,10 @@ artifact（`dist/index.js` + `dist/index.d.ts`），不安装 `@cs2dak/presentat
 身份、scope、持久化和 UI owner。1.1 performance surface 保留 player 的
 overall/T/CT slices，所有 rate 携带 numerator/denominator，team per-round
 denominator 按去重后的 team-round 计算。`TournamentPerformanceMapFacts` 的
-player-round 是逐回合 source；当同一 ZIP 同时带有 `playerStats` aggregate 时，不能
-把后者反推回 side-aware round rows。旧 `RRIndicators`/#381 scoreboard projection
-仍按其既有 aggregate contract 运行，不能与 performance DTO 混作同一个 source。
+player-round 是 Core canonical 逐回合 source；`playerStats` 只作为 frozen aggregate
+parity oracle，不能反推或覆盖 side-aware round rows。旧 `RRIndicators`/#381
+scoreboard projection 仍按其既有 aggregate contract 运行，不能与 performance DTO
+混作同一个 source。
 
 未来如需共享更高层的 presentation View Model，仍须先确认其以**构建产物**发布且
 依赖图自洽；两边各自原生渲染，确有必要再嵌**只读卡片组件**，不共享有状态视图。

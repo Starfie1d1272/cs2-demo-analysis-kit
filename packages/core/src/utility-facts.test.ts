@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { buildPlayerRoundPerformanceFacts } from "./performance-facts.js";
 import { loadDemoPackageFromZip } from "./loader.js";
 import { buildPlayerRoundFacts } from "./scoreboard.js";
 import { buildPlayerRoundUtilityFacts } from "./utility-facts.js";
@@ -39,17 +40,26 @@ describe("buildPlayerRoundUtilityFacts", () => {
     }
   });
 
-  it("uses the same active round window as core damage facts", async () => {
+  it("projects utility damage from the canonical full round damage stream", async () => {
     const pkg = await fixture();
     const firstRound = pkg.rounds[0]!;
-    const sourceDamage = pkg.damages[0]!;
+    const sourceDamage = pkg.damages.find((row) => row.weapon === "hegrenade");
+    expect(sourceDamage).toBeDefined();
+    if (!sourceDamage || sourceDamage.attackerIndex === null) return;
+    const attackerSteamId64 = pkg.players[sourceDamage.attackerIndex]?.steamId64;
     const withFreezeDamage = {
       ...pkg,
-      damages: [...pkg.damages, { ...sourceDamage, roundNumber: firstRound.roundNumber, tick: firstRound.freezeEndTick - 1 }],
+      damages: [...pkg.damages, { ...sourceDamage, roundNumber: firstRound.roundNumber, tick: firstRound.freezeEndTick - 1, healthDamage: 7 }],
     };
-    const baseline = buildPlayerRoundUtilityFacts(pkg);
+    const baseline = buildPlayerRoundPerformanceFacts(pkg);
+    const baselineRound = baseline.playerRounds.find((row) => row.roundNumber === firstRound.roundNumber && row.steamId64 === attackerSteamId64)!;
+    const actualPerformance = buildPlayerRoundPerformanceFacts(withFreezeDamage);
+    const actualRound = actualPerformance.playerRounds.find((row) => row.roundNumber === firstRound.roundNumber && row.steamId64 === attackerSteamId64)!;
     const actual = buildPlayerRoundUtilityFacts(withFreezeDamage);
 
-    expect(actual).toEqual(baseline);
+    expect(actualRound.damage - baselineRound.damage).toBe(7);
+    expect(actualRound.utility.utilityDamage - baselineRound.utility.utilityDamage).toBe(7);
+    expect(actual.find((row) => row.roundNumber === firstRound.roundNumber && row.steamId64 === baselineRound.steamId64)?.utilityDamage)
+      .toBe(baselineRound.utility.utilityDamage + 7);
   });
 });

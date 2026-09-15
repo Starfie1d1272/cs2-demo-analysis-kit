@@ -1,6 +1,11 @@
 import { round } from "./season-metrics.js";
 import { displayWeaponName } from "./weapons.js";
 import type { DemoPackage, TeamMapRoleMatrix } from "@cs2dak/contract";
+import {
+  aggregatePlayerRoundPerformanceFacts,
+  buildPlayerRoundPerformanceFacts,
+  type PlayerRoundPerformanceFacts,
+} from "@cs2dak/core";
 
 export interface TeamComparisonPlayerRow {
   teamName: string;
@@ -63,6 +68,7 @@ export interface TeamOverviewModel {
 export interface TeamComparisonInput {
   matchId: string;
   pkg: DemoPackage;
+  performanceFacts?: PlayerRoundPerformanceFacts;
 }
 
 export interface TeamComparisonFacts {
@@ -77,6 +83,13 @@ export interface TeamComparisonFacts {
     deaths: number;
     damageHealth: number;
     kastRounds: number;
+  }>;
+  /** Core-owned weapon aggregates; raw kills remain available as event facts. */
+  playerWeapons?: Array<{
+    playerSteamId64: string;
+    weapon: string;
+    kills: number;
+    headshotKills: number;
   }>;
   kills: Array<{ killerSteamId64: string | null; roundNumber: number; tick: number; weapon: string }>;
   rounds: Array<{ teamAEconomy: string; teamBEconomy: string; winnerTeamKey: "teamA" | "teamB" }>;
@@ -93,6 +106,8 @@ function averageNullable(values: Array<number | null | undefined>): number | nul
 
 export function extractTeamComparisonFacts(input: TeamComparisonInput): TeamComparisonFacts {
   const { pkg } = input;
+  const performanceFacts = input.performanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
+  const performanceBySteamId = aggregatePlayerRoundPerformanceFacts(performanceFacts);
   return {
     matchId: input.matchId,
     mapName: pkg.match.mapName,
@@ -105,17 +120,26 @@ export function extractTeamComparisonFacts(input: TeamComparisonInput): TeamComp
       name: player.name,
       teamKey: player.teamKey
     })),
-    playerStats: pkg.playerStats.map((stat) => {
-      const player = pkg.players[stat.playerIndex];
-      return {
-        playerSteamId64: player?.steamId64 ?? "",
-        rounds: stat.rounds,
-        kills: stat.kills,
-        deaths: stat.deaths,
-        damageHealth: stat.damageHealth,
-        kastRounds: stat.kastRounds
-      };
-    }).filter((row) => row.playerSteamId64 !== ""),
+    playerStats: pkg.players.flatMap((player) => {
+      const summary = performanceBySteamId.get(player.steamId64);
+      return summary ? [{
+        playerSteamId64: player.steamId64,
+        rounds: summary.rounds,
+        kills: summary.kills,
+        deaths: summary.deaths,
+        damageHealth: summary.damage,
+        kastRounds: summary.kastRounds,
+      }] : [];
+    }),
+    playerWeapons: pkg.players.flatMap((player) => {
+      const summary = performanceBySteamId.get(player.steamId64);
+      return summary?.weapons.map((weapon) => ({
+        playerSteamId64: player.steamId64,
+        weapon: weapon.weapon,
+        kills: weapon.kills,
+        headshotKills: weapon.headshotKills,
+      })) ?? [];
+    }),
     kills: pkg.kills.map((kill) => ({
       killerSteamId64: kill.killerIndex != null ? (pkg.players[kill.killerIndex]?.steamId64 ?? null) : null,
       roundNumber: kill.roundNumber,
@@ -211,12 +235,11 @@ export function buildTeamComparisonFromFacts(
           current.kastRounds += stat.kastRounds;
           playerRows.set(player.steamId64, current);
         }
-        for (const kill of input.kills) {
-          if (kill.killerSteamId64 == null) continue;
-          const killer = playerBySteam.get(kill.killerSteamId64);
+        for (const weapon of input.playerWeapons ?? []) {
+          const killer = playerBySteam.get(weapon.playerSteamId64);
           if (!killer || killer.teamKey !== teamKey) continue;
-          const weapon = killWeaponLabel(kill.weapon);
-          weaponKills.set(weapon, (weaponKills.get(weapon) ?? 0) + 1);
+          const label = killWeaponLabel(weapon.weapon);
+          weaponKills.set(label, (weaponKills.get(label) ?? 0) + weapon.kills);
         }
         for (const round of input.rounds) {
           const type = teamKey === "teamA" ? round.teamAEconomy : round.teamBEconomy;

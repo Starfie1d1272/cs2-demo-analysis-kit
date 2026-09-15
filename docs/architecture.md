@@ -51,6 +51,13 @@ Important v3 semantics:
 - Columnar streams are delta encoded; consumers use `decodeDelta()` from `cs2-demo-format`.
 - Missing derived data remains `null`, not coerced to `0`.
 
+`@cs2dak/core` is the sole owner of DAK performance semantics. Its
+`buildPlayerRoundPerformanceFacts()` converts the frozen event annotations into
+player-round Assist, Damage, Opening, Trade, KAST, Clutch, Utility, Objective,
+Weapon, and man-state facts. `playerStats` remains a reference aggregate used for
+strict parity validation only; cohort, tournament, presentation, and Evidence
+adapters aggregate or project the Core facts and do not recreate event rules.
+
 ### Tournament frozen-fact boundary
 
 Tournament analytics deliberately has a narrower runtime boundary than the general
@@ -135,6 +142,13 @@ v3 包包含：
 - `positions-1s.json` 已删除；空间消费者改读 8 Hz replay 流和 `place` 列。
 - 列式流为 delta 编码；消费者使用 `cs2-demo-format` 导出的 `decodeDelta()`。
 - 缺失派生数据保持 `null`，不得伪造为 `0`。
+
+`@cs2dak/core` 是 DAK performance semantics 的唯一 owner。其
+`buildPlayerRoundPerformanceFacts()` 将冻结的事件标注统一转换为 player-round
+层的 Assist、Damage、Opening、Trade、KAST、Clutch、Utility、Objective、Weapon
+与 man-state facts。`playerStats` 仅作为 reference aggregate 做严格 parity
+validation；cohort、tournament、presentation 和 Evidence 适配器只聚合或投影
+Core facts，不重新实现事件规则。
 
 ### Tournament frozen-fact 边界
 

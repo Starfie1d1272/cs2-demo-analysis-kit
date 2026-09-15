@@ -38,11 +38,10 @@
 
 仓库里**真数据被丢在桌上**，schema 已保留、core 却没用。这一阶段零成本提精度。
 
-- **用真值替换近似/占位**（fixture 已支持 TDD）：
-  - `combatDeathCount`：现在用总 deaths 近似 → 改用 `player-stats.combatDeathCount` 真值。
-  - `bombDeathCount`：现在硬写 `null` → 改用 `player-stats.bombDeathCount` 真值。
-  - `wallbangKillCount` / `noScopeKillCount`：用 `player-stats` 真值，去掉 `penetratedObjects>0` 估算。
-  - AWP/狙击判定：用 `kills.killerActiveWeapon` 而非武器名启发式。
+- **由 Core canonical performance facts 统一派生并与 frozen aggregate parity**（fixture 已支持 TDD）：
+  - `combatDeathCount` / `bombDeathCount`：由 Core 归因 `kills`，并严格对齐 `playerStats` oracle。
+  - `wallbangKillCount` / `noScopeKillCount`：由 Core `kill` annotations 归因，并与 `playerStats` parity 校验。
+  - AWP/狙击判定：使用 `kills.weapon`；`killerActiveWeapon` 不决定 performance weapon statistics。
   - 删除代码里"等导出器产出后填入"等**过时注释**。
 - **表达去原创化**：v1 定位为兼容基线（box-score baseline），不承担原创叙事；v2 明确标 `lite / uncalibrated / per-match`。
 - **`confidence` 字段**：数据完整度 + 样本量，前端据此显示"未启用 / 无样本 / beta"。

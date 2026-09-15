@@ -25,7 +25,7 @@
 | `cs2df`                  | 将原始 `.dem` 确定性导出为合法 v3 DemoPackage                   | RR/PRISM、产品展示、业务持久化              | v3 ZIP、导出报告            |
 | Python CLI / GUI         | 提供 cs2df 的本地 GUI / DAK Studio 桥 / 打包壳                  | 维护独立 parser/exporter、分析或展示实现    | GUI、Studio bridge、桌面应用 |
 | `@cs2dak/contract`       | 定义 DAK 派生结果的公共合同；re-export 上游合同                 | 复制 `cs2-demo-format` schema、实现分析逻辑 | Zod schema、TypeScript 类型 |
-| `@cs2dak/core`           | 单场 Demo 的标准化、事实派生、QA 和确定性分析                   | 跨场聚合、身份管理、页面叙事、React UI      | `AnalysisBundle`            |
+| `@cs2dak/core`           | 单场 Demo 的标准化、canonical performance facts、QA 和确定性分析 | 跨场聚合、身份管理、页面叙事、React UI      | `AnalysisBundle`            |
 | `@cs2dak/cohort`         | 跨场聚合、身份归并、赛季级 RR/PRISM 输入与结果整形              | 单场解析、数据库、产品 UI                   | `CohortBundle`              |
 | `@rivalhub/rival-rating` | RR、PRISM 及相关评分公式                                        | Demo 信号提取、持久化、展示                 | 评分结果                    |
 | `@cs2dak/maps`           | 地图标定、坐标变换、callout 语义/grid、默认位、包点入口、区域几何 | 评分公式、产品 UI、战术结论、静态完整战术库 | 地图与空间能力              |
@@ -70,6 +70,7 @@ PRISM 风格、强弱项等“相对当前范围”的判断可以继续使用 c
 10. 跨模块行为必须由公开合同和 fixture 验证，不依赖内部文件结构。
 11. `@cs2dak/tournament` 自己拥有窄 public DTO；不得把 `@cs2dak/contract` 的 DemoFormat、Zod 或 RR 依赖拖入其 runtime。1.1 performance surface 只消费已冻结的 player-round/objective/weapon sufficient facts，不重新 detection。
 12. `@cs2dak/cohort` 保留 RR/PRISM 所需的 `RRIndicators` compatibility projection；它不替代 `@cs2dak/tournament` 的透明 performance owner。Presentation 的证据/视图模型可以保留自己的输出整形，但不得重新实现 Core 的事件归因。
+13. `@cs2dak/core` 的 `buildPlayerRoundPerformanceFacts` 是 Assist、Damage、Opening、Trade、KAST、Clutch、Utility、Objective、Weapon 和 man-state 的唯一 analytical owner。`playerStats` 仅作 frozen aggregate parity oracle；旧的 `buildPlayerRoundFacts` / utility projection 只能从 canonical facts 投影，不能形成 fallback 或第二套事件循环。
 
 ## 边界变更规则
 

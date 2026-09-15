@@ -8,6 +8,7 @@ import {
   deriveRRSignals,
   derivePlayerWeaponHighlights,
   deriveRRIndicators,
+  findPlayerStatsParityMismatches,
   loadDemoPackageFromZip
 } from "./index";
 
@@ -73,31 +74,26 @@ describe("analyzeDemoPackage", () => {
     expect(indicators[0]).toEqual(bundle.playerIndicators[0]?.indicators);
   });
 
-  it("wires player-stats truth into RRIndicators instead of legacy approximations", () => {
+  it("keeps playerStats as a parity oracle instead of a semantic fallback", () => {
     const statsTruth = pkg.playerStats[0]!;
     const patchedStats = {
       ...statsTruth,
       deaths: statsTruth.deaths + 2,
-      combatDeathCount: statsTruth.deaths,
+      combatDeathCount: statsTruth.combatDeathCount + 1,
       bombDeathCount: 2
     };
     const patchedPkg = {
       ...pkg,
       playerStats: pkg.playerStats.map((row) => row.playerIndex === statsTruth.playerIndex ? patchedStats : row)
     };
+    const baseline = deriveRRIndicators(pkg);
     const indicators = deriveRRIndicators(patchedPkg);
-    const bombDeathStats = patchedStats;
-    const wallbangStats = pkg.playerStats.find((row) => row.wallbangKillCount > 0)!;
-
-    const bombDeathSteamId64 = pkg.players[statsTruth.playerIndex]?.steamId64 ?? "unknown";
-    const wallbangSteamId64 = pkg.players[wallbangStats.playerIndex]?.steamId64 ?? "unknown";
-    const bombDeathIndicators = indicators.find((row) => row.steamId64 === bombDeathSteamId64)!;
-    const wallbangIndicators = indicators.find((row) => row.steamId64 === wallbangSteamId64)!;
-
-    expect(bombDeathStats.deaths).not.toBe(bombDeathStats.combatDeathCount);
-    expect(bombDeathIndicators.combatDeathCount).toBe(bombDeathStats.combatDeathCount);
-    expect(bombDeathIndicators.bombDeathCount).toBe(bombDeathStats.bombDeathCount);
-    expect(wallbangIndicators.wallbangKillCount).toBe(wallbangStats.wallbangKillCount);
+    expect(indicators).toEqual(baseline);
+    expect(findPlayerStatsParityMismatches(patchedPkg)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ playerIndex: statsTruth.playerIndex, field: "deaths" }),
+      expect.objectContaining({ playerIndex: statsTruth.playerIndex, field: "combatDeathCount" }),
+      expect.objectContaining({ playerIndex: statsTruth.playerIndex, field: "bombDeathCount" }),
+    ]));
   });
 
   it("surfaces account breakdown and context status on the scoreboard", () => {

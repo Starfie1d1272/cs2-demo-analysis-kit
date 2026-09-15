@@ -10,7 +10,15 @@ import { normalizeDemoPackage } from "./normalize.js";
 import { loadSpatialAssets } from "./spatial/annotate.js";
 import { buildOfficialMapControl } from "./spatial/mapcontrol.js";
 import { createResolverFromPackage, type PlayerResolver } from "./resolve.js";
-import { buildPlayerRoundUtilityFacts } from "./utility-facts.js";
+import {
+  aggregatePlayerRoundPerformanceFacts,
+  buildPlayerRoundPerformanceFacts,
+  emptyPlayerPerformanceAggregate,
+  type PlayerPerformanceAggregate,
+  type PlayerRoundManStateFact,
+  type PlayerRoundPerformanceFact,
+  type PlayerRoundPerformanceFacts,
+} from "./performance-facts.js";
 import {
   type BuyDeltaBuckets,
   type ManStateBuckets,
@@ -20,26 +28,21 @@ import {
   getOrInit,
   zeroBuyDelta,
   zeroManState,
-  clutchSplit,
-  sumDamageForPlayer,
-  openingKillsForPlayer,
-  openingDeathsForPlayer,
-  multiKillRounds,
   round,
-  firstKillMap
 } from "./utils.js";
 
 export type AccountRatingResult = CohortAccountResult & Pick<RRSixAccountResult, "combatContextFactor" | "weightsVersion" | "model">;
 
-export function deriveRRSignals(input: unknown): RRSignals[] {
+export function deriveRRSignals(input: unknown, performanceFacts?: PlayerRoundPerformanceFacts): RRSignals[] {
   const pkg = normalizeDemoPackage(input);
+  const facts = performanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
+  const summaries = aggregatePlayerRoundPerformanceFacts(facts);
   const resolver = createResolverFromPackage(pkg);
-  const statsMap = new Map(pkg.playerStats.map((row) => [row.playerIndex, row]));
   const killsByBuyDelta = buildKillsByBuyDelta(pkg, resolver);
-  const killsByManState = buildKillsByManState(pkg, resolver);
-  const tradedOpeningDeaths = buildTradedOpeningDeaths(pkg, resolver);
-  const objective = buildObjectiveSignals(pkg, resolver);
-  const utility = buildUtilitySignals(pkg, statsMap);
+  const killsByManState = buildKillsByManState(facts.manState);
+  const tradedOpeningDeaths = buildTradedOpeningDeaths(facts.playerRounds);
+  const objective = buildObjectiveSignals(facts.playerRounds);
+  const utility = buildUtilitySignals(summaries);
 
   const buyDeltaAvailable = pkg.playerEconomies.length > 0;
   const manStateAvailable = pkg.rounds.length > 0;
@@ -49,39 +52,36 @@ export function deriveRRSignals(input: unknown): RRSignals[] {
   // replay-based spatial re-impl (step 3)
   const spatialObservable = spatialAssets.routes != null && (pkg.replay?.rounds?.length ?? 0) > 0;
 
-  return pkg.players.map((player, playerIdx) => {
-    const stats = statsMap.get(playerIdx);
-    const playerKills = pkg.kills.filter((kill) => kill.killerIndex === playerIdx);
-    const playerDeaths = pkg.kills.filter((kill) => kill.victimIndex === playerIdx);
-    const playerClutches = pkg.clutches.filter((row) => row.clutcherIndex === playerIdx);
-    const rounds = Math.max(stats?.rounds ?? pkg.rounds.length, 0);
+  return pkg.players.map((player) => {
+    const summary = summaries.get(player.steamId64) ?? emptyPlayerPerformanceAggregate(player);
+    const rounds = Math.max(summary.rounds, 0);
 
     return {
       steamId64: player.steamId64,
       rounds,
       sourceVersion: "cs2-demo-analysis-kit/1.0",
       combat: {
-        kills: stats?.kills ?? playerKills.length,
-        deaths: stats?.deaths ?? playerDeaths.length,
-        assists: stats?.assists ?? 0,
-        effectiveDamage: stats?.damageHealth ?? sumDamageForPlayer(pkg, playerIdx),
-        openingKills: stats?.firstKillCount ?? openingKillsForPlayer(pkg, playerIdx),
-        openingDeaths: stats?.firstDeathCount ?? openingDeathsForPlayer(pkg, playerIdx),
+        kills: summary.kills,
+        deaths: summary.deaths,
+        assists: summary.assists,
+        effectiveDamage: summary.damage,
+        openingKills: summary.firstKills,
+        openingDeaths: summary.firstDeaths,
         multiKills: {
-          two: stats?.twoKillCount ?? multiKillRounds(playerKills, 2),
-          three: stats?.threeKillCount ?? multiKillRounds(playerKills, 3),
-          four: stats?.fourKillCount ?? multiKillRounds(playerKills, 4),
-          five: stats?.fiveKillCount ?? multiKillRounds(playerKills, 5)
+          two: summary.twoKillRounds,
+          three: summary.threeKillRounds,
+          four: summary.fourKillRounds,
+          five: summary.fiveKillRounds
         },
-        headshotKills: stats?.headshotCount ?? playerKills.filter((kill) => kill.headshot).length,
-        wallbangKills: stats?.wallbangKillCount ?? playerKills.filter((kill) => kill.penetratedObjects > 0).length,
+        headshotKills: summary.headshots,
+        wallbangKills: summary.weapons.reduce((sum, weapon) => sum + weapon.wallbangKills, 0),
         killsByBuyDelta: buyDeltaAvailable ? (killsByBuyDelta.get(player.steamId64) ?? zeroBuyDelta()) : null,
         killsByManState: manStateAvailable ? (killsByManState.get(player.steamId64) ?? zeroManState()) : null
       },
       trade: {
-        tradeKills: stats?.tradeKillCount ?? playerKills.filter((kill) => kill.tradeKill).length,
-        tradedDeaths: stats?.tradeDeathCount ?? playerDeaths.filter((kill) => kill.tradeDeath).length,
-        deaths: stats?.deaths ?? playerDeaths.length,
+        tradeKills: summary.tradeKills,
+        tradedDeaths: summary.tradedDeaths,
+        deaths: summary.deaths,
         tradedOpeningDeaths: tradedOpeningDeaths.get(player.steamId64) ?? 0,
         strategicIsolationDeaths: spatialObservable
           ? (officialMapControl.get(player.steamId64)?.strategicIsolationDeaths ?? 0)
@@ -95,34 +95,34 @@ export function deriveRRSignals(input: unknown): RRSignals[] {
         firstControlEvents: null
       },
       clutch: {
-        vsOne: clutchSplit(stats?.vsOneCount, stats?.vsOneWonCount, playerClutches, 1),
-        vsTwo: clutchSplit(stats?.vsTwoCount, stats?.vsTwoWonCount, playerClutches, 2),
-        vsThree: clutchSplit(stats?.vsThreeCount, stats?.vsThreeWonCount, playerClutches, 3),
-        vsFour: clutchSplit(stats?.vsFourCount, stats?.vsFourWonCount, playerClutches, 4),
-        vsFive: clutchSplit(stats?.vsFiveCount, stats?.vsFiveWonCount, playerClutches, 5)
+        vsOne: { count: summary.clutch.byOpponentCount["1"].attempts, won: summary.clutch.byOpponentCount["1"].wins },
+        vsTwo: { count: summary.clutch.byOpponentCount["2"].attempts, won: summary.clutch.byOpponentCount["2"].wins },
+        vsThree: { count: summary.clutch.byOpponentCount["3"].attempts, won: summary.clutch.byOpponentCount["3"].wins },
+        vsFour: { count: summary.clutch.byOpponentCount["4"].attempts, won: summary.clutch.byOpponentCount["4"].wins },
+        vsFive: { count: summary.clutch.byOpponentCount["5"].attempts, won: summary.clutch.byOpponentCount["5"].wins }
       },
       objective: objective.get(player.steamId64) ?? { plants: 0, defuses: 0, plantsConverted: 0 },
       utility: {
         ...(utility.get(player.steamId64) ?? {
-          flashAssists: stats?.flashAssistCount ?? 0,
-          effectiveEnemyFlashSeconds: stats?.enemyFlashDurationSeconds ?? 0,
-          teamFlashSuppressionSeconds: stats?.teamFlashDurationSeconds ?? 0,
+          flashAssists: 0,
+          effectiveEnemyFlashSeconds: 0,
+          teamFlashSuppressionSeconds: 0,
           smokeProtectedCrossings: null,
           smokeSightlineDenialSeconds: null,
           smokeIsolationSeconds: null,
           incendiaryPathDelayUnits: null,
           incendiaryDisplacementEvents: null,
-          utilityDamage: stats?.utilityDamage ?? 0
+          utilityDamage: 0
         })
       }
     } satisfies RRSignals;
   });
 }
 
-export function computeAccountRatingsV2(input: unknown): Array<{ signals: RRSignals; rr: AccountRatingResult }> {
+export function computeAccountRatingsV2(input: unknown, performanceFacts?: PlayerRoundPerformanceFacts): Array<{ signals: RRSignals; rr: AccountRatingResult }> {
   const weights = rrSixAccountWeightsV1 as unknown as RRSixAccountWeights;
   const baseline = rrSixAccountProBaselineV0 as unknown as ProBaselineConfig;
-  const signals = deriveRRSignals(input);
+  const signals = deriveRRSignals(input, performanceFacts);
   const rawBySteamId = new Map(signals.map((row) => [row.steamId64, computeRRSixAccounts(row, weights)]));
   const balanced = signals.map((signal) => computeFrozenProBaselineRR(signal, weights, baseline));
 
@@ -167,103 +167,55 @@ function buildKillsByBuyDelta(pkg: DemoPackage, resolver: PlayerResolver): Map<s
   return out;
 }
 
-function buildKillsByManState(pkg: DemoPackage, resolver: PlayerResolver): Map<string, ManStateBuckets> {
+function buildKillsByManState(rows: PlayerRoundManStateFact[]): Map<string, ManStateBuckets> {
   const out = new Map<string, ManStateBuckets>();
-  const teamAIndices = new Set(pkg.players.flatMap((p, i) => p.teamKey === "teamA" ? [i] : []));
-  const teamBIndices = new Set(pkg.players.flatMap((p, i) => p.teamKey === "teamB" ? [i] : []));
-
-  for (const roundRow of pkg.rounds) {
-    const aliveA = new Set(teamAIndices);
-    const aliveB = new Set(teamBIndices);
-    const roundKills = pkg.kills
-      .filter((kill) => kill.roundNumber === roundRow.roundNumber)
-      .sort((a, b) => a.tick - b.tick);
-
-    for (const kill of roundKills) {
-      if (kill.killerIndex === null) continue;
-      const killerPlayer = resolver.byIndexOrNull(kill.killerIndex);
-      const victimPlayer = resolver.byIndexOrNull(kill.victimIndex);
-      if (!killerPlayer || !victimPlayer || killerPlayer.teamKey === victimPlayer.teamKey) continue;
-
-      const killerSteamId = killerPlayer.steamId64;
-      const buckets = getOrInit(out, killerSteamId, zeroManState);
-      const killerAlive = killerPlayer.teamKey === "teamA" ? aliveA.size : aliveB.size;
-      const victimAlive = victimPlayer.teamKey === "teamA" ? aliveA.size : aliveB.size;
-      const diff = killerAlive - victimAlive;
-      if (diff < 0) {
-        buckets.manDown += 1;
-      } else if (diff > 0) {
-        buckets.manUp += 1;
-      } else {
-        buckets.even += 1;
-      }
-
-      if (victimPlayer.teamKey === "teamA") aliveA.delete(kill.victimIndex);
-      else aliveB.delete(kill.victimIndex);
+  for (const row of rows) {
+    const buckets = getOrInit(out, row.killerSteamId64, zeroManState);
+    if (row.preAdvantageTeamKey === null) {
+      buckets.even += 1;
+    } else if (row.killerTeamKey === row.preAdvantageTeamKey) {
+      buckets.manUp += 1;
+    } else {
+      buckets.manDown += 1;
     }
   }
 
   return out;
 }
 
-function buildTradedOpeningDeaths(pkg: DemoPackage, resolver: PlayerResolver): Map<string, number> {
+function buildTradedOpeningDeaths(rows: PlayerRoundPerformanceFact[]): Map<string, number> {
   const out = new Map<string, number>();
-  for (const kill of firstKillMap(pkg).values()) {
-    if (kill.tradeDeath) {
-      const victimSteamId = resolver.steamIdOf(kill.victimIndex);
-      if (victimSteamId) out.set(victimSteamId, (out.get(victimSteamId) ?? 0) + 1);
+  for (const row of rows) {
+    if (row.openingDuel === "lost" && row.tradedDeaths > 0) {
+      out.set(row.steamId64, (out.get(row.steamId64) ?? 0) + 1);
     }
   }
   return out;
 }
 
-function buildObjectiveSignals(pkg: DemoPackage, resolver: PlayerResolver): Map<string, ObjectiveBuckets> {
+function buildObjectiveSignals(rows: PlayerRoundPerformanceFact[]): Map<string, ObjectiveBuckets> {
   const out = new Map<string, ObjectiveBuckets>();
-  const roundWinner = new Map(pkg.rounds.map((round) => [round.roundNumber, round.winnerTeamKey]));
-
-  for (const bomb of pkg.bombs) {
-    if (bomb.actorIndex === null) continue;
-    const actorPlayer = resolver.byIndexOrNull(bomb.actorIndex);
-    if (!actorPlayer) continue;
-    const buckets = getOrInit(out, actorPlayer.steamId64, () => ({ plants: 0, defuses: 0, plantsConverted: 0 }));
-    if (bomb.type === "planted") {
-      buckets.plants += 1;
-      if (roundWinner.get(bomb.roundNumber) === actorPlayer.teamKey) {
-        buckets.plantsConverted = (buckets.plantsConverted ?? 0) + 1;
-      }
-    } else if (bomb.type === "defused") {
-      buckets.defuses += 1;
-    }
+  for (const row of rows) {
+    if (row.objective.plants === 0 && row.objective.defuses === 0) continue;
+    const buckets = getOrInit(out, row.steamId64, () => ({ plants: 0, defuses: 0, plantsConverted: 0 }));
+    buckets.plants += row.objective.plants;
+    buckets.defuses += row.objective.defuses;
+    if (row.teamWonRound) buckets.plantsConverted = (buckets.plantsConverted ?? 0) + row.objective.plants;
   }
 
   return out;
 }
 
-function buildUtilitySignals(pkg: DemoPackage, statsMap: Map<number, DemoPackage["playerStats"][number]>): Map<string, UtilityBuckets> {
-  const utilityFacts = buildPlayerRoundUtilityFacts(pkg);
-  const totals = new Map<string, { flashAssists: number; enemyBlindSeconds: number; teamBlindSeconds: number; utilityDamage: number }>();
-  for (const fact of utilityFacts) {
-    const total = totals.get(fact.steamId64) ?? { flashAssists: 0, enemyBlindSeconds: 0, teamBlindSeconds: 0, utilityDamage: 0 };
-    total.flashAssists += fact.flashAssists;
-    total.enemyBlindSeconds += fact.enemyBlindSeconds;
-    total.teamBlindSeconds += fact.teamBlindSeconds;
-    total.utilityDamage += fact.utilityDamage;
-    totals.set(fact.steamId64, total);
-  }
-
-  return new Map(pkg.players.map((player, playerIdx) => {
-    const stats = statsMap.get(playerIdx);
-    const fact = totals.get(player.steamId64) ?? { flashAssists: 0, enemyBlindSeconds: 0, teamBlindSeconds: 0, utilityDamage: 0 };
-    return [player.steamId64, {
-      flashAssists: stats?.flashAssistCount ?? fact.flashAssists,
-      effectiveEnemyFlashSeconds: stats?.enemyFlashDurationSeconds ?? round(fact.enemyBlindSeconds, 3),
-      teamFlashSuppressionSeconds: stats?.teamFlashDurationSeconds ?? round(fact.teamBlindSeconds, 3),
+function buildUtilitySignals(summaries: Map<string, PlayerPerformanceAggregate>): Map<string, UtilityBuckets> {
+  return new Map([...summaries.entries()].map(([steamId64, summary]) => [steamId64, {
+      flashAssists: summary.utility.flashAssists,
+      effectiveEnemyFlashSeconds: round(summary.utility.enemyBlindSeconds, 3),
+      teamFlashSuppressionSeconds: round(summary.utility.teamBlindSeconds, 3),
       smokeProtectedCrossings: null,
       smokeSightlineDenialSeconds: null,
       smokeIsolationSeconds: null,
       incendiaryPathDelayUnits: null,
       incendiaryDisplacementEvents: null,
-      utilityDamage: stats?.utilityDamage ?? fact.utilityDamage
-    } satisfies UtilityBuckets];
-  }));
+      utilityDamage: summary.utility.utilityDamage
+    } satisfies UtilityBuckets]));
 }

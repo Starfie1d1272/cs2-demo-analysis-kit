@@ -1,4 +1,5 @@
 import {
+  buildPlayerRoundPerformanceFacts,
   deriveRRSignals,
   derivePlayerWeaponHighlights,
   deriveRRIndicators
@@ -126,9 +127,10 @@ export function buildSeasonCohort(
   const valueWeights = opts.valueWeights ?? (rrSixAccountWeightsV1 as unknown as RRSixAccountWeights);
   const rows: SeasonCohortFactRow[] = [];
   for (const demo of demos) {
-    const signals = deriveRRSignals(demo.pkg);
-    const indicators = deriveRRIndicators(demo.pkg);
-    const weaponHighlights = derivePlayerWeaponHighlights(demo.pkg);
+    const performanceFacts = buildPlayerRoundPerformanceFacts(demo.pkg);
+    const signals = deriveRRSignals(demo.pkg, performanceFacts);
+    const indicators = deriveRRIndicators(demo.pkg, performanceFacts);
+    const weaponHighlights = derivePlayerWeaponHighlights(demo.pkg, performanceFacts);
     const signalBySteamId = new Map(signals.map((row) => [row.steamId64, row]));
     const indicatorBySteamId = new Map(indicators.map((row) => [row.steamId64, row]));
     const weaponHighlightBySteamId = new Map(weaponHighlights.map((row) => [row.steamId64, row]));
@@ -345,9 +347,9 @@ function aggregateAccountSignals(steamId64: string, rows: RRSignals[]): RRSignal
 
 /**
  * Compatibility projection for the RR/PRISM input contract. This is not the
- * transparent tournament-performance owner: RRIndicators may intentionally
- * prefer playerStats aggregate truth and also carries rating-only fields.
- * New transparent cross-match metrics belong in @cs2dak/tournament.
+ * transparent tournament-performance owner: RRIndicators is a legacy
+ * compatibility projection and also carries rating-only fields. Transparent
+ * cross-match metrics belong in @cs2dak/tournament.
  */
 function aggregateRatingIndicators(steamId64: string, rows: RRIndicators[]): RRIndicators {
   const totalRounds = Math.max(sum(rows, (row) => row.totalRounds), 1);

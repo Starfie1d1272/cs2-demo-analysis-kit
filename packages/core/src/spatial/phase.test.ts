@@ -61,6 +61,7 @@ function replayTwoFrames(
 function makePkg(over: Partial<{
   bombs: unknown[];
   kills: unknown[];
+  clutches: unknown[];
   replay: unknown;
 }> = {}): DemoPackage {
   return {
@@ -76,6 +77,7 @@ function makePkg(over: Partial<{
     ],
     bombs: over.bombs ?? [],
     kills: over.kills ?? [],
+    clutches: over.clutches ?? [],
     replay: over.replay,
   } as unknown as DemoPackage;
 }
@@ -99,10 +101,9 @@ describe("inferRoundPhases / phaseAtTick", () => {
     expect(phaseAtTick(m, 800)).toBe("postPlant");
   });
 
-  it("enters clutch when a side drops to one alive", () => {
-    // teamB starts at 2; one kill on teamB → 1 alive → clutch
+  it("uses the canonical clutch event for the clutch phase", () => {
     const m = inferRoundPhases(makePkg({
-      kills: [{ roundNumber: 1, tick: 250, victimTeamKey: "teamB", victimIndex: 2, killerIndex: 0, weapon: "ak47", headshot: false }],
+      clutches: [{ roundNumber: 1, tick: 250, clutcherIndex: 0, opponentCount: 1, won: false, survived: false, killCount: 0 }],
     })).get(1)!;
     expect(m.clutchStartTick).toBe(250);
     expect(phaseAtTick(m, 249)).toBe("default");
@@ -112,7 +113,7 @@ describe("inferRoundPhases / phaseAtTick", () => {
   it("clutch overrides postPlant in the same window", () => {
     const m = inferRoundPhases(makePkg({
       bombs: [{ roundNumber: 1, tick: 300, type: "planted", actorTeamKey: "teamA" }],
-      kills: [{ roundNumber: 1, tick: 350, victimTeamKey: "teamA", victimIndex: 0, killerIndex: 2, weapon: "ak47", headshot: false }],
+      clutches: [{ roundNumber: 1, tick: 350, clutcherIndex: 2, opponentCount: 1, won: false, survived: false, killCount: 0 }],
     })).get(1)!;
     expect(phaseAtTick(m, 320)).toBe("postPlant");
     expect(phaseAtTick(m, 360)).toBe("clutch");

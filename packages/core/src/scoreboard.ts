@@ -19,191 +19,112 @@ import type {
 import type { RRSignals } from "@rivalhub/rival-rating";
 import type { AccountRatingResult } from "./signals.js";
 import { normalizeDemoPackage } from "./normalize.js";
-import { activeDamages, round, firstKillMap, clutchSplit, killWeaponName } from "./utils.js";
-import { createResolverFromPackage } from "./resolve.js";
+import {
+  aggregatePlayerRoundPerformanceFacts,
+  buildPlayerRoundPerformanceFacts,
+  emptyPlayerPerformanceAggregate,
+  toPlayerRoundFacts,
+  type PlayerRoundPerformanceFacts,
+} from "./performance-facts.js";
+import { round } from "./utils.js";
 import { fieldAvailability, fieldConfidence } from "./qa.js";
-import { buildPlayerRoundUtilityFacts } from "./utility-facts.js";
 
-export function deriveRRIndicators(input: unknown): RRIndicators[] {
+export function deriveRRIndicators(input: unknown, performanceFacts?: PlayerRoundPerformanceFacts): RRIndicators[] {
   const pkg = normalizeDemoPackage(input);
-  return buildPlayerIndicators(pkg, buildPlayerRoundFacts(pkg)).map((row) => row.indicators);
+  const facts = performanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
+  return buildPlayerIndicators(pkg, facts).map((row) => row.indicators);
 }
 
-export function buildPlayerRoundFacts(pkg: DemoPackage): PlayerRoundFact[] {
-  const resolver = createResolverFromPackage(pkg);
-  const firstKillByRound = firstKillMap(pkg);
-  const damageRows = activeDamages(pkg);
-  const utilityFacts = new Map(buildPlayerRoundUtilityFacts(pkg).map((fact) => [`${fact.roundNumber}:${fact.steamId64}`, fact]));
-
-  return pkg.rounds.flatMap((roundRow) =>
-    pkg.players.map((player, playerIdx) => {
-      const kills = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.killerIndex === playerIdx);
-      const deaths = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.victimIndex === playerIdx);
-      const assists = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.assisterIndex === playerIdx);
-      // Keep the existing PlayerRoundFact assist/KAST semantics (the
-      // flashAssists field itself is supplied by the shared utility helper).
-      const flashAssistRows = pkg.kills.filter((kill) => kill.roundNumber === roundRow.roundNumber && kill.flashAssisterIndex === playerIdx);
-      const utility = utilityFacts.get(`${roundRow.roundNumber}:${player.steamId64}`)!;
-      const playerDamageRows = damageRows.filter((row) =>
-        row.roundNumber === roundRow.roundNumber &&
-        row.attackerIndex === playerIdx &&
-        resolver.byIndexOrNull(row.victimIndex)?.teamKey !== player.teamKey
-      );
-      const economy = pkg.playerEconomies.find((row) => row.roundNumber === roundRow.roundNumber && row.playerIndex === playerIdx);
-      const side = player.teamKey === "teamA" ? roundRow.teamASide : roundRow.teamBSide;
-      const firstKill = firstKillByRound.get(roundRow.roundNumber);
-      const kastTags = new Set<PlayerRoundFact["kastTags"][number]>();
-
-      if (kills.length > 0) kastTags.add("kill");
-      if (assists.length > 0 || flashAssistRows.length > 0) kastTags.add("assist");
-      if (deaths.length === 0) kastTags.add("survive");
-      if (deaths.some((death) => death.tradeDeath)) kastTags.add("trade");
-
-      return {
-        roundNumber: roundRow.roundNumber,
-        steamId64: player.steamId64,
-        name: player.name,
-        teamKey: player.teamKey,
-        side,
-        survived: deaths.length === 0,
-        kills: kills.length,
-        deaths: deaths.length,
-        assists: assists.length + flashAssistRows.length,
-        damage: playerDamageRows.reduce((sum, row) => sum + row.healthDamage, 0),
-        utilityDamage: utility.utilityDamage,
-        flashAssists: utility.flashAssists,
-        tradeKills: kills.filter((kill) => kill.tradeKill).length,
-        tradedDeaths: deaths.filter((death) => death.tradeDeath).length,
-        openingDuel: firstKill?.killerIndex === playerIdx ? "won" : firstKill?.victimIndex === playerIdx ? "lost" : "none",
-        kastTags: [...kastTags],
-        equipmentValue: economy?.equipmentValue ?? null,
-        economyType: economy?.type ?? null
-      };
-    })
-  );
+/** Backwards-compatible 1.0 projection from the single Core performance owner. */
+export function buildPlayerRoundFacts(
+  pkg: DemoPackage,
+  performanceFacts: PlayerRoundPerformanceFacts = buildPlayerRoundPerformanceFacts(pkg),
+): PlayerRoundFact[] {
+  return toPlayerRoundFacts(performanceFacts);
 }
 
-export function buildPlayerIndicators(pkg: DemoPackage, facts: PlayerRoundFact[]): PlayerIndicatorRow[] {
-  const statsMap = new Map(pkg.playerStats.map((row) => [row.playerIndex, row]));
-  const utilityTotals = new Map<string, {
-    utilityDamage: number;
-    flashAssists: number;
-    enemyBlindSeconds: number;
-    teamBlindSeconds: number;
-  }>();
-  for (const fact of buildPlayerRoundUtilityFacts(pkg)) {
-    const total = utilityTotals.get(fact.steamId64) ?? { utilityDamage: 0, flashAssists: 0, enemyBlindSeconds: 0, teamBlindSeconds: 0 };
-    total.utilityDamage += fact.utilityDamage;
-    total.flashAssists += fact.flashAssists;
-    total.enemyBlindSeconds += fact.enemyBlindSeconds;
-    total.teamBlindSeconds += fact.teamBlindSeconds;
-    utilityTotals.set(fact.steamId64, total);
-  }
+export function buildPlayerIndicators(pkg: DemoPackage, performanceFacts: PlayerRoundPerformanceFacts): PlayerIndicatorRow[] {
+  const summaries = aggregatePlayerRoundPerformanceFacts(performanceFacts);
 
-  const indicators = pkg.players.map((player, playerIdx) => {
-    const stats = statsMap.get(playerIdx);
-    const playerFacts = facts.filter((fact) => fact.steamId64 === player.steamId64);
-    const playerKills = pkg.kills.filter((kill) => kill.killerIndex === playerIdx);
-    const playerDeaths = pkg.kills.filter((kill) => kill.victimIndex === playerIdx);
-    const playerEconomies = pkg.playerEconomies.filter((row) => row.playerIndex === playerIdx);
-    const playerClutches = pkg.clutches.filter((row) => row.clutcherIndex === playerIdx);
-    const utility = utilityTotals.get(player.steamId64) ?? { utilityDamage: 0, flashAssists: 0, enemyBlindSeconds: 0, teamBlindSeconds: 0 };
-    const totalRounds = Math.max(playerFacts.length, 1);
-    const killsByRound = new Map<number, number>();
-    for (const kill of playerKills) {
-      killsByRound.set(kill.roundNumber, (killsByRound.get(kill.roundNumber) ?? 0) + 1);
-    }
-    const mkRounds = [...killsByRound.values()];
-    const firstKillCount = stats?.firstKillCount ?? playerFacts.filter((fact) => fact.openingDuel === "won").length;
-    const firstDeathCount = stats?.firstDeathCount ?? playerFacts.filter((fact) => fact.openingDuel === "lost").length;
-    const openingDuels = firstKillCount + firstDeathCount;
-    const awpKills = playerKills.filter((kill) => killWeaponName(kill) === "awp").length;
-    const sniperKills = playerKills.filter((kill) => ["awp", "ssg08", "scout"].includes(killWeaponName(kill))).length;
-    const utilityDamage = stats?.utilityDamage ?? utility.utilityDamage;
-    const flashAssistCount = stats?.flashAssistCount ?? utility.flashAssists;
-    const enemyFlashDurationSeconds = stats?.enemyFlashDurationSeconds ?? utility.enemyBlindSeconds;
-    const teamFlashDurationSeconds = stats?.teamFlashDurationSeconds ?? utility.teamBlindSeconds;
-    const grenadeCount = pkg.grenades.filter((grenade) => grenade.throwerIndex === playerIdx).length;
-    const deaths = stats?.deaths ?? playerDeaths.length;
-    const kills = stats?.kills ?? playerKills.length;
-    const assists = stats?.assists ?? playerFacts.reduce((sum, fact) => sum + fact.assists, 0);
-    const damage = stats?.damageHealth ?? playerFacts.reduce((sum, fact) => sum + fact.damage, 0);
-    const tradeKillCount = stats?.tradeKillCount ?? playerFacts.reduce((sum, fact) => sum + fact.tradeKills, 0);
-    const tradeDeathCount = stats?.tradeDeathCount ?? playerFacts.reduce((sum, fact) => sum + fact.tradedDeaths, 0);
-    const playedRounds = Math.max(stats?.rounds ?? totalRounds, 1);
-    const clutchWins = stats
-      ? stats.vsOneWonCount + stats.vsTwoWonCount + stats.vsThreeWonCount + stats.vsFourWonCount + stats.vsFiveWonCount
-      : playerClutches.filter((row) => row.won).length;
-    const clutchScore = stats
-      ? stats.vsOneWonCount + stats.vsTwoWonCount * 2 + stats.vsThreeWonCount * 3 + stats.vsFourWonCount * 4 + stats.vsFiveWonCount * 5
-      : playerClutches.reduce((sum, row) => sum + (row.won ? row.opponentCount : 0), 0);
+  const indicators = pkg.players.map((player, playerIndex) => {
+    const summary = summaries.get(player.steamId64) ?? emptyPlayerPerformanceAggregate(player);
+    const playerEconomies = (pkg.playerEconomies ?? []).filter((row) => row.playerIndex === playerIndex);
+    const totalRounds = Math.max(summary.rounds, 1);
+    const openingDuels = summary.firstKills + summary.firstDeaths;
+    const awpKills = summary.weapons.filter((weapon) => weapon.weapon === "awp").reduce((sum, weapon) => sum + weapon.kills, 0);
+    const sniperKills = summary.weapons
+      .filter((weapon) => ["awp", "ssg08", "scout"].includes(weapon.weapon))
+      .reduce((sum, weapon) => sum + weapon.kills, 0);
+    const clutchScore = [1, 2, 3, 4, 5].reduce((sum, count) => sum + (summary.clutch.byOpponentCount[String(count) as "1" | "2" | "3" | "4" | "5"]?.wins ?? 0) * count, 0);
+    const multiKillRounds = summary.twoKillRounds + summary.threeKillRounds + summary.fourKillRounds + summary.fiveKillRounds;
+    const playerRoundStats = (count: 1 | 2 | 3 | 4 | 5) => summary.clutch.byOpponentCount[String(count) as "1" | "2" | "3" | "4" | "5"];
 
     return {
       steamId64: player.steamId64,
-      totalRounds: playedRounds,
-      kills,
-      deaths,
-      assists,
-      kpr: round(kills / playedRounds, 4),
-      dpr: round(deaths / playedRounds, 4),
-      apr: round(assists / playedRounds, 4),
-      adr: round(stats?.adr ?? damage / playedRounds, 2),
-      hsPercent: kills > 0 ? round(((stats?.headshotCount ?? playerKills.filter((kill) => kill.headshot).length) / kills) * 100, 2) : 0,
-      kast: round(stats?.kast ?? (playerFacts.filter((fact) => fact.kastTags.length > 0).length / playedRounds) * 100, 2),
-      survivalRate: round(Math.max(0, playedRounds - deaths) / playedRounds, 4),
-      twoKillRounds: stats?.twoKillCount ?? mkRounds.filter((count) => count === 2).length,
-      threeKillRounds: stats?.threeKillCount ?? mkRounds.filter((count) => count === 3).length,
-      fourKillRounds: stats?.fourKillCount ?? mkRounds.filter((count) => count === 4).length,
-      fiveKillRounds: stats?.fiveKillCount ?? mkRounds.filter((count) => count >= 5).length,
-      multiKillRate: round((stats ? stats.twoKillCount + stats.threeKillCount + stats.fourKillCount + stats.fiveKillCount : mkRounds.filter((count) => count >= 2).length) / playedRounds, 4),
-      firstKillCount,
-      firstDeathCount,
-      firstKillRate: round(firstKillCount / playedRounds, 4),
-      firstDeathRate: round(firstDeathCount / playedRounds, 4),
-      openingDuelRate: round(openingDuels / playedRounds, 4),
-      openingDuelWinRate: openingDuels > 0 ? round(firstKillCount / openingDuels, 4) : 0,
-      tradeKillCount,
-      tradeDeathCount,
-      tradeKillRate: round(tradeKillCount / playedRounds, 4),
-      tradeDeathRate: deaths > 0 ? round(tradeDeathCount / deaths, 4) : 0,
-      clutchAttempts: playerClutches.length,
-      clutchWins,
-      clutchWinRate: playerClutches.length > 0 ? round(clutchWins / playerClutches.length, 4) : 0,
-      clutchFrequency: round(playerClutches.length / playedRounds, 4),
+      totalRounds,
+      kills: summary.kills,
+      deaths: summary.deaths,
+      assists: summary.assists,
+      kpr: round(summary.kills / totalRounds, 4),
+      dpr: round(summary.deaths / totalRounds, 4),
+      apr: round(summary.assists / totalRounds, 4),
+      adr: round(summary.damage / totalRounds, 2),
+      hsPercent: summary.kills > 0 ? round((summary.headshots / summary.kills) * 100, 2) : 0,
+      kast: round((summary.kastRounds / totalRounds) * 100, 2),
+      survivalRate: round(summary.survivalRounds / totalRounds, 4),
+      twoKillRounds: summary.twoKillRounds,
+      threeKillRounds: summary.threeKillRounds,
+      fourKillRounds: summary.fourKillRounds,
+      fiveKillRounds: summary.fiveKillRounds,
+      multiKillRate: round(multiKillRounds / totalRounds, 4),
+      firstKillCount: summary.firstKills,
+      firstDeathCount: summary.firstDeaths,
+      firstKillRate: round(summary.firstKills / totalRounds, 4),
+      firstDeathRate: round(summary.firstDeaths / totalRounds, 4),
+      openingDuelRate: round(openingDuels / totalRounds, 4),
+      openingDuelWinRate: openingDuels > 0 ? round(summary.firstKills / openingDuels, 4) : 0,
+      tradeKillCount: summary.tradeKills,
+      tradeDeathCount: summary.tradedDeaths,
+      tradeKillRate: round(summary.tradeKills / totalRounds, 4),
+      tradeDeathRate: summary.deaths > 0 ? round(summary.tradedDeaths / summary.deaths, 4) : 0,
+      clutchAttempts: summary.clutch.attempts,
+      clutchWins: summary.clutch.wins,
+      clutchWinRate: summary.clutch.attempts > 0 ? round(summary.clutch.wins / summary.clutch.attempts, 4) : 0,
+      clutchFrequency: round(summary.clutch.attempts / totalRounds, 4),
       clutchScore,
-      clutchScoreRate: round(clutchScore / playedRounds, 4),
-      vsOne: clutchSplit(stats?.vsOneCount, stats?.vsOneWonCount, playerClutches, 1),
-      vsTwo: clutchSplit(stats?.vsTwoCount, stats?.vsTwoWonCount, playerClutches, 2),
-      vsThree: clutchSplit(stats?.vsThreeCount, stats?.vsThreeWonCount, playerClutches, 3),
-      vsFour: clutchSplit(stats?.vsFourCount, stats?.vsFourWonCount, playerClutches, 4),
-      vsFive: clutchSplit(stats?.vsFiveCount, stats?.vsFiveWonCount, playerClutches, 5),
+      clutchScoreRate: round(clutchScore / totalRounds, 4),
+      vsOne: { count: playerRoundStats(1).attempts, won: playerRoundStats(1).wins },
+      vsTwo: { count: playerRoundStats(2).attempts, won: playerRoundStats(2).wins },
+      vsThree: { count: playerRoundStats(3).attempts, won: playerRoundStats(3).wins },
+      vsFour: { count: playerRoundStats(4).attempts, won: playerRoundStats(4).wins },
+      vsFive: { count: playerRoundStats(5).attempts, won: playerRoundStats(5).wins },
       awpKills,
-      awpKillsPerRound: round(awpKills / playedRounds, 4),
-      awpKillRate: kills > 0 ? round(awpKills / kills, 4) : 0,
+      awpKillsPerRound: round(awpKills / totalRounds, 4),
+      awpKillRate: summary.kills > 0 ? round(awpKills / summary.kills, 4) : 0,
       sniperKills,
-      sniperKillRate: kills > 0 ? round(sniperKills / kills, 4) : 0,
+      sniperKillRate: summary.kills > 0 ? round(sniperKills / summary.kills, 4) : 0,
       awpMultiKillRate: null,
       awpDuelWinRate: null,
-      utilityDamage,
-      utilityDamagePerRound: round(stats?.averageUtilityDamagePerRound ?? utilityDamage / playedRounds, 2),
-      flashAssistCount,
-      flashAssistPerRound: round(flashAssistCount / playedRounds, 4),
-      blindDurationTotal: round(enemyFlashDurationSeconds, 2),
-      blindDurationPerRound: round(enemyFlashDurationSeconds / playedRounds, 2),
-      enemyFlashDurationSeconds: round(enemyFlashDurationSeconds, 2),
-      enemyFlashDurationPerRound: round(enemyFlashDurationSeconds / playedRounds, 2),
-      teamFlashDurationSeconds: round(teamFlashDurationSeconds, 2),
-      teamFlashDurationPerRound: round(teamFlashDurationSeconds / playedRounds, 2),
-      grenadeCount,
-      grenadeCountPerRound: round(grenadeCount / playedRounds, 4),
+      utilityDamage: summary.utility.utilityDamage,
+      utilityDamagePerRound: round(summary.utility.utilityDamage / totalRounds, 2),
+      flashAssistCount: summary.utility.flashAssists,
+      flashAssistPerRound: round(summary.utility.flashAssists / totalRounds, 4),
+      blindDurationTotal: round(summary.utility.enemyBlindSeconds, 2),
+      blindDurationPerRound: round(summary.utility.enemyBlindSeconds / totalRounds, 2),
+      enemyFlashDurationSeconds: round(summary.utility.enemyBlindSeconds, 2),
+      enemyFlashDurationPerRound: round(summary.utility.enemyBlindSeconds / totalRounds, 2),
+      teamFlashDurationSeconds: round(summary.utility.teamBlindSeconds, 2),
+      teamFlashDurationPerRound: round(summary.utility.teamBlindSeconds / totalRounds, 2),
+      grenadeCount: summary.utility.grenadesThrown,
+      grenadeCountPerRound: round(summary.utility.grenadesThrown / totalRounds, 4),
       ecoRoundCount: playerEconomies.filter((row) => row.type === "eco").length,
       forceRoundCount: playerEconomies.filter((row) => row.type === "force").length,
       fullBuyRoundCount: playerEconomies.filter((row) => row.type === "full").length,
       pistolRoundCount: playerEconomies.filter((row) => row.type === "pistol").length,
       avgEquipmentValue: playerEconomies.length > 0 ? round(playerEconomies.reduce((sum, row) => sum + row.equipmentValue, 0) / playerEconomies.length, 2) : 0,
-      combatDeathCount: stats?.combatDeathCount ?? deaths,
-      bombDeathCount: stats?.bombDeathCount ?? null,
-      wallbangKillCount: stats?.wallbangKillCount ?? playerKills.filter((kill) => (kill.penetratedObjects ?? 0) > 0).length,
+      combatDeathCount: summary.combatDeaths,
+      bombDeathCount: summary.bombDeaths,
+      wallbangKillCount: summary.weapons.reduce((sum, weapon) => sum + weapon.wallbangKills, 0),
       roundSwingTotal: null,
       roundSwingPerKill: null
     } satisfies RRIndicators;
@@ -237,22 +158,22 @@ export function buildPlayerIndicators(pkg: DemoPackage, facts: PlayerRoundFact[]
 export function buildScoreboard(
   pkg: DemoPackage,
   rows: PlayerIndicatorRow[],
-  accountRatings: Array<{ signals: RRSignals; rr: AccountRatingResult }>
+  accountRatings: Array<{ signals: RRSignals; rr: AccountRatingResult }>,
+  performanceFacts: PlayerRoundPerformanceFacts = buildPlayerRoundPerformanceFacts(pkg),
 ): PlayerScoreboardRow[] {
-  const resolver = createResolverFromPackage(pkg);
+  const performanceBySteamId = aggregatePlayerRoundPerformanceFacts(performanceFacts);
+  const playerIndexBySteamId = new Map(pkg.players.map((player, index) => [player.steamId64, index]));
+  const playerStatsByIndex = new Map((pkg.playerStats ?? []).map((stats) => [stats.playerIndex, stats]));
   const accountBySteamId = new Map(accountRatings.map((row) => [row.signals.steamId64, row]));
-  const statsMap = new Map(pkg.playerStats.map((row) => [row.playerIndex, row]));
   const availability = fieldAvailability(pkg);
   const confidence = fieldConfidence(availability);
   return rows.map((row) => {
+    const summary = performanceBySteamId.get(row.steamId64);
+    if (!summary) throw new Error(`Core performance summary missing for ${row.steamId64}`);
     const account = accountBySteamId.get(row.steamId64);
     const accountRr = account?.rr;
     const combatSignals = account?.signals.combat;
-    const playerIdx = resolver.indexOfSteamId(row.steamId64);
-    const stats = playerIdx != null ? statsMap.get(playerIdx) : undefined;
-    const playerKills = playerIdx != null
-      ? pkg.kills.filter((kill) => kill.killerIndex === playerIdx)
-      : [];
+    const playerIdx = playerIndexBySteamId.get(row.steamId64);
     return {
       steamId64: row.steamId64,
       name: row.name,
@@ -271,11 +192,11 @@ export function buildScoreboard(
       combatDeathCount: row.indicators.combatDeathCount,
       bombDeathCount: row.indicators.bombDeathCount,
       wallbangKillCount: row.indicators.wallbangKillCount,
-      noScopeKillCount: stats?.noScopeKillCount ?? playerKills.filter((kill) => kill.noScope).length,
-      throughSmokeKillCount: playerKills.filter((kill) => kill.throughSmoke).length,
-      collateralKillCount: stats?.collateralKillCount ?? null,
-      bombPlantCount: stats?.bombPlantCount ?? null,
-      bombDefuseCount: stats?.bombDefuseCount ?? null,
+      noScopeKillCount: summary.weapons.reduce((sum, weapon) => sum + weapon.noScopeKills, 0),
+      throughSmokeKillCount: summary.weapons.reduce((sum, weapon) => sum + weapon.throughSmokeKills, 0),
+      collateralKillCount: playerIdx == null ? null : playerStatsByIndex.get(playerIdx)?.collateralKillCount ?? null,
+      bombPlantCount: summary.objective.plants,
+      bombDefuseCount: summary.objective.defuses,
       confidence,
       fieldAvailability: availability,
       ratingSeed: round(row.rr.rrBase, 2),

@@ -2,9 +2,8 @@ import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import {
-  buildPlayerRoundFacts,
-  buildPlayerRoundUtilityFacts,
-  derivePlayerWeaponHighlights,
+  aggregatePlayerRoundPerformanceFacts,
+  buildPlayerRoundPerformanceFacts,
   loadDemoPackageFromZip,
 } from "@cs2dak/core";
 import { buildSeasonCohort } from "@cs2dak/cohort";
@@ -37,22 +36,19 @@ describe("tournament performance adapter", () => {
     expect(result.players).toHaveLength(pkg.players.length);
     expect(result.teams).toHaveLength(2);
 
-    const coreFacts = buildPlayerRoundFacts(pkg);
-    const utilityFacts = buildPlayerRoundUtilityFacts(pkg);
-    const weaponFacts = derivePlayerWeaponHighlights(pkg);
-    // Cohort's RRIndicators is the rating/#381 compatibility projection and
-    // may prefer package-level playerStats. The assertions below compare only
-    // overlapping fields whose source is the same frozen Core fact/helper.
+    const performanceFacts = buildPlayerRoundPerformanceFacts(pkg);
+    const performanceBySteamId = aggregatePlayerRoundPerformanceFacts(performanceFacts);
+    // Cohort's RRIndicators remains a compatibility projection. The
+    // tournament adapter itself must agree with the canonical Core facts.
     for (const packagePlayer of pkg.players) {
       const playerKey = `steam:${packagePlayer.steamId64}`;
       const actual = result.players.find((row) => row.player.entityKey === playerKey)!;
-      const playerFacts = coreFacts.filter((row) => row.steamId64 === packagePlayer.steamId64);
-      const playerUtility = utilityFacts.filter((row) => row.steamId64 === packagePlayer.steamId64);
-      const expectedWeapons = weaponFacts.find((row) => row.steamId64 === packagePlayer.steamId64)!;
+      const playerFacts = performanceFacts.playerRounds.filter((row) => row.steamId64 === packagePlayer.steamId64);
+      const playerUtility = playerFacts.map((row) => row.utility);
+      const expectedWeapons = performanceBySteamId.get(packagePlayer.steamId64)!;
+      const headshotKills = expectedWeapons.weapons.reduce((sum, weapon) => sum + weapon.headshotKills, 0);
       const cohortRow = cohort.players.find((row) => row.playerKey === playerKey)!;
       const utilityRow = utilitySummary.players.find((row) => row.id === playerKey)!;
-      const playerIndex = pkg.players.indexOf(packagePlayer);
-      const headshotKills = pkg.kills.filter((kill) => kill.killerIndex === playerIndex && kill.headshot).length;
 
       expect(actual.slices.overall.sample.rounds).toBe(pkg.rounds.length);
       expect(actual.slices.overall.combat.kills).toBe(playerFacts.reduce((sum, row) => sum + row.kills, 0));
@@ -62,7 +58,7 @@ describe("tournament performance adapter", () => {
       expect(actual.slices.overall.combat.kills).toBe(cohortRow.indicators.kills);
       expect(actual.slices.overall.combat.deaths).toBe(cohortRow.indicators.deaths);
       expect(actual.slices.overall.combat.headshots).toBe(headshotKills);
-      expect(actual.slices.overall.kast.successes).toBe(playerFacts.filter((row) => row.kastTags.length > 0).length);
+      expect(actual.slices.overall.kast.successes).toBe(playerFacts.filter((row) => row.kast).length);
       expect(actual.slices.overall.survival.successes).toBe(playerFacts.filter((row) => row.survived).length);
       expect(actual.slices.overall.utility.flashesThrown).toBe(playerUtility.reduce((sum, row) => sum + row.flashesThrown, 0));
       expect(actual.slices.overall.utility.enemyBlindVictims).toBe(playerUtility.reduce((sum, row) => sum + row.enemyBlindVictims, 0));
@@ -82,7 +78,9 @@ describe("tournament performance adapter", () => {
       expect(actual.slices.overall.clutch.attempts).toBe(cohortRow.indicators.clutchAttempts);
       expect(actual.slices.overall.clutch.wins).toBe(cohortRow.indicators.clutchWins);
       expect(actual.weapons.map((row) => [row.weapon, row.kills, row.headshotKills])).toEqual(
-        expectedWeapons.weapons.map((row) => [row.weapon, row.kills, row.headshotKills]),
+        [...expectedWeapons.weapons]
+          .sort((a, b) => b.kills - a.kills || a.weapon.localeCompare(b.weapon))
+          .map((row) => [row.weapon, row.kills, row.headshotKills]),
       );
     }
 

@@ -16,7 +16,14 @@ import {
 import { decodeDelta } from "@cs2dak/contract";
 import { groupBy, nameForSteamId, round, normalizeWeapon, isNamedWeapon } from "./workspace-utils.js";
 import { displayWeaponName } from "./weapons.js";
-import { activeDamages, analyzeDemoPackage, normalizeDemoPackage } from "@cs2dak/core";
+import {
+  activePhaseDamages,
+  aggregatePlayerRoundPerformanceFacts,
+  analyzeDemoPackage,
+  buildPlayerRoundPerformanceFacts,
+  normalizeDemoPackage,
+  type PlayerRoundPerformanceFacts,
+} from "@cs2dak/core";
 import { getMapCalibration, hasLowerLevel } from "@cs2dak/maps";
 
 export function buildDemoViewModel(bundle: AnalysisBundle) {
@@ -43,7 +50,8 @@ export function buildDemoViewModel(bundle: AnalysisBundle) {
 
 export function buildMatchWorkspaceModel(input: unknown): MatchWorkspaceModel {
   const pkg = normalizeDemoPackage(input);
-  const bundle = analyzeDemoPackage(pkg);
+  const performanceFacts = buildPlayerRoundPerformanceFacts(pkg);
+  const bundle = analyzeDemoPackage(pkg, performanceFacts);
 
   const view = buildDemoViewModel(bundle);
   const eventsByRound = groupBy(bundle.timeline, (event) => event.roundNumber);
@@ -87,7 +95,7 @@ export function buildMatchWorkspaceModel(input: unknown): MatchWorkspaceModel {
       teamBEconomy: roundRow.teamBEconomy,
       events: eventsByRound.get(roundRow.roundNumber) ?? [],
       playerFacts: factsByRound.get(roundRow.roundNumber) ?? [],
-      facets: buildRoundFacets(pkg, roundRow.roundNumber)
+      facets: buildRoundFacets(pkg, roundRow.roundNumber, performanceFacts)
     })),
     players: bundle.scoreboard.map((row) => ({
       row,
@@ -104,7 +112,7 @@ export function buildMatchWorkspaceModel(input: unknown): MatchWorkspaceModel {
       roundFacts: factsByPlayer.get(row.steamId64) ?? []
     })),
     economy: bundle.economy,
-    weapons: buildWorkspaceWeapons(pkg),
+    weapons: buildWorkspaceWeapons(pkg, performanceFacts),
     duels: buildWorkspaceDuels(pkg, bundle),
     map: buildWorkspaceMap(pkg, view.map, bundle.heatmap),
     replay: buildWorkspaceReplay(pkg),
@@ -113,31 +121,21 @@ export function buildMatchWorkspaceModel(input: unknown): MatchWorkspaceModel {
 }
 
 /** 回合筛选与时间轴锚点的派生事实（v0.2 query-first）。 */
-function buildRoundFacets(pkg: DemoPackage, roundNumber: number) {
-  const kills = pkg.kills
-    .filter((kill) => kill.roundNumber === roundNumber)
-    .sort((a, b) => a.tick - b.tick);
+function buildRoundFacets(pkg: DemoPackage, roundNumber: number, performanceFacts: PlayerRoundPerformanceFacts) {
+  const playerRounds = performanceFacts.playerRounds.filter((row) => row.roundNumber === roundNumber);
   const bombs = pkg.bombs.filter((bomb) => bomb.roundNumber === roundNumber);
   const plant = bombs.find((bomb) => bomb.type === "planted") ?? null;
   const defuse = bombs.find((bomb) => bomb.type === "defused") ?? null;
   const clutch = pkg.clutches.find((row) => row.roundNumber === roundNumber) ?? null;
-  const firstKill = kills[0] ?? null;
-
-  const killsByPlayer = new Map<string, number>();
-  for (const kill of kills) {
-    const killerPlayer = kill.killerIndex != null ? pkg.players[kill.killerIndex] : undefined;
-    const victimPlayer = pkg.players[kill.victimIndex];
-    if (!killerPlayer || !victimPlayer || killerPlayer.teamKey === victimPlayer.teamKey) continue;
-    killsByPlayer.set(killerPlayer.steamId64, (killsByPlayer.get(killerPlayer.steamId64) ?? 0) + 1);
-  }
+  const firstKill = playerRounds.find((row) => row.openingDuel === "won") ?? null;
 
   return {
     bombSite: plant?.site ?? null,
     bombPlantTick: plant?.tick ?? null,
     bombDefuseTick: defuse?.tick ?? null,
-    firstKillTick: firstKill?.tick ?? null,
-    firstKillSteamId64: firstKill && firstKill.killerIndex != null ? (pkg.players[firstKill.killerIndex]?.steamId64 ?? null) : null,
-    firstKillTeamKey: firstKill && firstKill.killerIndex != null ? (pkg.players[firstKill.killerIndex]?.teamKey ?? null) : null,
+    firstKillTick: firstKill?.openingTick ?? null,
+    firstKillSteamId64: firstKill?.steamId64 ?? null,
+    firstKillTeamKey: firstKill?.teamKey ?? null,
     clutch: clutch
       ? {
           steamId64: pkg.players[clutch.clutcherIndex]?.steamId64 ?? "",
@@ -147,44 +145,64 @@ function buildRoundFacets(pkg: DemoPackage, roundNumber: number) {
           tick: clutch.tick
         }
       : null,
-    maxKillsByOnePlayer: Math.max(0, ...killsByPlayer.values()),
-    wallbangKills: kills.filter((kill) => kill.penetratedObjects > 0).length,
-    throughSmokeKills: kills.filter((kill) => kill.throughSmoke).length
+    maxKillsByOnePlayer: Math.max(0, ...playerRounds.map((row) => row.kills)),
+    wallbangKills: playerRounds.reduce((sum, row) => sum + row.weapons.reduce((rowSum, weapon) => rowSum + weapon.wallbangKills, 0), 0),
+    throughSmokeKills: playerRounds.reduce((sum, row) => sum + row.weapons.reduce((rowSum, weapon) => rowSum + weapon.throughSmokeKills, 0), 0)
   };
 }
 
-/** 比赛级武器统计：击杀来自 kills.json，伤害来自 damages.json（healthDamage 口径）。 */
-function buildWorkspaceWeapons(pkg: DemoPackage) {
-  const killsByWeapon = groupBy(
-    pkg.kills.filter((kill) => isNamedWeapon(kill.weapon)),
-    (kill) => normalizeWeapon(kill.weapon)
-  );
+/** 比赛级武器统计：击杀与特殊击杀来自 Core canonical facts，伤害仍是回放阶段口径。 */
+function buildWorkspaceWeapons(pkg: DemoPackage, performanceFacts: PlayerRoundPerformanceFacts) {
+  const performanceBySteamId = aggregatePlayerRoundPerformanceFacts(performanceFacts);
   const damageByWeapon = new Map<string, number>();
-  for (const damage of activeDamages(pkg)) {
+  for (const damage of activePhaseDamages(pkg)) {
     if (!isNamedWeapon(damage.weapon)) continue;
     const key = normalizeWeapon(damage.weapon);
     damageByWeapon.set(key, (damageByWeapon.get(key) ?? 0) + damage.healthDamage);
   }
 
-  return [...killsByWeapon.entries()]
-    .map(([weapon, kills]) => {
-      const killerCounts = new Map<string, number>();
-      for (const kill of kills) {
-        if (kill.killerIndex == null) continue;
-        const killer = pkg.players[kill.killerIndex];
-        if (killer) killerCounts.set(killer.steamId64, (killerCounts.get(killer.steamId64) ?? 0) + 1);
-      }
-      const topKiller = [...killerCounts.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
-      const headshots = kills.filter((kill) => kill.headshot).length;
+  const weapons = new Map<string, {
+    kills: number;
+    headshots: number;
+    wallbangKills: number;
+    noScopeKills: number;
+    throughSmokeKills: number;
+    killerCounts: Map<string, number>;
+  }>();
+  for (const player of pkg.players) {
+    const summary = performanceBySteamId.get(player.steamId64);
+    for (const weapon of summary?.weapons ?? []) {
+      if (!isNamedWeapon(weapon.weapon)) continue;
+      const row = weapons.get(weapon.weapon) ?? {
+        kills: 0,
+        headshots: 0,
+        wallbangKills: 0,
+        noScopeKills: 0,
+        throughSmokeKills: 0,
+        killerCounts: new Map<string, number>(),
+      };
+      row.kills += weapon.kills;
+      row.headshots += weapon.headshotKills;
+      row.wallbangKills += weapon.wallbangKills;
+      row.noScopeKills += weapon.noScopeKills;
+      row.throughSmokeKills += weapon.throughSmokeKills;
+      row.killerCounts.set(player.steamId64, (row.killerCounts.get(player.steamId64) ?? 0) + weapon.kills);
+      weapons.set(weapon.weapon, row);
+    }
+  }
+
+  return [...weapons.entries()]
+    .map(([weapon, stats]) => {
+      const topKiller = [...stats.killerCounts.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
       return {
         weapon,
         label: displayWeaponName(weapon),
-        kills: kills.length,
-        headshotPercent: kills.length > 0 ? round((headshots / kills.length) * 100, 1) : null,
+        kills: stats.kills,
+        headshotPercent: stats.kills > 0 ? round((stats.headshots / stats.kills) * 100, 1) : null,
         damage: damageByWeapon.get(weapon) ?? 0,
-        wallbangKills: kills.filter((kill) => kill.penetratedObjects > 0).length,
-        noScopeKills: kills.filter((kill) => kill.noScope).length,
-        throughSmokeKills: kills.filter((kill) => kill.throughSmoke).length,
+        wallbangKills: stats.wallbangKills,
+        noScopeKills: stats.noScopeKills,
+        throughSmokeKills: stats.throughSmokeKills,
         topKillerName: topKiller ? nameForSteamId(pkg, topKiller[0]) : null,
         topKillerKills: topKiller ? topKiller[1] : 0
       };
@@ -243,7 +261,7 @@ function lowerRadarImageUrlForMap(mapName: string): string | null {
 function buildWorkspaceKpis(bundle: AnalysisBundle) {
   const topRR = bundle.scoreboard[0];
   const topAdr = [...bundle.scoreboard].sort((a, b) => b.adr - a.adr)[0];
-  const tradedDeaths = bundle.scoreboard.reduce((sum, row) => sum + row.tradeKills, 0);
+  const tradeKills = bundle.scoreboard.reduce((sum, row) => sum + row.tradeKills, 0);
   const roundCount = bundle.economy.length;
 
   return [
@@ -268,8 +286,8 @@ function buildWorkspaceKpis(bundle: AnalysisBundle) {
     {
       key: "tradeActivity",
       label: "补枪参与",
-      value: tradedDeaths.toString(),
-      detail: "来自 player-stats / kills"
+      value: tradeKills.toString(),
+      detail: "来自 Core canonical trade facts"
     }
   ];
 }
@@ -979,8 +997,7 @@ function weaponNameForIndex(weaponDict: string[], index: number): string | null 
 
 function buildRoundKills(pkg: DemoPackage, kills: DemoPackage["kills"]): WorkspaceKillEvent[] {
   return kills.map((kill, index) => {
-    const activeRaw = kill.killerActiveWeapon;
-    const weaponRaw = activeRaw && isNamedWeapon(normalizeWeapon(activeRaw)) ? activeRaw : kill.weapon;
+    const weaponRaw = kill.weapon;
     const killerSteamId = kill.killerIndex != null ? pkg.players[kill.killerIndex]?.steamId64 ?? null : null;
     const victimSteamId = pkg.players[kill.victimIndex]?.steamId64 ?? "";
     const killerTeamKey = kill.killerIndex != null ? (pkg.players[kill.killerIndex]?.teamKey ?? null) : null;

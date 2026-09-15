@@ -58,7 +58,11 @@ RR = 1.00×Combat + 0.40×Trade + (MapControl) + 0.25×Utility + 0.30×Clutch + 
 原始分 = 0.55×KPR − 0.35×DPR + 0.003×ADR + 0.3×(首杀−首死)/r + 0.4×多杀回合/r + 0.05×穿墙/r
 ```
 击杀项再乘"打架背景"乘子（只作用于击杀）：装备以弱打强 ×1.35 / 以强凌弱 ×0.8；人数劣势 ×1.2 / 优势 ×0.9。
-缺导出数据时乘子 = 1.0（不降权）。**有效武器伤害按剩余血量 cap，排除道具/火/炸弹/世界伤害**（与 Utility 去重）。
+缺导出数据时乘子 = 1.0（不降权）。`effectiveDamage` 直接使用 Core
+canonical damage：所有 attacker 对 enemy 的 `pkg.damages[].healthDamage`
+按 player/round 聚合，不经过 active-phase window；`utilityDamage` 作为同一份
+facts 的 breakdown 暴露，不在 RR path 再做一套过滤或 fallback。世界伤害与同队
+伤害不归属于 player attacker。
 
 ### 2.2 Trade（权重 0.4）
 

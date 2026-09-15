@@ -18,6 +18,7 @@ import {
 import { buildPlayerTacticalSegments } from "./segments.js";
 import { deriveOpeningPattern, deriveOpeningPressure } from "./formations.js";
 import { createReplayRoundContext, replayCalloutAt, replayTickAt, type ReplayRoundContext } from "./replay-round-context.js";
+import { buildPlayerRoundPerformanceFacts, type PlayerRoundPerformanceFacts } from "../performance-facts.js";
 import type { OpeningPattern, OpeningPressureEvent, TacticalFrameSample } from "./types.js";
 
 export const TACTICAL_FACT_VERSION = 9;
@@ -339,10 +340,9 @@ function c4RouteFor(
   };
 }
 
-function firstKillForTeam(pkg: DemoPackage, roundNumber: number, teamKey: TeamKey): boolean | null {
-  const first = pkg.kills.filter((kill) => kill.roundNumber === roundNumber).sort((a, b) => a.tick - b.tick)[0];
-  if (first?.killerIndex == null) return null;
-  return pkg.players[first.killerIndex]?.teamKey === teamKey;
+function firstKillForTeam(performanceFacts: PlayerRoundPerformanceFacts, roundNumber: number, teamKey: TeamKey): boolean | null {
+  const opening = performanceFacts.playerRounds.find((row) => row.roundNumber === roundNumber && row.openingDuel === "won");
+  return opening ? opening.teamKey === teamKey : null;
 }
 
 function teamName(pkg: DemoPackage, teamKey: TeamKey): string {
@@ -353,7 +353,7 @@ export function extractTacticalRoundFacts(
   pkg: DemoPackage,
   options: { matchId: string; calloutGrid?: CalloutGrid | null },
 ): TacticalRoundFact[] {
-  return extractTacticalRoundFactsWithContexts(pkg, options, undefined);
+  return extractTacticalRoundFactsWithContexts(pkg, options, undefined, buildPlayerRoundPerformanceFacts(pkg));
 }
 
 /** Internal composition seam: contexts never cross the @cs2dak/core public boundary. */
@@ -361,6 +361,7 @@ export function extractTacticalRoundFactsWithContexts(
   pkg: DemoPackage,
   options: { matchId: string; calloutGrid?: CalloutGrid | null },
   replayContexts: ReadonlyMap<number, ReplayRoundContext> | undefined,
+  performanceFacts: PlayerRoundPerformanceFacts = buildPlayerRoundPerformanceFacts(pkg),
 ): TacticalRoundFact[] {
   const tickrate = pkg.match.tickrate || 64;
   const out: TacticalRoundFact[] = [];
@@ -397,7 +398,7 @@ export function extractTacticalRoundFactsWithContexts(
         c4Route: side === "t" ? c4RouteFor(decoded, round, pkg.match.mapName, plant, options.calloutGrid ?? null) : null,
         executeRemainSec,
         executeBucket: bucketOf(executeRemainSec),
-        firstKillForTeam: firstKillForTeam(pkg, round.roundNumber, teamKey),
+        firstKillForTeam: firstKillForTeam(performanceFacts, round.roundNumber, teamKey),
         grenadeOccurrenceIds: grenades.map((grenade) => grenade.id),
       });
     }

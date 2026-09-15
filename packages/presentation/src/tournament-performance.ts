@@ -1,7 +1,7 @@
 import {
-  buildPlayerRoundFacts,
-  buildPlayerRoundUtilityFacts,
-  derivePlayerWeaponHighlights,
+  aggregatePlayerRoundPerformanceFacts,
+  buildPlayerRoundPerformanceFacts,
+  type PlayerRoundPerformanceFacts,
 } from "@cs2dak/core";
 import type { DemoPackage, TeamKey } from "@cs2dak/contract";
 import {
@@ -11,7 +11,6 @@ import {
   type TournamentPerformanceAnalytics,
   type TournamentPerformanceMapFacts,
   type TournamentPerformancePlayerRoundFact,
-  type TournamentPerformanceUtilityFact,
 } from "@cs2dak/tournament";
 import type { SeasonInsightsDemo } from "./insights.js";
 
@@ -37,45 +36,6 @@ function teamEntityKeyFor(matchId: string, teamKey: TeamKey, options: Tournament
 
 function playerEntityKeyFor(steamId64: string, options: TournamentPerformanceAdapterOptions): string {
   return options.playerEntityKeys?.[steamId64] ?? `steam:${steamId64}`;
-}
-
-function emptyUtility(): TournamentPerformanceUtilityFact {
-  return {
-    flashesThrown: 0,
-    enemyBlindSeconds: 0,
-    teamBlindSeconds: 0,
-    enemyBlindVictims: 0,
-    flashAssists: 0,
-    heThrows: 0,
-    heDamage: 0,
-    fireThrows: 0,
-    fireDamage: 0,
-    smokesThrown: 0,
-    utilityKills: 0,
-    utilityDamage: 0,
-  };
-}
-
-function utilityFor(
-  utilityByRoundPlayer: Map<string, ReturnType<typeof buildPlayerRoundUtilityFacts>[number]>,
-  roundNumber: number,
-  steamId64: string,
-): TournamentPerformanceUtilityFact {
-  const row = utilityByRoundPlayer.get(`${roundNumber}:${steamId64}`);
-  return row ? {
-    flashesThrown: row.flashesThrown,
-    enemyBlindSeconds: row.enemyBlindSeconds,
-    teamBlindSeconds: row.teamBlindSeconds,
-    enemyBlindVictims: row.enemyBlindVictims,
-    flashAssists: row.flashAssists,
-    heThrows: row.heThrows,
-    heDamage: row.heDamage,
-    fireThrows: row.fireThrows,
-    fireDamage: row.fireDamage,
-    smokesThrown: row.smokesThrown,
-    utilityKills: row.utilityKills,
-    utilityDamage: row.utilityDamage,
-  } : emptyUtility();
 }
 
 function mergeLabels(target: TournamentEntityLabels, source: TournamentEntityLabels): void {
@@ -108,44 +68,32 @@ function mapPlayerRounds(
   matchId: string,
   pkg: DemoPackage,
   options: TournamentPerformanceAdapterOptions,
+  performanceFacts: PlayerRoundPerformanceFacts,
 ): TournamentPerformancePlayerRoundFact[] {
-  const utilityByRoundPlayer = new Map(buildPlayerRoundUtilityFacts(pkg).map((row) => [`${row.roundNumber}:${row.steamId64}`, row]));
-  const clutchByRoundPlayer = new Map<string, DemoPackage["clutches"][number]>();
-  for (const clutch of pkg.clutches) {
-    const player = pkg.players[clutch.clutcherIndex];
-    if (!player) continue;
-    const key = `${clutch.roundNumber}:${playerSteamId(player)}`;
-    if (!clutchByRoundPlayer.has(key)) clutchByRoundPlayer.set(key, clutch);
-  }
-  const rounds = new Map(pkg.rounds.map((row) => [row.roundNumber, row]));
-  // Keep the per-round Core facts as the source for this DTO. playerStats is a
-  // separate aggregate/#381 scoreboard projection and cannot be allocated back
-  // to side-aware rounds without inventing facts.
-  const coreFacts = buildPlayerRoundFacts(pkg);
+  const roundSeq = new Map(pkg.rounds.map((row, index) => [row.roundNumber, index + 1]));
 
-  return coreFacts.map((row) => {
-    const player = pkg.players.find((candidate) => playerSteamId(candidate) === row.steamId64);
-    const round = rounds.get(row.roundNumber);
-    if (!player || !round) throw new Error(`Cannot adapt player-round fact ${row.roundNumber}:${row.steamId64}`);
-    const clutch = clutchByRoundPlayer.get(`${row.roundNumber}:${row.steamId64}`);
+  return performanceFacts.playerRounds.map((row) => {
+    const round = roundSeq.get(row.roundNumber);
+    if (round == null) throw new Error(`Cannot adapt player-round fact ${row.roundNumber}:${row.steamId64}`);
+    const { grenadesThrown: _grenadesThrown, ...utility } = row.utility;
     return {
-      roundSeq: row.roundNumber,
+      roundSeq: round,
       playerEntityKey: playerEntityKeyFor(row.steamId64, options),
       teamEntityKey: teamEntityKeyFor(matchId, row.teamKey, options),
       side: row.side,
-      teamWonRound: round.winnerTeamKey === row.teamKey,
+      teamWonRound: row.teamWonRound,
       kills: row.kills,
       deaths: row.deaths,
       assists: row.assists,
       damage: row.damage,
-      headshots: pkg.kills.filter((kill) => kill.roundNumber === row.roundNumber && kill.killerIndex === pkg.players.indexOf(player) && kill.headshot).length,
+      headshots: row.headshots,
       survived: row.survived,
-      kast: row.kastTags.length > 0,
+      kast: row.kast,
       tradeKills: row.tradeKills,
       tradedDeaths: row.tradedDeaths,
       openingDuel: row.openingDuel,
-      clutch: clutch ? { opponentCount: clutchOpponentCount(clutch.opponentCount), won: clutch.won } : null,
-      utility: utilityFor(utilityByRoundPlayer, row.roundNumber, row.steamId64),
+      clutch: row.clutch ? { opponentCount: clutchOpponentCount(row.clutch.opponentCount), won: row.clutch.won } : null,
+      utility,
     };
   });
 }
@@ -161,6 +109,8 @@ export function extractTournamentPerformanceMapFacts(
   options: TournamentPerformanceAdapterOptions = {},
 ): TournamentPerformanceMapFacts {
   const { pkg } = input;
+  const performanceFacts = input.performanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
+  const performanceBySteamId = aggregatePlayerRoundPerformanceFacts(performanceFacts);
   const teamEntityKeys = {
     teamA: teamEntityKeyFor(input.matchId, "teamA", options),
     teamB: teamEntityKeyFor(input.matchId, "teamB", options),
@@ -168,6 +118,7 @@ export function extractTournamentPerformanceMapFacts(
   const indexToPlayerKey = new Map(pkg.players.map((player, index) => [index, playerEntityKeyFor(playerSteamId(player), options)]));
   const indexToTeamKey = new Map(pkg.players.map((player, index) => [index, teamEntityKeys[player.teamKey]]));
   const rounds = new Map(pkg.rounds.map((row) => [row.roundNumber, row]));
+  const roundSeq = new Map(pkg.rounds.map((row, index) => [row.roundNumber, index + 1]));
   const objectives: TournamentPerformanceMapFacts["objectives"] = pkg.bombs
     .filter((bomb) => bomb.type === "planted" || bomb.type === "defused")
     .map((bomb) => {
@@ -175,7 +126,7 @@ export function extractTournamentPerformanceMapFacts(
       const round = rounds.get(bomb.roundNumber);
       const type = bomb.type === "planted" ? "planted" : "defused";
       return {
-        roundSeq: bomb.roundNumber,
+        roundSeq: roundSeq.get(bomb.roundNumber) ?? bomb.roundNumber,
         type,
         playerEntityKey: player ? indexToPlayerKey.get(bomb.actorIndex!) ?? null : null,
         teamEntityKey: player ? indexToTeamKey.get(bomb.actorIndex!) ?? null : null,
@@ -183,11 +134,10 @@ export function extractTournamentPerformanceMapFacts(
         teamWonRound: player && round ? round.winnerTeamKey === player.teamKey : null,
       };
     });
-  const playerWeapons = derivePlayerWeaponHighlights(pkg).flatMap((player) => {
-    const packagePlayer = pkg.players.find((candidate) => playerSteamId(candidate) === player.steamId64);
-    if (!packagePlayer) return [];
-    return player.weapons.map((weapon) => ({
-      playerEntityKey: playerEntityKeyFor(player.steamId64, options),
+  const playerWeapons = pkg.players.flatMap((packagePlayer) => {
+    const summary = performanceBySteamId.get(packagePlayer.steamId64);
+    return (summary?.weapons ?? []).map((weapon) => ({
+      playerEntityKey: playerEntityKeyFor(packagePlayer.steamId64, options),
       teamEntityKey: teamEntityKeys[packagePlayer.teamKey],
       weapon: weapon.weapon,
       kills: weapon.kills,
@@ -202,7 +152,7 @@ export function extractTournamentPerformanceMapFacts(
     matchKey: input.matchId,
     mapName: pkg.match.mapName,
     teamEntityKeys,
-    playerRounds: mapPlayerRounds(input.matchId, pkg, options),
+    playerRounds: mapPlayerRounds(input.matchId, pkg, options, performanceFacts),
     objectives,
     playerWeapons,
   };

@@ -212,7 +212,7 @@ describe("buildTournamentInsights", () => {
       { matchId: "m2", pkg }
     ];
 
-    expect(buildTournamentInsightsFromFacts(demos.map(extractTournamentFacts))).toEqual(buildTournamentInsights(demos));
+    expect(buildTournamentInsightsFromFacts(demos.map((demo) => extractTournamentFacts(demo)))).toEqual(buildTournamentInsights(demos));
   });
 
   it("preserves the Ancient fixture counts through the shared tournament owner", async () => {

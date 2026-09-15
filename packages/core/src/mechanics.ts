@@ -17,7 +17,7 @@ import {
   type VisibilityContext
 } from "./duel-window.js";
 import { createResolverFromPackage, type PlayerResolver } from "./resolve.js";
-import { activeDamages, normalizeWeapon, round } from "./utils.js";
+import { activePhaseDamages, normalizeWeapon, round } from "./utils.js";
 
 const BURST_GAP_SECONDS = 0.25;
 const PRE_MOVE_START_SECONDS = 0.2; // 开枪前 200ms
@@ -520,7 +520,7 @@ export function buildMechanicsSignals(
   const tickrate = tickrateOf(pkg);
   const ctx: VisibilityContext = { pkg, visibility: options.visibility };
   const shots = flattenShots(pkg);
-  const damages = activeDamages(pkg);
+  const damages = activePhaseDamages(pkg);
   const allZeroVelocity = shots.length > 0 && shots.every((shot) => shot.vx === 0 && shot.vy === 0);
 
   // duels 按 killerIndex + weapon 归并，供击杀耗时 / one tap / 反应 / 预瞄 join。
