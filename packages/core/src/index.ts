@@ -46,7 +46,7 @@ export type {
 } from "./performance-facts.js";
 export { assertPlayerStatsParity, findPlayerStatsParityMismatches } from "./performance-parity.js";
 export type { PlayerStatsParityMismatch } from "./performance-parity.js";
-export { CORE_ANALYSIS_VERSION } from "./version.js";
+export { CORE_ANALYSIS_VERSION, CORE_SEMANTIC_PROFILE } from "./version.js";
 export { buildTeamSideWinRates } from "./side-win-rate.js";
 export { buildDuelsSignals, deriveDuels, deriveOpeningDuels } from "./duels.js";
 export { buildMechanicsSignals, counterStrafeThresholdForWeapon, derivePlayerMechanics } from "./mechanics.js";
