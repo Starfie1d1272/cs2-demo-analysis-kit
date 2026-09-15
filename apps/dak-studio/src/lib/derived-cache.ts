@@ -60,7 +60,10 @@ export interface DerivedCacheStore {
 export function createDerivedCacheStore(adapter: StorageAdapter, namespace = DERIVED_MATCH_NAMESPACE): DerivedCacheStore {
   const stores = Object.fromEntries(TABLES.map((table) => [table, adapter.records(`${namespace}:${table}`)])) as Record<(typeof TABLES)[number], RecordStore>;
   const legacyStores = namespace === DERIVED_MATCH_NAMESPACE
-    ? ["player_insights", "tournament_facts", "team_comparison_facts", "duel_facts", "match_workspace", "opening_trails", "utility_value"].map((table) => adapter.records(`derived:match-v3-map2:${table}`))
+    ? [
+      ...TABLES.map((table) => adapter.records(`derived:match-v4:${table}`)),
+      ...["player_insights", "tournament_facts", "team_comparison_facts", "duel_facts", "match_workspace", "opening_trails", "utility_value"].map((table) => adapter.records(`derived:match-v3-map2:${table}`)),
+    ]
     : [];
   return {
     async putMatchDerived(value) {
