@@ -5,8 +5,6 @@ import type { RivalHubImportContext } from "../lib/rivalhub-import";
 import type { RivalHubMatchCandidate } from "../lib/rivalhub-match";
 import { mapDisplayName, type StudioSeriesRecord } from "../lib/series";
 import { rivalHubStatusPresentation } from "../lib/rivalhub-status";
-import { RIVALHUB_DROP_ZONE_ATTRIBUTE } from "../lib/rivalhub-acquisition";
-import { triggerWindowsDropCapture } from "../lib/dem";
 import { BpView } from "./BpView";
 
 function mapsForSeries(series: StudioSeriesRecord): NonNullable<StudioSeriesRecord["mapAssignments"]> {
@@ -25,7 +23,7 @@ function seriesScore(series: StudioSeriesRecord, entries: StudioDemoEntry[]): { 
   }, { a: 0, b: 0 });
 }
 
-function MapDrop({
+function MapImportButton({
   map,
   eventId,
   candidates,
@@ -60,12 +58,9 @@ function MapDrop({
       <button
         type="button"
         className="stu-button-sm"
-        {...{ [RIVALHUB_DROP_ZONE_ATTRIBUTE]: "" }}
         onClick={() => { if (onPick) void onPick(context); else inputRef.current?.click(); }}
-        onDragOver={(event) => { event.preventDefault(); event.stopPropagation(); }}
-        onDrop={(event) => { triggerWindowsDropCapture(event.dataTransfer.files); event.preventDefault(); event.stopPropagation(); start(event.dataTransfer.files); }}
       >
-        选择 / 拖入 Demo
+        选择 Demo
       </button>
     </>
   );
@@ -118,7 +113,7 @@ export function SeriesInspector({
                 {entry ? <span className="stu-rivalhub-status stu-rivalhub-status-synced"><i />本地 Demo 已关联</span> : <span className="stu-muted">本地未关联</span>}
                 {remoteStatus && <span className={remoteStatus.className}><i />{remoteStatus.label}</span>}
                 {entry && <button type="button" className="stu-button-sm" onClick={() => onOpenMatch(entry.id)}>打开 Demo</button>}
-                <MapDrop map={map} eventId={eventId} candidates={candidates} onImport={onImportOnlineFiles} onPick={onPickOnlineFiles} />
+                <MapImportButton map={map} eventId={eventId} candidates={candidates} onImport={onImportOnlineFiles} onPick={onPickOnlineFiles} />
               </div>
             </div>
           );

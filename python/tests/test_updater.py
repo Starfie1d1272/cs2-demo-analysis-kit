@@ -89,6 +89,49 @@ def test_find_app_root_missing_raises(tmp_path: Path) -> None:
         updater._find_app_root(tmp_path, "dak-studio.exe")
 
 
+def test_install_runtime_archive_flattens_existing_root_and_preserves_data(tmp_path: Path) -> None:
+    install = tmp_path / "dak-studio"
+    (install / "_internal").mkdir(parents=True)
+    (install / "_internal" / "old.txt").write_text("old", encoding="utf-8")
+    (install / "dak-studio.exe").write_bytes(b"old")
+    for name in ("userdata", "assets", "cache", "updates"):
+        (install / name).mkdir()
+        (install / name / "keep.txt").write_text(name, encoding="utf-8")
+    nested = install / "dak-studio"
+    nested.mkdir()
+    (nested / "dak-studio.exe").write_bytes(b"stale nested")
+
+    zip_path = tmp_path / "runtime.zip"
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.writestr("dak-studio/dak-studio.exe", b"new")
+        zf.writestr("dak-studio/_internal/new.txt", b"new runtime")
+
+    target = updater.install_runtime_archive(zip_path, install)
+
+    assert target == install / "dak-studio.exe"
+    assert target.read_bytes() == b"new"
+    assert (install / "_internal" / "new.txt").read_bytes() == b"new runtime"
+    assert not (install / "_internal" / "old.txt").exists()
+    assert not nested.exists()
+    for name in ("userdata", "assets", "cache", "updates"):
+        assert (install / name / "keep.txt").read_text(encoding="utf-8") == name
+    assert not list(tmp_path.glob(".dak-runtime-*"))
+
+
+def test_install_runtime_archive_flattens_fresh_install(tmp_path: Path) -> None:
+    install = tmp_path / "custom-root"
+    zip_path = tmp_path / "runtime.zip"
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.writestr("dak-studio/dak-studio.exe", b"new")
+        zf.writestr("dak-studio/_internal/runtime.txt", b"runtime")
+
+    target = updater.install_runtime_archive(zip_path, install)
+
+    assert target == install / "dak-studio.exe"
+    assert (install / "_internal" / "runtime.txt").read_bytes() == b"runtime"
+    assert not (install / "dak-studio" / "dak-studio.exe").exists()
+
+
 def test_safe_extract_rejects_path_traversal(tmp_path: Path) -> None:
     zip_path = tmp_path / "bad.zip"
     with zipfile.ZipFile(zip_path, "w") as zf:

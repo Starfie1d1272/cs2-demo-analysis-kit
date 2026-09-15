@@ -8,15 +8,16 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import tkinter as tk
 import tkinter.filedialog
 import tkinter.messagebox
 import tkinter.ttk as ttk
 import urllib.request
-import zipfile
 from pathlib import Path
 
 from cs2dak import __version__ as INSTALLER_VERSION
@@ -205,6 +206,7 @@ class SimpleInstaller:
         threading.Thread(target=self._install_run, args=(install_dir,), daemon=True).start()
 
     def _install_run(self, install_dir: str):
+        staging_dir = None
         try:
             # 1. Fetch manifest
             self._update("正在获取安装清单…", 5)
@@ -238,7 +240,8 @@ class SimpleInstaller:
 
             # 2. Download runtime
             self._update("下载运行时…", 10)
-            runtime_dest = os.path.join(install_dir, runtime["name"])
+            staging_dir = tempfile.mkdtemp(prefix=".dak-installer-", dir=str(Path(install_dir).parent))
+            runtime_dest = os.path.join(staging_dir, runtime["name"])
             self._download_asset(runtime, runtime_dest, "运行时")
 
             if self.cancelled:
@@ -246,10 +249,7 @@ class SimpleInstaller:
 
             # 3. Extract runtime & resolve app root (where dak-studio.exe lives)
             self._update("解压运行时…", 50)
-            self._extract_runtime(runtime_dest, install_dir)
-            app_root = self._app_root(install_dir)
-            if not app_root:
-                raise RuntimeError("解压后未找到 dak-studio.exe，安装包可能不完整")
+            app_root = self._extract_runtime(runtime_dest, install_dir)
             self._launch_exe = os.path.join(app_root, "dak-studio.exe")
 
             # 4. Download bundled events → app_root/assets/
@@ -309,6 +309,9 @@ class SimpleInstaller:
             self._update(f"安装失败：{exc}", 0)
             self.root.after(0, lambda: self._set_ui_state(installing=False, done=False))
             tkinter.messagebox.showerror("安装失败", str(exc))
+        finally:
+            if staging_dir:
+                shutil.rmtree(staging_dir, ignore_errors=True)
 
     def _fetch_manifest(self) -> dict:
         """按优先级拉 manifest：latest → versioned → 报错。"""
@@ -369,26 +372,16 @@ class SimpleInstaller:
         raise RuntimeError(f"下载 {label} 失败：{last_err}")
 
     @staticmethod
-    def _extract_runtime(zip_path: str, install_dir: str) -> None:
-        """解压 runtime zip 到安装目录。zip 内有一个顶层 onedir。"""
-        with zipfile.ZipFile(zip_path) as zf:
-            updater.safe_extract_zip(zf, Path(install_dir))
-        # 如果所有内容在单个子目录中，不 flatten（保持 onedir 结构）
-        # 运行时 zip 的顶层就是 onedir 目录，extractall 到 install_dir 后结构：
-        #   install_dir/dak-studio/...
+    def _extract_runtime(zip_path: str, install_dir: str) -> str:
+        """把 runtime app root 内容安装到用户选择的目录并返回 app root。"""
+        target_exe = updater.install_runtime_archive(Path(zip_path), Path(install_dir), "dak-studio.exe")
+        return str(target_exe.parent)
 
     @staticmethod
     def _app_root(install_dir: str) -> str | None:
-        """解压 runtime zip 后找到 dak-studio.exe 所在目录。
-
-        runtime zip 内含一个顶层 onedir（如 dak-studio/），dak-studio.exe 在其中。
-        返回该目录的绝对路径，找不到则返回 None。
-        """
-        for root, dirs, files in os.walk(install_dir):
-            for f in files:
-                if f.lower() in ("dak-studio.exe", "dak studio.exe"):
-                    return root
-        return None
+        """只认选定安装根目录中的新 exe，不扫描整个目录树。"""
+        exe = Path(install_dir) / "dak-studio.exe"
+        return str(exe.parent) if exe.is_file() else None
 
     def _launch(self):
         exe = getattr(self, "_launch_exe", None)

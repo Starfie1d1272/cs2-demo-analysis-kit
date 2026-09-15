@@ -24,7 +24,9 @@ from __future__ import annotations
 
 import hashlib
 import os
+import shutil
 import sys
+import tempfile
 import time
 import urllib.request
 import zipfile
@@ -33,6 +35,7 @@ from typing import Callable, Iterable
 
 CHUNK = 1 << 20  # 1 MiB
 DOWNLOAD_TIMEOUT_S = 30
+PERSISTENT_INSTALL_DIRS = ("userdata", "assets", "cache", "updates")
 
 
 class UpdateError(RuntimeError):
@@ -131,6 +134,47 @@ def _find_app_root(extract_dir: Path, exe_name: str) -> Path:
         if candidate.is_dir() and (candidate / exe_name).exists():
             return candidate
     raise UpdateError(f"更新包内未找到 {exe_name}")
+
+
+def install_runtime_archive(zip_path: Path, install_dir: Path, exe_name: str = "dak-studio.exe") -> Path:
+    """将 runtime ZIP 的 app root 内容安装到选定目录并返回新 exe。
+
+    runtime ZIP 可以带一个顶层 onedir，也可以直接包含 exe。最终安装目录
+    始终就是用户选择的目录；userdata/assets/cache/updates 由用户持有，升级时
+    不会被 runtime 内容覆盖。
+    """
+    install_dir = install_dir.resolve()
+    install_dir.mkdir(parents=True, exist_ok=True)
+    install_dir.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".dak-runtime-", dir=str(install_dir.parent)) as temp:
+        extract_dir = Path(temp) / "extract"
+        extract_dir.mkdir()
+        with zipfile.ZipFile(zip_path) as zf:
+            safe_extract_zip(zf, extract_dir)
+        archive_root = _find_app_root(extract_dir, exe_name)
+
+        # 清理旧 installer 产生的 install_dir/<top-level>/... 嵌套 runtime。
+        nested_root = install_dir / archive_root.name
+        if nested_root != install_dir and (nested_root / exe_name).is_file():
+            shutil.rmtree(nested_root)
+
+        for source in archive_root.iterdir():
+            if source.name in PERSISTENT_INSTALL_DIRS:
+                continue
+            target = install_dir / source.name
+            if target.is_dir() and not target.is_symlink():
+                shutil.rmtree(target)
+            elif target.exists() or target.is_symlink():
+                target.unlink()
+            if source.is_dir():
+                shutil.copytree(source, target)
+            else:
+                shutil.copy2(source, target)
+
+    target_exe = install_dir / exe_name
+    if not target_exe.is_file():
+        raise UpdateError(f"安装后未找到 {exe_name}")
+    return target_exe
 
 
 def _relaunch_bat(pid: int, install_dir: Path, new_dir: Path, exe_name: str) -> str:

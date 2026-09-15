@@ -110,6 +110,43 @@ function runWith(
 }
 
 describe("RivalHub serial batch import", () => {
+  it("syncs an existing local entry without exporting or importing it again", async () => {
+    const dependencies = baseDependencies();
+    const entry = localEntry("stored.zip");
+    const exportDem = vi.fn(async () => ({ file: new File(["zip"], "unexpected.zip", { type: "application/zip" }), sourceDemPath: null }));
+
+    const session = await runRivalHubBatch([{ kind: "local", entry }], { scope: "event", eventId: "event-1", candidates: [candidate("target")] }, {
+      exportDem,
+      dependencies,
+    });
+
+    expect(exportDem).not.toHaveBeenCalled();
+    expect(dependencies.importDemo).not.toHaveBeenCalled();
+    expect(dependencies.loadPackage).toHaveBeenCalledWith(entry.id, undefined);
+    expect(session.items[0]).toMatchObject({
+      fileName: entry.fileName,
+      localEntryId: entry.id,
+      reusedLocal: true,
+      phase: "synced",
+    });
+  });
+
+  it("marks an already-synced local entry without parsing or submitting again", async () => {
+    const dependencies = baseDependencies();
+    const entry = localEntry("stored-synced.zip");
+    const synced = candidate("target", { demoSha256, demoStatus: "synced" });
+
+    const session = await runRivalHubBatch([{ kind: "local", entry }], { scope: "event", eventId: "event-1", candidates: [synced] }, {
+      exportDem: vi.fn(),
+      dependencies,
+    });
+
+    expect(session.items[0]).toMatchObject({ fileName: entry.fileName, phase: "already_synced", reusedLocal: true });
+    expect(dependencies.loadPackage).not.toHaveBeenCalled();
+    expect(dependencies.submit).not.toHaveBeenCalled();
+    expect(session.counts.alreadySynced).toBe(1);
+  });
+
   it("routes a path-backed native selection through the existing export owner", async () => {
     const dependencies = baseDependencies();
     const exportDem = vi.fn(async (file: File) => ({
