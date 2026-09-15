@@ -3,6 +3,7 @@ import {
   assertPlayerStatsParity,
   buildPlayerRoundPerformanceFacts,
   CORE_ANALYSIS_VERSION,
+  CORE_SEMANTIC_PROFILE,
   type PlayerRoundPerformanceFacts,
 } from "@cs2dak/core";
 import type { DemoPackage, TeamKey } from "@cs2dak/contract";
@@ -17,7 +18,6 @@ import {
 import type { SeasonInsightsDemo } from "./insights.js";
 
 const TEAM_KEYS = ["teamA", "teamB"] as const satisfies readonly TeamKey[];
-const SEMANTIC_PROFILE = "dak-stable/1";
 
 export interface TournamentPerformanceAdapterOptions {
   /** Optional RivalHub or other consumer-owned canonical team identities. */
@@ -148,7 +148,7 @@ export function extractTournamentPerformanceMapFacts(
   });
 
   return {
-    semanticProfile: SEMANTIC_PROFILE,
+    semanticProfile: CORE_SEMANTIC_PROFILE,
     analysisVersion: CORE_ANALYSIS_VERSION,
     mapKey: `legacy-map:${input.matchId}:${pkg.match.mapName}`,
     matchKey: input.matchId,
