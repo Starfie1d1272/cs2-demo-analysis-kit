@@ -42,6 +42,13 @@ export interface RivalHubImportContext {
   fixedMatchMapId?: string;
 }
 
+export interface RivalHubLocalDemoInput {
+  kind: "local";
+  entry: StudioDemoEntry;
+}
+
+export type RivalHubBatchInput = File | RivalHubLocalDemoInput;
+
 export interface RivalHubTargetCandidateSummary {
   matchMapId: string;
   mapName: string;
@@ -151,8 +158,17 @@ function messageForPhase(phase: RivalHubBatchPhase): string {
   }[phase];
 }
 
-function newItem(file: File, index: number): RivalHubBatchItem {
-  return { id: `item-${index}-${file.name}`, fileName: file.name, phase: "queued", message: messageForPhase("queued") };
+function isLocalDemoInput(input: RivalHubBatchInput): input is RivalHubLocalDemoInput {
+  return typeof input === "object" && "kind" in input && input.kind === "local";
+}
+
+function inputFileName(input: RivalHubBatchInput): string {
+  return isLocalDemoInput(input) ? input.entry.fileName : input.name;
+}
+
+function newItem(input: RivalHubBatchInput, index: number): RivalHubBatchItem {
+  const fileName = inputFileName(input);
+  return { id: `item-${index}-${fileName}`, fileName, phase: "queued", message: messageForPhase("queued") };
 }
 
 function replacementResult(
@@ -175,14 +191,14 @@ function needsDesktopExport(file: File): boolean {
   return isDem(file) || nativePathForFile(file) !== null;
 }
 
-function freshSession(files: File[]): RivalHubBatchSession {
+function freshSession(inputs: RivalHubBatchInput[]): RivalHubBatchSession {
   return {
     id: sessionId(),
     status: "running",
     currentIndex: 0,
     awaitingTargetItemId: null,
-    total: files.length,
-    items: files.map(newItem),
+    total: inputs.length,
+    items: inputs.map(newItem),
     counts: { synced: 0, needsAttention: 0, alreadySynced: 0, needsTarget: 0, skipped: 0, failed: 0, reusedLocal: 0 },
   };
 }
@@ -209,11 +225,11 @@ function recount(session: RivalHubBatchSession): RivalHubBatchSession {
  * cache. A target picker resumes after matching, so export/import are not repeated.
  */
 export async function runRivalHubBatch(
-  filesInput: Iterable<File>,
+  filesInput: Iterable<RivalHubBatchInput>,
   context: RivalHubImportContext,
   callbacks: RivalHubBatchCallbacks,
 ): Promise<RivalHubBatchSession> {
-  const files: Array<File | null> = [...filesInput];
+  const inputs: Array<RivalHubBatchInput | null> = [...filesInput];
   const deps: RivalHubBatchDependencies = {
     exportDem: callbacks.exportDem,
     importDemo: importDemoFile,
@@ -228,7 +244,7 @@ export async function runRivalHubBatch(
     buildEvidence: buildRivalHubDemoEvidenceV1,
     ...callbacks.dependencies,
   };
-  let session = freshSession(files.filter((file): file is File => file !== null));
+  let session = freshSession(inputs.filter((input): input is RivalHubBatchInput => input !== null));
   const emit = () => callbacks.onUpdate?.(recount(session));
   const updateItem = (index: number, patch: Partial<RivalHubBatchItem>) => {
     const currentItem = session.items[index];
@@ -246,7 +262,7 @@ export async function runRivalHubBatch(
   };
   emit();
 
-  for (let index = 0; index < files.length; index += 1) {
+  for (let index = 0; index < inputs.length; index += 1) {
     if (callbacks.shouldStop?.()) {
       session = recount({
         ...session,
@@ -259,38 +275,50 @@ export async function runRivalHubBatch(
       emit();
       break;
     }
-    let input = files[index];
+    let input = inputs[index];
     if (!input) continue;
     let localEntry: StudioDemoEntry | null = null;
     let pkg: DemoPackage | null = null;
     let exported: ExportedDemoFile | null = null;
     try {
-      if (needsDesktopExport(input)) {
-        updateItem(index, { phase: "exporting", message: messageForPhase("exporting") });
-        exported = await deps.exportDem(input, (message) => updateItem(index, { detail: message }));
+      if (isLocalDemoInput(input)) {
+        localEntry = input.entry;
+        updateItem(index, {
+          phase: "matching",
+          message: messageForPhase("matching"),
+          localEntryId: localEntry.id,
+          demoSha256: localEntry.demoSha256,
+          reusedLocal: true,
+          detail: "复用本地 ZIP / facts，跳过 Demo 导出与入库",
+        });
       } else {
-        exported = { file: input, sourceDemPath: null };
+        if (needsDesktopExport(input)) {
+          updateItem(index, { phase: "exporting", message: messageForPhase("exporting") });
+          exported = await deps.exportDem(input, (message) => updateItem(index, { detail: message }));
+        } else {
+          exported = { file: input, sourceDemPath: null };
+        }
+        if (!exported) throw new Error("Demo 导出结果为空");
+        // The exported ZIP is the only representation needed from this point;
+        // release the dropped/input File before parsing the ZIP into the library.
+        inputs[index] = null;
+        input = null;
+        updateItem(index, { phase: "importing", message: messageForPhase("importing"), detail: undefined });
+        const imported = await deps.importDemo(exported.file, {
+          lowMemory: true,
+          sourceDemPath: exported.sourceDemPath ?? null,
+        });
+        localEntry = imported.entry;
+        updateItem(index, {
+          phase: "matching",
+          message: messageForPhase("matching"),
+          localEntryId: localEntry.id,
+          demoSha256: localEntry.demoSha256,
+          localDuplicate: imported.duplicate,
+          reusedLocal: imported.duplicate,
+          detail: imported.duplicate ? "复用本地 Demo 条目，继续在线匹配" : undefined,
+        });
       }
-      if (!exported) throw new Error("Demo 导出结果为空");
-      // The exported ZIP is the only representation needed from this point;
-      // release the dropped/input File before parsing the ZIP into the library.
-      files[index] = null;
-      input = null;
-      updateItem(index, { phase: "importing", message: messageForPhase("importing"), detail: undefined });
-      const imported = await deps.importDemo(exported.file, {
-        lowMemory: true,
-        sourceDemPath: exported.sourceDemPath ?? null,
-      });
-      localEntry = imported.entry;
-      updateItem(index, {
-        phase: "matching",
-        message: messageForPhase("matching"),
-        localEntryId: localEntry.id,
-        demoSha256: localEntry.demoSha256,
-        localDuplicate: imported.duplicate,
-        reusedLocal: imported.duplicate,
-        detail: imported.duplicate ? "复用本地 Demo 条目，继续在线匹配" : undefined,
-      });
 
       if (!localEntry.demoSha256) {
         updateItem(index, { phase: "failed", message: messageForPhase("failed"), detail: "缺少 canonical raw Demo hash，无法同步" });
@@ -300,14 +328,14 @@ export async function runRivalHubBatch(
       const hashMatches = context.candidates.filter(({ map }) => map.demoSha256?.toLowerCase() === localEntry!.demoSha256!.toLowerCase());
       let match: RivalHubMatchResult;
       if (context.fixedMatchMapId) {
-        pkg = await deps.loadPackage(localEntry.id, exported.file);
+        pkg = await deps.loadPackage(localEntry.id, exported?.file);
         match = deps.matchMap(pkg, context.candidates, { fixedMatchMapId: context.fixedMatchMapId, demoDate: entryDate(localEntry) });
       } else if (hashMatches.length === 1) {
         match = { status: "matched", candidate: hashMatches[0]!, mode: "remote_demo_sha" };
       } else if (hashMatches.length > 1) {
         match = { status: "needs_target", candidates: hashMatches, reason: "同一个 raw Demo hash 对应多个 RivalHub Map，服务端上下文不一致" };
       } else {
-        pkg = await deps.loadPackage(localEntry.id, exported.file);
+        pkg = await deps.loadPackage(localEntry.id, exported?.file);
         match = deps.matchMap(pkg, context.candidates, { demoSha256: localEntry.demoSha256, demoDate: entryDate(localEntry) });
       }
       if (match.status === "needs_target") {
@@ -347,7 +375,7 @@ export async function runRivalHubBatch(
       }
 
       const selected = match.candidate;
-      pkg ??= await deps.loadPackage(localEntry.id, exported.file);
+      pkg ??= await deps.loadPackage(localEntry.id, exported?.file);
       updateItem(index, { ...replacementResult(session.items[index]!, match), phase: "building_evidence", message: messageForPhase("building_evidence"), targetCandidates: undefined });
       const target = evidenceTargetFromRemoteMap(selected.map);
       let participantMatch: ReturnType<typeof resolveRivalHubParticipants> | ReturnType<typeof resolveRivalHubParticipantsFromEventRoster> | ReturnType<typeof resolveRivalHubParticipantsForReview>;
@@ -398,7 +426,7 @@ export async function runRivalHubBatch(
       exported = null;
       pkg = null;
       input = null;
-      files[index] = null;
+      inputs[index] = null;
     }
   }
   session = recount({ ...session, status: "completed" });

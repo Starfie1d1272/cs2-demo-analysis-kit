@@ -46,7 +46,7 @@ function sameTeams(entry: StudioDemoEntry, teamA: string, teamB: string): boolea
   return actual[0] === expected[0] && actual[1] === expected[1];
 }
 
-function sameRemoteMap(entry: StudioDemoEntry, series: RivalHubRemoteSeries, map: RivalHubRemoteMap): boolean {
+function sameRemoteMap(entry: StudioDemoEntry, series: Pick<RivalHubRemoteSeries, "teamAName" | "teamBName">, map: RivalHubRemoteMap): boolean {
   if (normalized(entry.meta.mapName) !== normalized(map.mapName)) return false;
   if (!sameTeams(entry, series.teamAName, series.teamBName)) return false;
   if (map.scoreA == null || map.scoreB == null) return true;
@@ -54,6 +54,15 @@ function sameRemoteMap(entry: StudioDemoEntry, series: RivalHubRemoteSeries, map
   return direct
     ? entry.meta.teamAScore === map.scoreA && entry.meta.teamBScore === map.scoreB
     : entry.meta.teamAScore === map.scoreB && entry.meta.teamBScore === map.scoreA;
+}
+
+/** 与远程赛事刷新使用同一匹配口径，供显式本地 Demo 同步筛选当前范围。 */
+export function matchesRivalHubDemo(
+  entry: StudioDemoEntry,
+  series: Pick<RivalHubRemoteSeries, "teamAName" | "teamBName">,
+  map: RivalHubRemoteMap,
+): boolean {
+  return sameRemoteMap(entry, series, map);
 }
 
 function matchRemoteMap(

@@ -1,13 +1,13 @@
 import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Radar, Settings, Swords, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { bulkUpdateTags, formatMatchLabel, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
+import { backfillDemoIdentities, bulkUpdateTags, formatMatchLabel, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { CohortScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
 import { AnalysisContextSummary } from "./components/AnalysisContextSummary";
 import { CapabilityBar } from "./components/CapabilityBar";
 import { detectDemBackend, exportDemToZip, fileFromNativePath, isDemFile, pickAndExportDems, pickDemPaths, triggerWindowsDropCapture, watchDemoPath, type ExportedDemoFile } from "./lib/dem";
 import { parseTags } from "./lib/tags";
 import { listSeriesRecords, pruneOrphanSeries, type StudioSeriesRecord } from "./lib/series";
-import { listEventRecords, markRivalHubEventsStale, upsertRivalHubEvents, type StudioEventRecord } from "./lib/events";
+import { listEventRecords, markRivalHubEventsStale, matchesRivalHubDemo, upsertRivalHubEvents, type StudioEventRecord } from "./lib/events";
 import { importEventAssetArchive } from "./lib/event-assets";
 import { APP_VERSION, checkForUpdateOnChannel, type UpdateChannel, type UpdateInfo } from "./lib/update";
 import { checkForUpdateViaBridge } from "./lib/updater-bridge";
@@ -45,9 +45,9 @@ import {
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
 import { getPinnedPlayer } from "./lib/pin";
 import { connectRivalHub, fetchRivalHubEvents, loadRivalHubConnection, revokeRivalHubPairing, type RivalHubConnectionState } from "./lib/rivalhub";
-import { rivalHubBatchCompletionMessage, runRivalHubBatch, type RivalHubBatchItem, type RivalHubBatchSession, type RivalHubImportContext } from "./lib/rivalhub-import";
+import { rivalHubBatchCompletionMessage, runRivalHubBatch, type RivalHubBatchInput, type RivalHubBatchItem, type RivalHubBatchSession, type RivalHubImportContext } from "./lib/rivalhub-import";
 import { RivalHubBatchImportPanel } from "./components/RivalHubBatchImportPanel";
-import { importRivalHubFromNativePicker, isRivalHubDropTarget, shouldHandleOrdinaryDrop } from "./lib/rivalhub-acquisition";
+import { importRivalHubFromNativePicker } from "./lib/rivalhub-acquisition";
 
 type StudioView =
   | "home"
@@ -399,10 +399,10 @@ export function App() {
     }
   }, [rivalHubConnection]);
 
-  const importOnlineFiles = useCallback(async (files: Iterable<File>, context: RivalHubImportContext) => {
+  const runRivalHubBatchInputs = useCallback(async (batchInputs: Iterable<RivalHubBatchInput>, context: RivalHubImportContext) => {
     if (importing) return;
-    let inputFiles = [...files];
-    if (inputFiles.length === 0) return;
+    let inputs = [...batchInputs];
+    if (inputs.length === 0) return;
     batchStopRequested.current = false;
     batchTargetResolvers.current.clear();
     setBatchSession(null);
@@ -410,7 +410,7 @@ export function App() {
     setNotice("正在启动 RivalHub Demo 批处理…");
     let demBackend: Awaited<ReturnType<typeof detectDemBackend>> | undefined;
     try {
-      const batchPromise = runRivalHubBatch(inputFiles, context, {
+      const batchPromise = runRivalHubBatch(inputs, context, {
         exportDem: async (file, onProgress) => {
           demBackend ??= await detectDemBackend();
           return exportDemToZip(file, demBackend, onProgress);
@@ -426,8 +426,8 @@ export function App() {
         },
       });
       // runRivalHubBatch copies the iterable synchronously before its first
-      // await; do not keep a second batch-wide File array in the App closure.
-      inputFiles = [];
+      // await; do not keep a second batch-wide input array in the App closure.
+      inputs = [];
       const session = await batchPromise;
       const remoteRefreshSucceeded = await refreshRivalHub({ announce: false });
       setBatchSession(session);
@@ -438,10 +438,37 @@ export function App() {
       setNotice(`在线 Demo 批处理失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
       batchTargetResolvers.current.clear();
-      inputFiles = [];
+      inputs = [];
       setImporting(false);
     }
   }, [importing, refreshEventRecords, refreshRivalHub]);
+
+  const importOnlineFiles = useCallback(async (files: Iterable<File>, context: RivalHubImportContext) => {
+    await runRivalHubBatchInputs(files, context);
+  }, [runRivalHubBatchInputs]);
+
+  const syncLocalRivalHubDemos = useCallback(async (context: RivalHubImportContext) => {
+    if (importing) return;
+    try {
+      const { entries: refreshedEntries } = await backfillDemoIdentities();
+      setEntries(refreshedEntries);
+      const currentSeries = await listSeriesRecords();
+      const candidateKeys = new Set(context.candidates.map((candidate) => `${candidate.series.id}:${candidate.map.id}`));
+      const linkedEntryIds = new Set(
+        currentSeries.flatMap((series) => (series.mapAssignments ?? [])
+          .filter((assignment) => assignment.entryId && assignment.rivalHub && candidateKeys.has(`${series.id}:${assignment.rivalHub.id}`))
+          .map((assignment) => assignment.entryId!)),
+      );
+      const localEntries = refreshedEntries.filter((entry) => linkedEntryIds.has(entry.id) || context.candidates.some((candidate) => matchesRivalHubDemo(entry, candidate.series, candidate.map)));
+      if (localEntries.length === 0) {
+        setNotice("当前 Event / Stage 范围没有可同步的本地 Demo");
+        return;
+      }
+      await runRivalHubBatchInputs(localEntries.map((entry) => ({ kind: "local", entry })), context);
+    } catch (error) {
+      setNotice(`扫描本地 Demo 失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, [importing, runRivalHubBatchInputs]);
 
   const stopRivalHubBatch = useCallback(() => {
     batchStopRequested.current = true;
@@ -799,9 +826,8 @@ export function App() {
   return (
     <div
       className="stu-app"
-      onDragOver={(e) => { if (!isRivalHubDropTarget(e.target)) e.preventDefault(); }}
+      onDragOver={(e) => { e.preventDefault(); }}
       onDrop={async (e) => {
-        if (!shouldHandleOrdinaryDrop(e.target, e.defaultPrevented)) return;
         e.preventDefault();
         if (e.dataTransfer.files.length > 0) {
           // Windows EdgeChromium：主动把 File 引用发给 Python
@@ -1091,6 +1117,7 @@ export function App() {
             onRefreshRivalHub={refreshRivalHub}
             onImportOnlineFiles={importOnlineFiles}
             onPickOnlineFiles={nativeImportAvailable ? pickRivalHubFiles : undefined}
+            onSyncLocalDemos={syncLocalRivalHubDemos}
             refreshToken={rivalHubRefreshToken}
           />
         ))}

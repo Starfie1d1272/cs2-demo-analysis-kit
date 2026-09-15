@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { nativePathForFile } from "./dem";
-import { importRivalHubFromNativePicker, isRivalHubDropTarget, RIVALHUB_DROP_ZONE_ATTRIBUTE, shouldHandleOrdinaryDrop } from "./rivalhub-acquisition";
+import { importRivalHubFromNativePicker } from "./rivalhub-acquisition";
 import type { RivalHubImportContext } from "./rivalhub-import";
 
 const context: RivalHubImportContext = {
@@ -35,21 +35,4 @@ describe("RivalHub desktop acquisition adapter", () => {
     expect(onImport).not.toHaveBeenCalled();
   });
 
-  it("identifies only descendants of a marked RivalHub drop zone", () => {
-    const inside = { closest: vi.fn((selector: string) => selector === `[${RIVALHUB_DROP_ZONE_ATTRIBUTE}]` ? {} : null) };
-    const outside = { closest: vi.fn(() => null) };
-
-    expect(isRivalHubDropTarget(inside as unknown as EventTarget)).toBe(true);
-    expect(isRivalHubDropTarget(outside as unknown as EventTarget)).toBe(false);
-    expect(isRivalHubDropTarget(null)).toBe(false);
-  });
-
-  it("keeps the App ordinary Library importer out of a RivalHub drop", () => {
-    const inside = { closest: vi.fn(() => ({})) };
-    const outside = { closest: vi.fn(() => null) };
-
-    expect(shouldHandleOrdinaryDrop(inside as unknown as EventTarget, false)).toBe(false);
-    expect(shouldHandleOrdinaryDrop(outside as unknown as EventTarget, false)).toBe(true);
-    expect(shouldHandleOrdinaryDrop(outside as unknown as EventTarget, true)).toBe(false);
-  });
 });

@@ -126,6 +126,7 @@ describe("SeriesInspector", () => {
 
     expect(html).toContain('type="file"');
     expect(html).toContain('accept=".dem,.zip,application/zip"');
-    expect(html).toContain("data-rivalhub-drop-zone");
+    expect(html).toContain("选择 Demo");
+    expect(html).not.toContain("data-rivalhub-drop-zone");
   });
 });

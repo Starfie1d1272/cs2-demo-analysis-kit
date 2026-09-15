@@ -1970,7 +1970,8 @@ body {
 .stu-online-issue { max-width: 420px; color: var(--dak-fg-dim); font-size: 11px; }
 .stu-online-issue summary { cursor: pointer; color: var(--dak-danger); }
 .stu-online-issue ul { margin: 4px 0; padding-left: 18px; }
-.stu-online-drop-zone {
+.stu-online-import-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.stu-online-import-button {
   width: 100%;
   padding: 10px 12px;
   border: 1px dashed color-mix(in srgb, var(--dak-accent) 55%, var(--dak-border));
@@ -1981,11 +1982,12 @@ body {
   text-align: left;
   cursor: pointer;
 }
-.stu-online-drop-zone:hover,
-.stu-online-drop-zone:focus-visible {
+.stu-online-import-button:hover,
+.stu-online-import-button:focus-visible {
   border-color: var(--dak-accent);
   color: var(--dak-fg);
 }
+.stu-online-import-button-secondary { background: transparent; border-style: solid; color: var(--dak-fg-dim); font-size: 11px; }
 
 .stu-rivalhub-status {
   display: inline-flex;
@@ -2053,8 +2055,8 @@ body {
 .stu-stage-tabs { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0 4px; }
 .stu-event-stage-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 18px 0 10px; }
 .stu-event-stage-head h3 { display: inline; margin: 0 9px 0 0; }
-.stu-event-stage-head .stu-online-drop-zone { width: auto; min-width: 118px; padding: 7px 10px; }
-.stu-online-drop-zone-secondary { background: transparent; border-style: solid; color: var(--dak-fg-dim); font-size: 11px; }
+.stu-event-stage-head .stu-online-import-actions { justify-content: flex-end; }
+.stu-event-stage-head .stu-online-import-button { width: auto; min-width: 118px; padding: 7px 10px; }
 .stu-stage-empty { margin: 10px 0; }
 .stu-series-index { display: grid; gap: 5px; margin: 14px 0; }
 .stu-series-index-head { display: flex; align-items: baseline; gap: 9px; padding-bottom: 3px; }
