@@ -3,6 +3,7 @@ import {
   analyzeDemoPackage,
   buildPlayerRoundPerformanceFacts,
   buildTeamSideWinRates,
+  CORE_SEMANTIC_PROFILE,
   demoSourceAvailability,
   type PlayerPerformanceAggregate,
 } from "../../../../packages/core/src/index";
@@ -473,7 +474,7 @@ export function buildRivalHubDemoEvidenceV1(
   });
   const conversions = teamConversions(pkg, performanceFacts);
   return {
-    contract: { contractVersion: "rivalhub-demo-evidence/1", semanticProfile: "dak-stable/1", analysisVersion: analysis.provenance.analysisVersion },
+    contract: { contractVersion: "rivalhub-demo-evidence/1", semanticProfile: CORE_SEMANTIC_PROFILE, analysisVersion: analysis.provenance.analysisVersion },
     target,
     source: {
       demoSha256, mapName: pkg.match.mapName, tickRateHz: pkg.match.tickrate, sourceSchemaVersion: pkg.manifest.schemaVersion,
