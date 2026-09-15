@@ -40,6 +40,9 @@ describe("tournament performance adapter", () => {
     const coreFacts = buildPlayerRoundFacts(pkg);
     const utilityFacts = buildPlayerRoundUtilityFacts(pkg);
     const weaponFacts = derivePlayerWeaponHighlights(pkg);
+    // Cohort's RRIndicators is the rating/#381 compatibility projection and
+    // may prefer package-level playerStats. The assertions below compare only
+    // overlapping fields whose source is the same frozen Core fact/helper.
     for (const packagePlayer of pkg.players) {
       const playerKey = `steam:${packagePlayer.steamId64}`;
       const actual = result.players.find((row) => row.player.entityKey === playerKey)!;

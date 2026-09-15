@@ -206,7 +206,7 @@ export function buildSeasonCohortFromRows(
 
   const seasonRows = [...players.values()].map((acc) => {
     const signals = aggregateAccountSignals(acc.playerKey, acc.signals);
-    const indicators = aggregateRRIndicators(acc.playerKey, acc.indicators);
+    const indicators = aggregateRatingIndicators(acc.playerKey, acc.indicators);
     const rrV1 = computeRR(indicators, rrWeights);
     return { acc, signals, indicators, rrV1 };
   });
@@ -343,7 +343,13 @@ function aggregateAccountSignals(steamId64: string, rows: RRSignals[]): RRSignal
   };
 }
 
-function aggregateRRIndicators(steamId64: string, rows: RRIndicators[]): RRIndicators {
+/**
+ * Compatibility projection for the RR/PRISM input contract. This is not the
+ * transparent tournament-performance owner: RRIndicators may intentionally
+ * prefer playerStats aggregate truth and also carries rating-only fields.
+ * New transparent cross-match metrics belong in @cs2dak/tournament.
+ */
+function aggregateRatingIndicators(steamId64: string, rows: RRIndicators[]): RRIndicators {
   const totalRounds = Math.max(sum(rows, (row) => row.totalRounds), 1);
   const kills = sum(rows, (row) => row.kills);
   const deaths = sum(rows, (row) => row.deaths);

@@ -83,7 +83,10 @@ artifact（`dist/index.js` + `dist/index.d.ts`），不安装 `@cs2dak/presentat
 `TournamentMapFacts` 或 `TournamentPerformanceMapFacts`，所以 RivalHub 保持自己的
 身份、scope、持久化和 UI owner。1.1 performance surface 保留 player 的
 overall/T/CT slices，所有 rate 携带 numerator/denominator，team per-round
-denominator 按去重后的 team-round 计算。
+denominator 按去重后的 team-round 计算。`TournamentPerformanceMapFacts` 的
+player-round 是逐回合 source；当同一 ZIP 同时带有 `playerStats` aggregate 时，不能
+把后者反推回 side-aware round rows。旧 `RRIndicators`/#381 scoreboard projection
+仍按其既有 aggregate contract 运行，不能与 performance DTO 混作同一个 source。
 
 未来如需共享更高层的 presentation View Model，仍须先确认其以**构建产物**发布且
 依赖图自洽；两边各自原生渲染，确有必要再嵌**只读卡片组件**，不共享有状态视图。

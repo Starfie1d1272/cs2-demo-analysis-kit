@@ -118,6 +118,9 @@ function mapPlayerRounds(
     if (!clutchByRoundPlayer.has(key)) clutchByRoundPlayer.set(key, clutch);
   }
   const rounds = new Map(pkg.rounds.map((row) => [row.roundNumber, row]));
+  // Keep the per-round Core facts as the source for this DTO. playerStats is a
+  // separate aggregate/#381 scoreboard projection and cannot be allocated back
+  // to side-aware rounds without inventing facts.
   const coreFacts = buildPlayerRoundFacts(pkg);
 
   return coreFacts.map((row) => {

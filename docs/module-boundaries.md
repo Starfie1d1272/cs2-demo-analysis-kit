@@ -69,6 +69,7 @@ PRISM 风格、强弱项等“相对当前范围”的判断可以继续使用 c
 9. 允许破坏性重构和删除旧 API；不为错误职责边界长期维护兼容层。
 10. 跨模块行为必须由公开合同和 fixture 验证，不依赖内部文件结构。
 11. `@cs2dak/tournament` 自己拥有窄 public DTO；不得把 `@cs2dak/contract` 的 DemoFormat、Zod 或 RR 依赖拖入其 runtime。1.1 performance surface 只消费已冻结的 player-round/objective/weapon sufficient facts，不重新 detection。
+12. `@cs2dak/cohort` 保留 RR/PRISM 所需的 `RRIndicators` compatibility projection；它不替代 `@cs2dak/tournament` 的透明 performance owner。Presentation 的证据/视图模型可以保留自己的输出整形，但不得重新实现 Core 的事件归因。
 
 ## 边界变更规则
 
