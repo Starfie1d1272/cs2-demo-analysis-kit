@@ -124,19 +124,79 @@ workflow 只面向 Windows 应用内测试：
 Studio 里把「更新通道」切到「测试版」后，检查更新会读
 `https://dakupdate.starfie1d.top/releases/beta/latest.json`。
 
-## npm 包发布（@cs2dak/*，Changesets）
+## npm 包发布（@cs2dak/*，Changesets + Trusted Publishing）
 
-仅当 RivalHub / CS2 Insight Agent 需要消费新的包 API 时发：
+仅当 RivalHub / CS2 Insight Agent 需要消费新的包 API 时发。当前 npm 公共包为：
 
-```bash
-pnpm changeset            # 写变更说明，选 bump 级别
-pnpm version:packages     # changeset version：改版本号 + CHANGELOG
-git commit -am "chore: version packages"
-pnpm release:npm          # build + test + typecheck + changeset publish（自动打 @cs2dak/*@x.y.z tag）
-git push --follow-tags
+`@cs2dak/cohort`、`@cs2dak/contract`、`@cs2dak/core`、`@cs2dak/maps`、
+`@cs2dak/presentation`、`@cs2dak/react`、`@cs2dak/tournament`。
+`@cs2dak/cli` 是私有工作区应用，不发 npm。
+
+正式 production 路径：
+
+```text
+feature PR + changeset
+→ Version Packages / release PR
+→ merge 到 main
+→ GitHub Actions: Publish npm packages（手动触发）
+→ npm Trusted Publishing / OIDC
+→ 验证 npm versions、provenance 与 package tags
 ```
 
-`@cs2dak/cli` 是私有工作区应用，不发 npm。
+准备 release PR 仍使用 Changesets：
+
+```bash
+pnpm changeset            # 写变更说明，选择 bump 级别
+pnpm version:packages     # 消费 changeset，更新版本号 + CHANGELOG
+git commit -am "chore: version packages"
+```
+
+合并 release PR 后，在 GitHub Actions 选择 **Publish npm packages**，确认 ref 为
+`main` 后手动运行。`.github/workflows/npm-publish.yml` 使用 GitHub-hosted
+`ubuntu-latest`、Node `24.x`、仓库锁定的 pnpm `11.7.0` 和 `npm-publish` environment；
+先运行完整的 build、test、typecheck，再运行 `pnpm exec changeset publish --no-git-tag`。
+OIDC 需要 job 级 `id-token: write`，package tag 推送需要 `contents: write`。
+
+工作流不使用长期 npm write token，不要求生产发布前 `npm login`，也不设置
+`NPM_TOKEN` / `NODE_AUTH_TOKEN`。Trusted Publishing 成功时 npm 会自动生成 provenance。
+本地 `pnpm release:npm` 保留作 release path 验证命令，但它最后仍会执行
+`changeset publish`；正式 registry publish 不走本机认证路径。
+
+Changesets 会按 registry 上的精确版本跳过已发布包。工作流关闭 Changesets 自己的
+本地 tag 创建，由 `scripts/reconcile-npm-publish.mjs` 先查询每个精确版本是否已经在
+npm 上存在，只为确认成功的版本创建并显式推送
+`@cs2dak/<package>@X.Y.Z` tag；推送不使用 force。这样部分发布失败时不会给未发布包
+预先打 tag，重跑会继续缺失版本，并保留已经成功发布的状态。远端已有但指向其他
+commit 的 tag 会直接使工作流失败，不会删除、回滚、移动 tag 或 unpublish。
+
+### 首次配置（仓库外的运维步骤）
+
+以下设置不保存到仓库 secret，需要在网页端完成：
+
+1. 在 GitHub 仓库 Settings → Environments 创建 `npm-publish`。建议给它设置 required
+   reviewers、禁止 self-review，并将部署分支限制为 `main`。
+2. 对上面列出的 7 个包分别在 npm → Package → Settings → Trusted publishing 添加
+   **GitHub Actions** publisher：
+
+   - Organization or user：`Starfie1d127`
+   - Repository：`cs2-demo-analysis-kit`
+   - Workflow filename：`npm-publish.yml`（只填文件名）
+   - Environment name：`npm-publish`
+   - Allowed actions：明确允许 **direct `npm publish`**；不能只保留默认的 staged publish
+
+3. 合并本仓库的 Trusted Publishing infrastructure PR，并把待发布的 version commit
+   放到新的 `main` 上；不要再次运行 `pnpm version:packages` 消费同一批 changeset。
+4. 在 Actions → **Publish npm packages** → ref `main` → Run workflow，先通过
+   `npm-publish` environment 审批，再观察发布日志。
+5. 对每个目标版本验证 `npm view <package>@<version> version`、npm 页面上的 provenance
+   以及远端 `@cs2dak/<package>@<version>` tag。`npm whoami` 不反映 Trusted Publishing
+   状态，不能作为 OIDC 健康检查。
+6. 首次 OIDC 发布成功并完成上述核对后，再撤销旧 npm write/release token，并在 npm
+   Publishing access 中开启 token restriction（如 `Require two-factor authentication
+   and disallow tokens`）。
+
+详见 npm 的 [Trusted publishing 文档](https://docs.npmjs.com/trusted-publishers/)
+和 [Changesets publish 文档](https://github.com/changesets/changesets/blob/main/docs/command-line-options.md#publish)。
 
 ## tag 规则
 

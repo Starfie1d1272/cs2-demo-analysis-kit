@@ -1,0 +1,104 @@
+name: Publish npm packages
+
+# 只允许在 main 上人工触发。npm Trusted Publisher 绑定本文件名与 npm-publish
+# environment；不要把本 workflow 改成 push/PR 自动发布。
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'Starfie1d1272/cs2-demo-analysis-kit' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
+        with:
+          version: 11.7.0
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.x
+          package-manager-cache: false
+
+      - name: Check release toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          NODE_VERSION="$(node --version)"
+          NPM_VERSION="$(npm --version)"
+          PNPM_VERSION="$(pnpm --version)"
+          printf '%s\n' "node ${NODE_VERSION}" "npm ${NPM_VERSION}" "pnpm ${PNPM_VERSION}"
+          NODE_VERSION="$NODE_VERSION" NPM_VERSION="$NPM_VERSION" PNPM_VERSION="$PNPM_VERSION" node --input-type=module <<'NODE'
+          const parse = (value) => value.replace(/^v/, "").split(".").map(Number);
+          const [nodeMajor, nodeMinor, nodePatch] = parse(process.env.NODE_VERSION);
+          const [npmMajor, npmMinor, npmPatch] = parse(process.env.NPM_VERSION);
+          if (nodeMajor < 22 || (nodeMajor === 22 && (nodeMinor < 14 || (nodeMinor === 14 && nodePatch < 0)))) {
+            throw new Error(`npm Trusted Publishing requires Node >=22.14.0, got ${process.env.NODE_VERSION}`);
+          }
+          if (npmMajor < 11 || (npmMajor === 11 && (npmMinor < 5 || (npmMinor === 5 && npmPatch < 1)))) {
+            throw new Error(`npm Trusted Publishing requires npm >=11.5.1, got ${process.env.NPM_VERSION}`);
+          }
+          if (process.env.PNPM_VERSION !== "11.7.0") {
+            throw new Error(`release workflow must use pnpm 11.7.0, got ${process.env.PNPM_VERSION}`);
+          }
+          NODE
+
+      - name: Check npm publish policy
+        run: node scripts/check-npm-publish-policy.mjs
+
+      - name: Verify release commit
+        run: node scripts/reconcile-npm-publish.mjs --check-only
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build release packages
+        run: pnpm build
+
+      - name: Run complete release tests
+        run: pnpm test:all
+
+      - name: Typecheck release packages
+        run: pnpm typecheck
+
+      # Changesets 负责按 registry 上的精确版本跳过已发布包并执行 publish。
+      # 关闭其本地 tag 创建，交给下面的 reconciliation 脚本按 npm 事实补齐。
+      - name: Publish package versions with Changesets
+        id: publish
+        continue-on-error: true
+        run: pnpm exec changeset publish --no-git-tag
+
+      # 即使 Changesets 部分失败也要运行：只为 npm 已确认存在的版本创建/推送 tag。
+      # 缺失版本不创建 tag，最终仍以失败结束，下一次重跑可继续发布。
+      - name: Reconcile npm versions and package tags
+        id: reconcile
+        if: always() && steps.publish.outcome != 'skipped'
+        continue-on-error: true
+        run: node scripts/reconcile-npm-publish.mjs
+
+      - name: Fail if npm publish was incomplete
+        if: always()
+        env:
+          PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
+          RECONCILE_OUTCOME: ${{ steps.reconcile.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$PUBLISH_OUTCOME" == "failure" || "$RECONCILE_OUTCOME" == "failure" ]]; then
+            exit 1
+          fi
