@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { RivalHubBatchItem, RivalHubBatchSession } from "../lib/rivalhub-import";
 import { rivalHubStatusPresentation } from "../lib/rivalhub-status";
 
-const ACTIVE_BATCH_PHASES = new Set(["exporting", "importing", "matching", "building_evidence", "submitting"]);
+const ACTIVE_BATCH_PHASES = new Set(["checking", "exporting", "importing", "matching", "building_evidence", "submitting"]);
 
 export function currentRivalHubBatchItem(session: RivalHubBatchSession | null): RivalHubBatchItem | null {
   if (!session) return null;

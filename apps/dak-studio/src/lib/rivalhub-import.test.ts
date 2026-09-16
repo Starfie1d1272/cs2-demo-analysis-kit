@@ -78,11 +78,15 @@ type BatchMatch = NonNullable<BatchDependencies["matchMap"]>;
 type BatchSubmit = NonNullable<BatchDependencies["submit"]>;
 
 function baseDependencies(options: {
+  hashNativePath?: BatchDependencies["hashNativePath"];
+  findDemoBySha256?: BatchDependencies["findDemoBySha256"];
   importDemo?: BatchImport;
   matchMap?: BatchMatch;
   submit?: BatchSubmit;
   resolveParticipantsFromEventRoster?: NonNullable<BatchDependencies["resolveParticipantsFromEventRoster"]>;
 } = {}) {
+  const hashNativePath = options.hashNativePath ?? vi.fn(async () => demoSha256);
+  const findDemoBySha256 = options.findDemoBySha256 ?? vi.fn(async () => null);
   const importDemo = options.importDemo ?? vi.fn(async (file: File) => ({ entry: localEntry(file.name), duplicate: false, replaced: false }));
   const matchMap = options.matchMap ?? vi.fn((): ReturnType<BatchMatch> => ({ status: "matched", candidate: candidate("target"), mode: "review_fallback" }));
   const submit = options.submit ?? vi.fn(async (): Promise<Awaited<ReturnType<BatchSubmit>>> => ({ status: "synced", importId: null, matchMapId: "target", demoSha256, issues: [] }));
@@ -93,7 +97,7 @@ function baseDependencies(options: {
   const resolveParticipantsFromEventRoster = options.resolveParticipantsFromEventRoster ?? vi.fn(() => ({ identities: new Map(), orientation: "direct" as const }));
   const resolveParticipantsForReview = vi.fn(() => ({ identities: new Map(), orientation: "direct" as const }));
   const buildEvidence = vi.fn(() => ({ contract: "test" }));
-  return { importDemo, matchMap, submit, loadPackage, linkMap, idempotencyKey, resolveParticipants, resolveParticipantsFromEventRoster, resolveParticipantsForReview, buildEvidence };
+  return { hashNativePath, findDemoBySha256, importDemo, matchMap, submit, loadPackage, linkMap, idempotencyKey, resolveParticipants, resolveParticipantsFromEventRoster, resolveParticipantsForReview, buildEvidence };
 }
 
 function runWith(
@@ -163,6 +167,66 @@ describe("RivalHub serial batch import", () => {
     expect(nativePathForFile(nativeFile)).toBe("/demos/native.zip");
     expect(exportDem).toHaveBeenCalledOnce();
     expect(exportDem.mock.calls[0]?.[0]).toBe(nativeFile);
+  });
+
+  it("reuses a path-backed raw Demo before invoking the exporter", async () => {
+    const entry = localEntry("stored.zip");
+    const dependencies = baseDependencies({
+      hashNativePath: vi.fn(async (path: string) => {
+        expect(path).toBe("/demos/incoming.dem");
+        return demoSha256;
+      }),
+      findDemoBySha256: vi.fn(async (sha256: string) => {
+        expect(sha256).toBe(demoSha256);
+        return entry;
+      }),
+    });
+    const exportDem = vi.fn();
+
+    const session = await runRivalHubBatch([fileFromNativePath("/demos/incoming.dem")], { scope: "event", eventId: "event-1", candidates: [candidate("target")] }, {
+      exportDem,
+      dependencies,
+    });
+
+    expect(exportDem).not.toHaveBeenCalled();
+    expect(dependencies.importDemo).not.toHaveBeenCalled();
+    expect(session.items[0]).toMatchObject({
+      localEntryId: entry.id,
+      localDuplicate: true,
+      reusedLocal: true,
+      phase: "synced",
+      detail: "复用本地 ZIP / facts，跳过 Demo 导出与入库",
+    });
+    expect(session.counts.reusedLocal).toBe(1);
+  });
+
+  it("exports only once for two path-backed files with the same raw Demo hash", async () => {
+    let existing: StudioDemoEntry | null = null;
+    const createdEntry = localEntry("first.zip");
+    const dependencies = baseDependencies({
+      findDemoBySha256: vi.fn(async () => existing),
+      importDemo: vi.fn(async () => {
+        existing = createdEntry;
+        return { entry: createdEntry, duplicate: false, replaced: false };
+      }),
+    });
+    const exportDem = vi.fn(async (file: File) => ({
+      file: new File(["zip"], `${file.name}.zip`, { type: "application/zip" }),
+      sourceDemPath: nativePathForFile(file),
+    }));
+
+    const session = await runRivalHubBatch([
+      fileFromNativePath("/demos/first.dem"),
+      fileFromNativePath("/demos/second.dem"),
+    ], { scope: "event", eventId: "event-1", candidates: [candidate("target")] }, {
+      exportDem,
+      dependencies,
+    });
+
+    expect(exportDem).toHaveBeenCalledOnce();
+    expect(dependencies.importDemo).toHaveBeenCalledOnce();
+    expect(session.items.map((item) => item.localEntryId)).toEqual([createdEntry.id, createdEntry.id]);
+    expect(session.items[1]).toMatchObject({ localDuplicate: true, reusedLocal: true });
   });
 
   it("loads the transient evidence package from the current ZIP File instead of storage", async () => {

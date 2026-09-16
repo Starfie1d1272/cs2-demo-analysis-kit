@@ -7,6 +7,7 @@
 
 前端通过 window.pywebview.api 调用本桥：
   - pick_dems():        原生文件对话框选 .dem/.zip
+  - hash_file_path():   只计算 native .dem 的 raw SHA-256，不启动 exporter
   - export_dem_path():  按路径导出为 v3 ZIP，base64 回传（ZIP 仅 1–3MB）
   - export_dem_bytes(): 按字节导出（Windows 拖拽无路径时的回退）
   - get_drop_path():    拖拽后按文件名解析本机路径（macOS WKWebView）
@@ -970,6 +971,16 @@ class StudioApi:
 
     def path_exists(self, path: str) -> bool:
         return Path(path).exists()
+
+    def hash_file_path(self, path: str) -> dict:
+        """Hash one native file without invoking the demo exporter."""
+        try:
+            source = Path(path)
+            if not source.is_file():
+                return {"ok": False, "error": "文件不存在"}
+            return {"ok": True, "sha256": updater.sha256_file(source)}
+        except Exception as exc:  # noqa: BLE001 - surface bridge errors to the UI
+            return {"ok": False, "error": str(exc)}
 
     def watch_demo(self, path: str, tick: int | None = None) -> dict:
         """Launch CS2 and load a local .dem."""

@@ -18,6 +18,7 @@ const REMOTE: Record<RivalHubDemoSyncStatus, RivalHubStatusPresentation> = {
 
 const BATCH: Record<RivalHubBatchPhase, RivalHubStatusPresentation> = {
   queued: { label: "排队中", className: "stu-rivalhub-status stu-rivalhub-status-queued" },
+  checking: { label: "检查本地", className: "stu-rivalhub-status stu-rivalhub-status-processing" },
   exporting: { label: "导出 Demo", className: "stu-rivalhub-status stu-rivalhub-status-processing" },
   importing: { label: "写入本地", className: "stu-rivalhub-status stu-rivalhub-status-processing" },
   matching: { label: "匹配中", className: "stu-rivalhub-status stu-rivalhub-status-processing" },

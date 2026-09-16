@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from types import SimpleNamespace
 
 import cs2dak.studio as studio_module
@@ -22,6 +23,22 @@ def test_rivalhub_bridge_rejects_non_web_urls_and_unknown_credentials(monkeypatc
     assert api.rivalhub_credential_get(RIVALHUB_CREDENTIAL_SERVICE, RIVALHUB_CREDENTIAL_ACCOUNT) is None
     assert not api.rivalhub_credential_set(RIVALHUB_CREDENTIAL_SERVICE, RIVALHUB_CREDENTIAL_ACCOUNT, "token")
     assert not api.rivalhub_credential_delete(RIVALHUB_CREDENTIAL_SERVICE, RIVALHUB_CREDENTIAL_ACCOUNT)
+
+
+def test_hash_file_path_uses_streaming_updater_and_reports_missing_files(tmp_path):
+    api = _api(tmp_path)
+    source = tmp_path / "source.dem"
+    payload = b"raw demo bytes"
+    source.write_bytes(payload)
+
+    assert api.hash_file_path(str(source)) == {
+        "ok": True,
+        "sha256": hashlib.sha256(payload).hexdigest(),
+    }
+    assert api.hash_file_path(str(tmp_path / "missing.dem")) == {
+        "ok": False,
+        "error": "文件不存在",
+    }
 
 
 def test_rivalhub_bridge_uses_only_fixed_keychain_item(monkeypatch, tmp_path):
