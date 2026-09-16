@@ -1,6 +1,6 @@
 import type { DemoPackage } from "@cs2dak/contract";
 import { hashNativePath, nativePathForFile, type ExportedDemoFile } from "./dem";
-import { entryDate, findDemoEntryBySha256, importDemoFile, loadDemoPackageTransient, type StudioDemoEntry } from "./library";
+import { entryDate, findDemoEntryBySha256, importDemoFile, loadDemoPackageTransient, updateDemoSourcePath, type StudioDemoEntry } from "./library";
 import { linkDemoToRivalHubMap } from "./events";
 import {
   buildRivalHubDemoEvidenceV1,
@@ -105,6 +105,7 @@ export function rivalHubBatchCompletionMessage(session: RivalHubBatchSession, re
 interface RivalHubBatchDependencies {
   hashNativePath: (path: string) => Promise<string>;
   findDemoBySha256: (sha256: string) => Promise<StudioDemoEntry | null>;
+  updateDemoSourcePath: typeof updateDemoSourcePath;
   exportDem: (file: File, onProgress?: (message: string) => void) => Promise<ExportedDemoFile>;
   importDemo: typeof importDemoFile;
   loadPackage: (id: string, sourceFile?: File) => Promise<DemoPackage>;
@@ -239,6 +240,7 @@ export async function runRivalHubBatch(
   const deps: RivalHubBatchDependencies = {
     hashNativePath,
     findDemoBySha256: findDemoEntryBySha256,
+    updateDemoSourcePath,
     exportDem: callbacks.exportDem,
     importDemo: importDemoFile,
     loadPackage: loadDemoPackageTransient,
@@ -306,7 +308,12 @@ export async function runRivalHubBatch(
           const demoSha256 = await deps.hashNativePath(nativeDemPath);
           const existing = await deps.findDemoBySha256(demoSha256);
           if (existing) {
-            localEntry = existing;
+            if (existing.sourceDemPath !== nativeDemPath) {
+              await deps.updateDemoSourcePath(existing.id, nativeDemPath);
+              localEntry = { ...existing, sourceDemPath: nativeDemPath };
+            } else {
+              localEntry = existing;
+            }
             updateItem(index, {
               phase: "matching",
               message: messageForPhase("matching"),

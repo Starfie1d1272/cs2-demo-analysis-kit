@@ -80,6 +80,7 @@ type BatchSubmit = NonNullable<BatchDependencies["submit"]>;
 function baseDependencies(options: {
   hashNativePath?: BatchDependencies["hashNativePath"];
   findDemoBySha256?: BatchDependencies["findDemoBySha256"];
+  updateDemoSourcePath?: BatchDependencies["updateDemoSourcePath"];
   importDemo?: BatchImport;
   matchMap?: BatchMatch;
   submit?: BatchSubmit;
@@ -87,6 +88,7 @@ function baseDependencies(options: {
 } = {}) {
   const hashNativePath = options.hashNativePath ?? vi.fn(async () => demoSha256);
   const findDemoBySha256 = options.findDemoBySha256 ?? vi.fn(async () => null);
+  const updateDemoSourcePath = options.updateDemoSourcePath ?? vi.fn(async () => undefined);
   const importDemo = options.importDemo ?? vi.fn(async (file: File) => ({ entry: localEntry(file.name), duplicate: false, replaced: false }));
   const matchMap = options.matchMap ?? vi.fn((): ReturnType<BatchMatch> => ({ status: "matched", candidate: candidate("target"), mode: "review_fallback" }));
   const submit = options.submit ?? vi.fn(async (): Promise<Awaited<ReturnType<BatchSubmit>>> => ({ status: "synced", importId: null, matchMapId: "target", demoSha256, issues: [] }));
@@ -97,7 +99,7 @@ function baseDependencies(options: {
   const resolveParticipantsFromEventRoster = options.resolveParticipantsFromEventRoster ?? vi.fn(() => ({ identities: new Map(), orientation: "direct" as const }));
   const resolveParticipantsForReview = vi.fn(() => ({ identities: new Map(), orientation: "direct" as const }));
   const buildEvidence = vi.fn(() => ({ contract: "test" }));
-  return { hashNativePath, findDemoBySha256, importDemo, matchMap, submit, loadPackage, linkMap, idempotencyKey, resolveParticipants, resolveParticipantsFromEventRoster, resolveParticipantsForReview, buildEvidence };
+  return { hashNativePath, findDemoBySha256, updateDemoSourcePath, importDemo, matchMap, submit, loadPackage, linkMap, idempotencyKey, resolveParticipants, resolveParticipantsFromEventRoster, resolveParticipantsForReview, buildEvidence };
 }
 
 function runWith(
@@ -198,6 +200,28 @@ describe("RivalHub serial batch import", () => {
       detail: "复用本地 ZIP / facts，跳过 Demo 导出与入库",
     });
     expect(session.counts.reusedLocal).toBe(1);
+  });
+
+  it("updates a reused raw Demo source path through the existing library owner", async () => {
+    const entry: StudioDemoEntry = { ...localEntry("stored.zip"), sourceDemPath: "/demos/old.dem" };
+    const updateDemoSourcePath = vi.fn(async (id: string, sourceDemPath: string | null) => {
+      expect(id).toBe(entry.id);
+      entry.sourceDemPath = sourceDemPath;
+    });
+    const dependencies = baseDependencies({
+      findDemoBySha256: vi.fn(async () => entry),
+      updateDemoSourcePath,
+    });
+
+    const session = await runRivalHubBatch([fileFromNativePath("/demos/new.dem")], { scope: "event", eventId: "event-1", candidates: [candidate("target")] }, {
+      exportDem: vi.fn(),
+      dependencies,
+    });
+
+    expect(updateDemoSourcePath).toHaveBeenCalledOnce();
+    expect(updateDemoSourcePath).toHaveBeenCalledWith(entry.id, "/demos/new.dem");
+    expect(entry.sourceDemPath).toBe("/demos/new.dem");
+    expect(session.items[0]).toMatchObject({ localEntryId: entry.id, localDuplicate: true, reusedLocal: true, phase: "synced" });
   });
 
   it("exports only once for two path-backed files with the same raw Demo hash", async () => {

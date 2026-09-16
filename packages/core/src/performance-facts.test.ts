@@ -245,6 +245,22 @@ describe("canonical player-round performance facts", () => {
     const row = facts.playerRounds.find((candidate) => candidate.steamId64 === "synthetic-0")!;
 
     expect(row).toMatchObject({ kills: 0, deaths: 1, survived: false, kast: false, kastTags: [] });
+
+    const playerStats = statsFromFacts(pkg, facts).map((stats) => stats.playerIndex === 0
+      ? { ...stats, kastRounds: stats.kastRounds + 1 }
+      : stats);
+    const parityPkg = { ...pkg, playerStats };
+    const parityIssues = findPlayerStatsParityMismatches(parityPkg, facts);
+    expect(parityIssues.filter((issue) => issue.comparable !== false)).toEqual([]);
+    expect(parityIssues).toContainEqual(expect.objectContaining({
+      playerIndex: 0,
+      field: "kastRounds",
+      expected: 1,
+      actual: 0,
+      comparable: false,
+      reason: expect.stringContaining("teamkill"),
+    }));
+    expect(() => assertPlayerStatsParity(parityPkg, facts)).not.toThrow();
   });
 
   it("uses kill.weapon for performance weapon buckets", () => {
@@ -340,7 +356,7 @@ describe("canonical player-round performance facts", () => {
       }),
     };
     const parityIssues = findPlayerStatsParityMismatches(parityPkg, facts);
-    expect(parityIssues.filter((issue) => issue.comparable === false)).toHaveLength(pkg.players.length * 2 + 8);
+    expect(parityIssues.filter((issue) => issue.comparable === false)).toHaveLength(pkg.players.length * 2);
     expect(parityIssues.filter((issue) => issue.comparable !== false)).toEqual([]);
     expect(() => assertPlayerStatsParity(parityPkg, facts)).not.toThrow();
 
@@ -408,24 +424,29 @@ describe("canonical player-round performance facts", () => {
     const nonComparableFields = issues.filter((issue) => issue.comparable === false).map((issue) => issue.field);
 
     expect(issues.filter((issue) => issue.comparable !== false)).toEqual([]);
-    expect(nonComparableFields).toEqual(expect.arrayContaining([
+    expect(nonComparableFields).toHaveLength(8);
+    expect([...nonComparableFields].sort()).toEqual([
       "kills",
       "headshotCount",
       "tradeKillCount",
-      "kastRounds",
       "oneKillCount",
       "twoKillCount",
-      "threeKillCount",
-      "fourKillCount",
-      "fiveKillCount",
       "wallbangKillCount",
       "noScopeKillCount",
       "weaponKillTotal",
-    ]));
+    ].sort());
     expect(issues.find((issue) => issue.field === "kills")).toMatchObject({
       comparable: false,
       reason: expect.stringContaining("teamkill"),
     });
     expect(() => assertPlayerStatsParity(parityPkg, facts)).not.toThrow();
+
+    const residualPkg = {
+      ...parityPkg,
+      playerStats: playerStats.map((row) => row.playerIndex === 0 ? { ...row, kills: row.kills + 1 } : row),
+    };
+    const residualKillIssue = findPlayerStatsParityMismatches(residualPkg, facts).find((issue) => issue.playerIndex === 0 && issue.field === "kills");
+    expect(residualKillIssue?.comparable).toBeUndefined();
+    expect(() => assertPlayerStatsParity(residualPkg, facts)).toThrow(/kills/);
   });
 });
