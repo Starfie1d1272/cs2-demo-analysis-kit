@@ -1,5 +1,15 @@
 # @cs2dak/dak-studio
 
+## 0.8.3
+
+### Patch Changes
+
+- Updated dependencies [532faf7]
+  - @cs2dak/core@2.0.1
+  - @cs2dak/presentation@2.1.0
+  - @cs2dak/cohort@2.0.1
+  - @cs2dak/react@1.1.1
+
 ## 0.9.0
 
 ### Minor Changes
