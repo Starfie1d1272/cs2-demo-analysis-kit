@@ -22,6 +22,9 @@ interface ExportJobStatus {
 
 interface PywebviewStudioApi {
   pick_dems: () => Promise<string[]>;
+  hash_file_path?: (path: string) => Promise<
+    { ok: true; sha256: string } | { ok: false; error: string }
+  >;
   path_exists?: (path: string) => Promise<boolean>;
   watch_demo?: (path: string, tick?: number | null) => Promise<
     { ok: true; warning?: string } | { ok: false; error: string }
@@ -70,6 +73,19 @@ export function fileFromNativePath(path: string): File {
 export function nativePathForFile(file: File): string | null {
   const path = (file as PathBackedFile).pywebviewFullPath;
   return typeof path === "string" && path.length > 0 ? path : null;
+}
+
+/** Hash a native file without reading it through the webview or invoking cs2df. */
+export async function hashNativePath(path: string): Promise<string> {
+  const api = window.pywebview?.api;
+  if (typeof api?.hash_file_path !== "function") {
+    throw new Error("当前桌面壳不支持 raw Demo hash 预检查，请先更新 DAK Studio");
+  }
+  const result = await api.hash_file_path(path);
+  if (!result.ok) throw new Error(result.error);
+  const sha256 = result.sha256.toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(sha256)) throw new Error("桌面壳返回了无效的 raw Demo SHA-256");
+  return sha256;
 }
 
 let devProbe: Promise<boolean> | null = null;

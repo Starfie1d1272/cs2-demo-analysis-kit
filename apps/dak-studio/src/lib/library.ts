@@ -127,6 +127,21 @@ async function ensureDemoIdentityIndex(): Promise<DemoIdentityIndex> {
   return identityIndexPromise;
 }
 
+/** 按 canonical raw Demo SHA-256 找到最新导入的本地条目。 */
+export async function findDemoEntryBySha256(sha256: string): Promise<StudioDemoEntry | null> {
+  const normalizedSha256 = sha256.trim().toLowerCase();
+  if (!normalizedSha256) return null;
+  const index = await ensureDemoIdentityIndex();
+  const entries = await Promise.all(
+    (index.byDemoSha256.get(normalizedSha256) ?? []).map((entryId) => demoMeta.get<StudioDemoEntry>(entryId))
+  );
+  return entries
+    .filter((entry): entry is StudioDemoEntry => entry != null)
+    .map(normalizeEntry)
+    .filter((entry) => entry.demoSha256 === normalizedSha256)
+    .sort((a, b) => b.importedAt - a.importedAt || a.id.localeCompare(b.id))[0] ?? null;
+}
+
 /** 维护入口使用：强制重扫历史条目并回填缺失的 raw Demo hash。 */
 export async function backfillDemoIdentities(): Promise<{ entries: StudioDemoEntry[]; backfilled: number; errors: string[] }> {
   const before = await demoMeta.getAll<StudioDemoEntry>();
@@ -473,15 +488,7 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     throw new Error(`${file.name}: ${err instanceof Error ? err.message : String(err)}`);
   }
   const demoSha256 = manifest.demo.hash?.toLowerCase() ?? null;
-  const index = await ensureDemoIdentityIndex();
-  const identityEntries = demoSha256
-    ? (await Promise.all((index.byDemoSha256.get(demoSha256) ?? []).map((entryId) => meta.get<StudioDemoEntry>(entryId))))
-      .filter((entry): entry is StudioDemoEntry => entry != null)
-      .map(normalizeEntry)
-      .filter((entry) => entry.demoSha256 === demoSha256)
-    : [];
-  const identityMatch = identityEntries
-    .sort((a, b) => b.importedAt - a.importedAt || a.id.localeCompare(b.id))[0];
+  const identityMatch = demoSha256 ? await findDemoEntryBySha256(demoSha256) : null;
   const existingById = await meta.get<StudioDemoEntry>(id);
   const existing = identityMatch ?? (existingById ? normalizeEntry(existingById) : undefined);
 

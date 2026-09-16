@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { getFactsStore } from "./facts-store";
 import { getStorage } from "./storage";
 import { deleteSeriesRecord, listSeriesRecords, saveSeriesRecord } from "./series";
-import { importDemoFile, listDemoEntries, matchIdForEntry, backfillDemoIdentities } from "./library";
+import { findDemoEntryBySha256, importDemoFile, listDemoEntries, matchIdForEntry, backfillDemoIdentities } from "./library";
 import { repairDemoIdentityAndDuplicates } from "./library-repair";
 
 const fixturePath = fileURLToPath(new URL("../../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url));
@@ -45,6 +45,16 @@ describe("Demo raw identity", () => {
     expect(second.entry.id).toBe(first.entry.id);
     expect(second.entry.tags).toContain("re-export");
     expect((await listDemoEntries()).filter((entry) => entry.demoSha256 === demoSha256)).toHaveLength(1);
+  });
+
+  it("looks up a local entry by canonical raw Demo hash", async () => {
+    const demoSha256 = "9".repeat(64);
+    const imported = await importDemoFile(file(await variantBytes(demoSha256, "2026-09-07T00:00:00Z"), "lookup.zip"));
+
+    await expect(findDemoEntryBySha256(demoSha256.toUpperCase())).resolves.toMatchObject({
+      id: imported.entry.id,
+      demoSha256,
+    });
   });
 
   it("keeps same map, score and teams when raw hashes differ", async () => {

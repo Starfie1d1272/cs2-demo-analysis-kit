@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-import type { DemoPackage } from "@cs2dak/contract";
+import type { DemoPackage, PackageKill } from "@cs2dak/contract";
 import { aggregatePlayerRoundPerformanceFacts, buildPlayerRoundPerformanceFacts, loadDemoPackageFromZip } from "../../../../packages/core/src/index";
 import { buildRivalHubDemoEvidenceV1, fixtureIdentity, fixtureTarget, matchRivalHubParticipants, matchRivalHubParticipantsForReview, normalizeRivalHubDemoPackage, resolveRivalHubParticipants, resolveRivalHubParticipantsFromEventRoster, resolveRivalHubParticipantsForReview, selectRivalHubMap, type RivalHubEvidenceTarget, type RivalHubTeamOrientation } from "./rivalhub-evidence";
 import { matchRivalHubMap, type RivalHubMatchCandidate } from "./rivalhub-match";
@@ -83,6 +83,147 @@ beforeAll(async () => {
   evidenceFixture = await loadDemoPackageFromZip(bytes, { profile: "evidence" });
 });
 
+function evidenceKill(overrides: Partial<PackageKill>): PackageKill {
+  return {
+    roundNumber: 1,
+    tick: 100,
+    killerIndex: null,
+    victimIndex: 0,
+    weapon: "ak47",
+    killerActiveWeapon: "ak47",
+    victimActiveWeapon: "ak47",
+    headshot: false,
+    flashAssist: false,
+    tradeKill: false,
+    tradeDeath: false,
+    throughSmoke: false,
+    noScope: false,
+    penetratedObjects: 0,
+    assisterIndex: null,
+    flashAssisterIndex: null,
+    killerPosition: { x: 100, y: 100, z: 0 },
+    victimPosition: { x: 200, y: 200, z: 0 },
+    ...overrides,
+  } as PackageKill;
+}
+
+function evidencePackageWithTeamkill(): { pkg: DemoPackage; identities: Map<string, ReturnType<typeof fixtureIdentity>> } {
+  const ids = Array.from({ length: 4 }, (_, index) => `765611980000000${String(index + 1).padStart(2, "0")}`);
+  const target = fixtureTarget();
+  const pkg = {
+    manifest: {
+      ...stableFixture.manifest,
+      demo: { ...stableFixture.manifest.demo, hash: "b".repeat(64), sourceFileName: "teamkill.dem" },
+      mapName: "de_ancient",
+    },
+    match: {
+      mapName: "de_ancient",
+      tickrate: 64,
+      durationSeconds: 16,
+      serverName: null,
+      source: "test",
+      teamA: { teamKey: "teamA", name: "Alpha", score: 1 },
+      teamB: { teamKey: "teamB", name: "Beta", score: 0 },
+    },
+    players: ids.map((steamId64, index) => ({ steamId64, name: `Player ${index}`, teamKey: index < 2 ? "teamA" : "teamB" })),
+    rounds: [{
+      roundNumber: 1,
+      startTick: 1,
+      freezeEndTick: 10,
+      endTick: 200,
+      teamASide: "t",
+      teamBSide: "ct",
+      teamAScoreBefore: 0,
+      teamBScoreBefore: 0,
+      teamAEconomy: "full",
+      teamBEconomy: "full",
+      winnerTeamKey: "teamA",
+      winnerSide: "t",
+      endReason: "t_win",
+    }],
+    kills: [
+      evidenceKill({ tick: 100, killerIndex: 0, victimIndex: 2, headshot: true }),
+      evidenceKill({ tick: 110, killerIndex: 0, victimIndex: 1, headshot: true, tradeKill: true, noScope: true, penetratedObjects: 1 }),
+    ],
+    playerEconomies: [],
+    damages: [],
+    blinds: [],
+    bombs: [],
+    grenades: [],
+    clutches: [],
+    playerStats: [],
+  } as unknown as DemoPackage;
+  const facts = buildPlayerRoundPerformanceFacts(pkg);
+  const summaries = aggregatePlayerRoundPerformanceFacts(facts);
+  const statsTemplate = stableFixture.playerStats[0]!;
+  pkg.playerStats = pkg.players.map((player, playerIndex) => {
+    const summary = summaries.get(player.steamId64)!;
+    const clutch = (count: 1 | 2 | 3 | 4 | 5) => summary.clutch.byOpponentCount[String(count) as "1" | "2" | "3" | "4" | "5"];
+    return {
+      ...statsTemplate,
+      playerIndex,
+      rounds: summary.rounds,
+      kills: summary.kills,
+      deaths: summary.deaths,
+      assists: summary.assists,
+      damageHealth: summary.damage,
+      adr: summary.rounds > 0 ? summary.damage / summary.rounds : 0,
+      utilityDamage: summary.utility.utilityDamage,
+      averageUtilityDamagePerRound: summary.rounds > 0 ? summary.utility.utilityDamage / summary.rounds : 0,
+      headshotCount: summary.headshots,
+      firstKillCount: summary.firstKills,
+      firstDeathCount: summary.firstDeaths,
+      tradeKillCount: summary.tradeKills,
+      tradeDeathCount: summary.tradedDeaths,
+      kast: summary.rounds > 0 ? (summary.kastRounds / summary.rounds) * 100 : 0,
+      oneKillCount: summary.oneKillRounds,
+      twoKillCount: summary.twoKillRounds,
+      threeKillCount: summary.threeKillRounds,
+      fourKillCount: summary.fourKillRounds,
+      fiveKillCount: summary.fiveKillRounds,
+      vsOneCount: clutch(1).attempts,
+      vsOneWonCount: clutch(1).wins,
+      vsOneLostCount: clutch(1).attempts - clutch(1).wins,
+      vsTwoCount: clutch(2).attempts,
+      vsTwoWonCount: clutch(2).wins,
+      vsTwoLostCount: clutch(2).attempts - clutch(2).wins,
+      vsThreeCount: clutch(3).attempts,
+      vsThreeWonCount: clutch(3).wins,
+      vsThreeLostCount: clutch(3).attempts - clutch(3).wins,
+      vsFourCount: clutch(4).attempts,
+      vsFourWonCount: clutch(4).wins,
+      vsFourLostCount: clutch(4).attempts - clutch(4).wins,
+      vsFiveCount: clutch(5).attempts,
+      vsFiveWonCount: clutch(5).wins,
+      vsFiveLostCount: clutch(5).attempts - clutch(5).wins,
+      bombPlantCount: summary.objective.plants,
+      bombDefuseCount: summary.objective.defuses,
+      wallbangKillCount: summary.weapons.reduce((sum, row) => sum + row.wallbangKills, 0),
+      noScopeKillCount: summary.weapons.reduce((sum, row) => sum + row.noScopeKills, 0),
+      kastRounds: summary.kastRounds,
+      flashAssistCount: summary.utility.flashAssists,
+      enemyFlashDurationSeconds: summary.utility.enemyBlindSeconds,
+      teamFlashDurationSeconds: summary.utility.teamBlindSeconds,
+      combatDeathCount: summary.combatDeaths,
+      bombDeathCount: summary.bombDeaths,
+    } as DemoPackage["playerStats"][number];
+  });
+  pkg.playerStats[0] = {
+    ...pkg.playerStats[0]!,
+    kills: pkg.playerStats[0]!.kills + 1,
+    headshotCount: pkg.playerStats[0]!.headshotCount + 1,
+    tradeKillCount: pkg.playerStats[0]!.tradeKillCount + 1,
+    oneKillCount: 0,
+    twoKillCount: 1,
+    wallbangKillCount: pkg.playerStats[0]!.wallbangKillCount + 1,
+    noScopeKillCount: pkg.playerStats[0]!.noScopeKillCount + 1,
+  };
+  return {
+    pkg,
+    identities: new Map(pkg.players.map((player, index) => [player.steamId64, fixtureIdentity(player, index, target)])),
+  };
+}
+
 describe("RivalHub online Demo matching", () => {
   it("keeps published tournament semantic facts exact after the owner migration", () => {
     const target = fixtureTarget();
@@ -101,7 +242,7 @@ describe("RivalHub online Demo matching", () => {
       };
     };
 
-    expect(evidence.contract).toEqual({ contractVersion: "rivalhub-demo-evidence/1", semanticProfile: "dak-stable/2", analysisVersion: "cs2-demo-analysis-kit/1.0.2" });
+    expect(evidence.contract).toEqual({ contractVersion: "rivalhub-demo-evidence/1", semanticProfile: "dak-stable/3", analysisVersion: "cs2-demo-analysis-kit/1.0.3" });
     expect(evidence.semanticFacts.economyMatrix).toEqual([
       { lowEconomy: "full", highEconomy: "full", rounds: 10, lowEconomyWins: 6 },
       { lowEconomy: "force", highEconomy: "full", rounds: 4, lowEconomyWins: 4 },
@@ -197,6 +338,26 @@ describe("RivalHub online Demo matching", () => {
         clutchWins: summary.clutch.wins,
       };
     }));
+  });
+
+  it("keeps teamkills out of Evidence semantic summaries while retaining the raw kill event", () => {
+    const target = fixtureTarget();
+    const { pkg, identities } = evidencePackageWithTeamkill();
+    const evidence = buildRivalHubDemoEvidenceV1(pkg, target, identities) as {
+      sourceFacts: { kills: Array<{ killerSteamId64: string | null; victimSteamId64: string | null; weapon: string; headshot: boolean }> };
+      semanticFacts: { playerRounds: Array<{ steamId64: string; kills: number; headshots: number; tradeKills: number }> };
+      summaries: { playerMaps: Array<{ steamId64: string; kills: number; headshots: number; twoKillRounds: number; threeKillRounds: number; fourKillRounds: number; fiveKillRounds: number }> };
+    };
+
+    const killerSteamId64 = pkg.players[0]!.steamId64;
+    const killerMap = evidence.summaries.playerMaps.find((row) => row.steamId64 === killerSteamId64)!;
+    const killerRound = evidence.semanticFacts.playerRounds.find((row) => row.steamId64 === killerSteamId64)!;
+    const rawTeamkill = evidence.sourceFacts.kills.find((row) => row.victimSteamId64 === pkg.players[1]!.steamId64)!;
+
+    expect(killerMap).toMatchObject({ kills: 1, headshots: 1, twoKillRounds: 0, threeKillRounds: 0, fourKillRounds: 0, fiveKillRounds: 0 });
+    expect(killerRound).toMatchObject({ kills: 1, headshots: 1, tradeKills: 0 });
+    expect(rawTeamkill).toMatchObject({ killerSteamId64: killerSteamId64, victimSteamId64: pkg.players[1]!.steamId64, headshot: true });
+    expect(evidence.sourceFacts.kills).toHaveLength(2);
   });
 
   it("fails fast when v3 playerStats is missing, incomplete, or indexed outside players", () => {

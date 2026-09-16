@@ -346,10 +346,9 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
       openingByRound.set(kill.roundNumber, kill);
     }
 
-    // The frozen playerStats aggregate attributes every non-suicide player
-    // killer event, including teamkills, to K/D/A and weapon buckets. The
-    // stricter enemyKill rule below is reserved for opening and man-state.
-    if (playerKill) {
+    // dak-stable/3 gives offensive credit only to enemy-player kills. Death
+    // state and the legacy non-suicide assist attribution below stay separate.
+    if (enemyKill) {
       const killerRow = rowFor(kill.roundNumber, kill.killerIndex!, "kills");
       killerRow.kills += 1;
       if (kill.headshot) killerRow.headshots += 1;

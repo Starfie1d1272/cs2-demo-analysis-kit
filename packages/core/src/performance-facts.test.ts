@@ -83,6 +83,64 @@ function syntheticKill(overrides: Partial<PackageKill>): PackageKill {
   } as PackageKill;
 }
 
+function statsFromFacts(pkg: DemoPackage, facts: ReturnType<typeof buildPlayerRoundPerformanceFacts>): DemoPackage["playerStats"] {
+  const summaries = aggregatePlayerRoundPerformanceFacts(facts);
+  return pkg.players.map((player, playerIndex) => {
+    const summary = summaries.get(player.steamId64)!;
+    const rounds = summary.rounds;
+    const clutch = (count: 1 | 2 | 3 | 4 | 5) => summary.clutch.byOpponentCount[String(count) as "1" | "2" | "3" | "4" | "5"];
+    return {
+      playerIndex,
+      rounds,
+      kills: summary.kills,
+      deaths: summary.deaths,
+      assists: summary.assists,
+      damageHealth: summary.damage,
+      damageArmor: 0,
+      adr: rounds > 0 ? summary.damage / rounds : 0,
+      utilityDamage: summary.utility.utilityDamage,
+      averageUtilityDamagePerRound: rounds > 0 ? summary.utility.utilityDamage / rounds : 0,
+      headshotCount: summary.headshots,
+      firstKillCount: summary.firstKills,
+      firstDeathCount: summary.firstDeaths,
+      tradeKillCount: summary.tradeKills,
+      tradeDeathCount: summary.tradedDeaths,
+      kast: rounds > 0 ? (summary.kastRounds / rounds) * 100 : 0,
+      oneKillCount: summary.oneKillRounds,
+      twoKillCount: summary.twoKillRounds,
+      threeKillCount: summary.threeKillRounds,
+      fourKillCount: summary.fourKillRounds,
+      fiveKillCount: summary.fiveKillRounds,
+      vsOneCount: clutch(1).attempts,
+      vsOneWonCount: clutch(1).wins,
+      vsOneLostCount: clutch(1).attempts - clutch(1).wins,
+      vsTwoCount: clutch(2).attempts,
+      vsTwoWonCount: clutch(2).wins,
+      vsTwoLostCount: clutch(2).attempts - clutch(2).wins,
+      vsThreeCount: clutch(3).attempts,
+      vsThreeWonCount: clutch(3).wins,
+      vsThreeLostCount: clutch(3).attempts - clutch(3).wins,
+      vsFourCount: clutch(4).attempts,
+      vsFourWonCount: clutch(4).wins,
+      vsFourLostCount: clutch(4).attempts - clutch(4).wins,
+      vsFiveCount: clutch(5).attempts,
+      vsFiveWonCount: clutch(5).wins,
+      vsFiveLostCount: clutch(5).attempts - clutch(5).wins,
+      bombPlantCount: summary.objective.plants,
+      bombDefuseCount: summary.objective.defuses,
+      wallbangKillCount: summary.weapons.reduce((sum, row) => sum + row.wallbangKills, 0),
+      noScopeKillCount: summary.weapons.reduce((sum, row) => sum + row.noScopeKills, 0),
+      collateralKillCount: 0,
+      kastRounds: summary.kastRounds,
+      flashAssistCount: summary.utility.flashAssists,
+      enemyFlashDurationSeconds: summary.utility.enemyBlindSeconds,
+      teamFlashDurationSeconds: summary.utility.teamBlindSeconds,
+      combatDeathCount: summary.combatDeaths,
+      bombDeathCount: summary.bombDeaths,
+    } as DemoPackage["playerStats"][number];
+  });
+}
+
 beforeAll(async () => {
   fixturePackages = await Promise.all(REAL_FIXTURES.map(async (path) => ({
     path,
@@ -111,6 +169,98 @@ describe("canonical player-round performance facts", () => {
     expect(donk.damage).toBe(2653);
     expect(facts.playerRounds).toHaveLength(pkg.rounds.length * pkg.players.length);
     expect(sh1ro.weapons.reduce((sum, weapon) => sum + weapon.kills, 0)).toBe(sh1ro.kills);
+  });
+
+  it("uses enemy-only offensive credit while preserving teamkill victim and assist semantics", () => {
+    const pkg = syntheticPackage(4, [
+      syntheticKill({ tick: 100, killerIndex: 0, victimIndex: 2, headshot: true }),
+      syntheticKill({
+        tick: 110,
+        killerIndex: 0,
+        victimIndex: 1,
+        weapon: "hegrenade",
+        headshot: true,
+        tradeKill: true,
+        noScope: true,
+        throughSmoke: true,
+        penetratedObjects: 1,
+        assisterIndex: 3,
+        flashAssist: true,
+        flashAssisterIndex: 3,
+      }),
+      syntheticKill({ tick: 120, killerIndex: null, victimIndex: 0 }),
+    ], 2);
+    const facts = buildPlayerRoundPerformanceFacts(pkg);
+    const summaries = aggregatePlayerRoundPerformanceFacts(facts);
+    const killer = summaries.get("synthetic-0")!;
+    const teamkillVictim = summaries.get("synthetic-1")!;
+    const assister = summaries.get("synthetic-3")!;
+
+    expect(killer).toMatchObject({
+      kills: 1,
+      deaths: 1,
+      headshots: 1,
+      tradeKills: 0,
+      firstKills: 1,
+      firstDeaths: 0,
+    });
+    expect(killer.headshots).toBeLessThanOrEqual(killer.kills);
+    expect(killer.oneKillRounds).toBe(1);
+    expect(killer.twoKillRounds).toBe(0);
+    const killerRound = facts.playerRounds.find((row) => row.steamId64 === "synthetic-0")!;
+    expect(killerRound).toMatchObject({
+      kills: 1,
+      deaths: 1,
+      headshots: 1,
+      survived: false,
+      openingDuel: "won",
+      kast: true,
+      kastTags: ["kill"],
+    });
+    expect(killer.utility.utilityKills).toBe(0);
+    expect(killer.weapons).toEqual([
+      expect.objectContaining({
+        weapon: "ak47",
+        kills: 1,
+        headshotKills: 1,
+        tradeKills: 0,
+        noScopeKills: 0,
+        throughSmokeKills: 0,
+        wallbangKills: 0,
+        penetratedObjects: 0,
+      }),
+    ]);
+    expect(teamkillVictim).toMatchObject({ kills: 0, deaths: 1, combatDeaths: 1 });
+    expect(assister).toMatchObject({ assists: 1, utility: { flashAssists: 1 } });
+    expect(facts.openingParity).toEqual({ nonComparableRounds: [] });
+    expect(facts.manState).toHaveLength(1);
+  });
+
+  it("does not let a TK-only round earn KAST through its kill tag", () => {
+    const pkg = syntheticPackage(4, [
+      syntheticKill({ tick: 100, killerIndex: 0, victimIndex: 1, headshot: true, weapon: "hegrenade" }),
+      syntheticKill({ tick: 110, killerIndex: null, victimIndex: 0 }),
+    ], 2);
+    const facts = buildPlayerRoundPerformanceFacts(pkg);
+    const row = facts.playerRounds.find((candidate) => candidate.steamId64 === "synthetic-0")!;
+
+    expect(row).toMatchObject({ kills: 0, deaths: 1, survived: false, kast: false, kastTags: [] });
+
+    const playerStats = statsFromFacts(pkg, facts).map((stats) => stats.playerIndex === 0
+      ? { ...stats, kastRounds: stats.kastRounds + 1 }
+      : stats);
+    const parityPkg = { ...pkg, playerStats };
+    const parityIssues = findPlayerStatsParityMismatches(parityPkg, facts);
+    expect(parityIssues.filter((issue) => issue.comparable !== false)).toEqual([]);
+    expect(parityIssues).toContainEqual(expect.objectContaining({
+      playerIndex: 0,
+      field: "kastRounds",
+      expected: 1,
+      actual: 0,
+      comparable: false,
+      reason: expect.stringContaining("teamkill"),
+    }));
+    expect(() => assertPlayerStatsParity(parityPkg, facts)).not.toThrow();
   });
 
   it("uses kill.weapon for performance weapon buckets", () => {
@@ -153,7 +303,7 @@ describe("canonical player-round performance facts", () => {
     const playerD = summaries.get("synthetic-3")!;
     const playerE = summaries.get("synthetic-4")!;
 
-    expect(playerA).toMatchObject({ kills: 1, deaths: 1, bombDeaths: 1, weapons: [expect.objectContaining({ weapon: "ak47", kills: 1 })] });
+    expect(playerA).toMatchObject({ kills: 0, deaths: 1, bombDeaths: 1, weapons: [] });
     expect(playerB).toMatchObject({ kills: 0, deaths: 1, combatDeaths: 1 });
     expect(playerC).toMatchObject({ kills: 0, deaths: 1, bombDeaths: 1 });
     expect(playerD).toMatchObject({ kills: 0, deaths: 1, firstDeaths: 1, headshots: 0 });
@@ -234,5 +384,69 @@ describe("canonical player-round performance facts", () => {
     expect(summary.kills).toBe(6);
     expect(summary.fiveKillRounds).toBe(1);
     expect(summary.weapons).toEqual([expect.objectContaining({ weapon: "ak47", kills: 6 })]);
+  });
+
+  it("keeps no-TK parity strict and records TK semantic divergence field by field", () => {
+    const noTeamkillPkg = syntheticPackage(4, [syntheticKill({ tick: 100, killerIndex: 0, victimIndex: 2 })], 2);
+    const noTeamkillFacts = buildPlayerRoundPerformanceFacts(noTeamkillPkg);
+    expect(findPlayerStatsParityMismatches({
+      ...noTeamkillPkg,
+      playerStats: statsFromFacts(noTeamkillPkg, noTeamkillFacts),
+    })).toEqual([]);
+
+    const pkg = syntheticPackage(4, [
+      syntheticKill({ tick: 100, killerIndex: 0, victimIndex: 2, headshot: true }),
+      syntheticKill({
+        tick: 110,
+        killerIndex: 0,
+        victimIndex: 1,
+        headshot: true,
+        tradeKill: true,
+        noScope: true,
+        penetratedObjects: 1,
+      }),
+    ], 2);
+    const facts = buildPlayerRoundPerformanceFacts(pkg);
+    const playerStats = statsFromFacts(pkg, facts).map((row) => row.playerIndex === 0
+      ? {
+        ...row,
+        kills: row.kills + 1,
+        headshotCount: row.headshotCount + 1,
+        tradeKillCount: row.tradeKillCount + 1,
+        oneKillCount: 0,
+        twoKillCount: 1,
+        wallbangKillCount: row.wallbangKillCount + 1,
+        noScopeKillCount: row.noScopeKillCount + 1,
+      }
+      : row);
+    const parityPkg = { ...pkg, playerStats };
+    const issues = findPlayerStatsParityMismatches(parityPkg, facts);
+    const nonComparableFields = issues.filter((issue) => issue.comparable === false).map((issue) => issue.field);
+
+    expect(issues.filter((issue) => issue.comparable !== false)).toEqual([]);
+    expect(nonComparableFields).toHaveLength(8);
+    expect([...nonComparableFields].sort()).toEqual([
+      "kills",
+      "headshotCount",
+      "tradeKillCount",
+      "oneKillCount",
+      "twoKillCount",
+      "wallbangKillCount",
+      "noScopeKillCount",
+      "weaponKillTotal",
+    ].sort());
+    expect(issues.find((issue) => issue.field === "kills")).toMatchObject({
+      comparable: false,
+      reason: expect.stringContaining("teamkill"),
+    });
+    expect(() => assertPlayerStatsParity(parityPkg, facts)).not.toThrow();
+
+    const residualPkg = {
+      ...parityPkg,
+      playerStats: playerStats.map((row) => row.playerIndex === 0 ? { ...row, kills: row.kills + 1 } : row),
+    };
+    const residualKillIssue = findPlayerStatsParityMismatches(residualPkg, facts).find((issue) => issue.playerIndex === 0 && issue.field === "kills");
+    expect(residualKillIssue?.comparable).toBeUndefined();
+    expect(() => assertPlayerStatsParity(residualPkg, facts)).toThrow(/kills/);
   });
 });

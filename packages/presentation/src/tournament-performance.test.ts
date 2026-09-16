@@ -5,6 +5,7 @@ import {
   aggregatePlayerRoundPerformanceFacts,
   buildPlayerRoundPerformanceFacts,
   CORE_ANALYSIS_VERSION,
+  CORE_SEMANTIC_PROFILE,
   loadDemoPackageFromZip,
 } from "@cs2dak/core";
 import { buildSeasonCohort } from "@cs2dak/cohort";
@@ -33,6 +34,7 @@ describe("tournament performance adapter", () => {
 
     expect(facts.playerRounds).toHaveLength(pkg.rounds.length * pkg.players.length);
     expect(facts.analysisVersion).toBe(CORE_ANALYSIS_VERSION);
+    expect(facts.semanticProfile).toBe(CORE_SEMANTIC_PROFILE);
     expect(facts.teamEntityKeys).toEqual({ teamA: "observed-team:m1:teamA", teamB: "observed-team:m1:teamB" });
     expect(result.totals).toMatchObject({ matchCount: 1, mapCount: 1, roundCount: pkg.rounds.length });
     expect(result.players).toHaveLength(pkg.players.length);

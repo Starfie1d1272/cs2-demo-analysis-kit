@@ -24,7 +24,7 @@ describe("analyzeDemoPackage", () => {
     const bundle = analyzeDemoPackage(pkg);
     expect(bundle.sourceSchemaVersion).toBe("cs2-demo-format/3.0");
     expect(bundle.version).toBe("cs2-demo-analysis-kit/1.0");
-    expect(bundle.provenance.analysisVersion).toBe("cs2-demo-analysis-kit/1.0.2");
+    expect(bundle.provenance.analysisVersion).toBe("cs2-demo-analysis-kit/1.0.3");
     expect(bundle.provenance.sourceSchemaVersion).toBe("cs2-demo-format/3.0");
     expect(bundle.provenance.ratingVersions.rr).toBeTruthy();
     expect(bundle.scoreboard).toHaveLength(10);

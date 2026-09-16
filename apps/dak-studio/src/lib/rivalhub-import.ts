@@ -1,6 +1,6 @@
 import type { DemoPackage } from "@cs2dak/contract";
-import { nativePathForFile, type ExportedDemoFile } from "./dem";
-import { entryDate, importDemoFile, loadDemoPackageTransient, type StudioDemoEntry } from "./library";
+import { hashNativePath, nativePathForFile, type ExportedDemoFile } from "./dem";
+import { entryDate, findDemoEntryBySha256, importDemoFile, loadDemoPackageTransient, updateDemoSourcePath, type StudioDemoEntry } from "./library";
 import { linkDemoToRivalHubMap } from "./events";
 import {
   buildRivalHubDemoEvidenceV1,
@@ -21,6 +21,7 @@ export type { RivalHubMatchCandidate } from "./rivalhub-match";
 
 export type RivalHubBatchPhase =
   | "queued"
+  | "checking"
   | "exporting"
   | "importing"
   | "matching"
@@ -102,6 +103,9 @@ export function rivalHubBatchCompletionMessage(session: RivalHubBatchSession, re
 }
 
 interface RivalHubBatchDependencies {
+  hashNativePath: (path: string) => Promise<string>;
+  findDemoBySha256: (sha256: string) => Promise<StudioDemoEntry | null>;
+  updateDemoSourcePath: typeof updateDemoSourcePath;
   exportDem: (file: File, onProgress?: (message: string) => void) => Promise<ExportedDemoFile>;
   importDemo: typeof importDemoFile;
   loadPackage: (id: string, sourceFile?: File) => Promise<DemoPackage>;
@@ -144,6 +148,7 @@ function candidateSummary(candidate: RivalHubMatchCandidate): RivalHubTargetCand
 function messageForPhase(phase: RivalHubBatchPhase): string {
   return {
     queued: "排队中",
+    checking: "检查本地 Demo",
     exporting: "导出 Demo",
     importing: "写入本地资料库",
     matching: "匹配 RivalHub Map",
@@ -182,6 +187,8 @@ function replacementResult(
     detail: `匹配方式：${result.mode}`,
   };
 }
+
+const LOCAL_REUSE_DETAIL = "复用本地 ZIP / facts，跳过 Demo 导出与入库";
 
 function isDem(file: File): boolean {
   return file.name.toLowerCase().endsWith(".dem");
@@ -231,6 +238,9 @@ export async function runRivalHubBatch(
 ): Promise<RivalHubBatchSession> {
   const inputs: Array<RivalHubBatchInput | null> = [...filesInput];
   const deps: RivalHubBatchDependencies = {
+    hashNativePath,
+    findDemoBySha256: findDemoEntryBySha256,
+    updateDemoSourcePath,
     exportDem: callbacks.exportDem,
     importDemo: importDemoFile,
     loadPackage: loadDemoPackageTransient,
@@ -289,35 +299,60 @@ export async function runRivalHubBatch(
           localEntryId: localEntry.id,
           demoSha256: localEntry.demoSha256,
           reusedLocal: true,
-          detail: "复用本地 ZIP / facts，跳过 Demo 导出与入库",
+          detail: LOCAL_REUSE_DETAIL,
         });
       } else {
-        if (needsDesktopExport(input)) {
+        const nativeDemPath = isDem(input) ? nativePathForFile(input) : null;
+        if (nativeDemPath) {
+          updateItem(index, { phase: "checking", message: messageForPhase("checking"), detail: "计算 raw Demo SHA-256…" });
+          const demoSha256 = await deps.hashNativePath(nativeDemPath);
+          const existing = await deps.findDemoBySha256(demoSha256);
+          if (existing) {
+            if (existing.sourceDemPath !== nativeDemPath) {
+              await deps.updateDemoSourcePath(existing.id, nativeDemPath);
+              localEntry = { ...existing, sourceDemPath: nativeDemPath };
+            } else {
+              localEntry = existing;
+            }
+            updateItem(index, {
+              phase: "matching",
+              message: messageForPhase("matching"),
+              localEntryId: localEntry.id,
+              demoSha256: localEntry.demoSha256 ?? demoSha256,
+              localDuplicate: true,
+              reusedLocal: true,
+              detail: "发现相同 raw Demo，复用本地 ZIP / facts，跳过 Demo 导出与入库",
+            });
+          }
+        }
+        if (!localEntry && needsDesktopExport(input)) {
           updateItem(index, { phase: "exporting", message: messageForPhase("exporting") });
           exported = await deps.exportDem(input, (message) => updateItem(index, { detail: message }));
-        } else {
+        } else if (!localEntry) {
           exported = { file: input, sourceDemPath: null };
         }
-        if (!exported) throw new Error("Demo 导出结果为空");
-        // The exported ZIP is the only representation needed from this point;
-        // release the dropped/input File before parsing the ZIP into the library.
-        inputs[index] = null;
-        input = null;
-        updateItem(index, { phase: "importing", message: messageForPhase("importing"), detail: undefined });
-        const imported = await deps.importDemo(exported.file, {
-          lowMemory: true,
-          sourceDemPath: exported.sourceDemPath ?? null,
-        });
-        localEntry = imported.entry;
-        updateItem(index, {
-          phase: "matching",
-          message: messageForPhase("matching"),
-          localEntryId: localEntry.id,
-          demoSha256: localEntry.demoSha256,
-          localDuplicate: imported.duplicate,
-          reusedLocal: imported.duplicate,
-          detail: imported.duplicate ? "复用本地 Demo 条目，继续在线匹配" : undefined,
-        });
+        if (!localEntry) {
+          if (!exported) throw new Error("Demo 导出结果为空");
+          // The exported ZIP is the only representation needed from this point;
+          // release the dropped/input File before parsing the ZIP into the library.
+          inputs[index] = null;
+          input = null;
+          updateItem(index, { phase: "importing", message: messageForPhase("importing"), detail: undefined });
+          const imported = await deps.importDemo(exported.file, {
+            lowMemory: true,
+            sourceDemPath: exported.sourceDemPath ?? null,
+          });
+          localEntry = imported.entry;
+          updateItem(index, {
+            phase: "matching",
+            message: messageForPhase("matching"),
+            localEntryId: localEntry.id,
+            demoSha256: localEntry.demoSha256,
+            localDuplicate: imported.duplicate,
+            reusedLocal: imported.duplicate,
+            detail: imported.duplicate ? "复用本地 Demo 条目，继续在线匹配" : undefined,
+          });
+        }
       }
 
       if (!localEntry.demoSha256) {
@@ -366,7 +401,13 @@ export async function runRivalHubBatch(
         && match.candidate.map.demoStatus === "synced"
         && match.candidate.map.demoSha256?.toLowerCase() === localEntry.demoSha256.toLowerCase()) {
         await deps.linkMap(match.candidate.series.id, match.candidate.map.id, localEntry.id);
-        updateItem(index, { ...replacementResult({ ...session.items[index]! }, match), phase: "already_synced", message: messageForPhase("already_synced") });
+        const currentItem = session.items[index]!;
+        updateItem(index, {
+          ...replacementResult({ ...currentItem }, match),
+          phase: "already_synced",
+          message: messageForPhase("already_synced"),
+          detail: currentItem.reusedLocal ? LOCAL_REUSE_DETAIL : undefined,
+        });
         continue;
       }
       if (match.status === "not_found") {
@@ -411,11 +452,14 @@ export async function runRivalHubBatch(
       updateItem(index, { phase: "submitting", message: messageForPhase("submitting") });
       const response: EvidenceSubmissionResponse = await deps.submit(evidence, await deps.idempotencyKey(selected.map.id, evidence));
       await deps.linkMap(selected.series.id, selected.map.id, localEntry.id);
+      const reusedLocal = session.items[index]?.reusedLocal === true;
       updateItem(index, {
         phase: response.status === "synced" ? "synced" : "needs_attention",
         message: messageForPhase(response.status === "synced" ? "synced" : "needs_attention"),
         serverIssues: response.issues,
-        detail: response.status === "synced" ? undefined : response.issues.map((issue) => issue.message).join("；") || "RivalHub 返回需要处理",
+        detail: response.status === "synced"
+          ? reusedLocal ? LOCAL_REUSE_DETAIL : undefined
+          : response.issues.map((issue) => issue.message).join("；") || "RivalHub 返回需要处理",
       });
     } catch (error) {
       updateItem(index, { phase: "failed", message: messageForPhase("failed"), detail: error instanceof Error ? error.message : String(error) });
