@@ -24,6 +24,7 @@
     "build": "pnpm -r --if-present build",
     "changeset": "changeset",
     "version:packages": "changeset version",
+    "check:release-policy": "node scripts/check-npm-publish-policy.mjs",
     "release:npm": "pnpm build && pnpm test:all && pnpm typecheck && changeset publish",
     "sync-version": "node scripts/sync-version.mjs",
     "package": "bash scripts/package.sh",
