@@ -4,6 +4,7 @@ import {
   assertPlayerStatsParity,
   buildPlayerRoundPerformanceFacts,
   CORE_ANALYSIS_VERSION,
+  CORE_SEMANTIC_PROFILE,
   type PlayerRoundManStateFact,
 } from "@cs2dak/core";
 import {
@@ -188,7 +189,6 @@ export interface TournamentFacts {
   manState?: PlayerRoundManStateFact[];
 }
 
-const SEMANTIC_PROFILE = "dak-stable/1";
 const ECONOMY_RANK: Record<string, number> = { eco: 0, semi: 1, force: 2, full: 3 };
 const MAN_ADVANTAGE_KEYS = ["5v4", "4v5", "5v3", "3v5"] as const satisfies readonly TournamentManAdvantage[];
 
@@ -399,7 +399,7 @@ function toTournamentMapFacts(facts: TournamentFacts): { facts: TournamentMapFac
 
   return {
     facts: {
-      semanticProfile: SEMANTIC_PROFILE,
+      semanticProfile: CORE_SEMANTIC_PROFILE,
       analysisVersion: CORE_ANALYSIS_VERSION,
       mapKey: `legacy-map:${facts.matchId}:${facts.mapName}`,
       matchKey: facts.matchId,
