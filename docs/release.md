@@ -201,7 +201,7 @@ commit 的 tag 会直接使工作流失败，不会删除、回滚、移动 tag 
 ## tag 规则
 
 - `vX.Y.Z`：桌面应用发布，唯一触发 Release CI 的 tag；
-- `@cs2dak/<pkg>@X.Y.Z`：changeset publish 自动打，不要手工创建；
+- `@cs2dak/<pkg>@X.Y.Z`：npm workflow 在确认发布后由 reconciliation 脚本创建并推送，不要手工创建；
 - 不要打裸 `X.Y.Z` 或其他形式的 tag。
 
 历史遗留：`v0.2.0`、`v0.2.1`、`v1.0.0` 是 2026-06 之前废弃的版本流残留，
