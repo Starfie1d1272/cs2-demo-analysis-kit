@@ -207,15 +207,13 @@ function assertPlayerRoundFact(value: unknown, mapKey: string, path: string): as
   if (row.headshots > row.kills) invalid(mapKey, `${path}.headshots`, "must not exceed kills");
   if (row.tradeKills > row.kills) invalid(mapKey, `${path}.tradeKills`, "must not exceed kills");
   if (row.tradedDeaths > row.deaths) invalid(mapKey, `${path}.tradedDeaths`, "must not exceed deaths");
-  if (row.survived !== (row.deaths === 0)) invalid(mapKey, `${path}.survived`, "must match deaths === 0");
   if (row.openingDuel !== "none" && row.openingDuel !== "won" && row.openingDuel !== "lost") {
     invalid(mapKey, `${path}.openingDuel`, "must be none, won, or lost");
   }
-  if (row.clutch !== null) {
-    assertClutch(row.clutch, mapKey, `${path}.clutch`);
-    if (row.clutch.won !== row.teamWonRound) invalid(mapKey, `${path}.clutch.won`, "must match teamWonRound");
-    if (row.clutch.won && !row.survived) invalid(mapKey, `${path}.clutch`, "a won clutch must be survived");
-  }
+  // Tournament consumes frozen semantic facts. Relationships such as survived
+  // vs deaths or clutch outcome vs round outcome are owned by Core/Evidence QA;
+  // re-deriving them here would create a second semantic owner.
+  if (row.clutch !== null) assertClutch(row.clutch, mapKey, `${path}.clutch`);
   assertUtility(row.utility, mapKey, `${path}.utility`);
 }
 

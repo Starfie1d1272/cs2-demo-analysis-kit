@@ -75,7 +75,7 @@ The **v3 ZIP is the only seam** between Python and TypeScript — neither side i
 | `@cs2dak/core` | Pure single-match analysis: normalize, economy, kills, clutches, timeline, heatmap, duels, mechanics, QA, RR/PRISM wiring. |
 | `@cs2dak/cohort` | Cross-match aggregation, identity merging, season RR/PRISM shaping. |
 | `@cs2dak/maps` | Map calibration, world→radar transforms, attack routes, zone geometry, callout mapping. |
-| `@cs2dak/tournament` | Zero-runtime-dependency frozen Tournament facts DTO, identity-safe cross-map merge, rates and invariant guards. |
+| `@cs2dak/tournament` | Zero-runtime-dependency frozen Tournament facts DTO, identity-safe cross-map merge, rates, and structural/reference/aggregation-safety guards. |
 | `@cs2dak/presentation` | Product-neutral view models, labels, workspace orchestration and Tournament legacy adapters. |
 | `@cs2dak/react` | React components that consume presentation contracts only. |
 | `@cs2dak/cli` | Thin CLI wiring `core` to the filesystem. |

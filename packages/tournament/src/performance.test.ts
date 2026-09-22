@@ -263,6 +263,38 @@ describe("buildTournamentPerformanceAnalytics", () => {
     expect(player.slices.ct.combat.killsPerRound).toEqual({ successes: 0, attempts: 1, rate: 0 });
   });
 
+  it("aggregates frozen semantic fields without re-deriving Core relationships", () => {
+    const wonAfterDeath = facts({
+      playerRounds: facts().playerRounds.map((row, index) => index === 3
+        ? { ...row, deaths: 1, survived: false, clutch: { opponentCount: 2, won: true } }
+        : row),
+    });
+    const wonAfterDeathResult = buildTournamentPerformanceAnalytics([wonAfterDeath]);
+    const wonAfterDeathPlayer = wonAfterDeathResult.players.find((row) => row.player.entityKey === "player-b")!;
+    expect(wonAfterDeathPlayer.slices.overall.combat.deaths).toBe(2);
+    expect(wonAfterDeathPlayer.slices.overall.survival).toEqual({ successes: 0, attempts: 2, rate: 0 });
+    expect(wonAfterDeathPlayer.slices.overall.clutch.winRate).toEqual({ successes: 1, attempts: 1, rate: 1 });
+
+    const independentSurvival = facts({
+      playerRounds: facts().playerRounds.map((row, index) => index === 2
+        ? { ...row, deaths: 1, survived: true }
+        : row),
+    });
+    const independentSurvivalResult = buildTournamentPerformanceAnalytics([independentSurvival]);
+    const independentSurvivalPlayer = independentSurvivalResult.players.find((row) => row.player.entityKey === "player-a")!;
+    expect(independentSurvivalPlayer.slices.overall.combat.deaths).toBe(1);
+    expect(independentSurvivalPlayer.slices.overall.survival).toEqual({ successes: 2, attempts: 2, rate: 1 });
+
+    const independentClutchOutcome = facts({
+      playerRounds: facts().playerRounds.map((row, index) => index === 3
+        ? { ...row, clutch: { opponentCount: 2, won: false } }
+        : row),
+    });
+    const independentClutchResult = buildTournamentPerformanceAnalytics([independentClutchOutcome]);
+    const independentClutchPlayer = independentClutchResult.players.find((row) => row.player.entityKey === "player-b")!;
+    expect(independentClutchPlayer.slices.overall.clutch.winRate).toEqual({ successes: 0, attempts: 1, rate: 0 });
+  });
+
   it("fails fast with map and field paths for malformed facts", () => {
     expect(() => buildTournamentPerformanceAnalytics([facts({
       playerRounds: [...facts().playerRounds, facts().playerRounds[0]!],

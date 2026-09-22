@@ -78,9 +78,14 @@ core single-map detection
 already-frozen player-round, objective, and weapon facts; it does not parse demos
 or redetect events. It does not resolve RivalHub scope, access storage, or own
 scoreboard/rating formulas. Entity keys are the only aggregation identity; display
-labels are injected at the final projection step. Its published runtime contains
-compiled ESM and declarations, with no dependency on `@cs2dak/core`,
-`@cs2dak/contract`, `@cs2dak/cohort`, maps, React, Zod, or RivalHub code.
+labels are injected at the final projection step. Tournament validation is deliberately
+limited to shape/count bounds, entity/reference integrity, duplicate detection,
+and cross-row constraints required for deterministic aggregation. It never
+re-derives Core semantics from other frozen fields: for example, it does not infer
+`survived` from `deaths` or decide `clutch.won` from `teamWonRound` /
+`survived`. Those semantic invariants belong to Core/Evidence QA. Its published
+runtime contains compiled ESM and declarations, with no dependency on
+`@cs2dak/core`, `@cs2dak/contract`, `@cs2dak/cohort`, maps, React, Zod, or RivalHub code.
 
 ### Rating layers
 
@@ -169,7 +174,11 @@ core 单场 detection
 `TournamentPerformanceAnalytics` 1.1 merge；performance surface 只消费已冻结的
 player-round、objective、weapon sufficient facts，不重新 detection。不解析 Demo、
 不解析 RivalHub scope、不访问存储，也不拥有 scoreboard 或评分公式。聚合只认
-entity key，display label 仅在最终 projection 注入。发布产物是编译后的 ESM +
+entity key，display label 仅在最终 projection 注入。Tournament 的 fail-fast
+只保护 shape/count、entity/reference、duplicate 与确定性聚合所必需的 cross-row
+约束；不得从一个 frozen semantic 字段重新推导另一个字段，例如不得由 `deaths`
+反推 `survived`，也不得由 `teamWonRound` / `survived` 重新裁决 `clutch.won`。
+这些 semantic invariant 只属于 Core / Evidence QA。发布产物是编译后的 ESM +
 declaration，runtime 不依赖 `@cs2dak/core`、`@cs2dak/contract`、`@cs2dak/cohort`、
 maps、React、Zod 或 RivalHub。
 
