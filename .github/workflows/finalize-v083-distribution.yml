@@ -1,0 +1,71 @@
+name: Finalize v0.8.3 Distribution Metadata
+
+on:
+  push:
+    branches: ["ops/finalize-v0.8.3-distribution"]
+    paths: [".github/workflows/finalize-v083-distribution.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    env:
+      TAG: "v0.8.3"
+      GH_TOKEN: ${{ github.token }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+    steps:
+      - name: Fetch uploader manifest from verified R2 mirror
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws s3 cp "s3://${R2_BUCKET}/releases/uploader/latest.json" uploader-manifest.json --endpoint-url "$R2_ENDPOINT"
+          node - <<'NODE'
+          const m = require("./uploader-manifest.json");
+          if (m.version !== "0.8.3") throw new Error(`unexpected uploader version ${m.version}`);
+          if (m.schemaVersion !== "cs2-demo-analysis-kit/uploader-distribution-1") throw new Error("unexpected uploader schema");
+          if (m.assets.windows.size !== 40003418 || m.assets.windows.sha256 !== "29b4dbbcc3e17aabc46e22560c8e95380a4acab0fc291f57f123dfa1c2008c00") throw new Error("Windows manifest identity mismatch");
+          if (m.assets.macos.size !== 37077723 || m.assets.macos.sha256 !== "6abbc685930bac6a15cb73b96d92421d5d8330a585f9b99adc85a6f86a24bb72") throw new Error("macOS manifest identity mismatch");
+          NODE
+
+      - name: Attach uploader manifest to existing GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" uploader-manifest.json --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Remove stale auto-generated cross-tag notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" > release.json
+          node - <<'NODE'
+          const fs = require("fs");
+          const release = JSON.parse(fs.readFileSync("release.json", "utf8"));
+          const marker = "\n## What's Changed\n";
+          const body = String(release.body ?? "");
+          const cleaned = body.includes(marker) ? body.split(marker)[0].trimEnd() + "\n" : body;
+          fs.writeFileSync("release-body.md", cleaned);
+          fs.writeFileSync("release-id.txt", String(release.id));
+          NODE
+          RELEASE_ID="$(cat release-id.txt)"
+          jq -Rs '{body: .}' release-body.md | gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --input -
+
+      - name: Verify GitHub Release metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets,body > verify.json
+          node - <<'NODE'
+          const r = require("./verify.json");
+          if (!r.assets.some((a) => a.name === "uploader-manifest.json")) throw new Error("uploader-manifest.json missing from release");
+          if (String(r.body ?? "").includes("## What's Changed")) throw new Error("stale auto-generated What's Changed remains");
+          console.log("v0.8.3 GitHub Release metadata finalized");
+          NODE
