@@ -1,8 +1,28 @@
 # Changelog
 
-DAK Studio 桌面应用及 `@cs2dak/*` 分析管道面向用户的变更记录。格式遵循 [Keep a Changelog](https://keepachangelog.com/)，版本号遵循 [Semantic Versioning](https://semver.org/)。
+DAK Studio、RivalHub Demo Uploader 及 `@cs2dak/*` 分析管道面向用户的变更记录。格式遵循 [Keep a Changelog](https://keepachangelog.com/)，版本号遵循 [Semantic Versioning](https://semver.org/)。
 
 > 0.1.3 起面向 Studio 用户维护。`@cs2dak/*` npm 包版本由 changesets 独立管理（见各包的 CHANGELOG.md）；本文件聚焦 DAK Studio 桌面应用变更。
+
+## [0.8.3] — 2026-09-28
+
+### 新增
+
+- **RivalHub Demo Uploader**：新增独立轻量桌面上传工具，可连接 RivalHub 后多选原始 `.dem`，逐场解析、自动匹配官方 MatchMap、在歧义时人工选择目标并提交 Demo Evidence；原始 Demo 保持本地，临时 ZIP 在任务结束后清理。
+- **上传诊断与安全凭据**：Uploader 使用 macOS Keychain / Windows Credential Manager 保存设备授权，失败项提供错误编号、处理建议和日志导出；提交后重新读取 RivalHub 状态，以网站确认的 `synced / needs_attention` 作为最终结果。
+- **已有本地 Demo 同步**：DAK Studio 可直接复用资料库中已有 Demo 的 ZIP / facts 同步 RivalHub，避免再次解析和重复入库。
+
+### 修复 / 变更
+
+- **RivalHub Demo 导入内存与复用**：导出结果改为磁盘临时文件 + 分块传输，Evidence 使用 evidence profile 读取必要事实；相同 raw Demo 优先复用本地结果并更新来源路径，降低批量导入的内存峰值和重复工作。
+- **Stable 击杀语义**：`dak-stable/3` 将 K、HS、trade、utility、weapon、multi-kill、KAST 的进攻击杀统一为敌方选手击杀；冻结 `playerStats` 的已知 TK 口径差异显式标记为不可比，真正的 semantic drift 继续由 Core QA 阻断。
+- **Windows 安装升级**：Web Installer 使用外部 staging 并正确展开 runtime 根目录，保留 `userdata/assets/cache/updates`，安装完成后明确启动本次安装的新程序。
+- **RivalHub 导入交互**：移除 RivalHub 专属拖拽入口，上传与同步统一使用明确的文件选择或本地资料库操作，减少拖拽目标歧义。
+
+### 内部与维护
+
+- **赛事统计聚合边界**：补齐 canonical performance facts 与透明 Tournament performance analytics，并收紧 frozen-fact validator，使 Tournament 负责结构、引用与聚合安全，不重新判定 Core 已冻结的 survival / clutch 等语义。
+- **发布治理**：npm Trusted Publishing 迁移到 OIDC；桌面应用与 private workspace 统一由 `vX.Y.Z` 管理，Changesets 明确不再修改 private package 版本，公共 `@cs2dak/*` npm 包继续独立版本化。
 
 ## [0.8.2] — 2026-09-14
 
