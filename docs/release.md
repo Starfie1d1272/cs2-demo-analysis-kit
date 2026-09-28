@@ -63,10 +63,11 @@ Changesets 管理的公共包；Changesets 显式关闭 private package versioni
    git push origin main v0.2.0
    ```
 
-   `release.yml` 在 macOS / Windows runner 上跑 `scripts/package.sh`，只产出
-   DAK Studio 产物：`dak-studio-X.Y.Z.dmg`、`DAK-Studio-Setup-X.Y.Z.exe`、
-   `dak-studio-windows-X.Y.Z-full.zip`、`dak-studio-windows-X.Y.Z.zip`。
-   纯导出器 cs2dak 不进 Release。
+   `release.yml` 在 macOS / Windows runner 上构建两类桌面产物：
+   DAK Studio 的 `dak-studio-X.Y.Z.dmg`、`DAK-Studio-Setup-X.Y.Z.exe`、
+   `dak-studio-windows-X.Y.Z-full.zip`、`dak-studio-windows-X.Y.Z.zip`，以及
+   RivalHub Demo Uploader 的 `rivalhub-demo-uploader-X.Y.Z.dmg` /
+   `rivalhub-demo-uploader-windows-X.Y.Z.zip`。纯导出器 cs2dak 不进 Release。
 
    若已发布 tag 的 Release workflow 因流水线故障失败，先通过普通 PR 修复 workflow，
    再从 `main` 手动 dispatch **Release** 并输入该既有 `vX.Y.Z` tag 安全重试；工作流会显式
@@ -85,7 +86,8 @@ Changesets 管理的公共包；Changesets 显式关闭 private package versioni
    `runtime` zip；未知路径保守走 runtime。
 
    **发版后验证（R2 链路）**：Release CI 会自动核 `latest.json` /
-   `install-manifest.json` 的版本和 R2 runtime 的 size/sha256；本地手动复核可跑：
+   `install-manifest.json`、`releases/uploader/latest.json` 的版本，并校验
+   R2 runtime 与 Uploader Windows/macOS 产物的 size/sha256；本地手动复核可跑：
 
    ```bash
    # 1) R2 上的 manifest 可访问
@@ -107,9 +109,15 @@ bash scripts/package.sh 0.2.0
 open "python/dist/DAK Studio.app"
 ```
 
-RivalHub Demo Uploader 与 Studio 一起构建并附在 GitHub Release。它不进入 Studio 的自动更新包：
-macOS 使用 `rivalhub-demo-uploader-X.Y.Z.dmg`，Windows 使用
-`rivalhub-demo-uploader-windows-X.Y.Z.zip`。独立本地打包命令为 `bash scripts/package-uploader.sh`。
+RivalHub Demo Uploader 与 Studio 一起构建并附在 GitHub Release，同时镜像到 R2。它不进入
+Studio 的自动更新包：macOS 使用 `rivalhub-demo-uploader-X.Y.Z.dmg`，Windows 使用
+`rivalhub-demo-uploader-windows-X.Y.Z.zip`。公开下载入口读取
+`https://dakupdate.starfie1d.top/releases/uploader/latest.json`，manifest 提供当前版本、
+size、SHA-256 以及 R2 → GitHub Release → ghproxy 下载顺序；版本化快照保存在
+`releases/vX.Y.Z/uploader-manifest.json`。独立本地打包命令为 `bash scripts/package-uploader.sh`。
+
+GitHub Release 正文以仓库维护的 `CHANGELOG.md` 版本段为唯一变更摘要，不再叠加
+GitHub 自动生成的跨 tag `What's Changed`，避免历史 tag 范围与桌面 release 边界不一致。
 
 ## Windows 测试版更新
 

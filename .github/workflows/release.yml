@@ -253,8 +253,51 @@ jobs:
           path: dist
           merge-multiple: true
 
-      # 自建 R2 镜像（国内可达，最高优先级）。上传 runtime zip、installer、full zip、
-      # install-manifest.json、event packages 到与代码中 URL 一致的路径。
+      # Uploader 不进入 Studio updater，但需要稳定的公开分发元数据供官网消费。
+      # 内联生成可保证手动重跑既有 tag 时，不依赖 tag 内后来新增的脚本。
+      - name: Generate uploader distribution manifest
+        env:
+          OWNER_REPO: Starfie1d1272/cs2-demo-analysis-kit
+          R2_PUBLIC_BASE: https://dakupdate.starfie1d.top
+        run: |
+          set -euo pipefail
+          export VERSION="${RELEASE_TAG#v}"
+          node - <<'NODE'
+          const fs = require("fs");
+          const crypto = require("crypto");
+          const path = require("path");
+          const version = process.env.VERSION;
+          const repo = process.env.OWNER_REPO;
+          const r2Base = process.env.R2_PUBLIC_BASE;
+          const tag = `v${version}`;
+          const proxies = ["", "https://ghfast.top/", "https://gh-proxy.com/", "https://ghproxy.net/"];
+          function asset(file) {
+            if (!fs.existsSync(file)) throw new Error(`missing uploader asset: ${file}`);
+            const buf = fs.readFileSync(file);
+            const name = path.basename(file);
+            const raw = `https://github.com/${repo}/releases/download/${tag}/${name}`;
+            return {
+              name,
+              size: buf.length,
+              sha256: crypto.createHash("sha256").update(buf).digest("hex"),
+              urls: [`${r2Base}/releases/${tag}/${name}`, ...proxies.map((p) => p ? `${p}${raw}` : raw)],
+            };
+          }
+          const manifest = {
+            schemaVersion: "cs2-demo-analysis-kit/uploader-distribution-1",
+            version,
+            publishedAt: new Date().toISOString(),
+            assets: {
+              windows: asset(`dist/rivalhub-demo-uploader-windows-${version}.zip`),
+              macos: asset(`dist/rivalhub-demo-uploader-${version}.dmg`),
+            },
+          };
+          fs.writeFileSync("dist/uploader-manifest.json", JSON.stringify(manifest, null, 2) + "\n");
+          console.log("uploader distribution manifest ready");
+          NODE
+
+      # 自建 R2 镜像（国内可达，最高优先级）。上传 Studio runtime/installer/full zip、
+      # Uploader 双平台产物及各自 manifest 到与公开 URL 一致的路径。
       # GitHub Release 仍是权威源/兜底；ghproxy 为最后兜底。
       - name: Upload to R2 mirror
         env:
@@ -274,6 +317,9 @@ jobs:
           INSTALLER="dist/DAK-Studio-Setup-${VERSION}.exe"
           FULL_ZIP="dist/dak-studio-windows-${VERSION}-full.zip"
           INSTALL_MANIFEST="dist/install-manifest.json"
+          UPLOADER_WIN="dist/rivalhub-demo-uploader-windows-${VERSION}.zip"
+          UPLOADER_MAC="dist/rivalhub-demo-uploader-${VERSION}.dmg"
+          UPLOADER_MANIFEST="dist/uploader-manifest.json"
 
           if [ ! -f "$ZIP" ]; then
             echo "::error::缺少 $ZIP，跳过 R2 上传"
@@ -333,13 +379,51 @@ jobs:
             echo "R2: install-manifest ✓ (${TAG}/ + latest)"
           fi
 
-          # 5. latest.json（现有逻辑）
+          # 5. Studio latest.json（现有逻辑）
           aws s3 cp "dist/latest.json" \
             "s3://${R2_BUCKET}/releases/latest.json" \
             --endpoint-url "$R2_ENDPOINT" \
             --content-type application/json \
             --cache-control "public, max-age=300"
           echo "R2: latest.json ✓"
+
+          # 6. RivalHub Demo Uploader 双平台产物（不可变）
+          for uploader in "$UPLOADER_WIN" "$UPLOADER_MAC"; do
+            if [ ! -f "$uploader" ]; then
+              echo "::error::缺少 $uploader"
+              exit 1
+            fi
+          done
+          aws s3 cp "$UPLOADER_WIN" \
+            "s3://${R2_BUCKET}/releases/${TAG}/rivalhub-demo-uploader-windows-${VERSION}.zip" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type application/zip \
+            --content-disposition "attachment; filename=rivalhub-demo-uploader-windows-${VERSION}.zip" \
+            --cache-control "public, max-age=31536000, immutable"
+          aws s3 cp "$UPLOADER_MAC" \
+            "s3://${R2_BUCKET}/releases/${TAG}/rivalhub-demo-uploader-${VERSION}.dmg" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type application/x-apple-diskimage \
+            --content-disposition "attachment; filename=rivalhub-demo-uploader-${VERSION}.dmg" \
+            --cache-control "public, max-age=31536000, immutable"
+          echo "R2: uploader binaries ✓"
+
+          # 7. Uploader manifest：版本化快照 + 稳定 latest 入口
+          if [ ! -f "$UPLOADER_MANIFEST" ]; then
+            echo "::error::缺少 $UPLOADER_MANIFEST"
+            exit 1
+          fi
+          aws s3 cp "$UPLOADER_MANIFEST" \
+            "s3://${R2_BUCKET}/releases/${TAG}/uploader-manifest.json" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type application/json \
+            --cache-control "public, max-age=31536000, immutable"
+          aws s3 cp "$UPLOADER_MANIFEST" \
+            "s3://${R2_BUCKET}/releases/uploader/latest.json" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type application/json \
+            --cache-control "public, max-age=300"
+          echo "R2: uploader manifest ✓ (${TAG}/ + latest)"
 
           echo "R2 上传完成"
 
@@ -358,14 +442,23 @@ jobs:
           TAG="v${VERSION}"
           aws s3 cp "s3://${R2_BUCKET}/releases/latest.json" latest.json --endpoint-url "$R2_ENDPOINT"
           aws s3 cp "s3://${R2_BUCKET}/releases/install-manifest.json" install-manifest.json --endpoint-url "$R2_ENDPOINT"
+          aws s3 cp "s3://${R2_BUCKET}/releases/uploader/latest.json" uploader-manifest.json --endpoint-url "$R2_ENDPOINT"
           node - <<'NODE'
           const fs = require("fs");
           const latest = JSON.parse(fs.readFileSync("latest.json", "utf8"));
           const install = JSON.parse(fs.readFileSync("install-manifest.json", "utf8"));
+          const uploader = JSON.parse(fs.readFileSync("uploader-manifest.json", "utf8"));
           const version = process.env.VERSION;
           if (latest.version !== version) throw new Error(`latest.json version ${latest.version} != ${version}`);
           if (install.appVersion !== version) throw new Error(`install appVersion ${install.appVersion} != ${version}`);
-          for (const [label, asset] of Object.entries({ runtime: latest.assets.windows, installRuntime: install.runtime })) {
+          if (uploader.version !== version) throw new Error(`uploader version ${uploader.version} != ${version}`);
+          if (uploader.schemaVersion !== "cs2-demo-analysis-kit/uploader-distribution-1") throw new Error("unexpected uploader manifest schema");
+          for (const [label, asset] of Object.entries({
+            runtime: latest.assets.windows,
+            installRuntime: install.runtime,
+            uploaderWindows: uploader.assets.windows,
+            uploaderMacos: uploader.assets.macos,
+          })) {
             if (!asset?.urls?.[0]?.startsWith("https://dakupdate.starfie1d.top/")) throw new Error(`${label} first URL is not R2`);
             if (!asset.sha256 || !asset.size) throw new Error(`${label} missing sha256/size`);
           }
@@ -383,6 +476,22 @@ jobs:
           console.log("R2 runtime OK", buf.length);
           NODE
 
+          aws s3 cp "s3://${R2_BUCKET}/releases/${TAG}/rivalhub-demo-uploader-windows-${VERSION}.zip" uploader-windows.zip --endpoint-url "$R2_ENDPOINT"
+          aws s3 cp "s3://${R2_BUCKET}/releases/${TAG}/rivalhub-demo-uploader-${VERSION}.dmg" uploader-macos.dmg --endpoint-url "$R2_ENDPOINT"
+          node - <<'NODE'
+          const fs = require("fs");
+          const crypto = require("crypto");
+          const manifest = require("./uploader-manifest.json");
+          for (const [key, file] of [["windows", "uploader-windows.zip"], ["macos", "uploader-macos.dmg"]]) {
+            const asset = manifest.assets[key];
+            const buf = fs.readFileSync(file);
+            const sha = crypto.createHash("sha256").update(buf).digest("hex");
+            if (buf.length !== asset.size) throw new Error(`${key} size ${buf.length} != ${asset.size}`);
+            if (sha !== asset.sha256) throw new Error(`${key} sha256 ${sha} != ${asset.sha256}`);
+            console.log(`R2 uploader ${key} OK`, buf.length);
+          }
+          NODE
+
       - uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228
         with:
           tag_name: ${{ env.RELEASE_TAG }}
@@ -392,6 +501,7 @@ jobs:
             dist/DAK-Studio-Setup*.exe
             dist/install-manifest.json
             dist/latest.json
+            dist/uploader-manifest.json
           body: |
             **安装说明**
 
@@ -434,4 +544,3 @@ jobs:
             ---
 
             ${{ steps.changelog.outputs.changelog }}
-          generate_release_notes: true
