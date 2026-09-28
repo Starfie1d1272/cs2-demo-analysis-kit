@@ -21,8 +21,8 @@ if rivalhub_uploader_web_dir.is_dir():
 else:
     raise SystemExit(
         f"rivalhub_uploader_web/ not found at {rivalhub_uploader_web_dir}. "
-        "Run: pnpm --filter @cs2dak/rivalhub-demo-uploader build && "
-        "cp -R apps/rivalhub-demo-uploader/dist python/src/cs2dak/rivalhub_uploader_web"
+        "Run: pnpm --filter @cs2dak/rivalhub-uploader build && "
+        "cp -R apps/rivalhub-uploader/dist python/src/cs2dak/rivalhub_uploader_web"
     )
 
 binaries = []
