@@ -2,11 +2,11 @@ import { describe, expect, it, beforeAll } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import type { DemoPackage } from "@cs2dak/contract";
-import type { RivalHubRemoteMap, RivalHubRemotePlayer, RivalHubRemoteTeam } from "./rivalhub-contract";
-import { matchRivalHubMap, type RivalHubMatchCandidate } from "./rivalhub-match";
-import { loadDemoPackageFromZip } from "@cs2dak/core";
+import type { RivalHubRemoteMap, RivalHubRemotePlayer, RivalHubRemoteTeam } from "./contract";
+import { matchRivalHubMap, type RivalHubMatchCandidate } from "./match";
+import { loadDemoPackageFromZip } from "@cs2dak/core/evidence";
 
-const fixturePath = fileURLToPath(new URL("../../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url));
+const fixturePath = fileURLToPath(new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url));
 let pkg: DemoPackage;
 
 function player(steamId64: string, entryId = "entry-a"): RivalHubRemotePlayer {

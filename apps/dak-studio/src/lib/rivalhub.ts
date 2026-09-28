@@ -1,8 +1,9 @@
+import { createRivalHubClient, normalizeBaseUrl, requestJson, RivalHubHttpError } from "@cs2dak/rivalhub-upload";
+export { normalizeBaseUrl, rivalHubEvidenceIdempotencyKey } from "@cs2dak/rivalhub-upload";
 import { getStorage } from "./storage";
 import { markRivalHubEventsStale } from "./events";
 import {
   RIVALHUB_EVENTS_CONTRACT,
-  rivalHubEventsResponseSchema,
   type EvidenceSubmissionResponse,
   type RivalHubEventsResponse,
   type RivalHubEvidenceSubmission,
@@ -37,18 +38,6 @@ interface NativeRivalHubApi {
   rivalhub_credential_delete?: (service: string, account: string) => Promise<boolean>;
 }
 
-interface PairingStartResponse {
-  pairingId: string;
-  pollToken: string;
-  authorizeUrl: string;
-  expiresAt: string;
-}
-
-interface PairingPollResponse {
-  status: "pending" | "authorized" | "expired";
-  expiresAt: string;
-  accessToken?: string;
-}
 
 let memoryCredential: { baseUrl: string; token: string } | null = null;
 
@@ -57,60 +46,15 @@ function nativeApi(): NativeRivalHubApi | null {
   return ((window as unknown as { pywebview?: { api?: NativeRivalHubApi } }).pywebview?.api) ?? null;
 }
 
-export function normalizeBaseUrl(value: string): string {
-  const parsed = new URL(value.trim());
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("RivalHub 地址必须使用 HTTPS；HTTP 仅允许本机开发地址");
-  }
-  if (!parsed.hostname || parsed.username || parsed.password) throw new Error("RivalHub 地址不能包含账号密码");
-  const hostname = parsed.hostname.toLowerCase();
-  const isLoopback = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]" || hostname === "::1";
-  if (parsed.protocol === "http:" && !isLoopback) throw new Error("RivalHub 远程地址必须使用 HTTPS；HTTP 仅允许 localhost、127.0.0.1 或 ::1");
-  return parsed.origin;
-}
-
-function stableSerialize(value: unknown): string {
-  if (value === null || typeof value !== "object") {
-    const serialized = JSON.stringify(value);
-    if (serialized === undefined) throw new Error("Evidence payload 无法稳定序列化");
-    return serialized;
-  }
-  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(",")}]`;
-  const entries = Object.entries(value as Record<string, unknown>)
-    .filter(([, item]) => item !== undefined)
-    .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
-  return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stableSerialize(item)}`).join(",")}}`;
-}
-
-export async function rivalHubEvidenceIdempotencyKey(
-  remoteMapId: string,
-  evidence: RivalHubEvidenceSubmission,
-): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(stableSerialize(evidence)));
-  const hash = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-  return `dak:${remoteMapId}:${hash}`;
-}
-
-class RivalHubHttpError extends Error {
-  constructor(readonly status: number, message: string) {
-    super(message);
-    this.name = "RivalHubHttpError";
-  }
-}
-
-function messageFromResponse(body: unknown, fallback: string): string {
-  if (typeof body === "object" && body !== null && "error" in body) {
-    const error = (body as { error?: { message?: unknown } }).error;
-    if (typeof error?.message === "string") return error.message;
-  }
-  return fallback;
-}
-
-async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, { ...init, cache: "no-store" });
-  const body: unknown = await response.json().catch(() => null);
-  if (!response.ok) throw new RivalHubHttpError(response.status, messageFromResponse(body, `RivalHub 请求失败：HTTP ${response.status}`));
-  return body as T;
+function createConnectionClient(baseUrl: string, token?: string) {
+  return createRivalHubClient(async <T,>(path: string, method: "GET" | "POST", body?: unknown, key?: string): Promise<T> => {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    if (key) headers["Idempotency-Key"] = key;
+    return requestJson<T>(`${baseUrl}/api/integrations/dak${path}`, {
+      method, headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+  });
 }
 
 async function readCredential(baseUrl: string): Promise<string | null> {
@@ -220,16 +164,13 @@ export async function connectRivalHub(
   const native = nativeApi();
   const preopenedBrowserWindow = native?.rivalhub_open_external_url ? null : preopenBrowserPairingWindow();
   try {
-    const start = await requestJson<PairingStartResponse>(`${baseUrl}/api/integrations/dak/pairing/start`, { method: "POST" });
+    const client = createConnectionClient(baseUrl);
+    const start = await client.startPairing();
     onProgress?.("请在系统浏览器中确认 RivalHub 赛事权限…");
     await openExternalUrl(start.authorizeUrl, preopenedBrowserWindow);
     const expiresAt = new Date(start.expiresAt).getTime();
     for (;;) {
-      const poll = await requestJson<PairingPollResponse>(`${baseUrl}/api/integrations/dak/pairing/poll`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pairingId: start.pairingId, pollToken: start.pollToken }),
-      });
+      const poll = await client.pollPairing(start.pairingId, start.pollToken);
       if (poll.status === "authorized" && poll.accessToken) {
         await saveCredential(baseUrl, poll.accessToken);
         const record = await saveConnection(baseUrl, start.pairingId);
@@ -250,10 +191,7 @@ export async function fetchRivalHubEvents(): Promise<RivalHubEventsResponse> {
   const token = await readCredential(state.baseUrl);
   if (!token) throw new Error("RivalHub 连接凭据不存在，请重新连接");
   try {
-    const response = await requestJson<unknown>(`${state.baseUrl}/api/integrations/dak/events`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const parsed = rivalHubEventsResponseSchema.parse(response);
+    const parsed = await createConnectionClient(state.baseUrl, token).events();
     await connectionStore.put(CONNECTION_KEY, { baseUrl: state.baseUrl, pairingId: state.pairingId, connectedAt: state.connectedAt, lastSyncAt: Date.now() });
     return parsed;
   } catch (error) {
@@ -271,15 +209,7 @@ export async function submitRivalHubEvidence(
   const token = await readCredential(state.baseUrl);
   if (!token) throw new Error("RivalHub 连接凭据不存在，请重新连接");
   try {
-    return await requestJson<EvidenceSubmissionResponse>(`${state.baseUrl}/api/integrations/dak/evidence`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        "Idempotency-Key": idempotencyKey,
-      },
-      body: JSON.stringify(evidence),
-    });
+    return await createConnectionClient(state.baseUrl, token).submit(evidence, idempotencyKey);
   } catch (error) {
     await clearUnauthorizedConnection(state, error);
     throw error;

@@ -1,14 +1,38 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/contract" },
-    { "path": "./packages/maps" },
-    { "path": "./packages/core" },
-    { "path": "./packages/cohort" },
-    { "path": "./packages/tournament" },
-    { "path": "./packages/presentation" },
-    { "path": "./packages/react" },
-    { "path": "./packages/cli" },
-    { "path": "./apps/dak-studio" }
+    {
+      "path": "./packages/contract"
+    },
+    {
+      "path": "./packages/maps"
+    },
+    {
+      "path": "./packages/core"
+    },
+    {
+      "path": "./packages/cohort"
+    },
+    {
+      "path": "./packages/tournament"
+    },
+    {
+      "path": "./packages/presentation"
+    },
+    {
+      "path": "./packages/react"
+    },
+    {
+      "path": "./packages/cli"
+    },
+    {
+      "path": "./apps/dak-studio"
+    },
+    {
+      "path": "./packages/rivalhub-upload"
+    },
+    {
+      "path": "./apps/rivalhub-uploader"
+    }
   ]
 }

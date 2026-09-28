@@ -11,6 +11,7 @@
   -> @cs2dak/core
        ├─> @cs2dak/cohort
        ├─> CS2 Insight Agent
+       ├─> @cs2dak/rivalhub-upload → RivalHub Evidence V1
        └─> @cs2dak/presentation <─ @cs2dak/cohort / @cs2dak/maps
               └─> @cs2dak/tournament（frozen Tournament facts 跨图聚合）
               -> @cs2dak/react
@@ -32,8 +33,10 @@
 | `@cs2dak/tournament`     | frozen Tournament sufficient-fact DTO、identity-safe 跨图 merge、透明 performance aggregation、rate 与结构/引用/聚合安全校验 | Demo 解析/detection、Core semantic QA、RivalHub scope、数据库、React、评分公式 | `TournamentAnalytics`、`TournamentPerformanceAnalytics` |
 | `@cs2dak/presentation`   | 将 core/cohort 结果转换为比赛、选手、队伍、赛季和排行榜展示模型；提供 Tournament 单图 fact adapter | 解析、评分公式、数据库、React、Tournament 跨图 merge | 产品中立 View Models        |
 | `@cs2dak/react`          | 渲染 presentation 合同和基础可视化组件                          | 数据库查询、分析、评分、产品业务规则        | React 组件与样式            |
+| `@cs2dak/rivalhub-upload` | RivalHub 配对与 HTTP client、目标匹配、Evidence V1 producer；唯一共享上传语义 owner | 本地文件、UI、数据库、Library 持久化 | `rivalhub-demo-evidence/1` |
 | Node CLI                 | 将 TypeScript 包接入本地文件系统和自动化流程                    | 复制核心分析逻辑                            | 命令行输出与文件产物        |
 | DAK Studio（`apps/dak-studio`） | 本地 Demo 管理、导入、检索、比较和个人档案               | RivalHub 赛事业务、共享分析公式             | 独立本地产品                |
+| RivalHub Demo Uploader（`apps/rivalhub-uploader`） | 原生多选 `.dem`、逐场上传编排、连接与错误指导 | 本地 Library、replay、赛事管理、Evidence 语义 | 上传桌面应用 |
 | RivalHub                 | 赛事、赛季、身份、权限、持久化和公开展示                        | 复制 DAK 分析与评分逻辑                     | 赛事产品                    |
 | CS2 Insight Agent        | 高光录制软件，复用本仓库 demo 展示模块                          | 复制 Demo 解析与评分逻辑                    | 产品                        |
 

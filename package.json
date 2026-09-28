@@ -34,7 +34,9 @@
     "event:export": "node scripts/event-export.mjs",
     "event:package": "node scripts/build-event-package.mjs",
     "event:submissions": "node scripts/promote-event-submission.mjs list",
-    "event:promote": "node scripts/promote-event-submission.mjs"
+    "event:promote": "node scripts/promote-event-submission.mjs",
+    "build:uploader": "pnpm --filter @cs2dak/rivalhub-uploader build",
+    "dev:uploader": "pnpm --filter @cs2dak/rivalhub-uploader dev"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",

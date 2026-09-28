@@ -66,6 +66,9 @@ importers:
       '@cs2dak/react':
         specifier: workspace:*
         version: link:../../packages/react
+      '@cs2dak/rivalhub-upload':
+        specifier: workspace:*
+        version: link:../../packages/rivalhub-upload
       jszip:
         specifier: ^3.10.1
         version: 3.10.1
@@ -85,6 +88,28 @@ importers:
       fake-indexeddb:
         specifier: ^6.2.5
         version: 6.2.5
+      vite:
+        specifier: ^7.3.5
+        version: 7.3.5(@types/node@24.12.4)(tsx@4.22.3)
+
+  apps/rivalhub-uploader:
+    dependencies:
+      '@cs2dak/rivalhub-upload':
+        specifier: workspace:*
+        version: link:../../packages/rivalhub-upload
+      lucide-react:
+        specifier: ^0.468.0
+        version: 0.468.0(react@19.2.6)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.6
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.6(react@19.2.6)
+    devDependencies:
+      '@vitejs/plugin-react':
+        specifier: ^5.0.0
+        version: 5.2.0(vite@7.3.5(@types/node@24.12.4)(tsx@4.22.3))
       vite:
         specifier: ^7.3.5
         version: 7.3.5(@types/node@24.12.4)(tsx@4.22.3)
@@ -190,6 +215,21 @@ importers:
       react-dom:
         specifier: '>=18'
         version: 19.2.6(react@19.2.6)
+
+  packages/rivalhub-upload:
+    dependencies:
+      '@cs2dak/contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@cs2dak/core':
+        specifier: workspace:*
+        version: link:../core
+      '@cs2dak/presentation':
+        specifier: workspace:*
+        version: link:../presentation
+      zod:
+        specifier: ^3.25.0
+        version: 3.25.76
 
   packages/tournament: {}
 

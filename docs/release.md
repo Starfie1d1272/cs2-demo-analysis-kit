@@ -107,6 +107,10 @@ bash scripts/package.sh 0.2.0
 open "python/dist/DAK Studio.app"
 ```
 
+RivalHub Demo Uploader 与 Studio 一起构建并附在 GitHub Release。它不进入 Studio 的自动更新包：
+macOS 使用 `rivalhub-demo-uploader-X.Y.Z.dmg`，Windows 使用
+`rivalhub-demo-uploader-windows-X.Y.Z.zip`。独立本地打包命令为 `bash scripts/package-uploader.sh`。
+
 ## Windows 测试版更新
 
 不打正式 tag。手动触发 GitHub Actions 的 **Beta Update** workflow：
