@@ -1,4 +1,4 @@
-# DAK Studio 分发架构
+# DAK Studio 与 RivalHub Demo Uploader 分发架构
 
 0.7.0 引入新的分发架构——从"一个大 zip 包罗万象"进化到三层分发 +
 installer 预装资产 + health check 修复。
@@ -100,9 +100,13 @@ Studio 启动时自动运行轻检查（存在 + size），不 hash 避免拖慢
 
 | 路径 | 内容 | 缓存 |
 |------|------|------|
-| `releases/latest.json` | 更新 manifest | `max-age=300` |
+| `releases/latest.json` | DAK Studio 更新 manifest | `max-age=300` |
+| `releases/uploader/latest.json` | RivalHub Demo Uploader 最新分发 manifest | `max-age=300` |
 | `releases/install-manifest.json` | 安装资产 manifest（latest） | `max-age=300` |
 | `releases/<tag>/install-manifest.json` | 安装资产 manifest（versioned） | immutable |
+| `releases/<tag>/uploader-manifest.json` | Uploader 分发 manifest（versioned） | immutable |
+| `releases/<tag>/rivalhub-demo-uploader-windows-<ver>.zip` | Uploader Windows | immutable |
+| `releases/<tag>/rivalhub-demo-uploader-<ver>.dmg` | Uploader macOS | immutable |
 | `releases/<tag>/dak-studio-windows-<ver>.zip` | Core runtime | immutable |
 | `releases/<tag>/DAK-Studio-Setup-<ver>.exe` | Web Installer | immutable |
 | `releases/<tag>/dak-studio-windows-<ver>-full.zip` | Full portable zip | immutable |
@@ -134,3 +138,15 @@ Health check 桥接两者：auto-update 后缺失资产 → health check 修复�
 
 判断规则在仓库根的 `release-update-policy.json`。workflow 默认自动判断；手动 beta workflow 可强制
 `web` 或 `runtime`。未知路径默认 runtime，避免小包漏更新。
+
+
+## RivalHub Demo Uploader 分发边界
+
+Uploader 与 DAK Studio 共用桌面版本 tag，但作为独立安装产物发布，不进入 Studio 的
+`latest.json`、Web Installer 或应用内更新包。Release workflow 在两个系统的构建产物汇合后
+生成 `uploader-manifest.json`，记录版本、文件名、size、SHA-256 以及按
+**R2 → GitHub Release → ghproxy** 排列的下载 URL。
+
+R2 同时保存版本化快照 `releases/<tag>/uploader-manifest.json` 和稳定入口
+`releases/uploader/latest.json`。官网或其它公开入口应消费稳定 manifest，而不是硬编码
+某个版本文件名；历史版本与权威归档仍由 GitHub Release 保留。
