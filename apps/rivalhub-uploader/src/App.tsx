@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ExternalLink, FileUp, Link2, LoaderCircle, Download, AlertCircle, ChevronRight } from "lucide-react";
 import { normalizeBaseUrl, uploadDemo, type UploadUpdate, type RivalHubMatchCandidate } from "@cs2dak/rivalhub-upload";
-import { client, delay, exportZip, native, nativeApiReady, type Connection, type DemoFile } from "./native";
+import { client, delay, exportZip, initializeNativeApiOnce, native, type Connection, type DemoFile } from "./native";
 import { explainError } from "./errors";
 import "./style.css";
 
@@ -27,11 +27,10 @@ export default function App() {
   const report = (error: unknown) => setProblem(explainError(error));
   useEffect(() => {
     const init = () => {
-      const api = window.pywebview?.api;
-      if (!nativeApiReady(api) || initialized.current) return;
-      initialized.current = true;
-      setReady(true);
-      void api.connection().then(value => { setConnection(value); setAddress(value.baseUrl || official); }).catch(report);
+      initializeNativeApiOnce(window.pywebview?.api, initialized, api => {
+        setReady(true);
+        void api.connection().then(value => { setConnection(value); setAddress(value.baseUrl || official); }).catch(report);
+      });
     };
     window.addEventListener("pywebviewready", init);
     init();
