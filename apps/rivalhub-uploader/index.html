@@ -1,1 +1,66 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>RivalHub Demo Uploader</title></head><body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RivalHub Demo Uploader</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <section id="startup-error" hidden role="alert" style="display:none;max-width:720px;margin:48px auto;padding:28px;border:1px solid #d5a09a;border-radius:8px;background:#fff;color:#292d33;font:15px/1.6 system-ui,sans-serif">
+      <h1 style="margin:0 0 8px;font-size:22px">界面无法启动</h1>
+      <p style="margin:0 0 12px">启动错误已写入诊断日志。请重启程序；如再次出现，请导出诊断日志并交给管理员。</p>
+      <p style="margin:0 0 8px">错误代码：<code>UI_STARTUP_ERROR</code></p>
+      <pre id="startup-error-detail" style="white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;background:#f4f5f6;border-radius:4px"></pre>
+      <button id="startup-error-export" type="button" style="padding:8px 12px">导出诊断日志</button>
+      <p id="startup-error-export-status" role="status"></p>
+    </section>
+    <script>
+      (() => {
+        const panel = document.getElementById("startup-error");
+        const detail = document.getElementById("startup-error-detail");
+        const exportStatus = document.getElementById("startup-error-export-status");
+        let pending = null;
+        const send = () => {
+          const report = window.pywebview?.api?.report_ui_error;
+          if (typeof report !== "function" || !pending) return false;
+          const error = pending;
+          pending = null;
+          report(error.message, error.stack).catch(() => {});
+          return true;
+        };
+        const show = (message, stack = "") => {
+          pending = { message: String(message).slice(0, 1000), stack: String(stack).slice(0, 4000) };
+          detail.textContent = pending.message + (pending.stack ? "\n" + pending.stack : "");
+          panel.hidden = false;
+          panel.style.display = "block";
+          send();
+        };
+        window.addEventListener("error", event => {
+          const target = event.target;
+          const resource = target instanceof HTMLScriptElement || target instanceof HTMLLinkElement
+            ? target.src || target.href : "";
+          const message = event.message || (resource ? "前端资源加载失败：" + resource.split("/").pop() : "前端运行错误");
+          show(message, event.error?.stack || "");
+        }, true);
+        window.addEventListener("unhandledrejection", event => {
+          show(event.reason?.message || String(event.reason), event.reason?.stack || "");
+        });
+        window.addEventListener("pywebviewready", send);
+        document.getElementById("startup-error-export").addEventListener("click", async () => {
+          const exportLogs = window.pywebview?.api?.export_logs;
+          if (typeof exportLogs !== "function") {
+            exportStatus.textContent = "桌面桥接尚未就绪，请重启程序后再导出。";
+            return;
+          }
+          try {
+            exportStatus.textContent = await exportLogs() ? "日志已导出。" : "未选择保存位置。";
+          } catch {
+            exportStatus.textContent = "日志导出失败，请重启程序后重试。";
+          }
+        });
+      })();
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

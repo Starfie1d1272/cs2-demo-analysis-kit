@@ -79,6 +79,13 @@ def test_bridge_rejects_paths_and_cross_origin_browser(api):
     assert not api.record("demo", "failed", "secret token\n")
 
 
+def test_frontend_startup_errors_are_safe_to_export(api, caplog):
+    api.report_ui_error("TypeError: failed Bearer secret-token", "stack Bearer another-secret")
+    assert "ui startup error" in caplog.text
+    assert "secret-token" not in caplog.text
+    assert "another-secret" not in caplog.text
+
+
 @pytest.mark.parametrize("value", ["http://remote.example", "https://u:p@example.com", "file:///x"])
 def test_invalid_website(value):
     with pytest.raises(ValueError):

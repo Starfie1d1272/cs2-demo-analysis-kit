@@ -222,6 +222,15 @@ class UploaderApi:
         log.info("demo=%s phase=%s code=%s", key, phase, code)
         return True
 
+    def report_ui_error(self, message: str, stack: str = "") -> bool:
+        import re
+        message = str(message)[:1000]
+        stack = str(stack)[:4000]
+        message = re.sub(r"(?i)(bearer\s+)[A-Za-z0-9._~-]+", r"\1[redacted]", message)
+        stack = re.sub(r"(?i)(bearer\s+)[A-Za-z0-9._~-]+", r"\1[redacted]", stack)
+        log.error("ui startup error message=%s stack=%s", json.dumps(message), json.dumps(stack))
+        return True
+
     def export_logs(self) -> bool:
         import webview
         target = self.window.create_file_dialog(webview.FileDialog.SAVE,
