@@ -253,6 +253,49 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # Uploader 不进入 Studio updater，但需要稳定的公开分发元数据供官网消费。
+      # 内联生成可保证手动重跑既有 tag 时，不依赖 tag 内后来新增的脚本。
+      - name: Generate uploader distribution manifest
+        env:
+          OWNER_REPO: Starfie1d1272/cs2-demo-analysis-kit
+          R2_PUBLIC_BASE: https://dakupdate.starfie1d.top
+        run: |
+          set -euo pipefail
+          export VERSION="${RELEASE_TAG#v}"
+          node - <<'NODE'
+          const fs = require("fs");
+          const crypto = require("crypto");
+          const path = require("path");
+          const version = process.env.VERSION;
+          const repo = process.env.OWNER_REPO;
+          const r2Base = process.env.R2_PUBLIC_BASE;
+          const tag = `v${version}`;
+          const proxies = ["", "https://ghfast.top/", "https://gh-proxy.com/", "https://ghproxy.net/"];
+          function asset(file) {
+            if (!fs.existsSync(file)) throw new Error(`missing uploader asset: ${file}`);
+            const buf = fs.readFileSync(file);
+            const name = path.basename(file);
+            const raw = `https://github.com/${repo}/releases/download/${tag}/${name}`;
+            return {
+              name,
+              size: buf.length,
+              sha256: crypto.createHash("sha256").update(buf).digest("hex"),
+              urls: [`${r2Base}/releases/${tag}/${name}`, ...proxies.map((p) => p ? `${p}${raw}` : raw)],
+            };
+          }
+          const manifest = {
+            schemaVersion: "cs2-demo-analysis-kit/uploader-distribution-1",
+            version,
+            publishedAt: new Date().toISOString(),
+            assets: {
+              windows: asset(`dist/rivalhub-demo-uploader-windows-${version}.zip`),
+              macos: asset(`dist/rivalhub-demo-uploader-${version}.dmg`),
+            },
+          };
+          fs.writeFileSync("dist/uploader-manifest.json", JSON.stringify(manifest, null, 2) + "\n");
+          console.log("uploader distribution manifest ready");
+          NODE
+
       # 自建 R2 镜像（国内可达，最高优先级）。上传 runtime zip、installer、full zip、
       # install-manifest.json、event packages 到与代码中 URL 一致的路径。
       # GitHub Release 仍是权威源/兜底；ghproxy 为最后兜底。
