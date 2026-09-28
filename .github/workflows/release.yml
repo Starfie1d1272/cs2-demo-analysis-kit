@@ -296,8 +296,8 @@ jobs:
           console.log("uploader distribution manifest ready");
           NODE
 
-      # 自建 R2 镜像（国内可达，最高优先级）。上传 runtime zip、installer、full zip、
-      # install-manifest.json、event packages 到与代码中 URL 一致的路径。
+      # 自建 R2 镜像（国内可达，最高优先级）。上传 Studio runtime/installer/full zip、
+      # Uploader 双平台产物及各自 manifest 到与公开 URL 一致的路径。
       # GitHub Release 仍是权威源/兜底；ghproxy 为最后兜底。
       - name: Upload to R2 mirror
         env:
@@ -317,6 +317,9 @@ jobs:
           INSTALLER="dist/DAK-Studio-Setup-${VERSION}.exe"
           FULL_ZIP="dist/dak-studio-windows-${VERSION}-full.zip"
           INSTALL_MANIFEST="dist/install-manifest.json"
+          UPLOADER_WIN="dist/rivalhub-demo-uploader-windows-${VERSION}.zip"
+          UPLOADER_MAC="dist/rivalhub-demo-uploader-${VERSION}.dmg"
+          UPLOADER_MANIFEST="dist/uploader-manifest.json"
 
           if [ ! -f "$ZIP" ]; then
             echo "::error::缺少 $ZIP，跳过 R2 上传"
@@ -376,13 +379,51 @@ jobs:
             echo "R2: install-manifest ✓ (${TAG}/ + latest)"
           fi
 
-          # 5. latest.json（现有逻辑）
+          # 5. Studio latest.json（现有逻辑）
           aws s3 cp "dist/latest.json" \
             "s3://${R2_BUCKET}/releases/latest.json" \
             --endpoint-url "$R2_ENDPOINT" \
             --content-type application/json \
             --cache-control "public, max-age=300"
           echo "R2: latest.json ✓"
+
+          # 6. RivalHub Demo Uploader 双平台产物（不可变）
+          for uploader in "$UPLOADER_WIN" "$UPLOADER_MAC"; do
+            if [ ! -f "$uploader" ]; then
+              echo "::error::缺少 $uploader"
+              exit 1
+            fi
+          done
+          aws s3 cp "$UPLOADER_WIN" \
+            "s3://${R2_BUCKET}/releases/${TAG}/rivalhub-demo-uploader-windows-${VERSION}.zip" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type application/zip \
+            --content-disposition "attachment; filename=rivalhub-demo-uploader-windows-${VERSION}.zip" \
+            --cache-control "public, max-age=31536000, immutable"
+          aws s3 cp "$UPLOADER_MAC" \
+            "s3://${R2_BUCKET}/releases/${TAG}/rivalhub-demo-uploader-${VERSION}.dmg" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type application/x-apple-diskimage \
+            --content-disposition "attachment; filename=rivalhub-demo-uploader-${VERSION}.dmg" \
+            --cache-control "public, max-age=31536000, immutable"
+          echo "R2: uploader binaries ✓"
+
+          # 7. Uploader manifest：版本化快照 + 稳定 latest 入口
+          if [ ! -f "$UPLOADER_MANIFEST" ]; then
+            echo "::error::缺少 $UPLOADER_MANIFEST"
+            exit 1
+          fi
+          aws s3 cp "$UPLOADER_MANIFEST" \
+            "s3://${R2_BUCKET}/releases/${TAG}/uploader-manifest.json" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type application/json \
+            --cache-control "public, max-age=31536000, immutable"
+          aws s3 cp "$UPLOADER_MANIFEST" \
+            "s3://${R2_BUCKET}/releases/uploader/latest.json" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type application/json \
+            --cache-control "public, max-age=300"
+          echo "R2: uploader manifest ✓ (${TAG}/ + latest)"
 
           echo "R2 上传完成"
 
