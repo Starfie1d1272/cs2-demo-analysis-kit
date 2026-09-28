@@ -1,20 +1,6 @@
 {
-  "name": "@cs2dak/rivalhub-uploader",
-  "version": "0.8.3",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "vite --host 127.0.0.1 --port 5180",
-    "build": "tsc -b && vite build"
-  },
-  "dependencies": {
-    "@cs2dak/rivalhub-upload": "workspace:*",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "lucide-react": "^0.468.0"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^5.0.0",
-    "vite": "^7.3.5"
-  }
+  "name": "@cs2dak/rivalhub-uploader", "version": "0.8.3", "private": true, "type": "module",
+  "scripts": { "dev": "vite --host 127.0.0.1 --port 5180", "build": "tsc -b && vite build" },
+  "dependencies": { "@cs2dak/rivalhub-upload": "workspace:*", "react": "^19.0.0", "react-dom": "^19.0.0", "lucide-react": "^0.468.0" },
+  "devDependencies": { "@vitejs/plugin-react": "^5.0.0", "vite": "^7.3.5" }
 }
