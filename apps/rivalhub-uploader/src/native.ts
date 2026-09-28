@@ -15,10 +15,19 @@ export interface NativeApi {
   cleanup(id: string): Promise<boolean>;
   record(id: string, phase: string, code?: string): Promise<boolean>;
   export_logs(): Promise<boolean>;
+  report_ui_error(message: string, stack?: string): Promise<boolean>;
 }
 declare global { interface Window { pywebview?: { api: NativeApi } } }
+const nativeMethods: (keyof NativeApi)[] = [
+  "connection", "configure", "save_connection", "open_website", "request", "select_demos",
+  "hash_demo", "start_export", "export_status", "read_chunk", "cleanup", "record",
+  "export_logs", "report_ui_error",
+];
+export function nativeApiReady(api: Partial<NativeApi> | undefined): api is NativeApi {
+  return nativeMethods.every(method => typeof api?.[method] === "function");
+}
 export function native(): NativeApi {
-  if (!window.pywebview?.api) throw new Error("DESKTOP_REQUIRED：请使用桌面程序选择 Demo；当前是界面预览");
+  if (!nativeApiReady(window.pywebview?.api)) throw new Error("DESKTOP_REQUIRED：桌面桥接尚未就绪，请稍候或重启程序");
   return window.pywebview.api;
 }
 export const client = createRivalHubClient(async <T,>(path: string, method: "GET" | "POST", body?: unknown, key?: string): Promise<T> => {
