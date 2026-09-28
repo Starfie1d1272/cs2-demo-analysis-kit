@@ -90,12 +90,30 @@ for (const forbidden of ["NPM_TOKEN", "NODE_AUTH_TOKEN", "npm login", "npm whoam
   check(!workflow.toLowerCase().includes(forbidden.toLowerCase()), `npm-publish.yml: forbidden token/auth reference ${forbidden}`);
 }
 
-for (const actionRef of [
-  "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
-  "pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996",
-  "actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38",
-]) {
-  check(workflow.includes(actionRef), `npm-publish.yml: expected pinned action ${actionRef}`);
+const allowedPublishActions = new Set([
+  "actions/checkout",
+  "pnpm/action-setup",
+  "actions/setup-node",
+]);
+const publishActionRefs = [...workflow.matchAll(/^\s*-\s+uses:\s+([^@\s]+)@([^\s#]+)/gm)]
+  .map((match) => ({ action: match[1], ref: match[2] }));
+
+check(
+  publishActionRefs.length === allowedPublishActions.size,
+  `npm-publish.yml: expected exactly ${allowedPublishActions.size} pinned actions`,
+);
+
+for (const action of allowedPublishActions) {
+  const refs = publishActionRefs.filter((entry) => entry.action === action);
+  check(refs.length === 1, `npm-publish.yml: expected exactly one ${action} step`);
+}
+
+for (const { action, ref } of publishActionRefs) {
+  check(allowedPublishActions.has(action), `npm-publish.yml: unexpected action ${action}`);
+  check(
+    /^[0-9a-f]{40}$/.test(ref),
+    `npm-publish.yml: ${action} must be pinned to a full 40-character commit SHA`,
+  );
 }
 
 const releaseDocs = readFileSync(releaseDocsPath, "utf8");
