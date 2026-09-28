@@ -442,14 +442,23 @@ jobs:
           TAG="v${VERSION}"
           aws s3 cp "s3://${R2_BUCKET}/releases/latest.json" latest.json --endpoint-url "$R2_ENDPOINT"
           aws s3 cp "s3://${R2_BUCKET}/releases/install-manifest.json" install-manifest.json --endpoint-url "$R2_ENDPOINT"
+          aws s3 cp "s3://${R2_BUCKET}/releases/uploader/latest.json" uploader-manifest.json --endpoint-url "$R2_ENDPOINT"
           node - <<'NODE'
           const fs = require("fs");
           const latest = JSON.parse(fs.readFileSync("latest.json", "utf8"));
           const install = JSON.parse(fs.readFileSync("install-manifest.json", "utf8"));
+          const uploader = JSON.parse(fs.readFileSync("uploader-manifest.json", "utf8"));
           const version = process.env.VERSION;
           if (latest.version !== version) throw new Error(`latest.json version ${latest.version} != ${version}`);
           if (install.appVersion !== version) throw new Error(`install appVersion ${install.appVersion} != ${version}`);
-          for (const [label, asset] of Object.entries({ runtime: latest.assets.windows, installRuntime: install.runtime })) {
+          if (uploader.version !== version) throw new Error(`uploader version ${uploader.version} != ${version}`);
+          if (uploader.schemaVersion !== "cs2-demo-analysis-kit/uploader-distribution-1") throw new Error("unexpected uploader manifest schema");
+          for (const [label, asset] of Object.entries({
+            runtime: latest.assets.windows,
+            installRuntime: install.runtime,
+            uploaderWindows: uploader.assets.windows,
+            uploaderMacos: uploader.assets.macos,
+          })) {
             if (!asset?.urls?.[0]?.startsWith("https://dakupdate.starfie1d.top/")) throw new Error(`${label} first URL is not R2`);
             if (!asset.sha256 || !asset.size) throw new Error(`${label} missing sha256/size`);
           }
@@ -467,6 +476,22 @@ jobs:
           console.log("R2 runtime OK", buf.length);
           NODE
 
+          aws s3 cp "s3://${R2_BUCKET}/releases/${TAG}/rivalhub-demo-uploader-windows-${VERSION}.zip" uploader-windows.zip --endpoint-url "$R2_ENDPOINT"
+          aws s3 cp "s3://${R2_BUCKET}/releases/${TAG}/rivalhub-demo-uploader-${VERSION}.dmg" uploader-macos.dmg --endpoint-url "$R2_ENDPOINT"
+          node - <<'NODE'
+          const fs = require("fs");
+          const crypto = require("crypto");
+          const manifest = require("./uploader-manifest.json");
+          for (const [key, file] of [["windows", "uploader-windows.zip"], ["macos", "uploader-macos.dmg"]]) {
+            const asset = manifest.assets[key];
+            const buf = fs.readFileSync(file);
+            const sha = crypto.createHash("sha256").update(buf).digest("hex");
+            if (buf.length !== asset.size) throw new Error(`${key} size ${buf.length} != ${asset.size}`);
+            if (sha !== asset.sha256) throw new Error(`${key} sha256 ${sha} != ${asset.sha256}`);
+            console.log(`R2 uploader ${key} OK`, buf.length);
+          }
+          NODE
+
       - uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228
         with:
           tag_name: ${{ env.RELEASE_TAG }}
@@ -476,6 +501,7 @@ jobs:
             dist/DAK-Studio-Setup*.exe
             dist/install-manifest.json
             dist/latest.json
+            dist/uploader-manifest.json
           body: |
             **安装说明**
 
@@ -518,4 +544,3 @@ jobs:
             ---
 
             ${{ steps.changelog.outputs.changelog }}
-          generate_release_notes: true
