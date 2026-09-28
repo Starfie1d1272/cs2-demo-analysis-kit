@@ -4,6 +4,19 @@ DAK Studio、RivalHub Demo Uploader 及 `@cs2dak/*` 分析管道面向用户的�
 
 > 0.1.3 起面向 Studio 用户维护。`@cs2dak/*` npm 包版本由 changesets 独立管理（见各包的 CHANGELOG.md）；本文件聚焦 DAK Studio 桌面应用变更。
 
+## [0.8.4] — 2026-09-28
+
+### 修复
+
+- **RivalHub Demo Uploader 启动白屏**：修复 pywebview 启动时先暴露空 `api` 对象造成的初始化竞态；前端现在等待完整原生桥接方法注入后再初始化，并确保重复 ready 信号不会重复连接。
+- **启动诊断**：在 React 启动前捕获前端异常并写入本地诊断日志，启动失败时显示可操作的错误页和日志导出入口；敏感 Bearer 凭据会在日志中脱敏。
+
+### 内部与维护
+
+- **启动生命周期回归保护**：新增空 API → 完整 API → 重复 ready 的回归测试，固定 pywebview bridge readiness contract。
+- **Uploader 分发**：Windows ZIP / macOS DMG 纳入现有 R2 镜像，新增独立 `releases/uploader/latest.json` 与版本化 manifest，并在发布后重新下载校验 size / SHA-256。
+- **CI / Release 维护**：更新并收拢 GitHub Actions 固定版本策略，保持 Dependabot 更新与 pinned action policy 一致。
+
 ## [0.8.3] — 2026-09-28
 
 ### 新增
