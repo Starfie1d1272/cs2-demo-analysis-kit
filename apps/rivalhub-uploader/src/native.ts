@@ -26,6 +26,16 @@ const nativeMethods: (keyof NativeApi)[] = [
 export function nativeApiReady(api: Partial<NativeApi> | undefined): api is NativeApi {
   return nativeMethods.every(method => typeof api?.[method] === "function");
 }
+export function initializeNativeApiOnce(
+  api: Partial<NativeApi> | undefined,
+  initialized: { current: boolean },
+  onReady: (api: NativeApi) => void,
+): boolean {
+  if (!nativeApiReady(api) || initialized.current) return false;
+  initialized.current = true;
+  onReady(api);
+  return true;
+}
 export function native(): NativeApi {
   if (!nativeApiReady(window.pywebview?.api)) throw new Error("DESKTOP_REQUIRED：桌面桥接尚未就绪，请稍候或重启程序");
   return window.pywebview.api;
