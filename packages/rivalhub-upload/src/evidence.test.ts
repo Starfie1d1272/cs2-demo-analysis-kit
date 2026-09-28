@@ -2,10 +2,10 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { DemoPackage, PackageKill } from "@cs2dak/contract";
-import { aggregatePlayerRoundPerformanceFacts, buildPlayerRoundPerformanceFacts, loadDemoPackageFromZip } from "../../../../packages/core/src/index";
-import { buildRivalHubDemoEvidenceV1, fixtureIdentity, fixtureTarget, matchRivalHubParticipants, matchRivalHubParticipantsForReview, normalizeRivalHubDemoPackage, resolveRivalHubParticipants, resolveRivalHubParticipantsFromEventRoster, resolveRivalHubParticipantsForReview, selectRivalHubMap, type RivalHubEvidenceTarget, type RivalHubTeamOrientation } from "./rivalhub-evidence";
-import { matchRivalHubMap, type RivalHubMatchCandidate } from "./rivalhub-match";
-import type { RivalHubRemoteMap, RivalHubRemotePlayer, RivalHubRemoteTeam } from "./rivalhub-contract";
+import { aggregatePlayerRoundPerformanceFacts, buildPlayerRoundPerformanceFacts, loadDemoPackageFromZip } from "@cs2dak/core/evidence";
+import { buildRivalHubDemoEvidenceV1, fixtureIdentity, fixtureTarget, matchRivalHubParticipants, matchRivalHubParticipantsForReview, normalizeRivalHubDemoPackage, resolveRivalHubParticipants, resolveRivalHubParticipantsFromEventRoster, resolveRivalHubParticipantsForReview, selectRivalHubMap, type RivalHubEvidenceTarget, type RivalHubTeamOrientation } from "./evidence";
+import { matchRivalHubMap, type RivalHubMatchCandidate } from "./match";
+import type { RivalHubRemoteMap, RivalHubRemotePlayer, RivalHubRemoteTeam } from "./contract";
 
 const target: RivalHubEvidenceTarget = {
   seasonId: "00000000-0000-4000-8000-000000000001",

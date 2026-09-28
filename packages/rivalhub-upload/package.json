@@ -1,0 +1,19 @@
+{
+  "name": "@cs2dak/rivalhub-upload",
+  "version": "0.8.2",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./contract": "./src/contract.ts",
+    "./match": "./src/match.ts",
+    "./evidence": "./src/evidence.ts",
+    "./client": "./src/client.ts"
+  },
+  "dependencies": {
+    "@cs2dak/contract": "workspace:*",
+    "@cs2dak/core": "workspace:*",
+    "@cs2dak/presentation": "workspace:*",
+    "zod": "^3.25.0"
+  }
+}

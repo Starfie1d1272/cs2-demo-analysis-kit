@@ -25,10 +25,11 @@ cs2dak = "cs2dak.cli:main"
 
 [project.gui-scripts]
 cs2dak-studio = "cs2dak.studio:main"
+rivalhub-demo-uploader = "cs2dak.rivalhub_uploader:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/cs2dak"]
-artifacts = ["src/cs2dak/studio_web/**"]
+artifacts = ["src/cs2dak/studio_web/**", "src/cs2dak/rivalhub_uploader_web/**"]
 
 [tool.ruff]
 line-length = 100

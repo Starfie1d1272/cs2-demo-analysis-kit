@@ -38,3 +38,6 @@ packages/maps/viz/
 python/src/cs2dak/studio_web/
 scripts/hltv/.download-state.json
 scripts/hltv/.extract-state.json
+
+python/src/cs2dak/rivalhub_uploader_web/
+.agent-tmp/

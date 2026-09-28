@@ -2,7 +2,7 @@
 // The repository release version follows the git tag (vX.Y.Z).
 // Public @cs2dak/* package versions are owned by Changesets and must not be
 // overwritten here. This script only synchronizes the root project, private
-// workspace apps, and the Python package.
+// workspace apps/packages, and the Python package.
 //
 //   node scripts/sync-version.mjs            # derive from latest git tag
 //   node scripts/sync-version.mjs 0.3.0      # set an explicit version
@@ -35,7 +35,7 @@ function privateWorkspacePackageJsons() {
       const path = join(repoRoot, pkg);
       if (!existsSync(path)) continue;
       const json = JSON.parse(readFileSync(path, "utf8"));
-      if (json.private === true || json.publishConfig == null) out.push(pkg);
+      if (json.private === true) out.push(pkg);
     }
   }
   return out;
