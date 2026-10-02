@@ -75,6 +75,17 @@ RivalHub（发布：公开排行榜 / 嵌入官网 / 赛事页）
 | `GET /api/integrations/dak/events` | RivalHub → DAK Studio | season/event、stage、CompetitionEntry、Canonical MatchRoster、match/map/series/veto、revision 与 Demo 状态 |
 | `POST /api/integrations/dak/evidence` | DAK Studio → RivalHub | `rivalhub-demo-evidence/1`；服务端硬校验、幂等、不可变 artifact、SQL projection 与 audit |
 
+`@cs2dak/rivalhub-upload` 是赛事目录 schema 与 HTTP client 的唯一 consumer owner，Studio
+只 re-export 合同。`rivalhub-dak-events/1` 通过现有 URL 的 `?seriesDisposition=1`
+显式请求 `series.isForfeit`；服务端默认响应不增加字段，保持已发布 strict 客户端兼容。
+新客户端也接受旧服务端忽略 query 后返回的缺字段响应；缺失表示未知，不默认成 false，
+不从 0:2、空 maps 或 BP 反推。两仓可按任意顺序部署，完整展示需双方都更新。
+
+`isForfeit` 只来自 RivalHub canonical match fact。Studio 仅对 `finished && isForfeit === true`
+显示“判负 / 弃权”，无地图时说明“无实际地图数据”，不把未录入 BP 当作待补数据。
+比分照常保留，不创建地图、BP 或 Demo 同步目标；已经实际打出的地图、BP 与 Demo evidence
+仍可查看和同步。普通比赛与旧服务端未知 disposition 保持原有缺失数据语义。
+
 DAK Studio 复用现有一级 `赛事` / `EventsView`，把在线 RivalHub 事件排在本地事件之前；连接后只手动刷新，断开时保留并标记缓存过期。在线地图上下文直接进入现有 `.dem → cs2-demo-format/3.x → @cs2dak/core` 导入链，支持单个或批量 Demo。身份匹配只接受 Steam64 与 Canonical MatchRoster 的稳定对应，不能用昵称回退；匹配不唯一时交给用户处理。
 
 RivalHub 只拥有 target、赛事/名单身份、revision、算术/交叉校验、持久化、投影与审计；DAK 只拥有 Demo QA、round/KDA/damage/HS/KAST/opening/trade/clutch/utility/weapon 与 conversion 语义。正常提交不需要管理员二次点击；可选 Broadcast/OCR 缺失不阻塞，冲突进入轻量 needs-attention。原始 `.dem` 永不上传，长期 token 不进入 Studio 普通记录存储。

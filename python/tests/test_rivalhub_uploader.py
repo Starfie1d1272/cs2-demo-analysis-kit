@@ -1,6 +1,7 @@
 """Native boundary tests without a WebView, OS credential prompts or live website."""
 import base64
 import hashlib
+import io
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -77,6 +78,29 @@ def test_bridge_rejects_paths_and_cross_origin_browser(api):
     with pytest.raises(ValueError):
         api.read_chunk("../../secret", 0)
     assert not api.record("demo", "failed", "secret token\n")
+
+
+@pytest.mark.parametrize("path", ["/events", "/events?seriesDisposition=1"])
+def test_events_negotiation_retains_native_authorization(api, monkeypatch, path):
+    api.configure("https://example.com")
+    monkeypatch.setattr(uploader, "credential", lambda origin: "test-token")
+    response = io.BytesIO(b'{"events": []}')
+    response.status = 200
+    opener = Mock()
+    opener.open.return_value = response
+    monkeypatch.setattr(uploader.urllib.request, "build_opener", lambda *args: opener)
+    assert api.request(path, "GET") == {"status": 200, "body": {"events": []}}
+    request = opener.open.call_args.args[0]
+    assert request.full_url == "https://example.com/api/integrations/dak" + path
+    assert request.get_header("Authorization") == "Bearer test-token"
+
+
+def test_events_negotiation_still_rejects_unknown_queries_and_missing_credentials(api, monkeypatch):
+    api.configure("https://example.com")
+    monkeypatch.setattr(uploader, "credential", lambda origin: None)
+    assert api.request("/events?seriesDisposition=1", "GET")["status"] == 401
+    with pytest.raises(ValueError):
+        api.request("/events?seriesDisposition=1&redirect=evil", "GET")
 
 
 def test_frontend_startup_errors_are_safe_to_export(api, caplog):

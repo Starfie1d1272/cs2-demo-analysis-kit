@@ -66,7 +66,9 @@ export function createRivalHubClient(request: RivalHubTransport) {
     startPairing: () => request<PairingStartResponse>("/pairing/start", "POST"),
     pollPairing: (pairingId: string, pollToken: string) => request<PairingPollResponse>("/pairing/poll", "POST", { pairingId, pollToken }),
     async events() {
-      return rivalHubEventsResponseSchema.parse(await request("/events", "GET"));
+      // Old servers ignore the query and remain readable; new servers keep the
+      // legacy strict response shape for clients that do not explicitly opt in.
+      return rivalHubEventsResponseSchema.parse(await request("/events?seriesDisposition=1", "GET"));
     },
     async submit(evidence: RivalHubEvidenceSubmission, idempotencyKey: string) {
       return evidenceResponseSchema.parse(await request("/evidence", "POST", evidence, idempotencyKey));

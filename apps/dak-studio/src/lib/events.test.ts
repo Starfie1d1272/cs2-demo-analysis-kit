@@ -1,8 +1,9 @@
 import "fake-indexeddb/auto";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { deleteEventRecord, importEventPackage, listEventRecords, upsertRivalHubEvents } from "./events";
 import type { StudioDemoEntry } from "./library";
-import type { RivalHubEventsResponse } from "./rivalhub-contract";
+import { rivalHubEventsResponseSchema, type RivalHubEventsResponse } from "./rivalhub-contract";
 import { listSeriesRecords } from "./series";
 
 function entry(id: string, mapName: string): StudioDemoEntry {
@@ -31,6 +32,24 @@ function entry(id: string, mapName: string): StudioDemoEntry {
 }
 
 describe("importEventPackage", () => {
+  it("refreshes canonical disposition without guessing or retaining stale truth from an old server", async () => {
+    const response = rivalHubEventsResponseSchema.parse(JSON.parse(readFileSync("fixtures/contracts/rivalhub-dak-events-1-disposition.json", "utf8")));
+    const remoteEvent = response.events[0]!;
+    const remote = remoteEvent.series[1]!;
+    const id = `event:rivalhub:${remoteEvent.seasonId}:series:${remote.id}`;
+    const read = async () => (await listSeriesRecords()).find((record) => record.id === id);
+    await upsertRivalHubEvents(response, []);
+    expect(await read()).toMatchObject({ status: "finished", isForfeit: true, scoreA: 0, scoreB: 2, mapAssignments: [], entryIds: [], veto: null });
+    delete remote.isForfeit;
+    await upsertRivalHubEvents(response, []);
+    expect((await read())?.isForfeit).toBeUndefined();
+    remote.isForfeit = false;
+    await upsertRivalHubEvents(response, []);
+    expect((await read())?.isForfeit).toBe(false);
+    const event = (await listEventRecords()).find((record) => record.id === `event:rivalhub:${remoteEvent.seasonId}`);
+    if (event) await deleteEventRecord(event);
+  });
+
   it("creates Event and Series records and pairs local maps", async () => {
     const result = await importEventPackage({
       version: "cs2-demo-analysis-kit/event-package-1.0",

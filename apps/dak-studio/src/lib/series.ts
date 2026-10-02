@@ -30,6 +30,8 @@ export interface StudioSeriesRecord {
   entryRound?: string | null;
   bracketNodeId?: string | null;
   status?: "scheduled" | "in_progress" | "finished" | "cancelled";
+  /** Canonical RivalHub disposition; undefined means the server did not expose it. */
+  isForfeit?: boolean;
   scoreA?: number | null;
   scoreB?: number | null;
   matchUrl?: string | null;
