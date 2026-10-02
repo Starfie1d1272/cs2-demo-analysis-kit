@@ -249,6 +249,7 @@ export async function upsertRivalHubEvents(
         entryRound: external.entryRound,
         bracketNodeId: external.bracketNodeId,
         status: external.status,
+        isForfeit: external.isForfeit,
         scoreA: external.scoreA,
         scoreB: external.scoreB,
         teamARecordBefore: external.teamARecordBefore,

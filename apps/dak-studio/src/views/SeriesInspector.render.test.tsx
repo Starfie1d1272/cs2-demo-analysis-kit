@@ -62,6 +62,41 @@ const series: StudioSeriesRecord = {
 };
 
 describe("SeriesInspector", () => {
+  function renderDisposition(override: Partial<StudioSeriesRecord>) {
+    return renderToStaticMarkup(createElement(SeriesInspector, {
+      series: { ...series, status: "finished", veto: null, entryIds: [], mapAssignments: [], scoreA: 0, scoreB: 2, ...override },
+      entries: [entry], eventId: "event-1", candidates: [], onOpenMatch: () => undefined,
+      onImportOnlineFiles: async () => undefined,
+    }));
+  }
+
+  it("explains an unplayed canonical forfeit without inventing BP or Demo work", () => {
+    const html = renderDisposition({ isForfeit: true });
+    expect(html).toContain("判负 / 弃权，无实际地图数据");
+    expect(html).toContain("0 : 2");
+    expect(html).not.toContain("未录入");
+    expect(html).not.toContain("本地未关联");
+    expect(html).not.toContain("选择 Demo");
+  });
+
+  it.each([false, undefined])("keeps missing BP semantics when disposition is %s", (isForfeit) => {
+    const html = renderDisposition({ isForfeit });
+    expect(html).toContain("BP：未录入");
+    expect(html).not.toContain("判负 / 弃权");
+  });
+
+  it("does not treat unfinished series as a completed forfeit", () => {
+    expect(renderDisposition({ isForfeit: true, status: "in_progress" })).toContain("BP：未录入");
+  });
+
+  it("keeps actual maps, BP and Demo links when forfeited after play", () => {
+    const html = renderDisposition({ isForfeit: true, mapAssignments: [series.mapAssignments![0]!], entryIds: [entry.id], veto });
+    expect(html).toContain("判负 / 弃权");
+    expect(html).not.toContain("无实际地图数据");
+    expect(html).toContain("打开 Demo");
+    expect(html).toContain("BP · BO3");
+  });
+
   it("keeps map/demo/BP details under the selected series", () => {
     const html = renderToStaticMarkup(createElement(SeriesInspector, {
       series,

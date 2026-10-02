@@ -31,7 +31,7 @@ function setup() {
   const requests: Array<{ path: string; body: unknown; key?: string }> = [];
   let attention = false;
   const client = createRivalHubClient(async <T,>(path: string, _method: string, body?: unknown, key?: string): Promise<T> => {
-    if (path === "/events") return structuredClone(data) as T;
+    if (path === "/events?seriesDisposition=1") return structuredClone(data) as T;
     requests.push({ path, body, key });
     const target = (body as { target: { matchMapId: string } }).target;
     const map = data.events[0]!.series[0]!.maps.find(m => m.id === target.matchMapId)!;

@@ -94,6 +94,8 @@ const remoteSeriesSchema = z.object({
   entryRound: z.string().nullable(),
   bracketNodeId: z.string().nullable(),
   status: z.enum(["scheduled", "in_progress", "finished", "cancelled"]),
+  /** RivalHub-owned fact; absent on old servers means unknown, never false. */
+  isForfeit: z.boolean().optional(),
   format: z.enum(["bo1", "bo3", "bo5"]),
   entryAId: uuidSchema,
   entryBId: uuidSchema,

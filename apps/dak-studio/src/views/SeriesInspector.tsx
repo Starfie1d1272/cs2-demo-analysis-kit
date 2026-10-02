@@ -88,6 +88,7 @@ export function SeriesInspector({
   const score = seriesScore(series, entries);
   const entryById = new Map(entries.map((entry) => [entry.id, entry]));
   const maps = mapsForSeries(series);
+  const isForfeit = series.status === "finished" && series.isForfeit === true;
   const activeOrder = activeMapOrder ?? maps[0]?.order ?? null;
   const activeMap = maps.find((map) => map.order === activeOrder) ?? maps[0];
   return (
@@ -122,7 +123,8 @@ export function SeriesInspector({
       {series.veto && (series.format === "bo1"
         ? <div className="stu-series-inspector-bp"><b>BP · BO1</b><BpView veto={series.veto} matchUrl={series.matchUrl} /></div>
         : <details className="stu-series-inspector-bp"><summary>BP · {series.format.toUpperCase()}</summary><BpView veto={series.veto} matchUrl={series.matchUrl} /></details>)}
-      {!series.veto && <p className="stu-muted">BP：未录入</p>}
+      {isForfeit && <p className="stu-muted">{maps.length === 0 ? "判负 / 弃权，无实际地图数据" : "判负 / 弃权"}</p>}
+      {!series.veto && !isForfeit && <p className="stu-muted">BP：未录入</p>}
       {activeMap?.rivalHub?.demoIssues && activeMap.rivalHub.demoIssues.length > 0 && (
         <details className="stu-online-issue"><summary>查看该地图的同步问题</summary><ul>{activeMap.rivalHub.demoIssues.map((issue) => <li key={`${issue.code}:${issue.path ?? ""}`}>{issue.message}</li>)}</ul></details>
       )}

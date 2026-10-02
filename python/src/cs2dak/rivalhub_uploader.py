@@ -117,11 +117,12 @@ class UploaderApi:
 
     def request(self, path: str, method: str, body=None, key: str | None = None) -> dict:
         allowed = {("/pairing/start", "POST"), ("/pairing/poll", "POST"),
-                   ("/events", "GET"), ("/evidence", "POST")}
+                   ("/events", "GET"), ("/events?seriesDisposition=1", "GET"),
+                   ("/evidence", "POST")}
         if (path, method) not in allowed or not self._origin:
             raise ValueError("不支持的请求")
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
-        if path in {"/events", "/evidence"}:
+        if path in {"/events", "/events?seriesDisposition=1", "/evidence"}:
             token = credential(self._origin)
             if not token:
                 return {"status": 401, "body": {"error": {"message": "授权不存在，请重新连接 RivalHub"}}}
