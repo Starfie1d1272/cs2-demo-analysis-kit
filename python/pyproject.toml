@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.32.4"]
 build-backend = "hatchling.build"
 
 [project]
@@ -7,18 +7,18 @@ name = "cs2dak"
 version = "0.8.4"
 description = "Desktop shell for cs2df v3 demo exports and DAK Studio"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "Xinyu Du" }]
 dependencies = [
     "cs2df>=3.1.0",  # v3 reference exporter (polars/numpy-based)
-    "typer>=0.12",   # CLI (version only)
+    "typer>=0.27.2",   # CLI (version only)
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ruff>=0.5"]
-gui = ["pywebview>=5.0"]    # DAK Studio 桌面壳
-build = ["pyinstaller>=6.0"] # bundle into a standalone .exe / .app
+dev = ["pytest>=9.1.1", "ruff>=0.16.10"]
+gui = ["pywebview>=6.2.1"]    # DAK Studio 桌面壳
+build = ["pyinstaller>=6.22.3"] # bundle into a standalone .exe / .app
 
 [project.scripts]
 cs2dak = "cs2dak.cli:main"

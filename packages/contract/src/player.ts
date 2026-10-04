@@ -83,7 +83,7 @@ export const playerSeasonProfileSchema = z.object({
     breakdown: z.array(rrBreakdownEntrySchema)
   }),
   /** 与排行榜同口径的展示指标（共享 SEASON_STAT_VIEWS 渲染列）。 */
-  metrics: z.record(leaderboardMetricKeySchema, z.number().nullable()),
+  metrics: z.partialRecord(leaderboardMetricKeySchema, z.number().nullable()),
   weapons: z.array(playerWeaponProfileEntrySchema),
   highlights: z.object({
     wallbangKills: z.number().int().nonnegative().nullable(),

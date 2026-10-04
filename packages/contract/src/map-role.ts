@@ -155,7 +155,7 @@ export const playerMapRoleEvidenceSchema = z.object({
     openingMainComponentShare: z.number().min(0).max(1).nullable(),
     openingNoUniqueCoreShare: z.number().min(0).max(1).nullable(),
     openingIsolatedShare: z.number().min(0).max(1).nullable(),
-    formationShares: z.record(z.number().min(0).max(1)),
+    formationShares: z.record(z.string(), z.number().min(0).max(1)),
   }),
   support: z.object({
     utilityUses: z.number().int().nonnegative(),

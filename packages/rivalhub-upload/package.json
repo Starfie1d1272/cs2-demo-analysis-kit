@@ -14,6 +14,6 @@
     "@cs2dak/contract": "workspace:*",
     "@cs2dak/core": "workspace:*",
     "@cs2dak/presentation": "workspace:*",
-    "zod": "^3.25.0"
+    "zod": "^4.6.5"
   }
 }

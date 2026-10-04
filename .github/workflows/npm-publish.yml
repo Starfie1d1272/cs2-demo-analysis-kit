@@ -27,9 +27,7 @@ jobs:
           ref: ${{ github.ref }}
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6
-        with:
-          version: 11.7.0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -46,6 +44,8 @@ jobs:
           PNPM_VERSION="$(pnpm --version)"
           printf '%s\n' "node ${NODE_VERSION}" "npm ${NPM_VERSION}" "pnpm ${PNPM_VERSION}"
           NODE_VERSION="$NODE_VERSION" NPM_VERSION="$NPM_VERSION" PNPM_VERSION="$PNPM_VERSION" node --input-type=module <<'NODE'
+          const { readFileSync } = await import("node:fs");
+          const pkg = JSON.parse(readFileSync("package.json", "utf8"));
           const parse = (value) => value.replace(/^v/, "").split(".").map(Number);
           const [nodeMajor, nodeMinor, nodePatch] = parse(process.env.NODE_VERSION);
           const [npmMajor, npmMinor, npmPatch] = parse(process.env.NPM_VERSION);
@@ -55,8 +55,8 @@ jobs:
           if (npmMajor < 11 || (npmMajor === 11 && (npmMinor < 5 || (npmMinor === 5 && npmPatch < 1)))) {
             throw new Error(`npm Trusted Publishing requires npm >=11.5.1, got ${process.env.NPM_VERSION}`);
           }
-          if (process.env.PNPM_VERSION !== "11.7.0") {
-            throw new Error(`release workflow must use pnpm 11.7.0, got ${process.env.PNPM_VERSION}`);
+          if (process.env.PNPM_VERSION !== pkg.packageManager.split("@")[1]) {
+            throw new Error(`release workflow must use ${pkg.packageManager}, got ${process.env.PNPM_VERSION}`);
           }
           NODE
 

@@ -79,7 +79,7 @@ export const seasonLeaderboardRowSchema = z.object({
   mapCount: z.number().int().positive(),
   confidence: z.number().min(0).max(1),
   /** 每个指标 key 都有值；不可得为 null（不伪造 0）。 */
-  metrics: z.record(leaderboardMetricKeySchema, z.number().nullable()),
+  metrics: z.partialRecord(leaderboardMetricKeySchema, z.number().nullable()),
   /** PRISM 风格画像，仅表达风格，不进入排序；缺失为 null。 */
   prism: z.custom<PrismResult>().nullable()
 });
