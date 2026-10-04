@@ -16,7 +16,7 @@
     "@cs2dak/contract": "workspace:*",
     "@cs2dak/presentation": "workspace:*",
     "@cs2dak/maps": "workspace:*",
-    "lucide-react": "^0.468.0"
+    "lucide-react": "^1.51.0"
   },
   "peerDependencies": {
     "react": ">=18",

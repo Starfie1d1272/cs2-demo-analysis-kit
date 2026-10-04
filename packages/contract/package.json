@@ -14,7 +14,7 @@
   "dependencies": {
     "@rivalhub/rival-rating": "^0.3.0",
     "cs2-demo-format": "^3.1.0",
-    "zod": "^3.25.0"
+    "zod": "^4.6.5"
   },
   "files": [
     "src"

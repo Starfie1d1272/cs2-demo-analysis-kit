@@ -133,6 +133,12 @@ def _studio_userdata() -> Path:
     首次切换到便携目录时，自动把旧 %APPDATA% 数据整体拷贝过来，
     避免 0.1.4/0.1.5 用户升级后资料库"清空"。
     """
+    if configured := os.environ.get("DAK_STUDIO_DATA_DIR"):
+        path = Path(configured).expanduser()
+        if not path.is_absolute():
+            raise ValueError("DAK_STUDIO_DATA_DIR must be an absolute directory")
+        path.mkdir(parents=True, exist_ok=True)
+        return path
     if sys.platform == "win32" and getattr(sys, "frozen", False):
         portable = Path(sys.executable).parent / "userdata"
         try:

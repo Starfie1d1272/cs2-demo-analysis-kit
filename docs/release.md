@@ -165,7 +165,7 @@ git commit -am "chore: version packages"
 
 合并 release PR 后，在 GitHub Actions 选择 **Publish npm packages**，确认 ref 为
 `main` 后手动运行。`.github/workflows/npm-publish.yml` 使用 GitHub-hosted
-`ubuntu-latest`、Node `24.x`、仓库锁定的 pnpm `11.7.0` 和 `npm-publish` environment；
+`ubuntu-latest`、Node `24.x`、由根 `package.json` 声明精确版本的 pnpm 和 `npm-publish` environment；
 先运行完整的 build、test、typecheck，再运行 `pnpm exec changeset publish --no-git-tag`。
 OIDC 需要 job 级 `id-token: write`，package tag 推送需要 `contents: write`。
 

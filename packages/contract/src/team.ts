@@ -13,7 +13,7 @@ export const teamMemberSummarySchema = z.object({
   name: z.string(),
   mapCount: z.number().int().positive(),
   confidence: z.number().min(0).max(1),
-  metrics: z.record(leaderboardMetricKeySchema, z.number().nullable())
+  metrics: z.partialRecord(leaderboardMetricKeySchema, z.number().nullable())
 });
 
 export const teamMetricLeaderSchema = z.object({

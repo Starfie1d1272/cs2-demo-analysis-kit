@@ -2,7 +2,7 @@
   "name": "cs2-demo-analysis-kit",
   "version": "0.8.4",
   "private": true,
-  "packageManager": "pnpm@11.7.0",
+  "packageManager": "pnpm@12.9.1",
   "description": "Reusable CS2 demo analysis models, QA reports, and previewable UI components.",
   "license": "MIT",
   "type": "module",
@@ -39,19 +39,19 @@
     "dev:uploader": "pnpm --filter @cs2dak/rivalhub-uploader dev"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.31.0",
-    "@types/node": "^24.0.0",
-    "@types/react": "^19.2.15",
-    "@types/react-dom": "^19.2.3",
-    "typescript": "^5.9.0",
-    "vitest": "^4.1.11"
+    "@changesets/cli": "^3.0.3",
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
   },
   "dependencies": {
     "@rivalhub/rival-rating": "^0.3.0",
-    "jszip": "^3.10.1",
-    "lucide-react": "^0.468.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "zod": "^3.25.0"
+    "jszip": "^3.10.2",
+    "lucide-react": "^1.51.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zod": "^4.6.5"
   }
 }

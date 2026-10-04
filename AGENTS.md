@@ -162,3 +162,9 @@ docs/                  # 架构与集成文档（索引见 docs/README.md）
 - **`.tri` 碰撞几何**：反应时间/预瞄的 LOS 口径需要 awpy `.tri`（`uvx awpy get tris`，~30MB/图，不进 git）。Node 端从 `~/.awpy/tris` 读（`AWPY_TRIS_DIR` 可覆盖）；Studio 浏览器端 fetch `tris/{map}.tri`——开发环境放/链到 `apps/dak-studio/public/tris/`，打包时 `scripts/package.sh` 自动从 `~/.awpy/tris` 拷入安装包。缺失只降级不报错
 - **cwd 敏感**：pnpm 命令只在 workspace root 有效，不要在 `python/` 子目录下跑
 - **dist 被 gitignore**：`apps/dak-studio/dist/` 与包构建产物不提交，CI 或本地需先构建
+
+## 依赖安装与更新
+
+依赖维护遵循 [`docs/dependency-maintenance.md`](docs/dependency-maintenance.md)。使用 manifest 指定的 pnpm，日常冻结安装，版本更新时自动生成锁文件；不要手改锁文件或恢复旧文件掩盖依赖变化。
+
+云环境中如存在 `/workspace/.onboarding/activate.sh`，每个 shell 执行仓库命令前先 source 该文件，以选择可写缓存和 manifest 对应的包管理器。
