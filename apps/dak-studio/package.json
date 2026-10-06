@@ -16,14 +16,14 @@
     "@cs2dak/maps": "workspace:*",
     "@cs2dak/presentation": "workspace:*",
     "@cs2dak/react": "workspace:*",
+    "@cs2dak/rivalhub-upload": "workspace:*",
     "jszip": "^3.10.2",
-    "lucide-react": "^1.51.0",
+    "lucide-react": "^1.52.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0",
-    "@cs2dak/rivalhub-upload": "workspace:*"
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^6.1.1",
+    "@vitejs/plugin-react": "^6.1.2",
     "fake-indexeddb": "^6.2.5",
     "vite": "^8.3.2"
   }
