@@ -49,7 +49,7 @@
   "dependencies": {
     "@rivalhub/rival-rating": "^0.3.0",
     "jszip": "^3.10.2",
-    "lucide-react": "^1.51.0",
+    "lucide-react": "^1.52.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "zod": "^4.6.5"
