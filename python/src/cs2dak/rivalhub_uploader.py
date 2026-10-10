@@ -72,7 +72,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 class UploaderApi:
     def __init__(self, userdata: Path):
-        self.window = None
+        self._window = None
         self._userdata = userdata
         self._metadata = userdata / "connection.json"
         self._temp = tempfile.TemporaryDirectory(prefix="rivalhub-uploader-")
@@ -149,7 +149,7 @@ class UploaderApi:
 
     def select_demos(self) -> list[dict]:
         import webview
-        paths = self.window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True,
+        paths = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True,
                                                file_types=("CS2 Demo (*.dem)",))
         result = []
         for value in paths or []:
@@ -234,7 +234,7 @@ class UploaderApi:
 
     def export_logs(self) -> bool:
         import webview
-        target = self.window.create_file_dialog(webview.FileDialog.SAVE,
+        target = self._window.create_file_dialog(webview.FileDialog.SAVE,
                                                save_filename="rivalhub-uploader.log")
         if not target:
             return False
@@ -268,7 +268,7 @@ def main():
     page = web / "rivalhub_uploader_web" / "index.html"
     if not page.is_file():
         raise RuntimeError("请先运行 pnpm build:uploader 并复制前端产物，或运行 scripts/package-uploader.sh")
-    api.window = webview.create_window("RivalHub Demo Uploader", str(page), js_api=api,
+    api._window = webview.create_window("RivalHub Demo Uploader", str(page), js_api=api,
                                        width=1080, height=800, min_size=(820, 640))
     try:
         webview.start(private_mode=True)
