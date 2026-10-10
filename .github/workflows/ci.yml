@@ -83,7 +83,7 @@ jobs:
         with:
           enable-cache: true
 
-      - run: uv sync --extra dev
+      - run: uv sync --frozen --extra dev --extra gui
         working-directory: python
 
       - name: Run pytest

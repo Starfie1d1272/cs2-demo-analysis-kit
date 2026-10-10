@@ -1,0 +1,52 @@
+name: Uploader Windows startup
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/uploader-startup-windows.yml'
+      - 'python/**'
+      - 'apps/rivalhub-uploader/**'
+      - 'packages/rivalhub-upload/**'
+      - 'scripts/package-uploader.sh'
+      - 'scripts/smoke-uploader-windows.ps1'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  startup:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: '3.12'
+          enable-cache: true
+      - run: pnpm install --frozen-lockfile
+      - name: Real pywebview reflection regression
+        shell: bash
+        run: |
+          cd python
+          uv sync --frozen --extra dev --extra gui --extra build
+          uv run --frozen pytest tests/test_rivalhub_uploader.py tests/test_uploader_webview_bridge.py
+      - name: Package source into full Windows onedir ZIP
+        shell: bash
+        env:
+          UV_FROZEN: 'true'
+        run: bash scripts/package-uploader.sh
+      - name: Frozen empty startup, message response, bridge ready, save dialog and cancel (twice)
+        shell: powershell
+        run: ./scripts/smoke-uploader-windows.ps1 -Exe "$pwd/python/dist/rivalhub-demo-uploader/rivalhub-demo-uploader.exe" -EvidenceDir "$env:RUNNER_TEMP/uploader-startup-evidence"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: uploader-startup-windows-review
+          compression-level: 0
+          path: |
+            python/dist/rivalhub-demo-uploader-windows-*.zip
+            ${{ runner.temp }}/uploader-startup-evidence/**
