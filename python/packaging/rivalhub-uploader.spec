@@ -58,10 +58,9 @@ def keep_runtime_module(name: str) -> bool:
     )
 
 for pkg in (
-    # cs2df runtime: parser extension, pandas columnar results and numpy.
-    # demoparser2 declares polars/pyarrow as optional conversion backends; the
-    # reference exporter consumes pandas DataFrames and never imports either.
-    "cs2df", "pandas", "numpy",
+    # demoparser2 converts native event results through pyarrow and Polars.
+    # These optional parser dependencies are required by real Demo exports.
+    "cs2df", "pandas", "numpy", "pyarrow", "polars", "_polars_runtime_32",
 ):
     datas += collect_data_files(pkg, include_py_files=False)
     binaries += collect_dynamic_libs(pkg)
@@ -77,7 +76,7 @@ a = Analysis(
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
-    excludes=["tkinter", "pytest", "pyarrow", "polars", "_polars_runtime_32"],
+    excludes=["tkinter", "pytest"],
 )
 pyz = PYZ(a.pure)
 

@@ -196,7 +196,12 @@ class UploaderApi:
                 (Path(self._temp.name) / key).write_bytes(data)
                 self._jobs[key].update(state="done", size=len(data), progress=1)
             log.info("demo=%s export complete bytes=%d", key, len(data))
-        except Exception as exc:
+        except BaseException as exc:
+            # Rust parser panics inherit BaseException; retain cancellation semantics.
+            if not isinstance(exc, Exception) and not (
+                type(exc).__module__ == "pyo3_runtime" and type(exc).__name__ == "PanicException"
+            ):
+                raise
             self._jobs[key].update(state="error", error=f"PARSE_FAILED：{exc}")
             log.exception("demo=%s export failed", key)
 

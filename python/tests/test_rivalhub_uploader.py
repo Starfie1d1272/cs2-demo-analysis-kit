@@ -56,16 +56,36 @@ def test_file_hash_chunks_and_cleanup(api, tmp_path, monkeypatch):
     assert source.read_bytes() == b"raw demo"
 
 
-def test_export_failure_is_actionable_and_cleanup_safe(api, tmp_path, monkeypatch):
+@pytest.mark.parametrize("failure_type", [
+    ValueError,
+    type("PanicException", (BaseException,), {"__module__": "pyo3_runtime"}),
+])
+def test_export_failure_is_actionable_and_cleanup_safe(api, tmp_path, monkeypatch, failure_type):
     import cs2df.package
     api._files["demo"] = tmp_path / "missing.dem"
     api._jobs["demo"] = {"state": "running"}
-    monkeypatch.setattr(cs2df.package, "export_demo", Mock(side_effect=ValueError("invalid header")))
+    monkeypatch.setattr(cs2df.package, "export_demo", Mock(side_effect=failure_type("invalid header")))
     api._export("demo")
+    assert api.export_status("demo")["state"] == "error"
     assert api.export_status("demo")["error"] == "PARSE_FAILED：invalid header"
     api.cleanup("demo")
     assert list(Path(api._temp.name).iterdir()) == []
 
+
+
+@pytest.mark.parametrize("failure_type", [
+    KeyboardInterrupt, SystemExit,
+    type("PanicException", (BaseException,), {"__module__": "another_runtime"}),
+])
+def test_export_does_not_swallow_process_control_or_unrelated_base_exceptions(
+    api, tmp_path, monkeypatch, failure_type,
+):
+    import cs2df.package
+    api._files["demo"] = tmp_path / "demo.dem"
+    api._jobs["demo"] = {"state": "running"}
+    monkeypatch.setattr(cs2df.package, "export_demo", Mock(side_effect=failure_type("stop")))
+    with pytest.raises(failure_type):
+        api._export("demo")
 
 def test_bridge_rejects_paths_and_cross_origin_browser(api):
     api.configure("https://example.com")
