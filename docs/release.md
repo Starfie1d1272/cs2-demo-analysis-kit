@@ -67,7 +67,7 @@ Changesets 管理的公共包；Changesets 显式关闭 private package versioni
    DAK Studio 的 `dak-studio-X.Y.Z.dmg`、`DAK-Studio-Setup-X.Y.Z.exe`、
    `dak-studio-windows-X.Y.Z-full.zip`、`dak-studio-windows-X.Y.Z.zip`，以及
    RivalHub Demo Uploader 的 `rivalhub-demo-uploader-X.Y.Z.dmg` /
-   `rivalhub-demo-uploader-windows-X.Y.Z.zip`。纯导出器 cs2dak 不进 Release。
+   `RivalHub-Demo-Uploader-Setup-X.Y.Z.exe` 与 `rivalhub-demo-uploader-windows-X.Y.Z.zip`。纯导出器 cs2dak 不进 Release。
 
    若已发布 tag 的 Release workflow 因流水线故障失败，先通过普通 PR 修复 workflow，
    再从 `main` 手动 dispatch **Release** 并输入该既有 `vX.Y.Z` tag 安全重试；工作流会显式
@@ -110,8 +110,8 @@ open "python/dist/DAK Studio.app"
 ```
 
 RivalHub Demo Uploader 与 Studio 一起构建并附在 GitHub Release，同时镜像到 R2。它不进入
-Studio 的自动更新包：macOS 使用 `rivalhub-demo-uploader-X.Y.Z.dmg`，Windows 使用
-`rivalhub-demo-uploader-windows-X.Y.Z.zip`。公开下载入口读取
+Studio 的自动更新包：macOS 使用 `rivalhub-demo-uploader-X.Y.Z.dmg`，Windows 推荐 `RivalHub-Demo-Uploader-Setup-X.Y.Z.exe`，完整 ZIP
+`rivalhub-demo-uploader-windows-X.Y.Z.zip` 保留兜底。公开下载入口读取
 `https://dakupdate.starfie1d.top/releases/uploader/latest.json`，manifest 提供当前版本、
 size、SHA-256 以及 R2 → GitHub Release → ghproxy 下载顺序；版本化快照保存在
 `releases/vX.Y.Z/uploader-manifest.json`。独立本地打包命令为 `bash scripts/package-uploader.sh`。
@@ -219,3 +219,8 @@ commit 的 tag 会直接使工作流失败，不会删除、回滚、移动 tag 
 历史遗留：`v0.2.0`、`v0.2.1`、`v1.0.0` 是 2026-06 之前废弃的版本流残留，
 应删除（`git push origin :refs/tags/<tag>` + 删除对应 GitHub Release），
 桌面流从 `v0.1.0` 重新起算。
+
+
+Windows Uploader 推荐入口为 `RivalHub-Demo-Uploader-Setup-X.Y.Z.exe`（完整离线应用），
+原完整 ZIP 保留兜底；manifest 的 `assets.windowsInstaller` 是推荐安装器字段，
+`assets.windows` 保持旧 ZIP 合同。详情与独立 Windows 验收见 [安装与诊断](uploader-windows.md)。

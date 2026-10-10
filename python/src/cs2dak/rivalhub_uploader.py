@@ -5,9 +5,7 @@ import base64
 import hashlib
 import json
 import logging
-from logging.handlers import RotatingFileHandler
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import sys
@@ -18,8 +16,13 @@ import urllib.parse
 import urllib.request
 import uuid
 import webbrowser
+from pathlib import Path
 
-from cs2dak.credentials import _windows_credential_delete, _windows_credential_get, _windows_credential_set
+from cs2dak.credentials import (
+    _windows_credential_delete,
+    _windows_credential_get,
+    _windows_credential_set,
+)
 
 SERVICE = "com.starfie1d.rivalhub-demo-uploader"
 PREFIX = "/api/integrations/dak"
@@ -251,30 +254,58 @@ class UploaderApi:
 
 
 def main():
-    import webview
-    from importlib.metadata import version
+    from cs2dak.uploader_startup import (
+        load_windows_runtime,
+        log_environment,
+        log_failure,
+        prerequisite_error,
+        setup_logging,
+        show_failure,
+        windows_runtimes,
+    )
 
     base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "Library" / "Application Support"))
     userdata = base / "RivalHub Demo Uploader"
-    userdata.mkdir(parents=True, exist_ok=True)
-    handler = RotatingFileHandler(userdata / "uploader.log", maxBytes=1024 * 1024,
-                                 backupCount=2, encoding="utf-8")
-    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
-    log.addHandler(handler)
-    log.setLevel(logging.INFO)
-    log.info("start version=%s platform=%s", version("cs2dak"), sys.platform)
-    api = UploaderApi(userdata)
-    web = (Path(sys._MEIPASS) if getattr(sys, "frozen", False) else Path(__file__).parent)
-    page = web / "rivalhub_uploader_web" / "index.html"
-    if not page.is_file():
-        raise RuntimeError("请先运行 pnpm build:uploader 并复制前端产物，或运行 scripts/package-uploader.sh")
-    api._window = webview.create_window("RivalHub Demo Uploader", str(page), js_api=api,
-                                       width=1080, height=800, min_size=(820, 640))
+    logfile = setup_logging(userdata, log)
+    api = None
+    previous_thread_hook = threading.excepthook
+
+    def thread_failure(args):
+        log_failure(log, args.exc_value)
+        previous_thread_hook(args)
+
+    threading.excepthook = thread_failure
     try:
-        webview.start(private_mode=True)
+        log_environment(log)
+        if sys.platform == "win32":
+            runtimes = windows_runtimes()
+            log.info("windows runtimes=%s", runtimes)
+            problem = prerequisite_error(runtimes)
+            if problem:
+                raise RuntimeError(problem)
+            load_windows_runtime()
+        # Import only after persistent diagnostics and Windows preflight are available.
+        import webview
+
+        api = UploaderApi(userdata)
+        web = (Path(sys._MEIPASS) if getattr(sys, "frozen", False) else Path(__file__).parent)
+        page = web / "rivalhub_uploader_web" / "index.html"
+        if not page.is_file():
+            raise RuntimeError("前端文件缺失，请重运行官方安装器；开发环境先运行 scripts/package-uploader.sh")
+        api._window = webview.create_window("RivalHub Demo Uploader", str(page), js_api=api,
+                                           width=1080, height=800, min_size=(820, 640))
+        api._window.events.loaded += lambda: log.info("webview loaded")
+        webview.start(private_mode=True, **({"gui": "edgechromium"} if sys.platform == "win32" else {}))
+    except Exception as exc:
+        log_failure(log, exc)
+        detail = str(exc) if sys.platform == "win32" and isinstance(exc, RuntimeError) else ""
+        show_failure(logfile, detail)
+        raise SystemExit(1) from exc
     finally:
-        api.close()
-        log.info("closed; temporary exports removed")
+        threading.excepthook = previous_thread_hook
+        if api is not None:
+            api.close()
+            log.info("closed; temporary exports removed")
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ shutil.copytree(source, target)
 PY
 VERSION="$(node -p "require('./package.json').version")"
 cd python
-uv sync --extra gui --extra build
+uv sync --frozen --extra gui --extra build
 uv run pyinstaller packaging/rivalhub-uploader.spec --noconfirm --clean --distpath dist
 if [[ "$OSTYPE" == darwin* ]]; then
   STAGE="$(mktemp -d -t rivalhub-uploader-dmg)"
@@ -22,8 +22,12 @@ if [[ "$OSTYPE" == darwin* ]]; then
   cp -R "dist/RivalHub Demo Uploader.app" "$STAGE/"
   ln -s /Applications "$STAGE/Applications"
   hdiutil create -volname "RivalHub Demo Uploader" -srcfolder "$STAGE" -ov -format UDZO "dist/rivalhub-demo-uploader-${VERSION}.dmg"
-else
+elif [[ "$OSTYPE" == msys* || "$OSTYPE" == cygwin* ]]; then
+  powershell.exe -NoProfile -File ../scripts/build-uploader-installer.ps1 -Version "$VERSION"
   (cd dist && 7z a -mx=9 "rivalhub-demo-uploader-windows-${VERSION}.zip" rivalhub-demo-uploader)
+else
+  echo "Uploader distribution requires Windows or macOS" >&2
+  exit 1
 fi
 uv run python - <<'PY'
 from pathlib import Path
