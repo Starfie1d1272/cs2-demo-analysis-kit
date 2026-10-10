@@ -42,6 +42,7 @@ public static class UploaderMessages {
     }, IntPtr.Zero);
     return windows.ToArray();
   }
+  public static bool Cancel(IntPtr h) { return PostMessage(h, 0x111, new UIntPtr(2), IntPtr.Zero); }
   public static bool Responsive(IntPtr h) {
     UIntPtr result;
     return h != IntPtr.Zero && SendMessageTimeout(h, 0, UIntPtr.Zero, IntPtr.Zero, 2, 1500, out result) != IntPtr.Zero;
@@ -94,7 +95,7 @@ for ($launch = 1; $launch -le 2; $launch++) {
         if ($handle -eq [IntPtr]::Zero) { throw 'Native save dialog did not open' }
         $entry.saveDialog = $true
         if (![UploaderMessages]::Responsive($handle)) { throw 'Native save dialog is unresponsive' }
-        $null = [UploaderMessages]::PostMessage($handle, 0x111, [UIntPtr]2, [IntPtr]::Zero) # WM_COMMAND IDCANCEL
+        $null = [UploaderMessages]::Cancel($handle) # WM_COMMAND IDCANCEL
         for ($attempt = 0; $attempt -lt 20; $attempt++) {
             Start-Sleep -Milliseconds 250
             $handle = [UploaderMessages]::Dialog($process.Id)
