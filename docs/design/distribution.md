@@ -150,3 +150,8 @@ Uploader 与 DAK Studio 共用桌面版本 tag，但作为独立安装产物发�
 R2 同时保存版本化快照 `releases/<tag>/uploader-manifest.json` 和稳定入口
 `releases/uploader/latest.json`。官网或其它公开入口应消费稳定 manifest，而不是硬编码
 某个版本文件名；历史版本与权威归档仍由 GitHub Release 保留。
+
+
+Windows Uploader 推荐入口为 `RivalHub-Demo-Uploader-Setup-X.Y.Z.exe`（完整离线应用），
+原完整 ZIP 保留兜底；manifest 的 `assets.windowsInstaller` 是推荐安装器字段，
+`assets.windows` 保持旧 ZIP 合同。详情与独立 Windows 验收见 [安装与诊断](../uploader-windows.md)。

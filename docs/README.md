@@ -36,3 +36,5 @@
 
 - [产品集成](integration.md)：RivalHub 分阶段数据接缝、CS2 Insight Agent 消费链路。
 - [发布流程](release.md)：桌面（git tag）与 npm（changesets）双版本流。
+
+- [Windows Uploader 安装与诊断](uploader-windows.md)：标准安装器、依赖和实机验收。

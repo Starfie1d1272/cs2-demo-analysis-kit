@@ -128,3 +128,65 @@ def test_replacing_connection_clears_old_credential(api, monkeypatch):
     assert deleted == ["https://old.example"]
     assert vault == {"https://new.example": "new-token"}
     assert api.connection()["baseUrl"] == "https://new.example"
+
+
+def test_bootstrap_persists_clr_import_failure_and_inner_cause(tmp_path, monkeypatch):
+    import builtins
+    import logging
+    import sys
+    from cs2dak import uploader_startup as startup
+
+    class ManagedError(Exception):
+        InnerException = ValueError("managed inner reason")
+
+    original_import = builtins.__import__
+
+    def fail_webview(name, *args, **kwargs):
+        if name == "webview":
+            try:
+                raise ManagedError("Loader.Initialize unavailable")
+            except ManagedError as cause:
+                raise RuntimeError("CLR failed") from cause
+        return original_import(name, *args, **kwargs)
+
+    logger = logging.Logger("isolated-uploader")
+    monkeypatch.setattr(uploader, "log", logger)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "中文 空格"))
+    monkeypatch.setattr(builtins, "__import__", fail_webview)
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(startup, "windows_runtimes", lambda: {
+        "netfx_release": 528040, "webview2_user": "130.0.1.2"})
+    monkeypatch.setattr(startup, "load_windows_runtime", lambda: None)
+    shown = Mock()
+    monkeypatch.setattr(startup, "show_failure", shown)
+    try:
+        with pytest.raises(SystemExit) as exit_info:
+            uploader.main()
+        assert exit_info.value.code == 1
+        evidence = shown.call_args.args[0].read_text(encoding="utf-8")
+        assert "Loader.Initialize unavailable" in evidence
+        assert "managed inner reason" in evidence
+        assert "CLR failed" in evidence
+        assert "package pythonnet=" in evidence
+        assert "executable=" in evidence
+        assert "windows runtimes=" in evidence
+    finally:
+        for handler in logger.handlers:
+            logging.getLogger("pywebview").removeHandler(handler)
+            handler.close()
+
+
+@pytest.mark.parametrize("runtimes, expected", [
+    ({"netfx_release": 461808, "webview2_user": "130.0.1.2"}, ""),
+    ({"netfx_release": 528040, "webview2_machine": "130.0.1.2"}, ""),
+    ({"netfx_release": 461308, "webview2_machine": "130.0.1.2"}, ".NET Framework"),
+    ({"netfx_release": 528040, "webview2_user": "0.0.0.0"}, "WebView2"),
+])
+def test_windows_prerequisite_guidance(runtimes, expected):
+    from cs2dak.uploader_startup import prerequisite_error
+    message = prerequisite_error(runtimes)
+    if expected:
+        assert expected in message
+        assert "https://" in message
+    else:
+        assert message == ""

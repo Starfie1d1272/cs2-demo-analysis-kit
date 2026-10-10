@@ -68,7 +68,8 @@ for pkg in (
     hiddenimports += collect_submodules(pkg, filter=keep_runtime_module)
 
 # Runtime version for diagnostic logs.
-datas += copy_metadata("cs2dak")
+for package in ("cs2dak", "pywebview") + (("pythonnet", "clr-loader") if IS_WIN else ()):
+    datas += copy_metadata(package)
 
 a = Analysis(
     [str(SRC / "cs2dak" / "rivalhub_uploader.py")],

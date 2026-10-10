@@ -27,6 +27,8 @@ jobs:
 
       - run: pnpm check:release-policy
 
+      - run: node --test scripts/uploader-release-contract.test.mjs
+
       - run: pnpm typecheck
 
       - run: pnpm test:fast
