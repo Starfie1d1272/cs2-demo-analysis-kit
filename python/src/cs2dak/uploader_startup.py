@@ -83,18 +83,30 @@ def log_environment(logger: logging.Logger):
             value = version(package)
         except PackageNotFoundError:
             value = "metadata unavailable"
+        except OSError:
+            logger.warning("package metadata probe failed: %s", package, exc_info=True)
+            value = "metadata unavailable"
         logger.info("package %s=%s", package, value)
     root = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))
     logger.info("runtime root=%s PYTHONNET_RUNTIME=%s", root, os.environ.get("PYTHONNET_RUNTIME"))
     if getattr(sys, "frozen", False):
         for name in ("python312.dll", "Python.Runtime.dll", "ClrLoader.dll", "netstandard.dll"):
-            files = list(root.rglob(name))
+            try:
+                files = list(root.rglob(name))
+            except OSError:
+                logger.warning("bundled DLL search failed: %s", name, exc_info=True)
+                continue
             if not files:
                 logger.warning("bundled DLL missing: %s", name)
             for path in files:
-                with path.open("rb") as stream:
-                    digest = hashlib.file_digest(stream, "sha256").hexdigest()
-                logger.info("bundled DLL path=%s bytes=%d sha256=%s", path, path.stat().st_size, digest)
+                try:
+                    with path.open("rb") as stream:
+                        digest = hashlib.file_digest(stream, "sha256").hexdigest()
+                    size = path.stat().st_size
+                except OSError:
+                    logger.warning("bundled DLL probe failed: %s", path, exc_info=True)
+                    continue
+                logger.info("bundled DLL path=%s bytes=%d sha256=%s", path, size, digest)
 
 
 def log_failure(logger: logging.Logger, exc: BaseException):
