@@ -55,3 +55,16 @@ describe("RivalHub batch current item", () => {
     expect(html).not.toContain("当前文件完成后停止");
   });
 });
+
+it("shows unconfirmed receipts separately from failures and business success", () => {
+  const session: RivalHubBatchSession = {
+    id: "confirmation", status: "completed", currentIndex: 0, awaitingTargetItemId: null, total: 1,
+    items: [{ id: "one", fileName: "one.zip", phase: "unconfirmed", message: "待确认", detail: "请刷新赛事确认；请勿重复提交" }],
+    counts: { synced: 0, needsAttention: 0, alreadySynced: 0, needsTarget: 0, skipped: 0, failed: 0, reusedLocal: 0, unconfirmed: 1 },
+  };
+  const html = renderToStaticMarkup(createElement(RivalHubBatchImportPanel, { session }));
+  expect(html).toContain("待确认");
+  expect(html).toContain("请刷新赛事确认");
+  expect(html).toContain("1/1 文件");
+  expect(html).not.toContain("仅重试本地关联");
+});

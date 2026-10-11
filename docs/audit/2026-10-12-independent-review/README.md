@@ -73,7 +73,7 @@
 
 ## 两项修复交付
 
-独立分支 `fix/independent-audit-receipts-secrets`：Studio在终态/link前核对map ID和raw SHA，错receipt失败但下一队列项继续；运行脱敏补credential/passwd/Basic及多词密码，Python handler+export再次保护；JSON parser仅提取语法类别和终端数字位置。无新增UI/API、无Evidence payload/hash改动。
+独立分支 `fix/independent-audit-receipts-secrets`：Studio在终态/link前核对map ID和raw SHA，错receipt保留待确认，下一队列项继续；运行脱敏补credential/passwd/Basic及多词密码，Python handler+export再次保护；JSON parser仅提取语法类别和终端数字位置。沿用现有批处理面板与刷新按钮，仅补待确认状态和授权仍在时的刷新重试入口；无新增API、无Evidence payload/hash改动。
 
 新定向67 TS、64 Python、typecheck、ruff、diff-check通过；原五条反证改后5/5通过（adversarial-after.log），Python三输入均全值脱敏。两次实现迭代失败日志也保留在本地支持目录：首次成功fixture固定receipt target、加严脱敏导致JSON位置信息丢失、TS常量类型/ruff问题，修正后才得到上述结果。自身修复未宣称独立审查通过，Ready PR交父会话独立协调；未经该审核不merge。
 
@@ -82,3 +82,20 @@
 补核全部OPEN PR：#6 最后更新时间为2026-07-31，旧capability reconciliation仍由#3；#77创建10-10、更新10-11，因此本次也纳入。#77 head=`618a21380bc5b78fe0bf00ee495805353b1bc9c7`，单提交，仅改infra/event-upload-worker/package.json和package-lock.json；wrangler4.147→4.149、sharp0.35.4→0.35.5以及workerd/esbuild/libvips/miniflare对应传递更新，没有Worker业务源码delta，所有resolved来源registry.npmjs.org。独立临时worktree执行npm ci --ignore-scripts、tsc --noEmit、wrangler deploy **--dry-run**（移除Cloudflare凭据、禁metrics）成功，输出明确dry-run退出；没有发布或接触实际R2。当前root CI不直接覆盖infra该npm子工程，因此不以root绿灯替代该验证。保持原PR开放交父协调，不纳入0.8.5已交付能力。
 
 push时GitHub通知default branch存在一个High Dependabot告警#38，但GET安全告警API返回integration 403。无法读取包/版本/漏洞和可达性，不能断言它就是#77或已修复。父协调如有安全权限应继续核对；本次不附凭据、不尝试绕过授权。此为访问边界，不是auto-review拒绝。
+
+
+## PR #95 独立复审返修
+
+父会话独立复审否定了第一次修复的两个组合边界，已保留其反证并返修，不能以第一次定向绿灯视为验收通过：
+
+- **Python P1**：合成 `password="https://a\";synthetic-private" reason=连接失败` 经真实 SafeFormatter→FileHandler→export_logs，在旧 head `4bc97bc` 仍残留合成私密值。凭据完整值现在先于 URL 变换解析，`[redacted]` 分支防止导出二次处理吞原因；`review-combination-before-after.log` 显示旧版泄漏、新版未泄漏且保留安全原因。并非真实用户凭据。
+- **TS P2**：第一次修复的第二轮 unquoted 规则重匹配 placeholder，吞掉 quoted 密码后的安全中英文原因。现在同一次替换按 quoted值/placeholder/unquoted值分支处理；`review-ts-combination-before-after.log` 显示原因恢复且重复处理幂等。对没有引号的凭据仍保守抹除整个不明确的值段，后接路径标记也可能被省去；tri 回归核验 TLS 原因存在且路径/秘密均不存在，不能要求保留这个无位置内容的标记来降低脱敏。
+- **回执恢复**：错 map/hash 回执保留 `unconfirmed` 和本次 season/match、目标 map、raw SHA、local entry/series、幂等键。新 GET 的 season/match/map/hash 均匹配且状态为 synced/needs_attention 才确认并关联；wrong identity、processing/缺 map 均保持待确认。GET 失败不抹待确认项；恢复过程没有第二次 POST。测试也覆盖确认后 local link失败、仅修复link以及重复刷新不重复link。
+- **真实 owner 边界**：本地 `event:rivalhub:<season>:series:<match>` 和远端 season/match ID 不相同，确认使用远端字段、关联使用本地字段；新增 namespaced 回归，避免简化 mock 掩盖。刷新失败状态保留授权记录时，既有 EventsView 现在保留“刷新赛事”重试入口，避免再次连接才可恢复。
+- **UI 证据**：`studio-synthetic-unconfirmed-refresh.png` 是真实 React 组件+CSS在 Chromium 中的合成状态，已人工检查；点击既有“刷新赛事”按钮执行真实组件回调一次。此截图只证明显示和按钮可达，不证明 App 异步恢复、native bridge、Windows包或线上服务器的整链实效。App 的 refresh/批处理状态接线另由源码和服务逻辑回归审查。
+
+**保留边界**：待确认事务只保留当前批次会话；关闭结果/退出应用后没有持久化恢复账本。现有唯一 raw SHA 的赛事刷新 owner 仍可修复部分本地关联，但不能据此宣称原 #49 的54/59已达到59/59。没有操作用户 Windows、生产库、发布、回填或上传原始内存 dump/凭据。#48/#47 的额外修复交父会话其他独立工作线，不在本次返修添加功能。
+
+返修新增代码继续等待父会话独立复审；自身测试与源码核对不称为独立审核通过。
+
+最终本地检查：130 files / **844 fast TS**、**8真实ZIP integration**、**146 Python**、sample analyze、全工作区typecheck、Studio build、ruff与diff-check通过；build保留既有chunk-size warning。完整fast首次返修运行发现tri路径占位符预期差异，记录在本地 `review-followup-all-ts.log`；上述脱敏安全取舍明确后再运行才得到最终844通过。

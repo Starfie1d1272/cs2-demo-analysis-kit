@@ -41,20 +41,21 @@ def sanitize_text(value, limit: int = 2000) -> str:
     except Exception:  # noqa: BLE001 - diagnostics must survive broken exception __str__.
         text = "[unprintable]"
     # Redact before truncation so a cut credential cannot escape a matching rule.
-    text = re.sub(r"(?i)\b(?:https?|file)://[^\s<>\"']+", "[url]", text)
-    text = re.sub(r"(?i)\b(Bearer|Basic)\s+[^\s,;\"']+", r"\1 [redacted]", text)
     secret_key = (r"authorization|(?:access|refresh|device|poll|session|auth|id)[_-]?token|"
                   r"token|password|passwd|credential|secret|pairing[_-]?code|device[_-]?code|client[_-]?secret|api[_-]?key")
     # JSON quoted strings can contain escaped quotes; consume the complete value.
     quoted_value = r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\''
     text = re.sub(
-        rf"(?i)([\"']?(?:{secret_key})[\"']?\s*[:=]\s*)(?:{quoted_value}|[^\r\n,;}}]+)",
+        rf"(?i)([\"']?(?:{secret_key})[\"']?\s*[:=]\s*)(?:{quoted_value}|\[redacted\]|[^\r\n,;}}]+)",
         r"\1[redacted]", text,
     )
     text = re.sub(
         rf"(?i)([\"']?(?:set-cookie|cookie)[\"']?\s*[:=]\s*)(?:{quoted_value}|[^\r\n]+)",
         r"\1[redacted]", text,
     )
+    # Parse complete credential values before URL rules can alter escaped quotes.
+    text = re.sub(r"(?i)\b(?:https?|file)://[^\s<>\"']+", "[url]", text)
+    text = re.sub(r"(?i)\b(Bearer|Basic)\s+[^\s,;\"']+", r"\1 [redacted]", text)
     text = re.sub(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b", "[redacted]", text)
     text = re.sub(r"(?i)(?:[a-z]:[\\/]|\\\\)[^\r\n\"'<>]+", "[path]", text)
     text = re.sub(r"(?<![\w:])/(?:[^/\r\n\"'<>]+/)+[^\r\n\"'<>:,]+", "[path]", text)

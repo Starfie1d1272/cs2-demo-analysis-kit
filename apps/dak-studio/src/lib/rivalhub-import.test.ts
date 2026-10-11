@@ -2,8 +2,8 @@ import "fake-indexeddb/auto";
 import { describe, expect, it, vi } from "vitest";
 import type { DemoPackage } from "@cs2dak/contract";
 import type { StudioDemoEntry } from "./library";
-import type { RivalHubRemoteMap, RivalHubRemoteTeam } from "./rivalhub-contract";
-import { retryRivalHubLocalLink, rivalHubBatchCompletionMessage, runRivalHubBatch, type RivalHubBatchCallbacks, type RivalHubMatchCandidate } from "./rivalhub-import";
+import type { RivalHubEventsResponse, RivalHubRemoteMap, RivalHubRemoteTeam } from "./rivalhub-contract";
+import { confirmRivalHubBatchReceipts, retryRivalHubLocalLink, rivalHubBatchCompletionMessage, runRivalHubBatch, type RivalHubBatchCallbacks, type RivalHubMatchCandidate } from "./rivalhub-import";
 import { fileFromNativePath, nativePathForFile } from "./dem";
 
 const demoSha256 = "a".repeat(64);
@@ -125,7 +125,7 @@ describe("RivalHub serial batch import", () => {
       issues: [],
     })) });
     const session = await runWith([new File(["zip"], "wrong.zip"), new File(["zip"], "next.zip")], dependencies);
-    expect(session.items[0]).toMatchObject({ phase: "failed", detail: expect.stringContaining("RESPONSE_MISMATCH") });
+    expect(session.items[0]).toMatchObject({ phase: "unconfirmed", detail: expect.stringContaining("RESPONSE_MISMATCH") });
     expect(session.items[0]?.localLink).toBeUndefined();
     expect(session.items[1]?.phase).toBe("synced");
     expect(dependencies.linkMap).toHaveBeenCalledExactlyOnceWith("series-target", "target", "entry:next.zip");
@@ -520,4 +520,73 @@ describe("RivalHub serial batch import", () => {
     } finally { vi.unstubAllGlobals(); }
   });
 
+});
+
+function confirmationResponse(map: RivalHubRemoteMap, eventId = "event-1", seriesId = "match"): RivalHubEventsResponse {
+  return { contractVersion: "rivalhub-dak-events/1", generatedAt: "2026-10-12T00:00:00.000Z",
+    events: [{ id: eventId, seasonId: eventId === "event-1" ? "season" : eventId, series: [{ id: seriesId, maps: [map] }] }],
+  } as RivalHubEventsResponse;
+}
+describe("mismatched receipt confirmation", () => {
+  it.each(["synced", "needs_attention"] as const)("keeps the known transaction across failed refresh and confirms %s without a second POST", async status => {
+    const dependencies = baseDependencies({ submit: vi.fn(async () => ({ status: "synced" as const, importId: null, matchMapId: "wrong", demoSha256, issues: [] })) });
+    const session = await runWith([new File(["zip"], "pending.zip")], dependencies);
+    const transaction = { eventId: "event-1", seasonId: "season", matchId: "match", seriesId: "series-target", matchMapId: "target", entryId: "entry:pending.zip", demoSha256, idempotencyKey: "dak:test:key" };
+    expect(session.items[0]?.pendingReceipt).toEqual(transaction);
+    expect(session.counts).toMatchObject({ synced: 0, failed: 0, unconfirmed: 1 });
+    // A failed GET supplies no fresh response and must leave this session intact.
+    const fetchEvents = vi.fn().mockRejectedValueOnce(new Error("connection refused"))
+      .mockResolvedValueOnce(confirmationResponse(remoteMap("target", { demoStatus: status, demoSha256 })));
+    await expect(fetchEvents()).rejects.toThrow("connection refused");
+    expect(session.items[0]?.pendingReceipt).toEqual(transaction);
+    expect(rivalHubBatchCompletionMessage(session, false)).toContain("待确认 1");
+    const confirmed = await confirmRivalHubBatchReceipts(session, await fetchEvents(), dependencies.linkMap);
+    expect(confirmed.items[0]).toMatchObject({ phase: status, pendingReceipt: undefined });
+    expect(confirmed.counts.unconfirmed).toBe(0);
+    expect(dependencies.linkMap).toHaveBeenCalledExactlyOnceWith("series-target", "target", "entry:pending.zip");
+    await confirmRivalHubBatchReceipts(confirmed, await fetchEvents(), dependencies.linkMap);
+    expect(dependencies.linkMap).toHaveBeenCalledTimes(1);
+    expect(dependencies.submit).toHaveBeenCalledTimes(1);
+  });
+  it("does not infer receipt success from a wrong event, series, map, hash or processing state", async () => {
+    const dependencies = baseDependencies({ submit: vi.fn(async () => ({ status: "synced" as const, importId: null, matchMapId: "wrong", demoSha256, issues: [] })) });
+    const session = await runWith([new File(["zip"], "pending.zip")], dependencies);
+    for (const response of [
+      confirmationResponse(remoteMap("target", { demoStatus: "synced", demoSha256 }), "wrong"),
+      confirmationResponse(remoteMap("target", { demoStatus: "synced", demoSha256 }), "event-1", "wrong"),
+      confirmationResponse(remoteMap("wrong", { demoStatus: "synced", demoSha256 })),
+      confirmationResponse(remoteMap("target", { demoStatus: "synced", demoSha256: "b".repeat(64) })),
+      confirmationResponse(remoteMap("target", { demoStatus: "demo_processing", demoSha256 })),
+    ]) {
+      expect((await confirmRivalHubBatchReceipts(session, response, dependencies.linkMap)).items[0]).toEqual(session.items[0]);
+    }
+    expect(dependencies.linkMap).not.toHaveBeenCalled();
+    expect(dependencies.submit).toHaveBeenCalledTimes(1);
+  });
+  it("retains confirmed remote status if local linking fails and repairs only that link", async () => {
+    const dependencies = baseDependencies({ submit: vi.fn(async () => ({ status: "synced" as const, importId: null, matchMapId: "wrong", demoSha256, issues: [] })) });
+    const session = await runWith([new File(["zip"], "pending.zip")], dependencies);
+    const failingLink = vi.fn(async () => { throw new Error("database locked"); });
+    const confirmed = await confirmRivalHubBatchReceipts(session, confirmationResponse(remoteMap("target", { demoStatus: "synced", demoSha256 })), failingLink);
+    expect(confirmed.items[0]).toMatchObject({ phase: "synced", pendingReceipt: undefined, localLink: { error: { message: "database locked" } } });
+    const repaired = await retryRivalHubLocalLink(confirmed.items[0]!, dependencies.linkMap);
+    expect(repaired.localLink).toBeUndefined();
+    expect(dependencies.submit).toHaveBeenCalledTimes(1);
+  });
+});
+
+it("confirms against remote season/match identity while linking the namespaced local series", async () => {
+  const selected = candidate("target");
+  selected.series.id = "event:rivalhub:season:series:match";
+  const dependencies = baseDependencies({
+    matchMap: vi.fn(() => ({ status: "matched" as const, candidate: selected, mode: "review_fallback" as const })),
+    submit: vi.fn(async () => ({ status: "synced" as const, importId: null, matchMapId: "wrong", demoSha256, issues: [] })),
+  });
+  const session = await runRivalHubBatch([new File(["zip"], "namespaced.zip")], {
+    scope: "event", eventId: "event:rivalhub:season", candidates: [selected],
+  }, { exportDem: vi.fn(), dependencies });
+  const confirmed = await confirmRivalHubBatchReceipts(session, confirmationResponse(remoteMap("target", { demoSha256, demoStatus: "synced" })), dependencies.linkMap);
+  expect(confirmed.items[0]?.phase).toBe("synced");
+  expect(dependencies.linkMap).toHaveBeenCalledExactlyOnceWith("event:rivalhub:season:series:match", "target", "entry:namespaced.zip");
+  expect(dependencies.submit).toHaveBeenCalledTimes(1);
 });

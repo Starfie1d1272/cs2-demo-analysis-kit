@@ -186,7 +186,9 @@ def test_runtime_credentials_are_redacted_through_log_and_export(tmp_path):
     handler.setFormatter(SafeFormatter("%(message)s"))
     logger.addHandler(handler)
     try:
-        for message in ("credential=synthetic-private", "passwd=synthetic-private", "password=two synthetic words", "password='two; synthetic words'"):
+        for message in ("credential=synthetic-private", "passwd=synthetic-private", "password=two synthetic words", "password='two; synthetic words'",
+                        r'password="https://a\";synthetic-private" reason=连接失败',
+                        'password="secret words" reason=connection refused'):
             logger.error(message)
         assert export_logs(logger, tmp_path / "shared.log")
         for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
@@ -194,6 +196,9 @@ def test_runtime_credentials_are_redacted_through_log_and_export(tmp_path):
             assert "synthetic-private" not in content
             assert "synthetic words" not in content
             assert "redacted" in content
+            assert "reason=连接失败" in content
+            assert "reason=connection refused" in content
+            assert "secret words" not in content
     finally:
         logger.removeHandler(handler)
         handler.close()

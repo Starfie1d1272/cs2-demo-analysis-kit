@@ -70,3 +70,14 @@ describe("runtime diagnostic credential fragments", () => {
     expect(normalizeDiagnostic(diagnostic)).toEqual(diagnostic);
   });
 });
+
+  it.each([
+    'password="secret words" reason=connection refused',
+    String.raw`password="https://a\";synthetic-private" reason=连接失败`,
+    "credential='secret words' reason=TLS handshake failed",
+  ])("preserves safe causes through repeated redaction: %s", message => {
+    const safe = normalizeDiagnostic(new Error(message));
+    expect(safe.message).not.toMatch(/secret words|synthetic-private/);
+    expect(safe.message).toContain(message.slice(message.indexOf("reason=")));
+    expect(normalizeDiagnostic(safe)).toEqual(safe);
+  });

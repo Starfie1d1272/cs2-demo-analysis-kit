@@ -74,7 +74,7 @@ export function RivalHubBatchImportPanel({
 }) {
   const current = useMemo(() => currentRivalHubBatchItem(session), [session]);
   if (!session) return null;
-  const finished = session.total === 0 ? 0 : session.items.filter((item) => ["synced", "needs_attention", "already_synced", "skipped", "failed"].includes(item.phase)).length;
+  const finished = session.total === 0 ? 0 : session.items.filter((item) => ["synced", "needs_attention", "already_synced", "skipped", "failed", "unconfirmed"].includes(item.phase)).length;
   const currentStatus = current ? rivalHubStatusPresentation(current.phase) : null;
   return (
     <section className="stu-card stu-rivalhub-batch-panel" aria-live="polite" aria-label="RivalHub Demo 批处理进度">
@@ -106,6 +106,7 @@ export function RivalHubBatchImportPanel({
         <span className="stu-chip">待目标 {session.counts.needsTarget}</span>
         <span className="stu-chip">已跳过 {session.counts.skipped}</span>
         <span className="stu-chip">失败 {session.counts.failed}</span>
+        {(session.counts.unconfirmed ?? 0) > 0 && <span className="stu-chip">待确认 {session.counts.unconfirmed}</span>}
         {session.counts.reusedLocal > 0 && <span className="stu-chip">复用本地 {session.counts.reusedLocal}</span>}
       </div>
       <div className="stu-rivalhub-batch-list">

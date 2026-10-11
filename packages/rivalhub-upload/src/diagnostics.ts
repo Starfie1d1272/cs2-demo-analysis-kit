@@ -3,12 +3,11 @@ export interface DiagnosticContext { stage?: string; fileId?: string; attempt?: 
 export interface SafeDiagnostic extends DiagnosticContext { code: string; message: string; cause?: string; status?: number; requestId?: string }
 export function sanitizeDiagnosticText(value: string, maxLength = 500): string {
   return value
-    .replace(/((?:"|')?(?:device[_-]?code|pairing[_-]?code|access[_-]?token|refresh[_-]?token|poll[_-]?token|token|authorization|password|passwd|credential|secret|(?:set-)?cookie|api[_-]?key)(?:"|')?\s*[:=]\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/gi, "$1[redacted]")
+    .replace(/((?:"|')?(?:device[_-]?code|pairing[_-]?code|access[_-]?token|refresh[_-]?token|poll[_-]?token|token|authorization|password|passwd|credential|secret|(?:set-)?cookie|api[_-]?key)(?:"|')?\s*[:=]\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\[redacted\]|[^\r\n,;}]+)/gi, "$1[redacted]")
     .replace(/\b(?:set-cookie|cookie|authorization)\s*[:=]\s*[^\r\n]+/gi, "[credentials redacted]")
     .replace(/https?:\/\/[^\s<>"']+/gi, "[url]")
     .replace(/file:\/\/[^\r\n<>"']+/gi, "[path]")
     .replace(/\b(Bearer|Basic)\s+[^\s,;"']+/gi, "$1 [redacted]")
-    .replace(/((?:"|')?(?:device[_-]?code|pairing[_-]?code|access[_-]?token|refresh[_-]?token|poll[_-]?token|token|authorization|password|passwd|credential|secret|cookie|api[_-]?key)(?:"|')?\s*[=:]\s*)[^\r\n,;}]+/gi, "$1[redacted]")
     .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, "[redacted]")
     .replace(/(?:[A-Za-z]:[\\/]|\\\\)[^\r\n<>"']+/g, "[path]")
     .replace(/(["'])(?:[A-Za-z]:[\\/]|\/)[^\r\n]*?\1/g, "[path]")
