@@ -1,0 +1,20 @@
+{
+  "synthetic": true,
+  "realZip": true,
+  "requests": [
+    {
+      "path": "/events?seriesDisposition=1",
+      "method": "GET"
+    },
+    {
+      "path": "/evidence",
+      "method": "POST",
+      "key": "dak:10000000-0000-4000-8000-000000000004:39a28b7dfe9d66d285eb04ebe00ec0ccc2b095e8111c5a0ea42b9b603f968648"
+    },
+    {
+      "path": "/events?seriesDisposition=1",
+      "method": "GET"
+    }
+  ],
+  "text": "R\nRivalHub\nDEMO UPLOADER\n已连接 RivalHub\n\nRIVALHUB · 比赛数据上传\n\n上传比赛 Demo\n\n选择 Demo，匹配 RivalHub 比赛并提交赛后数据。\n\n连接网站\n登录并授权\n2\n选择 Demo\n可多选文件\n3\n查看结果\n查看上传状态\n网站已连接\n\nhttp://localhost:8793\n\n打开网站\n更换连接\n选择 Demo 文件\n\n选择已录制完成的 .dem 文件。可一次选择多场，程序会逐场解析和上传。\n\n选择 Demo\n本次任务 1\n0 场已完成\nDemo / 对应比赛\t状态\t结果与操作\n合成验收场景.dem\n\nTeam Spirit vs Team Falcons · de_ancient\n\n诊断编号 audit_demo\n\t需要处理\t\n\nSYNTHETIC_REVIEW：合成场景：网站需要人工核对选手名单\n\n数据已送达。请在网站对应赛事核对选手名单、地图与比分，按提示处理；不必反复上传。\n\nCanonical A vs Canonical B · 第 1 图在 RivalHub 处理\n\n遇到问题时，按错误提示检查比赛或连接；需要协助时，截图并附上诊断编号和日志。\nDemo 只在本机解析；临时解析文件在处理结束后删除。\n\n导出诊断日志"
+}
