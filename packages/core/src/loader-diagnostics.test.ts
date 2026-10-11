@@ -25,7 +25,7 @@ describe("optional ZIP input observations", () => {
       observations.length = 0;
       zip.file("optional-shots.json", "{broken json");
       const invalid = await loadDemoPackageFromZip(new Uint8Array(), options);
-      expect(observations[0]).toMatchObject({ code: "OPTIONAL_INPUT_INVALID", stage: "package.optional.shots.parse", cause: expect.any(SyntaxError) });
+      expect(observations[0]).toMatchObject({ code: "OPTIONAL_INPUT_INVALID", stage: "package.optional.shots.parse", cause: expect.objectContaining({ name: "SyntaxError", message: expect.stringContaining("SyntaxError:") }) });
       expect(invalid).toEqual(absent);
       observations.length = 0;
       const failure = new Error("zip decompression failed");

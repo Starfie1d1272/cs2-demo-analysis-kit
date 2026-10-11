@@ -1,3 +1,4 @@
+import { jsonParseFailureCause } from "@cs2dak/core";
 import { reportDiagnostic } from "./worker-diagnostics";
 import { isValidTriBuffer, triDiagnostic } from "./tri-loading";
 import { installTriBuffer, listInstalledTris } from "./tri";
@@ -90,7 +91,7 @@ export async function loadTrisManifest(): Promise<TrisManifest | null> {
     const raw: unknown = JSON.parse(content);
     if (valid(raw)) return raw;
     report("TRI_MANIFEST_INVALID", "parse", "Optional tri manifest has an invalid structure");
-  } catch (error) { report("TRI_MANIFEST_INVALID", "parse", "Optional tri manifest contains invalid JSON", error); }
+  } catch (error) { report("TRI_MANIFEST_INVALID", "parse", "Optional tri manifest contains invalid JSON", jsonParseFailureCause(error)); }
   return null;
 }
 

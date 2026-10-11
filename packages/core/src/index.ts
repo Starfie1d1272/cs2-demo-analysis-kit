@@ -15,6 +15,7 @@ import { assertPlayerRoundPerformanceFacts } from "./performance-facts.js";
 
 export { loadDemoManifestFromZip, loadDemoPackageFromZip } from "./loader.js";
 export type { DemoManifest, DemoPackageLoadOptions, DemoPackageLoadProfile, OptionalInputDiagnostic } from "./loader.js";
+export { jsonParseFailureCause, type JsonParseFailureCause } from "./json-diagnostics.js";
 export { normalizeDemoPackage } from "./normalize.js";
 export { createPlayerResolver, createResolverFromPackage } from "./resolve.js";
 export type { PlayerResolver } from "./resolve.js";

@@ -1,4 +1,5 @@
 import JSZip from "jszip";
+import { jsonParseFailureCause } from "./json-diagnostics.js";
 import type { DemoPackage } from "@cs2dak/contract";
 import { manifestSchema } from "@cs2dak/contract";
 import { normalizeDemoPackage, parsePackageJson } from "./normalize.js";
@@ -71,7 +72,7 @@ export async function loadDemoPackageFromZip(
     try { content = await file.async("string"); }
     catch (error) { emit("OPTIONAL_INPUT_READ_FAILED", "Optional stream could not be read", "read", error); return undefined; }
     try { return parsePackageJson(content); }
-    catch (error) { emit("OPTIONAL_INPUT_INVALID", "Optional stream contains invalid JSON", "parse", error); return undefined; }
+    catch (error) { emit("OPTIONAL_INPUT_INVALID", "Optional stream contains invalid JSON", "parse", jsonParseFailureCause(error)); return undefined; }
   };
   const match = await readJson<unknown>(files.match);
   const players = await readJson<unknown>(files.players);
