@@ -33,6 +33,37 @@
 ZIP 兜底仍为 `rivalhub-demo-uploader-windows-X.Y.Z.zip`，必须完整解压，在同一目录运行 EXE，
 保留 `_internal`。安装器不能替已被单独拖出的 EXE 修复搜索路径；应使用安装后的快捷方式。
 
+## 安装日志与失败后操作
+
+安装器默认在运行安装器的用户临时目录生成一份独立日志，无需传 `/LOG`。
+点击向导左下角「本机安装日志」可查看本次实际文件名；目录/运行库预检失败提示也附相同位置。
+Windows「运行」输入 `%TEMP%` 可进入默认目录，按修改时间查找本次 `Setup Log*.txt`。
+不要将应用的 `uploader.log` 或卸载所有权文件 `unins*.dat` 当作安装日志。
+临时文件会被系统清理，失败后先保留报错全文及日志副本。
+
+日志保留 Inno 原始错误，并增加 `DAK installer stage=` 与 `exit.lastStage=` 标记，区分初始化、
+目录校验/拒绝、运行库预检、文件安装及完成。退出的最后阶段不自动代表成功、失败或取消，
+应结合原错误和退出结果判断。权限/磁盘/文件占用等原生安装错误仍由 Inno 处理；
+先按具体错误修复权限或空间、正常退出占用程序，再重试。明确缺失的运行库只从官方修复；
+不要求关闭 Defender、SmartScreen 或其它安全保护。
+
+日志仅保存在本机，安装器不会上传日志或读取网站授权/用户 Demo。Inno 原始日志可能包含用户名、
+程序来源、安装路径和命令行；它不经过应用的诊断日志 sanitizer。
+分享时保留本机原件，只发送经检查的副本：替换用户名、个人/网络路径及任何凭据、token 等敏感内容，
+保留时间、阶段、错误类别、DLL/文件名和版本。不直接公开原始日志或将整份资料目录发送出去。
+
+若向导没有启动、日志文件无法创建或临时目录不可写，可能没有日志；保留系统弹窗与安装器版本，
+先修复本机临时目录权限，不用管理员提权或放宽安全策略绕过问题。
+需要指定位置时可从终端运行（使用可写的新文件名，已有同名日志会被覆盖）：
+
+```powershell
+& ".\RivalHub-Demo-Uploader-Setup-X.Y.Z.exe" /LOG="$env:TEMP\RivalHub-setup-review.log"
+```
+
+指定日志无法创建时 Inno 会报错终止；不关闭日志以掩盖该错误。
+默认日志、显式 `/LOG` 和 `{log}` 的语义见 [Inno logging](https://jrsoftware.org/ishelp/topic_setup_setuplogging.htm)、
+[命令行参数](https://jrsoftware.org/ishelp/topic_setupcmdline.htm) 与 [实际日志常量](https://jrsoftware.org/ishelp/topic_consts.htm)。
+
 ## 启动失败与挂起
 
 启动日志为 `%LOCALAPPDATA%\RivalHub Demo Uploader\uploader.log`，滚动保留两份历史。
