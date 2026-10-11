@@ -1,6 +1,6 @@
 # #64 Phase A/B artifact audit（2026-10-11）
 
-基线：main `6beb85c876c8f3f6d18d6403ac39798a52b9fb46`。工具：Node 24.19.0 / npm 11.9.0 / pnpm 12.9.1 / TypeScript 7.0.2 / esbuild 0.28.2。
+初始验证基线：main `6beb85c876c8f3f6d18d6403ac39798a52b9fb46`；最终分支已 rebase 到 #95 已审 main `67684857814c31c2b07456d5ed34974aa983d95d`，完整保留其 diagnostics/receipt 实现。工具：Node 24.19.0 / npm 11.9.0 / pnpm 12.9.1 / TypeScript 7.0.2 / esbuild 0.28.2。
 
 ## 最终解决路径：DAK 编译精确上游依赖，七包 tgz consumer 通过
 
@@ -59,7 +59,7 @@ D 仅完成体积量化；尚无外部轻 consumer 的安装/CI/冷启动成本�
 ## 验证与未完成范围
 
 - 6 architecture tests：真实 graph；forbidden type/re-export/dynamic/require/import-type；manifest-only 反向边；DTO-only；未声明/跨包路径；生产导入测试模块拒绝。
-- 冷清理全部生成 dist/tsbuildinfo 后 build:packages → typecheck → build:uploader → Studio dependency-closure build；release-policy、837 fast、8 ZIP integration、145 Python（uv dev/gui extras）、21 release/build 脚本测试。
+- 初始基线上冷清理全部生成 dist/tsbuildinfo 后 build:packages → typecheck → build:uploader → Studio dependency-closure build；release-policy、837 fast、8 ZIP integration、145 Python（uv dev/gui extras）、21 release/build 脚本测试均通过。最终集成 #95 后的完整数量和结果以对应 PR head 的 CI logs 为准。
 - 七包真实 tgz Node/API/strict TS/完整传递依赖与 source-free runtime isolation；maps 专项资产隔离。
 - 最终 frozen install + pnpm exec 锁文件 SHA-256：`609b912213d8f06edc390c27d6bb403c49ccc502ad1cdb62870d4763fdd1fc7a`。
 
