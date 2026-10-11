@@ -103,3 +103,63 @@ def test_mirror_history_retains_safe_inner_cause():
         failure.add(1, outer)
     assert "inner refused" in failure.failures[0]["cause"]
     assert "inner refused" in str(failure) and "private" not in str(failure)
+
+
+def prepared_install(app, tmp_path, monkeypatch):
+    manifest = {"runtime": {"name": "runtime.zip", "size": 1}, "bundledEvents": [
+        {"slug": "sample", "size": 1, "sha256": "fake", "urls": ["first", "second"]}
+    ], "requiredTris": {}}
+    app._fetch_manifest = Mock(return_value=manifest)
+    monkeypatch.setattr(installer.tkinter.messagebox, "askyesno", lambda *_args: True)
+    monkeypatch.setattr(installer.tkinter.messagebox, "showerror", Mock())
+    final = tmp_path / "installed"
+
+    def extract(*_args):
+        final.mkdir()
+        (final / "dak-studio.exe").write_bytes(b"runtime")
+        return str(final)
+
+    app._extract_runtime = Mock(side_effect=extract)
+    return final
+
+
+def test_cancel_during_resource_download_reports_retained_final_files(tmp_path, monkeypatch):
+    app = shell()
+    final = prepared_install(app, tmp_path, monkeypatch)
+
+    def download(_entry, _dest, label):
+        if label == "sample":
+            app.cancelled = True
+            raise installer.InstallCancelled("canceled")
+
+    app._download_asset = Mock(side_effect=download)
+    app._install_run(str(final))
+    assert (final / "dak-studio.exe").read_bytes() == b"runtime"
+    assert not (final / "assets/install-manifest.json").exists()
+    app._update.assert_called_with("安装已中断；安装目录可能保留已写入文件，未回滚。可重新运行安装器补齐资源。", 0)
+    app._set_ui_state.assert_called_with(installing=False, done=False)
+    assert not app._install_committed
+
+
+def test_cancel_after_commit_cannot_relabel_completed_installation(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    app = shell()
+    final = prepared_install(app, tmp_path, monkeypatch)
+    app._download_asset = Mock()
+    monkeypatch.setattr(installer, "sys", SimpleNamespace(platform="win32"))
+    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
+
+    def shortcut(*_args):
+        assert app._install_committed
+        app.cancelled = True  # A previously queued cancellation completes late.
+
+    monkeypatch.setattr(installer, "create_shortcut", shortcut)
+    app._install_run(str(final))
+    assert (final / "assets/install-manifest.json").exists()
+    app._update.assert_called_with("安装完成！", 100)
+    app._set_ui_state.assert_called_with(installing=False, done=True)
+    app.cancelled = False
+    app._cancel()
+    assert not app.cancelled
+    assert "正在取消…" not in [call.args[0] for call in app.status_var.set.call_args_list]

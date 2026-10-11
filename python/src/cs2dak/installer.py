@@ -198,6 +198,8 @@ class SimpleInstaller:
             self.install_dir.set(path)
 
     def _cancel(self):
+        if getattr(self, "_install_committed", False):
+            return
         self.cancelled = True
         self.status_var.set("正在取消…")
 
@@ -223,6 +225,8 @@ class SimpleInstaller:
 
     def _install_run(self, install_dir: str):
         staging_dir = None
+        destination_started = False
+        self._install_committed = False
         try:
             # 1. Fetch manifest
             self._update("正在获取安装清单…", 5)
@@ -263,8 +267,10 @@ class SimpleInstaller:
 
             # 3. Extract runtime & resolve app root (where dak-studio.exe lives)
             self._update("解压运行时…", 50)
+            destination_started = True
             app_root = self._extract_runtime(runtime_dest, install_dir)
             self._launch_exe = os.path.join(app_root, "dak-studio.exe")
+            check_cancel(lambda: self.cancelled)
 
             # 4. Download bundled events → app_root/assets/
             userdata = os.path.join(app_root, "userdata")
@@ -278,6 +284,7 @@ class SimpleInstaller:
                 dest = os.path.join(bundled_dir, f"{evt['slug']}.zip")
                 self._download_asset(evt, dest, evt["slug"])
 
+            check_cancel(lambda: self.cancelled)
             # Write manifest.json for bundled events
             events_manifest = {
                 "version": "cs2-demo-analysis-kit/events-manifest-1.0",
@@ -301,9 +308,13 @@ class SimpleInstaller:
                 self._download_asset(entry, dest, map_name)
 
             # 6. Write install-manifest.json → app_root/assets/
+            check_cancel(lambda: self.cancelled)
             self._update("写入安装清单…", 95)
             with open(os.path.join(assets, "install-manifest.json"), "w", encoding="utf-8") as f:
                 json.dump(manifest, f, ensure_ascii=False, indent=2)
+            # Runtime and required resources are now committed in the final directory.
+            # Cancellation cannot roll this installation back or relabel it as canceled.
+            self._install_committed = True
 
             # 7. Create shortcuts (Windows only) — use resolved app_root exe
             if sys.platform == "win32" and self._launch_exe:
@@ -314,18 +325,25 @@ class SimpleInstaller:
                 create_shortcut(self._launch_exe, os.path.join(shortcut_dir, "DAK Studio.lnk"), "DAK Studio 战术分析工作台")
 
             # Done
-            check_cancel(lambda: self.cancelled)
             self._update("安装完成！", 100)
             self.root.after(0, lambda: self._set_ui_state(installing=False, done=True))
 
         except InstallCancelled:
-            self._update("已取消安装，可重新开始", 0)
+            message = ("安装已中断；安装目录可能保留已写入文件，未回滚。可重新运行安装器补齐资源。"
+                       if destination_started else "已取消安装，可重新开始")
+            self._update(message, 0)
             self.root.after(0, lambda: self._set_ui_state(installing=False, done=False))
         except Exception as exc:
             message = sanitize_text(exc, 2000)
-            self._update(f"安装失败：{message}", 0)
-            self.root.after(0, lambda: self._set_ui_state(installing=False, done=False))
-            tkinter.messagebox.showerror("安装失败", message)
+            if self._install_committed:
+                self._update(f"安装已完成；收尾失败：{message}", 100)
+                self.root.after(0, lambda: self._set_ui_state(installing=False, done=True))
+                tkinter.messagebox.showerror("安装收尾失败", message)
+            else:
+                suffix = "；安装目录可能保留已写入文件，未回滚" if destination_started else ""
+                self._update(f"安装失败：{message}{suffix}", 0)
+                self.root.after(0, lambda: self._set_ui_state(installing=False, done=False))
+                tkinter.messagebox.showerror("安装失败", message + suffix)
         finally:
             if staging_dir:
                 shutil.rmtree(staging_dir, ignore_errors=True)
