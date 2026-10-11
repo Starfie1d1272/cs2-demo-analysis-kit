@@ -233,7 +233,7 @@ Windows Uploader 推荐入口为 `RivalHub-Demo-Uploader-Setup-X.Y.Z.exe`（完�
 
 本地产物置于 `python/dist/dak-studio-X.Y.Z-build-<12-char-sha>[-dirty]/`；macOS DMG 文件名同样带该标识，内部 app/exe 名称保持原样。dirty 标记不是工作树内容哈希，同一 revision 的多次 dirty 构建会覆盖同一路径。无 Git 元数据的源码归档使用 `build-unknown`，revision/dirty 为 null，侧栏与 summary 明确显示 unknown，不声称可追溯。
 
-正式 Release CI 显式传 `PACKAGE_RELEASE_TAG=vX.Y.Z`，保留原来的版本化 DMG 与 runtime 目录；匹配 tag/manifest/HEAD 且工作树 clean 才允许进入构建。仅 skip sync 不代表正式 release。CI 获取外部 tris manifest 放在捕获源码 provenance 之后，避免将生成的发布输入误记为源码修改。npm 包继续由 Changesets 独立管理，本流程不改变公共包版本。
+正式 Release CI 显式传 `PACKAGE_RELEASE_TAG=vX.Y.Z`，保留原来的版本化 DMG 与 runtime 目录；匹配 tag/manifest/HEAD 且工作树 clean 才允许进入构建。仅 skip sync 不代表正式 release。CI 获取外部 tris manifest 放在捕获源码 provenance 之后，避免将生成的发布输入误记为源码修改。正式 Windows web patch 直接封装 `python/dist/dak-studio/_internal/studio_web` 内的已构建前端，检查同版本 clean release snapshot；不在下载资产后的新 CI step 重跑 Vite 或重新捕获 working-tree 状态。patch 与 runtime 的 build-info / frontend bytes 一致，只有 patch 额外生成的 version.json 不同。本地不传第四个 desktopWebDir 参数时仍可独立构建 patch。npm 包继续由 Changesets 独立管理，本流程不改变公共包版本。
 
 回归：`node --test scripts/build-info.test.mjs scripts/sync-version.test.mjs`。本地 Linux PyInstaller smoke 验证打包 metadata / frontend；macOS DMG 拖拽安装、Windows GUI 启动与正式发布 qualification 仍需对应平台验收。
 

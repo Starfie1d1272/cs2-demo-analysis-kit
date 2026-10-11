@@ -116,7 +116,9 @@ jobs:
         shell: bash
         run: |
           VERSION="$(node -p "require('./package.json').version")"
-          node scripts/build-web-patch.mjs "$VERSION" python/dist
+          # Use the frontend already embedded in this release's desktop runtime.
+          # Environment exports from package.sh do not survive between CI steps.
+          node scripts/build-web-patch.mjs "$VERSION" python/dist python/dist/dak-studio/_internal/studio_web
 
       # 0.7.0: Web Installer（极简 tkinter，onefile ~15MB）
       - name: Build Web Installer
