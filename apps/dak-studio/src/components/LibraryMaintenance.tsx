@@ -1,3 +1,4 @@
+import { normalizeDiagnostic } from "@cs2dak/rivalhub-upload";
 import { useEffect, useState } from "react";
 import {
   backupLibrary,
@@ -48,6 +49,19 @@ export function LibraryMaintenance({ onNotice, onLibraryChanged }: { onNotice: (
     }
   }
 
+  async function exportDiagnostics() {
+    setBusy(true);
+    try {
+      const result = await window.pywebview?.api.export_diagnostics?.();
+      if (result?.cancelled) return;
+      onNotice(result?.ok ? "诊断日志已导出" : normalizeDiagnostic(new Error(result?.error ?? "请更新桌面壳以导出诊断日志")).message);
+    } catch (error) {
+      onNotice(`诊断日志导出失败：${normalizeDiagnostic(error, { stage: "diagnostics.export" }).message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function repairIdentities() {
     setBusy(true);
     try {
@@ -73,6 +87,7 @@ export function LibraryMaintenance({ onNotice, onLibraryChanged }: { onNotice: (
             if (window.confirm("恢复会替换当前资料库，完成后需要重启 Studio。继续？")) void run(restoreLibrary, "备份已恢复，请重启 Studio");
           }}>恢复备份</button>
           <button className="stu-button stu-button-ghost" type="button" disabled={busy} onClick={() => void run(repairLibrary, "资料库一致性检查与修复完成")}>检查并修复</button>
+          <button className="stu-button stu-button-ghost" type="button" disabled={busy} onClick={() => void exportDiagnostics()}>导出诊断日志</button>
         </>}
         <button className="stu-button stu-button-ghost" type="button" disabled={busy} onClick={() => void repairIdentities()}>修复 Demo 身份与重复</button>
       </div>

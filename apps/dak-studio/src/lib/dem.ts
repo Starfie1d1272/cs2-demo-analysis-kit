@@ -7,6 +7,7 @@
  * - "dev"：pnpm dev:studio 时的 Vite 中间件（POST /api/export-dem → uv run cs2df export）。
  */
 
+import { normalizeDiagnostic, sanitizeDiagnosticText, type SafeDiagnostic } from "@cs2dak/rivalhub-upload";
 import { bytesToBase64, base64ToBytes } from "./storage/base64";
 
 interface ExportJobStatus {
@@ -16,11 +17,14 @@ interface ExportJobStatus {
   progress: number;
   elapsedSeconds: number;
   error: string | null;
+  diagnostic?: { stage: string; type: string; message: string; causes: { type: string; message: string; relation: string }[] };
   fileName: string | null;
   resultSize: number;
 }
 
 interface PywebviewStudioApi {
+  report_diagnostic?: (diagnostic: SafeDiagnostic) => Promise<{ ok: boolean }>;
+  export_diagnostics?: () => Promise<{ ok: boolean; cancelled?: boolean; error?: string; path?: string }>;
   pick_dems: () => Promise<string[]>;
   hash_file_path?: (path: string) => Promise<
     { ok: true; sha256: string } | { ok: false; error: string }
@@ -204,7 +208,10 @@ async function exportPathViaJob(
   const { jobId } = await api.start_export_job!(path);
   for (;;) {
     const status = await api.get_export_status!(jobId);
-    if (status.state === "error") throw new Error(`${displayName}: ${status.error ?? "导出失败"}`);
+    if (status.state === "error") {
+      const cause = normalizeDiagnostic(status.diagnostic ?? new Error(status.error ?? "导出失败"), { stage: status.diagnostic?.stage ?? status.stage });
+      throw new Error(`${sanitizeDiagnosticText(displayName)}: ${sanitizeDiagnosticText(status.error ?? "导出失败")}（阶段：${cause.stage}；可在管理页导出诊断日志）`, { cause });
+    }
     if (status.state === "done") break;
     onProgress?.(
       `${displayName}：${status.stage} ${Math.round(status.progress * 100)}%（已用 ${Math.round(status.elapsedSeconds)}s${formatEta(status)}）`
