@@ -9,7 +9,7 @@ import {
   aggregatePlayerRoundPerformanceFacts, buildPlayerRoundPerformanceFacts,
   type PlayerRoundManStateFact, type PlayerRoundPerformanceFacts,
 } from "./performance-facts.js";
-import { assertPlayerStatsParity } from "./performance-parity.js";
+import { assertPlayerRoundPerformanceFacts } from "./performance-facts.js";
 import { CORE_ANALYSIS_VERSION, CORE_SEMANTIC_PROFILE } from "./version.js";
 
 export interface TournamentIdentity {
@@ -91,7 +91,7 @@ export function extractTournamentSourceFacts(
   const { pkg } = input;
   assertTournamentIdentity(identity, pkg.players);
   const performanceFacts = suppliedPerformanceFacts ?? input.performanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
-  assertPlayerStatsParity(pkg, performanceFacts);
+  if (suppliedPerformanceFacts ?? input.performanceFacts) assertPlayerRoundPerformanceFacts(pkg, performanceFacts);
   const performanceBySteamId = aggregatePlayerRoundPerformanceFacts(performanceFacts);
   return {
     teamEntityKeys: { ...identity.teamEntityKeys },
@@ -347,7 +347,7 @@ export function projectTournamentPerformanceMapFacts(
   const { pkg } = input;
   assertTournamentIdentity(identity, pkg.players);
   const performanceFacts = input.performanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
-  assertPlayerStatsParity(pkg, performanceFacts);
+  if (input.performanceFacts) assertPlayerRoundPerformanceFacts(pkg, performanceFacts);
   const performanceBySteamId = aggregatePlayerRoundPerformanceFacts(performanceFacts);
   const teamEntityKeys = {
     teamA: identity.teamEntityKeys.teamA,

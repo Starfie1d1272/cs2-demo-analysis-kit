@@ -263,7 +263,7 @@ describe("RivalHub online Demo matching", () => {
       };
     };
 
-    expect(evidence.contract).toEqual({ contractVersion: "rivalhub-demo-evidence/1", semanticProfile: "dak-stable/3", analysisVersion: "cs2-demo-analysis-kit/1.0.3" });
+    expect(evidence.contract).toEqual({ contractVersion: "rivalhub-demo-evidence/1", semanticProfile: "dak-stable/3", analysisVersion: "cs2-demo-analysis-kit/1.0.4" });
     expect(evidence.semanticFacts.economyMatrix).toEqual([
       { lowEconomy: "full", highEconomy: "full", rounds: 10, lowEconomyWins: 6 },
       { lowEconomy: "force", highEconomy: "full", rounds: 4, lowEconomyWins: 4 },
@@ -437,22 +437,13 @@ describe("RivalHub online Demo matching", () => {
     })).toThrow(/playerStats\.playerIndex/);
   });
 
-  it("blocks Evidence when Core parity QA reports semantic drift", () => {
+  it("blocks Evidence on genuine source QA errors after removing the old oracle", () => {
     const target = fixtureTarget();
     const identities = new Map(stableFixture.players.map((player, index) => [player.steamId64, fixtureIdentity(player, index, target)]));
-    const statsTruth = stableFixture.playerStats[0]!;
-    const mismatched = {
-      ...stableFixture,
-      playerStats: stableFixture.playerStats.map((stats) => stats.playerIndex === statsTruth.playerIndex
-        ? { ...stats, deaths: stats.deaths + 1 }
-        : stats),
-    };
-
-    expect(() => buildRivalHubDemoEvidenceV1(mismatched, target, identities)).toThrow("Evidence blocked by Core QA: performance.parity_mismatch");
-    expect(() => buildRivalHubDemoEvidenceV1(mismatched, target, identities)).toThrow(/playerStats.deaths.*expected=.*actual=/);
-    try { buildRivalHubDemoEvidenceV1(mismatched, target, identities); } catch (error) {
-      expect((error as Error).message).toContain("[player]");
-    }
+    const damaged = { ...stableFixture, match: { ...stableFixture.match, teamA: { ...stableFixture.match.teamA, score: stableFixture.match.teamA.score + 1 } } };
+    expect(() => buildRivalHubDemoEvidenceV1(damaged, target, identities)).toThrow("Evidence blocked by Core QA: score.round_winners_mismatch");
+    const oldStats = { ...stableFixture, playerStats: stableFixture.playerStats.map(row => ({ ...row, firstKillCount: row.firstKillCount + 10, firstDeathCount: row.firstDeathCount + 10 })) };
+    expect(buildRivalHubDemoEvidenceV1(oldStats, target, identities)).toEqual(buildRivalHubDemoEvidenceV1(stableFixture, target, identities));
   });
 
   it("uses the canonical Steam64 lineup and rejects a missing member", () => {

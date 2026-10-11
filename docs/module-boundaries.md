@@ -73,7 +73,7 @@ PRISM 风格、强弱项等“相对当前范围”的判断可以继续使用 c
 10. 跨模块行为必须由公开合同和 fixture 验证，不依赖内部文件结构。
 11. `@cs2dak/tournament` 自己拥有窄 public DTO；不得把 `@cs2dak/contract` 的 DemoFormat、Zod 或 RR 依赖拖入其 runtime。1.1 performance surface 只消费已冻结的 player-round/objective/weapon sufficient facts，不重新 detection。Tournament 的 fail-fast 只保护 shape/count、entity/reference、duplicate 与 denominator/cross-row aggregation safety；不得从一个 frozen semantic 字段重新推导或否定另一个字段（例如用 `deaths` 推导 `survived`，或用 `teamWonRound` / `survived` 裁决 `clutch.won`）。这类 semantic QA 只属于 Core / Evidence producer。
 12. `@cs2dak/cohort` 保留 RR/PRISM 所需的 `RRIndicators` compatibility projection；它不替代 `@cs2dak/tournament` 的透明 performance owner。Presentation 的证据/视图模型可以保留自己的输出整形，但不得重新实现 Core 的事件归因。
-13. `@cs2dak/core` 的 `buildPlayerRoundPerformanceFacts` 是 Assist、Damage、Opening、Trade、KAST、Clutch、Utility、Objective、Weapon 和 man-state 的唯一 analytical owner。`playerStats` 仅作 frozen aggregate parity oracle；旧的 `buildPlayerRoundFacts` / utility projection 只能从 canonical facts 投影，不能形成 fallback 或第二套事件循环。`analyzeDemoPackage` 必须把可比 parity drift 写入 QA error；不可比的异常 Opening oracle 只能显式标记，不能改变 Tournament 的敌对 opening-duel 合同。
+13. `@cs2dak/core` 的 `buildPlayerRoundPerformanceFacts` 是 Assist、Damage、Opening、Trade、KAST、Clutch、Utility、Objective、Weapon 和 man-state 的唯一 analytical owner。`playerStats` 不再作为旧 aggregate 对照或事实 fallback；仅保留合同读取及尚未替代的 collateral 观察字段。`assertPlayerRoundPerformanceFacts` 复用同一 owner 的私有结果快照验证 supplied facts 的结构、身份、覆盖、统计守恒及成对 opening；未登记或源变化时仅调用 canonical owner 重建，不能维护第二套事件计算器。fresh facts 不重复校验，真实源 QA 仍保留。旧 `buildPlayerRoundFacts` / utility projection 只能从 canonical facts 投影，不能形成第二套 producer。
 
 ## 边界变更规则
 

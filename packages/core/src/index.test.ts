@@ -8,7 +8,6 @@ import {
   deriveRRSignals,
   derivePlayerWeaponHighlights,
   deriveRRIndicators,
-  findPlayerStatsParityMismatches,
   loadDemoPackageFromZip
 } from "./index";
 
@@ -24,7 +23,7 @@ describe("analyzeDemoPackage", () => {
     const bundle = analyzeDemoPackage(pkg);
     expect(bundle.sourceSchemaVersion).toBe("cs2-demo-format/3.0");
     expect(bundle.version).toBe("cs2-demo-analysis-kit/1.0");
-    expect(bundle.provenance.analysisVersion).toBe("cs2-demo-analysis-kit/1.0.3");
+    expect(bundle.provenance.analysisVersion).toBe("cs2-demo-analysis-kit/1.0.4");
     expect(bundle.provenance.sourceSchemaVersion).toBe("cs2-demo-format/3.0");
     expect(bundle.provenance.ratingVersions.rr).toBeTruthy();
     expect(bundle.scoreboard).toHaveLength(10);
@@ -74,7 +73,7 @@ describe("analyzeDemoPackage", () => {
     expect(indicators[0]).toEqual(bundle.playerIndicators[0]?.indicators);
   });
 
-  it("keeps playerStats as a parity oracle instead of a semantic fallback", () => {
+  it("keeps event metrics independent of obsolete aggregate comparisons", () => {
     const statsTruth = pkg.playerStats[0]!;
     const patchedStats = {
       ...statsTruth,
@@ -89,18 +88,9 @@ describe("analyzeDemoPackage", () => {
     const baseline = deriveRRIndicators(pkg);
     const indicators = deriveRRIndicators(patchedPkg);
     expect(indicators).toEqual(baseline);
-    expect(findPlayerStatsParityMismatches(patchedPkg)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ playerIndex: statsTruth.playerIndex, field: "deaths" }),
-      expect.objectContaining({ playerIndex: statsTruth.playerIndex, field: "combatDeathCount" }),
-      expect.objectContaining({ playerIndex: statsTruth.playerIndex, field: "bombDeathCount" }),
-    ]));
     const analysis = analyzeDemoPackage(patchedPkg);
-    expect(analysis.qa.ok).toBe(false);
-    expect(analysis.qa.issues).toContainEqual(expect.objectContaining({
-      code: "performance.parity_mismatch",
-      path: "playerStats.deaths",
-      severity: "error",
-    }));
+    expect(analysis.scoreboard).toEqual(analyzeDemoPackage(pkg).scoreboard);
+    expect(analysis.qa).toEqual(analyzeDemoPackage(pkg).qa);
   });
 
   it("surfaces account breakdown and context status on the scoreboard", () => {
