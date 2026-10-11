@@ -26,7 +26,7 @@
 
 `pnpm check:package-consumers` 实际 pack 七 tgz。逐包 consumer 只声明 root/React peers，全部传递 DAK dependency 用 npm overrides 固定到本次 tgz；安装目录无 workspace symlink，tgz 无 src/test/build metadata。检查公开 JS/types、生成模块 provenance/完整许可证，并禁止任何发布 JS 再 import 两上游的 source-only npm 入口。
 
-七包均在仓外 npm consumer 通过 Node ESM、实际 API 调用、strict NodeNext（skipLibCheck=false）完整声明闭包。声明检查之后还移除已安装两上游的 source trees，在新 Node 进程重新 import/call，证明 runtime 不依赖 TS fallback；没有改写/编译安装后的依赖来隐藏失败，没有 tsx/workspace source aliases。
+七包均在 Linux 仓外 npm consumer 通过 Node ESM、实际 API 调用、strict NodeNext（skipLibCheck=false）完整声明闭包。声明检查之后还移除已安装两上游的 source trees，在新 Node 进程重新 import/call，证明 runtime 不依赖 TS fallback；没有改写/编译安装后的依赖来隐藏失败，没有 tsx/workspace source aliases。
 
 | Root | 自动安装的 DAK 闭包 | 实际 API smoke | Node / strict TS |
 |---|---|---|---|
@@ -51,14 +51,14 @@ maps 专项另外通过五入口 API、JSON/tri 资产、strict NodeNext，以�
 | core | 102,684 | 372,724 | 90 |
 | cohort | 32,740 | 122,609 | 15 |
 | tournament | 13,219 | 68,764 | 10 |
-| presentation | 77,074 | 274,639 | 52 |
+| presentation | 75,467 | 267,873 | 50 |
 | react | 59,755 | 235,483 | 36 |
 
 D 仅完成体积量化；尚无外部轻 consumer 的安装/CI/冷启动成本证据，maps 资产和五入口不拆包。
 
 ## 验证与未完成范围
 
-- 6 architecture tests：真实 graph；forbidden type/re-export/dynamic/require/import-type；manifest-only 反向边；DTO-only；未声明/跨包路径；生产导入测试模块拒绝。
+- 8 architecture tests（含 Windows path.win32 所属/跨盘/相似前缀测试与 test-fixtures 泄漏回归）：真实 graph；forbidden type/re-export/dynamic/require/import-type；manifest-only 反向边；DTO-only；未声明/跨包路径；生产导入测试模块拒绝。
 - 初始基线上冷清理全部生成 dist/tsbuildinfo 后 build:packages → typecheck → build:uploader → Studio dependency-closure build；release-policy、837 fast、8 ZIP integration、145 Python（uv dev/gui extras）、21 release/build 脚本测试均通过。最终集成 #95 后的完整数量和结果以对应 PR head 的 CI logs 为准。
 - 七包真实 tgz Node/API/strict TS/完整传递依赖与 source-free runtime isolation；maps 专项资产隔离。
 - 最终 frozen install + pnpm exec 锁文件 SHA-256：`609b912213d8f06edc390c27d6bb403c49ccc502ad1cdb62870d4763fdd1fc7a`。
@@ -66,3 +66,11 @@ D 仅完成体积量化；尚无外部轻 consumer 的安装/CI/冷启动成本�
 #68 是已关闭重复记录；#69 canonical identity correctness 已完成，本 PR 固定该 adapter graph。不改分析/identity/UI，不碰 #95 diagnostics/receipt。C 总体跨消费者 seam 验收不由本 PR 重新宣告完成；D 尚需外部 consumer 成本决策，E 尚需 DTO ownership/consumer inventory，browser matrix 尚未验收。
 
 #64 保持 open；#47 仍需正式发布后的 registry Node 24 smoke。A/B 改动等待完整 CI 与父独立审再合 main。未写入上游仓库、未正式 publish/tag。
+
+## 独立审查修正与平台边界
+
+独审发现 5cace56 的 presentation tgz 包含仅由两项测试引用的 `test-fixtures.js/.d.ts`。已统一排除 test-fixtures / __tests__，保留 typecheck 对测试源码的检查；tgz 和安装后检查共用路径标准化的测试文件识别，生产代码不得 import 此类 helper。最终 presentation 包减少两项文件，按上表重新量化；七包 Linux tgz gate 重跑通过。
+
+独审发现 owner 字符串前缀 + `/` 依赖 POSIX separator。已改为原生 path.relative / isAbsolute 边界判断，回归覆盖 Windows 同包资产、反向路径、相似前缀和跨 drive，Windows startup CI 新增实际 `check:package-boundaries` step。
+
+完整 tgz consumer gate 的外部 npm/pnpm/.bin 进程启动目前只在 Linux 认证，因此增加显式 Linux 平台限制（失败不会静默 skip）。Windows 应用 packaging/startup/installer 与 Windows graph gate 是独立证据，**不等于 Windows tgz Node/TS consumer gate 已运行**；Windows/macOS 的独立 tgz consumer matrix 尚未验收。无 browser matrix 或正式 registry smoke 的替代声称。

@@ -4,12 +4,14 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bundledDependencies } from './lib/bundled-dependencies.mjs';
+import { isPublishableFile, isWithin } from './lib/package-files.mjs';
 import { packageImports } from './lib/package-imports.mjs';
 import { allowedDependencies } from './check-package-boundaries.mjs';
 
+assert.equal(process.platform, 'linux', 'This tgz consumer gate is certified on Linux; run it on Linux/Ubuntu CI. Windows app builds are a separate check.');
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const temporary = mkdtempSync(join(tmpdir(), 'dak-public-consumers-'));
 const names = Object.keys(allowedDependencies).filter(n => n !== 'rivalhub-upload');
@@ -27,7 +29,7 @@ try {
     archives[`@cs2dak/${name}`] = join(directory, readdirSync(directory).find(f => f.endsWith('.tgz')));
     // npm inspects the real compressed archive, rather than the working tree.
     const pack = JSON.parse(execFileSync('npm', ['pack', archives[`@cs2dak/${name}`], '--dry-run', '--json'], { cwd: temporary, encoding: 'utf8' }))[0];
-    assert.ok(pack.files.every(f => !f.path.startsWith('src/') && !/\.test\.|\.tsbuildinfo$|\.map$/.test(f.path)), `${name}: source/test/build metadata leaked`);
+    assert.ok(pack.files.every(f => isPublishableFile(f.path)), `${name}: source/test/build metadata leaked`);
     console.log(`PACK ${name}: ${pack.size} compressed bytes / ${pack.unpackedSize} unpacked bytes / ${pack.files.length} files`);
   }
   const failures = [];
@@ -51,9 +53,9 @@ try {
     assert.deepEqual(readdirSync(join(consumer, 'node_modules', '@cs2dak')).sort(), [...closure].sort());
     for (const n of closure) {
       const installed = join(consumer, 'node_modules', '@cs2dak', n);
-      assert.ok(realpathSync(installed).startsWith(consumer + '/'), `${n}: workspace symlink`);
+      assert.ok(isWithin(consumer, realpathSync(installed)), `${n}: workspace symlink`);
       const manifest = json(join(installed, 'package.json'));
-      assert.ok(!walk(installed).some(f => /\.test\.|\.tsbuildinfo$|\.map$/.test(f) || f.includes('/src/')));
+      assert.ok(walk(installed).every(f => isPublishableFile(relative(installed, f))));
       for (const [dependency, policy] of Object.entries(bundledDependencies)) {
         if (manifest.dependencies?.[dependency]) assert.equal(manifest.dependencies[dependency], policy.version, `${n}: type/runtime version mismatch`);
       }

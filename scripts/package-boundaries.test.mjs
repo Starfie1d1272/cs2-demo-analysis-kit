@@ -53,3 +53,26 @@ test('manifest-only reverse edges and Tournament runtime deps cannot bypass sour
     assert.throws(() => check('core', "import { x } from './helper.test.js';"), /production import of test/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('Windows relative imports retain same-package ownership and reject escapes', async () => {
+  const { win32 } = await import('node:path');
+  const { isWithin } = await import('./lib/package-files.mjs');
+  const file = 'C:\\repo\\packages\\maps\\src\\index.ts';
+  const declared = new Set();
+  const verify = specifier => checkImport('maps', { specifier, typeOnly: false }, declared, file, 'C:\\repo\\packages', win32);
+  verify('./geometry.js');
+  verify('../map-nav/de_ancient.nav.json');
+  assert.throws(() => verify('../../core/src/index.js'), /cross-package relative import/);
+  assert.throws(() => verify('../../../apps/app/src/index.js'), /cross-package relative import/);
+  assert.equal(isWithin('C:\\repo\\consumer', 'C:\\repo\\consumer-old\\file.js', win32), false);
+  assert.equal(isWithin('C:\\repo\\consumer', 'D:\\repo\\consumer\\file.js', win32), false);
+});
+test('test fixture helpers cannot enter published tarballs or production imports', async () => {
+  const { isPublishableFile } = await import('./lib/package-files.mjs');
+  for (const file of ['dist/test-fixtures.js', 'dist/test-fixtures.d.ts', 'dist\\test-fixtures.js', 'dist/__tests__/helper.js', 'dist/index.test.d.ts', 'src/index.ts']) {
+    assert.equal(isPublishableFile(file), false, file);
+  }
+  assert.equal(isPublishableFile('dist/vendor/upstream-artifacts.json'), true);
+  assert.equal(isPublishableFile('map-zones/de_ancient.json'), true);
+  assert.throws(() => check('presentation', "import { x } from './test-fixtures';"), /production import of test/);
+});

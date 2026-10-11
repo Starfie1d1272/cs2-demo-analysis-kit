@@ -91,7 +91,7 @@ Calibration-only 消费者优先使用 `@cs2dak/maps/calibration`；root 是 agg
 
 ## 可执行 package graph 与发布合同（#64 Phase A/B）
 
-`pnpm check:package-boundaries` 同时检查 production TypeScript/TSX 的 import、re-export、dynamic import、require、import type 与 manifest dependencies/peers/optional dependencies。测试文件可使用跨层 fixture，不进入生产 graph；跨包相对路径、未声明依赖、计算出来的模块入口与不在下表中的外部依赖均拒绝。`scripts/check-package-boundaries.mjs` 是机器规则，下表记录当前允许方向（不要求每个允许方向都有 runtime import）：
+`pnpm check:package-boundaries` 同时检查 production TypeScript/TSX 的 import、re-export、dynamic import、require、import type 与 manifest dependencies/peers/optional dependencies。测试文件与 test-fixtures/__tests__ helper 可使用跨层 fixture，不进入生产 graph（生产代码不得 import 测试 helper）；跨包相对路径、未声明依赖、计算出来的模块入口与不在下表中的外部依赖均拒绝。`scripts/check-package-boundaries.mjs` 是机器规则，下表记录当前允许方向（不要求每个允许方向都有 runtime import）：
 
 | 包 | 允许的依赖 |
 |---|---|
@@ -115,3 +115,5 @@ Core 的 tournament manifest dependency 是外部声明解析所需的 DTO 合�
 registry cs2-demo-format@3.1.0 与 @rivalhub/rival-rating@0.3.0 仍直接导出 TypeScript。DAK build 只从这两个精确版本的原版 registry bytes 生成 dependency ESM 模块，消费方 JS 引用生成模块，declarations 仍引用相同精确版本。生产源码 graph 的上游 owner 与 manifest type dependency 保留；只编译依赖，不复制改写公式/schema，不 bundle DAK 模块或 canonical facts caches。每个上游在一个 DAK package 内共享单一生成模块，附 MIT notices、原包 tarball/integrity、输入源码/输出哈希。包间仍用公开 DAK exports；不因此新增公开 API/package。详见 [artifact audit](research/public-package-artifact-audit.md)。PR 为普通 Ready 审查状态；是否合并仍需完整 CI 与父独立审，不执行发布。
 
 编译入口变化需要冷启动先构建依赖闭包：`pnpm build:packages` 用于公共库准备，CI 在 typecheck/fast tests 前执行；desktop/web-patch/uploader 的独立 build 递归包含对应 app dependencies。typecheck 的 rootDir 与发布 build 均为 src，保持 dist 声明路径一致。开发 dev 入口先准备公共产物；修改共享源码后需重跑 build:packages。构建器直接用 Node 调用已安装 tsc，避免 Windows pnpm shim 启动差异。仅变更依赖构建顺序，不改变诊断/发布 provenance 语义。
+
+路径归属使用原生 path.relative/isAbsolute，覆盖 Windows path.win32 回归；Windows startup CI 实跑 graph gate。全包 tgz consumer gate 当前认证范围为 Linux/Ubuntu，显式拒绝其他平台；Windows 应用 build 通过不能当成 Windows tgz consumer 已通过。

@@ -17,6 +17,10 @@
     "callout-grid/*.json"
   ],
   "exclude": [
-    "src/**/*.test.ts"
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/test-fixtures.ts",
+    "src/**/test-fixtures.tsx",
+    "src/**/__tests__/**"
   ]
 }

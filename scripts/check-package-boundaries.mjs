@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import path, { dirname, join, resolve } from 'node:path';
+import { isTestFile, isWithin } from './lib/package-files.mjs';
 import { fileURLToPath } from 'node:url';
 import { packageImports } from './lib/package-imports.mjs';
 
@@ -19,12 +20,12 @@ export const allowedDependencies = {
 export function dependencyName(specifier) {
   return specifier.startsWith('@') ? specifier.split('/').slice(0, 2).join('/') : specifier.split('/')[0];
 }
-export function checkImport(owner, imported, declared, file, packagesRoot = join(root, 'packages')) {
+export function checkImport(owner, imported, declared, file, packagesRoot = join(root, 'packages'), paths = path) {
   const { specifier, typeOnly } = imported;
   if (specifier.startsWith('.')) {
-    assert.ok(!/\.test\.(?:js|tsx?)$/.test(specifier), `${file}: production import of test module ${specifier}`);
-    const target = resolve(dirname(file), specifier);
-    assert.ok(target.startsWith(join(packagesRoot, owner) + '/'), `${file}: cross-package relative import ${specifier}`);
+    assert.ok(!isTestFile(specifier), `${file}: production import of test module ${specifier}`);
+    const target = paths.resolve(paths.dirname(file), specifier);
+    assert.ok(isWithin(paths.resolve(packagesRoot, owner), target, paths), `${file}: cross-package relative import ${specifier}`);
     return;
   }
   if (specifier.startsWith('node:')) {
@@ -46,7 +47,7 @@ export function checkBoundaries(repoRoot = root) {
     const declared = new Set([...Object.keys(manifest.dependencies ?? {}), ...Object.keys(manifest.peerDependencies ?? {}), ...Object.keys(manifest.optionalDependencies ?? {})]);
     for (const dependency of declared) assert.ok(allowed.includes(dependency), `${owner}: forbidden manifest dependency ${dependency}`);
     if (owner === 'tournament') assert.equal(declared.size, 0, 'Tournament must retain zero runtime/peer/optional dependencies');
-    for (const file of files(join(directory, 'src')).filter(f => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f))) {
+    for (const file of files(join(directory, 'src')).filter(f => /\.tsx?$/.test(f) && !isTestFile(f))) {
       for (const imported of packageImports(readFileSync(file, 'utf8'), file)) checkImport(owner, imported, declared, file, join(repoRoot, 'packages'));
     }
   }

@@ -9,6 +9,10 @@ on:
       - 'scripts/package-uploader.sh'
       - 'scripts/smoke-uploader-windows.ps1'
       - 'pnpm-lock.yaml'
+      - 'scripts/check-package-boundaries.mjs'
+      - 'scripts/package-boundaries.test.mjs'
+      - 'scripts/lib/package-files.mjs'
+      - 'scripts/lib/package-imports.mjs'
   workflow_dispatch:
 permissions:
   contents: read
@@ -28,6 +32,8 @@ jobs:
           python-version: '3.12'
           enable-cache: true
       - run: pnpm install --frozen-lockfile
+      - name: Check dependency boundaries on Windows
+        run: pnpm check:package-boundaries
       - name: Real pywebview reflection regression
         shell: bash
         run: |
