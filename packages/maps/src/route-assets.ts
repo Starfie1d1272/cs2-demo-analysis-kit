@@ -6,9 +6,9 @@ import mirageRoutes from "../map-routes/de_mirage.json" with { type: "json" };
 import nukeRoutes from "../map-routes/de_nuke.json" with { type: "json" };
 import overpassRoutes from "../map-routes/de_overpass.json" with { type: "json" };
 import type { MapRoutes } from "./routes.js";
-import type { ActiveDutyMap } from "./zones.js";
+import type { SpatialAssetMap } from "./map-pool.js";
 
-export const MAP_ROUTE_ASSETS: Record<ActiveDutyMap, MapRoutes> = {
+export const MAP_ROUTE_ASSETS: Record<SpatialAssetMap, MapRoutes> = {
   de_ancient: ancientRoutes as MapRoutes,
   de_anubis: anubisRoutes as MapRoutes,
   de_dust2: dust2Routes as MapRoutes,
