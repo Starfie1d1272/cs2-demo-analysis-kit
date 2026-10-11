@@ -91,6 +91,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.log(`Synced ${edits.length} file(s) to v${version}.`);
   } catch (error) {
     console.error(error.message);
+    if (error instanceof AggregateError) {
+      for (const cause of error.errors) console.error(`  Cause: ${cause.message}`);
+    }
     process.exitCode = 1;
   }
 }
