@@ -368,3 +368,73 @@ def test_cleanup_failure_does_not_replace_startup_exit(tmp_path, monkeypatch):
             logging.getLogger('pywebview').removeHandler(handler)
             handler.close()
         logger.handlers.clear()
+
+
+def test_cancel_undoes_only_owned_authorization_and_restores_previous(api, monkeypatch):
+    vault = {}
+
+    def credential(origin, value=None):
+        if value is None:
+            return vault.get(origin)
+        vault[origin] = value
+        return True
+
+    monkeypatch.setattr(uploader, "credential", credential)
+    monkeypatch.setattr(uploader, "delete_credential", lambda origin: vault.pop(origin, None) is not None)
+    api.configure("https://old.example")
+    api.save_connection("original", "old-token")
+    api.configure("https://new.example")
+    api.save_connection("canceled", "canceled-token", "https://new.example")
+    api.configure("https://new.example", "canceled")
+    assert vault == {"https://old.example": "old-token"}
+    assert api.connection()["pairingId"] == "original"
+    # A late cancellation cannot clear the next successfully saved pairing.
+    api.configure("https://new.example")
+    api.save_connection("next", "next-token", "https://new.example")
+    api.configure("https://new.example", "canceled")
+    assert vault == {"https://new.example": "next-token"}
+    assert api.connection()["pairingId"] == "next"
+
+
+def test_cancel_same_origin_restores_existing_credential(api, monkeypatch):
+    vault = {}
+
+    def credential(origin, value=None):
+        if value is None:
+            return vault.get(origin)
+        vault[origin] = value
+        return True
+
+    monkeypatch.setattr(uploader, "credential", credential)
+    api.configure("https://example.test")
+    api.save_connection("original", "original-token")
+    api.save_connection("canceled", "canceled-token", "https://example.test")
+    api.configure("https://example.test", "canceled")
+    assert vault == {"https://example.test": "original-token"}
+    assert api.connection()["pairingId"] == "original"
+
+
+def test_obsolete_origin_cannot_save_credential(api, monkeypatch):
+    write = Mock()
+    monkeypatch.setattr(uploader, "credential", write)
+    api.configure("https://next.example")
+    with pytest.raises(RuntimeError, match="PAIRING_SUPERSEDED"):
+        api.save_connection("old", "private", "https://old.example")
+    write.assert_not_called()
+
+
+def test_cancel_first_connection_removes_only_its_new_credential(api, monkeypatch):
+    vault = {}
+
+    def credential(origin, value=None):
+        if value is None:
+            return vault.get(origin)
+        vault[origin] = value
+        return True
+
+    monkeypatch.setattr(uploader, "credential", credential)
+    monkeypatch.setattr(uploader, "delete_credential", lambda origin: vault.pop(origin, None) is not None)
+    api.configure("https://example.test")
+    api.save_connection("canceled", "private", "https://example.test")
+    api.configure("https://example.test", "canceled")
+    assert not vault and not api._metadata.exists()

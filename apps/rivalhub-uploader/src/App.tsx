@@ -3,10 +3,11 @@ import { Check, ExternalLink, FileUp, Link2, LoaderCircle, Download, AlertCircle
 import { normalizeBaseUrl, normalizeDiagnostic, uploadDemo, type UploadUpdate, type RivalHubMatchCandidate } from "@cs2dak/rivalhub-upload";
 import { client, delay, exportZip, initializeNativeApiOnce, logDiagnostic, recordDiagnostic, native, type Connection, type DemoFile } from "./native";
 import { explainError } from "./errors";
+import { completePairing } from "./pairing";
 import "./style.css";
 
 type Task = DemoFile & UploadUpdate & { error?: ReturnType<typeof explainError>; warning?: ReturnType<typeof explainError> };
-const labels = { waiting: "等待", parsing: "解析", matching: "匹配", selecting: "选择比赛", uploading: "上传", done: "已完成", needs_attention: "需要处理", failed: "失败" };
+const labels = { waiting: "等待", parsing: "解析", matching: "匹配", selecting: "选择比赛", uploading: "上传", done: "已完成", needs_attention: "需要处理", unconfirmed: "待确认", failed: "失败" };
 const official = "https://match.starfie1d.top";
 export default function App() {
   const [connection, setConnection] = useState<Connection>({ baseUrl: "", connected: false });
@@ -22,6 +23,7 @@ export default function App() {
   const [choice, setChoice] = useState<{ file: string; candidates: RivalHubMatchCandidate[] } | null>(null);
   const resolver = useRef<((candidate: RivalHubMatchCandidate | null) => void) | null>(null);
   const pairingGeneration = useRef(0);
+  const pairingWork = useRef<Promise<void> | null>(null);
   const running = useRef(false);
   const initialized = useRef(false);
   const attempts = useRef(new Map<string, number>());
@@ -44,9 +46,15 @@ export default function App() {
   async function connect() {
     const generation = ++pairingGeneration.current;
     setProblem(null); setPairing(true); setNotice("正在打开授权页面…");
+    // Finish an older native write/rollback before another attempt can use its credentials.
+    await pairingWork.current;
+    if (generation !== pairingGeneration.current) return;
+    let finish!: () => void;
+    pairingWork.current = new Promise<void>(resolve => { finish = resolve; });
     try {
       const baseUrl = normalizeBaseUrl(address);
       await native().configure(baseUrl);
+      if (generation !== pairingGeneration.current) return;
       const start = await client.startPairing();
       if (generation !== pairingGeneration.current) return;
       if (normalizeBaseUrl(start.authorizeUrl) !== baseUrl) throw new Error("PAIRING_URL：授权页面与连接的网站不一致");
@@ -54,25 +62,25 @@ export default function App() {
       if (!Number.isFinite(expires)) throw new Error("PAIRING_EXPIRY：网站返回了无效的授权有效期");
       setPairingUrl(start.authorizeUrl);
       await native().open_website(start.authorizeUrl);
+      if (generation !== pairingGeneration.current) return;
       setNotice("请在浏览器登录 RivalHub 并确认授权，然后回到这里。此窗口会自动继续。");
       while (generation === pairingGeneration.current) {
         if (Date.now() >= expires) throw new Error("PAIRING_EXPIRED：授权已过期，请重新连接");
         const poll = await client.pollPairing(start.pairingId, start.pollToken);
         if (generation !== pairingGeneration.current) return;
         if (poll.status === "authorized" && poll.accessToken) {
-          await native().save_connection(start.pairingId, poll.accessToken);
-          await client.events();
+          if (!await completePairing(native(), () => client.events(), () => generation === pairingGeneration.current, baseUrl, start.pairingId, poll.accessToken)) return;
           setConnection({ baseUrl, connected: true, pairingId: start.pairingId });
           setEditing(false); setNotice("连接成功，可以选择 Demo 了。"); return;
         }
         if (poll.status === "expired") throw new Error("PAIRING_EXPIRED：授权已过期，请重新连接");
         await delay(1000);
       }
-    } catch (error) { report(error); }
-    finally { if (generation === pairingGeneration.current) { setPairing(false); setPairingUrl(""); } }
+    } catch (error) { if (generation === pairingGeneration.current) report(error); else void logDiagnostic(error); }
+    finally { finish(); if (generation === pairingGeneration.current) { setPairing(false); setPairingUrl(""); } }
   }
   const patch = (id: string, update: Partial<Task>) => setTasks(rows => rows.map(row => row.id === id ? { ...row, ...update } : row));
-  async function run(files: DemoFile[]) {
+  async function run(files: Array<DemoFile & Partial<UploadUpdate>>) {
     if (running.current) return;
     running.current = true; setBusy(true); setProblem(null);
     try {
@@ -83,6 +91,7 @@ export default function App() {
         patch(file.id, { error: undefined, warning: undefined, phase: "waiting", message: "等待处理" });
         try {
           await uploadDemo({
+            receipt: file.receipt,
             hash: () => { stage = "hash"; return native().hash_demo(file.id); },
             events: () => { stage = "events"; return client.events(); },
             submit: (evidence, key) => { stage = "submit"; return client.submit(evidence as Parameters<typeof client.submit>[0], key); },
@@ -101,9 +110,10 @@ export default function App() {
             },
           });
         } catch (error) {
-          const detail = explainError(error, { stage, fileId: file.id, attempt });
-          patch(file.id, { phase: "failed", message: detail.message, error: detail });
-          await recordDiagnostic(file.id, "failed", detail);
+          const detail = explainError(error, { stage: explainError(error).code === "STATUS_UNCONFIRMED" ? "confirmation" : stage, fileId: file.id, attempt });
+          const phase = detail.code === "STATUS_UNCONFIRMED" ? "unconfirmed" : "failed";
+          patch(file.id, { phase, message: detail.message, error: detail });
+          await recordDiagnostic(file.id, phase, detail);
         }
       }
     } finally { setBusy(false); running.current = false; }
@@ -130,7 +140,7 @@ export default function App() {
         {connected ? <><div className="connection-copy"><h2>网站已连接</h2><p>{connection.baseUrl}</p></div><button className="secondary" disabled={busy} onClick={() => act(() => native().open_website())}>打开网站 <ExternalLink size={14}/></button><button className="text-button" disabled={busy} onClick={() => { setEditing(true); setNotice(""); }}>更换连接</button></> : <div className="connect-form"><h2>连接 RivalHub</h2><p>点击连接，在浏览器登录并授权。本程序不会保存网站密码。</p><label htmlFor="address">RivalHub 网站地址</label><div className="input-row"><input id="address" type="url" value={address} disabled={pairing} onChange={event => setAddress(event.target.value)} placeholder="https://你的赛事网站"/><button className="primary" disabled={!ready || pairing} onClick={() => void connect()}>{pairing ? <LoaderCircle className="spin" size={17}/> : <Link2 size={17}/>} {pairing ? "等待浏览器授权" : "连接 RivalHub"}</button></div>{notice && <p role="status" className="notice">{notice}</p>}{pairingUrl && <button className="text-button" onClick={() => act(() => native().open_website(pairingUrl))}>重新打开授权页面 <ExternalLink size={13}/></button>}{pairing && <button className="text-button" onClick={() => { pairingGeneration.current++; setPairing(false); setPairingUrl(""); setNotice("已取消，请重新连接。"); }}>取消等待</button>}{editing && !pairing && <button className="text-button" onClick={() => act(async () => { await native().configure(connection.baseUrl); setEditing(false); })}>返回当前连接</button>}</div>}
       </section>
       <section className="upload-panel"><div><h2>选择 Demo 文件</h2><p>选择已录制完成的 <code>.dem</code> 文件。可一次选择多场，程序会逐场解析和上传。</p></div><button className="primary" disabled={!ready || !connected || busy || pairing} onClick={() => void select()}>{busy ? <LoaderCircle size={19} className="spin"/> : <FileUp size={19}/>} {busy ? "正在处理队列" : "选择 Demo"}</button></section>
-      <section className="queue"><div className="queue-title"><h2>本次任务 <span>{tasks.length}</span></h2><span>{tasks.length ? `${done} 场已完成` : "还没有选择文件"}</span></div>{!tasks.length ? <div className="empty"><FileUp size={32}/><h3>{connected ? "暂无上传任务" : "请先连接 RivalHub"}</h3><p>请先连接 RivalHub，再选择一份或多份 .dem 文件。存在多个候选比赛时，请从列表中选择对应场次。</p></div> : <table><thead><tr><th>Demo / 对应比赛</th><th>状态</th><th>结果与操作</th></tr></thead><tbody>{tasks.map(task => <tr key={task.id}><td><strong className="filename">{task.name}</strong><p>{task.match ?? "等待识别队伍和地图"}</p><small className="diagnostic">诊断编号 {task.id}</small></td><td><span className={`badge ${task.phase}`}>{labels[task.phase]}</span></td><td><p className="result" role="status">{task.message}</p>{task.warning && <p role="alert" className="action">临时文件清理未完成：{task.warning.message}。请导出日志交给管理员。</p>}{task.error && <p className="action">{task.error.action}</p>}{task.phase === "needs_attention" && <p className="action">数据已送达。请在网站对应赛事核对选手名单、地图与比分，按提示处理；不必反复上传。</p>}{task.target && <small>{task.target.series.teamAName} vs {task.target.series.teamBName} · 第 {task.target.map.order} 图</small>}{task.phase === "failed" && <div className="row-actions">{task.error && (task.error.status !== undefined || task.error.code.startsWith("HTTP_") || task.error.code.startsWith("TARGET") || task.error.code === "STATUS_UNCONFIRMED") && <button className="text-button" onClick={() => act(() => native().open_website())}>打开 RivalHub <ExternalLink size={12}/></button>}<button className="text-button" disabled={busy || !connected} onClick={() => void run([task])}>重试此项</button></div>}{task.phase === "needs_attention" && <button className="text-button" onClick={() => act(() => native().open_website())}>在 RivalHub 处理 <ExternalLink size={12}/></button>}{task.error && <details><summary>错误详情 · {task.error.code}</summary><pre>{task.error.message}{task.error.cause && `\n原因：${task.error.cause}`}{task.error.requestId && `\n请求编号：${task.error.requestId}`}{task.error.status !== undefined && `\nHTTP：${task.error.status}`}</pre></details>}</td></tr>)}</tbody></table>}</section>
+      <section className="queue"><div className="queue-title"><h2>本次任务 <span>{tasks.length}</span></h2><span>{tasks.length ? `${done} 场已完成` : "还没有选择文件"}</span></div>{!tasks.length ? <div className="empty"><FileUp size={32}/><h3>{connected ? "暂无上传任务" : "请先连接 RivalHub"}</h3><p>请先连接 RivalHub，再选择一份或多份 .dem 文件。存在多个候选比赛时，请从列表中选择对应场次。</p></div> : <table><thead><tr><th>Demo / 对应比赛</th><th>状态</th><th>结果与操作</th></tr></thead><tbody>{tasks.map(task => <tr key={task.id}><td><strong className="filename">{task.name}</strong><p>{task.match ?? "等待识别队伍和地图"}</p><small className="diagnostic">诊断编号 {task.id}</small></td><td><span className={`badge ${task.phase === "unconfirmed" ? "needs_attention" : task.phase}`}>{labels[task.phase]}</span></td><td><p className="result" role="status">{task.message}</p>{task.warning && <p role="alert" className="action">临时文件清理未完成：{task.warning.message}。请导出日志交给管理员。</p>}{task.error && <p className="action">{task.error.action}</p>}{task.phase === "needs_attention" && <p className="action">数据已送达。请在网站对应赛事核对选手名单、地图与比分，按提示处理；不必反复上传。</p>}{task.target && <small>{task.target.series.teamAName} vs {task.target.series.teamBName} · 第 {task.target.map.order} 图</small>}{["failed", "unconfirmed"].includes(task.phase) && <div className="row-actions">{task.error && (task.error.status !== undefined || task.error.code.startsWith("HTTP_") || task.error.code.startsWith("TARGET") || task.error.code === "STATUS_UNCONFIRMED") && <button className="text-button" onClick={() => act(() => native().open_website())}>打开 RivalHub <ExternalLink size={12}/></button>}<button className="text-button" disabled={busy || !connected} onClick={() => void run([task])}>{task.receipt ? "仅刷新状态" : "重试此项"}</button></div>}{task.phase === "needs_attention" && <button className="text-button" onClick={() => act(() => native().open_website())}>在 RivalHub 处理 <ExternalLink size={12}/></button>}{task.error && <details><summary>错误详情 · {task.error.code}</summary><pre>{task.error.message}{task.error.cause && `\n原因：${task.error.cause}`}{task.error.requestId && `\n请求编号：${task.error.requestId}`}{task.error.status !== undefined && `\nHTTP：${task.error.status}`}</pre></details>}</td></tr>)}</tbody></table>}</section>
       <footer><p>遇到问题时，按错误提示检查比赛或连接；需要协助时，截图并附上诊断编号和日志。<br/><span>Demo 只在本机解析；临时解析文件在处理结束后删除。</span></p><button className="secondary" disabled={!ready} onClick={() => act(async () => { if (await native().export_logs()) setNotice("日志已导出，可发送给管理员。"); })}><Download size={15}/> 导出诊断日志</button></footer>{notice && connected && <p role="status" className="notice">{notice}</p>}
     </main>
     {choice && <div className="overlay"><section role="dialog" aria-modal="true" aria-labelledby="choice-title" className="dialog"><p className="eyebrow">需要你确认一次</p><h2 id="choice-title">请选择对应的 RivalHub 比赛</h2><p>{choice.file}</p><div className="candidates">{choice.candidates.map(candidate => <button autoFocus={candidate === choice.candidates[0]} key={candidate.map.id} onClick={() => choose(candidate)}><strong>{candidate.series.teamAName} vs {candidate.series.teamBName}</strong><span>{candidate.series.stageKey} · {candidate.map.mapName} · 第 {candidate.map.order} 图 · {candidate.map.scoreA ?? "—"} : {candidate.map.scoreB ?? "—"}</span><small>{candidate.series.completedAt?.slice(0, 10) ?? "日期待确认"} · 比赛编号 {candidate.series.id}</small></button>)}</div><button className="secondary" onClick={() => choose(null)}>跳过此项，继续下一场</button></section></div>}

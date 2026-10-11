@@ -3,8 +3,8 @@ export interface DemoFile { id: string; name: string }
 export interface Connection { baseUrl: string; connected: boolean; pairingId?: string }
 export interface NativeApi {
   connection(): Promise<Connection>;
-  configure(baseUrl: string): Promise<boolean>;
-  save_connection(pairingId: string, token: string): Promise<boolean>;
+  configure(baseUrl: string, cancelPairingId?: string): Promise<boolean>;
+  save_connection(pairingId: string, token: string, baseUrl?: string): Promise<boolean>;
   open_website(url?: string): Promise<boolean>;
   request(path: string, method: string, body?: unknown, key?: string): Promise<{ status: number; body: unknown; requestId?: string; diagnostic?: SafeDiagnostic }>;
   select_demos(): Promise<DemoFile[]>;

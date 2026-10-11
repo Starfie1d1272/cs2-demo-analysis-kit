@@ -184,3 +184,24 @@ def test_apply_windows_update_launches_relay_from_stage_root(tmp_path: Path, mon
     assert calls[0]["cwd"] == str(stage_root)
     assert calls[0]["creationflags"] & 0x08000000  # CREATE_NO_WINDOW
     assert not calls[0]["creationflags"] & 0x00000008  # DETACHED_PROCESS
+
+
+def test_cleanup_failure_does_not_replace_download_history(tmp_path, monkeypatch, caplog):
+    part = tmp_path / "data.part"
+    original = Path.unlink
+    calls = 0
+
+    def unlink(path, *args, **kwargs):
+        nonlocal calls
+        if path == part:
+            calls += 1
+            if calls == 2:
+                raise PermissionError("cleanup denied")
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", unlink)
+    monkeypatch.setattr(updater, "_download_one", lambda *_args: (_ for _ in ()).throw(OSError("network unavailable")))
+    with pytest.raises(updater.UpdateError, match="network unavailable") as failure:
+        updater.download_with_fallback(["first"], tmp_path / "data")
+    assert failure.value.failures[0]["message"] == "network unavailable"
+    assert "update_download.cleanup" in caplog.text

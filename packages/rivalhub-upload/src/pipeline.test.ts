@@ -46,6 +46,38 @@ function setup() {
   return { data, deps, updates, requests, attention: () => { attention = true; } };
 }
 describe("standalone upload pipeline with real Demo + events contract", () => {
+  it.each(["network", "http", "projection"])("retains a POST receipt after %s confirmation failure; retry only queries status", async failure => {
+    const s = setup();
+    const events = s.deps.events;
+    let reads = 0;
+    s.deps.events = async () => {
+      if (++reads === 2) {
+        if (failure === "projection") return structuredClone(fixture);
+        throw Object.assign(new Error("connection failed https://user:private@example.test?token=private"), { status: failure === "http" ? 503 : 0, requestId: "confirm-123" });
+      }
+      return events();
+    };
+    await expect(uploadDemo(s.deps)).rejects.toMatchObject({ code: "STATUS_UNCONFIRMED", stage: "confirmation" });
+    const receipt = s.updates.at(-1)!.receipt!;
+    expect(receipt.response).toMatchObject({ matchMapId: receipt.target.map.id, demoSha256: hash });
+    expect(s.requests).toHaveLength(1);
+    // Even a repeated status outage cannot trigger another export or POST.
+    s.deps.receipt = receipt;
+    s.deps.events = async () => { throw new Error("offline"); };
+    await expect(uploadDemo(s.deps)).rejects.toThrow("STATUS_UNCONFIRMED");
+    s.deps.events = events;
+    await uploadDemo(s.deps);
+    expect(s.updates.at(-1)?.phase).toBe("done");
+    expect(s.requests).toHaveLength(1);
+    expect(s.deps.exportZip).toHaveBeenCalledOnce();
+  });
+  it("rejects a changed file on receipt retry without another POST", async () => {
+    const s = setup(); await uploadDemo(s.deps);
+    s.deps.receipt = s.updates.at(-1)!.receipt;
+    s.deps.hash = async () => "0".repeat(64);
+    await expect(uploadDemo(s.deps)).rejects.toThrow("DEMO_CHANGED");
+    expect(s.requests).toHaveLength(1);
+  });
   it("matches and submits Evidence V1 through the HTTP client; second upload skips export", async () => {
     const s = setup(); await uploadDemo(s.deps);
     expect(s.requests[0]!.path).toBe("/evidence");

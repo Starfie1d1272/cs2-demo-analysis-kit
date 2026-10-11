@@ -8,6 +8,33 @@ from pathlib import Path
 from types import TracebackType
 
 
+class SourceFailures(RuntimeError):
+    """Bounded, redacted mirror history; source numbers never reveal URLs."""
+
+    def __init__(self, message: str, stage: str = "download"):
+        super().__init__(sanitize_text(message, 200))
+        self.stage = stage
+        self.failures: list[dict] = []
+        self.omitted = 0
+
+    def add(self, source: int, error: Exception) -> None:
+        if len(self.failures) >= 8:
+            self.omitted += 1
+            return
+        detail = safe_exception(error, self.stage)
+        inner = "; ".join(f"{item['type']}: {item['message']}" for item in detail["causes"][1:3])
+        self.failures.append({"source": source, "type": detail["type"],
+                              "message": sanitize_text(detail["message"], 180),
+                              "cause": sanitize_text(inner, 180)})
+
+    def __str__(self) -> str:
+        items = [f"源 {item['source']} {item['type']}：{item['message']}"
+                 + (f"（内层：{item['cause']}）" if item["cause"] else "") for item in self.failures]
+        if self.omitted:
+            items.append(f"另有 {self.omitted} 个来源失败")
+        return super().__str__() + ("；" + "；".join(items) if items else "")
+
+
 def sanitize_text(value, limit: int = 2000) -> str:
     try:
         text = str(value)

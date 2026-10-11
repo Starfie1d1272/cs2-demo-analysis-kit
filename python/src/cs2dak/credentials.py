@@ -38,16 +38,23 @@ def _windows_credential_get(service: str, account: str) -> str | None:
     read.restype = wintypes.BOOL
     credential = ctypes.POINTER(_Credential)()
     if not read(_windows_credential_target(service, account), 1, 0, ctypes.byref(credential)):
-        return None
+        code = ctypes.get_last_error()
+        if code == 1168:  # ERROR_NOT_FOUND is the only absent-credential result.
+            return None
+        reason = {5: "访问被拒绝", 1312: "登录会话不存在"}.get(code, "系统调用失败")
+        raise OSError(code, f"CREDENTIAL_READ：Windows 安全存储{reason}，请检查凭据管理器与系统权限")
     try:
         size = credential.contents.blob_size
         if size == 0:
             return ""
         return ctypes.string_at(credential.contents.blob, size).decode("utf-16-le")
     except (UnicodeDecodeError, ValueError):
-        return None
+        # Decode errors may include secret blob bytes; never chain or render them.
+        pass
     finally:
         api.CredFree(credential)
+    # Raise outside the except block, so diagnostic walkers cannot read its context.
+    raise ValueError("CREDENTIAL_DECODE：Windows 凭据格式无效，请重新授权")
 
 
 def _windows_credential_set(service: str, account: str, value: str) -> bool:
