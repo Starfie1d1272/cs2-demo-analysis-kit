@@ -1,8 +1,7 @@
-import { RivalHubHttpError } from "@cs2dak/rivalhub-upload";
-export function explainError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  const status = error instanceof RivalHubHttpError ? error.status : null;
-  const code = status ? `HTTP_${status}` : /^([A-Z][A-Z_]+)[：:]/.exec(message)?.[1] ?? "UPLOAD_FAILED";
+import { normalizeDiagnostic, type DiagnosticContext } from "@cs2dak/rivalhub-upload";
+export function explainError(error: unknown, context?: DiagnosticContext) {
+  const diagnostic = normalizeDiagnostic(error, context);
+  const { message, status, code } = diagnostic;
   let action = "请重试此项；如果仍然失败，截图并导出日志交给管理员。";
   if (status === 404) action = "网站地址没有对应的 RivalHub 上传接口。检查是否填入站点主地址（例如 https://match.starfie1d.top），再重新连接。";
   else if (status === 400 || status === 422 || status === 409) action = "RivalHub 拒绝了这份数据。打开网站检查对应比赛、地图、比分与选手名单；保留错误代码交给管理员。";
@@ -13,5 +12,5 @@ export function explainError(error: unknown) {
   else if (code === "PARSE_FAILED" || code === "DEMO_CHANGED") action = "确认 Demo 已录制或下载完成，文件未损坏；重新下载完整 .dem 后再选一次。";
   else if (message.includes("Core QA")) action = "这份 Demo 未通过数据校验。请保留原始 .dem，将错误详情和日志交给管理员，不要修改比分绕过校验。";
   else if (code === "STATUS_UNCONFIRMED") action = "打开 RivalHub 查看该场是否已同步；稍后重试会先检查网站状态。";
-  return { code, message, action };
+  return { ...diagnostic, action };
 }

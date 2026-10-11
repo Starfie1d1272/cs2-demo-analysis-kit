@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import http.client
 import json
 import logging
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -22,6 +22,14 @@ from cs2dak.credentials import (
     _windows_credential_delete,
     _windows_credential_get,
     _windows_credential_set,
+)
+from cs2dak.diagnostics import (
+    export_logs as export_safe_logs,
+)
+from cs2dak.diagnostics import (
+    log_failure,
+    safe_metadata,
+    sanitize_text,
 )
 
 SERVICE = "com.starfie1d.rivalhub-demo-uploader"
@@ -134,21 +142,49 @@ class UploaderApi:
             headers["Idempotency-Key"] = key
         req = urllib.request.Request(self._origin + PREFIX + path, method=method, headers=headers,
                                      data=json.dumps(body).encode() if body is not None else None)
+        status = 0
+        request_id = ""
+
+        def response_data(response, response_status):
+            nonlocal status, request_id
+            status = response_status
+            response_headers = getattr(response, "headers", None)
+            if response_headers:
+                request_id = sanitize_text(response_headers.get("X-Request-Id", ""), 160)
+            try:
+                data = json.load(response)
+            except (ValueError, OSError, http.client.HTTPException) as exc:
+                failure = log_failure(log, exc, "http.response")
+                failure.update(code="INVALID_RESPONSE", status=status, requestId=request_id)
+                return {"status": status, "requestId": request_id,
+                        "body": {"error": {"code": "INVALID_RESPONSE",
+                                           "message": f"网站响应无效 HTTP {status}：{failure['message']}"}},
+                        "diagnostic": safe_metadata(failure)}
+            if not request_id and isinstance(data, dict):
+                candidate = data.get("requestId")
+                if not isinstance(candidate, str) and isinstance(data.get("error"), dict):
+                    candidate = data["error"].get("requestId")
+                if isinstance(candidate, str):
+                    request_id = sanitize_text(candidate, 160)
+            log.info("http method=%s path=%s status=%s requestId=%s", method, path, status, request_id)
+            result = {"status": status, "body": data}
+            if request_id:
+                result["requestId"] = request_id
+            return result
+
         try:
             with urllib.request.build_opener(NoRedirect()).open(req, timeout=90) as response:
-                data = json.load(response)
-                log.info("http method=%s path=%s status=%s", method, path, response.status)
-                return {"status": response.status, "body": data}
+                return response_data(response, response.status)
         except urllib.error.HTTPError as exc:
-            log.warning("http method=%s path=%s status=%s", method, path, exc.code)
-            try:
-                data = json.loads(exc.read())
-            except (ValueError, OSError):
-                data = {"error": {"message": f"网站请求失败 HTTP {exc.code}"}}
-            return {"status": exc.code, "body": data}
-        except (OSError, ValueError) as exc:
-            log.warning("http failure path=%s type=%s", path, type(exc).__name__)
-            raise RuntimeError("NETWORK：无法连接网站或响应无效，请检查网络和网站地址后重试") from None
+            with exc:
+                return response_data(exc, exc.code)
+        except (OSError, ValueError, http.client.HTTPException) as exc:
+            failure = log_failure(log, exc, "http.request")
+            failure.update(code="NETWORK", status=status, requestId=request_id)
+            return {"status": status, "requestId": request_id,
+                    "body": {"error": {"code": "NETWORK", "message":
+                             f"NETWORK：无法连接网站，请检查网络和网站地址后重试；{failure['message']}"}},
+                    "diagnostic": safe_metadata(failure)}
 
     def select_demos(self) -> list[dict]:
         import webview
@@ -184,7 +220,7 @@ class UploaderApi:
             from cs2df.package import export_demo
 
             def progress(stage, fraction):
-                stage = str(stage)[:80]
+                stage = sanitize_text(stage, 80)
                 fraction = max(0.0, min(1.0, float(fraction)))
                 self._jobs[key].update(stage=stage, progress=fraction)
                 log.info("demo=%s export stage=%s progress=%.3f", key, stage, fraction)
@@ -202,8 +238,10 @@ class UploaderApi:
                 type(exc).__module__ == "pyo3_runtime" and type(exc).__name__ == "PanicException"
             ):
                 raise
-            self._jobs[key].update(state="error", error=f"PARSE_FAILED：{exc}")
-            log.exception("demo=%s export failed", key)
+            failure = log_failure(log, exc, "export:" + self._jobs[key].get("stage", "parse"))
+            failure.update(code="PARSE_FAILED", fileId=key)
+            self._jobs[key].update(state="error", error=f"PARSE_FAILED：{failure['message']}",
+                                   diagnostic=safe_metadata(failure))
 
     def export_status(self, key: str) -> dict:
         return dict(self._jobs[key])
@@ -223,21 +261,19 @@ class UploaderApi:
         log.info("demo=%s temporary data removed", key)
         return True
 
-    def record(self, key: str, phase: str, code: str = "") -> bool:
+    def record(self, key: str, phase: str, code: str = "", diagnostic=None) -> bool:
         # Only controlled identifiers; never accept arbitrary response bodies or tokens into logs.
         import re
         if not all(re.fullmatch(r"[A-Za-z0-9_-]{0,64}", value) for value in (key, phase, code)):
             return False
-        log.info("demo=%s phase=%s code=%s", key, phase, code)
+        log.info("demo=%s phase=%s code=%s diagnostic=%s", key, phase, code,
+                 json.dumps(safe_metadata(diagnostic), ensure_ascii=False))
         return True
 
-    def report_ui_error(self, message: str, stack: str = "") -> bool:
-        import re
-        message = str(message)[:1000]
-        stack = str(stack)[:4000]
-        message = re.sub(r"(?i)(bearer\s+)[A-Za-z0-9._~-]+", r"\1[redacted]", message)
-        stack = re.sub(r"(?i)(bearer\s+)[A-Za-z0-9._~-]+", r"\1[redacted]", stack)
-        log.error("ui startup error message=%s stack=%s", json.dumps(message), json.dumps(stack))
+    def report_ui_error(self, message: str, stack: str = "", diagnostic=None) -> bool:
+        log.error("ui startup error message=%s stack=%s diagnostic=%s",
+                  json.dumps(sanitize_text(message, 1000)), json.dumps(sanitize_text(stack, 4000)),
+                  json.dumps(safe_metadata(diagnostic), ensure_ascii=False))
         return True
 
     def export_logs(self) -> bool:
@@ -247,10 +283,7 @@ class UploaderApi:
         if not target:
             return False
         destination = target if isinstance(target, str) else target[0]
-        for handler in log.handlers:
-            handler.flush()
-        shutil.copyfile(self._userdata / "uploader.log", destination)
-        return True
+        return export_safe_logs(log, Path(destination), self._userdata / "uploader.log")
 
     def close(self):
         with self._lock:
@@ -276,10 +309,11 @@ def main():
     previous_thread_hook = threading.excepthook
 
     def thread_failure(args):
-        log_failure(log, args.exc_value)
+        log_failure(log, args.exc_value, "background.thread")
         previous_thread_hook(args)
 
     threading.excepthook = thread_failure
+    stage = "startup.environment"
     try:
         log_environment(log)
         if sys.platform == "win32":
@@ -288,10 +322,13 @@ def main():
             problem = prerequisite_error(runtimes)
             if problem:
                 raise RuntimeError(problem)
+            stage = "startup.netfx"
             load_windows_runtime()
         # Import only after persistent diagnostics and Windows preflight are available.
+        stage = "startup.webview-import"
         import webview
 
+        stage = "startup.frontend"
         api = UploaderApi(userdata)
         web = (Path(sys._MEIPASS) if getattr(sys, "frozen", False) else Path(__file__).parent)
         page = web / "rivalhub_uploader_web" / "index.html"
@@ -300,17 +337,21 @@ def main():
         api._window = webview.create_window("RivalHub Demo Uploader", str(page), js_api=api,
                                            width=1080, height=800, min_size=(820, 640))
         api._window.events.loaded += lambda: log.info("webview loaded")
+        stage = "startup.webview-start"
         webview.start(private_mode=True, **({"gui": "edgechromium"} if sys.platform == "win32" else {}))
     except Exception as exc:
-        log_failure(log, exc)
-        detail = str(exc) if sys.platform == "win32" and isinstance(exc, RuntimeError) else ""
+        failure = log_failure(log, exc, stage)
+        detail = failure.get("guidance", failure["message"])
         show_failure(logfile, detail)
         raise SystemExit(1) from exc
     finally:
         threading.excepthook = previous_thread_hook
         if api is not None:
-            api.close()
-            log.info("closed; temporary exports removed")
+            try:
+                api.close()
+                log.info("closed; temporary exports removed")
+            except Exception as exc:  # noqa: BLE001 - Cleanup must not replace an active startup failure.
+                log_failure(log, exc, "shutdown.cleanup")
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+import { normalizeDiagnostic, type SafeDiagnostic } from "./diagnostics";
 import { loadDemoPackageFromZip } from "@cs2dak/core/evidence";
 import { buildRivalHubDemoEvidenceV1, resolveRivalHubParticipants, resolveRivalHubParticipantsForReview, resolveRivalHubParticipantsFromEventRoster } from "./evidence";
 import { evidenceTargetFromRemoteMap, matchRivalHubMap, type RivalHubMatchCandidate } from "./match";
@@ -7,6 +8,7 @@ import type { EvidenceSubmissionResponse, RivalHubEventsResponse } from "./contr
 export type UploadPhase = "waiting" | "parsing" | "matching" | "selecting" | "uploading" | "done" | "needs_attention" | "failed";
 export interface UploadUpdate { phase: UploadPhase; message: string; match?: string; target?: RivalHubMatchCandidate; response?: EvidenceSubmissionResponse }
 export interface UploadDependencies {
+  warning?(diagnostic: SafeDiagnostic): void;
   hash(): Promise<string>;
   exportZip(): Promise<Uint8Array>;
   cleanup(): Promise<void>;
@@ -67,6 +69,14 @@ export async function uploadDemo(deps: UploadDependencies): Promise<void> {
     const needsAttention = confirmed.map.demoStatus === "needs_attention";
     deps.update({ phase: needsAttention ? "needs_attention" : "done", message: needsAttention ? issues.map(i => `${i.code}：${i.message}`).join("；") || "网站需要人工核对比赛数据" : "上传完成，网站已确认同步", match: label, target: selected, response: { ...response, issues } });
   } finally {
-    await deps.cleanup();
+    try { await deps.cleanup(); }
+    catch (error) {
+      const diagnostic = normalizeDiagnostic(error, { stage: "cleanup" });
+      // Cleanup is secondary, including when the upload has already succeeded.
+      try {
+        if (deps.warning) deps.warning(diagnostic);
+        else console.warn("Upload cleanup failed", diagnostic);
+      } catch { /* Reporting must not replace the primary outcome. */ }
+    }
   }
 }

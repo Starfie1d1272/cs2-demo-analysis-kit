@@ -4,3 +4,5 @@ export * from "./evidence";
 export * from "./client";
 
 export * from "./pipeline";
+
+export * from "./diagnostics";

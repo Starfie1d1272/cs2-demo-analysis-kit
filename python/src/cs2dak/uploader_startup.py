@@ -8,10 +8,11 @@ import os
 import platform
 import sys
 import tempfile
-import traceback
 from importlib.metadata import PackageNotFoundError, version
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+
+from cs2dak.diagnostics import SafeFormatter, log_failure  # noqa: F401
 
 NETFX_KEY = r"SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full"
 WEBVIEW_KEY = r"Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
@@ -66,7 +67,7 @@ def setup_logging(userdata: Path, logger: logging.Logger) -> Path:
         fallback = Path(tempfile.mkdtemp(prefix="rivalhub-uploader-startup-"))
         handler = RotatingFileHandler(fallback / "uploader.log", maxBytes=1024 * 1024,
                                       backupCount=2, encoding="utf-8")
-    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+    handler.setFormatter(SafeFormatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
     # pywebview can catch and log backend errors rather than re-raise them.
@@ -107,25 +108,6 @@ def log_environment(logger: logging.Logger):
                     logger.warning("bundled DLL probe failed: %s", path, exc_info=True)
                     continue
                 logger.info("bundled DLL path=%s bytes=%d sha256=%s", path, size, digest)
-
-
-def log_failure(logger: logging.Logger, exc: BaseException):
-    logger.error("startup failed\n%s", "".join(traceback.format_exception(exc)))
-    # Python traceback preserves __cause__/__context__; managed InnerException isn't a Python cause.
-    pending = [exc]
-    seen = set()
-    while pending and len(seen) < 32:
-        error = pending.pop()
-        if id(error) in seen:
-            continue
-        seen.add(id(error))
-        logger.error("exception %s: %s", type(error).__name__, error)
-        for attr in ("InnerException", "__cause__", "__context__"):
-            inner = getattr(error, attr, None)
-            if inner is not None:
-                pending.append(inner)
-    for handler in logger.handlers:
-        handler.flush()
 
 
 def show_failure(logfile: Path, detail: str = ""):

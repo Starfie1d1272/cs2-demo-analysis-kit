@@ -14,3 +14,7 @@ describe("user-facing upload error guidance", () => {
     expect(explainError(new RivalHubHttpError(409, "Conflict")).action).toContain("选手名单");
   });
 });
+
+it("preserves native object failure details and request correlation", () => {
+  expect(explainError({ code: "NEW_CODE", status: 422, message: "Rejected", requestId: "req-9", cause: "Roster mismatch" }, { fileId: "file-2", stage: "submit", attempt: 3 })).toMatchObject({ code: "NEW_CODE", status: 422, requestId: "req-9", message: "Rejected", cause: "Roster mismatch", fileId: "file-2", stage: "submit", attempt: 3 });
+});
