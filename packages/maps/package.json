@@ -18,7 +18,8 @@
     "src",
     "callout-grid",
     "map-routes",
-    "map-nav"
+    "map-nav",
+    "map-zones"
   ],
   "publishConfig": {
     "access": "public"

@@ -26,12 +26,12 @@
 | `cs2df`                  | 将原始 `.dem` 确定性导出为合法 v3 DemoPackage                   | RR/PRISM、产品展示、业务持久化              | v3 ZIP、导出报告            |
 | Python CLI / GUI         | 提供 cs2df 的本地 GUI / DAK Studio 桥 / 打包壳                  | 维护独立 parser/exporter、分析或展示实现    | GUI、Studio bridge、桌面应用 |
 | `@cs2dak/contract`       | 定义 DAK 派生结果的公共合同；re-export 上游合同                 | 复制 `cs2-demo-format` schema、实现分析逻辑 | Zod schema、TypeScript 类型 |
-| `@cs2dak/core`           | 单场 Demo 的标准化、canonical performance facts、QA 和确定性分析 | 跨场聚合、身份管理、页面叙事、React UI      | `AnalysisBundle`            |
+| `@cs2dak/core`           | 单场 Demo 的标准化、canonical performance/frozen Tournament facts、QA 和确定性分析 | 跨场聚合、身份管理、页面叙事、React UI      | `AnalysisBundle`            |
 | `@cs2dak/cohort`         | 跨场聚合、身份归并、赛季级 RR/PRISM 输入与结果整形              | 单场解析、数据库、产品 UI                   | `CohortBundle`              |
 | `@rivalhub/rival-rating` | RR、PRISM 及相关评分公式                                        | Demo 信号提取、持久化、展示                 | 评分结果                    |
 | `@cs2dak/maps`           | 地图标定、坐标变换、callout 语义/grid、默认位、包点入口、区域几何 | 评分公式、产品 UI、战术结论、静态完整战术库 | 地图与空间能力              |
 | `@cs2dak/tournament`     | frozen Tournament sufficient-fact DTO、identity-safe 跨图 merge、透明 performance aggregation、rate 与结构/引用/聚合安全校验 | Demo 解析/detection、Core semantic QA、RivalHub scope、数据库、React、评分公式 | `TournamentAnalytics`、`TournamentPerformanceAnalytics` |
-| `@cs2dak/presentation`   | 将 core/cohort 结果转换为比赛、选手、队伍、赛季和排行榜展示模型；提供 Tournament 单图 fact adapter | 解析、评分公式、数据库、React、Tournament 跨图 merge | 产品中立 View Models        |
+| `@cs2dak/presentation`   | 将 core/cohort 结果转换为比赛、选手、队伍、赛季和排行榜展示模型；仅包装 canonical adapter 并注入最终显示标签 | 解析、评分公式、数据库、React、Tournament 跨图 merge | 产品中立 View Models        |
 | `@cs2dak/react`          | 渲染 presentation 合同和基础可视化组件                          | 数据库查询、分析、评分、产品业务规则        | React 组件与样式            |
 | `@cs2dak/rivalhub-upload` | RivalHub 配对与 HTTP client、目标匹配、Evidence V1 producer；唯一共享上传语义 owner | 本地文件、UI、数据库、Library 持久化 | `rivalhub-demo-evidence/1` |
 | Node CLI                 | 将 TypeScript 包接入本地文件系统和自动化流程                    | 复制核心分析逻辑                            | 命令行输出与文件产物        |
@@ -51,7 +51,7 @@ DAK Studio 已落地为 `apps/dak-studio`（资料库 / 比赛工作台 / 选手
 | 个人实验室 | 选手档案、趋势、武器分布、证据跳转 | `@cs2dak/cohort` + `@cs2dak/presentation` |
 | 对枪实验室 | duels/mechanics 信号聚合、三分类对枪、TTK、机制画像（含 .tri LOS 反应时间/预瞄） | `@cs2dak/core` + `@cs2dak/presentation` |
 | 道具实验室 | 跨场 Flash Value、负收益队闪、道具证据 | `@cs2dak/presentation` |
-| 经济与节奏 | 经济矩阵、手枪转化、eco/semi 翻盘 | `@cs2dak/tournament`（单图事实由 presentation adapter 生成） |
+| 经济与节奏 | 经济矩阵、手枪转化、eco/semi 翻盘 | `@cs2dak/tournament`（单图事实由 Core canonical adapter 生成） |
 | 赛事中台 | 跨队横向对比、地图盘面、武器榜、报表 | `@cs2dak/cohort` + `@cs2dak/presentation` + `@cs2dak/tournament` |
 | 教练工作台 | pattern/playbook/anti-strat 的本地查询与编排 | `@cs2dak/maps` 静态地图语义 + `@cs2dak/core` 回合推导 + `@cs2dak/cohort` 聚合 + `@cs2dak/presentation` 展示模型 |
 
@@ -84,3 +84,5 @@ PRISM 风格、强弱项等“相对当前范围”的判断可以继续使用 c
 3. 哪些模块明确不得实现它？
 
 无法明确回答时，不应开始实现。
+
+14. `core/src/tournament-facts.ts` 是单图 frozen Tournament economy/performance projection 的唯一 owner，只以 type import 消费 Tournament DTO。显式 stable team/player ID 必须完整，teamA/B 相同 ID 明确拒绝；显示队名、昵称、logo 不生成或决定 ID。Evidence 直接消费 Core data adapter，再按 target entry ID 查询 Tournament 结果，不通过 Presentation ViewModel 回查。未绑定的本地 Demo 使用显式 match-scoped observed ID，只表示本场观察，不能据同名跨图认定同队；Presentation 只注入标签，Studio `teamRenames` 不改变 frozen identity。

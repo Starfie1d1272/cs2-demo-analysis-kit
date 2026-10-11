@@ -1,21 +1,13 @@
-import type { DemoPackage, TeamKey } from "@cs2dak/contract";
+import type { TeamKey } from "@cs2dak/contract";
 import {
-  aggregatePlayerRoundPerformanceFacts,
-  assertPlayerStatsParity,
-  buildPlayerRoundPerformanceFacts,
-  CORE_ANALYSIS_VERSION,
-  CORE_SEMANTIC_PROFILE,
-  type PlayerRoundManStateFact,
+  buildPlayerRoundPerformanceFacts, extractTournamentSourceFacts, projectTournamentMapFacts,
+  observedTournamentIdentity, type TournamentIdentity, type TournamentSourceFacts,
 } from "@cs2dak/core";
 import {
   buildTournamentAnalytics,
-  type TournamentEconomyType,
   type TournamentEntityLabels,
-  type TournamentManAdvantage,
   type TournamentMapFacts,
-  type TournamentTeamConversionCount,
-  type TournamentTeamMapCount,
-  type WinLossCount,
+  type TournamentManAdvantage,
 } from "@cs2dak/tournament";
 import { round } from "./season-metrics.js";
 import { displayWeaponName } from "./weapons.js";
@@ -41,6 +33,7 @@ export interface TournamentWeaponStat {
 }
 
 export interface TournamentTeamPistolStat {
+  teamEntityKey: string;
   teamName: string;
   pistolRounds: number;
   pistolWins: number;
@@ -69,6 +62,7 @@ export interface TournamentEconomyMatrixCell {
 }
 
 export interface TournamentEcoUpsetStat {
+  teamEntityKey: string;
   teamName: string;
   opportunities: number;
   wins: number;
@@ -101,11 +95,13 @@ export interface TournamentTeamManAdvantageState {
 }
 
 export interface TournamentTeamManAdvantageStat {
+  teamEntityKey: string;
   teamName: string;
   states: TournamentTeamManAdvantageState[];
 }
 
 export interface TournamentTeamEconomySummary {
+  teamEntityKey: string;
   teamName: string;
   maps: number;
   rounds: number;
@@ -154,269 +150,31 @@ export interface TournamentInsights {
  * Studio 旧 derived-cache 中保存的单图原始事实。新代码只在这里把它
  * 适配为 frozen sufficient facts；跨图 merge 由 @cs2dak/tournament 负责。
  */
-export interface TournamentFacts {
-  matchId: string;
-  mapName: string;
+export interface TournamentFacts extends TournamentSourceFacts {
   teams: Record<TeamKey, string>;
   players: Array<{ steamId64: string; name: string; teamKey: TeamKey }>;
-  kills: Array<{
-    roundNumber: number;
-    tick: number;
-    killerSteamId64: string | null;
-    victimSteamId64: string;
-    weapon: string;
-    headshot: boolean;
-  }>;
-  /** Core-owned weapon aggregates; raw kills are retained as event facts. */
-  playerWeapons?: Array<{
-    playerSteamId64: string;
-    weapon: string;
-    kills: number;
-    headshotKills: number;
-  }>;
-  rounds: Array<{
-    roundNumber: number;
-    winnerSide: "t" | "ct";
-    winnerTeamKey: TeamKey;
-    teamAEconomy: string;
-    teamBEconomy: string;
-    teamASide?: "t" | "ct";
-    teamBSide?: "t" | "ct";
-    freezeEndTick?: number;
-    endTick?: number;
-  }>;
-  /** Core-owned ordered manpower state facts; absent only for old hand-built fixtures. */
-  manState?: PlayerRoundManStateFact[];
-}
-
-const ECONOMY_RANK: Record<string, number> = { eco: 0, semi: 1, force: 2, full: 3 };
-const MAN_ADVANTAGE_KEYS = ["5v4", "4v5", "5v3", "3v5"] as const satisfies readonly TournamentManAdvantage[];
-
-function teamNameForTournament(pkg: DemoPackage, teamKey: TeamKey): string {
-  return teamKey === "teamA" ? (pkg.match.teamA.name ?? "Team A") : (pkg.match.teamB.name ?? "Team B");
 }
 
 export function extractTournamentFacts(
   input: SeasonInsightsDemo,
   suppliedPerformanceFacts?: ReturnType<typeof buildPlayerRoundPerformanceFacts>,
+  identity: TournamentIdentity = input.tournamentIdentity ?? observedTournamentIdentity(input.matchId, input.pkg.players),
 ): TournamentFacts {
-  const { pkg } = input;
-  const performanceFacts = suppliedPerformanceFacts ?? input.performanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
-  assertPlayerStatsParity(pkg, performanceFacts);
-  const performanceBySteamId = aggregatePlayerRoundPerformanceFacts(performanceFacts);
+  const facts = extractTournamentSourceFacts(input, identity, suppliedPerformanceFacts);
   return {
-    matchId: input.matchId,
-    mapName: pkg.match.mapName,
-    teams: {
-      teamA: teamNameForTournament(pkg, "teamA"),
-      teamB: teamNameForTournament(pkg, "teamB")
-    },
-    players: pkg.players.map((player) => ({
-      steamId64: player.steamId64,
-      name: player.name,
-      teamKey: player.teamKey
-    })),
-    kills: pkg.kills.map((kill) => ({
-      roundNumber: kill.roundNumber,
-      tick: kill.tick,
-      killerSteamId64: kill.killerIndex != null ? (pkg.players[kill.killerIndex]?.steamId64 ?? null) : null,
-      victimSteamId64: pkg.players[kill.victimIndex]?.steamId64 ?? "",
-      weapon: kill.weapon || "unknown",
-      headshot: kill.headshot
-    })).filter((kill) => kill.victimSteamId64 !== ""),
-    playerWeapons: pkg.players.flatMap((player) => performanceBySteamId.get(player.steamId64)?.weapons.map((weapon) => ({
-      playerSteamId64: player.steamId64,
-      weapon: weapon.weapon,
-      kills: weapon.kills,
-      headshotKills: weapon.headshotKills,
-    })) ?? []),
-    rounds: pkg.rounds.map((roundRow) => ({
-      roundNumber: roundRow.roundNumber,
-      winnerSide: roundRow.winnerSide,
-      winnerTeamKey: roundRow.winnerTeamKey,
-      teamAEconomy: roundRow.teamAEconomy,
-      teamBEconomy: roundRow.teamBEconomy,
-      teamASide: roundRow.teamASide,
-      teamBSide: roundRow.teamBSide,
-      freezeEndTick: roundRow.freezeEndTick,
-      endTick: roundRow.endTick,
-    })),
-    manState: performanceFacts.manState,
+    ...facts,
+    teams: { teamA: input.pkg.match.teamA.name ?? "Team A", teamB: input.pkg.match.teamB.name ?? "Team B" },
+    players: input.pkg.players.map(player => ({ steamId64: player.steamId64, name: player.name, teamKey: player.teamKey })),
   };
-}
-
-function zeroCount(): WinLossCount {
-  return { opportunities: 0, wins: 0 };
-}
-
-function zeroTeamMaps(): TournamentTeamMapCount {
-  return { rounds: 0, roundWins: 0, tRounds: 0, tWins: 0, ctRounds: 0, ctWins: 0 };
-}
-
-function zeroTeamConversions(): TournamentTeamConversionCount {
-  return {
-    pistol: zeroCount(),
-    round2: { conversion: zeroCount(), break: zeroCount() },
-    ecoSemiUpset: zeroCount(),
-    manAdvantage: Object.fromEntries(MAN_ADVANTAGE_KEYS.map((key) => [key, zeroCount()])) as Record<TournamentManAdvantage, WinLossCount>,
-  };
-}
-
-function addCount(target: WinLossCount, won: boolean): void {
-  target.opportunities += 1;
-  if (won) target.wins += 1;
-}
-
-function otherTeam(teamKey: TeamKey): TeamKey {
-  return teamKey === "teamA" ? "teamB" : "teamA";
-}
-
-function roundSides(roundRow: TournamentFacts["rounds"][number]): Record<TeamKey, "t" | "ct"> {
-  if (roundRow.teamASide && roundRow.teamBSide) {
-    return { teamA: roundRow.teamASide, teamB: roundRow.teamBSide };
-  }
-  const tTeam = roundRow.winnerSide === "t" ? roundRow.winnerTeamKey : otherTeam(roundRow.winnerTeamKey);
-  return { teamA: tTeam === "teamA" ? "t" : "ct", teamB: tTeam === "teamB" ? "t" : "ct" };
-}
-
-function addTeamRound(
-  teamMaps: Record<TeamKey, TournamentTeamMapCount>,
-  row: TournamentFacts["rounds"][number],
-): void {
-  const sides = roundSides(row);
-  for (const teamKey of ["teamA", "teamB"] as const) {
-    const team = teamMaps[teamKey];
-    team.rounds += 1;
-    if (row.winnerTeamKey === teamKey) team.roundWins += 1;
-    if (sides[teamKey] === "t") {
-      team.tRounds += 1;
-      if (row.winnerTeamKey === teamKey) team.tWins += 1;
-    } else {
-      team.ctRounds += 1;
-      if (row.winnerTeamKey === teamKey) team.ctWins += 1;
-    }
-  }
-}
-
-function collectManAdvantage(
-  teamConversions: Record<TeamKey, TournamentTeamConversionCount>,
-  facts: TournamentFacts,
-  row: TournamentFacts["rounds"][number],
-): void {
-  const seen = new Set<string>();
-  for (const state of (facts.manState ?? [])
-    .filter((candidate) => candidate.roundNumber === row.roundNumber)
-    .sort((a, b) => a.tick - b.tick)) {
-    if (state.advantageTeamKey == null) continue;
-    const advantageAlive = state.advantageAlive;
-    const disadvantageAlive = state.disadvantageAlive;
-    const key = `${advantageAlive}v${disadvantageAlive}` as TournamentManAdvantage;
-    if (!MAN_ADVANTAGE_KEYS.includes(key) || seen.has(key)) continue;
-    seen.add(key);
-    const advantageTeam = state.advantageTeamKey;
-    const disadvantageTeam = otherTeam(advantageTeam);
-    addCount(teamConversions[advantageTeam].manAdvantage[key], row.winnerTeamKey === advantageTeam);
-    const disadvantageKey = `${disadvantageAlive}v${advantageAlive}` as TournamentManAdvantage;
-    addCount(teamConversions[disadvantageTeam].manAdvantage[disadvantageKey], row.winnerTeamKey === disadvantageTeam);
-  }
 }
 
 function toTournamentMapFacts(facts: TournamentFacts): { facts: TournamentMapFacts; labels: TournamentEntityLabels } {
-  const orderedRounds = [...facts.rounds].sort((a, b) => a.roundNumber - b.roundNumber);
-  const teamEntityKeys = {
-    teamA: `legacy-team:${facts.teams.teamA}`,
-    teamB: `legacy-team:${facts.teams.teamB}`,
-  } as const;
-  const teamMaps = { teamA: zeroTeamMaps(), teamB: zeroTeamMaps() };
-  const teamConversions = { teamA: zeroTeamConversions(), teamB: zeroTeamConversions() };
-  const pistolSides = { t: zeroCount(), ct: zeroCount() };
-  const economyMatrix = new Map<string, { lowEconomy: TournamentEconomyType; highEconomy: TournamentEconomyType; rounds: number; lowEconomyWins: number }>();
-
-  for (let index = 0; index < orderedRounds.length; index += 1) {
-    const row = orderedRounds[index]!;
-    addTeamRound(teamMaps, row);
-    const next = orderedRounds[index + 1];
-    const isPistolEconomy = row.teamAEconomy === "pistol" || row.teamBEconomy === "pistol";
-    const isPistol = row.roundNumber === 1 || row.roundNumber === 13 || isPistolEconomy;
-    if (isPistolEconomy) {
-      addCount(pistolSides.t, row.winnerSide === "t");
-      addCount(pistolSides.ct, row.winnerSide === "ct");
-    }
-    if (isPistol) {
-      addCount(teamConversions.teamA.pistol, row.winnerTeamKey === "teamA");
-      addCount(teamConversions.teamB.pistol, row.winnerTeamKey === "teamB");
-      if (next) {
-        addCount(teamConversions[row.winnerTeamKey].round2.conversion, next.winnerTeamKey === row.winnerTeamKey);
-        const loserTeamKey = otherTeam(row.winnerTeamKey);
-        addCount(teamConversions[loserTeamKey].round2.break, next.winnerTeamKey === loserTeamKey);
-      }
-    }
-
-    const rankA = ECONOMY_RANK[row.teamAEconomy];
-    const rankB = ECONOMY_RANK[row.teamBEconomy];
-    if (rankA != null && rankB != null) {
-      const lowIsA = rankA <= rankB;
-      const lowEconomy = (lowIsA ? row.teamAEconomy : row.teamBEconomy) as TournamentEconomyType;
-      const highEconomy = (lowIsA ? row.teamBEconomy : row.teamAEconomy) as TournamentEconomyType;
-      const key = `${lowEconomy}:${highEconomy}`;
-      const cell = economyMatrix.get(key) ?? { lowEconomy, highEconomy, rounds: 0, lowEconomyWins: 0 };
-      cell.rounds += 1;
-      if (row.winnerTeamKey === (lowIsA ? "teamA" : "teamB")) cell.lowEconomyWins += 1;
-      economyMatrix.set(key, cell);
-    }
-
-    const aWeak = row.teamAEconomy === "eco" || row.teamAEconomy === "semi";
-    const bWeak = row.teamBEconomy === "eco" || row.teamBEconomy === "semi";
-    if (aWeak && row.teamBEconomy === "full") addCount(teamConversions.teamA.ecoSemiUpset, row.winnerTeamKey === "teamA");
-    if (bWeak && row.teamAEconomy === "full") addCount(teamConversions.teamB.ecoSemiUpset, row.winnerTeamKey === "teamB");
-
-    collectManAdvantage(teamConversions, facts, row);
-  }
-
-  const playerTeamKeys = new Map(facts.players.map((player) => [player.steamId64, teamEntityKeys[player.teamKey]]));
-  const playerWeapons = new Map<string, {
-    playerEntityKey: string;
-    teamEntityKey: string;
-    weapon: string;
-    kills: number;
-    headshotKills: number;
-  }>();
-  for (const weapon of facts.playerWeapons ?? []) {
-    const teamEntityKey = playerTeamKeys.get(weapon.playerSteamId64);
-    if (!teamEntityKey) continue;
-    const key = `${weapon.playerSteamId64}:${weapon.weapon}`;
-    const cell = playerWeapons.get(key) ?? {
-      playerEntityKey: `steam:${weapon.playerSteamId64}`,
-      teamEntityKey,
-      weapon: weapon.weapon,
-      kills: 0,
-      headshotKills: 0,
-    };
-    cell.kills += weapon.kills;
-    cell.headshotKills += weapon.headshotKills;
-    playerWeapons.set(key, cell);
-  }
-
+  const projected = projectTournamentMapFacts(facts);
   return {
-    facts: {
-      semanticProfile: CORE_SEMANTIC_PROFILE,
-      analysisVersion: CORE_ANALYSIS_VERSION,
-      mapKey: `legacy-map:${facts.matchId}:${facts.mapName}`,
-      matchKey: facts.matchId,
-      mapName: facts.mapName,
-      teamEntityKeys,
-      teamMaps,
-      teamConversions,
-      economyMatrix: [...economyMatrix.values()],
-      pistolSides,
-      playerWeapons: [...playerWeapons.values()],
-    },
+    facts: projected,
     labels: {
-      teams: {
-        [teamEntityKeys.teamA]: facts.teams.teamA,
-        [teamEntityKeys.teamB]: facts.teams.teamB,
-      },
-      players: Object.fromEntries(facts.players.map((player) => [`steam:${player.steamId64}`, player.name])),
+      teams: { [facts.teamEntityKeys.teamA]: facts.teams.teamA, [facts.teamEntityKeys.teamB]: facts.teams.teamB },
+      players: Object.fromEntries(facts.players.map(player => [facts.playerEntityKeys[player.steamId64]!, player.name])),
     },
   };
 }
@@ -482,7 +240,7 @@ function legacyTeamManAdvantage(teamName: string, analyticsTeam: ReturnType<type
   const state53 = teamManAdvantageState(analyticsTeam.manAdvantage["5v3"], analyticsTeam.manAdvantage["3v5"], 5, 3);
   if (state54.advantageOpportunities > 0 || state54.disadvantageOpportunities > 0) states.push(state54);
   if (state53.advantageOpportunities > 0 || state53.disadvantageOpportunities > 0) states.push(state53);
-  return { teamName, states };
+  return { teamEntityKey: analyticsTeam.team.entityKey, teamName, states };
 }
 
 function buildLegacyInsights(analytics: ReturnType<typeof buildTournamentAnalytics>): TournamentInsights {
@@ -496,6 +254,7 @@ function buildLegacyInsights(analytics: ReturnType<typeof buildTournamentAnalyti
   const teamPistols = analytics.teams
     .filter((team) => team.pistol.opportunities > 0)
     .map((team) => ({
+      teamEntityKey: team.team.entityKey,
       teamName: team.team.displayName,
       pistolRounds: team.pistol.opportunities,
       pistolWins: team.pistol.wins,
@@ -519,6 +278,7 @@ function buildLegacyInsights(analytics: ReturnType<typeof buildTournamentAnalyti
     .sort((a, b) => b.rounds - a.rounds || a.lowEconomy.localeCompare(b.lowEconomy) || a.highEconomy.localeCompare(b.highEconomy));
   const ecoUpsets = analytics.teams
     .map((team) => ({
+      teamEntityKey: team.team.entityKey,
       teamName: team.team.displayName,
       opportunities: team.ecoSemiUpset.opportunities,
       wins: team.ecoSemiUpset.wins,
@@ -532,6 +292,7 @@ function buildLegacyInsights(analytics: ReturnType<typeof buildTournamentAnalyti
     .sort((a, b) => a.teamName.localeCompare(b.teamName));
   const teamEconomySummaries = analytics.teams
     .map((team) => ({
+      teamEntityKey: team.team.entityKey,
       teamName: team.team.displayName,
       maps: team.mapCount,
       rounds: team.rounds,

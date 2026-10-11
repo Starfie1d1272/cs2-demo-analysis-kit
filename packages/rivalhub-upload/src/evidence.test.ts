@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { DemoPackage, PackageKill } from "@cs2dak/contract";
-import { aggregatePlayerRoundPerformanceFacts, buildPlayerRoundPerformanceFacts, loadDemoPackageFromZip } from "@cs2dak/core/evidence";
+import { aggregatePlayerRoundPerformanceFacts, buildPlayerRoundPerformanceFacts, loadDemoPackageFromZip, extractTournamentSourceFacts, projectTournamentMapFacts } from "@cs2dak/core/evidence";
 import { buildRivalHubDemoEvidenceV1, fixtureIdentity, fixtureTarget, matchRivalHubParticipants, matchRivalHubParticipantsForReview, normalizeRivalHubDemoPackage, resolveRivalHubParticipants, resolveRivalHubParticipantsFromEventRoster, resolveRivalHubParticipantsForReview, selectRivalHubMap, type RivalHubEvidenceTarget, type RivalHubTeamOrientation } from "./evidence";
 import { rivalHubEvidenceIdempotencyKey } from "./client";
 import type { RivalHubEvidenceSubmission } from "./contract";
@@ -227,6 +227,25 @@ function evidencePackageWithTeamkill(): { pkg: DemoPackage; identities: Map<stri
 }
 
 describe("RivalHub online Demo matching", () => {
+  it("same team labels and renamed nicknames keep Evidence facts unchanged and use stable target IDs", () => {
+    const canonicalTarget = fixtureTarget();
+    const identities = new Map(stableFixture.players.map((player, index) => [player.steamId64, fixtureIdentity(player, index, canonicalTarget)]));
+    const renamed = { ...stableFixture, match: { ...stableFixture.match, teamA: { ...stableFixture.match.teamA, name: "Identical" }, teamB: { ...stableFixture.match.teamB, name: "Identical" } }, players: stableFixture.players.map(player => ({ ...player, name: "Renamed player" })) };
+    const baseline = buildRivalHubDemoEvidenceV1(stableFixture, canonicalTarget, identities) as any;
+    const evidence = buildRivalHubDemoEvidenceV1(renamed, canonicalTarget, identities) as any;
+    expect(evidence.sourceFacts).toEqual(baseline.sourceFacts);
+    expect(evidence.semanticFacts).toEqual(baseline.semanticFacts);
+    expect(evidence.summaries).toEqual(baseline.summaries);
+    const identity = { teamEntityKeys: { teamA: canonicalTarget.entryAId, teamB: canonicalTarget.entryBId }, playerEntityKeys: Object.fromEntries([...identities].map(([sid, player]) => [sid, player.steamId64])) };
+    const frozen = projectTournamentMapFacts(extractTournamentSourceFacts({ matchId: canonicalTarget.matchMapId, pkg: renamed }, identity));
+    for (const key of ["teamA", "teamB"] as const) {
+      const row = evidence.semanticFacts.teamConversions.find((item: { teamKey: string }) => item.teamKey === key);
+      expect(row.pistol).toEqual(frozen.teamConversions[key].pistol);
+      expect(row.round2).toEqual(frozen.teamConversions[key].round2);
+      expect(row.ecoSemiUpset).toEqual(frozen.teamConversions[key].ecoSemiUpset);
+    }
+    expect(() => buildRivalHubDemoEvidenceV1(renamed, { ...canonicalTarget, entryBId: canonicalTarget.entryAId }, identities)).toThrow("teamA and teamB must differ");
+  });
   it("keeps published tournament semantic facts exact after the owner migration", () => {
     const target = fixtureTarget();
     const identities = new Map(stableFixture.players.map((player, index) => [player.steamId64, fixtureIdentity(player, index, target)]));

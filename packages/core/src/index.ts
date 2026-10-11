@@ -117,3 +117,5 @@ export function analyzeDemoPackage(input: unknown, suppliedPerformanceFacts?: Pl
 }
 export * from "./tactics/index.js";
 export * from "./map-intelligence/index.js";
+
+export * from "./tournament-facts.js";

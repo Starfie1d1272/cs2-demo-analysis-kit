@@ -8,10 +8,12 @@ import {
   CORE_SEMANTIC_PROFILE,
   demoSourceAvailability,
   richKillDiagnostics,
+  extractTournamentSourceFacts,
+  projectTournamentMapFacts,
   type PlayerPerformanceAggregate,
 } from "@cs2dak/core/evidence";
 import type { DemoPackage, TeamKey } from "@cs2dak/contract";
-import { buildTournamentInsightsFromFacts, extractTournamentFacts } from "@cs2dak/presentation/tournament-compat";
+import { buildTournamentAnalytics } from "@cs2dak/tournament";
 import type { RivalHubRemoteMap, RivalHubRemotePlayer, RivalHubRemoteTeam } from "./contract";
 import { resolveRivalHubEventRoster } from "./match";
 
@@ -348,28 +350,28 @@ function mappedSteam(pkg: DemoPackage, identities: Map<string, RivalHubParticipa
   return player ? identities.get(player.steamId64)?.steamId64 ?? null : null;
 }
 
-function teamConversions(pkg: DemoPackage, performanceFacts: ReturnType<typeof buildPlayerRoundPerformanceFacts>) {
-  const insights = buildTournamentInsightsFromFacts([extractTournamentFacts({ matchId: "fixture", pkg }, performanceFacts)]);
-  const names = { teamA: pkg.match.teamA.name ?? "Team A", teamB: pkg.match.teamB.name ?? "Team B" };
+function teamConversions(pkg: DemoPackage, performanceFacts: ReturnType<typeof buildPlayerRoundPerformanceFacts>, target: RivalHubEvidenceTarget, identities: Map<string, RivalHubParticipantIdentity>) {
+  const identity = {
+    teamEntityKeys: { teamA: target.entryAId, teamB: target.entryBId },
+    playerEntityKeys: Object.fromEntries(pkg.players.map(player => [player.steamId64, identities.get(player.steamId64)?.steamId64 ?? ""])),
+  };
+  const facts = projectTournamentMapFacts(extractTournamentSourceFacts({ matchId: target.matchMapId, pkg, performanceFacts }, identity));
+  const analytics = buildTournamentAnalytics([facts]);
   return {
-    economyMatrix: insights.economyMatrix.map((row) => ({ lowEconomy: row.lowEconomy, highEconomy: row.highEconomy, rounds: row.rounds, lowEconomyWins: row.lowEconomyWins })),
+    economyMatrix: analytics.economyMatrix.map((row) => ({ lowEconomy: row.lowEconomy, highEconomy: row.highEconomy, rounds: row.rounds, lowEconomyWins: row.lowEconomyWins }))
+      .sort((a, b) => b.rounds - a.rounds || a.lowEconomy.localeCompare(b.lowEconomy) || a.highEconomy.localeCompare(b.highEconomy)),
     teams: (["teamA", "teamB"] as const).map((teamKey) => {
-      const summary = insights.teamEconomySummaries.find((row) => row.teamName === names[teamKey])!;
-      const states = new Map(summary.manAdvantage.states.map((row) => [`${row.advantageAlive}v${row.disadvantageAlive}`, row]));
-      const state = (label: "5v4" | "5v3") => states.get(label);
+      const summary = analytics.teams.find(row => row.team.entityKey === identity.teamEntityKeys[teamKey])!;
       return {
         teamKey,
-        pistol: { opportunities: summary.pistol.rounds, wins: summary.pistol.wins },
+        pistol: { opportunities: summary.pistol.opportunities, wins: summary.pistol.wins },
         round2: {
-          conversion: { opportunities: summary.round2.conversionRounds, wins: summary.round2.conversionWins },
-          break: { opportunities: summary.round2.breakRounds, wins: summary.round2.breakWins },
+          conversion: { opportunities: summary.round2.conversion.opportunities, wins: summary.round2.conversion.wins },
+          break: { opportunities: summary.round2.break.opportunities, wins: summary.round2.break.wins },
         },
-        ecoSemiUpset: { opportunities: summary.smallBuyUpset.opportunities, wins: summary.smallBuyUpset.wins },
+        ecoSemiUpset: { opportunities: summary.ecoSemiUpset.opportunities, wins: summary.ecoSemiUpset.wins },
         manAdvantage: [
-          { advantage: "5v4", opportunities: state("5v4")?.advantageOpportunities ?? 0, wins: state("5v4")?.advantageWins ?? 0 },
-          { advantage: "4v5", opportunities: state("5v4")?.disadvantageOpportunities ?? 0, wins: state("5v4")?.disadvantageWins ?? 0 },
-          { advantage: "5v3", opportunities: state("5v3")?.advantageOpportunities ?? 0, wins: state("5v3")?.advantageWins ?? 0 },
-          { advantage: "3v5", opportunities: state("5v3")?.disadvantageOpportunities ?? 0, wins: state("5v3")?.disadvantageWins ?? 0 },
+          ...(["5v4", "4v5", "5v3", "3v5"] as const).map(advantage => ({ advantage, opportunities: summary.manAdvantage[advantage].opportunities, wins: summary.manAdvantage[advantage].wins })),
         ],
       };
     }),
@@ -476,7 +478,7 @@ export function buildRivalHubDemoEvidenceV1(
       headshotKills: weapon.headshotKills,
     }));
   });
-  const conversions = teamConversions(pkg, performanceFacts);
+  const conversions = teamConversions(pkg, performanceFacts, target, identities);
   return {
     contract: { contractVersion: "rivalhub-demo-evidence/1", semanticProfile: CORE_SEMANTIC_PROFILE, analysisVersion: analysis.provenance.analysisVersion },
     target,

@@ -55,7 +55,7 @@ export interface IdentityOptions {
   /** 与 IdentityStoreState.version 一致；0 表示无自定义映射。 */
   version: number;
   map: PlayerIdentityMap;
-  /** 队伍原名 → 显示名；聚合时替换 pkg.match.teamA/B.name，同名队伍自动合并。 */
+  /** 队伍原名 → 显示名；不会改变 stable entity ID 或决定 Tournament 归并。 */
   teamRenames?: Record<string, string>;
 }
 
@@ -229,9 +229,8 @@ function missingFactsError(scope: string): Error {
 }
 
 /**
- * 把 facts 里的原始队名按 teamRenames 重映射后再交给 builder 聚合。
- * facts 在导入时以原始队名落库，聚合按 `teams[teamKey]` 字符串做 key——
- * 不在此重放改名，同名队伍就不会合并（队伍明细矩阵/对比表会显示未合并的原名）。
+ * 只替换 facts 的展示队名；Tournament 归并仍使用已持久化的 stable entity ID。
+ * 两个不同 ID 即使同名也保持独立，改名不会建立或移除身份绑定。
  * cache key 已并入 identity.version（改名 +1），无需额外失效处理。
  */
 export function withTeamRenames<T extends { teams: Record<string, string> }>(
@@ -487,7 +486,7 @@ const tournamentInsightsCache = new Map<string, Promise<TournamentInsights | nul
 
 /** 赛事/经济页面只需要 TournamentInsights，不必冷启动时构建 cohort + profiles + RR/PRISM。 */
 export function getTournamentInsights(entries: StudioDemoEntry[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<TournamentInsights | null> {
-  const key = `${keyOf(entries, identity?.version, selectedTeams)}:tournament`;
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:tournament-stable-id-v1`;
   const cached = tournamentInsightsCache.get(key);
   if (cached) return cached;
   const loading = (async () => {
@@ -557,9 +556,9 @@ const seasonSummaryCache = new Map<string, Promise<SeasonSummary>>();
 
 /** 聚合摘要：优先持久缓存命中（不触碰 ZIP），未命中才全量解析并回写。
  *  传入 identity 时将其并入缓存 key，identityMap 作为归并参数传给 buildSeasonCohort。
- *  teamRenames 在加载阶段应用，同名队伍自动合并。聚合后释放 pkgCache 降低峰值内存。 */
+ *  teamRenames 仅影响展示，stable ID 决定 Tournament 归并。聚合后释放 pkgCache 降低峰值内存。 */
 export function getSeasonSummary(entries: StudioDemoEntry[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<SeasonSummary> {
-  const key = keyOf(entries, identity?.version, selectedTeams);
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:stable-tournament-v1`;
   const cached = seasonSummaryCache.get(key);
   if (cached) return cached;
   const loading = (async () => {

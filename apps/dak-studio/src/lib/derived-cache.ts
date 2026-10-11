@@ -3,9 +3,9 @@ import type { DuelInsightsFacts, PlayerSeasonInsights, TeamComparisonFacts, Tour
 import type { FactsScope } from "./fact-types";
 import { getStorage, type RecordStore, type StorageAdapter } from "./storage";
 
-// v5 invalidates v4 rows because the persisted TournamentFacts payload now
-// depends on canonical manState and playerWeapons fields.
-export const DERIVED_MATCH_NAMESPACE = "derived:match-v5";
+// v6 requires explicit stable Tournament identities. Old label-derived rows
+// are rebuilt locally; raw Demo packages and immutable remote evidence are untouched.
+export const DERIVED_MATCH_NAMESPACE = "derived:match-v6";
 const TABLES = ["player_insights", "tournament", "team_comparison", "duels", "opening_trails", "utility_value"] as const;
 export const DERIVED_CACHE_RECORD_NAMESPACES = TABLES.map((table) => `${DERIVED_MATCH_NAMESPACE}:${table}`);
 
@@ -61,6 +61,7 @@ export function createDerivedCacheStore(adapter: StorageAdapter, namespace = DER
   const stores = Object.fromEntries(TABLES.map((table) => [table, adapter.records(`${namespace}:${table}`)])) as Record<(typeof TABLES)[number], RecordStore>;
   const legacyStores = namespace === DERIVED_MATCH_NAMESPACE
     ? [
+      ...TABLES.map((table) => adapter.records(`derived:match-v5:${table}`)),
       ...TABLES.map((table) => adapter.records(`derived:match-v4:${table}`)),
       ...["player_insights", "tournament_facts", "team_comparison_facts", "duel_facts", "match_workspace", "opening_trails", "utility_value"].map((table) => adapter.records(`derived:match-v3-map2:${table}`)),
     ]

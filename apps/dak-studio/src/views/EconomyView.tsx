@@ -185,7 +185,7 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
             <DataTable
               classes={STUDIO_TABLE_CLASSES}
               rows={insights.teamEconomySummaries}
-              rowKey={(t) => t.teamName}
+              rowKey={(t) => t.teamEntityKey}
               initialSortKey="rw"
               columns={TEAM_DETAIL_COLUMNS}
             />
@@ -208,7 +208,7 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
           <DataTable
             classes={STUDIO_TABLE_CLASSES}
             rows={insights.ecoUpsets}
-            rowKey={(r) => r.teamName}
+            rowKey={(r) => r.teamEntityKey}
             columns={ECO_UPSET_COLUMNS}
           />
         </article>
