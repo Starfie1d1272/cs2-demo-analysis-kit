@@ -1,0 +1,3 @@
+$ pnpm --filter @cs2dak/cli analyze ../../fixtures/input/cologne-major-2026-stage3-smoke-de_nuke.zip --out ../../fixtures/output/sample
+$ tsx src/index.ts analyze ../../fixtures/input/cologne-major-2026-stage3-smoke-de_nuke.zip --out ../../fixtures/output/sample
+Wrote analysis artifacts to ../../fixtures/output/sample

@@ -1,0 +1,10 @@
+$ cd python && uv run --extra dev pytest -- tests/test_diagnostics.py
+============================= test session starts ==============================
+platform linux -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0
+rootdir: /workspace/cs2-demo-analysis-kit/python
+configfile: pyproject.toml
+collected 42 items
+
+tests/test_diagnostics.py ..........................................     [100%]
+
+============================== 42 passed in 1.33s ==============================

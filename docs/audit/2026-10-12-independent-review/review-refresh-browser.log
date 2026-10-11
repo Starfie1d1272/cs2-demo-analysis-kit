@@ -1,0 +1,4 @@
+Synthetic Chromium UI with actual EventsView and RivalHubBatchImportPanel, CSS from repository.
+Retained pairing record, error=connection refused; pending batch count=1; synced=0; failed=0.
+Clicked actual EventsView button: 刷新赛事. Actual component callback calls: 1.
+Screenshot inspected. App/native/server end-to-end recovery is not exercised by this harness.

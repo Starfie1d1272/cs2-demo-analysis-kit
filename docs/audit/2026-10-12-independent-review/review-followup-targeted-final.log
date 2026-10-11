@@ -1,0 +1,12 @@
+
+ RUN  v5.0.3 /workspace/cs2-demo-analysis-kit
+
+
+ Test Files  4 passed (4)
+      Tests  70 passed (70)
+   Start at  19:31:58
+   Duration  3.94s (transform 75%, import 25%, tests 1%)
+
+  Transform  transforming modules took 7.97s · 75% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns

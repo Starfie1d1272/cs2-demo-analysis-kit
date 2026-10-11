@@ -174,3 +174,200 @@ def test_export_preserves_latest_failure_in_large_logs(tmp_path, size):
     finally:
         logger.removeHandler(handler)
         handler.close()
+
+
+def test_runtime_credentials_are_redacted_through_log_and_export(tmp_path):
+    import logging
+
+    from cs2dak.diagnostics import SafeFormatter, export_logs
+
+    logger = logging.getLogger("independent-audit")
+    handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+    handler.setFormatter(SafeFormatter("%(message)s"))
+    logger.addHandler(handler)
+    try:
+        for message in ("credential=synthetic-private", "passwd=synthetic-private", "password=two synthetic words", "password='two; synthetic words'",
+                        r'password="https://a\";synthetic-private" reason=连接失败',
+                        'password="secret words" reason=connection refused'):
+            logger.error(message)
+        assert export_logs(logger, tmp_path / "shared.log")
+        for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+            content = path.read_text()
+            assert "synthetic-private" not in content
+            assert "synthetic words" not in content
+            assert "redacted" in content
+            assert "reason=连接失败" in content
+            assert "reason=connection refused" in content
+            assert "secret words" not in content
+    finally:
+        logger.removeHandler(handler)
+        handler.close()
+
+
+@pytest.mark.parametrize("raw", [
+    "password=[redacted]synthetic-private",
+    "password=[redacted] synthetic-private",
+    "password=[redacted] reason=synthetic-private",
+    "credential=[redacted]\t synthetic-private",
+    "password=[redacted]synthetic-private; reason=连接失败",
+    "password=[redacted] synthetic-private; reason=connection refused",
+])
+def test_literal_redaction_marker_cannot_hide_suffix_in_real_export(tmp_path, raw):
+    logger = logging.getLogger("marker-boundary")
+    handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+    handler.setFormatter(SafeFormatter("%(message)s"))
+    logger.addHandler(handler)
+    try:
+        logger.error("TLS failed %s", raw)
+        assert export_logs(logger, tmp_path / "shared.log")
+        for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+            content = path.read_text()
+            assert "synthetic-private" not in content
+            assert "TLS failed" in content
+            if "; reason=" in raw:
+                assert raw[raw.index("; reason="):] in content
+            assert sanitize_text(content) == content
+    finally:
+        logger.removeHandler(handler)
+        handler.close()
+
+
+@pytest.mark.parametrize("entry", ["log_failure", "exception", "raw_json"])
+@pytest.mark.parametrize("raw, reason", [
+    ('password="secret words" reason=connection refused', 'connection refused'),
+    (r'password="https://a\";synthetic-private" reason=连接失败', '连接失败'),
+    ('password=[redacted] synthetic-private; reason=connection refused', 'connection refused'),
+    ('credential=[redacted]\t synthetic-private; reason=连接失败', '连接失败'),
+    ('password=[redacted] reason=synthetic-private; reason=连接失败', '连接失败'),
+])
+def test_structured_failure_roundtrip_preserves_safe_causes(tmp_path, entry, raw, reason):
+    import json
+
+    logger = logging.getLogger("structured-roundtrip")
+    handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+    handler.setFormatter(SafeFormatter("%(levelname)s %(message)s"))
+    logger.addHandler(handler)
+    try:
+        if entry == "log_failure":
+            log_failure(logger, ValueError(raw), "request")
+        elif entry == "exception":
+            try:
+                raise ValueError(raw)
+            except ValueError:
+                logger.exception("request failed")
+        else:
+            # No trust in a JSON payload or in a literal redaction marker.
+            logger.error("failure %s", json.dumps({"message": raw, "password": "synthetic-private",
+                                                  "nested": [{"credential": "secret words",
+                                                              "user_password": "synthetic-private"}]},
+                                                 ensure_ascii=False))
+        assert export_logs(logger, tmp_path / "shared.log")
+        for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+            content = path.read_text()
+            assert "secret words" not in content
+            assert "synthetic-private" not in content
+            assert "https://a" not in content
+            assert "reason=" + reason in content
+            assert sanitize_text(content, 16000) == content
+            line = next(line for line in content.splitlines() if '{"' in line)
+            detail = json.loads(line[line.index("{"):])
+            assert "reason=" + reason in detail["message"]
+            if entry != "raw_json":
+                assert "reason=" + reason in detail["causes"][0]["message"]
+                assert "reason=" + reason in detail["cause"]
+                assert detail["type"] == "ValueError"
+    finally:
+        logger.removeHandler(handler)
+        handler.close()
+
+
+@pytest.mark.parametrize("raw", [
+    'password="secret words\nsynthetic-private" reason=连接失败',
+    'password={"ordinary": "synthetic-private"}; reason=connection refused',
+    'password="{\nsynthetic-private\n}" reason=连接失败',
+])
+def test_json_looking_or_multiline_credential_remains_private(raw):
+    safe = sanitize_text(raw)
+    assert "synthetic-private" not in safe
+    assert "secret words" not in safe
+    assert "reason=" in safe
+    assert sanitize_text(safe) == safe
+
+
+def test_mixed_plain_and_structured_lines_share_one_export_policy():
+    import json
+
+    raw = ('password="secret words" reason=连接失败\n'
+           + "failure " + json.dumps({"message": 'password="secret words" reason=connection refused'})
+           + '\ncredential=[redacted] synthetic-private; reason=连接失败\n')
+    safe = sanitize_text(raw)
+    assert "secret words" not in safe and "synthetic-private" not in safe
+    assert "reason=connection refused" in safe and "reason=连接失败" in safe
+    assert sanitize_text(safe) == safe
+
+
+@pytest.mark.parametrize("formatter", ["%(message)s", "%(levelname)s %(message)s",
+                                        "%(asctime)s %(levelname)s %(name)s %(message)s"])
+@pytest.mark.parametrize("raw", [
+    r'failed C:\Users\{}\synthetic-private\demo.dem',
+    r'failed C:\Users\{}\{}\synthetic-private\demo.dem',
+    r'failed C:\Users\failure {}\synthetic-private\demo.dem',
+    'password="line one\nfailure {}\nsynthetic-private"; reason=连接失败',
+])
+def test_free_text_braces_are_not_structured_log_boundaries(tmp_path, formatter, raw):
+    import json
+
+    assert "synthetic-private" not in sanitize_text(raw)
+    logger = logging.getLogger("plain-path-boundary")
+    handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+    handler.setFormatter(SafeFormatter(formatter))
+    logger.addHandler(handler)
+    try:
+        logger.error("%s", raw)
+        logger.error("failure %s", json.dumps({"message": raw, "credential": "synthetic-private"},
+                                              ensure_ascii=False))
+        log_failure(logger, ValueError('password="secret words" reason=connection refused'))
+        try:
+            raise ValueError('password="secret words" reason=连接失败')
+        except ValueError:
+            logger.exception("request failed")
+        assert export_logs(logger, tmp_path / "shared.log")
+        for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+            content = path.read_text()
+            assert "synthetic-private" not in content
+            assert "secret words" not in content
+            assert "reason=connection refused" in content
+            assert "reason=连接失败" in content
+            assert sanitize_text(content, 16000) == content
+    finally:
+        logger.removeHandler(handler)
+        handler.close()
+
+
+@pytest.mark.parametrize("prefix", [
+    "failure ", "frontend diagnostic ", "export job synthetic-job failed: ",
+    "demo=synthetic phase=failed code=bad diagnostic=",
+    'ui startup error message="failed" stack="ignored" diagnostic=',
+])
+def test_production_structured_log_boundaries_preserve_causes(tmp_path, prefix):
+    import json
+
+    logger = logging.getLogger("cs2dak.synthetic")
+    handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+    handler.setFormatter(SafeFormatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+    logger.addHandler(handler)
+    try:
+        logger.error("%s%s", prefix, json.dumps({
+            "message": 'password="secret words" reason=connection refused',
+            "cause": 'password="secret words" reason=连接失败',
+            "nested": {"message": r'failed C:\Users\{}\synthetic-private\demo.dem'},
+        }, ensure_ascii=False))
+        assert export_logs(logger, tmp_path / "shared.log")
+        for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+            content = path.read_text()
+            assert "synthetic-private" not in content and "secret words" not in content
+            assert "reason=connection refused" in content and "reason=连接失败" in content
+            assert sanitize_text(content, 16000) == content
+    finally:
+        logger.removeHandler(handler)
+        handler.close()

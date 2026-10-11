@@ -66,11 +66,14 @@ export function httpErrorFromResponse(status: number, body: unknown, requestId?:
 function jsonReadCause(error: unknown): string {
   // JSON parsers can embed response bytes in their exception messages. Extract
   // only parser grammar and numeric locations; never forward the message itself.
-  const message = normalizeDiagnostic(error).message;
   if (error instanceof SyntaxError) {
+    // Read only to extract finite grammar categories and terminal coordinates;
+    // redaction may remove coordinates along with an embedded secret clause.
+    let message = "";
+    try { if (typeof error.message === "string") message = error.message; } catch { /* unsafe accessor */ }
     const reason = /^(Unexpected end of JSON input|Unexpected token|Unexpected non-whitespace character after JSON|Expected property name|Expected double-quoted property name|Unterminated string|Bad escaped character|Bad control character|Bad Unicode escape)/i.exec(message)?.[1] ?? "Invalid JSON syntax";
-    const position = /\bposition (\d{1,12})\b/i.exec(message)?.[1];
-    const location = /\bline (\d{1,12}) column (\d{1,12})\b/i.exec(message);
+    const position = / at position (\d{1,12})(?: \(line \d{1,12} column \d{1,12}\))?$/i.exec(message)?.[1];
+    const location = /\(line (\d{1,12}) column (\d{1,12})\)$/i.exec(message);
     return `SyntaxError: ${reason}${position ? `; position ${position}` : ""}${location ? `; line ${location[1]} column ${location[2]}` : ""}`;
   }
   if (error instanceof TypeError) return "TypeError: response body could not be read or decoded";

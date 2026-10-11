@@ -1,0 +1,420 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0
+rootdir: /workspace/cs2-demo-analysis-kit/python
+configfile: pyproject.toml
+collected 59 items
+
+python/tests/test_diagnostics.py ....................................... [ 66%]
+...FFFFFFFFF...FFFFF                                                     [100%]
+
+=================================== FAILURES ===================================
+_ test_free_text_braces_are_not_structured_log_boundaries[failed C:\\Users\\{}\\synthetic-private\\demo.dem-%(message)s] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-16/test_free_text_braces_are_not_0')
+formatter = '%(message)s'
+raw = 'failed C:\\Users\\{}\\synthetic-private\\demo.dem'
+
+    @pytest.mark.parametrize("formatter", ["%(message)s", "%(levelname)s %(message)s",
+                                            "%(asctime)s %(levelname)s %(name)s %(message)s"])
+    @pytest.mark.parametrize("raw", [
+        r'failed C:\Users\{}\synthetic-private\demo.dem',
+        r'failed C:\Users\{}\{}\synthetic-private\demo.dem',
+        r'failed C:\Users\failure {}\synthetic-private\demo.dem',
+        'password="line one\nfailure {}\nsynthetic-private"; reason=连接失败',
+    ])
+    def test_free_text_braces_are_not_structured_log_boundaries(tmp_path, formatter, raw):
+        import json
+    
+>       assert "synthetic-private" not in sanitize_text(raw)
+E       AssertionError: assert 'synthetic-private' not in 'failed [pat...te\\demo.dem'
+E         
+E         'synthetic-private' is contained here:
+E           failed [path]{}\synthetic-private\demo.dem
+
+python/tests/test_diagnostics.py:320: AssertionError
+_ test_free_text_braces_are_not_structured_log_boundaries[failed C:\\Users\\{}\\synthetic-private\\demo.dem-%(levelname)s %(message)s] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-16/test_free_text_braces_are_not_1')
+formatter = '%(levelname)s %(message)s'
+raw = 'failed C:\\Users\\{}\\synthetic-private\\demo.dem'
+
+    @pytest.mark.parametrize("formatter", ["%(message)s", "%(levelname)s %(message)s",
+                                            "%(asctime)s %(levelname)s %(name)s %(message)s"])
+    @pytest.mark.parametrize("raw", [
+        r'failed C:\Users\{}\synthetic-private\demo.dem',
+        r'failed C:\Users\{}\{}\synthetic-private\demo.dem',
+        r'failed C:\Users\failure {}\synthetic-private\demo.dem',
+        'password="line one\nfailure {}\nsynthetic-private"; reason=连接失败',
+    ])
+    def test_free_text_braces_are_not_structured_log_boundaries(tmp_path, formatter, raw):
+        import json
+    
+>       assert "synthetic-private" not in sanitize_text(raw)
+E       AssertionError: assert 'synthetic-private' not in 'failed [pat...te\\demo.dem'
+E         
+E         'synthetic-private' is contained here:
+E           failed [path]{}\synthetic-private\demo.dem
+
+python/tests/test_diagnostics.py:320: AssertionError
+_ test_free_text_braces_are_not_structured_log_boundaries[failed C:\\Users\\{}\\synthetic-private\\demo.dem-%(asctime)s %(levelname)s %(name)s %(message)s] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-16/test_free_text_braces_are_not_2')
+formatter = '%(asctime)s %(levelname)s %(name)s %(message)s'
+raw = 'failed C:\\Users\\{}\\synthetic-private\\demo.dem'
+
+    @pytest.mark.parametrize("formatter", ["%(message)s", "%(levelname)s %(message)s",
+                                            "%(asctime)s %(levelname)s %(name)s %(message)s"])
+    @pytest.mark.parametrize("raw", [
+        r'failed C:\Users\{}\synthetic-private\demo.dem',
+        r'failed C:\Users\{}\{}\synthetic-private\demo.dem',
+        r'failed C:\Users\failure {}\synthetic-private\demo.dem',
+        'password="line one\nfailure {}\nsynthetic-private"; reason=连接失败',
+    ])
+    def test_free_text_braces_are_not_structured_log_boundaries(tmp_path, formatter, raw):
+        import json
+    
+>       assert "synthetic-private" not in sanitize_text(raw)
+E       AssertionError: assert 'synthetic-private' not in 'failed [pat...te\\demo.dem'
+E         
+E         'synthetic-private' is contained here:
+E           failed [path]{}\synthetic-private\demo.dem
+
+python/tests/test_diagnostics.py:320: AssertionError
+_ test_free_text_braces_are_not_structured_log_boundaries[failed C:\\Users\\{}\\{}\\synthetic-private\\demo.dem-%(message)s] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-16/test_free_text_braces_are_not_3')
+formatter = '%(message)s'
+raw = 'failed C:\\Users\\{}\\{}\\synthetic-private\\demo.dem'
+
+    @pytest.mark.parametrize("formatter", ["%(message)s", "%(levelname)s %(message)s",
+                                            "%(asctime)s %(levelname)s %(name)s %(message)s"])
+    @pytest.mark.parametrize("raw", [
+        r'failed C:\Users\{}\synthetic-private\demo.dem',
+        r'failed C:\Users\{}\{}\synthetic-private\demo.dem',
+        r'failed C:\Users\failure {}\synthetic-private\demo.dem',
+        'password="line one\nfailure {}\nsynthetic-private"; reason=连接失败',
+    ])
+    def test_free_text_braces_are_not_structured_log_boundaries(tmp_path, formatter, raw):
+        import json
+    
+>       assert "synthetic-private" not in sanitize_text(raw)
+E       AssertionError: assert 'synthetic-private' not in 'failed [pat...te\\demo.dem'
+E         
+E         'synthetic-private' is contained here:
+E           failed [path]{}\{}\synthetic-private\demo.dem
+E         ?                    +++++++++++++++++
+
+python/tests/test_diagnostics.py:320: AssertionError
+_ test_free_text_braces_are_not_structured_log_boundaries[failed C:\\Users\\{}\\{}\\synthetic-private\\demo.dem-%(levelname)s %(message)s] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-16/test_free_text_braces_are_not_4')
+formatter = '%(levelname)s %(message)s'
+raw = 'failed C:\\Users\\{}\\{}\\synthetic-private\\demo.dem'
+
+    @pytest.mark.parametrize("formatter", ["%(message)s", "%(levelname)s %(message)s",
+                                            "%(asctime)s %(levelname)s %(name)s %(message)s"])
+    @pytest.mark.parametrize("raw", [
+        r'failed C:\Users\{}\synthetic-private\demo.dem',
+        r'failed C:\Users\{}\{}\synthetic-private\demo.dem',
+        r'failed C:\Users\failure {}\synthetic-private\demo.dem',
+        'password="line one\nfailure {}\nsynthetic-private"; reason=连接失败',
+    ])
+    def test_free_text_braces_are_not_structured_log_boundaries(tmp_path, formatter, raw):
+        import json
+    
+>       assert "synthetic-private" not in sanitize_text(raw)
+E       AssertionError: assert 'synthetic-private' not in 'failed [pat...te\\demo.dem'
+E         
+E         'synthetic-private' is contained here:
+E           failed [path]{}\{}\synthetic-private\demo.dem
+E         ?                    +++++++++++++++++
+
+python/tests/test_diagnostics.py:320: AssertionError
+_ test_free_text_braces_are_not_structured_log_boundaries[failed C:\\Users\\{}\\{}\\synthetic-private\\demo.dem-%(asctime)s %(levelname)s %(name)s %(message)s] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-16/test_free_text_braces_are_not_5')
+formatter = '%(asctime)s %(levelname)s %(name)s %(message)s'
+raw = 'failed C:\\Users\\{}\\{}\\synthetic-private\\demo.dem'
+
+    @pytest.mark.parametrize("formatter", ["%(message)s", "%(levelname)s %(message)s",
+                                            "%(asctime)s %(levelname)s %(name)s %(message)s"])
+    @pytest.mark.parametrize("raw", [
+        r'failed C:\Users\{}\synthetic-private\demo.dem',
+        r'failed C:\Users\{}\{}\synthetic-private\demo.dem',
+        r'failed C:\Users\failure {}\synthetic-private\demo.dem',
+        'password="line one\nfailure {}\nsynthetic-private"; reason=连接失败',
+    ])
+    def test_free_text_braces_are_not_structured_log_boundaries(tmp_path, formatter, raw):
+        import json
+    
+>       assert "synthetic-private" not in sanitize_text(raw)
+E       AssertionError: assert 'synthetic-private' not in 'failed [pat...te\\demo.dem'
+E         
+E         'synthetic-private' is contained here:
+E           failed [path]{}\{}\synthetic-private\demo.dem
+E         ?                    +++++++++++++++++
+
+python/tests/test_diagnostics.py:320: AssertionError
+_ test_free_text_braces_are_not_structured_log_boundaries[failed C:\\Users\\failure {}\\synthetic-private\\demo.dem-%(message)s] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-16/test_free_text_braces_are_not_6')
+formatter = '%(message)s'
+raw = 'failed C:\\Users\\failure {}\\synthetic-private\\demo.dem'
+
+    @pytest.mark.parametrize("formatter", ["%(message)s", "%(levelname)s %(message)s",
+                                            "%(asctime)s %(levelname)s %(name)s %(message)s"])
+    @pytest.mark.parametrize("raw", [
+        r'failed C:\Users\{}\synthetic-private\demo.dem',
+        r'failed C:\Users\{}\{}\synthetic-private\demo.dem',
+        r'failed C:\Users\failure {}\synthetic-private\demo.dem',
+        'password="line one\nfailure {}\nsynthetic-private"; reason=连接失败',
+    ])
+    def test_free_text_braces_are_not_structured_log_boundaries(tmp_path, formatter, raw):
+        import json
+    
+>       assert "synthetic-private" not in sanitize_text(raw)
+E       AssertionError: assert 'synthetic-private' not in 'failed [pat...te\\demo.dem'
+E         
+E         'synthetic-private' is contained here:
+E           failed [path]{}\synthetic-private\demo.dem
+
+python/tests/test_diagnostics.py:320: AssertionError
+_ test_free_text_braces_are_not_structured_log_boundaries[failed C:\\Users\\failure {}\\synthetic-private\\demo.dem-%(levelname)s %(message)s] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-16/test_free_text_braces_are_not_7')
+formatter = '%(levelname)s %(message)s'
+raw = 'failed C:\\Users\\failure {}\\synthetic-private\\demo.dem'
+
+    @pytest.mark.parametrize("formatter", ["%(message)s", "%(levelname)s %(message)s",
+                                            "%(asctime)s %(levelname)s %(name)s %(message)s"])
+    @pytest.mark.parametrize("raw", [
+        r'failed C:\Users\{}\synthetic-private\demo.dem',
+        r'failed C:\Users\{}\{}\synthetic-private\demo.dem',
+        r'failed C:\Users\failure {}\synthetic-private\demo.dem',
+        'password="line one\nfailure {}\nsynthetic-private"; reason=连接失败',
+    ])
+    def test_free_text_braces_are_not_structured_log_boundaries(tmp_path, formatter, raw):
+        import json
+    
+>       assert "synthetic-private" not in sanitize_text(raw)
+E       AssertionError: assert 'synthetic-private' not in 'failed [pat...te\\demo.dem'
+E         
+E         'synthetic-private' is contained here:
+E           failed [path]{}\synthetic-private\demo.dem
+
+python/tests/test_diagnostics.py:320: AssertionError
+_ test_free_text_braces_are_not_structured_log_boundaries[failed C:\\Users\\failure {}\\synthetic-private\\demo.dem-%(asctime)s %(levelname)s %(name)s %(message)s] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-16/test_free_text_braces_are_not_8')
+formatter = '%(asctime)s %(levelname)s %(name)s %(message)s'
+raw = 'failed C:\\Users\\failure {}\\synthetic-private\\demo.dem'
+
+    @pytest.mark.parametrize("formatter", ["%(message)s", "%(levelname)s %(message)s",
+                                            "%(asctime)s %(levelname)s %(name)s %(message)s"])
+    @pytest.mark.parametrize("raw", [
+        r'failed C:\Users\{}\synthetic-private\demo.dem',
+        r'failed C:\Users\{}\{}\synthetic-private\demo.dem',
+        r'failed C:\Users\failure {}\synthetic-private\demo.dem',
+        'password="line one\nfailure {}\nsynthetic-private"; reason=连接失败',
+    ])
+    def test_free_text_braces_are_not_structured_log_boundaries(tmp_path, formatter, raw):
+        import json
+    
+>       assert "synthetic-private" not in sanitize_text(raw)
+E       AssertionError: assert 'synthetic-private' not in 'failed [pat...te\\demo.dem'
+E         
+E         'synthetic-private' is contained here:
+E           failed [path]{}\synthetic-private\demo.dem
+
+python/tests/test_diagnostics.py:320: AssertionError
+_____ test_production_structured_log_boundaries_preserve_causes[failure ] ______
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-16/test_production_structured_log0')
+prefix = 'failure '
+
+    @pytest.mark.parametrize("prefix", [
+        "failure ", "frontend diagnostic ", "export job synthetic-job failed: ",
+        "demo=synthetic phase=failed code=bad diagnostic=",
+        'ui startup error message="failed" stack="ignored" diagnostic=',
+    ])
+    def test_production_structured_log_boundaries_preserve_causes(tmp_path, prefix):
+        import json
+    
+        logger = logging.getLogger("cs2dak.synthetic")
+        handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+        handler.setFormatter(SafeFormatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+        logger.addHandler(handler)
+        try:
+            logger.error("%s%s", prefix, json.dumps({
+                "message": 'password="secret words" reason=connection refused',
+                "cause": 'password="secret words" reason=连接失败',
+                "nested": {"message": r'failed C:\Users\{}\synthetic-private\demo.dem'},
+            }, ensure_ascii=False))
+            assert export_logs(logger, tmp_path / "shared.log")
+            for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+                content = path.read_text()
+>               assert "synthetic-private" not in content and "secret words" not in content
+E               assert ('synthetic-private' not in '2026-10-11 ...emo.dem"}}\n'
+E                 
+E                 'synthetic-private' is contained here:
+E                   [path]{}\\synthetic-private\\demo.dem"}})
+
+python/tests/test_diagnostics.py:368: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    cs2dak.synthetic:test_diagnostics.py:360 failure {"message": "password=\"secret words\" reason=connection refused", "cause": "password=\"secret words\" reason=连接失败", "nested": {"message": "failed C:\\Users\\{}\\synthetic-private\\demo.dem"}}
+_ test_production_structured_log_boundaries_preserve_causes[frontend diagnostic ] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-16/test_production_structured_log1')
+prefix = 'frontend diagnostic '
+
+    @pytest.mark.parametrize("prefix", [
+        "failure ", "frontend diagnostic ", "export job synthetic-job failed: ",
+        "demo=synthetic phase=failed code=bad diagnostic=",
+        'ui startup error message="failed" stack="ignored" diagnostic=',
+    ])
+    def test_production_structured_log_boundaries_preserve_causes(tmp_path, prefix):
+        import json
+    
+        logger = logging.getLogger("cs2dak.synthetic")
+        handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+        handler.setFormatter(SafeFormatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+        logger.addHandler(handler)
+        try:
+            logger.error("%s%s", prefix, json.dumps({
+                "message": 'password="secret words" reason=connection refused',
+                "cause": 'password="secret words" reason=连接失败',
+                "nested": {"message": r'failed C:\Users\{}\synthetic-private\demo.dem'},
+            }, ensure_ascii=False))
+            assert export_logs(logger, tmp_path / "shared.log")
+            for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+                content = path.read_text()
+>               assert "synthetic-private" not in content and "secret words" not in content
+E               assert ('synthetic-private' not in '2026-10-11 ...emo.dem"}}\n'
+E                 
+E                 'synthetic-private' is contained here:
+E                   [path]{}\\synthetic-private\\demo.dem"}})
+
+python/tests/test_diagnostics.py:368: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    cs2dak.synthetic:test_diagnostics.py:360 frontend diagnostic {"message": "password=\"secret words\" reason=connection refused", "cause": "password=\"secret words\" reason=连接失败", "nested": {"message": "failed C:\\Users\\{}\\synthetic-private\\demo.dem"}}
+_ test_production_structured_log_boundaries_preserve_causes[export job synthetic-job failed: ] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-16/test_production_structured_log2')
+prefix = 'export job synthetic-job failed: '
+
+    @pytest.mark.parametrize("prefix", [
+        "failure ", "frontend diagnostic ", "export job synthetic-job failed: ",
+        "demo=synthetic phase=failed code=bad diagnostic=",
+        'ui startup error message="failed" stack="ignored" diagnostic=',
+    ])
+    def test_production_structured_log_boundaries_preserve_causes(tmp_path, prefix):
+        import json
+    
+        logger = logging.getLogger("cs2dak.synthetic")
+        handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+        handler.setFormatter(SafeFormatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+        logger.addHandler(handler)
+        try:
+            logger.error("%s%s", prefix, json.dumps({
+                "message": 'password="secret words" reason=connection refused',
+                "cause": 'password="secret words" reason=连接失败',
+                "nested": {"message": r'failed C:\Users\{}\synthetic-private\demo.dem'},
+            }, ensure_ascii=False))
+            assert export_logs(logger, tmp_path / "shared.log")
+            for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+                content = path.read_text()
+>               assert "synthetic-private" not in content and "secret words" not in content
+E               assert ('synthetic-private' not in '2026-10-11 ...emo.dem"}}\n'
+E                 
+E                 'synthetic-private' is contained here:
+E                   [path]{}\\synthetic-private\\demo.dem"}})
+
+python/tests/test_diagnostics.py:368: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    cs2dak.synthetic:test_diagnostics.py:360 export job synthetic-job failed: {"message": "password=\"secret words\" reason=connection refused", "cause": "password=\"secret words\" reason=连接失败", "nested": {"message": "failed C:\\Users\\{}\\synthetic-private\\demo.dem"}}
+_ test_production_structured_log_boundaries_preserve_causes[demo=synthetic phase=failed code=bad diagnostic=] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-16/test_production_structured_log3')
+prefix = 'demo=synthetic phase=failed code=bad diagnostic='
+
+    @pytest.mark.parametrize("prefix", [
+        "failure ", "frontend diagnostic ", "export job synthetic-job failed: ",
+        "demo=synthetic phase=failed code=bad diagnostic=",
+        'ui startup error message="failed" stack="ignored" diagnostic=',
+    ])
+    def test_production_structured_log_boundaries_preserve_causes(tmp_path, prefix):
+        import json
+    
+        logger = logging.getLogger("cs2dak.synthetic")
+        handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+        handler.setFormatter(SafeFormatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+        logger.addHandler(handler)
+        try:
+            logger.error("%s%s", prefix, json.dumps({
+                "message": 'password="secret words" reason=connection refused',
+                "cause": 'password="secret words" reason=连接失败',
+                "nested": {"message": r'failed C:\Users\{}\synthetic-private\demo.dem'},
+            }, ensure_ascii=False))
+            assert export_logs(logger, tmp_path / "shared.log")
+            for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+                content = path.read_text()
+>               assert "synthetic-private" not in content and "secret words" not in content
+E               assert ('synthetic-private' not in '2026-10-11 ...emo.dem"}}\n'
+E                 
+E                 'synthetic-private' is contained here:
+E                   [path]{}\\synthetic-private\\demo.dem"}})
+
+python/tests/test_diagnostics.py:368: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    cs2dak.synthetic:test_diagnostics.py:360 demo=synthetic phase=failed code=bad diagnostic={"message": "password=\"secret words\" reason=connection refused", "cause": "password=\"secret words\" reason=连接失败", "nested": {"message": "failed C:\\Users\\{}\\synthetic-private\\demo.dem"}}
+_ test_production_structured_log_boundaries_preserve_causes[ui startup error message="failed" stack="ignored" diagnostic=] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-16/test_production_structured_log4')
+prefix = 'ui startup error message="failed" stack="ignored" diagnostic='
+
+    @pytest.mark.parametrize("prefix", [
+        "failure ", "frontend diagnostic ", "export job synthetic-job failed: ",
+        "demo=synthetic phase=failed code=bad diagnostic=",
+        'ui startup error message="failed" stack="ignored" diagnostic=',
+    ])
+    def test_production_structured_log_boundaries_preserve_causes(tmp_path, prefix):
+        import json
+    
+        logger = logging.getLogger("cs2dak.synthetic")
+        handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+        handler.setFormatter(SafeFormatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+        logger.addHandler(handler)
+        try:
+            logger.error("%s%s", prefix, json.dumps({
+                "message": 'password="secret words" reason=connection refused',
+                "cause": 'password="secret words" reason=连接失败',
+                "nested": {"message": r'failed C:\Users\{}\synthetic-private\demo.dem'},
+            }, ensure_ascii=False))
+            assert export_logs(logger, tmp_path / "shared.log")
+            for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+                content = path.read_text()
+>               assert "synthetic-private" not in content and "secret words" not in content
+E               assert ('synthetic-private' not in '2026-10-11 ...emo.dem"}}\n'
+E                 
+E                 'synthetic-private' is contained here:
+E                   [path]{}\\synthetic-private\\demo.dem"}})
+
+python/tests/test_diagnostics.py:368: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    cs2dak.synthetic:test_diagnostics.py:360 ui startup error message="failed" stack="ignored" diagnostic={"message": "password=\"secret words\" reason=connection refused", "cause": "password=\"secret words\" reason=连接失败", "nested": {"message": "failed C:\\Users\\{}\\synthetic-private\\demo.dem"}}
+=========================== short test summary info ============================
+FAILED python/tests/test_diagnostics.py::test_free_text_braces_are_not_structured_log_boundaries[failed C:\\Users\\{}\\synthetic-private\\demo.dem-%(message)s]
+FAILED python/tests/test_diagnostics.py::test_free_text_braces_are_not_structured_log_boundaries[failed C:\\Users\\{}\\synthetic-private\\demo.dem-%(levelname)s %(message)s]
+FAILED python/tests/test_diagnostics.py::test_free_text_braces_are_not_structured_log_boundaries[failed C:\\Users\\{}\\synthetic-private\\demo.dem-%(asctime)s %(levelname)s %(name)s %(message)s]
+FAILED python/tests/test_diagnostics.py::test_free_text_braces_are_not_structured_log_boundaries[failed C:\\Users\\{}\\{}\\synthetic-private\\demo.dem-%(message)s]
+FAILED python/tests/test_diagnostics.py::test_free_text_braces_are_not_structured_log_boundaries[failed C:\\Users\\{}\\{}\\synthetic-private\\demo.dem-%(levelname)s %(message)s]
+FAILED python/tests/test_diagnostics.py::test_free_text_braces_are_not_structured_log_boundaries[failed C:\\Users\\{}\\{}\\synthetic-private\\demo.dem-%(asctime)s %(levelname)s %(name)s %(message)s]
+FAILED python/tests/test_diagnostics.py::test_free_text_braces_are_not_structured_log_boundaries[failed C:\\Users\\failure {}\\synthetic-private\\demo.dem-%(message)s]
+FAILED python/tests/test_diagnostics.py::test_free_text_braces_are_not_structured_log_boundaries[failed C:\\Users\\failure {}\\synthetic-private\\demo.dem-%(levelname)s %(message)s]
+FAILED python/tests/test_diagnostics.py::test_free_text_braces_are_not_structured_log_boundaries[failed C:\\Users\\failure {}\\synthetic-private\\demo.dem-%(asctime)s %(levelname)s %(name)s %(message)s]
+FAILED python/tests/test_diagnostics.py::test_production_structured_log_boundaries_preserve_causes[failure ]
+FAILED python/tests/test_diagnostics.py::test_production_structured_log_boundaries_preserve_causes[frontend diagnostic ]
+FAILED python/tests/test_diagnostics.py::test_production_structured_log_boundaries_preserve_causes[export job synthetic-job failed: ]
+FAILED python/tests/test_diagnostics.py::test_production_structured_log_boundaries_preserve_causes[demo=synthetic phase=failed code=bad diagnostic=]
+FAILED python/tests/test_diagnostics.py::test_production_structured_log_boundaries_preserve_causes[ui startup error message="failed" stack="ignored" diagnostic=]
+======================== 14 failed, 45 passed in 1.56s =========================

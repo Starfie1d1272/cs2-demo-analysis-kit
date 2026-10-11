@@ -1,0 +1,25 @@
+$ cd python && uv run --extra dev pytest
+============================= test session starts ==============================
+platform linux -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0
+rootdir: /workspace/cs2-demo-analysis-kit/python
+configfile: pyproject.toml
+collected 188 items
+
+tests/test_credentials.py ..........................                     [ 13%]
+tests/test_diagnostics.py .............................................. [ 38%]
+.............                                                            [ 45%]
+tests/test_event_packages.py .....                                       [ 47%]
+tests/test_export_jobs.py ......                                         [ 51%]
+tests/test_installer.py ..........                                       [ 56%]
+tests/test_library_maintenance.py ...                                    [ 57%]
+tests/test_rivalhub_bridge.py .....                                      [ 60%]
+tests/test_rivalhub_uploader.py ........................................ [ 81%]
+                                                                         [ 81%]
+tests/test_selection_diagnostics.py ......                               [ 85%]
+tests/test_smoke.py ...                                                  [ 86%]
+tests/test_storage_configuration.py ..                                   [ 87%]
+tests/test_studio_diagnostics.py .......                                 [ 91%]
+tests/test_updater.py ...............                                    [ 99%]
+tests/test_uploader_webview_bridge.py .                                  [100%]
+
+============================= 188 passed in 2.79s ==============================

@@ -1,0 +1,305 @@
+$ cd python && uv run --extra dev pytest -- tests/test_diagnostics.py
+============================= test session starts ==============================
+platform linux -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0
+rootdir: /workspace/cs2-demo-analysis-kit/python
+configfile: pyproject.toml
+collected 38 items
+
+tests/test_diagnostics.py .......................FFFFFF.........         [100%]
+
+=================================== FAILURES ===================================
+_ test_structured_failure_roundtrip_preserves_safe_causes[password="secret words" reason=connection refused-connection refused-log_failure] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-0/test_structured_failure_roundt0')
+entry = 'log_failure', raw = 'password="secret words" reason=connection refused'
+reason = 'connection refused'
+
+    @pytest.mark.parametrize("entry", ["log_failure", "exception", "raw_json"])
+    @pytest.mark.parametrize("raw, reason", [
+        ('password="secret words" reason=connection refused', 'connection refused'),
+        (r'password="https://a\";synthetic-private" reason=连接失败', '连接失败'),
+        ('password=[redacted] synthetic-private; reason=connection refused', 'connection refused'),
+        ('credential=[redacted]\t synthetic-private; reason=连接失败', '连接失败'),
+        ('password=[redacted] reason=synthetic-private; reason=连接失败', '连接失败'),
+    ])
+    def test_structured_failure_roundtrip_preserves_safe_causes(tmp_path, entry, raw, reason):
+        import json
+    
+        logger = logging.getLogger("structured-roundtrip")
+        handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+        handler.setFormatter(SafeFormatter("%(levelname)s %(message)s"))
+        logger.addHandler(handler)
+        try:
+            if entry == "log_failure":
+                log_failure(logger, ValueError(raw), "request")
+            elif entry == "exception":
+                try:
+                    raise ValueError(raw)
+                except ValueError:
+                    logger.exception("request failed")
+            else:
+                # No trust in a JSON payload or in a literal redaction marker.
+                logger.error("failure %s", json.dumps({"message": raw, "password": "synthetic-private",
+                                                      "nested": [{"credential": "secret words"}]},
+                                                     ensure_ascii=False))
+            assert export_logs(logger, tmp_path / "shared.log")
+            for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+                content = path.read_text()
+                assert "secret words" not in content
+                assert "synthetic-private" not in content
+                assert "https://a" not in content
+>               assert "reason=" + reason in content
+E               assert ('reason=' + 'connection refused') in 'ERROR failure {"stage": "request", "type": "ValueError", "message": "password=[redacted], "causes": [{"type": "ValueE...essage": "password=[redacted], "relation": "error", "frames": []}], "cause": "error ValueError: password=[redacted]}\n'
+
+tests/test_diagnostics.py:269: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    structured-roundtrip:diagnostics.py:156 failure {"stage": "request", "type": "ValueError", "message": "password=\"[redacted]\" reason=connection refused", "causes": [{"type": "ValueError", "message": "password=\"[redacted]\" reason=connection refused", "relation": "error", "frames": []}], "cause": "error ValueError: password=\"[redacted]\" reason=connection refused"}
+_ test_structured_failure_roundtrip_preserves_safe_causes[password="secret words" reason=connection refused-connection refused-exception] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-0/test_structured_failure_roundt1')
+entry = 'exception', raw = 'password="secret words" reason=connection refused'
+reason = 'connection refused'
+
+    @pytest.mark.parametrize("entry", ["log_failure", "exception", "raw_json"])
+    @pytest.mark.parametrize("raw, reason", [
+        ('password="secret words" reason=connection refused', 'connection refused'),
+        (r'password="https://a\";synthetic-private" reason=连接失败', '连接失败'),
+        ('password=[redacted] synthetic-private; reason=connection refused', 'connection refused'),
+        ('credential=[redacted]\t synthetic-private; reason=连接失败', '连接失败'),
+        ('password=[redacted] reason=synthetic-private; reason=连接失败', '连接失败'),
+    ])
+    def test_structured_failure_roundtrip_preserves_safe_causes(tmp_path, entry, raw, reason):
+        import json
+    
+        logger = logging.getLogger("structured-roundtrip")
+        handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+        handler.setFormatter(SafeFormatter("%(levelname)s %(message)s"))
+        logger.addHandler(handler)
+        try:
+            if entry == "log_failure":
+                log_failure(logger, ValueError(raw), "request")
+            elif entry == "exception":
+                try:
+                    raise ValueError(raw)
+                except ValueError:
+                    logger.exception("request failed")
+            else:
+                # No trust in a JSON payload or in a literal redaction marker.
+                logger.error("failure %s", json.dumps({"message": raw, "password": "synthetic-private",
+                                                      "nested": [{"credential": "secret words"}]},
+                                                     ensure_ascii=False))
+            assert export_logs(logger, tmp_path / "shared.log")
+            for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+                content = path.read_text()
+                assert "secret words" not in content
+                assert "synthetic-private" not in content
+                assert "https://a" not in content
+>               assert "reason=" + reason in content
+E               assert ('reason=' + 'connection refused') in 'ERROR request failed\n{"stage": "unknown", "type": "ValueError", "message": "password=[redacted], "causes": [{"type":...ructured_failure_roundtrip_preserves_safe_causes", "line": 255}]}], "cause": "error ValueError: password=[redacted]}\n'
+
+tests/test_diagnostics.py:269: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    structured-roundtrip:test_diagnostics.py:257 request failed
+Traceback (most recent call last):
+  File "/workspace/cs2-demo-analysis-kit/python/tests/test_diagnostics.py", line 255, in test_structured_failure_roundtrip_preserves_safe_causes
+    raise ValueError(raw)
+ValueError: password="secret words" reason=connection refused
+_ test_structured_failure_roundtrip_preserves_safe_causes[password="secret words" reason=connection refused-connection refused-raw_json] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-0/test_structured_failure_roundt2')
+entry = 'raw_json', raw = 'password="secret words" reason=connection refused'
+reason = 'connection refused'
+
+    @pytest.mark.parametrize("entry", ["log_failure", "exception", "raw_json"])
+    @pytest.mark.parametrize("raw, reason", [
+        ('password="secret words" reason=connection refused', 'connection refused'),
+        (r'password="https://a\";synthetic-private" reason=连接失败', '连接失败'),
+        ('password=[redacted] synthetic-private; reason=connection refused', 'connection refused'),
+        ('credential=[redacted]\t synthetic-private; reason=连接失败', '连接失败'),
+        ('password=[redacted] reason=synthetic-private; reason=连接失败', '连接失败'),
+    ])
+    def test_structured_failure_roundtrip_preserves_safe_causes(tmp_path, entry, raw, reason):
+        import json
+    
+        logger = logging.getLogger("structured-roundtrip")
+        handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+        handler.setFormatter(SafeFormatter("%(levelname)s %(message)s"))
+        logger.addHandler(handler)
+        try:
+            if entry == "log_failure":
+                log_failure(logger, ValueError(raw), "request")
+            elif entry == "exception":
+                try:
+                    raise ValueError(raw)
+                except ValueError:
+                    logger.exception("request failed")
+            else:
+                # No trust in a JSON payload or in a literal redaction marker.
+                logger.error("failure %s", json.dumps({"message": raw, "password": "synthetic-private",
+                                                      "nested": [{"credential": "secret words"}]},
+                                                     ensure_ascii=False))
+            assert export_logs(logger, tmp_path / "shared.log")
+            for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+                content = path.read_text()
+                assert "secret words" not in content
+                assert "synthetic-private" not in content
+                assert "https://a" not in content
+>               assert "reason=" + reason in content
+E               assert ('reason=' + 'connection refused') in 'ERROR failure {"message": "password=[redacted], "password": "[redacted]", "nested": [{"credential": "[redacted]"}]}\n'
+
+tests/test_diagnostics.py:269: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    structured-roundtrip:test_diagnostics.py:260 failure {"message": "password=\"secret words\" reason=connection refused", "password": "synthetic-private", "nested": [{"credential": "secret words"}]}
+_ test_structured_failure_roundtrip_preserves_safe_causes[password="https://a\\";synthetic-private" reason=\u8fde\u63a5\u5931\u8d25-\u8fde\u63a5\u5931\u8d25-log_failure] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-0/test_structured_failure_roundt3')
+entry = 'log_failure'
+raw = 'password="https://a\\";synthetic-private" reason=连接失败', reason = '连接失败'
+
+    @pytest.mark.parametrize("entry", ["log_failure", "exception", "raw_json"])
+    @pytest.mark.parametrize("raw, reason", [
+        ('password="secret words" reason=connection refused', 'connection refused'),
+        (r'password="https://a\";synthetic-private" reason=连接失败', '连接失败'),
+        ('password=[redacted] synthetic-private; reason=connection refused', 'connection refused'),
+        ('credential=[redacted]\t synthetic-private; reason=连接失败', '连接失败'),
+        ('password=[redacted] reason=synthetic-private; reason=连接失败', '连接失败'),
+    ])
+    def test_structured_failure_roundtrip_preserves_safe_causes(tmp_path, entry, raw, reason):
+        import json
+    
+        logger = logging.getLogger("structured-roundtrip")
+        handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+        handler.setFormatter(SafeFormatter("%(levelname)s %(message)s"))
+        logger.addHandler(handler)
+        try:
+            if entry == "log_failure":
+                log_failure(logger, ValueError(raw), "request")
+            elif entry == "exception":
+                try:
+                    raise ValueError(raw)
+                except ValueError:
+                    logger.exception("request failed")
+            else:
+                # No trust in a JSON payload or in a literal redaction marker.
+                logger.error("failure %s", json.dumps({"message": raw, "password": "synthetic-private",
+                                                      "nested": [{"credential": "secret words"}]},
+                                                     ensure_ascii=False))
+            assert export_logs(logger, tmp_path / "shared.log")
+            for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+                content = path.read_text()
+                assert "secret words" not in content
+                assert "synthetic-private" not in content
+                assert "https://a" not in content
+>               assert "reason=" + reason in content
+E               assert ('reason=' + '连接失败') in 'ERROR failure {"stage": "request", "type": "ValueError", "message": "password=[redacted], "causes": [{"type": "ValueE...essage": "password=[redacted], "relation": "error", "frames": []}], "cause": "error ValueError: password=[redacted]}\n'
+
+tests/test_diagnostics.py:269: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    structured-roundtrip:diagnostics.py:156 failure {"stage": "request", "type": "ValueError", "message": "password=\"[redacted]\" reason=连接失败", "causes": [{"type": "ValueError", "message": "password=\"[redacted]\" reason=连接失败", "relation": "error", "frames": []}], "cause": "error ValueError: password=\"[redacted]\" reason=连接失败"}
+_ test_structured_failure_roundtrip_preserves_safe_causes[password="https://a\\";synthetic-private" reason=\u8fde\u63a5\u5931\u8d25-\u8fde\u63a5\u5931\u8d25-exception] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-0/test_structured_failure_roundt4')
+entry = 'exception'
+raw = 'password="https://a\\";synthetic-private" reason=连接失败', reason = '连接失败'
+
+    @pytest.mark.parametrize("entry", ["log_failure", "exception", "raw_json"])
+    @pytest.mark.parametrize("raw, reason", [
+        ('password="secret words" reason=connection refused', 'connection refused'),
+        (r'password="https://a\";synthetic-private" reason=连接失败', '连接失败'),
+        ('password=[redacted] synthetic-private; reason=connection refused', 'connection refused'),
+        ('credential=[redacted]\t synthetic-private; reason=连接失败', '连接失败'),
+        ('password=[redacted] reason=synthetic-private; reason=连接失败', '连接失败'),
+    ])
+    def test_structured_failure_roundtrip_preserves_safe_causes(tmp_path, entry, raw, reason):
+        import json
+    
+        logger = logging.getLogger("structured-roundtrip")
+        handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+        handler.setFormatter(SafeFormatter("%(levelname)s %(message)s"))
+        logger.addHandler(handler)
+        try:
+            if entry == "log_failure":
+                log_failure(logger, ValueError(raw), "request")
+            elif entry == "exception":
+                try:
+                    raise ValueError(raw)
+                except ValueError:
+                    logger.exception("request failed")
+            else:
+                # No trust in a JSON payload or in a literal redaction marker.
+                logger.error("failure %s", json.dumps({"message": raw, "password": "synthetic-private",
+                                                      "nested": [{"credential": "secret words"}]},
+                                                     ensure_ascii=False))
+            assert export_logs(logger, tmp_path / "shared.log")
+            for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+                content = path.read_text()
+                assert "secret words" not in content
+                assert "synthetic-private" not in content
+                assert "https://a" not in content
+>               assert "reason=" + reason in content
+E               assert ('reason=' + '连接失败') in 'ERROR request failed\n{"stage": "unknown", "type": "ValueError", "message": "password=[redacted], "causes": [{"type":...ructured_failure_roundtrip_preserves_safe_causes", "line": 255}]}], "cause": "error ValueError: password=[redacted]}\n'
+
+tests/test_diagnostics.py:269: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    structured-roundtrip:test_diagnostics.py:257 request failed
+Traceback (most recent call last):
+  File "/workspace/cs2-demo-analysis-kit/python/tests/test_diagnostics.py", line 255, in test_structured_failure_roundtrip_preserves_safe_causes
+    raise ValueError(raw)
+ValueError: password="https://a\";synthetic-private" reason=连接失败
+_ test_structured_failure_roundtrip_preserves_safe_causes[password="https://a\\";synthetic-private" reason=\u8fde\u63a5\u5931\u8d25-\u8fde\u63a5\u5931\u8d25-raw_json] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-0/test_structured_failure_roundt5')
+entry = 'raw_json'
+raw = 'password="https://a\\";synthetic-private" reason=连接失败', reason = '连接失败'
+
+    @pytest.mark.parametrize("entry", ["log_failure", "exception", "raw_json"])
+    @pytest.mark.parametrize("raw, reason", [
+        ('password="secret words" reason=connection refused', 'connection refused'),
+        (r'password="https://a\";synthetic-private" reason=连接失败', '连接失败'),
+        ('password=[redacted] synthetic-private; reason=connection refused', 'connection refused'),
+        ('credential=[redacted]\t synthetic-private; reason=连接失败', '连接失败'),
+        ('password=[redacted] reason=synthetic-private; reason=连接失败', '连接失败'),
+    ])
+    def test_structured_failure_roundtrip_preserves_safe_causes(tmp_path, entry, raw, reason):
+        import json
+    
+        logger = logging.getLogger("structured-roundtrip")
+        handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+        handler.setFormatter(SafeFormatter("%(levelname)s %(message)s"))
+        logger.addHandler(handler)
+        try:
+            if entry == "log_failure":
+                log_failure(logger, ValueError(raw), "request")
+            elif entry == "exception":
+                try:
+                    raise ValueError(raw)
+                except ValueError:
+                    logger.exception("request failed")
+            else:
+                # No trust in a JSON payload or in a literal redaction marker.
+                logger.error("failure %s", json.dumps({"message": raw, "password": "synthetic-private",
+                                                      "nested": [{"credential": "secret words"}]},
+                                                     ensure_ascii=False))
+            assert export_logs(logger, tmp_path / "shared.log")
+            for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+                content = path.read_text()
+                assert "secret words" not in content
+>               assert "synthetic-private" not in content
+E               assert 'synthetic-private' not in 'ERROR failu...acted]"}]}\n'
+E                 
+E                 'synthetic-private' is contained here:
+E                   redacted];synthetic-private\" reason=连接失败", "password": "[redacted]", "nested": [{"credential": "[redacted]"}]}
+E                 ?           +++++++++++++++++
+
+tests/test_diagnostics.py:267: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    structured-roundtrip:test_diagnostics.py:260 failure {"message": "password=\"https://a\\\";synthetic-private\" reason=连接失败", "password": "synthetic-private", "nested": [{"credential": "secret words"}]}
+=========================== short test summary info ============================
+FAILED tests/test_diagnostics.py::test_structured_failure_roundtrip_preserves_safe_causes[password="secret words" reason=connection refused-connection refused-log_failure]
+FAILED tests/test_diagnostics.py::test_structured_failure_roundtrip_preserves_safe_causes[password="secret words" reason=connection refused-connection refused-exception]
+FAILED tests/test_diagnostics.py::test_structured_failure_roundtrip_preserves_safe_causes[password="secret words" reason=connection refused-connection refused-raw_json]
+FAILED tests/test_diagnostics.py::test_structured_failure_roundtrip_preserves_safe_causes[password="https://a\\";synthetic-private" reason=\u8fde\u63a5\u5931\u8d25-\u8fde\u63a5\u5931\u8d25-log_failure]
+FAILED tests/test_diagnostics.py::test_structured_failure_roundtrip_preserves_safe_causes[password="https://a\\";synthetic-private" reason=\u8fde\u63a5\u5931\u8d25-\u8fde\u63a5\u5931\u8d25-exception]
+FAILED tests/test_diagnostics.py::test_structured_failure_roundtrip_preserves_safe_causes[password="https://a\\";synthetic-private" reason=\u8fde\u63a5\u5931\u8d25-\u8fde\u63a5\u5931\u8d25-raw_json]
+========================= 6 failed, 32 passed in 1.55s =========================
+[ELIFECYCLE] Command failed with exit code 1.

@@ -1,0 +1,14 @@
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProxy environment variables detected. We'll use your proxy for fetch requests.[0m
+
+
+
+ ⛅️ wrangler 4.149.0
+────────────────────
+Total Upload: 4.69 KiB / gzip: 1.92 KiB
+Your Worker has access to the following bindings:
+Binding                                   Resource
+env.ASSETS (cs2dak-assets)                R2 Bucket
+env.MAX_UPLOAD_BYTES ("536870912")        Environment Variable
+env.ALLOWED_ORIGINS ("*")                 Environment Variable
+
+--dry-run: exiting now.

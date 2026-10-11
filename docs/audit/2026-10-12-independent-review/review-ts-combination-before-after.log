@@ -1,0 +1,4 @@
+before connection refused secret removed: true safe cause retained: false idempotent: true
+before 连接失败 secret removed: true safe cause retained: false idempotent: true
+after connection refused secret removed: true safe cause retained: true idempotent: true
+after 连接失败 secret removed: true safe cause retained: true idempotent: true

@@ -1,0 +1,13 @@
+$ vitest run --pool=forks packages/cli/src/index.integration.test.ts packages/cli/src/cohort.integration.test.ts packages/core/src/spatial/utility.integration.test.ts packages/presentation/src/season-validation.test.ts
+
+ RUN  v5.0.3 /workspace/cs2-demo-analysis-kit
+
+
+ Test Files  4 passed (4)
+      Tests  8 passed (8)
+   Start at  19:30:08
+   Duration  6.90s (tests 59%, transform 32%, import 8%)
+
+  Transform  transforming modules took 5.51s · 32% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns

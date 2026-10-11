@@ -1,0 +1,21 @@
+package: @cs2dak/tournament@1.1.1
+Tarball Contents
+dist/aggregate.d.ts
+dist/aggregate.js
+dist/aggregate.test.d.ts
+dist/aggregate.test.js
+dist/index.d.ts
+dist/index.js
+dist/performance.d.ts
+dist/performance.js
+dist/performance.test.d.ts
+dist/performance.test.js
+dist/types.d.ts
+dist/types.js
+LICENSE
+package.json
+Tarball Details
+/tmp/cs2dak-tournament-1.1.1.tgz
+
+added 1 package in 276ms
+Packed tournament clean consumer passed

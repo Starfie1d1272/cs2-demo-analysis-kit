@@ -29,6 +29,7 @@ const BATCH: Record<RivalHubBatchPhase, RivalHubStatusPresentation> = {
   already_synced: { label: "已存在同步结果", className: "stu-rivalhub-status stu-rivalhub-status-synced" },
   needs_target: { label: "待选目标", className: "stu-rivalhub-status stu-rivalhub-status-needs-target" },
   skipped: { label: "已跳过", className: "stu-rivalhub-status stu-rivalhub-status-needs-target" },
+  unconfirmed: { label: "待确认", className: "stu-rivalhub-status stu-rivalhub-status-needs-attention" },
   failed: { label: "失败", className: "stu-rivalhub-status stu-rivalhub-status-needs-attention" },
 };
 

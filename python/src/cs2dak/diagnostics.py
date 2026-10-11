@@ -35,32 +35,101 @@ class SourceFailures(RuntimeError):
         return super().__str__() + ("；" + "；".join(items) if items else "")
 
 
+_SECRET_KEY = (r"authorization|(?:access|refresh|device|poll|session|auth|id)[_-]?token|"
+               r"token|password|passwd|credential|secret|pairing[_-]?code|device[_-]?code|client[_-]?secret|api[_-]?key")
+_QUOTED_VALUE = r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\''
+_CREDENTIAL_SPAN = re.compile(
+    rf"(?i)[\"']?(?:{_SECRET_KEY})[\"']?\s*[:=]\s*(?:{_QUOTED_VALUE}|[^\r\n,;}}]+)|"
+    rf"[\"']?(?:set-cookie|cookie)[\"']?\s*[:=]\s*(?:{_QUOTED_VALUE}|[^\r\n]+)"
+)
+
+# Only complete, single-line objects at actual diagnostic log boundaries are
+# decoded. A brace in a path or arbitrary prose never splits the plain value.
+_STRUCTURED_LINE = re.compile(
+    r"(?m)^(?:\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} )?"
+    r"(?:(?:DEBUG|INFO|WARNING|ERROR|CRITICAL) (?:[A-Za-z0-9_.-]+ )?)?"
+    r"(?:failure |frontend diagnostic |export job [A-Za-z0-9_-]+ failed: |"
+    r"demo=[A-Za-z0-9_-]* phase=[A-Za-z0-9_-]* code=[A-Za-z0-9_-]* diagnostic=|"
+    rf"ui startup error message=(?:{_QUOTED_VALUE}) stack=(?:{_QUOTED_VALUE}) diagnostic=)?"
+    r"(?P<object>\{[^\r\n]*\})[ \t]*\r?$"
+)
+
+
 def sanitize_text(value, limit: int = 2000) -> str:
     try:
         text = str(value)
     except Exception:  # noqa: BLE001 - diagnostics must survive broken exception __str__.
         text = "[unprintable]"
-    # Redact before truncation so a cut credential cannot escape a matching rule.
-    text = re.sub(r"(?i)\b(?:https?|file)://[^\s<>\"']+", "[url]", text)
-    text = re.sub(r"(?i)\b(Bearer|Basic)\s+[^\s,;\"']+", r"\1 [redacted]", text)
-    secret_key = (r"authorization|(?:access|refresh|device|poll|session|auth|id)[_-]?token|"
-                  r"token|password|secret|pairing[_-]?code|device[_-]?code|client[_-]?secret|api[_-]?key")
+    # JSON serialization escapes credential quotes inside message/cause strings.
+    # Decode a complete object before applying the same plain-text policy to its
+    # fields. No payload or marker is trusted; formatter and export both recheck.
+    text = _sanitize_log_text(text)
+    return text[:limit] + ("…" if len(text) > limit else "")
+
+
+def _sanitize_json(value):
+    if isinstance(value, dict):
+        return {_sanitize_plain_text(key)[:16000]: "[redacted]"
+                if re.search(rf"(?i)(?:{_SECRET_KEY}|set-cookie|cookie)$", key)
+                else _sanitize_json(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_json(item) for item in value]
+    if isinstance(value, str):
+        return _sanitize_plain_text(value)
+    return value
+
+
+def _sanitize_log_text(text: str) -> str:
+    pieces = []
+    cursor = 0
+    credentials = iter(_CREDENTIAL_SPAN.finditer(text))
+    credential = next(credentials, None)
+    for line in _STRUCTURED_LINE.finditer(text):
+        start = line.start("object")
+        while credential is not None and credential.end() <= start:
+            credential = next(credentials, None)
+        # A protocol-looking line inside a quoted multiline credential remains
+        # part of that complete secret value; it cannot create a trusted boundary.
+        if credential is not None and credential.start() < start < credential.end():
+            continue
+        try:
+            value = json.loads(line.group("object"))
+            safe = json.dumps(_sanitize_json(value), ensure_ascii=False)
+        except (ValueError, RecursionError):
+            continue
+        pieces.extend((_sanitize_plain_text(text[cursor:start]), safe))
+        cursor = line.end()
+    pieces.append(_sanitize_plain_text(text[cursor:]))
+    return "".join(pieces)
+
+
+def _sanitize_plain_text(text: str) -> str:
+    secret_key = _SECRET_KEY
     # JSON quoted strings can contain escaped quotes; consume the complete value.
-    quoted_value = r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\''
+    quoted_value = _QUOTED_VALUE
+    # Retain quoted boundaries for another pass; never trust a bare marker from input.
+    def redact_credential(match):
+        value = match.group(2)
+        quote = value[0] if value.startswith(('"', "'")) else ""
+        return match.group(1) + quote + "[redacted]" + quote
+
     text = re.sub(
-        rf"(?i)([\"']?(?:{secret_key})[\"']?\s*[:=]\s*)(?:{quoted_value}|[^\s,;}}]+)",
-        r"\1[redacted]", text,
+        rf"(?i)([\"']?(?:{secret_key})[\"']?\s*[:=]\s*)({quoted_value}|[^\r\n,;}}]+)",
+        redact_credential, text,
     )
     text = re.sub(
         rf"(?i)([\"']?(?:set-cookie|cookie)[\"']?\s*[:=]\s*)(?:{quoted_value}|[^\r\n]+)",
         r"\1[redacted]", text,
     )
+    # Parse complete credential values before URL rules can alter escaped quotes.
+    text = re.sub(r"(?i)\b(?:https?|file)://[^\s<>\"']+", "[url]", text)
+    text = re.sub(r"(?i)\b(Bearer|Basic)\s+[^\s,;\"']+", r"\1 [redacted]", text)
     text = re.sub(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b", "[redacted]", text)
     text = re.sub(r"(?i)(?:[a-z]:[\\/]|\\\\)[^\r\n\"'<>]+", "[path]", text)
     text = re.sub(r"(?<![\w:])/(?:[^/\r\n\"'<>]+/)+[^\r\n\"'<>:,]+", "[path]", text)
     text = re.sub(r"(?<![\w:])/(?:[^\s\"'<>:,]+/)*[^\s\"'<>:,]+", "[path]", text)
     text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
-    return text[:limit] + ("…" if len(text) > limit else "")
+    return text
 
 
 def _attribute(value, name):

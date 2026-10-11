@@ -1,0 +1,28 @@
+TS before case 1 leaked: true cause retained: true idempotent: true
+TS before case 2 leaked: true cause retained: true idempotent: true
+TS before case 3 leaked: true cause retained: true idempotent: true
+TS before case 4 leaked: true cause retained: true idempotent: true
+TS before case 5 leaked: true cause retained: true idempotent: true
+TS before case 6 leaked: true cause retained: true idempotent: true
+TS before leaks: 6/6
+TS after case 1 leaked: false cause retained: true idempotent: true
+TS after case 2 leaked: false cause retained: true idempotent: true
+TS after case 3 leaked: false cause retained: true idempotent: true
+TS after case 4 leaked: false cause retained: true idempotent: true
+TS after case 5 leaked: false cause retained: true idempotent: true
+TS after case 6 leaked: false cause retained: true idempotent: true
+TS after leaks: 0/6
+Python export before case 1 leaked: True cause retained: True idempotent: True
+Python export before case 2 leaked: True cause retained: True idempotent: True
+Python export before case 3 leaked: True cause retained: True idempotent: True
+Python export before case 4 leaked: True cause retained: True idempotent: True
+Python export before case 5 leaked: True cause retained: True idempotent: True
+Python export before case 6 leaked: True cause retained: True idempotent: True
+Python export before leaks: 6/6
+Python export after case 1 leaked: False cause retained: True idempotent: True
+Python export after case 2 leaked: False cause retained: True idempotent: True
+Python export after case 3 leaked: False cause retained: True idempotent: True
+Python export after case 4 leaked: False cause retained: True idempotent: True
+Python export after case 5 leaked: False cause retained: True idempotent: True
+Python export after case 6 leaked: False cause retained: True idempotent: True
+Python export after leaks: 0/6

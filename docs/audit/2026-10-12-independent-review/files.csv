@@ -1,0 +1,155 @@
+file,change_commits,evidence_class,boundary
+.changeset/canonical-tournament-identity.md,770c4c4,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+.changeset/maps-compiled-artifact.md,ec2fbb0,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+.changeset/maps-zone-package-assets.md,770c4c4,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+.changeset/optional-input-diagnostics.md,126f3af,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+.changeset/qa-rich-kill-diagnostics.md,0296acf,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+.changeset/remove-legacy-performance-oracle.md,0166078,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+.github/workflows/ci.yml,"9852ca1,4e442d8,8a8b482,4a8333d,ec2fbb0",declarative metadata / docs,not equivalent to Windows/user/production acceptance
+.github/workflows/npm-publish.yml,ec2fbb0,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+.github/workflows/release.yml,4e442d8,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+.github/workflows/uploader-startup-windows.yml,9852ca1,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+.github/workflows/uploader-windows.yml,4e442d8,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+CHANGELOG.md,6562abd,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+README.md,ec2fbb0,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+apps/dak-studio/package.json,6562abd,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/App.tsx,"8a8b482,333ee75,9f0cbd8",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/components/LibraryMaintenance.tsx,2f18ef1,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/components/RivalHubBatchImportPanel.test.ts,8a8b482,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/components/RivalHubBatchImportPanel.tsx,8a8b482,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/dem-diagnostics.test.ts,2f18ef1,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/dem-polling.test.ts,9f0cbd8,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/dem.ts,"2f18ef1,9f0cbd8",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/derived-cache.ts,"770c4c4,fc6ee5d",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/events.test.ts,0cf0038,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/events.ts,0cf0038,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/extract-match-facts.ts,770c4c4,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/fact-types.ts,770c4c4,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/facts-store.ts,fc6ee5d,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/facts.test.ts,770c4c4,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/import-persistence.ts,fc6ee5d,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/json-diagnostic-export.test.ts,126f3af,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/library-persistence.test.ts,fc6ee5d,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/library-worker-diagnostics.test.ts,"2f18ef1,126f3af",test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/library.ts,"2f18ef1,fc6ee5d,126f3af",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/pkg-worker-diagnostics.test.ts,126f3af,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/pkg-worker.ts,"2f18ef1,126f3af",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/rivalhub-import.test.ts,"8a8b482,126f3af",test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/rivalhub-import.ts,"8a8b482,126f3af",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/rivalhub.test.ts,333ee75,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/rivalhub.ts,333ee75,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/season.test.ts,770c4c4,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/season.ts,770c4c4,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/storage/match-rows.ts,fc6ee5d,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/storage/pywebview-adapter.test.ts,fc6ee5d,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/storage/pywebview-adapter.ts,fc6ee5d,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/tri-assets.test.ts,126f3af,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/tri-assets.ts,126f3af,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/tri-cache-diagnostics.test.ts,126f3af,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/tri-loading.test.ts,126f3af,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/tri-loading.ts,126f3af,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/tri.ts,126f3af,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/worker-diagnostics.test.ts,2f18ef1,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/lib/worker-diagnostics.ts,"2f18ef1,8a8b482,126f3af",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/dak-studio/src/views/EconomyView.tsx,770c4c4,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/rivalhub-uploader/package.json,6562abd,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+apps/rivalhub-uploader/src/App.tsx,"2f18ef1,8a8b482,9f0cbd8,126f3af",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/rivalhub-uploader/src/errors.test.ts,"2f18ef1,333ee75",test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/rivalhub-uploader/src/errors.ts,"2f18ef1,8a8b482,333ee75",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/rivalhub-uploader/src/export-polling.test.ts,9f0cbd8,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/rivalhub-uploader/src/native.test.ts,2f18ef1,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/rivalhub-uploader/src/native.ts,"2f18ef1,8a8b482,9f0cbd8",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+apps/rivalhub-uploader/src/pairing.test.ts,8a8b482,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+apps/rivalhub-uploader/src/pairing.ts,8a8b482,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+docs/README.md,4e442d8,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+docs/architecture.md,"770c4c4,0166078",declarative metadata / docs,not equivalent to Windows/user/production acceptance
+docs/decisions/2026-10-10-uploader-windows-installer.md,4e442d8,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+docs/design/distribution.md,4e442d8,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+docs/integration.md,"0296acf,0166078",declarative metadata / docs,not equivalent to Windows/user/production acceptance
+docs/module-boundaries.md,"770c4c4,0166078",declarative metadata / docs,not equivalent to Windows/user/production acceptance
+docs/release.md,"4e442d8,4a8333d,ec2fbb0",declarative metadata / docs,not equivalent to Windows/user/production acceptance
+docs/rr-roadmap.md,0166078,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+docs/stability-tiers.md,0166078,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+docs/uploader-startup-regression.md,"9852ca1,ffac376",declarative metadata / docs,not equivalent to Windows/user/production acceptance
+docs/uploader-windows.md,"4e442d8,2f18ef1,9f0cbd8,7266451",declarative metadata / docs,not equivalent to Windows/user/production acceptance
+package.json,6562abd,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+packages/cli/package.json,6562abd,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+packages/cli/src/index.integration.test.ts,0166078,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+packages/core/package.json,770c4c4,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+packages/core/src/evidence.ts,"0296acf,770c4c4,0166078",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/core/src/index.test.ts,0166078,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+packages/core/src/index.ts,"0296acf,770c4c4,0166078,126f3af",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/core/src/json-diagnostics.test.ts,126f3af,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+packages/core/src/json-diagnostics.ts,126f3af,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/core/src/loader-diagnostics.test.ts,126f3af,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+packages/core/src/loader.ts,126f3af,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/core/src/map-intelligence/awp.test.ts,0166078,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+packages/core/src/performance-facts.test.ts,0166078,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+packages/core/src/performance-facts.ts,0166078,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/core/src/performance-parity.ts,0166078,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/core/src/performance-validation.test.ts,0166078,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+packages/core/src/qa.test.ts,0296acf,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+packages/core/src/qa.ts,0296acf,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/core/src/tournament-facts.test.ts,770c4c4,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+packages/core/src/tournament-facts.ts,"770c4c4,0166078",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/core/src/version.ts,0166078,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/core/tsconfig.json,770c4c4,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+packages/maps/README.md,ec2fbb0,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+packages/maps/package.json,"770c4c4,ec2fbb0",declarative metadata / docs,not equivalent to Windows/user/production acceptance
+packages/maps/src/tri-assets.ts,ec2fbb0,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/maps/tsconfig.json,ec2fbb0,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+packages/presentation/src/insights.test.ts,770c4c4,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+packages/presentation/src/insights.ts,770c4c4,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/presentation/src/tournament-compat.ts,770c4c4,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/presentation/src/tournament-performance.test.ts,0166078,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+packages/presentation/src/tournament-performance.ts,770c4c4,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/rivalhub-upload/package.json,"6562abd,770c4c4",declarative metadata / docs,not equivalent to Windows/user/production acceptance
+packages/rivalhub-upload/src/client.test.ts,2f18ef1,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+packages/rivalhub-upload/src/client.ts,2f18ef1,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/rivalhub-upload/src/diagnostic-safety.ts,0296acf,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/rivalhub-upload/src/diagnostics.test.ts,2f18ef1,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+packages/rivalhub-upload/src/diagnostics.ts,2f18ef1,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/rivalhub-upload/src/evidence-diagnostics.test.ts,0296acf,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+packages/rivalhub-upload/src/evidence-diagnostics.ts,0296acf,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/rivalhub-upload/src/evidence.test.ts,"0296acf,770c4c4,0166078",test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+packages/rivalhub-upload/src/evidence.ts,"0296acf,770c4c4",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/rivalhub-upload/src/export-polling.test.ts,9f0cbd8,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+packages/rivalhub-upload/src/export-polling.ts,9f0cbd8,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/rivalhub-upload/src/index.ts,"2f18ef1,9f0cbd8",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/rivalhub-upload/src/pipeline.test.ts,"2f18ef1,8a8b482,126f3af",test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+packages/rivalhub-upload/src/pipeline.ts,"2f18ef1,8a8b482,126f3af",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+packages/rivalhub-upload/tsconfig.json,770c4c4,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+pnpm-lock.yaml,770c4c4,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+python/packaging/ChineseSimplified.isl,4e442d8,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+python/packaging/README.md,4e442d8,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+python/packaging/rivalhub-uploader.spec,"4e442d8,ffac376",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+python/packaging/uploader-setup.iss,"4e442d8,7266451",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+python/pyproject.toml,6562abd,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+python/src/cs2dak/__init__.py,6562abd,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+python/src/cs2dak/credentials.py,"8a8b482,333ee75",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+python/src/cs2dak/diagnostics.py,"2f18ef1,8a8b482",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+python/src/cs2dak/installer.py,8a8b482,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+python/src/cs2dak/rivalhub_uploader.py,"9852ca1,4e442d8,ffac376,2f18ef1,8a8b482,333ee75,126f3af",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+python/src/cs2dak/studio.py,"2f18ef1,333ee75,9f0cbd8,126f3af",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+python/src/cs2dak/updater.py,8a8b482,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+python/src/cs2dak/uploader_startup.py,"4e442d8,2f18ef1",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+python/tests/test_credentials.py,"8a8b482,333ee75",test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+python/tests/test_diagnostics.py,2f18ef1,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+python/tests/test_export_jobs.py,"2f18ef1,9f0cbd8",test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+python/tests/test_installer.py,8a8b482,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+python/tests/test_rivalhub_bridge.py,333ee75,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+python/tests/test_rivalhub_uploader.py,"4e442d8,ffac376,2f18ef1,8a8b482",test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+python/tests/test_selection_diagnostics.py,126f3af,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+python/tests/test_studio_diagnostics.py,2f18ef1,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+python/tests/test_updater.py,8a8b482,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+python/tests/test_uploader_webview_bridge.py,9852ca1,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+python/uv.lock,6562abd,declarative metadata / docs,not equivalent to Windows/user/production acceptance
+scripts/build-uploader-installer.ps1,4e442d8,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+scripts/data-producer-boundaries.test.ts,770c4c4,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+scripts/maps-package-smoke.mjs,ec2fbb0,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+scripts/package-uploader.sh,4e442d8,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+scripts/smoke-uploader-windows.ps1,9852ca1,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+scripts/sync-version.mjs,4a8333d,source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+scripts/sync-version.test.mjs,4a8333d,test source + baseline suite execution,not equivalent to Windows/user/production acceptance
+scripts/test-uploader-installer.ps1,"4e442d8,7266451",source path review + applicable baseline suite,not equivalent to Windows/user/production acceptance
+scripts/uploader-release-contract.test.mjs,4e442d8,test source + baseline suite execution,not equivalent to Windows/user/production acceptance

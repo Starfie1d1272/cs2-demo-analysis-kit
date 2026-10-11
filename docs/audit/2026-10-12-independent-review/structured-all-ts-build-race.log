@@ -1,0 +1,12 @@
+$ vitest run --pool=forks
+
+ RUN  v5.0.3 /workspace/cs2-demo-analysis-kit
+
+ ❯ packages/cohort/src/map-role-evidence.test.ts (0 test)
+ ❯ packages/cohort/src/index.test.ts (0 test)
+ ❯ packages/cli/src/index.integration.test.ts (5 tests | 2 failed) 4597ms
+   ❯ cs2dak cohort (1)
+     × exits 1 when no ZIPs are found in the directory 367ms
+   ❯ cs2dak (usage) (2)
+     × exits 0 and prints usage when called with no arguments 369ms
+[ELIFECYCLE] Command failed with exit code 130.

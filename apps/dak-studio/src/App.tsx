@@ -47,7 +47,7 @@ import {
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
 import { getPinnedPlayer } from "./lib/pin";
 import { assertRivalHubConnected, rivalHubFailureMessage, connectRivalHub, fetchRivalHubEvents, loadRivalHubConnection, revokeRivalHubPairing, type RivalHubConnectionState } from "./lib/rivalhub";
-import { rivalHubBatchCompletionMessage, runRivalHubBatch, type RivalHubBatchInput, type RivalHubBatchItem, type RivalHubBatchSession, type RivalHubImportContext } from "./lib/rivalhub-import";
+import { confirmRivalHubBatchReceipts, recountRivalHubBatch, rivalHubBatchCompletionMessage, runRivalHubBatch, type RivalHubBatchInput, type RivalHubBatchItem, type RivalHubBatchSession, type RivalHubImportContext } from "./lib/rivalhub-import";
 import { RivalHubBatchImportPanel } from "./components/RivalHubBatchImportPanel";
 import { importRivalHubFromNativePicker } from "./lib/rivalhub-acquisition";
 
@@ -161,6 +161,8 @@ export function App() {
   const [rivalHubConnection, setRivalHubConnection] = useState<RivalHubConnectionState>({ baseUrl: "", pairingId: null, connectedAt: 0, lastSyncAt: null, status: "disconnected", error: null });
   const [rivalHubRefreshToken, setRivalHubRefreshToken] = useState(0);
   const [batchSession, setBatchSession] = useState<RivalHubBatchSession | null>(null);
+  const batchSessionRef = useRef(batchSession);
+  useEffect(() => { batchSessionRef.current = batchSession; }, [batchSession]);
   const batchStopRequested = useRef(false);
   const batchTargetResolvers = useRef(new Map<string, (matchMapId: string | null) => void>());
   const [identityState, setIdentityState] = useState<IdentityStoreState>({ version: 0, mappings: [], teamRenames: {} });
@@ -364,7 +366,7 @@ export function App() {
     return importedEntries;
   }, []);
 
-  const refreshRivalHub = useCallback(async (options: { announce?: boolean } = {}): Promise<boolean> => {
+  const refreshRivalHub = useCallback(async (options: { announce?: boolean; confirmationSession?: RivalHubBatchSession } = {}): Promise<boolean> => {
     const announce = options.announce !== false;
     setRivalHubConnection((current) => ({ ...current, status: "connecting", error: null }));
     try {
@@ -374,6 +376,16 @@ export function App() {
       const connected = await loadRivalHubConnection();
       assertRivalHubConnected(connected);
       setRivalHubConnection(connected);
+      const pending = options.confirmationSession ?? batchSessionRef.current;
+      if (pending?.status === "completed" && pending.items.some(item => item.pendingReceipt)) {
+        const confirmed = await confirmRivalHubBatchReceipts(pending, response);
+        const applyConfirmation = (current: RivalHubBatchSession | null) => current?.id === confirmed.id
+          ? recountRivalHubBatch({ ...current, items: current.items.map(item => item.pendingReceipt
+            ? confirmed.items.find(updated => updated.id === item.id) ?? item : item) })
+          : current;
+        batchSessionRef.current = applyConfirmation(batchSessionRef.current);
+        setBatchSession(applyConfirmation);
+      }
       setRivalHubRefreshToken((current) => current + 1);
       if (announce) setNotice(`已刷新 RivalHub 赛事：${response.events.length} 个赛事`);
       return true;
@@ -446,11 +458,14 @@ export function App() {
       // await; do not keep a second batch-wide input array in the App closure.
       inputs = [];
       const session = await batchPromise;
-      const remoteRefreshSucceeded = await refreshRivalHub({ announce: false });
+      batchSessionRef.current = session;
       setBatchSession(session);
+      const remoteRefreshSucceeded = await refreshRivalHub({ announce: false, confirmationSession: session });
+      const confirmed = batchSessionRef.current?.id === session.id ? batchSessionRef.current : session;
+      setBatchSession(confirmed);
       setEntries(await listDemoEntries());
       await refreshEventRecords();
-      setNotice(rivalHubBatchCompletionMessage(session, remoteRefreshSucceeded));
+      setNotice(rivalHubBatchCompletionMessage(confirmed, remoteRefreshSucceeded));
     } catch (error) {
       setNotice(`在线 Demo 批处理失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {

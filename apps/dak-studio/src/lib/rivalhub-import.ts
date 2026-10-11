@@ -15,7 +15,7 @@ import {
   type RivalHubMatchResult,
 } from "./rivalhub-match";
 import { rivalHubEvidenceIdempotencyKey, submitRivalHubEvidence } from "./rivalhub";
-import type { EvidenceSubmissionResponse } from "./rivalhub-contract";
+import type { EvidenceSubmissionResponse, RivalHubEventsResponse } from "./rivalhub-contract";
 import { normalizeDiagnostic, type SafeDiagnostic } from "@cs2dak/rivalhub-upload";
 import { reportDiagnostic } from "./worker-diagnostics";
 
@@ -34,7 +34,8 @@ export type RivalHubBatchPhase =
   | "already_synced"
   | "needs_target"
   | "skipped"
-  | "failed";
+  | "failed"
+  | "unconfirmed";
 
 export type RivalHubImportScope = "event" | "stage" | "series" | "map";
 
@@ -78,6 +79,7 @@ export interface RivalHubBatchItem {
   localDuplicate?: boolean;
   reusedLocal?: boolean;
   targetCandidates?: RivalHubTargetCandidateSummary[];
+  pendingReceipt?: { eventId: string; seasonId: string; matchId: string; seriesId: string; matchMapId: string; entryId: string; demoSha256: string; idempotencyKey: string };
   localLink?: { seriesId: string; matchMapId: string; entryId: string; error: SafeDiagnostic };
 }
 
@@ -110,13 +112,15 @@ export interface RivalHubBatchSession {
     needsTarget: number;
     skipped: number;
     failed: number;
+    unconfirmed?: number;
     reusedLocal: number;
   };
 }
 
 export function rivalHubBatchCompletionMessage(session: RivalHubBatchSession, remoteRefreshSucceeded = true): string {
   const message = `批处理完成：已同步 ${session.counts.synced}，已存在 ${session.counts.alreadySynced}，需处理 ${session.counts.needsAttention}，待目标 ${session.counts.needsTarget}，已跳过 ${session.counts.skipped}，失败 ${session.counts.failed}`;
-  return remoteRefreshSucceeded ? message : `${message}；远程状态刷新失败，请点击「刷新赛事」重试`;
+  const result = session.counts.unconfirmed ? `${message}，待确认 ${session.counts.unconfirmed}（请刷新赛事核对）` : message;
+  return remoteRefreshSucceeded ? result : `${result}；远程状态刷新失败，请点击「刷新赛事」重试`;
 }
 
 interface RivalHubBatchDependencies {
@@ -177,6 +181,7 @@ function messageForPhase(phase: RivalHubBatchPhase): string {
     needs_target: "等待选择目标",
     skipped: "已跳过",
     failed: "失败",
+    unconfirmed: "待确认",
   }[phase];
 }
 
@@ -227,7 +232,7 @@ function freshSession(inputs: RivalHubBatchInput[]): RivalHubBatchSession {
   };
 }
 
-function recount(session: RivalHubBatchSession): RivalHubBatchSession {
+export function recountRivalHubBatch(session: RivalHubBatchSession): RivalHubBatchSession {
   const terminal = session.items;
   return {
     ...session,
@@ -237,6 +242,7 @@ function recount(session: RivalHubBatchSession): RivalHubBatchSession {
       alreadySynced: terminal.filter((item) => item.phase === "already_synced").length,
       needsTarget: terminal.filter((item) => item.phase === "needs_target").length,
       skipped: terminal.filter((item) => item.phase === "skipped").length,
+      unconfirmed: terminal.filter((item) => item.phase === "unconfirmed").length,
       failed: terminal.filter((item) => item.phase === "failed").length,
       reusedLocal: terminal.filter((item) => item.reusedLocal).length,
     },
@@ -272,14 +278,14 @@ export async function runRivalHubBatch(
     ...callbacks.dependencies,
   };
   let session = freshSession(inputs.filter((input): input is RivalHubBatchInput => input !== null));
-  const emit = () => callbacks.onUpdate?.(recount(session));
+  const emit = () => callbacks.onUpdate?.(recountRivalHubBatch(session));
   const updateItem = (index: number, patch: Partial<RivalHubBatchItem>) => {
     const currentItem = session.items[index];
     const nextPhase = patch.phase ?? currentItem?.phase;
     const awaitingTargetItemId = nextPhase === "needs_target"
       ? currentItem?.id ?? null
       : session.awaitingTargetItemId === currentItem?.id ? null : session.awaitingTargetItemId;
-    session = recount({
+    session = recountRivalHubBatch({
       ...session,
       currentIndex: index,
       awaitingTargetItemId,
@@ -291,7 +297,7 @@ export async function runRivalHubBatch(
 
   for (let index = 0; index < inputs.length; index += 1) {
     if (callbacks.shouldStop?.()) {
-      session = recount({
+      session = recountRivalHubBatch({
         ...session,
         status: "stopping",
         currentIndex: index,
@@ -480,7 +486,16 @@ export async function runRivalHubBatch(
       }
       const evidence = deps.buildEvidence(pkg, target, participantMatch.identities, participantMatch.orientation);
       updateItem(index, { phase: "submitting", message: messageForPhase("submitting") });
-      const response: EvidenceSubmissionResponse = await deps.submit(evidence, await deps.idempotencyKey(selected.map.id, evidence));
+      const idempotencyKey = await deps.idempotencyKey(selected.map.id, evidence);
+      const response: EvidenceSubmissionResponse = await deps.submit(evidence, idempotencyKey);
+      if (response.matchMapId !== selected.map.id || response.demoSha256.toLowerCase() !== localEntry.demoSha256.toLowerCase()) {
+        updateItem(index, {
+          phase: "unconfirmed", message: messageForPhase("unconfirmed"),
+          detail: "RESPONSE_MISMATCH：回执标识不一致，远端可能已接收。请刷新赛事确认；未建立本地关联，请勿重复提交。",
+          pendingReceipt: { eventId: context.eventId, seasonId: target.seasonId, matchId: target.matchId, seriesId: selected.series.id, matchMapId: selected.map.id, entryId: localEntry.id, demoSha256: localEntry.demoSha256, idempotencyKey },
+        });
+        continue;
+      }
       const reusedLocal = session.items[index]?.reusedLocal === true;
       updateItem(index, {
         phase: response.status === "synced" ? "synced" : "needs_attention",
@@ -509,7 +524,39 @@ export async function runRivalHubBatch(
       inputs[index] = null;
     }
   }
-  session = recount({ ...session, status: "completed" });
+  session = recountRivalHubBatch({ ...session, status: "completed" });
   emit();
   return session;
+}
+
+/** Reconcile only a fresh GET projection; never submit evidence on this path. */
+export async function confirmRivalHubBatchReceipts(
+  session: RivalHubBatchSession,
+  response: RivalHubEventsResponse,
+  linkMap = linkDemoToRivalHubMap,
+): Promise<RivalHubBatchSession> {
+  const items: RivalHubBatchItem[] = [];
+  for (const item of session.items) {
+    const pending = item.pendingReceipt;
+    if (item.phase !== "unconfirmed" || !pending) { items.push(item); continue; }
+    const event = response.events.find(event => event.seasonId === pending.seasonId);
+    const series = event?.series.find(series => series.id === pending.matchId);
+    const map = series?.maps.find(map => map.id === pending.matchMapId);
+    if (!map || map.demoSha256?.toLowerCase() !== pending.demoSha256.toLowerCase()
+        || (map.demoStatus !== "synced" && map.demoStatus !== "needs_attention")) {
+      items.push(item); continue;
+    }
+    let confirmed: RivalHubBatchItem = { ...item, phase: map.demoStatus, message: messageForPhase(map.demoStatus),
+      pendingReceipt: undefined, serverIssues: map.demoIssues,
+      detail: map.demoStatus === "synced" ? "已通过刷新赛事确认远端接收" : "已确认远端接收，仍需处理网站提示",
+    };
+    try { await linkMap(pending.seriesId, pending.matchMapId, pending.entryId); }
+    catch (error) {
+      const diagnostic = normalizeDiagnostic(error, { stage: "local_link", fileId: pending.entryId });
+      void reportDiagnostic(diagnostic);
+      confirmed = { ...confirmed, localLink: { seriesId: pending.seriesId, matchMapId: pending.matchMapId, entryId: pending.entryId, error: diagnostic } };
+    }
+    items.push(confirmed);
+  }
+  return recountRivalHubBatch({ ...session, items });
 }

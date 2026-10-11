@@ -1,0 +1,2 @@
+before synthetic value leaked: True safe cause retained: True
+after synthetic value leaked: False safe cause retained: True

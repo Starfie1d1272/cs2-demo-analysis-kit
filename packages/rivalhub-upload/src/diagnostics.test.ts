@@ -61,3 +61,40 @@ describe("safe diagnostics", () => {
     expect(result).toEqual({ message: "failed", code: "UPLOAD_FAILED" });
   });
 });
+
+describe("runtime diagnostic credential fragments", () => {
+  it.each(["credential=synthetic-private", "passwd=synthetic-private", "Basic c3ludGhldGljOnByaXZhdGU=", "password=two synthetic words", "password='two; synthetic words'"])("redacts %s through the runtime UI projection", message => {
+    const diagnostic = normalizeDiagnostic(new Error(message));
+    expect(diagnostic.message).not.toMatch(/synthetic-private|c3ludGhldGljOnByaXZhdGU=|synthetic words/);
+    expect(diagnostic.message).toContain("redacted");
+    expect(normalizeDiagnostic(diagnostic)).toEqual(diagnostic);
+  });
+});
+
+  it.each([
+    'password="secret words" reason=connection refused',
+    String.raw`password="https://a\";synthetic-private" reason=连接失败`,
+    "credential='secret words' reason=TLS handshake failed",
+  ])("preserves safe causes through repeated redaction: %s", message => {
+    const safe = normalizeDiagnostic(new Error(message));
+    expect(safe.message).not.toMatch(/secret words|synthetic-private/);
+    expect(safe.message).toContain(message.slice(message.indexOf("reason=")));
+    expect(normalizeDiagnostic(safe)).toEqual(safe);
+  });
+
+describe("literal redaction marker value boundaries", () => {
+  it.each([
+    "password=[redacted]synthetic-private",
+    "password=[redacted] synthetic-private",
+    "password=[redacted] reason=synthetic-private",
+    "credential=[redacted]\t synthetic-private",
+    "password=[redacted]synthetic-private; reason=连接失败",
+    "password=[redacted] synthetic-private; reason=connection refused",
+  ])("does not let a literal marker hide an unredacted suffix: %s", message => {
+    const diagnostic = normalizeDiagnostic(new Error(`TLS failed ${message}`));
+    expect(diagnostic.message).not.toContain("synthetic-private");
+    expect(diagnostic.message).toContain("TLS failed");
+    if (message.includes("; reason=")) expect(diagnostic.message).toContain(message.slice(message.indexOf("; reason=")));
+    expect(normalizeDiagnostic(diagnostic)).toEqual(diagnostic);
+  });
+});

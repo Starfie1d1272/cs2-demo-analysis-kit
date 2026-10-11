@@ -21,7 +21,9 @@ describe("optional tri transport", () => {
     const sink = (diagnostic: SafeDiagnostic) => { diagnostics.push(diagnostic); };
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("TLS failed accessToken=synthetic-secret /home/synthetic/demo.tri"); }));
     await expect(fetchTriBuffer("de_nuke", "./tris/", sink)).resolves.toBeNull();
-    expect(diagnostics[0]).toMatchObject({ code: "TRI_FETCH_FAILED", stage: "tri.fetch", cause: "TLS failed accessToken=[redacted] [path]" });
+    // Unquoted credential clauses are conservatively removed in full; the TLS cause survives.
+    expect(JSON.stringify(diagnostics[0])).not.toMatch(/synthetic-secret|\/home\/synthetic/);
+    expect(diagnostics[0]).toMatchObject({ code: "TRI_FETCH_FAILED", stage: "tri.fetch", cause: "TLS failed accessToken=[redacted]" });
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, headers: new Headers(), arrayBuffer: async () => { throw new Error("body read failed"); } })));
     await expect(fetchTriBuffer("de_nuke", "./tris/", sink)).resolves.toBeNull();
     expect(diagnostics[1]).toMatchObject({ code: "TRI_READ_FAILED", stage: "tri.read", cause: "body read failed" });
