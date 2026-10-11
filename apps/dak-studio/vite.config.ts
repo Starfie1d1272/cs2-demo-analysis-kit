@@ -6,11 +6,16 @@ import { execFile } from "node:child_process";
 import { pipeline } from "node:stream/promises";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import { readBuildInfo, type BuildInfo } from "../../scripts/build-info.mjs";
 
 const PYTHON_ROOT = resolve(__dirname, "../../python");
 const EXPORT_TIMEOUT_MS = 10 * 60 * 1000;
 const APP_VERSION = process.env.DAK_APP_VERSION ??
   (JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")) as { version: string }).version;
+
+const BUILD_INFO: BuildInfo = process.env.DAK_BUILD_INFO
+  ? JSON.parse(process.env.DAK_BUILD_INFO) as BuildInfo
+  : readBuildInfo(resolve(__dirname, "../.."));
 
 /**
  * dev 模式的 .dem 导入后端：POST /api/export-dem 收 .dem 字节流，
@@ -120,8 +125,14 @@ export default defineConfig({
   define: {
     // 桌面应用版本随 vX.Y.Z tag（scripts/sync-version.mjs 写入 package.json）
     __APP_VERSION__: JSON.stringify(APP_VERSION),
+    __BUILD_INFO__: JSON.stringify(BUILD_INFO),
   },
-  plugins: [react(), demExportPlugin(), trisProxyPlugin()],
+  plugins: [react(), demExportPlugin(), trisProxyPlugin(), {
+    name: "dak-build-info",
+    generateBundle() {
+      this.emitFile({ type: "asset", fileName: "build-info.json", source: JSON.stringify(BUILD_INFO, null, 2) + "\n" });
+    },
+  }],
   server: {
     port: 5178,
   },

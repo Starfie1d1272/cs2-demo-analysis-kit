@@ -24,6 +24,33 @@ else
   fi
 fi
 
+# Capture provenance after optional sync, before generating any output.
+DAK_BUILD_INFO="$(node scripts/build-info.mjs)"
+export DAK_BUILD_INFO
+export DAK_APP_VERSION="$(node -e 'console.log(JSON.parse(process.env.DAK_BUILD_INFO).releaseVersion)')"
+ARTIFACT_ID="$(node -e 'console.log(JSON.parse(process.env.DAK_BUILD_INFO).artifactId)')"
+PACKAGE_MODE="$(node -e 'console.log(JSON.parse(process.env.DAK_BUILD_INFO).packageMode)')"
+DIST_PATH="$ROOT/python/dist"
+if [[ "$PACKAGE_MODE" == "ad-hoc" ]]; then
+  DIST_PATH="$DIST_PATH/dak-studio-$ARTIFACT_ID"
+fi
+if [[ "$OSTYPE" == darwin* ]]; then
+  ARTIFACT="$DIST_PATH/dak-studio-$ARTIFACT_ID.dmg"
+else
+  ARTIFACT="$DIST_PATH/dak-studio"
+fi
+node - <<'NODE'
+const b = JSON.parse(process.env.DAK_BUILD_INFO);
+console.log(`Version sync: ${b.versionSync}
+Release version: ${b.releaseVersion}
+Git revision: ${b.buildRevision ?? 'unknown'}
+Working tree: ${b.buildDirty === null ? 'unknown' : b.buildDirty ? 'dirty' : 'clean'}
+Package mode: ${b.packageMode}`);
+if (b.buildDirty) console.warn('WARNING: Packaging local working tree changes (dirty source).');
+if (b.buildRevision === null) console.warn('WARNING: Git metadata unavailable; revision and source state are unknown.');
+NODE
+echo "Output artifact: $ARTIFACT"
+
 echo "==> [2/5] Building DAK Studio frontend"
 pnpm --filter @cs2dak/dak-studio build
 STUDIO_WEB="python/src/cs2dak/studio_web"
@@ -41,10 +68,9 @@ rm -rf "$STUDIO_WEB/tris"
 echo "==> [3/5] PyInstaller build (studio)"
 cd python
 uv sync --extra gui --extra build
-uv run pyinstaller packaging/cs2dak-studio.spec --noconfirm --distpath dist
+uv run pyinstaller packaging/cs2dak-studio.spec --noconfirm --distpath "$DIST_PATH"
 cd "$ROOT"
 
-VERSION="$(node -p "require('./package.json').version")"
 if [[ "$OSTYPE" == darwin* ]]; then
   echo "==> [4/5] Creating DMGs"
 
@@ -75,8 +101,8 @@ if [[ "$OSTYPE" == darwin* ]]; then
     rm -rf "$stage"
   }
 
-  if [[ -d python/dist/DAK\ Studio.app ]]; then
-    make_dmg "python/dist/DAK Studio.app" "python/dist/dak-studio-${VERSION}.dmg"
+  if [[ -d "$DIST_PATH/DAK Studio.app" ]]; then
+    make_dmg "$DIST_PATH/DAK Studio.app" "$ARTIFACT"
   else
     echo "    Skipped studio DMG: python/dist/DAK Studio.app not found"
   fi
@@ -84,4 +110,4 @@ else
   echo "==> [4/5] Skipped DMG: not macOS (PyInstaller output in python/dist/)"
 fi
 
-echo "==> [5/5] Done."
+echo "==> [5/5] Done. Output artifact: $ARTIFACT"

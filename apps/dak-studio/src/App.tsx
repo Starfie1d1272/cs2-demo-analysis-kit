@@ -10,6 +10,7 @@ import { parseTags } from "./lib/tags";
 import { listSeriesRecords, pruneOrphanSeries, type StudioSeriesRecord } from "./lib/series";
 import { listEventRecords, markRivalHubEventsStale, matchesRivalHubDemo, upsertRivalHubEvents, type StudioEventRecord } from "./lib/events";
 import { importEventAssetArchive } from "./lib/event-assets";
+import { BUILD_INFO, BUILD_LABEL } from "./lib/build-info";
 import { APP_VERSION, checkForUpdateOnChannel, type UpdateChannel, type UpdateInfo } from "./lib/update";
 import { checkForUpdateViaBridge } from "./lib/updater-bridge";
 import { UpdateControl } from "./components/UpdateControl";
@@ -913,6 +914,7 @@ export function App() {
           <NavButton item={MANAGEMENT_NAV} active={view === "management"} onClick={() => { setManagementInitialTab("identity"); setView("management"); }} />
           <span>{entries.length} 场 demo</span>
           <small>v{APP_VERSION} · v3 ZIP · 本地存储</small>
+          <small title={BUILD_INFO.buildRevision ?? "Git metadata unavailable"}>{BUILD_LABEL}</small>
           <label className="stu-update-channel">
             <span>更新通道</span>
             <select value={updateChannel} onChange={(e) => changeUpdateChannel(e.target.value === "beta" ? "beta" : "stable")}>

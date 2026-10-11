@@ -229,7 +229,13 @@ Windows Uploader 推荐入口为 `RivalHub-Demo-Uploader-Setup-X.Y.Z.exe`（完�
 
 `sync-version.mjs` 只接受 canonical `x.y.z`（CLI 可带 `v` 前缀），不接受自由 prerelease 或 build suffix。源码 revision 属于 build provenance，不写入 Python / npm release version。脚本先读取并校验全部私有 manifest 和三个 Python target，再开始写入；缺失、重复或无版本字段会在任何写入前失败。`uv.lock` 仅定位唯一 `cs2dak` package block，可恢复历史 malformed version，不修改其他依赖。写入失败时尝试恢复所有已尝试的 target；恢复失败会明确报出，需检查工作树后重试。该保护不宣称对进程被强制结束或磁盘故障提供跨文件事务。
 
-回归：`node --test scripts/sync-version.test.mjs`。`PACKAGE_SKIP_VERSION_SYNC=1` 的 artifact / UI revision provenance 仍由 #48 的后续工作验收。
+回归：`node --test scripts/sync-version.test.mjs`。本地 `bash scripts/package.sh 0.8.5`（sync enabled）和 `PACKAGE_SKIP_VERSION_SYNC=1 bash scripts/package.sh`（sync skipped）都属于 ad-hoc 构建。脚本在同步之后、生成产物之前抓取一份 provenance，打印 sync / release / revision / dirty / mode / output summary；dirty 本地构建允许但明确警告。releaseVersion 保持 canonical x.y.z，buildRevision 为完整 HEAD SHA，buildDirty 为工作树状态（含未忽略的新文件）。同一份信息写入前端 `build-info.json`，由既有 Studio 侧栏版本入口显示短 SHA 和 clean/dirty，并随 `studio_web` 打入 PyInstaller。
+
+本地产物置于 `python/dist/dak-studio-X.Y.Z-build-<12-char-sha>[-dirty]/`；macOS DMG 文件名同样带该标识，内部 app/exe 名称保持原样。dirty 标记不是工作树内容哈希，同一 revision 的多次 dirty 构建会覆盖同一路径。无 Git 元数据的源码归档使用 `build-unknown`，revision/dirty 为 null，侧栏与 summary 明确显示 unknown，不声称可追溯。
+
+正式 Release CI 显式传 `PACKAGE_RELEASE_TAG=vX.Y.Z`，保留原来的版本化 DMG 与 runtime 目录；匹配 tag/manifest/HEAD 且工作树 clean 才允许进入构建。仅 skip sync 不代表正式 release。CI 获取外部 tris manifest 放在捕获源码 provenance 之后，避免将生成的发布输入误记为源码修改。正式 Windows web patch 直接封装 `python/dist/dak-studio/_internal/studio_web` 内的已构建前端，检查同版本 clean release snapshot；不在下载资产后的新 CI step 重跑 Vite 或重新捕获 working-tree 状态。patch 与 runtime 的 build-info / frontend bytes 一致，只有 patch 额外生成的 version.json 不同。本地不传第四个 desktopWebDir 参数时仍可独立构建 patch。npm 包继续由 Changesets 独立管理，本流程不改变公共包版本。
+
+回归：`node --test scripts/build-info.test.mjs scripts/sync-version.test.mjs`。本地 Linux PyInstaller smoke 验证打包 metadata / frontend；macOS DMG 拖拽安装、Windows GUI 启动与正式发布 qualification 仍需对应平台验收。
 
 ### Maps 编译发布物验证
 
