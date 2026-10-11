@@ -37,6 +37,9 @@ jobs:
 
       - run: pnpm build
 
+      - name: Smoke packed maps in a clean consumer
+        run: node scripts/maps-package-smoke.mjs
+
       - name: Smoke compiled tournament package
         shell: bash
         run: |
@@ -73,7 +76,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm --filter @cs2dak/tournament build
+      - run: pnpm --filter @cs2dak/maps --filter @cs2dak/tournament build
 
       - run: pnpm test:integration
 
