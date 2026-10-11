@@ -1,6 +1,6 @@
 # 独立复审：2026-10-10—10-12 凌晨
 
-审查对象 `Starfie1d1272/cs2-demo-analysis-kit`。时间窗为北京时间 10-10 00:00 起，包含 10-12 01:38:11 已给出的收尾。以服务器读取核验 main=`126f3afed09d5c2278cd6ad9e8306fa36aef294f`；时间前基线=`15f5e319e60d16065054749fbd3d4e54a3588526`（10-06 最后提交）；正式 v0.8.5 tag=`6562abd058e4a4d5c2e606db4e859db55465a8df`。17 个 main 提交/合并 PR，154 个净变更文件。PR #72/#73 是 10-10/11 范围的一部分，不能只看 #84–94。`commits.tsv` 和逐提交 `.patch` 保存完整期间清单；`files.csv` 逐文件映射到这些提交，清单覆盖不等于每文件都有真机效果证明。分支上的未合并旧 PR #6 不属于期间交付；它仍需 #3 capability reconciliation。
+审查对象 `Starfie1d1272/cs2-demo-analysis-kit`。时间窗为北京时间 10-10 00:00 起，包含 10-12 01:38:11 已给出的收尾。以服务器读取核验 main=`126f3afed09d5c2278cd6ad9e8306fa36aef294f`；时间前基线=`15f5e319e60d16065054749fbd3d4e54a3588526`（10-06 最后提交）；正式 v0.8.5 tag=`6562abd058e4a4d5c2e606db4e859db55465a8df`。17 个 main 提交/合并 PR，154 个净变更文件；另有期间未合并依赖 PR #77（1个提交、2文件），全部纳入。PR #72/#73 是 10-10/11 范围的一部分，不能只看 #84–94。`commits.tsv` 和逐提交 `.patch` 保存完整期间清单；`files.csv` 逐文件映射到这些提交，清单覆盖不等于每文件都有真机效果证明。旧 PR #6 创建/更新均在7月，不属本时间窗；它仍需 #3 capability reconciliation。
 
 先读仓库 AGENTS.md、module-boundaries、fixture-verify skill。所有验证是本地、合成或只读 GitHub；没有用户 Windows、生产库、发布、原始 dump、真实 token 操作。旧作者的评论只用于寻找线索，证据强度依据源码和重新运行检查判断。
 
@@ -76,3 +76,9 @@
 独立分支 `fix/independent-audit-receipts-secrets`：Studio在终态/link前核对map ID和raw SHA，错receipt失败但下一队列项继续；运行脱敏补credential/passwd/Basic及多词密码，Python handler+export再次保护；JSON parser仅提取语法类别和终端数字位置。无新增UI/API、无Evidence payload/hash改动。
 
 新定向67 TS、64 Python、typecheck、ruff、diff-check通过；原五条反证改后5/5通过（adversarial-after.log），Python三输入均全值脱敏。两次实现迭代失败日志也保留在本地支持目录：首次成功fixture固定receipt target、加严脱敏导致JSON位置信息丢失、TS常量类型/ruff问题，修正后才得到上述结果。自身修复未宣称独立审查通过，Ready PR交父会话独立协调；未经该审核不merge。
+
+## 未合并期间 PR 与安全信息边界
+
+补核全部OPEN PR：#6 最后更新时间为2026-07-31，旧capability reconciliation仍由#3；#77创建10-10、更新10-11，因此本次也纳入。#77 head=`618a21380bc5b78fe0bf00ee495805353b1bc9c7`，单提交，仅改infra/event-upload-worker/package.json和package-lock.json；wrangler4.147→4.149、sharp0.35.4→0.35.5以及workerd/esbuild/libvips/miniflare对应传递更新，没有Worker业务源码delta，所有resolved来源registry.npmjs.org。独立临时worktree执行npm ci --ignore-scripts、tsc --noEmit、wrangler deploy **--dry-run**（移除Cloudflare凭据、禁metrics）成功，输出明确dry-run退出；没有发布或接触实际R2。当前root CI不直接覆盖infra该npm子工程，因此不以root绿灯替代该验证。保持原PR开放交父协调，不纳入0.8.5已交付能力。
+
+push时GitHub通知default branch存在一个High Dependabot告警#38，但GET安全告警API返回integration 403。无法读取包/版本/漏洞和可达性，不能断言它就是#77或已修复。父协调如有安全权限应继续核对；本次不附凭据、不尝试绕过授权。此为访问边界，不是auto-review拒绝。
