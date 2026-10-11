@@ -1,3 +1,5 @@
+import { withImportCheckpoint } from "./import-persistence";
+import { deleteMatchRows, settleWrites } from "./storage/match-rows";
 import { withWorkerFallback } from "./worker-diagnostics";
 import type { SafeDiagnostic } from "@cs2dak/rivalhub-upload";
 import { loadDemoManifestFromZip, loadDemoPackageFromZip, buildMatchRadarField, type DemoPackageLoadProfile } from "@cs2dak/core";
@@ -171,7 +173,7 @@ export async function saveDemoEntry(entry: StudioDemoEntry): Promise<void> {
 
 /** 删除 raw duplicate 的 meta/blob；调用方随后负责重建 survivor facts。 */
 export async function removeDemoStorageOnly(id: string): Promise<void> {
-  await Promise.all([demoMeta.delete(id), demoBlobs.delete(id)]);
+  await settleWrites([demoMeta.delete(id), demoBlobs.delete(id)]);
   pkgCache.delete(id);
   if (identityIndex) {
     const previousDemoSha256 = identityIndex.byId.get(id);
@@ -185,10 +187,10 @@ export async function removeDemoStorageOnly(id: string): Promise<void> {
 
 /** 删除某条 Demo 的 facts/derived 投影；调用方负责确认 matchId 不与 survivor 共享。 */
 export async function removeDemoAnalysis(matchId: string): Promise<void> {
-  await Promise.all([
+  await settleWrites([
     getFactsStore().deleteMatchFacts(matchId),
     getDerivedCacheStore().deleteMatch(matchId),
-    getStorage().records("facts:cohort_rows").deleteByPrefix(matchId),
+    deleteMatchRows(getStorage().records("facts:cohort_rows"), matchId),
   ]);
 }
 
@@ -197,18 +199,13 @@ export function isFactsStale(entry: StudioDemoEntry): boolean {
   return isAnalysisStale(entry.builtWith);
 }
 
-/** facts / derived cache 是查询加速层；写失败不破坏库完整性（ZIP+元数据已落盘，可后续重建）。 */
+/** Import succeeds only after all projections persist; preserve the first failure. */
 async function persistAnalysis(data: ExtractedMatchData): Promise<void> {
-  try {
-    await Promise.all([
-      getFactsStore().putMatchFacts(data.facts),
-      getDerivedCacheStore().putMatchDerived(data.derived),
-      // storage:3 以前误放在 facts namespace 的 cohort 聚合行只做一次清理，不再读取或生产。
-      getStorage().records("facts:cohort_rows").deleteByPrefix(data.facts.matchId),
-    ]);
-  } catch {
-    // 吞掉：facts 缺失只降级聚合查询。
-  }
+  await settleWrites([
+    getFactsStore().putMatchFacts(data.facts),
+    getDerivedCacheStore().putMatchDerived(data.derived),
+    deleteMatchRows(getStorage().records("facts:cohort_rows"), data.facts.matchId),
+  ]);
 }
 
 async function hasPersistedFacts(entry: StudioDemoEntry): Promise<boolean> {
@@ -480,30 +477,111 @@ export interface ImportDemoOptions {
   matchDate?: string | null;
   /** 内部重建入口：即使 raw hash 已存在且 facts 当前，也必须重新抽取。 */
   forceReanalyze?: boolean;
+  /** Abort before commit, or restore the runtime checkpoint if aborted during writes. */
+  signal?: AbortSignal;
 }
 
 /**
  * 导入一个 v3 ZIP；以内容哈希为 id，重复导入幂等（标签做并集）。
  * 解析失败抛错（带文件名）。
  */
-export async function importDemoFile(file: File, options: ImportDemoOptions | string[] = []): Promise<ImportResult> {
-  const { tags = [], sourceDemPath = null, replaceId, lowMemory = false, matchDate = null, forceReanalyze = false } = Array.isArray(options) ? { tags: options } : options;
-  let buffer = await file.arrayBuffer();
-  const id = await sha256Hex(buffer);
+async function finishImport(entry: StudioDemoEntry, replacement: StudioDemoEntry | undefined, signal: AbortSignal | undefined, prepare: () => Promise<void>): Promise<void> {
+  const matchId = matchIdForEntry(entry);
+  const previousMatchId = replacement ? matchIdForEntry(replacement) : null;
+  const ids = [entry.id, ...(replacement ? [replacement.id] : [])];
+  signal?.throwIfAborted();
+  try {
+    await withImportCheckpoint(getStorage(), ids,
+      [...new Set([matchId, ...(previousMatchId ? [previousMatchId] : [])])], async () => {
+        signal?.throwIfAborted();
+        await prepare();
+        signal?.throwIfAborted();
+        await saveDemoEntry(entry);
+        signal?.throwIfAborted();
+        if (replacement && replacement.id !== entry.id) {
+          const shared = (await demoMeta.getAll<StudioDemoEntry>()).some((row) => row.id !== replacement.id && matchIdForEntry(row) === previousMatchId);
+          await removeDemoStorageOnly(replacement.id);
+          if (previousMatchId && previousMatchId !== matchId && !shared) await removeDemoAnalysis(previousMatchId);
+          signal?.throwIfAborted();
+        }
+      });
+  } catch (error) {
+    identityIndex = null;
+    identityIndexPromise = null;
+    for (const id of ids) pkgCache.delete(id);
+    throw error;
+  }
+  pkgCache.delete(entry.id);
+}
 
+const pendingImports = new Map<string, Promise<void>>();
+
+async function withImportLocks<T>(keys: string[], operation: () => Promise<T>): Promise<T> {
+  const uniqueKeys = [...new Set(keys)];
+  const pending = [...new Set(uniqueKeys.map((key) => pendingImports.get(key)).filter((job): job is Promise<void> => Boolean(job)))];
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  for (const key of uniqueKeys) pendingImports.set(key, gate);
+  try {
+    await Promise.all(pending);
+    return await operation();
+  } finally {
+    release();
+    for (const key of uniqueKeys) if (pendingImports.get(key) === gate) pendingImports.delete(key);
+  }
+}
+
+export async function importDemoFile(file: File, options: ImportDemoOptions | string[] = []): Promise<ImportResult> {
+  const settings = Array.isArray(options) ? { tags: options } : options;
+  settings.signal?.throwIfAborted();
+  const buffer = await file.arrayBuffer();
+  const id = await sha256Hex(buffer);
+  let manifest;
+  try { manifest = await loadDemoManifestFromZip(buffer); }
+  catch (error) { throw new Error(`${file.name}: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
+  const resolveKeys = async (): Promise<string[]> => {
+    const replacement = settings.replaceId ? await demoMeta.get<StudioDemoEntry>(settings.replaceId) : undefined;
+    const identityMatch = manifest.demo.hash ? await findDemoEntryBySha256(manifest.demo.hash) : null;
+    const existing = identityMatch ?? await demoMeta.get<StudioDemoEntry>(id);
+    return [`zip:${id}`, `match:${matchIdForEntry({ fileName: file.name })}`,
+      ...(manifest.demo.hash ? [`demo:${manifest.demo.hash.toLowerCase()}`] : []),
+      ...(settings.replaceId ? [`entry:${settings.replaceId}`] : []),
+      ...(replacement ? [`match:${matchIdForEntry(replacement)}`] : []),
+      ...(existing ? [`match:${matchIdForEntry(existing)}`] : [])];
+  };
+  let keys = await resolveKeys();
+  for (;;) {
+    settings.signal?.throwIfAborted();
+    const attempt = await withImportLocks(keys, async () => {
+      settings.signal?.throwIfAborted();
+      // A queued import may now deduplicate to a different canonical filename.
+      // Never enter a checkpoint until its final survivor/target is covered.
+      const required = await resolveKeys();
+      if (required.some((key) => !keys.includes(key))) return { retry: required };
+      return { result: await importDemoFileUnlocked(file, settings, buffer, id, manifest) };
+    });
+    if (attempt.result) return attempt.result;
+    // Release the entire reservation before acquiring an expanded set: no
+    // nested lock acquisition, and therefore no waiting on a lock we hold.
+    keys = [...new Set([...keys, ...attempt.retry!])];
+  }
+}
+
+async function importDemoFileUnlocked(file: File, settings: ImportDemoOptions, input: ArrayBuffer, id: string, manifest: Awaited<ReturnType<typeof loadDemoManifestFromZip>>): Promise<ImportResult> {
+  const { tags = [], sourceDemPath = null, replaceId, lowMemory = false, matchDate = null, forceReanalyze = false, signal } = settings;
+  signal?.throwIfAborted();
+  let buffer = input;
   const meta = demoMeta;
   const blobs = demoBlobs;
+  // Read again under the relevant import locks; queued replacements may have committed.
   const replacement = replaceId ? await meta.get<StudioDemoEntry>(replaceId) : undefined;
-  let manifest;
-  try {
-    manifest = await loadDemoManifestFromZip(buffer);
-  } catch (err) {
-    throw new Error(`${file.name}: ${err instanceof Error ? err.message : String(err)}`);
-  }
   const demoSha256 = manifest.demo.hash?.toLowerCase() ?? null;
   const identityMatch = demoSha256 ? await findDemoEntryBySha256(demoSha256) : null;
   const existingById = await meta.get<StudioDemoEntry>(id);
   const existing = identityMatch ?? (existingById ? normalizeEntry(existingById) : undefined);
+  // An identical completed replacement can be retried; a different file cannot
+  // silently import after another queued replacement removed its target.
+  if (replaceId && !replacement && !existing) throw new Error("替换目标已不存在，请重新选择当前 Demo");
 
   const mergeDuplicateEntry = (current: StudioDemoEntry): StudioDemoEntry => normalizeEntry({
     ...current,
@@ -520,7 +598,8 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
   // without parsing the full package; repair/rebuild opts into forceReanalyze.
   if (existing && !forceReanalyze && !isFactsStale(existing) && await hasPersistedFacts(existing)) {
     const mergedEntry = mergeDuplicateEntry(existing);
-    await saveDemoEntry(mergedEntry);
+    mergedEntry.tags = normalizeTags([...(replacement?.tags ?? []), ...mergedEntry.tags]);
+    await finishImport(mergedEntry, replacement, signal, async () => undefined);
     return {
       entry: mergedEntry,
       duplicate: true,
@@ -560,35 +639,12 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     entry.sourceDemPath = sourceDemPath ?? replacement.sourceDemPath ?? null;
   }
 
-  if (existing) {
-    await Promise.all([blobs.put(persistedId, buffer), saveDemoEntry(entry)]);
+  await finishImport(entry, replacement, signal, async () => {
     await persistAnalysis(data);
-    if (replacement && replacement.id !== persistedId) {
-      await removeDemoStorageOnly(replacement.id);
-      void getFactsStore().deleteMatchFacts(matchIdForEntry(replacement));
-      void getDerivedCacheStore().deleteMatch(matchIdForEntry(replacement));
-    }
-    return {
-      entry,
-      duplicate: true,
-      replaced: Boolean(replacement && replacement.id !== persistedId),
-      replacedId: replacement?.id
-    };
-  }
-  await Promise.all([
-    blobs.put(persistedId, buffer),
-    saveDemoEntry(entry)
-  ]);
-  if (replacement && replacement.id !== persistedId) {
-    await removeDemoStorageOnly(replacement.id);
-    void getFactsStore().deleteMatchFacts(matchIdForEntry(replacement));
-    void getDerivedCacheStore().deleteMatch(matchIdForEntry(replacement));
-  }
-  // facts 已在 worker 里榨好；后续聚合走 facts 投影，不再反序列化整包 derived。
-  // 注意：不把整包放进 pkgCache —— 批量导入会让每场 DemoPackage（含完整 replay）常驻内存
-  // 导致 OOM。需要整包时由 getDemoPackage 按需从 ZIP 懒加载即可。
-  await persistAnalysis(data);
-  return { entry, duplicate: false, replaced: Boolean(replacement && replacement.id !== persistedId), replacedId: replacement?.id };
+    signal?.throwIfAborted();
+    await blobs.put(persistedId, buffer);
+  });
+  return { entry, duplicate: Boolean(existing), replaced: Boolean(replacement && replacement.id !== persistedId), replacedId: replacement?.id };
 }
 
 /** 更新某条 demo 的标签。 */
