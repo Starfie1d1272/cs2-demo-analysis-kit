@@ -124,3 +124,10 @@ def test_export_native_panic_is_terminal_but_control_signals_propagate(monkeypat
             with pytest.raises(type(failure)):
                 StudioApi()._run_export_job(job)
         monkeypatch.setattr(builtins, "__import__", original_import)
+
+
+def test_missing_export_job_is_a_query_uncertainty_not_parser_failure() -> None:
+    status = StudioApi().get_export_status("missing-job")
+    assert status["id"] == "missing-job"
+    assert status["code"] == "EXPORT_JOB_NOT_FOUND"
+    assert status["error"] == "未知任务"
