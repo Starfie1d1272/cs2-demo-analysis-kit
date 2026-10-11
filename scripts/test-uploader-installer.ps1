@@ -28,7 +28,11 @@ function Run-Setup($Exe, $Destination, $Success = $true, [switch]$DefaultLog) {
         if ($logText -notmatch 'DAK installer stage=directory.rejected') { throw 'Directory rejection stage missing' }
         # PrepareToInstall reports the same exact filename that the local-log button uses.
         $actualLog = if ($DefaultLog) { $created[0].FullName } else { $logPath }
-        if (!$logText.Contains($actualLog) -or !$logText.Contains('本机安装日志') -or !$logText.Contains('分享副本前')) { throw 'Failed install lacks actual local log path or share guidance' }
+        $reported = [regex]::Match($logText, '本机安装日志：([^\r\n]+)').Groups[1].Value.Trim()
+        if (!$reported -or !(Test-Path -LiteralPath $reported -PathType Leaf) -or !$logText.Contains('分享副本前')) { throw 'Failed install lacks readable local log path or share guidance' }
+        # Inno may return an 8.3 TEMP alias. Verify retrieval instead of comparing path spelling.
+        if ([System.IO.Path]::GetFileName($reported) -ine [System.IO.Path]::GetFileName($actualLog) -or
+            (Get-FileHash -LiteralPath $reported).Hash -ne (Get-FileHash -LiteralPath $actualLog).Hash) { throw 'Reported installation log differs from the generated log' }
     }
 }
 New-Item -ItemType Directory -Force $root | Out-Null
