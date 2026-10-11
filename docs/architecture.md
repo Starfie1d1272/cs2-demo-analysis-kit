@@ -54,11 +54,18 @@ Important v3 semantics:
 `@cs2dak/core` is the sole owner of DAK performance semantics. Its
 `buildPlayerRoundPerformanceFacts()` converts the frozen event annotations into
 player-round Assist, Damage, Opening, Trade, KAST, Clutch, Utility, Objective,
-Weapon, and man-state facts. `playerStats` remains a reference aggregate used for
-strict parity validation only; `analyzeDemoPackage()` records comparable drift as
-a QA error, while Opening rows affected by world death, suicide, or teamkill are
-explicitly marked not comparable. Cohort, tournament, presentation, and Evidence
-adapters aggregate or project the Core facts and do not recreate event rules.
+Weapon, and man-state facts. Event-derived source invariants validate coverage,
+identity, conserved counts, paired opening duels and supplied cached facts;
+exporter `playerStats` is not a comparison oracle or fallback. Its collateral
+count remains an observed field consumed by the scoreboard and weapon highlights.
+Opening FK/FD means the first valid enemy-player kill, ordered by round, tick and
+original event order: teamkills, suicides and world deaths update death state but
+do not receive opening credit. With no enemy kill, every player's FK/FD is zero.
+This is an opening duel, not the first chronological death or a guaranteed 5v5.
+Cohort, tournament, presentation, and Evidence adapters aggregate or project the
+Core facts and do not recreate event rules. Legacy ZIP/Evidence payloads remain
+readable and immutable; historical parity diagnostics may still be displayed and
+redacted, but new analysis does not emit the retired oracle diagnostics.
 
 ### Tournament frozen-fact boundary
 
@@ -154,9 +161,13 @@ v3 包包含：
 `@cs2dak/core` 是 DAK performance semantics 的唯一 owner。其
 `buildPlayerRoundPerformanceFacts()` 将冻结的事件标注统一转换为 player-round
 层的 Assist、Damage、Opening、Trade、KAST、Clutch、Utility、Objective、Weapon
-与 man-state facts。`playerStats` 仅作为 reference aggregate 做严格 parity
-validation；`analyzeDemoPackage()` 将可比 mismatch 写入 QA error，Opening 前出现
-世界伤害、自杀或队友击杀的回合则明确标记为不可比。cohort、tournament、
+与 man-state facts。校验直接检查源事件与 canonical facts 的身份、覆盖、统计守恒
+及 supplied facts；`playerStats` 不再作旧口径对照或 fallback，仍保留合同读取和
+尚未替代的 collateral 观察字段。FK/FD 指按回合、tick、原始事件顺序选择的首个
+有效敌对击杀，成对归属胜者/死者；TK、自杀和 world 死亡只更新死亡/存活状态。
+没有敌对击杀则全员 FK/FD 为零。这不是时间上的第一次死亡或保证 5v5 的对枪。
+历史 ZIP/Evidence 及已有 QA warning 保持原样读取，不改写为重新验证通过；历史
+parity 诊断继续脱敏显示，新分析不再生成这些旧 oracle 诊断。cohort、tournament、
 presentation 和 Evidence 适配器只聚合或投影 Core facts，不重新实现事件规则。
 
 ### Tournament frozen-fact 边界

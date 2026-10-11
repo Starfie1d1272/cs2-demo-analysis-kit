@@ -38,9 +38,9 @@
 
 仓库里**真数据被丢在桌上**，schema 已保留、core 却没用。这一阶段零成本提精度。
 
-- **由 Core canonical performance facts 统一派生并与 frozen aggregate parity**（fixture 已支持 TDD）：
-  - `combatDeathCount` / `bombDeathCount`：由 Core 归因 `kills`，并严格对齐 `playerStats` oracle。
-  - `wallbangKillCount` / `noScopeKillCount`：由 Core `kill` annotations 归因，并与 `playerStats` parity 校验。
+- **由 Core canonical performance facts 统一派生并校验源事件守恒**（fixture 已支持 TDD）：
+  - `combatDeathCount` / `bombDeathCount`：由 Core 归因 `kills`，并校验全部死亡事件的统计守恒。
+  - `wallbangKillCount` / `noScopeKillCount`：由 Core `kill` annotations 归因，并校验敌对击杀的 annotation 归属。
   - AWP/狙击判定：使用 `kills.weapon`；`killerActiveWeapon` 不决定 performance weapon statistics。
   - 删除代码里"等导出器产出后填入"等**过时注释**。
 - **表达去原创化**：v1 定位为兼容基线（box-score baseline），不承担原创叙事；v2 明确标 `lite / uncalibrated / per-match`。

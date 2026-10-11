@@ -1,6 +1,6 @@
 import type { DemoPackage } from "@cs2dak/contract";
 import { buildQaReport } from "./qa.js";
-import { findPlayerStatsParityMismatches } from "./performance-parity.js";
+import { assertPlayerRoundPerformanceFacts } from "./performance-validation.js";
 import {
   aggregatePlayerRoundPerformanceFacts,
   buildPlayerRoundPerformanceFacts,
@@ -26,18 +26,11 @@ export {
 };
 export { loadDemoPackageFromZip } from "./loader.js";
 
-/** Evidence uses the same Core parity checks and QA owner as full analysis. */
+/** Evidence validates canonical facts and source QA without a legacy aggregate oracle. */
 export function analyzeDemoPackageForEvidence(pkg: DemoPackage, facts: PlayerRoundPerformanceFacts) {
   const normalized = normalizeDemoPackage(pkg);
-  const mismatches = findPlayerStatsParityMismatches(normalized, facts);
-  const qa = buildQaReport(normalized, mismatches.map((mismatch) => ({
-    severity: mismatch.comparable === false ? "warning" as const : "error" as const,
-    code: mismatch.comparable === false ? "performance.parity_not_comparable" : "performance.parity_mismatch",
-    message: mismatch.comparable === false
-      ? `Frozen playerStats ${mismatch.field} is not comparable for ${mismatch.playerName} (playerIndex=${mismatch.playerIndex}): ${mismatch.reason ?? "opening semantics differ"}.`
-      : `Frozen playerStats ${mismatch.field} disagrees for ${mismatch.playerName} (playerIndex=${mismatch.playerIndex}): expected=${mismatch.expected}, actual=${mismatch.actual}.`,
-    path: `playerStats.${mismatch.field}`,
-  })));
+  assertPlayerRoundPerformanceFacts(normalized, facts);
+  const qa = buildQaReport(normalized);
   return { provenance: { analysisVersion: CORE_ANALYSIS_VERSION }, qa };
 }
 

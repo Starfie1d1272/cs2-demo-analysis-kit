@@ -81,7 +81,7 @@ export interface PlayerRoundPerformanceFact {
   economyType: EconomyType | null;
 }
 
-/** A canonical state transition consumed by RR and legacy tournament views. */
+/** A canonical state transition consumed by RR and tournament projections. */
 export interface PlayerRoundManStateFact {
   roundNumber: number;
   tick: number;
@@ -102,15 +102,11 @@ export interface PlayerRoundManStateFact {
 /**
  * One build gives every performance consumer the same source facts. The
  * package-level manState rows are included because they preserve the ordered
- * transitions needed by the legacy team-conversion projection.
+ * transitions needed by the team-conversion projection.
  */
 export interface PlayerRoundPerformanceFacts {
   playerRounds: PlayerRoundPerformanceFact[];
   manState: PlayerRoundManStateFact[];
-  /** Rounds where the frozen playerStats opening oracle is not comparable. */
-  openingParity?: {
-    nonComparableRounds: number[];
-  };
 }
 
 export interface PlayerPerformanceWeaponAggregate extends PlayerRoundPerformanceWeaponFact {}
@@ -195,7 +191,7 @@ function roundAt(pkg: DemoPackage, roundNumber: number, context: string): DemoPa
   return round;
 }
 
-function emptyUtility(): PlayerRoundPerformanceUtilityFact {
+export function emptyPerformanceUtility(): PlayerRoundPerformanceUtilityFact {
   return {
     flashesThrown: 0,
     enemyBlindSeconds: 0,
@@ -247,7 +243,7 @@ function emptyRoundFact(
     combatDeaths: 0,
     bombDeaths: 0,
     clutch: null,
-    utility: emptyUtility(),
+    utility: emptyPerformanceUtility(),
     objective: emptyObjective(),
     weapons: new Map(),
     equipmentValue: economy?.equipmentValue ?? null,
@@ -282,6 +278,15 @@ function sortKills(pkg: DemoPackage): Array<{ kill: DemoPackage["kills"][number]
     .sort((left, right) => left.kill.roundNumber - right.kill.roundNumber || left.kill.tick - right.kill.tick || left.index - right.index);
 }
 
+/** Shared event classification for the producer and its source invariants. */
+export function orderedPerformanceKills(pkg: DemoPackage) {
+  return sortKills(pkg).map(({ kill }) => {
+    const killer = kill.killerIndex === null ? null : playerAt(pkg, kill.killerIndex, "kills");
+    const victim = playerAt(pkg, kill.victimIndex, "kills");
+    return { kill, killer, victim, playerKill: isPlayerKill(kill, killer), enemyKill: isEnemyPlayerKill(kill, killer, victim) };
+  });
+}
+
 function addKastTags(row: MutablePlayerRound): void {
   if (row.kills > 0) row.kastTags.add("kill");
   if (row.assists > 0) row.kastTags.add("assist");
@@ -305,7 +310,7 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
   const players = pkg.players ?? [];
   const roundsByNumber = new Map(rounds.map((round) => [round.roundNumber, round]));
   const rows = new Map<string, MutablePlayerRound>();
-  if (rounds.length === 0) return { playerRounds: [], manState: [], openingParity: { nonComparableRounds: [] } };
+  if (rounds.length === 0) return { playerRounds: [], manState: [] };
   for (const round of rounds) {
     for (const [playerIndex, player] of players.entries()) {
       rows.set(keyFor(round.roundNumber, playerIndex), emptyRoundFact(pkg, round, player, playerIndex));
@@ -320,9 +325,8 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
     return row;
   };
 
-  const sortedKills = sortKills(pkg);
+  const sortedKills = orderedPerformanceKills(pkg);
   const openingByRound = new Map<number, DemoPackage["kills"][number]>();
-  const nonComparableOpeningRounds = new Set<number>();
   const aliveByRound = new Map<number, { teamA: Set<number>; teamB: Set<number> }>();
   for (const round of rounds) {
     aliveByRound.set(round.roundNumber, {
@@ -331,14 +335,7 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
     });
   }
   const manState: PlayerRoundManStateFact[] = [];
-  for (const { kill } of sortedKills) {
-    const killer = kill.killerIndex === null ? null : playerAt(pkg, kill.killerIndex, "kills");
-    const victim = playerAt(pkg, kill.victimIndex, "kills");
-    const playerKill = isPlayerKill(kill, killer);
-    const enemyKill = isEnemyPlayerKill(kill, killer, victim);
-    if (!openingByRound.has(kill.roundNumber) && !enemyKill) {
-      nonComparableOpeningRounds.add(kill.roundNumber);
-    }
+  for (const { kill, killer, victim, playerKill, enemyKill } of sortedKills) {
     // Tournament opening-duel semantics require the first valid enemy-player
     // kill. World deaths, suicides and teamkills update death state but are
     // not an opening duel.
@@ -347,7 +344,7 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
     }
 
     // dak-stable/3 gives offensive credit only to enemy-player kills. Death
-    // state and the legacy non-suicide assist attribution below stay separate.
+    // state and the non-suicide assist attribution below stay separate.
     if (enemyKill) {
       const killerRow = rowFor(kill.roundNumber, kill.killerIndex!, "kills");
       killerRow.kills += 1;
@@ -404,8 +401,8 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
     manState.push({
       roundNumber: kill.roundNumber,
       tick: kill.tick,
-      killerSteamId64: killer.steamId64,
-      killerTeamKey: killer.teamKey,
+      killerSteamId64: killer!.steamId64,
+      killerTeamKey: killer!.teamKey,
       victimSteamId64: victim.steamId64,
       victimTeamKey: victim.teamKey,
       advantageTeamKey,
@@ -501,7 +498,6 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
   return {
     playerRounds,
     manState,
-    openingParity: { nonComparableRounds: [...nonComparableOpeningRounds].sort((a, b) => a - b) },
   };
 }
 
@@ -570,7 +566,7 @@ function emptyAggregateForIdentity(identity: PerformanceIdentity): MutableAggreg
     threeKillRounds: 0,
     fourKillRounds: 0,
     fiveKillRounds: 0,
-    utility: emptyUtility(),
+    utility: emptyPerformanceUtility(),
     objective: emptyObjective(),
     clutch: emptyClutchAggregate(),
     weapons: new Map(),
