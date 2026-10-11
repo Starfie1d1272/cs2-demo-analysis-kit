@@ -1,10 +1,11 @@
+import { type ExportPollSnapshot } from "@cs2dak/rivalhub-upload";
 import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Radar, Settings, Swords, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { backfillDemoIdentities, bulkUpdateTags, formatMatchLabel, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { CohortScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
 import { AnalysisContextSummary } from "./components/AnalysisContextSummary";
 import { CapabilityBar } from "./components/CapabilityBar";
-import { detectDemBackend, exportDemToZip, fileFromNativePath, isDemFile, pickAndExportDems, pickDemPaths, triggerWindowsDropCapture, watchDemoPath, type ExportedDemoFile } from "./lib/dem";
+import { exportPolling, detectDemBackend, exportDemToZip, fileFromNativePath, isDemFile, pickAndExportDems, pickDemPaths, triggerWindowsDropCapture, watchDemoPath, type ExportedDemoFile } from "./lib/dem";
 import { parseTags } from "./lib/tags";
 import { listSeriesRecords, pruneOrphanSeries, type StudioSeriesRecord } from "./lib/series";
 import { listEventRecords, markRivalHubEventsStale, matchesRivalHubDemo, upsertRivalHubEvents, type StudioEventRecord } from "./lib/events";
@@ -135,7 +136,21 @@ export function App() {
   const [eventMode, setEventMode] = useState<EventMode>("directory");
   const [selectedDemoId, setSelectedDemoId] = useState<string | null>(null);
   const [matchDeepLink, setMatchDeepLink] = useState<MatchDeepLink | null>(null);
+  const [exportQueries, setExportQueries] = useState<ExportPollSnapshot[]>(() => exportPolling.snapshots());
   const [importing, setImporting] = useState(false);
+  useEffect(() => {
+    const reported = new Map<string, string>();
+    return exportPolling.subscribe(() => {
+      const rows = exportPolling.snapshots();
+      setExportQueries(rows);
+      for (const row of rows) if (row.diagnostic && reported.get(row.jobId) !== JSON.stringify(row.diagnostic)) {
+        reported.set(row.jobId, JSON.stringify(row.diagnostic));
+        void window.pywebview?.api.report_diagnostic?.(row.diagnostic).catch(() => {});
+      }
+      for (const row of rows) if (!row.uncertain) reported.delete(row.jobId);
+      for (const id of reported.keys()) if (!rows.some(row => row.jobId === id)) reported.delete(id);
+    });
+  }, []);
   const [notice, setNotice] = useState<string | null>(null);
   const [analysisContext, setAnalysisContext] = useState<AnalysisContext>(() => createAnalysisContextPreset("explore"));
   const [evidenceContinuation, setEvidenceContinuation] = useState<EvidenceContinuation | null>(null);
@@ -921,6 +936,13 @@ export function App() {
 
       <main className="stu-main">
         <AssetHealthBanner />
+        {exportQueries.map(query => <div className="stu-notice" role="status" key={query.jobId}>
+          <div><p>{query.message}</p><p>解析任务 {query.jobId} · 阶段 {query.stage} · 最后进度 {query.progress === null ? "未知" : `${Math.round(query.progress * 100)}%`}</p>
+            {query.diagnostic?.cause && <p>{query.diagnostic.cause}</p>}
+            {query.uncertain && <p>只查询现有任务；没有取消后台解析，也不会重新提交。</p>}
+          </div>
+          {query.uncertain && <button type="button" onClick={() => exportPolling.recheck(query.jobId)}>重查此任务状态</button>}
+        </div>)}
         {notice && (
           <div className="stu-notice" role="status">
             <span>{notice}</span>

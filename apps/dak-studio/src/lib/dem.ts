@@ -7,7 +7,7 @@
  * - "dev"：pnpm dev:studio 时的 Vite 中间件（POST /api/export-dem → uv run cs2df export）。
  */
 
-import { normalizeDiagnostic, sanitizeDiagnosticText, type SafeDiagnostic } from "@cs2dak/rivalhub-upload";
+import { ExportPolling, normalizeDiagnostic, sanitizeDiagnosticText, type SafeDiagnostic } from "@cs2dak/rivalhub-upload";
 import { bytesToBase64, base64ToBytes } from "./storage/base64";
 
 interface ExportJobStatus {
@@ -187,13 +187,13 @@ async function exportViaPywebview(file: File, onProgress?: (message: string) => 
   };
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+export const exportPolling = new ExportPolling();
 
 /** 每条 bridge 消息的 base64 上限（~512KB），保证回传不随 ZIP 大小膨胀。 */
 const RESULT_CHUNK_SIZE = 512 * 1024;
 
 function formatEta(status: ExportJobStatus): string {
-  if (status.progress < 0.03) return "";
+  if (!Number.isFinite(status.elapsedSeconds) || status.elapsedSeconds < 0 || status.progress < 0.03) return "";
   const remain = (status.elapsedSeconds / status.progress) * (1 - status.progress);
   return remain > 1 ? `，预计还需 ${Math.ceil(remain)}s` : "";
 }
@@ -206,19 +206,15 @@ async function exportPathViaJob(
 ): Promise<File> {
   const api = window.pywebview!.api;
   const { jobId } = await api.start_export_job!(path);
-  for (;;) {
-    const status = await api.get_export_status!(jobId);
-    if (status.state === "error") {
-      const cause = normalizeDiagnostic(status.diagnostic ?? new Error(status.error ?? "导出失败"), { stage: status.diagnostic?.stage ?? status.stage });
-      throw new Error(`${sanitizeDiagnosticText(displayName)}: ${sanitizeDiagnosticText(status.error ?? "导出失败")}（阶段：${cause.stage}；可在管理页导出诊断日志）`, { cause });
-    }
-    if (status.state === "done") break;
-    onProgress?.(
-      `${displayName}：${status.stage} ${Math.round(status.progress * 100)}%（已用 ${Math.round(status.elapsedSeconds)}s${formatEta(status)}）`
-    );
-    await sleep(500);
+  let final: ExportJobStatus;
+  try {
+    final = await exportPolling.wait(jobId, () => api.get_export_status!(jobId), status => {
+      onProgress?.(`${displayName}：${sanitizeDiagnosticText(status.stage)} ${Math.round(status.progress * 100)}%（已用 ${Number.isFinite(status.elapsedSeconds) ? Math.round(status.elapsedSeconds) + "s" : "未知"}${formatEta(status)}）`);
+    });
+  } catch (error) {
+    const cause = normalizeDiagnostic(error, { stage: normalizeDiagnostic(error).stage ?? "export", fileId: jobId });
+    throw new Error(`${sanitizeDiagnosticText(displayName)}: ${cause.message}（阶段：${cause.stage}；任务：${jobId}；可在管理页导出诊断日志）`, { cause });
   }
-  const final = await api.get_export_status!(jobId);
   onProgress?.(`${displayName}：传输结果…`);
   // Decode each bridge chunk as it arrives. Keeping one full base64 string in
   // addition to the ZIP bytes needlessly adds ~33% to the single-demo peak.
