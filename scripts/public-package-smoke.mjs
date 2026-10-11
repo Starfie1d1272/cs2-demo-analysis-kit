@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { bundledDependencies } from './lib/bundled-dependencies.mjs';
+import { packageImports } from './lib/package-imports.mjs';
 import { allowedDependencies } from './check-package-boundaries.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -51,6 +54,25 @@ try {
       assert.ok(realpathSync(installed).startsWith(consumer + '/'), `${n}: workspace symlink`);
       const manifest = json(join(installed, 'package.json'));
       assert.ok(!walk(installed).some(f => /\.test\.|\.tsbuildinfo$|\.map$/.test(f) || f.includes('/src/')));
+      for (const [dependency, policy] of Object.entries(bundledDependencies)) {
+        if (manifest.dependencies?.[dependency]) assert.equal(manifest.dependencies[dependency], policy.version, `${n}: type/runtime version mismatch`);
+      }
+      for (const file of walk(installed).filter(f => f.endsWith('.js'))) {
+        for (const { specifier } of packageImports(readFileSync(file, 'utf8'), file)) {
+          assert.ok(!Object.keys(bundledDependencies).some(name => specifier === name || specifier.startsWith(name + '/')), `${file}: upstream source runtime import escaped`);
+        }
+      }
+      const provenancePath = join(installed, 'dist/vendor/upstream-artifacts.json');
+      if (walk(installed).includes(provenancePath)) {
+        for (const provenance of json(provenancePath)) {
+          const policy = bundledDependencies[provenance.name];
+          assert.ok(policy, `${n}: unknown bundled upstream`);
+          for (const key of ['version', 'integrity', 'tarball', 'licenseSource']) assert.equal(provenance[key], policy[key]);
+          assert.equal(createHash('sha256').update(readFileSync(join(installed, 'dist/vendor', policy.license))).digest('hex'), policy.licenseSha256);
+          assert.equal(createHash('sha256').update(readFileSync(join(installed, 'dist/vendor', policy.file))).digest('hex'), provenance.outputSha256);
+          for (const [source, hash] of Object.entries(provenance.sourceHashes)) assert.equal(hash, policy.sourceHashes[source]);
+        }
+      }
       for (const [key, entry] of Object.entries(manifest.exports)) {
         if (key.endsWith('.css')) { assert.equal(entry, './dist/theme.css'); readFileSync(join(installed, entry)); continue; }
         assert.match(entry.types, /^\.\/dist\/.*\.d\.ts$/);
@@ -71,6 +93,13 @@ try {
     try { command(join(root, 'node_modules', '.bin', 'tsc'), ['-p', join(consumer, 'tsconfig.json')], consumer); typesPassed = true; }
     catch { failures.push(`${packageName}: strict NodeNext declarations failed`); }
     if (typesPassed) console.log(`TYPES PASS ${packageName}: strict NodeNext, full declaration closure`);
+    // After checking the complete original declaration closure, remove upstream
+    // source trees and import again in a fresh process: no TS runtime fallback.
+    for (const [dependency, directories] of [['cs2-demo-format', ['schemas', 'parser']], ['@rivalhub/rival-rating', ['src']]]) {
+      for (const directory of directories) rmSync(join(consumer, 'node_modules', dependency, directory), { recursive: true, force: true });
+    }
+    try { command(process.execPath, [join(consumer, 'entries.mjs')], consumer); }
+    catch { failures.push(`${packageName}: source-free runtime isolation failed`); runtimePassed = false; }
     const calls = {
       contract: `assert.equal(m.teamKeySchema.parse('teamA'), 'teamA');`,
       maps: `assert.ok(m.getMapCalibration('de_nuke'));`,

@@ -6,7 +6,8 @@
     "declaration": true,
     "declarationMap": true,
     "emitDeclarationOnly": true,
-    "outDir": "dist"
+    "outDir": "dist",
+    "rootDir": "src"
   },
   "include": ["src"],
   "references": [{ "path": "../contract" }, { "path": "../maps" }, { "path": "../tournament" }]

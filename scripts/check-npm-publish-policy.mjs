@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
+import { bundledDependencies } from "./lib/bundled-dependencies.mjs";
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const repositoryUrl = "https://github.com/Starfie1d1272/cs2-demo-analysis-kit.git";
@@ -30,6 +31,9 @@ for (const [expectedName, directory] of publicPackages) {
   const manifestPath = join(repoRoot, directory, "package.json");
   const manifest = readJson(manifestPath);
   const repository = manifest.repository ?? {};
+  for (const [name, policy] of Object.entries(bundledDependencies)) {
+    if (manifest.dependencies?.[name]) check(manifest.dependencies[name] === policy.version, `${expectedName}: ${name} must pin the compiled source/declaration version ${policy.version}`);
+  }
   check(manifest.main === './dist/index.js', `${expectedName}: main must be compiled ESM`);
   check(manifest.types === './dist/index.d.ts', `${expectedName}: types must be compiled declarations`);
   check(Array.isArray(manifest.files) && manifest.files.includes('dist') && !manifest.files.includes('src'), `${expectedName}: files must contain dist, not source`);

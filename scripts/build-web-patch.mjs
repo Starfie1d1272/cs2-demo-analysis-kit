@@ -22,7 +22,7 @@ if (desktopWebDir) {
   readFileSync(join(desktopWebDir, "index.html"));
   console.error(`Reusing desktop frontend: ${desktopWebDir} (${info.buildRevision})`);
 } else {
-  execFileSync("pnpm", ["--filter", "@cs2dak/dak-studio", "build"], {
+  execFileSync("pnpm", ["-r", "--filter", "@cs2dak/dak-studio...", "--if-present", "build"], {
     stdio: "inherit",
     env: { ...process.env, DAK_APP_VERSION: version },
   });

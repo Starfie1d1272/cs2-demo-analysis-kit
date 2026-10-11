@@ -33,6 +33,9 @@ jobs:
 
       - run: node --test scripts/sync-version.test.mjs scripts/build-info.test.mjs scripts/build-web-patch.test.mjs
 
+      - name: Build shared artifacts before cold typecheck and tests
+        run: pnpm build:packages
+
       - run: pnpm typecheck
 
       - run: pnpm test:fast

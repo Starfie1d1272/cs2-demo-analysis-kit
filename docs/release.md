@@ -251,4 +251,4 @@ CI 与发布 gate 运行 `node scripts/maps-package-smoke.mjs`（Ubuntu 上的 p
 
 所有公共 JS/types 入口指向 dist；React theme.css 保持公开 CSS 入口并按 CSS side effect 发布。测试和 build metadata 不进入 tgz。可单独运行 `node scripts/maps-package-smoke.mjs` 验证地图五入口、资产及 calibration 隔离。正式 npm publish/tag 仍走既有人工发布流程；本地 tgz gate 通过不表示 registry 已更新，也不能关闭等待 registry smoke 的 #47。#64 的 C/D/E 及 browser consumer matrix 不由 A/B gate 自动验收。
 
-当前全包 Node gate 被上游 registry 的 TypeScript 入口阻塞，详情见 [artifact audit](research/public-package-artifact-audit.md)。不得为发布跳过此 gate；本地 build 与 strict declarations 通过仍不足以验收 Node 依赖闭包。
+上游最新 registry root 仍是 TypeScript，DAK build 在生成产物内编译精确原版依赖（format 3.1.0 / rating 0.3.0），保留 MIT notices 和可追溯哈希；declarations 安装同一精确版本，版本更新必须同步 `scripts/lib/bundled-dependencies.mjs` 的 source hashes/license provenance 并重跑真实 consumer gate。详情见 [artifact audit](research/public-package-artifact-audit.md)。七包 Node/strict TS tgz gate 已通过；此结果证明 DAK 可消费，不声称上游自身 root 已修复或 npm 已正式发布。不得跳过完整闭包 gate。

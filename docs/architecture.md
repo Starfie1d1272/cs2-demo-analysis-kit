@@ -30,7 +30,7 @@ This repository owns the product-neutral analysis pipeline from a `cs2-demo-form
 | `@cs2dak/maps` | Map calibration + world-to-radar transform + attack routes (`MapRoute`) + zone geometry (`zoneAt` / `pointInPolygon`) + callout mappings. |
 | `@cs2dak/tournament` | Zero-runtime-dependency frozen sufficient-fact DTOs, identity-safe cross-map merge for 1.0 economy/team facts and 1.1 performance facts, denominator-aware rates, deterministic ordering, and invariant guards. |
 | `@cs2dak/presentation` | Product-neutral view models, labels, stories, workspace composition, and label wrappers around the Core canonical Tournament projection. |
-| `@cs2dak/react` | Product-neutral preview components that consume presentation contracts only. |
+| `@cs2dak/react` | Product-neutral components consuming presentation View Models, contract props/types, and maps coordinate/level projections. |
 | `@cs2dak/cli` | Language-neutral filesystem/automation wrapper around TypeScript packages. |
 | `apps/dak-studio` | Local demo library and analysis workbench. Stores ZIP bytes locally; `.dem` import is exported through `cs2df`. |
 
@@ -142,7 +142,7 @@ Formula ownership stays in `@rivalhub/rival-rating`. This kit only derives signa
 | `@cs2dak/maps` | 地图标定、world-to-radar 转换、进攻动线、zone 几何与 callout 映射。 |
 | `@cs2dak/tournament` | 零 runtime 依赖的 frozen sufficient-fact DTO、identity-safe 跨图 merge、透明 performance aggregation、rate、确定性排序与 invariant guard。 |
 | `@cs2dak/presentation` | 产品中立 View Model、标签、叙事、workspace 编排和 Core canonical Tournament adapter 的标签包装。 |
-| `@cs2dak/react` | 只消费 presentation 合同的产品中立组件。 |
+| `@cs2dak/react` | 消费 presentation View Model、contract props/types 与 maps 坐标/level 投影的产品中立组件。 |
 | `@cs2dak/cli` | TypeScript 包的文件系统/自动化入口。 |
 | `apps/dak-studio` | 本地 Demo 库和分析工作台；本地保存 ZIP 字节，`.dem` 导入通过 `cs2df` 导出。 |
 

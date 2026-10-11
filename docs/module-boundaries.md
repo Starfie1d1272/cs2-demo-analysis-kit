@@ -106,10 +106,12 @@ Calibration-only 消费者优先使用 `@cs2dak/maps/calibration`；root 是 agg
 
 Core 的 tournament manifest dependency 是外部声明解析所需的 DTO 合同，不允许变成运行时 aggregation。React 直接使用 contract props/type 和 maps 坐标变换是合理渲染职责；不得 import core、cohort、tournament 或产品代码。私有 uploader 直接消费 Core canonical facts；禁止回读 presentation。
 
-七个公共包发布 dist ESM/declarations，显式 exports 与有限 files；React 的 theme.css 保持原公开入口，复制到 dist 并标记 CSS side effect，其余包 sideEffects=false。现有 private CLI/uploader/apps 保持 private。编译不 bundle、不改变 owner/API；React 原有省略扩展名的相对路径只在生成的 JS/declaration 中补 `.js`。build configs 排除测试，typecheck configs 继续检查测试源码。
+七个公共包发布 dist ESM/declarations，显式 exports 与有限 files；React 的 theme.css 保持原公开入口，复制到 dist 并标记 CSS side effect，其余包 sideEffects=false。现有 private CLI/uploader/apps 保持 private。DAK 自身模块不 bundle、不改变 owner/API；React 原有省略扩展名的相对路径只在生成的 JS/declaration 中补 `.js`。build configs 排除测试，typecheck configs 继续检查测试源码。
 
 `pnpm check:package-consumers` 重建公共库、实际 pack 七个 tgz，逐包在仓外临时目录只安装该 root 与所需 peers；npm overrides 将每条传递 DAK dependency 固定到本次对应 tarball。它验证完整声明依赖闭包、公开 JS 入口实际 import/call、strict NodeNext（skipLibCheck=false），禁止 workspace link、源码/测试泄漏与额外 DAK 包，并记录真实 compressed/unpacked bytes。外部 cs2-demo-format/rating/Zod/React 等仍通过已声明 npm dependencies 安装；仓库只提供编译器工具，不提供 TS paths/aliases。
 
 保留 maps 专项五入口/资产/calibration 隔离 gate。上述 Node/strict TS 验证不能替代正式 registry 发布后的 smoke，也不声称完成 browser consumer matrix。Phase C 的 correctness 已在 #69 完成，本轮只固定其 adapter graph；跨消费者 Evidence seam 的全面审计、Phase D 的外部 consumer 成本判断和 Phase E 的 DTO ownership audit 仍需各自证据。记录 pack size 不等于授权拆 maps 资产；#64 保持 umbrella，不由 A/B PR 自动关闭。
 
-当前 A/B 未验收：registry cs2-demo-format@3.1.0 与 @rivalhub/rival-rating@0.3.0 仍导出 TypeScript，真实 Node gate 会失败。详见 [artifact audit](research/public-package-artifact-audit.md)；在上游 compiled 合同补齐前，此改动保持 Draft，不得合并或发布。
+registry cs2-demo-format@3.1.0 与 @rivalhub/rival-rating@0.3.0 仍直接导出 TypeScript。DAK build 只从这两个精确版本的原版 registry bytes 生成 dependency ESM 模块，消费方 JS 引用生成模块，declarations 仍引用相同精确版本。生产源码 graph 的上游 owner 与 manifest type dependency 保留；只编译依赖，不复制改写公式/schema，不 bundle DAK 模块或 canonical facts caches。每个上游在一个 DAK package 内共享单一生成模块，附 MIT notices、原包 tarball/integrity、输入源码/输出哈希。包间仍用公开 DAK exports；不因此新增公开 API/package。详见 [artifact audit](research/public-package-artifact-audit.md)。PR 为普通 Ready 审查状态；是否合并仍需完整 CI 与父独立审，不执行发布。
+
+编译入口变化需要冷启动先构建依赖闭包：`pnpm build:packages` 用于公共库准备，CI 在 typecheck/fast tests 前执行；desktop/web-patch/uploader 的独立 build 递归包含对应 app dependencies。typecheck 的 rootDir 与发布 build 均为 src，保持 dist 声明路径一致。开发 dev 入口先准备公共产物；修改共享源码后需重跑 build:packages。构建器直接用 Node 调用已安装 tsc，避免 Windows pnpm shim 启动差异。仅变更依赖构建顺序，不改变诊断/发布 provenance 语义。

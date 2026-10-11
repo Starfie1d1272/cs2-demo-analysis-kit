@@ -167,7 +167,7 @@ importers:
   .:
     dependencies:
       '@rivalhub/rival-rating':
-        specifier: ^0.3.0
+        specifier: 0.3.0
         version: 0.3.0
       jszip:
         specifier: ^3.10.2
@@ -200,6 +200,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.3.0
         version: 19.3.0(@types/react@19.3.0)
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -303,16 +306,16 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@rivalhub/rival-rating':
-        specifier: ^0.3.0
+        specifier: 0.3.0
         version: 0.3.0
 
   packages/contract:
     dependencies:
       '@rivalhub/rival-rating':
-        specifier: ^0.3.0
+        specifier: 0.3.0
         version: 0.3.0
       cs2-demo-format:
-        specifier: ^3.1.0
+        specifier: 3.1.0
         version: 3.1.0(zod@4.6.5)
       zod:
         specifier: ^4.6.5
@@ -330,7 +333,7 @@ importers:
         specifier: workspace:*
         version: link:../tournament
       '@rivalhub/rival-rating':
-        specifier: ^0.3.0
+        specifier: 0.3.0
         version: 0.3.0
       jszip:
         specifier: ^3.10.2
@@ -356,7 +359,7 @@ importers:
         specifier: workspace:*
         version: link:../tournament
       '@rivalhub/rival-rating':
-        specifier: ^0.3.0
+        specifier: 0.3.0
         version: 0.3.0
 
   packages/react:

@@ -8,7 +8,7 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm dev:studio",
-    "dev:studio": "pnpm --filter @cs2dak/dak-studio dev",
+    "dev:studio": "pnpm build:packages && pnpm --filter @cs2dak/dak-studio dev",
     "analyze:sample": "pnpm --filter @cs2dak/cli analyze ../../fixtures/input/cologne-major-2026-stage3-smoke-de_nuke.zip --out ../../fixtures/output/sample",
     "python:test": "cd python && uv run --extra dev pytest",
     "export:demo": "mkdir -p fixtures/output/nju-rivals-2026 && cd python && uv run cs2df export ../fixtures/demos/nju-rivals-2026/3671816592_1000003075.dem -o ../fixtures/output/nju-rivals-2026/3671816592_1000003075.zip",
@@ -35,10 +35,11 @@
     "event:package": "node scripts/build-event-package.mjs",
     "event:submissions": "node scripts/promote-event-submission.mjs list",
     "event:promote": "node scripts/promote-event-submission.mjs",
-    "build:uploader": "pnpm --filter @cs2dak/rivalhub-uploader build",
-    "dev:uploader": "pnpm --filter @cs2dak/rivalhub-uploader dev",
+    "build:uploader": "pnpm -r --filter \"@cs2dak/rivalhub-uploader...\" --if-present build",
+    "dev:uploader": "pnpm build:packages && pnpm --filter @cs2dak/rivalhub-uploader dev",
     "check:package-boundaries": "node --test scripts/package-boundaries.test.mjs",
-    "check:package-consumers": "node scripts/public-package-smoke.mjs"
+    "check:package-consumers": "node scripts/public-package-smoke.mjs",
+    "build:packages": "pnpm -r --filter \"./packages/**\" --if-present build"
   },
   "devDependencies": {
     "@babel/parser": "^8.0.7",
@@ -46,11 +47,12 @@
     "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "esbuild": "0.28.2",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"
   },
   "dependencies": {
-    "@rivalhub/rival-rating": "^0.3.0",
+    "@rivalhub/rival-rating": "0.3.0",
     "jszip": "^3.10.2",
     "lucide-react": "^1.52.0",
     "react": "^19.3.0",

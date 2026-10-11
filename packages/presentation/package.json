@@ -26,7 +26,7 @@
     "@cs2dak/core": "workspace:*",
     "@cs2dak/maps": "workspace:*",
     "@cs2dak/tournament": "workspace:*",
-    "@rivalhub/rival-rating": "^0.3.0"
+    "@rivalhub/rival-rating": "0.3.0"
   },
   "devDependencies": {},
   "files": [
