@@ -129,3 +129,5 @@ push时GitHub通知default branch存在一个High Dependabot告警#38，但GET�
 保留环境失败：首轮 test:all 缺 maps 编译物产生28文件导入失败/2 CLI断言失败；第二轮与 maps-package-smoke 自带的 maps build 并行，build 会清 dist，出现2文件导入失败/2 CLI失败，已中断该轮（exit130）。完成构建/打包检查后串行重跑 fast 和 integration，得到上述最终全部通过。第二轮竞争是验证调度失误，不作为产品回归；没有删除失败记录或将其算作通过。
 
 本轮只改 diagnostics、回归与证据；未新建 PR、未正式发布/生产回填/操作用户 Windows 或上传凭据，只用合成 fixture。现有 PR 工作流的 Windows CI不等于用户机器验收，也未手动 dispatch Windows。仍交父会话独立复审，未自行将修复称为独审通过或合并 main。
+
+最终扫描检查限制凭据前缀搜索到当前 JSON 对象之前的文本段，随后仍用同一完整值规则消费原值，避免多对象日志重复搜索全部剩余文本；不改变原有凭据匹配语法。20,000 个合成 JSON 对象的实际扫描/幂等结果见 `structured-many-objects.log`。此小调整后再次通过171 Python、42 diagnostics、ruff及精确版本复现；TS代码未改，以上全量TS/构建验收继续适用。

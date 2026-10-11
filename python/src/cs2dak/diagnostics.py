@@ -38,6 +38,9 @@ class SourceFailures(RuntimeError):
 _SECRET_KEY = (r"authorization|(?:access|refresh|device|poll|session|auth|id)[_-]?token|"
                r"token|password|passwd|credential|secret|pairing[_-]?code|device[_-]?code|client[_-]?secret|api[_-]?key")
 _QUOTED_VALUE = r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\''
+_CREDENTIAL_PREFIX = re.compile(
+    rf"(?i)[\"']?(?:{_SECRET_KEY}|set-cookie|cookie)[\"']?\s*[:=]\s*"
+)
 _CREDENTIAL_SPAN = re.compile(
     rf"(?i)[\"']?(?:{_SECRET_KEY})[\"']?\s*[:=]\s*(?:{_QUOTED_VALUE}|[^\r\n,;}}]+)|"
     rf"[\"']?(?:set-cookie|cookie)[\"']?\s*[:=]\s*(?:{_QUOTED_VALUE}|[^\r\n]+)"
@@ -76,7 +79,8 @@ def _sanitize_log_text(text: str) -> str:
         if start < 0:
             pieces.append(_sanitize_plain_text(text[cursor:]))
             break
-        credential = _CREDENTIAL_SPAN.search(text, cursor)
+        prefix = _CREDENTIAL_PREFIX.search(text, cursor, start)
+        credential = _CREDENTIAL_SPAN.match(text, prefix.start()) if prefix else None
         # Consume a complete plain credential before interpreting objects. This
         # also protects quoted multiline values and JSON-looking secret values.
         if credential and credential.start() < start:

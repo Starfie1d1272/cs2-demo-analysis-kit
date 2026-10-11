@@ -21,4 +21,4 @@ tests/test_studio_diagnostics.py .......                                 [ 90%]
 tests/test_updater.py ...............                                    [ 99%]
 tests/test_uploader_webview_bridge.py .                                  [100%]
 
-============================= 171 passed in 1.84s ==============================
+============================= 171 passed in 1.62s ==============================
