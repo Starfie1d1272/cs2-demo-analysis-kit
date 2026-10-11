@@ -539,14 +539,32 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
   let manifest;
   try { manifest = await loadDemoManifestFromZip(buffer); }
   catch (error) { throw new Error(`${file.name}: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
-  const replacement = settings.replaceId ? await demoMeta.get<StudioDemoEntry>(settings.replaceId) : undefined;
-  const existing = manifest.demo.hash ? await findDemoEntryBySha256(manifest.demo.hash) : null;
-  const keys = [`zip:${id}`, `match:${matchIdForEntry({ fileName: file.name })}`,
-    ...(manifest.demo.hash ? [`demo:${manifest.demo.hash.toLowerCase()}`] : []),
-    ...(settings.replaceId ? [`entry:${settings.replaceId}`] : []),
-    ...(replacement ? [`match:${matchIdForEntry(replacement)}`] : []),
-    ...(existing ? [`match:${matchIdForEntry(existing)}`] : [])];
-  return withImportLocks(keys, () => importDemoFileUnlocked(file, settings, buffer, id, manifest));
+  const resolveKeys = async (): Promise<string[]> => {
+    const replacement = settings.replaceId ? await demoMeta.get<StudioDemoEntry>(settings.replaceId) : undefined;
+    const identityMatch = manifest.demo.hash ? await findDemoEntryBySha256(manifest.demo.hash) : null;
+    const existing = identityMatch ?? await demoMeta.get<StudioDemoEntry>(id);
+    return [`zip:${id}`, `match:${matchIdForEntry({ fileName: file.name })}`,
+      ...(manifest.demo.hash ? [`demo:${manifest.demo.hash.toLowerCase()}`] : []),
+      ...(settings.replaceId ? [`entry:${settings.replaceId}`] : []),
+      ...(replacement ? [`match:${matchIdForEntry(replacement)}`] : []),
+      ...(existing ? [`match:${matchIdForEntry(existing)}`] : [])];
+  };
+  let keys = await resolveKeys();
+  for (;;) {
+    settings.signal?.throwIfAborted();
+    const attempt = await withImportLocks(keys, async () => {
+      settings.signal?.throwIfAborted();
+      // A queued import may now deduplicate to a different canonical filename.
+      // Never enter a checkpoint until its final survivor/target is covered.
+      const required = await resolveKeys();
+      if (required.some((key) => !keys.includes(key))) return { retry: required };
+      return { result: await importDemoFileUnlocked(file, settings, buffer, id, manifest) };
+    });
+    if (attempt.result) return attempt.result;
+    // Release the entire reservation before acquiring an expanded set: no
+    // nested lock acquisition, and therefore no waiting on a lock we hold.
+    keys = [...new Set([...keys, ...attempt.retry!])];
+  }
 }
 
 async function importDemoFileUnlocked(file: File, settings: ImportDemoOptions, input: ArrayBuffer, id: string, manifest: Awaited<ReturnType<typeof loadDemoManifestFromZip>>): Promise<ImportResult> {

@@ -12,7 +12,7 @@ const harness = vi.hoisted(() => {
     if (!blobs.has(namespace)) blobs.set(namespace, new Map());
     return blobs.get(namespace)!;
   };
-  const state = { onWrite: null as null | ((namespace: string, key: string, value: unknown) => Promise<void> | void) };
+  const state = { onManifest: null as null | ((marker: number) => void), onWrite: null as null | ((namespace: string, key: string, value: unknown) => Promise<void> | void) };
   const adapter: StorageAdapter = {
     records(namespace): RecordStore {
       return {
@@ -39,7 +39,11 @@ const harness = vi.hoisted(() => {
 });
 vi.mock("./storage", () => ({ getStorage: () => harness.adapter }));
 vi.mock("@cs2dak/core", () => ({
-  loadDemoManifestFromZip: async (buffer: ArrayBuffer) => ({ demo: { hash: String(new Uint8Array(buffer)[0]).repeat(64) } }),
+  loadDemoManifestFromZip: async (buffer: ArrayBuffer) => {
+    const marker = new Uint8Array(buffer)[0];
+    harness.state.onManifest?.(marker);
+    return { demo: { hash: String(marker).repeat(64) } };
+  },
   loadDemoPackageFromZip: async (buffer: ArrayBuffer) => ({ marker: new Uint8Array(buffer)[0], match: { mapName: "de_nuke" } }),
   buildMatchRadarField: vi.fn(),
   TACTICAL_FACT_VERSION: "test", MAP_INTELLIGENCE_FACT_VERSION: "test", CORE_ANALYSIS_VERSION: "test",
@@ -70,7 +74,7 @@ function failOnce(namespace: string, key?: string) {
 }
 
 beforeEach(async () => {
-  harness.records.clear(); harness.blobs.clear(); harness.state.onWrite = null;
+  harness.records.clear(); harness.blobs.clear(); harness.state.onWrite = null; harness.state.onManifest = null;
   await backfillDemoIdentities();
 });
 
@@ -245,6 +249,48 @@ describe("Demo replacement persistence", () => {
     await expect(importDemoFile(file(1), { tags: ["new"] })).rejects.toThrow("injected");
     expect(snapshot()).toEqual(before);
     expect((await importDemoFile(file(1))).entry.tags).toEqual(first.entry.tags);
+  });
+
+  it("revalidates a queued alias survivor before checkpointing and cannot roll back another success", async () => {
+    let releaseA!: () => void, releaseB!: () => void;
+    let reachedA!: () => void, reachedB!: () => void, preparedB!: () => void, preparedC!: () => void;
+    const aStarted = new Promise<void>((resolve) => { reachedA = resolve; });
+    const bStarted = new Promise<void>((resolve) => { reachedB = resolve; });
+    const bPrepared = new Promise<void>((resolve) => { preparedB = resolve; });
+    const cPrepared = new Promise<void>((resolve) => { preparedC = resolve; });
+    const aGate = new Promise<void>((resolve) => { releaseA = resolve; });
+    const bGate = new Promise<void>((resolve) => { releaseB = resolve; });
+    let heldA = false, heldB = false, raw2Preparations = 0, cFinished = false;
+    harness.state.onManifest = (marker) => {
+      if (marker === 2 && ++raw2Preparations === 2) preparedB();
+      if (marker === 3) preparedC();
+    };
+    harness.state.onWrite = async (namespace, key, value) => {
+      if (namespace === "facts:lineups" && key === "survivor" && !heldA) { heldA = true; reachedA(); await aGate; }
+      if (namespace === "demos" && (value as { tags?: string[] } | undefined)?.tags?.includes("queued") && !heldB) {
+        heldB = true; reachedB(); await bGate; throw new Error("queued metadata failed");
+      }
+    };
+    const a = importDemoFile(file(2, "survivor.zip"));
+    await aStarted;
+    const b = importDemoFile(file(2, "retry.zip"), { tags: ["queued"] });
+    const bResult = b.catch((error: unknown) => error);
+    await bPrepared;
+    // Drain the immediate mock reads so B has reserved its pre-survivor keys.
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    releaseA();
+    await a;
+    await bStarted;
+    const c = importDemoFile(file(3, "survivor.zip")).then((result) => { cFinished = true; return result; });
+    await cPrepared;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect.soft(cFinished).toBe(false);
+    releaseB();
+    expect(await bResult).toMatchObject({ message: "queued metadata failed" });
+    const successful = await c;
+    expect((await listDemoEntries()).some((entry) => entry.id === successful.entry.id)).toBe(true);
+    expect(await getFactsStore().getLineups()).toEqual([{ matchId: "survivor", marker: 3 }]);
+    expect((await listDemoEntries()).find((entry) => entry.demoSha256?.startsWith("2"))?.tags).not.toContain("queued");
   });
 
   it("retains the original and restoration errors if the storage stays unavailable", async () => {
