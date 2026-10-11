@@ -1,0 +1,31 @@
+$ node scripts/check-npm-publish-policy.mjs
+npm publish policy OK: 7 public packages, private @cs2dak/cli excluded
+✔ clean/dirty and enabled/skipped preserve release version and identify artifact (201.115871ms)
+✔ missing Git and nested unrelated repositories report unknown (29.692164ms)
+✔ release requires exact tag/manifest/clean source and retains existing artifact ID (88.161546ms)
+✔ new CI step after downloading assets packages the same release frontend bytes (228.287261ms)
+✔ missing, mismatched, dirty or ad-hoc desktop snapshots fail before artifact write (700.502941ms)
+✔ canonical version updates all private/Python targets, preserves public and other blocks (8.44643ms)
+✔ invalid input "invalid" changes no files (0.860512ms)
+✔ invalid input "0.8.3-dev.3a3307b" changes no files (3.009012ms)
+✔ invalid input "0.8.3+sha" changes no files (0.537433ms)
+✔ invalid input "01.2.3" changes no files (0.653619ms)
+✔ invalid input "0.8.3trailing" changes no files (1.515964ms)
+✔ invalid input "0.8.3\n" changes no files (1.438367ms)
+✔ repairs a malformed current cs2dak version without touching dependency versions (0.790926ms)
+✔ late validation failure missing project version leaves all existing bytes unchanged (1.095137ms)
+✔ late validation failure duplicate lock package leaves all existing bytes unchanged (0.919111ms)
+✔ late validation failure missing Python target leaves all existing bytes unchanged (1.228038ms)
+✔ late validation failure invalid manifest leaves all existing bytes unchanged (0.627499ms)
+✔ mid-write failure restores prior and partially written targets (0.938731ms)
+✔ rollback failures preserve both failures for the operator (0.854623ms)
+✔ new release refuses a missing setup EXE before writing a distribution manifest (55.075087ms)
+✔ new release requires installer metadata while retaining the existing ZIP contract (72.000539ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1064.562941

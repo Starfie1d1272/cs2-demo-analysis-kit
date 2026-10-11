@@ -1,0 +1,10 @@
+$ vitest run --pool=forks --exclude '**/*.integration.test.ts' --exclude '**/season-validation.test.ts'
+
+ RUN  v5.0.3 /workspace/cs2-demo-analysis-kit
+
+
+ Test Files  132 passed (132)
+      Tests  862 passed (862)
+   Start at  20:04:12
+   Duration  111.30s (tests 80%, import 16%, transform 3%)
+

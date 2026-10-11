@@ -230,3 +230,77 @@ def test_literal_redaction_marker_cannot_hide_suffix_in_real_export(tmp_path, ra
     finally:
         logger.removeHandler(handler)
         handler.close()
+
+
+@pytest.mark.parametrize("entry", ["log_failure", "exception", "raw_json"])
+@pytest.mark.parametrize("raw, reason", [
+    ('password="secret words" reason=connection refused', 'connection refused'),
+    (r'password="https://a\";synthetic-private" reason=连接失败', '连接失败'),
+    ('password=[redacted] synthetic-private; reason=connection refused', 'connection refused'),
+    ('credential=[redacted]\t synthetic-private; reason=连接失败', '连接失败'),
+    ('password=[redacted] reason=synthetic-private; reason=连接失败', '连接失败'),
+])
+def test_structured_failure_roundtrip_preserves_safe_causes(tmp_path, entry, raw, reason):
+    import json
+
+    logger = logging.getLogger("structured-roundtrip")
+    handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+    handler.setFormatter(SafeFormatter("%(levelname)s %(message)s"))
+    logger.addHandler(handler)
+    try:
+        if entry == "log_failure":
+            log_failure(logger, ValueError(raw), "request")
+        elif entry == "exception":
+            try:
+                raise ValueError(raw)
+            except ValueError:
+                logger.exception("request failed")
+        else:
+            # No trust in a JSON payload or in a literal redaction marker.
+            logger.error("failure %s", json.dumps({"message": raw, "password": "synthetic-private",
+                                                  "nested": [{"credential": "secret words",
+                                                              "user_password": "synthetic-private"}]},
+                                                 ensure_ascii=False))
+        assert export_logs(logger, tmp_path / "shared.log")
+        for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+            content = path.read_text()
+            assert "secret words" not in content
+            assert "synthetic-private" not in content
+            assert "https://a" not in content
+            assert "reason=" + reason in content
+            assert sanitize_text(content, 16000) == content
+            line = next(line for line in content.splitlines() if '{"' in line)
+            detail = json.loads(line[line.index("{"):])
+            assert "reason=" + reason in detail["message"]
+            if entry != "raw_json":
+                assert "reason=" + reason in detail["causes"][0]["message"]
+                assert "reason=" + reason in detail["cause"]
+                assert detail["type"] == "ValueError"
+    finally:
+        logger.removeHandler(handler)
+        handler.close()
+
+
+@pytest.mark.parametrize("raw", [
+    'password="secret words\nsynthetic-private" reason=连接失败',
+    'password={"ordinary": "synthetic-private"}; reason=connection refused',
+    'password="{\nsynthetic-private\n}" reason=连接失败',
+])
+def test_json_looking_or_multiline_credential_remains_private(raw):
+    safe = sanitize_text(raw)
+    assert "synthetic-private" not in safe
+    assert "secret words" not in safe
+    assert "reason=" in safe
+    assert sanitize_text(safe) == safe
+
+
+def test_mixed_plain_and_structured_lines_share_one_export_policy():
+    import json
+
+    raw = ('password="secret words" reason=连接失败\n'
+           + "failure " + json.dumps({"message": 'password="secret words" reason=connection refused'})
+           + '\ncredential=[redacted] synthetic-private; reason=连接失败\n')
+    safe = sanitize_text(raw)
+    assert "secret words" not in safe and "synthetic-private" not in safe
+    assert "reason=connection refused" in safe and "reason=连接失败" in safe
+    assert sanitize_text(safe) == safe

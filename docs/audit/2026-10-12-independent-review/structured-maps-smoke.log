@@ -1,0 +1,84 @@
+$ node -e "require('node:fs').rmSync('dist', { recursive: true, force: true })" && tsc -b --force
+package: @cs2dak/maps@1.0.0
+Tarball Contents
+callout-grid/de_ancient.json
+callout-grid/de_anubis.json
+callout-grid/de_dust2.json
+callout-grid/de_inferno.json
+callout-grid/de_mirage.json
+callout-grid/de_nuke.json
+callout-grid/de_overpass.json
+dist/calibration.d.ts
+dist/calibration.js
+dist/callout-grid-browser.d.ts
+dist/callout-grid-browser.js
+dist/callout-grid-node.d.ts
+dist/callout-grid-node.js
+dist/callout-grid.d.ts
+dist/callout-grid.js
+dist/callout-names.d.ts
+dist/callout-names.js
+dist/default-positions.d.ts
+dist/default-positions.js
+dist/geometry-assets.d.ts
+dist/geometry-assets.js
+dist/index.d.ts
+dist/index.js
+dist/lineups.d.ts
+dist/lineups.js
+dist/map-pool.d.ts
+dist/map-pool.js
+dist/nav.d.ts
+dist/nav.js
+dist/position-candidates.d.ts
+dist/position-candidates.js
+dist/radar-grid.d.ts
+dist/radar-grid.js
+dist/route-assets.d.ts
+dist/route-assets.js
+dist/routes.d.ts
+dist/routes.js
+dist/site-entry-chokes.d.ts
+dist/site-entry-chokes.js
+dist/site-entry-lexicon.d.ts
+dist/site-entry-lexicon.js
+dist/tri-assets.d.ts
+dist/tri-assets.js
+dist/visibility.d.ts
+dist/visibility.js
+dist/zone-assets.d.ts
+dist/zone-assets.js
+dist/zones.d.ts
+dist/zones.js
+LICENSE
+map-nav/de_ancient.nav.json
+map-nav/de_anubis.nav.json
+map-nav/de_dust2.nav.json
+map-nav/de_inferno.nav.json
+map-nav/de_mirage.nav.json
+map-nav/de_nuke.nav.json
+map-nav/de_overpass.nav.json
+map-routes/de_ancient.json
+map-routes/de_anubis.json
+map-routes/de_dust2.json
+map-routes/de_inferno.json
+map-routes/de_mirage.json
+map-routes/de_nuke.json
+map-routes/de_overpass.json
+map-zones/auto-de_mirage.json
+map-zones/de_ancient.json
+map-zones/de_anubis.json
+map-zones/de_dust2.json
+map-zones/de_inferno.json
+map-zones/de_mirage.json
+map-zones/de_mirage.template.json
+map-zones/README.md
+package.json
+README.md
+Tarball Details
+/tmp/dak-maps-consumer-29WWmq/cs2dak-maps-1.0.0.tgz
+
+added 1 package in 855ms
+Packed maps: all five ESM entries and actual API calls passed
+Packed maps: strict NodeNext declaration consumer passed
+Packed maps: calibration imports and calls pass with every spatial asset directory removed

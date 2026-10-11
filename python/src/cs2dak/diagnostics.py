@@ -35,16 +35,70 @@ class SourceFailures(RuntimeError):
         return super().__str__() + ("；" + "；".join(items) if items else "")
 
 
+_SECRET_KEY = (r"authorization|(?:access|refresh|device|poll|session|auth|id)[_-]?token|"
+               r"token|password|passwd|credential|secret|pairing[_-]?code|device[_-]?code|client[_-]?secret|api[_-]?key")
+_QUOTED_VALUE = r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\''
+_CREDENTIAL_SPAN = re.compile(
+    rf"(?i)[\"']?(?:{_SECRET_KEY})[\"']?\s*[:=]\s*(?:{_QUOTED_VALUE}|[^\r\n,;}}]+)|"
+    rf"[\"']?(?:set-cookie|cookie)[\"']?\s*[:=]\s*(?:{_QUOTED_VALUE}|[^\r\n]+)"
+)
+
+
 def sanitize_text(value, limit: int = 2000) -> str:
     try:
         text = str(value)
     except Exception:  # noqa: BLE001 - diagnostics must survive broken exception __str__.
         text = "[unprintable]"
-    # Redact before truncation so a cut credential cannot escape a matching rule.
-    secret_key = (r"authorization|(?:access|refresh|device|poll|session|auth|id)[_-]?token|"
-                  r"token|password|passwd|credential|secret|pairing[_-]?code|device[_-]?code|client[_-]?secret|api[_-]?key")
+    # JSON serialization escapes credential quotes inside message/cause strings.
+    # Decode a complete object before applying the same plain-text policy to its
+    # fields. No payload or marker is trusted; formatter and export both recheck.
+    text = _sanitize_log_text(text)
+    return text[:limit] + ("…" if len(text) > limit else "")
+
+
+def _sanitize_json(value):
+    if isinstance(value, dict):
+        return {sanitize_text(key, 16000): "[redacted]"
+                if re.search(rf"(?i)(?:{_SECRET_KEY}|set-cookie|cookie)$", key)
+                else _sanitize_json(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_json(item) for item in value]
+    if isinstance(value, str):
+        return sanitize_text(value, max(len(value) * 8, 16000))
+    return value
+
+
+def _sanitize_log_text(text: str) -> str:
+    pieces = []
+    cursor = 0
+    while cursor < len(text):
+        start = text.find("{", cursor)
+        if start < 0:
+            pieces.append(_sanitize_plain_text(text[cursor:]))
+            break
+        credential = _CREDENTIAL_SPAN.search(text, cursor)
+        # Consume a complete plain credential before interpreting objects. This
+        # also protects quoted multiline values and JSON-looking secret values.
+        if credential and credential.start() < start:
+            end = credential.end()
+            pieces.append(_sanitize_plain_text(text[cursor:end]))
+            cursor = end
+            continue
+        try:
+            value, end = json.JSONDecoder().raw_decode(text, start)
+            safe = json.dumps(_sanitize_json(value), ensure_ascii=False)
+        except (ValueError, RecursionError):
+            pieces.append(_sanitize_plain_text(text[cursor:]))
+            break
+        pieces.extend((_sanitize_plain_text(text[cursor:start]), safe))
+        cursor = end
+    return "".join(pieces)
+
+
+def _sanitize_plain_text(text: str) -> str:
+    secret_key = _SECRET_KEY
     # JSON quoted strings can contain escaped quotes; consume the complete value.
-    quoted_value = r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\''
+    quoted_value = _QUOTED_VALUE
     # Retain quoted boundaries for another pass; never trust a bare marker from input.
     def redact_credential(match):
         value = match.group(2)
@@ -67,7 +121,7 @@ def sanitize_text(value, limit: int = 2000) -> str:
     text = re.sub(r"(?<![\w:])/(?:[^/\r\n\"'<>]+/)+[^\r\n\"'<>:,]+", "[path]", text)
     text = re.sub(r"(?<![\w:])/(?:[^\s\"'<>:,]+/)*[^\s\"'<>:,]+", "[path]", text)
     text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
-    return text[:limit] + ("…" if len(text) > limit else "")
+    return text
 
 
 def _attribute(value, name):

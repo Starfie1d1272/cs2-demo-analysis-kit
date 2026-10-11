@@ -1,0 +1,238 @@
+$ vitest run --pool=forks
+
+ RUN  v5.0.3 /workspace/cs2-demo-analysis-kit
+
+ ❯ packages/core/src/map-intelligence/map-intelligence.test.ts (0 test)
+ ❯ packages/core/src/performance-validation.test.ts (0 test)
+ ❯ apps/dak-studio/src/lib/library-repair.test.ts (0 test)
+ ❯ apps/dak-studio/src/lib/library.test.ts (0 test)
+ ❯ apps/dak-studio/src/lib/facts.test.ts (0 test)
+ ❯ packages/core/src/index.test.ts (0 test)
+ ❯ packages/cohort/src/index.test.ts (0 test)
+ ❯ packages/core/src/performance-facts.test.ts (0 test)
+ ❯ packages/presentation/src/index.test.ts (0 test)
+ ❯ packages/core/src/radar-field.test.ts (0 test)
+ ❯ packages/presentation/src/insights.test.ts (0 test)
+ ❯ apps/dak-studio/src/lib/event-maker.test.ts (0 test)
+ ❯ packages/rivalhub-upload/src/pipeline.test.ts (0 test)
+ ❯ packages/presentation/src/map-roles.test.ts (0 test)
+ ❯ apps/dak-studio/src/lib/rivalhub.test.ts (0 test)
+ ❯ packages/cohort/src/map-role-evidence.test.ts (0 test)
+ ❯ packages/presentation/src/duel.test.ts (0 test)
+ ❯ apps/dak-studio/src/lib/rivalhub-import.test.ts (0 test)
+ ❯ apps/dak-studio/src/lib/tactics.test.ts (0 test)
+ ❯ packages/core/src/map-intelligence/ct-rotation.test.ts (0 test)
+ ❯ packages/presentation/src/season-validation.test.ts (0 test)
+ ❯ apps/dak-studio/src/lib/json-diagnostic-export.test.ts (0 test)
+ ❯ packages/presentation/src/series.test.ts (0 test)
+ ❯ packages/core/src/spatial/utility.integration.test.ts (0 test)
+ ❯ packages/presentation/src/weapons.test.ts (0 test)
+ ❯ packages/cli/src/index.integration.test.ts (5 tests | 2 failed) 5807ms
+   ❯ cs2dak cohort (1)
+     × exits 1 when no ZIPs are found in the directory 849ms
+   ❯ cs2dak (usage) (2)
+     × exits 0 and prints usage when called with no arguments 780ms
+ ❯ apps/dak-studio/src/lib/season-cache-version.test.ts (0 test)
+ ❯ apps/dak-studio/src/views/EventsView.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 27 ⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/cohort/src/index.test.ts [ packages/cohort/src/index.test.ts ]
+ FAIL  packages/cohort/src/map-role-evidence.test.ts [ packages/cohort/src/map-role-evidence.test.ts ]
+ FAIL  packages/core/src/index.test.ts [ packages/core/src/index.test.ts ]
+ FAIL  packages/core/src/performance-facts.test.ts [ packages/core/src/performance-facts.test.ts ]
+ FAIL  packages/presentation/src/duel.test.ts [ packages/presentation/src/duel.test.ts ]
+ FAIL  packages/presentation/src/index.test.ts [ packages/presentation/src/index.test.ts ]
+ FAIL  packages/presentation/src/insights.test.ts [ packages/presentation/src/insights.test.ts ]
+ FAIL  packages/presentation/src/map-roles.test.ts [ packages/presentation/src/map-roles.test.ts ]
+ FAIL  packages/presentation/src/season-validation.test.ts [ packages/presentation/src/season-validation.test.ts ]
+ FAIL  packages/presentation/src/series.test.ts [ packages/presentation/src/series.test.ts ]
+ FAIL  packages/presentation/src/weapons.test.ts [ packages/presentation/src/weapons.test.ts ]
+ FAIL  packages/rivalhub-upload/src/pipeline.test.ts [ packages/rivalhub-upload/src/pipeline.test.ts ]
+ FAIL  apps/dak-studio/src/views/EventsView.test.ts [ apps/dak-studio/src/views/EventsView.test.ts ]
+ FAIL  apps/dak-studio/src/lib/event-maker.test.ts [ apps/dak-studio/src/lib/event-maker.test.ts ]
+ FAIL  apps/dak-studio/src/lib/facts.test.ts [ apps/dak-studio/src/lib/facts.test.ts ]
+ FAIL  apps/dak-studio/src/lib/json-diagnostic-export.test.ts [ apps/dak-studio/src/lib/json-diagnostic-export.test.ts ]
+ FAIL  apps/dak-studio/src/lib/library.test.ts [ apps/dak-studio/src/lib/library.test.ts ]
+ FAIL  apps/dak-studio/src/lib/rivalhub-import.test.ts [ apps/dak-studio/src/lib/rivalhub-import.test.ts ]
+ FAIL  apps/dak-studio/src/lib/season-cache-version.test.ts [ apps/dak-studio/src/lib/season-cache-version.test.ts ]
+ FAIL  apps/dak-studio/src/lib/tactics.test.ts [ apps/dak-studio/src/lib/tactics.test.ts ]
+Error: Failed to resolve entry for package "@cs2dak/maps". The package may have incorrect main/module/exports specified in its package.json.
+ ❯ packages/core/src/spatial/annotate.ts:19:1
+     17| import { decodeDelta, FLAG_ALIVE } from "@cs2dak/contract";
+     18| import { createResolverFromPackage } from "../resolve.js";
+     19| import {
+       | ^
+     20|   getMapNav,
+     21|   getMapRoutes,
+ ❯ packages/core/src/signals.ts:10:1
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/29]⎯
+
+ FAIL  packages/core/src/performance-validation.test.ts [ packages/core/src/performance-validation.test.ts ]
+Error: Failed to resolve entry for package "@cs2dak/maps". The package may have incorrect main/module/exports specified in its package.json.
+ ❯ packages/core/src/duel-window.ts:3:1
+      1| import type { DemoPackage, DuelWindow, PackageGrenade } from "@cs2dak/…
+      2| import { decodeDelta } from "@cs2dak/contract";
+      3| import { staticLineOfSight, type TriangleBvh, type Vec3 } from "@cs2da…
+       | ^
+      4|
+      5| /**
+ ❯ packages/core/src/duels.ts:4:1
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/29]⎯
+
+ FAIL  packages/core/src/radar-field.test.ts [ packages/core/src/radar-field.test.ts ]
+Error: Failed to resolve entry for package "@cs2dak/maps". The package may have incorrect main/module/exports specified in its package.json.
+ ❯ packages/core/src/radar-field.test.ts:5:1
+      3| import { fileURLToPath } from "node:url";
+      4| import { beforeAll, describe, expect, it } from "vitest";
+      5| import { buildRadarFieldGrid } from "@cs2dak/maps";
+       | ^
+      6| import { RADAR_FIELD_BASES, type DemoPackage } from "@cs2dak/contract";
+      7| import { loadDemoPackageFromZip } from "./loader.js";
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/29]⎯
+
+ FAIL  apps/dak-studio/src/lib/library-repair.test.ts [ apps/dak-studio/src/lib/library-repair.test.ts ]
+Error: Failed to resolve entry for package "@cs2dak/maps". The package may have incorrect main/module/exports specified in its package.json.
+ ❯ apps/dak-studio/src/lib/series.ts:3:1
+      1| import type { RawDemoHint, SeriesFormat, SeriesVeto, SeriesVetoStep } …
+      2| import type { PrepItem } from "./playlist";
+      3| import { ACTIVE_DUTY_MAPS } from "@cs2dak/maps";
+       | ^
+      4| import { entryDate, type StudioDemoEntry } from "./library";
+      5| import { displayTeamName } from "./identity";
+ ❯ apps/dak-studio/src/lib/library-repair.test.ts:8:1
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/29]⎯
+
+ FAIL  apps/dak-studio/src/lib/rivalhub.test.ts [ apps/dak-studio/src/lib/rivalhub.test.ts ]
+Error: Failed to resolve entry for package "@cs2dak/maps". The package may have incorrect main/module/exports specified in its package.json.
+ ❯ apps/dak-studio/src/lib/series.ts:3:1
+      1| import type { RawDemoHint, SeriesFormat, SeriesVeto, SeriesVetoStep } …
+      2| import type { PrepItem } from "./playlist";
+      3| import { ACTIVE_DUTY_MAPS } from "@cs2dak/maps";
+       | ^
+      4| import { entryDate, type StudioDemoEntry } from "./library";
+      5| import { displayTeamName } from "./identity";
+ ❯ apps/dak-studio/src/lib/events.ts:3:1
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/29]⎯
+
+ FAIL  packages/core/src/map-intelligence/ct-rotation.test.ts [ packages/core/src/map-intelligence/ct-rotation.test.ts ]
+Error: Failed to resolve entry for package "@cs2dak/maps". The package may have incorrect main/module/exports specified in its package.json.
+ ❯ packages/core/src/map-intelligence/ct-rotation.ts:8:1
+      6|   type DemoPackage,
+      7| } from "@cs2dak/contract";
+      8| import { getPrimaryCalloutRegion, positionGroupOf, type CalloutGrid, t…
+       | ^
+      9| import {
+     10|   replayCalloutAt,
+ ❯ packages/core/src/map-intelligence/ct-rotation.test.ts:4:1
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/29]⎯
+
+ FAIL  packages/core/src/map-intelligence/map-intelligence.test.ts [ packages/core/src/map-intelligence/map-intelligence.test.ts ]
+Error: Failed to resolve entry for package "@cs2dak/maps". The package may have incorrect main/module/exports specified in its package.json.
+ ❯ packages/core/src/map-intelligence/index.ts:7:1
+      5|   type MatchMapIntelligenceFacts,
+      6| } from "@cs2dak/contract";
+      7| import { getMapNav, type CalloutGrid, type CompactNav } from "@cs2dak/…
+       | ^
+      8| import { createReplayRoundContexts, type ReplayRoundContext } from "..…
+      9| import { extractTacticalRoundFactsWithContexts, type TacticalRoundFact…
+ ❯ packages/core/src/map-intelligence/map-intelligence.test.ts:5:1
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/29]⎯
+
+ FAIL  packages/core/src/spatial/utility.integration.test.ts [ packages/core/src/spatial/utility.integration.test.ts ]
+Error: Failed to resolve entry for package "@cs2dak/maps". The package may have incorrect main/module/exports specified in its package.json.
+ ❯ packages/core/src/spatial/annotate.ts:19:1
+     17| import { decodeDelta, FLAG_ALIVE } from "@cs2dak/contract";
+     18| import { createResolverFromPackage } from "../resolve.js";
+     19| import {
+       | ^
+     20|   getMapNav,
+     21|   getMapRoutes,
+ ❯ packages/core/src/spatial/utility.integration.test.ts:7:1
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/29]⎯
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/cli/src/index.integration.test.ts > cs2dak cohort > exits 1 when no ZIPs are found in the directory
+AssertionError: expected 'node:internal/modules/esm/resolve:271…' to match /No \.zip files found/i
+
+- Expected:
+/No \.zip files found/i
+
++ Received:
+"node:internal/modules/esm/resolve:271
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/workspace/cs2-demo-analysis-kit/packages/core/node_modules/@cs2dak/maps/dist/index.js' imported from /workspace/cs2-demo-analysis-kit/packages/core/src/spatial/annotate.ts
+    at finalizeResolution (node:internal/modules/esm/resolve:271:11)
+    at moduleResolve (node:internal/modules/esm/resolve:865:10)
+    at defaultResolve (node:internal/modules/esm/resolve:992:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:701:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:721:38)
+    at nextStep (node:internal/modules/customization_hooks:189:26)
+    at resolveBaseSync (file:///workspace/cs2-demo-analysis-kit/node_modules/.pnpm/tsx@4.23.15/node_modules/tsx/dist/register-nyXW-TH3.mjs:2:11092)
+    at resolveDirectorySync (file:///workspace/cs2-demo-analysis-kit/node_modules/.pnpm/tsx@4.23.15/node_modules/tsx/dist/register-nyXW-TH3.mjs:2:12398)
+    at resolveTsPathsSync (file:///workspace/cs2-demo-analysis-kit/node_modules/.pnpm/tsx@4.23.15/node_modules/tsx/dist/register-nyXW-TH3.mjs:2:13605)
+    at resolve (file:///workspace/cs2-demo-analysis-kit/node_modules/.pnpm/tsx@4.23.15/node_modules/tsx/dist/register-nyXW-TH3.mjs:2:16832) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///workspace/cs2-demo-analysis-kit/packages/core/node_modules/@cs2dak/maps/dist/index.js'
+}
+
+Node.js v24.19.0
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × \"pnpm recursive exec\" failed in /workspace/cs2-demo-analysis-kit/packages/
+  │ cli
+
+"
+
+ ❯ packages/cli/src/index.integration.test.ts:71:27
+     69|     const result = await runCli("cohort", tmpDir, "--out", join(tmpDir…
+     70|     expect(result.code).toBe(1);
+     71|     expect(result.stderr).toMatch(/No \.zip files found/i);
+       |                           ^
+     72|   }, 30_000);
+     73| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/29]⎯
+
+ FAIL  packages/cli/src/index.integration.test.ts > cs2dak (usage) > exits 0 and prints usage when called with no arguments
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ packages/cli/src/index.integration.test.ts:78:25
+     76|   it("exits 0 and prints usage when called with no arguments", async (…
+     77|     const result = await runCli();
+     78|     expect(result.code).toBe(0);
+       |                         ^
+     79|     expect(result.stdout).toMatch(/Usage/i);
+     80|   }, 30_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/29]⎯
+
+
+ Test Files  28 failed | 108 passed (136)
+      Tests  2 failed | 622 passed (624)
+   Start at  20:01:57
+   Duration  30.84s (import 54%, tests 31%, transform 15%, worker 1%)
+
+     Import  405 modules were evaluated 3109 times · 35.87s total, 54% of tracked time
+             ~8.84s faster with isolate: false — shared modules are evaluated once per worker instead of once per file
+             learn more: https://vitest.dev/guide/improving-performance#test-isolation
+
+[ELIFECYCLE] Command failed with exit code 1.

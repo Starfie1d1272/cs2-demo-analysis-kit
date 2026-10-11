@@ -112,3 +112,20 @@ push时GitHub通知default branch存在一个High Dependabot告警#38，但GET�
 证据：`marker-ts-before.log` / `marker-python-before.log` 各5失败；`marker-ts-after.log` 包含36 diagnostic+8 client通过；`marker-python-after.log` 23通过，包含真实文件落盘和导出两端检查。仅使用合成秘密；未将旧head绿灯、自身回归通过称为独立验收。回执恢复与其他issue实现本轮未修改。
 
 本轮最终完整检查：130 files / **850 fast TS**、**8真实ZIP integration**、**152 Python**，另 sample analyze、全工作区typecheck/build、ruff与diff-check通过。新增修复仍需父会话独立复审，未merge或发布。
+
+
+## PR #95 第三次窄修：结构化异常日志重复脱敏
+
+接管时只使用已推送源码/报告重新核验：远端 PR95 head 为 `08b565d0dcefea92e609e00f8c8f5ab8b5fc1e25`，main 为 `6beb85c876c8f3f6d18d6403ac39798a52b9fb46`。没有声称访问旧终止任务的未推送材料；沿用 PR95。先合并该 main，保留 maps #97、Worker #77、provenance #96 和 PR95 原有全部改动，merge 无冲突。
+
+**P2 已实际复现**：`log_failure(logger, ValueError('password="secret words" reason=connection refused'))`，以及真实 `logger.exception→SafeFormatter→FileHandler→export_logs`，在 `519db1cf` 保留英文/中文安全原因，在 `08b565d0` 两种入口均吞掉原因并破坏 JSON（未见该输入秘密残留）。`structured-runtime-probe.py` 精确加载两版已推源码与当前源码，结果见 `structured-runtime-before-after.log`；运行方法为 `cd python && uv run python ../docs/audit/2026-10-12-independent-review/structured-runtime-probe.py`。旧 head 原本已幂等，再次证明幂等不能代替原因/安全断言。
+
+修复 owner 仍为 Python diagnostics 的共享重复脱敏边界：完整 JSON 对象先解码，对字符串字段套用同一脱敏策略，凭据字段无条件抹除，再序列化；处理 message、cause、嵌套 causes 的转义引号，不引入可信 marker、额外 reason 语法或单输入正则补丁。原始 quoted/unquoted 凭据先消费完整值，保护 multiline 和看似 JSON 的秘密值；不改变不明确 unquoted 值保守整体抹除的政策。字段名后缀保持原有凭据识别范围（例如 user_password）。formatter 和 export 两端仍重新检查；没有跳过已脱敏对象，也不写日志信任标记。
+
+新增三入口 × 五组合的真实文件落盘/导出回归：log_failure、logger.exception、未经信任的 raw JSON，覆盖 quoted 多词、escaped URL 引号、伪造 marker、tab、假 reason 秘密后缀、nested credential/user_password；检查秘密全值不残留、英文/中文原因在 message/causes/cause 中存在、JSON可解析、重复脱敏幂等。第一轮新增15组时旧实现 **6失败/32通过**，保存 `structured-python-before.log`；另补4个 multiline/JSON-looking credential 与混合日志保护回归，最终 diagnostics **42通过**，全仓 **171 Python通过**。原有全部 secret/marker/receipt 回归保留。
+
+最终验证：真实 TS normalizeDiagnostic/client/Studio import 定向 **74通过**；全量 **132文件/862 fast TS**、**8真实ZIP integration**、**171 Python**；全工作区 typecheck/build、release-policy、21项 Node release/provenance 合同、ruff、diff-check通过。实际 CLI `analyze:sample`、maps 五入口 clean tarball consumer/strict NodeNext/去空间资产 calibration、compiled tournament 和 clean tarball consumer 通过。build 保留既有 chunk-size warning。日志以 `structured-*` 保存。
+
+保留环境失败：首轮 test:all 缺 maps 编译物产生28文件导入失败/2 CLI断言失败；第二轮与 maps-package-smoke 自带的 maps build 并行，build 会清 dist，出现2文件导入失败/2 CLI失败，已中断该轮（exit130）。完成构建/打包检查后串行重跑 fast 和 integration，得到上述最终全部通过。第二轮竞争是验证调度失误，不作为产品回归；没有删除失败记录或将其算作通过。
+
+本轮只改 diagnostics、回归与证据；未新建 PR、未正式发布/生产回填/操作用户 Windows 或上传凭据，只用合成 fixture。现有 PR 工作流的 Windows CI不等于用户机器验收，也未手动 dispatch Windows。仍交父会话独立复审，未自行将修复称为独审通过或合并 main。
