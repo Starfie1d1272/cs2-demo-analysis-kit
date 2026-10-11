@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DemoPackage, PackageDamage } from "@cs2dak/contract";
 import { activePhaseDamages } from "./utils.js";
-import { buildQaReport, demoSourceAvailability } from "./qa.js";
+import { buildQaReport, demoSourceAvailability, richKillDiagnostics } from "./qa.js";
 
 function damage(tick: number): PackageDamage {
   return {
@@ -111,5 +111,18 @@ describe("buildQaReport", () => {
       severity: "error",
       code: "damages.tick_outside_round"
     }));
+  });
+});
+
+describe("rich kill capability diagnostics", () => {
+  it.each([
+    [[], "available", "no_kill_events", 0, 0],
+    [[{ throughSmoke: false, noScope: false, penetratedObjects: 0 }, { killerActiveWeapon: "ak47" }], "available", "flags_and_named_active_weapon", 1, 1],
+    [[{ throughSmoke: false, noScope: false, penetratedObjects: 0, killerActiveWeapon: "7" }], "partial", "no_named_active_weapon", 1, 0],
+    [[{ killerActiveWeapon: "ak47" }], "missing", "no_rich_kill_flags", 0, 1],
+  ] as const)("preserves capability semantics for %j", (kills, availability, reason, flags, named) => {
+    const demo = pkg({ kills: kills as unknown as DemoPackage["kills"] });
+    expect(demoSourceAvailability(demo).richKills).toBe(availability);
+    expect(richKillDiagnostics(demo)).toEqual({ eventCount: kills.length, flagsEventCount: flags, namedActiveWeaponEventCount: named, reason });
   });
 });

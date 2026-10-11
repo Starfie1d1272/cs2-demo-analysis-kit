@@ -7,7 +7,7 @@ import {
   type PlayerPerformanceAggregate,
   type PlayerRoundPerformanceFacts,
 } from "./performance-facts.js";
-import { demoSourceAvailability, type DemoSourceAvailability } from "./qa.js";
+import { demoSourceAvailability, richKillDiagnostics, type RichKillDiagnostics, type DemoSourceAvailability } from "./qa.js";
 import { CORE_ANALYSIS_VERSION, CORE_SEMANTIC_PROFILE } from "./version.js";
 import { buildTeamSideWinRates } from "./side-win-rate.js";
 import { normalizeDemoPackage } from "./normalize.js";
@@ -18,6 +18,8 @@ export {
   buildTeamSideWinRates,
   CORE_SEMANTIC_PROFILE,
   demoSourceAvailability,
+  richKillDiagnostics,
+  type RichKillDiagnostics,
   type DemoSourceAvailability,
   type PlayerPerformanceAggregate,
   type PlayerRoundPerformanceFacts,

@@ -18,7 +18,7 @@ export type { DemoManifest, DemoPackageLoadOptions, DemoPackageLoadProfile } fro
 export { normalizeDemoPackage } from "./normalize.js";
 export { createPlayerResolver, createResolverFromPackage } from "./resolve.js";
 export type { PlayerResolver } from "./resolve.js";
-export { demoSourceAvailability, type DemoSourceAvailability } from "./qa.js";
+export { demoSourceAvailability, richKillDiagnostics, type RichKillDiagnostics, type DemoSourceAvailability } from "./qa.js";
 export { deriveRRSignals, computeAccountRatingsV2 } from "./signals.js";
 export { activeDamages, activePhaseDamages, groupBy } from "./utils.js";
 export * from "./spatial/index.js";

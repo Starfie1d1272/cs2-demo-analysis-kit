@@ -1,3 +1,5 @@
+import { RivalHubEvidenceQaError, safeQaDiagnostics } from "./diagnostics";
+export { RivalHubEvidenceQaError } from "./diagnostics";
 import {
   aggregatePlayerRoundPerformanceFacts,
   analyzeDemoPackageForEvidence,
@@ -5,6 +7,7 @@ import {
   buildTeamSideWinRates,
   CORE_SEMANTIC_PROFILE,
   demoSourceAvailability,
+  richKillDiagnostics,
   type PlayerPerformanceAggregate,
 } from "@cs2dak/core/evidence";
 import type { DemoPackage, TeamKey } from "@cs2dak/contract";
@@ -441,9 +444,10 @@ export function buildRivalHubDemoEvidenceV1(
   const performanceBySteamId = aggregatePlayerRoundPerformanceFacts(performanceFacts);
   const playerMaps = projectPlayerMaps(pkg, identities, performanceBySteamId);
   const analysis = analyzeDemoPackageForEvidence(pkg, performanceFacts);
+  const safeIssues = safeQaDiagnostics(analysis.qa.issues, pkg.players.map((player) => player.name));
   const qaErrors = analysis.qa.issues.filter((issue) => issue.severity === "error");
   if (qaErrors.length > 0) {
-    throw new Error(`Evidence blocked by Core QA: ${qaErrors.map((issue) => issue.code).join(", ")}`);
+    throw new RivalHubEvidenceQaError(qaErrors, pkg.players.map((player) => player.name));
   }
   const sideWinRates = buildTeamSideWinRates(pkg);
   const roundSeq = new Map(pkg.rounds.map((round, index) => [round.roundNumber, index + 1]));
@@ -479,7 +483,7 @@ export function buildRivalHubDemoEvidenceV1(
     source: {
       demoSha256, mapName: pkg.match.mapName, tickRateHz: pkg.match.tickrate, sourceSchemaVersion: pkg.manifest.schemaVersion,
       exporterVersion: `${pkg.manifest.exporter.name}/${pkg.manifest.exporter.version}`, parserVersion: `${pkg.manifest.parser.name}/${pkg.manifest.parser.version}`,
-      producerVersion: "cs2dak-rivalhub-evidence/0.1.0", generatedAt: new Date(pkg.manifest.exportedAt).toISOString(),
+      producerVersion: "cs2dak-rivalhub-evidence/0.2.0", generatedAt: new Date(pkg.manifest.exportedAt).toISOString(),
     },
     quality: { qa: { ok: analysis.qa.ok, ...analysis.qa.summary }, capabilities: demoSourceAvailability(pkg) },
     participants: pkg.players.map((player) => {
@@ -504,6 +508,8 @@ export function buildRivalHubDemoEvidenceV1(
         return { teamKey, rounds: pkg.rounds.length, roundWins: t.won + ct.won, tRounds: t.played, tWins: t.won, ctRounds: ct.played, ctWins: ct.won };
       }),
     },
-    extensions: {},
+    extensions: {
+      "cs2dak/diagnostics": { version: 1, qa: safeIssues, richKills: richKillDiagnostics(pkg) },
+    },
   };
 }

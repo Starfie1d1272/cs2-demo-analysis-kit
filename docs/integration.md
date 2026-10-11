@@ -140,3 +140,27 @@ scoreboard projection 仍按其既有 aggregate contract 运行，不能与 perf
 
 > 历史的 symbol 级文件替换映射（RivalHub v1 → kit）已归档至
 > `docs/archive/2026-06/rivalhub-migration.md`，仅作历史参考，不再是当前接缝依据。
+
+### Evidence 的确定性诊断扩展
+
+Producer `cs2dak-rivalhub-evidence/0.2.0` 保留原 Evidence V1 与 `dak-stable/3`
+事实语义，在 `extensions["cs2dak/diagnostics"]` 添加以下可选的 v1 诊断：
+
+- `version: 1`；`qa.issues` 最多 64 条 `{code, severity, path, message}`，
+  `qa.omittedIssueCount` 为未携带条数。无问题时为空数组；summary 仍为完整 QA 计数。
+- code 最长 96，path 最长 128 且仅允许逻辑字段/数组索引，缺失为 null；
+  未知未来 code 保留，危险或超长标识符替换为 `diagnostic.redacted`。
+- message 最长 320，Core parity 玩家定位中的昵称替换为 `[player]`；凭据、文件路径、URL、运行上下文等
+  危险文本整条替换为 `[redacted]`。安全规则见
+  `packages/rivalhub-upload/src/diagnostic-safety.ts`，producer/receiver 共享同一规则。
+- `richKills` 为 Core 唯一生成的 `eventCount`、`flagsEventCount`、
+  `namedActiveWeaponEventCount` 和 `reason`。空 kills 为 `no_kill_events`/available；
+  存在 flags 且存在命名 active weapon 为 `flags_and_named_active_weapon`/available
+  （两者不必来自同一事件）；仅 flags 为 `no_named_active_weapon`/partial；
+  无 flags 为 `no_rich_kill_flags`/missing。
+
+QA error 仍在本地阻止提交，异常保留有界安全的 code/path/message 便于定位。
+诊断不携带 attempt、request ID、运行时间、cause、raw logs 或凭据，不重建缺失的历史 warnings。
+完整 payload 的稳定排序 SHA-256 算法不变，确定性诊断参与 hash；重复提交相同 payload
+得到相同 key，旧 producer 与新 producer 的不同 payload 通过既有 same-demo lineage
+处理，不能剔除诊断字段或改写历史 artifact。Canonical gameplay facts 不变。
