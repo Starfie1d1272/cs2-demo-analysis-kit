@@ -26,7 +26,6 @@ import re
 import shutil
 import socket
 import sqlite3
-import subprocess
 import sys
 import tempfile
 import threading
@@ -43,6 +42,9 @@ from pathlib import Path
 
 from cs2dak import __version__, updater
 from cs2dak.credentials import (
+    _macos_credential_delete,
+    _macos_credential_get,
+    _macos_credential_set,
     _windows_credential_delete,
     _windows_credential_get,
     _windows_credential_set,
@@ -634,59 +636,35 @@ class StudioApi:
         except OSError:
             return False
 
+    def _rivalhub_credential_call(self, operation: str, service: str, account: str, *args):
+        adapters = {
+            "win32": {"read": _windows_credential_get, "write": _windows_credential_set,
+                      "delete": _windows_credential_delete},
+            "darwin": {"read": _macos_credential_get, "write": _macos_credential_set,
+                       "delete": _macos_credential_delete},
+        }
+        if sys.platform not in adapters:
+            return None if operation == "read" else False
+        try:
+            return adapters[sys.platform][operation](service, account, *args)
+        except Exception as error:  # noqa: BLE001 - log the safe adapter failure, then re-raise
+            log_failure(log, error, f"credential.{operation}")
+            raise
+
     def rivalhub_credential_get(self, service: str, account: str) -> str | None:
         if not self._valid_rivalhub_credential_key(service, account):
             return None
-        if sys.platform == "win32":
-            return _windows_credential_get(service, account)
-        if sys.platform != "darwin":
-            return None
-        try:
-            result = subprocess.run(
-                ["/usr/bin/security", "find-generic-password", "-s", service, "-a", account, "-w"],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-        except OSError:
-            return None
-        return result.stdout.rstrip("\r\n") if result.returncode == 0 else None
+        return self._rivalhub_credential_call("read", service, account)
 
     def rivalhub_credential_set(self, service: str, account: str, value: str) -> bool:
         if not self._valid_rivalhub_credential_key(service, account) or not value:
             return False
-        if sys.platform == "win32":
-            return _windows_credential_set(service, account, value)
-        if sys.platform != "darwin":
-            return False
-        try:
-            result = subprocess.run(
-                ["/usr/bin/security", "add-generic-password", "-U", "-s", service, "-a", account, "-w", value],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-        except OSError:
-            return False
-        return result.returncode == 0
+        return self._rivalhub_credential_call("write", service, account, value)
 
     def rivalhub_credential_delete(self, service: str, account: str) -> bool:
         if not self._valid_rivalhub_credential_key(service, account):
             return False
-        if sys.platform == "win32":
-            return _windows_credential_delete(service, account)
-        if sys.platform != "darwin":
-            return False
-        try:
-            result = subprocess.run(
-                ["/usr/bin/security", "delete-generic-password", "-s", service, "-a", account],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-        except OSError:
-            return False
-        return result.returncode == 0
+        return self._rivalhub_credential_call("delete", service, account)
 
     def _blob_dir(self, namespace: str) -> Path:
         if namespace == "demos":

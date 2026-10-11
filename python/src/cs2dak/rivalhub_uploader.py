@@ -7,7 +7,6 @@ import http.client
 import json
 import logging
 import os
-import subprocess
 import sys
 import tempfile
 import threading
@@ -19,6 +18,9 @@ import webbrowser
 from pathlib import Path
 
 from cs2dak.credentials import (
+    _macos_credential_delete,
+    _macos_credential_get,
+    _macos_credential_set,
     _windows_credential_delete,
     _windows_credential_get,
     _windows_credential_set,
@@ -54,13 +56,8 @@ def credential(origin: str, value: str | None = None) -> str | bool | None:
                 else _windows_credential_set(SERVICE, account, value))
     if sys.platform != "darwin":
         raise RuntimeError("当前系统不支持安全凭据存储，请使用 Windows 或 macOS")
-    args = (["find-generic-password", "-s", SERVICE, "-a", account, "-w"] if value is None
-            else ["add-generic-password", "-U", "-s", SERVICE, "-a", account, "-w", value])
-    result = subprocess.run(["/usr/bin/security", *args], capture_output=True, text=True,
-                            timeout=30, check=False)
-    if value is not None:
-        return result.returncode == 0
-    return result.stdout.rstrip("\r\n") if result.returncode == 0 else None
+    return (_macos_credential_get(SERVICE, account) if value is None
+            else _macos_credential_set(SERVICE, account, value))
 
 
 def delete_credential(origin: str) -> bool:
@@ -69,10 +66,7 @@ def delete_credential(origin: str) -> bool:
         return _windows_credential_delete(SERVICE, account)
     if sys.platform != "darwin":
         raise RuntimeError("当前系统不支持安全凭据存储")
-    result = subprocess.run(["/usr/bin/security", "delete-generic-password", "-s", SERVICE,
-                             "-a", account], capture_output=True, text=True, timeout=30, check=False)
-    # Keychain returns a nonzero code when the item is already absent.
-    return result.returncode == 0 or "could not be found" in result.stderr.lower()
+    return _macos_credential_delete(SERVICE, account)
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
