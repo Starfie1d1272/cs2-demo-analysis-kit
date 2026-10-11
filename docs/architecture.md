@@ -13,7 +13,7 @@ This repository owns the product-neutral analysis pipeline from a `cs2-demo-form
        ├─ box-score / HLTV baseline / RR six-account / PRISM  (via @rivalhub/rival-rating)
        └─ replay / shots / duels decoding through cs2-demo-format helpers
   -> @cs2dak/cohort       (cross-match aggregation + identity map)
-  -> @cs2dak/presentation (single-map adapters + product-neutral view models)
+  -> @cs2dak/presentation (label wrappers + product-neutral view models)
        └─> @cs2dak/tournament (frozen Tournament facts -> cross-map analytics)
   -> @cs2dak/react / product adapters (RivalHub, CS2 Insight Agent)
 ```
@@ -25,11 +25,11 @@ This repository owns the product-neutral analysis pipeline from a `cs2-demo-form
 | `cs2df` | Reference `.dem -> cs2-demo-format/3.x ZIP` exporter. Owns raw parsing and ZIP production. |
 | `python/src/cs2dak` | Desktop launcher shell: pywebview GUI, DAK Studio bridge, PyInstaller packaging. Does not contain parser/exporter logic. |
 | `@cs2dak/contract` | Zod schemas + types; re-exports `cs2-demo-format` instead of forking it. |
-| `@cs2dak/core` | Deterministic single-match analysis, RR/PRISM signal derivation, QA. No product side effects. |
+| `@cs2dak/core` | Deterministic single-match analysis, RR/PRISM signal derivation, QA. Includes the data-only frozen Tournament projection with explicit stable identities. No product side effects. |
 | `@cs2dak/cohort` | Cross-match aggregation and identity merging. No product ranking rules. |
 | `@cs2dak/maps` | Map calibration + world-to-radar transform + attack routes (`MapRoute`) + zone geometry (`zoneAt` / `pointInPolygon`) + callout mappings. |
 | `@cs2dak/tournament` | Zero-runtime-dependency frozen sufficient-fact DTOs, identity-safe cross-map merge for 1.0 economy/team facts and 1.1 performance facts, denominator-aware rates, deterministic ordering, and invariant guards. |
-| `@cs2dak/presentation` | Product-neutral view models, labels, stories, workspace composition, and single-map Tournament fact adapters. |
+| `@cs2dak/presentation` | Product-neutral view models, labels, stories, workspace composition, and label wrappers around the Core canonical Tournament projection. |
 | `@cs2dak/react` | Product-neutral preview components that consume presentation contracts only. |
 | `@cs2dak/cli` | Language-neutral filesystem/automation wrapper around TypeScript packages. |
 | `apps/dak-studio` | Local demo library and analysis workbench. Stores ZIP bytes locally; `.dem` import is exported through `cs2df`. |
@@ -66,8 +66,9 @@ Tournament analytics deliberately has a narrower runtime boundary than the gener
 presentation package:
 
 ```text
-core single-map detection
-  -> presentation legacy adapter / Evidence producer
+core single-map detection + explicit stable identities
+  -> core canonical frozen-facts projection
+  -> presentation label wrapper / direct Evidence producer
   -> @cs2dak/tournament frozen-fact merge
   -> DAK Studio / RivalHub consumers
 ```
@@ -128,7 +129,7 @@ Formula ownership stays in `@rivalhub/rival-rating`. This kit only derives signa
 | `@cs2dak/cohort` | 跨场聚合与身份归并，不拥有产品排行榜规则。 |
 | `@cs2dak/maps` | 地图标定、world-to-radar 转换、进攻动线、zone 几何与 callout 映射。 |
 | `@cs2dak/tournament` | 零 runtime 依赖的 frozen sufficient-fact DTO、identity-safe 跨图 merge、透明 performance aggregation、rate、确定性排序与 invariant guard。 |
-| `@cs2dak/presentation` | 产品中立 View Model、标签、叙事、workspace 编排和 Tournament 单图 fact adapter。 |
+| `@cs2dak/presentation` | 产品中立 View Model、标签、叙事、workspace 编排和 Core canonical Tournament adapter 的标签包装。 |
 | `@cs2dak/react` | 只消费 presentation 合同的产品中立组件。 |
 | `@cs2dak/cli` | TypeScript 包的文件系统/自动化入口。 |
 | `apps/dak-studio` | 本地 Demo 库和分析工作台；本地保存 ZIP 字节，`.dem` 导入通过 `cs2df` 导出。 |
@@ -163,8 +164,9 @@ presentation 和 Evidence 适配器只聚合或投影 Core facts，不重新实�
 赛事统计的链路固定为：
 
 ```text
-core 单场 detection
-  -> presentation legacy adapter / Evidence producer
+core 单场 detection + 显式稳定身份
+  -> core canonical frozen-facts projection
+  -> presentation 标签包装 / Evidence 直接消费
   -> @cs2dak/tournament frozen-fact merge
   -> DAK Studio / RivalHub consumer
 ```
@@ -193,3 +195,25 @@ maps、React、Zod 或 RivalHub。
 | PRISM | 你是什么风格 | 跨场 cohort |
 
 公式所有权在 `@rivalhub/rival-rating`。本 kit 只做信号派生、模型接线、锚定与输出整形。生产 RR 统一使用 frozen pro baseline（`1.0 = 职业基线`），单场与 cohort 视图共用同一标尺。
+
+### Stable identity compatibility (#69)
+
+The canonical single-map adapter lives in the existing Core package and is exported
+through its existing root/evidence entries; no package or subpath is added. Its
+Tournament import is type-only. Tournament still owns the zero-runtime-dependency
+DTOs and cross-map merge. Presentation retains its existing wrapper functions and
+injects labels after identity has been established.
+
+Frozen facts require complete stable team/player IDs and reject missing IDs or
+identical teamA/teamB IDs. Consumers with authoritative event/roster identities
+supply them explicitly. For unbound local Demos, the wrapper explicitly constructs
+match-scoped observed team IDs and Steam player IDs: it preserves local use without
+claiming that teams in different matches are the same real team. Equal display
+names never establish that claim. Existing explicit player mappings remain valid.
+
+`teamRenames` changes labels only. Consequently two different stable IDs renamed
+to the same label remain separate; the same stable ID merges across maps even when
+its label changes. Old manually constructed `TournamentFacts` must supply the IDs.
+Studio derived cache moves from v5 to v6 and requires local facts backfill/reimport;
+its persisted tournament result keys are invalidated too. Raw Demo packages and
+immutable historical/remote evidence are not rewritten.

@@ -3,7 +3,7 @@ import { buildTournamentInsightsFromFacts, type DuelInsightsFacts, type Tourname
 import { filterDuelFactsByTeam, withTeamRenames } from "./season";
 
 /** 一张地图的最小 TournamentFacts：teamA 赢全部 N 个回合（手枪局走 ct 侧）。 */
-function makeFacts(matchId: string, teamA: string, teamB: string): TournamentFacts {
+function makeFacts(matchId: string, teamA: string, teamB: string, teamAId = `observed:${matchId}:A`): TournamentFacts {
   const rounds = Array.from({ length: 4 }, (_, i) => ({
     roundNumber: i + 1,
     winnerSide: "ct" as const,
@@ -13,6 +13,8 @@ function makeFacts(matchId: string, teamA: string, teamB: string): TournamentFac
   }));
   return {
     matchId,
+    teamEntityKeys: { teamA: teamAId, teamB: `observed:${matchId}:B` },
+    playerEntityKeys: {},
     mapName: "de_mirage",
     teams: { teamA, teamB },
     players: [],
@@ -37,7 +39,7 @@ describe("withTeamRenames", () => {
     expect(facts[0].teams.teamA).toBe("NJU.A");
   });
 
-  it("改名后两场不同原名的同队在明细矩阵里合并成一行（bug 回归）", () => {
+  it("相同显示名不会把两个不同稳定 ID 合并", () => {
     const facts = [makeFacts("m1", "NJU.A", "OPP1"), makeFacts("m2", "NJU_LegacyTag", "OPP2")];
     const renames = { "NJU.A": "NJU", "NJU_LegacyTag": "NJU" };
 
@@ -46,10 +48,25 @@ describe("withTeamRenames", () => {
 
     // 未改名前：NJU.A 与 NJU_LegacyTag 各占一行
     expect(before.teamEconomySummaries.filter((t) => t.teamName.startsWith("NJU"))).toHaveLength(2);
-    // 改名后：合并为单行 "NJU"，maps 累加
+    // 改名仅修改标签，两个独立观察身份仍保持两行。
     const merged = after.teamEconomySummaries.filter((t) => t.teamName === "NJU");
-    expect(merged).toHaveLength(1);
-    expect(merged[0].maps).toBe(2);
+    expect(merged).toHaveLength(2);
+    expect(merged.map(row => row.maps)).toEqual([1, 1]);
+    expect(new Set(merged.map(row => row.teamEntityKey)).size).toBe(2);
+  });
+  it("相同 stable ID 跨图改名仍归并，统计不变", () => {
+    const facts = [makeFacts("m1", "NJU.A", "OPP1", "stable-nju"), makeFacts("m2", "NJU_LegacyTag", "OPP2", "stable-nju")];
+    const before = buildTournamentInsightsFromFacts(facts);
+    const after = buildTournamentInsightsFromFacts(withTeamRenames(facts, { "NJU.A": "NJU", "NJU_LegacyTag": "NJU" }));
+    expect(before.teamEconomySummaries.filter(row => row.teamName.startsWith("NJU"))).toHaveLength(1);
+    expect(after.teamEconomySummaries.find(row => row.teamName === "NJU")).toMatchObject({ maps: 2, rounds: 8, roundWins: 8 });
+    expect(after.roundCount).toBe(before.roundCount);
+    expect(after.economyMatrix).toEqual(before.economyMatrix);
+  });
+  it("缺少稳定身份的旧缓存明确失败，不按显示名回退", () => {
+    const legacy = makeFacts("m1", "A", "B");
+    delete (legacy as Partial<TournamentFacts>).teamEntityKeys;
+    expect(() => buildTournamentInsightsFromFacts([legacy])).toThrow("explicit stable team IDs");
   });
 });
 

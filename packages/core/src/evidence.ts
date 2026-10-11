@@ -40,3 +40,5 @@ export function analyzeDemoPackageForEvidence(pkg: DemoPackage, facts: PlayerRou
   })));
   return { provenance: { analysisVersion: CORE_ANALYSIS_VERSION }, qa };
 }
+
+export * from "./tournament-facts.js";

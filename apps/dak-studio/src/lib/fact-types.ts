@@ -2,6 +2,7 @@ import type { C4RouteFact, CtRotationRoundFact, ExecuteBucket, PlayerPositionRou
 import type { DemoPackage, PlayerWeaponHighlightFacts, RRIndicators, RRSignals, Side, TeamKey } from "@cs2dak/contract";
 import type { CalloutGrid, LineupGrenadeLike, TriangleBvh, Vec3 } from "@cs2dak/maps";
 import type { PlayerMechanicsProfile, PlayerSeasonInsights, PlayerWeaponStat } from "@cs2dak/presentation";
+import type { TournamentIdentity } from "@cs2dak/core";
 
 interface FactBase {
   matchId: string;
@@ -92,6 +93,8 @@ export interface ExtractMatchFactsOptions {
   visibilityFor?: (mapName: string) => TriangleBvh | null;
   calloutGrid?: CalloutGrid | null;
   playerKeyFor?: (player: { steamId64: string; name: string; teamKey: string }) => string;
+  /** Explicit canonical bindings supplied by the event/identity owner, never display names. */
+  tournamentIdentity?: TournamentIdentity;
 }
 
 export interface FactsScope {

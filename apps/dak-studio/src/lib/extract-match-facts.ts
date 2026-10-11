@@ -6,6 +6,7 @@ import {
   deriveRRIndicators,
   deriveRRSignals,
   extractMatchTacticalAndMapIntelligenceFacts,
+  observedTournamentIdentity,
 } from "@cs2dak/core";
 import { decodeDelta, type DemoPackage, type Side } from "@cs2dak/contract";
 import type { TriangleBvh, CalloutGrid, Vec3, LineupGrenadeLike } from "@cs2dak/maps";
@@ -248,7 +249,11 @@ export function extractMatchData(pkg: DemoPackage, options: ExtractMatchFactsOpt
   const mapName = pkg.match.mapName;
   const visibilityFor = options.visibilityFor?.(mapName) ?? null;
   const calloutGrid = options.calloutGrid ?? null;
-  const input = { matchId: options.matchId, pkg, performanceFacts };
+  const tournamentIdentity = options.tournamentIdentity ?? {
+    ...observedTournamentIdentity(options.matchId, pkg.players),
+    playerEntityKeys: Object.fromEntries(pkg.players.map(player => [player.steamId64, playerKeyFor(player)])),
+  };
+  const input = { matchId: options.matchId, pkg, performanceFacts, tournamentIdentity };
   const utilityPlayers = pkg.players.map((player) => ({
     playerKey: playerKeyFor(player),
     name: player.name,

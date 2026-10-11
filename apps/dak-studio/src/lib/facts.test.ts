@@ -2,7 +2,7 @@ import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { loadDemoPackageFromZip, TACTICAL_FACT_VERSION } from "@cs2dak/core";
+import { loadDemoPackageFromZip, TACTICAL_FACT_VERSION, extractTournamentSourceFacts, projectTournamentMapFacts } from "@cs2dak/core";
 import type { ExecuteBucket } from "@cs2dak/core";
 import { buildSeasonCohort, buildSeasonCohortFromRows } from "@cs2dak/cohort";
 import {
@@ -44,12 +44,24 @@ function stableNumbers<T>(value: T): T {
 }
 
 describe("MatchFacts", () => {
+  it("Studio persists the same canonical frozen facts and preserves explicit identity bindings", async () => {
+    const pkg = await fixture;
+    const matchId = "canonical-studio";
+    const tournamentIdentity = { teamEntityKeys: { teamA: "canonical-alpha", teamB: "canonical-bravo" }, playerEntityKeys: Object.fromEntries(pkg.players.map(player => [player.steamId64, `bound:${player.steamId64}`])) };
+    const data = extractMatchData(pkg, { matchId, tournamentIdentity });
+    const persisted = data.derived.tournament[0]!.row;
+    const expected = projectTournamentMapFacts(extractTournamentSourceFacts({ matchId, pkg }, tournamentIdentity));
+    expect(projectTournamentMapFacts(persisted)).toEqual(expected);
+    expect(persisted.teamEntityKeys).toEqual(tournamentIdentity.teamEntityKeys);
+    expect(persisted.playerEntityKeys).toEqual(tournamentIdentity.playerEntityKeys);
+    expect(persisted.teams.teamA).toBe(pkg.match.teamA.name);
+  });
   it("keeps cohort/presentation outputs outside the facts namespace", () => {
     expect(FACTS_RECORD_NAMESPACES).toContain("facts:team_awp_rounds");
     expect(FACTS_RECORD_NAMESPACES).toContain("facts:ct_rotation_rounds");
     expect(FACTS_RECORD_NAMESPACES).toContain("facts:rr_signal_rows");
     expect(FACTS_RECORD_NAMESPACES.some((name) => /cohort|player_insights|tournament|team_comparison|duel|opening_trails|utility_value/.test(name))).toBe(false);
-    expect(DERIVED_CACHE_RECORD_NAMESPACES.every((name) => name.startsWith("derived:match-v5:"))).toBe(true);
+    expect(DERIVED_CACHE_RECORD_NAMESPACES.every((name) => name.startsWith("derived:match-v6:"))).toBe(true);
   });
 
   it("persists the same compact AWP round facts produced by the direct core pipeline", async () => {

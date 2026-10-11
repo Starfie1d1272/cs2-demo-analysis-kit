@@ -7,6 +7,7 @@ import {
   type PlayerRoundPerformanceFact,
   type PlayerRoundPerformanceFacts,
   type PlayerRoundPerformanceUtilityFact,
+  type TournamentIdentity,
 } from "@cs2dak/core";
 import type { TriangleBvh } from "@cs2dak/maps";
 import { round } from "./season-metrics.js";
@@ -27,6 +28,8 @@ export interface SeasonInsightsDemo {
   pkg: DemoPackage;
   /** Optional shared Core facts for callers that already built the package once. */
   performanceFacts?: PlayerRoundPerformanceFacts;
+  /** Explicit consumer-owned cross-map team/player identities; labels never supply these. */
+  tournamentIdentity?: TournamentIdentity;
 }
 
 function performanceFactsFor(demo: SeasonInsightsDemo): PlayerRoundPerformanceFacts {
