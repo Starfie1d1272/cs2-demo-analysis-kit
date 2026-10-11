@@ -1,4 +1,4 @@
-import { createRivalHubClient, httpErrorFromResponse, normalizeDiagnostic, type SafeDiagnostic } from "@cs2dak/rivalhub-upload";
+import { ExportPolling, sanitizeDiagnosticText, createRivalHubClient, httpErrorFromResponse, normalizeDiagnostic, type SafeDiagnostic } from "@cs2dak/rivalhub-upload";
 export interface DemoFile { id: string; name: string }
 export interface Connection { baseUrl: string; connected: boolean; pairingId?: string }
 export interface NativeApi {
@@ -71,23 +71,19 @@ export const client = createRivalHubClient(async <T,>(path: string, method: "GET
   return result.body as T;
 });
 export const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+export const exportPolling = new ExportPolling();
 export async function exportZip(id: string, progress: (message: string) => void): Promise<Uint8Array> {
   await native().start_export(id);
-  for (;;) {
-    const status = await native().export_status(id);
-    if (status.state === "error") throw status.diagnostic ?? new Error(status.error ?? "PARSE_FAILED：解析失败");
-    if (status.state === "done") {
-      const data = new Uint8Array(status.size!);
-      let offset = 0;
-      while (offset < data.length) {
-        const chunk = atob(await native().read_chunk(id, offset));
-        if (!chunk.length) throw new Error("EXPORT_READ：读取解析结果中断，请重试");
-        data.set(Uint8Array.from(chunk, char => char.charCodeAt(0)), offset);
-        offset += chunk.length;
-      }
-      return data;
-    }
-    progress(`正在解析 · ${Math.round(Math.max(0, Math.min(1, status.progress)) * 100)}% · 大文件请耐心等待`);
-    await delay(500);
+  const status = await exportPolling.wait(id, () => native().export_status(id), status => {
+    progress(`正在解析 · ${Math.round(status.progress * 100)}% · ${sanitizeDiagnosticText(status.stage)} · 大文件请耐心等待`);
+  });
+  const data = new Uint8Array(status.size!);
+  let offset = 0;
+  while (offset < data.length) {
+    const chunk = atob(await native().read_chunk(id, offset));
+    if (!chunk.length) throw new Error("EXPORT_READ：读取解析结果中断，请重试");
+    data.set(Uint8Array.from(chunk, char => char.charCodeAt(0)), offset);
+    offset += chunk.length;
   }
+  return data;
 }

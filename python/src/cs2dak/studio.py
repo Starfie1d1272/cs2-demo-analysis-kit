@@ -1202,7 +1202,7 @@ class StudioApi:
     def get_export_status(self, job_id: str) -> dict:
         job = self._jobs.get(job_id)
         if job is None:
-            return {"id": job_id, "state": "error", "error": "未知任务",
+            return {"id": job_id, "state": "error", "code": "EXPORT_JOB_NOT_FOUND", "error": "未知任务",
                     "stage": "", "progress": 0, "elapsedSeconds": 0,
                     "fileName": None, "resultSize": 0}
         return job.status()
