@@ -44,7 +44,7 @@ function redactFragments(value: string): string {
 export function sanitizeDiagnosticMessage(value: string): string {
   // Raw runtime output is not a QA explanation. The safe code/path are kept by
   // the caller, while this marker explicitly explains why prose was suppressed.
-  if (/\bTraceback\s*\(|(?:^|\n)\s*at\s+[^\n]*:\d+:\d+\)?\s*(?:\n|$)|\b(?:raw[ _-]?log|stacktrace)\s*:/i.test(value)) return RAW_DIAGNOSTIC;
+  if (/\bTraceback\s*\(|(?:^|\n)\s*at\s+[^\n]*:\d+(?::\d+)?\)?\s*(?:\n|$)|\b(?:raw[ _-]?log|stacktrace)\s*:/i.test(value)) return RAW_DIAGNOSTIC;
   let result = value.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g, " ")
     .replace(/\s+/g, " ").trim();
   // Redact before bounding so truncation cannot expose part of a secret. A

@@ -58,7 +58,7 @@ describe("safe evidence diagnostics", () => {
   ])("preserves safe QA prose %s", (message) => {
     expect(sanitizeDiagnosticMessage(message)).toBe(message);
   });
-  it.each(["raw log: oops", "Traceback (most recent call last): private", "Error: failed\n  at load (/private/file.ts:1:2)"])("explains suppression of raw runtime output", (message) => {
+  it.each(["at fn (file.ts:1)", "raw log: oops", "Traceback (most recent call last): private", "Error: failed\n  at load (/private/file.ts:1:2)"])("explains suppression of raw runtime output", (message) => {
     const issue = safeQaDiagnostics([{ code: "future.warning", severity: "warning", path: "kills", message }]).issues[0]!;
     expect(issue).toEqual({ code: "future.warning", severity: "warning", path: "kills", message: "[redacted: raw diagnostic]" });
     expect(sanitizeDiagnosticMessage(issue.message)).toBe(issue.message);
