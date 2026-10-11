@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { CALLOUT_DICT } from "./callout-names.js";
 import { getMapRoutes, MAP_ROUTE_ASSETS } from "./route-assets.js";
-import { ACTIVE_DUTY_MAPS } from "./zones.js";
+import { SPATIAL_ASSET_MAPS } from "./map-pool.js";
 import type { MapRoute, MapRoutes } from "./routes.js";
 
 const ROUTE_TYPES = new Set([
@@ -37,8 +37,8 @@ describe("map route assets", () => {
     }
   });
 
-  it("provides at least one confirmed route for every active duty map", () => {
-    for (const mapName of ACTIVE_DUTY_MAPS) {
+  it("provides at least one confirmed route for every spatial asset map", () => {
+    for (const mapName of SPATIAL_ASSET_MAPS) {
       expect(loadRoutes(mapName).routes, mapName).not.toHaveLength(0);
     }
   });
@@ -54,7 +54,7 @@ describe("map route assets", () => {
   });
 
   it("keeps route metadata and callout references internally consistent", () => {
-    for (const mapName of ACTIVE_DUTY_MAPS) {
+    for (const mapName of SPATIAL_ASSET_MAPS) {
       const asset = loadRoutes(mapName);
       const callouts = CALLOUT_DICT[mapName];
       const ids = asset.routes.map((route) => route.id);

@@ -7,7 +7,7 @@ import nukeNav from "../map-nav/de_nuke.nav.json" with { type: "json" };
 import overpassNav from "../map-nav/de_overpass.nav.json" with { type: "json" };
 import type { CompactNav } from "./nav.js";
 import type { TriangleBvh } from "./visibility.js";
-import type { ActiveDutyMap } from "./zones.js";
+import type { SpatialAssetMap } from "./map-pool.js";
 
 export interface MapGeometry {
   mapName: string;
@@ -19,7 +19,7 @@ export interface MapGeometry {
   };
 }
 
-export const MAP_NAV_ASSETS: Record<ActiveDutyMap, CompactNav> = {
+export const MAP_NAV_ASSETS: Record<SpatialAssetMap, CompactNav> = {
   de_ancient: ancientNav as CompactNav,
   de_anubis: anubisNav as CompactNav,
   de_dust2: dust2Nav as CompactNav,
@@ -31,7 +31,7 @@ export const MAP_NAV_ASSETS: Record<ActiveDutyMap, CompactNav> = {
 
 export function getMapNav(mapName: string): CompactNav | null {
   if (mapName in MAP_NAV_ASSETS) {
-    return MAP_NAV_ASSETS[mapName as ActiveDutyMap];
+    return MAP_NAV_ASSETS[mapName as SpatialAssetMap];
   }
   return null;
 }

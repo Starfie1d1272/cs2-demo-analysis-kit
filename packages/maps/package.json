@@ -28,6 +28,11 @@
       "types": "./dist/tri-assets.d.ts",
       "import": "./dist/tri-assets.js",
       "default": "./dist/tri-assets.js"
+    },
+    "./calibration": {
+      "types": "./dist/calibration.d.ts",
+      "import": "./dist/calibration.js",
+      "default": "./dist/calibration.js"
     }
   },
   "files": [
