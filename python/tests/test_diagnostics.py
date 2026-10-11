@@ -202,3 +202,31 @@ def test_runtime_credentials_are_redacted_through_log_and_export(tmp_path):
     finally:
         logger.removeHandler(handler)
         handler.close()
+
+
+@pytest.mark.parametrize("raw", [
+    "password=[redacted]synthetic-private",
+    "password=[redacted] synthetic-private",
+    "password=[redacted] reason=synthetic-private",
+    "credential=[redacted]\t synthetic-private",
+    "password=[redacted]synthetic-private; reason=连接失败",
+    "password=[redacted] synthetic-private; reason=connection refused",
+])
+def test_literal_redaction_marker_cannot_hide_suffix_in_real_export(tmp_path, raw):
+    logger = logging.getLogger("marker-boundary")
+    handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+    handler.setFormatter(SafeFormatter("%(message)s"))
+    logger.addHandler(handler)
+    try:
+        logger.error("TLS failed %s", raw)
+        assert export_logs(logger, tmp_path / "shared.log")
+        for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+            content = path.read_text()
+            assert "synthetic-private" not in content
+            assert "TLS failed" in content
+            if "; reason=" in raw:
+                assert raw[raw.index("; reason="):] in content
+            assert sanitize_text(content) == content
+    finally:
+        logger.removeHandler(handler)
+        handler.close()

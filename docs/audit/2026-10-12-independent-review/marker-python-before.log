@@ -1,0 +1,176 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0
+rootdir: /workspace/cs2-demo-analysis-kit/python
+configfile: pyproject.toml
+collected 22 items / 17 deselected / 5 selected
+
+tests/test_diagnostics.py FFFFF                                          [100%]
+
+=================================== FAILURES ===================================
+_ test_literal_redaction_marker_cannot_hide_suffix_in_real_export[password=[redacted]synthetic-private] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-6/test_literal_redaction_marker_0')
+raw = 'password=[redacted]synthetic-private'
+
+    @pytest.mark.parametrize("raw", [
+        "password=[redacted]synthetic-private",
+        "password=[redacted] synthetic-private",
+        "credential=[redacted]\t synthetic-private",
+        "password=[redacted]synthetic-private; reason=连接失败",
+        "password=[redacted] synthetic-private; reason=connection refused",
+    ])
+    def test_literal_redaction_marker_cannot_hide_suffix_in_real_export(tmp_path, raw):
+        logger = logging.getLogger("marker-boundary")
+        handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+        handler.setFormatter(SafeFormatter("%(message)s"))
+        logger.addHandler(handler)
+        try:
+            logger.error("TLS failed %s", raw)
+            assert export_logs(logger, tmp_path / "shared.log")
+            for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+                content = path.read_text()
+>               assert "synthetic-private" not in content
+E               AssertionError: assert 'synthetic-private' not in 'TLS failed ...ic-private\n'
+E
+E                 'synthetic-private' is contained here:
+E                   TLS failed password=[redacted]synthetic-private
+E                 ?                               +++++++++++++++++
+
+tests/test_diagnostics.py:224: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    marker-boundary:test_diagnostics.py:220 TLS failed password=[redacted]synthetic-private
+_ test_literal_redaction_marker_cannot_hide_suffix_in_real_export[password=[redacted] synthetic-private] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-6/test_literal_redaction_marker_1')
+raw = 'password=[redacted] synthetic-private'
+
+    @pytest.mark.parametrize("raw", [
+        "password=[redacted]synthetic-private",
+        "password=[redacted] synthetic-private",
+        "credential=[redacted]\t synthetic-private",
+        "password=[redacted]synthetic-private; reason=连接失败",
+        "password=[redacted] synthetic-private; reason=connection refused",
+    ])
+    def test_literal_redaction_marker_cannot_hide_suffix_in_real_export(tmp_path, raw):
+        logger = logging.getLogger("marker-boundary")
+        handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+        handler.setFormatter(SafeFormatter("%(message)s"))
+        logger.addHandler(handler)
+        try:
+            logger.error("TLS failed %s", raw)
+            assert export_logs(logger, tmp_path / "shared.log")
+            for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+                content = path.read_text()
+>               assert "synthetic-private" not in content
+E               AssertionError: assert 'synthetic-private' not in 'TLS failed ...ic-private\n'
+E
+E                 'synthetic-private' is contained here:
+E                   TLS failed password=[redacted] synthetic-private
+E                 ?                                +++++++++++++++++
+
+tests/test_diagnostics.py:224: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    marker-boundary:test_diagnostics.py:220 TLS failed password=[redacted] synthetic-private
+_ test_literal_redaction_marker_cannot_hide_suffix_in_real_export[credential=[redacted]\t synthetic-private] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-6/test_literal_redaction_marker_2')
+raw = 'credential=[redacted]\t synthetic-private'
+
+    @pytest.mark.parametrize("raw", [
+        "password=[redacted]synthetic-private",
+        "password=[redacted] synthetic-private",
+        "credential=[redacted]\t synthetic-private",
+        "password=[redacted]synthetic-private; reason=连接失败",
+        "password=[redacted] synthetic-private; reason=connection refused",
+    ])
+    def test_literal_redaction_marker_cannot_hide_suffix_in_real_export(tmp_path, raw):
+        logger = logging.getLogger("marker-boundary")
+        handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+        handler.setFormatter(SafeFormatter("%(message)s"))
+        logger.addHandler(handler)
+        try:
+            logger.error("TLS failed %s", raw)
+            assert export_logs(logger, tmp_path / "shared.log")
+            for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+                content = path.read_text()
+>               assert "synthetic-private" not in content
+E               AssertionError: assert 'synthetic-private' not in 'TLS failed ...ic-private\n'
+E
+E                 'synthetic-private' is contained here:
+E                   TLS failed credential=[redacted]	 synthetic-private
+E                 ?                                 	 +++++++++++++++++
+
+tests/test_diagnostics.py:224: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    marker-boundary:test_diagnostics.py:220 TLS failed credential=[redacted]	 synthetic-private
+_ test_literal_redaction_marker_cannot_hide_suffix_in_real_export[password=[redacted]synthetic-private; reason=\u8fde\u63a5\u5931\u8d25] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-6/test_literal_redaction_marker_3')
+raw = 'password=[redacted]synthetic-private; reason=连接失败'
+
+    @pytest.mark.parametrize("raw", [
+        "password=[redacted]synthetic-private",
+        "password=[redacted] synthetic-private",
+        "credential=[redacted]\t synthetic-private",
+        "password=[redacted]synthetic-private; reason=连接失败",
+        "password=[redacted] synthetic-private; reason=connection refused",
+    ])
+    def test_literal_redaction_marker_cannot_hide_suffix_in_real_export(tmp_path, raw):
+        logger = logging.getLogger("marker-boundary")
+        handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+        handler.setFormatter(SafeFormatter("%(message)s"))
+        logger.addHandler(handler)
+        try:
+            logger.error("TLS failed %s", raw)
+            assert export_logs(logger, tmp_path / "shared.log")
+            for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+                content = path.read_text()
+>               assert "synthetic-private" not in content
+E               AssertionError: assert 'synthetic-private' not in 'TLS failed ...eason=连接失败\n'
+E
+E                 'synthetic-private' is contained here:
+E                   TLS failed password=[redacted]synthetic-private; reason=连接失败
+E                 ?                               +++++++++++++++++
+
+tests/test_diagnostics.py:224: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    marker-boundary:test_diagnostics.py:220 TLS failed password=[redacted]synthetic-private; reason=连接失败
+_ test_literal_redaction_marker_cannot_hide_suffix_in_real_export[password=[redacted] synthetic-private; reason=connection refused] _
+
+tmp_path = PosixPath('/tmp/pytest-of-agent/pytest-6/test_literal_redaction_marker_4')
+raw = 'password=[redacted] synthetic-private; reason=connection refused'
+
+    @pytest.mark.parametrize("raw", [
+        "password=[redacted]synthetic-private",
+        "password=[redacted] synthetic-private",
+        "credential=[redacted]\t synthetic-private",
+        "password=[redacted]synthetic-private; reason=连接失败",
+        "password=[redacted] synthetic-private; reason=connection refused",
+    ])
+    def test_literal_redaction_marker_cannot_hide_suffix_in_real_export(tmp_path, raw):
+        logger = logging.getLogger("marker-boundary")
+        handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+        handler.setFormatter(SafeFormatter("%(message)s"))
+        logger.addHandler(handler)
+        try:
+            logger.error("TLS failed %s", raw)
+            assert export_logs(logger, tmp_path / "shared.log")
+            for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+                content = path.read_text()
+>               assert "synthetic-private" not in content
+E               AssertionError: assert 'synthetic-private' not in 'TLS failed ...on refused\n'
+E
+E                 'synthetic-private' is contained here:
+E                   TLS failed password=[redacted] synthetic-private; reason=connection refused
+E                 ?                                +++++++++++++++++
+
+tests/test_diagnostics.py:224: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    marker-boundary:test_diagnostics.py:220 TLS failed password=[redacted] synthetic-private; reason=connection refused
+=========================== short test summary info ============================
+FAILED tests/test_diagnostics.py::test_literal_redaction_marker_cannot_hide_suffix_in_real_export[password=[redacted]synthetic-private]
+FAILED tests/test_diagnostics.py::test_literal_redaction_marker_cannot_hide_suffix_in_real_export[password=[redacted] synthetic-private]
+FAILED tests/test_diagnostics.py::test_literal_redaction_marker_cannot_hide_suffix_in_real_export[credential=[redacted]\t synthetic-private]
+FAILED tests/test_diagnostics.py::test_literal_redaction_marker_cannot_hide_suffix_in_real_export[password=[redacted]synthetic-private; reason=\u8fde\u63a5\u5931\u8d25]
+FAILED tests/test_diagnostics.py::test_literal_redaction_marker_cannot_hide_suffix_in_real_export[password=[redacted] synthetic-private; reason=connection refused]
+======================= 5 failed, 17 deselected in 0.04s =======================

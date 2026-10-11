@@ -1,0 +1,51 @@
+$ pnpm -r --if-present build
+packages/maps build$ node -e "require('node:fs').rmSync('dist', { recursive: true, force: true })" && tsc -b --force
+packages/tournament build$ tsc -p tsconfig.json
+packages/tournament build: Done
+packages/maps build: Done
+apps/rivalhub-uploader build$ tsc -b && vite build
+apps/dak-studio build$ tsc -b && vite build
+apps/rivalhub-uploader build: vite v8.3.2 building client environment for production...
+apps/rivalhub-uploader build: transforming...
+apps/dak-studio build: (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+apps/dak-studio build:   - `__dirname` (vite.config.ts:10:29). Use `import.meta.dirname` instead
+apps/dak-studio build: Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+apps/dak-studio build: vite v8.3.2 building client environment for production...
+apps/dak-studio build: transforming...
+apps/rivalhub-uploader build: ✓ 2040 modules transformed.
+apps/rivalhub-uploader build: rendering chunks...
+apps/rivalhub-uploader build: computing gzip size...
+apps/rivalhub-uploader build: dist/index.html                   3.51 kB │ gzip:   1.55 kB
+apps/rivalhub-uploader build: dist/assets/index-DUtAkRxc.css    7.40 kB │ gzip:   2.27 kB
+apps/rivalhub-uploader build: dist/assets/index-Dcq5h_N4.js   538.94 kB │ gzip: 161.35 kB
+apps/rivalhub-uploader build:
+apps/rivalhub-uploader build: ✓ built in 500ms
+apps/rivalhub-uploader build: [plugin builtin:vite-reporter]
+apps/rivalhub-uploader build: (!) Some chunks are larger than 500 kB after minification. Consider:
+apps/rivalhub-uploader build: - Using dynamic import() to code-split the application
+apps/rivalhub-uploader build: - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+apps/rivalhub-uploader build: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+apps/rivalhub-uploader build: Done
+apps/dak-studio build: ✓ 2267 modules transformed.
+apps/dak-studio build: rendering chunks...
+apps/dak-studio build: computing gzip size...
+apps/dak-studio build: dist/index.html                                      0.62 kB │ gzip:     0.41 kB
+apps/dak-studio build: dist/assets/de_anubis-D-LxBex2.json              1,134.89 kB │ gzip:   247.67 kB
+apps/dak-studio build: dist/assets/de_overpass-BxOGZsdV.json            1,480.67 kB │ gzip:   315.37 kB
+apps/dak-studio build: dist/assets/de_inferno-D3wAlmqD.json             1,636.92 kB │ gzip:   379.70 kB
+apps/dak-studio build: dist/assets/de_ancient-Cqo4jjas.json             1,679.97 kB │ gzip:   389.22 kB
+apps/dak-studio build: dist/assets/de_nuke-DhSYCaYl.json                1,911.73 kB │ gzip:   387.19 kB
+apps/dak-studio build: dist/assets/de_mirage-BBlp-R9Z.json              2,123.83 kB │ gzip:   473.30 kB
+apps/dak-studio build: dist/assets/de_dust2-CIbm_rmp.json               2,295.23 kB │ gzip:   534.61 kB
+apps/dak-studio build: dist/assets/pkg-worker-DKZenPpK.js               6,165.30 kB
+apps/dak-studio build: dist/assets/sample-pro-finals-2026-BSmC_T79.zip  7,480.75 kB
+apps/dak-studio build: dist/assets/index-BsOxS3U5.css                     130.56 kB │ gzip:    22.21 kB
+apps/dak-studio build: dist/assets/index-DUzxSB7z.js                    7,052.78 kB │ gzip: 1,173.64 kB
+apps/dak-studio build:
+apps/dak-studio build: [plugin builtin:vite-reporter]
+apps/dak-studio build: (!) Some chunks are larger than 500 kB after minification. Consider:
+apps/dak-studio build: - Using dynamic import() to code-split the application
+apps/dak-studio build: - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+apps/dak-studio build: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+apps/dak-studio build: ✓ built in 1.89s
+apps/dak-studio build: Done

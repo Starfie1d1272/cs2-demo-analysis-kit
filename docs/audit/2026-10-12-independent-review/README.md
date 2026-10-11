@@ -99,3 +99,16 @@ push时GitHub通知default branch存在一个High Dependabot告警#38，但GET�
 返修新增代码继续等待父会话独立复审；自身测试与源码核对不称为独立审核通过。
 
 最终本地检查：130 files / **844 fast TS**、**8真实ZIP integration**、**146 Python**、sample analyze、全工作区typecheck、Studio build、ruff与diff-check通过；build保留既有chunk-size warning。完整fast首次返修运行发现tri路径占位符预期差异，记录在本地 `review-followup-all-ts.log`；上述脱敏安全取舍明确后再运行才得到最终844通过。
+
+
+## PR #95 第二次独立复审：literal marker 后缀
+
+父会话在 `519db1cf` 指出 `[redacted]` 备选缺值结束边界。本次新增反证通过真实 `normalizeDiagnostic(Error)` 和 Python `SafeFormatter→FileHandler→export_logs`，各5种合成输入在修前全部失败：marker紧接秘密、marker后空格/制表符再接秘密，以及带分号分隔安全中英文reason的组合。修前TS旧回归30条通过并不能否定新增5条泄漏，Python亦同。
+
+最终取消裸 `[redacted]` 特殊备选，原始marker和后缀始终按普通unquoted值一起脱敏。quoted凭据的替换结果保留原引号，因此下次按已有quoted解析边界处理，可保留后面的安全原因，无需相信marker来自上一轮，也无需引入新的reason字段语法。没有明确引号/分隔符的值段继续保守整体抹除，不以一个空格推定秘密结束。新增 `password=[redacted] reason=synthetic-private` 反证防止把貌似reason字段的秘密后缀特殊放过。quoted安全中英文原因、明确分隔原因、TLS前置原因均保留；二次normalize和实际导出再脱敏幂等。
+
+`marker-runtime-before-after.log` 对精确旧head `519db1cf` 与最终源码重放全部6例：真实TS normalizeDiagnostic和Python实际handler/export各从6/6泄漏变为0/6；安全原因保留且两端幂等。旧head同时幂等又泄漏，证明幂等本身不是安全验收。之前PR返修章节描述的是当时实现，这里的无裸marker分支方案取代它。
+
+证据：`marker-ts-before.log` / `marker-python-before.log` 各5失败；`marker-ts-after.log` 包含36 diagnostic+8 client通过；`marker-python-after.log` 23通过，包含真实文件落盘和导出两端检查。仅使用合成秘密；未将旧head绿灯、自身回归通过称为独立验收。回执恢复与其他issue实现本轮未修改。
+
+本轮最终完整检查：130 files / **850 fast TS**、**8真实ZIP integration**、**152 Python**，另 sample analyze、全工作区typecheck/build、ruff与diff-check通过。新增修复仍需父会话独立复审，未merge或发布。

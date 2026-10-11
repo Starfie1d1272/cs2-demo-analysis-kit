@@ -1,0 +1,23 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0
+rootdir: /workspace/cs2-demo-analysis-kit/python
+configfile: pyproject.toml
+collected 152 items
+
+tests/test_credentials.py ..........................                     [ 17%]
+tests/test_diagnostics.py .......................                        [ 32%]
+tests/test_event_packages.py .....                                       [ 35%]
+tests/test_export_jobs.py ......                                         [ 39%]
+tests/test_installer.py ..........                                       [ 46%]
+tests/test_library_maintenance.py ...                                    [ 48%]
+tests/test_rivalhub_bridge.py .....                                      [ 51%]
+tests/test_rivalhub_uploader.py ........................................ [ 77%]
+                                                                         [ 77%]
+tests/test_selection_diagnostics.py ......                               [ 81%]
+tests/test_smoke.py ...                                                  [ 83%]
+tests/test_storage_configuration.py ..                                   [ 84%]
+tests/test_studio_diagnostics.py .......                                 [ 89%]
+tests/test_updater.py ...............                                    [ 99%]
+tests/test_uploader_webview_bridge.py .                                  [100%]
+
+============================= 152 passed in 1.12s ==============================

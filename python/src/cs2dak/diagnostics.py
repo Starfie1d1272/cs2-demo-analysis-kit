@@ -45,9 +45,15 @@ def sanitize_text(value, limit: int = 2000) -> str:
                   r"token|password|passwd|credential|secret|pairing[_-]?code|device[_-]?code|client[_-]?secret|api[_-]?key")
     # JSON quoted strings can contain escaped quotes; consume the complete value.
     quoted_value = r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\''
+    # Retain quoted boundaries for another pass; never trust a bare marker from input.
+    def redact_credential(match):
+        value = match.group(2)
+        quote = value[0] if value.startswith(('"', "'")) else ""
+        return match.group(1) + quote + "[redacted]" + quote
+
     text = re.sub(
-        rf"(?i)([\"']?(?:{secret_key})[\"']?\s*[:=]\s*)(?:{quoted_value}|\[redacted\]|[^\r\n,;}}]+)",
-        r"\1[redacted]", text,
+        rf"(?i)([\"']?(?:{secret_key})[\"']?\s*[:=]\s*)({quoted_value}|[^\r\n,;}}]+)",
+        redact_credential, text,
     )
     text = re.sub(
         rf"(?i)([\"']?(?:set-cookie|cookie)[\"']?\s*[:=]\s*)(?:{quoted_value}|[^\r\n]+)",

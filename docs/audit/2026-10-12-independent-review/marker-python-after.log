@@ -1,0 +1,9 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0
+rootdir: /workspace/cs2-demo-analysis-kit/python
+configfile: pyproject.toml
+collected 23 items
+
+tests/test_diagnostics.py .......................                        [100%]
+
+============================== 23 passed in 0.85s ==============================

@@ -81,3 +81,20 @@ describe("runtime diagnostic credential fragments", () => {
     expect(safe.message).toContain(message.slice(message.indexOf("reason=")));
     expect(normalizeDiagnostic(safe)).toEqual(safe);
   });
+
+describe("literal redaction marker value boundaries", () => {
+  it.each([
+    "password=[redacted]synthetic-private",
+    "password=[redacted] synthetic-private",
+    "password=[redacted] reason=synthetic-private",
+    "credential=[redacted]\t synthetic-private",
+    "password=[redacted]synthetic-private; reason=连接失败",
+    "password=[redacted] synthetic-private; reason=connection refused",
+  ])("does not let a literal marker hide an unredacted suffix: %s", message => {
+    const diagnostic = normalizeDiagnostic(new Error(`TLS failed ${message}`));
+    expect(diagnostic.message).not.toContain("synthetic-private");
+    expect(diagnostic.message).toContain("TLS failed");
+    if (message.includes("; reason=")) expect(diagnostic.message).toContain(message.slice(message.indexOf("; reason=")));
+    expect(normalizeDiagnostic(diagnostic)).toEqual(diagnostic);
+  });
+});

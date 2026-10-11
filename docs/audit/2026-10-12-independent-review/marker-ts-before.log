@@ -1,0 +1,98 @@
+
+ RUN  v5.0.3 /workspace/cs2-demo-analysis-kit
+
+ ❯ packages/rivalhub-upload/src/diagnostics.test.ts (35 tests | 5 failed) 15ms
+   ❯ literal redaction marker value boundaries (5)
+     × does not let a literal marker hide an unredacted suffix: password=[redacted]synthetic-private 3ms
+     × does not let a literal marker hide an unredacted suffix: password=[redacted] synthetic-private 0ms
+     × does not let a literal marker hide an unredacted suffix: credential=[redacted]	 synthetic-private 0ms
+     × does not let a literal marker hide an unredacted suffix: password=[redacted]synthetic-private; reason=连接失败 1ms
+     × does not let a literal marker hide an unredacted suffix: password=[redacted] synthetic-private; reason=connection refused 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/rivalhub-upload/src/diagnostics.test.ts > literal redaction marker value boundaries > does not let a literal marker hide an unredacted suffix: password=[redacted]synthetic-private
+AssertionError: expected 'TLS failed password=[redacted]synthet…' not to contain 'synthetic-private'
+
+Expected: "synthetic-private"
+Received: "TLS failed password=[redacted]synthetic-private"
+
+ ❯ packages/rivalhub-upload/src/diagnostics.test.ts:94:36
+     92|   ])("does not let a literal marker hide an unredacted suffix: %s", me…
+     93|     const diagnostic = normalizeDiagnostic(new Error(`TLS failed ${mes…
+     94|     expect(diagnostic.message).not.toContain("synthetic-private");
+       |                                    ^
+     95|     expect(diagnostic.message).toContain("TLS failed");
+     96|     if (message.includes("; reason=")) expect(diagnostic.message).toCo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  packages/rivalhub-upload/src/diagnostics.test.ts > literal redaction marker value boundaries > does not let a literal marker hide an unredacted suffix: password=[redacted] synthetic-private
+AssertionError: expected 'TLS failed password=[redacted] synthe…' not to contain 'synthetic-private'
+
+Expected: "synthetic-private"
+Received: "TLS failed password=[redacted] synthetic-private"
+
+ ❯ packages/rivalhub-upload/src/diagnostics.test.ts:94:36
+     92|   ])("does not let a literal marker hide an unredacted suffix: %s", me…
+     93|     const diagnostic = normalizeDiagnostic(new Error(`TLS failed ${mes…
+     94|     expect(diagnostic.message).not.toContain("synthetic-private");
+       |                                    ^
+     95|     expect(diagnostic.message).toContain("TLS failed");
+     96|     if (message.includes("; reason=")) expect(diagnostic.message).toCo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  packages/rivalhub-upload/src/diagnostics.test.ts > literal redaction marker value boundaries > does not let a literal marker hide an unredacted suffix: credential=[redacted]	 synthetic-private
+AssertionError: expected 'TLS failed credential=[redacted]  syn…' not to contain 'synthetic-private'
+
+Expected: "synthetic-private"
+Received: "TLS failed credential=[redacted]  synthetic-private"
+
+ ❯ packages/rivalhub-upload/src/diagnostics.test.ts:94:36
+     92|   ])("does not let a literal marker hide an unredacted suffix: %s", me…
+     93|     const diagnostic = normalizeDiagnostic(new Error(`TLS failed ${mes…
+     94|     expect(diagnostic.message).not.toContain("synthetic-private");
+       |                                    ^
+     95|     expect(diagnostic.message).toContain("TLS failed");
+     96|     if (message.includes("; reason=")) expect(diagnostic.message).toCo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  packages/rivalhub-upload/src/diagnostics.test.ts > literal redaction marker value boundaries > does not let a literal marker hide an unredacted suffix: password=[redacted]synthetic-private; reason=连接失败
+AssertionError: expected 'TLS failed password=[redacted]synthet…' not to contain 'synthetic-private'
+
+Expected: "synthetic-private"
+Received: "TLS failed password=[redacted]synthetic-private; reason=连接失败"
+
+ ❯ packages/rivalhub-upload/src/diagnostics.test.ts:94:36
+     92|   ])("does not let a literal marker hide an unredacted suffix: %s", me…
+     93|     const diagnostic = normalizeDiagnostic(new Error(`TLS failed ${mes…
+     94|     expect(diagnostic.message).not.toContain("synthetic-private");
+       |                                    ^
+     95|     expect(diagnostic.message).toContain("TLS failed");
+     96|     if (message.includes("; reason=")) expect(diagnostic.message).toCo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  packages/rivalhub-upload/src/diagnostics.test.ts > literal redaction marker value boundaries > does not let a literal marker hide an unredacted suffix: password=[redacted] synthetic-private; reason=connection refused
+AssertionError: expected 'TLS failed password=[redacted] synthe…' not to contain 'synthetic-private'
+
+Expected: "synthetic-private"
+Received: "TLS failed password=[redacted] synthetic-private; reason=connection refused"
+
+ ❯ packages/rivalhub-upload/src/diagnostics.test.ts:94:36
+     92|   ])("does not let a literal marker hide an unredacted suffix: %s", me…
+     93|     const diagnostic = normalizeDiagnostic(new Error(`TLS failed ${mes…
+     94|     expect(diagnostic.message).not.toContain("synthetic-private");
+       |                                    ^
+     95|     expect(diagnostic.message).toContain("TLS failed");
+     96|     if (message.includes("; reason=")) expect(diagnostic.message).toCo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 30 passed (35)
+   Start at  19:39:08
+   Duration  154ms (transform 45%, tests 28%, import 21%, worker 5%)
