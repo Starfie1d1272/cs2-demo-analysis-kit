@@ -91,14 +91,14 @@ function baseDependencies(options: {
   const updateDemoSourcePath = options.updateDemoSourcePath ?? vi.fn(async () => undefined);
   const importDemo = options.importDemo ?? vi.fn(async (file: File) => ({ entry: localEntry(file.name), duplicate: false, replaced: false }));
   const matchMap = options.matchMap ?? vi.fn((): ReturnType<BatchMatch> => ({ status: "matched", candidate: candidate("target"), mode: "review_fallback" }));
-  const submit = options.submit ?? vi.fn(async (): Promise<Awaited<ReturnType<BatchSubmit>>> => ({ status: "synced", importId: null, matchMapId: "target", demoSha256, issues: [] }));
+  const submit = options.submit ?? vi.fn(async (evidence): Promise<Awaited<ReturnType<BatchSubmit>>> => ({ status: "synced", importId: null, matchMapId: evidence.target.matchMapId, demoSha256, issues: [] }));
   const loadPackage = vi.fn(async () => fakePackage);
   const linkMap = vi.fn(async () => undefined);
   const idempotencyKey = vi.fn(async () => "dak:test:key");
   const resolveParticipants = vi.fn(() => ({ identities: new Map(), orientation: "direct" as const }));
   const resolveParticipantsFromEventRoster = options.resolveParticipantsFromEventRoster ?? vi.fn(() => ({ identities: new Map(), orientation: "direct" as const }));
   const resolveParticipantsForReview = vi.fn(() => ({ identities: new Map(), orientation: "direct" as const }));
-  const buildEvidence = vi.fn(() => ({ contract: "test" }));
+  const buildEvidence = vi.fn((_pkg, target) => ({ contract: "test", target }));
   return { hashNativePath, findDemoBySha256, updateDemoSourcePath, importDemo, matchMap, submit, loadPackage, linkMap, idempotencyKey, resolveParticipants, resolveParticipantsFromEventRoster, resolveParticipantsForReview, buildEvidence };
 }
 
@@ -116,6 +116,20 @@ function runWith(
 }
 
 describe("RivalHub serial batch import", () => {
+  it.each(["map", "hash"])("rejects a mismatched %s receipt before success or local linking and continues the queue", async mismatch => {
+    let calls = 0;
+    const dependencies = baseDependencies({ submit: vi.fn(async () => ({
+      status: "synced" as const, importId: null,
+      matchMapId: ++calls === 1 && mismatch === "map" ? "other-map" : "target",
+      demoSha256: calls === 1 && mismatch === "hash" ? "b".repeat(64) : demoSha256,
+      issues: [],
+    })) });
+    const session = await runWith([new File(["zip"], "wrong.zip"), new File(["zip"], "next.zip")], dependencies);
+    expect(session.items[0]).toMatchObject({ phase: "failed", detail: expect.stringContaining("RESPONSE_MISMATCH") });
+    expect(session.items[0]?.localLink).toBeUndefined();
+    expect(session.items[1]?.phase).toBe("synced");
+    expect(dependencies.linkMap).toHaveBeenCalledExactlyOnceWith("series-target", "target", "entry:next.zip");
+  });
   it.each(["synced", "needs_attention"] as const)("preserves remote %s after local link failure; repairs the link without POST", async status => {
     const dependencies = baseDependencies({ submit: vi.fn(async () => ({ status, importId: null, matchMapId: "target", demoSha256, issues: [{ code: "REVIEW", message: "人工复核" }] })) });
     dependencies.linkMap = vi.fn(async () => { throw new Error("database locked", { cause: new Error("https://user:private@example.test?token=private") }); });

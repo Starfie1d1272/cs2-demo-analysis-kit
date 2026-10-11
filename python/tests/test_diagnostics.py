@@ -174,3 +174,26 @@ def test_export_preserves_latest_failure_in_large_logs(tmp_path, size):
     finally:
         logger.removeHandler(handler)
         handler.close()
+
+
+def test_runtime_credentials_are_redacted_through_log_and_export(tmp_path):
+    import logging
+
+    from cs2dak.diagnostics import SafeFormatter, export_logs
+
+    logger = logging.getLogger("independent-audit")
+    handler = logging.FileHandler(tmp_path / "runtime.log", encoding="utf-8")
+    handler.setFormatter(SafeFormatter("%(message)s"))
+    logger.addHandler(handler)
+    try:
+        for message in ("credential=synthetic-private", "passwd=synthetic-private", "password=two synthetic words", "password='two; synthetic words'"):
+            logger.error(message)
+        assert export_logs(logger, tmp_path / "shared.log")
+        for path in (tmp_path / "runtime.log", tmp_path / "shared.log"):
+            content = path.read_text()
+            assert "synthetic-private" not in content
+            assert "synthetic words" not in content
+            assert "redacted" in content
+    finally:
+        logger.removeHandler(handler)
+        handler.close()

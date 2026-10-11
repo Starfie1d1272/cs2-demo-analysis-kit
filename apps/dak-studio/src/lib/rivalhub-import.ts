@@ -481,6 +481,9 @@ export async function runRivalHubBatch(
       const evidence = deps.buildEvidence(pkg, target, participantMatch.identities, participantMatch.orientation);
       updateItem(index, { phase: "submitting", message: messageForPhase("submitting") });
       const response: EvidenceSubmissionResponse = await deps.submit(evidence, await deps.idempotencyKey(selected.map.id, evidence));
+      if (response.matchMapId !== selected.map.id || response.demoSha256.toLowerCase() !== localEntry.demoSha256.toLowerCase()) {
+        throw new Error("RESPONSE_MISMATCH：网站返回的比赛或 Demo 标识与本次提交不一致，请先刷新赛事或在网站核对；未建立本地关联");
+      }
       const reusedLocal = session.items[index]?.reusedLocal === true;
       updateItem(index, {
         phase: response.status === "synced" ? "synced" : "needs_attention",

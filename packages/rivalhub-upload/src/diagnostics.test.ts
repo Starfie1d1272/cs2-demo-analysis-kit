@@ -61,3 +61,12 @@ describe("safe diagnostics", () => {
     expect(result).toEqual({ message: "failed", code: "UPLOAD_FAILED" });
   });
 });
+
+describe("runtime diagnostic credential fragments", () => {
+  it.each(["credential=synthetic-private", "passwd=synthetic-private", "Basic c3ludGhldGljOnByaXZhdGU=", "password=two synthetic words", "password='two; synthetic words'"])("redacts %s through the runtime UI projection", message => {
+    const diagnostic = normalizeDiagnostic(new Error(message));
+    expect(diagnostic.message).not.toMatch(/synthetic-private|c3ludGhldGljOnByaXZhdGU=|synthetic words/);
+    expect(diagnostic.message).toContain("redacted");
+    expect(normalizeDiagnostic(diagnostic)).toEqual(diagnostic);
+  });
+});
