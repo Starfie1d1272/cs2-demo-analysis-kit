@@ -36,6 +36,7 @@ CloseApplications=yes
 RestartApplications=no
 UsePreviousAppDir=yes
 UninstallLogMode=append
+SetupLogging=yes
 
 [Languages]
 Name: "chinesesimp"; MessagesFile: "ChineseSimplified.isl"
@@ -59,6 +60,68 @@ Name: "{userdesktop}\RivalHub Demo Uploader"; Filename: "{app}\rivalhub-demo-upl
 Filename: "{app}\rivalhub-demo-uploader.exe"; Description: "启动 RivalHub Demo Uploader"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent
 
 [Code]
+var
+  InstallStage: String;
+
+procedure LogInstallStage(const Stage: String);
+begin
+  InstallStage := Stage;
+  Log('DAK installer stage=' + Stage);
+end;
+
+function InstallLogGuidance(): String;
+var
+  LogPath: String;
+begin
+  LogPath := ExpandConstant('{log}');
+  if LogPath <> '' then
+    Result := '本机安装日志：' + LogPath
+  else
+    Result := '未能取得安装日志位置；可在 Windows「运行」中输入 %TEMP% 查找本次 Setup Log。安装器未启动或临时目录不可写时，日志可能未生成。';
+  Result := Result + #13#10 +
+    '失败后先保留原报错和日志，根据错误修复目录权限、关闭占用程序或修复明确缺失的运行库后再试；不要关闭安全保护。' + #13#10 +
+    '日志只保存在本机，不会自动上传。分享副本前请替换用户名、个人路径和敏感内容，保留时间、阶段、错误与文件名；不要直接公开原日志。';
+end;
+
+procedure ShowInstallLogGuidance(Sender: TObject);
+begin
+  SuppressibleMsgBox(InstallLogGuidance(), mbInformation, MB_OK, IDOK);
+end;
+
+function InitializeSetup(): Boolean;
+begin
+  LogInstallStage('initialize');
+  Result := True;
+end;
+
+procedure InitializeWizard();
+var
+  LogButton: TNewButton;
+begin
+  LogButton := TNewButton.Create(WizardForm);
+  LogButton.Parent := WizardForm;
+  LogButton.Caption := '本机安装日志';
+  LogButton.Width := ScaleX(110);
+  LogButton.Height := WizardForm.CancelButton.Height;
+  LogButton.Left := ScaleX(8);
+  LogButton.Top := WizardForm.CancelButton.Top;
+  LogButton.OnClick := @ShowInstallLogGuidance;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  case CurStep of
+    ssInstall: LogInstallStage('install.files');
+    ssPostInstall: LogInstallStage('install.complete');
+    ssDone: LogInstallStage('done');
+  end;
+end;
+
+procedure DeinitializeSetup();
+begin
+  Log('DAK installer exit.lastStage=' + InstallStage);
+end;
+
 function HasContents(const Dir: String): Boolean;
 var
   Entry: TFindRec;
@@ -109,9 +172,11 @@ var
 begin
   Result := True;
   if CurPageID = wpSelectDir then begin
+    LogInstallStage('directory.validate');
     Problem := ValidateDirectory();
     if Problem <> '' then begin
-      SuppressibleMsgBox(Problem, mbError, MB_OK, IDOK);
+      LogInstallStage('directory.rejected');
+      SuppressibleMsgBox(Problem + #13#10 + InstallLogGuidance(), mbError, MB_OK, IDOK);
       Result := False;
     end;
   end;
@@ -123,19 +188,30 @@ var
   UserVersion, MachineVersion: String;
 begin
   // Also validates /VERYSILENT /DIR invocations which skip directory UI.
+  LogInstallStage('prepare.directory');
   Result := ValidateDirectory();
-  if Result <> '' then Exit;
+  if Result <> '' then begin
+    LogInstallStage('directory.rejected');
+    Result := Result + #13#10 + InstallLogGuidance();
+    Exit;
+  end;
+  LogInstallStage('prepare.netfx');
   if not RegQueryDWordValue(HKLM32, 'SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full', 'Release', Release) then
     Release := 0;
   if Release < 461808 then begin
+    LogInstallStage('runtime.netfx.rejected');
     Result := '需要 .NET Framework 4.7.2 或更高版本。官方 4.8 安装/修复：' + #13#10 +
-      'https://dotnet.microsoft.com/en-us/download/dotnet-framework/net48';
+      'https://dotnet.microsoft.com/en-us/download/dotnet-framework/net48' + #13#10 + InstallLogGuidance();
     Exit;
   end;
+  LogInstallStage('prepare.webview2');
   RegQueryStringValue(HKCU, 'Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', UserVersion);
   RegQueryStringValue(HKLM32, 'Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', MachineVersion);
   if ((UserVersion = '') or (UserVersion = '0.0.0.0')) and
-     ((MachineVersion = '') or (MachineVersion = '0.0.0.0')) then
+     ((MachineVersion = '') or (MachineVersion = '0.0.0.0')) then begin
+    LogInstallStage('runtime.webview2.rejected');
     Result := '需要 Microsoft Edge WebView2 Evergreen Runtime（x64）。官方安装：' + #13#10 +
-      'https://developer.microsoft.com/en-us/microsoft-edge/webview2/#download-section';
+      'https://developer.microsoft.com/en-us/microsoft-edge/webview2/#download-section' + #13#10 + InstallLogGuidance();
+  end else
+    LogInstallStage('prepare.complete');
 end;

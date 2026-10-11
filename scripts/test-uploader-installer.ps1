@@ -6,18 +6,38 @@ if (!$env:RUNNER_TEMP) { throw 'Requires an isolated CI worker' }
 $target = Join-Path $root '程序 中文 空格'
 $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{7647899F-A612-4C70-9B49-B7D289609F32}_is1'
 if (Test-Path $key) { throw 'Existing uploader installation; refusing to touch it' }
-function Run-Setup($Exe, $Destination, $Success = $true) {
-    $process = Start-Process $Exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/TASKS=desktopicon', "/DIR=`"$Destination`"", "/LOG=`"$root/setup-$([guid]::NewGuid()).log`"") -Wait -PassThru
-    if ($Success -and $process.ExitCode -ne 0) { throw "Setup failed: $($process.ExitCode)" }
-    if (!$Success -and $process.ExitCode -eq 0) { throw 'Unsafe install was accepted' }
+function Run-Setup($Exe, $Destination, $Success = $true, [switch]$DefaultLog) {
+    $arguments = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/TASKS=desktopicon', "/DIR=`"$Destination`"")
+    $logPath = Join-Path $root "setup-$([guid]::NewGuid()).log"
+    $before = @(Get-ChildItem ([System.IO.Path]::GetTempPath()) -Filter 'Setup Log*.txt' -File | ForEach-Object FullName)
+    if (!$DefaultLog) { $arguments += "/LOG=`"$logPath`"" }
+    $process = Start-Process $Exe -ArgumentList $arguments -Wait -PassThru
+    if ($DefaultLog) {
+        $created = @(Get-ChildItem ([System.IO.Path]::GetTempPath()) -Filter 'Setup Log*.txt' -File | Where-Object { $_.FullName -notin $before })
+        if ($created.Count -ne 1) { throw "Expected one default local Setup log, found $($created.Count)" }
+        Copy-Item $created[0].FullName $logPath
+    }
+    if (!(Test-Path $logPath)) { throw 'Installer did not preserve its local log' }
+    $logText = Get-Content $logPath -Raw
+    if ($logText -notmatch 'DAK installer stage=initialize' -or $logText -notmatch 'DAK installer exit.lastStage=') { throw 'Missing installer stage evidence' }
+    if ($Success) {
+        if ($process.ExitCode -ne 0) { throw "Setup failed: $($process.ExitCode)" }
+        if ($logText -notmatch 'DAK installer stage=install.files' -or $logText -notmatch 'DAK installer stage=done') { throw 'Successful install stages were not logged' }
+    } else {
+        if ($process.ExitCode -eq 0) { throw 'Unsafe install was accepted' }
+        if ($logText -notmatch 'DAK installer stage=directory.rejected') { throw 'Directory rejection stage missing' }
+        # PrepareToInstall reports the same exact filename that the local-log button uses.
+        $actualLog = if ($DefaultLog) { $created[0].FullName } else { $logPath }
+        if (!$logText.Contains($actualLog) -or !$logText.Contains('本机安装日志') -or !$logText.Contains('分享副本前')) { throw 'Failed install lacks actual local log path or share guidance' }
+    }
 }
 New-Item -ItemType Directory -Force $root | Out-Null
 $foreign = Join-Path $root '陌生目录'
 New-Item -ItemType Directory $foreign | Out-Null
 Set-Content "$foreign/keep.txt" 'foreign data'
-Run-Setup $Installer $foreign $false
+Run-Setup $Installer $foreign $false -DefaultLog
 if ((Get-Content "$foreign/keep.txt") -ne 'foreign data') { throw 'Foreign file changed' }
-Run-Setup $Installer $target
+Run-Setup $Installer $target -DefaultLog
 $exe = Join-Path $target 'rivalhub-demo-uploader.exe'
 $dll = Join-Path $target '_internal/python312.dll'
 if (!(Test-Path $dll)) { throw 'Missing onedir DLL' }
