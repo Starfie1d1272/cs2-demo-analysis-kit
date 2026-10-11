@@ -1,6 +1,7 @@
 import "fake-indexeddb/auto";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadTrisManifest } from "./tri-assets";
+import * as tri from "./tri";
+import { downloadTri, loadTrisManifest } from "./tri-assets";
 
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
@@ -35,6 +36,16 @@ describe(".tri asset manifest", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(body, { status, headers: { "content-type": contentType } })));
     await expect(loadTrisManifest()).resolves.toBeNull();
     expect(diagnostics).toEqual([expect.objectContaining({ code })]);
+  });
+
+  it("keeps explicit install persistence failure distinct from malformed tri bytes", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new ArrayBuffer(36))));
+    const install = vi.spyOn(tri, "installTriBuffer").mockResolvedValue(false);
+    await expect(downloadTri("de_nuke")).rejects.toThrow("TRI_CACHE_WRITE_FAILED");
+    install.mockClear();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new ArrayBuffer(1))));
+    await expect(downloadTri("de_nuke")).rejects.toThrow("TRI_INVALID");
+    expect(install).not.toHaveBeenCalled();
   });
 
 });

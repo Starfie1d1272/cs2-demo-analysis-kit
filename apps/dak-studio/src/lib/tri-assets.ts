@@ -1,5 +1,5 @@
 import { reportDiagnostic } from "./worker-diagnostics";
-import { triDiagnostic } from "./tri-loading";
+import { isValidTriBuffer, triDiagnostic } from "./tri-loading";
 import { installTriBuffer, listInstalledTris } from "./tri";
 
 /**
@@ -106,7 +106,10 @@ export async function downloadTri(mapName: string): Promise<void> {
   if (contentType.includes("text/html")) throw new Error("资源不可达（无在线源或离线）");
   const buffer = await response.arrayBuffer();
   // 桌面端已落 overlay（tri_present 可见），IDB 写入对其只是冗余缓存；浏览器/dev 必须写 IDB。
-  if (!supportsNativeTri() && !(await installTriBuffer(mapName, buffer))) {
-    throw new Error(".tri 字节非法");
+  if (!supportsNativeTri()) {
+    if (!isValidTriBuffer(buffer)) throw new Error("TRI_INVALID：.tri 字节非法");
+    if (!await installTriBuffer(mapName, buffer)) {
+      throw new Error("TRI_CACHE_WRITE_FAILED：无法保存 .tri 缓存，请检查本机存储权限及可用空间");
+    }
   }
 }
