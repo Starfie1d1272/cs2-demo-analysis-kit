@@ -1,5 +1,5 @@
-import { RivalHubEvidenceQaError, safeQaDiagnostics } from "./diagnostics";
-export { RivalHubEvidenceQaError } from "./diagnostics";
+import { RivalHubEvidenceQaError, safeQaDiagnostics } from "./evidence-diagnostics";
+export { RivalHubEvidenceQaError } from "./evidence-diagnostics";
 import {
   aggregatePlayerRoundPerformanceFacts,
   analyzeDemoPackageForEvidence,

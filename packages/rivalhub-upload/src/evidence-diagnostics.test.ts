@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { safeQaDiagnostics, RivalHubEvidenceQaError } from "./diagnostics";
+import { safeQaDiagnostics, RivalHubEvidenceQaError } from "./evidence-diagnostics";
 import { sanitizeDiagnosticCode, sanitizeDiagnosticPath, sanitizeDiagnosticMessage } from "./diagnostic-safety";
 
 describe("safe evidence diagnostics", () => {
