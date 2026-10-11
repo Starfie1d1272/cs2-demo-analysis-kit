@@ -63,6 +63,21 @@ export function httpErrorFromResponse(status: number, body: unknown, requestId?:
   return failure;
 }
 
+function jsonReadCause(error: unknown): string {
+  // JSON parsers can embed response bytes in their exception messages. Extract
+  // only parser grammar and numeric locations; never forward the message itself.
+  const message = normalizeDiagnostic(error).message;
+  if (error instanceof SyntaxError) {
+    const reason = /^(Unexpected end of JSON input|Unexpected token|Unexpected non-whitespace character after JSON|Expected property name|Expected double-quoted property name|Unterminated string|Bad escaped character|Bad control character|Bad Unicode escape)/i.exec(message)?.[1] ?? "Invalid JSON syntax";
+    const position = /\bposition (\d{1,12})\b/i.exec(message)?.[1];
+    const location = /\bline (\d{1,12}) column (\d{1,12})\b/i.exec(message);
+    return `SyntaxError: ${reason}${position ? `; position ${position}` : ""}${location ? `; line ${location[1]} column ${location[2]}` : ""}`;
+  }
+  if (error instanceof TypeError) return "TypeError: response body could not be read or decoded";
+  if (error instanceof DOMException && error.name === "AbortError") return "AbortError: response body read was aborted";
+  return "Response body read or JSON decoding failed";
+}
+
 export async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try { response = await fetch(url, { ...init, cache: "no-store" }); }
@@ -75,8 +90,10 @@ export async function requestJson<T>(url: string, init?: RequestInit): Promise<T
   const requestId = response.headers.get("x-request-id") ?? undefined;
   let body: unknown;
   try { body = await response.json(); }
-  catch {
-    throw new RivalHubHttpError(response.status, "网站返回了无法解析的 JSON 响应", response.ok ? "INVALID_RESPONSE" : undefined, requestId);
+  catch (error) {
+    const failure = new RivalHubHttpError(response.status, "网站返回了无法解析的 JSON 响应", response.ok ? "INVALID_RESPONSE" : undefined, requestId);
+    failure.cause = jsonReadCause(error);
+    throw failure;
   }
   if (!response.ok) throw httpErrorFromResponse(response.status, body, requestId);
   return body as T;
