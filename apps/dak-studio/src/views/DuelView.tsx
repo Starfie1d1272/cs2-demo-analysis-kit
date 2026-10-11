@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DuelFinderRow, DuelInsightsModel, PlayerMechanicsRow } from "@cs2dak/contract";
 import { displayWeaponName, duelClassificationLabel } from "@cs2dak/presentation";
-import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
+import { getMapCalibration, worldToRadar } from "@cs2dak/maps/calibration";
 import { EmptyState, MetricInfo, Pagination } from "@cs2dak/react";
 import { displayTeamName } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";

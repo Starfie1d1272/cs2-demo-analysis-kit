@@ -77,15 +77,3 @@ export function zoneAt(zones: MapZones, x: number, y: number, z?: number): MapZo
   }
   return null;
 }
-
-/** 当前 CS2 现役图池（train 已移除）。保留给 legacy zone 资产枚举。 */
-export const ACTIVE_DUTY_MAPS = [
-  "de_ancient",
-  "de_anubis",
-  "de_dust2",
-  "de_inferno",
-  "de_mirage",
-  "de_nuke",
-  "de_overpass",
-] as const;
-export type ActiveDutyMap = (typeof ACTIVE_DUTY_MAPS)[number];

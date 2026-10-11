@@ -24,7 +24,7 @@ import {
   normalizeDemoPackage,
   type PlayerRoundPerformanceFacts,
 } from "@cs2dak/core";
-import { getMapCalibration, hasLowerLevel } from "@cs2dak/maps";
+import { getMapCalibration, hasLowerLevel } from "@cs2dak/maps/calibration";
 
 export function buildDemoViewModel(bundle: AnalysisBundle) {
   return {

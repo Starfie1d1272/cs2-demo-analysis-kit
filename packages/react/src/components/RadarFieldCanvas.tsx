@@ -15,7 +15,7 @@ import {
   hasLowerLevel,
   levelAt,
   type MapLevel,
-} from "@cs2dak/maps";
+} from "@cs2dak/maps/calibration";
 import { Pause, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
