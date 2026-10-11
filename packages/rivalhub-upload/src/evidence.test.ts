@@ -4,6 +4,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { DemoPackage, PackageKill } from "@cs2dak/contract";
 import { aggregatePlayerRoundPerformanceFacts, buildPlayerRoundPerformanceFacts, loadDemoPackageFromZip } from "@cs2dak/core/evidence";
 import { buildRivalHubDemoEvidenceV1, fixtureIdentity, fixtureTarget, matchRivalHubParticipants, matchRivalHubParticipantsForReview, normalizeRivalHubDemoPackage, resolveRivalHubParticipants, resolveRivalHubParticipantsFromEventRoster, resolveRivalHubParticipantsForReview, selectRivalHubMap, type RivalHubEvidenceTarget, type RivalHubTeamOrientation } from "./evidence";
+import { rivalHubEvidenceIdempotencyKey } from "./client";
+import type { RivalHubEvidenceSubmission } from "./contract";
 import { matchRivalHubMap, type RivalHubMatchCandidate } from "./match";
 import type { RivalHubRemoteMap, RivalHubRemotePlayer, RivalHubRemoteTeam } from "./contract";
 
@@ -278,6 +280,49 @@ describe("RivalHub online Demo matching", () => {
     ]);
   });
 
+  it("emits empty diagnostic issues for the zero-warning committed smoke ZIP", async () => {
+    const pkg = await loadDemoPackageFromZip(await readFile(resolve(process.cwd(), "fixtures/input/cologne-major-2026-stage3-smoke-de_nuke.zip")), { profile: "evidence" });
+    const target = { ...fixtureTarget(), expectedMapName: "de_nuke" };
+    const identities = new Map(pkg.players.map((player, index) => [player.steamId64, fixtureIdentity(player, index, target)]));
+    const evidence = buildRivalHubDemoEvidenceV1(pkg, target, identities);
+    expect((evidence.extensions as Record<string, any>)["cs2dak/diagnostics"].qa).toEqual({ issues: [], omittedIssueCount: 0 });
+  });
+
+  it("preserves multiple producer warning details without changing facts", () => {
+    const { pkg, identities } = evidencePackageWithTeamkill();
+    const modified = { ...pkg, kills: pkg.kills.map((kill) => ({ ...kill, victimPosition: { x: 0, y: 0, z: 0 } })) };
+    const evidence = buildRivalHubDemoEvidenceV1(modified, fixtureTarget(), identities);
+    const diagnostics = (evidence.extensions as Record<string, any>)["cs2dak/diagnostics"];
+    expect(diagnostics.qa.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "economy.coverage_incomplete", severity: "warning", path: "playerEconomies" }),
+      expect.objectContaining({ code: "spatial.no_real_kill_positions", severity: "warning", path: "kills" }),
+    ]));
+    expect((evidence.quality as any).qa.warningCount).toBe(diagnostics.qa.issues.length);
+  });
+
+  it("retains fixture warnings, capability reasons, stable retry hashes and unchanged facts", async () => {
+    const target = fixtureTarget();
+    const identities = new Map(stableFixture.players.map((player, index) => [player.steamId64, fixtureIdentity(player, index, target)]));
+    const first = buildRivalHubDemoEvidenceV1(stableFixture, target, identities);
+    const retry = buildRivalHubDemoEvidenceV1(stableFixture, target, identities);
+    const diagnostics = (first.extensions as Record<string, any>)["cs2dak/diagnostics"];
+    expect(diagnostics.version).toBe(1);
+    expect(diagnostics.qa.issues.length + diagnostics.qa.omittedIssueCount).toBe((first.quality as any).qa.issueCount);
+    expect(diagnostics.richKills.eventCount).toBe(stableFixture.kills.length);
+    const hash = (payload: Record<string, unknown>) => rivalHubEvidenceIdempotencyKey(target.matchMapId, payload as RivalHubEvidenceSubmission);
+    expect(await hash(retry)).toBe(await hash(first));
+    const oldPayload = { ...first, extensions: {}, source: { ...(first.source as object), producerVersion: "cs2dak-rivalhub-evidence/0.1.0" } };
+    expect(await hash(oldPayload)).not.toBe(await hash(first));
+    const withoutWeaponNames = buildRivalHubDemoEvidenceV1({
+      ...stableFixture,
+      kills: stableFixture.kills.map((kill) => ({ ...kill, killerActiveWeapon: null })),
+    }, target, identities);
+    expect(withoutWeaponNames.sourceFacts).toEqual(first.sourceFacts);
+    expect(withoutWeaponNames.semanticFacts).toEqual(first.semanticFacts);
+    expect(withoutWeaponNames.summaries).toEqual(first.summaries);
+    expect((withoutWeaponNames.extensions as Record<string, any>)["cs2dak/diagnostics"].richKills.namedActiveWeaponEventCount).toBe(0);
+  });
+
   it("keeps Evidence V1 output byte-for-byte equivalent while omitting optional streams", () => {
     const target = fixtureTarget();
     const identities = new Map(stableFixture.players.map((player, index) => [player.steamId64, fixtureIdentity(player, index, target)]));
@@ -385,6 +430,10 @@ describe("RivalHub online Demo matching", () => {
     };
 
     expect(() => buildRivalHubDemoEvidenceV1(mismatched, target, identities)).toThrow("Evidence blocked by Core QA: performance.parity_mismatch");
+    expect(() => buildRivalHubDemoEvidenceV1(mismatched, target, identities)).toThrow(/playerStats.deaths.*expected=.*actual=/);
+    try { buildRivalHubDemoEvidenceV1(mismatched, target, identities); } catch (error) {
+      expect((error as Error).message).toContain("[player]");
+    }
   });
 
   it("uses the canonical Steam64 lineup and rejects a missing member", () => {
