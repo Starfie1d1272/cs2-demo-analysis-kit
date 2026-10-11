@@ -109,6 +109,72 @@ export interface PlayerRoundPerformanceFacts {
   manState: PlayerRoundManStateFact[];
 }
 
+// A private owner snapshot detects mutations without maintaining a second event calculator.
+const canonicalSnapshots = new WeakMap<DemoPackage, { source: string; facts: string }>();
+function comparableJson(value: unknown, path: string): string {
+  return JSON.stringify(value, function (field, item) {
+    const original = this[field];
+    if (original !== null && typeof original === "object" && original !== item) {
+      throw new Error(`Core performance facts violate source invariant: ${path}.${field} custom serialization`);
+    }
+    if (typeof item === "number" && !Number.isFinite(item)) {
+      throw new Error(`Core performance facts violate source invariant: ${path}.${field} non-finite number`);
+    }
+    return field === "name" ? undefined : item;
+  });
+}
+function performanceSource(pkg: DemoPackage): string {
+  // Tick/replay/research streams and the retired playerStats oracle are not performance inputs.
+  return comparableJson([pkg.players.map(player => [player.steamId64, player.teamKey]), pkg.rounds, pkg.playerEconomies, pkg.kills, pkg.damages,
+    pkg.grenades, pkg.blinds, pkg.bombs, pkg.clutches], "source");
+}
+function rememberCanonicalFacts(pkg: DemoPackage, facts: PlayerRoundPerformanceFacts): PlayerRoundPerformanceFacts {
+  canonicalSnapshots.set(pkg, { source: performanceSource(pkg), facts: comparableJson([facts.playerRounds, facts.manState], "facts") });
+  return facts;
+}
+function assertOwnerValue(expected: unknown, actual: unknown, path: string): void {
+  const fail = () => { throw new Error(`Core performance facts violate source invariant: ${path}`); };
+  if (typeof expected === "number") {
+    if (typeof actual !== "number" || !Number.isFinite(actual) || actual !== expected) fail();
+  } else if (Array.isArray(expected)) {
+    if (!Array.isArray(actual) || actual.length !== expected.length) fail();
+    const rows = actual as unknown[];
+    const first = expected[0] as Record<string, unknown> | undefined;
+    const identity = first && typeof first === "object"
+      ? "steamId64" in first && "roundNumber" in first ? ["roundNumber", "steamId64"] : "weapon" in first ? ["weapon"] : null
+      : null;
+    const rowKey = (row: unknown) => JSON.stringify(identity!.map(field => (row as Record<string, unknown> | null)?.[field]));
+    const byIdentity = identity ? new Map(rows.map(row => [rowKey(row), row])) : null;
+    if (byIdentity && byIdentity.size !== rows.length) fail();
+    expected.forEach((value, index) => assertOwnerValue(value, byIdentity ? byIdentity.get(rowKey(value)) : rows[index], `${path}[${index}]`));
+  } else if (expected !== null && typeof expected === "object") {
+    if (actual === null || typeof actual !== "object" || Array.isArray(actual)) fail();
+    for (const [field, value] of Object.entries(expected)) {
+      // Labels and unknown historical metadata are not performance identity or truth.
+      if (field !== "name") assertOwnerValue(value, (actual as Record<string, unknown>)[field], `${path}.${field}`);
+    }
+  } else if (actual !== expected) fail();
+}
+/** Validate supplied facts through the single owner; no exporter aggregate or second event rules. */
+export function assertPlayerRoundPerformanceFacts(pkg: DemoPackage, facts: PlayerRoundPerformanceFacts): void {
+  if (!Array.isArray(facts?.playerRounds) || !Array.isArray(facts?.manState)
+    || facts.playerRounds.some(row => row === null || typeof row !== "object" || typeof row.name !== "string")) {
+    throw new Error("Core performance facts violate source invariant: facts structure");
+  }
+  const source = performanceSource(pkg);
+  let snapshot = canonicalSnapshots.get(pkg);
+  if (!snapshot || snapshot.source !== source) {
+    // Untrusted serialized facts or a changed source require one build by the canonical owner.
+    buildPlayerRoundPerformanceFacts(pkg);
+    snapshot = canonicalSnapshots.get(pkg)!;
+  }
+  if (comparableJson([facts.playerRounds, facts.manState], "facts") === snapshot.facts) return;
+  // Reordered object fields or historical metadata take the structural comparison path.
+  const [playerRounds, manState] = JSON.parse(snapshot.facts) as unknown[];
+  assertOwnerValue(playerRounds, facts.playerRounds, "playerRounds");
+  assertOwnerValue(manState, facts.manState, "manState");
+}
+
 export interface PlayerPerformanceWeaponAggregate extends PlayerRoundPerformanceWeaponFact {}
 
 export interface PlayerPerformanceClutchAggregate {
@@ -191,7 +257,7 @@ function roundAt(pkg: DemoPackage, roundNumber: number, context: string): DemoPa
   return round;
 }
 
-export function emptyPerformanceUtility(): PlayerRoundPerformanceUtilityFact {
+function emptyUtility(): PlayerRoundPerformanceUtilityFact {
   return {
     flashesThrown: 0,
     enemyBlindSeconds: 0,
@@ -243,7 +309,7 @@ function emptyRoundFact(
     combatDeaths: 0,
     bombDeaths: 0,
     clutch: null,
-    utility: emptyPerformanceUtility(),
+    utility: emptyUtility(),
     objective: emptyObjective(),
     weapons: new Map(),
     equipmentValue: economy?.equipmentValue ?? null,
@@ -278,15 +344,6 @@ function sortKills(pkg: DemoPackage): Array<{ kill: DemoPackage["kills"][number]
     .sort((left, right) => left.kill.roundNumber - right.kill.roundNumber || left.kill.tick - right.kill.tick || left.index - right.index);
 }
 
-/** Shared event classification for the producer and its source invariants. */
-export function orderedPerformanceKills(pkg: DemoPackage) {
-  return sortKills(pkg).map(({ kill }) => {
-    const killer = kill.killerIndex === null ? null : playerAt(pkg, kill.killerIndex, "kills");
-    const victim = playerAt(pkg, kill.victimIndex, "kills");
-    return { kill, killer, victim, playerKill: isPlayerKill(kill, killer), enemyKill: isEnemyPlayerKill(kill, killer, victim) };
-  });
-}
-
 function addKastTags(row: MutablePlayerRound): void {
   if (row.kills > 0) row.kastTags.add("kill");
   if (row.assists > 0) row.kastTags.add("assist");
@@ -309,8 +366,11 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
   const rounds = pkg.rounds ?? [];
   const players = pkg.players ?? [];
   const roundsByNumber = new Map(rounds.map((round) => [round.roundNumber, round]));
+  if (roundsByNumber.size !== rounds.length || new Set(players.map(player => player.steamId64)).size !== players.length) {
+    throw new Error("Core performance source has duplicate player or round identity");
+  }
   const rows = new Map<string, MutablePlayerRound>();
-  if (rounds.length === 0) return { playerRounds: [], manState: [] };
+  if (rounds.length === 0) return rememberCanonicalFacts(pkg, { playerRounds: [], manState: [] });
   for (const round of rounds) {
     for (const [playerIndex, player] of players.entries()) {
       rows.set(keyFor(round.roundNumber, playerIndex), emptyRoundFact(pkg, round, player, playerIndex));
@@ -325,7 +385,7 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
     return row;
   };
 
-  const sortedKills = orderedPerformanceKills(pkg);
+  const sortedKills = sortKills(pkg);
   const openingByRound = new Map<number, DemoPackage["kills"][number]>();
   const aliveByRound = new Map<number, { teamA: Set<number>; teamB: Set<number> }>();
   for (const round of rounds) {
@@ -335,7 +395,11 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
     });
   }
   const manState: PlayerRoundManStateFact[] = [];
-  for (const { kill, killer, victim, playerKill, enemyKill } of sortedKills) {
+  for (const { kill } of sortedKills) {
+    const killer = kill.killerIndex === null ? null : playerAt(pkg, kill.killerIndex, "kills");
+    const victim = playerAt(pkg, kill.victimIndex, "kills");
+    const playerKill = isPlayerKill(kill, killer);
+    const enemyKill = isEnemyPlayerKill(kill, killer, victim);
     // Tournament opening-duel semantics require the first valid enemy-player
     // kill. World deaths, suicides and teamkills update death state but are
     // not an opening duel.
@@ -401,8 +465,8 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
     manState.push({
       roundNumber: kill.roundNumber,
       tick: kill.tick,
-      killerSteamId64: killer!.steamId64,
-      killerTeamKey: killer!.teamKey,
+      killerSteamId64: killer.steamId64,
+      killerTeamKey: killer.teamKey,
       victimSteamId64: victim.steamId64,
       victimTeamKey: victim.teamKey,
       advantageTeamKey,
@@ -495,10 +559,7 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
     if (round.teamASide === round.teamBSide) throw new Error(`Core performance fact round=${round.roundNumber} has identical sides`);
   }
 
-  return {
-    playerRounds,
-    manState,
-  };
+  return rememberCanonicalFacts(pkg, { playerRounds, manState });
 }
 
 /** Backwards-compatible 1.0 projection; it contains no independent rules. */
@@ -566,7 +627,7 @@ function emptyAggregateForIdentity(identity: PerformanceIdentity): MutableAggreg
     threeKillRounds: 0,
     fourKillRounds: 0,
     fiveKillRounds: 0,
-    utility: emptyPerformanceUtility(),
+    utility: emptyUtility(),
     objective: emptyObjective(),
     clutch: emptyClutchAggregate(),
     weapons: new Map(),

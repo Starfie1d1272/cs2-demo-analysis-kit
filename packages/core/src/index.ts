@@ -11,7 +11,7 @@ import {
   type PlayerRoundPerformanceFacts,
 } from "./performance-facts.js";
 import { CORE_ANALYSIS_VERSION } from "./version.js";
-import { assertPlayerRoundPerformanceFacts } from "./performance-validation.js";
+import { assertPlayerRoundPerformanceFacts } from "./performance-facts.js";
 
 export { loadDemoManifestFromZip, loadDemoPackageFromZip } from "./loader.js";
 export type { DemoManifest, DemoPackageLoadOptions, DemoPackageLoadProfile } from "./loader.js";
@@ -44,7 +44,7 @@ export type {
   PlayerRoundPerformanceUtilityFact,
   PlayerRoundPerformanceWeaponFact,
 } from "./performance-facts.js";
-export { assertPlayerRoundPerformanceFacts } from "./performance-validation.js";
+export { assertPlayerRoundPerformanceFacts } from "./performance-facts.js";
 export { CORE_ANALYSIS_VERSION, CORE_SEMANTIC_PROFILE } from "./version.js";
 export { buildTeamSideWinRates } from "./side-win-rate.js";
 export { buildDuelsSignals, deriveDuels, deriveOpeningDuels } from "./duels.js";
@@ -66,7 +66,7 @@ export type {
 export function analyzeDemoPackage(input: unknown, suppliedPerformanceFacts?: PlayerRoundPerformanceFacts): AnalysisBundle {
   const pkg = normalizeDemoPackage(input);
   const performanceFacts = suppliedPerformanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
-  assertPlayerRoundPerformanceFacts(pkg, performanceFacts);
+  if (suppliedPerformanceFacts) assertPlayerRoundPerformanceFacts(pkg, performanceFacts);
   const qa = buildQaReport(pkg);
   const playerRoundFacts = toPlayerRoundFacts(performanceFacts);
   const playerIndicators = buildPlayerIndicators(pkg, performanceFacts);

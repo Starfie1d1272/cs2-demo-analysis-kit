@@ -26,7 +26,8 @@ v3 ZIP（cs2-demo-format/3.x，由 cs2df 导出）
 `buildPlayerRoundPerformanceFacts` 统一派生，`@cs2dak/core` 导出的
 `CORE_ANALYSIS_VERSION` 是所有 performance facts 出口的 provenance owner；
 `playerStats` 保留公开 ZIP 合同读取及 collateral 观察字段，不作旧口径对照或
-fallback。canonical facts 按源事件检查覆盖、身份、守恒与成对敌对 opening；
+fallback。supplied facts 通过同一 Core owner 的私有快照核对结构、覆盖、身份、守恒与成对
+opening；未登记缓存调用一次 owner 重建，暖缓存不重复派生业务事实；
 真实源 QA error 仍阻止 Evidence 发布。历史上传包的 analysisVersion、QA 与已有
 warning 不修改、不伪标记为经当前版本重新验证；新分析携带新的 analysisVersion。
 

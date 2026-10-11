@@ -54,8 +54,8 @@ Important v3 semantics:
 `@cs2dak/core` is the sole owner of DAK performance semantics. Its
 `buildPlayerRoundPerformanceFacts()` converts the frozen event annotations into
 player-round Assist, Damage, Opening, Trade, KAST, Clutch, Utility, Objective,
-Weapon, and man-state facts. Event-derived source invariants validate coverage,
-identity, conserved counts, paired opening duels and supplied cached facts;
+Weapon, and man-state facts. The same Core owner validates supplied cached facts against a private snapshot
+of its own result, including identity, coverage, counts and paired opening duels;
 exporter `playerStats` is not a comparison oracle or fallback. Its collateral
 count remains an observed field consumed by the scoreboard and weapon highlights.
 Opening FK/FD means the first valid enemy-player kill, ordered by round, tick and
@@ -63,7 +63,12 @@ original event order: teamkills, suicides and world deaths update death state bu
 do not receive opening credit. With no enemy kill, every player's FK/FD is zero.
 This is an opening duel, not the first chronological death or a guaranteed 5v5.
 Cohort, tournament, presentation, and Evidence adapters aggregate or project the
-Core facts and do not recreate event rules. Legacy ZIP/Evidence payloads remain
+Core facts and do not recreate event rules. Source/fact signatures detect in-place mutations;
+unchanged sources reuse the private owner snapshot. Previously serialized facts
+without a registered snapshot require one canonical owner build. Fresh owner
+results skip redundant validation. Large replay/shots/duels streams are excluded
+from these signatures. Signatures stay private, are not a payload trust token,
+and never replace source QA. Legacy ZIP/Evidence payloads remain
 readable and immutable; historical parity diagnostics may still be displayed and
 redacted, but new analysis does not emit the retired oracle diagnostics.
 
@@ -161,8 +166,8 @@ v3 包包含：
 `@cs2dak/core` 是 DAK performance semantics 的唯一 owner。其
 `buildPlayerRoundPerformanceFacts()` 将冻结的事件标注统一转换为 player-round
 层的 Assist、Damage、Opening、Trade、KAST、Clutch、Utility、Objective、Weapon
-与 man-state facts。校验直接检查源事件与 canonical facts 的身份、覆盖、统计守恒
-及 supplied facts；`playerStats` 不再作旧口径对照或 fallback，仍保留合同读取和
+与 man-state facts。supplied/cached facts 的校验复用同一 owner 的私有结果快照，检查结构、身份、覆盖、
+统计守恒与成对 opening，不维护第二套事件计算器；`playerStats` 不再作旧口径对照或 fallback，仍保留合同读取和
 尚未替代的 collateral 观察字段。FK/FD 指按回合、tick、原始事件顺序选择的首个
 有效敌对击杀，成对归属胜者/死者；TK、自杀和 world 死亡只更新死亡/存活状态。
 没有敌对击杀则全员 FK/FD 为零。这不是时间上的第一次死亡或保证 5v5 的对枪。

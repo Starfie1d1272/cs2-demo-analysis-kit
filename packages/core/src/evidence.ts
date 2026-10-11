@@ -1,6 +1,6 @@
 import type { DemoPackage } from "@cs2dak/contract";
 import { buildQaReport } from "./qa.js";
-import { assertPlayerRoundPerformanceFacts } from "./performance-validation.js";
+import { assertPlayerRoundPerformanceFacts } from "./performance-facts.js";
 import {
   aggregatePlayerRoundPerformanceFacts,
   buildPlayerRoundPerformanceFacts,

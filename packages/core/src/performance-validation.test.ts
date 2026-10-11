@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { DemoPackage, PackageKill } from "@cs2dak/contract";
 import { loadDemoPackageFromZip } from "./loader.js";
 import { aggregatePlayerRoundPerformanceFacts, buildPlayerRoundPerformanceFacts } from "./performance-facts.js";
-import { assertPlayerRoundPerformanceFacts } from "./performance-validation.js";
+import { assertPlayerRoundPerformanceFacts } from "./performance-facts.js";
 import { deriveOpeningDuels } from "./duels.js";
 
 let pkg: DemoPackage;
@@ -13,7 +13,7 @@ beforeAll(async () => {
 function scenario(events: Array<[number | null, number, number]>, roundNumber = 1, swapped = false): DemoPackage {
   const original = pkg.rounds[0]!;
   const round = { ...original, roundNumber, teamASide: swapped ? "ct" as const : "t" as const, teamBSide: swapped ? "t" as const : "ct" as const, winnerSide: swapped ? "ct" as const : "t" as const, winnerTeamKey: "teamA" as const };
-  return { ...pkg, rounds: [round], kills: events.map(([killerIndex, victimIndex, tick]) => ({ ...pkg.kills[0]!, roundNumber, tick: original.freezeEndTick + tick, killerIndex, victimIndex, assisterIndex: null, flashAssisterIndex: null, flashAssist: false, tradeKill: false, tradeDeath: false, headshot: false } as PackageKill)), damages: [], blinds: [], grenades: [], bombs: [], clutches: [], playerEconomies: [], replay: undefined, shots: undefined, duels: undefined };
+  return { ...pkg, players: pkg.players.map(player => ({ ...player })), rounds: [round], kills: events.map(([killerIndex, victimIndex, tick]) => ({ ...pkg.kills[0]!, roundNumber, tick: original.freezeEndTick + tick, killerIndex, victimIndex, assisterIndex: null, flashAssisterIndex: null, flashAssist: false, tradeKill: false, tradeDeath: false, headshot: false } as PackageKill)), damages: [], blinds: [], grenades: [], bombs: [], clutches: [], playerEconomies: [], replay: undefined, shots: undefined, duels: undefined };
 }
 function indices() {
   const teamA = pkg.players.flatMap((player, index) => player.teamKey === "teamA" ? [index] : []);
@@ -67,6 +67,74 @@ describe("enemy opening definition and source invariants", () => {
     expect(() => assertPlayerRoundPerformanceFacts(source, historical)).not.toThrow();
     expect(JSON.stringify(historical)).toBe(snapshot);
     expect(buildPlayerRoundPerformanceFacts(source)).not.toHaveProperty("openingParity");
+  });
+  it("detects in-place facts mutation after an earlier successful validation", () => {
+    const [a, , c] = indices(), source = scenario([[a, c, 10]]);
+    const facts = buildPlayerRoundPerformanceFacts(source);
+    assertPlayerRoundPerformanceFacts(source, facts);
+    facts.playerRounds[0]!.damage++;
+    expect(() => assertPlayerRoundPerformanceFacts(source, facts)).toThrow(/damage/);
+  });
+  it("rebuilds through the owner when source events change, rejecting stale supplied facts", () => {
+    const [a, b, c] = indices(), source = scenario([[a, c, 10]]);
+    const facts = buildPlayerRoundPerformanceFacts(source);
+    source.kills[0]!.killerIndex = b;
+    expect(() => assertPlayerRoundPerformanceFacts(source, facts)).toThrow("source invariant");
+    expect(() => assertPlayerRoundPerformanceFacts(source, buildPlayerRoundPerformanceFacts(source))).not.toThrow();
+  });
+  it("checks untrusted serialized facts and rejects cross-Demo reuse with different events", () => {
+    const [a, b, c] = indices(), source = scenario([[a, c, 10]]);
+    const serialized = JSON.parse(JSON.stringify(buildPlayerRoundPerformanceFacts(source)));
+    const unregisteredSource = structuredClone(source);
+    expect(() => assertPlayerRoundPerformanceFacts(unregisteredSource, serialized)).not.toThrow();
+    expect(() => assertPlayerRoundPerformanceFacts(scenario([[b, c, 10]]), serialized)).toThrow("source invariant");
+  });
+  it("rejects duplicate source identities without a second event calculator", () => {
+    const [a, , c] = indices(), source = scenario([[a, c, 10]]);
+    source.players[1]!.steamId64 = source.players[0]!.steamId64;
+    expect(() => buildPlayerRoundPerformanceFacts(source)).toThrow("duplicate player or round identity");
+  });
+  it("warm validations do not rebuild event facts, skip heavy streams, and still detect corruption", () => {
+    const [a, , c] = indices(), source = scenario([[a, c, 10]]);
+    let classifications = 0;
+    source.kills = source.kills.map(kill => new Proxy(kill, { get(target, field, receiver) {
+      if (field === "killerIndex") classifications++;
+      return Reflect.get(target, field, receiver);
+    } }));
+    const facts = buildPlayerRoundPerformanceFacts(source);
+    for (const field of ["replay", "shots", "duels"] as const) Object.defineProperty(source, field, { get() { throw new Error("heavy stream must not be read"); } });
+    classifications = 0;
+    assertPlayerRoundPerformanceFacts(source, facts);
+    assertPlayerRoundPerformanceFacts(source, facts);
+    // Two reads per signature (JSON value and original-value safety check), no producer rebuild.
+    expect(classifications).toBe(source.kills.length * 4);
+    facts.playerRounds[0]!.damage++;
+    expect(() => assertPlayerRoundPerformanceFacts(source, facts)).toThrow(/damage/);
+  });
+  it.each([Number.NaN, Number.POSITIVE_INFINITY])("rejects non-finite cached values instead of serializing them as null (%s)", value => {
+    const [a, , c] = indices(), source = scenario([[a, c, 10]]);
+    const facts = buildPlayerRoundPerformanceFacts(source);
+    facts.playerRounds[0]!.equipmentValue = value;
+    expect(() => assertPlayerRoundPerformanceFacts(source, facts)).toThrow("non-finite number");
+  });
+  it("rejects custom serialization that could hide malformed cached data", () => {
+    const [a, , c] = indices(), source = scenario([[a, c, 10]]);
+    const facts = buildPlayerRoundPerformanceFacts(source);
+    facts.playerRounds[0]!.clutch = { toJSON: () => null } as unknown as typeof facts.playerRounds[0]["clutch"];
+    expect(() => assertPlayerRoundPerformanceFacts(source, facts)).toThrow("custom serialization");
+  });
+  it("accepts reordered serialized rows and labels without changing stable identity", () => {
+    const [a, , c] = indices(), source = scenario([[a, c, 10]]);
+    const facts = structuredClone(buildPlayerRoundPerformanceFacts(source));
+    facts.playerRounds.reverse();
+    facts.playerRounds.forEach(row => { row.name = "Changed label"; });
+    expect(() => assertPlayerRoundPerformanceFacts(source, facts)).not.toThrow();
+  });
+  it("checks label structure without using the label value as identity", () => {
+    const [a, , c] = indices(), source = scenario([[a, c, 10]]);
+    const facts = buildPlayerRoundPerformanceFacts(source);
+    facts.playerRounds[0]!.name = [] as unknown as string;
+    expect(() => assertPlayerRoundPerformanceFacts(source, facts)).toThrow("facts structure");
   });
   it("unknown player identities fail explicitly rather than guessing an enemy", () => {
     const [, , c] = indices();
