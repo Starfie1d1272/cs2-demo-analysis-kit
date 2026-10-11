@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 from types import SimpleNamespace
 
+import cs2dak.credentials as credentials_module
 import cs2dak.studio as studio_module
 from cs2dak.studio import RIVALHUB_CREDENTIAL_ACCOUNT, RIVALHUB_CREDENTIAL_SERVICE, StudioApi
 
@@ -50,7 +51,7 @@ def test_rivalhub_bridge_uses_only_fixed_keychain_item(monkeypatch, tmp_path):
         calls.append(argv)
         return SimpleNamespace(returncode=0, stdout="secret-token\n")
 
-    monkeypatch.setattr(studio_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(credentials_module.subprocess, "run", fake_run)
 
     assert api.rivalhub_credential_get(RIVALHUB_CREDENTIAL_SERVICE, RIVALHUB_CREDENTIAL_ACCOUNT) == "secret-token"
     assert api.rivalhub_credential_set(RIVALHUB_CREDENTIAL_SERVICE, RIVALHUB_CREDENTIAL_ACCOUNT, "new-token")
@@ -89,3 +90,19 @@ def test_rivalhub_bridge_uses_windows_credential_manager(monkeypatch, tmp_path):
         ("set", RIVALHUB_CREDENTIAL_SERVICE, RIVALHUB_CREDENTIAL_ACCOUNT, "new-token"),
         ("delete", RIVALHUB_CREDENTIAL_SERVICE, RIVALHUB_CREDENTIAL_ACCOUNT),
     ]
+
+
+def test_vault_fault_is_logged_with_stage_and_propagated(monkeypatch, tmp_path):
+    from unittest.mock import Mock
+
+    import pytest
+    api = _api(tmp_path)
+    monkeypatch.setattr(studio_module.sys, "platform", "darwin")
+    fault = RuntimeError("CREDENTIAL_READ：macOS 钥匙串系统拒绝操作（退出码 36）")
+    monkeypatch.setattr(studio_module, "_macos_credential_get", Mock(side_effect=fault))
+    logged = Mock()
+    monkeypatch.setattr(studio_module, "log_failure", logged)
+    with pytest.raises(RuntimeError) as result:
+        api.rivalhub_credential_get(RIVALHUB_CREDENTIAL_SERVICE, RIVALHUB_CREDENTIAL_ACCOUNT)
+    assert result.value is fault
+    logged.assert_called_once_with(studio_module.log, fault, "credential.read")
