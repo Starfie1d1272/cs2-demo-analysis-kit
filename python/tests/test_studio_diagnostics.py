@@ -31,7 +31,7 @@ def test_logging_rotates_and_redacts_with_preconfigured_root(tmp_path, studio_lo
         studio.log.error("request token=secret-token %s", "x" * 100)
     paths = list(tmp_path.glob("studio.log*"))
     assert 1 < len(paths) <= 4
-    assert all("secret-token" not in p.read_text() for p in paths)
+    assert all("secret-token" not in p.read_text(encoding="utf-8") for p in paths)
 
 
 def test_startup_dependency_failure_is_logged_before_webview_import(monkeypatch, tmp_path, studio_logging):
@@ -48,8 +48,8 @@ def test_startup_dependency_failure_is_logged_before_webview_import(monkeypatch,
         studio.main()
     log_path = studio._logs_dir_for(tmp_path) / "studio.log"
     assert str(log_path) in str(error.value)
-    assert "webview" in log_path.read_text()
-    assert "studio.startup" in log_path.read_text()
+    assert "webview" in log_path.read_text(encoding="utf-8")
+    assert "studio.startup" in log_path.read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize("cancel", [False, True])
@@ -67,8 +67,8 @@ def test_log_export_success_and_cancel(monkeypatch, tmp_path, studio_logging, ca
         assert not destination.exists()
     else:
         assert result["ok"] is True
-        assert "export diagnostic" in destination.read_text()
-        assert "hidden" not in destination.read_text()
+        assert "export diagnostic" in destination.read_text(encoding="utf-8")
+        assert "hidden" not in destination.read_text(encoding="utf-8")
 
 
 def test_logging_falls_back_to_actual_temp_path(monkeypatch, tmp_path, studio_logging):
@@ -88,7 +88,7 @@ def test_logging_falls_back_to_actual_temp_path(monkeypatch, tmp_path, studio_lo
     actual = studio._setup_logging(blocked)
     assert actual == fallback / "dak-studio-logs" / "studio.log"
     assert actual.is_file()
-    assert "userdata read-only" in actual.read_text()
+    assert "userdata read-only" in actual.read_text(encoding="utf-8")
 
 
 def test_userdata_failure_still_reports_actual_diagnostic_log(monkeypatch, tmp_path, studio_logging):
@@ -101,7 +101,7 @@ def test_userdata_failure_still_reports_actual_diagnostic_log(monkeypatch, tmp_p
         studio.main()
     actual = tmp_path / "dak-studio-logs" / "studio.log"
     assert str(actual) in str(error.value)
-    assert "userdata unavailable" in actual.read_text()
+    assert "userdata unavailable" in actual.read_text(encoding="utf-8")
 
 
 def test_frontend_diagnostic_is_sanitized_in_exported_log(monkeypatch, tmp_path, studio_logging):
@@ -110,7 +110,7 @@ def test_frontend_diagnostic_is_sanitized_in_exported_log(monkeypatch, tmp_path,
     api = studio.StudioApi()
     assert api.report_diagnostic({"stage": "worker.parse.fallback", "fileId": "match-1",
                                   "message": "worker unavailable token=secret", "raw": "unsafe-body"})["ok"]
-    text = actual.read_text()
+    text = actual.read_text(encoding="utf-8")
     assert "worker.parse.fallback" in text
     assert "match-1" in text
     assert "secret" not in text

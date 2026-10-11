@@ -29,7 +29,7 @@ def test_connection_keeps_token_out_of_metadata(api, monkeypatch):
     monkeypatch.setattr(uploader, "credential", credential)
     api.configure("https://example.com/path")
     api.save_connection("pairing", "secret-token")
-    assert "secret-token" not in api._metadata.read_text()
+    assert "secret-token" not in api._metadata.read_text(encoding="utf-8")
     other = uploader.UploaderApi(api._userdata)
     try:
         assert other.connection() == {
@@ -256,7 +256,7 @@ def test_optional_probe_read_failure_does_not_stop_startup(tmp_path, monkeypatch
         load_runtime.assert_called_once_with()
         webview.start.assert_called_once_with(private_mode=True, gui="edgechromium")
         shown.assert_not_called()
-        evidence = (tmp_path / "RivalHub Demo Uploader" / "uploader.log").read_text()
+        evidence = (tmp_path / "RivalHub Demo Uploader" / "uploader.log").read_text(encoding="utf-8")
         assert "WARNING" in evidence
         assert "package metadata probe failed" in evidence
         assert "bundled DLL probe failed" in evidence
@@ -360,7 +360,7 @@ def test_cleanup_failure_does_not_replace_startup_exit(tmp_path, monkeypatch):
             uploader.main()
         assert raised.value.code == 1
         assert isinstance(raised.value.__cause__, RuntimeError)
-        content = (tmp_path / 'RivalHub Demo Uploader' / 'uploader.log').read_text()
+        content = (tmp_path / 'RivalHub Demo Uploader' / 'uploader.log').read_text(encoding="utf-8")
         assert 'shutdown.cleanup' in content and 'cleanup failure' in content
         assert 'token=secret' not in content
     finally:

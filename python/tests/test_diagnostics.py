@@ -63,7 +63,7 @@ def test_formatter_redacts_traceback_and_export_preserves_rotations(tmp_path):
         path.with_name('actual.log.1').write_text('older token=old-secret\n')
         destination = tmp_path / 'export.log'
         assert export_logs(logger, destination)
-        content = destination.read_text()
+        content = destination.read_text(encoding="utf-8")
         assert 'ValueError' in content and 'TLS' in content and 'older' in content
         for secret in ('secret-one', 'secret-two', 'old-secret', 'alice'):
             assert secret not in content
@@ -167,7 +167,7 @@ def test_export_preserves_latest_failure_in_large_logs(tmp_path, size):
         source.write_bytes(b'older normal line\n' * (size // 18) + b'latest TLS failure token=hidden\n')
         destination = tmp_path / 'export.log'
         assert export_logs(logger, destination)
-        content = destination.read_text()
+        content = destination.read_text(encoding="utf-8")
         assert 'latest TLS failure' in content
         assert 'hidden' not in content
         assert ('older log content omitted' in content) == (size > 4 * 1024 * 1024)
