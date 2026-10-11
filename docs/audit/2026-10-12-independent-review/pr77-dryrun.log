@@ -6,9 +6,9 @@
 ────────────────────
 Total Upload: 4.69 KiB / gzip: 1.92 KiB
 Your Worker has access to the following bindings:
-Binding                                   Resource                  
-env.ASSETS (cs2dak-assets)                R2 Bucket                 
-env.MAX_UPLOAD_BYTES ("536870912")        Environment Variable      
-env.ALLOWED_ORIGINS ("*")                 Environment Variable      
+Binding                                   Resource
+env.ASSETS (cs2dak-assets)                R2 Bucket
+env.MAX_UPLOAD_BYTES ("536870912")        Environment Variable
+env.ALLOWED_ORIGINS ("*")                 Environment Variable
 
 --dry-run: exiting now.
