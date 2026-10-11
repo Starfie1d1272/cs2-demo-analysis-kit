@@ -32,7 +32,7 @@
 | `@cs2dak/maps`           | 地图标定、坐标变换、callout 语义/grid、默认位、包点入口、区域几何 | 评分公式、产品 UI、战术结论、静态完整战术库 | 地图与空间能力              |
 | `@cs2dak/tournament`     | frozen Tournament sufficient-fact DTO、identity-safe 跨图 merge、透明 performance aggregation、rate 与结构/引用/聚合安全校验 | Demo 解析/detection、Core semantic QA、RivalHub scope、数据库、React、评分公式 | `TournamentAnalytics`、`TournamentPerformanceAnalytics` |
 | `@cs2dak/presentation`   | 将 core/cohort 结果转换为比赛、选手、队伍、赛季和排行榜展示模型；仅包装 canonical adapter 并注入最终显示标签 | 解析、评分公式、数据库、React、Tournament 跨图 merge | 产品中立 View Models        |
-| `@cs2dak/react`          | 渲染 presentation 合同和基础可视化组件                          | 数据库查询、分析、评分、产品业务规则        | React 组件与样式            |
+| `@cs2dak/react`          | 渲染 presentation View Model、contract props/types 与 maps 坐标/level 投影                          | 数据库查询、分析、评分、产品业务规则        | React 组件与样式            |
 | `@cs2dak/rivalhub-upload` | RivalHub 配对与 HTTP client、目标匹配、Evidence V1 producer；唯一共享上传语义 owner | 本地文件、UI、数据库、Library 持久化 | `rivalhub-demo-evidence/1` |
 | Node CLI                 | 将 TypeScript 包接入本地文件系统和自动化流程                    | 复制核心分析逻辑                            | 命令行输出与文件产物        |
 | DAK Studio（`apps/dak-studio`） | 本地 Demo 管理、导入、检索、比较和个人档案               | RivalHub 赛事业务、共享分析公式             | 独立本地产品                |
@@ -88,3 +88,28 @@ PRISM 风格、强弱项等“相对当前范围”的判断可以继续使用 c
 14. `core/src/tournament-facts.ts` 是单图 frozen Tournament economy/performance projection 的唯一 owner，只以 type import 消费 Tournament DTO。显式 stable team/player ID 必须完整，teamA/B 相同 ID 明确拒绝；显示队名、昵称、logo 不生成或决定 ID。Evidence 直接消费 Core data adapter，再按 target entry ID 查询 Tournament 结果，不通过 Presentation ViewModel 回查。未绑定的本地 Demo 使用显式 match-scoped observed ID，只表示本场观察，不能据同名跨图认定同队；Presentation 只注入标签，Studio `teamRenames` 不改变 frozen identity。
 
 Calibration-only 消费者优先使用 `@cs2dak/maps/calibration`；root 是 aggregate compatibility surface。两者由同一 maps owner 实现，当前 Active Duty 与 checked-in spatial coverage 分别由 `ACTIVE_DUTY_MAPS` / `SPATIAL_ASSET_MAPS` 表达。
+
+## 可执行 package graph 与发布合同（#64 Phase A/B）
+
+`pnpm check:package-boundaries` 同时检查 production TypeScript/TSX 的 import、re-export、dynamic import、require、import type 与 manifest dependencies/peers/optional dependencies。测试文件可使用跨层 fixture，不进入生产 graph；跨包相对路径、未声明依赖、计算出来的模块入口与不在下表中的外部依赖均拒绝。`scripts/check-package-boundaries.mjs` 是机器规则，下表记录当前允许方向（不要求每个允许方向都有 runtime import）：
+
+| 包 | 允许的依赖 |
+|---|---|
+| contract | cs2-demo-format、rating、Zod |
+| maps | 无 npm 依赖；Node 专用入口可用 Node builtins |
+| core | contract、maps、rating、JSZip；tournament **仅 DTO/type** |
+| cohort | contract、core、rating |
+| tournament | **无 runtime/peer/optional 依赖，也不 import 外部 DTO** |
+| presentation | contract、core、cohort、maps、tournament、rating |
+| react | contract、presentation、maps、lucide-react；React/React DOM peers |
+| rivalhub-upload（private） | contract、core canonical adapter、tournament、Zod |
+
+Core 的 tournament manifest dependency 是外部声明解析所需的 DTO 合同，不允许变成运行时 aggregation。React 直接使用 contract props/type 和 maps 坐标变换是合理渲染职责；不得 import core、cohort、tournament 或产品代码。私有 uploader 直接消费 Core canonical facts；禁止回读 presentation。
+
+七个公共包发布 dist ESM/declarations，显式 exports 与有限 files；React 的 theme.css 保持原公开入口，复制到 dist 并标记 CSS side effect，其余包 sideEffects=false。现有 private CLI/uploader/apps 保持 private。编译不 bundle、不改变 owner/API；React 原有省略扩展名的相对路径只在生成的 JS/declaration 中补 `.js`。build configs 排除测试，typecheck configs 继续检查测试源码。
+
+`pnpm check:package-consumers` 重建公共库、实际 pack 七个 tgz，逐包在仓外临时目录只安装该 root 与所需 peers；npm overrides 将每条传递 DAK dependency 固定到本次对应 tarball。它验证完整声明依赖闭包、公开 JS 入口实际 import/call、strict NodeNext（skipLibCheck=false），禁止 workspace link、源码/测试泄漏与额外 DAK 包，并记录真实 compressed/unpacked bytes。外部 cs2-demo-format/rating/Zod/React 等仍通过已声明 npm dependencies 安装；仓库只提供编译器工具，不提供 TS paths/aliases。
+
+保留 maps 专项五入口/资产/calibration 隔离 gate。上述 Node/strict TS 验证不能替代正式 registry 发布后的 smoke，也不声称完成 browser consumer matrix。Phase C 的 correctness 已在 #69 完成，本轮只固定其 adapter graph；跨消费者 Evidence seam 的全面审计、Phase D 的外部 consumer 成本判断和 Phase E 的 DTO ownership audit 仍需各自证据。记录 pack size 不等于授权拆 maps 资产；#64 保持 umbrella，不由 A/B PR 自动关闭。
+
+当前 A/B 未验收：registry cs2-demo-format@3.1.0 与 @rivalhub/rival-rating@0.3.0 仍导出 TypeScript，真实 Node gate 会失败。详见 [artifact audit](research/public-package-artifact-audit.md)；在上游 compiled 合同补齐前，此改动保持 Draft，不得合并或发布。

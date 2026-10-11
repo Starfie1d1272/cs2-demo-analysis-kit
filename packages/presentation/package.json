@@ -9,8 +9,16 @@
     "directory": "packages/presentation"
   },
   "exports": {
-    ".": "./src/index.ts",
-    "./tournament-compat": "./src/tournament-compat.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./tournament-compat": {
+      "types": "./dist/tournament-compat.d.ts",
+      "import": "./dist/tournament-compat.js",
+      "default": "./dist/tournament-compat.js"
+    }
   },
   "dependencies": {
     "@cs2dak/contract": "workspace:*",
@@ -22,9 +30,15 @@
   },
   "devDependencies": {},
   "files": [
-    "src"
+    "dist"
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "scripts": {
+    "build": "node ../../scripts/build-public-package.mjs"
   }
 }

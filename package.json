@@ -25,7 +25,7 @@
     "changeset": "changeset",
     "version:packages": "changeset version",
     "check:release-policy": "node scripts/check-npm-publish-policy.mjs",
-    "release:npm": "pnpm build && pnpm test:all && pnpm typecheck && changeset publish",
+    "release:npm": "pnpm build && pnpm test:all && pnpm typecheck && pnpm check:package-boundaries && pnpm check:package-consumers && changeset publish",
     "sync-version": "node scripts/sync-version.mjs",
     "package": "bash scripts/package.sh",
     "events:build": "node scripts/build-event-asset.mjs",
@@ -36,9 +36,12 @@
     "event:submissions": "node scripts/promote-event-submission.mjs list",
     "event:promote": "node scripts/promote-event-submission.mjs",
     "build:uploader": "pnpm --filter @cs2dak/rivalhub-uploader build",
-    "dev:uploader": "pnpm --filter @cs2dak/rivalhub-uploader dev"
+    "dev:uploader": "pnpm --filter @cs2dak/rivalhub-uploader dev",
+    "check:package-boundaries": "node --test scripts/package-boundaries.test.mjs",
+    "check:package-consumers": "node scripts/public-package-smoke.mjs"
   },
   "devDependencies": {
+    "@babel/parser": "^8.0.7",
     "@changesets/cli": "^3.0.3",
     "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",

@@ -244,3 +244,11 @@ Windows Uploader 推荐入口为 `RivalHub-Demo-Uploader-Setup-X.Y.Z.exe`（完�
 CI 与发布 gate 运行 `node scripts/maps-package-smoke.mjs`（Ubuntu 上的 pnpm/npm 工具链）：build → pack → 临时目录干净安装 → 五入口实际导入/调用 → strict NodeNext 声明检查 → 删除全部空间资产后的新进程 calibration 隔离检查。consumer 无 workspace symlink、TypeScript runtime loader 或 DAK 源路径。JSON ESM 在仓库 Node 24 工具链上验证；browser callout loader 以注入 fetch 验证，不调用外部服务。脚本不 publish、不改版本，并清理其临时 consumer。fresh checkout 运行测试/dev 前先 `pnpm typecheck`；修改 maps 时可运行 `pnpm --filter @cs2dak/maps exec tsc -p tsconfig.json --watch` 更新编译输出。
 
 本地 artifact gate 已覆盖 #47 的 calibration 窄入口、图池/资产覆盖分离与 Train 标定 revision 2。Feature PR 只提交 maps minor changeset；不执行 version/publish/tag。授权正式发布后仍需从 registry 干净安装新 maps 版本并用 Node 24 重跑 root/calibration/资产/tri probes；真实 browser/Windows qualification 也不能由此脚本替代。#64 其余公共包的 consumer 与 graph 审计仍是后续范围。
+
+### 公共发布产物与消费检查
+
+发布前必须执行 `pnpm check:package-boundaries`、`pnpm check:package-consumers` 与现有 maps 专项 smoke。前者约束生产源码和 manifest 的真实 graph；后者 build + 实际 pack 七个公共包，然后对每个包单独建立仓外 npm consumer，以本次 tgz 安装全部传递 DAK 依赖，验证所有 JS 入口的 Node ESM 加载、实际 API 调用及 strict NodeNext 声明（不使用 workspace source aliases，不 skipLibCheck）。每次输出 compressed/unpacked bytes 和文件数量，供资产成本审计使用。
+
+所有公共 JS/types 入口指向 dist；React theme.css 保持公开 CSS 入口并按 CSS side effect 发布。测试和 build metadata 不进入 tgz。可单独运行 `node scripts/maps-package-smoke.mjs` 验证地图五入口、资产及 calibration 隔离。正式 npm publish/tag 仍走既有人工发布流程；本地 tgz gate 通过不表示 registry 已更新，也不能关闭等待 registry smoke 的 #47。#64 的 C/D/E 及 browser consumer matrix 不由 A/B gate 自动验收。
+
+当前全包 Node gate 被上游 registry 的 TypeScript 入口阻塞，详情见 [artifact audit](research/public-package-artifact-audit.md)。不得为发布跳过此 gate；本地 build 与 strict declarations 通过仍不足以验收 Node 依赖闭包。
