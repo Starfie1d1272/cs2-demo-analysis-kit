@@ -1,11 +1,12 @@
-from types import SimpleNamespace
-from unittest.mock import Mock
 import logging
 import sys
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
-from cs2dak import rivalhub_uploader as uploader, studio
+from cs2dak import rivalhub_uploader as uploader
+from cs2dak import studio
 
 
 def dialog_module(monkeypatch):

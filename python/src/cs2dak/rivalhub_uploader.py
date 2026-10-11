@@ -238,7 +238,7 @@ class UploaderApi:
         try:
             paths = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True,
                                                    file_types=("CS2 Demo (*.dem)",))
-        except Exception as error:  # noqa: BLE001 - native dialog boundary
+        except Exception as error:  # native dialog boundary
             log_failure(log, error, "selection.dialog")
             raise RuntimeError("FILE_DIALOG_FAILED：无法打开 Demo 选择器，请重试") from error
         if not paths:
