@@ -59,7 +59,14 @@ function createConnectionClient(baseUrl: string, token?: string) {
 
 async function readCredential(baseUrl: string): Promise<string | null> {
   const api = nativeApi();
-  if (api?.rivalhub_credential_get) return await api.rivalhub_credential_get(CREDENTIAL_SERVICE, CREDENTIAL_ACCOUNT);
+  if (api?.rivalhub_credential_get) {
+    try {
+      return await api.rivalhub_credential_get(CREDENTIAL_SERVICE, CREDENTIAL_ACCOUNT);
+    } catch (error) {
+      const diagnostic = normalizeDiagnostic(error, { stage: "credential.read" });
+      throw Object.assign(new Error(diagnostic.message), diagnostic);
+    }
+  }
   return memoryCredential?.baseUrl === baseUrl ? memoryCredential.token : null;
 }
 
@@ -189,9 +196,23 @@ export async function connectRivalHub(
   }
 }
 
+/** All operation/UI boundaries use the safe reason, including native rejection objects. */
+export function rivalHubFailureMessage(error: unknown, state?: RivalHubConnectionState): string {
+  const diagnostic = normalizeDiagnostic(error);
+  if (diagnostic.message === "尚未连接 RivalHub" && state?.status === "error" && state.error) {
+    return normalizeDiagnostic(state.error).message;
+  }
+  return diagnostic.message;
+}
+
+export function assertRivalHubConnected(state: RivalHubConnectionState): void {
+  if (state.status === "error" && state.error) throw new Error(normalizeDiagnostic(state.error).message);
+  if (!state.baseUrl || state.status !== "connected") throw new Error("尚未连接 RivalHub");
+}
+
 export async function fetchRivalHubEvents(): Promise<RivalHubEventsResponse> {
   const state = await loadRivalHubConnection();
-  if (!state.baseUrl || state.status !== "connected") throw new Error("尚未连接 RivalHub");
+  assertRivalHubConnected(state);
   const token = await readCredential(state.baseUrl);
   if (!token) throw new Error("RivalHub 连接凭据不存在，请重新连接");
   try {
@@ -209,7 +230,7 @@ export async function submitRivalHubEvidence(
   idempotencyKey: string,
 ): Promise<EvidenceSubmissionResponse> {
   const state = await loadRivalHubConnection();
-  if (!state.baseUrl || state.status !== "connected") throw new Error("尚未连接 RivalHub");
+  assertRivalHubConnected(state);
   const token = await readCredential(state.baseUrl);
   if (!token) throw new Error("RivalHub 连接凭据不存在，请重新连接");
   try {
@@ -222,7 +243,7 @@ export async function submitRivalHubEvidence(
 
 export async function revokeRivalHubPairing(): Promise<void> {
   const state = await loadRivalHubConnection();
-  if (!state.baseUrl || state.status !== "connected") throw new Error("尚未连接 RivalHub");
+  assertRivalHubConnected(state);
   if (!state.pairingId) throw new Error("当前连接缺少配对标识，请重新连接后再撤销此设备");
   const token = await readCredential(state.baseUrl);
   if (!token) throw new Error("RivalHub 连接凭据不存在，请重新连接");

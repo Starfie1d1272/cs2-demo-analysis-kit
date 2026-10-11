@@ -44,7 +44,7 @@ import {
 } from "./lib/analysis-context";
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
 import { getPinnedPlayer } from "./lib/pin";
-import { connectRivalHub, fetchRivalHubEvents, loadRivalHubConnection, revokeRivalHubPairing, type RivalHubConnectionState } from "./lib/rivalhub";
+import { assertRivalHubConnected, rivalHubFailureMessage, connectRivalHub, fetchRivalHubEvents, loadRivalHubConnection, revokeRivalHubPairing, type RivalHubConnectionState } from "./lib/rivalhub";
 import { rivalHubBatchCompletionMessage, runRivalHubBatch, type RivalHubBatchInput, type RivalHubBatchItem, type RivalHubBatchSession, type RivalHubImportContext } from "./lib/rivalhub-import";
 import { RivalHubBatchImportPanel } from "./components/RivalHubBatchImportPanel";
 import { importRivalHubFromNativePicker } from "./lib/rivalhub-acquisition";
@@ -356,7 +356,8 @@ export function App() {
       await upsertRivalHubEvents(response, await listDemoEntries());
       await refreshEventRecords();
       const connected = await loadRivalHubConnection();
-      setRivalHubConnection({ ...connected, status: "connected", error: null });
+      assertRivalHubConnected(connected);
+      setRivalHubConnection(connected);
       setRivalHubRefreshToken((current) => current + 1);
       if (announce) setNotice(`已刷新 RivalHub 赛事：${response.events.length} 个赛事`);
       return true;
@@ -364,7 +365,7 @@ export function App() {
       await markRivalHubEventsStale().catch(() => undefined);
       await refreshEventRecords().catch(() => undefined);
       const current = await loadRivalHubConnection().catch(() => rivalHubConnection);
-      const message = error instanceof Error ? error.message : String(error);
+      const message = rivalHubFailureMessage(error, current);
       setRivalHubConnection({ ...current, status: "error", error: message });
       if (announce) setNotice(`RivalHub 刷新失败：${message}`);
       return false;
@@ -378,7 +379,7 @@ export function App() {
       setRivalHubConnection(connected);
       await refreshRivalHub();
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = rivalHubFailureMessage(error);
       setRivalHubConnection((current) => ({ ...current, status: "error", error: message }));
       setNotice(`RivalHub 连接失败：${message}`);
     }
@@ -392,8 +393,8 @@ export function App() {
       setRivalHubRefreshToken((current) => current + 1);
       setNotice("已断开 RivalHub，并撤销此设备的访问凭据");
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
       const current = await loadRivalHubConnection().catch(() => rivalHubConnection);
+      const message = rivalHubFailureMessage(error, current);
       setRivalHubConnection({ ...current, status: current.status === "disconnected" ? "disconnected" : "error", error: message });
       setNotice(`断开并撤销 RivalHub 失败：${message}`);
     }
