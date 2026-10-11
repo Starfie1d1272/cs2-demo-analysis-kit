@@ -3,13 +3,11 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import http.client
 import json
 import logging
-from logging.handlers import RotatingFileHandler
 import os
-from pathlib import Path
-import shutil
-import subprocess
+import stat
 import sys
 import tempfile
 import threading
@@ -18,8 +16,24 @@ import urllib.parse
 import urllib.request
 import uuid
 import webbrowser
+from pathlib import Path
 
-from cs2dak.credentials import _windows_credential_delete, _windows_credential_get, _windows_credential_set
+from cs2dak.credentials import (
+    _macos_credential_delete,
+    _macos_credential_get,
+    _macos_credential_set,
+    _windows_credential_delete,
+    _windows_credential_get,
+    _windows_credential_set,
+)
+from cs2dak.diagnostics import (
+    export_logs as export_safe_logs,
+)
+from cs2dak.diagnostics import (
+    log_failure,
+    safe_metadata,
+    sanitize_text,
+)
 
 SERVICE = "com.starfie1d.rivalhub-demo-uploader"
 PREFIX = "/api/integrations/dak"
@@ -43,13 +57,8 @@ def credential(origin: str, value: str | None = None) -> str | bool | None:
                 else _windows_credential_set(SERVICE, account, value))
     if sys.platform != "darwin":
         raise RuntimeError("当前系统不支持安全凭据存储，请使用 Windows 或 macOS")
-    args = (["find-generic-password", "-s", SERVICE, "-a", account, "-w"] if value is None
-            else ["add-generic-password", "-U", "-s", SERVICE, "-a", account, "-w", value])
-    result = subprocess.run(["/usr/bin/security", *args], capture_output=True, text=True,
-                            timeout=30, check=False)
-    if value is not None:
-        return result.returncode == 0
-    return result.stdout.rstrip("\r\n") if result.returncode == 0 else None
+    return (_macos_credential_get(SERVICE, account) if value is None
+            else _macos_credential_set(SERVICE, account, value))
 
 
 def delete_credential(origin: str) -> bool:
@@ -58,10 +67,7 @@ def delete_credential(origin: str) -> bool:
         return _windows_credential_delete(SERVICE, account)
     if sys.platform != "darwin":
         raise RuntimeError("当前系统不支持安全凭据存储")
-    result = subprocess.run(["/usr/bin/security", "delete-generic-password", "-s", SERVICE,
-                             "-a", account], capture_output=True, text=True, timeout=30, check=False)
-    # Keychain returns a nonzero code when the item is already absent.
-    return result.returncode == 0 or "could not be found" in result.stderr.lower()
+    return _macos_credential_delete(SERVICE, account)
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -81,6 +87,7 @@ class UploaderApi:
         self._lock = threading.Lock()
         self._closed = False
         self._origin = ""
+        self._connection_rollback = None
 
     def connection(self) -> dict:
         if not self._metadata.exists():
@@ -89,21 +96,72 @@ class UploaderApi:
         self._origin = normalize_origin(data["baseUrl"])
         return {**data, "connected": bool(credential(self._origin))}
 
-    def configure(self, base_url: str) -> bool:
-        self._origin = normalize_origin(base_url)
-        return True
+    def configure(self, base_url: str, cancel_pairing_id: str = "") -> bool:
+        origin = normalize_origin(base_url)
+        with self._lock:
+            if cancel_pairing_id:
+                data = json.loads(self._metadata.read_text()) if self._metadata.exists() else {}
+                rollback = self._connection_rollback
+                # A late cancel may only undo the credential written by this attempt.
+                if data.get("pairingId") != cancel_pairing_id or data.get("baseUrl") != origin or not rollback or rollback[0] != cancel_pairing_id:
+                    return True
+                self._restore_connection(origin, rollback)
+                self._connection_rollback = None
+                return True
+            self._origin = origin
+            return True
 
-    def save_connection(self, pairing_id: str, token: str) -> bool:
+    def save_connection(self, pairing_id: str, token: str, base_url: str = "") -> bool:
+        with self._lock:
+            if base_url and normalize_origin(base_url) != self._origin:
+                raise RuntimeError("PAIRING_SUPERSEDED：连接已更换，请重新授权")
+            return self._save_connection(pairing_id, token)
+
+    def _restore_connection(self, origin: str, rollback) -> None:
+        _, previous, previous_token, replaced_token = rollback
+        if replaced_token:
+            if not credential(origin, replaced_token):
+                raise RuntimeError("CREDENTIAL_ROLLBACK：无法恢复原网站授权")
+        elif not delete_credential(origin):
+            raise RuntimeError("CREDENTIAL_ROLLBACK：无法清除本次授权")
+        previous_origin = normalize_origin(previous["baseUrl"]) if previous else ""
+        if previous_origin and previous_origin != origin and previous_token and not credential(previous_origin, previous_token):
+            raise RuntimeError("CREDENTIAL_ROLLBACK：无法恢复原网站授权")
+        current = json.loads(self._metadata.read_text()) if self._metadata.exists() else None
+        if current != previous:
+            if previous:
+                staging = self._metadata.with_suffix(".tmp")
+                staging.write_text(json.dumps(previous), encoding="utf-8")
+                staging.replace(self._metadata)
+            else:
+                self._metadata.unlink(missing_ok=True)
+        self._origin = previous_origin
+
+    def _save_connection(self, pairing_id: str, token: str) -> bool:
+        previous_data = json.loads(self._metadata.read_text()) if self._metadata.exists() else None
+        previous_origin = normalize_origin(previous_data["baseUrl"]) if previous_data else None
+        previous_token = credential(previous_origin) if previous_origin else None
+        replaced_token = previous_token if previous_origin == self._origin else credential(self._origin) if self._origin else None
         if not self._origin or not token or not credential(self._origin, token):
             raise RuntimeError("CREDENTIAL_SAVE：系统安全存储拒绝保存授权，请检查钥匙串或凭据管理器")
-        previous = json.loads(self._metadata.read_text()).get("baseUrl") if self._metadata.exists() else None
-        if previous and normalize_origin(previous) != self._origin and not delete_credential(normalize_origin(previous)):
-            delete_credential(self._origin)
-            raise RuntimeError("CREDENTIAL_REPLACE：无法清除旧网站授权，请检查系统安全存储")
-        data = {"baseUrl": self._origin, "pairingId": pairing_id}
-        staging = self._metadata.with_suffix(".tmp")
-        staging.write_text(json.dumps(data), encoding="utf-8")
-        staging.replace(self._metadata)
+        origin = self._origin
+        rollback = (pairing_id, previous_data, previous_token, replaced_token)
+        try:
+            if previous_origin and previous_origin != origin and not delete_credential(previous_origin):
+                raise RuntimeError("CREDENTIAL_REPLACE：无法清除旧网站授权，请检查系统安全存储")
+            data = {"baseUrl": origin, "pairingId": pairing_id}
+            staging = self._metadata.with_suffix(".tmp")
+            staging.write_text(json.dumps(data), encoding="utf-8")
+            staging.replace(self._metadata)
+        except Exception as primary:
+            log_failure(log, primary, "connection.save")
+            try:
+                self._restore_connection(origin, rollback)
+            except Exception as rollback_error:  # noqa: BLE001 - report rollback failure alongside primary.
+                log_failure(log, rollback_error, "connection.rollback")
+                raise RuntimeError("CREDENTIAL_ROLLBACK：保存授权失败，且原授权恢复未完成；请检查系统安全存储并重新授权") from primary
+            raise
+        self._connection_rollback = rollback
         log.info("connection saved host=%s", urllib.parse.urlsplit(self._origin).hostname)
         return True
 
@@ -131,35 +189,85 @@ class UploaderApi:
             headers["Idempotency-Key"] = key
         req = urllib.request.Request(self._origin + PREFIX + path, method=method, headers=headers,
                                      data=json.dumps(body).encode() if body is not None else None)
+        status = 0
+        request_id = ""
+
+        def response_data(response, response_status):
+            nonlocal status, request_id
+            status = response_status
+            response_headers = getattr(response, "headers", None)
+            if response_headers:
+                request_id = sanitize_text(response_headers.get("X-Request-Id", ""), 160)
+            try:
+                data = json.load(response)
+            except (ValueError, OSError, http.client.HTTPException) as exc:
+                failure = log_failure(log, exc, "http.response")
+                failure.update(code="INVALID_RESPONSE", status=status, requestId=request_id)
+                return {"status": status, "requestId": request_id,
+                        "body": {"error": {"code": "INVALID_RESPONSE",
+                                           "message": f"网站响应无效 HTTP {status}：{failure['message']}"}},
+                        "diagnostic": safe_metadata(failure)}
+            if not request_id and isinstance(data, dict):
+                candidate = data.get("requestId")
+                if not isinstance(candidate, str) and isinstance(data.get("error"), dict):
+                    candidate = data["error"].get("requestId")
+                if isinstance(candidate, str):
+                    request_id = sanitize_text(candidate, 160)
+            log.info("http method=%s path=%s status=%s requestId=%s", method, path, status, request_id)
+            result = {"status": status, "body": data}
+            if request_id:
+                result["requestId"] = request_id
+            return result
+
         try:
             with urllib.request.build_opener(NoRedirect()).open(req, timeout=90) as response:
-                data = json.load(response)
-                log.info("http method=%s path=%s status=%s", method, path, response.status)
-                return {"status": response.status, "body": data}
+                return response_data(response, response.status)
         except urllib.error.HTTPError as exc:
-            log.warning("http method=%s path=%s status=%s", method, path, exc.code)
-            try:
-                data = json.loads(exc.read())
-            except (ValueError, OSError):
-                data = {"error": {"message": f"网站请求失败 HTTP {exc.code}"}}
-            return {"status": exc.code, "body": data}
-        except (OSError, ValueError) as exc:
-            log.warning("http failure path=%s type=%s", path, type(exc).__name__)
-            raise RuntimeError("NETWORK：无法连接网站或响应无效，请检查网络和网站地址后重试") from None
+            with exc:
+                return response_data(exc, exc.code)
+        except (OSError, ValueError, http.client.HTTPException) as exc:
+            failure = log_failure(log, exc, "http.request")
+            failure.update(code="NETWORK", status=status, requestId=request_id)
+            return {"status": status, "requestId": request_id,
+                    "body": {"error": {"code": "NETWORK", "message":
+                             f"NETWORK：无法连接网站，请检查网络和网站地址后重试；{failure['message']}"}},
+                    "diagnostic": safe_metadata(failure)}
 
     def select_demos(self) -> list[dict]:
         import webview
-        paths = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True,
-                                               file_types=("CS2 Demo (*.dem)",))
+        try:
+            paths = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True,
+                                                   file_types=("CS2 Demo (*.dem)",))
+        except Exception as error:  # native dialog boundary
+            log_failure(log, error, "selection.dialog")
+            raise RuntimeError("FILE_DIALOG_FAILED：无法打开 Demo 选择器，请重试") from error
+        if not paths:
+            log.info("selection code=FILE_SELECTION_CANCELLED stage=selection.dialog")
+            return []
         result = []
-        for value in paths or []:
+        for ordinal, value in enumerate(paths, 1):
             path = Path(value)
-            if path.suffix.lower() != ".dem" or not path.is_file():
+            if path.suffix.lower() != ".dem":
+                log.info("selection code=FILE_EXTENSION_REJECTED stage=selection.filter item=%d", ordinal)
+                continue
+            try:
+                regular = stat.S_ISREG(path.stat().st_mode)
+            except FileNotFoundError:
+                log.info("selection code=FILE_MISSING stage=selection.filter item=%d", ordinal)
+                continue
+            except OSError as error:
+                log_failure(log, error, "selection.read")
+                continue
+            if not regular:
+                log.info("selection code=FILE_TYPE_REJECTED stage=selection.filter item=%d", ordinal)
                 continue
             key = uuid.uuid4().hex[:12]
             self._files[key] = path
             log.info("demo=%s selected file=%s", key, json.dumps(path.name, ensure_ascii=False))
             result.append({"id": key, "name": path.name})
+        if not result:
+            raise RuntimeError("FILE_SELECTION_REJECTED：所选文件均无法使用，请选择存在且可读取的 .dem 文件")
+        log.info("selection stage=selection.filter accepted=%d rejected=%d", len(result), len(paths) - len(result))
         return result
 
     def hash_demo(self, key: str) -> str:
@@ -181,7 +289,7 @@ class UploaderApi:
             from cs2df.package import export_demo
 
             def progress(stage, fraction):
-                stage = str(stage)[:80]
+                stage = sanitize_text(stage, 80)
                 fraction = max(0.0, min(1.0, float(fraction)))
                 self._jobs[key].update(stage=stage, progress=fraction)
                 log.info("demo=%s export stage=%s progress=%.3f", key, stage, fraction)
@@ -193,9 +301,16 @@ class UploaderApi:
                 (Path(self._temp.name) / key).write_bytes(data)
                 self._jobs[key].update(state="done", size=len(data), progress=1)
             log.info("demo=%s export complete bytes=%d", key, len(data))
-        except Exception as exc:
-            self._jobs[key].update(state="error", error=f"PARSE_FAILED：{exc}")
-            log.exception("demo=%s export failed", key)
+        except BaseException as exc:
+            # Rust parser panics inherit BaseException; retain cancellation semantics.
+            if not isinstance(exc, Exception) and not (
+                type(exc).__module__ == "pyo3_runtime" and type(exc).__name__ == "PanicException"
+            ):
+                raise
+            failure = log_failure(log, exc, "export:" + self._jobs[key].get("stage", "parse"))
+            failure.update(code="PARSE_FAILED", fileId=key)
+            self._jobs[key].update(state="error", error=f"PARSE_FAILED：{failure['message']}",
+                                   diagnostic=safe_metadata(failure))
 
     def export_status(self, key: str) -> dict:
         return dict(self._jobs[key])
@@ -215,21 +330,19 @@ class UploaderApi:
         log.info("demo=%s temporary data removed", key)
         return True
 
-    def record(self, key: str, phase: str, code: str = "") -> bool:
+    def record(self, key: str, phase: str, code: str = "", diagnostic=None) -> bool:
         # Only controlled identifiers; never accept arbitrary response bodies or tokens into logs.
         import re
         if not all(re.fullmatch(r"[A-Za-z0-9_-]{0,64}", value) for value in (key, phase, code)):
             return False
-        log.info("demo=%s phase=%s code=%s", key, phase, code)
+        log.info("demo=%s phase=%s code=%s diagnostic=%s", key, phase, code,
+                 json.dumps(safe_metadata(diagnostic), ensure_ascii=False))
         return True
 
-    def report_ui_error(self, message: str, stack: str = "") -> bool:
-        import re
-        message = str(message)[:1000]
-        stack = str(stack)[:4000]
-        message = re.sub(r"(?i)(bearer\s+)[A-Za-z0-9._~-]+", r"\1[redacted]", message)
-        stack = re.sub(r"(?i)(bearer\s+)[A-Za-z0-9._~-]+", r"\1[redacted]", stack)
-        log.error("ui startup error message=%s stack=%s", json.dumps(message), json.dumps(stack))
+    def report_ui_error(self, message: str, stack: str = "", diagnostic=None) -> bool:
+        log.error("ui startup error message=%s stack=%s diagnostic=%s",
+                  json.dumps(sanitize_text(message, 1000)), json.dumps(sanitize_text(stack, 4000)),
+                  json.dumps(safe_metadata(diagnostic), ensure_ascii=False))
         return True
 
     def export_logs(self) -> bool:
@@ -239,10 +352,7 @@ class UploaderApi:
         if not target:
             return False
         destination = target if isinstance(target, str) else target[0]
-        for handler in log.handlers:
-            handler.flush()
-        shutil.copyfile(self._userdata / "uploader.log", destination)
-        return True
+        return export_safe_logs(log, Path(destination), self._userdata / "uploader.log")
 
     def close(self):
         with self._lock:
@@ -251,30 +361,66 @@ class UploaderApi:
 
 
 def main():
-    import webview
-    from importlib.metadata import version
+    from cs2dak.uploader_startup import (
+        load_windows_runtime,
+        log_environment,
+        log_failure,
+        prerequisite_error,
+        setup_logging,
+        show_failure,
+        windows_runtimes,
+    )
 
     base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "Library" / "Application Support"))
     userdata = base / "RivalHub Demo Uploader"
-    userdata.mkdir(parents=True, exist_ok=True)
-    handler = RotatingFileHandler(userdata / "uploader.log", maxBytes=1024 * 1024,
-                                 backupCount=2, encoding="utf-8")
-    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
-    log.addHandler(handler)
-    log.setLevel(logging.INFO)
-    log.info("start version=%s platform=%s", version("cs2dak"), sys.platform)
-    api = UploaderApi(userdata)
-    web = (Path(sys._MEIPASS) if getattr(sys, "frozen", False) else Path(__file__).parent)
-    page = web / "rivalhub_uploader_web" / "index.html"
-    if not page.is_file():
-        raise RuntimeError("请先运行 pnpm build:uploader 并复制前端产物，或运行 scripts/package-uploader.sh")
-    api._window = webview.create_window("RivalHub Demo Uploader", str(page), js_api=api,
-                                       width=1080, height=800, min_size=(820, 640))
+    logfile = setup_logging(userdata, log)
+    api = None
+    previous_thread_hook = threading.excepthook
+
+    def thread_failure(args):
+        log_failure(log, args.exc_value, "background.thread")
+        previous_thread_hook(args)
+
+    threading.excepthook = thread_failure
+    stage = "startup.environment"
     try:
-        webview.start(private_mode=True)
+        log_environment(log)
+        if sys.platform == "win32":
+            runtimes = windows_runtimes()
+            log.info("windows runtimes=%s", runtimes)
+            problem = prerequisite_error(runtimes)
+            if problem:
+                raise RuntimeError(problem)
+            stage = "startup.netfx"
+            load_windows_runtime()
+        # Import only after persistent diagnostics and Windows preflight are available.
+        stage = "startup.webview-import"
+        import webview
+
+        stage = "startup.frontend"
+        api = UploaderApi(userdata)
+        web = (Path(sys._MEIPASS) if getattr(sys, "frozen", False) else Path(__file__).parent)
+        page = web / "rivalhub_uploader_web" / "index.html"
+        if not page.is_file():
+            raise RuntimeError("前端文件缺失，请重运行官方安装器；开发环境先运行 scripts/package-uploader.sh")
+        api._window = webview.create_window("RivalHub Demo Uploader", str(page), js_api=api,
+                                           width=1080, height=800, min_size=(820, 640))
+        api._window.events.loaded += lambda: log.info("webview loaded")
+        stage = "startup.webview-start"
+        webview.start(private_mode=True, **({"gui": "edgechromium"} if sys.platform == "win32" else {}))
+    except Exception as exc:
+        failure = log_failure(log, exc, stage)
+        detail = failure.get("guidance", failure["message"])
+        show_failure(logfile, detail)
+        raise SystemExit(1) from exc
     finally:
-        api.close()
-        log.info("closed; temporary exports removed")
+        threading.excepthook = previous_thread_hook
+        if api is not None:
+            try:
+                api.close()
+                log.info("closed; temporary exports removed")
+            except Exception as exc:  # noqa: BLE001 - Cleanup must not replace an active startup failure.
+                log_failure(log, exc, "shutdown.cleanup")
 
 
 if __name__ == "__main__":

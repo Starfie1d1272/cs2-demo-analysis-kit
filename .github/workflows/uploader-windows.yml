@@ -1,0 +1,52 @@
+name: Uploader Windows installer
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/uploader-windows.yml'
+      - 'python/**'
+      - 'apps/rivalhub-uploader/**'
+      - 'packages/rivalhub-upload/**'
+      - 'scripts/*uploader*'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: '3.12'
+          enable-cache: true
+      - run: pnpm install --frozen-lockfile
+      - name: Build complete uploader and installer
+        shell: bash
+        run: bash scripts/package-uploader.sh
+      - name: Build upgrade fixture and verify isolated installation
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $next = [version]$version
+          $upgrade = "$($next.Major).$($next.Minor).$($next.Build + 1)"
+          ./scripts/build-uploader-installer.ps1 -Version $upgrade -OutputDir "$env:RUNNER_TEMP/uploader-upgrade-fixture"
+          ./scripts/test-uploader-installer.ps1 -Installer "$pwd/python/dist/RivalHub-Demo-Uploader-Setup-$version.exe" -UpgradeInstaller "$env:RUNNER_TEMP/uploader-upgrade-fixture/RivalHub-Demo-Uploader-Setup-$upgrade.exe"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: uploader-windows-review
+          compression-level: 0
+          path: |
+            python/dist/RivalHub-Demo-Uploader-Setup-*.exe
+            python/dist/rivalhub-demo-uploader-windows-*.zip
+            ${{ runner.temp }}/Uploader 安装 验证/*.log
+            ${{ runner.temp }}/Uploader 安装 验证/startup/**
+            ${{ runner.temp }}/Uploader 安装 验证/*.json
+            ${{ runner.temp }}/Uploader 安装 验证/*.lnk

@@ -86,12 +86,12 @@ The **v3 ZIP is the only seam** between Python and TypeScript — neither side i
 
 ```bash
 pnpm install
+pnpm typecheck         # builds compiled workspace packages and checks types
 pnpm dev:studio        # DAK Studio (port 5178, .dem import via local uv env)
 pnpm dev               # alias for pnpm dev:studio
 pnpm test              # fast vitest (excludes integration + season validation)
 pnpm test:integration  # cohort / spatial / season validation against real ZIPs
 pnpm test:all          # everything
-pnpm typecheck         # tsc -b across the workspace
 pnpm analyze:sample    # CLI analysis of the sample ZIP → fixtures/output/sample/
 bash scripts/package.sh  # package the desktop app (DMG / exe)
 ```

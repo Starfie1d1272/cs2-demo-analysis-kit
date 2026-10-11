@@ -27,7 +27,7 @@ describe("extractAwpRoundFacts", () => {
     }));
     const round = { roundNumber: 1, freezeEndTick: 0, endTick: 64, teamASide: "ct", teamBSide: "t", teamAEconomy: "full", teamBEconomy: "full", winnerTeamKey: "teamA" } as DemoPackage["rounds"][number];
     const context: ReplayRoundContext = { round, startTick: 0, tickStep: 32, frameCount: 2, placeDict: [], weaponDict: ["awp"], tracks };
-    const pkg = { match: { tickrate: 64, mapName: "de_nuke" }, rounds: [round], players: [{ teamKey: "teamA" }, { teamKey: "teamA" }], kills: [] } as unknown as DemoPackage;
+    const pkg = { match: { tickrate: 64, mapName: "de_nuke" }, rounds: [round], players: tracks.map(track => ({ teamKey: track.teamKey, steamId64: track.steamId64, name: track.steamId64 })), kills: [] } as unknown as DemoPackage;
     const rows = tracks.map((track) => ({ teamKey: "teamA", playerIndex: track.playerIndex, freezeAwpOwnership: true, activeAwpSeconds: 1, awpShots: 0, awpKills: 0, availability: { replay: "available", nav: "missing", callouts: "missing", shots: "missing" } })) as unknown as import("@cs2dak/contract").PlayerPositionRoundFact[];
     expect(extractTeamAwpRoundFacts(pkg, "m1", context, rows).find((item) => item.teamKey === "teamA")?.doubleAwpActiveSeconds).toBe(0);
   });
@@ -40,7 +40,7 @@ describe("extractAwpRoundFacts", () => {
     ];
     const context: ReplayRoundContext = { round, startTick: 10, tickStep: 32, frameCount: 1, placeDict: [], weaponDict: ["awp"], tracks };
     const pkg = {
-      manifest: { files: { damages: "damages.json" } }, match: { tickrate: 64, mapName: "de_nuke" }, rounds: [round], players: [{ teamKey: "teamA" }, { teamKey: "teamB" }], kills: [],
+      manifest: { files: { damages: "damages.json" } }, match: { tickrate: 64, mapName: "de_nuke" }, rounds: [round], players: tracks.map(track => ({ teamKey: track.teamKey, steamId64: track.steamId64, name: track.steamId64 })), kills: [],
       damages: [
         { roundNumber: 1, tick: 20, attackerIndex: 0, victimIndex: 1, weapon: "weapon_awp", healthDamage: 40, healthDamageRaw: 100 },
         { roundNumber: 1, tick: 20, attackerIndex: 0, victimIndex: 0, weapon: "awp", healthDamage: 80, healthDamageRaw: 80 },

@@ -29,7 +29,7 @@ def test_connection_keeps_token_out_of_metadata(api, monkeypatch):
     monkeypatch.setattr(uploader, "credential", credential)
     api.configure("https://example.com/path")
     api.save_connection("pairing", "secret-token")
-    assert "secret-token" not in api._metadata.read_text()
+    assert "secret-token" not in api._metadata.read_text(encoding="utf-8")
     other = uploader.UploaderApi(api._userdata)
     try:
         assert other.connection() == {
@@ -56,16 +56,36 @@ def test_file_hash_chunks_and_cleanup(api, tmp_path, monkeypatch):
     assert source.read_bytes() == b"raw demo"
 
 
-def test_export_failure_is_actionable_and_cleanup_safe(api, tmp_path, monkeypatch):
+@pytest.mark.parametrize("failure_type", [
+    ValueError,
+    type("PanicException", (BaseException,), {"__module__": "pyo3_runtime"}),
+])
+def test_export_failure_is_actionable_and_cleanup_safe(api, tmp_path, monkeypatch, failure_type):
     import cs2df.package
     api._files["demo"] = tmp_path / "missing.dem"
     api._jobs["demo"] = {"state": "running"}
-    monkeypatch.setattr(cs2df.package, "export_demo", Mock(side_effect=ValueError("invalid header")))
+    monkeypatch.setattr(cs2df.package, "export_demo", Mock(side_effect=failure_type("invalid header")))
     api._export("demo")
+    assert api.export_status("demo")["state"] == "error"
     assert api.export_status("demo")["error"] == "PARSE_FAILED：invalid header"
     api.cleanup("demo")
     assert list(Path(api._temp.name).iterdir()) == []
 
+
+
+@pytest.mark.parametrize("failure_type", [
+    KeyboardInterrupt, SystemExit,
+    type("PanicException", (BaseException,), {"__module__": "another_runtime"}),
+])
+def test_export_does_not_swallow_process_control_or_unrelated_base_exceptions(
+    api, tmp_path, monkeypatch, failure_type,
+):
+    import cs2df.package
+    api._files["demo"] = tmp_path / "demo.dem"
+    api._jobs["demo"] = {"state": "running"}
+    monkeypatch.setattr(cs2df.package, "export_demo", Mock(side_effect=failure_type("stop")))
+    with pytest.raises(failure_type):
+        api._export("demo")
 
 def test_bridge_rejects_paths_and_cross_origin_browser(api):
     api.configure("https://example.com")
@@ -128,3 +148,387 @@ def test_replacing_connection_clears_old_credential(api, monkeypatch):
     assert deleted == ["https://old.example"]
     assert vault == {"https://new.example": "new-token"}
     assert api.connection()["baseUrl"] == "https://new.example"
+
+
+def test_bootstrap_persists_clr_import_failure_and_inner_cause(tmp_path, monkeypatch):
+    import builtins
+    import logging
+    import sys
+
+    from cs2dak import uploader_startup as startup
+
+    class ManagedError(Exception):
+        InnerException = ValueError("managed inner reason")
+
+    original_import = builtins.__import__
+
+    def fail_webview(name, *args, **kwargs):
+        if name == "webview":
+            try:
+                raise ManagedError("Loader.Initialize unavailable")
+            except ManagedError as cause:
+                raise RuntimeError("CLR failed") from cause
+        return original_import(name, *args, **kwargs)
+
+    logger = logging.getLogger("isolated-uploader")
+    monkeypatch.setattr(uploader, "log", logger)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "中文 空格"))
+    monkeypatch.setattr(builtins, "__import__", fail_webview)
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(startup, "windows_runtimes", lambda: {
+        "netfx_release": 528040, "webview2_user": "130.0.1.2"})
+    monkeypatch.setattr(startup, "load_windows_runtime", lambda: None)
+    shown = Mock()
+    monkeypatch.setattr(startup, "show_failure", shown)
+    try:
+        with pytest.raises(SystemExit) as exit_info:
+            uploader.main()
+        assert exit_info.value.code == 1
+        evidence = shown.call_args.args[0].read_text(encoding="utf-8")
+        assert "Loader.Initialize unavailable" in evidence
+        assert "managed inner reason" in evidence
+        assert "CLR failed" in evidence
+        assert "package pythonnet=" in evidence
+        assert "executable=" in evidence
+        assert "windows runtimes=" in evidence
+    finally:
+        for handler in logger.handlers:
+            logging.getLogger("pywebview").removeHandler(handler)
+            handler.close()
+        logger.handlers.clear()
+
+
+@pytest.mark.parametrize("runtimes, expected", [
+    ({"netfx_release": 461808, "webview2_user": "130.0.1.2"}, ""),
+    ({"netfx_release": 528040, "webview2_machine": "130.0.1.2"}, ""),
+    ({"netfx_release": 461308, "webview2_machine": "130.0.1.2"}, ".NET Framework"),
+    ({"netfx_release": 528040, "webview2_user": "0.0.0.0"}, "WebView2"),
+])
+def test_windows_prerequisite_guidance(runtimes, expected):
+    from cs2dak.uploader_startup import prerequisite_error
+    message = prerequisite_error(runtimes)
+    if expected:
+        assert expected in message
+        assert "https://" in message
+    else:
+        assert message == ""
+
+
+def test_optional_probe_read_failure_does_not_stop_startup(tmp_path, monkeypatch):
+    import logging
+    import sys
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from cs2dak import uploader_startup as startup
+
+    dll = tmp_path / "python312.dll"
+    dll.write_bytes(b"diagnostic fixture")
+    page = tmp_path / "rivalhub_uploader_web" / "index.html"
+    page.parent.mkdir()
+    page.write_text("<html></html>")
+    original_open = Path.open
+
+    def probe_denied(path, *args, **kwargs):
+        if path == dll:
+            raise PermissionError("diagnostic read denied")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", probe_denied)
+    monkeypatch.setattr(startup, "version", Mock(side_effect=OSError("metadata read denied")))
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "_MEIPASS", str(tmp_path), raising=False)
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(startup, "windows_runtimes", lambda: {
+        "netfx_release": 528040, "webview2_user": "130.0.1.2"})
+    load_runtime = Mock()
+    monkeypatch.setattr(startup, "load_windows_runtime", load_runtime)
+    shown = Mock()
+    monkeypatch.setattr(startup, "show_failure", shown)
+    window = SimpleNamespace(events=SimpleNamespace(loaded=MagicMock()))
+    webview = SimpleNamespace(create_window=Mock(return_value=window), start=Mock())
+    monkeypatch.setitem(sys.modules, "webview", webview)
+    logger = logging.getLogger("isolated-probe-startup")
+    monkeypatch.setattr(uploader, "log", logger)
+    try:
+        uploader.main()
+        load_runtime.assert_called_once_with()
+        webview.start.assert_called_once_with(private_mode=True, gui="edgechromium")
+        shown.assert_not_called()
+        evidence = (tmp_path / "RivalHub Demo Uploader" / "uploader.log").read_text(encoding="utf-8")
+        assert "WARNING" in evidence
+        assert "package metadata probe failed" in evidence
+        assert "bundled DLL probe failed" in evidence
+        assert "diagnostic read denied" in evidence
+        assert "closed; temporary exports removed" in evidence
+    finally:
+        for handler in logger.handlers:
+            logging.getLogger("pywebview").removeHandler(handler)
+            handler.close()
+        logger.handlers.clear()
+
+
+def test_network_reason_and_safe_context_survive(api, monkeypatch, caplog):
+    import urllib.error
+    api.configure('https://example.com')
+    monkeypatch.setattr(uploader.urllib.request, 'build_opener', lambda *args: Mock(
+        open=Mock(side_effect=urllib.error.URLError('certificate verify failed token=private'))))
+    result = api.request('/pairing/start', 'POST')
+    assert result['status'] == 0
+    assert 'certificate verify failed' in result['body']['error']['message']
+    assert result['diagnostic']['stage'] == 'http.request'
+    assert 'private' not in str(result) + caplog.text
+
+
+@pytest.mark.parametrize('status', [200, 502])
+def test_non_json_preserves_http_status_request_id_without_body(api, monkeypatch, caplog, status):
+    import urllib.error
+    api.configure('https://example.com')
+    headers = {'X-Request-Id': 'req-123'}
+    response = io.BytesIO(b'<html>private response body token=secret</html>')
+    response.status = status
+    response.headers = headers
+    opener = Mock()
+    if status == 200:
+        opener.open.return_value = response
+    else:
+        opener.open.side_effect = urllib.error.HTTPError('https://example.com', status, 'bad', headers, response)
+    monkeypatch.setattr(uploader.urllib.request, 'build_opener', lambda *args: opener)
+    result = api.request('/pairing/start', 'POST')
+    assert result['status'] == status
+    assert result['requestId'] == 'req-123'
+    assert result['body']['error']['code'] == 'INVALID_RESPONSE'
+    assert 'private response body' not in str(result) + caplog.text
+
+
+def test_record_structured_failure_is_bounded_and_redacted(api, caplog):
+    import logging
+    caplog.set_level(logging.INFO, logger='rivalhub-uploader')
+    assert api.record('demo', 'failed', 'NETWORK', {
+        'stage': 'upload', 'message': 'timeout Bearer hidden', 'requestId': 'req-1',
+        'cause': 'token=secret', 'body': 'raw response must never log'})
+    assert 'timeout' in caplog.text and 'req-1' in caplog.text
+    assert 'hidden' not in caplog.text and 'raw response' not in caplog.text
+    assert 'token=secret' not in caplog.text
+
+
+def test_incomplete_response_preserves_http_evidence(api, monkeypatch):
+    import http.client
+    from unittest.mock import MagicMock
+    api.configure('https://example.com')
+    response = MagicMock()
+    response.status = 502
+    response.headers = {'X-Request-Id': 'req-incomplete'}
+    response.read.side_effect = http.client.IncompleteRead(b'private response bytes', 100)
+    response.__enter__.return_value = response
+    opener = Mock()
+    opener.open.return_value = response
+    monkeypatch.setattr(uploader.urllib.request, 'build_opener', lambda *args: opener)
+    result = api.request('/pairing/start', 'POST')
+    assert result['status'] == 502
+    assert result['requestId'] == 'req-incomplete'
+    assert result['body']['error']['code'] == 'INVALID_RESPONSE'
+    assert 'IncompleteRead' in result['diagnostic']['cause']
+    assert 'private response bytes' not in str(result)
+
+
+def test_cleanup_failure_does_not_replace_startup_exit(tmp_path, monkeypatch):
+    import logging
+    import sys
+    from types import SimpleNamespace
+
+    from cs2dak import uploader_startup as startup
+
+    logger = logging.getLogger('isolated-cleanup-startup')
+    monkeypatch.setattr(uploader, 'log', logger)
+    monkeypatch.setenv('LOCALAPPDATA', str(tmp_path))
+    monkeypatch.setitem(sys.modules, 'webview', SimpleNamespace())
+    monkeypatch.setattr(startup, 'log_environment', lambda log: None)
+    monkeypatch.setattr(startup, 'windows_runtimes', dict)
+    monkeypatch.setattr(startup, 'prerequisite_error', lambda runtimes: '')
+    monkeypatch.setattr(startup, 'load_windows_runtime', lambda: None)
+    monkeypatch.setattr(startup, 'show_failure', Mock())
+    bridge = Mock()
+    bridge.close.side_effect = OSError('cleanup failure token=secret')
+    monkeypatch.setattr(uploader, 'UploaderApi', lambda userdata: bridge)
+    # Missing packaged frontend fails before window creation on every platform.
+    monkeypatch.setattr(sys, 'frozen', True, raising=False)
+    monkeypatch.setattr(sys, '_MEIPASS', str(tmp_path), raising=False)
+    try:
+        with pytest.raises(SystemExit) as raised:
+            uploader.main()
+        assert raised.value.code == 1
+        assert isinstance(raised.value.__cause__, RuntimeError)
+        content = (tmp_path / 'RivalHub Demo Uploader' / 'uploader.log').read_text(encoding="utf-8")
+        assert 'shutdown.cleanup' in content and 'cleanup failure' in content
+        assert 'token=secret' not in content
+    finally:
+        for handler in logger.handlers:
+            logging.getLogger('pywebview').removeHandler(handler)
+            handler.close()
+        logger.handlers.clear()
+
+
+def test_cancel_undoes_only_owned_authorization_and_restores_previous(api, monkeypatch):
+    vault = {}
+
+    def credential(origin, value=None):
+        if value is None:
+            return vault.get(origin)
+        vault[origin] = value
+        return True
+
+    monkeypatch.setattr(uploader, "credential", credential)
+    monkeypatch.setattr(uploader, "delete_credential", lambda origin: vault.pop(origin, None) is not None)
+    api.configure("https://old.example")
+    api.save_connection("original", "old-token")
+    api.configure("https://new.example")
+    api.save_connection("canceled", "canceled-token", "https://new.example")
+    api.configure("https://new.example", "canceled")
+    assert vault == {"https://old.example": "old-token"}
+    assert api.connection()["pairingId"] == "original"
+    # A late cancellation cannot clear the next successfully saved pairing.
+    api.configure("https://new.example")
+    api.save_connection("next", "next-token", "https://new.example")
+    api.configure("https://new.example", "canceled")
+    assert vault == {"https://new.example": "next-token"}
+    assert api.connection()["pairingId"] == "next"
+
+
+def test_cancel_same_origin_restores_existing_credential(api, monkeypatch):
+    vault = {}
+
+    def credential(origin, value=None):
+        if value is None:
+            return vault.get(origin)
+        vault[origin] = value
+        return True
+
+    monkeypatch.setattr(uploader, "credential", credential)
+    api.configure("https://example.test")
+    api.save_connection("original", "original-token")
+    api.save_connection("canceled", "canceled-token", "https://example.test")
+    api.configure("https://example.test", "canceled")
+    assert vault == {"https://example.test": "original-token"}
+    assert api.connection()["pairingId"] == "original"
+
+
+def test_obsolete_origin_cannot_save_credential(api, monkeypatch):
+    write = Mock()
+    monkeypatch.setattr(uploader, "credential", write)
+    api.configure("https://next.example")
+    with pytest.raises(RuntimeError, match="PAIRING_SUPERSEDED"):
+        api.save_connection("old", "private", "https://old.example")
+    write.assert_not_called()
+
+
+def test_cancel_first_connection_removes_only_its_new_credential(api, monkeypatch):
+    vault = {}
+
+    def credential(origin, value=None):
+        if value is None:
+            return vault.get(origin)
+        vault[origin] = value
+        return True
+
+    monkeypatch.setattr(uploader, "credential", credential)
+    monkeypatch.setattr(uploader, "delete_credential", lambda origin: vault.pop(origin, None) is not None)
+    api.configure("https://example.test")
+    api.save_connection("canceled", "private", "https://example.test")
+    api.configure("https://example.test", "canceled")
+    assert not vault and not api._metadata.exists()
+
+
+def fake_vault(monkeypatch):
+    vault = {}
+
+    def credential(origin, value=None):
+        if value is None:
+            return vault.get(origin)
+        vault[origin] = value
+        return True
+
+    monkeypatch.setattr(uploader, "credential", credential)
+    monkeypatch.setattr(uploader, "delete_credential", lambda origin: vault.pop(origin, None) is not None)
+    return vault
+
+
+def test_cancel_restores_origin_before_any_connection_read_or_request(api, monkeypatch):
+    vault = fake_vault(monkeypatch)
+    api.configure("https://old.example")
+    api.save_connection("original", "old-token")
+    api.configure("https://canceled.example")
+    api.save_connection("canceled", "private", "https://canceled.example")
+    api.configure("https://canceled.example", "canceled")
+    assert api._origin == "https://old.example"
+    assert vault == {"https://old.example": "old-token"}
+    # Do not call connection(): requests must already target the restored origin.
+    sent = []
+
+    def open_request(req, **_kwargs):
+        sent.append(req.full_url)
+        response = io.BytesIO(b'{"events": []}')
+        response.status = 200
+        response.headers = {}
+        return response
+
+    monkeypatch.setattr(uploader.urllib.request, "build_opener", lambda *_args: Mock(open=open_request))
+    assert api.request("/events", "GET")["status"] == 200
+    assert sent == ["https://old.example/api/integrations/dak/events"]
+
+
+@pytest.mark.parametrize("boundary", ["write", "replace"])
+@pytest.mark.parametrize("previous_origin", [None, "https://old.example", "https://new.example"])
+def test_metadata_failure_restores_owned_vault_and_origin(api, monkeypatch, boundary, previous_origin):
+    vault = fake_vault(monkeypatch)
+    if previous_origin:
+        api.configure(previous_origin)
+        api.save_connection("original", "original-token")
+    old_vault = vault.copy()
+    old_metadata = api._metadata.read_bytes() if api._metadata.exists() else None
+    api.configure("https://new.example")
+    staging = api._metadata.with_suffix(".tmp")
+    method = "write_text" if boundary == "write" else "replace"
+    original = getattr(Path, method)
+
+    def fail(path, *args, **kwargs):
+        if path == staging:
+            raise PermissionError("metadata denied")
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, method, fail)
+    with pytest.raises(PermissionError, match="metadata denied"):
+        api.save_connection("failed", "new-token", "https://new.example")
+    assert vault == old_vault
+    assert api._origin == (previous_origin or "")
+    assert (api._metadata.read_bytes() if api._metadata.exists() else None) == old_metadata
+
+
+def test_metadata_failure_and_vault_rollback_failure_are_both_reported(api, monkeypatch, caplog):
+    fake_vault(monkeypatch)
+    api.configure("https://old.example")
+    api.save_connection("original", "old-token")
+    api.configure("https://new.example")
+    previous_credential = uploader.credential
+
+    def fail_restore(origin, value=None):
+        if origin == "https://old.example" and value == "old-token":
+            return False
+        return previous_credential(origin, value)
+
+    monkeypatch.setattr(uploader, "credential", fail_restore)
+    staging = api._metadata.with_suffix(".tmp")
+    original_write = Path.write_text
+
+    def fail_write(path, *args, **kwargs):
+        if path == staging:
+            raise PermissionError("metadata denied")
+        return original_write(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", fail_write)
+    with pytest.raises(RuntimeError, match="CREDENTIAL_ROLLBACK") as failure:
+        api.save_connection("failed", "new-token", "https://new.example")
+    assert isinstance(failure.value.__cause__, PermissionError)
+    assert "connection.save" in caplog.text and "connection.rollback" in caplog.text
+    assert "old-token" not in caplog.text and "new-token" not in caplog.text

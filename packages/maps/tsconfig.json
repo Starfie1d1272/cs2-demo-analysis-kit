@@ -4,9 +4,19 @@
     "composite": true,
     "noEmit": false,
     "declaration": true,
-    "declarationMap": true,
-    "emitDeclarationOnly": true,
-    "outDir": "dist"
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
+    "outDir": "dist",
+    "rootDir": "src"
   },
-  "include": ["src", "map-routes/*.json", "map-nav/*.json", "map-zones/*.json", "callout-grid/*.json"]
+  "include": [
+    "src",
+    "map-routes/*.json",
+    "map-nav/*.json",
+    "map-zones/*.json",
+    "callout-grid/*.json"
+  ],
+  "exclude": [
+    "src/**/*.test.ts"
+  ]
 }

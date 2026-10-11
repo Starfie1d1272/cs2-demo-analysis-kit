@@ -7,6 +7,7 @@
  * - "dev"：pnpm dev:studio 时的 Vite 中间件（POST /api/export-dem → uv run cs2df export）。
  */
 
+import { ExportPolling, normalizeDiagnostic, sanitizeDiagnosticText, type SafeDiagnostic } from "@cs2dak/rivalhub-upload";
 import { bytesToBase64, base64ToBytes } from "./storage/base64";
 
 interface ExportJobStatus {
@@ -16,11 +17,14 @@ interface ExportJobStatus {
   progress: number;
   elapsedSeconds: number;
   error: string | null;
+  diagnostic?: { stage: string; type: string; message: string; causes: { type: string; message: string; relation: string }[] };
   fileName: string | null;
   resultSize: number;
 }
 
 interface PywebviewStudioApi {
+  report_diagnostic?: (diagnostic: SafeDiagnostic) => Promise<{ ok: boolean }>;
+  export_diagnostics?: () => Promise<{ ok: boolean; cancelled?: boolean; error?: string; path?: string }>;
   pick_dems: () => Promise<string[]>;
   hash_file_path?: (path: string) => Promise<
     { ok: true; sha256: string } | { ok: false; error: string }
@@ -183,13 +187,13 @@ async function exportViaPywebview(file: File, onProgress?: (message: string) => 
   };
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+export const exportPolling = new ExportPolling();
 
 /** 每条 bridge 消息的 base64 上限（~512KB），保证回传不随 ZIP 大小膨胀。 */
 const RESULT_CHUNK_SIZE = 512 * 1024;
 
 function formatEta(status: ExportJobStatus): string {
-  if (status.progress < 0.03) return "";
+  if (!Number.isFinite(status.elapsedSeconds) || status.elapsedSeconds < 0 || status.progress < 0.03) return "";
   const remain = (status.elapsedSeconds / status.progress) * (1 - status.progress);
   return remain > 1 ? `，预计还需 ${Math.ceil(remain)}s` : "";
 }
@@ -202,16 +206,15 @@ async function exportPathViaJob(
 ): Promise<File> {
   const api = window.pywebview!.api;
   const { jobId } = await api.start_export_job!(path);
-  for (;;) {
-    const status = await api.get_export_status!(jobId);
-    if (status.state === "error") throw new Error(`${displayName}: ${status.error ?? "导出失败"}`);
-    if (status.state === "done") break;
-    onProgress?.(
-      `${displayName}：${status.stage} ${Math.round(status.progress * 100)}%（已用 ${Math.round(status.elapsedSeconds)}s${formatEta(status)}）`
-    );
-    await sleep(500);
+  let final: ExportJobStatus;
+  try {
+    final = await exportPolling.wait(jobId, () => api.get_export_status!(jobId), status => {
+      onProgress?.(`${displayName}：${sanitizeDiagnosticText(status.stage)} ${Math.round(status.progress * 100)}%（已用 ${Number.isFinite(status.elapsedSeconds) ? Math.round(status.elapsedSeconds) + "s" : "未知"}${formatEta(status)}）`);
+    });
+  } catch (error) {
+    const cause = normalizeDiagnostic(error, { stage: normalizeDiagnostic(error).stage ?? "export", fileId: jobId });
+    throw new Error(`${sanitizeDiagnosticText(displayName)}: ${cause.message}（阶段：${cause.stage}；任务：${jobId}；可在管理页导出诊断日志）`, { cause });
   }
-  const final = await api.get_export_status!(jobId);
   onProgress?.(`${displayName}：传输结果…`);
   // Decode each bridge chunk as it arrives. Keeping one full base64 string in
   // addition to the ZIP bytes needlessly adds ~33% to the single-demo peak.

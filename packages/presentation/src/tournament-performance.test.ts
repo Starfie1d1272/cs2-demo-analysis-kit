@@ -94,7 +94,7 @@ describe("tournament performance adapter", () => {
     expect(result.totals.objective.defuses).toBe(defused);
   });
 
-  it("blocks parity drift before publishing tournament facts", async () => {
+  it("does not gate canonical tournament facts on obsolete aggregate values", async () => {
     const pkg = await fixture;
     const statsTruth = pkg.playerStats[0]!;
     const mismatchedPkg = {
@@ -104,7 +104,7 @@ describe("tournament performance adapter", () => {
         : row),
     };
 
-    expect(() => extractTournamentPerformanceMapFacts({ matchId: "mismatch", pkg: mismatchedPkg })).toThrow(/Core performance parity failed/);
+    expect(extractTournamentPerformanceMapFacts({ matchId: "mismatch", pkg: mismatchedPkg })).toEqual(extractTournamentPerformanceMapFacts({ matchId: "mismatch", pkg }));
   });
 
   it("uses consumer-owned identities without changing frozen metric counts", async () => {

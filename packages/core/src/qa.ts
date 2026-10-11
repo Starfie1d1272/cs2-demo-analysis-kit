@@ -203,7 +203,7 @@ export function demoSourceAvailability(pkg: DemoPackage): DemoSourceAvailability
     playerStats: "available",
     economy: "available",
     rounds: "available",
-    richKills: richKillAvailability(pkg),
+    richKills: richKillAvailability(richKillDiagnostics(pkg)),
     damages: "available",
     bombs: "available",
     utility: "available",
@@ -223,12 +223,30 @@ export function fieldConfidence(availability: ScoreboardFieldAvailability): numb
   return round(values.reduce((sum, value) => sum + value, 0) / values.length, 3);
 }
 
-function richKillAvailability(pkg: DemoPackage): ScoreboardFieldAvailability["richKills"] {
+export type RichKillDiagnostics = {
+  eventCount: number;
+  flagsEventCount: number;
+  namedActiveWeaponEventCount: number;
+  reason: "no_kill_events" | "flags_and_named_active_weapon" | "no_named_active_weapon" | "no_rich_kill_flags";
+};
+
+/** Core owns both capability and its explanation; counts use the same predicates. */
+export function richKillDiagnostics(pkg: DemoPackage): RichKillDiagnostics {
+  const eventCount = pkg.kills.length;
+  const flagsEventCount = pkg.kills.filter((kill) => "throughSmoke" in kill && "noScope" in kill && "penetratedObjects" in kill).length;
+  const namedActiveWeaponEventCount = pkg.kills.filter((kill) => kill.killerActiveWeapon && isNamedWeapon(normalizeWeapon(kill.killerActiveWeapon))).length;
+  const reason = eventCount === 0 ? "no_kill_events"
+    : flagsEventCount > 0 ? (namedActiveWeaponEventCount > 0 ? "flags_and_named_active_weapon" : "no_named_active_weapon")
+    : "no_rich_kill_flags";
+  return { eventCount, flagsEventCount, namedActiveWeaponEventCount, reason };
+}
+
+function richKillAvailability(diagnostics: RichKillDiagnostics): ScoreboardFieldAvailability["richKills"] {
   // A legal empty kills.json is an observed zero, not an unavailable source.
-  if (pkg.kills.length === 0) return "available";
-  const hasFlags = pkg.kills.some((kill) => "throughSmoke" in kill && "noScope" in kill && "penetratedObjects" in kill);
-  const activeWeaponsAreNames = pkg.kills.some((kill) => kill.killerActiveWeapon && isNamedWeapon(normalizeWeapon(kill.killerActiveWeapon)));
-  if (hasFlags && activeWeaponsAreNames) return "available";
-  if (hasFlags) return "partial";
-  return "missing";
+  switch (diagnostics.reason) {
+    case "no_kill_events":
+    case "flags_and_named_active_weapon": return "available";
+    case "no_named_active_weapon": return "partial";
+    case "no_rich_kill_flags": return "missing";
+  }
 }

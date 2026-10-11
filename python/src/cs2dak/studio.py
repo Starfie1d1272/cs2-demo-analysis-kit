@@ -18,10 +18,6 @@
 
 from __future__ import annotations
 
-from cs2dak.credentials import (
-    _windows_credential_get, _windows_credential_set, _windows_credential_delete,
-)
-
 import base64
 import json
 import logging
@@ -30,7 +26,6 @@ import re
 import shutil
 import socket
 import sqlite3
-import subprocess
 import sys
 import tempfile
 import threading
@@ -42,10 +37,26 @@ import webbrowser
 import zipfile
 from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from cs2dak import __version__, updater
+from cs2dak.credentials import (
+    _macos_credential_delete,
+    _macos_credential_get,
+    _macos_credential_set,
+    _windows_credential_delete,
+    _windows_credential_get,
+    _windows_credential_set,
+)
 from cs2dak.cs2_playback import launch_demo
+from cs2dak.diagnostics import (
+    SafeFormatter,
+    export_logs,
+    log_failure,
+    safe_exception,
+    safe_metadata,
+)
 
 # PyInstaller 打包后 __file__ 指向 Contents/Frameworks/（不含数据文件），
 # 实际资源在 sys._MEIPASS 临时目录。未打包时回退到源码目录。
@@ -395,20 +406,37 @@ def _valid_web_overlay(path: Path) -> Path | None:
     return None
 
 
-def _setup_logging(logs_dir: Path) -> None:
+def _setup_logging(logs_dir: Path) -> Path | None:
     """File log in cache/logs + stderr. The log is the user-facing
     answer to "解析到底开始了没有" when the UI looks stuck."""
+    # Configure our own logger even when a host already configured root logging.
+    for handler in list(log.handlers):
+        log.removeHandler(handler)
+        handler.close()
     handlers: list[logging.Handler] = [logging.StreamHandler()]
-    try:
-        logs_dir.mkdir(parents=True, exist_ok=True)
-        handlers.append(logging.FileHandler(logs_dir / "studio.log", encoding="utf-8"))
-    except OSError:
-        pass
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-        handlers=handlers,
-    )
+    active_path: Path | None = None
+    failures: list[OSError] = []
+    # Keep diagnostics available when the installation/userdata directory is read-only.
+    for directory in (logs_dir, Path(tempfile.gettempdir()) / "dak-studio-logs"):
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+            candidate = directory / "studio.log"
+            handlers.append(RotatingFileHandler(
+                candidate, maxBytes=2 * 1024 * 1024,
+                backupCount=3, encoding="utf-8",
+            ))
+            active_path = candidate
+            break
+        except OSError as exc:
+            failures.append(exc)
+    for handler in handlers:
+        handler.setFormatter(SafeFormatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+        log.addHandler(handler)
+    log.setLevel(logging.INFO)
+    log.propagate = False
+    for failure in failures:
+        log_failure(log, failure, "logging.setup")
+    return active_path
 
 
 def _stage_export_result(data: bytes) -> Path:
@@ -419,7 +447,10 @@ def _stage_export_result(data: bytes) -> Path:
         with os.fdopen(fd, "wb") as output:
             output.write(data)
     except Exception:
-        path.unlink(missing_ok=True)
+        try:
+            path.unlink(missing_ok=True)
+        except OSError as cleanup_exc:
+            log_failure(log, cleanup_exc, "export.cleanup")
         raise
     return path
 
@@ -437,6 +468,7 @@ class _ExportJob:
         self.stage = "排队中"
         self.progress = 0.0
         self.error: str | None = None
+        self.diagnostic: dict | None = None
         self.file_name: str | None = None
         self.result_path: Path | None = None
         self.result_size = 0
@@ -449,6 +481,7 @@ class _ExportJob:
             "progress": round(self.progress, 3),
             "elapsedSeconds": round(time.monotonic() - self.started, 1),
             "error": self.error,
+            "diagnostic": self.diagnostic,
             "fileName": self.file_name,
             "resultSize": self.result_size,
         }
@@ -603,59 +636,35 @@ class StudioApi:
         except OSError:
             return False
 
+    def _rivalhub_credential_call(self, operation: str, service: str, account: str, *args):
+        adapters = {
+            "win32": {"read": _windows_credential_get, "write": _windows_credential_set,
+                      "delete": _windows_credential_delete},
+            "darwin": {"read": _macos_credential_get, "write": _macos_credential_set,
+                       "delete": _macos_credential_delete},
+        }
+        if sys.platform not in adapters:
+            return None if operation == "read" else False
+        try:
+            return adapters[sys.platform][operation](service, account, *args)
+        except Exception as error:  # noqa: BLE001 - log the safe adapter failure, then re-raise
+            log_failure(log, error, f"credential.{operation}")
+            raise
+
     def rivalhub_credential_get(self, service: str, account: str) -> str | None:
         if not self._valid_rivalhub_credential_key(service, account):
             return None
-        if sys.platform == "win32":
-            return _windows_credential_get(service, account)
-        if sys.platform != "darwin":
-            return None
-        try:
-            result = subprocess.run(
-                ["/usr/bin/security", "find-generic-password", "-s", service, "-a", account, "-w"],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-        except OSError:
-            return None
-        return result.stdout.rstrip("\r\n") if result.returncode == 0 else None
+        return self._rivalhub_credential_call("read", service, account)
 
     def rivalhub_credential_set(self, service: str, account: str, value: str) -> bool:
         if not self._valid_rivalhub_credential_key(service, account) or not value:
             return False
-        if sys.platform == "win32":
-            return _windows_credential_set(service, account, value)
-        if sys.platform != "darwin":
-            return False
-        try:
-            result = subprocess.run(
-                ["/usr/bin/security", "add-generic-password", "-U", "-s", service, "-a", account, "-w", value],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-        except OSError:
-            return False
-        return result.returncode == 0
+        return self._rivalhub_credential_call("write", service, account, value)
 
     def rivalhub_credential_delete(self, service: str, account: str) -> bool:
         if not self._valid_rivalhub_credential_key(service, account):
             return False
-        if sys.platform == "win32":
-            return _windows_credential_delete(service, account)
-        if sys.platform != "darwin":
-            return False
-        try:
-            result = subprocess.run(
-                ["/usr/bin/security", "delete-generic-password", "-s", service, "-a", account],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-        except OSError:
-            return False
-        return result.returncode == 0
+        return self._rivalhub_credential_call("delete", service, account)
 
     def _blob_dir(self, namespace: str) -> Path:
         if namespace == "demos":
@@ -903,14 +912,17 @@ class StudioApi:
                 allow_multiple=True,
                 file_types=("CS2 Demo (*.dem;*.zip)", "All files (*.*)"),
             )
-        except Exception:
-            # 兜底：过滤器在某后端不被接受时退化为无过滤对话框，
-            # 保证导入入口永远可用。
-            result = self._window.create_file_dialog(
-                webview.FileDialog.OPEN, allow_multiple=True
-            )
+        except Exception as primary:  # noqa: BLE001 - native dialog fallback retains diagnostics
+            log_failure(log, primary, "selection.dialog.filtered")
+            # 过滤器不受支持时仍允许现有无过滤 fallback，但保留首次异常。
+            try:
+                result = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True)
+            except Exception as secondary:  # keep both failures
+                log_failure(log, secondary, "selection.dialog.fallback")
+                raise RuntimeError("FILE_DIALOG_FAILED：文件选择器及兼容模式均失败，请重试") from secondary
+            log.info("selection stage=selection.dialog.fallback outcome=%s", "selected" if result else "cancelled")
         paths = list(result or [])
-        log.info("pick_dems: %d 个文件 %s", len(paths), paths)
+        log.info("selection stage=selection.dialog code=%s count=%d", "FILE_SELECTION_SELECTED" if paths else "FILE_SELECTION_CANCELLED", len(paths))
         return paths
 
     # --- event packages ------------------------------------------------
@@ -1144,15 +1156,17 @@ class StudioApi:
         return {"jobId": job.id}
 
     def _run_export_job(self, job: _ExportJob) -> None:
-        from cs2df.package import export_demo
-
-        dem = Path(job.path)
         try:
+            dem = Path(job.path)
             if dem.suffix.lower() == ".zip":
                 job.stage = "读取 ZIP"
                 data = dem.read_bytes()
                 job.file_name = dem.name
             else:
+                job.stage = "export.dependencies"
+                from cs2df.package import export_demo
+
+                job.stage = "export.parse"
                 def on_progress(stage: str, frac: float) -> None:
                     job.stage = stage
                     job.progress = frac
@@ -1160,6 +1174,7 @@ class StudioApi:
 
                 data, match_meta = export_demo(str(dem), research=True, progress=on_progress)
                 job.file_name = _build_zip_name(dem, match_meta)
+            job.stage = "export.stage_result"
             job.result_path = _stage_export_result(data)
             job.result_size = len(data)
             del data
@@ -1168,19 +1183,29 @@ class StudioApi:
             job.stage = "完成"
             log.info("export job %s done: %s (%.1fs, %d bytes)", job.id,
                      job.file_name, time.monotonic() - job.started, job.result_size)
-        except Exception as exc:  # noqa: BLE001 - surface parse failures to the UI
-            if job.result_path is not None:
-                job.result_path.unlink(missing_ok=True)
-                job.result_path = None
-                job.result_size = 0
+        except BaseException as exc:  # Worker boundary: only parser panics and ordinary failures.
+            if not isinstance(exc, Exception) and not (
+                type(exc).__module__ == "pyo3_runtime" and type(exc).__name__ == "PanicException"
+            ):
+                raise
+            job.diagnostic = safe_exception(exc, job.stage)
+            job.error = job.diagnostic["message"]
             job.state = "error"
-            job.error = str(exc)
-            log.exception("export job %s failed: %s", job.id, job.path)
+            log.error("export job %s failed: %s", job.id, json.dumps(job.diagnostic, ensure_ascii=False))
+            log_failure(log, exc, job.stage)
+            if job.result_path is not None:
+                try:
+                    job.result_path.unlink(missing_ok=True)
+                except OSError as cleanup_exc:
+                    log_failure(log, cleanup_exc, "export.cleanup")
+                finally:
+                    job.result_path = None
+                    job.result_size = 0
 
     def get_export_status(self, job_id: str) -> dict:
         job = self._jobs.get(job_id)
         if job is None:
-            return {"id": job_id, "state": "error", "error": "未知任务",
+            return {"id": job_id, "state": "error", "code": "EXPORT_JOB_NOT_FOUND", "error": "未知任务",
                     "stage": "", "progress": 0, "elapsedSeconds": 0,
                     "fileName": None, "resultSize": 0}
         return job.status()
@@ -1745,6 +1770,33 @@ class StudioApi:
             log.warning("tri_download %s failed: %s", map_name, exc)
             return {"ok": False, "error": str(exc)}
 
+    def report_diagnostic(self, diagnostic: dict) -> dict:
+        """Persist only the bounded, sanitized frontend diagnostic allowlist."""
+        try:
+            log.warning("frontend diagnostic %s", json.dumps(safe_metadata(diagnostic), ensure_ascii=False))
+            return {"ok": True}
+        except Exception:  # noqa: BLE001 - diagnostic reporting must not change task outcome
+            return {"ok": False}
+
+    def export_diagnostics(self) -> dict:
+        """Save sanitized, bounded current and rotated logs via the native dialog."""
+        try:
+            import webview
+
+            result = self._window.create_file_dialog(
+                webview.FileDialog.SAVE, save_filename="dak-studio-diagnostics.log",
+                file_types=("Log (*.log)",),
+            )
+            if not result:
+                return {"ok": False, "cancelled": True}
+            destination = Path(result if isinstance(result, str) else result[0])
+            if not export_logs(log, destination, _logs_dir_for(self._userdata) / "studio.log"):
+                return {"ok": False, "error": "没有可导出的诊断日志，请重启 Studio 后重试"}
+            return {"ok": True, "path": str(destination)}
+        except Exception as exc:  # noqa: BLE001 - native bridge boundary
+            diagnostic = log_failure(log, exc, "diagnostics.export")
+            return {"ok": False, "error": diagnostic["message"], "diagnostic": diagnostic}
+
     # --- Library 目录（用户可见数据目录：显示路径 / 在文件管理器打开）-------------
     def userdata_dir(self) -> str:
         """用户数据目录绝对路径（资料库 SQLite + 原始 ZIP + 备份）。"""
@@ -1772,7 +1824,7 @@ class StudioApi:
             return {"ok": False, "error": str(exc)}
 
 
-def main() -> None:
+def _launch_studio(storage: Path) -> None:
     """gui-script entry point (see pyproject [project.gui-scripts])."""
     import webview
 
@@ -1783,12 +1835,10 @@ def main() -> None:
     from webview.dom import _dnd_state
     _dnd_state["num_listeners"] = max(_dnd_state["num_listeners"], 1)
 
-    storage = _studio_userdata()
     _migrate_storage_layout(storage)
     assets = _assets_dir_for(storage)
     cache = _cache_dir_for(storage)
     updates = _updates_dir_for(storage)
-    _setup_logging(_logs_dir_for(storage))
     log.info("DAK Studio %s 启动，userdata=%s assets=%s cache=%s updates=%s", __version__, storage, assets, cache, updates)
 
     index = WEB_DIR / "index.html"
@@ -1827,6 +1877,25 @@ def main() -> None:
     # private_mode=False：Windows Edge Chromium 默认隐私模式会把
     # IndexedDB 等数据存到临时目录，重启丢失；显式关掉后落盘到持久目录。
     webview.start(private_mode=False, storage_path=str(storage))
+
+
+def main() -> None:
+    log_path: Path | None = None
+    logging_ready = False
+    try:
+        storage = _studio_userdata()
+        log_path = _setup_logging(_logs_dir_for(storage))
+        logging_ready = True
+        _launch_studio(storage)
+    except (Exception, SystemExit) as exc:
+        if not logging_ready:
+            log_path = _setup_logging(Path(tempfile.gettempdir()) / "dak-studio-logs")
+        diagnostic = log_failure(log, exc, "studio.startup")
+        raise SystemExit(
+            f"DAK Studio 启动失败：{diagnostic['message']}。"
+            f"{diagnostic.get('guidance', '请重新安装完整桌面包；开发环境运行 uv sync --extra gui。')}"
+            f"日志：{log_path if log_path else '文件日志不可写，请从终端启动并保存错误输出'}"
+        ) from exc
 
 
 if __name__ == "__main__":

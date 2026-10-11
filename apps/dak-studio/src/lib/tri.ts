@@ -1,4 +1,6 @@
-import { buildTriangleBvh, parseAwpyTri, type TriangleBvh } from "@cs2dak/maps";
+import { type TriangleBvh } from "@cs2dak/maps";
+import { reportDiagnostic } from "./worker-diagnostics";
+import { buildTriBvh, fetchTriBuffer, isValidTriBuffer, triDiagnostic } from "./tri-loading";
 import { touchLimitedCache } from "./idb";
 import { getStorage } from "./storage";
 
@@ -16,43 +18,37 @@ const bvhCache = new Map<string, Promise<TriangleBvh | null>>();
 
 const triStore = getStorage().blobs("tri");
 
-function isValidTriBuffer(buffer: ArrayBuffer): boolean {
-  return buffer.byteLength > 0 && buffer.byteLength % 36 === 0;
-}
-
 async function readTriBuffer(mapName: string): Promise<ArrayBuffer | null> {
   try {
     const buffer = await triStore.get(mapName);
-    return buffer && isValidTriBuffer(buffer) ? buffer : null;
-  } catch {
+    if (buffer && !isValidTriBuffer(buffer)) {
+      triDiagnostic(reportDiagnostic, mapName, "TRI_INVALID", "cache_read", "Cached optional tri asset has an invalid byte length");
+      return null;
+    }
+    return buffer ?? null;
+  } catch (error) {
+    triDiagnostic(reportDiagnostic, mapName, "TRI_READ_FAILED", "cache_read", "Optional tri cache could not be read; trying the asset source", error);
     return null;
   }
 }
 
-async function writeTriBuffer(mapName: string, buffer: ArrayBuffer): Promise<void> {
+async function writeTriBuffer(mapName: string, buffer: ArrayBuffer): Promise<boolean> {
   try {
-    if (!isValidTriBuffer(buffer)) return;
+    if (!isValidTriBuffer(buffer)) return false;
     await triStore.put(mapName, buffer);
-  } catch {
-    // tri cache is an optimization; fetch fallback remains valid.
+    return true;
+  } catch (error) {
+    triDiagnostic(reportDiagnostic, mapName, "TRI_CACHE_WRITE_FAILED", "cache_write", "Optional tri cache could not be written", error);
+    return false;
   }
-}
-
-async function fetchTriBuffer(mapName: string): Promise<ArrayBuffer | null> {
-  const response = await fetch(`./tris/${mapName}.tri`);
-  if (!response.ok) return null;
-  const contentType = response.headers.get("content-type") ?? "";
-  // dev server 对缺失文件可能回退 index.html（200 + text/html）
-  if (contentType.includes("text/html")) return null;
-  const buffer = await response.arrayBuffer();
-  return isValidTriBuffer(buffer) ? buffer : null;
 }
 
 /** 已持久化（blob 命名空间）的 .tri 地图名列表；用于资产管理的"已装/缺失"矩阵。 */
 export async function listInstalledTris(): Promise<string[]> {
   try {
     return (await triStore.keys()).sort();
-  } catch {
+  } catch (error) {
+    triDiagnostic(reportDiagnostic, "tri", "TRI_READ_FAILED", "cache_list", "Optional tri cache could not be listed", error);
     return [];
   }
 }
@@ -63,8 +59,11 @@ export async function listInstalledTris(): Promise<string[]> {
  * @returns 是否成功写入。
  */
 export async function installTriBuffer(mapName: string, buffer: ArrayBuffer): Promise<boolean> {
-  if (!isValidTriBuffer(buffer)) return false;
-  await writeTriBuffer(mapName, buffer);
+  if (!isValidTriBuffer(buffer)) {
+    triDiagnostic(reportDiagnostic, mapName, "TRI_INVALID", "install", "Optional tri asset has an invalid byte length");
+    return false;
+  }
+  if (!await writeTriBuffer(mapName, buffer)) return false;
   bvhCache.delete(mapName);
   return true;
 }
@@ -75,11 +74,12 @@ export function loadMapTri(mapName: string): Promise<TriangleBvh | null> {
   const promise = (async () => {
     try {
       const persisted = await readTriBuffer(mapName);
-      const buffer = persisted ?? await fetchTriBuffer(mapName);
+      const buffer = persisted ?? await fetchTriBuffer(mapName, "./tris/", reportDiagnostic);
       if (!buffer) return null;
       if (!persisted) void writeTriBuffer(mapName, buffer.slice(0));
-      return buildTriangleBvh(parseAwpyTri(buffer));
-    } catch {
+      return buildTriBvh(buffer, mapName, reportDiagnostic);
+    } catch (error) {
+      triDiagnostic(reportDiagnostic, mapName, "TRI_READ_FAILED", "load", "Optional tri asset could not be loaded", error);
       return null;
     }
   })();

@@ -315,8 +315,10 @@ describe("buildTournamentInsights", () => {
       pistolConversionPercent: 50,
     };
 
-    expect(selectStableFields(fromDemo)).toEqual(expected);
-    expect(selectStableFields(fromFacts)).toEqual(expected);
+    const legacyDisplayFields = (value: unknown) => JSON.parse(JSON.stringify(value, (key, item) => key === "teamEntityKey" ? undefined : item));
+    expect(legacyDisplayFields(selectStableFields(fromDemo))).toEqual(expected);
+    expect(legacyDisplayFields(selectStableFields(fromFacts))).toEqual(expected);
+    expect(fromFacts.teamEconomySummaries.map(row => row.teamEntityKey).sort()).toEqual(["observed-team:m1:teamA", "observed-team:m1:teamB"]);
   });
 
   it("aggregates round-level rates across demos", async () => {
@@ -400,6 +402,8 @@ describe("buildTournamentInsights", () => {
     ];
     const base: TournamentFacts = {
       matchId: "tail-regression",
+      teamEntityKeys: { teamA: "team-alpha", teamB: "team-bravo" },
+      playerEntityKeys: Object.fromEntries(players.map(player => [player.steamId64, `steam:${player.steamId64}`])),
       mapName: "de_ancient",
       teams: { teamA: "Alpha", teamB: "Bravo" },
       players,

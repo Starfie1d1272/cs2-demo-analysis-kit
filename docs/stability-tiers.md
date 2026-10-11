@@ -25,7 +25,7 @@ UI 约定：Beta 指标在标题旁标 `Beta`，Experimental 标 `实验`；两�
   该 profile 将 offensive kill credit 统一为 enemy-player kill，`dak-stable/2` 与 `/1` 只作为
   immutable historical artifact 保留，不与 `/3` 静默混合。`@cs2dak/tournament` identity 只认
   entity key，`rate` 保留原始分子/分母；当前 Evidence producer provenance 为
-  `cs2-demo-analysis-kit/1.0.3`。
+  `cs2-demo-analysis-kit/1.0.4`。
 - **RR v1 单场数据线**：frozen pro baseline（`1.0 = 职业基线`），单场口径稳定。
 - **2D 回放与 EvidenceLink**：回放帧、锚点、统计跳转——基础设施级。
 - **QA 报告**：damage/freeze 伪影规则已冻结（见 `studio-redesign.md` §1）。

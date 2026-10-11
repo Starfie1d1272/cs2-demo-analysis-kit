@@ -1,3 +1,4 @@
+import { deleteMatchRows, settleWrites } from "./storage/match-rows";
 import type {
   FactsScope,
   FactsStore,
@@ -47,8 +48,8 @@ async function replaceRows<T extends { matchId: string }>(
   rows: Array<[string, T]>,
   matchId: string,
 ): Promise<void> {
-  await store.deleteByPrefix(matchId);
-  if (rows.length > 0) await Promise.all(rows.map(([key, row]) => store.put(key, row)));
+  await deleteMatchRows(store, matchId);
+  if (rows.length > 0) await settleWrites(rows.map(([key, row]) => store.put(key, row)));
 }
 
 const ROW_KEY_SEP = "\t";
@@ -71,7 +72,7 @@ export function createFactsStore(adapter: StorageAdapter, namespace = FACTS_NAME
 
   return {
     async putMatchFacts(facts) {
-      await Promise.all([
+      await settleWrites([
         replaceRows(playerStats, facts.playerMatchStats.map((row) => [rowKey(row.matchId, row.playerKey), row]), facts.matchId),
         replaceRows(playerWeapons, facts.playerWeapons.map((row) => [rowKey(row.matchId, row.playerKey, row.weapon), row]), facts.matchId),
         replaceRows(mechanics, facts.mechanicsSamples.map((row) => [rowKey(row.matchId, row.playerKey, row.weapon), row]), facts.matchId),
@@ -142,7 +143,7 @@ export function createFactsStore(adapter: StorageAdapter, namespace = FACTS_NAME
         .sort((a, b) => a.matchId.localeCompare(b.matchId) || a.roundNumber - b.roundNumber || a.teamKey.localeCompare(b.teamKey) || a.playerIndex - b.playerIndex);
     },
     async deleteMatchFacts(matchId) {
-      await Promise.all([
+      await settleWrites([
         playerStats,
         playerWeapons,
         mechanics,
@@ -153,7 +154,7 @@ export function createFactsStore(adapter: StorageAdapter, namespace = FACTS_NAME
         teamShapeRounds,
         teamAwpRounds,
         ctRotationRounds,
-      ].map((store) => store.deleteByPrefix(matchId)));
+      ].map((store) => deleteMatchRows(store, matchId)));
     },
   };
 }

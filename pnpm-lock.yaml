@@ -323,6 +323,9 @@ importers:
       '@cs2dak/maps':
         specifier: workspace:*
         version: link:../maps
+      '@cs2dak/tournament':
+        specifier: workspace:*
+        version: link:../tournament
       '@rivalhub/rival-rating':
         specifier: ^0.3.0
         version: 0.3.0
@@ -382,9 +385,9 @@ importers:
       '@cs2dak/core':
         specifier: workspace:*
         version: link:../core
-      '@cs2dak/presentation':
+      '@cs2dak/tournament':
         specifier: workspace:*
-        version: link:../presentation
+        version: link:../tournament
       zod:
         specifier: ^4.6.5
         version: 4.6.5

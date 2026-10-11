@@ -17,7 +17,7 @@ vi.mock("./storage", () => ({
   }),
 }));
 
-import { connectRivalHub, normalizeBaseUrl, revokeRivalHubPairing, rivalHubEvidenceIdempotencyKey } from "./rivalhub";
+import { assertRivalHubConnected, rivalHubFailureMessage, fetchRivalHubEvents, submitRivalHubEvidence, connectRivalHub, loadRivalHubConnection, normalizeBaseUrl, revokeRivalHubPairing, rivalHubEvidenceIdempotencyKey } from "./rivalhub";
 
 describe("RivalHub pairing revocation", () => {
   beforeEach(() => {
@@ -52,6 +52,57 @@ describe("RivalHub pairing revocation", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("keeps vault read failures visible without clearing connection metadata", async () => {
+    credentialGet.mockRejectedValueOnce({ message: "CREDENTIAL_READ：钥匙串拒绝访问（退出码 36）" });
+    const state = await loadRivalHubConnection();
+    expect(state).toMatchObject({ status: "error", baseUrl: "https://rivalhub.test", connectedAt: 1, lastSyncAt: 2 });
+    expect(state.error).toContain("CREDENTIAL_READ");
+    expect(recordDelete).not.toHaveBeenCalled();
+    expect(recordPut).not.toHaveBeenCalled();
+    expect(credentialDelete).not.toHaveBeenCalled();
+  });
+
+  it("treats only an absent credential as disconnected", async () => {
+    credentialGet.mockResolvedValueOnce(null);
+    expect(await loadRivalHubConnection()).toMatchObject({ status: "disconnected", error: null });
+  });
+
+  it.each(["refresh", "upload", "revoke"])("preserves vault failure through %s without HTTP/metadata writes", async (operation) => {
+    credentialGet.mockRejectedValue({ message: "[Errno 5] CREDENTIAL_READ：登录钥匙串拒绝访问，请解锁后重试 accessToken=synthetic-private https://private.test/?token=secret" });
+    const action = operation === "refresh" ? fetchRivalHubEvents
+      : operation === "revoke" ? revokeRivalHubPairing
+      : () => submitRivalHubEvidence({} as Parameters<typeof submitRivalHubEvidence>[0], "key");
+    let failure: unknown;
+    try { await action(); } catch (error) { failure = error; }
+    expect(failure).toBeInstanceOf(Error);
+    const message = rivalHubFailureMessage(failure);
+    expect(message).toContain("Errno 5");
+    expect(message).toContain("CREDENTIAL_READ");
+    expect(message).toContain("解锁后重试");
+    expect(message).not.toContain("尚未连接");
+    expect(message).not.toContain("synthetic-private");
+    expect(message).not.toContain("private.test");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(recordPut).not.toHaveBeenCalled();
+    expect(recordDelete).not.toHaveBeenCalled();
+    expect(credentialDelete).not.toHaveBeenCalled();
+  });
+
+  it("keeps a second vault read failure safe after connection inspection succeeded", async () => {
+    credentialGet.mockResolvedValueOnce("existing-token").mockRejectedValueOnce({ message: "CREDENTIAL_READ：退出码 36，请解锁 accessToken=synthetic-private" });
+    await expect(fetchRivalHubEvents()).rejects.toThrow("退出码 36");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("preserves the error state during post-refresh inspection and sanitizes UI fallback", () => {
+    const state = { baseUrl: "https://rivalhub.test", pairingId: "pairing", connectedAt: 1, lastSyncAt: 2, status: "error" as const, error: "CREDENTIAL_READ：退出码 36，请解锁 password=synthetic-private" };
+    expect(() => assertRivalHubConnected(state)).toThrow("退出码 36");
+    expect(rivalHubFailureMessage(new Error("尚未连接 RivalHub"), state)).toContain("解锁");
+    expect(rivalHubFailureMessage(new Error("尚未连接 RivalHub"), state)).not.toContain("synthetic-private");
+    expect(rivalHubFailureMessage({ message: "CREDENTIAL_DELETE：系统错误 5 token=synthetic-private" })).toContain("系统错误 5");
+    expect(rivalHubFailureMessage({ message: "CREDENTIAL_DELETE：系统错误 5 token=synthetic-private" })).not.toContain("synthetic-private");
   });
 
   it("revokes the current server pairing before clearing local credential and record", async () => {

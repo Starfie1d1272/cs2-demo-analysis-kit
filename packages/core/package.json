@@ -16,7 +16,8 @@
     "@cs2dak/contract": "workspace:*",
     "@cs2dak/maps": "workspace:*",
     "@rivalhub/rival-rating": "^0.3.0",
-    "jszip": "^3.10.2"
+    "jszip": "^3.10.2",
+    "@cs2dak/tournament": "workspace:*"
   },
   "files": [
     "src"

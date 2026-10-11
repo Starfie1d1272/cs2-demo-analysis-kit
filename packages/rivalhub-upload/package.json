@@ -1,6 +1,6 @@
 {
   "name": "@cs2dak/rivalhub-upload",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "private": true,
   "type": "module",
   "exports": {
@@ -13,7 +13,7 @@
   "dependencies": {
     "@cs2dak/contract": "workspace:*",
     "@cs2dak/core": "workspace:*",
-    "@cs2dak/presentation": "workspace:*",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "@cs2dak/tournament": "workspace:*"
   }
 }

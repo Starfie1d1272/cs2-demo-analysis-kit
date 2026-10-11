@@ -2,8 +2,10 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { DemoPackage, PackageKill } from "@cs2dak/contract";
-import { aggregatePlayerRoundPerformanceFacts, buildPlayerRoundPerformanceFacts, loadDemoPackageFromZip } from "@cs2dak/core/evidence";
+import { aggregatePlayerRoundPerformanceFacts, buildPlayerRoundPerformanceFacts, loadDemoPackageFromZip, extractTournamentSourceFacts, projectTournamentMapFacts } from "@cs2dak/core/evidence";
 import { buildRivalHubDemoEvidenceV1, fixtureIdentity, fixtureTarget, matchRivalHubParticipants, matchRivalHubParticipantsForReview, normalizeRivalHubDemoPackage, resolveRivalHubParticipants, resolveRivalHubParticipantsFromEventRoster, resolveRivalHubParticipantsForReview, selectRivalHubMap, type RivalHubEvidenceTarget, type RivalHubTeamOrientation } from "./evidence";
+import { rivalHubEvidenceIdempotencyKey } from "./client";
+import type { RivalHubEvidenceSubmission } from "./contract";
 import { matchRivalHubMap, type RivalHubMatchCandidate } from "./match";
 import type { RivalHubRemoteMap, RivalHubRemotePlayer, RivalHubRemoteTeam } from "./contract";
 
@@ -225,6 +227,25 @@ function evidencePackageWithTeamkill(): { pkg: DemoPackage; identities: Map<stri
 }
 
 describe("RivalHub online Demo matching", () => {
+  it("same team labels and renamed nicknames keep Evidence facts unchanged and use stable target IDs", () => {
+    const canonicalTarget = fixtureTarget();
+    const identities = new Map(stableFixture.players.map((player, index) => [player.steamId64, fixtureIdentity(player, index, canonicalTarget)]));
+    const renamed = { ...stableFixture, match: { ...stableFixture.match, teamA: { ...stableFixture.match.teamA, name: "Identical" }, teamB: { ...stableFixture.match.teamB, name: "Identical" } }, players: stableFixture.players.map(player => ({ ...player, name: "Renamed player" })) };
+    const baseline = buildRivalHubDemoEvidenceV1(stableFixture, canonicalTarget, identities) as any;
+    const evidence = buildRivalHubDemoEvidenceV1(renamed, canonicalTarget, identities) as any;
+    expect(evidence.sourceFacts).toEqual(baseline.sourceFacts);
+    expect(evidence.semanticFacts).toEqual(baseline.semanticFacts);
+    expect(evidence.summaries).toEqual(baseline.summaries);
+    const identity = { teamEntityKeys: { teamA: canonicalTarget.entryAId, teamB: canonicalTarget.entryBId }, playerEntityKeys: Object.fromEntries([...identities].map(([sid, player]) => [sid, player.steamId64])) };
+    const frozen = projectTournamentMapFacts(extractTournamentSourceFacts({ matchId: canonicalTarget.matchMapId, pkg: renamed }, identity));
+    for (const key of ["teamA", "teamB"] as const) {
+      const row = evidence.semanticFacts.teamConversions.find((item: { teamKey: string }) => item.teamKey === key);
+      expect(row.pistol).toEqual(frozen.teamConversions[key].pistol);
+      expect(row.round2).toEqual(frozen.teamConversions[key].round2);
+      expect(row.ecoSemiUpset).toEqual(frozen.teamConversions[key].ecoSemiUpset);
+    }
+    expect(() => buildRivalHubDemoEvidenceV1(renamed, { ...canonicalTarget, entryBId: canonicalTarget.entryAId }, identities)).toThrow("teamA and teamB must differ");
+  });
   it("keeps published tournament semantic facts exact after the owner migration", () => {
     const target = fixtureTarget();
     const identities = new Map(stableFixture.players.map((player, index) => [player.steamId64, fixtureIdentity(player, index, target)]));
@@ -242,7 +263,7 @@ describe("RivalHub online Demo matching", () => {
       };
     };
 
-    expect(evidence.contract).toEqual({ contractVersion: "rivalhub-demo-evidence/1", semanticProfile: "dak-stable/3", analysisVersion: "cs2-demo-analysis-kit/1.0.3" });
+    expect(evidence.contract).toEqual({ contractVersion: "rivalhub-demo-evidence/1", semanticProfile: "dak-stable/3", analysisVersion: "cs2-demo-analysis-kit/1.0.4" });
     expect(evidence.semanticFacts.economyMatrix).toEqual([
       { lowEconomy: "full", highEconomy: "full", rounds: 10, lowEconomyWins: 6 },
       { lowEconomy: "force", highEconomy: "full", rounds: 4, lowEconomyWins: 4 },
@@ -276,6 +297,49 @@ describe("RivalHub online Demo matching", () => {
         ],
       },
     ]);
+  });
+
+  it("emits empty diagnostic issues for the zero-warning committed smoke ZIP", async () => {
+    const pkg = await loadDemoPackageFromZip(await readFile(resolve(process.cwd(), "fixtures/input/cologne-major-2026-stage3-smoke-de_nuke.zip")), { profile: "evidence" });
+    const target = { ...fixtureTarget(), expectedMapName: "de_nuke" };
+    const identities = new Map(pkg.players.map((player, index) => [player.steamId64, fixtureIdentity(player, index, target)]));
+    const evidence = buildRivalHubDemoEvidenceV1(pkg, target, identities);
+    expect((evidence.extensions as Record<string, any>)["cs2dak/diagnostics"].qa).toEqual({ issues: [], omittedIssueCount: 0 });
+  });
+
+  it("preserves multiple producer warning details without changing facts", () => {
+    const { pkg, identities } = evidencePackageWithTeamkill();
+    const modified = { ...pkg, kills: pkg.kills.map((kill) => ({ ...kill, victimPosition: { x: 0, y: 0, z: 0 } })) };
+    const evidence = buildRivalHubDemoEvidenceV1(modified, fixtureTarget(), identities);
+    const diagnostics = (evidence.extensions as Record<string, any>)["cs2dak/diagnostics"];
+    expect(diagnostics.qa.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "economy.coverage_incomplete", severity: "warning", path: "playerEconomies" }),
+      expect.objectContaining({ code: "spatial.no_real_kill_positions", severity: "warning", path: "kills" }),
+    ]));
+    expect((evidence.quality as any).qa.warningCount).toBe(diagnostics.qa.issues.length);
+  });
+
+  it("retains fixture warnings, capability reasons, stable retry hashes and unchanged facts", async () => {
+    const target = fixtureTarget();
+    const identities = new Map(stableFixture.players.map((player, index) => [player.steamId64, fixtureIdentity(player, index, target)]));
+    const first = buildRivalHubDemoEvidenceV1(stableFixture, target, identities);
+    const retry = buildRivalHubDemoEvidenceV1(stableFixture, target, identities);
+    const diagnostics = (first.extensions as Record<string, any>)["cs2dak/diagnostics"];
+    expect(diagnostics.version).toBe(1);
+    expect(diagnostics.qa.issues.length + diagnostics.qa.omittedIssueCount).toBe((first.quality as any).qa.issueCount);
+    expect(diagnostics.richKills.eventCount).toBe(stableFixture.kills.length);
+    const hash = (payload: Record<string, unknown>) => rivalHubEvidenceIdempotencyKey(target.matchMapId, payload as RivalHubEvidenceSubmission);
+    expect(await hash(retry)).toBe(await hash(first));
+    const oldPayload = { ...first, extensions: {}, source: { ...(first.source as object), producerVersion: "cs2dak-rivalhub-evidence/0.1.0" } };
+    expect(await hash(oldPayload)).not.toBe(await hash(first));
+    const withoutWeaponNames = buildRivalHubDemoEvidenceV1({
+      ...stableFixture,
+      kills: stableFixture.kills.map((kill) => ({ ...kill, killerActiveWeapon: null })),
+    }, target, identities);
+    expect(withoutWeaponNames.sourceFacts).toEqual(first.sourceFacts);
+    expect(withoutWeaponNames.semanticFacts).toEqual(first.semanticFacts);
+    expect(withoutWeaponNames.summaries).toEqual(first.summaries);
+    expect((withoutWeaponNames.extensions as Record<string, any>)["cs2dak/diagnostics"].richKills.namedActiveWeaponEventCount).toBe(0);
   });
 
   it("keeps Evidence V1 output byte-for-byte equivalent while omitting optional streams", () => {
@@ -373,18 +437,13 @@ describe("RivalHub online Demo matching", () => {
     })).toThrow(/playerStats\.playerIndex/);
   });
 
-  it("blocks Evidence when Core parity QA reports semantic drift", () => {
+  it("blocks Evidence on genuine source QA errors after removing the old oracle", () => {
     const target = fixtureTarget();
     const identities = new Map(stableFixture.players.map((player, index) => [player.steamId64, fixtureIdentity(player, index, target)]));
-    const statsTruth = stableFixture.playerStats[0]!;
-    const mismatched = {
-      ...stableFixture,
-      playerStats: stableFixture.playerStats.map((stats) => stats.playerIndex === statsTruth.playerIndex
-        ? { ...stats, deaths: stats.deaths + 1 }
-        : stats),
-    };
-
-    expect(() => buildRivalHubDemoEvidenceV1(mismatched, target, identities)).toThrow("Evidence blocked by Core QA: performance.parity_mismatch");
+    const damaged = { ...stableFixture, match: { ...stableFixture.match, teamA: { ...stableFixture.match.teamA, score: stableFixture.match.teamA.score + 1 } } };
+    expect(() => buildRivalHubDemoEvidenceV1(damaged, target, identities)).toThrow("Evidence blocked by Core QA: score.round_winners_mismatch");
+    const oldStats = { ...stableFixture, playerStats: stableFixture.playerStats.map(row => ({ ...row, firstKillCount: row.firstKillCount + 10, firstDeathCount: row.firstDeathCount + 10 })) };
+    expect(buildRivalHubDemoEvidenceV1(oldStats, target, identities)).toEqual(buildRivalHubDemoEvidenceV1(stableFixture, target, identities));
   });
 
   it("uses the canonical Steam64 lineup and rejects a missing member", () => {

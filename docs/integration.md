@@ -25,8 +25,11 @@ v3 ZIP（cs2-demo-format/3.x，由 cs2df 导出）
 `@cs2dak/presentation`。单图 performance 先由 `@cs2dak/core` 的
 `buildPlayerRoundPerformanceFacts` 统一派生，`@cs2dak/core` 导出的
 `CORE_ANALYSIS_VERSION` 是所有 performance facts 出口的 provenance owner；
-`playerStats` 只用于 parity validation，不作为第二个 runtime source。可比
-mismatch 会进入 Core QA error，Evidence/Tournament adapter 不会发布这类结果。
+`playerStats` 保留公开 ZIP 合同读取及 collateral 观察字段，不作旧口径对照或
+fallback。supplied facts 通过同一 Core owner 的私有快照核对结构、覆盖、身份、守恒与成对
+opening；未登记缓存调用一次 owner 重建，暖缓存不重复派生业务事实；
+真实源 QA error 仍阻止 Evidence 发布。历史上传包的 analysisVersion、QA 与已有
+warning 不修改、不伪标记为经当前版本重新验证；新分析携带新的 analysisVersion。
 
 CLI 路径（无需在产品里复刻分析模型）：
 
@@ -101,8 +104,8 @@ overall/T/CT slices，所有 rate 携带 numerator/denominator，team per-round
 denominator 按去重后的 team-round 计算。Map/global opening 使用 round-based
 conversion（不把一场 opening duel 的两名玩家计作两次 attempts）。
 `TournamentPerformanceMapFacts` 的
-player-round 是 Core canonical 逐回合 source；`playerStats` 只作为 frozen aggregate
-parity oracle，不能反推或覆盖 side-aware round rows。旧 `RRIndicators`/#381
+player-round 是 Core canonical 逐回合 source；`playerStats` 只保留 collateral 等
+合同观察字段，不能作旧口径对照、反推或覆盖 side-aware round rows。旧 `RRIndicators`/#381
 scoreboard projection 仍按其既有 aggregate contract 运行，不能与 performance DTO
 混作同一个 source。
 
@@ -140,3 +143,28 @@ scoreboard projection 仍按其既有 aggregate contract 运行，不能与 perf
 
 > 历史的 symbol 级文件替换映射（RivalHub v1 → kit）已归档至
 > `docs/archive/2026-06/rivalhub-migration.md`，仅作历史参考，不再是当前接缝依据。
+
+### Evidence 的确定性诊断扩展
+
+Producer `cs2dak-rivalhub-evidence/0.2.0` 保留原 Evidence V1 与 `dak-stable/3`
+事实语义，在 `extensions["cs2dak/diagnostics"]` 添加以下可选的 v1 诊断：
+
+- `version: 1`；`qa.issues` 最多 64 条 `{code, severity, path, message}`，
+  `qa.omittedIssueCount` 为未携带条数。无问题时为空数组；summary 仍为完整 QA 计数。
+- code 最长 96，path 最长 128 且仅允许逻辑字段/数组索引，缺失为 null；
+  未知未来 code 保留，危险或超长标识符替换为 `diagnostic.redacted`。
+- message 最长 320，历史 Core parity 玩家定位中的昵称替换为 `[player]`；凭据、文件路径、URL、运行上下文等
+  敏感片段替换为 `[redacted]`，保留 QA 原因正文；明确的原始日志或堆栈整段抑制为
+  `[redacted: raw diagnostic]`，仍保留安全 code/path。安全规则见
+  `packages/rivalhub-upload/src/diagnostic-safety.ts`，producer/receiver 共享同一规则。
+- `richKills` 为 Core 唯一生成的 `eventCount`、`flagsEventCount`、
+  `namedActiveWeaponEventCount` 和 `reason`。空 kills 为 `no_kill_events`/available；
+  存在 flags 且存在命名 active weapon 为 `flags_and_named_active_weapon`/available
+  （两者不必来自同一事件）；仅 flags 为 `no_named_active_weapon`/partial；
+  无 flags 为 `no_rich_kill_flags`/missing。
+
+QA error 仍在本地阻止提交，异常保留有界安全的 code/path/message 便于定位。
+诊断不携带 attempt、request ID、运行时间、cause、raw logs 或凭据，不重建缺失的历史 warnings。
+完整 payload 的稳定排序 SHA-256 算法不变，确定性诊断参与 hash；重复提交相同 payload
+得到相同 key，旧 producer 与新 producer 的不同 payload 通过既有 same-demo lineage
+处理，不能剔除诊断字段或改写历史 artifact。Canonical gameplay facts 不变。

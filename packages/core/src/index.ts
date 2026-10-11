@@ -11,14 +11,15 @@ import {
   type PlayerRoundPerformanceFacts,
 } from "./performance-facts.js";
 import { CORE_ANALYSIS_VERSION } from "./version.js";
-import { findPlayerStatsParityMismatches } from "./performance-parity.js";
+import { assertPlayerRoundPerformanceFacts } from "./performance-facts.js";
 
 export { loadDemoManifestFromZip, loadDemoPackageFromZip } from "./loader.js";
-export type { DemoManifest, DemoPackageLoadOptions, DemoPackageLoadProfile } from "./loader.js";
+export type { DemoManifest, DemoPackageLoadOptions, DemoPackageLoadProfile, OptionalInputDiagnostic } from "./loader.js";
+export { jsonParseFailureCause, type JsonParseFailureCause } from "./json-diagnostics.js";
 export { normalizeDemoPackage } from "./normalize.js";
 export { createPlayerResolver, createResolverFromPackage } from "./resolve.js";
 export type { PlayerResolver } from "./resolve.js";
-export { demoSourceAvailability, type DemoSourceAvailability } from "./qa.js";
+export { demoSourceAvailability, richKillDiagnostics, type RichKillDiagnostics, type DemoSourceAvailability } from "./qa.js";
 export { deriveRRSignals, computeAccountRatingsV2 } from "./signals.js";
 export { activeDamages, activePhaseDamages, groupBy } from "./utils.js";
 export * from "./spatial/index.js";
@@ -44,8 +45,7 @@ export type {
   PlayerRoundPerformanceUtilityFact,
   PlayerRoundPerformanceWeaponFact,
 } from "./performance-facts.js";
-export { assertPlayerStatsParity, findPlayerStatsParityMismatches } from "./performance-parity.js";
-export type { PlayerStatsParityMismatch } from "./performance-parity.js";
+export { assertPlayerRoundPerformanceFacts } from "./performance-facts.js";
 export { CORE_ANALYSIS_VERSION, CORE_SEMANTIC_PROFILE } from "./version.js";
 export { buildTeamSideWinRates } from "./side-win-rate.js";
 export { buildDuelsSignals, deriveDuels, deriveOpeningDuels } from "./duels.js";
@@ -67,15 +67,8 @@ export type {
 export function analyzeDemoPackage(input: unknown, suppliedPerformanceFacts?: PlayerRoundPerformanceFacts): AnalysisBundle {
   const pkg = normalizeDemoPackage(input);
   const performanceFacts = suppliedPerformanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
-  const parityMismatches = findPlayerStatsParityMismatches(pkg, performanceFacts);
-  const qa = buildQaReport(pkg, parityMismatches.map((mismatch) => ({
-    severity: mismatch.comparable === false ? "warning" as const : "error" as const,
-    code: mismatch.comparable === false ? "performance.parity_not_comparable" : "performance.parity_mismatch",
-    message: mismatch.comparable === false
-      ? `Frozen playerStats ${mismatch.field} is not comparable for ${mismatch.playerName} (playerIndex=${mismatch.playerIndex}): ${mismatch.reason ?? "opening semantics differ"}.`
-      : `Frozen playerStats ${mismatch.field} disagrees for ${mismatch.playerName} (playerIndex=${mismatch.playerIndex}): expected=${mismatch.expected}, actual=${mismatch.actual}.`,
-    path: `playerStats.${mismatch.field}`,
-  })));
+  if (suppliedPerformanceFacts) assertPlayerRoundPerformanceFacts(pkg, performanceFacts);
+  const qa = buildQaReport(pkg);
   const playerRoundFacts = toPlayerRoundFacts(performanceFacts);
   const playerIndicators = buildPlayerIndicators(pkg, performanceFacts);
   const accountRatings = computeAccountRatingsV2(pkg, performanceFacts);
@@ -117,3 +110,5 @@ export function analyzeDemoPackage(input: unknown, suppliedPerformanceFacts?: Pl
 }
 export * from "./tactics/index.js";
 export * from "./map-intelligence/index.js";
+
+export * from "./tournament-facts.js";

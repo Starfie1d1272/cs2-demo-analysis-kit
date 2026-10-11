@@ -22,6 +22,16 @@ function session(overrides: Partial<RivalHubBatchSession> = {}): RivalHubBatchSe
 }
 
 describe("RivalHub batch current item", () => {
+  it("keeps remote success and offers a local-only repair with collapsed error details", () => {
+    const html = renderToStaticMarkup(createElement(RivalHubBatchImportPanel, {
+      session: session({ status: "completed", total: 1, items: [{ id: "synced", fileName: "ok.dem", phase: "synced", message: "已同步", localLink: { seriesId: "series", matchMapId: "map", entryId: "entry", error: { code: "UPLOAD_FAILED", message: "database locked", stage: "local_link" } } }] }),
+      onLocalLinkUpdate: () => {},
+    }));
+    expect(html).toContain("本地关联待修复");
+    expect(html).toContain("仅重试本地关联");
+    expect(html).toContain("<details><summary>本地关联错误详情</summary>");
+    expect(html).toContain("database locked");
+  });
   it("follows awaitingTargetItemId instead of an earlier needs_target item", () => {
     expect(currentRivalHubBatchItem(session())?.id).toBe("current");
     expect(currentRivalHubBatchItem(session({ awaitingTargetItemId: "target", currentIndex: 2 }))?.id).toBe("target");
