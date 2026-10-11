@@ -9,17 +9,27 @@
     "directory": "packages/contract"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
   },
   "dependencies": {
-    "@rivalhub/rival-rating": "^0.3.0",
-    "cs2-demo-format": "^3.1.0",
+    "@rivalhub/rival-rating": "0.3.0",
+    "cs2-demo-format": "3.1.0",
     "zod": "^4.6.5"
   },
   "files": [
-    "src"
+    "dist"
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "scripts": {
+    "build": "node ../../scripts/build-public-package.mjs"
   }
 }

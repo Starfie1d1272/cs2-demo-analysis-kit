@@ -10,11 +10,11 @@ function readPackageJson(relativePath: string) {
 }
 
 describe("package dependency boundaries", () => {
-  it("keeps shared contract dependencies on the current upstream versions", () => {
+  it("keeps shared contract dependencies on the pinned upstream runtime/declaration versions", () => {
     const root = readPackageJson("../../../package.json");
     const contract = readPackageJson("../package.json");
 
-    expect(contract.dependencies?.["cs2-demo-format"]).toBe("^3.1.0");
+    expect(contract.dependencies?.["cs2-demo-format"]).toBe("3.1.0");
     expect(contract.dependencies?.["@rivalhub/rival-rating"]).toBe(root.dependencies?.["@rivalhub/rival-rating"]);
   });
 

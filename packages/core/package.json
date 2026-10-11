@@ -9,20 +9,34 @@
     "directory": "packages/core"
   },
   "exports": {
-    ".": "./src/index.ts",
-    "./evidence": "./src/evidence.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./evidence": {
+      "types": "./dist/evidence.d.ts",
+      "import": "./dist/evidence.js",
+      "default": "./dist/evidence.js"
+    }
   },
   "dependencies": {
     "@cs2dak/contract": "workspace:*",
     "@cs2dak/maps": "workspace:*",
-    "@rivalhub/rival-rating": "^0.3.0",
+    "@rivalhub/rival-rating": "0.3.0",
     "jszip": "^3.10.2",
     "@cs2dak/tournament": "workspace:*"
   },
   "files": [
-    "src"
+    "dist"
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "scripts": {
+    "build": "node ../../scripts/build-public-package.mjs"
   }
 }

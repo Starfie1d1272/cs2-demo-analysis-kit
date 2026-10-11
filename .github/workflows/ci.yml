@@ -27,9 +27,14 @@ jobs:
 
       - run: pnpm check:release-policy
 
+      - run: pnpm check:package-boundaries
+
       - run: node --test scripts/uploader-release-contract.test.mjs
 
       - run: node --test scripts/sync-version.test.mjs scripts/build-info.test.mjs scripts/build-web-patch.test.mjs
+
+      - name: Build shared artifacts before cold typecheck and tests
+        run: pnpm build:packages
 
       - run: pnpm typecheck
 
@@ -40,26 +45,8 @@ jobs:
       - name: Smoke packed maps in a clean consumer
         run: node scripts/maps-package-smoke.mjs
 
-      - name: Smoke compiled tournament package
-        shell: bash
-        run: |
-          set -euo pipefail
-          pnpm --filter @cs2dak/tournament exec node --input-type=module -e \
-            "const m = await import('@cs2dak/tournament'); if (typeof m.buildTournamentAnalytics !== 'function' || typeof m.buildTournamentPerformanceAnalytics !== 'function') process.exit(1)"
-          PACK_DIR="$RUNNER_TEMP/cs2dak-tournament-pack"
-          mkdir -p "$PACK_DIR"
-          pnpm --filter @cs2dak/tournament pack --pack-destination "$PACK_DIR"
-          TARBALL="$(find "$PACK_DIR" -maxdepth 1 -type f -name '*.tgz' -print -quit)"
-          test -n "$TARBALL"
-          TARBALL_CONTENTS="$RUNNER_TEMP/cs2dak-tournament-pack-contents.txt"
-          tar -tzf "$TARBALL" > "$TARBALL_CONTENTS"
-          grep -Eq '(^|/)dist/index\.js$' "$TARBALL_CONTENTS"
-          grep -Eq '(^|/)dist/index\.d\.ts$' "$TARBALL_CONTENTS"
-          CONSUMER_DIR="$RUNNER_TEMP/cs2dak-tournament-consumer"
-          mkdir -p "$CONSUMER_DIR"
-          npm install --prefix "$CONSUMER_DIR" --no-save "$TARBALL"
-          CONSUMER_DIR="$CONSUMER_DIR" node --input-type=module -e \
-            "import { join } from 'node:path'; import { pathToFileURL } from 'node:url'; const root = join(process.env.CONSUMER_DIR, 'node_modules', '@cs2dak', 'tournament'); const m = await import(pathToFileURL(join(root, 'dist', 'index.js')).href); if (typeof m.buildTournamentAnalytics !== 'function' || typeof m.buildTournamentPerformanceAnalytics !== 'function') process.exit(1)"
+      - name: Smoke all public tarballs and their transitive closure
+        run: pnpm check:package-consumers
 
   typescript-integration:
     name: TypeScript (integration tests)
@@ -76,7 +63,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm --filter @cs2dak/maps --filter @cs2dak/tournament build
+      - run: pnpm -r --filter "@cs2dak/cli..." --filter "@cs2dak/react..." build
 
       - run: pnpm test:integration
 

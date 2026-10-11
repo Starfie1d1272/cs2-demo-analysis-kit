@@ -68,6 +68,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - run: pnpm check:package-boundaries
+
       - name: Build release packages
         run: pnpm build
 
@@ -76,6 +78,9 @@ jobs:
 
       - name: Typecheck release packages
         run: pnpm typecheck
+
+      - name: Verify every public tarball and transitive consumer
+        run: pnpm check:package-consumers
 
       - name: Verify packed maps consumer
         run: node scripts/maps-package-smoke.mjs

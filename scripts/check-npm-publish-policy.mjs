@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
+import { bundledDependencies } from "./lib/bundled-dependencies.mjs";
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const repositoryUrl = "https://github.com/Starfie1d1272/cs2-demo-analysis-kit.git";
@@ -30,6 +31,22 @@ for (const [expectedName, directory] of publicPackages) {
   const manifestPath = join(repoRoot, directory, "package.json");
   const manifest = readJson(manifestPath);
   const repository = manifest.repository ?? {};
+  for (const [name, policy] of Object.entries(bundledDependencies)) {
+    if (manifest.dependencies?.[name]) check(manifest.dependencies[name] === policy.version, `${expectedName}: ${name} must pin the compiled source/declaration version ${policy.version}`);
+  }
+  check(manifest.main === './dist/index.js', `${expectedName}: main must be compiled ESM`);
+  check(manifest.types === './dist/index.d.ts', `${expectedName}: types must be compiled declarations`);
+  check(Array.isArray(manifest.files) && manifest.files.includes('dist') && !manifest.files.includes('src'), `${expectedName}: files must contain dist, not source`);
+  check(manifest.scripts?.build, `${expectedName}: build script is required`);
+  check(expectedName === '@cs2dak/react' ? JSON.stringify(manifest.sideEffects) === '["**/*.css"]' : manifest.sideEffects === false, `${expectedName}: sideEffects must match actual CSS/pure behavior`);
+  for (const [key, entry] of Object.entries(manifest.exports ?? {})) {
+    if (expectedName === '@cs2dak/react' && key === './theme.css') {
+      check(entry === './dist/theme.css', `${expectedName}: CSS export must be copied into dist`);
+      continue;
+    }
+    check(typeof entry === 'object' && /^\.\/dist\/.*\.d\.ts$/.test(entry.types) && /^\.\/dist\/.*\.js$/.test(entry.import) && entry.default === entry.import, `${expectedName} ${key}: explicit compiled types/import/default exports required`);
+  }
+
 
   check(manifest.name === expectedName, `${directory}: package name must be ${expectedName}`);
   check(manifest.private !== true, `${expectedName}: public package must not be private`);
@@ -52,6 +69,11 @@ for (const directoryName of workspacePackageDirectories) {
   const manifest = readJson(join(repoRoot, directory, "package.json"));
   const isPublic = manifest.private !== true && manifest.publishConfig?.access === "public";
   if (isPublic) check(expectedPublicDirectories.has(directory), `${directory}: public package is missing from the allowlist`);
+}
+
+for (const directory of ['packages/rivalhub-upload', 'apps/dak-studio', 'apps/rivalhub-uploader']) {
+  const manifest = readJson(join(repoRoot, directory, 'package.json'));
+  check(manifest.private === true && manifest.publishConfig == null, `${directory}: must remain private`);
 }
 
 const cli = readJson(join(repoRoot, "packages", "cli", "package.json"));
@@ -81,6 +103,8 @@ check(/pnpm install --frozen-lockfile/.test(workflow), "npm-publish.yml: install
 check(/pnpm build/.test(workflow), "npm-publish.yml: build gate is missing");
 check(/pnpm test:all/.test(workflow), "npm-publish.yml: test:all gate is missing");
 check(/pnpm typecheck/.test(workflow), "npm-publish.yml: typecheck gate is missing");
+check(workflow.includes('pnpm check:package-boundaries'), 'npm-publish.yml: graph gate is missing');
+check(workflow.includes('pnpm check:package-consumers'), 'npm-publish.yml: actual all-package tarball consumer gate is missing');
 check(/changeset publish --no-git-tag/.test(workflow), "npm-publish.yml: publish must disable Changesets local tag creation");
 check(/reconcile-npm-publish\.mjs/.test(workflow), "npm-publish.yml: npm/tag reconciliation step is missing");
 check(/github\.ref\s*==\s*['"]refs\/heads\/main['"]/.test(workflow), "npm-publish.yml: publishing must be guarded to main");

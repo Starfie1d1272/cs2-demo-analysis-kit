@@ -9,17 +9,27 @@
     "directory": "packages/cohort"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
   },
   "dependencies": {
     "@cs2dak/contract": "workspace:*",
     "@cs2dak/core": "workspace:*",
-    "@rivalhub/rival-rating": "^0.3.0"
+    "@rivalhub/rival-rating": "0.3.0"
   },
   "files": [
-    "src"
+    "dist"
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "scripts": {
+    "build": "node ../../scripts/build-public-package.mjs"
   }
 }

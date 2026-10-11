@@ -52,7 +52,7 @@ NODE
 echo "Output artifact: $ARTIFACT"
 
 echo "==> [2/5] Building DAK Studio frontend"
-pnpm --filter @cs2dak/dak-studio build
+pnpm -r --filter "@cs2dak/dak-studio..." --if-present build
 STUDIO_WEB="python/src/cs2dak/studio_web"
 rm -rf "$STUDIO_WEB"
 cp -R apps/dak-studio/dist "$STUDIO_WEB"

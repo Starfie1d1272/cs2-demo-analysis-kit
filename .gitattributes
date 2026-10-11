@@ -1,0 +1,2 @@
+# Preserve the verified upstream license bytes on Windows checkouts.
+scripts/licenses/*.LICENSE text eol=lf

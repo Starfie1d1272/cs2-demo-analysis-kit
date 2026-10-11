@@ -22,7 +22,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "node ../../scripts/build-public-package.mjs"
   },
   "publishConfig": {
     "access": "public"
