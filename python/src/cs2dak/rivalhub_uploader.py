@@ -92,6 +92,7 @@ class UploaderApi:
         self._lock = threading.Lock()
         self._closed = False
         self._origin = ""
+        self._connection_rollback = None
 
     def connection(self) -> dict:
         if not self._metadata.exists():
@@ -100,21 +101,72 @@ class UploaderApi:
         self._origin = normalize_origin(data["baseUrl"])
         return {**data, "connected": bool(credential(self._origin))}
 
-    def configure(self, base_url: str) -> bool:
-        self._origin = normalize_origin(base_url)
-        return True
+    def configure(self, base_url: str, cancel_pairing_id: str = "") -> bool:
+        origin = normalize_origin(base_url)
+        with self._lock:
+            if cancel_pairing_id:
+                data = json.loads(self._metadata.read_text()) if self._metadata.exists() else {}
+                rollback = self._connection_rollback
+                # A late cancel may only undo the credential written by this attempt.
+                if data.get("pairingId") != cancel_pairing_id or data.get("baseUrl") != origin or not rollback or rollback[0] != cancel_pairing_id:
+                    return True
+                self._restore_connection(origin, rollback)
+                self._connection_rollback = None
+                return True
+            self._origin = origin
+            return True
 
-    def save_connection(self, pairing_id: str, token: str) -> bool:
+    def save_connection(self, pairing_id: str, token: str, base_url: str = "") -> bool:
+        with self._lock:
+            if base_url and normalize_origin(base_url) != self._origin:
+                raise RuntimeError("PAIRING_SUPERSEDED：连接已更换，请重新授权")
+            return self._save_connection(pairing_id, token)
+
+    def _restore_connection(self, origin: str, rollback) -> None:
+        _, previous, previous_token, replaced_token = rollback
+        if replaced_token:
+            if not credential(origin, replaced_token):
+                raise RuntimeError("CREDENTIAL_ROLLBACK：无法恢复原网站授权")
+        elif not delete_credential(origin):
+            raise RuntimeError("CREDENTIAL_ROLLBACK：无法清除本次授权")
+        previous_origin = normalize_origin(previous["baseUrl"]) if previous else ""
+        if previous_origin and previous_origin != origin and previous_token and not credential(previous_origin, previous_token):
+            raise RuntimeError("CREDENTIAL_ROLLBACK：无法恢复原网站授权")
+        current = json.loads(self._metadata.read_text()) if self._metadata.exists() else None
+        if current != previous:
+            if previous:
+                staging = self._metadata.with_suffix(".tmp")
+                staging.write_text(json.dumps(previous), encoding="utf-8")
+                staging.replace(self._metadata)
+            else:
+                self._metadata.unlink(missing_ok=True)
+        self._origin = previous_origin
+
+    def _save_connection(self, pairing_id: str, token: str) -> bool:
+        previous_data = json.loads(self._metadata.read_text()) if self._metadata.exists() else None
+        previous_origin = normalize_origin(previous_data["baseUrl"]) if previous_data else None
+        previous_token = credential(previous_origin) if previous_origin else None
+        replaced_token = previous_token if previous_origin == self._origin else credential(self._origin) if self._origin else None
         if not self._origin or not token or not credential(self._origin, token):
             raise RuntimeError("CREDENTIAL_SAVE：系统安全存储拒绝保存授权，请检查钥匙串或凭据管理器")
-        previous = json.loads(self._metadata.read_text()).get("baseUrl") if self._metadata.exists() else None
-        if previous and normalize_origin(previous) != self._origin and not delete_credential(normalize_origin(previous)):
-            delete_credential(self._origin)
-            raise RuntimeError("CREDENTIAL_REPLACE：无法清除旧网站授权，请检查系统安全存储")
-        data = {"baseUrl": self._origin, "pairingId": pairing_id}
-        staging = self._metadata.with_suffix(".tmp")
-        staging.write_text(json.dumps(data), encoding="utf-8")
-        staging.replace(self._metadata)
+        origin = self._origin
+        rollback = (pairing_id, previous_data, previous_token, replaced_token)
+        try:
+            if previous_origin and previous_origin != origin and not delete_credential(previous_origin):
+                raise RuntimeError("CREDENTIAL_REPLACE：无法清除旧网站授权，请检查系统安全存储")
+            data = {"baseUrl": origin, "pairingId": pairing_id}
+            staging = self._metadata.with_suffix(".tmp")
+            staging.write_text(json.dumps(data), encoding="utf-8")
+            staging.replace(self._metadata)
+        except Exception as primary:
+            log_failure(log, primary, "connection.save")
+            try:
+                self._restore_connection(origin, rollback)
+            except Exception as rollback_error:  # noqa: BLE001 - report rollback failure alongside primary.
+                log_failure(log, rollback_error, "connection.rollback")
+                raise RuntimeError("CREDENTIAL_ROLLBACK：保存授权失败，且原授权恢复未完成；请检查系统安全存储并重新授权") from primary
+            raise
+        self._connection_rollback = rollback
         log.info("connection saved host=%s", urllib.parse.urlsplit(self._origin).hostname)
         return True
 

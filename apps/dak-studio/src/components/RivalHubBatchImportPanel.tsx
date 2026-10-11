@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import type { RivalHubBatchItem, RivalHubBatchSession } from "../lib/rivalhub-import";
+import { useMemo, useState } from "react";
+import { retryRivalHubLocalLink, type RivalHubBatchItem, type RivalHubBatchSession } from "../lib/rivalhub-import";
 import { rivalHubStatusPresentation } from "../lib/rivalhub-status";
 
 const ACTIVE_BATCH_PHASES = new Set(["checking", "exporting", "importing", "matching", "building_evidence", "submitting"]);
@@ -11,7 +11,8 @@ export function currentRivalHubBatchItem(session: RivalHubBatchSession | null): 
   return item && ACTIVE_BATCH_PHASES.has(item.phase) ? item : null;
 }
 
-function ItemRow({ item, onSelectTarget }: { item: RivalHubBatchItem; onSelectTarget?: (itemId: string, matchMapId: string) => void }) {
+function ItemRow({ item, onSelectTarget, onLocalLinkUpdate }: { item: RivalHubBatchItem; onSelectTarget?: (itemId: string, matchMapId: string) => void; onLocalLinkUpdate?: (item: RivalHubBatchItem) => void }) {
+  const [linking, setLinking] = useState(false);
   const status = rivalHubStatusPresentation(item.phase);
   return (
     <details className="stu-rivalhub-batch-item" open={item.phase === "needs_target" || Boolean(item.detail)}>
@@ -19,10 +20,19 @@ function ItemRow({ item, onSelectTarget }: { item: RivalHubBatchItem; onSelectTa
         <span className="stu-rivalhub-batch-file">{item.fileName}</span>
         <span className={status.className}><i />{status.label}</span>
         {item.matchedSeriesLabel && <span className="stu-muted">{item.matchedSeriesLabel}</span>}
+        {item.localLink && <span className="stu-muted">本地关联待修复</span>}
       </summary>
-      {(item.detail || item.targetCandidates?.length) && (
+      {(item.detail || item.targetCandidates?.length || item.localLink) && (
         <div className="stu-rivalhub-batch-detail">
           {item.detail && <p className="stu-muted">{item.detail}</p>}
+          {item.localLink && <div>
+            <p className="stu-muted">RivalHub 已接收，本地资料库关联未写入。请仅重试本地关联。</p>
+            <details><summary>本地关联错误详情</summary><p className="stu-muted">{item.localLink.error.message}</p>{item.localLink.error.cause && <p className="stu-muted">{item.localLink.error.cause}</p>}</details>
+            <button type="button" className="stu-button-sm" disabled={linking || !onLocalLinkUpdate} onClick={() => {
+              setLinking(true);
+              void retryRivalHubLocalLink(item).then(updated => onLocalLinkUpdate?.(updated)).finally(() => setLinking(false));
+            }}>{linking ? "正在关联…" : "仅重试本地关联"}</button>
+          </div>}
           {item.targetCandidates && item.targetCandidates.length > 0 && (
             <div className="stu-rivalhub-target-picker" aria-label={`${item.fileName} 目标地图`}>
               <b>请选择官方目标</b>
@@ -54,11 +64,13 @@ export function RivalHubBatchImportPanel({
   onStop,
   onSelectTarget,
   onDismiss,
+  onLocalLinkUpdate,
 }: {
   session: RivalHubBatchSession | null;
   onStop?: () => void;
   onSelectTarget?: (itemId: string, matchMapId: string) => void;
   onDismiss?: () => void;
+  onLocalLinkUpdate?: (item: RivalHubBatchItem) => void;
 }) {
   const current = useMemo(() => currentRivalHubBatchItem(session), [session]);
   if (!session) return null;
@@ -97,7 +109,7 @@ export function RivalHubBatchImportPanel({
         {session.counts.reusedLocal > 0 && <span className="stu-chip">复用本地 {session.counts.reusedLocal}</span>}
       </div>
       <div className="stu-rivalhub-batch-list">
-        {session.items.map((item) => <ItemRow key={item.id} item={item} onSelectTarget={onSelectTarget} />)}
+        {session.items.map((item) => <ItemRow key={`${session.id}:${item.id}`} item={item} onSelectTarget={onSelectTarget} onLocalLinkUpdate={session.status === "completed" ? onLocalLinkUpdate : undefined} />)}
       </div>
     </section>
   );

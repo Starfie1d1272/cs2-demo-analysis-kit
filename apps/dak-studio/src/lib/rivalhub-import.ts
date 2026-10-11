@@ -16,6 +16,8 @@ import {
 } from "./rivalhub-match";
 import { rivalHubEvidenceIdempotencyKey, submitRivalHubEvidence } from "./rivalhub";
 import type { EvidenceSubmissionResponse } from "./rivalhub-contract";
+import { normalizeDiagnostic, type SafeDiagnostic } from "@cs2dak/rivalhub-upload";
+import { reportDiagnostic } from "./worker-diagnostics";
 
 export type { RivalHubMatchCandidate } from "./rivalhub-match";
 
@@ -76,6 +78,21 @@ export interface RivalHubBatchItem {
   localDuplicate?: boolean;
   reusedLocal?: boolean;
   targetCandidates?: RivalHubTargetCandidateSummary[];
+  localLink?: { seriesId: string; matchMapId: string; entryId: string; error: SafeDiagnostic };
+}
+
+/** Only repairs the local association. This path never submits remote evidence. */
+export async function retryRivalHubLocalLink(item: RivalHubBatchItem, linkMap = linkDemoToRivalHubMap): Promise<RivalHubBatchItem> {
+  if (!item.localLink) return item;
+  const { seriesId, matchMapId, entryId } = item.localLink;
+  try {
+    await linkMap(seriesId, matchMapId, entryId);
+    return { ...item, localLink: undefined };
+  } catch (error) {
+    const diagnostic = normalizeDiagnostic(error, { stage: "local_link", fileId: entryId });
+    void reportDiagnostic(diagnostic);
+    return { ...item, localLink: { seriesId, matchMapId, entryId, error: diagnostic } };
+  }
 }
 
 export interface RivalHubBatchSession {
@@ -400,7 +417,6 @@ export async function runRivalHubBatch(
       if (match.status === "matched"
         && match.candidate.map.demoStatus === "synced"
         && match.candidate.map.demoSha256?.toLowerCase() === localEntry.demoSha256.toLowerCase()) {
-        await deps.linkMap(match.candidate.series.id, match.candidate.map.id, localEntry.id);
         const currentItem = session.items[index]!;
         updateItem(index, {
           ...replacementResult({ ...currentItem }, match),
@@ -408,6 +424,13 @@ export async function runRivalHubBatch(
           message: messageForPhase("already_synced"),
           detail: currentItem.reusedLocal ? LOCAL_REUSE_DETAIL : undefined,
         });
+        try {
+          await deps.linkMap(match.candidate.series.id, match.candidate.map.id, localEntry.id);
+        } catch (error) {
+          const diagnostic = normalizeDiagnostic(error, { stage: "local_link", fileId: localEntry.id });
+          void reportDiagnostic(diagnostic);
+          updateItem(index, { localLink: { seriesId: match.candidate.series.id, matchMapId: match.candidate.map.id, entryId: localEntry.id, error: diagnostic } });
+        }
         continue;
       }
       if (match.status === "not_found") {
@@ -451,7 +474,6 @@ export async function runRivalHubBatch(
       const evidence = deps.buildEvidence(pkg, target, participantMatch.identities, participantMatch.orientation);
       updateItem(index, { phase: "submitting", message: messageForPhase("submitting") });
       const response: EvidenceSubmissionResponse = await deps.submit(evidence, await deps.idempotencyKey(selected.map.id, evidence));
-      await deps.linkMap(selected.series.id, selected.map.id, localEntry.id);
       const reusedLocal = session.items[index]?.reusedLocal === true;
       updateItem(index, {
         phase: response.status === "synced" ? "synced" : "needs_attention",
@@ -461,6 +483,13 @@ export async function runRivalHubBatch(
           ? reusedLocal ? LOCAL_REUSE_DETAIL : undefined
           : response.issues.map((issue) => issue.message).join("；") || "RivalHub 返回需要处理",
       });
+      try {
+        await deps.linkMap(selected.series.id, selected.map.id, localEntry.id);
+      } catch (error) {
+        const diagnostic = normalizeDiagnostic(error, { stage: "local_link", fileId: localEntry.id });
+        void reportDiagnostic(diagnostic);
+        updateItem(index, { localLink: { seriesId: selected.series.id, matchMapId: selected.map.id, entryId: localEntry.id, error: diagnostic } });
+      }
     } catch (error) {
       updateItem(index, { phase: "failed", message: messageForPhase("failed"), detail: error instanceof Error ? error.message : String(error) });
     } finally {

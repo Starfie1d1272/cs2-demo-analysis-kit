@@ -928,7 +928,7 @@ export function App() {
             </button>
           </div>
         )}
-        <RivalHubBatchImportPanel session={batchSession} onStop={stopRivalHubBatch} onSelectTarget={selectRivalHubBatchTarget} onDismiss={() => setBatchSession(null)} />
+        <RivalHubBatchImportPanel session={batchSession} onStop={stopRivalHubBatch} onSelectTarget={selectRivalHubBatchTarget} onDismiss={() => setBatchSession(null)} onLocalLinkUpdate={updated => setBatchSession(current => current && current.id === batchSession?.id ? { ...current, items: current.items.map(item => item.id === updated.id ? updated : item) } : current)} />
         {entries.length > 0 && view !== "library" && view !== "management" && (
           <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} onEdit={() => setContextEditorOpen((current) => !current)} />
         )}

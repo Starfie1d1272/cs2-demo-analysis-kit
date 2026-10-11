@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -22,12 +23,23 @@ from pathlib import Path
 
 from cs2dak import __version__ as INSTALLER_VERSION
 from cs2dak import updater
+from cs2dak.diagnostics import SourceFailures, log_failure, sanitize_text
 
 # R2 端点（稳定，不随版本变化）
 MANIFEST_URL_LATEST = "https://dakupdate.starfie1d.top/releases/install-manifest.json"
 MANIFEST_URL_VERSIONED = f"https://dakupdate.starfie1d.top/releases/v{INSTALLER_VERSION}/install-manifest.json"
 
 USER_AGENT = f"DAK-Studio-Installer/{INSTALLER_VERSION}"
+log = logging.getLogger("dak-studio-installer")
+
+
+class InstallCancelled(Exception):
+    """Cancellation is terminal and must not try another download source."""
+
+
+def check_cancel(should_cancel) -> None:
+    if should_cancel and should_cancel():
+        raise InstallCancelled("已取消安装")
 
 
 def fmt_mb(n: int) -> str:
@@ -38,6 +50,7 @@ def download_with_progress(url: str, dest: str, expected_sha256: str | None = No
                           expected_size: int | None = None,
                           on_progress=None, should_cancel=None) -> None:
     """单文件下载；镜像 fallback 由调用方遍历 urls[]。"""
+    check_cancel(should_cancel)
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310
@@ -47,8 +60,7 @@ def download_with_progress(url: str, dest: str, expected_sha256: str | None = No
         try:
             with open(part, "wb") as f:
                 while True:
-                    if should_cancel and should_cancel():
-                        raise RuntimeError("已取消")
+                    check_cancel(should_cancel)
                     chunk = resp.read(1 << 20)  # 1 MiB
                     if not chunk:
                         break
@@ -62,20 +74,24 @@ def download_with_progress(url: str, dest: str, expected_sha256: str | None = No
                 actual = hashlib.sha256()
                 with open(part, "rb") as f:
                     while True:
+                        check_cancel(should_cancel)
                         chunk = f.read(1 << 20)
                         if not chunk:
                             break
                         actual.update(chunk)
                 if actual.hexdigest() != expected_sha256:
-                    os.unlink(part)
-                    raise RuntimeError(f"sha256 校验失败：{url}")
+                    raise RuntimeError("sha256 校验失败")
             if expected_size and os.path.getsize(part) != expected_size:
-                os.unlink(part)
-                raise RuntimeError(f"文件大小不匹配：{url}")
+                raise RuntimeError("文件大小不匹配")
+            check_cancel(should_cancel)
             os.replace(part, dest)
         except Exception:
-            if os.path.exists(part):
+            try:
                 os.unlink(part)
+            except FileNotFoundError:
+                pass
+            except OSError as cleanup_error:
+                log_failure(log, cleanup_error, "install_download.cleanup")
             raise
 
 
@@ -182,6 +198,8 @@ class SimpleInstaller:
             self.install_dir.set(path)
 
     def _cancel(self):
+        if getattr(self, "_install_committed", False):
+            return
         self.cancelled = True
         self.status_var.set("正在取消…")
 
@@ -207,6 +225,8 @@ class SimpleInstaller:
 
     def _install_run(self, install_dir: str):
         staging_dir = None
+        destination_started = False
+        self._install_committed = False
         try:
             # 1. Fetch manifest
             self._update("正在获取安装清单…", 5)
@@ -235,8 +255,7 @@ class SimpleInstaller:
                 self.root.after(0, lambda: self._set_ui_state(installing=False, done=False))
                 return
 
-            if self.cancelled:
-                return
+            check_cancel(lambda: self.cancelled)
 
             # 2. Download runtime
             self._update("下载运行时…", 10)
@@ -244,13 +263,14 @@ class SimpleInstaller:
             runtime_dest = os.path.join(staging_dir, runtime["name"])
             self._download_asset(runtime, runtime_dest, "运行时")
 
-            if self.cancelled:
-                return
+            check_cancel(lambda: self.cancelled)
 
             # 3. Extract runtime & resolve app root (where dak-studio.exe lives)
             self._update("解压运行时…", 50)
+            destination_started = True
             app_root = self._extract_runtime(runtime_dest, install_dir)
             self._launch_exe = os.path.join(app_root, "dak-studio.exe")
+            check_cancel(lambda: self.cancelled)
 
             # 4. Download bundled events → app_root/assets/
             userdata = os.path.join(app_root, "userdata")
@@ -259,12 +279,12 @@ class SimpleInstaller:
             bundled_dir = os.path.join(assets, "bundled-events")
             os.makedirs(bundled_dir, exist_ok=True)
             for idx, evt in enumerate(events):
-                if self.cancelled:
-                    return
+                check_cancel(lambda: self.cancelled)
                 self._update(f"下载赛事包 {idx + 1}/{len(events)}：{evt['slug']}…", 55 + int(20 * idx / max(len(events), 1)))
                 dest = os.path.join(bundled_dir, f"{evt['slug']}.zip")
                 self._download_asset(evt, dest, evt["slug"])
 
+            check_cancel(lambda: self.cancelled)
             # Write manifest.json for bundled events
             events_manifest = {
                 "version": "cs2-demo-analysis-kit/events-manifest-1.0",
@@ -282,16 +302,19 @@ class SimpleInstaller:
             os.makedirs(tris_dir, exist_ok=True)
             tri_count = len(tris)
             for idx, (map_name, entry) in enumerate(tris.items()):
-                if self.cancelled:
-                    return
+                check_cancel(lambda: self.cancelled)
                 self._update(f"下载地图数据 {idx + 1}/{tri_count}：{map_name}…", 75 + int(20 * idx / max(tri_count, 1)))
                 dest = os.path.join(tris_dir, entry.get("name", f"{map_name}.tri"))
                 self._download_asset(entry, dest, map_name)
 
             # 6. Write install-manifest.json → app_root/assets/
+            check_cancel(lambda: self.cancelled)
             self._update("写入安装清单…", 95)
             with open(os.path.join(assets, "install-manifest.json"), "w", encoding="utf-8") as f:
                 json.dump(manifest, f, ensure_ascii=False, indent=2)
+            # Runtime and required resources are now committed in the final directory.
+            # Cancellation cannot roll this installation back or relabel it as canceled.
+            self._install_committed = True
 
             # 7. Create shortcuts (Windows only) — use resolved app_root exe
             if sys.platform == "win32" and self._launch_exe:
@@ -305,10 +328,22 @@ class SimpleInstaller:
             self._update("安装完成！", 100)
             self.root.after(0, lambda: self._set_ui_state(installing=False, done=True))
 
-        except Exception as exc:
-            self._update(f"安装失败：{exc}", 0)
+        except InstallCancelled:
+            message = ("安装已中断；安装目录可能保留已写入文件，未回滚。可重新运行安装器补齐资源。"
+                       if destination_started else "已取消安装，可重新开始")
+            self._update(message, 0)
             self.root.after(0, lambda: self._set_ui_state(installing=False, done=False))
-            tkinter.messagebox.showerror("安装失败", str(exc))
+        except Exception as exc:
+            message = sanitize_text(exc, 2000)
+            if self._install_committed:
+                self._update(f"安装已完成；收尾失败：{message}", 100)
+                self.root.after(0, lambda: self._set_ui_state(installing=False, done=True))
+                tkinter.messagebox.showerror("安装收尾失败", message)
+            else:
+                suffix = "；安装目录可能保留已写入文件，未回滚" if destination_started else ""
+                self._update(f"安装失败：{message}{suffix}", 0)
+                self.root.after(0, lambda: self._set_ui_state(installing=False, done=False))
+                tkinter.messagebox.showerror("安装失败", message + suffix)
         finally:
             if staging_dir:
                 shutil.rmtree(staging_dir, ignore_errors=True)
@@ -316,19 +351,26 @@ class SimpleInstaller:
     def _fetch_manifest(self) -> dict:
         """按优先级拉 manifest：latest → versioned → 报错。"""
         urls = [MANIFEST_URL_LATEST, MANIFEST_URL_VERSIONED]
-        last_err = None
-        for url in urls:
+        failures = SourceFailures("无法获取安装清单", "install_manifest")
+        for index, url in enumerate(urls):
+            check_cancel(lambda: self.cancelled)
             try:
                 req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
                 with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
-                    return json.loads(resp.read().decode("utf-8"))
+                    manifest = json.loads(resp.read().decode("utf-8"))
+                    check_cancel(lambda: self.cancelled)
+                    return manifest
+            except InstallCancelled:
+                raise
             except Exception as exc:  # noqa: BLE001
-                last_err = exc
+                check_cancel(lambda: self.cancelled)
+                failures.add(index + 1, exc)
                 continue
-        raise RuntimeError(f"无法获取安装清单：{last_err}")
+        raise failures from None
 
     def _download_asset(self, entry: dict, dest: str, label: str) -> None:
         """下载单个资产（skip if same hash）。"""
+        check_cancel(lambda: self.cancelled)
         expected_sha256 = entry.get("sha256")
         expected_size = entry.get("size")
 
@@ -338,6 +380,7 @@ class SimpleInstaller:
             h = hashlib.sha256()
             with open(dest, "rb") as f:
                 while True:
+                    check_cancel(lambda: self.cancelled)
                     chunk = f.read(1 << 20)
                     if not chunk:
                         break
@@ -349,8 +392,9 @@ class SimpleInstaller:
                 os.unlink(dest)
 
         urls = entry.get("urls", [])
-        last_err = None
-        for url in urls:
+        failures = SourceFailures(f"下载 {label} 失败", "install_download")
+        for index, url in enumerate(urls):
+            check_cancel(lambda: self.cancelled)
             try:
                 def _progress(dl, total):
                     if total > 0:
@@ -366,10 +410,13 @@ class SimpleInstaller:
                     should_cancel=lambda: self.cancelled,
                 )
                 return
+            except InstallCancelled:
+                raise
             except Exception as exc:  # noqa: BLE001
-                last_err = exc
+                check_cancel(lambda: self.cancelled)
+                failures.add(index + 1, exc)
                 continue
-        raise RuntimeError(f"下载 {label} 失败：{last_err}")
+        raise failures from None
 
     @staticmethod
     def _extract_runtime(zip_path: str, install_dir: str) -> str:

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { DemoPackage } from "@cs2dak/contract";
 import type { StudioDemoEntry } from "./library";
 import type { RivalHubRemoteMap, RivalHubRemoteTeam } from "./rivalhub-contract";
-import { rivalHubBatchCompletionMessage, runRivalHubBatch, type RivalHubBatchCallbacks, type RivalHubMatchCandidate } from "./rivalhub-import";
+import { retryRivalHubLocalLink, rivalHubBatchCompletionMessage, runRivalHubBatch, type RivalHubBatchCallbacks, type RivalHubMatchCandidate } from "./rivalhub-import";
 import { fileFromNativePath, nativePathForFile } from "./dem";
 
 const demoSha256 = "a".repeat(64);
@@ -116,6 +116,31 @@ function runWith(
 }
 
 describe("RivalHub serial batch import", () => {
+  it.each(["synced", "needs_attention"] as const)("preserves remote %s after local link failure; repairs the link without POST", async status => {
+    const dependencies = baseDependencies({ submit: vi.fn(async () => ({ status, importId: null, matchMapId: "target", demoSha256, issues: [{ code: "REVIEW", message: "人工复核" }] })) });
+    dependencies.linkMap = vi.fn(async () => { throw new Error("database locked", { cause: new Error("https://user:private@example.test?token=private") }); });
+    const session = await runWith([new File(["zip"], "link.zip")], dependencies);
+    const item = session.items[0]!;
+    expect(item.phase).toBe(status);
+    expect(session.counts.failed).toBe(0);
+    expect(item.localLink?.error).toMatchObject({ stage: "local_link", message: "database locked", cause: "[url]" });
+    expect(item.serverIssues).toEqual([{ code: "REVIEW", message: "人工复核" }]);
+    const failedRetry = await retryRivalHubLocalLink(item, dependencies.linkMap);
+    expect(failedRetry.phase).toBe(status);
+    const link = vi.fn(async () => {});
+    const repaired = await retryRivalHubLocalLink(failedRetry, link);
+    expect(repaired.localLink).toBeUndefined();
+    expect(link).toHaveBeenCalledWith(item.localLink!.seriesId, "target", item.localEntryId);
+    expect(dependencies.submit).toHaveBeenCalledOnce();
+  });
+  it("keeps already-synced hash identity terminal when its local link fails", async () => {
+    const dependencies = baseDependencies();
+    dependencies.linkMap = vi.fn(async () => { throw new Error("disk full"); });
+    const remote = candidate("target"); remote.map.demoSha256 = demoSha256; remote.map.demoStatus = "synced";
+    const session = await runWith([new File(["zip"], "existing.zip")], dependencies, [remote]);
+    expect(session.items[0]).toMatchObject({ phase: "already_synced", localLink: { error: { message: "disk full" } } });
+    expect(dependencies.submit).not.toHaveBeenCalled();
+  });
   it("syncs an existing local entry without exporting or importing it again", async () => {
     const dependencies = baseDependencies();
     const entry = localEntry("stored.zip");
