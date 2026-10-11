@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { seriesVetoSchema } from "@cs2dak/contract";
-import { deriveVetoSummary, suggestSeriesGroups, vetoSkeleton } from "./series";
+import { deriveVetoSummary, suggestSeriesGroups, vetoSkeleton, SERIES_MAP_POOL } from "./series";
 import type { StudioDemoEntry } from "./library";
 
 function entry(id: string, date: string, teamAName: string, teamBName: string): StudioDemoEntry {
@@ -29,6 +29,9 @@ function entry(id: string, date: string, teamAName: string, teamBName: string): 
 }
 
 describe("series grouping", () => {
+  it("defaults new series to the current Active Duty pool", () => {
+    expect(SERIES_MAP_POOL).toEqual(["de_ancient", "de_anubis", "de_cache", "de_dust2", "de_inferno", "de_mirage", "de_nuke"]);
+  });
   it("clusters BO1/BO3/BO5 by renamed teams and match date", () => {
     const groups = suggestSeriesGroups([
       entry("bo1", "2026-06-01", "A", "B"),

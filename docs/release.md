@@ -239,8 +239,8 @@ Windows Uploader 推荐入口为 `RivalHub-Demo-Uploader-Setup-X.Y.Z.exe`（完�
 
 ### Maps 编译发布物验证
 
-`@cs2dak/maps` 保留 root、`/callout-grid-node`、`/callout-grid-browser`、`/tri-assets` 四个入口与原有 API。公开导出指向 `dist/*.js` 与 `dist/*.d.ts`；地图 JSON 仍随包放在原根目录，静态 import 与 Node callout loader 不改变资产路径。`build` 清理旧 dist 并强制编译，避免旧声明布局或测试文件混入包。
+`@cs2dak/maps` 保留 root、`/callout-grid-node`、`/callout-grid-browser`、`/tri-assets` 及 `/calibration` 五个入口与原有 API。公开导出指向 `dist/*.js` 与 `dist/*.d.ts`；地图 JSON 仍随包放在原根目录，静态 import 与 Node callout loader 不改变资产路径。`build` 清理旧 dist 并强制编译，避免旧声明布局或测试文件混入包。
 
-CI 与发布 gate 运行 `node scripts/maps-package-smoke.mjs`（Ubuntu 上的 pnpm/npm 工具链）：build → pack → 临时目录干净安装 → 四入口实际导入/调用 → strict NodeNext 声明检查。consumer 无 workspace symlink、TypeScript runtime loader 或 DAK 源路径。JSON ESM 在仓库 Node 24 工具链上验证；browser callout loader 以注入 fetch 验证，不调用外部服务。脚本不 publish、不改版本，并清理其临时 consumer。fresh checkout 运行测试/dev 前先 `pnpm typecheck`；修改 maps 时可运行 `pnpm --filter @cs2dak/maps exec tsc -p tsconfig.json --watch` 更新编译输出。
+CI 与发布 gate 运行 `node scripts/maps-package-smoke.mjs`（Ubuntu 上的 pnpm/npm 工具链）：build → pack → 临时目录干净安装 → 五入口实际导入/调用 → strict NodeNext 声明检查 → 删除全部空间资产后的新进程 calibration 隔离检查。consumer 无 workspace symlink、TypeScript runtime loader 或 DAK 源路径。JSON ESM 在仓库 Node 24 工具链上验证；browser callout loader 以注入 fetch 验证，不调用外部服务。脚本不 publish、不改版本，并清理其临时 consumer。fresh checkout 运行测试/dev 前先 `pnpm typecheck`；修改 maps 时可运行 `pnpm --filter @cs2dak/maps exec tsc -p tsconfig.json --watch` 更新编译输出。
 
-这只完成 #47 的编译 artifact 修复；calibration 新入口、图池/资产覆盖分离与 Train 标定版本属于后续独立范围。
+本地 artifact gate 已覆盖 #47 的 calibration 窄入口、图池/资产覆盖分离与 Train 标定 revision 2。Feature PR 只提交 maps minor changeset；不执行 version/publish/tag。授权正式发布后仍需从 registry 干净安装新 maps 版本并用 Node 24 重跑 root/calibration/资产/tri probes；真实 browser/Windows qualification 也不能由此脚本替代。#64 其余公共包的 consumer 与 graph 审计仍是后续范围。
