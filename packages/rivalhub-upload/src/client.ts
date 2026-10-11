@@ -1,3 +1,4 @@
+import { normalizeDiagnostic, sanitizeDiagnosticText } from "./diagnostics";
 import type { RivalHubEvidenceSubmission } from "./contract";
 export function normalizeBaseUrl(value: string): string {
   const parsed = new URL(value.trim());
@@ -34,24 +35,67 @@ export async function rivalHubEvidenceIdempotencyKey(
 }
 
 export class RivalHubHttpError extends Error {
-  constructor(readonly status: number, message: string) {
-    super(message);
+  readonly code: string;
+  readonly requestId?: string;
+  constructor(readonly status: number, message: string, code?: string, requestId?: string) {
+    super(sanitizeDiagnosticText(message));
     this.name = "RivalHubHttpError";
+    const diagnostic = normalizeDiagnostic({ code: code ?? (status === 0 ? "NETWORK" : `HTTP_${status}`), message, requestId });
+    this.code = diagnostic.code;
+    this.requestId = diagnostic.requestId;
   }
 }
 
-function messageFromResponse(body: unknown, fallback: string): string {
-  if (typeof body === "object" && body !== null && "error" in body) {
-    const error = (body as { error?: { message?: unknown } }).error;
-    if (typeof error?.message === "string") return error.message;
+export function httpErrorFromResponse(status: number, body: unknown, requestId?: string): RivalHubHttpError {
+  let error: unknown;
+  try { error = body && typeof body === "object" ? (body as Record<string, unknown>).error : undefined; }
+  catch { /* A malformed object must not replace the HTTP failure. */ }
+  const diagnostic = normalizeDiagnostic(error);
+  const envelope = normalizeDiagnostic(body);
+  let hasCode = false;
+  try { hasCode = error != null && typeof error === "object" && typeof (error as Record<string, unknown>).code === "string"; }
+  catch { /* Ignore unsafe property access. */ }
+  const failure = new RivalHubHttpError(status,
+    error == null ? `RivalHub 请求失败：HTTP ${status}` : diagnostic.message,
+    !hasCode && diagnostic.code === "UPLOAD_FAILED" ? undefined : diagnostic.code,
+    requestId ?? diagnostic.requestId ?? envelope.requestId);
+  if (diagnostic.cause) failure.cause = diagnostic.cause;
+  return failure;
+}
+
+function jsonReadCause(error: unknown): string {
+  // JSON parsers can embed response bytes in their exception messages. Extract
+  // only parser grammar and numeric locations; never forward the message itself.
+  const message = normalizeDiagnostic(error).message;
+  if (error instanceof SyntaxError) {
+    const reason = /^(Unexpected end of JSON input|Unexpected token|Unexpected non-whitespace character after JSON|Expected property name|Expected double-quoted property name|Unterminated string|Bad escaped character|Bad control character|Bad Unicode escape)/i.exec(message)?.[1] ?? "Invalid JSON syntax";
+    const position = /\bposition (\d{1,12})\b/i.exec(message)?.[1];
+    const location = /\bline (\d{1,12}) column (\d{1,12})\b/i.exec(message);
+    return `SyntaxError: ${reason}${position ? `; position ${position}` : ""}${location ? `; line ${location[1]} column ${location[2]}` : ""}`;
   }
-  return fallback;
+  if (error instanceof TypeError) return "TypeError: response body could not be read or decoded";
+  if (error instanceof DOMException && error.name === "AbortError") return "AbortError: response body read was aborted";
+  return "Response body read or JSON decoding failed";
 }
 
 export async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, { ...init, cache: "no-store" });
-  const body: unknown = await response.json().catch(() => null);
-  if (!response.ok) throw new RivalHubHttpError(response.status, messageFromResponse(body, `RivalHub 请求失败：HTTP ${response.status}`));
+  let response: Response;
+  try { response = await fetch(url, { ...init, cache: "no-store" }); }
+  catch (error) {
+    const diagnostic = normalizeDiagnostic(error);
+    const failure = new RivalHubHttpError(0, diagnostic.message, "NETWORK");
+    if (diagnostic.cause) failure.cause = diagnostic.cause;
+    throw failure;
+  }
+  const requestId = response.headers.get("x-request-id") ?? undefined;
+  let body: unknown;
+  try { body = await response.json(); }
+  catch (error) {
+    const failure = new RivalHubHttpError(response.status, "网站返回了无法解析的 JSON 响应", response.ok ? "INVALID_RESPONSE" : undefined, requestId);
+    failure.cause = jsonReadCause(error);
+    throw failure;
+  }
+  if (!response.ok) throw httpErrorFromResponse(response.status, body, requestId);
   return body as T;
 }
 

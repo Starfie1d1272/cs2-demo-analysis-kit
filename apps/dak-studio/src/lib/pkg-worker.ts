@@ -1,3 +1,4 @@
+import { normalizeDiagnostic } from "@cs2dak/rivalhub-upload";
 import { loadDemoPackageFromZip, buildMatchRadarField, type DemoPackageLoadProfile } from "@cs2dak/core";
 import { buildTriangleBvh, parseAwpyTri, buildRadarFieldGrid, type TriangleBvh } from "@cs2dak/maps";
 import { loadCalloutGridBrowser } from "@cs2dak/maps/callout-grid-browser";
@@ -100,10 +101,7 @@ self.onmessage = async (event: MessageEvent<InMsg>) => {
     const meta = metaFromPackage(pkg);
     self.postMessage({ id: msg.id, ok: true, meta, data });
   } catch (err) {
-    self.postMessage({
-      id: msg.id,
-      ok: false,
-      error: err instanceof Error ? err.message : String(err)
-    });
+    const diagnostic = normalizeDiagnostic(err, { stage: `worker.${msg.op}` });
+    self.postMessage({ id: msg.id, ok: false, error: diagnostic.message, diagnostic });
   }
 };

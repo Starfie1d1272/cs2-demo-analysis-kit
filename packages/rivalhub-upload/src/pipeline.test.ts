@@ -75,6 +75,22 @@ describe("standalone upload pipeline with real Demo + events contract", () => {
     expect(s.deps.cleanup).toHaveBeenCalledOnce();
     s.deps.submit = submit; await uploadDemo(s.deps); expect(s.requests[0]!.key).toBe(firstKey);
   });
+  it("preserves the first failure when cleanup also fails", async () => {
+    const s = setup(); const primary = new Error("NETWORK: original failure");
+    s.deps.hash = async () => { throw primary; };
+    s.deps.cleanup = async () => { throw new Error("Permission denied /tmp/private"); };
+    s.deps.warning = vi.fn();
+    await expect(uploadDemo(s.deps)).rejects.toBe(primary);
+    expect(s.deps.warning).toHaveBeenCalledWith(expect.objectContaining({ stage: "cleanup", message: "Permission denied [path]" }));
+  });
+  it("keeps a successful upload successful when cleanup or warning reporting fails", async () => {
+    const s = setup();
+    s.deps.cleanup = async () => { throw new Error("Cleanup failure"); };
+    s.deps.warning = vi.fn(() => { throw new Error("Logger failure"); });
+    await expect(uploadDemo(s.deps)).resolves.toBeUndefined();
+    expect(s.updates.at(-1)?.phase).toBe("done");
+    expect(s.deps.warning).toHaveBeenCalledOnce();
+  });
   it("rejects changed raw files before upload", async () => {
     const s = setup(); s.deps.hash = async () => "0".repeat(64);
     await expect(uploadDemo(s.deps)).rejects.toThrow("DEMO_CHANGED");

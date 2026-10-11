@@ -29,7 +29,7 @@ def test_connection_keeps_token_out_of_metadata(api, monkeypatch):
     monkeypatch.setattr(uploader, "credential", credential)
     api.configure("https://example.com/path")
     api.save_connection("pairing", "secret-token")
-    assert "secret-token" not in api._metadata.read_text()
+    assert "secret-token" not in api._metadata.read_text(encoding="utf-8")
     other = uploader.UploaderApi(api._userdata)
     try:
         assert other.connection() == {
@@ -256,7 +256,7 @@ def test_optional_probe_read_failure_does_not_stop_startup(tmp_path, monkeypatch
         load_runtime.assert_called_once_with()
         webview.start.assert_called_once_with(private_mode=True, gui="edgechromium")
         shown.assert_not_called()
-        evidence = (tmp_path / "RivalHub Demo Uploader" / "uploader.log").read_text()
+        evidence = (tmp_path / "RivalHub Demo Uploader" / "uploader.log").read_text(encoding="utf-8")
         assert "WARNING" in evidence
         assert "package metadata probe failed" in evidence
         assert "bundled DLL probe failed" in evidence
@@ -265,5 +265,106 @@ def test_optional_probe_read_failure_does_not_stop_startup(tmp_path, monkeypatch
     finally:
         for handler in logger.handlers:
             logging.getLogger("pywebview").removeHandler(handler)
+            handler.close()
+        logger.handlers.clear()
+
+
+def test_network_reason_and_safe_context_survive(api, monkeypatch, caplog):
+    import urllib.error
+    api.configure('https://example.com')
+    monkeypatch.setattr(uploader.urllib.request, 'build_opener', lambda *args: Mock(
+        open=Mock(side_effect=urllib.error.URLError('certificate verify failed token=private'))))
+    result = api.request('/pairing/start', 'POST')
+    assert result['status'] == 0
+    assert 'certificate verify failed' in result['body']['error']['message']
+    assert result['diagnostic']['stage'] == 'http.request'
+    assert 'private' not in str(result) + caplog.text
+
+
+@pytest.mark.parametrize('status', [200, 502])
+def test_non_json_preserves_http_status_request_id_without_body(api, monkeypatch, caplog, status):
+    import urllib.error
+    api.configure('https://example.com')
+    headers = {'X-Request-Id': 'req-123'}
+    response = io.BytesIO(b'<html>private response body token=secret</html>')
+    response.status = status
+    response.headers = headers
+    opener = Mock()
+    if status == 200:
+        opener.open.return_value = response
+    else:
+        opener.open.side_effect = urllib.error.HTTPError('https://example.com', status, 'bad', headers, response)
+    monkeypatch.setattr(uploader.urllib.request, 'build_opener', lambda *args: opener)
+    result = api.request('/pairing/start', 'POST')
+    assert result['status'] == status
+    assert result['requestId'] == 'req-123'
+    assert result['body']['error']['code'] == 'INVALID_RESPONSE'
+    assert 'private response body' not in str(result) + caplog.text
+
+
+def test_record_structured_failure_is_bounded_and_redacted(api, caplog):
+    import logging
+    caplog.set_level(logging.INFO, logger='rivalhub-uploader')
+    assert api.record('demo', 'failed', 'NETWORK', {
+        'stage': 'upload', 'message': 'timeout Bearer hidden', 'requestId': 'req-1',
+        'cause': 'token=secret', 'body': 'raw response must never log'})
+    assert 'timeout' in caplog.text and 'req-1' in caplog.text
+    assert 'hidden' not in caplog.text and 'raw response' not in caplog.text
+    assert 'token=secret' not in caplog.text
+
+
+def test_incomplete_response_preserves_http_evidence(api, monkeypatch):
+    import http.client
+    from unittest.mock import MagicMock
+    api.configure('https://example.com')
+    response = MagicMock()
+    response.status = 502
+    response.headers = {'X-Request-Id': 'req-incomplete'}
+    response.read.side_effect = http.client.IncompleteRead(b'private response bytes', 100)
+    response.__enter__.return_value = response
+    opener = Mock()
+    opener.open.return_value = response
+    monkeypatch.setattr(uploader.urllib.request, 'build_opener', lambda *args: opener)
+    result = api.request('/pairing/start', 'POST')
+    assert result['status'] == 502
+    assert result['requestId'] == 'req-incomplete'
+    assert result['body']['error']['code'] == 'INVALID_RESPONSE'
+    assert 'IncompleteRead' in result['diagnostic']['cause']
+    assert 'private response bytes' not in str(result)
+
+
+def test_cleanup_failure_does_not_replace_startup_exit(tmp_path, monkeypatch):
+    import logging
+    import sys
+    from types import SimpleNamespace
+
+    from cs2dak import uploader_startup as startup
+
+    logger = logging.getLogger('isolated-cleanup-startup')
+    monkeypatch.setattr(uploader, 'log', logger)
+    monkeypatch.setenv('LOCALAPPDATA', str(tmp_path))
+    monkeypatch.setitem(sys.modules, 'webview', SimpleNamespace())
+    monkeypatch.setattr(startup, 'log_environment', lambda log: None)
+    monkeypatch.setattr(startup, 'windows_runtimes', dict)
+    monkeypatch.setattr(startup, 'prerequisite_error', lambda runtimes: '')
+    monkeypatch.setattr(startup, 'load_windows_runtime', lambda: None)
+    monkeypatch.setattr(startup, 'show_failure', Mock())
+    bridge = Mock()
+    bridge.close.side_effect = OSError('cleanup failure token=secret')
+    monkeypatch.setattr(uploader, 'UploaderApi', lambda userdata: bridge)
+    # Missing packaged frontend fails before window creation on every platform.
+    monkeypatch.setattr(sys, 'frozen', True, raising=False)
+    monkeypatch.setattr(sys, '_MEIPASS', str(tmp_path), raising=False)
+    try:
+        with pytest.raises(SystemExit) as raised:
+            uploader.main()
+        assert raised.value.code == 1
+        assert isinstance(raised.value.__cause__, RuntimeError)
+        content = (tmp_path / 'RivalHub Demo Uploader' / 'uploader.log').read_text(encoding="utf-8")
+        assert 'shutdown.cleanup' in content and 'cleanup failure' in content
+        assert 'token=secret' not in content
+    finally:
+        for handler in logger.handlers:
+            logging.getLogger('pywebview').removeHandler(handler)
             handler.close()
         logger.handlers.clear()

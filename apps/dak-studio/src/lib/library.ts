@@ -1,3 +1,5 @@
+import { withWorkerFallback } from "./worker-diagnostics";
+import type { SafeDiagnostic } from "@cs2dak/rivalhub-upload";
 import { loadDemoManifestFromZip, loadDemoPackageFromZip, buildMatchRadarField, type DemoPackageLoadProfile } from "@cs2dak/core";
 import { buildMatchWorkspaceModel } from "@cs2dak/presentation";
 import { buildRadarFieldGrid } from "@cs2dak/maps";
@@ -285,7 +287,7 @@ type WorkerReply =
   | { id: number; ok: true; pkg: DemoPackage }
   | { id: number; ok: true; meta: DemoMeta; data: ExtractedMatchData }
   | { id: number; ok: true; radarFields: RadarField[] }
-  | { id: number; ok: false; error: string };
+  | { id: number; ok: false; error: string; diagnostic?: SafeDiagnostic };
 
 interface PoolTask {
   op: "parse" | "import" | "radarField";
@@ -309,12 +311,9 @@ const workerPool: PoolWorker[] = [];
 const taskQueue: PoolTask[] = [];
 let workerSeq = 0;
 
-function settleWithFallback(task: PoolTask): void {
-  if (task.fallbackBuffer == null) {
-    task.reject(new Error("后台解析失败；低内存导入未保留回退字节，请重试该地图"));
-    return;
-  }
-  task.fallback(task.fallbackBuffer).then(task.resolve, task.reject);
+function settleWithFallback(task: PoolTask, error: unknown, taskId: number): void {
+  void withWorkerFallback(error, `worker.${task.op}`, task.fallbackBuffer, task.fallback, task.matchId ?? `worker-${taskId}`)
+    .then(task.resolve, task.reject);
 }
 
 function makePoolWorker(): PoolWorker {
@@ -332,17 +331,17 @@ function makePoolWorker(): PoolWorker {
       if ("pkg" in reply) task.resolve(reply.pkg);
       else if ("radarFields" in reply) task.resolve(reply.radarFields);
       else task.resolve({ meta: reply.meta, data: reply.data });
-    } else settleWithFallback(task);
+    } else settleWithFallback(task, reply.diagnostic ?? new Error(reply.error), pw.taskId);
     dispatchTasks();
   };
-  pw.worker.onerror = () => {
+  pw.worker.onerror = (event) => {
     // worker 可能已损坏：销毁、移出池，正在执行的任务回退主线程
     const task = pw.task;
     pw.task = null;
     pw.worker.terminate();
     const idx = workerPool.indexOf(pw);
     if (idx >= 0) workerPool.splice(idx, 1);
-    if (task) settleWithFallback(task);
+    if (task) settleWithFallback(task, event.error ?? new Error(event.message || "Worker 执行失败"), pw.taskId);
     dispatchTasks();
   };
   workerPool.push(pw);
@@ -357,7 +356,14 @@ function triBaseUrl(): string {
 function dispatchTasks(): void {
   while (taskQueue.length > 0) {
     let idle = workerPool.find((pw) => pw.task === null);
-    if (!idle && workerPool.length < WORKER_POOL_SIZE) idle = makePoolWorker();
+    if (!idle && workerPool.length < WORKER_POOL_SIZE) {
+      try {
+        idle = makePoolWorker();
+      } catch (error) {
+        settleWithFallback(taskQueue.shift()!, error, ++workerSeq);
+        continue;
+      }
+    }
     if (!idle) return;
     const task = taskQueue.shift()!;
     idle.task = task;
@@ -369,7 +375,14 @@ function dispatchTasks(): void {
         : task.op === "radarField"
           ? { id, op: "radarField", buffer: task.buffer, matchId: task.matchId, triBaseUrl: triBaseUrl(), economy: task.economy ?? "gun" }
           : { id, op: "import", buffer: task.buffer, matchId: task.matchId, triBaseUrl: triBaseUrl(), calloutUrls: CALLOUT_GRID_URLS };
-    idle.worker.postMessage(message, [task.buffer]);
+    try {
+      idle.worker.postMessage(message, [task.buffer]);
+    } catch (error) {
+      idle.task = null;
+      idle.worker.terminate();
+      workerPool.splice(workerPool.indexOf(idle), 1);
+      settleWithFallback(task, error, id);
+    }
   }
 }
 
