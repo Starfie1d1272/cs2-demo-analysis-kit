@@ -15,19 +15,59 @@ describe("safe evidence diagnostics", () => {
     expect(result.omittedIssueCount).toBe(6);
     expect(result.issues[0]).toMatchObject({ code: "diagnostic.redacted", path: "diagnostic.redacted" });
     expect(result.issues[0]!.message.length).toBeLessThanOrEqual(320);
+    expect(sanitizeDiagnosticMessage(result.issues[0]!.message)).toBe(result.issues[0]!.message);
   });
   it.each([
-    "Read /Users/private/demo.dem failed", "Read C:\\private\\demo.dem failed", "../secret/file.txt",
-    "https://private.example/path?token=abc", "Bearer abc", "password=abc", "accessToken=abc", "API key abc", "api\nkey abc", "attempt=2", "requestId=123",
-    "raw log: oops", "2026-10-11T12:00:00Z", "player user@example.com", "player 76561198000000001", "x".repeat(60),
-  ])("redacts unsafe message %s idempotently", (message) => {
+    ["Read /Users/private/demo.dem failed", "Read [redacted] failed"],
+    ["Read C:\\private\\demo.dem failed", "Read [redacted] failed"],
+    ["Read \"/Users/private person/demo.dem\" failed", "Read [redacted] failed"],
+    ["Read ../secret/file.txt failed", "Read [redacted] failed"],
+    ["Expected 2 rows from https://user:pass@private.example/path?token=abc but found 1.", "Expected 2 rows from [redacted] but found 1."],
+    ["Expected 2 rows; Bearer abc", "Expected 2 rows; [redacted]"],
+    ["Expected 2 rows; password=abc", "Expected 2 rows; [redacted]"],
+    ["Expected 2 rows; password=two words", "Expected 2 rows; [redacted]"],
+    ["Expected 2 rows; password=\"two; words\"; actual=1", "Expected 2 rows; [redacted]; actual=1"],
+    ["Expected 2 rows; password=\"two; words", "Expected 2 rows; [redacted]"],
+    ["Expected 2 rows; password='two\nwords'; actual=1", "Expected 2 rows; [redacted]; actual=1"],
+    ["Expected 2 rows; accessToken=abc", "Expected 2 rows; [redacted]"],
+    ["Expected 2 rows; API key = abc", "Expected 2 rows; [redacted]"],
+    ["Expected 2 rows; api\nkey=abc", "Expected 2 rows; [redacted]"],
+    ["Expected 2 rows; attempt=2", "Expected 2 rows; [redacted]"],
+    ["Expected 2 rows; requestId=123", "Expected 2 rows; [redacted]"],
+    ["Expected 2 rows; Cookie: session=abc; other=private", "Expected 2 rows; [redacted]"],
+    ["Expected 2 rows; Authorization: Bearer abc", "Expected 2 rows; [redacted]"],
+    ["Expected 2 rows at 2026-10-11T12:00:00Z", "Expected 2 rows at [redacted]"],
+    ["Expected 2 rows for user@example.com", "Expected 2 rows for [redacted]"],
+    ["Expected 2 rows for 76561198000000001", "Expected 2 rows for [redacted]"],
+    ["Expected 2 rows; eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.abc_signature", "Expected 2 rows; [redacted]"],
+    ["Expected 2 rows; " + "x".repeat(60), "Expected 2 rows; [redacted]"],
+  ])("redacts only unsafe fragments in %s idempotently", (message, expected) => {
     const safe = sanitizeDiagnosticMessage(message);
-    expect(safe).toBe("[redacted]");
+    expect(safe).toBe(expected);
     expect(sanitizeDiagnosticMessage(safe)).toBe(safe);
+  });
+  it.each([
+    "Expected 2 player economy rows, found 1.",
+    "Frozen playerStats deaths disagrees for [player] (playerIndex=2): expected=1, actual=2.",
+    "Kills exist, but no non-origin victim positions were found.",
+    "Token coverage is 1/2 because playerStats/kills includes 1 attempt count.",
+    "The tokenizer has incomplete coverage; attemptCount=2.",
+    "A secret field is absent; no password was supplied.",
+    "Round 1 has exploded before any planted event.",
+    "At most 2 players (round 1) should be present.",
+  ])("preserves safe QA prose %s", (message) => {
+    expect(sanitizeDiagnosticMessage(message)).toBe(message);
+  });
+  it.each(["raw log: oops", "Traceback (most recent call last): private", "Error: failed\n  at load (/private/file.ts:1:2)"])("explains suppression of raw runtime output", (message) => {
+    const issue = safeQaDiagnostics([{ code: "future.warning", severity: "warning", path: "kills", message }]).issues[0]!;
+    expect(issue).toEqual({ code: "future.warning", severity: "warning", path: "kills", message: "[redacted: raw diagnostic]" });
+    expect(sanitizeDiagnosticMessage(issue.message)).toBe(issue.message);
   });
   it("sanitizes controls, dangerous identifiers, absent paths and remains idempotent", () => {
     expect(sanitizeDiagnosticMessage("Rows\nexpected\u202e 2")).toBe("Rows expected 2");
     expect(sanitizeDiagnosticCode("future.warning")).toBe("future.warning");
+    expect(sanitizeDiagnosticCode("future.tokenCount")).toBe("future.tokenCount");
+    expect(sanitizeDiagnosticCode("attempts.coverage")).toBe("attempts.coverage");
     expect(sanitizeDiagnosticCode("accessToken.abc")).toBe("diagnostic.redacted");
     expect(sanitizeDiagnosticPath("players.password")).toBe("diagnostic.redacted");
     expect(sanitizeDiagnosticPath("/tmp/demo")).toBe("diagnostic.redacted");
