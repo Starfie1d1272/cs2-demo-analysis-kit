@@ -56,26 +56,39 @@ function sameRemoteMap(entry: StudioDemoEntry, series: Pick<RivalHubRemoteSeries
     : entry.meta.teamAScore === map.scoreB && entry.meta.teamBScore === map.scoreA;
 }
 
-/** 与远程赛事刷新使用同一匹配口径，供显式本地 Demo 同步筛选当前范围。 */
+/** 供显式本地 Demo 同步筛选当前范围；远程 raw SHA 已知时以它为准。 */
 export function matchesRivalHubDemo(
   entry: StudioDemoEntry,
   series: Pick<RivalHubRemoteSeries, "teamAName" | "teamBName">,
   map: RivalHubRemoteMap,
 ): boolean {
+  const sha = canonicalRawSha(map.demoSha256);
+  if (map.demoSha256 != null) return sha != null && canonicalRawSha(entry.demoSha256) === sha;
   return sameRemoteMap(entry, series, map);
+}
+
+function canonicalRawSha(value: string | null | undefined): string | null {
+  const sha = value?.trim().toLowerCase();
+  return sha && /^[a-f0-9]{64}$/.test(sha) ? sha : null;
 }
 
 function matchRemoteMap(
   entries: StudioDemoEntry[],
-  series: RivalHubRemoteSeries,
   map: RivalHubRemoteMap,
   used: Set<string>,
+  remoteShaCounts: Map<string, number>,
   previousId?: string | null,
 ): string | null {
+  // Existing local choices have priority, including legacy choices without provenance.
+  // Display names, scores or a changed remote hash must not overwrite a live selection.
   const previous = previousId ? entries.find((entry) => entry.id === previousId) : undefined;
-  if (previous && !used.has(previous.id) && sameRemoteMap(previous, series, map)) return previous.id;
-  const candidates = entries.filter((entry) => !used.has(entry.id) && sameRemoteMap(entry, series, map));
-  return candidates.length === 1 ? candidates[0]!.id : null;
+  if (previous) return previous.id;
+  const sha = canonicalRawSha(map.demoSha256);
+  if (!sha || remoteShaCounts.get(sha) !== 1) return null;
+  // Count all candidates before checking usage: excluding a used duplicate would
+  // turn an ambiguous raw identity into an apparently unique match.
+  const candidates = entries.filter((entry) => canonicalRawSha(entry.demoSha256) === sha);
+  return candidates.length === 1 && !used.has(candidates[0]!.id) ? candidates[0]!.id : null;
 }
 
 export async function listEventRecords(): Promise<StudioEventRecord[]> {
@@ -210,6 +223,11 @@ export async function upsertRivalHubEvents(
   const [previousEvents, previousSeries] = await Promise.all([listEventRecords(), listSeriesRecords()]);
   const previousSeriesById = new Map(previousSeries.map((row) => [row.id, row]));
   const nextEventIds = new Set<string>();
+  const remoteShaCounts = new Map<string, number>();
+  for (const event of response.events) for (const series of event.series) for (const map of series.maps) {
+    const sha = canonicalRawSha(map.demoSha256);
+    if (sha) remoteShaCounts.set(sha, (remoteShaCounts.get(sha) ?? 0) + 1);
+  }
   for (const remote of response.events) {
     const eventId = `event:rivalhub:${remote.seasonId}`;
     nextEventIds.add(eventId);
@@ -218,13 +236,19 @@ export async function upsertRivalHubEvents(
     for (const external of remote.series) {
       const id = `${eventId}:series:${external.id}`;
       const previous = previousSeriesById.get(id);
-      const used = new Set<string>();
+      const liveEntryIds = new Set(entries.map((entry) => entry.id));
+      const targetIds = new Set(external.maps.map((map) => map.id));
+      // Reserve retained choices before filling any gap, regardless of map order.
+      const used = new Set(previous?.mapAssignments?.flatMap((assignment) =>
+        assignment.entryId && liveEntryIds.has(assignment.entryId) && assignment.rivalHub && targetIds.has(assignment.rivalHub.id)
+          ? [assignment.entryId] : [],
+      ));
       const assignments = external.maps
         .slice()
         .sort((a, b) => a.order - b.order)
         .map((map) => {
           const previousAssignment = previous?.mapAssignments?.find((assignment) => assignment.rivalHub?.id === map.id);
-          const entryId = matchRemoteMap(entries, external, map, used, previousAssignment?.entryId);
+          const entryId = matchRemoteMap(entries, map, used, remoteShaCounts, previousAssignment?.entryId);
           if (entryId) used.add(entryId);
           return {
             order: map.order,

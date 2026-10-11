@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { deleteEventRecord, importEventPackage, listEventRecords, upsertRivalHubEvents } from "./events";
+import { deleteEventRecord, importEventPackage, listEventRecords, linkDemoToRivalHubMap, markRivalHubEventsStale, matchesRivalHubDemo, upsertRivalHubEvents } from "./events";
 import type { StudioDemoEntry } from "./library";
 import { rivalHubEventsResponseSchema, type RivalHubEventsResponse } from "./rivalhub-contract";
 import { listSeriesRecords } from "./series";
@@ -168,12 +168,80 @@ describe("importEventPackage", () => {
     await upsertRivalHubEvents(response, [entry("local-auto-link", "de_ancient")]);
     const savedSeries = (await listSeriesRecords()).find((record) => record.id === `event:rivalhub:${seasonId}:series:${seriesId}`);
     expect(savedSeries?.mapAssignments?.[0]).toMatchObject({
-      entryId: "local-auto-link",
+      entryId: null,
       rivalHub: { id: mapId, demoStatus: "finished_pending_demo" },
     });
-    expect(savedSeries?.mapAssignments?.[0]?.rivalHub?.demoStatus).not.toBe("synced");
+    await linkDemoToRivalHubMap(savedSeries!.id, mapId, "local-auto-link");
+    await upsertRivalHubEvents(response, [entry("local-auto-link", "de_ancient")]);
+    expect((await listSeriesRecords()).find((record) => record.id === savedSeries!.id)?.mapAssignments?.[0]).toMatchObject({
+      entryId: "local-auto-link", rivalHub: { demoStatus: "finished_pending_demo" },
+    });
 
     const savedEvent = (await listEventRecords()).find((event) => event.id === `event:rivalhub:${seasonId}`);
     if (savedEvent) await deleteEventRecord(savedEvent);
   });
+
+  it("reconciles missing links only through unique canonical raw SHA and retains local choices", async () => {
+    const response = rivalHubEventsResponseSchema.parse(JSON.parse(readFileSync("fixtures/contracts/rivalhub-dak-events-1-disposition.json", "utf8")));
+    const event = response.events[0]!;
+    const remote = event.series.find((series) => series.maps.length > 0)!;
+    // Isolate one remote target; duplicate remote identities are tested below.
+    event.series = [remote];
+    remote.maps = [remote.maps[0]!];
+    const map = remote.maps[0]!;
+    const seriesId = `event:rivalhub:${event.seasonId}:series:${remote.id}`;
+    const read = async () => (await listSeriesRecords()).find((record) => record.id === seriesId)!;
+    const linked = async () => (await read())?.mapAssignments?.[0]?.entryId;
+    const rawSha = "a".repeat(64);
+    const wrong = entry(rawSha, map.mapName); // ZIP identity must never substitute for raw SHA.
+    wrong.meta.teamAName = remote.teamAName;
+    wrong.meta.teamBName = remote.teamBName;
+    wrong.meta.teamAScore = map.scoreA!;
+    wrong.meta.teamBScore = map.scoreB!;
+    wrong.demoSha256 = "b".repeat(64);
+    map.demoSha256 = rawSha;
+    await upsertRivalHubEvents(response, [wrong]);
+    expect(await linked()).toBeNull(); // Identical map, teams and scores are insufficient.
+    expect(matchesRivalHubDemo(wrong, remote, map)).toBe(false);
+
+    const exact = entry("zip-identity", "de_dust2");
+    exact.demoSha256 = ` ${rawSha.toUpperCase()} `;
+    exact.meta.teamAName = "different embedded name";
+    await upsertRivalHubEvents(response, [wrong, exact]);
+    expect(await linked()).toBe(exact.id); // Raw SHA wins over labels and ZIP identity.
+    expect(matchesRivalHubDemo(exact, remote, map)).toBe(true);
+
+    await linkDemoToRivalHubMap(seriesId, map.id, wrong.id);
+    await upsertRivalHubEvents(response, [wrong, exact]);
+    expect(await linked()).toBe(wrong.id); // Explicit local choice is retained.
+    await markRivalHubEventsStale(); // Same cache-preserving path used on connection failure.
+    expect(await linked()).toBe(wrong.id);
+    expect((await listEventRecords()).find((row) => row.id === `event:rivalhub:${event.seasonId}`)?.rivalHub?.stale).toBe(true);
+
+    const duplicate = { ...exact, id: "another-zip-identity" };
+    await upsertRivalHubEvents(response, [exact, duplicate]); // Previous selected Demo is gone.
+    expect(await linked()).toBeNull();
+    expect((await read())?.entryIds).toEqual([]);
+    await upsertRivalHubEvents(response, [exact]);
+    expect(await linked()).toBe(exact.id); // Recover dangling selection only when unique.
+    await upsertRivalHubEvents(response, [wrong]);
+    expect(await linked()).toBeNull(); // No raw candidate; no heuristic fallback.
+
+    remote.maps.push({ ...map, id: "second-target", order: 2 });
+    await upsertRivalHubEvents(response, [exact]);
+    expect((await read())?.mapAssignments?.map((assignment) => assignment.entryId)).toEqual([null, null]);
+    remote.maps[1]!.demoSha256 = null;
+    await linkDemoToRivalHubMap(seriesId, "second-target", exact.id);
+    await upsertRivalHubEvents(response, [exact]);
+    expect((await read())?.mapAssignments?.map((assignment) => assignment.entryId)).toEqual([null, exact.id]);
+    remote.maps.pop();
+    for (const invalid of [null, "not-a-sha", "c".repeat(63)]) {
+      map.demoSha256 = invalid;
+      await upsertRivalHubEvents(response, [wrong]);
+      expect(await linked()).toBeNull();
+    }
+    const savedEvent = (await listEventRecords()).find((row) => row.id === `event:rivalhub:${event.seasonId}`);
+    if (savedEvent) await deleteEventRecord(savedEvent);
+  });
+
 });
