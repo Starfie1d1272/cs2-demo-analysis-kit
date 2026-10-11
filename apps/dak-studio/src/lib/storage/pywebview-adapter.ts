@@ -39,7 +39,9 @@ export function createPywebviewAdapter(api: PywebviewStorageApi): StorageAdapter
       if (!store) {
         store = {
           async get<T>(key: string) {
-            return (await api.storage_record_get(namespace, key)) as T | undefined;
+            const value = await api.storage_record_get(namespace, key);
+            // Python None crosses the bridge as null; RecordStore absence is undefined.
+            return value == null ? undefined : value as T;
           },
           async getAll<T>() {
             return (await api.storage_record_get_all(namespace)) as T[];
