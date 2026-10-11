@@ -7,6 +7,7 @@ import http.client
 import json
 import logging
 import os
+import stat
 import sys
 import tempfile
 import threading
@@ -234,17 +235,39 @@ class UploaderApi:
 
     def select_demos(self) -> list[dict]:
         import webview
-        paths = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True,
-                                               file_types=("CS2 Demo (*.dem)",))
+        try:
+            paths = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True,
+                                                   file_types=("CS2 Demo (*.dem)",))
+        except Exception as error:  # native dialog boundary
+            log_failure(log, error, "selection.dialog")
+            raise RuntimeError("FILE_DIALOG_FAILED：无法打开 Demo 选择器，请重试") from error
+        if not paths:
+            log.info("selection code=FILE_SELECTION_CANCELLED stage=selection.dialog")
+            return []
         result = []
-        for value in paths or []:
+        for ordinal, value in enumerate(paths, 1):
             path = Path(value)
-            if path.suffix.lower() != ".dem" or not path.is_file():
+            if path.suffix.lower() != ".dem":
+                log.info("selection code=FILE_EXTENSION_REJECTED stage=selection.filter item=%d", ordinal)
+                continue
+            try:
+                regular = stat.S_ISREG(path.stat().st_mode)
+            except FileNotFoundError:
+                log.info("selection code=FILE_MISSING stage=selection.filter item=%d", ordinal)
+                continue
+            except OSError as error:
+                log_failure(log, error, "selection.read")
+                continue
+            if not regular:
+                log.info("selection code=FILE_TYPE_REJECTED stage=selection.filter item=%d", ordinal)
                 continue
             key = uuid.uuid4().hex[:12]
             self._files[key] = path
             log.info("demo=%s selected file=%s", key, json.dumps(path.name, ensure_ascii=False))
             result.append({"id": key, "name": path.name})
+        if not result:
+            raise RuntimeError("FILE_SELECTION_REJECTED：所选文件均无法使用，请选择存在且可读取的 .dem 文件")
+        log.info("selection stage=selection.filter accepted=%d rejected=%d", len(result), len(paths) - len(result))
         return result
 
     def hash_demo(self, key: str) -> str:

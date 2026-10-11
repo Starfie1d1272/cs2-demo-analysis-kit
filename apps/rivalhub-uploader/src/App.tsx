@@ -112,9 +112,9 @@ export default function App() {
             exportZip: () => { stage = "export"; return exportZip(file.id, message => patch(file.id, { message })); },
             cleanup: async () => { if (!await native().cleanup(file.id)) throw new Error("CLEANUP_FAILED：临时文件未能删除"); },
             warning: diagnostic => {
-              const detail = explainError(diagnostic, { stage: "cleanup", fileId: file.id, attempt });
-              patch(file.id, { warning: detail });
-              void recordDiagnostic(file.id, "cleanup_warning", detail);
+              const detail = explainError(diagnostic, { stage: diagnostic.stage, fileId: file.id, attempt });
+              if (diagnostic.stage === "cleanup") patch(file.id, { warning: detail });
+              void recordDiagnostic(file.id, diagnostic.stage === "cleanup" ? "cleanup_warning" : "diagnostic", detail);
             },
             choose: candidates => new Promise(resolve => { resolver.current = resolve; setChoice({ file: file.name, candidates }); }),
             update: update => {

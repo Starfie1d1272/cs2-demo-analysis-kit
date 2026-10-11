@@ -400,10 +400,14 @@ export async function runRivalHubBatch(
         const selectedId = await callbacks.resolveTarget?.(session.items[index]!, match.candidates) ?? null;
         const selected = selectedId ? match.candidates.find((candidate) => candidate.map.id === selectedId) : undefined;
         if (!selected) {
+          void reportDiagnostic(normalizeDiagnostic({
+            code: selectedId ? "TARGET_SELECTION_INVALID" : "TARGET_SELECTION_SKIPPED",
+            message: selectedId ? "选择的目标不属于本次候选" : "用户跳过目标",
+          }, { stage: "matching.selection", fileId: localEntry.id }));
           updateItem(index, {
             phase: "skipped",
             message: messageForPhase("skipped"),
-            detail: "用户跳过目标，保留待后续处理",
+            detail: selectedId ? "选择的目标不属于本次候选，请重新选择" : "用户跳过目标，保留待后续处理",
             targetCandidates: undefined,
           });
           continue;
@@ -447,7 +451,8 @@ export async function runRivalHubBatch(
       if (selected.eventTeams && selected.eventTeams.length > 0) {
         try {
           eventRosterMatch = deps.resolveParticipantsFromEventRoster(pkg, target, selected.eventTeams);
-        } catch {
+        } catch (error) {
+          void reportDiagnostic(normalizeDiagnostic(error, { stage: "participants.event_roster.fallback", fileId: localEntry.id }));
           // A partial/mismatched EventRoster cannot establish identity; retain
           // the pre-existing MatchRoster validation/review fallback below.
         }
@@ -459,7 +464,8 @@ export async function runRivalHubBatch(
         if ((selected.map.lineup?.length ?? 0) > 0) {
           try {
             deps.resolveParticipants(pkg, target, selected.map.lineup ?? []);
-          } catch {
+          } catch (error) {
+            void reportDiagnostic(normalizeDiagnostic(error, { stage: "participants.lineup.check", fileId: localEntry.id }));
             // Keep EventRoster participant identity/orientation for evidence.
           }
         }
@@ -467,7 +473,8 @@ export async function runRivalHubBatch(
       } else {
         try {
           participantMatch = deps.resolveParticipants(pkg, target, selected.map.lineup ?? []);
-        } catch {
+        } catch (error) {
+          void reportDiagnostic(normalizeDiagnostic(error, { stage: "participants.lineup.fallback", fileId: localEntry.id }));
           participantMatch = deps.resolveParticipantsForReview(pkg, target, selected.map.lineup ?? []);
         }
       }

@@ -4,7 +4,7 @@ import { clearPkgCache, getDemoPackage, loadDemoPackageTransient } from "./libra
 import { getStorage } from "./storage";
 
 class FailingWorker {
-  static mode: "reply" | "event" = "reply";
+  static mode: "reply" | "event" | "degraded" = "reply";
   onmessage?: (event: unknown) => void;
   onerror?: (event: unknown) => void;
   terminate() {}
@@ -12,6 +12,11 @@ class FailingWorker {
     queueMicrotask(() => {
       if (FailingWorker.mode === "reply") {
         this.onmessage?.({ data: { id: message.id, ok: false, error: "original worker reply" } });
+      } else if (FailingWorker.mode === "degraded") {
+        this.onmessage?.({ data: { id: message.id, ok: true, pkg: {}, diagnostics: [{
+          code: "OPTIONAL_INPUT_READ_FAILED", message: "Optional input failed", stage: "package.optional.shots.read",
+          cause: "read denied accessToken=synthetic-secret /home/synthetic/demo.zip",
+        }] } });
       } else {
         this.onerror?.({ error: new Error("original ErrorEvent cause"), message: "generic worker error" });
       }
@@ -62,4 +67,15 @@ describe("library worker boundaries", () => {
       .rejects.toMatchObject({ cause: { message: "original ErrorEvent cause", fallback: { stage: "worker.parse.fallback" } } });
     await getStorage().blobs("demos").delete("worker-fallback-test");
   });
+  it("retains sanitized downgrade diagnostics on a successful worker reply", async () => {
+    const report = vi.fn(async () => ({ ok: true }));
+    vi.stubGlobal("window", { pywebview: { api: { report_diagnostic: report } } });
+    vi.stubGlobal("Worker", FailingWorker);
+    FailingWorker.mode = "degraded";
+    await expect(loadDemoPackageTransient("unused", new File(["zip"], "test.zip"))).resolves.toEqual({});
+    expect(report).toHaveBeenCalledWith(expect.objectContaining({ code: "OPTIONAL_INPUT_READ_FAILED", stage: "package.optional.shots.read", fileId: expect.stringMatching(/^worker-/) }));
+    expect(JSON.stringify(report.mock.calls)).not.toContain("synthetic-secret");
+    expect(JSON.stringify(report.mock.calls)).not.toContain("/home/synthetic");
+  });
+
 });

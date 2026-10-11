@@ -912,14 +912,17 @@ class StudioApi:
                 allow_multiple=True,
                 file_types=("CS2 Demo (*.dem;*.zip)", "All files (*.*)"),
             )
-        except Exception:
-            # 兜底：过滤器在某后端不被接受时退化为无过滤对话框，
-            # 保证导入入口永远可用。
-            result = self._window.create_file_dialog(
-                webview.FileDialog.OPEN, allow_multiple=True
-            )
+        except Exception as primary:  # noqa: BLE001 - native dialog fallback retains diagnostics
+            log_failure(log, primary, "selection.dialog.filtered")
+            # 过滤器不受支持时仍允许现有无过滤 fallback，但保留首次异常。
+            try:
+                result = self._window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True)
+            except Exception as secondary:  # keep both failures
+                log_failure(log, secondary, "selection.dialog.fallback")
+                raise RuntimeError("FILE_DIALOG_FAILED：文件选择器及兼容模式均失败，请重试") from secondary
+            log.info("selection stage=selection.dialog.fallback outcome=%s", "selected" if result else "cancelled")
         paths = list(result or [])
-        log.info("pick_dems: %d 个文件 %s", len(paths), paths)
+        log.info("selection stage=selection.dialog code=%s count=%d", "FILE_SELECTION_SELECTED" if paths else "FILE_SELECTION_CANCELLED", len(paths))
         return paths
 
     # --- event packages ------------------------------------------------

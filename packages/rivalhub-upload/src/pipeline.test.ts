@@ -121,11 +121,27 @@ describe("standalone upload pipeline with real Demo + events contract", () => {
     s.deps.warning = vi.fn(() => { throw new Error("Logger failure"); });
     await expect(uploadDemo(s.deps)).resolves.toBeUndefined();
     expect(s.updates.at(-1)?.phase).toBe("done");
-    expect(s.deps.warning).toHaveBeenCalledOnce();
+    expect(vi.mocked(s.deps.warning!).mock.calls.filter(([diagnostic]) => diagnostic.stage === "cleanup")).toHaveLength(1);
   });
   it("rejects changed raw files before upload", async () => {
     const s = setup(); s.deps.hash = async () => "0".repeat(64);
     await expect(uploadDemo(s.deps)).rejects.toThrow("DEMO_CHANGED");
     expect(s.requests).toHaveLength(0); expect(s.deps.cleanup).toHaveBeenCalledOnce();
   });
+  it("retains both roster fallback reasons and optional skips without changing upload success", async () => {
+    const s = setup();
+    s.data.events[0]!.teams = [];
+    s.data.events[0]!.series[0]!.maps[0]!.lineup = [];
+    s.deps.warning = vi.fn();
+    await uploadDemo(s.deps);
+    const diagnostics = vi.mocked(s.deps.warning).mock.calls.map(([diagnostic]) => diagnostic);
+    expect(diagnostics.filter(diagnostic => diagnostic.code === "OPTIONAL_INPUT_SKIPPED")).toHaveLength(3);
+    expect(diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ stage: "participants.event_roster.fallback" }),
+      expect.objectContaining({ stage: "participants.lineup.fallback" }),
+    ]));
+    expect(s.requests).toHaveLength(1);
+    expect(s.updates.at(-1)?.phase).toBe("done");
+  });
+
 });

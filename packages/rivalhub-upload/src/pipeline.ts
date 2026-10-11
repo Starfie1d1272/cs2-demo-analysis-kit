@@ -20,6 +20,14 @@ export interface UploadDependencies {
   update(update: UploadUpdate): void;
 }
 
+function observe(deps: UploadDependencies, error: unknown, stage?: string): void {
+  const diagnostic = normalizeDiagnostic(error, { stage });
+  try {
+    if (deps.warning) deps.warning(diagnostic);
+    else (diagnostic.code.endsWith("_SKIPPED") || diagnostic.code.endsWith("_MISSING") ? console.info : console.warn)("Upload diagnostic", diagnostic);
+  } catch { /* Diagnostics cannot alter matching, fallback, or submission. */ }
+}
+
 async function confirmSubmission(deps: UploadDependencies, receipt: UploadReceipt, hash: string): Promise<void> {
   const { target, response, match } = receipt;
   deps.update({ phase: "uploading", message: "网站已接收，正在确认最终状态", target, response, match, receipt });
@@ -65,14 +73,18 @@ export async function uploadDemo(deps: UploadDependencies): Promise<void> {
       return;
     }
     deps.update({ phase: "parsing", message: "正在解析 Demo，大文件可能需要几分钟" });
-    const pkg = await loadDemoPackageFromZip(await deps.exportZip(), { profile: "evidence" });
+    const pkg = await loadDemoPackageFromZip(await deps.exportZip(), { profile: "evidence", onDiagnostic: diagnostic => observe(deps, diagnostic) });
     if (pkg.manifest.demo?.hash !== hash) throw new Error("DEMO_CHANGED：Demo 在解析期间发生变化，请等待录制结束后重新选择");
     const label = `${pkg.match.teamA.name ?? "队伍 A"} vs ${pkg.match.teamB.name ?? "队伍 B"} · ${pkg.match.mapName}`;
     deps.update({ phase: "matching", message: "正在查找对应的赛事比赛", match: label });
     const match = matchRivalHubMap(pkg, candidates, { demoSha256: hash });
     if (match.status === "not_found") throw new Error(`TARGET_NOT_FOUND：${match.reason}`);
     let selected: RivalHubMatchCandidate | null;
+    if (match.status === "matched" && match.mode === "review_fallback") {
+      observe(deps, { code: "TARGET_REVIEW_FALLBACK", message: "Target selected through the existing review fallback" }, "matching.fallback");
+    }
     if (match.status === "needs_target") {
+      observe(deps, { code: "TARGET_SELECTION_REQUIRED", message: match.reason }, "matching.selection");
       deps.update({ phase: "selecting", message: "发现多个可能的比赛，请选择本场的目标", match: label });
       selected = await deps.choose(match.candidates);
       if (!selected) throw new Error("TARGET_SKIPPED：已跳过本场；确认比赛后可重试");
@@ -82,9 +94,13 @@ export async function uploadDemo(deps: UploadDependencies): Promise<void> {
     let participants;
     try {
       participants = resolveRivalHubParticipantsFromEventRoster(pkg, target, selected.eventTeams ?? []);
-    } catch {
+    } catch (error) {
+      observe(deps, error, "participants.event_roster.fallback");
       try { participants = resolveRivalHubParticipants(pkg, target, selected.map.lineup ?? []); }
-      catch { participants = resolveRivalHubParticipantsForReview(pkg, target, selected.map.lineup ?? []); }
+      catch (error) {
+        observe(deps, error, "participants.lineup.fallback");
+        participants = resolveRivalHubParticipantsForReview(pkg, target, selected.map.lineup ?? []);
+      }
     }
     const evidence = buildRivalHubDemoEvidenceV1(pkg, target, participants.identities, participants.orientation);
     deps.update({ phase: "uploading", message: "正在提交比赛数据", match: label, target: selected });
