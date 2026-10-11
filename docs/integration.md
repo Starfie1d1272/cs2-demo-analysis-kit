@@ -151,7 +151,8 @@ Producer `cs2dak-rivalhub-evidence/0.2.0` 保留原 Evidence V1 与 `dak-stable/
 - code 最长 96，path 最长 128 且仅允许逻辑字段/数组索引，缺失为 null；
   未知未来 code 保留，危险或超长标识符替换为 `diagnostic.redacted`。
 - message 最长 320，Core parity 玩家定位中的昵称替换为 `[player]`；凭据、文件路径、URL、运行上下文等
-  危险文本整条替换为 `[redacted]`。安全规则见
+  敏感片段替换为 `[redacted]`，保留 QA 原因正文；明确的原始日志或堆栈整段抑制为
+  `[redacted: raw diagnostic]`，仍保留安全 code/path。安全规则见
   `packages/rivalhub-upload/src/diagnostic-safety.ts`，producer/receiver 共享同一规则。
 - `richKills` 为 Core 唯一生成的 `eventCount`、`flagsEventCount`、
   `namedActiveWeaponEventCount` 和 `reason`。空 kills 为 `no_kill_events`/available；
