@@ -224,3 +224,9 @@ commit 的 tag 会直接使工作流失败，不会删除、回滚、移动 tag 
 Windows Uploader 推荐入口为 `RivalHub-Demo-Uploader-Setup-X.Y.Z.exe`（完整离线应用），
 原完整 ZIP 保留兜底；manifest 的 `assets.windowsInstaller` 是推荐安装器字段，
 `assets.windows` 保持旧 ZIP 合同。详情与独立 Windows 验收见 [安装与诊断](uploader-windows.md)。
+
+### 版本同步失败保护
+
+`sync-version.mjs` 只接受 canonical `x.y.z`（CLI 可带 `v` 前缀），不接受自由 prerelease 或 build suffix。源码 revision 属于 build provenance，不写入 Python / npm release version。脚本先读取并校验全部私有 manifest 和三个 Python target，再开始写入；缺失、重复或无版本字段会在任何写入前失败。`uv.lock` 仅定位唯一 `cs2dak` package block，可恢复历史 malformed version，不修改其他依赖。写入失败时尝试恢复所有已尝试的 target；恢复失败会明确报出，需检查工作树后重试。该保护不宣称对进程被强制结束或磁盘故障提供跨文件事务。
+
+回归：`node --test scripts/sync-version.test.mjs`。`PACKAGE_SKIP_VERSION_SYNC=1` 的 artifact / UI revision provenance 仍由 #48 的后续工作验收。
