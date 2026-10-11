@@ -23,6 +23,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import shutil
 import sys
@@ -33,12 +34,14 @@ import zipfile
 from pathlib import Path
 from typing import Callable, Iterable
 
+from cs2dak.diagnostics import SourceFailures, log_failure
+
 CHUNK = 1 << 20  # 1 MiB
 DOWNLOAD_TIMEOUT_S = 30
 PERSISTENT_INSTALL_DIRS = ("userdata", "assets", "cache", "updates")
 
 
-class UpdateError(RuntimeError):
+class UpdateError(SourceFailures):
     pass
 
 
@@ -99,7 +102,7 @@ def download_with_fallback(
     url_list = list(urls)
     if not url_list:
         raise UpdateError("没有可用下载地址")
-    last_err: str = ""
+    failures = UpdateError("所有镜像下载失败", "update_download")
     for index, url in enumerate(url_list):
         if on_mirror:
             on_mirror(index, url)
@@ -108,21 +111,22 @@ def download_with_fallback(
             _download_one(url, part, on_progress)
             actual_size = part.stat().st_size
             if expected_size and actual_size != expected_size:
-                last_err = f"大小不符（期望 {expected_size}，实际 {actual_size}）"
-                continue
+                raise ValueError(f"大小不符（期望 {expected_size}，实际 {actual_size}）")
             if expected_sha256:
                 actual = sha256_file(part)
                 if actual.lower() != expected_sha256.lower():
-                    last_err = "sha256 校验失败"
-                    continue
+                    raise ValueError("sha256 校验失败")
             part.replace(dest)
             return dest
         except Exception as exc:  # noqa: BLE001 - 任何失败都转移到下一个镜像
-            last_err = str(exc) or exc.__class__.__name__
+            failures.add(index + 1, exc)
             continue
         finally:
-            part.unlink(missing_ok=True)
-    raise UpdateError(f"所有镜像下载失败：{last_err}")
+            try:
+                part.unlink(missing_ok=True)
+            except OSError as cleanup_error:
+                log_failure(logging.getLogger("cs2dak.updater"), cleanup_error, "update_download.cleanup")
+    raise failures from None
 
 
 def _find_app_root(extract_dir: Path, exe_name: str) -> Path:

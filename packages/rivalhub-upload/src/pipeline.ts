@@ -5,9 +5,11 @@ import { evidenceTargetFromRemoteMap, matchRivalHubMap, type RivalHubMatchCandid
 import { rivalHubEvidenceIdempotencyKey } from "./client";
 import type { EvidenceSubmissionResponse, RivalHubEventsResponse } from "./contract";
 
-export type UploadPhase = "waiting" | "parsing" | "matching" | "selecting" | "uploading" | "done" | "needs_attention" | "failed";
-export interface UploadUpdate { phase: UploadPhase; message: string; match?: string; target?: RivalHubMatchCandidate; response?: EvidenceSubmissionResponse }
+export type UploadPhase = "waiting" | "parsing" | "matching" | "selecting" | "uploading" | "done" | "needs_attention" | "unconfirmed" | "failed";
+export interface UploadReceipt { target: RivalHubMatchCandidate; response: EvidenceSubmissionResponse; match?: string }
+export interface UploadUpdate { phase: UploadPhase; message: string; match?: string; target?: RivalHubMatchCandidate; response?: EvidenceSubmissionResponse; receipt?: UploadReceipt }
 export interface UploadDependencies {
+  receipt?: UploadReceipt;
   warning?(diagnostic: SafeDiagnostic): void;
   hash(): Promise<string>;
   exportZip(): Promise<Uint8Array>;
@@ -16,6 +18,27 @@ export interface UploadDependencies {
   submit(evidence: unknown, key: string): Promise<EvidenceSubmissionResponse>;
   choose(candidates: RivalHubMatchCandidate[]): Promise<RivalHubMatchCandidate | null>;
   update(update: UploadUpdate): void;
+}
+
+async function confirmSubmission(deps: UploadDependencies, receipt: UploadReceipt, hash: string): Promise<void> {
+  const { target, response, match } = receipt;
+  deps.update({ phase: "uploading", message: "网站已接收，正在确认最终状态", target, response, match, receipt });
+  let confirmed: RivalHubMatchCandidate | undefined;
+  try {
+    confirmed = uploadCandidates(await deps.events()).find(c => c.map.id === target.map.id);
+    if (!confirmed || confirmed.map.demoSha256 !== hash || !["synced", "needs_attention"].includes(confirmed.map.demoStatus)) {
+      throw new Error("网站状态尚未包含本次 Demo 回执");
+    }
+  } catch (error) {
+    const diagnostic = normalizeDiagnostic(error, { stage: "confirmation" });
+    deps.update({ phase: "unconfirmed", message: "网站已接收，状态待确认；请仅刷新状态", target, response, match, receipt });
+    throw Object.assign(new Error("STATUS_UNCONFIRMED：网站已接收，但暂未确认最终状态。请打开网站核对，重试将只查询状态", { cause: diagnostic }), {
+      code: "STATUS_UNCONFIRMED", stage: "confirmation", status: diagnostic.status, requestId: diagnostic.requestId,
+    });
+  }
+  const issues = confirmed.map.demoIssues.length ? confirmed.map.demoIssues : response.issues;
+  const needsAttention = confirmed.map.demoStatus === "needs_attention";
+  deps.update({ phase: needsAttention ? "needs_attention" : "done", message: needsAttention ? issues.map(i => `${i.code}：${i.message}`).join("；") || "网站需要人工核对比赛数据" : "上传完成，网站已确认同步", match, target, response: { ...response, issues }, receipt });
 }
 
 export function uploadCandidates(response: RivalHubEventsResponse): RivalHubMatchCandidate[] {
@@ -28,6 +51,13 @@ export async function uploadDemo(deps: UploadDependencies): Promise<void> {
   try {
     deps.update({ phase: "parsing", message: "正在检查 Demo 文件" });
     const hash = await deps.hash();
+    if (deps.receipt) {
+      if (deps.receipt.response.demoSha256 !== hash || deps.receipt.response.matchMapId !== deps.receipt.target.map.id) {
+        throw new Error("DEMO_CHANGED：本地 Demo 与已接收回执不一致，请重新选择文件");
+      }
+      await confirmSubmission(deps, deps.receipt, hash);
+      return;
+    }
     const candidates = uploadCandidates(await deps.events());
     const sameHash = candidates.filter(c => c.map.demoSha256 === hash);
     if (sameHash.length === 1 && sameHash[0]!.map.demoStatus === "synced") {
@@ -60,14 +90,7 @@ export async function uploadDemo(deps: UploadDependencies): Promise<void> {
     deps.update({ phase: "uploading", message: "正在提交比赛数据", match: label, target: selected });
     const response = await deps.submit(evidence, await rivalHubEvidenceIdempotencyKey(selected.map.id, evidence));
     if (response.matchMapId !== selected.map.id || response.demoSha256 !== hash) throw new Error("RESPONSE_MISMATCH：网站返回的比赛或 Demo 标识不一致，请联系管理员");
-    // The server owns the final state; re-read the events projection before claiming completion.
-    const confirmed = uploadCandidates(await deps.events()).find(c => c.map.id === selected!.map.id);
-    if (!confirmed || confirmed.map.demoSha256 !== hash || !["synced", "needs_attention"].includes(confirmed.map.demoStatus)) {
-      throw new Error("STATUS_UNCONFIRMED：网站已接收，但暂未确认最终状态。请打开网站核对，稍后重试不会重复入库");
-    }
-    const issues = confirmed.map.demoIssues.length ? confirmed.map.demoIssues : response.issues;
-    const needsAttention = confirmed.map.demoStatus === "needs_attention";
-    deps.update({ phase: needsAttention ? "needs_attention" : "done", message: needsAttention ? issues.map(i => `${i.code}：${i.message}`).join("；") || "网站需要人工核对比赛数据" : "上传完成，网站已确认同步", match: label, target: selected, response: { ...response, issues } });
+    await confirmSubmission(deps, { target: selected, response, match: label }, hash);
   } finally {
     try { await deps.cleanup(); }
     catch (error) {

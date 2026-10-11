@@ -1,13 +1,13 @@
 import { normalizeDiagnostic, type SafeDiagnostic } from "@cs2dak/rivalhub-upload";
 
-async function reportDiagnostic(diagnostic: SafeDiagnostic): Promise<void> {
+export async function reportDiagnostic(diagnostic: SafeDiagnostic): Promise<void> {
   try {
     const report = typeof window === "undefined" ? undefined : window.pywebview?.api.report_diagnostic;
     if (report && (await report(diagnostic)).ok) return;
   } catch {
     // Diagnostic delivery must never replace the parser outcome.
   }
-  try { console.warn("Studio worker diagnostic", diagnostic); } catch { /* best-effort sink */ }
+  try { console.warn("Studio diagnostic", diagnostic); } catch { /* best-effort sink */ }
 }
 
 /** Keep the worker failure primary even when a retry also fails. */

@@ -368,3 +368,167 @@ def test_cleanup_failure_does_not_replace_startup_exit(tmp_path, monkeypatch):
             logging.getLogger('pywebview').removeHandler(handler)
             handler.close()
         logger.handlers.clear()
+
+
+def test_cancel_undoes_only_owned_authorization_and_restores_previous(api, monkeypatch):
+    vault = {}
+
+    def credential(origin, value=None):
+        if value is None:
+            return vault.get(origin)
+        vault[origin] = value
+        return True
+
+    monkeypatch.setattr(uploader, "credential", credential)
+    monkeypatch.setattr(uploader, "delete_credential", lambda origin: vault.pop(origin, None) is not None)
+    api.configure("https://old.example")
+    api.save_connection("original", "old-token")
+    api.configure("https://new.example")
+    api.save_connection("canceled", "canceled-token", "https://new.example")
+    api.configure("https://new.example", "canceled")
+    assert vault == {"https://old.example": "old-token"}
+    assert api.connection()["pairingId"] == "original"
+    # A late cancellation cannot clear the next successfully saved pairing.
+    api.configure("https://new.example")
+    api.save_connection("next", "next-token", "https://new.example")
+    api.configure("https://new.example", "canceled")
+    assert vault == {"https://new.example": "next-token"}
+    assert api.connection()["pairingId"] == "next"
+
+
+def test_cancel_same_origin_restores_existing_credential(api, monkeypatch):
+    vault = {}
+
+    def credential(origin, value=None):
+        if value is None:
+            return vault.get(origin)
+        vault[origin] = value
+        return True
+
+    monkeypatch.setattr(uploader, "credential", credential)
+    api.configure("https://example.test")
+    api.save_connection("original", "original-token")
+    api.save_connection("canceled", "canceled-token", "https://example.test")
+    api.configure("https://example.test", "canceled")
+    assert vault == {"https://example.test": "original-token"}
+    assert api.connection()["pairingId"] == "original"
+
+
+def test_obsolete_origin_cannot_save_credential(api, monkeypatch):
+    write = Mock()
+    monkeypatch.setattr(uploader, "credential", write)
+    api.configure("https://next.example")
+    with pytest.raises(RuntimeError, match="PAIRING_SUPERSEDED"):
+        api.save_connection("old", "private", "https://old.example")
+    write.assert_not_called()
+
+
+def test_cancel_first_connection_removes_only_its_new_credential(api, monkeypatch):
+    vault = {}
+
+    def credential(origin, value=None):
+        if value is None:
+            return vault.get(origin)
+        vault[origin] = value
+        return True
+
+    monkeypatch.setattr(uploader, "credential", credential)
+    monkeypatch.setattr(uploader, "delete_credential", lambda origin: vault.pop(origin, None) is not None)
+    api.configure("https://example.test")
+    api.save_connection("canceled", "private", "https://example.test")
+    api.configure("https://example.test", "canceled")
+    assert not vault and not api._metadata.exists()
+
+
+def fake_vault(monkeypatch):
+    vault = {}
+
+    def credential(origin, value=None):
+        if value is None:
+            return vault.get(origin)
+        vault[origin] = value
+        return True
+
+    monkeypatch.setattr(uploader, "credential", credential)
+    monkeypatch.setattr(uploader, "delete_credential", lambda origin: vault.pop(origin, None) is not None)
+    return vault
+
+
+def test_cancel_restores_origin_before_any_connection_read_or_request(api, monkeypatch):
+    vault = fake_vault(monkeypatch)
+    api.configure("https://old.example")
+    api.save_connection("original", "old-token")
+    api.configure("https://canceled.example")
+    api.save_connection("canceled", "private", "https://canceled.example")
+    api.configure("https://canceled.example", "canceled")
+    assert api._origin == "https://old.example"
+    assert vault == {"https://old.example": "old-token"}
+    # Do not call connection(): requests must already target the restored origin.
+    sent = []
+
+    def open_request(req, **_kwargs):
+        sent.append(req.full_url)
+        response = io.BytesIO(b'{"events": []}')
+        response.status = 200
+        response.headers = {}
+        return response
+
+    monkeypatch.setattr(uploader.urllib.request, "build_opener", lambda *_args: Mock(open=open_request))
+    assert api.request("/events", "GET")["status"] == 200
+    assert sent == ["https://old.example/api/integrations/dak/events"]
+
+
+@pytest.mark.parametrize("boundary", ["write", "replace"])
+@pytest.mark.parametrize("previous_origin", [None, "https://old.example", "https://new.example"])
+def test_metadata_failure_restores_owned_vault_and_origin(api, monkeypatch, boundary, previous_origin):
+    vault = fake_vault(monkeypatch)
+    if previous_origin:
+        api.configure(previous_origin)
+        api.save_connection("original", "original-token")
+    old_vault = vault.copy()
+    old_metadata = api._metadata.read_bytes() if api._metadata.exists() else None
+    api.configure("https://new.example")
+    staging = api._metadata.with_suffix(".tmp")
+    method = "write_text" if boundary == "write" else "replace"
+    original = getattr(Path, method)
+
+    def fail(path, *args, **kwargs):
+        if path == staging:
+            raise PermissionError("metadata denied")
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, method, fail)
+    with pytest.raises(PermissionError, match="metadata denied"):
+        api.save_connection("failed", "new-token", "https://new.example")
+    assert vault == old_vault
+    assert api._origin == (previous_origin or "")
+    assert (api._metadata.read_bytes() if api._metadata.exists() else None) == old_metadata
+
+
+def test_metadata_failure_and_vault_rollback_failure_are_both_reported(api, monkeypatch, caplog):
+    fake_vault(monkeypatch)
+    api.configure("https://old.example")
+    api.save_connection("original", "old-token")
+    api.configure("https://new.example")
+    previous_credential = uploader.credential
+
+    def fail_restore(origin, value=None):
+        if origin == "https://old.example" and value == "old-token":
+            return False
+        return previous_credential(origin, value)
+
+    monkeypatch.setattr(uploader, "credential", fail_restore)
+    staging = api._metadata.with_suffix(".tmp")
+    original_write = Path.write_text
+
+    def fail_write(path, *args, **kwargs):
+        if path == staging:
+            raise PermissionError("metadata denied")
+        return original_write(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", fail_write)
+    with pytest.raises(RuntimeError, match="CREDENTIAL_ROLLBACK") as failure:
+        api.save_connection("failed", "new-token", "https://new.example")
+    assert isinstance(failure.value.__cause__, PermissionError)
+    assert "connection.save" in caplog.text and "connection.rollback" in caplog.text
+    assert "old-token" not in caplog.text and "new-token" not in caplog.text

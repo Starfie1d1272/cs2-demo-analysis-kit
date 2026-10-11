@@ -85,6 +85,11 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Install Tk for installer boundary tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk
+
       - run: uv sync --frozen --extra dev --extra gui
         working-directory: python
 
