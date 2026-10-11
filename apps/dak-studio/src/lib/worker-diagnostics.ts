@@ -7,7 +7,10 @@ export async function reportDiagnostic(diagnostic: SafeDiagnostic): Promise<void
   } catch {
     // Diagnostic delivery must never replace the parser outcome.
   }
-  try { console.warn("Studio diagnostic", diagnostic); } catch { /* best-effort sink */ }
+  try {
+    const benign = diagnostic.code.endsWith("_MISSING") || diagnostic.code.endsWith("_SKIPPED");
+    (benign ? console.info : console.warn)("Studio diagnostic", diagnostic);
+  } catch { /* best-effort sink */ }
 }
 
 /** Keep the worker failure primary even when a retry also fails. */

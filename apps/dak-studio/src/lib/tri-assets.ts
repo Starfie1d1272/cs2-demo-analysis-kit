@@ -1,3 +1,5 @@
+import { reportDiagnostic } from "./worker-diagnostics";
+import { triDiagnostic } from "./tri-loading";
 import { installTriBuffer, listInstalledTris } from "./tri";
 
 /**
@@ -45,7 +47,8 @@ export async function listAvailableTris(): Promise<string[]> {
   if (api) {
     try {
       return (await api.tri_present()).sort();
-    } catch {
+    } catch (error) {
+      triDiagnostic(reportDiagnostic, "tri", "TRI_READ_FAILED", "native_list", "Native tri inventory failed; trying the browser cache", error);
       // 桥失败时退回 IDB
     }
   }
@@ -54,24 +57,41 @@ export async function listAvailableTris(): Promise<string[]> {
 
 /** 清单仅用于显示尺寸（best-effort）：dev 经 Vite 代理可达；桌面/静态托管不一定有，失败返回 null。 */
 export async function loadTrisManifest(): Promise<TrisManifest | null> {
+  const valid = (raw: unknown): raw is TrisManifest => raw != null && typeof raw === "object"
+    && "maps" in raw && raw.maps != null && typeof raw.maps === "object" && !Array.isArray(raw.maps);
+  const report = (code: string, stage: string, message: string, cause?: unknown, status?: number) =>
+    triDiagnostic(reportDiagnostic, "manifest", code, `manifest.${stage}`, message, cause, status);
   const api = nativeTriApi();
   if (api?.tris_manifest) {
     try {
       const raw = await api.tris_manifest();
-      if (raw && typeof raw === "object") return raw as TrisManifest;
-    } catch {
-      // Fall through to same-origin fetch.
+      if (valid(raw)) return raw;
+      report(raw == null ? "TRI_MANIFEST_MISSING" : "TRI_MANIFEST_INVALID", "native", "Native optional tri manifest is absent or invalid");
+    } catch (error) {
+      report("TRI_MANIFEST_READ_FAILED", "native", "Native optional tri manifest could not be read; trying the asset source", error);
     }
   }
-  try {
-    const response = await fetch("./tris/manifest.json", { cache: "no-cache" });
-    if (!response.ok) return null;
-    const contentType = response.headers.get("content-type") ?? "";
-    if (!contentType.includes("json")) return null; // dev 缺失时可能回退 index.html
-    return (await response.json()) as TrisManifest;
-  } catch {
+  let response: Response;
+  try { response = await fetch("./tris/manifest.json", { cache: "no-cache" }); }
+  catch (error) { report("TRI_MANIFEST_FETCH_FAILED", "fetch", "Optional tri manifest request failed", error); return null; }
+  if (!response.ok) {
+    report(response.status === 404 ? "TRI_MANIFEST_MISSING" : "TRI_MANIFEST_FETCH_FAILED", "fetch", "Optional tri manifest was unavailable", undefined, response.status);
     return null;
   }
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("json")) {
+    report(contentType.includes("text/html") ? "TRI_MANIFEST_MISSING" : "TRI_MANIFEST_INVALID", "read", "Optional tri manifest did not return JSON");
+    return null;
+  }
+  let content: string;
+  try { content = await response.text(); }
+  catch (error) { report("TRI_MANIFEST_READ_FAILED", "read", "Optional tri manifest response could not be read", error); return null; }
+  try {
+    const raw: unknown = JSON.parse(content);
+    if (valid(raw)) return raw;
+    report("TRI_MANIFEST_INVALID", "parse", "Optional tri manifest has an invalid structure");
+  } catch (error) { report("TRI_MANIFEST_INVALID", "parse", "Optional tri manifest contains invalid JSON", error); }
+  return null;
 }
 
 /**

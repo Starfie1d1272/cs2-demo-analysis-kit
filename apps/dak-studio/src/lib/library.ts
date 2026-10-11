@@ -1,8 +1,8 @@
 import { withImportCheckpoint } from "./import-persistence";
 import { deleteMatchRows, settleWrites } from "./storage/match-rows";
-import { withWorkerFallback } from "./worker-diagnostics";
-import type { SafeDiagnostic } from "@cs2dak/rivalhub-upload";
-import { loadDemoManifestFromZip, loadDemoPackageFromZip, buildMatchRadarField, type DemoPackageLoadProfile } from "@cs2dak/core";
+import { reportDiagnostic, withWorkerFallback } from "./worker-diagnostics";
+import { normalizeDiagnostic, type SafeDiagnostic } from "@cs2dak/rivalhub-upload";
+import { loadDemoManifestFromZip, loadDemoPackageFromZip as loadRawDemoPackage, type DemoPackageLoadOptions, buildMatchRadarField, type DemoPackageLoadProfile } from "@cs2dak/core";
 import { buildMatchWorkspaceModel } from "@cs2dak/presentation";
 import { buildRadarFieldGrid } from "@cs2dak/maps";
 import type { DemoPackage, MatchWorkspaceModel, RadarField } from "@cs2dak/contract";
@@ -25,6 +25,13 @@ import { currentBuiltWith, isAnalysisStale, type BuiltWith } from "./analysis-ma
  */
 
 export type { DemoMeta };
+
+function loadDemoPackageFromZip(buffer: ArrayBuffer, options: DemoPackageLoadOptions = {}): Promise<DemoPackage> {
+  return loadRawDemoPackage(buffer, { ...options, onDiagnostic: diagnostic => {
+    void reportDiagnostic(normalizeDiagnostic(diagnostic));
+  } });
+}
+
 
 export interface StudioDemoEntry {
   id: string;
@@ -280,11 +287,11 @@ export interface ImportWorkerResult {
 
 type PoolResult = DemoPackage | ImportWorkerResult | RadarField[];
 
-type WorkerReply =
+type WorkerReply = (
   | { id: number; ok: true; pkg: DemoPackage }
   | { id: number; ok: true; meta: DemoMeta; data: ExtractedMatchData }
   | { id: number; ok: true; radarFields: RadarField[] }
-  | { id: number; ok: false; error: string; diagnostic?: SafeDiagnostic };
+  | { id: number; ok: false; error: string; diagnostic?: SafeDiagnostic }) & { diagnostics?: SafeDiagnostic[] };
 
 interface PoolTask {
   op: "parse" | "import" | "radarField";
@@ -324,6 +331,9 @@ function makePoolWorker(): PoolWorker {
     const task = pw.task;
     pw.task = null;
     const reply = event.data;
+    if (Array.isArray(reply.diagnostics)) for (const diagnostic of reply.diagnostics.slice(0, 16)) {
+      void reportDiagnostic(normalizeDiagnostic(diagnostic, { fileId: task.matchId ?? `worker-${reply.id}` }));
+    }
     if (reply.ok) {
       if ("pkg" in reply) task.resolve(reply.pkg);
       else if ("radarFields" in reply) task.resolve(reply.radarFields);

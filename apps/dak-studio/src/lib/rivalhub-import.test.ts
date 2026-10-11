@@ -473,4 +473,37 @@ describe("RivalHub serial batch import", () => {
     expect(states).toContain("stopping");
     expect(session.status).toBe("completed");
   });
+  it("logs sanitized roster fallback reasons without replacing review identities", async () => {
+    const report = vi.fn(async (_diagnostic: unknown) => ({ ok: true }));
+    vi.stubGlobal("window", { pywebview: { api: { report_diagnostic: report } } });
+    try {
+      const target = candidate("target", {}, [{ entryId: "entry-a", players: [] } as unknown as RivalHubRemoteTeam]);
+      const dependencies = baseDependencies({ matchMap: vi.fn(() => ({ status: "matched" as const, candidate: target, mode: "review_fallback" as const })) });
+      dependencies.resolveParticipantsFromEventRoster = vi.fn(() => { throw new Error("event roster failed accessToken=synthetic-secret"); });
+      dependencies.resolveParticipants = vi.fn(() => { throw new Error("lineup failed /home/synthetic/demo.zip"); });
+      const session = await runWith([new File(["zip"], "roster.zip")], dependencies, [target]);
+      expect(session.items[0]?.phase).toBe("synced");
+      expect(dependencies.resolveParticipantsForReview).toHaveBeenCalledOnce();
+      expect(report.mock.calls.map(([diagnostic]) => diagnostic)).toEqual(expect.arrayContaining([
+        expect.objectContaining({ stage: "participants.event_roster.fallback", fileId: expect.any(String) }),
+        expect.objectContaining({ stage: "participants.lineup.fallback", fileId: expect.any(String) }),
+      ]));
+      expect(JSON.stringify(report.mock.calls)).not.toContain("synthetic-secret");
+      expect(JSON.stringify(report.mock.calls)).not.toContain("/home/synthetic");
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  it("distinguishes a filtered-out selection from a deliberate skip without submitting", async () => {
+    const report = vi.fn(async (_diagnostic: unknown) => ({ ok: true }));
+    vi.stubGlobal("window", { pywebview: { api: { report_diagnostic: report } } });
+    try {
+      const target = candidate("target");
+      const dependencies = baseDependencies({ matchMap: vi.fn(() => ({ status: "needs_target" as const, candidates: [target], reason: "multiple targets" })) });
+      const session = await runWith([new File(["zip"], "selection.zip")], dependencies, [target], { resolveTarget: async () => "outside-current-candidates" });
+      expect(session.items[0]).toMatchObject({ phase: "skipped", detail: "选择的目标不属于本次候选，请重新选择" });
+      expect(dependencies.submit).not.toHaveBeenCalled();
+      expect(report).toHaveBeenCalledWith(expect.objectContaining({ code: "TARGET_SELECTION_INVALID", stage: "matching.selection" }));
+    } finally { vi.unstubAllGlobals(); }
+  });
+
 });

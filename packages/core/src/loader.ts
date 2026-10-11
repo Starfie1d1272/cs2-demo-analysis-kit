@@ -7,7 +7,17 @@ export type DemoManifest = ReturnType<typeof manifestSchema.parse>;
 
 export type DemoPackageLoadProfile = "full" | "evidence";
 
+/** Runtime observation only; never part of DemoPackage or deterministic evidence. */
+export interface OptionalInputDiagnostic {
+  code: "OPTIONAL_INPUT_MISSING" | "OPTIONAL_INPUT_SKIPPED" | "OPTIONAL_INPUT_INVALID" | "OPTIONAL_INPUT_READ_FAILED";
+  stage: string;
+  message: string;
+  cause?: unknown;
+}
+
 export interface DemoPackageLoadOptions {
+  /** The consumer sanitizes causes before logging; observer failures cannot affect parsing. */
+  onDiagnostic?: (diagnostic: OptionalInputDiagnostic) => void;
   /**
    * `full` preserves the normal workspace/replay package. `evidence` reads
    * only the manifest and fact files consumed by an evidence-oriented
@@ -49,8 +59,20 @@ export async function loadDemoPackageFromZip(
   };
   const files = manifest.files;
 
-  const optional = async (name: string | undefined, enabled = true): Promise<unknown> =>
-    enabled && name ? readJson<unknown>(name).catch(() => undefined) : undefined;
+  const optional = async (slot: "shots" | "replay" | "duels", name: string | undefined, enabled = true): Promise<unknown> => {
+    const emit = (code: OptionalInputDiagnostic["code"], message: string, phase: string, cause?: unknown) => {
+      try { options.onDiagnostic?.({ code, message, stage: `package.optional.${slot}.${phase}`, ...(cause === undefined ? {} : { cause }) }); }
+      catch { /* Diagnostics must not replace a valid optional downgrade. */ }
+    };
+    if (!enabled) { emit("OPTIONAL_INPUT_SKIPPED", "Evidence profile intentionally skips this optional stream", "skip"); return undefined; }
+    const file = name ? zip.file(name) : null;
+    if (!file) { emit("OPTIONAL_INPUT_MISSING", "Optional stream is absent", "read"); return undefined; }
+    let content: string;
+    try { content = await file.async("string"); }
+    catch (error) { emit("OPTIONAL_INPUT_READ_FAILED", "Optional stream could not be read", "read", error); return undefined; }
+    try { return parsePackageJson(content); }
+    catch (error) { emit("OPTIONAL_INPUT_INVALID", "Optional stream contains invalid JSON", "parse", error); return undefined; }
+  };
   const match = await readJson<unknown>(files.match);
   const players = await readJson<unknown>(files.players);
   const rounds = await readJson<unknown>(files.rounds);
@@ -65,9 +87,9 @@ export async function loadDemoPackageFromZip(
   const grenades = await readJson<unknown>(files.grenades);
   const clutches = await readJson<unknown>(files.clutches);
   const evidenceProfile = options.profile === "evidence";
-  const shots = await optional(files.shots, !evidenceProfile);
-  const replay = await optional(files.replay, !evidenceProfile);
-  const duels = await optional(files.duels, !evidenceProfile);
+  const shots = await optional("shots", files.shots, !evidenceProfile);
+  const replay = await optional("replay", files.replay, !evidenceProfile);
+  const duels = await optional("duels", files.duels, !evidenceProfile);
 
   return normalizeDemoPackage({
     manifest,
