@@ -1,0 +1,75 @@
+08b565d0 sanitize_text secret_present= False
+08b565d0 error %(message)s runtime.log secret_present= False idempotent= True
+08b565d0 error %(message)s export.log secret_present= False idempotent= True
+08b565d0 log_failure %(message)s runtime.log secret_present= False idempotent= True
+08b565d0 log_failure %(message)s export.log secret_present= False idempotent= True
+08b565d0 exception %(message)s runtime.log secret_present= False idempotent= True
+08b565d0 exception %(message)s export.log secret_present= False idempotent= True
+08b565d0 raw_json %(message)s runtime.log secret_present= False idempotent= True
+08b565d0 raw_json %(message)s export.log secret_present= False idempotent= True
+08b565d0 error %(levelname)s %(message)s runtime.log secret_present= False idempotent= True
+08b565d0 error %(levelname)s %(message)s export.log secret_present= False idempotent= True
+08b565d0 log_failure %(levelname)s %(message)s runtime.log secret_present= False idempotent= True
+08b565d0 log_failure %(levelname)s %(message)s export.log secret_present= False idempotent= True
+08b565d0 exception %(levelname)s %(message)s runtime.log secret_present= False idempotent= True
+08b565d0 exception %(levelname)s %(message)s export.log secret_present= False idempotent= True
+08b565d0 raw_json %(levelname)s %(message)s runtime.log secret_present= False idempotent= True
+08b565d0 raw_json %(levelname)s %(message)s export.log secret_present= False idempotent= True
+08b565d0 error %(asctime)s %(levelname)s %(name)s %(message)s runtime.log secret_present= False idempotent= True
+08b565d0 error %(asctime)s %(levelname)s %(name)s %(message)s export.log secret_present= False idempotent= True
+08b565d0 log_failure %(asctime)s %(levelname)s %(name)s %(message)s runtime.log secret_present= False idempotent= True
+08b565d0 log_failure %(asctime)s %(levelname)s %(name)s %(message)s export.log secret_present= False idempotent= True
+08b565d0 exception %(asctime)s %(levelname)s %(name)s %(message)s runtime.log secret_present= False idempotent= True
+08b565d0 exception %(asctime)s %(levelname)s %(name)s %(message)s export.log secret_present= False idempotent= True
+08b565d0 raw_json %(asctime)s %(levelname)s %(name)s %(message)s runtime.log secret_present= False idempotent= True
+08b565d0 raw_json %(asctime)s %(levelname)s %(name)s %(message)s export.log secret_present= False idempotent= True
+b01785c8 sanitize_text secret_present= True
+b01785c8 error %(message)s runtime.log secret_present= True idempotent= True
+b01785c8 error %(message)s export.log secret_present= True idempotent= True
+b01785c8 log_failure %(message)s runtime.log secret_present= True idempotent= True
+b01785c8 log_failure %(message)s export.log secret_present= True idempotent= True
+b01785c8 exception %(message)s runtime.log secret_present= True idempotent= True
+b01785c8 exception %(message)s export.log secret_present= True idempotent= True
+b01785c8 raw_json %(message)s runtime.log secret_present= True idempotent= True
+b01785c8 raw_json %(message)s export.log secret_present= True idempotent= True
+b01785c8 error %(levelname)s %(message)s runtime.log secret_present= True idempotent= True
+b01785c8 error %(levelname)s %(message)s export.log secret_present= True idempotent= True
+b01785c8 log_failure %(levelname)s %(message)s runtime.log secret_present= True idempotent= True
+b01785c8 log_failure %(levelname)s %(message)s export.log secret_present= True idempotent= True
+b01785c8 exception %(levelname)s %(message)s runtime.log secret_present= True idempotent= True
+b01785c8 exception %(levelname)s %(message)s export.log secret_present= True idempotent= True
+b01785c8 raw_json %(levelname)s %(message)s runtime.log secret_present= True idempotent= True
+b01785c8 raw_json %(levelname)s %(message)s export.log secret_present= True idempotent= True
+b01785c8 error %(asctime)s %(levelname)s %(name)s %(message)s runtime.log secret_present= True idempotent= True
+b01785c8 error %(asctime)s %(levelname)s %(name)s %(message)s export.log secret_present= True idempotent= True
+b01785c8 log_failure %(asctime)s %(levelname)s %(name)s %(message)s runtime.log secret_present= True idempotent= True
+b01785c8 log_failure %(asctime)s %(levelname)s %(name)s %(message)s export.log secret_present= True idempotent= True
+b01785c8 exception %(asctime)s %(levelname)s %(name)s %(message)s runtime.log secret_present= True idempotent= True
+b01785c8 exception %(asctime)s %(levelname)s %(name)s %(message)s export.log secret_present= True idempotent= True
+b01785c8 raw_json %(asctime)s %(levelname)s %(name)s %(message)s runtime.log secret_present= True idempotent= True
+b01785c8 raw_json %(asctime)s %(levelname)s %(name)s %(message)s export.log secret_present= True idempotent= True
+working-tree sanitize_text secret_present= False
+working-tree error %(message)s runtime.log secret_present= False idempotent= True
+working-tree error %(message)s export.log secret_present= False idempotent= True
+working-tree log_failure %(message)s runtime.log secret_present= False idempotent= True
+working-tree log_failure %(message)s export.log secret_present= False idempotent= True
+working-tree exception %(message)s runtime.log secret_present= False idempotent= True
+working-tree exception %(message)s export.log secret_present= False idempotent= True
+working-tree raw_json %(message)s runtime.log secret_present= False idempotent= True
+working-tree raw_json %(message)s export.log secret_present= False idempotent= True
+working-tree error %(levelname)s %(message)s runtime.log secret_present= False idempotent= True
+working-tree error %(levelname)s %(message)s export.log secret_present= False idempotent= True
+working-tree log_failure %(levelname)s %(message)s runtime.log secret_present= False idempotent= True
+working-tree log_failure %(levelname)s %(message)s export.log secret_present= False idempotent= True
+working-tree exception %(levelname)s %(message)s runtime.log secret_present= False idempotent= True
+working-tree exception %(levelname)s %(message)s export.log secret_present= False idempotent= True
+working-tree raw_json %(levelname)s %(message)s runtime.log secret_present= False idempotent= True
+working-tree raw_json %(levelname)s %(message)s export.log secret_present= False idempotent= True
+working-tree error %(asctime)s %(levelname)s %(name)s %(message)s runtime.log secret_present= False idempotent= True
+working-tree error %(asctime)s %(levelname)s %(name)s %(message)s export.log secret_present= False idempotent= True
+working-tree log_failure %(asctime)s %(levelname)s %(name)s %(message)s runtime.log secret_present= False idempotent= True
+working-tree log_failure %(asctime)s %(levelname)s %(name)s %(message)s export.log secret_present= False idempotent= True
+working-tree exception %(asctime)s %(levelname)s %(name)s %(message)s runtime.log secret_present= False idempotent= True
+working-tree exception %(asctime)s %(levelname)s %(name)s %(message)s export.log secret_present= False idempotent= True
+working-tree raw_json %(asctime)s %(levelname)s %(name)s %(message)s runtime.log secret_present= False idempotent= True
+working-tree raw_json %(asctime)s %(levelname)s %(name)s %(message)s export.log secret_present= False idempotent= True

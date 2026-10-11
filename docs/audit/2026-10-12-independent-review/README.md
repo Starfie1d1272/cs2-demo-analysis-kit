@@ -131,3 +131,16 @@ push时GitHub通知default branch存在一个High Dependabot告警#38，但GET�
 本轮只改 diagnostics、回归与证据；未新建 PR、未正式发布/生产回填/操作用户 Windows 或上传凭据，只用合成 fixture。现有 PR 工作流的 Windows CI不等于用户机器验收，也未手动 dispatch Windows。仍交父会话独立复审，未自行将修复称为独审通过或合并 main。
 
 最终扫描检查限制凭据前缀搜索到当前 JSON 对象之前的文本段，随后仍用同一完整值规则消费原值，避免多对象日志重复搜索全部剩余文本；不改变原有凭据匹配语法。20,000 个合成 JSON 对象的实际扫描/幂等结果见 `structured-many-objects.log`。此小调整后再次通过171 Python、42 diagnostics、ruff及精确版本复现；TS代码未改，以上全量TS/构建验收继续适用。
+
+
+## PR #95 第四次独立复审：自由文本路径不能建立 JSON 边界
+
+父会话对 `b01785c8e1cb43c124d9262568eadaf35aeb946d` 提出的实际路径反证成立：`failed C:\Users\{}\synthetic-private\demo.dem` 中 `{}` 被泛化扫描器解码，drive 路径前段被抹除后，尾段单 backslash 已无法按完整 drive/UNC 识别。真实 `sanitize_text`、FileHandler 与 export 均残留合成私密目录名。该泄漏由本轮结构化扫描引入，不以 prior head CI 全绿否定。
+
+精确旧/新复现脚本为 `plain-path-runtime-probe.py`（在 python/ 以 uv run 调用），涵盖直接脱敏及 error/log_failure/logger.exception/raw JSON 四入口、message-only/level+message/实际桌面 asctime+level+name+message 三种 Formatter，文件落盘与导出均核对。`plain-path-runtime-before-after.log`：`08b565d0` 25检查/0泄漏，`b01785c8` 25检查/25泄漏，最终源码25检查/0泄漏。只有 synthetic 字符串，没有 Windows 系统操作或真实秘密。
+
+**收窄 owner 边界**：取消任意 `{` 搜索及任意字段文本的再次结构化解码。只接受完整单行 JSON 对象：裸对象异常行，或带实际 logger 标准元信息、真实入口固定 failure/frontend diagnostic/export job failed/demo record diagnostic=/ui startup diagnostic= 前缀的行。对象之外的自由文本，以及解码后的所有字符串字段，都交给原有整体 plain-text policy；路径的大括号不建立协议。多行 quoted 凭据里的伪协议行仍属于完整秘密值。完整对象也不被信任：凭据字段继续无条件抹除，字符串仍重新脱敏，不引入可信 marker/额外 reason 语法，也不修改路径规则补这一条输入。
+
+新增12项路径/多行/混合真实入口回归，再补5种源码真实结构化边界在标准 logger 格式中的回归。原head对最终59项 diagnostics：**14失败/45通过**；修后**59通过**，全仓**188 Python通过**。同一落盘/导出同时核对普通路径、未经信任 raw JSON 中的路径/秘密字段、log_failure 英文原因与 logger.exception 中文原因及幂等。原先 structured cause、escaped quote URL、marker伪造、secret后缀、receipt全部回归保留。`plain-path-structured-cause-check.log` 再次重放519db1cf/08b565d0/最终源码，证实上一轮原因修复仍成立。
+
+TS没有改动，实际 diagnostic/client/Studio import 定向**74通过**；ruff、diff-check通过；20,000对象耗时/幂等记录见 `plain-path-many-objects.log`。已推 `b01785c8` 的主CI38171047933三组success；其全量862 fast TS、8 ZIP integration、typecheck/build/packed-consumer验证只作为此前精确head的证据，新head以其后续CI为准。没有把自己的测试称为独立复审通过。继续沿用PR95，尚待父会话对收窄方案独立复审，未合main/正式发布/生产回填。

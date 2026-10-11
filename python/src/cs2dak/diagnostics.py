@@ -38,12 +38,20 @@ class SourceFailures(RuntimeError):
 _SECRET_KEY = (r"authorization|(?:access|refresh|device|poll|session|auth|id)[_-]?token|"
                r"token|password|passwd|credential|secret|pairing[_-]?code|device[_-]?code|client[_-]?secret|api[_-]?key")
 _QUOTED_VALUE = r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\''
-_CREDENTIAL_PREFIX = re.compile(
-    rf"(?i)[\"']?(?:{_SECRET_KEY}|set-cookie|cookie)[\"']?\s*[:=]\s*"
-)
 _CREDENTIAL_SPAN = re.compile(
     rf"(?i)[\"']?(?:{_SECRET_KEY})[\"']?\s*[:=]\s*(?:{_QUOTED_VALUE}|[^\r\n,;}}]+)|"
     rf"[\"']?(?:set-cookie|cookie)[\"']?\s*[:=]\s*(?:{_QUOTED_VALUE}|[^\r\n]+)"
+)
+
+# Only complete, single-line objects at actual diagnostic log boundaries are
+# decoded. A brace in a path or arbitrary prose never splits the plain value.
+_STRUCTURED_LINE = re.compile(
+    r"(?m)^(?:\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} )?"
+    r"(?:(?:DEBUG|INFO|WARNING|ERROR|CRITICAL) (?:[A-Za-z0-9_.-]+ )?)?"
+    r"(?:failure |frontend diagnostic |export job [A-Za-z0-9_-]+ failed: |"
+    r"demo=[A-Za-z0-9_-]* phase=[A-Za-z0-9_-]* code=[A-Za-z0-9_-]* diagnostic=|"
+    rf"ui startup error message=(?:{_QUOTED_VALUE}) stack=(?:{_QUOTED_VALUE}) diagnostic=)?"
+    r"(?P<object>\{[^\r\n]*\})[ \t]*\r?$"
 )
 
 
@@ -61,41 +69,37 @@ def sanitize_text(value, limit: int = 2000) -> str:
 
 def _sanitize_json(value):
     if isinstance(value, dict):
-        return {sanitize_text(key, 16000): "[redacted]"
+        return {_sanitize_plain_text(key)[:16000]: "[redacted]"
                 if re.search(rf"(?i)(?:{_SECRET_KEY}|set-cookie|cookie)$", key)
                 else _sanitize_json(item) for key, item in value.items()}
     if isinstance(value, list):
         return [_sanitize_json(item) for item in value]
     if isinstance(value, str):
-        return sanitize_text(value, max(len(value) * 8, 16000))
+        return _sanitize_plain_text(value)
     return value
 
 
 def _sanitize_log_text(text: str) -> str:
     pieces = []
     cursor = 0
-    while cursor < len(text):
-        start = text.find("{", cursor)
-        if start < 0:
-            pieces.append(_sanitize_plain_text(text[cursor:]))
-            break
-        prefix = _CREDENTIAL_PREFIX.search(text, cursor, start)
-        credential = _CREDENTIAL_SPAN.match(text, prefix.start()) if prefix else None
-        # Consume a complete plain credential before interpreting objects. This
-        # also protects quoted multiline values and JSON-looking secret values.
-        if credential and credential.start() < start:
-            end = credential.end()
-            pieces.append(_sanitize_plain_text(text[cursor:end]))
-            cursor = end
+    credentials = iter(_CREDENTIAL_SPAN.finditer(text))
+    credential = next(credentials, None)
+    for line in _STRUCTURED_LINE.finditer(text):
+        start = line.start("object")
+        while credential is not None and credential.end() <= start:
+            credential = next(credentials, None)
+        # A protocol-looking line inside a quoted multiline credential remains
+        # part of that complete secret value; it cannot create a trusted boundary.
+        if credential is not None and credential.start() < start < credential.end():
             continue
         try:
-            value, end = json.JSONDecoder().raw_decode(text, start)
+            value = json.loads(line.group("object"))
             safe = json.dumps(_sanitize_json(value), ensure_ascii=False)
         except (ValueError, RecursionError):
-            pieces.append(_sanitize_plain_text(text[cursor:]))
-            break
+            continue
         pieces.extend((_sanitize_plain_text(text[cursor:start]), safe))
-        cursor = end
+        cursor = line.end()
+    pieces.append(_sanitize_plain_text(text[cursor:]))
     return "".join(pieces)
 
 
