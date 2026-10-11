@@ -86,3 +86,5 @@ PRISM 风格、强弱项等“相对当前范围”的判断可以继续使用 c
 无法明确回答时，不应开始实现。
 
 14. `core/src/tournament-facts.ts` 是单图 frozen Tournament economy/performance projection 的唯一 owner，只以 type import 消费 Tournament DTO。显式 stable team/player ID 必须完整，teamA/B 相同 ID 明确拒绝；显示队名、昵称、logo 不生成或决定 ID。Evidence 直接消费 Core data adapter，再按 target entry ID 查询 Tournament 结果，不通过 Presentation ViewModel 回查。未绑定的本地 Demo 使用显式 match-scoped observed ID，只表示本场观察，不能据同名跨图认定同队；Presentation 只注入标签，Studio `teamRenames` 不改变 frozen identity。
+
+Calibration-only 消费者优先使用 `@cs2dak/maps/calibration`；root 是 aggregate compatibility surface。两者由同一 maps owner 实现，当前 Active Duty 与 checked-in spatial coverage 分别由 `ACTIVE_DUTY_MAPS` / `SPATIAL_ASSET_MAPS` 表达。

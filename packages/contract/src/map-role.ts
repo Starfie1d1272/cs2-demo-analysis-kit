@@ -5,7 +5,7 @@ import { evidenceRefSchema } from "./evidence.js";
 export const MAP_ROLE_EVIDENCE_VERSION = 4;
 export const T_RESPONSIBILITY_RESEARCH_PROJECTION_VERSION = "cs2-demo-analysis-kit/t-responsibility-research-projection-1.0";
 
-/** The supported active-duty pool. Unknown maps are deliberately not generalized. */
+/** Supported map-role research/evidence coverage, independent of current Active Duty. Unknown maps are deliberately not generalized. */
 export const supportedMapNameSchema = z.enum([
   "de_ancient", "de_anubis", "de_dust2", "de_inferno", "de_mirage", "de_nuke", "de_overpass"
 ]);

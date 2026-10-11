@@ -11,8 +11,7 @@ import { getMapNav } from "./geometry-assets.js";
 /** 默认格边长（世界单位）。callout-grid 是 10u 更细；覆盖场用 128u 控制格数 ~300。 */
 export const RADAR_FIELD_CELL_SIZE = 128;
 
-/** world→radar 标定版本；MAP_CALIBRATIONS 变动时手动 +1，使旧缓存场失效。 */
-export const MAP_CALIBRATION_VERSION = "1";
+export { MAP_CALIBRATION_VERSION } from "./calibration.js";
 
 export interface RadarFieldGridIndex {
   cellSize: number;

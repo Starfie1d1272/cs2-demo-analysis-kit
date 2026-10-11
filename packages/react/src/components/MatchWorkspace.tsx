@@ -1,6 +1,6 @@
 import type { MatchWorkspaceModel, WorkspaceReplayFrame, WorkspaceReplayLoadout, WorkspaceReplayRound, WorkspaceSpatialPoint } from "@cs2dak/contract";
 import { displayWeaponName, sideLabel, economyLabelCn, buildMatchBuyQuality, buildMatchReportMarkdown, deriveReplayClock } from "@cs2dak/presentation";
-import { getMapCalibration, worldToRadar, hasLowerLevel, levelAt, type MapLevel } from "@cs2dak/maps";
+import { getMapCalibration, worldToRadar, hasLowerLevel, levelAt, type MapLevel } from "@cs2dak/maps/calibration";
 import { Activity, BarChart3, ChevronLeft, ChevronRight, Crosshair, Film, Gauge, ListChecks, Map as MapIcon, Pause, Play, ShieldCheck, Swords, Table2, Users } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { EconomyPanel } from "./EconomyPanel";

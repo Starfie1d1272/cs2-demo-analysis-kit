@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { getMapGeometry, getMapNav } from "./geometry-assets.js";
-import { ACTIVE_DUTY_MAPS } from "./zones.js";
+import { SPATIAL_ASSET_MAPS } from "./map-pool.js";
 
 describe("map geometry assets", () => {
-  it("ships compact nav assets for every active duty map", () => {
-    for (const mapName of ACTIVE_DUTY_MAPS) {
+  it("ships compact nav assets for every spatial asset map", () => {
+    for (const mapName of SPATIAL_ASSET_MAPS) {
       const nav = getMapNav(mapName);
       expect(nav?.mapName).toBe(mapName);
       expect(nav?.areas.length, mapName).toBeGreaterThan(100);

@@ -8,10 +8,10 @@ import mirageZones from "../map-zones/de_mirage.json" with { type: "json" };
 // import nukeZones from "../map-zones/de_nuke.json" with { type: "json" };
 // import overpassZones from "../map-zones/de_overpass.json" with { type: "json" };
 import type { MapZones } from "./zones.js";
-import type { ActiveDutyMap } from "./zones.js";
+import type { SpatialAssetMap } from "./map-pool.js";
 
 /** legacy 手标 zone 多边形。未标定的图 getMapZones 返回 null。 */
-export const MAP_ZONE_ASSETS: Partial<Record<ActiveDutyMap, MapZones>> = {
+export const MAP_ZONE_ASSETS: Partial<Record<SpatialAssetMap, MapZones>> = {
   de_ancient: ancientZones as unknown as MapZones,
   de_dust2: dust2Zones as unknown as MapZones,
   de_inferno: infernoZones as unknown as MapZones,

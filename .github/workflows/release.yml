@@ -71,6 +71,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Build desktop packages
+        env:
+          PACKAGE_RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: PACKAGE_SKIP_VERSION_SYNC=1 bash scripts/package.sh
+        shell: bash
+
       # .tri 由独立资产发布路径维护，不随桌面应用 release 重新生成或上传。安装
       # 包与 updater 都从已发布的 R2 manifest 按需获取；缺失只会降级相关分析。
       - name: Fetch published tris manifest
@@ -81,10 +87,6 @@ jobs:
             "https://dakupdate.starfie1d.top/tris/manifest.json" \
             -o tris-manifest.json
           node -e 'const manifest = require("./tris-manifest.json"); if (!manifest.maps || Object.keys(manifest.maps).length === 0) throw new Error("published tris manifest is empty");'
-
-      - name: Build desktop packages
-        run: PACKAGE_SKIP_VERSION_SYNC=1 bash scripts/package.sh
-        shell: bash
 
       - name: Build standalone RivalHub Demo Uploader
         run: bash scripts/package-uploader.sh
@@ -114,7 +116,9 @@ jobs:
         shell: bash
         run: |
           VERSION="$(node -p "require('./package.json').version")"
-          node scripts/build-web-patch.mjs "$VERSION" python/dist
+          # Use the frontend already embedded in this release's desktop runtime.
+          # Environment exports from package.sh do not survive between CI steps.
+          node scripts/build-web-patch.mjs "$VERSION" python/dist python/dist/dak-studio/_internal/studio_web
 
       # 0.7.0: Web Installer（极简 tkinter，onefile ~15MB）
       - name: Build Web Installer

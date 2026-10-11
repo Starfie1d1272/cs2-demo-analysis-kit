@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
+import { getMapCalibration, worldToRadar } from "@cs2dak/maps/calibration";
 
 export const GRENADE_COLOR: Record<string, string> = {
   flashbang: "var(--dak-grenade-flashbang)",

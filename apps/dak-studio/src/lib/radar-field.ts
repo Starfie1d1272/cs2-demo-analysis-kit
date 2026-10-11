@@ -12,7 +12,7 @@
 import type { RadarField, RadarFieldBase } from "@cs2dak/contract";
 import { RADAR_FIELD_BASES } from "@cs2dak/contract";
 import { RADAR_FIELD_VERSION } from "@cs2dak/core";
-import { MAP_CALIBRATION_VERSION } from "@cs2dak/maps";
+import { MAP_CALIBRATION_VERSION } from "@cs2dak/maps/calibration";
 import { radarFieldInWorker } from "./library";
 import { getStorage } from "./storage";
 

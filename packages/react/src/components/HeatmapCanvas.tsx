@@ -9,7 +9,7 @@
  * This replaces the previous DOM-span approach which could not render true density.
  */
 import type { DemoViewModel, GrenadeType, HeatmapPoint, Side, TeamKey } from "@cs2dak/contract";
-import { getMapCalibration, worldToRadar, hasLowerLevel, levelAt, type MapLevel } from "@cs2dak/maps";
+import { getMapCalibration, worldToRadar, hasLowerLevel, levelAt, type MapLevel } from "@cs2dak/maps/calibration";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 // ── HeatmapRenderer (adapted from simpleheat / CS Demo Manager, BSD-2-Clause) ─

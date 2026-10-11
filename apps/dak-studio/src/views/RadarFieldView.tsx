@@ -6,7 +6,7 @@
  */
 import { EmptyState } from "@cs2dak/react";
 import { RadarFieldCanvas } from "@cs2dak/react";
-import { getMapCalibration } from "@cs2dak/maps";
+import { getMapCalibration } from "@cs2dak/maps/calibration";
 import type { RadarField } from "@cs2dak/contract";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { StudioDemoEntry } from "../lib/library";
