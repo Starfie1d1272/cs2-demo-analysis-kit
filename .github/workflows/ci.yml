@@ -29,6 +29,8 @@ jobs:
 
       - run: node --test scripts/uploader-release-contract.test.mjs
 
+      - run: node --test scripts/sync-version.test.mjs
+
       - run: pnpm typecheck
 
       - run: pnpm test:fast
