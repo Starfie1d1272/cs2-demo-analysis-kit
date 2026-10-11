@@ -230,3 +230,11 @@ Windows Uploader 推荐入口为 `RivalHub-Demo-Uploader-Setup-X.Y.Z.exe`（完�
 `sync-version.mjs` 只接受 canonical `x.y.z`（CLI 可带 `v` 前缀），不接受自由 prerelease 或 build suffix。源码 revision 属于 build provenance，不写入 Python / npm release version。脚本先读取并校验全部私有 manifest 和三个 Python target，再开始写入；缺失、重复或无版本字段会在任何写入前失败。`uv.lock` 仅定位唯一 `cs2dak` package block，可恢复历史 malformed version，不修改其他依赖。写入失败时尝试恢复所有已尝试的 target；恢复失败会明确报出，需检查工作树后重试。该保护不宣称对进程被强制结束或磁盘故障提供跨文件事务。
 
 回归：`node --test scripts/sync-version.test.mjs`。`PACKAGE_SKIP_VERSION_SYNC=1` 的 artifact / UI revision provenance 仍由 #48 的后续工作验收。
+
+### Maps 编译发布物验证
+
+`@cs2dak/maps` 保留 root、`/callout-grid-node`、`/callout-grid-browser`、`/tri-assets` 四个入口与原有 API。公开导出指向 `dist/*.js` 与 `dist/*.d.ts`；地图 JSON 仍随包放在原根目录，静态 import 与 Node callout loader 不改变资产路径。`build` 清理旧 dist 并强制编译，避免旧声明布局或测试文件混入包。
+
+CI 与发布 gate 运行 `node scripts/maps-package-smoke.mjs`（Ubuntu 上的 pnpm/npm 工具链）：build → pack → 临时目录干净安装 → 四入口实际导入/调用 → strict NodeNext 声明检查。consumer 无 workspace symlink、TypeScript runtime loader 或 DAK 源路径。JSON ESM 在仓库 Node 24 工具链上验证；browser callout loader 以注入 fetch 验证，不调用外部服务。脚本不 publish、不改版本，并清理其临时 consumer。fresh checkout 运行测试/dev 前先 `pnpm typecheck`；修改 maps 时可运行 `pnpm --filter @cs2dak/maps exec tsc -p tsconfig.json --watch` 更新编译输出。
+
+这只完成 #47 的编译 artifact 修复；calibration 新入口、图池/资产覆盖分离与 Train 标定版本属于后续独立范围。

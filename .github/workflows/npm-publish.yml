@@ -77,6 +77,9 @@ jobs:
       - name: Typecheck release packages
         run: pnpm typecheck
 
+      - name: Verify packed maps consumer
+        run: node scripts/maps-package-smoke.mjs
+
       # Changesets 负责按 registry 上的精确版本跳过已发布包并执行 publish。
       # 关闭其本地 tag 创建，交给下面的 reconciliation 脚本按 npm 事实补齐。
       - name: Publish package versions with Changesets

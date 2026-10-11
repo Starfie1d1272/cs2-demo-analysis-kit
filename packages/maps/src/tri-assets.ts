@@ -8,7 +8,7 @@
  * DAK Studio 浏览器端不经过此 Node 路径；开发/桌面端通过 HTTP 按需加载 `.tri`。
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { buildTriangleBvh, parseAwpyTri, type TriangleBvh } from "./visibility.js";
 
@@ -56,7 +56,6 @@ export function getMapTri(mapName: string): TriangleBvh | null {
 export function hasMapTri(mapName: string): boolean {
   if (triBvhCache.has(mapName)) return triBvhCache.get(mapName) !== null;
   try {
-    const { statSync } = require("node:fs") as typeof import("node:fs");
     statSync(resolveTriPath(mapName));
     return true;
   } catch {

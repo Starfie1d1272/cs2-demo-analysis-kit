@@ -4,6 +4,25 @@ English | 简体中文
 
 Map calibration, world-to-radar transforms, compact nav topology, zone geometry, callout name mappings, default positions, and site-entry semantics. Route assets are retained as legacy spatial helpers; Coach semantics should prefer demo-derived facts plus `site-entry-chokes`.
 
+## Public package entries
+
+Published packages expose compiled ESM and declarations; repository `src/` paths below are implementation locations, not consumer imports. Existing APIs remain available through these four entries:
+
+| Entry | Runtime |
+| --- | --- |
+| `@cs2dak/maps` | Calibration, geometry and bundled JSON assets |
+| `@cs2dak/maps/callout-grid-node` | Node filesystem grid loader |
+| `@cs2dak/maps/callout-grid-browser` | Fetch-based grid loader |
+| `@cs2dak/maps/tri-assets` | Node filesystem triangle loader |
+
+```ts
+import { getMapCalibration, worldToRadar } from "@cs2dak/maps";
+const map = getMapCalibration("de_nuke");
+if (map) worldToRadar({ x: map.posX, y: map.posY }, map);
+```
+
+No workspace source aliases or runtime TypeScript loader are needed. `node scripts/maps-package-smoke.mjs` validates the actual tarball in a clean Node 24 consumer and checks declarations under strict NodeNext. Build the package with `pnpm --filter @cs2dak/maps build` before packing; the build clears generated `dist/`, including stale files from earlier declaration layouts. JSON assets retain their package-root paths.
+
 ## Contents
 
 | Directory / file | Purpose |
