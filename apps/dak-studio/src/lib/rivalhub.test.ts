@@ -17,7 +17,7 @@ vi.mock("./storage", () => ({
   }),
 }));
 
-import { connectRivalHub, normalizeBaseUrl, revokeRivalHubPairing, rivalHubEvidenceIdempotencyKey } from "./rivalhub";
+import { connectRivalHub, loadRivalHubConnection, normalizeBaseUrl, revokeRivalHubPairing, rivalHubEvidenceIdempotencyKey } from "./rivalhub";
 
 describe("RivalHub pairing revocation", () => {
   beforeEach(() => {
@@ -52,6 +52,21 @@ describe("RivalHub pairing revocation", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("keeps vault read failures visible without clearing connection metadata", async () => {
+    credentialGet.mockRejectedValueOnce({ message: "CREDENTIAL_READ：钥匙串拒绝访问（退出码 36）" });
+    const state = await loadRivalHubConnection();
+    expect(state).toMatchObject({ status: "error", baseUrl: "https://rivalhub.test", connectedAt: 1, lastSyncAt: 2 });
+    expect(state.error).toContain("CREDENTIAL_READ");
+    expect(recordDelete).not.toHaveBeenCalled();
+    expect(recordPut).not.toHaveBeenCalled();
+    expect(credentialDelete).not.toHaveBeenCalled();
+  });
+
+  it("treats only an absent credential as disconnected", async () => {
+    credentialGet.mockResolvedValueOnce(null);
+    expect(await loadRivalHubConnection()).toMatchObject({ status: "disconnected", error: null });
   });
 
   it("revokes the current server pairing before clearing local credential and record", async () => {

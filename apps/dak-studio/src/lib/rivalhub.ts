@@ -1,4 +1,4 @@
-import { createRivalHubClient, normalizeBaseUrl, requestJson, RivalHubHttpError } from "@cs2dak/rivalhub-upload";
+import { createRivalHubClient, normalizeDiagnostic, normalizeBaseUrl, requestJson, RivalHubHttpError } from "@cs2dak/rivalhub-upload";
 export { normalizeBaseUrl, rivalHubEvidenceIdempotencyKey } from "@cs2dak/rivalhub-upload";
 import { getStorage } from "./storage";
 import { markRivalHubEventsStale } from "./events";
@@ -152,8 +152,12 @@ export async function loadRivalHubConnection(): Promise<RivalHubConnectionState>
   if (!record?.baseUrl) return { baseUrl: "", pairingId: null, connectedAt: 0, lastSyncAt: null, status: "disconnected", error: null };
   const baseUrl = normalizeBaseUrl(record.baseUrl);
   const pairingId = typeof record.pairingId === "string" && record.pairingId ? record.pairingId : null;
-  const token = await readCredential(baseUrl);
-  return { ...record, baseUrl, pairingId, status: token ? "connected" : "disconnected", error: null };
+  try {
+    const token = await readCredential(baseUrl);
+    return { ...record, baseUrl, pairingId, status: token ? "connected" : "disconnected", error: null };
+  } catch (error) {
+    return { ...record, baseUrl, pairingId, status: "error", error: normalizeDiagnostic(error, { stage: "credential.read" }).message };
+  }
 }
 
 export async function connectRivalHub(
