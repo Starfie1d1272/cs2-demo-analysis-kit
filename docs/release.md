@@ -198,7 +198,7 @@ commit 的 tag 会直接使工作流失败，不会删除、回滚、移动 tag 
 2. 对上面列出的 7 个包分别在 npm → Package → Settings → Trusted publishing 添加
    **GitHub Actions** publisher：
 
-   - Organization or user：`Starfie1d127`
+   - Organization or user：`Starfie1d1272`（GitHub 仓库 owner，不是 npm 用户名）
    - Repository：`cs2-demo-analysis-kit`
    - Workflow filename：`npm-publish.yml`（只填文件名）
    - Environment name：`npm-publish`
@@ -274,3 +274,22 @@ provenance、实际checkout/gitHead和成功npm package tags都指X，桌面v0.8
 固定754，不移动、不重新构建覆盖其公开bytes。省略选择时保持当前版本提交模式；
 纯workflow修复提交本身无版本提升会拒绝盲发。冷构建与CI使用相同build:serial，
 保留完整测试、typecheck、实际tgz闭包、registry/provenance/tag验收；不创建凭据。
+
+### 原 npm 部分发布的续发边界
+
+2026-10-12 的 run `38204647873` 使用源码
+`263895839f8a4f334b6c92be2a38639fb09523ad`，版本选择为
+`75434c5dcce9477a567761ed5c378b346a4ceebe`。该次构建与 consumer gates
+通过；contract/maps 发布返回 404，tournament 1.1.2 已公开且 provenance 与
+package tag 均指向 2638958。其他四包尚未发布。
+
+先由包维护者在 npm 网页核对缺失六包的 GitHub Actions Trusted Publisher：
+owner、repository、workflow、environment 必须匹配上表，且允许 direct publish；
+检查连接是否过期。404 本身不能确定哪个字段错误，公开 registry 也不提供这些设置。
+不要为此生成 token、扩大账户权限或重发 tournament。
+
+设置核对完成并确认目标六版本仍缺失后，使用原 run 的 **Re-run failed jobs**，
+保留原 github.sha 与 release_commit；不要在新 main 上 Run workflow。
+release_commit 输入只选择版本，不能锁定源码 checkout。重跑前确认 tournament
+tag 仍指 2638958；成功后核验六包的 registry provenance 与七个 package tags，
+再从 registry 干净安装验证消费。桌面 v0.8.6 不重发、不移动 tag。
