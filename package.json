@@ -22,6 +22,7 @@
     "test:integration": "vitest run --pool=forks packages/cli/src/index.integration.test.ts packages/cli/src/cohort.integration.test.ts packages/core/src/spatial/utility.integration.test.ts packages/presentation/src/season-validation.test.ts",
     "test:all": "vitest run --pool=forks",
     "build": "pnpm -r --if-present build",
+    "build:serial": "pnpm -r --workspace-concurrency=1 --if-present build",
     "changeset": "changeset",
     "version:packages": "changeset version",
     "check:release-policy": "node scripts/check-npm-publish-policy.mjs",
