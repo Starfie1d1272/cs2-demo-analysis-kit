@@ -7,7 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import cs2dak
-from cs2dak import studio, updater
+from cs2dak import installer, studio, updater
 
 
 def test_exact_legacy_native_check_reads_manual_manifest_without_touching_library(tmp_path, monkeypatch):
@@ -83,3 +83,35 @@ def test_manual_install_preserves_all_persistent_directories_and_library_bytes(t
     updater.install_runtime_archive(archive, install)
     for path, content in before.items():
         assert (install / path).read_bytes() == content
+
+
+def test_new_installer_uses_exact_version_even_before_stable_manifest_promotion(monkeypatch):
+    monkeypatch.setattr(installer, "INSTALLER_VERSION", "0.8.6")
+    monkeypatch.setattr(installer, "MANIFEST_URL_VERSIONED", "https://dakupdate.starfie1d.top/releases/v0.8.6/install-manifest.json")
+    monkeypatch.setattr(installer, "MANIFEST_URL_GITHUB_VERSIONED", "https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/download/v0.8.6/install-manifest.json")
+    app = object.__new__(installer.SimpleInstaller)
+    app.cancelled = False
+    seen = []
+
+    class Response:
+        def __init__(self, version):
+            self.version = version
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self):
+            return json.dumps({"appVersion": self.version}).encode()
+
+    def fetch(request, **_kwargs):
+        seen.append(request.full_url)
+        assert "/v0.8.6/" in request.full_url
+        # An incorrect/cached response must not silently install the older runtime.
+        return Response("0.8.5" if len(seen) == 1 else "0.8.6")
+
+    monkeypatch.setattr(installer.urllib.request, "urlopen", fetch)
+    assert app._fetch_manifest()["appVersion"] == "0.8.6"
+    assert seen == [installer.MANIFEST_URL_VERSIONED, installer.MANIFEST_URL_GITHUB_VERSIONED]

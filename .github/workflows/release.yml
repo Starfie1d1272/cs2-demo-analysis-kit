@@ -375,29 +375,24 @@ jobs:
             echo "R2: full zip ✓"
           fi
 
-          # 4. install-manifest.json（versioned + latest 双路径）
+          # 4. Versioned install input; stable promotion waits for public download verification.
           if [ -f "$INSTALL_MANIFEST" ]; then
             aws s3 cp "$INSTALL_MANIFEST" \
               "s3://${R2_BUCKET}/releases/${TAG}/install-manifest.json" \
               --endpoint-url "$R2_ENDPOINT" \
               --content-type application/json \
               --cache-control "public, max-age=31536000, immutable"
-            aws s3 cp "$INSTALL_MANIFEST" \
-              "s3://${R2_BUCKET}/releases/install-manifest.json" \
-              --endpoint-url "$R2_ENDPOINT" \
-              --content-type application/json \
-              --cache-control "public, max-age=300"
-            echo "R2: install-manifest ✓ (${TAG}/ + latest)"
+            echo "R2: install-manifest snapshot ✓ (${TAG}/)"
           fi
 
-          # 5. Compatible runtimes retain automatic updates; legacy clients use safe installation.
+          # 5. Verify versioned snapshots before announcing through stable pointers.
           aws s3 cp "dist/latest-v2.json" \
-            "s3://${R2_BUCKET}/releases/latest-v2.json" \
+            "s3://${R2_BUCKET}/releases/${TAG}/latest-v2.json" \
             --endpoint-url "$R2_ENDPOINT" \
             --content-type application/json \
             --cache-control "public, max-age=300"
           aws s3 cp "dist/latest.json" \
-            "s3://${R2_BUCKET}/releases/latest.json" \
+            "s3://${R2_BUCKET}/releases/${TAG}/latest.json" \
             --endpoint-url "$R2_ENDPOINT" \
             --content-type application/json \
             --cache-control "public, max-age=300"
@@ -438,12 +433,7 @@ jobs:
             --endpoint-url "$R2_ENDPOINT" \
             --content-type application/json \
             --cache-control "public, max-age=31536000, immutable"
-          aws s3 cp "$UPLOADER_MANIFEST" \
-            "s3://${R2_BUCKET}/releases/uploader/latest.json" \
-            --endpoint-url "$R2_ENDPOINT" \
-            --content-type application/json \
-            --cache-control "public, max-age=300"
-          echo "R2: uploader manifest ✓ (${TAG}/ + latest)"
+          echo "R2: uploader manifest snapshot ✓ (${TAG}/)"
 
           echo "R2 上传完成"
 
@@ -460,10 +450,10 @@ jobs:
           set -euo pipefail
           export VERSION="${RELEASE_TAG#v}"
           TAG="v${VERSION}"
-          aws s3 cp "s3://${R2_BUCKET}/releases/latest.json" latest.json --endpoint-url "$R2_ENDPOINT"
-          aws s3 cp "s3://${R2_BUCKET}/releases/latest-v2.json" latest-v2.json --endpoint-url "$R2_ENDPOINT"
-          aws s3 cp "s3://${R2_BUCKET}/releases/install-manifest.json" install-manifest.json --endpoint-url "$R2_ENDPOINT"
-          aws s3 cp "s3://${R2_BUCKET}/releases/uploader/latest.json" uploader-manifest.json --endpoint-url "$R2_ENDPOINT"
+          aws s3 cp "s3://${R2_BUCKET}/releases/${TAG}/latest.json" latest.json --endpoint-url "$R2_ENDPOINT"
+          aws s3 cp "s3://${R2_BUCKET}/releases/${TAG}/latest-v2.json" latest-v2.json --endpoint-url "$R2_ENDPOINT"
+          aws s3 cp "s3://${R2_BUCKET}/releases/${TAG}/install-manifest.json" install-manifest.json --endpoint-url "$R2_ENDPOINT"
+          aws s3 cp "s3://${R2_BUCKET}/releases/${TAG}/uploader-manifest.json" uploader-manifest.json --endpoint-url "$R2_ENDPOINT"
           node - <<'NODE'
           const fs = require("fs");
           const latest = JSON.parse(fs.readFileSync("latest.json", "utf8"));
@@ -533,6 +523,7 @@ jobs:
       - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ env.RELEASE_TAG }}
+          make_latest: true
           files: |
             dist/*.dmg
             dist/*.zip
@@ -589,3 +580,51 @@ jobs:
             ---
 
             ${{ steps.changelog.outputs.changelog }}
+
+      - name: Verify installer downloads then announce Studio update
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          set -euo pipefail
+          TAG="$RELEASE_TAG"
+          VERSION="${TAG#v}"
+          LATEST_TAG="$(gh api "repos/${{ github.repository }}/releases/latest" --jq .tag_name)"
+          if [ "$LATEST_TAG" != "$TAG" ]; then
+            echo "::error::Legacy manual download destination is not this release"
+            exit 1
+          fi
+          curl --fail --location --retry 5 --retry-all-errors \
+            "https://dakupdate.starfie1d.top/releases/${TAG}/DAK-Studio-Setup-${VERSION}.exe" -o public-r2-setup.exe
+          curl --fail --location --retry 5 --retry-all-errors \
+            "https://github.com/${{ github.repository }}/releases/download/${TAG}/DAK-Studio-Setup-${VERSION}.exe" -o public-github-setup.exe
+          node - <<'NODE'
+          const fs = require("fs"), crypto = require("crypto");
+          const expected = require("./dist/latest.json").manualInstall;
+          for (const file of ["public-r2-setup.exe", "public-github-setup.exe"]) {
+            const bytes = fs.readFileSync(file);
+            if (bytes.length !== expected.size || crypto.createHash("sha256").update(bytes).digest("hex") !== expected.sha256) throw new Error("public manual installer size/SHA-256 mismatch");
+          }
+          console.log("Old-client manual destination and both public installer downloads verified");
+          NODE
+          for name in install-manifest.json latest-v2.json; do
+            aws s3 cp "dist/$name" "s3://${R2_BUCKET}/releases/$name" \
+              --endpoint-url "$R2_ENDPOINT" --content-type application/json --cache-control "public, max-age=300"
+            aws s3 cp "s3://${R2_BUCKET}/releases/$name" "published-$name" --endpoint-url "$R2_ENDPOINT"
+            cmp "dist/$name" "published-$name"
+          done
+          aws s3 cp dist/uploader-manifest.json "s3://${R2_BUCKET}/releases/uploader/latest.json" \
+            --endpoint-url "$R2_ENDPOINT" --content-type application/json --cache-control "public, max-age=300"
+          aws s3 cp "s3://${R2_BUCKET}/releases/uploader/latest.json" published-uploader.json --endpoint-url "$R2_ENDPOINT"
+          cmp dist/uploader-manifest.json published-uploader.json
+          # Legacy announcement is last: the page, exact installer and install input are ready.
+          aws s3 cp dist/latest.json "s3://${R2_BUCKET}/releases/latest.json" \
+            --endpoint-url "$R2_ENDPOINT" --content-type application/json --cache-control "public, max-age=300"
+          aws s3 cp "s3://${R2_BUCKET}/releases/latest.json" published-latest.json --endpoint-url "$R2_ENDPOINT"
+          cmp dist/latest.json published-latest.json

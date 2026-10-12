@@ -25,9 +25,9 @@ from cs2dak import __version__ as INSTALLER_VERSION
 from cs2dak import updater
 from cs2dak.diagnostics import SourceFailures, log_failure, sanitize_text
 
-# R2 端点（稳定，不随版本变化）
-MANIFEST_URL_LATEST = "https://dakupdate.starfie1d.top/releases/install-manifest.json"
+# Versioned inputs prevent a new safe installer from selecting an older runtime.
 MANIFEST_URL_VERSIONED = f"https://dakupdate.starfie1d.top/releases/v{INSTALLER_VERSION}/install-manifest.json"
+MANIFEST_URL_GITHUB_VERSIONED = f"https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/download/v{INSTALLER_VERSION}/install-manifest.json"
 
 USER_AGENT = f"DAK-Studio-Installer/{INSTALLER_VERSION}"
 log = logging.getLogger("dak-studio-installer")
@@ -349,8 +349,8 @@ class SimpleInstaller:
                 shutil.rmtree(staging_dir, ignore_errors=True)
 
     def _fetch_manifest(self) -> dict:
-        """按优先级拉 manifest：latest → versioned → 报错。"""
-        urls = [MANIFEST_URL_LATEST, MANIFEST_URL_VERSIONED]
+        """Install this installer version, including before stable pointers advance."""
+        urls = [MANIFEST_URL_VERSIONED, MANIFEST_URL_GITHUB_VERSIONED]
         failures = SourceFailures("无法获取安装清单", "install_manifest")
         for index, url in enumerate(urls):
             check_cancel(lambda: self.cancelled)
@@ -359,6 +359,8 @@ class SimpleInstaller:
                 with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
                     manifest = json.loads(resp.read().decode("utf-8"))
                     check_cancel(lambda: self.cancelled)
+                    if manifest.get("appVersion") != INSTALLER_VERSION:
+                        raise RuntimeError("安装清单版本与本安装器不一致；请使用对应版本安装器，原资料未修改")
                     return manifest
             except InstallCancelled:
                 raise

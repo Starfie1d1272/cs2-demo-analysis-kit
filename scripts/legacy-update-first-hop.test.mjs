@@ -15,6 +15,20 @@ const legacyHashes = {
   'legacy-updater-bridge-v0.8.5.txt': 'acb9068fd8a69b2c17a8bcc7d2ceef3798527d436d04b54ee97f1fe266a6052f',
 };
 
+test('stable control pointers wait for the actual legacy download page and both verified installers', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
+  const publish = workflow.indexOf('- uses: softprops/action-gh-release@');
+  assert.ok(publish > 0);
+  const beforeRelease = workflow.slice(0, publish);
+  for (const key of ['releases/latest.json', 'releases/latest-v2.json', 'releases/install-manifest.json', 'releases/uploader/latest.json']) {
+    assert.ok(!beforeRelease.includes(`s3://\${R2_BUCKET}/${key}"`), `premature stable pointer: ${key}`);
+  }
+  const promote = workflow.slice(workflow.indexOf('- name: Verify installer downloads then announce Studio update'));
+  assert.ok(promote.indexOf('releases/latest" --jq .tag_name') < promote.indexOf('for name in install-manifest.json latest-v2.json'));
+  assert.ok(promote.indexOf('public manual installer size/SHA-256 mismatch') < promote.indexOf('for name in install-manifest.json latest-v2.json'));
+  assert.ok(promote.indexOf('cmp dist/uploader-manifest.json') < promote.indexOf('aws s3 cp dist/latest.json'));
+});
+
 test('actual 0.8.5 client reads real-version manual manifest; safe native capability retains modern auto updates', async t => {
   const folder = mkdtempSync(join(tmpdir(), 'dak-first-hop-'));
   t.after(() => rmSync(folder, { recursive: true, force: true }));

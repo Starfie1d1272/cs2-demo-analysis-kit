@@ -48,3 +48,22 @@ manifest 常量及 check_update 方法（仅去类缩进），同样固定 hash�
 CI 对两个 manifest 版本、legacy 无应用资产、runtime 与 installer 的真实 R2
 size/hash 均核对。新 endpoint 或原文 fixtures 未发布前不能以本地通过冒称生产已
 切换；最终隔离 review、候选 main CI 和正式 tag 确认仍是发布前置门槛。
+
+## 旧 UI 实际落点与失败顺序
+
+真实旧 UpdateModal / UpdateControl 不读取 manualInstall URL，其手动动作固定去
+GitHub `/releases/latest`。因此 R2 先上传全部二进制和版本化控制快照并验 size/hash；
+然后创建 GitHub Release 并确认 latest 是本 tag，从公开 R2 与 GitHub 实际下载
+同一安装器、核验真实 bytes；最后才 promote install-manifest、v2、Uploader，
+旧 legacy latest 最后公告。新增 gate 约束不得在 GitHub Release 之前写稳定控制入口。
+
+新 installer 只读自己版本的 R2 / GitHub install-manifest，并核 appVersion 等于
+installer version；不会因稳定指针尚未提升或缓存错误而装回 0.8.5。原版旧 UI 实際
+渲染出的动作仍是“手动下载”和正确的新版本文件名，指引关闭 Studio、选择原目录。
+
+GitHub Release 之前失败：稳定入口保持原值，版本化快照可保留待安全重试。
+GitHub Release 已创建但 promotion 前失败：公开新安装器可直接用版本化输入安装，
+旧稳定入口尚未公告。promotion 部分失败：已推进的入口只指向已验证、可下载的
+正式制品；旧入口最后推进。保留失败状态并重试同一不可变 tag，不移动 tag、不删除
+用户资料或回滚已发布包。正式执行后仍必须核公共入口和最终下载，不能以模拟响应
+或 CI artifact 代替公开 URL 已可达的证据。
