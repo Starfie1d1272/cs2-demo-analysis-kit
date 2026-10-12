@@ -10,11 +10,30 @@ import hashlib
 import subprocess
 import sys
 import zipfile
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 
 import pytest
 
 from cs2dak import updater
+
+
+@contextmanager
+def _deny_directory_delete(path):
+    """Hold a real Windows directory handle without FILE_SHARE_DELETE."""
+    import ctypes
+
+    kernel = ctypes.windll.kernel32
+    kernel.CreateFileW.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p]
+    kernel.CreateFileW.restype = ctypes.c_void_p
+    kernel.CloseHandle.argtypes = [ctypes.c_void_p]
+    handle = kernel.CreateFileW(str(path), 0x80000000, 3, None, 3, 0x02000000, None)
+    if handle == ctypes.c_void_p(-1).value:
+        raise OSError("cannot lock synthetic directory")
+    try:
+        yield
+    finally:
+        kernel.CloseHandle(handle)
 
 
 def _file_url(path: Path) -> str:
@@ -230,7 +249,8 @@ def test_nested_legacy_persistent_data_stops_install_before_deletion(tmp_path, n
 
 @pytest.mark.skipif(sys.platform != "win32", reason="requires real cmd.exe directory move semantics")
 @pytest.mark.parametrize("failed_name", updater.PERSISTENT_INSTALL_DIRS)
-def test_windows_relay_failure_retains_data_and_does_not_launch(tmp_path, monkeypatch, failed_name):
+@pytest.mark.parametrize("failure_mode", ["target_conflict", "move_denied"])
+def test_windows_relay_failure_retains_data_and_does_not_launch(tmp_path, monkeypatch, failed_name, failure_mode):
     monkeypatch.setattr(updater.time, "strftime", lambda _fmt: "fixture")
     install = tmp_path / "install"
     old = tmp_path / "install.old-fixture"
@@ -238,8 +258,8 @@ def test_windows_relay_failure_retains_data_and_does_not_launch(tmp_path, monkey
     for name in updater.PERSISTENT_INSTALL_DIRS:
         (old / name).mkdir(parents=True)
         (old / name / "original.bin").write_bytes(name.encode())
-    # A target file causes Windows MOVE to fail; earlier directories may migrate.
-    (install / failed_name).write_bytes(b"blocked")
+    if failure_mode == "target_conflict":
+        (install / failed_name).write_bytes(b"blocked")
     bat = updater._relaunch_bat(1, install, tmp_path / "new", "dak-studio.exe")
     body = bat[bat.index(":newmoved\n"):]
     # Execute the real migration and cleanup branch in isolated fixture directories.
@@ -248,7 +268,9 @@ def test_windows_relay_failure_retains_data_and_does_not_launch(tmp_path, monkey
     body = body.replace('start "" notepad.exe "%LOG%"', 'rem editor suppressed for synthetic test')
     script = tmp_path / "relay.bat"
     script.write_text('@echo off\nset "LOG=%~dp0apply-update.log"\n' + body, encoding="utf-8")
-    result = subprocess.run(["cmd", "/c", str(script)], cwd=tmp_path, capture_output=True, timeout=20, check=False)
+    lock = _deny_directory_delete(old / failed_name) if failure_mode == "move_denied" else nullcontext()
+    with lock:
+        result = subprocess.run(["cmd", "/c", str(script)], cwd=tmp_path, capture_output=True, timeout=20, check=False)
     assert result.returncode == 1
     assert old.exists()
     assert not (tmp_path / "launched.txt").exists()
@@ -267,9 +289,9 @@ def test_old_relay_failure_reproduction_uses_only_temporary_fixture(tmp_path):
     (old / "userdata").mkdir(parents=True)
     (old / "userdata" / "studio.sqlite").write_bytes(b"synthetic-db")
     new.mkdir()
-    (new / "userdata").write_bytes(b"blocked-target")
     script = tmp_path / "old-relay.bat"
     script.write_text(f'@echo off\nmove "{old / "userdata"}" "{new / "userdata"}" >nul 2>&1\nrmdir /s /q "{old}" >nul 2>&1\n', encoding="utf-8")
-    subprocess.run(["cmd", "/c", str(script)], cwd=tmp_path, check=True, timeout=20)
+    with _deny_directory_delete(old / "userdata"):
+        subprocess.run(["cmd", "/c", str(script)], cwd=tmp_path, capture_output=True, check=False, timeout=20)
     assert not (old / "userdata" / "studio.sqlite").exists()
-    assert (new / "userdata").read_bytes() == b"blocked-target"
+    assert not (new / "userdata" / "studio.sqlite").exists()
