@@ -275,7 +275,7 @@ goto done
 echo [%date% %time%] old move failed, restart existing app >> "%LOG%"
 start "" "{target_exe}"
 :done
-del "%~f0" >nul 2>&1
+del "%~f0" >nul 2>&1 & exit /b 0
 """
 
 
