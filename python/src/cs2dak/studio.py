@@ -1368,6 +1368,13 @@ class StudioApi:
             return {"ok": False, "error": "更新包尚未就绪"}
         if sys.platform != "win32":
             return {"ok": False, "error": "应用内替换目前只支持 Windows"}
+        install_dir = updater.current_install_dir()
+        try:
+            relative_userdata = self._userdata.resolve(strict=False).relative_to(install_dir.resolve(strict=False))
+        except ValueError:
+            relative_userdata = None
+        if relative_userdata is not None and (not relative_userdata.parts or relative_userdata.parts[0].lower() not in updater.PERSISTENT_INSTALL_DIRS):
+            return {"ok": False, "error": "安装目录内的自定义资料位置需使用安装器升级；请关闭 Studio，保留旧目录并备份原 SQLite 和 Demo ZIP"}
         try:
             job.state = "applying"
             # apply_windows_update 自行在 install_dir.parent 下创建 staging 目录，

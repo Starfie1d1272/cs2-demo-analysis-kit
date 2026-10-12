@@ -36,6 +36,8 @@ function loadDemoPackageFromZip(buffer: ArrayBuffer, options: DemoPackageLoadOpt
 export interface StudioDemoEntry {
   id: string;
   fileName: string;
+  /** Local facts/derived identity. Legacy unique filenames retain their key. */
+  analysisMatchId?: string;
   importedAt: number;
   /** cs2df 写入的 raw .dem SHA-256；与本地 ZIP record id 有意分离。 */
   demoSha256: string | null;
@@ -57,6 +59,7 @@ function normalizeTags(tags: string[]): string[] {
 // ── 存储命名空间（经 StorageAdapter 接缝，后端可换） ──
 const demoMeta = getStorage().records("demos"); // StudioDemoEntry by id
 const demoBlobs = getStorage().blobs("demos"); // ZIP 原始字节 by id
+const retiredMatchIds = getStorage().records("analysis:retired-match-ids");
 
 interface DemoIdentityIndex {
   /** Indexes are intentionally identifiers only; metadata is always read fresh. */
@@ -73,6 +76,7 @@ function normalizeEntry(entry: StudioDemoEntry): StudioDemoEntry {
   return {
     id: entry.id,
     fileName: entry.fileName,
+    analysisMatchId: entry.analysisMatchId,
     importedAt: entry.importedAt,
     demoSha256: typeof entry.demoSha256 === "string" ? entry.demoSha256.toLowerCase() : null,
     tags: entry.tags ?? [],
@@ -155,6 +159,7 @@ export async function findDemoEntryBySha256(sha256: string): Promise<StudioDemoE
 
 /** 维护入口使用：强制重扫历史条目并回填缺失的 raw Demo hash。 */
 export async function backfillDemoIdentities(): Promise<{ entries: StudioDemoEntry[]; backfilled: number; errors: string[] }> {
+  await isolateLegacyProjectionAliases();
   const before = await demoMeta.getAll<StudioDemoEntry>();
   const missingBefore = before.filter((entry) => !entry.demoSha256).length;
   const index = await buildDemoIdentityIndex();
@@ -194,6 +199,7 @@ export async function removeDemoStorageOnly(id: string): Promise<void> {
 
 /** 删除某条 Demo 的 facts/derived 投影；调用方负责确认 matchId 不与 survivor 共享。 */
 export async function removeDemoAnalysis(matchId: string): Promise<void> {
+  if ((await demoMeta.getAll<StudioDemoEntry>()).some(row => matchIdForEntry(row) === matchId)) return;
   await settleWrites([
     getFactsStore().deleteMatchFacts(matchId),
     getDerivedCacheStore().deleteMatch(matchId),
@@ -239,9 +245,62 @@ async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** 跨场聚合使用的 matchId：文件名去掉 .zip。exporter 命名带日期前缀时天然按时间排序。 */
-export function matchIdForEntry(entry: Pick<StudioDemoEntry, "fileName">): string {
-  return entry.fileName.replace(/\.zip$/i, "");
+/** Local projection identity; historical noncolliding filenames retain their original key. */
+export function matchIdForEntry(entry: Pick<StudioDemoEntry, "fileName" | "analysisMatchId">): string {
+  return entry.analysisMatchId ?? entry.fileName.replace(/\.zip$/i, "");
+}
+
+function unusedProjectionId(base: string, id: string, occupied: Set<string>): string {
+  let candidate = `${base}~${id}`;
+  while (occupied.has(candidate)) candidate += "~";
+  return candidate;
+}
+
+async function importProjectionId(fileName: string, id: string, existing?: StudioDemoEntry, replacement?: StudioDemoEntry): Promise<string> {
+  const base = existing ? matchIdForEntry(existing) : matchIdForEntry({ fileName });
+  const others = (await demoMeta.getAll<StudioDemoEntry>()).filter(row => row.id !== id && row.id !== replacement?.id);
+  const occupied = new Set([...others.map(matchIdForEntry), ...await retiredMatchIds.keys()]);
+  return occupied.has(base) ? unusedProjectionId(base, id, occupied) : base;
+}
+
+/** Split legacy aliases without deleting ZIPs or guessing which shared facts are valid.
+ * Metadata is checkpointed; each alias becomes stale and can rebuild from its own ZIP.
+ * Keep old shared projections for recovery. Entry IDs, raw SHA, filenames and remote IDs stay unchanged.
+ */
+async function isolateLegacyProjectionAliases(): Promise<void> {
+  const records = await demoMeta.getAll<StudioDemoEntry>();
+  const retired = new Set(await retiredMatchIds.keys());
+  const groups = new Map<string, StudioDemoEntry[]>();
+  for (const entry of records) groups.set(matchIdForEntry(entry), [...(groups.get(matchIdForEntry(entry)) ?? []), entry]);
+  for (const [sharedId, aliases] of groups) {
+    if (aliases.length < 2 && !retired.has(sharedId)) continue;
+    let keys = [`match:${sharedId}`, ...aliases.map(row => `entry:${row.id}`)];
+    for (;;) {
+      const retry = await withImportLocks(keys, async () => {
+        const current = await demoMeta.getAll<StudioDemoEntry>();
+        const rows = current.filter(row => matchIdForEntry(row) === sharedId).sort((a, b) => a.id.localeCompare(b.id));
+        const previous = await retiredMatchIds.get<{ entryIds: string[] }>(sharedId);
+        if (!rows.length || (rows.length < 2 && !previous)) return null;
+        const occupied = new Set([...current.map(matchIdForEntry), ...await retiredMatchIds.keys()]);
+        const edits = rows.map(row => {
+          const analysisMatchId = unusedProjectionId(sharedId, row.id, occupied);
+          occupied.add(analysisMatchId);
+          return { ...row, analysisMatchId, builtWith: undefined };
+        });
+        const required = edits.flatMap(row => [`entry:${row.id}`, `match:${row.analysisMatchId}`]);
+        if (required.some(key => !keys.includes(key))) return required;
+        await withImportCheckpoint(getStorage(), rows.map(row => row.id), [sharedId], async () => {
+          // Saved PrepItems cannot identify which legacy alias they referred to.
+          // Permanently reserve the ambiguous key rather than rebinding it later.
+          await retiredMatchIds.put(sharedId, { entryIds: [...new Set([...(previous?.entryIds ?? []), ...rows.map(row => row.id)])] });
+          for (const row of edits) await saveDemoEntry(row);
+        });
+        return null;
+      });
+      if (!retry) break;
+      keys = [...new Set([...keys, ...retry])];
+    }
+  }
 }
 
 /** 从 exporter 命名（YYYY-MM-DD_map_A-vs-B_x-y.zip）提取比赛日期；不匹配时返回 null。 */
@@ -466,6 +525,7 @@ export function radarFieldInWorker(buffer: ArrayBuffer, matchId: string, economy
 }
 
 export async function listDemoEntries(): Promise<StudioDemoEntry[]> {
+  await isolateLegacyProjectionAliases();
   const records = await demoMeta.getAll<StudioDemoEntry>();
   return records.map(normalizeEntry).sort((a, b) => b.importedAt - a.importedAt);
 }
@@ -544,6 +604,7 @@ async function withImportLocks<T>(keys: string[], operation: () => Promise<T>): 
 export async function importDemoFile(file: File, options: ImportDemoOptions | string[] = []): Promise<ImportResult> {
   const settings = Array.isArray(options) ? { tags: options } : options;
   settings.signal?.throwIfAborted();
+  await isolateLegacyProjectionAliases();
   const buffer = await file.arrayBuffer();
   const id = await sha256Hex(buffer);
   let manifest;
@@ -553,11 +614,12 @@ export async function importDemoFile(file: File, options: ImportDemoOptions | st
     const replacement = settings.replaceId ? await demoMeta.get<StudioDemoEntry>(settings.replaceId) : undefined;
     const identityMatch = manifest.demo.hash ? await findDemoEntryBySha256(manifest.demo.hash) : null;
     const existing = identityMatch ?? await demoMeta.get<StudioDemoEntry>(id);
-    return [`zip:${id}`, `match:${matchIdForEntry({ fileName: file.name })}`,
+    const projectedId = await importProjectionId(existing?.fileName ?? file.name, existing?.id ?? id, existing, replacement);
+    return [`zip:${id}`, `match:${matchIdForEntry({ fileName: file.name })}`, `match:${projectedId}`,
       ...(manifest.demo.hash ? [`demo:${manifest.demo.hash.toLowerCase()}`] : []),
       ...(settings.replaceId ? [`entry:${settings.replaceId}`] : []),
       ...(replacement ? [`match:${matchIdForEntry(replacement)}`] : []),
-      ...(existing ? [`match:${matchIdForEntry(existing)}`] : [])];
+      ...(existing ? [`entry:${existing.id}`, `match:${matchIdForEntry(existing)}`] : [])];
   };
   let keys = await resolveKeys();
   for (;;) {
@@ -618,9 +680,9 @@ async function importDemoFileUnlocked(file: File, settings: ImportDemoOptions, i
     };
   }
 
-  // facts 的 matchId 必须等于最终持久化条目的 matchId：重复导入沿用既有条目的 fileName，
-  // 否则用本次文件名。故先定 matchId 再榨 facts（在 worker 里，含 replay 的整包不回主线程）。
-  const matchId = matchIdForEntry({ fileName: existing?.fileName ?? file.name });
+  // Select the final local projection key under import locks before extracting facts.
+  // Raw identity still controls dedupe; distinct same-name ZIPs cannot share facts.
+  const matchId = await importProjectionId(existing?.fileName ?? file.name, existing?.id ?? id, existing, replacement);
   const preservedSourceDemPath = sourceDemPath ?? existing?.sourceDemPath ?? replacement?.sourceDemPath ?? null;
   const preservedMatchDate = matchDate ?? existing?.meta.matchDate ?? replacement?.meta.matchDate ?? null;
   let result: ImportWorkerResult;
@@ -636,6 +698,7 @@ async function importDemoFileUnlocked(file: File, settings: ImportDemoOptions, i
   const entry: StudioDemoEntry = normalizeEntry({
     id: persistedId,
     fileName: existing?.fileName ?? file.name,
+    analysisMatchId: matchId,
     importedAt: existing?.importedAt ?? Date.now(),
     demoSha256,
     tags: normalizeTags([...(existing?.tags ?? []), ...tags]),
@@ -688,9 +751,16 @@ export async function bulkUpdateTags(ids: string[], add: string[] = [], remove: 
 }
 
 export async function removeDemo(id: string): Promise<void> {
+  await isolateLegacyProjectionAliases();
   const record = await demoMeta.get<StudioDemoEntry>(id);
-  await removeDemoStorageOnly(id);
-  if (record) await removeDemoAnalysis(matchIdForEntry(record));
+  if (!record) return;
+  await withImportLocks([`entry:${id}`, `match:${matchIdForEntry(record)}`], async () => {
+    const current = await demoMeta.get<StudioDemoEntry>(id);
+    if (!current) return;
+    await removeDemoStorageOnly(id);
+    const shared = (await demoMeta.getAll<StudioDemoEntry>()).some(row => matchIdForEntry(row) === matchIdForEntry(current));
+    if (!shared) await removeDemoAnalysis(matchIdForEntry(current));
+  });
 }
 
 /**

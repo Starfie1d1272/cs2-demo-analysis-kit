@@ -110,6 +110,8 @@ jobs:
           VERSION="$(node -p "require('./package.json').version")"
           cd python/dist
           7z a -mx=9 "dak-studio-windows-${VERSION}.zip" dak-studio
+          cd ../..
+          uv run --project python python scripts/check-desktop-notices.py "python/dist/dak-studio-windows-${VERSION}.zip" studio
 
       - name: Build web patch
         if: runner.os == 'Windows' && steps.update_kind.outputs.kind == 'web'
@@ -175,6 +177,7 @@ jobs:
             --tris-dir "$HOME/.awpy/tris" \
             --install-manifest python/dist/install-manifest.json \
             --out python/dist/
+          uv run --project python python scripts/check-desktop-notices.py "python/dist/dak-studio-windows-${VERSION}-full.zip" studio
 
       # 自动更新 manifest：客户端从 releases/latest/download/latest.json 拉取（带镜像）。
       # 只在 Windows job 产出（桌面端只面向 Windows）。

@@ -16,7 +16,7 @@ export async function withImportCheckpoint(
   matchIds: string[],
   operation: () => Promise<void>,
 ): Promise<void> {
-  const namespaces = [...FACTS_RECORD_NAMESPACES, ...DERIVED_CACHE_RECORD_NAMESPACES, ...LEGACY_DERIVED_RECORD_NAMESPACES, "facts:cohort_rows"];
+  const namespaces = [...FACTS_RECORD_NAMESPACES, ...DERIVED_CACHE_RECORD_NAMESPACES, ...LEGACY_DERIVED_RECORD_NAMESPACES, "facts:cohort_rows", "analysis:retired-match-ids"];
   const snapshots = await Promise.all(namespaces.map(async (namespace) => {
     const store = adapter.records(namespace);
     const matches = (key: string) => matchIds.some((id) => isMatchRowKey(key, id));

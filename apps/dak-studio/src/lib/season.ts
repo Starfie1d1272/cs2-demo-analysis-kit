@@ -86,7 +86,10 @@ export function seasonCacheKey(
   const factsPart = `:facts=${factsRevision}`;
   const idPart = identityVersion ? `:idv${identityVersion}` : "";
   const teamPart = selectedTeams.length > 0 ? `:teams=${[...selectedTeams].sort().join(",")}` : "";
-  return `v${CACHE_VERSION}${factsPart}${idPart}${teamPart}:` + entries.map((entry) => entry.id).sort().join("|");
+  return `v${CACHE_VERSION}${factsPart}${idPart}${teamPart}:` + entries.map((entry) => {
+    const legacy = entry.fileName.replace(/\.zip$/i, "");
+    return matchIdForEntry(entry) === legacy ? entry.id : `${entry.id}@${matchIdForEntry(entry)}`;
+  }).sort().join("|");
 }
 
 const keyOf = seasonCacheKey;

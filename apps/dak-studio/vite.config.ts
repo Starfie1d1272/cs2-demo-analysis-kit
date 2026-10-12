@@ -7,6 +7,7 @@ import { pipeline } from "node:stream/promises";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { readBuildInfo, type BuildInfo } from "../../scripts/build-info.mjs";
+import { desktopNoticeAssets } from "../../scripts/distribution-notices.mjs";
 
 const PYTHON_ROOT = resolve(__dirname, "../../python");
 const EXPORT_TIMEOUT_MS = 10 * 60 * 1000;
@@ -131,6 +132,7 @@ export default defineConfig({
     name: "dak-build-info",
     generateBundle() {
       this.emitFile({ type: "asset", fileName: "build-info.json", source: JSON.stringify(BUILD_INFO, null, 2) + "\n" });
+      for (const asset of desktopNoticeAssets(true)) this.emitFile({ type: "asset", ...asset });
     },
   }],
   server: {

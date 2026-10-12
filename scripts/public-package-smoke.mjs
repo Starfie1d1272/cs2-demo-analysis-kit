@@ -56,6 +56,12 @@ try {
       assert.ok(isWithin(consumer, realpathSync(installed)), `${n}: workspace symlink`);
       const manifest = json(join(installed, 'package.json'));
       assert.ok(walk(installed).every(f => isPublishableFile(relative(installed, f))));
+      if (n === 'react') {
+        const license = readFileSync(join(root, 'scripts/licenses/simpleheat.LICENSE'));
+        assert.equal(createHash('sha256').update(license).digest('hex'), '756d6c334c9289a7b8e563cad0be32ab425cd35303d491789ab1adb9fbcef847');
+        assert.deepEqual(readFileSync(join(installed, 'dist/simpleheat.LICENSE')), license);
+        assert.ok(readFileSync(join(installed, 'dist/THIRD-PARTY-NOTICES.md'), 'utf8').includes(license.toString()));
+      }
       for (const [dependency, policy] of Object.entries(bundledDependencies)) {
         if (manifest.dependencies?.[dependency]) assert.equal(manifest.dependencies[dependency], policy.version, `${n}: type/runtime version mismatch`);
       }
