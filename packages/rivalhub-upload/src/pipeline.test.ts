@@ -1,9 +1,11 @@
 import { readFile } from "node:fs/promises";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { loadDemoPackageFromZip } from "@cs2dak/core";
 import { rivalHubEventsResponseSchema, type RivalHubEventsResponse } from "./contract";
 import { uploadDemo, type UploadDependencies, type UploadUpdate } from "./pipeline";
-import { createRivalHubClient, rivalHubEvidenceIdempotencyKey } from "./client";
+import { createRivalHubClient, requestJson, rivalHubEvidenceIdempotencyKey } from "./client";
+
+afterEach(() => vi.unstubAllGlobals());
 
 let zip: Uint8Array;
 let fixture: RivalHubEventsResponse;
@@ -24,6 +26,24 @@ beforeAll(async () => {
     players[i]!.entryId = player.teamKey === "teamA" ? map.target.entryAId : map.target.entryBId;
   });
   map.lineup = structuredClone(players);
+});
+
+it("HTTP failures retain correlation without leaking private response or credentials", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => Response.json({
+    error: { code: "UPLOAD_FAILED", message: "Rejected token=private" }, raw: "private response",
+  }, { status: 422, headers: { "x-request-id": "upload-request" } })));
+  const failure = await requestJson("https://example.test").catch(error => error);
+  expect(failure).toMatchObject({ status: 422, code: "UPLOAD_FAILED", requestId: "upload-request", message: "Rejected token=[redacted]" });
+  expect(JSON.stringify(failure)).not.toContain("private");
+});
+
+it.each(["matchMapId", "demoSha256"])("refuses a POST response with the wrong %s", async field => {
+  const s = setup();
+  const submit = s.deps.submit;
+  s.deps.submit = async (body, key) => ({ ...await submit(body, key), [field]: "wrong-identity" });
+  await expect(uploadDemo(s.deps)).rejects.toThrow("RESPONSE_MISMATCH");
+  expect(s.updates.at(-1)?.phase).not.toBe("done");
+  expect(s.deps.cleanup).toHaveBeenCalledOnce();
 });
 function setup() {
   const data = structuredClone(fixture);
