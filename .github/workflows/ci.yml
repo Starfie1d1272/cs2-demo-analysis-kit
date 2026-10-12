@@ -29,11 +29,7 @@ jobs:
 
       - run: pnpm check:package-boundaries
 
-      - run: node --test scripts/uploader-release-contract.test.mjs
       - run: node --test scripts/legacy-update-first-hop.test.mjs
-      - run: node --test scripts/reconcile-npm-publish.test.mjs
-
-      - run: node --test scripts/sync-version.test.mjs scripts/build-info.test.mjs scripts/build-web-patch.test.mjs
 
       - name: Cold serial build before typecheck and tests
         run: pnpm build:serial

@@ -18,8 +18,10 @@ pnpm build                # 构建所有包
 pnpm typecheck            # tsc -b 全工作区类型检查
 
 # 测试
-pnpm test                 # vitest（packages/**/*.test.ts，node 环境）
-pnpm python:test          # Python 测试（uv run pytest）
+pnpm test                 # 关键流程 fast suite（Studio 持久化 / Evidence / 上传）
+pnpm test:integration     # committed ZIP 解析、必需流拒绝与可选流降级
+pnpm test:all             # 所有保留的 Vitest 流程
+pnpm python:test          # 原生桥 / 凭据 / 安全更新（dev + gui extras）
 
 # 分析
 pnpm analyze:sample       # CLI 分析 fixtures/input/cologne-major-2026-stage3-smoke-de_nuke.zip → fixtures/output/sample/
@@ -47,7 +49,7 @@ node scripts/gen-install-manifest.mjs # 生成 install-manifest.json
 node scripts/assemble-full-zip.mjs    # 组装 Full Portable Zip
 
 # 单测单文件
-pnpm vitest run packages/core/src/index.test.ts
+pnpm vitest run packages/core/src/critical-flows.integration.test.ts
 ```
 
 Python `uv sync --extra gui` 装 pywebview（DAK Studio 桌面壳运行需要）。禁止向系统 python 和 conda base 安装包。

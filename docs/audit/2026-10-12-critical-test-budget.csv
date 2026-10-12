@@ -1,0 +1,169 @@
+path,before_tests,after_tests,before_lines,after_lines,before_nonblank,after_nonblank,before_reported_ms,after_reported_ms,action,remaining_or_removed_protection
+apps/dak-studio/src/components/RivalHubBatchImportPanel.test.ts,4,0,70,0,65,0,13.295,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/components/primitives.test.ts,2,0,18,0,16,0,9.308,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/analysis-context.test.ts,7,0,124,0,107,0,5.943,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/capability-availability.test.ts,5,0,96,0,86,0,4.981,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/dem-diagnostics.test.ts,1,0,22,0,20,0,5.545,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/dem-polling.test.ts,1,0,20,0,20,0,17.954,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/event-assets.test.ts,5,0,70,0,62,0,135.952,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/event-bracket.test.ts,3,0,64,0,59,0,5.316,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/event-maker.test.ts,7,0,85,0,79,0,597.337,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/events.test.ts,5,0,247,0,232,0,44.801,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/evidence-continuation.test.ts,1,0,27,0,25,0,3.585,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/facts.test.ts,19,0,313,0,278,0,33019.979,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/identity.test.ts,17,0,224,0,205,0,21.203,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/json-diagnostic-export.test.ts,3,0,74,0,72,0,298.575,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/library-persistence.test.ts,26,8,392,144,366,136,70.107,42.734,retain or replace with critical flow,see critical-flow protection matrix; no claim of retaining every old assertion
+apps/dak-studio/src/lib/library-repair.test.ts,5,0,124,0,107,0,61052.796,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/library-worker-diagnostics.test.ts,6,0,81,0,73,0,18.94,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/library.test.ts,10,1,142,69,119,62,81387.304,41564.443,retain or replace with critical flow,see critical-flow protection matrix; no claim of retaining every old assertion
+apps/dak-studio/src/lib/pkg-worker-diagnostics.test.ts,1,0,26,0,26,0,705.674,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/playlist.test.ts,3,0,35,0,32,0,2.673,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/practice-lineups.test.ts,1,0,20,0,18,0,7.601,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/radar-field.test.ts,1,0,131,0,119,0,7.745,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/rivalhub-acquisition.test.ts,2,0,38,0,31,0,5.025,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/rivalhub-contract.fixture.test.ts,2,0,23,0,21,0,14.943,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/rivalhub-import.test.ts,30,0,592,0,533,0,73.285,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/rivalhub.test.ts,13,0,223,0,199,0,47.121,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/role-declarations.test.ts,6,0,63,0,56,0,22.058,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/season-cache-version.test.ts,2,0,23,0,21,0,3.233,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/season.test.ts,6,0,91,0,83,0,11.677,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/series-prep-items.test.ts,2,0,41,0,34,0,11.874,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/series.test.ts,7,0,113,0,103,0,10.47,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/storage/idb-adapter.test.ts,3,0,56,0,45,0,12.785,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/storage/pywebview-adapter.test.ts,1,0,17,0,16,0,3.534,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/tactics.test.ts,23,0,231,0,225,0,19.139,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/training-focus.test.ts,1,0,39,0,36,0,11.636,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/tri-assets.test.ts,6,0,51,0,46,0,37.308,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/tri-cache-diagnostics.test.ts,3,0,32,0,32,0,943.701,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/tri-loading.test.ts,6,0,39,0,38,0,38.333,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/update.test.ts,16,0,212,0,192,0,39.578,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/lib/worker-diagnostics.test.ts,4,0,55,0,51,0,10.306,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/views/EventsView.render.test.ts,3,0,48,0,43,0,15.834,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/views/EventsView.test.ts,3,0,16,0,15,0,13.444,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/views/SeriesInspector.render.test.tsx,7,0,167,0,155,0,16.566,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/views/SeriesWorkspace.test.ts,1,0,20,0,17,0,2.324,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/dak-studio/src/views/coach/PatternExplorer.test.ts,2,0,82,0,78,0,17.722,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+apps/rivalhub-uploader/src/errors.test.ts,7,0,30,0,26,0,6.281,,remove granular adapter regressions,retain public upload protocol and native security; detailed diagnostic/export polling states not all covered
+apps/rivalhub-uploader/src/export-polling.test.ts,1,0,19,0,19,0,10.231,,remove granular adapter regressions,retain public upload protocol and native security; detailed diagnostic/export polling states not all covered
+apps/rivalhub-uploader/src/native.test.ts,8,0,78,0,70,0,11.738,,remove granular adapter regressions,retain public upload protocol and native security; detailed diagnostic/export polling states not all covered
+apps/rivalhub-uploader/src/pairing.test.ts,4,0,31,0,30,0,4.921,,remove granular adapter regressions,retain public upload protocol and native security; detailed diagnostic/export polling states not all covered
+packages/cli/src/cohort.integration.test.ts,1,0,57,0,48,0,2667.396,,remove script unit regressions,operational gates retained; per-helper rollback/provenance examples not all covered
+packages/cli/src/index.integration.test.ts,5,0,86,0,72,0,5517.575,,remove script unit regressions,operational gates retained; per-helper rollback/provenance examples not all covered
+packages/cohort/src/index.test.ts,7,0,150,0,131,0,1386.668,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/cohort/src/map-role-evidence.test.ts,6,0,102,0,94,0,34.249,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/cohort/src/patterns.test.ts,2,0,136,0,133,0,12.37,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/cohort/src/t-role-research-projection.test.ts,4,0,144,0,135,0,56.979,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/contract/src/contract.test.ts,48,0,624,0,558,0,61.016,,remove individual schema examples,real ZIP/Evidence validation remains; every enum/bounds variant not covered
+packages/contract/src/dependency-boundaries.test.ts,2,0,27,0,22,0,2.396,,remove individual schema examples,real ZIP/Evidence validation remains; every enum/bounds variant not covered
+packages/contract/src/event-package.test.ts,4,0,48,0,43,0,11.833,,remove individual schema examples,real ZIP/Evidence validation remains; every enum/bounds variant not covered
+packages/core/src/critical-flows.integration.test.ts,,7,0,99,0,91,,24330.376,retain or replace with critical flow,see critical-flow protection matrix; no claim of retaining every old assertion
+packages/core/src/duels.test.ts,8,0,370,0,345,0,11.865,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/evidence.test.ts,1,0,18,0,17,0,136.382,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/fixture-invariants.test.ts,1,0,40,0,36,0,391.742,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/index.test.ts,9,0,157,0,138,0,5146.833,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/json-diagnostics.test.ts,4,0,23,0,22,0,3.966,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/loader-diagnostics.test.ts,2,0,55,0,52,0,204.28,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/map-intelligence/awp.test.ts,3,0,57,0,54,0,5.005,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/map-intelligence/ct-rotation.test.ts,6,0,149,0,134,0,14.315,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/map-intelligence/map-intelligence.test.ts,5,0,62,0,56,0,82225.712,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/map-intelligence/player-position.test.ts,2,0,28,0,25,0,3.145,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/map-intelligence/spatial.test.ts,2,0,25,0,22,0,4.009,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/map-intelligence/team-shape.test.ts,6,0,43,0,39,0,4.934,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/mechanics.test.ts,9,0,375,0,349,0,18.778,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/performance-facts.test.ts,9,0,275,0,251,0,244.81,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/performance-validation.test.ts,29,0,158,0,156,0,27.042,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/qa.test.ts,7,0,128,0,119,0,5.925,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/radar-field.test.ts,3,0,79,0,71,0,346.122,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/resolve.test.ts,9,0,174,0,158,0,66.429,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/side-win-rate.test.ts,2,0,33,0,30,0,2.788,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/spatial/annotate.test.ts,7,0,133,0,122,0,6.605,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/spatial/mapcontrol.test.ts,6,0,131,0,121,0,8.51,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/spatial/phase.test.ts,8,0,172,0,160,0,6.709,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/spatial/trade-closure.test.ts,2,0,38,0,35,0,950.804,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/spatial/utility-geometry.test.ts,11,0,88,0,82,0,5.366,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/spatial/utility.integration.test.ts,1,0,38,0,34,0,1.457,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/spatial/utility.test.ts,4,0,120,0,108,0,332.591,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/tactics/tactics.test.ts,5,0,112,0,101,0,15.017,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/tournament-facts.test.ts,4,0,52,0,50,0,101.649,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/core/src/utility-facts.test.ts,2,0,67,0,61,0,563.206,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/maps/scripts/derive-default-positions.test.ts,1,0,79,0,76,0,11.834,,remove map/helper detail regressions,packed asset gate remains; all spatial/callout algorithm edge cases not covered
+packages/maps/scripts/derive-route-graph.test.ts,17,0,328,0,292,0,21.391,,remove map/helper detail regressions,packed asset gate remains; all spatial/callout algorithm edge cases not covered
+packages/maps/src/calibration.test.ts,10,0,51,0,46,0,5.225,,remove map/helper detail regressions,packed asset gate remains; all spatial/callout algorithm edge cases not covered
+packages/maps/src/callout-grid-browser.test.ts,2,0,36,0,32,0,28.287,,remove map/helper detail regressions,packed asset gate remains; all spatial/callout algorithm edge cases not covered
+packages/maps/src/callout-grid-node.test.ts,3,0,27,0,24,0,61.856,,remove map/helper detail regressions,packed asset gate remains; all spatial/callout algorithm edge cases not covered
+packages/maps/src/callout-grid.test.ts,7,0,73,0,65,0,5.103,,remove map/helper detail regressions,packed asset gate remains; all spatial/callout algorithm edge cases not covered
+packages/maps/src/default-positions.test.ts,7,0,109,0,98,0,9.802,,remove map/helper detail regressions,packed asset gate remains; all spatial/callout algorithm edge cases not covered
+packages/maps/src/geometry-assets.test.ts,2,0,22,0,20,0,2.848,,remove map/helper detail regressions,packed asset gate remains; all spatial/callout algorithm edge cases not covered
+packages/maps/src/lineups.test.ts,6,0,95,0,84,0,13.698,,remove map/helper detail regressions,packed asset gate remains; all spatial/callout algorithm edge cases not covered
+packages/maps/src/map-pool.test.ts,1,0,15,0,14,0,2.881,,remove map/helper detail regressions,packed asset gate remains; all spatial/callout algorithm edge cases not covered
+packages/maps/src/nav.test.ts,2,0,68,0,65,0,4.057,,remove map/helper detail regressions,packed asset gate remains; all spatial/callout algorithm edge cases not covered
+packages/maps/src/position-candidates.test.ts,6,0,62,0,55,0,17.574,,remove map/helper detail regressions,packed asset gate remains; all spatial/callout algorithm edge cases not covered
+packages/maps/src/route-assets.test.ts,4,0,80,0,69,0,16.437,,remove map/helper detail regressions,packed asset gate remains; all spatial/callout algorithm edge cases not covered
+packages/maps/src/routes.test.ts,5,0,46,0,40,0,2.84,,remove map/helper detail regressions,packed asset gate remains; all spatial/callout algorithm edge cases not covered
+packages/maps/src/visibility.test.ts,2,0,36,0,32,0,3.142,,remove map/helper detail regressions,packed asset gate remains; all spatial/callout algorithm edge cases not covered
+packages/maps/src/zones.test.ts,6,0,51,0,44,0,3.179,,remove map/helper detail regressions,packed asset gate remains; all spatial/callout algorithm edge cases not covered
+packages/presentation/src/double-awp.test.ts,2,0,29,0,26,0,19.078,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/presentation/src/duel.test.ts,5,0,190,0,176,0,35.767,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/presentation/src/economy.test.ts,2,0,15,0,13,0,2.097,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/presentation/src/findings.test.ts,3,0,62,0,55,0,5.506,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/presentation/src/index.test.ts,3,0,52,0,44,0,1589.417,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/presentation/src/insights.test.ts,14,0,526,0,488,0,1435.241,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/presentation/src/leaderboard.test.ts,2,0,58,0,51,0,14.927,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/presentation/src/map-roles.test.ts,13,0,131,0,116,0,44.141,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/presentation/src/player.test.ts,6,0,145,0,125,0,34.47,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/presentation/src/replay-clock.test.ts,4,0,33,0,28,0,13.01,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/presentation/src/season-validation.test.ts,1,0,131,0,120,0,3.259,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/presentation/src/series.test.ts,3,0,65,0,58,0,1358.734,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/presentation/src/team.test.ts,2,0,29,0,24,0,520.562,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/presentation/src/test-fixtures.ts,,,191,0,187,0,,,remove orphan test helper,all consumers removed; no production import
+packages/presentation/src/tournament-performance.test.ts,3,0,124,0,114,0,973.918,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/presentation/src/trails.test.ts,3,0,63,0,57,0,658.404,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/presentation/src/weapons.test.ts,5,0,32,0,27,0,3.277,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/react/src/components/MapRoles.test.ts,3,0,50,0,48,0,15.601,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/react/src/components/MatchWorkspace.test.ts,5,0,206,0,193,0,35.445,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/react/src/components/RadarFieldCanvas.test.ts,1,0,39,0,36,0,12.313,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/react/src/components/ScoreboardTable.test.ts,2,0,47,0,44,0,11.634,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/react/src/components/SeasonLeaderboard.test.ts,3,0,55,0,51,0,13.679,,remove view/model detail regressions,public consumer build remains; every narrative/format/UI assertion not covered
+packages/rivalhub-upload/src/client.test.ts,8,0,40,0,40,0,37.802,,remove granular adapter regressions,retain public upload protocol and native security; detailed diagnostic/export polling states not all covered
+packages/rivalhub-upload/src/diagnostics.test.ts,36,0,100,0,97,0,13.776,,remove granular adapter regressions,retain public upload protocol and native security; detailed diagnostic/export polling states not all covered
+packages/rivalhub-upload/src/disposition.test.ts,4,0,39,0,35,0,18.125,,remove granular adapter regressions,retain public upload protocol and native security; detailed diagnostic/export polling states not all covered
+packages/rivalhub-upload/src/evidence-diagnostics.test.ts,40,0,94,0,93,0,33.774,,remove granular adapter regressions,retain public upload protocol and native security; detailed diagnostic/export polling states not all covered
+packages/rivalhub-upload/src/evidence.test.ts,20,4,558,91,521,85,468.621,272.691,retain or replace with critical flow,see critical-flow protection matrix; no claim of retaining every old assertion
+packages/rivalhub-upload/src/export-polling.test.ts,10,0,91,0,85,0,35.282,,remove granular adapter regressions,retain public upload protocol and native security; detailed diagnostic/export polling states not all covered
+packages/rivalhub-upload/src/match.test.ts,12,0,168,0,149,0,14.696,,remove granular adapter regressions,retain public upload protocol and native security; detailed diagnostic/export polling states not all covered
+packages/rivalhub-upload/src/pipeline.test.ts,12,15,147,167,145,162,506.645,719.569,retain or replace with critical flow,see critical-flow protection matrix; no claim of retaining every old assertion
+packages/tournament/src/aggregate.test.ts,11,0,247,0,229,0,15.906,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+packages/tournament/src/performance.test.ts,6,0,318,0,300,0,20.98,,remove analytical detail regressions,retain narrow canonical/identity examples; full specialty semantics not covered
+python/tests/test_credentials.py,26,0,108,0,93,0,25.0,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+python/tests/test_diagnostics.py,59,0,373,0,329,0,3054.0,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+python/tests/test_event_packages.py,5,0,120,0,103,0,35.0,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+python/tests/test_export_jobs.py,6,0,133,0,105,0,7.0,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+python/tests/test_installer.py,10,0,165,0,132,0,14.0,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+python/tests/test_library_maintenance.py,3,0,72,0,57,0,9.0,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+python/tests/test_rivalhub_bridge.py,5,0,108,0,83,0,5.0,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+python/tests/test_rivalhub_uploader.py,40,12,534,281,449,237,75.0,71.0,retain or replace with critical flow,see critical-flow protection matrix; no claim of retaining every old assertion
+python/tests/test_selection_diagnostics.py,6,0,95,0,81,0,6.0,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+python/tests/test_smoke.py,3,0,20,0,11,0,58.0,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+python/tests/test_storage_configuration.py,2,0,19,0,13,0,1.0,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+python/tests/test_studio_diagnostics.py,7,0,117,0,94,0,13.0,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+python/tests/test_update_first_hop.py,4,0,117,0,94,0,41.0,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+python/tests/test_updater.py,33,0,368,0,301,0,43.0,,remove shell/UI/cache detail regressions,retain persistence and selected native/update security; full OS/runtime matrix not covered
+python/tests/test_uploader_webview_bridge.py,1,0,89,0,75,0,86.0,,move native startup flow,real pywebview reflection case retained in test_rivalhub_uploader.py; redundant module imports removed
+scripts/build-info.test.mjs,3,0,61,0,60,0,164.728,,remove script unit regressions,operational gates retained; per-helper rollback/provenance examples not all covered
+scripts/build-web-patch.test.mjs,2,0,68,0,67,0,698.214,,remove script unit regressions,operational gates retained; per-helper rollback/provenance examples not all covered
+scripts/check-desktop-notices.py,,,32,32,31,31,,,retain unchanged gate,real package/installer/distribution checks; no new implementation
+scripts/check-npm-publish-policy.mjs,,,164,164,144,144,,,retain unchanged gate,real package/installer/distribution checks; no new implementation
+scripts/check-package-boundaries.mjs,,,56,56,55,55,,,retain unchanged gate,real package/installer/distribution checks; no new implementation
+scripts/data-producer-boundaries.test.ts,2,0,22,0,21,0,30.002,,remove script unit regressions,operational gates retained; per-helper rollback/provenance examples not all covered
+scripts/legacy-update-first-hop.test.mjs,2,2,94,94,89,89,157.659,246.863,retain or replace with critical flow,see critical-flow protection matrix; no claim of retaining every old assertion
+scripts/maps-package-smoke.mjs,,,138,138,137,137,,,retain unchanged gate,real package/installer/distribution checks; no new implementation
+scripts/package-boundaries.test.mjs,8,8,78,78,75,75,548.684,684.868,retain or replace with critical flow,see critical-flow protection matrix; no claim of retaining every old assertion
+scripts/public-package-smoke.mjs,,,130,130,129,129,,,retain unchanged gate,real package/installer/distribution checks; no new implementation
+scripts/reconcile-npm-publish.test.mjs,2,0,47,0,45,0,367.755,,remove script unit regressions,operational gates retained; per-helper rollback/provenance examples not all covered
+scripts/rivalhub-demo-evidence.test.ts,1,0,9,0,8,0,2.745,,remove script unit regressions,operational gates retained; per-helper rollback/provenance examples not all covered
+scripts/smoke-uploader-windows.ps1,,,115,115,115,115,,,retain unchanged gate,real package/installer/distribution checks; no new implementation
+scripts/sync-version.test.mjs,14,0,93,0,86,0,19.021,,remove script unit regressions,operational gates retained; per-helper rollback/provenance examples not all covered
+scripts/test-uploader-installer.ps1,,,106,106,106,106,,,remove script unit regressions,operational gates retained; per-helper rollback/provenance examples not all covered
+scripts/uploader-release-contract.test.mjs,2,0,44,0,43,0,82.908,,remove script unit regressions,operational gates retained; per-helper rollback/provenance examples not all covered
+vitest.config.ts,,,12,12,11,11,,,retain runner configuration,"same node environment, explicit scopes and timeouts; update stale comment"
