@@ -18,8 +18,10 @@ pnpm build                # 构建所有包
 pnpm typecheck            # tsc -b 全工作区类型检查
 
 # 测试
-pnpm test                 # vitest（packages/**/*.test.ts，node 环境）
-pnpm python:test          # Python 测试（uv run pytest）
+pnpm test                 # test:fast 别名；Vitest（packages/apps/scripts，node 环境）
+pnpm test:integration     # 真实 ZIP / CLI / utility / season 验证
+pnpm test:all             # 完整 Vitest 集合（fast + integration）
+pnpm python:test          # Python 测试（uv run --extra dev --extra gui pytest，与 CI 对齐）
 
 # 分析
 pnpm analyze:sample       # CLI 分析 fixtures/input/cologne-major-2026-stage3-smoke-de_nuke.zip → fixtures/output/sample/
