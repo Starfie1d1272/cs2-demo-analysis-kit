@@ -23,7 +23,7 @@ def test_exact_legacy_native_check_reads_manual_manifest_without_touching_librar
     subprocess.run(["node", str(root / "scripts/gen-update-manifest.mjs"), "0.8.6", str(runtime),
                     str(tmp_path / "latest-v2.json"), "--legacy-out", str(tmp_path / "latest.json"),
                     "--installer", str(installer)], check=True)
-    manifest = json.loads((tmp_path / "latest.json").read_text())
+    manifest = json.loads((tmp_path / "latest.json").read_text(encoding="utf-8"))
     userdata = tmp_path / "install" / "userdata"
     userdata.mkdir(parents=True)
     (userdata / "studio.sqlite").write_bytes(b"original-db")
