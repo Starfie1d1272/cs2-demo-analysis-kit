@@ -2,7 +2,6 @@
 import sys
 from pathlib import Path
 
-
 root = Path(__file__).resolve().parent.parent
 output = Path(sys.argv[1])
 license_bytes = (root / "scripts/licenses/simpleheat.LICENSE").read_bytes()
