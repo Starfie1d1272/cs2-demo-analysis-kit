@@ -600,6 +600,12 @@ jobs:
             echo "::error::Legacy manual download destination is not this release"
             exit 1
           fi
+          LATEST_PAGE="$(curl --fail --location --silent --show-error --retry 5 --retry-all-errors \
+            --output /dev/null --write-out '%{url_effective}' "https://github.com/${{ github.repository }}/releases/latest")"
+          if [[ "$LATEST_PAGE" != "https://github.com/${{ github.repository }}/releases/tag/${TAG}" ]]; then
+            echo "::error::Actual legacy download page has not reached this release"
+            exit 1
+          fi
           curl --fail --location --retry 5 --retry-all-errors \
             "https://dakupdate.starfie1d.top/releases/${TAG}/DAK-Studio-Setup-${VERSION}.exe" -o public-r2-setup.exe
           curl --fail --location --retry 5 --retry-all-errors \
