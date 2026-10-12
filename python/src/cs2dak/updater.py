@@ -12,7 +12,7 @@
     2. 把旧安装目录改名为 *.old-<ts>；
     3. 把新目录移到原位；
     4. 从 *.old 把 userdata/assets/cache/updates 搬回新目录（便携式数据不能丢）；
-    5. 全部持久目录迁移成功后启动新 exe；6. 删除 *.old；7. 自删脚本。
+    5. 全部持久目录迁移成功后启动新 exe；6. 保留 *.old 供恢复；7. 自删脚本。
   新程序移动失败时尝试回滚；持久目录迁移失败时停止启动和清理，
   保留新旧目录及接力日志，供人工恢复，不宣称跨目录事务。
 
@@ -157,6 +157,15 @@ def install_runtime_archive(zip_path: Path, install_dir: Path, exe_name: str = "
         with zipfile.ZipFile(zip_path) as zf:
             safe_extract_zip(zf, extract_dir)
         archive_root = _find_app_root(extract_dir, exe_name)
+        configured = os.environ.get("DAK_STUDIO_DATA_DIR")
+        if configured:
+            try:
+                relative_data = Path(configured).expanduser().absolute().relative_to(install_dir)
+            except ValueError:
+                relative_data = None
+            incoming = {path.name.lower() for path in archive_root.iterdir() if path.name.lower() not in PERSISTENT_INSTALL_DIRS}
+            if relative_data is not None and (not relative_data.parts or relative_data.parts[0].lower() in incoming):
+                raise UpdateError("自定义资料位置会被运行时文件覆盖；安装已停止，未删除原资料。请保留原目录、备份 SQLite 和 Demo ZIP 并联系支持确认安全迁移位置。", "install_runtime.custom_data")
 
         # 清理旧 installer 产生的 install_dir/<top-level>/... 嵌套 runtime。
         nested_root = install_dir / archive_root.name
@@ -169,7 +178,8 @@ def install_runtime_archive(zip_path: Path, install_dir: Path, exe_name: str = "
                     "保留原始 ZIP 和 SQLite，并联系支持确认迁移位置后重试。",
                     "install_runtime.persistent_data",
                 )
-            shutil.rmtree(nested_root)
+            # Unknown files may be custom user data. Installing the outer runtime
+            # does not require deleting the obsolete nested application.
 
         for source in archive_root.iterdir():
             if source.name in PERSISTENT_INSTALL_DIRS:
@@ -246,8 +256,8 @@ rem 3) 搬回持久目录；失败保留所有目录，禁止启动新版本或�
 rem 4) 启动新版本
 echo [%date% %time%] start "{target_exe}" >> "%LOG%"
 start "" "{target_exe}"
-rem 5) 清理旧目录
-rmdir /s /q "{old_dir}" >nul 2>&1
+rem 5) 保留旧目录；非白名单文件与自定义资料不能由成功清理删除
+echo [%date% %time%] Old installation retained for recovery: "{old_dir}". >> "%LOG%"
 goto done
 :migrationfailed
 echo [%date% %time%] Persistent data migration failed. Update stopped; new app was not started. >> "%LOG%"

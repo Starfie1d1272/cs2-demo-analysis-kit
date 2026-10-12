@@ -16,6 +16,7 @@ VERSION="$(node -p "require('./package.json').version")"
 cd python
 uv sync --frozen --extra gui --extra build
 uv run pyinstaller packaging/rivalhub-uploader.spec --noconfirm --clean --distpath dist
+uv run python ../scripts/check-desktop-notices.py dist uploader
 if [[ "$OSTYPE" == darwin* ]]; then
   STAGE="$(mktemp -d -t rivalhub-uploader-dmg)"
   trap 'rm -rf "$STAGE"' EXIT
@@ -25,6 +26,7 @@ if [[ "$OSTYPE" == darwin* ]]; then
 elif [[ "$OSTYPE" == msys* || "$OSTYPE" == cygwin* ]]; then
   powershell.exe -NoProfile -File ../scripts/build-uploader-installer.ps1 -Version "$VERSION"
   (cd dist && 7z a -mx=9 "rivalhub-demo-uploader-windows-${VERSION}.zip" rivalhub-demo-uploader)
+  uv run python ../scripts/check-desktop-notices.py "dist/rivalhub-demo-uploader-windows-${VERSION}.zip" uploader
 else
   echo "Uploader distribution requires Windows or macOS" >&2
   exit 1

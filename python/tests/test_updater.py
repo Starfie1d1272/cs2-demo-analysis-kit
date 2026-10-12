@@ -132,7 +132,7 @@ def test_install_runtime_archive_flattens_existing_root_and_preserves_data(tmp_p
     assert target.read_bytes() == b"new"
     assert (install / "_internal" / "new.txt").read_bytes() == b"new runtime"
     assert not (install / "_internal" / "old.txt").exists()
-    assert not nested.exists()
+    assert (nested / "dak-studio.exe").read_bytes() == b"stale nested"
     for name in ("userdata", "assets", "cache", "updates"):
         assert (install / name / "keep.txt").read_text(encoding="utf-8") == name
     assert not list(tmp_path.glob(".dak-runtime-*"))
@@ -295,3 +295,61 @@ def test_old_relay_failure_reproduction_uses_only_temporary_fixture(tmp_path):
         subprocess.run(["cmd", "/c", str(script)], cwd=tmp_path, capture_output=True, check=False, timeout=20)
     assert not (old / "userdata" / "studio.sqlite").exists()
     assert not (new / "userdata" / "studio.sqlite").exists()
+
+
+def test_manual_install_stops_before_overwriting_custom_data_inside_runtime(tmp_path, monkeypatch):
+    install = tmp_path / "install"
+    data = install / "_internal" / "custom-data"
+    data.mkdir(parents=True)
+    (data / "studio.sqlite").write_bytes(b"original-db")
+    (data / "demo.zip").write_bytes(b"original-zip")
+    monkeypatch.setenv("DAK_STUDIO_DATA_DIR", str(data))
+    archive = tmp_path / "runtime.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr("dak-studio/dak-studio.exe", b"new-runtime")
+        zf.writestr("dak-studio/_internal/runtime.bin", b"new-runtime")
+    with pytest.raises(updater.UpdateError, match="未删除原资料"):
+        updater.install_runtime_archive(archive, install)
+    assert (data / "studio.sqlite").read_bytes() == b"original-db"
+    assert (data / "demo.zip").read_bytes() == b"original-zip"
+
+
+def test_native_runtime_refuses_to_move_custom_data_outside_preserved_directories(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from cs2dak import studio
+
+    install = tmp_path / "install"
+    data = install / "custom-data"
+    data.mkdir(parents=True)
+    (data / "demo.zip").write_bytes(b"original-zip")
+    monkeypatch.setattr(studio, "_studio_userdata", lambda: data)
+    api = studio.StudioApi()
+    api._update_jobs["fixture"] = SimpleNamespace(staged_path=tmp_path / "runtime.zip", state="ready")
+    monkeypatch.setattr(studio.sys, "platform", "win32")
+    monkeypatch.setattr(updater, "current_install_dir", lambda: install)
+    monkeypatch.setattr(updater, "apply_windows_update", lambda *_args: (_ for _ in ()).throw(AssertionError("must not launch relay")))
+    result = api.update_apply("fixture")
+    assert not result["ok"]
+    assert "自定义资料位置" in result["error"]
+    assert (data / "demo.zip").read_bytes() == b"original-zip"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="requires real cmd.exe")
+def test_successful_relay_retains_non_whitelist_custom_data_in_old_root(tmp_path, monkeypatch):
+    monkeypatch.setattr(updater.time, "strftime", lambda _fmt: "fixture")
+    install = tmp_path / "install"
+    old = tmp_path / "install.old-fixture"
+    install.mkdir()
+    custom = old / "custom-data"
+    custom.mkdir(parents=True)
+    (custom / "studio.sqlite").write_bytes(b"original-db")
+    (custom / "demo.zip").write_bytes(b"original-zip")
+    bat = updater._relaunch_bat(1, install, tmp_path / "new", "dak-studio.exe")
+    body = bat[bat.index(":newmoved\n"):].replace(f'start "" "{install / "dak-studio.exe"}"', 'echo started > "%~dp0launched.txt"')
+    script = tmp_path / "success-relay.bat"
+    script.write_text('@echo off\nset "LOG=%~dp0apply-update.log"\n' + body, encoding="utf-8")
+    subprocess.run(["cmd", "/c", str(script)], cwd=tmp_path, capture_output=True, check=True, timeout=20)
+    assert (tmp_path / "launched.txt").exists()
+    assert (custom / "studio.sqlite").read_bytes() == b"original-db"
+    assert (custom / "demo.zip").read_bytes() == b"original-zip"

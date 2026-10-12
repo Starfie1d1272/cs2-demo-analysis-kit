@@ -59,6 +59,7 @@ function normalizeTags(tags: string[]): string[] {
 // ── 存储命名空间（经 StorageAdapter 接缝，后端可换） ──
 const demoMeta = getStorage().records("demos"); // StudioDemoEntry by id
 const demoBlobs = getStorage().blobs("demos"); // ZIP 原始字节 by id
+const retiredMatchIds = getStorage().records("analysis:retired-match-ids");
 
 interface DemoIdentityIndex {
   /** Indexes are intentionally identifiers only; metadata is always read fresh. */
@@ -258,7 +259,7 @@ function unusedProjectionId(base: string, id: string, occupied: Set<string>): st
 async function importProjectionId(fileName: string, id: string, existing?: StudioDemoEntry, replacement?: StudioDemoEntry): Promise<string> {
   const base = existing ? matchIdForEntry(existing) : matchIdForEntry({ fileName });
   const others = (await demoMeta.getAll<StudioDemoEntry>()).filter(row => row.id !== id && row.id !== replacement?.id);
-  const occupied = new Set(others.map(matchIdForEntry));
+  const occupied = new Set([...others.map(matchIdForEntry), ...await retiredMatchIds.keys()]);
   return occupied.has(base) ? unusedProjectionId(base, id, occupied) : base;
 }
 
@@ -268,17 +269,19 @@ async function importProjectionId(fileName: string, id: string, existing?: Studi
  */
 async function isolateLegacyProjectionAliases(): Promise<void> {
   const records = await demoMeta.getAll<StudioDemoEntry>();
+  const retired = new Set(await retiredMatchIds.keys());
   const groups = new Map<string, StudioDemoEntry[]>();
   for (const entry of records) groups.set(matchIdForEntry(entry), [...(groups.get(matchIdForEntry(entry)) ?? []), entry]);
   for (const [sharedId, aliases] of groups) {
-    if (aliases.length < 2) continue;
+    if (aliases.length < 2 && !retired.has(sharedId)) continue;
     let keys = [`match:${sharedId}`, ...aliases.map(row => `entry:${row.id}`)];
     for (;;) {
       const retry = await withImportLocks(keys, async () => {
         const current = await demoMeta.getAll<StudioDemoEntry>();
         const rows = current.filter(row => matchIdForEntry(row) === sharedId).sort((a, b) => a.id.localeCompare(b.id));
-        if (rows.length < 2) return null;
-        const occupied = new Set(current.map(matchIdForEntry));
+        const previous = await retiredMatchIds.get<{ entryIds: string[] }>(sharedId);
+        if (!rows.length || (rows.length < 2 && !previous)) return null;
+        const occupied = new Set([...current.map(matchIdForEntry), ...await retiredMatchIds.keys()]);
         const edits = rows.map(row => {
           const analysisMatchId = unusedProjectionId(sharedId, row.id, occupied);
           occupied.add(analysisMatchId);
@@ -286,7 +289,10 @@ async function isolateLegacyProjectionAliases(): Promise<void> {
         });
         const required = edits.flatMap(row => [`entry:${row.id}`, `match:${row.analysisMatchId}`]);
         if (required.some(key => !keys.includes(key))) return required;
-        await withImportCheckpoint(getStorage(), rows.map(row => row.id), [], async () => {
+        await withImportCheckpoint(getStorage(), rows.map(row => row.id), [sharedId], async () => {
+          // Saved PrepItems cannot identify which legacy alias they referred to.
+          // Permanently reserve the ambiguous key rather than rebinding it later.
+          await retiredMatchIds.put(sharedId, { entryIds: [...new Set([...(previous?.entryIds ?? []), ...rows.map(row => row.id)])] });
           for (const row of edits) await saveDemoEntry(row);
         });
         return null;

@@ -354,4 +354,39 @@ describe("Demo replacement persistence", () => {
     await expect(listDemoEntries()).rejects.toThrow("injected");
     expect(snapshot()).toEqual(before);
   });
+
+  it("retired legacy match IDs cannot redirect an existing PrepItem to a third same-name demo", async () => {
+    const first = await importDemoFile(file(1));
+    const second = await importDemoFile(file(2));
+    for (const entry of [first.entry, second.entry]) {
+      const legacy = { ...entry }; delete legacy.analysisMatchId;
+      await harness.adapter.records("demos").put(entry.id, legacy);
+    }
+    const savedReference = { matchId: "game", roundNumber: 1 };
+    await listDemoEntries();
+    await removeDemo(first.entry.id);
+    await removeDemo(second.entry.id);
+    const third = await importDemoFile(file(3));
+    expect(matchIdForEntry(third.entry)).not.toBe(savedReference.matchId);
+    const entryByMatchId = new Map((await listDemoEntries()).map(entry => [matchIdForEntry(entry), entry]));
+    expect(entryByMatchId.get(savedReference.matchId)).toBeUndefined();
+    expect(await harness.adapter.records("analysis:retired-match-ids").get("game")).toBeDefined();
+  });
+
+  it("resumes a process-interrupted alias split even when only one legacy key remains", async () => {
+    const first = await importDemoFile(file(1));
+    const second = await importDemoFile(file(2));
+    const resumedKey = `game~${first.entry.id}`;
+    // Durable state after a process stopped between the marker and metadata writes.
+    await harness.adapter.records("analysis:retired-match-ids").put("game", { entryIds: [first.entry.id, second.entry.id] });
+    await harness.adapter.records("demos").put(first.entry.id, { ...first.entry, analysisMatchId: resumedKey, builtWith: undefined });
+    const pending = { ...second.entry }; delete pending.analysisMatchId;
+    await harness.adapter.records("demos").put(second.entry.id, pending);
+    const beforeBytes = structuredClone(harness.blobs);
+    const reopened = await listDemoEntries();
+    expect(reopened.every(isFactsStale)).toBe(true);
+    expect(reopened.map(matchIdForEntry)).not.toContain("game");
+    expect(harness.blobs).toEqual(beforeBytes);
+    expect((await listDemoEntries()).map(matchIdForEntry)).toEqual(reopened.map(matchIdForEntry));
+  });
 });
