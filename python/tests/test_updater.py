@@ -349,7 +349,8 @@ def test_successful_relay_retains_non_whitelist_custom_data_in_old_root(tmp_path
     body = bat[bat.index(":newmoved\n"):].replace(f'start "" "{install / "dak-studio.exe"}"', 'echo started > "%~dp0launched.txt"')
     script = tmp_path / "success-relay.bat"
     script.write_text('@echo off\nset "LOG=%~dp0apply-update.log"\n' + body, encoding="utf-8")
-    subprocess.run(["cmd", "/c", str(script)], cwd=tmp_path, capture_output=True, check=True, timeout=20)
+    result = subprocess.run(["cmd", "/c", str(script)], cwd=tmp_path, capture_output=True, check=False, timeout=20)
+    assert result.returncode == 0, (result.stdout, result.stderr, (tmp_path / "apply-update.log").read_bytes() if (tmp_path / "apply-update.log").exists() else b"no relay log")
     assert (tmp_path / "launched.txt").exists()
     assert (custom / "studio.sqlite").read_bytes() == b"original-db"
     assert (custom / "demo.zip").read_bytes() == b"original-zip"
