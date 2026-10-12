@@ -59,7 +59,7 @@ vi.mock("./extract-match-facts", () => ({
     derived: { matchId, tournament: [{ matchId, row: { marker: pkg.marker } }], playerInsights: [], teamComparison: [], duels: [], openingTrails: [], utilityValue: [] },
   }),
 }));
-import { backfillDemoIdentities, importDemoFile, listDemoEntries, matchIdForEntry } from "./library";
+import { backfillDemoIdentities, importDemoFile, isFactsStale, listDemoEntries, matchIdForEntry, rebuildFactsFromZip, removeDemo } from "./library";
 import { getFactsStore } from "./facts-store";
 import { DERIVED_MATCH_NAMESPACE } from "./derived-cache";
 
@@ -289,7 +289,7 @@ describe("Demo replacement persistence", () => {
     expect(await bResult).toMatchObject({ message: "queued metadata failed" });
     const successful = await c;
     expect((await listDemoEntries()).some((entry) => entry.id === successful.entry.id)).toBe(true);
-    expect(await getFactsStore().getLineups()).toEqual([{ matchId: "survivor", marker: 3 }]);
+    expect(await getFactsStore().getLineups()).toEqual([{ matchId: "survivor", marker: 2 }, { matchId: matchIdForEntry(successful.entry), marker: 3 }]);
     expect((await listDemoEntries()).find((entry) => entry.demoSha256?.startsWith("2"))?.tags).not.toContain("queued");
   });
 
@@ -298,5 +298,60 @@ describe("Demo replacement persistence", () => {
     harness.state.onWrite = (namespace) => { if (namespace === "facts:lineups") throw new Error("storage unavailable"); };
     await expect(importDemoFile(file(2), { replaceId: first.entry.id })).rejects.toBeInstanceOf(AggregateError);
     harness.state.onWrite = null;
+  });
+
+  it("isolates different raw demos with the same filename and deletes only their own projections", async () => {
+    const first = await importDemoFile(file(1));
+    const second = await importDemoFile(file(2));
+    expect(first.entry.fileName).toBe(second.entry.fileName);
+    expect(matchIdForEntry(second.entry)).not.toBe(matchIdForEntry(first.entry));
+    expect(await getFactsStore().getLineups()).toEqual([{ matchId: "game", marker: 1 }, { matchId: matchIdForEntry(second.entry), marker: 2 }]);
+    await removeDemo(first.entry.id);
+    expect(await getFactsStore().getLineups()).toEqual([{ matchId: matchIdForEntry(second.entry), marker: 2 }]);
+    expect(await harness.adapter.blobs("demos").get(second.entry.id)).toBeDefined();
+    expect((await importDemoFile(file(2, "renamed.zip"))).entry.id).toBe(second.entry.id);
+  });
+
+  it("reserves distinct projections for concurrent same-name imports", async () => {
+    const results = await Promise.all([importDemoFile(file(1)), importDemoFile(file(2)), importDemoFile(file(3))]);
+    expect(new Set(results.map(result => matchIdForEntry(result.entry))).size).toBe(3);
+    expect((await getFactsStore().getLineups()).map(row => (row as unknown as { marker: number }).marker).sort()).toEqual([1, 2, 3]);
+  });
+
+  it("marks legacy aliases stale without deleting original ZIPs or the unowned shared facts", async () => {
+    const first = await importDemoFile(file(1));
+    const second = await importDemoFile(file(2));
+    for (const entry of [first.entry, second.entry]) {
+      const legacy = { ...entry };
+      delete legacy.analysisMatchId;
+      await harness.adapter.records("demos").put(entry.id, legacy);
+    }
+    const bytesBefore = structuredClone(harness.blobs);
+    const rows = await listDemoEntries();
+    expect(new Set(rows.map(matchIdForEntry)).size).toBe(2);
+    expect(rows.every(isFactsStale)).toBe(true);
+    expect(harness.blobs).toEqual(bytesBefore);
+    expect(await getFactsStore().getLineups({ matchIds: ["game"] })).toEqual([{ matchId: "game", marker: 1 }]);
+    const rebuiltFirst = await rebuildFactsFromZip(first.entry.id);
+    const rebuiltSecond = await rebuildFactsFromZip(second.entry.id);
+    expect(await getFactsStore().getLineups({ matchIds: [matchIdForEntry(rebuiltFirst!), matchIdForEntry(rebuiltSecond!)] })).toEqual(
+      expect.arrayContaining([{ matchId: matchIdForEntry(rebuiltFirst!), marker: 1 }, { matchId: matchIdForEntry(rebuiltSecond!), marker: 2 }])
+    );
+    await removeDemo(first.entry.id);
+    expect(matchIdForEntry((await listDemoEntries())[0]!)).toBe(matchIdForEntry(rebuiltSecond!));
+    expect(await getFactsStore().getLineups({ matchIds: [matchIdForEntry(rebuiltSecond!)] })).toEqual([{ matchId: matchIdForEntry(rebuiltSecond!), marker: 2 }]);
+  });
+
+  it("restores legacy alias metadata if splitting the second entry fails", async () => {
+    const first = await importDemoFile(file(1));
+    const second = await importDemoFile(file(2));
+    for (const entry of [first.entry, second.entry]) {
+      const legacy = { ...entry }; delete legacy.analysisMatchId;
+      await harness.adapter.records("demos").put(entry.id, legacy);
+    }
+    const before = snapshot();
+    failOnce("demos", [first.entry.id, second.entry.id].sort()[1]);
+    await expect(listDemoEntries()).rejects.toThrow("injected");
+    expect(snapshot()).toEqual(before);
   });
 });

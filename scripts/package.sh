@@ -71,6 +71,8 @@ uv sync --extra gui --extra build
 uv run pyinstaller packaging/cs2dak-studio.spec --noconfirm --distpath "$DIST_PATH"
 cd "$ROOT"
 
+uv run --project python python scripts/check-desktop-notices.py "$DIST_PATH"
+
 if [[ "$OSTYPE" == darwin* ]]; then
   echo "==> [4/5] Creating DMGs"
 

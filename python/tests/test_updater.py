@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
@@ -205,3 +206,70 @@ def test_cleanup_failure_does_not_replace_download_history(tmp_path, monkeypatch
         updater.download_with_fallback(["first"], tmp_path / "data")
     assert failure.value.failures[0]["message"] == "network unavailable"
     assert "update_download.cleanup" in caplog.text
+
+
+@pytest.mark.parametrize("name", updater.PERSISTENT_INSTALL_DIRS)
+def test_nested_legacy_persistent_data_stops_install_before_deletion(tmp_path, name):
+    install = tmp_path / "install"
+    nested = install / "dak-studio"
+    (nested / name).mkdir(parents=True)
+    (nested / name / "original.bin").write_bytes(b"preserved")
+    (nested / "dak-studio.exe").write_bytes(b"old-exe")
+    (install / "userdata").mkdir(exist_ok=True)
+    (install / "userdata" / "outer.bin").write_bytes(b"outer")
+    archive = tmp_path / "runtime.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr("dak-studio/dak-studio.exe", b"new-exe")
+    with pytest.raises(updater.UpdateError, match="未删除旧目录"):
+        updater.install_runtime_archive(archive, install)
+    assert (nested / name / "original.bin").read_bytes() == b"preserved"
+    assert (nested / "dak-studio.exe").read_bytes() == b"old-exe"
+    assert (install / "userdata" / "outer.bin").read_bytes() == b"outer"
+    assert not (install / "dak-studio.exe").exists()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="requires real cmd.exe directory move semantics")
+@pytest.mark.parametrize("failed_name", updater.PERSISTENT_INSTALL_DIRS)
+def test_windows_relay_failure_retains_data_and_does_not_launch(tmp_path, monkeypatch, failed_name):
+    monkeypatch.setattr(updater.time, "strftime", lambda _fmt: "fixture")
+    install = tmp_path / "install"
+    old = tmp_path / "install.old-fixture"
+    install.mkdir()
+    for name in updater.PERSISTENT_INSTALL_DIRS:
+        (old / name).mkdir(parents=True)
+        (old / name / "original.bin").write_bytes(name.encode())
+    # A target file causes Windows MOVE to fail; earlier directories may migrate.
+    (install / failed_name).write_bytes(b"blocked")
+    bat = updater._relaunch_bat(1, install, tmp_path / "new", "dak-studio.exe")
+    body = bat[bat.index(":newmoved\n"):]
+    # Execute the real migration and cleanup branch in isolated fixture directories.
+    # Replace launches with a marker so no app/editor windows are opened in CI.
+    body = body.replace(f'start "" "{install / "dak-studio.exe"}"', 'echo launched > "%~dp0launched.txt"')
+    body = body.replace('start "" notepad.exe "%LOG%"', 'rem editor suppressed for synthetic test')
+    script = tmp_path / "relay.bat"
+    script.write_text('@echo off\nset "LOG=%~dp0apply-update.log"\n' + body, encoding="utf-8")
+    result = subprocess.run(["cmd", "/c", str(script)], cwd=tmp_path, capture_output=True, timeout=20, check=False)
+    assert result.returncode == 1
+    assert old.exists()
+    assert not (tmp_path / "launched.txt").exists()
+    assert script.exists()
+    assert "Do not delete either directory" in (tmp_path / "apply-update.log").read_text()
+    for name in updater.PERSISTENT_INSTALL_DIRS:
+        preserved = old / name / "original.bin"
+        migrated = install / name / "original.bin"
+        assert (preserved if preserved.exists() else migrated).read_bytes() == name.encode()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="requires real cmd.exe")
+def test_old_relay_failure_reproduction_uses_only_temporary_fixture(tmp_path):
+    old = tmp_path / "old"
+    new = tmp_path / "new"
+    (old / "userdata").mkdir(parents=True)
+    (old / "userdata" / "studio.sqlite").write_bytes(b"synthetic-db")
+    new.mkdir()
+    (new / "userdata").write_bytes(b"blocked-target")
+    script = tmp_path / "old-relay.bat"
+    script.write_text(f'@echo off\nmove "{old / "userdata"}" "{new / "userdata"}" >nul 2>&1\nrmdir /s /q "{old}" >nul 2>&1\n', encoding="utf-8")
+    subprocess.run(["cmd", "/c", str(script)], cwd=tmp_path, check=True, timeout=20)
+    assert not (old / "userdata" / "studio.sqlite").exists()
+    assert (new / "userdata").read_bytes() == b"blocked-target"

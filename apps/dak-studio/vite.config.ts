@@ -131,6 +131,8 @@ export default defineConfig({
     name: "dak-build-info",
     generateBundle() {
       this.emitFile({ type: "asset", fileName: "build-info.json", source: JSON.stringify(BUILD_INFO, null, 2) + "\n" });
+      this.emitFile({ type: "asset", fileName: "THIRD-PARTY-NOTICES.md", source: readFileSync(resolve(__dirname, "../../THIRD-PARTY-NOTICES.md"), "utf8") });
+      this.emitFile({ type: "asset", fileName: "simpleheat.LICENSE", source: readFileSync(resolve(__dirname, "../../scripts/licenses/simpleheat.LICENSE"), "utf8") });
     },
   }],
   server: {

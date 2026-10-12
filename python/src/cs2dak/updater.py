@@ -12,8 +12,9 @@
     2. 把旧安装目录改名为 *.old-<ts>；
     3. 把新目录移到原位；
     4. 从 *.old 把 userdata/assets/cache/updates 搬回新目录（便携式数据不能丢）；
-    5. 启动新 exe；6. 删除 *.old；7. 自删脚本。
-  任一步失败回滚（把 *.old 改回原名），保证不变砖。
+    5. 全部持久目录迁移成功后启动新 exe；6. 删除 *.old；7. 自删脚本。
+  新程序移动失败时尝试回滚；持久目录迁移失败时停止启动和清理，
+  保留新旧目录及接力日志，供人工恢复，不宣称跨目录事务。
 
   注意：staging 目录必须在 install_dir 外部（install_dir.parent），
   不能在 install_dir/userdata 内部——否则 bat 第一步 move install_dir 后
@@ -160,6 +161,14 @@ def install_runtime_archive(zip_path: Path, install_dir: Path, exe_name: str = "
         # 清理旧 installer 产生的 install_dir/<top-level>/... 嵌套 runtime。
         nested_root = install_dir / archive_root.name
         if nested_root != install_dir and (nested_root / exe_name).is_file():
+            preserved = [name for name in PERSISTENT_INSTALL_DIRS if (nested_root / name).exists()]
+            if preserved:
+                raise UpdateError(
+                    f"旧嵌套安装目录包含持久资料（{', '.join(preserved)}）；"
+                    "安装已停止，未删除旧目录；请备份旧目录及外层安装目录的资料，"
+                    "保留原始 ZIP 和 SQLite，并联系支持确认迁移位置后重试。",
+                    "install_runtime.persistent_data",
+                )
             shutil.rmtree(nested_root)
 
         for source in archive_root.iterdir():
@@ -186,6 +195,13 @@ def _relaunch_bat(pid: int, install_dir: Path, new_dir: Path, exe_name: str) -> 
     ts = time.strftime("%Y%m%d%H%M%S")
     old_dir = install_dir.parent / f"{install_dir.name}.old-{ts}"
     target_exe = install_dir / exe_name
+    migrate = "\n".join(f'''if not exist "{old_dir}\\{name}" goto migrated_{name}
+if exist "{install_dir}\\{name}" goto migrationfailed
+move "{old_dir}\\{name}" "{install_dir}\\{name}" >> "%LOG%" 2>&1
+if errorlevel 1 goto migrationfailed
+if exist "{old_dir}\\{name}" goto migrationfailed
+if not exist "{install_dir}\\{name}\\" goto migrationfailed
+:migrated_{name}''' for name in PERSISTENT_INSTALL_DIRS)
     return f"""@echo off
 setlocal
 set "LOG=%~dp0apply-update.log"
@@ -205,6 +221,7 @@ timeout /t 2 /nobreak >nul
 rem 1) 旧目录改名（释放后可改名）
 echo [%date% %time%] move old "{install_dir}" to "{old_dir}" >> "%LOG%"
 set /a tries=0
+if exist "{old_dir}" goto fail
 :moveold
 move "{install_dir}" "{old_dir}" >> "%LOG%" 2>&1
 if not errorlevel 1 goto oldmoved
@@ -224,17 +241,21 @@ if %tries% geq 30 goto rollback
 timeout /t 1 /nobreak >nul
 goto movenew
 :newmoved
-	rem 3) 搬回持久目录（便携式数据不能丢）
-	if exist "{old_dir}\\userdata" move "{old_dir}\\userdata" "{install_dir}\\userdata" >nul 2>&1
-	if exist "{old_dir}\\assets" move "{old_dir}\\assets" "{install_dir}\\assets" >nul 2>&1
-	if exist "{old_dir}\\cache" move "{old_dir}\\cache" "{install_dir}\\cache" >nul 2>&1
-	if exist "{old_dir}\\updates" move "{old_dir}\\updates" "{install_dir}\\updates" >nul 2>&1
+rem 3) 搬回持久目录；失败保留所有目录，禁止启动新版本或删除旧目录
+{migrate}
 rem 4) 启动新版本
 echo [%date% %time%] start "{target_exe}" >> "%LOG%"
 start "" "{target_exe}"
 rem 5) 清理旧目录
 rmdir /s /q "{old_dir}" >nul 2>&1
 goto done
+:migrationfailed
+echo [%date% %time%] Persistent data migration failed. Update stopped; new app was not started. >> "%LOG%"
+echo Keep both directories: "{old_dir}" and "{install_dir}". >> "%LOG%"
+echo Back up userdata/assets/cache/updates from BOTH locations before merging or retrying. Do not delete either directory. >> "%LOG%"
+echo Contact support with this log; restore each preserved directory to its original install location after closing all app processes. >> "%LOG%"
+start "" notepad.exe "%LOG%"
+exit /b 1
 :rollback
 echo [%date% %time%] new move failed, rollback >> "%LOG%"
 move "{old_dir}" "{install_dir}" >nul 2>&1

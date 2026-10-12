@@ -67,3 +67,7 @@ for (const path of emittedFiles) {
   writeFileSync(path, output);
 }
 if (existsSync('src/theme.css')) copyFileSync('src/theme.css', 'dist/theme.css');
+if (JSON.parse(readFileSync('package.json', 'utf8')).name === '@cs2dak/react') {
+  copyFileSync(fileURLToPath(new URL('../THIRD-PARTY-NOTICES.md', import.meta.url)), 'dist/THIRD-PARTY-NOTICES.md');
+  copyFileSync(fileURLToPath(new URL('./licenses/simpleheat.LICENSE', import.meta.url)), 'dist/simpleheat.LICENSE');
+}
