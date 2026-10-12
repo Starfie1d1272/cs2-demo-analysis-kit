@@ -75,11 +75,11 @@ EVENTS_MANIFEST_TIMEOUT_S = 8
 
 # 更新检查引用的镜像源（优先级：R2 → GitHub 直连 → ghproxy×3，与前端 update.ts 一致）。
 _MANIFEST_URLS = [
-    "https://dakupdate.starfie1d.top/releases/latest.json",
-    "https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/latest/download/latest.json",
-    "https://ghfast.top/https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/latest/download/latest.json",
-    "https://gh-proxy.com/https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/latest/download/latest.json",
-    "https://ghproxy.net/https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/latest/download/latest.json",
+    "https://dakupdate.starfie1d.top/releases/latest-v2.json",
+    "https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/latest/download/latest-v2.json",
+    "https://ghfast.top/https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/latest/download/latest-v2.json",
+    "https://gh-proxy.com/https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/latest/download/latest-v2.json",
+    "https://ghproxy.net/https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/latest/download/latest-v2.json",
 ]
 _BETA_MANIFEST_URLS = [
     "https://dakupdate.starfie1d.top/releases/beta/latest.json",
@@ -1404,6 +1404,15 @@ class StudioApi:
 
         threading.Thread(target=_quit, daemon=True).start()
         return {"ok": True}
+
+    def update_apply_runtime_safe(self, job_id: str) -> dict:
+        """Native capability for the checked persistent-directory relay.
+
+        Older runtimes do not expose this method, including those running a newer
+        web overlay. Keep update_apply for old frontend compatibility after a safe
+        manual installation; both methods execute the checked relay in this runtime.
+        """
+        return self.update_apply(job_id)
 
     def update_apply_web(self, job_id: str, version: str) -> dict:
         """Install a frontend-only update into cache/studio-web.

@@ -36,6 +36,8 @@ interface PywebviewApi {
   update_start?(urls: string[], sha256: string, size: number, name: string): Promise<{ jobId: string }>;
   update_status?(jobId: string): Promise<UpdateJobStatus>;
   update_apply?(jobId: string): Promise<{ ok: boolean; error?: string }>;
+  /** Capability is provided by the safe native runtime, never by web overlay version. */
+  update_apply_runtime_safe?(jobId: string): Promise<{ ok: boolean; error?: string }>;
   update_apply_web?(jobId: string, version: string): Promise<{ ok: boolean; error?: string }>;
 }
 
@@ -58,7 +60,8 @@ export function getUpdaterApi(): RuntimeUpdaterApi | null {
 
 /** 当前环境是否支持应用内一键更新（桌面壳 + 有当前平台资产）。 */
 export function canSelfUpdate(asset: UpdateAsset | undefined): asset is UpdateAsset {
-  return asset != null && getUpdaterApi() != null;
+  return asset != null && getUpdaterApi() != null &&
+    (asset.kind === "web" || typeof getPywebviewApi()?.update_apply_runtime_safe === "function");
 }
 
 /**
@@ -108,7 +111,7 @@ export async function downloadUpdate(
   onProgress: (status: UpdateJobStatus) => void
 ): Promise<UpdateJobStatus> {
   const api = getUpdaterApi();
-  if (!api) throw new Error("当前环境不支持应用内更新");
+  if (!api || !canSelfUpdate(asset)) throw new Error("当前运行时需使用安装器升级，请先关闭 Studio 并保留原资料目录");
   const { jobId } = await api.update_start(asset.urls, asset.sha256, asset.size, asset.name);
   for (;;) {
     const status = await api.update_status(jobId);
@@ -119,9 +122,9 @@ export async function downloadUpdate(
 }
 
 export async function applyUpdate(jobId: string): Promise<{ ok: boolean; error?: string }> {
-  const api = getUpdaterApi();
-  if (!api) return { ok: false, error: "当前环境不支持应用内更新" };
-  return api.update_apply(jobId);
+  const api = getPywebviewApi();
+  if (!api?.update_apply_runtime_safe) return { ok: false, error: "当前运行时需使用安装器升级，请先关闭 Studio 并保留原资料目录" };
+  return api.update_apply_runtime_safe(jobId);
 }
 
 export async function applyWebUpdate(jobId: string, version: string): Promise<{ ok: boolean; error?: string }> {

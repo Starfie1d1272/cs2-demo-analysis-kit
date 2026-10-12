@@ -1,3 +1,5 @@
 # Preserve the verified upstream license bytes on Windows checkouts.
 scripts/licenses/*.LICENSE text eol=lf
 THIRD-PARTY-NOTICES.md text eol=lf
+scripts/test-fixtures/legacy-*.txt text eol=lf
+python/tests/legacy_update_v0_8_5.txt text eol=lf

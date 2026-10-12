@@ -32,12 +32,12 @@ const RELEASES_LATEST_API = `https://api.github.com/repos/${OWNER_REPO}/releases
 export const R2_BASE = "https://dakupdate.starfie1d.top";
 
 /** manifest 在 GitHub Release 上的稳定地址（权威源/兜底）。 */
-const MANIFEST_CANONICAL_STABLE = `https://github.com/${OWNER_REPO}/releases/latest/download/latest.json`;
+const MANIFEST_CANONICAL_STABLE = `https://github.com/${OWNER_REPO}/releases/latest/download/latest-v2.json`;
 
 export type UpdateChannel = "stable" | "beta";
 
 export function updateManifestPath(channel: UpdateChannel): string {
-  return channel === "beta" ? "releases/beta/latest.json" : "releases/latest.json";
+  return channel === "beta" ? "releases/beta/latest.json" : "releases/latest-v2.json";
 }
 
 /**
