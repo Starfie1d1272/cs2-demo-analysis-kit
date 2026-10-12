@@ -1,5 +1,35 @@
 # @cs2dak/presentation
 
+## 3.0.0
+
+### Major Changes
+
+- 770c4c4: 将单图 frozen Tournament economy/performance 数据投影收口到现有 Core，显示队名与昵称不再决定身份；Presentation 保留显示包装并直接消费同一投影。
+
+  兼容性变化：手写 TournamentFacts 必须提供完整 stable team/player IDs；两个不同 ID 的同名队伍不再隐式合并。相同 ID 改名仍归并。未绑定本地 Demo 使用 match-scoped 观察身份；Studio 派生缓存需要本地回填。
+
+### Patch Changes
+
+- 31b461f: 公共包统一发布编译后的 ESM 与 declarations，保留既有 root/subpath API；React theme.css 继续公开并保留 CSS side effect。移除 tournament 发布产物中的测试文件，保持零 runtime dependency。真实 tgz 的逐包 Node ESM、strict NodeNext 与完整传递依赖 consumer gate 在 CI/publish 前执行；不修改分析算法、稳定身份或 UI。
+
+  在 DAK build 中将精确的 cs2-demo-format@3.1.0 / @rivalhub/rival-rating@0.3.0 原版 registry 源码生成 ESM dependency 模块，仅重写 DAK 生成 JS 的依赖路径；保留模块身份、上游唯一语义 owner 与 MIT notices，声明引用相同精确版本。附源码哈希/原包 integrity/许可证 provenance，消除上游 source-only npm 入口造成的 Node 闭包阻塞，不修改原分析公式或 schema。
+- a4c0760: 新增窄范围 Evidence QA 与 Tournament 适配入口，供共享 RivalHub 上传客户端使用。
+- Updated dependencies [770c4c4]
+- Updated dependencies [eaca7aa]
+- Updated dependencies [ec2fbb0]
+- Updated dependencies [770c4c4]
+- Updated dependencies [126f3af]
+- Updated dependencies [31b461f]
+- Updated dependencies [0296acf]
+- Updated dependencies [0166078]
+- Updated dependencies [a4c0760]
+- Updated dependencies [b1a9523]
+  - @cs2dak/core@3.0.0
+  - @cs2dak/maps@1.1.0
+  - @cs2dak/contract@2.0.0
+  - @cs2dak/cohort@2.0.3
+  - @cs2dak/tournament@1.1.2
+
 ## 2.1.1
 
 ### Patch Changes
