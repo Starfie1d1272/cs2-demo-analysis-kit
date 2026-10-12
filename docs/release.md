@@ -262,3 +262,15 @@ CI 与发布 gate 运行 `node scripts/maps-package-smoke.mjs`（Ubuntu 上的 p
 上游最新 registry root 仍是 TypeScript，DAK build 在生成产物内编译精确原版依赖（format 3.1.0 / rating 0.3.0），保留 MIT notices 和可追溯哈希；declarations 安装同一精确版本，版本更新必须同步 `scripts/lib/bundled-dependencies.mjs` 的 source hashes/license provenance 并重跑真实 consumer gate。详情见 [artifact audit](research/public-package-artifact-audit.md)。七包 Node/strict TS tgz gate 已通过；此结果证明 DAK 可消费，不声称上游自身 root 已修复或 npm 已正式发布。不得跳过完整闭包 gate。
 
 全包 tgz consumer gate 当前只在 Linux/Ubuntu 认证，其他平台显式报错；Windows/macOS 独立 npm consumer 与 browser matrix 尚未验收。Windows startup CI 单独执行 dependency graph gate，应用打包/启动/安装检查不能替代 tgz consumer 证据。test-fixtures / __tests__ 也从公共产物排除，并由实际 pack/install 文件检查保护。
+
+### npm 构建链修复后的受控重试
+
+发行版本提交与实际发布源码提交必须分别明确。若版本提交之后只合入获独审的
+构建链修复，可在 Publish npm packages 输入原40位 `release_commit`，例如
+75434c5dcce9477a567761ed5c378b346a4ceebe；工作流实际checkout本次 github.sha
+（新的发布源码提交X），不伪造GITHUB_SHA。脚本要求版本提交是X祖先、全部公共
+manifest名称/版本与选定版本提交一致，再从该提交与其父的差异选择原七包。
+provenance、实际checkout/gitHead和成功npm package tags都指X，桌面v0.8.6仍
+固定754，不移动、不重新构建覆盖其公开bytes。省略选择时保持当前版本提交模式；
+纯workflow修复提交本身无版本提升会拒绝盲发。冷构建与CI使用相同build:serial，
+保留完整测试、typecheck、实际tgz闭包、registry/provenance/tag验收；不创建凭据。

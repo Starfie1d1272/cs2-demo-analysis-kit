@@ -6,6 +6,8 @@ import { join } from "node:path";
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const registry = "https://registry.npmjs.org";
 const checkOnly = process.argv.includes("--check-only");
+const releaseIndex = process.argv.indexOf("--release-commit");
+const requestedRelease = releaseIndex < 0 ? null : process.argv[releaseIndex + 1];
 
 function git(args, { allowFailure = false } = {}) {
   try {
@@ -40,13 +42,26 @@ function workspacePublicPackages() {
 }
 
 function releaseTargets() {
-  const parent = git(["rev-parse", "HEAD^"]);
+  if (releaseIndex >= 0 && !/^[0-9a-f]{40}$/.test(requestedRelease ?? "")) {
+    throw new Error("--release-commit requires a complete 40-character commit SHA");
+  }
+  const selection = git(["rev-parse", "--verify", `${requestedRelease ?? "HEAD"}^{commit}`]);
+  if (git(["merge-base", "--is-ancestor", selection, "HEAD"], { allowFailure: true }) === null) {
+    throw new Error("version selection commit must be an ancestor of the actual source checkout");
+  }
+  console.log(`version selection commit: ${selection}`);
+  const parent = git(["rev-parse", `${selection}^`]);
   return workspacePublicPackages()
     .map(({ directory, manifest }) => {
       const relativeManifest = `${directory}/package.json`;
+      const selectedText = git(["show", `${selection}:${relativeManifest}`], { allowFailure: true });
+      const selected = selectedText ? JSON.parse(selectedText) : null;
+      if (!selected || selected.name !== manifest.name || selected.version !== manifest.version) {
+        throw new Error(`${manifest.name}: actual manifest differs from selected release version`);
+      }
       const previousText = git(["show", `${parent}:${relativeManifest}`], { allowFailure: true });
       const previous = previousText ? JSON.parse(previousText) : null;
-      if (previous?.version === manifest.version) return null;
+      if (previous?.version === selected.version) return null;
       return {
         directory,
         name: manifest.name,

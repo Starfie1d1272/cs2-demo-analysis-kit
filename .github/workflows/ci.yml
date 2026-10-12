@@ -31,17 +31,18 @@ jobs:
 
       - run: node --test scripts/uploader-release-contract.test.mjs
       - run: node --test scripts/legacy-update-first-hop.test.mjs
+      - run: node --test scripts/reconcile-npm-publish.test.mjs
 
       - run: node --test scripts/sync-version.test.mjs scripts/build-info.test.mjs scripts/build-web-patch.test.mjs
 
-      - name: Build shared artifacts before cold typecheck and tests
-        run: pnpm build:packages
+      - name: Cold serial build before typecheck and tests
+        run: pnpm build:serial
 
       - run: pnpm typecheck
 
       - run: pnpm test:fast
 
-      - run: pnpm build
+      - run: pnpm build:serial
 
       - name: Smoke packed maps in a clean consumer
         run: node scripts/maps-package-smoke.mjs
