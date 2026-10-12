@@ -157,6 +157,7 @@ scripts/check-npm-publish-policy.mjs,,,164,164,144,144,,,retain unchanged gate,r
 scripts/check-package-boundaries.mjs,,,56,56,55,55,,,retain unchanged gate,real package/installer/distribution checks; no new implementation
 scripts/data-producer-boundaries.test.ts,2,0,22,0,21,0,30.002,,remove script unit regressions,operational gates retained; per-helper rollback/provenance examples not all covered
 scripts/legacy-update-first-hop.test.mjs,2,2,94,94,89,89,157.659,246.863,retain or replace with critical flow,see critical-flow protection matrix; no claim of retaining every old assertion
+scripts/lib/package-files.mjs,,,15,15,14,14,,,retain shared validation helper,boundary and tarball test exclusion/path portability helper; unchanged implementation
 scripts/maps-package-smoke.mjs,,,138,138,137,137,,,retain unchanged gate,real package/installer/distribution checks; no new implementation
 scripts/package-boundaries.test.mjs,8,8,78,78,75,75,548.684,684.868,retain or replace with critical flow,see critical-flow protection matrix; no claim of retaining every old assertion
 scripts/public-package-smoke.mjs,,,130,130,129,129,,,retain unchanged gate,real package/installer/distribution checks; no new implementation

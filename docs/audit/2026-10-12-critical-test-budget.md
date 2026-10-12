@@ -17,20 +17,24 @@
 | pytest | 210 / 15 文件 | 12 / 1 文件 | 5.71% 用例 |
 | node:test | 33 / 7 文件 | 10 / 2 文件 | 30.30% 用例；全仓统一预算，非逐 runner 限额 |
 | 常规测试入口（含 Windows installer 脚本） | 159 文件 / 17,531 行 | 9 文件 / 1,129 行 | 5.66% 文件 / 6.43% 行 |
-| 扩大到 check/smoke gate 与专用 helper | 167 文件 / 18,369 行 | 16 文件 / 1,776 行 | 9.58% 文件 / 9.67% 行 |
-| 扩大口径非空行 | 16,658 | 1,665 | 9.995% |
+| 扩大到 check/smoke gate 与专用 helper | 168 文件 / 18,384 行 | 17 文件 / 1,791 行 | 10.119% 文件 / 9.742% 行 |
+| 扩大口径非空行 | 16,672 | 1,679 | 10.071% |
+
+10% 目标按 runner 实际用例数判断，57/1,119 达标。文件数与非空行的扩大口径
+略高于 10%，不声称所有口径达标，也不为文件数硬删仍有用途的 helper。
 
 扩大口径包含原有 package graph、release policy、desktop notices、maps consumer、
 七包 consumer、Windows startup smoke 六个脚本；保留这六个脚本原样。
 另计入 `vitest.config.ts`；单条 pywebview reflection 流程归入同一 native flow 模块，
-没有隐藏用例。也计入原有专用 `presentation/src/test-fixtures.ts`，其消费者删除后移除该 helper。
+没有隐藏用例。计入仍保留且 base/head 均为 15 行、14 非空行的
+`scripts/lib/package-files.mjs`；原报告漏计此共享 helper，本次补入 CSV。也计入原有专用 `presentation/src/test-fixtures.ts`，其消费者删除后移除该 helper。
 未把 helper 搬到生产目录，也未用循环或压缩排版藏起数百个用例。
 现存 3 个确认故障变体、4 个写入边界和 2 个错误回执字段仍由 runner 展开计数。
 
 fixtures、地图资产、历史 client 快照等输入数据完全保留。两个历史 client 文本快照
 共 346 行，是 legacy regression 的输入/被测对象，不计为测试实现；若连这些
-历史源码输入也计入，物理量是 169→18 文件、18,715→2,122 行，**该扩大口径未达 10%**。
-源码字符数也不是 10%：858,345→102,714（约 12%）。这些额外口径如实记录，
+历史源码输入也计入，物理量是 170→19 文件、18,730→2,137 行，**该扩大口径未达 10%**。
+源码字符数也不是 10%：859,074→103,443（约 12%）。这些额外口径如实记录，
 不将其与用例或非空行目标混用；没有删改资料来降低数字。
 
 ## 保留项为什么有独有价值
@@ -82,7 +86,7 @@ Node 24.19.0、pnpm 12.9.1、Vitest 5.0.3。同工作区，先 build；完整 Vi
 | typecheck / committed sample analyze | baseline build/测试通过 | typecheck 与 `pnpm analyze:sample` 通过 |
 
 保留集的 Library 单条完整生命周期约 41.56s，CT facade flow 所在文件累计 body
-约 24.33s；并行时间不能相加当 wall。代码/用例达到 10% **不代表耗时也只有 10%**。
+约 24.33s；并行时间不能相加当 wall。用例数达标 **不代表源码所有口径或耗时也只有 10%**。
 
 临时 Vite transform 故障注入、不改生产文件、不永久入库：
 
