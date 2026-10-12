@@ -610,12 +610,20 @@ jobs:
             "https://dakupdate.starfie1d.top/releases/${TAG}/DAK-Studio-Setup-${VERSION}.exe" -o public-r2-setup.exe
           curl --fail --location --retry 5 --retry-all-errors \
             "https://github.com/${{ github.repository }}/releases/download/${TAG}/DAK-Studio-Setup-${VERSION}.exe" -o public-github-setup.exe
+          curl --fail --location --retry 5 --retry-all-errors \
+            "https://dakupdate.starfie1d.top/releases/${TAG}/install-manifest.json" -o public-r2-install.json
+          curl --fail --location --retry 5 --retry-all-errors \
+            "https://github.com/${{ github.repository }}/releases/download/${TAG}/install-manifest.json" -o public-github-install.json
           node - <<'NODE'
           const fs = require("fs"), crypto = require("crypto");
           const expected = require("./dist/latest.json").manualInstall;
           for (const file of ["public-r2-setup.exe", "public-github-setup.exe"]) {
             const bytes = fs.readFileSync(file);
             if (bytes.length !== expected.size || crypto.createHash("sha256").update(bytes).digest("hex") !== expected.sha256) throw new Error("public manual installer size/SHA-256 mismatch");
+          }
+          const install = fs.readFileSync("dist/install-manifest.json");
+          for (const file of ["public-r2-install.json", "public-github-install.json"]) {
+            if (!fs.readFileSync(file).equals(install)) throw new Error("public versioned install input differs from the verified release");
           }
           console.log("Old-client manual destination and both public installer downloads verified");
           NODE
