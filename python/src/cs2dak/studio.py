@@ -1370,7 +1370,7 @@ class StudioApi:
             return {"ok": False, "error": "应用内替换目前只支持 Windows"}
         install_dir = updater.current_install_dir()
         try:
-            relative_userdata = self._userdata.absolute().relative_to(install_dir.absolute())
+            relative_userdata = self._userdata.resolve(strict=False).relative_to(install_dir.resolve(strict=False))
         except ValueError:
             relative_userdata = None
         if relative_userdata is not None and (not relative_userdata.parts or relative_userdata.parts[0].lower() not in updater.PERSISTENT_INSTALL_DIRS):

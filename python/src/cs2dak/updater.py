@@ -12,7 +12,7 @@
     2. 把旧安装目录改名为 *.old-<ts>；
     3. 把新目录移到原位；
     4. 从 *.old 把 userdata/assets/cache/updates 搬回新目录（便携式数据不能丢）；
-    5. 全部持久目录迁移成功后启动新 exe；6. 保留 *.old 供恢复；7. 自删脚本。
+    5. 全部持久目录迁移成功后启动新 exe；6. 保留 *.old、脚本和日志供恢复。
   新程序移动失败时尝试回滚；持久目录迁移失败时停止启动和清理，
   保留新旧目录及接力日志，供人工恢复，不宣称跨目录事务。
 
@@ -160,7 +160,7 @@ def install_runtime_archive(zip_path: Path, install_dir: Path, exe_name: str = "
         configured = os.environ.get("DAK_STUDIO_DATA_DIR")
         if configured:
             try:
-                relative_data = Path(configured).expanduser().absolute().relative_to(install_dir)
+                relative_data = Path(configured).expanduser().resolve(strict=False).relative_to(install_dir.resolve(strict=False))
             except ValueError:
                 relative_data = None
             incoming = {path.name.lower() for path in archive_root.iterdir() if path.name.lower() not in PERSISTENT_INSTALL_DIRS}
@@ -275,7 +275,7 @@ goto done
 echo [%date% %time%] old move failed, restart existing app >> "%LOG%"
 start "" "{target_exe}"
 :done
-del "%~f0" >nul 2>&1 & exit /b 0
+exit /b 0
 """
 
 

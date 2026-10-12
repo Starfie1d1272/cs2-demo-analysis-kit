@@ -174,7 +174,8 @@ def test_relaunch_bat_mentions_pid_and_paths(tmp_path: Path) -> None:
     assert "DAK_PID_FOUND" in bat and "/FO CSV" in bat
     assert ":moveold" in bat and ":movenew" in bat
     assert "old move failed, restart existing app" in bat
-    assert "del " in bat  # 自删脚本
+    assert 'del "%~f0"' not in bat  # preserve relay evidence; deleting a running batch breaks cmd
+    assert "exit /b 0" in bat
 
 
 def test_apply_windows_update_launches_relay_from_stage_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -297,13 +298,24 @@ def test_old_relay_failure_reproduction_uses_only_temporary_fixture(tmp_path):
     assert not (new / "userdata" / "studio.sqlite").exists()
 
 
-def test_manual_install_stops_before_overwriting_custom_data_inside_runtime(tmp_path, monkeypatch):
+@pytest.mark.parametrize("path_mode", ["direct", "dotdot", "alias"])
+def test_manual_install_stops_before_overwriting_custom_data_inside_runtime(tmp_path, monkeypatch, path_mode):
     install = tmp_path / "install"
     data = install / "_internal" / "custom-data"
     data.mkdir(parents=True)
     (data / "studio.sqlite").write_bytes(b"original-db")
     (data / "demo.zip").write_bytes(b"original-zip")
-    monkeypatch.setenv("DAK_STUDIO_DATA_DIR", str(data))
+    configured = data
+    if path_mode == "dotdot":
+        configured = install / ".." / install.name / "_internal" / "custom-data"
+    elif path_mode == "alias":
+        alias = tmp_path / "data-alias"
+        if sys.platform == "win32":
+            subprocess.run(["cmd", "/c", "mklink", "/J", str(alias), str(data)], capture_output=True, check=True)
+        else:
+            alias.symlink_to(data, target_is_directory=True)
+        configured = alias
+    monkeypatch.setenv("DAK_STUDIO_DATA_DIR", str(configured))
     archive = tmp_path / "runtime.zip"
     with zipfile.ZipFile(archive, "w") as zf:
         zf.writestr("dak-studio/dak-studio.exe", b"new-runtime")
