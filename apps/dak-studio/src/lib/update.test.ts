@@ -42,7 +42,7 @@ describe("manifestSources", () => {
   it("R2 最高优先级，其后 GitHub 直连 + ghproxy", () => {
     const sources = manifestSources();
     // R2 完整 URL 在最前
-    expect(sources[0]).toBe(`${R2_BASE}/releases/latest.json`);
+    expect(sources[0]).toBe(`${R2_BASE}/releases/latest-v2.json`);
     // 其后是 MANIFEST_MIRRORS 套在 github canonical 上（数量 = 1 + 镜像数）
     expect(sources).toHaveLength(1 + MANIFEST_MIRRORS.length);
     // 第二个是 github 直连（空前缀）
@@ -126,7 +126,7 @@ describe("checkForUpdate", () => {
     });
     const info = await checkForUpdate();
     expect(info?.latest).toBe("0.7.0");
-    expect(seen[0]).toBe(`${R2_BASE}/releases/latest.json`);
+    expect(seen[0]).toBe(`${R2_BASE}/releases/latest-v2.json`);
     expect(seen).toHaveLength(1); // R2 成功即停
   });
 

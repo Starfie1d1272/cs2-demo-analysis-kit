@@ -203,7 +203,9 @@ jobs:
           fi
           node scripts/gen-update-manifest.mjs "$VERSION" \
             "python/dist/dak-studio-windows-${VERSION}.zip" \
-            "python/dist/latest.json" \
+            "python/dist/latest-v2.json" \
+            --legacy-out "python/dist/latest.json" \
+            --installer "python/dist/DAK-Studio-Setup-${VERSION}.exe" \
             --notes-file /tmp/changelog-notes.txt \
             "${WEB_ARGS[@]}"
 
@@ -218,6 +220,7 @@ jobs:
             python/dist/RivalHub-Demo-Uploader-Setup*.exe
             python/dist/install-manifest.json
             python/dist/latest.json
+            python/dist/latest-v2.json
           if-no-files-found: error
 
   release:
@@ -387,7 +390,12 @@ jobs:
             echo "R2: install-manifest ✓ (${TAG}/ + latest)"
           fi
 
-          # 5. Studio latest.json（现有逻辑）
+          # 5. Compatible runtimes retain automatic updates; legacy clients use safe installation.
+          aws s3 cp "dist/latest-v2.json" \
+            "s3://${R2_BUCKET}/releases/latest-v2.json" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type application/json \
+            --cache-control "public, max-age=300"
           aws s3 cp "dist/latest.json" \
             "s3://${R2_BUCKET}/releases/latest.json" \
             --endpoint-url "$R2_ENDPOINT" \
@@ -453,20 +461,25 @@ jobs:
           export VERSION="${RELEASE_TAG#v}"
           TAG="v${VERSION}"
           aws s3 cp "s3://${R2_BUCKET}/releases/latest.json" latest.json --endpoint-url "$R2_ENDPOINT"
+          aws s3 cp "s3://${R2_BUCKET}/releases/latest-v2.json" latest-v2.json --endpoint-url "$R2_ENDPOINT"
           aws s3 cp "s3://${R2_BUCKET}/releases/install-manifest.json" install-manifest.json --endpoint-url "$R2_ENDPOINT"
           aws s3 cp "s3://${R2_BUCKET}/releases/uploader/latest.json" uploader-manifest.json --endpoint-url "$R2_ENDPOINT"
           node - <<'NODE'
           const fs = require("fs");
           const latest = JSON.parse(fs.readFileSync("latest.json", "utf8"));
+          const compatible = JSON.parse(fs.readFileSync("latest-v2.json", "utf8"));
           const install = JSON.parse(fs.readFileSync("install-manifest.json", "utf8"));
           const uploader = JSON.parse(fs.readFileSync("uploader-manifest.json", "utf8"));
           const version = process.env.VERSION;
           if (latest.version !== version) throw new Error(`latest.json version ${latest.version} != ${version}`);
+          if (compatible.version !== version || compatible.schemaVersion !== "cs2-demo-analysis-kit/update-2") throw new Error("compatible update manifest version/schema mismatch");
+          if (latest.updateMode !== "manual-install" || Object.keys(latest.assets ?? {}).length || !latest.notes?.includes("手动下载")) throw new Error("legacy updater must receive manual-install guidance without apply assets");
           if (install.appVersion !== version) throw new Error(`install appVersion ${install.appVersion} != ${version}`);
           if (uploader.version !== version) throw new Error(`uploader version ${uploader.version} != ${version}`);
           if (uploader.schemaVersion !== "cs2-demo-analysis-kit/uploader-distribution-1") throw new Error("unexpected uploader manifest schema");
           for (const [label, asset] of Object.entries({
-            runtime: latest.assets.windows,
+            runtime: compatible.assets.windows,
+            legacyInstaller: latest.manualInstall,
             installRuntime: install.runtime,
             uploaderWindows: uploader.assets.windows,
             uploaderMacos: uploader.assets.macos,
@@ -481,12 +494,22 @@ jobs:
           node - <<'NODE'
           const fs = require("fs");
           const crypto = require("crypto");
-          const asset = require("./latest.json").assets.windows;
+          const asset = require("./latest-v2.json").assets.windows;
           const buf = fs.readFileSync("dak-runtime.zip");
           const sha = crypto.createHash("sha256").update(buf).digest("hex");
           if (buf.length !== asset.size) throw new Error(`runtime size ${buf.length} != ${asset.size}`);
           if (sha !== asset.sha256) throw new Error(`runtime sha256 ${sha} != ${asset.sha256}`);
           console.log("R2 runtime OK", buf.length);
+          NODE
+
+          aws s3 cp "s3://${R2_BUCKET}/releases/${TAG}/DAK-Studio-Setup-${VERSION}.exe" studio-setup.exe --endpoint-url "$R2_ENDPOINT"
+          node - <<'NODE'
+          const fs = require("fs");
+          const crypto = require("crypto");
+          const asset = require("./latest.json").manualInstall;
+          const buf = fs.readFileSync("studio-setup.exe");
+          if (buf.length !== asset.size || crypto.createHash("sha256").update(buf).digest("hex") !== asset.sha256) throw new Error("legacy installer size/SHA-256 mismatch");
+          console.log("R2 safe manual installer OK", buf.length);
           NODE
 
           aws s3 cp "s3://${R2_BUCKET}/releases/${TAG}/rivalhub-demo-uploader-windows-${VERSION}.zip" uploader-windows.zip --endpoint-url "$R2_ENDPOINT"
@@ -517,13 +540,17 @@ jobs:
             dist/RivalHub-Demo-Uploader-Setup*.exe
             dist/install-manifest.json
             dist/latest.json
+            dist/latest-v2.json
             dist/uploader-manifest.json
           body: |
             **安装说明**
 
             ### 已安装用户（推荐：应用内更新）
-            打开 DAK Studio，左下角点「检查更新」。应用会优先使用小体积前端增量包；
-            如本次涉及运行时或依赖变更，会自动退回完整 runtime 更新。
+            0.8.5 及更早版本：左下角「检查更新」会提示手动下载。本次首次升级请先关闭
+            Studio，运行本 Release 的 `DAK-Studio-Setup-<version>.exe` 并选择原安装目录。
+            安装器保留 `userdata`（SQLite / Demo ZIP）、`assets`、`cache`、`updates`；
+            不要删除旧目录。旧嵌套安装含资料时会停止并提供恢复指引。
+            完成这次安全安装后，新运行时继续支持自动更新，迁移失败会保留新旧目录和日志。
 
             ### Windows（推荐：Web Installer）
             下载 `DAK-Studio-Setup-<version>.exe`，运行后选择安装目录，联网自动下载运行时 +

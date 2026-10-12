@@ -42,6 +42,19 @@ function assetUrls(version, name, channel = "stable") {
 
 function main() {
   const args = process.argv.slice(2);
+  const legacyIdx = args.indexOf("--legacy-out");
+  let legacyOut = "";
+  if (legacyIdx >= 0) {
+    legacyOut = args[legacyIdx + 1] || "";
+    if (!legacyOut) throw new Error("--legacy-out requires a path");
+    args.splice(legacyIdx, 2);
+  }
+  const installerIdx = args.indexOf("--installer");
+  let installerPath = "";
+  if (installerIdx >= 0) {
+    installerPath = args[installerIdx + 1] || "";
+    args.splice(installerIdx, 2);
+  }
   const notesIdx = args.indexOf("--notes-file");
   let notes = "";
   if (notesIdx >= 0) {
@@ -70,6 +83,9 @@ function main() {
     process.exit(1);
   }
   const ver = version.replace(/^v/, "");
+  if (legacyOut && (channel !== "stable" || !installerPath || zipPath === "-" || !zipPath)) {
+    throw new Error("safe legacy stable distribution requires the full runtime and installer");
+  }
   const assets = {};
   if (zipPath && zipPath !== "-") {
     const name = basename(zipPath);
@@ -90,14 +106,29 @@ function main() {
     };
   }
   const manifest = {
+    schemaVersion: "cs2-demo-analysis-kit/update-2",
     version: ver,
     channel,
     notes: notes || undefined,
     publishedAt: new Date().toISOString(),
     assets
   };
+  const legacy = legacyOut ? {
+    version: ver,
+    channel,
+    publishedAt: manifest.publishedAt,
+    updateMode: "manual-install",
+    notes: `### 旧版首次升级：使用安装器保留资料\n\n当前运行时的自动替换不具备资料迁移失败保护，本次需点击「手动下载」，从 Release 页面下载 ${basename(installerPath)}。先关闭 Studio，选择原安装目录；安装器保留 userdata（SQLite 和 Demo ZIP）、assets、cache、updates。不要删除旧目录。旧嵌套目录含资料时安装会停止并给出恢复指引。\n\n${notes}`,
+    // Old clients only recognize windows/macos/web here: no asset means manual UI.
+    assets: {},
+    manualInstall: {
+      name: basename(installerPath), size: statSync(installerPath).size,
+      sha256: sha256(installerPath), urls: assetUrls(ver, basename(installerPath), channel),
+    },
+  } : null;
   const out = outArg || join(dirname(zipPath), "latest.json");
   writeFileSync(out, JSON.stringify(manifest, null, 2) + "\n");
+  if (legacy) writeFileSync(legacyOut, JSON.stringify(legacy, null, 2) + "\n");
   console.error(`wrote ${out} (${Object.keys(assets).join(", ")})`);
 }
 

@@ -85,13 +85,21 @@ Changesets 管理的公共包；Changesets 显式关闭 private package versioni
    应用内更新会按 `release-update-policy.json` 自动决定优先发前端 `web` 小包还是完整
    `runtime` zip；未知路径保守走 runtime。
 
-   **发版后验证（R2 链路）**：Release CI 会自动核 `latest.json` /
+   0.8.6 起采用两个真实版本 manifest：旧客户端固定读取 `latest.json`，该入口保留
+   版本、日志和经过 size/SHA-256 校验的 `manualInstall`，不给不安全 relay 提供
+   `assets.windows/web`。旧版首次升级须关闭 Studio，运行本版 Web Installer，选择
+   原安装目录，保留 SQLite / Demo ZIP 与其他持久目录；旧嵌套安装含资料时停止并
+   给出恢复指引，不删除原目录。新 native runtime 暴露 `update_apply_runtime_safe`，
+   从 `latest-v2.json` 读取完整真实 runtime（以及未来允许的 web 资产），正常自动
+   更新继续可用。新版 web overlay 不能替旧 native 声明该能力。Beta 路径维持原入口。
+
+   **发版后验证（R2 链路）**：Release CI 会自动核 `latest.json` / `latest-v2.json` /
    `install-manifest.json`、`releases/uploader/latest.json` 的版本，并校验
    R2 runtime 与 Uploader Windows/macOS 产物的 size/sha256；本地手动复核可跑：
 
    ```bash
    # 1) R2 上的 manifest 可访问
-   curl -fsSL https://dakupdate.starfie1d.top/releases/latest.json | tee /tmp/latest.json
+   curl -fsSL https://dakupdate.starfie1d.top/releases/latest-v2.json | tee /tmp/latest.json
    # 2) manifest 里第一个（R2）zip URL 可访问，且 sha256/size 与 manifest 一致
    URL=$(node -p "require('/tmp/latest.json').assets.windows.urls[0]")
    curl -fsSL "$URL" -o /tmp/dak.zip

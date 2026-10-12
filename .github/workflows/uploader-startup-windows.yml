@@ -34,12 +34,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Check dependency boundaries on Windows
         run: pnpm check:package-boundaries
+      - name: Legacy first-hop manifest and safe native capability
+        run: node --test scripts/legacy-update-first-hop.test.mjs
       - name: Real pywebview reflection regression
         shell: bash
         run: |
           cd python
           uv sync --frozen --extra dev --extra gui --extra build
-          uv run --frozen pytest tests/test_rivalhub_uploader.py tests/test_uploader_webview_bridge.py tests/test_updater.py
+          uv run --frozen pytest tests/test_rivalhub_uploader.py tests/test_uploader_webview_bridge.py tests/test_updater.py tests/test_update_first_hop.py
       - name: Package source into full Windows onedir ZIP
         shell: bash
         env:
