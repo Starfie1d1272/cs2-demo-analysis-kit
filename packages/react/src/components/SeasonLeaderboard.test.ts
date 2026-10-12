@@ -29,17 +29,13 @@ const model = {
 } as unknown as SeasonLeaderboardModel;
 
 describe("SeasonLeaderboard", () => {
-  it("formats metrics per column format and renders null as —", () => {
+  it("formats metrics, preserves missing values and sorts the default column descending", () => {
     const html = renderToStaticMarkup(React.createElement(SeasonLeaderboard, { model }));
     expect(html).toContain("Alice");
     expect(html).toContain("Bob");
     expect(html).toContain("1.23"); // rating: 2 位小数
     expect(html).toContain("55.5%"); // percent: 0–100 + %
     expect(html).toContain("—"); // Bob 的 K/D 为 null
-  });
-
-  it("sorts by the default sort column descending, nulls last", () => {
-    const html = renderToStaticMarkup(React.createElement(SeasonLeaderboard, { model }));
     // 默认按 rivalhubRR 降序：Alice(1.234) 在 Bob(0.9) 前
     expect(html.indexOf("Alice")).toBeLessThan(html.indexOf("Bob"));
   });

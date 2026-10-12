@@ -76,7 +76,9 @@ function scenario(options: { deathTick?: number; otherContactTick?: number; seco
 
 describe("extractCtRotationRoundFacts", () => {
   it("records a stable cross-area response and its team-relative order without emitting a role", () => {
-    const row = scenario().find((candidate) => candidate.playerIndex === 0)!;
+    const rows = scenario();
+    expect(scenario()).toEqual(rows); // 确定性由 CT owner 的同输入场景保护，避免重跑整场空间分析。
+    const row = rows.find((candidate) => candidate.playerIndex === 0)!;
 
     expect(row).toMatchObject({
       initialPositionGroupId: "a_site",

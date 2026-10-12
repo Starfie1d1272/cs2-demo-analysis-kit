@@ -32,10 +32,10 @@ function radarFieldDigest(fields: ReturnType<typeof buildMatchRadarField>): stri
 }
 
 describe("buildMatchRadarField", () => {
-  it("每场产出两份按队归属的加性场贡献", () => {
+  it("真实场贡献保持指纹、shape 和逐元素聚合守恒", () => {
     const grid = buildRadarFieldGrid("de_ancient");
     expect(grid).not.toBeNull();
-    const fields = buildMatchRadarField(pkg, { matchId: "m", grid: grid!, bvh: null });
+    const fields = buildMatchRadarField(pkg, { matchId: "snapshot", grid: grid!, bvh: null });
     expect(fields).toHaveLength(2);
 
     for (const f of fields) {
@@ -55,23 +55,13 @@ describe("buildMatchRadarField", () => {
     expect(totalVis).toBeGreaterThan(0);
     const totalSound = fields.reduce((s, f) => s + f.fields.tSound.reduce((a, row) => a + row.reduce((x, y) => x + y, 0), 0), 0);
     expect(totalSound).toBeGreaterThan(0);
-  });
-
-  it("sample 输出指纹保持稳定", () => {
-    const grid = buildRadarFieldGrid("de_ancient")!;
-    const fields = buildMatchRadarField(pkg, { matchId: "snapshot", grid, bvh: null });
     expect(radarFieldDigest(fields)).toBe("0405c90078d54c7ce4a391a1140a9cf2dc6bd3c9a28b4aace3be5d5be3bc8319");
-  });
-
-  it("aggregateRadarFields 是逐元素加法（联赛基线 = 各贡献之和）", () => {
-    const grid = buildRadarFieldGrid("de_ancient")!;
-    const fields = buildMatchRadarField(pkg, { matchId: "m", grid, bvh: null });
     const league = aggregateRadarFields(fields, { kind: "league", team: null })!;
     expect(league.scope.kind).toBe("league");
 
     // 抽查某秒某格：聚合 = 两份之和。
     const s = 20;
-    const g = Math.floor(grid.cells.length / 2);
+    const g = Math.floor(grid!.cells.length / 2);
     const expected = fields[0]!.fields.ctVis[s]![g]! + fields[1]!.fields.ctVis[s]![g]!;
     expect(league.fields.ctVis[s]![g]!).toBe(expected);
     expect(league.denomCt[s]!).toBe(fields[0]!.denomCt[s]! + fields[1]!.denomCt[s]!);

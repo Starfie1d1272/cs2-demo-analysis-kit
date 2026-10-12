@@ -32,7 +32,7 @@ describe("Demo raw identity", () => {
     sampleBytes = new Uint8Array(await readFile(fixturePath));
   });
 
-  it("dedupes different ZIP bytes with the same manifest raw Demo hash", async () => {
+  it("dedupes re-exported ZIPs, resolves raw hash and backfills historic metadata", async () => {
     const demoSha256 = "b".repeat(64);
     const firstBytes = await variantBytes(demoSha256, "2026-09-01T00:00:00Z");
     const secondBytes = await variantBytes(demoSha256, "2026-09-02T00:00:00Z");
@@ -45,16 +45,15 @@ describe("Demo raw identity", () => {
     expect(second.entry.id).toBe(first.entry.id);
     expect(second.entry.tags).toContain("re-export");
     expect((await listDemoEntries()).filter((entry) => entry.demoSha256 === demoSha256)).toHaveLength(1);
-  });
-
-  it("looks up a local entry by canonical raw Demo hash", async () => {
-    const demoSha256 = "9".repeat(64);
-    const imported = await importDemoFile(file(await variantBytes(demoSha256, "2026-09-07T00:00:00Z"), "lookup.zip"));
-
     await expect(findDemoEntryBySha256(demoSha256.toUpperCase())).resolves.toMatchObject({
-      id: imported.entry.id,
-      demoSha256,
+      id: first.entry.id, demoSha256,
     });
+    const meta = getStorage().records("demos");
+    const { demoSha256: _demoSha256, ...historic } = second.entry;
+    await meta.put(first.entry.id, historic);
+    const result = await backfillDemoIdentities();
+    expect(result.backfilled).toBe(1);
+    expect(result.entries.find(entry => entry.id === first.entry.id)?.demoSha256).toBe(demoSha256);
   });
 
   it("keeps same map, score and teams when raw hashes differ", async () => {
@@ -64,18 +63,6 @@ describe("Demo raw identity", () => {
     expect(second.duplicate).toBe(false);
     expect(second.entry.id).not.toBe(first.entry.id);
     expect((await listDemoEntries()).filter((entry) => [first.entry.id, second.entry.id].includes(entry.id))).toHaveLength(2);
-  });
-
-  it("backfills a historic entry with manifest-only parsing", async () => {
-    const imported = await importDemoFile(file(await variantBytes("e".repeat(64), "2026-09-05T00:00:00Z"), "backfill.zip"));
-    const meta = getStorage().records("demos");
-    const { demoSha256: _demoSha256, ...historic } = imported.entry;
-    await meta.put(imported.entry.id, historic);
-
-    const result = await backfillDemoIdentities();
-
-    expect(result.backfilled).toBe(1);
-    expect(result.entries.find((entry) => entry.id === imported.entry.id)?.demoSha256).toBe("e".repeat(64));
   });
 
   it("rewires duplicate references and preserves facts when fileName is shared", async () => {

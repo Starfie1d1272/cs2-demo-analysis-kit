@@ -1,0 +1,159 @@
+path,runner,owner,tags,before_tests,before_body_ms,after_tests,after_body_ms,result
+scripts/test-uploader-installer.ps1,PowerShell,scripts,Windows installer acceptance,,,,,not run on Linux
+apps/dak-studio/src/components/RivalHubBatchImportPanel.test.ts,Vitest,apps/dak-studio,SSR-render,4,13.72,4,13.328,passed
+apps/dak-studio/src/components/primitives.test.ts,Vitest,apps/dak-studio,SSR-render,2,9.817,2,9.062,passed
+apps/dak-studio/src/lib/analysis-context.test.ts,Vitest,apps/dak-studio,synthetic-behavior,7,6.163,7,5.892,passed
+apps/dak-studio/src/lib/capability-availability.test.ts,Vitest,apps/dak-studio,synthetic-behavior,5,5.102,5,5.261,passed
+apps/dak-studio/src/lib/dem-diagnostics.test.ts,Vitest,apps/dak-studio,adapter-mocks,1,5.522,1,5.68,passed
+apps/dak-studio/src/lib/dem-polling.test.ts,Vitest,apps/dak-studio,adapter-mocks,1,9.791,1,10.755,passed
+apps/dak-studio/src/lib/event-assets.test.ts,Vitest,apps/dak-studio,persistence;adapter-mocks;manifest,5,138.119,5,145.856,passed
+apps/dak-studio/src/lib/event-bracket.test.ts,Vitest,apps/dak-studio,synthetic-behavior,3,5.641,3,5.431,passed
+apps/dak-studio/src/lib/event-maker.test.ts,Vitest,apps/dak-studio,real-ZIP;manifest,7,645.453,7,604.549,passed
+apps/dak-studio/src/lib/events.test.ts,Vitest,apps/dak-studio,persistence,5,45.264,5,43.533,passed
+apps/dak-studio/src/lib/evidence-continuation.test.ts,Vitest,apps/dak-studio,synthetic-behavior,1,3.528,1,3.54,passed
+apps/dak-studio/src/lib/facts.test.ts,Vitest,apps/dak-studio,real-ZIP;persistence,19,32842.544,19,32463.896,passed
+apps/dak-studio/src/lib/identity.test.ts,Vitest,apps/dak-studio,synthetic-behavior,17,16.725,17,16.688,passed
+apps/dak-studio/src/lib/json-diagnostic-export.test.ts,Vitest,apps/dak-studio,real-ZIP;persistence;adapter-mocks,3,361.127,3,342.668,passed
+apps/dak-studio/src/lib/library-persistence.test.ts,Vitest,apps/dak-studio,real-ZIP;adapter-mocks,26,79.04,26,85.576,passed
+apps/dak-studio/src/lib/library-repair.test.ts,Vitest,apps/dak-studio,real-ZIP;persistence,5,62614.651,3,46102.525,passed
+apps/dak-studio/src/lib/library-worker-diagnostics.test.ts,Vitest,apps/dak-studio,persistence;adapter-mocks,6,18.393,6,18.373,passed
+apps/dak-studio/src/lib/library.test.ts,Vitest,apps/dak-studio,real-ZIP;persistence,10,82980.081,6,62128.119,passed
+apps/dak-studio/src/lib/pkg-worker-diagnostics.test.ts,Vitest,apps/dak-studio,real-ZIP;adapter-mocks,1,781.705,1,725.16,passed
+apps/dak-studio/src/lib/playlist.test.ts,Vitest,apps/dak-studio,synthetic-behavior,3,2.78,3,2.605,passed
+apps/dak-studio/src/lib/practice-lineups.test.ts,Vitest,apps/dak-studio,persistence,1,7.508,1,9.86,passed
+apps/dak-studio/src/lib/radar-field.test.ts,Vitest,apps/dak-studio,adapter-mocks,1,8.841,1,7.465,passed
+apps/dak-studio/src/lib/rivalhub-acquisition.test.ts,Vitest,apps/dak-studio,synthetic-behavior,2,5.339,2,5.777,passed
+apps/dak-studio/src/lib/rivalhub-contract.fixture.test.ts,Vitest,apps/dak-studio,synthetic-behavior,2,16.296,2,15.919,passed
+apps/dak-studio/src/lib/rivalhub-import.test.ts,Vitest,apps/dak-studio,persistence;adapter-mocks,30,43.718,30,46.938,passed
+apps/dak-studio/src/lib/rivalhub.test.ts,Vitest,apps/dak-studio,adapter-mocks,13,47.936,13,46.41,passed
+apps/dak-studio/src/lib/role-declarations.test.ts,Vitest,apps/dak-studio,persistence,6,27.217,6,26.274,passed
+apps/dak-studio/src/lib/season-cache-version.test.ts,Vitest,apps/dak-studio,synthetic-behavior,2,3.316,2,3.269,passed
+apps/dak-studio/src/lib/season.test.ts,Vitest,apps/dak-studio,synthetic-behavior,6,11.211,6,11.32,passed
+apps/dak-studio/src/lib/series-prep-items.test.ts,Vitest,apps/dak-studio,persistence,2,11.958,2,12.688,passed
+apps/dak-studio/src/lib/series.test.ts,Vitest,apps/dak-studio,synthetic-behavior,7,10.731,7,11.834,passed
+apps/dak-studio/src/lib/storage/idb-adapter.test.ts,Vitest,apps/dak-studio,persistence,3,12.279,3,13.263,passed
+apps/dak-studio/src/lib/storage/pywebview-adapter.test.ts,Vitest,apps/dak-studio,persistence,1,3.581,1,3.503,passed
+apps/dak-studio/src/lib/tactics.test.ts,Vitest,apps/dak-studio,synthetic-behavior,23,19.001,23,18.71,passed
+apps/dak-studio/src/lib/training-focus.test.ts,Vitest,apps/dak-studio,persistence,1,12.766,1,11.054,passed
+apps/dak-studio/src/lib/tri-assets.test.ts,Vitest,apps/dak-studio,persistence;adapter-mocks,6,37.942,6,35.25,passed
+apps/dak-studio/src/lib/tri-cache-diagnostics.test.ts,Vitest,apps/dak-studio,adapter-mocks,3,946.484,3,888.672,passed
+apps/dak-studio/src/lib/tri-loading.test.ts,Vitest,apps/dak-studio,adapter-mocks,6,37.856,6,50.382,passed
+apps/dak-studio/src/lib/update.test.ts,Vitest,apps/dak-studio,adapter-mocks,16,39.956,16,48.59,passed
+apps/dak-studio/src/lib/worker-diagnostics.test.ts,Vitest,apps/dak-studio,adapter-mocks,4,10.203,4,10.825,passed
+apps/dak-studio/src/views/EventsView.render.test.ts,Vitest,apps/dak-studio,SSR-render,3,15.421,3,15.408,passed
+apps/dak-studio/src/views/EventsView.test.ts,Vitest,apps/dak-studio,SSR-render;persistence,3,13.741,3,13.495,passed
+apps/dak-studio/src/views/SeriesInspector.render.test.tsx,Vitest,apps/dak-studio,SSR-render,7,17.745,7,16.883,passed
+apps/dak-studio/src/views/SeriesWorkspace.test.ts,Vitest,apps/dak-studio,synthetic-behavior,1,3.016,1,2.342,passed
+apps/dak-studio/src/views/coach/PatternExplorer.test.ts,Vitest,apps/dak-studio,SSR-render,2,19.051,2,18.859,passed
+apps/rivalhub-uploader/src/errors.test.ts,Vitest,apps/rivalhub-uploader,synthetic-behavior,7,6.222,7,6.305,passed
+apps/rivalhub-uploader/src/export-polling.test.ts,Vitest,apps/rivalhub-uploader,adapter-mocks,1,10.664,1,20.13,passed
+apps/rivalhub-uploader/src/native.test.ts,Vitest,apps/rivalhub-uploader,adapter-mocks,8,12.212,8,11.776,passed
+apps/rivalhub-uploader/src/pairing.test.ts,Vitest,apps/rivalhub-uploader,synthetic-behavior,4,4.973,4,6.72,passed
+packages/cli/src/cohort.integration.test.ts,Vitest,packages/cli,integration;real-ZIP,1,2733.365,1,2792.021,passed
+packages/cli/src/index.integration.test.ts,Vitest,packages/cli,integration;real-ZIP,5,5031.915,5,5036.826,passed
+packages/cohort/src/index.test.ts,Vitest,packages/cohort,real-ZIP,7,1121.124,7,1455.438,passed
+packages/cohort/src/map-role-evidence.test.ts,Vitest,packages/cohort,synthetic-behavior,6,32.504,6,32.581,passed
+packages/cohort/src/patterns.test.ts,Vitest,packages/cohort,synthetic-behavior,2,12.049,2,12.427,passed
+packages/cohort/src/t-role-research-projection.test.ts,Vitest,packages/cohort,synthetic-behavior,4,31.734,4,31.994,passed
+packages/contract/src/contract.test.ts,Vitest,packages/contract,synthetic-behavior,48,57.473,48,65.635,passed
+packages/contract/src/dependency-boundaries.test.ts,Vitest,packages/contract,manifest,1,2.192,1,2.075,passed
+packages/contract/src/event-package.test.ts,Vitest,packages/contract,synthetic-behavior,4,12.339,4,13.649,passed
+packages/core/src/duels.test.ts,Vitest,packages/core,synthetic-behavior,8,12.165,8,22.737,passed
+packages/core/src/evidence.test.ts,Vitest,packages/core,real-ZIP,1,139.649,1,145.157,passed
+packages/core/src/fixture-invariants.test.ts,Vitest,packages/core,real-ZIP,1,388.075,1,373.629,passed
+packages/core/src/index.test.ts,Vitest,packages/core,real-ZIP,9,4803.447,4,2307.38,passed
+packages/core/src/json-diagnostics.test.ts,Vitest,packages/core,synthetic-behavior,4,4.052,4,3.983,passed
+packages/core/src/loader-diagnostics.test.ts,Vitest,packages/core,real-ZIP,2,205.551,2,223.821,passed
+packages/core/src/map-intelligence/awp.test.ts,Vitest,packages/core,synthetic-behavior,3,5.028,3,4.902,passed
+packages/core/src/map-intelligence/ct-rotation.test.ts,Vitest,packages/core,synthetic-behavior,6,18.383,6,18.919,passed
+packages/core/src/map-intelligence/map-intelligence.test.ts,Vitest,packages/core,real-ZIP,5,85907.337,5,73014.294,passed
+packages/core/src/map-intelligence/player-position.test.ts,Vitest,packages/core,synthetic-behavior,2,3.294,2,3.45,passed
+packages/core/src/map-intelligence/spatial.test.ts,Vitest,packages/core,synthetic-behavior,2,3.9,2,3.944,passed
+packages/core/src/map-intelligence/team-shape.test.ts,Vitest,packages/core,synthetic-behavior,6,4.948,6,4.84,passed
+packages/core/src/mechanics.test.ts,Vitest,packages/core,synthetic-behavior,9,16.708,9,15.002,passed
+packages/core/src/performance-facts.test.ts,Vitest,packages/core,real-ZIP,9,243.737,9,242.292,passed
+packages/core/src/performance-validation.test.ts,Vitest,packages/core,real-ZIP,29,40.49,29,32.993,passed
+packages/core/src/qa.test.ts,Vitest,packages/core,synthetic-behavior,7,6.153,7,5.959,passed
+packages/core/src/radar-field.test.ts,Vitest,packages/core,real-ZIP,3,380.043,1,150.0,passed
+packages/core/src/resolve.test.ts,Vitest,packages/core,real-ZIP,9,84.521,9,73.866,passed
+packages/core/src/side-win-rate.test.ts,Vitest,packages/core,synthetic-behavior,2,3.061,2,2.947,passed
+packages/core/src/spatial/annotate.test.ts,Vitest,packages/core,synthetic-behavior,7,9.14,7,6.872,passed
+packages/core/src/spatial/mapcontrol.test.ts,Vitest,packages/core,synthetic-behavior,6,9.183,6,9.795,passed
+packages/core/src/spatial/phase.test.ts,Vitest,packages/core,synthetic-behavior,8,10.589,8,6.082,passed
+packages/core/src/spatial/trade-closure.test.ts,Vitest,packages/core,real-ZIP,2,985.621,2,948.247,passed
+packages/core/src/spatial/utility-geometry.test.ts,Vitest,packages/core,synthetic-behavior,11,5.389,11,5.892,passed
+packages/core/src/spatial/utility.integration.test.ts,Vitest,packages/core,integration;real-ZIP,1,1.41,1,1.334,passed
+packages/core/src/spatial/utility.test.ts,Vitest,packages/core,real-ZIP,4,283.852,4,227.066,passed
+packages/core/src/tactics/tactics.test.ts,Vitest,packages/core,synthetic-behavior,5,15.081,5,14.631,passed
+packages/core/src/tournament-facts.test.ts,Vitest,packages/core,real-ZIP,4,103.417,4,114.914,passed
+packages/core/src/utility-facts.test.ts,Vitest,packages/core,real-ZIP,2,575.65,2,626.501,passed
+packages/maps/scripts/derive-default-positions.test.ts,Vitest,packages/maps,synthetic-behavior,1,11.543,1,11.755,passed
+packages/maps/scripts/derive-route-graph.test.ts,Vitest,packages/maps,synthetic-behavior,17,20.551,17,18.919,passed
+packages/maps/src/calibration.test.ts,Vitest,packages/maps,synthetic-behavior,10,5.765,10,5.441,passed
+packages/maps/src/callout-grid-browser.test.ts,Vitest,packages/maps,synthetic-behavior,2,30.099,2,32.238,passed
+packages/maps/src/callout-grid-node.test.ts,Vitest,packages/maps,synthetic-behavior,3,65.77,1,69.295,passed
+packages/maps/src/callout-grid.test.ts,Vitest,packages/maps,synthetic-behavior,7,5.627,7,5.129,passed
+packages/maps/src/default-positions.test.ts,Vitest,packages/maps,synthetic-behavior,7,10.944,7,8.995,passed
+packages/maps/src/geometry-assets.test.ts,Vitest,packages/maps,synthetic-behavior,2,2.835,2,2.942,passed
+packages/maps/src/lineups.test.ts,Vitest,packages/maps,synthetic-behavior,6,13.508,6,13.86,passed
+packages/maps/src/map-pool.test.ts,Vitest,packages/maps,synthetic-behavior,1,2.907,1,2.973,passed
+packages/maps/src/nav.test.ts,Vitest,packages/maps,synthetic-behavior,2,4.132,2,4.054,passed
+packages/maps/src/position-candidates.test.ts,Vitest,packages/maps,synthetic-behavior,6,19.041,6,17.148,passed
+packages/maps/src/route-assets.test.ts,Vitest,packages/maps,synthetic-behavior,4,16.735,2,12.624,passed
+packages/maps/src/routes.test.ts,Vitest,packages/maps,synthetic-behavior,5,3.011,5,3.031,passed
+packages/maps/src/visibility.test.ts,Vitest,packages/maps,synthetic-behavior,2,3.138,2,3.195,passed
+packages/maps/src/zones.test.ts,Vitest,packages/maps,synthetic-behavior,6,3.263,6,3.194,passed
+packages/presentation/src/double-awp.test.ts,Vitest,packages/presentation,synthetic-behavior,2,21.071,2,19.443,passed
+packages/presentation/src/duel.test.ts,Vitest,packages/presentation,synthetic-behavior,5,28.185,5,25.85,passed
+packages/presentation/src/economy.test.ts,Vitest,packages/presentation,synthetic-behavior,2,2.096,2,2.113,passed
+packages/presentation/src/findings.test.ts,Vitest,packages/presentation,synthetic-behavior,3,5.342,3,6.314,passed
+packages/presentation/src/index.test.ts,Vitest,packages/presentation,real-ZIP,3,1641.607,3,1886.406,passed
+packages/presentation/src/insights.test.ts,Vitest,packages/presentation,real-ZIP,14,1591.047,14,1533.12,passed
+packages/presentation/src/leaderboard.test.ts,Vitest,packages/presentation,synthetic-behavior,2,15.112,2,18.128,passed
+packages/presentation/src/map-roles.test.ts,Vitest,packages/presentation,synthetic-behavior,13,53.183,13,43.477,passed
+packages/presentation/src/player.test.ts,Vitest,packages/presentation,synthetic-behavior,6,35.033,6,36.433,passed
+packages/presentation/src/replay-clock.test.ts,Vitest,packages/presentation,synthetic-behavior,4,4.235,4,4.02,passed
+packages/presentation/src/season-validation.test.ts,Vitest,packages/presentation,integration;real-ZIP,1,3.117,1,3.217,passed
+packages/presentation/src/series.test.ts,Vitest,packages/presentation,real-ZIP,3,1336.588,3,1364.062,passed
+packages/presentation/src/team.test.ts,Vitest,packages/presentation,real-ZIP,2,528.059,2,47.06,passed
+packages/presentation/src/tournament-performance.test.ts,Vitest,packages/presentation,real-ZIP,3,903.097,3,890.907,passed
+packages/presentation/src/trails.test.ts,Vitest,packages/presentation,real-ZIP,3,667.166,3,59.97,passed
+packages/presentation/src/weapons.test.ts,Vitest,packages/presentation,synthetic-behavior,5,3.261,5,3.249,passed
+packages/react/src/components/MapRoles.test.ts,Vitest,packages/react,SSR-render,3,20.796,3,16.215,passed
+packages/react/src/components/MatchWorkspace.test.ts,Vitest,packages/react,SSR-render,5,35.114,4,32.533,passed
+packages/react/src/components/RadarFieldCanvas.test.ts,Vitest,packages/react,SSR-render,1,11.798,1,12.421,passed
+packages/react/src/components/ScoreboardTable.test.ts,Vitest,packages/react,SSR-render,2,14.079,2,12.639,passed
+packages/react/src/components/SeasonLeaderboard.test.ts,Vitest,packages/react,SSR-render,3,13.589,2,14.881,passed
+packages/rivalhub-upload/src/client.test.ts,Vitest,packages/rivalhub-upload,adapter-mocks,8,39.545,8,45.039,passed
+packages/rivalhub-upload/src/diagnostics.test.ts,Vitest,packages/rivalhub-upload,synthetic-behavior,36,15.498,36,16.021,passed
+packages/rivalhub-upload/src/disposition.test.ts,Vitest,packages/rivalhub-upload,synthetic-behavior,4,23.127,4,24.706,passed
+packages/rivalhub-upload/src/evidence-diagnostics.test.ts,Vitest,packages/rivalhub-upload,synthetic-behavior,40,20.382,40,19.635,passed
+packages/rivalhub-upload/src/evidence.test.ts,Vitest,packages/rivalhub-upload,real-ZIP,20,486.021,20,462.739,passed
+packages/rivalhub-upload/src/export-polling.test.ts,Vitest,packages/rivalhub-upload,synthetic-behavior,10,35.519,10,52.722,passed
+packages/rivalhub-upload/src/match.test.ts,Vitest,packages/rivalhub-upload,real-ZIP,12,8.06,12,7.696,passed
+packages/rivalhub-upload/src/pipeline.test.ts,Vitest,packages/rivalhub-upload,real-ZIP;adapter-mocks,12,557.265,12,506.873,passed
+packages/tournament/src/aggregate.test.ts,Vitest,packages/tournament,synthetic-behavior,11,15.551,11,16.391,passed
+packages/tournament/src/performance.test.ts,Vitest,packages/tournament,synthetic-behavior,6,19.761,6,20.641,passed
+scripts/rivalhub-demo-evidence.test.ts,Vitest,scripts,synthetic-behavior,1,2.673,1,2.73,passed
+scripts/build-info.test.mjs,node:test,scripts,build/release/boundary,3,272.263,3,,passed
+scripts/build-web-patch.test.mjs,node:test,scripts,build/release/boundary,2,928.514,2,,passed
+scripts/legacy-update-first-hop.test.mjs,node:test,scripts,build/release/boundary,2,214.351,2,,passed
+scripts/package-boundaries.test.mjs,node:test,scripts,build/release/boundary,8,643.663,8,,passed
+scripts/reconcile-npm-publish.test.mjs,node:test,scripts,build/release/boundary,2,493.072,2,,passed
+scripts/sync-version.test.mjs,node:test,scripts,build/release/boundary,14,27.812,14,,passed
+scripts/uploader-release-contract.test.mjs,node:test,scripts,build/release/boundary,2,80.33,2,,passed
+python/tests/test_credentials.py,pytest,python,native/filesystem/security,26,27.0,26,,passed; 0 skipped
+python/tests/test_diagnostics.py,pytest,python,native/filesystem/security,59,3302.0,59,,passed; 0 skipped
+python/tests/test_event_packages.py,pytest,python,native/filesystem/security,5,21.0,5,,passed; 0 skipped
+python/tests/test_export_jobs.py,pytest,python,native/filesystem/security,6,7.0,6,,passed; 0 skipped
+python/tests/test_installer.py,pytest,python,native/filesystem/security,10,18.0,10,,passed; 0 skipped
+python/tests/test_library_maintenance.py,pytest,python,native/filesystem/security,3,8.0,3,,passed; 0 skipped
+python/tests/test_rivalhub_bridge.py,pytest,python,native/filesystem/security,5,5.0,5,,passed; 0 skipped
+python/tests/test_rivalhub_uploader.py,pytest,python,native/filesystem/security,40,70.0,40,,passed; 0 skipped
+python/tests/test_selection_diagnostics.py,pytest,python,native/filesystem/security,6,9.0,6,,passed; 0 skipped
+python/tests/test_smoke.py,pytest,python,native/filesystem/security,3,13.0,3,,passed; 0 skipped
+python/tests/test_storage_configuration.py,pytest,python,native/filesystem/security,2,1.0,2,,passed; 0 skipped
+python/tests/test_studio_diagnostics.py,pytest,python,native/filesystem/security,7,14.0,7,,passed; 0 skipped
+python/tests/test_update_first_hop.py,pytest,python,native/filesystem/security,4,44.0,4,,passed; 0 skipped
+python/tests/test_updater.py,pytest,python,native/filesystem/security,33,44.0,33,,passed; 10 skipped
+python/tests/test_uploader_webview_bridge.py,pytest,python,native/filesystem/security,1,37.0,1,,passed; 0 skipped

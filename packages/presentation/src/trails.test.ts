@@ -1,15 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import type { DemoPackage } from "@cs2dak/contract";
 import { loadDemoPackageFromZip } from "@cs2dak/core";
 import { buildOpeningTrails } from "./trails";
 
+let pkg: DemoPackage;
+beforeAll(async () => {
+  const zip = await readFile(
+    fileURLToPath(new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url))
+  );
+  pkg = await loadDemoPackageFromZip(zip);
+});
+
 describe("buildOpeningTrails", () => {
   it("extracts full-buy opening trails with grenades from the sanitized fixture", async () => {
-    const zip = await readFile(
-      fileURLToPath(new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url))
-    );
-    const pkg = await loadDemoPackageFromZip(zip);
     const steamId64 = pkg.players[0].steamId64;
 
     const model = buildOpeningTrails(pkg, "fixture-match", steamId64);
@@ -34,10 +39,6 @@ describe("buildOpeningTrails", () => {
   });
 
   it("supports custom window and economy filters", async () => {
-    const zip = await readFile(
-      fileURLToPath(new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url))
-    );
-    const pkg = await loadDemoPackageFromZip(zip);
     const steamId64 = pkg.players[0].steamId64;
 
     const model = buildOpeningTrails(pkg, "fixture-match", steamId64, {
@@ -52,10 +53,6 @@ describe("buildOpeningTrails", () => {
   });
 
   it("returns unavailable model when replay stream is missing", async () => {
-    const zip = await readFile(
-      fileURLToPath(new URL("../../../fixtures/input/sample-2026-05-17_de_ancient_Team_Spirit_13-10_Team_Falcons.zip", import.meta.url))
-    );
-    const pkg = await loadDemoPackageFromZip(zip);
     const model = buildOpeningTrails({ ...pkg, replay: undefined }, "m", pkg.players[0].steamId64);
     expect(model.available).toBe(false);
     expect(model.rounds).toHaveLength(0);

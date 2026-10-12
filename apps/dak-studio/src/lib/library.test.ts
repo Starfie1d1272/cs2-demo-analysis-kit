@@ -16,56 +16,55 @@ async function sampleFile(): Promise<File> {
   return new File([await sampleBytes], sampleName, { type: "application/zip" });
 }
 
-describe("importDemoFile", () => {
-  it("rebuilds facts when re-importing an existing demo", async () => {
-    const first = await importDemoFile(await sampleFile(), { tags: ["initial"] });
+describe("Demo import / rebuild lifecycle", () => {
+  it("preserves metadata, manifest and fact identity through reimport, rebuild and deletion", async () => {
+    const first = await importDemoFile(await sampleFile(), {
+      tags: ["initial"], sourceDemPath: "/demos/source.dem", matchDate: "2026-09-01"
+    });
+    const id = first.entry.id;
     const matchId = matchIdForEntry(first.entry);
     const factsStore = getFactsStore();
-    await factsStore.deleteMatchFacts(matchId);
+    try {
+      expect(first.entry.builtWith?.factsRevision).toBe(ANALYSIS_MANIFEST.factsRevision);
+      expect(first.entry.builtWith?.formatVersion).toBe(ANALYSIS_MANIFEST.formatVersion);
+      expect(isFactsStale(first.entry)).toBe(false);
 
-    const duplicate = await importDemoFile(await sampleFile(), { tags: ["reimport"] });
+      await updateDemoTags(id, ["edited"]);
+      await updateDemoSourcePath(id, "/demos/edited.dem");
+      const duplicate = await importDemoFile(await sampleFile(), { tags: ["incoming"] });
+      expect(duplicate.duplicate).toBe(true);
+      expect(duplicate.entry.id).toBe(id);
+      expect(duplicate.entry.tags).toEqual(expect.arrayContaining(["edited", "incoming"]));
+      expect(duplicate.entry.sourceDemPath).toBe("/demos/edited.dem");
 
-    expect(duplicate.duplicate).toBe(true);
-    expect(await factsStore.getRrSignalRows({ matchIds: [matchId] })).not.toHaveLength(0);
-    expect(await factsStore.getPlayerPositionRounds({ matchIds: [matchId] })).not.toHaveLength(0);
-    expect(await factsStore.getTeamShapeRounds({ matchIds: [matchId] })).not.toHaveLength(0);
-    expect(await factsStore.getCtRotationRounds({ matchIds: [matchId] })).not.toHaveLength(0);
-    expect(await factsStore.getTacticalRounds({ matchIds: [matchId] })).not.toHaveLength(0);
-  });
+      await factsStore.deleteMatchFacts(matchId);
+      const reimported = await importDemoFile(await sampleFile(), { tags: ["reimport"] });
+      expect(reimported.duplicate).toBe(true);
+      expect(reimported.entry.id).toBe(id);
+      expect(reimported.entry.sourceDemPath).toBe("/demos/edited.dem");
+      expect(reimported.entry.meta.matchDate).toBe("2026-09-01");
+      expect(await factsStore.getRrSignalRows({ matchIds: [matchId] })).not.toHaveLength(0);
+      expect(await factsStore.getPlayerPositionRounds({ matchIds: [matchId] })).not.toHaveLength(0);
+      expect(await factsStore.getTeamShapeRounds({ matchIds: [matchId] })).not.toHaveLength(0);
+      expect(await factsStore.getCtRotationRounds({ matchIds: [matchId] })).not.toHaveLength(0);
+      expect(await factsStore.getTacticalRounds({ matchIds: [matchId] })).not.toHaveLength(0);
 
-  it("stamps current AnalysisManifest version on import", async () => {
-    const result = await importDemoFile(await sampleFile(), { tags: ["versioned"] });
-    expect(result.entry.builtWith?.factsRevision).toBe(ANALYSIS_MANIFEST.factsRevision);
-    expect(result.entry.builtWith?.formatVersion).toBe(ANALYSIS_MANIFEST.formatVersion);
-    expect(isFactsStale(result.entry)).toBe(false);
-  });
+      await factsStore.deleteMatchFacts(matchId);
+      const rebuilt = await rebuildFactsFromZip(id);
+      expect(rebuilt?.id).toBe(id);
+      expect(rebuilt?.builtWith?.factsRevision).toBe(ANALYSIS_MANIFEST.factsRevision);
+      expect(await factsStore.getRrSignalRows({ matchIds: [matchId] })).not.toHaveLength(0);
+      expect(await factsStore.getCtRotationRounds({ matchIds: [matchId] })).not.toHaveLength(0);
+      expect((await listDemoEntries()).find(entry => entry.id === id)?.builtWith?.factsRevision)
+        .toBe(ANALYSIS_MANIFEST.factsRevision);
 
-  it("re-reads edited metadata and preserves it through stale-facts reanalysis", async () => {
-    const existing = await importDemoFile(await sampleFile());
-    await removeDemo(existing.entry.id);
-    const first = await importDemoFile(await sampleFile(), { sourceDemPath: "/demos/source.dem", matchDate: "2026-09-01" });
-    await getFactsStore().deleteMatchFacts(matchIdForEntry(first.entry));
-
-    const rebuilt = await importDemoFile(await sampleFile());
-
-    expect(rebuilt.entry.sourceDemPath).toBe("/demos/source.dem");
-    expect(rebuilt.entry.meta.matchDate).toBe("2026-09-01");
-    await removeDemo(first.entry.id);
-  });
-
-  it("keeps the identity index coherent across metadata edits and deletion", async () => {
-    const first = await importDemoFile(await sampleFile());
-    await updateDemoTags(first.entry.id, ["edited"]);
-    await updateDemoSourcePath(first.entry.id, "/demos/edited.dem");
-
-    const duplicate = await importDemoFile(await sampleFile(), { tags: ["incoming"] });
-    expect(duplicate.entry.tags).toEqual(expect.arrayContaining(["edited", "incoming"]));
-    expect(duplicate.entry.sourceDemPath).toBe("/demos/edited.dem");
-
-    await removeDemo(first.entry.id);
-    const afterDelete = await importDemoFile(await sampleFile());
-    expect(afterDelete.duplicate).toBe(false);
-    await removeDemo(afterDelete.entry.id);
+      await removeDemo(id);
+      const afterDelete = await importDemoFile(await sampleFile());
+      expect(afterDelete.duplicate).toBe(false);
+      await removeDemo(afterDelete.entry.id);
+    } finally {
+      await removeDemo(id);
+    }
   });
 });
 
@@ -83,24 +82,6 @@ describe("isAnalysisStale", () => {
 });
 
 describe("rebuildFactsFromZip", () => {
-  it("re-extracts facts from the stored ZIP and refreshes builtWith, keeping the same id", async () => {
-    const first = await importDemoFile(await sampleFile(), { tags: ["initial"] });
-    const id = first.entry.id;
-    const matchId = matchIdForEntry(first.entry);
-    const factsStore = getFactsStore();
-    await factsStore.deleteMatchFacts(matchId);
-
-    const rebuilt = await rebuildFactsFromZip(id);
-
-    expect(rebuilt?.id).toBe(id);
-    expect(rebuilt?.builtWith?.factsRevision).toBe(ANALYSIS_MANIFEST.factsRevision);
-    expect(await factsStore.getRrSignalRows({ matchIds: [matchId] })).not.toHaveLength(0);
-    expect(await factsStore.getCtRotationRounds({ matchIds: [matchId] })).not.toHaveLength(0);
-    // entry 仍在库中且非 stale
-    const entries = await listDemoEntries();
-    expect(entries.find((e) => e.id === id)?.builtWith?.factsRevision).toBe(ANALYSIS_MANIFEST.factsRevision);
-  });
-
   it("returns null for an unknown id", async () => {
     expect(await rebuildFactsFromZip("does-not-exist")).toBeNull();
   });

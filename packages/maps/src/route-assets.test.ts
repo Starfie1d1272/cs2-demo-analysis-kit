@@ -25,24 +25,6 @@ function expectedBombsite(route: MapRoute): string {
 }
 
 describe("map route assets", () => {
-  it("route zones 不重复维护中文名", () => {
-    for (const [map, routes] of Object.entries(MAP_ROUTE_ASSETS)) {
-      const table = CALLOUT_DICT[map] ?? {};
-      for (const route of routes.routes) {
-        for (const zone of route.zones) {
-          expect("nameCn" in zone).toBe(false);
-          expect(table[zone.id] ?? zone.id).toBeTruthy();
-        }
-      }
-    }
-  });
-
-  it("provides at least one confirmed route for every spatial asset map", () => {
-    for (const mapName of SPATIAL_ASSET_MAPS) {
-      expect(loadRoutes(mapName).routes, mapName).not.toHaveLength(0);
-    }
-  });
-
   it("exposes confirmed Dust2 routes through the public route asset helper", () => {
     const dust2 = getMapRoutes("de_dust2");
     expect(dust2?.mapName).toBe("de_dust2");
@@ -53,9 +35,10 @@ describe("map route assets", () => {
     expect(getMapRoutes("de_cache")).toBeNull();
   });
 
-  it("keeps route metadata and callout references internally consistent", () => {
+  it("keeps every spatial map populated with consistent metadata and owner-resolved callouts", () => {
     for (const mapName of SPATIAL_ASSET_MAPS) {
       const asset = loadRoutes(mapName);
+      expect(asset.routes, mapName).not.toHaveLength(0);
       const callouts = CALLOUT_DICT[mapName];
       const ids = asset.routes.map((route) => route.id);
 
@@ -72,6 +55,7 @@ describe("map route assets", () => {
         expect(new Set(zoneIds).size, `${mapName}/${route.id} repeated zones`).toBe(zoneIds.length);
 
         for (const zone of route.zones) {
+          expect("nameCn" in zone).toBe(false);
           expect(zone.id in callouts, `${mapName}/${route.id}/${zone.id}`).toBe(true);
         }
       }

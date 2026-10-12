@@ -143,7 +143,7 @@ describe("MatchWorkspace", () => {
     expect(html).not.toContain("CS Demo Manager");
   });
 
-  it("renders stable loadout and current held utility in replay roster", () => {
+  it("renders loadout, held utility and smoke colored by current side", () => {
     const html = renderToStaticMarkup(React.createElement(ReplayViewer, {
       replay: model.replay,
       map: model.map.view
@@ -153,14 +153,6 @@ describe("MatchWorkspace", () => {
     expect(html).toContain("USP-S");
     expect(html).toContain("烟");
     expect(html).not.toContain("闪");
-  });
-
-  it("colors replay smoke by current side instead of team identity", () => {
-    const html = renderToStaticMarkup(React.createElement(ReplayViewer, {
-      replay: model.replay,
-      map: model.map.view
-    }));
-
     expect(html).toContain("dak-replay-fx-ct");
     expect(html).not.toContain("dak-replay-fx-teamA");
   });
