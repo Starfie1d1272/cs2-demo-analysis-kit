@@ -1,5 +1,16 @@
 # @cs2dak/maps
 
+## 1.1.0
+
+### Minor Changes
+
+- eaca7aa: 新增纯 calibration 公开入口并将标定与版本归于单一 owner；补齐 Train -50 分层元数据并将 calibration revision 升至 2。区分 Valve 当前 Active Duty 图池和已提交 nav/route 覆盖，保留 Overpass 历史资产。通过真实 tarball 的 runtime、严格声明与移除空间资产后的 calibration 隔离验证。
+
+### Patch Changes
+
+- ec2fbb0: 现有 root、callout-grid-node/browser 和 tri-assets 入口发布编译后的 ESM 与声明，保留全部公开 API 和地图资产；修复干净 Node consumer 无法加载 node_modules 下 TypeScript 源文件，以及 ESM hasMapTri 错误使用 require 返回 false。发布前用实际 tarball 干净安装验证四个入口的导入、调用与声明解析。
+- 770c4c4: 包含根入口静态引用的 map-zones JSON，修复独立 tarball 消费者加载 Maps、Core 与 Presentation 根入口时的 ERR_MODULE_NOT_FOUND。不改变导出、数据语义或公共包架构。
+
 ## 1.0.0
 
 ### Major Changes
