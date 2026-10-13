@@ -40,8 +40,9 @@ pnpm --filter @cs2dak/cli analyze /absolute/path/match.zip --out /absolute/path/
 ```
 
 `@cs2dak/cli` 是私有 TypeScript workspace，不是 npm 公共安装入口。Python 安装的
-`cs2dak` 当前无参数打印版本，不接受 `version` 或 `analyze` 子命令；
-使用绝对输入/输出路径可避免
+`cs2dak` 不提供 `analyze`。其既有版本命令约定是 `cs2dak version`，源码也注册
+`version` 命令，但当前入口拒绝该子命令，这是待独立修复的兼容 bug；修复前
+暂用无参数 `cs2dak` 打印版本，本 PR 不改实现。使用绝对输入/输出路径可避免
 `pnpm --filter` 在 `packages/cli/` 工作目录下解析相对路径。
 
 ---
