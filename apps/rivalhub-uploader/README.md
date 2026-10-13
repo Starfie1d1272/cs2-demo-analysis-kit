@@ -19,7 +19,15 @@ The Vite page shows a preview. File selection, parsing, secure credential storag
 bash scripts/package-uploader.sh
 ```
 
-This builds an unsigned macOS app and DMG on macOS, or a Windows onedir ZIP on Windows. The DMG/ZIP and unpacked runtime sizes are printed after packaging. A matching native machine and Python environment are required for each platform.
+This builds an unsigned macOS app and DMG on macOS. On Windows it builds the
+recommended `RivalHub-Demo-Uploader-Setup-X.Y.Z.exe` offline installer and a
+`rivalhub-demo-uploader-windows-X.Y.Z.zip` fallback containing the complete onedir
+runtime. Outputs are in `python/dist/`. A matching native machine and Python
+environment are required for each platform; Windows also needs Inno Setup 6.4+.
+See [Windows installation and acceptance](../../docs/uploader-windows.md) for
+prerequisites, logs, and the remaining manual checks. Automated build/startup
+checks do not establish a complete real-device authorization, parsing, matching,
+upload, and website-confirmation pass.
 
 ## User support
 

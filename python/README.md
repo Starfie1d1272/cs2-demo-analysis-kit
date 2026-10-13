@@ -13,7 +13,7 @@
 This package is now a thin desktop shell:
 
 - `cs2dak-studio`: DAK Studio desktop bridge and bundled web assets
-- `cs2dak version`: package version
+- `cs2dak`: print package version (current single-command entry point)
 
 ```text
 .dem -> cs2df -> cs2-demo-format/3.x ZIP -> @cs2dak/* TypeScript analysis
@@ -23,16 +23,20 @@ This package is now a thin desktop shell:
 
 ```bash
 cd python
-uv sync --extra dev
+uv sync --locked --extra dev --extra gui
 uv run pytest
-uv run cs2dak version
+uv run cs2dak
 ```
 
-DAK Studio additionally needs:
+The test setup above includes pywebview for native bridge tests. For GUI-only development:
 
 ```bash
-uv sync --extra gui
+uv sync --locked --extra gui
 ```
+
+With the current single-command entry point, `uv run cs2dak version` is rejected;
+invoke `uv run cs2dak` without a subcommand. Restoring a `version` subcommand would
+be a separate CLI behavior change.
 
 ### Exporting demos
 
@@ -50,6 +54,7 @@ exported ZIP is the only Python/TypeScript seam.
 ### Packaging
 
 ```bash
+cd ..  # from python/ to the workspace root
 bash scripts/package.sh
 ```
 
@@ -65,7 +70,7 @@ The PyInstaller spec bundles the Python shell plus DAK Studio frontend assets.
 本包现在只是桌面壳层：
 
 - `cs2dak-studio`：DAK Studio 桌面桥和打包后的前端资产
-- `cs2dak version`：包版本
+- `cs2dak`：打印包版本（当前单命令入口）
 
 ```text
 .dem -> cs2df -> cs2-demo-format/3.x ZIP -> @cs2dak/* TypeScript 分析
@@ -75,16 +80,19 @@ The PyInstaller spec bundles the Python shell plus DAK Studio frontend assets.
 
 ```bash
 cd python
-uv sync --extra dev
+uv sync --locked --extra dev --extra gui
 uv run pytest
-uv run cs2dak version
+uv run cs2dak
 ```
 
-DAK Studio 还需要：
+上面的测试环境包含原生桥测试需要的 pywebview。仅开发 GUI 时：
 
 ```bash
-uv sync --extra gui
+uv sync --locked --extra gui
 ```
+
+当前单命令入口拒绝 `uv run cs2dak version`；使用不带子命令的 `uv run cs2dak`。
+是否恢复 `version` 子命令需作为独立 CLI 行为变更讨论。
 
 ### 导出 demo
 
@@ -101,6 +109,7 @@ DAK Studio 内部也调用同一个 `cs2df` 包。导出的 ZIP 是 Python/TypeS
 ### 打包
 
 ```bash
+cd ..  # from python/ to the workspace root
 bash scripts/package.sh
 ```
 

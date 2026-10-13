@@ -31,12 +31,18 @@ opening；未登记缓存调用一次 owner 重建，暖缓存不重复派生业
 真实源 QA error 仍阻止 Evidence 发布。历史上传包的 analysisVersion、QA 与已有
 warning 不修改、不伪标记为经当前版本重新验证；新分析携带新的 analysisVersion。
 
-CLI 路径（无需在产品里复刻分析模型）：
+CLI 路径（在本仓库根目录执行；无需在产品里复刻分析模型）：
 
 ```bash
-cs2dak analyze match.zip --out analysis-output
+pnpm build:packages
+pnpm --filter @cs2dak/cli analyze /absolute/path/match.zip --out /absolute/path/analysis-output
 # → analysis-bundle.json + view-model.json + qa-report.json
 ```
+
+`@cs2dak/cli` 是私有 TypeScript workspace，不是 npm 公共安装入口。Python 安装的
+`cs2dak` 当前无参数打印版本，不接受 `version` 或 `analyze` 子命令；
+使用绝对输入/输出路径可避免
+`pnpm --filter` 在 `packages/cli/` 工作目录下解析相对路径。
 
 ---
 

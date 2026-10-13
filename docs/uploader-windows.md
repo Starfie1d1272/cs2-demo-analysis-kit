@@ -84,7 +84,7 @@ DAK Studio 的资料库维护区也提供诊断日志导出。以上能力仅说
 PyInstaller 在 Python 启动前就找不到 `python312.dll` 时，应用代码尚未执行，无法创建应用日志，
 需同时保存系统弹窗和目录结构。已打开后未响应时，保留现场并记录版本、进程/线程、任务管理器
 状态和日志；关闭进程会丢失挂起现场。该空启动挂起已由后续本机线程证据定位为公开 window 引用导致的桥接反射死锁，
-最小源码修复和独立回归在 PR #73；本安装器分支同步该修复。详情见
+最小源码修复和独立回归在 PR #73；该修复已合入 main。详情见
 [启动回归](uploader-startup-regression.md)。Loader.Initialize 报告仍独立待证。
 
 ## 构建与验收
@@ -99,9 +99,10 @@ bash scripts/package-uploader.sh
 只构建并保存 Actions artifact，不创建 Release、不推 tag、不上传 R2。用
 `uploader-windows-review` artifact 的当前版本安装器验收；较高版本 CI fixture 只用于安装版本
 升级规则检查，不代表另一个真实应用版本。PR 审阅构建沿用 main 的桌面版本号，
-但来自 PR commit（当前 pythonnet 3.2.0），不等同于已发布 v0.8.4 官方包（pythonnet 3.1.0）。
+但来自 PR commit，不等同于正式安装包；核验时分别记录 PR 的完整 head SHA
+与正式 release 的 tag、资产文件名及哈希。正式版本保持 v0.8.6，本次文档修正不重建或发布资产。
 公开下载消费者应优先取 `assets.windowsInstaller`，再用 `assets.windows` ZIP 兜底；
-其它仓库的官网消费代码不在本 PR 修改范围。
+其它仓库的官网消费代码不在本仓库的构建验收范围。
 
 自动化负责：Windows 编译、中文/空格路径隔离新装、缺 DLL 修复、升级和拒绝降级、陌生目录
 拒绝、快捷方式 TargetPath/WorkingDirectory、frozen 消息响应/前端 bridge ready/原生保存对话框及取消、卸载保留陌生文件/用户资料、
@@ -121,7 +122,7 @@ Linux pytest/静态检查不算 Windows 启动通过。
 7. 使用完整 ZIP 兜底启动；记录安装器来源/版本/哈希、Windows build、运行时版本与日志。
 
 实机记录还需覆盖 UAC、目录权限、应用被占用、磁盘空间不足与安装中断等交互风险。
-产物未签名，信任提示和杀毒误报仍需独立评估；本 PR 不承诺签名或生产验收。
+产物未签名，信任提示和杀毒误报仍需独立评估；自动化构建不代表签名或生产验收。
 
 ### 解析状态无法确认时
 
