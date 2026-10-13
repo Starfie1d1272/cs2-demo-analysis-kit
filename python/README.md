@@ -13,7 +13,7 @@
 This package is now a thin desktop shell:
 
 - `cs2dak-studio`: DAK Studio desktop bridge and bundled web assets
-- `cs2dak version`: package-version command by the existing CLI convention (see the known compatibility bug below)
+- `cs2dak version`: print the package version (also available without a subcommand)
 
 ```text
 .dem -> cs2df -> cs2-demo-format/3.x ZIP -> @cs2dak/* TypeScript analysis
@@ -25,7 +25,7 @@ This package is now a thin desktop shell:
 cd python
 uv sync --locked --extra dev --extra gui
 uv run pytest
-uv run cs2dak
+uv run cs2dak version
 ```
 
 The test setup above includes pywebview for native bridge tests. For GUI-only development:
@@ -34,12 +34,9 @@ The test setup above includes pywebview for native bridge tests. For GUI-only de
 uv sync --locked --extra gui
 ```
 
-Known compatibility bug: `src/cs2dak/cli.py` documents `cs2dak version` and
-registers a `version` command, but the current single-command entry point rejects
-`uv run cs2dak version`. This disagrees with the existing CLI convention. Until
-a separate bug fix restores compatibility, temporarily use `uv run cs2dak`
-without a subcommand to print the version. This documentation change does not
-modify the implementation.
+`uv run cs2dak version` prints the package version. The no-argument
+`uv run cs2dak` shortcut remains supported; `uv run cs2dak --help` lists the
+`version` command.
 
 ### Exporting demos
 
@@ -73,7 +70,7 @@ The PyInstaller spec bundles the Python shell plus DAK Studio frontend assets.
 本包现在只是桌面壳层：
 
 - `cs2dak-studio`：DAK Studio 桌面桥和打包后的前端资产
-- `cs2dak version`：既有 CLI 约定中的包版本命令（见下方已知兼容缺陷）
+- `cs2dak version`：打印包版本（也可不带子命令调用）
 
 ```text
 .dem -> cs2df -> cs2-demo-format/3.x ZIP -> @cs2dak/* TypeScript 分析
@@ -85,7 +82,7 @@ The PyInstaller spec bundles the Python shell plus DAK Studio frontend assets.
 cd python
 uv sync --locked --extra dev --extra gui
 uv run pytest
-uv run cs2dak
+uv run cs2dak version
 ```
 
 上面的测试环境包含原生桥测试需要的 pywebview。仅开发 GUI 时：
@@ -94,10 +91,8 @@ uv run cs2dak
 uv sync --locked --extra gui
 ```
 
-已知兼容缺陷：`src/cs2dak/cli.py` 声明 `cs2dak version` 并注册 `version` 命令，
-但当前单命令入口拒绝 `uv run cs2dak version`，与既有 CLI 约定不一致。
-兼容修复另列为 bug；修复前暂用不带子命令的 `uv run cs2dak` 打印版本。
-本次文档修正不修改实现。
+`uv run cs2dak version` 打印包版本；无参数的 `uv run cs2dak` 快捷用法继续支持。
+`uv run cs2dak --help` 列出 `version` 命令。
 
 ### 导出 demo
 
