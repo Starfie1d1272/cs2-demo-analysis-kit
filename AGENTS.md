@@ -40,11 +40,11 @@ bash scripts/package.sh          # 打包桌面应用（DAK Studio + PyInstaller
 pnpm event:export                # 赛事批量导出（读 spec.export，--research --compress-level 9）
 pnpm events:build                # 构建赛事 R2 资产（build-event-asset.mjs）
 pnpm events:publish              # 上传赛事资产到 R2
-node scripts/cologne-build.mjs   # 科隆 Major per-stage 装配（4 个 event-package）
+pnpm event:package <spec.json>   # 通用赛事 per-stage event-package 装配
 node scripts/hltv/extract-stage-urls.mjs  # CDP 提取 HLTV match URL（Node 24 原生 WebSocket）
 
 # 分发
-python src/cs2dak/installer.py        # Web Installer（极简 tkinter GUI）
+cd python && uv run python -m cs2dak.installer # Web Installer（极简 tkinter GUI）
 node scripts/gen-install-manifest.mjs # 生成 install-manifest.json
 node scripts/assemble-full-zip.mjs    # 组装 Full Portable Zip
 
