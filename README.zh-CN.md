@@ -61,7 +61,8 @@ Windows 离线/便携使用 `dak-studio-windows-X.Y.Z-full.zip`。较小的
        └─ python/src/cs2dak    GUI / Studio 桥 / 打包壳（无 parser 逻辑）
   → @cs2dak/core               加载 v3 ZIP → 标准化 / 信号派生 / QA → AnalysisBundle
   → @cs2dak/cohort             跨场聚合 · 身份归并 · 赛季 RR/PRISM
-  → @cs2dak/presentation       产品中立 View Model
+  → @cs2dak/presentation       单图适配 · 产品中立 View Model
+       └─ @cs2dak/tournament    冻结 Tournament facts · 身份安全的跨图分析
   → @cs2dak/react              可复用 React 组件
   → apps/dak-studio            DAK Studio（pywebview 桌面壳 / 浏览器）
 ```
@@ -74,7 +75,8 @@ Windows 离线/便携使用 `dak-studio-windows-X.Y.Z-full.zip`。较小的
 | `@cs2dak/core` | 纯单场分析：标准化、经济、击杀、残局、时间线、热力图、对枪、机制、QA、RR/PRISM 接线。 |
 | `@cs2dak/cohort` | 跨场聚合、身份归并、赛季 RR/PRISM 整形。 |
 | `@cs2dak/maps` | 地图标定、world→radar 变换、进攻动线、zone 几何、callout 中文映射。 |
-| `@cs2dak/presentation` | 产品中立 View Model、标签、workspace 编排。 |
+| `@cs2dak/tournament` | 零运行时依赖的冻结 Tournament facts DTO、身份安全的跨图合并、比率计算，以及结构 / 引用 / 聚合安全校验。 |
+| `@cs2dak/presentation` | 产品中立 View Model、标签、workspace 编排与 Tournament 旧接口适配。 |
 | `@cs2dak/react` | 只消费 presentation 合同的 React 组件。 |
 | `@cs2dak/cli` | 把 `core` 接到文件系统的薄 CLI。 |
 | `apps/dak-studio` | DAK Studio：本地 demo 工作台（IndexedDB 资料库）。 |
@@ -86,8 +88,8 @@ Windows 离线/便携使用 `dak-studio-windows-X.Y.Z-full.zip`。较小的
 pnpm install
 pnpm dev:studio        # DAK Studio（端口 5178，.dem 导入走本地 uv 环境）
 pnpm dev               # pnpm dev:studio 的别名
-pnpm test              # 快速 vitest（排除 integration 与 season 验证）
-pnpm test:integration  # cohort / spatial / season 真实 ZIP 验证
+pnpm test              # 快速 Vitest 测试（排除 *.integration.test.ts）
+pnpm test:integration  # 关键流程：真实 ZIP 导入、必需流拒绝、可选流降级
 pnpm test:all          # 全量
 pnpm typecheck         # 全工作区 tsc -b
 pnpm analyze:sample    # CLI 分析示例 ZIP → fixtures/output/sample/
