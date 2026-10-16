@@ -47,7 +47,7 @@ export interface MapZones {
 
 /**
  * 射线法判断点是否在多边形内（世界坐标 XY）。多边形自动闭合。
- * 边界视为命中（<=），避免相邻区域漏判。
+ * 使用严格交点比较（<）；边/顶点不保证统一命中，不作为边界包含判定。
  */
 export function pointInPolygon(x: number, y: number, polygon: Array<[number, number]>): boolean {
   let inside = false;
