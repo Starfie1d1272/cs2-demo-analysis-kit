@@ -38,7 +38,7 @@ jobs:
           $upgrade = "$($next.Major).$($next.Minor).$($next.Build + 1)"
           ./scripts/build-uploader-installer.ps1 -Version $upgrade -OutputDir "$env:RUNNER_TEMP/uploader-upgrade-fixture"
           ./scripts/test-uploader-installer.ps1 -Installer "$pwd/python/dist/RivalHub-Demo-Uploader-Setup-$version.exe" -UpgradeInstaller "$env:RUNNER_TEMP/uploader-upgrade-fixture/RivalHub-Demo-Uploader-Setup-$upgrade.exe"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: uploader-windows-review
