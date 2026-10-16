@@ -1,3 +1,5 @@
+import { pointInPolygon as pointInPolygon2d } from "./zones.js";
+
 export interface Vec3 {
   x: number;
   y: number;
@@ -156,16 +158,6 @@ export function sampleNavZ(
   const max = zValues[zValues.length - 1]!;
   const median = zValues[Math.floor(zValues.length / 2)]!;
   return { zValues, min, max, median, clusters: detectClusters(zValues, clusterGapThreshold) };
-}
-
-function pointInPolygon2d(x: number, y: number, polygon: Array<[number, number]>): boolean {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
-    const [xi, yi] = polygon[i]!;
-    const [xj, yj] = polygon[j]!;
-    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
-  }
-  return inside;
 }
 
 function detectClusters(sortedZ: number[], gapThreshold: number): NavZCluster[] {
