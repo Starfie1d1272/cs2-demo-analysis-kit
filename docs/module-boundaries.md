@@ -22,7 +22,7 @@
 
 | 模块                     | 负责                                                            | 不负责                                      | 主要输出                    |
 | ------------------------ | --------------------------------------------------------------- | ------------------------------------------- | --------------------------- |
-| `cs2-demo-format`        | 定义并校验 v3 DemoPackage 数据合同                              | Demo 解析、分析、评分、展示                 | Schema、类型、validator     |
+| `cs2-demo-format`        | 定义 v3 DemoPackage 数据合同，解析并校验 v3 ZIP                  | 原始 `.dem` 解析、分析、评分、展示          | Schema、类型、ZIP parser、validator |
 | `cs2df`                  | 将原始 `.dem` 确定性导出为合法 v3 DemoPackage                   | RR/PRISM、产品展示、业务持久化              | v3 ZIP、导出报告            |
 | Python CLI / GUI         | 提供 cs2df 的本地 GUI / DAK Studio 桥 / 打包壳                  | 维护独立 parser/exporter、分析或展示实现    | GUI、Studio bridge、桌面应用 |
 | `@cs2dak/contract`       | 定义 DAK 派生结果的公共合同；re-export 上游合同                 | 复制 `cs2-demo-format` schema、实现分析逻辑 | Zod schema、TypeScript 类型 |
@@ -69,7 +69,7 @@ PRISM 风格、强弱项等“相对当前范围”的判断可以继续使用 c
 6. 缺失数据保持 `null`；不得为了展示、聚合或兼容伪造为 `0`。
 7. Apps 和 CLI 只能负责适配与编排，不能成为共享逻辑 owner。
 8. View Model 不包含数据库、权限或产品路由语义。
-9. 允许破坏性重构和删除旧 API；不为错误职责边界长期维护兼容层。
+9. 当前任务确需调整边界时，允许重构和删除旧 API；先检查调用方并完成必要迁移，不为错误职责边界长期维护兼容层。不把该许可视为清理所有旧 API 或发布不兼容版本的授权。
 10. 跨模块行为必须由公开合同和 fixture 验证，不依赖内部文件结构。
 11. `@cs2dak/tournament` 自己拥有窄 public DTO；不得把 `@cs2dak/contract` 的 DemoFormat、Zod 或 RR 依赖拖入其 runtime。1.1 performance surface 只消费已冻结的 player-round/objective/weapon sufficient facts，不重新 detection。Tournament 的 fail-fast 只保护 shape/count、entity/reference、duplicate 与 denominator/cross-row aggregation safety；不得从一个 frozen semantic 字段重新推导或否定另一个字段（例如用 `deaths` 推导 `survived`，或用 `teamWonRound` / `survived` 裁决 `clutch.won`）。这类 semantic QA 只属于 Core / Evidence producer。
 12. `@cs2dak/cohort` 保留 RR/PRISM 所需的 `RRIndicators` compatibility projection；它不替代 `@cs2dak/tournament` 的透明 performance owner。Presentation 的证据/视图模型可以保留自己的输出整形，但不得重新实现 Core 的事件归因。
@@ -83,7 +83,9 @@ PRISM 风格、强弱项等“相对当前范围”的判断可以继续使用 c
 2. 它消费什么公共合同，输出什么公共合同？
 3. 哪些模块明确不得实现它？
 
-无法明确回答时，不应开始实现。
+先从代码、公共合同与本表确定答案，这是实现前的技术判断，不要求用户逐项确认。
+若仍存在会改变产品目标或公共合同语义的未授权取舍，给出证据与选项，只暂停相关
+实现；继续独立的调查、验证或修复。授权范围内的技术归属可自主决定并记录依据。
 
 14. `core/src/tournament-facts.ts` 是单图 frozen Tournament economy/performance projection 的唯一 owner，只以 type import 消费 Tournament DTO。显式 stable team/player ID 必须完整，teamA/B 相同 ID 明确拒绝；显示队名、昵称、logo 不生成或决定 ID。Evidence 直接消费 Core data adapter，再按 target entry ID 查询 Tournament 结果，不通过 Presentation ViewModel 回查。未绑定的本地 Demo 使用显式 match-scoped observed ID，只表示本场观察，不能据同名跨图认定同队；Presentation 只注入标签，Studio `teamRenames` 不改变 frozen identity。
 
@@ -112,7 +114,9 @@ Core 的 tournament manifest dependency 是外部声明解析所需的 DTO 合�
 
 保留 maps 专项五入口/资产/calibration 隔离 gate。上述 Node/strict TS 验证不能替代正式 registry 发布后的 smoke，也不声称完成 browser consumer matrix。Phase C 的 correctness 已在 #69 完成，本轮只固定其 adapter graph；跨消费者 Evidence seam 的全面审计、Phase D 的外部 consumer 成本判断和 Phase E 的 DTO ownership audit 仍需各自证据。记录 pack size 不等于授权拆 maps 资产；#64 保持 umbrella，不由 A/B PR 自动关闭。
 
-registry cs2-demo-format@3.1.0 与 @rivalhub/rival-rating@0.3.0 仍直接导出 TypeScript。DAK build 只从这两个精确版本的原版 registry bytes 生成 dependency ESM 模块，消费方 JS 引用生成模块，declarations 仍引用相同精确版本。生产源码 graph 的上游 owner 与 manifest type dependency 保留；只编译依赖，不复制改写公式/schema，不 bundle DAK 模块或 canonical facts caches。每个上游在一个 DAK package 内共享单一生成模块，附 MIT notices、原包 tarball/integrity、输入源码/输出哈希。包间仍用公开 DAK exports；不因此新增公开 API/package。详见 [artifact audit](research/public-package-artifact-audit.md)。PR 为普通 Ready 审查状态；是否合并仍需完整 CI 与父独立审，不执行发布。
+registry cs2-demo-format@3.1.0 与 @rivalhub/rival-rating@0.3.0 仍直接导出 TypeScript。DAK build 只从这两个精确版本的原版 registry bytes 生成 dependency ESM 模块，消费方 JS 引用生成模块，declarations 仍引用相同精确版本。生产源码 graph 的上游 owner 与 manifest type dependency 保留；只编译依赖，不复制改写公式/schema，不 bundle DAK 模块或 canonical facts caches。每个上游在一个 DAK package 内共享单一生成模块，附 MIT notices、原包 tarball/integrity、输入源码/输出哈希。包间仍用公开 DAK exports；不因此新增公开 API/package。详见 [artifact audit](research/public-package-artifact-audit.md)。
+
+**#64 Phase A/B 的任务范围记录**：该 PR 当时按普通 Ready 状态交付，合并需完整 CI 与父独立审，该任务不执行发布。这不是后续任务的通用禁发或额外审批规则；后续合并/发布按当前任务授权、仓库保护规则及 `docs/release.md` 的适用门禁执行。
 
 编译入口变化需要冷启动先构建依赖闭包：`pnpm build:packages` 用于公共库准备，CI 在 typecheck/fast tests 前执行；desktop/web-patch/uploader 的独立 build 递归包含对应 app dependencies。typecheck 的 rootDir 与发布 build 均为 src，保持 dist 声明路径一致。开发 dev 入口先准备公共产物；修改共享源码后需重跑 build:packages。构建器直接用 Node 调用已安装 tsc，避免 Windows pnpm shim 启动差异。仅变更依赖构建顺序，不改变诊断/发布 provenance 语义。
 
