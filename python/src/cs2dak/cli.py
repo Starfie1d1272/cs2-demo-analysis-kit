@@ -25,6 +25,13 @@ def version() -> None:
     typer.echo(__version__)
 
 
+@app.callback(invoke_without_command=True)
+def callback(ctx: typer.Context) -> None:
+    """Keep the version subcommand and the no-argument version shortcut."""
+    if ctx.invoked_subcommand is None:
+        version()
+
+
 def main() -> None:
     """Console-script entry point (see pyproject [project.scripts])."""
     app()

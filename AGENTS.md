@@ -40,11 +40,11 @@ bash scripts/package.sh          # 打包桌面应用（DAK Studio + PyInstaller
 pnpm event:export                # 赛事批量导出（读 spec.export，--research --compress-level 9）
 pnpm events:build                # 构建赛事 R2 资产（build-event-asset.mjs）
 pnpm events:publish              # 上传赛事资产到 R2
-node scripts/cologne-build.mjs   # 科隆 Major per-stage 装配（4 个 event-package）
+pnpm event:package <spec.json>   # 通用赛事 per-stage event-package 装配
 node scripts/hltv/extract-stage-urls.mjs  # CDP 提取 HLTV match URL（Node 24 原生 WebSocket）
 
 # 分发
-python src/cs2dak/installer.py        # Web Installer（极简 tkinter GUI）
+cd python && uv run python -m cs2dak.installer # Web Installer（极简 tkinter GUI）
 node scripts/gen-install-manifest.mjs # 生成 install-manifest.json
 node scripts/assemble-full-zip.mjs    # 组装 Full Portable Zip
 
@@ -112,14 +112,31 @@ docs/                  # 架构与集成文档（索引见 docs/README.md）
 
 模块职责、禁止事项与目标依赖边界以 [`docs/module-boundaries.md`](docs/module-boundaries.md)
 为准。新增、迁移或删除功能前必须先确定唯一 owner；允许删除违反该边界的旧 API，
-不得为错误职责长期维护兼容层。
+不得为错误职责长期维护兼容层。删除或迁移限于当前任务所需范围，检查调用方并完成
+必要迁移；发现其他边界问题不自动扩大重构范围。
 
 ### 工作流分流
 
-- 中大型实现任务（跨文件、改变产品行为、可能引出设计判断）使用全局 `$delivery-task`；小修、只读审计和纯讨论不强套流程。
-- 设计文档是当前假设，改动前先核真实代码、数据合同和现有入口；如果实现证据推翻原假设，先显式决策再扩 scope。
-- 开发中发现的新内容先分类：Blocker 立即处理；Invalidation 暂停决策；Improvement / New Idea 记录到 [`docs/product/discovery-inbox.md`](docs/product/discovery-inbox.md)。
-- 影响产品方向、模块边界、数据口径或发布策略的决定记录到 [`docs/decisions/`](docs/decisions/)。
+- 按风险与不确定性选择流程，不按文件数量升级流程。目标明确的小修、只读审计和纯讨论直接完成；需要多步协调或设计取舍的实现任务，若全局 `$delivery-task` 可用则使用。若未挂载且用户未明确要求该 Skill，说明一次，按“目标与验收 → 最小实现 → 相关验证 → 交付”继续；若用户明确指定且缺失会影响交付，只暂停依赖它的部分并说明缺失项。
+- 先核真实代码、数据合同和现有入口。设计文档是当前假设；实现与文档不一致是调查线索，不自动代表实现正确，也不自动触发用户审批。
+- 只处理影响当前验收的 Blocker。Invalidation 若仅改变授权范围内的技术方案，自主调整并简述依据；若会改变产品目标、公共合同语义或发布范围且未获授权，提出具体取舍，只暂停依赖该决定的工作。
+- 有后续价值的 Improvement / New Idea 简记到 [`docs/product/discovery-inbox.md`](docs/product/discovery-inbox.md)，不扩入本次任务。影响产品方向、模块边界、数据口径或发布策略的重要决定记到 [`docs/decisions/`](docs/decisions/)；普通技术选择无需另建决策文档。
+
+### 自主执行、澄清与批准
+
+本节定义仓库默认协作方式；Skills 补充具体操作步骤，不重复设审批关卡。遵守系统、平台与适用上级指令；在其允许范围内以用户当前任务和本轮已有授权为准。
+
+- 用户提出实现、修复或优化请求即授权完成相应工作。先读取上下文，再自主完成范围内的可逆改动、必要迁移与验证；不要在计划、诊断或第一处修复后询问“是否继续”。
+- 澄清用于补齐影响结果的信息：先查仓库与已有对话；低风险、可逆的缺省选择直接采用并说明。只有目标、验收、关键数据或会显著改变结果的取舍仍无法确定时才问；合并相关问题，等待期间继续不依赖答案的工作。用户未回复不等于批准。
+- 批准用于授权尚未获准的动作。已有授权在同一目标、范围和后果下持续有效；发布、合并、外部写入等动作先检查是否已获授权，不一律重新询问。破坏性/难以恢复的操作、对外发送消息及平台强制门禁遵守适用的明确授权要求。
+- 确需批准时，先完成允许进行的准备与验证，给出具体对象、差异、后果和阻塞规则来源；批准后从该步骤继续，不重启整个流程。不得为了等待最终批准而提前停止独立工作。
+
+### 验证与完成
+
+- 完成标准是用户要求的结果已实现且相关验收有证据；纯审阅交付发现和依据，要求优化时还需落地修改。不要用计划、测试变绿或“可继续”代替交付结果。
+- 验证按改动面选择：文档改动检查内容、引用和 diff；行为变更运行相关测试；跨语言合同/fixture 改动使用 `fixture-verify`；发布任务保留 [`docs/release.md`](docs/release.md) 的全部适用门禁。通过后仅因新修改、失败或具体未解风险扩大或重跑检查。
+- 工具、依赖或权限失败时先诊断，尝试有依据的替代办法；不重复相同失败命令，不以跳过测试或放宽断言制造成功。仍受阻则完成其余工作，交付已完成内容、未完成项、失败证据及解除阻塞所需的最小信息或操作。
+- 最终说明改动、验证结果及剩余限制；只有实际执行并获成功证据的提交、发布或保存才可声称完成。达到验收后结束，不主动追加重构、全量测试或下一阶段任务。
 
 ## 4. Conventions
 

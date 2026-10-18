@@ -77,8 +77,10 @@ playwright-cli -s=site1 snapshot
 playwright-cli -s=site2 snapshot
 playwright-cli -s=site3 snapshot
 
-# Cleanup
-playwright-cli close-all
+# Cleanup only the sessions created above
+playwright-cli -s=site1 close
+playwright-cli -s=site2 close
+playwright-cli -s=site3 close
 ```
 
 ### A/B Testing Sessions
@@ -203,21 +205,28 @@ playwright-cli -s=docs-scrape open https://docs.example.com
 playwright-cli -s=s1 open https://github.com
 ```
 
-### 2. Always Clean Up
+### 2. Clean Up Task-Owned Sessions
+
+Close only sessions created for the current task. Detach from an attached user-owned
+browser. Use `close-all` / `kill-all` only when every affected session belongs to this
+task or their termination is explicitly authorized; other work may share the browser.
 
 ```bash
 # Stop browsers when done
 playwright-cli -s=auth close
 playwright-cli -s=scrape close
 
-# Or stop all at once
+# Only if all sessions belong to this task
 playwright-cli close-all
 
-# If browsers become unresponsive or zombie processes remain
+# Same ownership requirement for unresponsive or zombie processes
 playwright-cli kill-all
 ```
 
 ### 3. Delete Stale Browser Data
+
+Delete only disposable data created for this task or data whose deletion was
+explicitly requested. Age alone does not authorize removing a persistent profile.
 
 ```bash
 # Remove old browser data to free disk space

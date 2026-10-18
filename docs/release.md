@@ -198,7 +198,7 @@ commit 的 tag 会直接使工作流失败，不会删除、回滚、移动 tag 
 2. 对上面列出的 7 个包分别在 npm → Package → Settings → Trusted publishing 添加
    **GitHub Actions** publisher：
 
-   - Organization or user：`Starfie1d127`
+   - Organization or user：`Starfie1d1272`（GitHub 仓库 owner，不是 npm 用户名）
    - Repository：`cs2-demo-analysis-kit`
    - Workflow filename：`npm-publish.yml`（只填文件名）
    - Environment name：`npm-publish`
@@ -237,19 +237,19 @@ Windows Uploader 推荐入口为 `RivalHub-Demo-Uploader-Setup-X.Y.Z.exe`（完�
 
 `sync-version.mjs` 只接受 canonical `x.y.z`（CLI 可带 `v` 前缀），不接受自由 prerelease 或 build suffix。源码 revision 属于 build provenance，不写入 Python / npm release version。脚本先读取并校验全部私有 manifest 和三个 Python target，再开始写入；缺失、重复或无版本字段会在任何写入前失败。`uv.lock` 仅定位唯一 `cs2dak` package block，可恢复历史 malformed version，不修改其他依赖。写入失败时尝试恢复所有已尝试的 target；恢复失败会明确报出，需检查工作树后重试。该保护不宣称对进程被强制结束或磁盘故障提供跨文件事务。
 
-回归：`node --test scripts/sync-version.test.mjs`。本地 `bash scripts/package.sh 0.8.5`（sync enabled）和 `PACKAGE_SKIP_VERSION_SYNC=1 bash scripts/package.sh`（sync skipped）都属于 ad-hoc 构建。脚本在同步之后、生成产物之前抓取一份 provenance，打印 sync / release / revision / dirty / mode / output summary；dirty 本地构建允许但明确警告。releaseVersion 保持 canonical x.y.z，buildRevision 为完整 HEAD SHA，buildDirty 为工作树状态（含未忽略的新文件）。同一份信息写入前端 `build-info.json`，由既有 Studio 侧栏版本入口显示短 SHA 和 clean/dirty，并随 `studio_web` 打入 PyInstaller。
+`sync-version` 的原独立回归测试已在 #109 移除，覆盖缺口见[关键流程测试保留集](audit/2026-10-12-critical-test-budget.md#明确移除的独有保护)。修改此脚本时仍需针对性验证全部目标预校验与失败写入恢复，现有 CI gate 不能替代这些保护。本地 `bash scripts/package.sh 0.8.5`（sync enabled）和 `PACKAGE_SKIP_VERSION_SYNC=1 bash scripts/package.sh`（sync skipped）都属于 ad-hoc 构建。脚本在同步之后、生成产物之前抓取一份 provenance，打印 sync / release / revision / dirty / mode / output summary；dirty 本地构建允许但明确警告。releaseVersion 保持 canonical x.y.z，buildRevision 为完整 HEAD SHA，buildDirty 为工作树状态（含未忽略的新文件）。同一份信息写入前端 `build-info.json`，由既有 Studio 侧栏版本入口显示短 SHA 和 clean/dirty，并随 `studio_web` 打入 PyInstaller。
 
 本地产物置于 `python/dist/dak-studio-X.Y.Z-build-<12-char-sha>[-dirty]/`；macOS DMG 文件名同样带该标识，内部 app/exe 名称保持原样。dirty 标记不是工作树内容哈希，同一 revision 的多次 dirty 构建会覆盖同一路径。无 Git 元数据的源码归档使用 `build-unknown`，revision/dirty 为 null，侧栏与 summary 明确显示 unknown，不声称可追溯。
 
 正式 Release CI 显式传 `PACKAGE_RELEASE_TAG=vX.Y.Z`，保留原来的版本化 DMG 与 runtime 目录；匹配 tag/manifest/HEAD 且工作树 clean 才允许进入构建。仅 skip sync 不代表正式 release。CI 获取外部 tris manifest 放在捕获源码 provenance 之后，避免将生成的发布输入误记为源码修改。正式 Windows web patch 直接封装 `python/dist/dak-studio/_internal/studio_web` 内的已构建前端，检查同版本 clean release snapshot；不在下载资产后的新 CI step 重跑 Vite 或重新捕获 working-tree 状态。patch 与 runtime 的 build-info / frontend bytes 一致，只有 patch 额外生成的 version.json 不同。本地不传第四个 desktopWebDir 参数时仍可独立构建 patch。npm 包继续由 Changesets 独立管理，本流程不改变公共包版本。
 
-回归：`node --test scripts/build-info.test.mjs scripts/sync-version.test.mjs`。本地 Linux PyInstaller smoke 验证打包 metadata / frontend；macOS DMG 拖拽安装、Windows GUI 启动与正式发布 qualification 仍需对应平台验收。
+`build-info` 的原独立回归测试也已在 #109 移除；修改 provenance 相关脚本时需针对性验证 metadata 与实际打包 frontend 的来源一致性，不以当前 suite 跑绿代替。本地 Linux PyInstaller smoke 验证打包 metadata / frontend；macOS DMG 拖拽安装、Windows GUI 启动与正式发布 qualification 仍需对应平台验收。
 
 ### Maps 编译发布物验证
 
 `@cs2dak/maps` 保留 root、`/callout-grid-node`、`/callout-grid-browser`、`/tri-assets` 及 `/calibration` 五个入口与原有 API。公开导出指向 `dist/*.js` 与 `dist/*.d.ts`；地图 JSON 仍随包放在原根目录，静态 import 与 Node callout loader 不改变资产路径。`build` 清理旧 dist 并强制编译，避免旧声明布局或测试文件混入包。
 
-CI 与发布 gate 运行 `node scripts/maps-package-smoke.mjs`（Ubuntu 上的 pnpm/npm 工具链）：build → pack → 临时目录干净安装 → 五入口实际导入/调用 → strict NodeNext 声明检查 → 删除全部空间资产后的新进程 calibration 隔离检查。consumer 无 workspace symlink、TypeScript runtime loader 或 DAK 源路径。JSON ESM 在仓库 Node 24 工具链上验证；browser callout loader 以注入 fetch 验证，不调用外部服务。脚本不 publish、不改版本，并清理其临时 consumer。fresh checkout 运行测试/dev 前先 `pnpm typecheck`；修改 maps 时可运行 `pnpm --filter @cs2dak/maps exec tsc -p tsconfig.json --watch` 更新编译输出。
+CI 与发布 gate 运行 `node scripts/maps-package-smoke.mjs`（Ubuntu 上的 pnpm/npm 工具链）：build → pack → 临时目录干净安装 → 五入口实际导入/调用 → strict NodeNext 声明检查 → 删除全部空间资产后的新进程 calibration 隔离检查。consumer 无 workspace symlink、TypeScript runtime loader 或 DAK 源路径。JSON ESM 在仓库 Node 24 工具链上验证；browser callout loader 以注入 fetch 验证，不调用外部服务。脚本不 publish、不改版本，并清理其临时 consumer。fresh checkout 冻结安装后，先 `pnpm build:packages`，再 `pnpm typecheck` 或运行测试；`pnpm dev` 自带公共包准备步骤。修改共享源码后重跑 `pnpm build:packages` 更新编译输出。
 
 本地 artifact gate 已覆盖 #47 的 calibration 窄入口、图池/资产覆盖分离与 Train 标定 revision 2。Feature PR 只提交 maps minor changeset；不执行 version/publish/tag。授权正式发布后仍需从 registry 干净安装新 maps 版本并用 Node 24 重跑 root/calibration/资产/tri probes；真实 browser/Windows qualification 也不能由此脚本替代。#64 其余公共包的 consumer 与 graph 审计仍是后续范围。
 
@@ -274,3 +274,22 @@ provenance、实际checkout/gitHead和成功npm package tags都指X，桌面v0.8
 固定754，不移动、不重新构建覆盖其公开bytes。省略选择时保持当前版本提交模式；
 纯workflow修复提交本身无版本提升会拒绝盲发。冷构建与CI使用相同build:serial，
 保留完整测试、typecheck、实际tgz闭包、registry/provenance/tag验收；不创建凭据。
+
+### 原 npm 部分发布的续发边界
+
+2026-10-12 的 run `38204647873` 使用源码
+`263895839f8a4f334b6c92be2a38639fb09523ad`，版本选择为
+`75434c5dcce9477a567761ed5c378b346a4ceebe`。该次构建与 consumer gates
+通过；contract/maps 发布返回 404，tournament 1.1.2 已公开且 provenance 与
+package tag 均指向 2638958。其他四包尚未发布。
+
+先由包维护者在 npm 网页核对缺失六包的 GitHub Actions Trusted Publisher：
+owner、repository、workflow、environment 必须匹配上表，且允许 direct publish；
+检查连接是否过期。404 本身不能确定哪个字段错误，公开 registry 也不提供这些设置。
+不要为此生成 token、扩大账户权限或重发 tournament。
+
+设置核对完成并确认目标六版本仍缺失后，使用原 run 的 **Re-run failed jobs**，
+保留原 github.sha 与 release_commit；不要在新 main 上 Run workflow。
+release_commit 输入只选择版本，不能锁定源码 checkout。重跑前确认 tournament
+tag 仍指 2638958；成功后核验六包的 registry provenance 与七个 package tags，
+再从 registry 干净安装验证消费。桌面 v0.8.6 不重发、不移动 tag。

@@ -2,6 +2,12 @@
 
 End-to-end workflow for authoring and maintaining Playwright tests with `playwright-cli`. Every `playwright-cli` action emits the equivalent Playwright TypeScript, and that generated code is the raw material for every test. The sections below can be used independently:
 
+Use only the sections needed for the requested result. Reuse existing fixtures and
+test conventions. A small test repair needs diagnosis, a focused edit, and a rerun;
+it does not require a new plan/spec/seed. For a broad new suite, document scenarios
+and use the planning workflow below. Repository AGENTS.md governs approval and
+completion throughout; annotation commands are optional when user feedback is needed.
+
 - **How generation works** — the core mechanic everything else relies on: actions become TypeScript, plus how to add assertions.
 - **Plan** — explore the app, produce a spec file describing what to test.
 - **Generate** — turn a spec into Playwright test files. Update the spec if it's vague or stale.
@@ -141,7 +147,9 @@ await expect(page.getByRole('navigation')).toMatchAriaSnapshot(`
 
 ## 1. Planning
 
-Goal: produce a spec file (e.g. `specs/<feature>.plan.md`) that enumerates the scenarios to test. **Always** write the spec to a file.
+Goal for a broad new suite: record the scenarios in an existing suitable spec or
+`specs/<feature>.plan.md`. For a focused regression test, the test and its description
+can carry the scenario; do not create a separate planning artifact by default.
 
 ### 1.1 Prerequisite: workspace
 
@@ -153,11 +161,11 @@ test -f playwright.config.ts || test -f playwright.config.js
 npx --no-install playwright --version
 ```
 
-If there is no Playwright install, bootstrap one and let the user pick the defaults:
-
-```bash
-npm init playwright@latest
-```
+If Playwright is absent, first check for an existing browser/test tool that can
+verify the requested behavior. Add project-local tooling only when the requested
+test work needs it, following the repository dependency policy and existing defaults.
+Ask only about a choice that materially affects the user's result; do not run an
+interactive bootstrap or introduce a framework for a one-off inspection.
 
 ### 1.2 Prerequisite: seed test
 
@@ -290,7 +298,8 @@ Goal: take a spec file and produce Playwright test files. Optionally update the 
 
 ### 2.2 Generate one scenario
 
-For each target scenario, in sequence (never in parallel — scenarios share the seed session):
+Generate scenarios sequentially by default. Do not run scenarios concurrently when
+they share a browser session or mutable test data; see 2.3 for isolation requirements.
 
 ```bash
 PLAYWRIGHT_HTML_OPEN=never npx playwright test <seed-file> --debug=cli   # background
@@ -300,7 +309,12 @@ playwright-cli attach tw-XXXX
 
 **Do not** just open the app url with playwright-cli, always go through the test to capture any custom setup done there.
 
-Walk the scenario's `Steps:` one by one with `playwright-cli`, treating the spec as the plan and the live app as the source of truth. If a step is vague ("click the button" — which button?), references an element that no longer exists, or contradicts the app's actual behaviour, use your judgement: update the spec to match what the app really does, then keep going. Editing the spec mid-generation is expected.
+Walk the scenario's `Steps:` with `playwright-cli`. Treat the task, contract, and
+authorized decisions as the intended behavior, and the live app as observed evidence.
+Resolve vague locators from that evidence. If behavior contradicts the spec, apply
+the diagnosis and reconciliation rules in 3.3–3.4: update the spec only for an
+authorized behavior change, fix an in-scope app regression, or ask about unresolved
+intent while continuing independent scenarios. Do not normalize a bug into the spec.
 
 Every action prints the equivalent Playwright TypeScript (see [How generation works](#0-how-generation-works)):
 
@@ -349,7 +363,10 @@ Rules:
 
 ### 2.3 Generate multiple scenarios
 
-Loop 2.2 over the targeted scenarios one at a time, restarting the seed between each so every test starts from a clean page. This is safe to parallelise due to unique generated session names - just make sure each test run is stopped.
+Loop 2.2 over the targeted scenarios, restarting the seed so each starts clean.
+Parallel execution is optional only when browser sessions, mutable data, and output
+files are isolated; unique session names alone are insufficient. Stop each task-owned
+test run after use.
 
 ### 2.4 Run generated tests
 
@@ -400,27 +417,41 @@ Rehearse the corrected interaction with `playwright-cli` — the generated code 
 
 ### 3.3 Apply the fix
 
-Edit the test file: update the locator, assertion, step order, or inputs to match the corrected behaviour. Stop the background debug run. Rerun the single test to confirm green.
+Identify whether the defect is in the test or app using the requested behavior,
+contract, and observed evidence. Fix the test for locator/setup defects or authorized
+behavior changes. If the app regresses against the intended behavior and app repair
+is in scope, fix the app and retain the regression assertion. Stop the background
+debug run and rerun the affected test. Do not change expectations merely to match
+broken behavior.
 
 Never skip hooks or add sleeps as a fix. Never use `networkidle`.
 
 ### 3.4 Reconcile with the spec
 
-Open the spec referenced by the `// spec:` header in the test file and locate the scenario that matches the test.
+If the test references a spec, locate the matching scenario; otherwise use the task
+acceptance criteria and existing contract. Do not invent a spec just to repair a test.
 
 - **Fix was purely technical** (locator drift, better assertion shape) and the spec's user-level behaviour still matches the app → leave the spec alone.
-- **Fix changed user-visible steps, inputs, order, or expected outcomes** that the spec describes → update the spec to match reality. Keep the scenario id and file path stable; only the step / expect lines change.
-- **Unclear whether the app change is intentional** (spec is stale) **or a regression** (test was right, app is wrong) → **stop and ask the user**. Provide:
+- **An authorized behavior change changed user-visible steps, inputs, order, or expected outcomes** → update the spec to the intended behavior. Keep the scenario id and file path stable; only the step / expect lines change.
+- **Intent remains unclear after checking the task, contract, code, and prior decisions**, and choosing would materially change behavior → ask one focused question and pause only the affected repair. Provide:
   - the scenario id (e.g. `2.3`),
   - the spec lines that no longer match,
   - the observed app behaviour (quote a snapshot excerpt or a concrete outcome).
 
-Only after the user answers, either update the spec (intentional change) or file/flag the test as covering a bug (regression).
+Reuse an existing user decision rather than asking again. If a new decision is
+needed, continue independent repairs while waiting; do not infer approval from silence.
+Once resolved, implement the authorized repair and validate it.
 
-### 3.5 Iteration and giving up
+### 3.5 Validation and completion
 
-- Fix failures one at a time; rerun after each.
-- If after thorough investigation you are confident the test is correct but the app is wrong *and* the user has confirmed it's a bug: mark the test `test.fixme(...)` with a comment pointing at the user's decision or issue link. Never silently skip.
+- Rerun affected tests after a relevant fix. Broaden checks only for related impact
+  or a concrete unresolved concern; stop after the requested behavior is verified.
+- If an app bug is in scope, repair it rather than marking the regression test
+  `test.fixme(...)`. If it is outside scope or blocked, preserve the failing evidence
+  and report the gap. Quarantine only when explicitly authorized, with a reason and
+  issue/decision reference; quarantined tests are not passing verification.
+- For persistent tool/environment failures, try a supported alternative and report
+  the exact blocker and unverified behavior; do not repeat identical failed attempts.
 
 ---
 

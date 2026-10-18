@@ -13,7 +13,7 @@
 This package is now a thin desktop shell:
 
 - `cs2dak-studio`: DAK Studio desktop bridge and bundled web assets
-- `cs2dak version`: package version
+- `cs2dak version`: print the package version (also available without a subcommand)
 
 ```text
 .dem -> cs2df -> cs2-demo-format/3.x ZIP -> @cs2dak/* TypeScript analysis
@@ -23,16 +23,20 @@ This package is now a thin desktop shell:
 
 ```bash
 cd python
-uv sync --extra dev
+uv sync --locked --extra dev --extra gui
 uv run pytest
 uv run cs2dak version
 ```
 
-DAK Studio additionally needs:
+The test setup above includes pywebview for native bridge tests. For GUI-only development:
 
 ```bash
-uv sync --extra gui
+uv sync --locked --extra gui
 ```
+
+`uv run cs2dak version` prints the package version. The no-argument
+`uv run cs2dak` shortcut remains supported; `uv run cs2dak --help` lists the
+`version` command.
 
 ### Exporting demos
 
@@ -50,6 +54,7 @@ exported ZIP is the only Python/TypeScript seam.
 ### Packaging
 
 ```bash
+cd ..  # from python/ to the workspace root
 bash scripts/package.sh
 ```
 
@@ -65,7 +70,7 @@ The PyInstaller spec bundles the Python shell plus DAK Studio frontend assets.
 本包现在只是桌面壳层：
 
 - `cs2dak-studio`：DAK Studio 桌面桥和打包后的前端资产
-- `cs2dak version`：包版本
+- `cs2dak version`：打印包版本（也可不带子命令调用）
 
 ```text
 .dem -> cs2df -> cs2-demo-format/3.x ZIP -> @cs2dak/* TypeScript 分析
@@ -75,16 +80,19 @@ The PyInstaller spec bundles the Python shell plus DAK Studio frontend assets.
 
 ```bash
 cd python
-uv sync --extra dev
+uv sync --locked --extra dev --extra gui
 uv run pytest
 uv run cs2dak version
 ```
 
-DAK Studio 还需要：
+上面的测试环境包含原生桥测试需要的 pywebview。仅开发 GUI 时：
 
 ```bash
-uv sync --extra gui
+uv sync --locked --extra gui
 ```
+
+`uv run cs2dak version` 打印包版本；无参数的 `uv run cs2dak` 快捷用法继续支持。
+`uv run cs2dak --help` 列出 `version` 命令。
 
 ### 导出 demo
 
@@ -101,6 +109,7 @@ DAK Studio 内部也调用同一个 `cs2df` 包。导出的 ZIP 是 Python/TypeS
 ### 打包
 
 ```bash
+cd ..  # from python/ to the workspace root
 bash scripts/package.sh
 ```
 

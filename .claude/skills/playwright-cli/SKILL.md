@@ -1,10 +1,25 @@
 ---
 name: playwright-cli
-description: Automate browser interactions, test web pages and work with Playwright tests.
+description: Automate requested browser interactions, inspect UI behavior, and author or debug Playwright tests when browser evidence is needed.
 allowed-tools: Bash(playwright-cli:*) Bash(npx:*) Bash(npm:*)
 ---
 
 # Browser Automation with playwright-cli
+
+## Scope and completion
+
+Follow repository AGENTS.md for authorization, clarification, and completion. Use
+this skill's commands as needed, not as a mandatory checklist. For an inspection,
+collect relevant browser evidence and deliver findings; for a requested fix,
+implement it and rerun the affected flow. Load test-generation guidance only when
+authoring or maintaining tests. A one-off inspection does not require a new test
+framework, spec file, recording, or user review session.
+
+Use the user's existing authorization for the requested browser actions. Ask for
+missing intent only when it materially changes the outcome and cannot be resolved
+from the task or page evidence; continue unrelated work while waiting. Examples
+below illustrate commands and do not authorize unrelated form submissions or data
+deletion. Close sessions created for this task; detach from user-owned sessions.
 
 ## Quick start
 
@@ -348,11 +363,13 @@ If global `playwright-cli` command is not available, try a local version via `np
 npx --no-install playwright --version
 ```
 
-When local version is available, use `npx playwright cli` in all commands. Otherwise, install `playwright-cli` as a global command:
-
-```bash
-npm install -g @playwright/cli@latest
-```
+When the local version supports the CLI, use `npx --no-install playwright cli` in
+place of `playwright-cli`. Check available help/version output before choosing a
+command. Otherwise prefer an existing browser tool or repository test runner.
+If installation is necessary for the requested task, follow the repository's
+dependency policy and use a project-local or temporary tool; do not default to a
+global `@latest` install. If no supported route works, finish independent work and
+report the missing tool and the verification it blocks.
 
 ## Example: Form submission
 
@@ -400,7 +417,12 @@ playwright-cli close
 
 ## Example: Interactive session
 
-Ask the user for UI review or design feedback. The user draws boxes on the live page and types comments; you receive the annotated screenshot, the snapshot of the marked region, and the user's notes. Use this whenever the user asks for "UI review", "design feedback", or to "ask the user what they think / want / mean":
+When the user explicitly wants to annotate the page or provide their own design
+feedback, use the interactive session below if supported. An ordinary request for
+UI review asks the agent to inspect and report findings; it does not require user
+annotation or an approval round. If a visual preference is essential and unresolved,
+ask one focused question and continue independent work. If annotation is unavailable,
+use existing page evidence and text feedback.
 
 ```bash
 playwright-cli open https://example.com
