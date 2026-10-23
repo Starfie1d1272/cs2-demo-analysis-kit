@@ -19,7 +19,7 @@
     "typecheck": "tsc -b --pretty",
     "test": "pnpm test:fast",
     "test:fast": "vitest run --pool=forks --exclude '**/*.integration.test.ts'",
-    "test:integration": "vitest run --pool=forks packages/core/src/critical-flows.integration.test.ts",
+    "test:integration": "vitest run --pool=forks packages/core/src/critical-flows.integration.test.ts packages/core/src/trade-facts.integration.test.ts",
     "test:all": "vitest run --pool=forks",
     "build": "pnpm -r --if-present build",
     "build:serial": "pnpm -r --workspace-concurrency=1 --if-present build",

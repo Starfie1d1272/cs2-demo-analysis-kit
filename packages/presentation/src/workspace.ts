@@ -21,6 +21,7 @@ import {
   aggregatePlayerRoundPerformanceFacts,
   analyzeDemoPackage,
   buildPlayerRoundPerformanceFacts,
+  deriveKillTrades,
   normalizeDemoPackage,
   type PlayerRoundPerformanceFacts,
 } from "@cs2dak/core";
@@ -748,6 +749,7 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
     };
   }
 
+  const { tradeKills } = deriveKillTrades(pkg);
   const killsByRound = groupBy(pkg.kills, (k) => k.roundNumber);
   const grenadesByRound = groupBy(pkg.grenades, (g) => g.roundNumber);
   const bombsByRound = groupBy(pkg.bombs, (b) => b.roundNumber);
@@ -782,7 +784,7 @@ function buildWorkspaceReplay(pkg: DemoPackage) {
       frameCount: roundRow.frameCount,
       officialEndTick,
       targetEndTick,
-      kills: buildRoundKills(pkg, killsByRound.get(roundRow.roundNumber) ?? []),
+      kills: buildRoundKills(pkg, killsByRound.get(roundRow.roundNumber) ?? [], tradeKills),
       grenades: (grenadesByRound.get(roundRow.roundNumber) ?? []).map((row) => ({
         grenade: row.grenade,
         throwerSide: sideForTeam(pkg.players[row.throwerIndex]?.teamKey),
@@ -995,7 +997,7 @@ function weaponNameForIndex(weaponDict: string[], index: number): string | null 
   return /^\d+$/.test(normalized) ? null : displayWeaponName(raw);
 }
 
-function buildRoundKills(pkg: DemoPackage, kills: DemoPackage["kills"]): WorkspaceKillEvent[] {
+function buildRoundKills(pkg: DemoPackage, kills: DemoPackage["kills"], tradeKills: ReadonlySet<DemoPackage["kills"][number]>): WorkspaceKillEvent[] {
   return kills.map((kill, index) => {
     const weaponRaw = kill.weapon;
     const killerSteamId = kill.killerIndex != null ? pkg.players[kill.killerIndex]?.steamId64 ?? null : null;
@@ -1012,7 +1014,7 @@ function buildRoundKills(pkg: DemoPackage, kills: DemoPackage["kills"]): Workspa
       throughSmoke: kill.throughSmoke,
       noScope: kill.noScope,
       flashAssist: kill.flashAssist,
-      tradeKill: kill.tradeKill,
+      tradeKill: tradeKills.has(kill),
       wallbang: kill.penetratedObjects > 0,
       killerX: kill.killerPosition?.x ?? null,
       killerY: kill.killerPosition?.y ?? null,

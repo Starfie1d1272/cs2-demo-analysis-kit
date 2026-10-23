@@ -13,6 +13,7 @@
  * actual-effect（需 zone 多边形标定）。
  */
 import type { DemoPackage } from "@cs2dak/contract";
+import { deriveKillTrades } from "../performance-facts.js";
 import { routeIndex, type MapRoute, type MapRoutes } from "@cs2dak/maps";
 import { createResolverFromPackage, type PlayerResolver } from "../resolve.js";
 import { clamp, groupBy } from "../utils.js";
@@ -214,12 +215,13 @@ function buildIsolationCredits(
   const windowTicks = ISOLATION_WINDOW_SECONDS * tickrate;
   const credits = new Map<string, number>();
 
+  const { tradedDeaths } = deriveKillTrades(pkg);
   for (const kill of pkg.kills) {
     const killerPlayer = resolver.byIndexOrNull(kill.killerIndex);
     const victimPlayer = resolver.byIndexOrNull(kill.victimIndex);
     if (!victimPlayer) continue;
     if (killerPlayer && killerPlayer.teamKey === victimPlayer.teamKey) continue;
-    if ((kill as { tradeDeath?: boolean }).tradeDeath) continue;
+    if (tradedDeaths.has(kill)) continue;
     const victim = victimPlayer.steamId64;
     if (!victim) continue;
     const phase = phases.get(kill.roundNumber);

@@ -344,6 +344,33 @@ function sortKills(pkg: DemoPackage): Array<{ kill: DemoPackage["kills"][number]
     .sort((left, right) => left.kill.roundNumber - right.kill.roundNumber || left.kill.tick - right.kill.tick || left.index - right.index);
 }
 
+/** Canonical trade membership for the original kill objects; never mutates ZIP flags. */
+export function deriveKillTrades(pkg: DemoPackage): {
+  tradeKills: ReadonlySet<DemoPackage["kills"][number]>;
+  tradedDeaths: ReadonlySet<DemoPackage["kills"][number]>;
+} {
+  const tradeKills = new Set<DemoPackage["kills"][number]>();
+  const tradedDeaths = new Set<DemoPackage["kills"][number]>();
+  const windowTicks = 6 * pkg.match.tickrate;
+  const enemyKills = sortKills(pkg).map(({ kill }) => kill).filter((kill) => {
+    const killer = kill.killerIndex === null ? null : playerAt(pkg, kill.killerIndex, "kills");
+    return isEnemyPlayerKill(kill, killer, playerAt(pkg, kill.victimIndex, "kills"));
+  });
+  for (const [index, kill] of enemyKills.entries()) {
+    for (let previous = index - 1; previous >= 0; previous -= 1) {
+      const death = enemyKills[previous]!;
+      const delta = kill.tick - death.tick;
+      if (death.roundNumber !== kill.roundNumber || delta > windowTicks) break;
+      if (delta < 0 || death.killerIndex !== kill.victimIndex) continue;
+      if (playerAt(pkg, kill.killerIndex!, "kills").teamKey !== playerAt(pkg, death.victimIndex, "kills").teamKey) continue;
+      tradeKills.add(kill);
+      tradedDeaths.add(death);
+      break; // A trade covers the most recent eligible teammate death only.
+    }
+  }
+  return { tradeKills, tradedDeaths };
+}
+
 function addKastTags(row: MutablePlayerRound): void {
   if (row.kills > 0) row.kastTags.add("kill");
   if (row.assists > 0) row.kastTags.add("assist");
@@ -386,6 +413,7 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
   };
 
   const sortedKills = sortKills(pkg);
+  const trades = deriveKillTrades(pkg);
   const openingByRound = new Map<number, DemoPackage["kills"][number]>();
   const aliveByRound = new Map<number, { teamA: Set<number>; teamB: Set<number> }>();
   for (const round of rounds) {
@@ -413,12 +441,12 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
       const killerRow = rowFor(kill.roundNumber, kill.killerIndex!, "kills");
       killerRow.kills += 1;
       if (kill.headshot) killerRow.headshots += 1;
-      if (kill.tradeKill) killerRow.tradeKills += 1;
+      if (trades.tradeKills.has(kill)) killerRow.tradeKills += 1;
       if (isUtilityWeapon(kill.weapon)) killerRow.utility.utilityKills += 1;
       const weapon = weaponFor(killerRow.weapons, normalizeWeapon(kill.weapon));
       weapon.kills += 1;
       if (kill.headshot) weapon.headshotKills += 1;
-      if (kill.tradeKill) weapon.tradeKills += 1;
+      if (trades.tradeKills.has(kill)) weapon.tradeKills += 1;
       if (kill.noScope) weapon.noScopeKills += 1;
       if (kill.throughSmoke) weapon.throughSmokeKills += 1;
       if ((kill.penetratedObjects ?? 0) > 0) weapon.wallbangKills += 1;
@@ -429,7 +457,7 @@ export function buildPlayerRoundPerformanceFacts(pkg: DemoPackage): PlayerRoundP
     victimRow.deaths += 1;
     if (killer === null || kill.killerIndex === kill.victimIndex) victimRow.bombDeaths += 1;
     else victimRow.combatDeaths += 1;
-    if (kill.tradeDeath) victimRow.tradedDeaths += 1;
+    if (trades.tradedDeaths.has(kill)) victimRow.tradedDeaths += 1;
 
     if (playerKill) {
       if (kill.assisterIndex !== null) {
