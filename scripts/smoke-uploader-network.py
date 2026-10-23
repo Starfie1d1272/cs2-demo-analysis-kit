@@ -12,7 +12,6 @@ import urllib.request
 from pathlib import Path
 
 from cs2dak.rivalhub_uploader import NoRedirect, UploaderApi
-from cs2dak.uploader_transport import UploaderHTTPSHandler, tls_context
 
 ORIGIN = "https://match.starfie1d.top"
 
@@ -44,12 +43,13 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
-    probes = [probe("previous-urllib-default", None)]
+    probes = [probe("stdlib-default", None)]
     for version in [ssl.TLSVersion.TLSv1_2, ssl.TLSVersion.TLSv1_3]:
-        context = tls_context(version)
+        context = ssl.create_default_context()
+        context.minimum_version = version
+        context.set_alpn_protocols(["http/1.1"])
         context.maximum_version = version
         probes.append(probe(version.name, urllib.request.HTTPSHandler(context=context)))
-    probes.append(probe("uploader-preferred-tls", UploaderHTTPSHandler()))
     with tempfile.TemporaryDirectory(prefix="uploader-network-smoke-") as directory:
         api = UploaderApi(Path(directory))
         try:
@@ -67,7 +67,7 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2))
-    return 0 if probes[-2].get("validIdentity") and rejected else 1
+    return 0 if probes[0].get("validIdentity") and rejected else 1
 
 
 if __name__ == "__main__":
