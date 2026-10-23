@@ -89,6 +89,19 @@ PyInstaller 在 Python 启动前就找不到 `python312.dll` 时，应用代码�
 
 ## 构建与验收
 
+上传器的 HTTPS owner 为 `python/src/cs2dak/uploader_transport.py`。连接优先使用 TLS 1.3，
+协议协商失败或握手被重置时，在应用请求尚未发送前重新连接一次，使用 TLS 1.2+ 兼容协商。
+两个路径均验证系统信任链、主机名及 SNI；证书错误、DNS/TCP/代理 CONNECT 失败与超时直接报错。
+HTTP 请求发送后发生的错误不自动重试，POST 和幂等键只发送一次；禁止跟随重定向转发设备凭据。
+日志记录 OpenSSL 版本、TLS 1.3 支持、实际协商协议及握手尝试次数。
+
+**Uploader Windows startup** 的手动 dispatch 可启用 `live_network_smoke`：对正式域名对照旧
+urllib、TLS 1.2、TLS 1.3 和当前 transport，并由真实 `UploaderApi` 发送缺少必需字段的 pairing
+poll，验证 HTTP 错误响应可达。它不建立授权、不提交 Demo、不写业务数据。报告保存在该 run
+artifact 的 `network.json`。本地可在 `python/` 中执行
+`uv run --frozen python ../scripts/smoke-uploader-network.py --output NETWORK_REPORT_PATH`。
+该证据覆盖执行机的网络和 Python runtime；其他网络及完整用户配对/上传仍需分别记录验收。
+
 Windows 安装 Inno Setup 6.4+（[官方](https://jrsoftware.org/isdl.php)），使用仓库冻结依赖：
 
 ```bash

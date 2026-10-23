@@ -8,12 +8,18 @@ on:
       - 'packages/rivalhub-upload/**'
       - 'scripts/package-uploader.sh'
       - 'scripts/smoke-uploader-windows.ps1'
+      - 'scripts/smoke-uploader-network.py'
       - 'pnpm-lock.yaml'
       - 'scripts/check-package-boundaries.mjs'
       - 'scripts/package-boundaries.test.mjs'
       - 'scripts/lib/package-files.mjs'
       - 'scripts/lib/package-imports.mjs'
   workflow_dispatch:
+    inputs:
+      live_network_smoke:
+        description: Verify public production HTTPS and reject an empty pairing poll (no writes)
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -47,6 +53,12 @@ jobs:
         env:
           UV_FROZEN: 'true'
         run: bash scripts/package-uploader.sh
+      - name: Verify uploader transport against the current RivalHub server
+        if: github.event_name == 'workflow_dispatch' && inputs.live_network_smoke
+        shell: bash
+        run: |
+          cd python
+          uv run --frozen python ../scripts/smoke-uploader-network.py --output "$RUNNER_TEMP/uploader-startup-evidence/network.json"
       - name: Frozen empty startup, message response, bridge ready, save dialog and cancel (twice)
         shell: powershell
         run: ./scripts/smoke-uploader-windows.ps1 -Exe "$pwd/python/dist/rivalhub-demo-uploader/rivalhub-demo-uploader.exe" -EvidenceDir "$env:RUNNER_TEMP/uploader-startup-evidence"

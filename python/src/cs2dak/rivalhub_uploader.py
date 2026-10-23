@@ -34,6 +34,7 @@ from cs2dak.diagnostics import (
     safe_metadata,
     sanitize_text,
 )
+from cs2dak.uploader_transport import UploaderHTTPSHandler
 
 SERVICE = "com.starfie1d.rivalhub-demo-uploader"
 PREFIX = "/api/integrations/dak"
@@ -220,7 +221,8 @@ class UploaderApi:
             return result
 
         try:
-            with urllib.request.build_opener(NoRedirect()).open(req, timeout=90) as response:
+            with urllib.request.build_opener(NoRedirect(), UploaderHTTPSHandler()).open(
+                    req, timeout=90) as response:
                 return response_data(response, response.status)
         except urllib.error.HTTPError as exc:
             with exc:
