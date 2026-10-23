@@ -6,6 +6,7 @@ import hashlib
 import logging
 import os
 import platform
+import ssl
 import sys
 import tempfile
 from importlib.metadata import PackageNotFoundError, version
@@ -79,6 +80,7 @@ def log_environment(logger: logging.Logger):
     logger.info("startup python=%s windows=%s machine=%s executable=%s cwd=%s frozen=%s",
                 sys.version, platform.platform(), platform.machine(), sys.executable,
                 Path.cwd(), getattr(sys, "frozen", False))
+    logger.info("tls openssl=%s tls13=%s", ssl.OPENSSL_VERSION, ssl.HAS_TLSv1_3)
     for package in ("cs2dak", "pywebview", "pythonnet", "clr-loader"):
         try:
             value = version(package)

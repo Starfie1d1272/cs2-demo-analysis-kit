@@ -89,6 +89,19 @@ PyInstaller 在 Python 启动前就找不到 `python312.dll` 时，应用代码�
 
 ## 构建与验收
 
+Windows 上传器使用 uv-managed Python 3.12.15；`scripts/package-uploader.sh` 固定运行库并在
+打包前检查 OpenSSL 3.5+ / TLS 1.3。两个 Windows 验证 workflow 使用相同版本，升级时一并更新。
+使用该入口构建的 Release、候选安装器和 ZIP 均包含此运行库；用户无需另装 Python。
+HTTPS 使用 Python 标准库的默认协商、系统信任链及主机名验证，保留代理和禁止重定向规则。
+启动日志记录实际 Python/OpenSSL 版本及 TLS 1.3 支持，便于核对安装包和连接故障。
+
+**Uploader Windows startup** 的手动 dispatch 可启用 `live_network_smoke`：对正式域名对照
+默认 urllib、TLS 1.2 和 TLS 1.3，并由真实 `UploaderApi` 发送缺少必需字段的 pairing poll，
+要求版本接口返回 200、空 poll 返回 422 VALIDATION_FAILED。它不建立授权、不提交 Demo、
+不写业务数据。报告保存在该 run artifact 的 `network.json`。本地可在 `python/` 中执行
+`uv run --frozen python ../scripts/smoke-uploader-network.py --output NETWORK_REPORT_PATH`。
+该证据覆盖执行机的网络和 Python runtime；其他网络及完整用户配对/上传仍需分别记录验收。
+
 Windows 安装 Inno Setup 6.4+（[官方](https://jrsoftware.org/isdl.php)），使用仓库冻结依赖：
 
 ```bash
