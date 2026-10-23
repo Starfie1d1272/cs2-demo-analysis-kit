@@ -29,6 +29,7 @@ export { buildPlayerRoundUtilityFacts, toPlayerRoundUtilityFacts, type PlayerRou
 export { derivePlayerWeaponHighlights } from "./weapon-highlights.js";
 export {
   aggregatePlayerRoundPerformanceFacts,
+  deriveKillTrades,
   buildPlayerRoundPerformanceFacts,
   toPlayerRoundFacts,
 } from "./performance-facts.js";

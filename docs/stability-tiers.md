@@ -25,7 +25,11 @@ UI 约定：Beta 指标在标题旁标 `Beta`，Experimental 标 `实验`；两�
   该 profile 将 offensive kill credit 统一为 enemy-player kill，`dak-stable/2` 与 `/1` 只作为
   immutable historical artifact 保留，不与 `/3` 静默混合。`@cs2dak/tournament` identity 只认
   entity key，`rate` 保留原始分子/分母；当前 Evidence producer provenance 为
-  `cs2-demo-analysis-kit/1.0.4`。
+  `cs2-demo-analysis-kit/1.0.5`。补枪从同回合事件按六秒窗口重派生，只归属最近一条合格队友死亡，
+  修复旧 ZIP 标记的队伤、自杀、跨回合与乱序污染；这是 `/3` 已有补枪语义的修复，不改变
+  Evidence 协议或升级 semantic profile。`analysisVersion` 区分修复前后；Studio 的
+  `FACTS_REVISION` 随 Core 版本变化，旧资料可从已存 ZIP 重建，无需原始 `.dem`。网站已入库
+  事实不自动重算，需另行授权更新；不得将旧分析版本当作已修复。
 - **RR v1 单场数据线**：frozen pro baseline（`1.0 = 职业基线`），单场口径稳定。
 - **2D 回放与 EvidenceLink**：回放帧、锚点、统计跳转——基础设施级。
 - **QA 报告**：damage/freeze 伪影规则已冻结（见 `studio-redesign.md` §1）。
