@@ -92,7 +92,12 @@ PyInstaller 在 Python 启动前就找不到 `python312.dll` 时，应用代码�
 Windows 上传器使用 uv-managed Python 3.12.15；`scripts/package-uploader.sh` 固定运行库并在
 打包前检查 OpenSSL 3.5+ / TLS 1.3。两个 Windows 验证 workflow 使用相同版本，升级时一并更新。
 使用该入口构建的 Release、候选安装器和 ZIP 均包含此运行库；用户无需另装 Python。
-HTTPS 使用 Python 标准库的默认协商、系统信任链及主机名验证，保留代理和禁止重定向规则。
+HTTPS 由原生桥内的 urllib3 会话连接池持有，沿用默认 TLS 协商、系统信任链和主机名验证。
+保留 urllib 的系统/环境代理发现、绕过规则及代理认证；变更网站或代理后关闭旧连接池。
+同一会话串行复用连接，退出时清理。所有请求禁止重定向与底层自动重试；提交结果不确定时
+仍由上传流程使用原幂等键和回执恢复，传输层不重新发送。
+连接建立超时为 10 秒，配对和赛程读取的响应读取超时为 15 秒，Evidence 提交为 90 秒。
+这些值限制 socket 等待，不代表包含排队、DNS 和整个响应读取在内的总耗时上限。
 启动日志记录实际 Python/OpenSSL 版本及 TLS 1.3 支持，便于核对安装包和连接故障。
 
 **Uploader Windows startup** 的手动 dispatch 可启用 `live_network_smoke`：对正式域名对照

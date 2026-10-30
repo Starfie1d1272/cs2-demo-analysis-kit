@@ -1,7 +1,6 @@
 """Native boundary tests without a WebView, OS credential prompts or live website."""
 import base64
 import hashlib
-import io
 import json
 import threading
 from types import SimpleNamespace
@@ -120,15 +119,12 @@ def test_safe_extract_rejects_path_traversal(tmp_path: Path) -> None:
 def test_events_negotiation_retains_native_authorization(api, monkeypatch, path):
     api.configure("https://example.com")
     monkeypatch.setattr(uploader, "credential", lambda origin: "test-token")
-    response = io.BytesIO(b'{"events": []}')
-    response.status = 200
-    opener = Mock()
-    opener.open.return_value = response
-    monkeypatch.setattr(uploader.urllib.request, "build_opener", lambda *args: opener)
+    request = Mock(return_value=SimpleNamespace(data=b'{"events": []}', status=200, headers={}))
+    monkeypatch.setattr(api._transport, "request", request)
     assert api.request(path, "GET") == {"status": 200, "body": {"events": []}}
-    request = opener.open.call_args.args[0]
-    assert request.full_url == "https://example.com/api/integrations/dak" + path
-    assert request.get_header("Authorization") == "Bearer test-token"
+    args = request.call_args.args
+    assert args[:3] == ("https://example.com", path, "GET")
+    assert args[3]["Authorization"] == "Bearer test-token"
 
 
 def test_cancel_undoes_only_owned_authorization_and_restores_previous(api, monkeypatch):

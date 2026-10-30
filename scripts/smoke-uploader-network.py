@@ -11,9 +11,14 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from cs2dak.rivalhub_uploader import NoRedirect, UploaderApi
+from cs2dak.rivalhub_uploader import UploaderApi
 
 ORIGIN = "https://match.starfie1d.top"
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 def probe(name, handler):
