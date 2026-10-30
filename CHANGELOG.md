@@ -4,6 +4,18 @@ DAK Studio、RivalHub Demo Uploader 及 `@cs2dak/*` 分析管道面向用户的�
 
 > 0.1.3 起面向 Studio 用户维护。`@cs2dak/*` npm 包版本由 changesets 独立管理（见各包的 CHANGELOG.md）；本文件聚焦 DAK Studio 桌面应用变更。
 
+## [0.8.8] — 2026-10-30
+
+### 变更
+
+- **RivalHub 上传器连接**：在会话内复用 HTTPS 连接，并按配对、赛程读取和 Evidence 提交设置读取超时；保留代理、证书校验和提交恢复规则。
+
+### 内部与维护
+
+- **Python 打包依赖**：将 setuptools 更新至 84.1.0，包含安全修复。
+- **赛事上传 Worker**：更新 Wrangler 等开发依赖，并在 CI 中执行安装、类型检查和不部署的构建验证。
+- **CI 与发布工作流**：更新 setup-uv Action 至 10.3.2。
+
 ## [0.8.7] — 2026-10-24
 
 ### 修复
