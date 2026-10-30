@@ -11,12 +11,12 @@ import stat
 import sys
 import tempfile
 import threading
-import urllib.error
 import urllib.parse
-import urllib.request
 import uuid
 import webbrowser
 from pathlib import Path
+
+import urllib3
 
 from cs2dak.credentials import (
     _macos_credential_delete,
@@ -34,6 +34,7 @@ from cs2dak.diagnostics import (
     safe_metadata,
     sanitize_text,
 )
+from cs2dak.uploader_transport import UploaderTransport
 
 SERVICE = "com.starfie1d.rivalhub-demo-uploader"
 PREFIX = "/api/integrations/dak"
@@ -70,15 +71,10 @@ def delete_credential(origin: str) -> bool:
     return _macos_credential_delete(SERVICE, account)
 
 
-class NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        # Never forward device credentials to a redirect destination.
-        return None
-
-
 class UploaderApi:
     def __init__(self, userdata: Path):
         self._window = None
+        self._transport = UploaderTransport()
         self._userdata = userdata
         self._metadata = userdata / "connection.json"
         self._temp = tempfile.TemporaryDirectory(prefix="rivalhub-uploader-")
@@ -179,16 +175,15 @@ class UploaderApi:
                    ("/evidence", "POST")}
         if (path, method) not in allowed or not self._origin:
             raise ValueError("不支持的请求")
+        origin = self._origin
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
         if path in {"/events", "/events?seriesDisposition=1", "/evidence"}:
-            token = credential(self._origin)
+            token = credential(origin)
             if not token:
                 return {"status": 401, "body": {"error": {"message": "授权不存在，请重新连接 RivalHub"}}}
             headers["Authorization"] = f"Bearer {token}"
         if key:
             headers["Idempotency-Key"] = key
-        req = urllib.request.Request(self._origin + PREFIX + path, method=method, headers=headers,
-                                     data=json.dumps(body).encode() if body is not None else None)
         status = 0
         request_id = ""
 
@@ -199,7 +194,7 @@ class UploaderApi:
             if response_headers:
                 request_id = sanitize_text(response_headers.get("X-Request-Id", ""), 160)
             try:
-                data = json.load(response)
+                data = json.loads(response.data)
             except (ValueError, OSError, http.client.HTTPException) as exc:
                 failure = log_failure(log, exc, "http.response")
                 failure.update(code="INVALID_RESPONSE", status=status, requestId=request_id)
@@ -220,12 +215,10 @@ class UploaderApi:
             return result
 
         try:
-            with urllib.request.build_opener(NoRedirect()).open(req, timeout=90) as response:
-                return response_data(response, response.status)
-        except urllib.error.HTTPError as exc:
-            with exc:
-                return response_data(exc, exc.code)
-        except (OSError, ValueError, http.client.HTTPException) as exc:
+            response = self._transport.request(origin, path, method, headers,
+                                               json.dumps(body).encode() if body is not None else None)
+            return response_data(response, response.status)
+        except (OSError, ValueError, http.client.HTTPException, urllib3.exceptions.HTTPError) as exc:
             failure = log_failure(log, exc, "http.request")
             failure.update(code="NETWORK", status=status, requestId=request_id)
             return {"status": status, "requestId": request_id,
@@ -355,6 +348,7 @@ class UploaderApi:
         return export_safe_logs(log, Path(destination), self._userdata / "uploader.log")
 
     def close(self):
+        self._transport.close()
         with self._lock:
             self._closed = True
             self._temp.cleanup()
