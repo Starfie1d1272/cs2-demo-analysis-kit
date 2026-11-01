@@ -6,10 +6,10 @@
 
 ## 安全模型
 
-- **边缘只能收**：Worker 只能 `put` 到 `events/_submissions/`，无法列出、删除或 promote 已发布资产。
-- **promote 全在本地**：审核与发布用 `scripts/promote-event-submission.mjs` + 你的 R2 凭证完成，
-  边缘永不持有 promote 能力。即使 Worker 被滥用，最坏后果是隔离区堆垃圾文件（有大小上限 + 可选人机校验），
-  绝不会污染已发布赛事。
+- HTTP 接口只提供隔离上传，写入 `events/_submissions/`。审核与 promote 由本地脚本执行；R2 binding 本身具有 bucket API 能力，路径限制由本 Worker 实现。
+- 请求必须带 64 位十六进制 `x-sha256`。Worker 逐块计数并用 `crypto.DigestStream` 计算 SHA-256，保留一个 5 MiB 缓冲区。较大文件通过 R2 multipart 上传，校验成功后 complete；超限、断流或校验失败时 abort。
+- 小文件在校验后单次 put；multipart 的完整长度记录在并列 `.meta.json`。ZIP 魔数校验完整四字节，深度合同检查仍由 promote 执行。
+- 服务端默认最多 512 MiB；Cloudflare 账户的 HTTP 请求体限制也适用。没有 Content-Length 的请求按实际读取字节限制。客户声明长度与实际长度不符时拒绝。
 
 ## 部署（需 Cloudflare 凭证）
 

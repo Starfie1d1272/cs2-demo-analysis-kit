@@ -181,8 +181,9 @@ OIDC 需要 job 级 `id-token: write`，package tag 推送需要 `contents: writ
 
 工作流不使用长期 npm write token，不要求生产发布前 `npm login`，也不设置
 `NPM_TOKEN` / `NODE_AUTH_TOKEN`。Trusted Publishing 成功时 npm 会自动生成 provenance。
-本地 `pnpm release:npm` 保留作 release path 验证命令，但它最后仍会执行
-`changeset publish`；正式 registry publish 不走本机认证路径。
+本地 `pnpm check:release` 执行发布前验证，不上传包或创建 tag。
+本地 `pnpm release:npm` 会报错并指向 GitHub Actions 的 **Publish npm packages**；
+实际发布统一由 `npm-publish.yml` 执行 OIDC 上传和有界 registry 对账。
 
 Changesets 会按 registry 上的精确版本跳过已发布包。工作流关闭 Changesets 自己的
 本地 tag 创建，由 `scripts/reconcile-npm-publish.mjs` 先查询每个精确版本是否已经在

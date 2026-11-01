@@ -23,6 +23,7 @@ jobs:
           node-version: 24
       - run: npm ci
       - run: npm run typecheck
+      - run: npm test
       - run: ./node_modules/.bin/wrangler deploy --dry-run --outdir "$RUNNER_TEMP/event-upload-worker"
 
   typescript:
