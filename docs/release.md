@@ -197,7 +197,7 @@ commit 的 tag 会直接使工作流失败，不会删除、回滚、移动 tag 
 
 1. 在 GitHub 仓库 Settings → Environments 创建 `npm-publish`。建议给它设置 required
    reviewers、禁止 self-review，并将部署分支限制为 `main`。
-2. 对上面列出的 7 个包分别在 npm → Package → Settings → Trusted publishing 添加
+2. 对上面列出的公共包分别在 npm → Package → Settings → Trusted publishing 添加
    **GitHub Actions** publisher：
 
    - Organization or user：`Starfie1d1272`（GitHub 仓库 owner，不是 npm 用户名）

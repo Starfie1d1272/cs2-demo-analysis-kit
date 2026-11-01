@@ -41,3 +41,6 @@ scripts/hltv/.extract-state.json
 
 python/src/cs2dak/rivalhub_uploader_web/
 .agent-tmp/
+
+# Project-reference typechecking has separate declarations from publish artifacts.
+packages/*/.typecheck/

@@ -5,6 +5,7 @@
 "@cs2dak/maps": major
 "@cs2dak/presentation": major
 "@cs2dak/react": major
+"@cs2dak/rating": patch
 ---
 
 按基础事实、评分、跨场画像、地图算法与资产、战术、展示和执行编排重划公共边界；删除迁出的旧入口。

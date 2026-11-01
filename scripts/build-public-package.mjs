@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 import { bundledDependencies } from './lib/bundled-dependencies.mjs';
@@ -66,8 +66,12 @@ for (const name of upstreamDependencies) {
   } finally {
     rmSync(configDirectory, { recursive: true, force: true });
   }
-  const declarationSources = listedFiles.split(/\r?\n/).filter(file => file.startsWith(upstreamRoot + sep));
-  assert.ok(declarationSources.includes(entry), `${name}: declaration compiler did not report its entry source`);
+  // tsc prints forward slashes on Windows; compare native paths, including drive casing.
+  const declarationSources = listedFiles.split(/\r?\n/).filter(Boolean).map(file => resolve(file)).filter(file => {
+    const fromRoot = relative(upstreamRoot, file);
+    return fromRoot !== '' && fromRoot !== '..' && !fromRoot.startsWith(`..${sep}`) && !isAbsolute(fromRoot);
+  });
+  assert.ok(declarationSources.some(file => relative(entry, file) === ''), `${name}: declaration compiler did not report its entry source`);
   for (const file of declarationSources) {
     const key = relative(upstreamRoot, file).split(sep).join('/');
     const hash = createHash('sha256').update(readFileSync(file)).digest('hex');

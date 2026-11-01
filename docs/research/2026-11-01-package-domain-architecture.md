@@ -180,3 +180,9 @@ flowchart TD
 - UI SSR 与 browser bundle 消费通过。地图专项验证覆盖 JSON 公开出口、Node/browser loader、tri API、strict NodeNext，以及卸载 map-assets 后 maps root/calibration 独立加载。
 
 以上是本轮本机验证。未进行浏览器交互或 Windows 验收，未执行完整 Linux tgz gate，未正式发布。
+
+## 合并前行为与 CI 复核
+
+对比 main `48d37cc` 与重构提交 `91ff245`，分别独立构建，在同一 Node 26.9.0 环境执行 Nuke、Inferno、Ancient 三份已提交 ZIP fixture。三份完整 AnalysisBundle 深比较一致；生成的 Markdown 报告、工作台初始 SSR HTML 和记分板 SSR HTML 均逐字一致。模型差异限于已声明的 workspace-0.2 合同、预计算字段及展示侧移除的非数值标识。该对比覆盖这些固定输入和初始渲染，交互事件另经完整代码 diff 审阅。
+
+PR #128 首轮 CI 发现 Windows 的 tsc 路径格式差异，以及重复构建时类型检查声明与发布声明共用 dist。修复将项目引用类型检查产物移至 `.typecheck`，发布构建继续独占 dist；Windows 对 compiler 输出按平台路径规则规范化，源哈希与目录边界断言保留。本地按“串行构建 → 全工作区类型检查 → 串行再构建”复现验证修复。
