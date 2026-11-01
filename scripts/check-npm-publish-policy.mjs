@@ -151,6 +151,10 @@ for (const { action, ref } of publishActionRefs) {
   );
 }
 
+const rootManifest = readJson(join(repoRoot, "package.json"));
+check(rootManifest.scripts?.["release:npm"] === "node scripts/release-npm.mjs", "release:npm must redirect to the OIDC workflow");
+check(typeof rootManifest.scripts?.["check:release"] === "string" && !/changeset publish|npm publish/.test(rootManifest.scripts["check:release"]), "check:release must only validate artifacts");
+
 const releaseDocs = readFileSync(releaseDocsPath, "utf8");
 for (const required of [
   "npm-publish.yml",

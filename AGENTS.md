@@ -167,7 +167,7 @@ docs/                  # 架构与集成文档（索引见 docs/README.md）
   Release CI 出 DMG/zip。发版前 `node scripts/sync-version.mjs X.Y.Z` 同步
   根 package.json / 私有 apps / python。Studio 启动时自查 releases/latest 提示更新。
 - **npm 包**（`@cs2dak/*`）：Changesets 管理（`pnpm changeset` → `version:packages`
-  → `release:npm`），tag 形如 `@cs2dak/core@1.0.0`。`sync-version.mjs` 不碰公共包。
+  → 合并版本 PR → 手动运行 `npm-publish.yml`），本地验证用 `pnpm check:release`。tag 形如 `@cs2dak/core@1.0.0`。`sync-version.mjs` 不碰公共包。
 
 ## 5. Hard Constraints
 
