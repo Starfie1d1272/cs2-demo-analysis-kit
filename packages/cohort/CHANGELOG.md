@@ -1,5 +1,12 @@
 # @cs2dak/cohort
 
+## 3.0.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @cs2dak/rating@1.0.2
+
 ## 3.0.0
 
 ### Major Changes
