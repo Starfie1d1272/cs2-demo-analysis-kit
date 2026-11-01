@@ -5,7 +5,7 @@ import type {
   LeaderboardMetricKey,
   LeaderboardViewKey,
   SeasonLeaderboardModel
-} from "@cs2dak/contract";
+} from "@cs2dak/presentation";
 
 export interface SeasonLeaderboardProps {
   model: SeasonLeaderboardModel;

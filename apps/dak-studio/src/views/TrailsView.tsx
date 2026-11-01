@@ -1,6 +1,6 @@
 import { Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { OpeningTrailsModel, OpeningTrailRound } from "@cs2dak/contract";
+import type { OpeningTrailsModel, OpeningTrailRound } from "@cs2dak/tactics";
 import { RadarTrails, GRENADE_COLOR, type RadarTrail, type RadarGrenadeOverlay } from "../components/RadarTrails";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import type { IdentityOptions } from "../lib/season";
@@ -11,7 +11,7 @@ import { EmptyState } from "@cs2dak/react";
 
 /**
  * 开局动线：选手在长枪局开局前 N 秒的走位 + 道具投掷叠加动画。
- * 数据由 @cs2dak/presentation buildOpeningTrails 派生，本视图只做投影与播放。
+ * 数据由 @cs2dak/analytics buildOpeningTrails 派生，本视图只做投影与播放。
  */
 
 export interface TrailsViewProps {

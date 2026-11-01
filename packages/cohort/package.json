@@ -16,9 +16,8 @@
     }
   },
   "dependencies": {
-    "@cs2dak/contract": "workspace:*",
-    "@cs2dak/core": "workspace:*",
-    "@rivalhub/rival-rating": "0.3.0"
+    "@cs2dak/rating": "workspace:*",
+    "zod": "^4.6.5"
   },
   "files": [
     "dist"

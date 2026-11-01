@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, extname, join, parse } from "node:path";
-import { analyzeDemoPackage, loadDemoPackageFromZip } from "@cs2dak/core";
+import { analyzeDemoPackage } from "@cs2dak/pipeline";
+import { loadDemoPackageFromZip } from "@cs2dak/demo-io";
 import { buildDemoViewModel } from "@cs2dak/presentation";
-import { buildSeasonCohort, type PlayerIdentityMap } from "@cs2dak/cohort";
+import { buildSeasonCohort } from "@cs2dak/pipeline";
+import { type PlayerIdentityMap } from "@cs2dak/cohort";
 
 async function main() {
   const [command, inputPath, ...rest] = process.argv.slice(2);

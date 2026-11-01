@@ -38,14 +38,14 @@ const harness = vi.hoisted(() => {
   return { records, blobs, rows, state, adapter };
 });
 vi.mock("./storage", () => ({ getStorage: () => harness.adapter }));
-vi.mock("@cs2dak/core", () => ({
+vi.mock("@cs2dak/demo-io", () => ({
   loadDemoManifestFromZip: async (buffer: ArrayBuffer) => ({ demo: { hash: String(new Uint8Array(buffer)[0]).repeat(64) } }),
   loadDemoPackageFromZip: async (buffer: ArrayBuffer) => ({ marker: new Uint8Array(buffer)[0], match: { mapName: "de_nuke" } }),
-  buildMatchRadarField: vi.fn(),
-  TACTICAL_FACT_VERSION: "test", MAP_INTELLIGENCE_FACT_VERSION: "test", CORE_ANALYSIS_VERSION: "test",
 }));
+vi.mock("@cs2dak/tactics", () => ({ buildMatchRadarField: vi.fn(), TACTICAL_FACT_VERSION: "test", MAP_INTELLIGENCE_FACT_VERSION: "test" }));
+vi.mock("@cs2dak/core", () => ({ CORE_ANALYSIS_VERSION: "test" }));
 vi.mock("@cs2dak/maps", () => ({ buildRadarFieldGrid: vi.fn() }));
-vi.mock("@cs2dak/presentation", () => ({ buildMatchWorkspaceModel: vi.fn() }));
+vi.mock("@cs2dak/pipeline", () => ({ analyzeMatchWorkspace: vi.fn() }));
 vi.mock("./tri", () => ({ loadTriLookup: async () => null, loadMapTri: vi.fn() }));
 vi.mock("./callout-grid", () => ({ CALLOUT_GRID_URLS: {}, loadStudioCalloutGrid: async () => null }));
 vi.mock("./demo-meta", () => ({ metaFromPackage: () => ({ matchDate: null, mapName: "de_nuke" }) }));

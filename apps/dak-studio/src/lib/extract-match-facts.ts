@@ -1,13 +1,7 @@
-import {
-  aggregatePlayerRoundPerformanceFacts,
-  buildPlayerRoundPerformanceFacts,
-  derivePlayerMechanics,
-  derivePlayerWeaponHighlights,
-  deriveRRIndicators,
-  deriveRRSignals,
-  extractMatchTacticalAndMapIntelligenceFacts,
-  observedTournamentIdentity,
-} from "@cs2dak/core";
+import { buildRatingSpatialContext } from "@cs2dak/pipeline";
+import { aggregatePlayerRoundPerformanceFacts, buildPlayerRoundPerformanceFacts, derivePlayerWeaponHighlights, observedTournamentIdentity } from "@cs2dak/core";
+import { deriveRRIndicators, deriveRRSignals } from "@cs2dak/analytics";
+import { derivePlayerMechanics, extractMatchTacticalAndMapIntelligenceFacts } from "@cs2dak/tactics";
 import { decodeDelta, type DemoPackage, type Side } from "@cs2dak/contract";
 import type { TriangleBvh, CalloutGrid, Vec3, LineupGrenadeLike } from "@cs2dak/maps";
 import { calloutNear } from "@cs2dak/maps";
@@ -18,7 +12,7 @@ import {
   extractDuelInsightsFacts,
   extractTeamComparisonFacts,
   extractTournamentFacts,
-} from "@cs2dak/presentation";
+} from "@cs2dak/analytics";
 import type {
   ExtractMatchFactsOptions,
   LineupFact,
@@ -188,7 +182,7 @@ export function extractMatchData(pkg: DemoPackage, options: ExtractMatchFactsOpt
   }).filter((row): row is PlayerMatchStatsFact => row != null);
 
   const players = playerBySteamId(pkg);
-  const rrSignals = deriveRRSignals(pkg, performanceFacts);
+  const rrSignals = deriveRRSignals(pkg, performanceFacts, buildRatingSpatialContext(pkg));
   const rrIndicators = deriveRRIndicators(pkg, performanceFacts);
   const weaponHighlights = derivePlayerWeaponHighlights(pkg, performanceFacts);
   const signalBySteamId = new Map(rrSignals.map((row) => [row.steamId64, row]));

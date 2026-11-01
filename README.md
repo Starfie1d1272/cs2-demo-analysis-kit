@@ -55,32 +55,49 @@ Nine modules over one shared evidence layer (2D replay · round filters · evide
 
 ## Architecture
 
-```
-.dem
-  → cs2df (PyPI; demoparser2 → cs2-demo-format/3.x ZIP)
-       └─ python/src/cs2dak    GUI / Studio bridge / packaging shell (no parser logic)
-  → @cs2dak/core               load v3 ZIP → normalize / derive signals / QA → AnalysisBundle
-  → @cs2dak/cohort             cross-match aggregation · identity merging · season RR/PRISM
-  → @cs2dak/presentation       single-map adapters · product-neutral view models
-       └─ @cs2dak/tournament    frozen Tournament facts · identity-safe cross-map analytics
-  → @cs2dak/react              reusable React components
-  → apps/dak-studio            DAK Studio (pywebview desktop shell / browser)
+```text
+.dem → cs2df → v3 ZIP → @cs2dak/demo-io → DemoPackage
+  → @cs2dak/core          canonical single-match facts and QA
+  → @cs2dak/tactics       spatial / engagement analysis and tactical clustering
+  → @cs2dak/analytics     rating signals, insights and UI projections
+  → @cs2dak/rating        RR / PRISM formula adapter
+  → @cs2dak/cohort        aggregation of supplied rating rows
+
+@cs2dak/pipeline          orchestrates the complete analysis workflow
+existing UI data → @cs2dak/presentation → @cs2dak/react → host product
 ```
 
-The **v3 ZIP is the only seam** between Python and TypeScript — neither side imports the other. v2 packages are not supported at runtime; loaders fail fast and ask you to re-export with `cs2df`.
+The v3 ZIP is the only Python/TypeScript seam. Each consumer selects the capability it needs; Core facts, ratings, map assets and UI have separate installation boundaries.
 
 | Package | Role |
 |---|---|
-| `@cs2dak/contract` | Zod schemas + types; re-exports `cs2-demo-format` (never forks it). |
-| `@cs2dak/core` | Pure single-match analysis: normalize, economy, kills, clutches, timeline, heatmap, duels, mechanics, QA, RR/PRISM wiring. |
-| `@cs2dak/cohort` | Cross-match aggregation, identity merging, season RR/PRISM shaping. |
-| `@cs2dak/maps` | Map calibration, world→radar transforms, attack routes, zone geometry, callout mapping. |
-| `@cs2dak/tournament` | Zero-runtime-dependency frozen Tournament facts DTO, identity-safe cross-map merge, rates, and structural/reference/aggregation-safety guards. |
-| `@cs2dak/presentation` | Product-neutral view models, labels, workspace orchestration and Tournament legacy adapters. |
-| `@cs2dak/react` | React components that consume presentation contracts only. |
-| `@cs2dak/cli` | Thin CLI wiring `core` to the filesystem. |
-| `apps/dak-studio` | DAK Studio: local demo workbench (IndexedDB library). |
-| `python/src/cs2dak` | Python shell around `cs2df`: pywebview GUI + Studio bridge + PyInstaller packaging. No parser/exporter logic. |
+| `@cs2dak/contract` | Input and basic fact schemas; compiles the pinned original format schema and declarations for distribution. |
+| `@cs2dak/demo-io` | ZIP loading, stream selection and input diagnostics. |
+| `@cs2dak/core` | Canonical event attribution, facts, QA and frozen Tournament projection; no loader, rating or map dependency. |
+| `@cs2dak/rating` | RR/PRISM DTOs and formula adapter; inputs are supplied signals. |
+| `@cs2dak/cohort` | Supplied-row aggregation, identity merging and cohort RR/PRISM. |
+| `@cs2dak/maps` | Asset-independent calibration and spatial algorithms. |
+| `@cs2dak/map-assets` | Map data and explicit Node/browser asset loaders. |
+| `@cs2dak/tactics` | Spatial and engagement analysis, map-role evidence and tactical clustering. |
+| `@cs2dak/tournament` | Frozen facts DTOs, identity-safe cross-map aggregation and aggregation-safety guards. |
+| `@cs2dak/analytics` | Cross-domain signal derivation, insights and existing-results-to-UI projection. |
+| `@cs2dak/pipeline` | Raw DemoPackage analysis and multi-match orchestration. |
+| `@cs2dak/presentation` | Display models, formatting and labels; depends on maps and Zod. |
+| `@cs2dak/react` | Reusable components with scoreboard, table and replay subpaths. |
+| `@cs2dak/cli` | Private filesystem adapter for demo-io and pipeline. |
+| `apps/dak-studio` / `python/src/cs2dak` | Local workbench, desktop bridge and packaging shell. |
+
+```tsx
+import type { MapView, WorkspaceReplay } from '@cs2dak/presentation';
+import { ReplayViewer } from '@cs2dak/react/replay';
+import '@cs2dak/react/theme.css';
+
+export function Replay({ replay, map }: { replay: WorkspaceReplay; map: MapView }) {
+  return <ReplayViewer replay={replay} map={map} />;
+}
+```
+
+For raw DemoPackage input, use `pipeline.analyzeMatchWorkspace(input, options?)`. For existing package/bundle/canonical facts, use `analytics.buildMatchWorkspaceFromAnalysis(pkg, bundle, facts, options?)`. The host supplies radar image URLs through `DemoViewOptions`; omitted URLs are null. See [architecture](docs/architecture.md) for the public entry points and [module boundaries](docs/module-boundaries.md) for the enforced graph.
 
 ## Develop
 
@@ -110,8 +127,8 @@ DAK is the **product-neutral analysis layer**. Products own business logic, iden
 
 - **RivalHub** (cloud tournament platform) integrates over a **versioned data seam**, not shared source at runtime — phased plan in [docs/integration.md](docs/integration.md) (data API first, selective package sharing later).
 - **CS2 Insight Agent** produces raw `.dem`, exports v3 ZIPs with `cs2df`, then runs `cs2dak analyze` for conversational analysis.
-- **rival-rating** owns the RR/PRISM formulas and calibration; this kit only derives signals and wires them in.
-- **cs2-demo-format** owns the v3 ZIP contract; the contract package re-exports it, never forks it.
+- **rival-rating** owns the RR/PRISM formulas and calibration; `@cs2dak/rating` compiles the pinned upstream implementation and declarations, while analytics derives signals and pipeline selects the workflow.
+- **cs2-demo-format** owns the v3 ZIP schema; contract compiles the pinned original schema and declarations. Source hashes and licenses are recorded in the published artifacts. The source-only upstream package is a build dependency.
 
 ## Documentation
 

@@ -1,5 +1,6 @@
-export { MatchWorkspace, ReplayViewer } from "./components/MatchWorkspace";
-export { ScoreboardTable } from "./components/ScoreboardTable";
+export { MatchWorkspace, type MatchWorkspaceProps } from "./components/MatchWorkspace";
+export { ReplayViewer, type ReplayViewerProps, type ReplayTarget } from "./components/ReplayViewer";
+export { ScoreboardTable, type ScoreboardTableProps } from "./components/ScoreboardTable";
 export { RoundTimeline } from "./components/RoundTimeline";
 export { EconomyPanel } from "./components/EconomyPanel";
 export { HeatmapCanvas } from "./components/HeatmapCanvas";
@@ -23,7 +24,3 @@ export {
   type SortDirection,
   useSortable
 } from "./components/DataTable";
-
-// AdminQaWorkspace 保留在源文件中但不再从公共 API 导出：
-// 仓库内零消费者，等待 DAK Studio 建设时重新决定公共面。
-// import { AdminQaWorkspace } from "./components/MatchWorkspace";

@@ -1,11 +1,16 @@
+import { getMapNav } from "@cs2dak/map-assets";
+import { getMapCalibration, hasLowerLevel } from "@cs2dak/maps/calibration";
 import { withImportCheckpoint } from "./import-persistence";
 import { deleteMatchRows, settleWrites } from "./storage/match-rows";
 import { reportDiagnostic, withWorkerFallback } from "./worker-diagnostics";
 import { normalizeDiagnostic, type SafeDiagnostic } from "@cs2dak/rivalhub-upload";
-import { loadDemoManifestFromZip, loadDemoPackageFromZip as loadRawDemoPackage, type DemoPackageLoadOptions, buildMatchRadarField, type DemoPackageLoadProfile } from "@cs2dak/core";
-import { buildMatchWorkspaceModel } from "@cs2dak/presentation";
+import { loadDemoManifestFromZip, loadDemoPackageFromZip as loadRawDemoPackage, type DemoPackageLoadOptions, type DemoPackageLoadProfile } from "@cs2dak/demo-io";
+import { buildMatchRadarField } from "@cs2dak/tactics";
+import { analyzeMatchWorkspace } from "@cs2dak/pipeline";
 import { buildRadarFieldGrid } from "@cs2dak/maps";
-import type { DemoPackage, MatchWorkspaceModel, RadarField } from "@cs2dak/contract";
+import type { DemoPackage } from "@cs2dak/contract";
+import type { RadarField } from "@cs2dak/tactics";
+import type { MatchWorkspaceModel } from "@cs2dak/presentation";
 import { extractMatchData, type ExtractedMatchData } from "./extract-match-facts";
 import { getFactsStore } from "./facts-store";
 import { getDerivedCacheStore } from "./derived-cache";
@@ -494,7 +499,7 @@ function importInWorker(buffer: ArrayBuffer, matchId: string, keepFallback = tru
 /** 主线程兜底算雷达场（无 Worker / node 测试）。 */
 async function radarFieldOnMainThread(buffer: ArrayBuffer, matchId: string, economy: "gun" | "all"): Promise<RadarField[]> {
   const pkg = await loadDemoPackageFromZip(buffer);
-  const grid = buildRadarFieldGrid(pkg.match.mapName);
+  const grid = buildRadarFieldGrid(getMapNav(pkg.match.mapName));
   if (!grid) return [];
   const bvh = await loadMapTri(pkg.match.mapName);
   return buildMatchRadarField(pkg, { matchId, grid, bvh, economy });
@@ -831,7 +836,12 @@ export async function loadDemoPackageTransient(id: string, sourceFile?: File): P
  * 只在打开该场工作台/教练回放时按需构建——与 getDemoPackage 同款懒加载策略。
  */
 export async function loadMatchWorkspaceModel(demoId: string): Promise<MatchWorkspaceModel> {
-  return buildMatchWorkspaceModel(await getDemoPackage(demoId));
+  const pkg = await getDemoPackage(demoId);
+  const calibration = getMapCalibration(pkg.match.mapName);
+  return analyzeMatchWorkspace(pkg, {
+    radarImageUrl: calibration ? `./maps/radars/${pkg.match.mapName}.png` : null,
+    lowerRadarImageUrl: calibration && hasLowerLevel(calibration) ? `./maps/radars/${pkg.match.mapName}_lower.png` : null,
+  });
 }
 
 /** 批量替换资料库中所有匹配 originalName 的队伍名为 displayName。 */

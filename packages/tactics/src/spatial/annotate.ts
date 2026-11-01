@@ -1,0 +1,153 @@
+/**
+ * Raw evidence 地基：位置标注 + 空间资产装载（严格重建 SP1）。
+ * 设计见 docs/design/rr-model.md §3、§5（计算流程）。
+ *
+ * 当前控图/战术语义真相源是 replay place 生成的 callout grid，不是手标 zone polygon。
+ * zone 字段只保留给旧 shadow spatial/utility 几何路径；新增控图 finding 不应消费 zoneId。
+ * 这些是 official MapControl gate（SP2：solo pressure 的 nav 距离、denial 的 LOS）的输入底座。
+ *
+ * v3 replay 8Hz 流替代了 v2 的 positions-1s。每帧解码后转换：
+ * - track.tick（差分编码 → decodeDelta）
+ * - track.x/y/z（差分编码 × coordScale → 游戏单位）
+ * - track.place（索引 → placeDict）
+ * - track.flags（FLAG_ALIVE）
+ * - track.hp（原始值）
+ */
+import type { DemoPackage } from "@cs2dak/contract";
+import { decodeDelta, FLAG_ALIVE } from "@cs2dak/contract";
+import { createResolverFromPackage } from "@cs2dak/core";
+import { getMapNav, getMapRoutes, getMapZones } from "@cs2dak/map-assets";
+import { zoneAt, type CompactNav, type MapRoutes, type MapZones, type TriangleBvh, type Vec3, type ZoneRole } from "@cs2dak/maps";
+
+export interface SpatialAssets {
+  mapName: string;
+  routes: MapRoutes | null;
+  zones: MapZones | null;
+  nav: CompactNav | null;
+  /** 静态视线 BVH；Node 下经 tri-assets 装载，浏览器降级为 null。 */
+  visibility: TriangleBvh | null;
+  available: {
+    routes: boolean;
+    zones: boolean;
+    nav: boolean;
+    visibility: boolean;
+  };
+}
+
+export function loadSpatialAssets(mapName: string, triBvh?: TriangleBvh | null): SpatialAssets {
+  const routes = getMapRoutes(mapName);
+  const zones = getMapZones(mapName);
+  const nav = getMapNav(mapName);
+  const visibility = triBvh ?? null;
+  return {
+    mapName,
+    routes,
+    zones,
+    nav,
+    visibility,
+    available: {
+      routes: routes != null,
+      zones: zones != null,
+      nav: nav != null,
+      visibility: visibility != null,
+    },
+  };
+}
+
+export interface AnnotatedSample {
+  roundNumber: number;
+  tick: number;
+  steamId64: string;
+  teamKey: string;
+  side: string | null;
+  alive: boolean;
+  position: Vec3;
+  /** callout（replay placeDict）；缺失为 null。 */
+  callout: string | null;
+  /** legacy 手标 zone id；当前控图/战术语义不要把它当真相源。 */
+  zoneId: string | null;
+  /** zone 语义角色（site/mid/connector/lane…）；无 zone 为 null。 */
+  zoneRole: ZoneRole | null;
+  /** zone 关联包点；无则 null。 */
+  zoneBombsite: "a" | "b" | null;
+  /** 最近 nav area id；无 nav 资产为 null。 */
+  navAreaId: number | null;
+  /** 当前血量（火焰逼退掉血判定用）；缺失为 100。 */
+  health: number;
+}
+
+/**
+ * 从 replay 8Hz 流标注位置样本（v3 替代 v2 positions-1s）。
+ * 返回所有存活/阵亡玩家的逐帧标注，zone/nav 判定暂缺（需 maps 包导出 zoneAt/nearestNavArea）。
+ */
+export function annotatePositions(pkg: DemoPackage, assets: SpatialAssets): AnnotatedSample[] {
+  const resolver = createResolverFromPackage(pkg);
+  const replay = pkg.replay;
+  if (!replay) return [];
+
+  const coordScale = replay.meta.coordScale;
+  const placeDict = replay.placeDict ?? [];
+  const samples: AnnotatedSample[] = [];
+
+  const roundByNumber = new Map(pkg.rounds.map((r) => [r.roundNumber, r]));
+
+  for (const round of replay.rounds) {
+    const roundRow = roundByNumber.get(round.roundNumber);
+    if (!roundRow) continue;
+    const tickStep = round.tickStep;
+
+    for (const track of round.players) {
+      const player = resolver.byIndexOrNull(track.playerIndex);
+      if (!player) continue;
+
+      const xs = decodeDelta(track.x);
+      const ys = decodeDelta(track.y);
+      const zs = decodeDelta(track.z);
+      const side: string | null =
+        player.teamKey === "teamA" ? roundRow.teamASide : roundRow.teamBSide;
+
+      for (let i = 0; i < xs.length; i++) {
+        const placeIdx = track.place[i] ?? -1;
+        const px = (xs[i] ?? 0) * coordScale;
+        const py = (ys[i] ?? 0) * coordScale;
+        const pz = (zs[i] ?? 0) * coordScale;
+        const zone = assets.zones ? zoneAt(assets.zones, px, py, pz) : null;
+        samples.push({
+          roundNumber: round.roundNumber,
+          tick: round.startTick + i * tickStep,
+          steamId64: player.steamId64,
+          teamKey: player.teamKey,
+          side,
+          alive: ((track.flags[i] ?? 0) & FLAG_ALIVE) !== 0,
+          position: { x: px, y: py, z: pz },
+          callout: placeIdx >= 0 && placeIdx < placeDict.length ? placeDict[placeIdx] : null,
+          zoneId: zone?.id ?? null,
+          zoneRole: (zone?.role as ZoneRole | undefined) ?? null,
+          zoneBombsite: (zone?.bombsite as "a" | "b" | undefined) ?? null,
+          navAreaId: null,
+          health: track.hp[i] ?? 100,
+        });
+      }
+    }
+  }
+
+  return samples;
+}
+
+/** 按 (round, tick) 分组的标注样本，供逐帧 gate 消费。 */
+export function groupSamplesByRoundTick(
+  samples: AnnotatedSample[],
+): Map<number, Map<number, AnnotatedSample[]>> {
+  const out = new Map<number, Map<number, AnnotatedSample[]>>();
+  for (const s of samples) {
+    let byTick = out.get(s.roundNumber);
+    if (!byTick) {
+      byTick = new Map();
+      out.set(s.roundNumber, byTick);
+    }
+    const arr = byTick.get(s.tick) ?? [];
+    arr.push(s);
+    byTick.set(s.tick, arr);
+  }
+  return out;
+}

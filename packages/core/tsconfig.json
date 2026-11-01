@@ -6,9 +6,18 @@
     "declaration": true,
     "declarationMap": true,
     "emitDeclarationOnly": true,
-    "outDir": "dist",
+    "outDir": ".typecheck",
     "rootDir": "src"
   },
-  "include": ["src"],
-  "references": [{ "path": "../contract" }, { "path": "../maps" }, { "path": "../tournament" }]
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../contract"
+    },
+    {
+      "path": "../tournament"
+    }
+  ]
 }

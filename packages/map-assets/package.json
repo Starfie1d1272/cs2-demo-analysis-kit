@@ -1,0 +1,53 @@
+{
+  "name": "@cs2dak/map-assets",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Starfie1d1272/cs2-demo-analysis-kit.git",
+    "directory": "packages/map-assets"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./callout-grid-node": {
+      "types": "./dist/callout-grid-node.d.ts",
+      "import": "./dist/callout-grid-node.js",
+      "default": "./dist/callout-grid-node.js"
+    },
+    "./callout-grid-browser": {
+      "types": "./dist/callout-grid-browser.d.ts",
+      "import": "./dist/callout-grid-browser.js",
+      "default": "./dist/callout-grid-browser.js"
+    },
+    "./tri-assets": {
+      "types": "./dist/tri-assets.d.ts",
+      "import": "./dist/tri-assets.js",
+      "default": "./dist/tri-assets.js"
+    },
+    "./callout-grid/*.json": "./callout-grid/*.json"
+  },
+  "dependencies": {
+    "@cs2dak/maps": "workspace:*"
+  },
+  "files": [
+    "dist",
+    "map-nav",
+    "map-routes",
+    "map-zones",
+    "callout-grid"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "scripts": {
+    "build": "node ../../scripts/build-public-package.mjs"
+  }
+}

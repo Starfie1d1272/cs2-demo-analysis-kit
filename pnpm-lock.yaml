@@ -166,9 +166,6 @@ importers:
 
   .:
     dependencies:
-      '@rivalhub/rival-rating':
-        specifier: 0.3.0
-        version: 0.3.0
       jszip:
         specifier: ^3.10.2
         version: 3.10.2
@@ -212,6 +209,9 @@ importers:
 
   apps/dak-studio:
     dependencies:
+      '@cs2dak/analytics':
+        specifier: workspace:*
+        version: link:../../packages/analytics
       '@cs2dak/cohort':
         specifier: workspace:*
         version: link:../../packages/cohort
@@ -221,18 +221,33 @@ importers:
       '@cs2dak/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@cs2dak/demo-io':
+        specifier: workspace:*
+        version: link:../../packages/demo-io
+      '@cs2dak/map-assets':
+        specifier: workspace:*
+        version: link:../../packages/map-assets
       '@cs2dak/maps':
         specifier: workspace:*
         version: link:../../packages/maps
+      '@cs2dak/pipeline':
+        specifier: workspace:*
+        version: link:../../packages/pipeline
       '@cs2dak/presentation':
         specifier: workspace:*
         version: link:../../packages/presentation
+      '@cs2dak/rating':
+        specifier: workspace:*
+        version: link:../../packages/rating
       '@cs2dak/react':
         specifier: workspace:*
         version: link:../../packages/react
       '@cs2dak/rivalhub-upload':
         specifier: workspace:*
         version: link:../../packages/rivalhub-upload
+      '@cs2dak/tactics':
+        specifier: workspace:*
+        version: link:../../packages/tactics
       jszip:
         specifier: ^3.10.2
         version: 3.10.2
@@ -278,11 +293,14 @@ importers:
         specifier: ^8.3.2
         version: 8.3.2(@types/node@26.6.4)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1)
 
-  packages/cli:
+  packages/analytics:
     dependencies:
       '@cs2dak/cohort':
         specifier: workspace:*
         version: link:../cohort
+      '@cs2dak/contract':
+        specifier: workspace:*
+        version: link:../contract
       '@cs2dak/core':
         specifier: workspace:*
         version: link:../core
@@ -292,6 +310,51 @@ importers:
       '@cs2dak/presentation':
         specifier: workspace:*
         version: link:../presentation
+      '@cs2dak/rating':
+        specifier: workspace:*
+        version: link:../rating
+      '@cs2dak/tactics':
+        specifier: workspace:*
+        version: link:../tactics
+      '@cs2dak/tournament':
+        specifier: workspace:*
+        version: link:../tournament
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+
+  packages/cli:
+    dependencies:
+      '@cs2dak/analytics':
+        specifier: workspace:*
+        version: link:../analytics
+      '@cs2dak/cohort':
+        specifier: workspace:*
+        version: link:../cohort
+      '@cs2dak/core':
+        specifier: workspace:*
+        version: link:../core
+      '@cs2dak/demo-io':
+        specifier: workspace:*
+        version: link:../demo-io
+      '@cs2dak/map-assets':
+        specifier: workspace:*
+        version: link:../map-assets
+      '@cs2dak/maps':
+        specifier: workspace:*
+        version: link:../maps
+      '@cs2dak/pipeline':
+        specifier: workspace:*
+        version: link:../pipeline
+      '@cs2dak/presentation':
+        specifier: workspace:*
+        version: link:../presentation
+      '@cs2dak/rating':
+        specifier: workspace:*
+        version: link:../rating
+      '@cs2dak/tactics':
+        specifier: workspace:*
+        version: link:../tactics
     devDependencies:
       tsx:
         specifier: ^4.23.15
@@ -299,50 +362,67 @@ importers:
 
   packages/cohort:
     dependencies:
-      '@cs2dak/contract':
+      '@cs2dak/rating':
         specifier: workspace:*
-        version: link:../contract
-      '@cs2dak/core':
-        specifier: workspace:*
-        version: link:../core
-      '@rivalhub/rival-rating':
-        specifier: 0.3.0
-        version: 0.3.0
-
-  packages/contract:
-    dependencies:
-      '@rivalhub/rival-rating':
-        specifier: 0.3.0
-        version: 0.3.0
-      cs2-demo-format:
-        specifier: 3.1.0
-        version: 3.1.0(zod@4.6.5)
+        version: link:../rating
       zod:
         specifier: ^4.6.5
         version: 4.6.5
+
+  packages/contract:
+    dependencies:
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      cs2-demo-format:
+        specifier: 3.1.0
+        version: 3.1.0(zod@4.6.5)
 
   packages/core:
     dependencies:
       '@cs2dak/contract':
         specifier: workspace:*
         version: link:../contract
-      '@cs2dak/maps':
-        specifier: workspace:*
-        version: link:../maps
       '@cs2dak/tournament':
         specifier: workspace:*
         version: link:../tournament
-      '@rivalhub/rival-rating':
-        specifier: 0.3.0
-        version: 0.3.0
+
+  packages/demo-io:
+    dependencies:
+      '@cs2dak/contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@cs2dak/core':
+        specifier: workspace:*
+        version: link:../core
       jszip:
         specifier: ^3.10.2
         version: 3.10.2
+    devDependencies:
+      '@cs2dak/analytics':
+        specifier: workspace:*
+        version: link:../analytics
+      '@cs2dak/pipeline':
+        specifier: workspace:*
+        version: link:../pipeline
+      '@cs2dak/tactics':
+        specifier: workspace:*
+        version: link:../tactics
+
+  packages/map-assets:
+    dependencies:
+      '@cs2dak/maps':
+        specifier: workspace:*
+        version: link:../maps
 
   packages/maps: {}
 
-  packages/presentation:
+  packages/pipeline:
     dependencies:
+      '@cs2dak/analytics':
+        specifier: workspace:*
+        version: link:../analytics
       '@cs2dak/cohort':
         specifier: workspace:*
         version: link:../cohort
@@ -352,21 +432,37 @@ importers:
       '@cs2dak/core':
         specifier: workspace:*
         version: link:../core
+      '@cs2dak/presentation':
+        specifier: workspace:*
+        version: link:../presentation
+      '@cs2dak/rating':
+        specifier: workspace:*
+        version: link:../rating
+      '@cs2dak/tactics':
+        specifier: workspace:*
+        version: link:../tactics
+
+  packages/presentation:
+    dependencies:
       '@cs2dak/maps':
         specifier: workspace:*
         version: link:../maps
-      '@cs2dak/tournament':
-        specifier: workspace:*
-        version: link:../tournament
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+
+  packages/rating:
+    dependencies:
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
       '@rivalhub/rival-rating':
         specifier: 0.3.0
         version: 0.3.0
 
   packages/react:
     dependencies:
-      '@cs2dak/contract':
-        specifier: workspace:*
-        version: link:../contract
       '@cs2dak/maps':
         specifier: workspace:*
         version: link:../maps
@@ -391,9 +487,30 @@ importers:
       '@cs2dak/core':
         specifier: workspace:*
         version: link:../core
+      '@cs2dak/demo-io':
+        specifier: workspace:*
+        version: link:../demo-io
       '@cs2dak/tournament':
         specifier: workspace:*
         version: link:../tournament
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+
+  packages/tactics:
+    dependencies:
+      '@cs2dak/contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@cs2dak/core':
+        specifier: workspace:*
+        version: link:../core
+      '@cs2dak/map-assets':
+        specifier: workspace:*
+        version: link:../map-assets
+      '@cs2dak/maps':
+        specifier: workspace:*
+        version: link:../maps
       zod:
         specifier: ^4.6.5
         version: 4.6.5

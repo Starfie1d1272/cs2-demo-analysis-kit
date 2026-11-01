@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { loadDemoPackageFromZip } from "../../core/src/index.ts";
+import { loadDemoPackageFromZip } from "../../demo-io/src/index.ts";
 import { FLAG_ALIVE, type DemoPackage } from "../../contract/src/index.ts";
 import { CALLOUT_DICT, calloutCn, getCalloutTendencies } from "../src/callout-names.js";
 import { DEFAULT_POSITION_GROUPS, type DefaultPositionGroup } from "../src/default-positions.js";

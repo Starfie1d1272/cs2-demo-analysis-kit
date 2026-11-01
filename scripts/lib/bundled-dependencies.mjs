@@ -1,5 +1,5 @@
 // Original upstream packages remain the sole source of schema/formula semantics.
-// Pin runtime and declaration dependencies together; only compile their registry bytes.
+// Pin build inputs; publish generated runtime and declarations from their registry bytes.
 export const bundledDependencies = {
   "cs2-demo-format": {
     "version": "3.1.0",

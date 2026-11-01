@@ -1,7 +1,14 @@
-import type { DemoPackage, PlayerScoreboardRow, QaIssue, QaReport } from "@cs2dak/contract";
+import type { DemoPackage, QaIssue, QaReport } from "@cs2dak/contract";
 import { isNamedWeapon, normalizeWeapon, round } from "./utils.js";
 
-export type ScoreboardFieldAvailability = PlayerScoreboardRow["fieldAvailability"];
+export interface ScoreboardFieldAvailability {
+  playerStats: "available" | "missing";
+  economy: "available" | "missing";
+  rounds: "available" | "missing";
+  richKills: "available" | "partial" | "missing";
+  damages: "available" | "missing";
+  bombs: "available" | "missing";
+}
 
 export type DemoSourceAvailability = ScoreboardFieldAvailability & {
   utility: "available";

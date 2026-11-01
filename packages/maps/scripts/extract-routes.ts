@@ -11,11 +11,11 @@
  * 用法：
  *   pnpm exec tsx packages/maps/scripts/extract-routes.ts <zip-dir> [--window 45]
  *
- * 把输出里的候选链人工确认后写进 packages/maps/map-routes/<map>.json。
+ * 把输出里的候选链人工确认后写进 packages/map-assets/map-routes/<map>.json。
  */
 import { readFile, readdir } from "node:fs/promises";
 import { extname, join } from "node:path";
-import { loadDemoPackageFromZip } from "../../core/src/index.ts";
+import { loadDemoPackageFromZip } from "../../demo-io/src/index.ts";
 import { decodeDelta } from "../../contract/src/index.ts";
 
 interface Sample {

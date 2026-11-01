@@ -1,5 +1,5 @@
 import { eventPackageSchema, type EventPackage, type EventStage, type SeriesFormat, type SeriesVeto } from "@cs2dak/contract";
-import { loadDemoPackageFromZip } from "@cs2dak/core";
+import { loadDemoPackageFromZip } from "@cs2dak/demo-io";
 import JSZip from "jszip";
 
 export type EventPreset = "round_robin" | "swiss" | "single_elim" | "double_elim" | "major";

@@ -54,7 +54,7 @@ with open(f"{ROOT}/packages/maps/callout-bounds.json") as f:
 
 # 加载 zone 多边形
 ZONES = {}
-zones_dir = f"{ROOT}/packages/maps/map-zones"
+zones_dir = f"{ROOT}/packages/map-assets/map-zones"
 for fname in os.listdir(zones_dir):
     if not fname.endswith(".json") or "template" in fname:
         continue

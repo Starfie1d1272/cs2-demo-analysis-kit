@@ -9,14 +9,9 @@
 import { readFile, readdir } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  loadDemoPackageFromZip,
-  loadSpatialAssets,
-  buildUtilityWindows,
-  buildOfficialUtilitySpatial,
-  buildOfficialMapControl,
-} from "@cs2dak/core";
-import { getMapTri } from "@cs2dak/maps/tri-assets";
+import { loadDemoPackageFromZip } from "@cs2dak/demo-io";
+import { loadSpatialAssets, buildUtilityWindows, buildOfficialUtilitySpatial, buildOfficialMapControl } from "@cs2dak/tactics";
+import { getMapTri } from "@cs2dak/map-assets/tri-assets";
 
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const NO_TRI = process.argv.includes("--no-tri");

@@ -1,4 +1,4 @@
-import type { QaReport } from "@cs2dak/contract";
+import type { QaReport } from "@cs2dak/presentation";
 
 export interface QaReportPanelProps {
   report: QaReport;

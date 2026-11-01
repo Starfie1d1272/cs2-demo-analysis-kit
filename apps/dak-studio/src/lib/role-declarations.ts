@@ -1,4 +1,4 @@
-import { roleDeclarationSchema, type RoleDeclaration } from "@cs2dak/contract";
+import { roleDeclarationSchema, type RoleDeclaration } from "@cs2dak/tactics";
 import type { IdentityStoreState } from "./identity";
 import { getStorage } from "./storage";
 

@@ -39,7 +39,7 @@ for m in re.finditer(r'(de_\w+):\s*\{(.*?)\n  \}', callout_ts, re.S):
     ZH[m.group(1)] = {k:v for k,v in re.findall(r'\n    (\w+):\s*"([^"]*)"', m.group(2))}
 
 routes_by_map = {}
-for f in sorted(glob.glob(f"{ROOT}/packages/maps/map-routes/de_*.json")):
+for f in sorted(glob.glob(f"{ROOT}/packages/map-assets/map-routes/de_*.json")):
     mp = re.search(r'(de_\w+)', os.path.basename(f)).group(1)
     data = json.load(open(f))
     routes_by_map[mp] = data.get("routes", [])

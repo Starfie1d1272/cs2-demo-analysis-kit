@@ -8,6 +8,12 @@ const repositoryUrl = "https://github.com/Starfie1d1272/cs2-demo-analysis-kit.gi
 const workflowPath = join(repoRoot, ".github", "workflows", "npm-publish.yml");
 const releaseDocsPath = join(repoRoot, "docs", "release.md");
 const publicPackages = [
+  ["@cs2dak/rating", "packages/rating"],
+  ["@cs2dak/map-assets", "packages/map-assets"],
+  ["@cs2dak/tactics", "packages/tactics"],
+  ["@cs2dak/demo-io", "packages/demo-io"],
+  ["@cs2dak/analytics", "packages/analytics"],
+  ["@cs2dak/pipeline", "packages/pipeline"],
   ["@cs2dak/cohort", "packages/cohort"],
   ["@cs2dak/contract", "packages/contract"],
   ["@cs2dak/core", "packages/core"],
@@ -32,7 +38,8 @@ for (const [expectedName, directory] of publicPackages) {
   const manifest = readJson(manifestPath);
   const repository = manifest.repository ?? {};
   for (const [name, policy] of Object.entries(bundledDependencies)) {
-    if (manifest.dependencies?.[name]) check(manifest.dependencies[name] === policy.version, `${expectedName}: ${name} must pin the compiled source/declaration version ${policy.version}`);
+    for (const kind of ['dependencies', 'peerDependencies', 'optionalDependencies']) check(!manifest[kind]?.[name], `${expectedName}: ${name} is a build-only upstream`);
+    if (manifest.devDependencies?.[name]) check(manifest.devDependencies[name] === policy.version, `${expectedName}: ${name} must pin the compiled source/declaration version ${policy.version}`);
   }
   check(manifest.main === './dist/index.js', `${expectedName}: main must be compiled ESM`);
   check(manifest.types === './dist/index.d.ts', `${expectedName}: types must be compiled declarations`);
@@ -42,6 +49,10 @@ for (const [expectedName, directory] of publicPackages) {
   for (const [key, entry] of Object.entries(manifest.exports ?? {})) {
     if (expectedName === '@cs2dak/react' && key === './theme.css') {
       check(entry === './dist/theme.css', `${expectedName}: CSS export must be copied into dist`);
+      continue;
+    }
+    if (expectedName === '@cs2dak/map-assets' && key === './callout-grid/*.json') {
+      check(entry === './callout-grid/*.json', `${expectedName}: raw callout grid export must point to packaged assets`);
       continue;
     }
     check(typeof entry === 'object' && /^\.\/dist\/.*\.d\.ts$/.test(entry.types) && /^\.\/dist\/.*\.js$/.test(entry.import) && entry.default === entry.import, `${expectedName} ${key}: explicit compiled types/import/default exports required`);

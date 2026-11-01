@@ -1,4 +1,4 @@
-import type { DoubleAwpAnalysis, EvidenceRef, PlayerMapPoolRow, PlayerMapRoleProfile, TeamMapRoleMatrix } from "@cs2dak/contract";
+import type { DoubleAwpAnalysisView, EvidenceRef, PlayerMapPoolRowView, PlayerMapRoleProfileView, TeamMapRoleMatrixView } from "@cs2dak/presentation";
 import { DataTable, DAK_TABLE_CLASSES, type DataTableColumn } from "./DataTable";
 import { EmptyState, EvidenceLink, LimitNote, MetricInfo } from "./Primitives";
 
@@ -20,7 +20,7 @@ export function PlayerMapRoleProfilePanel({
   profile,
   onOpenEvidence,
 }: {
-  profile: PlayerMapRoleProfile | null;
+  profile: PlayerMapRoleProfileView | null;
   onOpenEvidence?: (evidence: EvidenceRef) => void;
 }) {
   if (!profile) return <EmptyState variant="insufficient" title="地图 / 位置画像不可用" hint="需要当前选手的地图位置 facts；缺失时可在资料库重建 facts。" />;
@@ -67,12 +67,12 @@ export function TeamMapRoleMatrixPanel({
   playerNames = {},
   onOpenEvidence,
 }: {
-  matrix: TeamMapRoleMatrix | null;
+  matrix: TeamMapRoleMatrixView | null;
   playerNames?: Record<string, string>;
   onOpenEvidence?: (evidence: EvidenceRef) => void;
 }) {
   if (!matrix) return <EmptyState variant="insufficient" title="该地图暂无职责矩阵" hint="选择有位置 facts 的地图和阵营；样本不足会明确保留，而不是补零。" />;
-  const columns: DataTableColumn<TeamMapRoleMatrix["players"][number]>[] = [
+  const columns: DataTableColumn<TeamMapRoleMatrixView["players"][number]>[] = [
     { key: "player", label: "选手", format: (row) => playerNames[row.playerKey] ?? row.playerKey },
     { key: "position", label: "主要位置组", format: (row) => row.primaryPositionGroups.map((group) => `${group.displayName}${group.officialName ? ` / ${group.officialName}` : ""} ${Math.round(group.share * 100)}%`).join(" · ") || "—" },
     { key: "responsibility", label: <>结构职责 <MetricInfo note="只描述当前空间证据支持的主体组、边翼、晚汇合或位置稳定倾向。" /></>, format: (row) => RESPONSIBILITY_LABEL[row.responsibility] },
@@ -92,7 +92,7 @@ export function TeamMapRoleMatrixPanel({
   );
 }
 
-export function DoubleAwpAnalysisPanel({ model, playerNames = {}, onOpenEvidence }: { model: DoubleAwpAnalysis | null; playerNames?: Record<string, string>; onOpenEvidence?: (evidence: EvidenceRef) => void }) {
+export function DoubleAwpAnalysisPanel({ model, playerNames = {}, onOpenEvidence }: { model: DoubleAwpAnalysisView | null; playerNames?: Record<string, string>; onOpenEvidence?: (evidence: EvidenceRef) => void }) {
   if (!model) return <EmptyState variant="insufficient" title="双 AWP 样本不可用" hint="需要逐回合 AWP 与经济 facts；T/CT 会分别统计。" />;
   return <section className="dak-role-panel">
     <div className="dak-role-head"><div><h3>{model.side.toUpperCase()} 双 AWP</h3><p>仅描述 qualified full-buy / long-gun round 的观测指标，不作因果归因。</p></div><Status value={model.status} /></div>
@@ -103,8 +103,8 @@ export function DoubleAwpAnalysisPanel({ model, playerNames = {}, onOpenEvidence
   </section>;
 }
 
-export function PlayerMapPoolPanel({ rows, onOpenEvidence }: { rows: PlayerMapPoolRow[]; onOpenEvidence?: (evidence: EvidenceRef) => void }) {
-  const columns: DataTableColumn<PlayerMapPoolRow>[] = [
+export function PlayerMapPoolPanel({ rows, onOpenEvidence }: { rows: PlayerMapPoolRowView[]; onOpenEvidence?: (evidence: EvidenceRef) => void }) {
+  const columns: DataTableColumn<PlayerMapPoolRowView>[] = [
     { key: "map", label: "地图", format: (row) => row.mapName.replace("de_", "") },
     { key: "record", label: "场次 / 战绩", sortable: true, sortValue: (row) => row.matchCount, format: (row) => `${row.matchCount} · ${row.wins}胜 ${row.losses}负` },
     { key: "rounds", label: "回合", numeric: true, sortable: true, sortValue: (row) => row.roundCount, format: (row) => row.roundCount },

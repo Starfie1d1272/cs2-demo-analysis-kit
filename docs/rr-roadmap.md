@@ -15,11 +15,11 @@
 公式所有权在 [`@rivalhub/rival-rating`](https://github.com/Starfie1d1272/rival-rating)；
 `.dem` 导出端是 `cs2df`；本 kit 的 TS 侧负责**信号派生 + 接线 + 锚定 + 展示**。
 
-## 数据现状（55 场锦标赛，仅差总决赛）
+## 早期样本计划（55 场锦标赛）
 
 - 55 场 demo 需要以 `cs2-demo-format/3.x` 重导后进入当前管线；富事件 + replay/shots/duels 见 [architecture](architecture.md)。
 - **per-match 的 HLTV baseline / RR 六账户现在就能跑全 55 场。**
-- 跨场聚合层不存在 → 这是 PRISM 与赛季锚定的唯一结构性前置（阶段 2）。
+- 当前跨场入口已实现：pipeline 从 Demo 集合提取行，cohort 以 `buildSeasonCohortFromRows` 聚合。早期样本清单不代表当前采集进度。
 
 ---
 
@@ -29,7 +29,7 @@
 
 - **missing vs zero**：context 分桶在数据源缺失时发 `null`（模型降级为乘子 1.0），不再混成零桶。
 - **账户 breakdown 透传**：模型已算出的六账户贡献，落到 scoreboard / view-model（此前被丢弃）。
-- **per-match 联赛锚定**：`computeAccountRatingsV2` 跑完整场后整体归一，`accountRR` 的 1.00 = 本场均值。
+- **统一职业基线**：`rating.computeAccountRatings` 消费 analytics 提取的信号，调用原版 frozen pro baseline；`accountRR` 的 1.00 = 职业基线。
 
 产出：`PlayerScoreboardRow` 新增 `accountBreakdown` / `accountContextStatus`；`accountRR` 语义变为锚定后。
 详见 [rr-model.md](design/rr-model.md)。
@@ -56,7 +56,7 @@
 
 - 跨场 cohort：把多场的选手信号汇总，做跨人 z-score（PRISM 才有意义）。
 - 身份主键：默认按 `steamId64`，但支持外部 `identityMap` 归并到同一 `playerKey`，给 RivalHub 的 userId / Steam alias 对接预留正确边界。
-- 把"per-match 锚定"升级为**赛季级锚定**（league mean 跨整季）。
+- RR 单场与跨场使用同一 frozen pro baseline；PRISM 可使用当前 cohort 的风格百分位。
 - 先做数据质量体检：各指标分布、极值、缺失率（顺带验证阶段 1 的导出器问题是否普遍）。
 - 设计入口：[cohort.md](archive/2026-06/cohort.md)。
 
@@ -80,11 +80,11 @@
 - 地图：优先 Mirage/Inferno/Nuke/Ancient/Anubis/Dust2/Train，补地图平衡再补队伍平衡。
 - 排除：加时异常、技术重赛、过旧 CS:GO demo。
 
-## 阶段 R — 评分参照系重设计（固定职业基准）★ 下一步重点
+## 阶段 R — 固定职业基准（已接线，继续校准）
 
-当前 RR v2 的归一化是**赛季相对**（在被分析这批人内部 z-score），导致分数不可移植、单 demo 无法绝对评分。
-目标：换成**固定职业基准**——从大量职业 demo 冻结一条标准曲线，1.0 = 职业平均，任意 demo 对同一把尺子量。
-玩家向整体方案见 [rr-model.md](design/rr-model.md)「当前方案 vs 未来方案」。
+当前单场与 cohort 共用 `rrSixAccountProBaselineV0`，公式由 rating 接线。
+原始 Demo 编排归 pipeline，Core 保持事实 owner。后续职业样本与基线质量评估独立于包结构重构。
+以下 R0/R1 记录原校准路线，具体落地状态以代码与冻结基线记录为准。
 
 - **R0**：把 cohort z-score 换成 normalizer strategy 接口（`cohort_normalizer` / `frozen_pro_baseline_normalizer`），接口先用现有 55 场跑通。
 - **R1**：用 Phase D1 职业样本算出六账户分布，percentile mapping / sigmoid 曲线，冻结进 `rr-v2-pro-baseline.json`。单 demo 即可出绝对 RR，不依赖 cohort。

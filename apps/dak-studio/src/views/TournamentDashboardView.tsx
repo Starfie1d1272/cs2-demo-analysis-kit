@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { formatPercent, type TeamComparisonModel, type TournamentInsights } from "@cs2dak/presentation";
+import { formatPercent, type TeamComparisonModel } from "@cs2dak/presentation";
+import { type TournamentInsights } from "@cs2dak/analytics";
 import { DataTable, STUDIO_TABLE_CLASSES, TeamComparisonPanel, type DataTableColumn } from "@cs2dak/react";
 import { getTeamComparison, getTournamentInsights, type IdentityOptions } from "../lib/season";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";

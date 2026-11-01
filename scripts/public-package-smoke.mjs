@@ -5,22 +5,29 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { bundledDependencies } from './lib/bundled-dependencies.mjs';
 import { isPublishableFile, isWithin } from './lib/package-files.mjs';
 import { packageImports } from './lib/package-imports.mjs';
-import { allowedDependencies } from './check-package-boundaries.mjs';
+import { allowedDependencies, forbiddenUiDependencies, forbiddenFactsDependencies, dependencyName } from './check-package-boundaries.mjs';
 
-assert.equal(process.platform, 'linux', 'This tgz consumer gate is certified on Linux; run it on Linux/Ubuntu CI. Windows app builds are a separate check.');
+const options = new Set(process.argv.slice(2));
+for (const option of options) assert.ok(['--local-platform', '--skip-build'].includes(option), `Unknown option ${option}`);
+if (!options.has('--local-platform')) assert.equal(process.platform, 'linux', 'The default tgz gate runs on Linux. Use --local-platform to record checks only for this host.');
+console.log(`Public consumer host: ${process.platform}/${process.arch}, Node ${process.version}; results apply only to this platform`);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const temporary = mkdtempSync(join(tmpdir(), 'dak-public-consumers-'));
+const temporary = realpathSync(mkdtempSync(join(tmpdir(), 'dak-public-consumers-')));
 const names = Object.keys(allowedDependencies).filter(n => n !== 'rivalhub-upload');
 const command = (program, args, cwd = root) => execFileSync(program, args, { cwd, stdio: 'inherit' });
 const json = path => JSON.parse(readFileSync(path, 'utf8'));
 const walk = directory => readdirSync(directory, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(join(directory, e.name)) : [join(directory, e.name)]);
 try {
   // Rebuild only libraries: app typechecks can emit test declarations into dist.
-  command('pnpm', ['-r', ...names.flatMap(n => ['--filter', `@cs2dak/${n}`]), 'build']);
+  if (!options.has('--skip-build')) command('pnpm', ['-r', ...names.flatMap(n => ['--filter', `@cs2dak/${n}`]), 'build']);
+  else console.log('Using existing dist artifacts (--skip-build)');
+  const { loadDemoPackageFromZip } = await import(pathToFileURL(join(root, 'packages/demo-io/dist/index.js')).href);
+  const demoInput = join(temporary, 'demo-input.json');
+  writeFileSync(demoInput, JSON.stringify(await loadDemoPackageFromZip(readFileSync(join(root, 'fixtures/input/cologne-major-2026-stage3-smoke-de_nuke.zip')))));
   const archives = {};
   for (const name of names) {
     const directory = join(temporary, name);
@@ -40,6 +47,13 @@ try {
     const peers = name === 'react' ? { react: json(join(root, 'package.json')).dependencies.react, 'react-dom': json(join(root, 'package.json')).dependencies['react-dom'], '@types/react': json(join(root, 'package.json')).devDependencies['@types/react'] } : {};
     writeFileSync(join(consumer, 'package.json'), JSON.stringify({ private: true, type: 'module', dependencies: { [packageName]: `file:${archives[packageName]}`, ...peers }, overrides: Object.fromEntries(Object.entries(archives).map(([n, path]) => [n, `file:${path}`])) }));
     command('npm', ['install', '--no-audit', '--no-fund', '--ignore-scripts'], consumer);
+    const isUiConsumer = name === 'presentation' || name === 'react';
+    for (const installedPath of Object.keys(json(join(consumer, 'package-lock.json')).packages)) {
+        const dependency = dependencyName(installedPath.split('node_modules/').at(-1));
+        assert.ok(!Object.hasOwn(bundledDependencies, dependency), `${name}: source-only upstream installed ${dependency}`);
+        if (isUiConsumer) assert.ok(!forbiddenUiDependencies.has(dependency), `${name}: installed analysis dependency ${dependency}`);
+        if (name === 'core' || name === 'contract') assert.ok(!forbiddenFactsDependencies.has(dependency), `${name}: installed non-fact dependency ${dependency}`);
+    }
     // This consumer declares only its root + peers; all DAK transitive deps must
     // be installed by the packed manifests, from this run's exact tarballs.
     const closure = new Set();
@@ -47,7 +61,7 @@ try {
       if (closure.has(n)) return;
       closure.add(n);
       const manifest = json(join(consumer, 'node_modules', '@cs2dak', n, 'package.json'));
-      for (const dep of Object.keys(manifest.dependencies ?? {})) if (dep.startsWith('@cs2dak/')) collect(dep.slice(8));
+      for (const dep of Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies, ...manifest.optionalDependencies })) if (dep.startsWith('@cs2dak/')) collect(dep.slice(8));
     };
     collect(name);
     assert.deepEqual(readdirSync(join(consumer, 'node_modules', '@cs2dak')).sort(), [...closure].sort());
@@ -63,11 +77,19 @@ try {
         assert.ok(readFileSync(join(installed, 'dist/THIRD-PARTY-NOTICES.md'), 'utf8').includes(license.toString()));
       }
       for (const [dependency, policy] of Object.entries(bundledDependencies)) {
-        if (manifest.dependencies?.[dependency]) assert.equal(manifest.dependencies[dependency], policy.version, `${n}: type/runtime version mismatch`);
+        for (const kind of ['dependencies', 'peerDependencies', 'optionalDependencies']) assert.ok(!manifest[kind]?.[dependency], `${n}: source-only upstream in consumer manifest`);
+        if (manifest.devDependencies?.[dependency]) assert.equal(manifest.devDependencies[dependency], policy.version, `${n}: build input version mismatch`);
       }
-      for (const file of walk(installed).filter(f => f.endsWith('.js'))) {
+      if (isUiConsumer) {
+        for (const file of walk(installed).filter(f => /\.(js|d\.ts)$/.test(f))) {
+          for (const { specifier } of packageImports(readFileSync(file, 'utf8'), file)) {
+            assert.ok(!forbiddenUiDependencies.has(dependencyName(specifier)), `${file}: analysis dependency in UI artifact ${specifier}`);
+          }
+        }
+      }
+      for (const file of walk(installed).filter(f => /\.(js|d\.ts)$/.test(f))) {
         for (const { specifier } of packageImports(readFileSync(file, 'utf8'), file)) {
-          assert.ok(!Object.keys(bundledDependencies).some(name => specifier === name || specifier.startsWith(name + '/')), `${file}: upstream source runtime import escaped`);
+          assert.ok(!Object.keys(bundledDependencies).some(name => specifier === name || specifier.startsWith(name + '/')), `${file}: upstream source import escaped published JS/declarations`);
         }
       }
       const provenancePath = join(installed, 'dist/vendor/upstream-artifacts.json');
@@ -79,10 +101,22 @@ try {
           assert.equal(createHash('sha256').update(readFileSync(join(installed, 'dist/vendor', policy.license))).digest('hex'), policy.licenseSha256);
           assert.equal(createHash('sha256').update(readFileSync(join(installed, 'dist/vendor', policy.file))).digest('hex'), provenance.outputSha256);
           for (const [source, hash] of Object.entries(provenance.sourceHashes)) assert.equal(hash, policy.sourceHashes[source]);
+          assert.ok(Object.keys(provenance.declarationHashes ?? {}).length, `${n}: generated declaration provenance missing`);
+          for (const [file, hash] of Object.entries(provenance.declarationHashes)) {
+            const declaration = resolve(installed, 'dist/vendor', file);
+            assert.ok(isWithin(join(installed, 'dist/vendor'), declaration), `${n}: declaration provenance path escaped`);
+            assert.match(file, /\.d\.ts$/);
+            assert.equal(createHash('sha256').update(readFileSync(declaration)).digest('hex'), hash, `${n}: generated declaration changed`);
+          }
         }
       }
       for (const [key, entry] of Object.entries(manifest.exports)) {
         if (key.endsWith('.css')) { assert.equal(entry, './dist/theme.css'); readFileSync(join(installed, entry)); continue; }
+        if (n === 'map-assets' && key === './callout-grid/*.json') {
+          assert.equal(entry, './callout-grid/*.json');
+          for (const asset of readdirSync(join(installed, 'callout-grid')).filter(file => file.endsWith('.json'))) json(join(installed, 'callout-grid', asset));
+          continue;
+        }
         assert.match(entry.types, /^\.\/dist\/.*\.d\.ts$/);
         assert.match(entry.import, /^\.\/dist\/.*\.js$/);
         assert.equal(entry.default, entry.import);
@@ -90,7 +124,7 @@ try {
       }
     }
     const manifest = json(join(consumer, 'node_modules', '@cs2dak', name, 'package.json'));
-    const entries = Object.keys(manifest.exports).filter(k => !k.endsWith('.css')).map(k => packageName + (k === '.' ? '' : k.slice(1)));
+    const entries = Object.keys(manifest.exports).filter(k => typeof manifest.exports[k] === 'object').map(k => packageName + (k === '.' ? '' : k.slice(1)));
     writeFileSync(join(consumer, 'entries.mjs'), `import assert from 'node:assert/strict';\n${entries.map((entry, i) => `import * as entry${i} from ${JSON.stringify(entry)}; assert.ok(Object.keys(entry${i}).length);`).join('\n')}\n`);
     let runtimePassed = false;
     try { command(process.execPath, [join(consumer, 'entries.mjs')], consumer); runtimePassed = true; }
@@ -101,22 +135,33 @@ try {
     try { command(join(root, 'node_modules', '.bin', 'tsc'), ['-p', join(consumer, 'tsconfig.json')], consumer); typesPassed = true; }
     catch { failures.push(`${packageName}: strict NodeNext declarations failed`); }
     if (typesPassed) console.log(`TYPES PASS ${packageName}: strict NodeNext, full declaration closure`);
-    // After checking the complete original declaration closure, remove upstream
-    // source trees and import again in a fresh process: no TS runtime fallback.
-    for (const [dependency, directories] of [['cs2-demo-format', ['schemas', 'parser']], ['@rivalhub/rival-rating', ['src']]]) {
-      for (const directory of directories) rmSync(join(consumer, 'node_modules', dependency, directory), { recursive: true, force: true });
-    }
-    try { command(process.execPath, [join(consumer, 'entries.mjs')], consumer); }
-    catch { failures.push(`${packageName}: source-free runtime isolation failed`); runtimePassed = false; }
     const calls = {
       contract: `assert.equal(m.teamKeySchema.parse('teamA'), 'teamA');`,
       maps: `assert.ok(m.getMapCalibration('de_nuke'));`,
-      core: `const {readFileSync}=await import('node:fs'); const pkg=await m.loadDemoPackageFromZip(readFileSync(${JSON.stringify(join(root, 'fixtures/input/cologne-major-2026-stage3-smoke-de_nuke.zip'))})); const bundle=m.analyzeDemoPackage(pkg); assert.ok(bundle.scoreboard.length);`,
-      cohort: `assert.ok(m.buildSeasonCohort([]));`,
+      core: `const {readFileSync}=await import('node:fs'); const pkg=m.normalizeDemoPackage(JSON.parse(readFileSync(${JSON.stringify(demoInput)}, 'utf8'))); const facts=m.buildPlayerRoundPerformanceFacts(pkg); assert.ok(facts.playerRounds.length);`,
+      'demo-io': `const {readFileSync}=await import('node:fs'); const pkg=await m.loadDemoPackageFromZip(readFileSync(${JSON.stringify(join(root, 'fixtures/input/cologne-major-2026-stage3-smoke-de_nuke.zip'))})); assert.ok(pkg.players.length);`,
+      'map-assets': `assert.ok(m.getMapZones('de_mirage')); const grid=await import('@cs2dak/map-assets/callout-grid/de_nuke.json', {with:{type:'json'}}); assert.ok(grid.default);`,
+      rating: `assert.deepEqual(m.computeAccountRatings([]), []); assert.deepEqual(m.computeIndicatorRatings([]), []);`,
+      tactics: `assert.deepEqual(m.buildTacticalClusters([]), []); assert.ok(m.counterStrafeThresholdForWeapon('ak47').maxSpeed > 0);`,
+      cohort: `assert.ok(m.buildSeasonCohortFromRows([]));`,
       tournament: `assert.ok(m.buildTournamentAnalytics([])); assert.ok(m.buildTournamentPerformanceAnalytics([]));`,
       presentation: `assert.equal(m.formatPercent(50, 0), '50%');`,
+      analytics: `assert.deepEqual(m.buildMatchBuyQuality([]).teamA, []);`,
+      pipeline: `const {readFileSync}=await import('node:fs'); const pkg=JSON.parse(readFileSync(${JSON.stringify(demoInput)}, 'utf8')); const model=m.analyzeMatchWorkspace(pkg); assert.ok(model.scoreboard.length);`,
       react: `const React=await import('react'); const {renderToStaticMarkup}=await import('react-dom/server'); assert.match(renderToStaticMarkup(React.createElement(m.EmptyState, {title:'Packed consumer'})), /Packed consumer/);`,
     };
+    assert.ok(calls[name], `${packageName}: actual API smoke is missing`);
+    if (isUiConsumer) {
+      const { build } = await import('esbuild');
+      const browserEntry = join(consumer, 'browser.mjs');
+      writeFileSync(browserEntry, `import * as ui from ${JSON.stringify(packageName)}; globalThis.dak = ui;\n`);
+      const bundle = await build({ entryPoints: [browserEntry], absWorkingDir: consumer, bundle: true, platform: 'browser', format: 'esm', write: false, metafile: true });
+      for (const input of Object.keys(bundle.metafile.inputs)) {
+        const dependency = dependencyName(input.split('node_modules/').at(-1));
+        assert.ok(!forbiddenUiDependencies.has(dependency), `${name}: browser bundle includes ${dependency}`);
+      }
+      console.log(`BROWSER PASS ${packageName}: all public root exports bundle without analysis dependencies`);
+    }
     writeFileSync(join(consumer, 'calls.mjs'), `import assert from 'node:assert/strict'; import * as m from ${JSON.stringify(packageName)}; ${calls[name]}\n`);
     if (runtimePassed) {
       try { command(process.execPath, [join(consumer, 'calls.mjs')], consumer); }

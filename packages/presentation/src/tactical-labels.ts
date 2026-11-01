@@ -47,11 +47,6 @@ export function formatEntryEvidenceLabel(mapName: string, site: "a" | "b", combo
   return entryRouteCn(mapName, site, combo) || structuralEntryName(mapName, combo);
 }
 
-/** 兼容旧展示调用；不得将此函数用于主簇名称。 */
-export function formatEntryTacticName(mapName: string, site: "a" | "b", combo: string | null): string {
-  return combo ? formatEntryEvidenceLabel(mapName, site, combo) : `${site.toUpperCase()} 点进点`;
-}
-
 function formationLabel(input: TacticalClusterLabelInput): string {
   const { a, mid, b } = input.openingIntent.regionCounts;
   return `${a}A-${mid}中-${b}B`;

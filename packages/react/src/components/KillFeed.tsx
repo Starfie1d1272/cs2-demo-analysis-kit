@@ -1,5 +1,5 @@
-import { displayWeaponName } from "@cs2dak/presentation";
-import type { WorkspaceKillEvent } from "@cs2dak/contract";
+import { displayWeaponName } from "@cs2dak/presentation/weapons";
+import type { WorkspaceKillEvent } from "@cs2dak/presentation";
 
 export interface KillFeedProps {
   kills: WorkspaceKillEvent[];

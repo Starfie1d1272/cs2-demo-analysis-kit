@@ -1,5 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { loadDemoPackageFromZip } from "../packages/core/src/index.ts";
+import { loadDemoPackageFromZip } from "../packages/demo-io/src/index.ts";
 import {
   buildRivalHubDemoEvidenceV1,
   fixtureIdentity,

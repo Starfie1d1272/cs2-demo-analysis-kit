@@ -20,6 +20,12 @@
       "path": "./packages/presentation"
     },
     {
+      "path": "./packages/analytics"
+    },
+    {
+      "path": "./packages/pipeline"
+    },
+    {
       "path": "./packages/react"
     },
     {
@@ -33,6 +39,18 @@
     },
     {
       "path": "./apps/rivalhub-uploader"
+    },
+    {
+      "path": "./packages/rating"
+    },
+    {
+      "path": "./packages/map-assets"
+    },
+    {
+      "path": "./packages/tactics"
+    },
+    {
+      "path": "./packages/demo-io"
     }
   ]
 }

@@ -16,13 +16,5 @@ export function withTacticalTeamIdentities<T extends { teamName: string; opponen
   }));
 }
 
-export {
-  advancedBasisKey,
-  buildTacticalClusters,
-  defaultsBasisKey,
-  openingPatternKey,
-  positionGroupSetKey,
-  tacticalClusterKey,
-  type TacticalCluster,
-} from "@cs2dak/cohort";
+export { advancedBasisKey, buildTacticalClusters, defaultsBasisKey, openingPatternKey, positionGroupSetKey, tacticalClusterKey, type TacticalCluster } from "@cs2dak/tactics";
 export { formatTacticalClusterName as autoName } from "@cs2dak/presentation";

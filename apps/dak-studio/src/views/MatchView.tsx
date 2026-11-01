@@ -1,7 +1,7 @@
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { buildSeriesSummary } from "@cs2dak/presentation";
-import type { MatchWorkspaceModel, SeriesSummary } from "@cs2dak/contract";
+import { buildSeriesSummary } from "@cs2dak/analytics";
+import type { MatchWorkspaceModel, SeriesSummary } from "@cs2dak/presentation";
 import { MatchWorkspace, QaReportPanel } from "@cs2dak/react";
 import { entryDate, loadMatchWorkspaceModel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";

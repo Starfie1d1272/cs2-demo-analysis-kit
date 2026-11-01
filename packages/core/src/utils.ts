@@ -1,11 +1,4 @@
-import type { DemoPackage, RRSignals } from "@cs2dak/contract";
-
-export type BuyDeltaBuckets = NonNullable<RRSignals["combat"]["killsByBuyDelta"]>;
-export type ManStateBuckets = NonNullable<RRSignals["combat"]["killsByManState"]>;
-export type ObjectiveBuckets = RRSignals["objective"];
-export type UtilityBuckets = RRSignals["utility"];
-
-export const BUY_DELTA_EVEN_THRESHOLD = 1000;
+import type { DemoPackage } from "@cs2dak/contract";
 
 export function round(value: number, digits: number): number {
   const factor = 10 ** digits;
@@ -40,14 +33,6 @@ export function groupBy<T, K>(rows: T[], keyFor: (row: T) => K): Map<K, T[]> {
     out.set(key, bucket);
   }
   return out;
-}
-
-export function zeroBuyDelta(): BuyDeltaBuckets {
-  return { disadvantage: 0, even: 0, advantage: 0 };
-}
-
-export function zeroManState(): ManStateBuckets {
-  return { manDown: 0, even: 0, manUp: 0 };
 }
 
 /**

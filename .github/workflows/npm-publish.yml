@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       release_commit:
-        description: "完整40位版本提交SHA；构建链修复后重试时保留原七包选择，留空使用本次源码SHA"
+        description: "完整40位版本提交SHA；构建链修复后重试时保留该提交的版本选择，留空使用本次源码SHA"
         required: false
         type: string
 

@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { findingFromUtilityDamage, findingFromUtilityFlash, type UtilityDamageEvidence, type UtilityValueRow, type UtilityValueSummary } from "@cs2dak/presentation";
+import {
+  findingFromUtilityDamage,
+  findingFromUtilityFlash,
+  type UtilityDamageEvidence,
+  type UtilityValueRow,
+  type UtilityValueSummary,
+} from "@cs2dak/analytics";
 import { DataTable, EmptyState, MetricInfo, STUDIO_TABLE_CLASSES, type DataTableColumn } from "@cs2dak/react";
 import { getSeasonSummary, getUtilityValueSummary, type IdentityOptions } from "../lib/season";
 import { formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";

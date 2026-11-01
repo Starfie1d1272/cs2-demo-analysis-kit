@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import type { BracketCell, ElimModel, EventStage, SwissModel } from "@cs2dak/contract";
+import type { BracketCell, ElimModel, SwissModel } from "@cs2dak/presentation";
+import type { EventStage } from "@cs2dak/contract";
 import { frameworkSlots, type MakerSeriesDraft } from "../lib/event-maker";
 import { ElimBracket, SwissBracket } from "@cs2dak/react";
 

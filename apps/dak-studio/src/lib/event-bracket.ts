@@ -1,7 +1,8 @@
-import type { BracketCell, ElimModel, ElimNode, EventStage, SwissColumn, SwissModel } from "@cs2dak/contract";
+import type { BracketCell, ElimModel, ElimNode, SwissColumn, SwissModel } from "@cs2dak/presentation";
+import type { EventStage } from "@cs2dak/contract";
 import type { StudioSeriesRecord } from "./series";
 
-// 类型 BracketCell / SwissModel / ElimModel 等已下沉至 @cs2dak/contract，
+// 类型 BracketCell / SwissModel / ElimModel 由 @cs2dak/presentation 拥有，
 // 本文件仅保留 Studio 侧模型推导函数（依赖 StudioSeriesRecord）。
 
 function winnerOf(scoreA: number | null, scoreB: number | null, finished: boolean): "A" | "B" | null {

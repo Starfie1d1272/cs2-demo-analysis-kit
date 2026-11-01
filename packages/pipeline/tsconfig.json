@@ -1,0 +1,38 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "outDir": ".typecheck",
+    "rootDir": "src"
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../contract"
+    },
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../analytics"
+    },
+    {
+      "path": "../presentation"
+    },
+    {
+      "path": "../rating"
+    },
+    {
+      "path": "../tactics"
+    },
+    {
+      "path": "../cohort"
+    }
+  ]
+}

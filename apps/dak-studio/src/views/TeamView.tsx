@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { DataTable, DoubleAwpAnalysisPanel, EmptyState, STUDIO_TABLE_CLASSES, TeamMapRoleMatrixPanel, type DataTableColumn } from "@cs2dak/react";
-import type { DoubleAwpAnalysis, RoleDeclaration, TeamMapRoleMatrix } from "@cs2dak/contract";
+import type { DoubleAwpAnalysis, RoleDeclaration, TeamMapRoleMatrix } from "@cs2dak/tactics";
 import type { TeamOverviewModel } from "@cs2dak/presentation";
 import { getDoubleAwpAnalysis, getTeamMapRoleMatrices, getTeamOverview, type IdentityOptions } from "../lib/season";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";

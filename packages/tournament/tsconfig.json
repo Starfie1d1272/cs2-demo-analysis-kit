@@ -7,7 +7,9 @@
     "declaration": true,
     "declarationMap": false,
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": ".typecheck"
   },
-  "include": ["src"]
+  "include": [
+    "src"
+  ]
 }

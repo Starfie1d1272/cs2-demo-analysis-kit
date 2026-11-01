@@ -1,4 +1,4 @@
-import type { TimelineEvent } from "@cs2dak/contract";
+import type { TimelineEvent } from "@cs2dak/presentation";
 import { useState } from "react";
 
 export interface RoundTimelineProps {

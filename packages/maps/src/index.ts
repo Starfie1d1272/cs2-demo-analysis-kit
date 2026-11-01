@@ -1,12 +1,9 @@
 export * from "./calibration.js";
 export * from "./map-pool.js";
 export * from "./zones.js";
-export * from "./zone-assets.js";
 export * from "./routes.js";
-export * from "./route-assets.js";
 export * from "./site-entry-chokes.js";
 export * from "./site-entry-lexicon.js";
-export * from "./geometry-assets.js";
 export * from "./nav.js";
 export * from "./visibility.js";
 export * from "./radar-grid.js";
@@ -29,3 +26,4 @@ export {
   type CalloutNearOptions,
   type CalloutNearResult,
 } from "./callout-grid.js";
+export { EYE_HEIGHT, TARGET_HEIGHT } from "./player-geometry.js";

@@ -1,7 +1,7 @@
-import type { PlayerScoreboardRow, TeamKey } from "@cs2dak/contract";
+import type { ScoreboardTableRow, TeamKey } from "@cs2dak/presentation";
 
 export interface ScoreboardTableProps {
-  rows: PlayerScoreboardRow[];
+  rows: ScoreboardTableRow[];
   /**
    * When provided, each player row becomes clickable (mouse + keyboard) and
    * reports the clicked player's steamId64. Lets an embedding app (RivalHub,
@@ -60,8 +60,8 @@ export function ScoreboardTable({ rows, onPlayerClick }: ScoreboardTableProps) {
                 <span>{row.name}</span>
               </span>
             </td>
-            <td className="dak-mono dak-rr">{row.accountRR.toFixed(3)}</td>
-            <td className="dak-mono dak-rr">{row.rr.toFixed(2)}</td>
+            <td className="dak-mono dak-rr">{row.accountRR == null ? "—" : row.accountRR.toFixed(3)}</td>
+            <td className="dak-mono dak-rr">{row.rr == null ? "—" : row.rr.toFixed(2)}</td>
             <td className="dak-mono">{row.kills}</td>
             <td className="dak-mono">{row.deaths}</td>
             <td className="dak-mono">{row.assists}</td>

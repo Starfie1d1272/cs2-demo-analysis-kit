@@ -1,82 +1,11 @@
 import {
-  buildPlayerRoundPerformanceFacts,
-  deriveRRSignals,
-  derivePlayerWeaponHighlights,
-  deriveRRIndicators
-} from "@cs2dak/core";
-import {
-  seasonCohortBundleSchema,
-  type AccountContextAvailability,
-  type DemoPackage,
-  type RRIndicators,
-  type RRSignals,
-  type PlayerWeaponHighlightFacts,
-  type SeasonCohortBundle,
-  type TeamKey,
-  type RRSixAccountWeights
-} from "@cs2dak/contract";
-import {
-  computeFrozenProBaselineRR,
-  computePrism,
-  computeRR,
-  prismWeightsV1,
-  rrSixAccountProBaselineV0,
-  rrToPercentile,
-  hltv2BaselineWeightsV1,
-  rrSixAccountWeightsV1,
-  type ProBaselineConfig,
-  type PrismComputeInput,
-  type PrismWeights,
-  type RRWeights
-} from "@rivalhub/rival-rating";
-
-export { buildOpeningPatternClusters } from "./patterns.js";
-export type { OpeningPatternCluster, OpeningPatternInput, OpeningPatternOptions } from "./patterns.js";
-export {
-  advancedBasisKey,
-  buildTacticalClusters,
-  chokeComboOf,
-  defaultsBasisKey,
-  economyEntryOf,
-  entryEvidenceKey,
-  openingIntentKey,
-  openingPatternKey,
-  positionGroupSetKey,
-  tacticalClusterKey,
-} from "./tactical-clusters.js";
-export type {
-  EconomyEntry,
-  TacticalCluster,
-  TacticalEntryEvidence,
-  TacticalEntryEvidenceRoute,
-  TacticalExecuteBucket,
-  TacticalPatternRow,
-} from "./tactical-clusters.js";
-export {
-  buildPlayerMapRoleEvidence,
-  buildTeamMapResponsibilityEvidence,
-  MAP_ROLE_MODEL_VERSION,
-  MAP_ROLE_THRESHOLDS,
-  type MapRoleEvidenceFacts,
-  type MapRoleEvidenceOptions,
-} from "./map-role-evidence.js";
-export {
-  buildTResponsibilityResearchProjections,
-  scoreFrozenTResponsibilityFeatures,
-  T_RESPONSIBILITY_RESEARCH_MODEL_ID,
-  T_RESPONSIBILITY_RESEARCH_THRESHOLD,
-} from "./t-role-research-projection.js";
-
-
-/**
- * "Season" 是历史命名：cohort = 任意一组比赛的跨场聚合，不限于赛季。
- * 同一 API 服务于赛季排行（RivalHub）、单赛事统计（主办方）、个人全量复盘（玩家）
- * 与自选职业 demo 集（分析师）；范围筛选由调用方决定（如 DAK Studio 的聚合范围过滤）。
- */
-export interface SeasonCohortInput {
-  matchId: string;
-  pkg: DemoPackage;
-}
+  computeFrozenProBaselineRR, computePrism, computeRR, prismWeightsV1,
+  rrSixAccountProBaselineV0, rrToPercentile, hltv2BaselineWeightsV1, rrSixAccountWeightsV1,
+  type ProBaselineConfig, type PrismComputeInput, type PrismWeights, type RRWeights,
+  type AccountContextAvailability, type RRIndicators, type RRSignals, type RRSixAccountWeights
+} from "@cs2dak/rating";
+import { seasonCohortBundleSchema, type SeasonCohortBundle, type CohortTeamKey, type CohortWeaponHighlightFacts } from "./models.js";
+export * from "./models.js";
 
 export interface SeasonCohortOptions {
   rrWeights?: RRWeights;
@@ -90,10 +19,10 @@ export interface SeasonCohortFactRow {
   sourceDemoHash: string | null;
   steamId64: string;
   playerName: string;
-  teamKey: TeamKey;
+  teamKey: CohortTeamKey;
   signals: RRSignals;
   indicators: RRIndicators;
-  weaponHighlight: PlayerWeaponHighlightFacts | null;
+  weaponHighlight: CohortWeaponHighlightFacts | null;
 }
 
 export interface PlayerIdentity {
@@ -111,51 +40,12 @@ interface PlayerAccumulator {
   externalUserId: string | null;
   displayName: string | null;
   names: Map<string, number>;
-  teamKeys: Set<TeamKey>;
+  teamKeys: Set<CohortTeamKey>;
   mapCount: number;
   signals: RRSignals[];
   indicators: RRIndicators[];
-  weaponHighlights: PlayerWeaponHighlightFacts[];
+  weaponHighlights: CohortWeaponHighlightFacts[];
   perMatch: Array<{ matchId: string; steamId64: string; accountRR: number; rrV1: number }>;
-}
-
-export function buildSeasonCohort(
-  demos: SeasonCohortInput[],
-  opts: SeasonCohortOptions = {}
-): SeasonCohortBundle {
-  const rrWeights = opts.rrWeights ?? (hltv2BaselineWeightsV1 as unknown as RRWeights);
-  const valueWeights = opts.valueWeights ?? (rrSixAccountWeightsV1 as unknown as RRSixAccountWeights);
-  const rows: SeasonCohortFactRow[] = [];
-  for (const demo of demos) {
-    const performanceFacts = buildPlayerRoundPerformanceFacts(demo.pkg);
-    const signals = deriveRRSignals(demo.pkg, performanceFacts);
-    const indicators = deriveRRIndicators(demo.pkg, performanceFacts);
-    const weaponHighlights = derivePlayerWeaponHighlights(demo.pkg, performanceFacts);
-    const signalBySteamId = new Map(signals.map((row) => [row.steamId64, row]));
-    const indicatorBySteamId = new Map(indicators.map((row) => [row.steamId64, row]));
-    const weaponHighlightBySteamId = new Map(weaponHighlights.map((row) => [row.steamId64, row]));
-    for (const player of demo.pkg.players) {
-      const signal = signalBySteamId.get(player.steamId64);
-      const indicator = indicatorBySteamId.get(player.steamId64);
-      if (!signal || !indicator) continue;
-      rows.push({
-        matchId: demo.matchId,
-        sourceDemoHash: demo.pkg.manifest.demo?.hash ?? null,
-        steamId64: player.steamId64,
-        playerName: player.name,
-        teamKey: player.teamKey,
-        signals: signal,
-        indicators: indicator,
-        weaponHighlight: weaponHighlightBySteamId.get(player.steamId64) ?? null
-      });
-    }
-  }
-  return buildSeasonCohortFromRows(rows, {
-    ...opts,
-    rrWeights,
-    valueWeights,
-    matchCount: demos.length
-  });
 }
 
 export function buildSeasonCohortFromRows(
@@ -179,7 +69,7 @@ export function buildSeasonCohortFromRows(
       externalUserId: identity.userId ?? null,
       displayName: identity.displayName ?? null,
       names: new Map<string, number>(),
-      teamKeys: new Set<TeamKey>(),
+      teamKeys: new Set<CohortTeamKey>(),
       mapCount: 0,
       signals: [],
       indicators: [],
@@ -451,9 +341,9 @@ function aggregateRatingIndicators(steamId64: string, rows: RRIndicators[]): RRI
 
 function aggregateWeaponHighlights(
   steamId64: string,
-  rows: PlayerWeaponHighlightFacts[]
-): PlayerWeaponHighlightFacts {
-  const weapons = new Map<string, PlayerWeaponHighlightFacts["weapons"][number]>();
+  rows: CohortWeaponHighlightFacts[]
+): CohortWeaponHighlightFacts {
+  const weapons = new Map<string, CohortWeaponHighlightFacts["weapons"][number]>();
   for (const row of rows) {
     for (const weapon of row.weapons) {
       const current = weapons.get(weapon.weapon) ?? {

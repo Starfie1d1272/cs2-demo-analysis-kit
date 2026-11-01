@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { loadDemoPackageFromZip } from "@cs2dak/core";
+import { loadDemoPackageFromZip } from "@cs2dak/demo-io";
 import { rivalHubEventsResponseSchema, type RivalHubEventsResponse } from "./contract";
 import { uploadDemo, type UploadDependencies, type UploadUpdate } from "./pipeline";
 import { createRivalHubClient, requestJson, rivalHubEvidenceIdempotencyKey } from "./client";

@@ -4,8 +4,8 @@
 
 ## 常青规则
 
-- [架构](architecture.md)：数据流、组件职责、v3 ZIP seam、评分三层。
-- [模块边界](module-boundaries.md)：每个模块做什么、不做什么、唯一 owner。
+- [架构](architecture.md)：UI / analytics / pipeline 消费入口、数据流、v3 ZIP seam 与评分所有权。
+- [模块边界](module-boundaries.md)：领域 owner、UI 传递依赖限制与可执行 package graph。
 - [设计语言](design-language.md)：Tactical Slate，Studio 所有页面强制遵守。
 - [组件登记表](design/studio-components.md)：可复用组件与 token 速查，新增 UI 前必查。
 - [地图语义](design/map-semantics.md)：callout 倾向、默认位、进点入口七图表与分类合同。
@@ -33,6 +33,14 @@
 - [自动更新](design/auto-update.md)：manifest 方案、R2 镜像与 Windows 接力替换。
 
 ## 集成与发布
+
+- [展示模型与工具](../packages/presentation/README.md)：已有数据的展示合同。
+- [React 组件](../packages/react/README.md)：独立组件、样式与宿主回调。
+- [基础事实](../packages/core/README.md)：canonical facts 与 QA。
+- [评分](../packages/rating/README.md)：信号到 RR/PRISM 的公式接线。
+- [跨场画像](../packages/cohort/README.md)：已有行的聚合。
+- [领域洞察](../packages/analytics/README.md)：已有 facts/bundle 的统计与展示投影。
+- [分析编排](../packages/pipeline/README.md)：原始 DemoPackage 到工作台模型。
 
 - [产品集成](integration.md)：RivalHub 分阶段数据接缝、CS2 Insight Agent 消费链路。
 - [发布流程](release.md)：桌面（git tag）与 npm（changesets）双版本流。

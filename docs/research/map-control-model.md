@@ -144,9 +144,9 @@ banana」，而在「我拿过 banana，所以现在可以少放人，且仍不�
 
 | 资产 | 现状 | 对地图控制的角色 |
 |---|---|---|
-| `callout-grid/*.json`（7 图） | 10-unit 3D 格点 × 110 场多数表决，inferno 24 词 / 62k 格 | **已是数据驱动区域图**，但词表粗（Banana 是整块） |
-| `map-nav/*.json`（7 图） | CompactNav，inferno 3060 个 area（含 centroid/corners/neighbors） | 覆盖场 grid-sample 的天然采样点 + 连通性 |
-| `map-zones/*.json`（legacy） | 手标多边形 + `grid-to-zones.py` 派生（auto-<map>.json） | 旧 shadow spatial/utility 辅助；当前控图真相源不用它 |
+| `packages/map-assets/callout-grid/*.json`（7 图） | 10-unit 3D 格点 × 110 场多数表决，inferno 24 词 / 62k 格 | **已是数据驱动区域图**，但词表粗（Banana 是整块） |
+| `packages/map-assets/map-nav/*.json`（7 图） | CompactNav，inferno 3060 个 area（含 centroid/corners/neighbors） | 覆盖场 grid-sample 的天然采样点 + 连通性 |
+| `packages/map-assets/map-zones/*.json`（legacy） | 手标多边形 + `grid-to-zones.py` 派生（auto-<map>.json） | 旧 shadow spatial/utility 辅助；当前控图真相源不用它 |
 | `DEFAULT_POSITION_GROUPS`（7 图） | T默认/CT默认/contested 三组口径 | 三类先验区域的种子 |
 | `core/duel-window.ts` | `isVisibleAt`（视锥 40° / `.tri` LOS / 烟雾 / flash / HP），**生产就绪** | **L2 覆盖场算法直接复用** |
 | `core/spatial/mapcontrol.ts` | scalar `buildOfficialMapControl`（route-index 手调 gate，只进 shadow 不进 RR） | **v0 代理，冻结**，将被价值模型取代 |
