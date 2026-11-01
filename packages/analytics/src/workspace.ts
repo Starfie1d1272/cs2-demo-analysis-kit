@@ -1,0 +1,1015 @@
+import { assertWorkspaceSource } from "./workspace-source.js";
+import { type AnalysisBundle, type DemoPackage, type EconomyPoint, type HeatmapPoint, type PlayerScoreboardRow, type TeamKey } from "@cs2dak/contract";
+import { matchWorkspaceModelSchema, type MatchWorkspaceModel, type WorkspaceKillEvent, type WorkspaceReplayFrame, type WorkspaceReplayLoadout, type WorkspaceReplayRound, type WorkspaceSpatialPoint } from "@cs2dak/presentation";
+import { decodeDelta } from "@cs2dak/contract";
+
+import { groupBy, nameForSteamId, round, normalizeWeapon, isNamedWeapon } from "./workspace-utils.js";
+import { displayWeaponName } from "@cs2dak/presentation";
+import {
+  activePhaseDamages,
+  aggregatePlayerRoundPerformanceFacts,
+  assertPlayerRoundPerformanceFacts,
+  deriveKillTrades,
+  type PlayerRoundPerformanceFacts,
+} from "@cs2dak/core";
+import { buildMatchBuyQuality } from "./insights.js";
+import { buildDemoViewModel, type DemoViewOptions } from "@cs2dak/presentation";
+
+export function buildMatchWorkspaceFromAnalysis(
+  pkg: DemoPackage,
+  bundle: AnalysisBundle,
+  performanceFacts: PlayerRoundPerformanceFacts,
+  options: DemoViewOptions = {},
+): MatchWorkspaceModel {
+  assertPlayerRoundPerformanceFacts(pkg, performanceFacts);
+  assertWorkspaceSource(pkg, bundle, performanceFacts);
+  const view = buildDemoViewModel(bundle, options);
+  const eventsByRound = groupBy(bundle.timeline, (event) => event.roundNumber);
+  const factsByRound = groupBy(bundle.playerRoundFacts, (fact) => fact.roundNumber);
+  const factsByPlayer = groupBy(bundle.playerRoundFacts, (fact) => fact.steamId64);
+  const teamNames = {
+    teamA: bundle.teams.teamA.name,
+    teamB: bundle.teams.teamB.name
+  };
+
+  const rounds = pkg.rounds.map((roundRow) => ({
+    roundNumber: roundRow.roundNumber,
+    scoreBefore: `${roundRow.teamAScoreBefore}:${roundRow.teamBScoreBefore}`,
+    winnerTeamKey: roundRow.winnerTeamKey,
+    winnerSide: roundRow.winnerSide,
+    endReason: roundRow.endReason,
+    teamAEconomy: roundRow.teamAEconomy,
+    teamBEconomy: roundRow.teamBEconomy,
+    events: eventsByRound.get(roundRow.roundNumber) ?? [],
+    playerFacts: factsByRound.get(roundRow.roundNumber) ?? [],
+    facets: buildRoundFacets(pkg, roundRow.roundNumber, performanceFacts)
+  }));
+
+  return matchWorkspaceModelSchema.parse({
+    version: "cs2-demo-analysis-kit/workspace-0.2",
+    sourceSchemaVersion: bundle.sourceSchemaVersion,
+    title: view.title,
+    subtitle: view.subtitle,
+    scoreline: view.scoreline,
+    mapName: bundle.mapName,
+    teams: bundle.teams,
+    tabs: [
+      { key: "overview", label: "总览" },
+      { key: "rounds", label: "回合" },
+      { key: "players", label: "选手" },
+      { key: "economy", label: "经济" },
+      { key: "weapons", label: "武器" },
+      { key: "duels", label: "对位" },
+      { key: "map", label: "地图" },
+      { key: "replay", label: "回放" }
+    ],
+    overview: {
+      kpis: buildWorkspaceKpis(bundle),
+      story: buildWorkspaceStory(bundle, pkg)
+    },
+    scoreboard: view.scoreboard,
+    rounds,
+    reportHighlights: buildReportHighlights(rounds),
+    players: bundle.scoreboard.map((row, index) => ({
+      row: view.scoreboard[index]!,
+      teamName: teamNames[row.teamKey],
+      summary: buildPlayerSummary(row),
+      rrBreakdown: [
+        { key: "combat", label: "Combat", value: row.accountBreakdown.combat },
+        { key: "trade", label: "Trade", value: row.accountBreakdown.trade },
+        { key: "mapControl", label: "MapControl", value: row.accountBreakdown.mapControl },
+        { key: "clutch", label: "Clutch", value: row.accountBreakdown.clutch },
+        { key: "objective", label: "Objective", value: row.accountBreakdown.objective },
+        { key: "utility", label: "Utility", value: row.accountBreakdown.utility }
+      ],
+      roundFacts: factsByPlayer.get(row.steamId64) ?? [],
+      roundSummary: summarizePlayerRoundFacts(factsByPlayer.get(row.steamId64) ?? [])
+    })),
+    economy: bundle.economy,
+    buyQuality: buildMatchBuyQuality(bundle.economy),
+    weapons: buildWorkspaceWeapons(pkg, performanceFacts),
+    duels: buildWorkspaceDuels(pkg, bundle),
+    map: buildWorkspaceMap(pkg, view.map, bundle.heatmap),
+    replay: buildWorkspaceReplay(pkg),
+    adminQa: bundle.qa
+  });
+}
+
+function summarizePlayerRoundFacts(facts: MatchWorkspaceModel["players"][number]["roundFacts"]) {
+  return facts.reduce(
+    (summary, fact) => ({
+      survived: summary.survived + (fact.survived ? 1 : 0),
+      openingKills: summary.openingKills + (fact.openingDuel === "won" ? 1 : 0),
+      tradeKills: summary.tradeKills + fact.tradeKills
+    }),
+    { survived: 0, openingKills: 0, tradeKills: 0 }
+  );
+}
+
+function buildReportHighlights(rounds: MatchWorkspaceModel["rounds"]): MatchWorkspaceModel["reportHighlights"] {
+  return rounds
+    .filter((row) => row.facets && (row.facets.clutch || row.facets.maxKillsByOnePlayer >= 3))
+    .map((row) => {
+      const tags: string[] = [];
+      if (row.facets?.clutch) {
+        tags.push(`1v${row.facets.clutch.opponentCount} 残局${row.facets.clutch.won ? "成功" : "失败"}`);
+      }
+      if ((row.facets?.maxKillsByOnePlayer ?? 0) >= 3) {
+        tags.push(`${row.facets!.maxKillsByOnePlayer} 杀回合`);
+      }
+      return { roundNumber: row.roundNumber, scoreBefore: row.scoreBefore, winnerSide: row.winnerSide, tags };
+    });
+}
+
+/** 回合筛选与时间轴锚点的派生事实（v0.2 query-first）。 */
+function buildRoundFacets(pkg: DemoPackage, roundNumber: number, performanceFacts: PlayerRoundPerformanceFacts) {
+  const playerRounds = performanceFacts.playerRounds.filter((row) => row.roundNumber === roundNumber);
+  const bombs = pkg.bombs.filter((bomb) => bomb.roundNumber === roundNumber);
+  const plant = bombs.find((bomb) => bomb.type === "planted") ?? null;
+  const defuse = bombs.find((bomb) => bomb.type === "defused") ?? null;
+  const clutch = pkg.clutches.find((row) => row.roundNumber === roundNumber) ?? null;
+  const firstKill = playerRounds.find((row) => row.openingDuel === "won") ?? null;
+
+  return {
+    bombSite: plant?.site ?? null,
+    bombPlantTick: plant?.tick ?? null,
+    bombDefuseTick: defuse?.tick ?? null,
+    firstKillTick: firstKill?.openingTick ?? null,
+    firstKillSteamId64: firstKill?.steamId64 ?? null,
+    firstKillTeamKey: firstKill?.teamKey ?? null,
+    clutch: clutch
+      ? {
+          steamId64: pkg.players[clutch.clutcherIndex]?.steamId64 ?? "",
+          teamKey: pkg.players[clutch.clutcherIndex]?.teamKey ?? "",
+          opponentCount: clutch.opponentCount,
+          won: clutch.won,
+          tick: clutch.tick
+        }
+      : null,
+    maxKillsByOnePlayer: Math.max(0, ...playerRounds.map((row) => row.kills)),
+    wallbangKills: playerRounds.reduce((sum, row) => sum + row.weapons.reduce((rowSum, weapon) => rowSum + weapon.wallbangKills, 0), 0),
+    throughSmokeKills: playerRounds.reduce((sum, row) => sum + row.weapons.reduce((rowSum, weapon) => rowSum + weapon.throughSmokeKills, 0), 0)
+  };
+}
+
+/** 比赛级武器统计：击杀与特殊击杀来自 Core canonical facts，伤害仍是回放阶段口径。 */
+function buildWorkspaceWeapons(pkg: DemoPackage, performanceFacts: PlayerRoundPerformanceFacts) {
+  const performanceBySteamId = aggregatePlayerRoundPerformanceFacts(performanceFacts);
+  const damageByWeapon = new Map<string, number>();
+  for (const damage of activePhaseDamages(pkg)) {
+    if (!isNamedWeapon(damage.weapon)) continue;
+    const key = normalizeWeapon(damage.weapon);
+    damageByWeapon.set(key, (damageByWeapon.get(key) ?? 0) + damage.healthDamage);
+  }
+
+  const weapons = new Map<string, {
+    kills: number;
+    headshots: number;
+    wallbangKills: number;
+    noScopeKills: number;
+    throughSmokeKills: number;
+    killerCounts: Map<string, number>;
+  }>();
+  for (const player of pkg.players) {
+    const summary = performanceBySteamId.get(player.steamId64);
+    for (const weapon of summary?.weapons ?? []) {
+      if (!isNamedWeapon(weapon.weapon)) continue;
+      const row = weapons.get(weapon.weapon) ?? {
+        kills: 0,
+        headshots: 0,
+        wallbangKills: 0,
+        noScopeKills: 0,
+        throughSmokeKills: 0,
+        killerCounts: new Map<string, number>(),
+      };
+      row.kills += weapon.kills;
+      row.headshots += weapon.headshotKills;
+      row.wallbangKills += weapon.wallbangKills;
+      row.noScopeKills += weapon.noScopeKills;
+      row.throughSmokeKills += weapon.throughSmokeKills;
+      row.killerCounts.set(player.steamId64, (row.killerCounts.get(player.steamId64) ?? 0) + weapon.kills);
+      weapons.set(weapon.weapon, row);
+    }
+  }
+
+  return [...weapons.entries()]
+    .map(([weapon, stats]) => {
+      const topKiller = [...stats.killerCounts.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
+      return {
+        weapon,
+        label: displayWeaponName(weapon),
+        kills: stats.kills,
+        headshotPercent: stats.kills > 0 ? round((stats.headshots / stats.kills) * 100, 1) : null,
+        damage: damageByWeapon.get(weapon) ?? 0,
+        wallbangKills: stats.wallbangKills,
+        noScopeKills: stats.noScopeKills,
+        throughSmokeKills: stats.throughSmokeKills,
+        topKillerName: topKiller ? nameForSteamId(pkg, topKiller[0]) : null,
+        topKillerKills: topKiller ? topKiller[1] : 0
+      };
+    })
+    .sort((a, b) => b.kills - a.kills);
+}
+
+/** 对位：10x10 击杀矩阵（teamA 在前）+ 开局对枪统计（来自 playerRoundFacts）。 */
+function buildWorkspaceDuels(pkg: DemoPackage, bundle: AnalysisBundle) {
+  const players = [...bundle.scoreboard]
+    .sort((a, b) => (a.teamKey === b.teamKey ? b.accountRR - a.accountRR : a.teamKey === "teamA" ? -1 : 1))
+    .map((row) => ({ steamId64: row.steamId64, name: row.name, teamKey: row.teamKey }));
+  const indexBySteamId = new Map(players.map((player, index) => [player.steamId64, index]));
+
+  const matrix = players.map(() => players.map(() => 0));
+  for (const kill of pkg.kills) {
+    if (kill.killerIndex == null) continue;
+    const killer = pkg.players[kill.killerIndex];
+    const victim = pkg.players[kill.victimIndex];
+    if (!killer || !victim) continue;
+    const killerIdx = indexBySteamId.get(killer.steamId64);
+    const victimIdx = indexBySteamId.get(victim.steamId64);
+    if (killerIdx == null || victimIdx == null) continue;
+    matrix[killerIdx][victimIdx] += 1;
+  }
+
+  const factsByPlayer = groupBy(bundle.playerRoundFacts, (fact) => fact.steamId64);
+  const openings = players.map((player) => {
+    const facts = factsByPlayer.get(player.steamId64) ?? [];
+    const openingKills = facts.filter((fact) => fact.openingDuel === "won").length;
+    const openingDeaths = facts.filter((fact) => fact.openingDuel === "lost").length;
+    const total = openingKills + openingDeaths;
+    return {
+      ...player,
+      openingKills,
+      openingDeaths,
+      winRatePercent: total > 0 ? round((openingKills / total) * 100, 1) : null
+    };
+  });
+
+  return { players, matrix, openings };
+}
+
+function buildWorkspaceKpis(bundle: AnalysisBundle) {
+  const topRR = bundle.scoreboard[0];
+  const topAdr = [...bundle.scoreboard].sort((a, b) => b.adr - a.adr)[0];
+  const tradeKills = bundle.scoreboard.reduce((sum, row) => sum + row.tradeKills, 0);
+  const roundCount = bundle.economy.length;
+
+  return [
+    {
+      key: "topRR",
+      label: "最高 V2 RR",
+      value: topRR ? topRR.accountRR.toFixed(3) : "0.000",
+      detail: topRR?.name ?? "暂无选手"
+    },
+    {
+      key: "topADR",
+      label: "最高 ADR",
+      value: topAdr ? topAdr.adr.toFixed(1) : "0.0",
+      detail: topAdr?.name ?? "暂无选手"
+    },
+    {
+      key: "roundCount",
+      label: "总回合数",
+      value: roundCount.toString(),
+      detail: `${bundle.teams.teamA.score}:${bundle.teams.teamB.score}`
+    },
+    {
+      key: "tradeActivity",
+      label: "补枪参与",
+      value: tradeKills.toString(),
+      detail: "来自 Core canonical trade facts"
+    }
+  ];
+}
+
+// ── 比赛叙事（overview.story）────────────────────────────────────────────
+// 采用「候选 beat 池 + 显著度择优」：每个生成器产出一条候选，按显著度排序取前
+// MAX_STORY_BEATS 条；开场 beat 强制置顶，选手类 beat 最多占 MAX_PLAYER_BEATS 条，
+// 显著度低于阈值的不强凑。文案为解说式口语。
+
+const MAX_STORY_BEATS = 6;
+const MAX_PLAYER_BEATS = 2;
+const MIN_BEAT_SALIENCE = 0.2;
+const PLAYER_BEAT_KEYS = new Set(["mvp", "entry", "clutch"]);
+
+const MAP_DISPLAY_NAMES: Record<string, string> = {
+  de_ancient: "Ancient",
+  de_anubis: "Anubis",
+  de_dust2: "Dust2",
+  de_inferno: "Inferno",
+  de_mirage: "Mirage",
+  de_nuke: "Nuke",
+  de_overpass: "Overpass",
+  de_train: "Train",
+  de_vertigo: "Vertigo"
+};
+
+function mapDisplayName(mapName: string): string {
+  return MAP_DISPLAY_NAMES[mapName] ?? mapName.replace(/^de_/, "").replace(/^\w/, (c) => c.toUpperCase());
+}
+
+function sideLabelZh(side: "ct" | "t" | null): string {
+  return side === "ct" ? "CT" : "T";
+}
+
+// ── 文案模板（集中管理，改词只动这里）─────────────────────────────────────
+// 上面的 beat 生成器只负责算数据、决定走哪个分支；具体「怎么说」全部收在这里。
+// 想调措辞、换口吻、改用词，编辑这个对象即可，无需碰逻辑。
+const STORY_COPY = {
+  headline: {
+    /** 比分差 → 动词。 */
+    verb: (margin: number) => (margin >= 8 ? "大比分战胜" : margin <= 2 ? "险胜" : "战胜"),
+    comeback: (firstHalf: number, secondHalf: number) =>
+      `上半场拿到 ${firstHalf} 分，换边后取得 ${secondHalf} 分完成比分反超`,
+    frontRunner: (firstHalf: number, secondHalf: number) =>
+      `上半场拿到 ${firstHalf} 分，下半场再取得 ${secondHalf} 分`,
+    even: (firstHalf: number, secondHalf: number) =>
+      `上半场拿 ${firstHalf} 分、下半场再添 ${secondHalf} 分`,
+    overtime: (overtimeWins: number) => `，加时又咬下 ${overtimeWins} 分才分出胜负`,
+    line: (mapName: string, winner: string, winnerScore: number, loserScore: number, verb: string, loser: string, half: string, overtime: string) =>
+      `${mapName} 一图，${winner} ${winnerScore}:${loserScore} ${verb} ${loser}——${half}${overtime}。`
+  },
+  momentum: {
+    /** 连胜的攻防上下文短语；非赢家或无 side 时返回空串。 */
+    context: (sideLabel: string, crossSwitch: boolean, ownedByWinner: boolean) =>
+      !ownedByWinner ? "" : crossSwitch ? "横跨换边" : `靠 ${sideLabel} 半场`,
+    line: (startRound: number, endRound: number, length: number, team: string, context: string) =>
+      `${team} 在 R${startRound}-R${endRound} 取得 ${length} 连胜${context ? `（${context}）` : ""}，这是本场最长连胜段。`
+  },
+  pistol: {
+    sweep: "两次手枪局均取胜。",
+    none: "两次手枪局均未取胜，胜局来自后续回合。",
+    split: "双方各取一次手枪局。",
+    line: (total: number, winner: string, wins: number, tail: string) =>
+      `${total} 个手枪局 ${winner} 拿下 ${wins} 个，${tail}`
+  },
+  clutch: {
+    line: (who: string, teamTag: string, round: number, opponents: number) =>
+      `样本中人数规模最大的残局是 ${who}${teamTag}在 R${round} 完成的 1v${opponents}。`
+  },
+  entry: {
+    line: (name: string, entryKills: number) =>
+      `${name} 记录到 ${entryKills} 次首杀，为队内最多。`
+  },
+  lowBuy: {
+    line: (winner: string, count: number, round: number) =>
+      `${winner} 在 ${count} 个低经济回合中取胜，代表回合为 R${round}。`
+  },
+  closeout: {
+    reason: {
+      target_bombed: "C4爆炸",
+      bomb_defused: "拆弹",
+      t_win: "正面歼灭",
+      ct_win: "正面歼灭",
+      target_saved: "拖到时间耗尽"
+    } as Record<string, string>,
+    line: (winner: string, count: number, total: number, reason: string) =>
+      `${winner} 的胜局中有 ${count}/${total} 个以${reason}结束。`
+  },
+  mvp: {
+    dom: {
+      combat: "Combat 项",
+      trade: "Trade 项",
+      mapControl: "MapControl 项",
+      clutch: "Clutch 项",
+      objective: "Objective 项",
+      utility: "Utility 项"
+    } as Record<string, string>,
+    winnerAdrTail: (name: string, adr: string) => `；场均伤害最高的则是 ${name}（ADR ${adr}）`,
+    winner: (name: string, kda: string, adr: string, rr: string, dom: string, adrTail: string) =>
+      `胜方 RR 最高的是 ${name}（${kda}、ADR ${adr}、RR ${rr}），六账户分解中${dom}最突出${adrTail}。`,
+    loser: (rr: string, kda: string, name: string, team: string, dom: string) =>
+      `全场 RR 最高的是落败方 ${team} 的 ${name}（${rr}，${kda}），六账户分解中${dom}最突出。`
+  }
+} as const;
+
+interface StoryBeat {
+  key: string;
+  available: boolean;
+  salience: number;
+  text: string;
+}
+
+interface StoryContext {
+  bundle: AnalysisBundle;
+  pkg: DemoPackage;
+  mapName: string;
+  winnerKey: TeamKey;
+  loserKey: TeamKey;
+  winner: AnalysisBundle["teams"]["teamA"];
+  loser: AnalysisBundle["teams"]["teamA"];
+  /** 赢家在某回合所站的边（ct/t）。 */
+  sideOfWinner: (roundNumber: number) => "ct" | "t" | null;
+  /** 赢家 CT 半 / T 半各赢多少分（跨加时聚合，靠 per-round side 判定）。 */
+  ctWins: number;
+  tWins: number;
+  /** 真实换边后的上/下半场与加时赢分（赢家视角）。 */
+  firstHalfWins: number;
+  secondHalfWins: number;
+  overtimeWins: number;
+  hasOvertime: boolean;
+}
+
+function buildStoryContext(bundle: AnalysisBundle, pkg: DemoPackage): StoryContext {
+  const winnerKey: TeamKey = bundle.teams.teamA.score >= bundle.teams.teamB.score ? "teamA" : "teamB";
+  const loserKey: TeamKey = winnerKey === "teamA" ? "teamB" : "teamA";
+
+  const roundsByNumber = new Map(pkg.rounds.map((roundRow) => [roundRow.roundNumber, roundRow]));
+  const sideOfWinner = (roundNumber: number): "ct" | "t" | null => {
+    const roundRow = roundsByNumber.get(roundNumber);
+    if (!roundRow) return null;
+    return winnerKey === "teamA" ? roundRow.teamASide : roundRow.teamBSide;
+  };
+
+  // 找真实换边点：side 相对上一回合翻转处即为换边。
+  const ordered = [...bundle.economy].sort((a, b) => a.roundNumber - b.roundNumber);
+  const switchRounds: number[] = [];
+  for (let index = 1; index < ordered.length; index += 1) {
+    if (sideOfWinner(ordered[index]!.roundNumber) !== sideOfWinner(ordered[index - 1]!.roundNumber)) {
+      switchRounds.push(ordered[index]!.roundNumber);
+    }
+  }
+  const firstSwitch = switchRounds[0] ?? Infinity;
+  const overtimeStart = 25; // CS2 常规局 24 回合，加时从 R25 起。
+
+  let ctWins = 0;
+  let tWins = 0;
+  let firstHalfWins = 0;
+  let secondHalfWins = 0;
+  let overtimeWins = 0;
+  for (const point of ordered) {
+    if (point.winnerTeamKey !== winnerKey) continue;
+    const side = sideOfWinner(point.roundNumber);
+    if (side === "ct") ctWins += 1;
+    else if (side === "t") tWins += 1;
+    if (point.roundNumber >= overtimeStart) overtimeWins += 1;
+    else if (point.roundNumber < firstSwitch) firstHalfWins += 1;
+    else secondHalfWins += 1;
+  }
+
+  return {
+    bundle,
+    pkg,
+    mapName: mapDisplayName(bundle.mapName),
+    winnerKey,
+    loserKey,
+    winner: bundle.teams[winnerKey],
+    loser: bundle.teams[loserKey],
+    sideOfWinner,
+    ctWins,
+    tWins,
+    firstHalfWins,
+    secondHalfWins,
+    overtimeWins,
+    hasOvertime: ordered.some((point) => point.roundNumber >= overtimeStart)
+  };
+}
+
+function buildWorkspaceStory(bundle: AnalysisBundle, pkg: DemoPackage): string[] {
+  const ctx = buildStoryContext(bundle, pkg);
+  const candidates = [
+    headlineBeat(ctx),
+    momentumBeat(ctx),
+    pistolBeat(ctx),
+    clutchBeat(ctx),
+    entryBeat(ctx),
+    lowBuyBeat(ctx),
+    closeoutBeat(ctx),
+    mvpBeat(ctx)
+  ].filter((beat): beat is StoryBeat => beat !== null && beat.available);
+
+  const headline = candidates.find((beat) => beat.key === "headline");
+  const rest = candidates
+    .filter((beat) => beat.key !== "headline" && beat.salience >= MIN_BEAT_SALIENCE)
+    .sort((a, b) => b.salience - a.salience);
+
+  // 选手类 beat 限流，避免整段都在夸人。
+  let playerCount = 0;
+  const picked: StoryBeat[] = [];
+  for (const beat of rest) {
+    if (PLAYER_BEAT_KEYS.has(beat.key)) {
+      if (playerCount >= MAX_PLAYER_BEATS) continue;
+      playerCount += 1;
+    }
+    picked.push(beat);
+  }
+
+  return [headline, ...picked]
+    .filter((beat): beat is StoryBeat => beat !== undefined)
+    .slice(0, MAX_STORY_BEATS)
+    .map((beat) => beat.text);
+}
+
+function headlineBeat(ctx: StoryContext): StoryBeat {
+  const { winner, loser, mapName } = ctx;
+  const verb = STORY_COPY.headline.verb(winner.score - loser.score);
+  let half: string;
+  if (ctx.firstHalfWins <= 4 && ctx.secondHalfWins > ctx.firstHalfWins) {
+    half = STORY_COPY.headline.comeback(ctx.firstHalfWins, ctx.secondHalfWins);
+  } else if (ctx.firstHalfWins >= 9) {
+    half = STORY_COPY.headline.frontRunner(ctx.firstHalfWins, ctx.secondHalfWins);
+  } else {
+    half = STORY_COPY.headline.even(ctx.firstHalfWins, ctx.secondHalfWins);
+  }
+  const overtime = ctx.hasOvertime ? STORY_COPY.headline.overtime(ctx.overtimeWins) : "";
+  return {
+    key: "headline",
+    available: true,
+    salience: 1,
+    text: STORY_COPY.headline.line(mapName, winner.name, winner.score, loser.score, verb, loser.name, half, overtime)
+  };
+}
+
+function momentumBeat(ctx: StoryContext): StoryBeat | null {
+  const run = longestWinRun(ctx.bundle.economy);
+  if (run.length < 4) return null;
+  const team = run.teamKey === "teamA" ? ctx.bundle.teams.teamA.name : ctx.bundle.teams.teamB.name;
+  const total = ctx.bundle.teams.teamA.score + ctx.bundle.teams.teamB.score;
+  const startSide = ctx.sideOfWinner(run.startRound);
+  const endSide = ctx.sideOfWinner(run.endRound);
+  const ownedByWinner = run.teamKey === ctx.winnerKey;
+  const crossSwitch = ownedByWinner && startSide !== null && endSide !== null && startSide !== endSide;
+  const context = STORY_COPY.momentum.context(sideLabelZh(startSide), crossSwitch, ownedByWinner);
+  return {
+    key: "momentum",
+    available: true,
+    salience: Math.min(0.95, run.length / total + 0.2),
+    text: STORY_COPY.momentum.line(run.startRound, run.endRound, run.length, team, context)
+  };
+}
+
+function pistolBeat(ctx: StoryContext): StoryBeat | null {
+  const pistols = ctx.bundle.economy.filter(
+    (roundRow) => roundRow.teamAEconomy === "pistol" || roundRow.teamBEconomy === "pistol"
+  );
+  if (pistols.length === 0) return null;
+  const wins = pistols.filter((roundRow) => roundRow.winnerTeamKey === ctx.winnerKey).length;
+  const tail = wins === pistols.length ? STORY_COPY.pistol.sweep : wins === 0 ? STORY_COPY.pistol.none : STORY_COPY.pistol.split;
+  return {
+    key: "pistol",
+    available: true,
+    salience: wins === pistols.length ? 0.7 : wins === 0 ? 0.55 : 0.45,
+    text: STORY_COPY.pistol.line(pistols.length, ctx.winner.name, wins, tail)
+  };
+}
+
+function clutchBeat(ctx: StoryContext): StoryBeat | null {
+  const won = ctx.pkg.clutches.filter((row) => row.won && (row.opponentCount ?? 0) >= 2);
+  if (won.length === 0) return null;
+  const top = [...won].sort((a, b) => (b.opponentCount ?? 0) - (a.opponentCount ?? 0))[0]!;
+  const player = ctx.pkg.players[top.clutcherIndex];
+  const who = player?.name ?? "某选手";
+  const teamName = player
+    ? player.teamKey === "teamA"
+      ? ctx.bundle.teams.teamA.name
+      : ctx.bundle.teams.teamB.name
+    : null;
+  const teamTag = teamName ? `（${teamName}）` : "";
+  return {
+    key: "clutch",
+    available: true,
+    salience: 0.4 + (top.opponentCount ?? 2) * 0.12,
+    text: STORY_COPY.clutch.line(who, teamTag, top.roundNumber, top.opponentCount)
+  };
+}
+
+function entryBeat(ctx: StoryContext): StoryBeat | null {
+  const topEntry = [...ctx.bundle.scoreboard].sort((a, b) => b.entryKills - a.entryKills)[0];
+  // 与 MVP 撞人就让位给 MVP（同一人不重复出两条）。
+  if (!topEntry || topEntry.entryKills < 3 || topEntry.steamId64 === ctx.bundle.scoreboard[0]?.steamId64) {
+    return null;
+  }
+  return {
+    key: "entry",
+    available: true,
+    salience: 0.3 + topEntry.entryKills * 0.05,
+    text: STORY_COPY.entry.line(topEntry.name, topEntry.entryKills)
+  };
+}
+
+function lowBuyBeat(ctx: StoryContext): StoryBeat | null {
+  const steals = ctx.bundle.economy.filter((roundRow) => {
+    const winnerEconomy = ctx.winnerKey === "teamA" ? roundRow.teamAEconomy : roundRow.teamBEconomy;
+    const loserEconomy = ctx.winnerKey === "teamA" ? roundRow.teamBEconomy : roundRow.teamAEconomy;
+    return roundRow.winnerTeamKey === ctx.winnerKey && ["eco", "semi", "force"].includes(winnerEconomy) && loserEconomy === "full";
+  });
+  if (steals.length === 0) return null;
+  return {
+    key: "lowBuy",
+    available: true,
+    salience: 0.25 + steals.length * 0.08,
+    text: STORY_COPY.lowBuy.line(ctx.winner.name, steals.length, steals[0]!.roundNumber)
+  };
+}
+
+function closeoutBeat(ctx: StoryContext): StoryBeat | null {
+  const winnerRounds = ctx.pkg.rounds.filter((roundRow) => roundRow.winnerTeamKey === ctx.winnerKey);
+  if (winnerRounds.length === 0) return null;
+  const byReason = new Map<string, number>();
+  for (const roundRow of winnerRounds) {
+    byReason.set(roundRow.endReason, (byReason.get(roundRow.endReason) ?? 0) + 1);
+  }
+  const [reason, count] = [...byReason.entries()].sort((a, b) => b[1] - a[1])[0] ?? ["", 0];
+  const ratio = count / winnerRounds.length;
+  if (ratio < 0.5) return null;
+  return {
+    key: "closeout",
+    available: true,
+    salience: ratio - 0.25,
+    text: STORY_COPY.closeout.line(ctx.winner.name, count, winnerRounds.length, STORY_COPY.closeout.reason[reason] ?? reason)
+  };
+}
+
+function mvpBeat(ctx: StoryContext): StoryBeat | null {
+  const top = ctx.bundle.scoreboard[0];
+  if (!top) return null;
+  const domKey = (Object.entries(top.accountBreakdown).sort((a, b) => b[1] - a[1])[0]?.[0]) ?? "combat";
+  const dom = STORY_COPY.mvp.dom[domKey] ?? STORY_COPY.mvp.dom.combat!;
+  const kda = `${top.kills}/${top.deaths}/${top.assists}`;
+  const rr = top.accountRR.toFixed(2);
+  if (top.teamKey === ctx.winnerKey) {
+    const topAdr = [...ctx.bundle.scoreboard].sort((a, b) => b.adr - a.adr)[0];
+    const adrTail = topAdr && topAdr.steamId64 !== top.steamId64
+      ? STORY_COPY.mvp.winnerAdrTail(topAdr.name, topAdr.adr.toFixed(0))
+      : "";
+    return {
+      key: "mvp",
+      available: true,
+      salience: 0.6,
+      text: STORY_COPY.mvp.winner(top.name, kda, top.adr.toFixed(0), rr, dom, adrTail)
+    };
+  }
+  // 全场最高分落在败方：点明队属，避免误读成赢家 MVP。
+  return {
+    key: "mvp",
+    available: true,
+    salience: 0.55,
+    text: STORY_COPY.mvp.loser(rr, kda, top.name, ctx.loser.name, dom)
+  };
+}
+
+function longestWinRun(rounds: EconomyPoint[]): { teamKey: TeamKey; startRound: number; endRound: number; length: number } {
+  let best = { teamKey: "teamA" as TeamKey, startRound: 0, endRound: 0, length: 0 };
+  let current = { teamKey: "teamA" as TeamKey, startRound: 0, endRound: 0, length: 0 };
+  for (const roundRow of rounds) {
+    if (current.length > 0 && current.teamKey === roundRow.winnerTeamKey) {
+      current = { ...current, endRound: roundRow.roundNumber, length: current.length + 1 };
+    } else {
+      current = { teamKey: roundRow.winnerTeamKey, startRound: roundRow.roundNumber, endRound: roundRow.roundNumber, length: 1 };
+    }
+    if (current.length > best.length) {
+      best = current;
+    }
+  }
+  return best;
+}
+
+function buildPlayerSummary(row: PlayerScoreboardRow): string[] {
+  const summary = [
+    `${row.kills}/${row.deaths}/${row.assists}，ADR ${row.adr.toFixed(1)}，KAST ${row.kast.toFixed(1)}%。`,
+    `V2 RR ${row.accountRR.toFixed(3)}，数据可信度 ${(row.confidence * 100).toFixed(0)}%。`
+  ];
+  if (row.entryKills > 0) {
+    summary.push(`贡献 ${row.entryKills} 次首杀。`);
+  }
+  if (row.tradeKills > 0) {
+    summary.push(`完成 ${row.tradeKills} 次补枪。`);
+  }
+  if ((row.bombPlantCount ?? 0) + (row.bombDefuseCount ?? 0) > 0) {
+    summary.push(`目标贡献：${row.bombPlantCount ?? 0} 次下包，${row.bombDefuseCount ?? 0} 次拆包。`);
+  }
+  return summary;
+}
+
+function buildWorkspaceMap(pkg: DemoPackage, view: ReturnType<typeof buildDemoViewModel>["map"], heatmap: HeatmapPoint[]) {
+  const bombPoints: WorkspaceSpatialPoint[] = pkg.bombs
+    .filter((bomb) => bomb.position && (bomb.position.x !== 0 || bomb.position.y !== 0))
+    .map((bomb) => ({
+      x: bomb.position.x,
+      y: bomb.position.y,
+      z: bomb.position.z,
+      roundNumber: bomb.roundNumber,
+      teamKey: bomb.actorIndex != null ? (pkg.players[bomb.actorIndex]?.teamKey ?? null) : null,
+      steamId64: bomb.actorIndex != null ? (pkg.players[bomb.actorIndex]?.steamId64 ?? null) : null,
+      kind: "bomb",
+      side: null,
+      grenadeType: null
+    }));
+  const points: WorkspaceSpatialPoint[] = [
+    ...heatmap.map((point) => ({ ...point, kind: point.kind })),
+    ...bombPoints
+  ];
+  const count = (kind: WorkspaceSpatialPoint["kind"]) => points.filter((point) => point.kind === kind).length;
+  const hasPositionData = points.length > 0;
+
+  return {
+    view,
+    modes: [
+      { key: "death", label: "死亡", count: count("death") },
+      { key: "kill", label: "击杀", count: count("kill") },
+      { key: "grenade", label: "道具", count: count("grenade") },
+      { key: "bomb", label: "炸弹", count: count("bomb") },
+      { key: "position", label: "站位", count: count("position") }
+    ],
+    points,
+    status: {
+      hasRadar: !!view.radarImageUrl,
+      hasPositionData,
+      message: !view.radarImageUrl
+        ? "该地图暂无雷达底图"
+        : hasPositionData
+          ? null
+          : "该导出包暂无可展示的位置数据"
+    }
+  };
+}
+
+function buildWorkspaceReplay(pkg: DemoPackage) {
+  const replay = pkg.replay;
+  if (!replay) {
+    return {
+      available: false,
+      sampleRate: null,
+      tickrate: null,
+      rounds: [],
+      capabilities: {
+        hasDefuseKit: false
+      }
+    };
+  }
+
+  const { tradeKills } = deriveKillTrades(pkg);
+  const killsByRound = groupBy(pkg.kills, (k) => k.roundNumber);
+  const grenadesByRound = groupBy(pkg.grenades, (g) => g.roundNumber);
+  const bombsByRound = groupBy(pkg.bombs, (b) => b.roundNumber);
+  const roundsByNumber = new Map(pkg.rounds.map((r) => [r.roundNumber, r]));
+  const endTickByRound = new Map(pkg.rounds.map((r) => [r.roundNumber, r.endTick]));
+  const sortedPackageRounds = [...pkg.rounds].sort((a, b) => a.startTick - b.startTick);
+  const targetEndTickByRound = new Map<number, number>();
+  sortedPackageRounds.forEach((round, index) => {
+    targetEndTickByRound.set(
+      round.roundNumber,
+      sortedPackageRounds[index + 1]?.startTick ?? round.endTick
+    );
+  });
+  const economyByRoundPlayer = new Map(pkg.playerEconomies.map((row) => [`${row.roundNumber}:${row.playerIndex}`, row]));
+
+  let hasDefuseKit = false;
+  const rounds = replay.rounds.map((roundRow) => {
+    const sourceRound = roundsByNumber.get(roundRow.roundNumber);
+    const sideForTeam = (teamKey: TeamKey | null | undefined) => {
+      if (!sourceRound || !teamKey) return null;
+      return teamKey === "teamA" ? sourceRound.teamASide : sourceRound.teamBSide;
+    };
+
+    const officialEndTick = endTickByRound.get(roundRow.roundNumber);
+    const targetEndTick = targetEndTickByRound.get(roundRow.roundNumber) ?? officialEndTick;
+
+    return {
+      roundNumber: roundRow.roundNumber,
+      startTick: roundRow.startTick,
+      freezeEndTick: sourceRound?.freezeEndTick ?? roundRow.startTick,
+      tickStep: roundRow.tickStep,
+      frameCount: roundRow.frameCount,
+      officialEndTick,
+      targetEndTick,
+      kills: buildRoundKills(pkg, killsByRound.get(roundRow.roundNumber) ?? [], tradeKills),
+      grenades: (grenadesByRound.get(roundRow.roundNumber) ?? []).map((row) => ({
+        grenade: row.grenade,
+        throwerSide: sideForTeam(pkg.players[row.throwerIndex]?.teamKey),
+        throwTick: row.throwTick,
+        effectTick: row.effectTick,
+        destroyTick: row.destroyTick,
+        throwX: row.throwPosition.x,
+        throwY: row.throwPosition.y,
+        effectX: row.effectPosition.x,
+        effectY: row.effectPosition.y,
+        effectZ: row.effectPosition.z
+      })),
+      // v2.3+ 导出包才带飞行轨迹；旧包置空，渲染端按"无数据"处理
+      // v3 起 x/y/z 为差分编码（首元素绝对值 + 后续 delta），前缀和解码后 × coordScale 还原游戏单位
+      projectiles: (roundRow.projectiles ?? []).map((proj) => ({
+        grenade: proj.grenade,
+        startTick: proj.startTick,
+        x: decodeDelta(proj.x).map((v) => v * (replay.meta.coordScale || 1)),
+        y: decodeDelta(proj.y).map((v) => v * (replay.meta.coordScale || 1)),
+        z: decodeDelta(proj.z ?? []).map((v) => v * (replay.meta.coordScale || 1))
+      })),
+      bomb: buildRoundBomb(bombsByRound.get(roundRow.roundNumber) ?? []),
+      groundBombs: buildGroundBombs(
+        bombsByRound.get(roundRow.roundNumber) ?? [],
+        targetEndTick ?? roundRow.startTick + roundRow.frameCount * roundRow.tickStep
+      ),
+      groundDefusers: buildGroundDefusers(
+        roundRow,
+        replay.meta.coordScale || 1,
+        sourceRound?.freezeEndTick ?? roundRow.startTick,
+        targetEndTick ?? roundRow.startTick + roundRow.frameCount * roundRow.tickStep
+      ),
+      players: roundRow.players.map((player) => {
+        // v3 起 x/y/z/yaw 为差分编码，flash 改为独立列（0.1 秒单位，flags 不再含致盲位）
+        const coordScale = replay.meta.coordScale || 1;
+        const angleScale = replay.meta.angleScale || 1;
+        const xs = decodeDelta(player.x);
+        const ys = decodeDelta(player.y);
+        const zs = decodeDelta(player.z);
+        const yaws = decodeDelta(player.yaw);
+        const replayPlayer = pkg.players[player.playerIndex];
+        const economy = economyByRoundPlayer.get(`${roundRow.roundNumber}:${player.playerIndex}`);
+        // 此位选手本回合是否戴头盔（player-economies 逐回合数据，全帧相同）
+        const hasHelmet = economy?.hasHelmet ?? false;
+        const loadout = loadoutForEconomy(economy);
+        const frames: WorkspaceReplayFrame[] = [];
+        for (let index = 0; index < roundRow.frameCount; index += 1) {
+          const flags = player.flags[index] ?? 0;
+          const frame = {
+            tick: roundRow.startTick + index * roundRow.tickStep,
+            x: (xs[index] ?? 0) * coordScale,
+            y: (ys[index] ?? 0) * coordScale,
+            z: (zs[index] ?? 0) * coordScale,
+            yaw: (yaws[index] ?? 0) / angleScale,
+            hp: player.hp[index] ?? 0,
+            armor: player.armor?.[index] ?? 0,
+            weapon: weaponNameForIndex(replay.weaponDict, player.weapon[index] ?? -1),
+            grenades: normalizeHeldGrenades((player as { grenades?: unknown[][] }).grenades?.[index]),
+            alive: (flags & 1) !== 0,
+            flashed: (player.flash?.[index] ?? 0) > 0,
+            flashRemainingSeconds: Math.max(0, (player.flash?.[index] ?? 0) / 10),
+            hasDefuseKit: (flags & 4) !== 0,
+            hasBomb: (flags & 2) !== 0,
+            hasHelmet
+          };
+          if (frame.hasDefuseKit) {
+            hasDefuseKit = true;
+          }
+          frames.push(frame);
+        }
+        return {
+          steamId64: replayPlayer?.steamId64 ?? String(player.playerIndex),
+          name: replayPlayer?.name ?? `Player ${player.playerIndex}`,
+          teamKey: replayPlayer?.teamKey ?? "teamA",
+          side: sideForTeam(replayPlayer?.teamKey) ?? "t",
+          loadout,
+          frames
+        };
+      })
+    };
+  });
+
+  return {
+    available: true,
+    sampleRate: replay.meta.sampleRate,
+    tickrate: replay.meta.tickrate,
+    rounds,
+    capabilities: {
+      hasDefuseKit
+    }
+  };
+}
+
+const HELD_GRENADE_TYPES = new Set(["flashbang", "smoke", "molotov", "incendiary", "hegrenade", "decoy"]);
+
+function loadoutForEconomy(economy: DemoPackage["playerEconomies"][number] | undefined): WorkspaceReplayLoadout {
+  const maybeGrenades = (economy as { grenades?: unknown } | undefined)?.grenades;
+  const rawGrenades = Array.isArray(maybeGrenades) ? maybeGrenades : [];
+  return {
+    primaryWeapon: economy?.primaryWeapon ?? null,
+    secondaryWeapon: economy?.secondaryWeapon ?? null,
+    grenadeCount: economy?.grenadeCount ?? 0,
+    grenades: rawGrenades.filter((value): value is WorkspaceReplayLoadout["grenades"][number] =>
+      typeof value === "string" && HELD_GRENADE_TYPES.has(value)
+    )
+  };
+}
+
+function normalizeHeldGrenades(value: unknown): WorkspaceReplayLoadout["grenades"] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is WorkspaceReplayLoadout["grenades"][number] =>
+    typeof item === "string" && HELD_GRENADE_TYPES.has(item)
+  );
+}
+
+/** 从 bombs.json 取该回合 C4 锚点：plant 位置定格，defuse/explode 决定终态。 */
+function buildRoundBomb(events: DemoPackage["bombs"]): WorkspaceReplayRound["bomb"] {
+  const plant = events.find((event) => event.type === "planted");
+  if (!plant) return null;
+  return {
+    plantTick: plant.tick,
+    x: plant.position.x,
+    y: plant.position.y,
+    z: plant.position.z,
+    defuseTick: events.find((event) => event.type === "defused")?.tick ?? null,
+    explodeTick: events.find((event) => event.type === "exploded")?.tick ?? null
+  };
+}
+
+/** dropped → 下一次 picked_up / planted / exploded / defused 构成一段地面区间。 */
+function buildGroundBombs(events: DemoPackage["bombs"], roundEndTick: number): WorkspaceReplayRound["groundBombs"] {
+  const sorted = [...events].sort((a, b) => a.tick - b.tick);
+  const intervals: { startTick: number; endTick: number; x: number; y: number; z: number }[] = [];
+  for (let i = 0; i < sorted.length; i += 1) {
+    if (sorted[i].type !== "dropped") continue;
+    const drop = sorted[i];
+    // 找下一个相关事件：picked_up / planted / defused / exploded
+    const next = sorted.slice(i + 1).find((e) =>
+      e.type === "picked_up" || e.type === "planted" || e.type === "defused" || e.type === "exploded"
+    );
+    intervals.push({
+      startTick: drop.tick,
+      endTick: next?.tick ?? roundEndTick,
+      x: drop.position.x,
+      y: drop.position.y,
+      z: drop.position.z
+    });
+  }
+  return intervals;
+}
+
+/**
+ * 拆弹器掉落区间：CS2 中 kit 只在持有者阵亡时落地（不可手动丢弃）。
+ * 逐帧扫描每名玩家的存活位（flags&1）与持 kit 位（flags&4）：
+ *  - 阵亡掉落：上一帧"存活且持 kit" → 本帧"阵亡" ⇒ 在上一帧位置生成一个落地 kit；
+ *  - 被捡起：某玩家存活且 kit 由无变有（freezeEnd 之后，排除买阶段初始持有）⇒ 关闭最早一个落地 kit（FIFO）。
+ * 未被捡起的落地 kit 持续到回合结束（符合"钳子一直留在地上"）。
+ */
+function buildGroundDefusers(
+  roundRow: NonNullable<DemoPackage["replay"]>["rounds"][number],
+  coordScale: number,
+  freezeEndTick: number,
+  roundEndTick: number
+): WorkspaceReplayRound["groundDefusers"] {
+  const decoded = roundRow.players.map((p) => ({
+    x: decodeDelta(p.x),
+    y: decodeDelta(p.y),
+    z: decodeDelta(p.z),
+    flags: p.flags
+  }));
+  const result: WorkspaceReplayRound["groundDefusers"] = [];
+  const active: Array<{ startTick: number; x: number; y: number; z: number }> = [];
+  for (let i = 1; i < roundRow.frameCount; i += 1) {
+    const tick = roundRow.startTick + i * roundRow.tickStep;
+    if (tick < freezeEndTick) continue;
+    for (const p of decoded) {
+      const prev = p.flags[i - 1] ?? 0;
+      const cur = p.flags[i] ?? 0;
+      const prevAlive = (prev & 1) !== 0;
+      const prevKit = (prev & 4) !== 0;
+      const curAlive = (cur & 1) !== 0;
+      const curKit = (cur & 4) !== 0;
+      if (prevAlive && prevKit && !curAlive) {
+        active.push({
+          startTick: tick,
+          x: (p.x[i - 1] ?? 0) * coordScale,
+          y: (p.y[i - 1] ?? 0) * coordScale,
+          z: (p.z[i - 1] ?? 0) * coordScale
+        });
+      }
+      if (curAlive && !prevKit && curKit && active.length > 0) {
+        const dropped = active.shift()!;
+        result.push({ ...dropped, endTick: tick });
+      }
+    }
+  }
+  for (const dropped of active) result.push({ ...dropped, endTick: roundEndTick });
+  return result;
+}
+
+function weaponNameForIndex(weaponDict: string[], index: number): string | null {
+  const raw = index >= 0 ? weaponDict[index] ?? null : null;
+  if (!raw) {
+    return null;
+  }
+  // Only reject purely-numeric entries (untranslated weapon dict indices).
+  // Display names with spaces (e.g. "M9 Bayonet") are intentionally allowed through
+  // so displayWeaponName can match them via its knife/bayonet patterns.
+  const normalized = normalizeWeapon(raw);
+  return /^\d+$/.test(normalized) ? null : displayWeaponName(raw);
+}
+
+function buildRoundKills(pkg: DemoPackage, kills: DemoPackage["kills"], tradeKills: ReadonlySet<DemoPackage["kills"][number]>): WorkspaceKillEvent[] {
+  return kills.map((kill, index) => {
+    const weaponRaw = kill.weapon;
+    const killerSteamId = kill.killerIndex != null ? pkg.players[kill.killerIndex]?.steamId64 ?? null : null;
+    const victimSteamId = pkg.players[kill.victimIndex]?.steamId64 ?? "";
+    const killerTeamKey = kill.killerIndex != null ? (pkg.players[kill.killerIndex]?.teamKey ?? null) : null;
+    return {
+      id: `kf-${kill.roundNumber}-${kill.tick}-${index}`,
+      tick: kill.tick,
+      killerName: nameForSteamId(pkg, killerSteamId),
+      killerTeamKey,
+      victimName: nameForSteamId(pkg, victimSteamId) ?? victimSteamId,
+      weapon: displayWeaponName(weaponRaw),
+      headshot: kill.headshot,
+      throughSmoke: kill.throughSmoke,
+      noScope: kill.noScope,
+      flashAssist: kill.flashAssist,
+      tradeKill: tradeKills.has(kill),
+      wallbang: kill.penetratedObjects > 0,
+      killerX: kill.killerPosition?.x ?? null,
+      killerY: kill.killerPosition?.y ?? null,
+      killerZ: kill.killerPosition?.z ?? null,
+      victimX: kill.victimPosition.x,
+      victimY: kill.victimPosition.y,
+      victimZ: kill.victimPosition.z
+    };
+  });
+}

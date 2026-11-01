@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { EvidenceRef } from "@cs2dak/contract";
+import type { EvidenceRef } from "@cs2dak/presentation";
 import type { AnalysisFinding } from "@cs2dak/presentation";
 
 /**

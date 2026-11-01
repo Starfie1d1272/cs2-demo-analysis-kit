@@ -1,14 +1,13 @@
 import { Star } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { DeclaredRole, PlayerMapPoolRow, PlayerMapRoleProfile, PlayerSeasonProfile, WeaponDuty } from "@cs2dak/contract";
+import type { DeclaredRole, PlayerMapPoolRow, PlayerMapRoleProfile, WeaponDuty } from "@cs2dak/contract";
+import type { PlayerSeasonProfile } from "@cs2dak/presentation";
+import { SEASON_STAT_VIEWS, mechanicsMetricsForWeapon, type MechanicsMetricKey } from "@cs2dak/presentation";
 import {
-  SEASON_STAT_VIEWS,
-  mechanicsMetricsForWeapon,
-  type MechanicsMetricKey,
   type PlayerMechanicsProfile,
   type PlayerSeasonInsights,
-  type PlayerWeaponStat
-} from "@cs2dak/presentation";
+  type PlayerWeaponStat,
+} from "@cs2dak/analytics";
 import { getPlayerMapPool, getPlayerMapRoleProfiles, getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";

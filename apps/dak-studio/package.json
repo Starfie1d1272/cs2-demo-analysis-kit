@@ -20,7 +20,9 @@
     "jszip": "^3.10.2",
     "lucide-react": "^1.52.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "@cs2dak/analytics": "workspace:*",
+    "@cs2dak/pipeline": "workspace:*"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.1.2",

@@ -1,5 +1,6 @@
 import { playerMapPoolRowSchema, type PlayerMapPoolRow, type PlayerMapRoleProfile, type SupportedMapName } from "@cs2dak/contract";
 
+
 export interface PlayerMapPerformanceInput {
   mapName: SupportedMapName; matchCount: number; roundCount: number; wins: number; losses: number;
   rr: number | null; adr: number | null; kast: number | null; openingKills: number; openingDeaths: number; mainWeapon: string | null;

@@ -1,12 +1,12 @@
 import {
   buildPlayerMechanicsProfileFromRows,
   mergeUtilityValueSummaries,
-  displayWeaponName,
   type PlayerMechanicsProfile,
   type PlayerSeasonInsights,
   type PlayerWeaponStat,
   type UtilityValueSummary,
-} from "@cs2dak/presentation";
+} from "@cs2dak/analytics";
+import { displayWeaponName } from "@cs2dak/presentation";
 import type {
   FactsStore,
   PlayerFlashSummariesFactsOptions,

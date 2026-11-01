@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { bundledDependencies } from './lib/bundled-dependencies.mjs';
 import { isPublishableFile, isWithin } from './lib/package-files.mjs';
 import { packageImports } from './lib/package-imports.mjs';
-import { allowedDependencies } from './check-package-boundaries.mjs';
+import { allowedDependencies, forbiddenUiDependencies, dependencyName } from './check-package-boundaries.mjs';
 
 assert.equal(process.platform, 'linux', 'This tgz consumer gate is certified on Linux; run it on Linux/Ubuntu CI. Windows app builds are a separate check.');
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -40,6 +40,13 @@ try {
     const peers = name === 'react' ? { react: json(join(root, 'package.json')).dependencies.react, 'react-dom': json(join(root, 'package.json')).dependencies['react-dom'], '@types/react': json(join(root, 'package.json')).devDependencies['@types/react'] } : {};
     writeFileSync(join(consumer, 'package.json'), JSON.stringify({ private: true, type: 'module', dependencies: { [packageName]: `file:${archives[packageName]}`, ...peers }, overrides: Object.fromEntries(Object.entries(archives).map(([n, path]) => [n, `file:${path}`])) }));
     command('npm', ['install', '--no-audit', '--no-fund', '--ignore-scripts'], consumer);
+    const isUiConsumer = name === 'presentation' || name === 'react';
+    if (isUiConsumer) {
+      for (const installedPath of Object.keys(json(join(consumer, 'package-lock.json')).packages)) {
+        const dependency = dependencyName(installedPath.split('node_modules/').at(-1));
+        assert.ok(!forbiddenUiDependencies.has(dependency), `${name}: installed analysis dependency ${dependency}`);
+      }
+    }
     // This consumer declares only its root + peers; all DAK transitive deps must
     // be installed by the packed manifests, from this run's exact tarballs.
     const closure = new Set();
@@ -47,7 +54,7 @@ try {
       if (closure.has(n)) return;
       closure.add(n);
       const manifest = json(join(consumer, 'node_modules', '@cs2dak', n, 'package.json'));
-      for (const dep of Object.keys(manifest.dependencies ?? {})) if (dep.startsWith('@cs2dak/')) collect(dep.slice(8));
+      for (const dep of Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies, ...manifest.optionalDependencies })) if (dep.startsWith('@cs2dak/')) collect(dep.slice(8));
     };
     collect(name);
     assert.deepEqual(readdirSync(join(consumer, 'node_modules', '@cs2dak')).sort(), [...closure].sort());
@@ -64,6 +71,13 @@ try {
       }
       for (const [dependency, policy] of Object.entries(bundledDependencies)) {
         if (manifest.dependencies?.[dependency]) assert.equal(manifest.dependencies[dependency], policy.version, `${n}: type/runtime version mismatch`);
+      }
+      if (isUiConsumer) {
+        for (const file of walk(installed).filter(f => /\.(js|d\.ts)$/.test(f))) {
+          for (const { specifier } of packageImports(readFileSync(file, 'utf8'), file)) {
+            assert.ok(!forbiddenUiDependencies.has(dependencyName(specifier)), `${file}: analysis dependency in UI artifact ${specifier}`);
+          }
+        }
       }
       for (const file of walk(installed).filter(f => f.endsWith('.js'))) {
         for (const { specifier } of packageImports(readFileSync(file, 'utf8'), file)) {
@@ -115,8 +129,22 @@ try {
       cohort: `assert.ok(m.buildSeasonCohort([]));`,
       tournament: `assert.ok(m.buildTournamentAnalytics([])); assert.ok(m.buildTournamentPerformanceAnalytics([]));`,
       presentation: `assert.equal(m.formatPercent(50, 0), '50%');`,
+      analytics: `assert.deepEqual(m.buildMatchBuyQuality([]).teamA, []);`,
+      pipeline: `const {readFileSync}=await import('node:fs'); const {loadDemoPackageFromZip}=await import('@cs2dak/core'); const pkg=await loadDemoPackageFromZip(readFileSync(${JSON.stringify(join(root, 'fixtures/input/cologne-major-2026-stage3-smoke-de_nuke.zip'))})); const model=m.analyzeMatchWorkspace(pkg); assert.ok(model.scoreboard.length);`,
       react: `const React=await import('react'); const {renderToStaticMarkup}=await import('react-dom/server'); assert.match(renderToStaticMarkup(React.createElement(m.EmptyState, {title:'Packed consumer'})), /Packed consumer/);`,
     };
+    assert.ok(calls[name], `${packageName}: actual API smoke is missing`);
+    if (isUiConsumer) {
+      const { build } = await import('esbuild');
+      const browserEntry = join(consumer, 'browser.mjs');
+      writeFileSync(browserEntry, `import * as ui from ${JSON.stringify(packageName)}; globalThis.dak = ui;\n`);
+      const bundle = await build({ entryPoints: [browserEntry], absWorkingDir: consumer, bundle: true, platform: 'browser', format: 'esm', write: false, metafile: true });
+      for (const input of Object.keys(bundle.metafile.inputs)) {
+        const dependency = dependencyName(input.split('node_modules/').at(-1));
+        assert.ok(!forbiddenUiDependencies.has(dependency), `${name}: browser bundle includes ${dependency}`);
+      }
+      console.log(`BROWSER PASS ${packageName}: all public root exports bundle without analysis dependencies`);
+    }
     writeFileSync(join(consumer, 'calls.mjs'), `import assert from 'node:assert/strict'; import * as m from ${JSON.stringify(packageName)}; ${calls[name]}\n`);
     if (runtimePassed) {
       try { command(process.execPath, [join(consumer, 'calls.mjs')], consumer); }

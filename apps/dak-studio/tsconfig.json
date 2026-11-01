@@ -25,6 +25,12 @@
     },
     {
       "path": "../../packages/rivalhub-upload"
+    },
+    {
+      "path": "../../packages/analytics"
+    },
+    {
+      "path": "../../packages/pipeline"
     }
   ]
 }

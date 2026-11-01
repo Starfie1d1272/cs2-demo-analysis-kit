@@ -1,19 +1,5 @@
-import {
-  playerMapRoleProfileSchema,
-  teamMapRoleMatrixSchema,
-  type DeclaredRole,
-  type EvidenceRef,
-  type InferredMapRole,
-  type MainRoleDeclaration,
-  type MapRoleStatus,
-  type PlayerMapRoleEvidence,
-  type PlayerMapRoleProfile,
-  type RoleDeclaration,
-  type TeamMapResponsibilityEvidence,
-  type TeamMapRoleMatrix,
-  type WeaponDutyDeclaration,
-  type WeaponDuty,
-} from "@cs2dak/contract";
+import { playerMapRoleProfileSchema, teamMapRoleMatrixSchema, type DeclaredRole, type EvidenceRef, type InferredMapRole, type MainRoleDeclaration, type MapRoleStatus, type PlayerMapRoleEvidence, type PlayerMapRoleProfile, type RoleDeclaration, type TeamMapResponsibilityEvidence, type TeamMapRoleMatrix, type WeaponDutyDeclaration, type WeaponDuty } from "@cs2dak/contract";
+
 import { MAP_ROLE_MODEL_VERSION, MAP_ROLE_THRESHOLDS } from "@cs2dak/cohort";
 import { positionGroupDisplay } from "@cs2dak/maps";
 

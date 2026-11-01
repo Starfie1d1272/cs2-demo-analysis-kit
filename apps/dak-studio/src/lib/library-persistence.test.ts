@@ -45,7 +45,7 @@ vi.mock("@cs2dak/core", () => ({
   TACTICAL_FACT_VERSION: "test", MAP_INTELLIGENCE_FACT_VERSION: "test", CORE_ANALYSIS_VERSION: "test",
 }));
 vi.mock("@cs2dak/maps", () => ({ buildRadarFieldGrid: vi.fn() }));
-vi.mock("@cs2dak/presentation", () => ({ buildMatchWorkspaceModel: vi.fn() }));
+vi.mock("@cs2dak/pipeline", () => ({ analyzeMatchWorkspace: vi.fn() }));
 vi.mock("./tri", () => ({ loadTriLookup: async () => null, loadMapTri: vi.fn() }));
 vi.mock("./callout-grid", () => ({ CALLOUT_GRID_URLS: {}, loadStudioCalloutGrid: async () => null }));
 vi.mock("./demo-meta", () => ({ metaFromPackage: () => ({ matchDate: null, mapName: "de_nuke" }) }));

@@ -8,6 +8,8 @@ const repositoryUrl = "https://github.com/Starfie1d1272/cs2-demo-analysis-kit.gi
 const workflowPath = join(repoRoot, ".github", "workflows", "npm-publish.yml");
 const releaseDocsPath = join(repoRoot, "docs", "release.md");
 const publicPackages = [
+  ["@cs2dak/analytics", "packages/analytics"],
+  ["@cs2dak/pipeline", "packages/pipeline"],
   ["@cs2dak/cohort", "packages/cohort"],
   ["@cs2dak/contract", "packages/contract"],
   ["@cs2dak/core", "packages/core"],

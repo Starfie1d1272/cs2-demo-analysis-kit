@@ -14,19 +14,35 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
-    "./tournament-compat": {
-      "types": "./dist/tournament-compat.d.ts",
-      "import": "./dist/tournament-compat.js",
-      "default": "./dist/tournament-compat.js"
+    "./models": {
+      "types": "./dist/models/index.d.ts",
+      "import": "./dist/models/index.js",
+      "default": "./dist/models/index.js"
+    },
+    "./weapons": {
+      "types": "./dist/weapons.d.ts",
+      "import": "./dist/weapons.js",
+      "default": "./dist/weapons.js"
+    },
+    "./replay-clock": {
+      "types": "./dist/replay-clock.d.ts",
+      "import": "./dist/replay-clock.js",
+      "default": "./dist/replay-clock.js"
+    },
+    "./economy": {
+      "types": "./dist/economy.d.ts",
+      "import": "./dist/economy.js",
+      "default": "./dist/economy.js"
+    },
+    "./radar-field": {
+      "types": "./dist/radar-field.d.ts",
+      "import": "./dist/radar-field.js",
+      "default": "./dist/radar-field.js"
     }
   },
   "dependencies": {
-    "@cs2dak/contract": "workspace:*",
-    "@cs2dak/cohort": "workspace:*",
-    "@cs2dak/core": "workspace:*",
     "@cs2dak/maps": "workspace:*",
-    "@cs2dak/tournament": "workspace:*",
-    "@rivalhub/rival-rating": "0.3.0"
+    "zod": "^4.6.5"
   },
   "devDependencies": {},
   "files": [

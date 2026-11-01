@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { PlayerStyle } from "@cs2dak/contract";
-import type { PlayerSeasonInsights } from "@cs2dak/presentation";
+import type { PlayerStyle } from "@cs2dak/presentation";
+import type { PlayerSeasonInsights } from "@cs2dak/analytics";
 import { formatMatchLabel, type StudioDemoEntry } from "../lib/library";
 
 /**

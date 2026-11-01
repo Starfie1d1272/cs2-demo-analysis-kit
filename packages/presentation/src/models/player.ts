@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { teamKeySchema } from "cs2-demo-format";
-import { accountContextAvailabilitySchema } from "./analysis.js";
+import { teamKeySchema } from "./primitives.js";
+import { accountContextAvailabilitySchema } from "./summary.js";
 import { leaderboardMetricKeySchema } from "./leaderboard.js";
 
 /**

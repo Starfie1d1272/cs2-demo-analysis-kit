@@ -1,14 +1,14 @@
 /**
  * RadarFieldCanvas —— 雷达覆盖场渲染（描述性，不上评分）。
  *
- * 吃聚合后的 RadarField（赛事基线或单队），逐秒 scrubber + 模式切换 + 队伍−基线差分。
+ * 吃聚合后的 RadarFieldView（赛事基线或单队），逐秒 scrubber + 模式切换 + 队伍−基线差分。
  * 渲染移植自已验证原型（coverage-render）：每格柔化径向 blob，顺序场叠加成热力、
  * 差分场红↑/蓝↓。合成/归一化在 @cs2dak/presentation（react 不跑分析），这里只画。
  *
  * 复用 dak-heatmap-* 设计语言与 worldToRadar / 双层处理，与 HeatmapCanvas 视觉一致。
  */
-import type { RadarField } from "@cs2dak/contract";
-import { RADAR_FIELD_MODES, radarModeFrame, type RadarFieldMode } from "@cs2dak/presentation";
+import type { RadarFieldView } from "@cs2dak/presentation";
+import { RADAR_FIELD_MODES, radarModeFrame, type RadarFieldMode } from "@cs2dak/presentation/radar-field";
 import {
   getMapCalibration,
   worldToRadar,
@@ -140,9 +140,9 @@ function formatClock(seconds: number): string {
 }
 
 export interface RadarFieldCanvasProps {
-  field: RadarField;
+  field: RadarFieldView;
   /** 非空 = 差分模式（队伍 − 赛事地图基线）：防守漏洞 / 进攻防守倾向。 */
-  baseline?: RadarField | null;
+  baseline?: RadarFieldView | null;
   map: { name: string; radarImageUrl?: string | null; lowerRadarImageUrl?: string | null };
 }
 

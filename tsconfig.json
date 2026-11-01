@@ -20,6 +20,12 @@
       "path": "./packages/presentation"
     },
     {
+      "path": "./packages/analytics"
+    },
+    {
+      "path": "./packages/pipeline"
+    },
+    {
       "path": "./packages/react"
     },
     {

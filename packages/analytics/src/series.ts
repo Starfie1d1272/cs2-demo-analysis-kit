@@ -1,11 +1,4 @@
-import {
-  seriesSummarySchema,
-  type MatchWorkspaceModel,
-  type MvpCandidate,
-  type SeriesMatchInput,
-  type SeriesPlayerRow,
-  type SeriesSummary
-} from "@cs2dak/contract";
+import { seriesSummarySchema, type MatchWorkspaceModel, type MvpCandidate, type SeriesMatchInput, type SeriesPlayerRow, type SeriesSummary } from "@cs2dak/presentation";
 import { round } from "./season-metrics.js";
 
 const MVP_CANDIDATE_LIMIT = 3;

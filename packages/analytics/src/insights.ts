@@ -1,4 +1,6 @@
-import type { DemoPackage, EvidenceRef, MatchWorkspaceModel, TeamKey } from "@cs2dak/contract";
+import type { MatchBuyQuality, BuyQualityRow } from "@cs2dak/presentation";
+import type { DemoPackage, EvidenceRef, TeamKey } from "@cs2dak/contract";
+import type { MatchWorkspaceModel } from "@cs2dak/presentation";
 import {
   aggregatePlayerRoundPerformanceFacts,
   buildPlayerRoundPerformanceFacts,
@@ -11,7 +13,7 @@ import {
 } from "@cs2dak/core";
 import type { TriangleBvh } from "@cs2dak/maps";
 import { round } from "./season-metrics.js";
-import { displayWeaponName } from "./weapons.js";
+import { displayWeaponName } from "@cs2dak/presentation";
 import { normalizeWeapon } from "./workspace-utils.js";
 
 /**
@@ -1060,21 +1062,6 @@ export function buildPlayerFlashSummaries(
 
 // ── Buy Quality（单场，比赛工作台经济页用）──────────────────────────────────
 
-export interface BuyQualityRow {
-  economy: string;
-  label: string;
-  rounds: number;
-  wins: number;
-  winRatePercent: number | null;
-}
-
-export interface MatchBuyQuality {
-  teamA: BuyQualityRow[];
-  teamB: BuyQualityRow[];
-  /** 手枪局之后一回合（conversion）的胜率。 */
-  conversion: { teamA: { rounds: number; wins: number }; teamB: { rounds: number; wins: number } };
-}
-
 const ECONOMY_ORDER = ["pistol", "eco", "semi", "force", "full"] as const;
 const ECONOMY_LABEL: Record<string, string> = {
   pistol: "手枪局",
@@ -1117,61 +1104,4 @@ export function buildMatchBuyQuality(economy: MatchWorkspaceModel["economy"]): M
     teamB: rowsFor("teamB"),
     conversion: { teamA: conversionFor("teamA"), teamB: conversionFor("teamB") }
   };
-}
-
-// ── 赛事报表（Markdown）─────────────────────────────────────────────────────
-
-/** 单场比赛报告：half-by-half、关键回合、记分板。给主办方发布用。 */
-export function buildMatchReportMarkdown(model: MatchWorkspaceModel): string {
-  const lines: string[] = [];
-  lines.push(`# ${model.title}`);
-  lines.push("");
-  lines.push(`**${model.mapName}** · 比分 **${model.scoreline}**`);
-  lines.push("");
-  for (const beat of model.overview.story) {
-    lines.push(`> ${beat}`);
-  }
-  lines.push("");
-  lines.push("## 记分板");
-  lines.push("");
-  lines.push("| 选手 | 队伍 | K/D/A | ADR | KAST | RR |");
-  lines.push("|---|---|---|---|---|---|");
-  for (const row of model.scoreboard) {
-    const teamName = row.teamKey === "teamA" ? model.teams.teamA.name : model.teams.teamB.name;
-    lines.push(
-      `| ${row.name} | ${teamName} | ${row.kills}/${row.deaths}/${row.assists} | ${row.adr.toFixed(1)} | ${row.kast.toFixed(1)}% | ${row.accountRR.toFixed(2)} |`
-    );
-  }
-  lines.push("");
-  lines.push("## 关键回合");
-  lines.push("");
-  const keyRounds = model.rounds.filter(
-    (row) => row.facets && (row.facets.clutch || row.facets.maxKillsByOnePlayer >= 3)
-  );
-  if (keyRounds.length === 0) {
-    lines.push("（本场无 3+ 多杀或残局回合）");
-  }
-  for (const row of keyRounds) {
-    const tags: string[] = [];
-    if (row.facets?.clutch) {
-      tags.push(`1v${row.facets.clutch.opponentCount} 残局${row.facets.clutch.won ? "成功" : "失败"}`);
-    }
-    if ((row.facets?.maxKillsByOnePlayer ?? 0) >= 3) {
-      tags.push(`${row.facets!.maxKillsByOnePlayer} 杀回合`);
-    }
-    lines.push(`- **R${row.roundNumber}**（${row.scoreBefore}，${row.winnerSide.toUpperCase()} 胜）：${tags.join("、")}`);
-  }
-  lines.push("");
-  lines.push("## 经济与回合");
-  lines.push("");
-  lines.push("| 回合 | 比分 | 胜方 | A 队经济 | B 队经济 | 结束方式 |");
-  lines.push("|---|---|---|---|---|---|");
-  for (const row of model.rounds) {
-    lines.push(
-      `| R${row.roundNumber} | ${row.scoreBefore} | ${row.winnerSide.toUpperCase()} | ${row.teamAEconomy} | ${row.teamBEconomy} | ${row.endReason} |`
-    );
-  }
-  lines.push("");
-  lines.push(`---\n由 DAK Studio 生成 · cs2-demo-analysis-kit`);
-  return lines.join("\n");
 }

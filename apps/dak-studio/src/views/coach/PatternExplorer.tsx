@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import type { MatchWorkspaceModel } from "@cs2dak/contract";
-import { ReplayViewer } from "@cs2dak/react";
+import type { MatchWorkspaceModel } from "@cs2dak/presentation";
+import { ReplayViewer } from "@cs2dak/react/replay";
 import { economyLabelCn, formatClockSeconds, ECONOMY_ENTRY_CN, formatEntryEvidenceLabel, formatTacticalClusterShortName } from "@cs2dak/presentation";
 import { calloutCn, buildLineupClusters, type LineupGrenadeLike } from "@cs2dak/maps";
 import type { EconomyEntry } from "@cs2dak/cohort";

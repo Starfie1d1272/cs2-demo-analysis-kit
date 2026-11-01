@@ -1,5 +1,5 @@
-import type { EconomyPoint, EconomyType } from "@cs2dak/contract";
-import { ECONOMY_LABEL_SHORT } from "@cs2dak/presentation";
+import type { EconomyPoint, EconomyType } from "@cs2dak/presentation";
+import { ECONOMY_LABEL_SHORT } from "@cs2dak/presentation/economy";
 
 export interface EconomyPanelProps {
   points: EconomyPoint[];

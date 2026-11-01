@@ -1,6 +1,12 @@
 import { deleteMatchRows, settleWrites } from "./storage/match-rows";
 import type { OpeningTrailsModel } from "@cs2dak/contract";
-import type { DuelInsightsFacts, PlayerSeasonInsights, TeamComparisonFacts, TournamentFacts, UtilityValueSummary } from "@cs2dak/presentation";
+import type {
+  DuelInsightsFacts,
+  PlayerSeasonInsights,
+  TeamComparisonFacts,
+  TournamentFacts,
+  UtilityValueSummary,
+} from "@cs2dak/analytics";
 import type { FactsScope } from "./fact-types";
 import { getStorage, type RecordStore, type StorageAdapter } from "./storage";
 

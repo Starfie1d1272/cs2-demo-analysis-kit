@@ -1,7 +1,7 @@
-import type { LeaderboardMetricKey, LeaderboardView, SeasonPlayerRow } from "@cs2dak/contract";
+import type { LeaderboardView } from "./models/leaderboard.js";
 
 /**
- * 赛季统计的共享展示层：指标计算 + 视图（列）定义。
+ * 赛季指标的共享展示层：格式化与视图（列）定义。
  * 排行榜（SeasonLeaderboardModel）和选手页（PlayerSeasonProfile）共用同一套，
  * 保证两处的口径、标签、格式一致。标签归 presentation（React 不重复定义）。
  *
@@ -67,32 +67,3 @@ export const SEASON_STAT_VIEWS: LeaderboardView[] = [
     ]
   }
 ];
-
-/**
- * 把一行赛季 cohort 结果转换为展示指标。纯转换：不重算聚合（cohort 已 sum→recompute），
- * 不算评分公式。缺失保持 null。
- */
-export function computeSeasonMetrics(player: SeasonPlayerRow): Record<LeaderboardMetricKey, number | null> {
-  const ind = player.indicators;
-  return {
-    maps: player.mapCount,
-    rivalhubRR: player.accountRR,
-    hltvRating: player.rrV1,
-    adr: ind.adr,
-    kd: ind.deaths > 0 ? round(ind.kills / ind.deaths, 2) : null,
-    kpr: ind.kpr,
-    hsPercent: ind.hsPercent, // 已是 0–100
-    // 产量家族：每 100 回合 X 次
-    firstKillPer100: round(ind.firstKillRate * 100, 2),
-    multiKillPer100: round(ind.multiKillRate * 100, 2),
-    clutchPer100: round((ind.clutchWins / ind.totalRounds) * 100, 2),
-    // 百分比统一为 0–100（cohort 中以 0–1 存储的需 ×100）
-    openingDuelWinRate: round(ind.openingDuelWinRate * 100, 2),
-    kast: ind.kast, // 已是 0–100
-    utilityDamagePerRound: ind.utilityDamagePerRound,
-    awpKillsPerRound: ind.awpKillsPerRound,
-    awpKillRate: round(ind.awpKillRate * 100, 2),
-    flashAssistPerRound: ind.flashAssistPerRound,
-    tradeKillRate: ind.tradeKillRate
-  };
-}

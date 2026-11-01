@@ -1,14 +1,8 @@
 import { PRISM_AXIS_ORDER, type PrismAxisKey } from "@rivalhub/rival-rating";
-import {
-  playerSeasonProfileSchema,
-  type LeaderboardMetricKey,
-  type PlayerSeasonProfile,
-  type RRBreakdownEntry,
-  type SeasonCohortBundle,
-  type SeasonPlayerRow
-} from "@cs2dak/contract";
+import { type SeasonCohortBundle, type SeasonPlayerRow } from "@cs2dak/contract";
+import { playerSeasonProfileSchema, type LeaderboardMetricKey, type PlayerSeasonProfile, type RRBreakdownEntry } from "@cs2dak/presentation";
 import { computeSeasonMetrics, round } from "./season-metrics.js";
-import { displayWeaponName } from "./weapons.js";
+import { displayWeaponName } from "@cs2dak/presentation";
 
 /** RR 账户分解标签（与 Match Workspace 的 rrBreakdown 一致）。 */
 const RR_BREAKDOWN_LABEL: Record<RRBreakdownEntry["key"], string> = {

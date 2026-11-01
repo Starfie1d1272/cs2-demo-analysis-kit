@@ -1,15 +1,16 @@
 import { z } from "zod";
-export { seriesVetoSchema, type SeriesVeto } from "./veto.js";
-import { teamKeySchema, sideSchema, grenadeTypeSchema, teamEconomySchema } from "cs2-demo-format";
-import { qaReportSchema } from "./qa.js";
+
+import { teamKeySchema, sideSchema, grenadeTypeSchema, teamEconomySchema } from "./primitives.js";
+import { qaReportSchema } from "./summary.js";
+import { buyQualitySchema } from "./buy-quality.js";
 import {
-  analysisBundleSchema,
+  teamsViewSchema,
   timelineEventSchema,
   economyPointSchema,
   playerScoreboardRowSchema,
   playerRoundFactSchema,
   mapViewSchema,
-} from "./analysis.js";
+} from "./summary.js";
 
 export const workspaceTabSchema = z.object({
   key: z.enum(["overview", "rounds", "players", "economy", "weapons", "duels", "map", "replay"]),
@@ -28,7 +29,7 @@ export const workspaceOverviewSchema = z.object({
   story: z.array(z.string())
 });
 
-/** 回合筛选与时间轴用的派生事实（v0.2 query-first），由 presentation 从
+/** 回合筛选与时间轴用的派生事实（v0.2 query-first），由 analytics 从
  *  kills/bombs/clutches 一次性算好，React 端只做谓词匹配。 */
 export const workspaceRoundFacetsSchema = z.object({
   /** 下包点；该回合未下包为 null。 */
@@ -75,7 +76,12 @@ export const workspacePlayerSchema = z.object({
     label: z.string(),
     value: z.number()
   })),
-  roundFacts: z.array(playerRoundFactSchema)
+  roundFacts: z.array(playerRoundFactSchema),
+  roundSummary: z.object({
+    survived: z.number().int().nonnegative(),
+    openingKills: z.number().int().nonnegative(),
+    tradeKills: z.number().int().nonnegative()
+  })
 });
 
 /** 武器统计行（比赛级，按击杀数降序）。 */
@@ -300,19 +306,26 @@ export const workspaceReplaySchema = z.object({
 });
 
 export const matchWorkspaceModelSchema = z.object({
-  version: z.literal("cs2-demo-analysis-kit/workspace-0.1"),
+  version: z.literal("cs2-demo-analysis-kit/workspace-0.2"),
   sourceSchemaVersion: z.literal("cs2-demo-format/3.0"),
   title: z.string(),
   subtitle: z.string(),
   scoreline: z.string(),
   mapName: z.string(),
-  teams: analysisBundleSchema.shape.teams,
+  teams: teamsViewSchema,
   tabs: z.array(workspaceTabSchema),
   overview: workspaceOverviewSchema,
   scoreboard: z.array(playerScoreboardRowSchema),
   rounds: z.array(workspaceRoundSchema),
+  reportHighlights: z.array(z.object({
+    roundNumber: z.number().int().positive(),
+    scoreBefore: z.string(),
+    winnerSide: sideSchema,
+    tags: z.array(z.string())
+  })),
   players: z.array(workspacePlayerSchema),
   economy: z.array(economyPointSchema),
+  buyQuality: buyQualitySchema,
   weapons: z.array(workspaceWeaponRowSchema),
   duels: workspaceDuelsSchema,
   map: workspaceMapSchema,
@@ -339,3 +352,5 @@ export type WorkspaceReplayGroundDefuser = z.infer<typeof workspaceReplayGroundD
 export type WorkspaceReplayBomb = z.infer<typeof workspaceReplayBombSchema>;
 export type WorkspaceReplayRound = z.infer<typeof workspaceReplayRoundSchema>;
 export type MatchWorkspaceModel = z.infer<typeof matchWorkspaceModelSchema>;
+
+export type WorkspaceReplay = z.infer<typeof workspaceReplaySchema>;

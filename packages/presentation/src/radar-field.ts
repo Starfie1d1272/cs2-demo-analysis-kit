@@ -1,5 +1,5 @@
 /**
- * 雷达场渲染期合成 —— 把 RadarField 的原始计数归一化、按模式合成、可选差分。
+ * 雷达场渲染期合成 —— 把 RadarFieldView 的原始计数归一化、按模式合成、可选差分。
  *
  * 纯函数，供 react 画布逐秒调用（scrubber）。底层基础场不动，所有视图都是这里的派生：
  *   ctVis/tVis = 4:3 屏幕可见；ctAim/tAim = 30°准星覆盖；
@@ -8,9 +8,9 @@
  *   contested = min(tVis, ctVis)（双方都看到 = 对拼线 / 真实交火点）
  * 给定 baseline（联赛场）则输出「队伍 − 联赛」偏移（队伍倾向 / 防守漏洞）。
  */
-import type { RadarField, RadarFieldBase } from "@cs2dak/contract";
+import type { RadarFieldView, RadarFieldBaseView } from "./models/radar-view.js";
 
-export type RadarFieldMode = RadarFieldBase | "info-diff" | "contested";
+export type RadarFieldMode = RadarFieldBaseView | "info-diff" | "contested";
 
 export interface RadarModeOption {
   value: RadarFieldMode;
@@ -59,7 +59,7 @@ export interface RadarModeFrame {
 }
 
 /** 某基础场在 [sec−window, sec+window] 的归一化频率（计数 / 对应 side denom）。 */
-function freqAt(field: RadarField, base: RadarFieldBase, sec: number, window: number): Float64Array {
+function freqAt(field: RadarFieldView, base: RadarFieldBaseView, sec: number, window: number): Float64Array {
   const nCells = field.grid.cells.length;
   const out = new Float64Array(nCells);
   const denomArr = base.startsWith("ct") ? field.denomCt : field.denomT;
@@ -76,7 +76,7 @@ function freqAt(field: RadarField, base: RadarFieldBase, sec: number, window: nu
 }
 
 /** 单场在某模式下的逐格频率（未差分）。info-diff/contested 在此合成。 */
-function modeFreq(field: RadarField, mode: RadarFieldMode, sec: number, window: number): Float64Array {
+function modeFreq(field: RadarFieldView, mode: RadarFieldMode, sec: number, window: number): Float64Array {
   if (mode === "info-diff") {
     const t = freqAt(field, "tVis", sec, window);
     const c = freqAt(field, "ctVis", sec, window);
@@ -99,8 +99,8 @@ function modeFreq(field: RadarField, mode: RadarFieldMode, sec: number, window: 
  * @param smoothWindow 时间平滑半窗（±N 秒），默认 ±2s。
  */
 export function radarModeFrame(
-  field: RadarField,
-  baseline: RadarField | null,
+  field: RadarFieldView,
+  baseline: RadarFieldView | null,
   mode: RadarFieldMode,
   sec: number,
   smoothWindow = 2
@@ -116,6 +116,6 @@ export function radarModeFrame(
 }
 
 /** scope 内长枪局回合数（展示用）；league=赛事总局，team=该队参与的局。 */
-export function radarFieldRoundCount(field: RadarField): number {
+export function radarFieldRoundCount(field: RadarFieldView): number {
   return field.scope.roundCount;
 }

@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from "react";
-import type { SeriesSummary } from "@cs2dak/contract";
+import type { SeriesSummary } from "@cs2dak/presentation";
 import type { StudioDemoEntry } from "../lib/library";
 import { mapDisplayName, sortEntriesByVeto, type StudioSeriesRecord } from "../lib/series";
 import { BpView } from "./BpView";

@@ -14,10 +14,24 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
-    "./theme.css": "./dist/theme.css"
+    "./theme.css": "./dist/theme.css",
+    "./scoreboard": {
+      "types": "./dist/components/ScoreboardTable.d.ts",
+      "import": "./dist/components/ScoreboardTable.js",
+      "default": "./dist/components/ScoreboardTable.js"
+    },
+    "./table": {
+      "types": "./dist/components/DataTable.d.ts",
+      "import": "./dist/components/DataTable.js",
+      "default": "./dist/components/DataTable.js"
+    },
+    "./replay": {
+      "types": "./dist/components/ReplayViewer.d.ts",
+      "import": "./dist/components/ReplayViewer.js",
+      "default": "./dist/components/ReplayViewer.js"
+    }
   },
   "dependencies": {
-    "@cs2dak/contract": "workspace:*",
     "@cs2dak/maps": "workspace:*",
     "@cs2dak/presentation": "workspace:*",
     "lucide-react": "^1.52.0"

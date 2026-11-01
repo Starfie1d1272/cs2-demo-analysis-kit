@@ -1,7 +1,9 @@
 import { Pause, Play, RotateCcw, Star } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { OpeningTrailRound, OpeningTrailsModel, PlayerSeasonProfile, TeamKey } from "@cs2dak/contract";
-import { buildMistakeFindings, SEASON_STAT_VIEWS, type AnalysisFinding, type PlayerSeasonInsights } from "@cs2dak/presentation";
+import type { OpeningTrailRound, OpeningTrailsModel, TeamKey } from "@cs2dak/contract";
+import type { PlayerSeasonProfile } from "@cs2dak/presentation";
+import { buildMistakeFindings, type PlayerSeasonInsights } from "@cs2dak/analytics";
+import { SEASON_STAT_VIEWS, type AnalysisFinding } from "@cs2dak/presentation";
 import { getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, type PinnedPlayer } from "../lib/pin";

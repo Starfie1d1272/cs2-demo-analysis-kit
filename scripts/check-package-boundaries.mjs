@@ -13,10 +13,35 @@ export const allowedDependencies = {
   core: ['@cs2dak/contract', '@cs2dak/maps', '@cs2dak/tournament', '@rivalhub/rival-rating', 'jszip'],
   cohort: ['@cs2dak/contract', '@cs2dak/core', '@rivalhub/rival-rating'],
   tournament: [],
-  presentation: ['@cs2dak/contract', '@cs2dak/core', '@cs2dak/cohort', '@cs2dak/maps', '@cs2dak/tournament', '@rivalhub/rival-rating'],
-  react: ['@cs2dak/contract', '@cs2dak/presentation', '@cs2dak/maps', 'lucide-react', 'react', 'react-dom'],
+  presentation: ['@cs2dak/maps', 'zod'],
+  react: ['@cs2dak/presentation', '@cs2dak/maps', 'lucide-react', 'react', 'react-dom'],
+  analytics: ['@cs2dak/contract', '@cs2dak/core', '@cs2dak/cohort', '@cs2dak/maps', '@cs2dak/tournament', '@rivalhub/rival-rating', '@cs2dak/presentation'],
+  pipeline: ['@cs2dak/contract', '@cs2dak/core', '@cs2dak/cohort', '@cs2dak/maps', '@cs2dak/tournament', '@rivalhub/rival-rating', '@cs2dak/analytics', '@cs2dak/presentation'],
   'rivalhub-upload': ['@cs2dak/contract', '@cs2dak/core', '@cs2dak/tournament', 'zod'],
 };
+export const forbiddenUiDependencies = new Set([
+  '@cs2dak/contract', '@cs2dak/core', '@cs2dak/cohort', '@cs2dak/tournament',
+  '@cs2dak/analytics', '@cs2dak/pipeline', '@cs2dak/rivalhub-upload',
+  '@rivalhub/rival-rating', 'cs2-demo-format', 'jszip',
+]);
+
+export function checkUiDependencyClosure(manifests) {
+  for (const owner of ['presentation', 'react']) {
+    const visited = new Set();
+    const visit = name => {
+      if (visited.has(name)) return;
+      visited.add(name);
+      const manifest = manifests.get(name);
+      assert.ok(manifest, `${owner}: missing manifest for ${name}`);
+      for (const dependency of Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies, ...manifest.optionalDependencies })) {
+        assert.ok(!forbiddenUiDependencies.has(dependency), `${owner}: analysis dependency in UI closure: ${dependency}`);
+        if (dependency.startsWith('@cs2dak/')) visit(dependency.slice(8));
+      }
+    };
+    visit(owner);
+  }
+}
+
 export function dependencyName(specifier) {
   return specifier.startsWith('@') ? specifier.split('/').slice(0, 2).join('/') : specifier.split('/')[0];
 }
@@ -41,9 +66,11 @@ function files(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap(e => e.isDirectory() ? files(join(directory, e.name)) : [join(directory, e.name)]);
 }
 export function checkBoundaries(repoRoot = root) {
+  const manifests = new Map();
   for (const [owner, allowed] of Object.entries(allowedDependencies)) {
     const directory = join(repoRoot, 'packages', owner);
     const manifest = JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8'));
+    manifests.set(owner, manifest);
     const declared = new Set([...Object.keys(manifest.dependencies ?? {}), ...Object.keys(manifest.peerDependencies ?? {}), ...Object.keys(manifest.optionalDependencies ?? {})]);
     for (const dependency of declared) assert.ok(allowed.includes(dependency), `${owner}: forbidden manifest dependency ${dependency}`);
     if (owner === 'tournament') assert.equal(declared.size, 0, 'Tournament must retain zero runtime/peer/optional dependencies');
@@ -51,6 +78,7 @@ export function checkBoundaries(repoRoot = root) {
       for (const imported of packageImports(readFileSync(file, 'utf8'), file)) checkImport(owner, imported, declared, file, join(repoRoot, 'packages'));
     }
   }
+  checkUiDependencyClosure(manifests);
   console.log('Package boundaries OK: manifests and all production source imports (including type/dynamic imports)');
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) checkBoundaries();

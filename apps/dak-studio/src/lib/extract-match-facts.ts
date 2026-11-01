@@ -18,7 +18,7 @@ import {
   extractDuelInsightsFacts,
   extractTeamComparisonFacts,
   extractTournamentFacts,
-} from "@cs2dak/presentation";
+} from "@cs2dak/analytics";
 import type {
   ExtractMatchFactsOptions,
   LineupFact,

@@ -1,7 +1,5 @@
-import type { PrismResult } from "@rivalhub/rival-rating";
 import { z } from "zod";
-import { teamKeySchema } from "cs2-demo-format";
-import { seasonCohortBundleSchema } from "./cohort.js";
+import { teamKeySchema } from "./primitives.js";
 
 /**
  * 赛季排行榜展示模型。由 @cs2dak/presentation 从 SeasonCohortBundle 派生，
@@ -80,15 +78,13 @@ export const seasonLeaderboardRowSchema = z.object({
   confidence: z.number().min(0).max(1),
   /** 每个指标 key 都有值；不可得为 null（不伪造 0）。 */
   metrics: z.partialRecord(leaderboardMetricKeySchema, z.number().nullable()),
-  /** PRISM 风格画像，仅表达风格，不进入排序；缺失为 null。 */
-  prism: z.custom<PrismResult>().nullable()
 });
 
 export const seasonLeaderboardModelSchema = z.object({
   version: z.literal("cs2-demo-analysis-kit/leaderboard-0.1"),
   weightsVersion: z.string(),
   matchCount: z.number().int().nonnegative(),
-  provenance: seasonCohortBundleSchema.shape.provenance,
+  provenance: z.object({ cohortVersion: z.string(), sourceSchemaVersion: z.string(), matches: z.array(z.object({ matchId: z.string(), sourceDemoHash: z.string().nullable() })) }),
   views: z.array(leaderboardViewSchema),
   rows: z.array(seasonLeaderboardRowSchema)
 });

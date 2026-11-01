@@ -158,14 +158,6 @@ export const heatmapPointSchema = z.object({
   grenadeType: grenadeTypeSchema.nullable()
 });
 
-export const mapViewSchema = z.object({
-  name: z.string(),
-  radarImageUrl: z.string().nullable(),
-  /** 双层地图（de_nuke / de_vertigo）的下层底图；单层地图为 null。 */
-  lowerRadarImageUrl: z.string().nullable().optional().default(null),
-  calibrated: z.boolean()
-});
-
 export const analysisProvenanceSchema = z.object({
   analysisVersion: z.string(),
   sourceSchemaVersion: z.literal("cs2-demo-format/3.0"),
@@ -198,21 +190,6 @@ export const analysisBundleSchema = z.object({
   qa: qaReportSchema
 });
 
-export const demoViewModelSchema = z.object({
-  title: z.string(),
-  subtitle: z.string(),
-  map: mapViewSchema,
-  scoreline: z.string(),
-  teams: analysisBundleSchema.shape.teams,
-  scoreboard: z.array(playerScoreboardRowSchema),
-  playerIndicators: z.array(playerIndicatorRowSchema),
-  playerRoundFacts: z.array(playerRoundFactSchema),
-  timeline: z.array(timelineEventSchema),
-  economy: z.array(economyPointSchema),
-  heatmap: z.array(heatmapPointSchema),
-  qa: qaReportSchema
-});
-
 export type PlayerRoundFact = z.infer<typeof playerRoundFactSchema>;
 export type PlayerIndicatorRow = z.infer<typeof playerIndicatorRowSchema>;
 export type PlayerScoreboardRow = z.infer<typeof playerScoreboardRowSchema>;
@@ -225,4 +202,3 @@ export type GrenadeType = z.infer<typeof grenadeTypeSchema>;
 export type HeatmapPoint = z.infer<typeof heatmapPointSchema>;
 export type AnalysisBundle = z.infer<typeof analysisBundleSchema>;
 export type AnalysisProvenance = z.infer<typeof analysisProvenanceSchema>;
-export type DemoViewModel = z.infer<typeof demoViewModelSchema>;

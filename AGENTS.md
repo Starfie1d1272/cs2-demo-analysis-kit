@@ -64,20 +64,26 @@ Python `uv sync --extra gui` 装 pywebview（DAK Studio 桌面壳运行需要）
        ├─ normalize / economy / kills / clutches / timeline / heatmap / QA
        ├─ box-score / HLTV baseline / RR 六账户 / PRISM（经 @rivalhub/rival-rating）
        └─ → AnalysisBundle
-  → @cs2dak/cohort → @cs2dak/presentation
-  → @cs2dak/react 组件 或 产品适配层（RivalHub / CS2 Insight Agent）
+  → @cs2dak/cohort / @cs2dak/tournament
+  → @cs2dak/analytics（领域洞察 / 已有结果的展示投影）
+  → @cs2dak/presentation 展示模型 → @cs2dak/react
+
+原始 DemoPackage → @cs2dak/pipeline（编排 core + analytics）
+已有 UI 数据 → presentation 类型 / helper → react
 ```
 
 **跨语言边界**：v3 ZIP 是 Python ↔ TypeScript 唯一耦合点，两边代码不互相 import。
 
 | 包 | 职责 |
 |---|---|
-| `@cs2dak/contract` | Zod schemas + TS 类型。re-export `cs2-demo-format`。 |
+| `@cs2dak/contract` | 分析数据 Zod schemas + TS 类型；re-export `cs2-demo-format`。纯展示模型由 presentation 拥有。 |
 | `@cs2dak/core` | 纯分析逻辑。加载 v3 ZIP → 标准化、信号派生、QA、RR/PRISM 接线。无副作用。 |
 | `@cs2dak/cohort` | 跨场聚合、身份归并与赛季 RR/PRISM 整形。 |
 | `@cs2dak/maps` | 地图标定、world→radar 坐标变换、zone 几何（`zoneAt` / `pointInPolygon`）、callout 中文名与倾向、callout grid、进点入口（`site-entry-chokes`）、默认站位查询（`classifyTacticalLocation`）。 |
-| `@cs2dak/presentation` | 产品中立 View Model、标签与 workspace 编排。 |
-| `@cs2dak/react` | React 组件。消费 presentation View Model、contract props/types 与 maps 坐标投影，不查数据库、不跑分析。 |
+| `@cs2dak/analytics` | 领域洞察、经济统计、事实提取和已有分析结果到展示模型的投影。 |
+| `@cs2dak/pipeline` | 原始 DemoPackage 到完整工作台的分析执行编排。 |
+| `@cs2dak/presentation` | 展示 schema、窄 View DTO、标签、格式与纯投影；仅依赖 maps/Zod。 |
+| `@cs2dak/react` | React 组件。消费 presentation View Model 与 maps/calibration 坐标投影；安装和声明闭包不依赖分析包。 |
 | `@cs2dak/cli` | 薄 CLI（tsx），把 `@cs2dak/core` 接到文件系统。 |
 | `apps/dak-studio` | DAK Studio：本地 Demo 管理、战术分析与个人打法复盘工作台（独立设计语言；导入即提取 facts 行持久化，视图读投影；IndexedDB 开发 / SQLite 桌面双后端）。教练页战术聚类 0.6.0 已落地（`TacticalRoundFact`/`TacticalCluster` + `PatternExplorer` 三栏 + `RadarTrails` + `MapPoolTable` + Round Playlist + 默认位资产 + 3D callout 网格）见 `docs/design/studio-redesign.md §8`。 |
 | `python/src/cs2dak` | Python 壳（cs2df 包装器）：DAK Studio 桌面桥。CLI 仅保留 version。 |
@@ -169,7 +175,7 @@ docs/                  # 架构与集成文档（索引见 docs/README.md）
 - **contract 不 fork**：`@cs2dak/contract` 依赖并 re-export `cs2-demo-format`，不在本仓库内 fork 类型定义
 - **Null 保持 null**：`RRSignals` 字段缺失时发 `null`，绝不 coerce 到 0
 - **Core 包不 import 产品代码**：RivalHub、CS2 Insight Agent、任何 app 都不得被 core 包引用
-- **React 组件不查数据库**：不跑分析逻辑；允许 presentation View Model、contract props/types 与 maps 坐标投影
+- **React 组件不查数据库**：不跑分析逻辑；props/type 从 presentation 获取，坐标投影用 maps/calibration。presentation/React 的传递依赖禁止 contract/core/cohort/tournament/analytics/pipeline/rating/format/JSZip
 - **fixtures/ 是真相源**：跨语言行为验证以 fixtures 为准
 - **公式所有权**：RR/PRISM 公式在 `@rivalhub/rival-rating`（外部依赖），kit 只做信号派生和接线
 

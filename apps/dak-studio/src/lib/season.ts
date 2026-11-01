@@ -21,10 +21,9 @@ import {
   type PlayerWeaponStat,
   type UtilityValueSummary,
   type TournamentInsights,
-  type TeamComparisonModel,
-  type TeamOverviewModel,
-  type DuelInsightsFacts
-} from "@cs2dak/presentation";
+  type DuelInsightsFacts,
+} from "@cs2dak/analytics";
+import { type TeamComparisonModel, type TeamOverviewModel } from "@cs2dak/presentation";
 import { touchLimitedCache } from "./idb";
 import {
   buildPlayerFlashSummariesFromFacts,
@@ -38,9 +37,7 @@ import { FACTS_REVISION } from "./analysis-manifest";
 import type {
   DuelInsightsModel,
   DoubleAwpAnalysis,
-  PlayerSeasonProfile,
   SeasonCohortBundle,
-  SeasonLeaderboardModel,
   PlayerMapRoleEvidence,
   PlayerMapRoleProfile,
   PlayerMapPoolRow,
@@ -48,6 +45,7 @@ import type {
   TeamMapRoleMatrix,
   TeamMapResponsibilityEvidence,
 } from "@cs2dak/contract";
+import type { PlayerSeasonProfile, SeasonLeaderboardModel } from "@cs2dak/presentation";
 import { entryDate, matchIdForEntry, type StudioDemoEntry } from "./library";
 import { displayTeamName, originalTeamNamesForDisplay } from "./identity";
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { formatPercent, type TournamentInsights } from "@cs2dak/presentation";
+import { formatPercent } from "@cs2dak/presentation";
+import { type TournamentInsights } from "@cs2dak/analytics";
 import { DataTable, STUDIO_TABLE_CLASSES, EmptyState, type DataTableColumn, type HeatTone } from "@cs2dak/react";
 import { getTournamentInsights, type IdentityOptions } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";

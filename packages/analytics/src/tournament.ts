@@ -1,4 +1,5 @@
 import type { TeamKey } from "@cs2dak/contract";
+
 import {
   buildPlayerRoundPerformanceFacts, extractTournamentSourceFacts, projectTournamentMapFacts,
   observedTournamentIdentity, type TournamentIdentity, type TournamentSourceFacts,
@@ -10,10 +11,10 @@ import {
   type TournamentManAdvantage,
 } from "@cs2dak/tournament";
 import { round } from "./season-metrics.js";
-import { displayWeaponName } from "./weapons.js";
+import { displayWeaponName } from "@cs2dak/presentation";
 import type { SeasonInsightsDemo } from "./insights.js";
 
-// ── Tournament Dashboard legacy view model ─────────────────────────────────
+// Tournament dashboard projection over canonical frozen facts.
 
 export interface TournamentMapStat {
   mapName: string;
@@ -213,7 +214,7 @@ function teamManAdvantageState(
   };
 }
 
-function legacyManAdvantageRows(analytics: ReturnType<typeof buildTournamentAnalytics>): TournamentManAdvantageStat[] {
+function projectManAdvantageRows(analytics: ReturnType<typeof buildTournamentAnalytics>): TournamentManAdvantageStat[] {
   return ([
     ["5v4", 5, 4],
     ["5v3", 5, 3],
@@ -234,7 +235,7 @@ function legacyManAdvantageRows(analytics: ReturnType<typeof buildTournamentAnal
   });
 }
 
-function legacyTeamManAdvantage(teamName: string, analyticsTeam: ReturnType<typeof buildTournamentAnalytics>["teams"][number]): TournamentTeamManAdvantageStat {
+function projectTeamManAdvantage(teamName: string, analyticsTeam: ReturnType<typeof buildTournamentAnalytics>["teams"][number]): TournamentTeamManAdvantageStat {
   const states: TournamentTeamManAdvantageState[] = [];
   const state54 = teamManAdvantageState(analyticsTeam.manAdvantage["5v4"], analyticsTeam.manAdvantage["4v5"], 5, 4);
   const state53 = teamManAdvantageState(analyticsTeam.manAdvantage["5v3"], analyticsTeam.manAdvantage["3v5"], 5, 3);
@@ -243,7 +244,7 @@ function legacyTeamManAdvantage(teamName: string, analyticsTeam: ReturnType<type
   return { teamEntityKey: analyticsTeam.team.entityKey, teamName, states };
 }
 
-function buildLegacyInsights(analytics: ReturnType<typeof buildTournamentAnalytics>): TournamentInsights {
+function projectTournamentInsights(analytics: ReturnType<typeof buildTournamentAnalytics>): TournamentInsights {
   const maps = analytics.maps.map((map) => ({
     mapName: map.mapName,
     matches: map.mapCount,
@@ -287,7 +288,7 @@ function buildLegacyInsights(analytics: ReturnType<typeof buildTournamentAnalyti
     .filter((row) => row.opportunities > 0)
     .sort((a, b) => b.wins - a.wins || b.opportunities - a.opportunities || a.teamName.localeCompare(b.teamName));
   const teamManAdvantageConversions = analytics.teams
-    .map((team) => legacyTeamManAdvantage(team.team.displayName, team))
+    .map((team) => projectTeamManAdvantage(team.team.displayName, team))
     .filter((team) => team.states.length > 0)
     .sort((a, b) => a.teamName.localeCompare(b.teamName));
   const teamEconomySummaries = analytics.teams
@@ -311,7 +312,7 @@ function buildLegacyInsights(analytics: ReturnType<typeof buildTournamentAnalyti
         breakWins: team.round2.break.wins,
         breakRatePercent: percent(team.round2.break.rate),
       },
-      manAdvantage: legacyTeamManAdvantage(team.team.displayName, team),
+      manAdvantage: projectTeamManAdvantage(team.team.displayName, team),
       smallBuyUpset: {
         opportunities: team.ecoSemiUpset.opportunities,
         wins: team.ecoSemiUpset.wins,
@@ -335,7 +336,7 @@ function buildLegacyInsights(analytics: ReturnType<typeof buildTournamentAnalyti
     teamPistols,
     economyMatrix,
     ecoUpsets,
-    manAdvantageConversions: legacyManAdvantageRows(analytics),
+    manAdvantageConversions: projectManAdvantageRows(analytics),
     teamManAdvantageConversions,
     teamEconomySummaries,
     tWinRatePercent: percent(analytics.totals.t.rate) ?? 0,
@@ -351,7 +352,7 @@ export function buildTournamentInsightsFromFacts(demos: TournamentFacts[]): Tour
     mergeLabels(labels, adapted.labels);
     return adapted.facts;
   });
-  return buildLegacyInsights(buildTournamentAnalytics(mapFacts, { labels }));
+  return projectTournamentInsights(buildTournamentAnalytics(mapFacts, { labels }));
 }
 
 export function buildTournamentInsights(demos: SeasonInsightsDemo[]): TournamentInsights {

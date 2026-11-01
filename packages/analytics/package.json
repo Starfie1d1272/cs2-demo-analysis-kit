@@ -1,0 +1,39 @@
+{
+  "name": "@cs2dak/analytics",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Starfie1d1272/cs2-demo-analysis-kit.git",
+    "directory": "packages/analytics"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@cs2dak/contract": "workspace:*",
+    "@cs2dak/core": "workspace:*",
+    "@cs2dak/cohort": "workspace:*",
+    "@cs2dak/maps": "workspace:*",
+    "@cs2dak/tournament": "workspace:*",
+    "@cs2dak/presentation": "workspace:*",
+    "@rivalhub/rival-rating": "0.3.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "scripts": {
+    "build": "node ../../scripts/build-public-package.mjs"
+  }
+}

@@ -1,4 +1,4 @@
-import type { BracketCell, ElimModel, SwissModel } from "@cs2dak/contract";
+import type { BracketCell, ElimModel, SwissModel } from "@cs2dak/presentation";
 
 // ── 内部接口 ──────────────────────────────────────────────────────────────
 
