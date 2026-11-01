@@ -70,6 +70,9 @@ jobs:
       - name: Check npm publish policy
         run: node scripts/check-npm-publish-policy.mjs
 
+      - name: Test npm registry reconciliation
+        run: node --test scripts/npm-registry-visibility.test.mjs
+
       - name: Verify release commit
         run: node scripts/reconcile-npm-publish.mjs --check-only --release-commit "$RELEASE_COMMIT"
 
@@ -100,12 +103,13 @@ jobs:
         run: pnpm exec changeset publish --no-git-tag
 
       # 即使 Changesets 部分失败也要运行：只为 npm 已确认存在的版本创建/推送 tag。
-      # 缺失版本不创建 tag，最终仍以失败结束，下一次重跑可继续发布。
+      # 等待 registry 可见性最多 10 分钟；超时只为已确认版本创建 tag。
       - name: Reconcile npm versions and package tags
         id: reconcile
+        timeout-minutes: 12
         if: always() && steps.publish.outcome != 'skipped'
         continue-on-error: true
-        run: node scripts/reconcile-npm-publish.mjs --release-commit "$RELEASE_COMMIT"
+        run: node scripts/reconcile-npm-publish.mjs --release-commit "$RELEASE_COMMIT" --wait-timeout-ms 600000
 
       - name: Fail if npm publish was incomplete
         if: always()
