@@ -35,5 +35,5 @@ Revisit after:
 
 ### [Improvement] 赛事上传内存预算与本地发布入口
 Source: [巡检记录](../research/2026-11-01-repository-health-review.md)
-Current task needs it: npm registry 等待修复已独立完成；巡检发现 Worker 配置允许 512 MiB 却整包读入 128 MB isolate，以及本地 release:npm 绕开正式对账策略。
-Deferred because: 两项分别涉及上传合同与本地发布入口语义，单独处理并验证；本次保留源码依据与建议。
+Current task needs it: 用户已要求完成明确修复；Worker 已改为增量校验与 5 MiB 分片，本地 release:npm 已改为指向正式 workflow。
+Resolution: 实现与定向验证已完成，详见巡检记录的后续执行部分。

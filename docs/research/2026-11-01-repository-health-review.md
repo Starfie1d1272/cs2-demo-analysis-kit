@@ -8,15 +8,15 @@
 
 [PR #131](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/131) 增加共享 10 分钟预算、10 秒间隔、15 秒单请求超时和分类错误处理。确认版本才允许补 tag。10 项定向 HTTP 测试通过；真实 registry 只读查询 maps@2.0.0、analytics@1.0.2 成功。修复没有触发新 npm 发布；下一次实际发布的延迟场景仍需观察。
 
-## 仍应处理的问题
+## 巡检发现与处理进度
 
-### P1：赛事上传 Worker 的内存策略与上限冲突
+### P1：赛事上传 Worker 的内存策略与上限冲突（后续已修复）
 
 `infra/event-upload-worker/wrangler.toml` 配置单包 536870912 字节（512 MiB），`src/index.ts:91` 先 `request.arrayBuffer()` 整包读取，之后才校验实际长度，再整包计算 SHA-256。超过内存预算的请求可能在返回预期 413 或写入 R2 前失败；并发请求还共享 isolate 内存。
 
 [Cloudflare 官方限制](https://developers.cloudflare.com/workers/platform/limits/)（2026-11-01 查阅，页面更新 2026-10-29）为每 isolate 128 MB。官方建议使用流处理大请求。建议独立修复为有字节上限的流式隔离上传与完整性核验，或先明确收紧产品上传上限。此处已由源码与平台限制确认设计冲突，未对线上 Worker 做大文件压测，也未核对实际部署是否覆盖了仓库默认配置。
 
-### P2：本地发布入口与正式发布政策分叉
+### P2：本地发布入口与正式发布政策分叉（后续已修复）
 
 根 `package.json` 的 `release:npm` 最后执行裸 `changeset publish`，没有 `--no-git-tag`，也没有调用 registry reconciliation；`docs/release.md` 同时称它为 release path 验证命令并说明会真实发布。正式工作流已明确使用 OIDC 和确认后补 tag。本地入口容易绕开这次等待策略，也可能提前创建本地 tag。建议单独将验证命令与真实发布入口命名、语义统一。本次只修正式 workflow 对账。
 
@@ -62,3 +62,13 @@ Issue 的旧正文与后续评论存在时间差，应更新状态而保留历�
 - 本次仅新增/执行发布恢复相关 10 项定向检查，未本地重跑全仓测试。修复 PR 的最终 CI 结果以 PR checks 为准。
 
 未发现新的包架构阻断项；这条结论限于上述覆盖面。下一优先事项是 Worker 上传内存问题，其后是关闭旧状态与补齐真实资格验证。
+
+## 2026-11-01 后续执行
+
+用户要求完成明确修复并清理过期 Issues，PR #6 由用户另开的工作线负责。
+
+- #131 已合并到 `4857f71934c72315d3aa8ff930387c5b003b72c7`。
+- Worker 改为 DigestStream 增量校验与 5 MiB R2 分片；校验、字节上限和声明长度通过后才 complete，失败 abort。13 项定向数据完整性/故障恢复测试通过；真实 workerd/Miniflare 运行时完成 130 MiB 上传，回读大小与 SHA-256 一致。未操作生产 R2 或部署 Worker。
+- `release:npm` 现在报错并指向正式 GitHub Actions，`check:release` 提供本地验证；发布策略检查防止恢复本地直接上传入口。
+- 本记录上方保留发现时的源码状态。Issue 的当前状态以 GitHub 整理后的正文为准；PR #6 的实现由另一工作线推进。
+- #47 的发布后专项已补验：隔离 npm cache/临时 consumer，从 registry 安装 maps@2.0.0 和 map-assets@1.0.2，在 Node v24.22.2、macOS arm64 下完成所有公开入口实际调用、JSON/tri 资源、严格 NodeNext 声明检查，以及删除 map-assets 后的新进程 maps/calibration 隔离调用。通过后可关闭 maps artifact Issue；跨平台完整产品验收继续由 #64 跟踪。
