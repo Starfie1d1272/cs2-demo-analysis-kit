@@ -1,10 +1,12 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
+import { waitForRegistryVersions } from "./lib/npm-registry-visibility.mjs";
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
-const registry = "https://registry.npmjs.org";
+const waitIndex = process.argv.indexOf("--wait-timeout-ms");
+const waitTimeoutMs = waitIndex < 0 ? 600_000 : Number(process.argv[waitIndex + 1]);
 const checkOnly = process.argv.includes("--check-only");
 const releaseIndex = process.argv.indexOf("--release-commit");
 const requestedRelease = releaseIndex < 0 ? null : process.argv[releaseIndex + 1];
@@ -97,20 +99,6 @@ function remoteTagCommit(tag) {
   throw new Error(`remote has an unexpected tag ref matching ${tag}`);
 }
 
-function npmVersionExists(name, version) {
-  const result = spawnSync(
-    "npm",
-    ["view", `${name}@${version}`, "version", "--json", `--registry=${registry}`],
-    { cwd: repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
-  );
-  if (result.status !== 0) return false;
-  try {
-    return JSON.parse(result.stdout.trim()) === version;
-  } catch {
-    return false;
-  }
-}
-
 function ensureTag(target, head) {
   const local = localTagCommit(target.tag);
   if (local && local !== head) {
@@ -139,7 +127,10 @@ function ensureTag(target, head) {
   console.log(`pushed tag: ${target.tag}`);
 }
 
-function main() {
+async function main() {
+  if (!Number.isSafeInteger(waitTimeoutMs) || waitTimeoutMs <= 0) {
+    throw new Error("--wait-timeout-ms requires a positive integer in milliseconds");
+  }
   const targets = releaseTargets();
   if (targets.length === 0) {
     throw new Error("no public package version change found in HEAD; refusing to publish or create tags");
@@ -152,28 +143,20 @@ function main() {
 
   if (checkOnly) return;
 
-  const confirmed = [];
-  const missing = [];
-  for (const target of targets) {
-    if (npmVersionExists(target.name, target.version)) {
-      confirmed.push(target);
-      console.log(`npm version confirmed: ${target.name}@${target.version}`);
-    } else {
-      missing.push(`${target.name}@${target.version}`);
-      console.log(`npm version not visible yet: ${target.name}@${target.version}`);
-    }
-  }
+  const { confirmed, pending, errors } = await waitForRegistryVersions(targets, { timeoutMs: waitTimeoutMs });
 
   for (const target of confirmed) ensureTag(target, head);
 
-  if (missing.length > 0) {
-    throw new Error(`publish incomplete; no tags were created for missing versions: ${missing.join(", ")}`);
+  if (errors.length > 0 || pending.length > 0) {
+    const detail = [...errors, ...pending].map(({ target, reason }) => `${target.name}@${target.version}: ${reason}`).join("; ");
+    const cause = errors.length > 0 ? "registry query failed" : `registry visibility timed out after ${waitTimeoutMs}ms`;
+    throw new Error(`${cause}; no tags were created for unconfirmed versions: ${detail}. Accepted uploads may still become visible later; check registry before retrying publish.`);
   }
   console.log(`npm publish reconciliation complete: ${confirmed.length} package tag(s) verified`);
 }
 
 try {
-  main();
+  await main();
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
