@@ -14,6 +14,9 @@
   ],
   "references": [
     {
+      "path": "../contract"
+    },
+    {
       "path": "../core"
     },
     {
@@ -21,6 +24,15 @@
     },
     {
       "path": "../presentation"
+    },
+    {
+      "path": "../rating"
+    },
+    {
+      "path": "../tactics"
+    },
+    {
+      "path": "../cohort"
     }
   ]
 }

@@ -1,16 +1,8 @@
 import type { MatchBuyQuality, BuyQualityRow } from "@cs2dak/presentation";
 import type { DemoPackage, EvidenceRef, TeamKey } from "@cs2dak/contract";
 import type { MatchWorkspaceModel } from "@cs2dak/presentation";
-import {
-  aggregatePlayerRoundPerformanceFacts,
-  buildPlayerRoundPerformanceFacts,
-  derivePlayerMechanics,
-  type PlayerMechanicsFact,
-  type PlayerRoundPerformanceFact,
-  type PlayerRoundPerformanceFacts,
-  type PlayerRoundPerformanceUtilityFact,
-  type TournamentIdentity,
-} from "@cs2dak/core";
+import { aggregatePlayerRoundPerformanceFacts, buildPlayerRoundPerformanceFacts, type PlayerRoundPerformanceFact, type PlayerRoundPerformanceFacts, type PlayerRoundPerformanceUtilityFact, type TournamentIdentity } from "@cs2dak/core";
+import { derivePlayerMechanics, type PlayerMechanicsFact } from "@cs2dak/tactics";
 import type { TriangleBvh } from "@cs2dak/maps";
 import { round } from "./season-metrics.js";
 import { displayWeaponName } from "@cs2dak/presentation";

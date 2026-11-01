@@ -1,5 +1,5 @@
 import { deleteMatchRows, settleWrites } from "./storage/match-rows";
-import type { OpeningTrailsModel } from "@cs2dak/contract";
+import type { OpeningTrailsModel } from "@cs2dak/tactics";
 import type {
   DuelInsightsFacts,
   PlayerSeasonInsights,

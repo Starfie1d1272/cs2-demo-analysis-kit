@@ -1,4 +1,4 @@
-import { type SeasonCohortBundle } from "@cs2dak/contract";
+import { type SeasonCohortBundle } from "@cs2dak/cohort";
 import { seasonLeaderboardModelSchema, type SeasonLeaderboardModel } from "@cs2dak/presentation";
 import { SEASON_STAT_VIEWS } from "@cs2dak/presentation";
 import { computeSeasonMetrics } from "./season-metrics.js";

@@ -24,7 +24,6 @@ export {
   type PlayerPerformanceAggregate,
   type PlayerRoundPerformanceFacts,
 };
-export { loadDemoPackageFromZip } from "./loader.js";
 
 /** Evidence validates canonical facts and source QA without a legacy aggregate oracle. */
 export function analyzeDemoPackageForEvidence(pkg: DemoPackage, facts: PlayerRoundPerformanceFacts) {

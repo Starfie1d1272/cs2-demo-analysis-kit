@@ -14,21 +14,6 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
-    "./callout-grid-browser": {
-      "types": "./dist/callout-grid-browser.d.ts",
-      "import": "./dist/callout-grid-browser.js",
-      "default": "./dist/callout-grid-browser.js"
-    },
-    "./callout-grid-node": {
-      "types": "./dist/callout-grid-node.d.ts",
-      "import": "./dist/callout-grid-node.js",
-      "default": "./dist/callout-grid-node.js"
-    },
-    "./tri-assets": {
-      "types": "./dist/tri-assets.d.ts",
-      "import": "./dist/tri-assets.js",
-      "default": "./dist/tri-assets.js"
-    },
     "./calibration": {
       "types": "./dist/calibration.d.ts",
       "import": "./dist/calibration.js",
@@ -36,11 +21,7 @@
     }
   },
   "files": [
-    "dist",
-    "callout-grid",
-    "map-routes",
-    "map-nav",
-    "map-zones"
+    "dist"
   ],
   "publishConfig": {
     "access": "public"

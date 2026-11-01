@@ -4,7 +4,7 @@ import type { DemoPackage, DuelInsightsModel, DuelFinderRow, MechanicsMetric, Op
 
 import { duelInsightsModelSchema } from "@cs2dak/contract";
 
-import { deriveDuels, deriveOpeningDuels, derivePlayerMechanics, type PlayerMechanicsFact, type RateSample } from "@cs2dak/core";
+import { deriveDuels, deriveOpeningDuels, derivePlayerMechanics, type PlayerMechanicsFact, type RateSample } from "@cs2dak/tactics";
 import type { TriangleBvh } from "@cs2dak/maps";
 
 export interface DuelInsightsInput {

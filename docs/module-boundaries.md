@@ -5,13 +5,12 @@
 ## 总体数据流
 
 ```text
-.dem → cs2df → v3 ZIP → core loader → DemoPackage
-  → pipeline（编排 core analysis 与 analytics projection）
-  → presentation 展示模型 → react / 产品
-
-已有 canonical facts / cohort 结果 → analytics → presentation 展示模型
+.dem → cs2df → v3 ZIP → demo-io → DemoPackage → core canonical facts
+                                            → tactics 空间 / 交战分析
+core / tactics 结果 → analytics 信号与洞察 → rating 公式 → cohort 行聚合
+pipeline 编排上述单场 / 跨场执行链
+已有 UI 数据 → presentation 展示合同 / helper → react
 冻结 Tournament facts → tournament → 产品结果
-已有 UI 数据 → presentation 类型 / helper → react
 ```
 
 代码依赖方向是 `pipeline → analytics → presentation` 与 `react → presentation`。
@@ -24,14 +23,18 @@
 | `cs2-demo-format`        | 定义 v3 DemoPackage 数据合同，解析并校验 v3 ZIP                  | 原始 `.dem` 解析、分析、评分、展示          | Schema、类型、ZIP parser、validator |
 | `cs2df`                  | 将原始 `.dem` 确定性导出为合法 v3 DemoPackage                   | RR/PRISM、产品展示、业务持久化              | v3 ZIP、导出报告            |
 | Python CLI / GUI         | 提供 cs2df 的本地 GUI / DAK Studio 桥 / 打包壳                  | 维护独立 parser/exporter、分析或展示实现    | GUI、Studio bridge、桌面应用 |
-| `@cs2dak/contract`       | 定义 DAK 分析结果的公共合同；re-export 上游合同                 | 复制 `cs2-demo-format` schema、纯展示合同、实现分析逻辑 | Zod schema、TypeScript 类型 |
-| `@cs2dak/core`           | 单场 Demo 的标准化、canonical performance/frozen Tournament facts、QA 和确定性分析 | 跨场聚合、身份管理、页面叙事、React UI      | `AnalysisBundle`            |
-| `@cs2dak/cohort`         | 跨场聚合、身份归并、赛季级 RR/PRISM 输入与结果整形              | 单场解析、数据库、产品 UI                   | `CohortBundle`              |
+| `@cs2dak/contract`       | 定义原始输入与基础事实合同；从原版上游编译格式 schema/声明                 | 复制 `cs2-demo-format` schema、纯展示合同、实现分析逻辑 | Zod schema、TypeScript 类型 |
+| `@cs2dak/demo-io` | ZIP 加载、流选择与输入诊断 | 事件归因、评分、UI | DemoPackage |
+| `@cs2dak/rating` | RR/PRISM DTO 与原版公式接线 | Demo 解析、事实提取、空间分析 | 评分结果 |
+| `@cs2dak/map-assets` | 地图数据与显式 Node/browser loader | 空间推导、评分、UI | nav/zone/route/grid/tri 输入 |
+| `@cs2dak/tactics` | 空间与交战分析、地图职责、回合特征、战术聚类 | 评分公式、产品持久化 | 战术与机制结果 |
+| `@cs2dak/core`           | 单场标准化、canonical performance/frozen Tournament facts、QA 和基础统计 | ZIP 加载、评分、地图/战术、跨场聚合、页面模型 | canonical facts            |
+| `@cs2dak/cohort`         | 已有行的跨场身份归并、RR/PRISM 聚合与结果整形              | 单场解析、数据库、产品 UI                   | `SeasonCohortBundle`              |
 | `@rivalhub/rival-rating` | RR、PRISM 及相关评分公式                                        | Demo 信号提取、持久化、展示                 | 评分结果                    |
-| `@cs2dak/maps`           | 地图标定、坐标变换、callout 语义/grid、默认位、包点入口、区域几何 | 评分公式、产品 UI、战术结论、静态完整战术库 | 地图与空间能力              |
+| `@cs2dak/maps`           | 资产无关的地图标定、坐标变换、几何和查询算法 | 评分公式、产品 UI、战术结论、静态完整战术库 | 地图与空间能力              |
 | `@cs2dak/tournament`     | frozen Tournament sufficient-fact DTO、identity-safe 跨图 merge、透明 performance aggregation、rate 与结构/引用/聚合安全校验 | Demo 解析/detection、Core semantic QA、RivalHub scope、数据库、React、评分公式 | `TournamentAnalytics`、`TournamentPerformanceAnalytics` |
-| `@cs2dak/analytics` | 经济/机制/队伍等领域洞察、事实提取、已有分析结果的展示投影与 Tournament adapter | 重写 Core 事件归因、文件/网络/数据库、React | 洞察、统计、View Models |
-| `@cs2dak/pipeline` | 原始 DemoPackage → Core 分析 → analytics 工作台投影的编排 | 文件加载、持久化、权限、领域算法 | `MatchWorkspaceModel` |
+| `@cs2dak/analytics` | 评分信号派生、经济/机制/队伍等领域洞察、已有结果投影与 Tournament adapter | 重写 Core 事件归因、文件/网络/数据库、React | 洞察、统计、View Models |
+| `@cs2dak/pipeline` | 原始 DemoPackage → Core/tactics/analytics/rating/cohort 的单场与跨场执行编排 | 文件加载、持久化、权限、领域算法 | `MatchWorkspaceModel` |
 | `@cs2dak/presentation` | 展示 schema、窄 View DTO、标签、格式、报告排版与纯结果投影 | 解析、事件检测、评分、经济统计、数据库、分析执行 | 产品中立 View Models |
 | `@cs2dak/react`          | 渲染 presentation View Model 与 maps/calibration 坐标/level 投影                          | 数据库查询、分析、评分、产品业务规则        | React 组件与样式            |
 | `@cs2dak/rivalhub-upload` | RivalHub 配对与 HTTP client、目标匹配、Evidence V1 producer；唯一共享上传语义 owner | 本地文件、UI、数据库、Library 持久化 | `rivalhub-demo-evidence/1` |
@@ -47,14 +50,14 @@ DAK Studio 已落地为 `apps/dak-studio`（资料库 / 比赛工作台 / 选手
 
 | Studio 模块 | 唯一职责 | 共享逻辑 owner |
 |---|---|---|
-| 资料库 | 本地 ZIP/.dem 导入、标签、重导、检索 | Studio 本地适配；ZIP 解析仍属 core/contract |
+| 资料库 | 本地 ZIP/.dem 导入、标签、重导、检索 | Studio 本地适配；ZIP 加载属 demo-io，格式 schema 属 contract |
 | 比赛工作台 | 单场回合、回放、地图、经济与 RR 解释入口 | `@cs2dak/pipeline` / `@cs2dak/analytics` 生成模型；`@cs2dak/react` 渲染 |
 | 个人实验室 | 选手档案、趋势、武器分布、证据跳转 | `@cs2dak/cohort` + `@cs2dak/analytics` |
-| 对枪实验室 | duels/mechanics 信号聚合、三分类对枪、TTK、机制画像（含 .tri LOS 反应时间/预瞄） | `@cs2dak/core` + `@cs2dak/analytics` |
+| 对枪实验室 | duels/mechanics 信号聚合、三分类对枪、TTK、机制画像（含 .tri LOS 反应时间/预瞄） | `@cs2dak/tactics` + `@cs2dak/analytics` |
 | 道具实验室 | 跨场 Flash Value、负收益队闪、道具证据 | `@cs2dak/analytics` |
 | 经济与节奏 | 经济矩阵、手枪转化、eco/semi 翻盘 | `@cs2dak/tournament`（单图事实由 Core canonical adapter 生成） |
 | 赛事中台 | 跨队横向对比、地图盘面、武器榜、报表 | `@cs2dak/cohort` + `@cs2dak/analytics` + `@cs2dak/tournament` |
-| 教练工作台 | pattern/playbook/anti-strat 的本地查询与编排 | `@cs2dak/maps` 静态地图语义 + `@cs2dak/core` 回合推导 + `@cs2dak/cohort` 聚合 + `@cs2dak/analytics` 展示投影 |
+| 教练工作台 | pattern/playbook/anti-strat 的本地查询与编排 | `@cs2dak/maps` 算法 + `@cs2dak/map-assets` 数据 + `@cs2dak/tactics` 特征与聚类 + `@cs2dak/analytics` 展示投影 |
 
 RR 口径统一使用 `@rivalhub/rival-rating` 的 frozen pro baseline：单场和跨场聚合都以
 `1.0 = 职业基线` 为同一标准；cohort 层只做身份归并、信号汇总和展示模型整形。
@@ -90,7 +93,7 @@ PRISM 风格、强弱项等“相对当前范围”的判断可以继续使用 c
 
 14. `core/src/tournament-facts.ts` 是单图 frozen Tournament economy/performance projection 的唯一 owner，只以 type import 消费 Tournament DTO。显式 stable team/player ID 必须完整，teamA/B 相同 ID 明确拒绝；显示队名、昵称、logo 不生成或决定 ID。Evidence 直接消费 Core data adapter，再按 target entry ID 查询 Tournament 结果，不通过 Presentation ViewModel 回查。未绑定的本地 Demo 使用显式 match-scoped observed ID，只表示本场观察，不能据同名跨图认定同队；Analytics adapter 在身份确定后注入标签，Studio `teamRenames` 不改变 frozen identity。
 
-Calibration-only 消费者优先使用 `@cs2dak/maps/calibration`；root 聚合空间能力。两者由同一 maps owner 实现，当前 Active Duty 与 checked-in spatial coverage 分别由 `ACTIVE_DUTY_MAPS` / `SPATIAL_ASSET_MAPS` 表达。calibration 已隔离模块加载；空间资产仍随 maps 同包安装。
+Calibration-only 消费者优先使用 `@cs2dak/maps/calibration`；root 聚合空间能力。两者由同一 maps owner 实现，当前 Active Duty 与 checked-in spatial coverage 分别由 `ACTIVE_DUTY_MAPS` / `SPATIAL_ASSET_MAPS` 表达。maps 仅发布算法；空间数据和 loader 在 map-assets 独立安装，UI/基础事实不依赖它。
 
 ## 可执行 package graph 与发布合同
 
@@ -98,30 +101,34 @@ Calibration-only 消费者优先使用 `@cs2dak/maps/calibration`；root 聚合�
 
 | 包 | 允许的依赖 |
 |---|---|
-| contract | cs2-demo-format、rating、Zod |
-| maps | 无 npm 依赖；Node 专用入口可用 Node builtins |
-| core | contract、maps、rating、JSZip；tournament **仅 DTO/type** |
-| cohort | contract、core、rating |
+| contract | Zod；cs2-demo-format 仅精确 build-only 输入 |
+| maps | 无 npm 依赖 |
+| map-assets | maps；Node 专用 loader 可用 Node builtins |
+| core | contract；tournament **仅 DTO/type** |
+| rating | Zod；rival-rating 仅精确 build-only 输入 |
+| cohort | rating、Zod |
+| tactics | contract、core、maps、map-assets、Zod |
+| demo-io | contract、core、JSZip；允许 Node builtins |
 | tournament | **无 runtime/peer/optional 依赖，也不 import 外部 DTO** |
 | presentation | maps、Zod |
 | react | presentation、maps、lucide-react；React/React DOM peers |
-| analytics | contract、core、cohort、maps、tournament、rating、presentation |
-| pipeline | contract、core、cohort、maps、tournament、rating、analytics、presentation |
-| rivalhub-upload（private） | contract、core canonical adapter、tournament、Zod |
+| analytics | contract、core、rating、cohort、tactics、maps、map-assets、tournament、presentation、Zod |
+| pipeline | contract、core、rating、cohort、tactics、demo-io、maps、map-assets、tournament、analytics、presentation |
+| rivalhub-upload（private） | contract、core、demo-io、tournament、Zod |
 
-Core 的 tournament manifest dependency 是外部声明解析所需的 DTO 合同，不允许变成运行时 aggregation。React 的 props/type 由 presentation 拥有，地图投影使用 maps/calibration。presentation/React 的源码、声明和安装闭包均不得依赖 contract、core、cohort、tournament、analytics、pipeline、rivalhub-upload、rating、cs2-demo-format 或 JSZip。私有 uploader 直接消费 Core canonical facts；禁止回读 presentation。
+Core 的 tournament manifest dependency 是外部声明解析所需的 DTO 合同，不允许变成运行时 aggregation。React 的 props/type 由 presentation 拥有，地图投影使用 maps/calibration。presentation/React 的源码、声明和安装闭包均不得依赖 contract、core、cohort、tournament、analytics、pipeline、rivalhub-upload、rating、tactics、demo-io、map-assets、cs2-demo-format 或 JSZip。私有 uploader 直接消费 Core canonical facts；禁止回读 presentation。
 
-九个公共包的发布合同为 dist ESM/declarations，显式 exports 与有限 files；React 的 theme.css 保持原公开入口，复制到 dist 并标记 CSS side effect，其余包 sideEffects=false。现有 private CLI/uploader/apps 保持 private。DAK 自身模块不 bundle；React 原有省略扩展名的相对路径只在生成的 JS/declaration 中补 `.js`。build configs 排除测试，typecheck configs 继续检查测试源码。
+十三个公共包的发布合同为 dist ESM/declarations，显式 exports 与有限 files；React 的 theme.css 保持原公开入口，复制到 dist 并标记 CSS side effect，其余包 sideEffects=false。现有 private CLI/uploader/apps 保持 private。DAK 自身模块不 bundle；React 原有省略扩展名的相对路径只在生成的 JS/declaration 中补 `.js`。build configs 排除测试，typecheck configs 继续检查测试源码。
 
-`pnpm check:package-consumers` 重建公共库、实际 pack 九个 tgz，逐包在仓外临时目录只安装该 root 与所需 peers；npm overrides 将每条传递 DAK dependency 固定到本次对应 tarball。它验证完整声明依赖闭包、公开 JS 入口实际 import/call、strict NodeNext（skipLibCheck=false），禁止 workspace link、源码/测试泄漏与额外 DAK 包，并记录真实 compressed/unpacked bytes。外部依赖按对应 manifest 安装；UI consumer 另检查安装树与 JS/declaration 无分析依赖，并将全部 root exports 以 browser 平台打包检查；仓库只提供编译器工具，不提供 TS paths/aliases。
+`pnpm check:package-consumers` 重建公共库、实际 pack 十三个 tgz，逐包在仓外临时目录只安装该 root 与所需 peers；npm overrides 将每条传递 DAK dependency 固定到本次对应 tarball。它验证完整声明依赖闭包、公开 JS 入口实际 import/call、strict NodeNext（skipLibCheck=false），禁止 workspace link、源码/测试泄漏与额外 DAK 包，并记录真实 compressed/unpacked bytes。外部依赖按对应 manifest 安装；UI consumer 另检查安装树与 JS/declaration 无分析依赖，并将全部 root exports 以 browser 平台打包检查；仓库只提供编译器工具，不提供 TS paths/aliases。
 
-保留 maps 专项五入口/资产/calibration 隔离 gate。Node/strict TS 和浏览器 bundle 检查各自覆盖不同边界，均不能替代正式 registry 发布后的消费验证或浏览器交互验收。包体积记录不等于资产拆包收益证据。
+maps/map-assets 专项 gate 检查两包入口、JSON 公开出口、loader 与卸载资产包后的算法隔离。Node/strict TS 和浏览器 bundle 检查各自覆盖不同边界，均不能替代正式 registry 发布后的消费验证或浏览器交互验收。
 
-DAK build 针对固定的 cs2-demo-format@3.1.0 与 @rivalhub/rival-rating@0.3.0 源码发布产物生成 ESM dependency 模块；declarations 引用相同精确版本。生产源码的上游 owner 与 manifest type dependency 保留；只编译依赖，不复制改写公式/schema，不 bundle DAK 模块或 canonical facts caches。每个上游在一个 DAK package 内共享单一生成模块，附 MIT notices、原包 tarball/integrity、输入源码/输出哈希。历史依据见 [artifact audit](research/public-package-artifact-audit.md)；本轮没有据此宣称 registry 已更新。
+DAK build 从精确固定的 cs2-demo-format@3.1.0 和 rival-rating@0.3.0 原版源生成私有 vendor ESM 与完整声明；这些源码上游只允许精确 devDependencies。所有 JS/d.ts 引用改指配套 vendor 入口，消费者无需安装上游源码包。TypeScript CLI 递归发射固定源清单的声明，JSON 权重由原数据生成类型，声明相对入口统一为 NodeNext 可解析的 `.js`。源哈希、声明哈希和许可证一并记录；不改写公式或格式语义。基础事实安装闭包必须只含 core/contract/tournament/Zod，UI 闭包只含展示和算法能力。
 
 编译入口变化需要冷启动先构建依赖闭包：`pnpm build:packages` 用于公共库准备，CI 在 typecheck/fast tests 前执行；desktop/web-patch/uploader 的独立 build 递归包含对应 app dependencies。typecheck 的 rootDir 与发布 build 均为 src，保持 dist 声明路径一致。开发 dev 入口先准备公共产物；修改共享源码后需重跑 build:packages。构建器直接用 Node 调用已安装 tsc，避免 Windows pnpm shim 启动差异。诊断/发布 provenance 语义保持原 owner。
 
-路径归属使用原生 path.relative/isAbsolute，覆盖 Windows path.win32 回归；Windows startup CI 实跑 graph gate。全包 tgz consumer gate 当前认证范围为 Linux/Ubuntu，显式拒绝其他平台；Windows 应用 build 通过不能当成 Windows tgz consumer 已通过。
+路径归属使用原生 path.relative/isAbsolute，覆盖 Windows path.win32 回归；Windows startup CI 实跑 graph gate。全包 tgz gate 默认要求 Linux；`--local-platform` 显式在当前主机运行并打印平台，`--skip-build` 使用已构建产物。各平台结果分别记录，macOS 通过不代替 Linux/Windows 验证。
 
 ## UI 消费入口
 

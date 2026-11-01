@@ -1,6 +1,7 @@
-import { playerMapRoleProfileSchema, teamMapRoleMatrixSchema, type DeclaredRole, type EvidenceRef, type InferredMapRole, type MainRoleDeclaration, type MapRoleStatus, type PlayerMapRoleEvidence, type PlayerMapRoleProfile, type RoleDeclaration, type TeamMapResponsibilityEvidence, type TeamMapRoleMatrix, type WeaponDutyDeclaration, type WeaponDuty } from "@cs2dak/contract";
+import { playerMapRoleProfileSchema, teamMapRoleMatrixSchema, type DeclaredRole, type InferredMapRole, type MainRoleDeclaration, type MapRoleStatus, type PlayerMapRoleEvidence, type PlayerMapRoleProfile, type RoleDeclaration, type TeamMapResponsibilityEvidence, type TeamMapRoleMatrix, type WeaponDutyDeclaration, type WeaponDuty } from "@cs2dak/tactics";
+import { type EvidenceRef } from "@cs2dak/contract";
 
-import { MAP_ROLE_MODEL_VERSION, MAP_ROLE_THRESHOLDS } from "@cs2dak/cohort";
+import { MAP_ROLE_MODEL_VERSION, MAP_ROLE_THRESHOLDS } from "@cs2dak/tactics";
 import { positionGroupDisplay } from "@cs2dak/maps";
 
 const ROLE_ORDER: InferredMapRole[] = ["awper", "anchor", "opener", "closer"];

@@ -1,9 +1,5 @@
-import {
-  buildPlayerMapRoleEvidence,
-  buildSeasonCohortFromRows,
-  buildTeamMapResponsibilityEvidence,
-  type PlayerIdentityMap,
-} from "@cs2dak/cohort";
+import { buildPlayerMapRoleEvidence, buildTeamMapResponsibilityEvidence } from "@cs2dak/tactics";
+import { buildSeasonCohortFromRows, type PlayerIdentityMap } from "@cs2dak/cohort";
 import {
   buildAllPlayerSeasonProfiles,
   buildDoubleAwpAnalyses,
@@ -34,17 +30,9 @@ import { getFactsStore } from "./facts-store";
 import { getDerivedCacheStore } from "./derived-cache";
 import { getStorage } from "./storage";
 import { FACTS_REVISION } from "./analysis-manifest";
-import type {
-  DuelInsightsModel,
-  DoubleAwpAnalysis,
-  SeasonCohortBundle,
-  PlayerMapRoleEvidence,
-  PlayerMapRoleProfile,
-  PlayerMapPoolRow,
-  RoleDeclaration,
-  TeamMapRoleMatrix,
-  TeamMapResponsibilityEvidence,
-} from "@cs2dak/contract";
+import type { DuelInsightsModel } from "@cs2dak/contract";
+import type { SeasonCohortBundle } from "@cs2dak/cohort";
+import type { DoubleAwpAnalysis, PlayerMapRoleEvidence, PlayerMapRoleProfile, PlayerMapPoolRow, RoleDeclaration, TeamMapRoleMatrix, TeamMapResponsibilityEvidence } from "@cs2dak/tactics";
 import type { PlayerSeasonProfile, SeasonLeaderboardModel } from "@cs2dak/presentation";
 import { entryDate, matchIdForEntry, type StudioDemoEntry } from "./library";
 import { displayTeamName, originalTeamNamesForDisplay } from "./identity";
@@ -375,7 +363,7 @@ export async function getPlayerMapPool(entries: StudioDemoEntry[], playerKey: st
     for (const weapon of weapons.filter((weapon) => entryByMatch.get(weapon.matchId)?.meta.mapName === mapName)) weaponCounts.set(weapon.weapon, (weaponCounts.get(weapon.weapon) ?? 0) + weapon.kills);
     const mainWeapon = [...weaponCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? null;
     const indicators = bundle.players.find((candidate) => candidate.playerKey === playerKey)?.indicators;
-    return { mapName: mapName as import("@cs2dak/contract").SupportedMapName, matchCount: matches.length, roundCount: indicators?.totalRounds ?? 0, wins, losses: matches.length - wins, rr: profile?.rating.rivalhubRR ?? null, adr: indicators?.adr ?? null, kast: indicators?.kast ?? null, openingKills: indicators?.firstKillCount ?? 0, openingDeaths: indicators?.firstDeathCount ?? 0, mainWeapon };
+    return { mapName: mapName as import("@cs2dak/tactics").SupportedMapName, matchCount: matches.length, roundCount: indicators?.totalRounds ?? 0, wins, losses: matches.length - wins, rr: profile?.rating.rivalhubRR ?? null, adr: indicators?.adr ?? null, kast: indicators?.kast ?? null, openingKills: indicators?.firstKillCount ?? 0, openingDeaths: indicators?.firstDeathCount ?? 0, mainWeapon };
   }), roleProfile);
 }
 

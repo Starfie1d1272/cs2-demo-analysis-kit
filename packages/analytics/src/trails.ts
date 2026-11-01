@@ -1,4 +1,5 @@
-import { decodeDelta, openingTrailsModelSchema, type DemoPackage, type OpeningTrailRound, type OpeningTrailsModel } from "@cs2dak/contract";
+import { decodeDelta, type DemoPackage } from "@cs2dak/contract";
+import { openingTrailsModelSchema, type OpeningTrailRound, type OpeningTrailsModel } from "@cs2dak/tactics";
 
 import { normalizeDemoPackage } from "@cs2dak/core";
 import { nameForSteamId } from "./workspace-utils.js";

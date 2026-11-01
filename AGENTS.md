@@ -49,42 +49,42 @@ node scripts/gen-install-manifest.mjs # 生成 install-manifest.json
 node scripts/assemble-full-zip.mjs    # 组装 Full Portable Zip
 
 # 单测单文件
-pnpm vitest run packages/core/src/critical-flows.integration.test.ts
+pnpm vitest run packages/demo-io/src/critical-flows.integration.test.ts
 ```
 
 Python `uv sync --extra gui` 装 pywebview（DAK Studio 桌面壳运行需要）。禁止向系统 python 和 conda base 安装包。
 
 ## 3. Architecture
 
-```
-.dem
-  → cs2df（PyPI）  （demoparser2 → cs2-demo-format/3.0 ZIP）
-       └─ python/src/cs2dak  （薄壳：CLI→version，Studio 桌面桥）
-  → @cs2dak/core  （加载 ZIP → DemoPackage → AnalysisBundle）
-       ├─ normalize / economy / kills / clutches / timeline / heatmap / QA
-       ├─ box-score / HLTV baseline / RR 六账户 / PRISM（经 @rivalhub/rival-rating）
-       └─ → AnalysisBundle
-  → @cs2dak/cohort / @cs2dak/tournament
-  → @cs2dak/analytics（领域洞察 / 已有结果的展示投影）
-  → @cs2dak/presentation 展示模型 → @cs2dak/react
+```text
+.dem → cs2df → v3 ZIP → @cs2dak/demo-io → DemoPackage
+  → core：canonical facts / QA
+  → tactics：空间 / 交战分析 / 战术聚类
+  → analytics：信号派生 / 领域洞察 / 展示投影
+  → rating：评分公式接线 → cohort：已有行跨场画像
 
-原始 DemoPackage → @cs2dak/pipeline（编排 core + analytics）
-已有 UI 数据 → presentation 类型 / helper → react
+pipeline 编排上述执行链；apps/CLI 负责文件、缓存、权限和产品流程。
+已有 UI 数据 → presentation 展示合同 / helper → react
 ```
 
 **跨语言边界**：v3 ZIP 是 Python ↔ TypeScript 唯一耦合点，两边代码不互相 import。
 
 | 包 | 职责 |
 |---|---|
-| `@cs2dak/contract` | 分析数据 Zod schemas + TS 类型；re-export `cs2-demo-format`。纯展示模型由 presentation 拥有。 |
-| `@cs2dak/core` | 纯分析逻辑。加载 v3 ZIP → 标准化、信号派生、QA、RR/PRISM 接线。无副作用。 |
-| `@cs2dak/cohort` | 跨场聚合、身份归并与赛季 RR/PRISM 整形。 |
-| `@cs2dak/maps` | 地图标定、world→radar 坐标变换、zone 几何（`zoneAt` / `pointInPolygon`）、callout 中文名与倾向、callout grid、进点入口（`site-entry-chokes`）、默认站位查询（`classifyTacticalLocation`）。 |
-| `@cs2dak/analytics` | 领域洞察、经济统计、事实提取和已有分析结果到展示模型的投影。 |
-| `@cs2dak/pipeline` | 原始 DemoPackage 到完整工作台的分析执行编排。 |
+| `@cs2dak/contract` | 原始输入与基础事实 schema；上游 format 为精确 build-only 输入，发布 JS/声明由原源编译。 |
+| `@cs2dak/demo-io` | ZIP 加载、流选择和输入诊断；公共分析包的 JSZip 依赖归输入适配层。 |
+| `@cs2dak/core` | 单场 canonical facts、标准化、QA 与 frozen Tournament projection；仅依赖 contract 和 Tournament DTO。 |
+| `@cs2dak/rating` | RR/PRISM DTO 与原版公式接线；消费已提取信号，仅 runtime 依赖 Zod。 |
+| `@cs2dak/cohort` | 已有行的跨场聚合、身份归并与 RR/PRISM 整形；仅依赖 rating/Zod。 |
+| `@cs2dak/maps` | 资产无关的标定、坐标变换与空间算法。 |
+| `@cs2dak/map-assets` | 地图数据、callout grid、nav/route/zone 与 Node/browser 资产加载。 |
+| `@cs2dak/tactics` | 空间/交战分析、地图职责、回合特征与战术聚类。 |
+| `@cs2dak/tournament` | 自有 frozen DTO 与身份安全的透明跨场聚合，零 runtime 依赖。 |
+| `@cs2dak/analytics` | 跨域信号派生、领域洞察、经济统计和已有分析结果到展示模型的投影。 |
+| `@cs2dak/pipeline` | 原始 DemoPackage 单场/跨场分析的执行编排。 |
 | `@cs2dak/presentation` | 展示 schema、窄 View DTO、标签、格式与纯投影；仅依赖 maps/Zod。 |
 | `@cs2dak/react` | React 组件。消费 presentation View Model 与 maps/calibration 坐标投影；安装和声明闭包不依赖分析包。 |
-| `@cs2dak/cli` | 薄 CLI（tsx），把 `@cs2dak/core` 接到文件系统。 |
+| `@cs2dak/cli` | 薄 CLI（tsx），把 demo-io 与 pipeline 接到文件系统。 |
 | `apps/dak-studio` | DAK Studio：本地 Demo 管理、战术分析与个人打法复盘工作台（独立设计语言；导入即提取 facts 行持久化，视图读投影；IndexedDB 开发 / SQLite 桌面双后端）。教练页战术聚类 0.6.0 已落地（`TacticalRoundFact`/`TacticalCluster` + `PatternExplorer` 三栏 + `RadarTrails` + `MapPoolTable` + Round Playlist + 默认位资产 + 3D callout 网格）见 `docs/design/studio-redesign.md §8`。 |
 | `python/src/cs2dak` | Python 壳（cs2df 包装器）：DAK Studio 桌面桥。CLI 仅保留 version。 |
 
@@ -172,10 +172,10 @@ docs/                  # 架构与集成文档（索引见 docs/README.md）
 ## 5. Hard Constraints
 
 - **v3 ZIP 是唯一 seam**：Python ↔ TypeScript 只通过 v3 ZIP 合同对接
-- **contract 不 fork**：`@cs2dak/contract` 依赖并 re-export `cs2-demo-format`，不在本仓库内 fork 类型定义
+- **contract 不 fork**：`@cs2dak/contract` 由精确上游 format 源编译 schema/声明；上游为 build-only 依赖，禁止 fork 或手改生成声明
 - **Null 保持 null**：`RRSignals` 字段缺失时发 `null`，绝不 coerce 到 0
 - **Core 包不 import 产品代码**：RivalHub、CS2 Insight Agent、任何 app 都不得被 core 包引用
-- **React 组件不查数据库**：不跑分析逻辑；props/type 从 presentation 获取，坐标投影用 maps/calibration。presentation/React 的传递依赖禁止 contract/core/cohort/tournament/analytics/pipeline/rating/format/JSZip
+- **React 组件不查数据库**：不跑分析逻辑；props/type 从 presentation 获取，坐标投影用 maps/calibration。presentation/React 的传递依赖禁止 contract/core/cohort/tournament/analytics/pipeline/rating/tactics/demo-io/map-assets/format/JSZip
 - **fixtures/ 是真相源**：跨语言行为验证以 fixtures 为准
 - **公式所有权**：RR/PRISM 公式在 `@rivalhub/rival-rating`（外部依赖），kit 只做信号派生和接线
 

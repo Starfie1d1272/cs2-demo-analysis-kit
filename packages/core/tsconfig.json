@@ -9,6 +9,15 @@
     "outDir": "dist",
     "rootDir": "src"
   },
-  "include": ["src"],
-  "references": [{ "path": "../contract" }, { "path": "../maps" }, { "path": "../tournament" }]
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../contract"
+    },
+    {
+      "path": "../tournament"
+    }
+  ]
 }

@@ -1,5 +1,5 @@
 import { normalizeDiagnostic, type SafeDiagnostic } from "./diagnostics";
-import { loadDemoPackageFromZip } from "@cs2dak/core/evidence";
+import { loadDemoPackageFromZip } from "@cs2dak/demo-io";
 import { buildRivalHubDemoEvidenceV1, resolveRivalHubParticipants, resolveRivalHubParticipantsForReview, resolveRivalHubParticipantsFromEventRoster } from "./evidence";
 import { evidenceTargetFromRemoteMap, matchRivalHubMap, type RivalHubMatchCandidate } from "./match";
 import { rivalHubEvidenceIdempotencyKey } from "./client";

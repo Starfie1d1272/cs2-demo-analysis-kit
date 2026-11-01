@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { beforeAll, expect, it } from "vitest";
 import type { DemoPackage } from "@cs2dak/contract";
-import { aggregatePlayerRoundPerformanceFacts, buildPlayerRoundPerformanceFacts, extractTournamentSourceFacts, projectTournamentMapFacts, loadDemoPackageFromZip } from "@cs2dak/core/evidence";
+import { aggregatePlayerRoundPerformanceFacts, buildPlayerRoundPerformanceFacts, extractTournamentSourceFacts, projectTournamentMapFacts } from "@cs2dak/core/evidence";
+import { loadDemoPackageFromZip } from "@cs2dak/demo-io";
 import { buildTournamentAnalytics } from "@cs2dak/tournament";
 import { buildRivalHubDemoEvidenceV1, fixtureIdentity, fixtureTarget, resolveRivalHubParticipants, normalizeRivalHubDemoPackage } from "./evidence";
 

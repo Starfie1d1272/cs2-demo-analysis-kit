@@ -1,0 +1,32 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../analytics"
+    },
+    {
+      "path": "../contract"
+    },
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../pipeline"
+    },
+    {
+      "path": "../tactics"
+    }
+  ]
+}

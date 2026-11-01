@@ -1,7 +1,9 @@
+import { getMapNav } from "@cs2dak/map-assets";
 import { normalizeDiagnostic, type SafeDiagnostic } from "@cs2dak/rivalhub-upload";
-import { loadDemoPackageFromZip, buildMatchRadarField, type DemoPackageLoadProfile } from "@cs2dak/core";
+import { loadDemoPackageFromZip, type DemoPackageLoadProfile } from "@cs2dak/demo-io";
+import { buildMatchRadarField } from "@cs2dak/tactics";
 import { buildRadarFieldGrid, type TriangleBvh } from "@cs2dak/maps";
-import { loadCalloutGridBrowser } from "@cs2dak/maps/callout-grid-browser";
+import { loadCalloutGridBrowser } from "@cs2dak/map-assets/callout-grid-browser";
 import { buildTriBvh, fetchTriBuffer, type TriDiagnosticSink } from "./tri-loading";
 import { extractMatchData } from "./extract-match-facts";
 import { metaFromPackage } from "./demo-meta";
@@ -73,7 +75,7 @@ self.onmessage = async (event: MessageEvent<InMsg>) => {
     }
     if (msg.op === "radarField") {
       const mapName = pkg.match.mapName;
-      const grid = buildRadarFieldGrid(mapName);
+      const grid = buildRadarFieldGrid(getMapNav(mapName));
       if (!grid) {
         self.postMessage({ id: msg.id, diagnostics, ok: true, radarFields: [] });
         return;

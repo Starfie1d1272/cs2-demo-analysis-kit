@@ -1,4 +1,5 @@
-import type { AnalysisBundle, DemoPackage } from "@cs2dak/contract";
+import type { AnalysisBundle } from "./models.js";
+import type { DemoPackage } from "@cs2dak/contract";
 import { toPlayerRoundFacts, type PlayerRoundPerformanceFacts } from "@cs2dak/core";
 
 /** Guard the source join; event semantics remain owned by Core. */

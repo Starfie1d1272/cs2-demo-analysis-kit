@@ -1,6 +1,6 @@
 import { Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { OpeningTrailsModel, OpeningTrailRound } from "@cs2dak/contract";
+import type { OpeningTrailsModel, OpeningTrailRound } from "@cs2dak/tactics";
 import { RadarTrails, GRENADE_COLOR, type RadarTrail, type RadarGrenadeOverlay } from "../components/RadarTrails";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import type { IdentityOptions } from "../lib/season";

@@ -1,9 +1,6 @@
 import type { TeamKey } from "@cs2dak/contract";
 
-import {
-  buildPlayerRoundPerformanceFacts, extractTournamentSourceFacts, projectTournamentMapFacts,
-  observedTournamentIdentity, type TournamentIdentity, type TournamentSourceFacts,
-} from "@cs2dak/core";
+import { buildPlayerRoundPerformanceFacts, extractTournamentSourceFacts, projectTournamentMapFacts, observedTournamentIdentity, type TournamentIdentity, type TournamentSourceFacts } from "@cs2dak/core";
 import {
   buildTournamentAnalytics,
   type TournamentEntityLabels,

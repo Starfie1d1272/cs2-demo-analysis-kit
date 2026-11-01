@@ -38,6 +38,6 @@ export function ReplayPage({ replay, map }: { replay: WorkspaceReplay; map: MapV
 - runtime：presentation、maps、lucide-react。
 - peers：React / React DOM，版本范围以 package.json 为准。
 - props/type：presentation 的展示合同；源码、声明和安装闭包禁止分析包、rating、format 和 JSZip。
-- 地图投影：`@cs2dak/maps/calibration`。它隔离空间资产的模块加载，资产仍随 maps 同包安装。
+- 地图投影：`@cs2dak/maps/calibration`。它隔离空间资产的模块加载，资产独立位于 map-assets，UI 安装闭包不包含它。
 
 样式通过 `@cs2dak/react/theme.css` 引入，使用 DAK 主题 token。发布合同为 dist ESM/declarations 与独立 CSS 入口；实际 registry 发布状态以发布记录为准。

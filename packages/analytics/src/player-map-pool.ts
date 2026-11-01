@@ -1,4 +1,4 @@
-import { playerMapPoolRowSchema, type PlayerMapPoolRow, type PlayerMapRoleProfile, type SupportedMapName } from "@cs2dak/contract";
+import { playerMapPoolRowSchema, type PlayerMapPoolRow, type PlayerMapRoleProfile, type SupportedMapName } from "@cs2dak/tactics";
 
 
 export interface PlayerMapPerformanceInput {

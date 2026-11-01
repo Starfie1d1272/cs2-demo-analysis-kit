@@ -44,7 +44,7 @@ def load_role_mappings(map_name: str) -> dict[str, tuple[str, str | None]]:
     result: dict[str, tuple[str, str | None]] = {}
 
     # 1. 从 manual zone 文件读取已知映射
-    manual_path = os.path.join(ROOT, "packages/maps/map-zones", f"{map_name}.json")
+    manual_path = os.path.join(ROOT, "packages/map-assets/map-zones", f"{map_name}.json")
     if os.path.exists(manual_path):
         with open(manual_path) as f:
             manual = json.load(f)
@@ -443,7 +443,7 @@ def format_z_desc(z_min, z_max, gradient, tolerance) -> str:
 
 
 def load_manual_zones(map_name: str) -> dict | None:
-    path = os.path.join(ROOT, "packages/maps/map-zones", f"{map_name}.json")
+    path = os.path.join(ROOT, "packages/map-assets/map-zones", f"{map_name}.json")
     if os.path.exists(path):
         with open(path) as f:
             return json.load(f)
@@ -480,7 +480,7 @@ def process_map(map_name: str, grid: dict):
     print(f"{'=' * 60}")
 
     result = grid_to_zones(map_name, grid)
-    out_path = os.path.join(ROOT, "packages/maps/map-zones", f"auto-{map_name}.json")
+    out_path = os.path.join(ROOT, "packages/map-assets/map-zones", f"auto-{map_name}.json")
     with open(out_path, "w") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
 
@@ -540,7 +540,7 @@ def main():
     ]
 
     for map_name in targets:
-        grid_path = os.path.join(ROOT, "packages/maps/callout-grid", f"{map_name}.json")
+        grid_path = os.path.join(ROOT, "packages/map-assets/callout-grid", f"{map_name}.json")
         if not os.path.exists(grid_path):
             print(f"  跳过 {map_name}: callout-grid 不存在")
             continue

@@ -1,4 +1,5 @@
-import { CORE_ANALYSIS_VERSION, MAP_INTELLIGENCE_FACT_VERSION, TACTICAL_FACT_VERSION } from "@cs2dak/core";
+import { CORE_ANALYSIS_VERSION } from "@cs2dak/core";
+import { MAP_INTELLIGENCE_FACT_VERSION, TACTICAL_FACT_VERSION } from "@cs2dak/tactics";
 
 /**
  * 分析能力的版本中枢：把 ZIP 合同、facts 存储布局和各 facts producer 分开记录。

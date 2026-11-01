@@ -36,6 +36,9 @@
 
 - [展示模型与工具](../packages/presentation/README.md)：已有数据的展示合同。
 - [React 组件](../packages/react/README.md)：独立组件、样式与宿主回调。
+- [基础事实](../packages/core/README.md)：canonical facts 与 QA。
+- [评分](../packages/rating/README.md)：信号到 RR/PRISM 的公式接线。
+- [跨场画像](../packages/cohort/README.md)：已有行的聚合。
 - [领域洞察](../packages/analytics/README.md)：已有 facts/bundle 的统计与展示投影。
 - [分析编排](../packages/pipeline/README.md)：原始 DemoPackage 到工作台模型。
 

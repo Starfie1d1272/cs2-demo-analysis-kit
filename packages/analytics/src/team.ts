@@ -1,12 +1,9 @@
 import { round } from "./season-metrics.js";
 import { displayWeaponName } from "@cs2dak/presentation";
-import type { DemoPackage, TeamMapRoleMatrix } from "@cs2dak/contract";
+import type { DemoPackage } from "@cs2dak/contract";
+import type { TeamMapRoleMatrix } from "@cs2dak/tactics";
 
-import {
-  aggregatePlayerRoundPerformanceFacts,
-  buildPlayerRoundPerformanceFacts,
-  type PlayerRoundPerformanceFacts,
-} from "@cs2dak/core";
+import { aggregatePlayerRoundPerformanceFacts, buildPlayerRoundPerformanceFacts, type PlayerRoundPerformanceFacts } from "@cs2dak/core";
 
 import type { TeamComparisonPlayerRow, TeamComparisonSideMatch, TeamComparisonSide, TeamComparisonModel, TeamOverviewModel } from "@cs2dak/presentation";
 

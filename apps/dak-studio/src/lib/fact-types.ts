@@ -1,5 +1,6 @@
-import type { C4RouteFact, CtRotationRoundFact, ExecuteBucket, PlayerPositionRoundFact, SiteEntryFact, TacticalGrenadeOccurrence, TacticalPlantFact, TacticalRoundFact, TeamAwpRoundFact, TeamShapeRoundFact } from "@cs2dak/core";
-import type { DemoPackage, PlayerWeaponHighlightFacts, RRIndicators, RRSignals, Side, TeamKey } from "@cs2dak/contract";
+import type { C4RouteFact, CtRotationRoundFact, ExecuteBucket, PlayerPositionRoundFact, SiteEntryFact, TacticalGrenadeOccurrence, TacticalPlantFact, TacticalRoundFact, TeamAwpRoundFact, TeamShapeRoundFact } from "@cs2dak/tactics";
+import type { DemoPackage, PlayerWeaponHighlightFacts, Side, TeamKey } from "@cs2dak/contract";
+import type { RRIndicators, RRSignals } from "@cs2dak/rating";
 import type { CalloutGrid, LineupGrenadeLike, TriangleBvh, Vec3 } from "@cs2dak/maps";
 import type { PlayerMechanicsProfile, PlayerSeasonInsights, PlayerWeaponStat } from "@cs2dak/analytics";
 import type { TournamentIdentity } from "@cs2dak/core";
@@ -56,7 +57,7 @@ export interface PlayerWeaponFact extends PlayerFactBase {
 
 export interface MechanicsSamplesFact extends PlayerFactBase {
   weapon: string;
-  row: import("@cs2dak/core").PlayerMechanicsFact;
+  row: import("@cs2dak/tactics").PlayerMechanicsFact;
 }
 
 export interface PlayerRrFact extends PlayerFactBase {
@@ -106,7 +107,7 @@ export interface FactsScope {
 
 export interface ProjectedMechanicsRows {
   matchId: string;
-  rows: import("@cs2dak/core").PlayerMechanicsFact[];
+  rows: import("@cs2dak/tactics").PlayerMechanicsFact[];
 }
 
 export interface FactsStore {

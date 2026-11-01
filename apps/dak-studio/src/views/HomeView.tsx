@@ -1,6 +1,7 @@
 import { Pause, Play, RotateCcw, Star } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { OpeningTrailRound, OpeningTrailsModel, TeamKey } from "@cs2dak/contract";
+import type { OpeningTrailRound, OpeningTrailsModel } from "@cs2dak/tactics";
+import type { TeamKey } from "@cs2dak/contract";
 import type { PlayerSeasonProfile } from "@cs2dak/presentation";
 import { buildMistakeFindings, type PlayerSeasonInsights } from "@cs2dak/analytics";
 import { SEASON_STAT_VIEWS, type AnalysisFinding } from "@cs2dak/presentation";

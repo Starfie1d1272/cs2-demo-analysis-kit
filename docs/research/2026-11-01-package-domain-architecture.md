@@ -1,7 +1,7 @@
 # DAK 包领域边界整理方案
 
 日期：2026-11-01。审阅基线：main `48d37cc`。
-状态：第一批已落地。下文保留原审阅基线与提案；当前模块规则见 `docs/module-boundaries.md`，实际落点见文末。
+状态：整体领域重构已落地。下文保留原审阅基线和分批提案；当前规则见 `docs/module-boundaries.md`，最终落点及验收见文末。
 
 ## 结论
 
@@ -161,3 +161,22 @@ flowchart TD
 - 六个消费入口的 browser bundle；独立 replay 的输入依赖图不包含完整 MatchWorkspace 或空间资产。
 
 这些记录证明本轮源码产物的独立消费路径。未运行自动化测试套件，未完成浏览器交互、Windows 或完整 Linux tgz gate，未正式发布。maps 空间资产仍同包安装。
+
+## 整体重构落点与验收（2026-11-01）
+
+在 UI 分离之后，继续完成基础事实、评分、跨场画像、地图资产与战术能力的独立边界：
+
+- core 仅依赖 contract 与 Tournament DTO；ZIP loader 移 demo-io，评分合同/公式接线移 rating，完整分析和原始 Demo cohort 编排移 pipeline。
+- analytics 提取评分信号和跨域投影；cohort 只消费已有行，依赖 rating/Zod；战术聚类和空间/交战分析归 tactics。
+- maps 只发布算法，map-assets 独立发布数据和 Node/browser loader。maps tgz 约 38 KB 压缩 / 118 KB 解压；map-assets 约 3.57 MB / 18.78 MB，数值随包文档小幅变化。
+- format 与原版 rival-rating 为精确 build-only 输入，vendor 同时编译 JS 和完整声明，保留源/声明哈希、许可证和 provenance。外部消费者不安装这两个源码包。
+- 原入口直接删除；迁移对照见根 README、各包 README 与本轮 changeset。
+
+最终验收记录：
+
+- 十三个公共包统一构建、全工作区 TypeScript 检查通过；Studio 与 uploader production build 通过，构建仍有大 chunk 提示。
+- ZIP/Trade、上传 Evidence/pipeline、Studio library persistence 共五个相关测试文件，38 条通过。
+- macOS / Node 26.9.0 下十三个真实 tgz 的仓外安装、完整 strict NodeNext 声明、Node ESM 与实际 API 消费全部通过。实测 DAK 闭包：core = core/contract/tournament；cohort = cohort/rating；react = react/maps/presentation。
+- UI SSR 与 browser bundle 消费通过。地图专项验证覆盖 JSON 公开出口、Node/browser loader、tri API、strict NodeNext，以及卸载 map-assets 后 maps root/calibration 独立加载。
+
+以上是本轮本机验证。未进行浏览器交互或 Windows 验收，未执行完整 Linux tgz gate，未正式发布。

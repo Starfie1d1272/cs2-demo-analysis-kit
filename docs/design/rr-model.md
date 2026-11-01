@@ -157,7 +157,7 @@ official scoring 排除 `save / exit / freeze`（仍可进 review 层）。
 > 手雷归属率 94–98%。进 review/shadow，**未进 RR 评分**（待职业样本校准）。
 > 诊断：`pnpm analyze:spatial-coverage`（看覆盖）/ `analyze:utility-rr-impact`（看 RR 影响）。
 >
-> **tri 仅分析侧加载**（207MB，按需）：production `deriveRRSignals` 不传 tri → 两项 LOS 发 null。
+> **tri 仅分析侧加载**（207MB，按需）：production pipeline 的空间上下文不传 tri → 两项 LOS 发 null。
 >
 > **冻结决定（2026-06-07）**：当前实现保持 shadow，**不再继续打磨**。实测净 ΔRR 极小（见下），
 > 正式进 RR 价值有限；vision-based 重构推迟到权重 ramp 阶段三（§3.6），届时连同 sightlineDenial
@@ -213,31 +213,29 @@ nav 绕路把"奖励投掷量"变成"奖励有效封锁"，方向对但被 isola
 ## 5. 信号 → 评分接线
 
 ```text
-v3 ZIP → deriveRRSignals(pkg)            [core/signals.ts]
-  ├─ buildKillsByBuyDelta / buildKillsByManState        Combat context（缺源发 null）
-  ├─ buildTradedOpeningDeaths                            Trade
-  ├─ buildObjectiveSignals                               Objective
-  ├─ buildUtilitySignals                                 Utility 结果型
-  └─ mapControl / utilitySpatial = null                  空间账户 shadow（待 §3 重建）
-  → RRSignals[]
-  → computeAccountRatingsV2(pkg)         [core/signals.ts]
-      ├─ computeRRSixAccounts            单场 raw
-      ├─ computeCohortAccountsRR         跨选手 z → Combat 残差化 → 先验加权
-      └─ AccountRatingResult[]           → scoreboard.accountBreakdown / accountRR
+v3 ZIP → demo-io.loadDemoPackageFromZip → DemoPackage
+  → core.buildPlayerRoundPerformanceFacts → canonical facts
+  → pipeline.buildRatingSpatialContext → tactics 空间上下文
+  → analytics.deriveRRSignals(pkg, facts, context) → RRSignals[]
+  → rating.computeAccountRatings(signals)
+      ├─ 原版 computeRRSixAccounts：raw 与 context 解释
+      └─ 原版 computeFrozenProBaselineRR：统一职业基线
+  → analytics.buildScoreboard → AnalysisBundle / ViewModel
 ```
 
-工程归属：信号派生在 `core/signals.ts`；几何资产在 `@cs2dak/maps`；schema/公式/权重在 `@rivalhub/rival-rating`；
-产品只消费 `RRSignals` 与 scoreboard，不碰原始事件。
+信号派生位于 `packages/analytics/src/rating-inputs.ts`。评分公式接线位于
+`packages/rating/src/index.ts`，公式和权重继续归原版 `@rivalhub/rival-rating`。
+空间算法在 maps，数据在 map-assets，空间/交战推导在 tactics。pipeline 负责执行顺序，
+Core 只拥有基础事实。cohort 消费已经提取的行，调用同一 rating owner。
 
 ---
 
-## 6. 归一化：当前 vs 未来（1.0 代表谁）
+## 6. 当前归一化：固定职业基准
 
-- **当前 — 赛季相对（cohort z-score）**：1.0 = 被分析这批人的均值。问题：不可移植、单 demo 无法绝对评分。
-  因权重是未校准先验，必须显式 **per-match 锚定**（`computeAccountRatingsV2` 整场归一）。
-- **未来 — 固定职业基准（冻结曲线）★**：1.0 = 职业平均。从大量职业 demo 冻结 percentile/sigmoid 曲线，
-  任意 demo 对同一把尺子量、可移植、单 demo 即可绝对评分；尾部天然饱和。天梯均值落 0.8–0.9 是有意为之
-  （友好化放展示层，不污染模型）。基准加版本标签（`pro_baseline_cs2_2025H2_v1`）。
+单场与跨场 RR 共用 `rrSixAccountProBaselineV0` 和 `computeFrozenProBaselineRR`：
+`1.0 = 职业基线`。cohort 范围影响 PRISM 风格百分位，不改变 RR 标尺。
+旧方案中的按场/按赛季均值归一不作为当前调用入口。基线质量与后续校准需要单独的数据证据，
+本轮包拆分保持公式、权重与 null 语义。
 
 ---
 

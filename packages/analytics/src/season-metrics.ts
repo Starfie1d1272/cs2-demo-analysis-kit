@@ -1,4 +1,4 @@
-import type { SeasonPlayerRow } from "@cs2dak/contract";
+import type { SeasonPlayerRow } from "@cs2dak/cohort";
 import type { LeaderboardMetricKey } from "@cs2dak/presentation";
 import { round } from "@cs2dak/presentation";
 export { round } from "@cs2dak/presentation";

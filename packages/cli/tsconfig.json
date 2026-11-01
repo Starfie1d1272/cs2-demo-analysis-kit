@@ -8,11 +8,39 @@
     "emitDeclarationOnly": true,
     "outDir": "dist"
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
-    { "path": "../core" },
-    { "path": "../cohort" },
-    { "path": "../maps" },
-    { "path": "../presentation" }
+    {
+      "path": "../cohort"
+    },
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../maps"
+    },
+    {
+      "path": "../presentation"
+    },
+    {
+      "path": "../demo-io"
+    },
+    {
+      "path": "../pipeline"
+    },
+    {
+      "path": "../analytics"
+    },
+    {
+      "path": "../rating"
+    },
+    {
+      "path": "../tactics"
+    },
+    {
+      "path": "../map-assets"
+    }
   ]
 }

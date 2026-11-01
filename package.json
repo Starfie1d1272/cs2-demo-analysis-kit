@@ -19,7 +19,7 @@
     "typecheck": "tsc -b --pretty",
     "test": "pnpm test:fast",
     "test:fast": "vitest run --pool=forks --exclude '**/*.integration.test.ts'",
-    "test:integration": "vitest run --pool=forks packages/core/src/critical-flows.integration.test.ts packages/core/src/trade-facts.integration.test.ts",
+    "test:integration": "vitest run --pool=forks packages/demo-io/src/critical-flows.integration.test.ts packages/demo-io/src/trade-facts.integration.test.ts",
     "test:all": "vitest run --pool=forks",
     "build": "pnpm -r --if-present build",
     "build:serial": "pnpm -r --workspace-concurrency=1 --if-present build",
@@ -53,7 +53,6 @@
     "vitest": "^5.0.3"
   },
   "dependencies": {
-    "@rivalhub/rival-rating": "0.3.0",
     "jszip": "^3.10.2",
     "lucide-react": "^1.52.0",
     "react": "^19.3.0",

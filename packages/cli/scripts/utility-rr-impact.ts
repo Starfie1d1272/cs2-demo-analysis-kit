@@ -1,3 +1,5 @@
+import { buildPlayerRoundPerformanceFacts } from "@cs2dak/core";
+import { buildRatingSpatialContext } from "@cs2dak/pipeline";
 /**
  * 道具空间指标对 RR 的影响分析。对比三档配置（per-match 锚定，均值=1.0）：
  *   A 基线（pre-spatial）：strategicIsolationDeaths=null + utility 空间指标=null
@@ -11,15 +13,12 @@
 import { readFile, readdir } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  loadDemoPackageFromZip,
-  deriveRRSignals,
-  loadSpatialAssets,
-  buildOfficialUtilitySpatial,
-} from "@cs2dak/core";
-import { getMapTri } from "@cs2dak/maps/tri-assets";
-import { computeCohortAccountsRR, rrSixAccountWeightsV1 } from "@rivalhub/rival-rating";
-import type { RRSignals, RRSixAccountWeights } from "@rivalhub/rival-rating";
+import { loadDemoPackageFromZip } from "@cs2dak/demo-io";
+import { deriveRRSignals } from "@cs2dak/analytics";
+import { loadSpatialAssets, buildOfficialUtilitySpatial } from "@cs2dak/tactics";
+import { getMapTri } from "@cs2dak/map-assets/tri-assets";
+import { computeCohortAccountsRR, rrSixAccountWeightsV1 } from "@cs2dak/rating";
+import type { RRSignals, RRSixAccountWeights } from "@cs2dak/rating";
 
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const ZONE_MAPS = new Set(["de_ancient", "de_dust2", "de_inferno", "de_mirage"]);
@@ -60,7 +59,8 @@ async function main() {
       const pkg = await loadDemoPackageFromZip(await readFile(join(dir, file)));
       const mapName = pkg.match?.mapName ?? m;
       const assets = loadSpatialAssets(mapName, getMapTri(mapName));
-      const signals = deriveRRSignals(pkg); // B（含 strategicIsolationDeaths）
+      const facts = buildPlayerRoundPerformanceFacts(pkg);
+      const signals = deriveRRSignals(pkg, facts, buildRatingSpatialContext(pkg)); // B（含 strategicIsolationDeaths）
       const util = buildOfficialUtilitySpatial(pkg, assets);
       const nadesByPlayer = countNades(pkg);
 

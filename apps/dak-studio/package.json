@@ -22,7 +22,11 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "@cs2dak/analytics": "workspace:*",
-    "@cs2dak/pipeline": "workspace:*"
+    "@cs2dak/pipeline": "workspace:*",
+    "@cs2dak/demo-io": "workspace:*",
+    "@cs2dak/tactics": "workspace:*",
+    "@cs2dak/map-assets": "workspace:*",
+    "@cs2dak/rating": "workspace:*"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.1.2",

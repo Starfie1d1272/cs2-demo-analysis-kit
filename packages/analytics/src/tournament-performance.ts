@@ -1,6 +1,4 @@
-import {
-  observedTournamentIdentity, projectTournamentPerformanceMapFacts, type TournamentIdentity,
-} from "@cs2dak/core";
+import { observedTournamentIdentity, projectTournamentPerformanceMapFacts, type TournamentIdentity } from "@cs2dak/core";
 import type { DemoPackage, TeamKey } from "@cs2dak/contract";
 
 import {

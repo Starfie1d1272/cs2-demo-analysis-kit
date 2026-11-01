@@ -41,7 +41,7 @@ const triPath = process.env.AWPY_TRIS_DIR ? join(process.env.AWPY_TRIS_DIR, `${m
 const triBuf = readFileSync(triPath);
 const bvh: TriangleBvh = buildTriangleBvh(parseAwpyTri(triBuf.buffer.slice(triBuf.byteOffset, triBuf.byteOffset + triBuf.byteLength)));
 
-const nav = JSON.parse(readFileSync(join(repoRoot, "packages/maps/map-nav", `${mapName}.nav.json`), "utf8"));
+const nav = JSON.parse(readFileSync(join(repoRoot, "packages/map-assets/map-nav", `${mapName}.nav.json`), "utf8"));
 const cellMap = new Map<string, { x: number; y: number; z: number; n: number }>();
 for (const a of nav.areas as Array<{ corners: Vec3[] }>) {
   const c = a.corners.reduce((s, p) => ({ x: s.x + p.x, y: s.y + p.y, z: s.z + p.z }), { x: 0, y: 0, z: 0 });

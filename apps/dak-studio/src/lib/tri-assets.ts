@@ -1,4 +1,4 @@
-import { jsonParseFailureCause } from "@cs2dak/core";
+import { jsonParseFailureCause } from "@cs2dak/demo-io";
 import { reportDiagnostic } from "./worker-diagnostics";
 import { isValidTriBuffer, triDiagnostic } from "./tri-loading";
 import { installTriBuffer, listInstalledTris } from "./tri";

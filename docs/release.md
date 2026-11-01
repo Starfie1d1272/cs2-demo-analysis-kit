@@ -148,8 +148,10 @@ Studio 里把「更新通道」切到「测试版」后，检查更新会读
 
 仅当 RivalHub / CS2 Insight Agent 需要消费新的包 API 时发。当前 npm 公共包为：
 
-`@cs2dak/cohort`、`@cs2dak/contract`、`@cs2dak/core`、`@cs2dak/maps`、
-`@cs2dak/presentation`、`@cs2dak/react`、`@cs2dak/tournament`。
+`@cs2dak/contract`、`@cs2dak/core`、`@cs2dak/demo-io`、`@cs2dak/rating`、
+`@cs2dak/cohort`、`@cs2dak/tournament`、`@cs2dak/maps`、`@cs2dak/map-assets`、
+`@cs2dak/tactics`、`@cs2dak/analytics`、`@cs2dak/pipeline`、
+`@cs2dak/presentation`、`@cs2dak/react`。
 `@cs2dak/cli` 是私有工作区应用，不发 npm。
 
 正式 production 路径：
@@ -247,21 +249,21 @@ Windows Uploader 推荐入口为 `RivalHub-Demo-Uploader-Setup-X.Y.Z.exe`（完�
 
 ### Maps 编译发布物验证
 
-`@cs2dak/maps` 保留 root、`/callout-grid-node`、`/callout-grid-browser`、`/tri-assets` 及 `/calibration` 五个入口与原有 API。公开导出指向 `dist/*.js` 与 `dist/*.d.ts`；地图 JSON 仍随包放在原根目录，静态 import 与 Node callout loader 不改变资产路径。`build` 清理旧 dist 并强制编译，避免旧声明布局或测试文件混入包。
+`@cs2dak/maps` 发布 root 与 `/calibration` 算法入口。地图数据属于 `@cs2dak/map-assets`，其 root 提供 nav/route/zone，独立子入口提供 callout-grid Node/browser loader 与 tri loader，`/callout-grid/*.json` 提供公开 JSON 资源路径。JS/类型指向 `dist`；原 maps 资产入口已删除，本轮 maps 为 major changeset。
 
-CI 与发布 gate 运行 `node scripts/maps-package-smoke.mjs`（Ubuntu 上的 pnpm/npm 工具链）：build → pack → 临时目录干净安装 → 五入口实际导入/调用 → strict NodeNext 声明检查 → 删除全部空间资产后的新进程 calibration 隔离检查。consumer 无 workspace symlink、TypeScript runtime loader 或 DAK 源路径。JSON ESM 在仓库 Node 24 工具链上验证；browser callout loader 以注入 fetch 验证，不调用外部服务。脚本不 publish、不改版本，并清理其临时 consumer。fresh checkout 冻结安装后，先 `pnpm build:packages`，再 `pnpm typecheck` 或运行测试；`pnpm dev` 自带公共包准备步骤。修改共享源码后重跑 `pnpm build:packages` 更新编译输出。
+CI 与发布 gate 运行 `node scripts/maps-package-smoke.mjs`：构建并打包两包，仓外安装后调用公开 API、验证 JSON 出口和 strict NodeNext 声明，再卸载 map-assets，确认 maps root/calibration 可独立使用。browser loader 通过注入 fetch 验证。脚本清理临时消费者，不执行发布。
 
-本地 artifact gate 已覆盖 #47 的 calibration 窄入口、图池/资产覆盖分离与 Train 标定 revision 2。Feature PR 只提交 maps minor changeset；不执行 version/publish/tag。授权正式发布后仍需从 registry 干净安装新 maps 版本并用 Node 24 重跑 root/calibration/资产/tri probes；真实 browser/Windows qualification 也不能由此脚本替代。#64 其余公共包的 consumer 与 graph 审计仍是后续范围。
+fresh checkout 冻结安装后先 `pnpm build:packages`，再按需进行类型或功能检查；`pnpm dev` 自带公共包准备步骤。正式发布后还需用 registry 版本执行消费验收。
 
 ### 公共发布产物与消费检查
 
-发布前必须执行 `pnpm check:package-boundaries`、`pnpm check:package-consumers` 与现有 maps 专项 smoke。前者约束生产源码和 manifest 的真实 graph；后者 build + 实际 pack 七个公共包，然后对每个包单独建立仓外 npm consumer，以本次 tgz 安装全部传递 DAK 依赖，验证所有 JS 入口的 Node ESM 加载、实际 API 调用及 strict NodeNext 声明（不使用 workspace source aliases，不 skipLibCheck）。每次输出 compressed/unpacked bytes 和文件数量，供资产成本审计使用。
+发布前必须执行 `pnpm check:package-boundaries`、`pnpm check:package-consumers` 与 maps 专项 smoke。边界检查覆盖生产源码和 manifest；consumer gate 构建并实际打包十三个公共包，为每个包单独建立仓外 npm consumer，以本次 tgz 安装其传递依赖，验证全部 JS 入口、实际 API 和 strict NodeNext 完整声明。消费者使用原生 Node，声明检查启用 `skipLibCheck=false`。
 
-所有公共 JS/types 入口指向 dist；React theme.css 保持公开 CSS 入口并按 CSS side effect 发布。测试和 build metadata 不进入 tgz。可单独运行 `node scripts/maps-package-smoke.mjs` 验证地图五入口、资产及 calibration 隔离。正式 npm publish/tag 仍走既有人工发布流程；本地 tgz gate 通过不表示 registry 已更新，也不能关闭等待 registry smoke 的 #47。#64 的 C/D/E 及 browser consumer matrix 不由 A/B gate 自动验收。
+公共 JS/types 指向 dist；React theme.css 按 CSS side effect 发布；map-assets 显式公开 JSON 资源。测试和 build metadata 排除在 tgz 外。UI 消费另外验证 SSR 和浏览器 bundle；安装、声明与浏览器依赖图均检查领域隔离。
 
-上游最新 registry root 仍是 TypeScript，DAK build 在生成产物内编译精确原版依赖（format 3.1.0 / rating 0.3.0），保留 MIT notices 和可追溯哈希；declarations 安装同一精确版本，版本更新必须同步 `scripts/lib/bundled-dependencies.mjs` 的 source hashes/license provenance 并重跑真实 consumer gate。详情见 [artifact audit](research/public-package-artifact-audit.md)。七包 Node/strict TS tgz gate 已通过；此结果证明 DAK 可消费，不声称上游自身 root 已修复或 npm 已正式发布。不得跳过完整闭包 gate。
+format 3.1.0 与 rating 0.3.0 是精确 build-only 输入。DAK 从原版源生成私有 JS 和完整声明，记录源/声明哈希及 MIT 许可证；消费者无需安装上游源码包。更新上游版本时同步 `scripts/lib/bundled-dependencies.mjs` 并重跑完整 consumer gate。历史记录见 [artifact audit](research/public-package-artifact-audit.md)，本轮验证见 [领域重构记录](research/2026-11-01-package-domain-architecture.md)。
 
-全包 tgz consumer gate 当前只在 Linux/Ubuntu 认证，其他平台显式报错；Windows/macOS 独立 npm consumer 与 browser matrix 尚未验收。Windows startup CI 单独执行 dependency graph gate，应用打包/启动/安装检查不能替代 tgz consumer 证据。test-fixtures / __tests__ 也从公共产物排除，并由实际 pack/install 文件检查保护。
+默认全包 gate 保留 Linux/Ubuntu 平台要求。其他平台可显式使用 `node scripts/public-package-smoke.mjs --local-platform`，结果仅适用于输出的本机平台；`--skip-build` 只用于已有最新生产包构建的场景。本轮 macOS / Node 26.9.0 的十三包 tgz、UI SSR/browser bundle 与地图专项通过；Linux、Windows 和浏览器交互验收需分别执行。正式 npm publish/tag 继续遵守本文件发布流程。
 
 ### npm 构建链修复后的受控重试
 

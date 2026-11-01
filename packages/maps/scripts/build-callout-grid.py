@@ -162,7 +162,7 @@ for mp, mp_zips in sorted(maps_zips.items()):
         "cells": cells,
     }
 
-    out_path = f"{ROOT}/packages/maps/callout-grid/{mp}.json"
+    out_path = f"{ROOT}/packages/map-assets/callout-grid/{mp}.json"
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(output, f, separators=(",", ":"), ensure_ascii=False)
@@ -177,4 +177,4 @@ for mp, mp_zips in sorted(maps_zips.items()):
     print(f"    词汇表: {len(vocabulary)} 个 callout", file=sys.stderr)
     print(f"    输出: {out_path} ({os.path.getsize(out_path)/1024:.0f} KB)", file=sys.stderr)
 
-print(f"\n全部输出: {ROOT}/packages/maps/callout-grid/", file=sys.stderr)
+print(f"\n全部输出: {ROOT}/packages/map-assets/callout-grid/", file=sys.stderr)

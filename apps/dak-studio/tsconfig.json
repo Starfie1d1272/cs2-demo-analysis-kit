@@ -12,10 +12,28 @@
   ],
   "references": [
     {
-      "path": "../../packages/core"
+      "path": "../../packages/analytics"
     },
     {
       "path": "../../packages/cohort"
+    },
+    {
+      "path": "../../packages/contract"
+    },
+    {
+      "path": "../../packages/core"
+    },
+    {
+      "path": "../../packages/demo-io"
+    },
+    {
+      "path": "../../packages/map-assets"
+    },
+    {
+      "path": "../../packages/maps"
+    },
+    {
+      "path": "../../packages/pipeline"
     },
     {
       "path": "../../packages/presentation"
@@ -27,10 +45,7 @@
       "path": "../../packages/rivalhub-upload"
     },
     {
-      "path": "../../packages/analytics"
-    },
-    {
-      "path": "../../packages/pipeline"
+      "path": "../../packages/tactics"
     }
   ]
 }

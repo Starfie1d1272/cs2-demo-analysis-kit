@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadDemoPackageFromZip } from "../../core/src/index.ts";
+import { loadDemoPackageFromZip } from "../../demo-io/src/index.ts";
 import { FLAG_ALIVE, type DemoPackage } from "../../contract/src/index.ts";
 import { calloutCn } from "../src/callout-names.js";
 import { siteEntryChokeId } from "../src/site-entry-chokes.js";

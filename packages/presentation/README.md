@@ -38,4 +38,4 @@ const options = {
 
 文件加载、缓存、权限和持久化属于宿主。独立记分板使用窄 `ScoreboardTableRow`，`rr` / `accountRR` 可为 `null`；独立回放使用 `WorkspaceReplay` 与 `MapView`。
 
-发布合同为编译后的 ESM 与 declarations；实际 registry 可用版本以发布记录为准。地图基础坐标变换使用 `@cs2dak/maps/calibration`，空间资产仍随 maps 同包安装。
+发布合同为编译后的 ESM 与 declarations；实际 registry 可用版本以发布记录为准。地图基础坐标变换使用 `@cs2dak/maps/calibration`，空间资产独立位于 map-assets，UI 安装闭包不包含它。

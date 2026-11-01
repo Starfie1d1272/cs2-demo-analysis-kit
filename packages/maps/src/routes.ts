@@ -11,9 +11,9 @@
  *
  * 边界：动线**只引用 callout 名字，不含任何坐标**——区域归属由 v3 replay `place`
  * 列提供，本层不做几何。需要把一个 callout 再切细（如 Palace 分上下）时
- * 才回到 `zones.ts` 的多边形层。本文件只定义结构 + 沿线定位，不算指标（指标在 core）。
+ * 才回到 `zones.ts` 的多边形层。本文件只定义结构 + 沿线定位，不算指标（指标在 tactics）。
  *
- * 数据：每张图一个 `packages/maps/map-routes/<map>.json`，由 `scripts/extract-routes.ts`
+ * 数据：每张图一个 `packages/map-assets/map-routes/<map>.json`，由 `scripts/extract-routes.ts`
  * 从真实 demo 的 T 方开局转移半自动挖出、人工确认。
  */
 

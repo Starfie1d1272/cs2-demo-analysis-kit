@@ -10,11 +10,7 @@
     "rootDir": "src"
   },
   "include": [
-    "src",
-    "map-routes/*.json",
-    "map-nav/*.json",
-    "map-zones/*.json",
-    "callout-grid/*.json"
+    "src"
   ],
   "exclude": [
     "src/**/*.test.ts",
@@ -22,5 +18,6 @@
     "src/**/test-fixtures.ts",
     "src/**/test-fixtures.tsx",
     "src/**/__tests__/**"
-  ]
+  ],
+  "references": []
 }

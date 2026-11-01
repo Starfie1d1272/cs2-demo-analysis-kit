@@ -1,6 +1,6 @@
 import type { DuelFinderRow, EvidenceRef } from "@cs2dak/contract";
 
-import type { TacticalCluster } from "@cs2dak/cohort";
+import type { TacticalCluster } from "@cs2dak/tactics";
 import { duelClassificationLabel } from "@cs2dak/presentation";
 import type {
   EnemyFlashIncident,

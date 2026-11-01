@@ -9,8 +9,8 @@ import type {
   PlayerWeaponFact,
 } from "./fact-types";
 import { getStorage, type RecordStore, type StorageAdapter } from "./storage";
-import type { PlayerMechanicsFact } from "@cs2dak/core";
-import type { CtRotationRoundFact, PlayerPositionRoundFact, TacticalRoundFact, TeamAwpRoundFact, TeamShapeRoundFact } from "@cs2dak/core";
+import type { PlayerMechanicsFact } from "@cs2dak/tactics";
+import type { CtRotationRoundFact, PlayerPositionRoundFact, TacticalRoundFact, TeamAwpRoundFact, TeamShapeRoundFact } from "@cs2dak/tactics";
 
 export const FACTS_NAMESPACE = "facts";
 const FACT_TABLES = [

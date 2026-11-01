@@ -14,22 +14,28 @@
   ],
   "references": [
     {
+      "path": "../cohort"
+    },
+    {
       "path": "../contract"
     },
     {
       "path": "../core"
     },
     {
-      "path": "../cohort"
-    },
-    {
       "path": "../maps"
     },
     {
-      "path": "../tournament"
+      "path": "../presentation"
     },
     {
-      "path": "../presentation"
+      "path": "../rating"
+    },
+    {
+      "path": "../tactics"
+    },
+    {
+      "path": "../tournament"
     }
   ]
 }

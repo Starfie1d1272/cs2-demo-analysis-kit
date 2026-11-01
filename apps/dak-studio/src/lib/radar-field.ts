@@ -9,9 +9,9 @@
  * 缓存 key 不含版本号，版本写进 blob header；读时校验 computeVersion/calibrationVersion
  * 不符即当未命中重算覆盖（无泄漏）。算法/标定变更 → core 的 RADAR_FIELD_VERSION +1 即可。
  */
-import type { RadarField, RadarFieldBase } from "@cs2dak/contract";
-import { RADAR_FIELD_BASES } from "@cs2dak/contract";
-import { RADAR_FIELD_VERSION } from "@cs2dak/core";
+import type { RadarField, RadarFieldBase } from "@cs2dak/tactics";
+import { RADAR_FIELD_BASES } from "@cs2dak/tactics";
+import { RADAR_FIELD_VERSION } from "@cs2dak/tactics";
 import { MAP_CALIBRATION_VERSION } from "@cs2dak/maps/calibration";
 import { radarFieldInWorker } from "./library";
 import { getStorage } from "./storage";

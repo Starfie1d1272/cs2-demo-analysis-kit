@@ -1,17 +1,12 @@
 import { assertWorkspaceSource } from "./workspace-source.js";
-import { type AnalysisBundle, type DemoPackage, type EconomyPoint, type HeatmapPoint, type PlayerScoreboardRow, type TeamKey } from "@cs2dak/contract";
+import { type AnalysisBundle, type PlayerScoreboardRow } from "./models.js";
+import { type DemoPackage, type EconomyPoint, type HeatmapPoint, type TeamKey } from "@cs2dak/contract";
 import { matchWorkspaceModelSchema, type MatchWorkspaceModel, type WorkspaceKillEvent, type WorkspaceReplayFrame, type WorkspaceReplayLoadout, type WorkspaceReplayRound, type WorkspaceSpatialPoint } from "@cs2dak/presentation";
 import { decodeDelta } from "@cs2dak/contract";
 
 import { groupBy, nameForSteamId, round, normalizeWeapon, isNamedWeapon } from "./workspace-utils.js";
 import { displayWeaponName } from "@cs2dak/presentation";
-import {
-  activePhaseDamages,
-  aggregatePlayerRoundPerformanceFacts,
-  assertPlayerRoundPerformanceFacts,
-  deriveKillTrades,
-  type PlayerRoundPerformanceFacts,
-} from "@cs2dak/core";
+import { activePhaseDamages, aggregatePlayerRoundPerformanceFacts, assertPlayerRoundPerformanceFacts, deriveKillTrades, type PlayerRoundPerformanceFacts } from "@cs2dak/core";
 import { buildMatchBuyQuality } from "./insights.js";
 import { buildDemoViewModel, type DemoViewOptions } from "@cs2dak/presentation";
 

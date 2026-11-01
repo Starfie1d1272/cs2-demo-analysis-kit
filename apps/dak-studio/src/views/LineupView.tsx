@@ -1,13 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  buildLineupClusters,
-  getMapCalibration,
-  worldToRadar,
-  calloutCn,
-  type LineupCluster,
-  type LineupClusterMode,
-  type LineupGrenadeLike,
-} from "@cs2dak/maps";
+import { buildLineupClusters, getMapCalibration, worldToRadar, calloutCn, type LineupCluster, type LineupClusterMode, type LineupGrenadeLike } from "@cs2dak/maps";
 import { displayWeaponName } from "@cs2dak/presentation";
 import { DataTable, STUDIO_TABLE_CLASSES, EmptyState, MetricInfo, EvidenceLink, type DataTableColumn } from "@cs2dak/react";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";

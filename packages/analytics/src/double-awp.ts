@@ -1,4 +1,4 @@
-import { doubleAwpAnalysisSchema, type DoubleAwpAnalysis, type TeamAwpRoundFact } from "@cs2dak/contract";
+import { doubleAwpAnalysisSchema, type DoubleAwpAnalysis, type TeamAwpRoundFact } from "@cs2dak/tactics";
 
 
 export interface DoubleAwpAnalysisOptions {

@@ -12,3 +12,6 @@ export * from "./tournament.js";
 export * from "./tournament-performance.js";
 export * from "./trails.js";
 export * from "./workspace.js";
+export * from "./models.js";
+export * from "./rating-inputs.js";
+export * from "./scoreboard.js";

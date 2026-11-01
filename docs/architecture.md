@@ -10,21 +10,21 @@ Consumers choose an entry based on the data they already have:
 |---|---|---|
 | UI model | `@cs2dak/presentation` types + `@cs2dak/react` components | Display supplied results and emit interaction callbacks |
 | DemoPackage + AnalysisBundle + canonical performance facts | `@cs2dak/analytics.buildMatchWorkspaceFromAnalysis` | Validate supplied facts and project a workspace with precomputed economy results |
-| Raw DemoPackage | `@cs2dak/pipeline.analyzeMatchWorkspace` | Normalize, calculate canonical facts, run Core analysis, then project the UI model |
-| v3 ZIP | `@cs2dak/core.loadDemoPackageFromZip` followed by the appropriate entry above | Load the input data |
+| Raw DemoPackage | `@cs2dak/pipeline.analyzeMatchWorkspace` | Normalize, calculate canonical facts, run pipeline analysis, then project the UI model |
+| v3 ZIP | `@cs2dak/demo-io.loadDemoPackageFromZip` followed by the appropriate entry above | Load the input data |
 | Frozen Tournament facts | `@cs2dak/tournament` | Aggregate across maps using stable entity identities |
 
-`presentation` owns UI schemas, narrow view DTOs, labels and display helpers. Its dependencies are maps and Zod. `react` consumes presentation and maps/calibration, with React peers and lucide-react. Neither package may depend, directly or transitively, on contract, Core, cohort, Tournament, analytics, pipeline, rival-rating, cs2-demo-format or JSZip. Analytics consumes the display contract; display code never invokes analytics.
+`presentation` owns UI schemas, narrow view DTOs, labels and display helpers. Its dependencies are maps and Zod. `react` consumes presentation and maps/calibration, with React peers and lucide-react. Neither package may depend, directly or transitively, on contract, Core, cohort, Tournament, analytics, pipeline, rating, tactics, demo-io, map-assets, rival-rating, cs2-demo-format or JSZip. Analytics consumes the display contract; display code never invokes analytics.
 
 These are the current source boundaries. Registry publication and consumer verification require their own recorded evidence.
 
 ## 数据流与职责
 
 ```text
-.dem → cs2df → v3 ZIP → core loader → DemoPackage
+.dem → cs2df → v3 ZIP → demo-io → DemoPackage
                                        │
                     pipeline.analyzeMatchWorkspace
-                       ├─ core：canonical facts / AnalysisBundle
+                       ├─ core：canonical facts / QA；rating：评分
                        └─ analytics：已有结果 → 工作台模型
 
 已有单场 / 跨场事实 → analytics：洞察、统计、展示投影
@@ -41,13 +41,17 @@ These are the current source boundaries. Registry publication and consumer verif
 |---|---|
 | `cs2-demo-format` / `cs2df` | 上游原始数据合同与 `.dem` 导出 |
 | `python/src/cs2dak` | pywebview 桌面壳、Studio bridge、安装与打包 |
-| `@cs2dak/contract` | DAK 分析数据合同、上游格式 re-export；不承载工作台、排行榜等纯展示合同 |
-| `@cs2dak/core` | 标准化、单场 canonical facts、QA、评分信号与接线、单图 frozen Tournament projection |
-| `@cs2dak/cohort` | 跨场身份归并、RR/PRISM 群体画像及战术聚类 |
+| `@cs2dak/contract` | 原始输入与基础事实合同；原版 format 仅为编译输入 |
+| `@cs2dak/demo-io` | ZIP 加载、流选择和输入诊断 |
+| `@cs2dak/rating` | RR/PRISM DTO 与原版公式接线；消费已提取信号 |
+| `@cs2dak/map-assets` | 静态地图数据与 Node/browser 资产加载 |
+| `@cs2dak/tactics` | 空间、交战、地图职责分析与战术聚类 |
+| `@cs2dak/core` | 标准化、单场 canonical facts、QA、基础统计与单图 frozen Tournament projection |
+| `@cs2dak/cohort` | 已有行的身份归并与 RR/PRISM 群体画像 |
 | `@cs2dak/tournament` | 自有窄 DTO、透明 performance/economy 跨图聚合和聚合安全校验；零 runtime 依赖 |
-| `@cs2dak/maps` | 地图标定、空间几何与静态地图资产；`calibration` 为轻加载入口 |
-| `@cs2dak/analytics` | 单场/跨场领域洞察、经济统计、事实提取与已有分析结果到展示模型的投影；复用 canonical owner |
-| `@cs2dak/pipeline` | 原始 DemoPackage 到完整工作台的执行编排 |
+| `@cs2dak/maps` | 资产无关的地图标定与空间算法 |
+| `@cs2dak/analytics` | 跨域评分信号、领域洞察与已有结果到展示模型的投影；复用 canonical owner |
+| `@cs2dak/pipeline` | 原始 DemoPackage 的单场分析、跨场 cohort 与工作台执行编排 |
 | `@cs2dak/presentation` | 展示 schema、窄 View DTO、标签、格式、报告排版与纯结果投影 |
 | `@cs2dak/react` | 渲染已有展示数据；导航、选取和证据跳转交由宿主回调 |
 | `@cs2dak/rivalhub-upload` | 私有 RivalHub 配对、HTTP client 与 Evidence producer |
@@ -55,7 +59,7 @@ These are the current source boundaries. Registry publication and consumer verif
 
 地图角色组件消费 `PlayerMapRoleProfileView` 等窄展示合同，雷达组件消费 `RadarFieldView`。领域事实仍由原 owner 定义；结构可赋值的领域结果可以直接作为展示输入，展示模块不 import 领域类型。
 
-`@cs2dak/maps/calibration` 隔离坐标变换的模块加载。空间资产仍随 maps 同包安装；入口拆分不代表资产安装体积已减少。
+`@cs2dak/maps` 独立发布算法，map-assets 独立发布 nav/zone/route/grid 等数据与 loader。UI 使用 maps/calibration，安装闭包不含 map-assets。基础事实 core 也不依赖地图包或评分包。
 
 ## 消费方式
 
@@ -137,6 +141,10 @@ Core 对 Tournament 的依赖仅用于 DTO/type。其 canonical projection 仍�
 | RR 六账户 | 包含上下文的贡献 | 单场 / cohort |
 | PRISM | 打法画像 | 跨场 cohort |
 
-公式与基线由 `@rivalhub/rival-rating` 拥有，DAK 负责信号、接线和输出整形。RR 使用 frozen pro baseline（`1.0 = 职业基线`）；PRISM 的群体百分位不改变 RR 标尺。本轮 UI 分层没有迁移 Core 的评分执行。
+公式与基线由 `@rivalhub/rival-rating` 拥有，DAK 负责信号、接线和输出整形。RR 使用 frozen pro baseline（`1.0 = 职业基线`）；PRISM 的群体百分位不改变 RR 标尺。信号提取在 analytics，评分执行在 rating，完整调用链在 pipeline。Core 保持基础事实所有权。
 
 机器依赖规则与发布产物要求见 [模块边界](module-boundaries.md)。
+
+## 编译分发
+
+contract 的 format 上游和 rating 的公式上游仅为精确 devDependencies。构建从固定 registry 源编译私有 JS/完整声明，校验源、声明和许可证哈希；消费者不安装这些源码包。外部 strict NodeNext 消费检查覆盖完整声明闭包，避免格式包的 parser/JSZip 传递进入基础事实消费路径。

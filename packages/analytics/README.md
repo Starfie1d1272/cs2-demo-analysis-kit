@@ -2,7 +2,7 @@
 
 Domain insights and projections over DAK match facts: economy conversion, player and team summaries, mechanics, map roles, tactical findings, and tournament adapters.
 
-The package owns computations that previously ran inside presentation. Inputs explicitly carry Demo packages, canonical facts, or already aggregated rows. Core remains the owner of event attribution and Tournament owns its cross-map merge rules. Output UI models belong to `@cs2dak/presentation`.
+The package derives rating inputs and cross-domain insights from canonical facts. Rating formulas belong to rating; spatial and engagement analysis belongs to tactics. Inputs explicitly carry Demo packages, canonical facts, or already aggregated rows. Core remains the owner of event attribution and Tournament owns its cross-map merge rules. Output UI models belong to `@cs2dak/presentation`.
 
 ```ts
 import { buildMatchBuyQuality } from '@cs2dak/analytics';
@@ -10,7 +10,7 @@ import { buildMatchBuyQuality } from '@cs2dak/analytics';
 const buyQuality = buildMatchBuyQuality(economyRows);
 ```
 
-`buildMatchWorkspaceFromAnalysis(pkg, analysis, performanceFacts, options?)` projects a workspace from an existing Core analysis. Use `@cs2dak/pipeline` when starting from a raw DemoPackage. Consumers that already have UI models install `@cs2dak/presentation` and `@cs2dak/react` directly.
+`buildMatchWorkspaceFromAnalysis(pkg, analysis, performanceFacts, options?)` projects a workspace from an existing analysis bundle. Use `@cs2dak/pipeline` when starting from a raw DemoPackage. Consumers that already have UI models install `@cs2dak/presentation` and `@cs2dak/react` directly.
 
 The root publishes compiled ESM and declarations. No filesystem, network, storage, or product navigation is owned here.
 

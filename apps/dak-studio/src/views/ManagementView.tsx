@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { SeasonCohortBundle } from "@cs2dak/contract";
+import type { SeasonCohortBundle } from "@cs2dak/cohort";
 import { EmptyState } from "@cs2dak/react";
 import { AssetsPanel } from "../components/AssetsPanel";
 import { getSeasonSummary, type IdentityOptions } from "../lib/season";

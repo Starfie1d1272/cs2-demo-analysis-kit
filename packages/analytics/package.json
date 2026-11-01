@@ -22,7 +22,9 @@
     "@cs2dak/maps": "workspace:*",
     "@cs2dak/tournament": "workspace:*",
     "@cs2dak/presentation": "workspace:*",
-    "@rivalhub/rival-rating": "0.3.0"
+    "@cs2dak/rating": "workspace:*",
+    "@cs2dak/tactics": "workspace:*",
+    "zod": "^4.6.5"
   },
   "files": [
     "dist"

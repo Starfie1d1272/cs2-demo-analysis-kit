@@ -1,12 +1,12 @@
 import type { CalloutGrid } from "@cs2dak/maps";
-import { loadCalloutGridBrowser } from "@cs2dak/maps/callout-grid-browser";
-import deAncientUrl from "../../../../packages/maps/callout-grid/de_ancient.json?url";
-import deAnubisUrl from "../../../../packages/maps/callout-grid/de_anubis.json?url";
-import deDust2Url from "../../../../packages/maps/callout-grid/de_dust2.json?url";
-import deInfernoUrl from "../../../../packages/maps/callout-grid/de_inferno.json?url";
-import deMirageUrl from "../../../../packages/maps/callout-grid/de_mirage.json?url";
-import deNukeUrl from "../../../../packages/maps/callout-grid/de_nuke.json?url";
-import deOverpassUrl from "../../../../packages/maps/callout-grid/de_overpass.json?url";
+import { loadCalloutGridBrowser } from "@cs2dak/map-assets/callout-grid-browser";
+import deAncientUrl from "@cs2dak/map-assets/callout-grid/de_ancient.json?url";
+import deAnubisUrl from "@cs2dak/map-assets/callout-grid/de_anubis.json?url";
+import deDust2Url from "@cs2dak/map-assets/callout-grid/de_dust2.json?url";
+import deInfernoUrl from "@cs2dak/map-assets/callout-grid/de_inferno.json?url";
+import deMirageUrl from "@cs2dak/map-assets/callout-grid/de_mirage.json?url";
+import deNukeUrl from "@cs2dak/map-assets/callout-grid/de_nuke.json?url";
+import deOverpassUrl from "@cs2dak/map-assets/callout-grid/de_overpass.json?url";
 
 /** callout grid 各图的 hashed 静态资源 URL（Vite `?url`）。worker 内 fetch 需要同一份。 */
 export const CALLOUT_GRID_URLS: Record<string, string> = {

@@ -1,34 +1,13 @@
-import { analysisBundleSchema, type AnalysisBundle } from "@cs2dak/contract";
-import { normalizeDemoPackage } from "./normalize.js";
-import { buildQaReport } from "./qa.js";
-import { buildPlayerIndicators, buildScoreboard } from "./scoreboard.js";
-import { computeAccountRatingsV2 } from "./signals.js";
-import { buildTimeline, buildEconomy, buildHeatmap } from "./timeline.js";
-import { buildPlayerWeaponHighlights } from "./weapon-highlights.js";
-import {
-  buildPlayerRoundPerformanceFacts,
-  toPlayerRoundFacts,
-  type PlayerRoundPerformanceFacts,
-} from "./performance-facts.js";
-import { CORE_ANALYSIS_VERSION } from "./version.js";
-import { assertPlayerRoundPerformanceFacts } from "./performance-facts.js";
-
-export { loadDemoManifestFromZip, loadDemoPackageFromZip } from "./loader.js";
-export type { DemoManifest, DemoPackageLoadOptions, DemoPackageLoadProfile, OptionalInputDiagnostic } from "./loader.js";
-export { jsonParseFailureCause, type JsonParseFailureCause } from "./json-diagnostics.js";
-export { normalizeDemoPackage } from "./normalize.js";
+export { normalizeDemoPackage, parsePackageJson } from "./normalize.js";
 export { createPlayerResolver, createResolverFromPackage } from "./resolve.js";
 export type { PlayerResolver } from "./resolve.js";
 export { demoSourceAvailability, richKillDiagnostics, type RichKillDiagnostics, type DemoSourceAvailability } from "./qa.js";
-export { deriveRRSignals, computeAccountRatingsV2 } from "./signals.js";
 export { activeDamages, activePhaseDamages, groupBy } from "./utils.js";
-export * from "./spatial/index.js";
-export { deriveRRIndicators } from "./scoreboard.js";
-export { buildPlayerRoundFacts } from "./scoreboard.js";
 export { buildPlayerRoundUtilityFacts, toPlayerRoundUtilityFacts, type PlayerRoundUtilityFact } from "./utility-facts.js";
 export { derivePlayerWeaponHighlights } from "./weapon-highlights.js";
 export {
   aggregatePlayerRoundPerformanceFacts,
+  emptyPlayerPerformanceAggregate,
   deriveKillTrades,
   buildPlayerRoundPerformanceFacts,
   toPlayerRoundFacts,
@@ -49,67 +28,13 @@ export type {
 export { assertPlayerRoundPerformanceFacts } from "./performance-facts.js";
 export { CORE_ANALYSIS_VERSION, CORE_SEMANTIC_PROFILE } from "./version.js";
 export { buildTeamSideWinRates } from "./side-win-rate.js";
-export { buildDuelsSignals, deriveDuels, deriveOpeningDuels } from "./duels.js";
-export { buildMechanicsSignals, counterStrafeThresholdForWeapon, derivePlayerMechanics } from "./mechanics.js";
-export { buildMatchRadarField, aggregateRadarFields, RADAR_FIELD_VERSION } from "./radar-field.js";
-export type { BuildMatchRadarFieldOptions } from "./radar-field.js";
 export type { SideWinRateStats, TeamSideWinRates } from "./side-win-rate.js";
-export type { DuelClassification, DuelHpBucket, DuelRecord, DuelSignals, TtkDistribution } from "./duels.js";
-export type {
-  BurstLengthBuckets,
-  MechanicsMetricSet,
-  MechanicsSignals,
-  MedianSample,
-  PlayerMechanicsFact,
-  PreaimSample,
-  RateSample,
-} from "./mechanics.js";
 
-export function analyzeDemoPackage(input: unknown, suppliedPerformanceFacts?: PlayerRoundPerformanceFacts): AnalysisBundle {
-  const pkg = normalizeDemoPackage(input);
-  const performanceFacts = suppliedPerformanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
-  if (suppliedPerformanceFacts) assertPlayerRoundPerformanceFacts(pkg, performanceFacts);
-  const qa = buildQaReport(pkg);
-  const playerRoundFacts = toPlayerRoundFacts(performanceFacts);
-  const playerIndicators = buildPlayerIndicators(pkg, performanceFacts);
-  const accountRatings = computeAccountRatingsV2(pkg, performanceFacts);
-  const scoreboard = buildScoreboard(pkg, playerIndicators, accountRatings, performanceFacts);
-  const playerWeaponHighlights = buildPlayerWeaponHighlights(pkg, performanceFacts);
-  const timeline = buildTimeline(pkg);
-  const economy = buildEconomy(pkg);
-  const heatmap = buildHeatmap(pkg);
-
-  return analysisBundleSchema.parse({
-    version: "cs2-demo-analysis-kit/1.0",
-    sourceSchemaVersion: pkg.manifest.schemaVersion,
-    provenance: {
-      analysisVersion: CORE_ANALYSIS_VERSION,
-      sourceSchemaVersion: pkg.manifest.schemaVersion,
-      sourceDemoHash: pkg.manifest.demo?.hash ?? null,
-      exporter: pkg.manifest.exporter,
-      parser: pkg.manifest.parser,
-      ratingVersions: {
-        rr: playerIndicators[0]?.rr.weightsVersion ?? null,
-        valueAccounts: accountRatings[0]?.rr.weightsVersion ?? null
-      }
-    },
-    mapName: pkg.match.mapName,
-    tickrate: pkg.match.tickrate,
-    teams: {
-      teamA: { name: pkg.match.teamA.name ?? "Team A", score: pkg.match.teamA.score },
-      teamB: { name: pkg.match.teamB.name ?? "Team B", score: pkg.match.teamB.score }
-    },
-    scoreboard,
-    playerWeaponHighlights,
-    playerIndicators,
-    playerRoundFacts,
-    timeline,
-    economy,
-    heatmap,
-    qa
-  });
-}
-export * from "./tactics/index.js";
-export * from "./map-intelligence/index.js";
 
 export * from "./tournament-facts.js";
+export { buildQaReport } from "./qa.js";
+export { buildTimeline, buildEconomy, buildHeatmap } from "./timeline.js";
+export { buildPlayerWeaponHighlights } from "./weapon-highlights.js";
+export { round, clamp, getOrInit, normalizeWeapon, killWeaponName } from "./utils.js";
+
+export { fieldAvailability, fieldConfidence } from "./qa.js";
