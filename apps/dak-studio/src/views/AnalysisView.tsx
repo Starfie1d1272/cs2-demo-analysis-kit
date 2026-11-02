@@ -108,7 +108,7 @@ export function AnalysisView({
   };
   const theme =
     page === "patterns"
-      ? "overview"
+      ? null
       : (themes.find((item) => item.pages.includes(page))?.key ?? "overview");
   const selectTheme = (key: AnalysisTheme) =>
     onSelect(
@@ -196,7 +196,7 @@ export function AnalysisView({
         ))}
       </nav>
       <nav className="stu-chip-row" aria-label="主题快捷入口">
-        {shortcuts[theme].map(([target, label]) => (
+        {theme === null ? <span className="stu-chip stu-chip-active" aria-current="page">战术模式与对手侦察</span> : shortcuts[theme].map(([target, label]) => (
           <button
             key={target}
             type="button"

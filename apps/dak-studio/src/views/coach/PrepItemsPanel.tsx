@@ -143,9 +143,9 @@ export function PrepItemEditor({ record, draft, onChange, renderEvidence }: {
   onChange: (draft: PrepItemDraft) => void;
   renderEvidence: (record: PrepItem) => ReactNode;
 }) {
-  return <><h1>备战条目</h1>
-    <label>分组<input className="stu-input" value={draft.group} onChange={(event) => onChange({ ...draft, group: event.target.value })} /></label>
-    <label>备注<input className="stu-input" value={draft.note} onChange={(event) => onChange({ ...draft, note: event.target.value })} /></label>
+  return <><header className="stu-view-header"><h1>备战条目</h1></header>
+    <label className="stu-form-field">分组<input className="stu-form-control" value={draft.group} onChange={(event) => onChange({ ...draft, group: event.target.value })} /></label>
+    <label className="stu-form-field">备注<input className="stu-form-control" value={draft.note} onChange={(event) => onChange({ ...draft, note: event.target.value })} /></label>
     <p>{record.mapName ?? "—"} · R{record.roundNumber} · 来源版本未知 {renderEvidence(record)}</p>
     <details><summary>Markdown 导出</summary><textarea className="stu-input" readOnly value={prepItemsToMarkdown("备战清单", [{ ...record, ...draft }])} /></details>
   </>;
