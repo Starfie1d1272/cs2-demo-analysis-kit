@@ -60,7 +60,7 @@ export interface PlayerSeasonDetails {
 /** 选中选手的逐场洞察：只返回小结果，不把全量 DemoPackage 长期放进 React state。 */
 export function getPlayerSeasonDetails(entries: StudioDemoEntry[], steamIds: string[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<PlayerSeasonDetails> {
   const key = `${keyOf(entries, identity?.version, selectedTeams)}:player:v3:${[...steamIds].sort().join(",")}:order=${orderedMatchIds(entries).join(",")}`;
-  return cachedQuery(detailsCache, key, DETAILS_CACHE_LIMIT, () => assertCurrentFacts(entries), async (generation) => {
+  return cachedQuery(detailsCache, key, DETAILS_CACHE_LIMIT, () => assertCurrentFacts(entries), entries, async (generation) => {
     const persisted = await readPersistedValue<PlayerSeasonDetails>(key, generation);
     if (persisted) return persisted;
     const factsStore = getFactsStore();

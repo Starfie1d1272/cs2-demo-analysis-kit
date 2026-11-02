@@ -1,3 +1,4 @@
+import { withStoredAnalysis } from "../../lib/queries/query-cache";
 import { AnalysisScopeEmpty, useCapabilityBlocked } from "../../components/CapabilityBar";
 import type { AnalysisExportSource } from "../../lib/analysis-export";
 import type { PatternPageState } from "../../lib/pattern-page-state";
@@ -110,7 +111,7 @@ export function PatternsPage({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    Promise.resolve().then(() => { assertCurrentFacts(entries); return getFactsStore().getTacticalRounds({ matchIds: entries.map(matchIdForEntry) }); })
+    withStoredAnalysis(entries, () => { assertCurrentFacts(entries); return getFactsStore().getTacticalRounds({ matchIds: entries.map(matchIdForEntry) }); })
       .then((rows) => {
         if (!cancelled) {
           assertAnalysisGeneration(analysisData.generation);

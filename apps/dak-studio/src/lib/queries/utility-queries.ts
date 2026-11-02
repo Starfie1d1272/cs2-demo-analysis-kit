@@ -5,10 +5,11 @@ import { getDerivedCacheStore } from "../derived-cache";
 import { matchIdForEntry, type StudioDemoEntry } from "../demo-entry";
 
 import type { IdentityOptions } from "../identity";
-import { keyOf, orderedMatchIds, allowedTeamKeysByMatch, missingFactsError } from "./query-scope";
+import { keyOf, orderedMatchIds, missingFactsError } from "./query-scope";
+import { getAnalysisTeamSlots, getAnalysisTeamAssignments } from "./team-scope";
 const SMALL_CACHE_LIMIT = 3;
-import { buildPlayerSeasonInsightsFromFacts, mergeUtilityValueSummaries } from "@cs2dak/analytics";
-import type { PlayerFlashSummariesFactsOptions, UtilityValueFactsOptions } from "../fact-types";
+import { buildPlayerSeasonInsightsFromFacts, mergeUtilityValueSummaries, selectUtilityValueSide } from "@cs2dak/analytics";
+import type { PlayerFlashSummariesFactsOptions } from "../fact-types";
 import type { DerivedPlayerInsight } from "../derived-cache";
 function buildPlayerFlashSummariesFromFacts(
   rows: readonly DerivedPlayerInsight[],
@@ -37,19 +38,6 @@ function buildPlayerFlashSummariesFromFacts(
   });
 }
 
-function buildUtilityValueSummaryFromFacts(
-  facts: UtilityValueSummary[],
-  options: UtilityValueFactsOptions,
-): UtilityValueSummary {
-  const summary = mergeUtilityValueSummaries(facts, {
-    players: options.players,
-    teamRenames: options.teamRenames,
-  });
-  return options.selectedTeams && options.selectedTeams.length > 0
-    ? { ...summary, teams: summary.teams.filter((row) => options.selectedTeams!.includes(row.name)) }
-    : summary;
-}
-
 const flashCache = createAnalysisBucket<PlayerFlashSummary[]>();
 const utilityValueCache = createAnalysisBucket<UtilityValueSummary>();
 /** 道具页多人 Flash Value：单次扫描所有 demo，避免每个选手重复扫全量 events。 */
@@ -59,15 +47,15 @@ export function getPlayerFlashSummaries(
   identity?: IdentityOptions,
   selectedTeams: string[] = [],
 ): Promise<PlayerFlashSummary[]> {
-  const key = `${keyOf(entries, identity?.version, selectedTeams)}:flash:v2:order=${orderedMatchIds(entries).join(",")}:${players.map((p) => `${p.playerKey}=${p.steamIds.join(",")}`).sort().join("|")}`;
-  return cachedQuery(flashCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), async (generation) => {
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:flash:v3:order=${orderedMatchIds(entries).join(",")}:${players.map((p) => `${p.playerKey}=${p.steamIds.join(",")}`).sort().join("|")}`;
+  return cachedQuery(flashCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), entries, async (generation) => {
     const persisted = await readPersistedValue<PlayerFlashSummary[]>(key, generation);
     if (persisted) return persisted;
     const matchIds = entries.map(matchIdForEntry);
     const derived = getDerivedCacheStore();
     const factRows = await derived.getPlayerInsights({ matchIds });
     if (entries.length === 0 || factRows.length > 0) {
-      const summaries = buildPlayerFlashSummariesFromFacts(factRows, { matchIds: orderedMatchIds(entries), players }, allowedTeamKeysByMatch(entries, selectedTeams, identity?.teamRenames));
+      const summaries = buildPlayerFlashSummariesFromFacts(factRows, { matchIds: orderedMatchIds(entries), players }, await getAnalysisTeamSlots(entries, identity, selectedTeams));
       await writePersistedValue(key, summaries, generation);
       return summaries;
     }
@@ -82,20 +70,32 @@ export function getUtilityValueSummary(
   selectedTeams: string[] = [],
 ): Promise<UtilityValueSummary> {
   const playerKey = players.map((p) => `${p.playerKey}=${p.steamIds.join(",")}`).sort().join("|");
-  const key = `${keyOf(entries, identity?.version, selectedTeams)}:utility-value:v2:${playerKey}`;
-  return cachedQuery(utilityValueCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), async (generation) => {
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:utility-value:v5:${playerKey}`;
+  return cachedQuery(utilityValueCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), entries, async (generation) => {
     const persisted = await readPersistedValue<UtilityValueSummary>(key, generation);
     if (persisted) return persisted;
     const matchIds = entries.map(matchIdForEntry);
     const derived = getDerivedCacheStore();
-    const facts = await derived.getUtilityValue({ matchIds });
-    if (facts.length >= entries.length) {
-      const summary = buildUtilityValueSummaryFromFacts(facts, {
-        matchIds,
-        players,
-        teamRenames: identity?.teamRenames,
-        selectedTeams
+    const [rows, comparisons, assignment] = await Promise.all([
+      derived.getUtilityValueRows({ matchIds }), derived.getTeamComparison({ matchIds }),
+      getAnalysisTeamAssignments(entries, identity, selectedTeams),
+    ]);
+    if (rows.length >= entries.length) {
+      const byMatch = new Map(comparisons.map(row => [row.matchId, row]));
+      const selected = new Set(assignment.selectedKeys);
+      const facts = rows.flatMap(({ matchId, row }) => {
+        const comparison = byMatch.get(matchId);
+        if (!comparison) throw missingFactsError("道具分组");
+        return (["teamA", "teamB"] as const).flatMap(slot => {
+          const groupKey = assignment.teamIdentityMap[`${matchId}:${slot}`];
+          if (!groupKey) throw missingFactsError("道具分组");
+          if (selectedTeams.length && !selected.has(groupKey)) return [];
+          const group = assignment.groups.find(item => item.key === groupKey);
+          if (!group) throw missingFactsError("道具分组");
+          return [selectUtilityValueSide(row, comparison.players.filter(player => player.teamKey === slot).map(player => player.steamId64), groupKey, group.label, comparison.rounds.length)];
+        });
       });
+      const summary = mergeUtilityValueSummaries(facts, { players, teamIdentity: "id" });
       await writePersistedValue(key, summary, generation);
       return summary;
     }

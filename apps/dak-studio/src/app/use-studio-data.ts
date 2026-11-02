@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { listDemoEntries } from "../lib/library";
+import { invalidateLibrarySourceCaches, listDemoEntries } from "../lib/library";
 import type { StudioDemoEntry } from "../lib/demo-entry";
 import { listSeriesRecords, pruneOrphanSeries, type StudioSeriesRecord } from "../lib/series";
 import { listEventRecords, type StudioEventRecord } from "../lib/events";
 import { loadIdentityState } from "../lib/identity-commands";
 import type { IdentityStoreState } from "../lib/identity";
-import { ensureAnalysisDataReady } from "../lib/queries/query-cache";
+import { ensureAnalysisDataReady, getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation } from "../lib/queries/query-cache";
 export type DirectoryLoadStatus = "loading" | "ready" | "error";
 
-export function useStudioData({ onError }: { onError: (message: string) => void }) {
+export function useStudioData({ onError, importing }: { onError: (message: string) => void; importing: boolean }) {
   const [entries, setEntries] = useState<StudioDemoEntry[]>([]);
   const [entriesReady, setEntriesReady] = useState(false);
   const [entriesStatus, setEntriesStatus] = useState<DirectoryLoadStatus>("loading");
@@ -21,6 +21,7 @@ export function useStudioData({ onError }: { onError: (message: string) => void 
   const [identityReady, setIdentityReady] = useState(false);
   const [identityState, setIdentityState] = useState<IdentityStoreState>({ version: 0, mappings: [], teamRenames: {} });
   const mounted = useRef(false);
+  const directoryRefreshPending = useRef(false);
   const versions = useRef({ entries: 0, events: 0, identity: 0 });
   const refreshEntries = useCallback(async () => {
     const id = ++versions.current.entries;
@@ -73,5 +74,30 @@ export function useStudioData({ onError }: { onError: (message: string) => void 
     void refreshIdentity().catch(err => { if (mounted.current) onError(`读取身份失败：${String(err)}`); });
     return () => { mounted.current = false; versions.current.entries++; versions.current.events++; versions.current.identity++; };
   }, [onError, refreshEntries, refreshEventRecords, refreshIdentity]);
+  useEffect(() => {
+    let generation = getAnalysisDataSnapshot().generation;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const schedule = () => {
+      if (!directoryRefreshPending.current || importing || getAnalysisDataSnapshot().status !== "ready") return;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        directoryRefreshPending.current = false;
+        void refreshEntries().catch(() => {});
+      }, 500);
+    };
+    const unsubscribe = subscribeAnalysisDataInvalidation(() => {
+      const next = getAnalysisDataSnapshot();
+      if (next.generation !== generation) {
+        generation = next.generation;
+        invalidateLibrarySourceCaches();
+        // A read started before this revision must never publish its old rows.
+        versions.current.entries++;
+        directoryRefreshPending.current = true;
+      }
+      schedule();
+    });
+    schedule();
+    return () => { unsubscribe(); clearTimeout(timer); };
+  }, [importing, refreshEntries]);
   return { entries, entriesReady, entriesStatus, entriesError, identityStatus, identityReady, eventsStatus, seriesStatus, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity };
 }

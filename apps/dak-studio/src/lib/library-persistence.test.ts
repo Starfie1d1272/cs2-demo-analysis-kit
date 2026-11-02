@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { StorageAdapter, RecordStore, BlobStore } from "./storage";
+import type { AtomicStorageAdapter } from "./storage/types";
+import type { RecordStore, BlobStore } from "./storage";
 
 const harness = vi.hoisted(() => {
   const records = new Map<string, Map<string, unknown>>();
@@ -13,7 +14,18 @@ const harness = vi.hoisted(() => {
     return blobs.get(namespace)!;
   };
   const state = { onWrite: null as null | ((namespace: string, key: string, value: unknown) => Promise<void> | void) };
-  const adapter: StorageAdapter = {
+  const adapter: AtomicStorageAdapter = {
+    async readRecords(refs) {
+      return refs.map(ref => ({ ...ref, exists: rows(ref.namespace).has(ref.key), ...(rows(ref.namespace).has(ref.key) ? { value: structuredClone(rows(ref.namespace).get(ref.key)) } : {}) }));
+    },
+    async compareAndWriteRecords(expected, writes) {
+      if (expected.some(item => rows(item.namespace).has(item.key) !== item.exists || (item.exists && JSON.stringify(rows(item.namespace).get(item.key)) !== JSON.stringify(item.value)))) return false;
+      for (const write of writes) {
+        if (write.kind === "put") rows(write.namespace).set(write.key, structuredClone(write.value));
+        else rows(write.namespace).delete(write.key);
+      }
+      return true;
+    },
     records(namespace): RecordStore {
       return {
         async get<T>(key: string) { return structuredClone(rows(namespace).get(key)) as T | undefined; },
@@ -61,7 +73,8 @@ import { getFactsStore } from "./facts-store";
 import { DERIVED_MATCH_NAMESPACE } from "./derived-cache";
 
 const file = (marker: number, name = "game.zip") => new File([new Uint8Array([marker])], name);
-const snapshot = () => structuredClone({ records: harness.records, blobs: harness.blobs });
+// Cache invalidation revision is expected to advance even after a rolled-back write.
+const snapshot = () => structuredClone({ records: new Map([...harness.records].filter(([namespace]) => namespace !== "analysis-state")), blobs: harness.blobs });
 function failOnce(namespace: string, key?: string) {
   harness.state.onWrite = async (ns, rowKey) => {
     if (ns !== namespace || (key && key !== rowKey)) return;

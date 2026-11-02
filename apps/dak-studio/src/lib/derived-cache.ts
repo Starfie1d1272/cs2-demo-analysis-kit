@@ -66,6 +66,7 @@ export interface DerivedCacheStore {
   getDuels(scope?: FactsScope): Promise<DuelInsightsFacts[]>;
   getOpeningTrails(scope?: FactsScope): Promise<DerivedOpeningTrail[]>;
   getUtilityValue(scope?: FactsScope): Promise<UtilityValueSummary[]>;
+  getUtilityValueRows(scope?: FactsScope): Promise<DerivedUtilityValue[]>;
   getUtilityValueMatchIds(scope?: FactsScope): Promise<string[]>;
   deleteMatch(matchId: string): Promise<void>;
 }
@@ -92,6 +93,7 @@ export function createDerivedCacheStore(adapter: StorageAdapter, namespace = DER
     async getTeamComparison(scope) { return (await stores.team_comparison.getAll<DerivedTeamComparison>()).filter((row) => inScope(row, scope)).sort((a, b) => a.matchId.localeCompare(b.matchId)).map((row) => row.row); },
     async getDuels(scope) { return (await stores.duels.getAll<DerivedDuel>()).filter((row) => inScope(row, scope)).sort((a, b) => a.matchId.localeCompare(b.matchId)).map((row) => row.row); },
     async getOpeningTrails(scope) { return (await stores.opening_trails.getAll<DerivedOpeningTrail>()).filter((row) => inScope(row, scope)).sort((a, b) => a.matchId.localeCompare(b.matchId) || a.playerKey.localeCompare(b.playerKey)); },
+    async getUtilityValueRows(scope) { return (await stores.utility_value.getAll<DerivedUtilityValue>()).filter(row => inScope(row, scope)).sort((a, b) => a.matchId.localeCompare(b.matchId)); },
     async getUtilityValue(scope) { return (await stores.utility_value.getAll<DerivedUtilityValue>()).filter((row) => inScope(row, scope)).sort((a, b) => a.matchId.localeCompare(b.matchId)).map((row) => row.row); },
     async getUtilityValueMatchIds(scope) { return [...new Set((await stores.utility_value.getAll<DerivedUtilityValue>()).filter((row) => inScope(row, scope)).map((row) => row.matchId))].sort(); },
     async deleteMatch(matchId) { await settleWrites([...Object.values(stores), ...legacyStores].map((store) => deleteMatchRows(store, matchId))); },

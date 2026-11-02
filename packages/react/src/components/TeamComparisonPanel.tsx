@@ -18,8 +18,8 @@ export function TeamComparisonPanel({
   if (model.availableTeams.length < 2) {
     return <div className="dak-empty">至少需要两个队伍的比赛才能生成对比。</div>;
   }
-  const selectedA = model.teams[0]?.teamName ?? "";
-  const selectedB = model.teams[1]?.teamName ?? "";
+  const selectedA = model.teams[0]?.teamKey ?? model.teams[0]?.teamName ?? "";
+  const selectedB = model.teams[1]?.teamKey ?? model.teams[1]?.teamName ?? "";
 
   const picker = (
     <div className="dak-team-picker">
@@ -94,8 +94,8 @@ function TeamSelect({
       aria-label="选择对比队伍"
     >
       {teams.map((team) => (
-        <option key={team.name} value={team.name} disabled={team.name === exclude}>
-          {team.name}（{team.matches} 场）
+        <option key={team.key ?? team.name} value={team.key ?? team.name} disabled={(team.key ?? team.name) === exclude}>
+          {team.label ?? team.name}（{team.matches} 场）
         </option>
       ))}
     </select>

@@ -16,7 +16,7 @@ import { ClipboardList, Crosshair, Film, House, LibraryBig, Radar, Settings } fr
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnalysisScopeEditor } from "./components/AnalysisScopeEditor";
 import { AnalysisContextSummary } from "./components/AnalysisContextSummary";
-import { CapabilityPanel } from "./components/CapabilityBar";
+import { CapabilityPanel, DirectoryRefreshContext } from "./components/CapabilityBar";
 import { BackgroundActivity } from "./components/BackgroundActivity";
 import { type StudioEventRecord } from "./lib/events";
 import { BUILD_INFO, BUILD_LABEL } from "./lib/build-info";
@@ -111,7 +111,7 @@ function NavButton({ item, active, onClick }: { item: typeof MANAGEMENT_NAV; act
 export function App() {
   const activity = useStudioActivity();
   const { importing, setNotice } = activity;
-  const { entries, entriesReady, entriesStatus, entriesError, identityStatus, identityReady, eventsStatus, seriesStatus, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity } = useStudioData({ onError: setNotice });
+  const { entries, entriesReady, entriesStatus, entriesError, identityStatus, identityReady, eventsStatus, seriesStatus, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity } = useStudioData({ onError: setNotice, importing });
   const { importTagsRaw, setImportTagsRaw, importFiles, importDropped, importViaNativeDialog, nativeImportAvailable, loadBuiltinEvent, handleLinkRawDemo, watchRawDemo, handleRemove, handleRemoveMany, handleUpdateTags, handleBulkUpdateTags, handleReexportDemo, handleReexportAll, handleReexportSelected, handleRebuildFacts, handleRebuildStale, handleRebuildSelected } = useLibraryActions({ entries, refreshEntries, refreshEventRecords, activity });
   const { rivalHubConnection, batchSession, dismissBatch, updateLocalLink, refreshRivalHub, handleConnectRivalHub, handleRevokeRivalHub, importOnlineFiles, syncLocalRivalHubDemos, stopRivalHubBatch, pickRivalHubFiles, selectRivalHubBatchTarget } = useRivalHubActions({ refreshEntries, refreshEventRecords, activity });
   const [navigation, setNavigation] = useState(() => createStudioNavigation("initial"));
@@ -234,6 +234,7 @@ export function App() {
     [identityState.version, identityState.mappings, identityState.teamRenames]
   );
   const selectedTeams = useMemo(() => selectedTeam ? [selectedTeam] : [], [selectedTeam]);
+  const selectedTeamGroups = useMemo(() => analysisContext.focus.kind === "team" ? [analysisContext.focus.teamKey ?? analysisContext.focus.teamName] : analysisContext.focus.kind === "player" && (analysisContext.focus.teamKey || analysisContext.focus.teamName) ? [analysisContext.focus.teamKey ?? analysisContext.focus.teamName!] : [], [analysisContext.focus]);
   const focusIdentity = useMemo(() => {
     if (!selectedPlayerKey || !identityReady) return null;
     const mapping = identityState.mappings.find(item => item.playerKey === selectedPlayerKey);
@@ -248,11 +249,11 @@ export function App() {
     if (action === "rebuild-facts") { navigate({ page: "management", tab: "library" }); return; }
     goLibrary();
   }, [goLibrary, navigate]);
-  const selectRadarTeam = useCallback((teamName: string | null) => {
+  const selectRadarTeam = useCallback((teamName: string | null, teamKey?: string) => {
     setAnalysisContext((current) => ({
       ...current,
       goal: teamName ? "team-analysis" : current.goal === "team-analysis" ? "explore" : current.goal,
-      focus: teamName ? { kind: "team", teamName } : current.focus.kind === "team" ? { kind: "aggregate" } : current.focus,
+      focus: teamName ? { kind: "team", teamName, ...(teamKey && { teamKey }) } : current.focus.kind === "team" ? { kind: "aggregate" } : current.focus,
     }));
   }, [setAnalysisContext]);
 
@@ -383,10 +384,10 @@ export function App() {
     navigate({ page: "player", context: { ...context, goal: "player-analysis", focus: { kind: "player", playerKey, label } } });
   }, [navigate]);
 
-  const openTeam = useCallback((teamName: string) => {
+  const openTeam = useCallback((teamName: string, teamKey?: string) => {
     const current = navigationRef.current.active.destination;
     const context = "context" in current ? current.context : createAnalysisContextPreset("explore");
-    navigate({ page: "team", context: { ...context, goal: "team-analysis", focus: { kind: "team", teamName } } });
+    navigate({ page: "team", context: { ...context, goal: "team-analysis", focus: { kind: "team", teamName, ...(teamKey && { teamKey }) } } });
   }, [navigate]);
 
   const startEventAnalysis = useCallback((event: StudioEventRecord) => {
@@ -429,6 +430,7 @@ export function App() {
   )) : null;
 
   return (
+    <DirectoryRefreshContext.Provider value={refreshEntries}>
     <div
       className="stu-app"
       onDragOver={(e) => { e.preventDefault(); }}
@@ -617,6 +619,7 @@ export function App() {
             key={active.id}
             entries={scopedEntries}
             selectedTeam={analysisContext.focus.kind === "team" ? analysisContext.focus.teamName : null}
+            selectedTeamKey={analysisContext.focus.kind === "team" ? analysisContext.focus.teamKey : undefined}
             onSelectTeam={openTeam}
             onOpenMatch={openDemo}
             onOpenCapability={(key) => navigate({ page: key, context: key === "patterns" && analysisContext.focus.kind === "team" ? { ...analysisContext, goal: "own-review", roles: { ...analysisContext.roles, beneficiary: { kind: "team", id: analysisContext.focus.teamName.toLowerCase(), label: analysisContext.focus.teamName } } } : analysisContext })}
@@ -637,7 +640,7 @@ export function App() {
               return studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: { ...previous, player } });
             })} onPageReady={keys => onPageReady(active.id, keys)} />
         ) : analysisContext.focus.kind === "team" ? (
-          <TeamRolesPanel exportSource={analysisExportSource(analysisContext, scopedEntries, summarizeAnalysisContext(analysisContext, entries, eventScopes))} key={active.id} entries={scopedEntries} onCapabilityRepair={openCapabilityRepair} teamName={selectedTeam!} identityOptions={identityOptions}
+          <TeamRolesPanel exportSource={analysisExportSource(analysisContext, scopedEntries, summarizeAnalysisContext(analysisContext, entries, eventScopes))} key={active.id} entries={scopedEntries} onCapabilityRepair={openCapabilityRepair} teamName={selectedTeam!} teamKey={analysisContext.focus.teamKey} identityOptions={identityOptions}
             onOpenEvidence={openEvidence} state={(active.ui as import("./lib/studio-page-state").RolesPageState).team}
             onStateChange={team => setNavigation(current => {
               if (current.active.id !== active.id) return current;
@@ -654,7 +657,13 @@ export function App() {
             entries={scopedEntries}
             identityOptions={identityOptions}
             focusPlayerKey={selectedPlayerKey}
-            onSelectPlayer={(playerKey, label) => setAnalysisContext(current => ({ ...current, focus: { kind: "player", playerKey, label } }))}
+            selectedTeams={selectedTeamGroups}
+            onSelectPlayer={(playerKey, label) => setAnalysisContext(current => {
+              const focus = current.focus;
+              const teamKey = focus.kind === "team" || focus.kind === "player" ? focus.teamKey : undefined;
+              const teamName = focus.kind === "team" || focus.kind === "player" ? focus.teamName : undefined;
+              return { ...current, focus: { kind: "player", playerKey, label, ...(teamKey && { teamKey }), ...(teamName && { teamName }) } };
+            })}
             state={active.ui as import("./lib/spatial-view-state").OpeningPageState}
             onStateChange={update => setNavigation(current => {
               if (current.active.id !== active.id) return current;
@@ -677,7 +686,7 @@ export function App() {
             onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
             entries={eligible}
-            selectedTeams={selectedTeams}
+            selectedTeams={selectedTeamGroups}
             playerSteamIds={selectedPlayerKey ? focusIdentity!.steamIds : null}
             state={active.ui as import("./lib/analysis-theme-state").DuelPageState}
             onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
@@ -695,7 +704,7 @@ export function App() {
             key={active.id}
             allEntries={entries}
             entries={eligible}
-            selectedTeams={selectedTeams}
+            selectedTeams={selectedTeamGroups}
             playerFocus={selectedPlayerKey ? focusIdentity : null}
             onGoLineups={() => navigate({ page: "lineups", context: analysisContext })}
             state={active.ui as import("./lib/studio-page-state").UtilityPageState}
@@ -731,7 +740,7 @@ export function App() {
             onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
             entries={eligible}
-            selectedTeams={selectedTeams}
+            selectedTeams={analysisContext.focus.kind === "team" && analysisContext.focus.teamKey ? [analysisContext.focus.teamKey] : selectedTeams}
             playerFocused={selectedPlayerKey !== null}
             onViewMatches={() => navigate({ page: "matches", entryIds: eligible.map(entry => entry.id) })}
             state={active.ui as import("./lib/analysis-theme-state").EconomyPageState}
@@ -779,7 +788,9 @@ export function App() {
             onPageReady={(keys) => onPageReady(active.id, keys)}
             entries={scopedEntries}
             teamRenames={identityState.teamRenames}
+            identityOptions={identityOptions}
             selectedTeam={selectedTeam}
+            selectedTeamKey={analysisContext.focus.kind === "team" ? analysisContext.focus.teamKey : undefined}
             onOpenMatch={openDemo}
             onSelectTeam={selectRadarTeam}
           />
@@ -795,6 +806,7 @@ export function App() {
             allEntries={entries}
             entries={scopedEntries}
             selectedTeam={selectedTeam}
+            selectedTeamKey={analysisContext.focus.kind === "team" ? analysisContext.focus.teamKey : undefined}
             identityOptions={identityOptions}
             onOpenMatch={openDemo}
             onOpenTeam={openTeam}
@@ -854,5 +866,6 @@ export function App() {
         </>}
       </main>
     </div>
+    </DirectoryRefreshContext.Provider>
   );
 }

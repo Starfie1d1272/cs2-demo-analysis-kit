@@ -1,3 +1,4 @@
+import { withStoredAnalysis } from "../lib/queries/query-cache";
 import { canExportSnapshot, withCapabilityConditions, withAnalysisExportEntries as applyExportEntries } from "../lib/analysis-export";
 import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
 import { buildOpeningAnalysisResult } from "../lib/analysis-export-spatial";
@@ -15,6 +16,7 @@ import { RadarTrails, GRENADE_COLOR, type RadarTrail, type RadarGrenadeOverlay }
 import { entryDate, matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import type { IdentityOptions } from "../lib/identity";
 import { getFactsStore } from "../lib/facts-store";
+import { getAnalysisTeamSlots } from "../lib/queries/team-scope";
 import { getDerivedCacheStore } from "../lib/derived-cache";
 import { EmptyState } from "@cs2dak/react";
 
@@ -34,6 +36,7 @@ export interface TrailsViewProps {
   onOpenMatch?: (entryId: string, target: { matchId: string; roundNumber: number }, rounds: OpeningTrailRound[]) => void;
   identityOptions?: IdentityOptions;
   focusPlayerKey: string | null;
+  selectedTeams?: string[];
   onSelectPlayer: (playerKey: string, label: string) => void;
   state: OpeningPageState;
   onStateChange: Dispatch<SetStateAction<OpeningPageState>>;
@@ -74,7 +77,7 @@ const EFFECT_DURATION_SECONDS: Partial<Record<string, number>> = {
   decoy: 15
 };
 
-export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entries, onGoLibrary, onEditScope, onOpenMatch, identityOptions, onPageReady, focusPlayerKey, onSelectPlayer, state: pageState, onStateChange: setPageState }: TrailsViewProps) {
+export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entries, onGoLibrary, onEditScope, onOpenMatch, identityOptions, onPageReady, focusPlayerKey, selectedTeams = [], onSelectPlayer, state: pageState, onStateChange: setPageState }: TrailsViewProps) {
   // 业务流程：① 选手 → ② 地图（该选手出场的图）→ ③ 最近 N 场（该选手在该图）
   const { recentMatchCount: rangeN, mapName, side } = pageState;
   const hiddenRounds = useMemo(() => new Set(pageState.hiddenRoundKeys), [pageState.hiddenRoundKeys]);
@@ -83,7 +86,7 @@ export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entri
   const setMapName = (update: SetStateAction<string | null>) => setPageState(current => ({ ...current, mapName: typeof update === "function" ? update(current.mapName) : update }));
   const selectedKey = focusPlayerKey;
   const [rosterSnapshot, setRosterSnapshot] = useState<{ key: string; players: PlayerOption[]; roster: Map<string, Set<string>> } | null>(null);
-  const rosterKey = JSON.stringify([entries.map(entry => entry.id), identityOptions?.version]);
+  const rosterKey = JSON.stringify([entries.map(entry => entry.id), identityOptions?.version, selectedTeams]);
   const players = rosterSnapshot?.key === rosterKey ? rosterSnapshot.players : null;
   const rosterByEntry = rosterSnapshot?.key === rosterKey ? rosterSnapshot.roster : null;
   const [modelSnapshot, setModelSnapshot] = useState<{ key: string; generation: number; value: OpeningTrailsModel[] } | null>(null);
@@ -106,7 +109,10 @@ export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entri
       if (typeof found === "string") return { playerKey: found, displayName: name };
       return { playerKey: `steam:${steamId}`, displayName: name };
     };
-    getFactsStore().getPlayerMatchStats({ matchIds: entries.map(matchIdForEntry) })
+    withStoredAnalysis(entries, async () => {
+      const [rows, allowed] = await Promise.all([getFactsStore().getPlayerMatchStats({ matchIds: entries.map(matchIdForEntry) }), getAnalysisTeamSlots(entries, identityOptions, selectedTeams)]);
+      return rows.filter(row => !allowed || allowed.get(row.matchId)?.has(row.teamKey));
+    })
       .then(async (rows) => {
         if (cancelled) return;
         const counts = new Map<string, PlayerOption>();
@@ -183,11 +189,11 @@ export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entri
     if (!selected || !eligibleEntries || !eligibleEntries.length || analysis.status !== "ready") return;
     let cancelled = false;
     setError(null);
-    getDerivedCacheStore().getOpeningTrails({
+    withStoredAnalysis(eligibleEntries, () => getDerivedCacheStore().getOpeningTrails({
       matchIds: eligibleEntries.map(matchIdForEntry),
       playerKeys: [selected.playerKey],
       steamIds: selected.steamIds
-    })
+    }))
       .then((result) => {
         if (cancelled) return;
         assertAnalysisGeneration(analysis.generation);

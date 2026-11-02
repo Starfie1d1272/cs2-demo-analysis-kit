@@ -19,6 +19,8 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import inspect
 import json
 import logging
 import os
@@ -35,7 +37,9 @@ import urllib.request
 import uuid
 import webbrowser
 import zipfile
+from contextlib import contextmanager
 from datetime import datetime, timezone
+from functools import wraps
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -514,6 +518,95 @@ class _UpdateJob:
         }
 
 
+class _GateLease:
+    def __init__(self, release):
+        self._release = release
+
+    def close(self):
+        if self._release is not None:
+            release, self._release = self._release, None
+            release()
+
+
+class _ProcessLibraryGate:
+    """One OS gate per library/process, with explicit local shared leases."""
+
+    def __init__(self):
+        self.condition = threading.Condition()
+        self.readers = 0
+        self.shared_handle = None
+        self.exclusive_owner = None
+        self.exclusive_depth = 0
+        self.exclusive_handle = None
+
+    def acquire(self, open_gate, *, exclusive):
+        thread = threading.get_ident()
+        with self.condition:
+            if self.exclusive_owner == thread:
+                self.exclusive_depth += 1
+                return _GateLease(self._release_exclusive)
+            if exclusive:
+                while self.exclusive_owner is not None or self.readers:
+                    self.condition.wait()
+                self.exclusive_handle = open_gate(exclusive=True)
+                self.exclusive_owner = thread
+                self.exclusive_depth = 1
+                return _GateLease(self._release_exclusive)
+            while self.exclusive_owner is not None:
+                self.condition.wait()
+            if not self.readers:
+                self.shared_handle = open_gate(exclusive=False)
+            self.readers += 1
+            return _GateLease(self._release_shared)
+
+    def _release_shared(self):
+        with self.condition:
+            self.readers -= 1
+            if not self.readers:
+                handle, self.shared_handle = self.shared_handle, None
+                try:
+                    handle.close()
+                finally:
+                    self.condition.notify_all()
+
+    def _release_exclusive(self):
+        with self.condition:
+            self.exclusive_depth -= 1
+            if not self.exclusive_depth:
+                handle, self.exclusive_handle = self.exclusive_handle, None
+                try:
+                    handle.close()
+                finally:
+                    self.exclusive_owner = None
+                    self.condition.notify_all()
+
+
+_library_gate_registry_lock = threading.Lock()
+_library_gate_registry: dict[Path, _ProcessLibraryGate] = {}
+
+
+def _shared_library_mutation(method):
+    @wraps(method)
+    def guarded(self, *args, **kwargs):
+        handle = self._library_gate(exclusive=False)
+        try:
+            return method(self, *args, **kwargs)
+        finally:
+            handle.close()
+    # pywebview uses getfullargspec rather than following __wrapped__.
+    guarded.__signature__ = inspect.signature(method)
+    return guarded
+
+
+def _exclusive_maintenance(method):
+    @wraps(method)
+    def guarded(self, *args, **kwargs):
+        with self._exclusive_library_maintenance():
+            return method(self, *args, **kwargs)
+    guarded.__signature__ = inspect.signature(method)
+    return guarded
+
+
 class StudioApi:
     """Bridge exposed to the Studio frontend as window.pywebview.api.*"""
 
@@ -525,8 +618,11 @@ class StudioApi:
         self._event_download_jobs: dict[str, _UpdateJob] = {}
         self._event_maker_sessions: dict[str, Path] = {}
         self._userdata = _studio_userdata()
-        _migrate_storage_layout(self._userdata)
+        with self._exclusive_library_maintenance():
+            _migrate_storage_layout(self._userdata)
         self._db_lock = threading.Lock()
+        self._demo_commit_handles: dict[str, list] = {}
+        self._demo_commit_guard = threading.Lock()
         self._db: sqlite3.Connection | None = None
 
     def _assets_dir(self) -> Path:
@@ -550,6 +646,92 @@ class StudioApi:
     def _web_overlay_dir(self) -> Path:
         return self._cache_dir() / "studio-web"
 
+    def _library_gate(self, *, exclusive: bool):
+        path = self._userdata.resolve()
+        with _library_gate_registry_lock:
+            state = _library_gate_registry.setdefault(path, _ProcessLibraryGate())
+        return state.acquire(self._open_library_gate, exclusive=exclusive)
+
+    def _open_library_gate(self, *, exclusive: bool):
+        """Coordinate short commits with whole-library maintenance across processes."""
+        self._userdata.mkdir(parents=True, exist_ok=True)
+        handle = (self._userdata / "library-maintenance.lock").open("a+b")
+        try:
+            if sys.platform == "win32":
+                import msvcrt
+                handle.seek(0, os.SEEK_END)
+                if handle.tell() == 0:
+                    handle.write(b"\0")
+                    handle.flush()
+                handle.seek(0)
+                # msvcrt has no shared mode: short commits serialize on Windows.
+                msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+            return handle
+        except BaseException:
+            handle.close()
+            raise
+
+    @contextmanager
+    def _exclusive_library_maintenance(self):
+        handle = self._library_gate(exclusive=True)
+        try:
+            yield
+        finally:
+            handle.close()
+
+    def storage_demo_commit_begin(self, keys: list[str]) -> str:
+        """Hold process-safe locks for one short library commit; OS releases on exit."""
+        ordered = sorted(set(keys))
+        if not ordered or len(ordered) > 32 or any(not isinstance(key, str) or len(key) > 1024 for key in ordered):
+            raise ValueError("invalid library commit keys")
+        lock_dir = self._userdata / "commit-locks"
+        lock_dir.mkdir(parents=True, exist_ok=True)
+        handles = [self._library_gate(exclusive=False)]
+        try:
+            for key in ordered:
+                path = lock_dir / hashlib.sha256(key.encode("utf-8")).hexdigest()
+                handle = path.open("a+b")
+                handles.append(handle)
+                if sys.platform == "win32":
+                    import msvcrt
+                    handle.seek(0, os.SEEK_END)
+                    if handle.tell() == 0:
+                        handle.write(b"\0")
+                        handle.flush()
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            token = uuid.uuid4().hex
+            with self._demo_commit_guard:
+                self._demo_commit_handles[token] = handles
+            return token
+        except BaseException:
+            for handle in reversed(handles):
+                try:
+                    handle.close()
+                except BaseException:
+                    log.exception("Failed to release a library commit lock")
+            raise
+
+    def storage_demo_commit_end(self, token: str) -> None:
+        with self._demo_commit_guard:
+            handles = self._demo_commit_handles.pop(token, None)
+        if handles is None:
+            raise ValueError("unknown library commit token")
+        failure = None
+        for handle in reversed(handles):
+            try:
+                handle.close()
+            except BaseException as error:
+                failure = failure or error
+        if failure is not None:
+            raise failure
+
     # --- native storage -------------------------------------------------
     # 待桌面验证：CI/沙箱没有真实 pywebview 桌面壳。TS 侧已保留 IndexedDB fallback。
     def _conn(self) -> sqlite3.Connection:
@@ -564,6 +746,7 @@ class StudioApi:
             self._db = db
         return self._db
 
+    @_shared_library_mutation
     def storage_records_read(self, refs: list[dict]) -> list[dict]:
         """Read a consistent snapshot of explicitly identified records."""
         with self._db_lock:
@@ -580,6 +763,7 @@ class StudioApi:
                 db.rollback()
                 raise
 
+    @_shared_library_mutation
     def storage_records_compare_and_write(self, expected: list[dict], writes: list[dict]) -> bool:
         """Commit selected record changes only while every observed value still matches."""
         def same_json(left, right) -> bool:
@@ -617,6 +801,7 @@ class StudioApi:
                 db.rollback()
                 raise
 
+    @_shared_library_mutation
     def storage_record_get(self, namespace: str, key: str):
         with self._db_lock:
             row = self._conn().execute(
@@ -625,6 +810,7 @@ class StudioApi:
             ).fetchone()
         return json.loads(row[0]) if row else None
 
+    @_shared_library_mutation
     def storage_record_get_all(self, namespace: str) -> list:
         with self._db_lock:
             rows = self._conn().execute(
@@ -633,6 +819,7 @@ class StudioApi:
             ).fetchall()
         return [json.loads(row[0]) for row in rows]
 
+    @_shared_library_mutation
     def storage_record_entries(self, namespace: str) -> list:
         with self._db_lock:
             rows = self._conn().execute(
@@ -641,6 +828,7 @@ class StudioApi:
             ).fetchall()
         return [[key, json.loads(value)] for key, value in rows]
 
+    @_shared_library_mutation
     def storage_record_keys(self, namespace: str) -> list[str]:
         with self._db_lock:
             rows = self._conn().execute(
@@ -649,6 +837,7 @@ class StudioApi:
             ).fetchall()
         return [row[0] for row in rows]
 
+    @_shared_library_mutation
     def storage_record_put(self, namespace: str, key: str, value) -> None:
         data = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
         with self._db_lock:
@@ -659,11 +848,13 @@ class StudioApi:
             )
             self._conn().commit()
 
+    @_shared_library_mutation
     def storage_record_delete(self, namespace: str, key: str) -> None:
         with self._db_lock:
             self._conn().execute("delete from records where namespace=? and key=?", (namespace, key))
             self._conn().commit()
 
+    @_shared_library_mutation
     def storage_record_delete_prefix(self, namespace: str, prefix: str) -> None:
         with self._db_lock:
             self._conn().execute(
@@ -732,26 +923,31 @@ class StudioApi:
         suffix = ".zip" if namespace == "demos" else ".bin"
         return self._blob_dir(namespace) / f"{name}{suffix}"
 
+    @_shared_library_mutation
     def storage_blob_get(self, namespace: str, key: str) -> str | None:
         path = self._blob_path(namespace, key)
         if not path.exists():
             return None
         return base64.b64encode(path.read_bytes()).decode("ascii")
 
+    @_shared_library_mutation
     def storage_blob_put(self, namespace: str, key: str, dataBase64: str) -> None:  # noqa: N803 - JS bridge name
         self._blob_path(namespace, key).write_bytes(base64.b64decode(dataBase64))
 
+    @_shared_library_mutation
     def storage_blob_delete(self, namespace: str, key: str) -> None:
         try:
             self._blob_path(namespace, key).unlink()
         except FileNotFoundError:
             pass
 
+    @_shared_library_mutation
     def storage_blob_delete_prefix(self, namespace: str, prefix: str) -> None:
         for key in self.storage_blob_keys(namespace):
             if key == prefix or key.startswith(prefix + "\t"):
                 self.storage_blob_delete(namespace, key)
 
+    @_shared_library_mutation
     def storage_blob_keys(self, namespace: str) -> list[str]:
         suffix = ".zip" if namespace == "demos" else ".bin"
         return [
@@ -797,6 +993,7 @@ class StudioApi:
             categories.append({"id": category, "bytes": size, "files": files, "path": str(path)})
         return {"ok": True, "userdata": str(self._userdata), "categories": categories}
 
+    @_exclusive_maintenance
     def storage_backup(self) -> dict:
         """Create a portable backup containing durable records and original ZIPs."""
         backups = self._userdata / "backups"
@@ -844,6 +1041,10 @@ class StudioApi:
         source = Path(path) if path else Path(self._pick_backup() or "")
         if not source.is_file():
             return {"ok": False, "error": "未选择有效备份文件"}
+        return self._storage_restore_locked(source)
+
+    @_exclusive_maintenance
+    def _storage_restore_locked(self, source: Path) -> dict:
         with tempfile.TemporaryDirectory(prefix="dak-restore-") as temp_name:
             temp = Path(temp_name)
             try:
@@ -866,11 +1067,12 @@ class StudioApi:
             if integrity != "ok":
                 return {"ok": False, "error": f"备份数据库损坏：{integrity}"}
             with self._db_lock:
-                if self._db is not None:
-                    self._db.close()
-                    self._db = None
                 self._userdata.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(restored_db, self._userdata / "studio.sqlite")
+                source_db = sqlite3.connect(restored_db)
+                try:
+                    source_db.backup(self._conn())
+                finally:
+                    source_db.close()
                 destination_demos = self._userdata / "demos"
                 shutil.rmtree(destination_demos, ignore_errors=True)
                 source_demos = temp / "demos"
@@ -878,8 +1080,17 @@ class StudioApi:
                     shutil.copytree(source_demos, destination_demos)
                 else:
                     destination_demos.mkdir(parents=True, exist_ok=True)
+                # A restored snapshot may contain a revision seen by a still-open window.
+                conn = self._conn()
+                conn.execute(
+                    "insert into records(namespace,key,value) values(?,?,?) "
+                    "on conflict(namespace,key) do update set value=excluded.value",
+                    ("analysis-state", "revision", json.dumps(uuid.uuid4().hex)),
+                )
+                conn.commit()
         return {"ok": True, "path": str(source), "restartRequired": True}
 
+    @_exclusive_maintenance
     def storage_cleanup(self, category: str) -> dict:
         """Delete only explicitly rebuildable storage categories."""
         targets = {
@@ -903,6 +1114,7 @@ class StudioApi:
                 pass
         return {"ok": True, "category": category, "freedBytes": before, "files": files}
 
+    @_exclusive_maintenance
     def storage_repair(self) -> dict:
         """Repair durable Library consistency and compact SQLite."""
         with self._db_lock:
@@ -1904,7 +2116,9 @@ def _launch_studio(storage: Path) -> None:
     from webview.dom import _dnd_state
     _dnd_state["num_listeners"] = max(_dnd_state["num_listeners"], 1)
 
-    _migrate_storage_layout(storage)
+    api = StudioApi()
+    if api._userdata.resolve() != storage.resolve():
+        raise RuntimeError("资料库路径在启动期间发生变化，请重试")
     assets = _assets_dir_for(storage)
     cache = _cache_dir_for(storage)
     updates = _updates_dir_for(storage)
@@ -1931,7 +2145,6 @@ def _launch_studio(storage: Path) -> None:
         overlay_bundled_events=overlay_bundled_events,
         overlay_web=_valid_web_overlay(overlay_web),
     )
-    api = StudioApi()
     window = webview.create_window(
         title=f"DAK Studio {__version__}",
         url=index_url,

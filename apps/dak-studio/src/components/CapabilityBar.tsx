@@ -2,7 +2,7 @@ import { EmptyState } from "@cs2dak/react";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { StudioDemoEntry } from "../lib/demo-entry";
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "../lib/capability-availability";
-import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, invalidateAnalysisQueries } from "../lib/queries/query-cache";
+import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, invalidateAnalysisQueries, withStoredAnalysis } from "../lib/queries/query-cache";
 import { useSyncExternalStore } from "react";
 
 const LABEL = { ready: "可用", partial: "部分可用", unavailable: "不可用" } as const;
@@ -46,7 +46,10 @@ export function CapabilityBar({ availability, onRepair }: { availability: Capabi
   </div>;
 }
 
+export const DirectoryRefreshContext = createContext<(() => Promise<unknown>) | null>(null);
+
 export function useCapability(entries: StudioDemoEntry[], capability: StudioCapability, playerScope?: { playerKeys: string[]; steamIds: string[] }) {
+  const refreshDirectory = useContext(DirectoryRefreshContext);
   const [result, setResult] = useState<{ key: string; revision: string; generation: number; availability: CapabilityAvailability } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retryVersion, setRetryVersion] = useState(0);
@@ -62,14 +65,14 @@ export function useCapability(entries: StudioDemoEntry[], capability: StudioCapa
     let cancelled = false;
     if (data.status === "ready") {
       setError(null);
-      void loadCapabilityAvailabilityInputs(entries, capability, undefined, undefined, undefined, playerScope)
+      void withStoredAnalysis(entries, () => loadCapabilityAvailabilityInputs(entries, capability, undefined, undefined, undefined, playerScope), true)
         .then(inputs => { if (!cancelled && getAnalysisDataSnapshot().generation === data.generation && getAnalysisDataSnapshot().status === "ready") setResult({ key, revision, generation: data.generation, availability: deriveCapabilityAvailability(entries, capability, inputs) }); })
         .catch(reason => { if (!cancelled) setError(reason instanceof Error ? reason.message : String(reason)); });
     }
     return () => { cancelled = true; };
   }, [entries, capability, data, key, revision, retryVersion]);
   const effectiveError = data.status === "error" ? "分析缓存不可用，请重试刷新。" : error;
-  return { availability: current, eligible, error: effectiveError, retry: () => { if (data.status === "error") void invalidateAnalysisQueries().catch(() => {}); else setRetryVersion(version => version + 1); }, stale: !!current && (data.status !== "ready" || result?.generation !== data.generation || result?.revision !== revision || !!effectiveError) };
+  return { availability: current, eligible, error: effectiveError, retry: () => { if (data.status === "error") void invalidateAnalysisQueries().catch(() => {}); else if (refreshDirectory) void refreshDirectory().then(() => setRetryVersion(version => version + 1)).catch(() => {}); else setRetryVersion(version => version + 1); }, stale: !!current && (data.status !== "ready" || result?.generation !== data.generation || result?.revision !== revision || !!effectiveError) };
 }
 
 const ScopeEditorContext = createContext<(() => void) | undefined>(undefined);

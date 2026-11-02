@@ -1,6 +1,9 @@
+import { withLibraryCommit } from "./library-commit";
+import { getStorage } from "./storage";
 import { withAnalysisQueryInvalidation } from "./queries/query-cache";
 import {
   backfillDemoIdentities,
+  commitKeys,
   rebuildFactsFromZip,
   removeDemoAnalysis,
   removeDemoStorageOnly,
@@ -49,7 +52,11 @@ export async function repairDemoIdentityAndDuplicates(): Promise<LibraryIdentity
     const duplicates = ordered.slice(1);
     const latestSource = ordered.find((entry) => entry.sourceDemPath)?.sourceDemPath ?? survivor.sourceDemPath ?? null;
     const mergedTags = [...new Set(ordered.flatMap((entry) => entry.tags ?? []))];
-    await saveDemoEntry({ ...survivor, tags: mergedTags, sourceDemPath: latestSource });
+    await withLibraryCommit(commitKeys(survivor), async () => {
+      const current = await getStorage().records("demos").get<StudioDemoEntry>(survivor.id);
+      if (!current || current.demoSha256 !== survivor.demoSha256 || matchIdForEntry(current) !== matchIdForEntry(survivor)) throw new Error("比赛资料已变化，请重新修复。");
+      await saveDemoEntry({ ...current, tags: [...new Set([...(current.tags ?? []), ...mergedTags])], sourceDemPath: current.sourceDemPath ?? latestSource });
+    });
     for (const duplicate of duplicates) {
       replacements.set(duplicate.id, survivor.id);
       duplicateEntries.push({ duplicate, survivor });
@@ -62,13 +69,16 @@ export async function repairDemoIdentityAndDuplicates(): Promise<LibraryIdentity
   // Series/Event references are rewritten before any duplicate storage is
   // deleted, so a failed rewrite cannot leave records pointing at missing IDs.
   for (const { duplicate, survivor } of duplicateEntries) {
-    await withAnalysisQueryInvalidation(async () => {
-      await removeDemoStorageOnly(duplicate.id);
-      if (matchIdForEntry(duplicate) !== matchIdForEntry(survivor)) {
-        await removeDemoAnalysis(matchIdForEntry(duplicate));
-      }
+    await withLibraryCommit([...commitKeys(duplicate), ...commitKeys(survivor)], async () => {
+      const records = getStorage().records("demos");
+      const [current, currentSurvivor] = await Promise.all([records.get<StudioDemoEntry>(duplicate.id), records.get<StudioDemoEntry>(survivor.id)]);
+      if (!current || !currentSurvivor || current.demoSha256 !== duplicate.demoSha256 || currentSurvivor.demoSha256 !== survivor.demoSha256 || matchIdForEntry(current) !== matchIdForEntry(duplicate) || matchIdForEntry(currentSurvivor) !== matchIdForEntry(survivor)) throw new Error("比赛资料已变化，请重新修复。");
+      await withAnalysisQueryInvalidation(async () => {
+        await removeDemoStorageOnly(duplicate.id);
+        if (matchIdForEntry(duplicate) !== matchIdForEntry(survivor)) await removeDemoAnalysis(matchIdForEntry(duplicate));
+      });
+      removed += 1;
     });
-    removed += 1;
   }
   // The imported ZIP is still the source of truth after duplicate deletion. Rebuild it
   // last so a duplicate with the same fileName cannot erase the survivor facts.

@@ -1,3 +1,4 @@
+import { withStoredAnalysis } from "../../lib/queries/query-cache";
 import { canExportSnapshot, withCapabilityConditions, unionExportEntries, withAnalysisExportEntries } from "../../lib/analysis-export";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../../lib/queries/query-cache";
 import { CapabilityBar, useCapability } from "../../components/CapabilityBar";
@@ -8,7 +9,8 @@ import { buildTeamRolesAnalysisResult } from "../../lib/analysis-export-roles";
 import type { AnalysisExportSource } from "../../lib/analysis-export";
 import { DoubleAwpAnalysisPanel, EmptyState, TeamMapRoleMatrixPanel } from "@cs2dak/react";
 import type { DoubleAwpAnalysis, TeamMapRoleMatrix } from "@cs2dak/tactics";
-import { getDoubleAwpAnalysis, getTeamMapRoleMatrices, getRoleTeamEntries, type RoleTeamGroup } from "../../lib/queries/spatial-queries";
+import { getDoubleAwpAnalysis, getTeamMapRoleMatrices } from "../../lib/queries/spatial-queries";
+import { getRoleTeamEntries, type RoleTeamGroup } from "../../lib/queries/team-scope";
 import { getFactsStore } from "../../lib/facts-store";
 import { matchIdForEntry, type StudioDemoEntry } from "../../lib/demo-entry";
 import { loadRoleDeclarations } from "../../lib/identity-commands";
@@ -16,9 +18,9 @@ import { type IdentityOptions } from "../../lib/identity";
 import type { OpenEvidence } from "../../lib/evidence-continuation";
 import type { TeamRolesState } from "../../lib/studio-page-state";
 
-export function TeamRolesPanel({ exportSource, onCapabilityRepair, entries, teamName, identityOptions, state, onStateChange, onOpenEvidence, onPageReady }: {
+export function TeamRolesPanel({ exportSource, onCapabilityRepair, entries, teamName, teamKey, identityOptions, state, onStateChange, onOpenEvidence, onPageReady }: {
   exportSource?: AnalysisExportSource | null;
-  onCapabilityRepair: (action: CapabilityRepairAction) => void; entries: StudioDemoEntry[]; teamName: string; identityOptions?: IdentityOptions;
+  onCapabilityRepair: (action: CapabilityRepairAction) => void; entries: StudioDemoEntry[]; teamName: string; teamKey?: string; identityOptions?: IdentityOptions;
   state: TeamRolesState; onStateChange: (state: TeamRolesState) => void;
   onOpenEvidence: OpenEvidence; onPageReady?: (keys: string[]) => void;
 }) {
@@ -29,20 +31,20 @@ export function TeamRolesPanel({ exportSource, onCapabilityRepair, entries, team
     let cancelled = false;
     setScopedRoleEntries(null); setScopeError(null);
     if (analysis.status !== "ready") return () => { cancelled = true; };
-    void getRoleTeamEntries(entries, identityOptions, teamName).then(value => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setScopedRoleEntries(value); } })
+    void getRoleTeamEntries(entries, identityOptions, teamKey ?? teamName).then(value => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setScopedRoleEntries(value); } })
       .catch(error => { if (!cancelled) setScopeError(error instanceof Error ? error.message : String(error)); });
     return () => { cancelled = true; };
-  }, [entries, teamName, identityOptions?.version, analysis]);
+  }, [entries, teamName, teamKey, identityOptions?.version, analysis]);
   const capability = useCapability(scopedRoleEntries ?? [], "map-role");
   const roleEntries = capability.eligible;
   const awpCapability = useCapability(scopedRoleEntries ?? [], "team-awp");
   const awpEntries = awpCapability.eligible;
   const [roleSnapshot, setRoleSnapshot] = useState<{ key: string; generation: number; value: Array<TeamMapRoleMatrix & { teamGroup: RoleTeamGroup }> } | null>(null);
-  const roleKey = JSON.stringify([roleEntries?.map(entry => entry.id), teamName, identityOptions?.version]);
+  const roleKey = JSON.stringify([roleEntries?.map(entry => entry.id), teamName, teamKey, identityOptions?.version]);
   const matrices = roleSnapshot?.key === roleKey ? roleSnapshot.value : null;
   const [matrixError, setMatrixError] = useState<string | null>(null);
   const [awpSnapshot, setAwpSnapshot] = useState<{ key: string; generation: number; value: DoubleAwpAnalysis[] } | null>(null);
-  const awpKey = JSON.stringify([awpEntries?.map(entry => entry.id), teamName, identityOptions?.version]);
+  const awpKey = JSON.stringify([awpEntries?.map(entry => entry.id), teamName, teamKey, identityOptions?.version]);
   const doubleAwp = awpSnapshot?.key === awpKey ? awpSnapshot.value : null;
   const [doubleAwpError, setDoubleAwpError] = useState<string | null>(null);
   const [playerNames, setPlayerNames] = useState<Record<string, string>>({});
@@ -57,7 +59,7 @@ export function TeamRolesPanel({ exportSource, onCapabilityRepair, entries, team
     if (analysis.status !== "ready") return;
     let cancelled = false;
     setMatrixError(null);
-    void loadRoleDeclarations().then(value => getTeamMapRoleMatrices(roleEntries, value.declarations.map(row => row.declaration), identityOptions, [teamName]))
+    void loadRoleDeclarations().then(value => getTeamMapRoleMatrices(roleEntries, value.declarations.map(row => row.declaration), identityOptions, [teamKey ?? teamName]))
       .then(value => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setRoleSnapshot({ key: roleKey, generation: analysis.generation, value }); } })
       .catch(reason => { if (!cancelled) setMatrixError(reason instanceof Error ? reason.message : String(reason)); });
     return () => { cancelled = true; };
@@ -68,7 +70,7 @@ export function TeamRolesPanel({ exportSource, onCapabilityRepair, entries, team
     if (analysis.status !== "ready") return;
     let cancelled = false;
     setDoubleAwpError(null);
-    void getDoubleAwpAnalysis(awpEntries, identityOptions, [teamName])
+    void getDoubleAwpAnalysis(awpEntries, identityOptions, [teamKey ?? teamName])
       .then(value => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setAwpSnapshot({ key: awpKey, generation: analysis.generation, value }); } })
       .catch(reason => { if (!cancelled) setDoubleAwpError((reason instanceof Error ? reason.message : String(reason)) || "读取失败"); });
     return () => { cancelled = true; };
@@ -76,7 +78,7 @@ export function TeamRolesPanel({ exportSource, onCapabilityRepair, entries, team
   useEffect(() => {
     let cancelled = false;
     setPlayerNames({});
-    void getFactsStore().getPlayerMatchStats({ matchIds: entries.map(matchIdForEntry) }).then(rows => {
+    void withStoredAnalysis(entries, () => getFactsStore().getPlayerMatchStats({ matchIds: entries.map(matchIdForEntry) })).then(rows => {
       if (cancelled) return;
       const names: Record<string, string> = {};
       for (const row of rows) {

@@ -27,8 +27,8 @@ export interface AnalysisCorpus {
 export type AnalysisFocus =
   | { kind: "aggregate" }
   | { kind: "self"; playerKey: string; label: string }
-  | { kind: "player"; playerKey: string; label: string }
-  | { kind: "team"; teamName: string }
+  | { kind: "player"; playerKey: string; label: string; teamKey?: string; teamName?: string }
+  | { kind: "team"; teamName: string; teamKey?: string }
   | { kind: "event"; eventId: string; label: string }
   | { kind: "match"; entryId: string; label: string };
 

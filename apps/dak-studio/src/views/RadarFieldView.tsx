@@ -19,9 +19,10 @@ import { RadarFieldCanvas } from "@cs2dak/react";
 import { getMapCalibration, hasLowerLevel } from "@cs2dak/maps/calibration";
 import type { RadarField } from "@cs2dak/tactics";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import type { StudioDemoEntry } from "../lib/demo-entry";
+import { matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
+import { getTeamAnalysisGroups, getAnalysisTeamSlots } from "../lib/queries/team-scope";
+import type { IdentityOptions } from "../lib/identity";
 import { buildScopeRadarFields } from "../lib/radar-field";
-import { displayTeamName, teamRenameGroups } from "../lib/team-identity";
 
 export interface RadarFieldViewProps {
   exportSource?: AnalysisExportSource | null;
@@ -32,11 +33,13 @@ export interface RadarFieldViewProps {
   entries: StudioDemoEntry[];
   teamRenames?: Record<string, string>;
   selectedTeam?: string | null;
+  selectedTeamKey?: string | null;
+  identityOptions?: IdentityOptions;
   onOpenMatch: (entryId: string) => void;
-  onSelectTeam?: (teamName: string | null) => void;
+  onSelectTeam?: (teamName: string | null, teamKey?: string) => void;
 }
 
-export function RadarFieldView({ exportSource, onCapabilityRepair, entries, teamRenames = {}, selectedTeam = null, onSelectTeam, onPageReady, state, onStateChange, onOpenMatch }: RadarFieldViewProps) {
+export function RadarFieldView({ exportSource, onCapabilityRepair, entries, teamRenames = {}, selectedTeam = null, selectedTeamKey = null, identityOptions, onSelectTeam, onPageReady, state, onStateChange, onOpenMatch }: RadarFieldViewProps) {
   const maps = useMemo(() => {
     const set = new Map<string, number>();
     for (const e of entries) if (getMapCalibration(e.meta.mapName)) set.set(e.meta.mapName, (set.get(e.meta.mapName) ?? 0) + 1);
@@ -54,28 +57,29 @@ export function RadarFieldView({ exportSource, onCapabilityRepair, entries, team
   );
   const capability = useCapability(entriesOfMap, "control");
   const eligibleEntries = capability.eligible;
-  const teams = useMemo(
-    () => teamRenameGroups(entriesOfMap.map((e) => ({ teamA: e.meta.teamAName, teamB: e.meta.teamBName })), teamRenames),
-    [entriesOfMap, teamRenames]
-  );
-  const teamMatchCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const entry of entriesOfMap) {
-      const names = new Set([
-        displayTeamName(entry.meta.teamAName, teamRenames),
-        displayTeamName(entry.meta.teamBName, teamRenames),
-      ]);
-      for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
-    }
-    return counts;
-  }, [entriesOfMap, teamRenames]);
-
-  const activeTeam = selectedTeam && teams.some((team) => team.displayName === selectedTeam) ? selectedTeam : null;
-  const invalidTeamForMap = selectedTeam !== null && activeTeam === null;
+  const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
+  const [groupError, setGroupError] = useState<string | null>(null);
+  const [groupSnapshot, setGroupSnapshot] = useState<{ key: string; groups: Awaited<ReturnType<typeof getTeamAnalysisGroups>>; slots: Awaited<ReturnType<typeof getAnalysisTeamSlots>> } | null>(null);
+  const groupKey = JSON.stringify([entriesOfMap.map(entry => entry.id), selectedTeamKey, selectedTeam, identityOptions?.version, analysis.generation]);
+  useEffect(() => {
+    let cancelled = false;
+    if (analysis.status !== "ready") return () => { cancelled = true; };
+    setGroupError(null);
+    void Promise.all([getTeamAnalysisGroups(entriesOfMap, identityOptions), getAnalysisTeamSlots(entriesOfMap, identityOptions, selectedTeamKey ? [selectedTeamKey] : selectedTeam ? [selectedTeam] : [])])
+      .then(([groups, slots]) => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setGroupSnapshot({ key: groupKey, groups, slots }); } })
+      .catch(reason => { if (!cancelled) { setGroupSnapshot(null); setGroupError(reason instanceof Error ? reason.message : String(reason)); } });
+    return () => { cancelled = true; };
+  }, [entriesOfMap, groupKey, identityOptions?.version, analysis]);
+  const groups = groupSnapshot?.key === groupKey ? groupSnapshot.groups : [];
+  const slots = groupSnapshot?.key === groupKey ? groupSnapshot.slots : null;
+  const matches = groups.filter(group => selectedTeamKey ? group.key === selectedTeamKey : selectedTeam != null && group.names.includes(selectedTeam));
+  const activeGroup = matches.length === 1 ? matches[0]! : null;
+  const activeTeam = activeGroup?.label ?? (!selectedTeamKey && matches.length > 1 ? selectedTeam : null);
+  const invalidTeamForMap = selectedTeam !== null && groupSnapshot?.key === groupKey && !activeTeam;
+  const groupsReady = groupSnapshot?.key === groupKey;
 
   const missingSelectedMap = mapName !== null && !maps.some(([name]) => name === mapName);
 
-  const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const requestKey = JSON.stringify([eligibleEntries?.map(entry => entry.id), activeMap, activeTeam, economy, teamRenames]);
   const [snapshot, setSnapshot] = useState<{ key: string; generation: number; field: RadarField | null; baseline: RadarField | null } | null>(null);
   const field = snapshot?.key === requestKey ? snapshot.field : null;
@@ -87,7 +91,7 @@ export function RadarFieldView({ exportSource, onCapabilityRepair, entries, team
   usePageReady(!activeMap || entriesOfMap.length === 0 || invalidTeamForMap || fieldReady, onPageReady);
 
   useEffect(() => {
-    if (!activeMap || !eligibleEntries || eligibleEntries.length === 0 || invalidTeamForMap) {
+    if (!activeMap || !eligibleEntries || eligibleEntries.length === 0 || invalidTeamForMap || !groupsReady) {
       setProgress(null);
       setFieldReady(true);
       return;
@@ -107,7 +111,7 @@ export function RadarFieldView({ exportSource, onCapabilityRepair, entries, team
           matchIds,
           economy,
           team: isTeam
-            ? { name: activeTeam, includeTeam: (raw) => displayTeamName(raw, teamRenames) === activeTeam }
+            ? { name: activeTeam, includeTeam: (_raw, slot, id) => { const entry = eligibleEntries.find(item => item.id === id); return !!entry && !!slots?.get(matchIdForEntry(entry))?.has(slot); } }
             : undefined,
           signal: abort.signal,
           onProgress: (done, total) => {
@@ -127,7 +131,7 @@ export function RadarFieldView({ exportSource, onCapabilityRepair, entries, team
       }
     })();
     return () => abort.abort();
-  }, [activeMap, activeTeam, eligibleEntries, invalidTeamForMap, teamRenames, economy, requestKey, analysis]);
+  }, [activeMap, activeTeam, eligibleEntries, invalidTeamForMap, groupsReady, slots, teamRenames, economy, requestKey, analysis]);
 
   if (missingSelectedMap) {
     return <div className="stu-radar-field">
@@ -188,23 +192,19 @@ export function RadarFieldView({ exportSource, onCapabilityRepair, entries, team
         >
           赛事地图基线 <small>{entriesOfMap.length}</small>
         </button>
-        {teams.map((t) => (
-          <button
-            key={t.displayName}
-            type="button"
-            className={activeTeam === t.displayName ? "stu-chip stu-chip-active" : "stu-chip"}
-            title={t.originals.length > 1 ? `已合并：${t.originals.join(" / ")}` : undefined}
-            onClick={() => onSelectTeam?.(t.displayName)}
-          >
-            {t.displayName} <small>{teamMatchCounts.get(t.displayName) ?? 0}</small>
+        {groups.map((group) => (
+          <button key={group.key} type="button" className={activeGroup?.key === group.key ? "stu-chip stu-chip-active" : "stu-chip"}
+            onClick={() => onSelectTeam?.(group.name, group.key)}>
+            {group.label} <small>{group.matchIds.length}</small>
           </button>
         ))}
       </div>
 
       <details className="stu-card"><summary>查看样本比赛</summary><p className="stu-muted">仅列出当前地图、范围和所选队伍的比赛；覆盖格不提供回合反查。</p>
-        {entriesOfMap.filter(entry => !selectedTeam || [entry.meta.teamAName, entry.meta.teamBName].some(name => displayTeamName(name, teamRenames) === selectedTeam)).map(entry => <button key={entry.id} type="button" className="stu-button-sm" onClick={() => onOpenMatch(entry.id)}>{entry.meta.teamAName} vs {entry.meta.teamBName} · {entry.meta.mapName}</button>)}
+        {entriesOfMap.filter(entry => !selectedTeam || !!slots?.get(matchIdForEntry(entry))?.size).map(entry => <button key={entry.id} type="button" className="stu-button-sm" onClick={() => onOpenMatch(entry.id)}>{entry.meta.teamAName} vs {entry.meta.teamBName} · {entry.meta.mapName}</button>)}
       </details>
 
+      {groupError && <p role="alert">队伍分组读取失败：{groupError}</p>}
       {invalidTeamForMap && (
         <EmptyState
           variant="insufficient"
