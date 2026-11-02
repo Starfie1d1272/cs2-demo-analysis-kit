@@ -1,5 +1,6 @@
+import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 import { useEffect, useMemo, useState } from "react";
-import { DataTable, DoubleAwpAnalysisPanel, EmptyState, STUDIO_TABLE_CLASSES, TeamMapRoleMatrixPanel, type DataTableColumn } from "@cs2dak/react";
+import { DataTable, DoubleAwpAnalysisPanel, EmptyState, TeamMapRoleMatrixPanel, type DataTableColumn } from "@cs2dak/react";
 import type { DoubleAwpAnalysis, RoleDeclaration, TeamMapRoleMatrix } from "@cs2dak/tactics";
 import type { TeamOverviewModel } from "@cs2dak/presentation";
 import { getDoubleAwpAnalysis, getTeamMapRoleMatrices, getTeamOverview, type IdentityOptions } from "../lib/season";
@@ -46,6 +47,8 @@ export function TeamView({
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
 }) {
+  const [mapTable, setMapTable] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "matches", direction: "desc" }, page: 0 });
+  const [rosterTable, setRosterTable] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "rr", direction: "desc" }, page: 0 });
   const teams = useMemo(() => {
     const counts = new Map<string, number>();
     for (const entry of entries) {
@@ -143,8 +146,8 @@ export function TeamView({
             </div>
           </section>
           <div className="stu-home-grid">
-            <section className="stu-card"><h3>地图盘面</h3><DataTable classes={STUDIO_TABLE_CLASSES} rows={overview.maps} rowKey={(row) => row.mapName} initialSortKey="matches" columns={MAP_COLUMNS} /></section>
-            <section className="stu-card"><h3>阵容</h3><DataTable classes={STUDIO_TABLE_CLASSES} rows={overview.roster} rowKey={(row) => row.steamId64} initialSortKey="rr" columns={ROSTER_COLUMNS} /></section>
+            <section className="stu-card"><h3>地图盘面</h3><DataTable classes={STUDIO_TABLE_CLASSES} rows={overview.maps} rowKey={(row) => row.mapName} state={mapTable} onStateChange={setMapTable} columns={MAP_COLUMNS} /></section>
+            <section className="stu-card"><h3>阵容</h3><DataTable classes={STUDIO_TABLE_CLASSES} rows={overview.roster} rowKey={(row) => row.steamId64} state={rosterTable} onStateChange={setRosterTable} columns={ROSTER_COLUMNS} /></section>
           </div>
           <section className="stu-card" id="team:map-roles">
             <div className="stu-card-head"><h3>地图位置职责</h3><div className="stu-chip-row" role="tablist" aria-label="职责矩阵筛选">{matrixMaps.map((map) => <button key={map} type="button" className={matrixMap === map ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => setMatrixMap(map)}>{map.replace("de_", "")}</button>)}{(["t", "ct"] as const).map((side) => <button key={side} type="button" className={matrixSide === side ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => setMatrixSide(side)}>{side.toUpperCase()}</button>)}</div></div>

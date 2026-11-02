@@ -1,8 +1,9 @@
 import { usePageReady } from "../lib/use-page-ready";
+import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 import { useEffect, useMemo, useState } from "react";
 import { formatPercent, type TeamComparisonModel } from "@cs2dak/presentation";
 import { type TournamentInsights } from "@cs2dak/analytics";
-import { DataTable, STUDIO_TABLE_CLASSES, TeamComparisonPanel, type DataTableColumn } from "@cs2dak/react";
+import { DataTable, TeamComparisonPanel, type DataTableColumn } from "@cs2dak/react";
 import { getTeamComparison, getTournamentInsights, type IdentityOptions } from "../lib/season";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { EmptyState, MetricInfo } from "@cs2dak/react";
@@ -54,6 +55,8 @@ export function TournamentDashboardView({
   identityOptions,
   onPageReady
 }: TournamentDashboardViewProps) {
+  const [mapTable, setMapTable] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "matches", direction: "desc" }, page: 0 });
+  const [weaponTable, setWeaponTable] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "kills", direction: "desc" }, page: 0 });
   const [insights, setInsights] = useState<TournamentInsights | null>(null);
   const [teamComparison, setTeamComparison] = useState<TeamComparisonModel | null>(null);
   const [comparisonReady, setComparisonReady] = useState(false);
@@ -173,7 +176,7 @@ export function TournamentDashboardView({
               classes={STUDIO_TABLE_CLASSES}
               rows={insights.maps}
               rowKey={(row) => row.mapName}
-              initialSortKey="matches"
+              state={mapTable} onStateChange={setMapTable}
               columns={MAP_COLUMNS}
             />
           </div>
@@ -183,7 +186,7 @@ export function TournamentDashboardView({
               classes={STUDIO_TABLE_CLASSES}
               rows={insights.weaponKills}
               rowKey={(row) => row.weapon}
-              initialSortKey="kills"
+              state={weaponTable} onStateChange={setWeaponTable}
               columns={WEAPON_COLUMNS}
             />
           </div>

@@ -1,8 +1,9 @@
 import { usePageReady } from "../lib/use-page-ready";
+import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 import { useEffect, useState } from "react";
 import { formatPercent } from "@cs2dak/presentation";
 import { type TournamentInsights } from "@cs2dak/analytics";
-import { DataTable, STUDIO_TABLE_CLASSES, EmptyState, type DataTableColumn, type HeatTone } from "@cs2dak/react";
+import { DataTable, EmptyState, type DataTableColumn, type HeatTone } from "@cs2dak/react";
 import { getTournamentInsights, type IdentityOptions } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";
 
@@ -113,6 +114,9 @@ const TEAM_DETAIL_COLUMNS: DataTableColumn<TeamEconomySummary>[] = [
 ];
 
 function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
+  const [teamTable, setTeamTable] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "rw", direction: "desc" }, page: 0 });
+  const [matrixTable, setMatrixTable] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: null, direction: "desc" }, page: 0 });
+  const [upsetTable, setUpsetTable] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: null, direction: "desc" }, page: 0 });
   const bestPistol = [...insights.teamPistols].sort((a, b) => (b.winRatePercent ?? -1) - (a.winRatePercent ?? -1))[0] ?? null;
   const bestConversion = [...insights.teamPistols].sort((a, b) => (b.conversionPercent ?? -1) - (a.conversionPercent ?? -1))[0] ?? null;
   const bestBreak = [...insights.teamPistols].sort((a, b) => (b.breakRatePercent ?? -1) - (a.breakRatePercent ?? -1))[0] ?? null;
@@ -191,7 +195,7 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
               classes={STUDIO_TABLE_CLASSES}
               rows={insights.teamEconomySummaries}
               rowKey={(t) => t.teamEntityKey}
-              initialSortKey="rw"
+              state={teamTable} onStateChange={setTeamTable}
               columns={TEAM_DETAIL_COLUMNS}
             />
           </div>
@@ -200,6 +204,7 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
         <article className="stu-card stu-econ-card">
           <h3>经济对位胜率</h3>
           <DataTable
+            state={matrixTable} onStateChange={setMatrixTable}
             classes={STUDIO_TABLE_CLASSES}
             rows={insights.economyMatrix}
             rowKey={(r) => `${r.lowEconomy}-${r.highEconomy}`}
@@ -211,6 +216,7 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
         <article className="stu-card stu-econ-card">
           <h3>小枪翻盘排行</h3>
           <DataTable
+            state={upsetTable} onStateChange={setUpsetTable}
             classes={STUDIO_TABLE_CLASSES}
             rows={insights.ecoUpsets}
             rowKey={(r) => r.teamEntityKey}

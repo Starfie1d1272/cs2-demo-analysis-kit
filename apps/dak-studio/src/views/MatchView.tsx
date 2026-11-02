@@ -3,7 +3,10 @@ import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { buildSeriesSummary } from "@cs2dak/analytics";
 import type { MatchWorkspaceModel, SeriesSummary } from "@cs2dak/presentation";
-import { MatchWorkspace, QaReportPanel } from "@cs2dak/react";
+import { QaReportPanel } from "@cs2dak/react";
+import { normalizeReplayViewState } from "@cs2dak/presentation";
+import { MatchReviewWorkspace } from "./match/MatchReviewWorkspace";
+import { createMatchWorkspaceState, type MatchWorkspaceState } from "../lib/match-workspace-state";
 import { entryDate, loadMatchWorkspaceModel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import { EmptyState } from "@cs2dak/react";
@@ -46,7 +49,8 @@ async function loadModel(id: string): Promise<MatchWorkspaceModel> {
 export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceContinuation, onReturnToSource, onPageReady }: MatchViewProps) {
   const activeId = demoId;
   const activeEntry = activeId ? entries.find((entry) => entry.id === activeId) ?? null : null;
-  const [model, setModel] = useState<MatchWorkspaceModel | null>(activeId ? modelCache.get(activeId) ?? null : null);
+  const [loaded, setLoaded] = useState<{ id: string; model: MatchWorkspaceModel; state: MatchWorkspaceState } | null>(null);
+  const model = loaded?.id === activeId ? loaded.model : null;
   const [error, setError] = useState<string | null>(null);
   const [showQa, setShowQa] = useState(false);
   const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
@@ -102,18 +106,25 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     setShowQa(false);
     const cached = modelCache.get(activeId);
     if (cached) {
-      setModel(cached);
+      setLoaded({ id: activeId, model: cached, state: createMatchWorkspaceState(cached) });
       setError(null);
       return;
     }
     let cancelled = false;
-    setModel(null);
+    setLoaded(null);
     setError(null);
     loadModel(activeId)
-      .then((built) => { if (!cancelled) setModel(built); })
+      .then((built) => { if (!cancelled) setLoaded({ id: activeId, model: built, state: createMatchWorkspaceState(built) }); })
       .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); });
     return () => { cancelled = true; };
-  }, [activeId, activeEntry, entries]);
+  }, [activeId, Boolean(activeEntry)]);
+
+  useEffect(() => {
+    if (!deepLink || !loaded || loaded.id !== activeId) return;
+    const round = loaded.model.replay.rounds.find(r => r.roundNumber === deepLink.roundNumber);
+    if (!round || !loaded.state.replay) return;
+    setLoaded(prev => prev && prev.id === activeId ? { ...prev, state: { ...prev.state, view: "replay", replay: normalizeReplayViewState(prev.model.replay, prev.model.map.view, { ...prev.state.replay!, roundNumber: round.roundNumber, tick: deepLink.tick ?? round.freezeEndTick, playing: false }) } } : prev);
+  }, [deepLink, activeId, loaded?.id]);
 
   // 汇总模式：懒构建系列内各图模型 → 跨图记分板
   useEffect(() => {
@@ -147,7 +158,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     ? <EmptyState variant="error" title="加载失败" hint={error} />
     : !model
       ? <div className="stu-loading">读取本地持久化工作台…</div>
-      : <MatchWorkspace model={model} initialTarget={deepLink} />;
+      : <MatchReviewWorkspace model={model} state={loaded!.state} onStateChange={(state) => setLoaded(prev => prev && prev.id === activeId ? { ...prev, state } : prev)} />;
 
   return (
     <div className="stu-view stu-view-flush">

@@ -65,15 +65,7 @@ These are the current source boundaries. Registry publication and consumer verif
 
 已有数据时，组件仅要求对应的展示模型：
 
-```tsx
-import type { MatchWorkspaceModel } from '@cs2dak/presentation';
-import { MatchWorkspace } from '@cs2dak/react';
-import '@cs2dak/react/theme.css';
-
-export function MatchPage({ model }: { model: MatchWorkspaceModel }) {
-  return <MatchWorkspace model={model} />;
-}
-```
+宿主组合公共控件并持有受控表格和回放状态；Studio 的整页比赛工作区属于 App。详见 [React 迁移指南](migrations/react-controlled-state.md)。
 
 已有原始 DemoPackage 时，由需要执行分析的宿主调用：
 

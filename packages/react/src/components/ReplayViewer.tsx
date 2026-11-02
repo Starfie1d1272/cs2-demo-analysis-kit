@@ -1,29 +1,12 @@
+import { normalizeReplayViewState, type ReplayViewState } from "@cs2dak/presentation";
 import type { MapView, WorkspaceReplay, WorkspaceReplayFrame, WorkspaceReplayLoadout, WorkspaceReplayRound } from "@cs2dak/presentation";
 import { displayWeaponName } from "@cs2dak/presentation/weapons";
 import { deriveReplayClock } from "@cs2dak/presentation/replay-clock";
 import { getMapCalibration, worldToRadar, hasLowerLevel, levelAt, type MapLevel } from "@cs2dak/maps/calibration";
 import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { KillFeed } from "./KillFeed";
 import { Panel } from "./Panel";
-
-/** 统计数字 → 2D 回放的跳转目标（v0.2 query-first）。 */
-export interface ReplayTarget {
-  roundNumber: number;
-  /** 落到该 tick 附近的帧；缺省从回合开头播。 */
-  tick?: number;
-  /** 同一目标重复点击也要触发跳转，用自增序列区分。 */
-  seq: number;
-}
-
-/** 2D 回放叠加图层开关（v0.2）。 */
-interface ReplayLayerState {
-  trace: boolean;
-  killLines: boolean;
-  grenades: boolean;
-}
-
-const STANDARD_ROUND_SECONDS = 115;
 
 function replayFrameIndexAtTick(round: WorkspaceReplayRound, tick: number): number {
   const targetEndTick = round.targetEndTick ?? round.officialEndTick;
@@ -34,85 +17,50 @@ function replayFrameIndexAtTick(round: WorkspaceReplayRound, tick: number): numb
   return Math.max(0, Math.min(endIndex, index));
 }
 
-function replayInitialFrameIndex(
-  round: WorkspaceReplayRound,
-  tickrate: number,
-  initialClockSeconds = STANDARD_ROUND_SECONDS,
-): number {
-  const elapsedSeconds = Math.max(0, STANDARD_ROUND_SECONDS - initialClockSeconds);
-  return replayFrameIndexAtTick(round, round.freezeEndTick + elapsedSeconds * Math.max(tickrate, 1));
-}
-
 export interface ReplayViewerProps {
   replay: WorkspaceReplay;
   map: MapView;
-  /** 统计跳回放：定位到某回合（可选定位 tick）。 */
-  target?: ReplayTarget | null;
-  /** 未指定 tick 时的初始比赛时钟；比赛工作台 1:55，教练工作台 1:35。 */
-  initialClockSeconds?: number;
+  state: ReplayViewState | null;
+  onStateChange: (next: ReplayViewState | null) => void;
 }
 
-export function ReplayViewer({ replay, map, target = null, initialClockSeconds = STANDARD_ROUND_SECONDS }: ReplayViewerProps) {
-  const initialRoundNumber = target?.roundNumber ?? replay.rounds[0]?.roundNumber ?? 1;
-  const initialRound = replay.rounds.find((row) => row.roundNumber === initialRoundNumber) ?? replay.rounds[0];
-  const [roundNumber, setRoundNumber] = useState(initialRoundNumber);
-  const [frameIndex, setFrameIndex] = useState(() => {
-    if (!initialRound) return 0;
-    if (target?.tick != null) return replayFrameIndexAtTick(initialRound, target.tick);
-    return replayInitialFrameIndex(initialRound, replay.tickrate ?? 64, initialClockSeconds);
-  });
-  const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(1);
-  const [layers, setLayers] = useState<ReplayLayerState>({ trace: false, killLines: true, grenades: true });
-  // de_nuke / de_vertigo：上下双层雷达。当前层实心、另一层半透明幽灵显示，
-  // 道具效果与 C4 只画在所属层。
+export function ReplayViewer({ replay, map, state, onStateChange }: ReplayViewerProps) {
+  const normalized = normalizeReplayViewState(replay, map, state);
+  const latest = useRef({ state: normalized, onStateChange });
+  latest.current = { state: normalized, onStateChange };
+  useEffect(() => {
+    if (JSON.stringify(state) !== JSON.stringify(normalized)) onStateChange(normalized);
+  }, [state, normalized?.roundNumber, normalized?.tick, normalized?.playing, normalized?.speed, normalized?.layers.trace, normalized?.layers.killLines, normalized?.layers.grenades, normalized?.level, onStateChange]);
   const calibration = getMapCalibration(map.name);
   const dualLevel = !!(calibration && hasLowerLevel(calibration) && map.lowerRadarImageUrl);
-  const [level, setLevel] = useState<MapLevel>("upper");
   const levelOf = (z: number): MapLevel => (calibration ? levelAt(z, calibration) : "upper");
-  const round = replay.rounds.find((row) => row.roundNumber === roundNumber) ?? replay.rounds[0];
-
-  // 有效帧范围：数据实际帧数；targetEndTick 优先延伸到下一回合 freeze/start 边界。
+  const round = replay.rounds.find(row => row.roundNumber === normalized?.roundNumber);
+  const playing = normalized?.playing ?? false;
+  const speed = normalized?.speed ?? 1;
+  const layers = normalized?.layers ?? { trace: false, killLines: true, grenades: true };
+  const level = normalized?.level ?? "upper";
+  const frameIndex = round && normalized ? replayFrameIndexAtTick(round, normalized.tick) : 0;
   const lastDataFrameIndex = round ? Math.max(round.frameCount - 1, 0) : 0;
-  const targetEndFrameIndex = useMemo(() => {
-    if (!round) return lastDataFrameIndex;
-    const targetEndTick = round.targetEndTick ?? round.officialEndTick;
-    if (targetEndTick == null) return lastDataFrameIndex;
-    const computed = Math.round((targetEndTick - round.startTick) / round.tickStep);
-    return Math.max(lastDataFrameIndex, computed);
-  }, [round, lastDataFrameIndex]);
-
-  // 回合切换与统计跳转统一走同一定位规则；显式 tick 优先，否则使用调用方的初始比赛时钟。
+  const targetEndFrameIndex = round ? replayFrameIndexAtTick(round, round.targetEndTick ?? round.officialEndTick ?? (round.startTick + lastDataFrameIndex * round.tickStep)) : 0;
+  const update = (patch: Partial<ReplayViewState>) => {
+    if (normalized) onStateChange(normalizeReplayViewState(replay, map, { ...normalized, ...patch }));
+  };
+  const setRoundNumber = (roundNumber: number) => {
+    const next = replay.rounds.find(row => row.roundNumber === roundNumber);
+    if (next) update({ roundNumber, tick: next.freezeEndTick, playing: false });
+  };
   useEffect(() => {
-    const selectedRound = replay.rounds.find((row) => row.roundNumber === roundNumber);
-    if (!selectedRound) return;
-    setPlaying(false);
-    const explicitTick = target?.roundNumber === roundNumber ? target.tick : undefined;
-    setFrameIndex(explicitTick != null
-      ? replayFrameIndexAtTick(selectedRound, explicitTick)
-      : replayInitialFrameIndex(selectedRound, replay.tickrate ?? 64, initialClockSeconds));
-  }, [roundNumber, target?.seq, replay.rounds, replay.tickrate, initialClockSeconds]);
-
-  useEffect(() => {
-    if (target && replay.rounds.some((row) => row.roundNumber === target.roundNumber)) {
-      setRoundNumber(target.roundNumber);
-    }
-  }, [target?.seq, replay.rounds]);
-
-  useEffect(() => {
-    if (!playing || !round || targetEndFrameIndex <= 0) return undefined;
-    const msPerFrame = Math.max(35, 1000 / ((replay.sampleRate ?? 8) * speed));
+    if (!playing || !round || targetEndFrameIndex <= 0) return;
+    let active = true;
     const timer = window.setInterval(() => {
-      setFrameIndex((value) => {
-        if (value >= targetEndFrameIndex) {
-          setPlaying(false);
-          return targetEndFrameIndex;
-        }
-        return value + 1;
-      });
-    }, msPerFrame);
-    return () => window.clearInterval(timer);
-  }, [playing, replay.sampleRate, targetEndFrameIndex, speed]);
+      const current = latest.current.state;
+      if (!active || !current || !current.playing || current.roundNumber !== round.roundNumber) return;
+      const endTick = round.startTick + targetEndFrameIndex * round.tickStep;
+      const tick = Math.min(endTick, current.tick + round.tickStep);
+      latest.current.onStateChange({ ...current, tick, playing: tick < endTick });
+    }, Math.max(35, 1000 / ((replay.sampleRate ?? 8) * speed)));
+    return () => { active = false; window.clearInterval(timer); };
+  }, [playing, round, replay, targetEndFrameIndex, speed]);
 
   // Stable per-player numbers: teamA → 1-5, teamB → 6-0.
   // Computed from round.players order so the mapping is consistent across frames.
@@ -140,8 +88,7 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
     return list.filter((a) => a.tick >= round.startTick && a.tick <= endTick);
   }, [round, endTick]);
   const seekTick = (tick: number) => {
-    setPlaying(false);
-    setFrameIndex(Math.max(0, Math.min(targetEndFrameIndex, Math.round((tick - round.startTick) / round.tickStep))));
+    update({ tick, playing: false });
   };
   // 帧数据访问用 dataFrameIndex（clamp 到实际录制范围），让超出部分冻结在最后帧
 
@@ -243,10 +190,10 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
           </button>
         </div>
         <div className="dak-playback">
-          <button className="dak-play-button" type="button" onClick={() => setPlaying((value) => !value)} aria-label={playing ? "暂停" : "播放"}>
+          <button className="dak-play-button" type="button" onClick={() => update({ playing: !playing })} aria-label={playing ? "暂停" : "播放"}>
             {playing ? <Pause size={18} /> : <Play size={18} />}
           </button>
-          <button className="dak-icon-button" type="button" onClick={() => setFrameIndex((value) => Math.max(0, value - Math.max(1, Math.round((replay.sampleRate ?? 8) / 2))))} aria-label="后退">
+          <button className="dak-icon-button" type="button" onClick={() => seekTick(currentTick - round.tickStep * Math.max(1, Math.round((replay.sampleRate ?? 8) / 2)))} aria-label="后退">
             <ChevronLeft size={17} />
           </button>
           <div className="dak-scrubber-wrap">
@@ -268,10 +215,10 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
               min={0}
               max={targetEndFrameIndex}
               value={currentFrameIndex}
-              onChange={(event) => setFrameIndex(Number(event.target.value))}
+              onChange={(event) => seekTick(round.startTick + Number(event.target.value) * round.tickStep)}
             />
           </div>
-          <button className="dak-icon-button" type="button" onClick={() => setFrameIndex((value) => Math.min(targetEndFrameIndex, value + Math.max(1, Math.round((replay.sampleRate ?? 8) / 2))))} aria-label="前进">
+          <button className="dak-icon-button" type="button" onClick={() => seekTick(currentTick + round.tickStep * Math.max(1, Math.round((replay.sampleRate ?? 8) / 2)))} aria-label="前进">
             <ChevronRight size={17} />
           </button>
         </div>
@@ -299,7 +246,7 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
                 type="button"
                 className={layers[key] ? "dak-speed dak-speed-active" : "dak-speed"}
                 aria-pressed={layers[key]}
-                onClick={() => setLayers((prev) => ({ ...prev, [key]: !prev[key] }))}
+                onClick={() => update({ layers: { ...layers, [key]: !layers[key] } })}
               >
                 {label}
               </button>
@@ -312,7 +259,7 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
                   key={nextLevel}
                   type="button"
                   className={level === nextLevel ? "dak-speed dak-speed-active" : "dak-speed"}
-                  onClick={() => setLevel(nextLevel)}
+                  onClick={() => update({ level: nextLevel })}
                 >
                   {nextLevel === "upper" ? "上层" : "下层"}
                 </button>
@@ -320,12 +267,12 @@ export function ReplayViewer({ replay, map, target = null, initialClockSeconds =
             </div>
           )}
           <div className="dak-speed-group dak-speed-group-compact" role="group" aria-label="播放速度">
-            {[0.5, 1, 2, 4].map((nextSpeed) => (
+            {([0.5, 1, 2, 4] as const).map((nextSpeed) => (
               <button
                 key={nextSpeed}
                 type="button"
                 className={speed === nextSpeed ? "dak-speed dak-speed-active" : "dak-speed"}
-                onClick={() => setSpeed(nextSpeed)}
+                onClick={() => update({ speed: nextSpeed })}
               >
                 {nextSpeed}x
               </button>
