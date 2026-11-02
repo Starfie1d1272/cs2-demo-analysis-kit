@@ -1,3 +1,4 @@
+import type { DirectoryLoadStatus } from "../app/use-studio-data";
 import type { EventsPageState } from "../lib/studio-page-state";
 import { usePageReady } from "../lib/use-page-ready";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
@@ -181,8 +182,10 @@ function stageCandidatesFor(series: StudioSeriesRecord[], eventTeams: RivalHubRe
   return series.flatMap((row) => remoteMapsForSeries(row).map(({ series: candidateSeries, map }) => candidateFromSeriesMap(candidateSeries, map, eventTeams)));
 }
 
-export function EventsView({ state, onStateChange, eventTools, events, series, directoryReady, entries, onOpenMatch, onAnalyzeEvent, onGoLibrary, rivalHubConnection, onConnectRivalHub, onRevokeRivalHub, onRefreshRivalHub, onImportOnlineFiles, onPickOnlineFiles, onSyncLocalDemos, onPageReady }: {
-  directoryReady: boolean;
+export function EventsView({ state, onStateChange, eventTools, events, series, eventsStatus, seriesStatus, onRetry, entries, onOpenMatch, onAnalyzeEvent, onGoLibrary, rivalHubConnection, onConnectRivalHub, onRevokeRivalHub, onRefreshRivalHub, onImportOnlineFiles, onPickOnlineFiles, onSyncLocalDemos, onPageReady }: {
+  onRetry: () => void;
+  eventsStatus: DirectoryLoadStatus;
+  seriesStatus: DirectoryLoadStatus;
   eventTools?: React.ReactNode;
   events: StudioEventRecord[];
   series: StudioSeriesRecord[];
@@ -203,16 +206,23 @@ export function EventsView({ state, onStateChange, eventTools, events, series, d
 }) {
   const { activeEventId: activeId, activeStageKey, selectedSeriesId } = state;
   const [customBaseUrl, setCustomBaseUrl] = useState(rivalHubConnection?.baseUrl ?? "");
-  usePageReady(directoryReady, onPageReady);
+  usePageReady(eventsStatus !== "loading" && seriesStatus !== "loading", onPageReady);
   useEffect(() => { if (rivalHubConnection?.baseUrl) setCustomBaseUrl(rivalHubConnection.baseUrl); }, [rivalHubConnection?.baseUrl]);
   const orderedEvents = useMemo(() => [...events].sort((a, b) => (a.source === "rivalhub" ? 0 : 1) - (b.source === "rivalhub" ? 0 : 1) || b.updatedAt - a.updatedAt), [events]);
   useEffect(() => {
-    if (!directoryReady || activeId || orderedEvents.length === 0) return;
-    const first = orderedEvents[0];
-    const firstSeries = series.filter(row => row.eventId === first.id);
-    const firstStage = first.stages.find(stage => firstSeries.some(row => row.stageKey === stage.key))?.key ?? first.stages[0]?.key ?? (firstSeries.some(row => !row.stageKey) ? "other" : null);
-    onStateChange({ activeEventId: first.id, activeStageKey: firstStage, selectedSeriesId: firstSeries.find(row => firstStage === "other" ? !row.stageKey : row.stageKey === firstStage)?.id ?? null });
-  }, [directoryReady, activeId, orderedEvents, series, onStateChange]);
+    if (eventsStatus !== "ready" || seriesStatus !== "ready") return;
+    const event = activeId ? orderedEvents.find(row => row.id === activeId) : orderedEvents[0];
+    if (!event) return;
+    const eventSeries = series.filter(row => row.eventId === event.id);
+    const firstStage = event.stages.find(stage => eventSeries.some(row => row.stageKey === stage.key))?.key
+      ?? (eventSeries.some(row => !row.stageKey) ? "other" : event.stages[0]?.key ?? null);
+    const stage = activeStageKey ?? firstStage;
+    if (activeStageKey && !event.stages.some(row => row.key === activeStageKey)
+      && !(activeStageKey === "other" && eventSeries.some(row => !row.stageKey))) return;
+    const firstSeries = eventSeries.find(row => stage === "other" ? !row.stageKey : row.stageKey === stage);
+    if (activeId && activeStageKey === stage && (selectedSeriesId || !firstSeries)) return;
+    onStateChange({ activeEventId: event.id, activeStageKey: stage, selectedSeriesId: selectedSeriesId ?? firstSeries?.id ?? null });
+  }, [eventsStatus, seriesStatus, activeId, activeStageKey, selectedSeriesId, orderedEvents, series, onStateChange]);
   const active = orderedEvents.find((event) => event.id === activeId) ?? null;
   const eventSeries = useMemo(() => active ? series.filter((row) => row.eventId === active.id) : [], [active, series]);
   const eventCandidates = useMemo(() => stageCandidatesFor(eventSeries, active?.rivalHub?.teams ?? []), [active?.rivalHub?.teams, eventSeries]);
@@ -231,7 +241,7 @@ export function EventsView({ state, onStateChange, eventTools, events, series, d
 
   return (
     <div className="stu-view stu-reading-view">
-      {directoryReady && activeId && !active && <p className="stu-error" role="status">所选赛事已不存在，请从目录选择。</p>}
+      {eventsStatus === "ready" && activeId && !active && <p className="stu-error" role="status">所选赛事已不存在，请从目录选择。</p>}
       <header className="stu-view-header">
         <div><h1>赛事目录</h1><p>按 Event → Stage → Series → Map 浏览赛事；官方结构与排名来自 RivalHub，本地 Demo 只负责分析与关联。</p></div>
         {onConnectRivalHub && <div className="stu-rivalhub-connection" aria-label="RivalHub 连接">
@@ -241,10 +251,14 @@ export function EventsView({ state, onStateChange, eventTools, events, series, d
           {rivalHubConnection?.error && <small className="stu-error-text">{rivalHubConnection.error}</small>}
         </div>}
       </header>
-      {events.length === 0 ? <EmptyState title="还没有赛事目录" hint="连接 RivalHub 获取在线赛事，或在资料库导入本地 event-package/1.0 资源包。" action={<button className="stu-button" onClick={onGoLibrary}>去资料库</button>} /> : <div className="stu-event-directory">
-        <aside className="stu-event-list" aria-label="赛事列表"><span className="stu-event-list-label">在线赛事优先 · {orderedEvents.length}</span>{orderedEvents.map((event) => { const linkedSeries = series.filter((row) => row.eventId === event.id); const linked = linkedSeries.reduce((sum, row) => sum + (row.mapAssignments?.filter((map) => map.entryId).length ?? row.entryIds.length), 0); const remote = linkedSeries.flatMap((row) => row.mapAssignments?.flatMap((map) => map.rivalHub ? [map.rivalHub] : []) ?? []); return <button key={event.id} type="button" className={event.id === activeId ? "stu-event-list-item stu-event-list-item-active" : "stu-event-list-item"} onClick={() => { const firstStage = event.stages[0]?.key ?? (linkedSeries.some(row => !row.stageKey) ? "other" : null); const firstSeries = linkedSeries.find(row => firstStage === "other" ? !row.stageKey : row.stageKey === firstStage); onStateChange({ activeEventId: event.id, activeStageKey: firstStage, selectedSeriesId: firstSeries?.id ?? null }); }}><b>{event.name}</b><span>{event.source === "rivalhub" ? "RivalHub" : "本地"} · 本地已关联 {linked} 图 · 远程已同步 {remote.filter((map) => map.demoStatus === "synced").length}{event.rivalHub?.stale ? " · 缓存已过期" : ""}</span></button>; })}</aside>
-        {active && <section className="stu-event-content">{activeStageKey && !activeStage && <p role="status">所选阶段已不存在，请选择其他阶段。</p>}{activeStage && selectedSeriesId && !activeStageSeries.some(row => row.id === selectedSeriesId) && <p role="status">所选系列已不存在，请选择其他系列。</p>}<header className="stu-event-content-head"><div><h2>{active.name}</h2><p>{active.kind} · {eventSeries.length} 个系列 · {active.source}{active.readOnly ? " · 只读资产" : ""}</p><div className="stu-event-sync-summary"><span>本地已关联 {localLinked}/{totalMaps} 图</span>{active.source === "rivalhub" && <><span>远程已同步 {remoteSynced}/{eventCandidates.length} 图</span><span>需要处理 {remoteNeedsAttention}</span>{active.rivalHub?.lastSyncedAt && <span>上次同步 {new Date(active.rivalHub.lastSyncedAt).toLocaleString("zh-CN")}{active.rivalHub.stale ? " · 缓存已过期" : ""}</span>}</>}</div></div><button type="button" className="stu-button" onClick={() => onAnalyzeEvent(active)}>分析此赛事</button></header>{onImportOnlineFiles && active.source === "rivalhub" && eventCandidates.length > 0 && <ImportButton label="选择本赛事 Demo" context={{ scope: "event", eventId: active.id, candidates: eventCandidates }} onImport={onImportOnlineFiles} onPick={onPickOnlineFiles} onSyncLocalDemos={onSyncLocalDemos} />}{stageOptions.length > 0 && <div className="stu-stage-tabs" role="tablist" aria-label="赛事阶段">{stageOptions.map((stage) => <button key={stage.key} type="button" role="tab" aria-selected={activeStage?.key === stage.key} className={activeStage?.key === stage.key ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => onStateChange({ ...state, activeStageKey: stage.key, selectedSeriesId: eventSeries.find(row => stage.key === "other" ? !row.stageKey : row.stageKey === stage.key)?.id ?? null })}>{stage.name}</button>)}</div>}{activeStage && <EventStageSection selectedSeriesId={selectedSeriesId} onSelectSeries={(id) => onStateChange({ ...state, selectedSeriesId: id })} eventId={active.id} stage={activeStage} series={activeStageSeries} entries={entries} candidates={eventCandidates} remote={active.source === "rivalhub"} onOpenMatch={onOpenMatch} onImportOnlineFiles={onImportOnlineFiles} onPickOnlineFiles={onPickOnlineFiles} onSyncLocalDemos={onSyncLocalDemos} />}</section>}
-      </div>}
+      {eventsStatus === "loading" && <p role="status">正在读取赛事目录…</p>}
+      {eventsStatus === "error" && <p className="stu-error" role="alert">赛事目录读取失败。<button type="button" className="stu-button-sm" onClick={onRetry}>重试读取</button></p>}
+      {seriesStatus === "loading" && <p role="status">正在读取系列…</p>}
+      {seriesStatus === "error" && <p className="stu-error" role="alert">系列读取失败，赛事目录仍可浏览。<button type="button" className="stu-button-sm" onClick={onRetry}>重试读取</button></p>}
+      {events.length === 0 && eventsStatus === "ready" ? <EmptyState title="还没有赛事目录" hint="连接 RivalHub 获取在线赛事，或在资料库导入本地 event-package/1.0 资源包。" action={<button className="stu-button" onClick={onGoLibrary}>去资料库</button>} /> : events.length > 0 ? <div className="stu-event-directory">
+        <aside className="stu-event-list" aria-label="赛事列表"><span className="stu-event-list-label">在线赛事优先 · {orderedEvents.length}</span>{orderedEvents.map((event) => { const linkedSeries = series.filter((row) => row.eventId === event.id); const linked = linkedSeries.reduce((sum, row) => sum + (row.mapAssignments?.filter((map) => map.entryId).length ?? row.entryIds.length), 0); const remote = linkedSeries.flatMap((row) => row.mapAssignments?.flatMap((map) => map.rivalHub ? [map.rivalHub] : []) ?? []); return <button key={event.id} type="button" className={event.id === activeId ? "stu-event-list-item stu-event-list-item-active" : "stu-event-list-item"} onClick={() => { const firstStage = event.stages[0]?.key ?? (linkedSeries.some(row => !row.stageKey) ? "other" : null); const firstSeries = linkedSeries.find(row => firstStage === "other" ? !row.stageKey : row.stageKey === firstStage); onStateChange({ activeEventId: event.id, activeStageKey: firstStage, selectedSeriesId: firstSeries?.id ?? null }); }}><b>{event.name}</b><span>{event.source === "rivalhub" ? "RivalHub" : "本地"} · {seriesStatus === "ready" ? `本地已关联 ${linked} 图 · 远程已同步 ${remote.filter((map) => map.demoStatus === "synced").length}` : "系列不可用"}{event.rivalHub?.stale ? " · 缓存已过期" : ""}</span></button>; })}</aside>
+        {active && <section className="stu-event-content">{eventsStatus === "ready" && seriesStatus === "ready" && activeStageKey && !activeStage && <p role="status">所选阶段已不存在，请选择其他阶段。</p>}{seriesStatus === "ready" && activeStage && selectedSeriesId && !activeStageSeries.some(row => row.id === selectedSeriesId) && <p role="status">所选系列已不存在，请选择其他系列。</p>}<header className="stu-event-content-head"><div><h2>{active.name}</h2><p>{active.kind} · {seriesStatus === "ready" ? `${eventSeries.length} 个系列` : "系列不可用"} · {active.source}{active.readOnly ? " · 只读资产" : ""}</p><div className="stu-event-sync-summary">{seriesStatus === "ready" && <span>本地已关联 {localLinked}/{totalMaps} 图</span>}{active.source === "rivalhub" && <><span>远程已同步 {remoteSynced}/{eventCandidates.length} 图</span><span>需要处理 {remoteNeedsAttention}</span>{active.rivalHub?.lastSyncedAt && <span>上次同步 {new Date(active.rivalHub.lastSyncedAt).toLocaleString("zh-CN")}{active.rivalHub.stale ? " · 缓存已过期" : ""}</span>}</>}</div></div><button type="button" className="stu-button" onClick={() => onAnalyzeEvent(active)}>分析此赛事</button></header>{onImportOnlineFiles && active.source === "rivalhub" && eventCandidates.length > 0 && <ImportButton label="选择本赛事 Demo" context={{ scope: "event", eventId: active.id, candidates: eventCandidates }} onImport={onImportOnlineFiles} onPick={onPickOnlineFiles} onSyncLocalDemos={onSyncLocalDemos} />}{stageOptions.length > 0 && <div className="stu-stage-tabs" role="tablist" aria-label="赛事阶段">{stageOptions.map((stage) => <button key={stage.key} type="button" role="tab" aria-selected={activeStage?.key === stage.key} className={activeStage?.key === stage.key ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => onStateChange({ ...state, activeStageKey: stage.key, selectedSeriesId: eventSeries.find(row => stage.key === "other" ? !row.stageKey : row.stageKey === stage.key)?.id ?? null })}>{stage.name}</button>)}</div>}{activeStage && seriesStatus === "ready" && <EventStageSection selectedSeriesId={selectedSeriesId} onSelectSeries={(id) => onStateChange({ ...state, selectedSeriesId: id })} eventId={active.id} stage={activeStage} series={activeStageSeries} entries={entries} candidates={eventCandidates} remote={active.source === "rivalhub"} onOpenMatch={onOpenMatch} onImportOnlineFiles={onImportOnlineFiles} onPickOnlineFiles={onPickOnlineFiles} onSyncLocalDemos={onSyncLocalDemos} />}</section>}
+      </div> : null}
       {eventTools}
     </div>
   );

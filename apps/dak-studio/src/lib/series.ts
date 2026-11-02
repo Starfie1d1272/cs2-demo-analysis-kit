@@ -218,12 +218,8 @@ export function deriveVetoSummary(steps: SeriesVetoStep[]): Pick<SeriesVeto, "ma
 }
 
 export async function listSeriesRecords(): Promise<StudioSeriesRecord[]> {
-  try {
-    const rows = await seriesStore.getAll<StudioSeriesRecord>();
-    return rows.sort((a, b) => b.updatedAt - a.updatedAt);
-  } catch {
-    return [];
-  }
+  const rows = await seriesStore.getAll<StudioSeriesRecord>();
+  return rows.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export async function saveSeriesRecord(record: Omit<StudioSeriesRecord, "createdAt" | "updatedAt">): Promise<StudioSeriesRecord> {
