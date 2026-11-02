@@ -19,7 +19,7 @@ const teamOverviewCache = createAnalysisBucket<TeamOverviewModel | null>();
  */
 export async function getTeamComparison(entries: StudioDemoEntry[], identity?: IdentityOptions, pair?: [string, string]): Promise<TeamComparisonModel> {
   const key = `${keyOf(entries, identity?.version)}:team-comparison-v2:${pair ? `${pair[0]}__vs__${pair[1]}` : "auto"}`;
-  return cachedQuery(teamComparisonCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), async (generation) => {
+  return cachedQuery(teamComparisonCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), entries, async (generation) => {
     const persisted = await readPersistedValue<TeamComparisonModel>(key, generation);
     if (persisted) return persisted;
     const matchIds = entries.map(matchIdForEntry);
@@ -36,7 +36,7 @@ export async function getTeamComparison(entries: StudioDemoEntry[], identity?: I
 /** 队伍对象页：从可重建 comparison facts 编排摘要，不在页面层重新解析 ZIP。 */
 export async function getTeamOverview(entries: StudioDemoEntry[], teamName: string, identity?: IdentityOptions): Promise<TeamOverviewModel | null> {
   const key = `${keyOf(entries, identity?.version)}:team-overview-v3:${teamName}`;
-  return cachedQuery(teamOverviewCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), async (generation) => {
+  return cachedQuery(teamOverviewCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), entries, async (generation) => {
     const persisted = await readPersistedValue<TeamOverviewModel | null>(key, generation);
     if (persisted !== undefined) return persisted;
     const matchIds = entries.map(matchIdForEntry);

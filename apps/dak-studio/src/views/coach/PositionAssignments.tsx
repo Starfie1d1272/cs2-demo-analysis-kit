@@ -1,3 +1,4 @@
+import { withStoredAnalysis } from "../../lib/queries/query-cache";
 import { useEffect, useState } from "react";
 import { SPATIAL_ASSET_MAPS } from "@cs2dak/maps";
 import { TeamMapRoleMatrixPanel } from "@cs2dak/react";
@@ -36,7 +37,7 @@ export function PositionAssignments({ draft, entries, identityOptions, observati
     }
     setPlayerNames(names);
     if (!entries.length) return () => { live = false; };
-    void getFactsStore().getPlayerMatchStats({ matchIds: entries.map(matchIdForEntry) }).then(rows => {
+    void withStoredAnalysis(entries, () => getFactsStore().getPlayerMatchStats({ matchIds: entries.map(matchIdForEntry) })).then(rows => {
       for (const row of rows) {
         const mapped = identityOptions?.map[row.steamId64];
         const key = mapped == null ? `steam:${row.steamId64}` : typeof mapped === "string" ? mapped : mapped.playerKey;

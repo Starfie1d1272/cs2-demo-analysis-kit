@@ -1,3 +1,4 @@
+import { withStoredAnalysis } from "../lib/queries/query-cache";
 import { canExportSnapshot, withCapabilityConditions, withAnalysisExportEntries as applyExportEntries } from "../lib/analysis-export";
 import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
 import { buildOpeningAnalysisResult } from "../lib/analysis-export-spatial";
@@ -105,7 +106,7 @@ export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entri
       if (typeof found === "string") return { playerKey: found, displayName: name };
       return { playerKey: `steam:${steamId}`, displayName: name };
     };
-    getFactsStore().getPlayerMatchStats({ matchIds: entries.map(matchIdForEntry) })
+    withStoredAnalysis(entries, () => getFactsStore().getPlayerMatchStats({ matchIds: entries.map(matchIdForEntry) }))
       .then(async (rows) => {
         if (cancelled) return;
         const counts = new Map<string, PlayerOption>();
@@ -182,11 +183,11 @@ export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entri
     if (!selected || !eligibleEntries || !eligibleEntries.length || analysis.status !== "ready") return;
     let cancelled = false;
     setError(null);
-    getDerivedCacheStore().getOpeningTrails({
+    withStoredAnalysis(eligibleEntries, () => getDerivedCacheStore().getOpeningTrails({
       matchIds: eligibleEntries.map(matchIdForEntry),
       playerKeys: [selected.playerKey],
       steamIds: selected.steamIds
-    })
+    }))
       .then((result) => {
         if (cancelled) return;
         assertAnalysisGeneration(analysis.generation);

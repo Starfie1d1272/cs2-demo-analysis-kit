@@ -3,7 +3,7 @@ import type { TacticalRoundFact } from "@cs2dak/tactics";
 import { withTacticalDisplayGroupKeys } from "../tactical-display-groups";
 import { buildPlayerMapRoleEvidence, buildTeamMapResponsibilityEvidence } from "@cs2dak/tactics";
 import { buildDoubleAwpAnalyses, buildPlayerMapRoleProfiles, buildPlayerMapPool, buildPlayerMapPerformance, buildTeamMapRoleMatrices } from "@cs2dak/analytics";
-import { createAnalysisBucket, cachedQuery, readPersistedValue, writePersistedValue, ensureAnalysisDataReady, getAnalysisDataGeneration, assertAnalysisGeneration } from "./query-cache";
+import { createAnalysisBucket, cachedQuery, readPersistedValue, writePersistedValue, ensureAnalysisDataReady, beginStoredAnalysis, endStoredAnalysis } from "./query-cache";
 import { assertCurrentFacts } from "../facts-readiness";
 import { getFactsStore } from "../facts-store";
 import type { DoubleAwpAnalysis, PlayerMapRoleEvidence, PlayerMapRoleProfile, PlayerMapPoolRow, RoleDeclaration, TeamMapRoleMatrix, TeamMapResponsibilityEvidence } from "@cs2dak/tactics";
@@ -35,7 +35,7 @@ export function getMapRoleEvidence(entries: StudioDemoEntry[], identity?: Identi
   const teamIdentityMap = roleTeamIdentityMap(entries, identity);
   const teamMappingKey = Object.entries(teamIdentityMap).sort(([a], [b]) => a.localeCompare(b)).map(([raw, canonical]) => `${raw}=${canonical}`).join("|");
   const key = `${keyOf(entries, identity?.version, selectedTeams)}:map-role-evidence:v4:team-map=${teamMappingKey}`;
-  return cachedQuery(mapRoleEvidenceCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), async (generation) => {
+  return cachedQuery(mapRoleEvidenceCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), entries, async (generation) => {
     const persisted = await readPersistedValue<MapRoleEvidenceSummary>(key, generation);
     if (persisted) return persisted;
     const factsStore = getFactsStore();
@@ -86,7 +86,7 @@ export async function getTeamMapRoleMatrices(
 export async function getDoubleAwpAnalysis(entries: StudioDemoEntry[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<DoubleAwpAnalysis[]> {
   assertCurrentFacts(entries);
   await ensureAnalysisDataReady();
-  const generation = getAnalysisDataGeneration();
+  const snapshot = await beginStoredAnalysis(entries);
   const factsStore = getFactsStore();
   const matchIds = entries.map(matchIdForEntry);
   const [rows, positions] = await Promise.all([factsStore.getTeamAwpRounds({ matchIds }), factsStore.getPlayerPositionRounds({ matchIds })]);
@@ -95,7 +95,7 @@ export async function getDoubleAwpAnalysis(entries: StudioDemoEntry[], identity?
     const mapped = identity?.map[row.steamId64];
     return mapped == null ? `steam:${row.steamId64}` : typeof mapped === "string" ? mapped : mapped.playerKey;
   })()]));
-  assertAnalysisGeneration(generation);
+  await endStoredAnalysis(entries, snapshot);
   return buildDoubleAwpAnalyses(rows, {
     teamKeyFor: (matchId, rawTeamKey) => teams[`${matchId}:${rawTeamKey}`] ?? `${matchId}:${rawTeamKey}`,
     playerKeyFor: (matchId, playerIndex) => players.get(`${matchId}:${playerIndex}`) ?? `${matchId}:player:${playerIndex}`,
@@ -106,11 +106,11 @@ export interface PlayerMapPoolResult { rows: PlayerMapPoolRow[]; unsupportedMapN
 export async function getPlayerMapPool(entries: StudioDemoEntry[], playerKey: string, roleProfile: PlayerMapRoleProfile | null, identity?: IdentityOptions): Promise<PlayerMapPoolResult> {
   assertCurrentFacts(entries);
   await ensureAnalysisDataReady();
-  const generation = getAnalysisDataGeneration();
+  const snapshot = await beginStoredAnalysis(entries);
   const matchIds = entries.map(matchIdForEntry);
   const facts = getFactsStore();
   const [cohortRows, weaponRows] = await Promise.all([facts.getRrSignalRows({ matchIds }), facts.getPlayerWeapons({ matchIds })]);
-  assertAnalysisGeneration(generation);
+  await endStoredAnalysis(entries, snapshot);
   const result = buildPlayerMapPerformance({ playerKey, identityMap: identity?.map ?? {}, cohortRows, weaponRows,
     matches: entries.map(entry => ({ matchId: matchIdForEntry(entry), mapName: entry.meta.mapName, teamAScore: entry.meta.teamAScore, teamBScore: entry.meta.teamBScore })) });
   return { rows: buildPlayerMapPool(result.rows, roleProfile), unsupportedMapNames: result.unsupportedMapNames };

@@ -1,3 +1,4 @@
+import { withStoredAnalysis } from "../lib/queries/query-cache";
 import { useCapabilityBlocked } from "../components/CapabilityBar";
 import { canExportSnapshot } from "../lib/analysis-export";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
@@ -56,7 +57,7 @@ async function loadAllGrenades(
   onProgress?: (done: number) => void
 ): Promise<LoadedGrenades[]> {
   assertCurrentFacts(entries);
-  const facts = await getFactsStore().getLineups({ matchIds: entries.map(matchIdForEntry) });
+  const facts = await withStoredAnalysis(entries, () => getFactsStore().getLineups({ matchIds: entries.map(matchIdForEntry) }));
   const entryIdByMatchId = new Map(entries.map((entry) => [matchIdForEntry(entry), entry.id]));
   onProgress?.(facts.length);
   return facts.map((fact) => {

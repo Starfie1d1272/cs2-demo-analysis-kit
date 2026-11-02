@@ -73,7 +73,8 @@ import { getFactsStore } from "./facts-store";
 import { DERIVED_MATCH_NAMESPACE } from "./derived-cache";
 
 const file = (marker: number, name = "game.zip") => new File([new Uint8Array([marker])], name);
-const snapshot = () => structuredClone({ records: harness.records, blobs: harness.blobs });
+// Cache invalidation revision is expected to advance even after a rolled-back write.
+const snapshot = () => structuredClone({ records: new Map([...harness.records].filter(([namespace]) => namespace !== "analysis-state")), blobs: harness.blobs });
 function failOnce(namespace: string, key?: string) {
   harness.state.onWrite = async (ns, rowKey) => {
     if (ns !== namespace || (key && key !== rowKey)) return;

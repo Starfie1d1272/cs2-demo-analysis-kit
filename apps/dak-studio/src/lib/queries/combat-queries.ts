@@ -14,7 +14,7 @@ const duelInsightsCache = createAnalysisBucket<DuelInsightsModel>();
 const DUEL_CACHE_VER = 3;
 export function getDuelInsights(entries: StudioDemoEntry[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<DuelInsightsModel> {
   const key = `${keyOf(entries, identity?.version, selectedTeams)}:duels:v${DUEL_CACHE_VER}`;
-  return cachedQuery(duelInsightsCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), async (generation) => {
+  return cachedQuery(duelInsightsCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), entries, async (generation) => {
     const persisted = await readPersistedValue<DuelInsightsModel>(key, generation);
     if (persisted) return persisted;
     const matchIds = entries.map(matchIdForEntry);

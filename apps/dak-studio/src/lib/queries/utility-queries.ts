@@ -60,7 +60,7 @@ export function getPlayerFlashSummaries(
   selectedTeams: string[] = [],
 ): Promise<PlayerFlashSummary[]> {
   const key = `${keyOf(entries, identity?.version, selectedTeams)}:flash:v2:order=${orderedMatchIds(entries).join(",")}:${players.map((p) => `${p.playerKey}=${p.steamIds.join(",")}`).sort().join("|")}`;
-  return cachedQuery(flashCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), async (generation) => {
+  return cachedQuery(flashCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), entries, async (generation) => {
     const persisted = await readPersistedValue<PlayerFlashSummary[]>(key, generation);
     if (persisted) return persisted;
     const matchIds = entries.map(matchIdForEntry);
@@ -83,7 +83,7 @@ export function getUtilityValueSummary(
 ): Promise<UtilityValueSummary> {
   const playerKey = players.map((p) => `${p.playerKey}=${p.steamIds.join(",")}`).sort().join("|");
   const key = `${keyOf(entries, identity?.version, selectedTeams)}:utility-value:v2:${playerKey}`;
-  return cachedQuery(utilityValueCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), async (generation) => {
+  return cachedQuery(utilityValueCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), entries, async (generation) => {
     const persisted = await readPersistedValue<UtilityValueSummary>(key, generation);
     if (persisted) return persisted;
     const matchIds = entries.map(matchIdForEntry);

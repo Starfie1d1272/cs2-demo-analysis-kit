@@ -1,3 +1,4 @@
+import { withStoredAnalysis } from "../../lib/queries/query-cache";
 import { canExportSnapshot, withCapabilityConditions, unionExportEntries, withAnalysisExportEntries } from "../../lib/analysis-export";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../../lib/queries/query-cache";
 import { CapabilityBar, useCapability } from "../../components/CapabilityBar";
@@ -67,7 +68,7 @@ export function TeamRolesPanel({ exportSource, onCapabilityRepair, entries, team
   useEffect(() => {
     let cancelled = false;
     setPlayerNames({});
-    void getFactsStore().getPlayerMatchStats({ matchIds: entries.map(matchIdForEntry) }).then(rows => {
+    void withStoredAnalysis(entries, () => getFactsStore().getPlayerMatchStats({ matchIds: entries.map(matchIdForEntry) })).then(rows => {
       if (cancelled) return;
       const names: Record<string, string> = {};
       for (const row of rows) {

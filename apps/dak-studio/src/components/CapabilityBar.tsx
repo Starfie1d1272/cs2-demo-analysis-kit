@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { StudioDemoEntry } from "../lib/demo-entry";
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "../lib/capability-availability";
-import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, invalidateAnalysisQueries } from "../lib/queries/query-cache";
+import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, invalidateAnalysisQueries, withStoredAnalysis } from "../lib/queries/query-cache";
 import { useSyncExternalStore } from "react";
 
 const LABEL = { ready: "可用", partial: "部分可用", unavailable: "不可用" } as const;
@@ -58,7 +58,7 @@ export function useCapability(entries: StudioDemoEntry[], capability: StudioCapa
     let cancelled = false;
     if (data.status === "ready") {
       setError(null);
-      void loadCapabilityAvailabilityInputs(entries, capability, undefined, undefined, undefined, playerScope)
+      void withStoredAnalysis(entries, () => loadCapabilityAvailabilityInputs(entries, capability, undefined, undefined, undefined, playerScope), true)
         .then(inputs => { if (!cancelled && getAnalysisDataSnapshot().generation === data.generation && getAnalysisDataSnapshot().status === "ready") setResult({ key, revision, generation: data.generation, availability: deriveCapabilityAvailability(entries, capability, inputs) }); })
         .catch(reason => { if (!cancelled) setError(reason instanceof Error ? reason.message : String(reason)); });
     }

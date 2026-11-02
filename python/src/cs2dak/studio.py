@@ -36,7 +36,9 @@ import urllib.request
 import uuid
 import webbrowser
 import zipfile
+from contextlib import contextmanager
 from datetime import datetime, timezone
+from functools import wraps
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -515,6 +517,14 @@ class _UpdateJob:
         }
 
 
+def _exclusive_maintenance(method):
+    @wraps(method)
+    def guarded(self, *args, **kwargs):
+        with self._exclusive_library_maintenance():
+            return method(self, *args, **kwargs)
+    return guarded
+
+
 class StudioApi:
     """Bridge exposed to the Studio frontend as window.pywebview.api.*"""
 
@@ -553,6 +563,36 @@ class StudioApi:
     def _web_overlay_dir(self) -> Path:
         return self._cache_dir() / "studio-web"
 
+    def _library_gate(self, *, exclusive: bool):
+        """Coordinate short commits with whole-library maintenance across processes."""
+        self._userdata.mkdir(parents=True, exist_ok=True)
+        handle = (self._userdata / "library-maintenance.lock").open("a+b")
+        try:
+            if sys.platform == "win32":
+                import msvcrt
+                handle.seek(0, os.SEEK_END)
+                if handle.tell() == 0:
+                    handle.write(b"\0")
+                    handle.flush()
+                handle.seek(0)
+                # msvcrt has no shared mode: short commits serialize on Windows.
+                msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+            return handle
+        except BaseException:
+            handle.close()
+            raise
+
+    @contextmanager
+    def _exclusive_library_maintenance(self):
+        handle = self._library_gate(exclusive=True)
+        try:
+            yield
+        finally:
+            handle.close()
+
     def storage_demo_commit_begin(self, keys: list[str]) -> str:
         """Hold process-safe locks for one short library commit; OS releases on exit."""
         ordered = sorted(set(keys))
@@ -560,7 +600,7 @@ class StudioApi:
             raise ValueError("invalid library commit keys")
         lock_dir = self._userdata / "commit-locks"
         lock_dir.mkdir(parents=True, exist_ok=True)
-        handles = []
+        handles = [self._library_gate(exclusive=False)]
         try:
             for key in ordered:
                 path = lock_dir / hashlib.sha256(key.encode("utf-8")).hexdigest()
@@ -841,6 +881,7 @@ class StudioApi:
             categories.append({"id": category, "bytes": size, "files": files, "path": str(path)})
         return {"ok": True, "userdata": str(self._userdata), "categories": categories}
 
+    @_exclusive_maintenance
     def storage_backup(self) -> dict:
         """Create a portable backup containing durable records and original ZIPs."""
         backups = self._userdata / "backups"
@@ -888,6 +929,10 @@ class StudioApi:
         source = Path(path) if path else Path(self._pick_backup() or "")
         if not source.is_file():
             return {"ok": False, "error": "未选择有效备份文件"}
+        return self._storage_restore_locked(source)
+
+    @_exclusive_maintenance
+    def _storage_restore_locked(self, source: Path) -> dict:
         with tempfile.TemporaryDirectory(prefix="dak-restore-") as temp_name:
             temp = Path(temp_name)
             try:
@@ -922,6 +967,14 @@ class StudioApi:
                     shutil.copytree(source_demos, destination_demos)
                 else:
                     destination_demos.mkdir(parents=True, exist_ok=True)
+                # A restored snapshot may contain a revision seen by a still-open window.
+                conn = self._conn()
+                conn.execute(
+                    "insert into records(namespace,key,value) values(?,?,?) "
+                    "on conflict(namespace,key) do update set value=excluded.value",
+                    ("analysis-state", "revision", json.dumps(uuid.uuid4().hex)),
+                )
+                conn.commit()
         return {"ok": True, "path": str(source), "restartRequired": True}
 
     def storage_cleanup(self, category: str) -> dict:
@@ -947,6 +1000,7 @@ class StudioApi:
                 pass
         return {"ok": True, "category": category, "freedBytes": before, "files": files}
 
+    @_exclusive_maintenance
     def storage_repair(self) -> dict:
         """Repair durable Library consistency and compact SQLite."""
         with self._db_lock:
