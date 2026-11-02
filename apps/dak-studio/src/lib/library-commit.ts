@@ -2,7 +2,9 @@ import { getNativeStorageApiForCurrentAdapter } from "./storage";
 
 /** Serialize only a library commit, across windows sharing the same storage. */
 export async function withLibraryCommit<T>(keys: string[], operation: () => Promise<T>): Promise<T> {
-  const ordered = [...new Set(keys)].sort();
+  // Analysis cache uses a single persistent dirty marker, so its short writes
+  // and startup recovery must not overlap across windows.
+  const ordered = [...new Set(keys.some(key => key.startsWith("match:")) ? [...keys, "analysis-cache"] : keys)].sort();
   if (!ordered.length) return operation();
   // Node’s test adapters do not have competing browser contexts.
   if (typeof window === "undefined") return operation();

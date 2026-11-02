@@ -2,6 +2,7 @@ import { getStorage } from "../storage";
 import { CACHE_VERSION } from "./cache-version";
 import { assertStoredFacts, FactsNotReadyError } from "../facts-readiness";
 import { isAnalysisStale } from "../analysis-manifest";
+import { withLibraryCommit } from "../library-commit";
 import type { StudioDemoEntry } from "../demo-entry";
 
 const DIRTY = "__analysis_dirty__";
@@ -18,6 +19,7 @@ const cache = () => getStorage().records("cache");
 const meta = () => getStorage().records("cache-meta");
 const revisionStore = () => getStorage().records("analysis-state");
 let observedRevision: string | undefined;
+const revisionByGeneration = new Map<number, string | undefined>();
 const channel = typeof window !== "undefined" && typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("dak-analysis-change") : null;
 if (channel) channel.onmessage = () => { clearMemory(); publish(snapshot.status, true); };
 async function markRevision(): Promise<void> {
@@ -104,48 +106,51 @@ async function clearLocked(): Promise<void> {
   } catch (error) { publish("error"); throw error; }
 }
 export function invalidateAnalysisQueries(): Promise<void> {
-  return commit(async () => {
+  return withLibraryCommit(["analysis-cache"], () => commit(async () => {
     publish("invalidating", true); clearMemory();
-    try { await io(() => meta().put(DIRTY, { dirty: true })); }
+    try { await markRevision(); await io(() => meta().put(DIRTY, { dirty: true })); }
     catch (error) { publish("error"); throw error; }
-    await clearLocked();
-  });
+    try { await clearLocked(); await markRevision(); }
+    catch (error) { publish("error"); throw error; }
+  }));
 }
 export function ensureAnalysisDataReady(): Promise<void> {
   if (snapshot.status === "ready") return Promise.resolve();
   if (snapshot.status === "error") return Promise.reject(new Error("分析缓存不可用，请重试刷新"));
   if (!initialization) {
-    initialization = commit(async () => {
+    initialization = withLibraryCommit(["analysis-cache"], () => commit(async () => {
       try {
         const dirty = await io(() => meta().get(DIRTY));
         if (dirty) await clearLocked(); else if (pendingCommits === 1) publish("ready");
       } catch (error) { publish("error"); throw error; }
-    }).finally(() => { initialization = null; });
+    })).finally(() => { initialization = null; });
   }
   return initialization;
 }
 export function withAnalysisQueryInvalidation<T>(write: () => Promise<T>): Promise<T> {
+  // Callers hold withLibraryCommit with a match key (and hence analysis-cache).
   return commit(async () => {
     publish("invalidating", true); clearMemory();
-    await markRevision();
-    try { await io(() => meta().put(DIRTY, { dirty: true })); }
+    try { await markRevision(); await io(() => meta().put(DIRTY, { dirty: true })); }
     catch (error) { publish("error"); throw new Error("无法记录分析缓存失效，未执行数据写入", { cause: error }); }
     let value: T;
     try { value = await write(); }
     catch (error) {
-      try { await clearLocked(); await markRevision(); } catch (cacheError) { throw new AggregateError([error, cacheError], "数据写入失败，分析缓存刷新也失败"); }
+      try { await clearLocked(); await markRevision(); } catch (cacheError) { publish("error"); throw new AggregateError([error, cacheError], "数据写入失败，分析缓存刷新也失败"); }
       throw error;
     }
     try { await clearLocked(); await markRevision(); }
-    catch (error) { throw new Error("数据已写入，分析缓存刷新失败；请重试刷新", { cause: error }); }
+    catch (error) { publish("error"); throw new Error("数据已写入，分析缓存刷新失败；请重试刷新", { cause: error }); }
     return value;
   });
 }
 export async function readPersistedValue<T>(key: string, current: number): Promise<T | undefined> {
   return io(async () => {
     assertAnalysisGeneration(current);
-    const record = await cache().get<{ value: T }>(key);
+    if (!revisionByGeneration.has(current)) throw new DOMException("Analysis query invalidated", "AbortError");
+    const record = await cache().get<{ value: T; revisionStamped?: boolean; revision?: string }>(key);
     assertAnalysisGeneration(current);
+    if (!record?.revisionStamped || record.revision !== revisionByGeneration.get(current)) return undefined;
     if (record) await meta().put(key, { touchedAt: Date.now() });
     assertAnalysisGeneration(current);
     return record?.value;
@@ -154,7 +159,12 @@ export async function readPersistedValue<T>(key: string, current: number): Promi
 export async function writePersistedValue<T>(key: string, value: T, current: number): Promise<void> {
   await io(async () => {
     assertAnalysisGeneration(current);
-    await cache().put(key, { key, touchedAt: Date.now(), value });
+    if (!revisionByGeneration.has(current)) throw new DOMException("Analysis query invalidated", "AbortError");
+    const revision = revisionByGeneration.get(current);
+    if (await readRevision() !== revision) throw new DOMException("Analysis query invalidated", "AbortError");
+    assertAnalysisGeneration(current);
+    await cache().put(key, { key, touchedAt: Date.now(), value, revisionStamped: true, revision });
+    if (await readRevision() !== revision) throw new DOMException("Analysis query invalidated", "AbortError");
     assertAnalysisGeneration(current);
     await meta().put(key, { touchedAt: Date.now() });
     const keys = await cache().keys();
@@ -173,6 +183,8 @@ export async function cachedQuery<T>(bucket: Map<string, Promise<T>>, key: strin
   await assertStoredFacts(entries);
   const revision = await readRevision();
   const current = generation; assertAnalysisGeneration(current);
+  revisionByGeneration.clear();
+  revisionByGeneration.set(current, revision);
   const validate = async () => {
     await assertStoredFacts(entries);
     if (await readRevision() !== revision) throw new DOMException("Analysis query invalidated", "AbortError");

@@ -2,6 +2,7 @@ import { downloadAnalysisResult } from "../lib/analysis-export-download";
 import type { AnalysisResultSnapshotV1 } from "../lib/analysis-export";
 import { useState, useSyncExternalStore } from "react";
 import { assertExportReady, getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation } from "../lib/queries/query-cache";
+import { FactsNotReadyError } from "../lib/facts-readiness";
 
 /** Capture at click time, so the saved file cannot follow later page changes. */
 export function AnalysisExportButtons({
@@ -21,8 +22,10 @@ export function AnalysisExportButtons({
       await assertExportReady(result.sources.map(source => source.entryId), analysis.generation);
       downloadAnalysisResult(result, format);
       setError(null);
-    } catch {
-      setError("分析数据正在更新，请刷新后重试。");
+    } catch (reason) {
+      setError(reason instanceof FactsNotReadyError || (reason instanceof Error && reason.name === "AbortError")
+        ? "分析数据正在更新，请刷新后重试。"
+        : `导出失败：${reason instanceof Error ? reason.message : String(reason)}`);
     }
   };
   return (
