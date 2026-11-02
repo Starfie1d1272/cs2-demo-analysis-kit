@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { SPATIAL_ASSET_MAPS } from "@cs2dak/maps";
+import { mapDisplayName } from "../../lib/series";
 import type { CoachMatchSheetDraft } from "../../lib/coach-match-sheet";
 import type { SheetMaterialRef } from "../../lib/material-ref";
 import {
@@ -80,14 +82,16 @@ export function MatchSheetEditor({
         />
       </label>
       <label>
-        地图（留空为多图）{" "}
-        <input
+        地图{" "}
+        <select
           className="stu-input"
           value={draft.mapName ?? ""}
-          onChange={(e) =>
-            onChange({ ...draft, mapName: e.target.value || null })
-          }
-        />
+          onChange={(e) => onChange({ ...draft, mapName: e.target.value || null })}
+        >
+          <option value="">多图</option>
+          {draft.mapName && !SPATIAL_ASSET_MAPS.some(map => map === draft.mapName) && <option value={draft.mapName}>{mapDisplayName(draft.mapName)}</option>}
+          {SPATIAL_ASSET_MAPS.map(map => <option key={map} value={map}>{mapDisplayName(map)}</option>)}
+        </select>
       </label>
       <label>
         搜索材料{" "}
