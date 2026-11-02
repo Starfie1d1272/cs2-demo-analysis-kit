@@ -9,18 +9,18 @@
 
 `@cs2dak/react` 是**产品中立**包（被 RivalHub / CS2 Insight Agent 消费）。硬约束：
 
-- **不查数据库、不跑分析、只消费 presentation/contract 合同。**
+- **不查数据库、不跑分析、只消费 `@cs2dak/presentation` 的展示合同与 `@cs2dak/maps` 坐标投影；传递依赖不得包含 contract 或领域分析包。**
 - 样式走 `dak-*`（CSS 在 `packages/react/src/theme.css`）。
 
 DAK Studio 是独立 `stu-*` 设计语言（CSS 在 `apps/dak-studio/src/studio.css`），
 遵守 [`design-language.md`](../design-language.md)。
 
-**分类轴线 = 纯展示 vs 绑数据**：
+**分类轴线 = 产品中立可复用性与职责**：
 
 | 组件性质 | 归属 |
 |---|---|
-| 纯展示（props 进、回调出，零数据依赖） | **应下沉 `@cs2dak/react`** |
-| 绑 facts store / `season.ts` / 分析编排 | 留 Studio（container） |
+| 产品中立、已有复用需求的展示原语 | 可放 `@cs2dak/react`；纯展示本身不强制下沉 |
+| 绑 facts store / App queries / 分析编排 | 留 Studio（container） |
 | 桌面壳（pywebview 桥 / 自更新 / 本地目录） | Studio 专属，下沉无意义 |
 
 正确终态是 **container(Studio) / presentational(React) 分层**：Studio 视图负责
@@ -37,16 +37,17 @@ DAK Studio 是独立 `stu-*` 设计语言（CSS 在 `apps/dak-studio/src/studio.
 | `ScoreboardTable` | `@cs2dak/react` | 单场记分板（队伍着色、可点选手）。 | 记分板。 |
 | `EmptyState` / `MetricInfo` / `EvidenceLink` | `@cs2dak/react` | 空态骨架 / 派生指标 ⓘ 口径 / 跳回放原语。 | 裸空 div、裸 `title=`、自绘回放按钮。 |
 | `PlayerMapRoleProfilePanel` / `TeamMapRoleMatrixPanel` | `@cs2dak/react` | 地图/位置角色画像与队伍职责矩阵；只展示 presentation 模型，证据与动作由 container 注入。 | Studio 内重算角色、私有职责表或第二套证据按钮。 |
-| `AnalysisContextSummary` + `CohortScope` adapter | Studio | 分析页面只读展示该页面的 `AnalysisContext`；编辑时才投影语料字段。 | 第二套 scope/context owner。 |
-| `FingerprintRadar` / `TrendChart` | Studio（`views/profile-widgets.tsx`） | PRISM 八维风格雷达 / 个人趋势柱状图（指标可切换 + min–max 参照）。纯展示，个人实验室与「我的主页」复用。 | 重画风格雷达 / 趋势图。 |
-| `ElimBracket` / `SwissBracket` / `BracketConnections` | `@cs2dak/react` | 淘汰赛 bracket、瑞士轮 Buchholz 图、双败/GSL lane-aware 晋级连线。类型在 `@cs2dak/contract`。 | 淘汰赛渲染（唯一正确实现，见 D6）。 |
+| `AnalysisContextSummary` + 范围编辑器 | Studio | 分析页面只读展示该页面的 `AnalysisContext`；编辑时才投影语料字段。 | 第二套 scope/context owner。 |
+| `FingerprintRadar` / `TrendChart` | Studio（`views/profile-widgets.tsx`） | PRISM 八维风格雷达 / 个人趋势柱状图（指标可切换 + min–max 参照）。用于选手分析。 | 重画风格雷达 / 趋势图。 |
+| `ElimBracket` / `SwissBracket` / `BracketConnections` | `@cs2dak/react` | 淘汰赛 bracket、瑞士轮 Buchholz 图、双败/GSL lane-aware 晋级连线。消费 `@cs2dak/presentation` 的展示模型。 | 淘汰赛渲染（唯一正确实现，见 D6）。 |
 
-Studio 的 `WorkbenchView`、`MatchesView`、`AnalysisView`、`MaterialsView` 负责四入口的轻量组合；`LibraryView` 以浏览/维护模式共享筛选与同一动作 owner。`HomeView` 和 `CoachView` 暂供个人复盘与备战入口使用，分别由 W07/W09 迁完删除。
+Studio 的 `WorkbenchView`、`MatchesView`、`AnalysisView`、`MaterialsView` 负责四入口的轻量组合；`LibraryView` 以浏览/维护模式共享筛选与同一动作 owner。个人分析由分析主题承接，战术和材料由 Studio 持有；`HomeView`、`CoachView` 与 `CohortScope` 已删除，不是待恢复入口。
 
 ## 2. `DataTable` 用法
 
 ```tsx
 import { DataTable, type DataTableColumn } from "@cs2dak/react";
+import type { TableState } from "@cs2dak/presentation";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 
 const [tableState, setTableState] = useState<TableState>({ sort: { key: "wins", direction: "desc" }, page: 0 });
@@ -71,10 +72,12 @@ const COLUMNS: DataTableColumn<Row>[] = [
 - **样式注入**：`STUDIO_TABLE_CLASSES`（`stu-*`，CSS 在 studio.css）/ `DAK_TABLE_CLASSES`（`dak-*`，theme.css）。组件只共享逻辑结构，不跨设计语言。
 - **特例**：行 hover 联动（如 LineupView 雷达）用 `rowProps`；行整体点击用 `onRowClick`；条件行样式用 `rowClassName`。
 
-## 3. 表格统一迁移清单
+## 3. 历史表格迁移记录
+
+以下为当时的迁移记录，不作为当前组件清单或恢复旧页面的指令。
 
 仓库历史上有 **4 套排序实现**（`stu-col-sortable` 切换 / `stu-sort-header` 仅降序 /
-`dak-col-sortable` 仅降序 / 一堆静态表）。目标：全部收敛到 `DataTable`。
+`dak-col-sortable` 仅降序 / 一堆静态表）。当时的目标是收敛到 `DataTable`。
 
 | 表 | 位置 | 状态 |
 |---|---|---|
@@ -93,11 +96,11 @@ const COLUMNS: DataTableColumn<Row>[] = [
 ## 4. 下沉到 React 的待办（Tier A）
 
 - ~~`primitives.tsx` 的 `EmptyState` / `MetricInfo` / `EvidenceLink` → React~~ ✅ 已下沉（2026-06-23），原 `stu-*` 类→`dak-*`，CSS 迁 `theme.css`
-- ~~Bracket 渲染器 `ElimBracket` / `SwissBracket` / `BracketConnections` → React~~ ✅ 已下沉（2026-06-23），`BracketCell`/`ElimModel`/`SwissModel` 类型已迁 `@cs2dak/contract`
+- ~~Bracket 渲染器 `ElimBracket` / `SwissBracket` / `BracketConnections` → React~~ ✅ 已下沉（2026-06-23），bracket 展示类型现由 `@cs2dak/presentation` 提供
 
 ## 5. 必须留 Studio（绑数据）
 
-所有 View 容器、`CohortScope`、`EventManager` / `EventPackageMaker` / `EventFrameworkBoard` /
+所有 View 容器、分析范围编辑与状态、`EventManager` / `EventPackageMaker` / `EventFrameworkBoard` /
 `LibraryView` / `LibraryMaintenance`、`VetoInputDialog`。
 
 ## 6. Studio 专属（桌面壳，不下沉）

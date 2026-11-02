@@ -1,52 +1,26 @@
 # DAK Studio
 
-> **License: AGPL-3.0-only**（见本目录 [LICENSE](LICENSE)，Copyright (c) 2026 Starfie1d）。
-> 与仓库其余部分（MIT 生态包）不同：Studio 是产品，分发或以网络服务提供衍生版本时必须开源。
+> **License: AGPL-3.0-only**（见本目录 [LICENSE](LICENSE)）。Studio 是产品；共享包的许可见各包。
 
-本地 Demo 工作台：导入 `cs2-demo-format/3.x` ZIP，做战术分析与个人打法复盘。
-形态对标 CS Demo Manager，分析能力全部来自 `@cs2dak/*` 共享包——Studio 只做适配与编排（模块边界见 `docs/module-boundaries.md`）。
+本地比赛分析与训练工作台，支持导入 `cs2-demo-format/3.x` ZIP；桌面壳通过 cs2df 将 `.dem` 转为 ZIP。包职责见 [模块边界](../../docs/module-boundaries.md)，界面规则见 [设计语言](../../docs/design-language.md)。
 
 ```bash
 pnpm dev:studio   # http://127.0.0.1:5178
 ```
 
-## 目标用户与对应能力
+## 入口与资料
 
-| 用户 | 用法 |
-|---|---|
-| 普通玩家 | 导入自己的 demo，「关注选手」标星自己，看跨场趋势与强弱项 |
-| 高校赛主办方 | 导入赛事全部导出包，排行榜 + 比赛 QA 徽章检查导出质量 |
-| 参赛选手 | 聚合范围筛到本赛季，档案页逐场跳转复盘 |
-| 数据分析师 | 导入职业 demo，按地图筛聚合范围，选手对比 |
+- **工作台**：导入、最近比赛、继续分析及创建材料。
+- **比赛**：比赛库和赛事；打开比赛后由 Studio 的 `MatchReviewWorkspace` 组合单场总览、回合、选手与回放等。公共 React 包提供受控展示组件，不拥有 Studio 整页。
+- **分析**：表现与趋势、交火与协同、经济与转化、道具、开局与控图、位置与职责等主题。当前分析页面的 `AnalysisContext` 控制对象与语料范围，不隐式改其他页面。
+- **战术与训练**：管理笔记、战术、人员职责、比赛单等材料并进入讲解。证据引用比赛来源；删除比赛不等于删除笔记。
+- **数据管理**：身份、资产和资料库维护，包括浏览、标签、重建与备份入口；与比赛入口共享资料库动作。
 
-## 视图
+“保存分析”保存分析条件与页面状态；重开按**当前资料库重新计算**，不是冻结数值。分析页统一导出当前结果（Markdown/JSON），导出的文件是生成时的固定结果，包含来源与限制；后续导入或删除比赛不会修改已下载文件。旧 Prep 页面和旧导出无需恢复，旧用户数据不主动清除。
 
-- **资料库**：导入 .dem / v3 ZIP（多选 / 拖拽 / 示例 / 批量标签）、检索、地图与标签筛选。ZIP 字节存 IndexedDB（内容哈希去重），.dem 经 cs2df 转 ZIP 后入库（不存 .dem），解析结果只缓存内存。
-- **比赛工作台**：嵌入 `MatchWorkspace`（总览/回合/选手/经济/武器/对位/地图/回放）+ QA 徽章（strict validator + 分析 QA）。
-- **选手档案**：跨场画像（RR / Rating 2.0 / 六账户 / PRISM / 武器 / 每场走势 / 比赛列表）+ 关注选手 + 双人对比。
-- **开局动线**：选手在长枪局开局前 30 秒的走位 + 道具投掷叠加动画（默认最近 5 场，地图/阵营筛选，逐回合开关）。数据由 `@cs2dak/presentation` `buildOpeningTrails` 派生。
-- **排行榜**：`SeasonLeaderboard`，点选手跳档案。
-- **教练工作台**：导入时持久化 `TacticalRoundFact v5`；开局模式来自 core 的连续区域段与双层签名，前压使用独立中文 callout 证据。模式页常驻复用比赛工作台的 `ReplayViewer`，默认从 1:35 开始，回合/C4/赛后统一倒计时；不再生成或展示固定战术切片。
+## .dem 导入与桌面打包
 
-选手档案、开局动线与排行榜共享同一个「聚合范围」（地图多选 + 标签 + 单场勾选），对应 `buildSeasonCohort` 的输入集合。
+- **开发模式**：Vite 中间件调用 `uv run cs2df export`；ZIP 在浏览器持久化，facts/派生缓存用于后续分析。
+- **打包版**：pywebview 桌面壳调用本机 cs2df，前端与 Python 由 PyInstaller 打包，运行时不需要 Node。桌面后端采用 SQLite 与本地文件；不同平台、版本的升级及恢复仍需实机验收。
 
-## .dem 导入与打包形态
-
-数据库长期只存 v3 ZIP；.dem 在导入时即时转换：
-
-- **开发模式**（`pnpm dev:studio`）：Vite 中间件 `POST /api/export-dem` 调 `uv run cs2df export`。
-- **打包版**（`scripts/package.sh`）：pywebview 桌面壳 `cs2dak-studio` 托管 Studio 构建产物，
-  `.dem` 经 JS bridge（`python/src/cs2dak/studio.py`）走本机 cs2df。Python 与前端打进同一个
-  应用（PyInstaller `packaging/cs2dak-studio.spec`），运行时不需要 Node。
-
-## 设计语言「Tactical Slate」
-
-`src/studio.css` 覆盖 `:root` 的 `--dak-*` 设计变量（青绿 accent #2fe0a8）统一嵌入组件，不 fork 组件；
-Studio 自有壳层用 `stu-*` 前缀；`.stu-embed .dak-shell` 去掉全屏壳背景。
-
-## Roadmap（未实现，按价值排序）
-
-1. 选手跨场热力图（CSDM PlayerHeatmap 形态）—— 需要 presentation 聚合多场 spatial points。
-2. 资料库备注 / 比赛评论（CSDM comment 形态）。
-3. 开局动线扩展：CT 默认站位对比、强起局开关、按 zone 的到点时间统计。
-4. Demo 下载集成（Valve / Faceit 分享码）。
+安装、版本与发布门禁见 [发行文档](../../docs/release.md)。原生壳、在线服务和大资料库能力不能仅凭浏览器开发模式推断。
