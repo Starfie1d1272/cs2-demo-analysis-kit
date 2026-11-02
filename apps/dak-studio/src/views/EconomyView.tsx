@@ -77,7 +77,6 @@ export function EconomyView({ exportSource, state, onStateChange, onViewMatches,
           <h1>{playerFocused ? "当前比赛范围的经济" : "经济与转化"}</h1>
           {insights && exportSource && !error && canExportSnapshot(snapshot, analysis) && <AnalysisExportButtons capture={() => buildEconomyAnalysisResult(exportSource, insights, state, { teams: TEAM_DETAIL_COLUMNS, matrix: ECON_MATRIX_COLUMNS, upset: ECO_UPSET_COLUMNS })} />}
           <p>按所选比赛范围聚合，查看手枪转化、5v4/5v3 转化、劣势翻盘和小枪破局。当前结果为描述性聚合，尚不自动生成 Finding。</p>
-          <p>未绑定队伍按显示名分组；同场同名双方单独列出。名称筛选包含该名称的全部分组。</p>
           {playerFocused && <p>经济统计按比赛范围计算，未按个人筛选。</p>}
           <button type="button" className="stu-button-sm" disabled={entries.length === 0} onClick={onViewMatches}>查看这组比赛</button>
         </div>
