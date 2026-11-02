@@ -5,10 +5,10 @@ import { listSeriesRecords, pruneOrphanSeries, type StudioSeriesRecord } from ".
 import { listEventRecords, type StudioEventRecord } from "../lib/events";
 import { loadIdentityState } from "../lib/identity-commands";
 import type { IdentityStoreState } from "../lib/identity";
-import { ensureAnalysisDataReady } from "../lib/queries/query-cache";
+import { ensureAnalysisDataReady, getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation } from "../lib/queries/query-cache";
 export type DirectoryLoadStatus = "loading" | "ready" | "error";
 
-export function useStudioData({ onError }: { onError: (message: string) => void }) {
+export function useStudioData({ onError, importing }: { onError: (message: string) => void; importing: boolean }) {
   const [entries, setEntries] = useState<StudioDemoEntry[]>([]);
   const [entriesReady, setEntriesReady] = useState(false);
   const [entriesStatus, setEntriesStatus] = useState<DirectoryLoadStatus>("loading");
@@ -73,5 +73,29 @@ export function useStudioData({ onError }: { onError: (message: string) => void 
     void refreshIdentity().catch(err => { if (mounted.current) onError(`读取身份失败：${String(err)}`); });
     return () => { mounted.current = false; versions.current.entries++; versions.current.events++; versions.current.identity++; };
   }, [onError, refreshEntries, refreshEventRecords, refreshIdentity]);
+  useEffect(() => {
+    let generation = getAnalysisDataSnapshot().generation;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let pending = false;
+    const schedule = () => {
+      if (!pending || importing || getAnalysisDataSnapshot().status !== "ready") return;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        pending = false;
+        void refreshEntries().catch(() => {});
+      }, 500);
+    };
+    const unsubscribe = subscribeAnalysisDataInvalidation(() => {
+      const next = getAnalysisDataSnapshot();
+      if (next.generation !== generation) {
+        generation = next.generation;
+        // A read started before this revision must never publish its old rows.
+        versions.current.entries++;
+        pending = true;
+      }
+      schedule();
+    });
+    return () => { unsubscribe(); clearTimeout(timer); };
+  }, [importing, refreshEntries]);
   return { entries, entriesReady, entriesStatus, entriesError, identityStatus, identityReady, eventsStatus, seriesStatus, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity };
 }
