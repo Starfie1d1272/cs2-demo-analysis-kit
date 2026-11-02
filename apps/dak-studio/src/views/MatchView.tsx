@@ -15,6 +15,8 @@ import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import { EmptyState } from "@cs2dak/react";
 import { SeriesWorkspace } from "./SeriesWorkspace";
 import { captureSavedEvidence } from "../lib/saved-evidence";
+import { buildMatchAnalysisResult } from "../lib/analysis-export";
+import { downloadAnalysisResult } from "../lib/analysis-export-download";
 import type { StudyNoteDraft } from "../lib/study-notes";
 import type { EvidenceSession } from "../lib/evidence-continuation";
 
@@ -223,7 +225,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     ? <EmptyState variant="error" title="加载失败" hint={error} />
     : !model
       ? <div className="stu-loading">读取本地持久化工作台…</div>
-      : <MatchReviewWorkspace model={model} onReviewChoice={() => { mayApplyPinned.current = false; }} onAnalyzePlayer={onAnalyzePlayer} pinnedIds={pinned ?? []} onNote={(roundNumber) => { if (activeEntry) openStudyNoteEditor({ title: `${activeEntry.meta.teamAName} vs ${activeEntry.meta.teamBName} · R${roundNumber}`, body: "", purpose: "review", playerKey: null, evidence: [captureSavedEvidence(activeEntry, { matchId: matchIdForEntry(activeEntry), roundNumber, reason: "比赛回合笔记" })] }); }} state={loaded!.state} onStateChange={(state) => { if (loaded?.state.replay?.playing && state.replay && !state.replay.playing) onReplayPaused?.({ roundNumber: state.replay.roundNumber, tick: state.replay.tick }); setLoaded(prev => prev && prev.id === activeId ? { ...prev, state } : prev); }} />;
+      : <MatchReviewWorkspace model={model} onExportCurrent={format => { if (activeEntry && loaded) downloadAnalysisResult(buildMatchAnalysisResult(model, activeEntry, loaded.state), format); }} onReviewChoice={() => { mayApplyPinned.current = false; }} onAnalyzePlayer={onAnalyzePlayer} pinnedIds={pinned ?? []} onNote={(roundNumber) => { if (activeEntry) openStudyNoteEditor({ title: `${activeEntry.meta.teamAName} vs ${activeEntry.meta.teamBName} · R${roundNumber}`, body: "", purpose: "review", playerKey: null, evidence: [captureSavedEvidence(activeEntry, { matchId: matchIdForEntry(activeEntry), roundNumber, reason: "比赛回合笔记" })] }); }} state={loaded!.state} onStateChange={(state) => { if (loaded?.state.replay?.playing && state.replay && !state.replay.playing) onReplayPaused?.({ roundNumber: state.replay.roundNumber, tick: state.replay.tick }); setLoaded(prev => prev && prev.id === activeId ? { ...prev, state } : prev); }} />;
 
   return (
     <div className="stu-view stu-view-flush">

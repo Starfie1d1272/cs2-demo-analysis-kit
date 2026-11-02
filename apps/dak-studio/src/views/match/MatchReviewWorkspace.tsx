@@ -25,7 +25,7 @@ const WORKSPACE_NAV: Array<{ key: WorkspaceView; label: string }> = [
   { key: "map", label: "地图" }
 ];
 
-export function MatchReviewWorkspace({ model, state: input, onStateChange, pinnedIds, onNote, onAnalyzePlayer, onReviewChoice }: { onReviewChoice: () => void; onAnalyzePlayer: (steamId: string, label: string) => void; pinnedIds: string[]; onNote: (roundNumber: number) => void; model: MatchWorkspaceModel; state: MatchWorkspaceState; onStateChange: (next: MatchWorkspaceState) => void }) {
+export function MatchReviewWorkspace({ model, state: input, onStateChange, pinnedIds, onNote, onAnalyzePlayer, onReviewChoice, onExportCurrent }: { onExportCurrent: (format: "markdown" | "json") => void; onReviewChoice: () => void; onAnalyzePlayer: (steamId: string, label: string) => void; pinnedIds: string[]; onNote: (roundNumber: number) => void; model: MatchWorkspaceModel; state: MatchWorkspaceState; onStateChange: (next: MatchWorkspaceState) => void }) {
   const state = normalizeMatchWorkspaceState(model, input);
   const setView = (view: WorkspaceView) => onStateChange({ ...state, view, replay: state.replay && view !== "replay" ? { ...state.replay, playing: false } : state.replay });
   const view = state.view;
@@ -50,6 +50,8 @@ export function MatchReviewWorkspace({ model, state: input, onStateChange, pinne
           <div className="dak-scoreblock">
             <div className="dak-scoreline">{model.scoreline}</div>
             <div className="dak-mapline">{model.mapName}</div>
+            <button type="button" className="dak-report-button" onClick={() => onExportCurrent("markdown")}>导出本次结果 · Markdown</button>
+            <button type="button" className="dak-report-button" onClick={() => onExportCurrent("json")}>导出本次结果 · JSON</button>
             <button
               type="button"
               className="dak-report-button"
