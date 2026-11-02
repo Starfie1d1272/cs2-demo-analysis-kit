@@ -245,7 +245,7 @@ export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entri
         <label>
           <span>① 选手</span>
           <select className="stu-select" value={selectedKey ?? ""} onChange={(e) => { const player = players?.find(option => option.playerKey === e.target.value); if (player) onSelectPlayer(player.playerKey, player.name); }}>
-            {selectedKey && !(players ?? []).some(option => option.playerKey === selectedKey) && <option value={selectedKey}>{players ? "当前选手 · 0 场" : "正在读取选手…"}</option>}
+            {selectedKey && !(players ?? []).some(option => option.playerKey === selectedKey) && <option value={selectedKey}>{players || entries.length === 0 ? "当前选手 · 0 场" : "正在读取选手…"}</option>}
             {!selectedKey && <option value="">请选择选手</option>}
             {(players ?? []).map((option) => (
               <option key={option.playerKey} value={option.playerKey}>
@@ -257,8 +257,8 @@ export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entri
         <label>
           <span>② 地图</span>
           <select className="stu-select" value={mapName ?? ""} onChange={(e) => setMapName(e.target.value || null)}>
-            {mapName === null && <option value="">{rosterByEntry ? "请选择地图" : "正在读取地图…"}</option>}
-            {mapName !== null && !mapOptions.some(([map]) => map === mapName) && <option value={mapName}>{mapName}（{rosterByEntry ? "0 场" : "读取中"}）</option>}
+            {mapName === null && <option value="">{rosterByEntry || entries.length === 0 ? "请选择地图" : "正在读取地图…"}</option>}
+            {mapName !== null && !mapOptions.some(([map]) => map === mapName) && <option value={mapName}>{mapName}（{rosterByEntry || entries.length === 0 ? "0 场" : "读取中"}）</option>}
             {mapOptions.map(([map, count]) => (
               <option key={map} value={map}>
                 {map}（{count} 场）
