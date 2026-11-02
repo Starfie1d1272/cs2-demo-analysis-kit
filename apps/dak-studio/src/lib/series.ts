@@ -1,9 +1,8 @@
 import type { RawDemoHint, SeriesFormat, SeriesVeto, SeriesVetoStep } from "@cs2dak/contract";
-import type { PrepItem } from "./playlist";
 import { ACTIVE_DUTY_MAPS } from "@cs2dak/maps";
 import { entryDate, type StudioDemoEntry } from "./demo-entry";
 import { displayTeamName } from "./identity";
-import { getStorage, type RecordStore } from "./storage";
+import { getStorage } from "./storage";
 import type { RivalHubRemoteMap } from "./rivalhub-contract";
 
 /** BP 录入默认图池：CS2 现役 7 张（de_ 形式，与 entry.meta.mapName 对齐）。 */
@@ -77,9 +76,6 @@ const SETTINGS_KEY = "coach";
 
 const seriesStore = getStorage().records("series");
 const settingsStore = getStorage().records("series-settings");
-const playbookStore = getStorage().records("playbook");
-const prepItemsStore = getStorage().records("prep-items");
-const mapPoolNotesStore = getStorage().records("map-pool-notes");
 
 /** 按 demo 数量推断初始赛制（用户可在 UI 中手动调整）。
  *  启发式：>=4 场只可能是 BO5；2-3 场大概率 BO3。
@@ -291,60 +287,4 @@ export async function loadCoachSettings(): Promise<CoachSettings> {
 export async function saveCoachSettings(settings: CoachSettings): Promise<CoachSettings> {
   await settingsStore.put(SETTINGS_KEY, settings);
   return settings;
-}
-
-export async function listPlaybookNames(): Promise<Record<string, string>> {
-  try {
-    const entries = await playbookStore.entries<string>();
-    return Object.fromEntries(entries.map(([key, value]) => [key, value ?? ""]));
-  } catch {
-    return {};
-  }
-}
-
-export async function savePlaybookName(clusterId: string, name: string): Promise<void> {
-  await playbookStore.put(clusterId, name.trim());
-}
-
-/** Coach 备战清单的唯一持久化 owner。每次读取都幂等搬迁残留的旧 playlist 数据。 */
-export function createPrepItemsStore(records: RecordStore, legacyRecords?: RecordStore) {
-  return {
-    async list(): Promise<PrepItem[]> {
-      const current = await records.getAll<PrepItem>();
-      if (!legacyRecords) return current.sort((a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0));
-      const legacy = await legacyRecords.getAll<PrepItem>();
-      const byId = new Map(current.map((item) => [item.id, item]));
-      for (const item of legacy) {
-        if (!byId.has(item.id)) {
-          const migrated = { ...item, source: item.source ?? "tactical-pattern" as const };
-          await records.put(item.id, migrated);
-          byId.set(item.id, migrated);
-        }
-        await legacyRecords.delete(item.id);
-      }
-      return [...byId.values()].sort((a, b) => (a.addedAt ?? 0) - (b.addedAt ?? 0));
-    },
-    async save(item: PrepItem): Promise<void> {
-      await records.put(item.id, { ...item, source: item.source ?? "tactical-pattern", addedAt: item.addedAt ?? Date.now() });
-    },
-    async remove(id: string): Promise<void> { await records.delete(id); },
-  };
-}
-
-const prepItems = createPrepItemsStore(prepItemsStore, getStorage().records("playlist"));
-export const listPrepItems = prepItems.list;
-export const savePrepItem = prepItems.save;
-export const removePrepItem = prepItems.remove;
-
-export async function listMapPoolNotes(): Promise<Record<string, string>> {
-  try {
-    const entries = await mapPoolNotesStore.entries<string>();
-    return Object.fromEntries(entries.map(([mapName, note]) => [mapName, note ?? ""]));
-  } catch {
-    return {};
-  }
-}
-
-export async function saveMapPoolNote(mapName: string, note: string): Promise<void> {
-  await mapPoolNotesStore.put(mapName, note);
 }

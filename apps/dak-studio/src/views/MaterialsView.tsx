@@ -1,12 +1,85 @@
-import { useEffect, useState } from "react";
-import { listPracticeLineups, type PracticeLineup } from "../lib/practice-lineups";
+import { useEffect, useRef, useState } from "react";
+import { usePageReady } from "../lib/use-page-ready";
+import type { StudioDemoEntry } from "../lib/demo-entry";
+import { matchIdForEntry } from "../lib/demo-entry";
+import type { OpenEvidenceRequest } from "../lib/evidence-continuation";
+import type { MaterialRef } from "../lib/material-ref";
+import { emptyStudyNoteDraft, materialStateMatches, type MaterialPageState, type MaterialsPageState } from "../lib/material-page-state";
+import { listStudyMaterialsKind, sortMaterials, materialKey, type MaterialKind, type MaterialSummary } from "../lib/study-materials";
+import { createStudyNote, getStudyNote, removeStudyNote, updateStudyNote } from "../lib/study-notes";
+import { listTrainingFocus, type TrainingFocus } from "../lib/training-focus";
+import { listPrepItems, type PrepItem } from "../lib/prep-items";
+import { listPracticeLineups, removePracticeLineup, type PracticeLineup } from "../lib/practice-lineups";
+import { FACTS_REVISION } from "../lib/analysis-manifest";
+import { TrainingFocusEditor, saveTrainingFocusDraft, deleteTrainingFocus } from "./coach/TrainingFocusPanel";
+import { PrepItemEditor, savePrepItemDraft, deletePrepItem } from "./coach/PrepItemsPanel";
+import { resolveSavedEvidence } from "../lib/saved-evidence";
+import { StudyNoteEditor } from "./coach/StudyNoteEditor";
 
-export function MaterialsView({ onLineups, onOpenMatch }: { onLineups: () => void; onOpenMatch: (id: string, target: { roundNumber: number; tick?: number }) => void }) {
-  const [items, setItems] = useState<PracticeLineup[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => { let cancelled = false; void listPracticeLineups().then(rows => { if (!cancelled) setItems(rows); }).catch(reason => { if (!cancelled) setError(String(reason)); }); return () => { cancelled = true; }; }, []);
-  return <div className="stu-view"><header className="stu-view-header"><div><h1>战术与训练</h1><p>整理备战材料并访问已保存的练习。</p></div></header>
-    <button type="button" className="stu-button" onClick={onLineups}>浏览道具点位</button><h2>已保存练习</h2>
-    {error ? <p role="alert">读取练习失败：{error}</p> : items.length === 0 ? <p>暂无已保存练习。</p> : items.map(item => <div key={item.id}><b>{item.label}</b> {item.practiceCommand && <code>{item.practiceCommand}</code>} {item.evidence && <button type="button" className="stu-button-sm" onClick={() => onOpenMatch(item.evidence!.entryId, item.evidence!)}>查看比赛</button>}</div>)}
+const labels: Record<MaterialKind, string> = { "study-note": "笔记", "training-focus": "训练重点", "prep-item": "备战条目", "practice-lineup": "练习点位" };
+const statusLabels = { "no-evidence": "无证据", exact: "来源一致", "version-changed": "来源版本已变化", missing: "原比赛当前不在资料库", conflict: "来源身份冲突", unverified: "来源版本未知" };
+
+type ListProps = { onPageReady?: (keys: string[]) => void; prepMigrationStatus: "loading" | "ready" | "error"; prepMigrationError: string | null; retryPrepMigration: () => Promise<void>; entries: StudioDemoEntry[]; state: MaterialsPageState; onStateChange: (state: MaterialsPageState) => void; onOpenMaterial: (ref: MaterialRef) => void; onCreatedMaterial: (ref: MaterialRef, state: MaterialsPageState) => void; onOpenEvidence: (request: OpenEvidenceRequest, state: MaterialsPageState) => void };
+export function MaterialsView({ entries, state, onStateChange, onOpenMaterial, onCreatedMaterial, onOpenEvidence, prepMigrationStatus, prepMigrationError, retryPrepMigration, onPageReady }: ListProps) {
+  const [rows, setRows] = useState<MaterialSummary[]>([]); const [errors, setErrors] = useState<Partial<Record<MaterialKind, string>>>({}); const [unreadable, setUnreadable] = useState(0); const [revision, setRevision] = useState(0); const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const [loaded, setLoaded] = useState(false);
+  usePageReady(loaded && prepMigrationStatus !== "loading", onPageReady);
+  useEffect(() => {
+    let live = true;
+    setLoaded(false);
+    const pending: Promise<void>[] = [];
+    for (const kind of Object.keys(labels) as MaterialKind[]) {
+      if (kind === "prep-item" && prepMigrationStatus === "loading") continue;
+      pending.push(listStudyMaterialsKind(kind, entries).then(result => {
+        if (!live) return;
+        setRows(previous => sortMaterials([...previous.filter(row => row.ref.kind !== kind), ...result.rows]));
+        setErrors(previous => { const next = { ...previous }; delete next[kind]; return next; });
+        if (kind === "study-note") setUnreadable(result.unreadable);
+      }).catch(reason => { if (live) setErrors(previous => ({ ...previous, [kind]: String(reason) })); }));
+    }
+    void Promise.all(pending).then(() => { if (live) setLoaded(true); });
+    return () => { live = false; };
+  }, [entries, revision, prepMigrationStatus]);
+  const change = (patch: Partial<MaterialsPageState>) => onStateChange({ ...state, ...patch });
+  const filtered = rows.filter(row => (!state.typeFilter || row.ref.kind === state.typeFilter) && (!state.mapFilter || row.mapName === state.mapFilter) && `${row.title} ${row.summary}`.toLowerCase().includes(state.search.toLowerCase()));
+  const save = async () => { if (!state.newNote || savingRef.current) return; savingRef.current = true; setSaving(true); try { const note = await createStudyNote(state.newNote); setError(null); onCreatedMaterial({ kind: "study-note", id: note.id }, { ...state, newNote: null, newNoteDirty: false }); } catch (e) { setError(String(e)); } finally { savingRef.current = false; setSaving(false); } };
+  return <div className="stu-view"><header className="stu-view-header"><div><h1>资料</h1><p>查找已保存的笔记、重点和备战材料。</p></div></header>
+    <button className="stu-button" disabled={state.newNote !== null} onClick={() => change({ newNote: emptyStudyNoteDraft(), newNoteDirty: false })}>新建笔记</button>
+    <div><input className="stu-input" placeholder="搜索标题或正文" value={state.search} onChange={e => change({ search: e.target.value })} /><select className="stu-input" value={state.typeFilter ?? ""} onChange={e => change({ typeFilter: e.target.value || null })}><option value="">全部类型</option>{Object.entries(labels).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select><select className="stu-input" value={state.mapFilter ?? ""} onChange={e => change({ mapFilter: e.target.value || null })}><option value="">全部地图</option>{[...new Set(rows.flatMap(r => r.mapName ? [r.mapName] : []))].sort().map(map => <option key={map}>{map}</option>)}</select></div>
+    {prepMigrationStatus === "error" && <p role="alert">备战条目迁移未完成：{prepMigrationError} <button className="stu-button-sm" onClick={() => void retryPrepMigration()}>重试迁移</button></p>}
+    {Object.entries(errors).map(([kind, message]) => <p role="alert" key={kind}>{labels[kind as MaterialKind]}读取失败：{message} <button className="stu-button-sm" onClick={() => setRevision(n => n + 1)}>重试</button></p>)}{unreadable > 0 && <p role="alert">有 {unreadable} 条笔记无法读取，原始记录已保留。</p>}
+    {(!loaded || prepMigrationStatus === "loading") && <p>正在读取资料…</p>}{loaded && prepMigrationStatus !== "loading" && filtered.length === 0 && <p>没有匹配的资料。</p>}{filtered.map(row => <div key={materialKey(row.ref)}><button className="stu-button-sm" onClick={() => { change({ selectedRef: row.ref }); onOpenMaterial(row.ref); }}>{row.title}</button> · {row.kindLabel} · {row.mapName ?? "—"} · {row.updatedAt === null ? "时间未知" : new Date(row.updatedAt).toLocaleString()} · {statusLabels[row.sourceStatus]}<p>{row.summary || "—"}</p></div>)}
+    {state.newNote && <div role="dialog" aria-label="新建笔记"><h2>新建笔记</h2><fieldset disabled={saving}><StudyNoteEditor draft={state.newNote} entries={entries} onChange={draft => change({ newNote: draft, newNoteDirty: true })} onEvidence={index => { const ref = state.newNote!.evidence[index]; const resolved = resolveSavedEvidence(ref, entries); if (resolved.canOpenCurrent && resolved.currentEntryId) onOpenEvidence({ entryId: resolved.currentEntryId, evidence: ref.evidence }, state); }} />{error && <p role="alert">保存失败：{error}</p>}<button className="stu-button" disabled={saving} onClick={() => void save()}>保存</button><button className="stu-button-sm" disabled={saving} onClick={() => { if (!state.newNoteDirty || window.confirm("放弃新建笔记？")) change({ newNote: null, newNoteDirty: false }); }}>取消</button></fieldset></div>}
+  </div>;
+}
+
+type DetailProps = { onPageReady?: (keys: string[]) => void; refValue: MaterialRef; entries: StudioDemoEntry[]; state: MaterialPageState | null; onStateChange: (state: MaterialPageState | null) => void; onBack: (cleanState?: MaterialPageState | null) => void; onOpened: (ref: MaterialRef) => void; onOpenEvidence: (request: OpenEvidenceRequest, state: MaterialPageState) => void };
+type RecordValue = TrainingFocus | PrepItem | PracticeLineup;
+export function MaterialDetailView({ refValue, entries, state, onStateChange, onBack, onOpened, onOpenEvidence, onPageReady }: DetailProps) {
+  const [record, setRecord] = useState<RecordValue | null>(null); const [error, setError] = useState<string | null>(null); const [saved, setSaved] = useState(false); const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  usePageReady(!loading, onPageReady);
+  useEffect(() => { let live = true; setLoading(true); setError(null); const load = async () => {
+    switch (refValue.kind) {
+      case "study-note": { const n = await getStudyNote(refValue.id); if (!n) throw new Error("笔记不存在或无法读取"); if (live && !materialStateMatches(state, refValue)) onStateChange({ kind: "study-note", id: n.id, draft: { title: n.title, body: n.body, purpose: n.purpose, playerKey: n.playerKey, evidence: n.evidence }, dirty: false }); break; }
+      case "training-focus": { const n = (await listTrainingFocus()).find(x => x.id === refValue.id); if (!n) throw new Error("记录不存在"); if (live) { setRecord(n); if (!materialStateMatches(state, refValue)) onStateChange({ kind: "training-focus", id: n.id, draft: { note: n.note, reviewCondition: n.reviewCondition }, dirty: false }); } break; }
+      case "prep-item": { const n = (await listPrepItems()).find(x => x.id === refValue.id); if (!n) throw new Error("记录不存在"); if (live) { setRecord(n); if (!materialStateMatches(state, refValue)) onStateChange({ kind: "prep-item", id: n.id, draft: { group: n.group, note: n.note }, dirty: false }); } break; }
+      case "practice-lineup": { const n = (await listPracticeLineups()).find(x => x.id === refValue.id); if (!n) throw new Error("记录不存在"); if (live) { setRecord(n); if (!materialStateMatches(state, refValue)) onStateChange({ kind: "practice-lineup", id: n.id, selectedEvidence: null }); } break; }
+      default: throw new Error("此资料类型尚未开放");
+    }
+  }; void load().then(() => { if (live) onOpened(refValue); }).catch(e => { if (live) setError(String(e)); }).finally(() => { if (live) setLoading(false); }); return () => { live = false; }; }, [refValue.kind, refValue.id]);
+  const current = materialStateMatches(state, refValue) ? state : null;
+  const leave = () => onBack();
+  const save = async () => { if (!current || savingRef.current) return; savingRef.current = true; setSaving(true); try { switch (current.kind) { case "study-note": if (!await updateStudyNote(current.id, current.draft)) throw new Error("记录不存在"); break; case "training-focus": if (!record) throw new Error("记录不存在"); await saveTrainingFocusDraft(record as TrainingFocus, current.draft); break; case "prep-item": if (!record) throw new Error("记录不存在"); await savePrepItemDraft(record as PrepItem, current.draft); break; case "practice-lineup": return; } onStateChange({ ...current, dirty: false }); setSaved(true); setError(null); } catch (e) { setError(String(e)); } finally { savingRef.current = false; setSaving(false); } };
+  const remove = async () => { if (!window.confirm("删除这条资料？")) return; try { switch (refValue.kind) { case "study-note": await removeStudyNote(refValue.id); break; case "training-focus": await deleteTrainingFocus(refValue.id); break; case "prep-item": await deletePrepItem(refValue.id); break; case "practice-lineup": await removePracticeLineup(refValue.id); break; default: return; } onBack(null); } catch (e) { setError(String(e)); } };
+  const legacyEvidence = (matchId: string, roundNumber: number, tick?: number) => { const matches = entries.filter(e => matchIdForEntry(e) === matchId); const entry = matches.length === 1 ? matches[0] : undefined; return <>{!entry && <span>{matches.length ? "来源存在歧义" : "原比赛当前不在资料库"} </span>}<button className="stu-button-sm" disabled={!entry} onClick={() => entry && current && onOpenEvidence({ entryId: entry.id, evidence: { matchId, roundNumber, tick, reason: "已保存资料" } }, current)}>回放</button></>; };
+  return <div className="stu-view"><button className="stu-button-sm" disabled={saving} onClick={leave}>返回资料</button>{loading && <p>正在读取…</p>}{error && <p role="alert">{error}</p>}<fieldset disabled={saving}>{current?.kind === "study-note" && <><h1>笔记</h1><StudyNoteEditor draft={current.draft} entries={entries} onChange={draft => { setSaved(false); onStateChange({ ...current, draft, dirty: true }); }} onEvidence={index => { const ref = current.draft.evidence[index]; const resolved = resolveSavedEvidence(ref, entries); if (resolved.canOpenCurrent && resolved.currentEntryId) onOpenEvidence({ entryId: resolved.currentEntryId, evidence: ref.evidence }, current); }} /></>}
+    {current?.kind === "training-focus" && record && <TrainingFocusEditor record={record as TrainingFocus} draft={current.draft} onChange={draft => onStateChange({ ...current, draft, dirty: true })} renderEvidence={e => <span>R{e.roundNumber} · 来源版本未知 {legacyEvidence(e.matchId, e.roundNumber, e.tick)}</span>} />}
+    {current?.kind === "prep-item" && record && <PrepItemEditor record={record as PrepItem} draft={current.draft} onChange={draft => onStateChange({ ...current, draft, dirty: true })} renderEvidence={n => <span>{n.mapName ?? "—"} · R{n.roundNumber} · 来源版本未知 {legacyEvidence(n.matchId, n.roundNumber)}</span>} />}
+    {current?.kind === "practice-lineup" && record && (() => { const n = record as PracticeLineup; const entry = entries.find(e => e.id === n.evidence?.entryId); return <><h1>{n.label}</h1><p>练习命令：{n.practiceCommand ?? "—"}</p><p>来源版本：{!n.sourceFactsRevision ? "未知" : n.sourceFactsRevision !== FACTS_REVISION ? "已变化" : n.sourceFactsRevision}</p>{n.evidence && <p>R{n.evidence.roundNumber} {entry ? <button className="stu-button-sm" onClick={() => current && n.evidence && onOpenEvidence({ entryId: entry.id, evidence: { matchId: matchIdForEntry(entry), roundNumber: n.evidence.roundNumber, tick: n.evidence.tick, reason: "已保存资料" } }, current)}>回放</button> : "原比赛当前不在资料库"}</p>}</>; })()}
+    {current && current.kind !== "practice-lineup" && <button className="stu-button" disabled={saving} onClick={() => void save()}>保存</button>}{saved && <span>已保存</span>}{current && <button className="stu-button-sm" disabled={saving} onClick={() => void remove()}>删除</button>}</fieldset>
   </div>;
 }

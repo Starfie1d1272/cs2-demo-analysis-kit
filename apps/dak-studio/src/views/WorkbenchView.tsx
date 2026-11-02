@@ -1,3 +1,5 @@
+import { listStudyMaterialsKind, sortMaterials, type MaterialKind, type MaterialSummary } from "../lib/study-materials";
+import type { MaterialRef } from "../lib/material-ref";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { entryDate, formatMatchLabel, type StudioDemoEntry } from "../lib/demo-entry";
 import { getLastWork, setLastWork, type LastWork } from "../lib/last-work";
@@ -10,12 +12,25 @@ function validDate(entry: StudioDemoEntry): string | null {
   const parsed = new Date(`${date}T00:00:00Z`);
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date ? date : null;
 }
-export function WorkbenchView({ entries, entriesReady, importing, importTagsRaw, onImportFiles, onNativeImport, onMatches, onOpenMatch, onPersonal, onResumeAnalysis }: {
+export function WorkbenchView({ entries, entriesReady, importing, importTagsRaw, onImportFiles, onNativeImport, onMatches, onOpenMatch, onPersonal, onResumeAnalysis, onOpenMaterial, onNewNote, prepMigrationStatus }: {
   entries: StudioDemoEntry[]; entriesReady: boolean; importing: boolean; importTagsRaw: string; onImportFiles: (files: Iterable<File>, tags: string[]) => void;
   onNativeImport?: () => void; onMatches: () => void; onOpenMatch: (id: string, target?: { roundNumber: number; tick?: number }) => void;
+  prepMigrationStatus: "loading" | "ready" | "error";
+  onOpenMaterial: (ref: MaterialRef) => void; onNewNote: () => void;
   onPersonal: (pinned: PinnedPlayer | null) => void; onResumeAnalysis?: () => void;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
+  const [materials, setMaterials] = useState<MaterialSummary[]>([]);
+  const [materialErrors, setMaterialErrors] = useState(false);
+  useEffect(() => {
+    let active = true;
+    const kinds: MaterialKind[] = ["study-note", "training-focus", "practice-lineup", ...(prepMigrationStatus === "loading" ? [] : ["prep-item" as const])];
+    setMaterialErrors(false);
+    for (const kind of kinds) void listStudyMaterialsKind(kind, entries).then(result => {
+      if (active) setMaterials(previous => sortMaterials([...previous.filter(row => row.ref.kind !== kind), ...result.rows]));
+    }).catch(() => { if (active) setMaterialErrors(true); });
+    return () => { active = false; };
+  }, [entries, prepMigrationStatus]);
   const [last, setLast] = useState<LastWork | null>(null);
   const [pinned, setPinned] = useState<PinnedPlayer | null>(null);
   useEffect(() => { let active = true; void getLastWork().then(value => { if (active) setLast(value); }); void getPinnedPlayer().then(value => { if (active) setPinned(value); }); return () => { active = false; }; }, []);
@@ -31,6 +46,7 @@ export function WorkbenchView({ entries, entriesReady, importing, importTagsRaw,
     {last && <section><h2>继续上次</h2>{!entriesReady && last.target.kind === "match" ? <p>正在读取比赛…</p> : match && last.target.kind === "match" ? <button type="button" className="stu-button" onClick={() => { if (last.target.kind === "match") onOpenMatch(last.target.entryId, last.target.roundNumber === undefined ? undefined : { roundNumber: last.target.roundNumber, tick: last.target.tick }); }}>比赛 · {formatMatchLabel(match)} · {new Date(last.openedAt).toLocaleString()}</button> : <p>上次工作不可用 · {new Date(last.openedAt).toLocaleString()} <button type="button" className="stu-button-sm" onClick={() => { setLast(null); void setLastWork(null); }}>移除捷径</button></p>}</section>}
     {onResumeAnalysis && <section><h2>本次会话</h2><button type="button" className="stu-button" onClick={onResumeAnalysis}>继续上次分析</button></section>}
     <section><h2>最近比赛</h2>{!entriesReady ? <p>正在读取比赛…</p> : recent.length === 0 ? <p>还没有比赛，导入后即可开始复盘。</p> : recent.map(entry => <div key={entry.id}><button type="button" className="stu-button" onClick={() => onOpenMatch(entry.id)}>{entry.meta.mapName || "—"} · {entry.meta.teamAName || "—"} {entry.meta.teamAScore ?? "—"}:{entry.meta.teamBScore ?? "—"} {entry.meta.teamBName || "—"} · {validDate(entry) ?? "日期未知"}</button></div>)}</section>
+    <section><h2>最近资料</h2><button type="button" className="stu-button" onClick={onNewNote}>新建笔记</button>{materialErrors && <p role="alert">部分资料读取失败，请到资料页重试。</p>}{materials.slice(0, 5).map(item => <div key={`${item.ref.kind}:${item.ref.id}`}><button type="button" className="stu-button" onClick={() => onOpenMaterial(item.ref)}>{item.kindLabel} · {item.title}</button></div>)}</section>
     <section><h2>我的关注</h2><button type="button" className="stu-button" onClick={() => onPersonal(pinned)}>{pinned ? `我的分析 · ${pinned.name}` : "选择我的选手"}</button></section>
   </div>;
 }

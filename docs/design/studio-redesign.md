@@ -241,7 +241,7 @@ one tap 只对可一枪满血终结的武器展示，Glock/USP/M4 等不展示�
   schema + `VetoInputDialog` + `SeriesWorkspace` 系列赛工作台含各图 tab/比分/跨图记分板）
   + `MapPoolTable`（地图池比较表：我方/对手样本胜率 + 对手高频打法）✅ 2026-06-15。
 - 8e PrepItem：备战清单持久化（`PrepItem` + IndexedDB `prep-items`
-  namespace）+ Markdown 导出（`prepItemsToMarkdown`）；首次读取会迁移并删除旧 `playlist` 记录。
+  namespace）+ Markdown 导出（`prepItemsToMarkdown`）；启动时通过可重试的有限迁移复制旧 `playlist` 记录，确认写入后才删除旧项；普通列表读取不迁移。
 - **道具点位库**：归备战素材库，供 lineup 练习、战术本和战术板复用；不再作为旧「道具实验室」的一部分。
 - **战术板 MVP**：回放/雷达画布标注层（箭头 / 道具图标 / 文字）→ PNG + Markdown 导出；
   无实时协作、无动画播放。

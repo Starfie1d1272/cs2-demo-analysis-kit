@@ -18,7 +18,8 @@ import { FingerprintRadar, TrendChart } from "./profile-widgets";
 import { RadarTrails, type RadarGrenadeOverlay, type RadarTrail } from "../components/RadarTrails";
 import { EvidenceActions } from "../components/EvidenceActions";
 import type { OpenEvidence } from "../lib/evidence-continuation";
-import { createTrainingFocus, listTrainingFocus, removeTrainingFocus, updateTrainingFocus, type TrainingFocus } from "../lib/training-focus";
+import { createTrainingFocus } from "../lib/training-focus";
+import { TrainingFocusPanel } from "./coach/TrainingFocusPanel";
 
 export interface HomeViewProps {
   onPageReady?: (keys: string[]) => void;
@@ -110,10 +111,7 @@ export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, on
   const [error, setError] = useState<string | null>(null);
   const [pinned, setPinned] = useState<PinnedPlayer | null>(null);
   const [pinnedLoaded, setPinnedLoaded] = useState(false);
-  const [trainingFocuses, setTrainingFocuses] = useState<TrainingFocus[]>([]);
-  const [editingFocus, setEditingFocus] = useState<string | null>(null);
-  const [focusNote, setFocusNote] = useState("");
-  const [focusReviewCondition, setFocusReviewCondition] = useState("");
+  const [focusRevision, setFocusRevision] = useState(0);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
 
   useEffect(() => {
@@ -152,18 +150,6 @@ export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, on
     () => insights && me ? buildMistakeFindings(insights.mistakes, { id: me.playerKey, label: me.name }) : [],
     [insights, me?.playerKey, me?.name]
   );
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!me) {
-      setTrainingFocuses([]);
-      return;
-    }
-    void listTrainingFocus(me.playerKey).then((items) => {
-      if (!cancelled) setTrainingFocuses(items);
-    });
-    return () => { cancelled = true; };
-  }, [me?.playerKey]);
 
   useEffect(() => {
     if (!me || entries.length === 0) {
@@ -324,25 +310,13 @@ export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, on
 
   const addTrainingFocus = async (finding: AnalysisFinding) => {
     if (!me) return;
-    const created = await createTrainingFocus({
+    await createTrainingFocus({
       playerKey: me.playerKey,
       finding,
       evidence: finding.evidence,
       contextSummary,
     });
-    setTrainingFocuses((current) => [created, ...current]);
-  };
-
-  const beginEditFocus = (focus: TrainingFocus) => {
-    setEditingFocus(focus.id);
-    setFocusNote(focus.note);
-    setFocusReviewCondition(focus.reviewCondition);
-  };
-
-  const saveFocus = async (focus: TrainingFocus) => {
-    const updated = await updateTrainingFocus(focus.id, { note: focusNote, reviewCondition: focusReviewCondition });
-    if (updated) setTrainingFocuses((current) => current.map((item) => item.id === updated.id ? updated : item));
-    setEditingFocus(null);
+    setFocusRevision((revision) => revision + 1);
   };
 
   return (
@@ -451,31 +425,7 @@ export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, on
                 </div>
               )}
             </section>
-            <section>
-              <div className="stu-section-head"><h3>训练重点</h3><small className="stu-dim">仅保存已确认内容</small></div>
-              {trainingFocuses.length === 0 ? (
-                <p className="stu-muted">确认一个待复核结论后，可在这里保存复盘重点与复查条件。</p>
-              ) : (
-                <div className="stu-home-focus-list">
-                  {trainingFocuses.map((focus) => (
-                    <article key={focus.id} className="stu-training-focus">
-                      <header><b>{focus.finding.title}</b><button type="button" className="stu-button-sm" onClick={() => void removeTrainingFocus(focus.id).then(() => setTrainingFocuses((items) => items.filter((item) => item.id !== focus.id)))}>删除</button></header>
-                      <p>{focus.finding.statement}</p>
-                      <small>{focus.contextSummary}</small>
-                      {editingFocus === focus.id ? (
-                        <div className="stu-focus-editor">
-                          <input className="stu-input" value={focusNote} onChange={(event) => setFocusNote(event.target.value)} placeholder="你的复盘备注" />
-                          <input className="stu-input" value={focusReviewCondition} onChange={(event) => setFocusReviewCondition(event.target.value)} placeholder="复查条件" />
-                          <div><button type="button" className="stu-button-sm" onClick={() => void saveFocus(focus)}>保存</button><button type="button" className="stu-button-sm" onClick={() => setEditingFocus(null)}>取消</button></div>
-                        </div>
-                      ) : (
-                        <div className="stu-focus-meta"><span>{focus.note || "未添加备注"}</span><span>{focus.reviewCondition || "未设置复查条件"}</span><button type="button" className="stu-button-sm" onClick={() => beginEditFocus(focus)}>编辑</button></div>
-                      )}
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
+            <TrainingFocusPanel playerKey={me.playerKey} revision={focusRevision} />
           </div>
 
           {/* ④ 开局动线 + 最近比赛 */}

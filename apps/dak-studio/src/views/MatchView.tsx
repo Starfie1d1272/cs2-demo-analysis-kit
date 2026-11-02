@@ -13,10 +13,13 @@ import { loadMatchWorkspaceModel } from "../lib/match-workspace-loader";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import { EmptyState } from "@cs2dak/react";
 import { SeriesWorkspace } from "./SeriesWorkspace";
+import { captureSavedEvidence } from "../lib/saved-evidence";
+import type { StudyNoteDraft } from "../lib/study-notes";
 import type { EvidenceSession } from "../lib/evidence-continuation";
 
 export interface MatchViewProps {
   onPageReady?: (keys: string[]) => void;
+  openStudyNoteEditor: (draft: StudyNoteDraft) => void;
   onOpened?: (target: { roundNumber?: number; tick?: number }) => void;
   onReplayPaused?: (target: { roundNumber: number; tick: number }) => void;
   entries: StudioDemoEntry[];
@@ -57,7 +60,7 @@ async function loadModel(id: string, generation: number): Promise<MatchWorkspace
   return model;
 }
 
-export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceSession, onMoveEvidence, workspaceState, onWorkspaceStateChange, onReturnToSource, onPageReady, onOpened, onReplayPaused }: MatchViewProps) {
+export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceSession, onMoveEvidence, workspaceState, onWorkspaceStateChange, onReturnToSource, onPageReady, onOpened, onReplayPaused, openStudyNoteEditor }: MatchViewProps) {
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   useEffect(() => subscribeAnalysisDataInvalidation(() => { if (getAnalysisDataSnapshot().status !== "ready") modelCache.clear(); }), []);
   const activeId = demoId;
@@ -233,6 +236,10 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
             进游戏
           </button>
         )}
+        {activeEntry && loaded?.id === activeId && loaded.state.roundExplorer.selectedRoundNumber !== null && <button type="button" className="stu-button-sm" onClick={() => {
+          const roundNumber = loaded.state.view === "replay" && loaded.state.replay ? loaded.state.replay.roundNumber : loaded.state.roundExplorer.selectedRoundNumber!;
+          openStudyNoteEditor({ title: `回合 ${roundNumber}`, body: "", purpose: "review", playerKey: null, evidence: [captureSavedEvidence(activeEntry, { matchId: matchIdForEntry(activeEntry), roundNumber, reason: "比赛回合笔记" })] });
+        }}>记一笔</button>}
         {model && (
           <button
             type="button"
