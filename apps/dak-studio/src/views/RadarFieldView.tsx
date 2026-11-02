@@ -73,10 +73,7 @@ export function RadarFieldView({ exportSource, onCapabilityRepair, entries, team
   const activeTeam = selectedTeam && teams.some((team) => team.displayName === selectedTeam) ? selectedTeam : null;
   const invalidTeamForMap = selectedTeam !== null && activeTeam === null;
 
-  useEffect(() => {
-    if (activeMap && maps.some(([name]) => name === activeMap)) return;
-    setMapName(null);
-  }, [activeMap, maps]);
+  const missingSelectedMap = mapName !== null && !maps.some(([name]) => name === mapName);
 
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const requestKey = JSON.stringify([eligibleEntries?.map(entry => entry.id), activeMap, activeTeam, economy, teamRenames]);
@@ -132,6 +129,14 @@ export function RadarFieldView({ exportSource, onCapabilityRepair, entries, team
     return () => abort.abort();
   }, [activeMap, activeTeam, eligibleEntries, invalidTeamForMap, teamRenames, economy, requestKey, analysis]);
 
+  if (missingSelectedMap) {
+    return <div className="stu-radar-field">
+      <EmptyState variant="insufficient" title={`${mapName} 在当前范围没有样本`} hint={maps.length > 0 ? "请选择其他地图，或调整分析范围以恢复该地图的比赛。" : "请调整分析范围或导入该地图的比赛。"} />
+      {maps.length > 0 && <div className="stu-subtabs" role="tablist" aria-label="选择其他地图">
+        {maps.map(([name, count]) => <button key={name} type="button" role="tab" aria-selected={false} className="stu-subtab" onClick={() => setMapName(name)}>{name} <small>{count}</small></button>)}
+      </div>}
+    </div>;
+  }
   if (maps.length === 0) {
     return <EmptyState title="暂无可分析地图" hint="先导入若干含回放（replay）的 demo，再来看覆盖场。" />;
   }
