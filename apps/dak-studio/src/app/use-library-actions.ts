@@ -261,14 +261,14 @@ export function useLibraryActions({ entries, refreshEntries, refreshEventRecords
   /** 从已存 ZIP 重榨 facts（不走 .dem / cs2df）；逐场串行，失败不打断，结束汇总。 */
   const rebuildFactsForEntries = useCallback(async (targets: StudioDemoEntry[]) => {
     if (targets.length === 0) return;
-    if (!window.confirm(`将用当前分析口径重建 ${targets.length} 场 facts（从已存 ZIP，无需原始 .dem），继续？`)) return;
+    if (!window.confirm(`将用当前分析口径重建 ${targets.length} 场分析数据（从已存 ZIP，无需原始 .dem），继续？`)) return;
     const release = tryBegin();
     if (!release) return;
     try {
     let done = 0;
     const failures: string[] = [];
     for (const [index, entry] of targets.entries()) {
-      setNotice(`重建 facts（${index + 1}/${targets.length}）：${entry.fileName}…`);
+      setNotice(`重建分析数据（${index + 1}/${targets.length}）：${entry.fileName}…`);
       try {
         if (await rebuildFactsFromZip(entry.id)) done += 1;
         else failures.push(`${entry.fileName}: 原始 ZIP 缺失`);
@@ -286,11 +286,11 @@ export function useLibraryActions({ entries, refreshEntries, refreshEventRecords
   const handleRebuildFacts = useCallback(async (id: string) => {
     const release = tryBegin();
     if (!release) return;
-    setNotice("正在从 ZIP 重建 facts…");
+    setNotice("正在从 ZIP 重建分析数据…");
     try {
       const entry = await rebuildFactsFromZip(id);
       await refreshEntries();
-      setNotice(entry ? `已重建 ${entry.fileName} 的 facts` : "重建失败：原始 ZIP 缺失");
+      setNotice(entry ? `已重建 ${entry.fileName} 的分析数据` : "重建失败：原始 ZIP 缺失");
     } catch (err) {
       setNotice(`重建失败：${err instanceof Error ? err.message : String(err)}`);
     } finally {

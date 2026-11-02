@@ -21,6 +21,7 @@ export function useStudioData({ onError, importing }: { onError: (message: strin
   const [identityReady, setIdentityReady] = useState(false);
   const [identityState, setIdentityState] = useState<IdentityStoreState>({ version: 0, mappings: [], teamRenames: {} });
   const mounted = useRef(false);
+  const directoryRefreshPending = useRef(false);
   const versions = useRef({ entries: 0, events: 0, identity: 0 });
   const refreshEntries = useCallback(async () => {
     const id = ++versions.current.entries;
@@ -76,12 +77,11 @@ export function useStudioData({ onError, importing }: { onError: (message: strin
   useEffect(() => {
     let generation = getAnalysisDataSnapshot().generation;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    let pending = false;
     const schedule = () => {
-      if (!pending || importing || getAnalysisDataSnapshot().status !== "ready") return;
+      if (!directoryRefreshPending.current || importing || getAnalysisDataSnapshot().status !== "ready") return;
       clearTimeout(timer);
       timer = setTimeout(() => {
-        pending = false;
+        directoryRefreshPending.current = false;
         void refreshEntries().catch(() => {});
       }, 500);
     };
@@ -91,10 +91,11 @@ export function useStudioData({ onError, importing }: { onError: (message: strin
         generation = next.generation;
         // A read started before this revision must never publish its old rows.
         versions.current.entries++;
-        pending = true;
+        directoryRefreshPending.current = true;
       }
       schedule();
     });
+    schedule();
     return () => { unsubscribe(); clearTimeout(timer); };
   }, [importing, refreshEntries]);
   return { entries, entriesReady, entriesStatus, entriesError, identityStatus, identityReady, eventsStatus, seriesStatus, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity };
