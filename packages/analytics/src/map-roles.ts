@@ -121,8 +121,8 @@ function alignment(declaration: MainRoleDeclaration, inferred: InferredMapRole |
 
 export interface BuildPlayerMapRoleProfilesOptions { matchTimes?: Record<string, string | null>; aggregatedEvidence?: PlayerMapRoleEvidence[] }
 
-function infer(rows: PlayerMapRoleEvidence[]) {
-  const weaponDuty = globalWeaponDuty(rows);
+function infer(rows: PlayerMapRoleEvidence[], weaponRows = rows) {
+  const weaponDuty = globalWeaponDuty(weaponRows);
   const roleEvidenceScores = evidenceScores(rows, weaponDuty);
   // AWP resemblance remains useful evidence, but only a reliable primary AWP
   // duty is eligible to win the public main-role headline.
@@ -156,7 +156,7 @@ export function buildPlayerMapRoleProfiles(evidenceRows: PlayerMapRoleEvidence[]
       const matchIds = [...new Set(rows.filter((source) => source.mapName === row.mapName && source.side === row.side && source.sample.eligibleRounds > 0).flatMap((source) => source.matchIds))];
       return { ...row, matchIds, sample: { ...row.sample, matchCount: matchIds.length } };
     }) ?? rows;
-    const automatic = infer(displayRows);
+    const automatic = infer(displayRows, rows);
     const { weaponDuty, roleEvidenceScores, winner, runnerUp, margin, sufficient, status, inferredPrimaryRole } = automatic;
     const declaredIgl = scopedDeclarations.some((item) => item.declaration.kind === "main_role" && item.declaration.priority === "primary" && item.declaration.role === "igl" && item.declaration.mapName == null && item.declaration.validFrom == null && item.declaration.validTo == null);
     const headlineRole = declaredIgl ? inferredPrimaryRole === "awper" ? "IGL / AWPer" : "IGL" : inferredPrimaryRole;
