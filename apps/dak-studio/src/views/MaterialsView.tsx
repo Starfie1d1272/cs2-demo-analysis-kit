@@ -1,11 +1,11 @@
 import { MatchSheetEditor } from "./coach/MatchSheetEditor";
-import { emptyMatchSheet, createCoachMatchSheet, getCoachMatchSheet, createCoachMatchSheetStore } from "../lib/coach-match-sheet";
+import { emptyMatchSheet, createCoachMatchSheet, getCoachMatchSheet, updateCoachMatchSheet, removeCoachMatchSheet } from "../lib/coach-match-sheet";
 import { MatchSheetView } from "./coach/MatchSheetView";
 import { PositionAssignments, emptyAssignmentDraft } from "./coach/PositionAssignments";
-import { getCoachAssignment, createCoachAssignment, createCoachAssignmentStore } from "../lib/coach-assignments";
+import { getCoachAssignment, createCoachAssignment, updateCoachAssignment, removeCoachAssignment } from "../lib/coach-assignments";
 import { PlaybookList } from "./coach/PlaybookList";
 import { PlaybookEditor } from "./coach/PlaybookEditor";
-import { createCoachPlaybook, getCoachPlaybook, createCoachPlaybookStore, copyCoachPlaybook } from "../lib/coach-playbook";
+import { createCoachPlaybook, getCoachPlaybook, updateCoachPlaybook, removeCoachPlaybook, copyCoachPlaybook } from "../lib/coach-playbook";
 import { useEffect, useRef, useState } from "react";
 import { usePageReady } from "../lib/use-page-ready";
 import type { IdentityOptions } from "../lib/identity";
@@ -15,14 +15,14 @@ import type { OpenEvidenceRequest } from "../lib/evidence-continuation";
 import type { MaterialRef } from "../lib/material-ref";
 import { emptyStudyNoteDraft, emptyCoachPlaybookDraft, materialStateMatches, type MaterialPageState, type MaterialsPageState } from "../lib/material-page-state";
 import { listStudyMaterialsKind, sortMaterials, materialKey, type MaterialKind, type MaterialSummary } from "../lib/study-materials";
-import { createStudyNote, getStudyNote, createStudyNotesStore } from "../lib/study-notes";
-import { listTrainingFocus, createTrainingFocusStore, type TrainingFocus } from "../lib/training-focus";
+import { createStudyNote, getStudyNote, updateStudyNote, removeStudyNote } from "../lib/study-notes";
+import { listTrainingFocus, updateTrainingFocus, removeTrainingFocus, type TrainingFocus } from "../lib/training-focus";
 import { listPracticeLineups, removePracticeLineup, type PracticeLineup } from "../lib/practice-lineups";
 import { FACTS_REVISION } from "../lib/analysis-manifest";
 import { TrainingFocusEditor } from "./coach/TrainingFocusPanel";
 import { resolveSavedEvidence } from "../lib/saved-evidence";
 import { StudyNoteEditor } from "./coach/StudyNoteEditor";
-import { getStorage, type RecordStore } from "../lib/storage";
+import { MaterialConflict } from "../lib/material-revision";
 
 const labels: Record<MaterialKind, string> = { "match-sheet": "比赛单", "assignment-set": "人员安排", "playbook": "战术", "study-note": "笔记", "training-focus": "训练重点", "practice-lineup": "练习点位" };
 function materialExcerpt(summary: string): string {
@@ -103,30 +103,6 @@ export function MaterialsView({ identityOptions, onAnalyzeAssignments, entries, 
 
 type DetailProps = { identityOptions?: IdentityOptions; onAnalyzeAssignments: AssignmentAnalysis; onPageReady?: (keys: string[]) => void; refValue: MaterialRef; entries: StudioDemoEntry[]; state: MaterialPageState | null; onStateChange: (state: MaterialPageState | null) => void; onBack: (cleanState?: MaterialPageState | null) => void; onOpened: (ref: MaterialRef) => void; onLecture: (state: Extract<MaterialPageState, { kind: "playbook" | "match-sheet" }>) => void; onOpenEvidence: (request: OpenEvidenceRequest, state: MaterialPageState) => void };
 type RecordValue = TrainingFocus | PracticeLineup;
-class MaterialConflict extends Error {}
-
-// The editor's store operates on its captured record. Its only write commits
-// that record if the persisted snapshot still matches, in one transaction.
-function revisionStore(namespace: string, id: string, revision: string): RecordStore {
-  const storage = getStorage();
-  const records = storage.records(namespace);
-  const value: unknown = JSON.parse(revision);
-  const expected = { namespace, key: id, exists: true, value };
-  const checkKey = (key: string) => { if (key !== id) throw new Error("资料身份不匹配"); };
-  return {
-    ...records,
-    async get<T>(key: string) { checkKey(key); return structuredClone(value) as T; },
-    async put<T>(key: string, next: T) {
-      checkKey(key);
-      if (!await storage.compareAndWriteRecords([expected], [{ namespace, key, kind: "put", value: next }])) throw new MaterialConflict();
-    },
-    async delete(key: string) {
-      checkKey(key);
-      if (!await storage.compareAndWriteRecords([expected], [{ namespace, key, kind: "delete" }])) throw new MaterialConflict();
-    },
-  };
-}
-
 /** 每个编辑帧保留其读取的完整记录快照，用它检查保存时是否仍是同一版本。 */
 async function loadMaterialState(ref: MaterialRef): Promise<{ ui: MaterialPageState; record?: RecordValue }> {
   switch (ref.kind) {
@@ -175,11 +151,11 @@ export function MaterialDetailView({ identityOptions, onAnalyzeAssignments, refV
     try {
       let result: unknown;
       switch (current.kind) {
-        case "match-sheet": result = await createCoachMatchSheetStore(revisionStore("coach-match-sheets", current.id, current.baseRevision)).update(current.id, current.draft); break;
-        case "assignment-set": result = await createCoachAssignmentStore(revisionStore("coach-assignments", current.id, current.baseRevision)).update(current.id, current.draft); break;
-        case "playbook": result = await createCoachPlaybookStore(revisionStore("coach-playbook", current.id, current.baseRevision)).update(current.id, current.draft); break;
-        case "study-note": result = await createStudyNotesStore(revisionStore("study-notes", current.id, current.baseRevision)).update(current.id, current.draft); break;
-        case "training-focus": result = await createTrainingFocusStore(revisionStore("training-focus", current.id, current.baseRevision)).update(current.id, current.draft); break;
+        case "match-sheet": result = await updateCoachMatchSheet(current.id, current.draft, current.baseRevision); break;
+        case "assignment-set": result = await updateCoachAssignment(current.id, current.draft, current.baseRevision); break;
+        case "playbook": result = await updateCoachPlaybook(current.id, current.draft, current.baseRevision); break;
+        case "study-note": result = await updateStudyNote(current.id, current.draft, current.baseRevision); break;
+        case "training-focus": result = await updateTrainingFocus(current.id, current.draft, current.baseRevision); break;
       }
       if (!result) throw new Error("资料不存在或无法读取");
       if (current.kind === "training-focus") setRecord(result as TrainingFocus);
@@ -192,11 +168,11 @@ export function MaterialDetailView({ identityOptions, onAnalyzeAssignments, refV
     savingRef.current = true; setSaving(true);
     try {
       switch (current.kind) {
-        case "match-sheet": await createCoachMatchSheetStore(revisionStore("coach-match-sheets", current.id, current.baseRevision)).remove(current.id); break;
-        case "assignment-set": await createCoachAssignmentStore(revisionStore("coach-assignments", current.id, current.baseRevision)).remove(current.id); break;
-        case "playbook": await createCoachPlaybookStore(revisionStore("coach-playbook", current.id, current.baseRevision)).remove(current.id); break;
-        case "study-note": await createStudyNotesStore(revisionStore("study-notes", current.id, current.baseRevision)).remove(current.id); break;
-        case "training-focus": await createTrainingFocusStore(revisionStore("training-focus", current.id, current.baseRevision)).remove(current.id); break;
+        case "match-sheet": await removeCoachMatchSheet(current.id, current.baseRevision); break;
+        case "assignment-set": await removeCoachAssignment(current.id, current.baseRevision); break;
+        case "playbook": await removeCoachPlaybook(current.id, current.baseRevision); break;
+        case "study-note": await removeStudyNote(current.id, current.baseRevision); break;
+        case "training-focus": await removeTrainingFocus(current.id, current.baseRevision); break;
         case "practice-lineup": await removePracticeLineup(current.id); break;
       }
       onBack(null);

@@ -1,4 +1,6 @@
-import { getStorage, type RecordStore } from "./storage";
+import type { AtomicStorageAdapter } from "./storage/types";
+import { commitMaterialRevision, materialBaseline } from "./material-revision";
+import { getStorage } from "./storage";
 
 export interface CoachAssignmentSet {
   schemaVersion: 1; id: string; title: string; teamLabel: string; mapName: string; side: "t" | "ct";
@@ -20,14 +22,16 @@ function normalize(draft: CoachAssignmentSetDraft) {
   if (!d.observedTeamKey) d.observedEntryIds = [];
   return d;
 }
-export function createCoachAssignmentStore(records: RecordStore) {
+export function createCoachAssignmentStore(storage: AtomicStorageAdapter) {
+  const namespace = "coach-assignments";
+  const records = storage.records(namespace);
   return {
     async list() { const all = await records.getAll<unknown>(); const items = all.filter(valid); return { items, unreadable: all.length - items.length }; },
     async get(id: string) { const value = await records.get<unknown>(id); if (value === undefined) return null; if (!valid(value)) throw new Error("人员安排无法读取"); return value; },
     async create(draft: CoachAssignmentSetDraft) { const now = Date.now(); const item = { ...normalize(draft), schemaVersion: 1 as const, id: crypto.randomUUID(), createdAt: now, updatedAt: now }; if (!valid(item)) throw new Error("请填写标题并选择地图和阵营"); await records.put(item.id, item); return item; },
-    async update(id: string, draft: CoachAssignmentSetDraft) { const old = await records.get<unknown>(id); if (!valid(old)) return null; const item = { ...old, ...normalize(draft), updatedAt: Date.now() }; if (!valid(item)) throw new Error("请填写标题并选择地图和阵营"); await records.put(id, item); return item; },
-    async remove(id: string) { const old = await records.get<unknown>(id); if (!valid(old)) throw new Error("人员安排不存在或无法读取"); await records.delete(id); },
+    async update(id: string, draft: CoachAssignmentSetDraft, revision: string) { const old = materialBaseline(revision, id, valid); const item = { ...old, ...normalize(draft), updatedAt: Date.now() }; if (!valid(item)) throw new Error("请填写标题并选择地图和阵营"); await commitMaterialRevision(storage, namespace, id, old, { namespace, key: id, kind: "put", value: item }); return item; },
+    async remove(id: string, revision: string) { const old = materialBaseline(revision, id, valid); await commitMaterialRevision(storage, namespace, id, old, { namespace, key: id, kind: "delete" }); },
   };
 }
-const store = createCoachAssignmentStore(getStorage().records("coach-assignments"));
+const store = createCoachAssignmentStore(getStorage());
 export const listCoachAssignments = store.list; export const getCoachAssignment = store.get; export const createCoachAssignment = store.create; export const updateCoachAssignment = store.update; export const removeCoachAssignment = store.remove;
