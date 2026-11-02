@@ -1,8 +1,8 @@
-import type { BlobStore, RecordStore, StorageAdapter } from "./types";
+import type { BlobStore, RecordStore, AtomicStorageAdapter, RecordRef, RecordSnapshot, RecordMutation } from "./types";
 
 interface PywebviewStorageApi {
-  storage_identity_lock_acquire?(): Promise<string>;
-  storage_identity_lock_release?(token: string): Promise<void>;
+  storage_records_read(refs: RecordRef[]): Promise<RecordSnapshot[]>;
+  storage_records_compare_and_write(expected: RecordSnapshot[], writes: RecordMutation[]): Promise<boolean>;
   storage_record_get(namespace: string, key: string): Promise<unknown>;
   storage_record_get_all(namespace: string): Promise<unknown[]>;
   storage_record_entries(namespace: string): Promise<Array<[string, unknown]>>;
@@ -31,11 +31,13 @@ import { bytesToBase64, base64ToBytes } from "./base64";
  * pywebview native 后端。待桌面验证：当前 CI/沙箱没有真实桌面壳，
  * 这里只做类型检查与浏览器 fallback 验证。
  */
-export function createPywebviewAdapter(api: PywebviewStorageApi): StorageAdapter {
+export function createPywebviewAdapter(api: PywebviewStorageApi): AtomicStorageAdapter {
   const recordStores = new Map<string, RecordStore>();
   const blobStores = new Map<string, BlobStore>();
 
   return {
+    readRecords: (refs) => api.storage_records_read(refs),
+    compareAndWriteRecords: (expected, writes) => api.storage_records_compare_and_write(expected, writes),
     records(namespace): RecordStore {
       let store = recordStores.get(namespace);
       if (!store) {

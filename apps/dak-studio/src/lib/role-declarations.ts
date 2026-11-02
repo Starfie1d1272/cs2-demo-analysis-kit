@@ -27,7 +27,7 @@ export function parseRoleDeclarations(value: unknown): RoleDeclarationsState | n
     return typeof candidate.id === "string" && typeof candidate.createdAt === "number" && typeof candidate.updatedAt === "number"
       && roleDeclarationSchema.safeParse(candidate.declaration).success;
   });
-  return declarations.length === state.declarations.length ? { version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations } : null;
+  return declarations.length === state.declarations.length && new Set(declarations.map(row => row.id)).size === declarations.length ? { version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations } : null;
 }
 
 /** 身份合并后按 steamId 交集迁移；没有交集的声明保持原 key，绝不猜测。 */

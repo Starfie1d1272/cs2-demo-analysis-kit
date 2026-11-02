@@ -1,174 +1,144 @@
 import { getNativeStorageApiForCurrentAdapter, getStorage } from "./storage";
+import type { RecordRef, RecordSnapshot, RecordMutation } from "./storage/types";
 import { applyMerge, applySplit, applyRename, applyTeamRename, type IdentityStoreState } from "./identity";
 import { ROLE_DECLARATIONS_SCHEMA_VERSION, parseRoleDeclarations, migrateRoleDeclarationsForIdentity, type RoleDeclarationsState, type StoredRoleDeclaration } from "./role-declarations";
 import { roleDeclarationSchema, type RoleDeclaration } from "@cs2dak/tactics";
 
-const roleStore = getStorage().records("role-declarations");
-async function readRoles(): Promise<RoleDeclarationsState> {
-  const raw = await roleStore.get<unknown>("current");
-  if (raw === undefined) return { version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations: [] };
-  const state = parseRoleDeclarations(raw);
-  if (!state) throw new Error("角色声明数据无法读取或格式无效，未进行修改");
-  return state;
-}
-async function writeRoles(state: RoleDeclarationsState): Promise<RoleDeclarationsState> {
-  await roleStore.put("current", state);
-  return state;
-}
-
-interface RoleChange {
-  id: string;
-  before: StoredRoleDeclaration | null;
-  after: StoredRoleDeclaration | null;
-}
-
-interface AuditEntry {
-  id: string;
-  timestamp: number;
-  description: string;
-  snapshot: IdentityStoreState;
-  after?: IdentityStoreState;
-  roleChanges?: RoleChange[];
-}
-
-interface PendingIdentityCommand {
-  phase: "rollback" | "committed";
-  before: IdentityStoreState;
-  after: IdentityStoreState;
-  roleChanges: RoleChange[];
-  audit: AuditEntry;
-  action: "add" | "remove";
-}
-
-const STATE_KEY = "current";
-const PENDING_KEY = "pending-command";
-const MAX_AUDIT = 20;
+interface RoleChange { id: string; before: StoredRoleDeclaration | null; after: StoredRoleDeclaration | null }
+interface AuditEntry { id: string; timestamp: number; description: string; snapshot: IdentityStoreState; after?: IdentityStoreState; roleChanges?: RoleChange[] }
+const identityRef = { namespace: "identity", key: "current" };
+const rolesRef = { namespace: "role-declarations", key: "current" };
+const historyRef = { namespace: "identity-audit", key: "__atomic_history_v1" };
+const markerRef = { namespace: "identity-workspace", key: "initialized-v1" };
 const EMPTY_STATE: IdentityStoreState = { version: 0, mappings: [], teamRenames: {} };
-const stateStore = getStorage().records("identity");
-const auditStore = getStorage().records("identity-audit");
-let commandQueue: Promise<unknown> = Promise.resolve();
-
-async function withStorageLock<T>(run: () => Promise<T>): Promise<T> {
-  const native = getNativeStorageApiForCurrentAdapter();
-  if (native) {
-    if (!native.storage_identity_lock_acquire || !native.storage_identity_lock_release) throw new Error("桌面存储不支持身份资料锁，请更新应用后重试");
-    const token = await native.storage_identity_lock_acquire();
-    try { return await run(); } finally { await native.storage_identity_lock_release(token); }
-  }
-  if (!navigator.locks) throw new Error("浏览器不支持身份资料锁，无法安全修改资料");
-  return navigator.locks.request("dak-identity-roles", { mode: "exclusive" }, run);
-}
-
-function serialized<T>(run: () => Promise<T>): Promise<T> {
-  const guarded = () => withStorageLock(run);
-  const result = commandQueue.then(guarded, guarded);
-  commandQueue = result.catch(() => {});
-  return result;
-}
-
+const EMPTY_ROLES: RoleDeclarationsState = { version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations: [] };
+const storage = getStorage();
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const newestAuditFirst = (a: AuditEntry, b: AuditEntry) => (b.after?.version ?? -1) - (a.after?.version ?? -1) || b.timestamp - a.timestamp;
 
+function validIdentity(value: unknown): value is IdentityStoreState {
+  if (!value || typeof value !== "object") return false;
+  const s = value as IdentityStoreState;
+  return Number.isSafeInteger(s.version) && s.version >= 0 && Array.isArray(s.mappings)
+    && s.mappings.every(m => m && typeof m.playerKey === "string" && typeof m.displayName === "string" && Array.isArray(m.steamIds) && m.steamIds.every(id => typeof id === "string") && typeof m.updatedAt === "number")
+    && !!s.teamRenames && typeof s.teamRenames === "object" && !Array.isArray(s.teamRenames) && Object.values(s.teamRenames).every(v => typeof v === "string");
+}
+function validRoleChange(value: unknown): value is RoleChange {
+  if (!value || typeof value !== "object") return false;
+  const change = value as RoleChange;
+  const validRow = (row: StoredRoleDeclaration | null) => row === null || (!!row && row.id === change.id && !!parseRoleDeclarations({ version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations: [row] }));
+  return typeof change.id === "string" && validRow(change.before) && validRow(change.after) && (change.before !== null || change.after !== null);
+}
+function validAudit(value: unknown): value is AuditEntry {
+  if (!value || typeof value !== "object") return false;
+  const a = value as AuditEntry;
+  return typeof a.id === "string" && typeof a.timestamp === "number" && typeof a.description === "string" && validIdentity(a.snapshot)
+    && (a.after === undefined || validIdentity(a.after)) && (a.roleChanges === undefined || (Array.isArray(a.roleChanges) && a.roleChanges.every(validRoleChange) && new Set(a.roleChanges.map(change => change.id)).size === a.roleChanges.length));
+}
+
+async function readLegacyRecord(ref: RecordRef): Promise<RecordSnapshot> {
+  const entries = await storage.records(ref.namespace).entries<unknown>();
+  const entry = entries.find(([key]) => key === ref.key);
+  return entry ? { ...ref, exists: true, value: entry[1] } : { ...ref, exists: false };
+}
+
+/** 浏览器只读复制旧三库并原子接管；SQLite 保留原身份/声明位置，仅建立审计索引。 */
+async function ensureInitialized(): Promise<void> {
+  const [marker] = await storage.readRecords([markerRef]);
+  if (marker.exists) {
+    if (marker.value !== 1) throw new Error("身份资料接管标记无效，未进行修改");
+    return;
+  }
+  const native = !!getNativeStorageApiForCurrentAdapter();
+  const [legacyValues, oldHistory] = await Promise.all([
+    native ? storage.readRecords([identityRef, rolesRef]) : Promise.all([readLegacyRecord(identityRef), readLegacyRecord(rolesRef)]),
+    storage.records("identity-audit").entries<unknown>(),
+  ]);
+  const oldIdentity = legacyValues[0].exists ? legacyValues[0].value : undefined;
+  const oldRoles = legacyValues[1].exists ? legacyValues[1].value : undefined;
+  const snapshots = await storage.readRecords([markerRef, identityRef, rolesRef, historyRef]);
+  if (snapshots[0].exists) {
+    if (snapshots[0].value !== 1) throw new Error("身份资料接管标记无效，未进行修改");
+    return;
+  }
+  if (legacyValues[0].exists && !validIdentity(oldIdentity)) throw new Error("身份数据格式无效，未进行修改");
+  if (legacyValues[1].exists && !parseRoleDeclarations(oldRoles)) throw new Error("角色声明数据格式无效，未进行修改");
+  if (oldHistory.some(([key, value]) => !validAudit(value) || value.id !== key)) throw new Error("身份审计数据格式无效，未进行修改");
+  if (snapshots[3].exists || (!native && (snapshots[1].exists || snapshots[2].exists))) throw new Error("身份资料接管未完成，请检查存储后重试");
+  if (native && (!same(snapshots[1].exists ? snapshots[1].value : undefined, oldIdentity) || !same(snapshots[2].exists ? snapshots[2].value : undefined, oldRoles))) throw new Error("身份资料已变化，请重试");
+  const writes: RecordMutation[] = [
+    { ...markerRef, kind: "put", value: 1 },
+    { ...historyRef, kind: "put", value: oldHistory.map(([, row]) => row) },
+  ];
+  if (!native || !legacyValues[0].exists) writes.push({ ...identityRef, kind: "put", value: legacyValues[0].exists ? oldIdentity : EMPTY_STATE });
+  if (!native || !legacyValues[1].exists) writes.push({ ...rolesRef, kind: "put", value: legacyValues[1].exists ? oldRoles : EMPTY_ROLES });
+  if (!await storage.compareAndWriteRecords(snapshots, writes)) {
+    const [winner] = await storage.readRecords([markerRef]);
+    if (!winner.exists || winner.value !== 1) throw new Error("身份资料已变化，请重试");
+  }
+}
+
+type Bundle = { snapshots: RecordSnapshot[]; identity: IdentityStoreState; roles: RoleDeclarationsState; history: AuditEntry[] };
+async function readBundle(): Promise<Bundle> {
+  await ensureInitialized();
+  const snapshots = await storage.readRecords([identityRef, rolesRef, historyRef]);
+  const [identity, roles, history] = snapshots;
+  if (!identity.exists || !validIdentity(identity.value)) throw new Error("身份数据缺失或格式无效，未进行修改");
+  const parsedRoles = roles.exists ? parseRoleDeclarations(roles.value) : null;
+  if (!parsedRoles) throw new Error("角色声明数据格式无效，未进行修改");
+  const parsedHistory = parseHistory(history);
+  return { snapshots, identity: identity.value as IdentityStoreState, roles: parsedRoles, history: parsedHistory };
+}
+function parseHistory(snapshot: RecordSnapshot): AuditEntry[] {
+  if (!snapshot.exists || !Array.isArray(snapshot.value) || !snapshot.value.every(validAudit) || new Set(snapshot.value.map(entry => entry.id)).size !== snapshot.value.length) throw new Error("身份审计数据格式无效，未进行修改");
+  return snapshot.value;
+}
+async function commit(bundle: Bundle, writes: RecordMutation[]): Promise<void> {
+  if (!await storage.compareAndWriteRecords(bundle.snapshots, writes)) throw new Error("身份或角色资料已变化，请刷新后重试");
+}
 function roleChanges(before: RoleDeclarationsState, after: RoleDeclarationsState): RoleChange[] {
   const old = new Map(before.declarations.map(row => [row.id, row]));
   const next = new Map(after.declarations.map(row => [row.id, row]));
   return [...new Set([...old.keys(), ...next.keys()])].flatMap(id => {
-    const a = old.get(id) ?? null;
-    const b = next.get(id) ?? null;
+    const a = old.get(id) ?? null, b = next.get(id) ?? null;
     return same(a, b) ? [] : [{ id, before: a, after: b }];
   });
 }
-
-/** 只恢复命令改动过的声明；后续对同一声明的编辑必须由用户处理。 */
-async function applyRoleChanges(changes: RoleChange[], reverse: boolean): Promise<void> {
-  if (!changes.length) return;
-  const current = await readRoles();
+function restoreRoles(current: RoleDeclarationsState, changes: RoleChange[]): RoleDeclarationsState {
   const rows = new Map(current.declarations.map(row => [row.id, row]));
   for (const change of changes) {
-    const from = reverse ? change.after : change.before;
-    const to = reverse ? change.before : change.after;
     const actual = rows.get(change.id) ?? null;
-    // 可重复恢复，也不会覆盖命令之后对同一记录的修改。
-    if (!same(actual, from) && !same(actual, to)) throw new Error("相关角色声明已变化，无法安全恢复身份操作");
-    if (to) rows.set(change.id, to); else rows.delete(change.id);
+    if (!same(actual, change.after)) throw new Error("相关角色声明已变化，无法安全撤销身份操作");
+    if (change.before) rows.set(change.id, change.before); else rows.delete(change.id);
   }
-  await writeRoles({ ...current, declarations: [...rows.values()] });
+  return { ...current, declarations: [...rows.values()] };
 }
-
-async function recoverPending(): Promise<void> {
-  const pending = await stateStore.get<PendingIdentityCommand>(PENDING_KEY);
-  if (!pending) return;
-  if (pending.phase === "rollback") {
-    const actual = await stateStore.get<IdentityStoreState>(STATE_KEY) ?? EMPTY_STATE;
-    const restored = { ...pending.before, version: pending.after.version + 1 };
-    if (!same(actual, pending.before) && !same(actual, pending.after) && !same(actual, restored)) throw new Error("身份数据已变化，无法安全恢复未完成的操作");
-    await applyRoleChanges(pending.roleChanges, true);
-    await stateStore.put(STATE_KEY, restored);
-    if (pending.action === "add") await auditStore.delete(pending.audit.id);
-    else await auditStore.put(pending.audit.id, pending.audit);
-  }
-  await stateStore.delete(PENDING_KEY);
-}
-
-/** 角色读取先完成身份命令恢复，避免展示跨存储的中间结果。 */
-function withIdentityRoleAccess<T>(operation: () => Promise<T>): Promise<T> {
-  return serialized(async () => { await recoverPending(); return operation(); });
-}
-
-export function loadIdentityState(): Promise<IdentityStoreState> {
-  return serialized(async () => {
-    await recoverPending();
-    return await stateStore.get<IdentityStoreState>(STATE_KEY) ?? EMPTY_STATE;
-  });
-}
-
-async function executeCommand(pending: PendingIdentityCommand): Promise<void> {
-  await stateStore.put(PENDING_KEY, pending);
+async function trimHistory(): Promise<void> {
   try {
-    await applyRoleChanges(pending.roleChanges, false);
-    await stateStore.put(STATE_KEY, pending.after);
-    if (pending.action === "add") await auditStore.put(pending.audit.id, pending.audit);
-    else await auditStore.delete(pending.audit.id);
-    await stateStore.put(PENDING_KEY, { ...pending, phase: "committed" });
-  } catch (error) {
-    try { await recoverPending(); }
-    catch { throw new Error("身份操作未完成，恢复也失败；请重试或重新打开后再操作"); }
-    throw error;
-  }
-  // 命令已经提交；清理失败时留给下一次读取恢复，不伪报操作失败。
-  try { await stateStore.delete(PENDING_KEY); } catch { /* 以后清理 */ }
-}
-
-async function commitChange(
-  current: IdentityStoreState,
-  next: IdentityStoreState,
-  description: string,
-  migrateRolesFor?: string,
-): Promise<IdentityStoreState> {
-  return serialized(async () => {
-    await recoverPending();
-    const stored = await stateStore.get<IdentityStoreState>(STATE_KEY) ?? EMPTY_STATE;
-    if (!same(current, stored)) throw new Error("身份数据已变化，请刷新后重试");
-    let changes: RoleChange[] = [];
-    if (migrateRolesFor) {
-      const roles = await readRoles();
-      changes = roleChanges(roles, migrateRoleDeclarationsForIdentity(roles, next, migrateRolesFor));
+    const [snapshot] = await storage.readRecords([historyRef]);
+    if (snapshot.exists && Array.isArray(snapshot.value) && snapshot.value.length > 20 && snapshot.value.every(validAudit)) {
+      await storage.compareAndWriteRecords([snapshot], [{ ...historyRef, kind: "put", value: [...snapshot.value].sort(newestAuditFirst).slice(0, 20) }]);
     }
-    const entry: AuditEntry = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      timestamp: Date.now(), description, snapshot: stored, after: next, roleChanges: changes,
-    };
-    await executeCommand({ phase: "rollback", before: stored, after: next, roleChanges: changes, audit: entry, action: "add" });
-    // 审计裁剪不属于命令提交，不让清理失败冒充业务失败。
-    try {
-      const all = await auditStore.getAll<AuditEntry>();
-      const stale = all.sort(newestAuditFirst).slice(MAX_AUDIT);
-      for (const entry of stale) await auditStore.delete(entry.id);
-    } catch { /* 下次再清理 */ }
-    return next;
-  });
+  } catch { /* 审计裁剪失败不改变已提交命令 */ }
 }
-
+async function commitChange(current: IdentityStoreState, next: IdentityStoreState, description: string, migrateRolesFor?: string): Promise<IdentityStoreState> {
+  const bundle = await readBundle();
+  if (!same(current, bundle.identity)) throw new Error("身份数据已变化，请刷新后重试");
+  if (!validIdentity(next)) throw new Error("身份版本或数据无效，未进行修改");
+  const roles = migrateRolesFor ? migrateRoleDeclarationsForIdentity(bundle.roles, next, migrateRolesFor) : bundle.roles;
+  const entry: AuditEntry = { id: crypto.randomUUID(), timestamp: Date.now(), description, snapshot: bundle.identity, after: next, roleChanges: roleChanges(bundle.roles, roles) };
+  const writes: RecordMutation[] = [{ ...identityRef, kind: "put", value: next }, { ...historyRef, kind: "put", value: [...bundle.history, entry] }];
+  if (!same(roles, bundle.roles)) writes.push({ ...rolesRef, kind: "put", value: roles });
+  await commit(bundle, writes);
+  await trimHistory();
+  return next;
+}
+export async function loadIdentityState(): Promise<IdentityStoreState> {
+  await ensureInitialized();
+  const [identity] = await storage.readRecords([identityRef]);
+  if (!identity.exists || !validIdentity(identity.value)) throw new Error("身份数据缺失或格式无效，未进行修改");
+  return identity.value;
+}
 
 /** 将多个 steamId64 归并到同一身份。primary 是保留的主 playerKey 的 steamId64。 */
 export async function mergeIdentities(
@@ -211,77 +181,77 @@ export async function setTeamRename(
   return commitChange(current, next, `队伍改名 "${originalName}" → "${displayName || "(清除)"}"`);
 }
 
-/** 撤销最近一次操作，返回恢复后的状态；无可撤销时返回 null。 */
-export function undoLastAction(): Promise<IdentityStoreState | null> {
-  return serialized(async () => {
-    await recoverPending();
-    const all = await auditStore.getAll<AuditEntry>();
-    if (!all.length) return null;
-    const latest = all.sort(newestAuditFirst)[0];
-    if (!latest.after || !latest.roleChanges) throw new Error("旧操作缺少完整的角色声明记录，无法安全撤销");
-    const current = await stateStore.get<IdentityStoreState>(STATE_KEY) ?? EMPTY_STATE;
-    if (!same({ ...current, version: 0 }, { ...latest.after, version: 0 })) throw new Error("身份数据已变化，无法安全撤销");
-    const next = { ...latest.snapshot, version: current.version + 1 };
-    const changes = latest.roleChanges.map(change => ({ ...change, before: change.after, after: change.before }));
-    await executeCommand({ phase: "rollback", before: current, after: next, roleChanges: changes, audit: latest, action: "remove" });
-    return next;
-  });
+/** 撤销恢复业务内容，同时生成新的缓存版本。 */
+export async function undoLastAction(): Promise<IdentityStoreState | null> {
+  const bundle = await readBundle();
+  if (!bundle.history.length) return null;
+  const latest = [...bundle.history].sort(newestAuditFirst)[0];
+  if (!latest.after || !latest.roleChanges) throw new Error("旧操作缺少完整的角色声明记录，无法安全撤销");
+  if (!same({ ...bundle.identity, version: 0 }, { ...latest.after, version: 0 })) throw new Error("身份数据已变化，无法安全撤销");
+  const next = { ...latest.snapshot, version: bundle.identity.version + 1 };
+  if (!validIdentity(next)) throw new Error("身份版本或数据无效，未进行修改");
+  const roles = restoreRoles(bundle.roles, latest.roleChanges);
+  const writes: RecordMutation[] = [
+    { ...identityRef, kind: "put", value: next },
+    { ...historyRef, kind: "put", value: bundle.history.filter(entry => entry.id !== latest.id) },
+  ];
+  if (!same(roles, bundle.roles)) writes.push({ ...rolesRef, kind: "put", value: roles });
+  await commit(bundle, writes);
+  return next;
 }
-
-export function listAuditEntries(): Promise<AuditEntry[]> {
-  return withIdentityRoleAccess(async () => (await auditStore.getAll<AuditEntry>()).sort(newestAuditFirst));
+export async function listAuditEntries(): Promise<AuditEntry[]> {
+  await ensureInitialized();
+  const [history] = await storage.readRecords([historyRef]);
+  return [...parseHistory(history)].sort(newestAuditFirst);
 }
-
-export function loadRoleDeclarations(): Promise<RoleDeclarationsState> {
-  return withIdentityRoleAccess(readRoles);
+export async function loadRoleDeclarations(): Promise<RoleDeclarationsState> {
+  await ensureInitialized();
+  const [roles] = await storage.readRecords([rolesRef]);
+  const parsed = roles.exists ? parseRoleDeclarations(roles.value) : null;
+  if (!parsed) throw new Error("角色声明数据缺失或格式无效，未进行修改");
+  return parsed;
 }
-export function removeRoleDeclaration(current: RoleDeclarationsState, id: string): Promise<RoleDeclarationsState> {
-  return withIdentityRoleAccess(async () => {
-    const actual = await readRoles();
-    const expectedRow = current.declarations.find(row => row.id === id);
-    const actualRow = actual.declarations.find(row => row.id === id);
-    if (!expectedRow || !same(expectedRow, actualRow)) throw new Error("角色声明已变化，请刷新后重试");
-    return writeRoles({ ...actual, declarations: actual.declarations.filter(row => row.id !== id) });
-  });
+export async function removeRoleDeclaration(current: RoleDeclarationsState, id: string): Promise<RoleDeclarationsState> {
+  const bundle = await readBundle();
+  const expected = current.declarations.find(row => row.id === id);
+  const actual = bundle.roles.declarations.find(row => row.id === id);
+  if (!expected || !same(expected, actual)) throw new Error("角色声明已变化，请刷新后重试");
+  const next = { ...bundle.roles, declarations: bundle.roles.declarations.filter(row => row.id !== id) };
+  await commit(bundle, [{ ...rolesRef, kind: "put", value: next }]);
+  return next;
 }
-async function assertCurrentPlayerKey(playerKey: string): Promise<void> {
-  const identity = await stateStore.get<IdentityStoreState>(STATE_KEY) ?? EMPTY_STATE;
+function assertCurrentPlayerKey(identity: IdentityStoreState, playerKey: string): void {
   if (playerKey.startsWith("steam:")) {
-    const steamId = playerKey.slice(6);
-    const mapping = identity.mappings.find(item => item.steamIds.includes(steamId));
+    const mapping = identity.mappings.find(item => item.steamIds.includes(playerKey.slice(6)));
     if (mapping && mapping.playerKey !== playerKey) throw new Error("选手身份已归并，请刷新后重试");
   }
 }
-
-export function replaceOrdinaryUserRoleDeclarations(playerKey: string, teamKey: string | null, inputs: RoleDeclaration[], expected: RoleDeclarationsState): Promise<RoleDeclarationsState> {
-  return withIdentityRoleAccess(async () => {
-    await assertCurrentPlayerKey(playerKey);
-    const declarations = inputs.map(input => roleDeclarationSchema.parse(input));
-    if (declarations.some(item => item.source !== "user" || item.playerKey !== playerKey || (item.teamKey ?? null) !== teamKey || item.mapName != null || item.validFrom != null || item.validTo != null)) throw new Error("角色声明范围不一致");
-    const current = await readRoles();
-    const now = Date.now();
-    const inScope = (row: StoredRoleDeclaration) => row.declaration.source === "user" && row.declaration.playerKey === playerKey && (row.declaration.teamKey ?? null) === teamKey && row.declaration.mapName == null && row.declaration.validFrom == null && row.declaration.validTo == null;
-    if (!same(current.declarations.filter(inScope), expected.declarations.filter(inScope))) throw new Error("当前选手的角色声明已变化，请刷新后重试");
-    const retained = current.declarations.filter(row => !inScope(row));
-    const added = declarations.map(declaration => ({ id: crypto.randomUUID(), createdAt: now, updatedAt: now, declaration }));
-    return writeRoles({ ...current, declarations: [...retained, ...added] });
-  });
+export async function replaceOrdinaryUserRoleDeclarations(playerKey: string, teamKey: string | null, inputs: RoleDeclaration[], expected: RoleDeclarationsState): Promise<RoleDeclarationsState> {
+  const bundle = await readBundle();
+  assertCurrentPlayerKey(bundle.identity, playerKey);
+  const declarations = inputs.map(input => roleDeclarationSchema.parse(input));
+  if (declarations.some(item => item.source !== "user" || item.playerKey !== playerKey || (item.teamKey ?? null) !== teamKey || item.mapName != null || item.validFrom != null || item.validTo != null)) throw new Error("角色声明范围不一致");
+  const inScope = (row: StoredRoleDeclaration) => row.declaration.source === "user" && row.declaration.playerKey === playerKey && (row.declaration.teamKey ?? null) === teamKey && row.declaration.mapName == null && row.declaration.validFrom == null && row.declaration.validTo == null;
+  if (!same(bundle.roles.declarations.filter(inScope), expected.declarations.filter(inScope))) throw new Error("当前选手的角色声明已变化，请刷新后重试");
+  const now = Date.now();
+  const added = declarations.map(declaration => ({ id: crypto.randomUUID(), createdAt: now, updatedAt: now, declaration }));
+  const next = { ...bundle.roles, declarations: [...bundle.roles.declarations.filter(row => !inScope(row)), ...added] };
+  await commit(bundle, [{ ...rolesRef, kind: "put", value: next }]);
+  return next;
 }
-
-export function upsertRoleDeclaration(current: RoleDeclarationsState, input: RoleDeclaration, id?: string): Promise<RoleDeclarationsState> {
-  return withIdentityRoleAccess(async () => {
-    const actual = await readRoles();
-    if (!same(current, actual)) throw new Error("角色声明已变化，请刷新后重试");
-    const declaration = roleDeclarationSchema.parse(input);
-    await assertCurrentPlayerKey(declaration.playerKey);
-    const now = Date.now();
-    const nextId = id ?? `${now}-${Math.random().toString(36).slice(2, 8)}`;
-    const existing = actual.declarations.find(row => row.id === nextId);
-    const scope = (d: RoleDeclaration) => [d.playerKey, d.teamKey ?? "", d.mapName ?? "", d.validFrom ?? "", d.validTo ?? ""].join("\t");
-    const rows = actual.declarations.filter(row => row.id !== nextId).map(row =>
-      declaration.kind === "main_role" && declaration.priority === "primary" && row.declaration.kind === "main_role" && row.declaration.priority === "primary" && scope(row.declaration) === scope(declaration)
-        ? { ...row, updatedAt: now, declaration: { ...row.declaration, priority: "secondary" as const } } : row
-    ).filter(row => declaration.kind !== "weapon_duty" || row.declaration.kind !== "weapon_duty" || scope(row.declaration) !== scope(declaration));
-    return writeRoles({ ...actual, declarations: [...rows, { id: nextId, createdAt: existing?.createdAt ?? now, updatedAt: now, declaration }] });
-  });
+export async function upsertRoleDeclaration(current: RoleDeclarationsState, input: RoleDeclaration, id?: string): Promise<RoleDeclarationsState> {
+  const bundle = await readBundle();
+  if (!same(current, bundle.roles)) throw new Error("角色声明已变化，请刷新后重试");
+  const declaration = roleDeclarationSchema.parse(input);
+  assertCurrentPlayerKey(bundle.identity, declaration.playerKey);
+  const now = Date.now(), nextId = id ?? crypto.randomUUID();
+  const existing = bundle.roles.declarations.find(row => row.id === nextId);
+  const scope = (d: RoleDeclaration) => [d.playerKey, d.teamKey ?? "", d.mapName ?? "", d.validFrom ?? "", d.validTo ?? ""].join("\t");
+  const rows = bundle.roles.declarations.filter(row => row.id !== nextId).map(row =>
+    declaration.kind === "main_role" && declaration.priority === "primary" && row.declaration.kind === "main_role" && row.declaration.priority === "primary" && scope(row.declaration) === scope(declaration)
+      ? { ...row, updatedAt: now, declaration: { ...row.declaration, priority: "secondary" as const } } : row
+  ).filter(row => declaration.kind !== "weapon_duty" || row.declaration.kind !== "weapon_duty" || scope(row.declaration) !== scope(declaration));
+  const next = { ...bundle.roles, declarations: [...rows, { id: nextId, createdAt: existing?.createdAt ?? now, updatedAt: now, declaration }] };
+  await commit(bundle, [{ ...rolesRef, kind: "put", value: next }]);
+  return next;
 }
