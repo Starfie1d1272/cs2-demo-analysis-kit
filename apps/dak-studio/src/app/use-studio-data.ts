@@ -11,17 +11,32 @@ export type DirectoryLoadStatus = "loading" | "ready" | "error";
 export function useStudioData({ onError }: { onError: (message: string) => void }) {
   const [entries, setEntries] = useState<StudioDemoEntry[]>([]);
   const [entriesReady, setEntriesReady] = useState(false);
+  const [entriesStatus, setEntriesStatus] = useState<DirectoryLoadStatus>("loading");
+  const [entriesError, setEntriesError] = useState<string | null>(null);
   const [eventsStatus, setEventsStatus] = useState<DirectoryLoadStatus>("loading");
   const [seriesStatus, setSeriesStatus] = useState<DirectoryLoadStatus>("loading");
   const [eventRecords, setEventRecords] = useState<StudioEventRecord[]>([]);
   const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
+  const [identityStatus, setIdentityStatus] = useState<DirectoryLoadStatus>("loading");
+  const [identityReady, setIdentityReady] = useState(false);
   const [identityState, setIdentityState] = useState<IdentityStoreState>({ version: 0, mappings: [], teamRenames: {} });
   const [prepMigrationStatus, setPrepMigrationStatus] = useState<DirectoryLoadStatus>("loading");
   const [prepMigrationError, setPrepMigrationError] = useState<string | null>(null);
   const migrationInFlight = useRef<Promise<void> | null>(null);
   const mounted = useRef(false);
   const versions = useRef({ entries: 0, events: 0, identity: 0 });
-  const refreshEntries = useCallback(async () => { const id = ++versions.current.entries; const rows = await listDemoEntries(); if (mounted.current && id === versions.current.entries) setEntries(rows); return rows; }, []);
+  const refreshEntries = useCallback(async () => {
+    const id = ++versions.current.entries;
+    if (mounted.current) { setEntriesStatus("loading"); setEntriesError(null); }
+    try {
+      const rows = await listDemoEntries();
+      if (mounted.current && id === versions.current.entries) { setEntries(rows); setEntriesReady(true); setEntriesStatus("ready"); }
+      return rows;
+    } catch (error) {
+      if (mounted.current && id === versions.current.entries) { setEntriesError(error instanceof Error ? error.message : String(error)); setEntriesStatus("error"); }
+      throw error;
+    }
+  }, []);
   const refreshEventRecords = useCallback(async () => {
     const id = ++versions.current.events;
     if (mounted.current) { setEventsStatus("loading"); setSeriesStatus("loading"); }
@@ -41,7 +56,17 @@ export function useStudioData({ onError }: { onError: (message: string) => void 
     ]);
     if (results.some(result => result.status === "rejected")) throw new Error("读取赛事或系列失败");
   }, [onError]);
-  const refreshIdentity = useCallback(async () => { const id = ++versions.current.identity; const identity = await loadIdentityState(); if (mounted.current && id === versions.current.identity) setIdentityState(identity); }, []);
+  const refreshIdentity = useCallback(async () => {
+    const id = ++versions.current.identity;
+    if (mounted.current) setIdentityStatus("loading");
+    try {
+      const identity = await loadIdentityState();
+      if (mounted.current && id === versions.current.identity) { setIdentityState(identity); setIdentityReady(true); setIdentityStatus("ready"); }
+    } catch (error) {
+      if (mounted.current && id === versions.current.identity) setIdentityStatus("error");
+      throw error;
+    }
+  }, []);
   const retryPrepMigration = useCallback(async () => {
     if (migrationInFlight.current) return migrationInFlight.current;
     if (mounted.current) { setPrepMigrationStatus("loading"); setPrepMigrationError(null); }
@@ -58,10 +83,10 @@ export function useStudioData({ onError }: { onError: (message: string) => void 
     void retryPrepMigration();
     void ensureAnalysisDataReady().catch(() => {});
     const initialVersion = versions.current.entries + 1;
-    void refreshEntries().then(async rows => { if (mounted.current && versions.current.entries === initialVersion) { await pruneOrphanSeries(new Set(rows.map(row => row.id))).catch(error => { if (mounted.current) onError(`清理系列失败：${String(error)}`); }); await refreshEventRecords().catch(() => {}); } }).catch(err => { if (mounted.current) onError(`读取本地资料库失败：${err instanceof Error ? err.message : String(err)}`); }).finally(() => { if (mounted.current) setEntriesReady(true); });
+    void refreshEntries().then(async rows => { if (mounted.current && versions.current.entries === initialVersion) { await pruneOrphanSeries(new Set(rows.map(row => row.id))).catch(error => { if (mounted.current) onError(`清理系列失败：${String(error)}`); }); await refreshEventRecords().catch(() => {}); } }).catch(err => { if (mounted.current && versions.current.entries === initialVersion) onError(`读取本地资料库失败：${err instanceof Error ? err.message : String(err)}`); });
     void refreshEventRecords().catch(() => {});
     void refreshIdentity().catch(err => { if (mounted.current) onError(`读取身份失败：${String(err)}`); });
     return () => { mounted.current = false; versions.current.entries++; versions.current.events++; versions.current.identity++; };
   }, [onError, refreshEntries, refreshEventRecords, refreshIdentity, retryPrepMigration]);
-  return { entries, entriesReady, eventsStatus, seriesStatus, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity, prepMigrationStatus, prepMigrationError, retryPrepMigration };
+  return { entries, entriesReady, entriesStatus, entriesError, identityStatus, identityReady, eventsStatus, seriesStatus, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity, prepMigrationStatus, prepMigrationError, retryPrepMigration };
 }

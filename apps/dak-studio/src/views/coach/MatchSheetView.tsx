@@ -8,6 +8,7 @@ import {
   type CoachPlaybookItem,
 } from "../../lib/coach-playbook";
 import { getCoachAssignment } from "../../lib/coach-assignments";
+import { resolveSavedEvidence, type SavedEvidenceRef } from "../../lib/saved-evidence";
 import { getStudyNote } from "../../lib/study-notes";
 import { listTrainingFocus } from "../../lib/training-focus";
 import { listPrepItems, prepItemsToMarkdown } from "../../lib/prep-items";
@@ -36,6 +37,12 @@ const source = (name: string, map: string, round: number, tick?: number) =>
   label(
     `来源：${safeName(name)} · ${map} · R${round}${tick == null ? "" : ` · tick ${tick}`}`,
   );
+const savedSource = (ref: SavedEvidenceRef, entries: StudioDemoEntry[]) => {
+  const result = resolveSavedEvidence(ref, entries);
+  const { fileName, mapName } = ref.source;
+  const { roundNumber, tick } = ref.evidence;
+  return label(`来源：${safeName(fileName)} · ${mapName} · R${roundNumber}${tick == null ? "" : ` · tick ${tick}`} · ${result.reason}`);
+};
 async function resolve(
   ref: SheetMaterialRef,
   entries: StudioDemoEntry[],
@@ -60,12 +67,7 @@ async function resolve(
               })),
             ]),
             ...n.evidence.map((e) =>
-              source(
-                e.source.fileName,
-                e.source.mapName,
-                e.evidence.roundNumber,
-                e.evidence.tick,
-              ),
+              savedSource(e, entries),
             ),
           ],
           play: n,
@@ -96,12 +98,7 @@ async function resolve(
           lines: [
             body(n.body),
             ...n.evidence.map((e) =>
-              source(
-                e.source.fileName,
-                e.source.mapName,
-                e.evidence.roundNumber,
-                e.evidence.tick,
-              ),
+              savedSource(e, entries),
             ),
           ],
         }
@@ -371,6 +368,7 @@ export function MatchSheetView({
                                 tab: "diagram",
                                 selectedEvidenceId: null,
                                 replayEntryId: null,
+                                replayGeneration: null,
                                 replay: null,
                               }
                         }

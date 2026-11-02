@@ -45,12 +45,8 @@ export interface TeamRenameGroup {
 }
 
 export async function loadIdentityState(): Promise<IdentityStoreState> {
-  try {
-    const record = await stateStore.get<IdentityStoreState>(STATE_KEY);
-    return record ?? EMPTY_STATE;
-  } catch {
-    return EMPTY_STATE;
-  }
+  const record = await stateStore.get<IdentityStoreState>(STATE_KEY);
+  return record ?? EMPTY_STATE;
 }
 
 async function commitChange(

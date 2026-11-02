@@ -52,7 +52,6 @@ import type { CapabilityRepairAction } from "./lib/capability-availability";
 import { createStudioNavigation, studioNavigationReducer, findAnalysisFrame, PAGE_SECTION, type StudioDestination, type StudioNavigation, type StudioSection } from "./lib/studio-navigation";
 import { WorkbenchView } from "./views/WorkbenchView";
 import { MatchesView } from "./views/MatchesView";
-import { getSeasonSummary } from "./lib/queries/season-queries";
 import { AnalysisView } from "./views/AnalysisView";
 import { type PinnedPlayer } from "./lib/pin";
 import { setLastWork, updateLastMatchPosition } from "./lib/last-work";
@@ -103,7 +102,7 @@ function NavButton({ item, active, onClick }: { item: typeof MANAGEMENT_NAV; act
 export function App() {
   const activity = useStudioActivity();
   const { importing, setNotice } = activity;
-  const { entries, entriesReady, eventsStatus, seriesStatus, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity, prepMigrationStatus, prepMigrationError, retryPrepMigration } = useStudioData({ onError: setNotice });
+  const { entries, entriesReady, entriesStatus, entriesError, identityStatus, identityReady, eventsStatus, seriesStatus, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity, prepMigrationStatus, prepMigrationError, retryPrepMigration } = useStudioData({ onError: setNotice });
   const { importTagsRaw, setImportTagsRaw, importFiles, importDropped, importViaNativeDialog, nativeImportAvailable, loadBuiltinEvent, handleLinkRawDemo, watchRawDemo, handleRemove, handleRemoveMany, handleUpdateTags, handleBulkUpdateTags, handleReexportDemo, handleReexportAll, handleReexportSelected, handleRebuildFacts, handleRebuildStale, handleRebuildSelected } = useLibraryActions({ entries, refreshEntries, refreshEventRecords, activity });
   const { rivalHubConnection, batchSession, dismissBatch, updateLocalLink, refreshRivalHub, handleConnectRivalHub, handleRevokeRivalHub, importOnlineFiles, syncLocalRivalHubDemos, stopRivalHubBatch, pickRivalHubFiles, selectRivalHubBatchTarget } = useRivalHubActions({ refreshEntries, refreshEventRecords, activity });
   const [navigation, setNavigation] = useState(() => createStudioNavigation("initial"));
@@ -214,21 +213,18 @@ export function App() {
     [identityState.version, identityState.mappings, identityState.teamRenames]
   );
   const selectedTeams = useMemo(() => selectedTeam ? [selectedTeam] : [], [selectedTeam]);
-  const [focusIdentity, setFocusIdentity] = useState<{ playerKey: string; steamIds: string[] } | null>(null);
-  useEffect(() => {
-    if (!selectedPlayerKey || scopedEntries.length === 0 || (destination.page !== "duel" && destination.page !== "utility")) { setFocusIdentity(null); return; }
-    let cancelled = false;
-    setFocusIdentity({ playerKey: selectedPlayerKey, steamIds: [] });
-    void getSeasonSummary(scopedEntries, identityOptions).then(summary => {
-      if (!cancelled) setFocusIdentity({ playerKey: selectedPlayerKey, steamIds: summary.profiles.find(p => p.playerKey === selectedPlayerKey)?.steamIds ?? [] });
-    }).catch(() => { if (!cancelled) setFocusIdentity({ playerKey: selectedPlayerKey, steamIds: [] }); });
-    return () => { cancelled = true; };
-  }, [selectedPlayerKey, scopedEntries, identityOptions, destination.page]);
+  const focusIdentity = useMemo(() => {
+    if (!selectedPlayerKey || !identityReady) return null;
+    const mapping = identityState.mappings.find(item => item.playerKey === selectedPlayerKey);
+    const steamIds = mapping?.steamIds ?? (selectedPlayerKey.startsWith("steam:") && selectedPlayerKey.length > 6 ? [selectedPlayerKey.slice(6)] : []);
+    return steamIds.length ? { playerKey: selectedPlayerKey, steamIds } : null;
+  }, [selectedPlayerKey, identityReady, identityState.mappings]);
   const openCapabilityRepair = useCallback((action: CapabilityRepairAction) => {
     if (action === "install-tri") {
       navigate({ page: "management", tab: "assets" });
       return;
     }
+    if (action === "rebuild-facts") { navigate({ page: "management", tab: "library" }); return; }
     goLibrary();
   }, [goLibrary, navigate]);
   const selectRadarTeam = useCallback((teamName: string | null) => {
@@ -378,7 +374,7 @@ export function App() {
     }) });
   }, [navigate]);
 
-  const libraryView = (destination.page === "matches" || destination.page === "management") ? (
+  const libraryView = (destination.page === "matches" || destination.page === "management") ? (!entriesReady ? (entriesStatus === "error" ? <p role="alert">比赛资料读取失败。 <button type="button" className="stu-button-sm" onClick={() => { void refreshEntries().catch(() => {}); }}>重试</button></p> : <p>正在读取比赛资料…</p>) : (
           <LibraryView
             key={active.id}
             mode={destination.page === "management" ? "maintenance" : "browse"}
@@ -394,9 +390,9 @@ export function App() {
             onLibraryChanged={() => { void refreshEntries().catch(() => {}); void refreshEventRecords().catch(() => {}); }}
             onLoadBuiltin={loadBuiltinEvent}
             onOpenDemo={openDemo}
-            onRemoveDemo={handleRemove}
-            onUpdateTags={handleUpdateTags}
-            onBulkUpdateTags={handleBulkUpdateTags}
+            onRemoveDemo={id => { void handleRemove(id).catch(error => setNotice(`资料库操作或刷新失败：${error instanceof Error ? error.message : String(error)}`)); }}
+            onUpdateTags={(id, tags) => { void handleUpdateTags(id, tags).catch(error => setNotice(`资料库操作或刷新失败：${error instanceof Error ? error.message : String(error)}`)); }}
+            onBulkUpdateTags={(ids, add, remove) => { void handleBulkUpdateTags(ids, add, remove).catch(error => setNotice(`资料库操作或刷新失败：${error instanceof Error ? error.message : String(error)}`)); }}
             onLinkRawDemo={nativeImportAvailable ? handleLinkRawDemo : undefined}
             onWatchRawDemo={nativeImportAvailable ? (entry) => void watchRawDemo(entry.id) : undefined}
             onReexportDemo={handleReexportDemo}
@@ -407,7 +403,7 @@ export function App() {
             onRebuildStale={handleRebuildStale}
             onRebuildSelected={handleRebuildSelected}
           />
-  ) : null;
+  )) : null;
 
   return (
     <div
@@ -476,12 +472,14 @@ export function App() {
             <button type="button" onClick={() => { void invalidateAnalysisQueries().catch(() => {}); }}>重试刷新</button>
           </div>
         )}
+        {entriesStatus === "error" && entriesReady && destination.page !== "workbench" && <p role="alert">比赛资料刷新失败，显示上次成功读取的数据。 <button type="button" className="stu-button-sm" onClick={() => { void refreshEntries().catch(() => {}); }}>重试</button></p>}
+        {!entriesReady && (section === "analysis" || section === "matches") ? (entriesStatus === "error" ? <p role="alert">比赛资料读取失败。 <button type="button" className="stu-button-sm" onClick={() => { void refreshEntries().catch(() => {}); }}>重试</button></p> : <p>正在读取比赛资料…</p>) : <>
         {entries.length > 0 && section === "analysis" && "context" in destination && (
           <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} onEdit={() => setContextEditorOpen((current) => !current)} onCompare={(destination.page === "player" && selectedPlayerKey || destination.page === "team" && selectedTeam) ? () => document.getElementById("analysis-comparison")?.scrollIntoView({ behavior: "smooth", block: "center" }) : undefined} />
         )}
         {entries.length > 0 && contextEditorOpen && section === "analysis" && "context" in destination && (
           <AnalysisScopeEditor
-            key={active.id}
+            key={`scope-editor:${active.id}`}
             entries={entries}
             context={analysisContext}
             onChange={setAnalysisContext}
@@ -489,10 +487,10 @@ export function App() {
             events={eventScopes}
           />
         )}
-        {destination.page === "workbench" && <WorkbenchView onOpenSaved={row => void openSavedAnalysis(row)} events={eventScopes} entries={entries} entriesReady={entriesReady} onOpenMatch={openDemo} onPersonal={openWorkbenchPersonal} onResumeAnalysis={navigation.history.some(frame => PAGE_SECTION[frame.destination.page] === "analysis") ? () => resumeSection("analysis") : undefined} importing={importing} importTagsRaw={importTagsRaw} onImportFiles={importFiles} onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined} onMatches={() => navigate({ page: "matches" })} onOpenMaterial={openMaterial} onNewNote={() => openStudyNoteEditor(emptyStudyNoteDraft())} onNewPlaybook={() => { if (!canLeave()) return; const id = `frame-${++nextFrameId.current}`; setEvidenceSession(null); setNavigation(current => { const next = studioNavigationReducer(discardMaterialDraft(current), { intent: "open", id, destination: { page: "materials" }, scrollY: window.scrollY }); return studioNavigationReducer(next, { intent: "ui", frameId: id, ui: { ...emptyMaterialsPageState(), newPlaybook: emptyCoachPlaybookDraft() } }); }); }} prepMigrationStatus={prepMigrationStatus} retryPrepMigration={retryPrepMigration} />}
+        {destination.page === "workbench" && <WorkbenchView onOpenSaved={row => void openSavedAnalysis(row)} events={eventScopes} entries={entries} entriesReady={entriesReady} entriesStatus={entriesStatus} entriesError={entriesError} onRetryEntries={() => { void refreshEntries().catch(() => {}); }} onOpenMatch={openDemo} onPersonal={openWorkbenchPersonal} onResumeAnalysis={navigation.history.some(frame => PAGE_SECTION[frame.destination.page] === "analysis") ? () => resumeSection("analysis") : undefined} importing={importing} importTagsRaw={importTagsRaw} onImportFiles={importFiles} onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined} onMatches={() => navigate({ page: "matches" })} onOpenMaterial={openMaterial} onNewNote={() => openStudyNoteEditor(emptyStudyNoteDraft())} onNewPlaybook={() => { if (!canLeave()) return; const id = `frame-${++nextFrameId.current}`; setEvidenceSession(null); setNavigation(current => { const next = studioNavigationReducer(discardMaterialDraft(current), { intent: "open", id, destination: { page: "materials" }, scrollY: window.scrollY }); return studioNavigationReducer(next, { intent: "ui", frameId: id, ui: { ...emptyMaterialsPageState(), newPlaybook: emptyCoachPlaybookDraft() } }); }); }} prepMigrationStatus={prepMigrationStatus} retryPrepMigration={retryPrepMigration} />}
         {section === "matches" && <MatchesView page={destination.page} onMatches={() => navigate({ page: "matches" })} onEvents={() => navigate({ page: "events" })} />}
         {destination.page === "materials" && <MaterialsView identityOptions={identityOptions} onAnalyzeAssignments={openAssignmentAnalysis} onPageReady={keys => onPageReady(active.id, keys)} entries={entries} state={active.ui as MaterialsPageState} onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))} onOpenMaterial={openMaterial} onCreatedMaterial={createdMaterial} onOpenEvidence={openMaterialEvidence} prepMigrationStatus={prepMigrationStatus} prepMigrationError={prepMigrationError} retryPrepMigration={retryPrepMigration} />}
-        {destination.page === "material" && <MaterialDetailView onLecture={source => { const id = `frame-${++nextFrameId.current}`; setNavigation(current => { const next = studioNavigationReducer(current, { intent: "open", id, destination: { page: "lecture", materialRef: { kind: source.kind, id: source.id } }, scrollY: window.scrollY }); const ui: LecturePageState = source.kind === "playbook" ? { kind: "playbook", id: source.id, phaseId: source.phaseId, tab: "diagram", selectedEvidenceId: null, replayEntryId: null, replay: null } : { kind: "match-sheet", id: source.id, selectedSectionId: source.draft.sections[0]?.id ?? null, selectedRefKey: source.draft.sections[0] ? `${source.draft.sections[0].id}:${source.draft.sections[0].refs[0] ? `${source.draft.sections[0].refs[0].kind}:${source.draft.sections[0].refs[0].id}` : "text"}` : null, lectureIndex: 0, tab: "content", playbook: null }; return studioNavigationReducer(next, { intent: "ui", frameId: id, ui }); }); }} identityOptions={identityOptions} onAnalyzeAssignments={openAssignmentAnalysis} onPageReady={keys => onPageReady(active.id, keys)} refValue={destination.materialRef} entries={entries} state={active.ui as MaterialPageState | null} onStateChange={ui => setNavigation(current => {
+        {destination.page === "material" && <MaterialDetailView onLecture={source => { const id = `frame-${++nextFrameId.current}`; setNavigation(current => { const next = studioNavigationReducer(current, { intent: "open", id, destination: { page: "lecture", materialRef: { kind: source.kind, id: source.id } }, scrollY: window.scrollY }); const ui: LecturePageState = source.kind === "playbook" ? { kind: "playbook", id: source.id, phaseId: source.phaseId, tab: "diagram", selectedEvidenceId: null, replayEntryId: null, replayGeneration: null, replay: null } : { kind: "match-sheet", id: source.id, selectedSectionId: source.draft.sections[0]?.id ?? null, selectedRefKey: source.draft.sections[0] ? `${source.draft.sections[0].id}:${source.draft.sections[0].refs[0] ? `${source.draft.sections[0].refs[0].kind}:${source.draft.sections[0].refs[0].id}` : "text"}` : null, lectureIndex: 0, tab: "content", playbook: null }; return studioNavigationReducer(next, { intent: "ui", frameId: id, ui }); }); }} identityOptions={identityOptions} onAnalyzeAssignments={openAssignmentAnalysis} onPageReady={keys => onPageReady(active.id, keys)} refValue={destination.materialRef} entries={entries} state={active.ui as MaterialPageState | null} onStateChange={ui => setNavigation(current => {
           const frame = current.active;
           if (frame.id !== active.id || frame.destination.page !== "material" || frame.destination.materialRef.kind !== destination.materialRef.kind || frame.destination.materialRef.id !== destination.materialRef.id) return current;
           return studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui });
@@ -639,7 +637,9 @@ export function App() {
             onGoLibrary={() => goLibrary()}
           />
         )}
-        {destination.page === "duel" && (
+        {(destination.page === "duel" || destination.page === "utility") && selectedPlayerKey && identityStatus === "error" && identityReady && <p role="alert">身份资料刷新失败，使用上次成功读取的身份。 <button type="button" className="stu-button-sm" onClick={() => { void refreshIdentity().catch(() => {}); }}>重试</button></p>}
+        {(destination.page === "duel" || destination.page === "utility") && selectedPlayerKey && !focusIdentity && (identityStatus === "loading" ? <p>正在读取选手身份…</p> : <p role="alert">无法读取或解析该选手身份。 <button type="button" className="stu-button-sm" onClick={() => { void refreshIdentity().catch(() => {}); }}>重试</button></p>)}
+        {destination.page === "duel" && (!selectedPlayerKey || focusIdentity) && (
           <CapabilityPanel entries={scopedEntries} capability="duel" onRepair={openCapabilityRepair}>{(eligible, current, availability) =>
           <DuelView exportSource={current ? withCapabilityConditions(analysisExportSource(analysisContext, eligible, summarizeAnalysisContext(analysisContext, entries, eventScopes)), availability) : null}
             key={active.id}
@@ -647,7 +647,7 @@ export function App() {
             allEntries={entries}
             entries={eligible}
             selectedTeams={selectedTeams}
-            playerSteamIds={selectedPlayerKey ? focusIdentity?.playerKey === selectedPlayerKey ? focusIdentity.steamIds : [] : null}
+            playerSteamIds={selectedPlayerKey ? focusIdentity!.steamIds : null}
             state={active.ui as import("./lib/analysis-theme-state").DuelPageState}
             onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
             onOpenEvidence={openEvidence}
@@ -658,14 +658,14 @@ export function App() {
           />
           }</CapabilityPanel>
         )}
-        {destination.page === "utility" && (
+        {destination.page === "utility" && (!selectedPlayerKey || focusIdentity) && (
           <CapabilityPanel entries={scopedEntries} capability="utility" onRepair={openCapabilityRepair}>{(eligible, current, availability) =>
           <UtilityView exportSource={current ? withCapabilityConditions(analysisExportSource(analysisContext, eligible, summarizeAnalysisContext(analysisContext, entries, eventScopes)), availability) : null}
             key={active.id}
             allEntries={entries}
             entries={eligible}
             selectedTeams={selectedTeams}
-            playerFocus={selectedPlayerKey ? focusIdentity?.playerKey === selectedPlayerKey ? focusIdentity : { playerKey: selectedPlayerKey, steamIds: [] } : null}
+            playerFocus={selectedPlayerKey ? focusIdentity : null}
             onGoLineups={() => navigate({ page: "lineups", context: analysisContext })}
             state={active.ui as import("./lib/studio-page-state").UtilityPageState}
             onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
@@ -809,7 +809,7 @@ export function App() {
             onPageReady={(keys) => onPageReady(active.id, keys)}
             entries={entries}
             identity={identityState}
-            onIdentityChange={() => { void refreshIdentity(); }}
+            onIdentityChange={() => { void refreshIdentity().catch(() => {}); }}
             identityOptions={identityOptions}
             teamRenames={identityState.teamRenames}
             onGoLibrary={() => goLibrary()}
@@ -820,6 +820,7 @@ export function App() {
             library={libraryView}
           />
         )}
+        </>}
       </main>
     </div>
   );
