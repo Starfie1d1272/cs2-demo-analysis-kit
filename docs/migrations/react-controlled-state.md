@@ -30,3 +30,7 @@ const seek = (roundNumber: number, tick: number) => setState(current => current 
 ## 表格样式
 
 之前从 `@cs2dak/react` 导入 `STUDIO_TABLE_CLASSES`。现在宿主定义自己的 `DataTableClasses` 并传给 `classes`；通用 `DAK_TABLE_CLASSES` 仍可使用。
+
+## 赛季排行榜
+
+`SeasonLeaderboard` 不再保存视图和排序。宿主必须提供 `viewKey`、`tableState`、`onViewKeyChange` 和 `onTableStateChange`；切换视图时将表格排序设为对应 `model.views` 项的 `defaultSort`，并将页码重置为 0。无效的 view key 会显示首个可用视图。地图职责和地图池组件可选接收 `state` / `onStateChange` 以恢复表格状态。

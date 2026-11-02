@@ -1,10 +1,10 @@
 import { createAnalysisContext, createAnalysisContextPreset, type AnalysisContext } from "./analysis-context.js";
 import { emptyMaterialsPageState } from "./material-page-state";
 import type { LectureMaterialRef, MaterialRef } from "./material-ref.js";
-import { emptyMatchesState, emptyEventsState, emptyUtilityState, emptyPlayerState, type StudioPageStateMap } from "./studio-page-state.js";
+import { emptyMatchesState, emptyEventsState, emptyUtilityState, emptyPlayerState, emptyTeamState, emptyAnalysisState, type StudioPageStateMap } from "./studio-page-state.js";
 
 export type StudioSection = "workbench" | "matches" | "analysis" | "materials" | "management";
-export type AnalysisPageId = "analysis" | "personal-review" | "player" | "team" | "event-analysis" | "duel" | "economy" | "utility" | "lineups" | "opening" | "control" | "patterns";
+export type AnalysisPageId = "analysis" | "player" | "team" | "event-analysis" | "duel" | "economy" | "utility" | "lineups" | "opening" | "control" | "patterns";
 export type AnalysisDestination = { [P in AnalysisPageId]: { page: P; context: AnalysisContext } }[AnalysisPageId];
 export type StudioDestination =
   | { page: "workbench" } | { page: "matches" } | { page: "events"; eventId?: string }
@@ -18,7 +18,7 @@ export type StudioFrame = { [P in StudioPageId]: { id: string; destination: Dest
 
 export const PAGE_SECTION: Record<StudioPageId, StudioSection> = {
   workbench: "workbench", matches: "matches", events: "matches", match: "matches",
-  analysis: "analysis", "personal-review": "analysis", player: "analysis", team: "analysis",
+  analysis: "analysis", player: "analysis", team: "analysis",
   "event-analysis": "analysis", duel: "analysis", economy: "analysis", utility: "analysis",
   lineups: "analysis", opening: "analysis", control: "analysis", patterns: "analysis",
   materials: "materials", material: "materials", lecture: "materials", management: "management",
@@ -38,7 +38,7 @@ function copyDestination(destination: StudioDestination): StudioDestination {
   return { ...destination };
 }
 function frame(id: string, destination: StudioDestination): StudioFrame {
-  return { id, destination: copyDestination(destination), ui: destination.page === "player" ? emptyPlayerState() : destination.page === "materials" ? emptyMaterialsPageState() : destination.page === "utility" ? emptyUtilityState() : destination.page === "matches" ? emptyMatchesState() : destination.page === "events" ? { ...emptyEventsState(), activeEventId: destination.eventId ?? null } : destination.page === "management" ? { tab: destination.tab, library: emptyMatchesState() } : null, scrollY: 0 } as StudioFrame;
+  return { id, destination: copyDestination(destination), ui: destination.page === "analysis" || destination.page === "event-analysis" ? emptyAnalysisState() : destination.page === "player" ? emptyPlayerState() : destination.page === "team" ? emptyTeamState() : destination.page === "materials" ? emptyMaterialsPageState() : destination.page === "utility" ? emptyUtilityState() : destination.page === "matches" ? emptyMatchesState() : destination.page === "events" ? { ...emptyEventsState(), activeEventId: destination.eventId ?? null } : destination.page === "management" ? { tab: destination.tab, library: emptyMatchesState() } : null, scrollY: 0 } as StudioFrame;
 }
 export interface StudioNavigation {
   active: StudioFrame;
@@ -47,6 +47,7 @@ export interface StudioNavigation {
 }
 export type NavigationAction =
   | { intent: "open"; id: string; destination: StudioDestination; scrollY: number }
+  | { intent: "switch-analysis"; id: string; destination: AnalysisDestination; scrollY: number }
   | { intent: "evidence"; id: string; destination: DestinationFor<"match">; scrollY: number; sourceKey?: string }
   | { intent: "resume"; id: string; section: StudioSection; scrollY: number }
   | { intent: "back"; id: string }
@@ -57,6 +58,14 @@ export type NavigationAction =
   | { intent: "position"; frameId: string; scrollY: number; anchorKey?: string };
 export function createStudioNavigation(id: string): StudioNavigation {
   return { active: frame(id, defaultDestination("workbench")), history: [], resume: {} };
+}
+/** 查找同一语义上下文的最近分析页面，用于主题切换恢复。 */
+export function findAnalysisFrame(history: readonly StudioFrame[], destination: AnalysisDestination): StudioFrame | undefined {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const item = history[i];
+    if (item.destination.page === destination.page && "context" in item.destination && JSON.stringify(item.destination.context) === JSON.stringify(destination.context)) return item;
+  }
+  return undefined;
 }
 export function studioNavigationReducer(state: StudioNavigation, action: NavigationAction): StudioNavigation {
   if (action.intent === "restore") return { ...state, active: structuredClone(action.frame), history: state.history.filter(item => item.id !== action.frame.id) };
@@ -74,6 +83,15 @@ export function studioNavigationReducer(state: StudioNavigation, action: Navigat
     const ids = new Set([active.id, ...history.map(item => item.id)]);
     const resume = Object.fromEntries(Object.entries(state.resume).filter(([, id]) => ids.has(id)));
     return { active, history, resume: { ...resume, [PAGE_SECTION[active.destination.page]]: active.id } };
+  }
+  if (action.intent === "switch-analysis") {
+    const source = { ...state.active, scrollY: action.scrollY } as StudioFrame;
+    const active = findAnalysisFrame(state.history, action.destination);
+    if (active) {
+      const history = [...state.history.filter(item => item.id !== active.id), source].slice(-20);
+      return { active, history, resume: { ...state.resume, analysis: active.id } };
+    }
+    return studioNavigationReducer(state, { ...action, intent: "open" });
   }
   const source = { ...state.active, scrollY: action.scrollY, ...(action.intent === "evidence" ? { anchorKey: action.sourceKey } : {}) } as StudioFrame;
   const section = PAGE_SECTION[source.destination.page];
