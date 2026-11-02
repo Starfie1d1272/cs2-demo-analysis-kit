@@ -144,7 +144,3 @@ export interface UtilityValueFactsOptions extends FactsScope {
   teamRenames?: Record<string, string>;
   selectedTeams?: string[];
 }
-
-export type { C4RouteFact, CtRotationRoundFact, ExecuteBucket, PlayerPositionRoundFact, SiteEntryFact, TacticalGrenadeOccurrence, TacticalPlantFact, TacticalRoundFact, TeamAwpRoundFact, TeamShapeRoundFact };
-export type { DemoPackage, Side, TeamKey };
-export type { Vec3 };

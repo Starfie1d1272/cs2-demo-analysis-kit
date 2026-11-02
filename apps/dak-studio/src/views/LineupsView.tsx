@@ -8,9 +8,10 @@ export interface LineupsViewProps {
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
+  onRebuild: (ids: string[]) => void;
 }
 
-export function LineupsView({ allEntries, entries, onOpenMatch, onWatchDemo, onGoLibrary }: LineupsViewProps) {
+export function LineupsView({ allEntries, entries, onOpenMatch, onWatchDemo, onGoLibrary, onRebuild }: LineupsViewProps) {
   if (allEntries.length === 0) {
     return (
       <div className="stu-view">
@@ -35,7 +36,7 @@ export function LineupsView({ allEntries, entries, onOpenMatch, onWatchDemo, onG
       {entries.length === 0 ? (
         <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整全局范围。" />
       ) : (
-        <LineupView entries={entries} onOpenMatch={onOpenMatch} onWatchDemo={onWatchDemo} />
+        <LineupView onRebuild={onRebuild} entries={entries} onOpenMatch={onOpenMatch} onWatchDemo={onWatchDemo} />
       )}
     </div>
   );

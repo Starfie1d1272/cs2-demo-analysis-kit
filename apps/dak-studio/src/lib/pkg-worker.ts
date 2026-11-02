@@ -5,7 +5,7 @@ import { buildMatchRadarField } from "@cs2dak/tactics";
 import { buildRadarFieldGrid, type TriangleBvh } from "@cs2dak/maps";
 import { loadCalloutGridBrowser } from "@cs2dak/map-assets/callout-grid-browser";
 import { buildTriBvh, fetchTriBuffer, type TriDiagnosticSink } from "./tri-loading";
-import { extractMatchData } from "./extract-match-facts";
+import { buildMatchRecords } from "./match-records";
 import { metaFromPackage } from "./demo-meta";
 
 /**
@@ -90,7 +90,7 @@ self.onmessage = async (event: MessageEvent<InMsg>) => {
       loadTriBvh(mapName, msg.triBaseUrl, observe),
       loadCalloutGridBrowser(mapName, { urls: msg.calloutUrls })
     ]);
-    const data = extractMatchData(pkg, {
+    const data = buildMatchRecords(pkg, {
       matchId: msg.matchId,
       visibilityFor: (name) => (name === mapName ? bvh : null),
       calloutGrid
