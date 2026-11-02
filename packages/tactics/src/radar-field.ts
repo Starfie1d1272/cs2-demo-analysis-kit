@@ -334,54 +334,63 @@ export function buildMatchRadarField(pkg: DemoPackage, options: BuildMatchRadarF
   });
 }
 
-/** 把多份场加性合并成一个 scope 场（联赛基线或单队）。grid/maxSec 必须一致。 */
-export function aggregateRadarFields(
-  fields: RadarField[],
-  scope: { kind: "league" | "team"; team: string | null }
-): RadarField | null {
-  if (fields.length === 0) return null;
-  const first = fields[0]!;
-  const maxSec = first.maxSec;
-  const nCells = first.grid.cells.length;
-  const denomCt = new Int32Array(maxSec);
-  const denomT = new Int32Array(maxSec);
-  const out = makeFields(maxSec, nCells);
+/** Incremental aggregation keeps only one output field in memory. */
+export interface RadarFieldAccumulator {
+  append(field: RadarField): void;
+  finish(): RadarField | null;
+}
+
+export function createRadarFieldAccumulator(scope: { kind: "league" | "team"; team: string | null }): RadarFieldAccumulator {
+  let result: RadarField | null = null;
+  let finished = false;
   const matchIds = new Set<string>();
-  const countedForRounds = new Set<string>();
-  let roundCount = 0;
-  let economy = first.scope.economy;
-
-  for (const f of fields) {
-    economy = f.scope.economy;
-    for (let s = 0; s < maxSec; s++) {
-      denomCt[s]! += f.denomCt[s]!;
-      denomT[s]! += f.denomT[s]!;
-      for (const base of FIELD_BASES) {
-        const dst = out[base][s]!;
-        const src = f.fields[base][s]!;
-        for (let g = 0; g < nCells; g++) dst[g]! += src[g]!;
-      }
-    }
-    // roundCount 按 matchId 去重计：联赛求和时同场两份贡献只算一次回合数。
-    const mid = f.scope.matchIds[0];
-    if (mid && !countedForRounds.has(mid)) {
-      countedForRounds.add(mid);
-      roundCount += f.scope.roundCount;
-    }
-    for (const m of f.scope.matchIds) matchIds.add(m);
-  }
-
+  const counted = new Set<string>();
   return {
-    schemaVersion: first.schemaVersion,
-    computeVersion: first.computeVersion,
-    mapName: first.mapName,
-    calibrationVersion: first.calibrationVersion,
-    triAvailability: fields.some((f) => f.triAvailability === "none") ? "none" : "full",
-    scope: { kind: scope.kind, team: scope.team, economy, roundCount, matchIds: [...matchIds] },
-    grid: first.grid,
-    maxSec,
-    denomCt,
-    denomT,
-    fields: out,
+    append(src) {
+      if (finished) throw new Error("Radar field accumulator already finished");
+      const n = src.grid.cells.length;
+      if (src.denomCt.length !== src.maxSec || src.denomT.length !== src.maxSec ||
+          FIELD_BASES.some(base => src.fields[base].length !== src.maxSec || src.fields[base].some(row => row.length !== n))) {
+        throw new Error("Invalid radar field dimensions");
+      }
+      if (result && (result.schemaVersion !== src.schemaVersion || result.computeVersion !== src.computeVersion ||
+          result.mapName !== src.mapName || result.calibrationVersion !== src.calibrationVersion ||
+          result.maxSec !== src.maxSec || result.scope.economy !== src.scope.economy ||
+          result.grid.cellSize !== src.grid.cellSize || JSON.stringify(result.grid.cells) !== JSON.stringify(src.grid.cells))) {
+        throw new Error("Incompatible radar field metadata");
+      }
+      result ??= {
+        schemaVersion: src.schemaVersion, computeVersion: src.computeVersion, mapName: src.mapName,
+        calibrationVersion: src.calibrationVersion, triAvailability: src.triAvailability,
+        scope: { ...scope, economy: src.scope.economy, roundCount: 0, matchIds: [] },
+        grid: src.grid, maxSec: src.maxSec, denomCt: new Int32Array(src.maxSec),
+        denomT: new Int32Array(src.maxSec), fields: makeFields(src.maxSec, n),
+      };
+      if (src.triAvailability === "none") result.triAvailability = "none";
+      for (let s = 0; s < src.maxSec; s++) {
+        result.denomCt[s]! += src.denomCt[s]!;
+        result.denomT[s]! += src.denomT[s]!;
+        for (const base of FIELD_BASES) {
+          const dst = result.fields[base][s]!;
+          const row = src.fields[base][s]!;
+          for (let g = 0; g < n; g++) dst[g]! += row[g]!;
+        }
+      }
+      const mid = src.scope.matchIds[0];
+      if (mid && !counted.has(mid)) { counted.add(mid); result.scope.roundCount += src.scope.roundCount; }
+      for (const id of src.scope.matchIds) matchIds.add(id);
+    },
+    finish() {
+      finished = true;
+      if (result) result.scope.matchIds = [...matchIds];
+      return result;
+    },
   };
+}
+
+/** Aggregate fields using the same streaming owner. */
+export function aggregateRadarFields(fields: RadarField[], scope: { kind: "league" | "team"; team: string | null }): RadarField | null {
+  const accumulator = createRadarFieldAccumulator(scope);
+  for (const field of fields) accumulator.append(field);
+  return accumulator.finish();
 }

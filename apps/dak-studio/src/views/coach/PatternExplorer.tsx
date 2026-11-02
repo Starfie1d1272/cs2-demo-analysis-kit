@@ -1,12 +1,14 @@
+import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../../lib/queries/query-cache";
 import { createReplayViewState, normalizeReplayViewState, type ReplayViewState } from "@cs2dak/presentation";
 import { STUDIO_TABLE_CLASSES } from "../../components/table-styles";
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 import type { MatchWorkspaceModel } from "@cs2dak/presentation";
 import { ReplayViewer } from "@cs2dak/react/replay";
 import { economyLabelCn, formatClockSeconds, ECONOMY_ENTRY_CN, formatEntryEvidenceLabel, formatTacticalClusterShortName } from "@cs2dak/presentation";
 import { calloutCn, buildLineupClusters, type LineupGrenadeLike } from "@cs2dak/maps";
 import type { EconomyEntry } from "@cs2dak/tactics";
-import { autoName, type TacticalCluster } from "../../lib/tactics.js";
+import { formatTacticalClusterName as autoName } from "@cs2dak/presentation";
+import type { TacticalCluster } from "@cs2dak/tactics";
 import type { TacticalRoundFact } from "@cs2dak/tactics";
 import { loadMatchWorkspaceModel, type StudioDemoEntry } from "../../lib/library.js";
 import { MetricInfo, EvidenceLink, DataTable, type DataTableColumn } from "@cs2dak/react";
@@ -213,12 +215,17 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
 }
 
 
-async function loadReplayModel(matchId: string, demoId: string | null, cache: Map<string, MatchWorkspaceModel>): Promise<MatchWorkspaceModel> {
-  const cached = cache.get(matchId);
+async function loadReplayModel(demoId: string | null, cache: Map<string, MatchWorkspaceModel>, generation: number): Promise<MatchWorkspaceModel> {
+  assertAnalysisGeneration(generation);
+  if (!demoId) throw new Error("本场没有可用回放，请重新导入或重建该场。");
+  for (const key of cache.keys()) if (!key.startsWith(`${generation}:`)) cache.delete(key);
+  const key = `${generation}:${demoId}`;
+  const cached = cache.get(key);
   if (cached) return cached;
-  const model = demoId ? await loadMatchWorkspaceModel(demoId) : null;
-  if (!model) throw new Error("本场没有可用回放，请重新导入或重建该场。");
-  cache.set(matchId, model);
+  const model = await loadMatchWorkspaceModel(demoId);
+  assertAnalysisGeneration(generation);
+  cache.set(key, model);
+  while (cache.size > 5) cache.delete(cache.keys().next().value!);
   return model;
 }
 
@@ -229,38 +236,43 @@ function CoachReplayStage({ fact, entryByMatchId, cache, mainRef }: {
   cache: Map<string, MatchWorkspaceModel>;
   mainRef?: RefObject<HTMLDivElement | null>;
 }) {
+  const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
+  useEffect(() => subscribeAnalysisDataInvalidation(() => { if (getAnalysisDataSnapshot().status !== "ready") cache.clear(); }), [cache]);
   const matchId = fact?.matchId ?? null;
-  const cachedModel = matchId ? cache.get(matchId) ?? null : null;
-  const [loaded, setLoaded] = useState<{ matchId: string; model: MatchWorkspaceModel } | null>(
-    matchId && cachedModel ? { matchId, model: cachedModel } : null
+  const entryId = matchId ? entryByMatchId.get(matchId)?.id : undefined;
+  const cachedModel = entryId && analysis.status === "ready" ? cache.get(`${analysis.generation}:${entryId}`) ?? null : null;
+  const [loaded, setLoaded] = useState<{ matchId: string; generation: number; model: MatchWorkspaceModel } | null>(
+    matchId && cachedModel ? { matchId, generation: analysis.generation, model: cachedModel } : null
   );
   const [error, setError] = useState<string | null>(null);
-  const model = loaded?.matchId === matchId ? loaded.model : null;
+  const model = loaded?.matchId === matchId && loaded.generation === analysis.generation && analysis.status === "ready" && entryId ? loaded.model : null;
   const [replayState, setReplayState] = useState<ReplayViewState | null>(null);
   const replayMatchId = useRef<string | null>(null);
   useEffect(() => {
+    if (analysis.status !== "ready") return;
     if (!model || !fact) { replayMatchId.current = null; setReplayState(null); return; }
     const round = model.replay.rounds.find(r => r.roundNumber === fact.roundNumber);
     const initial = createReplayViewState(model.replay, model.map.view);
     const sameMatch = replayMatchId.current === fact.matchId;
     replayMatchId.current = fact.matchId;
     setReplayState(previous => round && initial ? normalizeReplayViewState(model.replay, model.map.view, { ...(sameMatch && previous ? previous : initial), roundNumber: round.roundNumber, tick: round.freezeEndTick + 20 * (model.replay.tickrate ?? 64), playing: false }) : null);
-  }, [model, fact?.matchId, fact?.roundNumber]);
+  }, [model, fact?.matchId, fact?.roundNumber, analysis.status]);
 
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    if (!matchId) {
+    if (!matchId || !entryId || analysis.status !== "ready") {
       setLoaded(null);
       return () => { cancelled = true; };
     }
-    const nextCached = cache.get(matchId);
-    setLoaded(nextCached ? { matchId, model: nextCached } : null);
-    loadReplayModel(matchId, entryByMatchId.get(matchId)?.id ?? null, cache)
-      .then((nextModel) => { if (!cancelled) setLoaded({ matchId, model: nextModel }); })
+    for (const key of cache.keys()) if (!key.startsWith(`${analysis.generation}:`)) cache.delete(key);
+    const nextCached = cache.get(`${analysis.generation}:${entryId}`);
+    setLoaded(nextCached ? { matchId, generation: analysis.generation, model: nextCached } : null);
+    loadReplayModel(entryId, cache, analysis.generation)
+      .then((nextModel) => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setLoaded({ matchId, generation: analysis.generation, model: nextModel }); } })
       .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)); });
     return () => { cancelled = true; };
-  }, [matchId, cache, entryByMatchId]);
+  }, [matchId, entryId, cache, analysis.generation, analysis.status]);
 
   if (!fact) return <div ref={mainRef} className="stu-pe-replay-main stu-pe-radar-empty">该模式没有可用证据回合。</div>;
   const entry = entryByMatchId.get(fact.matchId);

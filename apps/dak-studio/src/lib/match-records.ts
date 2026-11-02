@@ -54,13 +54,16 @@ export function buildMatchRecords(pkg: DemoPackage, options: ExtractMatchFactsOp
   const signalBySteamId = new Map(rrSignals.map((row) => [row.steamId64, row]));
   const indicatorBySteamId = new Map(rrIndicators.map((row) => [row.steamId64, row]));
   const weaponBySteamId = new Map(weaponHighlights.map((row) => [row.steamId64, row]));
-  const playerInsights = pkg.players.map((player) => ({
+  const playerInsights = analysis.playerInsights.map((facts) => {
+    const player = players.get(facts.performance.steamId64)!;
+    return ({
     matchId: options.matchId,
     playerKey: playerKeyFor(player),
     steamId64: player.steamId64,
     playerName: player.name,
-    insight: analysis.playerInsights.find(row => row.steamId64 === player.steamId64)!.insight,
-  } satisfies DerivedPlayerInsight));
+    facts,
+  } satisfies DerivedPlayerInsight);
+  });
 
   const playerWeapons = pkg.players.flatMap((player) => {
     const summary = performanceBySteamId.get(player.steamId64);

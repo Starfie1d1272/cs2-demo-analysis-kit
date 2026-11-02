@@ -2,7 +2,7 @@ import { deleteMatchRows, settleWrites } from "./storage/match-rows";
 import type { OpeningTrailsModel } from "@cs2dak/tactics";
 import type {
   DuelInsightsFacts,
-  PlayerSeasonInsights,
+  PlayerMatchInsightFacts,
   TeamComparisonFacts,
   TournamentFacts,
   UtilityValueSummary,
@@ -12,17 +12,18 @@ import { getStorage, type RecordStore, type StorageAdapter } from "./storage";
 
 // v6 requires explicit stable Tournament identities. Old label-derived rows
 // are rebuilt locally; raw Demo packages and immutable remote evidence are untouched.
-export const DERIVED_MATCH_NAMESPACE = "derived:match-v6";
+export const DERIVED_MATCH_NAMESPACE = "derived:match-v7";
 const TABLES = ["player_insights", "tournament", "team_comparison", "duels", "opening_trails", "utility_value"] as const;
 export const DERIVED_CACHE_RECORD_NAMESPACES = TABLES.map((table) => `${DERIVED_MATCH_NAMESPACE}:${table}`);
 export const LEGACY_DERIVED_RECORD_NAMESPACES = [
+  ...TABLES.map((table) => `derived:match-v6:${table}`),
   ...TABLES.map((table) => `derived:match-v5:${table}`),
   ...TABLES.map((table) => `derived:match-v4:${table}`),
   ...["player_insights", "tournament_facts", "team_comparison_facts", "duel_facts", "match_workspace", "opening_trails", "utility_value"].map((table) => `derived:match-v3-map2:${table}`),
 ];
 
 interface ScopedRow { matchId: string; playerKey?: string; steamId64?: string; mapName?: string }
-export interface DerivedPlayerInsight extends ScopedRow { playerKey: string; steamId64: string; playerName: string; insight: PlayerSeasonInsights }
+export interface DerivedPlayerInsight extends ScopedRow { playerKey: string; steamId64: string; playerName: string; facts: PlayerMatchInsightFacts }
 export interface DerivedTournament extends ScopedRow { mapName: string; row: TournamentFacts }
 export interface DerivedTeamComparison extends ScopedRow { mapName: string; row: TeamComparisonFacts }
 export interface DerivedDuel extends ScopedRow { mapName: string; row: DuelInsightsFacts }

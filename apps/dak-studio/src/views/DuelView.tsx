@@ -6,7 +6,8 @@ import { getMapCalibration, worldToRadar } from "@cs2dak/maps/calibration";
 import { EmptyState, MetricInfo, Pagination } from "@cs2dak/react";
 import { displayTeamName } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
-import { getDuelInsights, type IdentityOptions } from "../lib/season";
+import { getDuelInsights } from "../lib/queries/combat-queries";
+import { type IdentityOptions } from "../lib/identity";
 
 type DuelTab = "records" | "opening" | "mechanics";
 type EvidenceFilter = "contested_duel" | "suppressed_kill" | "caught_off_guard" | "low_hp" | "third_party" | "all";

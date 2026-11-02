@@ -140,3 +140,15 @@ Core 对 Tournament 的依赖仅用于 DTO/type。其 canonical projection 仍�
 ## 编译分发
 
 contract 的 format 上游和 rating 的公式上游仅为精确 devDependencies。构建从固定 registry 源编译私有 JS/完整声明，校验源、声明和许可证哈希；消费者不安装这些源码包。外部 strict NodeNext 消费检查覆盖完整声明闭包，避免格式包的 parser/JSZip 传递进入基础事实消费路径。
+
+### Studio 分析事实与缓存版本
+
+单场洞察持久化为 `PlayerMatchInsightFacts`：pipeline 的 `analyzeMatchFacts().playerInsights`
+直接返回事实行，使用 `performance.steamId64` 识别选手；跨场结果由 analytics 的
+`buildPlayerSeasonInsightsFromFacts` 按调用方提供的完整比赛顺序投影。需要趋势或 Flash
+汇总的调用方应传入目标 Steam ID 和有序 match ID，不再读取旧的逐场 `insight` 汇总字段。
+武器场均的分母由选手参赛事实提供，与枪法样本覆盖独立。
+
+Studio facts revision 7 会将旧分析标记为待重建；从已存 ZIP 重建即可。查询缓存与
+单场模型通过同一代际失效，缓存清理失败时可在提示中重试刷新。ZIP、笔记、声明和练习
+材料不属于可重建分析缓存。

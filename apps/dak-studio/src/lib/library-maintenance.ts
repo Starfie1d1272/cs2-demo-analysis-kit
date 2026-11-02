@@ -1,3 +1,4 @@
+import { invalidateAnalysisQueries } from "./queries/query-cache";
 export interface StorageCategory {
   id: "database" | "demos" | "cache" | "bundledEvents" | "tris" | "updates" | "reports" | "logs" | "backups";
   bytes: number;
@@ -51,7 +52,10 @@ export async function restoreLibrary() {
 }
 
 export async function cleanupStorage(category: StorageCategory["id"]) {
-  return api()?.storage_cleanup(category) ?? { ok: false, error: "仅桌面版支持存储清理" };
+  const result = await (api()?.storage_cleanup(category) ?? { ok: false, error: "仅桌面版支持存储清理" });
+  if (category !== "cache" || !result.ok) return result;
+  try { await invalidateAnalysisQueries(); return result; }
+  catch (error) { return { ...result, ok: false, error: `磁盘缓存已清理，分析缓存刷新失败：${String(error)}` }; }
 }
 
 export async function repairLibrary() {

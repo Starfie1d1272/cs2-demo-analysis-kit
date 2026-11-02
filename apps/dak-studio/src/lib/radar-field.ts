@@ -10,7 +10,7 @@
  * 不符即当未命中重算覆盖（无泄漏）。算法/标定变更 → core 的 RADAR_FIELD_VERSION +1 即可。
  */
 import type { RadarField, RadarFieldBase } from "@cs2dak/tactics";
-import { RADAR_FIELD_BASES } from "@cs2dak/tactics";
+import { RADAR_FIELD_BASES, createRadarFieldAccumulator } from "@cs2dak/tactics";
 import { RADAR_FIELD_VERSION } from "@cs2dak/tactics";
 import { MAP_CALIBRATION_VERSION } from "@cs2dak/maps/calibration";
 import { radarFieldInWorker } from "./library";
@@ -183,73 +183,6 @@ export interface RadarScopeBatchResult {
   team: RadarField | null;
 }
 
-interface RadarAccumulator {
-  field: RadarField;
-  matchIds: Set<string>;
-  countedForRounds: Set<string>;
-}
-
-function makeRows(maxSec: number, nCells: number): Int32Array[] {
-  return Array.from({ length: maxSec }, () => new Int32Array(nCells));
-}
-
-function makeFieldRows(maxSec: number, nCells: number): Record<RadarFieldBase, Int32Array[]> {
-  const fields = {} as Record<RadarFieldBase, Int32Array[]>;
-  for (const base of FIELD_BASES) fields[base] = makeRows(maxSec, nCells);
-  return fields;
-}
-
-function makeAccumulator(sample: RadarField, scope: { kind: "league" | "team"; team: string | null }): RadarAccumulator {
-  const maxSec = sample.maxSec;
-  const nCells = sample.grid.cells.length;
-  return {
-    field: {
-      schemaVersion: sample.schemaVersion,
-      computeVersion: sample.computeVersion,
-      mapName: sample.mapName,
-      calibrationVersion: sample.calibrationVersion,
-      triAvailability: sample.triAvailability,
-      scope: { kind: scope.kind, team: scope.team, economy: sample.scope.economy, roundCount: 0, matchIds: [] },
-      grid: sample.grid,
-      maxSec,
-      denomCt: new Int32Array(maxSec),
-      denomT: new Int32Array(maxSec),
-      fields: makeFieldRows(maxSec, nCells),
-    },
-    matchIds: new Set(),
-    countedForRounds: new Set(),
-  };
-}
-
-function appendField(acc: RadarAccumulator, src: RadarField): void {
-  const dst = acc.field;
-  const maxSec = dst.maxSec;
-  const nCells = dst.grid.cells.length;
-  dst.scope.economy = src.scope.economy;
-  if (src.triAvailability === "none") dst.triAvailability = "none";
-  for (let s = 0; s < maxSec; s++) {
-    dst.denomCt[s]! += src.denomCt[s]!;
-    dst.denomT[s]! += src.denomT[s]!;
-    for (const base of FIELD_BASES) {
-      const out = dst.fields[base][s]!;
-      const row = src.fields[base][s]!;
-      for (let g = 0; g < nCells; g++) out[g]! += row[g]!;
-    }
-  }
-  const mid = src.scope.matchIds[0];
-  if (mid && !acc.countedForRounds.has(mid)) {
-    acc.countedForRounds.add(mid);
-    dst.scope.roundCount += src.scope.roundCount;
-  }
-  for (const matchId of src.scope.matchIds) acc.matchIds.add(matchId);
-}
-
-function finishAccumulator(acc: RadarAccumulator | null): RadarField | null {
-  if (!acc) return null;
-  acc.field.scope.matchIds = [...acc.matchIds];
-  return acc.field;
-}
-
 async function forEachLimit<T>(
   items: T[],
   limit: number,
@@ -273,26 +206,24 @@ export async function buildScopeRadarFields(req: RadarScopeBatchRequest): Promis
   const economy = req.economy ?? "gun";
   const total = req.matchIds.length;
   let done = 0;
-  let leagueAcc: RadarAccumulator | null = null;
-  let teamAcc: RadarAccumulator | null = null;
+  const leagueAcc = createRadarFieldAccumulator({ kind: "league", team: null });
+  const teamAcc = createRadarFieldAccumulator({ kind: "team", team: req.team?.name ?? null });
   await forEachLimit(req.matchIds, RADAR_FIELD_LOAD_CONCURRENCY, req.signal, async (id) => {
     const fields = await getMatchRadarFields(id, economy);
     if (req.signal?.aborted) return;
     for (const f of fields) {
       if (req.league ?? true) {
-        leagueAcc ??= makeAccumulator(f, { kind: "league", team: null });
-        appendField(leagueAcc, f);
+        leagueAcc.append(f);
       }
       if (req.team && f.scope.team != null && req.team.includeTeam(f.scope.team)) {
-        teamAcc ??= makeAccumulator(f, { kind: "team", team: req.team.name });
-        appendField(teamAcc, f);
+        teamAcc.append(f);
       }
     }
     done += 1;
     req.onProgress?.(done, total);
   });
   if (req.signal?.aborted) return { league: null, team: null };
-  return { league: finishAccumulator(leagueAcc), team: finishAccumulator(teamAcc) };
+  return { league: leagueAcc.finish(), team: teamAcc.finish() };
 }
 
 /** 聚合一个 scope 的雷达场（赛事基线或单队）。worker 池并发算缺失场，命中缓存秒回。 */

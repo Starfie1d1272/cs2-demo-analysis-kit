@@ -261,3 +261,11 @@ export function buildCohortIdentityMap(mappings: IdentityMapping[]): PlayerIdent
   }
   return map;
 }
+
+export interface IdentityOptions {
+  /** 与 IdentityStoreState.version 一致；0 表示无自定义映射。 */
+  version: number;
+  map: PlayerIdentityMap;
+  /** 队伍原名 → 显示名；不会改变 stable entity ID 或决定 Tournament 归并。 */
+  teamRenames?: Record<string, string>;
+}
