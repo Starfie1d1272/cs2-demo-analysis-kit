@@ -55,6 +55,13 @@ interface DemoIdentityIndex {
 
 let identityIndex: DemoIdentityIndex | null = null;
 let identityIndexPromise: Promise<DemoIdentityIndex> | null = null;
+let identityIndexGeneration = 0;
+
+function invalidateIdentityIndex(): void {
+  identityIndexGeneration++;
+  identityIndex = null;
+  identityIndexPromise = null;
+}
 
 /** demo 元数据补默认值（tags / sourceDemPath 为后加字段）。 */
 function normalizeEntry(entry: StudioDemoEntry): StudioDemoEntry {
@@ -126,14 +133,17 @@ async function buildDemoIdentityIndex(): Promise<DemoIdentityIndex> {
 async function ensureDemoIdentityIndex(): Promise<DemoIdentityIndex> {
   if (identityIndex) return identityIndex;
   if (!identityIndexPromise) {
-    identityIndexPromise = buildDemoIdentityIndex().then((index) => {
+    const generation = identityIndexGeneration;
+    const pending = buildDemoIdentityIndex().then((index) => {
+      if (generation !== identityIndexGeneration) return ensureDemoIdentityIndex();
       identityIndex = index;
       identityIndexPromise = null;
       return index;
     }, (error) => {
-      identityIndexPromise = null;
+      if (generation === identityIndexGeneration) identityIndexPromise = null;
       throw error;
     });
+    identityIndexPromise = pending;
   }
   return identityIndexPromise;
 }
@@ -158,8 +168,9 @@ export async function backfillDemoIdentities(): Promise<{ entries: StudioDemoEnt
   await isolateLegacyProjectionAliases();
   const before = await demoMeta.getAll<StudioDemoEntry>();
   const missingBefore = before.filter((entry) => !entry.demoSha256).length;
+  const generation = identityIndexGeneration;
   const index = await buildDemoIdentityIndex();
-  identityIndex = index;
+  if (generation === identityIndexGeneration) identityIndex = index;
   const entries = (await demoMeta.getAll<StudioDemoEntry>()).map(normalizeEntry);
   return {
     entries,
@@ -299,6 +310,12 @@ const pkgCache = new Map<string, Promise<DemoPackage>>();
 /** 释放内存中的 DemoPackage 缓存。聚合完成后调用以降低峰值内存。 */
 export function clearPkgCache(): void {
   pkgCache.clear();
+}
+
+/** Drop cached source state after another window changes the library. */
+export function invalidateLibrarySourceCaches(): void {
+  invalidateIdentityIndex();
+  clearPkgCache();
 }
 
 // ── 导入 worker pool ──
@@ -532,6 +549,8 @@ function sameEntrySource(a: StudioDemoEntry, b: StudioDemoEntry): boolean {
     JSON.stringify(a.pendingCommit) === JSON.stringify(b.pendingCommit);
 }
 
+class ImportOwnershipChanged extends Error {}
+
 async function finishImport(entry: StudioDemoEntry, replacement: StudioDemoEntry | undefined, signal: AbortSignal | undefined, prepare: () => Promise<void>, base?: StudioDemoEntry, addedTags: string[] = [], writesSource = false, sourceDemPath: string | null = null, matchDate: string | null = null): Promise<StudioDemoEntry> {
   const matchId = matchIdForEntry(entry);
   const previousMatchId = replacement ? matchIdForEntry(replacement) : null;
@@ -539,14 +558,24 @@ async function finishImport(entry: StudioDemoEntry, replacement: StudioDemoEntry
   const keys = [...commitKeys(entry), ...(replacement ? commitKeys(replacement) : [])];
   return withLibraryCommit(keys, async () => {
     signal?.throwIfAborted();
-    const stored = await demoMeta.get<StudioDemoEntry>(entry.id);
+    // The process-local import locks cannot protect another window. Recheck the
+    // canonical source and projection while holding the cross-window commit lock.
+    const rows = (await demoMeta.getAll<StudioDemoEntry>()).map(normalizeEntry);
+    const owner = entry.demoSha256
+      ? rows.filter(row => row.demoSha256 === entry.demoSha256)
+        .sort((a, b) => b.importedAt - a.importedAt || a.id.localeCompare(b.id))[0]
+      : undefined;
+    if ((owner && owner.id !== entry.id) ||
+        rows.some(row => row.id !== entry.id && row.id !== replacement?.id && matchIdForEntry(row) === matchId) ||
+        (await retiredMatchIds.get(matchId))) throw new ImportOwnershipChanged();
+    const stored = rows.find(row => row.id === entry.id);
     const latest = stored ? normalizeEntry(stored) : undefined;
-    if (base && (!latest || !sameEntrySource(latest, normalizeEntry(base)))) throw new Error("比赛资料已变化，请重新导入。");
-    if (!base && latest) throw new Error("比赛资料已变化，请重新导入。");
+    if (base && (!latest || !sameEntrySource(latest, normalizeEntry(base)))) throw new ImportOwnershipChanged();
+    if (!base && latest) throw new ImportOwnershipChanged();
     let currentReplacement: StudioDemoEntry | undefined;
     if (replacement && replacement.id !== entry.id) {
       const current = await demoMeta.get<StudioDemoEntry>(replacement.id);
-      if (!current || !sameEntrySource(normalizeEntry(current), normalizeEntry(replacement))) throw new Error("替换目标已变化，请重新导入。");
+      if (!current || !sameEntrySource(normalizeEntry(current), normalizeEntry(replacement))) throw new ImportOwnershipChanged();
       currentReplacement = normalizeEntry(current);
     }
     const finalEntry = {
@@ -584,8 +613,7 @@ async function finishImport(entry: StudioDemoEntry, replacement: StudioDemoEntry
       if (!hasRollbackFailure(error)) {
         for (const item of marked) await finishPending(item.id, item.prior, false).catch(() => {});
       }
-      identityIndex = null;
-      identityIndexPromise = null;
+      invalidateIdentityIndex();
       for (const id of ids) pkgCache.delete(id);
       throw error;
     }
@@ -640,7 +668,14 @@ export async function importDemoFile(file: File, options: ImportDemoOptions = {}
       // Never enter a checkpoint until its final survivor/target is covered.
       const required = await resolveKeys();
       if (required.some((key) => !keys.includes(key))) return { retry: required };
-      return { result: await importDemoFileUnlocked(file, settings, buffer, id, manifest) };
+      try {
+        return { result: await importDemoFileUnlocked(file, settings, buffer, id, manifest) };
+      } catch (error) {
+        if (!(error instanceof ImportOwnershipChanged)) throw error;
+        // Drop the per-window index so the next attempt resolves the new owner.
+        invalidateIdentityIndex();
+        return { retry: await resolveKeys() };
+      }
     });
     if (attempt.result) return attempt.result;
     // Release the entire reservation before acquiring an expanded set: no
@@ -652,7 +687,8 @@ export async function importDemoFile(file: File, options: ImportDemoOptions = {}
 async function importDemoFileUnlocked(file: File, settings: ImportDemoOptions, input: ArrayBuffer, id: string, manifest: Awaited<ReturnType<typeof loadDemoManifestFromZip>>): Promise<ImportResult> {
   const { tags = [], sourceDemPath = null, replaceId, lowMemory = false, matchDate = null, forceReanalyze = false, signal } = settings;
   signal?.throwIfAborted();
-  let buffer = input;
+  // A low-memory worker may have transferred the input during an earlier attempt.
+  let buffer = input.byteLength ? input : await file.arrayBuffer();
   const meta = demoMeta;
   const blobs = demoBlobs;
   // Read again under the relevant import locks; queued replacements may have committed.
@@ -920,7 +956,7 @@ export function getDemoPackage(id: string): Promise<DemoPackage> {
     return parseZipInWorker(buffer);
   })();
   pkgCache.set(id, loading);
-  loading.catch(() => pkgCache.delete(id));
+  loading.catch(() => { if (pkgCache.get(id) === loading) pkgCache.delete(id); });
   return loading;
 }
 
