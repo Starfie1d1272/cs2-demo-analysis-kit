@@ -16,13 +16,15 @@ export type StudioCapability =
   | "tactical"
   | "map-role"
   | "player-map-pool"
-  | "team-awp";
+  | "team-awp"
+  | "season"
+  | "team-comparison";
 
 export type CapabilityStatus = "ready" | "partial" | "unavailable";
 export type CapabilityOutputLevel = "observation" | "system-finding";
 export type CapabilityRepairAction = "rebuild-facts" | "reimport-with-replay" | "reimport-with-shots" | "install-tri";
 
-type FactKind = "player-map-pool" | "team-awp" | "opening" | "insights" | "duel" | "economy" | "utility" | "lineup" | "tactical" | "map-intelligence";
+type FactKind = "season" | "team-comparison" | "player-map-pool" | "team-awp" | "opening" | "insights" | "duel" | "economy" | "utility" | "lineup" | "tactical" | "map-intelligence";
 
 export interface EntryCapabilityFacts {
   facts: Partial<Record<FactKind, boolean>>;
@@ -75,6 +77,8 @@ const REQUIREMENTS: Record<StudioCapability, CapabilityRequirement> = {
   "map-role": { requiredFacts: ["map-intelligence"], outputLevel: "observation" },
   "player-map-pool": { requiredFacts: ["player-map-pool"], outputLevel: "observation" },
   "team-awp": { requiredFacts: ["team-awp"], outputLevel: "observation" },
+  season: { requiredFacts: ["season"], outputLevel: "observation" },
+  "team-comparison": { requiredFacts: ["team-comparison"], outputLevel: "observation" },
 };
 
 const DEPENDENCY_LABEL: Record<CapabilityDependencyAvailability["key"], string> = {
@@ -84,6 +88,8 @@ const DEPENDENCY_LABEL: Record<CapabilityDependencyAvailability["key"], string> 
 };
 
 const FACT_LABEL: Record<FactKind, string> = {
+  season: "选手赛季 facts",
+  "team-comparison": "队伍对比 facts",
   "player-map-pool": "选手地图池 facts",
   "team-awp": "AWP 回合 facts",
   opening: "开局动线 facts",
@@ -199,8 +205,8 @@ export async function loadCapabilityAvailabilityInputs(
   const needsFact = (kind: FactKind) => requirement.requiredFacts?.includes(kind) ?? false;
   const needsDependency = (kind: CapabilityDependencyAvailability["key"]) =>
     requirement.requiredDependencies?.includes(kind) || requirement.optionalDependencies?.includes(kind);
-  const [insights, duels, economy, utilityMatchIds, lineups, tactical, playerPositions, teamShapes, mechanics, opening, tris, rrRows, awpRows] = await Promise.all([
-    needsFact("insights") ? derivedStore.getPlayerInsights({ matchIds }) : [],
+  const [insights, duels, economy, utilityMatchIds, lineups, tactical, playerPositions, teamShapes, mechanics, opening, tris, rrRows, awpRows, comparisonRows, seasonRows] = await Promise.all([
+    needsFact("insights") ? derivedStore.getPlayerInsights({ matchIds, ...playerScope }) : [],
     needsFact("duel") ? derivedStore.getDuels({ matchIds }) : [],
     needsFact("economy") ? derivedStore.getTournament({ matchIds }) : [],
     needsFact("utility") ? derivedStore.getUtilityValueMatchIds({ matchIds }) : [],
@@ -213,9 +219,13 @@ export async function loadCapabilityAvailabilityInputs(
     needsDependency("tri") ? (availableTris ?? listAvailableTris()) : [],
     needsFact("player-map-pool") && playerScope ? factsStore.getRrSignalRows({ matchIds, ...playerScope }) : [],
     needsFact("team-awp") ? factsStore.getTeamAwpRounds({ matchIds }) : [],
+    needsFact("team-comparison") ? derivedStore.getTeamComparison({ matchIds }) : [],
+    needsFact("season") ? factsStore.getRrSignalRows({ matchIds }) : [],
   ]);
   const shapes = idsOf(teamShapes);
   const factSets = {
+    season: idsOf(seasonRows),
+    "team-comparison": idsOf(comparisonRows),
     "player-map-pool": idsOf(rrRows),
     "team-awp": idsOf(awpRows),
     opening: idsOf(opening.filter(row => row.row.available)),
@@ -233,6 +243,8 @@ export async function loadCapabilityAvailabilityInputs(
     const matchId = matchIdForEntry(entry);
     return [entry.id, {
       facts: {
+        season: factSets.season.has(matchId),
+        "team-comparison": factSets["team-comparison"].has(matchId),
         "player-map-pool": factSets["player-map-pool"].has(matchId),
         "team-awp": factSets["team-awp"].has(matchId),
         opening: factSets.opening.has(matchId),

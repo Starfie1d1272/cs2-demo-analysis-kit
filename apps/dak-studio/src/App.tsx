@@ -560,6 +560,8 @@ export function App() {
         }}>
         {destination.page === "player" && (
           <PlayersView
+            activity={activity}
+            onCapabilityRepair={openCapabilityRepair}
             key={active.id}
             allEntries={entries}
             entries={scopedEntries}
@@ -582,6 +584,8 @@ export function App() {
         )}
         {destination.page === "team" && (
           <TeamView
+            activity={activity}
+            onCapabilityRepair={openCapabilityRepair}
             key={active.id}
             entries={scopedEntries}
             selectedTeam={analysisContext.focus.kind === "team" ? analysisContext.focus.teamName : null}
@@ -753,6 +757,8 @@ export function App() {
         )}
         {(destination.page === "event-analysis" || destination.page === "analysis") && (
           <TournamentDashboardView
+            activity={activity}
+            onCapabilityRepair={openCapabilityRepair}
             key={active.id}
             state={active.ui as import("./lib/studio-page-state").AnalysisPageState}
             onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}

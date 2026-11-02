@@ -1,7 +1,10 @@
+import { CapabilityBar, useCapability } from "../components/CapabilityBar";
+import type { CapabilityRepairAction } from "../lib/capability-availability";
+import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { PlayerFindingsPanel } from "./analysis/PlayerFindingsPanel";
 import type { PlayerPageState } from "../lib/studio-page-state";
 import { Star } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { PlayerSeasonProfile } from "@cs2dak/presentation";
 import { SEASON_STAT_VIEWS, mechanicsMetricsForWeapon, type MechanicsMetricKey } from "@cs2dak/presentation";
 import {
@@ -9,9 +12,9 @@ import {
   type PlayerSeasonInsights,
   type PlayerWeaponStat,
 } from "@cs2dak/analytics";
-import { getPlayerSeasonDetails } from "../lib/queries/player-queries";
+import { getPlayerSeasonDetails, type PlayerSeasonDetails } from "../lib/queries/player-queries";
 import { getSeasonSummary } from "../lib/queries/season-queries";
-import { type IdentityOptions } from "../lib/identity";
+import { displayTeamName, type IdentityOptions } from "../lib/identity";
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
 import { FingerprintRadar, TrendChart } from "./profile-widgets";
@@ -20,6 +23,8 @@ import { EvidenceActions } from "../components/EvidenceActions";
 import type { OpenEvidence } from "../lib/evidence-continuation";
 
 export interface PlayersViewProps {
+  activity: { importing: boolean; notice: string | null };
+  onCapabilityRepair: (action: CapabilityRepairAction) => void;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   selectedTeam?: string | null;
@@ -59,6 +64,8 @@ function formatMetric(value: number | null, format: string): string {
 }
 
 export function PlayersView({
+  activity,
+  onCapabilityRepair,
   allEntries,
   entries,
   selectedTeam = null,
@@ -76,12 +83,28 @@ export function PlayersView({
   onOpenMaterials,
   onOpenOpening, onOpenRoles
 }: PlayersViewProps) {
-  const [matchStats, setMatchStats] = useState<Array<{ matchId: string; teamKey: "teamA" | "teamB" }>>([]);
-  const [profiles, setProfiles] = useState<PlayerSeasonProfile[] | null>(null);
-  const [insights, setInsights] = useState<PlayerSeasonInsights | null>(null);
-  const [weaponStats, setWeaponStats] = useState<PlayerWeaponStat[]>([]);
-  const [coverage, setCoverage] = useState<{ eligibleMatchCount: number; mechanicsMatchCount: number } | null>(null);
-  const [mechanics, setMechanics] = useState<PlayerMechanicsProfile | null>(null);
+  const updateFailed = !activity.importing && !!activity.notice && /重建|导入|重新导出/.test(activity.notice) && /失败/.test(activity.notice);
+  const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
+  const playerScope = useMemo(() => selectedPlayerKey ? {
+    playerKeys: [selectedPlayerKey],
+    steamIds: [...new Set([...(selectedPlayerKey.startsWith("steam:") ? [selectedPlayerKey.slice(6)] : []), ...Object.entries(identityOptions?.map ?? {}).filter(([, mapped]) => (typeof mapped === "string" ? mapped : mapped.playerKey) === selectedPlayerKey).map(([steamId]) => steamId)])],
+  } : undefined, [selectedPlayerKey, identityOptions?.map]);
+  const teamEntries = useMemo(() => selectedTeam ? entries.filter(entry => [entry.meta.teamAName, entry.meta.teamBName].some(name => displayTeamName(name, identityOptions?.teamRenames) === selectedTeam)) : entries, [entries, selectedTeam, identityOptions?.teamRenames]);
+  const seasonCapability = useCapability(teamEntries, "season");
+  const detailsCapability = useCapability(teamEntries, "personal-review", playerScope);
+  const seasonEntries = seasonCapability.eligible;
+  const detailsEntries = detailsCapability.eligible;
+  const profileKey = JSON.stringify([entries.map(entry => entry.id), selectedTeam, identityOptions?.version]);
+  const [profileSnapshot, setProfileSnapshot] = useState<{ key: string; generation: number; sample: string; value: PlayerSeasonProfile[] } | null>(null);
+  const profiles = profileSnapshot?.key === profileKey ? profileSnapshot.value : null;
+  const detailKey = JSON.stringify([profileKey, selectedPlayerKey]);
+  const [detailSnapshot, setDetailSnapshot] = useState<{ key: string; generation: number; sample: string; value: PlayerSeasonDetails } | null>(null);
+  const details = detailSnapshot?.key === detailKey ? detailSnapshot.value : null;
+  const insights = details?.insights ?? null;
+  const matchStats = details?.participation ?? [];
+  const weaponStats = details?.weaponStats.slice(0, 8) ?? [];
+  const coverage = details?.coverage ?? null;
+  const mechanics = details?.mechanics ?? null;
   const [error, setError] = useState<string | null>(null);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [pinned, setPinned] = useState<PinnedPlayer | null>(null);
@@ -97,26 +120,14 @@ export function PlayersView({
   }, []);
 
   useEffect(() => {
-    if (entries.length === 0) {
-      setProfiles(null);
-      return;
-    }
+    if (!seasonEntries || !seasonEntries.length || analysis.status !== "ready") return;
     let cancelled = false;
-    setProfiles(null);
     setError(null);
-    getSeasonSummary(entries, identityOptions, selectedTeam ? [selectedTeam] : [])
-      .then((summary) => {
-        if (!cancelled) {
-          setProfiles([...summary.profiles].sort((a, b) => b.rating.rivalhubRR - a.rating.rivalhubRR));
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [entries, identityOptions?.version, selectedTeam]);
+    getSeasonSummary(seasonEntries, identityOptions, selectedTeam ? [selectedTeam] : [])
+      .then(summary => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setProfileSnapshot({ key: profileKey, generation: analysis.generation, sample: JSON.stringify(seasonEntries.map(entry => entry.id)), value: [...summary.profiles].sort((a, b) => b.rating.rivalhubRR - a.rating.rivalhubRR) }); } })
+      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); });
+    return () => { cancelled = true; };
+  }, [seasonEntries, identityOptions?.version, selectedTeam, profileKey, analysis]);
 
   // 关注选手置顶；其余按 RR 降序
   const orderedProfiles = useMemo(() => {
@@ -133,9 +144,9 @@ export function PlayersView({
 
   useEffect(() => {
     if (!onPageReady || (!profiles && !error && entries.length > 0)) return;
-    if (selected && (profileTab === "overview" || profileTab === "utility") && !insights && !detailsError) return;
+    if (selected && (profileTab === "overview" || profileTab === "utility") && !insights && !detailsError && !detailsCapability.error && detailsEntries?.length !== 0) return;
     onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
-  }, [profiles, error, insights, detailsError, entries.length, onPageReady, selected, profileTab]);
+  }, [profiles, error, insights, detailsError, detailsCapability.error, detailsEntries, entries.length, onPageReady, selected, profileTab]);
 
   const compare = useMemo(() => {
     if (!profiles || !compareKey || compareKey === selected?.playerKey) return null;
@@ -156,36 +167,14 @@ export function PlayersView({
   };
 
   useEffect(() => {
-    if (!selected || entries.length === 0) {
-      setInsights(null);
-      setMatchStats([]);
-      setWeaponStats([]);
-      setMechanics(null);
-      setCoverage(null);
-      setDetailsError(null);
-      return;
-    }
+    if (!selected || !detailsEntries || !detailsEntries.length || analysis.status !== "ready") return;
     let cancelled = false;
-    setInsights(null);
-    setWeaponStats([]);
-    setMechanics(null);
     setDetailsError(null);
-    getPlayerSeasonDetails(entries, selected.steamIds, identityOptions, selectedTeam ? [selectedTeam] : [])
-      .then((details) => {
-        if (cancelled) return;
-        setInsights(details.insights);
-        setMatchStats(details.participation);
-        setWeaponStats(details.weaponStats.slice(0, 8));
-        setMechanics(details.mechanics);
-        setCoverage(details.coverage);
-      })
-      .catch((err) => {
-        if (!cancelled) setDetailsError(err instanceof Error ? err.message : String(err));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [entries, selected?.playerKey, identityOptions?.version, selectedTeam]);
+    getPlayerSeasonDetails(detailsEntries, selected.steamIds, identityOptions, selectedTeam ? [selectedTeam] : [])
+      .then(value => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setDetailSnapshot({ key: detailKey, generation: analysis.generation, sample: JSON.stringify(detailsEntries.map(entry => entry.id)), value }); } })
+      .catch(err => { if (!cancelled) setDetailsError(err instanceof Error ? err.message : String(err)); });
+    return () => { cancelled = true; };
+  }, [detailsEntries, selected?.playerKey, identityOptions?.version, selectedTeam, detailKey, analysis]);
 
   if (allEntries.length === 0) {
     return (
@@ -200,10 +189,10 @@ export function PlayersView({
     );
   }
 
-  if (error) {
+  if ((error || seasonCapability.error) && !profiles) {
     return (
       <div className="stu-view">
-        <EmptyState variant="error" title="聚合失败" hint={error} />
+        <EmptyState variant="error" title="聚合失败" hint={error ?? seasonCapability.error ?? undefined} action={seasonCapability.error ? <button type="button" className="stu-button-sm" onClick={seasonCapability.retry}>重试</button> : undefined} />
       </div>
     );
   }
@@ -214,6 +203,7 @@ export function PlayersView({
       </div>
     );
   }
+  if (seasonEntries && seasonEntries.length === 0 && !profiles) return <div className="stu-view">{seasonCapability.availability && <CapabilityBar availability={seasonCapability.availability} onRepair={onCapabilityRepair} />}<EmptyState variant="insufficient" title="没有可用选手数据" hint="请查看上方限制和修复入口。" /></div>;
   if (!orderedProfiles) {
     return (
       <div className="stu-view">
@@ -224,10 +214,12 @@ export function PlayersView({
   if (!selected) {
     return (
       <div className="stu-view">
+        {seasonCapability.availability && <CapabilityBar availability={seasonCapability.availability} onRepair={onCapabilityRepair} />}
+        {profiles && (error || seasonCapability.error || activity.importing || updateFailed || analysis.status !== "ready" || profileSnapshot?.generation !== analysis.generation || profileSnapshot.sample !== JSON.stringify(seasonEntries?.map(entry => entry.id))) && <p role="status">{error || seasonCapability.error || updateFailed || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
         <header className="stu-view-header">
           <div>
             <h1>选手档案</h1>
-            <p>基于 {entries.length} 场 demo 的跨场画像。请先从名单中选择要查看的选手。</p>
+            <p>基于 {profileSnapshot ? JSON.parse(profileSnapshot.sample).length : 0} 场 demo 的跨场画像。请先从名单中选择要查看的选手。</p>
           </div>
         </header>
         <div className="stu-split">
@@ -275,11 +267,16 @@ export function PlayersView({
 
   return (
     <div className="stu-view">
+      {seasonCapability.availability && <CapabilityBar availability={seasonCapability.availability} onRepair={onCapabilityRepair} />}
+      {detailsCapability.availability && <CapabilityBar availability={detailsCapability.availability} onRepair={onCapabilityRepair} />}
+      {detailsCapability.error && <p role="alert">选手详情能力读取失败：{detailsCapability.error} <button type="button" className="stu-button-sm" onClick={detailsCapability.retry}>重试</button></p>}
+      {seasonCapability.error && <p role="alert">选手能力读取失败：{seasonCapability.error} <button type="button" className="stu-button-sm" onClick={seasonCapability.retry}>重试</button></p>}
+      {(error || seasonCapability.error || detailsError || detailsCapability.error || activity.importing || updateFailed || analysis.status !== "ready" || profileSnapshot?.generation !== analysis.generation || (details && detailSnapshot?.generation !== analysis.generation) || profileSnapshot?.sample !== JSON.stringify(seasonEntries?.map(entry => entry.id)) || (details && detailSnapshot?.sample !== JSON.stringify(detailsEntries?.map(entry => entry.id)))) && <p role="status">{error || seasonCapability.error || detailsError || detailsCapability.error || updateFailed || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
       <header className="stu-view-header">
         <div>
           <h1>选手档案</h1>
           <p>
-            基于 {entries.length} 场 demo 的跨场画像 · 权重 {selected.weightsVersion}。强弱项相对当前聚合范围内的选手计算
+            基于 {profileSnapshot ? JSON.parse(profileSnapshot.sample).length : 0} 场 demo 的跨场画像 · 权重 {selected.weightsVersion}。强弱项相对当前聚合范围内的选手计算
             {orderedProfiles.length < 5 ? "（不足 5 人，暂不出强弱项判断）" : ""}。
           </p>
         </div>
