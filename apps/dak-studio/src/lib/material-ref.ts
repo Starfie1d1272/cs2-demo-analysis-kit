@@ -4,3 +4,5 @@ export type MaterialRef = {
 };
 
 export type LectureMaterialRef = { kind: "playbook" | "match-sheet"; id: string };
+
+export type SheetMaterialRef = { kind: Exclude<MaterialRef["kind"], "match-sheet">; id: string };

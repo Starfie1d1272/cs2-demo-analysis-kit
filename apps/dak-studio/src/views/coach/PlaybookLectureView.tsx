@@ -5,10 +5,10 @@ import type { CoachPlaybookDraft } from "../../lib/coach-playbook";
 import type { StudioDemoEntry } from "../../lib/demo-entry";
 import { loadMatchWorkspaceModel } from "../../lib/match-workspace-loader";
 import { resolveSavedEvidence } from "../../lib/saved-evidence";
-import type { LecturePageState } from "../../lib/material-page-state";
+import type { PlaybookLectureState } from "../../lib/material-page-state";
 import { usePlaybookMap } from "./PlaybookPhaseEditor";
 
-export function PlaybookLectureView({ draft, entries, state, onChange, onBack }: { draft: CoachPlaybookDraft; entries: StudioDemoEntry[]; state: LecturePageState; onChange: (state: LecturePageState) => void; onBack: () => void }) {
+export function PlaybookLectureView({ draft, entries, state, onChange, onBack }: { draft: CoachPlaybookDraft; entries: StudioDemoEntry[]; state: PlaybookLectureState; onChange: (state: PlaybookLectureState) => void; onBack: () => void }) {
   const initial = useRef(state);
   useEffect(() => { if (initial.current.replay?.playing) onChange({ ...initial.current, replay: { ...initial.current.replay, playing: false } }); }, []);
   const [level, setLevel] = useState<"upper" | "lower">("upper");
