@@ -47,6 +47,7 @@ import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type Ca
 import { createStudioNavigation, studioNavigationReducer, findAnalysisFrame, PAGE_SECTION, type StudioDestination, type StudioNavigation, type StudioPageId, type StudioSection } from "./lib/studio-navigation";
 import { WorkbenchView } from "./views/WorkbenchView";
 import { MatchesView } from "./views/MatchesView";
+import { getSeasonSummary } from "./lib/queries/season-queries";
 import { AnalysisView } from "./views/AnalysisView";
 import { type PinnedPlayer } from "./lib/pin";
 import { setLastWork, updateLastMatchPosition } from "./lib/last-work";
@@ -204,6 +205,17 @@ export function App() {
       : undefined,
     [identityState.version, identityState.mappings, identityState.teamRenames]
   );
+  const selectedTeams = useMemo(() => selectedTeam ? [selectedTeam] : [], [selectedTeam]);
+  const [focusIdentity, setFocusIdentity] = useState<{ playerKey: string; steamIds: string[] } | null>(null);
+  useEffect(() => {
+    if (!selectedPlayerKey || scopedEntries.length === 0 || (destination.page !== "duel" && destination.page !== "utility")) { setFocusIdentity(null); return; }
+    let cancelled = false;
+    setFocusIdentity({ playerKey: selectedPlayerKey, steamIds: [] });
+    void getSeasonSummary(scopedEntries, identityOptions).then(summary => {
+      if (!cancelled) setFocusIdentity({ playerKey: selectedPlayerKey, steamIds: summary.profiles.find(p => p.playerKey === selectedPlayerKey)?.steamIds ?? [] });
+    }).catch(() => { if (!cancelled) setFocusIdentity({ playerKey: selectedPlayerKey, steamIds: [] }); });
+    return () => { cancelled = true; };
+  }, [selectedPlayerKey, scopedEntries, identityOptions, destination.page]);
   const openCapabilityRepair = useCallback((action: CapabilityRepairAction) => {
     if (action === "install-tri") {
       navigate({ page: "management", tab: "assets" });
@@ -257,7 +269,7 @@ export function App() {
   const openEvidence = useCallback<OpenEvidence>((request) => {
     const source = navigationRef.current.active;
     if (source.id !== active.id) return;
-    const sourceFrame = source.destination.page === "utility" ? { ...source, ui: { ...source.ui, selectedEvidenceKey: request.sourceKey ?? null } } : source;
+    const sourceFrame = source.destination.page === "utility" ? { ...source, ui: { ...source.ui, selectedEvidenceKey: request.sourceKey ?? null } } : source.destination.page === "duel" ? { ...source, ui: { ...source.ui, selectedRowId: request.sourceKey ?? null } } : source;
     setEvidenceSession(createEvidenceSession(request, { ...sourceFrame, scrollY: window.scrollY, anchorKey: request.sourceKey } as import("./lib/studio-navigation").StudioFrame));
     navigate({ page: "match", entryId: request.entryId, roundNumber: request.evidence.roundNumber, tick: request.evidence.tick }, "evidence", request.sourceKey);
   }, [active.id, navigate]);
@@ -374,7 +386,7 @@ export function App() {
             mode={destination.page === "management" ? "maintenance" : "browse"}
             state={destination.page === "management" ? (active.ui as import("./lib/studio-page-state").StudioPageStateMap["management"]).library : active.ui as import("./lib/studio-page-state").MatchesPageState}
             onStateChange={ui => setNavigation(current => { if (current.active.destination.page === "management") return studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: { ...(current.active.ui as import("./lib/studio-page-state").StudioPageStateMap["management"]), library: ui } }); return studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }); })}
-            entries={entries}
+            entries={destination.page === "matches" && destination.entryIds ? entries.filter(entry => destination.entryIds!.includes(entry.id)) : entries}
             importing={importing}
             importTagsRaw={importTagsRaw}
             onImportTagsChange={setImportTagsRaw}
@@ -511,7 +523,7 @@ export function App() {
             return studioNavigationReducer(studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: cleanState }), { intent: "back", id });
           });
         }} onOpened={ref => { const frame = navigationRef.current.active; if (frame.id === active.id && frame.destination.page === "material" && frame.destination.materialRef.kind === ref.kind && frame.destination.materialRef.id === ref.id) void setLastWork({ kind: "material", materialRef: ref }); }} onOpenEvidence={openMaterialEvidence} />}
-        {destination.page === "matches" && libraryView}
+        {destination.page === "matches" && <>{destination.entryIds && <div className="stu-card">当前显示所选分析范围的比赛 <button type="button" className="stu-button-sm" onClick={() => navigate({ page: "matches" })}>查看全部比赛</button></div>}{libraryView}</>}
         {destination.page === "match" && (
           <MatchView
             key={active.id}
@@ -626,13 +638,15 @@ export function App() {
             onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
             entries={scopedEntries}
-            selectedTeam={selectedTeam}
-            onOpenMatch={openDemo}
+            selectedTeams={selectedTeams}
+            playerSteamIds={selectedPlayerKey ? focusIdentity?.playerKey === selectedPlayerKey ? focusIdentity.steamIds : [] : null}
+            state={active.ui as import("./lib/analysis-theme-state").DuelPageState}
+            onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
+            onOpenEvidence={openEvidence}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
-            onGoLibrary={() => goLibrary()}
+            onGoLibrary={goLibrary}
             identityOptions={identityOptions}
             teamRenames={identityState.teamRenames}
-            initialTab={analysisContext.goal === "personal-review" ? "records" : "opening"}
           />
         )}
         {destination.page === "utility" && (
@@ -640,10 +654,11 @@ export function App() {
             key={active.id}
             allEntries={entries}
             entries={scopedEntries}
-            selectedTeam={selectedTeam}
+            selectedTeams={selectedTeams}
+            playerFocus={selectedPlayerKey ? focusIdentity?.playerKey === selectedPlayerKey ? focusIdentity : { playerKey: selectedPlayerKey, steamIds: [] } : null}
+            onGoLineups={() => navigate({ page: "lineups", context: analysisContext })}
             state={active.ui as import("./lib/studio-page-state").UtilityPageState}
             onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
-            onOpenMatch={openDemo}
             onOpenEvidence={openEvidence}
             onPageReady={(keys) => onPageReady(active.id, keys)}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
@@ -656,9 +671,11 @@ export function App() {
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
             onRebuild={handleRebuildSelected}
+            state={active.ui as import("./lib/analysis-theme-state").LineupsPageState}
+            onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
             allEntries={entries}
             entries={scopedEntries}
-            onOpenMatch={openDemo}
+            onOpenEvidence={openEvidence}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoLibrary={() => goLibrary()}
           />
@@ -669,7 +686,11 @@ export function App() {
             onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
             entries={scopedEntries}
-            selectedTeam={selectedTeam}
+            selectedTeams={selectedTeams}
+            playerFocused={selectedPlayerKey !== null}
+            onViewMatches={() => navigate({ page: "matches", entryIds: scopedEntries.map(entry => entry.id) })}
+            state={active.ui as import("./lib/analysis-theme-state").EconomyPageState}
+            onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
             identityOptions={identityOptions}
             onGoLibrary={() => goLibrary()}
           />

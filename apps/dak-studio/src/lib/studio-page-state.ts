@@ -3,6 +3,7 @@ import type { PatternPageState } from "./pattern-page-state";
 import type { MaterialPageState, MaterialsPageState } from "./material-page-state";
 import type { TableState } from "@cs2dak/presentation";
 import type { MatchWorkspaceState } from "./match-workspace-state";
+import type { DuelPageState, EconomyPageState, LineupsPageState } from "./analysis-theme-state";
 import type { StudioPageId } from "./studio-navigation.js";
 
 export interface MatchesPageState { search: string; mapFilter: string | null; tagFilter: string | null; serverFilter: string | null; dateFrom: string; dateTo: string }
@@ -21,4 +22,4 @@ export interface AnalysisPageState { comparePair: [string, string] | null; leade
 export const emptyAnalysisState = (): AnalysisPageState => ({ comparePair: null, leaderboardView: "core", tables: {} });
 export interface RolesPageState { player: PlayerRolesState; team: TeamRolesState }
 export const emptyRolesState = (): RolesPageState => ({ player: { tables: {} }, team: { matrixMapName: null, matrixSide: "ct", tables: {} } });
-export type StudioPageStateMap = { [P in StudioPageId]: P extends "roles" ? RolesPageState : P extends "opening" ? OpeningPageState : P extends "control" ? ControlPageState : P extends "patterns" ? PatternPageState : P extends "analysis" | "event-analysis" ? AnalysisPageState : P extends "player" ? PlayerPageState : P extends "team" ? TeamPageState : P extends "materials" ? MaterialsPageState : P extends "material" ? MaterialPageState | null : P extends "match" ? MatchWorkspaceState | null : P extends "utility" ? UtilityPageState : P extends "matches" ? MatchesPageState : P extends "events" ? EventsPageState : P extends "management" ? { tab: "identity" | "assets" | "library"; library: MatchesPageState } : null };
+export type StudioPageStateMap = { [P in StudioPageId]: P extends "roles" ? RolesPageState : P extends "opening" ? OpeningPageState : P extends "control" ? ControlPageState : P extends "patterns" ? PatternPageState : P extends "analysis" | "event-analysis" ? AnalysisPageState : P extends "player" ? PlayerPageState : P extends "team" ? TeamPageState : P extends "materials" ? MaterialsPageState : P extends "material" ? MaterialPageState | null : P extends "match" ? MatchWorkspaceState | null : P extends "duel" ? DuelPageState : P extends "economy" ? EconomyPageState : P extends "lineups" ? LineupsPageState : P extends "utility" ? UtilityPageState : P extends "matches" ? MatchesPageState : P extends "events" ? EventsPageState : P extends "management" ? { tab: "identity" | "assets" | "library"; library: MatchesPageState } : null };

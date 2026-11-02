@@ -1,6 +1,7 @@
 import { emptyOpeningPageState, emptyControlPageState } from "./spatial-view-state";
 import { emptyPatternPageState } from "./pattern-page-state";
 import { createAnalysisContext, createAnalysisContextPreset, type AnalysisContext } from "./analysis-context.js";
+import { emptyDuelState, emptyEconomyState, emptyLineupsState } from "./analysis-theme-state";
 import { emptyMaterialsPageState } from "./material-page-state";
 import type { LectureMaterialRef, MaterialRef } from "./material-ref.js";
 import { emptyMatchesState, emptyEventsState, emptyUtilityState, emptyPlayerState, emptyTeamState, emptyAnalysisState, emptyRolesState, type StudioPageStateMap } from "./studio-page-state.js";
@@ -9,7 +10,7 @@ export type StudioSection = "workbench" | "matches" | "analysis" | "materials" |
 export type AnalysisPageId = "analysis" | "player" | "team" | "event-analysis" | "duel" | "economy" | "utility" | "lineups" | "opening" | "control" | "patterns" | "roles";
 export type AnalysisDestination = { [P in AnalysisPageId]: { page: P; context: AnalysisContext } }[AnalysisPageId];
 export type StudioDestination =
-  | { page: "workbench" } | { page: "matches" } | { page: "events"; eventId?: string }
+  | { page: "workbench" } | { page: "matches"; entryIds?: string[] } | { page: "events"; eventId?: string }
   | { page: "match"; entryId: string; roundNumber?: number; tick?: number }
   | AnalysisDestination | { page: "materials" } | { page: "material"; materialRef: MaterialRef }
   | { page: "lecture"; materialRef: LectureMaterialRef }
@@ -35,12 +36,13 @@ export function defaultDestination(section: StudioSection): StudioDestination {
   }
 }
 function copyDestination(destination: StudioDestination): StudioDestination {
+  if (destination.page === "matches" && destination.entryIds) return { ...destination, entryIds: [...destination.entryIds] };
   if ("context" in destination) return { ...destination, context: createAnalysisContext(destination.context) };
   if ("materialRef" in destination) return { ...destination, materialRef: { ...destination.materialRef } } as StudioDestination;
   return { ...destination };
 }
 function frame(id: string, destination: StudioDestination): StudioFrame {
-  return { id, destination: copyDestination(destination), ui: destination.page === "roles" ? emptyRolesState() : destination.page === "opening" ? emptyOpeningPageState() : destination.page === "control" ? emptyControlPageState() : destination.page === "patterns" ? emptyPatternPageState() : destination.page === "analysis" || destination.page === "event-analysis" ? emptyAnalysisState() : destination.page === "player" ? emptyPlayerState() : destination.page === "team" ? emptyTeamState() : destination.page === "materials" ? emptyMaterialsPageState() : destination.page === "utility" ? emptyUtilityState() : destination.page === "matches" ? emptyMatchesState() : destination.page === "events" ? { ...emptyEventsState(), activeEventId: destination.eventId ?? null } : destination.page === "management" ? { tab: destination.tab, library: emptyMatchesState() } : null, scrollY: 0 } as StudioFrame;
+  return { id, destination: copyDestination(destination), ui: destination.page === "roles" ? emptyRolesState() : destination.page === "opening" ? emptyOpeningPageState() : destination.page === "control" ? emptyControlPageState() : destination.page === "patterns" ? emptyPatternPageState() : destination.page === "analysis" || destination.page === "event-analysis" ? emptyAnalysisState() : destination.page === "player" ? emptyPlayerState() : destination.page === "team" ? emptyTeamState() : destination.page === "materials" ? emptyMaterialsPageState() : destination.page === "duel" ? emptyDuelState() : destination.page === "economy" ? emptyEconomyState() : destination.page === "lineups" ? emptyLineupsState() : destination.page === "utility" ? emptyUtilityState() : destination.page === "matches" ? emptyMatchesState() : destination.page === "events" ? { ...emptyEventsState(), activeEventId: destination.eventId ?? null } : destination.page === "management" ? { tab: destination.tab, library: emptyMatchesState() } : null, scrollY: 0 } as StudioFrame;
 }
 export interface StudioNavigation {
   active: StudioFrame;
