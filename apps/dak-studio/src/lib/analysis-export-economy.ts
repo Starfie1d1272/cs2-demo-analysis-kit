@@ -66,7 +66,7 @@ export function buildEconomyAnalysisResult(
       title: "队伍明细矩阵 · 当前队伍投影",
       text: [],
       sampleDescription: `${teams.length} 行 · 全部筛选结果`,
-      limitations: [],
+      limitations: ["未绑定队伍按用户重命名后的显示名分组；同场同名双方单独列出。名称筛选包含该名称的全部分组。"],
       columns: [
         { key: "team", label: "队伍", unit: null },
         { key: "maps", label: "Maps", unit: null },
