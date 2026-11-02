@@ -1,12 +1,7 @@
 import type { ReactNode } from "react";
-import { removeTrainingFocus, updateTrainingFocus, type TrainingFocus } from "../../lib/training-focus";
+import { type TrainingFocus } from "../../lib/training-focus";
 
 export type TrainingFocusDraft = Pick<TrainingFocus, "note" | "reviewCondition">;
-export async function saveTrainingFocusDraft(record: TrainingFocus, draft: TrainingFocusDraft): Promise<void> {
-  if (!await updateTrainingFocus(record.id, draft)) throw new Error("记录不存在");
-}
-export const deleteTrainingFocus = removeTrainingFocus;
-
 export function TrainingFocusEditor({ record, draft, onChange, renderEvidence }: {
   record: TrainingFocus;
   draft: TrainingFocusDraft;

@@ -6,11 +6,11 @@ import type { CoachPlaybookDraft } from "./coach-playbook";
 import type { StudyNoteDraft } from "./study-notes";
 
 export type MaterialPageState =
-  | { kind: "match-sheet"; id: string; draft: CoachMatchSheetDraft; dirty: boolean }
-  | { kind: "assignment-set"; id: string; draft: CoachAssignmentSetDraft; dirty: boolean; observationExpanded: boolean }
-  | { kind: "playbook"; id: string; draft: CoachPlaybookDraft; dirty: boolean; phaseId: string | null }
-  | { kind: "study-note"; id: string; draft: StudyNoteDraft; dirty: boolean }
-  | { kind: "training-focus"; id: string; draft: { note: string; reviewCondition: string }; dirty: boolean }
+  | { kind: "match-sheet"; id: string; draft: CoachMatchSheetDraft; dirty: boolean; baseRevision: string }
+  | { kind: "assignment-set"; id: string; draft: CoachAssignmentSetDraft; dirty: boolean; baseRevision: string; observationExpanded: boolean }
+  | { kind: "playbook"; id: string; draft: CoachPlaybookDraft; dirty: boolean; baseRevision: string; phaseId: string | null }
+  | { kind: "study-note"; id: string; draft: StudyNoteDraft; dirty: boolean; baseRevision: string }
+  | { kind: "training-focus"; id: string; draft: { note: string; reviewCondition: string }; dirty: boolean; baseRevision: string }
   | { kind: "practice-lineup"; id: string; selectedEvidence: number | null };
 export interface MaterialsPageState {
   search: string;
