@@ -73,11 +73,15 @@ function rankScores(scores: Record<InferredMapRole, number>): Array<[InferredMap
 interface ScopedEvidence { rows: PlayerMapRoleEvidence[]; limitations: string[]; relevant: boolean }
 
 function scopedEvidence(declaration: RoleDeclaration, rows: PlayerMapRoleEvidence[], matchTimes: Record<string, string | null>): ScopedEvidence {
-  const base = rows.filter((row) => (declaration.teamKey == null || row.teamKey === declaration.teamKey)
-    && (declaration.mapName == null || row.mapName === declaration.mapName)
-    && (declaration.teamScope?.kind !== "observation" || row.matchIds.includes(declaration.teamScope.matchId)));
-  if (base.length === 0) return { rows: [], limitations: [], relevant: false };
-  if (declaration.validFrom == null && declaration.validTo == null) return { rows: base, limitations: [], relevant: true };
+  const teamKey = declaration.teamKey ?? (declaration.teamScope?.kind === "entity" ? declaration.teamScope.key : null);
+  const candidates = rows.filter((row) => (teamKey == null || row.teamKey === teamKey)
+    && (declaration.mapName == null || row.mapName === declaration.mapName));
+  const observation = declaration.teamScope?.kind === "observation" ? declaration.teamScope.matchId : null;
+  const partialObservation = observation != null && candidates.some(row => row.matchIds.includes(observation) && row.matchIds.some(id => id !== observation));
+  const base = observation == null ? candidates : candidates.filter(row => row.matchIds.length > 0 && row.matchIds.every(id => id === observation));
+  const scopeLimitations = partialObservation ? ["聚合证据跨越比赛范围，未纳入该行。"] : [];
+  if (base.length === 0) return { rows: [], limitations: scopeLimitations, relevant: partialObservation };
+  if (declaration.validFrom == null && declaration.validTo == null) return { rows: base, limitations: scopeLimitations, relevant: true };
   const inScope = (matchId: string) => {
     const time = matchTimes[matchId];
     return time != null && (declaration.validFrom == null || time >= declaration.validFrom) && (declaration.validTo == null || time <= declaration.validTo);
@@ -91,10 +95,11 @@ function scopedEvidence(declaration: RoleDeclaration, rows: PlayerMapRoleEvidenc
   return {
     rows: inRange,
     limitations: [
+      ...scopeLimitations,
       ...(unknown ? ["比赛时间缺失；该声明未与时间未知的 evidence 对齐。"] : []),
       ...(partial ? ["聚合 evidence 跨越声明日期；为避免混入期外样本，未纳入该行。"] : []),
     ],
-    relevant: inRange.length > 0 || unknown || partial,
+    relevant: inRange.length > 0 || unknown || partial || partialObservation,
   };
 }
 
@@ -148,7 +153,9 @@ export function buildPlayerMapRoleProfiles(evidenceRows: PlayerMapRoleEvidence[]
   return [...byPlayerTeam.entries()].map(([key, rows]) => {
     const [playerKey, teamKey] = key.split("\t");
     const scopedDeclarations = declarations
-      .filter((declaration) => declaration.playerKey === playerKey && (declaration.teamKey == null || declaration.teamKey === teamKey))
+      .filter((declaration) => declaration.playerKey === playerKey
+        && !(declaration.teamScope?.kind === "observation" && declaration.teamKey == null)
+        && (declaration.teamKey ?? (declaration.teamScope?.kind === "entity" ? declaration.teamScope.key : teamKey)) === teamKey)
       .map((declaration) => ({ declaration, scope: scopedEvidence(declaration, rows, options.matchTimes ?? {}) }))
       .filter((item) => item.scope.relevant);
     const declaredRoles = scopedDeclarations.filter((item): item is { declaration: MainRoleDeclaration; scope: ScopedEvidence } => item.declaration.kind === "main_role").map((item) => item.declaration);
