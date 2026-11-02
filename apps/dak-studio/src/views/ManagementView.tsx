@@ -1,3 +1,4 @@
+import { usePageReady } from "../lib/use-page-ready";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SeasonCohortBundle } from "@cs2dak/cohort";
 import { EmptyState } from "@cs2dak/react";
@@ -17,6 +18,7 @@ import type { StudioDemoEntry } from "../lib/library";
 import { migrateRoleDeclarationsForIdentity } from "../lib/role-declarations";
 
 export interface ManagementViewProps {
+  onPageReady?: (keys: string[]) => void;
   entries: StudioDemoEntry[];
   identity: IdentityStoreState;
   onIdentityChange: (state: IdentityStoreState) => void;
@@ -47,6 +49,7 @@ export function ManagementView({
   teamRenames = identity.teamRenames,
   onNotice = () => {},
   onLibraryChanged,
+  onPageReady,
   initialTab = "identity"
 }: ManagementViewProps) {
   const [tab, setTab] = useState<ManagementTab>(initialTab);
@@ -60,8 +63,11 @@ export function ManagementView({
   const [selectedTeams, setSelectedTeams] = useState<Set<string>>(new Set());
   const [teamMergeName, setTeamMergeName] = useState("");
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
+  const [auditReady, setAuditReady] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const cancelRef = useRef(false);
+  usePageReady(tab === "identity" && auditReady && (entries.length === 0 || bundle !== null || error !== null), onPageReady);
 
   useEffect(() => {
     setTab(initialTab);
@@ -83,9 +89,14 @@ export function ManagementView({
 
   // 加载审计记录
   useEffect(() => {
-    listAuditEntries().then((rows) =>
-      setAuditRows(rows.map((r) => ({ id: r.id, timestamp: r.timestamp, description: r.description })))
-    );
+    let cancelled = false;
+    setAuditReady(false);
+    setAuditError(null);
+    void listAuditEntries()
+      .then((rows) => { if (!cancelled) setAuditRows(rows.map((r) => ({ id: r.id, timestamp: r.timestamp, description: r.description }))); })
+      .catch((reason) => { if (!cancelled) setAuditError(reason instanceof Error ? reason.message : String(reason)); })
+      .finally(() => { if (!cancelled) setAuditReady(true); });
+    return () => { cancelled = true; };
   }, [identity.version]);
 
   // 唯一队伍名
@@ -266,7 +277,7 @@ export function ManagementView({
       </div>
 
       {tab === "assets" && (
-        <AssetsPanel entries={entries} onLibraryChanged={onLibraryChanged} onNotice={onNotice} />
+        <AssetsPanel onPageReady={onPageReady} entries={entries} onLibraryChanged={onLibraryChanged} onNotice={onNotice} />
       )}
       {tab === "identity" && entries.length === 0 && (
         <EmptyState
@@ -290,6 +301,7 @@ export function ManagementView({
             )}
           </div>
           {error && <p className="stu-error">{error}</p>}
+          {auditError && <p className="stu-error">读取操作记录失败：{auditError}</p>}
           {!bundle && !error && <p className="stu-loading-text">聚合中…</p>}
           {bundle && (
             <div className="stu-mgmt-player-list">

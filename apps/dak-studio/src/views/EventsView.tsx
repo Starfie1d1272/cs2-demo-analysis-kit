@@ -1,3 +1,4 @@
+import { usePageReady } from "../lib/use-page-ready";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { EventStage, EventStanding } from "@cs2dak/contract";
@@ -181,8 +182,9 @@ function stageCandidatesFor(series: StudioSeriesRecord[], eventTeams: RivalHubRe
   return series.flatMap((row) => remoteMapsForSeries(row).map(({ series: candidateSeries, map }) => candidateFromSeriesMap(candidateSeries, map, eventTeams)));
 }
 
-export function EventsView({ entries, onOpenMatch, onAnalyzeEvent, onGoLibrary, rivalHubConnection, onConnectRivalHub, onRevokeRivalHub, onRefreshRivalHub, onImportOnlineFiles, onPickOnlineFiles, onSyncLocalDemos, refreshToken = 0 }: {
+export function EventsView({ entries, onOpenMatch, onAnalyzeEvent, onGoLibrary, rivalHubConnection, onConnectRivalHub, onRevokeRivalHub, onRefreshRivalHub, onImportOnlineFiles, onPickOnlineFiles, onSyncLocalDemos, onPageReady, refreshToken = 0 }: {
   entries: StudioDemoEntry[];
+  onPageReady?: (keys: string[]) => void;
   onOpenMatch: (entryId: string) => void;
   onAnalyzeEvent: (event: StudioEventRecord) => void;
   onGoLibrary: () => void;
@@ -200,7 +202,19 @@ export function EventsView({ entries, onOpenMatch, onAnalyzeEvent, onGoLibrary, 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeStageKey, setActiveStageKey] = useState<string | null>(null);
   const [customBaseUrl, setCustomBaseUrl] = useState(rivalHubConnection?.baseUrl ?? "");
-  useEffect(() => { void Promise.all([listEventRecords(), listSeriesRecords()]).then(([nextEvents, nextSeries]) => { setEvents(nextEvents); setSeries(nextSeries); setActiveId((current) => current ?? nextEvents[0]?.id ?? null); }); }, [refreshToken]);
+  const [directoryReady, setDirectoryReady] = useState(false);
+  const [directoryError, setDirectoryError] = useState<string | null>(null);
+  usePageReady(directoryReady, onPageReady);
+  useEffect(() => {
+    let cancelled = false;
+    setDirectoryReady(false);
+    setDirectoryError(null);
+    void Promise.all([listEventRecords(), listSeriesRecords()])
+      .then(([nextEvents, nextSeries]) => { if (!cancelled) { setEvents(nextEvents); setSeries(nextSeries); setActiveId((current) => current ?? nextEvents[0]?.id ?? null); } })
+      .catch((reason) => { if (!cancelled) setDirectoryError(reason instanceof Error ? reason.message : String(reason)); })
+      .finally(() => { if (!cancelled) setDirectoryReady(true); });
+    return () => { cancelled = true; };
+  }, [refreshToken]);
   useEffect(() => { if (rivalHubConnection?.baseUrl) setCustomBaseUrl(rivalHubConnection.baseUrl); }, [rivalHubConnection?.baseUrl]);
   const orderedEvents = useMemo(() => [...events].sort((a, b) => (a.source === "rivalhub" ? 0 : 1) - (b.source === "rivalhub" ? 0 : 1) || b.updatedAt - a.updatedAt), [events]);
   const active = orderedEvents.find((event) => event.id === activeId) ?? orderedEvents[0] ?? null;
@@ -225,6 +239,7 @@ export function EventsView({ entries, onOpenMatch, onAnalyzeEvent, onGoLibrary, 
 
   return (
     <div className="stu-view stu-reading-view">
+      {directoryError && <p className="stu-error" role="alert">赛事目录加载失败：{directoryError}</p>}
       <header className="stu-view-header">
         <div><h1>赛事目录</h1><p>按 Event → Stage → Series → Map 浏览赛事；官方结构与排名来自 RivalHub，本地 Demo 只负责分析与关联。</p></div>
         {onConnectRivalHub && <div className="stu-rivalhub-connection" aria-label="RivalHub 连接">

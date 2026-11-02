@@ -32,6 +32,7 @@ export function TeamView({
   onOpenCapability,
   onOpenEvidence,
   returnEvidenceKey,
+  onPageReady,
   onGoLibrary,
   identityOptions,
 }: {
@@ -42,6 +43,7 @@ export function TeamView({
   onOpenCapability: (view: TeamViewAction) => void;
   onOpenEvidence: OpenEvidence;
   returnEvidenceKey?: string;
+  onPageReady?: (keys: string[]) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
 }) {
@@ -103,6 +105,13 @@ export function TeamView({
   useEffect(() => {
     if (returningMatrix?.[2]) setMatrixSide(returningMatrix[2] as "t" | "ct");
   }, [returnEvidenceKey]);
+
+  useEffect(() => {
+    if (!onPageReady || (activeTeam && !overview && !error)) return;
+    if (returnEvidenceKey?.startsWith("team:map-roles") && !matrices && !matrixError && activeTeam) return;
+    if (returnEvidenceKey === "team:double-awp" && !doubleAwp && activeTeam) return;
+    onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
+  }, [onPageReady, activeTeam, overview, error, matrices, matrixError, doubleAwp, returnEvidenceKey]);
 
   const matrixMaps = [...new Set((matrices ?? []).map((row) => row.mapName))];
   const activeMatrix = matrices?.find((row) => row.mapName === matrixMap && row.side === matrixSide) ?? null;

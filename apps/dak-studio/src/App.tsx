@@ -1,7 +1,7 @@
 import { type ExportPollSnapshot } from "@cs2dak/rivalhub-upload";
 import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Radar, Settings, Swords, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { backfillDemoIdentities, bulkUpdateTags, formatMatchLabel, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
+import { backfillDemoIdentities, bulkUpdateTags, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { CohortScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
 import { AnalysisContextSummary } from "./components/AnalysisContextSummary";
 import { CapabilityBar } from "./components/CapabilityBar";
@@ -28,14 +28,14 @@ import { EventsView } from "./views/EventsView";
 import { UtilityView } from "./views/UtilityView";
 import { LineupsView } from "./views/LineupsView";
 import { EconomyView } from "./views/EconomyView";
-import { ManagementView, type ManagementTab } from "./views/ManagementView";
+import { ManagementView } from "./views/ManagementView";
 import { DuelView } from "./views/DuelView";
 import { CoachView } from "./views/CoachView";
 import { RadarFieldView } from "./views/RadarFieldView";
 import { loadIdentityState, buildCohortIdentityMap, type IdentityStoreState } from "./lib/identity";
 import type { IdentityOptions } from "./lib/season";
 import type { BuiltinEvent } from "./lib/builtin-events";
-import { createEvidenceContinuation, type EvidenceContinuation, type OpenEvidence } from "./lib/evidence-continuation";
+import { type EvidenceContinuation, type OpenEvidence } from "./lib/evidence-continuation";
 import {
   applyCohortScopeProjection,
   cohortScopeProjection,
@@ -45,13 +45,14 @@ import {
   type AnalysisContext,
 } from "./lib/analysis-context";
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
+import { createStudioNavigation, studioNavigationReducer, PAGE_SECTION, type StudioDestination, type StudioPageId, type StudioSection } from "./lib/studio-navigation";
 import { getPinnedPlayer } from "./lib/pin";
 import { assertRivalHubConnected, rivalHubFailureMessage, connectRivalHub, fetchRivalHubEvents, loadRivalHubConnection, revokeRivalHubPairing, type RivalHubConnectionState } from "./lib/rivalhub";
 import { confirmRivalHubBatchReceipts, recountRivalHubBatch, rivalHubBatchCompletionMessage, runRivalHubBatch, type RivalHubBatchInput, type RivalHubBatchItem, type RivalHubBatchSession, type RivalHubImportContext } from "./lib/rivalhub-import";
 import { RivalHubBatchImportPanel } from "./components/RivalHubBatchImportPanel";
 import { importRivalHubFromNativePicker } from "./lib/rivalhub-acquisition";
 
-type StudioView =
+type NavKey =
   | "home"
   | "library"
   | "match"
@@ -67,7 +68,7 @@ type StudioView =
   | "control"
   | "management";
 
-type NavItem = { key: StudioView; label: string; hint: string; icon: typeof LibraryBig };
+type NavItem = { key: NavKey; label: string; hint: string; icon: typeof LibraryBig };
 const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "开始",
@@ -105,10 +106,9 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
 ];
 const MANAGEMENT_NAV: NavItem = { key: "management", label: "管理", hint: "身份归并 · 资料库维护 · 赛事资产", icon: Settings };
 
-type EventMode = "directory" | "overview";
 type MatchDeepLink = { roundNumber: number; tick?: number };
 const UPDATE_CHANNEL_KEY = "dak:update-channel";
-const CAPABILITY_BY_VIEW: Partial<Record<StudioView, StudioCapability>> = {
+const CAPABILITY_BY_VIEW: Partial<Record<NavKey, StudioCapability>> = {
   home: "personal-review", players: "map-role", teams: "map-role", duel: "duel", economy: "economy", utility: "utility", lineups: "lineup", control: "control", coach: "tactical",
 };
 
@@ -133,10 +133,69 @@ function NavButton({ item, active, onClick }: { item: NavItem; active: boolean; 
 
 export function App() {
   const [entries, setEntries] = useState<StudioDemoEntry[]>([]);
-  const [view, setView] = useState<StudioView>("home");
-  const [eventMode, setEventMode] = useState<EventMode>("directory");
-  const [selectedDemoId, setSelectedDemoId] = useState<string | null>(null);
-  const [matchDeepLink, setMatchDeepLink] = useState<MatchDeepLink | null>(null);
+  const [entriesReady, setEntriesReady] = useState(false);
+  const [navigation, setNavigation] = useState(() => createStudioNavigation("initial"));
+  const navigationRef = useRef(navigation);
+  navigationRef.current = navigation;
+  const nextFrameId = useRef(0);
+  const touchedFrames = useRef(new Set<string>());
+  useEffect(() => {
+    const retained = new Set([navigation.active.id, ...navigation.history.map(frame => frame.id)]);
+    for (const id of touchedFrames.current) if (!retained.has(id)) touchedFrames.current.delete(id);
+  }, [navigation]);
+  const active = navigation.active;
+  const destination = active.destination;
+  const pageToView: Partial<Record<StudioPageId, NavKey>> = {
+    workbench: "home", analysis: "players", "personal-review": "home", matches: "library", match: "match",
+    player: "players", team: "teams", opening: "trails", patterns: "coach",
+    "event-analysis": "events", events: "events", management: "management",
+    duel: "duel", economy: "economy", utility: "utility", lineups: "lineups", control: "control",
+  };
+  const view = destination.page === "management" && destination.tab === "library" ? "library" : pageToView[destination.page] ?? "library";
+  const selectedDemoId = destination.page === "match" ? destination.entryId : null;
+  const targetRound = destination.page === "match" ? destination.roundNumber : undefined;
+  const targetTick = destination.page === "match" ? destination.tick : undefined;
+  const matchDeepLink = useMemo(() => targetRound === undefined
+    ? null : { roundNumber: targetRound, tick: targetTick }, [active.id, targetRound, targetTick]);
+  const eventMode = destination.page === "event-analysis" ? "overview" : "directory";
+  const managementInitialTab = destination.page === "management" ? destination.tab : "identity";
+  const fallbackContext = useMemo(() => createAnalysisContextPreset("explore"), []);
+  const analysisContext = "context" in destination ? destination.context : fallbackContext;
+  const navigate = useCallback((next: StudioDestination, intent: "open" | "evidence" = "open", sourceKey?: string) => {
+    const id = `frame-${++nextFrameId.current}`;
+    if (intent === "open") { setEvidenceDetails(null); setRestoringFrameId(null); }
+    setNavigation(current => studioNavigationReducer(current, intent === "evidence" && next.page === "match"
+      ? { intent, id, destination: next, scrollY: window.scrollY, sourceKey }
+      : { intent: "open", id, destination: next, scrollY: window.scrollY }));
+  }, []);
+  const resumeSection = useCallback((section: StudioSection) => {
+    const current = navigationRef.current;
+    if (PAGE_SECTION[current.active.destination.page] === section) return;
+    const id = `frame-${++nextFrameId.current}`;
+    const target = current.history.find(frame => frame.id === current.resume[section]);
+    setEvidenceDetails(null);
+    setRestoringFrameId(target?.id ?? null);
+    setNavigation(state => studioNavigationReducer(state, { intent: "resume", id, section, scrollY: window.scrollY }));
+  }, []);
+  const setAnalysisContext = useCallback((update: AnalysisContext | ((current: AnalysisContext) => AnalysisContext)) => {
+    const id = active.id;
+    touchedFrames.current.add(id);
+    setNavigation(current => {
+      if (current.active.id !== id || !("context" in current.active.destination)) return current;
+      const context = current.active.destination.context;
+      return studioNavigationReducer(current, { intent: "context", frameId: id, context: typeof update === "function" ? update(context) : update });
+    });
+  }, [active.id]);
+  const setView = useCallback((key: NavKey) => {
+    const context = createAnalysisContextPreset("explore");
+    const analysisPages = { players: "player", teams: "team", trails: "opening", duel: "duel", utility: "utility", lineups: "lineups", economy: "economy", coach: "patterns", control: "control" } as const;
+    if (key in analysisPages) navigate({ page: analysisPages[key as keyof typeof analysisPages], context });
+    else if (key === "home") navigate({ page: "personal-review", context: createAnalysisContextPreset("personal-review") });
+    else if (key === "library") navigate({ page: "matches" });
+    else if (key === "match") resumeSection("matches");
+    else if (key === "events") navigate({ page: "events" });
+    else navigate({ page: "management", tab: "identity" });
+  }, [navigate, resumeSection]);
   const [exportQueries, setExportQueries] = useState<ExportPollSnapshot[]>(() => exportPolling.snapshots());
   const [importing, setImporting] = useState(false);
   useEffect(() => {
@@ -153,9 +212,14 @@ export function App() {
     });
   }, []);
   const [notice, setNotice] = useState<string | null>(null);
-  const [analysisContext, setAnalysisContext] = useState<AnalysisContext>(() => createAnalysisContextPreset("explore"));
-  const [evidenceContinuation, setEvidenceContinuation] = useState<EvidenceContinuation | null>(null);
-  const [returningEvidence, setReturningEvidence] = useState<EvidenceContinuation | null>(null);
+  const [evidenceDetails, setEvidenceDetails] = useState<Pick<EvidenceContinuation, "evidence" | "finding"> | null>(null);
+  const evidenceSource = navigation.history.at(-1);
+  const evidenceContinuation: EvidenceContinuation | null = evidenceDetails && evidenceSource ? {
+    ...evidenceDetails, sourceView: evidenceSource.destination.page,
+    context: "context" in evidenceSource.destination ? evidenceSource.destination.context : fallbackContext,
+    sourceKey: evidenceSource.anchorKey,
+  } : null;
+  const [restoringFrameId, setRestoringFrameId] = useState<string | null>(null);
   const [eventRecords, setEventRecords] = useState<StudioEventRecord[]>([]);
   const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
   const [rivalHubConnection, setRivalHubConnection] = useState<RivalHubConnectionState>({ baseUrl: "", pairingId: null, connectedAt: 0, lastSyncAt: null, status: "disconnected", error: null });
@@ -175,7 +239,6 @@ export function App() {
   const [updateChannel, setUpdateChannel] = useState<UpdateChannel>(initialUpdateChannel);
   const [contextEditorOpen, setContextEditorOpen] = useState(false);
   const [capabilityAvailability, setCapabilityAvailability] = useState<CapabilityAvailability | null>(null);
-  const [managementInitialTab, setManagementInitialTab] = useState<ManagementTab>("identity");
 
   async function doCheckUpdate() {
     setCheckingUpdate(true);
@@ -240,7 +303,7 @@ export function App() {
   }, [analysisContext.goal, analysisContext.roles.beneficiary, analysisContext.roles.opponent, capabilityAvailability, scopedEntries, view]);
   const updateLegacyScope = useCallback((next: CohortScopeState) => {
     setAnalysisContext((current) => applyCohortScopeProjection(current, next));
-  }, []);
+  }, [setAnalysisContext]);
   const identityOptions = useMemo<IdentityOptions | undefined>(
     () => identityState.version > 0
       ? { version: identityState.version, map: buildCohortIdentityMap(identityState.mappings), teamRenames: identityState.teamRenames }
@@ -249,8 +312,7 @@ export function App() {
   );
   const openCapabilityRepair = useCallback((action: CapabilityRepairAction) => {
     if (action === "install-tri") {
-      setManagementInitialTab("assets");
-      setView("management");
+      navigate({ page: "management", tab: "assets" });
       return;
     }
     setView("library");
@@ -261,7 +323,7 @@ export function App() {
       goal: teamName ? "team-analysis" : current.goal === "team-analysis" ? "explore" : current.goal,
       focus: teamName ? { kind: "team", teamName } : current.focus.kind === "team" ? { kind: "aggregate" } : current.focus,
     }));
-  }, []);
+  }, [setAnalysisContext]);
 
   useEffect(() => {
     const capability = CAPABILITY_BY_VIEW[view];
@@ -287,20 +349,14 @@ export function App() {
         await pruneOrphanSeries(new Set(loaded.map((entry) => entry.id))).catch(() => 0);
         await refreshEventRecords();
       })
-      .catch((err) => setNotice(`读取本地资料库失败：${err instanceof Error ? err.message : String(err)}`));
+      .catch((err) => setNotice(`读取本地资料库失败：${err instanceof Error ? err.message : String(err)}`))
+      .finally(() => setEntriesReady(true));
     // 自动更新属于桌面壳职责。浏览器开发入口没有跨域桥，启动时主动请求发布源
     // 只会制造 CORS 错误；需要时仍可由用户手动检查。
     if (window.pywebview?.api) void doCheckUpdate();
     void loadRivalHubConnection().then(setRivalHubConnection).catch(() => undefined);
     void loadIdentityState().then(setIdentityState);
-    void getPinnedPlayer().then((pinned) => {
-      if (!pinned) return;
-      setAnalysisContext((current) => current.goal === "explore" && current.focus.kind === "aggregate"
-        ? createAnalysisContextPreset("personal-review", {
-            focus: { kind: "self", playerKey: pinned.playerKey, label: pinned.name },
-          })
-        : current);
-    });
+
   }, [refreshEventRecords]);
 
   const importFiles = useCallback(async (files: Iterable<File | ExportedDemoFile>, tags: string[] = [], initialErrors: string[] = []): Promise<StudioDemoEntry[]> => {
@@ -567,67 +623,46 @@ export function App() {
   }, []);
 
   const openDemo = useCallback((id: string, target?: MatchDeepLink) => {
-    const entry = entries.find((row) => row.id === id);
-    if (entry) {
-      setAnalysisContext(createAnalysisContextPreset("match-review", {
-        corpus: { eventIds: [], entryIds: [id], matchIds: [], maps: [], tags: [], excludedEntryIds: [] },
-        focus: { kind: "match", entryId: id, label: formatMatchLabel(entry) },
-      }));
-    }
-    setSelectedDemoId(id);
-    setMatchDeepLink(target ? { ...target } : null);
-    setView("match");
-  }, [entries]);
+    navigate({ page: "match", entryId: id, ...target });
+  }, [navigate]);
 
   const openEvidence = useCallback<OpenEvidence>((id, evidence, sourceKey, finding) => {
-    setEvidenceContinuation(createEvidenceContinuation({
-      sourceView: view,
-      context: analysisContext,
-      sourceKey,
-      evidence,
-      finding,
-    }));
-    setSelectedDemoId(id);
-    setMatchDeepLink({ roundNumber: evidence.roundNumber, tick: evidence.tick });
-    setView("match");
-  }, [analysisContext, view]);
+    if (navigationRef.current.active.id !== active.id) return;
+    setEvidenceDetails({ evidence: { ...evidence }, finding: finding ? { ...finding } : undefined });
+    navigate({ page: "match", entryId: id, roundNumber: evidence.roundNumber, tick: evidence.tick }, "evidence", sourceKey);
+  }, [active.id, navigate]);
 
-  const returnFromEvidence = useCallback(() => {
-    if (!evidenceContinuation) return;
-    setAnalysisContext(evidenceContinuation.context);
-    setView(evidenceContinuation.sourceView as StudioView);
-    setReturningEvidence(evidenceContinuation);
-    setEvidenceContinuation(null);
-  }, [evidenceContinuation]);
+  const goBack = useCallback(() => {
+    const current = navigationRef.current;
+    const id = `frame-${++nextFrameId.current}`;
+    setRestoringFrameId(current.history.at(-1)?.id ?? id);
+    setEvidenceDetails(null);
+    setNavigation(state => studioNavigationReducer(state, { intent: "back", id }));
+  }, []);
 
-  useEffect(() => {
-    if (!returningEvidence || view !== returningEvidence.sourceView) return;
-    let frame = 0;
-    let attempts = 0;
-    const restoreSource = () => {
-      const anchor = returningEvidence.sourceKey ? document.getElementById(returningEvidence.sourceKey) : null;
-      if (anchor) {
-        anchor.scrollIntoView({ block: "center" });
-        setReturningEvidence(null);
-        return;
-      }
-      if (attempts++ < 8) frame = window.requestAnimationFrame(restoreSource);
-      else setReturningEvidence(null);
-    };
-    // 来源视图可能先挂壳、后完成异步 facts 渲染；等下一帧再找真实 DOM anchor。
-    frame = window.requestAnimationFrame(restoreSource);
-    return () => window.cancelAnimationFrame(frame);
-  }, [returningEvidence, view]);
-
-  // 一级页面是新的工作面：普通切页从页首开始，避免把上一页的深滚动位置
-  // 泄漏到新页面。证据返回是唯一例外，由上面的 continuation 精确恢复来源锚点。
-  useEffect(() => {
-    if (!returningEvidence) {
-      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-      document.querySelector<HTMLElement>(".stu-sidebar")?.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  const onPageReady = useCallback((frameId: string, availableAnchorKeys: string[]) => {
+    const frame = navigationRef.current.active;
+    if (!entriesReady || frame.id !== frameId || restoringFrameId !== frameId) return;
+    if (frame.anchorKey && availableAnchorKeys.includes(frame.anchorKey)) {
+      document.getElementById(frame.anchorKey)?.scrollIntoView({ block: "center" });
+    } else {
+      const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      window.scrollTo({ top: Math.min(frame.scrollY, max), behavior: "instant" });
+      if (frame.anchorKey && max === 0 && frame.scrollY > 0) setNotice("未能恢复原位置，已返回页面顶部。");
     }
-    // 只在 view 真正变化时判断；returningEvidence 清空不能再次把已恢复的锚点拉回页首。
-  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
+    setNavigation(current => studioNavigationReducer(current, { intent: "position", frameId, scrollY: window.scrollY }));
+    setRestoringFrameId(null);
+  }, [restoringFrameId, entriesReady]);
+
+  useEffect(() => {
+    if (restoringFrameId !== active.id) window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [active.id]); // The restoration signal may clear without changing frames.
+
+  useEffect(() => {
+    if (view === "library" && entriesReady) {
+      onPageReady(active.id, Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
+    }
+  }, [view, active.id, entriesReady, onPageReady]);
 
   const handleLinkRawDemo = useCallback(async (entry: StudioDemoEntry) => {
     try {
@@ -673,32 +708,24 @@ export function App() {
   }, [entries]);
 
   const openPlayer = useCallback((playerKey: string, label = playerKey) => {
-    setAnalysisContext((current) => ({
-      ...current,
-      goal: "player-analysis",
-      focus: { kind: "player", playerKey, label },
-    }));
-    setView("players");
-  }, []);
+    const current = navigationRef.current.active.destination;
+    const context = "context" in current ? current.context : createAnalysisContextPreset("explore");
+    navigate({ page: "player", context: { ...context, goal: "player-analysis", focus: { kind: "player", playerKey, label } } });
+  }, [navigate]);
 
   const openTeam = useCallback((teamName: string) => {
-    setAnalysisContext((current) => ({
-      ...current,
-      goal: "team-analysis",
-      focus: { kind: "team", teamName },
-    }));
-    setView("teams");
-  }, []);
+    const current = navigationRef.current.active.destination;
+    const context = "context" in current ? current.context : createAnalysisContextPreset("explore");
+    navigate({ page: "team", context: { ...context, goal: "team-analysis", focus: { kind: "team", teamName } } });
+  }, [navigate]);
 
   const startEventAnalysis = useCallback((event: StudioEventRecord) => {
-    setAnalysisContext(createAnalysisContextPreset("event-analysis", {
+    navigate({ page: "event-analysis", context: createAnalysisContextPreset("event-analysis", {
       corpus: { eventIds: [event.id], entryIds: [], matchIds: [], maps: [], tags: [], excludedEntryIds: [] },
       focus: { kind: "event", eventId: event.id, label: event.name },
       baseline: { kind: "event-peers", eventId: event.id },
-    }));
-    setEventMode("overview");
-    setView("events");
-  }, []);
+    }) });
+  }, [navigate]);
 
   const handleRemove = useCallback(
     async (id: string) => {
@@ -706,7 +733,6 @@ export function App() {
       const next = await listDemoEntries();
       setEntries(next);
       await pruneOrphanSeries(new Set(next.map((entry) => entry.id))).catch(() => 0);
-      setSelectedDemoId((current) => (current === id ? null : current));
     },
     []
   );
@@ -736,7 +762,7 @@ export function App() {
       sourceDemPath: entry.sourceDemPath,
       replaceId: entry.id
     });
-    setSelectedDemoId((current) => (current === entry.id ? result.entry.id : current));
+    void result;
   }, []);
 
   const handleReexportDemo = useCallback(async (entry: StudioDemoEntry) => {
@@ -846,7 +872,6 @@ export function App() {
       const next = await listDemoEntries();
       setEntries(next);
       await pruneOrphanSeries(new Set(next.map((entry) => entry.id))).catch(() => 0);
-      setSelectedDemoId((current) => (current && ids.includes(current) ? null : current));
       setNotice(`已删除 ${ids.length} 场 demo`);
     } catch (err) {
       setNotice(`批量删除失败：${err instanceof Error ? err.message : String(err)}`);
@@ -886,47 +911,23 @@ export function App() {
               {group.items.map((item) => (
                 <NavButton key={item.key} item={item} active={view === item.key} onClick={() => {
                   if (item.key === "home") {
-                    setAnalysisContext((current) => createAnalysisContextPreset("personal-review", {
-                      focus: current.focus.kind === "self" || current.focus.kind === "player"
-                        ? { kind: "self", playerKey: current.focus.playerKey, label: current.focus.label }
-                        : { kind: "aggregate" },
-                    }));
-                    void getPinnedPlayer().then((pinned) => {
+                    const id = `frame-${++nextFrameId.current}`;
+                    setNavigation(current => studioNavigationReducer(current, { intent: "open", id, destination: { page: "personal-review", context: createAnalysisContextPreset("personal-review") }, scrollY: window.scrollY }));
+                    void getPinnedPlayer().then(pinned => {
                       if (!pinned) return;
-                      setAnalysisContext((current) => current.goal === "personal-review"
-                        ? createAnalysisContextPreset("personal-review", {
-                            focus: { kind: "self", playerKey: pinned.playerKey, label: pinned.name },
-                          })
-                        : current);
+                      setNavigation(current => {
+                        if (touchedFrames.current.has(id) || current.active.id !== id || current.active.destination.page !== "personal-review" || current.active.destination.context.focus.kind !== "aggregate") return current;
+                        return studioNavigationReducer(current, { intent: "context", frameId: id, context: createAnalysisContextPreset("personal-review", { focus: { kind: "self", playerKey: pinned.playerKey, label: pinned.name } }) });
+                      });
                     });
-                  }
-                  if (item.key === "match") {
-                    const entry = entries.find((row) => row.id === selectedDemoId) ?? entries[0];
-                    if (entry) {
-                      setSelectedDemoId(entry.id);
-                      setMatchDeepLink(null);
-                      setAnalysisContext(createAnalysisContextPreset("match-review", {
-                        corpus: { eventIds: [], entryIds: [entry.id], matchIds: [], maps: [], tags: [], excludedEntryIds: [] },
-                        focus: { kind: "match", entryId: entry.id, label: formatMatchLabel(entry) },
-                      }));
-                    }
-                  }
-                  if (item.key === "events") {
-                    setEventMode("directory");
-                    setAnalysisContext((current) => createAnalysisContextPreset("explore", { corpus: current.corpus }));
-                  }
-                  if (item.key === "teams" && analysisContext.focus.kind !== "team") {
-                    const firstTeam = entries[0] ? (identityState.teamRenames[entries[0].meta.teamAName] ?? entries[0].meta.teamAName) : null;
-                    if (firstTeam) setAnalysisContext((current) => createAnalysisContextPreset("team-analysis", { corpus: current.corpus, focus: { kind: "team", teamName: firstTeam }, baseline: current.baseline }));
-                  }
-                  setView(item.key);
+                  } else setView(item.key);
                 }} />
               ))}
             </section>
           ))}
         </nav>
         <div className="stu-sidebar-foot">
-          <NavButton item={MANAGEMENT_NAV} active={view === "management"} onClick={() => { setManagementInitialTab("identity"); setView("management"); }} />
+          <NavButton item={MANAGEMENT_NAV} active={view === "management"} onClick={() => setView("management")} />
           <span>{entries.length} 场 demo</span>
           <small>v{APP_VERSION} · v3 ZIP · 本地存储</small>
           <small title={BUILD_INFO.buildRevision ?? "Git metadata unavailable"}>{BUILD_LABEL}</small>
@@ -953,6 +954,7 @@ export function App() {
 
       <main className="stu-main">
         <AssetHealthBanner />
+        {navigation.history.length > 0 && <button type="button" className="stu-button-sm" onClick={goBack}>返回</button>}
         {exportQueries.map(query => <div className="stu-notice" role="status" key={query.jobId}>
           <div><p>{query.message}</p><p>解析任务 {query.jobId} · 阶段 {query.stage} · 最后进度 {query.progress === null ? "未知" : `${Math.round(query.progress * 100)}%`}</p>
             {query.diagnostic?.cause && <p>{query.diagnostic.cause}</p>}
@@ -969,7 +971,7 @@ export function App() {
           </div>
         )}
         <RivalHubBatchImportPanel session={batchSession} onStop={stopRivalHubBatch} onSelectTarget={selectRivalHubBatchTarget} onDismiss={() => setBatchSession(null)} onLocalLinkUpdate={updated => setBatchSession(current => current && current.id === batchSession?.id ? { ...current, items: current.items.map(item => item.id === updated.id ? updated : item) } : current)} />
-        {entries.length > 0 && view !== "library" && view !== "management" && (
+        {entries.length > 0 && "context" in destination && (
           <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} onEdit={() => setContextEditorOpen((current) => !current)} />
         )}
         {entries.length > 0 && contextEditorOpen && view !== "library" && view !== "management" && (
@@ -985,7 +987,10 @@ export function App() {
         {displayedCapabilityAvailability && <CapabilityBar availability={displayedCapabilityAvailability} onRepair={openCapabilityRepair} />}
         {view === "home" && (
           <HomeView
+            key={active.id}
             entries={scopedEntries}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
+            returnEvidenceKey={active.anchorKey}
             onOpenMatch={openDemo}
             onOpenEvidence={openEvidence}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
@@ -997,6 +1002,7 @@ export function App() {
         )}
         {view === "library" && (
           <LibraryView
+            key={active.id}
             entries={entries}
             importing={importing}
             importTagsRaw={importTagsRaw}
@@ -1023,6 +1029,8 @@ export function App() {
         )}
         {view === "match" && (
           <MatchView
+            key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             entries={entries}
             demoId={selectedDemoId}
             deepLink={matchDeepLink}
@@ -1030,11 +1038,12 @@ export function App() {
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoLibrary={() => setView("library")}
             evidenceContinuation={evidenceContinuation}
-            onReturnToSource={returnFromEvidence}
+            onReturnToSource={goBack}
           />
         )}
         {view === "players" && (
           <PlayersView
+            key={active.id}
             allEntries={entries}
             entries={scopedEntries}
             selectedTeam={selectedTeam}
@@ -1043,26 +1052,31 @@ export function App() {
             onOpenMatch={openDemo}
             onOpenEvidence={openEvidence}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
-            returnEvidenceKey={returningEvidence?.sourceView === "players" ? returningEvidence.sourceKey : undefined}
+            returnEvidenceKey={active.anchorKey}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             identityOptions={identityOptions}
             onGoLibrary={() => setView("library")}
           />
         )}
         {view === "teams" && (
           <TeamView
+            key={active.id}
             entries={scopedEntries}
             selectedTeam={analysisContext.focus.kind === "team" ? analysisContext.focus.teamName : null}
             onSelectTeam={openTeam}
             onOpenMatch={openDemo}
-            onOpenCapability={setView}
+            onOpenCapability={(key) => navigate({ page: key, context: analysisContext })}
             onOpenEvidence={openEvidence}
-            returnEvidenceKey={returningEvidence?.sourceView === "teams" ? returningEvidence.sourceKey : undefined}
+            returnEvidenceKey={active.anchorKey}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             onGoLibrary={() => setView("library")}
             identityOptions={identityOptions}
           />
         )}
         {view === "trails" && (
           <TrailsView
+            key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
             entries={scopedEntries}
             identityOptions={identityOptions}
@@ -1071,6 +1085,8 @@ export function App() {
         )}
         {view === "duel" && (
           <DuelView
+            key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
             entries={scopedEntries}
             selectedTeam={selectedTeam}
@@ -1084,11 +1100,13 @@ export function App() {
         )}
         {view === "utility" && (
           <UtilityView
+            key={active.id}
             allEntries={entries}
             entries={scopedEntries}
             selectedTeam={selectedTeam}
             onOpenMatch={openDemo}
             onOpenEvidence={openEvidence}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             identityOptions={identityOptions}
             onGoLibrary={() => setView("library")}
@@ -1096,6 +1114,8 @@ export function App() {
         )}
         {view === "lineups" && (
           <LineupsView
+            key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             onRebuild={handleRebuildSelected}
             allEntries={entries}
             entries={scopedEntries}
@@ -1106,6 +1126,8 @@ export function App() {
         )}
         {view === "economy" && (
           <EconomyView
+            key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
             entries={scopedEntries}
             selectedTeam={selectedTeam}
@@ -1115,6 +1137,8 @@ export function App() {
         )}
         {view === "coach" && (
           <CoachView
+            key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
             entries={scopedEntries}
             onOpenMatch={openDemo}
@@ -1127,6 +1151,8 @@ export function App() {
         )}
         {view === "control" && (
           <RadarFieldView
+            key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             entries={scopedEntries}
             teamRenames={identityState.teamRenames}
             selectedTeam={selectedTeam}
@@ -1135,6 +1161,8 @@ export function App() {
         )}
         {view === "events" && (eventMode === "overview" ? (
           <TournamentDashboardView
+            key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
             entries={scopedEntries}
             selectedTeam={selectedTeam}
@@ -1143,11 +1171,13 @@ export function App() {
             onOpenTeam={openTeam}
             onOpenPlayer={openPlayer}
             onGoLibrary={() => setView("library")}
-            onGoEconomy={() => setView("economy")}
-            onGoDirectory={() => setEventMode("directory")}
+            onGoEconomy={() => navigate({ page: "economy", context: analysisContext })}
+            onGoDirectory={() => navigate({ page: "events" })}
           />
         ) : (
           <EventsView
+            key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             entries={entries}
             onOpenMatch={openDemo}
             onAnalyzeEvent={startEventAnalysis}
@@ -1164,6 +1194,8 @@ export function App() {
         ))}
         {view === "management" && (
           <ManagementView
+            key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             entries={entries}
             identity={identityState}
             onIdentityChange={setIdentityState}
@@ -1172,7 +1204,7 @@ export function App() {
             onGoLibrary={() => setView("library")}
             onNotice={setNotice}
             onLibraryChanged={setEntries}
-            initialTab={managementInitialTab}
+            initialTab={managementInitialTab === "library" ? "identity" : managementInitialTab}
           />
         )}
       </main>

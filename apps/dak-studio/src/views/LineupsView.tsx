@@ -1,8 +1,10 @@
+import { usePageReady } from "../lib/use-page-ready";
 import { EmptyState } from "@cs2dak/react";
 import type { StudioDemoEntry } from "../lib/library";
 import { LineupView } from "./LineupView";
 
 export interface LineupsViewProps {
+  onPageReady?: (keys: string[]) => void;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
@@ -11,7 +13,8 @@ export interface LineupsViewProps {
   onRebuild: (ids: string[]) => void;
 }
 
-export function LineupsView({ allEntries, entries, onOpenMatch, onWatchDemo, onGoLibrary, onRebuild }: LineupsViewProps) {
+export function LineupsView({ allEntries, entries, onOpenMatch, onWatchDemo, onGoLibrary, onRebuild, onPageReady }: LineupsViewProps) {
+  usePageReady(allEntries.length === 0 || entries.length === 0, onPageReady);
   if (allEntries.length === 0) {
     return (
       <div className="stu-view">
@@ -36,7 +39,7 @@ export function LineupsView({ allEntries, entries, onOpenMatch, onWatchDemo, onG
       {entries.length === 0 ? (
         <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整全局范围。" />
       ) : (
-        <LineupView onRebuild={onRebuild} entries={entries} onOpenMatch={onOpenMatch} onWatchDemo={onWatchDemo} />
+        <LineupView onPageReady={onPageReady} onRebuild={onRebuild} entries={entries} onOpenMatch={onOpenMatch} onWatchDemo={onWatchDemo} />
       )}
     </div>
   );

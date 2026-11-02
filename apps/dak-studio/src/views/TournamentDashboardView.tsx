@@ -1,3 +1,4 @@
+import { usePageReady } from "../lib/use-page-ready";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 import { useEffect, useMemo, useState } from "react";
 import { formatPercent, type TeamComparisonModel } from "@cs2dak/presentation";
@@ -9,6 +10,7 @@ import { EmptyState, MetricInfo } from "@cs2dak/react";
 import { LeaderboardView } from "./LeaderboardView";
 
 export interface TournamentDashboardViewProps {
+  onPageReady?: (keys: string[]) => void;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   selectedTeam?: string | null;
@@ -50,15 +52,20 @@ export function TournamentDashboardView({
   onOpenTeam,
   onGoDirectory,
   onOpenPlayer,
-  identityOptions
+  identityOptions,
+  onPageReady
 }: TournamentDashboardViewProps) {
   const [mapTable, setMapTable] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "matches", direction: "desc" }, page: 0 });
   const [weaponTable, setWeaponTable] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "kills", direction: "desc" }, page: 0 });
   const [insights, setInsights] = useState<TournamentInsights | null>(null);
   const [teamComparison, setTeamComparison] = useState<TeamComparisonModel | null>(null);
+  const [comparisonReady, setComparisonReady] = useState(false);
+  const [comparisonError, setComparisonError] = useState<string | null>(null);
   const [comparePair, setComparePair] = useState<[string, string] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
+
+  usePageReady(entries.length === 0 || ((insights !== null || error !== null) && comparisonReady), onPageReady);
 
   useEffect(() => {
     if (entries.length === 0) {
@@ -88,13 +95,16 @@ export function TournamentDashboardView({
       return;
     }
     let cancelled = false;
+    setComparisonReady(false);
+    setComparisonError(null);
     getTeamComparison(entries, identityOptions, comparePair ?? undefined)
       .then((result) => {
         if (!cancelled) setTeamComparison(result);
       })
-      .catch(() => {
-        if (!cancelled) setTeamComparison(null);
-      });
+      .catch((reason) => {
+        if (!cancelled) { setTeamComparison(null); setComparisonError(reason instanceof Error ? reason.message : String(reason)); }
+      })
+      .finally(() => { if (!cancelled) setComparisonReady(true); });
     return () => {
       cancelled = true;
     };
@@ -149,6 +159,8 @@ export function TournamentDashboardView({
                   if (entry) onOpenMatch(entry.id, { roundNumber: 1 });
                 }}
               />
+            ) : comparisonError ? (
+              <p className="stu-error" role="alert">队伍对比加载失败：{comparisonError}</p>
             ) : (
               <p className="stu-dim">至少需要两个队伍的 demo 才能生成对比。</p>
             )}

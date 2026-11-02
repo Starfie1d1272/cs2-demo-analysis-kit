@@ -107,9 +107,15 @@ export function createAnalysisContext(
   return {
     goal: input.goal,
     corpus: copyCorpus(input.corpus),
-    focus: input.focus ?? { kind: "aggregate" },
-    roles: { ...input.roles },
-    baseline: input.baseline ?? { kind: "descriptive" },
+    focus: input.focus ? { ...input.focus } : { kind: "aggregate" },
+    roles: {
+      ...(input.roles?.beneficiary && { beneficiary: { ...input.roles.beneficiary } }),
+      ...(input.roles?.opponent && { opponent: { ...input.roles.opponent } }),
+      ...(input.roles?.comparison && { comparison: { ...input.roles.comparison } }),
+    },
+    baseline: input.baseline?.kind === "specified"
+      ? { ...input.baseline, subject: { ...input.baseline.subject } }
+      : { ...(input.baseline ?? { kind: "descriptive" }) },
   };
 }
 

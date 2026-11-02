@@ -1,3 +1,4 @@
+import { usePageReady } from "../lib/use-page-ready";
 import { useEffect, useMemo, useState } from "react";
 import { Download, RefreshCw, ShieldCheck } from "lucide-react";
 import {
@@ -19,12 +20,13 @@ import {
 } from "../lib/asset-health-bridge";
 
 export interface AssetsPanelProps {
+  onPageReady?: (keys: string[]) => void;
   entries: StudioDemoEntry[];
   onLibraryChanged?: (entries: StudioDemoEntry[]) => void;
   onNotice?: (message: string) => void;
 }
 
-export function AssetsPanel({ entries, onLibraryChanged, onNotice = () => {} }: AssetsPanelProps) {
+export function AssetsPanel({ entries, onLibraryChanged, onNotice = () => {}, onPageReady }: AssetsPanelProps) {
   const desktop = hasLibraryMaintenance();
   const assetAvailable = useAssetHealthAvailable();
   const [browserOverview, setBrowserOverview] = useState<BrowserStorageOverview | null>(null);
@@ -34,6 +36,9 @@ export function AssetsPanel({ entries, onLibraryChanged, onNotice = () => {} }: 
   const [busy, setBusy] = useState(false);
   const [assetStatus, setAssetStatus] = useState<AssetStatus | null>(null);
   const [repairMsg, setRepairMsg] = useState("");
+  const [assetsReady, setAssetsReady] = useState(false);
+  const [assetsError, setAssetsError] = useState<string | null>(null);
+  usePageReady(assetsReady, onPageReady);
 
   const demoStats = useMemo(() => {
     const sizeBytes = entries.reduce((sum, e) => sum + (e.sizeBytes ?? 0), 0);
@@ -73,8 +78,19 @@ export function AssetsPanel({ entries, onLibraryChanged, onNotice = () => {} }: 
     }
   }
 
-  useEffect(() => { void refresh(); }, [entries, assetAvailable]);  // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { void loadTrisManifest().then(setTrisManifest).catch(() => setTrisManifest(null)); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    setAssetsReady(false);
+    setAssetsError(null);
+    void Promise.allSettled([refresh(), loadTrisManifest().then((manifest) => { if (!cancelled) setTrisManifest(manifest); })])
+      .then((results) => {
+        if (cancelled) return;
+        const failed = results.find((result) => result.status === "rejected");
+        if (failed?.status === "rejected") setAssetsError(failed.reason instanceof Error ? failed.reason.message : String(failed.reason));
+        setAssetsReady(true);
+      });
+    return () => { cancelled = true; };
+  }, [entries, assetAvailable]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 修复官方资产 ──
 
@@ -178,6 +194,7 @@ export function AssetsPanel({ entries, onLibraryChanged, onNotice = () => {} }: 
 
   return (
     <div className="stu-view-body" style={{ display: "grid", gap: "var(--dak-gap, 16px)" }}>
+      {assetsError && <p className="stu-error" role="alert">读取资产信息失败：{assetsError}</p>}
       {/* ── 存储总览 ── */}
       {desktop ? (
         <LibraryMaintenance onNotice={onNotice} onLibraryChanged={onLibraryChanged} />

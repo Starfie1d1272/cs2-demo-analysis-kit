@@ -1,3 +1,4 @@
+import { usePageReady } from "../lib/use-page-ready";
 import { Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { OpeningTrailsModel, OpeningTrailRound } from "@cs2dak/tactics";
@@ -15,6 +16,7 @@ import { EmptyState } from "@cs2dak/react";
  */
 
 export interface TrailsViewProps {
+  onPageReady?: (keys: string[]) => void;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   onGoLibrary: () => void;
@@ -56,7 +58,7 @@ const EFFECT_DURATION_SECONDS: Partial<Record<string, number>> = {
   decoy: 15
 };
 
-export function TrailsView({ allEntries, entries, onGoLibrary, identityOptions }: TrailsViewProps) {
+export function TrailsView({ allEntries, entries, onGoLibrary, identityOptions , onPageReady }: TrailsViewProps) {
   // 业务流程：① 选手 → ② 地图（该选手出场的图）→ ③ 最近 N 场（该选手在该图）
   const [rangeN, setRangeN] = useState<number>(5);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -158,6 +160,8 @@ export function TrailsView({ allEntries, entries, onGoLibrary, identityOptions }
     const pool = playerEntries.filter((entry) => entry.meta.mapName === mapName);
     return rangeN > 0 ? pool.slice(0, rangeN) : pool;
   }, [playerEntries, mapName, rangeN]);
+
+  usePageReady(entries.length === 0 || error !== null || (players !== null && (players.length === 0 || (selectedKey !== null && (mapOptions.length === 0 || (mapName !== null && (rangeEntries.length === 0 || models !== null)))))), onPageReady);
 
   // 为选中选手构建各场动线
   useEffect(() => {

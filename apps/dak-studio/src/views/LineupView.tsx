@@ -1,3 +1,4 @@
+import { usePageReady } from "../lib/use-page-ready";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 import { useEffect, useMemo, useState } from "react";
 import { buildLineupClusters, getMapCalibration, worldToRadar, calloutCn, type LineupCluster, type LineupClusterMode, type LineupGrenadeLike } from "@cs2dak/maps";
@@ -75,16 +76,18 @@ export function LineupView({
   onOpenMatch,
   onWatchDemo,
   onRebuild,
+  onPageReady,
 }: {
   entries: StudioDemoEntry[];
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onRebuild: (ids: string[]) => void;
+  onPageReady?: (keys: string[]) => void;
 }) {
   const [clusters, setClusters] = useState<LineupCluster[]>([]);
   const [staleIds, setStaleIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const [activeMap, setActiveMap] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -98,8 +101,12 @@ export function LineupView({
   const [copiedClusterId, setCopiedClusterId] = useState<string | null>(null);
   const [savedClusterId, setSavedClusterId] = useState<string | null>(null);
   const [savedLineups, setSavedLineups] = useState<PracticeLineup[]>([]);
+  const [savedReady, setSavedReady] = useState(false);
+  const [savedError, setSavedError] = useState<string | null>(null);
   const [savedDetailsOpen, setSavedDetailsOpen] = useState(true);
   const entryById = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);
+
+  usePageReady((entries.length === 0 || !loading) && savedReady, onPageReady);
 
   function handleClusterJump(cluster: LineupCluster) {
     const first = cluster.throws[0];
@@ -135,7 +142,13 @@ export function LineupView({
     setSavedLineups(await listPracticeLineups());
   }
 
-  useEffect(() => { void listPracticeLineups().then(setSavedLineups); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    void listPracticeLineups().then((rows) => { if (!cancelled) setSavedLineups(rows); })
+      .catch((reason) => { if (!cancelled) setSavedError(reason instanceof Error ? reason.message : String(reason)); })
+      .finally(() => { if (!cancelled) setSavedReady(true); });
+    return () => { cancelled = true; };
+  }, []);
 
   // ── 加载：分批 → 按地图分组 → 跨场聚类 ──────────────────────────────────
   useEffect(() => {
@@ -301,8 +314,10 @@ export function LineupView({
 
   // ── 渲染（空态提前返回） ──────────────────────────────────────────────
 
+  const savedErrorNotice = savedError && <div className="stu-card"><h3>已保存练习点位</h3><p className="stu-error" role="alert">读取失败：{savedError}</p></div>;
   if (error) return <div>
     <EmptyState variant="error" title="Lineup 聚类失败" hint={error} action={staleIds.length ? <button type="button" className="stu-button" onClick={() => onRebuild(staleIds)}>重建 facts</button> : undefined} />
+    {savedErrorNotice}
     {savedLineups.length > 0 && <div className="stu-card"><h3>已保存练习点位</h3>{savedLineups.map(item => <p key={item.id}>{item.label}{!item.sourceFactsRevision && " · 来源版本未知，需要核验"}</p>)}</div>}
   </div>;
   if (loading) {
@@ -314,11 +329,14 @@ export function LineupView({
   }
   if (byMap.length === 0) {
     return (
-      <EmptyState
-        variant="insufficient"
-        title="没有可聚类道具"
-        hint="需要 v3 ZIP 中的 grenades.json 才能生成道具库。"
-      />
+      <div>
+        {savedErrorNotice}
+        <EmptyState
+          variant="insufficient"
+          title="没有可聚类道具"
+          hint="需要 v3 ZIP 中的 grenades.json 才能生成道具库。"
+        />
+      </div>
     );
   }
 
@@ -340,6 +358,7 @@ export function LineupView({
 
   return (
     <div className="stu-lineup-page">
+      {savedErrorNotice}
       {savedLineups.length > 0 && (
         <details
           className="stu-card stu-lineup-saved"

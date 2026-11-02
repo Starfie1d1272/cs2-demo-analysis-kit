@@ -1,3 +1,4 @@
+import { usePageReady } from "../lib/use-page-ready";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { buildSeriesSummary } from "@cs2dak/analytics";
@@ -13,6 +14,7 @@ import { SeriesWorkspace } from "./SeriesWorkspace";
 import type { EvidenceContinuation } from "../lib/evidence-continuation";
 
 export interface MatchViewProps {
+  onPageReady?: (keys: string[]) => void;
   entries: StudioDemoEntry[];
   demoId: string | null;
   deepLink?: { roundNumber: number; tick?: number } | null;
@@ -44,21 +46,29 @@ async function loadModel(id: string): Promise<MatchWorkspaceModel> {
   return model;
 }
 
-export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceContinuation, onReturnToSource }: MatchViewProps) {
-  const activeId = demoId ?? entries[0]?.id ?? null;
+export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceContinuation, onReturnToSource, onPageReady }: MatchViewProps) {
+  const activeId = demoId;
   const activeEntry = activeId ? entries.find((entry) => entry.id === activeId) ?? null : null;
   const [loaded, setLoaded] = useState<{ id: string; model: MatchWorkspaceModel; state: MatchWorkspaceState } | null>(null);
   const model = loaded?.id === activeId ? loaded.model : null;
   const [error, setError] = useState<string | null>(null);
   const [showQa, setShowQa] = useState(false);
   const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
+  const [seriesReady, setSeriesReady] = useState(false);
+  const [seriesError, setSeriesError] = useState<string | null>(null);
   const [summaryMode, setSummaryMode] = useState(false);
   const [summary, setSummary] = useState<SeriesSummary | null>(null);
   // 50+ 场时纯下拉不可用：搜索过滤（队名/地图/日期/文件名）+ 按地图分组
   const [matchSearch, setMatchSearch] = useState("");
 
+  usePageReady(!activeId || !activeEntry || (seriesReady && (model !== null || error !== null)), onPageReady);
+
   useEffect(() => {
-    void listSeriesRecords().then(setSeriesRecords);
+    let cancelled = false;
+    void listSeriesRecords().then((rows) => { if (!cancelled) setSeriesRecords(rows); })
+      .catch((reason) => { if (!cancelled) setSeriesError(reason instanceof Error ? reason.message : String(reason)); })
+      .finally(() => { if (!cancelled) setSeriesReady(true); });
+    return () => { cancelled = true; };
   }, []);
 
   const groupedEntries = useMemo(() => {
@@ -133,6 +143,10 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     return () => { cancelled = true; };
   }, [summaryMode, activeSeries, seriesEntries]);
 
+  if (activeId && !activeEntry) {
+    return <div className="stu-view"><EmptyState variant="insufficient" title="比赛已不存在" hint="此比赛可能已从资料库删除。" action={<button type="button" className="stu-button" onClick={onGoLibrary}>返回资料库</button>} /></div>;
+  }
+
   if (entries.length === 0) {
     return (
       <div className="stu-view">
@@ -154,6 +168,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
 
   return (
     <div className="stu-view stu-view-flush">
+      {seriesError && <p className="stu-error" role="alert">读取系列赛失败：{seriesError}</p>}
       <div className="stu-context-bar">
         <span className="stu-context-label">当前比赛</span>
         {entries.length > 8 && (
