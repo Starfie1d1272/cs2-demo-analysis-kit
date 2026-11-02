@@ -1,3 +1,5 @@
+import { PlayerFindingsPanel } from "./analysis/PlayerFindingsPanel";
+import type { PlayerPageState } from "../lib/studio-page-state";
 import { Star } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DeclaredRole, PlayerMapPoolRow, PlayerMapRoleProfile, WeaponDuty } from "@cs2dak/tactics";
@@ -28,11 +30,14 @@ export interface PlayersViewProps {
   onSelectPlayer: (playerKey: string, label?: string) => void;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onOpenEvidence: OpenEvidence;
-  returnEvidenceKey?: string;
+  state: PlayerPageState;
+  onStateChange: (state: PlayerPageState) => void;
   onPageReady?: (keys: string[]) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
+  contextSummary: string;
+  onOpenMaterials: () => void;
 }
 
 const CORE_VIEW = SEASON_STAT_VIEWS.find((view) => view.key === "core")!;
@@ -62,11 +67,14 @@ export function PlayersView({
   onSelectPlayer,
   onOpenMatch,
   onOpenEvidence,
-  returnEvidenceKey,
+  state,
+  onStateChange,
   onPageReady,
   onWatchDemo,
   onGoLibrary,
-  identityOptions
+  identityOptions,
+  contextSummary,
+  onOpenMaterials
 }: PlayersViewProps) {
   const [profiles, setProfiles] = useState<PlayerSeasonProfile[] | null>(null);
   const [insights, setInsights] = useState<PlayerSeasonInsights | null>(null);
@@ -76,9 +84,10 @@ export function PlayersView({
   const [error, setError] = useState<string | null>(null);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [pinned, setPinned] = useState<PinnedPlayer | null>(null);
-  const [compareKey, setCompareKey] = useState<string | null>(null);
-  const [profileTab, setProfileTab] = useState<ProfileTab>(() => returnEvidenceKey?.startsWith("players:map-") ? "overview" : returnEvidenceKey ? "utility" : "overview");
-  const [flashMode, setFlashMode] = useState<"net" | "enemy">("net");
+  const { comparePlayerKey: compareKey, profileTab, flashMode } = state;
+  const setCompareKey = (comparePlayerKey: string | null) => onStateChange({ ...state, comparePlayerKey });
+  const setProfileTab = (profileTab: ProfileTab) => onStateChange({ ...state, profileTab });
+  const setFlashMode = (flashMode: "net" | "enemy") => onStateChange({ ...state, flashMode });
   const [roleProfiles, setRoleProfiles] = useState<PlayerMapRoleProfile[] | null>(null);
   const [mapPool, setMapPool] = useState<PlayerMapPoolRow[]>([]);
   const [mapPoolReady, setMapPoolReady] = useState(false);
@@ -152,11 +161,9 @@ export function PlayersView({
 
   useEffect(() => {
     if (!onPageReady || (!profiles && !error && entries.length > 0)) return;
-    if (returnEvidenceKey?.startsWith("players:map-") && !roleProfiles && !roleError && selected) return;
-    if (returnEvidenceKey === "players:map-pool" && !mapPoolReady && !roleError && selected) return;
-    if (returnEvidenceKey && !returnEvidenceKey.startsWith("players:map-") && !insights && !detailsError && selected) return;
+    if (selected && (profileTab === "overview" ? (!roleProfiles && !roleError || !mapPoolReady && !mapPoolError) : (profileTab === "utility" && !insights && !detailsError))) return;
     onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
-  }, [profiles, error, roleProfiles, roleError, insights, detailsError, entries.length, returnEvidenceKey, onPageReady, selected, mapPoolReady]);
+  }, [profiles, error, roleProfiles, roleError, insights, detailsError, entries.length, onPageReady, selected, mapPoolReady, mapPoolError, profileTab]);
 
   const compare = useMemo(() => {
     if (!profiles || !compareKey || compareKey === selected?.playerKey) return null;
@@ -460,6 +467,7 @@ export function PlayersView({
 
           {profileTab === "overview" && (
           <div className="stu-profile-grid">
+            {insights && <PlayerFindingsPanel insights={insights} player={selected} entries={entries} contextSummary={contextSummary} onOpenEvidence={onOpenEvidence} onOpenMaterials={onOpenMaterials} />}
             <div className="stu-card stu-card-wide" id="players:map-roles">
               <div className="stu-card-head"><h3>地图 / 位置</h3><button type="button" className="stu-button-sm" onClick={openRoleEditor}>编辑声明</button></div>
               {roleError ? <EmptyState variant="error" title="地图角色不可用" hint={roleError} /> : <PlayerMapRoleProfilePanel profile={selectedRoleProfile} onOpenEvidence={(evidence) => {
