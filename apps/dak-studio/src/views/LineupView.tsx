@@ -405,7 +405,7 @@ export function LineupView({
         >
           <summary>
             <span>已保存练习点位 · {mapDisplayName(current.mapName)}</span>
-            <small>{savedForCurrentMap.length} 个 · 已保存；重建 facts 时保留</small>
+            <small>{savedForCurrentMap.length} 个 · 更新分析数据时保留</small>
           </summary>
           {savedForCurrentMap.length > 0 ? (
             <div className="stu-chip-row">
