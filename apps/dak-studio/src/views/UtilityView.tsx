@@ -267,7 +267,7 @@ function BestFlashList({ flashes, entryByMatchId, onOpenEvidence, onWatchDemo }:
   return (
     <div className="stu-card">
       <h3>闪光候选</h3>
-      <p className="stu-muted">这里只显示有限的最佳候选，并非道具事件全集或统计分母。按单颗闪造成的敌方致盲时间排序；队友短暂被白只作为参考，不进入主榜。</p>
+      <p className="stu-muted">展示部分最佳候选，按单颗闪造成的敌方致盲时间排序；队友短暂被白作为参考，不进入主榜。</p>
       <div className="stu-evidence-list">
         {flashes.map((flash, index) => {
           const entry = entryByMatchId.get(flash.matchId);
@@ -308,7 +308,7 @@ function DamageEvidenceList({ rows, entryByMatchId, onOpenEvidence, onWatchDemo 
   return (
     <div className="stu-card">
       <h3>伤害回合候选</h3>
-      <p className="stu-muted">这里只显示有限的最佳候选，并非所有伤害回合或统计分母。</p>
+      <p className="stu-muted">展示部分最佳伤害回合候选。</p>
       <div className="stu-evidence-list">
         {rows.map((row, index) => {
           const entry = entryByMatchId.get(row.matchId);
