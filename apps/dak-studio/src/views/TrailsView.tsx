@@ -30,6 +30,7 @@ export interface TrailsViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   onGoLibrary: () => void;
+  onEditScope: () => void;
   onOpenMatch?: (entryId: string, target: { matchId: string; roundNumber: number }, rounds: OpeningTrailRound[]) => void;
   identityOptions?: IdentityOptions;
   focusPlayerKey: string | null;
@@ -73,7 +74,7 @@ const EFFECT_DURATION_SECONDS: Partial<Record<string, number>> = {
   decoy: 15
 };
 
-export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entries, onGoLibrary, onOpenMatch, identityOptions, onPageReady, focusPlayerKey, onSelectPlayer, state: pageState, onStateChange: setPageState }: TrailsViewProps) {
+export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entries, onGoLibrary, onEditScope, onOpenMatch, identityOptions, onPageReady, focusPlayerKey, onSelectPlayer, state: pageState, onStateChange: setPageState }: TrailsViewProps) {
   // 业务流程：① 选手 → ② 地图（该选手出场的图）→ ③ 最近 N 场（该选手在该图）
   const { recentMatchCount: rangeN, mapName, side } = pageState;
   const hiddenRounds = useMemo(() => new Set(pageState.hiddenRoundKeys), [pageState.hiddenRoundKeys]);
@@ -306,15 +307,13 @@ export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entri
       {selectedOption && capability.availability && <CapabilityBar availability={capability.availability} onRepair={onCapabilityRepair} />}
       {capability.error && <p role="alert">能力读取失败：{capability.error} <button type="button" className="stu-button-sm" onClick={capability.retry}>重试</button>{capability.availability && " · 显示旧版本"}</p>}
       {models && (error || analysis.status !== "ready" || modelSnapshot?.generation !== analysis.generation) && <p className="stu-muted" role="status">{error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
-      {capability.error && !models ? null : error && !models ? (
+      {entries.length === 0 && !error ? <div className="stu-compact-empty"><EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" action={<button type="button" className="stu-button-sm" onClick={onEditScope}>调整范围</button>} /></div> : capability.error && !models ? null : error && !models ? (
         <EmptyState variant="error" title="构建失败" hint={error} />
       ) : players && missingSelectedMap ? (
         <EmptyState variant="insufficient" title={`${mapName} 在当前范围没有该选手的样本`} hint="请选择其他地图，或调整范围以恢复该地图的比赛。" />
       ) : players && !selectedOption ? (
         <div className="stu-compact-empty"><EmptyState variant="insufficient" title="请选择选手" hint="选择选手和地图后查看开局动线。" /></div>
-      ) : players && rangeEntries.length > 0 && eligibleEntries?.length === 0 ? (
-        <div className="stu-compact-empty"><EmptyState variant="insufficient" title="当前范围暂无可用比赛" hint="请查看上方原因和操作。" /></div>
-      ) : players && rangeEntries.length === 0 ? (
+      ) : players && rangeEntries.length > 0 && eligibleEntries?.length === 0 && !models ? null : players && rangeEntries.length === 0 ? (
         <div className="stu-compact-empty"><EmptyState variant="insufficient" title="当前条件没有比赛样本" hint="最近场次只包含有日期的比赛；可选择全部场次或调整选手、地图与范围。" /></div>
       ) : !models || !players ? (
         <div className="stu-loading">提取 {rangeEntries.length} 场回放轨迹…</div>

@@ -1,4 +1,4 @@
-import { useCapabilityBlocked } from "../components/CapabilityBar";
+import { AnalysisScopeEmpty, useCapabilityBlocked } from "../components/CapabilityBar";
 import { EVIDENCE_FILTERS } from "../lib/analysis-display-labels";
 import { canExportSnapshot } from "../lib/analysis-export";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
@@ -158,7 +158,7 @@ export function DuelView({
       {playerSteamIds !== null && playerSteamIds.length === 0 && <p className="stu-muted">无法解析该选手的身份，无法筛选个人交火证据。</p>}
       {model && (error || analysis.status !== "ready" || snapshot?.generation !== analysis.generation) && <p className="stu-muted" role="status">{error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
       {error && <EmptyState variant="error" title="分析失败" hint={error} />}
-      {!error && entries.length === 0 && <div className="stu-compact-empty"><EmptyState variant="insufficient" title={blocked === "error" ? "分析数据暂不可用" : blocked ? "当前范围暂无可用比赛" : "聚合范围为空"} hint={blocked === "error" ? "请重试或查看上方状态。" : blocked ? "请查看上方原因和操作。" : "请调整聚合范围。"} /></div>}
+      {!error && entries.length === 0 && !blocked && <AnalysisScopeEmpty />}
       {!error && !model && entries.length > 0 && <div className="stu-loading">分析 {entries.length} 场 demo 的逐枪与伤害事件…</div>}
 
       {projected && tab === "records" && (

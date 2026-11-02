@@ -1,4 +1,4 @@
-import { useCapabilityBlocked } from "../components/CapabilityBar";
+import { AnalysisScopeEmpty, useCapabilityBlocked } from "../components/CapabilityBar";
 import { canExportSnapshot } from "../lib/analysis-export";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
@@ -80,6 +80,7 @@ function calloutName(mapName: string, place: string): string {
 
 export function LineupView({
   exportSource,
+  hasLibrary, onGoLibrary,
   entries,
   state,
   onStateChange,
@@ -89,6 +90,7 @@ export function LineupView({
   onPageReady,
 }: {
   exportSource?: AnalysisExportSource | null;
+  hasLibrary: boolean; onGoLibrary: () => void;
   entries: StudioDemoEntry[];
   state: import("../lib/analysis-theme-state").LineupsPageState;
   onStateChange: (state: import("../lib/analysis-theme-state").LineupsPageState) => void;
@@ -363,11 +365,7 @@ export function LineupView({
         {staleNotice}
         {savedErrorNotice}
         {savedLineups.length > 0 && <div className="stu-card"><h3>已保存练习点位</h3>{savedLineups.map(item => <p key={item.id}>{item.label}{!item.sourceFactsRevision && " · 来源版本未知，需要核验"}</p>)}</div>}
-        <div className="stu-compact-empty"><EmptyState
-          variant="insufficient"
-          title={blocked === "error" ? "分析数据暂不可用" : blocked ? "当前范围暂无可用比赛" : entries.length === 0 ? "聚合范围为空" : "没有可聚类道具"}
-          hint={blocked === "error" ? "请重试或查看上方状态。" : blocked ? "请查看上方原因和操作。" : entries.length === 0 ? "请调整聚合范围。" : "需要 v3 ZIP 中的 grenades.json 才能生成道具库。"}
-        /></div>
+        {entries.length === 0 ? !hasLibrary ? <div className="stu-compact-empty"><EmptyState title="还没有比赛" hint="导入比赛后，即可查看道具点位。" action={<button type="button" className="stu-button-sm" onClick={onGoLibrary}>前往比赛库</button>} /></div> : !blocked && <AnalysisScopeEmpty /> : <div className="stu-compact-empty"><EmptyState variant="insufficient" title="没有可聚类道具" hint="需要 v3 ZIP 中的 grenades.json 才能生成道具库。" /></div>}
       </div>
     );
   }
