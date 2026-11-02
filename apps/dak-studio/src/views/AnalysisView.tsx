@@ -126,10 +126,10 @@ export function AnalysisView({
   return (
     <>
       <div className="stu-header-actions">
-        <button className="stu-button" onClick={beginSave} disabled={pending}>
+        <button className="stu-button-sm" onClick={beginSave} disabled={pending}>
           保存分析
         </button>
-        <button className="stu-button" onClick={() => setShowSaved(!showSaved)}>
+        <button className="stu-button-sm" onClick={() => setShowSaved(!showSaved)}>
           已保存
         </button>
       </div>
@@ -220,9 +220,6 @@ export function AnalysisView({
           战术模式与对手侦察
         </button>
       )}
-      <p className="stu-muted">
-        阵营、经济档等局部条件只应用于设置它们的主题，切换主题时不应用于其他汇总。
-      </p>
       {children}
     </>
   );

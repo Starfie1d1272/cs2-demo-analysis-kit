@@ -12,23 +12,12 @@ export function AnalysisExportButtons({
   label?: string;
 }) {
   return (
-    <span className="stu-header-actions">
-      <button
-        type="button"
-        className="stu-button-sm"
-        disabled={disabled}
-        onClick={() => downloadAnalysisResult(capture(), "markdown")}
-      >
-        {label} · Markdown
-      </button>
-      <button
-        type="button"
-        className="stu-button-sm"
-        disabled={disabled}
-        onClick={() => downloadAnalysisResult(capture(), "json")}
-      >
-        {label} · JSON
-      </button>
-    </span>
+    <details className="stu-export-menu">
+      <summary className="stu-button-sm" aria-disabled={disabled}>{label}</summary>
+      <div className="stu-export-options">
+        <button type="button" className="stu-button-sm" disabled={disabled} onClick={() => downloadAnalysisResult(capture(), "markdown")}>Markdown</button>
+        <button type="button" className="stu-button-sm" disabled={disabled} onClick={() => downloadAnalysisResult(capture(), "json")}>JSON</button>
+      </div>
+    </details>
   );
 }
