@@ -4,6 +4,8 @@ import type { StudioDemoEntry } from "../lib/demo-entry";
 import { LineupView } from "./LineupView";
 
 export interface LineupsViewProps {
+  state: import("../lib/analysis-theme-state").LineupsPageState;
+  onStateChange: (state: import("../lib/analysis-theme-state").LineupsPageState) => void;
   onPageReady?: (keys: string[]) => void;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
@@ -13,7 +15,7 @@ export interface LineupsViewProps {
   onRebuild: (ids: string[]) => void;
 }
 
-export function LineupsView({ allEntries, entries, onOpenMatch, onWatchDemo, onGoLibrary, onRebuild, onPageReady }: LineupsViewProps) {
+export function LineupsView({ state, onStateChange, allEntries, entries, onOpenMatch, onWatchDemo, onGoLibrary, onRebuild, onPageReady }: LineupsViewProps) {
   usePageReady(allEntries.length === 0 || entries.length === 0, onPageReady);
   if (allEntries.length === 0) {
     return (
@@ -39,7 +41,7 @@ export function LineupsView({ allEntries, entries, onOpenMatch, onWatchDemo, onG
       {entries.length === 0 ? (
         <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整全局范围。" />
       ) : (
-        <LineupView onPageReady={onPageReady} onRebuild={onRebuild} entries={entries} onOpenMatch={onOpenMatch} onWatchDemo={onWatchDemo} />
+        <LineupView state={state} onStateChange={onStateChange} onPageReady={onPageReady} onRebuild={onRebuild} entries={entries} onOpenMatch={onOpenMatch} onWatchDemo={onWatchDemo} />
       )}
     </div>
   );

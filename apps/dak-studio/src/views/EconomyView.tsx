@@ -9,15 +9,17 @@ import { type IdentityOptions } from "../lib/identity";
 import type { StudioDemoEntry } from "../lib/demo-entry";
 
 export interface EconomyViewProps {
+  state: import("../lib/analysis-theme-state").EconomyPageState;
+  onStateChange: (state: import("../lib/analysis-theme-state").EconomyPageState) => void;
   onPageReady?: (keys: string[]) => void;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
-  selectedTeam?: string | null;
+  selectedTeams: string[];
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
 }
 
-export function EconomyView({ allEntries, entries, selectedTeam = null, onGoLibrary, identityOptions , onPageReady }: EconomyViewProps) {
+export function EconomyView({ state, onStateChange, allEntries, entries, selectedTeams, onGoLibrary, identityOptions , onPageReady }: EconomyViewProps) {
   const [insights, setInsights] = useState<TournamentInsights | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +33,7 @@ export function EconomyView({ allEntries, entries, selectedTeam = null, onGoLibr
     let cancelled = false;
     setInsights(null);
     setError(null);
-    getTournamentInsights(entries, identityOptions, selectedTeam ? [selectedTeam] : [])
+    getTournamentInsights(entries, identityOptions, selectedTeams)
       .then((result) => {
         if (!cancelled) setInsights(result);
       })
@@ -41,7 +43,7 @@ export function EconomyView({ allEntries, entries, selectedTeam = null, onGoLibr
     return () => {
       cancelled = true;
     };
-  }, [entries, identityOptions?.version, selectedTeam]);
+  }, [entries, identityOptions?.version, selectedTeams]);
 
   if (allEntries.length === 0) {
     return (
@@ -68,7 +70,7 @@ export function EconomyView({ allEntries, entries, selectedTeam = null, onGoLibr
       {!error && !insights && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的转化数据…</div>}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
       {insights && (
-        <EconomyDashboard insights={insights} />
+        <EconomyDashboard insights={insights} state={state} onStateChange={onStateChange} />
       )}
     </div>
   );
@@ -114,10 +116,7 @@ const TEAM_DETAIL_COLUMNS: DataTableColumn<TeamEconomySummary>[] = [
   { key: "upset", label: "小枪翻盘", title: "Eco / 半起面对长枪局的胜率", numeric: true, sortable: true, sortValue: (t) => t.smallBuyUpset.winRatePercent, heat: (t) => toneForPercent(t.smallBuyUpset.winRatePercent), render: (t) => renderPercentCell(t.smallBuyUpset.winRatePercent, t.smallBuyUpset.wins, t.smallBuyUpset.opportunities) },
 ];
 
-function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
-  const [teamTable, setTeamTable] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "rw", direction: "desc" }, page: 0 });
-  const [matrixTable, setMatrixTable] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: null, direction: "desc" }, page: 0 });
-  const [upsetTable, setUpsetTable] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: null, direction: "desc" }, page: 0 });
+function EconomyDashboard({ insights, state, onStateChange }: { insights: TournamentInsights; state: import("../lib/analysis-theme-state").EconomyPageState; onStateChange: (state: import("../lib/analysis-theme-state").EconomyPageState) => void }) {
   const bestPistol = [...insights.teamPistols].sort((a, b) => (b.winRatePercent ?? -1) - (a.winRatePercent ?? -1))[0] ?? null;
   const bestConversion = [...insights.teamPistols].sort((a, b) => (b.conversionPercent ?? -1) - (a.conversionPercent ?? -1))[0] ?? null;
   const bestBreak = [...insights.teamPistols].sort((a, b) => (b.breakRatePercent ?? -1) - (a.breakRatePercent ?? -1))[0] ?? null;
@@ -196,7 +195,7 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
               classes={STUDIO_TABLE_CLASSES}
               rows={insights.teamEconomySummaries}
               rowKey={(t) => t.teamEntityKey}
-              state={teamTable} onStateChange={setTeamTable}
+              state={state.teamDetails} onStateChange={teamDetails => onStateChange({ ...state, teamDetails })}
               columns={TEAM_DETAIL_COLUMNS}
             />
           </div>
@@ -205,7 +204,7 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
         <article className="stu-card stu-econ-card">
           <h3>经济对位胜率 · 比赛范围总体</h3>
           <DataTable
-            state={matrixTable} onStateChange={setMatrixTable}
+            state={state.economyMatrix} onStateChange={economyMatrix => onStateChange({ ...state, economyMatrix })}
             classes={STUDIO_TABLE_CLASSES}
             rows={insights.economyMatrix}
             rowKey={(r) => `${r.lowEconomy}-${r.highEconomy}`}
@@ -217,7 +216,7 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
         <article className="stu-card stu-econ-card">
           <h3>小枪翻盘排行</h3>
           <DataTable
-            state={upsetTable} onStateChange={setUpsetTable}
+            state={state.smallBuyUpsets} onStateChange={smallBuyUpsets => onStateChange({ ...state, smallBuyUpsets })}
             classes={STUDIO_TABLE_CLASSES}
             rows={insights.ecoUpsets}
             rowKey={(r) => r.teamEntityKey}

@@ -33,7 +33,6 @@ const MODE_LABEL: Record<LineupClusterMode, { label: string; hint: string }> = {
 
 const PAGE_SIZE = 20;
 const TOP_N_OPTIONS = [20, 40, 60] as const;
-type TopNOption = (typeof TOP_N_OPTIONS)[number];
 
 // ── 数据加载与 callout 解析 ──────────────────────────────────────────────────
 
@@ -74,12 +73,16 @@ function calloutName(mapName: string, place: string): string {
 
 export function LineupView({
   entries,
+  state,
+  onStateChange,
   onOpenMatch,
   onWatchDemo,
   onRebuild,
   onPageReady,
 }: {
   entries: StudioDemoEntry[];
+  state: import("../lib/analysis-theme-state").LineupsPageState;
+  onStateChange: (state: import("../lib/analysis-theme-state").LineupsPageState) => void;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onRebuild: (ids: string[]) => void;
@@ -90,15 +93,8 @@ export function LineupView({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
-  const [activeMap, setActiveMap] = useState<string | null>(null);
+  const { mapName: activeMap, grenade: typeFilter, side: sideFilter, table: tableState, radarTopN, mode: clusterMode } = state;
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [typeFilter, setTypeFilter] = useState<string | null>(null);
-  const [sideFilter, setSideFilter] = useState<"t" | "ct" | null>(null);
-  const [tableState, setTableState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "sample", direction: "desc" }, page: 0 });
-  const page = tableState.page;
-  const setPage = (page: number) => setTableState(prev => ({ ...prev, page }));
-  const [radarTopN, setRadarTopN] = useState<TopNOption>(20);
-  const [clusterMode, setClusterMode] = useState<LineupClusterMode>("strict");
   const [copiedClusterId, setCopiedClusterId] = useState<string | null>(null);
   const [savedClusterId, setSavedClusterId] = useState<string | null>(null);
   const [savedLineups, setSavedLineups] = useState<PracticeLineup[]>([]);
@@ -111,7 +107,7 @@ export function LineupView({
 
   function handleClusterJump(cluster: LineupCluster) {
     const first = cluster.throws[0];
-    if (first) onOpenMatch(first.entryId, { roundNumber: first.roundNumber, tick: first.tick });
+    if (first) { onStateChange({ ...state, selectedClusterId: cluster.id }); onOpenMatch(first.entryId, { roundNumber: first.roundNumber, tick: first.tick }); }
   }
 
   async function checkSources(cluster: LineupCluster) {
@@ -157,7 +153,6 @@ export function LineupView({
     setClusters([]);
     setError(null);
     setProgress(0);
-    setPage(0);
     if (entries.length === 0) return;
     setLoading(true);
 
@@ -342,7 +337,7 @@ export function LineupView({
   }
 
   if (activeMap && !byMap.some((group) => group.mapName === activeMap)) {
-    return <EmptyState variant="insufficient" title="所选地图没有点位" hint="当前范围中已没有该地图的点位，请重新选择地图。" action={<button type="button" className="stu-button" onClick={() => setActiveMap(null)}>返回地图列表</button>} />;
+    return <EmptyState variant="insufficient" title="所选地图没有点位" hint="当前范围中已没有该地图的点位，请重新选择地图。" action={<button type="button" className="stu-button" onClick={() => onStateChange({ ...state, mapName: null, selectedClusterId: null, table: { ...tableState, page: 0 } })}>返回地图列表</button>} />;
   }
 
   // ── 当前地图数据（byMap 非空，current 安全） ─────────────────────────
@@ -355,7 +350,7 @@ export function LineupView({
     ? current.rows.filter((r) => r.side === sideFilter)
     : current.rows;
   const radarRows = radarSideFiltered.slice(0, radarTopN);
-  const selectedCluster = hoveredId ? current.rows.find((cluster) => cluster.id === hoveredId) : undefined;
+  const selectedCluster = current.rows.find((cluster) => cluster.id === (hoveredId ?? state.selectedClusterId));
   const radarClusters = selectedCluster && !radarRows.some((cluster) => cluster.id === selectedCluster.id)
     ? [...radarRows, selectedCluster]
     : radarRows;
@@ -396,8 +391,7 @@ export function LineupView({
               className={clusterMode === mode ? "stu-chip stu-chip-active" : "stu-chip"}
               title={MODE_LABEL[mode].hint}
               onClick={() => {
-                setClusterMode(mode);
-                setPage(0);
+                onStateChange({ ...state, mode, selectedClusterId: null, table: { ...tableState, page: 0 } });
               }}
             >
               {MODE_LABEL[mode].label}
@@ -418,8 +412,7 @@ export function LineupView({
                   group.mapName === current.mapName ? "stu-chip stu-chip-active" : "stu-chip"
                 }
                 onClick={() => {
-                  setActiveMap(group.mapName);
-                  setPage(0);
+                  onStateChange({ ...state, mapName: group.mapName, selectedClusterId: null, table: { ...tableState, page: 0 } });
                 }}
               >
                 {mapDisplayName(group.mapName)} · {group.rows.length}
@@ -434,8 +427,7 @@ export function LineupView({
               type="button"
               className={typeFilter === null ? "stu-chip stu-chip-active" : "stu-chip"}
               onClick={() => {
-                setTypeFilter(null);
-                setPage(0);
+                onStateChange({ ...state, grenade: null, selectedClusterId: null, table: { ...tableState, page: 0 } });
               }}
             >
               全部
@@ -446,8 +438,7 @@ export function LineupView({
                 type="button"
                 className={typeFilter === type ? "stu-chip stu-chip-active" : "stu-chip"}
                 onClick={() => {
-                  setTypeFilter(typeFilter === type ? null : type);
-                  setPage(0);
+                  onStateChange({ ...state, grenade: typeFilter === type ? null : type, selectedClusterId: null, table: { ...tableState, page: 0 } });
                 }}
               >
                 {GRENADE_LABEL[type] ?? type}
@@ -462,7 +453,7 @@ export function LineupView({
             role="tab"
             aria-selected={sideFilter === null}
             className={sideFilter === null ? "stu-chip stu-chip-active" : "stu-chip"}
-            onClick={() => { setSideFilter(null); setPage(0); }}
+            onClick={() => { onStateChange({ ...state, side: null, selectedClusterId: null, table: { ...tableState, page: 0 } }); }}
           >
             全部
           </button>
@@ -471,7 +462,7 @@ export function LineupView({
             role="tab"
             aria-selected={sideFilter === "t"}
             className={sideFilter === "t" ? "stu-chip stu-chip-active" : "stu-chip"}
-            onClick={() => { setSideFilter("t"); setPage(0); }}
+            onClick={() => { onStateChange({ ...state, side: "t", selectedClusterId: null, table: { ...tableState, page: 0 } }); }}
           >
             T · {current.rows.filter((r) => r.side === "t").length}
           </button>
@@ -480,7 +471,7 @@ export function LineupView({
             role="tab"
             aria-selected={sideFilter === "ct"}
             className={sideFilter === "ct" ? "stu-chip stu-chip-active" : "stu-chip"}
-            onClick={() => { setSideFilter("ct"); setPage(0); }}
+            onClick={() => { onStateChange({ ...state, side: "ct", selectedClusterId: null, table: { ...tableState, page: 0 } }); }}
           >
             CT · {current.rows.filter((r) => r.side === "ct").length}
           </button>
@@ -494,7 +485,7 @@ export function LineupView({
               role="radio"
               aria-checked={radarTopN === value}
               className={radarTopN === value ? "stu-chip stu-chip-active" : "stu-chip"}
-              onClick={() => setRadarTopN(value)}
+              onClick={() => onStateChange({ ...state, radarTopN: value })}
             >
               Top {value}
             </button>
@@ -603,7 +594,7 @@ export function LineupView({
             rows={sideFilteredRows}
             rowKey={(c) => c.id}
                         pageSize={PAGE_SIZE}
-            state={tableState} onStateChange={setTableState}
+            state={tableState} onStateChange={table => onStateChange({ ...state, table })}
             paginationInfo={(total) => `${total} 条`}
             rowProps={(cluster) => ({
               className: hoveredId === cluster.id ? "stu-lineup-row-hovered" : "",

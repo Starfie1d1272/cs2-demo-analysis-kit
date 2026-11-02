@@ -14,14 +14,16 @@ import { type IdentityOptions } from "../lib/identity";
 import { formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import { EvidenceActions } from "../components/EvidenceActions";
 import type { OpenEvidence } from "../lib/evidence-continuation";
+import { projectUtilityPlayer } from "../lib/analysis-view-projections";
 
 export interface UtilityViewProps {
   state: import("../lib/studio-page-state").UtilityPageState;
   onStateChange: (state: import("../lib/studio-page-state").UtilityPageState) => void;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
-  selectedTeam?: string | null;
-  onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  selectedTeams: string[];
+  playerFocus: { playerKey: string; steamIds: readonly string[] } | null;
+  onGoLineups: () => void;
   onOpenEvidence: OpenEvidence;
   onPageReady?: (keys: string[]) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
@@ -95,7 +97,7 @@ const SMOKE_COLUMNS: DataTableColumn<UtilityValueRow>[] = [
   { key: "smokesPerRound", label: "烟/回合", numeric: true, sortable: true, sortValue: (r) => r.smokesPerRound, format: (r) => fmt(r.smokesPerRound, 3) },
 ];
 
-export function UtilityView({ state, onStateChange, allEntries, entries, selectedTeam = null, onOpenMatch, onOpenEvidence, onWatchDemo, onGoLibrary, identityOptions, onPageReady }: UtilityViewProps) {
+export function UtilityView({ state, onStateChange, playerFocus, onGoLineups, allEntries, entries, selectedTeams, onOpenEvidence, onWatchDemo, onGoLibrary, identityOptions, onPageReady }: UtilityViewProps) {
   const [summary, setSummary] = useState<UtilityValueSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
@@ -113,7 +115,7 @@ export function UtilityView({ state, onStateChange, allEntries, entries, selecte
     let cancelled = false;
     setSummary(null);
     setError(null);
-    getSeasonSummary(entries, identityOptions, selectedTeam ? [selectedTeam] : [])
+    getSeasonSummary(entries, identityOptions, selectedTeams)
       .then((season) => getUtilityValueSummary(
         entries,
         season.profiles.map((profile) => ({
@@ -122,7 +124,7 @@ export function UtilityView({ state, onStateChange, allEntries, entries, selecte
           steamIds: profile.steamIds,
         })),
         identityOptions,
-        selectedTeam ? [selectedTeam] : [],
+        selectedTeams,
       ))
       .then((next) => {
         if (!cancelled) setSummary(next);
@@ -131,7 +133,10 @@ export function UtilityView({ state, onStateChange, allEntries, entries, selecte
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
       });
     return () => { cancelled = true; };
-  }, [entries, identityOptions?.version, selectedTeam]);
+  }, [entries, identityOptions?.version, selectedTeams]);
+
+  const visibleSummary = useMemo(() => summary && playerFocus ? projectUtilityPlayer(summary, playerFocus.steamIds.length ? playerFocus.playerKey : "") : summary, [summary, playerFocus]);
+  const openEvidence: OpenEvidence = request => { onStateChange({ ...state, selectedEvidenceKey: request.sourceKey ?? null }); onOpenEvidence(request); };
 
   if (allEntries.length === 0) {
     return (
@@ -152,35 +157,37 @@ export function UtilityView({ state, onStateChange, allEntries, entries, selecte
         <div>
           <h1>道具价值</h1>
           <p>按回合和投掷数归一：闪光看敌方致盲时间，HE/火看敌方伤害，烟只看每回合投入；不把关联数据表述为对胜负的因果贡献。</p>
+          <button type="button" className="stu-button-sm" onClick={onGoLineups}>查看道具点位</button>
+          {playerFocus && <p>选手行与具备身份的候选按焦点筛选；队伍榜显示比赛范围内的队伍上下文。{playerFocus.steamIds.length === 0 && "无法解析该选手的身份。"}</p>}
         </div>
       </header>
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && !summary && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的道具数据…</div>}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
-      {summary && (
+      {visibleSummary && (
         <div className="stu-utility-stack">
           <UtilitySection
             title="HE 伤害"
-            player={<UtilityTable tableState={state.tables.hePlayers} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, hePlayers: table } })} title="选手榜" rows={summary.players.filter((row) => row.heThrows > 0)} columns={HE_COLUMNS} initialSortKey="heDamagePerThrow" empty="当前范围内没有 HE 手雷伤害数据。" pageSize={10} />}
-            team={<UtilityTable tableState={state.tables.heTeams} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, heTeams: table } })} title="队伍榜" rows={summary.teams.filter((row) => row.heThrows > 0)} columns={HE_COLUMNS} initialSortKey="heDamagePerThrow" empty="当前范围内没有队伍 HE 手雷伤害数据。" pageSize={10} />}
+            player={<UtilityTable tableState={state.tables.hePlayers} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, hePlayers: table } })} title="选手榜" rows={visibleSummary.players.filter((row) => row.heThrows > 0)} columns={HE_COLUMNS} initialSortKey="heDamagePerThrow" empty="当前范围内没有 HE 手雷伤害数据。" pageSize={10} />}
+            team={<UtilityTable tableState={state.tables.heTeams} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, heTeams: table } })} title="队伍榜" rows={visibleSummary.teams.filter((row) => row.heThrows > 0)} columns={HE_COLUMNS} initialSortKey="heDamagePerThrow" empty="当前范围内没有队伍 HE 手雷伤害数据。" pageSize={10} />}
           />
           <UtilitySection
             title="火焰伤害"
-            player={<UtilityTable tableState={state.tables.firePlayers} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, firePlayers: table } })} title="选手榜" rows={summary.players.filter((row) => row.fireThrows > 0)} columns={FIRE_COLUMNS} initialSortKey="fireDamagePerThrow" empty="当前范围内没有火伤害数据。" pageSize={10} />}
-            team={<UtilityTable tableState={state.tables.fireTeams} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, fireTeams: table } })} title="队伍榜" rows={summary.teams.filter((row) => row.fireThrows > 0)} columns={FIRE_COLUMNS} initialSortKey="fireDamagePerThrow" empty="当前范围内没有队伍火伤害数据。" pageSize={10} />}
+            player={<UtilityTable tableState={state.tables.firePlayers} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, firePlayers: table } })} title="选手榜" rows={visibleSummary.players.filter((row) => row.fireThrows > 0)} columns={FIRE_COLUMNS} initialSortKey="fireDamagePerThrow" empty="当前范围内没有火伤害数据。" pageSize={10} />}
+            team={<UtilityTable tableState={state.tables.fireTeams} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, fireTeams: table } })} title="队伍榜" rows={visibleSummary.teams.filter((row) => row.fireThrows > 0)} columns={FIRE_COLUMNS} initialSortKey="fireDamagePerThrow" empty="当前范围内没有队伍火伤害数据。" pageSize={10} />}
           />
           <UtilitySection
             title="闪光"
-            player={<UtilityTable tableState={state.tables.flashPlayers} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, flashPlayers: table } })} title="选手榜" rows={summary.players.filter((row) => row.flashesThrown > 0)} columns={FLASH_COLUMNS} initialSortKey="enemyBlindSecondsPerRound" empty="当前范围内没有闪光数据。" pageSize={10} />}
-            team={<UtilityTable tableState={state.tables.flashTeams} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, flashTeams: table } })} title="队伍榜" rows={summary.teams.filter((row) => row.flashesThrown > 0)} columns={FLASH_COLUMNS} initialSortKey="enemyBlindSecondsPerRound" empty="当前范围内没有队伍闪光数据。" pageSize={10} />}
+            player={<UtilityTable tableState={state.tables.flashPlayers} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, flashPlayers: table } })} title="选手榜" rows={visibleSummary.players.filter((row) => row.flashesThrown > 0)} columns={FLASH_COLUMNS} initialSortKey="enemyBlindSecondsPerRound" empty="当前范围内没有闪光数据。" pageSize={10} />}
+            team={<UtilityTable tableState={state.tables.flashTeams} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, flashTeams: table } })} title="队伍榜" rows={visibleSummary.teams.filter((row) => row.flashesThrown > 0)} columns={FLASH_COLUMNS} initialSortKey="enemyBlindSecondsPerRound" empty="当前范围内没有队伍闪光数据。" pageSize={10} />}
           />
           <UtilitySection
             title="烟雾"
-            player={<UtilityTable tableState={state.tables.smokePlayers} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, smokePlayers: table } })} title="选手榜" rows={summary.players.filter((row) => row.smokesThrown > 0)} columns={SMOKE_COLUMNS} initialSortKey="smokesPerRound" empty="当前范围内没有烟雾数据。" pageSize={10} />}
-            team={<UtilityTable tableState={state.tables.smokeTeams} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, smokeTeams: table } })} title="队伍榜" rows={summary.teams.filter((row) => row.smokesThrown > 0)} columns={SMOKE_COLUMNS} initialSortKey="smokesPerRound" empty="当前范围内没有队伍烟雾数据。" pageSize={10} />}
+            player={<UtilityTable tableState={state.tables.smokePlayers} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, smokePlayers: table } })} title="选手榜" rows={visibleSummary.players.filter((row) => row.smokesThrown > 0)} columns={SMOKE_COLUMNS} initialSortKey="smokesPerRound" empty="当前范围内没有烟雾数据。" pageSize={10} />}
+            team={<UtilityTable tableState={state.tables.smokeTeams} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, smokeTeams: table } })} title="队伍榜" rows={visibleSummary.teams.filter((row) => row.smokesThrown > 0)} columns={SMOKE_COLUMNS} initialSortKey="smokesPerRound" empty="当前范围内没有队伍烟雾数据。" pageSize={10} />}
           />
-          <BestFlashList flashes={summary.bestFlashes.slice(0, 12)} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} onOpenEvidence={onOpenEvidence} onWatchDemo={onWatchDemo} />
-          <DamageEvidenceList rows={summary.bestDamageRounds} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} onOpenEvidence={onOpenEvidence} onWatchDemo={onWatchDemo} />
+          <BestFlashList flashes={visibleSummary.bestFlashes.slice(0, 12)} entryByMatchId={entryByMatchId} onOpenEvidence={openEvidence} onWatchDemo={onWatchDemo} />
+          <DamageEvidenceList rows={visibleSummary.bestDamageRounds} entryByMatchId={entryByMatchId} onOpenEvidence={openEvidence} onWatchDemo={onWatchDemo} />
         </div>
       )}
     </div>
@@ -232,10 +239,9 @@ function UtilityTable({ title, rows, columns, initialSortKey, empty, pageSize, t
   );
 }
 
-function BestFlashList({ flashes, entryByMatchId, onOpenMatch, onOpenEvidence, onWatchDemo }: {
+function BestFlashList({ flashes, entryByMatchId, onOpenEvidence, onWatchDemo }: {
   flashes: BestFlash[];
   entryByMatchId: Map<string, StudioDemoEntry>;
-  onOpenMatch: UtilityViewProps["onOpenMatch"];
   onOpenEvidence: UtilityViewProps["onOpenEvidence"];
   onWatchDemo?: UtilityViewProps["onWatchDemo"];
 }) {
@@ -274,10 +280,9 @@ function BestFlashList({ flashes, entryByMatchId, onOpenMatch, onOpenEvidence, o
   );
 }
 
-function DamageEvidenceList({ rows, entryByMatchId, onOpenMatch, onOpenEvidence, onWatchDemo }: {
+function DamageEvidenceList({ rows, entryByMatchId, onOpenEvidence, onWatchDemo }: {
   rows: UtilityDamageEvidence[];
   entryByMatchId: Map<string, StudioDemoEntry>;
-  onOpenMatch: UtilityViewProps["onOpenMatch"];
   onOpenEvidence: UtilityViewProps["onOpenEvidence"];
   onWatchDemo?: UtilityViewProps["onWatchDemo"];
 }) {
