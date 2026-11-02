@@ -1,4 +1,4 @@
-import { buildPlayerMapRoleProfiles, buildTeamMapRoleMatrices, buildTeamComparisonFromFacts, buildTeamOverviewFromFacts } from "@cs2dak/analytics";
+import { buildTeamComparisonFromFacts, buildTeamOverviewFromFacts } from "@cs2dak/analytics";
 import { type TeamComparisonModel, type TeamOverviewModel } from "@cs2dak/presentation";
 import { createAnalysisBucket, cachedQuery, readPersistedValue, writePersistedValue } from "./query-cache";
 import { assertCurrentFacts } from "../facts-readiness";
@@ -8,7 +8,6 @@ import { matchIdForEntry, type StudioDemoEntry } from "../demo-entry";
 import type { IdentityOptions } from "../identity";
 import { keyOf, missingFactsError, withTeamRenames } from "./query-scope";
 const SMALL_CACHE_LIMIT = 3;
-import { getMapRoleEvidence } from "./spatial-queries";
 
 const teamComparisonCache = createAnalysisBucket<TeamComparisonModel>();
 const teamOverviewCache = createAnalysisBucket<TeamOverviewModel | null>();
@@ -35,16 +34,14 @@ export async function getTeamComparison(entries: StudioDemoEntry[], identity?: I
 
 /** 队伍对象页：从可重建 comparison facts 编排摘要，不在页面层重新解析 ZIP。 */
 export async function getTeamOverview(entries: StudioDemoEntry[], teamName: string, identity?: IdentityOptions): Promise<TeamOverviewModel | null> {
-  const key = `${keyOf(entries, identity?.version)}:team-overview-v2:${teamName}`;
+  const key = `${keyOf(entries, identity?.version)}:team-overview-v3:${teamName}`;
   return cachedQuery(teamOverviewCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), async (generation) => {
     const persisted = await readPersistedValue<TeamOverviewModel | null>(key, generation);
     if (persisted !== undefined) return persisted;
     const matchIds = entries.map(matchIdForEntry);
     const facts = withTeamRenames(await getDerivedCacheStore().getTeamComparison({ matchIds }), identity?.teamRenames);
     if (facts.length < entries.length) throw missingFactsError("队伍总览");
-    const roleEvidence = await getMapRoleEvidence(entries, identity);
-    const matrices = buildTeamMapRoleMatrices(roleEvidence.teamEvidence, buildPlayerMapRoleProfiles(roleEvidence.playerEvidence));
-    const overview = buildTeamOverviewFromFacts(facts, teamName, matrices);
+    const overview = buildTeamOverviewFromFacts(facts, teamName);
     await writePersistedValue(key, overview, generation);
     return overview;
   });
