@@ -143,5 +143,5 @@ export function PlayerMapPoolPanel({ rows, onOpenEvidence, state, onStateChange 
     { key: "quality", label: "位置样本 / 置信度", format: (row) => row.roleMatchCount ? `${row.roleMatchCount} 场 · ${Math.round(row.sampleQuality * 100)}% / ${Math.round(row.confidence * 100)}%` : "0 场 · —" },
     { key: "evidence", label: "证据", render: (row) => <Evidence evidence={row.evidence} onOpenEvidence={onOpenEvidence} /> },
   ];
-  return rows.length ? <div className="dak-table-scroll"><DataTable classes={DAK_TABLE_CLASSES} rows={rows} rowKey={(row) => row.mapName} columns={columns} state={tableState} onStateChange={setTableState} /></div> : <EmptyState variant="insufficient" title="地图池样本不足" hint="当前选手没有可聚合的地图级 facts。" />;
+  return rows.length ? <div className="dak-table-scroll"><DataTable classes={DAK_TABLE_CLASSES} rows={rows} rowKey={(row) => row.mapName} columns={columns} state={tableState} onStateChange={setTableState} /></div> : <EmptyState variant="insufficient" title="地图池样本不足" hint="当前选手暂无可用的地图比赛数据。" />;
 }

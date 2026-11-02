@@ -58,7 +58,7 @@ async function roleGroups(entries: StudioDemoEntry[], identity?: IdentityOptions
       const unbound = original.teamEntityKeys[slot] === `observed-team:${fact.matchId}:${slot}`;
       const collision = unbound && renamed[i]!.teams.teamA === renamed[i]!.teams.teamB;
       const scope: RoleTeamGroup["scopes"][number] = collision
-        ? { label: `${name} · ${fact.mapName} · ${fact.matchId} · ${slot === "teamA" ? "A" : "B"} 方`, teamScope: { kind: "observation", matchId: fact.matchId, slot } }
+        ? { label: fact.teams[slot], teamScope: { kind: "observation", matchId: fact.matchId, slot } }
         : unbound ? { label: name, teamKey: name }
         : { label: name, teamScope: { kind: "entity", key } };
       if (!group.scopes.some(item => JSON.stringify([item.teamKey, item.teamScope]) === JSON.stringify([scope.teamKey, scope.teamScope]))) group.scopes.push(scope);
