@@ -1,7 +1,8 @@
+import type { PatternExplorerState } from "../../lib/pattern-page-state";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../../lib/queries/query-cache";
 import { createReplayViewState, normalizeReplayViewState, type ReplayViewState } from "@cs2dak/presentation";
 import { STUDIO_TABLE_CLASSES } from "../../components/table-styles";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject, type Dispatch, type SetStateAction } from "react";
 import type { MatchWorkspaceModel } from "@cs2dak/presentation";
 import { ReplayViewer } from "@cs2dak/react/replay";
 import { economyLabelCn, formatClockSeconds, ECONOMY_ENTRY_CN, formatEntryEvidenceLabel, formatTacticalClusterShortName } from "@cs2dak/presentation";
@@ -15,6 +16,8 @@ import { type StudioDemoEntry } from "../../lib/demo-entry.js";
 import { MetricInfo, EvidenceLink, DataTable, type DataTableColumn } from "@cs2dak/react";
 
 export interface PatternExplorerProps {
+  state: PatternExplorerState;
+  onStateChange: Dispatch<SetStateAction<PatternExplorerState>>;
   clusters: TacticalCluster[];
   facts: TacticalRoundFact[];
   entryByMatchId: Map<string, StudioDemoEntry>;
@@ -25,21 +28,12 @@ export interface PatternExplorerProps {
   replayModelCache?: Map<string, MatchWorkspaceModel>;
 }
 
-export function resolveEconomyFilter(
-  requested: EconomyEntry | "all",
-  available: readonly EconomyEntry[],
-): EconomyEntry | "all" {
-  if (requested === "all" || available.includes(requested)) return requested;
-  return available[0] ?? "all";
-}
-
-export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, onWatchDemo, onAddToPlaylist, replayModelCache }: PatternExplorerProps) {
-  // 顶部视角切换：T 进攻语境 / CT 防守语境分开看，避免两个 side 的簇混在一列。
-  const [side, setSide] = useState<"t" | "ct">("t");
-  // 一级经济入口筛选：手枪/长枪/Anti-eco/强起/半起/Eco，默认看长枪局。
-  const [econ, setEcon] = useState<EconomyEntry | "all">("gun");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedEvidenceKey, setSelectedEvidenceKey] = useState<string | null>(null);
+export function PatternExplorer({ state, onStateChange, clusters, facts, entryByMatchId, onOpenMatch, onWatchDemo, onAddToPlaylist, replayModelCache }: PatternExplorerProps) {
+  const { mapName, side, economyEntry: econ, clusterId: selectedId, selectedFactKey: selectedEvidenceKey } = state;
+  const maps = useMemo(() => [...new Set(clusters.map(c => c.mapName))].sort(), [clusters]);
+  const setSide = (side: "t" | "ct") => onStateChange(current => ({ ...current, side, clusterId: null, selectedFactKey: null }));
+  const setEcon = (economyEntry: EconomyEntry | "all") => onStateChange(current => ({ ...current, economyEntry, clusterId: null, selectedFactKey: null }));
+  const setSelectedEvidenceKey = (selectedFactKey: string | null) => onStateChange(current => ({ ...current, selectedFactKey }));
   const localReplayCache = useRef(new Map<string, MatchWorkspaceModel>());
   const replayCache = replayModelCache ?? localReplayCache.current;
   const replayMainRef = useRef<HTMLDivElement | null>(null);
@@ -50,16 +44,16 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
     ct: clusters.filter((c) => c.side === "ct").length,
   }), [clusters]);
 
-  // 当前 side 下实际出现的经济入口（用于只渲染有数据的筛选项）。
+  // 保留当前所选经济档，即使新数据里没有样本。
   const econOptions = useMemo(() => {
     const present = new Set(clusters.filter((c) => c.side === side).map((c) => c.economyEntry));
-    return (["pistol", "gun", "anti_eco", "force", "semi", "eco"] as EconomyEntry[]).filter((e) => present.has(e));
-  }, [clusters, side]);
-  const effectiveEcon = resolveEconomyFilter(econ, econOptions);
+    return (["pistol", "gun", "anti_eco", "force", "semi", "eco"] as EconomyEntry[]).filter((e) => present.has(e) || e === econ);
+  }, [clusters, side, econ]);
+  const effectiveEcon = econ;
 
   const visibleClusters = useMemo(
-    () => clusters.filter((c) => c.side === side && (effectiveEcon === "all" || c.economyEntry === effectiveEcon)),
-    [clusters, side, effectiveEcon]
+    () => clusters.filter((c) => c.side === side && (mapName === null || c.mapName === mapName) && (effectiveEcon === "all" || c.economyEntry === effectiveEcon)),
+    [clusters, side, mapName, effectiveEcon]
   );
 
   // 双层分组：大分类（打A/打B…）→ 小聚类（具体站位/结构）。
@@ -73,9 +67,9 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
     return [...groups.entries()];
   }, [visibleClusters]);
 
-  // 选中项必须属于当前 side；切换 side 或数据变化后回退到首个可见簇。
+  // 初次进入可展示首项；已选择的模式失效时不切换到其他模式。
   const selected = useMemo(
-    () => visibleClusters.find((c) => c.id === selectedId) ?? visibleClusters[0] ?? null,
+    () => selectedId === null ? visibleClusters[0] ?? null : visibleClusters.find((c) => c.id === selectedId) ?? null,
     [visibleClusters, selectedId]
   );
 
@@ -88,7 +82,7 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
     );
   }, [selected, facts]);
   const activeFact = useMemo(
-    () => selectedFacts.find((fact) => evidenceKey(fact) === selectedEvidenceKey) ?? selectedFacts[0] ?? null,
+    () => selectedEvidenceKey === null ? selectedFacts[0] ?? null : selectedFacts.find((fact) => evidenceKey(fact) === selectedEvidenceKey) ?? null,
     [selectedFacts, selectedEvidenceKey]
   );
 
@@ -111,6 +105,9 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
 
   return (
     <div className="stu-pe-shell">
+      <label>地图 <select className="stu-select" value={mapName ?? ""} onChange={event => onStateChange(current => ({ ...current, mapName: event.target.value || null, clusterId: null, selectedFactKey: null }))}>
+        <option value="">全部地图</option>{maps.map(map => <option key={map} value={map}>{map}</option>)}
+      </select></label>
       <div className="stu-subtabs stu-pe-econ-filter" role="tablist" aria-label="经济入口筛选">
         <button
           type="button"
@@ -156,10 +153,11 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
       </div>
       {visibleClusters.length === 0 ? (
         <div className="stu-coach-pattern-explorer stu-empty">
-          该视角下暂无聚类（{side === "t" ? "T" : "CT"} 方）。切换到另一视角，或导入更多 demo。
+          当前经济条件暂无样本。该视角下暂无聚类（{side === "t" ? "T" : "CT"} 方）。切换到另一视角，或导入更多 demo。
         </div>
       ) : (
         <div className="stu-coach-pattern-explorer">
+          {selectedId !== null && !selected && <div className="stu-notice" role="status">所选模式已不可用，请重新选择。</div>}
           {/* 左栏：大分类 → 小聚类双层列表 */}
           <aside className="stu-pe-list" style={replayHeight ? { height: replayHeight } : undefined}>
             {groupedClusters.map(([category, cats]) => (
@@ -171,8 +169,7 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
                     type="button"
                     className={c.id === selected?.id ? "stu-pe-cluster stu-pe-cluster-active" : "stu-pe-cluster"}
                     onClick={() => {
-                      setSelectedId(c.id);
-                      setSelectedEvidenceKey(null);
+                      onStateChange(current => ({ ...current, clusterId: c.id, selectedFactKey: null, evidenceTable: { ...current.evidenceTable, page: 0 } }));
                     }}
                   >
                     <span className="stu-pe-cluster-name">
@@ -189,7 +186,7 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
           </aside>
 
           {/* 中栏：常驻统一回放。模式与证据选择只改变它的当前回合。 */}
-          <CoachReplayStage fact={activeFact} entryByMatchId={entryByMatchId} cache={replayCache} mainRef={replayMainRef} />
+          <CoachReplayStage fact={activeFact} entryByMatchId={entryByMatchId} cache={replayCache} mainRef={replayMainRef} savedSource={state.replaySource} savedReplay={state.replay} onReplayChange={(replaySource, replay) => onStateChange(current => ({ ...current, replaySource, replay }))} />
 
           {/* 右栏：数据摘要 + 证据回合 */}
           <div className="stu-pe-detail">
@@ -198,6 +195,8 @@ export function PatternExplorer({ clusters, facts, entryByMatchId, onOpenMatch, 
                 <ClusterSummary cluster={selected} facts={selectedFacts} />
                 <EvidenceTable
                   cluster={selected}
+                  tableState={state.evidenceTable}
+                  onTableStateChange={evidenceTable => onStateChange(current => ({ ...current, evidenceTable }))}
                   facts={selectedFacts}
                   entryByMatchId={entryByMatchId}
                   activeFact={activeFact}
@@ -231,8 +230,11 @@ async function loadReplayModel(demoId: string | null, cache: Map<string, MatchWo
 }
 
 /** 教练页常驻回放主画布：只按当前证据的 matchId 懒加载单场 workspace。 */
-function CoachReplayStage({ fact, entryByMatchId, cache, mainRef }: {
+function CoachReplayStage({ fact, entryByMatchId, cache, mainRef, savedSource, savedReplay, onReplayChange }: {
   fact: TacticalRoundFact | null;
+  savedSource: string | null;
+  savedReplay: ReplayViewState | null;
+  onReplayChange: (source: string, state: ReplayViewState) => void;
   entryByMatchId: Map<string, StudioDemoEntry>;
   cache: Map<string, MatchWorkspaceModel>;
   mainRef?: RefObject<HTMLDivElement | null>;
@@ -247,17 +249,21 @@ function CoachReplayStage({ fact, entryByMatchId, cache, mainRef }: {
   );
   const [error, setError] = useState<string | null>(null);
   const model = loaded?.matchId === matchId && loaded.generation === analysis.generation && analysis.status === "ready" && entryId ? loaded.model : null;
-  const [replayState, setReplayState] = useState<ReplayViewState | null>(null);
-  const replayMatchId = useRef<string | null>(null);
+  const [replay, setReplay] = useState<{ source: string; matchId: string; state: ReplayViewState } | null>(null);
+  const source = fact ? evidenceKey(fact) : null;
   useEffect(() => {
     if (analysis.status !== "ready") return;
-    if (!model || !fact) { replayMatchId.current = null; setReplayState(null); return; }
+    if (!model || !fact || !source) { setReplay(null); return; }
     const round = model.replay.rounds.find(r => r.roundNumber === fact.roundNumber);
     const initial = createReplayViewState(model.replay, model.map.view);
-    const sameMatch = replayMatchId.current === fact.matchId;
-    replayMatchId.current = fact.matchId;
-    setReplayState(previous => round && initial ? normalizeReplayViewState(model.replay, model.map.view, { ...(sameMatch && previous ? previous : initial), roundNumber: round.roundNumber, tick: round.freezeEndTick + 20 * (model.replay.tickrate ?? 64), playing: false }) : null);
-  }, [model, fact?.matchId, fact?.roundNumber, analysis.status]);
+    setReplay(previous => {
+      const state = round && initial ? normalizeReplayViewState(model.replay, model.map.view, {
+        ...(savedSource === source && savedReplay ? savedReplay : previous?.matchId === fact.matchId ? previous.state : initial),
+        roundNumber: round.roundNumber, tick: savedSource === source && savedReplay ? savedReplay.tick : round.freezeEndTick + 20 * (model.replay.tickrate ?? 64), playing: false,
+      }) : null;
+      return state ? { source, matchId: fact.matchId, state } : null;
+    });
+  }, [model, fact?.matchId, fact?.roundNumber, source, analysis.status]);
 
   useEffect(() => {
     let cancelled = false;
@@ -275,7 +281,7 @@ function CoachReplayStage({ fact, entryByMatchId, cache, mainRef }: {
     return () => { cancelled = true; };
   }, [matchId, entryId, cache, analysis.generation, analysis.status]);
 
-  if (!fact) return <div ref={mainRef} className="stu-pe-replay-main stu-pe-radar-empty">该模式没有可用证据回合。</div>;
+  if (!fact) return <div ref={mainRef} className="stu-pe-replay-main stu-pe-radar-empty">所选回合不可用，请从证据回合中重新选择。</div>;
   const entry = entryByMatchId.get(fact.matchId);
   const label = entry
     ? `${entry.meta.teamAName} vs ${entry.meta.teamBName} · R${fact.roundNumber}`
@@ -284,7 +290,7 @@ function CoachReplayStage({ fact, entryByMatchId, cache, mainRef }: {
   return (
     <div ref={mainRef} className="stu-pe-replay-main">
       <div className="stu-pe-replay-bar">
-        <span className="stu-pe-replay-kicker">代表回合</span>
+        <span className="stu-pe-replay-kicker">示例回合</span>
         <span className="stu-pe-replay-label">{label}</span>
       </div>
       {error ? (
@@ -293,13 +299,15 @@ function CoachReplayStage({ fact, entryByMatchId, cache, mainRef }: {
         <div className="stu-loading">读取本地回放…</div>
       ) : !model.replay.available || !model.replay.rounds.some(r => r.roundNumber === fact.roundNumber) ? (
         <div className="stu-pe-radar-empty">本场导出未附带 2D 回放流。</div>
+      ) : replay?.source !== source ? (
+        <div className="stu-loading">准备示例回合…</div>
       ) : (
         <div className="stu-pe-replay-frame">
           <ReplayViewer
             replay={model.replay}
             map={model.map.view}
-            state={replayMatchId.current === matchId ? replayState : null}
-            onStateChange={setReplayState}
+            state={replay.state}
+            onStateChange={(state) => { if (!state || !source) return; setReplay(current => current?.source === source ? { ...current, state } : current); onReplayChange(source, { ...state, playing: false }); }}
           />
         </div>
       )}
@@ -467,6 +475,7 @@ function buildUtilityLanding(facts: TacticalRoundFact[], mapName: string) {
 }
 
 function EvidenceTable({
+  tableState, onTableStateChange,
   cluster,
   facts,
   entryByMatchId,
@@ -477,6 +486,8 @@ function EvidenceTable({
   onAddToPlaylist,
 }: {
   cluster: TacticalCluster;
+  tableState: import("@cs2dak/presentation").TableState;
+  onTableStateChange: (state: import("@cs2dak/presentation").TableState) => void;
   facts: TacticalRoundFact[];
   entryByMatchId: Map<string, StudioDemoEntry>;
   activeFact: TacticalRoundFact | null;
@@ -486,10 +497,6 @@ function EvidenceTable({
   onAddToPlaylist?: (cluster: TacticalCluster, fact: TacticalRoundFact) => void;
 }) {
   const PAGE_SIZE = 12;
-  const [tableState, setTableState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: null, direction: "desc" }, page: 0 });
-  const page = tableState.page;
-  const setPage = (page: number) => setTableState(prev => ({ ...prev, page }));
-  useEffect(() => { setPage(0); }, [cluster.id]);
 
   // 预建 fact 查找表，避免每列每行重复线性扫描
   const factByRound = useMemo(
@@ -573,14 +580,14 @@ function EvidenceTable({
   ], [factByRound, entryByMatchId, onSelect, onOpenMatch, onWatchDemo, onAddToPlaylist, cluster]);
 
   return (
-    <div className="stu-pe-evidence">
+    <div className="stu-pe-evidence" id="patterns:evidence">
       <h4>证据回合（{cluster.roundCount}）</h4>
       <DataTable
         classes={STUDIO_TABLE_CLASSES}
         rows={cluster.rounds}
         rowKey={(r) => `${r.matchId}-${r.roundNumber}`}
         pageSize={PAGE_SIZE}
-        state={tableState} onStateChange={setTableState}
+        state={tableState} onStateChange={onTableStateChange}
         paginationMaxButtons={6}
         paginationInfo={(total) => `${total} 回合`}
         rowClassName={(r) => activeFact?.matchId === r.matchId && activeFact.roundNumber === r.roundNumber ? "stu-pe-evidence-active" : undefined}

@@ -8,7 +8,7 @@
  * 复用 dak-heatmap-* 设计语言与 worldToRadar / 双层处理，与 HeatmapCanvas 视觉一致。
  */
 import type { RadarFieldView } from "@cs2dak/presentation";
-import { RADAR_FIELD_MODES, radarModeFrame, type RadarFieldMode } from "@cs2dak/presentation/radar-field";
+import { RADAR_FIELD_MODES, radarModeFrame, type RadarFieldMode, type RadarFieldCanvasState } from "@cs2dak/presentation/radar-field";
 import {
   getMapCalibration,
   worldToRadar,
@@ -144,24 +144,35 @@ export interface RadarFieldCanvasProps {
   /** 非空 = 差分模式（队伍 − 赛事地图基线）：防守漏洞 / 进攻防守倾向。 */
   baseline?: RadarFieldView | null;
   map: { name: string; radarImageUrl?: string | null; lowerRadarImageUrl?: string | null };
+  state?: RadarFieldCanvasState;
+  onStateChange?: (state: RadarFieldCanvasState) => void;
 }
 
-export function RadarFieldCanvas({ field, baseline = null, map }: RadarFieldCanvasProps) {
-  const [mode, setMode] = useState<RadarFieldMode>("ctVis");
-  const [sec, setSec] = useState(20);
+export function RadarFieldCanvas({ field, baseline = null, map, state, onStateChange }: RadarFieldCanvasProps) {
+  const [localState, setLocalState] = useState<RadarFieldCanvasState>({ mode: "ctVis", second: 20, level: "upper" });
+  const current = state ?? localState;
+  const currentRef = useRef(current);
+  currentRef.current = current;
+  const update = (patch: Partial<RadarFieldCanvasState>) => {
+    const next = { ...currentRef.current, ...patch };
+    currentRef.current = next;
+    if (state) onStateChange?.(next); else setLocalState(next);
+  };
+  const { mode, second: sec, level } = current;
+  const setMode = (mode: RadarFieldMode) => update({ mode });
+  const setLevel = (level: MapLevel) => update({ level });
+  const setSec = (value: number | ((previous: number) => number)) => update({ second: typeof value === "function" ? value(currentRef.current.second) : value });
   const [playing, setPlaying] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
   const calibration = getMapCalibration(map.name);
   const dualLevel = !!(calibration && hasLowerLevel(calibration) && map.lowerRadarImageUrl);
-  const [level, setLevel] = useState<MapLevel>("upper");
 
   const isDiff = !!baseline;
   const maxSec = Math.max(0, field.maxSec - 1);
 
   useEffect(() => {
-    setSec((value) => Math.min(value, maxSec));
-  }, [maxSec]);
+    if (sec > maxSec || (!dualLevel && level === "lower")) update({ second: Math.min(sec, maxSec), level: dualLevel ? level : "upper" });
+  }, [maxSec, dualLevel, sec, level]);
 
   useEffect(() => {
     if (!playing || maxSec <= 0) return undefined;

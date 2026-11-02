@@ -4,17 +4,13 @@ import type { TeamComparisonModel } from "@cs2dak/presentation";
 import type { TeamPageState } from "../lib/studio-page-state";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 import { useEffect, useMemo, useState } from "react";
-import { DataTable, DoubleAwpAnalysisPanel, EmptyState, TeamMapRoleMatrixPanel, type DataTableColumn } from "@cs2dak/react";
-import type { DoubleAwpAnalysis, RoleDeclaration, TeamMapRoleMatrix } from "@cs2dak/tactics";
+import { DataTable, EmptyState, type DataTableColumn } from "@cs2dak/react";
 import type { TeamOverviewModel } from "@cs2dak/presentation";
-import { getDoubleAwpAnalysis, getTeamMapRoleMatrices } from "../lib/queries/spatial-queries";
 import { getTeamOverview } from "../lib/queries/team-queries";
 import { type IdentityOptions } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
-import type { OpenEvidence } from "../lib/evidence-continuation";
-import { loadRoleDeclarations } from "../lib/role-declarations";
 
-type TeamViewAction = "duel" | "economy" | "utility" | "opening" | "control" | "patterns";
+type TeamViewAction = "duel" | "economy" | "utility" | "opening" | "control" | "patterns" | "roles";
 
 const MAP_COLUMNS: DataTableColumn<TeamOverviewModel["maps"][number]>[] = [
   { key: "mapName", label: "地图", format: (row) => row.mapName },
@@ -36,7 +32,6 @@ export function TeamView({
   onSelectTeam,
   onOpenMatch,
   onOpenCapability,
-  onOpenEvidence,
   state,
   onStateChange,
   onPageReady,
@@ -48,7 +43,6 @@ export function TeamView({
   onSelectTeam: (teamName: string) => void;
   onOpenMatch: (entryId: string) => void;
   onOpenCapability: (view: TeamViewAction) => void;
-  onOpenEvidence: OpenEvidence;
   state: TeamPageState;
   onStateChange: (state: TeamPageState) => void;
   onPageReady?: (keys: string[]) => void;
@@ -77,15 +71,6 @@ export function TeamView({
   const [comparisonRetry, setComparisonRetry] = useState(0);
   const [overview, setOverview] = useState<TeamOverviewModel | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [matrices, setMatrices] = useState<TeamMapRoleMatrix[] | null>(null);
-  const [matrixError, setMatrixError] = useState<string | null>(null);
-  const [doubleAwp, setDoubleAwp] = useState<DoubleAwpAnalysis[] | null>(null);
-  const [doubleAwpError, setDoubleAwpError] = useState<string | null>(null);
-  const matrixSide = state.matrixSide;
-  const matrixMap = state.matrixMapName ?? matrices?.[0]?.mapName ?? null;
-  const setMatrixMap = (matrixMapName: string) => onStateChange({ ...state, matrixMapName });
-  const setMatrixSide = (matrixSide: "t" | "ct") => onStateChange({ ...state, matrixSide });
-
   useEffect(() => {
     if (!activeTeam || !state.compareTeamName) { setComparison(null); setComparisonError(null); return; }
     let cancelled = false;
@@ -111,37 +96,14 @@ export function TeamView({
   }, [entries, activeTeam, identityOptions?.version]);
 
   useEffect(() => {
-    if (!activeTeam || entries.length === 0) { setMatrices(null); return; }
-    let cancelled = false;
-    setMatrices(null); setMatrixError(null);
-    void loadRoleDeclarations().then((state) => getTeamMapRoleMatrices(entries, state.declarations.map((row) => row.declaration as RoleDeclaration), identityOptions, [activeTeam]))
-      .then((next) => { if (!cancelled) { setMatrices(next); } })
-      .catch((reason) => { if (!cancelled) setMatrixError(reason instanceof Error ? reason.message : String(reason)); });
-    return () => { cancelled = true; };
-  }, [entries, activeTeam, identityOptions?.version]);
-
-  useEffect(() => {
-    if (!activeTeam || entries.length === 0) { setDoubleAwp(null); setDoubleAwpError(null); return; }
-    let cancelled = false;
-    setDoubleAwp(null); setDoubleAwpError(null);
-    void getDoubleAwpAnalysis(entries, identityOptions, [activeTeam])
-      .then((models) => { if (!cancelled) setDoubleAwp(models); })
-      .catch((reason) => { if (!cancelled) setDoubleAwpError((reason instanceof Error ? reason.message : String(reason)) || "读取失败"); });
-    return () => { cancelled = true; };
-  }, [entries, activeTeam, identityOptions?.version]);
-
-  useEffect(() => {
-    if (!onPageReady || (activeTeam && (!overview && !error || !matrices && !matrixError || !doubleAwp && !doubleAwpError))) return;
+    if (!onPageReady || (activeTeam && !overview && !error)) return;
     onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
-  }, [onPageReady, activeTeam, overview, error, matrices, matrixError, doubleAwp, doubleAwpError]);
-
-  const matrixMaps = [...new Set((matrices ?? []).map((row) => row.mapName))];
-  const activeMatrix = matrices?.find((row) => row.mapName === matrixMap && row.side === matrixSide) ?? null;
-  const playerNames = Object.fromEntries((overview?.roster ?? []).flatMap((row) => [[row.steamId64, row.name], [`steam:${row.steamId64}`, row.name]]));
+  }, [onPageReady, activeTeam, overview, error]);
 
   if (entries.length === 0) {
     return <div className="stu-view"><EmptyState mark title="还没有队伍数据" hint="先在资料库导入比赛，才能按本地队伍身份组织总览。" action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>} /></div>;
   }
+
 
   return (
     <div className="stu-view stu-reading-view">
@@ -178,19 +140,12 @@ export function TeamView({
             <section className="stu-card"><h3>地图盘面</h3><DataTable classes={STUDIO_TABLE_CLASSES} rows={overview.maps} rowKey={(row) => row.mapName} state={mapTable} onStateChange={setMapTable} columns={MAP_COLUMNS} /></section>
             <section className="stu-card"><h3>阵容</h3><DataTable classes={STUDIO_TABLE_CLASSES} rows={overview.roster} rowKey={(row) => row.steamId64} state={rosterTable} onStateChange={setRosterTable} columns={ROSTER_COLUMNS} /></section>
           </div>
-          <section className="stu-card" id="team:map-roles">
-            <div className="stu-card-head"><h3>地图位置职责</h3><div className="stu-chip-row" role="tablist" aria-label="职责矩阵筛选">{matrixMaps.map((map) => <button key={map} type="button" className={matrixMap === map ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => setMatrixMap(map)}>{map.replace("de_", "")}</button>)}{(["t", "ct"] as const).map((side) => <button key={side} type="button" className={matrixSide === side ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => setMatrixSide(side)}>{side.toUpperCase()}</button>)}</div></div>
-            {matrixError ? <EmptyState variant="error" title="职责矩阵不可用" hint={matrixError} /> : matrices === null ? <div className="stu-loading">读取地图位置事实…</div> : <TeamMapRoleMatrixPanel state={state.tables.roles ?? { sort: { key: "sample", direction: "desc" }, page: 0 }} onStateChange={table => onStateChange({ ...state, tables: { ...state.tables, roles: table } })} matrix={activeMatrix} playerNames={playerNames} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry && matrixMap) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "team:map-roles" }); }} />}
-          </section>
-          <section className="stu-card" id="team:double-awp">
-            <div className="stu-card-head"><h3>双 AWP 条件统计</h3></div>
-            {doubleAwpError ? <EmptyState variant="error" title="双 AWP 统计不可用" hint={doubleAwpError} /> : doubleAwp === null ? <div className="stu-loading">读取 AWP 回合事实…</div> : <DoubleAwpAnalysisPanel model={doubleAwp.find((row) => row.side === matrixSide) ?? null} playerNames={playerNames} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "team:double-awp" }); }} />}
-          </section>
+          <section className="stu-card"><h3>位置与职责</h3><button type="button" className="stu-button-sm" onClick={() => onOpenCapability("roles")}>查看位置与职责</button></section>
           <div className="stu-home-grid">
             <section className="stu-card"><h3>经济样本</h3>{overview.economyWinRate.length === 0 ? <p className="stu-muted">当前范围没有可用经济事实。</p> : <div className="stu-chip-row">{overview.economyWinRate.map((row) => <span key={row.economyType} className="stu-chip">{row.economyType} · {row.wins}/{row.rounds}</span>)}</div>}</section>
             <section className="stu-card"><h3>最近比赛</h3><div className="stu-chip-row">{overview.matches.slice(-5).reverse().map((match) => <button key={match.matchId} type="button" className="stu-chip" onClick={() => { const entry = entries.find((item) => matchIdForEntry(item) === match.matchId); if (entry) onOpenMatch(entry.id); }}>{match.mapName} · {match.opponent} · {match.roundsWon}:{match.roundsLost}</button>)}</div></section>
           </div>
-          <section className="stu-card"><h3>继续分析</h3><p className="stu-muted">以下入口保持当前队伍与语料；各能力只展示其实际可用的样本与限制。</p><div className="stu-header-actions">{(["duel", "economy", "utility", "opening", "control", "patterns"] as const).map((view) => <button key={view} type="button" className="stu-button-sm" onClick={() => onOpenCapability(view)}>{({ duel: "对枪", economy: "经济与转化", utility: "道具价值", opening: "开局动线", control: "控图", patterns: "位置与职责" })[view]}</button>)}</div></section>
+          <section className="stu-card"><h3>继续分析</h3><p className="stu-muted">以下入口保持当前队伍与语料；各能力只展示其实际可用的样本与限制。</p><div className="stu-header-actions">{(["duel", "economy", "utility", "opening", "control", "patterns"] as const).map((view) => <button key={view} type="button" className="stu-button-sm" onClick={() => onOpenCapability(view)}>{({ duel: "对枪", economy: "经济与转化", utility: "道具价值", opening: "开局动线", control: "控图", patterns: "战术模式与对手侦察" })[view]}</button>)}</div></section>
         </>
       )}
     </div>

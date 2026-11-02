@@ -11,6 +11,8 @@
 import type { RadarFieldView, RadarFieldBaseView } from "./models/radar-view.js";
 
 export type RadarFieldMode = RadarFieldBaseView | "info-diff" | "contested";
+export interface RadarFieldCanvasState { mode: RadarFieldMode; second: number; level: "upper" | "lower" }
+
 
 export interface RadarModeOption {
   value: RadarFieldMode;
