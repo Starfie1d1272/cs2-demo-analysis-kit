@@ -49,8 +49,8 @@ vi.mock("@cs2dak/pipeline", () => ({ analyzeMatchWorkspace: vi.fn() }));
 vi.mock("./tri", () => ({ loadTriLookup: async () => null, loadMapTri: vi.fn() }));
 vi.mock("./callout-grid", () => ({ CALLOUT_GRID_URLS: {}, loadStudioCalloutGrid: async () => null }));
 vi.mock("./demo-meta", () => ({ metaFromPackage: () => ({ matchDate: null, mapName: "de_nuke" }) }));
-vi.mock("./extract-match-facts", () => ({
-  extractMatchData: (pkg: { marker: number }, { matchId }: { matchId: string }) => ({
+vi.mock("./match-records", () => ({
+  buildMatchRecords: (pkg: { marker: number }, { matchId }: { matchId: string }) => ({
     facts: { matchId, lineups: [{ matchId, marker: pkg.marker }], playerMatchStats: [{ matchId, playerKey: "player-1", playerName: "fixture", marker: pkg.marker }], playerWeapons: [], mechanicsSamples: [], rrSignalRows: [], tacticalRounds: [], playerPositionRounds: [], teamShapeRounds: [], teamAwpRounds: [], ctRotationRounds: [] },
     derived: { matchId, tournament: [{ matchId, row: { marker: pkg.marker } }], playerInsights: [], teamComparison: [], duels: [], openingTrails: [], utilityValue: [] },
   }),
