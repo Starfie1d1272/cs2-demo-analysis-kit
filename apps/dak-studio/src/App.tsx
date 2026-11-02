@@ -6,7 +6,7 @@ import { useDesktopUpdates } from "./app/use-desktop-updates";
 import { invalidateAnalysisQueries, getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation } from "./lib/queries/query-cache";
 import { ClipboardList, Crosshair, Film, House, LibraryBig, Radar, Settings } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { CohortScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
+import { AnalysisScopeEditor } from "./components/AnalysisScopeEditor";
 import { AnalysisContextSummary } from "./components/AnalysisContextSummary";
 import { CapabilityBar } from "./components/CapabilityBar";
 import { type StudioEventRecord } from "./lib/events";
@@ -35,8 +35,6 @@ import { buildCohortIdentityMap } from "./lib/identity";
 import type { IdentityOptions } from "./lib/identity";
 import { createEvidenceSession, type EvidenceSession, type OpenEvidence } from "./lib/evidence-continuation";
 import {
-  applyCohortScopeProjection,
-  cohortScopeProjection,
   createAnalysisContextPreset,
   resolveAnalysisCorpus,
   summarizeAnalysisContext,
@@ -175,7 +173,7 @@ export function App() {
   const [contextEditorOpen, setContextEditorOpen] = useState(false);
   const [capabilityAvailability, setCapabilityAvailability] = useState<CapabilityAvailability | null>(null);
 
-  const eventScopes = useMemo<CohortScopeEvent[]>(() => {
+  const eventScopes = useMemo<import("./lib/analysis-context").AnalysisEventScope[]>(() => {
     const seriesById = new Map(seriesRecords.map((series) => [series.id, series]));
     return eventRecords
       .map((event) => ({
@@ -191,8 +189,6 @@ export function App() {
     () => resolveAnalysisCorpus(entries, analysisContext.corpus, eventScopes),
     [entries, analysisContext.corpus, eventScopes]
   );
-  /** 旧页面短期仍读 CohortScopeState；其值完全由 AnalysisContext 投影，不再拥有 App state。 */
-  const legacyScope = useMemo<CohortScopeState>(() => cohortScopeProjection(analysisContext), [analysisContext]);
   const selectedPlayerKey = analysisContext.focus.kind === "self" || analysisContext.focus.kind === "player"
     ? analysisContext.focus.playerKey
     : null;
@@ -214,9 +210,6 @@ export function App() {
       repairActions: [],
     };
   }, [analysisContext.goal, analysisContext.roles.beneficiary, analysisContext.roles.opponent, capabilityAvailability, scopedEntries, destination.page, section]);
-  const updateLegacyScope = useCallback((next: CohortScopeState) => {
-    setAnalysisContext((current) => applyCohortScopeProjection(current, next));
-  }, [setAnalysisContext]);
   const identityOptions = useMemo<IdentityOptions | undefined>(
     () => identityState.version > 0
       ? { version: identityState.version, map: buildCohortIdentityMap(identityState.mappings), teamRenames: identityState.teamRenames }
@@ -489,13 +482,13 @@ export function App() {
           <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} onEdit={() => setContextEditorOpen((current) => !current)} />
         )}
         {entries.length > 0 && contextEditorOpen && section === "analysis" && "context" in destination && (
-          <CohortScope
+          <AnalysisScopeEditor
+            key={active.id}
             entries={entries}
-            scope={legacyScope}
-            onChange={updateLegacyScope}
+            context={analysisContext}
+            onChange={setAnalysisContext}
             teamRenames={identityState.teamRenames}
             events={eventScopes}
-            teamSelection="single-focus"
           />
         )}
         {displayedCapabilityAvailability && <CapabilityBar availability={displayedCapabilityAvailability} onRepair={openCapabilityRepair} />}
@@ -565,9 +558,12 @@ export function App() {
             onOpenMatch={openDemo}
             onOpenEvidence={openEvidence}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
-            returnEvidenceKey={active.anchorKey}
+            state={active.ui as import("./lib/studio-page-state").PlayerPageState}
+            onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
             onPageReady={(keys) => onPageReady(active.id, keys)}
             identityOptions={identityOptions}
+            contextSummary={summarizeAnalysisContext(analysisContext, entries, eventScopes)}
+            onOpenMaterials={() => navigate({ page: "materials" })}
             onGoLibrary={() => goLibrary()}
           />
         )}

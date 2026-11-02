@@ -1,4 +1,4 @@
-import { matchIdForEntry, type StudioDemoEntry } from "./demo-entry.js";
+import { entryDate, matchIdForEntry, type StudioDemoEntry } from "./demo-entry.js";
 
 /** 当前分析的用户目标；运行时状态，不是可保存的业务对象。 */
 export type AnalysisGoal =
@@ -19,6 +19,7 @@ export interface AnalysisCorpus {
   maps: string[];
   tags: string[];
   excludedEntryIds: string[];
+  dateRange?: { from: string | null; to: string | null; includeUnknown: boolean };
 }
 
 export type AnalysisFocus =
@@ -63,15 +64,6 @@ export interface AnalysisEventScope {
   entryIds: string[];
 }
 
-/** 仅供尚未迁移的页面消费；它不是第二份可写状态。 */
-export interface CohortScopeProjection {
-  eventIds: string[];
-  maps: string[];
-  tags: string[];
-  excludedIds: string[];
-  teams: string[];
-}
-
 export const EMPTY_ANALYSIS_CORPUS: AnalysisCorpus = {
   eventIds: [],
   entryIds: [],
@@ -97,6 +89,7 @@ function copyCorpus(corpus: AnalysisCorpus = EMPTY_ANALYSIS_CORPUS): AnalysisCor
     maps: [...corpus.maps],
     tags: [...corpus.tags],
     excludedEntryIds: [...corpus.excludedEntryIds],
+    ...(corpus.dateRange && { dateRange: { ...corpus.dateRange } }),
   };
 }
 
@@ -147,35 +140,11 @@ export function withAnalysisGoal(context: AnalysisContext, goal: AnalysisGoal): 
   return { ...context, goal };
 }
 
-export function cohortScopeProjection(context: AnalysisContext): CohortScopeProjection {
-  return {
-    eventIds: [...context.corpus.eventIds],
-    maps: [...context.corpus.maps],
-    tags: [...context.corpus.tags],
-    excludedIds: [...context.corpus.excludedEntryIds],
-    teams: context.focus.kind === "team" ? [context.focus.teamName] : [],
-  };
-}
-
-/** 将旧 CohortScope 的用户操作映射回唯一 context owner。 */
-export function applyCohortScopeProjection(context: AnalysisContext, next: CohortScopeProjection): AnalysisContext {
-  const selectedTeam = next.teams[0] ?? null;
-  const clearedTeamFocus = context.focus.kind === "team" && !selectedTeam;
-  return {
-    ...context,
-    goal: selectedTeam && context.goal === "explore"
-      ? "team-analysis"
-      : clearedTeamFocus && context.goal === "team-analysis" ? "explore" : context.goal,
-    corpus: {
-      eventIds: [...next.eventIds],
-      entryIds: [...context.corpus.entryIds],
-      matchIds: [...context.corpus.matchIds],
-      maps: [...next.maps],
-      tags: [...next.tags],
-      excludedEntryIds: [...next.excludedIds],
-    },
-    focus: selectedTeam ? { kind: "team", teamName: selectedTeam } : clearedTeamFocus ? { kind: "aggregate" } : context.focus,
-  };
+/** 严格校验日历日期，避免 Date 自动归一化无效日期。 */
+export function isCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
 }
 
 /**
@@ -194,7 +163,13 @@ export function resolveAnalysisCorpus(
   const entryIds = corpus.entryIds.length > 0 ? new Set(corpus.entryIds) : null;
   const matchIds = corpus.matchIds.length > 0 ? new Set(corpus.matchIds) : null;
 
+  const range = corpus.dateRange;
   return entries.filter((entry) =>
+    (!range || (() => {
+      const date = entryDate(entry);
+      if (!date || !isCalendarDate(date)) return range.includeUnknown;
+      return (!range.from || date >= range.from) && (!range.to || date <= range.to);
+    })()) &&
     (!eventEntryIds || eventEntryIds.has(entry.id)) &&
     (!entryIds || entryIds.has(entry.id)) &&
     (!matchIds || matchIds.has(matchIdForEntry(entry))) &&
@@ -275,9 +250,12 @@ export function summarizeAnalysisContextParts(
   events: readonly AnalysisEventScope[] = [],
 ): AnalysisContextSummaryParts {
   const corpus = resolveAnalysisCorpus(entries, context.corpus, events);
-  const corpusLabel = context.corpus.eventIds.length === 1
-    ? events.find((event) => event.id === context.corpus.eventIds[0])?.name ?? `${corpus.length} 场`
-    : `${corpus.length} 场`;
+  const eventName = context.corpus.eventIds.length === 1
+    ? events.find((event) => event.id === context.corpus.eventIds[0])?.name
+    : undefined;
+  const range = context.corpus.dateRange;
+  const dateLabel = range ? `${range.from ?? "不限"} 至 ${range.to ?? "不限"}${range.includeUnknown ? "（含未知日期）" : ""}` : null;
+  const corpusLabel = [eventName, dateLabel, `${corpus.length} 场`].filter(Boolean).join(" · ");
   const roleParts = [
     context.roles.beneficiary ? `我方：${context.roles.beneficiary.label}` : null,
     context.roles.opponent ? `对手：${context.roles.opponent.label}` : null,
