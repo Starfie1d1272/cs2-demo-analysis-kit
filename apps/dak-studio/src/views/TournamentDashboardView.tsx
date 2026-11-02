@@ -181,7 +181,7 @@ export function TournamentDashboardView({
       {entries.length > 0 && insightCapability.availability && <CapabilityBar availability={insightCapability.availability} onRepair={onCapabilityRepair} />}
       {insightCapability.error && <p role="alert">赛事数据读取失败：{insightCapability.error} <button type="button" className="stu-button-sm" onClick={insightCapability.retry}>重试</button></p>}
       {!sharedUnavailable && insightEntries?.length === 0 && !insights && <EmptyState variant="insufficient" title="没有可用赛事数据" hint="请查看上方限制和修复入口。" />}
-          <div className="stu-card">
+          {(!sharedUnavailable || !!error || !!comparisonError) && <div className="stu-card">
             <h3>队伍对比</h3>
             {entries.length > 0 && !sharedNotice && comparisonCapability.availability && <CapabilityBar availability={comparisonCapability.availability} onRepair={onCapabilityRepair} />}
             {comparisonCapability.error && <p role="alert">对比能力读取失败：{comparisonCapability.error} <button type="button" className="stu-button-sm" onClick={comparisonCapability.retry}>重试</button></p>}
@@ -205,7 +205,7 @@ export function TournamentDashboardView({
                 {teamComparison.availableTeams.map((team) => <button key={team.name} type="button" className="stu-chip" onClick={() => onOpenTeam(team.name)}>{team.name} · {team.matches} 场</button>)}
               </div>
             )}
-          </div>
+          </div>}
 
       {insights && (error || insightCapability.error || analysis.status !== "ready" || insightSnapshot?.generation !== analysis.generation || insightSnapshot.sample !== JSON.stringify(insightEntries?.map(entry => entry.id))) && <p role="status">{error || insightCapability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && insightEntries?.length === 0 ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}

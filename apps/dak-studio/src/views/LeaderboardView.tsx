@@ -69,6 +69,8 @@ export function LeaderboardView({ captureOverview, exportSource, exportPage = "a
     );
   }
 
+  if (coveredByShared && !error) return null;
+
   return (
     <div className={embedded ? "stu-card" : "stu-view"}>
       <header className={embedded ? "stu-section-head" : "stu-view-header"}>

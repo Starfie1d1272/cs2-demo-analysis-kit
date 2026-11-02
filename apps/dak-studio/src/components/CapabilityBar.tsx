@@ -29,7 +29,7 @@ export function sameCapabilityNotice(a: CapabilityAvailability | null, b: Capabi
 export function CapabilityBar({ availability, onRepair }: { availability: CapabilityAvailability; onRepair?: (action: CapabilityRepairAction) => void }) {
   const firstExclusion = availability.excluded[0];
   const firstDependency = firstExclusion ? undefined : availability.dependencies.find(item => item.available < item.totalEligible);
-  const limitation = firstExclusion ? displayReason(firstExclusion.reason) : firstDependency ? `${DEPENDENCY[firstDependency.key]}不完整（${firstDependency.available}/${firstDependency.totalEligible} 场具备）` : null;
+  const limitation = firstExclusion ? displayReason(firstExclusion.reason) : firstDependency ? `${DEPENDENCY[firstDependency.key]}不完整（${firstDependency.available}/${firstDependency.totalEligible} 场具备，${firstDependency.required ? "必需" : "可选"}）` : null;
   return <div className={`stu-capability-bar stu-capability-${availability.status}`}>
     <span>{availability.eligibleMatches}/{availability.totalMatches} 场可用</span>
     {availability.status !== "ready" && <>
