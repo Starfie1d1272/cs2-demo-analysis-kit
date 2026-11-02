@@ -31,12 +31,11 @@ export interface PatternExplorerProps {
   entryByMatchId: Map<string, StudioDemoEntry>;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
-  onAddToPlaylist?: (cluster: TacticalCluster, fact: TacticalRoundFact) => void;
   /** 回放缓存：传入则与上层复用；未传时组件生命周期内保持同一个缓存。 */
   replayModelCache?: Map<string, MatchWorkspaceModel>;
 }
 
-export function PatternExplorer({ exportSource, patternNames = {}, state, onStateChange, clusters, facts, entryByMatchId, onOpenMatch, onWatchDemo, onAddToPlaylist, replayModelCache }: PatternExplorerProps) {
+export function PatternExplorer({ exportSource, patternNames = {}, state, onStateChange, clusters, facts, entryByMatchId, onOpenMatch, onWatchDemo, replayModelCache }: PatternExplorerProps) {
   const { mapName, side, economyEntry: econ, clusterId: selectedId, selectedFactKey: selectedEvidenceKey } = state;
   const maps = useMemo(() => [...new Set(clusters.map(c => c.mapName))].sort(), [clusters]);
   const setSide = (side: "t" | "ct") => onStateChange(current => ({ ...current, side, clusterId: null, selectedFactKey: null }));
@@ -212,7 +211,6 @@ export function PatternExplorer({ exportSource, patternNames = {}, state, onStat
                   onOpenMatch={onOpenMatch}
                   onWatchDemo={onWatchDemo}
                   onSelect={setSelectedEvidenceKey}
-                  onAddToPlaylist={onAddToPlaylist}
                 />
               </>
             )}
@@ -490,7 +488,6 @@ function EvidenceTable({
   onOpenMatch,
   onWatchDemo,
   onSelect,
-  onAddToPlaylist,
 }: {
   cluster: TacticalCluster;
   tableState: import("@cs2dak/presentation").TableState;
@@ -501,7 +498,6 @@ function EvidenceTable({
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onSelect: (key: string) => void;
-  onAddToPlaylist?: (cluster: TacticalCluster, fact: TacticalRoundFact) => void;
 }) {
   const PAGE_SIZE = 12;
 
@@ -568,9 +564,6 @@ function EvidenceTable({
         const fact = findFact(r);
         const entry = entryByMatchId.get(r.matchId);
         return <>
-          {fact && onAddToPlaylist && (
-            <button type="button" className="stu-button-sm" onClick={() => onAddToPlaylist(cluster, fact)}>加入</button>
-          )}
           {entry && (
             <EvidenceLink hint="在比赛工作台打开完整分析并定位执行证据" onOpen={() => onOpenMatch(entry.id, { roundNumber: r.roundNumber, tick: fact ? jumpTickFor(fact) : undefined })}>
               工作台 ↗
@@ -584,7 +577,7 @@ function EvidenceTable({
         </>;
       }
     },
-  ], [factByRound, entryByMatchId, onSelect, onOpenMatch, onWatchDemo, onAddToPlaylist, cluster]);
+  ], [factByRound, entryByMatchId, onSelect, onOpenMatch, onWatchDemo, cluster]);
 
   return (
     <div className="stu-pe-evidence" id="patterns:evidence">

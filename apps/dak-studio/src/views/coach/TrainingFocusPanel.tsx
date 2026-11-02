@@ -46,21 +46,6 @@ export async function saveTrainingFocusDraft(record: TrainingFocus, draft: Train
 }
 export const deleteTrainingFocus = removeTrainingFocus;
 
-export function trainingFocusToMarkdown(record: TrainingFocus, draft: TrainingFocusDraft): string {
-  const evidence = record.evidence.length
-    ? record.evidence.map((item) => `- 比赛 ${item.matchId} · R${item.roundNumber}${item.tick != null ? ` · tick ${item.tick}` : ""} · 来源版本未知`).join("\n")
-    : "无来源证据";
-  return [
-    `# ${record.finding.title}`,
-    record.finding.statement,
-    `## 上下文\n${record.contextSummary || "—"}`,
-    `## 局限\n${record.finding.limitations?.length ? record.finding.limitations.map((item) => `- ${item}`).join("\n") : "—"}`,
-    `## 备注\n${draft.note || "—"}`,
-    `## 复查条件\n${draft.reviewCondition || "—"}`,
-    `## 来源\n${evidence}`,
-  ].join("\n\n");
-}
-
 export function TrainingFocusEditor({ record, draft, onChange, renderEvidence }: {
   record: TrainingFocus;
   draft: TrainingFocusDraft;
@@ -71,6 +56,5 @@ export function TrainingFocusEditor({ record, draft, onChange, renderEvidence }:
     <label className="stu-form-field">备注<input className="stu-form-control" value={draft.note} onChange={(event) => onChange({ ...draft, note: event.target.value })} /></label>
     <label className="stu-form-field">复查条件<input className="stu-form-control" value={draft.reviewCondition} onChange={(event) => onChange({ ...draft, reviewCondition: event.target.value })} /></label>
     {record.evidence.map((evidence, index) => <div key={index}>R{evidence.roundNumber} · 来源版本未知 {renderEvidence(evidence, index)}</div>)}
-    <details><summary>Markdown 导出</summary><textarea className="stu-input" readOnly value={trainingFocusToMarkdown(record, draft)} /></details>
   </>;
 }

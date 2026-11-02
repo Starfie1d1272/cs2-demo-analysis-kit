@@ -13,7 +13,6 @@ import type { StudioDemoEntry } from "../../lib/demo-entry";
 import type { AnalysisContext } from "../../lib/analysis-context";
 import { listPatternNames, savePatternName } from "../../lib/pattern-names";
 import { buildAntiStratMarkdown, patternFingerprint } from "../../lib/pattern-observations";
-import { savePrepItem, type PrepItem } from "../../lib/prep-items";
 import { getObservedMapPool } from "../../lib/queries/spatial-queries";
 import { PatternExplorer } from "../coach/PatternExplorer";
 import { MapPoolTable } from "../coach/MapPoolTable";
@@ -34,11 +33,10 @@ export interface PatternsThemeProps {
   subjectTeam: string | null;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
-  onPrepSaved?: () => void;
 }
 
-/** 自动观察与人工材料相互独立；只保存用户明确命名或加入的项目。 */
-export function PatternsTheme({ exportSource, section, explorerState, onExplorerStateChange, clusters, facts, allFacts, entryByMatchId, analysisContext, teamRenames, subjectTeam, onOpenMatch, onWatchDemo, onPrepSaved }: PatternsThemeProps) {
+/** 自动观察与人工材料相互独立；模式命名由用户明确保存。 */
+export function PatternsTheme({ exportSource, section, explorerState, onExplorerStateChange, clusters, facts, allFacts, entryByMatchId, analysisContext, teamRenames, subjectTeam, onOpenMatch, onWatchDemo }: PatternsThemeProps) {
   const [mapPoolNotes, setMapPoolNotes] = useState<Record<string, string> | null>(null);
   useEffect(() => { let cancelled = false; void listMapPoolNotes().then(rows => { if (!cancelled) setMapPoolNotes(rows); }); return () => { cancelled = true; }; }, []);
   const mapPool = useMemo(() => getObservedMapPool(allFacts, analysisContext.roles.beneficiary?.label ?? null, analysisContext.roles.opponent?.label ?? null, teamRenames), [allFacts, analysisContext.roles.beneficiary?.label, analysisContext.roles.opponent?.label, teamRenames]);
@@ -64,23 +62,6 @@ export function PatternsTheme({ exportSource, section, explorerState, onExplorer
             entryByMatchId={entryByMatchId}
             onOpenMatch={onOpenMatch}
             onWatchDemo={onWatchDemo}
-            onAddToPlaylist={async (cluster, fact) => {
-              const entry = entryByMatchId.get(fact.matchId);
-              const item: PrepItem = {
-                id: `${cluster.id}:${fact.matchId}:${fact.roundNumber}`,
-                group: autoName(cluster) || `${cluster.mapName} ${cluster.side.toUpperCase()}`,
-                matchId: fact.matchId,
-                mapName: fact.mapName,
-                roundNumber: fact.roundNumber,
-                clusterId: cluster.id,
-                patternFingerprint: patternFingerprint(cluster),
-                source: "tactical-pattern",
-                coverage: `${cluster.roundCount} 回合 · ${cluster.mapName} · ${SIDE_LABEL[cluster.side]}`,
-                note: entry ? `${entry.meta.teamAName} ${entry.meta.teamAScore}:${entry.meta.teamBScore} ${entry.meta.teamBName}` : "",
-              };
-              await savePrepItem(item);
-              onPrepSaved?.();
-            }}
           />
           <details className="stu-card stu-coach-pattern-names">
             <summary>模式命名与备注</summary>
