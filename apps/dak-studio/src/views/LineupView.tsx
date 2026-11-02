@@ -314,9 +314,10 @@ export function LineupView({
 
   // ── 渲染（空态提前返回） ──────────────────────────────────────────────
 
-  if (savedError) return <EmptyState variant="error" title="读取已保存练习失败" hint={savedError} />;
+  const savedErrorNotice = savedError && <div className="stu-card"><h3>已保存练习点位</h3><p className="stu-error" role="alert">读取失败：{savedError}</p></div>;
   if (error) return <div>
     <EmptyState variant="error" title="Lineup 聚类失败" hint={error} action={staleIds.length ? <button type="button" className="stu-button" onClick={() => onRebuild(staleIds)}>重建 facts</button> : undefined} />
+    {savedErrorNotice}
     {savedLineups.length > 0 && <div className="stu-card"><h3>已保存练习点位</h3>{savedLineups.map(item => <p key={item.id}>{item.label}{!item.sourceFactsRevision && " · 来源版本未知，需要核验"}</p>)}</div>}
   </div>;
   if (loading) {
@@ -328,11 +329,14 @@ export function LineupView({
   }
   if (byMap.length === 0) {
     return (
-      <EmptyState
-        variant="insufficient"
-        title="没有可聚类道具"
-        hint="需要 v3 ZIP 中的 grenades.json 才能生成道具库。"
-      />
+      <div>
+        {savedErrorNotice}
+        <EmptyState
+          variant="insufficient"
+          title="没有可聚类道具"
+          hint="需要 v3 ZIP 中的 grenades.json 才能生成道具库。"
+        />
+      </div>
     );
   }
 
@@ -354,6 +358,7 @@ export function LineupView({
 
   return (
     <div className="stu-lineup-page">
+      {savedErrorNotice}
       {savedLineups.length > 0 && (
         <details
           className="stu-card stu-lineup-saved"
