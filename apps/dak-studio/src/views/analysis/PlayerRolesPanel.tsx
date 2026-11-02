@@ -2,7 +2,7 @@ import { canExportSnapshot, withCapabilityConditions, unionExportEntries, withAn
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../../lib/queries/query-cache";
 import { CapabilityBar, useCapability } from "../../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../../lib/capability-availability";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnalysisExportButtons } from "../../components/AnalysisExportButtons";
 import { buildPlayerRolesAnalysisResult } from "../../lib/analysis-export-roles";
 import type { AnalysisExportSource } from "../../lib/analysis-export";
@@ -15,6 +15,8 @@ import { matchIdForEntry, type StudioDemoEntry } from "../../lib/demo-entry";
 import type { IdentityOptions } from "../../lib/identity";
 import type { OpenEvidence } from "../../lib/evidence-continuation";
 import type { PlayerRolesState } from "../../lib/studio-page-state";
+
+const DUTY_LABEL: Record<WeaponDuty, string> = { primary_awper: "主 AWP", secondary_awper: "副 AWP", situational_awper: "情境 AWP", rifler: "步枪" };
 
 export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, playerKey, playerLabel, selectedTeam, identityOptions, onOpenEvidence, state, onStateChange, onPageReady }: {
   exportSource?: AnalysisExportSource | null;
@@ -54,7 +56,7 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
   const mapPool = pool?.rows ?? [];
   const unsupportedMaps = pool?.unsupported ?? [];
   const [roleEditorOpen, setRoleEditorOpen] = useState(false);
-  const [declaredRole, setDeclaredRole] = useState<DeclaredRole>("awper");
+  const [declaredRole, setDeclaredRole] = useState<DeclaredRole | "">("awper");
   const [declaredSecondaryRole, setDeclaredSecondaryRole] = useState<DeclaredRole | "">("");
   const [declaredWeaponDuty, setDeclaredWeaponDuty] = useState<WeaponDuty | "">("");
   const [scopeIndex, setScopeIndex] = useState(0);
@@ -117,13 +119,15 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
   const ambiguousDeclarations = roleDeclarations?.declarations.filter(row => row.declaration.source === "user" && row.declaration.playerKey === playerKey && !row.declaration.teamScope && row.declaration.teamKey != null && selectedRoleProfile?.teamGroup.ambiguousNames.includes(row.declaration.teamKey)) ?? [];
 
   const editorOwner = JSON.stringify([playerKey, selectedRoleProfile?.teamKey, declarationTeam, declarationScope]);
-  useEffect(() => {
+  const editorOwnerRef = useRef(editorOwner);
+  editorOwnerRef.current = editorOwner;
+  useLayoutEffect(() => {
     if (!roleEditorOpen) return;
     const ordinary = selectedDeclarations.filter(({ declaration }) => declaration.mapName == null && declaration.validFrom == null && declaration.validTo == null);
     const main = ordinary.find(({ declaration }) => declaration.kind === "main_role" && declaration.priority === "primary")?.declaration;
     const secondary = ordinary.find(({ declaration }) => declaration.kind === "main_role" && declaration.priority === "secondary")?.declaration;
     const weapon = ordinary.find(({ declaration }) => declaration.kind === "weapon_duty")?.declaration;
-    setDeclaredRole(main?.kind === "main_role" ? main.role : "awper");
+    setDeclaredRole(main?.kind === "main_role" ? main.role : ordinary.length ? "" : "awper");
     setDeclaredSecondaryRole(secondary?.kind === "main_role" ? secondary.role : "");
     setDeclaredWeaponDuty(weapon?.kind === "weapon_duty" ? weapon.weaponDuty : "");
     setRoleFormError(null);
@@ -136,7 +140,8 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
   }
 
   async function saveRoleDeclaration() {
-    if (!roleDeclarations || declarationsSavingRef.current) return;
+    if (!roleDeclarations || !declaredRole || declarationsSavingRef.current) return;
+    const savingOwner = editorOwner;
     declarationsSavingRef.current = true;
     setDeclarationsSaving(true);
     setRoleFormError(null);
@@ -152,9 +157,10 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
         ...(declaredWeaponDuty ? [{ ...scope, kind: "weapon_duty" as const, weaponDuty: declaredWeaponDuty }] : []),
       ];
       const next = await replaceOrdinaryUserRoleDeclarations(playerKey, declarationTeam, declarations, roleDeclarations, declarationScope);
-      setRoleDeclarations(next); setRoleEditorOpen(false);
+      setRoleDeclarations(next);
+      if (editorOwnerRef.current === savingOwner) setRoleEditorOpen(false);
     } catch (reason) {
-      setRoleFormError(reason instanceof Error ? reason.message : "保存声明失败，请重试。");
+      if (editorOwnerRef.current === savingOwner) setRoleFormError(reason instanceof Error ? reason.message : "保存声明失败，请重试。");
     } finally {
       declarationsSavingRef.current = false;
       setDeclarationsSaving(false);
@@ -193,16 +199,16 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
             <div className="stu-modal-backdrop" role="dialog" aria-modal="true" aria-label="编辑角色声明" onClick={() => { if (!declarationsSavingRef.current) setRoleEditorOpen(false); }}>
               <div className="stu-dialog stu-dialog-form" ref={roleDialogRef} onClick={(event) => event.stopPropagation()}>
                 <header className="stu-modal-head"><h3>角色声明 · {playerLabel}</h3><button type="button" className="stu-modal-close" disabled={declarationsSaving} onClick={() => { if (!declarationsSavingRef.current) setRoleEditorOpen(false); }} aria-label="关闭">✕</button></header>
-                <div className="stu-modal-body">{scopeOptions.length > 0 && <label className="stu-form-field"><span className="stu-form-label">声明范围</span><select className="stu-form-control" disabled={declarationsSaving} value={Math.min(scopeIndex, scopeOptions.length - 1)} onChange={event => setScopeIndex(Number(event.target.value))}>{scopeOptions.map((scope, index) => <option key={index} value={index}>{scope.label}</option>)}</select></label>}{ambiguousDeclarations.length > 0 && <section className="stu-declaration-list"><p className="stu-muted">原有同名声明的范围不明确，已保留；请选择明确范围重新声明。</p>{ambiguousDeclarations.map(row => <div key={row.id} className="stu-declaration-row"><span>{row.declaration.kind === "main_role" ? `${row.declaration.priority} · ${row.declaration.role}` : row.declaration.weaponDuty}</span><button type="button" className="stu-button-sm" disabled={declarationsSaving} onClick={() => void clearRoleDeclaration(row.id)}>清除</button></div>)}</section>}<p className="stu-muted">副角色和武器职责可留空。</p>
+                <div className="stu-modal-body">{scopeOptions.length > 0 && <label className="stu-form-field"><span className="stu-form-label">声明范围</span><select className="stu-form-control" disabled={declarationsSaving} value={Math.min(scopeIndex, scopeOptions.length - 1)} onChange={event => setScopeIndex(Number(event.target.value))}>{scopeOptions.map((scope, index) => <option key={index} value={index}>{scope.label}</option>)}</select></label>}{ambiguousDeclarations.length > 0 && <section className="stu-declaration-list"><p className="stu-muted">原有同名声明的范围不明确，已保留；请选择明确范围重新声明。</p>{ambiguousDeclarations.map(row => <div key={row.id} className="stu-declaration-row"><span>{row.declaration.kind === "main_role" ? `${row.declaration.priority === "primary" ? "主角色" : "副角色"} · ${row.declaration.role}` : DUTY_LABEL[row.declaration.weaponDuty]}</span><button type="button" className="stu-button-sm" disabled={declarationsSaving} onClick={() => void clearRoleDeclaration(row.id)}>清除</button></div>)}</section>}<p className="stu-muted">副角色和武器职责可留空。</p>
                   <div className="stu-form-grid">
-                    <label className="stu-form-field"><span className="stu-form-label">主角色</span><select className="stu-form-control" disabled={declarationsSaving} value={declaredRole} onChange={(event) => { const role = event.target.value as DeclaredRole; setDeclaredRole(role); if (declaredSecondaryRole === role) setDeclaredSecondaryRole(""); }}>{(["igl", "awper", "anchor", "opener", "closer"] as const).map((role) => <option key={role} value={role}>{role}</option>)}</select></label>
-                    <label className="stu-form-field"><span className="stu-form-label">副角色（可选）</span><select className="stu-form-control" disabled={declarationsSaving} value={declaredSecondaryRole} onChange={(event) => setDeclaredSecondaryRole(event.target.value as DeclaredRole | "")}><option value="">不声明</option>{(["igl", "awper", "anchor", "opener", "closer"] as const).filter((role) => role !== declaredRole).map((role) => <option key={role} value={role}>{role}</option>)}</select></label>
-                    <label className="stu-form-field"><span className="stu-form-label">武器职责（可选）</span><select className="stu-form-control" disabled={declarationsSaving} value={declaredWeaponDuty} onChange={(event) => setDeclaredWeaponDuty(event.target.value as WeaponDuty | "")}><option value="">不声明</option>{(["primary_awper", "secondary_awper", "situational_awper", "rifler"] as const).map((duty) => <option key={duty} value={duty}>{duty}</option>)}</select></label>
+                    <label className="stu-form-field"><span className="stu-form-label">主角色</span><select className="stu-form-control" disabled={declarationsSaving} value={declaredRole} onChange={(event) => { const role = event.target.value as DeclaredRole | ""; setDeclaredRole(role); if (declaredSecondaryRole === role) setDeclaredSecondaryRole(""); }}><option value="" disabled>请选择</option>{(["igl", "awper", "anchor", "opener", "closer"] as const).map((role) => <option key={role} value={role}>{role}</option>)}</select></label>
+                    <label className="stu-form-field"><span className="stu-form-label">副角色（可选）</span><select className="stu-form-control" disabled={declarationsSaving} value={declaredSecondaryRole} onChange={(event) => setDeclaredSecondaryRole(event.target.value as DeclaredRole | "")}><option value="">不声明</option>{(["igl", "awper", "anchor", "opener", "closer"] as const).filter((role) => role !== declaredRole || role === declaredSecondaryRole).map((role) => <option key={role} value={role}>{role}</option>)}</select></label>
+                    <label className="stu-form-field"><span className="stu-form-label">武器职责（可选）</span><select className="stu-form-control" disabled={declarationsSaving} value={declaredWeaponDuty} onChange={(event) => setDeclaredWeaponDuty(event.target.value as WeaponDuty | "")}><option value="">不声明</option>{(["primary_awper", "secondary_awper", "situational_awper", "rifler"] as const).map((duty) => <option key={duty} value={duty}>{DUTY_LABEL[duty]}</option>)}</select></label>
                   </div>
                   {roleFormError && <p className="stu-form-error" role="alert">{roleFormError}</p>}
-                  {selectedDeclarations.length > 0 && <section className="stu-declaration-list"><h4>已有声明</h4>{selectedDeclarations.map((row) => <div key={row.id} className="stu-declaration-row"><span>{row.declaration.kind === "main_role" ? `${row.declaration.priority} · ${row.declaration.role}` : row.declaration.weaponDuty}{row.declaration.mapName ? ` · ${row.declaration.mapName.replace("de_", "")}` : ""}</span><button type="button" className="stu-button-sm" disabled={declarationsSaving} onClick={() => void clearRoleDeclaration(row.id)}>清除</button></div>)}</section>}
+                  {selectedDeclarations.length > 0 && <section className="stu-declaration-list"><h4>已有声明</h4>{selectedDeclarations.map((row) => <div key={row.id} className="stu-declaration-row"><span>{row.declaration.kind === "main_role" ? `${row.declaration.priority === "primary" ? "主角色" : "副角色"} · ${row.declaration.role}` : DUTY_LABEL[row.declaration.weaponDuty]}{row.declaration.mapName ? ` · ${row.declaration.mapName.replace("de_", "")}` : ""}</span><button type="button" className="stu-button-sm" disabled={declarationsSaving} onClick={() => void clearRoleDeclaration(row.id)}>清除</button></div>)}</section>}
                 </div>
-                <footer className="stu-modal-foot"><div className="stu-modal-actions"><button type="button" className="stu-button" disabled={declarationsSaving} onClick={() => setRoleEditorOpen(false)}>取消</button><button type="button" className="stu-button stu-button-primary" disabled={declarationsSaving} onClick={() => void saveRoleDeclaration()}>{declarationsSaving ? "保存中…" : "保存声明"}</button></div></footer>
+                <footer className="stu-modal-foot"><div className="stu-modal-actions"><button type="button" className="stu-button" disabled={declarationsSaving} onClick={() => setRoleEditorOpen(false)}>取消</button><button type="button" className="stu-button stu-button-primary" disabled={declarationsSaving || !declaredRole} onClick={() => void saveRoleDeclaration()}>{declarationsSaving ? "保存中…" : "保存声明"}</button></div></footer>
               </div>
             </div>
           )}
