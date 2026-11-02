@@ -64,6 +64,15 @@ import { PlaybookLectureView } from "./views/coach/PlaybookLectureView";
 import { MaterialsView, MaterialDetailView } from "./views/MaterialsView";
 import { RivalHubBatchImportPanel } from "./components/RivalHubBatchImportPanel";
 
+function hasMaterialDraft(frame: import("./lib/studio-navigation").StudioFrame): boolean {
+  if (frame.destination.page === "material") return Boolean(frame.ui && "dirty" in frame.ui && frame.ui.dirty);
+  if (frame.destination.page === "materials") {
+    const ui = frame.ui as MaterialsPageState;
+    return ui.newNoteDirty || ui.newPlaybookDirty || ui.newAssignmentDirty || ui.newMatchSheetDirty;
+  }
+  return false;
+}
+
 function discardMaterialDraft(navigation: StudioNavigation): StudioNavigation {
   const frame = navigation.active;
   if (frame.destination.page === "material" && frame.ui && "dirty" in frame.ui && frame.ui.dirty) return studioNavigationReducer(navigation, { intent: "ui", frameId: frame.id, ui: null });
@@ -108,6 +117,16 @@ export function App() {
   const [navigation, setNavigation] = useState(() => createStudioNavigation("initial"));
   const navigationRef = useRef(navigation);
   navigationRef.current = navigation;
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      const current = navigationRef.current;
+      if ([current.active, ...current.history].some(hasMaterialDraft)) {
+        event.preventDefault(); event.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, []);
   const nextFrameId = useRef(0);
   const savedOpenRequest = useRef(0);
   const touchedFrames = useRef(new Set<string>());
@@ -798,7 +817,7 @@ export function App() {
             eventsStatus={eventsStatus}
             seriesStatus={seriesStatus}
             onRetry={() => { void refreshEventRecords().catch(() => {}); }}
-            eventTools={<EventManager defaultOpen={false} entries={entries} onNotice={setNotice} onLibraryChanged={() => { void refreshEntries(); void refreshEventRecords(); }} onLoadBuiltin={loadBuiltinEvent} />}
+            eventTools={<EventManager defaultOpen={false} entries={entries} onNotice={setNotice} onEventRecordsChanged={refreshEventRecords} onLibraryChanged={() => { void refreshEntries().catch(() => {}); void refreshEventRecords().catch(() => {}); }} onLoadBuiltin={loadBuiltinEvent} />}
             state={active.ui as import("./lib/studio-page-state").EventsPageState}
             onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
             onPageReady={(keys) => onPageReady(active.id, keys)}

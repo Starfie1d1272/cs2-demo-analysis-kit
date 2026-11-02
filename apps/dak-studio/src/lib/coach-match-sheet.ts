@@ -1,4 +1,6 @@
-import { getStorage, type RecordStore } from "./storage";
+import type { AtomicStorageAdapter } from "./storage/types";
+import { commitMaterialRevision, materialBaseline } from "./material-revision";
+import { getStorage } from "./storage";
 import type { SheetMaterialRef } from "./material-ref";
 
 export interface CoachMatchSheet {
@@ -84,7 +86,9 @@ function valid(x: unknown, key: string): x is CoachMatchSheet {
     new Set(x.sections.map((section) => section.id)).size === x.sections.length
   );
 }
-export function createCoachMatchSheetStore(records: RecordStore) {
+export function createCoachMatchSheetStore(storage: AtomicStorageAdapter) {
+  const namespace = "coach-match-sheets";
+  const records = storage.records(namespace);
   return {
     async list() {
       const all = await records.entries<unknown>();
@@ -116,9 +120,8 @@ export function createCoachMatchSheetStore(records: RecordStore) {
       await records.put(item.id, item);
       return item;
     },
-    async update(id: string, draft: CoachMatchSheetDraft) {
-      const old = await records.get<unknown>(id);
-      if (!valid(old, id)) return null;
+    async update(id: string, draft: CoachMatchSheetDraft, revision: string) {
+      const old = materialBaseline(revision, id, (value): value is CoachMatchSheet => valid(value, id));
       const item = {
         ...old,
         ...structuredClone(draft),
@@ -126,19 +129,16 @@ export function createCoachMatchSheetStore(records: RecordStore) {
         updatedAt: Date.now(),
       };
       if (!valid(item, id)) throw new Error("请填写标题并检查引用");
-      await records.put(id, item);
+      await commitMaterialRevision(storage, namespace, id, old, { namespace, key: id, kind: "put", value: item });
       return item;
     },
-    async remove(id: string) {
-      const old = await records.get<unknown>(id);
-      if (!valid(old, id)) throw new Error("比赛单不存在或无法读取");
-      await records.delete(id);
+    async remove(id: string, revision: string) {
+      const old = materialBaseline(revision, id, (value): value is CoachMatchSheet => valid(value, id));
+      await commitMaterialRevision(storage, namespace, id, old, { namespace, key: id, kind: "delete" });
     },
   };
 }
-const store = createCoachMatchSheetStore(
-  getStorage().records("coach-match-sheets"),
-);
+const store = createCoachMatchSheetStore(getStorage());
 export const listCoachMatchSheets = store.list;
 export const getCoachMatchSheet = store.get;
 export const createCoachMatchSheet = store.create;
