@@ -57,13 +57,15 @@ export function RadarFieldView({ exportSource, onCapabilityRepair, entries, team
   );
   const capability = useCapability(entriesOfMap, "control");
   const eligibleEntries = capability.eligible;
+  const [groupError, setGroupError] = useState<string | null>(null);
   const [groupSnapshot, setGroupSnapshot] = useState<{ key: string; groups: Awaited<ReturnType<typeof getTeamAnalysisGroups>>; slots: Awaited<ReturnType<typeof getAnalysisTeamSlots>> } | null>(null);
   const groupKey = JSON.stringify([entriesOfMap.map(entry => entry.id), selectedTeamKey, selectedTeam, identityOptions?.version]);
   useEffect(() => {
     let cancelled = false;
+    setGroupError(null);
     void Promise.all([getTeamAnalysisGroups(entriesOfMap, identityOptions), getAnalysisTeamSlots(entriesOfMap, identityOptions, selectedTeamKey ? [selectedTeamKey] : selectedTeam ? [selectedTeam] : [])])
       .then(([groups, slots]) => { if (!cancelled) setGroupSnapshot({ key: groupKey, groups, slots }); })
-      .catch(() => { if (!cancelled) setGroupSnapshot(null); });
+      .catch(reason => { if (!cancelled) { setGroupSnapshot(null); setGroupError(reason instanceof Error ? reason.message : String(reason)); } });
     return () => { cancelled = true; };
   }, [entriesOfMap, groupKey, identityOptions?.version]);
   const groups = groupSnapshot?.key === groupKey ? groupSnapshot.groups : [];
@@ -201,6 +203,7 @@ export function RadarFieldView({ exportSource, onCapabilityRepair, entries, team
         {entriesOfMap.filter(entry => !selectedTeam || !!slots?.get(matchIdForEntry(entry))?.size).map(entry => <button key={entry.id} type="button" className="stu-button-sm" onClick={() => onOpenMatch(entry.id)}>{entry.meta.teamAName} vs {entry.meta.teamBName} · {entry.meta.mapName}</button>)}
       </details>
 
+      {groupError && <p role="alert">队伍分组读取失败：{groupError}</p>}
       {invalidTeamForMap && (
         <EmptyState
           variant="insufficient"
