@@ -44,7 +44,18 @@ pipeline 编排上述单场 / 跨场执行链
 | RivalHub                 | 赛事、赛季、身份、权限、持久化和公开展示                        | 复制 DAK 分析与评分逻辑                     | 赛事产品                    |
 | CS2 Insight Agent        | 高光录制软件，复用本仓库 demo 展示模块                          | 复制 Demo 解析与评分逻辑                    | 产品                        |
 
-DAK Studio 已落地为 `apps/dak-studio`（资料库 / 比赛工作台 / 选手档案 / 道具实验室 / 经济与节奏 / 排行榜 / 赛事总览），仍须遵守上表边界：只做适配与编排，不拥有共享逻辑。
+DAK Studio 拥有本地 I/O、存储查询、页面组合与产品领域状态和用户资料；共享事实、算法与可复用展示原语仍归各公共包。纯函数或纯展示本身不决定公共 API。
+
+## 工作台交付边界（2026-11）
+
+本轮是产品重组与已拆包后的边界收尾，不再造 SDK；[决策](decisions/2026-11-01-studio-workbench-delivery.md) 和 [#133](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/133) 是目标与实施顺序，未完成事项不是现状。
+
+- W20 已合 [#157](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/157)：单场 facts 编排归 pipeline、投掷姿态归 tactics；App 封装本地存储与身份键。
+- W03 已合 [#159](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/159)：通用受控控件在 react，Studio 整页和状态在 App；公共破坏按 major 迁移，不留 shim。
+- W21 [#154](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/154) 将跨场数学归 analytics、空间聚合归 tactics，本地范围/存储查询和缓存归 App queries，删除旧 facade。W22 [#155](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/155) 分清组合根、metadata 与 I/O hooks。
+- W07 [#139](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/139)、W09 [#144](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/144)、W12 [#142](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/142) 分别收口范围/context、观察及材料 owner，按任务删除旧 Home/Coach 总页与双写；有限迁移保护用户资料，facts/cache 可重建但不能连带删除资料。
+
+下表保留历史功能归属，不代表旧页面结构是目标导航。
 
 ## DAK Studio 八模块归属
 

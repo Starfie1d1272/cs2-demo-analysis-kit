@@ -1,5 +1,7 @@
 # DAK Studio 完整版总设计（四类任务流 + 管理工具）
 
+> **2026-11 执行入口：** [总包 #133](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/133) 和 [工作台决策](../decisions/2026-11-01-studio-workbench-delivery.md) 覆盖本文旧导航、全局 context、Finding/行动模型及战术材料范围；其余历史分析与数据口径保留参考。
+
 > 2026-06-12 制定，取代 `duel-coach-lab.md`（已归档至 `docs/archive/2026-06/`，
 > 其中模块 4/8 的**数据口径定义原文吸收进本文，不得回退**）。
 > 本文不参考旧页面布局，以「现有功能组件 + v3 数据能力」为底，规划最终形态：

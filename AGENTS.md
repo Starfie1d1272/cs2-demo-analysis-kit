@@ -152,7 +152,7 @@ docs/                  # 架构与集成文档（索引见 docs/README.md）
 - **组件导出**：公共组件从 `packages/react/src/index.ts` 统一导出
 - **组件复用**：新增 UI 前先查 [`docs/design/studio-components.md`](docs/design/studio-components.md)
   组件登记表——能复用就复用，不要重造。表格一律用 `DataTable`（唯一排序表），
-  翻页用 `Pagination`。纯展示组件应下沉 `@cs2dak/react`（绑数据的才留 Studio）
+  翻页用 `Pagination`。可复用展示原语下沉 `@cs2dak/react`；Studio 产品页面组合与产品状态留 App，纯函数或纯展示本身不决定公共 API
 - **UI 设计语言**：DAK Studio 所有页面与组件必须遵守
   [`docs/design-language.md`](docs/design-language.md)（Tactical Slate：只用
   `--dak-*`/`stu-*` token，禁止裸色值与视图私有控件样式；统计证据可点击、

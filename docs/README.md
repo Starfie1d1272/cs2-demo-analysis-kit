@@ -10,10 +10,15 @@
 - [组件登记表](design/studio-components.md)：可复用组件与 token 速查，新增 UI 前必查。
 - [地图语义](design/map-semantics.md)：callout 倾向、默认位、进点入口七图表与分类合同。
 
+## 当前工作台执行
+
+- [Studio 工作台决策](decisions/2026-11-01-studio-workbench-delivery.md) 和 [总包 #133](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/133)：产品目标、owner 与唯一阶段顺序。
+- [PR #6 能力差量审计](audits/2026-11-01-pr6-capability-reconciliation.md)：固定 head 的证据与去向。
+
 ## 设计与排期
 
-- [Studio 完整模块设计](design/studio-redesign.md)：九模块最终形态（唯一设计真相源）。
-- [路线图](roadmap.md)：0.5 / 0.6 / 0.7 时间排序。
+- [Studio 完整模块设计](design/studio-redesign.md)：历史模块设计；当前工作台执行入口见下。
+- [路线图](roadmap.md)：版本历史与当前工作台执行入口。
 - [稳定性等级](stability-tiers.md)：各指标 Stable / Beta / Experimental。
 - [RR 评分模型](design/rr-model.md)：RR v1 / 六账户 / PRISM 唯一设计文档。
 - [RR / PRISM Roadmap](rr-roadmap.md)：评分阶段顺序与现状速查。
