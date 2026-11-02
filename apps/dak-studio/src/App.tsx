@@ -76,11 +76,11 @@ function discardMaterialDraft(navigation: StudioNavigation): StudioNavigation {
 
 const MAIN_NAV: Array<{ section: StudioSection; label: string; hint: string; icon: typeof LibraryBig }> = [
   { section: "workbench", label: "工作台", hint: "开始与导入", icon: House },
-  { section: "matches", label: "比赛", hint: "比赛与赛事", icon: Film },
+  { section: "matches", label: "比赛库", hint: "比赛与赛事", icon: Film },
   { section: "analysis", label: "分析", hint: "选手、队伍与主题", icon: Radar },
   { section: "materials", label: "战术与训练", hint: "备战与材料", icon: ClipboardList },
 ];
-const MANAGEMENT_NAV = { label: "数据管理", hint: "身份 · 资产 · 资料库维护", icon: Settings };
+const MANAGEMENT_NAV = { label: "数据管理", hint: "身份 · 资产 · 比赛库维护", icon: Settings };
 
 type MatchDeepLink = { roundNumber: number; tick?: number };
 
@@ -394,9 +394,9 @@ export function App() {
             onLibraryChanged={() => { void refreshEntries().catch(() => {}); void refreshEventRecords().catch(() => {}); }}
             onLoadBuiltin={loadBuiltinEvent}
             onOpenDemo={openDemo}
-            onRemoveDemo={id => { void handleRemove(id).catch(error => setNotice(`资料库操作或刷新失败：${error instanceof Error ? error.message : String(error)}`)); }}
-            onUpdateTags={(id, tags) => { void handleUpdateTags(id, tags).catch(error => setNotice(`资料库操作或刷新失败：${error instanceof Error ? error.message : String(error)}`)); }}
-            onBulkUpdateTags={(ids, add, remove) => { void handleBulkUpdateTags(ids, add, remove).catch(error => setNotice(`资料库操作或刷新失败：${error instanceof Error ? error.message : String(error)}`)); }}
+            onRemoveDemo={id => { void handleRemove(id).catch(error => setNotice(`比赛库操作或刷新失败：${error instanceof Error ? error.message : String(error)}`)); }}
+            onUpdateTags={(id, tags) => { void handleUpdateTags(id, tags).catch(error => setNotice(`比赛库操作或刷新失败：${error instanceof Error ? error.message : String(error)}`)); }}
+            onBulkUpdateTags={(ids, add, remove) => { void handleBulkUpdateTags(ids, add, remove).catch(error => setNotice(`比赛库操作或刷新失败：${error instanceof Error ? error.message : String(error)}`)); }}
             onLinkRawDemo={nativeImportAvailable ? handleLinkRawDemo : undefined}
             onWatchRawDemo={nativeImportAvailable ? (entry) => void watchRawDemo(entry.id) : undefined}
             onReexportDemo={handleReexportDemo}
@@ -554,7 +554,7 @@ export function App() {
             onWorkspaceStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
           />
         )}
-        {section === "analysis" && active.originSavedAnalysisId && <p>已保存分析：按当前资料库重新计算。</p>}
+        {section === "analysis" && active.originSavedAnalysisId && <p>已保存分析：按当前比赛库和所选比赛重新计算。</p>}
         {section === "analysis" && <AnalysisView key={active.id} page={destination.page as import("./lib/studio-navigation").AnalysisPageId} focus={analysisContext.focus} onBeginSave={async () => { const frame = navigationRef.current.active; if (frame.id !== active.id) throw new Error("分析页面已切换"); const id = frame.originSavedAnalysisId; if (!id) return null; const row = await savedAnalyses.get(id); if (!row) throw new Error("原保存项已删除，可另存"); return { title: row.title, shortcut: row.workbenchShortcut }; }} savedPanel={<SavedAnalysesPanel onReset={() => navigate({ page: "analysis", context: createAnalysisContextPreset("explore") })} entries={entries} events={eventScopes} onOpen={row => void openSavedAnalysis(row)} />} onSave={async (title, workbenchShortcut, copy) => {
           const frame = navigationRef.current.active;
           if (frame.id !== active.id || !("context" in frame.destination)) throw new Error("分析页面已切换");
