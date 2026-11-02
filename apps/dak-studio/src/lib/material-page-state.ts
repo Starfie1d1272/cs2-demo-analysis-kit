@@ -37,6 +37,6 @@ export const emptyCoachPlaybookDraft = (): CoachPlaybookDraft => ({ kind: "defau
 export const emptyMaterialsPageState = (): MaterialsPageState => ({ search: "", typeFilter: null, mapFilter: null, selectedRef: null, playbookSide: null, playbookKind: null, playbookTable: { sort: { key: null, direction: "desc" }, page: 0 }, newAssignment: null, newAssignmentDirty: false, newAssignmentObservationExpanded: false, newPlaybook: null, newPlaybookDirty: false, newPlaybookPhaseId: null, newNote: null, newNoteDirty: false, newMatchSheet: null, newMatchSheetDirty: false });
 export function materialStateMatches(state: MaterialPageState | null, ref: MaterialRef): state is MaterialPageState { return state !== null && state.kind === ref.kind && state.id === ref.id; }
 
-export type PlaybookLectureState = { kind: "playbook"; id: string; phaseId: string | null; tab: "diagram" | "evidence"; selectedEvidenceId: string | null; replayEntryId: string | null; replay: ReplayViewState | null };
+export type PlaybookLectureState = { kind: "playbook"; id: string; phaseId: string | null; tab: "diagram" | "evidence"; selectedEvidenceId: string | null; replayEntryId: string | null; replayGeneration: number | null; replay: ReplayViewState | null };
 
 export type LecturePageState = PlaybookLectureState | { kind: "match-sheet"; id: string; selectedSectionId: string | null; selectedRefKey: string | null; lectureIndex: number; tab: "content"; playbook: PlaybookLectureState | null };

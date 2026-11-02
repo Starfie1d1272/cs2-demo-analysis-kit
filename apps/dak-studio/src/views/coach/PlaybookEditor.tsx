@@ -3,7 +3,7 @@ import { SPATIAL_ASSET_MAPS } from "@cs2dak/maps";
 import type { CoachPlaybookDraft } from "../../lib/coach-playbook";
 import type { StudioDemoEntry } from "../../lib/demo-entry";
 import { SavedEvidenceEditor } from "./SavedEvidenceEditor";
-export function PlaybookEditor({ draft, entries, onChange, onEvidence, phaseId, onPhaseIdChange }: { phaseId: string | null; onPhaseIdChange: (id: string | null) => void; draft: CoachPlaybookDraft; entries: StudioDemoEntry[]; onChange: (draft: CoachPlaybookDraft) => void; onEvidence: (index: number) => void }) {
+export function PlaybookEditor({ draft, entries, onChange, onEvidence, phaseId, onPhaseIdChange }: { phaseId: string | null; onPhaseIdChange: (id: string | null) => void; draft: CoachPlaybookDraft; entries: StudioDemoEntry[]; onChange: (draft: CoachPlaybookDraft, selectedPhaseId?: string | null) => void; onEvidence: (index: number) => void }) {
   const update = (patch: Partial<CoachPlaybookDraft>) => onChange({ ...draft, ...patch });
   return <div><label>标题<input className="stu-input" value={draft.title} onChange={e => update({ title: e.target.value })} /></label>
     <label>地图<select className="stu-input" value={draft.mapName} onChange={e => update({ mapName: e.target.value })}>{!SPATIAL_ASSET_MAPS.some(map => map === draft.mapName) && <option value={draft.mapName}>{draft.mapName}</option>}{SPATIAL_ASSET_MAPS.map(map => <option key={map} value={map}>{map}</option>)}</select></label>

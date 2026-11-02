@@ -13,7 +13,7 @@ export function usePlaybookMap(name: string) {
   useEffect(() => { let live = true; const probe = (url: string | null) => new Promise<boolean>(resolve => { if (!url) return resolve(false); const image = new Image(); image.onload = () => resolve(true); image.onerror = () => resolve(false); image.src = url; }); void Promise.all([probe(candidate.radarImageUrl), probe(candidate.lowerRadarImageUrl)]).then(([upper, lower]) => { if (live) setLoaded({ name, upper, lower }); }); return () => { live = false; }; }, [name]);
   return { ...candidate, radarImageUrl: loaded.name === name && loaded.upper ? candidate.radarImageUrl : null, lowerRadarImageUrl: loaded.name === name && loaded.lower ? candidate.lowerRadarImageUrl : null };
 }
-export function PlaybookPhaseEditor({ draft, phaseId, onPhaseIdChange, onChange }: { draft: CoachPlaybookDraft; phaseId: string | null; onPhaseIdChange: (id: string | null) => void; onChange: (draft: CoachPlaybookDraft) => void }) {
+export function PlaybookPhaseEditor({ draft, phaseId, onPhaseIdChange, onChange }: { draft: CoachPlaybookDraft; phaseId: string | null; onPhaseIdChange: (id: string | null) => void; onChange: (draft: CoachPlaybookDraft, selectedPhaseId?: string | null) => void }) {
   const [level, setLevel] = useState<"upper" | "lower">("upper");
   const [kind, setKind] = useState<CoachMarker["kind"]>("position");
   const [selected, setSelected] = useState<string | null>(null);
@@ -25,7 +25,7 @@ export function PlaybookPhaseEditor({ draft, phaseId, onPhaseIdChange, onChange 
   useEffect(() => { setLevel("upper"); }, [draft.mapName]);
   const phases = (items: CoachPhase[]) => onChange({ ...draft, phases: items });
   const update = (patch: Partial<CoachPhase>) => { if (phase) phases(draft.phases.map(p => p.id === phase.id ? { ...p, ...patch } : p)); };
-  const reorder = (delta: number) => { if (!phase) return; const items = [...draft.phases], index = items.findIndex(p => p.id === phase.id), next = index + delta; if (next < 0 || next >= items.length) return; [items[index], items[next]] = [items[next], items[index]]; phases(items); };
+  const reorder = (delta: number) => { if (!phase) return; const items = [...draft.phases], index = items.findIndex(p => p.id === phase.id), next = index + delta; if (next < 0 || next >= items.length) return; [items[index], items[next]] = [items[next], items[index]]; onChange({ ...draft, phases: items }, phase.id); };
   const marker = phase?.markers.find(m => m.id === selected);
   return <section><h2>阶段与手工示意</h2><nav aria-label="阶段">{draft.phases.map(p => <button type="button" className="stu-button-sm" key={p.id} aria-pressed={phase?.id === p.id} onClick={() => onPhaseIdChange(p.id)}>{p.title || "未命名阶段"}</button>)}<button type="button" className="stu-button-sm" onClick={() => { const p: CoachPhase = { id: crypto.randomUUID(), title: `阶段 ${draft.phases.length + 1}`, body: "", tasks: [], markers: [] }; phases([...draft.phases, p]); }}>新增阶段</button></nav>
     {phase && <><label>阶段名称<input className="stu-input" value={phase.title} onChange={e => update({ title: e.target.value })} /></label><button type="button" className="stu-button-sm" onClick={() => reorder(-1)}>上移</button><button type="button" className="stu-button-sm" onClick={() => reorder(1)}>下移</button><button type="button" className="stu-button-sm" onClick={() => { if (window.confirm(`删除此阶段及 ${phase.tasks.length} 项任务、${phase.markers.length} 个标记？`)) { phases(draft.phases.filter(p => p.id !== phase.id)); } }}>删除阶段</button>
