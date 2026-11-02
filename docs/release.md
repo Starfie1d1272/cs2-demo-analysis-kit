@@ -127,9 +127,9 @@ size、SHA-256 以及 R2 → GitHub Release → ghproxy 下载顺序；版本化
 GitHub Release 正文以仓库维护的 `CHANGELOG.md` 版本段为唯一变更摘要，不再叠加
 GitHub 自动生成的跨 tag `What's Changed`，避免历史 tag 范围与桌面 release 边界不一致。
 
-## macOS 桌面候选（RC）
+## 桌面候选（RC）
 
-RC 使用独立 `Desktop RC` workflow：先按正式流程核最终源码与 CI、同步尚未使用的数字桌面版本并提交；按上一正式 tag 到候选提交的完整变化维护 `CHANGELOG.md` 中该数字版本段，候选说明与正式发行共用该段，缺失或为空时停止。由发行负责人在最终冻结提交打 `vX.Y.Z-rc.N`（N 从 1 开始），推送后构建 Apple Silicon DMG 并创建 GitHub prerelease。当前稳定版为 0.8.8 时可考虑 `0.8.9-rc.1`，发行前仍须核实远端 tag 和版本。不要提前打 tag，也不要移动已有 tag。数字版本仍是应用内版本；候选 tag 与 build-info 的 revision/candidateTag 标明准确来源。同一数字版本的正式版不保证向已安装 RC 触发更新提示，正式版需要手动安装验证。
+RC 使用独立 `Desktop RC` workflow：先按正式流程核最终源码与 CI、同步尚未使用的数字桌面版本并提交；按上一正式 tag 到候选提交的完整变化维护 `CHANGELOG.md` 中该数字版本段，候选说明与正式发行共用该段，缺失或为空时停止。由发行负责人在最终冻结提交打 `vX.Y.Z-rc.N`（N 从 1 开始），推送后构建 Windows 与 Apple Silicon 候选产物，全部通过后统一创建 GitHub prerelease。当前稳定版为 0.8.8 时可考虑后续 `0.8.9-rc.N`，发行前仍须核实远端 tag 和版本。不要提前打 tag，也不要移动已有 tag。数字版本仍是应用内版本；候选 tag 与 build-info 的 revision/candidateTag 标明准确来源。同一数字版本的正式版不保证向已安装 RC 触发更新提示，正式版需要手动安装验证。
 
 候选流程核对 tag、全部私有版本及 clean checkout，复用桌面打包脚本，在 Windows 和 Apple Silicon 构建均成功后统一发布 runtime ZIP、完整便携 ZIP、候选联网安装器、安装清单和 DMG，并附 SHA-256。候选安装器只读取该候选 tag 的 GitHub 清单；应用数字版本仍为基础版本。候选不上传 R2、不更改正式更新 manifest、不发 npm，也不设为 latest。已有 release 不覆盖，RC1 保持原样；新流程使用后续 RC。构建为未签名，macOS 未公证；使用前备份资料，真实 Windows 安装和 macOS 安装仍须实机验收。
 

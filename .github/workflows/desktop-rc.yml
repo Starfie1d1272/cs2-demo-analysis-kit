@@ -249,34 +249,58 @@ jobs:
 
   release:
     needs: [windows, macos]
-    if: ${{ !inputs.build_only }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.build_only && github.sha || inputs.tag || github.ref }}
+          fetch-depth: 0
+      - name: Validate source identity
+        shell: bash
+        env:
+          RC_TAG: ${{ inputs.tag || github.ref_name }}
+          BUILD_ONLY: ${{ inputs.build_only }}
+        run: |
+          set -euo pipefail
+          if [[ "$BUILD_ONLY" == true ]]; then
+            ! git rev-parse -q --verify "refs/tags/$RC_TAG"
+            git tag "$RC_TAG" HEAD
+          fi
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse "refs/tags/$RC_TAG^{commit}")" ]]
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           merge-multiple: true
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify complete candidate and checksums
+        shell: bash
+        env:
+          RC_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          ID="${RC_TAG#v}"
+          for f in "dak-studio-$ID-macos-arm64.dmg" "dak-studio-windows-$ID.zip" "dak-studio-windows-$ID-full.zip" "DAK-Studio-Setup-$ID.exe" install-manifest.json; do test -s "dist/$f"; done
+          (cd dist && sha256sum "dak-studio-$ID-macos-arm64.dmg" "dak-studio-windows-$ID.zip" "dak-studio-windows-$ID-full.zip" "DAK-Studio-Setup-$ID.exe" install-manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ inputs.build_only }}
         with:
-          ref: ${{ inputs.tag || github.ref }}
-          fetch-depth: 0
+          name: candidate-checksums
+          path: dist/SHA256SUMS.txt
+          if-no-files-found: error
       - name: Publish complete candidate
+        if: ${{ !inputs.build_only }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           RC_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          [[ "$(git rev-parse HEAD)" == "$(git rev-parse "refs/tags/$RC_TAG^{commit}")" ]]
           if gh release view "$RC_TAG" >/dev/null 2>&1; then
             echo "Release already exists; refusing to overwrite assets" >&2
             exit 1
           fi
           ID="${RC_TAG#v}"
-          for f in "dak-studio-$ID-macos-arm64.dmg" "dak-studio-windows-$ID.zip" "dak-studio-windows-$ID-full.zip" "DAK-Studio-Setup-$ID.exe" install-manifest.json; do test -s "dist/$f"; done
-          (cd dist && sha256sum "dak-studio-$ID-macos-arm64.dmg" "dak-studio-windows-$ID.zip" "dak-studio-windows-$ID-full.zip" "DAK-Studio-Setup-$ID.exe" install-manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
           VERSION="${ID%-rc.*}"
           awk -v ver="$VERSION" 'BEGIN { section=0 } $0 ~ "^## \\[" ver "\\]" { section=1; next } section && /^## \[/ { exit } section { print }' CHANGELOG.md > "$RUNNER_TEMP/changelog.txt"
           grep -q '[^[:space:]]' "$RUNNER_TEMP/changelog.txt"
