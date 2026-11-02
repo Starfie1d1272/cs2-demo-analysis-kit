@@ -152,7 +152,10 @@ export function buildPlayerMapRoleProfiles(evidenceRows: PlayerMapRoleEvidence[]
       .filter((item) => item.scope.relevant);
     const declaredRoles = scopedDeclarations.filter((item): item is { declaration: MainRoleDeclaration; scope: ScopedEvidence } => item.declaration.kind === "main_role").map((item) => item.declaration);
     const declaredWeaponDuties = scopedDeclarations.filter((item): item is { declaration: WeaponDutyDeclaration; scope: ScopedEvidence } => item.declaration.kind === "weapon_duty").map((item) => item.declaration);
-    const displayRows = options.aggregatedEvidence?.filter((row) => row.playerKey === playerKey && row.teamKey === teamKey) ?? rows;
+    const displayRows = options.aggregatedEvidence?.filter((row) => row.playerKey === playerKey && row.teamKey === teamKey).map((row) => {
+      const matchIds = [...new Set(rows.filter((source) => source.mapName === row.mapName && source.side === row.side && source.sample.eligibleRounds > 0).flatMap((source) => source.matchIds))];
+      return { ...row, matchIds, sample: { ...row.sample, matchCount: matchIds.length } };
+    }) ?? rows;
     const automatic = infer(displayRows);
     const { weaponDuty, roleEvidenceScores, winner, runnerUp, margin, sufficient, status, inferredPrimaryRole } = automatic;
     const declaredIgl = scopedDeclarations.some((item) => item.declaration.kind === "main_role" && item.declaration.priority === "primary" && item.declaration.role === "igl" && item.declaration.mapName == null && item.declaration.validFrom == null && item.declaration.validTo == null);
