@@ -77,7 +77,7 @@ export async function getRoleTeamEntries(entries: StudioDemoEntry[], identity: I
 }
 
 export function getMapRoleEvidence(entries: StudioDemoEntry[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<MapRoleEvidenceSummary> {
-  const key = `${keyOf(entries, identity?.version, selectedTeams)}:map-role-evidence:v6`;
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:map-role-evidence:v7`;
   return cachedQuery(mapRoleEvidenceCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), async (generation) => {
     const persisted = await readPersistedValue<MapRoleEvidenceSummary>(key, generation);
     if (persisted) return persisted;
