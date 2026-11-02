@@ -1,5 +1,5 @@
 import { FLAG_ALIVE, type TeamKey } from "@cs2dak/contract";
-import { findNavPath, nearestNavArea, type CalloutGrid, type CompactNav, type Vec3 } from "@cs2dak/maps";
+import { findNavPath, type CalloutGrid, type CompactNav, type Vec3 } from "@cs2dak/maps";
 import { replayCalloutAt, replayPointAt, replayTickAt, type ReplayRoundContext, type ReplayRoundTrack } from "../tactics/replay-round-context.js";
 
 export interface SpatialPlayerSample {
@@ -77,6 +77,7 @@ export function buildRoundSpatialFrames(
   context: ReplayRoundContext,
   grid: CalloutGrid | null,
   nav: CompactNav | null,
+  navAreaAt: (point: Vec3) => number | null,
 ): TeamSpatialFrame[] {
   const frames: TeamSpatialFrame[] = [];
   for (let frameIndex = 0; frameIndex < context.frameCount; frameIndex += 1) {
@@ -94,7 +95,7 @@ export function buildRoundSpatialFrames(
             track,
             point,
             callout: replayCalloutAt(context, track, frameIndex, grid),
-            navAreaId: nav ? nearestNavArea(nav, point)?.id ?? null : null,
+            navAreaId: navAreaAt(point),
           };
         }).filter((player): player is SpatialPlayerSample => player != null);
       if (players.length > 0) frames.push({ tick, teamKey, side, players, components: components(players, nav) });
