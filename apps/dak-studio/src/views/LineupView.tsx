@@ -1,7 +1,8 @@
+import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { flushSync } from "react-dom";
 import { usePageReady } from "../lib/use-page-ready";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { buildLineupClusters, getMapCalibration, worldToRadar, calloutCn, type LineupCluster, type LineupClusterMode, type LineupGrenadeLike } from "@cs2dak/maps";
 import { displayWeaponName } from "@cs2dak/presentation";
 import { DataTable, EmptyState, MetricInfo, EvidenceLink, type DataTableColumn } from "@cs2dak/react";
@@ -89,12 +90,16 @@ export function LineupView({
   onRebuild: (ids: string[]) => void;
   onPageReady?: (keys: string[]) => void;
 }) {
-  const [clusters, setClusters] = useState<LineupCluster[]>([]);
+  const [clusterSnapshot, setClusterSnapshot] = useState<{ key: string; generation: number; value: LineupCluster[] } | null>(null);
+  const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const [staleIds, setStaleIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const { mapName: activeMap, grenade: typeFilter, side: sideFilter, table: tableState, radarTopN, mode: clusterMode } = state;
+  const requestKey = JSON.stringify([entries.map(entry => entry.id), clusterMode]);
+  const clusters = clusterSnapshot?.key === requestKey ? clusterSnapshot.value : [];
+  const hasSnapshot = clusterSnapshot?.key === requestKey;
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [copiedClusterId, setCopiedClusterId] = useState<string | null>(null);
   const [savedClusterId, setSavedClusterId] = useState<string | null>(null);
@@ -154,10 +159,10 @@ export function LineupView({
   // ── 加载：分批 → 按地图分组 → 跨场聚类 ──────────────────────────────────
   useEffect(() => {
     let cancelled = false;
-    setClusters([]);
+    if (analysis.status !== "ready") return;
     setError(null);
     setProgress(0);
-    if (entries.length === 0) return;
+    if (entries.length === 0) { setLoading(false); return; }
     setLoading(true);
 
     loadAllGrenades(entries, (done) => {
@@ -204,7 +209,7 @@ export function LineupView({
           allClusters.push(...result);
         }
 
-        if (!cancelled) setClusters(allClusters);
+        if (!cancelled) { assertAnalysisGeneration(analysis.generation); setClusterSnapshot({ key: requestKey, generation: analysis.generation, value: allClusters }); }
       })
       .catch((err) => {
         if (!cancelled) { setStaleIds(err instanceof FactsNotReadyError ? err.entryIds : []); setError(err instanceof Error ? err.message : String(err)); }
@@ -216,7 +221,7 @@ export function LineupView({
     return () => {
       cancelled = true;
     };
-  }, [entries, clusterMode]);
+  }, [entries, clusterMode, requestKey, analysis]);
 
   // ── 按地图分组 + 类型筛选（排序交由 DataTable） ──────────────────────────
   const byMap = useMemo(() => {
@@ -315,22 +320,25 @@ export function LineupView({
   // ── 渲染（空态提前返回） ──────────────────────────────────────────────
 
   const savedErrorNotice = savedError && <div className="stu-card"><h3>已保存练习点位</h3><p className="stu-error" role="alert">读取失败：{savedError}</p></div>;
-  if (error) return <div>
+  if (error && !hasSnapshot) return <div>
     <EmptyState variant="error" title="Lineup 聚类失败" hint={error} action={staleIds.length ? <button type="button" className="stu-button" onClick={() => onRebuild(staleIds)}>重建 facts</button> : undefined} />
     {savedErrorNotice}
     {savedLineups.length > 0 && <div className="stu-card"><h3>已保存练习点位</h3>{savedLineups.map(item => <p key={item.id}>{item.label}{!item.sourceFactsRevision && " · 来源版本未知，需要核验"}</p>)}</div>}
   </div>;
-  if (loading) {
+  if ((loading || analysis.status !== "ready") && !hasSnapshot) {
     return (
       <div className="stu-loading">
         扫描 {entries.length} 场 demo 的 grenades.json… ({progress}/{entries.length})
       </div>
     );
   }
+  const staleNotice = hasSnapshot && (loading || error || analysis.status !== "ready" || clusterSnapshot.generation !== analysis.generation) ? <p role="status" className="stu-muted">{error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p> : null;
   if (byMap.length === 0) {
     return (
       <div>
+        {staleNotice}
         {savedErrorNotice}
+        {savedLineups.length > 0 && <div className="stu-card"><h3>已保存练习点位</h3>{savedLineups.map(item => <p key={item.id}>{item.label}{!item.sourceFactsRevision && " · 来源版本未知，需要核验"}</p>)}</div>}
         <EmptyState
           variant="insufficient"
           title="没有可聚类道具"
@@ -362,6 +370,7 @@ export function LineupView({
 
   return (
     <div className="stu-lineup-page">
+      {staleNotice}
       {savedErrorNotice}
       {savedLineups.length > 0 && (
         <details

@@ -1,7 +1,10 @@
+import { CapabilityBar, useCapability } from "../components/CapabilityBar";
+import type { CapabilityRepairAction } from "../lib/capability-availability";
+import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import type { AnalysisPageState } from "../lib/studio-page-state";
 import { usePageReady } from "../lib/use-page-ready";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { formatPercent, type TeamComparisonModel } from "@cs2dak/presentation";
 import { type TournamentInsights } from "@cs2dak/analytics";
 import { DataTable, TeamComparisonPanel, type DataTableColumn } from "@cs2dak/react";
@@ -13,6 +16,7 @@ import { EmptyState, MetricInfo } from "@cs2dak/react";
 import { LeaderboardView } from "./LeaderboardView";
 
 export interface TournamentDashboardViewProps {
+  onCapabilityRepair: (action: CapabilityRepairAction) => void;
   state: AnalysisPageState;
   onStateChange: (state: AnalysisPageState) => void;
   onPageReady?: (keys: string[]) => void;
@@ -48,6 +52,7 @@ const WEAPON_COLUMNS: DataTableColumn<WeaponRow>[] = [
 
 /** v0.3 赛事总览：地图使用率、T/CT 胜率、手枪局与转化（cohort 同源聚合）。 */
 export function TournamentDashboardView({
+  onCapabilityRepair,
   allEntries,
   entries,
   state,
@@ -66,59 +71,43 @@ export function TournamentDashboardView({
   const weaponTable = state.tables.weapons ?? { sort: { key: "kills", direction: "desc" as const }, page: 0 };
   const setMapTable = (value: typeof mapTable) => onStateChange({ ...state, tables: { ...state.tables, maps: value } });
   const setWeaponTable = (value: typeof weaponTable) => onStateChange({ ...state, tables: { ...state.tables, weapons: value } });
-  const [insights, setInsights] = useState<TournamentInsights | null>(null);
-  const [teamComparison, setTeamComparison] = useState<TeamComparisonModel | null>(null);
-  const [comparisonReady, setComparisonReady] = useState(false);
-  const [comparisonError, setComparisonError] = useState<string | null>(null);
+  const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
+  const insightCapability = useCapability(entries, "economy");
+  const comparisonCapability = useCapability(entries, "team-comparison");
+  const insightEntries = insightCapability.eligible;
+  const comparisonEntries = comparisonCapability.eligible;
+  const insightKey = JSON.stringify([entries.map(entry => entry.id), selectedTeam, identityOptions?.version]);
   const comparePair = state.comparePair;
   const setComparePair = (comparePair: [string, string] | null) => onStateChange({ ...state, comparePair });
+  const comparisonKey = JSON.stringify([entries.map(entry => entry.id), comparePair, identityOptions?.version]);
+  const [insightSnapshot, setInsightSnapshot] = useState<{ key: string; generation: number; sample: string; value: TournamentInsights | null } | null>(null);
+  const [comparisonSnapshot, setComparisonSnapshot] = useState<{ key: string; generation: number; sample: string; value: TeamComparisonModel } | null>(null);
+  const insights = insightSnapshot?.key === insightKey ? insightSnapshot.value : null;
+  const teamComparison = comparisonSnapshot?.key === comparisonKey ? comparisonSnapshot.value : null;
+  const [comparisonReady, setComparisonReady] = useState(false);
+  const [comparisonError, setComparisonError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
-
-  usePageReady(entries.length === 0 || ((insights !== null || error !== null) && comparisonReady), onPageReady);
-
+  usePageReady(entries.length === 0 || ((insights !== null || error !== null || insightCapability.error !== null || insightEntries?.length === 0) && (comparisonReady || comparisonCapability.error !== null || comparisonEntries?.length === 0)), onPageReady);
   useEffect(() => {
-    if (entries.length === 0) {
-      setInsights(null);
-      return;
-    }
+    if (!insightEntries?.length || analysis.status !== "ready") return;
     let cancelled = false;
-    setInsights(null);
     setError(null);
-    getTournamentInsights(entries, identityOptions, selectedTeam ? [selectedTeam] : [])
-      .then((result) => {
-        if (!cancelled) setInsights(result);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [entries, identityOptions?.version, selectedTeam]);
-
-  // 队伍对比独立加载：A/B 两队跨全部己方比赛聚合，无需互相交手。comparePair 缺省时
-  // 由构建器取场次最多的两队；选队后只换 pair 重查（availableTeams 不变）。
+    getTournamentInsights(insightEntries, identityOptions, selectedTeam ? [selectedTeam] : [])
+      .then(value => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setInsightSnapshot({ key: insightKey, generation: analysis.generation, sample: JSON.stringify(insightEntries.map(entry => entry.id)), value }); } })
+      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); });
+    return () => { cancelled = true; };
+  }, [insightEntries, identityOptions?.version, selectedTeam, insightKey, analysis]);
   useEffect(() => {
-    if (entries.length === 0) {
-      setTeamComparison(null);
-      return;
-    }
+    if (!comparisonEntries?.length || analysis.status !== "ready") return;
     let cancelled = false;
-    setComparisonReady(false);
-    setComparisonError(null);
-    getTeamComparison(entries, identityOptions, comparePair ?? undefined)
-      .then((result) => {
-        if (!cancelled) setTeamComparison(result);
-      })
-      .catch((reason) => {
-        if (!cancelled) { setTeamComparison(null); setComparisonError(reason instanceof Error ? reason.message : String(reason)); }
-      })
+    setComparisonReady(false); setComparisonError(null);
+    getTeamComparison(comparisonEntries, identityOptions, comparePair ?? undefined)
+      .then(value => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setComparisonSnapshot({ key: comparisonKey, generation: analysis.generation, sample: JSON.stringify(comparisonEntries.map(entry => entry.id)), value }); } })
+      .catch(reason => { if (!cancelled) setComparisonError(reason instanceof Error ? reason.message : String(reason)); })
       .finally(() => { if (!cancelled) setComparisonReady(true); });
-    return () => {
-      cancelled = true;
-    };
-  }, [entries, identityOptions?.version, comparePair]);  // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { cancelled = true; };
+  }, [comparisonEntries, identityOptions?.version, comparisonKey, analysis]);
 
   if (allEntries.length === 0) {
     return (
@@ -142,8 +131,39 @@ export function TournamentDashboardView({
         </div>
         {onGoDirectory && <button type="button" className="stu-button-sm" onClick={onGoDirectory}>返回赛事目录</button>}
       </header>
+      {insightCapability.availability && <CapabilityBar availability={insightCapability.availability} onRepair={onCapabilityRepair} />}
+      {insightCapability.error && <p role="alert">赛事数据读取失败：{insightCapability.error} <button type="button" className="stu-button-sm" onClick={insightCapability.retry}>重试</button></p>}
+      {insightEntries?.length === 0 && !insights && <EmptyState variant="insufficient" title="没有可用赛事数据" hint="请查看上方限制和修复入口。" />}
+          <div className="stu-card">
+            <h3>队伍对比</h3>
+            {comparisonCapability.availability && <CapabilityBar availability={comparisonCapability.availability} onRepair={onCapabilityRepair} />}
+            {comparisonCapability.error && <p role="alert">对比能力读取失败：{comparisonCapability.error} <button type="button" className="stu-button-sm" onClick={comparisonCapability.retry}>重试</button></p>}
+            {teamComparison && (comparisonError || comparisonCapability.error || analysis.status !== "ready" || comparisonSnapshot?.generation !== analysis.generation || comparisonSnapshot.sample !== JSON.stringify(comparisonEntries?.map(entry => entry.id))) && <p role="status">{comparisonError || comparisonCapability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && comparisonEntries?.length === 0 ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}
+            <p className="stu-muted">选两支队伍对比当前状态——无需互相交手，适合赛前侦察。</p>
+            {teamComparison ? (
+              <TeamComparisonPanel
+                model={teamComparison}
+                onSelectPair={(a, b) => setComparePair([a, b])}
+                onOpenMatch={(matchId) => {
+                  const entry = entryByMatchId.get(matchId);
+                  if (entry) onOpenMatch(entry.id, { roundNumber: 1 });
+                }}
+              />
+            ) : comparisonCapability.error ? null : comparisonEntries?.length === 0 ? <p>当前没有可用对比样本。</p> : comparisonError ? (
+              <p className="stu-error" role="alert">队伍对比加载失败：{comparisonError}</p>
+            ) : (
+              <p className="stu-dim">至少需要两个队伍的 demo 才能生成对比。</p>
+            )}
+            {teamComparison && onOpenTeam && (
+              <div className="stu-chip-row">
+                {teamComparison.availableTeams.map((team) => <button key={team.name} type="button" className="stu-chip" onClick={() => onOpenTeam(team.name)}>{team.name} · {team.matches} 场</button>)}
+              </div>
+            )}
+          </div>
+
+      {insights && (error || insightCapability.error || analysis.status !== "ready" || insightSnapshot?.generation !== analysis.generation || insightSnapshot.sample !== JSON.stringify(insightEntries?.map(entry => entry.id))) && <p role="status">{error || insightCapability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && insightEntries?.length === 0 ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
-      {!error && !insights && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo…</div>}
+      {!error && !insightCapability.error && !insights && insightEntries?.length !== 0 && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo…</div>}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
       {insights && (
         <>
@@ -156,29 +176,6 @@ export function TournamentDashboardView({
               <span>手枪局转化<MetricInfo note="赢下手枪局后把下一回合也拿下的比率" /></span>
               <b>{formatPercent(insights.pistolConversionPercent)}</b>
             </div>
-          </div>
-          <div className="stu-card">
-            <h3>队伍对比</h3>
-            <p className="stu-muted">选两支队伍对比当前状态——无需互相交手，适合赛前侦察。</p>
-            {teamComparison ? (
-              <TeamComparisonPanel
-                model={teamComparison}
-                onSelectPair={(a, b) => setComparePair([a, b])}
-                onOpenMatch={(matchId) => {
-                  const entry = entryByMatchId.get(matchId);
-                  if (entry) onOpenMatch(entry.id, { roundNumber: 1 });
-                }}
-              />
-            ) : comparisonError ? (
-              <p className="stu-error" role="alert">队伍对比加载失败：{comparisonError}</p>
-            ) : (
-              <p className="stu-dim">至少需要两个队伍的 demo 才能生成对比。</p>
-            )}
-            {teamComparison && onOpenTeam && (
-              <div className="stu-chip-row">
-                {teamComparison.availableTeams.map((team) => <button key={team.name} type="button" className="stu-chip" onClick={() => onOpenTeam(team.name)}>{team.name} · {team.matches} 场</button>)}
-              </div>
-            )}
           </div>
           <div className="stu-card">
             <h3>地图盘面</h3>
@@ -200,12 +197,12 @@ export function TournamentDashboardView({
               columns={WEAPON_COLUMNS}
             />
           </div>
-          {onOpenPlayer && <LeaderboardView state={state} onStateChange={onStateChange} embedded allEntries={allEntries} entries={entries} selectedTeam={selectedTeam} identityOptions={identityOptions} onPlayerClick={onOpenPlayer} onGoLibrary={onGoLibrary} />}
           <p className="stu-muted">队伍手枪局、经济对位胜率与 Eco/Semi 翻盘等经济维度，统一在
             {onGoEconomy ? <button type="button" className="dak-evidence" onClick={onGoEconomy}>经济与节奏</button> : "「经济与节奏」"}页查看（避免重复）。
           </p>
         </>
       )}
+      {onOpenPlayer && <LeaderboardView onCapabilityRepair={onCapabilityRepair} state={state} onStateChange={onStateChange} embedded allEntries={allEntries} entries={entries} selectedTeam={selectedTeam} identityOptions={identityOptions} onPlayerClick={onOpenPlayer} onGoLibrary={onGoLibrary} />}
     </div>
   );
 }

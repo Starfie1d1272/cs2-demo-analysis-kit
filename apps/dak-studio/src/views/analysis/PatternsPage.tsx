@@ -55,6 +55,9 @@ export function PatternsPage({
   const setTab = (section: PatternTab) => onStateChange(current => ({ ...current, section }));
   const [allFacts, setAllFacts] = useState<TacticalRoundFact[]>([]);
   const [factsGeneration, setFactsGeneration] = useState(-1);
+  const [factsRequest, setFactsRequest] = useState("");
+  const requestKey = JSON.stringify([entries.map(entry => entry.id), teamRenames]);
+  const hasSnapshot = factsGeneration >= 0 && factsRequest === requestKey;
   const [hasValidFacts, setHasValidFacts] = useState(false);
   // loading=true 初始值：防止首帧渲染时 clusters=[] && !loading 导致闪出空态
   const [loading, setLoading] = useState(true);
@@ -72,8 +75,8 @@ export function PatternsPage({
 
   // 没有明确主体时不能把全部队伍混成一个“模式”；直接入口只要求用户补一次队伍。
   const facts = useMemo(
-    () => subjectTeam && analysisData.status === "ready" && factsGeneration === analysisData.generation ? filterBySubjectTeam(allFacts, subjectTeam, teamRenames) : [],
-    [allFacts, subjectTeam, teamRenames, analysisData, factsGeneration]
+    () => subjectTeam && hasSnapshot ? filterBySubjectTeam(allFacts, subjectTeam, teamRenames) : [],
+    [allFacts, subjectTeam, teamRenames, hasSnapshot]
   );
   const clusters = useMemo(
     () => facts.length > 0 ? buildTacticalClusters(withTacticalDisplayGroupKeys(facts, teamRenames)) : [],
@@ -82,9 +85,7 @@ export function PatternsPage({
 
   useEffect(() => {
     if (entries.length === 0 || analysisData.status !== "ready") {
-      setAllFacts([]);
-      setHasValidFacts(false);
-      setLoading(false);
+      setLoading(analysisData.status === "invalidating");
       return;
     }
     let cancelled = false;
@@ -98,6 +99,7 @@ export function PatternsPage({
           setHasValidFacts(validRows.length > 0);
           setAllFacts(validRows);
           setFactsGeneration(analysisData.generation);
+          setFactsRequest(requestKey);
           setLoading(false);
         }
       })
@@ -108,7 +110,7 @@ export function PatternsPage({
         }
       });
     return () => { cancelled = true; };
-  }, [entries, teamRenames, analysisData.generation, analysisData.status]); // subjectTeam 变化时不回库——useMemo 派生即可
+  }, [entries, teamRenames, analysisData.generation, analysisData.status, requestKey]); // subjectTeam 变化时不回库——useMemo 派生即可
 
   function setMode(next: "own" | "scout") {
     onAnalysisContextChange((current) => ({ ...current, goal: next === "own" ? "own-review" : "opponent-prep" }));
@@ -183,9 +185,10 @@ export function PatternsPage({
           </button>
         ))}
       </div>
+      {hasSnapshot && (loading || analysisData.status !== "ready" || factsGeneration !== analysisData.generation || error) && <p className="stu-muted" role="status">{error || analysisData.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
-      {!error && loading && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的开局 pattern…</div>}
+      {!hasSnapshot && !error && loading && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的开局 pattern…</div>}
       {!error && !loading && clusters.length === 0 && entries.length > 0 && hasValidFacts && (
         <EmptyState
           variant="insufficient"
@@ -202,7 +205,7 @@ export function PatternsPage({
           hint="当前资料库里的教练 facts 是旧口径，请重新导入或重建这些 demo 后再查看战术聚类。"
         />
       )}
-      {!loading && clusters.length > 0 && (
+      {hasSnapshot && clusters.length > 0 && (
         <PatternsTheme section={tab} explorerState={state.explorer} onExplorerStateChange={update => onStateChange(current => ({ ...current, explorer: typeof update === "function" ? update(current.explorer) : update }))} clusters={clusters} facts={facts} allFacts={allFacts}
           entryByMatchId={entryByMatchId} analysisContext={analysisContext} teamRenames={teamRenames}
           subjectTeam={subjectTeam} onOpenMatch={onOpenMatch} onWatchDemo={onWatchDemo} />

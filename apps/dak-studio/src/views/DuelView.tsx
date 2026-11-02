@@ -1,6 +1,7 @@
+import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { flushSync } from "react-dom";
 import { usePageReady } from "../lib/use-page-ready";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { DuelFinderRow, DuelInsightsModel, PlayerMechanicsRow } from "@cs2dak/contract";
 import { displayWeaponName, duelClassificationLabel } from "@cs2dak/presentation";
 import { getMapCalibration, worldToRadar } from "@cs2dak/maps/calibration";
@@ -62,22 +63,24 @@ export function DuelView({
   onPageReady,
 }: DuelViewProps) {
   const tab = state.tab;
-  const [model, setModel] = useState<DuelInsightsModel | null>(null);
+  const [snapshot, setSnapshot] = useState<{ key: string; generation: number; value: DuelInsightsModel | null } | null>(null);
+  const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
+  const requestKey = JSON.stringify([entries.map(entry => entry.id), selectedTeams, identityOptions?.version]);
+  const model = snapshot?.key === requestKey ? snapshot.value : null;
   const [error, setError] = useState<string | null>(null);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
   usePageReady(entries.length === 0 || model !== null || error !== null, onPageReady);
 
   useEffect(() => {
     if (entries.length === 0) {
-      setModel(null);
       return;
     }
+    if (analysis.status !== "ready") return;
     let cancelled = false;
-    setModel(null);
     setError(null);
     getDuelInsights(entries, identityOptions, selectedTeams)
       .then((next) => {
-        if (!cancelled) setModel(next);
+        if (!cancelled) { assertAnalysisGeneration(analysis.generation); setSnapshot({ key: requestKey, generation: analysis.generation, value: next }); }
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
@@ -85,7 +88,7 @@ export function DuelView({
     return () => {
       cancelled = true;
     };
-  }, [entries, identityOptions?.version, selectedTeams]);
+  }, [entries, identityOptions?.version, selectedTeams, requestKey, analysis]);
 
   const projected = useMemo(() => model && playerSteamIds !== null ? projectDuelPlayer(model, playerSteamIds) : model, [model, playerSteamIds]);
   const summary = useMemo(() => projected ? summarizeDuels(projected) : null, [projected]);
@@ -152,6 +155,7 @@ export function DuelView({
         </div>
 
       {playerSteamIds !== null && playerSteamIds.length === 0 && <p className="stu-muted">无法解析该选手的身份，无法筛选个人交火证据。</p>}
+      {model && (error || analysis.status !== "ready" || snapshot?.generation !== analysis.generation) && <p className="stu-muted" role="status">{error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
       {error && <EmptyState variant="error" title="分析失败" hint={error} />}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
       {!error && !model && entries.length > 0 && <div className="stu-loading">分析 {entries.length} 场 demo 的逐枪与伤害事件…</div>}

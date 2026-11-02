@@ -1,4 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../../lib/queries/query-cache";
+import { CapabilityBar, useCapability } from "../../components/CapabilityBar";
+import type { CapabilityRepairAction } from "../../lib/capability-availability";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { EmptyState, PlayerMapPoolPanel, PlayerMapRoleProfilePanel } from "@cs2dak/react";
 import type { DeclaredRole, PlayerMapPoolRow, PlayerMapRoleProfile, WeaponDuty } from "@cs2dak/tactics";
 import { getPlayerMapPool, getPlayerMapRoleProfiles } from "../../lib/queries/spatial-queries";
@@ -8,18 +11,34 @@ import type { IdentityOptions } from "../../lib/identity";
 import type { OpenEvidence } from "../../lib/evidence-continuation";
 import type { PlayerRolesState } from "../../lib/studio-page-state";
 
-export function PlayerRolesPanel({ entries, playerKey, playerLabel, selectedTeam, identityOptions, onOpenEvidence, state, onStateChange, onPageReady }: {
-  entries: StudioDemoEntry[]; playerKey: string; playerLabel: string; selectedTeam: string | null;
+export function PlayerRolesPanel({ onCapabilityRepair, entries, playerKey, playerLabel, selectedTeam, identityOptions, onOpenEvidence, state, onStateChange, onPageReady }: {
+  onCapabilityRepair: (action: CapabilityRepairAction) => void; entries: StudioDemoEntry[]; playerKey: string; playerLabel: string; selectedTeam: string | null;
   identityOptions?: IdentityOptions; onOpenEvidence: OpenEvidence; state: PlayerRolesState;
   onStateChange: (state: PlayerRolesState) => void; onPageReady?: (keys: string[]) => void;
 }) {
-  const [roleProfiles, setRoleProfiles] = useState<PlayerMapRoleProfile[] | null>(null);
-  const [mapPool, setMapPool] = useState<PlayerMapPoolRow[]>([]);
+  const capability = useCapability(entries, "map-role");
+  const roleEntries = capability.eligible;
+  const playerScope = useMemo(() => ({
+    playerKeys: [playerKey],
+    steamIds: [...new Set([...(playerKey.startsWith("steam:") ? [playerKey.slice(6)] : []), ...Object.entries(identityOptions?.map ?? {}).filter(([, mapped]) => (typeof mapped === "string" ? mapped : mapped.playerKey) === playerKey).map(([steamId]) => steamId)])],
+  }), [playerKey, identityOptions?.map]);
+  const poolCapability = useCapability(entries, "player-map-pool", playerScope);
+  const poolEntries = poolCapability.eligible;
+  const [roleSnapshot, setRoleSnapshot] = useState<{ key: string; generation: number; value: PlayerMapRoleProfile[] } | null>(null);
+  const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
+  const [poolSnapshot, setPoolSnapshot] = useState<{ key: string; generation: number; rows: PlayerMapPoolRow[]; unsupported: string[] } | null>(null);
   const [mapPoolReady, setMapPoolReady] = useState(false);
-  const [unsupportedMaps, setUnsupportedMaps] = useState<string[]>([]);
+
   const [mapPoolError, setMapPoolError] = useState<string | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
   const [roleDeclarations, setRoleDeclarations] = useState<RoleDeclarationsState | null>(null);
+  const roleKey = JSON.stringify([roleEntries?.map(entry => entry.id), playerKey, selectedTeam, identityOptions?.version, roleDeclarations]);
+  const roleProfiles = roleSnapshot?.key === roleKey ? roleSnapshot.value : null;
+  const selectedRoleProfile = roleProfiles?.find((profile) => profile.playerKey === playerKey && (selectedTeam == null || profile.teamKey === selectedTeam)) ?? null;
+  const poolKey = JSON.stringify([poolEntries?.map(entry => entry.id), playerKey, selectedTeam, identityOptions?.version, selectedRoleProfile]);
+  const pool = poolSnapshot?.key === poolKey ? poolSnapshot : null;
+  const mapPool = pool?.rows ?? [];
+  const unsupportedMaps = pool?.unsupported ?? [];
   const [roleEditorOpen, setRoleEditorOpen] = useState(false);
   const [declaredRole, setDeclaredRole] = useState<DeclaredRole>("awper");
   const [declaredSecondaryRole, setDeclaredSecondaryRole] = useState<DeclaredRole | "">("");
@@ -42,30 +61,32 @@ export function PlayerRolesPanel({ entries, playerKey, playerLabel, selectedTeam
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [roleEditorOpen]);
   useEffect(() => {
-    if (!roleDeclarations || entries.length === 0) { setRoleProfiles(null); return; }
+    if (!roleDeclarations || !roleEntries) return;
+    if (!roleEntries.length) { setRoleSnapshot({ key: roleKey, generation: analysis.generation, value: [] }); return; }
+    if (analysis.status !== "ready") return;
     let cancelled = false;
-    setRoleProfiles(null); setRoleError(null);
-    void getPlayerMapRoleProfiles(entries, roleDeclarations.declarations.map(row => row.declaration), identityOptions, selectedTeam ? [selectedTeam] : [])
-      .then(value => { if (!cancelled) setRoleProfiles(value); })
+    setRoleError(null);
+    void getPlayerMapRoleProfiles(roleEntries, roleDeclarations.declarations.map(row => row.declaration), identityOptions, selectedTeam ? [selectedTeam] : [])
+      .then(value => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setRoleSnapshot({ key: roleKey, generation: analysis.generation, value }); } })
       .catch(reason => { if (!cancelled) setRoleError(reason instanceof Error ? reason.message : String(reason)); });
     return () => { cancelled = true; };
-  }, [entries, playerKey, roleDeclarations, identityOptions?.version, selectedTeam]);
+  }, [roleEntries, playerKey, roleDeclarations, identityOptions?.version, selectedTeam, roleKey, analysis]);
   useEffect(() => {
-    if (entries.length === 0 || (!roleProfiles && !roleError)) { setMapPool([]); setMapPoolReady(false); return; }
+    if (!poolEntries) return;
+    if (!poolEntries.length) { setPoolSnapshot({ key: poolKey, generation: analysis.generation, rows: [], unsupported: [] }); setMapPoolReady(true); return; }
+    if (analysis.status !== "ready") return;
     let cancelled = false;
     setMapPoolReady(false); setMapPoolError(null);
-    const profile = roleProfiles?.find(item => item.playerKey === playerKey && (selectedTeam == null || item.teamKey === selectedTeam)) ?? null;
-    void getPlayerMapPool(entries, playerKey, profile, identityOptions)
-      .then(result => { if (!cancelled) { setMapPool(result.rows); setUnsupportedMaps(result.unsupportedMapNames); setMapPoolReady(true); } })
-      .catch(reason => { if (!cancelled) { setMapPool([]); setUnsupportedMaps([]); setMapPoolError(reason instanceof Error ? reason.message : String(reason)); setMapPoolReady(true); } });
+    void getPlayerMapPool(poolEntries, playerKey, selectedRoleProfile, identityOptions)
+      .then(result => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setPoolSnapshot({ key: poolKey, generation: analysis.generation, rows: result.rows, unsupported: result.unsupportedMapNames }); setMapPoolReady(true); } })
+      .catch(reason => { if (!cancelled) { setMapPoolError(reason instanceof Error ? reason.message : String(reason)); setMapPoolReady(true); } });
     return () => { cancelled = true; };
-  }, [entries, playerKey, selectedTeam, roleProfiles, roleError, identityOptions?.version]);
+  }, [poolEntries, playerKey, selectedTeam, selectedRoleProfile, identityOptions?.version, poolKey, analysis]);
   useEffect(() => {
-    if (!onPageReady || (entries.length > 0 && ((!roleProfiles && !roleError) || (!mapPoolReady && !mapPoolError)))) return;
+    if (!onPageReady || (entries.length > 0 && ((!roleProfiles && !roleError && !capability.error) || (!mapPoolReady && !mapPoolError && !poolCapability.error)))) return;
     onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
-  }, [onPageReady, entries.length, roleProfiles, roleError, mapPoolReady, mapPoolError]);
+  }, [onPageReady, entries.length, roleProfiles, roleError, capability.error, mapPoolReady, mapPoolError, poolCapability.error]);
   if (!entries.length) return <div className="stu-view"><EmptyState variant="insufficient" title="聚合范围为空" hint="请调整分析范围。" /></div>;
-  const selectedRoleProfile = roleProfiles?.find((profile) => profile.playerKey === playerKey && (selectedTeam == null || profile.teamKey === selectedTeam)) ?? null;
   const declarationTeam = selectedTeam ?? selectedRoleProfile?.teamKey ?? null;
   const selectedDeclarations = roleDeclarations?.declarations.filter((row) => row.declaration.source === "user" && row.declaration.playerKey === playerKey && (declarationTeam == null || row.declaration.teamKey === declarationTeam)) ?? [];
 
@@ -98,13 +119,16 @@ export function PlayerRolesPanel({ entries, playerKey, playerLabel, selectedTeam
 
   const rolePanels = <>
             <div className="stu-card stu-card-wide" id="players:map-roles">
+                {capability.availability && <CapabilityBar availability={capability.availability} onRepair={onCapabilityRepair} />}
+              {capability.error && <p role="alert">地图位置能力读取失败：{capability.error} <button type="button" className="stu-button-sm" onClick={capability.retry}>重试</button>{capability.availability && " · 显示旧版本"}</p>}
               <div className="stu-card-head"><h3>地图 / 位置</h3><button type="button" className="stu-button-sm" disabled={!roleDeclarations} onClick={openRoleEditor}>编辑声明</button></div>
-              {roleError ? <EmptyState variant="error" title="地图角色不可用" hint={roleError} /> : !roleProfiles ? <div className="stu-loading">读取地图位置事实…</div> : <PlayerMapRoleProfilePanel state={state.tables.roles ?? { sort: { key: "sample", direction: "desc" }, page: 0 }} onStateChange={table => onStateChange({ ...state, tables: { ...state.tables, roles: table } })} profile={selectedRoleProfile} onOpenEvidence={(evidence) => {
+              {roleProfiles && (roleError || analysis.status !== "ready" || roleSnapshot?.generation !== analysis.generation) && <p className="stu-muted" role="status">{roleError || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
+              {roleError && !roleProfiles ? <EmptyState variant="error" title="地图角色不可用" hint={roleError} /> : !roleProfiles && !capability.error ? <div className="stu-loading">读取地图位置事实…</div> : !roleProfiles ? null : <PlayerMapRoleProfilePanel state={state.tables.roles ?? { sort: { key: "sample", direction: "desc" }, page: 0 }} onStateChange={table => onStateChange({ ...state, tables: { ...state.tables, roles: table } })} profile={selectedRoleProfile} onOpenEvidence={(evidence) => {
                 const entry = entryByMatchId.get(evidence.matchId);
                 if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "players:map-roles" });
               }} />}
             </div>
-            <div className="stu-card stu-card-wide" id="players:map-pool"><h3>完整个人地图池</h3>{mapPoolError && <p role="alert">地图池不可用：{mapPoolError}</p>}{unsupportedMaps.length > 0 && <p>未支持的地图：{unsupportedMaps.join("、")}</p>}{!mapPoolReady && !mapPoolError ? <div className="stu-loading">读取个人地图池…</div> : <PlayerMapPoolPanel state={state.tables.mapPool ?? { sort: { key: "record", direction: "desc" }, page: 0 }} onStateChange={table => onStateChange({ ...state, tables: { ...state.tables, mapPool: table } })} rows={mapPool} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "players:map-pool" }); }} />}</div>
+            <div className="stu-card stu-card-wide" id="players:map-pool"><h3>完整个人地图池</h3>{poolCapability.availability && <CapabilityBar availability={poolCapability.availability} onRepair={onCapabilityRepair} />}{poolCapability.error && <p role="alert">地图池能力读取失败：{poolCapability.error} <button type="button" className="stu-button-sm" onClick={poolCapability.retry}>重试</button>{poolCapability.availability && " · 显示旧版本"}</p>}{mapPoolError && <p role="alert">地图池更新失败：{mapPoolError}</p>}{pool && (!mapPoolReady || mapPoolError || analysis.status !== "ready" || pool.generation !== analysis.generation) && <p role="status" className="stu-muted">{mapPoolError || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}{unsupportedMaps.length > 0 && <p>未支持的地图：{unsupportedMaps.join("、")}</p>}{!pool && (poolCapability.error || mapPoolError) ? null : !pool ? <div className="stu-loading">读取个人地图池…</div> : <PlayerMapPoolPanel state={state.tables.mapPool ?? { sort: { key: "record", direction: "desc" }, page: 0 }} onStateChange={table => onStateChange({ ...state, tables: { ...state.tables, mapPool: table } })} rows={mapPool} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "players:map-pool" }); }} />}</div>
           {roleEditorOpen && (
             <div className="stu-modal-backdrop" role="dialog" aria-modal="true" aria-label="编辑角色声明" onClick={() => setRoleEditorOpen(false)}>
               <div className="stu-dialog stu-dialog-form" ref={roleDialogRef} onClick={(event) => event.stopPropagation()}>

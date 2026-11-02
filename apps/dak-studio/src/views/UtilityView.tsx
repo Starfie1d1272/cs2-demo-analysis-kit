@@ -1,6 +1,7 @@
+import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { flushSync } from "react-dom";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
   findingFromUtilityDamage,
   findingFromUtilityFlash,
@@ -99,7 +100,10 @@ const SMOKE_COLUMNS: DataTableColumn<UtilityValueRow>[] = [
 ];
 
 export function UtilityView({ state, onStateChange, playerFocus, onGoLineups, allEntries, entries, selectedTeams, onOpenEvidence, onWatchDemo, onGoLibrary, identityOptions, onPageReady }: UtilityViewProps) {
-  const [summary, setSummary] = useState<UtilityValueSummary | null>(null);
+  const [snapshot, setSnapshot] = useState<{ key: string; generation: number; value: UtilityValueSummary | null } | null>(null);
+  const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
+  const requestKey = JSON.stringify([entries.map(entry => entry.id), selectedTeams, identityOptions?.version]);
+  const summary = snapshot?.key === requestKey ? snapshot.value : null;
   const [error, setError] = useState<string | null>(null);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
 
@@ -110,11 +114,10 @@ export function UtilityView({ state, onStateChange, playerFocus, onGoLineups, al
 
   useEffect(() => {
     if (entries.length === 0) {
-      setSummary(null);
       return;
     }
+    if (analysis.status !== "ready") return;
     let cancelled = false;
-    setSummary(null);
     setError(null);
     getSeasonSummary(entries, identityOptions, selectedTeams)
       .then((season) => getUtilityValueSummary(
@@ -128,13 +131,13 @@ export function UtilityView({ state, onStateChange, playerFocus, onGoLineups, al
         selectedTeams,
       ))
       .then((next) => {
-        if (!cancelled) setSummary(next);
+        if (!cancelled) { assertAnalysisGeneration(analysis.generation); setSnapshot({ key: requestKey, generation: analysis.generation, value: next }); }
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
       });
     return () => { cancelled = true; };
-  }, [entries, identityOptions?.version, selectedTeams]);
+  }, [entries, identityOptions?.version, selectedTeams, requestKey, analysis]);
 
   const visibleSummary = useMemo(() => summary && playerFocus ? projectUtilityPlayer(summary, playerFocus.steamIds.length ? playerFocus.playerKey : "") : summary, [summary, playerFocus]);
   const openEvidence: OpenEvidence = request => { flushSync(() => onStateChange({ ...state, selectedEvidenceKey: request.sourceKey ?? null })); onOpenEvidence(request); };
@@ -162,6 +165,7 @@ export function UtilityView({ state, onStateChange, playerFocus, onGoLineups, al
           {playerFocus && <p>选手行与具备身份的候选按焦点筛选；队伍榜显示比赛范围内的队伍上下文。{playerFocus.steamIds.length === 0 && "无法解析该选手的身份。"}</p>}
         </div>
       </header>
+      {summary && (error || analysis.status !== "ready" || snapshot?.generation !== analysis.generation) && <p className="stu-muted" role="status">{error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && !summary && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的道具数据…</div>}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
