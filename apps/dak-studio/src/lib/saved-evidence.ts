@@ -26,3 +26,10 @@ export function resolveSavedEvidence(ref: SavedEvidenceRef, entries: StudioDemoE
   if (current.builtWith.formatVersion !== source.builtWith.formatVersion || current.builtWith.factsRevision !== source.builtWith.factsRevision) return result("version-changed", "分析版本已变化；可查看当前数据", entry.id);
   return result("exact", "来源和已知版本一致", entry.id);
 }
+
+/** Rebind one explicitly selected reference only if it is still the unique verified candidate. */
+export function relinkSavedEvidence(ref: SavedEvidenceRef, candidate: StudioSourceRef, entries: StudioDemoEntry[]): SavedEvidenceRef | null {
+  const current = resolveSavedEvidence(ref, entries).uniqueRelinkCandidate;
+  if (!current || current.entryId !== candidate.entryId || current.matchId !== candidate.matchId) return null;
+  return { ...ref, source: current, evidence: { ...ref.evidence, matchId: current.matchId } };
+}

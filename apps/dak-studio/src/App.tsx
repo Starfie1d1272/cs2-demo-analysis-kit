@@ -300,7 +300,7 @@ export function App() {
   const createdMaterial = useCallback((materialRef: MaterialRef, ui: MaterialsPageState) => {
     const id = `frame-${++nextFrameId.current}`;
     setNavigation(current => {
-      if (current.active.id !== active.id) return current;
+      if (current.active.id !== active.id || current.active.destination.page !== "materials") return current;
       const updated = studioNavigationReducer(current, { intent: "ui", frameId: current.active.id, ui });
       return studioNavigationReducer(updated, { intent: "open", id, destination: { page: "material", materialRef }, scrollY: window.scrollY });
     });
@@ -326,7 +326,7 @@ export function App() {
     const id = `frame-${++nextFrameId.current}`;
     setRestoringFrameId(current.history.at(-1)?.id ?? id);
     setEvidenceSession(null);
-    setNavigation(state => studioNavigationReducer(state, { intent: "back", id }));
+    setNavigation(state => studioNavigationReducer(discardMaterialDraft(state), { intent: "back", id }));
   }, [canLeave, evidenceSession, returnToEvidenceSource]);
 
   const onPageReady = useCallback((frameId: string, availableAnchorKeys: string[]) => {
@@ -502,11 +502,21 @@ export function App() {
         {section === "matches" && <MatchesView page={destination.page} onMatches={() => navigate({ page: "matches" })} onEvents={() => navigate({ page: "events" })} />}
         {section === "analysis" && <AnalysisView page={destination.page} onSelect={page => page === "personal-review" ? openPersonalReview() : navigate({ page, context: analysisContext })} />}
         {destination.page === "materials" && <MaterialsView onPageReady={keys => onPageReady(active.id, keys)} entries={entries} state={active.ui as MaterialsPageState} onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))} onOpenMaterial={openMaterial} onCreatedMaterial={createdMaterial} onOpenEvidence={openMaterialEvidence} prepMigrationStatus={prepMigrationStatus} prepMigrationError={prepMigrationError} retryPrepMigration={retryPrepMigration} />}
-        {destination.page === "material" && <MaterialDetailView onPageReady={keys => onPageReady(active.id, keys)} refValue={destination.materialRef} entries={entries} state={active.ui as MaterialPageState | null} onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))} onBack={cleanState => {
+        {destination.page === "material" && <MaterialDetailView onPageReady={keys => onPageReady(active.id, keys)} refValue={destination.materialRef} entries={entries} state={active.ui as MaterialPageState | null} onStateChange={ui => setNavigation(current => {
+          const frame = current.active;
+          if (frame.id !== active.id || frame.destination.page !== "material" || frame.destination.materialRef.kind !== destination.materialRef.kind || frame.destination.materialRef.id !== destination.materialRef.id) return current;
+          return studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui });
+        })} onBack={cleanState => {
+          const source = navigationRef.current.active;
+          if (source.id !== active.id || source.destination.page !== "material" || source.destination.materialRef.kind !== destination.materialRef.kind || source.destination.materialRef.id !== destination.materialRef.id) return;
           if (cleanState === undefined) { goBack(); return; }
           const id = `frame-${++nextFrameId.current}`;
-          setNavigation(current => studioNavigationReducer(studioNavigationReducer(current, { intent: "ui", frameId: current.active.id, ui: cleanState }), { intent: "back", id }));
-        }} onOpened={ref => { const frame = navigationRef.current.active; if (frame.destination.page === "material" && frame.destination.materialRef.kind === ref.kind && frame.destination.materialRef.id === ref.id) void setLastWork({ kind: "material", materialRef: ref }); }} onOpenEvidence={openMaterialEvidence} />}
+          setNavigation(current => {
+            const frame = current.active;
+            if (frame.id !== active.id || frame.destination.page !== "material" || frame.destination.materialRef.kind !== destination.materialRef.kind || frame.destination.materialRef.id !== destination.materialRef.id) return current;
+            return studioNavigationReducer(studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: cleanState }), { intent: "back", id });
+          });
+        }} onOpened={ref => { const frame = navigationRef.current.active; if (frame.id === active.id && frame.destination.page === "material" && frame.destination.materialRef.kind === ref.kind && frame.destination.materialRef.id === ref.id) void setLastWork({ kind: "material", materialRef: ref }); }} onOpenEvidence={openMaterialEvidence} />}
         {destination.page === "personal-review" && (
           <HomeView
             key={active.id}

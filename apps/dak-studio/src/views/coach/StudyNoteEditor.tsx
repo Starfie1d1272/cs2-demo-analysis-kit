@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { matchIdForEntry, type StudioDemoEntry } from "../../lib/demo-entry";
 import { loadMatchWorkspaceModel } from "../../lib/match-workspace-loader";
 import type { StudyNoteDraft } from "../../lib/study-notes";
-import { captureSavedEvidence, resolveSavedEvidence } from "../../lib/saved-evidence";
+import { captureSavedEvidence, relinkSavedEvidence, resolveSavedEvidence } from "../../lib/saved-evidence";
 
 export function StudyNoteEditor({ draft, entries, onChange, onEvidence }: { draft: StudyNoteDraft; entries: StudioDemoEntry[]; onChange: (draft: StudyNoteDraft) => void; onEvidence: (index: number) => void }) {
   const [entryId, setEntryId] = useState("");
@@ -38,7 +38,7 @@ export function StudyNoteEditor({ draft, entries, onChange, onEvidence }: { draf
     {draft.evidence.map((ref, index) => { const resolution = resolveSavedEvidence(ref, entries); return <div key={ref.id}>
       <span>{ref.source.mapName} · R{ref.evidence.roundNumber} · {resolution.reason}</span>{resolution.status === "missing" && <span> 原比赛当前不在资料库</span>}
       <button className="stu-button-sm" type="button" disabled={!resolution.canOpenCurrent} onClick={() => onEvidence(index)}>回放</button>
-      {resolution.uniqueRelinkCandidate && <button className="stu-button-sm" type="button" onClick={() => update({ evidence: draft.evidence.map((item, i) => i === index ? { ...item, source: resolution.uniqueRelinkCandidate! } : item) })}>重新关联</button>}
+      {resolution.uniqueRelinkCandidate && <button className="stu-button-sm" type="button" onClick={() => { if (!window.confirm("将这条证据重新关联到所选比赛？")) return; const rebound = relinkSavedEvidence(ref, resolution.uniqueRelinkCandidate!, entries); if (rebound) update({ evidence: draft.evidence.map((item, i) => i === index ? rebound : item) }); }}>重新关联</button>}
       <button className="stu-button-sm" type="button" onClick={() => update({ evidence: draft.evidence.filter((_, i) => i !== index) })}>移除证据</button>
     </div>; })}
   </div>;
