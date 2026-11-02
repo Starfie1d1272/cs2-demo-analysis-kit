@@ -8,6 +8,22 @@ const DUTY_LABEL = { primary_awper: "主 AWP", secondary_awper: "副 AWP", situa
 const RESPONSIBILITY_LABEL = { pack: "主体组", extremity: "边翼", late_joining: "晚汇合", stable_default: "稳定默认位", anchor_tendency: "守点倾向", component_mobile: "组间移动", independent_mobile: "独立移动", stable_position: "稳定位置", mixed: "混合", unknown: "未知" } as const;
 const MODIFIER_LABEL = { utility_supportive: "道具协同", positionally_stable: "位置稳定", spatially_isolated: "空间孤立", component_mobile: "组间移动" } as const;
 
+/** Sort accessors shared with consumers exporting the complete displayed tables. */
+export const playerRoleSortColumns: DataTableColumn<PlayerMapRoleProfileView["perMapEvidence"][number]>[] = [
+  { key: "sample", label: "样本", sortable: true, sortValue: row => row.sample.eligibleRounds },
+  { key: "confidence", label: "置信度", sortable: true, sortValue: row => row.confidence },
+];
+export const teamRoleSortColumns: DataTableColumn<TeamMapRoleMatrixView["players"][number]>[] = [
+  { key: "sample", label: "样本", sortable: true, sortValue: row => row.sampleRounds },
+];
+export const playerMapPoolSortColumns: DataTableColumn<PlayerMapPoolRowView>[] = [
+  { key: "record", label: "场次", sortable: true, sortValue: row => row.matchCount },
+  { key: "rounds", label: "回合", sortable: true, sortValue: row => row.roundCount },
+  { key: "rr", label: "RR", sortable: true, sortValue: row => row.rr },
+  { key: "adr", label: "ADR", sortable: true, sortValue: row => row.adr },
+  { key: "kast", label: "KAST", sortable: true, sortValue: row => row.kast },
+];
+
 function Status({ value }: { value: keyof typeof STATUS_LABEL }) {
   return <span className={`dak-role-status dak-role-status-${value}`}>{STATUS_LABEL[value]}</span>;
 }
@@ -33,7 +49,7 @@ export function PlayerMapRoleProfilePanel({
   const positionLabels = new Map(profile.positionGroupDisplay.map((row) => [`${row.mapName}:${row.side}:${row.positionGroupId}`, row]));
   const columns: DataTableColumn<(typeof rows)[number]>[] = [
     { key: "map", label: "地图 / 边", format: (row) => `${row.mapName.replace("de_", "")} · ${row.side.toUpperCase()}` },
-    { key: "sample", label: "样本", numeric: true, sortable: true, sortValue: (row) => row.sample.eligibleRounds, format: (row) => `${row.sample.eligibleRounds} 回合` },
+    { key: "sample", label: "样本", numeric: true, sortable: true, sortValue: playerRoleSortColumns[0].sortValue, format: (row) => `${row.sample.eligibleRounds} 回合` },
     { key: "position", label: "位置组", format: (row) => {
       const group = row.positionGroups[0];
       if (!group) return "—";
@@ -42,7 +58,7 @@ export function PlayerMapRoleProfilePanel({
     } },
     { key: "responsibility", label: "逐侧职责", format: (row) => RESPONSIBILITY_LABEL[row.responsibility] },
     { key: "duty", label: "武器职责", format: (row) => DUTY_LABEL[row.awp.duty] },
-    { key: "confidence", label: <>置信度 <MetricInfo note="来自 position group、队内相对空间、AWP 责任和样本覆盖；不是固定槽位或战术真相。" /></>, numeric: true, sortable: true, sortValue: (row) => row.confidence, format: (row) => `${Math.round(row.confidence * 100)}%` },
+    { key: "confidence", label: <>置信度 <MetricInfo note="来自 position group、队内相对空间、AWP 责任和样本覆盖；不是固定槽位或战术真相。" /></>, numeric: true, sortable: true, sortValue: playerRoleSortColumns[1].sortValue, format: (row) => `${Math.round(row.confidence * 100)}%` },
     { key: "evidence", label: "代表回合", render: (row) => <Evidence evidence={row.representativeRounds.map((ref) => ({ ...ref, reason: `${row.mapName} ${row.side.toUpperCase()} 的位置职责代表回合`, role: "example" as const }))} onOpenEvidence={onOpenEvidence} /> },
   ];
   return (
@@ -87,7 +103,7 @@ export function TeamMapRoleMatrixPanel({
     { key: "responsibility", label: <>结构职责 <MetricInfo note="只描述当前空间证据支持的主体组、边翼、晚汇合或位置稳定倾向。" /></>, format: (row) => RESPONSIBILITY_LABEL[row.responsibility] },
     { key: "modifiers", label: "附加属性", format: (row) => row.modifiers.map((modifier) => MODIFIER_LABEL[modifier]).join(" · ") || "—" },
     { key: "awp", label: "AWP", format: (row) => row.weaponDuty ? DUTY_LABEL[row.weaponDuty] : "—" },
-    { key: "sample", label: "样本", numeric: true, sortable: true, sortValue: (row) => row.sampleRounds, format: (row) => `${row.sampleRounds} 回合` },
+    { key: "sample", label: "样本", numeric: true, sortable: true, sortValue: teamRoleSortColumns[0].sortValue, format: (row) => `${row.sampleRounds} 回合` },
     { key: "evidence", label: "证据", render: (row) => <Evidence evidence={row.evidence} onOpenEvidence={onOpenEvidence} /> },
   ];
   return (
@@ -117,11 +133,11 @@ export function PlayerMapPoolPanel({ rows, onOpenEvidence, state, onStateChange 
   const tableState = state ?? localState; const setTableState = onStateChange ?? setLocalState;
   const columns: DataTableColumn<PlayerMapPoolRowView>[] = [
     { key: "map", label: "地图", format: (row) => row.mapName.replace("de_", "") },
-    { key: "record", label: "场次 / 战绩", sortable: true, sortValue: (row) => row.matchCount, format: (row) => `${row.matchCount} · ${row.wins}胜 ${row.losses}负` },
-    { key: "rounds", label: "回合", numeric: true, sortable: true, sortValue: (row) => row.roundCount, format: (row) => row.roundCount },
-    { key: "rr", label: "RR", numeric: true, sortable: true, sortValue: (row) => row.rr, format: (row) => row.rr?.toFixed(2) ?? "—" },
-    { key: "adr", label: "ADR", numeric: true, sortable: true, sortValue: (row) => row.adr, format: (row) => row.adr?.toFixed(1) ?? "—" },
-    { key: "kast", label: "KAST", numeric: true, sortable: true, sortValue: (row) => row.kast, format: (row) => row.kast == null ? "—" : `${row.kast.toFixed(1)}%` },
+    { key: "record", label: "场次 / 战绩", sortable: true, sortValue: playerMapPoolSortColumns[0].sortValue, format: (row) => `${row.matchCount} · ${row.wins}胜 ${row.losses}负` },
+    { key: "rounds", label: "回合", numeric: true, sortable: true, sortValue: playerMapPoolSortColumns[1].sortValue, format: (row) => row.roundCount },
+    { key: "rr", label: "RR", numeric: true, sortable: true, sortValue: playerMapPoolSortColumns[2].sortValue, format: (row) => row.rr?.toFixed(2) ?? "—" },
+    { key: "adr", label: "ADR", numeric: true, sortable: true, sortValue: playerMapPoolSortColumns[3].sortValue, format: (row) => row.adr?.toFixed(1) ?? "—" },
+    { key: "kast", label: "KAST", numeric: true, sortable: true, sortValue: playerMapPoolSortColumns[4].sortValue, format: (row) => row.kast == null ? "—" : `${row.kast.toFixed(1)}%` },
     { key: "opening", label: "Opening", format: (row) => `${row.openingKills}:${row.openingDeaths}` },
     { key: "weapon", label: "主武器 / 全局职责", format: (row) => `${row.mainWeapon ?? "—"} · ${row.globalWeaponDuty ? DUTY_LABEL[row.globalWeaponDuty] : "—"}` },
     { key: "position", label: "T / CT 位置", format: (row) => `${row.tPositionGroup ?? "—"} / ${row.ctPositionGroup ?? "—"}` },

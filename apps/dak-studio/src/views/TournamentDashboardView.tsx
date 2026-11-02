@@ -1,6 +1,9 @@
 import { CapabilityBar, useCapability } from "../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../lib/capability-availability";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
+import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
+import { buildTournamentAnalysisResult } from "../lib/analysis-export-tournament";
+import type { AnalysisExportSource } from "../lib/analysis-export";
 import type { AnalysisPageState } from "../lib/studio-page-state";
 import { usePageReady } from "../lib/use-page-ready";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
@@ -17,6 +20,8 @@ import { LeaderboardView } from "./LeaderboardView";
 
 export interface TournamentDashboardViewProps {
   onCapabilityRepair: (action: CapabilityRepairAction) => void;
+  exportSource?: AnalysisExportSource | null;
+  exportPage?: "analysis" | "event-analysis";
   state: AnalysisPageState;
   onStateChange: (state: AnalysisPageState) => void;
   onPageReady?: (keys: string[]) => void;
@@ -53,6 +58,7 @@ const WEAPON_COLUMNS: DataTableColumn<WeaponRow>[] = [
 /** v0.3 赛事总览：地图使用率、T/CT 胜率、手枪局与转化（cohort 同源聚合）。 */
 export function TournamentDashboardView({
   onCapabilityRepair,
+  exportSource, exportPage = "event-analysis",
   allEntries,
   entries,
   state,
@@ -127,6 +133,7 @@ export function TournamentDashboardView({
       <header className="stu-view-header">
         <div>
           <h1>赛事总览</h1>
+          {insights && exportSource && comparisonReady && <AnalysisExportButtons capture={() => buildTournamentAnalysisResult(exportSource, insights, teamComparison, state, { maps: MAP_COLUMNS, weapons: WEAPON_COLUMNS }, exportPage)} />}
           <p>当前赛事语料的地图、队伍与经济观察；只有底层提供依据时才会形成 Finding。</p>
         </div>
         {onGoDirectory && <button type="button" className="stu-button-sm" onClick={onGoDirectory}>返回赛事目录</button>}

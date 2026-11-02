@@ -33,13 +33,24 @@ export interface AnalysisResultSnapshotV1 {
 /** Capture only the data explicitly projected by the page, independently of later edits. */
 export function captureAnalysisResult(input: Omit<AnalysisResultSnapshotV1, "schemaVersion" | "generatedAt" | "appVersion" | "sources"> & { entries: StudioDemoEntry[] }): AnalysisResultSnapshotV1 {
   const { entries, ...result } = input;
+  const sourceWarnings: string[] = [];
+  const safeIdentifier = (value: string) => {
+    if (/^(?:[a-zA-Z]:[\\/]|\\\\|\/)/.test(value)) {
+      sourceWarnings.push("来源标识包含本机路径，已隐藏。");
+      return "[来源标识已隐藏]";
+    }
+    return value;
+  };
   return structuredClone({
     ...result, schemaVersion: 1 as const, generatedAt: Date.now(), appVersion: ANALYSIS_MANIFEST.appVersion,
     sources: entries.map(entry => {
       const source = sourceRefForEntry(entry);
       // Legacy records can contain paths; only the final filename belongs in a report.
-      return { ...source, fileName: source.fileName.split(/[\\/]/).pop() ?? "" };
+      const hash = source.demoSha256;
+      if (hash !== null && !/^[a-f0-9]{64}$/.test(hash)) sourceWarnings.push("来源 demo SHA-256 无效，已保留为未知。");
+      return { ...source, entryId: safeIdentifier(source.entryId), matchId: safeIdentifier(source.matchId), demoSha256: hash && /^[a-f0-9]{64}$/.test(hash) ? hash : null, fileName: source.fileName.split(/[\\/]/).pop() ?? "" };
     }),
+    limitations: [...result.limitations, ...sourceWarnings],
     sections: result.sections.map(section => ({ ...section, rows: section.rows.map(row => Object.fromEntries(
       Object.entries(row).map(([key, value]) => [key, typeof value === "number" && !Number.isFinite(value) ? null : value]),
     )) })),
@@ -55,8 +66,8 @@ export function buildMatchAnalysisResult(model: MatchWorkspaceModel, entry: Stud
     conditions, entries: [entry], limitations: ["图像、回放帧和原始 ZIP 未包含；此文件不能重建旧算法环境。"],
     sections: [
       { title: "记分板", text: [], sampleDescription: `${model.scoreboard.length} 名选手`, limitations: [],
-        columns: [{ key: "name", label: "选手", unit: null }, { key: "team", label: "队伍", unit: null }, { key: "kills", label: "击杀", unit: null }, { key: "deaths", label: "死亡", unit: null }, { key: "assists", label: "助攻", unit: null }, { key: "adr", label: "ADR", unit: null }, { key: "kast", label: "KAST", unit: "%" }, { key: "rr", label: "RR", unit: null }],
-        rows: model.scoreboard.map(row => ({ name: row.name, team: model.teams[row.teamKey].name, kills: row.fieldAvailability.playerStats === "available" ? row.kills : null, deaths: row.fieldAvailability.playerStats === "available" ? row.deaths : null, assists: row.fieldAvailability.playerStats === "available" ? row.assists : null, adr: row.fieldAvailability.damages === "available" ? row.adr : null, kast: row.fieldAvailability.rounds === "available" ? row.kast : null, rr: row.accountRR })) },
+        columns: [{ key: "name", label: "选手", unit: null }, { key: "team", label: "队伍", unit: null }, { key: "kills", label: "击杀", unit: null }, { key: "deaths", label: "死亡", unit: null }, { key: "assists", label: "助攻", unit: null }, { key: "adr", label: "ADR", unit: null }, { key: "kast", label: "KAST", unit: "%" }, { key: "accountRR", label: "职业 RR", unit: null }, { key: "rr", label: "RR", unit: null }, { key: "headshotPercent", label: "HS", unit: "%" }, { key: "entryKills", label: "首杀", unit: null }, { key: "tradeKills", label: "补枪", unit: null }, { key: "awpKills", label: "AWP", unit: null }, { key: "utilityDamage", label: "道具伤害", unit: null }],
+        rows: model.scoreboard.map(row => ({ name: row.name, team: model.teams[row.teamKey].name, kills: row.fieldAvailability.playerStats === "available" ? row.kills : null, deaths: row.fieldAvailability.playerStats === "available" ? row.deaths : null, assists: row.fieldAvailability.playerStats === "available" ? row.assists : null, adr: row.fieldAvailability.damages === "available" ? row.adr : null, kast: row.fieldAvailability.rounds === "available" ? row.kast : null, accountRR: row.accountRR, rr: row.rr, headshotPercent: row.fieldAvailability.playerStats === "available" ? row.headshotPercent : null, entryKills: row.fieldAvailability.playerStats === "available" ? row.entryKills : null, tradeKills: row.fieldAvailability.playerStats === "available" ? row.tradeKills : null, awpKills: row.fieldAvailability.playerStats === "available" ? row.awpKills : null, utilityDamage: row.fieldAvailability.damages === "available" ? row.utilityDamage : null })) },
       { title: "关键回合", text: [], sampleDescription: `${model.reportHighlights.length} 个关键回合`, limitations: [],
         columns: [{ key: "round", label: "回合", unit: null }, { key: "score", label: "比分", unit: null }, { key: "winner", label: "胜方", unit: null }, { key: "tags", label: "标签", unit: null }],
         rows: model.reportHighlights.map(row => ({ round: row.roundNumber, score: row.scoreBefore, winner: row.winnerSide, tags: row.tags.join("、") })) },
@@ -68,7 +79,7 @@ export function buildMatchAnalysisResult(model: MatchWorkspaceModel, entry: Stud
 }
 
 function escapeMarkdown(value: ExportCell): string {
-  return String(value ?? "—").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>");
+  return String(value ?? "—").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/([\\`*_{}\[\]()#!])/g, "\\$1").replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>");
 }
 export function analysisResultMarkdown(snapshot: AnalysisResultSnapshotV1): string {
   const lines = [`# ${escapeMarkdown(snapshot.title)}`, "", `范围：${escapeMarkdown(snapshot.scopeSummary)}`, `生成时间：${new Date(snapshot.generatedAt).toISOString()}`, `应用版本：${escapeMarkdown(snapshot.appVersion)}`, "", "## 条件", ...snapshot.conditions.map(value => `- ${escapeMarkdown(value)}`)];
@@ -82,4 +93,12 @@ export function analysisResultMarkdown(snapshot: AnalysisResultSnapshotV1): stri
   }
   lines.push("", "## 来源", ...snapshot.sources.map(source => `- ${escapeMarkdown(source.fileName)} · ${escapeMarkdown(source.mapName)} · entry ${escapeMarkdown(source.entryId)} · match ${escapeMarkdown(source.matchId)} · SHA-256 ${escapeMarkdown(source.demoSha256)} · 构建版本 ${escapeMarkdown(source.builtWith ? JSON.stringify(source.builtWith) : null)}`), "", "## 局限", ...snapshot.limitations.map(value => `- ${escapeMarkdown(value)}`));
   return lines.join("\n");
+}
+
+/** Source and context must come from the same successful request as the supplied model. */
+export interface AnalysisExportSource {
+  context: AnalysisContext;
+  entries: StudioDemoEntry[];
+  scopeSummary: string;
+  conditions: string[];
 }

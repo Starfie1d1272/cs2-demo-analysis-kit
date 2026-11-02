@@ -1,3 +1,4 @@
+import type { AnalysisExportSource } from "../../lib/analysis-export";
 import type { PatternExplorerState } from "../../lib/pattern-page-state";
 import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -17,6 +18,7 @@ import { MapPoolTable } from "../coach/MapPoolTable";
 const SIDE_LABEL: Record<string, string> = { t: "T 方", ct: "CT 方" };
 
 export interface PatternsThemeProps {
+  exportSource?: AnalysisExportSource | null;
   section: "patterns" | "anti";
   explorerState: PatternExplorerState;
   onExplorerStateChange: Dispatch<SetStateAction<PatternExplorerState>>;
@@ -33,7 +35,7 @@ export interface PatternsThemeProps {
 }
 
 /** 自动观察与人工材料相互独立；只保存用户明确命名或加入的项目。 */
-export function PatternsTheme({ section, explorerState, onExplorerStateChange, clusters, facts, allFacts, entryByMatchId, analysisContext, teamRenames, subjectTeam, onOpenMatch, onWatchDemo, onPrepSaved }: PatternsThemeProps) {
+export function PatternsTheme({ exportSource, section, explorerState, onExplorerStateChange, clusters, facts, allFacts, entryByMatchId, analysisContext, teamRenames, subjectTeam, onOpenMatch, onWatchDemo, onPrepSaved }: PatternsThemeProps) {
   const [playbook, setPlaybook] = useState<Record<string, string>>({});
   const [namesError, setNamesError] = useState<string | null>(null);
   useEffect(() => {
@@ -48,6 +50,7 @@ export function PatternsTheme({ section, explorerState, onExplorerStateChange, c
       {section === "patterns" && (
         <>
           <PatternExplorer
+            exportSource={exportSource} patternNames={playbook}
             state={explorerState}
             onStateChange={onExplorerStateChange}
             clusters={clusters}

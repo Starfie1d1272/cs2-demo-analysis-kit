@@ -1,3 +1,7 @@
+import { AnalysisExportButtons } from "../../components/AnalysisExportButtons";
+import { buildPatternsAnalysisResult } from "../../lib/analysis-export-patterns";
+import type { AnalysisExportSource } from "../../lib/analysis-export";
+import { patternFingerprint } from "../../lib/pattern-observations";
 import type { PatternExplorerState } from "../../lib/pattern-page-state";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../../lib/queries/query-cache";
 import { createReplayViewState, normalizeReplayViewState, type ReplayViewState } from "@cs2dak/presentation";
@@ -16,6 +20,8 @@ import { type StudioDemoEntry } from "../../lib/demo-entry.js";
 import { MetricInfo, EvidenceLink, DataTable, type DataTableColumn } from "@cs2dak/react";
 
 export interface PatternExplorerProps {
+  exportSource?: AnalysisExportSource | null;
+  patternNames?: Record<string, string>;
   state: PatternExplorerState;
   onStateChange: Dispatch<SetStateAction<PatternExplorerState>>;
   clusters: TacticalCluster[];
@@ -28,7 +34,7 @@ export interface PatternExplorerProps {
   replayModelCache?: Map<string, MatchWorkspaceModel>;
 }
 
-export function PatternExplorer({ state, onStateChange, clusters, facts, entryByMatchId, onOpenMatch, onWatchDemo, onAddToPlaylist, replayModelCache }: PatternExplorerProps) {
+export function PatternExplorer({ exportSource, patternNames = {}, state, onStateChange, clusters, facts, entryByMatchId, onOpenMatch, onWatchDemo, onAddToPlaylist, replayModelCache }: PatternExplorerProps) {
   const { mapName, side, economyEntry: econ, clusterId: selectedId, selectedFactKey: selectedEvidenceKey } = state;
   const maps = useMemo(() => [...new Set(clusters.map(c => c.mapName))].sort(), [clusters]);
   const setSide = (side: "t" | "ct") => onStateChange(current => ({ ...current, side, clusterId: null, selectedFactKey: null }));
@@ -105,6 +111,7 @@ export function PatternExplorer({ state, onStateChange, clusters, facts, entryBy
 
   return (
     <div className="stu-pe-shell">
+      {exportSource && selected && <AnalysisExportButtons capture={() => buildPatternsAnalysisResult(exportSource, selected, selectedFacts, { section: "patterns", explorer: state }, patternNames[patternFingerprint(selected)] ?? null)} />}
       <label>地图 <select className="stu-select" value={mapName ?? ""} onChange={event => onStateChange(current => ({ ...current, mapName: event.target.value || null, clusterId: null, selectedFactKey: null }))}>
         <option value="">全部地图</option>{maps.map(map => <option key={map} value={map}>{map}</option>)}
       </select></label>

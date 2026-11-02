@@ -1,3 +1,4 @@
+import { sortTableRows } from "./DataTable";
 import { useMemo } from "react";
 import type { TableState } from "@cs2dak/presentation";
 import type {
@@ -46,17 +47,7 @@ export function SeasonLeaderboard({ model, onPlayerClick, viewKey: controlledVie
     onTableStateChange({ sort: { key, direction: sortKey === key && sortDesc ? "asc" : "desc" }, page: 0 });
   }
 
-  const rows = useMemo(() => {
-    const dir = sortDesc ? 1 : -1;
-    return [...model.rows].sort((a, b) => {
-      const va = a.metrics[sortKey];
-      const vb = b.metrics[sortKey];
-      if (va == null && vb == null) return 0;
-      if (va == null) return 1;
-      if (vb == null) return -1;
-      return (vb - va) * dir;
-    });
-  }, [model.rows, sortKey, sortDesc]);
+  const rows = useMemo(() => sortTableRows(model.rows, [{ key: sortKey, label: sortKey, sortable: true, sortValue: row => row.metrics[sortKey] ?? null }], { key: sortKey, direction: sortDesc ? "desc" : "asc" }), [model.rows, sortKey, sortDesc]);
 
   return (
     <div className="dak-leaderboard">

@@ -2,6 +2,9 @@ import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnaly
 import { CapabilityBar, useCapability } from "../../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../../lib/capability-availability";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { AnalysisExportButtons } from "../../components/AnalysisExportButtons";
+import { buildPlayerRolesAnalysisResult } from "../../lib/analysis-export-roles";
+import type { AnalysisExportSource } from "../../lib/analysis-export";
 import { EmptyState, PlayerMapPoolPanel, PlayerMapRoleProfilePanel } from "@cs2dak/react";
 import type { DeclaredRole, PlayerMapPoolRow, PlayerMapRoleProfile, WeaponDuty } from "@cs2dak/tactics";
 import { getPlayerMapPool, getPlayerMapRoleProfiles } from "../../lib/queries/spatial-queries";
@@ -11,7 +14,8 @@ import type { IdentityOptions } from "../../lib/identity";
 import type { OpenEvidence } from "../../lib/evidence-continuation";
 import type { PlayerRolesState } from "../../lib/studio-page-state";
 
-export function PlayerRolesPanel({ onCapabilityRepair, entries, playerKey, playerLabel, selectedTeam, identityOptions, onOpenEvidence, state, onStateChange, onPageReady }: {
+export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, playerKey, playerLabel, selectedTeam, identityOptions, onOpenEvidence, state, onStateChange, onPageReady }: {
+  exportSource?: AnalysisExportSource | null;
   onCapabilityRepair: (action: CapabilityRepairAction) => void; entries: StudioDemoEntry[]; playerKey: string; playerLabel: string; selectedTeam: string | null;
   identityOptions?: IdentityOptions; onOpenEvidence: OpenEvidence; state: PlayerRolesState;
   onStateChange: (state: PlayerRolesState) => void; onPageReady?: (keys: string[]) => void;
@@ -147,5 +151,5 @@ export function PlayerRolesPanel({ onCapabilityRepair, entries, playerKey, playe
             </div>
           )}
   </>;
-  return <div className="stu-view"><header className="stu-view-header"><h1>位置与职责 · {playerLabel}</h1></header>{rolePanels}</div>;
+  return <div className="stu-view"><header className="stu-view-header"><h1>位置与职责 · {playerLabel}</h1>{exportSource && selectedRoleProfile && mapPoolReady && !mapPoolError && <AnalysisExportButtons capture={() => buildPlayerRolesAnalysisResult(exportSource, selectedRoleProfile, mapPool, state, playerLabel, unsupportedMaps)} />}</header>{rolePanels}</div>;
 }

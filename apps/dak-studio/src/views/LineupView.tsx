@@ -1,4 +1,7 @@
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
+import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
+import { buildLineupsAnalysisResult } from "../lib/analysis-export-lineups";
+import type { AnalysisExportSource } from "../lib/analysis-export";
 import { flushSync } from "react-dom";
 import { usePageReady } from "../lib/use-page-ready";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
@@ -74,6 +77,7 @@ function calloutName(mapName: string, place: string): string {
 // ── 组件 ────────────────────────────────────────────────────────────────────
 
 export function LineupView({
+  exportSource,
   entries,
   state,
   onStateChange,
@@ -82,6 +86,7 @@ export function LineupView({
   onRebuild,
   onPageReady,
 }: {
+  exportSource?: AnalysisExportSource | null;
   entries: StudioDemoEntry[];
   state: import("../lib/analysis-theme-state").LineupsPageState;
   onStateChange: (state: import("../lib/analysis-theme-state").LineupsPageState) => void;
@@ -393,6 +398,7 @@ export function LineupView({
       {/* ── 雷达 ──────────────────────────────────────────────────────── */}
       <div className="stu-card stu-lineup-radar-card">
         <h3>道具点位雷达 · {mapDisplayName(current.mapName)}</h3>
+        {exportSource && <AnalysisExportButtons capture={() => buildLineupsAnalysisResult(exportSource, sideFilteredRows, state, lineupColumns, selectedCluster ?? null, selectedCluster ? practiceCommandForCluster(selectedCluster) : null)} />}
 
         <div className="stu-chip-row" role="tablist" aria-label="聚类模式">
           {(["strict", "loose"] as const).map((mode) => (

@@ -1,6 +1,9 @@
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { CapabilityBar, useCapability } from "../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../lib/capability-availability";
+import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
+import { buildControlAnalysisResult } from "../lib/analysis-export-spatial";
+import type { AnalysisExportSource } from "../lib/analysis-export";
 import type { ControlPageState } from "../lib/spatial-view-state";
 import type { Dispatch, SetStateAction } from "react";
 import { usePageReady } from "../lib/use-page-ready";
@@ -20,6 +23,7 @@ import { buildScopeRadarFields } from "../lib/radar-field";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
 
 export interface RadarFieldViewProps {
+  exportSource?: AnalysisExportSource | null;
   state: ControlPageState;
   onStateChange: Dispatch<SetStateAction<ControlPageState>>;
   onPageReady?: (keys: string[]) => void;
@@ -31,7 +35,7 @@ export interface RadarFieldViewProps {
   onSelectTeam?: (teamName: string | null) => void;
 }
 
-export function RadarFieldView({ onCapabilityRepair, entries, teamRenames = {}, selectedTeam = null, onSelectTeam, onPageReady, state, onStateChange, onOpenMatch }: RadarFieldViewProps) {
+export function RadarFieldView({ exportSource, onCapabilityRepair, entries, teamRenames = {}, selectedTeam = null, onSelectTeam, onPageReady, state, onStateChange, onOpenMatch }: RadarFieldViewProps) {
   const maps = useMemo(() => {
     const set = new Map<string, number>();
     for (const e of entries) if (getMapCalibration(e.meta.mapName)) set.set(e.meta.mapName, (set.get(e.meta.mapName) ?? 0) + 1);
@@ -136,6 +140,7 @@ export function RadarFieldView({ onCapabilityRepair, entries, teamRenames = {}, 
       <div className="stu-card stu-radar-field-head">
         <div>
           <h3>控图覆盖场</h3>
+          {exportSource && field && fieldReady && !progress && !fieldError && !invalidTeamForMap && <AnalysisExportButtons capture={() => buildControlAnalysisResult({ ...exportSource, entries: entriesOfMap }, field, baseline, state)} />}
           <p className="stu-muted">
             基线 = 当前全局范围中 {activeMap} 的 {entriesOfMap.length} 场；
             队伍视图 = 该队在这些场次里的贡献。覆盖场仅作描述性观察，不自动识别弱区或生成对策。

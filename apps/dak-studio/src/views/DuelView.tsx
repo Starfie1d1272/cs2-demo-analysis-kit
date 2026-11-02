@@ -1,4 +1,8 @@
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
+import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
+import { buildDuelAnalysisResult } from "../lib/analysis-export-duel";
+import type { AnalysisExportSource } from "../lib/analysis-export";
+import { filteredDuelRows, weaponCat, groupDuelMechanics } from "../lib/duel-export-projection";
 import { flushSync } from "react-dom";
 import { usePageReady } from "../lib/use-page-ready";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
@@ -11,7 +15,7 @@ import { matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import { getDuelInsights } from "../lib/queries/combat-queries";
 import { type IdentityOptions } from "../lib/identity";
 
-import type { DuelTab, EvidenceFilter, DuelPageState } from "../lib/analysis-theme-state";
+import type { DuelTab, EvidenceFilter, DuelPageState, WeaponCategory } from "../lib/analysis-theme-state";
 import type { OpenEvidence } from "../lib/evidence-continuation";
 import { projectDuelPlayer } from "../lib/analysis-view-projections";
 
@@ -25,6 +29,7 @@ const EVIDENCE_FILTERS: Array<{ key: EvidenceFilter; label: string; description:
 ];
 
 export interface DuelViewProps {
+  exportSource?: AnalysisExportSource | null;
   state: DuelPageState;
   onStateChange: (state: DuelPageState) => void;
   onOpenEvidence: OpenEvidence;
@@ -52,7 +57,7 @@ const CLASS_TONE: Record<string, string> = {
 };
 
 export function DuelView({
-  state, onStateChange, onOpenEvidence, playerSteamIds,
+  exportSource, state, onStateChange, onOpenEvidence, playerSteamIds,
   allEntries,
   entries,
   selectedTeams,
@@ -111,6 +116,7 @@ export function DuelView({
       <header className="stu-view-header">
         <div>
           <h1>对枪</h1>
+          {projected && exportSource && <AnalysisExportButtons capture={() => buildDuelAnalysisResult(exportSource, projected, state)} />}
           <p>在同一分析上下文中查看交火证据、首次交火分布与枪法机制；指标只来自当前聚合范围。受压制或无有效视野的记录不自动代表选手失误。</p>
         </div>
       </header>
@@ -205,25 +211,7 @@ function PlayerMechanicsGrid({
   duelRows: DuelFinderRow[];
   teamRenames: Record<string, string>;
 }) {
-  const grouped = useMemo(() => {
-    const byPlayer = new Map<string, { name: string; teamName: string; rows: PlayerMechanicsRow[]; duels: DuelFinderRow[] }>();
-    for (const row of rows) {
-      const current = byPlayer.get(row.steamId64) ?? { name: row.playerName, teamName: row.teamName, rows: [], duels: [] };
-      current.rows.push(row);
-      byPlayer.set(row.steamId64, current);
-    }
-    for (const duel of duelRows) {
-      const current = byPlayer.get(duel.killerSteamId64);
-      if (current) current.duels.push(duel);
-    }
-    return [...byPlayer.entries()]
-      .map(([steamId64, data]) => ({
-        steamId64,
-        ...data,
-        rows: [...data.rows].sort((a, b) => b.killCount - a.killCount || b.shotCount - a.shotCount)
-      }))
-      .sort((a, b) => b.duels.length - a.duels.length || a.name.localeCompare(b.name));
-  }, [rows, duelRows]);
+  const grouped = useMemo(() => groupDuelMechanics(rows, duelRows), [rows, duelRows]);
 
   const MECHANICS_PAGE_SIZE = 12;
   const mechTotalPages = Math.max(1, Math.ceil(grouped.length / MECHANICS_PAGE_SIZE));
@@ -283,34 +271,6 @@ function PlayerMechanicsGrid({
   );
 }
 
-// ── 武器分类映射（用于筛选栏） ──
-type WeaponCategory = "步枪" | "狙击" | "手枪" | "冲锋枪" | "霰弹机枪";
-
-const WEAPON_CATS: Record<string, WeaponCategory> = {
-  // 步枪（从 WEAPON_DISPLAY_NAMES 的 key 看）
-  ak47: "步枪", m4a4: "步枪", m4a1: "步枪", m4a1_silencer: "步枪",
-  aug: "步枪", sg556: "步枪", sg553: "步枪",
-  famas: "步枪", galilar: "步枪", galil: "步枪",
-  // 狙击
-  awp: "狙击", ssg08: "狙击", scar20: "狙击", g3sg1: "狙击",
-  // 手枪
-  deagle: "手枪", deserteagle: "手枪", revolver: "手枪",
-  glock: "手枪", usp_silencer: "手枪", usp: "手枪",
-  hkp2000: "手枪", p2000: "手枪", p250: "手枪",
-  fiveseven: "手枪", tec9: "手枪", cz75a: "手枪", cz75: "手枪",
-  elite: "手枪",
-  // 冲锋枪
-  mp9: "冲锋枪", mp7: "冲锋枪", mp5sd: "冲锋枪",
-  ump45: "冲锋枪", p90: "冲锋枪", bizon: "冲锋枪", mac10: "冲锋枪",
-  // 霰弹/机枪
-  nova: "霰弹机枪", xm1014: "霰弹机枪", mag7: "霰弹机枪",
-  sawedoff: "霰弹机枪", m249: "霰弹机枪", negev: "霰弹机枪"
-};
-
-function weaponCat(name: string): WeaponCategory | "其他" {
-  return WEAPON_CATS[name.toLowerCase()] ?? "其他";
-}
-
 const CAT_KEYS: Array<WeaponCategory | "其他" | "全部"> = ["步枪", "狙击", "手枪", "冲锋枪", "霰弹机枪", "其他", "全部"];
 const CAT_LABEL: Record<WeaponCategory | "其他" | "全部", string> = {
   步枪: "步枪", 狙击: "狙击", 手枪: "手枪", 冲锋枪: "冲锋枪", 霰弹机枪: "霰弹机枪", 其他: "其他", 全部: "全部"
@@ -368,18 +328,7 @@ function EvidenceCards({
   }, [rows]);
 
   // 分类 + 武器 + 排序
-  const activeRows = useMemo(() => {
-    let filtered = rows;
-    if (filter === "low_hp") filtered = filtered.filter((r) => r.hpBucket === "low_hp");
-    else if (filter === "third_party") filtered = filtered.filter((r) => r.thirdParty);
-    else if (filter !== "all") filtered = filtered.filter((r) => r.classification === filter);
-    if (weaponCatFilter !== "全部") filtered = filtered.filter((r) => weaponCat(r.weapon) === weaponCatFilter);
-    return [...filtered].sort((a, b) => {
-      const orderA = a.ttkMs != null ? 0 : a.hpBucket === "low_hp" ? 1 : 2;
-      const orderB = b.ttkMs != null ? 0 : b.hpBucket === "low_hp" ? 1 : 2;
-      return orderA - orderB || a.roundNumber - b.roundNumber || a.tick - b.tick;
-    });
-  }, [rows, filter, weaponCatFilter]);
+  const activeRows = useMemo(() => filteredDuelRows(rows, filter, weaponCatFilter), [rows, filter, weaponCatFilter]);
 
   const totalPages = Math.max(1, Math.ceil(activeRows.length / perPage));
   const safePage = Math.max(0, Math.min(page, totalPages - 1));

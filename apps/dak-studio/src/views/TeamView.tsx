@@ -1,6 +1,9 @@
 import { CapabilityBar, useCapability } from "../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../lib/capability-availability";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
+import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
+import { buildTeamAnalysisResult } from "../lib/analysis-export-team";
+import type { AnalysisExportSource } from "../lib/analysis-export";
 import { getTeamComparison } from "../lib/queries/team-queries";
 import { TeamComparisonPanel } from "@cs2dak/react";
 import type { TeamComparisonModel } from "@cs2dak/presentation";
@@ -31,6 +34,7 @@ const ROSTER_COLUMNS: DataTableColumn<TeamOverviewModel["roster"][number]>[] = [
 
 export function TeamView({
   onCapabilityRepair,
+  exportSource,
   entries,
   selectedTeam,
   onSelectTeam,
@@ -43,6 +47,7 @@ export function TeamView({
   identityOptions,
 }: {
   onCapabilityRepair: (action: CapabilityRepairAction) => void;
+  exportSource?: AnalysisExportSource | null;
   entries: StudioDemoEntry[];
   selectedTeam: string | null;
   onSelectTeam: (teamName: string) => void;
@@ -117,7 +122,7 @@ export function TeamView({
   return (
     <div className="stu-view stu-reading-view">
       <header className="stu-view-header">
-        <div><h1>队伍</h1><p>用当前语料查看一支队伍的基础盘面，并在同一上下文继续专项分析。</p></div>
+        <div><h1>队伍</h1>{overview && exportSource && (!state.compareTeamName || comparison || comparisonError) && <AnalysisExportButtons capture={() => buildTeamAnalysisResult(exportSource, overview, comparison, state, { maps: MAP_COLUMNS, roster: ROSTER_COLUMNS })} />}<p>用当前语料查看一支队伍的基础盘面，并在同一上下文继续专项分析。</p></div>
         <label className="stu-team-picker">切换队伍
           <select value={activeTeam ?? ""} onChange={(event) => event.target.value && onSelectTeam(event.target.value)}>
             <option value="">请选择队伍</option>

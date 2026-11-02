@@ -2,6 +2,9 @@ import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnaly
 import { CapabilityBar, useCapability } from "../../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../../lib/capability-availability";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { AnalysisExportButtons } from "../../components/AnalysisExportButtons";
+import { buildTeamRolesAnalysisResult } from "../../lib/analysis-export-roles";
+import type { AnalysisExportSource } from "../../lib/analysis-export";
 import { DoubleAwpAnalysisPanel, EmptyState, TeamMapRoleMatrixPanel } from "@cs2dak/react";
 import type { DoubleAwpAnalysis, TeamMapRoleMatrix } from "@cs2dak/tactics";
 import { getDoubleAwpAnalysis, getTeamMapRoleMatrices } from "../../lib/queries/spatial-queries";
@@ -12,7 +15,8 @@ import { displayTeamName, type IdentityOptions } from "../../lib/identity";
 import type { OpenEvidence } from "../../lib/evidence-continuation";
 import type { TeamRolesState } from "../../lib/studio-page-state";
 
-export function TeamRolesPanel({ onCapabilityRepair, entries, teamName, identityOptions, state, onStateChange, onOpenEvidence, onPageReady }: {
+export function TeamRolesPanel({ exportSource, onCapabilityRepair, entries, teamName, identityOptions, state, onStateChange, onOpenEvidence, onPageReady }: {
+  exportSource?: AnalysisExportSource | null;
   onCapabilityRepair: (action: CapabilityRepairAction) => void; entries: StudioDemoEntry[]; teamName: string; identityOptions?: IdentityOptions;
   state: TeamRolesState; onStateChange: (state: TeamRolesState) => void;
   onOpenEvidence: OpenEvidence; onPageReady?: (keys: string[]) => void;
@@ -97,5 +101,5 @@ export function TeamRolesPanel({ onCapabilityRepair, entries, teamName, identity
             {doubleAwpError && !doubleAwp ? <EmptyState variant="error" title="双 AWP 统计不可用" hint={doubleAwpError} /> : doubleAwp === null && !awpCapability.error ? <div className="stu-loading">读取 AWP 回合事实…</div> : doubleAwp === null ? null : <DoubleAwpAnalysisPanel model={doubleAwp.find((row) => row.side === matrixSide) ?? null} playerNames={playerNames} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "team:double-awp" }); }} />}
           </section>
   </>;
-  return <div className="stu-view"><header className="stu-view-header"><h1>位置与职责 · {teamName}</h1></header>{rolePanels}</div>;
+  return <div className="stu-view"><header className="stu-view-header"><h1>位置与职责 · {teamName}</h1>{exportSource && activeMatrix && (doubleAwp || doubleAwpError) && <AnalysisExportButtons capture={() => buildTeamRolesAnalysisResult(exportSource, activeMatrix, doubleAwp?.find(row => row.side === matrixSide) ?? null, state, playerNames)} />}</header>{rolePanels}</div>;
 }

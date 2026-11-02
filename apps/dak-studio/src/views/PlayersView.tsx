@@ -1,6 +1,9 @@
 import { CapabilityBar, useCapability } from "../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../lib/capability-availability";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
+import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
+import { buildPlayerAnalysisResult } from "../lib/analysis-export-player";
+import type { AnalysisExportSource } from "../lib/analysis-export";
 import { PlayerFindingsPanel } from "./analysis/PlayerFindingsPanel";
 import type { PlayerPageState } from "../lib/studio-page-state";
 import { Star } from "lucide-react";
@@ -24,6 +27,7 @@ import type { OpenEvidence } from "../lib/evidence-continuation";
 
 export interface PlayersViewProps {
   onCapabilityRepair: (action: CapabilityRepairAction) => void;
+  exportSource?: AnalysisExportSource | null;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   selectedTeam?: string | null;
@@ -64,6 +68,7 @@ function formatMetric(value: number | null, format: string): string {
 
 export function PlayersView({
   onCapabilityRepair,
+  exportSource,
   allEntries,
   entries,
   selectedTeam = null,
@@ -273,6 +278,7 @@ export function PlayersView({
       <header className="stu-view-header">
         <div>
           <h1>选手档案</h1>
+          {exportSource && (coverage || detailsError) && <AnalysisExportButtons capture={() => buildPlayerAnalysisResult(exportSource, selected, compare, insights, weaponStats, mechanics, coverage, state)} />}
           <p>
             基于 {profileSnapshot ? JSON.parse(profileSnapshot.sample).length : 0} 场 demo 的跨场画像 · 权重 {selected.weightsVersion}。强弱项相对当前聚合范围内的选手计算
             {orderedProfiles.length < 5 ? "（不足 5 人，暂不出强弱项判断）" : ""}。

@@ -25,3 +25,5 @@ export {
 } from "./components/DataTable";
 
 export { MapAnnotationCanvas, type MapAnnotationCanvasProps } from "./components/MapAnnotationCanvas";
+
+export { playerRoleSortColumns, teamRoleSortColumns, playerMapPoolSortColumns } from "./components/MapRoles";
