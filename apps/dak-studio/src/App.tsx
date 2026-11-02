@@ -1,3 +1,4 @@
+import { flushSync } from "react-dom";
 import { savedAnalyses, type SavedAnalysis, type SavedAnalysisInput } from "./lib/saved-analysis";
 import { SavedAnalysesPanel } from "./views/analysis/SavedAnalysesPanel";
 import { matchIdForEntry } from "./lib/demo-entry";
@@ -109,6 +110,7 @@ export function App() {
   const navigationRef = useRef(navigation);
   navigationRef.current = navigation;
   const nextFrameId = useRef(0);
+  const savedOpenRequest = useRef(0);
   const touchedFrames = useRef(new Set<string>());
   useEffect(() => {
     const retained = new Set([navigation.active.id, ...navigation.history.map(frame => frame.id)]);
@@ -139,14 +141,24 @@ export function App() {
   }, [canLeave]);
   const openSavedAnalysis = useCallback(async (row: SavedAnalysis) => {
     if (!canLeave()) return;
+    const source = navigationRef.current;
+    const request = ++savedOpenRequest.current;
     try {
       const saved = await savedAnalyses.get(row.id);
+      if (savedOpenRequest.current !== request || navigationRef.current !== source) return;
       if (!saved) throw new Error("原保存项已删除，可另存");
       const id = `frame-${++nextFrameId.current}`;
+      // Check again in the state update: an intervening navigation or draft edit
+      // must not be discarded by a late read.
+      flushSync(() => setNavigation(current => current === source && savedOpenRequest.current === request
+        ? studioNavigationReducer(discardMaterialDraft(current), { intent: "open-saved", id, saved, scrollY: window.scrollY })
+        : current));
+      if (navigationRef.current.active.id !== id) return;
       setEvidenceSession(null); setRestoringFrameId(null);
-      setNavigation(current => studioNavigationReducer(discardMaterialDraft(current), { intent: "open-saved", id, saved, scrollY: window.scrollY }));
       void setLastWork({ kind: "saved-analysis", queryId: saved.id });
-    } catch (e) { setNotice(e instanceof Error ? e.message : "打开保存分析失败"); }
+    } catch (e) {
+      if (savedOpenRequest.current === request && navigationRef.current === source) setNotice(e instanceof Error ? e.message : "打开保存分析失败");
+    }
   }, [canLeave, setNotice]);
   const resumeSection = useCallback((section: StudioSection) => {
     const current = navigationRef.current;
