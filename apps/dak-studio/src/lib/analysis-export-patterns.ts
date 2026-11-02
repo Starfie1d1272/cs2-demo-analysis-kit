@@ -1,6 +1,9 @@
 import { sortTableRows } from "@cs2dak/react";
 import { patternEvidenceSortColumns } from "./pattern-evidence-sort";
-import { formatTacticalClusterName } from "@cs2dak/presentation";
+import {
+  economyLabelCn,
+  formatTacticalClusterName,
+} from "@cs2dak/presentation";
 import type { TacticalCluster, TacticalRoundFact } from "@cs2dak/tactics";
 import type { PatternPageState } from "./pattern-page-state";
 import {
@@ -79,7 +82,7 @@ export function buildPatternsAnalysisResult(
         return {
           match: row.matchId,
           round: row.roundNumber,
-          economy: row.economy,
+          economy: economyLabelCn(row.economy),
           remaining: fact?.executeRemainSec ?? null,
           firstKill: fact?.firstKillForTeam ?? null,
           plant: fact?.plant?.site ?? null,
