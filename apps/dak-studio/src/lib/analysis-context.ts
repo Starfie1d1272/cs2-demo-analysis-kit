@@ -164,6 +164,9 @@ export function resolveAnalysisCorpus(
   const matchIds = corpus.matchIds.length > 0 ? new Set(corpus.matchIds) : null;
 
   const range = corpus.dateRange;
+  if (range && ((range.from && !isCalendarDate(range.from)) || (range.to && !isCalendarDate(range.to)) || (range.from && range.to && range.from > range.to))) {
+    throw new RangeError("分析日期范围无效");
+  }
   return entries.filter((entry) =>
     (!range || (() => {
       const date = entryDate(entry);

@@ -34,7 +34,16 @@ export function AnalysisScopeEditor({ entries, context, onChange, events, teamRe
     <div className="stu-chip-row">地图：{maps.map(m => <button type="button" key={m} className={corpus.maps.includes(m) ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => update({ maps: toggle(corpus.maps, m) })}>{m}</button>)}</div>
     <div className="stu-chip-row">标签：{tags.map(t => <button type="button" key={t} className={corpus.tags.includes(t) ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => update({ tags: toggle(corpus.tags, t) })}>#{t}</button>)}</div>
     <div>日期：<input aria-label="开始日期" type="date" value={from} onChange={e => setFrom(e.target.value)} /> 至 <input aria-label="结束日期" type="date" value={to} onChange={e => setTo(e.target.value)} /> <label><input type="checkbox" checked={includeUnknown} onChange={e => setIncludeUnknown(e.target.checked)} />包含未知日期</label> <button type="button" onClick={applyDate}>应用日期</button>{error && <span role="alert">{error}</span>}</div>
-    <details><summary>具体比赛与排除项</summary><div className="stu-scope-list">{entries.map(entry => <label key={entry.id} className="stu-scope-item"><input type="checkbox" checked={!corpus.excludedEntryIds.includes(entry.id)} onChange={() => update({ excludedEntryIds: toggle(corpus.excludedEntryIds, entry.id) })} />{entry.meta.mapName} · {displayTeamName(entry.meta.teamAName, teamRenames)} {entry.meta.teamAScore}:{entry.meta.teamBScore} {displayTeamName(entry.meta.teamBName, teamRenames)} · {entryDate(entry) ?? "未知日期"}</label>)}</div></details>
+    <details><summary>具体比赛与排除项</summary>
+      <p>选择具体比赛后只分析所选场次；清除选择恢复全部比赛。排除项始终单独生效。</p>
+      <button type="button" onClick={() => update({ entryIds: [] })}>清除具体比赛选择</button>
+      <div className="stu-scope-list">{entries.map(entry => <div key={entry.id} className="stu-scope-item">
+        <label><input type="checkbox" checked={corpus.entryIds.includes(entry.id)} onChange={() => update({ entryIds: toggle(corpus.entryIds, entry.id) })} />选择</label>
+        <label><input type="checkbox" checked={corpus.excludedEntryIds.includes(entry.id)} onChange={() => update({ excludedEntryIds: toggle(corpus.excludedEntryIds, entry.id) })} />排除</label>
+        {entry.meta.mapName} · {displayTeamName(entry.meta.teamAName, teamRenames)} {entry.meta.teamAScore}:{entry.meta.teamBScore} {displayTeamName(entry.meta.teamBName, teamRenames)} · {entryDate(entry) ?? "未知日期"}
+      </div>)}</div>
+      {corpus.entryIds.filter(id => !entries.some(entry => entry.id === id)).map(id => <p key={id}>已选择的比赛不可用：{id} <button type="button" onClick={() => update({ entryIds: corpus.entryIds.filter(value => value !== id) })}>移除</button></p>)}
+    </details>
     <div>当前主题支持的条件：请在对应主题内调整。</div>
     <div className="stu-chip-row">对象与对比：<button type="button" className={context.focus.kind === "aggregate" ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => onChange({ ...context, focus: { kind: "aggregate" } })}>总体</button>{teams.map(team => <button type="button" key={team.displayName} className={context.focus.kind === "team" && context.focus.teamName === team.displayName ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => onChange({ ...context, focus: { kind: "team", teamName: team.displayName } })}>{team.displayName}</button>)}</div>
   </div>;
