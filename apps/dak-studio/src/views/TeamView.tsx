@@ -80,6 +80,7 @@ export function TeamView({
   const [matrices, setMatrices] = useState<TeamMapRoleMatrix[] | null>(null);
   const [matrixError, setMatrixError] = useState<string | null>(null);
   const [doubleAwp, setDoubleAwp] = useState<DoubleAwpAnalysis[] | null>(null);
+  const [doubleAwpError, setDoubleAwpError] = useState<string | null>(null);
   const matrixSide = state.matrixSide;
   const matrixMap = state.matrixMapName ?? matrices?.[0]?.mapName ?? null;
   const setMatrixMap = (matrixMapName: string) => onStateChange({ ...state, matrixMapName });
@@ -120,16 +121,19 @@ export function TeamView({
   }, [entries, activeTeam, identityOptions?.version]);
 
   useEffect(() => {
-    if (!activeTeam || entries.length === 0) { setDoubleAwp(null); return; }
+    if (!activeTeam || entries.length === 0) { setDoubleAwp(null); setDoubleAwpError(null); return; }
     let cancelled = false;
-    void getDoubleAwpAnalysis(entries, identityOptions, [activeTeam]).then((models) => { if (!cancelled) setDoubleAwp(models); }).catch(() => { if (!cancelled) setDoubleAwp([]); });
+    setDoubleAwp(null); setDoubleAwpError(null);
+    void getDoubleAwpAnalysis(entries, identityOptions, [activeTeam])
+      .then((models) => { if (!cancelled) setDoubleAwp(models); })
+      .catch((reason) => { if (!cancelled) setDoubleAwpError(reason instanceof Error ? reason.message : String(reason)); });
     return () => { cancelled = true; };
   }, [entries, activeTeam, identityOptions?.version]);
 
   useEffect(() => {
-    if (!onPageReady || (activeTeam && (!overview && !error || !matrices && !matrixError || !doubleAwp))) return;
+    if (!onPageReady || (activeTeam && (!overview && !error || !matrices && !matrixError || !doubleAwp && !doubleAwpError))) return;
     onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
-  }, [onPageReady, activeTeam, overview, error, matrices, matrixError, doubleAwp]);
+  }, [onPageReady, activeTeam, overview, error, matrices, matrixError, doubleAwp, doubleAwpError]);
 
   const matrixMaps = [...new Set((matrices ?? []).map((row) => row.mapName))];
   const activeMatrix = matrices?.find((row) => row.mapName === matrixMap && row.side === matrixSide) ?? null;
@@ -180,7 +184,7 @@ export function TeamView({
           </section>
           <section className="stu-card" id="team:double-awp">
             <div className="stu-card-head"><h3>双 AWP 条件统计</h3></div>
-            {doubleAwp === null ? <div className="stu-loading">读取 AWP 回合事实…</div> : <DoubleAwpAnalysisPanel model={doubleAwp.find((row) => row.side === matrixSide) ?? null} playerNames={playerNames} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "team:double-awp" }); }} />}
+            {doubleAwpError ? <EmptyState variant="error" title="双 AWP 统计不可用" hint={doubleAwpError} /> : doubleAwp === null ? <div className="stu-loading">读取 AWP 回合事实…</div> : <DoubleAwpAnalysisPanel model={doubleAwp.find((row) => row.side === matrixSide) ?? null} playerNames={playerNames} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "team:double-awp" }); }} />}
           </section>
           <div className="stu-home-grid">
             <section className="stu-card"><h3>经济样本</h3>{overview.economyWinRate.length === 0 ? <p className="stu-muted">当前范围没有可用经济事实。</p> : <div className="stu-chip-row">{overview.economyWinRate.map((row) => <span key={row.economyType} className="stu-chip">{row.economyType} · {row.wins}/{row.rounds}</span>)}</div>}</section>
