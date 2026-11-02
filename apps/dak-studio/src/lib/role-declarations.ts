@@ -25,30 +25,12 @@ function scopeKey(declaration: Pick<RoleDeclaration, "playerKey" | "teamKey" | "
   return [declaration.playerKey, declaration.teamKey ?? "", declaration.mapName ?? "", declaration.validFrom ?? "", declaration.validTo ?? ""].join("\t");
 }
 
-function migrateLegacy(value: { version?: unknown; declarations?: unknown }): RoleDeclarationsState | null {
-  if ((value.version !== 1 && value.version !== 2) || !Array.isArray(value.declarations)) return null;
-  const primaries = new Set<string>();
-  const declarations: StoredRoleDeclaration[] = [];
-  for (const raw of [...value.declarations].sort((a, b) => Number((a as StoredRoleDeclaration).createdAt ?? 0) - Number((b as StoredRoleDeclaration).createdAt ?? 0))) {
-    const row = raw as Partial<StoredRoleDeclaration> & { declaration?: Partial<RoleDeclaration> & { role?: unknown; priority?: unknown } };
-    if (typeof row.id !== "string" || typeof row.createdAt !== "number" || typeof row.updatedAt !== "number" || !row.declaration) return null;
-    const key = scopeKey(row.declaration as RoleDeclaration);
-    const priority = value.version === 1 ? (primaries.has(key) ? "secondary" : "primary") : row.declaration.priority;
-    if (priority === "primary") primaries.add(key);
-    const parsed = roleDeclarationSchema.safeParse({ ...row.declaration, kind: "main_role", priority });
-    if (!parsed.success) return null;
-    declarations.push({ id: row.id, createdAt: row.createdAt, updatedAt: row.updatedAt, declaration: parsed.data });
-  }
-  return { version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations };
-}
-
 function valid(value: unknown): RoleDeclarationsState | null {
   if (!value || typeof value !== "object") return null;
   const state = value as Partial<RoleDeclarationsState>;
-  const migrated = migrateLegacy(state);
-  if (migrated) return migrated;
   if (state.version !== ROLE_DECLARATIONS_SCHEMA_VERSION || !Array.isArray(state.declarations)) return null;
   const declarations = state.declarations.filter((row): row is StoredRoleDeclaration => {
+    if (!row || typeof row !== "object") return false;
     const candidate = row as Partial<StoredRoleDeclaration>;
     return typeof candidate.id === "string" && typeof candidate.createdAt === "number" && typeof candidate.updatedAt === "number"
       && roleDeclarationSchema.safeParse(candidate.declaration).success;
@@ -56,16 +38,13 @@ function valid(value: unknown): RoleDeclarationsState | null {
   return declarations.length === state.declarations.length ? { version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations } : null;
 }
 
-async function readRoleDeclarations(persistMigration: boolean): Promise<RoleDeclarationsState> {
+export async function loadRoleDeclarations(): Promise<RoleDeclarationsState> {
   const raw = await store.get<unknown>(STATE_KEY);
   if (raw === undefined) return EMPTY;
   const state = valid(raw);
   if (!state) throw new Error("角色声明数据无法读取或格式无效，未进行修改");
-  if (persistMigration && [1, 2].includes(Number((raw as { version?: unknown }).version))) await store.put(STATE_KEY, state);
   return state;
 }
-
-export function loadRoleDeclarations(): Promise<RoleDeclarationsState> { return readRoleDeclarations(true); }
 
 async function save(state: RoleDeclarationsState): Promise<RoleDeclarationsState> {
   await store.put(STATE_KEY, state);
@@ -100,7 +79,7 @@ export async function replaceOrdinaryUserRoleDeclarations(
   if (declarations.some(item => item.source !== "user" || item.playerKey !== playerKey || (item.teamKey ?? null) !== teamKey || item.mapName != null || item.validFrom != null || item.validTo != null)) {
     throw new Error("角色声明范围不一致");
   }
-  const current = await readRoleDeclarations(false);
+  const current = await loadRoleDeclarations();
   const now = Date.now();
   const retained = current.declarations.filter(row => !(row.declaration.source === "user" && row.declaration.playerKey === playerKey
     && (row.declaration.teamKey ?? null) === teamKey && row.declaration.mapName == null
