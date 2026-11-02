@@ -187,13 +187,14 @@ jobs:
           if (m.appVersion !== version || m.runtime.urls.length !== 1 || m.runtime.urls[0] !== `https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/download/${tag}/${m.runtime.name}` || m.runtime.sha256 !== crypto.createHash('sha256').update(bytes).digest('hex') || m.runtime.size !== bytes.length || m.bundledEvents.length !== 2) throw new Error('Candidate manifest mismatch');
           NODE
           uv run --project python python - <<'PY'
-          import hashlib, json, pathlib, urllib.request
+          import hashlib, json, pathlib, subprocess
           manifest = json.loads(pathlib.Path('dist/install-manifest.json').read_text())
           for entry in manifest['requiredTris'].values():
-              data = urllib.request.urlopen(entry['urls'][0], timeout=60).read()
+              dest = pathlib.Path('dist/tris', entry['name'])
+              subprocess.run(['curl', '--fail', '--silent', '--show-error', '--retry', '5', '--retry-all-errors', entry['urls'][0], '-o', str(dest)], check=True)
+              data = dest.read_bytes()
               if len(data) != entry['size'] or hashlib.sha256(data).hexdigest() != entry['sha256']:
                   raise ValueError('tri integrity mismatch')
-              pathlib.Path('dist/tris', entry['name']).write_bytes(data)
           PY
           node scripts/assemble-full-zip.mjs --runtime-zip "dist/dak-studio-windows-$ID.zip" --bundled-events dist/events --tris-manifest dist/tris-manifest.json --tris-dir dist/tris --install-manifest dist/install-manifest.json --out dist/
           uv run --project python python scripts/check-desktop-notices.py "dist/dak-studio-windows-$ID-full.zip" studio
