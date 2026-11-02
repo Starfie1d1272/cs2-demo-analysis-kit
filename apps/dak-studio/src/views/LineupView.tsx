@@ -1,7 +1,7 @@
 import { canExportSnapshot } from "../lib/analysis-export";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
-import { buildLineupsAnalysisResult } from "../lib/analysis-export-lineups";
+import { buildLineupsAnalysisResult, LINEUPS_SCOPE_NOTE } from "../lib/analysis-export-lineups";
 import type { AnalysisExportSource } from "../lib/analysis-export";
 import { flushSync } from "react-dom";
 import { usePageReady } from "../lib/use-page-ready";
@@ -376,6 +376,7 @@ export function LineupView({
 
   return (
     <div className="stu-lineup-page">
+      <p className="stu-muted">{LINEUPS_SCOPE_NOTE}</p>
       {staleNotice}
       {savedErrorNotice}
       {savedLineups.length > 0 && (

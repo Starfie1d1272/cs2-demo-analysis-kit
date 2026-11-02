@@ -18,7 +18,7 @@ import { type RadarFieldGridIndex, type Vec3, type TriangleBvh, staticLineOfSigh
 import { EYE_HEIGHT, TARGET_HEIGHT } from "@cs2dak/maps";
 
 /** 算法参数指纹；锥角/采样率/格大小/眼高/MAX_DIST 任一变更即 +1，使旧缓存场失效。 */
-export const RADAR_FIELD_VERSION = 2;
+export const RADAR_FIELD_VERSION = 3;
 
 /** 视野判定最大距离（世界单位），超出直接跳过 LOS。 */
 const MAX_DIST = 4096;
@@ -91,13 +91,14 @@ function makeContribution(team: string, matchId: string, maxSec: number, nCells:
 }
 
 function decodeTrack(t: { x: number[]; y: number[]; z: number[]; yaw: number[]; pitch: number[]; hp: number[]; flash: number[] }, coordScale: number, angleScale: number): Track {
-  const cum = (arr: number[], by: number) => decodeDelta(arr).map((v) => v / by);
+  const coords = (arr: number[]) => decodeDelta(arr).map((v) => v * coordScale);
+  const angles = (arr: number[]) => decodeDelta(arr).map((v) => v / angleScale);
   return {
-    x: cum(t.x, coordScale),
-    y: cum(t.y, coordScale),
-    z: cum(t.z, coordScale),
-    yaw: cum(t.yaw, angleScale),
-    pitch: cum(t.pitch, angleScale),
+    x: coords(t.x),
+    y: coords(t.y),
+    z: coords(t.z),
+    yaw: angles(t.yaw),
+    pitch: angles(t.pitch),
     hp: t.hp,
     flash: t.flash,
   };

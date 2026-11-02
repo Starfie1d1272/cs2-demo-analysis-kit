@@ -1,5 +1,5 @@
 import { normalizeTableState, type TableState } from "@cs2dak/presentation";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, useId, type ReactNode } from "react";
 import { Pagination } from "./Pagination";
 
 /**
@@ -54,7 +54,7 @@ export function sortTableRows<T>(rows: T[], columns: DataTableColumn<T>[], sort:
     if (va == null && vb == null) return 0;
     if (va == null) return 1;
     if (vb == null) return -1;
-    if (typeof va === "string" || typeof vb === "string") return String(va).localeCompare(String(vb)) * dir;
+    if (typeof va === "string" || typeof vb === "string") return String(vb).localeCompare(String(va)) * dir;
     return (vb - va) * dir;
   });
 }
@@ -140,6 +140,7 @@ export function DataTable<T>({
   rowProps,
   showRank = false,
 }: DataTableProps<T>) {
+  const tableId = useId();
   const normalized = normalizeTableState(state, { sortableKeys: columns.filter(c => c.sortable && c.sortValue).map(c => c.key), totalRows: rows.length, pageSize });
   const { key: sortKey, direction } = normalized.sort;
   const sortDesc = direction === "desc";
@@ -172,11 +173,12 @@ export function DataTable<T>({
           className={classes.pagination}
         />
       )}
+      <span id={`${tableId}-sort-label`} className="dak-table-sort-label">排序</span>
       <table className={classes.table}>
         <thead>
           <tr>
             {showRank && <th className={classes.numeric}>#</th>}
-            {columns.map((col) => {
+            {columns.map((col, columnIndex) => {
               const active = sortKey === col.key;
               const thClass = [
                 col.numeric ? classes.numeric : "",
@@ -190,11 +192,13 @@ export function DataTable<T>({
                   key={col.key}
                   className={thClass || undefined}
                   title={col.title}
+                  scope="col"
                   aria-sort={active ? (sortDesc ? "descending" : "ascending") : undefined}
-                  onClick={col.sortable && col.sortValue ? () => handleSort(col.key) : undefined}
                 >
-                  {col.label}
-                  {col.sortable ? arrow(col.key) : ""}
+                  {col.sortable && col.sortValue ? <>
+                    <label id={`${tableId}-column-${columnIndex}`} htmlFor={`${tableId}-button-${columnIndex}`}>{col.label}</label>
+                    <button id={`${tableId}-button-${columnIndex}`} type="button" className="dak-table-sort-button" aria-labelledby={`${tableId}-column-${columnIndex} ${tableId}-sort-label`} onClick={() => handleSort(col.key)}>{active ? arrow(col.key) : " ↕"}</button>
+                  </> : col.label}
                 </th>
               );
             })}

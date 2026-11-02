@@ -41,7 +41,7 @@ DAK Studio 是独立 `stu-*` 设计语言（CSS 在 `apps/dak-studio/src/studio.
 | `FingerprintRadar` / `TrendChart` | Studio（`views/profile-widgets.tsx`） | PRISM 八维风格雷达 / 个人趋势柱状图（指标可切换 + min–max 参照）。用于选手分析。 | 重画风格雷达 / 趋势图。 |
 | `ElimBracket` / `SwissBracket` / `BracketConnections` | `@cs2dak/react` | 淘汰赛 bracket、瑞士轮 Buchholz 图、双败/GSL lane-aware 晋级连线。消费 `@cs2dak/presentation` 的展示模型。 | 淘汰赛渲染（唯一正确实现，见 D6）。 |
 
-Studio 的 `WorkbenchView`、`MatchesView`、`AnalysisView`、`MaterialsView` 负责四入口的轻量组合；`LibraryView` 以浏览/维护模式共享筛选与同一动作 owner。个人分析由分析主题承接，战术和材料由 Studio 持有；`HomeView`、`CoachView` 与 `CohortScope` 已删除，不是待恢复入口。
+Studio 的 `WorkbenchView`、`MatchesView`、`AnalysisView`、`MaterialsView` 分别负责工作台、比赛库、分析、战术与训练四入口的轻量组合；`LibraryView` 以浏览/维护模式共享筛选与同一动作 owner。个人分析由分析主题承接，战术和材料由 Studio 持有；`HomeView`、`CoachView` 与 `CohortScope` 已删除，不是待恢复入口。
 
 ## 2. `DataTable` 用法
 
