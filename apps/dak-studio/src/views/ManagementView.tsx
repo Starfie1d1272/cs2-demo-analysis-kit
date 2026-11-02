@@ -7,16 +7,16 @@ import { getSeasonSummary } from "../lib/queries/season-queries";
 import { type IdentityOptions } from "../lib/identity";
 import {
   listAuditEntries,
+  loadIdentityState,
   mergeIdentities,
   renamePlayer,
   setTeamRename,
   splitIdentity,
-  undoLastAction,
-  type IdentityStoreState
-} from "../lib/identity";
+  undoLastAction
+} from "../lib/identity-commands";
+import type { IdentityStoreState } from "../lib/identity";
 import { teamRenameGroups } from "../lib/team-identity";
 import type { StudioDemoEntry } from "../lib/demo-entry";
-import { migrateRoleDeclarationsForIdentity } from "../lib/role-declarations";
 
 export interface ManagementViewProps {
   onPageReady?: (keys: string[]) => void;
@@ -129,6 +129,12 @@ export function ManagementView({
     });
   };
 
+  async function reportIdentityError(error: unknown) {
+    try { onIdentityChange(await loadIdentityState()); }
+    catch { onNotice("身份操作未完成，当前数据恢复失败；请重试或重新打开"); return; }
+    onNotice(error instanceof Error ? error.message : "身份操作失败，请重试");
+  }
+
   async function handleMerge() {
     if (selectedList.length < 2 || !mergeDisplayName.trim()) return;
     setWorking(true);
@@ -137,9 +143,10 @@ export function ManagementView({
       const primarySteamId = primary.steamIds[0];
       const secondaryIds = rest.flatMap((p) => p.steamIds);
       const next = await mergeIdentities(identity, primarySteamId, secondaryIds, mergeDisplayName.trim());
-      await migrateRoleDeclarationsForIdentity(next);
       onIdentityChange(next);
       setSelected(new Set());
+    } catch (error) {
+      await reportIdentityError(error);
     } finally {
       setWorking(false);
     }
@@ -151,6 +158,8 @@ export function ManagementView({
     try {
       const next = await renamePlayer(identity, renameKey, renameValue.trim());
       onIdentityChange(next);
+    } catch (error) {
+      await reportIdentityError(error);
     } finally {
       setWorking(false);
     }
@@ -165,6 +174,8 @@ export function ManagementView({
       const next = await splitIdentity(identity, playerKey, toSplit);
       onIdentityChange(next);
       setSelected(new Set());
+    } catch (error) {
+      await reportIdentityError(error);
     } finally {
       setWorking(false);
     }
@@ -201,6 +212,8 @@ export function ManagementView({
       }
       onIdentityChange(next);
       setSelectedTeams(new Set());
+    } catch (error) {
+      await reportIdentityError(error);
     } finally {
       setWorking(false);
     }
@@ -217,6 +230,8 @@ export function ManagementView({
       }
       onIdentityChange(next);
       setSelectedTeams(new Set());
+    } catch (error) {
+      await reportIdentityError(error);
     } finally {
       setWorking(false);
     }
@@ -231,6 +246,8 @@ export function ManagementView({
         next = await setTeamRename(next, original, displayName === original ? "" : displayName);
       }
       onIdentityChange(next);
+    } catch (error) {
+      await reportIdentityError(error);
     } finally {
       setWorking(false);
     }
@@ -242,6 +259,8 @@ export function ManagementView({
       const prev = await undoLastAction();
       if (!prev) return;
       onIdentityChange(prev);
+    } catch (error) {
+      await reportIdentityError(error);
     } finally {
       setWorking(false);
     }

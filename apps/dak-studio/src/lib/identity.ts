@@ -1,12 +1,4 @@
 import type { PlayerIdentityMap } from "@cs2dak/cohort";
-import { getStorage } from "./storage";
-
-/**
- * 选手身份归并存储。
- * - 经 StorageAdapter 的 "identity"（当前状态）/ "identity-audit"（审计）命名空间持久化。
- * - version 每次变更 +1，调用方将其并入 season 缓存 key。
- * - 审计留最近 MAX_AUDIT 条；每条保存变更前快照，支持单步撤销。
- */
 
 export interface IdentityMapping {
   /** 稳定 key，默认取主 steamId64：steam:${id} */
@@ -21,51 +13,6 @@ export interface IdentityStoreState {
   mappings: IdentityMapping[];
   /** 原名 → 显示名；不在此表中的队伍名保持原样。 */
   teamRenames: Record<string, string>;
-}
-
-interface AuditEntry {
-  id: string;
-  timestamp: number;
-  description: string;
-  snapshot: IdentityStoreState;
-}
-
-const STATE_KEY = "current";
-const MAX_AUDIT = 20;
-
-const EMPTY_STATE: IdentityStoreState = { version: 0, mappings: [], teamRenames: {} };
-
-const stateStore = getStorage().records("identity");
-const auditStore = getStorage().records("identity-audit");
-
-export async function loadIdentityState(): Promise<IdentityStoreState> {
-  const record = await stateStore.get<IdentityStoreState>(STATE_KEY);
-  return record ?? EMPTY_STATE;
-}
-
-async function commitChange(
-  current: IdentityStoreState,
-  next: IdentityStoreState,
-  description: string
-): Promise<IdentityStoreState> {
-  // 写新状态 + 审计（独立命名空间，可并行）
-  const entry: AuditEntry = {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    timestamp: Date.now(),
-    description,
-    snapshot: current
-  };
-  await Promise.all([
-    stateStore.put(STATE_KEY, next),
-    auditStore.put(entry.id, entry)
-  ]);
-  // 清理超出上限的旧条目
-  const all = await auditStore.getAll<AuditEntry>();
-  if (all.length > MAX_AUDIT) {
-    const stale = all.sort((a, b) => a.timestamp - b.timestamp).slice(0, all.length - MAX_AUDIT);
-    for (const e of stale) await auditStore.delete(e.id);
-  }
-  return next;
 }
 
 /** 纯状态变换：合并多个 steamId 到同一身份（不含持久化）。 */
@@ -91,17 +38,6 @@ export function applyMerge(
   return { ...current, version: current.version + 1, mappings: [...kept, merged] };
 }
 
-/** 将多个 steamId64 归并到同一身份。primary 是保留的主 playerKey 的 steamId64。 */
-export async function mergeIdentities(
-  current: IdentityStoreState,
-  primarySteamId: string,
-  secondarySteamIds: string[],
-  displayName: string
-): Promise<IdentityStoreState> {
-  const next = applyMerge(current, primarySteamId, secondarySteamIds, displayName);
-  return commitChange(current, next, `合并 ${next.mappings.at(-1)?.steamIds.length ?? 0} 个账号 → ${displayName}`);
-}
-
 /** 纯状态变换：拆分指定 steamIds（不含持久化）。 */
 export function applySplit(
   current: IdentityStoreState,
@@ -118,16 +54,6 @@ export function applySplit(
   return { ...current, version: current.version + 1, mappings };
 }
 
-/** 将已归并身份拆分：把指定 steamIds 从 playerKey 的 mapping 中移除，各自还原为默认身份。 */
-export async function splitIdentity(
-  current: IdentityStoreState,
-  playerKey: string,
-  steamIdsToSplit: string[]
-): Promise<IdentityStoreState> {
-  const next = applySplit(current, playerKey, steamIdsToSplit);
-  return commitChange(current, next, `拆分 ${steamIdsToSplit.length} 个账号从 ${playerKey}`);
-}
-
 /** 纯状态变换：重命名（不含持久化）。 */
 export function applyRename(
   current: IdentityStoreState,
@@ -137,17 +63,11 @@ export function applyRename(
   const mappings = current.mappings.map((m) =>
     m.playerKey === playerKey ? { ...m, displayName: newDisplayName, updatedAt: Date.now() } : m
   );
+  if (!mappings.some(m => m.playerKey === playerKey)) {
+    if (!playerKey.startsWith("steam:") || !playerKey.slice(6)) throw new Error("无法重命名没有 Steam 身份的选手");
+    mappings.push({ playerKey, steamIds: [playerKey.slice(6)], displayName: newDisplayName, updatedAt: Date.now() });
+  }
   return { ...current, version: current.version + 1, mappings };
-}
-
-/** 修改选手的显示名。 */
-export async function renamePlayer(
-  current: IdentityStoreState,
-  playerKey: string,
-  newDisplayName: string
-): Promise<IdentityStoreState> {
-  const next = applyRename(current, playerKey, newDisplayName);
-  return commitChange(current, next, `重命名 ${playerKey} → ${newDisplayName}`);
 }
 
 /** 纯状态变换：设置/清除队伍显示名（不含持久化）。 */
@@ -163,41 +83,6 @@ export function applyTeamRename(
     delete teamRenames[originalName];
   }
   return { ...current, version: current.version + 1, teamRenames };
-}
-
-/** 设置或清除队伍显示名（原名 → 空字符串即清除）。 */
-export async function setTeamRename(
-  current: IdentityStoreState,
-  originalName: string,
-  displayName: string
-): Promise<IdentityStoreState> {
-  const next = applyTeamRename(current, originalName, displayName);
-  return commitChange(current, next, `队伍改名 "${originalName}" → "${displayName || "(清除)"}"`);
-}
-
-/** 撤销最近一次操作，返回恢复后的状态；无可撤销时返回 null。 */
-export async function undoLastAction(): Promise<IdentityStoreState | null> {
-  try {
-    const all = await auditStore.getAll<AuditEntry>();
-    if (all.length === 0) return null;
-    const latest = all.sort((a, b) => b.timestamp - a.timestamp)[0];
-    await Promise.all([
-      stateStore.put(STATE_KEY, latest.snapshot),
-      auditStore.delete(latest.id)
-    ]);
-    return latest.snapshot;
-  } catch {
-    return null;
-  }
-}
-
-export async function listAuditEntries(): Promise<AuditEntry[]> {
-  try {
-    const all = await auditStore.getAll<AuditEntry>();
-    return all.sort((a, b) => b.timestamp - a.timestamp);
-  } catch {
-    return [];
-  }
 }
 
 /**

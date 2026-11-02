@@ -9,7 +9,8 @@ import type { AnalysisExportSource } from "../../lib/analysis-export";
 import { EmptyState, PlayerMapPoolPanel, PlayerMapRoleProfilePanel } from "@cs2dak/react";
 import type { DeclaredRole, PlayerMapPoolRow, PlayerMapRoleProfile, WeaponDuty } from "@cs2dak/tactics";
 import { getPlayerMapPool, getPlayerMapRoleProfiles } from "../../lib/queries/spatial-queries";
-import { loadRoleDeclarations, removeRoleDeclaration, replaceOrdinaryUserRoleDeclarations, type RoleDeclarationsState } from "../../lib/role-declarations";
+import { loadRoleDeclarations, removeRoleDeclaration, replaceOrdinaryUserRoleDeclarations } from "../../lib/identity-commands";
+import type { RoleDeclarationsState } from "../../lib/role-declarations";
 import { matchIdForEntry, type StudioDemoEntry } from "../../lib/demo-entry";
 import type { IdentityOptions } from "../../lib/identity";
 import type { OpenEvidence } from "../../lib/evidence-continuation";
@@ -123,7 +124,7 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
         ...(declaredSecondaryRole ? [{ ...scope, kind: "main_role" as const, role: declaredSecondaryRole, priority: "secondary" as const }] : []),
         ...(declaredWeaponDuty ? [{ ...scope, kind: "weapon_duty" as const, weaponDuty: declaredWeaponDuty }] : []),
       ];
-      const next = await replaceOrdinaryUserRoleDeclarations(playerKey, declarationTeam, declarations);
+      const next = await replaceOrdinaryUserRoleDeclarations(playerKey, declarationTeam, declarations, roleDeclarations);
       setRoleDeclarations(next); setRoleEditorOpen(false);
     } catch (reason) {
       setRoleFormError(reason instanceof Error ? reason.message : "保存声明失败，请重试。");
@@ -139,8 +140,7 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
     setDeclarationsSaving(true);
     setRoleFormError(null);
     try {
-      const current = await loadRoleDeclarations();
-      setRoleDeclarations(await removeRoleDeclaration(current, id));
+      setRoleDeclarations(await removeRoleDeclaration(roleDeclarations, id));
     } catch (reason) {
       setRoleFormError(reason instanceof Error ? reason.message : String(reason));
     } finally {
