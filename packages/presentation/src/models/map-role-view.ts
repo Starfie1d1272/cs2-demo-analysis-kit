@@ -32,7 +32,7 @@ export interface PlayerMapRoleProfileView {
     teamKey: string;
     mapName: string;
     side: Side;
-    sample: { eligibleRounds: number };
+    sample: { eligibleRounds: number; matchCount: number };
     positionGroups: Array<{ positionGroupId: string }>;
     responsibility: TeamResponsibilityView;
     awp: { duty: WeaponDutyView };
@@ -102,6 +102,7 @@ export interface PlayerMapPoolRowView {
   ctPositionGroup: string | null;
   tResponsibility: TeamResponsibilityView;
   ctResponsibility: TeamResponsibilityView;
+  roleMatchCount: number;
   sampleQuality: number;
   confidence: number;
   evidence: EvidenceRef[];

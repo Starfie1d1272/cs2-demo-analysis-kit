@@ -532,27 +532,34 @@ function sameEntrySource(a: StudioDemoEntry, b: StudioDemoEntry): boolean {
     JSON.stringify(a.pendingCommit) === JSON.stringify(b.pendingCommit);
 }
 
-async function finishImport(entry: StudioDemoEntry, replacement: StudioDemoEntry | undefined, signal: AbortSignal | undefined, prepare: () => Promise<void>, base?: StudioDemoEntry, addedTags: string[] = [], writesSource = false): Promise<void> {
+async function finishImport(entry: StudioDemoEntry, replacement: StudioDemoEntry | undefined, signal: AbortSignal | undefined, prepare: () => Promise<void>, base?: StudioDemoEntry, addedTags: string[] = [], writesSource = false, sourceDemPath: string | null = null, matchDate: string | null = null): Promise<StudioDemoEntry> {
   const matchId = matchIdForEntry(entry);
   const previousMatchId = replacement ? matchIdForEntry(replacement) : null;
   const ids = [...new Set([entry.id, ...(replacement ? [replacement.id] : [])])];
   const keys = [...commitKeys(entry), ...(replacement ? commitKeys(replacement) : [])];
-  await withLibraryCommit(keys, async () => {
+  return withLibraryCommit(keys, async () => {
     signal?.throwIfAborted();
-    const latest = await demoMeta.get<StudioDemoEntry>(entry.id);
-    if (base && (!latest || !sameEntrySource(normalizeEntry(latest), normalizeEntry(base)))) throw new Error("比赛资料已变化，请重新导入。");
+    const stored = await demoMeta.get<StudioDemoEntry>(entry.id);
+    const latest = stored ? normalizeEntry(stored) : undefined;
+    if (base && (!latest || !sameEntrySource(latest, normalizeEntry(base)))) throw new Error("比赛资料已变化，请重新导入。");
     if (!base && latest) throw new Error("比赛资料已变化，请重新导入。");
+    let currentReplacement: StudioDemoEntry | undefined;
     if (replacement && replacement.id !== entry.id) {
       const current = await demoMeta.get<StudioDemoEntry>(replacement.id);
       if (!current || !sameEntrySource(normalizeEntry(current), normalizeEntry(replacement))) throw new Error("替换目标已变化，请重新导入。");
+      currentReplacement = normalizeEntry(current);
     }
-    const finalEntry = latest && base ? {
+    const finalEntry = {
       ...entry,
-      tags: normalizeTags([...(latest.tags ?? []), ...addedTags]),
-      sourceDemPath: latest.sourceDemPath !== base.sourceDemPath ? latest.sourceDemPath : entry.sourceDemPath,
-      meta: { ...entry.meta, matchDate: latest.meta.matchDate !== base.meta.matchDate ? latest.meta.matchDate : entry.meta.matchDate },
-    } : entry;
-    const committedEntry = writesSource ? { ...finalEntry, sourceRevision: crypto.randomUUID() } : finalEntry;
+      tags: normalizeTags([...(latest && base ? latest.tags : []), ...(currentReplacement?.tags ?? []), ...addedTags]),
+      sourceDemPath: latest && base && latest.sourceDemPath !== base.sourceDemPath ? latest.sourceDemPath
+        : writesSource && currentReplacement && (sourceDemPath == null ||
+          (sourceDemPath === replacement?.sourceDemPath && currentReplacement.sourceDemPath !== replacement.sourceDemPath))
+          ? currentReplacement.sourceDemPath : entry.sourceDemPath,
+      meta: { ...entry.meta, matchDate: latest && base && latest.meta.matchDate !== base.meta.matchDate ? latest.meta.matchDate
+        : writesSource && currentReplacement && matchDate == null && base?.meta.matchDate == null ? currentReplacement.meta.matchDate : entry.meta.matchDate },
+    };
+    const committedEntry = normalizeEntry({ ...finalEntry, ...(writesSource ? { sourceRevision: crypto.randomUUID() } : {}), pendingCommit: undefined });
     const marked: Array<{ id: string; prior: StudioDemoEntry }> = [];
     try {
       if (writesSource) for (const id of ids) {
@@ -564,7 +571,7 @@ async function finishImport(entry: StudioDemoEntry, replacement: StudioDemoEntry
           signal?.throwIfAborted();
           await prepare();
           signal?.throwIfAborted();
-          await saveDemoEntry({ ...committedEntry, pendingCommit: undefined });
+          await saveDemoEntry(committedEntry);
           signal?.throwIfAborted();
           if (replacement && replacement.id !== entry.id) {
             const shared = (await demoMeta.getAll<StudioDemoEntry>()).some((row) => row.id !== replacement.id && matchIdForEntry(row) === previousMatchId);
@@ -583,6 +590,7 @@ async function finishImport(entry: StudioDemoEntry, replacement: StudioDemoEntry
       throw error;
     }
     pkgCache.delete(entry.id);
+    return committedEntry;
   });
 }
 
@@ -673,9 +681,9 @@ async function importDemoFileUnlocked(file: File, settings: ImportDemoOptions, i
   if (existing && !forceReanalyze && !isFactsStale(existing) && await hasPersistedFacts(existing)) {
     const mergedEntry = mergeDuplicateEntry(existing);
     mergedEntry.tags = normalizeTags([...(replacement?.tags ?? []), ...mergedEntry.tags]);
-    await finishImport(mergedEntry, replacement, signal, async () => undefined, existing, tags);
+    const committedEntry = await finishImport(mergedEntry, replacement, signal, async () => undefined, existing, tags);
     return {
-      entry: mergedEntry,
+      entry: committedEntry,
       duplicate: true,
       replaced: Boolean(replacement && replacement.id !== existing.id),
       replacedId: replacement?.id,
@@ -714,12 +722,12 @@ async function importDemoFileUnlocked(file: File, settings: ImportDemoOptions, i
     entry.sourceDemPath = sourceDemPath ?? replacement.sourceDemPath ?? null;
   }
 
-  await finishImport(entry, replacement, signal, async () => {
+  const committedEntry = await finishImport(entry, replacement, signal, async () => {
     await persistAnalysis(data);
     signal?.throwIfAborted();
     await blobs.put(persistedId, buffer);
-  }, existing, tags, true);
-  return { entry, duplicate: Boolean(existing), replaced: Boolean(replacement && replacement.id !== persistedId), replacedId: replacement?.id };
+  }, existing, tags, true, sourceDemPath, matchDate);
+  return { entry: committedEntry, duplicate: Boolean(existing), replaced: Boolean(replacement && replacement.id !== persistedId), replacedId: replacement?.id };
 }
 
 export function commitKeys(entry: StudioDemoEntry): string[] {

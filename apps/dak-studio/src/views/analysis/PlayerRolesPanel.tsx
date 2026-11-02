@@ -8,7 +8,7 @@ import { buildPlayerRolesAnalysisResult } from "../../lib/analysis-export-roles"
 import type { AnalysisExportSource } from "../../lib/analysis-export";
 import { EmptyState, PlayerMapPoolPanel, PlayerMapRoleProfilePanel } from "@cs2dak/react";
 import type { DeclaredRole, PlayerMapPoolRow, PlayerMapRoleProfile, WeaponDuty } from "@cs2dak/tactics";
-import { getPlayerMapPool, getPlayerMapRoleProfiles } from "../../lib/queries/spatial-queries";
+import { getPlayerMapPool, getPlayerMapRoleProfiles, type RoleTeamGroup } from "../../lib/queries/spatial-queries";
 import { loadRoleDeclarations, removeRoleDeclaration, replaceOrdinaryUserRoleDeclarations } from "../../lib/identity-commands";
 import type { RoleDeclarationsState } from "../../lib/role-declarations";
 import { matchIdForEntry, type StudioDemoEntry } from "../../lib/demo-entry";
@@ -30,7 +30,7 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
   }), [playerKey, identityOptions?.map]);
   const poolCapability = useCapability(entries, "player-map-pool", playerScope);
   const poolEntries = poolCapability.eligible;
-  const [roleSnapshot, setRoleSnapshot] = useState<{ key: string; generation: number; value: PlayerMapRoleProfile[] } | null>(null);
+  const [roleSnapshot, setRoleSnapshot] = useState<{ key: string; generation: number; value: Array<PlayerMapRoleProfile & { teamGroup: RoleTeamGroup }> } | null>(null);
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const [poolSnapshot, setPoolSnapshot] = useState<{ key: string; generation: number; rows: PlayerMapPoolRow[]; unsupported: string[] } | null>(null);
   const [mapPoolReady, setMapPoolReady] = useState(false);
@@ -44,7 +44,9 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
   const declarationsSavingRef = useRef(false);
   const roleKey = JSON.stringify([roleEntries?.map(entry => entry.id), playerKey, selectedTeam, identityOptions?.version, roleDeclarations]);
   const roleProfiles = roleSnapshot?.key === roleKey ? roleSnapshot.value : null;
-  const selectedRoleProfile = roleProfiles?.find((profile) => profile.playerKey === playerKey && (selectedTeam == null || profile.teamKey === selectedTeam)) ?? null;
+  const playerProfiles = roleProfiles?.filter(profile => profile.playerKey === playerKey) ?? [];
+  const [profileTeam, setProfileTeam] = useState<string | null>(null);
+  const selectedRoleProfile = playerProfiles.find(profile => profile.teamKey === profileTeam) ?? playerProfiles[0] ?? null;
   // A pool refreshed after a role failure must not incorporate an older role snapshot.
   const poolRoleProfile = !roleError && !capability.error && !capability.stale && canExportSnapshot(roleSnapshot, analysis) ? selectedRoleProfile : null;
   const poolKey = JSON.stringify([poolEntries?.map(entry => entry.id), playerKey, selectedTeam, identityOptions?.version, poolRoleProfile]);
@@ -55,6 +57,7 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
   const [declaredRole, setDeclaredRole] = useState<DeclaredRole>("awper");
   const [declaredSecondaryRole, setDeclaredSecondaryRole] = useState<DeclaredRole | "">("");
   const [declaredWeaponDuty, setDeclaredWeaponDuty] = useState<WeaponDuty | "">("");
+  const [scopeIndex, setScopeIndex] = useState(0);
   const [roleFormError, setRoleFormError] = useState<string | null>(null);
   const roleDialogRef = useRef<HTMLDivElement>(null);
   const entryByMatchId = useMemo(() => new Map(entries.map(entry => [matchIdForEntry(entry), entry])), [entries]);
@@ -101,11 +104,21 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
     onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
   }, [onPageReady, entries.length, roleProfiles, roleError, capability.error, declarationsError, mapPoolReady, mapPoolError, poolCapability.error]);
   if (!entries.length) return <div className="stu-view"><EmptyState variant="insufficient" title="聚合范围为空" hint="请调整分析范围。" /></div>;
-  const declarationTeam = selectedTeam ?? selectedRoleProfile?.teamKey ?? null;
-  const selectedDeclarations = roleDeclarations?.declarations.filter((row) => row.declaration.source === "user" && row.declaration.playerKey === playerKey && (declarationTeam == null || row.declaration.teamKey === declarationTeam)) ?? [];
+  const scopeOptions = selectedRoleProfile?.teamGroup.scopes ?? [];
+  const selectedScope = scopeOptions[scopeIndex] ?? scopeOptions[0];
+  const declarationTeam = selectedScope?.teamKey ?? null;
+  const declarationScope = selectedScope?.teamScope;
+  const scopeMatches = (declaration: import("@cs2dak/tactics").RoleDeclaration) => {
+    const scope = declaration.teamScope;
+    return (declaration.teamKey ?? null) === declarationTeam && (scope == null && declarationScope == null
+      || scope?.kind === "entity" && declarationScope?.kind === "entity" && scope.key === declarationScope.key
+      || scope?.kind === "observation" && declarationScope?.kind === "observation" && scope.matchId === declarationScope.matchId && scope.slot === declarationScope.slot);
+  };
+  const selectedDeclarations = roleDeclarations?.declarations.filter(row => row.declaration.source === "user" && row.declaration.playerKey === playerKey && scopeMatches(row.declaration)) ?? [];
+  const ambiguousDeclarations = roleDeclarations?.declarations.filter(row => row.declaration.source === "user" && row.declaration.playerKey === playerKey && !row.declaration.teamScope && row.declaration.teamKey != null && selectedRoleProfile?.teamGroup.ambiguousNames.includes(row.declaration.teamKey)) ?? [];
 
   function openRoleEditor() {
-    setDeclaredRole("awper"); setDeclaredSecondaryRole(""); setDeclaredWeaponDuty("");
+    setScopeIndex(0); setDeclaredRole("awper"); setDeclaredSecondaryRole(""); setDeclaredWeaponDuty("");
     setRoleFormError(null); setRoleEditorOpen(true);
   }
 
@@ -117,6 +130,7 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
     const scope = {
       playerKey, source: "user" as const, provenance: "Studio 用户声明",
       ...(declarationTeam ? { teamKey: declarationTeam } : {}),
+      ...(declarationScope ? { teamScope: declarationScope } : {}),
     };
     try {
       const declarations: import("@cs2dak/tactics").RoleDeclaration[] = [
@@ -124,7 +138,7 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
         ...(declaredSecondaryRole ? [{ ...scope, kind: "main_role" as const, role: declaredSecondaryRole, priority: "secondary" as const }] : []),
         ...(declaredWeaponDuty ? [{ ...scope, kind: "weapon_duty" as const, weaponDuty: declaredWeaponDuty }] : []),
       ];
-      const next = await replaceOrdinaryUserRoleDeclarations(playerKey, declarationTeam, declarations, roleDeclarations);
+      const next = await replaceOrdinaryUserRoleDeclarations(playerKey, declarationTeam, declarations, roleDeclarations, declarationScope);
       setRoleDeclarations(next); setRoleEditorOpen(false);
     } catch (reason) {
       setRoleFormError(reason instanceof Error ? reason.message : "保存声明失败，请重试。");
@@ -153,10 +167,10 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
             <div className="stu-card stu-card-wide" id="players:map-roles">
                 {capability.availability && <CapabilityBar availability={capability.availability} onRepair={onCapabilityRepair} />}
               {capability.error && <p role="alert">地图位置能力读取失败：{capability.error} <button type="button" className="stu-button-sm" onClick={capability.retry}>重试</button>{capability.availability && " · 显示旧版本"}</p>}
-              <div className="stu-card-head"><h3>地图 / 位置</h3><button type="button" className="stu-button-sm" disabled={!roleDeclarations || declarationsSaving} onClick={openRoleEditor}>编辑声明</button></div>
+              <div className="stu-card-head"><h3>地图 / 位置</h3>{playerProfiles.length > 1 && <select className="stu-form-control" style={{ width: "auto", maxWidth: "18rem" }} aria-label="选择队伍画像" value={selectedRoleProfile?.teamKey ?? ""} onChange={event => { setProfileTeam(event.target.value); setScopeIndex(0); }}>{playerProfiles.map(profile => <option key={profile.teamKey} value={profile.teamKey}>{profile.teamGroup.label}</option>)}</select>}<button type="button" className="stu-button-sm" disabled={!roleDeclarations || !selectedRoleProfile || declarationsSaving} onClick={openRoleEditor}>编辑声明</button></div>
               {declarationsError && <p role="alert">角色声明读取失败：{declarationsError} <button type="button" className="stu-button-sm" onClick={() => setDeclarationsRetry(value => value + 1)}>重试</button></p>}
               {roleProfiles && (roleError || analysis.status !== "ready" || roleSnapshot?.generation !== analysis.generation) && <p className="stu-muted" role="status">{roleError || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
-              {roleError && !roleProfiles ? <EmptyState variant="error" title="地图角色不可用" hint={roleError} /> : !roleProfiles && !capability.error && !declarationsError ? <div className="stu-loading">读取地图位置事实…</div> : !roleProfiles ? null : roleEntries?.length === 0 && roleProfiles.length === 0 ? (capability.error ? null : <p className="stu-muted" role="status">当前范围暂无可用比赛，请查看上方原因和操作。</p>) : <PlayerMapRoleProfilePanel state={state.tables.roles ?? { sort: { key: "sample", direction: "desc" }, page: 0 }} onStateChange={table => onStateChange({ ...state, tables: { ...state.tables, roles: table } })} profile={selectedRoleProfile} onOpenEvidence={(evidence) => {
+              {roleError && !roleProfiles ? <EmptyState variant="error" title="地图角色不可用" hint={roleError} /> : !roleProfiles && !capability.error && !declarationsError ? <div className="stu-loading">读取地图位置事实…</div> : !roleProfiles ? null : roleEntries?.length === 0 && roleProfiles.length === 0 ? (capability.error ? null : <p className="stu-muted" role="status">当前范围暂无可用比赛，请查看上方原因和操作。</p>) : <PlayerMapRoleProfilePanel state={state.tables.roles ?? { sort: { key: "sample", direction: "desc" }, page: 0 }} onStateChange={table => onStateChange({ ...state, tables: { ...state.tables, roles: table } })} profile={selectedRoleProfile ? { ...selectedRoleProfile, teamKey: selectedRoleProfile.teamGroup.label } : null} onOpenEvidence={(evidence) => {
                 const entry = entryByMatchId.get(evidence.matchId);
                 if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "players:map-roles" });
               }} />}
@@ -166,7 +180,7 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
             <div className="stu-modal-backdrop" role="dialog" aria-modal="true" aria-label="编辑角色声明" onClick={() => { if (!declarationsSavingRef.current) setRoleEditorOpen(false); }}>
               <div className="stu-dialog stu-dialog-form" ref={roleDialogRef} onClick={(event) => event.stopPropagation()}>
                 <header className="stu-modal-head"><h3>角色声明 · {playerLabel}</h3><button type="button" className="stu-modal-close" disabled={declarationsSaving} onClick={() => { if (!declarationsSavingRef.current) setRoleEditorOpen(false); }} aria-label="关闭">✕</button></header>
-                <div className="stu-modal-body"><p className="stu-muted">只声明当前队伍下的通常职责；副角色和武器职责都可留空。地图与日期由可信赛事/阵容元数据管理。</p>
+                <div className="stu-modal-body">{scopeOptions.length > 0 && <label className="stu-form-field"><span className="stu-form-label">声明范围</span><select className="stu-form-control" disabled={declarationsSaving} value={Math.min(scopeIndex, scopeOptions.length - 1)} onChange={event => setScopeIndex(Number(event.target.value))}>{scopeOptions.map((scope, index) => <option key={index} value={index}>{scope.label}</option>)}</select></label>}{ambiguousDeclarations.length > 0 && <section className="stu-declaration-list"><p className="stu-muted">原有同名声明的范围不明确，已保留；请选择明确范围重新声明。</p>{ambiguousDeclarations.map(row => <div key={row.id} className="stu-declaration-row"><span>{row.declaration.kind === "main_role" ? `${row.declaration.priority} · ${row.declaration.role}` : row.declaration.weaponDuty}</span><button type="button" className="stu-button-sm" disabled={declarationsSaving} onClick={() => void clearRoleDeclaration(row.id)}>清除</button></div>)}</section>}<p className="stu-muted">副角色和武器职责可留空。</p>
                   <div className="stu-form-grid">
                     <label className="stu-form-field"><span className="stu-form-label">主角色</span><select className="stu-form-control" disabled={declarationsSaving} value={declaredRole} onChange={(event) => { const role = event.target.value as DeclaredRole; setDeclaredRole(role); if (declaredSecondaryRole === role) setDeclaredSecondaryRole(""); }}>{(["igl", "awper", "anchor", "opener", "closer"] as const).map((role) => <option key={role} value={role}>{role}</option>)}</select></label>
                     <label className="stu-form-field"><span className="stu-form-label">副角色（可选）</span><select className="stu-form-control" disabled={declarationsSaving} value={declaredSecondaryRole} onChange={(event) => setDeclaredSecondaryRole(event.target.value as DeclaredRole | "")}><option value="">不声明</option>{(["igl", "awper", "anchor", "opener", "closer"] as const).filter((role) => role !== declaredRole).map((role) => <option key={role} value={role}>{role}</option>)}</select></label>

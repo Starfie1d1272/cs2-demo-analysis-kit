@@ -137,6 +137,7 @@ export function buildPlayerRolesAnalysisResult(
               { key: "ct", label: "CT 位置", unit: null },
               { key: "tResponsibility", label: "T 职责", unit: null },
               { key: "ctResponsibility", label: "CT 职责", unit: null },
+              { key: "roleMatches", label: "位置证据场次", unit: null },
               { key: "quality", label: "样本质量", unit: "比例 (0–1)" },
               { key: "confidence", label: "置信度", unit: "比例 (0–1)" },
               { key: "evidence", label: "代表回合", unit: null },
@@ -158,8 +159,9 @@ export function buildPlayerRolesAnalysisResult(
               ct: row.ctPositionGroup,
               tResponsibility: label(row.tResponsibility),
               ctResponsibility: label(row.ctResponsibility),
-              quality: row.sampleQuality,
-              confidence: row.confidence,
+              roleMatches: row.roleMatchCount,
+              quality: row.roleMatchCount ? row.sampleQuality : null,
+              confidence: row.roleMatchCount ? row.confidence : null,
               evidence: row.evidence[0]
                 ? `${row.evidence[0].matchId} R${row.evidence[0].roundNumber}`
                 : null,

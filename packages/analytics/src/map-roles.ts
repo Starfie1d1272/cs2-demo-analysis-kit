@@ -73,10 +73,15 @@ function rankScores(scores: Record<InferredMapRole, number>): Array<[InferredMap
 interface ScopedEvidence { rows: PlayerMapRoleEvidence[]; limitations: string[]; relevant: boolean }
 
 function scopedEvidence(declaration: RoleDeclaration, rows: PlayerMapRoleEvidence[], matchTimes: Record<string, string | null>): ScopedEvidence {
-  const base = rows.filter((row) => (declaration.teamKey == null || row.teamKey === declaration.teamKey)
+  const teamKey = declaration.teamKey ?? (declaration.teamScope?.kind === "entity" ? declaration.teamScope.key : null);
+  const candidates = rows.filter((row) => (teamKey == null || row.teamKey === teamKey)
     && (declaration.mapName == null || row.mapName === declaration.mapName));
-  if (base.length === 0) return { rows: [], limitations: [], relevant: false };
-  if (declaration.validFrom == null && declaration.validTo == null) return { rows: base, limitations: [], relevant: true };
+  const observation = declaration.teamScope?.kind === "observation" ? declaration.teamScope.matchId : null;
+  const partialObservation = observation != null && candidates.some(row => row.matchIds.includes(observation) && row.matchIds.some(id => id !== observation));
+  const base = observation == null ? candidates : candidates.filter(row => row.matchIds.length > 0 && row.matchIds.every(id => id === observation));
+  const scopeLimitations = partialObservation ? ["聚合证据跨越比赛范围，未纳入该行。"] : [];
+  if (base.length === 0) return { rows: [], limitations: scopeLimitations, relevant: partialObservation };
+  if (declaration.validFrom == null && declaration.validTo == null) return { rows: base, limitations: scopeLimitations, relevant: true };
   const inScope = (matchId: string) => {
     const time = matchTimes[matchId];
     return time != null && (declaration.validFrom == null || time >= declaration.validFrom) && (declaration.validTo == null || time <= declaration.validTo);
@@ -90,10 +95,11 @@ function scopedEvidence(declaration: RoleDeclaration, rows: PlayerMapRoleEvidenc
   return {
     rows: inRange,
     limitations: [
+      ...scopeLimitations,
       ...(unknown ? ["比赛时间缺失；该声明未与时间未知的 evidence 对齐。"] : []),
       ...(partial ? ["聚合 evidence 跨越声明日期；为避免混入期外样本，未纳入该行。"] : []),
     ],
-    relevant: inRange.length > 0 || unknown || partial,
+    relevant: inRange.length > 0 || unknown || partial || partialObservation,
   };
 }
 
@@ -119,10 +125,10 @@ function alignment(declaration: MainRoleDeclaration, inferred: InferredMapRole |
   } as const;
 }
 
-export interface BuildPlayerMapRoleProfilesOptions { matchTimes?: Record<string, string | null> }
+export interface BuildPlayerMapRoleProfilesOptions { matchTimes?: Record<string, string | null>; aggregatedEvidence?: PlayerMapRoleEvidence[] }
 
-function infer(rows: PlayerMapRoleEvidence[]) {
-  const weaponDuty = globalWeaponDuty(rows);
+function infer(rows: PlayerMapRoleEvidence[], weaponRows = rows) {
+  const weaponDuty = globalWeaponDuty(weaponRows);
   const roleEvidenceScores = evidenceScores(rows, weaponDuty);
   // AWP resemblance remains useful evidence, but only a reliable primary AWP
   // duty is eligible to win the public main-role headline.
@@ -147,14 +153,20 @@ export function buildPlayerMapRoleProfiles(evidenceRows: PlayerMapRoleEvidence[]
   return [...byPlayerTeam.entries()].map(([key, rows]) => {
     const [playerKey, teamKey] = key.split("\t");
     const scopedDeclarations = declarations
-      .filter((declaration) => declaration.playerKey === playerKey && (declaration.teamKey == null || declaration.teamKey === teamKey))
+      .filter((declaration) => declaration.playerKey === playerKey
+        && !(declaration.teamScope?.kind === "observation" && declaration.teamKey == null)
+        && (declaration.teamKey ?? (declaration.teamScope?.kind === "entity" ? declaration.teamScope.key : teamKey)) === teamKey)
       .map((declaration) => ({ declaration, scope: scopedEvidence(declaration, rows, options.matchTimes ?? {}) }))
       .filter((item) => item.scope.relevant);
     const declaredRoles = scopedDeclarations.filter((item): item is { declaration: MainRoleDeclaration; scope: ScopedEvidence } => item.declaration.kind === "main_role").map((item) => item.declaration);
     const declaredWeaponDuties = scopedDeclarations.filter((item): item is { declaration: WeaponDutyDeclaration; scope: ScopedEvidence } => item.declaration.kind === "weapon_duty").map((item) => item.declaration);
-    const automatic = infer(rows);
+    const displayRows = options.aggregatedEvidence?.filter((row) => row.playerKey === playerKey && row.teamKey === teamKey).map((row) => {
+      const matchIds = [...new Set(rows.filter((source) => source.mapName === row.mapName && source.side === row.side && source.sample.eligibleRounds > 0).flatMap((source) => source.matchIds))];
+      return { ...row, matchIds, sample: { ...row.sample, matchCount: matchIds.length } };
+    }) ?? rows;
+    const automatic = infer(displayRows, rows);
     const { weaponDuty, roleEvidenceScores, winner, runnerUp, margin, sufficient, status, inferredPrimaryRole } = automatic;
-    const declaredIgl = scopedDeclarations.some((item) => item.declaration.kind === "main_role" && item.declaration.priority === "primary" && item.declaration.role === "igl" && item.declaration.mapName == null && item.declaration.validFrom == null && item.declaration.validTo == null);
+    const declaredIgl = scopedDeclarations.some((item) => item.declaration.kind === "main_role" && item.declaration.priority === "primary" && item.declaration.role === "igl" && item.declaration.teamScope?.kind !== "observation" && item.declaration.mapName == null && item.declaration.validFrom == null && item.declaration.validTo == null);
     const headlineRole = declaredIgl ? inferredPrimaryRole === "awper" ? "IGL / AWPer" : "IGL" : inferredPrimaryRole;
     const volume = clamp(rows.reduce((sum, row) => sum + row.sample.eligibleRounds, 0) / 40);
     const quality = weighted(rows, (row) => row.sample.dataQuality);
@@ -177,9 +189,9 @@ export function buildPlayerMapRoleProfiles(evidenceRows: PlayerMapRoleEvidence[]
       declaredRoles, declaredWeaponDuties,
       inferredPrimaryRole, runnerUpRole: sufficient ? runnerUp : null, separationMargin: sufficient ? margin : null, roleEvidenceScores,
       headlineRole, status, confidence, weaponDuty,
-      positionGroupDisplay: rows.flatMap((row) => row.positionGroups.map((group) => ({ mapName: row.mapName, side: row.side, positionGroupId: group.positionGroupId, ...positionGroupDisplay(row.mapName, row.side, group.positionGroupId) }))),
+      positionGroupDisplay: displayRows.flatMap((row) => row.positionGroups.map((group) => ({ mapName: row.mapName, side: row.side, positionGroupId: group.positionGroupId, ...positionGroupDisplay(row.mapName, row.side, group.positionGroupId) }))),
       roleAlignments, weaponDutyAlignments,
-      perMapEvidence: rows.sort((a, b) => a.teamKey.localeCompare(b.teamKey) || a.mapName.localeCompare(b.mapName) || a.side.localeCompare(b.side)),
+      perMapEvidence: [...displayRows].sort((a, b) => a.teamKey.localeCompare(b.teamKey) || a.mapName.localeCompare(b.mapName) || a.side.localeCompare(b.side)),
       evidence: evidence(rows),
       basis: [`${MAP_ROLE_MODEL_VERSION}：headline 直接由连续 evidence 计算，不重复叠加离散职责标签。`, "倾向分不是概率；人工声明与自动观察独立保存。"],
       limitations: ["IGL 无法由 demo 统计验证。", ...[...new Set(scopedDeclarations.flatMap((item) => item.scope.limitations))]],
