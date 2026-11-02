@@ -3,7 +3,7 @@ import { Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { OpeningTrailsModel, OpeningTrailRound } from "@cs2dak/tactics";
 import { RadarTrails, GRENADE_COLOR, type RadarTrail, type RadarGrenadeOverlay } from "../components/RadarTrails";
-import { matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
+import { entryDate, matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import type { IdentityOptions } from "../lib/identity";
 import { getPinnedPlayer } from "../lib/pin";
 import { getFactsStore } from "../lib/facts-store";
@@ -131,12 +131,12 @@ export function TrailsView({ allEntries, entries, onGoLibrary, identityOptions ,
     };
   }, [entries, identityOptions?.version]);
 
-  // 该选手出场的全部场次（matchId 日期前缀降序）
+  // 已知日期优先，未知日期稳定排序；文件名或 matchId 不能充当日期。
   const playerEntries = useMemo(() => {
     if (!selectedKey || !rosterByEntry) return [];
     return entries
       .filter((entry) => rosterByEntry.get(entry.id)?.has(selectedKey))
-      .sort((a, b) => matchIdForEntry(b).localeCompare(matchIdForEntry(a)));
+      .sort((a, b) => (entryDate(b) ?? "").localeCompare(entryDate(a) ?? "") || a.id.localeCompare(b.id));
   }, [entries, selectedKey, rosterByEntry]);
 
   // ② 地图选项 = 该选手出场过的图
@@ -158,7 +158,7 @@ export function TrailsView({ allEntries, entries, onGoLibrary, identityOptions ,
   const rangeEntries = useMemo(() => {
     if (!mapName) return [];
     const pool = playerEntries.filter((entry) => entry.meta.mapName === mapName);
-    return rangeN > 0 ? pool.slice(0, rangeN) : pool;
+    return rangeN > 0 ? pool.filter((entry) => entryDate(entry) !== null).slice(0, rangeN) : pool;
   }, [playerEntries, mapName, rangeN]);
 
   usePageReady(entries.length === 0 || error !== null || (players !== null && (players.length === 0 || (selectedKey !== null && (mapOptions.length === 0 || (mapName !== null && (rangeEntries.length === 0 || models !== null)))))), onPageReady);
@@ -257,7 +257,7 @@ export function TrailsView({ allEntries, entries, onGoLibrary, identityOptions ,
             className="stu-select"
             value={rangeN}
             onChange={(e) => setRangeN(Number(e.target.value))}
-            title="该选手在该地图的最近 N 场"
+            title="当前范围内该选手在该地图的最近 N 场；无日期场次仅在全部中显示"
           >
             {RANGE_OPTIONS.map((n) => (
               <option key={n} value={n}>
@@ -284,13 +284,15 @@ export function TrailsView({ allEntries, entries, onGoLibrary, identityOptions ,
         </div>
         {selectedPlayer && mapName && (
           <span className="stu-dim">
-            正在叠加：{selectedPlayer.name} · {mapName} · {rangeEntries.length} 场
+            当前范围 · {selectedPlayer.name} · {mapName} · {rangeN === 0 ? "全部" : `最近 ${rangeN} 场（仅有日期）`} · {rangeEntries.length} 场
           </span>
         )}
       </div>
 
       {error ? (
         <EmptyState variant="error" title="构建失败" hint={error} />
+      ) : players && rangeEntries.length === 0 ? (
+        <EmptyState variant="insufficient" title="当前条件没有比赛样本" hint="最近场次只包含有日期的比赛；可选择全部场次或调整选手、地图与范围。" />
       ) : !models || !players ? (
         <div className="stu-loading">提取 {rangeEntries.length} 场回放轨迹…</div>
       ) : visibleRounds.length === 0 ? (

@@ -30,6 +30,7 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
   }, [entries]);
 
   const [mapName, setMapName] = useState<string | null>(null);
+  const [economy, setEconomy] = useState<"gun" | "all">("gun");
   const activeMap = mapName ?? maps[0]?.[0] ?? null;
 
   const entriesOfMap = useMemo(
@@ -58,8 +59,7 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
   useEffect(() => {
     if (activeMap && maps.some(([name]) => name === activeMap)) return;
     setMapName(null);
-    onSelectTeam?.(null);
-  }, [activeMap, maps, onSelectTeam]);
+  }, [activeMap, maps]);
 
   const [field, setField] = useState<RadarField | null>(null);
   const [baseline, setBaseline] = useState<RadarField | null>(null);
@@ -88,6 +88,7 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
       try {
         const { league, team } = await buildScopeRadarFields({
           matchIds,
+          economy,
           team: isTeam
             ? { name: activeTeam, includeTeam: (raw) => displayTeamName(raw, teamRenames) === activeTeam }
             : undefined,
@@ -111,7 +112,7 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
       }
     })();
     return () => abort.abort();
-  }, [activeMap, activeTeam, entriesOfMap, invalidTeamForMap, teamRenames]);
+  }, [activeMap, activeTeam, entriesOfMap, invalidTeamForMap, teamRenames, economy]);
 
   if (maps.length === 0) {
     return <EmptyState title="暂无可分析地图" hint="先导入若干含回放（replay）的 demo，再来看覆盖场。" />;
@@ -144,6 +145,14 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
           </button>
         ))}
       </div>
+
+      <label className="stu-card stu-radar-field-scope">
+        回合经济
+        <select className="stu-select" value={economy} onChange={(event) => setEconomy(event.target.value as "gun" | "all")}>
+          <option value="gun">长枪局</option>
+          <option value="all">全部回合</option>
+        </select>
+      </label>
 
       <div className="stu-card stu-radar-field-scope" aria-label="对象">
         <span className="stu-muted">对象</span>
@@ -185,7 +194,7 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
       {!invalidTeamForMap && !progress && field && <RadarFieldCanvas field={field} baseline={baseline} map={{ name: activeMap!, radarImageUrl: `./maps/radars/${activeMap}.png` }} />}
       {!invalidTeamForMap && !progress && !field && activeMap && (
         fieldError ? <EmptyState variant="error" title="覆盖场加载失败" hint={fieldError} />
-          : <EmptyState title="该地图暂无覆盖场数据" hint="所选范围内没有含回放的长枪局。" />
+          : <EmptyState title="该地图暂无覆盖场数据" hint="所选范围和经济条件内没有含回放的回合。" />
       )}
     </div>
   );
