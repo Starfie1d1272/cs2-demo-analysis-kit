@@ -1,4 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../../lib/queries/query-cache";
+import { CapabilityBar, useCapability } from "../../components/CapabilityBar";
+import type { CapabilityRepairAction } from "../../lib/capability-availability";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { EmptyState, PlayerMapPoolPanel, PlayerMapRoleProfilePanel } from "@cs2dak/react";
 import type { DeclaredRole, PlayerMapPoolRow, PlayerMapRoleProfile, WeaponDuty } from "@cs2dak/tactics";
 import { getPlayerMapPool, getPlayerMapRoleProfiles } from "../../lib/queries/spatial-queries";
@@ -8,18 +11,23 @@ import type { IdentityOptions } from "../../lib/identity";
 import type { OpenEvidence } from "../../lib/evidence-continuation";
 import type { PlayerRolesState } from "../../lib/studio-page-state";
 
-export function PlayerRolesPanel({ entries, playerKey, playerLabel, selectedTeam, identityOptions, onOpenEvidence, state, onStateChange, onPageReady }: {
-  entries: StudioDemoEntry[]; playerKey: string; playerLabel: string; selectedTeam: string | null;
+export function PlayerRolesPanel({ onCapabilityRepair, entries, playerKey, playerLabel, selectedTeam, identityOptions, onOpenEvidence, state, onStateChange, onPageReady }: {
+  onCapabilityRepair: (action: CapabilityRepairAction) => void; entries: StudioDemoEntry[]; playerKey: string; playerLabel: string; selectedTeam: string | null;
   identityOptions?: IdentityOptions; onOpenEvidence: OpenEvidence; state: PlayerRolesState;
   onStateChange: (state: PlayerRolesState) => void; onPageReady?: (keys: string[]) => void;
 }) {
-  const [roleProfiles, setRoleProfiles] = useState<PlayerMapRoleProfile[] | null>(null);
+  const capability = useCapability(entries, "map-role");
+  const roleEntries = capability.eligible;
+  const [roleSnapshot, setRoleSnapshot] = useState<{ key: string; generation: number; value: PlayerMapRoleProfile[] } | null>(null);
+  const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const [mapPool, setMapPool] = useState<PlayerMapPoolRow[]>([]);
   const [mapPoolReady, setMapPoolReady] = useState(false);
   const [unsupportedMaps, setUnsupportedMaps] = useState<string[]>([]);
   const [mapPoolError, setMapPoolError] = useState<string | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
   const [roleDeclarations, setRoleDeclarations] = useState<RoleDeclarationsState | null>(null);
+  const roleKey = JSON.stringify([roleEntries?.map(entry => entry.id), playerKey, selectedTeam, identityOptions?.version, roleDeclarations]);
+  const roleProfiles = roleSnapshot?.key === roleKey ? roleSnapshot.value : null;
   const [roleEditorOpen, setRoleEditorOpen] = useState(false);
   const [declaredRole, setDeclaredRole] = useState<DeclaredRole>("awper");
   const [declaredSecondaryRole, setDeclaredSecondaryRole] = useState<DeclaredRole | "">("");
@@ -42,14 +50,16 @@ export function PlayerRolesPanel({ entries, playerKey, playerLabel, selectedTeam
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [roleEditorOpen]);
   useEffect(() => {
-    if (!roleDeclarations || entries.length === 0) { setRoleProfiles(null); return; }
+    if (!roleDeclarations || !roleEntries) return;
+    if (!roleEntries.length) { setRoleSnapshot({ key: roleKey, generation: analysis.generation, value: [] }); return; }
+    if (analysis.status !== "ready") return;
     let cancelled = false;
-    setRoleProfiles(null); setRoleError(null);
-    void getPlayerMapRoleProfiles(entries, roleDeclarations.declarations.map(row => row.declaration), identityOptions, selectedTeam ? [selectedTeam] : [])
-      .then(value => { if (!cancelled) setRoleProfiles(value); })
+    setRoleError(null);
+    void getPlayerMapRoleProfiles(roleEntries, roleDeclarations.declarations.map(row => row.declaration), identityOptions, selectedTeam ? [selectedTeam] : [])
+      .then(value => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setRoleSnapshot({ key: roleKey, generation: analysis.generation, value }); } })
       .catch(reason => { if (!cancelled) setRoleError(reason instanceof Error ? reason.message : String(reason)); });
     return () => { cancelled = true; };
-  }, [entries, playerKey, roleDeclarations, identityOptions?.version, selectedTeam]);
+  }, [roleEntries, playerKey, roleDeclarations, identityOptions?.version, selectedTeam, roleKey, analysis]);
   useEffect(() => {
     if (entries.length === 0 || (!roleProfiles && !roleError)) { setMapPool([]); setMapPoolReady(false); return; }
     let cancelled = false;
@@ -98,8 +108,10 @@ export function PlayerRolesPanel({ entries, playerKey, playerLabel, selectedTeam
 
   const rolePanels = <>
             <div className="stu-card stu-card-wide" id="players:map-roles">
+                {capability.availability && <CapabilityBar availability={capability.availability} onRepair={onCapabilityRepair} />}
               <div className="stu-card-head"><h3>地图 / 位置</h3><button type="button" className="stu-button-sm" disabled={!roleDeclarations} onClick={openRoleEditor}>编辑声明</button></div>
-              {roleError ? <EmptyState variant="error" title="地图角色不可用" hint={roleError} /> : !roleProfiles ? <div className="stu-loading">读取地图位置事实…</div> : <PlayerMapRoleProfilePanel state={state.tables.roles ?? { sort: { key: "sample", direction: "desc" }, page: 0 }} onStateChange={table => onStateChange({ ...state, tables: { ...state.tables, roles: table } })} profile={selectedRoleProfile} onOpenEvidence={(evidence) => {
+              {roleProfiles && (roleError || analysis.status !== "ready" || roleSnapshot?.generation !== analysis.generation) && <p className="stu-muted" role="status">{roleError || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
+              {roleError && !roleProfiles ? <EmptyState variant="error" title="地图角色不可用" hint={roleError} /> : !roleProfiles ? <div className="stu-loading">读取地图位置事实…</div> : <PlayerMapRoleProfilePanel state={state.tables.roles ?? { sort: { key: "sample", direction: "desc" }, page: 0 }} onStateChange={table => onStateChange({ ...state, tables: { ...state.tables, roles: table } })} profile={selectedRoleProfile} onOpenEvidence={(evidence) => {
                 const entry = entryByMatchId.get(evidence.matchId);
                 if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "players:map-roles" });
               }} />}

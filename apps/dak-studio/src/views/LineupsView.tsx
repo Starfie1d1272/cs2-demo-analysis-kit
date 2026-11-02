@@ -17,18 +17,6 @@ export interface LineupsViewProps {
 
 export function LineupsView({ state, onStateChange, allEntries, entries, onOpenEvidence, onWatchDemo, onGoLibrary, onRebuild, onPageReady }: LineupsViewProps) {
   usePageReady(allEntries.length === 0 || entries.length === 0, onPageReady);
-  if (allEntries.length === 0) {
-    return (
-      <div className="stu-view">
-        <EmptyState
-          mark
-          title="还没有道具点位"
-          hint="先导入 demo，再按地图查看常用投掷物出手点、落点和证据回合。"
-          action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="stu-view">
@@ -38,11 +26,7 @@ export function LineupsView({ state, onStateChange, allEntries, entries, onOpenE
           <p>按地图聚类常用投掷物，提供出手点、落点、回放与一次性练习；是否有效仍需在比赛证据中核对。</p>
         </div>
       </header>
-      {entries.length === 0 ? (
-        <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整全局范围。" />
-      ) : (
-        <LineupView state={state} onStateChange={onStateChange} onPageReady={onPageReady} onRebuild={onRebuild} entries={entries} onOpenEvidence={onOpenEvidence} onWatchDemo={onWatchDemo} />
-      )}
+      <LineupView state={state} onStateChange={onStateChange} onPageReady={onPageReady} onRebuild={onRebuild} entries={entries} onOpenEvidence={onOpenEvidence} onWatchDemo={onWatchDemo} />
     </div>
   );
 }

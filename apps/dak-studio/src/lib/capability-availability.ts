@@ -11,6 +11,7 @@ export type StudioCapability =
   | "economy"
   | "utility"
   | "lineup"
+  | "opening"
   | "control"
   | "tactical"
   | "map-role";
@@ -19,7 +20,7 @@ export type CapabilityStatus = "ready" | "partial" | "unavailable";
 export type CapabilityOutputLevel = "observation" | "system-finding";
 export type CapabilityRepairAction = "rebuild-facts" | "reimport-with-replay" | "reimport-with-shots" | "install-tri";
 
-type FactKind = "insights" | "duel" | "economy" | "utility" | "lineup" | "tactical" | "map-intelligence";
+type FactKind = "opening" | "insights" | "duel" | "economy" | "utility" | "lineup" | "tactical" | "map-intelligence";
 
 export interface EntryCapabilityFacts {
   facts: Partial<Record<FactKind, boolean>>;
@@ -66,6 +67,7 @@ const REQUIREMENTS: Record<StudioCapability, CapabilityRequirement> = {
   economy: { requiredFacts: ["economy"], outputLevel: "observation" },
   utility: { requiredFacts: ["utility"], outputLevel: "system-finding" },
   lineup: { requiredFacts: ["lineup"], optionalDependencies: ["replay"], outputLevel: "observation" },
+  opening: { requiredFacts: ["opening"], requiredDependencies: ["replay"], outputLevel: "observation" },
   control: { requiredDependencies: ["replay"], optionalDependencies: ["tri"], outputLevel: "observation" },
   tactical: { requiredFacts: ["tactical", "map-intelligence"], optionalDependencies: ["replay"], outputLevel: "system-finding" },
   "map-role": { requiredFacts: ["map-intelligence"], outputLevel: "observation" },
@@ -78,6 +80,7 @@ const DEPENDENCY_LABEL: Record<CapabilityDependencyAvailability["key"], string> 
 };
 
 const FACT_LABEL: Record<FactKind, string> = {
+  opening: "开局动线 facts",
   insights: "个人复盘 facts",
   duel: "对枪 facts",
   economy: "经济 facts",
@@ -124,7 +127,8 @@ export function deriveCapabilityAvailability(
       facts: {}, hasReplay: entry.meta.hasReplay, hasShots: false, hasTri: false,
     };
     let reason: string | null = null;
-    if (requirement.requiredFacts && isAnalysisStale(entry.builtWith)) reason = "facts 需要重建";
+    if (capability === "opening" && !input.hasReplay) reason = "replay 缺失";
+    else if (requirement.requiredFacts && isAnalysisStale(entry.builtWith)) reason = "facts 需要重建";
     else {
       const missingFact = requirement.requiredFacts?.find((fact) => !input.facts[fact]);
       if (missingFact) reason = `${FACT_LABEL[missingFact]} 缺失`;
@@ -181,9 +185,10 @@ export async function loadCapabilityAvailabilityInputs(
   factsStore: FactsStore = getFactsStore(),
   derivedStore: DerivedCacheStore = getDerivedCacheStore(),
   availableTris?: readonly string[],
+  openingScope?: { playerKeys: string[]; steamIds: string[] },
 ): Promise<Map<string, EntryCapabilityFacts>> {
   const matchIds = entries.map(matchIdForEntry);
-  const [insights, duels, economy, utilityMatchIds, lineups, tactical, playerPositions, teamShapes, mechanics] = await Promise.all([
+  const [insights, duels, economy, utilityMatchIds, lineups, tactical, playerPositions, teamShapes, mechanics, opening] = await Promise.all([
     derivedStore.getPlayerInsights({ matchIds }),
     derivedStore.getDuels({ matchIds }),
     derivedStore.getTournament({ matchIds }),
@@ -193,8 +198,10 @@ export async function loadCapabilityAvailabilityInputs(
     factsStore.getPlayerPositionRounds({ matchIds }),
     factsStore.getTeamShapeRounds({ matchIds }),
     factsStore.getMechanicsRows({ matchIds }),
+    openingScope ? derivedStore.getOpeningTrails({ matchIds, ...openingScope }) : Promise.resolve([]),
   ]);
   const factSets = {
+    opening: idsOf(opening.filter(row => row.row.available)),
     insights: idsOf(insights),
     duel: idsOf(duels),
     economy: idsOf(economy),
@@ -209,6 +216,7 @@ export async function loadCapabilityAvailabilityInputs(
     const matchId = matchIdForEntry(entry);
     return [entry.id, {
       facts: {
+        opening: factSets.opening.has(matchId),
         insights: factSets.insights.has(matchId),
         duel: factSets.duel.has(matchId),
         economy: factSets.economy.has(matchId),

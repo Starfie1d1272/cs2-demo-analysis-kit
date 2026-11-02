@@ -1,6 +1,7 @@
+import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { usePageReady } from "../lib/use-page-ready";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { formatPercent } from "@cs2dak/presentation";
 import { type TournamentInsights } from "@cs2dak/analytics";
 import { DataTable, EmptyState, type DataTableColumn, type HeatTone } from "@cs2dak/react";
@@ -22,22 +23,24 @@ export interface EconomyViewProps {
 }
 
 export function EconomyView({ state, onStateChange, onViewMatches, playerFocused, allEntries, entries, selectedTeams, onGoLibrary, identityOptions , onPageReady }: EconomyViewProps) {
-  const [insights, setInsights] = useState<TournamentInsights | null>(null);
+  const [snapshot, setSnapshot] = useState<{ key: string; generation: number; value: TournamentInsights | null } | null>(null);
+  const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
+  const requestKey = JSON.stringify([entries.map(entry => entry.id), selectedTeams, identityOptions?.version]);
+  const insights = snapshot?.key === requestKey ? snapshot.value : null;
   const [error, setError] = useState<string | null>(null);
 
   usePageReady(entries.length === 0 || insights !== null || error !== null, onPageReady);
 
   useEffect(() => {
     if (entries.length === 0) {
-      setInsights(null);
       return;
     }
+    if (analysis.status !== "ready") return;
     let cancelled = false;
-    setInsights(null);
     setError(null);
     getTournamentInsights(entries, identityOptions, selectedTeams)
       .then((result) => {
-        if (!cancelled) setInsights(result);
+        if (!cancelled) { assertAnalysisGeneration(analysis.generation); setSnapshot({ key: requestKey, generation: analysis.generation, value: result }); }
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
@@ -45,7 +48,7 @@ export function EconomyView({ state, onStateChange, onViewMatches, playerFocused
     return () => {
       cancelled = true;
     };
-  }, [entries, identityOptions?.version, selectedTeams]);
+  }, [entries, identityOptions?.version, selectedTeams, requestKey, analysis]);
 
   if (allEntries.length === 0) {
     return (
@@ -70,6 +73,7 @@ export function EconomyView({ state, onStateChange, onViewMatches, playerFocused
           <button type="button" className="stu-button-sm" onClick={onViewMatches}>查看这组比赛</button>
         </div>
       </header>
+      {insights && (error || analysis.status !== "ready" || snapshot?.generation !== analysis.generation) && <p className="stu-muted" role="status">{error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && !insights && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的转化数据…</div>}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}

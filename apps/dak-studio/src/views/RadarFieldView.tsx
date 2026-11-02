@@ -1,3 +1,6 @@
+import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
+import { CapabilityBar, useCapability } from "../components/CapabilityBar";
+import type { CapabilityRepairAction } from "../lib/capability-availability";
 import type { ControlPageState } from "../lib/spatial-view-state";
 import type { Dispatch, SetStateAction } from "react";
 import { usePageReady } from "../lib/use-page-ready";
@@ -11,7 +14,7 @@ import { EmptyState } from "@cs2dak/react";
 import { RadarFieldCanvas } from "@cs2dak/react";
 import { getMapCalibration, hasLowerLevel } from "@cs2dak/maps/calibration";
 import type { RadarField } from "@cs2dak/tactics";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { StudioDemoEntry } from "../lib/demo-entry";
 import { buildScopeRadarFields } from "../lib/radar-field";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
@@ -20,6 +23,7 @@ export interface RadarFieldViewProps {
   state: ControlPageState;
   onStateChange: Dispatch<SetStateAction<ControlPageState>>;
   onPageReady?: (keys: string[]) => void;
+  onCapabilityRepair: (action: CapabilityRepairAction) => void;
   entries: StudioDemoEntry[];
   teamRenames?: Record<string, string>;
   selectedTeam?: string | null;
@@ -27,7 +31,7 @@ export interface RadarFieldViewProps {
   onSelectTeam?: (teamName: string | null) => void;
 }
 
-export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null, onSelectTeam, onPageReady, state, onStateChange, onOpenMatch }: RadarFieldViewProps) {
+export function RadarFieldView({ onCapabilityRepair, entries, teamRenames = {}, selectedTeam = null, onSelectTeam, onPageReady, state, onStateChange, onOpenMatch }: RadarFieldViewProps) {
   const maps = useMemo(() => {
     const set = new Map<string, number>();
     for (const e of entries) if (getMapCalibration(e.meta.mapName)) set.set(e.meta.mapName, (set.get(e.meta.mapName) ?? 0) + 1);
@@ -43,6 +47,8 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
     () => (activeMap ? entries.filter((e) => e.meta.mapName === activeMap) : []),
     [entries, activeMap]
   );
+  const capability = useCapability(entriesOfMap, "control");
+  const eligibleEntries = capability.eligible;
   const teams = useMemo(
     () => teamRenameGroups(entriesOfMap.map((e) => ({ teamA: e.meta.teamAName, teamB: e.meta.teamBName })), teamRenames),
     [entriesOfMap, teamRenames]
@@ -67,8 +73,11 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
     setMapName(null);
   }, [activeMap, maps]);
 
-  const [field, setField] = useState<RadarField | null>(null);
-  const [baseline, setBaseline] = useState<RadarField | null>(null);
+  const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
+  const requestKey = JSON.stringify([eligibleEntries?.map(entry => entry.id), activeMap, activeTeam, economy, teamRenames]);
+  const [snapshot, setSnapshot] = useState<{ key: string; generation: number; field: RadarField | null; baseline: RadarField | null } | null>(null);
+  const field = snapshot?.key === requestKey ? snapshot.field : null;
+  const baseline = snapshot?.key === requestKey ? snapshot.baseline : null;
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const reqToken = useRef(0);
   const [fieldReady, setFieldReady] = useState(false);
@@ -76,17 +85,17 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
   usePageReady(!activeMap || entriesOfMap.length === 0 || invalidTeamForMap || fieldReady, onPageReady);
 
   useEffect(() => {
-    if (!activeMap || entriesOfMap.length === 0 || invalidTeamForMap) {
-      setField(null);
-      setBaseline(null);
+    if (!activeMap || !eligibleEntries || eligibleEntries.length === 0 || invalidTeamForMap) {
       setProgress(null);
+      setFieldReady(true);
       return;
     }
+    if (analysis.status !== "ready") return;
     setFieldReady(false);
     setFieldError(null);
     const token = ++reqToken.current;
     const abort = new AbortController();
-    const matchIds = entriesOfMap.map((e) => e.id);
+    const matchIds = eligibleEntries.map((e) => e.id);
     const isTeam = activeTeam !== null;
     setProgress({ done: 0, total: matchIds.length });
 
@@ -104,21 +113,19 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
           },
         });
         if (token !== reqToken.current || abort.signal.aborted) return;
-        setField(isTeam ? team : league);
-        setBaseline(team ? league : null);
+        assertAnalysisGeneration(analysis.generation);
+        setSnapshot({ key: requestKey, generation: analysis.generation, field: isTeam ? team : league, baseline: team ? league : null });
         setProgress(null);
         setFieldReady(true);
       } catch (reason) {
         if (token !== reqToken.current || abort.signal.aborted) return;
         setFieldError(reason instanceof Error ? reason.message : String(reason));
-        setField(null);
-        setBaseline(null);
         setProgress(null);
         setFieldReady(true);
       }
     })();
     return () => abort.abort();
-  }, [activeMap, activeTeam, entriesOfMap, invalidTeamForMap, teamRenames, economy]);
+  }, [activeMap, activeTeam, eligibleEntries, invalidTeamForMap, teamRenames, economy, requestKey, analysis]);
 
   if (maps.length === 0) {
     return <EmptyState title="暂无可分析地图" hint="先导入若干含回放（replay）的 demo，再来看覆盖场。" />;
@@ -201,7 +208,9 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
         </div>
       )}
 
-      {!invalidTeamForMap && !progress && field && <RadarFieldCanvas field={field} baseline={baseline} map={{ name: activeMap!, radarImageUrl: `./maps/radars/${activeMap}.png`, lowerRadarImageUrl: getMapCalibration(activeMap!) && hasLowerLevel(getMapCalibration(activeMap!)!) ? `./maps/radars/${activeMap}_lower.png` : null }} state={{ mode: state.mode, second: state.second, level: state.level }} onStateChange={view => onStateChange(current => ({ ...current, ...view }))} />}
+      {field && (progress || fieldError || analysis.status !== "ready" || snapshot?.generation !== analysis.generation) && <p className="stu-muted" role="status">{fieldError || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
+      {capability.availability && <CapabilityBar availability={capability.availability} onRepair={onCapabilityRepair} />}
+      {!invalidTeamForMap && field && <RadarFieldCanvas field={field} baseline={baseline} map={{ name: activeMap!, radarImageUrl: `./maps/radars/${activeMap}.png`, lowerRadarImageUrl: getMapCalibration(activeMap!) && hasLowerLevel(getMapCalibration(activeMap!)!) ? `./maps/radars/${activeMap}_lower.png` : null }} state={{ mode: state.mode, second: state.second, level: state.level }} onStateChange={view => onStateChange(current => ({ ...current, ...view }))} />}
       {!invalidTeamForMap && !progress && !field && activeMap && (
         fieldError ? <EmptyState variant="error" title="覆盖场加载失败" hint={fieldError} />
           : <EmptyState title="该地图暂无覆盖场数据" hint="所选范围和经济条件内没有含回放的回合。" />

@@ -68,7 +68,8 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
   const activeId = demoId;
   const activeEntry = activeId ? entries.find((entry) => entry.id === activeId) ?? null : null;
   const [loaded, setLoaded] = useState<{ id: string; generation: number; model: MatchWorkspaceModel; state: MatchWorkspaceState } | null>(null);
-  const model = loaded?.id === activeId && loaded.generation === analysis.generation && analysis.status === "ready" ? loaded.model : null;
+  const model = loaded?.id === activeId ? loaded.model : null;
+  const staleModel = !!model && (analysis.status !== "ready" || loaded!.generation !== analysis.generation);
   const [pinned, setPinned] = useState<string[] | null>(null);
   const [pinnedError, setPinnedError] = useState(false);
   const mayApplyPinned = useRef(!workspaceState);
@@ -218,7 +219,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
   }
 
   const invalidEvidence = evidenceSession && (!activeEntry || matchIdForEntry(activeEntry) !== evidenceSession.queue[evidenceSession.activeIndex].evidence.matchId || (model && !model.rounds.some(round => round.roundNumber === deepLink?.roundNumber)));
-  const workspaceBody = invalidEvidence ? <EmptyState variant="insufficient" title="原证据回合当前无法定位" hint="来源比赛或回合不可用。" /> : analysis.status !== "ready" ? <div className="stu-loading">{analysis.status === "error" ? "分析缓存不可用，请重试刷新" : "分析数据正在更新…"}</div> : error
+  const workspaceBody = invalidEvidence ? <EmptyState variant="insufficient" title="原证据回合当前无法定位" hint="来源比赛或回合不可用。" /> : !model && analysis.status !== "ready" ? <div className="stu-loading">{analysis.status === "error" ? "分析缓存不可用，请重试刷新" : "分析数据正在更新…"}</div> : !model && error
     ? <EmptyState variant="error" title="加载失败" hint={error} />
     : !model
       ? <div className="stu-loading">读取本地持久化工作台…</div>
@@ -226,6 +227,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
 
   return (
     <div className="stu-view stu-view-flush">
+      {model && (staleModel || error) && <p role="status" className="stu-muted">{error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
       {pinnedError && <p className="stu-error" role="status">无法读取关注选手，可继续手动选择选手。</p>}
       {seriesError && <p className="stu-error" role="alert">读取系列赛失败：{seriesError}</p>}
       <div className="stu-context-bar">

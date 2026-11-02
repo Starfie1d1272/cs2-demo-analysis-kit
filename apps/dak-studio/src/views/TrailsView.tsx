@@ -1,8 +1,11 @@
 import { OPENING_WINDOW_SECONDS, OPENING_SPEEDS, OPENING_OPACITY_MIN, OPENING_OPACITY_MAX } from "../lib/spatial-view-state";
+import { CapabilityBar, useCapability } from "../components/CapabilityBar";
+import type { CapabilityRepairAction } from "../lib/capability-availability";
+import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { type OpeningPageState } from "../lib/spatial-view-state";
 import { usePageReady } from "../lib/use-page-ready";
 import { Pause, Play, RotateCcw } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
 import type { OpeningTrailsModel, OpeningTrailRound } from "@cs2dak/tactics";
 import { RadarTrails, GRENADE_COLOR, type RadarTrail, type RadarGrenadeOverlay } from "../components/RadarTrails";
 import { entryDate, matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
@@ -17,6 +20,7 @@ import { EmptyState } from "@cs2dak/react";
  */
 
 export interface TrailsViewProps {
+  onCapabilityRepair: (action: CapabilityRepairAction) => void;
   onPageReady?: (keys: string[]) => void;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
@@ -64,7 +68,7 @@ const EFFECT_DURATION_SECONDS: Partial<Record<string, number>> = {
   decoy: 15
 };
 
-export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, identityOptions, onPageReady, focusPlayerKey, onSelectPlayer, state: pageState, onStateChange: setPageState }: TrailsViewProps) {
+export function TrailsView({ onCapabilityRepair, allEntries, entries, onGoLibrary, onOpenMatch, identityOptions, onPageReady, focusPlayerKey, onSelectPlayer, state: pageState, onStateChange: setPageState }: TrailsViewProps) {
   // 业务流程：① 选手 → ② 地图（该选手出场的图）→ ③ 最近 N 场（该选手在该图）
   const { recentMatchCount: rangeN, mapName, side } = pageState;
   const hiddenRounds = useMemo(() => new Set(pageState.hiddenRoundKeys), [pageState.hiddenRoundKeys]);
@@ -72,22 +76,21 @@ export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, iden
   const setSide = (side: OpeningPageState["side"]) => setPageState(current => ({ ...current, side }));
   const setMapName = (update: SetStateAction<string | null>) => setPageState(current => ({ ...current, mapName: typeof update === "function" ? update(current.mapName) : update }));
   const selectedKey = focusPlayerKey;
-  const [players, setPlayers] = useState<PlayerOption[] | null>(null);
-  /** entryId → 该场出场选手集合。 */
-  const [rosterByEntry, setRosterByEntry] = useState<Map<string, Set<string>> | null>(null);
-  const [models, setModels] = useState<OpeningTrailsModel[] | null>(null);
+  const [rosterSnapshot, setRosterSnapshot] = useState<{ key: string; players: PlayerOption[]; roster: Map<string, Set<string>> } | null>(null);
+  const rosterKey = JSON.stringify([entries.map(entry => entry.id), identityOptions?.version]);
+  const players = rosterSnapshot?.key === rosterKey ? rosterSnapshot.players : null;
+  const rosterByEntry = rosterSnapshot?.key === rosterKey ? rosterSnapshot.roster : null;
+  const [modelSnapshot, setModelSnapshot] = useState<{ key: string; generation: number; value: OpeningTrailsModel[] } | null>(null);
+  const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const [error, setError] = useState<string | null>(null);
 
   // ① 加载范围内全部 DemoPackage，建立选手候选与每场名单（derived 缓存命中后开销很小）
   useEffect(() => {
     if (entries.length === 0) {
-      setPlayers(null);
-      setRosterByEntry(null);
-      setModels(null);
       return;
     }
+    if (analysis.status !== "ready") return;
     let cancelled = false;
-    setPlayers(null);
     setError(null);
     // identity 归并：把每个 steamId 解析到稳定 playerKey + 显示名（未归并者各自成键）。
     const idMap = identityOptions?.map ?? {};
@@ -119,8 +122,8 @@ export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, iden
         }
         const options = [...counts.values()].sort((a, b) => b.matchCount - a.matchCount || a.name.localeCompare(b.name));
         if (cancelled) return;
-        setPlayers(options);
-        setRosterByEntry(roster);
+        assertAnalysisGeneration(analysis.generation);
+        setRosterSnapshot({ key: rosterKey, players: options, roster });
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
@@ -128,7 +131,7 @@ export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, iden
     return () => {
       cancelled = true;
     };
-  }, [entries, identityOptions?.version, focusPlayerKey]);
+  }, [entries, identityOptions?.version, focusPlayerKey, rosterKey, analysis]);
 
   // 已知日期优先，未知日期稳定排序；文件名或 matchId 不能充当日期。
   const playerEntries = useMemo(() => {
@@ -160,26 +163,29 @@ export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, iden
     return rangeN > 0 ? pool.filter((entry) => entryDate(entry) !== null).slice(0, rangeN) : pool;
   }, [playerEntries, mapName, rangeN]);
 
+  const selectedOption = players?.find(option => option.playerKey === selectedKey);
+  const openingScope = useMemo(() => selectedOption ? { playerKeys: [selectedOption.playerKey], steamIds: selectedOption.steamIds } : undefined, [selectedOption]);
+  const capability = useCapability(rangeEntries, "opening", openingScope);
+  const eligibleEntries = capability.eligible;
+  const requestKey = JSON.stringify([eligibleEntries?.map(entry => entry.id), openingScope]);
+  const models = modelSnapshot?.key === requestKey ? modelSnapshot.value : null;
   usePageReady(entries.length === 0 || error !== null || (players !== null && (!selectedKey || players.length === 0 || mapOptions.length === 0 || (mapName !== null && (rangeEntries.length === 0 || models !== null)))), onPageReady);
 
   // 为选中选手构建各场动线
   useEffect(() => {
     const selected = players?.find((option) => option.playerKey === selectedKey);
-    if (!selected || rangeEntries.length === 0) {
-      setModels(null);
-      return;
-    }
+    if (!selected || !eligibleEntries || !eligibleEntries.length || analysis.status !== "ready") return;
     let cancelled = false;
-    setModels(null);
     setError(null);
     getDerivedCacheStore().getOpeningTrails({
-      matchIds: rangeEntries.map(matchIdForEntry),
+      matchIds: eligibleEntries.map(matchIdForEntry),
       playerKeys: [selected.playerKey],
       steamIds: selected.steamIds
     })
       .then((result) => {
         if (cancelled) return;
-        setModels(result.map((fact) => fact.row));
+        assertAnalysisGeneration(analysis.generation);
+        setModelSnapshot({ key: requestKey, generation: analysis.generation, value: result.map((fact) => fact.row) });
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
@@ -187,7 +193,7 @@ export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, iden
     return () => {
       cancelled = true;
     };
-  }, [rangeEntries, selectedKey, players]);
+  }, [eligibleEntries, selectedKey, players, requestKey, analysis]);
 
   const visibleRounds = useMemo(() => {
     if (!models || !mapName) return [];
@@ -289,9 +295,11 @@ export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, iden
         )}
       </div>
 
-      {error ? (
+      {selectedOption && capability.availability && <CapabilityBar availability={capability.availability} onRepair={onCapabilityRepair} />}
+      {models && (error || analysis.status !== "ready" || modelSnapshot?.generation !== analysis.generation) && <p className="stu-muted" role="status">{error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
+      {error && !models ? (
         <EmptyState variant="error" title="构建失败" hint={error} />
-      ) : players && rangeEntries.length === 0 ? (
+      ) : players && (rangeEntries.length === 0 || eligibleEntries?.length === 0) ? (
         <EmptyState variant="insufficient" title="当前条件没有比赛样本" hint="最近场次只包含有日期的比赛；可选择全部场次或调整选手、地图与范围。" />
       ) : !models || !players ? (
         <div className="stu-loading">提取 {rangeEntries.length} 场回放轨迹…</div>

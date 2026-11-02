@@ -15,7 +15,8 @@ import { ClipboardList, Crosshair, Film, House, LibraryBig, Radar, Settings } fr
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnalysisScopeEditor } from "./components/AnalysisScopeEditor";
 import { AnalysisContextSummary } from "./components/AnalysisContextSummary";
-import { CapabilityBar } from "./components/CapabilityBar";
+import { CapabilityPanel } from "./components/CapabilityBar";
+import { BackgroundActivity } from "./components/BackgroundActivity";
 import { type StudioEventRecord } from "./lib/events";
 import { BUILD_INFO, BUILD_LABEL } from "./lib/build-info";
 import { APP_VERSION } from "./lib/update";
@@ -46,8 +47,8 @@ import {
   summarizeAnalysisContext,
   type AnalysisContext,
 } from "./lib/analysis-context";
-import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
-import { createStudioNavigation, studioNavigationReducer, findAnalysisFrame, PAGE_SECTION, type StudioDestination, type StudioNavigation, type StudioPageId, type StudioSection } from "./lib/studio-navigation";
+import type { CapabilityRepairAction } from "./lib/capability-availability";
+import { createStudioNavigation, studioNavigationReducer, findAnalysisFrame, PAGE_SECTION, type StudioDestination, type StudioNavigation, type StudioSection } from "./lib/studio-navigation";
 import { WorkbenchView } from "./views/WorkbenchView";
 import { MatchesView } from "./views/MatchesView";
 import { getSeasonSummary } from "./lib/queries/season-queries";
@@ -82,9 +83,6 @@ const MAIN_NAV: Array<{ section: StudioSection; label: string; hint: string; ico
 const MANAGEMENT_NAV = { label: "数据管理", hint: "身份 · 资产 · 资料库维护", icon: Settings };
 
 type MatchDeepLink = { roundNumber: number; tick?: number };
-const CAPABILITY_BY_PAGE: Partial<Record<StudioPageId, StudioCapability>> = {
-  player: "map-role", team: "map-role", duel: "duel", economy: "economy", utility: "utility", lineups: "lineup", control: "control", patterns: "tactical", roles: "map-role",
-};
 
 function NavButton({ item, active, onClick }: { item: typeof MANAGEMENT_NAV; active: boolean; onClick: () => void }) {
   const Icon = item.icon;
@@ -103,7 +101,7 @@ function NavButton({ item, active, onClick }: { item: typeof MANAGEMENT_NAV; act
 
 export function App() {
   const activity = useStudioActivity();
-  const { importing, notice, setNotice, exportQueries, recheckExport } = activity;
+  const { importing, setNotice } = activity;
   const { entries, entriesReady, eventsStatus, seriesStatus, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity, prepMigrationStatus, prepMigrationError, retryPrepMigration } = useStudioData({ onError: setNotice });
   const { importTagsRaw, setImportTagsRaw, importFiles, importDropped, importViaNativeDialog, nativeImportAvailable, loadBuiltinEvent, handleLinkRawDemo, watchRawDemo, handleRemove, handleRemoveMany, handleUpdateTags, handleBulkUpdateTags, handleReexportDemo, handleReexportAll, handleReexportSelected, handleRebuildFacts, handleRebuildStale, handleRebuildSelected } = useLibraryActions({ entries, refreshEntries, refreshEventRecords, activity });
   const { rivalHubConnection, batchSession, dismissBatch, updateLocalLink, refreshRivalHub, handleConnectRivalHub, handleRevokeRivalHub, importOnlineFiles, syncLocalRivalHubDemos, stopRivalHubBatch, pickRivalHubFiles, selectRivalHubBatchTarget } = useRivalHubActions({ refreshEntries, refreshEventRecords, activity });
@@ -187,7 +185,6 @@ export function App() {
   const [restoringFrameId, setRestoringFrameId] = useState<string | null>(null);
   const { update, checkingUpdate, dismissedVersion, setDismissedVersion, showLatestMsg, updateChannel, doCheckUpdate, changeUpdateChannel } = useDesktopUpdates({ onError: setNotice });
   const [contextEditorOpen, setContextEditorOpen] = useState(false);
-  const [capabilityAvailability, setCapabilityAvailability] = useState<CapabilityAvailability | null>(null);
 
   const eventScopes = useMemo<import("./lib/analysis-context").AnalysisEventScope[]>(() => {
     const seriesById = new Map(seriesRecords.map((series) => [series.id, series]));
@@ -209,23 +206,6 @@ export function App() {
     ? analysisContext.focus.playerKey
     : null;
   const selectedTeam = analysisContext.focus.kind === "team" ? analysisContext.focus.teamName : null;
-  const displayedCapabilityAvailability = useMemo<CapabilityAvailability | null>(() => {
-    if (section === "materials") return null;
-    if (destination.page !== "patterns" || !capabilityAvailability) return capabilityAvailability;
-    const requiredRole = analysisContext.goal === "opponent-prep" ? analysisContext.roles.opponent : analysisContext.roles.beneficiary;
-    if (requiredRole) return capabilityAvailability;
-    return {
-      ...capabilityAvailability,
-      status: "unavailable",
-      eligibleMatches: 0,
-      excluded: [{
-        reason: analysisContext.goal === "opponent-prep" ? "请选择对手队伍" : "请选择己方队伍",
-        count: scopedEntries.length,
-        entryIds: scopedEntries.map((entry) => entry.id),
-      }],
-      repairActions: [],
-    };
-  }, [analysisContext.goal, analysisContext.roles.beneficiary, analysisContext.roles.opponent, capabilityAvailability, scopedEntries, destination.page, section]);
   const identityOptions = useMemo<IdentityOptions | undefined>(
     () => identityState.version > 0
       ? { version: identityState.version, map: buildCohortIdentityMap(identityState.mappings), teamRenames: identityState.teamRenames }
@@ -257,16 +237,6 @@ export function App() {
       focus: teamName ? { kind: "team", teamName } : current.focus.kind === "team" ? { kind: "aggregate" } : current.focus,
     }));
   }, [setAnalysisContext]);
-
-  useEffect(() => {
-    const capability = CAPABILITY_BY_PAGE[destination.page];
-    if (!capability || scopedEntries.length === 0) { setCapabilityAvailability(null); return; }
-    let cancelled = false;
-    void loadCapabilityAvailabilityInputs(scopedEntries)
-      .then((inputs) => { if (!cancelled) setCapabilityAvailability(deriveCapabilityAvailability(scopedEntries, capability, inputs)); })
-      .catch(() => { if (!cancelled) setCapabilityAvailability(null); });
-    return () => { cancelled = true; };
-  }, [destination.page, scopedEntries]);
 
   const openDemo = useCallback((id: string, target?: MatchDeepLink) => {
     navigate({ page: "match", entryId: id, ...target });
@@ -496,28 +466,15 @@ export function App() {
       <main className="stu-main">
         <AssetHealthBanner />
         {navigation.history.length > 0 && <button type="button" className="stu-button-sm" onClick={goBack}>返回</button>}
-        {exportQueries.map(query => <div className="stu-notice" role="status" key={query.jobId}>
-          <div><p>{query.message}</p><p>解析任务 {query.jobId} · 阶段 {query.stage} · 最后进度 {query.progress === null ? "未知" : `${Math.round(query.progress * 100)}%`}</p>
-            {query.diagnostic?.cause && <p>{query.diagnostic.cause}</p>}
-            {query.uncertain && <p>只查询现有任务；没有取消后台解析，也不会重新提交。</p>}
-          </div>
-          {query.uncertain && <button type="button" onClick={() => recheckExport(query.jobId)}>重查此任务状态</button>}
-        </div>)}
+        <BackgroundActivity activity={activity} batch={batchSession}>
+          <RivalHubBatchImportPanel session={batchSession} onStop={stopRivalHubBatch} onSelectTarget={selectRivalHubBatchTarget} onDismiss={dismissBatch} onLocalLinkUpdate={updateLocalLink} />
+        </BackgroundActivity>
         {analysisData.status === "error" && (
           <div className="stu-notice" role="alert">
             <span>分析缓存不可用，请重试刷新。</span>
             <button type="button" onClick={() => { void invalidateAnalysisQueries().catch(() => {}); }}>重试刷新</button>
           </div>
         )}
-        {notice && (
-          <div className="stu-notice" role="status">
-            <span>{notice}</span>
-            <button type="button" onClick={() => setNotice(null)}>
-              ✕
-            </button>
-          </div>
-        )}
-        <RivalHubBatchImportPanel session={batchSession} onStop={stopRivalHubBatch} onSelectTarget={selectRivalHubBatchTarget} onDismiss={dismissBatch} onLocalLinkUpdate={updateLocalLink} />
         {entries.length > 0 && section === "analysis" && "context" in destination && (
           <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} onEdit={() => setContextEditorOpen((current) => !current)} onCompare={(destination.page === "player" && selectedPlayerKey || destination.page === "team" && selectedTeam) ? () => document.getElementById("analysis-comparison")?.scrollIntoView({ behavior: "smooth", block: "center" }) : undefined} />
         )}
@@ -531,7 +488,6 @@ export function App() {
             events={eventScopes}
           />
         )}
-        {displayedCapabilityAvailability && <CapabilityBar availability={displayedCapabilityAvailability} onRepair={openCapabilityRepair} />}
         {destination.page === "workbench" && <WorkbenchView onOpenSaved={row => void openSavedAnalysis(row)} events={eventScopes} entries={entries} entriesReady={entriesReady} onOpenMatch={openDemo} onPersonal={openWorkbenchPersonal} onResumeAnalysis={navigation.history.some(frame => PAGE_SECTION[frame.destination.page] === "analysis") ? () => resumeSection("analysis") : undefined} importing={importing} importTagsRaw={importTagsRaw} onImportFiles={importFiles} onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined} onMatches={() => navigate({ page: "matches" })} onOpenMaterial={openMaterial} onNewNote={() => openStudyNoteEditor(emptyStudyNoteDraft())} onNewPlaybook={() => { if (!canLeave()) return; const id = `frame-${++nextFrameId.current}`; setEvidenceSession(null); setNavigation(current => { const next = studioNavigationReducer(discardMaterialDraft(current), { intent: "open", id, destination: { page: "materials" }, scrollY: window.scrollY }); return studioNavigationReducer(next, { intent: "ui", frameId: id, ui: { ...emptyMaterialsPageState(), newPlaybook: emptyCoachPlaybookDraft() } }); }); }} prepMigrationStatus={prepMigrationStatus} retryPrepMigration={retryPrepMigration} />}
         {section === "matches" && <MatchesView page={destination.page} onMatches={() => navigate({ page: "matches" })} onEvents={() => navigate({ page: "events" })} />}
         {destination.page === "materials" && <MaterialsView identityOptions={identityOptions} onAnalyzeAssignments={openAssignmentAnalysis} onPageReady={keys => onPageReady(active.id, keys)} entries={entries} state={active.ui as MaterialsPageState} onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))} onOpenMaterial={openMaterial} onCreatedMaterial={createdMaterial} onOpenEvidence={openMaterialEvidence} prepMigrationStatus={prepMigrationStatus} prepMigrationError={prepMigrationError} retryPrepMigration={retryPrepMigration} />}
@@ -640,7 +596,7 @@ export function App() {
           />
         )}
         {destination.page === "roles" && (analysisContext.focus.kind === "player" || analysisContext.focus.kind === "self" ? (
-          <PlayerRolesPanel key={active.id} entries={scopedEntries} playerKey={analysisContext.focus.playerKey} playerLabel={analysisContext.focus.label}
+          <PlayerRolesPanel key={active.id} entries={scopedEntries} onCapabilityRepair={openCapabilityRepair} playerKey={selectedPlayerKey!} playerLabel={(analysisContext.focus as Extract<AnalysisContext["focus"], { kind: "player" | "self" }>).label}
             selectedTeam={selectedTeam} identityOptions={identityOptions} onOpenEvidence={openEvidence}
             state={(active.ui as import("./lib/studio-page-state").RolesPageState).player}
             onStateChange={player => setNavigation(current => {
@@ -649,7 +605,7 @@ export function App() {
               return studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: { ...previous, player } });
             })} onPageReady={keys => onPageReady(active.id, keys)} />
         ) : analysisContext.focus.kind === "team" ? (
-          <TeamRolesPanel key={active.id} entries={scopedEntries} teamName={analysisContext.focus.teamName} identityOptions={identityOptions}
+          <TeamRolesPanel key={active.id} entries={scopedEntries} onCapabilityRepair={openCapabilityRepair} teamName={selectedTeam!} identityOptions={identityOptions}
             onOpenEvidence={openEvidence} state={(active.ui as import("./lib/studio-page-state").RolesPageState).team}
             onStateChange={team => setNavigation(current => {
               if (current.active.id !== active.id) return current;
@@ -659,6 +615,7 @@ export function App() {
         ) : <div className="stu-card"><h2>选择分析对象</h2><p>请先选择一名选手或一支队伍。</p><button type="button" className="stu-button" onClick={() => navigate({ page: "player", context: analysisContext })}>选择选手</button><button type="button" className="stu-button" onClick={() => navigate({ page: "team", context: analysisContext })}>选择队伍</button></div>)}
         {destination.page === "opening" && (
           <TrailsView
+            onCapabilityRepair={openCapabilityRepair}
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
@@ -680,11 +637,12 @@ export function App() {
           />
         )}
         {destination.page === "duel" && (
+          <CapabilityPanel entries={scopedEntries} capability="duel" onRepair={openCapabilityRepair}>{eligible =>
           <DuelView
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
-            entries={scopedEntries}
+            entries={eligible}
             selectedTeams={selectedTeams}
             playerSteamIds={selectedPlayerKey ? focusIdentity?.playerKey === selectedPlayerKey ? focusIdentity.steamIds : [] : null}
             state={active.ui as import("./lib/analysis-theme-state").DuelPageState}
@@ -695,12 +653,14 @@ export function App() {
             identityOptions={identityOptions}
             teamRenames={identityState.teamRenames}
           />
+          }</CapabilityPanel>
         )}
         {destination.page === "utility" && (
+          <CapabilityPanel entries={scopedEntries} capability="utility" onRepair={openCapabilityRepair}>{eligible =>
           <UtilityView
             key={active.id}
             allEntries={entries}
-            entries={scopedEntries}
+            entries={eligible}
             selectedTeams={selectedTeams}
             playerFocus={selectedPlayerKey ? focusIdentity?.playerKey === selectedPlayerKey ? focusIdentity : { playerKey: selectedPlayerKey, steamIds: [] } : null}
             onGoLineups={() => navigate({ page: "lineups", context: analysisContext })}
@@ -712,8 +672,10 @@ export function App() {
             identityOptions={identityOptions}
             onGoLibrary={() => goLibrary()}
           />
+          }</CapabilityPanel>
         )}
         {destination.page === "lineups" && (
+          <CapabilityPanel entries={scopedEntries} capability="lineup" onRepair={openCapabilityRepair}>{eligible =>
           <LineupsView
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
@@ -721,28 +683,32 @@ export function App() {
             state={active.ui as import("./lib/analysis-theme-state").LineupsPageState}
             onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
             allEntries={entries}
-            entries={scopedEntries}
+            entries={eligible}
             onOpenEvidence={openEvidence}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoLibrary={() => goLibrary()}
           />
+          }</CapabilityPanel>
         )}
         {destination.page === "economy" && (
+          <CapabilityPanel entries={scopedEntries} capability="economy" onRepair={openCapabilityRepair}>{eligible =>
           <EconomyView
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
-            entries={scopedEntries}
+            entries={eligible}
             selectedTeams={selectedTeams}
             playerFocused={selectedPlayerKey !== null}
-            onViewMatches={() => navigate({ page: "matches", entryIds: scopedEntries.map(entry => entry.id) })}
+            onViewMatches={() => navigate({ page: "matches", entryIds: eligible.map(entry => entry.id) })}
             state={active.ui as import("./lib/analysis-theme-state").EconomyPageState}
             onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
             identityOptions={identityOptions}
             onGoLibrary={() => goLibrary()}
           />
+          }</CapabilityPanel>
         )}
         {(destination.page === "patterns") && (
+          <CapabilityPanel entries={scopedEntries} capability="tactical" onRepair={openCapabilityRepair}>{eligible =>
           <PatternsPage
             key={active.id}
             state={active.ui as import("./lib/pattern-page-state").PatternPageState}
@@ -753,7 +719,7 @@ export function App() {
             })}
             onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
-            entries={scopedEntries}
+            entries={eligible}
             onOpenMatch={(entryId, target) => {
               const entry = entries.find(item => item.id === entryId);
               if (entry && target) openEvidence({ entryId, evidence: { matchId: matchIdForEntry(entry), roundNumber: target.roundNumber, tick: target.tick, reason: "战术模式示例" }, sourceKey: "patterns:evidence" });
@@ -764,9 +730,11 @@ export function App() {
             analysisContext={analysisContext}
             onAnalysisContextChange={setAnalysisContext}
           />
+          }</CapabilityPanel>
         )}
         {destination.page === "control" && (
           <RadarFieldView
+            onCapabilityRepair={openCapabilityRepair}
             key={active.id}
             state={active.ui as import("./lib/spatial-view-state").ControlPageState}
             onStateChange={update => setNavigation(current => {
@@ -781,6 +749,7 @@ export function App() {
             onOpenMatch={openDemo}
             onSelectTeam={selectRadarTeam}
           />
+
         )}
         {(destination.page === "event-analysis" || destination.page === "analysis") && (
           <TournamentDashboardView

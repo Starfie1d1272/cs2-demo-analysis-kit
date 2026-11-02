@@ -1,25 +1,60 @@
-import type { CapabilityAvailability, CapabilityRepairAction } from "../lib/capability-availability";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import type { StudioDemoEntry } from "../lib/demo-entry";
+import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "../lib/capability-availability";
+import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation } from "../lib/queries/query-cache";
+import { useSyncExternalStore } from "react";
 
 const LABEL = { ready: "可用", partial: "部分可用", unavailable: "不可用" } as const;
-
+const DEPENDENCY = { replay: "回放轨迹", shots: "射击记录", tri: "地图碰撞资源" } as const;
 const REPAIR_LABEL: Record<CapabilityRepairAction, string> = {
-  "rebuild-facts": "去资料库重建 facts",
-  "reimport-with-replay": "重新导入含 replay 的 ZIP",
-  "reimport-with-shots": "重新导入含 shots 的 ZIP",
-  "install-tri": "管理 .tri 资产",
+  "rebuild-facts": "前往资料库重建分析数据",
+  "reimport-with-replay": "前往比赛导入回放轨迹",
+  "reimport-with-shots": "前往比赛导入射击记录",
+  "install-tri": "管理地图碰撞资源",
 };
-
+function displayReason(reason: string): string {
+  return reason.replace(/shots\/duels/g, "射击记录").replace(/replay/g, "回放轨迹").replace(/facts/g, "分析数据");
+}
 export function CapabilityBar({ availability, onRepair }: { availability: CapabilityAvailability; onRepair?: (action: CapabilityRepairAction) => void }) {
-  const limitation = availability.excluded[0]?.reason
-    ?? availability.dependencies.find((item) => item.available < item.totalEligible)?.label
-    ?? null;
+  const limitation = availability.excluded[0] ? displayReason(availability.excluded[0].reason)
+    : availability.dependencies.find(item => item.available < item.totalEligible);
   return <div className={`stu-capability-bar stu-capability-${availability.status}`}>
-    <b>{LABEL[availability.status]}</b>
     <span>{availability.eligibleMatches}/{availability.totalMatches} 场可用</span>
-    <span>{availability.outputLevel === "system-finding" ? "支持系统 Finding" : "描述性观察"}</span>
-    {limitation && <span>限制：{limitation}</span>}
-    {onRepair && availability.repairActions.map((action) => (
-      <button key={action} type="button" className="stu-button-sm" onClick={() => onRepair(action)}>{REPAIR_LABEL[action]}</button>
-    ))}
+    {availability.status !== "ready" && <details><summary>{LABEL[availability.status]}{limitation && `：${typeof limitation === "string" ? limitation : DEPENDENCY[limitation.key] + "不完整"}`} · 详情</summary>
+      <p>覆盖单位为比赛；{availability.outputLevel === "system-finding" ? "可生成带证据的分析结论" : "提供描述性观察"}。</p>
+      {availability.excluded.map(item => <p key={item.reason}>{displayReason(item.reason)}：{item.count} 场未纳入</p>)}
+      {availability.dependencies.map(item => <p key={item.key}>{DEPENDENCY[item.key]}：{item.available}/{item.totalEligible} 场具备{item.required ? "（必需）" : "（可选）"}</p>)}
+      {(availability.repairActions.includes("reimport-with-replay") || availability.repairActions.includes("reimport-with-shots")) && <p>已有 ZIP 没有相应流时，需要从原始 demo 重新导出并导入；重建不能生成缺失的流。</p>}
+      {onRepair && availability.repairActions.map(action => <button key={action} type="button" className="stu-button-sm" onClick={() => onRepair(action)}>{REPAIR_LABEL[action]}</button>)}
+    </details>}
   </div>;
+}
+
+export function useCapability(entries: StudioDemoEntry[], capability: StudioCapability, openingScope?: { playerKeys: string[]; steamIds: string[] }) {
+  const [result, setResult] = useState<{ key: string; generation: number; availability: CapabilityAvailability } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const data = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
+  const key = JSON.stringify([capability, entries.map(entry => entry.id), openingScope]);
+  const current = result?.key === key ? result.availability : null;
+  const eligible = useMemo(() => {
+    const excluded = new Set(current?.excluded.flatMap(item => item.entryIds) ?? []);
+    return current ? entries.filter(entry => !excluded.has(entry.id)) : null;
+  }, [entries, current]);
+  useEffect(() => {
+    let cancelled = false;
+    if (data.status === "ready") {
+      setError(null);
+      void loadCapabilityAvailabilityInputs(entries, undefined, undefined, undefined, openingScope)
+        .then(inputs => { if (!cancelled && getAnalysisDataSnapshot().generation === data.generation && getAnalysisDataSnapshot().status === "ready") setResult({ key, generation: data.generation, availability: deriveCapabilityAvailability(entries, capability, inputs) }); })
+        .catch(reason => { if (!cancelled) setError(reason instanceof Error ? reason.message : String(reason)); });
+    }
+    return () => { cancelled = true; };
+  }, [entries, capability, data, key]);
+  return { availability: current, eligible, error, stale: !!current && (data.status !== "ready" || result?.generation !== data.generation || !!error) };
+}
+
+export function CapabilityPanel({ entries, capability, onRepair, children }: { entries: StudioDemoEntry[]; capability: StudioCapability; onRepair: (action: CapabilityRepairAction) => void; children: (eligible: StudioDemoEntry[]) => ReactNode }) {
+  const { availability, eligible, error, stale } = useCapability(entries, capability);
+  if (!availability || !eligible) return error ? <div role="alert">读取可用性失败：{error}</div> : <div className="stu-loading">读取分析数据可用性…</div>;
+  return <><CapabilityBar availability={availability} onRepair={onRepair} />{stale && <p className="stu-muted" role="status">{error ? "可用性更新失败，显示旧版本。" : "正在更新可用性。"}</p>}{children(eligible)}</>;
 }
