@@ -54,15 +54,21 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
   const [error, setError] = useState<string | null>(null);
   const [showQa, setShowQa] = useState(false);
   const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
+  const [seriesReady, setSeriesReady] = useState(false);
+  const [seriesError, setSeriesError] = useState<string | null>(null);
   const [summaryMode, setSummaryMode] = useState(false);
   const [summary, setSummary] = useState<SeriesSummary | null>(null);
   // 50+ 场时纯下拉不可用：搜索过滤（队名/地图/日期/文件名）+ 按地图分组
   const [matchSearch, setMatchSearch] = useState("");
 
-  usePageReady(!activeId || !activeEntry || model !== null || error !== null, onPageReady);
+  usePageReady(!activeId || !activeEntry || (seriesReady && (model !== null || error !== null)), onPageReady);
 
   useEffect(() => {
-    void listSeriesRecords().then(setSeriesRecords);
+    let cancelled = false;
+    void listSeriesRecords().then((rows) => { if (!cancelled) setSeriesRecords(rows); })
+      .catch((reason) => { if (!cancelled) setSeriesError(reason instanceof Error ? reason.message : String(reason)); })
+      .finally(() => { if (!cancelled) setSeriesReady(true); });
+    return () => { cancelled = true; };
   }, []);
 
   const groupedEntries = useMemo(() => {
@@ -162,6 +168,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
 
   return (
     <div className="stu-view stu-view-flush">
+      {seriesError && <p className="stu-error" role="alert">读取系列赛失败：{seriesError}</p>}
       <div className="stu-context-bar">
         <span className="stu-context-label">当前比赛</span>
         {entries.length > 8 && (
