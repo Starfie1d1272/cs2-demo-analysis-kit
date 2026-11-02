@@ -14,7 +14,7 @@ import { matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import type { OpenEvidence } from "../lib/evidence-continuation";
 import { loadRoleDeclarations } from "../lib/role-declarations";
 
-type TeamViewAction = "duel" | "economy" | "utility" | "control";
+type TeamViewAction = "duel" | "economy" | "utility" | "opening" | "control" | "patterns";
 
 const MAP_COLUMNS: DataTableColumn<TeamOverviewModel["maps"][number]>[] = [
   { key: "mapName", label: "地图", format: (row) => row.mapName },
@@ -180,7 +180,7 @@ export function TeamView({
             <section className="stu-card"><h3>经济样本</h3>{overview.economyWinRate.length === 0 ? <p className="stu-muted">当前范围没有可用经济事实。</p> : <div className="stu-chip-row">{overview.economyWinRate.map((row) => <span key={row.economyType} className="stu-chip">{row.economyType} · {row.wins}/{row.rounds}</span>)}</div>}</section>
             <section className="stu-card"><h3>最近比赛</h3><div className="stu-chip-row">{overview.matches.slice(-5).reverse().map((match) => <button key={match.matchId} type="button" className="stu-chip" onClick={() => { const entry = entries.find((item) => matchIdForEntry(item) === match.matchId); if (entry) onOpenMatch(entry.id); }}>{match.mapName} · {match.opponent} · {match.roundsWon}:{match.roundsLost}</button>)}</div></section>
           </div>
-          <section className="stu-card"><h3>继续分析</h3><p className="stu-muted">以下入口保持当前队伍与语料；各能力只展示其实际可用的样本与限制。</p><div className="stu-header-actions">{(["duel", "economy", "utility", "control"] as const).map((view) => <button key={view} type="button" className="stu-button-sm" onClick={() => onOpenCapability(view)}>{({ duel: "对枪", economy: "经济与转化", utility: "道具价值", control: "控图" })[view]}</button>)}</div></section>
+          <section className="stu-card"><h3>继续分析</h3><p className="stu-muted">以下入口保持当前队伍与语料；各能力只展示其实际可用的样本与限制。</p><div className="stu-header-actions">{(["duel", "economy", "utility", "opening", "control", "patterns"] as const).map((view) => <button key={view} type="button" className="stu-button-sm" onClick={() => onOpenCapability(view)}>{({ duel: "对枪", economy: "经济与转化", utility: "道具价值", opening: "开局动线", control: "控图", patterns: "位置与职责" })[view]}</button>)}</div></section>
         </>
       )}
     </div>
