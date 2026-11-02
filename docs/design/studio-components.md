@@ -103,3 +103,5 @@ const COLUMNS: DataTableColumn<Row>[] = [
 ## 6. Studio 专属（桌面壳，不下沉）
 
 `UpdateControl` / `UpdateModal` / `Changelog` / `LibraryDirButton`。
+
+- `MapAnnotationCanvas`（`@cs2dak/react`）：有限地图点的展示、选择与图片坐标回调；阶段、任务和保存由 Studio 持有。

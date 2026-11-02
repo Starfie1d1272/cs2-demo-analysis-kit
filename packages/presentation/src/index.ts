@@ -24,3 +24,5 @@ export * from "./models/radar-view.js";
 export * from "./models/evidence-view.js";
 
 export * from "./models/view-state.js";
+
+export * from "./models/map-annotations.js";
