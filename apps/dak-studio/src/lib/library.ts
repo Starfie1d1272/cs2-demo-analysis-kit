@@ -11,7 +11,7 @@ import { buildRadarFieldGrid } from "@cs2dak/maps";
 import type { DemoPackage } from "@cs2dak/contract";
 import type { RadarField } from "@cs2dak/tactics";
 import type { MatchWorkspaceModel } from "@cs2dak/presentation";
-import { extractMatchData, type ExtractedMatchData } from "./extract-match-facts";
+import { buildMatchRecords, type MatchRecords } from "./match-records";
 import { getFactsStore } from "./facts-store";
 import { getDerivedCacheStore } from "./derived-cache";
 import { CALLOUT_GRID_URLS, loadStudioCalloutGrid } from "./callout-grid";
@@ -218,7 +218,7 @@ export function isFactsStale(entry: StudioDemoEntry): boolean {
 }
 
 /** Import succeeds only after all projections persist; preserve the first failure. */
-async function persistAnalysis(data: ExtractedMatchData): Promise<void> {
+async function persistAnalysis(data: MatchRecords): Promise<void> {
   await settleWrites([
     getFactsStore().putMatchFacts(data.facts),
     getDerivedCacheStore().putMatchDerived(data.derived),
@@ -241,7 +241,7 @@ async function importOnMainThread(buffer: ArrayBuffer, matchId: string): Promise
     loadTriLookup([pkg.match.mapName]),
     loadStudioCalloutGrid(pkg.match.mapName)
   ]);
-  const data = extractMatchData(pkg, { matchId, visibilityFor, calloutGrid });
+  const data = buildMatchRecords(pkg, { matchId, visibilityFor, calloutGrid });
   return { meta: metaFromPackage(pkg), data };
 }
 
@@ -346,14 +346,14 @@ const WORKER_POOL_SIZE = 4;
 
 export interface ImportWorkerResult {
   meta: DemoMeta;
-  data: ExtractedMatchData;
+  data: MatchRecords;
 }
 
 type PoolResult = DemoPackage | ImportWorkerResult | RadarField[];
 
 type WorkerReply = (
   | { id: number; ok: true; pkg: DemoPackage }
-  | { id: number; ok: true; meta: DemoMeta; data: ExtractedMatchData }
+  | { id: number; ok: true; meta: DemoMeta; data: MatchRecords }
   | { id: number; ok: true; radarFields: RadarField[] }
   | { id: number; ok: false; error: string; diagnostic?: SafeDiagnostic }) & { diagnostics?: SafeDiagnostic[] };
 

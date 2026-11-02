@@ -3,11 +3,14 @@ import { useEffect, useMemo, useState } from "react";
 import { buildLineupClusters, getMapCalibration, worldToRadar, calloutCn, type LineupCluster, type LineupClusterMode, type LineupGrenadeLike } from "@cs2dak/maps";
 import { displayWeaponName } from "@cs2dak/presentation";
 import { DataTable, EmptyState, MetricInfo, EvidenceLink, type DataTableColumn } from "@cs2dak/react";
-import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { matchIdForEntry, listDemoEntries, type StudioDemoEntry } from "../lib/library";
 import { mapDisplayName } from "../lib/series";
 import { getFactsStore } from "../lib/facts-store";
 import { GRENADE_COLOR } from "../components/RadarTrails";
 import { listPracticeLineups, removePracticeLineup, savePracticeLineup, type PracticeLineup } from "../lib/practice-lineups";
+
+import { assertCurrentFacts, FactsNotReadyError } from "../lib/facts-readiness";
+import { FACTS_REVISION } from "../lib/analysis-manifest";
 
 // ── 常亮 ────────────────────────────────────────────────────────────────────
 
@@ -44,6 +47,7 @@ async function loadAllGrenades(
   entries: StudioDemoEntry[],
   onProgress?: (done: number) => void
 ): Promise<LoadedGrenades[]> {
+  assertCurrentFacts(entries);
   const facts = await getFactsStore().getLineups({ matchIds: entries.map(matchIdForEntry) });
   const entryIdByMatchId = new Map(entries.map((entry) => [matchIdForEntry(entry), entry.id]));
   onProgress?.(facts.length);
@@ -70,12 +74,15 @@ export function LineupView({
   entries,
   onOpenMatch,
   onWatchDemo,
+  onRebuild,
 }: {
   entries: StudioDemoEntry[];
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onRebuild: (ids: string[]) => void;
 }) {
   const [clusters, setClusters] = useState<LineupCluster[]>([]);
+  const [staleIds, setStaleIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -99,7 +106,17 @@ export function LineupView({
     if (first) onOpenMatch(first.entryId, { roundNumber: first.roundNumber, tick: first.tick });
   }
 
+  async function checkSources(cluster: LineupCluster) {
+    const ids = [...new Set(cluster.throws.map(row => row.entryId))];
+    const current = await listDemoEntries();
+    const selected = current.filter(entry => ids.includes(entry.id));
+    const missing = ids.filter(id => !selected.some(entry => entry.id === id));
+    if (missing.length) throw new FactsNotReadyError(missing);
+    assertCurrentFacts(selected);
+  }
+
   async function handleCopyPractice(cluster: LineupCluster) {
+    try { await checkSources(cluster); } catch (e) { setStaleIds(e instanceof FactsNotReadyError ? e.entryIds : []); setError(e instanceof Error ? e.message : String(e)); return; }
     const command = practiceCommandForCluster(cluster);
     if (!command) return;
     try {
@@ -112,7 +129,8 @@ export function LineupView({
   }
 
   async function handleSavePractice(cluster: LineupCluster) {
-    await savePracticeLineup(cluster, practiceCommandForCluster(cluster));
+    try { await checkSources(cluster); } catch (e) { setStaleIds(e instanceof FactsNotReadyError ? e.entryIds : []); setError(e instanceof Error ? e.message : String(e)); return; }
+    await savePracticeLineup({ cluster, command: practiceCommandForCluster(cluster), sourceFactsRevision: FACTS_REVISION });
     setSavedClusterId(cluster.id);
     setSavedLineups(await listPracticeLineups());
   }
@@ -176,7 +194,7 @@ export function LineupView({
         if (!cancelled) setClusters(allClusters);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+        if (!cancelled) { setStaleIds(err instanceof FactsNotReadyError ? err.entryIds : []); setError(err instanceof Error ? err.message : String(err)); }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -283,7 +301,10 @@ export function LineupView({
 
   // ── 渲染（空态提前返回） ──────────────────────────────────────────────
 
-  if (error) return <EmptyState variant="error" title="Lineup 聚类失败" hint={error} />;
+  if (error) return <div>
+    <EmptyState variant="error" title="Lineup 聚类失败" hint={error} action={staleIds.length ? <button type="button" className="stu-button" onClick={() => onRebuild(staleIds)}>重建 facts</button> : undefined} />
+    {savedLineups.length > 0 && <div className="stu-card"><h3>已保存练习点位</h3>{savedLineups.map(item => <p key={item.id}>{item.label}{!item.sourceFactsRevision && " · 来源版本未知，需要核验"}</p>)}</div>}
+  </div>;
   if (loading) {
     return (
       <div className="stu-loading">
@@ -331,7 +352,7 @@ export function LineupView({
           </summary>
           {savedForCurrentMap.length > 0 ? (
             <div className="stu-chip-row">
-              {savedForCurrentMap.map((item) => <span key={item.id} className="stu-chip">{item.label}<button type="button" className="stu-button-sm" onClick={() => void removePracticeLineup(item.id).then(async () => setSavedLineups(await listPracticeLineups()))}>删除</button></span>)}
+              {savedForCurrentMap.map((item) => <span key={item.id} className="stu-chip">{item.label}{!item.sourceFactsRevision && " · 来源版本未知，需要核验"}<button type="button" className="stu-button-sm" onClick={() => void removePracticeLineup(item.id).then(async () => setSavedLineups(await listPracticeLineups()))}>删除</button></span>)}
             </div>
           ) : <p className="stu-muted">当前地图还没有保存的练习点位。</p>}
         </details>

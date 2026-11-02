@@ -8,24 +8,16 @@ import {
 } from "@cs2dak/core";
 import {
   analysisBundleSchema, buildMatchWorkspaceFromAnalysis, buildPlayerIndicators, buildScoreboard,
-  deriveRRSignals, deriveRRIndicators, type AnalysisBundle, type RatingSpatialContext,
+  deriveRRSignals, deriveRRIndicators, type AnalysisBundle,
 } from "@cs2dak/analytics";
 import { computeAccountRatings, computeIndicatorRatings } from "@cs2dak/rating";
-import { loadSpatialAssets, buildOfficialMapControl } from "@cs2dak/tactics";
+import { buildRatingSpatialContext } from "./rating-spatial-context.js";
+export { buildRatingSpatialContext } from "./rating-spatial-context.js";
+export { analyzeMatchFacts, type AnalyzeMatchFactsOptions, type MatchFactsAnalysis } from "./match-facts.js";
 import {
   buildSeasonCohortFromRows,
   type SeasonCohortFactRow, type SeasonCohortOptions, type SeasonCohortBundle,
 } from "@cs2dak/cohort";
-
-/** Compute the spatial inputs selected by the rating workflow. */
-export function buildRatingSpatialContext(pkg: DemoPackage): RatingSpatialContext {
-  const assets = loadSpatialAssets(pkg.match.mapName ?? pkg.manifest.mapName);
-  const control = buildOfficialMapControl(pkg, assets);
-  return {
-    observable: assets.routes != null && (pkg.replay?.rounds.length ?? 0) > 0,
-    strategicIsolationDeaths: new Map([...control].map(([id, row]) => [id, row.strategicIsolationDeaths])),
-  };
-}
 
 export function analyzeDemoPackage(input: unknown, suppliedPerformanceFacts?: PlayerRoundPerformanceFacts): AnalysisBundle {
   const pkg = normalizeDemoPackage(input);

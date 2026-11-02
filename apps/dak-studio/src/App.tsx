@@ -1096,6 +1096,7 @@ export function App() {
         )}
         {view === "lineups" && (
           <LineupsView
+            onRebuild={handleRebuildSelected}
             allEntries={entries}
             entries={scopedEntries}
             onOpenMatch={openDemo}
