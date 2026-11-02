@@ -4,7 +4,7 @@ import type { SavedEvidenceRef } from "./saved-evidence";
 export interface StudyNote { schemaVersion: 1; id: string; title: string; body: string; purpose: "review" | "practice"; playerKey: string | null; evidence: SavedEvidenceRef[]; createdAt: number; updatedAt: number }
 export type StudyNoteDraft = Pick<StudyNote, "title" | "body" | "purpose" | "playerKey" | "evidence">;
 export type CreateStudyNoteInput = Omit<StudyNoteDraft, "purpose"> & { purpose?: StudyNoteDraft["purpose"] };
-function validEvidence(value: unknown): value is SavedEvidenceRef {
+export function validEvidence(value: unknown): value is SavedEvidenceRef {
   if (!value || typeof value !== "object") return false;
   const v = value as Partial<SavedEvidenceRef>;
   return typeof v.id === "string" && typeof v.capturedAt === "number" && Number.isFinite(v.capturedAt) && !!v.source && typeof v.source.entryId === "string" && typeof v.source.matchId === "string" && typeof v.source.fileName === "string" && typeof v.source.mapName === "string" && (v.source.demoSha256 === null || typeof v.source.demoSha256 === "string") && (v.source.builtWith === null || typeof v.source.builtWith === "object") && !!v.evidence && typeof v.evidence.matchId === "string" && Number.isInteger(v.evidence.roundNumber) && v.evidence.roundNumber > 0 && typeof v.evidence.reason === "string";

@@ -29,7 +29,7 @@ export interface BrowserStorageOverview {
 /** 资料库元数据/设置等"数据库"类命名空间（非派生缓存、非原始字节）。 */
 const DATABASE_NAMESPACES = [
   "demos", "identity", "identity-audit", "series", "series-settings",
-  "study-notes", "training-focus", "prep-items", "practice-lineups", "role-declarations", "playbook", "playlist", "map-pool-notes", "events", "kv",
+  "coach-playbook", "study-notes", "training-focus", "prep-items", "practice-lineups", "role-declarations", "playbook", "playlist", "map-pool-notes", "events", "kv",
 ];
 
 const CACHE_NAMESPACES = [...FACTS_RECORD_NAMESPACES, ...DERIVED_CACHE_RECORD_NAMESPACES, "cache", "cache-meta"];

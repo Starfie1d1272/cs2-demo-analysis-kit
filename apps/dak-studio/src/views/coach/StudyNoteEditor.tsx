@@ -4,7 +4,7 @@ import { loadMatchWorkspaceModel } from "../../lib/match-workspace-loader";
 import type { StudyNoteDraft } from "../../lib/study-notes";
 import { captureSavedEvidence, relinkSavedEvidence, resolveSavedEvidence } from "../../lib/saved-evidence";
 
-export function StudyNoteEditor({ draft, entries, onChange, onEvidence }: { draft: StudyNoteDraft; entries: StudioDemoEntry[]; onChange: (draft: StudyNoteDraft) => void; onEvidence: (index: number) => void }) {
+export function StudyNoteEditor({ draft, entries, onChange, onEvidence, evidenceOnly = false }: { evidenceOnly?: boolean; draft: StudyNoteDraft; entries: StudioDemoEntry[]; onChange: (draft: StudyNoteDraft) => void; onEvidence: (index: number) => void }) {
   const [entryId, setEntryId] = useState("");
   const [round, setRound] = useState("");
   const [rounds, setRounds] = useState<{ entryId: string; values: number[] } | null>(null);
@@ -26,11 +26,11 @@ export function StudyNoteEditor({ draft, entries, onChange, onEvidence }: { draf
   const canAdd = !!entry && rounds?.entryId === entryId && rounds.values.includes(roundNumber);
   const update = (patch: Partial<StudyNoteDraft>) => onChange({ ...draft, ...patch });
   return <div>
-    <label>标题<input className="stu-input" value={draft.title} onChange={e => update({ title: e.target.value })} /></label>
+    {!evidenceOnly && <><label>标题<input className="stu-input" value={draft.title} onChange={e => update({ title: e.target.value })} /></label>
     <label>正文<textarea className="stu-input" value={draft.body} onChange={e => update({ body: e.target.value })} /></label>
     <label>用途<select className="stu-input" value={draft.purpose} onChange={e => update({ purpose: e.target.value as StudyNoteDraft["purpose"] })}><option value="review">复盘</option><option value="practice">练习</option></select></label>
     <label>选手标识<input className="stu-input" value={draft.playerKey ?? ""} onChange={e => update({ playerKey: e.target.value || null })} /></label>
-    <h3>证据</h3>
+    </>}<h3>证据</h3>
     <div><label>选择比赛<select className="stu-input" value={entryId} onChange={e => setEntryId(e.target.value)}><option value="">请选择</option>{entries.map(item => <option key={item.id} value={item.id}>{item.fileName} · {item.meta.mapName}</option>)}</select></label>
     <label>回合<select className="stu-input" value={round} disabled={!rounds || rounds.entryId !== entryId || loadingRounds} onChange={e => setRound(e.target.value)}><option value="">请选择</option>{rounds?.entryId === entryId && rounds.values.map(number => <option key={number} value={number}>R{number}</option>)}</select></label>
     {loadingRounds && <span>正在读取回合…</span>}{roundError && <p role="alert">读取回合失败：{roundError} <button type="button" className="stu-button-sm" onClick={() => setRetry(value => value + 1)}>重试</button></p>}{rounds?.entryId === entryId && rounds.values.length === 0 && <span>该比赛没有可用回合。</span>}
