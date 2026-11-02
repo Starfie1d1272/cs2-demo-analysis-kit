@@ -1,5 +1,7 @@
 import { matchIdForEntry } from "./lib/demo-entry";
-import { emptyTeamState } from "./lib/studio-page-state";
+import { emptyRolesState } from "./lib/studio-page-state";
+import { PlayerRolesPanel } from "./views/analysis/PlayerRolesPanel";
+import { TeamRolesPanel } from "./views/analysis/TeamRolesPanel";
 import { useStudioActivity } from "./app/use-studio-activity";
 import { useStudioData } from "./app/use-studio-data";
 import { useLibraryActions } from "./app/use-library-actions";
@@ -274,8 +276,8 @@ export function App() {
     });
     setEvidenceSession(null); setRestoringFrameId(null);
     setNavigation(current => {
-      const next = studioNavigationReducer(discardMaterialDraft(current), { intent: "open", id, destination: { page: "team", context }, scrollY: window.scrollY });
-      return studioNavigationReducer(next, { intent: "ui", frameId: id, ui: { ...emptyTeamState(), section: "roles", matrixMapName: scope.mapName, matrixSide: scope.side } });
+      const next = studioNavigationReducer(discardMaterialDraft(current), { intent: "open", id, destination: { page: "roles", context }, scrollY: window.scrollY });
+      return studioNavigationReducer(next, { intent: "ui", frameId: id, ui: { ...emptyRolesState(), team: { ...emptyRolesState().team, matrixMapName: scope.mapName, matrixSide: scope.side } } });
     });
   }, [canLeave]);
   const openStudyNoteEditor = useCallback((draft: StudyNoteDraft) => {
@@ -571,7 +573,6 @@ export function App() {
             onSelectTeam={openTeam}
             onOpenMatch={openDemo}
             onOpenCapability={(key) => navigate({ page: key, context: key === "patterns" && analysisContext.focus.kind === "team" ? { ...analysisContext, goal: "own-review", roles: { ...analysisContext.roles, beneficiary: { kind: "team", id: analysisContext.focus.teamName.toLowerCase(), label: analysisContext.focus.teamName } } } : analysisContext })}
-            onOpenEvidence={openEvidence}
             state={active.ui as import("./lib/studio-page-state").TeamPageState}
             onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
             onPageReady={(keys) => onPageReady(active.id, keys)}
@@ -580,21 +581,22 @@ export function App() {
           />
         )}
         {destination.page === "roles" && (analysisContext.focus.kind === "player" || analysisContext.focus.kind === "self" ? (
-          <PlayersView key={active.id} rolesOnly allEntries={entries} entries={scopedEntries} selectedTeam={selectedTeam}
-            selectedPlayerKey={selectedPlayerKey} onSelectPlayer={(playerKey, label = playerKey) => setAnalysisContext(current => ({ ...current, focus: { kind: "player", playerKey, label } }))}
-            onOpenMatch={openDemo} onOpenEvidence={openEvidence} onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
+          <PlayerRolesPanel key={active.id} entries={scopedEntries} playerKey={analysisContext.focus.playerKey} playerLabel={analysisContext.focus.label}
+            selectedTeam={selectedTeam} identityOptions={identityOptions} onOpenEvidence={openEvidence}
             state={(active.ui as import("./lib/studio-page-state").RolesPageState).player}
-            onStateChange={player => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: { ...(active.ui as import("./lib/studio-page-state").RolesPageState), player } }))}
-            onPageReady={keys => onPageReady(active.id, keys)} identityOptions={identityOptions}
-            contextSummary={summarizeAnalysisContext(analysisContext, entries, eventScopes)} onOpenMaterials={() => navigate({ page: "materials" })}
-            onOpenOpening={() => navigate({ page: "opening", context: analysisContext })} onOpenRoles={() => {}} onGoLibrary={() => goLibrary()} />
+            onStateChange={player => setNavigation(current => {
+              if (current.active.id !== active.id) return current;
+              const previous = current.active.ui as import("./lib/studio-page-state").RolesPageState;
+              return studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: { ...previous, player } });
+            })} onPageReady={keys => onPageReady(active.id, keys)} />
         ) : analysisContext.focus.kind === "team" ? (
-          <TeamView key={active.id} rolesOnly entries={scopedEntries} selectedTeam={analysisContext.focus.teamName}
-            onSelectTeam={teamName => setAnalysisContext(current => ({ ...current, focus: { kind: "team", teamName } }))}
-            onOpenMatch={openDemo} onOpenCapability={key => navigate({ page: key, context: analysisContext })} onOpenEvidence={openEvidence}
-            state={(active.ui as import("./lib/studio-page-state").RolesPageState).team}
-            onStateChange={team => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: { ...(active.ui as import("./lib/studio-page-state").RolesPageState), team } }))}
-            onPageReady={keys => onPageReady(active.id, keys)} onGoLibrary={() => goLibrary()} identityOptions={identityOptions} />
+          <TeamRolesPanel key={active.id} entries={scopedEntries} teamName={analysisContext.focus.teamName} identityOptions={identityOptions}
+            onOpenEvidence={openEvidence} state={(active.ui as import("./lib/studio-page-state").RolesPageState).team}
+            onStateChange={team => setNavigation(current => {
+              if (current.active.id !== active.id) return current;
+              const previous = current.active.ui as import("./lib/studio-page-state").RolesPageState;
+              return studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: { ...previous, team } });
+            })} onPageReady={keys => onPageReady(active.id, keys)} />
         ) : <div className="stu-card"><h2>选择分析对象</h2><p>请先选择一名选手或一支队伍。</p><button type="button" className="stu-button" onClick={() => navigate({ page: "player", context: analysisContext })}>选择选手</button><button type="button" className="stu-button" onClick={() => navigate({ page: "team", context: analysisContext })}>选择队伍</button></div>)}
         {destination.page === "opening" && (
           <TrailsView

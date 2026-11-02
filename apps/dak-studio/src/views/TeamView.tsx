@@ -4,15 +4,11 @@ import type { TeamComparisonModel } from "@cs2dak/presentation";
 import type { TeamPageState } from "../lib/studio-page-state";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 import { useEffect, useMemo, useState } from "react";
-import { DataTable, DoubleAwpAnalysisPanel, EmptyState, TeamMapRoleMatrixPanel, type DataTableColumn } from "@cs2dak/react";
-import type { DoubleAwpAnalysis, RoleDeclaration, TeamMapRoleMatrix } from "@cs2dak/tactics";
+import { DataTable, EmptyState, type DataTableColumn } from "@cs2dak/react";
 import type { TeamOverviewModel } from "@cs2dak/presentation";
-import { getDoubleAwpAnalysis, getTeamMapRoleMatrices } from "../lib/queries/spatial-queries";
 import { getTeamOverview } from "../lib/queries/team-queries";
 import { type IdentityOptions } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
-import type { OpenEvidence } from "../lib/evidence-continuation";
-import { loadRoleDeclarations } from "../lib/role-declarations";
 
 type TeamViewAction = "duel" | "economy" | "utility" | "opening" | "control" | "patterns" | "roles";
 
@@ -36,26 +32,22 @@ export function TeamView({
   onSelectTeam,
   onOpenMatch,
   onOpenCapability,
-  onOpenEvidence,
   state,
   onStateChange,
   onPageReady,
   onGoLibrary,
   identityOptions,
-  rolesOnly = false,
 }: {
   entries: StudioDemoEntry[];
   selectedTeam: string | null;
   onSelectTeam: (teamName: string) => void;
   onOpenMatch: (entryId: string) => void;
   onOpenCapability: (view: TeamViewAction) => void;
-  onOpenEvidence: OpenEvidence;
   state: TeamPageState;
   onStateChange: (state: TeamPageState) => void;
   onPageReady?: (keys: string[]) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
-  rolesOnly?: boolean;
 }) {
   const mapTable = state.tables.maps ?? { sort: { key: "matches", direction: "desc" as const }, page: 0 };
   const rosterTable = state.tables.roster ?? { sort: { key: "rr", direction: "desc" as const }, page: 0 };
@@ -79,15 +71,6 @@ export function TeamView({
   const [comparisonRetry, setComparisonRetry] = useState(0);
   const [overview, setOverview] = useState<TeamOverviewModel | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [matrices, setMatrices] = useState<TeamMapRoleMatrix[] | null>(null);
-  const [matrixError, setMatrixError] = useState<string | null>(null);
-  const [doubleAwp, setDoubleAwp] = useState<DoubleAwpAnalysis[] | null>(null);
-  const [doubleAwpError, setDoubleAwpError] = useState<string | null>(null);
-  const matrixSide = state.matrixSide;
-  const matrixMap = state.matrixMapName ?? matrices?.[0]?.mapName ?? null;
-  const setMatrixMap = (matrixMapName: string) => onStateChange({ ...state, matrixMapName });
-  const setMatrixSide = (matrixSide: "t" | "ct") => onStateChange({ ...state, matrixSide });
-
   useEffect(() => {
     if (!activeTeam || !state.compareTeamName) { setComparison(null); setComparisonError(null); return; }
     let cancelled = false;
@@ -113,49 +96,14 @@ export function TeamView({
   }, [entries, activeTeam, identityOptions?.version]);
 
   useEffect(() => {
-    if (!activeTeam || entries.length === 0) { setMatrices(null); return; }
-    let cancelled = false;
-    setMatrices(null); setMatrixError(null);
-    void loadRoleDeclarations().then((state) => getTeamMapRoleMatrices(entries, state.declarations.map((row) => row.declaration as RoleDeclaration), identityOptions, [activeTeam]))
-      .then((next) => { if (!cancelled) { setMatrices(next); } })
-      .catch((reason) => { if (!cancelled) setMatrixError(reason instanceof Error ? reason.message : String(reason)); });
-    return () => { cancelled = true; };
-  }, [entries, activeTeam, identityOptions?.version]);
-
-  useEffect(() => {
-    if (!activeTeam || entries.length === 0) { setDoubleAwp(null); setDoubleAwpError(null); return; }
-    let cancelled = false;
-    setDoubleAwp(null); setDoubleAwpError(null);
-    void getDoubleAwpAnalysis(entries, identityOptions, [activeTeam])
-      .then((models) => { if (!cancelled) setDoubleAwp(models); })
-      .catch((reason) => { if (!cancelled) setDoubleAwpError((reason instanceof Error ? reason.message : String(reason)) || "读取失败"); });
-    return () => { cancelled = true; };
-  }, [entries, activeTeam, identityOptions?.version]);
-
-  useEffect(() => {
-    if (!onPageReady || (activeTeam && (!overview && !error || !matrices && !matrixError || !doubleAwp && !doubleAwpError))) return;
+    if (!onPageReady || (activeTeam && !overview && !error)) return;
     onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
-  }, [onPageReady, activeTeam, overview, error, matrices, matrixError, doubleAwp, doubleAwpError]);
-
-  const matrixMaps = [...new Set((matrices ?? []).map((row) => row.mapName))];
-  const activeMatrix = matrices?.find((row) => row.mapName === matrixMap && row.side === matrixSide) ?? null;
-  const playerNames = Object.fromEntries((overview?.roster ?? []).flatMap((row) => [[row.steamId64, row.name], [`steam:${row.steamId64}`, row.name]]));
+  }, [onPageReady, activeTeam, overview, error]);
 
   if (entries.length === 0) {
     return <div className="stu-view"><EmptyState mark title="还没有队伍数据" hint="先在资料库导入比赛，才能按本地队伍身份组织总览。" action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>} /></div>;
   }
 
-  const rolePanels = <>
-          <section className="stu-card" id="team:map-roles">
-            <div className="stu-card-head"><h3>地图位置职责</h3><div className="stu-chip-row" role="tablist" aria-label="职责矩阵筛选">{matrixMaps.map((map) => <button key={map} type="button" className={matrixMap === map ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => setMatrixMap(map)}>{map.replace("de_", "")}</button>)}{(["t", "ct"] as const).map((side) => <button key={side} type="button" className={matrixSide === side ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => setMatrixSide(side)}>{side.toUpperCase()}</button>)}</div></div>
-            {matrixError ? <EmptyState variant="error" title="职责矩阵不可用" hint={matrixError} /> : matrices === null ? <div className="stu-loading">读取地图位置事实…</div> : <TeamMapRoleMatrixPanel state={state.tables.roles ?? { sort: { key: "sample", direction: "desc" }, page: 0 }} onStateChange={table => onStateChange({ ...state, tables: { ...state.tables, roles: table } })} matrix={activeMatrix} playerNames={playerNames} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry && matrixMap) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "team:map-roles" }); }} />}
-          </section>
-          <section className="stu-card" id="team:double-awp">
-            <div className="stu-card-head"><h3>双 AWP 条件统计</h3></div>
-            {doubleAwpError ? <EmptyState variant="error" title="双 AWP 统计不可用" hint={doubleAwpError} /> : doubleAwp === null ? <div className="stu-loading">读取 AWP 回合事实…</div> : <DoubleAwpAnalysisPanel model={doubleAwp.find((row) => row.side === matrixSide) ?? null} playerNames={playerNames} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "team:double-awp" }); }} />}
-          </section>
-  </>;
-  if (rolesOnly && activeTeam) return <div className="stu-view"><header className="stu-view-header"><h1>位置与职责 · {activeTeam}</h1></header>{rolePanels}</div>;
 
   return (
     <div className="stu-view stu-reading-view">
