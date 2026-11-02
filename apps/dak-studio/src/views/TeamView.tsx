@@ -126,7 +126,7 @@ export function TeamView({
     setDoubleAwp(null); setDoubleAwpError(null);
     void getDoubleAwpAnalysis(entries, identityOptions, [activeTeam])
       .then((models) => { if (!cancelled) setDoubleAwp(models); })
-      .catch((reason) => { if (!cancelled) setDoubleAwpError(reason instanceof Error ? reason.message : String(reason)); });
+      .catch((reason) => { if (!cancelled) setDoubleAwpError((reason instanceof Error ? reason.message : String(reason)) || "读取失败"); });
     return () => { cancelled = true; };
   }, [entries, activeTeam, identityOptions?.version]);
 
