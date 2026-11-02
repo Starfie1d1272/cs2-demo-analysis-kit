@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { clearPkgCache, listDemoEntries } from "../lib/library";
+import { invalidateLibrarySourceCaches, listDemoEntries } from "../lib/library";
 import type { StudioDemoEntry } from "../lib/demo-entry";
 import { listSeriesRecords, pruneOrphanSeries, type StudioSeriesRecord } from "../lib/series";
 import { listEventRecords, type StudioEventRecord } from "../lib/events";
@@ -89,7 +89,7 @@ export function useStudioData({ onError, importing }: { onError: (message: strin
       const next = getAnalysisDataSnapshot();
       if (next.generation !== generation) {
         generation = next.generation;
-        clearPkgCache();
+        invalidateLibrarySourceCaches();
         // A read started before this revision must never publish its old rows.
         versions.current.entries++;
         directoryRefreshPending.current = true;
