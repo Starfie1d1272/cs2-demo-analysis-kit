@@ -1,5 +1,7 @@
 # DAK Studio 最终产品审核与一体化重做方案
 
+> **2026-11 执行入口：** [总包 #133](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/133) 和 [工作台决策](../../decisions/2026-11-01-studio-workbench-delivery.md) 覆盖本文旧导航、全局 context、Finding/行动模型及战术材料范围；其余历史分析与数据口径保留参考。
+
 - 审核日期：2026-07-11
 - 审核对象：`01-current-product-reality.md` 至 `06-target-product-architecture.md`
 - 证据顺序：01–03 的运行态与任务走查优先；04、04b、05、06 均视为待审核方案；必要处定向核对当前实现和 `cs2-demo-format → core → cohort → presentation → Studio` 管线
