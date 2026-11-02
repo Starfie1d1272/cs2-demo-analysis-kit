@@ -1,9 +1,8 @@
 import type { DemoPackage } from "@cs2dak/contract";
 import type { CalloutGrid, TriangleBvh } from "@cs2dak/maps";
 import { normalizeDemoPackage, buildPlayerRoundPerformanceFacts, aggregatePlayerRoundPerformanceFacts, derivePlayerWeaponHighlights, observedTournamentIdentity, type TournamentIdentity } from "@cs2dak/core";
-import { deriveRRSignals, deriveRRIndicators, buildOpeningTrails, extractPlayerMatchInsightFacts, buildUtilityValueSummary, extractDuelInsightsFacts, extractTeamComparisonFacts, extractTournamentFacts } from "@cs2dak/analytics";
+import { deriveRRSignals, deriveRRIndicators, buildOpeningTrails, extractPlayerMatchInsightFacts, buildUtilityValueSummary, extractDuelInsightsFacts, extractTeamComparisonFacts, extractTournamentFacts, buildRatingSpatialContext } from "@cs2dak/analytics";
 import { derivePlayerMechanics, extractMatchTacticalAndMapIntelligenceFacts, extractMatchLineupObservations } from "@cs2dak/tactics";
-import { buildRatingSpatialContext } from "./rating-spatial-context.js";
 
 export interface AnalyzeMatchFactsOptions { matchId: string; tournamentIdentity?: TournamentIdentity; calloutGrid?: CalloutGrid | null; visibility?: TriangleBvh | null }
 export function analyzeMatchFacts(input: DemoPackage, options: AnalyzeMatchFactsOptions) {

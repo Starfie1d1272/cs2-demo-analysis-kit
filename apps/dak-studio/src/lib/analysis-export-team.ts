@@ -20,7 +20,7 @@ export function comparisonSections(
       title: `${side.teamName} · 比赛`,
       text: [],
       sampleDescription: `${side.matchCount} 场；两队分别按各自出场集合聚合`,
-      limitations: ["两队无需直接交手。"],
+      limitations: ["按显示名称观察组汇总；同场双方同名时双方贡献均计入，比赛场次去重，胜负与回合按双方累计。两队无需直接交手。"],
       columns: [
         { key: "match", label: "比赛", unit: null },
         { key: "map", label: "地图", unit: null },
@@ -40,7 +40,7 @@ export function comparisonSections(
       title: `${side.teamName} · 选手`,
       text: [],
       sampleDescription: `${Math.min(side.players.length, 8)} 名显示的选手`,
-      limitations: ["仅包含页面显示的前八名选手。"],
+      limitations: ["仅包含页面显示的前八名选手。RR 按该队出场信号聚合后计算账号评分，与单场计分板指标评分口径不同。"],
       columns: [
         { key: "name", label: "选手", unit: null },
         ...["rr", "adr", "kast", "kpr", "dpr"].map((key) => ({
@@ -95,7 +95,7 @@ export function comparisonSections(
     text: [],
     sampleDescription: "两侧使用相同页面比较口径",
     limitations: [
-      "图像未包含；两队无需直接交手。比较模型没有应用分析上下文中单独选择的基线。",
+      "图像未包含；两队无需直接交手。比较模型没有应用分析上下文中单独选择的基线。RR 为选手账号评分的均值。",
     ],
     columns: [
       { key: "metric", label: "指标", unit: null },
@@ -146,6 +146,7 @@ export function buildTeamAnalysisResult(
       title: "队伍总览",
       text: [
         `比赛 ${model.matchCount} 场，${model.wins} 胜 ${model.losses} 负；回合 ${model.roundsWon}:${model.roundsLost}。`,
+        "按显示名称观察组汇总；同场双方同名时双方贡献均计入，比赛场次去重，胜负与回合按双方累计。RR 为出场信号聚合后的账号评分，与单场计分板指标评分口径不同。",
       ],
       columns: [],
       rows: [],

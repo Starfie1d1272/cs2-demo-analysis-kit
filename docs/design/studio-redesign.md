@@ -1,20 +1,6 @@
-# DAK Studio 完整版总设计（四类任务流 + 管理工具）
+# DAK Studio 历史总设计（2026-06，参考）
 
-> **2026-11 执行入口：** [总包 #133](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/133) 和 [工作台决策](../decisions/2026-11-01-studio-workbench-delivery.md) 覆盖本文旧导航、全局 context、Finding/行动模型及战术材料范围；其余历史分析与数据口径保留参考。
-
-> 2026-06-12 制定，取代 `duel-coach-lab.md`（已归档至 `docs/archive/2026-06/`，
-> 其中模块 4/8 的**数据口径定义原文吸收进本文，不得回退**）。
-> 本文不参考旧页面布局，以「现有功能组件 + v3 数据能力」为底，规划最终形态：
-> 每个产品面服务什么用户任务、组件如何组织、还缺什么。落地节奏另行排期。
->
-> UI 约定见 [`docs/design-language.md`](../design-language.md)（强制）。
-> 模块 owner 边界见 [`docs/module-boundaries.md`](../module-boundaries.md)（强制）。
->
-> **2026-07 已收口：** 本文保留早期数据能力和组件来历；当前产品导航、页面职责、
-> `AnalysisContext`、Finding/Evidence continuation 与行动条目边界，以
-> [`07-final-product-review.md`](../audit/2026-07-product-review/07-final-product-review.md)
-> 和 [`08-page-level-ui-ux-implementation.md`](../audit/2026-07-product-review/08-page-level-ui-ux-implementation.md)
-> 为准。不得按下文旧导航、App 级 `CohortScope` 或 `PlaylistItem` 叙述回退实现。
+> **历史文档，非现行规范。** 下文保留当时的设计及数据口径讨论，不要求恢复旧导航、全局范围、Coach/Home、Prep、playlist 或旧导出。当前产品入口及行为以 [Studio README](../../apps/dak-studio/README.md)、[组件登记](studio-components.md) 和实际实现为准；模块职责以 [module-boundaries.md](../module-boundaries.md) 为准。旧数据口径需与当前实现及有效合同核对，不以本历史文本覆盖现行代码。
 
 ## 0. 全局结构
 

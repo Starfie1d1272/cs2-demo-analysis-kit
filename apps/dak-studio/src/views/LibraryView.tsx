@@ -181,7 +181,7 @@ export function LibraryView({
     <div className="stu-view">
       <header className="stu-view-header">
         <div>
-          <h1>{mode === "browse" ? "比赛列表" : "资料库维护"}</h1>
+          <h1>{mode === "browse" ? "比赛库" : "比赛库维护"}</h1>
           <p>
             导入 .dem（自动经 cs2df 转 v3 ZIP）或 cs2-demo-format/3.x ZIP，本地管理、检索并进入分析。支持拖拽到窗口任意位置。
           </p>
@@ -255,7 +255,7 @@ export function LibraryView({
         <div className="stu-toolbar">
           {selectedIds.size > 0 ? (
             <>
-              <span className="stu-bulk-count">{selectedIds.size} 场已选</span>
+              <span className="stu-bulk-count">{selectedIds.size} 场所选比赛</span>
               <button type="button" className="stu-button stu-button-ghost" onClick={addBatchTags}>
                 添加标签
               </button>
@@ -393,7 +393,7 @@ export function LibraryView({
       {entries.length === 0 ? (
         <EmptyState
           mark
-          title="资料库为空"
+          title="比赛库为空"
           hint="把 .dem 或 v3 ZIP 拖进窗口，或点右上角「导入 demo」。赛事目录可加载或导入赛事资源包。"
         />
       ) : (
@@ -502,7 +502,7 @@ export function LibraryView({
                     {mode === "maintenance" && <button
                       type="button"
                       className="stu-icon-button stu-icon-button-danger"
-                      title="从资料库删除"
+                      title="从比赛库删除"
                       onClick={() => onRemoveDemo(entry.id)}
                     >
                       <Trash2 size={14} />

@@ -1,16 +1,6 @@
-# DAK Studio Roadmap
+# DAK Studio 路线图（历史版本计划）
 
-> **2026-11 工作台执行入口：** [总包 #133](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/133) 是 22 项状态与批次唯一索引；[决策](decisions/2026-11-01-studio-workbench-delivery.md)、[PR #6 差量](audits/2026-11-01-pr6-capability-reconciliation.md)。截至 main `560a572`，W20 [#157](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/157) 与 W03 [#159](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/159) 已合；其余任务以总包及各 issue 的实时状态为准，不能从旧版本计划推断完成。下文是历史版本计划，其中导航、全局 context、Finding 和战术板范围被本轮决策覆盖。
-
-
-> 本文只管理产品版本顺序、范围与出口条件，不重复设计细节或研究论证。
->
-> - 产品职责真相源：[`07-final-product-review.md`](audit/2026-07-product-review/07-final-product-review.md)
-> - 页面实施参考：[`08-page-level-ui-ux-implementation.md`](audit/2026-07-product-review/08-page-level-ui-ux-implementation.md)
-> - 模块边界：[`module-boundaries.md`](module-boundaries.md)
-> - 指标成熟度：[`stability-tiers.md`](stability-tiers.md)
-> - 发布流程：[`release.md`](release.md)
-> - 用户可见历史：[`CHANGELOG.md`](../CHANGELOG.md)
+> 下文记录旧版本规划和当时的状态，不是当前规范、任务清单或恢复旧页面/兼容层的要求。当前入口见 [Studio README](../apps/dak-studio/README.md)，模块职责见 [模块边界](module-boundaries.md)；实际剩余验收以 [W19 记录](qa/2026-11-studio-workbench-acceptance.md) 和各 issue 为准。
 
 ## 产品原则
 
