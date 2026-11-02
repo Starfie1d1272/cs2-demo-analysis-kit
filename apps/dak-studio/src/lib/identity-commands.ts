@@ -1,5 +1,4 @@
-import { getStorage } from "./storage";
-import { getPywebviewStorageApi } from "./storage/pywebview-adapter";
+import { getNativeStorageApiForCurrentAdapter, getStorage } from "./storage";
 import { applyMerge, applySplit, applyRename, applyTeamRename, type IdentityStoreState } from "./identity";
 import { ROLE_DECLARATIONS_SCHEMA_VERSION, parseRoleDeclarations, migrateRoleDeclarationsForIdentity, type RoleDeclarationsState, type StoredRoleDeclaration } from "./role-declarations";
 import { roleDeclarationSchema, type RoleDeclaration } from "@cs2dak/tactics";
@@ -50,7 +49,7 @@ const auditStore = getStorage().records("identity-audit");
 let commandQueue: Promise<unknown> = Promise.resolve();
 
 async function withStorageLock<T>(run: () => Promise<T>): Promise<T> {
-  const native = getPywebviewStorageApi();
+  const native = getNativeStorageApiForCurrentAdapter();
   if (native) {
     if (!native.storage_identity_lock_acquire || !native.storage_identity_lock_release) throw new Error("桌面存储不支持身份资料锁，请更新应用后重试");
     const token = await native.storage_identity_lock_acquire();

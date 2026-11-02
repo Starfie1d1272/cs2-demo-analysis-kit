@@ -11,12 +11,19 @@ import { createPywebviewAdapter, getPywebviewStorageApi } from "./pywebview-adap
 import type { StorageAdapter } from "./types";
 
 let adapter: StorageAdapter | null = null;
+let nativeApiForAdapter: ReturnType<typeof getPywebviewStorageApi> = null;
 
 export function getStorage(): StorageAdapter {
   if (adapter) return adapter;
-  const nativeApi = getPywebviewStorageApi();
-  adapter = nativeApi ? createPywebviewAdapter(nativeApi) : createIdbAdapter();
+  nativeApiForAdapter = getPywebviewStorageApi();
+  adapter = nativeApiForAdapter ? createPywebviewAdapter(nativeApiForAdapter) : createIdbAdapter();
   return adapter;
+}
+
+/** 锁必须与已选存储后端一致，即使桌面桥接稍后才出现。 */
+export function getNativeStorageApiForCurrentAdapter(): ReturnType<typeof getPywebviewStorageApi> {
+  getStorage();
+  return nativeApiForAdapter;
 }
 
 export type { StorageAdapter, RecordStore, BlobStore } from "./types";
