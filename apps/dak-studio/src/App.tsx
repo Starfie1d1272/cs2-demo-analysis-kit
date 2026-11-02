@@ -59,8 +59,7 @@ function discardMaterialDraft(navigation: StudioNavigation): StudioNavigation {
   if (frame.destination.page === "material" && frame.ui && "dirty" in frame.ui && frame.ui.dirty) return studioNavigationReducer(navigation, { intent: "ui", frameId: frame.id, ui: null });
   if (frame.destination.page === "materials") {
     const ui = frame.ui as MaterialsPageState;
-    if (ui.newPlaybookDirty) return studioNavigationReducer(navigation, { intent: "ui", frameId: frame.id, ui: { ...ui, newPlaybook: null, newPlaybookDirty: false } });
-    if (ui.newNoteDirty) return studioNavigationReducer(navigation, { intent: "ui", frameId: frame.id, ui: { ...ui, newNote: null, newNoteDirty: false } });
+    if (ui.newPlaybookDirty || ui.newNoteDirty) return studioNavigationReducer(navigation, { intent: "ui", frameId: frame.id, ui: { ...ui, newPlaybook: null, newPlaybookDirty: false, newNote: null, newNoteDirty: false } });
   }
   return navigation;
 }
