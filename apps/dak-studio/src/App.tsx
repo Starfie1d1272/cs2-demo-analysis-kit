@@ -4,7 +4,7 @@ import { useLibraryActions } from "./app/use-library-actions";
 import { useRivalHubActions } from "./app/use-rivalhub-actions";
 import { useDesktopUpdates } from "./app/use-desktop-updates";
 import { invalidateAnalysisQueries, getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation } from "./lib/queries/query-cache";
-import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Radar, Settings, Swords, Trophy, UserRound } from "lucide-react";
+import { ClipboardList, Crosshair, Film, House, LibraryBig, Radar, Settings } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { CohortScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
 import { AnalysisContextSummary } from "./components/AnalysisContextSummary";
@@ -44,69 +44,28 @@ import {
 } from "./lib/analysis-context";
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
 import { createStudioNavigation, studioNavigationReducer, PAGE_SECTION, type StudioDestination, type StudioPageId, type StudioSection } from "./lib/studio-navigation";
+import { WorkbenchView } from "./views/WorkbenchView";
+import { MatchesView } from "./views/MatchesView";
+import { AnalysisView } from "./views/AnalysisView";
 import { getPinnedPlayer } from "./lib/pin";
+import { EventManager } from "./components/EventManager";
+import { MaterialsView } from "./views/MaterialsView";
 import { RivalHubBatchImportPanel } from "./components/RivalHubBatchImportPanel";
 
-type NavKey =
-  | "home"
-  | "library"
-  | "match"
-  | "players"
-  | "teams"
-  | "trails"
-  | "duel"
-  | "utility"
-  | "lineups"
-  | "economy"
-  | "events"
-  | "coach"
-  | "control"
-  | "management";
-
-type NavItem = { key: NavKey; label: string; hint: string; icon: typeof LibraryBig };
-const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
-  {
-    label: "开始",
-    items: [
-      { key: "home", label: "我的复盘", hint: "个人状态与待复核", icon: House },
-      { key: "library", label: "资料库", hint: "导入与管理 Demo", icon: LibraryBig },
-      { key: "match", label: "比赛复盘", hint: "回合 / 地图 / 回放", icon: Film }
-    ]
-  },
-  {
-    label: "选手复盘",
-    items: [
-      { key: "players", label: "选手", hint: "画像 / 趋势 / 机制", icon: UserRound },
-      { key: "trails", label: "开局动线", hint: "默认位 / 出门路线", icon: Radar },
-      { key: "duel", label: "对枪", hint: "证据 / 态势 / 机制", icon: Swords }
-    ]
-  },
-  {
-    label: "对象分析",
-    items: [
-      { key: "teams", label: "队伍", hint: "基础盘面 / 专项入口", icon: UserRound },
-      { key: "events", label: "赛事", hint: "目录 / 总览 / 赛程", icon: Trophy },
-      { key: "economy", label: "经济与转化", hint: "手枪 / 人数优势 / 经济对位", icon: Coins },
-      { key: "utility", label: "道具价值", hint: "闪光 / 雷火 / 烟", icon: Bomb },
-      { key: "lineups", label: "道具点位", hint: "出手 / 落点 / 练习", icon: Bomb },
-      { key: "control", label: "控图", hint: "覆盖场 / 赛事基线 / 队伍差分", icon: Radar }
-    ]
-  },
-  {
-    label: "备战",
-    items: [
-      { key: "coach", label: "Coach", hint: "模式 / 清单 / 报告", icon: ClipboardList }
-    ]
-  }
+const MAIN_NAV: Array<{ section: StudioSection; label: string; hint: string; icon: typeof LibraryBig }> = [
+  { section: "workbench", label: "工作台", hint: "开始与导入", icon: House },
+  { section: "matches", label: "比赛", hint: "比赛与赛事", icon: Film },
+  { section: "analysis", label: "分析", hint: "选手、队伍与主题", icon: Radar },
+  { section: "materials", label: "战术与训练", hint: "备战与材料", icon: ClipboardList },
 ];
-const MANAGEMENT_NAV: NavItem = { key: "management", label: "管理", hint: "身份归并 · 资料库维护 · 赛事资产", icon: Settings };
+const MANAGEMENT_NAV = { label: "数据管理", hint: "身份 · 资产 · 资料库维护", icon: Settings };
 
 type MatchDeepLink = { roundNumber: number; tick?: number };
-const CAPABILITY_BY_VIEW: Partial<Record<NavKey, StudioCapability>> = {
-  home: "personal-review", players: "map-role", teams: "map-role", duel: "duel", economy: "economy", utility: "utility", lineups: "lineup", control: "control", coach: "tactical",
+const CAPABILITY_BY_PAGE: Partial<Record<StudioPageId, StudioCapability>> = {
+  "personal-review": "personal-review", player: "map-role", team: "map-role", duel: "duel", economy: "economy", utility: "utility", lineups: "lineup", control: "control", patterns: "tactical",
 };
 
-function NavButton({ item, active, onClick }: { item: NavItem; active: boolean; onClick: () => void }) {
+function NavButton({ item, active, onClick }: { item: typeof MANAGEMENT_NAV; active: boolean; onClick: () => void }) {
   const Icon = item.icon;
   return (
     <button
@@ -124,9 +83,9 @@ function NavButton({ item, active, onClick }: { item: NavItem; active: boolean; 
 export function App() {
   const activity = useStudioActivity();
   const { importing, notice, setNotice, exportQueries, recheckExport } = activity;
-  const { entries, entriesReady, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity } = useStudioData({ onError: setNotice });
+  const { entries, entriesReady, eventsStatus, seriesStatus, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity } = useStudioData({ onError: setNotice });
   const { importTagsRaw, setImportTagsRaw, importFiles, importDropped, importViaNativeDialog, nativeImportAvailable, loadBuiltinEvent, handleLinkRawDemo, watchRawDemo, handleRemove, handleRemoveMany, handleUpdateTags, handleBulkUpdateTags, handleReexportDemo, handleReexportAll, handleReexportSelected, handleRebuildFacts, handleRebuildStale, handleRebuildSelected } = useLibraryActions({ entries, refreshEntries, refreshEventRecords, activity });
-  const { rivalHubConnection, rivalHubRefreshToken, batchSession, dismissBatch, updateLocalLink, refreshRivalHub, handleConnectRivalHub, handleRevokeRivalHub, importOnlineFiles, syncLocalRivalHubDemos, stopRivalHubBatch, pickRivalHubFiles, selectRivalHubBatchTarget } = useRivalHubActions({ refreshEntries, refreshEventRecords, activity });
+  const { rivalHubConnection, batchSession, dismissBatch, updateLocalLink, refreshRivalHub, handleConnectRivalHub, handleRevokeRivalHub, importOnlineFiles, syncLocalRivalHubDemos, stopRivalHubBatch, pickRivalHubFiles, selectRivalHubBatchTarget } = useRivalHubActions({ refreshEntries, refreshEventRecords, activity });
   const [navigation, setNavigation] = useState(() => createStudioNavigation("initial"));
   const navigationRef = useRef(navigation);
   navigationRef.current = navigation;
@@ -138,20 +97,13 @@ export function App() {
   }, [navigation]);
   const active = navigation.active;
   const destination = active.destination;
-  const pageToView: Partial<Record<StudioPageId, NavKey>> = {
-    workbench: "home", analysis: "players", "personal-review": "home", matches: "library", match: "match",
-    player: "players", team: "teams", opening: "trails", patterns: "coach",
-    "event-analysis": "events", events: "events", management: "management",
-    duel: "duel", economy: "economy", utility: "utility", lineups: "lineups", control: "control",
-  };
-  const view = destination.page === "management" && destination.tab === "library" ? "library" : pageToView[destination.page] ?? "library";
+  const section = PAGE_SECTION[destination.page];
   const selectedDemoId = destination.page === "match" ? destination.entryId : null;
   const targetRound = destination.page === "match" ? destination.roundNumber : undefined;
   const targetTick = destination.page === "match" ? destination.tick : undefined;
   const matchDeepLink = useMemo(() => targetRound === undefined
     ? null : { roundNumber: targetRound, tick: targetTick }, [active.id, targetRound, targetTick]);
   const eventMode = destination.page === "event-analysis" ? "overview" : "directory";
-  const managementInitialTab = destination.page === "management" ? destination.tab : "identity";
   const fallbackContext = useMemo(() => createAnalysisContextPreset("explore"), []);
   const analysisContext = "context" in destination ? destination.context : fallbackContext;
   const navigate = useCallback((next: StudioDestination, intent: "open" | "evidence" = "open", sourceKey?: string) => {
@@ -179,16 +131,22 @@ export function App() {
       return studioNavigationReducer(current, { intent: "context", frameId: id, context: typeof update === "function" ? update(context) : update });
     });
   }, [active.id]);
-  const setView = useCallback((key: NavKey) => {
-    const context = createAnalysisContextPreset("explore");
-    const analysisPages = { players: "player", teams: "team", trails: "opening", duel: "duel", utility: "utility", lineups: "lineups", economy: "economy", coach: "patterns", control: "control" } as const;
-    if (key in analysisPages) navigate({ page: analysisPages[key as keyof typeof analysisPages], context });
-    else if (key === "home") navigate({ page: "personal-review", context: createAnalysisContextPreset("personal-review") });
-    else if (key === "library") navigate({ page: "matches" });
-    else if (key === "match") resumeSection("matches");
-    else if (key === "events") navigate({ page: "events" });
-    else navigate({ page: "management", tab: "identity" });
-  }, [navigate, resumeSection]);
+  const goLibrary = useCallback(() => navigate({ page: "matches" }), [navigate]);
+  const goPlayers = useCallback(() => navigate({ page: "player", context: createAnalysisContextPreset("explore") }), [navigate]);
+  const goLineups = useCallback(() => navigate({ page: "lineups", context: createAnalysisContextPreset("explore") }), [navigate]);
+  const openPersonalReview = useCallback(() => {
+    const id = `frame-${++nextFrameId.current}`;
+    setEvidenceDetails(null);
+    setRestoringFrameId(null);
+    setNavigation(current => studioNavigationReducer(current, { intent: "open", id, destination: { page: "personal-review", context: createAnalysisContextPreset("personal-review") }, scrollY: window.scrollY }));
+    void getPinnedPlayer().then(pinned => {
+      if (!pinned) return;
+      setNavigation(current => {
+        if (touchedFrames.current.has(id) || current.active.id !== id || current.active.destination.page !== "personal-review" || current.active.destination.context.focus.kind !== "aggregate") return current;
+        return studioNavigationReducer(current, { intent: "context", frameId: id, context: createAnalysisContextPreset("personal-review", { focus: { kind: "self", playerKey: pinned.playerKey, label: pinned.name } }) });
+      });
+    }).catch(() => {});
+  }, []);
   const analysisData = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const [evidenceDetails, setEvidenceDetails] = useState<Pick<EvidenceContinuation, "evidence" | "finding"> | null>(null);
   const evidenceSource = navigation.history.at(-1);
@@ -225,7 +183,8 @@ export function App() {
     : null;
   const selectedTeam = analysisContext.focus.kind === "team" ? analysisContext.focus.teamName : null;
   const displayedCapabilityAvailability = useMemo<CapabilityAvailability | null>(() => {
-    if (view !== "coach" || !capabilityAvailability) return capabilityAvailability;
+    if (section === "materials") return null;
+    if (destination.page !== "patterns" || !capabilityAvailability) return capabilityAvailability;
     const requiredRole = analysisContext.goal === "opponent-prep" ? analysisContext.roles.opponent : analysisContext.roles.beneficiary;
     if (requiredRole) return capabilityAvailability;
     return {
@@ -239,7 +198,7 @@ export function App() {
       }],
       repairActions: [],
     };
-  }, [analysisContext.goal, analysisContext.roles.beneficiary, analysisContext.roles.opponent, capabilityAvailability, scopedEntries, view]);
+  }, [analysisContext.goal, analysisContext.roles.beneficiary, analysisContext.roles.opponent, capabilityAvailability, scopedEntries, destination.page, section]);
   const updateLegacyScope = useCallback((next: CohortScopeState) => {
     setAnalysisContext((current) => applyCohortScopeProjection(current, next));
   }, [setAnalysisContext]);
@@ -254,8 +213,8 @@ export function App() {
       navigate({ page: "management", tab: "assets" });
       return;
     }
-    setView("library");
-  }, []);
+    goLibrary();
+  }, [goLibrary, navigate]);
   const selectRadarTeam = useCallback((teamName: string | null) => {
     setAnalysisContext((current) => ({
       ...current,
@@ -265,14 +224,14 @@ export function App() {
   }, [setAnalysisContext]);
 
   useEffect(() => {
-    const capability = CAPABILITY_BY_VIEW[view];
+    const capability = CAPABILITY_BY_PAGE[destination.page];
     if (!capability || scopedEntries.length === 0) { setCapabilityAvailability(null); return; }
     let cancelled = false;
     void loadCapabilityAvailabilityInputs(scopedEntries)
       .then((inputs) => { if (!cancelled) setCapabilityAvailability(deriveCapabilityAvailability(scopedEntries, capability, inputs)); })
       .catch(() => { if (!cancelled) setCapabilityAvailability(null); });
     return () => { cancelled = true; };
-  }, [view, scopedEntries]);
+  }, [destination.page, scopedEntries]);
 
   const openDemo = useCallback((id: string, target?: MatchDeepLink) => {
     navigate({ page: "match", entryId: id, ...target });
@@ -311,10 +270,10 @@ export function App() {
   }, [active.id]); // The restoration signal may clear without changing frames.
 
   useEffect(() => {
-    if (view === "library" && entriesReady) {
+    if ((destination.page === "matches" || (destination.page === "management" && (active.ui as import("./lib/studio-page-state").StudioPageStateMap["management"]).tab === "library")) && entriesReady) {
       onPageReady(active.id, Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
     }
-  }, [view, active.id, entriesReady, onPageReady]);
+  }, [destination.page, active.id, active.ui, entriesReady, onPageReady]);
 
   const openPlayer = useCallback((playerKey: string, label = playerKey) => {
     const current = navigationRef.current.active.destination;
@@ -335,6 +294,37 @@ export function App() {
       baseline: { kind: "event-peers", eventId: event.id },
     }) });
   }, [navigate]);
+
+  const libraryView = (destination.page === "matches" || destination.page === "management") ? (
+          <LibraryView
+            key={active.id}
+            mode={destination.page === "management" ? "maintenance" : "browse"}
+            state={destination.page === "management" ? (active.ui as import("./lib/studio-page-state").StudioPageStateMap["management"]).library : active.ui as import("./lib/studio-page-state").MatchesPageState}
+            onStateChange={ui => setNavigation(current => { if (current.active.destination.page === "management") return studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: { ...(current.active.ui as import("./lib/studio-page-state").StudioPageStateMap["management"]), library: ui } }); return studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }); })}
+            entries={entries}
+            importing={importing}
+            importTagsRaw={importTagsRaw}
+            onImportTagsChange={setImportTagsRaw}
+            onImportFiles={importFiles}
+            onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined}
+            onNotice={setNotice}
+            onLibraryChanged={() => { void refreshEntries().catch(() => {}); void refreshEventRecords().catch(() => {}); }}
+            onLoadBuiltin={loadBuiltinEvent}
+            onOpenDemo={openDemo}
+            onRemoveDemo={handleRemove}
+            onUpdateTags={handleUpdateTags}
+            onBulkUpdateTags={handleBulkUpdateTags}
+            onLinkRawDemo={nativeImportAvailable ? handleLinkRawDemo : undefined}
+            onWatchRawDemo={nativeImportAvailable ? (entry) => void watchRawDemo(entry.id) : undefined}
+            onReexportDemo={handleReexportDemo}
+            onReexportAll={handleReexportAll}
+            onReexportSelected={handleReexportSelected}
+            onRemoveMany={handleRemoveMany}
+            onRebuildFacts={handleRebuildFacts}
+            onRebuildStale={handleRebuildStale}
+            onRebuildSelected={handleRebuildSelected}
+          />
+  ) : null;
 
   return (
     <div
@@ -360,29 +350,13 @@ export function App() {
           </div>
         </div>
         <nav className="stu-nav">
-          {NAV_GROUPS.map((group) => (
-            <section key={group.label} className="stu-nav-section" aria-label={group.label}>
-              <span className="stu-nav-section-label">{group.label}</span>
-              {group.items.map((item) => (
-                <NavButton key={item.key} item={item} active={view === item.key} onClick={() => {
-                  if (item.key === "home") {
-                    const id = `frame-${++nextFrameId.current}`;
-                    setNavigation(current => studioNavigationReducer(current, { intent: "open", id, destination: { page: "personal-review", context: createAnalysisContextPreset("personal-review") }, scrollY: window.scrollY }));
-                    void getPinnedPlayer().then(pinned => {
-                      if (!pinned) return;
-                      setNavigation(current => {
-                        if (touchedFrames.current.has(id) || current.active.id !== id || current.active.destination.page !== "personal-review" || current.active.destination.context.focus.kind !== "aggregate") return current;
-                        return studioNavigationReducer(current, { intent: "context", frameId: id, context: createAnalysisContextPreset("personal-review", { focus: { kind: "self", playerKey: pinned.playerKey, label: pinned.name } }) });
-                      });
-                    });
-                  } else setView(item.key);
-                }} />
-              ))}
-            </section>
-          ))}
+          {MAIN_NAV.map(item => {
+            const Icon = item.icon;
+            return <button key={item.section} type="button" className={section === item.section ? "stu-nav-item stu-nav-item-active" : "stu-nav-item"} aria-current={section === item.section ? "page" : undefined} onClick={() => resumeSection(item.section)}><Icon size={16} /><span><b>{item.label}</b><small>{item.hint}</small></span></button>;
+          })}
         </nav>
         <div className="stu-sidebar-foot">
-          <NavButton item={MANAGEMENT_NAV} active={view === "management"} onClick={() => setView("management")} />
+          <NavButton item={MANAGEMENT_NAV} active={section === "management"} onClick={() => resumeSection("management")} />
           <span>{entries.length} 场 demo</span>
           <small>v{APP_VERSION} · v3 ZIP · 本地存储</small>
           <small title={BUILD_INFO.buildRevision ?? "Git metadata unavailable"}>{BUILD_LABEL}</small>
@@ -432,10 +406,10 @@ export function App() {
           </div>
         )}
         <RivalHubBatchImportPanel session={batchSession} onStop={stopRivalHubBatch} onSelectTarget={selectRivalHubBatchTarget} onDismiss={dismissBatch} onLocalLinkUpdate={updateLocalLink} />
-        {entries.length > 0 && "context" in destination && (
+        {entries.length > 0 && section === "analysis" && "context" in destination && (
           <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} onEdit={() => setContextEditorOpen((current) => !current)} />
         )}
-        {entries.length > 0 && contextEditorOpen && view !== "library" && view !== "management" && (
+        {entries.length > 0 && contextEditorOpen && section === "analysis" && "context" in destination && (
           <CohortScope
             entries={entries}
             scope={legacyScope}
@@ -446,7 +420,11 @@ export function App() {
           />
         )}
         {displayedCapabilityAvailability && <CapabilityBar availability={displayedCapabilityAvailability} onRepair={openCapabilityRepair} />}
-        {view === "home" && (
+        {destination.page === "workbench" && <WorkbenchView importing={importing} importTagsRaw={importTagsRaw} onImportFiles={importFiles} onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined} onMatches={() => navigate({ page: "matches" })} />}
+        {section === "matches" && <MatchesView page={destination.page} onMatches={() => navigate({ page: "matches" })} onEvents={() => navigate({ page: "events" })} />}
+        {section === "analysis" && <AnalysisView page={destination.page} onSelect={page => page === "personal-review" ? openPersonalReview() : navigate({ page, context: analysisContext })} />}
+        {destination.page === "materials" && <MaterialsView onLineups={() => goLineups()} onOpenMatch={openDemo} />}
+        {destination.page === "personal-review" && (
           <HomeView
             key={active.id}
             entries={scopedEntries}
@@ -455,40 +433,14 @@ export function App() {
             onOpenMatch={openDemo}
             onOpenEvidence={openEvidence}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
-            onGoPlayers={(player) => player ? openPlayer(player.playerKey, player.name) : setView("players")}
-            onGoLibrary={() => setView("library")}
+            onGoPlayers={(player) => player ? openPlayer(player.playerKey, player.name) : goPlayers()}
+            onGoLibrary={() => goLibrary()}
             contextSummary={summarizeAnalysisContext(analysisContext, entries, eventScopes)}
             identityOptions={identityOptions}
           />
         )}
-        {view === "library" && (
-          <LibraryView
-            key={active.id}
-            entries={entries}
-            importing={importing}
-            importTagsRaw={importTagsRaw}
-            onImportTagsChange={setImportTagsRaw}
-            onImportFiles={importFiles}
-            onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined}
-            onNotice={setNotice}
-            onLibraryChanged={() => { void refreshEntries().catch(() => {}); void refreshEventRecords().catch(() => {}); }}
-            onLoadBuiltin={loadBuiltinEvent}
-            onOpenDemo={openDemo}
-            onRemoveDemo={handleRemove}
-            onUpdateTags={handleUpdateTags}
-            onBulkUpdateTags={handleBulkUpdateTags}
-            onLinkRawDemo={nativeImportAvailable ? handleLinkRawDemo : undefined}
-            onWatchRawDemo={nativeImportAvailable ? (entry) => void watchRawDemo(entry.id) : undefined}
-            onReexportDemo={handleReexportDemo}
-            onReexportAll={handleReexportAll}
-            onReexportSelected={handleReexportSelected}
-            onRemoveMany={handleRemoveMany}
-            onRebuildFacts={handleRebuildFacts}
-            onRebuildStale={handleRebuildStale}
-            onRebuildSelected={handleRebuildSelected}
-          />
-        )}
-        {view === "match" && (
+        {destination.page === "matches" && libraryView}
+        {destination.page === "match" && (
           <MatchView
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
@@ -497,12 +449,12 @@ export function App() {
             deepLink={matchDeepLink}
             onSelectDemo={(id) => openDemo(id)}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
-            onGoLibrary={() => setView("library")}
+            onGoLibrary={() => goLibrary()}
             evidenceContinuation={evidenceContinuation}
             onReturnToSource={goBack}
           />
         )}
-        {view === "players" && (
+        {destination.page === "player" && (
           <PlayersView
             key={active.id}
             allEntries={entries}
@@ -516,10 +468,10 @@ export function App() {
             returnEvidenceKey={active.anchorKey}
             onPageReady={(keys) => onPageReady(active.id, keys)}
             identityOptions={identityOptions}
-            onGoLibrary={() => setView("library")}
+            onGoLibrary={() => goLibrary()}
           />
         )}
-        {view === "teams" && (
+        {destination.page === "team" && (
           <TeamView
             key={active.id}
             entries={scopedEntries}
@@ -530,21 +482,21 @@ export function App() {
             onOpenEvidence={openEvidence}
             returnEvidenceKey={active.anchorKey}
             onPageReady={(keys) => onPageReady(active.id, keys)}
-            onGoLibrary={() => setView("library")}
+            onGoLibrary={() => goLibrary()}
             identityOptions={identityOptions}
           />
         )}
-        {view === "trails" && (
+        {destination.page === "opening" && (
           <TrailsView
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
             entries={scopedEntries}
             identityOptions={identityOptions}
-            onGoLibrary={() => setView("library")}
+            onGoLibrary={() => goLibrary()}
           />
         )}
-        {view === "duel" && (
+        {destination.page === "duel" && (
           <DuelView
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
@@ -553,13 +505,13 @@ export function App() {
             selectedTeam={selectedTeam}
             onOpenMatch={openDemo}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
-            onGoLibrary={() => setView("library")}
+            onGoLibrary={() => goLibrary()}
             identityOptions={identityOptions}
             teamRenames={identityState.teamRenames}
             initialTab={analysisContext.goal === "personal-review" ? "records" : "opening"}
           />
         )}
-        {view === "utility" && (
+        {destination.page === "utility" && (
           <UtilityView
             key={active.id}
             allEntries={entries}
@@ -570,10 +522,10 @@ export function App() {
             onPageReady={(keys) => onPageReady(active.id, keys)}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             identityOptions={identityOptions}
-            onGoLibrary={() => setView("library")}
+            onGoLibrary={() => goLibrary()}
           />
         )}
-        {view === "lineups" && (
+        {destination.page === "lineups" && (
           <LineupsView
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
@@ -582,10 +534,10 @@ export function App() {
             entries={scopedEntries}
             onOpenMatch={openDemo}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
-            onGoLibrary={() => setView("library")}
+            onGoLibrary={() => goLibrary()}
           />
         )}
-        {view === "economy" && (
+        {destination.page === "economy" && (
           <EconomyView
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
@@ -593,10 +545,10 @@ export function App() {
             entries={scopedEntries}
             selectedTeam={selectedTeam}
             identityOptions={identityOptions}
-            onGoLibrary={() => setView("library")}
+            onGoLibrary={() => goLibrary()}
           />
         )}
-        {view === "coach" && (
+        {(destination.page === "patterns" || destination.page === "materials") && (
           <CoachView
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
@@ -604,13 +556,14 @@ export function App() {
             entries={scopedEntries}
             onOpenMatch={openDemo}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
-            onGoLibrary={() => setView("library")}
+            onGoLibrary={() => goLibrary()}
             teamRenames={identityState.teamRenames}
             analysisContext={analysisContext}
             onAnalysisContextChange={setAnalysisContext}
+            initialTab={destination.page === "materials" ? "playlist" : "patterns"}
           />
         )}
-        {view === "control" && (
+        {destination.page === "control" && (
           <RadarFieldView
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
@@ -620,7 +573,7 @@ export function App() {
             onSelectTeam={selectRadarTeam}
           />
         )}
-        {view === "events" && (eventMode === "overview" ? (
+        {(destination.page === "events" || destination.page === "event-analysis") && (eventMode === "overview" ? (
           <TournamentDashboardView
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
@@ -631,18 +584,26 @@ export function App() {
             onOpenMatch={openDemo}
             onOpenTeam={openTeam}
             onOpenPlayer={openPlayer}
-            onGoLibrary={() => setView("library")}
+            onGoLibrary={() => goLibrary()}
             onGoEconomy={() => navigate({ page: "economy", context: analysisContext })}
             onGoDirectory={() => navigate({ page: "events" })}
           />
         ) : (
           <EventsView
             key={active.id}
+            events={eventRecords}
+            series={seriesRecords}
+            eventsStatus={eventsStatus}
+            seriesStatus={seriesStatus}
+            onRetry={() => { void refreshEventRecords().catch(() => {}); }}
+            eventTools={<EventManager defaultOpen={false} entries={entries} onNotice={setNotice} onLibraryChanged={() => { void refreshEntries(); void refreshEventRecords(); }} onLoadBuiltin={loadBuiltinEvent} />}
+            state={active.ui as import("./lib/studio-page-state").EventsPageState}
+            onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
             onPageReady={(keys) => onPageReady(active.id, keys)}
             entries={entries}
             onOpenMatch={openDemo}
             onAnalyzeEvent={startEventAnalysis}
-            onGoLibrary={() => setView("library")}
+            onGoLibrary={() => goLibrary()}
             rivalHubConnection={rivalHubConnection}
             onConnectRivalHub={handleConnectRivalHub}
             onRevokeRivalHub={handleRevokeRivalHub}
@@ -650,10 +611,9 @@ export function App() {
             onImportOnlineFiles={importOnlineFiles}
             onPickOnlineFiles={nativeImportAvailable ? pickRivalHubFiles : undefined}
             onSyncLocalDemos={syncLocalRivalHubDemos}
-            refreshToken={rivalHubRefreshToken}
           />
         ))}
-        {view === "management" && (
+        {destination.page === "management" && (
           <ManagementView
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
@@ -662,10 +622,12 @@ export function App() {
             onIdentityChange={() => { void refreshIdentity(); }}
             identityOptions={identityOptions}
             teamRenames={identityState.teamRenames}
-            onGoLibrary={() => setView("library")}
+            onGoLibrary={() => goLibrary()}
             onNotice={setNotice}
             onLibraryChanged={() => { void refreshEntries().catch(() => {}); void refreshEventRecords().catch(() => {}); }}
-            initialTab={managementInitialTab === "library" ? "identity" : managementInitialTab}
+            tab={(active.ui as import("./lib/studio-page-state").StudioPageStateMap["management"]).tab}
+            onTabChange={tab => setNavigation(current => { if (current.active.destination.page !== "management") return current; return studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: { ...(current.active.ui as import("./lib/studio-page-state").StudioPageStateMap["management"]), tab } }); })}
+            library={libraryView}
           />
         )}
       </main>

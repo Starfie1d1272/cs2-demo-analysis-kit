@@ -12,7 +12,6 @@ type Options = { refreshEntries: () => Promise<StudioDemoEntry[]>; refreshEventR
 export function useRivalHubActions({ refreshEntries, refreshEventRecords, activity }: Options) {
   const { tryBegin, setNotice } = activity;
   const [rivalHubConnection, setRivalHubConnection] = useState<RivalHubConnectionState>({ baseUrl: "", pairingId: null, connectedAt: 0, lastSyncAt: null, status: "disconnected", error: null });
-  const [rivalHubRefreshToken, setRivalHubRefreshToken] = useState(0);
   const [batchSession, setBatchSession] = useState<RivalHubBatchSession | null>(null);
   const batchSessionRef = useRef(batchSession);
   const batchStopRequested = useRef(false);
@@ -38,7 +37,6 @@ export function useRivalHubActions({ refreshEntries, refreshEventRecords, activi
         batchSessionRef.current = applyConfirmation(batchSessionRef.current);
         setBatchSession(applyConfirmation);
       }
-      setRivalHubRefreshToken((current) => current + 1);
       if (announce) setNotice(`已刷新 RivalHub 赛事：${response.events.length} 个赛事`);
       return true;
     } catch (error) {
@@ -70,7 +68,6 @@ export function useRivalHubActions({ refreshEntries, refreshEventRecords, activi
     try {
       await revokeRivalHubPairing();
       setRivalHubConnection(await loadRivalHubConnection());
-      setRivalHubRefreshToken((current) => current + 1);
       setNotice("已断开 RivalHub，并撤销此设备的访问凭据");
     } catch (error) {
       const current = await loadRivalHubConnection().catch(() => rivalHubConnection);
@@ -191,5 +188,5 @@ export function useRivalHubActions({ refreshEntries, refreshEventRecords, activi
     batchSessionRef.current = next;
     setBatchSession(next);
   };
-  return { rivalHubConnection, rivalHubRefreshToken, batchSession, dismissBatch, updateLocalLink, refreshRivalHub, handleConnectRivalHub, handleRevokeRivalHub, importOnlineFiles, syncLocalRivalHubDemos, stopRivalHubBatch, pickRivalHubFiles, selectRivalHubBatchTarget };
+  return { rivalHubConnection, batchSession, dismissBatch, updateLocalLink, refreshRivalHub, handleConnectRivalHub, handleRevokeRivalHub, importOnlineFiles, syncLocalRivalHubDemos, stopRivalHubBatch, pickRivalHubFiles, selectRivalHubBatchTarget };
 }

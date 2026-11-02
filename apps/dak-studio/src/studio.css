@@ -2857,6 +2857,7 @@ td.stu-heat-cell.stu-heat-neutral {
 /* --- 模块子页签 --- */
 .stu-subtabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 12px;
   border-bottom: 1px solid var(--dak-border);

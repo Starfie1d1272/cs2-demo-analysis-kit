@@ -1,6 +1,6 @@
 import { createAnalysisContext, createAnalysisContextPreset, type AnalysisContext } from "./analysis-context.js";
 import type { LectureMaterialRef, MaterialRef } from "./material-ref.js";
-import type { StudioPageStateMap } from "./studio-page-state.js";
+import { emptyMatchesState, emptyEventsState, type StudioPageStateMap } from "./studio-page-state.js";
 
 export type StudioSection = "workbench" | "matches" | "analysis" | "materials" | "management";
 export type AnalysisPageId = "analysis" | "personal-review" | "player" | "team" | "event-analysis" | "duel" | "economy" | "utility" | "lineups" | "opening" | "control" | "patterns";
@@ -8,7 +8,7 @@ export type AnalysisDestination = { [P in AnalysisPageId]: { page: P; context: A
 export type StudioDestination =
   | { page: "workbench" } | { page: "matches" } | { page: "events"; eventId?: string }
   | { page: "match"; entryId: string; roundNumber?: number; tick?: number }
-  | AnalysisDestination | { page: "materials" } | { page: "material"; materialRef: MaterialRef }
+  | AnalysisDestination | { page: "materials"; context: AnalysisContext } | { page: "material"; materialRef: MaterialRef }
   | { page: "lecture"; materialRef: LectureMaterialRef }
   | { page: "management"; tab: "identity" | "assets" | "library" };
 export type StudioPageId = StudioDestination["page"];
@@ -27,7 +27,7 @@ export function defaultDestination(section: StudioSection): StudioDestination {
     case "workbench": return { page: "workbench" };
     case "matches": return { page: "matches" };
     case "analysis": return { page: "analysis", context: createAnalysisContextPreset("explore") };
-    case "materials": return { page: "materials" };
+    case "materials": return { page: "materials", context: createAnalysisContextPreset("explore") };
     case "management": return { page: "management", tab: "identity" };
   }
 }
@@ -37,7 +37,7 @@ function copyDestination(destination: StudioDestination): StudioDestination {
   return { ...destination };
 }
 function frame(id: string, destination: StudioDestination): StudioFrame {
-  return { id, destination: copyDestination(destination), ui: null, scrollY: 0 } as StudioFrame;
+  return { id, destination: copyDestination(destination), ui: destination.page === "matches" ? emptyMatchesState() : destination.page === "events" ? { ...emptyEventsState(), activeEventId: destination.eventId ?? null } : destination.page === "management" ? { tab: destination.tab, library: emptyMatchesState() } : null, scrollY: 0 } as StudioFrame;
 }
 export interface StudioNavigation {
   active: StudioFrame;
@@ -50,7 +50,7 @@ export type NavigationAction =
   | { intent: "resume"; id: string; section: StudioSection; scrollY: number }
   | { intent: "back"; id: string }
   | { intent: "context"; frameId: string; context: AnalysisContext }
-  | { intent: "ui"; frameId: string; ui: null }
+  | { intent: "ui"; frameId: string; ui: StudioPageStateMap[StudioPageId] }
   | { intent: "position"; frameId: string; scrollY: number; anchorKey?: string };
 export function createStudioNavigation(id: string): StudioNavigation {
   return { active: frame(id, defaultDestination("workbench")), history: [], resume: {} };

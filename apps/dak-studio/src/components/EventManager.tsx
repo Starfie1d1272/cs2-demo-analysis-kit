@@ -21,7 +21,9 @@ export function EventManager({
   onNotice,
   onLibraryChanged,
   onLoadBuiltin,
+  defaultOpen = true,
 }: {
+  defaultOpen?: boolean;
   entries: StudioDemoEntry[];
   onNotice: (message: string) => void;
   onLibraryChanged?: (entries: StudioDemoEntry[]) => void;
@@ -34,7 +36,7 @@ export function EventManager({
   const [busySlug, setBusySlug] = useState<string | null>(null);
   const cancelRequested = useRef(false);
   const nativeImport = supportsNativeEventImport();
-  useEffect(() => { void Promise.all([listEventRecords(), listSeriesRecords()]).then(([nextEvents, nextSeries]) => { setEvents(nextEvents); setSeries(nextSeries); }); }, []);
+  useEffect(() => { void Promise.all([listEventRecords(), listSeriesRecords()]).then(([nextEvents, nextSeries]) => { setEvents(nextEvents); setSeries(nextSeries); }).catch(error => onNotice(`读取赛事管理数据失败：${String(error)}`)); }, []);
   useEffect(() => { void loadEventsManifest().then(setManifest).catch(() => setManifest(null)); }, []);
   useEffect(() => { void loadBundledEventsManifest().then(setBundledManifest).catch(() => setBundledManifest(null)); }, []);
 
@@ -61,6 +63,8 @@ export function EventManager({
       await onLoadBuiltin(builtin);
       setEvents(await listEventRecords());
       setSeries(await listSeriesRecords());
+    } catch (error) {
+      onNotice(`读取赛事管理数据失败：${String(error)}`);
     } finally {
       setBusySlug(null);
     }
@@ -120,7 +124,7 @@ export function EventManager({
 
   return <>
   {/* 资料库的赛事包入口：下载、导入、移除都在数据生命周期内完成。 */}
-    <details className="stu-card" open>
+    <details className="stu-card" open={defaultOpen}>
       <summary><b>导入赛事资源包</b></summary>
       <p className="stu-muted">下载内置示例或在线赛事，或导入本地赛事资源包（含 event-package.json 与各图 ZIP）。导入后自动建立赛事、系列和地图关联。</p>
       <EventGallery
@@ -177,7 +181,7 @@ export function EventManager({
                   })()}
                   <button type="button" className="stu-button-sm" onClick={() => {
                     if (!window.confirm(`移除赛事「${event.name}」的组织记录？\n\ndemo 档案会保留在资料库，可重新建立赛事。`)) return;
-                    void deleteEventRecord(event).then(async () => { setEvents(await listEventRecords()); setSeries(await listSeriesRecords()); onNotice(`已移除赛事「${event.name}」（demo 保留）`); });
+                    void deleteEventRecord(event).then(async () => { setEvents(await listEventRecords()); setSeries(await listSeriesRecords()); onNotice(`已移除赛事「${event.name}」（demo 保留）`); }).catch(error => onNotice(`移除赛事或刷新失败，请检查目录：${String(error)}`));
                   }}>移除（保留 demo）</button>
                   {" "}
                   <button type="button" className="stu-button-sm stu-button-danger" onClick={() => {
@@ -190,7 +194,7 @@ export function EventManager({
                       setEvents(await listEventRecords());
                       setSeries(await listSeriesRecords());
                       onNotice(`已彻底删除赛事「${event.name}」及 ${entryIds.length} 场 demo`);
-                    });
+                    }).catch(error => onNotice(`删除赛事或刷新失败：${String(error)}`));
                   }}>删除赛事及 demo</button>
                 </td>
               </tr>

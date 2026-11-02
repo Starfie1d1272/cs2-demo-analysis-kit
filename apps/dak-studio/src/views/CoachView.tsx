@@ -30,6 +30,7 @@ import type { AnalysisContext, AnalysisRoleRef } from "../lib/analysis-context";
 type CoachTab = "patterns" | "playlist" | "anti";
 
 export interface CoachViewProps {
+  initialTab?: CoachTab;
   onPageReady?: (keys: string[]) => void;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
@@ -63,8 +64,9 @@ export function CoachView({
   analysisContext,
   onAnalysisContextChange,
   onPageReady,
+  initialTab = "patterns",
 }: CoachViewProps) {
-  const [tab, setTab] = useState<CoachTab>("patterns");
+  const [tab, setTab] = useState<CoachTab>(initialTab);
   const [allFacts, setAllFacts] = useState<TacticalRoundFact[]>([]);
   const [factsGeneration, setFactsGeneration] = useState(-1);
   const [hasValidFacts, setHasValidFacts] = useState(false);
@@ -177,18 +179,6 @@ export function CoachView({
     [tab, clusters, subjectTeam],
   );
 
-  if (allEntries.length === 0) {
-    return (
-      <div className="stu-view">
-        <EmptyState
-          mark
-          title="还没有教练数据"
-          hint="先导入多场 demo，再整理战术模式、备战材料和报告。"
-          action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="stu-view stu-coach-view">
@@ -252,7 +242,7 @@ export function CoachView({
       </div>
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {settingsError && <EmptyState variant="error" title="读取教练资料失败" hint={settingsError} />}
-      {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
+      {!error && entries.length === 0 && tab !== "playlist" && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
       {!error && loading && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的开局 pattern…</div>}
       {!error && !loading && clusters.length === 0 && entries.length > 0 && hasValidFacts && (
         <EmptyState
