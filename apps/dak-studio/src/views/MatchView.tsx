@@ -51,13 +51,13 @@ function cacheModel(id: string, model: MatchWorkspaceModel): void {
   }
 }
 
-async function loadModel(id: string, generation: number): Promise<MatchWorkspaceModel> {
+async function loadModel(entry: StudioDemoEntry, generation: number): Promise<MatchWorkspaceModel> {
   assertAnalysisGeneration(generation);
-  const key = `${generation}:${id}`;
+  const key = `${generation}:${entry.id}:${entry.sourceRevision ?? ""}`;
   for (const old of modelCache.keys()) if (!old.startsWith(`${generation}:`)) modelCache.delete(old);
   const cached = modelCache.get(key);
   if (cached) return cached;
-  const model = await loadMatchWorkspaceModel(id);
+  const model = await loadMatchWorkspaceModel(entry.id);
   assertAnalysisGeneration(generation);
   cacheModel(key, model);
   return model;
@@ -141,7 +141,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     if (!activeId || !activeEntry || analysis.status !== "ready") return;
     setShowQa(false);
     for (const key of modelCache.keys()) if (!key.startsWith(`${analysis.generation}:`)) modelCache.delete(key);
-    const cached = modelCache.get(`${analysis.generation}:${activeId}`);
+    const cached = modelCache.get(`${analysis.generation}:${activeId}:${activeEntry.sourceRevision ?? ""}`);
     if (cached) {
       setLoaded(prev => ({ id: activeId, generation: analysis.generation, model: cached, state: prev?.id === activeId ? prev.state : workspaceState ? snapshotMatchWorkspaceState(workspaceState) : createMatchWorkspaceState(cached) }));
       setError(null);
@@ -149,11 +149,11 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     }
     let cancelled = false;
     setError(null);
-    loadModel(activeId, analysis.generation)
+    loadModel(activeEntry, analysis.generation)
       .then((built) => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setLoaded(prev => ({ id: activeId, generation: analysis.generation, model: built, state: prev?.id === activeId ? prev.state : workspaceState ? snapshotMatchWorkspaceState(workspaceState) : createMatchWorkspaceState(built) })); } })
       .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); });
     return () => { cancelled = true; };
-  }, [activeId, Boolean(activeEntry), analysis.generation, analysis.status]);
+  }, [activeId, activeEntry?.sourceRevision, analysis.generation, analysis.status]);
 
   useEffect(() => {
     if (pinned === null || !loaded || loaded.id !== activeId || !mayApplyPinned.current) return;
@@ -195,7 +195,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     if (!summaryMode || !activeSeries || seriesEntries.length === 0 || analysis.status !== "ready") return;
     let cancelled = false;
     setSummary(null);
-    Promise.all(seriesEntries.map(async (entry) => ({ matchId: matchIdForEntry(entry), model: await loadModel(entry.id, analysis.generation) })))
+    Promise.all(seriesEntries.map(async (entry) => ({ matchId: matchIdForEntry(entry), model: await loadModel(entry, analysis.generation) })))
       .then((matches) => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setSummary(buildSeriesSummary(matches)); setSummaryGeneration(analysis.generation); } })
       .catch(() => { if (!cancelled) setSummary(null); });
     return () => { cancelled = true; };
