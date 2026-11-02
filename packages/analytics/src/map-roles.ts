@@ -119,7 +119,7 @@ function alignment(declaration: MainRoleDeclaration, inferred: InferredMapRole |
   } as const;
 }
 
-export interface BuildPlayerMapRoleProfilesOptions { matchTimes?: Record<string, string | null> }
+export interface BuildPlayerMapRoleProfilesOptions { matchTimes?: Record<string, string | null>; aggregatedEvidence?: PlayerMapRoleEvidence[] }
 
 function infer(rows: PlayerMapRoleEvidence[]) {
   const weaponDuty = globalWeaponDuty(rows);
@@ -152,7 +152,8 @@ export function buildPlayerMapRoleProfiles(evidenceRows: PlayerMapRoleEvidence[]
       .filter((item) => item.scope.relevant);
     const declaredRoles = scopedDeclarations.filter((item): item is { declaration: MainRoleDeclaration; scope: ScopedEvidence } => item.declaration.kind === "main_role").map((item) => item.declaration);
     const declaredWeaponDuties = scopedDeclarations.filter((item): item is { declaration: WeaponDutyDeclaration; scope: ScopedEvidence } => item.declaration.kind === "weapon_duty").map((item) => item.declaration);
-    const automatic = infer(rows);
+    const displayRows = options.aggregatedEvidence?.filter((row) => row.playerKey === playerKey && row.teamKey === teamKey) ?? rows;
+    const automatic = infer(displayRows);
     const { weaponDuty, roleEvidenceScores, winner, runnerUp, margin, sufficient, status, inferredPrimaryRole } = automatic;
     const declaredIgl = scopedDeclarations.some((item) => item.declaration.kind === "main_role" && item.declaration.priority === "primary" && item.declaration.role === "igl" && item.declaration.mapName == null && item.declaration.validFrom == null && item.declaration.validTo == null);
     const headlineRole = declaredIgl ? inferredPrimaryRole === "awper" ? "IGL / AWPer" : "IGL" : inferredPrimaryRole;
@@ -177,9 +178,9 @@ export function buildPlayerMapRoleProfiles(evidenceRows: PlayerMapRoleEvidence[]
       declaredRoles, declaredWeaponDuties,
       inferredPrimaryRole, runnerUpRole: sufficient ? runnerUp : null, separationMargin: sufficient ? margin : null, roleEvidenceScores,
       headlineRole, status, confidence, weaponDuty,
-      positionGroupDisplay: rows.flatMap((row) => row.positionGroups.map((group) => ({ mapName: row.mapName, side: row.side, positionGroupId: group.positionGroupId, ...positionGroupDisplay(row.mapName, row.side, group.positionGroupId) }))),
+      positionGroupDisplay: displayRows.flatMap((row) => row.positionGroups.map((group) => ({ mapName: row.mapName, side: row.side, positionGroupId: group.positionGroupId, ...positionGroupDisplay(row.mapName, row.side, group.positionGroupId) }))),
       roleAlignments, weaponDutyAlignments,
-      perMapEvidence: rows.sort((a, b) => a.teamKey.localeCompare(b.teamKey) || a.mapName.localeCompare(b.mapName) || a.side.localeCompare(b.side)),
+      perMapEvidence: [...displayRows].sort((a, b) => a.teamKey.localeCompare(b.teamKey) || a.mapName.localeCompare(b.mapName) || a.side.localeCompare(b.side)),
       evidence: evidence(rows),
       basis: [`${MAP_ROLE_MODEL_VERSION}：headline 直接由连续 evidence 计算，不重复叠加离散职责标签。`, "倾向分不是概率；人工声明与自动观察独立保存。"],
       limitations: ["IGL 无法由 demo 统计验证。", ...[...new Set(scopedDeclarations.flatMap((item) => item.scope.limitations))]],

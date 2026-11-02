@@ -64,7 +64,7 @@ export async function getPlayerMapRoleProfiles(
   selectedTeams: string[] = [],
 ): Promise<PlayerMapRoleProfile[]> {
   const evidence = await getMapRoleEvidence(entries, identity, selectedTeams);
-  return buildPlayerMapRoleProfiles(evidence.playerEvidence, declarations, { matchTimes: Object.fromEntries(entries.map((entry) => {
+  return buildPlayerMapRoleProfiles(evidence.playerEvidence, declarations, { aggregatedEvidence: evidence.teamEvidence.flatMap(row => row.players), matchTimes: Object.fromEntries(entries.map((entry) => {
     const date = entryDate(entry);
     return [matchIdForEntry(entry), date ? `${date}T00:00:00.000Z` : null];
   })) });
@@ -77,7 +77,7 @@ export async function getTeamMapRoleMatrices(
   selectedTeams: string[] = [],
 ): Promise<TeamMapRoleMatrix[]> {
   const evidence = await getMapRoleEvidence(entries, identity, selectedTeams);
-  return buildTeamMapRoleMatrices(evidence.teamEvidence, buildPlayerMapRoleProfiles(evidence.playerEvidence, declarations, { matchTimes: Object.fromEntries(entries.map((entry) => {
+  return buildTeamMapRoleMatrices(evidence.teamEvidence, buildPlayerMapRoleProfiles(evidence.playerEvidence, declarations, { aggregatedEvidence: evidence.teamEvidence.flatMap(row => row.players), matchTimes: Object.fromEntries(entries.map((entry) => {
     const date = entryDate(entry);
     return [matchIdForEntry(entry), date ? `${date}T00:00:00.000Z` : null];
   })) }));
