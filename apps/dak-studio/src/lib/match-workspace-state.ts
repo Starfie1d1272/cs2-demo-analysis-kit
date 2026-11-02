@@ -1,3 +1,4 @@
+import { matchesQuickRound, type QuickRoundFilter } from "./match-review";
 import { createReplayViewState, normalizeReplayViewState, type MatchWorkspaceModel, type ReplayViewState } from "@cs2dak/presentation";
 type RoundModel = MatchWorkspaceModel["rounds"][number];
 export interface MatchRoundFilterState {
@@ -47,19 +48,23 @@ export function roundMatchesFilter(round: RoundModel, filter: MatchRoundFilterSt
 export interface MatchWorkspaceState {
   view: "overview" | "rounds" | "players" | "economy" | "weapons" | "duels" | "map" | "replay";
   playerPanelSteamId64: string | null;
+  reviewPlayerSteamId64: string | null;
+  quickRoundFilter: QuickRoundFilter;
   roundExplorer: { filter: MatchRoundFilterState; selectedRoundNumber: number | null; showAllEvents: boolean };
   mapLayer: "death" | "kill" | "grenade";
   replay: ReplayViewState | null;
 }
 export function createMatchWorkspaceState(model: MatchWorkspaceModel): MatchWorkspaceState {
-  return normalizeMatchWorkspaceState(model, { view: "overview", playerPanelSteamId64: null, roundExplorer: { filter: { ...ROUND_FILTER_DEFAULT, special: { ...ROUND_FILTER_DEFAULT.special } }, selectedRoundNumber: null, showAllEvents: false }, mapLayer: "death", replay: createReplayViewState(model.replay, model.map.view) });
+  return normalizeMatchWorkspaceState(model, { view: "overview", playerPanelSteamId64: null, reviewPlayerSteamId64: null, quickRoundFilter: "all", roundExplorer: { filter: { ...ROUND_FILTER_DEFAULT, special: { ...ROUND_FILTER_DEFAULT.special } }, selectedRoundNumber: null, showAllEvents: false }, mapLayer: "death", replay: createReplayViewState(model.replay, model.map.view) });
 }
 export function normalizeMatchWorkspaceState(model: MatchWorkspaceModel, state: MatchWorkspaceState): MatchWorkspaceState {
-  const rounds = model.rounds.filter(r => roundMatchesFilter(r, state.roundExplorer.filter));
+  const reviewPlayerSteamId64 = model.players.some(p => p.row.steamId64 === state.reviewPlayerSteamId64) ? state.reviewPlayerSteamId64 : null;
+  const quickRoundFilter = !reviewPlayerSteamId64 && (state.quickRoundFilter === "first-death" || state.quickRoundFilter === "utility") ? "all" : state.quickRoundFilter ?? "all";
+  const rounds = model.rounds.filter(r => roundMatchesFilter(r, state.roundExplorer.filter) && matchesQuickRound(r, quickRoundFilter, reviewPlayerSteamId64));
   const selectedRoundNumber = rounds.some(r => r.roundNumber === state.roundExplorer.selectedRoundNumber) ? state.roundExplorer.selectedRoundNumber : rounds[0]?.roundNumber ?? null;
   const layers = model.map.modes.filter(m => m.key === "death" || m.key === "kill" || m.key === "grenade");
   const mapLayer = layers.some(m => m.key === state.mapLayer) ? state.mapLayer : (layers[0]?.key as MatchWorkspaceState["mapLayer"] | undefined) ?? "death";
-  return { ...state, playerPanelSteamId64: model.players.some(p => p.row.steamId64 === state.playerPanelSteamId64) ? state.playerPanelSteamId64 : model.players[0]?.row.steamId64 ?? null, roundExplorer: { ...state.roundExplorer, selectedRoundNumber }, mapLayer, replay: normalizeReplayViewState(model.replay, model.map.view, state.replay) };
+  return { ...state, reviewPlayerSteamId64, quickRoundFilter, playerPanelSteamId64: model.players.some(p => p.row.steamId64 === state.playerPanelSteamId64) ? state.playerPanelSteamId64 : model.players[0]?.row.steamId64 ?? null, roundExplorer: { ...state.roundExplorer, selectedRoundNumber }, mapLayer, replay: normalizeReplayViewState(model.replay, model.map.view, state.replay) };
 }
 export function snapshotMatchWorkspaceState(state: MatchWorkspaceState): MatchWorkspaceState {
   return { ...state, roundExplorer: { ...state.roundExplorer, filter: { ...state.roundExplorer.filter, special: { ...state.roundExplorer.filter.special } } }, replay: state.replay ? { ...state.replay, layers: { ...state.replay.layers }, playing: false } : null };

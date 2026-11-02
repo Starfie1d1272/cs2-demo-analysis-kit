@@ -1,3 +1,4 @@
+import { listCoachPlaybook, getCoachPlaybook, type CoachPlaybookItem } from "./coach-playbook";
 import type { MaterialRef } from "./material-ref";
 import { getStudyNote, listStudyNotes } from "./study-notes";
 import { listTrainingFocus } from "./training-focus";
@@ -9,8 +10,8 @@ import { matchIdForEntry } from "./demo-entry";
 import { FACTS_REVISION } from "./analysis-manifest";
 
 export type MaterialSourceStatus = "no-evidence" | "exact" | "version-changed" | "missing" | "conflict" | "unverified";
-export interface MaterialSummary { ref: MaterialRef; title: string; kindLabel: string; mapName: string | null; summary: string; updatedAt: number | null; sourceStatus: MaterialSourceStatus }
-export type MaterialKind = "study-note" | "training-focus" | "prep-item" | "practice-lineup";
+export interface MaterialSummary { ref: MaterialRef; title: string; kindLabel: string; mapName: string | null; summary: string; updatedAt: number | null; sourceStatus: MaterialSourceStatus; side?: CoachPlaybookItem["side"]; playKind?: CoachPlaybookItem["kind"] }
+export type MaterialKind = "playbook" | "study-note" | "training-focus" | "prep-item" | "practice-lineup";
 export const materialKey = (ref: MaterialRef): string => `${ref.kind}:${ref.id}`;
 export const sortMaterials = (rows: MaterialSummary[]) => rows.sort((a,b) => (b.updatedAt ?? -Infinity) - (a.updatedAt ?? -Infinity) || materialKey(a.ref).localeCompare(materialKey(b.ref)));
 function noteStatus(evidence: SavedEvidenceRef[], entries: StudioDemoEntry[]): MaterialSourceStatus {
@@ -21,6 +22,7 @@ function noteStatus(evidence: SavedEvidenceRef[], entries: StudioDemoEntry[]): M
 export async function listStudyMaterialsKind(kind: MaterialKind, entries: StudioDemoEntry[]): Promise<{ rows: MaterialSummary[]; unreadable: number }> {
   let rows: MaterialSummary[];
   switch (kind) {
+    case "playbook": { const result = await listCoachPlaybook(); rows = result.items.map(n => ({ ref: { kind, id: n.id }, title: n.title, kindLabel: `战术 · ${n.side.toUpperCase()} · ${n.kind}`, side: n.side, playKind: n.kind, mapName: n.mapName, summary: n.body, updatedAt: n.updatedAt, sourceStatus: noteStatus(n.evidence, entries) })); return { rows: sortMaterials(rows), unreadable: result.unreadable }; }
     case "study-note": { const result = await listStudyNotes(); rows = result.notes.map(n => ({ ref: { kind, id: n.id }, title: n.title, kindLabel: "笔记", mapName: n.evidence[0]?.source.mapName ?? null, summary: n.body, updatedAt: n.updatedAt, sourceStatus: noteStatus(n.evidence, entries) })); return { rows: sortMaterials(rows), unreadable: result.unreadable }; }
     case "training-focus": rows = (await listTrainingFocus()).map(n => ({ ref: { kind, id: n.id }, title: n.finding.title, kindLabel: "训练重点", mapName: null, summary: n.note || n.finding.statement, updatedAt: n.updatedAt, sourceStatus: !n.evidence.length ? "no-evidence" : n.evidence.some(e => !entries.some(entry => matchIdForEntry(entry) === e.matchId)) ? "missing" : "unverified" })); break;
     case "prep-item": rows = (await listPrepItems()).map(n => ({ ref: { kind, id: n.id }, title: n.group, kindLabel: "备战条目", mapName: n.mapName ?? null, summary: n.note, updatedAt: n.addedAt ?? null, sourceStatus: entries.some(entry => matchIdForEntry(entry) === n.matchId) ? "unverified" : "missing" })); break;
@@ -29,7 +31,7 @@ export async function listStudyMaterialsKind(kind: MaterialKind, entries: Studio
   return { rows: sortMaterials(rows), unreadable: 0 };
 }
 export async function listStudyMaterials(entries: StudioDemoEntry[], includePrep = true) {
-  const kinds: MaterialKind[] = ["study-note", "training-focus", ...(includePrep ? ["prep-item" as const] : []), "practice-lineup"];
+  const kinds: MaterialKind[] = ["playbook", "study-note", "training-focus", ...(includePrep ? ["prep-item" as const] : []), "practice-lineup"];
   const results = await Promise.allSettled(kinds.map(kind => listStudyMaterialsKind(kind, entries)));
   const rows: MaterialSummary[] = []; const errors: Partial<Record<MaterialKind, string>> = {}; let unreadable = 0;
   results.forEach((result, index) => { if (result.status === "fulfilled") { rows.push(...result.value.rows); unreadable += result.value.unreadable; } else errors[kinds[index]] = String(result.reason); });
@@ -39,6 +41,7 @@ export async function listStudyMaterials(entries: StudioDemoEntry[], includePrep
 /** Resolve one reference against its owning store without loading match data. */
 export async function resolveStudyMaterial(ref: MaterialRef, entries: StudioDemoEntry[]): Promise<MaterialSummary | null> {
   switch (ref.kind) {
+    case "playbook": { const n = await getCoachPlaybook(ref.id); return n ? { ref: { ...ref }, title: n.title, kindLabel: `战术 · ${n.side.toUpperCase()} · ${n.kind}`, side: n.side, playKind: n.kind, mapName: n.mapName, summary: n.body, updatedAt: n.updatedAt, sourceStatus: noteStatus(n.evidence, entries) } : null; }
     case "study-note": {
       const n = await getStudyNote(ref.id);
       return n ? { ref: { ...ref }, title: n.title, kindLabel: "笔记", mapName: n.evidence[0]?.source.mapName ?? null, summary: n.body, updatedAt: n.updatedAt, sourceStatus: noteStatus(n.evidence, entries) } : null;

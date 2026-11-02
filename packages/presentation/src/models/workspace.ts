@@ -47,6 +47,7 @@ export const workspaceRoundFacetsSchema = z.object({
     won: z.boolean(),
     tick: z.number().int().positive()
   }).nullable(),
+  utilityThrowerSteamIds: z.array(z.string()).optional(),
   /** 单人单回合最高击杀数（≥3 即多杀回合）。 */
   maxKillsByOnePlayer: z.number().int().nonnegative(),
   wallbangKills: z.number().int().nonnegative(),

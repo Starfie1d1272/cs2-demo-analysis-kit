@@ -6,6 +6,12 @@ export interface StudioSourceRef { entryId: string; matchId: string; fileName: s
 export interface SavedEvidenceRef { id: string; source: StudioSourceRef; evidence: EvidenceRef; capturedAt: number }
 export interface SavedEvidenceResolution { status: "exact" | "version-changed" | "missing" | "conflict" | "unverified"; currentEntryId: string | null; canOpenCurrent: boolean; reason: string; uniqueRelinkCandidate: StudioSourceRef | null }
 
+export function isValidSavedEvidence(value: unknown): value is SavedEvidenceRef {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Partial<SavedEvidenceRef>;
+  return typeof v.id === "string" && typeof v.capturedAt === "number" && Number.isFinite(v.capturedAt) && !!v.source && typeof v.source.entryId === "string" && typeof v.source.matchId === "string" && typeof v.source.fileName === "string" && typeof v.source.mapName === "string" && (v.source.demoSha256 === null || typeof v.source.demoSha256 === "string") && (v.source.builtWith === null || typeof v.source.builtWith === "object") && !!v.evidence && typeof v.evidence.matchId === "string" && Number.isInteger(v.evidence.roundNumber) && v.evidence.roundNumber > 0 && typeof v.evidence.reason === "string";
+}
+
 export function sourceRefForEntry(entry: StudioDemoEntry): StudioSourceRef {
   return { entryId: entry.id, matchId: matchIdForEntry(entry), fileName: entry.fileName, mapName: entry.meta.mapName, demoSha256: entry.demoSha256?.toLowerCase() ?? null, builtWith: entry.builtWith ? { ...entry.builtWith } : null };
 }

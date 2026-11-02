@@ -1,7 +1,8 @@
+import { readPinnedPlayer } from "../lib/pin";
 import { usePageReady } from "../lib/use-page-ready";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { buildSeriesSummary } from "@cs2dak/analytics";
 import type { MatchWorkspaceModel, SeriesSummary } from "@cs2dak/presentation";
 import { QaReportPanel } from "@cs2dak/react";
@@ -20,6 +21,7 @@ import type { EvidenceSession } from "../lib/evidence-continuation";
 export interface MatchViewProps {
   onPageReady?: (keys: string[]) => void;
   openStudyNoteEditor: (draft: StudyNoteDraft) => void;
+  onAnalyzePlayer: (steamId: string, label: string) => void;
   onOpened?: (target: { roundNumber?: number; tick?: number }) => void;
   onReplayPaused?: (target: { roundNumber: number; tick: number }) => void;
   entries: StudioDemoEntry[];
@@ -60,13 +62,22 @@ async function loadModel(id: string, generation: number): Promise<MatchWorkspace
   return model;
 }
 
-export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceSession, onMoveEvidence, workspaceState, onWorkspaceStateChange, onReturnToSource, onPageReady, onOpened, onReplayPaused, openStudyNoteEditor }: MatchViewProps) {
+export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceSession, onMoveEvidence, workspaceState, onWorkspaceStateChange, onReturnToSource, onPageReady, onOpened, onReplayPaused, openStudyNoteEditor, onAnalyzePlayer }: MatchViewProps) {
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   useEffect(() => subscribeAnalysisDataInvalidation(() => { if (getAnalysisDataSnapshot().status !== "ready") modelCache.clear(); }), []);
   const activeId = demoId;
   const activeEntry = activeId ? entries.find((entry) => entry.id === activeId) ?? null : null;
   const [loaded, setLoaded] = useState<{ id: string; generation: number; model: MatchWorkspaceModel; state: MatchWorkspaceState } | null>(null);
   const model = loaded?.id === activeId && loaded.generation === analysis.generation && analysis.status === "ready" ? loaded.model : null;
+  const [pinned, setPinned] = useState<string[] | null>(null);
+  const [pinnedError, setPinnedError] = useState(false);
+  const mayApplyPinned = useRef(!workspaceState);
+  useEffect(() => {
+    let active = true;
+    void readPinnedPlayer().then(p => { if (active) setPinned(p?.steamIds ?? []); })
+      .catch(() => { if (active) { setPinned([]); setPinnedError(true); } });
+    return () => { active = false; };
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [showQa, setShowQa] = useState(false);
   const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
@@ -142,6 +153,14 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     return () => { cancelled = true; };
   }, [activeId, Boolean(activeEntry), analysis.generation, analysis.status]);
 
+  useEffect(() => {
+    if (pinned === null || !loaded || loaded.id !== activeId || !mayApplyPinned.current) return;
+    mayApplyPinned.current = false;
+    const matches = loaded.model.players.filter(player => pinned.includes(player.row.steamId64));
+    if (matches.length === 1) setLoaded(prev => prev && prev.id === activeId
+      ? { ...prev, state: { ...prev.state, reviewPlayerSteamId64: matches[0].row.steamId64 } } : prev);
+  }, [pinned, loaded?.id, activeId]);
+
   useLayoutEffect(() => {
     if (!deepLink || !loaded || loaded.id !== activeId) return;
     if (evidenceSession && (!activeEntry || matchIdForEntry(activeEntry) !== evidenceSession.queue[evidenceSession.activeIndex].evidence.matchId)) return;
@@ -152,7 +171,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
       if (!prev || prev.id !== activeId) return prev;
       const state = round && prev.state.replay
         ? { ...prev.state, view: "replay" as const, replay: normalizeReplayViewState(prev.model.replay, prev.model.map.view, { ...prev.state.replay, roundNumber: round.roundNumber, tick: deepLink.tick ?? round.freezeEndTick, playing: false }) }
-        : { ...prev.state, view: "rounds" as const, roundExplorer: { ...prev.state.roundExplorer, filter: { ...ROUND_FILTER_DEFAULT, special: { ...ROUND_FILTER_DEFAULT.special } }, selectedRoundNumber: detail.roundNumber } };
+        : { ...prev.state, view: "rounds" as const, quickRoundFilter: "all" as const, roundExplorer: { ...prev.state.roundExplorer, filter: { ...ROUND_FILTER_DEFAULT, special: { ...ROUND_FILTER_DEFAULT.special } }, selectedRoundNumber: detail.roundNumber } };
       return { ...prev, state };
     });
   }, [deepLink, activeId, loaded?.id, evidenceSession?.activeIndex]);
@@ -203,10 +222,11 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     ? <EmptyState variant="error" title="加载失败" hint={error} />
     : !model
       ? <div className="stu-loading">读取本地持久化工作台…</div>
-      : <MatchReviewWorkspace model={model} state={loaded!.state} onStateChange={(state) => { if (loaded?.state.replay?.playing && state.replay && !state.replay.playing) onReplayPaused?.({ roundNumber: state.replay.roundNumber, tick: state.replay.tick }); setLoaded(prev => prev && prev.id === activeId ? { ...prev, state } : prev); }} />;
+      : <MatchReviewWorkspace model={model} onReviewChoice={() => { mayApplyPinned.current = false; }} onAnalyzePlayer={onAnalyzePlayer} pinnedIds={pinned ?? []} onNote={(roundNumber) => { if (activeEntry) openStudyNoteEditor({ title: `${activeEntry.meta.teamAName} vs ${activeEntry.meta.teamBName} · R${roundNumber}`, body: "", purpose: "review", playerKey: null, evidence: [captureSavedEvidence(activeEntry, { matchId: matchIdForEntry(activeEntry), roundNumber, reason: "比赛回合笔记" })] }); }} state={loaded!.state} onStateChange={(state) => { if (loaded?.state.replay?.playing && state.replay && !state.replay.playing) onReplayPaused?.({ roundNumber: state.replay.roundNumber, tick: state.replay.tick }); setLoaded(prev => prev && prev.id === activeId ? { ...prev, state } : prev); }} />;
 
   return (
     <div className="stu-view stu-view-flush">
+      {pinnedError && <p className="stu-error" role="status">无法读取关注选手，可继续手动选择选手。</p>}
       {seriesError && <p className="stu-error" role="alert">读取系列赛失败：{seriesError}</p>}
       <div className="stu-context-bar">
         <span className="stu-context-label">当前比赛</span>
@@ -236,10 +256,6 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
             进游戏
           </button>
         )}
-        {activeEntry && loaded?.id === activeId && loaded.state.roundExplorer.selectedRoundNumber !== null && <button type="button" className="stu-button-sm" onClick={() => {
-          const roundNumber = loaded.state.view === "replay" && loaded.state.replay ? loaded.state.replay.roundNumber : loaded.state.roundExplorer.selectedRoundNumber!;
-          openStudyNoteEditor({ title: `回合 ${roundNumber}`, body: "", purpose: "review", playerKey: null, evidence: [captureSavedEvidence(activeEntry, { matchId: matchIdForEntry(activeEntry), roundNumber, reason: "比赛回合笔记" })] });
-        }}>记一笔</button>}
         {model && (
           <button
             type="button"
