@@ -30,11 +30,12 @@ export function CapabilityBar({ availability, onRepair }: { availability: Capabi
   </div>;
 }
 
-export function useCapability(entries: StudioDemoEntry[], capability: StudioCapability, openingScope?: { playerKeys: string[]; steamIds: string[] }) {
+export function useCapability(entries: StudioDemoEntry[], capability: StudioCapability, playerScope?: { playerKeys: string[]; steamIds: string[] }) {
   const [result, setResult] = useState<{ key: string; generation: number; availability: CapabilityAvailability } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retryVersion, setRetryVersion] = useState(0);
   const data = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
-  const key = JSON.stringify([capability, entries.map(entry => entry.id), openingScope]);
+  const key = JSON.stringify([capability, entries.map(entry => entry.id), playerScope]);
   const current = result?.key === key ? result.availability : null;
   const eligible = useMemo(() => {
     const excluded = new Set(current?.excluded.flatMap(item => item.entryIds) ?? []);
@@ -44,17 +45,17 @@ export function useCapability(entries: StudioDemoEntry[], capability: StudioCapa
     let cancelled = false;
     if (data.status === "ready") {
       setError(null);
-      void loadCapabilityAvailabilityInputs(entries, undefined, undefined, undefined, openingScope)
+      void loadCapabilityAvailabilityInputs(entries, capability, undefined, undefined, undefined, playerScope)
         .then(inputs => { if (!cancelled && getAnalysisDataSnapshot().generation === data.generation && getAnalysisDataSnapshot().status === "ready") setResult({ key, generation: data.generation, availability: deriveCapabilityAvailability(entries, capability, inputs) }); })
         .catch(reason => { if (!cancelled) setError(reason instanceof Error ? reason.message : String(reason)); });
     }
     return () => { cancelled = true; };
-  }, [entries, capability, data, key]);
-  return { availability: current, eligible, error, stale: !!current && (data.status !== "ready" || result?.generation !== data.generation || !!error) };
+  }, [entries, capability, data, key, retryVersion]);
+  return { availability: current, eligible, error, retry: () => setRetryVersion(version => version + 1), stale: !!current && (data.status !== "ready" || result?.generation !== data.generation || !!error) };
 }
 
 export function CapabilityPanel({ entries, capability, onRepair, children }: { entries: StudioDemoEntry[]; capability: StudioCapability; onRepair: (action: CapabilityRepairAction) => void; children: (eligible: StudioDemoEntry[]) => ReactNode }) {
-  const { availability, eligible, error, stale } = useCapability(entries, capability);
-  if (!availability || !eligible) return error ? <div role="alert">读取可用性失败：{error}</div> : <div className="stu-loading">读取分析数据可用性…</div>;
-  return <><CapabilityBar availability={availability} onRepair={onRepair} />{stale && <p className="stu-muted" role="status">{error ? "可用性更新失败，显示旧版本。" : "正在更新可用性。"}</p>}{children(eligible)}</>;
+  const { availability, eligible, error, stale, retry } = useCapability(entries, capability);
+  if (!availability || !eligible) return error ? <div role="alert">读取可用性失败：{error} <button type="button" className="stu-button-sm" onClick={retry}>重试</button></div> : <div className="stu-loading">读取分析数据可用性…</div>;
+  return <><CapabilityBar availability={availability} onRepair={onRepair} />{stale && <p className="stu-muted" role="status">{error ? <>可用性更新失败，显示旧版本。 <button type="button" className="stu-button-sm" onClick={retry}>重试</button></> : "正在更新可用性。"}</p>}{children(eligible)}</>;
 }

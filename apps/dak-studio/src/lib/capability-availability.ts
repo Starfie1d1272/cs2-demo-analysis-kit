@@ -14,13 +14,15 @@ export type StudioCapability =
   | "opening"
   | "control"
   | "tactical"
-  | "map-role";
+  | "map-role"
+  | "player-map-pool"
+  | "team-awp";
 
 export type CapabilityStatus = "ready" | "partial" | "unavailable";
 export type CapabilityOutputLevel = "observation" | "system-finding";
 export type CapabilityRepairAction = "rebuild-facts" | "reimport-with-replay" | "reimport-with-shots" | "install-tri";
 
-type FactKind = "opening" | "insights" | "duel" | "economy" | "utility" | "lineup" | "tactical" | "map-intelligence";
+type FactKind = "player-map-pool" | "team-awp" | "opening" | "insights" | "duel" | "economy" | "utility" | "lineup" | "tactical" | "map-intelligence";
 
 export interface EntryCapabilityFacts {
   facts: Partial<Record<FactKind, boolean>>;
@@ -71,6 +73,8 @@ const REQUIREMENTS: Record<StudioCapability, CapabilityRequirement> = {
   control: { requiredDependencies: ["replay"], optionalDependencies: ["tri"], outputLevel: "observation" },
   tactical: { requiredFacts: ["tactical", "map-intelligence"], optionalDependencies: ["replay"], outputLevel: "system-finding" },
   "map-role": { requiredFacts: ["map-intelligence"], outputLevel: "observation" },
+  "player-map-pool": { requiredFacts: ["player-map-pool"], outputLevel: "observation" },
+  "team-awp": { requiredFacts: ["team-awp"], outputLevel: "observation" },
 };
 
 const DEPENDENCY_LABEL: Record<CapabilityDependencyAvailability["key"], string> = {
@@ -80,6 +84,8 @@ const DEPENDENCY_LABEL: Record<CapabilityDependencyAvailability["key"], string> 
 };
 
 const FACT_LABEL: Record<FactKind, string> = {
+  "player-map-pool": "选手地图池 facts",
+  "team-awp": "AWP 回合 facts",
   opening: "开局动线 facts",
   insights: "个人复盘 facts",
   duel: "对枪 facts",
@@ -182,25 +188,36 @@ function idsOf<T extends { matchId: string }>(rows: readonly T[]): Set<string> {
 /** 从 facts store 与本地 .tri 资产读取 availability 输入；不加载完整 ZIP 或重跑分析。 */
 export async function loadCapabilityAvailabilityInputs(
   entries: readonly StudioDemoEntry[],
+  capability: StudioCapability,
   factsStore: FactsStore = getFactsStore(),
   derivedStore: DerivedCacheStore = getDerivedCacheStore(),
   availableTris?: readonly string[],
-  openingScope?: { playerKeys: string[]; steamIds: string[] },
+  playerScope?: { playerKeys: string[]; steamIds: string[] },
 ): Promise<Map<string, EntryCapabilityFacts>> {
   const matchIds = entries.map(matchIdForEntry);
-  const [insights, duels, economy, utilityMatchIds, lineups, tactical, playerPositions, teamShapes, mechanics, opening] = await Promise.all([
-    derivedStore.getPlayerInsights({ matchIds }),
-    derivedStore.getDuels({ matchIds }),
-    derivedStore.getTournament({ matchIds }),
-    derivedStore.getUtilityValueMatchIds({ matchIds }),
-    factsStore.getLineups({ matchIds }),
-    factsStore.getTacticalRounds({ matchIds }),
-    factsStore.getPlayerPositionRounds({ matchIds }),
-    factsStore.getTeamShapeRounds({ matchIds }),
-    factsStore.getMechanicsRows({ matchIds }),
-    openingScope ? derivedStore.getOpeningTrails({ matchIds, ...openingScope }) : Promise.resolve([]),
+  const requirement = REQUIREMENTS[capability];
+  const needsFact = (kind: FactKind) => requirement.requiredFacts?.includes(kind) ?? false;
+  const needsDependency = (kind: CapabilityDependencyAvailability["key"]) =>
+    requirement.requiredDependencies?.includes(kind) || requirement.optionalDependencies?.includes(kind);
+  const [insights, duels, economy, utilityMatchIds, lineups, tactical, playerPositions, teamShapes, mechanics, opening, tris, rrRows, awpRows] = await Promise.all([
+    needsFact("insights") ? derivedStore.getPlayerInsights({ matchIds }) : [],
+    needsFact("duel") ? derivedStore.getDuels({ matchIds }) : [],
+    needsFact("economy") ? derivedStore.getTournament({ matchIds }) : [],
+    needsFact("utility") ? derivedStore.getUtilityValueMatchIds({ matchIds }) : [],
+    needsFact("lineup") ? factsStore.getLineups({ matchIds }) : [],
+    needsFact("tactical") ? factsStore.getTacticalRounds({ matchIds }) : [],
+    needsFact("map-intelligence") ? factsStore.getPlayerPositionRounds({ matchIds }) : [],
+    needsFact("map-intelligence") ? factsStore.getTeamShapeRounds({ matchIds }) : [],
+    needsDependency("shots") ? factsStore.getMechanicsRows({ matchIds }) : [],
+    needsFact("opening") && playerScope ? derivedStore.getOpeningTrails({ matchIds, ...playerScope }) : [],
+    needsDependency("tri") ? (availableTris ?? listAvailableTris()) : [],
+    needsFact("player-map-pool") && playerScope ? factsStore.getRrSignalRows({ matchIds, ...playerScope }) : [],
+    needsFact("team-awp") ? factsStore.getTeamAwpRounds({ matchIds }) : [],
   ]);
+  const shapes = idsOf(teamShapes);
   const factSets = {
+    "player-map-pool": idsOf(rrRows),
+    "team-awp": idsOf(awpRows),
     opening: idsOf(opening.filter(row => row.row.available)),
     insights: idsOf(insights),
     duel: idsOf(duels),
@@ -208,14 +225,16 @@ export async function loadCapabilityAvailabilityInputs(
     utility: new Set(utilityMatchIds),
     lineup: idsOf(lineups),
     tactical: idsOf(tactical),
-    "map-intelligence": new Set([...idsOf(playerPositions)].filter((matchId) => idsOf(teamShapes).has(matchId))),
-    mechanics: new Set(mechanics.map((row) => row.matchId)),
+    "map-intelligence": new Set([...idsOf(playerPositions)].filter((matchId) => shapes.has(matchId))),
+    mechanics: idsOf(mechanics),
   };
-  const tris = new Set(availableTris ?? await listAvailableTris());
+  const triMaps = new Set(tris);
   return new Map(entries.map((entry) => {
     const matchId = matchIdForEntry(entry);
     return [entry.id, {
       facts: {
+        "player-map-pool": factSets["player-map-pool"].has(matchId),
+        "team-awp": factSets["team-awp"].has(matchId),
         opening: factSets.opening.has(matchId),
         insights: factSets.insights.has(matchId),
         duel: factSets.duel.has(matchId),
@@ -227,7 +246,7 @@ export async function loadCapabilityAvailabilityInputs(
       },
       hasReplay: entry.meta.hasReplay,
       hasShots: factSets.mechanics.has(matchId),
-      hasTri: tris.has(entry.meta.mapName),
+      hasTri: triMaps.has(entry.meta.mapName),
     } satisfies EntryCapabilityFacts] as const;
   }));
 }

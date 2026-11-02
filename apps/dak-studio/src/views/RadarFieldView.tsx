@@ -210,8 +210,9 @@ export function RadarFieldView({ onCapabilityRepair, entries, teamRenames = {}, 
 
       {field && (progress || fieldError || analysis.status !== "ready" || snapshot?.generation !== analysis.generation) && <p className="stu-muted" role="status">{fieldError || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
       {capability.availability && <CapabilityBar availability={capability.availability} onRepair={onCapabilityRepair} />}
+      {capability.error && <p role="alert">能力读取失败：{capability.error} <button type="button" className="stu-button-sm" onClick={capability.retry}>重试</button>{capability.availability && " · 显示旧版本"}</p>}
       {!invalidTeamForMap && field && <RadarFieldCanvas field={field} baseline={baseline} map={{ name: activeMap!, radarImageUrl: `./maps/radars/${activeMap}.png`, lowerRadarImageUrl: getMapCalibration(activeMap!) && hasLowerLevel(getMapCalibration(activeMap!)!) ? `./maps/radars/${activeMap}_lower.png` : null }} state={{ mode: state.mode, second: state.second, level: state.level }} onStateChange={view => onStateChange(current => ({ ...current, ...view }))} />}
-      {!invalidTeamForMap && !progress && !field && activeMap && (
+      {!invalidTeamForMap && !progress && !field && activeMap && capability.availability && !capability.error && (
         fieldError ? <EmptyState variant="error" title="覆盖场加载失败" hint={fieldError} />
           : <EmptyState title="该地图暂无覆盖场数据" hint="所选范围和经济条件内没有含回放的回合。" />
       )}

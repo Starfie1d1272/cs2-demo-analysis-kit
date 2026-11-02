@@ -296,8 +296,9 @@ export function TrailsView({ onCapabilityRepair, allEntries, entries, onGoLibrar
       </div>
 
       {selectedOption && capability.availability && <CapabilityBar availability={capability.availability} onRepair={onCapabilityRepair} />}
+      {capability.error && <p role="alert">能力读取失败：{capability.error} <button type="button" className="stu-button-sm" onClick={capability.retry}>重试</button>{capability.availability && " · 显示旧版本"}</p>}
       {models && (error || analysis.status !== "ready" || modelSnapshot?.generation !== analysis.generation) && <p className="stu-muted" role="status">{error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
-      {error && !models ? (
+      {capability.error && !models ? null : error && !models ? (
         <EmptyState variant="error" title="构建失败" hint={error} />
       ) : players && (rangeEntries.length === 0 || eligibleEntries?.length === 0) ? (
         <EmptyState variant="insufficient" title="当前条件没有比赛样本" hint="最近场次只包含有日期的比赛；可选择全部场次或调整选手、地图与范围。" />
