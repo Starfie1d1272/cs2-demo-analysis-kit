@@ -1,5 +1,5 @@
 import type { MatchWorkspaceModel, WorkspaceSpatialPoint } from "@cs2dak/presentation";
-import { displayWeaponName, sideLabel, economyLabelCn, buildMatchReportMarkdown } from "@cs2dak/presentation";
+import { displayWeaponName, sideLabel, economyLabelCn } from "@cs2dak/presentation";
 import { Activity, BarChart3, Crosshair, Film, Gauge, ListChecks, Map as MapIcon, Swords, Table2, Users } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 import { EconomyPanel, HeatmapCanvas, ReplayViewer, ScoreboardTable } from "@cs2dak/react";
@@ -50,14 +50,6 @@ export function MatchReviewWorkspace({ model, state: input, onStateChange, pinne
             <div className="dak-mapline">{model.mapName}</div>
             <button type="button" className="dak-report-button" disabled={!onExportCurrent} onClick={() => onExportCurrent?.("markdown")}>导出本次结果 · Markdown</button>
             <button type="button" className="dak-report-button" disabled={!onExportCurrent} onClick={() => onExportCurrent?.("json")}>导出本次结果 · JSON</button>
-            <button
-              type="button"
-              className="dak-report-button"
-              onClick={() => downloadMatchReport(model)}
-              title="导出本场比赛报告（Markdown）"
-            >
-              导出报告
-            </button>
           </div>
         </header>
 
@@ -569,18 +561,6 @@ function MapWorkspace({ model, layer, setLayer }: MatchWorkspaceProps & { layer:
       </Panel>
     </div>
   );
-}
-
-/** 导出 Markdown 比赛报告（浏览器下载，无副作用依赖）。 */
-function downloadMatchReport(model: MatchWorkspaceModel) {
-  const md = buildMatchReportMarkdown(model);
-  const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${model.title.replace(/[\\/:*?"<>|]/g, "_")}-报告.md`;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 /** v0.3 Buy Quality：full/force/eco 胜率链 + 手枪局转化。 */
