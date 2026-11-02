@@ -234,7 +234,7 @@ export function App() {
     [identityState.version, identityState.mappings, identityState.teamRenames]
   );
   const selectedTeams = useMemo(() => selectedTeam ? [selectedTeam] : [], [selectedTeam]);
-  const selectedTeamGroups = useMemo(() => analysisContext.focus.kind === "team" ? [analysisContext.focus.teamKey ?? analysisContext.focus.teamName] : analysisContext.focus.kind === "player" && analysisContext.focus.teamKey ? [analysisContext.focus.teamKey] : [], [analysisContext.focus]);
+  const selectedTeamGroups = useMemo(() => analysisContext.focus.kind === "team" ? [analysisContext.focus.teamKey ?? analysisContext.focus.teamName] : analysisContext.focus.kind === "player" && (analysisContext.focus.teamKey || analysisContext.focus.teamName) ? [analysisContext.focus.teamKey ?? analysisContext.focus.teamName!] : [], [analysisContext.focus]);
   const focusIdentity = useMemo(() => {
     if (!selectedPlayerKey || !identityReady) return null;
     const mapping = identityState.mappings.find(item => item.playerKey === selectedPlayerKey);

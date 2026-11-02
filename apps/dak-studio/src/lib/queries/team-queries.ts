@@ -40,12 +40,12 @@ export async function getTeamComparison(entries: StudioDemoEntry[], identity?: I
     const matchIds = entries.map(matchIdForEntry);
     const facts = await groupedTeamFacts(matchIds, identity);
     if (facts.length >= entries.length) {
+      const groups = await getTeamAnalysisGroups(entries, identity);
       const resolve = (value: string) => {
-        const keys = new Set(facts.flatMap(fact => (["teamA", "teamB"] as const).filter(slot => fact.teamEntityKeys[slot] === value || fact.teams[slot] === value).map(slot => fact.teamEntityKeys[slot])));
-        return keys.size === 1 ? [...keys][0]! : value;
+        const matches = groups.filter(group => group.key === value || group.names.includes(value));
+        return matches.length === 1 ? matches[0]!.key : value;
       };
       const built = buildTeamComparisonFromFacts(facts, pair && [resolve(pair[0]), resolve(pair[1])], await getFactsStore().getRrSignalRows({ matchIds }));
-      const groups = await getTeamAnalysisGroups(entries, identity);
       const model = { ...built, availableTeams: built.availableTeams.map(team => {
         const group = groups.find(item => item.key === team.key);
         return group ? { ...team, name: group.name, label: group.label } : team;
@@ -66,8 +66,9 @@ export async function getTeamOverview(entries: StudioDemoEntry[], teamName: stri
     const matchIds = entries.map(matchIdForEntry);
     const facts = await groupedTeamFacts(matchIds, identity);
     if (facts.length < entries.length) throw missingFactsError("队伍总览");
-    const keys = new Set(facts.flatMap(fact => (["teamA", "teamB"] as const).filter(slot => fact.teams[slot] === teamName || fact.teamEntityKeys[slot] === teamName).map(slot => fact.teamEntityKeys[slot])));
-    const overview = keys.size === 1 ? buildTeamOverviewFromFacts(facts, [...keys][0]!, [], await getFactsStore().getRrSignalRows({ matchIds })) : null;
+    const groups = await getTeamAnalysisGroups(entries, identity);
+    const matches = groups.filter(group => group.key === teamName || group.names.includes(teamName));
+    const overview = matches.length === 1 ? buildTeamOverviewFromFacts(facts, matches[0]!.key, [], await getFactsStore().getRrSignalRows({ matchIds })) : null;
     await writePersistedValue(key, overview, generation);
     return overview;
   });

@@ -70,8 +70,8 @@ export function RadarFieldView({ exportSource, onCapabilityRepair, entries, team
   const slots = groupSnapshot?.key === groupKey ? groupSnapshot.slots : null;
   const matches = groups.filter(group => selectedTeamKey ? group.key === selectedTeamKey : selectedTeam != null && group.names.includes(selectedTeam));
   const activeGroup = matches.length === 1 ? matches[0]! : null;
-  const activeTeam = activeGroup?.label ?? null;
-  const invalidTeamForMap = selectedTeam !== null && groupSnapshot?.key === groupKey && !activeGroup;
+  const activeTeam = activeGroup?.label ?? (!selectedTeamKey && matches.length > 1 ? selectedTeam : null);
+  const invalidTeamForMap = selectedTeam !== null && groupSnapshot?.key === groupKey && !activeTeam;
   const groupsReady = groupSnapshot?.key === groupKey;
 
   const missingSelectedMap = mapName !== null && !maps.some(([name]) => name === mapName);
