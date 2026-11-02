@@ -24,7 +24,7 @@ const tournamentInsightsCache = createAnalysisBucket<TournamentInsights | null>(
 
 /** 赛事/经济页面只需要 TournamentInsights，不必冷启动时构建 cohort + profiles + RR/PRISM。 */
 export function getTournamentInsights(entries: StudioDemoEntry[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<TournamentInsights | null> {
-  const key = `${keyOf(entries, identity?.version, selectedTeams)}:tournament-name-groups-v4`;
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:tournament-insights-name-groups-v5`;
   return cachedQuery(tournamentInsightsCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), async (generation) => {
     const persisted = await readPersistedValue<TournamentInsights | null>(key, generation);
     if (persisted !== undefined) return persisted;
@@ -46,7 +46,7 @@ const seasonSummaryCache = createAnalysisBucket<SeasonSummary>();
  *  传入 identity 时将其并入缓存 key，identityMap 作为归并参数传给 buildSeasonCohort。
  *  Tournament 显式身份优先；未绑定队伍按当前显示名分组。 */
 export function getSeasonSummary(entries: StudioDemoEntry[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<SeasonSummary> {
-  const key = `${keyOf(entries, identity?.version, selectedTeams)}:tournament-name-groups-v4`;
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:season-summary-name-groups-v5`;
   return cachedQuery(seasonSummaryCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), async (generation) => {
     const persisted = await readPersistedValue<SeasonSummary>(key, generation);
     if (persisted) return persisted;
