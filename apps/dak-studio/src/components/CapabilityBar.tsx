@@ -46,7 +46,10 @@ export function CapabilityBar({ availability, onRepair }: { availability: Capabi
   </div>;
 }
 
+export const DirectoryRefreshContext = createContext<(() => Promise<unknown>) | null>(null);
+
 export function useCapability(entries: StudioDemoEntry[], capability: StudioCapability, playerScope?: { playerKeys: string[]; steamIds: string[] }) {
+  const refreshDirectory = useContext(DirectoryRefreshContext);
   const [result, setResult] = useState<{ key: string; revision: string; generation: number; availability: CapabilityAvailability } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retryVersion, setRetryVersion] = useState(0);
@@ -69,7 +72,7 @@ export function useCapability(entries: StudioDemoEntry[], capability: StudioCapa
     return () => { cancelled = true; };
   }, [entries, capability, data, key, revision, retryVersion]);
   const effectiveError = data.status === "error" ? "分析缓存不可用，请重试刷新。" : error;
-  return { availability: current, eligible, error: effectiveError, retry: () => { if (data.status === "error") void invalidateAnalysisQueries().catch(() => {}); else setRetryVersion(version => version + 1); }, stale: !!current && (data.status !== "ready" || result?.generation !== data.generation || result?.revision !== revision || !!effectiveError) };
+  return { availability: current, eligible, error: effectiveError, retry: () => { if (data.status === "error") void invalidateAnalysisQueries().catch(() => {}); else if (refreshDirectory) void refreshDirectory().then(() => setRetryVersion(version => version + 1)).catch(() => {}); else setRetryVersion(version => version + 1); }, stale: !!current && (data.status !== "ready" || result?.generation !== data.generation || result?.revision !== revision || !!effectiveError) };
 }
 
 const ScopeEditorContext = createContext<(() => void) | undefined>(undefined);
