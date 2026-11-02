@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import logging
 import os
@@ -527,6 +528,8 @@ class StudioApi:
         self._userdata = _studio_userdata()
         _migrate_storage_layout(self._userdata)
         self._db_lock = threading.Lock()
+        self._demo_commit_handles: dict[str, list] = {}
+        self._demo_commit_guard = threading.Lock()
         self._db: sqlite3.Connection | None = None
 
     def _assets_dir(self) -> Path:
@@ -549,6 +552,47 @@ class StudioApi:
 
     def _web_overlay_dir(self) -> Path:
         return self._cache_dir() / "studio-web"
+
+    def storage_demo_commit_begin(self, keys: list[str]) -> str:
+        """Hold process-safe locks for one short library commit; OS releases on exit."""
+        ordered = sorted(set(keys))
+        if not ordered or len(ordered) > 32 or any(not isinstance(key, str) or len(key) > 1024 for key in ordered):
+            raise ValueError("invalid library commit keys")
+        lock_dir = self._userdata / "commit-locks"
+        lock_dir.mkdir(parents=True, exist_ok=True)
+        handles = []
+        try:
+            for key in ordered:
+                path = lock_dir / hashlib.sha256(key.encode("utf-8")).hexdigest()
+                handle = path.open("a+b")
+                handles.append(handle)
+                if sys.platform == "win32":
+                    import msvcrt
+                    handle.seek(0, os.SEEK_END)
+                    if handle.tell() == 0:
+                        handle.write(b"\0")
+                        handle.flush()
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            token = uuid.uuid4().hex
+            with self._demo_commit_guard:
+                self._demo_commit_handles[token] = handles
+            return token
+        except BaseException:
+            for handle in reversed(handles):
+                handle.close()
+            raise
+
+    def storage_demo_commit_end(self, token: str) -> None:
+        with self._demo_commit_guard:
+            handles = self._demo_commit_handles.pop(token, None)
+        if handles is None:
+            raise ValueError("unknown library commit token")
+        for handle in reversed(handles):
+            handle.close()
 
     # --- native storage -------------------------------------------------
     # 待桌面验证：CI/沙箱没有真实 pywebview 桌面壳。TS 侧已保留 IndexedDB fallback。

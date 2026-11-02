@@ -1,6 +1,8 @@
 import type { BlobStore, RecordStore, AtomicStorageAdapter, RecordRef, RecordSnapshot, RecordMutation } from "./types";
 
 interface PywebviewStorageApi {
+  storage_demo_commit_begin?(keys: string[]): Promise<string>;
+  storage_demo_commit_end?(token: string): Promise<void>;
   storage_records_read?(refs: RecordRef[]): Promise<RecordSnapshot[]>;
   storage_records_compare_and_write?(expected: RecordSnapshot[], writes: RecordMutation[]): Promise<boolean>;
   storage_record_get(namespace: string, key: string): Promise<unknown>;
