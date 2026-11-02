@@ -118,6 +118,8 @@ export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, on
     let cancelled = false;
     getPinnedPlayer().then((p) => {
       if (!cancelled) { setPinned(p); setPinnedLoaded(true); }
+    }).catch((reason) => {
+      if (!cancelled) { setError(reason instanceof Error ? reason.message : String(reason)); setPinnedLoaded(true); }
     });
     return () => { cancelled = true; };
   }, []);

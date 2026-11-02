@@ -73,10 +73,11 @@ export function PlayersView({
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [pinned, setPinned] = useState<PinnedPlayer | null>(null);
   const [compareKey, setCompareKey] = useState<string | null>(null);
-  const [profileTab, setProfileTab] = useState<ProfileTab>(() => returnEvidenceKey?.startsWith("players:map-roles") ? "overview" : returnEvidenceKey ? "utility" : "overview");
+  const [profileTab, setProfileTab] = useState<ProfileTab>(() => returnEvidenceKey?.startsWith("players:map-") ? "overview" : returnEvidenceKey ? "utility" : "overview");
   const [flashMode, setFlashMode] = useState<"net" | "enemy">("net");
   const [roleProfiles, setRoleProfiles] = useState<PlayerMapRoleProfile[] | null>(null);
   const [mapPool, setMapPool] = useState<PlayerMapPoolRow[]>([]);
+  const [mapPoolReady, setMapPoolReady] = useState(false);
   const [roleError, setRoleError] = useState<string | null>(null);
   const [roleDeclarations, setRoleDeclarations] = useState<RoleDeclarationsState | null>(null);
   const [roleEditorOpen, setRoleEditorOpen] = useState(false);
@@ -92,7 +93,13 @@ export function PlayersView({
     return () => { cancelled = true; };
   }, []);
 
-  useEffect(() => { void loadRoleDeclarations().then(setRoleDeclarations); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    void loadRoleDeclarations()
+      .then((state) => { if (!cancelled) setRoleDeclarations(state); })
+      .catch((reason) => { if (!cancelled) setRoleError(reason instanceof Error ? reason.message : String(reason)); });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (!roleEditorOpen) return;
@@ -140,9 +147,10 @@ export function PlayersView({
   useEffect(() => {
     if (!onPageReady || (!profiles && !error && entries.length > 0)) return;
     if (returnEvidenceKey?.startsWith("players:map-") && !roleProfiles && !roleError && selected) return;
+    if (returnEvidenceKey === "players:map-pool" && !mapPoolReady && !roleError && selected) return;
     if (returnEvidenceKey && !returnEvidenceKey.startsWith("players:map-") && !insights && !detailsError && selected) return;
     onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
-  }, [profiles, error, roleProfiles, roleError, insights, detailsError, entries.length, returnEvidenceKey, onPageReady, selected]);
+  }, [profiles, error, roleProfiles, roleError, insights, detailsError, entries.length, returnEvidenceKey, onPageReady, selected, mapPoolReady]);
 
   const compare = useMemo(() => {
     if (!profiles || !compareKey || compareKey === selected?.playerKey) return null;
@@ -201,10 +209,13 @@ export function PlayersView({
   }, [entries, selected?.playerKey, roleDeclarations, identityOptions?.version, selectedTeam]);
 
   useEffect(() => {
-    if (!selected || !roleProfiles) { setMapPool([]); return; }
+    if (!selected || !roleProfiles) { setMapPool([]); setMapPoolReady(false); return; }
     let cancelled = false;
+    setMapPoolReady(false);
     const roleProfile = roleProfiles.find((profile) => profile.playerKey === selected.playerKey && (selectedTeam == null || profile.teamKey === selectedTeam)) ?? null;
-    void getPlayerMapPool(entries, selected.playerKey, roleProfile, identityOptions).then((rows) => { if (!cancelled) setMapPool(rows); }).catch(() => { if (!cancelled) setMapPool([]); });
+    void getPlayerMapPool(entries, selected.playerKey, roleProfile, identityOptions)
+      .then((rows) => { if (!cancelled) { setMapPool(rows); setMapPoolReady(true); } })
+      .catch(() => { if (!cancelled) { setMapPool([]); setMapPoolReady(true); } });
     return () => { cancelled = true; };
   }, [entries, selected?.playerKey, selectedTeam, roleProfiles, identityOptions?.version]);
 

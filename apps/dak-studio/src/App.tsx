@@ -653,11 +653,6 @@ export function App() {
   useEffect(() => {
     if (restoringFrameId !== active.id) window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [active.id]); // The restoration signal may clear without changing frames.
-  useEffect(() => {
-    if (restoringFrameId === active.id && !["home", "players", "teams", "utility"].includes(view)) {
-      onPageReady(active.id, Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
-    }
-  }, [active.id, restoringFrameId, view, onPageReady]);
 
   const handleLinkRawDemo = useCallback(async (entry: StudioDemoEntry) => {
     try {

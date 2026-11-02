@@ -78,7 +78,7 @@ export function studioNavigationReducer(state: StudioNavigation, action: Navigat
     const resumeId = state.resume[action.section];
     const index = history.findIndex(item => item.id === resumeId);
     active = index >= 0 ? history[index] : frame(action.id, defaultDestination(action.section));
-    if (index >= 0) history = history.slice(0, index);
+    if (index >= 0) history = history.filter((_, i) => i !== index);
   } else active = frame(action.id, action.destination);
   history = history.slice(-20);
   const ids = new Set([active.id, ...history.map(item => item.id)]);
