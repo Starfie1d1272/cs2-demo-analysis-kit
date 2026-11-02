@@ -1,5 +1,6 @@
 import { buildSeasonCohortFromRows, type SeasonCohortFactRow } from "@cs2dak/cohort";
 import { round } from "./season-metrics.js";
+import { buildRatingSpatialContext, deriveRRIndicators, deriveRRSignals } from "./rating-inputs.js";
 import { displayWeaponName } from "@cs2dak/presentation";
 import type { DemoPackage } from "@cs2dak/contract";
 import type { TeamMapRoleMatrix } from "@cs2dak/tactics";
@@ -235,7 +236,20 @@ export function buildTeamComparison(
   inputs: TeamComparisonInput[],
   requestedPair?: [string, string]
 ): TeamComparisonModel {
-  return buildTeamComparisonFromFacts(inputs.map(extractTeamComparisonFacts), requestedPair);
+  const ratingRows: SeasonCohortFactRow[] = inputs.flatMap(({ matchId, pkg, performanceFacts }) => {
+    const facts = performanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
+    const signals = deriveRRSignals(pkg, facts, buildRatingSpatialContext(pkg));
+    const indicators = new Map(deriveRRIndicators(pkg, facts).map(row => [row.steamId64, row]));
+    const players = new Map(pkg.players.map(player => [player.steamId64, player]));
+    return signals.flatMap(signal => {
+      const player = players.get(signal.steamId64);
+      const indicator = indicators.get(signal.steamId64);
+      return player && indicator ? [{ matchId, sourceDemoHash: pkg.manifest.demo?.hash ?? null,
+        steamId64: player.steamId64, playerName: player.name, teamKey: player.teamKey,
+        signals: signal, indicators: indicator, weaponHighlight: null }] : [];
+    });
+  });
+  return buildTeamComparisonFromFacts(inputs.map(extractTeamComparisonFacts), requestedPair, ratingRows);
 }
 
 export function buildTeamOverviewFromFacts(inputs: TeamComparisonFacts[], teamName: string, roleMatrices: TeamMapRoleMatrix[] = [], ratingRows: SeasonCohortFactRow[] = []): TeamOverviewModel | null {

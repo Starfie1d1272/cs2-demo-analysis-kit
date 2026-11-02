@@ -139,8 +139,8 @@ export function TeamView({
             overview, comparisonCurrent ? comparison : null, state, { maps: MAP_COLUMNS, roster: ROSTER_COLUMNS },
             state.compareTeamName && !comparisonCurrent ? ["队伍对比未导出：无当前可用结果或正在更新。"] : [],
           )}
-        />}<p>按显示名称观察组汇总；同场双方同名时分别计入双方贡献，比赛场次去重，胜负与回合按双方累计。RR 为出场信号聚合后的账号评分，计分板使用单场指标评分，口径不同。</p></div>
-        <label className="stu-team-picker">切换队伍
+        />}<p>按队名分组查看比赛与阵容。</p><details><summary>统计口径</summary><p>同场双方同名时分别计入双方贡献，比赛场次去重，胜负与回合按双方累计。RR 为出场信号聚合后的账号评分，计分板使用单场指标评分，口径不同。</p></details></div>
+        <label className="stu-team-picker">队名分组
           <select value={activeTeam ?? ""} onChange={(event) => event.target.value && onSelectTeam(event.target.value)}>
             <option value="">请选择队伍</option>
             {teams.map((team) => <option key={team.name} value={team.name}>{team.name} · {team.matches} 场</option>)}

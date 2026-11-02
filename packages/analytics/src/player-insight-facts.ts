@@ -2,6 +2,8 @@ import { aggregatePlayerRoundPerformanceFacts, buildPlayerRoundPerformanceFacts,
 import { round } from "./season-metrics.js";
 import type { SeasonInsightsDemo, PlayerSeasonInsights, MistakeEvidence, MistakeReview, TeamFlashIncident, EnemyFlashIncident } from "./insights.js";
 
+export const PLAYER_INSIGHT_FACT_VERSION = 2;
+
 const LOW_BUY_TYPES = new Set(["eco", "semi", "force"]);
 const DEATH_EARLY_SECONDS = 25;
 const DEATH_LATE_SECONDS = 55;
