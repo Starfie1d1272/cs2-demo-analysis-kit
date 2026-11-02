@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { formatPercent } from "@cs2dak/presentation";
 import { type TournamentInsights } from "@cs2dak/analytics";
 import { DataTable, EmptyState, type DataTableColumn, type HeatTone } from "@cs2dak/react";
-import { getTournamentInsights, type IdentityOptions } from "../lib/season";
+import { getTournamentInsights } from "../lib/queries/season-queries";
+import { type IdentityOptions } from "../lib/identity";
 import type { StudioDemoEntry } from "../lib/library";
 
 export interface EconomyViewProps {

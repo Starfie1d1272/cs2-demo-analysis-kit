@@ -133,6 +133,7 @@ export interface PlayerSeasonDetailsFromFacts {
   insights: PlayerSeasonInsights;
   weaponStats: PlayerWeaponStat[];
   mechanics: PlayerMechanicsProfile;
+  coverage: { eligibleMatchCount: number; mechanicsMatchCount: number };
 }
 
 export interface PlayerFlashSummariesFactsOptions extends FactsScope {

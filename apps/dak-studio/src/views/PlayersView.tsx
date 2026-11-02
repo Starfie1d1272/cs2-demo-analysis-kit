@@ -8,7 +8,10 @@ import {
   type PlayerSeasonInsights,
   type PlayerWeaponStat,
 } from "@cs2dak/analytics";
-import { getPlayerMapPool, getPlayerMapRoleProfiles, getPlayerSeasonDetails, getSeasonSummary, type IdentityOptions } from "../lib/season";
+import { getPlayerMapPool, getPlayerMapRoleProfiles } from "../lib/queries/spatial-queries";
+import { getPlayerSeasonDetails } from "../lib/queries/player-queries";
+import { getSeasonSummary } from "../lib/queries/season-queries";
+import { type IdentityOptions } from "../lib/identity";
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
 import { FingerprintRadar, TrendChart } from "./profile-widgets";
@@ -68,6 +71,7 @@ export function PlayersView({
   const [profiles, setProfiles] = useState<PlayerSeasonProfile[] | null>(null);
   const [insights, setInsights] = useState<PlayerSeasonInsights | null>(null);
   const [weaponStats, setWeaponStats] = useState<PlayerWeaponStat[]>([]);
+  const [coverage, setCoverage] = useState<{ eligibleMatchCount: number; mechanicsMatchCount: number } | null>(null);
   const [mechanics, setMechanics] = useState<PlayerMechanicsProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [detailsError, setDetailsError] = useState<string | null>(null);
@@ -78,6 +82,8 @@ export function PlayersView({
   const [roleProfiles, setRoleProfiles] = useState<PlayerMapRoleProfile[] | null>(null);
   const [mapPool, setMapPool] = useState<PlayerMapPoolRow[]>([]);
   const [mapPoolReady, setMapPoolReady] = useState(false);
+  const [unsupportedMaps, setUnsupportedMaps] = useState<string[]>([]);
+  const [mapPoolError, setMapPoolError] = useState<string | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
   const [roleDeclarations, setRoleDeclarations] = useState<RoleDeclarationsState | null>(null);
   const [roleEditorOpen, setRoleEditorOpen] = useState(false);
@@ -175,6 +181,7 @@ export function PlayersView({
       setInsights(null);
       setWeaponStats([]);
       setMechanics(null);
+      setCoverage(null);
       setDetailsError(null);
       return;
     }
@@ -189,6 +196,7 @@ export function PlayersView({
         setInsights(details.insights);
         setWeaponStats(details.weaponStats.slice(0, 8));
         setMechanics(details.mechanics);
+        setCoverage(details.coverage);
       })
       .catch((err) => {
         if (!cancelled) setDetailsError(err instanceof Error ? err.message : String(err));
@@ -209,15 +217,15 @@ export function PlayersView({
   }, [entries, selected?.playerKey, roleDeclarations, identityOptions?.version, selectedTeam]);
 
   useEffect(() => {
-    if (!selected || !roleProfiles) { setMapPool([]); setMapPoolReady(false); return; }
+    if (!selected || (!roleProfiles && !roleError)) { setMapPool([]); setMapPoolReady(false); return; }
     let cancelled = false;
-    setMapPoolReady(false);
-    const roleProfile = roleProfiles.find((profile) => profile.playerKey === selected.playerKey && (selectedTeam == null || profile.teamKey === selectedTeam)) ?? null;
+    setMapPoolReady(false); setMapPoolError(null);
+    const roleProfile = roleProfiles?.find((profile) => profile.playerKey === selected.playerKey && (selectedTeam == null || profile.teamKey === selectedTeam)) ?? null;
     void getPlayerMapPool(entries, selected.playerKey, roleProfile, identityOptions)
-      .then((rows) => { if (!cancelled) { setMapPool(rows); setMapPoolReady(true); } })
-      .catch(() => { if (!cancelled) { setMapPool([]); setMapPoolReady(true); } });
+      .then((result) => { if (!cancelled) { setMapPool(result.rows); setUnsupportedMaps(result.unsupportedMapNames); setMapPoolReady(true); } })
+      .catch((reason) => { if (!cancelled) { setMapPool([]); setUnsupportedMaps([]); setMapPoolError(reason instanceof Error ? reason.message : String(reason)); setMapPoolReady(true); } });
     return () => { cancelled = true; };
-  }, [entries, selected?.playerKey, selectedTeam, roleProfiles, identityOptions?.version]);
+  }, [entries, selected?.playerKey, selectedTeam, roleProfiles, roleError, identityOptions?.version]);
 
   if (allEntries.length === 0) {
     return (
@@ -459,7 +467,7 @@ export function PlayersView({
                 if (entry) onOpenEvidence(entry.id, evidence, "players:map-roles");
               }} />}
             </div>
-            <div className="stu-card stu-card-wide" id="players:map-pool"><h3>完整个人地图池</h3><PlayerMapPoolPanel rows={mapPool} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence(entry.id, evidence, "players:map-pool"); }} /></div>
+            <div className="stu-card stu-card-wide" id="players:map-pool"><h3>完整个人地图池</h3>{mapPoolError && <p role="alert">地图池不可用：{mapPoolError}</p>}{unsupportedMaps.length > 0 && <p>未支持的地图：{unsupportedMaps.join("、")}</p>}<PlayerMapPoolPanel rows={mapPool} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence(entry.id, evidence, "players:map-pool"); }} /></div>
             <div className="stu-card">
               <h3>核心指标</h3>
               <div className="stu-metric-grid">
@@ -558,13 +566,8 @@ export function PlayersView({
           <div className="stu-profile-grid">
             <div className="stu-card">
               <h3>武器画像</h3>
-              <WeaponBars weapons={weaponStats.length > 0 ? weaponStats : selected.weapons.slice(0, 8).map((weapon) => ({
-                weapon: weapon.weapon,
-                label: weapon.label,
-                kills: weapon.kills,
-                headshotPercent: weapon.headshotPercent,
-                killsPerMatch: 0
-              }))} />
+              {coverage && <p>参赛样本 {coverage.eligibleMatchCount} 场 · 枪法样本 {coverage.mechanicsMatchCount} 场</p>}
+              <WeaponBars weapons={weaponStats} />
             </div>
 
             {mechanics && (

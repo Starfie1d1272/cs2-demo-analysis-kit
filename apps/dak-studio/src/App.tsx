@@ -1,6 +1,7 @@
+import { ensureAnalysisDataReady, invalidateAnalysisQueries, getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation } from "./lib/queries/query-cache";
 import { type ExportPollSnapshot } from "@cs2dak/rivalhub-upload";
 import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Radar, Settings, Swords, Trophy, UserRound } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { backfillDemoIdentities, bulkUpdateTags, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { CohortScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
 import { AnalysisContextSummary } from "./components/AnalysisContextSummary";
@@ -33,7 +34,7 @@ import { DuelView } from "./views/DuelView";
 import { CoachView } from "./views/CoachView";
 import { RadarFieldView } from "./views/RadarFieldView";
 import { loadIdentityState, buildCohortIdentityMap, type IdentityStoreState } from "./lib/identity";
-import type { IdentityOptions } from "./lib/season";
+import type { IdentityOptions } from "./lib/identity";
 import type { BuiltinEvent } from "./lib/builtin-events";
 import { type EvidenceContinuation, type OpenEvidence } from "./lib/evidence-continuation";
 import {
@@ -212,6 +213,7 @@ export function App() {
     });
   }, []);
   const [notice, setNotice] = useState<string | null>(null);
+  const analysisData = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const [evidenceDetails, setEvidenceDetails] = useState<Pick<EvidenceContinuation, "evidence" | "finding"> | null>(null);
   const evidenceSource = navigation.history.at(-1);
   const evidenceContinuation: EvidenceContinuation | null = evidenceDetails && evidenceSource ? {
@@ -342,6 +344,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    void ensureAnalysisDataReady().catch(() => {});
     listDemoEntries()
       .then(async (loaded) => {
         setEntries(loaded);
@@ -962,6 +965,12 @@ export function App() {
           </div>
           {query.uncertain && <button type="button" onClick={() => exportPolling.recheck(query.jobId)}>重查此任务状态</button>}
         </div>)}
+        {analysisData.status === "error" && (
+          <div className="stu-notice" role="alert">
+            <span>分析缓存不可用，请重试刷新。</span>
+            <button type="button" onClick={() => { void invalidateAnalysisQueries().catch(() => {}); }}>重试刷新</button>
+          </div>
+        )}
         {notice && (
           <div className="stu-notice" role="status">
             <span>{notice}</span>

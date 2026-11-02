@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { SeasonLeaderboardModel } from "@cs2dak/presentation";
 import { SeasonLeaderboard } from "@cs2dak/react";
-import { getSeasonSummary, type IdentityOptions } from "../lib/season";
+import { getSeasonSummary } from "../lib/queries/season-queries";
+import { type IdentityOptions } from "../lib/identity";
 import type { StudioDemoEntry } from "../lib/library";
 import { EmptyState } from "@cs2dak/react";
 

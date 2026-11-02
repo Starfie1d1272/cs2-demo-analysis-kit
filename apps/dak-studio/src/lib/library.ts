@@ -1,3 +1,4 @@
+import { withAnalysisQueryInvalidation } from "./queries/query-cache";
 import { getMapNav } from "@cs2dak/map-assets";
 import { getMapCalibration, hasLowerLevel } from "@cs2dak/maps/calibration";
 import { withImportCheckpoint } from "./import-persistence";
@@ -294,12 +295,12 @@ async function isolateLegacyProjectionAliases(): Promise<void> {
         });
         const required = edits.flatMap(row => [`entry:${row.id}`, `match:${row.analysisMatchId}`]);
         if (required.some(key => !keys.includes(key))) return required;
-        await withImportCheckpoint(getStorage(), rows.map(row => row.id), [sharedId], async () => {
+        await withAnalysisQueryInvalidation(() => withImportCheckpoint(getStorage(), rows.map(row => row.id), [sharedId], async () => {
           // Saved PrepItems cannot identify which legacy alias they referred to.
           // Permanently reserve the ambiguous key rather than rebinding it later.
           await retiredMatchIds.put(sharedId, { entryIds: [...new Set([...(previous?.entryIds ?? []), ...rows.map(row => row.id)])] });
           for (const row of edits) await saveDemoEntry(row);
-        });
+        }));
         return null;
       });
       if (!retry) break;
@@ -566,7 +567,7 @@ async function finishImport(entry: StudioDemoEntry, replacement: StudioDemoEntry
   const ids = [entry.id, ...(replacement ? [replacement.id] : [])];
   signal?.throwIfAborted();
   try {
-    await withImportCheckpoint(getStorage(), ids,
+    await withAnalysisQueryInvalidation(() => withImportCheckpoint(getStorage(), ids,
       [...new Set([matchId, ...(previousMatchId ? [previousMatchId] : [])])], async () => {
         signal?.throwIfAborted();
         await prepare();
@@ -579,7 +580,7 @@ async function finishImport(entry: StudioDemoEntry, replacement: StudioDemoEntry
           if (previousMatchId && previousMatchId !== matchId && !shared) await removeDemoAnalysis(previousMatchId);
           signal?.throwIfAborted();
         }
-      });
+      }));
   } catch (error) {
     identityIndex = null;
     identityIndexPromise = null;
@@ -762,9 +763,11 @@ export async function removeDemo(id: string): Promise<void> {
   await withImportLocks([`entry:${id}`, `match:${matchIdForEntry(record)}`], async () => {
     const current = await demoMeta.get<StudioDemoEntry>(id);
     if (!current) return;
-    await removeDemoStorageOnly(id);
-    const shared = (await demoMeta.getAll<StudioDemoEntry>()).some(row => matchIdForEntry(row) === matchIdForEntry(current));
-    if (!shared) await removeDemoAnalysis(matchIdForEntry(current));
+    await withAnalysisQueryInvalidation(async () => {
+      await removeDemoStorageOnly(id);
+      const shared = (await demoMeta.getAll<StudioDemoEntry>()).some(row => matchIdForEntry(row) === matchIdForEntry(current));
+      if (!shared) await removeDemoAnalysis(matchIdForEntry(current));
+    });
   });
 }
 

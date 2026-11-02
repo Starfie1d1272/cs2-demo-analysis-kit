@@ -15,3 +15,7 @@ export * from "./workspace.js";
 export * from "./models.js";
 export * from "./rating-inputs.js";
 export * from "./scoreboard.js";
+
+export * from "./player-weapon-stats.js";
+export * from "./player-insight-facts.js";
+export * from "./observed-map-pool.js";

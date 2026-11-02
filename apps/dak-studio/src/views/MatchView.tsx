@@ -1,6 +1,7 @@
 import { usePageReady } from "../lib/use-page-ready";
+import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { buildSeriesSummary } from "@cs2dak/analytics";
 import type { MatchWorkspaceModel, SeriesSummary } from "@cs2dak/presentation";
 import { QaReportPanel } from "@cs2dak/react";
@@ -38,19 +39,25 @@ function cacheModel(id: string, model: MatchWorkspaceModel): void {
   }
 }
 
-async function loadModel(id: string): Promise<MatchWorkspaceModel> {
-  const cached = modelCache.get(id);
+async function loadModel(id: string, generation: number): Promise<MatchWorkspaceModel> {
+  assertAnalysisGeneration(generation);
+  const key = `${generation}:${id}`;
+  for (const old of modelCache.keys()) if (!old.startsWith(`${generation}:`)) modelCache.delete(old);
+  const cached = modelCache.get(key);
   if (cached) return cached;
   const model = await loadMatchWorkspaceModel(id);
-  cacheModel(id, model);
+  assertAnalysisGeneration(generation);
+  cacheModel(key, model);
   return model;
 }
 
 export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceContinuation, onReturnToSource, onPageReady }: MatchViewProps) {
+  const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
+  useEffect(() => subscribeAnalysisDataInvalidation(() => { if (getAnalysisDataSnapshot().status !== "ready") modelCache.clear(); }), []);
   const activeId = demoId;
   const activeEntry = activeId ? entries.find((entry) => entry.id === activeId) ?? null : null;
-  const [loaded, setLoaded] = useState<{ id: string; model: MatchWorkspaceModel; state: MatchWorkspaceState } | null>(null);
-  const model = loaded?.id === activeId ? loaded.model : null;
+  const [loaded, setLoaded] = useState<{ id: string; generation: number; model: MatchWorkspaceModel; state: MatchWorkspaceState } | null>(null);
+  const model = loaded?.id === activeId && loaded.generation === analysis.generation && analysis.status === "ready" ? loaded.model : null;
   const [error, setError] = useState<string | null>(null);
   const [showQa, setShowQa] = useState(false);
   const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
@@ -58,10 +65,11 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
   const [seriesError, setSeriesError] = useState<string | null>(null);
   const [summaryMode, setSummaryMode] = useState(false);
   const [summary, setSummary] = useState<SeriesSummary | null>(null);
+  const [summaryGeneration, setSummaryGeneration] = useState(-1);
   // 50+ 场时纯下拉不可用：搜索过滤（队名/地图/日期/文件名）+ 按地图分组
   const [matchSearch, setMatchSearch] = useState("");
 
-  usePageReady(!activeId || !activeEntry || (seriesReady && (model !== null || error !== null)), onPageReady);
+  usePageReady(!activeId || !activeEntry || (seriesReady && (model !== null || error !== null || analysis.status === "error")), onPageReady);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,22 +116,22 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
   }, [activeId]);
 
   useEffect(() => {
-    if (!activeId || !activeEntry) return;
+    if (!activeId || !activeEntry || analysis.status !== "ready") return;
     setShowQa(false);
-    const cached = modelCache.get(activeId);
+    for (const key of modelCache.keys()) if (!key.startsWith(`${analysis.generation}:`)) modelCache.delete(key);
+    const cached = modelCache.get(`${analysis.generation}:${activeId}`);
     if (cached) {
-      setLoaded({ id: activeId, model: cached, state: createMatchWorkspaceState(cached) });
+      setLoaded(prev => ({ id: activeId, generation: analysis.generation, model: cached, state: prev?.id === activeId ? prev.state : createMatchWorkspaceState(cached) }));
       setError(null);
       return;
     }
     let cancelled = false;
-    setLoaded(null);
     setError(null);
-    loadModel(activeId)
-      .then((built) => { if (!cancelled) setLoaded({ id: activeId, model: built, state: createMatchWorkspaceState(built) }); })
+    loadModel(activeId, analysis.generation)
+      .then((built) => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setLoaded(prev => ({ id: activeId, generation: analysis.generation, model: built, state: prev?.id === activeId ? prev.state : createMatchWorkspaceState(built) })); } })
       .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); });
     return () => { cancelled = true; };
-  }, [activeId, Boolean(activeEntry)]);
+  }, [activeId, Boolean(activeEntry), analysis.generation, analysis.status]);
 
   useEffect(() => {
     if (!deepLink || !loaded || loaded.id !== activeId) return;
@@ -134,14 +142,14 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
 
   // 汇总模式：懒构建系列内各图模型 → 跨图记分板
   useEffect(() => {
-    if (!summaryMode || !activeSeries || seriesEntries.length === 0) return;
+    if (!summaryMode || !activeSeries || seriesEntries.length === 0 || analysis.status !== "ready") return;
     let cancelled = false;
     setSummary(null);
-    Promise.all(seriesEntries.map(async (entry) => ({ matchId: matchIdForEntry(entry), model: await loadModel(entry.id) })))
-      .then((matches) => { if (!cancelled) setSummary(buildSeriesSummary(matches)); })
+    Promise.all(seriesEntries.map(async (entry) => ({ matchId: matchIdForEntry(entry), model: await loadModel(entry.id, analysis.generation) })))
+      .then((matches) => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setSummary(buildSeriesSummary(matches)); setSummaryGeneration(analysis.generation); } })
       .catch(() => { if (!cancelled) setSummary(null); });
     return () => { cancelled = true; };
-  }, [summaryMode, activeSeries, seriesEntries]);
+  }, [summaryMode, activeSeries, seriesEntries, analysis.generation, analysis.status]);
 
   if (activeId && !activeEntry) {
     return <div className="stu-view"><EmptyState variant="insufficient" title="比赛已不存在" hint="此比赛可能已从资料库删除。" action={<button type="button" className="stu-button" onClick={onGoLibrary}>返回资料库</button>} /></div>;
@@ -160,7 +168,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     );
   }
 
-  const workspaceBody = error
+  const workspaceBody = analysis.status !== "ready" ? <div className="stu-loading">{analysis.status === "error" ? "分析缓存不可用，请重试刷新" : "分析数据正在更新…"}</div> : error
     ? <EmptyState variant="error" title="加载失败" hint={error} />
     : !model
       ? <div className="stu-loading">读取本地持久化工作台…</div>
@@ -227,7 +235,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
             entries={seriesEntries}
             activeId={activeId ?? ""}
             summaryMode={summaryMode}
-            summary={summary}
+            summary={analysis.status === "ready" && summaryGeneration === analysis.generation ? summary : null}
             onSelectMap={(id) => { setSummaryMode(false); onSelectDemo(id); }}
             onShowSummary={() => setSummaryMode(true)}
           >

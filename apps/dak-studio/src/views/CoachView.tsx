@@ -1,13 +1,18 @@
 import { usePageReady } from "../lib/use-page-ready";
+import { assertCurrentFacts } from "../lib/facts-readiness";
+import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
+import { getObservedMapPool } from "../lib/queries/spatial-queries";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
 import { EmptyState, DataTable, type DataTableColumn } from "@cs2dak/react";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { TACTICAL_FACT_VERSION } from "@cs2dak/tactics";
 import { getFactsStore } from "../lib/facts-store";
 import type { TacticalRoundFact } from "@cs2dak/tactics";
-import { buildTacticalClusters, autoName, withTacticalTeamIdentities, type TacticalCluster } from "../lib/tactics";
+import { buildTacticalClusters, type TacticalCluster } from "@cs2dak/tactics";
+import { formatTacticalClusterName as autoName } from "@cs2dak/presentation";
+import { withTacticalDisplayGroupKeys } from "../lib/tactical-display-groups";
 import { prepItemsToMarkdown, type PrepItem } from "../lib/playlist";
 import {
   listPlaybookNames,
@@ -61,6 +66,7 @@ export function CoachView({
 }: CoachViewProps) {
   const [tab, setTab] = useState<CoachTab>("patterns");
   const [allFacts, setAllFacts] = useState<TacticalRoundFact[]>([]);
+  const [factsGeneration, setFactsGeneration] = useState(-1);
   const [hasValidFacts, setHasValidFacts] = useState(false);
   // loading=true 初始值：防止首帧渲染时 clusters=[] && !loading 导致闪出空态
   const [loading, setLoading] = useState(true);
@@ -69,7 +75,8 @@ export function CoachView({
   const [error, setError] = useState<string | null>(null);
   const [settingsReady, setSettingsReady] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
-  usePageReady(settingsReady && (entries.length === 0 || !loading || error !== null), onPageReady);
+  const analysisData = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
+  usePageReady(settingsReady && (entries.length === 0 || analysisData.status === "error" || (analysisData.status === "ready" && (!loading || error !== null))), onPageReady);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
   const teamGroups = useMemo(
     () => teamRenameGroups(allEntries.map((entry) => ({ teamA: entry.meta.teamAName, teamB: entry.meta.teamBName })), teamRenames),
@@ -81,11 +88,11 @@ export function CoachView({
 
   // 没有明确主体时不能把全部队伍混成一个“模式”；直接入口只要求用户补一次队伍。
   const facts = useMemo(
-    () => subjectTeam ? filterBySubjectTeam(allFacts, subjectTeam, teamRenames) : [],
-    [allFacts, subjectTeam, teamRenames]
+    () => subjectTeam && analysisData.status === "ready" && factsGeneration === analysisData.generation ? filterBySubjectTeam(allFacts, subjectTeam, teamRenames) : [],
+    [allFacts, subjectTeam, teamRenames, analysisData, factsGeneration]
   );
   const clusters = useMemo(
-    () => facts.length > 0 ? buildTacticalClusters(withTacticalTeamIdentities(facts, teamRenames)) : [],
+    () => facts.length > 0 ? buildTacticalClusters(withTacticalDisplayGroupKeys(facts, teamRenames)) : [],
     [facts, teamRenames]
   );
 
@@ -118,7 +125,7 @@ export function CoachView({
   }, [onAnalysisContextChange]);
 
   useEffect(() => {
-    if (entries.length === 0) {
+    if (entries.length === 0 || analysisData.status !== "ready") {
       setAllFacts([]);
       setHasValidFacts(false);
       setLoading(false);
@@ -127,12 +134,14 @@ export function CoachView({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    getFactsStore().getTacticalRounds({ matchIds: entries.map(matchIdForEntry) })
+    Promise.resolve().then(() => { assertCurrentFacts(entries); return getFactsStore().getTacticalRounds({ matchIds: entries.map(matchIdForEntry) }); })
       .then((rows) => {
         if (!cancelled) {
+          assertAnalysisGeneration(analysisData.generation);
           const validRows = rows.filter(isCurrentTacticalRoundFact);
           setHasValidFacts(validRows.length > 0);
           setAllFacts(validRows);
+          setFactsGeneration(analysisData.generation);
           setLoading(false);
         }
       })
@@ -143,7 +152,7 @@ export function CoachView({
         }
       });
     return () => { cancelled = true; };
-  }, [entries, teamRenames]); // subjectTeam 变化时不回库——useMemo 派生即可
+  }, [entries, teamRenames, analysisData.generation, analysisData.status]); // subjectTeam 变化时不回库——useMemo 派生即可
 
   function setMode(next: "own" | "scout") {
     onAnalysisContextChange((current) => ({ ...current, goal: next === "own" ? "own-review" : "opponent-prep" }));
@@ -331,10 +340,9 @@ export function CoachView({
       {!loading && clusters.length > 0 && tab === "anti" && (
         <>
           <MapPoolTable
-            facts={allFacts}
-            myTeamName={analysisContext.roles.beneficiary?.label ?? null}
-            opponentTeamName={analysisContext.roles.opponent?.label ?? null}
-            teamRenames={teamRenames}
+            rows={getObservedMapPool(allFacts, analysisContext.roles.beneficiary?.label ?? null, analysisContext.roles.opponent?.label ?? null, teamRenames)}
+            hasOwn={Boolean(analysisContext.roles.beneficiary)}
+            hasOpponent={Boolean(analysisContext.roles.opponent)}
           />
           <details className="stu-card stu-coach-report-details">
             <summary>备战报告 Markdown</summary>

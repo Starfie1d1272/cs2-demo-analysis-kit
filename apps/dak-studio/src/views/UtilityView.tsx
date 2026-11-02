@@ -8,7 +8,9 @@ import {
   type UtilityValueSummary,
 } from "@cs2dak/analytics";
 import { DataTable, EmptyState, MetricInfo, type DataTableColumn } from "@cs2dak/react";
-import { getSeasonSummary, getUtilityValueSummary, type IdentityOptions } from "../lib/season";
+import { getSeasonSummary } from "../lib/queries/season-queries";
+import { getUtilityValueSummary } from "../lib/queries/utility-queries";
+import { type IdentityOptions } from "../lib/identity";
 import { formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { EvidenceActions } from "../components/EvidenceActions";
 import type { OpenEvidence } from "../lib/evidence-continuation";

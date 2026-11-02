@@ -1,3 +1,4 @@
+import { withAnalysisQueryInvalidation } from "./queries/query-cache";
 import {
   backfillDemoIdentities,
   rebuildFactsFromZip,
@@ -62,10 +63,12 @@ export async function repairDemoIdentityAndDuplicates(): Promise<LibraryIdentity
   // Series/Event references are rewritten before any duplicate storage is
   // deleted, so a failed rewrite cannot leave records pointing at missing IDs.
   for (const { duplicate, survivor } of duplicateEntries) {
-    await removeDemoStorageOnly(duplicate.id);
-    if (matchIdForEntry(duplicate) !== matchIdForEntry(survivor)) {
-      await removeDemoAnalysis(matchIdForEntry(duplicate));
-    }
+    await withAnalysisQueryInvalidation(async () => {
+      await removeDemoStorageOnly(duplicate.id);
+      if (matchIdForEntry(duplicate) !== matchIdForEntry(survivor)) {
+        await removeDemoAnalysis(matchIdForEntry(duplicate));
+      }
+    });
     removed += 1;
   }
   // The imported ZIP is still the source of truth after duplicate deletion. Rebuild it
