@@ -1,6 +1,7 @@
 import type { MaterialPageState, MaterialsPageState } from "./material-page-state";
 import type { TableState } from "@cs2dak/presentation";
 import type { MatchWorkspaceState } from "./match-workspace-state";
+import type { DuelPageState, EconomyPageState, LineupsPageState } from "./analysis-theme-state";
 import type { StudioPageId } from "./studio-navigation.js";
 
 export interface MatchesPageState { search: string; mapFilter: string | null; tagFilter: string | null; serverFilter: string | null; dateFrom: string; dateTo: string }
@@ -15,4 +16,4 @@ export interface TeamPageState { section: "overview" | "roles"; matrixMapName: s
 export const emptyTeamState = (): TeamPageState => ({ section: "overview", matrixMapName: null, matrixSide: "ct", compareTeamName: null, tables: {} });
 export interface AnalysisPageState { comparePair: [string, string] | null; leaderboardView: import("@cs2dak/presentation").LeaderboardViewKey; tables: Partial<Record<"maps" | "weapons" | "leaderboard", TableState>> }
 export const emptyAnalysisState = (): AnalysisPageState => ({ comparePair: null, leaderboardView: "core", tables: {} });
-export type StudioPageStateMap = { [P in StudioPageId]: P extends "analysis" | "event-analysis" ? AnalysisPageState : P extends "player" ? PlayerPageState : P extends "team" ? TeamPageState : P extends "materials" ? MaterialsPageState : P extends "material" ? MaterialPageState | null : P extends "match" ? MatchWorkspaceState | null : P extends "utility" ? UtilityPageState : P extends "matches" ? MatchesPageState : P extends "events" ? EventsPageState : P extends "management" ? { tab: "identity" | "assets" | "library"; library: MatchesPageState } : null };
+export type StudioPageStateMap = { [P in StudioPageId]: P extends "analysis" | "event-analysis" ? AnalysisPageState : P extends "player" ? PlayerPageState : P extends "team" ? TeamPageState : P extends "materials" ? MaterialsPageState : P extends "material" ? MaterialPageState | null : P extends "match" ? MatchWorkspaceState | null : P extends "duel" ? DuelPageState : P extends "economy" ? EconomyPageState : P extends "lineups" ? LineupsPageState : P extends "utility" ? UtilityPageState : P extends "matches" ? MatchesPageState : P extends "events" ? EventsPageState : P extends "management" ? { tab: "identity" | "assets" | "library"; library: MatchesPageState } : null };
