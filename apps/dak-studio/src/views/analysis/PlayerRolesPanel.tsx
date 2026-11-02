@@ -131,12 +131,27 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
     setDeclaredSecondaryRole(secondary?.kind === "main_role" ? secondary.role : "");
     setDeclaredWeaponDuty(weapon?.kind === "weapon_duty" ? weapon.weaponDuty : "");
     setRoleFormError(null);
-  }, [roleEditorOpen, editorOwner, roleDeclarations]);
+  }, [roleEditorOpen, editorOwner]);
 
   if (!entries.length) return <div className="stu-view"><EmptyState variant="insufficient" title="聚合范围为空" hint="请调整分析范围。" /></div>;
 
-  function openRoleEditor() {
-    setScopeIndex(0); setRoleFormError(null); setRoleEditorOpen(true);
+  async function openRoleEditor() {
+    if (declarationsSavingRef.current) return;
+    const openingOwner = editorOwner;
+    declarationsSavingRef.current = true;
+    setDeclarationsSaving(true);
+    setDeclarationsError(null);
+    try {
+      const current = await loadRoleDeclarations();
+      if (editorOwnerRef.current !== openingOwner) return;
+      setRoleDeclarations(current);
+      setScopeIndex(0); setRoleFormError(null); setRoleEditorOpen(true);
+    } catch (reason) {
+      if (editorOwnerRef.current === openingOwner) setDeclarationsError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      declarationsSavingRef.current = false;
+      setDeclarationsSaving(false);
+    }
   }
 
   async function saveRoleDeclaration() {
@@ -186,7 +201,7 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
             <div className="stu-card stu-card-wide" id="players:map-roles">
                 {capability.availability && <CapabilityBar availability={capability.availability} onRepair={onCapabilityRepair} />}
               {capability.error && <p role="alert">地图位置能力读取失败：{capability.error} <button type="button" className="stu-button-sm" onClick={capability.retry}>重试</button>{capability.availability && " · 显示旧版本"}</p>}
-              <div className="stu-card-head"><h3>地图 / 位置</h3>{playerProfiles.length > 1 && <select className="stu-form-control" disabled={declarationsSaving || roleEditorOpen} style={{ width: "auto", maxWidth: "18rem" }} aria-label="选择队伍画像" value={selectedRoleProfile?.teamKey ?? ""} onChange={event => { setProfileTeam(event.target.value); setScopeIndex(0); }}>{playerProfiles.map(profile => <option key={profile.teamKey} value={profile.teamKey}>{profile.teamGroup.label}</option>)}</select>}<button type="button" className="stu-button-sm" disabled={!roleDeclarations || !selectedRoleProfile || declarationsSaving} onClick={openRoleEditor}>编辑声明</button></div>
+              <div className="stu-card-head"><h3>地图 / 位置</h3>{playerProfiles.length > 1 && <select className="stu-form-control" disabled={declarationsSaving || roleEditorOpen} style={{ width: "auto", maxWidth: "18rem" }} aria-label="选择队伍画像" value={selectedRoleProfile?.teamKey ?? ""} onChange={event => { setProfileTeam(event.target.value); setScopeIndex(0); }}>{playerProfiles.map(profile => <option key={profile.teamKey} value={profile.teamKey}>{profile.teamGroup.label}</option>)}</select>}<button type="button" className="stu-button-sm" disabled={!roleDeclarations || !selectedRoleProfile || declarationsSaving} onClick={() => void openRoleEditor()}>编辑声明</button></div>
               {declarationsError && <p role="alert">角色声明读取失败：{declarationsError} <button type="button" className="stu-button-sm" onClick={() => setDeclarationsRetry(value => value + 1)}>重试</button></p>}
               {roleProfiles && (roleError || analysis.status !== "ready" || roleSnapshot?.generation !== analysis.generation) && <p className="stu-muted" role="status">{roleError || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
               {roleError && !roleProfiles ? <EmptyState variant="error" title="地图角色不可用" hint={roleError} /> : !roleProfiles && !capability.error && !declarationsError ? <div className="stu-loading">读取地图位置事实…</div> : !roleProfiles ? null : roleEntries?.length === 0 && roleProfiles.length === 0 ? (capability.error ? null : <p className="stu-muted" role="status">当前范围暂无可用比赛，请查看上方原因和操作。</p>) : <PlayerMapRoleProfilePanel state={state.tables.roles ?? { sort: { key: "sample", direction: "desc" }, page: 0 }} onStateChange={table => onStateChange({ ...state, tables: { ...state.tables, roles: table } })} profile={selectedRoleProfile ? { ...selectedRoleProfile, teamKey: selectedRoleProfile.teamGroup.label } : null} onOpenEvidence={(evidence) => {
@@ -208,7 +223,7 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
                   {roleFormError && <p className="stu-form-error" role="alert">{roleFormError}</p>}
                   {selectedDeclarations.length > 0 && <section className="stu-declaration-list"><h4>已有声明</h4>{selectedDeclarations.map((row) => <div key={row.id} className="stu-declaration-row"><span>{row.declaration.kind === "main_role" ? `${row.declaration.priority === "primary" ? "主角色" : "副角色"} · ${row.declaration.role}` : DUTY_LABEL[row.declaration.weaponDuty]}{row.declaration.mapName ? ` · ${row.declaration.mapName.replace("de_", "")}` : ""}</span><button type="button" className="stu-button-sm" disabled={declarationsSaving} onClick={() => void clearRoleDeclaration(row.id)}>清除</button></div>)}</section>}
                 </div>
-                <footer className="stu-modal-foot"><div className="stu-modal-actions"><button type="button" className="stu-button" disabled={declarationsSaving} onClick={() => setRoleEditorOpen(false)}>取消</button><button type="button" className="stu-button stu-button-primary" disabled={declarationsSaving || !declaredRole} onClick={() => void saveRoleDeclaration()}>{declarationsSaving ? "保存中…" : "保存声明"}</button></div></footer>
+                <footer className="stu-modal-foot"><div className="stu-modal-actions"><button type="button" className="stu-button" disabled={declarationsSaving} onClick={() => setRoleEditorOpen(false)}>取消</button><button type="button" className="stu-button stu-button-primary" disabled={declarationsSaving || !declaredRole || !selectedRoleProfile} onClick={() => void saveRoleDeclaration()}>{declarationsSaving ? "保存中…" : "保存声明"}</button></div></footer>
               </div>
             </div>
           )}

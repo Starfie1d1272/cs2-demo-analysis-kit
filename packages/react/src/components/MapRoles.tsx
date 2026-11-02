@@ -24,11 +24,6 @@ export const playerMapPoolSortColumns: DataTableColumn<PlayerMapPoolRowView>[] =
   { key: "kast", label: "KAST", sortable: true, sortValue: row => row.kast },
 ];
 
-function alignmentLabel(value: string) {
-  return value.replace(/(T|CT) 方观察职责：(\w+)/g, (_match, side: string, responsibility: string) =>
-    `${side} 方观察职责：${RESPONSIBILITY_LABEL[responsibility as keyof typeof RESPONSIBILITY_LABEL] ?? "未知"}`);
-}
-
 function Status({ value }: { value: keyof typeof STATUS_LABEL }) {
   return <span className={`dak-role-status dak-role-status-${value}`}>{STATUS_LABEL[value]}</span>;
 }
@@ -81,7 +76,7 @@ export function PlayerMapRoleProfilePanel({
       <div className="dak-role-summary"><span>AWPer 倾向分 <b>{Math.round(profile.roleEvidenceScores.awper * 100)}</b></span><span>Anchor 倾向分 <b>{Math.round(profile.roleEvidenceScores.anchor * 100)}</b></span><span>Opener 倾向分 <b>{Math.round(profile.roleEvidenceScores.opener * 100)}</b></span><span>Closer 倾向分 <b>{Math.round(profile.roleEvidenceScores.closer * 100)}</b></span></div>
       <div className="dak-role-declarations"><b>用户主角色</b>{profile.declaredRoles.filter((row) => row.source === "user").map((row, index) => <span key={`user-${row.role}-${index}`} className="dak-role-tag">{row.priority === "primary" ? "主角色" : "副角色"} · {row.role}{row.mapName ? ` · ${row.mapName.replace("de_", "")}` : ""}</span>)}{!profile.declaredRoles.some((row) => row.source === "user") && <span>未提供</span>}<b>用户武器职责</b>{profile.declaredWeaponDuties.filter((row) => row.source === "user").map((row, index) => <span key={`weapon-${row.weaponDuty}-${index}`} className="dak-role-tag">{DUTY_LABEL[row.weaponDuty]}{row.mapName ? ` · ${row.mapName.replace("de_", "")}` : ""}</span>)}{!profile.declaredWeaponDuties.some((row) => row.source === "user") && <span>未提供</span>}</div>
       {rows.length ? <DataTable classes={DAK_TABLE_CLASSES} rows={rows} rowKey={(row) => `${row.teamKey}:${row.mapName}:${row.side}`} columns={columns} state={tableState} onStateChange={setTableState} /> : <EmptyState variant="insufficient" title="没有可用地图样本" hint="当前范围没有满足角色证据条件的地图 / 阵营数据。" />}
-      {profile.roleAlignments.map((alignment, index) => <p className="dak-role-note" key={`role-alignment-${index}`}><b>声明与观察</b>{alignmentLabel(alignment.tSide)}；{alignmentLabel(alignment.ctSide)}{alignment.sampleLimitations[0] ? `；${alignment.sampleLimitations[0]}` : ""}</p>)}
+      {profile.roleAlignments.map((alignment, index) => <p className="dak-role-note" key={`role-alignment-${index}`}><b>声明与观察</b>T 方观察职责：{RESPONSIBILITY_LABEL[alignment.tResponsibility]}；CT 方观察职责：{RESPONSIBILITY_LABEL[alignment.ctResponsibility]}{alignment.sampleLimitations[0] ? `；${alignment.sampleLimitations[0]}` : ""}</p>)}
       {profile.weaponDutyAlignments.map((alignment, index) => <p className="dak-role-note" key={`weapon-alignment-${index}`}><b>武器职责声明与观察</b>{DUTY_LABEL[alignment.declaration.weaponDuty]} / {alignment.observedWeaponDuty ? DUTY_LABEL[alignment.observedWeaponDuty] : "—"}</p>)}
     </section>
   );
