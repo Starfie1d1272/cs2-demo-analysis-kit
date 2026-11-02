@@ -2,6 +2,7 @@ import { buildTeamComparisonFromFacts, buildTeamOverviewFromFacts } from "@cs2da
 import { type TeamComparisonModel, type TeamOverviewModel } from "@cs2dak/presentation";
 import { createAnalysisBucket, cachedQuery, readPersistedValue, writePersistedValue } from "./query-cache";
 import { assertCurrentFacts } from "../facts-readiness";
+import { getFactsStore } from "../facts-store";
 import { getDerivedCacheStore } from "../derived-cache";
 import { matchIdForEntry, type StudioDemoEntry } from "../demo-entry";
 
@@ -24,7 +25,7 @@ export async function getTeamComparison(entries: StudioDemoEntry[], identity?: I
     const matchIds = entries.map(matchIdForEntry);
     const facts = withTeamRenames(await getDerivedCacheStore().getTeamComparison({ matchIds }), identity?.teamRenames);
     if (facts.length >= entries.length) {
-      const model = buildTeamComparisonFromFacts(facts, pair);
+      const model = buildTeamComparisonFromFacts(facts, pair, await getFactsStore().getRrSignalRows({ matchIds }));
       await writePersistedValue(key, model, generation);
       return model;
     }
@@ -41,7 +42,7 @@ export async function getTeamOverview(entries: StudioDemoEntry[], teamName: stri
     const matchIds = entries.map(matchIdForEntry);
     const facts = withTeamRenames(await getDerivedCacheStore().getTeamComparison({ matchIds }), identity?.teamRenames);
     if (facts.length < entries.length) throw missingFactsError("队伍总览");
-    const overview = buildTeamOverviewFromFacts(facts, teamName);
+    const overview = buildTeamOverviewFromFacts(facts, teamName, [], await getFactsStore().getRrSignalRows({ matchIds }));
     await writePersistedValue(key, overview, generation);
     return overview;
   });

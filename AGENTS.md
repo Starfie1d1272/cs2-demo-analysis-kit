@@ -85,7 +85,7 @@ pipeline 编排上述执行链；apps/CLI 负责文件、缓存、权限和产�
 | `@cs2dak/presentation` | 展示 schema、窄 View DTO、标签、格式与纯投影；仅依赖 maps/Zod。 |
 | `@cs2dak/react` | React 组件。消费 presentation View Model 与 maps/calibration 坐标投影；安装和声明闭包不依赖分析包。 |
 | `@cs2dak/cli` | 薄 CLI（tsx），把 demo-io 与 pipeline 接到文件系统。 |
-| `apps/dak-studio` | DAK Studio：本地 Demo 管理、战术分析与个人打法复盘工作台（独立设计语言；导入即提取 facts 行持久化，视图读投影；IndexedDB 开发 / SQLite 桌面双后端）。教练页战术聚类 0.6.0 已落地（`TacticalRoundFact`/`TacticalCluster` + `PatternExplorer` 三栏 + `RadarTrails` + `MapPoolTable` + Round Playlist + 默认位资产 + 3D callout 网格）见 `docs/design/studio-redesign.md §8`。 |
+| `apps/dak-studio` | DAK Studio：本地 Demo 管理、战术分析与个人打法复盘工作台（独立设计语言；导入即提取 facts 行持久化，视图读投影；IndexedDB 开发 / SQLite 桌面双后端）。当前入口为工作台、比赛库、分析、战术与训练及数据管理；历史设计见 `docs/design/studio-redesign.md`，不得据此恢复旧页面或旧导出。 |
 | `python/src/cs2dak` | Python 壳（cs2df 包装器）：DAK Studio 桌面桥。CLI 仅保留 version。 |
 
 ```
@@ -112,7 +112,7 @@ docs/                  # 架构与集成文档（索引见 docs/README.md）
 > **已迁移**：cs2-demo-format 3.1.0 / cs2df 3.1.0（2026-06）。TS 管线全部使用 v3 合同，
 > Python exporter 切换为 PyPI `cs2df`（本仓库只留 Studio 桌面壳）。
 > v3 迁移与 fixture 重导均已完成（归档见 `docs/archive/2026-06/v3-migration.md`）。
-> Studio 最终形态设计见 [`docs/design/studio-redesign.md`](docs/design/studio-redesign.md)。
+> Studio 当前入口见 [`apps/dak-studio/README.md`](apps/dak-studio/README.md)，旧设计仅作历史参考。
 
 ### 模块边界规则
 
