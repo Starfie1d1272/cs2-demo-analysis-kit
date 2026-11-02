@@ -2,11 +2,15 @@
 
 本记录不是整体验收通过证明。原始实测基线 main `186f3fafea6bda8bee8850250ef49d7bf5adcd7f`，2026-11-02 UTC；分支随后更新到 `39e3a66`（含 #180/#181），新差异见 C2；[#133](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/133)、[#152](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/152)。21 个前置项已合入，但其 PR/CI 不替代下列旅程验收。没有关闭 #152/#133，也不建议据此关闭 #17。#3 的长期运行及 50+ 场、#64 的桌面平台、#49/#75/#76 各自独立门槛仍由原 owner 承接。
 
+## 2026-11-02 用户授权的范围调整
+
+用户明确：除比赛 format/ZIP 资料库外，DAK 旧版兼容不再作为验收要求；不恢复旧 Prep 页面、旧手工入口或旧导出，保留新统一导出。旧数据不主动物理清除。下文此前执行的 Prep、材料单编辑和旧资料迁移记录是当时的历史观察，不要求恢复这些入口或将其通过作为关闭门槛；W09/W11 正在按新范围删除或收口，最终合流后必须基于实际保留的新入口重新跑相应旅程。比赛 format/ZIP、基础身份与当前产品数据仍需按实际合同核验。
+
 ## 环境与证据
 
 - Linux x86_64 云环境，5 vCPU（AMD EPYC 9V74），约 17 GiB 可用内存；Node 24.19.0/pnpm 使用仓库 activate 脚本，Vite 开发服务，Chromium 151 headless，1280×800；隔离浏览器 context/IndexedDB，没有接触现有用户库。无显示服务器及可用桌面设备，本次没有原生壳、Windows/macOS、原生壳备份/恢复或实际打印机结果。
 - 空库 A 和独立 B；B 通过文件选择导入仓库 Nuke `cologne-major-2026-stage3-smoke-de_nuke.zip`（593,751 bytes）及 cohort 三个 ZIP（1,986,337 / 1,045,157 / 1,134,000 bytes），共 4 场，约 4.8 MB；均为仓库真实样本，未伪造 50 场。四场界面均显示日期未知。另用临时副本和内存/SQLite 记录模拟缺失、故障与旧资料，具体方法在各项注明；未操作项不标通过。
-- 精确 main 的 [官方 CI](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/actions/runs/41407963506)：TypeScript（typecheck/fast/build）、integration、Python、event worker 四项成功。本地先缺 dist 直接运行失败；按仓库流程 `pnpm build:packages` 后 `pnpm typecheck`、Studio build 成功，既有 library-persistence/library 两文件 9 项通过。`pnpm check:package-boundaries`（8 项）和 `pnpm check:package-consumers` 成功：真实 tarball、隔离安装、NodeNext 声明闭包及浏览器打包。额外独立安装当前 maps/presentation/react tarball，实调用 `sortTableRows` 和三个 MapRoles 排序列：样本 3 在 1 前、RR 2/1/null 顺序正确。不是所有外部消费者迁移证明。
+- 原始基线 main 的 [官方 CI](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/actions/runs/41407963506)：TypeScript（typecheck/fast/build）、integration、Python、event worker 四项成功。本地先缺 dist 直接运行失败；按仓库流程 `pnpm build:packages` 后 `pnpm typecheck`、Studio build 成功，既有 library-persistence/library 两文件 9 项通过。`pnpm check:package-boundaries`（8 项）和 `pnpm check:package-consumers` 成功：真实 tarball、隔离安装、NodeNext 声明闭包及浏览器打包。额外独立安装当前 maps/presentation/react tarball，实调用 `sortTableRows` 和三个 MapRoles 排序列：样本 3 在 1 前、RR 2/1/null 顺序正确。不是所有外部消费者迁移证明。
 
 ## A 玩家
 
