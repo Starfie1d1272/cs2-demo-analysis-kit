@@ -149,7 +149,7 @@ export function RadarFieldView({ exportSource, onCapabilityRepair, entries, team
           {exportSource && field && fieldReady && !progress && !fieldError && !capability.error && !capability.stale && !invalidTeamForMap && canExportSnapshot(snapshot, analysis) && <AnalysisExportButtons capture={() => buildControlAnalysisResult(withCapabilityConditions(withAnalysisExportEntries(exportSource, entriesOfMap.filter(entry => field.scope.matchIds.includes(entry.id) || baseline?.scope.matchIds.includes(entry.id))), capability.availability), field, baseline, state)} />}
           <p className="stu-muted">
             基线 = 当前全局范围中 {activeMap} 的 {entriesOfMap.length} 场；
-            队伍视图 = 该队在这些场次里的贡献。覆盖场仅作描述性观察，不自动识别弱区或生成对策。
+            队伍视图 = 该队在这些场次里的贡献。覆盖场展示选定范围内的空间分布。
           </p>
         </div>
         <span className="stu-radar-field-badge">首次计算后会缓存</span>
