@@ -1,3 +1,4 @@
+import { OPENING_WINDOW_SECONDS, OPENING_SPEEDS, OPENING_OPACITY_MIN, OPENING_OPACITY_MAX } from "../lib/spatial-view-state";
 import { type OpeningPageState } from "../lib/spatial-view-state";
 import { usePageReady } from "../lib/use-page-ready";
 import { Pause, Play, RotateCcw } from "lucide-react";
@@ -28,7 +29,7 @@ export interface TrailsViewProps {
   onStateChange: Dispatch<SetStateAction<OpeningPageState>>;
 }
 
-const WINDOW_SECONDS = 30;
+const WINDOW_SECONDS = OPENING_WINDOW_SECONDS;
 const RANGE_OPTIONS = [3, 5, 10, 0] as const; // 0 = 全部
 
 interface PlayerOption {
@@ -475,15 +476,15 @@ function TrailStage({ mapName, rounds, hiddenRounds, onToggleRound, missingRepla
           <label className="stu-trail-opacity" title="轨迹透明度">
             <input
               type="range"
-              min={0.1}
-              max={1}
+              min={OPENING_OPACITY_MIN}
+              max={OPENING_OPACITY_MAX}
               step={0.05}
               value={trailOpacity}
               onChange={(e) => setTrailOpacity(Number(e.target.value))}
             />
           </label>
           <div className="stu-speed-toggle" role="group" aria-label="播放速度">
-            {[1, 2, 4].map((value) => (
+            {OPENING_SPEEDS.map((value) => (
               <button
                 key={value}
                 type="button"

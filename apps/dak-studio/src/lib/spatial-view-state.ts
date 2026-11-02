@@ -1,5 +1,10 @@
 import type { RadarFieldMode } from "@cs2dak/presentation/radar-field";
 
+export const OPENING_WINDOW_SECONDS = 30;
+export const OPENING_SPEEDS = [1, 2, 4] as const;
+export const OPENING_OPACITY_MIN = 0.1;
+export const OPENING_OPACITY_MAX = 1;
+
 export interface OpeningPageState {
   mapName: string | null;
   side: "t" | "ct";

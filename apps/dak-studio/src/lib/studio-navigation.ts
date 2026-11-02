@@ -79,7 +79,8 @@ export function studioNavigationReducer(state: StudioNavigation, action: Navigat
   if (action.intent === "saved-origin") return state.active.id === action.frameId ? { ...state, active: { ...state.active, originSavedAnalysisId: action.id } as StudioFrame } : state;
   if (action.intent === "context") {
     if (state.active.id !== action.frameId || !("context" in state.active.destination)) return state;
-    return { ...state, active: { ...state.active, destination: { ...state.active.destination, context: createAnalysisContext(action.context) } } as StudioFrame };
+    const focusChanged = JSON.stringify(state.active.destination.context.focus) !== JSON.stringify(action.context.focus);
+    return { ...state, active: { ...state.active, ...(focusChanged ? { originSavedAnalysisId: undefined } : {}), destination: { ...state.active.destination, context: createAnalysisContext(action.context) } } as StudioFrame };
   }
   if (action.intent === "ui") return state.active.id === action.frameId ? { ...state, active: { ...state.active, ui: action.ui } as StudioFrame } : state;
   if (action.intent === "position") return state.active.id === action.frameId ? { ...state, active: { ...state.active, scrollY: action.scrollY, anchorKey: action.anchorKey } } : state;

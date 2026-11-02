@@ -570,9 +570,9 @@ export function App() {
           />
         )}
         {section === "analysis" && active.originSavedAnalysisId && <p>已保存分析：按当前资料库重新计算。</p>}
-        {section === "analysis" && <AnalysisView page={destination.page as import("./lib/studio-navigation").AnalysisPageId} focus={analysisContext.focus} onBeginSave={async () => { const id = navigationRef.current.active.originSavedAnalysisId; if (!id) return null; const row = await savedAnalyses.get(id); if (!row) throw new Error("原保存项已删除，可另存"); return { title: row.title, shortcut: row.workbenchShortcut }; }} savedPanel={<SavedAnalysesPanel onReset={() => navigate({ page: "analysis", context: createAnalysisContextPreset("explore") })} entries={entries} events={eventScopes} onOpen={row => void openSavedAnalysis(row)} />} onSave={async (title, workbenchShortcut, copy) => {
+        {section === "analysis" && <AnalysisView key={active.id} page={destination.page as import("./lib/studio-navigation").AnalysisPageId} focus={analysisContext.focus} onBeginSave={async () => { const frame = navigationRef.current.active; if (frame.id !== active.id) throw new Error("分析页面已切换"); const id = frame.originSavedAnalysisId; if (!id) return null; const row = await savedAnalyses.get(id); if (!row) throw new Error("原保存项已删除，可另存"); return { title: row.title, shortcut: row.workbenchShortcut }; }} savedPanel={<SavedAnalysesPanel onReset={() => navigate({ page: "analysis", context: createAnalysisContextPreset("explore") })} entries={entries} events={eventScopes} onOpen={row => void openSavedAnalysis(row)} />} onSave={async (title, workbenchShortcut, copy) => {
           const frame = navigationRef.current.active;
-          if (!("context" in frame.destination)) throw new Error("当前页面不能保存");
+          if (frame.id !== active.id || !("context" in frame.destination)) throw new Error("分析页面已切换");
           const input = { page: frame.destination.page, context: frame.destination.context, ui: frame.ui, title, workbenchShortcut } as SavedAnalysisInput;
           const saved = frame.originSavedAnalysisId && !copy ? await savedAnalyses.update(frame.originSavedAnalysisId, input) : await savedAnalyses.create(input);
           setNavigation(current => studioNavigationReducer(current, { intent: "saved-origin", frameId: frame.id, id: saved.id }));
