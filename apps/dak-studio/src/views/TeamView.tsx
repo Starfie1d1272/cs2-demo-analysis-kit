@@ -10,12 +10,11 @@ import { TeamComparisonPanel } from "@cs2dak/react";
 import type { TeamComparisonModel } from "@cs2dak/presentation";
 import type { TeamPageState } from "../lib/studio-page-state";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { DataTable, EmptyState, type DataTableColumn } from "@cs2dak/react";
 import type { TeamOverviewModel } from "@cs2dak/presentation";
 import { getTeamOverview } from "../lib/queries/team-queries";
 import { type IdentityOptions } from "../lib/identity";
-import { displayTeamName } from "../lib/team-identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 
 type TeamViewAction = "duel" | "economy" | "utility" | "opening" | "control" | "patterns" | "roles";
@@ -39,6 +38,7 @@ export function TeamView({
   exportSource,
   entries,
   selectedTeam,
+  selectedTeamKey,
   onSelectTeam,
   onOpenMatch,
   onOpenCapability,
@@ -52,7 +52,8 @@ export function TeamView({
   exportSource?: AnalysisExportSource | null;
   entries: StudioDemoEntry[];
   selectedTeam: string | null;
-  onSelectTeam: (teamName: string) => void;
+  selectedTeamKey?: string | null;
+  onSelectTeam: (teamName: string, teamKey?: string) => void;
   onOpenMatch: (entryId: string) => void;
   onOpenCapability: (view: TeamViewAction) => void;
   state: TeamPageState;
@@ -65,24 +66,28 @@ export function TeamView({
   const rosterTable = state.tables.roster ?? { sort: { key: "rr", direction: "desc" as const }, page: 0 };
   const setMapTable = (value: typeof mapTable) => onStateChange({ ...state, tables: { ...state.tables, maps: value } });
   const setRosterTable = (value: typeof rosterTable) => onStateChange({ ...state, tables: { ...state.tables, roster: value } });
-  const teams = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const entry of entries) {
-      for (const name of new Set([entry.meta.teamAName, entry.meta.teamBName].map(rawName => displayTeamName(rawName, identityOptions?.teamRenames)))) {
-        counts.set(name, (counts.get(name) ?? 0) + 1);
-      }
-    }
-    return [...counts.entries()]
-      .map(([name, matches]) => ({ name, matches }))
-      .sort((a, b) => b.matches - a.matches || a.name.localeCompare(b.name));
-  }, [entries, identityOptions?.version]);
-  const activeTeam = selectedTeam && teams.some((team) => team.name === selectedTeam) ? selectedTeam : null;
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
-  const teamEntries = useMemo(() => activeTeam ? entries.filter(entry => [entry.meta.teamAName, entry.meta.teamBName].some(name => displayTeamName(name, identityOptions?.teamRenames) === activeTeam)) : [], [entries, activeTeam, identityOptions?.teamRenames]);
+  const [teamList, setTeamList] = useState<TeamComparisonModel["availableTeams"]>([]);
+  const [teamListError, setTeamListError] = useState<string | null>(null);
+  const teamEntries = entries;
   const overviewCapability = useCapability(teamEntries, "team-comparison");
   const comparisonCapability = useCapability(entries, "team-comparison");
   const overviewEntries = overviewCapability.eligible;
   const comparisonEntries = comparisonCapability.eligible;
+  useEffect(() => {
+    if (!comparisonEntries?.length || analysis.status !== "ready") { setTeamList([]); return; }
+    let cancelled = false;
+    setTeamListError(null);
+    void getTeamComparison(comparisonEntries, identityOptions).then(model => {
+      if (!cancelled) { assertAnalysisGeneration(analysis.generation); setTeamList(model.availableTeams); }
+    }).catch(error => { if (!cancelled) { setTeamList([]); setTeamListError(error instanceof Error ? error.message : String(error)); } });
+    return () => { cancelled = true; };
+  }, [comparisonEntries, identityOptions?.version, analysis]);
+  const teams = teamList.map(team => ({ ...team, key: team.key ?? team.name }));
+  const matchingTeams = teams.filter(team => team.name === selectedTeam);
+  const activeTeam = selectedTeamKey
+    ? (teams.some(team => team.key === selectedTeamKey) ? selectedTeamKey : null)
+    : matchingTeams.length === 1 ? matchingTeams[0]!.key : null;
   const overviewKey = JSON.stringify([entries.map(entry => entry.id), activeTeam, identityOptions?.version]);
   const comparisonKey = JSON.stringify([entries.map(entry => entry.id), activeTeam, state.compareTeamName, identityOptions?.version]);
   const [overviewSnapshot, setOverviewSnapshot] = useState<{ key: string; generation: number; sample: string; value: TeamOverviewModel | null } | null>(null);
@@ -139,15 +144,16 @@ export function TeamView({
             overview, comparisonCurrent ? comparison : null, state, { maps: MAP_COLUMNS, roster: ROSTER_COLUMNS },
             state.compareTeamName && !comparisonCurrent ? ["队伍对比未导出：无当前可用结果或正在更新。"] : [],
           )}
-        />}<p>按队名分组查看比赛与阵容。</p><details><summary>统计口径</summary><p>同场双方同名时分别计入双方贡献，比赛场次去重，胜负与回合按双方累计。RR 为出场信号聚合后的账号评分，计分板使用单场指标评分，口径不同。</p></details></div>
+        />}<p>按队伍分组查看比赛与阵容。</p><details><summary>统计口径</summary><p>RR 为出场信号聚合后的账号评分，计分板使用单场指标评分，口径不同。</p></details></div>
         <label className="stu-team-picker">队名分组
-          <select value={activeTeam ?? ""} onChange={(event) => event.target.value && onSelectTeam(event.target.value)}>
+          <select value={activeTeam ?? ""} onChange={(event) => event.target.value && onSelectTeam(teams.find(team => team.key === event.target.value)!.name, event.target.value)}>
             <option value="">请选择队伍</option>
-            {teams.map((team) => <option key={team.name} value={team.name}>{team.name} · {team.matches} 场</option>)}
+            {teams.map((team) => <option key={team.key} value={team.key}>{team.name} · {team.matches} 场</option>)}
           </select>
         </label>
       </header>
-      {!activeTeam && <EmptyState variant="insufficient" title={selectedTeam ? "当前队伍在此范围为 0 场" : "请选择队伍"} hint="请调整范围，或从上方选择当前语料中的队伍。" />}
+      {teamListError && <p role="alert">队伍列表读取失败：{teamListError}</p>}
+      {!activeTeam && !teamListError && <EmptyState variant="insufficient" title="请选择队伍" hint="请从上方选择当前范围内的队伍。" />}
       {activeTeam && overviewCapability.availability && <CapabilityBar availability={overviewCapability.availability} onRepair={onCapabilityRepair} />}
       {overviewCapability.error && <p role="alert">队伍数据读取失败：{overviewCapability.error} <button type="button" className="stu-button-sm" onClick={overviewCapability.retry}>重试</button></p>}
       {activeTeam && (
@@ -155,11 +161,11 @@ export function TeamView({
             {comparisonCapability.availability && <CapabilityBar availability={comparisonCapability.availability} onRepair={onCapabilityRepair} />}
             {comparisonCapability.error && <p role="alert">对比能力读取失败：{comparisonCapability.error} <button type="button" className="stu-button-sm" onClick={comparisonCapability.retry}>重试</button></p>}
             {comparison && (comparisonError || comparisonCapability.error || analysis.status !== "ready" || comparisonSnapshot?.generation !== analysis.generation || comparisonSnapshot.sample !== JSON.stringify(comparisonEntries?.map(entry => entry.id))) && <p role="status">{comparisonError || comparisonCapability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && comparisonEntries?.length === 0 ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}
-            <label>对比队伍 <select value={state.compareTeamName ?? ""} onChange={event => onStateChange({ ...state, compareTeamName: event.target.value || null })}><option value="">不比较</option>{teams.filter(team => team.name !== activeTeam).map(team => <option key={team.name} value={team.name}>{team.name} · {team.matches} 场</option>)}</select></label>
+            <label>对比队伍 <select value={state.compareTeamName ?? ""} onChange={event => onStateChange({ ...state, compareTeamName: event.target.value || null })}><option value="">不比较</option>{teams.filter(team => team.key !== activeTeam).map(team => <option key={team.key} value={team.key}>{team.name} · {team.matches} 场</option>)}</select></label>
             {state.compareTeamName && comparisonEntries?.length === 0 && !comparison && <p>当前没有可用对比样本。</p>}
             {comparisonError && <div role="alert"><span>队伍对比加载失败：{comparisonError}</span> <button type="button" className="stu-button-sm" onClick={() => setComparisonRetry(value => value + 1)}>重试对比</button></div>}
             {state.compareTeamName && !comparison && !comparisonError && !comparisonCapability.error && !comparisonCapability.stale && comparisonEntries?.length !== 0 && <div className="stu-loading">加载队伍对比…</div>}
-            {comparison && <TeamComparisonPanel model={comparison} onSelectPair={(a, b) => { if (a !== activeTeam) onSelectTeam(a); else onStateChange({ ...state, compareTeamName: b }); }} onOpenMatch={matchId => { const entry = entries.find(item => matchIdForEntry(item) === matchId); if (entry) onOpenMatch(entry.id); }} />}
+            {comparison && <TeamComparisonPanel model={comparison} onSelectPair={(a, b) => { if (a !== activeTeam) onSelectTeam(teams.find(team => team.key === a)?.name ?? a, a); else onStateChange({ ...state, compareTeamName: b }); }} onOpenMatch={matchId => { const entry = entries.find(item => matchIdForEntry(item) === matchId); if (entry) onOpenMatch(entry.id); }} />}
           </section>
       )}
       {overview && (error || overviewCapability.error || analysis.status !== "ready" || overviewSnapshot?.generation !== analysis.generation || overviewSnapshot.sample !== JSON.stringify(overviewEntries?.map(entry => entry.id))) && <p role="status">{error || overviewCapability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && overviewEntries?.length === 0 ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}

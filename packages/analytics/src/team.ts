@@ -131,8 +131,8 @@ export function buildTeamComparisonFromFacts(
 
   const valid = (name: string | undefined): name is string => name != null && matchCounts.has(name);
   const teamNames =
-    requestedPair && valid(requestedPair[0]) && valid(requestedPair[1])
-      ? [requestedPair[0], requestedPair[1]]
+    requestedPair
+      ? valid(requestedPair[0]) && valid(requestedPair[1]) && requestedPair[0] !== requestedPair[1] ? [requestedPair[0], requestedPair[1]] : []
       : availableTeams.slice(0, 2).map((team) => team.key);
   if (teamNames.length < 2) return empty();
 

@@ -383,10 +383,10 @@ export function App() {
     navigate({ page: "player", context: { ...context, goal: "player-analysis", focus: { kind: "player", playerKey, label } } });
   }, [navigate]);
 
-  const openTeam = useCallback((teamName: string) => {
+  const openTeam = useCallback((teamName: string, teamKey?: string) => {
     const current = navigationRef.current.active.destination;
     const context = "context" in current ? current.context : createAnalysisContextPreset("explore");
-    navigate({ page: "team", context: { ...context, goal: "team-analysis", focus: { kind: "team", teamName } } });
+    navigate({ page: "team", context: { ...context, goal: "team-analysis", focus: { kind: "team", teamName, ...(teamKey && { teamKey }) } } });
   }, [navigate]);
 
   const startEventAnalysis = useCallback((event: StudioEventRecord) => {
@@ -617,6 +617,7 @@ export function App() {
             key={active.id}
             entries={scopedEntries}
             selectedTeam={analysisContext.focus.kind === "team" ? analysisContext.focus.teamName : null}
+            selectedTeamKey={analysisContext.focus.kind === "team" ? analysisContext.focus.teamKey : undefined}
             onSelectTeam={openTeam}
             onOpenMatch={openDemo}
             onOpenCapability={(key) => navigate({ page: key, context: key === "patterns" && analysisContext.focus.kind === "team" ? { ...analysisContext, goal: "own-review", roles: { ...analysisContext.roles, beneficiary: { kind: "team", id: analysisContext.focus.teamName.toLowerCase(), label: analysisContext.focus.teamName } } } : analysisContext })}
@@ -637,7 +638,7 @@ export function App() {
               return studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: { ...previous, player } });
             })} onPageReady={keys => onPageReady(active.id, keys)} />
         ) : analysisContext.focus.kind === "team" ? (
-          <TeamRolesPanel exportSource={analysisExportSource(analysisContext, scopedEntries, summarizeAnalysisContext(analysisContext, entries, eventScopes))} key={active.id} entries={scopedEntries} onCapabilityRepair={openCapabilityRepair} teamName={selectedTeam!} identityOptions={identityOptions}
+          <TeamRolesPanel exportSource={analysisExportSource(analysisContext, scopedEntries, summarizeAnalysisContext(analysisContext, entries, eventScopes))} key={active.id} entries={scopedEntries} onCapabilityRepair={openCapabilityRepair} teamName={selectedTeam!} teamKey={analysisContext.focus.teamKey} identityOptions={identityOptions}
             onOpenEvidence={openEvidence} state={(active.ui as import("./lib/studio-page-state").RolesPageState).team}
             onStateChange={team => setNavigation(current => {
               if (current.active.id !== active.id) return current;
@@ -731,7 +732,7 @@ export function App() {
             onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
             entries={eligible}
-            selectedTeams={selectedTeams}
+            selectedTeams={analysisContext.focus.kind === "team" && analysisContext.focus.teamKey ? [analysisContext.focus.teamKey] : selectedTeams}
             playerFocused={selectedPlayerKey !== null}
             onViewMatches={() => navigate({ page: "matches", entryIds: eligible.map(entry => entry.id) })}
             state={active.ui as import("./lib/analysis-theme-state").EconomyPageState}
