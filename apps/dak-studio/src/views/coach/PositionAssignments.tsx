@@ -6,7 +6,7 @@ import type { CoachAssignmentSetDraft } from "../../lib/coach-assignments";
 import { formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../../lib/demo-entry";
 import type { IdentityOptions } from "../../lib/identity";
 import type { OpenEvidenceRequest } from "../../lib/evidence-continuation";
-import { loadRoleDeclarations } from "../../lib/role-declarations";
+import { loadRoleDeclarations } from "../../lib/identity-commands";
 import { getTeamMapRoleMatrices } from "../../lib/queries/spatial-queries";
 
 export const emptyAssignmentRow = (): CoachAssignmentSetDraft["rows"][number] => ({ id: crypto.randomUUID(), playerLabel: "", playerKey: null, positionLabel: "", responsibility: "", notes: "" });

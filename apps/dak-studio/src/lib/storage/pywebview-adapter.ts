@@ -1,6 +1,8 @@
 import type { BlobStore, RecordStore, StorageAdapter } from "./types";
 
 interface PywebviewStorageApi {
+  storage_identity_lock_acquire?(): Promise<string>;
+  storage_identity_lock_release?(token: string): Promise<void>;
   storage_record_get(namespace: string, key: string): Promise<unknown>;
   storage_record_get_all(namespace: string): Promise<unknown[]>;
   storage_record_entries(namespace: string): Promise<Array<[string, unknown]>>;

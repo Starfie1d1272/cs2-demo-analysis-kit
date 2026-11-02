@@ -12,9 +12,9 @@ import {
   renamePlayer,
   setTeamRename,
   splitIdentity,
-  undoLastAction,
-  type IdentityStoreState
-} from "../lib/identity";
+  undoLastAction
+} from "../lib/identity-commands";
+import type { IdentityStoreState } from "../lib/identity";
 import { teamRenameGroups } from "../lib/team-identity";
 import type { StudioDemoEntry } from "../lib/demo-entry";
 

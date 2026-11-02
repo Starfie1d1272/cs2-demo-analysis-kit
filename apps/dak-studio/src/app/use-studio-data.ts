@@ -3,7 +3,8 @@ import { listDemoEntries } from "../lib/library";
 import type { StudioDemoEntry } from "../lib/demo-entry";
 import { listSeriesRecords, pruneOrphanSeries, type StudioSeriesRecord } from "../lib/series";
 import { listEventRecords, type StudioEventRecord } from "../lib/events";
-import { loadIdentityState, type IdentityStoreState } from "../lib/identity";
+import { loadIdentityState } from "../lib/identity-commands";
+import type { IdentityStoreState } from "../lib/identity";
 import { ensureAnalysisDataReady } from "../lib/queries/query-cache";
 export type DirectoryLoadStatus = "loading" | "ready" | "error";
 

@@ -527,6 +527,8 @@ class StudioApi:
         self._userdata = _studio_userdata()
         _migrate_storage_layout(self._userdata)
         self._db_lock = threading.Lock()
+        self._identity_lock_guard = threading.Lock()
+        self._identity_locks: dict[str, sqlite3.Connection] = {}
         self._db: sqlite3.Connection | None = None
 
     def _assets_dir(self) -> Path:
@@ -563,6 +565,27 @@ class StudioApi:
             )
             self._db = db
         return self._db
+
+    def storage_identity_lock_acquire(self) -> str:
+        """Hold a process-safe lock for the identity/role command until release."""
+        self._userdata.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(self._userdata / "identity-command-lock.sqlite", timeout=30, check_same_thread=False)
+        try:
+            connection.execute("begin immediate")
+        except BaseException:
+            connection.close()
+            raise
+        token = uuid.uuid4().hex
+        with self._identity_lock_guard:
+            self._identity_locks[token] = connection
+        return token
+
+    def storage_identity_lock_release(self, token: str) -> None:
+        with self._identity_lock_guard:
+            connection = self._identity_locks.pop(token, None)
+        if connection is None:
+            raise ValueError("unknown identity command lock")
+        connection.close()
 
     def storage_record_get(self, namespace: str, key: str):
         with self._db_lock:
