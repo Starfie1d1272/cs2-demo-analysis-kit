@@ -106,6 +106,18 @@ for ($launch = 1; $launch -le 2; $launch++) {
         if (!$process.CloseMainWindow() -or !$process.WaitForExit(10000) -or $process.ExitCode -ne 0) { throw 'Uploader did not close normally' }
         $entry.normalExit = $true
     } finally {
+        Write-Host "DIAG launch=$launch pid=$($process.Id) session=$($process.SessionId) main=$($process.MainWindowHandle)"
+        Write-Host "DIAG windows=$([UploaderMessages]::Windows($process.Id) -join ' | ')"
+        try {
+            if ($window) {
+                $matches = $window.FindAll([Windows.Automation.TreeScope]::Descendants, $condition)
+                foreach ($match in $matches) {
+                    Write-Host "DIAG element name=$($match.Current.Name) enabled=$($match.Current.IsEnabled) offscreen=$($match.Current.IsOffscreen) id=$($match.Current.AutomationId) type=$($match.Current.ControlType.ProgrammaticName)"
+                }
+            }
+        } catch { Write-Host "DIAG UIAutomation error: $_" }
+        $logfile = Join-Path $userdata 'RivalHub Demo Uploader/uploader.log'
+        if (Test-Path $logfile) { Write-Host 'DIAG uploader log:'; Get-Content $logfile | ForEach-Object { Write-Host $_ } }
         $entry.windows = [UploaderMessages]::Windows($process.Id)
         if (!$process.HasExited) { Stop-Process -Id $process.Id }
         $results += $entry
