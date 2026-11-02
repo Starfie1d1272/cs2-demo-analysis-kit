@@ -63,6 +63,7 @@ function serialized<T>(run: () => Promise<T>): Promise<T> {
 }
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+const newestAuditFirst = (a: AuditEntry, b: AuditEntry) => (b.after?.version ?? -1) - (a.after?.version ?? -1) || b.timestamp - a.timestamp;
 
 function roleChanges(before: RoleDeclarationsState, after: RoleDeclarationsState): RoleChange[] {
   const old = new Map(before.declarations.map(row => [row.id, row]));
@@ -156,7 +157,7 @@ async function commitChange(
     // 审计裁剪不属于命令提交，不让清理失败冒充业务失败。
     try {
       const all = await auditStore.getAll<AuditEntry>();
-      const stale = all.sort((a, b) => a.timestamp - b.timestamp || (a.after?.version ?? 0) - (b.after?.version ?? 0)).slice(0, Math.max(0, all.length - MAX_AUDIT));
+      const stale = all.sort(newestAuditFirst).slice(MAX_AUDIT);
       for (const entry of stale) await auditStore.delete(entry.id);
     } catch { /* 下次再清理 */ }
     return next;
@@ -280,7 +281,7 @@ export function undoLastAction(): Promise<IdentityStoreState | null> {
     await recoverPending();
     const all = await auditStore.getAll<AuditEntry>();
     if (!all.length) return null;
-    const latest = all.sort((a, b) => b.timestamp - a.timestamp || (b.after?.version ?? 0) - (a.after?.version ?? 0))[0];
+    const latest = all.sort(newestAuditFirst)[0];
     if (!latest.after || !latest.roleChanges) throw new Error("旧操作缺少完整的角色声明记录，无法安全撤销");
     const current = await stateStore.get<IdentityStoreState>(STATE_KEY) ?? EMPTY_STATE;
     if (!same({ ...current, version: 0 }, { ...latest.after, version: 0 })) throw new Error("身份数据已变化，无法安全撤销");
@@ -294,7 +295,7 @@ export function undoLastAction(): Promise<IdentityStoreState | null> {
 export async function listAuditEntries(): Promise<AuditEntry[]> {
   try {
     const all = await auditStore.getAll<AuditEntry>();
-    return all.sort((a, b) => b.timestamp - a.timestamp);
+    return all.sort(newestAuditFirst);
   } catch {
     return [];
   }
