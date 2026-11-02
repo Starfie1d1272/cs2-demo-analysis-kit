@@ -532,6 +532,10 @@ export function App() {
             onPageReady={(keys) => onPageReady(active.id, keys)}
             entries={entries}
             openStudyNoteEditor={openStudyNoteEditor}
+            onAnalyzePlayer={(steamId, label) => {
+              const mapping = identityState.mappings.find(item => item.steamIds.includes(steamId));
+              navigate({ page: "player", context: { ...createAnalysisContextPreset("explore", { corpus: { eventIds: [], entryIds: [destination.entryId], matchIds: [], maps: [], tags: [], excludedEntryIds: [] }, focus: { kind: "player", playerKey: mapping?.playerKey ?? `steam:${steamId}`, label: mapping?.displayName ?? label } }), goal: "player-analysis" } });
+            }}
             onOpened={recordMatchOpened}
             onReplayPaused={recordReplayPaused}
             demoId={selectedDemoId}
