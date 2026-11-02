@@ -17,6 +17,8 @@ import type { EvidenceSession } from "../lib/evidence-continuation";
 
 export interface MatchViewProps {
   onPageReady?: (keys: string[]) => void;
+  onOpened?: (target: { roundNumber?: number; tick?: number }) => void;
+  onReplayPaused?: (target: { roundNumber: number; tick: number }) => void;
   entries: StudioDemoEntry[];
   demoId: string | null;
   deepLink?: { roundNumber: number; tick?: number } | null;
@@ -55,7 +57,7 @@ async function loadModel(id: string, generation: number): Promise<MatchWorkspace
   return model;
 }
 
-export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceSession, onMoveEvidence, workspaceState, onWorkspaceStateChange, onReturnToSource, onPageReady }: MatchViewProps) {
+export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceSession, onMoveEvidence, workspaceState, onWorkspaceStateChange, onReturnToSource, onPageReady, onOpened, onReplayPaused }: MatchViewProps) {
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   useEffect(() => subscribeAnalysisDataInvalidation(() => { if (getAnalysisDataSnapshot().status !== "ready") modelCache.clear(); }), []);
   const activeId = demoId;
@@ -156,6 +158,15 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     if (loaded && loaded.id === activeId) onWorkspaceStateChange(snapshotMatchWorkspaceState(loaded.state));
   }, [loaded?.state, loaded?.id, activeId]);
 
+  useEffect(() => {
+    if (!model || !activeEntry) return;
+    if (evidenceSession && matchIdForEntry(activeEntry) !== evidenceSession.queue[evidenceSession.activeIndex].evidence.matchId) return;
+    if (deepLink && !model.rounds.some(round => round.roundNumber === deepLink.roundNumber)) return;
+    const round = deepLink && model.replay.rounds.find(item => item.roundNumber === deepLink.roundNumber);
+    const replay = round && loaded?.state.replay ? normalizeReplayViewState(model.replay, model.map.view, { ...loaded.state.replay, roundNumber: round.roundNumber, tick: deepLink?.tick ?? round.freezeEndTick, playing: false }) : null;
+    onOpened?.(deepLink ? { roundNumber: deepLink.roundNumber, ...(replay ? { tick: replay.tick } : {}) } : {});
+  }, [model, activeEntry, deepLink, evidenceSession, onOpened]);
+
   // 汇总模式：懒构建系列内各图模型 → 跨图记分板
   useEffect(() => {
     if (!summaryMode || !activeSeries || seriesEntries.length === 0 || analysis.status !== "ready") return;
@@ -189,7 +200,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     ? <EmptyState variant="error" title="加载失败" hint={error} />
     : !model
       ? <div className="stu-loading">读取本地持久化工作台…</div>
-      : <MatchReviewWorkspace model={model} state={loaded!.state} onStateChange={(state) => setLoaded(prev => prev && prev.id === activeId ? { ...prev, state } : prev)} />;
+      : <MatchReviewWorkspace model={model} state={loaded!.state} onStateChange={(state) => { if (loaded?.state.replay?.playing && state.replay && !state.replay.playing) onReplayPaused?.({ roundNumber: state.replay.roundNumber, tick: state.replay.tick }); setLoaded(prev => prev && prev.id === activeId ? { ...prev, state } : prev); }} />;
 
   return (
     <div className="stu-view stu-view-flush">
