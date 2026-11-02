@@ -1,6 +1,5 @@
 import { AnalysisExportButtons } from "../../components/AnalysisExportButtons";
 import { buildPatternReportAnalysisResult } from "../../lib/analysis-export-patterns";
-import { listMapPoolNotes, saveMapPoolNote } from "../../lib/map-pool-notes";
 import type { AnalysisExportSource } from "../../lib/analysis-export";
 import type { PatternExplorerState } from "../../lib/pattern-page-state";
 import type { Dispatch, SetStateAction } from "react";
@@ -11,7 +10,6 @@ import type { TacticalCluster, TacticalRoundFact } from "@cs2dak/tactics";
 import { STUDIO_TABLE_CLASSES } from "../../components/table-styles";
 import type { StudioDemoEntry } from "../../lib/demo-entry";
 import type { AnalysisContext } from "../../lib/analysis-context";
-import { listPatternNames, savePatternName } from "../../lib/pattern-names";
 import { patternFingerprint } from "../../lib/pattern-observations";
 import { getObservedMapPool } from "../../lib/queries/spatial-queries";
 import { PatternExplorer } from "../coach/PatternExplorer";
@@ -21,6 +19,8 @@ const SIDE_LABEL: Record<string, string> = { t: "T 方", ct: "CT 方" };
 
 export interface PatternsThemeProps {
   exportSource?: AnalysisExportSource | null;
+  notes: StoredDrafts;
+  names: StoredDrafts;
   section: "patterns" | "anti";
   explorerState: PatternExplorerState;
   onExplorerStateChange: Dispatch<SetStateAction<PatternExplorerState>>;
@@ -37,9 +37,7 @@ export interface PatternsThemeProps {
 }
 
 /** 自动观察与人工材料相互独立；模式命名由用户明确保存。 */
-export function PatternsTheme({ exportSource, section, explorerState, onExplorerStateChange, clusters, facts, allFacts, entryByMatchId, analysisContext, teamRenames, subjectTeam, mode, onOpenMatch, onWatchDemo }: PatternsThemeProps) {
-  const notes = useStoredDrafts(listMapPoolNotes, saveMapPoolNote, false, true);
-  const names = useStoredDrafts(listPatternNames, savePatternName, true);
+export function PatternsTheme({ notes, names, exportSource, section, explorerState, onExplorerStateChange, clusters, facts, allFacts, entryByMatchId, analysisContext, teamRenames, subjectTeam, mode, onOpenMatch, onWatchDemo }: PatternsThemeProps) {
   const mapPool = useMemo(() => getObservedMapPool(allFacts, analysisContext.roles.beneficiary?.label ?? null, analysisContext.roles.opponent?.label ?? null, teamRenames), [allFacts, analysisContext.roles.beneficiary?.label, analysisContext.roles.opponent?.label, teamRenames]);
   return <>
     {section === "patterns" && names.error && <div className="stu-notice" role="alert">模式命名读取失败：{names.error} <button type="button" onClick={names.retry}>重试读取</button></div>}
@@ -91,7 +89,7 @@ export function PatternsTheme({ exportSource, section, explorerState, onExplorer
 
 // The page owns both the persisted snapshot and editable drafts. Reads are only retried
 // before editing starts; individual writes update the snapshot without replacing drafts.
-function useStoredDrafts(load: () => Promise<Record<string, string>>, write: (key: string, value: string) => Promise<void>, trim = false, autoSave = false) {
+export function useStoredDrafts(load: () => Promise<Record<string, string>>, write: (key: string, value: string) => Promise<void>, trim = false, autoSave = false) {
   const [persisted, setPersisted] = useState<Record<string, string> | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -139,6 +137,8 @@ function useStoredDrafts(load: () => Promise<Record<string, string>>, write: (ke
   };
   return { persisted: persisted ?? {}, drafts, ready: persisted !== null, error, retry: () => setAttempt(n => n + 1), saving, errors, dirty: dirty || Object.values(saving).some(Boolean), change, save };
 }
+
+export type StoredDrafts = ReturnType<typeof useStoredDrafts>;
 
 function PlaybookTable({ tableState, onTableStateChange, clusters, drafts, persisted, saving, errors, ready, onChange, onSave }: {
   tableState: import("@cs2dak/presentation").TableState;
