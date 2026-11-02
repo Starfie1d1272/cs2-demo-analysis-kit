@@ -15,6 +15,10 @@ export interface StudioDemoEntry {
   sourceDemPath?: string | null;
   /** 榨 facts 时所用的 facts revision（AnalysisManifest）；缺失=历史条目，视为旧口径。 */
   builtWith?: BuiltWith;
+  /** Changes whenever the stored ZIP is replaced. */
+  sourceRevision?: string;
+  /** A commit interrupted while its derived rows or source ZIP were being written. */
+  pendingCommit?: { token: string; previousBuiltWith?: BuiltWith };
   /** 原始 v3 ZIP 字节数（导入时记录）；用于资产占用统计，免去读全部 blob。 */
   sizeBytes?: number;
   meta: DemoMeta;

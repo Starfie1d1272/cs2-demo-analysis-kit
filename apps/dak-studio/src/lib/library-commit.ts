@@ -4,6 +4,8 @@ import { getNativeStorageApiForCurrentAdapter } from "./storage";
 export async function withLibraryCommit<T>(keys: string[], operation: () => Promise<T>): Promise<T> {
   const ordered = [...new Set(keys)].sort();
   if (!ordered.length) return operation();
+  // Node’s test adapters do not have competing browser contexts.
+  if (typeof window === "undefined") return operation();
   const native = getNativeStorageApiForCurrentAdapter();
   if (native) {
     if (!native.storage_demo_commit_begin || !native.storage_demo_commit_end) {
@@ -12,8 +14,6 @@ export async function withLibraryCommit<T>(keys: string[], operation: () => Prom
     const token = await native.storage_demo_commit_begin(ordered);
     try { return await operation(); } finally { await native.storage_demo_commit_end(token); }
   }
-  // Node's in-memory test adapter has no competing browser contexts.
-  if (typeof window === "undefined") return operation();
   if (!navigator.locks) throw new Error("当前环境不支持安全的跨窗口提交，请使用桌面版。");
   const acquire = (index: number): Promise<T> => index === ordered.length
     ? operation()

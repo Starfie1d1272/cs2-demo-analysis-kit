@@ -1,4 +1,5 @@
 import { withAnalysisQueryInvalidation } from "./queries/query-cache";
+import { withLibraryCommit } from "./library-commit";
 import { getMapNav } from "@cs2dak/map-assets";
 import { withImportCheckpoint } from "./import-persistence";
 import { deleteMatchRows, settleWrites } from "./storage/match-rows";
@@ -66,6 +67,8 @@ function normalizeEntry(entry: StudioDemoEntry): StudioDemoEntry {
     tags: entry.tags ?? [],
     sourceDemPath: entry.sourceDemPath ?? null,
     builtWith: entry.builtWith,
+    sourceRevision: entry.sourceRevision,
+    pendingCommit: entry.pendingCommit,
     sizeBytes: entry.sizeBytes,
     meta: { ...entry.meta, serverName: entry.meta.serverName ?? null, matchDate: entry.meta.matchDate ?? null }
   };
@@ -98,8 +101,17 @@ async function buildDemoIdentityIndex(): Promise<DemoIdentityIndex> {
           const manifest = await loadDemoManifestFromZip(buffer);
           const demoSha256 = manifest.demo.hash?.toLowerCase() ?? null;
           if (demoSha256) {
-            normalized = { ...entry, demoSha256 };
-            await demoMeta.put(entry.id, normalized);
+            const originalHash = await sha256Hex(buffer);
+            normalized = await withLibraryCommit([`entry:${entry.id}`], async () => {
+              const current = await demoMeta.get<StudioDemoEntry>(entry.id);
+              const currentBuffer = await demoBlobs.get(entry.id);
+              if (!current || !currentBuffer || await sha256Hex(currentBuffer) !== originalHash) return entry;
+              const latest = normalizeEntry(current);
+              if (latest.demoSha256) return latest;
+              const next = { ...latest, demoSha256 };
+              await saveDemoEntry(next);
+              return next;
+            });
           }
         } catch (error) {
           index.errors.push(`${entry.fileName}：${error instanceof Error ? error.message : String(error)}`);
@@ -255,7 +267,7 @@ async function isolateLegacyProjectionAliases(): Promise<void> {
     if (aliases.length < 2 && !retired.has(sharedId)) continue;
     let keys = [`match:${sharedId}`, ...aliases.map(row => `entry:${row.id}`)];
     for (;;) {
-      const retry = await withImportLocks(keys, async () => {
+      const retry = await withImportLocks(keys, () => withLibraryCommit(keys, async () => {
         const current = await demoMeta.getAll<StudioDemoEntry>();
         const rows = current.filter(row => matchIdForEntry(row) === sharedId).sort((a, b) => a.id.localeCompare(b.id));
         const previous = await retiredMatchIds.get<{ entryIds: string[] }>(sharedId);
@@ -275,7 +287,7 @@ async function isolateLegacyProjectionAliases(): Promise<void> {
           for (const row of edits) await saveDemoEntry(row);
         }));
         return null;
-      });
+      }));
       if (!retry) break;
       keys = [...new Set([...keys, ...retry])];
     }
@@ -513,33 +525,65 @@ export interface ImportDemoOptions {
  * 导入一个 v3 ZIP；以内容哈希为 id，重复导入幂等（标签做并集）。
  * 解析失败抛错（带文件名）。
  */
-async function finishImport(entry: StudioDemoEntry, replacement: StudioDemoEntry | undefined, signal: AbortSignal | undefined, prepare: () => Promise<void>): Promise<void> {
+function sameEntrySource(a: StudioDemoEntry, b: StudioDemoEntry): boolean {
+  return a.id === b.id && a.fileName === b.fileName && a.importedAt === b.importedAt &&
+    a.demoSha256 === b.demoSha256 && a.sourceRevision === b.sourceRevision && matchIdForEntry(a) === matchIdForEntry(b) &&
+    JSON.stringify(a.builtWith) === JSON.stringify(b.builtWith) &&
+    JSON.stringify(a.pendingCommit) === JSON.stringify(b.pendingCommit);
+}
+
+async function finishImport(entry: StudioDemoEntry, replacement: StudioDemoEntry | undefined, signal: AbortSignal | undefined, prepare: () => Promise<void>, base?: StudioDemoEntry, addedTags: string[] = [], writesSource = false): Promise<void> {
   const matchId = matchIdForEntry(entry);
   const previousMatchId = replacement ? matchIdForEntry(replacement) : null;
-  const ids = [entry.id, ...(replacement ? [replacement.id] : [])];
-  signal?.throwIfAborted();
-  try {
-    await withAnalysisQueryInvalidation(() => withImportCheckpoint(getStorage(), ids,
-      [...new Set([matchId, ...(previousMatchId ? [previousMatchId] : [])])], async () => {
-        signal?.throwIfAborted();
-        await prepare();
-        signal?.throwIfAborted();
-        await saveDemoEntry(entry);
-        signal?.throwIfAborted();
-        if (replacement && replacement.id !== entry.id) {
-          const shared = (await demoMeta.getAll<StudioDemoEntry>()).some((row) => row.id !== replacement.id && matchIdForEntry(row) === previousMatchId);
-          await removeDemoStorageOnly(replacement.id);
-          if (previousMatchId && previousMatchId !== matchId && !shared) await removeDemoAnalysis(previousMatchId);
+  const ids = [...new Set([entry.id, ...(replacement ? [replacement.id] : [])])];
+  const keys = [...commitKeys(entry), ...(replacement ? commitKeys(replacement) : [])];
+  await withLibraryCommit(keys, async () => {
+    signal?.throwIfAborted();
+    const latest = await demoMeta.get<StudioDemoEntry>(entry.id);
+    if (base && (!latest || !sameEntrySource(normalizeEntry(latest), normalizeEntry(base)))) throw new Error("比赛资料已变化，请重新导入。");
+    if (!base && latest) throw new Error("比赛资料已变化，请重新导入。");
+    if (replacement && replacement.id !== entry.id) {
+      const current = await demoMeta.get<StudioDemoEntry>(replacement.id);
+      if (!current || !sameEntrySource(normalizeEntry(current), normalizeEntry(replacement))) throw new Error("替换目标已变化，请重新导入。");
+    }
+    const finalEntry = latest && base ? {
+      ...entry,
+      tags: normalizeTags([...(latest.tags ?? []), ...addedTags]),
+      sourceDemPath: latest.sourceDemPath !== base.sourceDemPath ? latest.sourceDemPath : entry.sourceDemPath,
+      meta: { ...entry.meta, matchDate: latest.meta.matchDate !== base.meta.matchDate ? latest.meta.matchDate : entry.meta.matchDate },
+    } : entry;
+    const committedEntry = writesSource ? { ...finalEntry, sourceRevision: crypto.randomUUID() } : finalEntry;
+    const marked: Array<{ id: string; prior: StudioDemoEntry }> = [];
+    try {
+      if (writesSource) for (const id of ids) {
+        const prior = await markCommitPending(id);
+        if (prior) marked.push({ id, prior });
+      }
+      await withAnalysisQueryInvalidation(() => withImportCheckpoint(getStorage(), ids,
+        [...new Set([matchId, ...(previousMatchId ? [previousMatchId] : [])])], async () => {
           signal?.throwIfAborted();
-        }
-      }));
-  } catch (error) {
-    identityIndex = null;
-    identityIndexPromise = null;
-    for (const id of ids) pkgCache.delete(id);
-    throw error;
-  }
-  pkgCache.delete(entry.id);
+          await prepare();
+          signal?.throwIfAborted();
+          await saveDemoEntry({ ...committedEntry, pendingCommit: undefined });
+          signal?.throwIfAborted();
+          if (replacement && replacement.id !== entry.id) {
+            const shared = (await demoMeta.getAll<StudioDemoEntry>()).some((row) => row.id !== replacement.id && matchIdForEntry(row) === previousMatchId);
+            await removeDemoStorageOnly(replacement.id);
+            if (previousMatchId && previousMatchId !== matchId && !shared) await removeDemoAnalysis(previousMatchId);
+            signal?.throwIfAborted();
+          }
+        }));
+    } catch (error) {
+      if (!hasRollbackFailure(error)) {
+        for (const item of marked) await finishPending(item.id, item.prior, false).catch(() => {});
+      }
+      identityIndex = null;
+      identityIndexPromise = null;
+      for (const id of ids) pkgCache.delete(id);
+      throw error;
+    }
+    pkgCache.delete(entry.id);
+  });
 }
 
 const pendingImports = new Map<string, Promise<void>>();
@@ -629,7 +673,7 @@ async function importDemoFileUnlocked(file: File, settings: ImportDemoOptions, i
   if (existing && !forceReanalyze && !isFactsStale(existing) && await hasPersistedFacts(existing)) {
     const mergedEntry = mergeDuplicateEntry(existing);
     mergedEntry.tags = normalizeTags([...(replacement?.tags ?? []), ...mergedEntry.tags]);
-    await finishImport(mergedEntry, replacement, signal, async () => undefined);
+    await finishImport(mergedEntry, replacement, signal, async () => undefined, existing, tags);
     return {
       entry: mergedEntry,
       duplicate: true,
@@ -674,12 +718,55 @@ async function importDemoFileUnlocked(file: File, settings: ImportDemoOptions, i
     await persistAnalysis(data);
     signal?.throwIfAborted();
     await blobs.put(persistedId, buffer);
-  });
+  }, existing, tags, true);
   return { entry, duplicate: Boolean(existing), replaced: Boolean(replacement && replacement.id !== persistedId), replacedId: replacement?.id };
+}
+
+export function commitKeys(entry: StudioDemoEntry): string[] {
+  return [`entry:${entry.id}`, `match:${matchIdForEntry(entry)}`, ...(entry.demoSha256 ? [`demo:${entry.demoSha256}`] : [])];
+}
+
+function hasRollbackFailure(error: unknown): boolean {
+  if ((error as { code?: string } | null)?.code === "IMPORT_ROLLBACK_FAILED") return true;
+  return error instanceof AggregateError && error.errors.some(hasRollbackFailure);
+}
+
+/** Caller holds the cross-window commit lock. */
+async function markCommitPending(id: string): Promise<StudioDemoEntry | null> {
+  const current = await demoMeta.get<StudioDemoEntry>(id);
+  if (!current) return null;
+  const normalized = normalizeEntry(current);
+  const token = crypto.randomUUID();
+  try {
+    await saveDemoEntry({ ...normalized, builtWith: undefined, pendingCommit: { token, previousBuiltWith: normalized.pendingCommit?.previousBuiltWith ?? normalized.builtWith } });
+  } catch (error) {
+    // A bridge can fail after writing. The caller still holds the commit lock.
+    try { await saveDemoEntry(normalized); }
+    catch (restoreError) { throw Object.assign(new AggregateError([error, restoreError], "无法恢复提交前的比赛资料"), { code: "IMPORT_ROLLBACK_FAILED" }); }
+    throw error;
+  }
+  return normalized;
+}
+
+/** Caller still holds the lock; preserve metadata edited before acquisition. */
+async function finishPending(id: string, prior: StudioDemoEntry, success: boolean): Promise<StudioDemoEntry | null> {
+  const storage = getStorage(); const ref = { namespace: "demos", key: id };
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const [snapshot] = await storage.readRecords([ref]);
+    if (!snapshot?.exists) return null;
+    const latest = normalizeEntry(snapshot.value as StudioDemoEntry);
+    const next = { ...latest, builtWith: success ? currentBuiltWith() : prior.pendingCommit ? undefined : prior.builtWith, pendingCommit: success || !prior.pendingCommit ? undefined : prior.pendingCommit };
+    if (await storage.compareAndWriteRecords([snapshot], [{ ...ref, kind: "put", value: next }])) {
+      if (identityIndex) addToIdentityIndex(identityIndex, next);
+      return next;
+    }
+  }
+  throw new Error("比赛资料正在被修改，请重试。");
 }
 
 /** Update user-owned metadata without overwriting a concurrent rebuild or edit. */
 async function updateUserMetadata(id: string, update: (entry: StudioDemoEntry) => StudioDemoEntry): Promise<void> {
+  return withLibraryCommit([`entry:${id}`], async () => {
   const storage = getStorage();
   const ref = { namespace: "demos", key: id };
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -692,6 +779,7 @@ async function updateUserMetadata(id: string, update: (entry: StudioDemoEntry) =
     }
   }
   throw new Error("比赛资料正在被修改，请重试。");
+  });
 }
 
 /** 更新某条 demo 的标签。 */
@@ -716,15 +804,18 @@ export async function removeDemo(id: string): Promise<void> {
   await isolateLegacyProjectionAliases();
   const record = await demoMeta.get<StudioDemoEntry>(id);
   if (!record) return;
-  await withImportLocks([`entry:${id}`, `match:${matchIdForEntry(record)}`], async () => {
+  const source = normalizeEntry(record);
+  await withImportLocks([`entry:${id}`, `match:${matchIdForEntry(source)}`], () => withLibraryCommit(commitKeys(source), async () => {
     const current = await demoMeta.get<StudioDemoEntry>(id);
     if (!current) return;
+    if (matchIdForEntry(current) !== matchIdForEntry(source) || current.demoSha256 !== source.demoSha256) throw new Error("比赛资料已变化，请重新删除。");
+    await markCommitPending(id);
     await withAnalysisQueryInvalidation(async () => {
       await removeDemoStorageOnly(id);
       const shared = (await demoMeta.getAll<StudioDemoEntry>()).some(row => matchIdForEntry(row) === matchIdForEntry(current));
       if (!shared) await removeDemoAnalysis(matchIdForEntry(current));
     });
-  });
+  }));
 }
 
 /**
@@ -755,7 +846,7 @@ export async function rebuildFactsFromZip(id: string): Promise<StudioDemoEntry |
   const sourceHash = await sha256Hex(buffer);
   const sameSource = (entry: StudioDemoEntry) => entry.id === source.id &&
     entry.fileName === source.fileName && entry.importedAt === source.importedAt &&
-    entry.demoSha256 === source.demoSha256 && matchIdForEntry(entry) === matchId &&
+    entry.demoSha256 === source.demoSha256 && entry.sourceRevision === source.sourceRevision && matchIdForEntry(entry) === matchId &&
     JSON.stringify(entry.builtWith) === JSON.stringify(source.builtWith);
   const changed = () => new Error("比赛资料或原始 ZIP 已变化，请重新重建。");
   const verifyZip = async () => {
@@ -766,33 +857,49 @@ export async function rebuildFactsFromZip(id: string): Promise<StudioDemoEntry |
   try { ({ data } = await importInWorker(buffer.slice(0), matchId, false)); }
   catch (error) { throw new Error(`${source.fileName}: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
 
-  return withImportLocks([`entry:${id}`, `match:${matchId}`, `zip:${sourceHash}`], async () => {
-    const ref = { namespace: "demos", key: id };
-    const storage = getStorage();
-    await verifyZip();
-    let committed: StudioDemoEntry | null = null;
-    await withAnalysisQueryInvalidation(() => withImportCheckpoint(storage, [], [matchId], async () => {
+  return withImportLocks([`entry:${id}`, `match:${matchId}`, `zip:${sourceHash}`], () =>
+    withLibraryCommit(commitKeys(source), async () => {
+      const ref = { namespace: "demos", key: id };
+      const storage = getStorage();
+      await verifyZip();
       const initial = await demoMeta.get<StudioDemoEntry>(id);
       if (!initial || !sameSource(normalizeEntry(initial))) throw changed();
-      await persistAnalysis(data);
-      for (let attempt = 0; attempt < 20; attempt++) {
-        await verifyZip();
-        const [snapshot] = await storage.readRecords([ref]);
-        if (!snapshot?.exists) throw changed();
-        const latest = normalizeEntry(snapshot.value as StudioDemoEntry);
-        if (!sameSource(latest)) throw changed();
-        const next = { ...latest, builtWith: currentBuiltWith() };
-        if (await storage.compareAndWriteRecords([snapshot], [{ ...ref, kind: "put", value: next }])) {
-          committed = next;
-          if (identityIndex) addToIdentityIndex(identityIndex, next);
-          return;
+      const prior = await markCommitPending(id);
+      if (!prior) throw changed();
+      const marked = await demoMeta.get<StudioDemoEntry>(id);
+      const token = marked?.pendingCommit?.token;
+      if (!token) throw changed();
+      let committed: StudioDemoEntry | null = null;
+      try {
+        await withAnalysisQueryInvalidation(() => withImportCheckpoint(storage, [], [matchId], async () => {
+          await persistAnalysis(data);
+          for (let attempt = 0; attempt < 20; attempt++) {
+            await verifyZip();
+            const [snapshot] = await storage.readRecords([ref]);
+            if (!snapshot?.exists) throw changed();
+            const latest = normalizeEntry(snapshot.value as StudioDemoEntry);
+            if (latest.pendingCommit?.token !== token || latest.id !== source.id ||
+              latest.fileName !== source.fileName || latest.importedAt !== source.importedAt ||
+              latest.demoSha256 !== source.demoSha256 || latest.sourceRevision !== source.sourceRevision || matchIdForEntry(latest) !== matchId) throw changed();
+            const next = { ...latest, builtWith: currentBuiltWith(), pendingCommit: undefined };
+            if (await storage.compareAndWriteRecords([snapshot], [{ ...ref, kind: "put", value: next }])) {
+              committed = next;
+              if (identityIndex) addToIdentityIndex(identityIndex, next);
+              return;
+            }
+          }
+          throw new Error("比赛资料正在被修改，请重试。");
+        }));
+      } catch (error) {
+        // A failed rollback or changed source must remain stale for explicit retry.
+        if (!committed && !hasRollbackFailure(error)) {
+          try { await verifyZip(); await finishPending(id, prior, false); } catch { /* leave stale */ }
         }
+        throw error;
       }
-      throw new Error("比赛资料正在被修改，请重试。");
+      pkgCache.delete(id);
+      return committed;
     }));
-    pkgCache.delete(id);
-    return committed;
-  });
 }
 
 /** 取解析后的 DemoPackage：内存 → ZIP 重建。仅用于逐场证据/工作台，不作为聚合缓存。 */
