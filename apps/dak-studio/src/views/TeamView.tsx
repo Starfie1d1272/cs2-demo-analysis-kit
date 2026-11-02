@@ -73,6 +73,8 @@ export function TeamView({
   }, [entries, identityOptions?.version]);
   const activeTeam = selectedTeam && teams.some((team) => team.name === selectedTeam) ? selectedTeam : null;
   const [comparison, setComparison] = useState<TeamComparisonModel | null>(null);
+  const [comparisonError, setComparisonError] = useState<string | null>(null);
+  const [comparisonRetry, setComparisonRetry] = useState(0);
   const [overview, setOverview] = useState<TeamOverviewModel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [matrices, setMatrices] = useState<TeamMapRoleMatrix[] | null>(null);
@@ -84,12 +86,14 @@ export function TeamView({
   const setMatrixSide = (matrixSide: "t" | "ct") => onStateChange({ ...state, matrixSide });
 
   useEffect(() => {
-    if (!activeTeam || !state.compareTeamName) { setComparison(null); return; }
+    if (!activeTeam || !state.compareTeamName) { setComparison(null); setComparisonError(null); return; }
     let cancelled = false;
-    setComparison(null);
-    void getTeamComparison(entries, identityOptions, [activeTeam, state.compareTeamName]).then(model => { if (!cancelled) setComparison(model); }).catch(() => { if (!cancelled) setComparison(null); });
+    setComparison(null); setComparisonError(null);
+    void getTeamComparison(entries, identityOptions, [activeTeam, state.compareTeamName])
+      .then(model => { if (!cancelled) setComparison(model); })
+      .catch(reason => { if (!cancelled) setComparisonError(reason instanceof Error ? reason.message : String(reason)); });
     return () => { cancelled = true; };
-  }, [entries, activeTeam, state.compareTeamName, identityOptions?.version]);
+  }, [entries, activeTeam, state.compareTeamName, identityOptions?.version, comparisonRetry]);
 
   useEffect(() => {
     if (!activeTeam || entries.length === 0) {
@@ -162,6 +166,8 @@ export function TeamView({
           </section>
           <section className="stu-card" id="analysis-comparison"><h3>队伍对比 · 当前范围 {entries.length} 场</h3>
             <label>对比队伍 <select value={state.compareTeamName ?? ""} onChange={event => onStateChange({ ...state, compareTeamName: event.target.value || null })}><option value="">不比较</option>{teams.filter(team => team.name !== activeTeam).map(team => <option key={team.name} value={team.name}>{team.name} · {team.matches} 场</option>)}</select></label>
+            {comparisonError && <div role="alert"><span>队伍对比加载失败：{comparisonError}</span> <button type="button" className="stu-button-sm" onClick={() => setComparisonRetry(value => value + 1)}>重试对比</button></div>}
+            {state.compareTeamName && !comparison && !comparisonError && <div className="stu-loading">加载队伍对比…</div>}
             {comparison && <TeamComparisonPanel model={comparison} onSelectPair={(a, b) => { if (a !== activeTeam) onSelectTeam(a); else onStateChange({ ...state, compareTeamName: b }); }} onOpenMatch={matchId => { const entry = entries.find(item => matchIdForEntry(item) === matchId); if (entry) onOpenMatch(entry.id); }} />}
           </section>
           <div className="stu-home-grid">

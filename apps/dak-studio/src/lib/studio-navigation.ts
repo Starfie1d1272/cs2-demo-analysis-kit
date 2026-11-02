@@ -59,6 +59,14 @@ export type NavigationAction =
 export function createStudioNavigation(id: string): StudioNavigation {
   return { active: frame(id, defaultDestination("workbench")), history: [], resume: {} };
 }
+/** 查找同一语义上下文的最近分析页面，用于主题切换恢复。 */
+export function findAnalysisFrame(history: readonly StudioFrame[], destination: AnalysisDestination): StudioFrame | undefined {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const item = history[i];
+    if (item.destination.page === destination.page && "context" in item.destination && JSON.stringify(item.destination.context) === JSON.stringify(destination.context)) return item;
+  }
+  return undefined;
+}
 export function studioNavigationReducer(state: StudioNavigation, action: NavigationAction): StudioNavigation {
   if (action.intent === "restore") return { ...state, active: structuredClone(action.frame), history: state.history.filter(item => item.id !== action.frame.id) };
   if (action.intent === "evidence-target") return { ...state, active: { ...state.active, destination: action.destination, ui: null } as StudioFrame };
@@ -78,11 +86,9 @@ export function studioNavigationReducer(state: StudioNavigation, action: Navigat
   }
   if (action.intent === "switch-analysis") {
     const source = { ...state.active, scrollY: action.scrollY } as StudioFrame;
-    let index = -1;
-    for (let i = state.history.length - 1; i >= 0; i--) { const item = state.history[i]; if (item.destination.page === action.destination.page && "context" in item.destination && JSON.stringify(item.destination.context) === JSON.stringify(action.destination.context)) { index = i; break; } }
-    if (index >= 0) {
-      const active = state.history[index];
-      const history = [...state.history.filter((_, i) => i !== index), source].slice(-20);
+    const active = findAnalysisFrame(state.history, action.destination);
+    if (active) {
+      const history = [...state.history.filter(item => item.id !== active.id), source].slice(-20);
       return { active, history, resume: { ...state.resume, analysis: active.id } };
     }
     return studioNavigationReducer(state, { ...action, intent: "open" });

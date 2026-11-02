@@ -40,7 +40,7 @@ import {
   type AnalysisContext,
 } from "./lib/analysis-context";
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
-import { createStudioNavigation, studioNavigationReducer, PAGE_SECTION, type StudioDestination, type StudioNavigation, type StudioPageId, type StudioSection } from "./lib/studio-navigation";
+import { createStudioNavigation, studioNavigationReducer, findAnalysisFrame, PAGE_SECTION, type StudioDestination, type StudioNavigation, type StudioPageId, type StudioSection } from "./lib/studio-navigation";
 import { WorkbenchView } from "./views/WorkbenchView";
 import { MatchesView } from "./views/MatchesView";
 import { AnalysisView } from "./views/AnalysisView";
@@ -522,7 +522,9 @@ export function App() {
         {section === "analysis" && <AnalysisView page={destination.page as import("./lib/studio-navigation").AnalysisPageId} focus={analysisContext.focus} onSelect={page => {
           if (page === destination.page) return;
           const id = `frame-${++nextFrameId.current}`;
-          setNavigation(current => studioNavigationReducer(current, { intent: "switch-analysis", id, destination: { page, context: analysisContext }, scrollY: window.scrollY }));
+          const target = { page, context: analysisContext };
+          setRestoringFrameId(findAnalysisFrame(navigationRef.current.history, target)?.id ?? null);
+          setNavigation(current => studioNavigationReducer(current, { intent: "switch-analysis", id, destination: target, scrollY: window.scrollY }));
         }}>
         {destination.page === "player" && (
           <PlayersView
