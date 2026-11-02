@@ -250,7 +250,7 @@ export function ManagementView({
   const MGMT_TABS = [
     { key: "identity" as const, label: "身份" },
     { key: "assets" as const, label: "资产" },
-    { key: "library" as const, label: "资料库维护" },
+    { key: "library" as const, label: "比赛库维护" },
   ];
 
   return (
