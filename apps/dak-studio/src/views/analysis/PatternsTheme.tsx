@@ -4,7 +4,7 @@ import { listMapPoolNotes, saveMapPoolNote } from "../../lib/map-pool-notes";
 import type { AnalysisExportSource } from "../../lib/analysis-export";
 import type { PatternExplorerState } from "../../lib/pattern-page-state";
 import type { Dispatch, SetStateAction } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DataTable, type DataTableColumn } from "@cs2dak/react";
 import { formatTacticalClusterName as autoName } from "@cs2dak/presentation";
 import type { TacticalCluster, TacticalRoundFact } from "@cs2dak/tactics";
@@ -38,7 +38,7 @@ export interface PatternsThemeProps {
 
 /** 自动观察与人工材料相互独立；模式命名由用户明确保存。 */
 export function PatternsTheme({ exportSource, section, explorerState, onExplorerStateChange, clusters, facts, allFacts, entryByMatchId, analysisContext, teamRenames, subjectTeam, mode, onOpenMatch, onWatchDemo }: PatternsThemeProps) {
-  const notes = useStoredDrafts(listMapPoolNotes, saveMapPoolNote);
+  const notes = useStoredDrafts(listMapPoolNotes, saveMapPoolNote, false, true);
   const names = useStoredDrafts(listPatternNames, savePatternName, true);
   const mapPool = useMemo(() => getObservedMapPool(allFacts, analysisContext.roles.beneficiary?.label ?? null, analysisContext.roles.opponent?.label ?? null, teamRenames), [allFacts, analysisContext.roles.beneficiary?.label, analysisContext.roles.opponent?.label, teamRenames]);
   return <>
@@ -76,9 +76,9 @@ export function PatternsTheme({ exportSource, section, explorerState, onExplorer
       {section === "anti" && (
         <>
           {notes.error && <div className="stu-notice" role="alert">地图池备注读取失败，无法导出备注：{notes.error} <button type="button" onClick={notes.retry}>重试读取</button></div>}
-          {notes.dirty && <div className="stu-notice">地图池备注尚未保存，请保存后导出。</div>}
-          {exportSource && notes.ready && analysisContext.roles.opponent && <AnalysisExportButtons disabled={notes.dirty} capture={() => buildPatternReportAnalysisResult(exportSource, mapPool, clusters, notes.persisted, Boolean(analysisContext.roles.beneficiary), subjectTeam, mode)} />}
-          <MapPoolTable ready={notes.ready} notes={notes.drafts} persisted={notes.persisted} onNotesChange={notes.change} onSave={notes.save} saving={notes.saving} errors={notes.errors}
+          {notes.ready && mapPool.some(row => notes.saving[row.mapName] || (notes.drafts[row.mapName] ?? "") !== (notes.persisted[row.mapName] ?? "")) && <div className="stu-notice">导出包含当前显示的备注；部分备注尚未保存到本地。</div>}
+          {exportSource && notes.ready && analysisContext.roles.opponent && <AnalysisExportButtons capture={() => buildPatternReportAnalysisResult(exportSource, mapPool, clusters, notes.drafts, Boolean(analysisContext.roles.beneficiary), subjectTeam, mode)} />}
+          <MapPoolTable ready={notes.ready} notes={notes.drafts} onNotesChange={notes.change} onSave={notes.save} saving={notes.saving} errors={notes.errors}
             rows={mapPool}
             hasOwn={Boolean(analysisContext.roles.beneficiary)}
             hasOpponent={Boolean(analysisContext.roles.opponent)}
@@ -91,31 +91,51 @@ export function PatternsTheme({ exportSource, section, explorerState, onExplorer
 
 // The page owns both the persisted snapshot and editable drafts. Reads are only retried
 // before editing starts; individual writes update the snapshot without replacing drafts.
-function useStoredDrafts(load: () => Promise<Record<string, string>>, write: (key: string, value: string) => Promise<void>, trim = false) {
+function useStoredDrafts(load: () => Promise<Record<string, string>>, write: (key: string, value: string) => Promise<void>, trim = false, autoSave = false) {
   const [persisted, setPersisted] = useState<Record<string, string> | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const latest = useRef<Record<string, string>>({});
+  const inFlight = useRef(new Set<string>());
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    void load().then(rows => { if (!cancelled) { setPersisted(rows); setDrafts(rows); } })
+    void load().then(rows => { if (!cancelled) { setPersisted(rows); latest.current = rows; setDrafts(rows); } })
       .catch(reason => { if (!cancelled) setError(reason instanceof Error ? reason.message : String(reason)); });
     return () => { cancelled = true; };
   }, [load, attempt]);
   const normalize = (value: string) => trim ? value.trim() : value;
   const dirty = persisted !== null && Object.keys(drafts).some(key => normalize(drafts[key] ?? "") !== (persisted[key] ?? ""));
-  const change = (key: string, value: string) => setDrafts(current => ({ ...current, [key]: value }));
   const save = (key: string) => {
-    if (saving[key] || persisted === null) return;
-    const value = normalize(drafts[key] ?? "");
+    if (inFlight.current.has(key) || persisted === null) return;
+    inFlight.current.add(key);
     setSaving(current => ({ ...current, [key]: true }));
     setErrors(current => { const next = { ...current }; delete next[key]; return next; });
-    void write(key, value).then(() => setPersisted(current => current && ({ ...current, [key]: value })))
-      .catch(reason => setErrors(current => ({ ...current, [key]: reason instanceof Error ? reason.message : String(reason) })))
-      .finally(() => setSaving(current => ({ ...current, [key]: false })));
+    void (async () => {
+      while (true) {
+        const value = normalize(latest.current[key] ?? "");
+        try {
+          await write(key, value);
+          setPersisted(current => current && ({ ...current, [key]: value }));
+        } catch (reason) {
+          // A newer edit gets its own attempt; otherwise retain it for explicit retry.
+          if (autoSave && normalize(latest.current[key] ?? "") !== value) continue;
+          setErrors(current => ({ ...current, [key]: reason instanceof Error ? reason.message : String(reason) }));
+          break;
+        }
+        if (!autoSave || normalize(latest.current[key] ?? "") === value) break;
+      }
+      inFlight.current.delete(key);
+      setSaving(current => ({ ...current, [key]: false }));
+    })();
+  };
+  const change = (key: string, value: string) => {
+    latest.current = { ...latest.current, [key]: value };
+    setDrafts(latest.current);
+    if (autoSave) save(key);
   };
   return { persisted: persisted ?? {}, drafts, ready: persisted !== null, error, retry: () => setAttempt(n => n + 1), saving, errors, dirty: dirty || Object.values(saving).some(Boolean), change, save };
 }
