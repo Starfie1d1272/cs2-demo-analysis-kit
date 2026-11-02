@@ -1,3 +1,4 @@
+import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   findingFromUtilityDamage,
@@ -6,7 +7,7 @@ import {
   type UtilityValueRow,
   type UtilityValueSummary,
 } from "@cs2dak/analytics";
-import { DataTable, EmptyState, MetricInfo, STUDIO_TABLE_CLASSES, type DataTableColumn } from "@cs2dak/react";
+import { DataTable, EmptyState, MetricInfo, type DataTableColumn } from "@cs2dak/react";
 import { getSeasonSummary, getUtilityValueSummary, type IdentityOptions } from "../lib/season";
 import { formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { EvidenceActions } from "../components/EvidenceActions";
@@ -196,6 +197,7 @@ function UtilityTable({ title, rows, columns, initialSortKey, empty, pageSize }:
   empty: string;
   pageSize: number;
 }) {
+  const [tableState, setTableState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: initialSortKey, direction: "desc" }, page: 0 });
   if (rows.length === 0) {
     return <EmptyState variant="insufficient" title={title} hint={empty} />;
   }
@@ -207,7 +209,7 @@ function UtilityTable({ title, rows, columns, initialSortKey, empty, pageSize }:
           classes={STUDIO_TABLE_CLASSES}
           rows={rows}
           rowKey={(r) => r.id}
-          initialSortKey={initialSortKey}
+          state={tableState} onStateChange={setTableState}
           pageSize={pageSize}
           paginationInfo={(total) => `${total} 项`}
           showRank

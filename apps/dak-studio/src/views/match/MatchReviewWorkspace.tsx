@@ -1,17 +1,14 @@
 import type { MatchWorkspaceModel, WorkspaceSpatialPoint } from "@cs2dak/presentation";
 import { displayWeaponName, sideLabel, economyLabelCn, buildMatchReportMarkdown } from "@cs2dak/presentation";
 import { Activity, BarChart3, Crosshair, Film, Gauge, ListChecks, Map as MapIcon, Swords, Table2, Users } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { EconomyPanel } from "./EconomyPanel";
-import { HeatmapCanvas } from "./HeatmapCanvas";
-import { ReplayViewer, type ReplayTarget } from "./ReplayViewer";
-import { Panel } from "./Panel";
-import { ScoreboardTable } from "./ScoreboardTable";
+import { useMemo, type ReactNode } from "react";
+import { EconomyPanel, HeatmapCanvas, ReplayViewer, ScoreboardTable } from "@cs2dak/react";
+import { normalizeReplayViewState } from "@cs2dak/presentation";
+import { Panel } from "./MatchPanel";
+import { normalizeMatchWorkspaceState, roundMatchesFilter, ROUND_FILTER_DEFAULT, type MatchRoundFilterState, type MatchWorkspaceState } from "../../lib/match-workspace-state";
+import "./match-review.css";
 
-export interface MatchWorkspaceProps {
-  model: MatchWorkspaceModel;
-  initialTarget?: { roundNumber: number; tick?: number } | null;
-}
+interface MatchWorkspaceProps { model: MatchWorkspaceModel }
 
 type WorkspaceView = MatchWorkspaceModel["tabs"][number]["key"];
 type HeatmapLayer = Extract<WorkspaceSpatialPoint["kind"], "death" | "kill" | "grenade">;
@@ -27,20 +24,15 @@ const WORKSPACE_NAV: Array<{ key: WorkspaceView; label: string }> = [
   { key: "map", label: "地图" }
 ];
 
-export function MatchWorkspace({ model, initialTarget }: MatchWorkspaceProps) {
-  // 顶部横向分段导航 + 单一全宽主区：一次只显示一个视图，避免宽回放与其它视图争抢宽度。
-  // 回放是默认首项（无回放流时退化为概览）；EvidenceLink 跳转自动切到回放并定位 tick。
-  // 落地视图固定为概览仪表盘（KPI / 计分板 / 快捷入口）；带 initialTarget 打开时才经 useEffect 跳到回放。
-  const [view, setView] = useState<WorkspaceView>("overview");
-  const [replayTarget, setReplayTarget] = useState<ReplayTarget | null>(null);
+export function MatchReviewWorkspace({ model, state: input, onStateChange }: { model: MatchWorkspaceModel; state: MatchWorkspaceState; onStateChange: (next: MatchWorkspaceState) => void }) {
+  const state = normalizeMatchWorkspaceState(model, input);
+  const setView = (view: WorkspaceView) => onStateChange({ ...state, view, replay: state.replay && view !== "replay" ? { ...state.replay, playing: false } : state.replay });
+  const view = state.view;
   const openReplay = (roundNumber: number, tick?: number) => {
-    setReplayTarget((prev) => ({ roundNumber, tick, seq: (prev?.seq ?? 0) + 1 }));
-    setView("replay");
+    const round = model.replay.rounds.find(r => r.roundNumber === roundNumber);
+    const replay = state.replay && round ? normalizeReplayViewState(model.replay, model.map.view, { ...state.replay, roundNumber, tick: tick ?? round.freezeEndTick, playing: false }) : state.replay;
+    onStateChange({ ...state, view: "replay", replay });
   };
-  useEffect(() => {
-    if (!initialTarget) return;
-    openReplay(initialTarget.roundNumber, initialTarget.tick);
-  }, [initialTarget?.roundNumber, initialTarget?.tick]);
   const replayHandler = model.replay.available ? openReplay : undefined;
   const nav = model.replay.available ? WORKSPACE_NAV : WORKSPACE_NAV.filter((item) => item.key !== "replay");
 
@@ -88,11 +80,11 @@ export function MatchWorkspace({ model, initialTarget }: MatchWorkspaceProps) {
 
         <section className="dak-ws-main">
           {view === "replay" && model.replay.available && (
-            <ReplayViewer replay={model.replay} map={model.map.view} target={replayTarget} />
+            <ReplayViewer replay={model.replay} map={model.map.view} state={state.replay} onStateChange={(replay) => onStateChange({ ...state, replay })} />
           )}
           {view === "overview" && <OverviewView model={model} onNavigate={setView} />}
-          {view === "rounds" && <RoundExplorer model={model} onOpenReplay={replayHandler} />}
-          {view === "players" && <PlayerStoryPanel model={model} onOpenReplay={replayHandler} />}
+          {view === "rounds" && <RoundExplorer model={model} state={state.roundExplorer} onChange={(roundExplorer) => onStateChange(normalizeMatchWorkspaceState(model, { ...state, roundExplorer }))} onOpenReplay={replayHandler} />}
+          {view === "players" && <PlayerStoryPanel model={model} selectedSteamId={state.playerPanelSteamId64} setSelectedSteamId={(playerPanelSteamId64) => onStateChange({ ...state, playerPanelSteamId64 })} onOpenReplay={replayHandler} />}
           {view === "economy" && (
             <div className="dak-stack">
               <Panel title="经济走势">
@@ -103,7 +95,7 @@ export function MatchWorkspace({ model, initialTarget }: MatchWorkspaceProps) {
           )}
           {view === "weapons" && <WeaponsView model={model} />}
           {view === "duels" && <DuelsView model={model} />}
-          {view === "map" && <MapWorkspace model={model} />}
+          {view === "map" && <MapWorkspace model={model} layer={state.mapLayer} setLayer={(mapLayer) => onStateChange({ ...state, mapLayer })} />}
         </section>
       </div>
     </main>
@@ -144,28 +136,6 @@ function OverviewView({ model, onNavigate }: MatchWorkspaceProps & { onNavigate:
 }
 
 // ── 回合筛选器（v0.2 query-first 最小实现）────────────────────────────────
-type RoundModel = MatchWorkspaceModel["rounds"][number];
-
-interface RoundFilterState {
-  winnerSide: "all" | "ct" | "t";
-  economy: "all" | "pistol" | "eco" | "semi" | "force" | "full";
-  bombSite: "all" | "a" | "b" | "none";
-  endReason: string; // "all" 或具体 endReason
-  firstKill: "all" | "teamA" | "teamB";
-  special: { clutch: boolean; multiKill: boolean; wallbang: boolean; smoke: boolean };
-  playerSteamId64: string; // "" = 全部；匹配该选手有击杀/首杀/残局的回合
-}
-
-const ROUND_FILTER_DEFAULT: RoundFilterState = {
-  winnerSide: "all",
-  economy: "all",
-  bombSite: "all",
-  endReason: "all",
-  firstKill: "all",
-  special: { clutch: false, multiKill: false, wallbang: false, smoke: false },
-  playerSteamId64: ""
-};
-
 const END_REASON_LABELS: Record<string, string> = {
   target_bombed: "爆弹",
   bomb_defused: "拆弹",
@@ -173,29 +143,6 @@ const END_REASON_LABELS: Record<string, string> = {
   ct_win: "CT 歼灭",
   target_saved: "守时"
 };
-
-function roundMatchesFilter(round: RoundModel, filter: RoundFilterState): boolean {
-  if (filter.winnerSide !== "all" && round.winnerSide !== filter.winnerSide) return false;
-  if (filter.economy !== "all" && round.teamAEconomy !== filter.economy && round.teamBEconomy !== filter.economy) return false;
-  if (filter.endReason !== "all" && round.endReason !== filter.endReason) return false;
-  const facets = round.facets;
-  if (filter.bombSite !== "all") {
-    if (!facets) return false;
-    if (filter.bombSite === "none" ? facets.bombSite !== null : facets.bombSite !== filter.bombSite) return false;
-  }
-  if (filter.firstKill !== "all" && facets?.firstKillTeamKey !== filter.firstKill) return false;
-  if (filter.special.clutch && !facets?.clutch) return false;
-  if (filter.special.multiKill && (facets?.maxKillsByOnePlayer ?? 0) < 3) return false;
-  if (filter.special.wallbang && (facets?.wallbangKills ?? 0) === 0) return false;
-  if (filter.special.smoke && (facets?.throughSmokeKills ?? 0) === 0) return false;
-  if (filter.playerSteamId64) {
-    const fact = round.playerFacts.find((f) => f.steamId64 === filter.playerSteamId64);
-    const involved = !!fact && (fact.kills > 0 || fact.openingDuel !== "none" || !fact.survived);
-    const isClutcher = facets?.clutch?.steamId64 === filter.playerSteamId64;
-    if (!involved && !isClutcher) return false;
-  }
-  return true;
-}
 
 function FilterChip({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return (
@@ -205,33 +152,23 @@ function FilterChip({ active, label, onClick }: { active: boolean; label: string
   );
 }
 
-function RoundExplorer({ model, onOpenReplay }: MatchWorkspaceProps & { onOpenReplay?: (roundNumber: number, tick?: number) => void }) {
-  const [selectedRound, setSelectedRound] = useState(model.rounds[0]?.roundNumber ?? 1);
-  const [showAllEvents, setShowAllEvents] = useState(false);
-  const [filter, setFilter] = useState<RoundFilterState>(ROUND_FILTER_DEFAULT);
+function RoundExplorer({ model, state, onChange, onOpenReplay }: MatchWorkspaceProps & { state: MatchWorkspaceState["roundExplorer"]; onChange: (state: MatchWorkspaceState["roundExplorer"]) => void; onOpenReplay?: (roundNumber: number, tick?: number) => void }) {
+  const { selectedRoundNumber: selectedRound, showAllEvents, filter } = state;
+  const setSelectedRound = (selectedRoundNumber: number) => onChange({ ...state, selectedRoundNumber, showAllEvents: false });
+  const setShowAllEvents = (showAllEvents: boolean) => onChange({ ...state, showAllEvents });
+  const setFilter = (next: MatchRoundFilterState | ((prev: MatchRoundFilterState) => MatchRoundFilterState)) => onChange({ ...state, filter: typeof next === "function" ? next(filter) : next });
   const filteredRounds = useMemo(
     () => model.rounds.filter((row) => roundMatchesFilter(row, filter)),
     [model.rounds, filter]
   );
-  const round = model.rounds.find((row) => row.roundNumber === selectedRound)
-    ?? filteredRounds[0]
-    ?? model.rounds[0];
-
-  useEffect(() => {
-    setShowAllEvents(false);
-  }, [selectedRound]);
-
-  if (!round) {
-    return <Panel title="回合浏览"><p className="dak-muted">暂无回合数据</p></Panel>;
-  }
-
+  const round = filteredRounds.find((row) => row.roundNumber === selectedRound) ?? filteredRounds[0];
   const eventLimit = 28;
-  const visibleEvents = showAllEvents ? round.events : round.events.slice(0, eventLimit);
-  const hiddenEventCount = round.events.length - visibleEvents.length;
+  const visibleEvents = round ? (showAllEvents ? round.events : round.events.slice(0, eventLimit)) : [];
+  const hiddenEventCount = (round?.events.length ?? 0) - visibleEvents.length;
   const hasFacets = model.rounds.some((row) => row.facets);
   const endReasons = [...new Set(model.rounds.map((row) => row.endReason))];
   const filterActive = filteredRounds.length !== model.rounds.length;
-  const toggleSpecial = (key: keyof RoundFilterState["special"]) =>
+  const toggleSpecial = (key: keyof MatchRoundFilterState["special"]) =>
     setFilter((prev) => ({ ...prev, special: { ...prev.special, [key]: !prev.special[key] } }));
 
   return (
@@ -300,7 +237,7 @@ function RoundExplorer({ model, onOpenReplay }: MatchWorkspaceProps & { onOpenRe
           {filteredRounds.map((row) => (
             <button
               key={row.roundNumber}
-              className={row.roundNumber === round.roundNumber ? "dak-round-pill dak-round-pill-active" : "dak-round-pill"}
+              className={row.roundNumber === round?.roundNumber ? "dak-round-pill dak-round-pill-active" : "dak-round-pill"}
               type="button"
               onClick={() => setSelectedRound(row.roundNumber)}
             >
@@ -312,7 +249,7 @@ function RoundExplorer({ model, onOpenReplay }: MatchWorkspaceProps & { onOpenRe
           {filteredRounds.length === 0 && <p className="dak-muted">没有匹配筛选条件的回合</p>}
         </div>
       </Panel>
-      <Panel title={`R${round.roundNumber} 详情`}>
+      {round && <Panel title={`R${round.roundNumber} 详情`}>
         <div className="dak-round-detail">
           {onOpenReplay && (
             <button className="dak-timeline-more" type="button" onClick={() => onOpenReplay(round.roundNumber)}>
@@ -351,13 +288,12 @@ function RoundExplorer({ model, onOpenReplay }: MatchWorkspaceProps & { onOpenRe
             )}
           </div>
         </div>
-      </Panel>
+      </Panel>}
     </div>
   );
 }
 
-function PlayerStoryPanel({ model, onOpenReplay }: MatchWorkspaceProps & { onOpenReplay?: (roundNumber: number, tick?: number) => void }) {
-  const [selectedSteamId, setSelectedSteamId] = useState(model.players[0]?.row.steamId64 ?? "");
+function PlayerStoryPanel({ model, selectedSteamId, setSelectedSteamId, onOpenReplay }: MatchWorkspaceProps & { selectedSteamId: string | null; setSelectedSteamId: (id: string) => void; onOpenReplay?: (roundNumber: number, tick?: number) => void }) {
   const selected = model.players.find((player) => player.row.steamId64 === selectedSteamId) ?? model.players[0];
 
   if (!selected) {
@@ -574,11 +510,10 @@ function formatIndicatorValue(value: number | null): string {
   return value.toFixed(2);
 }
 
-function MapWorkspace({ model }: MatchWorkspaceProps) {
+function MapWorkspace({ model, layer, setLayer }: MatchWorkspaceProps & { layer: HeatmapLayer; setLayer: (layer: HeatmapLayer) => void }) {
   const renderableLayers = model.map.modes.filter((mode): mode is typeof mode & { key: HeatmapLayer } => (
     mode.key === "death" || mode.key === "kill" || mode.key === "grenade"
   ));
-  const [layer, setLayer] = useState<HeatmapLayer>(renderableLayers[0]?.key ?? "death");
   const heatmapPoints = model.map.points
     .filter((point): point is WorkspaceSpatialPoint & { kind: "kill" | "death" | "grenade" } => (
       point.kind === "kill" || point.kind === "death" || point.kind === "grenade"

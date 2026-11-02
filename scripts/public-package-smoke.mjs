@@ -129,7 +129,28 @@ try {
     let runtimePassed = false;
     try { command(process.execPath, [join(consumer, 'entries.mjs')], consumer); runtimePassed = true; }
     catch { failures.push(`${packageName}: Node ESM import failed`); }
-    writeFileSync(join(consumer, 'consumer.ts'), entries.map((entry, i) => `import * as entry${i} from ${JSON.stringify(entry)}; void entry${i};`).join('\n'));
+    writeFileSync(join(consumer, 'consumer.ts'), entries.map((entry, i) => `import * as entry${i} from ${JSON.stringify(entry)}; void entry${i};`).join('\n') + (name === 'react' ? `
+import type { DataTableProps as RootTable, ReplayViewerProps as RootReplay } from '@cs2dak/react';
+import type { DataTableProps as SubTable } from '@cs2dak/react/table';
+import type { ReplayViewerProps as SubReplay } from '@cs2dak/react/replay';
+import type { TableState, ReplayViewState, WorkspaceReplay, MapView } from '@cs2dak/presentation/models';
+const tableState: TableState = { sort: { key: 'n', direction: 'desc' }, page: 0 };
+const table: RootTable<{ n: number }> = { rows: [{ n: 1 }], columns: [{ key: 'n', label: 'n', sortable: true, sortValue: r => r.n }], rowKey: r => String(r.n), state: tableState, onStateChange: next => { tableState.page = next.page; } };
+const subTable: SubTable<{ n: number }> = table; void subTable;
+declare const replay: WorkspaceReplay; declare const map: MapView; declare const state: ReplayViewState | null;
+const player: RootReplay = { replay, map, state, onStateChange: next => { void next; } }; const subPlayer: SubReplay = player; void subPlayer;
+// @ts-expect-error removed table prop
+const oldTable: RootTable<{ n: number }> = { ...table, initialSortKey: 'n' };
+// @ts-expect-error removed replay prop
+const oldPlayer: RootReplay = { ...player, target: { roundNumber: 1, seq: 1 } };
+// @ts-expect-error removed page export
+import { MatchWorkspace } from '@cs2dak/react';
+// @ts-expect-error removed target type
+import type { ReplayTarget } from '@cs2dak/react/replay';
+// @ts-expect-error removed preset
+import { STUDIO_TABLE_CLASSES } from '@cs2dak/react';
+void oldTable; void oldPlayer; void MatchWorkspace; void STUDIO_TABLE_CLASSES;
+` : ''));
     writeFileSync(join(consumer, 'tsconfig.json'), JSON.stringify({ compilerOptions: { strict: true, noEmit: true, module: 'NodeNext', moduleResolution: 'NodeNext', target: 'ES2022', lib: ['ES2022', 'DOM'], types: [], skipLibCheck: false }, include: ['consumer.ts'] }));
     let typesPassed = false;
     try { command(join(root, 'node_modules', '.bin', 'tsc'), ['-p', join(consumer, 'tsconfig.json')], consumer); typesPassed = true; }
@@ -148,7 +169,7 @@ try {
       presentation: `assert.equal(m.formatPercent(50, 0), '50%');`,
       analytics: `assert.deepEqual(m.buildMatchBuyQuality([]).teamA, []);`,
       pipeline: `const {readFileSync}=await import('node:fs'); const pkg=JSON.parse(readFileSync(${JSON.stringify(demoInput)}, 'utf8')); const model=m.analyzeMatchWorkspace(pkg); assert.ok(model.scoreboard.length);`,
-      react: `const React=await import('react'); const {renderToStaticMarkup}=await import('react-dom/server'); assert.match(renderToStaticMarkup(React.createElement(m.EmptyState, {title:'Packed consumer'})), /Packed consumer/);`,
+      react: `const React=await import('react'); const {renderToStaticMarkup}=await import('react-dom/server'); assert.match(renderToStaticMarkup(React.createElement(m.EmptyState, {title:'Packed consumer'})), /Packed consumer/); const state={sort:{key:'n',direction:'desc'},page:0}; assert.match(renderToStaticMarkup(React.createElement(m.DataTable,{rows:[{n:2}],columns:[{key:'n',label:'N',sortable:true,sortValue:r=>r.n,format:r=>r.n}],rowKey:r=>String(r.n),state,onStateChange:()=>{}})), />2</); const map={name:'de_nuke',radarImageUrl:null,lowerRadarImageUrl:null,calibrated:false}; const replay={available:false,sampleRate:8,tickrate:64,rounds:[],capabilities:{hasDefuseKit:false}}; assert.match(renderToStaticMarkup(React.createElement(m.ReplayViewer,{replay,map,state:null,onStateChange:()=>{}})), /回放流/); const round={roundNumber:1,startTick:100,freezeEndTick:108,tickStep:8,frameCount:1,players:[],kills:[],grenades:[],projectiles:[],bomb:null,groundBombs:[],groundDefusers:[]}; replay.available=true; replay.rounds=[round]; const view={roundNumber:1,tick:100,playing:false,speed:1,layers:{trace:false,killLines:true,grenades:true},level:'upper'}; assert.match(renderToStaticMarkup(React.createElement(m.ReplayViewer,{replay,map,state:view,onStateChange:()=>{}})), /回合/);`,
     };
     assert.ok(calls[name], `${packageName}: actual API smoke is missing`);
     if (isUiConsumer) {

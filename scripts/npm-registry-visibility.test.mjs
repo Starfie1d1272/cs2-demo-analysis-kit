@@ -25,9 +25,23 @@ test("waits for delayed visibility and does not recheck confirmed packages", asy
     const value = req.url.includes("maps") ? second : target;
     respond(res, value === second && count < 3 ? 404 : 200, value);
   });
+  const confirmedCounts = new Map();
+  opts.log = message => {
+    for (const item of [target, second]) {
+      if (message === `npm version confirmed: ${item.name}@${item.version}`) {
+        const path = `/${encodeURIComponent(item.name)}/${encodeURIComponent(item.version)}`;
+        confirmedCounts.set(path, counts.get(path));
+      }
+    }
+  };
   const result = await waitForRegistryVersions([target, second], opts);
   assert.deepEqual(result, { confirmed: [target, second], pending: [], errors: [] });
-  assert.deepEqual([...counts.values()], [1, 3]);
+  const corePath = `/${encodeURIComponent(target.name)}/${encodeURIComponent(target.version)}`;
+  const mapsPath = `/${encodeURIComponent(second.name)}/${encodeURIComponent(second.version)}`;
+  assert.ok(confirmedCounts.get(corePath) >= 1);
+  assert.ok(confirmedCounts.get(mapsPath) >= 3);
+  assert.equal(counts.get(corePath), confirmedCounts.get(corePath));
+  assert.equal(counts.get(mapsPath), confirmedCounts.get(mapsPath));
 });
 
 test("retries transient HTTP and connection errors", async t => {

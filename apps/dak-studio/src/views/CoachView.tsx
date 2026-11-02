@@ -1,5 +1,6 @@
+import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { EmptyState, DataTable, STUDIO_TABLE_CLASSES, type DataTableColumn } from "@cs2dak/react";
+import { EmptyState, DataTable, type DataTableColumn } from "@cs2dak/react";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { TACTICAL_FACT_VERSION } from "@cs2dak/tactics";
@@ -422,6 +423,7 @@ function PlaybookTable({
   playbook: Record<string, string>;
   onRename: (clusterId: string, name: string) => Promise<void>;
 }) {
+  const [tableState, setTableState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: null, direction: "desc" }, page: 0 });
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   // ref 持有 drafts 最新值，避免按键时 columns useMemo 失效重建
   const draftsRef = useRef(drafts);
@@ -458,6 +460,7 @@ function PlaybookTable({
     <div className="stu-card">
       <h3>战术本</h3>
       <DataTable
+        state={tableState} onStateChange={setTableState}
         classes={STUDIO_TABLE_CLASSES}
         rows={clusters}
         rowKey={(c) => c.id}
@@ -484,6 +487,7 @@ function PlaylistTable({
   onOpenMatch: (matchId: string, roundNumber: number) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
 }) {
+  const [tableState, setTableState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: null, direction: "desc" }, page: 0 });
   const markdown = prepItemsToMarkdown("备战清单", items);
   if (items.length === 0) {
     return <EmptyState variant="insufficient" title="备战清单为空" hint="在开局模式的证据回合里点击加入。" />;
@@ -514,6 +518,7 @@ function PlaylistTable({
     <div className="stu-card">
       <h3>备战清单</h3>
       <DataTable
+        state={tableState} onStateChange={setTableState}
         classes={STUDIO_TABLE_CLASSES}
         rows={items}
         rowKey={(item) => item.id}

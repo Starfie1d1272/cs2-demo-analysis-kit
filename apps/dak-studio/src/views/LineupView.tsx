@@ -1,7 +1,8 @@
+import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 import { useEffect, useMemo, useState } from "react";
 import { buildLineupClusters, getMapCalibration, worldToRadar, calloutCn, type LineupCluster, type LineupClusterMode, type LineupGrenadeLike } from "@cs2dak/maps";
 import { displayWeaponName } from "@cs2dak/presentation";
-import { DataTable, STUDIO_TABLE_CLASSES, EmptyState, MetricInfo, EvidenceLink, type DataTableColumn } from "@cs2dak/react";
+import { DataTable, EmptyState, MetricInfo, EvidenceLink, type DataTableColumn } from "@cs2dak/react";
 import { matchIdForEntry, listDemoEntries, type StudioDemoEntry } from "../lib/library";
 import { mapDisplayName } from "../lib/series";
 import { getFactsStore } from "../lib/facts-store";
@@ -89,7 +90,9 @@ export function LineupView({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [sideFilter, setSideFilter] = useState<"t" | "ct" | null>(null);
-  const [page, setPage] = useState(0);
+  const [tableState, setTableState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "sample", direction: "desc" }, page: 0 });
+  const page = tableState.page;
+  const setPage = (page: number) => setTableState(prev => ({ ...prev, page }));
   const [radarTopN, setRadarTopN] = useState<TopNOption>(20);
   const [clusterMode, setClusterMode] = useState<LineupClusterMode>("strict");
   const [copiedClusterId, setCopiedClusterId] = useState<string | null>(null);
@@ -575,10 +578,8 @@ export function LineupView({
             classes={STUDIO_TABLE_CLASSES}
             rows={sideFilteredRows}
             rowKey={(c) => c.id}
-            initialSortKey="sample"
-            pageSize={PAGE_SIZE}
-            page={page}
-            onPageChange={setPage}
+                        pageSize={PAGE_SIZE}
+            state={tableState} onStateChange={setTableState}
             paginationInfo={(total) => `${total} 条`}
             rowProps={(cluster) => ({
               className: hoveredId === cluster.id ? "stu-lineup-row-hovered" : "",

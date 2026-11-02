@@ -1,6 +1,7 @@
+import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { EventStage, EventStanding } from "@cs2dak/contract";
-import { DataTable, ElimBracket, EmptyState, STUDIO_TABLE_CLASSES, SwissBracket, type DataTableColumn } from "@cs2dak/react";
+import { DataTable, ElimBracket, EmptyState, SwissBracket, type DataTableColumn } from "@cs2dak/react";
 import { listEventRecords, type StudioEventRecord } from "../lib/events";
 import type { StudioDemoEntry } from "../lib/library";
 import type { RivalHubConnectionState } from "../lib/rivalhub";
@@ -100,6 +101,7 @@ function localStandings(series: StudioSeriesRecord[]): Array<EventStanding & { t
 }
 
 function StandingsTable({ stage, series, remote }: { stage: EventStage; series: StudioSeriesRecord[]; remote: boolean }) {
+  const [tableState, setTableState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: null, direction: "desc" }, page: 0 });
   const rows = remote
     ? (stage.standings ?? []).map((standing) => ({ ...standing, teamName: standing.teamName ?? standing.entryId }))
     : localStandings(series);
@@ -115,7 +117,7 @@ function StandingsTable({ stage, series, remote }: { stage: EventStage; series: 
     { key: "roundDiff", label: "回合差", numeric: true, sortable: true, sortValue: (row) => row.roundDiff ?? null, format: (row) => row.roundDiff ?? "—" },
     { key: "tiebreak", label: "官方 tiebreak", render: (row) => row.tiebreakFacts ? Object.entries(row.tiebreakFacts).map(([key, value]) => `${key}: ${value ?? "—"}`).join(" · ") : "—" },
   ];
-  return <DataTable rows={rows} columns={columns} rowKey={(row) => row.entryId} classes={STUDIO_TABLE_CLASSES} />;
+  return <DataTable state={tableState} onStateChange={setTableState} rows={rows} columns={columns} rowKey={(row) => row.entryId} classes={STUDIO_TABLE_CLASSES} />;
 }
 
 function MatchIndex({ series, selectedId, onSelect }: { series: StudioSeriesRecord[]; selectedId: string | null; onSelect: (id: string) => void }) {

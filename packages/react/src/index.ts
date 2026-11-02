@@ -1,5 +1,4 @@
-export { MatchWorkspace, type MatchWorkspaceProps } from "./components/MatchWorkspace";
-export { ReplayViewer, type ReplayViewerProps, type ReplayTarget } from "./components/ReplayViewer";
+export { ReplayViewer, type ReplayViewerProps } from "./components/ReplayViewer";
 export { ScoreboardTable, type ScoreboardTableProps } from "./components/ScoreboardTable";
 export { RoundTimeline } from "./components/RoundTimeline";
 export { EconomyPanel } from "./components/EconomyPanel";
@@ -15,7 +14,6 @@ export { DoubleAwpAnalysisPanel, PlayerMapPoolPanel, PlayerMapRoleProfilePanel, 
 export { ElimBracket, SwissBracket } from "./components/EventBracket";
 export {
   DataTable,
-  STUDIO_TABLE_CLASSES,
   DAK_TABLE_CLASSES,
   type DataTableColumn,
   type DataTableClasses,
