@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { DataTable, EmptyState, type DataTableColumn } from "@cs2dak/react";
 import type { TeamOverviewModel } from "@cs2dak/presentation";
 import { getTeamOverview } from "../lib/queries/team-queries";
-import { getTeamAnalysisGroups } from "../lib/queries/spatial-queries";
+import { getTeamAnalysisGroups } from "../lib/queries/team-scope";
 import { type IdentityOptions } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 

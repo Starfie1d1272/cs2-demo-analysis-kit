@@ -10,7 +10,7 @@ import { matchIdForEntry, type StudioDemoEntry } from "../demo-entry";
 
 import type { IdentityOptions } from "../identity";
 import { groupAnalysisTeams } from "./tournament-groups";
-import { getAnalysisTeamSlots } from "./spatial-queries";
+import { getAnalysisTeamSlots } from "./team-scope";
 import { keyOf, filterTournamentInsightsByTeam, missingFactsError, withTeamRenames } from "./query-scope";
 const SMALL_CACHE_LIMIT = 3;
 

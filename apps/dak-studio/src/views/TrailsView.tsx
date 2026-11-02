@@ -16,7 +16,7 @@ import { RadarTrails, GRENADE_COLOR, type RadarTrail, type RadarGrenadeOverlay }
 import { entryDate, matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import type { IdentityOptions } from "../lib/identity";
 import { getFactsStore } from "../lib/facts-store";
-import { getAnalysisTeamSlots } from "../lib/queries/spatial-queries";
+import { getAnalysisTeamSlots } from "../lib/queries/team-scope";
 import { getDerivedCacheStore } from "../lib/derived-cache";
 import { EmptyState } from "@cs2dak/react";
 

@@ -7,7 +7,7 @@ import { matchIdForEntry, type StudioDemoEntry } from "../demo-entry";
 
 import type { IdentityOptions } from "../identity";
 import { keyOf, missingFactsError } from "./query-scope";
-import { getAnalysisTeamSlots } from "./spatial-queries";
+import { getAnalysisTeamSlots } from "./team-scope";
 const SMALL_CACHE_LIMIT = 3;
 
 const duelInsightsCache = createAnalysisBucket<DuelInsightsModel>();

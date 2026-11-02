@@ -8,7 +8,8 @@ import { buildPlayerRolesAnalysisResult } from "../../lib/analysis-export-roles"
 import type { AnalysisExportSource } from "../../lib/analysis-export";
 import { EmptyState, PlayerMapPoolPanel, PlayerMapRoleProfilePanel } from "@cs2dak/react";
 import type { DeclaredRole, PlayerMapPoolRow, PlayerMapRoleProfile, WeaponDuty } from "@cs2dak/tactics";
-import { getPlayerMapPool, getPlayerMapRoleProfiles, type RoleTeamGroup } from "../../lib/queries/spatial-queries";
+import { getPlayerMapPool, getPlayerMapRoleProfiles } from "../../lib/queries/spatial-queries";
+import type { RoleTeamGroup } from "../../lib/queries/team-scope";
 import { loadRoleDeclarations, removeRoleDeclaration, replaceOrdinaryUserRoleDeclarations } from "../../lib/identity-commands";
 import type { RoleDeclarationsState } from "../../lib/role-declarations";
 import { matchIdForEntry, type StudioDemoEntry } from "../../lib/demo-entry";

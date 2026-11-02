@@ -6,7 +6,7 @@ import { matchIdForEntry, type StudioDemoEntry } from "../demo-entry";
 
 import type { IdentityOptions } from "../identity";
 import { keyOf, orderedMatchIds, missingFactsError } from "./query-scope";
-import { getAnalysisTeamSlots, getAnalysisTeamAssignments } from "./spatial-queries";
+import { getAnalysisTeamSlots, getAnalysisTeamAssignments } from "./team-scope";
 const SMALL_CACHE_LIMIT = 3;
 import { buildPlayerSeasonInsightsFromFacts, mergeUtilityValueSummaries, selectUtilityValueSide } from "@cs2dak/analytics";
 import type { PlayerFlashSummariesFactsOptions, UtilityValueFactsOptions } from "../fact-types";
@@ -38,8 +38,8 @@ function buildPlayerFlashSummariesFromFacts(
   });
 }
 
-function buildPlayerUtilityMerge(facts: UtilityValueSummary[], players: UtilityValueFactsOptions["players"], teamRenames?: Record<string, string>): UtilityValueSummary {
-  return mergeUtilityValueSummaries(facts, { players, teamRenames });
+function buildPlayerUtilityMerge(facts: UtilityValueSummary[], players: UtilityValueFactsOptions["players"], teamRenames?: Record<string, string>, grouped = false): UtilityValueSummary {
+  return mergeUtilityValueSummaries(facts, { players, teamRenames, ...(grouped && { teamIdentity: "id" as const }) });
 }
 
 const flashCache = createAnalysisBucket<PlayerFlashSummary[]>();
@@ -74,7 +74,7 @@ export function getUtilityValueSummary(
   selectedTeams: string[] = [],
 ): Promise<UtilityValueSummary> {
   const playerKey = players.map((p) => `${p.playerKey}=${p.steamIds.join(",")}`).sort().join("|");
-  const key = `${keyOf(entries, identity?.version, selectedTeams)}:utility-value:v3:${playerKey}`;
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:utility-value:v4:${playerKey}`;
   return cachedQuery(utilityValueCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), entries, async (generation) => {
     const persisted = await readPersistedValue<UtilityValueSummary>(key, generation);
     if (persisted) return persisted;
@@ -95,10 +95,10 @@ export function getUtilityValueSummary(
           if (!groupKey || !selected.has(groupKey)) return [];
           const group = assignment.groups.find(item => item.key === groupKey);
           if (!group) throw missingFactsError("道具分组");
-          return [selectUtilityValueSide(row, comparison.players.filter(player => player.teamKey === slot).map(player => player.steamId64), group.label, comparison.rounds.length)];
+          return [selectUtilityValueSide(row, comparison.players.filter(player => player.teamKey === slot).map(player => player.steamId64), groupKey, group.label, comparison.rounds.length)];
         });
       }) : rows.map(row => row.row);
-      const summary = buildPlayerUtilityMerge(facts, players, assignment ? undefined : identity?.teamRenames);
+      const summary = buildPlayerUtilityMerge(facts, players, assignment ? undefined : identity?.teamRenames, !!assignment);
       await writePersistedValue(key, summary, generation);
       return summary;
     }

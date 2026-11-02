@@ -9,7 +9,7 @@ import { matchIdForEntry, type StudioDemoEntry } from "../demo-entry";
 import type { IdentityOptions } from "../identity";
 import { keyOf, missingFactsError, withTeamRenames } from "./query-scope";
 import { groupAnalysisTeams } from "./tournament-groups";
-import { getTeamAnalysisGroups } from "./spatial-queries";
+import { getTeamAnalysisGroups } from "./team-scope";
 
 async function groupedTeamFacts(matchIds: string[], identity?: IdentityOptions) {
   const store = getDerivedCacheStore();

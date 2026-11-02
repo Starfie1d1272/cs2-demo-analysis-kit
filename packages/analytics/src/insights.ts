@@ -434,10 +434,10 @@ function sortUtilityRows(rows: UtilityValueRow[]): UtilityValueRow[] {
 }
 
 /** Project one observed side from per-player facts before merging matches. */
-export function selectUtilityValueSide(summary: UtilityValueSummary, steamIds: string[], teamName: string, rounds: number): UtilityValueSummary {
+export function selectUtilityValueSide(summary: UtilityValueSummary, steamIds: string[], teamKey: string, teamName: string, rounds: number): UtilityValueSummary {
   const ids = new Set(steamIds.map(id => `steam:${id}`));
   const players = summary.players.filter(row => ids.has(row.id));
-  const team = utilityRow(teamName, teamName);
+  const team = utilityRow(teamKey, teamName);
   for (const player of players) addUtilityRow(team, player);
   team.rounds = rounds;
   return {
@@ -450,7 +450,7 @@ export function selectUtilityValueSide(summary: UtilityValueSummary, steamIds: s
 
 export function mergeUtilityValueSummaries(
   summaries: UtilityValueSummary[],
-  options: { players?: PlayerFlashSummaryInput[]; teamRenames?: Record<string, string> } = {}
+  options: { players?: PlayerFlashSummaryInput[]; teamRenames?: Record<string, string>; teamIdentity?: "id" } = {}
 ): UtilityValueSummary {
   const playerRows = new Map<string, UtilityValueRow>();
   const playerTargetBySource = new Map<string, PlayerFlashSummaryInput>();
@@ -472,8 +472,9 @@ export function mergeUtilityValueSummaries(
   };
   const ensureTeam = (row: UtilityValueRow): UtilityValueRow => {
     const name = options.teamRenames?.[row.name] ?? row.name;
-    const existing = teamRows.get(name) ?? utilityRow(name, name);
-    teamRows.set(name, existing);
+    const key = options.teamIdentity === "id" ? row.id : name;
+    const existing = teamRows.get(key) ?? utilityRow(key, name);
+    teamRows.set(key, existing);
     return existing;
   };
 

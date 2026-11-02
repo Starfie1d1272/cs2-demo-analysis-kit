@@ -20,7 +20,7 @@ import { getMapCalibration, hasLowerLevel } from "@cs2dak/maps/calibration";
 import type { RadarField } from "@cs2dak/tactics";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
-import { getTeamAnalysisGroups, getAnalysisTeamSlots } from "../lib/queries/spatial-queries";
+import { getTeamAnalysisGroups, getAnalysisTeamSlots } from "../lib/queries/team-scope";
 import type { IdentityOptions } from "../lib/identity";
 import { buildScopeRadarFields } from "../lib/radar-field";
 
@@ -57,17 +57,19 @@ export function RadarFieldView({ exportSource, onCapabilityRepair, entries, team
   );
   const capability = useCapability(entriesOfMap, "control");
   const eligibleEntries = capability.eligible;
+  const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const [groupError, setGroupError] = useState<string | null>(null);
   const [groupSnapshot, setGroupSnapshot] = useState<{ key: string; groups: Awaited<ReturnType<typeof getTeamAnalysisGroups>>; slots: Awaited<ReturnType<typeof getAnalysisTeamSlots>> } | null>(null);
-  const groupKey = JSON.stringify([entriesOfMap.map(entry => entry.id), selectedTeamKey, selectedTeam, identityOptions?.version]);
+  const groupKey = JSON.stringify([entriesOfMap.map(entry => entry.id), selectedTeamKey, selectedTeam, identityOptions?.version, analysis.generation]);
   useEffect(() => {
     let cancelled = false;
+    if (analysis.status !== "ready") return () => { cancelled = true; };
     setGroupError(null);
     void Promise.all([getTeamAnalysisGroups(entriesOfMap, identityOptions), getAnalysisTeamSlots(entriesOfMap, identityOptions, selectedTeamKey ? [selectedTeamKey] : selectedTeam ? [selectedTeam] : [])])
-      .then(([groups, slots]) => { if (!cancelled) setGroupSnapshot({ key: groupKey, groups, slots }); })
+      .then(([groups, slots]) => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setGroupSnapshot({ key: groupKey, groups, slots }); } })
       .catch(reason => { if (!cancelled) { setGroupSnapshot(null); setGroupError(reason instanceof Error ? reason.message : String(reason)); } });
     return () => { cancelled = true; };
-  }, [entriesOfMap, groupKey, identityOptions?.version]);
+  }, [entriesOfMap, groupKey, identityOptions?.version, analysis]);
   const groups = groupSnapshot?.key === groupKey ? groupSnapshot.groups : [];
   const slots = groupSnapshot?.key === groupKey ? groupSnapshot.slots : null;
   const matches = groups.filter(group => selectedTeamKey ? group.key === selectedTeamKey : selectedTeam != null && group.names.includes(selectedTeam));
@@ -78,7 +80,6 @@ export function RadarFieldView({ exportSource, onCapabilityRepair, entries, team
 
   const missingSelectedMap = mapName !== null && !maps.some(([name]) => name === mapName);
 
-  const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const requestKey = JSON.stringify([eligibleEntries?.map(entry => entry.id), activeMap, activeTeam, economy, teamRenames]);
   const [snapshot, setSnapshot] = useState<{ key: string; generation: number; field: RadarField | null; baseline: RadarField | null } | null>(null);
   const field = snapshot?.key === requestKey ? snapshot.field : null;
