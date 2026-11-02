@@ -25,6 +25,7 @@ export function buildPlayerMapPool(performance: PlayerMapPerformanceInput[], pro
       globalWeaponDuty: profile?.weaponDuty ?? null,
       mapSideAwpUsage: roleRows.map((evidence) => ({ side: evidence.side, duty: evidence.awp.duty, qualifiedRounds: evidence.awp.qualifiedLongGunRounds, activeSeconds: evidence.awp.activeSeconds })),
       tPositionGroup: label("t"), ctPositionGroup: label("ct"), tResponsibility: side("t")?.responsibility ?? "unknown", ctResponsibility: side("ct")?.responsibility ?? "unknown",
+      roleMatchCount: new Set(roleRows.filter(evidence => evidence.sample.eligibleRounds > 0).flatMap(evidence => evidence.matchIds)).size,
       sampleQuality: weighted((evidence) => evidence.sample.dataQuality), confidence: weighted((evidence) => evidence.confidence),
       evidence: roleRows.flatMap((evidence) => evidence.representativeRounds.map((ref) => ({ ...ref, reason: `${row.mapName} 地图池代表回合`, role: "example" as const }))).slice(0, 6),
     });

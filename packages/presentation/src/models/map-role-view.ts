@@ -102,6 +102,7 @@ export interface PlayerMapPoolRowView {
   ctPositionGroup: string | null;
   tResponsibility: TeamResponsibilityView;
   ctResponsibility: TeamResponsibilityView;
+  roleMatchCount: number;
   sampleQuality: number;
   confidence: number;
   evidence: EvidenceRef[];

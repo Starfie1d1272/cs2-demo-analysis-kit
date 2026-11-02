@@ -296,6 +296,7 @@ export const playerMapPoolRowSchema = z.object({
   openingKills: z.number().int().nonnegative(), openingDeaths: z.number().int().nonnegative(),
   mainWeapon: z.string().nullable(), globalWeaponDuty: weaponDutySchema.nullable(), mapSideAwpUsage: z.array(z.object({ side: z.enum(["t", "ct"]), duty: weaponDutySchema, qualifiedRounds: z.number().int().nonnegative(), activeSeconds: z.number().nonnegative().nullable() })),
   tPositionGroup: z.string().nullable(), ctPositionGroup: z.string().nullable(), tResponsibility: teamResponsibilitySchema, ctResponsibility: teamResponsibilitySchema,
+  roleMatchCount: z.number().int().nonnegative(),
   sampleQuality: z.number().min(0).max(1), confidence: z.number().min(0).max(1), evidence: z.array(evidenceRefSchema),
 });
 
