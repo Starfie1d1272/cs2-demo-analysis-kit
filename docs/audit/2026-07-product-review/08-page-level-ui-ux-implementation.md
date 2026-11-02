@@ -1,5 +1,7 @@
 # DAK Studio 页面级 UI/UX 实施设计
 
+> **2026-11 执行入口：** [总包 #133](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/133) 和 [工作台决策](../../decisions/2026-11-01-studio-workbench-delivery.md) 覆盖本文旧导航、全局 context、Finding/行动模型及战术材料范围；其余历史分析与数据口径保留参考。
+
 - 日期：2026-07-11
 - 适用分支：`starfie1d/studio-integrated-redesign`
 - 产品真相源：[`07-final-product-review.md`](./07-final-product-review.md)

@@ -1,5 +1,8 @@
 # DAK Studio Roadmap
 
+> **2026-11 工作台执行入口：** [总包 #133](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/133) 是 22 项状态与批次唯一索引；[决策](decisions/2026-11-01-studio-workbench-delivery.md)、[PR #6 差量](audits/2026-11-01-pr6-capability-reconciliation.md)。截至 main `560a572`，W20 [#157](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/157) 与 W03 [#159](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/159) 已合；其余任务以总包及各 issue 的实时状态为准，不能从旧版本计划推断完成。下文是历史版本计划，其中导航、全局 context、Finding 和战术板范围被本轮决策覆盖。
+
+
 > 本文只管理产品版本顺序、范围与出口条件，不重复设计细节或研究论证。
 >
 > - 产品职责真相源：[`07-final-product-review.md`](audit/2026-07-product-review/07-final-product-review.md)
