@@ -1,3 +1,5 @@
+import { RADAR_FIELD_MODES } from "@cs2dak/presentation/radar-field";
+import { economyLabelCn } from "@cs2dak/presentation";
 import type { OpeningTrailRound, RadarField } from "@cs2dak/tactics";
 import type { OpeningPageState, ControlPageState } from "./spatial-view-state";
 import {
@@ -23,7 +25,7 @@ export function buildOpeningAnalysisResult(
     conditions: [
       ...source.conditions,
       `地图：${state.mapName ?? "未知"}`,
-      `阵营：${state.side}`,
+      `阵营：${state.side.toUpperCase()}`,
       `场次：${state.recentMatchCount ? `最近 ${state.recentMatchCount} 场（仅有日期）` : "全部"}`,
       `经济：长枪局`,
       `时间：${state.timeSeconds}s / 30s`,
@@ -47,7 +49,7 @@ export function buildOpeningAnalysisResult(
           match: row.matchId,
           round: row.roundNumber,
           side: row.side,
-          economy: row.economyType,
+          economy: economyLabelCn(row.economyType),
         })),
       },
     ],
@@ -72,10 +74,10 @@ export function buildControlAnalysisResult(
         : []),
       `地图：${field.mapName}`,
       `对象：${field.scope.team ?? "赛事地图基线"}`,
-      `经济：${field.scope.economy}`,
-      `模式：${state.mode}`,
+      `经济：${field.scope.economy === "gun" ? "长枪局" : "全部回合"}`,
+      `模式：${RADAR_FIELD_MODES.find((mode) => mode.value === state.mode)?.label ?? state.mode}`,
       `时间：${state.second}s`,
-      `层：${state.level}`,
+      `层：${state.level === "upper" ? "上层" : "下层"}`,
     ],
     sections: [
       {
@@ -87,7 +89,7 @@ export function buildControlAnalysisResult(
                 `比较基线 ${baseline.scope.matchIds.length} 场、${baseline.scope.roundCount} 回合。`,
               ]
             : []),
-          `遮挡数据：${field.triAvailability}`,
+          `遮挡数据：${field.triAvailability === "full" ? "完整" : "缺失"}`,
         ],
         columns: [
           { key: "scope", label: "范围", unit: null },

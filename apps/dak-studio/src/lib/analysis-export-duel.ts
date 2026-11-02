@@ -2,6 +2,10 @@ import {
   displayWeaponName,
   duelClassificationLabel,
 } from "@cs2dak/presentation";
+import {
+  DUEL_TAB_LABELS,
+  EVIDENCE_FILTER_LABELS,
+} from "./analysis-display-labels";
 import { displayTeamName } from "./identity";
 import type { DuelInsightsModel } from "@cs2dak/contract";
 import type { DuelPageState } from "./analysis-theme-state";
@@ -113,13 +117,16 @@ export function buildDuelAnalysisResult(
   }
   return captureAnalysisResult({
     ...source,
-    title: "交火与配合",
+    title: "交火与协同",
     page: "duel",
     conditions: [
       ...source.conditions,
-      `子页：${state.tab}`,
+      `子页：${DUEL_TAB_LABELS[state.tab]}`,
       ...(state.tab === "records"
-        ? [`证据筛选：${state.evidenceFilter}`, `武器：${state.weaponCategory}`]
+        ? [
+            `证据筛选：${EVIDENCE_FILTER_LABELS[state.evidenceFilter]}`,
+            `武器：${state.weaponCategory}`,
+          ]
         : state.tab === "opening"
           ? [`地图：${sections[0]?.title ?? "未知"}`]
           : []),

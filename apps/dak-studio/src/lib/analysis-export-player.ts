@@ -399,9 +399,9 @@ export function buildPlayerAnalysisResult(
     page: "player",
     conditions: [
       ...source.conditions,
-      `档案子页：${state.profileTab}`,
+      `档案子页：${{ overview: "总览", aim: "枪法 / 机制", utility: "道具 / 失误", trend: "趋势 / 比赛" }[state.profileTab]}`,
       ...(state.profileTab === "utility"
-        ? [`闪光排序：${state.flashMode}`]
+        ? [`闪光排序：${state.flashMode === "net" ? "净收益" : "致盲最久"}`]
         : []),
     ],
     sections,
