@@ -26,16 +26,6 @@ export interface MapRoleEvidenceSummary {
   teamIdentityMap: Record<string, string>;
 }
 
-function roleTeamIdentityMap(entries: StudioDemoEntry[], identity?: IdentityOptions): Record<string, string> {
-  return Object.fromEntries(entries.flatMap((entry) => {
-    const matchId = matchIdForEntry(entry);
-    return [
-      [`${matchId}:teamA`, displayTeamName(entry.meta.teamAName, identity?.teamRenames)],
-      [`${matchId}:teamB`, displayTeamName(entry.meta.teamBName, identity?.teamRenames)],
-    ];
-  }));
-}
-
 export interface RoleTeamGroup {
   key: string;
   label: string;
@@ -157,7 +147,8 @@ export async function getDoubleAwpAnalysis(entries: StudioDemoEntry[], identity?
   const factsStore = getFactsStore();
   const matchIds = entries.map(matchIdForEntry);
   const [rows, positions] = await Promise.all([factsStore.getTeamAwpRounds({ matchIds }), factsStore.getPlayerPositionRounds({ matchIds })]);
-  const teams = roleTeamIdentityMap(entries, identity);
+  const { teamIdentityMap: teams, selectedKeys } = await roleGroups(entries, identity, selectedTeams);
+  const selected = new Set(selectedKeys);
   const players = new Map(positions.map((row) => [`${row.matchId}:${row.playerIndex}`, (() => {
     const mapped = identity?.map[row.steamId64];
     return mapped == null ? `steam:${row.steamId64}` : typeof mapped === "string" ? mapped : mapped.playerKey;
@@ -166,7 +157,7 @@ export async function getDoubleAwpAnalysis(entries: StudioDemoEntry[], identity?
   return buildDoubleAwpAnalyses(rows, {
     teamKeyFor: (matchId, rawTeamKey) => teams[`${matchId}:${rawTeamKey}`] ?? `${matchId}:${rawTeamKey}`,
     playerKeyFor: (matchId, playerIndex) => players.get(`${matchId}:${playerIndex}`) ?? `${matchId}:player:${playerIndex}`,
-  }).filter((row) => selectedTeams.length === 0 || selectedTeams.includes(row.teamKey));
+  }).filter((row) => selectedTeams.length === 0 || selected.has(row.teamKey));
 }
 
 export interface PlayerMapPoolResult { rows: PlayerMapPoolRow[]; unsupportedMapNames: string[] }

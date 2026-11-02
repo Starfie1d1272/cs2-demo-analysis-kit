@@ -2,7 +2,7 @@ import { canExportSnapshot, withCapabilityConditions, unionExportEntries, withAn
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../../lib/queries/query-cache";
 import { CapabilityBar, useCapability } from "../../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../../lib/capability-availability";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { AnalysisExportButtons } from "../../components/AnalysisExportButtons";
 import { buildTeamRolesAnalysisResult } from "../../lib/analysis-export-roles";
 import type { AnalysisExportSource } from "../../lib/analysis-export";
@@ -13,7 +13,6 @@ import { getFactsStore } from "../../lib/facts-store";
 import { matchIdForEntry, type StudioDemoEntry } from "../../lib/demo-entry";
 import { loadRoleDeclarations } from "../../lib/identity-commands";
 import { type IdentityOptions } from "../../lib/identity";
-import { displayTeamName } from "../../lib/team-identity";
 import type { OpenEvidence } from "../../lib/evidence-continuation";
 import type { TeamRolesState } from "../../lib/studio-page-state";
 
@@ -23,7 +22,6 @@ export function TeamRolesPanel({ exportSource, onCapabilityRepair, entries, team
   state: TeamRolesState; onStateChange: (state: TeamRolesState) => void;
   onOpenEvidence: OpenEvidence; onPageReady?: (keys: string[]) => void;
 }) {
-  const teamEntries = useMemo(() => entries.filter(entry => [entry.meta.teamAName, entry.meta.teamBName].some(name => displayTeamName(name, identityOptions?.teamRenames) === teamName)), [entries, teamName, identityOptions?.teamRenames]);
   const [scopedRoleEntries, setScopedRoleEntries] = useState<StudioDemoEntry[] | null>(null);
   const [scopeError, setScopeError] = useState<string | null>(null);
   useEffect(() => {
@@ -35,7 +33,7 @@ export function TeamRolesPanel({ exportSource, onCapabilityRepair, entries, team
   }, [entries, teamName, identityOptions?.version]);
   const capability = useCapability(scopedRoleEntries ?? [], "map-role");
   const roleEntries = capability.eligible;
-  const awpCapability = useCapability(teamEntries, "team-awp");
+  const awpCapability = useCapability(scopedRoleEntries ?? [], "team-awp");
   const awpEntries = awpCapability.eligible;
   const [roleSnapshot, setRoleSnapshot] = useState<{ key: string; generation: number; value: Array<TeamMapRoleMatrix & { teamGroup: RoleTeamGroup }> } | null>(null);
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
@@ -64,7 +62,7 @@ export function TeamRolesPanel({ exportSource, onCapabilityRepair, entries, team
     return () => { cancelled = true; };
   }, [scopedRoleEntries, roleEntries, teamName, identityOptions?.version, roleKey, analysis]);
   useEffect(() => {
-    if (!awpEntries) return;
+    if (!scopedRoleEntries || !awpEntries) return;
     if (!awpEntries.length) { setAwpSnapshot({ key: awpKey, generation: analysis.generation, value: [] }); setDoubleAwpError(null); return; }
     if (analysis.status !== "ready") return;
     let cancelled = false;
@@ -73,7 +71,7 @@ export function TeamRolesPanel({ exportSource, onCapabilityRepair, entries, team
       .then(value => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setAwpSnapshot({ key: awpKey, generation: analysis.generation, value }); } })
       .catch(reason => { if (!cancelled) setDoubleAwpError((reason instanceof Error ? reason.message : String(reason)) || "读取失败"); });
     return () => { cancelled = true; };
-  }, [awpEntries, teamName, identityOptions?.version, awpKey, analysis]);
+  }, [scopedRoleEntries, awpEntries, teamName, identityOptions?.version, awpKey, analysis]);
   useEffect(() => {
     let cancelled = false;
     setPlayerNames({});
@@ -100,6 +98,7 @@ export function TeamRolesPanel({ exportSource, onCapabilityRepair, entries, team
   const matrixMaps = [...new Set(teamMatrices.map(row => row.mapName))];
   const activeMap = matrixMaps.some(map => map === matrixMap) ? matrixMap : matrixMaps[0];
   const activeMatrix = teamMatrices.find(row => row.mapName === activeMap && row.side === matrixSide) ?? null;
+  const activeAwp = doubleAwp?.find(row => row.teamKey === (activeTeam ?? doubleAwp[0]?.teamKey) && row.side === matrixSide) ?? null;
   if (!entries.length) return <div className="stu-view"><EmptyState variant="insufficient" title="聚合范围为空" hint="请调整分析范围。" /></div>;
   const rolePanels = <>
           <section className="stu-card" id="team:map-roles">
@@ -111,13 +110,12 @@ export function TeamRolesPanel({ exportSource, onCapabilityRepair, entries, team
           </section>
           <section className="stu-card" id="team:double-awp">
             <div className="stu-card-head"><h3>双 AWP 条件统计</h3></div>
-            {awpCapability.availability && <CapabilityBar availability={awpCapability.availability} onRepair={onCapabilityRepair} />}
+            {scopedRoleEntries && awpCapability.availability && <CapabilityBar availability={awpCapability.availability} onRepair={onCapabilityRepair} />}
             {awpCapability.error && <p role="alert">AWP 能力读取失败：{awpCapability.error} <button type="button" className="stu-button-sm" onClick={awpCapability.retry}>重试</button>{awpCapability.availability && " · 显示旧版本"}</p>}
             {doubleAwp && (doubleAwpError || analysis.status !== "ready" || awpSnapshot?.generation !== analysis.generation) && <p role="status" className="stu-muted">{doubleAwpError || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
-            {doubleAwpError && !doubleAwp ? <EmptyState variant="error" title="双 AWP 统计不可用" hint={doubleAwpError} /> : doubleAwp === null && !awpCapability.error ? <div className="stu-loading">读取 AWP 回合事实…</div> : doubleAwp === null ? null : awpEntries?.length === 0 && doubleAwp.length === 0 ? (awpCapability.error ? null : <p className="stu-muted" role="status">当前范围暂无可用比赛，请查看上方原因和操作。</p>) : <DoubleAwpAnalysisPanel model={doubleAwp.find((row) => row.side === matrixSide) ?? null} playerNames={playerNames} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "team:double-awp" }); }} />}
+            {doubleAwpError && !doubleAwp ? <EmptyState variant="error" title="双 AWP 统计不可用" hint={doubleAwpError} /> : doubleAwp === null && !awpCapability.error ? <div className="stu-loading">读取 AWP 回合事实…</div> : doubleAwp === null ? null : awpEntries?.length === 0 && doubleAwp.length === 0 ? (awpCapability.error ? null : <p className="stu-muted" role="status">当前范围暂无可用比赛，请查看上方原因和操作。</p>) : <DoubleAwpAnalysisPanel model={activeAwp} playerNames={playerNames} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "team:double-awp" }); }} />}
           </section>
   </>;
-  const activeAwp = doubleAwp?.find(row => row.side === matrixSide) ?? null;
   const roleCurrent = !!activeMatrix && !matrixError && !capability.error &&
     !capability.stale && canExportSnapshot(roleSnapshot, analysis);
   const awpCurrent = !!activeAwp && !doubleAwpError && !awpCapability.error &&
