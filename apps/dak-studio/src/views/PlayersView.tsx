@@ -115,7 +115,7 @@ export function PlayersView({
   const [pinned, setPinned] = useState<PinnedPlayer | null>(null);
   const { comparePlayerKey: compareKey, profileTab, flashMode } = state;
   const setCompareKey = (comparePlayerKey: string | null) => onStateChange({ ...state, comparePlayerKey });
-  const setProfileTab = (profileTab: ProfileTab) => onStateChange({ ...state, profileTab });
+  const setProfileTab = (profileTab: ProfileTab) => { if (profileTab !== state.profileTab) setTrendMetric("adr"); onStateChange({ ...state, profileTab }); };
   const setFlashMode = (flashMode: "net" | "enemy") => onStateChange({ ...state, flashMode });
 
   useEffect(() => {
