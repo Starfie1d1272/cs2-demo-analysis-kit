@@ -17,6 +17,6 @@ Render an existing workspace model directly with `@cs2dak/react`; UI consumers d
 
 The optional second argument is `DemoViewOptions`; omitted image URLs default to `null`. The host owns asset URLs. Studio supplies its relative radar paths from its library layer.
 
-The output uses `workspace-0.2`, with precomputed `buyQuality`, `players[].roundSummary`, and `reportHighlights`. Report helpers only format those results.
+The output uses `workspace-0.2`, with precomputed `buyQuality`, `players[].roundSummary`, and `reportHighlights`.
 
 `analyzeDemoPackage` returns an AnalysisBundle. `buildSeasonCohort` prepares rows from raw DemoPackage inputs and calls `cohort.buildSeasonCohortFromRows`. Load ZIP bytes separately with `@cs2dak/demo-io`; consumers with existing data do not need that loader.

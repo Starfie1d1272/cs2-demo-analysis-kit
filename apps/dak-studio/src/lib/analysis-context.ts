@@ -283,5 +283,5 @@ export function summarizeAnalysisContext(
   events: readonly AnalysisEventScope[] = [],
 ): string {
   const summary = summarizeAnalysisContextParts(context, entries, events);
-  return [summary.focus, summary.corpus, summary.roles, summary.baseline, summary.goal].filter(Boolean).join(" · ");
+  return [summary.focus, summary.corpus].filter(Boolean).join(" · ");
 }

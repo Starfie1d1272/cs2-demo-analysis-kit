@@ -10,7 +10,6 @@ export * from "./duel-labels.js";
 export * from "./findings.js";
 export * from "./team-model.js";
 export * from "./models/buy-quality.js";
-export * from "./report.js";
 export * from "./models/primitives.js";
 export * from "./models/summary.js";
 export * from "./models/workspace.js";

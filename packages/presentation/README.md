@@ -23,7 +23,7 @@ export function MatchPage({ model }: { model: MatchWorkspaceModel }) {
 - 原始 DemoPackage：`@cs2dak/pipeline.analyzeMatchWorkspace(demoPackage)`。
 - 已有同场 package、AnalysisBundle 和 canonical performance facts：`@cs2dak/analytics.buildMatchWorkspaceFromAnalysis(pkg, bundle, facts)`。
 
-工作台模型使用 `cs2-demo-analysis-kit/workspace-0.2`，必填 `buyQuality`、`players[].roundSummary` 和 `reportHighlights`，由 analytics 预计算。报告 helper 只排版这些结果。
+工作台模型使用 `cs2-demo-analysis-kit/workspace-0.2`，必填 `buyQuality`、`players[].roundSummary` 和 `reportHighlights`，由 analytics 预计算。
 
 `buildDemoViewModel(bundle, options?)`、pipeline 和 analytics 的工作台入口均接收 `DemoViewOptions`：
 
