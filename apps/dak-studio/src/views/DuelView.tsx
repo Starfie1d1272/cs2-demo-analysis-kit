@@ -1,3 +1,4 @@
+import { flushSync } from "react-dom";
 import { usePageReady } from "../lib/use-page-ready";
 import { useEffect, useMemo, useState } from "react";
 import type { DuelFinderRow, DuelInsightsModel, PlayerMechanicsRow } from "@cs2dak/contract";
@@ -397,7 +398,7 @@ function EvidenceCards({
   function openRow(row: DuelFinderRow) {
     const entry = entryByMatchId.get(row.matchId);
     if (!entry) return;
-    onStateChange({ ...state, selectedRowId: row.id });
+    flushSync(() => onStateChange({ ...state, selectedRowId: row.id }));
     onOpenEvidence({ entryId: entry.id, evidence: row.evidence, sourceKey: row.id, selectedKey: row.id, queue });
   }
 
@@ -410,7 +411,7 @@ function EvidenceCards({
         <div className="stu-duel-evidence compact">
           {pageRows.map((row) => {
             const entry = entryByMatchId.get(row.matchId);
-            const hovered = hoveredId === row.id;
+            const hovered = hoveredId === row.id || state.selectedRowId === row.id;
             const hp = row.killerHealthBefore != null ? `${row.killerHealthBefore}→${row.victimHealthBefore}` : `?→${row.victimHealthBefore}`;
             const matchLabel = entry ? `${entry.meta.teamAName} ${entry.meta.teamAScore}:${entry.meta.teamBScore} ${entry.meta.teamBName}` : row.mapName;
             return (
@@ -591,7 +592,7 @@ function OpeningDuelMap({
   function openRow(row: DuelFinderRow) {
     const entry = entryByMatchId.get(row.matchId);
     if (!entry) return;
-    onStateChange({ ...state, selectedRowId: row.id });
+    flushSync(() => onStateChange({ ...state, selectedRowId: row.id, openingPage: Math.floor(mapRows.findIndex(item => item.id === row.id) / LIST_PAGE_SIZE) }));
     onOpenEvidence({ entryId: entry.id, evidence: row.evidence, sourceKey: row.id, selectedKey: row.id, queue });
   }
   const calibration = getMapCalibration(mapName);

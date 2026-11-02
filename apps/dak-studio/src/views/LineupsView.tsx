@@ -9,13 +9,13 @@ export interface LineupsViewProps {
   onPageReady?: (keys: string[]) => void;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
-  onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onOpenEvidence: import("../lib/evidence-continuation").OpenEvidence;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   onRebuild: (ids: string[]) => void;
 }
 
-export function LineupsView({ state, onStateChange, allEntries, entries, onOpenMatch, onWatchDemo, onGoLibrary, onRebuild, onPageReady }: LineupsViewProps) {
+export function LineupsView({ state, onStateChange, allEntries, entries, onOpenEvidence, onWatchDemo, onGoLibrary, onRebuild, onPageReady }: LineupsViewProps) {
   usePageReady(allEntries.length === 0 || entries.length === 0, onPageReady);
   if (allEntries.length === 0) {
     return (
@@ -41,7 +41,7 @@ export function LineupsView({ state, onStateChange, allEntries, entries, onOpenM
       {entries.length === 0 ? (
         <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整全局范围。" />
       ) : (
-        <LineupView state={state} onStateChange={onStateChange} onPageReady={onPageReady} onRebuild={onRebuild} entries={entries} onOpenMatch={onOpenMatch} onWatchDemo={onWatchDemo} />
+        <LineupView state={state} onStateChange={onStateChange} onPageReady={onPageReady} onRebuild={onRebuild} entries={entries} onOpenEvidence={onOpenEvidence} onWatchDemo={onWatchDemo} />
       )}
     </div>
   );

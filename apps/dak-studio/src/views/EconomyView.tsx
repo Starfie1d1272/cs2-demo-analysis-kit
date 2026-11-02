@@ -16,10 +16,12 @@ export interface EconomyViewProps {
   entries: StudioDemoEntry[];
   selectedTeams: string[];
   onGoLibrary: () => void;
+  onViewMatches: () => void;
+  playerFocused: boolean;
   identityOptions?: IdentityOptions;
 }
 
-export function EconomyView({ state, onStateChange, allEntries, entries, selectedTeams, onGoLibrary, identityOptions , onPageReady }: EconomyViewProps) {
+export function EconomyView({ state, onStateChange, onViewMatches, playerFocused, allEntries, entries, selectedTeams, onGoLibrary, identityOptions , onPageReady }: EconomyViewProps) {
   const [insights, setInsights] = useState<TournamentInsights | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,8 +64,10 @@ export function EconomyView({ state, onStateChange, allEntries, entries, selecte
     <div className="stu-view">
       <header className="stu-view-header">
         <div>
-          <h1>经济与转化</h1>
+          <h1>{playerFocused ? "当前比赛范围的经济" : "经济与转化"}</h1>
           <p>按所选比赛范围聚合，查看手枪转化、5v4/5v3 转化、劣势翻盘和小枪破局。当前结果为描述性聚合，尚不自动生成 Finding。</p>
+          {playerFocused && <p>经济统计按比赛范围计算，未按个人筛选。</p>}
+          <button type="button" className="stu-button-sm" onClick={onViewMatches}>查看这组比赛</button>
         </div>
       </header>
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}

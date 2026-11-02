@@ -1,3 +1,4 @@
+import { flushSync } from "react-dom";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
@@ -136,7 +137,7 @@ export function UtilityView({ state, onStateChange, playerFocus, onGoLineups, al
   }, [entries, identityOptions?.version, selectedTeams]);
 
   const visibleSummary = useMemo(() => summary && playerFocus ? projectUtilityPlayer(summary, playerFocus.steamIds.length ? playerFocus.playerKey : "") : summary, [summary, playerFocus]);
-  const openEvidence: OpenEvidence = request => { onStateChange({ ...state, selectedEvidenceKey: request.sourceKey ?? null }); onOpenEvidence(request); };
+  const openEvidence: OpenEvidence = request => { flushSync(() => onStateChange({ ...state, selectedEvidenceKey: request.sourceKey ?? null })); onOpenEvidence(request); };
 
   if (allEntries.length === 0) {
     return (

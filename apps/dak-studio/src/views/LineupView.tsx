@@ -1,3 +1,4 @@
+import { flushSync } from "react-dom";
 import { usePageReady } from "../lib/use-page-ready";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 import { useEffect, useMemo, useState } from "react";
@@ -75,7 +76,7 @@ export function LineupView({
   entries,
   state,
   onStateChange,
-  onOpenMatch,
+  onOpenEvidence,
   onWatchDemo,
   onRebuild,
   onPageReady,
@@ -83,7 +84,7 @@ export function LineupView({
   entries: StudioDemoEntry[];
   state: import("../lib/analysis-theme-state").LineupsPageState;
   onStateChange: (state: import("../lib/analysis-theme-state").LineupsPageState) => void;
-  onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
+  onOpenEvidence: import("../lib/evidence-continuation").OpenEvidence;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onRebuild: (ids: string[]) => void;
   onPageReady?: (keys: string[]) => void;
@@ -106,8 +107,11 @@ export function LineupView({
   usePageReady((entries.length === 0 || !loading) && savedReady, onPageReady);
 
   function handleClusterJump(cluster: LineupCluster) {
-    const first = cluster.throws[0];
-    if (first) { onStateChange({ ...state, selectedClusterId: cluster.id }); onOpenMatch(first.entryId, { roundNumber: first.roundNumber, tick: first.tick }); }
+    const first = cluster.throws.find(row => entryById.has(row.entryId));
+    const entry = first && entryById.get(first.entryId);
+    if (!first || !entry) return;
+    flushSync(() => onStateChange({ ...state, selectedClusterId: cluster.id }));
+    onOpenEvidence({ entryId: entry.id, sourceKey: `lineup:${cluster.id}`, evidence: { matchId: matchIdForEntry(entry), roundNumber: first.roundNumber, tick: first.tick, reason: "道具点位投掷", role: "example" } });
   }
 
   async function checkSources(cluster: LineupCluster) {
@@ -280,7 +284,7 @@ export function LineupView({
         const practiceCommand = practiceCommandForCluster(c);
         return firstThrow ? (
           <span className="stu-lineup-actions">
-            <EvidenceLink hint="打开该场比赛复盘并定位该点位投掷" onOpen={() => onOpenMatch(firstThrow.entryId, { roundNumber: firstThrow.roundNumber, tick: firstThrow.tick })}>
+            <EvidenceLink hint="打开该场比赛复盘并定位该点位投掷" onOpen={() => handleClusterJump(c)}>
               回放
             </EvidenceLink>
             {practiceCommand && (
@@ -306,7 +310,7 @@ export function LineupView({
         ) : null;
       }
     },
-  ], [copiedClusterId, savedClusterId, entryById, onOpenMatch, onWatchDemo]);
+  ], [copiedClusterId, savedClusterId, entryById, onOpenEvidence, onWatchDemo, state, onStateChange]);
 
   // ── 渲染（空态提前返回） ──────────────────────────────────────────────
 
@@ -597,7 +601,8 @@ export function LineupView({
             state={tableState} onStateChange={table => onStateChange({ ...state, table })}
             paginationInfo={(total) => `${total} 条`}
             rowProps={(cluster) => ({
-              className: hoveredId === cluster.id ? "stu-lineup-row-hovered" : "",
+              id: `lineup:${cluster.id}`,
+              className: hoveredId === cluster.id || state.selectedClusterId === cluster.id ? "stu-lineup-row-hovered" : "",
               onMouseEnter: () => setHoveredId(cluster.id),
               onMouseLeave: () => setHoveredId(null),
               onFocus: () => setHoveredId(cluster.id),
