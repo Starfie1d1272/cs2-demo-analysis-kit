@@ -1,7 +1,7 @@
 import { eventPackageSchema, type EventPackage, type EventStage } from "@cs2dak/contract";
 import { getStorage } from "./storage";
 import { deleteSeriesRecord, listSeriesRecords, saveSeriesRecord, type StudioSeriesRecord } from "./series";
-import type { StudioDemoEntry } from "./library";
+import type { StudioDemoEntry } from "./demo-entry";
 import type { RivalHubEventsResponse, RivalHubRemoteMap, RivalHubRemoteSeries, RivalHubRemoteTeam } from "./rivalhub-contract";
 
 export interface StudioEventRecord {

@@ -1,4 +1,4 @@
-import { matchIdForEntry, type StudioDemoEntry } from "./library.js";
+import { matchIdForEntry, type StudioDemoEntry } from "./demo-entry.js";
 
 /** 当前分析的用户目标；运行时状态，不是可保存的业务对象。 */
 export type AnalysisGoal =

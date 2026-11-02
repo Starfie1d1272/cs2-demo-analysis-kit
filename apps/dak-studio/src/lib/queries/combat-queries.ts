@@ -3,7 +3,7 @@ import { createAnalysisBucket, cachedQuery, readPersistedValue, writePersistedVa
 import { assertCurrentFacts } from "../facts-readiness";
 import { getDerivedCacheStore } from "../derived-cache";
 import type { DuelInsightsModel } from "@cs2dak/contract";
-import { matchIdForEntry, type StudioDemoEntry } from "../library";
+import { matchIdForEntry, type StudioDemoEntry } from "../demo-entry";
 
 import type { IdentityOptions } from "../identity";
 import { keyOf, filterDuelFactsByTeam, missingFactsError } from "./query-scope";

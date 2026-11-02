@@ -55,7 +55,8 @@ vi.mock("./match-records", () => ({
     derived: { matchId, tournament: [{ matchId, row: { marker: pkg.marker } }], playerInsights: [], teamComparison: [], duels: [], openingTrails: [], utilityValue: [] },
   }),
 }));
-import { backfillDemoIdentities, importDemoFile, matchIdForEntry, removeDemo } from "./library";
+import { backfillDemoIdentities, importDemoFile, removeDemo } from "./library";
+import { matchIdForEntry } from "./demo-entry";
 import { getFactsStore } from "./facts-store";
 import { DERIVED_MATCH_NAMESPACE } from "./derived-cache";
 

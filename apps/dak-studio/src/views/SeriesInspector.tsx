@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { SeriesVeto } from "@cs2dak/contract";
-import type { StudioDemoEntry } from "../lib/library";
+import type { StudioDemoEntry } from "../lib/demo-entry";
 import type { RivalHubImportContext } from "../lib/rivalhub-import";
 import type { RivalHubMatchCandidate } from "../lib/rivalhub-match";
 import { mapDisplayName, type StudioSeriesRecord } from "../lib/series";

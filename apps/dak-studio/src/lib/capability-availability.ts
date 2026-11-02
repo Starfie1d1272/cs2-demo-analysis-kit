@@ -2,7 +2,7 @@ import { isAnalysisStale } from "./analysis-manifest.js";
 import { getFactsStore } from "./facts-store.js";
 import type { FactsStore } from "./fact-types.js";
 import { getDerivedCacheStore, type DerivedCacheStore } from "./derived-cache.js";
-import { matchIdForEntry, type StudioDemoEntry } from "./library.js";
+import { matchIdForEntry, type StudioDemoEntry } from "./demo-entry.js";
 import { listAvailableTris } from "./tri-assets.js";
 
 export type StudioCapability =

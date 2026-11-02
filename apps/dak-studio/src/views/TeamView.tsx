@@ -6,7 +6,7 @@ import type { TeamOverviewModel } from "@cs2dak/presentation";
 import { getDoubleAwpAnalysis, getTeamMapRoleMatrices } from "../lib/queries/spatial-queries";
 import { getTeamOverview } from "../lib/queries/team-queries";
 import { type IdentityOptions } from "../lib/identity";
-import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import type { OpenEvidence } from "../lib/evidence-continuation";
 import { loadRoleDeclarations } from "../lib/role-declarations";
 

@@ -1,6 +1,6 @@
 import type { AnalysisContext, AnalysisEventScope } from "../lib/analysis-context";
 import { summarizeAnalysisContextParts } from "../lib/analysis-context";
-import type { StudioDemoEntry } from "../lib/library";
+import type { StudioDemoEntry } from "../lib/demo-entry";
 
 export function AnalysisContextSummary({
   context,

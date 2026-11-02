@@ -5,8 +5,8 @@ import {
   isFactsStale,
   listDemoEntries,
   rebuildFactsFromZip,
-  type StudioDemoEntry,
 } from "../lib/library";
+import { type StudioDemoEntry } from "../lib/demo-entry";
 import { downloadTri, listAvailableTris, loadTrisManifest, type TrisManifest } from "../lib/tri-assets";
 import { hasLibraryMaintenance } from "../lib/library-maintenance";
 import { loadBrowserStorageOverview, type BrowserStorageOverview } from "../lib/storage-overview";

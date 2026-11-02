@@ -3,7 +3,7 @@ import { Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { OpeningTrailsModel, OpeningTrailRound } from "@cs2dak/tactics";
 import { RadarTrails, GRENADE_COLOR, type RadarTrail, type RadarGrenadeOverlay } from "../components/RadarTrails";
-import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import type { IdentityOptions } from "../lib/identity";
 import { getPinnedPlayer } from "../lib/pin";
 import { getFactsStore } from "../lib/facts-store";

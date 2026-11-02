@@ -70,14 +70,14 @@ export function canSelfUpdate(asset: UpdateAsset | undefined): asset is UpdateAs
  *
  * 返回的 UpdateInfo 带 asset（manifest 命中时），前端据此显示一键更新按钮。
  */
-export async function checkForUpdateViaBridge(channel: UpdateChannel = "stable"): Promise<UpdateInfo | null> {
+export async function checkForUpdateViaBridge(channel: UpdateChannel = "stable"): Promise<{ checked: boolean; update: UpdateInfo | null }> {
   const api = getPywebviewApi();
-  if (!api?.check_update) return null;
+  if (!api?.check_update) return { checked: false, update: null };
   try {
     const raw = await api.check_update(channel);
-    if (!raw || typeof raw.version !== "string") return null;
+    if (!raw || typeof raw.version !== "string") return { checked: false, update: null };
     const version = raw.version.replace(/^v/, "");
-    if (!semverLess(APP_VERSION, version)) return null;
+    if (!semverLess(APP_VERSION, version)) return { checked: true, update: null };
     const notes = typeof raw.notes === "string" ? raw.notes : undefined;
     // 解析资产：web patch 优先，缺失时退 runtime。
     const assets = raw.assets as Record<string, unknown> | undefined;
@@ -94,9 +94,9 @@ export async function checkForUpdateViaBridge(channel: UpdateChannel = "stable")
             urls: rawAsset.urls as string[],
           }
         : undefined;
-    return { latest: version, url: RELEASES_PAGE, notes, asset };
+    return { checked: true, update: { latest: version, url: RELEASES_PAGE, notes, asset } };
   } catch {
-    return null;
+    return { checked: false, update: null };
   }
 }
 

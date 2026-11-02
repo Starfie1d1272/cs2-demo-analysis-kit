@@ -6,7 +6,7 @@ import { getFactsStore } from "../facts-store";
 import { getDerivedCacheStore } from "../derived-cache";
 import type { SeasonCohortBundle } from "@cs2dak/cohort";
 import type { PlayerSeasonProfile, SeasonLeaderboardModel } from "@cs2dak/presentation";
-import { matchIdForEntry, type StudioDemoEntry } from "../library";
+import { matchIdForEntry, type StudioDemoEntry } from "../demo-entry";
 
 import type { IdentityOptions } from "../identity";
 import { keyOf, allowedTeamKeysByMatch, filterTournamentInsightsByTeam, missingFactsError, withTeamRenames } from "./query-scope";

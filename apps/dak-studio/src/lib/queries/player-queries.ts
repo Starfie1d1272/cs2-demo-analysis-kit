@@ -3,7 +3,7 @@ import { createAnalysisBucket, cachedQuery, readPersistedValue, writePersistedVa
 import { assertCurrentFacts } from "../facts-readiness";
 import { getFactsStore } from "../facts-store";
 import { getDerivedCacheStore } from "../derived-cache";
-import { type StudioDemoEntry } from "../library";
+import { type StudioDemoEntry } from "../demo-entry";
 
 import type { IdentityOptions } from "../identity";
 import { keyOf, orderedMatchIds, allowedTeamKeysByMatch } from "./query-scope";

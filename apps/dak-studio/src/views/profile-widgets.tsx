@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { PlayerStyle } from "@cs2dak/presentation";
 import type { PlayerSeasonInsights } from "@cs2dak/analytics";
-import { formatMatchLabel, type StudioDemoEntry } from "../lib/library";
+import { formatMatchLabel, type StudioDemoEntry } from "../lib/demo-entry";
 
 /**
  * 选手档案共享展示组件：个人实验室与「我的主页」复用同一套渲染，

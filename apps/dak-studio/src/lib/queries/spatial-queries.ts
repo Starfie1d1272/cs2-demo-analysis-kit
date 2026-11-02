@@ -7,7 +7,7 @@ import { createAnalysisBucket, cachedQuery, readPersistedValue, writePersistedVa
 import { assertCurrentFacts } from "../facts-readiness";
 import { getFactsStore } from "../facts-store";
 import type { DoubleAwpAnalysis, PlayerMapRoleEvidence, PlayerMapRoleProfile, PlayerMapPoolRow, RoleDeclaration, TeamMapRoleMatrix, TeamMapResponsibilityEvidence } from "@cs2dak/tactics";
-import { entryDate, matchIdForEntry, type StudioDemoEntry } from "../library";
+import { entryDate, matchIdForEntry, type StudioDemoEntry } from "../demo-entry";
 import { displayTeamName } from "../identity";
 
 import type { IdentityOptions } from "../identity";

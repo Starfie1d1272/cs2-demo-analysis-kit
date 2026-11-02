@@ -10,7 +10,8 @@ import type { EconomyEntry } from "@cs2dak/tactics";
 import { formatTacticalClusterName as autoName } from "@cs2dak/presentation";
 import type { TacticalCluster } from "@cs2dak/tactics";
 import type { TacticalRoundFact } from "@cs2dak/tactics";
-import { loadMatchWorkspaceModel, type StudioDemoEntry } from "../../lib/library.js";
+import { loadMatchWorkspaceModel } from "../../lib/match-workspace-loader.js";
+import { type StudioDemoEntry } from "../../lib/demo-entry.js";
 import { MetricInfo, EvidenceLink, DataTable, type DataTableColumn } from "@cs2dak/react";
 
 export interface PatternExplorerProps {
