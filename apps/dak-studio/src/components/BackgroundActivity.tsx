@@ -6,6 +6,7 @@ export function BackgroundActivity({ activity, batch, children }: { activity: Re
   const { importing, notice, setNotice, exportQueries, recheckExport } = activity;
   if (!importing && !notice && !exportQueries.length && !batch) return null;
   const summary = importing ? notice ?? "正在处理导入或重建" : exportQueries.some(row => row.uncertain) ? "仍在确认后台任务状态" : batch ? "RivalHub 批处理" : notice ?? "后台任务";
+  if (!exportQueries.length && !batch) return <div className="stu-notice" role="status"><span>{summary}</span>{notice && <button type="button" aria-label="关闭通知" onClick={() => setNotice(null)}>✕</button>}</div>;
   return <details className="stu-notice" role="status"><summary>{summary} · 详情</summary>
     {exportQueries.map(query => <div key={query.jobId}>
       <p>{query.uncertain ? "仍在确认后台任务状态" : query.message}</p>
@@ -13,7 +14,7 @@ export function BackgroundActivity({ activity, batch, children }: { activity: Re
       {query.diagnostic?.cause && <p>{query.diagnostic.cause}</p>}
       {query.uncertain && <button type="button" onClick={() => recheckExport(query.jobId)}>重查此任务状态</button>}
     </div>)}
-    {notice && <div><span>{notice}</span><button type="button" aria-label="关闭通知" onClick={() => setNotice(null)}>✕</button></div>}
+    {notice && <div>{notice !== summary && <span>{notice}</span>}<button type="button" aria-label="关闭通知" onClick={() => setNotice(null)}>✕</button></div>}
     {children}
   </details>;
 }

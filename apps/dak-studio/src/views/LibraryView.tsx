@@ -452,19 +452,19 @@ export function LibraryView({
                   <td>{entry.meta.hasReplay ? <span className="stu-tag stu-tag-ok">8Hz</span> : <span className="stu-tag">无</span>}</td>
                   <td className="stu-dim">{formatImportedAt(entry.importedAt)}</td>
                   <td className="stu-row-actions" onClick={(e) => e.stopPropagation()}>
-                    {mode === "maintenance" && <><button type="button" className="stu-icon-button" title="编辑标签" onClick={() => editTags(entry)}>
+                    {mode === "maintenance" && <button type="button" className="stu-icon-button" title="编辑标签" onClick={() => editTags(entry)}>
                       <TagIcon size={14} />
-                    </button>
+                    </button>}
                     <button
                       type="button"
                       className={isFactsStale(entry) ? "stu-icon-button stu-icon-button-warn" : "stu-icon-button"}
-                      title="从已存 ZIP 重建 facts（无需原始 .dem）"
+                      title="更新这场比赛的分析数据"
                       disabled={importing}
                       onClick={() => onRebuildFacts(entry.id)}
                     >
                       <RefreshCw size={14} />
                     </button>
-                    <button
+                    {mode === "maintenance" && <><button
                       type="button"
                       className="stu-icon-button"
                       title={entry.sourceDemPath ? "重新导出并替换（从 .dem）" : "未记录原始 .dem 路径"}
