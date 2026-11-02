@@ -261,16 +261,7 @@ export function PlayersView({
 
   const trendMax = Math.max(...selected.perMatch.map((m) => m.rivalhubRR), 0.01);
   const playerMatches = [...selected.perMatch].reverse();
-  const exportPlayerCard = () => {
-    const md = buildPlayerCardMarkdown(selected, insights);
-    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${selected.name}-选手图卡.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+
 
   return (
     <div className="stu-view">
@@ -327,9 +318,6 @@ export function PlayersView({
               <small className="stu-dim">
                 {selected.mapCount} 场 · 置信度 {(selected.confidence * 100).toFixed(0)}%
               </small>
-              <button type="button" className="stu-button stu-button-ghost" onClick={exportPlayerCard}>
-                导出选手图卡 (Markdown)
-              </button>
             </div>
             <div className="stu-rating-cards">
               <div className="stu-rating-card stu-rating-card-primary" title="Rival Rating（RivalHub 绝对刻度评分）">
@@ -798,38 +786,6 @@ function MechanicsMetric({
       {percentile && <small>{percentile}</small>}
     </div>
   );
-}
-
-/** 选手图卡 Markdown（主办方发布用）。 */
-function buildPlayerCardMarkdown(profile: PlayerSeasonProfile, insights: PlayerSeasonInsights | null): string {
-  const lines: string[] = [];
-  lines.push(`# ${profile.name} · 选手图卡`);
-  lines.push("");
-  lines.push(`${profile.mapCount} 场 · RivalHub RR **${profile.rating.rivalhubRR.toFixed(2)}** · Rating 2.0 **${profile.rating.hltvRating.toFixed(2)}**（P${profile.rating.hltvPercentile.toFixed(0)}）`);
-  lines.push("");
-  if (profile.strengths.length > 0) lines.push(`**强项**：${profile.strengths.join("、")}`);
-  if (profile.weaknesses.length > 0) lines.push(`**弱项**：${profile.weaknesses.join("、")}`);
-  lines.push("");
-  lines.push("| 指标 | 数值 |");
-  lines.push("|---|---|");
-  for (const column of CORE_COLUMNS) {
-    lines.push(`| ${column.label} | ${formatMetric(profile.metrics[column.key] ?? null, column.format)} |`);
-  }
-  if (profile.style) {
-    lines.push("");
-    lines.push("**PRISM 打法画像（当前样本内）**：" + profile.style.axes.map((axis) => axis.status === "ready"
-      ? `${axis.label} 行为 P${axis.involvementPercentile!.toFixed(0)} / 效率 P${axis.efficiencyPercentile!.toFixed(0)}`
-      : `${axis.label} ${axis.status === "partial" ? "部分信号" : axis.status === "insufficient" ? `样本不足（${axis.comparisonCount} 人）` : "不可用"}`
-    ).join(" · "));
-  }
-  if (insights) {
-    lines.push("");
-    lines.push(`**闪光价值**：投 ${insights.flash.flashesThrown} 颗，致盲敌方 ${insights.flash.enemyBlindSeconds.toFixed(1)}s / 队友 ${insights.flash.teamBlindSeconds.toFixed(1)}s` +
-      (insights.flash.netSecondsPerFlash != null ? `，净价值 ${insights.flash.netSecondsPerFlash.toFixed(2)}s/颗` : ""));
-  }
-  lines.push("");
-  lines.push("---\n由 DAK Studio 生成");
-  return lines.join("\n");
 }
 
 /** 双选手并排对比：核心指标 + 六账户 + PRISM。条形以两人较大值归一。 */
