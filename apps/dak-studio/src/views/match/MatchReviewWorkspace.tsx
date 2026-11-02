@@ -6,6 +6,7 @@ import { EconomyPanel, HeatmapCanvas, ReplayViewer, ScoreboardTable } from "@cs2
 import { normalizeReplayViewState } from "@cs2dak/presentation";
 import { Panel } from "./MatchPanel";
 import { normalizeMatchWorkspaceState, roundMatchesFilter, ROUND_FILTER_DEFAULT, type MatchRoundFilterState, type MatchWorkspaceState } from "../../lib/match-workspace-state";
+import { matchesQuickRound, quickRoundTick, type QuickRoundFilter } from "../../lib/match-review";
 import "./match-review.css";
 
 interface MatchWorkspaceProps { model: MatchWorkspaceModel }
@@ -24,15 +25,17 @@ const WORKSPACE_NAV: Array<{ key: WorkspaceView; label: string }> = [
   { key: "map", label: "地图" }
 ];
 
-export function MatchReviewWorkspace({ model, state: input, onStateChange }: { model: MatchWorkspaceModel; state: MatchWorkspaceState; onStateChange: (next: MatchWorkspaceState) => void }) {
+export function MatchReviewWorkspace({ model, state: input, onStateChange, pinnedIds, onNote, onAnalyzePlayer, onReviewChoice }: { onReviewChoice: () => void; onAnalyzePlayer: (steamId: string, label: string) => void; pinnedIds: string[]; onNote: (roundNumber: number) => void; model: MatchWorkspaceModel; state: MatchWorkspaceState; onStateChange: (next: MatchWorkspaceState) => void }) {
   const state = normalizeMatchWorkspaceState(model, input);
   const setView = (view: WorkspaceView) => onStateChange({ ...state, view, replay: state.replay && view !== "replay" ? { ...state.replay, playing: false } : state.replay });
   const view = state.view;
   const openReplay = (roundNumber: number, tick?: number) => {
     const round = model.replay.rounds.find(r => r.roundNumber === roundNumber);
     const replay = state.replay && round ? normalizeReplayViewState(model.replay, model.map.view, { ...state.replay, roundNumber, tick: tick ?? round.freezeEndTick, playing: false }) : state.replay;
-    onStateChange({ ...state, view: "replay", replay });
+    onStateChange(round && replay ? { ...state, view: "replay", replay } : { ...state, view: "rounds", quickRoundFilter: "all", roundExplorer: { ...state.roundExplorer, filter: ROUND_FILTER_DEFAULT, selectedRoundNumber: roundNumber } });
   };
+  const pinnedMatches = model.players.filter(p => pinnedIds.includes(p.row.steamId64));
+  const reviewRow = model.scoreboard.find(row => row.steamId64 === state.reviewPlayerSteamId64);
   const replayHandler = model.replay.available ? openReplay : undefined;
   const nav = model.replay.available ? WORKSPACE_NAV : WORKSPACE_NAV.filter((item) => item.key !== "replay");
 
@@ -64,6 +67,14 @@ export function MatchReviewWorkspace({ model, state: input, onStateChange }: { m
           ))}
         </section>
 
+        <section className="dak-stack" aria-label="复盘对象">
+          <div><button type="button" className="stu-button-sm" onClick={() => { onReviewChoice(); onStateChange(normalizeMatchWorkspaceState(model, { ...state, reviewPlayerSteamId64: null })); }}>全部</button> {pinnedMatches.length === 1 && <button type="button" className="stu-button-sm" onClick={() => { onReviewChoice(); onStateChange(normalizeMatchWorkspaceState(model, { ...state, reviewPlayerSteamId64: pinnedMatches[0].row.steamId64 })); }}>我</button>} {pinnedMatches.length > 1 && <span>关注的多个账号都在本场，请选择选手。</span>}</div>
+          <label>选择选手 <select className="stu-select" value={state.reviewPlayerSteamId64 ?? ""} onChange={e => { onReviewChoice(); onStateChange(normalizeMatchWorkspaceState(model, { ...state, reviewPlayerSteamId64: e.target.value || null })); }}>
+            <option value="">全部选手</option>
+            {model.players.map(p => <option key={p.row.steamId64} value={p.row.steamId64}>{p.row.name}</option>)}
+          </select></label>
+          {reviewRow && <p>{reviewRow.name} · K/D/A {reviewRow.fieldAvailability.playerStats === "available" ? `${reviewRow.kills}/${reviewRow.deaths}/${reviewRow.assists}` : "—"} · ADR {reviewRow.fieldAvailability.damages === "available" ? reviewRow.adr.toFixed(1) : "—"} · KAST {reviewRow.fieldAvailability.rounds === "available" ? `${reviewRow.kast.toFixed(1)}%` : "—"}</p>}
+        </section>
         <nav className="dak-ws-nav" aria-label="比赛工作台视图">
           {nav.map((item) => (
             <button
@@ -82,9 +93,9 @@ export function MatchReviewWorkspace({ model, state: input, onStateChange }: { m
           {view === "replay" && model.replay.available && (
             <ReplayViewer replay={model.replay} map={model.map.view} state={state.replay} onStateChange={(replay) => onStateChange({ ...state, replay })} />
           )}
-          {view === "overview" && <OverviewView model={model} onNavigate={setView} />}
-          {view === "rounds" && <RoundExplorer model={model} state={state.roundExplorer} onChange={(roundExplorer) => onStateChange(normalizeMatchWorkspaceState(model, { ...state, roundExplorer }))} onOpenReplay={replayHandler} />}
-          {view === "players" && <PlayerStoryPanel model={model} selectedSteamId={state.playerPanelSteamId64} setSelectedSteamId={(playerPanelSteamId64) => onStateChange({ ...state, playerPanelSteamId64 })} onOpenReplay={replayHandler} />}
+          {view === "overview" && <OverviewView model={model} onNavigate={setView} onPlayerClick={id => onStateChange({ ...state, view: "players", playerPanelSteamId64: id })} />}
+          {view === "rounds" && <RoundExplorer model={model} onNote={onNote} quickFilter={state.quickRoundFilter} reviewPlayer={state.reviewPlayerSteamId64} onQuickFilter={(quickRoundFilter) => onStateChange(normalizeMatchWorkspaceState(model, { ...state, quickRoundFilter }))} state={state.roundExplorer} onChange={(roundExplorer) => onStateChange(normalizeMatchWorkspaceState(model, { ...state, roundExplorer }))} onOpenReplay={replayHandler} />}
+          {view === "players" && <PlayerStoryPanel model={model} onAnalyzePlayer={onAnalyzePlayer} selectedSteamId={state.playerPanelSteamId64} setSelectedSteamId={(playerPanelSteamId64) => onStateChange({ ...state, playerPanelSteamId64 })} onOpenReplay={replayHandler} />}
           {view === "economy" && (
             <div className="dak-stack">
               <Panel title="经济走势">
@@ -102,7 +113,7 @@ export function MatchReviewWorkspace({ model, state: input, onStateChange }: { m
   );
 }
 
-function OverviewView({ model, onNavigate }: MatchWorkspaceProps & { onNavigate: (view: WorkspaceView) => void }) {
+function OverviewView({ model, onNavigate, onPlayerClick }: MatchWorkspaceProps & { onNavigate: (view: WorkspaceView) => void; onPlayerClick: (id: string) => void }) {
   // 全宽 2 栏：左 = 主线 + 记分板，右 = 模块快捷入口 + 地图状态。
   return (
     <div className="dak-grid">
@@ -115,7 +126,7 @@ function OverviewView({ model, onNavigate }: MatchWorkspaceProps & { onNavigate:
           </div>
         </Panel>
         <Panel title="选手数据 / RR">
-          <ScoreboardTable rows={model.scoreboard} />
+          <ScoreboardTable rows={model.scoreboard} onPlayerClick={onPlayerClick} />
         </Panel>
       </section>
       <aside className="dak-stack">
@@ -152,14 +163,14 @@ function FilterChip({ active, label, onClick }: { active: boolean; label: string
   );
 }
 
-function RoundExplorer({ model, state, onChange, onOpenReplay }: MatchWorkspaceProps & { state: MatchWorkspaceState["roundExplorer"]; onChange: (state: MatchWorkspaceState["roundExplorer"]) => void; onOpenReplay?: (roundNumber: number, tick?: number) => void }) {
+function RoundExplorer({ model, state, onChange, onOpenReplay, quickFilter, reviewPlayer, onQuickFilter, onNote }: MatchWorkspaceProps & { onNote: (roundNumber: number) => void; quickFilter: QuickRoundFilter; reviewPlayer: string | null; onQuickFilter: (filter: QuickRoundFilter) => void; state: MatchWorkspaceState["roundExplorer"]; onChange: (state: MatchWorkspaceState["roundExplorer"]) => void; onOpenReplay?: (roundNumber: number, tick?: number) => void }) {
   const { selectedRoundNumber: selectedRound, showAllEvents, filter } = state;
   const setSelectedRound = (selectedRoundNumber: number) => onChange({ ...state, selectedRoundNumber, showAllEvents: false });
   const setShowAllEvents = (showAllEvents: boolean) => onChange({ ...state, showAllEvents });
   const setFilter = (next: MatchRoundFilterState | ((prev: MatchRoundFilterState) => MatchRoundFilterState)) => onChange({ ...state, filter: typeof next === "function" ? next(filter) : next });
   const filteredRounds = useMemo(
-    () => model.rounds.filter((row) => roundMatchesFilter(row, filter)),
-    [model.rounds, filter]
+    () => model.rounds.filter((row) => roundMatchesFilter(row, filter) && matchesQuickRound(row, quickFilter, reviewPlayer)),
+    [model.rounds, filter, quickFilter, reviewPlayer]
   );
   const round = filteredRounds.find((row) => row.roundNumber === selectedRound) ?? filteredRounds[0];
   const eventLimit = 28;
@@ -174,7 +185,10 @@ function RoundExplorer({ model, state, onChange, onOpenReplay }: MatchWorkspaceP
   return (
     <div className="dak-selection-layout">
       <Panel title="回合时间线" eyebrow={filterActive ? `筛选命中 ${filteredRounds.length}/${model.rounds.length} 回合` : undefined}>
-        <div className="dak-round-filterbar">
+        <div className="dak-heatmap-side-filter" aria-label="快捷回合">
+          {([ ["all", "全部回合"], ["opening", "首次交火"], ["first-death", "首死"], ["clutch", "残局"], ["utility", "投掷过道具的回合"] ] as const).map(([key, label]) => <button key={key} type="button" className={quickFilter === key ? "dak-sf-chip dak-sf-chip-active" : "dak-sf-chip"} disabled={((key === "first-death" || key === "utility") && !reviewPlayer) || (key === "utility" && !model.rounds.some(r => r.facets?.utilityThrowerSteamIds !== undefined))} title={!reviewPlayer && (key === "first-death" || key === "utility") ? "请选择选手" : key === "utility" ? "仅定位回合，非精确投掷时刻" : undefined} onClick={() => onQuickFilter(key)}>{label}</button>)}
+        </div>
+        <details><summary>筛选回合</summary><p>经济条件匹配任一队的经济档。</p><div className="dak-round-filterbar">
           <div className="dak-heatmap-side-filter" role="radiogroup" aria-label="胜方阵营">
             {(["all", "ct", "t"] as const).map((s) => (
               <FilterChip key={s} active={filter.winnerSide === s} label={s === "all" ? "全部" : `${s.toUpperCase()} 胜`} onClick={() => setFilter((prev) => ({ ...prev, winnerSide: s }))} />
@@ -233,6 +247,7 @@ function RoundExplorer({ model, state, onChange, onOpenReplay }: MatchWorkspaceP
             )}
           </div>
         </div>
+        </details>
         <div className="dak-round-pills">
           {filteredRounds.map((row) => (
             <button
@@ -251,8 +266,9 @@ function RoundExplorer({ model, state, onChange, onOpenReplay }: MatchWorkspaceP
       </Panel>
       {round && <Panel title={`R${round.roundNumber} 详情`}>
         <div className="dak-round-detail">
+          <button type="button" className="stu-button-sm" onClick={() => onNote(round.roundNumber)}>记一笔</button>
           {onOpenReplay && (
-            <button className="dak-timeline-more" type="button" onClick={() => onOpenReplay(round.roundNumber)}>
+            <button className="dak-timeline-more" type="button" onClick={() => onOpenReplay(round.roundNumber, quickRoundTick(round, quickFilter))}>
               ▶ 在 2D 回放中打开本回合
             </button>
           )}
@@ -293,7 +309,7 @@ function RoundExplorer({ model, state, onChange, onOpenReplay }: MatchWorkspaceP
   );
 }
 
-function PlayerStoryPanel({ model, selectedSteamId, setSelectedSteamId, onOpenReplay }: MatchWorkspaceProps & { selectedSteamId: string | null; setSelectedSteamId: (id: string) => void; onOpenReplay?: (roundNumber: number, tick?: number) => void }) {
+function PlayerStoryPanel({ model, selectedSteamId, setSelectedSteamId, onOpenReplay, onAnalyzePlayer }: MatchWorkspaceProps & { onAnalyzePlayer: (steamId: string, label: string) => void; selectedSteamId: string | null; setSelectedSteamId: (id: string) => void; onOpenReplay?: (roundNumber: number, tick?: number) => void }) {
   const selected = model.players.find((player) => player.row.steamId64 === selectedSteamId) ?? model.players[0];
 
   if (!selected) {
@@ -320,6 +336,7 @@ function PlayerStoryPanel({ model, selectedSteamId, setSelectedSteamId, onOpenRe
         </div>
       </Panel>
       <Panel title={`${selected.row.name} 个人故事`}>
+        <button type="button" className="stu-button-sm" onClick={() => onAnalyzePlayer(selected.row.steamId64, selected.row.name)}>分析此选手</button>
         <div className="dak-story-list">
           {selected.summary.map((line) => <p key={line}>{line}</p>)}
         </div>
