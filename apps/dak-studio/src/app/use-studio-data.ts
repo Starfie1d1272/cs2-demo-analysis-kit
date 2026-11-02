@@ -8,6 +8,7 @@ import { ensureAnalysisDataReady } from "../lib/queries/query-cache";
 export function useStudioData({ onError }: { onError: (message: string) => void }) {
   const [entries, setEntries] = useState<StudioDemoEntry[]>([]);
   const [entriesReady, setEntriesReady] = useState(false);
+  const [eventsReady, setEventsReady] = useState(false);
   const [eventRecords, setEventRecords] = useState<StudioEventRecord[]>([]);
   const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
   const [identityState, setIdentityState] = useState<IdentityStoreState>({ version: 0, mappings: [], teamRenames: {} });
@@ -25,6 +26,7 @@ export function useStudioData({ onError }: { onError: (message: string) => void 
       listSeriesRecords().then(series => { if (mounted.current && id === versions.current.events) setSeriesRecords(series); }, error => report("系列", error)),
     ]);
     if (results.some(result => result.status === "rejected")) throw new Error("读取赛事或系列失败");
+    if (mounted.current && id === versions.current.events) setEventsReady(true);
   }, [onError]);
   const refreshIdentity = useCallback(async () => { const id = ++versions.current.identity; const identity = await loadIdentityState(); if (mounted.current && id === versions.current.identity) setIdentityState(identity); }, []);
   useEffect(() => {
@@ -36,5 +38,5 @@ export function useStudioData({ onError }: { onError: (message: string) => void 
     void refreshIdentity().catch(err => { if (mounted.current) onError(`读取身份失败：${String(err)}`); });
     return () => { mounted.current = false; versions.current.entries++; versions.current.events++; versions.current.identity++; };
   }, [onError, refreshEntries, refreshEventRecords, refreshIdentity]);
-  return { entries, entriesReady, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity };
+  return { entries, entriesReady, eventsReady, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity };
 }

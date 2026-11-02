@@ -28,10 +28,12 @@ export interface ManagementViewProps {
   teamRenames?: Record<string, string>;
   onNotice?: (message: string) => void;
   onLibraryChanged?: (entries: StudioDemoEntry[]) => void;
-  initialTab?: ManagementTab;
+  tab: ManagementTab;
+  onTabChange: (tab: ManagementTab) => void;
+  library: React.ReactNode;
 }
 
-export type ManagementTab = "identity" | "assets";
+export type ManagementTab = "identity" | "assets" | "library";
 
 type BundlePlayer = SeasonCohortBundle["players"][number];
 
@@ -51,9 +53,8 @@ export function ManagementView({
   onNotice = () => {},
   onLibraryChanged,
   onPageReady,
-  initialTab = "identity"
+  tab, onTabChange, library
 }: ManagementViewProps) {
-  const [tab, setTab] = useState<ManagementTab>(initialTab);
   const [bundle, setBundle] = useState<SeasonCohortBundle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -70,9 +71,6 @@ export function ManagementView({
   const cancelRef = useRef(false);
   usePageReady(tab === "identity" && auditReady && (entries.length === 0 || bundle !== null || error !== null), onPageReady);
 
-  useEffect(() => {
-    setTab(initialTab);
-  }, [initialTab]);
 
   // 加载 bundle
   useEffect(() => {
@@ -252,6 +250,7 @@ export function ManagementView({
   const MGMT_TABS = [
     { key: "identity" as const, label: "身份" },
     { key: "assets" as const, label: "资产" },
+    { key: "library" as const, label: "资料库维护" },
   ];
 
   return (
@@ -270,13 +269,14 @@ export function ManagementView({
             role="tab"
             aria-selected={tab === key}
             className={tab === key ? "stu-subtab stu-subtab-active" : "stu-subtab"}
-            onClick={() => setTab(key)}
+            onClick={() => onTabChange(key)}
           >
             {label}
           </button>
         ))}
       </div>
 
+      {tab === "library" && library}
       {tab === "assets" && (
         <AssetsPanel onPageReady={onPageReady} entries={entries} onLibraryChanged={onLibraryChanged} onNotice={onNotice} />
       )}

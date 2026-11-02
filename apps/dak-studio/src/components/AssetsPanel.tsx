@@ -11,7 +11,6 @@ import { downloadTri, listAvailableTris, loadTrisManifest, type TrisManifest } f
 import { hasLibraryMaintenance } from "../lib/library-maintenance";
 import { loadBrowserStorageOverview, type BrowserStorageOverview } from "../lib/storage-overview";
 import { bytesLabel } from "../lib/format";
-import { LibraryMaintenance } from "./LibraryMaintenance";
 import {
   checkAssets,
   repairAssets,
@@ -196,9 +195,7 @@ export function AssetsPanel({ entries, onLibraryChanged, onNotice = () => {}, on
     <div className="stu-view-body" style={{ display: "grid", gap: "var(--dak-gap, 16px)" }}>
       {assetsError && <p className="stu-error" role="alert">读取资产信息失败：{assetsError}</p>}
       {/* ── 存储总览 ── */}
-      {desktop ? (
-        <LibraryMaintenance onNotice={onNotice} onLibraryChanged={onLibraryChanged} />
-      ) : (
+      {!desktop && (
         <div className="stu-card">
           <b>存储占用</b>
           <p className="stu-muted">浏览器/开发环境下的占用估算。桌面版可看到精确的按字节分类与清理工具。</p>

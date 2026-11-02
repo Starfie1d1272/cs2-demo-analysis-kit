@@ -1,13 +1,18 @@
 import { FileDown, Film, FolderOpen, Play, RefreshCw, Tag as TagIcon, Trash2 } from "lucide-react";
-import { useMemo, useState, type ChangeEvent } from "react";
+import { useMemo, useRef, useState, type ChangeEvent } from "react";
 import { isFactsStale} from "../lib/library";
 import { entryDate, type StudioDemoEntry } from "../lib/demo-entry";
 import { parseTags } from "../lib/tags";
 import { EmptyState } from "@cs2dak/react";
 import { EventManager } from "../components/EventManager";
+import { LibraryMaintenance } from "../components/LibraryMaintenance";
+import type { MatchesPageState } from "../lib/studio-page-state";
 import type { BuiltinEvent } from "../lib/builtin-events";
 
 export interface LibraryViewProps {
+  mode: "browse" | "maintenance";
+  state: MatchesPageState;
+  onStateChange: (state: MatchesPageState) => void;
   entries: StudioDemoEntry[];
   importing: boolean;
   importTagsRaw: string;
@@ -50,6 +55,7 @@ function formatImportedAt(ts: number): string {
 }
 
 export function LibraryView({
+  mode, state, onStateChange,
   entries,
   importing,
   importTagsRaw,
@@ -73,12 +79,14 @@ export function LibraryView({
   onRebuildStale,
   onRebuildSelected,
 }: LibraryViewProps) {
-  const [search, setSearch] = useState("");
-  const [mapFilter, setMapFilter] = useState<string | null>(null);
-  const [tagFilter, setTagFilter] = useState<string | null>(null);
-  const [serverFilter, setServerFilter] = useState<string | null>(null);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const { search, mapFilter, tagFilter, serverFilter, dateFrom, dateTo } = state;
+  const setSearch = (search: string) => onStateChange({ ...state, search });
+  const setMapFilter = (mapFilter: string | null) => onStateChange({ ...state, mapFilter });
+  const setTagFilter = (tagFilter: string | null) => onStateChange({ ...state, tagFilter });
+  const setServerFilter = (serverFilter: string | null) => onStateChange({ ...state, serverFilter });
+  const setDateFrom = (dateFrom: string) => onStateChange({ ...state, dateFrom });
+  const setDateTo = (dateTo: string) => onStateChange({ ...state, dateTo });
+  const fileInput = useRef<HTMLInputElement>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 
   const allTags = useMemo(() => [...new Set(entries.flatMap((entry) => entry.tags))].sort(), [entries]);
@@ -173,13 +181,13 @@ export function LibraryView({
     <div className="stu-view">
       <header className="stu-view-header">
         <div>
-          <h1>资料库</h1>
+          <h1>{mode === "browse" ? "比赛列表" : "资料库维护"}</h1>
           <p>
             导入 .dem（自动经 cs2df 转 v3 ZIP）或 cs2-demo-format/3.x ZIP，本地管理、检索并进入分析。支持拖拽到窗口任意位置。
           </p>
         </div>
         <div className="stu-header-actions">
-          {onRebuildStale && staleCount > 0 && (
+          {mode === "maintenance" && onRebuildStale && staleCount > 0 && (
             <button
               type="button"
               className="stu-button stu-button-ghost"
@@ -190,7 +198,7 @@ export function LibraryView({
               <RefreshCw size={15} /> 重建旧口径（{staleCount}）
             </button>
           )}
-          {onReexportAll && entries.some((entry) => entry.sourceDemPath) && (
+          {mode === "maintenance" && onReexportAll && entries.some((entry) => entry.sourceDemPath) && (
             <button
               type="button"
               className="stu-button stu-button-ghost"
@@ -215,15 +223,14 @@ export function LibraryView({
             </button>
           )}
           {!onNativeImport && (
-            <label className={importing ? "stu-button stu-button-disabled" : "stu-button"}>
-              <FolderOpen size={15} /> {importing ? "导入中…" : "导入 demo"}
-              <input type="file" accept=".zip,.dem" multiple hidden onChange={onPick} disabled={importing} />
-            </label>
+            <><button type="button" className="stu-button" disabled={importing} onClick={() => fileInput.current?.click()}><FolderOpen size={15} /> {importing ? "导入中…" : "导入 demo"}</button>
+              <input ref={fileInput} type="file" accept=".zip,.dem" multiple hidden onChange={onPick} disabled={importing} /></>
           )}
         </div>
       </header>
 
-      <EventManager entries={entries} onNotice={onNotice} onLibraryChanged={onLibraryChanged} onLoadBuiltin={onLoadBuiltin} />
+      {mode === "maintenance" && <LibraryMaintenance onNotice={onNotice} onLibraryChanged={onLibraryChanged} />}
+      {mode === "maintenance" && <EventManager entries={entries} onNotice={onNotice} onLibraryChanged={onLibraryChanged} onLoadBuiltin={onLoadBuiltin} />}
 
       <div className="stu-stat-strip">
         <div className="stu-stat">
@@ -374,7 +381,7 @@ export function LibraryView({
                 />
               </span>
               {(dateFrom || dateTo) && (
-                <button type="button" className="stu-chip" onClick={() => { setDateFrom(""); setDateTo(""); }}>
+                <button type="button" className="stu-chip" onClick={() => { onStateChange({ ...state, dateFrom: "", dateTo: "" }); }}>
                   清除
                 </button>
               )}
@@ -387,16 +394,14 @@ export function LibraryView({
         <EmptyState
           mark
           title="资料库为空"
-          hint="把 .dem 或 v3 ZIP 拖进窗口，或点右上角「导入 demo」。上方也可加载内置/在线赛事，或导入本地赛事资源包。"
+          hint="把 .dem 或 v3 ZIP 拖进窗口，或点右上角「导入 demo」。赛事目录可加载或导入赛事资源包。"
         />
       ) : (
         <div className="stu-table-wrap">
           <table className="stu-table">
             <thead>
               <tr>
-                <th aria-label="选择">
-                  <input type="checkbox" checked={allVisibleSelected} onChange={toggleVisible} />
-                </th>
+                {mode === "maintenance" && <th aria-label="选择"><input type="checkbox" checked={allVisibleSelected} onChange={toggleVisible} /></th>}
                 <th>地图</th>
                 <th>对阵</th>
                 <th>日期</th>
@@ -411,14 +416,14 @@ export function LibraryView({
             <tbody>
               {filtered.map((entry) => (
                 <tr key={entry.id} onClick={() => onOpenDemo(entry.id)}>
-                  <td onClick={(e) => e.stopPropagation()}>
+                  {mode === "maintenance" && <td onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={selectedIds.has(entry.id)}
                       onChange={() => toggleSelected(entry.id)}
                       aria-label={`选择 ${entry.fileName}`}
                     />
-                  </td>
+                  </td>}
                   <td>
                     <span className="stu-map-badge">{entry.meta.mapName}</span>
                   </td>
@@ -447,7 +452,7 @@ export function LibraryView({
                   <td>{entry.meta.hasReplay ? <span className="stu-tag stu-tag-ok">8Hz</span> : <span className="stu-tag">无</span>}</td>
                   <td className="stu-dim">{formatImportedAt(entry.importedAt)}</td>
                   <td className="stu-row-actions" onClick={(e) => e.stopPropagation()}>
-                    <button type="button" className="stu-icon-button" title="编辑标签" onClick={() => editTags(entry)}>
+                    {mode === "maintenance" && <><button type="button" className="stu-icon-button" title="编辑标签" onClick={() => editTags(entry)}>
                       <TagIcon size={14} />
                     </button>
                     <button
@@ -479,6 +484,7 @@ export function LibraryView({
                         <FolderOpen size={14} />
                       </button>
                     )}
+                    </>}
                     {onWatchRawDemo && (
                       <button
                         type="button"
@@ -493,14 +499,14 @@ export function LibraryView({
                     <button type="button" className="stu-icon-button" title="打开工作台" onClick={() => onOpenDemo(entry.id)}>
                       <Play size={14} />
                     </button>
-                    <button
+                    {mode === "maintenance" && <button
                       type="button"
                       className="stu-icon-button stu-icon-button-danger"
                       title="从资料库删除"
                       onClick={() => onRemoveDemo(entry.id)}
                     >
                       <Trash2 size={14} />
-                    </button>
+                    </button>}
                   </td>
                 </tr>
               ))}
