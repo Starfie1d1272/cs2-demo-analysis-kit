@@ -248,17 +248,21 @@ function CoachReplayStage({ fact, entryByMatchId, cache, mainRef }: {
   );
   const [error, setError] = useState<string | null>(null);
   const model = loaded?.matchId === matchId && loaded.generation === analysis.generation && analysis.status === "ready" && entryId ? loaded.model : null;
-  const [replayState, setReplayState] = useState<ReplayViewState | null>(null);
-  const replayMatchId = useRef<string | null>(null);
+  const [replay, setReplay] = useState<{ source: string; matchId: string; state: ReplayViewState } | null>(null);
+  const source = fact ? evidenceKey(fact) : null;
   useEffect(() => {
     if (analysis.status !== "ready") return;
-    if (!model || !fact) { replayMatchId.current = null; setReplayState(null); return; }
+    if (!model || !fact || !source) { setReplay(null); return; }
     const round = model.replay.rounds.find(r => r.roundNumber === fact.roundNumber);
     const initial = createReplayViewState(model.replay, model.map.view);
-    const sameMatch = replayMatchId.current === fact.matchId;
-    replayMatchId.current = fact.matchId;
-    setReplayState(previous => round && initial ? normalizeReplayViewState(model.replay, model.map.view, { ...(sameMatch && previous ? previous : initial), roundNumber: round.roundNumber, tick: round.freezeEndTick + 20 * (model.replay.tickrate ?? 64), playing: false }) : null);
-  }, [model, fact?.matchId, fact?.roundNumber, analysis.status]);
+    setReplay(previous => {
+      const state = round && initial ? normalizeReplayViewState(model.replay, model.map.view, {
+        ...(previous?.matchId === fact.matchId ? previous.state : initial),
+        roundNumber: round.roundNumber, tick: round.freezeEndTick + 20 * (model.replay.tickrate ?? 64), playing: false,
+      }) : null;
+      return state ? { source, matchId: fact.matchId, state } : null;
+    });
+  }, [model, fact?.matchId, fact?.roundNumber, source, analysis.status]);
 
   useEffect(() => {
     let cancelled = false;
@@ -294,13 +298,15 @@ function CoachReplayStage({ fact, entryByMatchId, cache, mainRef }: {
         <div className="stu-loading">读取本地回放…</div>
       ) : !model.replay.available || !model.replay.rounds.some(r => r.roundNumber === fact.roundNumber) ? (
         <div className="stu-pe-radar-empty">本场导出未附带 2D 回放流。</div>
+      ) : replay?.source !== source ? (
+        <div className="stu-loading">准备示例回合…</div>
       ) : (
         <div className="stu-pe-replay-frame">
           <ReplayViewer
             replay={model.replay}
             map={model.map.view}
-            state={replayMatchId.current === matchId ? replayState : null}
-            onStateChange={setReplayState}
+            state={replay.state}
+            onStateChange={(state) => setReplay(current => current?.source === source && state ? { ...current, state } : current)}
           />
         </div>
       )}
