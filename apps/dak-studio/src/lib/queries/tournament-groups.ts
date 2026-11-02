@@ -18,7 +18,7 @@ export function groupAnalysisTeams<T extends {
           : `analysis-team-name:${JSON.stringify(name)}`;
       }
       const key = teamEntityKeys[slot];
-      if (selected.has(name)) selectedKeys.add(key);
+      if (selected.has(name) || selected.has(key)) selectedKeys.add(key);
       const names = namesByKey.get(key) ?? new Set<string>();
       names.add(name);
       namesByKey.set(key, names);

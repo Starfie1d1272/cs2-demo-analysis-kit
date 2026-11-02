@@ -94,10 +94,14 @@ function deserializeMatchRadarFields(buf: ArrayBuffer): RadarField[] | null {
   if (header.fmt !== SERIAL_FORMAT) return null;
   if (header.computeVersion !== RADAR_FIELD_VERSION || header.calibrationVersion !== MAP_CALIBRATION_VERSION) return null;
   if (header.contributions.length === 0) return [];
+  // The producer returns either no fields or the complete [teamA, teamB] pair.
+  // Reject incomplete cached pairs so an absent side cannot shift the other side.
+  if (header.contributions.length !== 2) return null;
 
   const { maxSec, nCells } = header;
   const payload = buf.slice(4 + headerLen); // slice → 4 字节对齐；rows 只建 subarray 视图。
-  if (payload.byteLength % Int32Array.BYTES_PER_ELEMENT !== 0) return null;
+  const expectedInts = header.contributions.length * (maxSec * 2 + maxSec * nCells * FIELD_BASES.length);
+  if (payload.byteLength !== expectedInts * Int32Array.BYTES_PER_ELEMENT) return null;
   const ints = new Int32Array(payload);
   let off = 0;
   return header.contributions.map((c) => {
@@ -129,6 +133,7 @@ async function computeAndCache(matchId: string, economy: "gun" | "all"): Promise
   const buffer = await getStorage().blobs("demos").get(matchId);
   if (!buffer) return [];
   const fields = await radarFieldInWorker(buffer, matchId, economy, false);
+  if (fields.length !== 0 && fields.length !== 2) throw new Error("控图数据缺少一方贡献");
   try {
     await fieldBlobs.put(cacheKey(matchId, economy), serializeMatchRadarFields(fields));
   } catch {
@@ -173,7 +178,7 @@ export interface RadarScopeBatchRequest {
   matchIds: string[];
   economy?: "gun" | "all";
   league?: boolean;
-  team?: { name: string; includeTeam: (rawTeamName: string) => boolean };
+  team?: { name: string; includeTeam: (rawTeamName: string, slot: "teamA" | "teamB", entryId: string) => boolean };
   onProgress?: (done: number, total: number) => void;
   signal?: AbortSignal;
 }
@@ -211,11 +216,13 @@ export async function buildScopeRadarFields(req: RadarScopeBatchRequest): Promis
   await forEachLimit(req.matchIds, RADAR_FIELD_LOAD_CONCURRENCY, req.signal, async (id) => {
     const fields = await getMatchRadarFields(id, economy);
     if (req.signal?.aborted) return;
-    for (const f of fields) {
+    // buildMatchRadarField emits [] or exactly [teamA, teamB]; cache decoding
+    // rejects partial pairs and preserves the producer's order.
+    for (const [index, f] of fields.entries()) {
       if (req.league ?? true) {
         leagueAcc.append(f);
       }
-      if (req.team && f.scope.team != null && req.team.includeTeam(f.scope.team)) {
+      if (req.team && f.scope.team != null && req.team.includeTeam(f.scope.team, index === 0 ? "teamA" : "teamB", id)) {
         teamAcc.append(f);
       }
     }
