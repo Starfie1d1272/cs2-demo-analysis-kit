@@ -173,7 +173,7 @@ export interface RadarScopeBatchRequest {
   matchIds: string[];
   economy?: "gun" | "all";
   league?: boolean;
-  team?: { name: string; includeTeam: (rawTeamName: string) => boolean };
+  team?: { name: string; includeTeam: (rawTeamName: string, slot: "teamA" | "teamB", entryId: string) => boolean };
   onProgress?: (done: number, total: number) => void;
   signal?: AbortSignal;
 }
@@ -211,11 +211,11 @@ export async function buildScopeRadarFields(req: RadarScopeBatchRequest): Promis
   await forEachLimit(req.matchIds, RADAR_FIELD_LOAD_CONCURRENCY, req.signal, async (id) => {
     const fields = await getMatchRadarFields(id, economy);
     if (req.signal?.aborted) return;
-    for (const f of fields) {
+    for (const [index, f] of fields.entries()) {
       if (req.league ?? true) {
         leagueAcc.append(f);
       }
-      if (req.team && f.scope.team != null && req.team.includeTeam(f.scope.team)) {
+      if (req.team && f.scope.team != null && req.team.includeTeam(f.scope.team, index === 0 ? "teamA" : "teamB", id)) {
         teamAcc.append(f);
       }
     }

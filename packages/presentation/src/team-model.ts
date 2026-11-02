@@ -38,7 +38,7 @@ export interface TeamComparisonModel {
   teams: [TeamComparisonSide, TeamComparisonSide] | [];
   radar: Array<{ metric: string; label: string; a: number | null; b: number | null; delta: number | null }>;
   /** cohort 内全部队伍（按场次降序），供 UI 选 A/B 两队。 */
-  availableTeams: Array<{ key?: string; name: string; matches: number }>;
+  availableTeams: Array<{ key?: string; name: string; label?: string; matches: number }>;
 }
 
 /** 队伍总览只编排已有跨场事实；不推导强弱项、因果或对策。 */

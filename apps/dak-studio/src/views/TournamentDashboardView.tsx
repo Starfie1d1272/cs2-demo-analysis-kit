@@ -204,7 +204,7 @@ export function TournamentDashboardView({
             )}
             {teamComparison && onOpenTeam && (
               <div className="stu-chip-row">
-                {teamComparison.availableTeams.map((team) => <button key={team.key ?? team.name} type="button" className="stu-chip" onClick={() => onOpenTeam(team.name, team.key)}>{team.name} · {team.matches} 场</button>)}
+                {teamComparison.availableTeams.map((team) => <button key={team.key ?? team.name} type="button" className="stu-chip" onClick={() => onOpenTeam(team.name, team.key)}>{team.label ?? team.name} · {team.matches} 场</button>)}
               </div>
             )}
           </div>}

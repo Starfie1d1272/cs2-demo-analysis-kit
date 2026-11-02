@@ -95,7 +95,7 @@ function TeamSelect({
     >
       {teams.map((team) => (
         <option key={team.key ?? team.name} value={team.key ?? team.name} disabled={(team.key ?? team.name) === exclude}>
-          {team.name}（{team.matches} 场）
+          {team.label ?? team.name}（{team.matches} 场）
         </option>
       ))}
     </select>

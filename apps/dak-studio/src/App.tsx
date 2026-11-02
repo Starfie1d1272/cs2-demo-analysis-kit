@@ -234,7 +234,7 @@ export function App() {
     [identityState.version, identityState.mappings, identityState.teamRenames]
   );
   const selectedTeams = useMemo(() => selectedTeam ? [selectedTeam] : [], [selectedTeam]);
-  const selectedTeamGroups = useMemo(() => analysisContext.focus.kind === "team" ? [analysisContext.focus.teamKey ?? analysisContext.focus.teamName] : [], [analysisContext.focus]);
+  const selectedTeamGroups = useMemo(() => analysisContext.focus.kind === "team" ? [analysisContext.focus.teamKey ?? analysisContext.focus.teamName] : analysisContext.focus.kind === "player" && analysisContext.focus.teamKey ? [analysisContext.focus.teamKey] : [], [analysisContext.focus]);
   const focusIdentity = useMemo(() => {
     if (!selectedPlayerKey || !identityReady) return null;
     const mapping = identityState.mappings.find(item => item.playerKey === selectedPlayerKey);
@@ -249,11 +249,11 @@ export function App() {
     if (action === "rebuild-facts") { navigate({ page: "management", tab: "library" }); return; }
     goLibrary();
   }, [goLibrary, navigate]);
-  const selectRadarTeam = useCallback((teamName: string | null) => {
+  const selectRadarTeam = useCallback((teamName: string | null, teamKey?: string) => {
     setAnalysisContext((current) => ({
       ...current,
       goal: teamName ? "team-analysis" : current.goal === "team-analysis" ? "explore" : current.goal,
-      focus: teamName ? { kind: "team", teamName } : current.focus.kind === "team" ? { kind: "aggregate" } : current.focus,
+      focus: teamName ? { kind: "team", teamName, ...(teamKey && { teamKey }) } : current.focus.kind === "team" ? { kind: "aggregate" } : current.focus,
     }));
   }, [setAnalysisContext]);
 
@@ -657,7 +657,13 @@ export function App() {
             entries={scopedEntries}
             identityOptions={identityOptions}
             focusPlayerKey={selectedPlayerKey}
-            onSelectPlayer={(playerKey, label) => setAnalysisContext(current => ({ ...current, focus: { kind: "player", playerKey, label } }))}
+            selectedTeams={selectedTeamGroups}
+            onSelectPlayer={(playerKey, label) => setAnalysisContext(current => {
+              const focus = current.focus;
+              const teamKey = focus.kind === "team" || focus.kind === "player" ? focus.teamKey : undefined;
+              const teamName = focus.kind === "team" || focus.kind === "player" ? focus.teamName : undefined;
+              return { ...current, focus: { kind: "player", playerKey, label, ...(teamKey && { teamKey }), ...(teamName && { teamName }) } };
+            })}
             state={active.ui as import("./lib/spatial-view-state").OpeningPageState}
             onStateChange={update => setNavigation(current => {
               if (current.active.id !== active.id) return current;
@@ -698,7 +704,7 @@ export function App() {
             key={active.id}
             allEntries={entries}
             entries={eligible}
-            selectedTeams={selectedTeams}
+            selectedTeams={selectedTeamGroups}
             playerFocus={selectedPlayerKey ? focusIdentity : null}
             onGoLineups={() => navigate({ page: "lineups", context: analysisContext })}
             state={active.ui as import("./lib/studio-page-state").UtilityPageState}
@@ -782,7 +788,9 @@ export function App() {
             onPageReady={(keys) => onPageReady(active.id, keys)}
             entries={scopedEntries}
             teamRenames={identityState.teamRenames}
+            identityOptions={identityOptions}
             selectedTeam={selectedTeam}
+            selectedTeamKey={analysisContext.focus.kind === "team" ? analysisContext.focus.teamKey : undefined}
             onOpenMatch={openDemo}
             onSelectTeam={selectRadarTeam}
           />

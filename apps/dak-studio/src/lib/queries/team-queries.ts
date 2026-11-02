@@ -9,6 +9,7 @@ import { matchIdForEntry, type StudioDemoEntry } from "../demo-entry";
 import type { IdentityOptions } from "../identity";
 import { keyOf, missingFactsError, withTeamRenames } from "./query-scope";
 import { groupAnalysisTeams } from "./tournament-groups";
+import { getTeamAnalysisGroups } from "./spatial-queries";
 
 async function groupedTeamFacts(matchIds: string[], identity?: IdentityOptions) {
   const store = getDerivedCacheStore();
@@ -32,7 +33,7 @@ const teamOverviewCache = createAnalysisBucket<TeamOverviewModel | null>();
  * 返回的 model.availableTeams 供 UI 填充选队下拉。
  */
 export async function getTeamComparison(entries: StudioDemoEntry[], identity?: IdentityOptions, pair?: [string, string]): Promise<TeamComparisonModel> {
-  const key = `${keyOf(entries, identity?.version)}:team-comparison-groups-v1:${pair ? `${pair[0]}__vs__${pair[1]}` : "auto"}`;
+  const key = `${keyOf(entries, identity?.version)}:team-comparison-groups-v2:${pair ? `${pair[0]}__vs__${pair[1]}` : "auto"}`;
   return cachedQuery(teamComparisonCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), entries, async (generation) => {
     const persisted = await readPersistedValue<TeamComparisonModel>(key, generation);
     if (persisted) return persisted;
@@ -43,7 +44,12 @@ export async function getTeamComparison(entries: StudioDemoEntry[], identity?: I
         const keys = new Set(facts.flatMap(fact => (["teamA", "teamB"] as const).filter(slot => fact.teamEntityKeys[slot] === value || fact.teams[slot] === value).map(slot => fact.teamEntityKeys[slot])));
         return keys.size === 1 ? [...keys][0]! : value;
       };
-      const model = buildTeamComparisonFromFacts(facts, pair && [resolve(pair[0]), resolve(pair[1])], await getFactsStore().getRrSignalRows({ matchIds }));
+      const built = buildTeamComparisonFromFacts(facts, pair && [resolve(pair[0]), resolve(pair[1])], await getFactsStore().getRrSignalRows({ matchIds }));
+      const groups = await getTeamAnalysisGroups(entries, identity);
+      const model = { ...built, availableTeams: built.availableTeams.map(team => {
+        const group = groups.find(item => item.key === team.key);
+        return group ? { ...team, name: group.name, label: group.label } : team;
+      }) };
       await writePersistedValue(key, model, generation);
       return model;
     }

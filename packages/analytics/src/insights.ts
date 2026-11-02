@@ -433,6 +433,21 @@ function sortUtilityRows(rows: UtilityValueRow[]): UtilityValueRow[] {
     .sort((a, b) => (b.heDamagePerRound ?? 0) + (b.fireDamagePerRound ?? 0) - ((a.heDamagePerRound ?? 0) + (a.fireDamagePerRound ?? 0)));
 }
 
+/** Project one observed side from per-player facts before merging matches. */
+export function selectUtilityValueSide(summary: UtilityValueSummary, steamIds: string[], teamName: string, rounds: number): UtilityValueSummary {
+  const ids = new Set(steamIds.map(id => `steam:${id}`));
+  const players = summary.players.filter(row => ids.has(row.id));
+  const team = utilityRow(teamName, teamName);
+  for (const player of players) addUtilityRow(team, player);
+  team.rounds = rounds;
+  return {
+    players,
+    teams: [finalizeUtilityRow(team)],
+    bestFlashes: summary.bestFlashes.filter(row => row.playerId != null && ids.has(row.playerId)),
+    bestDamageRounds: summary.bestDamageRounds.filter(row => row.playerId != null && ids.has(row.playerId)),
+  };
+}
+
 export function mergeUtilityValueSummaries(
   summaries: UtilityValueSummary[],
   options: { players?: PlayerFlashSummaryInput[]; teamRenames?: Record<string, string> } = {}

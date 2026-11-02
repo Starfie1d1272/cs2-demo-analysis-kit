@@ -70,6 +70,10 @@ async function roleGroups(entries: StudioDemoEntry[], identity?: IdentityOptions
   return { groups: values, teamIdentityMap, selectedKeys: grouped.selectedKeys };
 }
 
+export async function getAnalysisTeamAssignments(entries: StudioDemoEntry[], identity: IdentityOptions | undefined, selectedTeams: string[]) {
+  return roleGroups(entries, identity, selectedTeams);
+}
+
 /** Resolve the selected group(s) to their observed sides in each match. */
 export async function getAnalysisTeamSlots(entries: StudioDemoEntry[], identity: IdentityOptions | undefined, selectedTeams: string[]): Promise<Map<string, Set<"teamA" | "teamB">> | null> {
   if (!selectedTeams.length) return null;
@@ -82,12 +86,14 @@ export async function getAnalysisTeamSlots(entries: StudioDemoEntry[], identity:
 }
 
 /** Selector groups and their matching entries use the same local grouping as role evidence. */
-export function getTeamAnalysisGroups(entries: StudioDemoEntry[], identity?: IdentityOptions): Promise<Array<{ key: string; name: string; matchIds: string[] }>> {
+export function getTeamAnalysisGroups(entries: StudioDemoEntry[], identity?: IdentityOptions): Promise<Array<{ key: string; name: string; names: string[]; label: string; matchIds: string[] }>> {
   return withStoredAnalysis(entries, async () => {
     const { groups, teamIdentityMap } = await roleGroups(entries, identity);
     return groups.map(group => ({
       key: group.key,
-      name: group.label,
+      name: [...new Set(group.names.map(name => displayTeamName(name, identity?.teamRenames)))].sort((a, b) => a.localeCompare(b))[0]!,
+      names: [...new Set(group.names.map(name => displayTeamName(name, identity?.teamRenames)))],
+      label: group.label,
       matchIds: [...new Set(entries.map(matchIdForEntry).filter(matchId =>
         (["teamA", "teamB"] as const).some(slot => teamIdentityMap[`${matchId}:${slot}`] === group.key)))],
     })).sort((a, b) => b.matchIds.length - a.matchIds.length || a.name.localeCompare(b.name));

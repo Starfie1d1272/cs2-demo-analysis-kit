@@ -68,7 +68,7 @@ export function TeamView({
   const setMapTable = (value: typeof mapTable) => onStateChange({ ...state, tables: { ...state.tables, maps: value } });
   const setRosterTable = (value: typeof rosterTable) => onStateChange({ ...state, tables: { ...state.tables, roster: value } });
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
-  const [teamList, setTeamList] = useState<Array<{ key: string; name: string; matchIds: string[] }>>([]);
+  const [teamList, setTeamList] = useState<Array<{ key: string; name: string; names: string[]; label: string; matchIds: string[] }>>([]);
   const [teamListError, setTeamListError] = useState<string | null>(null);
   useEffect(() => {
     if (!entries.length || analysis.status !== "ready") { setTeamList([]); return; }
@@ -80,7 +80,7 @@ export function TeamView({
     return () => { cancelled = true; };
   }, [entries, identityOptions?.version, analysis]);
   const teams = teamList.map(team => ({ ...team, matches: team.matchIds.length }));
-  const matchingTeams = teams.filter(team => team.name === selectedTeam);
+  const matchingTeams = teams.filter(team => selectedTeam && team.names.includes(selectedTeam));
   const activeTeam = selectedTeamKey
     ? (teams.some(team => team.key === selectedTeamKey) ? selectedTeamKey : null)
     : matchingTeams.length === 1 ? matchingTeams[0]!.key : null;
@@ -152,7 +152,7 @@ export function TeamView({
         <label className="stu-team-picker">队名分组
           <select value={activeTeam ?? ""} onChange={(event) => event.target.value && onSelectTeam(teams.find(team => team.key === event.target.value)!.name, event.target.value)}>
             <option value="">请选择队伍</option>
-            {teams.map((team) => <option key={team.key} value={team.key}>{team.name} · {team.matches} 场</option>)}
+            {teams.map((team) => <option key={team.key} value={team.key}>{team.label} · {team.matches} 场</option>)}
           </select>
         </label>
       </header>
@@ -165,7 +165,7 @@ export function TeamView({
             {comparisonCapability.availability && <CapabilityBar availability={comparisonCapability.availability} onRepair={onCapabilityRepair} />}
             {comparisonCapability.error && <p role="alert">对比能力读取失败：{comparisonCapability.error} <button type="button" className="stu-button-sm" onClick={comparisonCapability.retry}>重试</button></p>}
             {comparison && (comparisonError || comparisonCapability.error || analysis.status !== "ready" || comparisonSnapshot?.generation !== analysis.generation || comparisonSnapshot.sample !== JSON.stringify(comparisonEntries?.map(entry => entry.id))) && <p role="status">{comparisonError || comparisonCapability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && comparisonEntries?.length === 0 ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}
-            <label>对比队伍 <select value={state.compareTeamName ?? ""} onChange={event => onStateChange({ ...state, compareTeamName: event.target.value || null })}><option value="">不比较</option>{teams.filter(team => team.key !== activeTeam).map(team => <option key={team.key} value={team.key}>{team.name} · {team.matches} 场</option>)}</select></label>
+            <label>对比队伍 <select value={state.compareTeamName ?? ""} onChange={event => onStateChange({ ...state, compareTeamName: event.target.value || null })}><option value="">不比较</option>{teams.filter(team => team.key !== activeTeam).map(team => <option key={team.key} value={team.key}>{team.label} · {team.matches} 场</option>)}</select></label>
             {state.compareTeamName && comparisonEntries?.length === 0 && !comparison && <p>当前没有可用对比样本。</p>}
             {comparisonError && <div role="alert"><span>队伍对比加载失败：{comparisonError}</span> <button type="button" className="stu-button-sm" onClick={() => setComparisonRetry(value => value + 1)}>重试对比</button></div>}
             {state.compareTeamName && !comparison && !comparisonError && !comparisonCapability.error && !comparisonCapability.stale && comparisonEntries?.length !== 0 && <div className="stu-loading">加载队伍对比…</div>}
