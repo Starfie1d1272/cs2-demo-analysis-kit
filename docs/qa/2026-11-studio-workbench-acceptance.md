@@ -12,12 +12,12 @@
 
 - A1 部分通过：未绑定本人启动，空工作台可用；B 的最近比赛打开 Nuke。绑定本人/缺席默认选择未验。
 - A2 部分通过：Nuke 显示 9z 1:13 Aurora、10 人、14 回合；soulfly 19/7/1、ADR 137.8，界面显示 RR 1.611。未独立逐事实核验筛选和首死措辞。
-- A3–A5 部分通过：另一隔离库导入 Nuke 后创建 StudyNote，选择该场 R1 添加证据并保存，显示“来源和已知版本一致”；重载资料页仍显示笔记、正文及“来源一致”。删除 Nuke 后笔记和正文保留并提示原场缺失；把另一场 Inferno 临时复制为同一文件名后导入，原证据仍显示 Nuke R1 已不存在，未指向同名场。回放实际切 R2、下层、2× 并前进一步，显示 tick 7453 / 664 帧中的第 5 帧；无 `.dem`。对临时副本移除 replay.json 与 shots.json（模拟缺失，原 fixture 未改）导入后 1:13、ADR 137.8 和回合统计可读，回放入口不可用；因 shots 缺失 RR 与原样本不同，不能视为同口径。模拟零帧反例：临时副本将 R1 的 replay frameCount 设 0 并清空玩家帧，保存 R1 证据再打开，横幅显示 R1，播放器却显示 R2 / tick 7421；这是直接阻塞，待回放 owner 修复并重验。跨场往返、null 投法命令尚未验。
+- A3–A5 部分通过：另一隔离库导入 Nuke 后创建 StudyNote，选择该场 R1 添加证据并保存，显示“来源和已知版本一致”；重载资料页仍显示笔记、正文及“来源一致”。删除 Nuke 后笔记和正文保留并提示原场缺失；把另一场 Inferno 临时复制为同一文件名后导入，原证据仍显示 Nuke R1 已不存在，未指向同名场。回放实际切 R2、下层、2× 并前进一步，显示 tick 7453 / 664 帧中的第 5 帧；无 `.dem`。对临时副本移除 replay.json 与 shots.json（模拟缺失，原 fixture 未改）导入后 1:13、ADR 137.8 和回合统计可读，回放入口不可用；因 shots 缺失 RR 与原样本不同，不能视为同口径。模拟零帧反例：临时副本将 R1 的 replay frameCount 设 0 并清空玩家帧，保存 R1 证据再打开，横幅显示 R1，播放器却显示 R2 / tick 7421；这是直接阻塞，待回放 owner 修复并重验。两场交火证据列表打开 Nuke R1，再以“下一条”进入 Inferno R1（分别显示 tick 4634 和 5856），返回来源回到交火列表；筛选/排序/页码/anchor 的完整恢复及 null 投法命令尚未验。
 
 ## B 教练
 
 - B1 部分通过：空库可打开新建战术、人员安排、笔记编辑器；战术默认 Mirage/T，可选择 Default/Protocol/Play，人员安排有五行与观察绑定。在空库保存 Mirage T 的 Default、Protocol、Play 和一份人员安排（Player A 的职责填入 IGL + 主 AWP + A 区），重新加载后四条均显示；另建一份 Play，添加三个阶段、各一项人员任务和 position/smoke/flash 标记；保存重载后逐阶段列表可见。真实 Nuke 中为手工人员安排显式绑定 9z 的观察范围，出现位置矩阵；输入的 IGL + 主 AWP + A 区人工文字在绑定后及重载后不变。
-- B2–B5 部分通过：空库比赛单加入 Play、人员安排、StudyNote，重排后保存并进入/退出讲解；实际下载 Markdown 含三项材料及手工判断。调用打印并以 Chromium print media 输出 A4 一页 PDF，文本检查包含主体且无编辑按钮；没有目视核实所有复杂内容与原生打印。删除被引用笔记后，比赛单显示 `材料已删除 study-note:<id>`，另两项仍显示。模式示例、含 PrepItem 的比赛单、真实回合讲解及复杂打印仍未完成。另在空库创建仅含正文 `W19 正文战术内容` 的战术，进入讲解只显示“暂无阶段/手工示意”，正文未显示：直接阻塞，待战术讲解 owner 修复并重验。另一三阶段样本中选中阶段 2 再上移，本次仍选中阶段 2，不能排除其他重排路径问题。
+- B2–B5 部分通过：空库比赛单加入 Play、人员安排、StudyNote，重排后保存并进入/退出讲解；实际下载 Markdown 含三项材料及手工判断。调用打印并以 Chromium print media 输出 A4 一页 PDF，文本检查包含主体且无编辑按钮；没有目视核实所有复杂内容与原生打印。删除被引用笔记后，比赛单显示 `材料已删除 study-note:<id>`，另两项仍显示。真实 cohort 三场中选择 Team Plasma 侦察 Team D'avenir，模式列出 Inferno R18/R23，加入 R18 后材料页出现备战条目并标注“来源版本未知”；“报告”页可显示地图池比较。含 PrepItem 的比赛单、真实回合讲解及复杂打印仍未完成，报告其他入口未覆盖。另在空库创建仅含正文 `W19 正文战术内容` 的战术，进入讲解只显示“暂无阶段/手工示意”，正文未显示：直接阻塞，待战术讲解 owner 修复并重验。另一三阶段样本中选中阶段 2 再上移，本次仍选中阶段 2，不能排除其他重排路径问题。另在空库已保存三战术、一份人员安排与一份比赛单，工作台“最近资料”只列出三战术，人员安排及比赛单均未列出；源码种类列表同样缺这两类，待工作台 owner 修复。
 
 ## C 分析师
 
@@ -27,7 +27,7 @@
 
 ## D 数据、异步、可用性
 
-- 导入真实四场最终工作台显示 4 场；另在 cohort 三场导入期间新建并保存笔记，切换比赛/分析/战术与训练/工作台，任务完成后笔记编辑页仍在。模拟 IndexedDB 持续 open 抛错：页面显示“读取本地资料库失败”与缓存重试，同时最近比赛仍写“还没有比赛”；失败状态与空库文案并存，待数据 owner 修复/核对。后台任务失败重试、A/B 竞态与 scope 切换导出仍未实测。
+- 导入真实四场最终工作台显示 4 场；另在 cohort 三场导入期间新建并保存笔记，切换比赛/分析/战术与训练/工作台，任务完成后笔记编辑页仍在。模拟 IndexedDB 持续 open 抛错：页面显示“读取本地资料库失败”与缓存重试，同时最近比赛仍写“还没有比赛”；失败状态与空库文案并存，待数据 owner 修复/核对。临时浏览器延迟查询并触发真实 `invalidateAnalysisQueries`：旧 Promise 在恢复后以 AbortError 结束、bucket 清空；这是模拟延迟的数据 generation 检查，不等于 A/B 证据或 scope 切换导出验收。后台任务失败重试、A/B 竞态与 scope 切换导出仍未实测。
 - 源码 `storage-overview.ts` 的用户 namespace 包含 training-focus、prep-items、practice-lineups、role-declarations、study-notes、coach-playbook、coach-assignments、coach-match-sheets、saved-analyses；cache 名单由 facts/derived cache 加 cache/meta 构成。另以临时隔离目录直接运行 Linux Python `StudioApi` 后端：九类各写一条模拟记录，清除 9 字节临时 cache 后逐类一致；备份后删除九条及真实 Nuke ZIP，恢复后九类各一条和 ZIP 字节一致（SHA-256 `e9405245cd0ba55d4427bb5890874b0b70b19475790248d963734b6cd93e4d21`）。这是后端调用、模拟用户资料，不是 pywebview 壳或 Windows/macOS 实机验证。
 - 旧 playlist 迁移源码先写后删、冲突时另分 ID、末尾写 marker；普通 prep list 仅读取排序。临时内存 RecordStore 注入首次复制失败与首次删除失败，重试后旧记录删除、同 ID 不同内容两条保留、marker 写入；重复迁移和普通 list 无写入。此为模拟故障，旧版本真实资料及平台恢复尚未验。
 - 赛事/series/BP、RivalHub、批量标签/修复、身份/资产/更新/原始 demo/进游戏的逐项可达性未验；canonical/RR/PRISM 跨版本同语料逐项对照未完成。W20 缺姿态保持缺失、W21 分母和日期修正应按 #157/#161 语义核实，不能为了旧错误数值回退。
@@ -53,4 +53,4 @@
 | 导航镜像及旧证据 fallback | App 页面帧与单对象 `OpenEvidenceRequest` | [#158](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/158)、[#164](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/164)；`sourceKey` 仍作为 anchor 合法存在，前缀猜 tab/所有 fallback 尚需逐项核查 |
 | 公共 break | presentation/react 等各自 major Changeset | `.changeset/w03-controlled-state.md`、迁移指南；本次真实 tarball 消费通过，不代表未知外部调用方已迁移 |
 
-公共包源码检索未命中 AnalysisContext、MaterialRef、RecordStore、STUDIO_TABLE_CLASSES、initialTarget 或 initialViewState；query 目录未命中 view import。这是针对名称的静态检查，不证明所有潜在耦合已排除。纯模块依赖、所有 query 算法唯一性、series 领域界限、CoachSettings、来源回退与所有受控调用方仍需逐项验证。因此架构表尚未闭合。
+公共包源码检索未命中 AnalysisContext、MaterialRef、RecordStore、STUDIO_TABLE_CLASSES、initialTarget 或 initialViewState；query 目录未命中 view import。这是针对名称的静态检查，不证明所有潜在耦合已排除。已发现边界未闭合：`queries/query-scope.ts` 为 `originalTeamNamesForDisplay` 导入 `identity.ts`，后者模块顶层调用 `getStorage().records(...)`；纯查询读取队名会加载 storage，需原 owner 拆分纯身份变换与 I/O。源码搜索未见 CoachSettings、sourceKey 前缀猜 tab，series 源码未见材料/教练设置引用；其他纯模块依赖、所有 query 算法唯一性、来源回退与所有受控调用方仍需逐项验证。因此架构表尚未闭合。
