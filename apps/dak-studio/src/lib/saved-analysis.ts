@@ -190,7 +190,7 @@ function validUI(page: AnalysisPageId, v: unknown): boolean {
   const allowed: Record<AnalysisPageId, string[]> = {
     analysis: ["comparePair", "leaderboardView", "tables"],
     "event-analysis": ["comparePair", "leaderboardView", "tables"],
-    player: ["profileTab", "comparePlayerKey", "flashMode"],
+    player: ["profileTab", "comparePlayerKey", "flashMode", "trendMetric"],
     team: ["compareTeamName", "tables"],
     roles: ["player", "team"],
     duel: [
@@ -244,7 +244,8 @@ function validUI(page: AnalysisPageId, v: unknown): boolean {
       return (
         (["overview", "aim", "utility", "trend"] as readonly unknown[]).includes(v.profileTab) &&
         nullableString(v.comparePlayerKey) &&
-        (["net", "enemy"] as readonly unknown[]).includes(v.flashMode)
+        (["net", "enemy"] as readonly unknown[]).includes(v.flashMode) &&
+        (["adr", "kast", "fkMinusFd", "utilityDamagePerRound"] as readonly unknown[]).includes(v.trendMetric)
       );
     case "team":
       return (

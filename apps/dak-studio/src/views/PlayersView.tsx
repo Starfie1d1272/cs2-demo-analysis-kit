@@ -23,7 +23,7 @@ import { type IdentityOptions } from "../lib/identity";
 import { displayTeamName } from "../lib/team-identity";
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
-import { FingerprintRadar, TrendChart, type TrendMetricKey } from "./profile-widgets";
+import { FingerprintRadar, TrendChart } from "./profile-widgets";
 import { EmptyState, MetricInfo } from "@cs2dak/react";
 import { EvidenceActions } from "../components/EvidenceActions";
 import type { OpenEvidence } from "../lib/evidence-continuation";
@@ -89,7 +89,6 @@ export function PlayersView({
   onOpenMaterials,
   onOpenOpening, onOpenRoles
 }: PlayersViewProps) {
-  const [trendMetric, setTrendMetric] = useState<TrendMetricKey>("adr");
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const playerScope = useMemo(() => selectedPlayerKey ? {
     playerKeys: [selectedPlayerKey],
@@ -114,9 +113,10 @@ export function PlayersView({
   const [error, setError] = useState<string | null>(null);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [pinned, setPinned] = useState<PinnedPlayer | null>(null);
-  const { comparePlayerKey: compareKey, profileTab, flashMode } = state;
+  const { comparePlayerKey: compareKey, profileTab, flashMode, trendMetric } = state;
   const setCompareKey = (comparePlayerKey: string | null) => onStateChange({ ...state, comparePlayerKey });
-  const setProfileTab = (profileTab: ProfileTab) => { if (profileTab !== state.profileTab) setTrendMetric("adr"); onStateChange({ ...state, profileTab }); };
+  const setProfileTab = (profileTab: ProfileTab) => onStateChange({ ...state, profileTab });
+  const setTrendMetric = (trendMetric: PlayerPageState["trendMetric"]) => onStateChange({ ...state, trendMetric });
   const setFlashMode = (flashMode: "net" | "enemy") => onStateChange({ ...state, flashMode });
 
   useEffect(() => {
