@@ -118,8 +118,8 @@ function alignment(declaration: MainRoleDeclaration, inferred: InferredMapRole |
     declaredSecondary: secondary,
     inferredPrimary: inferred,
     overall,
-    tSide: `T 方观察职责：${top("t")}`,
-    ctSide: `CT 方观察职责：${top("ct")}`,
+    tResponsibility: top("t"),
+    ctResponsibility: top("ct"),
     disagreementReasons: overall === "different_observation" ? ["声明与当前语料中的观察重点不同；这不表示声明填写错误。"] : [],
     sampleLimitations: [...new Set([...scopeLimitations, ...rows.flatMap((row) => row.limitations)])].slice(0, 4),
   } as const;
