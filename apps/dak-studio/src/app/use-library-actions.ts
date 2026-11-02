@@ -6,13 +6,13 @@ import { parseTags } from "../lib/tags";
 import { pruneOrphanSeries } from "../lib/series";
 import { importEventAssetArchive } from "../lib/event-assets";
 import type { BuiltinEvent } from "../lib/builtin-events";
-type Activity = { importing: boolean; setImporting: (value: boolean) => void; setNotice: (message: string | null) => void };
-type Options = { entries: StudioDemoEntry[]; refreshEntries: () => Promise<StudioDemoEntry[]>; refreshEventRecords: () => Promise<void>; activity: Activity };
+import type { ActivityActions } from "./activity-types";
+type Options = { entries: StudioDemoEntry[]; refreshEntries: () => Promise<StudioDemoEntry[]>; refreshEventRecords: () => Promise<void>; activity: ActivityActions };
 type MatchDeepLink = { roundNumber: number; tick?: number };
 export function useLibraryActions({ entries, refreshEntries, refreshEventRecords, activity }: Options) {
-  const { setImporting, setNotice } = activity;
+  const { tryBegin, setNotice } = activity;
   const [importTagsRaw, setImportTagsRaw] = useState("");
-  const importFiles = useCallback(async (files: Iterable<File | ExportedDemoFile>, tags: string[] = [], initialErrors: string[] = []): Promise<StudioDemoEntry[]> => {
+  const importFilesCore = useCallback(async (files: Iterable<File | ExportedDemoFile>, tags: string[] = [], initialErrors: string[] = []): Promise<StudioDemoEntry[]> => {
     const fileList = [...files];
     const items = fileList.map((item) => item instanceof File ? { file: item, sourceDemPath: null } : item);
     const zips = items.filter((item) => item.file.name.toLowerCase().endsWith(".zip"));
@@ -21,7 +21,6 @@ export function useLibraryActions({ entries, refreshEntries, refreshEventRecords
       setNotice("请选择 .dem 或 cs2-demo-format/3.x ZIP 文件");
       return [];
     }
-    setImporting(true);
     setNotice(null);
     let imported = 0;
     let duplicates = 0;
@@ -76,12 +75,19 @@ export function useLibraryActions({ entries, refreshEntries, refreshEventRecords
     } catch (error) {
       setNotice(`导入失败：${error instanceof Error ? error.message : String(error)}`);
       return importedEntries;
-    } finally { setImporting(false); }
-  }, [refreshEntries, setImporting, setNotice]);
+    }
+  }, [refreshEntries, setNotice]);
+
+  const importFiles = useCallback(async (files: Iterable<File | ExportedDemoFile>, tags: string[] = [], errors: string[] = []) => {
+    const release = tryBegin();
+    if (!release) return [];
+    try { return await importFilesCore(files, tags, errors); } finally { release(); }
+  }, [tryBegin, importFilesCore]);
 
   // 桌面壳：原生文件对话框选 .dem/.zip → 本机 exporter 转 ZIP → 入库
   const importViaNativeDialog = useCallback(async () => {
-    setImporting(true);
+    const release = tryBegin();
+    if (!release) return;
     setNotice(null);
     try {
       const { files, errors, cancelled } = await pickAndExportDems(setNotice);
@@ -89,13 +95,13 @@ export function useLibraryActions({ entries, refreshEntries, refreshEventRecords
         setNotice(null); // 用户取消了对话框
         return;
       }
-      await importFiles(files, parseTags(importTagsRaw), errors);
+      await importFilesCore(files, parseTags(importTagsRaw), errors);
     } catch (err) {
       setNotice(`导入失败：${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setImporting(false);
+      release();
     }
-  }, [importFiles, importTagsRaw]);
+  }, [importFilesCore, importTagsRaw, tryBegin]);
 
   /** pywebview 桌面壳提供原生对话框，由 LibraryView 条件展示。 */
   const nativeImportAvailable = typeof window.pywebview?.api?.pick_dems === "function";
@@ -103,7 +109,8 @@ export function useLibraryActions({ entries, refreshEntries, refreshEventRecords
   // 载入一个内置赛事/示例：拉随包 event-package zip，走与在线/cologne 完全相同的导入路径
   // （importEventAssetArchive：逐图导入 demo + 建立赛事/系列/BP）。BP 已写在包里，无需回填。
   const loadBuiltinEvent = useCallback(async (builtin: BuiltinEvent) => {
-    setImporting(true);
+    const release = tryBegin();
+    if (!release) return;
     setNotice(null);
     try {
       const response = await fetch(builtin.packageUrl);
@@ -116,7 +123,7 @@ export function useLibraryActions({ entries, refreshEntries, refreshEventRecords
     } catch (err) {
       setNotice(`载入失败：${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setImporting(false);
+      release();
     }
   }, []);
 
@@ -202,7 +209,8 @@ export function useLibraryActions({ entries, refreshEntries, refreshEventRecords
   }, []);
 
   const handleReexportDemo = useCallback(async (entry: StudioDemoEntry) => {
-    setImporting(true);
+    const release = tryBegin();
+    if (!release) return;
     setNotice(`正在重新导出 ${entry.fileName}…`);
     try {
       await reexportOne(entry);
@@ -211,7 +219,7 @@ export function useLibraryActions({ entries, refreshEntries, refreshEventRecords
     } catch (err) {
       setNotice(`重新导出失败：${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setImporting(false);
+      release();
     }
   }, [reexportOne]);
 
@@ -224,7 +232,8 @@ export function useLibraryActions({ entries, refreshEntries, refreshEventRecords
       return;
     }
     if (!window.confirm(`将重新导出 ${withPath.length} 场 demo（逐场进行，可能需要较长时间），继续？`)) return;
-    setImporting(true);
+    const release = tryBegin();
+    if (!release) return;
     try {
     let done = 0;
     const failures: string[] = [];
@@ -242,7 +251,7 @@ export function useLibraryActions({ entries, refreshEntries, refreshEventRecords
       `批量重新导出完成：成功 ${done} 场` +
         (failures.length > 0 ? `，失败 ${failures.length} 场（${failures[0]}）` : "")
     );
-    } finally { setImporting(false); }
+    } finally { release(); }
   }, [reexportOne, refreshEntries]);
 
   const handleReexportAll = useCallback(async () => {
@@ -253,7 +262,8 @@ export function useLibraryActions({ entries, refreshEntries, refreshEventRecords
   const rebuildFactsForEntries = useCallback(async (targets: StudioDemoEntry[]) => {
     if (targets.length === 0) return;
     if (!window.confirm(`将用当前分析口径重建 ${targets.length} 场 facts（从已存 ZIP，无需原始 .dem），继续？`)) return;
-    setImporting(true);
+    const release = tryBegin();
+    if (!release) return;
     try {
     let done = 0;
     const failures: string[] = [];
@@ -270,11 +280,12 @@ export function useLibraryActions({ entries, refreshEntries, refreshEventRecords
     setNotice(
       `重建完成：成功 ${done} 场` + (failures.length > 0 ? `，失败 ${failures.length} 场（${failures[0]}）` : "")
     );
-    } finally { setImporting(false); }
+    } finally { release(); }
   }, [refreshEntries]);
 
   const handleRebuildFacts = useCallback(async (id: string) => {
-    setImporting(true);
+    const release = tryBegin();
+    if (!release) return;
     setNotice("正在从 ZIP 重建 facts…");
     try {
       const entry = await rebuildFactsFromZip(id);
@@ -283,7 +294,7 @@ export function useLibraryActions({ entries, refreshEntries, refreshEventRecords
     } catch (err) {
       setNotice(`重建失败：${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setImporting(false);
+      release();
     }
   }, []);
 
@@ -304,7 +315,8 @@ export function useLibraryActions({ entries, refreshEntries, refreshEventRecords
   const handleRemoveMany = useCallback(async (ids: string[]) => {
     if (ids.length === 0) return;
     if (!window.confirm(`确认从资料库删除 ${ids.length} 场 demo？此操作不可撤销。`)) return;
-    setImporting(true);
+    const release = tryBegin();
+    if (!release) return;
     try {
       await removeDemos(ids, (done, total) => setNotice(`正在删除（${done}/${total}）…`));
       const next = await refreshEntries();
@@ -314,10 +326,17 @@ export function useLibraryActions({ entries, refreshEntries, refreshEventRecords
     } catch (err) {
       setNotice(`批量删除失败：${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setImporting(false);
+      release();
     }
   }, []);
 
-  const importDropped = (files: FileList) => { triggerWindowsDropCapture(files); void importFiles(files, parseTags(importTagsRaw)); };
+  const importDropped = (files: FileList) => {
+    const release = tryBegin();
+    if (!release) return;
+    try {
+      triggerWindowsDropCapture(files);
+      void importFilesCore(files, parseTags(importTagsRaw)).finally(release);
+    } catch (error) { release(); throw error; }
+  };
   return { importTagsRaw, setImportTagsRaw, importFiles, importDropped, importViaNativeDialog, nativeImportAvailable, loadBuiltinEvent, handleLinkRawDemo, watchRawDemo, handleRemove, handleRemoveMany, handleUpdateTags, handleBulkUpdateTags, handleReexportDemo, handleReexportAll, handleReexportSelected, handleRebuildFacts, handleRebuildStale, handleRebuildSelected };
 }

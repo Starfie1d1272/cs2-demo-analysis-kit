@@ -1,10 +1,18 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { type ExportPollSnapshot } from "@cs2dak/rivalhub-upload";
 import { exportPolling } from "../lib/dem";
 
 export function useStudioActivity() {
   const [exportQueries, setExportQueries] = useState<ExportPollSnapshot[]>(() => exportPolling.snapshots());
   const [importing, setImporting] = useState(false);
+  const owner = useRef<symbol | null>(null);
+  const tryBegin = useCallback(() => {
+    if (owner.current) return null;
+    const token = Symbol();
+    owner.current = token;
+    setImporting(true);
+    return () => { if (owner.current === token) { owner.current = null; setImporting(false); } };
+  }, []);
   useEffect(() => {
     const reported = new Map<string, string>();
     return exportPolling.subscribe(() => {
@@ -19,5 +27,5 @@ export function useStudioActivity() {
     });
   }, []);
   const [notice, setNotice] = useState<string | null>(null);
-  return { importing, setImporting, notice, setNotice, exportQueries, recheckExport: exportPolling.recheck };
+  return { importing, tryBegin, notice, setNotice, exportQueries, recheckExport: exportPolling.recheck };
 }

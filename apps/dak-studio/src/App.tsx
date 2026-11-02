@@ -126,7 +126,7 @@ export function App() {
   const { importing, notice, setNotice, exportQueries, recheckExport } = activity;
   const { entries, entriesReady, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity } = useStudioData({ onError: setNotice });
   const { importTagsRaw, setImportTagsRaw, importFiles, importDropped, importViaNativeDialog, nativeImportAvailable, loadBuiltinEvent, handleLinkRawDemo, watchRawDemo, handleRemove, handleRemoveMany, handleUpdateTags, handleBulkUpdateTags, handleReexportDemo, handleReexportAll, handleReexportSelected, handleRebuildFacts, handleRebuildStale, handleRebuildSelected } = useLibraryActions({ entries, refreshEntries, refreshEventRecords, activity });
-  const { rivalHubConnection, rivalHubRefreshToken, batchSession, dismissBatch, updateLocalLink, refreshRivalHub, handleConnectRivalHub, handleRevokeRivalHub, importOnlineFiles, syncLocalRivalHubDemos, stopRivalHubBatch, pickRivalHubFiles, selectRivalHubBatchTarget } = useRivalHubActions({ entries, refreshEntries, refreshEventRecords, activity });
+  const { rivalHubConnection, rivalHubRefreshToken, batchSession, dismissBatch, updateLocalLink, refreshRivalHub, handleConnectRivalHub, handleRevokeRivalHub, importOnlineFiles, syncLocalRivalHubDemos, stopRivalHubBatch, pickRivalHubFiles, selectRivalHubBatchTarget } = useRivalHubActions({ refreshEntries, refreshEventRecords, activity });
   const [navigation, setNavigation] = useState(() => createStudioNavigation("initial"));
   const navigationRef = useRef(navigation);
   navigationRef.current = navigation;
@@ -198,7 +198,7 @@ export function App() {
     sourceKey: evidenceSource.anchorKey,
   } : null;
   const [restoringFrameId, setRestoringFrameId] = useState<string | null>(null);
-  const { update, checkingUpdate, dismissedVersion, setDismissedVersion, showLatestMsg, updateChannel, doCheckUpdate, changeUpdateChannel } = useDesktopUpdates();
+  const { update, checkingUpdate, dismissedVersion, setDismissedVersion, showLatestMsg, updateChannel, doCheckUpdate, changeUpdateChannel } = useDesktopUpdates({ onError: setNotice });
   const [contextEditorOpen, setContextEditorOpen] = useState(false);
   const [capabilityAvailability, setCapabilityAvailability] = useState<CapabilityAvailability | null>(null);
 
@@ -471,7 +471,7 @@ export function App() {
             onImportFiles={importFiles}
             onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined}
             onNotice={setNotice}
-            onLibraryChanged={() => { void refreshEntries(); void refreshEventRecords(); }}
+            onLibraryChanged={() => { void refreshEntries().catch(() => {}); void refreshEventRecords().catch(() => {}); }}
             onLoadBuiltin={loadBuiltinEvent}
             onOpenDemo={openDemo}
             onRemoveDemo={handleRemove}
@@ -664,7 +664,7 @@ export function App() {
             teamRenames={identityState.teamRenames}
             onGoLibrary={() => setView("library")}
             onNotice={setNotice}
-            onLibraryChanged={() => { void refreshEntries(); void refreshEventRecords(); }}
+            onLibraryChanged={() => { void refreshEntries().catch(() => {}); void refreshEventRecords().catch(() => {}); }}
             initialTab={managementInitialTab === "library" ? "identity" : managementInitialTab}
           />
         )}

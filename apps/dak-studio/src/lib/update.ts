@@ -196,7 +196,7 @@ export async function checkForUpdateOnChannel(channel: UpdateChannel = "stable")
     const asset = manifest.assets.web ?? (platform ? manifest.assets[platform] : undefined);
     return { latest: manifest.version, url: RELEASES_PAGE, notes: manifest.notes, asset };
   }
-  if (channel === "beta") return null;
+  if (channel === "beta") throw new Error("无法读取测试版更新信息");
   // 所有镜像都失败 → 退回 GitHub API（直连成功的网络仍可用）。
   return checkViaGitHubApi();
 }
@@ -207,9 +207,10 @@ export async function checkForUpdateOnChannel(channel: UpdateChannel = "stable")
  */
 async function checkViaGitHubApi(): Promise<UpdateInfo | null> {
   const raw = await fetchJson(RELEASES_LATEST_API);
-  if (!raw || typeof raw !== "object") return null;
+  if (!raw || typeof raw !== "object") throw new Error("无法读取更新信息");
   const data = raw as { tag_name?: string; html_url?: string };
   const latest = (data.tag_name ?? "").replace(/^v/, "");
-  if (!latest || !semverLess(APP_VERSION, latest)) return null;
+  if (!latest) throw new Error("更新信息缺少版本号");
+  if (!semverLess(APP_VERSION, latest)) return null;
   return { latest, url: data.html_url ?? RELEASES_PAGE };
 }

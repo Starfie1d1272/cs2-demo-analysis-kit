@@ -7,10 +7,10 @@ import { markRivalHubEventsStale, matchesRivalHubDemo, upsertRivalHubEvents } fr
 import { assertRivalHubConnected, rivalHubFailureMessage, connectRivalHub, fetchRivalHubEvents, loadRivalHubConnection, revokeRivalHubPairing, type RivalHubConnectionState } from "../lib/rivalhub";
 import { confirmRivalHubBatchReceipts, recountRivalHubBatch, rivalHubBatchCompletionMessage, runRivalHubBatch, type RivalHubBatchInput, type RivalHubBatchItem, type RivalHubBatchSession, type RivalHubImportContext } from "../lib/rivalhub-import";
 import { importRivalHubFromNativePicker } from "../lib/rivalhub-acquisition";
-type Activity = { importing: boolean; setImporting: (value: boolean) => void; setNotice: (message: string | null) => void };
-type Options = { entries: StudioDemoEntry[]; refreshEntries: () => Promise<StudioDemoEntry[]>; refreshEventRecords: () => Promise<void>; activity: Activity };
-export function useRivalHubActions({ entries, refreshEntries, refreshEventRecords, activity }: Options) {
-  const { importing, setImporting, setNotice } = activity;
+import type { ActivityActions } from "./activity-types";
+type Options = { refreshEntries: () => Promise<StudioDemoEntry[]>; refreshEventRecords: () => Promise<void>; activity: ActivityActions };
+export function useRivalHubActions({ refreshEntries, refreshEventRecords, activity }: Options) {
+  const { tryBegin, setNotice } = activity;
   const [rivalHubConnection, setRivalHubConnection] = useState<RivalHubConnectionState>({ baseUrl: "", pairingId: null, connectedAt: 0, lastSyncAt: null, status: "disconnected", error: null });
   const [rivalHubRefreshToken, setRivalHubRefreshToken] = useState(0);
   const [batchSession, setBatchSession] = useState<RivalHubBatchSession | null>(null);
@@ -81,14 +81,12 @@ export function useRivalHubActions({ entries, refreshEntries, refreshEventRecord
   }, [rivalHubConnection]);
 
   const runRivalHubBatchInputs = useCallback(async (batchInputs: Iterable<RivalHubBatchInput>, context: RivalHubImportContext) => {
-    if (importing) return;
     let inputs = [...batchInputs];
     if (inputs.length === 0) return;
     batchStopRequested.current = false;
     batchTargetResolvers.current.clear();
     batchSessionRef.current = null;
     setBatchSession(null);
-    setImporting(true);
     setNotice("正在启动 RivalHub Demo 批处理…");
     let demBackend: Awaited<ReturnType<typeof detectDemBackend>> | undefined;
     try {
@@ -127,16 +125,18 @@ export function useRivalHubActions({ entries, refreshEntries, refreshEventRecord
       batchTargetResolvers.current.forEach(resolve => resolve(null));
       batchTargetResolvers.current.clear();
       inputs = [];
-      setImporting(false);
     }
-  }, [importing, refreshEventRecords, refreshRivalHub]);
+  }, [refreshEntries, refreshEventRecords, refreshRivalHub, setNotice]);
 
   const importOnlineFiles = useCallback(async (files: Iterable<File>, context: RivalHubImportContext) => {
-    await runRivalHubBatchInputs(files, context);
-  }, [runRivalHubBatchInputs]);
+    const release = tryBegin();
+    if (!release) return;
+    try { await runRivalHubBatchInputs(files, context); } finally { release(); }
+  }, [runRivalHubBatchInputs, tryBegin]);
 
   const syncLocalRivalHubDemos = useCallback(async (context: RivalHubImportContext) => {
-    if (importing) return;
+    const release = tryBegin();
+    if (!release) return;
     try {
       const { entries: refreshedEntries } = await backfillDemoIdentities();
       await refreshEntries();
@@ -155,8 +155,8 @@ export function useRivalHubActions({ entries, refreshEntries, refreshEventRecord
       await runRivalHubBatchInputs(localEntries.map((entry) => ({ kind: "local", entry })), context);
     } catch (error) {
       setNotice(`扫描本地 Demo 失败：${error instanceof Error ? error.message : String(error)}`);
-    }
-  }, [importing, runRivalHubBatchInputs]);
+    } finally { release(); }
+  }, [runRivalHubBatchInputs, tryBegin]);
 
   const stopRivalHubBatch = useCallback(() => {
     batchStopRequested.current = true;
@@ -166,13 +166,15 @@ export function useRivalHubActions({ entries, refreshEntries, refreshEventRecord
   }, []);
 
   const pickRivalHubFiles = useCallback(async (context: RivalHubImportContext) => {
+    const release = tryBegin();
+    if (!release) return;
     try {
-      const started = await importRivalHubFromNativePicker(context, importOnlineFiles);
+      const started = await importRivalHubFromNativePicker(context, runRivalHubBatchInputs);
       if (!started) setNotice(null);
     } catch (error) {
       setNotice(`选择 RivalHub Demo 失败：${error instanceof Error ? error.message : String(error)}`);
-    }
-  }, [importOnlineFiles]);
+    } finally { release(); }
+  }, [runRivalHubBatchInputs, tryBegin]);
 
   const selectRivalHubBatchTarget = useCallback((itemId: string, matchMapId: string) => {
     const resolve = batchTargetResolvers.current.get(itemId);
