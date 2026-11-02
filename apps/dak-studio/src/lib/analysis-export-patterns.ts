@@ -110,13 +110,14 @@ export function buildPatternsAnalysisResult(
 export function buildPatternReportAnalysisResult(
   source: AnalysisExportSource,
   rows: import("@cs2dak/analytics").ObservedMapPoolRow[],
-  report: string,
+  clusters: TacticalCluster[],
   notes: Record<string, string>,
   hasOwn: boolean,
+  subjectTeam: string | null,
 ) {
   return captureAnalysisResult({
     ...source,
-    title: "对手备战报告",
+    title: subjectTeam ? `对手备战报告 · ${subjectTeam}` : "对手备战报告",
     page: "patterns",
     conditions: [
       ...source.conditions,
@@ -160,14 +161,45 @@ export function buildPatternReportAnalysisResult(
           note: notes[row.mapName] ?? "",
         })),
       },
-      {
-        title: "备战报告文字",
-        text: [report],
-        columns: [],
-        rows: [],
-        sampleDescription: "当前页面报告",
-        limitations: [],
-      },
+      ...[...new Set(clusters.map((cluster) => cluster.mapName))]
+        .sort()
+        .flatMap((map) =>
+          (["t", "ct"] as const).map((side): AnalysisResultSection => {
+            const patterns = clusters
+              .filter(
+                (cluster) => cluster.mapName === map && cluster.side === side,
+              )
+              .slice(0, 5);
+            return {
+              title: `${map} · ${side === "t" ? "T 方" : "CT 方"}`,
+              text: patterns.length ? [] : ["暂无数据"],
+              columns: [
+                { key: "pattern", label: "模式", unit: null },
+                { key: "rounds", label: "回合", unit: null },
+                { key: "winRate", label: "胜率", unit: "%" },
+              ],
+              rows: patterns.map((cluster) => ({
+                pattern: formatTacticalClusterName(cluster),
+                rounds: cluster.roundCount,
+                winRate: cluster.winRatePercent,
+              })),
+              sampleDescription: "当前聚类结果，最多五种模式",
+              limitations: [],
+            };
+          }),
+        ),
+      ...(clusters.length === 0
+        ? [
+            {
+              title: "聚类结果",
+              text: ["暂无聚类数据。"],
+              columns: [],
+              rows: [],
+              sampleDescription: "当前聚类结果",
+              limitations: [],
+            },
+          ]
+        : []),
     ],
     limitations: ["人工备注明确标注；图像未包含。"],
   });

@@ -1,3 +1,4 @@
+import { ANALYSIS_PAGE_LABELS } from "../lib/analysis-display-labels";
 import { useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { AnalysisFocus } from "../lib/analysis-context";
@@ -30,7 +31,7 @@ const shortcuts: Record<AnalysisTheme, [AnalysisPageId, string][]> = {
     ["team", "队伍"],
     ["event-analysis", "赛事"],
   ],
-  engagement: [["duel", "交战与配合"]],
+  engagement: [["duel", ANALYSIS_PAGE_LABELS.duel]],
   economy: [["economy", "经济"]],
   utility: [
     ["utility", "道具分析"],
@@ -68,7 +69,7 @@ export function AnalysisView({
     [pending, setPending] = useState(false);
   const inFlight = useRef(false);
   const request = useRef(0);
-  const defaultTitle = `${focus.kind === "aggregate" ? "整体范围" : focus.kind === "team" ? focus.teamName : focus.label} · ${page}`;
+  const defaultTitle = `${focus.kind === "aggregate" ? "整体范围" : focus.kind === "team" ? focus.teamName : focus.label} · ${ANALYSIS_PAGE_LABELS[page]}`;
   const save = async (copy: boolean) => {
     if (inFlight.current || loading) return;
     inFlight.current = true;
@@ -137,6 +138,7 @@ export function AnalysisView({
           <label>
             标题{" "}
             <input
+              className="stu-input"
               disabled={loading || pending}
               value={title}
               onChange={(e) => setTitle(e.target.value)}

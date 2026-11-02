@@ -1,5 +1,4 @@
 import { TACTICAL_FACT_VERSION, type TacticalCluster, type TacticalRoundFact } from "@cs2dak/tactics";
-import { formatTacticalClusterName as autoName } from "@cs2dak/presentation";
 import { displayTeamName } from "./identity";
 
 export function patternFingerprint(cluster: TacticalCluster): string {
@@ -46,18 +45,4 @@ export function isCurrentTacticalRoundFact(row: TacticalRoundFact): boolean {
     typeof event.calloutLabel === "string" &&
     (event.kind === "forward" || event.kind === "deep")
   );
-}
-
-export function buildAntiStratMarkdown(clusters: TacticalCluster[], myTeamName: string | null): string {
-  const mapPool = [...new Set(clusters.map((c) => c.mapName))].sort();
-  const sections = mapPool.map((map) => {
-    const mapClusters = clusters.filter((c) => c.mapName === map);
-    const tPatterns = mapClusters.filter((c) => c.side === "t").slice(0, 5);
-    const ctPatterns = mapClusters.filter((c) => c.side === "ct").slice(0, 5);
-    const fmt = (cs: TacticalCluster[]) =>
-      cs.map((c) => `- ${autoName(c)}（${c.roundCount} 回合，胜率 ${c.winRatePercent?.toFixed(1) ?? "—"}%）`).join("\n");
-    return `## ${map}\n\n### T 方\n${fmt(tPatterns) || "暂无数据"}\n\n### CT 方\n${fmt(ctPatterns) || "暂无数据"}`;
-  });
-  const header = `# 备战报告${myTeamName ? `（${myTeamName}）` : ""}\n`;
-  return sections.length > 0 ? `${header}\n${sections.join("\n\n")}` : `${header}\n暂无聚类数据。`;
 }

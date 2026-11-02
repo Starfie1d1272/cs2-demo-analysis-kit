@@ -12,7 +12,7 @@ import { STUDIO_TABLE_CLASSES } from "../../components/table-styles";
 import type { StudioDemoEntry } from "../../lib/demo-entry";
 import type { AnalysisContext } from "../../lib/analysis-context";
 import { listPatternNames, savePatternName } from "../../lib/pattern-names";
-import { buildAntiStratMarkdown, patternFingerprint } from "../../lib/pattern-observations";
+import { patternFingerprint } from "../../lib/pattern-observations";
 import { getObservedMapPool } from "../../lib/queries/spatial-queries";
 import { PatternExplorer } from "../coach/PatternExplorer";
 import { MapPoolTable } from "../coach/MapPoolTable";
@@ -48,7 +48,6 @@ export function PatternsTheme({ exportSource, section, explorerState, onExplorer
       .catch((error) => { if (!cancelled) setNamesError(error instanceof Error ? error.message : String(error)); });
     return () => { cancelled = true; };
   }, []);
-  const antiMarkdown = useMemo(() => buildAntiStratMarkdown(clusters, subjectTeam), [clusters, subjectTeam]);
   return <>
     {namesError && <div className="stu-notice" role="alert">模式命名读取失败：{namesError}</div>}
       {section === "patterns" && (
@@ -80,16 +79,12 @@ export function PatternsTheme({ exportSource, section, explorerState, onExplorer
       )}
       {section === "anti" && (
         <>
-          {exportSource && mapPoolNotes && analysisContext.roles.opponent && <AnalysisExportButtons capture={() => buildPatternReportAnalysisResult(exportSource, mapPool, antiMarkdown, mapPoolNotes, Boolean(analysisContext.roles.beneficiary))} />}
+          {exportSource && mapPoolNotes && analysisContext.roles.opponent && <AnalysisExportButtons capture={() => buildPatternReportAnalysisResult(exportSource, mapPool, clusters, mapPoolNotes, Boolean(analysisContext.roles.beneficiary), subjectTeam)} />}
           <MapPoolTable notes={mapPoolNotes ?? {}} onNotesChange={(mapName, note) => setMapPoolNotes(previous => ({ ...previous, [mapName]: note }))}
             rows={mapPool}
             hasOwn={Boolean(analysisContext.roles.beneficiary)}
             hasOpponent={Boolean(analysisContext.roles.opponent)}
           />
-          <details className="stu-card stu-coach-report-details">
-            <summary>备战报告 Markdown</summary>
-            <textarea className="stu-coach-report" readOnly value={antiMarkdown} />
-          </details>
         </>
       )}
   </>;
