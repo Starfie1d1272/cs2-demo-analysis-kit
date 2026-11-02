@@ -288,7 +288,7 @@ export function RadarFieldCanvas({ field, baseline = null, map, state, onStateCh
         <div className="dak-heatmap-legend">
           <span>
             {field.scope.kind === "team" ? field.scope.team : "赛事地图基线"}
-            <small> · {field.scope.roundCount} 长枪局{isDiff ? ` vs 赛事基线 ${baseline!.scope.roundCount}` : ""}</small>
+            <small> · {field.scope.roundCount} 回合{isDiff ? ` vs 赛事基线 ${baseline!.scope.roundCount}` : ""}</small>
           </span>
           <span className="dak-heatmap-legend-scale">
             <i className="dak-legend-radar-field" />

@@ -14,7 +14,8 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { DataTable, EmptyState, type DataTableColumn } from "@cs2dak/react";
 import type { TeamOverviewModel } from "@cs2dak/presentation";
 import { getTeamOverview } from "../lib/queries/team-queries";
-import { displayTeamName, type IdentityOptions } from "../lib/identity";
+import { type IdentityOptions } from "../lib/identity";
+import { displayTeamName } from "../lib/team-identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 
 type TeamViewAction = "duel" | "economy" | "utility" | "opening" | "control" | "patterns" | "roles";

@@ -8,7 +8,7 @@ import { assertCurrentFacts } from "../facts-readiness";
 import { getFactsStore } from "../facts-store";
 import type { DoubleAwpAnalysis, PlayerMapRoleEvidence, PlayerMapRoleProfile, PlayerMapPoolRow, RoleDeclaration, TeamMapRoleMatrix, TeamMapResponsibilityEvidence } from "@cs2dak/tactics";
 import { entryDate, matchIdForEntry, type StudioDemoEntry } from "../demo-entry";
-import { displayTeamName } from "../identity";
+import { displayTeamName } from "../team-identity";
 
 import type { IdentityOptions } from "../identity";
 import { keyOf, missingFactsError } from "./query-scope";

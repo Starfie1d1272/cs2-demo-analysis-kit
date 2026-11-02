@@ -11,10 +11,10 @@ import {
   renamePlayer,
   setTeamRename,
   splitIdentity,
-  teamRenameGroups,
   undoLastAction,
   type IdentityStoreState
 } from "../lib/identity";
+import { teamRenameGroups } from "../lib/team-identity";
 import type { StudioDemoEntry } from "../lib/demo-entry";
 import { migrateRoleDeclarationsForIdentity } from "../lib/role-declarations";
 

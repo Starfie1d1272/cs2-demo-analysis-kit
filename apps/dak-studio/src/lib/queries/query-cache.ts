@@ -1,6 +1,6 @@
 import { getStorage } from "../storage";
+import { CACHE_VERSION } from "./cache-version";
 
-export const CACHE_VERSION = 13;
 const DIRTY = "__analysis_dirty__";
 const buckets = new Set<Map<string, Promise<unknown>>>();
 let generation = 0;

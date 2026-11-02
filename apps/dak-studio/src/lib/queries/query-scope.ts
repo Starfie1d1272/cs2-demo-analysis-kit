@@ -1,8 +1,8 @@
 import { type TournamentInsights, type DuelInsightsFacts } from "@cs2dak/analytics";
-import { CACHE_VERSION } from "./query-cache";
+import { CACHE_VERSION } from "./cache-version";
 import { FACTS_REVISION } from "../analysis-manifest";
 import { entryDate, matchIdForEntry, type StudioDemoEntry } from "../demo-entry";
-import { originalTeamNamesForDisplay } from "../identity";
+import { originalTeamNamesForDisplay } from "../team-identity";
 
 export function seasonCacheKey(
   entries: StudioDemoEntry[],

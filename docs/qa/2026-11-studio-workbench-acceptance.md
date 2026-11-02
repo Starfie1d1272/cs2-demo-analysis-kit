@@ -6,6 +6,19 @@
 
 用户明确：除比赛 format/ZIP 资料库外，DAK 旧版兼容不再作为验收要求；不恢复旧 Prep 页面、旧手工入口或旧导出，保留新统一导出。旧数据不主动物理清除。下文此前执行的 Prep、材料单编辑和旧资料迁移记录是当时的历史观察，不要求恢复这些入口或将其通过作为关闭门槛；W09/W11 正在按新范围删除或收口，最终合流后必须基于实际保留的新入口重新跑相应旅程。比赛 format/ZIP、基础身份与当前产品数据仍需按实际合同核验。
 
+## 最终合流后复验（2026-11-02 UTC）
+
+最终产品基线 `98c3d50e3b52e93e6908379651fcd6efda0526a3`（#180–#185），隔离 Chromium 151、1280×800，fresh Vite 服务；没有旧用户库。以下是新范围内的实际操作，不依赖旧 Prep 页面或旧导出。
+
+- 空库：新建笔记并输入后切换新建战术，取消放弃时笔记和内容保留且仅一个编辑器；确认后仅一个战术编辑器。纯文字战术讲解显示正文。新建战术、笔记、比赛单，导出 Markdown、打印按钮实际触发浏览器打印调用，打印媒体 PDF 生成，重载后均在资料页。A4 一页 PDF 的文本包含正文且无编辑按钮，尚未实机打印或目视检验复杂分页。
+- 真实 B 库：导入仓库 Nuke + cohort 三个 ZIP 共四场。实际从管理进入分析、导出经济 JSON（4 个 source），另在单场库保存经济分析、重载打开并另存，实际下载 JSON/Markdown；新增第二场后 JSON 的 SHA-256 仍为 `d61663f9674709515117415daff758c3580c9ec5667cec9db4de1865584da4ef`。进入材料创建 Nuke R1 证据笔记和战术，加入比赛单；讲解项、Markdown 和打印媒体 PDF 都显示来源及“来源和已知版本一致”，重载后材料存在。六分析主题和 Nuke 1:13/14 回合重新打开。另分两次导入标记 W19-A/W19-B，范围筛选分别为 1/4 和 3/4。
+- 零帧：在 Nuke 临时 ZIP 副本将 R1 frameCount 设 0 并清空玩家帧；打开 R1 证据后保持 R1 详情并显示本回合无可播放回放，不再跳到 R2。旧场隔离：在另一隔离库仅将 Inferno factsRevision 改成模拟旧值；选中当前 Nuke 的 soulfly，交火提示 1/2 可用并出现个人记录。浏览器模拟 IndexedDB 全部打开失败时显示资料读取失败及“比赛资料暂不可用”。
+- 数据保留：隔离 IndexedDB 中的 Nuke demo 元数据和 ZIP blob 重载前后 key 一致；写入的合成旧 playlist 与笔记哨兵重载后仍在。旧记录没有迁移或物理清除；这不是承诺旧页面兼容。模拟查询延迟后 invalidation 返回 AbortError 且清空旧 bucket；两场范围编辑的编辑器始终为一个。
+- #183 主线已收范围编辑器 key 修复；本 PR 不再重复该接线。#184 删除 Prep 兼容模块、旧页面和旧报告导出；#185 收口分析文案。旧版历史记录保留在下文，不作为当前功能通过证明。最终 main 的[官方 CI](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/actions/runs/41423559464)四项成功；本分支改动另以自身 CI 核验。
+- 最终源码删除表：旧 `prep-items.ts` / `material-data-migration.ts` / `PrepItemsPanel.tsx` → 新 StudyNote/战术与比赛单的各自 App owner（#184）；旧单场报告下载 → 统一 AnalysisResult 导出（#184）；失效通用基线选择 → 主题实际支持的条件和真实来源（#185）；旧 playlist 数据不主动清除。源码搜索未发现旧 PrepItem 入口及旧单场 Markdown 报告 helper；`storage-overview` 仍列旧 namespace 以保留数据，属于允许的数据保留。
+- 本 PR 将纯队名映射/分组从持久化 `identity.ts` 移到 `team-identity.ts`，将缓存版本常量移入纯模块并迁完仓内调用方；esbuild 输入闭包未含 storage/worker/pipeline/query-cache，别名反查两原名与真实 Nuke 队伍改名后分析/重载通过。覆盖场全部经济条件将公共组件“长枪局”改为“回合”，长枪/全部分别显示 4/14 回合；有 React patch Changeset、真实 tarball 消费和包边界验证。真实 Nuke 的 Aurora 改名 W19 Aurora 后，队伍分析仍显示 13:1，重载身份管理保留改名。
+
+
 ## 环境与证据
 
 - Linux x86_64 云环境，5 vCPU（AMD EPYC 9V74），约 17 GiB 可用内存；Node 24.19.0/pnpm 使用仓库 activate 脚本，Vite 开发服务，Chromium 151 headless，1280×800；隔离浏览器 context/IndexedDB，没有接触现有用户库。无显示服务器及可用桌面设备，本次没有原生壳、Windows/macOS、原生壳备份/恢复或实际打印机结果。
@@ -35,11 +48,11 @@
 - 源码 `storage-overview.ts` 的用户 namespace 包含 training-focus、prep-items、practice-lineups、role-declarations、study-notes、coach-playbook、coach-assignments、coach-match-sheets、saved-analyses；cache 名单由 facts/derived cache 加 cache/meta 构成。另以临时隔离目录直接运行 Linux Python `StudioApi` 后端：九类各写一条模拟记录，清除 9 字节临时 cache 后逐类一致；备份后删除九条及真实 Nuke ZIP，恢复后九类各一条和 ZIP 字节一致（SHA-256 `e9405245cd0ba55d4427bb5890874b0b70b19475790248d963734b6cd93e4d21`）。这是后端调用、模拟用户资料，不是 pywebview 壳或 Windows/macOS 实机验证。
 - 旧 playlist 迁移源码先写后删、冲突时另分 ID、末尾写 marker；普通 prep list 仅读取排序。隔离两场库中将 Inferno 一场的 factsRevision 改为模拟旧值并重载，选手列表提示 1/2 场可用且仍列出 Nuke 选手；选中当前 Nuke 的 soulfly 后切交火，仍提示 1/2 可用却显示“无法解析该选手的身份”、0 条证据；不相关旧场阻断个人交火，需分析查询 owner 修复。其余个人主题未覆盖。临时内存 RecordStore 注入首次复制失败与首次删除失败，重试后旧记录删除、同 ID 不同内容两条保留、marker 写入；重复迁移和普通 list 无写入。另在隔离 IndexedDB 写入模拟旧 playlist 与同 ID 不同内容的现存 prep，重载应用后旧记录清空、两条新记录及 marker 存在，再次重载仍为两条。此为模拟故障和合成旧记录，旧版本真实资料及平台恢复尚未验。
 - 浏览器导入仓库 `sample-pro-finals-2026.zip`（7,585,021 字节解压内容，7 图）后赛事目录显示两系列、7/7 图关联；IEM 决赛 BO5、FURIA 1:3 Vitality 和四图可见；展开 BP 后显示 Dust2/Ancient ban、Mirage/Inferno/Nuke/Overpass pick 与 Anubis decider。另一阶段实操未完成。另可见导入赛事资源包及赛事资源制作器；数据管理中的身份、资产和资料库维护均可打开，维护页显示备份入口，资产页显示 .tri 资产。它们只是入口检查；赛事/series/BP、RivalHub 实际导入、批量标签/修复、身份修改、更新、原始 demo/进游戏的逐项流程未验。canonical/RR/PRISM 跨版本同语料逐项对照未完成。W20 缺姿态保持缺失、W21 分母和日期修正应按 #157/#161 语义核实，不能为了旧错误数值回退。
-- 单 Nuke 文件从选择到显示约 15 秒（粗观察）。同一隔离 Chromium、1 场/593,751 字节：空库首次工作台 1,496ms，导入后首次/再次打开比赛 1,074/115ms，返回工作台 64/53ms；两次比赛进入时 JS heap 约 242/227 MB（非进程总内存、GC 可波动）。这是一次开发服务器粗测，不作 50 场或长期性能结论。1280×800 页面可显示导航与主要内容；键盘 Tab 实际依次进入四主导航、数据管理、全部比赛和导入；阶段地图标记在列表中可见。返回/关键按钮和切页焦点的完整键盘路径、复杂打印裁切未验。未验证首页无全量加载或模型缓存长期行为。
+- 单 Nuke 文件从选择到显示约 15 秒（粗观察）。同一隔离 Chromium、1 场/593,751 字节：空库首次工作台 1,496ms，导入后首次/再次打开比赛 1,074/115ms，返回工作台 64/53ms；两次比赛进入时 JS heap 约 242/227 MB（非进程总内存、GC 可波动）。最终代码另一轮单场粗测：空库首页 2,268ms，首次/再次比赛 1,622/107ms，返回首页 56/70ms；JS heap 约 229/239 MB（环境并发时测量）。这是一次开发服务器粗测，不作 50 场或长期性能结论。1280×800 页面可显示导航与主要内容；键盘 Tab 实际依次进入四主导航、数据管理、全部比赛和导入；阶段地图标记在列表中可见。返回/关键按钮和切页焦点的完整键盘路径、复杂打印裁切未验。未验证首页无全量加载或模型缓存长期行为。
 
 ## 验收中修复的直接阻塞
 
-原 main 在分析范围编辑中，scope editor 与 AnalysisView 及主题页面使用相同 React sibling key；每次修改上下文可把范围编辑器从 1 个累积到多个，复选框无法稳定选择。`App.tsx` 为 scope 和 analysis 栏分配独立、稳定的 frame 派生 key。修后以同样两场数据切 focus、地图、日期、选择与排除，编辑器始终为 1 个，最终空范围为 0/2；`pnpm typecheck` 和 Studio build 成功。此为 UI 接线修复，没有改变公共包合同。
+原 main 在分析范围编辑中，scope editor 与 AnalysisView 及主题页面使用相同 React sibling key；每次修改上下文可把范围编辑器从 1 个累积到多个，复选框无法稳定选择。该问题后由 #183 在主线为 scope 编辑器分配独立 key；本分支未保留重复接线。修后以同样两场数据切 focus、地图、日期、选择与排除，编辑器始终为 1 个，最终空范围为 0/2；`pnpm typecheck` 和 Studio build 成功。此为 UI 接线修复，没有改变公共包合同。
 
 ## E 架构删除与新 owner（静态证据，部分闭合）
 
@@ -57,4 +70,4 @@
 | 导航镜像及旧证据 fallback | App 页面帧与单对象 `OpenEvidenceRequest` | [#158](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/158)、[#164](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/164)；`sourceKey` 仍作为 anchor 合法存在，前缀猜 tab/所有 fallback 尚需逐项核查 |
 | 公共 break | presentation/react 等各自 major Changeset | `.changeset/w03-controlled-state.md`、迁移指南；本次真实 tarball 消费通过，不代表未知外部调用方已迁移 |
 
-公共包源码检索未命中 AnalysisContext、MaterialRef、RecordStore、STUDIO_TABLE_CLASSES、initialTarget 或 initialViewState；query 目录未命中 view import。这是针对名称的静态检查，不证明所有潜在耦合已排除。已发现边界未闭合：`queries/query-scope.ts` 为 `originalTeamNamesForDisplay` 导入 `identity.ts`，后者模块顶层调用 `getStorage().records(...)`；纯查询读取队名会加载 storage，需原 owner 拆分纯身份变换与 I/O。源码搜索未见 CoachSettings、sourceKey 前缀猜 tab，series 源码未见材料/教练设置引用；其他纯模块依赖、所有 query 算法唯一性、来源回退与所有受控调用方仍需逐项验证。因此架构表尚未闭合。
+公共包源码检索未命中 AnalysisContext、MaterialRef、RecordStore、STUDIO_TABLE_CLASSES、initialTarget 或 initialViewState；query 目录未命中 view import。这是针对名称的静态检查，不证明所有潜在耦合已排除。本轮将队名纯映射/分组迁至 `team-identity.ts`，查询缓存版本常量迁至纯模块；原 `identity.ts` 中的旧函数已删除并迁完调用方，纯模块 bundle 未引入 storage、worker、pipeline 或 query-cache。源码搜索未见 CoachSettings、sourceKey 前缀猜 tab，series 源码未见材料/教练设置引用；其他纯模块依赖、所有 query 算法唯一性、来源回退与所有受控调用方仍需逐项验证。因此架构表尚未闭合。

@@ -269,8 +269,8 @@ async function isolateLegacyProjectionAliases(): Promise<void> {
         const required = edits.flatMap(row => [`entry:${row.id}`, `match:${row.analysisMatchId}`]);
         if (required.some(key => !keys.includes(key))) return required;
         await withAnalysisQueryInvalidation(() => withImportCheckpoint(getStorage(), rows.map(row => row.id), [sharedId], async () => {
-          // Saved PrepItems cannot identify which legacy alias they referred to.
-          // Permanently reserve the ambiguous key rather than rebinding it later.
+          // A shared legacy match key cannot safely identify one ZIP.
+          // Reserve the ambiguous key rather than rebinding it later.
           await retiredMatchIds.put(sharedId, { entryIds: [...new Set([...(previous?.entryIds ?? []), ...rows.map(row => row.id)])] });
           for (const row of edits) await saveDemoEntry(row);
         }));

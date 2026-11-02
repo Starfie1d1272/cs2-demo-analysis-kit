@@ -3,7 +3,7 @@ import {
   duelClassificationLabel,
 } from "@cs2dak/presentation";
 import { DUEL_TAB_LABELS, EVIDENCE_FILTERS } from "./analysis-display-labels";
-import { displayTeamName } from "./identity";
+import { displayTeamName } from "./team-identity";
 import type { DuelInsightsModel } from "@cs2dak/contract";
 import type { DuelPageState } from "./analysis-theme-state";
 import { filteredDuelRows, groupDuelMechanics } from "./duel-export-projection";

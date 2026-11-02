@@ -10,7 +10,8 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { SeasonLeaderboardModel } from "@cs2dak/presentation";
 import { SeasonLeaderboard } from "@cs2dak/react";
 import { getSeasonSummary } from "../lib/queries/season-queries";
-import { displayTeamName, type IdentityOptions } from "../lib/identity";
+import { type IdentityOptions } from "../lib/identity";
+import { displayTeamName } from "../lib/team-identity";
 import type { StudioDemoEntry } from "../lib/demo-entry";
 import { EmptyState } from "@cs2dak/react";
 
