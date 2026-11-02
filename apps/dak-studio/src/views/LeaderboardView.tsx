@@ -11,7 +11,6 @@ import type { StudioDemoEntry } from "../lib/demo-entry";
 import { EmptyState } from "@cs2dak/react";
 
 export interface LeaderboardViewProps {
-  activity: { importing: boolean; notice: string | null };
   onCapabilityRepair: (action: CapabilityRepairAction) => void;
   state: AnalysisPageState;
   onStateChange: (state: AnalysisPageState) => void;
@@ -24,8 +23,7 @@ export interface LeaderboardViewProps {
   embedded?: boolean;
 }
 
-export function LeaderboardView({ activity, onCapabilityRepair, state, onStateChange, allEntries, entries, selectedTeam = null, onPlayerClick, onGoLibrary, identityOptions, embedded = false }: LeaderboardViewProps) {
-  const updateFailed = !activity.importing && !!activity.notice && /重建|导入|重新导出/.test(activity.notice) && /失败/.test(activity.notice);
+export function LeaderboardView({ onCapabilityRepair, state, onStateChange, allEntries, entries, selectedTeam = null, onPlayerClick, onGoLibrary, identityOptions, embedded = false }: LeaderboardViewProps) {
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const teamEntries = useMemo(() => selectedTeam ? entries.filter(entry => [entry.meta.teamAName, entry.meta.teamBName].some(name => displayTeamName(name, identityOptions?.teamRenames) === selectedTeam)) : entries, [entries, selectedTeam, identityOptions?.teamRenames]);
   const capability = useCapability(teamEntries, "season");
@@ -70,11 +68,11 @@ export function LeaderboardView({ activity, onCapabilityRepair, state, onStateCh
       </header>
       {capability.availability && <CapabilityBar availability={capability.availability} onRepair={onCapabilityRepair} />}
       {capability.error && <p role="alert">排行能力读取失败：{capability.error} <button type="button" className="stu-button-sm" onClick={capability.retry}>重试</button></p>}
-      {model && (error || capability.error || activity.importing || updateFailed || analysis.status !== "ready" || snapshot?.generation !== analysis.generation || snapshot.sample !== JSON.stringify(eligible?.map(entry => entry.id))) && <p role="status">{error || capability.error || updateFailed || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
+      {model && (error || capability.error || analysis.status !== "ready" || snapshot?.generation !== analysis.generation || snapshot.sample !== JSON.stringify(eligible?.map(entry => entry.id))) && <p role="status">{error || capability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && eligible?.length === 0 ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}
       {error && !model ? (
         <EmptyState variant="error" title="聚合失败" hint={error} />
       ) : capability.error && !model ? null : entries.length === 0 || (eligible?.length === 0 && !model) ? (
-        <EmptyState variant="insufficient" title="聚合范围为空" hint="当前过滤条件没有命中任何 demo，请调整聚合范围。" />
+        <EmptyState variant="insufficient" title={entries.length === 0 ? "聚合范围为空" : "没有可用排行样本"} hint="请调整范围或查看能力限制。" />
       ) : !model ? (
         <div className="stu-loading">聚合 {entries.length} 场 demo，构建排行榜…</div>
       ) : (

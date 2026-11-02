@@ -30,7 +30,6 @@ const ROSTER_COLUMNS: DataTableColumn<TeamOverviewModel["roster"][number]>[] = [
 ];
 
 export function TeamView({
-  activity,
   onCapabilityRepair,
   entries,
   selectedTeam,
@@ -43,7 +42,6 @@ export function TeamView({
   onGoLibrary,
   identityOptions,
 }: {
-  activity: { importing: boolean; notice: string | null };
   onCapabilityRepair: (action: CapabilityRepairAction) => void;
   entries: StudioDemoEntry[];
   selectedTeam: string | null;
@@ -73,7 +71,6 @@ export function TeamView({
       .sort((a, b) => b.matches - a.matches || a.name.localeCompare(b.name));
   }, [entries, identityOptions?.version]);
   const activeTeam = selectedTeam && teams.some((team) => team.name === selectedTeam) ? selectedTeam : null;
-  const updateFailed = !activity.importing && !!activity.notice && /重建|导入|重新导出/.test(activity.notice) && /失败/.test(activity.notice);
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const teamEntries = useMemo(() => activeTeam ? entries.filter(entry => [entry.meta.teamAName, entry.meta.teamBName].some(name => displayTeamName(name, identityOptions?.teamRenames) === activeTeam)) : [], [entries, activeTeam, identityOptions?.teamRenames]);
   const overviewCapability = useCapability(teamEntries, "team-comparison");
@@ -135,14 +132,15 @@ export function TeamView({
                   <section className="stu-card" id="analysis-comparison"><h3>队伍对比</h3>
             {comparisonCapability.availability && <CapabilityBar availability={comparisonCapability.availability} onRepair={onCapabilityRepair} />}
             {comparisonCapability.error && <p role="alert">对比能力读取失败：{comparisonCapability.error} <button type="button" className="stu-button-sm" onClick={comparisonCapability.retry}>重试</button></p>}
-            {comparison && (comparisonError || comparisonCapability.error || activity.importing || updateFailed || analysis.status !== "ready" || comparisonSnapshot?.generation !== analysis.generation || comparisonSnapshot.sample !== JSON.stringify(comparisonEntries?.map(entry => entry.id))) && <p role="status">{comparisonError || comparisonCapability.error || updateFailed || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
+            {comparison && (comparisonError || comparisonCapability.error || analysis.status !== "ready" || comparisonSnapshot?.generation !== analysis.generation || comparisonSnapshot.sample !== JSON.stringify(comparisonEntries?.map(entry => entry.id))) && <p role="status">{comparisonError || comparisonCapability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && comparisonEntries?.length === 0 ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}
             <label>对比队伍 <select value={state.compareTeamName ?? ""} onChange={event => onStateChange({ ...state, compareTeamName: event.target.value || null })}><option value="">不比较</option>{teams.filter(team => team.name !== activeTeam).map(team => <option key={team.name} value={team.name}>{team.name} · {team.matches} 场</option>)}</select></label>
+            {state.compareTeamName && comparisonEntries?.length === 0 && !comparison && <p>当前没有可用对比样本。</p>}
             {comparisonError && <div role="alert"><span>队伍对比加载失败：{comparisonError}</span> <button type="button" className="stu-button-sm" onClick={() => setComparisonRetry(value => value + 1)}>重试对比</button></div>}
             {state.compareTeamName && !comparison && !comparisonError && !comparisonCapability.error && comparisonEntries?.length !== 0 && <div className="stu-loading">加载队伍对比…</div>}
             {comparison && <TeamComparisonPanel model={comparison} onSelectPair={(a, b) => { if (a !== activeTeam) onSelectTeam(a); else onStateChange({ ...state, compareTeamName: b }); }} onOpenMatch={matchId => { const entry = entries.find(item => matchIdForEntry(item) === matchId); if (entry) onOpenMatch(entry.id); }} />}
           </section>
       )}
-      {overview && (error || overviewCapability.error || activity.importing || updateFailed || analysis.status !== "ready" || overviewSnapshot?.generation !== analysis.generation || overviewSnapshot.sample !== JSON.stringify(overviewEntries?.map(entry => entry.id))) && <p role="status">{error || overviewCapability.error || updateFailed || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
+      {overview && (error || overviewCapability.error || analysis.status !== "ready" || overviewSnapshot?.generation !== analysis.generation || overviewSnapshot.sample !== JSON.stringify(overviewEntries?.map(entry => entry.id))) && <p role="status">{error || overviewCapability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && overviewEntries?.length === 0 ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}
       {error && <EmptyState variant="error" title="队伍总览不可用" hint={error} />}
       {activeTeam && overviewEntries?.length === 0 && !overview && <EmptyState variant="insufficient" title="没有可用队伍数据" hint="请查看上方限制和修复入口。" />}
       {!error && !overviewCapability.error && overviewEntries?.length !== 0 && activeTeam && !overview && <div className="stu-loading">聚合队伍事实…</div>}

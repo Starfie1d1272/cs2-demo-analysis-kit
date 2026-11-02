@@ -23,7 +23,6 @@ import { EvidenceActions } from "../components/EvidenceActions";
 import type { OpenEvidence } from "../lib/evidence-continuation";
 
 export interface PlayersViewProps {
-  activity: { importing: boolean; notice: string | null };
   onCapabilityRepair: (action: CapabilityRepairAction) => void;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
@@ -64,7 +63,6 @@ function formatMetric(value: number | null, format: string): string {
 }
 
 export function PlayersView({
-  activity,
   onCapabilityRepair,
   allEntries,
   entries,
@@ -83,7 +81,6 @@ export function PlayersView({
   onOpenMaterials,
   onOpenOpening, onOpenRoles
 }: PlayersViewProps) {
-  const updateFailed = !activity.importing && !!activity.notice && /重建|导入|重新导出/.test(activity.notice) && /失败/.test(activity.notice);
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const playerScope = useMemo(() => selectedPlayerKey ? {
     playerKeys: [selectedPlayerKey],
@@ -143,10 +140,10 @@ export function PlayersView({
   }, [orderedProfiles, selectedPlayerKey]);
 
   useEffect(() => {
-    if (!onPageReady || (!profiles && !error && entries.length > 0)) return;
+    if (!onPageReady || (!profiles && !error && !seasonCapability.error && seasonEntries?.length !== 0 && entries.length > 0)) return;
     if (selected && (profileTab === "overview" || profileTab === "utility") && !insights && !detailsError && !detailsCapability.error && detailsEntries?.length !== 0) return;
     onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
-  }, [profiles, error, insights, detailsError, detailsCapability.error, detailsEntries, entries.length, onPageReady, selected, profileTab]);
+  }, [profiles, error, seasonCapability.error, seasonEntries, insights, detailsError, detailsCapability.error, detailsEntries, entries.length, onPageReady, selected, profileTab]);
 
   const compare = useMemo(() => {
     if (!profiles || !compareKey || compareKey === selected?.playerKey) return null;
@@ -215,7 +212,7 @@ export function PlayersView({
     return (
       <div className="stu-view">
         {seasonCapability.availability && <CapabilityBar availability={seasonCapability.availability} onRepair={onCapabilityRepair} />}
-        {profiles && (error || seasonCapability.error || activity.importing || updateFailed || analysis.status !== "ready" || profileSnapshot?.generation !== analysis.generation || profileSnapshot.sample !== JSON.stringify(seasonEntries?.map(entry => entry.id))) && <p role="status">{error || seasonCapability.error || updateFailed || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
+        {profiles && (error || seasonCapability.error || analysis.status !== "ready" || profileSnapshot?.generation !== analysis.generation || profileSnapshot.sample !== JSON.stringify(seasonEntries?.map(entry => entry.id))) && <p role="status">{error || seasonCapability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && seasonEntries?.length === 0 ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}
         <header className="stu-view-header">
           <div>
             <h1>选手档案</h1>
@@ -269,9 +266,10 @@ export function PlayersView({
     <div className="stu-view">
       {seasonCapability.availability && <CapabilityBar availability={seasonCapability.availability} onRepair={onCapabilityRepair} />}
       {detailsCapability.availability && <CapabilityBar availability={detailsCapability.availability} onRepair={onCapabilityRepair} />}
+      {analysis.status === "ready" && detailsEntries?.length === 0 && !details && <p>当前选手没有可用详情样本，请查看能力限制。</p>}
       {detailsCapability.error && <p role="alert">选手详情能力读取失败：{detailsCapability.error} <button type="button" className="stu-button-sm" onClick={detailsCapability.retry}>重试</button></p>}
       {seasonCapability.error && <p role="alert">选手能力读取失败：{seasonCapability.error} <button type="button" className="stu-button-sm" onClick={seasonCapability.retry}>重试</button></p>}
-      {(error || seasonCapability.error || detailsError || detailsCapability.error || activity.importing || updateFailed || analysis.status !== "ready" || profileSnapshot?.generation !== analysis.generation || (details && detailSnapshot?.generation !== analysis.generation) || profileSnapshot?.sample !== JSON.stringify(seasonEntries?.map(entry => entry.id)) || (details && detailSnapshot?.sample !== JSON.stringify(detailsEntries?.map(entry => entry.id)))) && <p role="status">{error || seasonCapability.error || detailsError || detailsCapability.error || updateFailed || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
+      {(error || seasonCapability.error || detailsError || detailsCapability.error || analysis.status !== "ready" || profileSnapshot?.generation !== analysis.generation || (details && detailSnapshot?.generation !== analysis.generation) || profileSnapshot?.sample !== JSON.stringify(seasonEntries?.map(entry => entry.id)) || (details && detailSnapshot?.sample !== JSON.stringify(detailsEntries?.map(entry => entry.id)))) && <p role="status">{error || seasonCapability.error || detailsError || detailsCapability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && (seasonEntries?.length === 0 || (details && detailsEntries?.length === 0)) ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}
       <header className="stu-view-header">
         <div>
           <h1>选手档案</h1>

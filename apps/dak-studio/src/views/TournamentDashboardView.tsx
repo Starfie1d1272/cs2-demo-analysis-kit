@@ -16,7 +16,6 @@ import { EmptyState, MetricInfo } from "@cs2dak/react";
 import { LeaderboardView } from "./LeaderboardView";
 
 export interface TournamentDashboardViewProps {
-  activity: { importing: boolean; notice: string | null };
   onCapabilityRepair: (action: CapabilityRepairAction) => void;
   state: AnalysisPageState;
   onStateChange: (state: AnalysisPageState) => void;
@@ -53,7 +52,6 @@ const WEAPON_COLUMNS: DataTableColumn<WeaponRow>[] = [
 
 /** v0.3 赛事总览：地图使用率、T/CT 胜率、手枪局与转化（cohort 同源聚合）。 */
 export function TournamentDashboardView({
-  activity,
   onCapabilityRepair,
   allEntries,
   entries,
@@ -73,7 +71,6 @@ export function TournamentDashboardView({
   const weaponTable = state.tables.weapons ?? { sort: { key: "kills", direction: "desc" as const }, page: 0 };
   const setMapTable = (value: typeof mapTable) => onStateChange({ ...state, tables: { ...state.tables, maps: value } });
   const setWeaponTable = (value: typeof weaponTable) => onStateChange({ ...state, tables: { ...state.tables, weapons: value } });
-  const updateFailed = !activity.importing && !!activity.notice && /重建|导入|重新导出/.test(activity.notice) && /失败/.test(activity.notice);
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const insightCapability = useCapability(entries, "economy");
   const comparisonCapability = useCapability(entries, "team-comparison");
@@ -141,7 +138,7 @@ export function TournamentDashboardView({
             <h3>队伍对比</h3>
             {comparisonCapability.availability && <CapabilityBar availability={comparisonCapability.availability} onRepair={onCapabilityRepair} />}
             {comparisonCapability.error && <p role="alert">对比能力读取失败：{comparisonCapability.error} <button type="button" className="stu-button-sm" onClick={comparisonCapability.retry}>重试</button></p>}
-            {teamComparison && (comparisonError || comparisonCapability.error || activity.importing || updateFailed || analysis.status !== "ready" || comparisonSnapshot?.generation !== analysis.generation || comparisonSnapshot.sample !== JSON.stringify(comparisonEntries?.map(entry => entry.id))) && <p role="status">{comparisonError || comparisonCapability.error || updateFailed || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
+            {teamComparison && (comparisonError || comparisonCapability.error || analysis.status !== "ready" || comparisonSnapshot?.generation !== analysis.generation || comparisonSnapshot.sample !== JSON.stringify(comparisonEntries?.map(entry => entry.id))) && <p role="status">{comparisonError || comparisonCapability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && comparisonEntries?.length === 0 ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}
             <p className="stu-muted">选两支队伍对比当前状态——无需互相交手，适合赛前侦察。</p>
             {teamComparison ? (
               <TeamComparisonPanel
@@ -152,7 +149,7 @@ export function TournamentDashboardView({
                   if (entry) onOpenMatch(entry.id, { roundNumber: 1 });
                 }}
               />
-            ) : comparisonCapability.error ? null : comparisonError ? (
+            ) : comparisonCapability.error ? null : comparisonEntries?.length === 0 ? <p>当前没有可用对比样本。</p> : comparisonError ? (
               <p className="stu-error" role="alert">队伍对比加载失败：{comparisonError}</p>
             ) : (
               <p className="stu-dim">至少需要两个队伍的 demo 才能生成对比。</p>
@@ -164,7 +161,7 @@ export function TournamentDashboardView({
             )}
           </div>
 
-      {insights && (error || insightCapability.error || activity.importing || updateFailed || analysis.status !== "ready" || insightSnapshot?.generation !== analysis.generation || insightSnapshot.sample !== JSON.stringify(insightEntries?.map(entry => entry.id))) && <p role="status">{error || insightCapability.error || updateFailed || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
+      {insights && (error || insightCapability.error || analysis.status !== "ready" || insightSnapshot?.generation !== analysis.generation || insightSnapshot.sample !== JSON.stringify(insightEntries?.map(entry => entry.id))) && <p role="status">{error || insightCapability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && insightEntries?.length === 0 ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && !insightCapability.error && !insights && insightEntries?.length !== 0 && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo…</div>}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
@@ -205,7 +202,7 @@ export function TournamentDashboardView({
           </p>
         </>
       )}
-      {onOpenPlayer && <LeaderboardView activity={activity} onCapabilityRepair={onCapabilityRepair} state={state} onStateChange={onStateChange} embedded allEntries={allEntries} entries={entries} selectedTeam={selectedTeam} identityOptions={identityOptions} onPlayerClick={onOpenPlayer} onGoLibrary={onGoLibrary} />}
+      {onOpenPlayer && <LeaderboardView onCapabilityRepair={onCapabilityRepair} state={state} onStateChange={onStateChange} embedded allEntries={allEntries} entries={entries} selectedTeam={selectedTeam} identityOptions={identityOptions} onPlayerClick={onOpenPlayer} onGoLibrary={onGoLibrary} />}
     </div>
   );
 }
