@@ -130,6 +130,7 @@ export interface PlayerSeasonDetailsFactsOptions extends FactsScope {
 }
 
 export interface PlayerSeasonDetailsFromFacts {
+  participation: Array<{ matchId: string; teamKey: "teamA" | "teamB" }>;
   insights: PlayerSeasonInsights;
   weaponStats: PlayerWeaponStat[];
   mechanics: PlayerMechanicsProfile;

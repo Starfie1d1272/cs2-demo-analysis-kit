@@ -1,3 +1,4 @@
+import type { AnalysisPageState } from "../lib/studio-page-state";
 import { usePageReady } from "../lib/use-page-ready";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 import { useEffect, useMemo, useState } from "react";
@@ -12,6 +13,8 @@ import { EmptyState, MetricInfo } from "@cs2dak/react";
 import { LeaderboardView } from "./LeaderboardView";
 
 export interface TournamentDashboardViewProps {
+  state: AnalysisPageState;
+  onStateChange: (state: AnalysisPageState) => void;
   onPageReady?: (keys: string[]) => void;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
@@ -47,6 +50,8 @@ const WEAPON_COLUMNS: DataTableColumn<WeaponRow>[] = [
 export function TournamentDashboardView({
   allEntries,
   entries,
+  state,
+  onStateChange,
   selectedTeam = null,
   onOpenMatch,
   onGoLibrary,
@@ -57,13 +62,16 @@ export function TournamentDashboardView({
   identityOptions,
   onPageReady
 }: TournamentDashboardViewProps) {
-  const [mapTable, setMapTable] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "matches", direction: "desc" }, page: 0 });
-  const [weaponTable, setWeaponTable] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "kills", direction: "desc" }, page: 0 });
+  const mapTable = state.tables.maps ?? { sort: { key: "matches", direction: "desc" as const }, page: 0 };
+  const weaponTable = state.tables.weapons ?? { sort: { key: "kills", direction: "desc" as const }, page: 0 };
+  const setMapTable = (value: typeof mapTable) => onStateChange({ ...state, tables: { ...state.tables, maps: value } });
+  const setWeaponTable = (value: typeof weaponTable) => onStateChange({ ...state, tables: { ...state.tables, weapons: value } });
   const [insights, setInsights] = useState<TournamentInsights | null>(null);
   const [teamComparison, setTeamComparison] = useState<TeamComparisonModel | null>(null);
   const [comparisonReady, setComparisonReady] = useState(false);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
-  const [comparePair, setComparePair] = useState<[string, string] | null>(null);
+  const comparePair = state.comparePair;
+  const setComparePair = (comparePair: [string, string] | null) => onStateChange({ ...state, comparePair });
   const [error, setError] = useState<string | null>(null);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
 
@@ -192,7 +200,7 @@ export function TournamentDashboardView({
               columns={WEAPON_COLUMNS}
             />
           </div>
-          {onOpenPlayer && <LeaderboardView embedded allEntries={allEntries} entries={entries} selectedTeam={selectedTeam} identityOptions={identityOptions} onPlayerClick={onOpenPlayer} onGoLibrary={onGoLibrary} />}
+          {onOpenPlayer && <LeaderboardView state={state} onStateChange={onStateChange} embedded allEntries={allEntries} entries={entries} selectedTeam={selectedTeam} identityOptions={identityOptions} onPlayerClick={onOpenPlayer} onGoLibrary={onGoLibrary} />}
           <p className="stu-muted">队伍手枪局、经济对位胜率与 Eco/Semi 翻盘等经济维度，统一在
             {onGoEconomy ? <button type="button" className="dak-evidence" onClick={onGoEconomy}>经济与节奏</button> : "「经济与节奏」"}页查看（避免重复）。
           </p>

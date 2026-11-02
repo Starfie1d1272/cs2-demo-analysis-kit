@@ -20,11 +20,14 @@ function Evidence({ evidence, onOpenEvidence }: { evidence: EvidenceRef[]; onOpe
 export function PlayerMapRoleProfilePanel({
   profile,
   onOpenEvidence,
+  state, onStateChange,
 }: {
+  state?: import("@cs2dak/presentation").TableState; onStateChange?: (state: import("@cs2dak/presentation").TableState) => void;
   profile: PlayerMapRoleProfileView | null;
   onOpenEvidence?: (evidence: EvidenceRef) => void;
 }) {
-  const [tableState, setTableState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "sample", direction: "desc" }, page: 0 });
+  const [localState, setLocalState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "sample", direction: "desc" }, page: 0 });
+  const tableState = state ?? localState; const setTableState = onStateChange ?? setLocalState;
   if (!profile) return <EmptyState variant="insufficient" title="地图 / 位置画像不可用" hint="需要当前选手的地图位置 facts；缺失时可在资料库重建 facts。" />;
   const rows = profile.perMapEvidence;
   const positionLabels = new Map(profile.positionGroupDisplay.map((row) => [`${row.mapName}:${row.side}:${row.positionGroupId}`, row]));
@@ -68,12 +71,15 @@ export function TeamMapRoleMatrixPanel({
   matrix,
   playerNames = {},
   onOpenEvidence,
+  state, onStateChange,
 }: {
+  state?: import("@cs2dak/presentation").TableState; onStateChange?: (state: import("@cs2dak/presentation").TableState) => void;
   matrix: TeamMapRoleMatrixView | null;
   playerNames?: Record<string, string>;
   onOpenEvidence?: (evidence: EvidenceRef) => void;
 }) {
-  const [tableState, setTableState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "sample", direction: "desc" }, page: 0 });
+  const [localState, setLocalState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "sample", direction: "desc" }, page: 0 });
+  const tableState = state ?? localState; const setTableState = onStateChange ?? setLocalState;
   if (!matrix) return <EmptyState variant="insufficient" title="该地图暂无职责矩阵" hint="选择有位置 facts 的地图和阵营；样本不足会明确保留，而不是补零。" />;
   const columns: DataTableColumn<TeamMapRoleMatrixView["players"][number]>[] = [
     { key: "player", label: "选手", format: (row) => playerNames[row.playerKey] ?? row.playerKey },
@@ -106,8 +112,9 @@ export function DoubleAwpAnalysisPanel({ model, playerNames = {}, onOpenEvidence
   </section>;
 }
 
-export function PlayerMapPoolPanel({ rows, onOpenEvidence }: { rows: PlayerMapPoolRowView[]; onOpenEvidence?: (evidence: EvidenceRef) => void }) {
-  const [tableState, setTableState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "record", direction: "desc" }, page: 0 });
+export function PlayerMapPoolPanel({ rows, onOpenEvidence, state, onStateChange }: { rows: PlayerMapPoolRowView[]; onOpenEvidence?: (evidence: EvidenceRef) => void; state?: import("@cs2dak/presentation").TableState; onStateChange?: (state: import("@cs2dak/presentation").TableState) => void }) {
+  const [localState, setLocalState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "record", direction: "desc" }, page: 0 });
+  const tableState = state ?? localState; const setTableState = onStateChange ?? setLocalState;
   const columns: DataTableColumn<PlayerMapPoolRowView>[] = [
     { key: "map", label: "地图", format: (row) => row.mapName.replace("de_", "") },
     { key: "record", label: "场次 / 战绩", sortable: true, sortValue: (row) => row.matchCount, format: (row) => `${row.matchCount} · ${row.wins}胜 ${row.losses}负` },
