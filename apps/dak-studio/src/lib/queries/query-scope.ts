@@ -69,14 +69,12 @@ export function filterDuelFactsByTeam(
 }
 
 /**
- * 队伍透镜（match 级）：按队伍过滤 TournamentInsights 的各队伍数组。
- * insights 由已 `withTeamRenames` 的 facts 构建，teamName 是显示名，
- * 故直接按 selectedTeams（显示名）匹配，不走 originalTeamNamesForDisplay。
+ * 队伍透镜：按当前分析分组键过滤各队伍数组。
  */
-export function filterTournamentInsightsByTeam(insights: TournamentInsights, selectedTeams: string[]): TournamentInsights {
-  if (selectedTeams.length === 0) return insights;
-  const selected = new Set(selectedTeams);
-  const byTeam = <T extends { teamName: string }>(rows: T[]) => rows.filter((row) => selected.has(row.teamName));
+export function filterTournamentInsightsByTeam(insights: TournamentInsights, selectedKeys: string[], active = selectedKeys.length > 0): TournamentInsights {
+  if (!active) return insights;
+  const selected = new Set(selectedKeys);
+  const byTeam = <T extends { teamEntityKey: string }>(rows: T[]) => rows.filter((row) => selected.has(row.teamEntityKey));
   return {
     ...insights,
     teamPistols: byTeam(insights.teamPistols),
