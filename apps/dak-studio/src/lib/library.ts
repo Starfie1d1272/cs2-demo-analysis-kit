@@ -672,7 +672,8 @@ export async function importDemoFile(file: File, options: ImportDemoOptions = {}
 async function importDemoFileUnlocked(file: File, settings: ImportDemoOptions, input: ArrayBuffer, id: string, manifest: Awaited<ReturnType<typeof loadDemoManifestFromZip>>): Promise<ImportResult> {
   const { tags = [], sourceDemPath = null, replaceId, lowMemory = false, matchDate = null, forceReanalyze = false, signal } = settings;
   signal?.throwIfAborted();
-  let buffer = input;
+  // A low-memory worker may have transferred the input during an earlier attempt.
+  let buffer = input.byteLength ? input : await file.arrayBuffer();
   const meta = demoMeta;
   const blobs = demoBlobs;
   // Read again under the relevant import locks; queued replacements may have committed.
