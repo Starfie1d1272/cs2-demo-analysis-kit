@@ -2789,6 +2789,7 @@ td.stu-heat-cell.stu-heat-neutral {
 @media (max-width: 900px) {
   .stu-app {
     grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
   }
 
   .stu-sidebar {
