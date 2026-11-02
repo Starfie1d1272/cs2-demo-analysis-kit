@@ -1,3 +1,5 @@
+import type { PatternExplorerState } from "../../lib/pattern-page-state";
+import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DataTable, type DataTableColumn } from "@cs2dak/react";
 import { formatTacticalClusterName as autoName } from "@cs2dak/presentation";
@@ -9,13 +11,15 @@ import { listPatternNames, savePatternName } from "../../lib/pattern-names";
 import { buildAntiStratMarkdown, patternFingerprint } from "../../lib/pattern-observations";
 import { savePrepItem, type PrepItem } from "../../lib/prep-items";
 import { getObservedMapPool } from "../../lib/queries/spatial-queries";
-import { PatternExplorer, emptyPatternExplorerState } from "../coach/PatternExplorer";
+import { PatternExplorer } from "../coach/PatternExplorer";
 import { MapPoolTable } from "../coach/MapPoolTable";
 
 const SIDE_LABEL: Record<string, string> = { t: "T 方", ct: "CT 方" };
 
 export interface PatternsThemeProps {
   section: "patterns" | "anti";
+  explorerState: PatternExplorerState;
+  onExplorerStateChange: Dispatch<SetStateAction<PatternExplorerState>>;
   clusters: TacticalCluster[];
   facts: TacticalRoundFact[];
   allFacts: TacticalRoundFact[];
@@ -29,8 +33,7 @@ export interface PatternsThemeProps {
 }
 
 /** 自动观察与人工材料相互独立；只保存用户明确命名或加入的项目。 */
-export function PatternsTheme({ section, clusters, facts, allFacts, entryByMatchId, analysisContext, teamRenames, subjectTeam, onOpenMatch, onWatchDemo, onPrepSaved }: PatternsThemeProps) {
-  const [explorerState, setExplorerState] = useState(emptyPatternExplorerState);
+export function PatternsTheme({ section, explorerState, onExplorerStateChange, clusters, facts, allFacts, entryByMatchId, analysisContext, teamRenames, subjectTeam, onOpenMatch, onWatchDemo, onPrepSaved }: PatternsThemeProps) {
   const [playbook, setPlaybook] = useState<Record<string, string>>({});
   const [namesError, setNamesError] = useState<string | null>(null);
   useEffect(() => {
@@ -46,7 +49,7 @@ export function PatternsTheme({ section, clusters, facts, allFacts, entryByMatch
         <>
           <PatternExplorer
             state={explorerState}
-            onStateChange={setExplorerState}
+            onStateChange={onExplorerStateChange}
             clusters={clusters}
             facts={facts}
             entryByMatchId={entryByMatchId}
@@ -73,6 +76,8 @@ export function PatternsTheme({ section, clusters, facts, allFacts, entryByMatch
           <details className="stu-card stu-coach-pattern-names">
             <summary>模式命名与备注</summary>
             <PlaybookTable
+              tableState={explorerState.namesTable}
+              onTableStateChange={namesTable => onExplorerStateChange(current => ({ ...current, namesTable }))}
               clusters={clusters}
               playbook={playbook}
               onRename={async (patternKey, name) => {
@@ -100,15 +105,17 @@ export function PatternsTheme({ section, clusters, facts, allFacts, entryByMatch
 }
 
 function PlaybookTable({
+  tableState, onTableStateChange,
   clusters,
   playbook,
   onRename
 }: {
+  tableState: import("@cs2dak/presentation").TableState;
+  onTableStateChange: (state: import("@cs2dak/presentation").TableState) => void;
   clusters: TacticalCluster[];
   playbook: Record<string, string>;
   onRename: (clusterId: string, name: string) => Promise<void>;
 }) {
-  const [tableState, setTableState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: null, direction: "desc" }, page: 0 });
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   // ref 持有 drafts 最新值，避免按键时 columns useMemo 失效重建
   const draftsRef = useRef(drafts);
@@ -145,7 +152,7 @@ function PlaybookTable({
     <div className="stu-card">
       <h3>模式命名</h3>
       <DataTable
-        state={tableState} onStateChange={setTableState}
+        state={tableState} onStateChange={onTableStateChange}
         classes={STUDIO_TABLE_CLASSES}
         rows={clusters}
         rowKey={(c) => c.id}

@@ -1,4 +1,5 @@
-import { emptyControlPageState } from "../lib/spatial-view-state";
+import type { ControlPageState } from "../lib/spatial-view-state";
+import type { Dispatch, SetStateAction } from "react";
 import { usePageReady } from "../lib/use-page-ready";
 /**
  * 雷达覆盖场（控图）——描述性地图控制，不上评分。
@@ -8,7 +9,7 @@ import { usePageReady } from "../lib/use-page-ready";
  */
 import { EmptyState } from "@cs2dak/react";
 import { RadarFieldCanvas } from "@cs2dak/react";
-import { getMapCalibration } from "@cs2dak/maps/calibration";
+import { getMapCalibration, hasLowerLevel } from "@cs2dak/maps/calibration";
 import type { RadarField } from "@cs2dak/tactics";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { StudioDemoEntry } from "../lib/demo-entry";
@@ -16,27 +17,26 @@ import { buildScopeRadarFields } from "../lib/radar-field";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
 
 export interface RadarFieldViewProps {
+  state: ControlPageState;
+  onStateChange: Dispatch<SetStateAction<ControlPageState>>;
   onPageReady?: (keys: string[]) => void;
   entries: StudioDemoEntry[];
   teamRenames?: Record<string, string>;
   selectedTeam?: string | null;
+  onOpenMatch: (entryId: string) => void;
   onSelectTeam?: (teamName: string | null) => void;
 }
 
-export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null, onSelectTeam, onPageReady }: RadarFieldViewProps) {
+export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null, onSelectTeam, onPageReady, state, onStateChange, onOpenMatch }: RadarFieldViewProps) {
   const maps = useMemo(() => {
     const set = new Map<string, number>();
     for (const e of entries) if (getMapCalibration(e.meta.mapName)) set.set(e.meta.mapName, (set.get(e.meta.mapName) ?? 0) + 1);
     return [...set.entries()].sort((a, b) => b[1] - a[1]);
   }, [entries]);
 
-  const [scopeState, setScopeState] = useState(() => {
-    const { mapName, economy } = emptyControlPageState();
-    return { mapName, economy };
-  });
-  const { mapName, economy } = scopeState;
-  const setMapName = (mapName: string | null) => setScopeState(current => ({ ...current, mapName }));
-  const setEconomy = (economy: "gun" | "all") => setScopeState(current => ({ ...current, economy }));
+  const { mapName, economy } = state;
+  const setMapName = (mapName: string | null) => onStateChange(current => ({ ...current, mapName }));
+  const setEconomy = (economy: "gun" | "all") => onStateChange(current => ({ ...current, economy }));
   const activeMap = mapName ?? maps[0]?.[0] ?? null;
 
   const entriesOfMap = useMemo(
@@ -104,7 +104,7 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
           },
         });
         if (token !== reqToken.current || abort.signal.aborted) return;
-        setField(team ?? league);
+        setField(isTeam ? team : league);
         setBaseline(team ? league : null);
         setProgress(null);
         setFieldReady(true);
@@ -183,6 +183,10 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
         ))}
       </div>
 
+      <details className="stu-card"><summary>查看样本比赛</summary><p className="stu-muted">仅列出当前地图、范围和所选队伍的比赛；覆盖格不提供回合反查。</p>
+        {entriesOfMap.filter(entry => !selectedTeam || [entry.meta.teamAName, entry.meta.teamBName].some(name => displayTeamName(name, teamRenames) === selectedTeam)).map(entry => <button key={entry.id} type="button" className="stu-button-sm" onClick={() => onOpenMatch(entry.id)}>{entry.meta.teamAName} vs {entry.meta.teamBName} · {entry.meta.mapName}</button>)}
+      </details>
+
       {invalidTeamForMap && (
         <EmptyState
           variant="insufficient"
@@ -197,7 +201,7 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
         </div>
       )}
 
-      {!invalidTeamForMap && !progress && field && <RadarFieldCanvas field={field} baseline={baseline} map={{ name: activeMap!, radarImageUrl: `./maps/radars/${activeMap}.png` }} />}
+      {!invalidTeamForMap && !progress && field && <RadarFieldCanvas field={field} baseline={baseline} map={{ name: activeMap!, radarImageUrl: `./maps/radars/${activeMap}.png`, lowerRadarImageUrl: getMapCalibration(activeMap!) && hasLowerLevel(getMapCalibration(activeMap!)!) ? `./maps/radars/${activeMap}_lower.png` : null }} state={{ mode: state.mode, second: state.second, level: state.level }} onStateChange={view => onStateChange(current => ({ ...current, ...view }))} />}
       {!invalidTeamForMap && !progress && !field && activeMap && (
         fieldError ? <EmptyState variant="error" title="覆盖场加载失败" hint={fieldError} />
           : <EmptyState title="该地图暂无覆盖场数据" hint="所选范围和经济条件内没有含回放的回合。" />

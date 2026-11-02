@@ -1,10 +1,12 @@
+import { emptyOpeningPageState, emptyControlPageState } from "./spatial-view-state";
+import { emptyPatternPageState } from "./pattern-page-state";
 import { createAnalysisContext, createAnalysisContextPreset, type AnalysisContext } from "./analysis-context.js";
 import { emptyMaterialsPageState } from "./material-page-state";
 import type { LectureMaterialRef, MaterialRef } from "./material-ref.js";
-import { emptyMatchesState, emptyEventsState, emptyUtilityState, emptyPlayerState, emptyTeamState, emptyAnalysisState, type StudioPageStateMap } from "./studio-page-state.js";
+import { emptyMatchesState, emptyEventsState, emptyUtilityState, emptyPlayerState, emptyTeamState, emptyAnalysisState, emptyRolesState, type StudioPageStateMap } from "./studio-page-state.js";
 
 export type StudioSection = "workbench" | "matches" | "analysis" | "materials" | "management";
-export type AnalysisPageId = "analysis" | "player" | "team" | "event-analysis" | "duel" | "economy" | "utility" | "lineups" | "opening" | "control" | "patterns";
+export type AnalysisPageId = "analysis" | "player" | "team" | "event-analysis" | "duel" | "economy" | "utility" | "lineups" | "opening" | "control" | "patterns" | "roles";
 export type AnalysisDestination = { [P in AnalysisPageId]: { page: P; context: AnalysisContext } }[AnalysisPageId];
 export type StudioDestination =
   | { page: "workbench" } | { page: "matches" } | { page: "events"; eventId?: string }
@@ -20,7 +22,7 @@ export const PAGE_SECTION: Record<StudioPageId, StudioSection> = {
   workbench: "workbench", matches: "matches", events: "matches", match: "matches",
   analysis: "analysis", player: "analysis", team: "analysis",
   "event-analysis": "analysis", duel: "analysis", economy: "analysis", utility: "analysis",
-  lineups: "analysis", opening: "analysis", control: "analysis", patterns: "analysis",
+  lineups: "analysis", opening: "analysis", control: "analysis", patterns: "analysis", roles: "analysis",
   materials: "materials", material: "materials", lecture: "materials", management: "management",
 };
 export function defaultDestination(section: StudioSection): StudioDestination {
@@ -38,7 +40,7 @@ function copyDestination(destination: StudioDestination): StudioDestination {
   return { ...destination };
 }
 function frame(id: string, destination: StudioDestination): StudioFrame {
-  return { id, destination: copyDestination(destination), ui: destination.page === "analysis" || destination.page === "event-analysis" ? emptyAnalysisState() : destination.page === "player" ? emptyPlayerState() : destination.page === "team" ? emptyTeamState() : destination.page === "materials" ? emptyMaterialsPageState() : destination.page === "utility" ? emptyUtilityState() : destination.page === "matches" ? emptyMatchesState() : destination.page === "events" ? { ...emptyEventsState(), activeEventId: destination.eventId ?? null } : destination.page === "management" ? { tab: destination.tab, library: emptyMatchesState() } : null, scrollY: 0 } as StudioFrame;
+  return { id, destination: copyDestination(destination), ui: destination.page === "roles" ? emptyRolesState() : destination.page === "opening" ? emptyOpeningPageState() : destination.page === "control" ? emptyControlPageState() : destination.page === "patterns" ? emptyPatternPageState() : destination.page === "analysis" || destination.page === "event-analysis" ? emptyAnalysisState() : destination.page === "player" ? emptyPlayerState() : destination.page === "team" ? emptyTeamState() : destination.page === "materials" ? emptyMaterialsPageState() : destination.page === "utility" ? emptyUtilityState() : destination.page === "matches" ? emptyMatchesState() : destination.page === "events" ? { ...emptyEventsState(), activeEventId: destination.eventId ?? null } : destination.page === "management" ? { tab: destination.tab, library: emptyMatchesState() } : null, scrollY: 0 } as StudioFrame;
 }
 export interface StudioNavigation {
   active: StudioFrame;

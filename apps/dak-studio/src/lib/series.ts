@@ -67,15 +67,7 @@ export interface SeriesSuggestion {
   teamBName: string;
 }
 
-export interface CoachSettings {
-  myTeamName: string | null;
-  opponentTeamName: string | null;
-}
-
-const SETTINGS_KEY = "coach";
-
 const seriesStore = getStorage().records("series");
-const settingsStore = getStorage().records("series-settings");
 
 /** 按 demo 数量推断初始赛制（用户可在 UI 中手动调整）。
  *  启发式：>=4 场只可能是 BO5；2-3 场大概率 BO3。
@@ -273,18 +265,4 @@ export async function pruneOrphanSeries(existingEntryIds: Set<string>): Promise<
     }
   }
   return removed;
-}
-
-export async function loadCoachSettings(): Promise<CoachSettings> {
-  try {
-    const value = await settingsStore.get<CoachSettings>(SETTINGS_KEY);
-    return { myTeamName: value?.myTeamName ?? null, opponentTeamName: value?.opponentTeamName ?? null };
-  } catch {
-    return { myTeamName: null, opponentTeamName: null };
-  }
-}
-
-export async function saveCoachSettings(settings: CoachSettings): Promise<CoachSettings> {
-  await settingsStore.put(SETTINGS_KEY, settings);
-  return settings;
 }

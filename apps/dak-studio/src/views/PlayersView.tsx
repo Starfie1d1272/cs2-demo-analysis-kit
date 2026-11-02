@@ -39,6 +39,8 @@ export interface PlayersViewProps {
   contextSummary: string;
   onOpenMaterials: () => void;
   onOpenOpening: () => void;
+  onOpenRoles: () => void;
+  rolesOnly?: boolean;
 }
 
 const CORE_VIEW = SEASON_STAT_VIEWS.find((view) => view.key === "core")!;
@@ -76,7 +78,7 @@ export function PlayersView({
   identityOptions,
   contextSummary,
   onOpenMaterials,
-  onOpenOpening
+  onOpenOpening, onOpenRoles, rolesOnly = false
 }: PlayersViewProps) {
   const [matchStats, setMatchStats] = useState<Array<{ matchId: string; teamKey: "teamA" | "teamB" }>>([]);
   const [profiles, setProfiles] = useState<PlayerSeasonProfile[] | null>(null);
@@ -345,6 +347,35 @@ export function PlayersView({
     }
   }
 
+  const rolePanels = <>
+            <div className="stu-card stu-card-wide" id="players:map-roles">
+              <div className="stu-card-head"><h3>地图 / 位置</h3><button type="button" className="stu-button-sm" onClick={openRoleEditor}>编辑声明</button></div>
+              {roleError ? <EmptyState variant="error" title="地图角色不可用" hint={roleError} /> : <PlayerMapRoleProfilePanel state={state.tables.roles ?? { sort: { key: "sample", direction: "desc" }, page: 0 }} onStateChange={table => onStateChange({ ...state, tables: { ...state.tables, roles: table } })} profile={selectedRoleProfile} onOpenEvidence={(evidence) => {
+                const entry = entryByMatchId.get(evidence.matchId);
+                if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "players:map-roles" });
+              }} />}
+            </div>
+            <div className="stu-card stu-card-wide" id="players:map-pool"><h3>完整个人地图池</h3>{mapPoolError && <p role="alert">地图池不可用：{mapPoolError}</p>}{unsupportedMaps.length > 0 && <p>未支持的地图：{unsupportedMaps.join("、")}</p>}<PlayerMapPoolPanel state={state.tables.mapPool ?? { sort: { key: "record", direction: "desc" }, page: 0 }} onStateChange={table => onStateChange({ ...state, tables: { ...state.tables, mapPool: table } })} rows={mapPool} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "players:map-pool" }); }} /></div>
+          {roleEditorOpen && (
+            <div className="stu-modal-backdrop" role="dialog" aria-modal="true" aria-label="编辑角色声明" onClick={() => setRoleEditorOpen(false)}>
+              <div className="stu-dialog stu-dialog-form" ref={roleDialogRef} onClick={(event) => event.stopPropagation()}>
+                <header className="stu-modal-head"><h3>角色声明 · {selected.name}</h3><button type="button" className="stu-modal-close" onClick={() => setRoleEditorOpen(false)} aria-label="关闭">✕</button></header>
+                <div className="stu-modal-body"><p className="stu-muted">只声明当前队伍下的通常职责；副角色和武器职责都可留空。地图与日期由可信赛事/阵容元数据管理。</p>
+                  <div className="stu-form-grid">
+                    <label className="stu-form-field"><span className="stu-form-label">主角色</span><select className="stu-form-control" value={declaredRole} onChange={(event) => { const role = event.target.value as DeclaredRole; setDeclaredRole(role); if (declaredSecondaryRole === role) setDeclaredSecondaryRole(""); }}>{(["igl", "awper", "anchor", "opener", "closer"] as const).map((role) => <option key={role} value={role}>{role}</option>)}</select></label>
+                    <label className="stu-form-field"><span className="stu-form-label">副角色（可选）</span><select className="stu-form-control" value={declaredSecondaryRole} onChange={(event) => setDeclaredSecondaryRole(event.target.value as DeclaredRole | "")}><option value="">不声明</option>{(["igl", "awper", "anchor", "opener", "closer"] as const).filter((role) => role !== declaredRole).map((role) => <option key={role} value={role}>{role}</option>)}</select></label>
+                    <label className="stu-form-field"><span className="stu-form-label">武器职责（可选）</span><select className="stu-form-control" value={declaredWeaponDuty} onChange={(event) => setDeclaredWeaponDuty(event.target.value as WeaponDuty | "")}><option value="">不声明</option>{(["primary_awper", "secondary_awper", "situational_awper", "rifler"] as const).map((duty) => <option key={duty} value={duty}>{duty}</option>)}</select></label>
+                  </div>
+                  {roleFormError && <p className="stu-form-error" role="alert">{roleFormError}</p>}
+                  {selectedDeclarations.length > 0 && <section className="stu-declaration-list"><h4>已有声明</h4>{selectedDeclarations.map((row) => <div key={row.id} className="stu-declaration-row"><span>{row.declaration.kind === "main_role" ? `${row.declaration.priority} · ${row.declaration.role}` : row.declaration.weaponDuty}{row.declaration.mapName ? ` · ${row.declaration.mapName.replace("de_", "")}` : ""}</span><button type="button" className="stu-button-sm" onClick={() => void removeRoleDeclaration(roleDeclarations!, row.id).then(setRoleDeclarations)}>清除</button></div>)}</section>}
+                </div>
+                <footer className="stu-modal-foot"><span className="stu-muted">声明不会写入 facts 或自动证据缓存。</span><div className="stu-modal-actions"><button type="button" className="stu-button" onClick={() => setRoleEditorOpen(false)}>取消</button><button type="button" className="stu-button stu-button-primary" onClick={() => void saveRoleDeclaration()}>保存声明</button></div></footer>
+              </div>
+            </div>
+          )}
+  </>;
+  if (rolesOnly) return <div className="stu-view"><header className="stu-view-header"><h1>位置与职责 · {selected.name}</h1></header>{rolePanels}</div>;
+
   const exportPlayerCard = () => {
     const md = buildPlayerCardMarkdown(selected, insights);
     const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
@@ -474,14 +505,7 @@ export function PlayersView({
           <div className="stu-profile-grid">
             <button type="button" className="stu-button-sm" onClick={onOpenOpening}>查看开局动线</button>
             {insights && <PlayerFindingsPanel insights={insights} player={selected} entries={entries} contextSummary={contextSummary} onOpenEvidence={onOpenEvidence} onOpenMaterials={onOpenMaterials} />}
-            <div className="stu-card stu-card-wide" id="players:map-roles">
-              <div className="stu-card-head"><h3>地图 / 位置</h3><button type="button" className="stu-button-sm" onClick={openRoleEditor}>编辑声明</button></div>
-              {roleError ? <EmptyState variant="error" title="地图角色不可用" hint={roleError} /> : <PlayerMapRoleProfilePanel state={state.tables.roles ?? { sort: { key: "sample", direction: "desc" }, page: 0 }} onStateChange={table => onStateChange({ ...state, tables: { ...state.tables, roles: table } })} profile={selectedRoleProfile} onOpenEvidence={(evidence) => {
-                const entry = entryByMatchId.get(evidence.matchId);
-                if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "players:map-roles" });
-              }} />}
-            </div>
-            <div className="stu-card stu-card-wide" id="players:map-pool"><h3>完整个人地图池</h3>{mapPoolError && <p role="alert">地图池不可用：{mapPoolError}</p>}{unsupportedMaps.length > 0 && <p>未支持的地图：{unsupportedMaps.join("、")}</p>}<PlayerMapPoolPanel state={state.tables.mapPool ?? { sort: { key: "record", direction: "desc" }, page: 0 }} onStateChange={table => onStateChange({ ...state, tables: { ...state.tables, mapPool: table } })} rows={mapPool} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "players:map-pool" }); }} /></div>
+            <div className="stu-card stu-card-wide"><h3>位置与职责</h3><button type="button" className="stu-button-sm" onClick={onOpenRoles}>查看位置与职责</button></div>
             <div className="stu-card">
               <h3>核心指标</h3>
               <div className="stu-metric-grid">
@@ -558,23 +582,6 @@ export function PlayersView({
           </div>
           )}
 
-          {roleEditorOpen && (
-            <div className="stu-modal-backdrop" role="dialog" aria-modal="true" aria-label="编辑角色声明" onClick={() => setRoleEditorOpen(false)}>
-              <div className="stu-dialog stu-dialog-form" ref={roleDialogRef} onClick={(event) => event.stopPropagation()}>
-                <header className="stu-modal-head"><h3>角色声明 · {selected.name}</h3><button type="button" className="stu-modal-close" onClick={() => setRoleEditorOpen(false)} aria-label="关闭">✕</button></header>
-                <div className="stu-modal-body"><p className="stu-muted">只声明当前队伍下的通常职责；副角色和武器职责都可留空。地图与日期由可信赛事/阵容元数据管理。</p>
-                  <div className="stu-form-grid">
-                    <label className="stu-form-field"><span className="stu-form-label">主角色</span><select className="stu-form-control" value={declaredRole} onChange={(event) => { const role = event.target.value as DeclaredRole; setDeclaredRole(role); if (declaredSecondaryRole === role) setDeclaredSecondaryRole(""); }}>{(["igl", "awper", "anchor", "opener", "closer"] as const).map((role) => <option key={role} value={role}>{role}</option>)}</select></label>
-                    <label className="stu-form-field"><span className="stu-form-label">副角色（可选）</span><select className="stu-form-control" value={declaredSecondaryRole} onChange={(event) => setDeclaredSecondaryRole(event.target.value as DeclaredRole | "")}><option value="">不声明</option>{(["igl", "awper", "anchor", "opener", "closer"] as const).filter((role) => role !== declaredRole).map((role) => <option key={role} value={role}>{role}</option>)}</select></label>
-                    <label className="stu-form-field"><span className="stu-form-label">武器职责（可选）</span><select className="stu-form-control" value={declaredWeaponDuty} onChange={(event) => setDeclaredWeaponDuty(event.target.value as WeaponDuty | "")}><option value="">不声明</option>{(["primary_awper", "secondary_awper", "situational_awper", "rifler"] as const).map((duty) => <option key={duty} value={duty}>{duty}</option>)}</select></label>
-                  </div>
-                  {roleFormError && <p className="stu-form-error" role="alert">{roleFormError}</p>}
-                  {selectedDeclarations.length > 0 && <section className="stu-declaration-list"><h4>已有声明</h4>{selectedDeclarations.map((row) => <div key={row.id} className="stu-declaration-row"><span>{row.declaration.kind === "main_role" ? `${row.declaration.priority} · ${row.declaration.role}` : row.declaration.weaponDuty}{row.declaration.mapName ? ` · ${row.declaration.mapName.replace("de_", "")}` : ""}</span><button type="button" className="stu-button-sm" onClick={() => void removeRoleDeclaration(roleDeclarations!, row.id).then(setRoleDeclarations)}>清除</button></div>)}</section>}
-                </div>
-                <footer className="stu-modal-foot"><span className="stu-muted">声明不会写入 facts 或自动证据缓存。</span><div className="stu-modal-actions"><button type="button" className="stu-button" onClick={() => setRoleEditorOpen(false)}>取消</button><button type="button" className="stu-button stu-button-primary" onClick={() => void saveRoleDeclaration()}>保存声明</button></div></footer>
-              </div>
-            </div>
-          )}
 
           {profileTab === "aim" && (
           <div className="stu-profile-grid">

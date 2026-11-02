@@ -1,3 +1,4 @@
+import { matchIdForEntry } from "./lib/demo-entry";
 import { useStudioActivity } from "./app/use-studio-activity";
 import { useStudioData } from "./app/use-studio-data";
 import { useLibraryActions } from "./app/use-library-actions";
@@ -28,7 +29,7 @@ import { LineupsView } from "./views/LineupsView";
 import { EconomyView } from "./views/EconomyView";
 import { ManagementView } from "./views/ManagementView";
 import { DuelView } from "./views/DuelView";
-import { CoachView } from "./views/CoachView";
+import { PatternsPage } from "./views/analysis/PatternsPage";
 import { RadarFieldView } from "./views/RadarFieldView";
 import { buildCohortIdentityMap } from "./lib/identity";
 import type { IdentityOptions } from "./lib/identity";
@@ -73,7 +74,7 @@ const MANAGEMENT_NAV = { label: "数据管理", hint: "身份 · 资产 · 资�
 
 type MatchDeepLink = { roundNumber: number; tick?: number };
 const CAPABILITY_BY_PAGE: Partial<Record<StudioPageId, StudioCapability>> = {
-  player: "map-role", team: "map-role", duel: "duel", economy: "economy", utility: "utility", lineups: "lineup", control: "control", patterns: "tactical",
+  player: "map-role", team: "map-role", duel: "duel", economy: "economy", utility: "utility", lineups: "lineup", control: "control", patterns: "tactical", roles: "map-role",
 };
 
 function NavButton({ item, active, onClick }: { item: typeof MANAGEMENT_NAV; active: boolean; onClick: () => void }) {
@@ -544,6 +545,7 @@ export function App() {
             contextSummary={summarizeAnalysisContext(analysisContext, entries, eventScopes)}
             onOpenMaterials={() => navigate({ page: "materials" })}
             onOpenOpening={() => navigate({ page: "opening", context: analysisContext })}
+            onOpenRoles={() => navigate({ page: "roles", context: analysisContext })}
             onGoLibrary={() => goLibrary()}
           />
         )}
@@ -554,7 +556,7 @@ export function App() {
             selectedTeam={analysisContext.focus.kind === "team" ? analysisContext.focus.teamName : null}
             onSelectTeam={openTeam}
             onOpenMatch={openDemo}
-            onOpenCapability={(key) => navigate({ page: key, context: analysisContext })}
+            onOpenCapability={(key) => navigate({ page: key, context: key === "patterns" && analysisContext.focus.kind === "team" ? { ...analysisContext, goal: "own-review", roles: { ...analysisContext.roles, beneficiary: { kind: "team", id: analysisContext.focus.teamName.toLowerCase(), label: analysisContext.focus.teamName } } } : analysisContext })}
             onOpenEvidence={openEvidence}
             state={active.ui as import("./lib/studio-page-state").TeamPageState}
             onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
@@ -563,6 +565,23 @@ export function App() {
             identityOptions={identityOptions}
           />
         )}
+        {destination.page === "roles" && (analysisContext.focus.kind === "player" || analysisContext.focus.kind === "self" ? (
+          <PlayersView key={active.id} rolesOnly allEntries={entries} entries={scopedEntries} selectedTeam={selectedTeam}
+            selectedPlayerKey={selectedPlayerKey} onSelectPlayer={(playerKey, label = playerKey) => setAnalysisContext(current => ({ ...current, focus: { kind: "player", playerKey, label } }))}
+            onOpenMatch={openDemo} onOpenEvidence={openEvidence} onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
+            state={(active.ui as import("./lib/studio-page-state").RolesPageState).player}
+            onStateChange={player => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: { ...(active.ui as import("./lib/studio-page-state").RolesPageState), player } }))}
+            onPageReady={keys => onPageReady(active.id, keys)} identityOptions={identityOptions}
+            contextSummary={summarizeAnalysisContext(analysisContext, entries, eventScopes)} onOpenMaterials={() => navigate({ page: "materials" })}
+            onOpenOpening={() => navigate({ page: "opening", context: analysisContext })} onOpenRoles={() => {}} onGoLibrary={() => goLibrary()} />
+        ) : analysisContext.focus.kind === "team" ? (
+          <TeamView key={active.id} rolesOnly entries={scopedEntries} selectedTeam={analysisContext.focus.teamName}
+            onSelectTeam={teamName => setAnalysisContext(current => ({ ...current, focus: { kind: "team", teamName } }))}
+            onOpenMatch={openDemo} onOpenCapability={key => navigate({ page: key, context: analysisContext })} onOpenEvidence={openEvidence}
+            state={(active.ui as import("./lib/studio-page-state").RolesPageState).team}
+            onStateChange={team => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: { ...(active.ui as import("./lib/studio-page-state").RolesPageState), team } }))}
+            onPageReady={keys => onPageReady(active.id, keys)} onGoLibrary={() => goLibrary()} identityOptions={identityOptions} />
+        ) : <div className="stu-card"><h2>选择分析对象</h2><p>请先选择一名选手或一支队伍。</p><button type="button" className="stu-button" onClick={() => navigate({ page: "player", context: analysisContext })}>选择选手</button><button type="button" className="stu-button" onClick={() => navigate({ page: "team", context: analysisContext })}>选择队伍</button></div>)}
         {destination.page === "opening" && (
           <TrailsView
             key={active.id}
@@ -571,6 +590,17 @@ export function App() {
             entries={scopedEntries}
             identityOptions={identityOptions}
             focusPlayerKey={selectedPlayerKey}
+            onSelectPlayer={(playerKey, label) => setAnalysisContext(current => ({ ...current, focus: { kind: "player", playerKey, label } }))}
+            state={active.ui as import("./lib/spatial-view-state").OpeningPageState}
+            onStateChange={update => setNavigation(current => {
+              if (current.active.id !== active.id) return current;
+              const previous = current.active.ui as import("./lib/spatial-view-state").OpeningPageState;
+              return studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: typeof update === "function" ? update(previous) : update });
+            })}
+            onOpenMatch={(entryId, target, rounds) => openEvidence({ entryId, evidence: { ...target, reason: "开局动线" }, sourceKey: "opening:rounds",
+              selectedKey: `${target.matchId}#R${target.roundNumber}`,
+              queue: rounds.flatMap(round => { const entry = scopedEntries.find(item => matchIdForEntry(item) === round.matchId); return entry ? [{ key: `${round.matchId}#R${round.roundNumber}`, entryId: entry.id, evidence: { matchId: round.matchId, roundNumber: round.roundNumber, reason: "开局动线" } }] : []; })
+            })}
             onGoLibrary={() => goLibrary()}
           />
         )}
@@ -629,27 +659,42 @@ export function App() {
           />
         )}
         {(destination.page === "patterns") && (
-          <CoachView
+          <PatternsPage
             key={active.id}
+            state={active.ui as import("./lib/pattern-page-state").PatternPageState}
+            onStateChange={update => setNavigation(current => {
+              if (current.active.id !== active.id) return current;
+              const previous = current.active.ui as import("./lib/pattern-page-state").PatternPageState;
+              return studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: typeof update === "function" ? update(previous) : update });
+            })}
             onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
             entries={scopedEntries}
-            onOpenMatch={openDemo}
+            onOpenMatch={(entryId, target) => {
+              const entry = entries.find(item => item.id === entryId);
+              if (entry && target) openEvidence({ entryId, evidence: { matchId: matchIdForEntry(entry), roundNumber: target.roundNumber, tick: target.tick, reason: "战术模式示例" }, sourceKey: "patterns:evidence" });
+            }}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoLibrary={() => goLibrary()}
             teamRenames={identityState.teamRenames}
             analysisContext={analysisContext}
             onAnalysisContextChange={setAnalysisContext}
-            initialTab="patterns"
           />
         )}
         {destination.page === "control" && (
           <RadarFieldView
             key={active.id}
+            state={active.ui as import("./lib/spatial-view-state").ControlPageState}
+            onStateChange={update => setNavigation(current => {
+              if (current.active.id !== active.id) return current;
+              const previous = current.active.ui as import("./lib/spatial-view-state").ControlPageState;
+              return studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: typeof update === "function" ? update(previous) : update });
+            })}
             onPageReady={(keys) => onPageReady(active.id, keys)}
             entries={scopedEntries}
             teamRenames={identityState.teamRenames}
             selectedTeam={selectedTeam}
+            onOpenMatch={openDemo}
             onSelectTeam={selectRadarTeam}
           />
         )}

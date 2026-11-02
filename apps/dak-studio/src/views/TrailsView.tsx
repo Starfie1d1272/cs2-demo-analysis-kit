@@ -1,4 +1,4 @@
-import { emptyOpeningPageState, type OpeningPageState } from "../lib/spatial-view-state";
+import { type OpeningPageState } from "../lib/spatial-view-state";
 import { usePageReady } from "../lib/use-page-ready";
 import { Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
@@ -6,7 +6,6 @@ import type { OpeningTrailsModel, OpeningTrailRound } from "@cs2dak/tactics";
 import { RadarTrails, GRENADE_COLOR, type RadarTrail, type RadarGrenadeOverlay } from "../components/RadarTrails";
 import { entryDate, matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import type { IdentityOptions } from "../lib/identity";
-import { getPinnedPlayer } from "../lib/pin";
 import { getFactsStore } from "../lib/facts-store";
 import { getDerivedCacheStore } from "../lib/derived-cache";
 import { EmptyState } from "@cs2dak/react";
@@ -21,9 +20,12 @@ export interface TrailsViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   onGoLibrary: () => void;
-  onOpenMatch?: (entryId: string, target: { roundNumber: number }) => void;
+  onOpenMatch?: (entryId: string, target: { matchId: string; roundNumber: number }, rounds: OpeningTrailRound[]) => void;
   identityOptions?: IdentityOptions;
-  focusPlayerKey?: string | null;
+  focusPlayerKey: string | null;
+  onSelectPlayer: (playerKey: string, label: string) => void;
+  state: OpeningPageState;
+  onStateChange: Dispatch<SetStateAction<OpeningPageState>>;
 }
 
 const WINDOW_SECONDS = 30;
@@ -61,15 +63,14 @@ const EFFECT_DURATION_SECONDS: Partial<Record<string, number>> = {
   decoy: 15
 };
 
-export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, identityOptions, onPageReady, focusPlayerKey }: TrailsViewProps) {
+export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, identityOptions, onPageReady, focusPlayerKey, onSelectPlayer, state: pageState, onStateChange: setPageState }: TrailsViewProps) {
   // 业务流程：① 选手 → ② 地图（该选手出场的图）→ ③ 最近 N 场（该选手在该图）
-  const [pageState, setPageState] = useState(emptyOpeningPageState);
   const { recentMatchCount: rangeN, mapName, side } = pageState;
   const hiddenRounds = useMemo(() => new Set(pageState.hiddenRoundKeys), [pageState.hiddenRoundKeys]);
   const setRangeN = (recentMatchCount: OpeningPageState["recentMatchCount"]) => setPageState(current => ({ ...current, recentMatchCount }));
   const setSide = (side: OpeningPageState["side"]) => setPageState(current => ({ ...current, side }));
   const setMapName = (update: SetStateAction<string | null>) => setPageState(current => ({ ...current, mapName: typeof update === "function" ? update(current.mapName) : update }));
-  const [selectedKey, setSelectedKey] = useState<string | null>(focusPlayerKey ?? null);
+  const selectedKey = focusPlayerKey;
   const [players, setPlayers] = useState<PlayerOption[] | null>(null);
   /** entryId → 该场出场选手集合。 */
   const [rosterByEntry, setRosterByEntry] = useState<Map<string, Set<string>> | null>(null);
@@ -116,18 +117,9 @@ export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, iden
           roster.set(entry.id, new Set([...(roster.get(entry.id) ?? []), ...keys]));
         }
         const options = [...counts.values()].sort((a, b) => b.matchCount - a.matchCount || a.name.localeCompare(b.name));
-        const pinned = focusPlayerKey ? null : await getPinnedPlayer();
         if (cancelled) return;
         setPlayers(options);
         setRosterByEntry(roster);
-        setSelectedKey((current) => {
-          if (focusPlayerKey) return focusPlayerKey;
-          if (current && options.some((option) => option.playerKey === current)) return current;
-          const pinnedOption = pinned
-            ? options.find((option) => option.playerKey === pinned.playerKey || option.steamIds.some((s) => pinned.steamIds.includes(s)))
-            : null;
-          return (pinnedOption ?? options[0])?.playerKey ?? null;
-        });
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
@@ -167,7 +159,7 @@ export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, iden
     return rangeN > 0 ? pool.filter((entry) => entryDate(entry) !== null).slice(0, rangeN) : pool;
   }, [playerEntries, mapName, rangeN]);
 
-  usePageReady(entries.length === 0 || error !== null || (players !== null && (players.length === 0 || (selectedKey !== null && (mapOptions.length === 0 || (mapName !== null && (rangeEntries.length === 0 || models !== null)))))), onPageReady);
+  usePageReady(entries.length === 0 || error !== null || (players !== null && (!selectedKey || players.length === 0 || mapOptions.length === 0 || (mapName !== null && (rangeEntries.length === 0 || models !== null)))), onPageReady);
 
   // 为选中选手构建各场动线
   useEffect(() => {
@@ -238,8 +230,9 @@ export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, iden
       <div className="stu-trail-controls">
         <label>
           <span>① 选手</span>
-          <select className="stu-select" value={selectedKey ?? ""} onChange={(e) => setSelectedKey(e.target.value || null)}>
+          <select className="stu-select" value={selectedKey ?? ""} onChange={(e) => { const player = players?.find(option => option.playerKey === e.target.value); if (player) onSelectPlayer(player.playerKey, player.name); }}>
             {selectedKey && !(players ?? []).some(option => option.playerKey === selectedKey) && <option value={selectedKey}>当前选手 · 0 场</option>}
+            {!selectedKey && <option value="">请选择选手</option>}
             {(players ?? []).map((option) => (
               <option key={option.playerKey} value={option.playerKey}>
                 {option.name}（{option.matchCount} 场）
@@ -331,7 +324,7 @@ export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, iden
           missingReplay={missingReplay}
           onOpenRound={onOpenMatch ? (round) => {
             const entry = entries.find(candidate => matchIdForEntry(candidate) === round.matchId);
-            if (entry) onOpenMatch(entry.id, { roundNumber: round.roundNumber });
+            if (entry) onOpenMatch(entry.id, { matchId: round.matchId, roundNumber: round.roundNumber }, visibleRounds);
           } : undefined}
         />
       )}
@@ -503,7 +496,7 @@ function TrailStage({ mapName, rounds, hiddenRounds, onToggleRound, missingRepla
           </div>
         </div>
       </div>
-      <aside className="stu-trail-legend">
+      <aside className="stu-trail-legend" id="opening:rounds">
         <h3>回合（{rounds.length}）</h3>
         {prepared.map((item) => (
           <div key={item.key}>
