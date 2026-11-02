@@ -4078,6 +4078,12 @@ td.stu-heat-cell.stu-heat-neutral {
   transition: opacity .12s ease, transform .12s ease;
 }
 
+.stu-duel-evidence-toolbar button .stu-duel-tooltip {
+  left: auto;
+  right: 0;
+  max-width: min(320px, calc(100vw - 32px));
+}
+
 .stu-duel-evidence-toolbar button:hover .stu-duel-tooltip,
 .stu-duel-evidence-toolbar button:focus-visible .stu-duel-tooltip,
 .stu-duel-type:hover .stu-duel-tooltip,

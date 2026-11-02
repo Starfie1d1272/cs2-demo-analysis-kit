@@ -1,3 +1,4 @@
+import { EmptyState } from "@cs2dak/react";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { StudioDemoEntry } from "../lib/demo-entry";
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "../lib/capability-availability";
@@ -71,17 +72,23 @@ export function useCapability(entries: StudioDemoEntry[], capability: StudioCapa
   return { availability: current, eligible, error: effectiveError, retry: () => { if (data.status === "error") void invalidateAnalysisQueries().catch(() => {}); else setRetryVersion(version => version + 1); }, stale: !!current && (data.status !== "ready" || result?.generation !== data.generation || result?.revision !== revision || !!effectiveError) };
 }
 
+const ScopeEditorContext = createContext<(() => void) | undefined>(undefined);
+export function AnalysisScopeEmpty() {
+  const onEditScope = useContext(ScopeEditorContext);
+  return <div className="stu-compact-empty"><EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" action={onEditScope && <button type="button" className="stu-button-sm" onClick={onEditScope}>调整范围</button>} /></div>;
+}
+
 const CapabilityBlockedContext = createContext<"excluded" | "error" | null>(null);
 /** Distinguishes an excluded sample from a genuinely empty scope in child views. */
 export function useCapabilityBlocked(): "excluded" | "error" | null { return useContext(CapabilityBlockedContext); }
 
-export function CapabilityPanel({ entries, capability, onRepair, children }: { entries: StudioDemoEntry[]; capability: StudioCapability; onRepair: (action: CapabilityRepairAction) => void; children: (eligible: StudioDemoEntry[], current: boolean, availability: CapabilityAvailability) => ReactNode }) {
+export function CapabilityPanel({ entries, capability, onRepair, onEditScope, children }: { entries: StudioDemoEntry[]; capability: StudioCapability; onRepair: (action: CapabilityRepairAction) => void; onEditScope?: () => void; children: (eligible: StudioDemoEntry[], current: boolean, availability: CapabilityAvailability) => ReactNode }) {
   const { availability, eligible, error, stale, retry } = useCapability(entries, capability);
   if (!availability || !eligible) return error ? <div role="alert">读取可用性失败：{error} <button type="button" className="stu-button-sm" onClick={retry}>重试</button></div> : <div className="stu-loading">读取分析数据可用性…</div>;
   const blocked = entries.length > 0 && eligible.length === 0 ? (error ? "error" : "excluded") : null;
-  return <CapabilityBlockedContext.Provider value={blocked}>
+  return <ScopeEditorContext.Provider value={onEditScope}><CapabilityBlockedContext.Provider value={blocked}>
     {entries.length > 0 && <CapabilityBar availability={availability} onRepair={onRepair} />}
     {stale && <p className="stu-muted" role="status">{error ? <>可用性更新失败。 <button type="button" className="stu-button-sm" onClick={retry}>重试</button></> : "正在更新可用性。"}</p>}
     {children(eligible, !stale, availability)}
-  </CapabilityBlockedContext.Provider>;
+  </CapabilityBlockedContext.Provider></ScopeEditorContext.Provider>;
 }

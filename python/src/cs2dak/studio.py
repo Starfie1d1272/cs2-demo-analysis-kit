@@ -2116,7 +2116,9 @@ def _launch_studio(storage: Path) -> None:
     from webview.dom import _dnd_state
     _dnd_state["num_listeners"] = max(_dnd_state["num_listeners"], 1)
 
-    _migrate_storage_layout(storage)
+    api = StudioApi()
+    if api._userdata.resolve() != storage.resolve():
+        raise RuntimeError("资料库路径在启动期间发生变化，请重试")
     assets = _assets_dir_for(storage)
     cache = _cache_dir_for(storage)
     updates = _updates_dir_for(storage)
@@ -2143,7 +2145,6 @@ def _launch_studio(storage: Path) -> None:
         overlay_bundled_events=overlay_bundled_events,
         overlay_web=_valid_web_overlay(overlay_web),
     )
-    api = StudioApi()
     window = webview.create_window(
         title=f"DAK Studio {__version__}",
         url=index_url,
