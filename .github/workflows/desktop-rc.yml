@@ -10,6 +10,11 @@ on:
         description: "Existing vX.Y.Z-rc.N tag for retry"
         required: true
         type: string
+      build_only:
+        description: "Build and retain artifacts without publishing"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -84,6 +89,7 @@ jobs:
           shasum -a 256 "dist/dak-studio-$ID-macos-arm64.dmg" > dist/SHA256SUMS.txt
 
       - name: Publish GitHub prerelease
+        if: ${{ !inputs.build_only }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -100,3 +106,59 @@ jobs:
           gh release create "$RC_TAG" dist/*.dmg dist/SHA256SUMS.txt \
             --verify-tag --prerelease --latest=false --title "DAK Studio $RC_TAG" \
             --notes-file "$RUNNER_TEMP/rc-notes.md"
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Exclude workspace from Windows Defender
+        shell: pwsh
+        run: |
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE" -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath "$env:RUNNER_TEMP" -ErrorAction SilentlyContinue
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+      - name: Validate candidate identity
+        shell: bash
+        env:
+          RC_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          [[ "$RC_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-rc\.[1-9][0-9]*$ ]]
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse "refs/tags/$RC_TAG^{commit}")" ]]
+          node --input-type=module - "$RC_TAG" <<'NODE'
+          import { planVersionSync } from './scripts/sync-version.mjs';
+          const version = process.argv[2].slice(1).replace(/-rc\.[1-9]\d*$/, '');
+          const changes = planVersionSync(process.cwd(), version);
+          if (changes.length) throw new Error(`Candidate version ${version} is not synced: ${changes.map(x => x.rel).join(', ')}`);
+          NODE
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - run: pnpm install --frozen-lockfile
+      - name: Package Windows candidate runtime
+        shell: bash
+        env:
+          PACKAGE_CANDIDATE_TAG: ${{ inputs.tag || github.ref_name }}
+          PACKAGE_SKIP_VERSION_SYNC: "1"
+        run: |
+          set -euo pipefail
+          bash scripts/package.sh
+          ID="${PACKAGE_CANDIDATE_TAG#v}"
+          cd "python/dist/dak-studio-$ID"
+          test -s dak-studio/dak-studio.exe
+          7z a -mx=9 "dak-studio-windows-$ID.zip" dak-studio
+          cd ../../..
+          uv run --project python python scripts/check-desktop-notices.py "python/dist/dak-studio-$ID/dak-studio-windows-$ID.zip" studio
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-candidate-runtime
+          path: python/dist/dak-studio-*/dak-studio-windows-*.zip
+          if-no-files-found: error
