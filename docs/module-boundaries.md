@@ -51,7 +51,7 @@ DAK Studio 已落地为 `apps/dak-studio`（资料库 / 比赛工作台 / 选手
 | Studio 模块 | 唯一职责 | 共享逻辑 owner |
 |---|---|---|
 | 资料库 | 本地 ZIP/.dem 导入、标签、重导、检索 | Studio 本地适配；ZIP 加载属 demo-io，格式 schema 属 contract |
-| 比赛工作台 | 单场回合、回放、地图、经济与 RR 解释入口 | `@cs2dak/pipeline` / `@cs2dak/analytics` 生成模型；`@cs2dak/react` 渲染 |
+| 比赛工作台 | 单场回合、回放、地图、经济与 RR 解释入口 | `@cs2dak/pipeline` / `@cs2dak/analytics` 生成模型；`@cs2dak/react` 渲染通用控件；Studio 组合整页与状态 |
 | 个人实验室 | 选手档案、趋势、武器分布、证据跳转 | `@cs2dak/cohort` + `@cs2dak/analytics` |
 | 对枪实验室 | duels/mechanics 信号聚合、三分类对枪、TTK、机制画像（含 .tri LOS 反应时间/预瞄） | `@cs2dak/tactics` + `@cs2dak/analytics` |
 | 道具实验室 | 跨场 Flash Value、负收益队闪、道具证据 | `@cs2dak/analytics` |

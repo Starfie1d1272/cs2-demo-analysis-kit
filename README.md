@@ -97,7 +97,7 @@ export function Replay({ replay, map }: { replay: WorkspaceReplay; map: MapView 
 }
 ```
 
-For raw DemoPackage input, use `pipeline.analyzeMatchWorkspace(input, options?)`. For existing package/bundle/canonical facts, use `analytics.buildMatchWorkspaceFromAnalysis(pkg, bundle, facts, options?)`. The host supplies radar image URLs through `DemoViewOptions`; omitted URLs are null. See [architecture](docs/architecture.md) for the public entry points and [module boundaries](docs/module-boundaries.md) for the enforced graph.
+For raw DemoPackage input, use `pipeline.analyzeMatchWorkspace(input, options?)`. For existing package/bundle/canonical facts, use `analytics.buildMatchWorkspaceFromAnalysis(pkg, bundle, facts, options?)`. Studio owns its match workspace composition; public React tables and replay are controlled by the host. See [React migration](docs/migrations/react-controlled-state.md). The host supplies radar image URLs through `DemoViewOptions`; omitted URLs are null. See [architecture](docs/architecture.md) for the public entry points and [module boundaries](docs/module-boundaries.md) for the enforced graph.
 
 ## Develop
 

@@ -1,3 +1,5 @@
+import { createReplayViewState, normalizeReplayViewState, type ReplayViewState } from "@cs2dak/presentation";
+import { STUDIO_TABLE_CLASSES } from "../../components/table-styles";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { MatchWorkspaceModel } from "@cs2dak/presentation";
 import { ReplayViewer } from "@cs2dak/react/replay";
@@ -7,7 +9,7 @@ import type { EconomyEntry } from "@cs2dak/tactics";
 import { autoName, type TacticalCluster } from "../../lib/tactics.js";
 import type { TacticalRoundFact } from "../../lib/fact-types.js";
 import { loadMatchWorkspaceModel, type StudioDemoEntry } from "../../lib/library.js";
-import { MetricInfo, EvidenceLink, DataTable, STUDIO_TABLE_CLASSES, type DataTableColumn } from "@cs2dak/react";
+import { MetricInfo, EvidenceLink, DataTable, type DataTableColumn } from "@cs2dak/react";
 
 export interface PatternExplorerProps {
   clusters: TacticalCluster[];
@@ -220,12 +222,6 @@ async function loadReplayModel(matchId: string, demoId: string | null, cache: Ma
   return model;
 }
 
-function replayTargetSeq(matchId: string, roundNumber: number): number {
-  let hash = roundNumber;
-  for (let index = 0; index < matchId.length; index += 1) hash = (hash * 31 + matchId.charCodeAt(index)) | 0;
-  return Math.abs(hash);
-}
-
 /** 教练页常驻回放主画布：只按当前证据的 matchId 懒加载单场 workspace。 */
 function CoachReplayStage({ fact, entryByMatchId, cache, mainRef }: {
   fact: TacticalRoundFact | null;
@@ -240,6 +236,16 @@ function CoachReplayStage({ fact, entryByMatchId, cache, mainRef }: {
   );
   const [error, setError] = useState<string | null>(null);
   const model = loaded?.matchId === matchId ? loaded.model : null;
+  const [replayState, setReplayState] = useState<ReplayViewState | null>(null);
+  const replayMatchId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!model || !fact) { replayMatchId.current = null; setReplayState(null); return; }
+    const round = model.replay.rounds.find(r => r.roundNumber === fact.roundNumber);
+    const initial = createReplayViewState(model.replay, model.map.view);
+    const sameMatch = replayMatchId.current === fact.matchId;
+    replayMatchId.current = fact.matchId;
+    setReplayState(previous => round && initial ? normalizeReplayViewState(model.replay, model.map.view, { ...(sameMatch && previous ? previous : initial), roundNumber: round.roundNumber, tick: round.freezeEndTick + 20 * (model.replay.tickrate ?? 64), playing: false }) : null);
+  }, [model, fact?.matchId, fact?.roundNumber]);
 
   useEffect(() => {
     let cancelled = false;
@@ -272,15 +278,15 @@ function CoachReplayStage({ fact, entryByMatchId, cache, mainRef }: {
         <div className="stu-pe-radar-empty">{error}</div>
       ) : !model ? (
         <div className="stu-loading">读取本地回放…</div>
-      ) : !model.replay.available ? (
+      ) : !model.replay.available || !model.replay.rounds.some(r => r.roundNumber === fact.roundNumber) ? (
         <div className="stu-pe-radar-empty">本场导出未附带 2D 回放流。</div>
       ) : (
         <div className="stu-pe-replay-frame">
           <ReplayViewer
             replay={model.replay}
             map={model.map.view}
-            target={{ roundNumber: fact.roundNumber, seq: replayTargetSeq(fact.matchId, fact.roundNumber) }}
-            initialClockSeconds={95}
+            state={replayMatchId.current === matchId ? replayState : null}
+            onStateChange={setReplayState}
           />
         </div>
       )}
@@ -467,7 +473,9 @@ function EvidenceTable({
   onAddToPlaylist?: (cluster: TacticalCluster, fact: TacticalRoundFact) => void;
 }) {
   const PAGE_SIZE = 12;
-  const [page, setPage] = useState(0);
+  const [tableState, setTableState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: null, direction: "desc" }, page: 0 });
+  const page = tableState.page;
+  const setPage = (page: number) => setTableState(prev => ({ ...prev, page }));
   useEffect(() => { setPage(0); }, [cluster.id]);
 
   // 预建 fact 查找表，避免每列每行重复线性扫描
@@ -559,8 +567,7 @@ function EvidenceTable({
         rows={cluster.rounds}
         rowKey={(r) => `${r.matchId}-${r.roundNumber}`}
         pageSize={PAGE_SIZE}
-        page={page}
-        onPageChange={setPage}
+        state={tableState} onStateChange={setTableState}
         paginationMaxButtons={6}
         paginationInfo={(total) => `${total} 回合`}
         rowClassName={(r) => activeFact?.matchId === r.matchId && activeFact.roundNumber === r.roundNumber ? "stu-pe-evidence-active" : undefined}

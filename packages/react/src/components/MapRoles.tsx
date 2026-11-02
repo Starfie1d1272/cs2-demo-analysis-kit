@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { DoubleAwpAnalysisView, EvidenceRef, PlayerMapPoolRowView, PlayerMapRoleProfileView, TeamMapRoleMatrixView } from "@cs2dak/presentation";
 import { DataTable, DAK_TABLE_CLASSES, type DataTableColumn } from "./DataTable";
 import { EmptyState, EvidenceLink, LimitNote, MetricInfo } from "./Primitives";
@@ -23,6 +24,7 @@ export function PlayerMapRoleProfilePanel({
   profile: PlayerMapRoleProfileView | null;
   onOpenEvidence?: (evidence: EvidenceRef) => void;
 }) {
+  const [tableState, setTableState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "sample", direction: "desc" }, page: 0 });
   if (!profile) return <EmptyState variant="insufficient" title="地图 / 位置画像不可用" hint="需要当前选手的地图位置 facts；缺失时可在资料库重建 facts。" />;
   const rows = profile.perMapEvidence;
   const positionLabels = new Map(profile.positionGroupDisplay.map((row) => [`${row.mapName}:${row.side}:${row.positionGroupId}`, row]));
@@ -53,7 +55,7 @@ export function PlayerMapRoleProfilePanel({
       </div>
       <div className="dak-role-summary"><span>AWPer 倾向分 <b>{Math.round(profile.roleEvidenceScores.awper * 100)}</b></span><span>Anchor 倾向分 <b>{Math.round(profile.roleEvidenceScores.anchor * 100)}</b></span><span>Opener 倾向分 <b>{Math.round(profile.roleEvidenceScores.opener * 100)}</b></span><span>Closer 倾向分 <b>{Math.round(profile.roleEvidenceScores.closer * 100)}</b></span></div>
       <div className="dak-role-declarations"><b>用户主角色</b>{profile.declaredRoles.filter((row) => row.source === "user").map((row, index) => <span key={`user-${row.role}-${index}`} className="dak-role-tag">{row.priority} · {row.role}{row.mapName ? ` · ${row.mapName.replace("de_", "")}` : ""}</span>)}{!profile.declaredRoles.some((row) => row.source === "user") && <span>未提供</span>}<b>用户武器职责</b>{profile.declaredWeaponDuties.filter((row) => row.source === "user").map((row, index) => <span key={`weapon-${row.weaponDuty}-${index}`} className="dak-role-tag">{DUTY_LABEL[row.weaponDuty]}{row.mapName ? ` · ${row.mapName.replace("de_", "")}` : ""}</span>)}{!profile.declaredWeaponDuties.some((row) => row.source === "user") && <span>未提供</span>}</div>
-      {rows.length ? <DataTable classes={DAK_TABLE_CLASSES} rows={rows} rowKey={(row) => `${row.teamKey}:${row.mapName}:${row.side}`} columns={columns} initialSortKey="sample" /> : <EmptyState variant="insufficient" title="没有可用地图样本" hint="当前范围没有满足角色证据条件的地图 / 阵营数据。" />}
+      {rows.length ? <DataTable classes={DAK_TABLE_CLASSES} rows={rows} rowKey={(row) => `${row.teamKey}:${row.mapName}:${row.side}`} columns={columns} state={tableState} onStateChange={setTableState} /> : <EmptyState variant="insufficient" title="没有可用地图样本" hint="当前范围没有满足角色证据条件的地图 / 阵营数据。" />}
       {profile.roleAlignments.map((alignment, index) => <p className="dak-role-note" key={`role-alignment-${index}`}><b>声明与观察</b>{alignment.tSide}；{alignment.ctSide}{alignment.sampleLimitations[0] ? `；${alignment.sampleLimitations[0]}` : ""}</p>)}
       {profile.weaponDutyAlignments.map((alignment, index) => <p className="dak-role-note" key={`weapon-alignment-${index}`}><b>武器职责声明与观察</b>{DUTY_LABEL[alignment.declaration.weaponDuty]} / {alignment.observedWeaponDuty ? DUTY_LABEL[alignment.observedWeaponDuty] : "—"}</p>)}
       {profile.basis[0] && <p className="dak-role-note"><b>依据</b>{profile.basis[0]}</p>}
@@ -71,6 +73,7 @@ export function TeamMapRoleMatrixPanel({
   playerNames?: Record<string, string>;
   onOpenEvidence?: (evidence: EvidenceRef) => void;
 }) {
+  const [tableState, setTableState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "sample", direction: "desc" }, page: 0 });
   if (!matrix) return <EmptyState variant="insufficient" title="该地图暂无职责矩阵" hint="选择有位置 facts 的地图和阵营；样本不足会明确保留，而不是补零。" />;
   const columns: DataTableColumn<TeamMapRoleMatrixView["players"][number]>[] = [
     { key: "player", label: "选手", format: (row) => playerNames[row.playerKey] ?? row.playerKey },
@@ -85,7 +88,7 @@ export function TeamMapRoleMatrixPanel({
     <section className="dak-role-panel">
       <div className="dak-role-head"><div><h3>{matrix.mapName.replace("de_", "")} · {matrix.side.toUpperCase()} 位置职责</h3><p>描述队伍地图盘面；不自动生成强弱判断或对策。</p></div><Status value={matrix.status} /></div>
       <div className="dak-role-summary"><span>置信度：<b>{Math.round(matrix.confidence * 100)}%</b></span><span>覆盖不稳：<b>{matrix.unstableCoverage ? "是" : "否"}</b></span><span>位置集中度：<b>{matrix.positionConcentration == null ? "—" : `${Math.round(matrix.positionConcentration * 100)}%`}</b></span><span>位置重叠：<b>{matrix.positionOverlap.length}</b></span></div>
-      <DataTable classes={DAK_TABLE_CLASSES} rows={matrix.players} rowKey={(row) => row.playerKey} columns={columns} initialSortKey="sample" />
+      <DataTable classes={DAK_TABLE_CLASSES} rows={matrix.players} rowKey={(row) => row.playerKey} columns={columns} state={tableState} onStateChange={setTableState} />
       {matrix.representativeRounds.length > 0 && <div className="dak-role-evidence"><b>队伍代表回合</b><Evidence evidence={matrix.representativeRounds} onOpenEvidence={onOpenEvidence} /></div>}
       {matrix.limitations[0] && <LimitNote>{matrix.limitations[0]}</LimitNote>}
     </section>
@@ -104,6 +107,7 @@ export function DoubleAwpAnalysisPanel({ model, playerNames = {}, onOpenEvidence
 }
 
 export function PlayerMapPoolPanel({ rows, onOpenEvidence }: { rows: PlayerMapPoolRowView[]; onOpenEvidence?: (evidence: EvidenceRef) => void }) {
+  const [tableState, setTableState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "record", direction: "desc" }, page: 0 });
   const columns: DataTableColumn<PlayerMapPoolRowView>[] = [
     { key: "map", label: "地图", format: (row) => row.mapName.replace("de_", "") },
     { key: "record", label: "场次 / 战绩", sortable: true, sortValue: (row) => row.matchCount, format: (row) => `${row.matchCount} · ${row.wins}胜 ${row.losses}负` },
@@ -118,5 +122,5 @@ export function PlayerMapPoolPanel({ rows, onOpenEvidence }: { rows: PlayerMapPo
     { key: "quality", label: "样本 / 置信度", format: (row) => `${Math.round(row.sampleQuality * 100)}% / ${Math.round(row.confidence * 100)}%` },
     { key: "evidence", label: "证据", render: (row) => <Evidence evidence={row.evidence} onOpenEvidence={onOpenEvidence} /> },
   ];
-  return rows.length ? <div className="dak-table-scroll"><DataTable classes={DAK_TABLE_CLASSES} rows={rows} rowKey={(row) => row.mapName} columns={columns} initialSortKey="record" /></div> : <EmptyState variant="insufficient" title="地图池样本不足" hint="当前选手没有可聚合的地图级 facts。" />;
+  return rows.length ? <div className="dak-table-scroll"><DataTable classes={DAK_TABLE_CLASSES} rows={rows} rowKey={(row) => row.mapName} columns={columns} state={tableState} onStateChange={setTableState} /></div> : <EmptyState variant="insufficient" title="地图池样本不足" hint="当前选手没有可聚合的地图级 facts。" />;
 }

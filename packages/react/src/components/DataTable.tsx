@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { normalizeTableState, type TableState } from "@cs2dak/presentation";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Pagination } from "./Pagination";
 
 /**
@@ -6,7 +7,7 @@ import { Pagination } from "./Pagination";
  *
  * 设计目标：取代仓库里 4 套各自为政的排序实现（stu-col-sortable / stu-sort-header /
  * dak-col-sortable / 一堆静态表）。**只下沉逻辑与结构，样式靠 classes 预设注入**——
- * 这样 DAK Studio 的表保留 `stu-*` 长相（STUDIO_TABLE_CLASSES），React 原生用法走
+ * 宿主可注入自己的样式，React 原生用法走
  * `dak-*`（DAK_TABLE_CLASSES），两套设计语言不互相污染。
  *
  * 纯展示：不查数据库、不跑分析，只吃 rows + 列配置。复杂单元格（按钮/证据链/着色）
@@ -53,17 +54,6 @@ export interface DataTableClasses {
   pagination?: string;
 }
 
-/** DAK Studio 表（Tactical Slate / stu-*）。CSS 在 studio.css。 */
-export const STUDIO_TABLE_CLASSES: DataTableClasses = {
-  table: "stu-mini-table",
-  numeric: "stu-num",
-  sortable: "stu-col-sortable",
-  sortableActive: "stu-col-sortable",
-  rowClickable: "stu-row-clickable",
-  heatCell: (tone) => `stu-heat-cell stu-heat-${tone}`,
-  pagination: "stu-pagination",
-};
-
 /** React 包原生表（dak-*）。CSS 在 theme.css。 */
 export const DAK_TABLE_CLASSES: DataTableClasses = {
   table: "dak-table",
@@ -79,14 +69,9 @@ export interface DataTableProps<T> {
   rows: T[];
   rowKey: (row: T) => string;
   classes?: DataTableClasses;
-  /** 初始排序列 key；缺省不排序（保留 rows 原序）。 */
-  initialSortKey?: string;
-  initialSortDirection?: SortDirection;
-  /** 设置后启用分页。 */
+  state: TableState;
+  onStateChange: (next: TableState) => void;
   pageSize?: number;
-  /** 受控分页：外部指定当前页（用于 hover 联动等场景）。缺省走内部 state。 */
-  page?: number;
-  onPageChange?: (page: number) => void;
   paginationMaxButtons?: number;
   /** 分页信息文字生成器（接收行总数）。 */
   paginationInfo?: (total: number) => string;
@@ -128,11 +113,9 @@ export function DataTable<T>({
   rows,
   rowKey,
   classes = DAK_TABLE_CLASSES,
-  initialSortKey,
-  initialSortDirection = "desc",
+  state,
+  onStateChange,
   pageSize,
-  page,
-  onPageChange,
   paginationMaxButtons = 8,
   paginationInfo,
   onRowClick,
@@ -140,20 +123,14 @@ export function DataTable<T>({
   rowProps,
   showRank = false,
 }: DataTableProps<T>) {
-  const [sortKey, setSortKey] = useState<string | null>(initialSortKey ?? null);
-  const [sortDesc, setSortDesc] = useState(initialSortDirection === "desc");
-  const [internalPage, setInternalPage] = useState(0);
-  const controlled = page !== undefined;
-  const currentPage = controlled ? page : internalPage;
-  const setPage = controlled ? (onPageChange ?? (() => {})) : setInternalPage;
-
+  const normalized = normalizeTableState(state, { sortableKeys: columns.filter(c => c.sortable && c.sortValue).map(c => c.key), totalRows: rows.length, pageSize });
+  const { key: sortKey, direction } = normalized.sort;
+  const sortDesc = direction === "desc";
+  useEffect(() => {
+    if (normalized.sort.key !== state.sort.key || normalized.sort.direction !== state.sort.direction || normalized.page !== state.page) onStateChange(normalized);
+  }, [normalized.sort.key, normalized.sort.direction, normalized.page, state.sort.key, state.sort.direction, state.page, onStateChange]);
   function handleSort(key: string) {
-    if (sortKey === key) setSortDesc((d) => !d);
-    else {
-      setSortKey(key);
-      setSortDesc(true);
-    }
-    setPage(0);
+    onStateChange({ sort: { key, direction: sortKey === key && sortDesc ? "asc" : "desc" }, page: 0 });
   }
 
   const sortedRows = useMemo(() => {
@@ -175,7 +152,7 @@ export function DataTable<T>({
   }, [rows, columns, sortKey, sortDesc]);
 
   const totalPages = pageSize ? Math.max(1, Math.ceil(sortedRows.length / pageSize)) : 1;
-  const safePage = Math.min(currentPage, totalPages - 1);
+  const safePage = normalized.page;
   const pageRows = pageSize
     ? sortedRows.slice(safePage * pageSize, (safePage + 1) * pageSize)
     : sortedRows;
@@ -188,7 +165,7 @@ export function DataTable<T>({
         <Pagination
           page={safePage}
           totalPages={totalPages}
-          onChange={setPage}
+          onChange={(page) => onStateChange({ ...normalized, page })}
           maxButtons={paginationMaxButtons}
           info={paginationInfo?.(sortedRows.length)}
           className={classes.pagination}
@@ -213,7 +190,7 @@ export function DataTable<T>({
                   className={thClass || undefined}
                   title={col.title}
                   aria-sort={active ? (sortDesc ? "descending" : "ascending") : undefined}
-                  onClick={col.sortable ? () => handleSort(col.key) : undefined}
+                  onClick={col.sortable && col.sortValue ? () => handleSort(col.key) : undefined}
                 >
                   {col.label}
                   {col.sortable ? arrow(col.key) : ""}

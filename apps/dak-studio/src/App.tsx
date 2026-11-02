@@ -575,7 +575,7 @@ export function App() {
       }));
     }
     setSelectedDemoId(id);
-    setMatchDeepLink(target ?? null);
+    setMatchDeepLink(target ? { ...target } : null);
     setView("match");
   }, [entries]);
 

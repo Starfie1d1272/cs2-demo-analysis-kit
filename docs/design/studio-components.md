@@ -44,8 +44,10 @@ DAK Studio 是独立 `stu-*` 设计语言（CSS 在 `apps/dak-studio/src/studio.
 ## 2. `DataTable` 用法
 
 ```tsx
-import { DataTable, STUDIO_TABLE_CLASSES, type DataTableColumn } from "@cs2dak/react";
+import { DataTable, type DataTableColumn } from "@cs2dak/react";
+import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 
+const [tableState, setTableState] = useState<TableState>({ sort: { key: "wins", direction: "desc" }, page: 0 });
 const COLUMNS: DataTableColumn<Row>[] = [
   { key: "name", label: "队伍", format: (r) => r.name },
   { key: "wins", label: "胜场", numeric: true, sortable: true, sortValue: (r) => r.wins, format: (r) => r.wins },
@@ -57,7 +59,8 @@ const COLUMNS: DataTableColumn<Row>[] = [
   classes={STUDIO_TABLE_CLASSES}   // Studio 表保留 stu-* 长相；缺省 DAK_TABLE_CLASSES 走 dak-*
   rows={rows}
   rowKey={(r) => r.id}
-  initialSortKey="wins"
+  state={tableState}
+  onStateChange={setTableState}
   pageSize={15}                    // 设置即启用分页
   columns={COLUMNS}
 />
