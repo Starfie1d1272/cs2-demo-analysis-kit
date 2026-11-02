@@ -70,6 +70,19 @@ async function roleGroups(entries: StudioDemoEntry[], identity?: IdentityOptions
   return { groups: values, teamIdentityMap, selectedKeys: grouped.selectedKeys };
 }
 
+/** Selector groups and their matching entries use the same local grouping as role evidence. */
+export function getTeamAnalysisGroups(entries: StudioDemoEntry[], identity?: IdentityOptions): Promise<Array<{ key: string; name: string; matchIds: string[] }>> {
+  return withStoredAnalysis(entries, async () => {
+    const { groups, teamIdentityMap } = await roleGroups(entries, identity);
+    return groups.map(group => ({
+      key: group.key,
+      name: group.label,
+      matchIds: [...new Set(entries.map(matchIdForEntry).filter(matchId =>
+        (["teamA", "teamB"] as const).some(slot => teamIdentityMap[`${matchId}:${slot}`] === group.key)))],
+    })).sort((a, b) => b.matchIds.length - a.matchIds.length || a.name.localeCompare(b.name));
+  }, true);
+}
+
 export async function getRoleTeamEntries(entries: StudioDemoEntry[], identity: IdentityOptions | undefined, team: string): Promise<StudioDemoEntry[]> {
   return withStoredAnalysis(entries, async () => {
     const grouped = await roleGroups(entries, identity, [team]);

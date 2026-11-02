@@ -10,10 +10,11 @@ import { TeamComparisonPanel } from "@cs2dak/react";
 import type { TeamComparisonModel } from "@cs2dak/presentation";
 import type { TeamPageState } from "../lib/studio-page-state";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { DataTable, EmptyState, type DataTableColumn } from "@cs2dak/react";
 import type { TeamOverviewModel } from "@cs2dak/presentation";
 import { getTeamOverview } from "../lib/queries/team-queries";
+import { getTeamAnalysisGroups } from "../lib/queries/spatial-queries";
 import { type IdentityOptions } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 
@@ -67,27 +68,30 @@ export function TeamView({
   const setMapTable = (value: typeof mapTable) => onStateChange({ ...state, tables: { ...state.tables, maps: value } });
   const setRosterTable = (value: typeof rosterTable) => onStateChange({ ...state, tables: { ...state.tables, roster: value } });
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
-  const [teamList, setTeamList] = useState<TeamComparisonModel["availableTeams"]>([]);
+  const [teamList, setTeamList] = useState<Array<{ key: string; name: string; matchIds: string[] }>>([]);
   const [teamListError, setTeamListError] = useState<string | null>(null);
-  const teamEntries = entries;
-  const overviewCapability = useCapability(teamEntries, "team-comparison");
-  const comparisonCapability = useCapability(entries, "team-comparison");
-  const overviewEntries = overviewCapability.eligible;
-  const comparisonEntries = comparisonCapability.eligible;
   useEffect(() => {
-    if (!comparisonEntries?.length || analysis.status !== "ready") { setTeamList([]); return; }
+    if (!entries.length || analysis.status !== "ready") { setTeamList([]); return; }
     let cancelled = false;
     setTeamListError(null);
-    void getTeamComparison(comparisonEntries, identityOptions).then(model => {
-      if (!cancelled) { assertAnalysisGeneration(analysis.generation); setTeamList(model.availableTeams); }
+    void getTeamAnalysisGroups(entries, identityOptions).then(groups => {
+      if (!cancelled) { assertAnalysisGeneration(analysis.generation); setTeamList(groups); }
     }).catch(error => { if (!cancelled) { setTeamList([]); setTeamListError(error instanceof Error ? error.message : String(error)); } });
     return () => { cancelled = true; };
-  }, [comparisonEntries, identityOptions?.version, analysis]);
-  const teams = teamList.map(team => ({ ...team, key: team.key ?? team.name }));
+  }, [entries, identityOptions?.version, analysis]);
+  const teams = teamList.map(team => ({ ...team, matches: team.matchIds.length }));
   const matchingTeams = teams.filter(team => team.name === selectedTeam);
   const activeTeam = selectedTeamKey
     ? (teams.some(team => team.key === selectedTeamKey) ? selectedTeamKey : null)
     : matchingTeams.length === 1 ? matchingTeams[0]!.key : null;
+  const teamEntries = useMemo(() => {
+    const matchIds = new Set(teamList.find(team => team.key === activeTeam)?.matchIds ?? []);
+    return entries.filter(entry => matchIds.has(matchIdForEntry(entry)));
+  }, [entries, teamList, activeTeam]);
+  const overviewCapability = useCapability(teamEntries, "team-comparison");
+  const comparisonCapability = useCapability(entries, "team-comparison");
+  const overviewEntries = overviewCapability.eligible;
+  const comparisonEntries = comparisonCapability.eligible;
   const overviewKey = JSON.stringify([entries.map(entry => entry.id), activeTeam, identityOptions?.version]);
   const comparisonKey = JSON.stringify([entries.map(entry => entry.id), activeTeam, state.compareTeamName, identityOptions?.version]);
   const [overviewSnapshot, setOverviewSnapshot] = useState<{ key: string; generation: number; sample: string; value: TeamOverviewModel | null } | null>(null);
