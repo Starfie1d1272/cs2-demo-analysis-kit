@@ -1,73 +1,47 @@
-# Studio 工作台 W19 集成验收记录（进行中）
+# Studio 工作台 W19 集成验收（2026-11-02）
 
-本记录不是整体验收通过证明。原始实测基线 main `186f3fafea6bda8bee8850250ef49d7bf5adcd7f`，2026-11-02 UTC；分支随后更新到 `39e3a66`（含 #180/#181），新差异见 C2；[#133](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/133)、[#152](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/152)。21 个前置项已合入，但其 PR/CI 不替代下列旅程验收。没有关闭 #152/#133，也不建议据此关闭 #17。#3 的长期运行及 50+ 场、#64 的桌面平台、#49/#75/#76 各自独立门槛仍由原 owner 承接。
+本记录对应 [#133](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/133)、[#152](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/152)：产品基线 main `98c3d50e3b52e93e6908379651fcd6efda0526a3`，以及本 PR 的纯依赖、回合标签、键盘返回、证据焦点和打印分页修正。21 项前置合并和 CI 不代替旅程实测。除比赛 format/ZIP 资料库外，用户已取消旧版兼容要求：不恢复旧 Prep 页面、旧手工入口或旧导出；旧数据不主动 purge，新分析统一导出保留。本文不是原生平台或整体验收通过的声明。
 
-## 2026-11-02 用户授权的范围调整
+环境：Linux x86_64 云机，Node 24.19.0、仓库 pnpm、Vite 开发服务、Chromium 151 headless，1280×800。独立浏览器 context/IndexedDB：A 空库；B 导入仓库真实 Nuke ZIP（593,751 bytes）及 cohort 三 ZIP（1,986,337 / 1,045,157 / 1,134,000 bytes），四场约 4.8 MB。赛事另用仓库 `sample-pro-finals-2026.zip` 的七图。模拟数据、故障均在下表标明；没有模拟 50 场或使用用户 Mac。
 
-用户明确：除比赛 format/ZIP 资料库外，DAK 旧版兼容不再作为验收要求；不恢复旧 Prep 页面、旧手工入口或旧导出，保留新统一导出。旧数据不主动物理清除。下文此前执行的 Prep、材料单编辑和旧资料迁移记录是当时的历史观察，不要求恢复这些入口或将其通过作为关闭门槛；W09/W11 正在按新范围删除或收口，最终合流后必须基于实际保留的新入口重新跑相应旅程。比赛 format/ZIP、基础身份与当前产品数据仍需按实际合同核验。
+## 当前验收结果
 
-## 最终合流后复验（2026-11-02 UTC）
-
-最终产品基线 `98c3d50e3b52e93e6908379651fcd6efda0526a3`（#180–#185），隔离 Chromium 151、1280×800，fresh Vite 服务；没有旧用户库。以下是新范围内的实际操作，不依赖旧 Prep 页面或旧导出。
-
-- 空库：新建笔记并输入后切换新建战术，取消放弃时笔记和内容保留且仅一个编辑器；确认后仅一个战术编辑器。纯文字战术讲解显示正文；另一 Play 的三个阶段各保存人员任务及位置、烟雾、闪光标记，重载后逐阶段可见。新建战术、笔记、比赛单，导出 Markdown、打印按钮实际触发浏览器打印调用，打印媒体 PDF 生成，重载后均在资料页。A4 一页 PDF 的文本包含正文且无编辑按钮，尚未实机打印或目视检验复杂分页。
-- 真实 B 库：导入仓库 Nuke + cohort 三个 ZIP 共四场。实际从管理进入分析、导出经济 JSON（4 个 source），另在单场库保存经济分析、重载打开并另存，实际下载 JSON/Markdown；新增第二场后 JSON 的 SHA-256 仍为 `d61663f9674709515117415daff758c3580c9ec5667cec9db4de1865584da4ef`。进入材料创建 Nuke R1 证据笔记和战术，加入比赛单；讲解项、Markdown 和打印媒体 PDF 都显示来源及“来源和已知版本一致”，重载后材料存在。六分析主题和 Nuke 1:13/14 回合重新打开；总体、选手、队伍、赛事、经济、道具分析、点位、个人开局、覆盖场及战术模式入口逐一可达（需要对象/条件的页面如实显示选择或无样本），不据此声称每个旧视图的所有功能都通过。另分两次导入标记 W19-A/W19-B，范围筛选分别为 1/4 和 3/4。
-- 零帧：在 Nuke 临时 ZIP 副本将 R1 frameCount 设 0 并清空玩家帧；打开 R1 证据后保持 R1 详情并显示本回合无可播放回放，不再跳到 R2。旧场隔离：在另一隔离库仅将 Inferno factsRevision 改成模拟旧值；选中当前 Nuke 的 soulfly，交火提示 1/2 可用并出现个人记录。浏览器模拟 IndexedDB 全部打开失败时显示资料读取失败及“比赛资料暂不可用”。
-- 数据保留：隔离 IndexedDB 中的 Nuke demo 元数据和 ZIP blob 重载前后 key 一致；写入的合成旧 playlist 与笔记哨兵重载后仍在。旧记录没有迁移或物理清除；这不是承诺旧页面兼容。模拟查询延迟后 invalidation 返回 AbortError 且清空旧 bucket；两场范围编辑的编辑器始终为一个。
-- #183 主线已收范围编辑器 key 修复；本 PR 不再重复该接线。#184 删除 Prep 兼容模块、旧页面和旧报告导出；#185 收口分析文案。旧版历史记录保留在下文，不作为当前功能通过证明。最终 main 的[官方 CI](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/actions/runs/41423559464)四项成功；本分支改动另以自身 CI 核验。
-- 最终源码删除表：旧 `prep-items.ts` / `material-data-migration.ts` / `PrepItemsPanel.tsx` → 新 StudyNote/战术与比赛单的各自 App owner（#184）；旧单场报告下载 → 统一 AnalysisResult 导出（#184）；失效通用基线选择 → 主题实际支持的条件和真实来源（#185）；旧 playlist 数据不主动清除。源码搜索未发现旧 PrepItem 入口及旧单场 Markdown 报告 helper；`storage-overview` 仍列旧 namespace 以保留数据，属于允许的数据保留。
-- 本 PR 将纯队名映射/分组从持久化 `identity.ts` 移到 `team-identity.ts`，将缓存版本常量移入纯模块并迁完仓内调用方；esbuild 输入闭包未含 storage/worker/pipeline/query-cache，别名反查两原名与真实 Nuke 队伍改名后分析/重载通过。覆盖场全部经济条件将公共组件“长枪局”改为“回合”，长枪/全部分别显示 4/14 回合；有 React patch Changeset、真实 tarball 消费和包边界验证。真实 Nuke 的 Aurora 改名 W19 Aurora 后，队伍分析仍显示 13:1，重载身份管理保留改名。
-
-
-## 环境与证据
-
-- Linux x86_64 云环境，5 vCPU（AMD EPYC 9V74），约 17 GiB 可用内存；Node 24.19.0/pnpm 使用仓库 activate 脚本，Vite 开发服务，Chromium 151 headless，1280×800；隔离浏览器 context/IndexedDB，没有接触现有用户库。无显示服务器及可用桌面设备，本次没有原生壳、Windows/macOS、原生壳备份/恢复或实际打印机结果。
-- 空库 A 和独立 B；B 通过文件选择导入仓库 Nuke `cologne-major-2026-stage3-smoke-de_nuke.zip`（593,751 bytes）及 cohort 三个 ZIP（1,986,337 / 1,045,157 / 1,134,000 bytes），共 4 场，约 4.8 MB；均为仓库真实样本，未伪造 50 场。四场界面均显示日期未知。另用临时副本和内存/SQLite 记录模拟缺失、故障与旧资料，具体方法在各项注明；未操作项不标通过。
-- 原始基线 main 的 [官方 CI](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/actions/runs/41407963506)：TypeScript（typecheck/fast/build）、integration、Python、event worker 四项成功。本地先缺 dist 直接运行失败；按仓库流程 `pnpm build:packages` 后 `pnpm typecheck`、Studio build 成功，既有 library-persistence/library 两文件 9 项通过。`pnpm check:package-boundaries`（8 项）和 `pnpm check:package-consumers` 成功：真实 tarball、隔离安装、NodeNext 声明闭包及浏览器打包。额外独立安装当前 maps/presentation/react tarball，实调用 `sortTableRows` 和三个 MapRoles 排序列：样本 3 在 1 前、RR 2/1/null 顺序正确。不是所有外部消费者迁移证明。
-
-## A 玩家
-
-- A1 部分通过：未绑定本人启动，空工作台可用；B 的最近比赛打开 Nuke。在选手页将 soulfly 设为“这是我”后，打开含他的 Nuke 自动选中其 Steam ID；打开不含他的 Inferno 选择框为空（全部选手）。
-- A2 部分通过：Nuke 显示 9z 1:13 Aurora、10 人、14 回合；soulfly 19/7/1、ADR 137.8，界面显示 RR 1.611。选择 soulfly 后实际切首死/残局/道具回合得到 0/0/12；独立读取 ZIP 的 kills、clutches、grenades 对照：首死 0、残局 0、投掷回合 12（R2–R12、R14），与 UI 一致；首死筛选未自动称失误。
-- A3–A5 部分通过：另一隔离库导入 Nuke 后创建 StudyNote，选择该场 R1 添加证据并保存，显示“来源和已知版本一致”；重载资料页仍显示笔记、正文及“来源一致”。删除 Nuke 后笔记和正文保留并提示原场缺失；把另一场 Inferno 临时复制为同一文件名后导入，原证据仍显示 Nuke R1 已不存在，未指向同名场。回放实际切 R2、下层、2× 并前进一步，显示 tick 7453 / 664 帧中的第 5 帧；无 `.dem`。对临时副本移除 replay.json 与 shots.json（模拟缺失，原 fixture 未改）导入后 1:13、ADR 137.8 和回合统计可读，回放入口不可用；因 shots 缺失 RR 与原样本不同，不能视为同口径。模拟零帧反例：临时副本将 R1 的 replay frameCount 设 0 并清空玩家帧，保存 R1 证据再打开，横幅显示 R1，播放器却显示 R2 / tick 7421；这是直接阻塞，待回放 owner 修复并重验。两场交火证据列表打开 Nuke R1，再以“下一条”进入 Inferno R1（分别显示 tick 4634 和 5856），返回来源回到交火列表；筛选/排序/页码/anchor 的完整恢复尚未验。隔离 IndexedDB 中写入合成 PracticeLineup（practiceCommand 为 null），打开资料只显示“练习命令：—”，未生成命令；这是模拟记录。
-
-## B 教练
-
-- B1 部分通过：空库可打开新建战术、人员安排、笔记编辑器；战术默认 Mirage/T，可选择 Default/Protocol/Play，人员安排有五行与观察绑定。在空库保存 Mirage T 的 Default、Protocol、Play 和一份人员安排（Player A 的职责填入 IGL + 主 AWP + A 区），重新加载后四条均显示；另建一份 Play，添加三个阶段、各一项人员任务和 position/smoke/flash 标记；保存重载后逐阶段列表可见。真实 Nuke 中为手工人员安排显式绑定 9z 的观察范围，出现位置矩阵；输入的 IGL + 主 AWP + A 区人工文字在绑定后及重载后不变。
-- B2–B5 部分通过：空库比赛单加入 Play、人员安排、StudyNote，重排后保存并进入/退出讲解；实际下载 Markdown 含三项材料及手工判断。调用打印并以 Chromium print media 输出 A4 一页 PDF，文本检查包含主体且无编辑按钮；没有目视核实所有复杂内容与原生打印。删除被引用笔记后，比赛单显示 `材料已删除 study-note:<id>`，另两项仍显示。真实 cohort 三场中选择 Team Plasma 侦察 Team D'avenir，模式列出 Inferno R18/R23，加入 R18 后材料页出现备战条目并标注“来源版本未知”；“报告”页可显示地图池比较。另将该真实 PrepItem 与 Play、人员安排、StudyNote 加入比赛单并保存，比赛单正文显示 Inferno R18 和来源，已按下一项走到真实 PrepItem，讲解显示 Inferno R18 来源和人工备注。但材料页显示“来源版本未知”，讲解项未显示该状态且本次未找到打开真实回合的动作；需讲解 owner 核实来源状态与往返。复杂打印及报告其他入口未覆盖。另在空库创建仅含正文 `W19 正文战术内容` 的战术，进入讲解只显示“暂无阶段/手工示意”，正文未显示：直接阻塞，待战术讲解 owner 修复并重验。另一三阶段样本中选中阶段 2 再上移，本次仍选中阶段 2，不能排除其他重排路径问题。另在空库已保存三战术、一份人员安排与一份比赛单，工作台“最近资料”只列出三战术，人员安排及比赛单均未列出；源码种类列表同样缺这两类，待工作台 owner 修复。
-
-## C 分析师
-
-- C1 部分通过：两场独立库范围初始 2/2；将 focus 切到 Aurora 后仍为 2/2，选择 Nuke 后为 1/2。两场日期均未知；日期条件默认排除未知为 0/2，勾选包含未知后恢复 2/2。选择再排除同一场后为 0/2。赛事/标签尚未核对；删除显式选择参见 C3–C5。
-- C2 部分通过：实际点击六主题（表现与趋势、交火与协同、经济与转化、道具、开局与控图、位置与职责），均可进入；经济页显示 4 场、82 回合与具体队伍矩阵。两场不交手的 Aurora Gaming 与 Team Plasma 实际生成队伍比较；同一 Aurora 语料选择 soulfly 与 Wicadia 显示选手 CompareCard。更新至 #180 后，在浏览器临时拦截队伍比较查询并模拟抛错：界面显示比较失败，但仍提供“不含队伍对比”导出；实际 JSON 包含该局限且 sources 仅列 Aurora 的 Nuke。更新至 #181 后，覆盖场选 de_nuke 再将范围切到 de_inferno，显示“de_nuke 在当前范围没有样本”，显式选 de_inferno 后进入该图；未静默换图。覆盖场选择 Nuke 的 9z，长枪局显示 4 对赛事基线 4；切全部回合后变为 14 对 14，队伍和基线使用相同条件。但全部回合仍显示“14 长枪局”，`packages/react/src/components/RadarFieldCanvas.tsx` 写死标签，需公共展示 owner 修复。14 旧视图映射仍未完整操作。
-- C3–C5 部分通过：Nuke 经济页保存分析并勾选工作台，重载后打开，再另存；实际下载 JSON 与 Markdown。JSON 显示 1 场/14 回合、scope、来源 entryId/matchId、demo SHA-256、format/facts 版本、时间、局限及 null；导入另一真实场前后下载文件 SHA-256 均为 `e17655a5ae1880b85eeec440bb42b502bde65048ee1ced0d774f8a8ff2eb9e7c`。另保存仅含 Nuke 的显式比赛范围，删除 Nuke 而保留 Inferno 后重开，显示 0/1 而未扩为全库。反例：另存 Nuke 地图筛选，删除唯一 Nuke 后重开同样为 0/1，但范围编辑器地图行只显示 de_inferno，没有展示已失效的 de_nuke 选择；用户无法看见原筛选条件，待分析范围 owner 核实和修复。局部筛选和更多导出主题仍未验。
-
-## D 数据、异步、可用性
-
-- 导入真实四场最终工作台显示 4 场；另在 cohort 三场导入期间新建并保存笔记，切换比赛/分析/战术与训练/工作台，任务完成后笔记编辑页仍在。模拟 IndexedDB 持续 open 抛错：页面显示“读取本地资料库失败”与缓存重试，同时最近比赛仍写“还没有比赛”；失败状态与空库文案并存，待数据 owner 修复/核对。临时浏览器延迟查询并触发真实 `invalidateAnalysisQueries`：旧 Promise 在恢复后以 AbortError 结束、bucket 清空；这是模拟延迟的数据 generation 检查，不等于 A/B 证据或 scope 切换导出验收。另在浏览器临时拦截 model loader，使证据 A 的加载延迟 12 秒；立即点下一条进入 B，等待 A 晚到后仍显示 Inferno R1/tick 5856，再返回来源。这是标明注入方式的竞态验证。对 ExportPolling 使用短超时与模拟状态读取：首次查询超时进入 uncertain，重查同一 job 得到 done，共两次读取、零启动调用；此为模拟 bridge，非原生后台实机。另临时拦截经济查询并延迟 8 秒：从两场切到 Nuke 范围期间 JSON 导出按钮消失，返回后下载含 de_nuke、1 场及 Nuke source ID；这是模拟延迟，不代表所有主题的竞态均已覆盖。后台任务真实失败重试仍未实测。
-- 源码 `storage-overview.ts` 的用户 namespace 包含 training-focus、prep-items、practice-lineups、role-declarations、study-notes、coach-playbook、coach-assignments、coach-match-sheets、saved-analyses；cache 名单由 facts/derived cache 加 cache/meta 构成。另以临时隔离目录直接运行 Linux Python `StudioApi` 后端：九类各写一条模拟记录，清除 9 字节临时 cache 后逐类一致；备份后删除九条及真实 Nuke ZIP，恢复后九类各一条和 ZIP 字节一致（SHA-256 `e9405245cd0ba55d4427bb5890874b0b70b19475790248d963734b6cd93e4d21`）。这是后端调用、模拟用户资料，不是 pywebview 壳或 Windows/macOS 实机验证。
-- 旧 playlist 迁移源码先写后删、冲突时另分 ID、末尾写 marker；普通 prep list 仅读取排序。隔离两场库中将 Inferno 一场的 factsRevision 改为模拟旧值并重载，选手列表提示 1/2 场可用且仍列出 Nuke 选手；选中当前 Nuke 的 soulfly 后切交火，仍提示 1/2 可用却显示“无法解析该选手的身份”、0 条证据；不相关旧场阻断个人交火，需分析查询 owner 修复。其余个人主题未覆盖。临时内存 RecordStore 注入首次复制失败与首次删除失败，重试后旧记录删除、同 ID 不同内容两条保留、marker 写入；重复迁移和普通 list 无写入。另在隔离 IndexedDB 写入模拟旧 playlist 与同 ID 不同内容的现存 prep，重载应用后旧记录清空、两条新记录及 marker 存在，再次重载仍为两条。此为模拟故障和合成旧记录，旧版本真实资料及平台恢复尚未验。
-- 浏览器导入仓库 `sample-pro-finals-2026.zip`（7,585,021 字节解压内容，7 图）后赛事目录显示两系列、7/7 图关联；IEM 决赛 BO5、FURIA 1:3 Vitality 和四图可见；展开 BP 后显示 Dust2/Ancient ban、Mirage/Inferno/Nuke/Overpass pick 与 Anubis decider。另一阶段实操未完成。另可见导入赛事资源包及赛事资源制作器；数据管理中的身份、资产和资料库维护均可打开，维护页显示备份入口，资产页显示 .tri 资产。它们只是入口检查；赛事/series/BP、RivalHub 实际导入、批量标签/修复、身份修改、更新、原始 demo/进游戏的逐项流程未验。canonical/RR/PRISM 跨版本同语料逐项对照未完成。W20 缺姿态保持缺失、W21 分母和日期修正应按 #157/#161 语义核实，不能为了旧错误数值回退。
-- 单 Nuke 文件从选择到显示约 15 秒（粗观察）。同一隔离 Chromium、1 场/593,751 字节：空库首次工作台 1,496ms，导入后首次/再次打开比赛 1,074/115ms，返回工作台 64/53ms；两次比赛进入时 JS heap 约 242/227 MB（非进程总内存、GC 可波动）。最终代码另一轮单场粗测：空库首页 2,268ms，首次/再次比赛 1,622/107ms，返回首页 56/70ms；JS heap 约 229/239 MB（环境并发时测量）。这是一次开发服务器粗测，不作 50 场或长期性能结论。1280×800 页面可显示导航与主要内容；键盘 Tab 实际依次进入四主导航、数据管理、全部比赛和导入；阶段地图标记在列表中可见。返回/关键按钮和切页焦点的完整键盘路径、复杂打印裁切未验。未验证首页无全量加载或模型缓存长期行为。
-
-## 验收中修复的直接阻塞
-
-原 main 在分析范围编辑中，scope editor 与 AnalysisView 及主题页面使用相同 React sibling key；每次修改上下文可把范围编辑器从 1 个累积到多个，复选框无法稳定选择。该问题后由 #183 在主线为 scope 编辑器分配独立 key；本分支未保留重复接线。修后以同样两场数据切 focus、地图、日期、选择与排除，编辑器始终为 1 个，最终空范围为 0/2；`pnpm typecheck` 和 Studio build 成功。此为 UI 接线修复，没有改变公共包合同。
-
-## E 架构删除与新 owner（静态证据，部分闭合）
-
-下表的 PR 为实现来源，源码搜索与构建是本次证据；未逐项验证的内容保留待办，不以 CI 代替架构验收。
-
-| 已删除旧项 / 范围 | 新 owner | 实现 / 本次证据 |
+| 范围 | 实际操作与结果 | 边界 |
 |---|---|---|
-| `season.ts`、`facts-projections.ts`、`tactics.ts` facade | App queries + analytics/tactics | [#161](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/161)，目标文件名搜索无匹配；尚需逐函数核重 |
-| `HomeView.tsx`、`CohortScope.tsx` | Players/AnalysisContext | [#169](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/169)、[#171](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/171)，目标文件搜索无匹配；CSS 仍有旧名称注释，非运行时 owner |
-| `CoachView.tsx` | 分析主题与 App 材料 | [#172](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/172)，目标文件搜索无匹配；CoachSettings 双写尚需完整追踪 |
-| `playlist.ts` 与材料混入 series | prep-items / material-data-migration | [#166](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/166)，文件搜索无匹配；迁移只做静态检查 |
-| 公共 React 整页 MatchWorkspace、Studio 样式 | App MatchReviewWorkspace；公共窄 DTO/widgets | [#159](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/159)，源码搜索及 tarball 闭包；修正 presentation README 仍引用已删组件的示例 |
-| 旧回放/表格状态 props | 受控 state/onStateChange | [#159](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/159)，公共源码搜索 `initialTarget`/`initialViewState` 无匹配；所有 caller 和旧位置参数需继续逐项核验 |
-| App 姿态计算和单场编排 | tactics `extractMatchLineupObservations` / pipeline `analyzeMatchFacts` | [#157](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/157)，`library.ts` 与 `pkg-worker.ts` 均调用 `buildMatchRecords`，后者调用 pipeline |
-| 导航镜像及旧证据 fallback | App 页面帧与单对象 `OpenEvidenceRequest` | [#158](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/158)、[#164](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/164)；`sourceKey` 仍作为 anchor 合法存在，前缀猜 tab/所有 fallback 尚需逐项核查 |
-| 公共 break | presentation/react 等各自 major Changeset | `.changeset/w03-controlled-state.md`、迁移指南；本次真实 tarball 消费通过，不代表未知外部调用方已迁移 |
+| A 玩家身份和单场 | 绑定 soulfly 为本人；Nuke 自动选其 Steam ID，不含该人的 Inferno 不误选。Nuke 9z 1:13 Aurora、14 回合，soulfly 19/7/1、ADR 137.8；首死/残局/道具回合 0/0/12，独立读取 ZIP kills、clutches、grenades 一致。 | 不代表所有统计跨版本口径均已逐项核对。 |
+| A 证据与删除 | Nuke R1 保存证据笔记并重载，正文及来源一致状态保留；删除 Nuke 后笔记保留且提示来源缺失，另导入同名 Inferno 不误绑定。真实回放切 R2、下层、2×、单步；两场交火证据可前进及返回来源；步枪筛选的第 2 页进入 Inferno R17 后返回，仍为 2/3 页、116 条、原卡片并将焦点恢复到该卡片。 | 无 `.dem`，未验证进入游戏。 |
+| A 缺失/零帧 | 临时 Nuke 副本移除 replay/shots：比赛统计可读、回放不可用；shots 缺失时 RR 不同，不能比较口径。另将 R1 frameCount 置 0 并清空玩家帧：R1 详情显示无可播放回放，不跳 R2。 | 两者是明确注入的异常，原 fixture 未更改。 |
+| B 空库材料 | 保存 Default/Protocol/Play、五人职责、笔记和比赛单并重载；三阶段战术任务与 position/smoke/flash 标记重载保留。未保存笔记切换新建战术时，取消保留原编辑内容，确认后只有新编辑器；纯文字战术讲解可见正文。 | 不是原生桌面操作。 |
+| B 真实绑定、讲解和打印 | 四场库建立 Nuke R1 证据笔记和战术、加入比赛单；讲解、下载 Markdown、打印 PDF 显示来源和已知版本一致，重载保留。另一真实 Nuke 手工职责绑定 9z 观察范围后，人工 IGL/AWP/A 区文字重载不变。删除引用笔记后比赛单提示材料已删除，其他项保留。 | Chromium 打印模拟；真实打印机和原生壳未验。 |
+| C 范围及六主题 | 实际进入表现与趋势、交火与协同、经济与转化、道具、开局与控图、位置与职责；经济四场 82 回合。范围选 Nuke 为 1/2；未知日期默认排除为 0/2、包含后 2/2；显式选择再排除为 0/2。两次真实导入标签筛选 A 1/4、B 3/4。 | 各主题空样本与条件限制按界面呈现，不等于所有子维度均实测。 |
+| C 比较和固定导出 | 两不交手队伍及同队两选手生成比较；模拟队伍比较查询失败时仍能导出不含比较的结果并标局限。Nuke 经济保存、重载打开并另存，下载 JSON/Markdown；新增真实场前后固定 JSON SHA-256 都为 `d61663f9674709515117415daff758c3580c9ec5667cec9db4de1865584da4ef`，含范围、来源 ID/哈希、版本及局限。删除显式选择的 Nuke 后重开为 0/1，未扩成全库。 | 注入失败仅覆盖该比较路径。 |
+| C 地图和回合条件 | 保存 Nuke 地图后切至 Inferno 范围，显示 Nuke 无样本而不静默切图；手选 Inferno 生效。Nuke 覆盖场长枪/全部为 4/14 回合，队伍和基线条件一致，标签均为“回合”。 | 条件对照为此样本。 |
+| D 管理、身份和数据 | 两场中修改单场标签、批量标签、重建 facts，重载后保留；真实 Nuke 的 Aurora Gaming 改为 W19 Aurora，队伍分析仍为 13:1，重载名称保留，原名反查覆盖两别名。真实 ZIP blob 和元数据 key 重载不变；合成旧 playlist、笔记哨兵仍物理存在。 | 保留数据不承诺旧 UI 兼容。 |
+| D 失败与异步 | 模拟 IndexedDB 打开失败显示资料读取失败及暂不可用；模拟一场旧 factsRevision，另一场 Nuke 的个人交火仍可查并显示 1/2 可用。模拟慢查询 invalidation 得 AbortError、旧 bucket 清空；模拟证据 A 晚于 B 返回，B 仍保持；模拟范围慢查询期间导出不可用，完成后导出正确 Nuke source。模拟后台导出超时后重查同 job 成功，未重新启动。 | 注入故障和模拟 bridge，非原生后台失败重试实机。 |
+| D 清缓存与恢复 | 隔离 Linux Python StudioApi 中九类合成用户记录，清 9 字节临时 cache 后均一致；备份、删除记录及真实 Nuke ZIP、恢复后九类与 ZIP SHA-256 均一致。 | 是后端调用，非 pywebview 壳或 Windows/macOS 备份恢复。 |
+| D 赛事与输入 | 七图资源导入后两系列、7/7 图关联；IEM BO5 1:3、四图及 ban/pick/decider 可见。管理身份/资产/维护入口可打开。键盘 Tab 到比赛、Enter 进入、聚焦返回再 Enter 后焦点回到工作台导航。 | 另一赛事阶段、RivalHub 在线导入、更新、原生桌面和进游戏未验。 |
+| D 打印分页 | 五条各 18 行的笔记组成比赛单，Chromium A4 导出三页；标题与后续正文不再跨页孤立，抽取文字完整。 | 纸张/驱动和复杂战术地图实际打印未验。 |
 
-公共包源码检索未命中 AnalysisContext、MaterialRef、RecordStore、STUDIO_TABLE_CLASSES、initialTarget 或 initialViewState；query 目录未命中 view import。这是针对名称的静态检查，不证明所有潜在耦合已排除。本轮将队名纯映射/分组迁至 `team-identity.ts`，查询缓存版本常量迁至纯模块；原 `identity.ts` 中的旧函数已删除并迁完调用方，纯模块 bundle 未引入 storage、worker、pipeline 或 query-cache。源码搜索未见 CoachSettings、sourceKey 前缀猜 tab，series 源码未见材料/教练设置引用；其他纯模块依赖、所有 query 算法唯一性、来源回退与所有受控调用方仍需逐项验证。因此架构表尚未闭合。
+## 有效能力映射和架构删除
+
+用户不要求保留旧页面；以下列出当前实际 owner。入口实测不等于每个历史视图的每个功能均已逐项通过。
+
+| 原能力或已删除项 | 当前 owner / 本次核对 | 证据 |
+|---|---|---|
+| Home 选手概览、趋势及发现 | PlayersView 与表现与趋势；选手及总体入口可达，个人数据和身份如上实测。旧 HomeView/CohortScope 文件不存在。 | [#169](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/169)、[#171](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/171) |
+| 单场、回放、证据 | App MatchReviewWorkspace；真实单场、证据、回放如上。公共 React 不再拥有整页 MatchWorkspace 或 Studio 样式。 | [#159](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/159)、[#164](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/164)、[#184](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/184) |
+| 比赛库、赛事、系列和 BP | MatchesView/LibraryView 与 EventsView/SeriesInspector；四 ZIP 管理、七图赛事和 BP 如上。 | [#158](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/158) |
+| 交火、经济、道具、开局、位置和职责，赛事/排行 | Analysis 各主题及 TournamentDashboardView/LeaderboardView；六主题入口和部分真实样本如上。战术模式由 Patterns 页面承接；旧 CoachView 文件不存在。 | [#161](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/161)、[#172](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/172) |
+| 旧 Prep/playlist 页面与单场报告导出 | 新材料 StudyNote、战术、职责、比赛单及统一 AnalysisResult 导出；`prep-items.ts`、`material-data-migration.ts`、`PrepItemsPanel.tsx` 和旧单场 Markdown helper 已删除。storage overview 保留旧 namespace 用于不删除用户数据。 | [#166](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/166)、[#184](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/184) |
+| 旧 season/facts-projections/tactics facade 与 App 姿态编排 | App queries 调 analytics/tactics，library 和 worker 同调 `buildMatchRecords`，后者调 pipeline `analyzeMatchFacts` 和 tactics lineup 提取；旧 facade 文件不存在，query 不反向 import view。utility/player/team/combat/season/spatial 的计算入口逐一核对对应 analytics/tactics owner。 | [#157](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/157)、[#161](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/161) |
+| 双 context、导航镜像与旧证据 fallback | AnalysisContext 和 App 页面帧/单对象 OpenEvidenceRequest；旧 CohortScope、CoachSettings、sourceKey 前缀猜 tab 搜索无匹配，sourceKey 本身仍合法用于 anchor。 | [#158](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/158)、[#164](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/164) |
+| 旧回放/表格初始 props | 公共组件受控 `state`/`onStateChange`；AST 检查仓内 16 个 DataTable 和 3 个 ReplayViewer 调用均传两项，无 spread；`initialTarget`/`initialViewState` 源码无匹配。 | [#159](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/159) |
+| 纯队名查询依赖及公共回合标签 | 本 PR 将纯队名映射移到 `team-identity.ts`、缓存版本移到纯模块，调用方迁移；esbuild 闭包无 storage/worker/pipeline/query-cache。RadarFieldCanvas 标签改为“回合”，提供 React patch Changeset；presentation README 删除已不存在的整页示例。 | 本 PR；真实队名与 4/14 回合实测如上。 |
+
+## 验证与剩余边界
+
+最终 main 的[官方 CI](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/actions/runs/41423559464)四项成功；本 PR 需以其最终提交的官方 CI 单独核对。本地 typecheck、Studio build、既有 library-persistence/library 共 9 项、package-boundaries 和 package-consumers 通过。真实 tarball 隔离安装检查 NodeNext 声明与浏览器打包，额外调用公共 `sortTableRows` 和 MapRoles 排序列；不等于未知外部消费者均已迁移。没有新增测试文件或测试框架。
+
+真实设备和服务依赖仍未验：原生壳、Windows/macOS、原生备份恢复、打印机、RivalHub 在线、原始 demo 进入游戏。四场不能证明 #3 的 50+ 场/长期性能；#64 的桌面平台及 #49/#75/#76 各自门槛独立，不因本文关闭。单场开发环境粗测只能作为观察，不能外推性能结论。当前无已复现且尚未修复的云端直接阻塞；未列为通过的子功能仍需各自证据。
+
+历史说明：早期基线的范围编辑器重复、旧场阻断个人分析、初始读取失败混为空库、零帧回退、战术正文、旧地图静默替换等观察，分别由 #180–#185 最终改动替代并在上表按当前状态复验；旧 Prep 迁移和旧导出已按用户决定删除，不再作为新 owner 或待恢复事项。

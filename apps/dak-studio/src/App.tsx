@@ -334,7 +334,9 @@ export function App() {
     const frame = navigationRef.current.active;
     if (!entriesReady || frame.id !== frameId || restoringFrameId !== frameId) return;
     if (frame.anchorKey && availableAnchorKeys.includes(frame.anchorKey)) {
-      document.getElementById(frame.anchorKey)?.scrollIntoView({ block: "center" });
+      const anchor = document.getElementById(frame.anchorKey);
+      anchor?.scrollIntoView({ block: "center" });
+      anchor?.focus({ preventScroll: true });
     } else {
       const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
       window.scrollTo({ top: Math.min(frame.scrollY, max), behavior: "instant" });
@@ -462,7 +464,14 @@ export function App() {
 
       <main className="stu-main">
         <AssetHealthBanner />
-        {navigation.history.length > 0 && <button type="button" className="stu-button-sm" onClick={goBack}>返回</button>}
+        {navigation.history.length > 0 && <button type="button" className="stu-button-sm" onClick={event => {
+          const previousFrame = navigationRef.current.active.id;
+          const keyboard = event.detail === 0;
+          goBack();
+          if (keyboard) requestAnimationFrame(() => {
+            if (navigationRef.current.active.id !== previousFrame) document.querySelector<HTMLButtonElement>(".stu-nav-item-active")?.focus({ preventScroll: true });
+          });
+        }}>返回</button>}
         <BackgroundActivity activity={activity} batch={batchSession}>
           <RivalHubBatchImportPanel session={batchSession} onStop={stopRivalHubBatch} onSelectTarget={selectRivalHubBatchTarget} onDismiss={dismissBatch} onLocalLinkUpdate={updateLocalLink} />
         </BackgroundActivity>
