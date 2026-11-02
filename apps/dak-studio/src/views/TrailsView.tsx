@@ -1,6 +1,7 @@
+import { emptyOpeningPageState, type OpeningPageState } from "../lib/spatial-view-state";
 import { usePageReady } from "../lib/use-page-ready";
 import { Pause, Play, RotateCcw } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { OpeningTrailsModel, OpeningTrailRound } from "@cs2dak/tactics";
 import { RadarTrails, GRENADE_COLOR, type RadarTrail, type RadarGrenadeOverlay } from "../components/RadarTrails";
 import { entryDate, matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
@@ -20,6 +21,7 @@ export interface TrailsViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   onGoLibrary: () => void;
+  onOpenMatch?: (entryId: string, target: { roundNumber: number }) => void;
   identityOptions?: IdentityOptions;
 }
 
@@ -58,17 +60,19 @@ const EFFECT_DURATION_SECONDS: Partial<Record<string, number>> = {
   decoy: 15
 };
 
-export function TrailsView({ allEntries, entries, onGoLibrary, identityOptions , onPageReady }: TrailsViewProps) {
+export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, identityOptions , onPageReady }: TrailsViewProps) {
   // 业务流程：① 选手 → ② 地图（该选手出场的图）→ ③ 最近 N 场（该选手在该图）
-  const [rangeN, setRangeN] = useState<number>(5);
+  const [pageState, setPageState] = useState(emptyOpeningPageState);
+  const { recentMatchCount: rangeN, mapName, side } = pageState;
+  const hiddenRounds = useMemo(() => new Set(pageState.hiddenRoundKeys), [pageState.hiddenRoundKeys]);
+  const setRangeN = (recentMatchCount: OpeningPageState["recentMatchCount"]) => setPageState(current => ({ ...current, recentMatchCount }));
+  const setSide = (side: OpeningPageState["side"]) => setPageState(current => ({ ...current, side }));
+  const setMapName = (update: SetStateAction<string | null>) => setPageState(current => ({ ...current, mapName: typeof update === "function" ? update(current.mapName) : update }));
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [players, setPlayers] = useState<PlayerOption[] | null>(null);
   /** entryId → 该场出场选手集合。 */
   const [rosterByEntry, setRosterByEntry] = useState<Map<string, Set<string>> | null>(null);
   const [models, setModels] = useState<OpeningTrailsModel[] | null>(null);
-  const [mapName, setMapName] = useState<string | null>(null);
-  const [side, setSide] = useState<"t" | "ct">("t");
-  const [hiddenRounds, setHiddenRounds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   // ① 加载范围内全部 DemoPackage，建立选手候选与每场名单（derived 缓存命中后开销很小）
@@ -181,7 +185,6 @@ export function TrailsView({ allEntries, entries, onGoLibrary, identityOptions ,
       .then((result) => {
         if (cancelled) return;
         setModels(result.map((fact) => fact.row));
-        setHiddenRounds(new Set());
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
@@ -256,7 +259,7 @@ export function TrailsView({ allEntries, entries, onGoLibrary, identityOptions ,
           <select
             className="stu-select"
             value={rangeN}
-            onChange={(e) => setRangeN(Number(e.target.value))}
+            onChange={(e) => setRangeN(Number(e.target.value) as OpeningPageState["recentMatchCount"])}
             title="当前范围内该选手在该地图的最近 N 场；无日期场次仅在全部中显示"
           >
             {RANGE_OPTIONS.map((n) => (
@@ -314,15 +317,19 @@ export function TrailsView({ allEntries, entries, onGoLibrary, identityOptions ,
           mapName={mapName!}
           rounds={visibleRounds}
           hiddenRounds={hiddenRounds}
-          onToggleRound={(roundKey) =>
-            setHiddenRounds((current) => {
-              const next = new Set(current);
-              if (next.has(roundKey)) next.delete(roundKey);
-              else next.add(roundKey);
-              return next;
-            })
-          }
+          pageState={pageState}
+          onPageStateChange={setPageState}
+          onToggleRound={(roundKey) => setPageState(current => ({
+            ...current,
+            hiddenRoundKeys: current.hiddenRoundKeys.includes(roundKey)
+              ? current.hiddenRoundKeys.filter(key => key !== roundKey)
+              : [...current.hiddenRoundKeys, roundKey],
+          }))}
           missingReplay={missingReplay}
+          onOpenRound={onOpenMatch ? (round) => {
+            const entry = entries.find(candidate => matchIdForEntry(candidate) === round.matchId);
+            if (entry) onOpenMatch(entry.id, { roundNumber: round.roundNumber });
+          } : undefined}
         />
       )}
     </div>
@@ -339,15 +346,19 @@ interface TrailStageProps {
   hiddenRounds: Set<string>;
   onToggleRound: (roundKey: string) => void;
   missingReplay: string[];
+  onOpenRound?: (round: OpeningTrailRound) => void;
+  pageState: OpeningPageState;
+  onPageStateChange: Dispatch<SetStateAction<OpeningPageState>>;
 }
 
-function TrailStage({ mapName, rounds, hiddenRounds, onToggleRound, missingReplay }: TrailStageProps) {
-  const [time, setTime] = useState(WINDOW_SECONDS);
+function TrailStage({ mapName, rounds, hiddenRounds, onToggleRound, missingReplay, onOpenRound, pageState, onPageStateChange }: TrailStageProps) {
+  const { timeSeconds: time, speed, trailOpacity, showTrails, showGrenades } = pageState;
+  const setTime = (update: SetStateAction<number>) => onPageStateChange(current => ({ ...current, timeSeconds: typeof update === "function" ? update(current.timeSeconds) : update }));
+  const setSpeed = (speed: number) => onPageStateChange(current => ({ ...current, speed }));
+  const setTrailOpacity = (trailOpacity: number) => onPageStateChange(current => ({ ...current, trailOpacity }));
+  const setShowTrails = (update: SetStateAction<boolean>) => onPageStateChange(current => ({ ...current, showTrails: typeof update === "function" ? update(current.showTrails) : update }));
+  const setShowGrenades = (update: SetStateAction<boolean>) => onPageStateChange(current => ({ ...current, showGrenades: typeof update === "function" ? update(current.showGrenades) : update }));
   const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(2);
-  const [trailOpacity, setTrailOpacity] = useState(0.5);
-  const [showTrails, setShowTrails] = useState(true);
-  const [showGrenades, setShowGrenades] = useState(true);
   const rafRef = useRef<number | null>(null);
   const lastTsRef = useRef<number | null>(null);
 
@@ -492,8 +503,8 @@ function TrailStage({ mapName, rounds, hiddenRounds, onToggleRound, missingRepla
       <aside className="stu-trail-legend">
         <h3>回合（{rounds.length}）</h3>
         {prepared.map((item) => (
+          <div key={item.key}>
           <button
-            key={item.key}
             type="button"
             className={hiddenRounds.has(item.key) ? "stu-trail-chip stu-trail-chip-off" : "stu-trail-chip"}
             onClick={() => onToggleRound(item.key)}
@@ -505,6 +516,8 @@ function TrailStage({ mapName, rounds, hiddenRounds, onToggleRound, missingRepla
             </span>
             <small>{item.round.grenades.length} 道具</small>
           </button>
+          {onOpenRound && <button type="button" className="stu-button-sm" onClick={() => onOpenRound(item.round)}>打开回合</button>}
+          </div>
         ))}
         <div className="stu-trail-grenade-legend">
           {Object.entries(GRENADE_LABEL).filter(([key]) => key !== "incendiary").map(([key, label]) => (

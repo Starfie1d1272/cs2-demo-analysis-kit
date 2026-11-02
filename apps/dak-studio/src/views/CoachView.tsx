@@ -1,28 +1,21 @@
-import { buildAntiStratMarkdown, filterBySubjectTeam, isCurrentTacticalRoundFact, patternFingerprint } from "../lib/pattern-observations";
-import { listPatternNames, savePatternName } from "../lib/pattern-names";
-import { savePrepItem } from "../lib/prep-items";
+import { filterBySubjectTeam, isCurrentTacticalRoundFact } from "../lib/pattern-observations";
 import { usePageReady } from "../lib/use-page-ready";
 import { assertCurrentFacts } from "../lib/facts-readiness";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
-import { getObservedMapPool } from "../lib/queries/spatial-queries";
-import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
-import { EmptyState, DataTable, type DataTableColumn } from "@cs2dak/react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
+import { EmptyState } from "@cs2dak/react";
 import { teamRenameGroups } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import { getFactsStore } from "../lib/facts-store";
 import type { TacticalRoundFact } from "@cs2dak/tactics";
-import { buildTacticalClusters, type TacticalCluster } from "@cs2dak/tactics";
-import { formatTacticalClusterName as autoName } from "@cs2dak/presentation";
+import { buildTacticalClusters } from "@cs2dak/tactics";
 import { withTacticalDisplayGroupKeys } from "../lib/tactical-display-groups";
-import type { PrepItem } from "../lib/prep-items";
 import { PrepItemsPanel } from "./coach/PrepItemsPanel";
 import {
   loadCoachSettings,
   saveCoachSettings,
 } from "../lib/series";
-import { PatternExplorer } from "./coach/PatternExplorer";
-import { MapPoolTable } from "./coach/MapPoolTable";
+import { PatternsTheme } from "./analysis/PatternsTheme";
 import type { AnalysisContext, AnalysisRoleRef } from "../lib/analysis-context";
 
 type CoachTab = "patterns" | "playlist" | "anti";
@@ -46,8 +39,6 @@ const TABS: Array<{ key: CoachTab; label: string }> = [
   { key: "anti", label: "报告" }
 ];
 
-const SIDE_LABEL: Record<string, string> = { t: "T 方", ct: "CT 方" };
-
 function teamRole(label: string): AnalysisRoleRef {
   return { kind: "team", id: label.trim().toLowerCase(), label };
 }
@@ -70,7 +61,6 @@ export function CoachView({
   const [hasValidFacts, setHasValidFacts] = useState(false);
   // loading=true 初始值：防止首帧渲染时 clusters=[] && !loading 导致闪出空态
   const [loading, setLoading] = useState(true);
-  const [playbook, setPlaybook] = useState<Record<string, string>>({});
   const [prepRevision, setPrepRevision] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [settingsReady, setSettingsReady] = useState(false);
@@ -113,8 +103,7 @@ export function CoachView({
         };
       });
     });
-    const playbookRequest = listPatternNames().then((rows) => { if (!cancelled) setPlaybook(rows); });
-    void Promise.allSettled([settingsRequest, playbookRequest]).then((results) => {
+    void Promise.allSettled([settingsRequest]).then((results) => {
       if (cancelled) return;
       const failure = results.find((result) => result.status === "rejected");
       if (failure?.status === "rejected") setSettingsError(failure.reason instanceof Error ? failure.reason.message : String(failure.reason));
@@ -170,12 +159,6 @@ export function CoachView({
       return { ...current, roles };
     });
   }
-
-  const antiMarkdown = useMemo(
-    () => (tab === "anti" ? buildAntiStratMarkdown(clusters, subjectTeam) : ""),
-    [tab, clusters, subjectTeam],
-  );
-
 
   return (
     <div className="stu-view stu-coach-view">
@@ -257,44 +240,11 @@ export function CoachView({
           hint="当前资料库里的教练 facts 是旧口径，请重新导入或重建这些 demo 后再查看战术聚类。"
         />
       )}
-      {!loading && clusters.length > 0 && tab === "patterns" && (
-        <>
-          <PatternExplorer
-            clusters={clusters}
-            facts={facts}
-            entryByMatchId={entryByMatchId}
-            onOpenMatch={onOpenMatch}
-            onWatchDemo={onWatchDemo}
-            onAddToPlaylist={async (cluster, fact) => {
-              const entry = entryByMatchId.get(fact.matchId);
-              const item: PrepItem = {
-                id: `${cluster.id}:${fact.matchId}:${fact.roundNumber}`,
-                group: autoName(cluster) || `${cluster.mapName} ${cluster.side.toUpperCase()}`,
-                matchId: fact.matchId,
-                mapName: fact.mapName,
-                roundNumber: fact.roundNumber,
-                clusterId: cluster.id,
-                patternFingerprint: patternFingerprint(cluster),
-                source: "tactical-pattern",
-                coverage: `${cluster.roundCount} 回合 · ${cluster.mapName} · ${SIDE_LABEL[cluster.side]}`,
-                note: entry ? `${entry.meta.teamAName} ${entry.meta.teamAScore}:${entry.meta.teamBScore} ${entry.meta.teamBName}` : "",
-              };
-              await savePrepItem(item);
-              setPrepRevision((revision) => revision + 1);
-            }}
-          />
-          <details className="stu-card stu-coach-pattern-names">
-            <summary>模式命名与备注</summary>
-            <PlaybookTable
-              clusters={clusters}
-              playbook={playbook}
-              onRename={async (patternKey, name) => {
-                await savePatternName(patternKey, name);
-                setPlaybook(await listPatternNames());
-              }}
-            />
-          </details>
-        </>
+      {!loading && clusters.length > 0 && tab !== "playlist" && (
+        <PatternsTheme section={tab} clusters={clusters} facts={facts} allFacts={allFacts}
+          entryByMatchId={entryByMatchId} analysisContext={analysisContext} teamRenames={teamRenames}
+          subjectTeam={subjectTeam} onOpenMatch={onOpenMatch} onWatchDemo={onWatchDemo}
+          onPrepSaved={() => setPrepRevision((revision) => revision + 1)} />
       )}
       {tab === "playlist" && (
         <PrepItemsPanel
@@ -308,77 +258,7 @@ export function CoachView({
           onWatchDemo={onWatchDemo}
         />
       )}
-      {!loading && clusters.length > 0 && tab === "anti" && (
-        <>
-          <MapPoolTable
-            rows={getObservedMapPool(allFacts, analysisContext.roles.beneficiary?.label ?? null, analysisContext.roles.opponent?.label ?? null, teamRenames)}
-            hasOwn={Boolean(analysisContext.roles.beneficiary)}
-            hasOpponent={Boolean(analysisContext.roles.opponent)}
-          />
-          <details className="stu-card stu-coach-report-details">
-            <summary>备战报告 Markdown</summary>
-            <textarea className="stu-coach-report" readOnly value={antiMarkdown} />
-          </details>
-        </>
-      )}
-    </div>
-  );
-}
 
-function PlaybookTable({
-  clusters,
-  playbook,
-  onRename
-}: {
-  clusters: TacticalCluster[];
-  playbook: Record<string, string>;
-  onRename: (clusterId: string, name: string) => Promise<void>;
-}) {
-  const [tableState, setTableState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: null, direction: "desc" }, page: 0 });
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
-  // ref 持有 drafts 最新值，避免按键时 columns useMemo 失效重建
-  const draftsRef = useRef(drafts);
-  draftsRef.current = drafts;
-
-  // 预计算 fingerprint，避免 name/action 两列重复计算
-  const fingerprints = useMemo(
-    () => new Map(clusters.map((c) => [c.id, patternFingerprint(c)] as const)),
-    [clusters],
-  );
-
-  const columns = useMemo<DataTableColumn<TacticalCluster>[]>(() => [
-    {
-      key: "name", label: "战术名",
-      render: (cluster) => {
-        const key = fingerprints.get(cluster.id)!;
-        const value = draftsRef.current[key] ?? playbook[key] ?? "";
-        return <input className="stu-input stu-input-sm" value={value} placeholder="命名战术" onChange={(event) => setDrafts((current) => ({ ...current, [key]: event.target.value }))} />;
-      }
-    },
-    { key: "pattern", label: "打法模式", format: (c) => `${c.mapName} · ${SIDE_LABEL[c.side]} · ${autoName(c)}` },
-    { key: "rounds", label: "样本", numeric: true, sortable: true, sortValue: (c) => c.roundCount, format: (c) => c.roundCount },
-    {
-      key: "action", label: "",
-      render: (cluster) => {
-        const key = fingerprints.get(cluster.id)!;
-        const value = draftsRef.current[key] ?? playbook[key] ?? "";
-        return <button type="button" className="stu-button-sm" onClick={() => void onRename(key, value)}>保存</button>;
-      }
-    },
-  ], [fingerprints, playbook, onRename]);
-
-  return (
-    <div className="stu-card">
-      <h3>战术本</h3>
-      <DataTable
-        state={tableState} onStateChange={setTableState}
-        classes={STUDIO_TABLE_CLASSES}
-        rows={clusters}
-        rowKey={(c) => c.id}
-        pageSize={20}
-        paginationInfo={(total) => `${total} 个打法模式`}
-        columns={columns}
-      />
     </div>
   );
 }

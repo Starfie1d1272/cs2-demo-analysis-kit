@@ -1,3 +1,4 @@
+import { emptyControlPageState } from "../lib/spatial-view-state";
 import { usePageReady } from "../lib/use-page-ready";
 /**
  * 雷达覆盖场（控图）——描述性地图控制，不上评分。
@@ -29,8 +30,13 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
     return [...set.entries()].sort((a, b) => b[1] - a[1]);
   }, [entries]);
 
-  const [mapName, setMapName] = useState<string | null>(null);
-  const [economy, setEconomy] = useState<"gun" | "all">("gun");
+  const [scopeState, setScopeState] = useState(() => {
+    const { mapName, economy } = emptyControlPageState();
+    return { mapName, economy };
+  });
+  const { mapName, economy } = scopeState;
+  const setMapName = (mapName: string | null) => setScopeState(current => ({ ...current, mapName }));
+  const setEconomy = (economy: "gun" | "all") => setScopeState(current => ({ ...current, economy }));
   const activeMap = mapName ?? maps[0]?.[0] ?? null;
 
   const entriesOfMap = useMemo(
