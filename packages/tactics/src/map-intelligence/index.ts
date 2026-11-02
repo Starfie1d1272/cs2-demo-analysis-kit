@@ -5,7 +5,7 @@ import { type CalloutGrid, type CompactNav } from "@cs2dak/maps";
 import { createReplayRoundContexts, type ReplayRoundContext } from "../tactics/replay-round-context.js";
 import { extractTacticalRoundFactsWithContexts, type TacticalRoundFact } from "../tactics/round-facts.js";
 import { extractPlayerPositionRoundFacts } from "./player-position.js";
-import { buildRoundSpatialFrames } from "./spatial.js";
+import { buildRoundSpatialFrames, createNavAreaLookup } from "./spatial.js";
 import { extractTeamShapeRoundFacts } from "./team-shape.js";
 import { extractTeamAwpRoundFacts } from "./team-awp-round.js";
 import { extractCtRotationRoundFacts } from "./ct-rotation.js";
@@ -42,13 +42,14 @@ function extractMapIntelligenceWithContexts(
   performanceFacts: PlayerRoundPerformanceFacts = buildPlayerRoundPerformanceFacts(pkg),
 ): MatchMapIntelligenceFacts {
   const nav = options.nav === undefined ? getMapNav(pkg.match.mapName) : options.nav;
+  const navAreaAt = createNavAreaLookup(nav);
   const playerPositionRounds = [];
   const teamShapeRounds = [];
   const teamAwpRounds = [];
   const ctRotationRounds = [];
   for (const round of pkg.rounds) {
     const context = contexts.get(round.roundNumber) ?? null;
-    const frames = context ? buildRoundSpatialFrames(context, options.calloutGrid ?? null, nav) : [];
+    const frames = context ? buildRoundSpatialFrames(context, options.calloutGrid ?? null, nav, navAreaAt) : [];
     const positionRows = extractPlayerPositionRoundFacts(pkg, options.matchId, context, round, frames, options.calloutGrid ?? null, nav != null);
     playerPositionRounds.push(...positionRows);
     teamShapeRounds.push(...extractTeamShapeRoundFacts(pkg, options.matchId, context, round, frames, options.calloutGrid ?? null, nav != null));
