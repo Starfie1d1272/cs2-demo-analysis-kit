@@ -243,14 +243,18 @@ export function removeRoleDeclaration(current: RoleDeclarationsState, id: string
     return writeRoles({ ...actual, declarations: actual.declarations.filter(row => row.id !== id) });
   });
 }
+async function assertCurrentPlayerKey(playerKey: string): Promise<void> {
+  const identity = await stateStore.get<IdentityStoreState>(STATE_KEY) ?? EMPTY_STATE;
+  if (playerKey.startsWith("steam:")) {
+    const steamId = playerKey.slice(6);
+    const mapping = identity.mappings.find(item => item.steamIds.includes(steamId));
+    if (mapping && mapping.playerKey !== playerKey) throw new Error("选手身份已归并，请刷新后重试");
+  }
+}
+
 export function replaceOrdinaryUserRoleDeclarations(playerKey: string, teamKey: string | null, inputs: RoleDeclaration[], expected: RoleDeclarationsState): Promise<RoleDeclarationsState> {
   return withIdentityRoleAccess(async () => {
-    const identity = await stateStore.get<IdentityStoreState>(STATE_KEY) ?? EMPTY_STATE;
-    if (playerKey.startsWith("steam:")) {
-      const steamId = playerKey.slice(6);
-      const mapping = identity.mappings.find(item => item.steamIds.includes(steamId));
-      if (mapping && mapping.playerKey !== playerKey) throw new Error("选手身份已归并，请刷新后重试");
-    }
+    await assertCurrentPlayerKey(playerKey);
     const declarations = inputs.map(input => roleDeclarationSchema.parse(input));
     if (declarations.some(item => item.source !== "user" || item.playerKey !== playerKey || (item.teamKey ?? null) !== teamKey || item.mapName != null || item.validFrom != null || item.validTo != null)) throw new Error("角色声明范围不一致");
     const current = await readRoles();
@@ -268,6 +272,7 @@ export function upsertRoleDeclaration(current: RoleDeclarationsState, input: Rol
     const actual = await readRoles();
     if (!same(current, actual)) throw new Error("角色声明已变化，请刷新后重试");
     const declaration = roleDeclarationSchema.parse(input);
+    await assertCurrentPlayerKey(declaration.playerKey);
     const now = Date.now();
     const nextId = id ?? `${now}-${Math.random().toString(36).slice(2, 8)}`;
     const existing = actual.declarations.find(row => row.id === nextId);
