@@ -20,6 +20,7 @@ export function EventManager({
   entries,
   onNotice,
   onLibraryChanged,
+  onEventRecordsChanged,
   onLoadBuiltin,
   defaultOpen = true,
 }: {
@@ -27,6 +28,7 @@ export function EventManager({
   entries: StudioDemoEntry[];
   onNotice: (message: string) => void;
   onLibraryChanged?: (entries: StudioDemoEntry[]) => void;
+  onEventRecordsChanged?: () => Promise<void>;
   onLoadBuiltin: (builtin: BuiltinEvent) => Promise<void> | void;
 }) {
   const [events, setEvents] = useState<StudioEventRecord[]>([]);
@@ -181,7 +183,20 @@ export function EventManager({
                   })()}
                   <button type="button" className="stu-button-sm" onClick={() => {
                     if (!window.confirm(`移除赛事「${event.name}」的组织记录？\n\ndemo 档案会保留在资料库，可重新建立赛事。`)) return;
-                    void deleteEventRecord(event).then(async () => { setEvents(await listEventRecords()); setSeries(await listSeriesRecords()); onNotice(`已移除赛事「${event.name}」（demo 保留）`); }).catch(error => onNotice(`移除赛事或刷新失败，请检查目录：${String(error)}`));
+                    void (async () => {
+                      try { await deleteEventRecord(event); }
+                      catch (error) { onNotice(`移除赛事失败：${String(error)}`); return; }
+                      const [local, directory] = await Promise.allSettled([
+                        Promise.all([listEventRecords(), listSeriesRecords()]),
+                        onEventRecordsChanged ? onEventRecordsChanged() : Promise.resolve(onLibraryChanged?.(entries)),
+                      ]);
+                      if (local.status === "fulfilled") { setEvents(local.value[0]); setSeries(local.value[1]); }
+                      if (local.status === "rejected") {
+                        onNotice(`已移除赛事「${event.name}」（demo 保留），但管理列表刷新失败，请重新进入赛事页。`);
+                      } else if (directory.status === "rejected") {
+                        onNotice(`已移除赛事「${event.name}」（demo 保留），但赛事目录刷新失败，请重试读取。`);
+                      } else onNotice(`已移除赛事「${event.name}」（demo 保留）`);
+                    })();
                   }}>移除（保留 demo）</button>
                   {" "}
                   <button type="button" className="stu-button-sm stu-button-danger" onClick={() => {
