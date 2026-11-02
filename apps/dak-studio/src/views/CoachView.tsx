@@ -1,3 +1,4 @@
+import { usePageReady } from "../lib/use-page-ready";
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { EmptyState, DataTable, STUDIO_TABLE_CLASSES, type DataTableColumn } from "@cs2dak/react";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
@@ -23,6 +24,7 @@ import type { AnalysisContext, AnalysisRoleRef } from "../lib/analysis-context";
 type CoachTab = "patterns" | "playlist" | "anti";
 
 export interface CoachViewProps {
+  onPageReady?: (keys: string[]) => void;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
@@ -54,6 +56,7 @@ export function CoachView({
   teamRenames = {},
   analysisContext,
   onAnalysisContextChange,
+  onPageReady,
 }: CoachViewProps) {
   const [tab, setTab] = useState<CoachTab>("patterns");
   const [allFacts, setAllFacts] = useState<TacticalRoundFact[]>([]);
@@ -63,6 +66,7 @@ export function CoachView({
   const [playbook, setPlaybook] = useState<Record<string, string>>({});
   const [playlist, setPlaylist] = useState<PrepItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  usePageReady(entries.length === 0 || !loading || error !== null, onPageReady);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
   const teamGroups = useMemo(
     () => teamRenameGroups(allEntries.map((entry) => ({ teamA: entry.meta.teamAName, teamB: entry.meta.teamBName })), teamRenames),

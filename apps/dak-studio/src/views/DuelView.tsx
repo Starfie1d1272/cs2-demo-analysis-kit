@@ -1,3 +1,4 @@
+import { usePageReady } from "../lib/use-page-ready";
 import { useEffect, useMemo, useState } from "react";
 import type { DuelFinderRow, DuelInsightsModel, PlayerMechanicsRow } from "@cs2dak/contract";
 import { displayWeaponName, duelClassificationLabel } from "@cs2dak/presentation";
@@ -20,6 +21,7 @@ const EVIDENCE_FILTERS: Array<{ key: EvidenceFilter; label: string; description:
 ];
 
 export interface DuelViewProps {
+  onPageReady?: (keys: string[]) => void;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   selectedTeam?: string | null;
@@ -53,11 +55,14 @@ export function DuelView({
   identityOptions,
   teamRenames = {},
   initialTab = "records",
+  onPageReady,
 }: DuelViewProps) {
   const [tab, setTab] = useState<DuelTab>(initialTab);
   const [model, setModel] = useState<DuelInsightsModel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
+  usePageReady(entries.length === 0 || model !== null || error !== null, onPageReady);
+
   useEffect(() => {
     setTab(initialTab);
   }, [initialTab]);

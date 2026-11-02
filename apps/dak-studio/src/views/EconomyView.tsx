@@ -1,3 +1,4 @@
+import { usePageReady } from "../lib/use-page-ready";
 import { useEffect, useState } from "react";
 import { formatPercent } from "@cs2dak/presentation";
 import { type TournamentInsights } from "@cs2dak/analytics";
@@ -6,6 +7,7 @@ import { getTournamentInsights, type IdentityOptions } from "../lib/season";
 import type { StudioDemoEntry } from "../lib/library";
 
 export interface EconomyViewProps {
+  onPageReady?: (keys: string[]) => void;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   selectedTeam?: string | null;
@@ -13,9 +15,11 @@ export interface EconomyViewProps {
   identityOptions?: IdentityOptions;
 }
 
-export function EconomyView({ allEntries, entries, selectedTeam = null, onGoLibrary, identityOptions }: EconomyViewProps) {
+export function EconomyView({ allEntries, entries, selectedTeam = null, onGoLibrary, identityOptions , onPageReady }: EconomyViewProps) {
   const [insights, setInsights] = useState<TournamentInsights | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  usePageReady(entries.length === 0 || insights !== null || error !== null, onPageReady);
 
   useEffect(() => {
     if (entries.length === 0) {

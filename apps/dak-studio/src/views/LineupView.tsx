@@ -1,3 +1,4 @@
+import { usePageReady } from "../lib/use-page-ready";
 import { useEffect, useMemo, useState } from "react";
 import { buildLineupClusters, getMapCalibration, worldToRadar, calloutCn, type LineupCluster, type LineupClusterMode, type LineupGrenadeLike } from "@cs2dak/maps";
 import { displayWeaponName } from "@cs2dak/presentation";
@@ -74,16 +75,18 @@ export function LineupView({
   onOpenMatch,
   onWatchDemo,
   onRebuild,
+  onPageReady,
 }: {
   entries: StudioDemoEntry[];
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onRebuild: (ids: string[]) => void;
+  onPageReady?: (keys: string[]) => void;
 }) {
   const [clusters, setClusters] = useState<LineupCluster[]>([]);
   const [staleIds, setStaleIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const [activeMap, setActiveMap] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -97,6 +100,8 @@ export function LineupView({
   const [savedLineups, setSavedLineups] = useState<PracticeLineup[]>([]);
   const [savedDetailsOpen, setSavedDetailsOpen] = useState(true);
   const entryById = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);
+
+  usePageReady(entries.length === 0 || !loading, onPageReady);
 
   function handleClusterJump(cluster: LineupCluster) {
     const first = cluster.throws[0];

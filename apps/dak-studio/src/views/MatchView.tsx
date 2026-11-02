@@ -1,3 +1,4 @@
+import { usePageReady } from "../lib/use-page-ready";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { buildSeriesSummary } from "@cs2dak/analytics";
@@ -10,6 +11,7 @@ import { SeriesWorkspace } from "./SeriesWorkspace";
 import type { EvidenceContinuation } from "../lib/evidence-continuation";
 
 export interface MatchViewProps {
+  onPageReady?: (keys: string[]) => void;
   entries: StudioDemoEntry[];
   demoId: string | null;
   deepLink?: { roundNumber: number; tick?: number } | null;
@@ -41,7 +43,7 @@ async function loadModel(id: string): Promise<MatchWorkspaceModel> {
   return model;
 }
 
-export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceContinuation, onReturnToSource }: MatchViewProps) {
+export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceContinuation, onReturnToSource, onPageReady }: MatchViewProps) {
   const activeId = demoId;
   const activeEntry = activeId ? entries.find((entry) => entry.id === activeId) ?? null : null;
   const [model, setModel] = useState<MatchWorkspaceModel | null>(activeId ? modelCache.get(activeId) ?? null : null);
@@ -52,6 +54,8 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
   const [summary, setSummary] = useState<SeriesSummary | null>(null);
   // 50+ 场时纯下拉不可用：搜索过滤（队名/地图/日期/文件名）+ 按地图分组
   const [matchSearch, setMatchSearch] = useState("");
+
+  usePageReady(!activeId || !activeEntry || model !== null || error !== null, onPageReady);
 
   useEffect(() => {
     void listSeriesRecords().then(setSeriesRecords);

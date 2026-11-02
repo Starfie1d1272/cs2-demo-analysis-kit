@@ -1,3 +1,4 @@
+import { usePageReady } from "../lib/use-page-ready";
 import { useEffect, useMemo, useState } from "react";
 import { formatPercent, type TeamComparisonModel } from "@cs2dak/presentation";
 import { type TournamentInsights } from "@cs2dak/analytics";
@@ -8,6 +9,7 @@ import { EmptyState, MetricInfo } from "@cs2dak/react";
 import { LeaderboardView } from "./LeaderboardView";
 
 export interface TournamentDashboardViewProps {
+  onPageReady?: (keys: string[]) => void;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   selectedTeam?: string | null;
@@ -49,13 +51,16 @@ export function TournamentDashboardView({
   onOpenTeam,
   onGoDirectory,
   onOpenPlayer,
-  identityOptions
+  identityOptions,
+  onPageReady
 }: TournamentDashboardViewProps) {
   const [insights, setInsights] = useState<TournamentInsights | null>(null);
   const [teamComparison, setTeamComparison] = useState<TeamComparisonModel | null>(null);
   const [comparePair, setComparePair] = useState<[string, string] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
+
+  usePageReady(entries.length === 0 || insights !== null || error !== null, onPageReady);
 
   useEffect(() => {
     if (entries.length === 0) {

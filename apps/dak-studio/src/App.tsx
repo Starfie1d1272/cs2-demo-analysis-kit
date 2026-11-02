@@ -133,6 +133,7 @@ function NavButton({ item, active, onClick }: { item: NavItem; active: boolean; 
 
 export function App() {
   const [entries, setEntries] = useState<StudioDemoEntry[]>([]);
+  const [entriesReady, setEntriesReady] = useState(false);
   const [navigation, setNavigation] = useState(() => createStudioNavigation("initial"));
   const navigationRef = useRef(navigation);
   navigationRef.current = navigation;
@@ -152,8 +153,10 @@ export function App() {
   };
   const view = destination.page === "management" && destination.tab === "library" ? "library" : pageToView[destination.page] ?? "library";
   const selectedDemoId = destination.page === "match" ? destination.entryId : null;
-  const matchDeepLink = destination.page === "match" && destination.roundNumber !== undefined
-    ? { roundNumber: destination.roundNumber, tick: destination.tick } : null;
+  const targetRound = destination.page === "match" ? destination.roundNumber : undefined;
+  const targetTick = destination.page === "match" ? destination.tick : undefined;
+  const matchDeepLink = useMemo(() => targetRound === undefined
+    ? null : { roundNumber: targetRound, tick: targetTick }, [active.id, targetRound, targetTick]);
   const eventMode = destination.page === "event-analysis" ? "overview" : "directory";
   const managementInitialTab = destination.page === "management" ? destination.tab : "identity";
   const fallbackContext = useMemo(() => createAnalysisContextPreset("explore"), []);
@@ -346,7 +349,8 @@ export function App() {
         await pruneOrphanSeries(new Set(loaded.map((entry) => entry.id))).catch(() => 0);
         await refreshEventRecords();
       })
-      .catch((err) => setNotice(`读取本地资料库失败：${err instanceof Error ? err.message : String(err)}`));
+      .catch((err) => setNotice(`读取本地资料库失败：${err instanceof Error ? err.message : String(err)}`))
+      .finally(() => setEntriesReady(true));
     // 自动更新属于桌面壳职责。浏览器开发入口没有跨域桥，启动时主动请求发布源
     // 只会制造 CORS 错误；需要时仍可由用户手动检查。
     if (window.pywebview?.api) void doCheckUpdate();
@@ -638,7 +642,7 @@ export function App() {
 
   const onPageReady = useCallback((frameId: string, availableAnchorKeys: string[]) => {
     const frame = navigationRef.current.active;
-    if (frame.id !== frameId || restoringFrameId !== frameId) return;
+    if (!entriesReady || frame.id !== frameId || restoringFrameId !== frameId) return;
     if (frame.anchorKey && availableAnchorKeys.includes(frame.anchorKey)) {
       document.getElementById(frame.anchorKey)?.scrollIntoView({ block: "center" });
     } else {
@@ -648,11 +652,17 @@ export function App() {
     }
     setNavigation(current => studioNavigationReducer(current, { intent: "position", frameId, scrollY: window.scrollY }));
     setRestoringFrameId(null);
-  }, [restoringFrameId]);
+  }, [restoringFrameId, entriesReady]);
 
   useEffect(() => {
     if (restoringFrameId !== active.id) window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [active.id]); // The restoration signal may clear without changing frames.
+
+  useEffect(() => {
+    if (view === "library" && entriesReady) {
+      onPageReady(active.id, Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
+    }
+  }, [view, active.id, entriesReady, onPageReady]);
 
   const handleLinkRawDemo = useCallback(async (entry: StudioDemoEntry) => {
     try {
@@ -1020,6 +1030,7 @@ export function App() {
         {view === "match" && (
           <MatchView
             key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             entries={entries}
             demoId={selectedDemoId}
             deepLink={matchDeepLink}
@@ -1065,6 +1076,7 @@ export function App() {
         {view === "trails" && (
           <TrailsView
             key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
             entries={scopedEntries}
             identityOptions={identityOptions}
@@ -1074,6 +1086,7 @@ export function App() {
         {view === "duel" && (
           <DuelView
             key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
             entries={scopedEntries}
             selectedTeam={selectedTeam}
@@ -1102,6 +1115,7 @@ export function App() {
         {view === "lineups" && (
           <LineupsView
             key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             onRebuild={handleRebuildSelected}
             allEntries={entries}
             entries={scopedEntries}
@@ -1113,6 +1127,7 @@ export function App() {
         {view === "economy" && (
           <EconomyView
             key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
             entries={scopedEntries}
             selectedTeam={selectedTeam}
@@ -1123,6 +1138,7 @@ export function App() {
         {view === "coach" && (
           <CoachView
             key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
             entries={scopedEntries}
             onOpenMatch={openDemo}
@@ -1136,6 +1152,7 @@ export function App() {
         {view === "control" && (
           <RadarFieldView
             key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             entries={scopedEntries}
             teamRenames={identityState.teamRenames}
             selectedTeam={selectedTeam}
@@ -1145,6 +1162,7 @@ export function App() {
         {view === "events" && (eventMode === "overview" ? (
           <TournamentDashboardView
             key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
             entries={scopedEntries}
             selectedTeam={selectedTeam}
@@ -1159,6 +1177,7 @@ export function App() {
         ) : (
           <EventsView
             key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             entries={entries}
             onOpenMatch={openDemo}
             onAnalyzeEvent={startEventAnalysis}
@@ -1176,6 +1195,7 @@ export function App() {
         {view === "management" && (
           <ManagementView
             key={active.id}
+            onPageReady={(keys) => onPageReady(active.id, keys)}
             entries={entries}
             identity={identityState}
             onIdentityChange={setIdentityState}
