@@ -160,8 +160,8 @@ export function buildPlayerRolesAnalysisResult(
               tResponsibility: label(row.tResponsibility),
               ctResponsibility: label(row.ctResponsibility),
               roleMatches: row.roleMatchCount,
-              quality: row.sampleQuality,
-              confidence: row.confidence,
+              quality: row.roleMatchCount ? row.sampleQuality : null,
+              confidence: row.roleMatchCount ? row.confidence : null,
               evidence: row.evidence[0]
                 ? `${row.evidence[0].matchId} R${row.evidence[0].roundNumber}`
                 : null,
