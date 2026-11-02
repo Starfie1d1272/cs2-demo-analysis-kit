@@ -133,7 +133,7 @@ export function TournamentDashboardView({
       <header className="stu-view-header">
         <div>
           <h1>赛事总览</h1>
-          {insights && exportSource && comparisonReady && <AnalysisExportButtons capture={() => buildTournamentAnalysisResult(exportSource, insights, teamComparison, state, { maps: MAP_COLUMNS, weapons: WEAPON_COLUMNS }, exportPage)} />}
+          {insights && exportSource && comparisonReady && !comparisonError && <AnalysisExportButtons capture={() => buildTournamentAnalysisResult(exportSource, insights, teamComparison, state, { maps: MAP_COLUMNS, weapons: WEAPON_COLUMNS }, exportPage)} />}
           <p>当前赛事语料的地图、队伍与经济观察；只有底层提供依据时才会形成 Finding。</p>
         </div>
         {onGoDirectory && <button type="button" className="stu-button-sm" onClick={onGoDirectory}>返回赛事目录</button>}

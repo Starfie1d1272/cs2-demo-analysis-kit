@@ -1,3 +1,6 @@
+import { AnalysisExportButtons } from "../../components/AnalysisExportButtons";
+import { buildPatternReportAnalysisResult } from "../../lib/analysis-export-patterns";
+import { listMapPoolNotes } from "../../lib/map-pool-notes";
 import type { AnalysisExportSource } from "../../lib/analysis-export";
 import type { PatternExplorerState } from "../../lib/pattern-page-state";
 import type { Dispatch, SetStateAction } from "react";
@@ -36,6 +39,9 @@ export interface PatternsThemeProps {
 
 /** 自动观察与人工材料相互独立；只保存用户明确命名或加入的项目。 */
 export function PatternsTheme({ exportSource, section, explorerState, onExplorerStateChange, clusters, facts, allFacts, entryByMatchId, analysisContext, teamRenames, subjectTeam, onOpenMatch, onWatchDemo, onPrepSaved }: PatternsThemeProps) {
+  const [mapPoolNotes, setMapPoolNotes] = useState<Record<string, string> | null>(null);
+  useEffect(() => { let cancelled = false; void listMapPoolNotes().then(rows => { if (!cancelled) setMapPoolNotes(rows); }); return () => { cancelled = true; }; }, []);
+  const mapPool = useMemo(() => getObservedMapPool(allFacts, analysisContext.roles.beneficiary?.label ?? null, analysisContext.roles.opponent?.label ?? null, teamRenames), [allFacts, analysisContext.roles.beneficiary?.label, analysisContext.roles.opponent?.label, teamRenames]);
   const [playbook, setPlaybook] = useState<Record<string, string>>({});
   const [namesError, setNamesError] = useState<string | null>(null);
   useEffect(() => {
@@ -93,8 +99,9 @@ export function PatternsTheme({ exportSource, section, explorerState, onExplorer
       )}
       {section === "anti" && (
         <>
-          <MapPoolTable
-            rows={getObservedMapPool(allFacts, analysisContext.roles.beneficiary?.label ?? null, analysisContext.roles.opponent?.label ?? null, teamRenames)}
+          {exportSource && mapPoolNotes && analysisContext.roles.opponent && <AnalysisExportButtons capture={() => buildPatternReportAnalysisResult(exportSource, mapPool, antiMarkdown, mapPoolNotes, Boolean(analysisContext.roles.beneficiary))} />}
+          <MapPoolTable notes={mapPoolNotes ?? {}} onNotesChange={setMapPoolNotes}
+            rows={mapPool}
             hasOwn={Boolean(analysisContext.roles.beneficiary)}
             hasOpponent={Boolean(analysisContext.roles.opponent)}
           />

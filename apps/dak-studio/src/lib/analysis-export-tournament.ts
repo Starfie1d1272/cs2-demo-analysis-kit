@@ -25,3 +25,7 @@ export function leaderboardSection(model: import("@cs2dak/presentation").SeasonL
   const rows = sortTableRows(model.rows, [{ key, label: key, sortable: true, sortValue: row => row.metrics[key] ?? null }], { ...sort, key });
   return { title: `排行榜 · ${view.label}`, text: [`权重 ${model.weightsVersion}`], sampleDescription: `${rows.length} 行 · 全部筛选结果，${model.matchCount} 场`, limitations: [], columns: [{ key: "name", label: "选手", unit: null }, ...view.columns.map(column => ({ key: column.key, label: column.label, unit: column.format === "percent" ? "%" : null }))], rows: rows.map(row => ({ name: row.name, ...Object.fromEntries(view.columns.map(column => [column.key, row.metrics[column.key] ?? null])) })) };
 }
+
+export function buildLeaderboardAnalysisResult(source: AnalysisExportSource, model: import("@cs2dak/presentation").SeasonLeaderboardModel, state: AnalysisPageState, page: "analysis" | "event-analysis") {
+  return captureAnalysisResult({ ...source, title: "排行榜", page, conditions: [...source.conditions, `排行子页：${state.leaderboardView}`], sections: [leaderboardSection(model, state)], limitations: [] });
+}

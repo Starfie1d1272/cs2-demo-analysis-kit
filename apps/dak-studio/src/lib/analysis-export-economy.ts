@@ -21,5 +21,5 @@ export function buildEconomyAnalysisResult(source: AnalysisExportSource, model: 
     { title: "经济对位胜率 · 比赛范围总体", text: [], sampleDescription: `${matrix.length} 行 · 全部筛选结果`, limitations: ["经济表不能精确反查每格回合。"], columns: [{ key: "low", label: "低经济方", unit: null }, { key: "high", label: "高经济方", unit: null }, { key: "rounds", label: "样本", unit: null }, { key: "rate", label: "低经济方胜率", unit: "%" }], rows: matrix.map(row => ({ low: row.lowEconomy, high: row.highEconomy, rounds: row.rounds, rate: row.lowWinRatePercent })) },
     { title: "小枪翻盘排行", text: [], sampleDescription: `${upsets.length} 行 · 全部筛选结果`, limitations: [], columns: [{ key: "team", label: "队伍", unit: null }, { key: "wins", label: "胜场", unit: null }, { key: "opps", label: "机会", unit: null }, { key: "rate", label: "胜率", unit: "%" }], rows: upsets.map(row => ({ team: row.teamName, wins: row.wins, opps: row.opportunities, rate: row.winRatePercent })) },
   ];
-  return captureAnalysisResult({ ...source, title: "经济与转化", page: "economy", sections, limitations: ["经济结果仅提供比赛来源，不虚构逐格证据。"] });
+  return captureAnalysisResult({ ...source, conditions: [...source.conditions, ...(source.context.focus.kind === "player" || source.context.focus.kind === "self" ? ["经济统计按比赛范围计算，未按个人筛选。"] : [])], title: "经济与转化", page: "economy", sections, limitations: ["经济结果仅提供比赛来源，不虚构逐格证据。"] });
 }

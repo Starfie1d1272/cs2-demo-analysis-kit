@@ -7,8 +7,9 @@ export function downloadAnalysisResult(snapshot: AnalysisResultSnapshotV1, forma
   try {
     const link = document.createElement("a");
     const slug = snapshot.title.replace(/[\\/:*?"<>|\x00-\x1f]+/g, "-").trim().replace(/[. ]+$/g, "").slice(0, 100) || "analysis-result";
+    const safeSlug = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(slug) ? `_${slug}` : slug;
     link.href = url;
-    link.download = `${slug}-${new Date(snapshot.generatedAt).toISOString().slice(0, 10)}.${format === "json" ? "json" : "md"}`;
+    link.download = `${safeSlug}-${new Date(snapshot.generatedAt).toISOString().slice(0, 10)}.${format === "json" ? "json" : "md"}`;
     link.click();
   } finally {
     URL.revokeObjectURL(url);
