@@ -1,3 +1,4 @@
+import { getPinnedPlayer } from "../lib/pin";
 import { usePageReady } from "../lib/use-page-ready";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
@@ -20,6 +21,7 @@ import type { EvidenceSession } from "../lib/evidence-continuation";
 export interface MatchViewProps {
   onPageReady?: (keys: string[]) => void;
   openStudyNoteEditor: (draft: StudyNoteDraft) => void;
+  onAnalyzePlayer: (steamId: string, label: string) => void;
   onOpened?: (target: { roundNumber?: number; tick?: number }) => void;
   onReplayPaused?: (target: { roundNumber: number; tick: number }) => void;
   entries: StudioDemoEntry[];
@@ -60,13 +62,15 @@ async function loadModel(id: string, generation: number): Promise<MatchWorkspace
   return model;
 }
 
-export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceSession, onMoveEvidence, workspaceState, onWorkspaceStateChange, onReturnToSource, onPageReady, onOpened, onReplayPaused, openStudyNoteEditor }: MatchViewProps) {
+export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceSession, onMoveEvidence, workspaceState, onWorkspaceStateChange, onReturnToSource, onPageReady, onOpened, onReplayPaused, openStudyNoteEditor, onAnalyzePlayer }: MatchViewProps) {
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   useEffect(() => subscribeAnalysisDataInvalidation(() => { if (getAnalysisDataSnapshot().status !== "ready") modelCache.clear(); }), []);
   const activeId = demoId;
   const activeEntry = activeId ? entries.find((entry) => entry.id === activeId) ?? null : null;
   const [loaded, setLoaded] = useState<{ id: string; generation: number; model: MatchWorkspaceModel; state: MatchWorkspaceState } | null>(null);
   const model = loaded?.id === activeId && loaded.generation === analysis.generation && analysis.status === "ready" ? loaded.model : null;
+  const [pinned, setPinned] = useState<string[] | null>(null);
+  useEffect(() => { void getPinnedPlayer().then(p => setPinned(p?.steamIds ?? [])); }, []);
   const [error, setError] = useState<string | null>(null);
   const [showQa, setShowQa] = useState(false);
   const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
@@ -125,22 +129,22 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
   }, [activeId]);
 
   useEffect(() => {
-    if (!activeId || !activeEntry || analysis.status !== "ready") return;
+    if (!activeId || !activeEntry || analysis.status !== "ready" || pinned === null) return;
     setShowQa(false);
     for (const key of modelCache.keys()) if (!key.startsWith(`${analysis.generation}:`)) modelCache.delete(key);
     const cached = modelCache.get(`${analysis.generation}:${activeId}`);
     if (cached) {
-      setLoaded(prev => ({ id: activeId, generation: analysis.generation, model: cached, state: prev?.id === activeId ? prev.state : workspaceState ? snapshotMatchWorkspaceState(workspaceState) : createMatchWorkspaceState(cached) }));
+      setLoaded(prev => ({ id: activeId, generation: analysis.generation, model: cached, state: prev?.id === activeId ? prev.state : workspaceState ? snapshotMatchWorkspaceState(workspaceState) : initialState(cached, pinned) }));
       setError(null);
       return;
     }
     let cancelled = false;
     setError(null);
     loadModel(activeId, analysis.generation)
-      .then((built) => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setLoaded(prev => ({ id: activeId, generation: analysis.generation, model: built, state: prev?.id === activeId ? prev.state : workspaceState ? snapshotMatchWorkspaceState(workspaceState) : createMatchWorkspaceState(built) })); } })
+      .then((built) => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setLoaded(prev => ({ id: activeId, generation: analysis.generation, model: built, state: prev?.id === activeId ? prev.state : workspaceState ? snapshotMatchWorkspaceState(workspaceState) : initialState(built, pinned) })); } })
       .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); });
     return () => { cancelled = true; };
-  }, [activeId, Boolean(activeEntry), analysis.generation, analysis.status]);
+  }, [activeId, Boolean(activeEntry), analysis.generation, analysis.status, pinned]);
 
   useLayoutEffect(() => {
     if (!deepLink || !loaded || loaded.id !== activeId) return;
@@ -152,7 +156,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
       if (!prev || prev.id !== activeId) return prev;
       const state = round && prev.state.replay
         ? { ...prev.state, view: "replay" as const, replay: normalizeReplayViewState(prev.model.replay, prev.model.map.view, { ...prev.state.replay, roundNumber: round.roundNumber, tick: deepLink.tick ?? round.freezeEndTick, playing: false }) }
-        : { ...prev.state, view: "rounds" as const, roundExplorer: { ...prev.state.roundExplorer, filter: { ...ROUND_FILTER_DEFAULT, special: { ...ROUND_FILTER_DEFAULT.special } }, selectedRoundNumber: detail.roundNumber } };
+        : { ...prev.state, view: "rounds" as const, quickRoundFilter: "all" as const, roundExplorer: { ...prev.state.roundExplorer, filter: { ...ROUND_FILTER_DEFAULT, special: { ...ROUND_FILTER_DEFAULT.special } }, selectedRoundNumber: detail.roundNumber } };
       return { ...prev, state };
     });
   }, [deepLink, activeId, loaded?.id, evidenceSession?.activeIndex]);
@@ -203,7 +207,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     ? <EmptyState variant="error" title="加载失败" hint={error} />
     : !model
       ? <div className="stu-loading">读取本地持久化工作台…</div>
-      : <MatchReviewWorkspace model={model} state={loaded!.state} onStateChange={(state) => { if (loaded?.state.replay?.playing && state.replay && !state.replay.playing) onReplayPaused?.({ roundNumber: state.replay.roundNumber, tick: state.replay.tick }); setLoaded(prev => prev && prev.id === activeId ? { ...prev, state } : prev); }} />;
+      : <MatchReviewWorkspace model={model} onAnalyzePlayer={onAnalyzePlayer} pinnedIds={pinned ?? []} onNote={(roundNumber) => { if (activeEntry) openStudyNoteEditor({ title: `${activeEntry.meta.teamAName} vs ${activeEntry.meta.teamBName} · R${roundNumber}`, body: "", purpose: "review", playerKey: null, evidence: [captureSavedEvidence(activeEntry, { matchId: matchIdForEntry(activeEntry), roundNumber, reason: "比赛回合笔记" })] }); }} state={loaded!.state} onStateChange={(state) => { if (loaded?.state.replay?.playing && state.replay && !state.replay.playing) onReplayPaused?.({ roundNumber: state.replay.roundNumber, tick: state.replay.tick }); setLoaded(prev => prev && prev.id === activeId ? { ...prev, state } : prev); }} />;
 
   return (
     <div className="stu-view stu-view-flush">
@@ -236,10 +240,6 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
             进游戏
           </button>
         )}
-        {activeEntry && loaded?.id === activeId && loaded.state.roundExplorer.selectedRoundNumber !== null && <button type="button" className="stu-button-sm" onClick={() => {
-          const roundNumber = loaded.state.view === "replay" && loaded.state.replay ? loaded.state.replay.roundNumber : loaded.state.roundExplorer.selectedRoundNumber!;
-          openStudyNoteEditor({ title: `回合 ${roundNumber}`, body: "", purpose: "review", playerKey: null, evidence: [captureSavedEvidence(activeEntry, { matchId: matchIdForEntry(activeEntry), roundNumber, reason: "比赛回合笔记" })] });
-        }}>记一笔</button>}
         {model && (
           <button
             type="button"
@@ -285,4 +285,10 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
       </div>
     </div>
   );
+}
+
+function initialState(model: MatchWorkspaceModel, pinned: string[]): MatchWorkspaceState {
+  const state = createMatchWorkspaceState(model);
+  const matches = model.players.filter(player => pinned.includes(player.row.steamId64));
+  return { ...state, reviewPlayerSteamId64: matches.length === 1 ? matches[0].row.steamId64 : null };
 }
