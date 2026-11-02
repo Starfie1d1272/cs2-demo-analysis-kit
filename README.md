@@ -88,12 +88,14 @@ The v3 ZIP is the only Python/TypeScript seam. Each consumer selects the capabil
 | `apps/dak-studio` / `python/src/cs2dak` | Local workbench, desktop bridge and packaging shell. |
 
 ```tsx
-import type { MapView, WorkspaceReplay } from '@cs2dak/presentation';
+import { useState } from 'react';
+import { createReplayViewState, type MapView, type WorkspaceReplay } from '@cs2dak/presentation';
 import { ReplayViewer } from '@cs2dak/react/replay';
 import '@cs2dak/react/theme.css';
 
 export function Replay({ replay, map }: { replay: WorkspaceReplay; map: MapView }) {
-  return <ReplayViewer replay={replay} map={map} />;
+  const [state, setState] = useState(() => createReplayViewState(replay, map));
+  return <ReplayViewer replay={replay} map={map} state={state} onStateChange={setState} />;
 }
 ```
 
