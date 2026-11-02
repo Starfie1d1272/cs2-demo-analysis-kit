@@ -4,7 +4,7 @@ import { displayTeamName, teamRenameGroups } from "../lib/identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
 import { TACTICAL_FACT_VERSION } from "@cs2dak/tactics";
 import { getFactsStore } from "../lib/facts-store";
-import type { TacticalRoundFact } from "../lib/fact-types";
+import type { TacticalRoundFact } from "@cs2dak/tactics";
 import { buildTacticalClusters, autoName, withTacticalTeamIdentities, type TacticalCluster } from "../lib/tactics";
 import { prepItemsToMarkdown, type PrepItem } from "../lib/playlist";
 import {

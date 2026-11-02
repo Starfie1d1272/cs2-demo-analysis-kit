@@ -13,3 +13,5 @@ export * from "./t-role-research-projection.js";
 
 export * from "./duels.js";
 export * from "./mechanics.js";
+
+export { extractMatchLineupObservations, type MatchLineupObservations } from "./lineup-observations.js";
