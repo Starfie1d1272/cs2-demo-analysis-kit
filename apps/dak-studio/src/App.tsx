@@ -562,8 +562,8 @@ export function App() {
           const saved = frame.originSavedAnalysisId && !copy ? await savedAnalyses.update(frame.originSavedAnalysisId, input) : await savedAnalyses.create(input);
           setNavigation(current => studioNavigationReducer(current, { intent: "saved-origin", frameId: frame.id, id: saved.id }));
         }} onSelect={page => {
-          if (!canLeave()) return;
           if (page === destination.page) return;
+          if (!canLeave()) return;
           const id = `frame-${++nextFrameId.current}`;
           const target = { page, context: analysisContext };
           setRestoringFrameId(findAnalysisFrame(navigationRef.current.history, target, navigationRef.current.active.originSavedAnalysisId)?.id ?? null);
