@@ -10,7 +10,8 @@ import { matchIdForEntry, type StudioDemoEntry } from "../demo-entry";
 
 import type { IdentityOptions } from "../identity";
 import { groupAnalysisTeams } from "./tournament-groups";
-import { keyOf, allowedTeamKeysByMatch, filterTournamentInsightsByTeam, missingFactsError, withTeamRenames } from "./query-scope";
+import { getAnalysisTeamSlots } from "./spatial-queries";
+import { keyOf, filterTournamentInsightsByTeam, missingFactsError, withTeamRenames } from "./query-scope";
 const SMALL_CACHE_LIMIT = 3;
 
 export interface SeasonSummary {
@@ -46,14 +47,14 @@ const seasonSummaryCache = createAnalysisBucket<SeasonSummary>();
  *  传入 identity 时将其并入缓存 key，identityMap 作为归并参数传给 buildSeasonCohort。
  *  Tournament 显式身份优先；未绑定队伍按当前显示名分组。 */
 export function getSeasonSummary(entries: StudioDemoEntry[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<SeasonSummary> {
-  const key = `${keyOf(entries, identity?.version, selectedTeams)}:season-summary-name-groups-v5`;
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:season-summary-name-groups-v6`;
   return cachedQuery(seasonSummaryCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), entries, async (generation) => {
     const persisted = await readPersistedValue<SeasonSummary>(key, generation);
     if (persisted) return persisted;
     const factsStore = getFactsStore();
     const matchIds = entries.map(matchIdForEntry);
     // 队伍透镜（行级）：不窄化 demo 语料，只按 teamKey 过滤 cohort 行。内层 row.teamKey 新旧 facts 皆有。
-    const allowed = allowedTeamKeysByMatch(entries, selectedTeams, identity?.teamRenames);
+    const allowed = await getAnalysisTeamSlots(entries, identity, selectedTeams);
     const cohortRows = (await factsStore.getRrSignalRows({ matchIds })).filter((row) =>
       !allowed || allowed.get(row.matchId)?.has(row.teamKey),
     );

@@ -234,6 +234,7 @@ export function App() {
     [identityState.version, identityState.mappings, identityState.teamRenames]
   );
   const selectedTeams = useMemo(() => selectedTeam ? [selectedTeam] : [], [selectedTeam]);
+  const selectedTeamGroups = useMemo(() => analysisContext.focus.kind === "team" ? [analysisContext.focus.teamKey ?? analysisContext.focus.teamName] : [], [analysisContext.focus]);
   const focusIdentity = useMemo(() => {
     if (!selectedPlayerKey || !identityReady) return null;
     const mapping = identityState.mappings.find(item => item.playerKey === selectedPlayerKey);
@@ -679,7 +680,7 @@ export function App() {
             onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
             entries={eligible}
-            selectedTeams={selectedTeams}
+            selectedTeams={selectedTeamGroups}
             playerSteamIds={selectedPlayerKey ? focusIdentity!.steamIds : null}
             state={active.ui as import("./lib/analysis-theme-state").DuelPageState}
             onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
