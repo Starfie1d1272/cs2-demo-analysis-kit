@@ -29,10 +29,11 @@ export interface TournamentDashboardViewProps {
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   selectedTeam?: string | null;
+  selectedTeamKey?: string | null;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   onGoEconomy?: () => void;
-  onOpenTeam?: (teamName: string) => void;
+  onOpenTeam?: (teamName: string, teamKey?: string) => void;
   onGoDirectory?: () => void;
   onOpenPlayer?: (playerKey: string) => void;
   identityOptions?: IdentityOptions;
@@ -65,6 +66,7 @@ export function TournamentDashboardView({
   state,
   onStateChange,
   selectedTeam = null,
+  selectedTeamKey = null,
   onOpenMatch,
   onGoLibrary,
   onGoEconomy,
@@ -88,7 +90,7 @@ export function TournamentDashboardView({
     availability.excluded.length === 1 && availability.excluded[0]?.reason === "facts 需要重建" &&
     availability.excluded[0].count === entries.length;
 
-  const insightKey = JSON.stringify([entries.map(entry => entry.id), selectedTeam, identityOptions?.version]);
+  const insightKey = JSON.stringify([entries.map(entry => entry.id), selectedTeam, selectedTeamKey, identityOptions?.version]);
   const comparePair = state.comparePair;
   const setComparePair = (comparePair: [string, string] | null) => onStateChange({ ...state, comparePair });
   const comparisonKey = JSON.stringify([entries.map(entry => entry.id), comparePair, identityOptions?.version]);
@@ -109,11 +111,11 @@ export function TournamentDashboardView({
     if (!insightEntries?.length || analysis.status !== "ready") return;
     let cancelled = false;
     setError(null);
-    getTournamentInsights(insightEntries, identityOptions, selectedTeam ? [selectedTeam] : [])
+    getTournamentInsights(insightEntries, identityOptions, (selectedTeamKey ?? selectedTeam) ? [selectedTeamKey ?? selectedTeam!] : [])
       .then(value => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setInsightSnapshot({ key: insightKey, generation: analysis.generation, sample: JSON.stringify(insightEntries.map(entry => entry.id)), value }); } })
       .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); });
     return () => { cancelled = true; };
-  }, [insightEntries, identityOptions?.version, selectedTeam, insightKey, analysis]);
+  }, [insightEntries, identityOptions?.version, selectedTeam, selectedTeamKey, insightKey, analysis]);
   useEffect(() => {
     if (!comparisonEntries?.length || analysis.status !== "ready") return;
     let cancelled = false;
@@ -202,7 +204,7 @@ export function TournamentDashboardView({
             )}
             {teamComparison && onOpenTeam && (
               <div className="stu-chip-row">
-                {teamComparison.availableTeams.map((team) => <button key={team.name} type="button" className="stu-chip" onClick={() => onOpenTeam(team.name)}>{team.name} · {team.matches} 场</button>)}
+                {teamComparison.availableTeams.map((team) => <button key={team.key ?? team.name} type="button" className="stu-chip" onClick={() => onOpenTeam(team.name, team.key)}>{team.name} · {team.matches} 场</button>)}
               </div>
             )}
           </div>}

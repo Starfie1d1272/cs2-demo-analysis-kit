@@ -796,6 +796,7 @@ export function App() {
             allEntries={entries}
             entries={scopedEntries}
             selectedTeam={selectedTeam}
+            selectedTeamKey={analysisContext.focus.kind === "team" ? analysisContext.focus.teamKey : undefined}
             identityOptions={identityOptions}
             onOpenMatch={openDemo}
             onOpenTeam={openTeam}

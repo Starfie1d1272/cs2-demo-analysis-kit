@@ -126,7 +126,7 @@ function validContext(v: unknown): boolean {
       f.kind === "aggregate"
         ? ["kind"]
         : f.kind === "team"
-          ? ["kind", "teamName"]
+          ? ["kind", "teamName", "teamKey"]
           : f.kind === "event"
             ? ["kind", "eventId", "label"]
             : f.kind === "match"
@@ -151,7 +151,7 @@ function validContext(v: unknown): boolean {
   if (
     !(
       f.kind === "aggregate" ||
-      (f.kind === "team" && str(f.teamName)) ||
+      (f.kind === "team" && str(f.teamName) && (f.teamKey === undefined || str(f.teamKey))) ||
       ((["self", "player"] as readonly unknown[]).includes(f.kind) &&
         str(f.playerKey) &&
         str(f.label)) ||
