@@ -479,7 +479,7 @@ export function App() {
         )}
         {entries.length > 0 && contextEditorOpen && section === "analysis" && "context" in destination && (
           <AnalysisScopeEditor
-            key={active.id}
+            key={`scope-editor:${active.id}`}
             entries={entries}
             context={analysisContext}
             onChange={setAnalysisContext}
