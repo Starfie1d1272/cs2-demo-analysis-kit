@@ -81,7 +81,7 @@ const FLASH_COLUMNS: DataTableColumn<UtilityValueRow>[] = [
   { key: "flashesThrown", label: "闪光数", numeric: true, sortable: true, sortValue: (r) => r.flashesThrown, format: (r) => r.flashesThrown },
   {
     key: "enemyBlindSecondsPerRound",
-    label: <>闪光时间/回合<MetricInfo note="闪光造成的敌方致盲秒数 / 回合数；不把队友短暂被白作为主指标。" /></>,
+    label: <>闪光时间/回合<MetricInfo note="闪光造成的敌方致盲秒数 / 回合数。" /></>,
     numeric: true,
     sortable: true,
     sortValue: (r) => r.enemyBlindSecondsPerRound,
@@ -168,7 +168,7 @@ export function UtilityView({ exportSource, state, onStateChange, playerFocus, o
         <div>
           <h1>道具价值</h1>
           {visibleSummary && exportSource && (!playerFocus || playerFocus.steamIds.length > 0) && !error && canExportSnapshot(snapshot, analysis) && <AnalysisExportButtons capture={() => buildUtilityAnalysisResult(exportSource, visibleSummary, state, { he: HE_COLUMNS, fire: FIRE_COLUMNS, flash: FLASH_COLUMNS, smoke: SMOKE_COLUMNS })} />}
-          <p>按回合和投掷数归一：闪光看敌方致盲时间，HE/火看敌方伤害，烟只看每回合投入；不把关联数据表述为对胜负的因果贡献。</p>
+          <p>按回合和投掷数归一：闪光看敌方致盲时间，HE/火看敌方伤害，烟看每回合投入。</p>
           <button type="button" className="stu-button-sm" onClick={onGoLineups}>查看道具点位</button>
           {playerFocus && <p>选手行与具备身份的候选按焦点筛选；队伍榜显示比赛范围内的队伍上下文。{playerFocus.steamIds.length === 0 && "无法解析该选手的身份。"}</p>}
         </div>
