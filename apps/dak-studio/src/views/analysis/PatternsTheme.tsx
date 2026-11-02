@@ -31,12 +31,13 @@ export interface PatternsThemeProps {
   analysisContext: AnalysisContext;
   teamRenames: Record<string, string>;
   subjectTeam: string | null;
+  mode: "own" | "scout";
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
 }
 
 /** 自动观察与人工材料相互独立；模式命名由用户明确保存。 */
-export function PatternsTheme({ exportSource, section, explorerState, onExplorerStateChange, clusters, facts, allFacts, entryByMatchId, analysisContext, teamRenames, subjectTeam, onOpenMatch, onWatchDemo }: PatternsThemeProps) {
+export function PatternsTheme({ exportSource, section, explorerState, onExplorerStateChange, clusters, facts, allFacts, entryByMatchId, analysisContext, teamRenames, subjectTeam, mode, onOpenMatch, onWatchDemo }: PatternsThemeProps) {
   const [mapPoolNotes, setMapPoolNotes] = useState<Record<string, string> | null>(null);
   useEffect(() => { let cancelled = false; void listMapPoolNotes().then(rows => { if (!cancelled) setMapPoolNotes(rows); }); return () => { cancelled = true; }; }, []);
   const mapPool = useMemo(() => getObservedMapPool(allFacts, analysisContext.roles.beneficiary?.label ?? null, analysisContext.roles.opponent?.label ?? null, teamRenames), [allFacts, analysisContext.roles.beneficiary?.label, analysisContext.roles.opponent?.label, teamRenames]);
@@ -79,7 +80,7 @@ export function PatternsTheme({ exportSource, section, explorerState, onExplorer
       )}
       {section === "anti" && (
         <>
-          {exportSource && mapPoolNotes && analysisContext.roles.opponent && <AnalysisExportButtons capture={() => buildPatternReportAnalysisResult(exportSource, mapPool, clusters, mapPoolNotes, Boolean(analysisContext.roles.beneficiary), subjectTeam)} />}
+          {exportSource && mapPoolNotes && analysisContext.roles.opponent && <AnalysisExportButtons capture={() => buildPatternReportAnalysisResult(exportSource, mapPool, clusters, mapPoolNotes, Boolean(analysisContext.roles.beneficiary), subjectTeam, mode)} />}
           <MapPoolTable notes={mapPoolNotes ?? {}} onNotesChange={(mapName, note) => setMapPoolNotes(previous => ({ ...previous, [mapName]: note }))}
             rows={mapPool}
             hasOwn={Boolean(analysisContext.roles.beneficiary)}
