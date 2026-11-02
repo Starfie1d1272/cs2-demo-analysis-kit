@@ -70,17 +70,14 @@ export function applyRename(
   return { ...current, version: current.version + 1, mappings };
 }
 
-/** 纯状态变换：设置/清除队伍显示名（不含持久化）。 */
-export function applyTeamRename(
-  current: IdentityStoreState,
-  originalName: string,
-  displayName: string
-): IdentityStoreState {
+export interface TeamRenameChange { originalName: string; displayName: string }
+
+/** 将一次队伍操作中的全部映射作为一个身份版本处理。 */
+export function applyTeamRenames(current: IdentityStoreState, changes: TeamRenameChange[]): IdentityStoreState {
   const teamRenames = { ...current.teamRenames };
-  if (displayName.trim()) {
-    teamRenames[originalName] = displayName.trim();
-  } else {
-    delete teamRenames[originalName];
+  for (const { originalName, displayName } of changes) {
+    if (displayName.trim()) teamRenames[originalName] = displayName.trim();
+    else delete teamRenames[originalName];
   }
   return { ...current, version: current.version + 1, teamRenames };
 }
