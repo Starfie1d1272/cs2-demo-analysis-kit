@@ -17,7 +17,7 @@ export type StudioDestination =
   | { page: "management"; tab: "identity" | "assets" | "library" };
 export type StudioPageId = StudioDestination["page"];
 export type DestinationFor<P extends StudioPageId> = Extract<StudioDestination, { page: P }>;
-export type StudioFrame = { [P in StudioPageId]: { id: string; destination: DestinationFor<P>; ui: StudioPageStateMap[P]; scrollY: number; anchorKey?: string } }[StudioPageId];
+export type StudioFrame = { [P in StudioPageId]: { id: string; destination: DestinationFor<P>; ui: StudioPageStateMap[P]; scrollY: number; anchorKey?: string; originSavedAnalysisId?: string } }[StudioPageId];
 
 export const PAGE_SECTION: Record<StudioPageId, StudioSection> = {
   workbench: "workbench", matches: "matches", events: "matches", match: "matches",
@@ -51,12 +51,14 @@ export interface StudioNavigation {
 }
 export type NavigationAction =
   | { intent: "open"; id: string; destination: StudioDestination; scrollY: number }
+  | { intent: "open-saved"; id: string; saved: import("./saved-analysis").SavedAnalysis; scrollY: number }
   | { intent: "switch-analysis"; id: string; destination: AnalysisDestination; scrollY: number }
   | { intent: "evidence"; id: string; destination: DestinationFor<"match">; scrollY: number; sourceKey?: string }
   | { intent: "resume"; id: string; section: StudioSection; scrollY: number }
   | { intent: "back"; id: string }
   | { intent: "restore"; frame: StudioFrame }
   | { intent: "evidence-target"; destination: DestinationFor<"match"> }
+  | { intent: "saved-origin"; frameId: string; id: string }
   | { intent: "context"; frameId: string; context: AnalysisContext }
   | { intent: "ui"; frameId: string; ui: StudioPageStateMap[StudioPageId] }
   | { intent: "position"; frameId: string; scrollY: number; anchorKey?: string };
@@ -64,16 +66,17 @@ export function createStudioNavigation(id: string): StudioNavigation {
   return { active: frame(id, defaultDestination("workbench")), history: [], resume: {} };
 }
 /** 查找同一语义上下文的最近分析页面，用于主题切换恢复。 */
-export function findAnalysisFrame(history: readonly StudioFrame[], destination: AnalysisDestination): StudioFrame | undefined {
+export function findAnalysisFrame(history: readonly StudioFrame[], destination: AnalysisDestination, originSavedAnalysisId?: string): StudioFrame | undefined {
   for (let i = history.length - 1; i >= 0; i--) {
     const item = history[i];
-    if (item.destination.page === destination.page && "context" in item.destination && JSON.stringify(item.destination.context) === JSON.stringify(destination.context)) return item;
+    if (item.originSavedAnalysisId === originSavedAnalysisId && item.destination.page === destination.page && "context" in item.destination && JSON.stringify(item.destination.context) === JSON.stringify(destination.context)) return item;
   }
   return undefined;
 }
 export function studioNavigationReducer(state: StudioNavigation, action: NavigationAction): StudioNavigation {
   if (action.intent === "restore") return { ...state, active: structuredClone(action.frame), history: state.history.filter(item => item.id !== action.frame.id) };
   if (action.intent === "evidence-target") return { ...state, active: { ...state.active, destination: action.destination, ui: null } as StudioFrame };
+  if (action.intent === "saved-origin") return state.active.id === action.frameId ? { ...state, active: { ...state.active, originSavedAnalysisId: action.id } as StudioFrame } : state;
   if (action.intent === "context") {
     if (state.active.id !== action.frameId || !("context" in state.active.destination)) return state;
     return { ...state, active: { ...state.active, destination: { ...state.active.destination, context: createAnalysisContext(action.context) } } as StudioFrame };
@@ -88,14 +91,19 @@ export function studioNavigationReducer(state: StudioNavigation, action: Navigat
     const resume = Object.fromEntries(Object.entries(state.resume).filter(([, id]) => ids.has(id)));
     return { active, history, resume: { ...resume, [PAGE_SECTION[active.destination.page]]: active.id } };
   }
+  if (action.intent === "open-saved") {
+    const next = studioNavigationReducer(state, { intent: "open", id: action.id, destination: { page: action.saved.page, context: action.saved.context }, scrollY: action.scrollY });
+    return { ...next, active: { ...next.active, ui: structuredClone(action.saved.ui), originSavedAnalysisId: action.saved.id } as StudioFrame };
+  }
   if (action.intent === "switch-analysis") {
     const source = { ...state.active, scrollY: action.scrollY } as StudioFrame;
-    const active = findAnalysisFrame(state.history, action.destination);
+    const active = findAnalysisFrame(state.history, action.destination, state.active.originSavedAnalysisId);
     if (active) {
       const history = [...state.history.filter(item => item.id !== active.id), source].slice(-20);
       return { active, history, resume: { ...state.resume, analysis: active.id } };
     }
-    return studioNavigationReducer(state, { ...action, intent: "open" });
+    const next = studioNavigationReducer(state, { ...action, intent: "open" });
+    return { ...next, active: { ...next.active, originSavedAnalysisId: state.active.originSavedAnalysisId } as StudioFrame };
   }
   const source = { ...state.active, scrollY: action.scrollY, ...(action.intent === "evidence" ? { anchorKey: action.sourceKey } : {}) } as StudioFrame;
   const section = PAGE_SECTION[source.destination.page];
