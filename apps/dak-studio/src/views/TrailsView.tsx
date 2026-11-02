@@ -156,10 +156,10 @@ export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entri
   }, [playerEntries]);
 
   useEffect(() => {
-    setMapName((current) =>
-      current && mapOptions.some(([map]) => map === current) ? current : (mapOptions[0]?.[0] ?? null)
-    );
-  }, [mapOptions]);
+    if (!rosterByEntry || !selectedKey || mapOptions.length === 0) return;
+    setMapName((current) => current ?? mapOptions[0][0]);
+  }, [rosterByEntry, selectedKey, mapOptions]);
+  const missingSelectedMap = mapName !== null && rosterByEntry !== null && !mapOptions.some(([map]) => map === mapName);
 
   // ③ 范围 = 该选手在该图的最近 N 场
   const rangeEntries = useMemo(() => {
@@ -218,7 +218,7 @@ export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entri
       <div className="stu-view">
         <EmptyState
           mark
-          title="还没有动线数据"
+          title={mapName ? `${mapName} 在当前资料库没有样本` : "还没有动线数据"}
           hint="开局动线需要含回放流的 v3 ZIP，先导入几场比赛。"
           action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
         />
@@ -233,7 +233,7 @@ export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entri
       <header className="stu-view-header">
         <div>
           <h1>开局动线</h1>
-          {exportSource && models && selectedPlayer && !error && !capability.error && !capability.stale && canExportSnapshot(modelSnapshot, analysis) && <AnalysisExportButtons capture={() => buildOpeningAnalysisResult(withCapabilityConditions(applyExportEntries(exportSource, eligibleEntries ?? []), capability.availability), visibleRounds, selectedPlayer.name, pageState, missingReplay)} />}
+          {exportSource && models && selectedPlayer && !missingSelectedMap && rangeEntries.length > 0 && !error && !capability.error && !capability.stale && canExportSnapshot(modelSnapshot, analysis) && <AnalysisExportButtons capture={() => buildOpeningAnalysisResult(withCapabilityConditions(applyExportEntries(exportSource, eligibleEntries ?? []), capability.availability), visibleRounds, selectedPlayer.name, pageState, missingReplay)} />}
           <p>
             选手在<b>长枪局</b>开局前 {WINDOW_SECONDS} 秒的走位与道具投掷叠加动画——直观看出默认位、出门路线和道具习惯，也可用于学习职业选手的 default。
           </p>
@@ -244,7 +244,7 @@ export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entri
         <label>
           <span>① 选手</span>
           <select className="stu-select" value={selectedKey ?? ""} onChange={(e) => { const player = players?.find(option => option.playerKey === e.target.value); if (player) onSelectPlayer(player.playerKey, player.name); }}>
-            {selectedKey && !(players ?? []).some(option => option.playerKey === selectedKey) && <option value={selectedKey}>当前选手 · 0 场</option>}
+            {selectedKey && !(players ?? []).some(option => option.playerKey === selectedKey) && <option value={selectedKey}>{players ? "当前选手 · 0 场" : "正在读取选手…"}</option>}
             {!selectedKey && <option value="">请选择选手</option>}
             {(players ?? []).map((option) => (
               <option key={option.playerKey} value={option.playerKey}>
@@ -256,6 +256,8 @@ export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entri
         <label>
           <span>② 地图</span>
           <select className="stu-select" value={mapName ?? ""} onChange={(e) => setMapName(e.target.value || null)}>
+            {mapName === null && <option value="">{rosterByEntry ? "请选择地图" : "正在读取地图…"}</option>}
+            {mapName !== null && !mapOptions.some(([map]) => map === mapName) && <option value={mapName}>{mapName}（{rosterByEntry ? "0 场" : "读取中"}）</option>}
             {mapOptions.map(([map, count]) => (
               <option key={map} value={map}>
                 {map}（{count} 场）
@@ -306,6 +308,8 @@ export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entri
       {models && (error || analysis.status !== "ready" || modelSnapshot?.generation !== analysis.generation) && <p className="stu-muted" role="status">{error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
       {capability.error && !models ? null : error && !models ? (
         <EmptyState variant="error" title="构建失败" hint={error} />
+      ) : players && missingSelectedMap ? (
+        <EmptyState variant="insufficient" title={`${mapName} 在当前范围没有该选手的样本`} hint="请选择其他地图，或调整范围以恢复该地图的比赛。" />
       ) : players && (rangeEntries.length === 0 || eligibleEntries?.length === 0) ? (
         <EmptyState variant="insufficient" title="当前条件没有比赛样本" hint="最近场次只包含有日期的比赛；可选择全部场次或调整选手、地图与范围。" />
       ) : !models || !players ? (
