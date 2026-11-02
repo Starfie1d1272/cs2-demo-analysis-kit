@@ -11,7 +11,6 @@ import { getCoachAssignment } from "../../lib/coach-assignments";
 import { resolveSavedEvidence, type SavedEvidenceRef } from "../../lib/saved-evidence";
 import { getStudyNote } from "../../lib/study-notes";
 import { listTrainingFocus } from "../../lib/training-focus";
-import { listPrepItems, prepItemsToMarkdown } from "../../lib/prep-items";
 import { listPracticeLineups } from "../../lib/practice-lineups";
 import { MapAnnotationCanvas } from "@cs2dak/react";
 import { usePlaybookMap } from "./PlaybookPhaseEditor";
@@ -129,32 +128,6 @@ async function resolve(
             ],
           }
         : null;
-    }
-    case "prep-item": {
-      const n = (await listPrepItems()).find((x) => x.id === ref.id);
-      if (!n) return null;
-      const matches = entries.filter((x) => matchIdForEntry(x) === n.matchId);
-      const file =
-        matches.length === 1 ? safeName(matches[0].fileName) : "来源不可用";
-      const safeItem = {
-        ...n,
-        group: escapeText(n.group),
-        mapName: n.mapName ? escapeText(n.mapName) : undefined,
-        matchId: escapeText(file),
-        note: "",
-      };
-      const markdown = prepItemsToMarkdown(escapeText(n.group), [safeItem]);
-      const display = prepItemsToMarkdown(n.group, [
-        { ...n, matchId: file, note: "" },
-      ]);
-      return {
-        title: n.group,
-        lines: [
-          { text: display, markdown },
-          namedBody("用户备注", n.note),
-          source(file, n.mapName ?? "地图未知", n.roundNumber),
-        ],
-      };
     }
     case "practice-lineup": {
       const n = (await listPracticeLineups()).find((x) => x.id === ref.id);

@@ -1,5 +1,5 @@
 export type MaterialRef = {
-  kind: "study-note" | "training-focus" | "prep-item" | "practice-lineup" | "playbook" | "assignment-set" | "match-sheet";
+  kind: "study-note" | "training-focus" | "practice-lineup" | "playbook" | "assignment-set" | "match-sheet";
   id: string;
 };
 

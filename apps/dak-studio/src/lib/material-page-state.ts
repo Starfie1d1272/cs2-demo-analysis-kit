@@ -11,7 +11,6 @@ export type MaterialPageState =
   | { kind: "playbook"; id: string; draft: CoachPlaybookDraft; dirty: boolean; phaseId: string | null }
   | { kind: "study-note"; id: string; draft: StudyNoteDraft; dirty: boolean }
   | { kind: "training-focus"; id: string; draft: { note: string; reviewCondition: string }; dirty: boolean }
-  | { kind: "prep-item"; id: string; draft: { group: string; note: string }; dirty: boolean }
   | { kind: "practice-lineup"; id: string; selectedEvidence: number | null };
 export interface MaterialsPageState {
   search: string;
