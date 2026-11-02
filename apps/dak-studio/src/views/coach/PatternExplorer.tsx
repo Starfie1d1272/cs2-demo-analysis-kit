@@ -5,7 +5,8 @@ import type { AnalysisExportSource } from "../../lib/analysis-export";
 import { patternFingerprint } from "../../lib/pattern-observations";
 import type { PatternExplorerState } from "../../lib/pattern-page-state";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../../lib/queries/query-cache";
-import { createReplayViewState, normalizeReplayViewState, type ReplayViewState } from "@cs2dak/presentation";
+import { type ReplayViewState } from "@cs2dak/presentation";
+import { replayStateForRound } from "../../lib/match-workspace-state";
 import { STUDIO_TABLE_CLASSES } from "../../components/table-styles";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject, type Dispatch, type SetStateAction } from "react";
 import type { MatchWorkspaceModel } from "@cs2dak/presentation";
@@ -30,12 +31,11 @@ export interface PatternExplorerProps {
   entryByMatchId: Map<string, StudioDemoEntry>;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
-  onAddToPlaylist?: (cluster: TacticalCluster, fact: TacticalRoundFact) => void;
   /** 回放缓存：传入则与上层复用；未传时组件生命周期内保持同一个缓存。 */
   replayModelCache?: Map<string, MatchWorkspaceModel>;
 }
 
-export function PatternExplorer({ exportSource, patternNames = {}, state, onStateChange, clusters, facts, entryByMatchId, onOpenMatch, onWatchDemo, onAddToPlaylist, replayModelCache }: PatternExplorerProps) {
+export function PatternExplorer({ exportSource, patternNames = {}, state, onStateChange, clusters, facts, entryByMatchId, onOpenMatch, onWatchDemo, replayModelCache }: PatternExplorerProps) {
   const { mapName, side, economyEntry: econ, clusterId: selectedId, selectedFactKey: selectedEvidenceKey } = state;
   const maps = useMemo(() => [...new Set(clusters.map(c => c.mapName))].sort(), [clusters]);
   const setSide = (side: "t" | "ct") => onStateChange(current => ({ ...current, side, clusterId: null, selectedFactKey: null }));
@@ -211,7 +211,6 @@ export function PatternExplorer({ exportSource, patternNames = {}, state, onStat
                   onOpenMatch={onOpenMatch}
                   onWatchDemo={onWatchDemo}
                   onSelect={setSelectedEvidenceKey}
-                  onAddToPlaylist={onAddToPlaylist}
                 />
               </>
             )}
@@ -263,12 +262,10 @@ function CoachReplayStage({ fact, entryByMatchId, cache, mainRef, savedSource, s
     if (analysis.status !== "ready") return;
     if (!model || !fact || !source) { setReplay(null); return; }
     const round = model.replay.rounds.find(r => r.roundNumber === fact.roundNumber);
-    const initial = createReplayViewState(model.replay, model.map.view);
     setReplay(previous => {
-      const state = round && initial ? normalizeReplayViewState(model.replay, model.map.view, {
-        ...(savedSource === source && savedReplay ? savedReplay : previous?.matchId === fact.matchId ? previous.state : initial),
-        roundNumber: round.roundNumber, tick: savedSource === source && savedReplay ? savedReplay.tick : round.freezeEndTick + 20 * (model.replay.tickrate ?? 64), playing: false,
-      }) : null;
+      const base = savedSource === source && savedReplay ? savedReplay : previous?.matchId === fact.matchId ? previous.state : null;
+      const tick = savedSource === source && savedReplay ? savedReplay.tick : round ? round.freezeEndTick + 20 * (model.replay.tickrate ?? 64) : undefined;
+      const state = replayStateForRound(model, base, fact.roundNumber, tick);
       return state ? { source, matchId: fact.matchId, state } : null;
     });
   }, [model, fact?.matchId, fact?.roundNumber, source, analysis.status]);
@@ -305,8 +302,8 @@ function CoachReplayStage({ fact, entryByMatchId, cache, mainRef, savedSource, s
         <div className="stu-pe-radar-empty">{error}</div>
       ) : !model ? (
         <div className="stu-loading">读取本地回放…</div>
-      ) : !model.replay.available || !model.replay.rounds.some(r => r.roundNumber === fact.roundNumber) ? (
-        <div className="stu-pe-radar-empty">本场导出未附带 2D 回放流。</div>
+      ) : !replayStateForRound(model, null, fact.roundNumber) ? (
+        <div className="stu-pe-radar-empty">该回合没有可播放的 2D 回放，仍可查看下方证据详情。</div>
       ) : replay?.source !== source ? (
         <div className="stu-loading">准备示例回合…</div>
       ) : (
@@ -491,7 +488,6 @@ function EvidenceTable({
   onOpenMatch,
   onWatchDemo,
   onSelect,
-  onAddToPlaylist,
 }: {
   cluster: TacticalCluster;
   tableState: import("@cs2dak/presentation").TableState;
@@ -502,7 +498,6 @@ function EvidenceTable({
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onSelect: (key: string) => void;
-  onAddToPlaylist?: (cluster: TacticalCluster, fact: TacticalRoundFact) => void;
 }) {
   const PAGE_SIZE = 12;
 
@@ -569,9 +564,6 @@ function EvidenceTable({
         const fact = findFact(r);
         const entry = entryByMatchId.get(r.matchId);
         return <>
-          {fact && onAddToPlaylist && (
-            <button type="button" className="stu-button-sm" onClick={() => onAddToPlaylist(cluster, fact)}>加入</button>
-          )}
           {entry && (
             <EvidenceLink hint="在比赛工作台打开完整分析并定位执行证据" onOpen={() => onOpenMatch(entry.id, { roundNumber: r.roundNumber, tick: fact ? jumpTickFor(fact) : undefined })}>
               工作台 ↗
@@ -585,7 +577,7 @@ function EvidenceTable({
         </>;
       }
     },
-  ], [factByRound, entryByMatchId, onSelect, onOpenMatch, onWatchDemo, onAddToPlaylist, cluster]);
+  ], [factByRound, entryByMatchId, onSelect, onOpenMatch, onWatchDemo, cluster]);
 
   return (
     <div className="stu-pe-evidence" id="patterns:evidence">

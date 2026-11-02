@@ -30,7 +30,6 @@ export const emptyMatchSheet = (): CoachMatchSheetDraft => ({
 const kinds = [
   "study-note",
   "training-focus",
-  "prep-item",
   "practice-lineup",
   "playbook",
   "assignment-set",

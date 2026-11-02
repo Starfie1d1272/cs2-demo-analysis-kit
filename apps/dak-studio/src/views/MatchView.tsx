@@ -6,9 +6,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalS
 import { buildSeriesSummary } from "@cs2dak/analytics";
 import type { MatchWorkspaceModel, SeriesSummary } from "@cs2dak/presentation";
 import { QaReportPanel } from "@cs2dak/react";
-import { normalizeReplayViewState } from "@cs2dak/presentation";
 import { MatchReviewWorkspace } from "./match/MatchReviewWorkspace";
-import { createMatchWorkspaceState, snapshotMatchWorkspaceState, ROUND_FILTER_DEFAULT, type MatchWorkspaceState } from "../lib/match-workspace-state";
+import { createMatchWorkspaceState, snapshotMatchWorkspaceState, replayStateForRound, ROUND_FILTER_DEFAULT, type MatchWorkspaceState } from "../lib/match-workspace-state";
 import { entryDate, matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import { loadMatchWorkspaceModel } from "../lib/match-workspace-loader";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
@@ -169,11 +168,11 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     if (evidenceSession && (!activeEntry || matchIdForEntry(activeEntry) !== evidenceSession.queue[evidenceSession.activeIndex].evidence.matchId)) return;
     const detail = loaded.model.rounds.find(r => r.roundNumber === deepLink.roundNumber);
     if (!detail) return;
-    const round = loaded.model.replay.rounds.find(r => r.roundNumber === deepLink.roundNumber);
     setLoaded(prev => {
       if (!prev || prev.id !== activeId) return prev;
-      const state = round && prev.state.replay
-        ? { ...prev.state, view: "replay" as const, replay: normalizeReplayViewState(prev.model.replay, prev.model.map.view, { ...prev.state.replay, roundNumber: round.roundNumber, tick: deepLink.tick ?? round.freezeEndTick, playing: false }) }
+      const replay = replayStateForRound(prev.model, prev.state.replay, deepLink.roundNumber, deepLink.tick);
+      const state = replay
+        ? { ...prev.state, view: "replay" as const, replay }
         : { ...prev.state, view: "rounds" as const, quickRoundFilter: "all" as const, roundExplorer: { ...prev.state.roundExplorer, filter: { ...ROUND_FILTER_DEFAULT, special: { ...ROUND_FILTER_DEFAULT.special } }, selectedRoundNumber: detail.roundNumber } };
       return { ...prev, state };
     });
@@ -187,8 +186,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     if (!model || !activeEntry) return;
     if (evidenceSession && matchIdForEntry(activeEntry) !== evidenceSession.queue[evidenceSession.activeIndex].evidence.matchId) return;
     if (deepLink && !model.rounds.some(round => round.roundNumber === deepLink.roundNumber)) return;
-    const round = deepLink && model.replay.rounds.find(item => item.roundNumber === deepLink.roundNumber);
-    const replay = round && loaded?.state.replay ? normalizeReplayViewState(model.replay, model.map.view, { ...loaded.state.replay, roundNumber: round.roundNumber, tick: deepLink?.tick ?? round.freezeEndTick, playing: false }) : null;
+    const replay = deepLink ? replayStateForRound(model, loaded?.state.replay ?? null, deepLink.roundNumber, deepLink.tick) : null;
     onOpened?.(deepLink ? { roundNumber: deepLink.roundNumber, ...(replay ? { tick: replay.tick } : {}) } : {});
   }, [model, activeEntry, deepLink, evidenceSession, onOpened]);
 
