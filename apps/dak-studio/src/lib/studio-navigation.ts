@@ -1,7 +1,7 @@
 import { createAnalysisContext, createAnalysisContextPreset, type AnalysisContext } from "./analysis-context.js";
 import { emptyMaterialsPageState } from "./material-page-state";
 import type { LectureMaterialRef, MaterialRef } from "./material-ref.js";
-import { emptyMatchesState, emptyEventsState, emptyUtilityState, type StudioPageStateMap } from "./studio-page-state.js";
+import { emptyMatchesState, emptyEventsState, emptyUtilityState, emptyPlayerState, type StudioPageStateMap } from "./studio-page-state.js";
 
 export type StudioSection = "workbench" | "matches" | "analysis" | "materials" | "management";
 export type AnalysisPageId = "analysis" | "personal-review" | "player" | "team" | "event-analysis" | "duel" | "economy" | "utility" | "lineups" | "opening" | "control" | "patterns";
@@ -38,7 +38,7 @@ function copyDestination(destination: StudioDestination): StudioDestination {
   return { ...destination };
 }
 function frame(id: string, destination: StudioDestination): StudioFrame {
-  return { id, destination: copyDestination(destination), ui: destination.page === "materials" ? emptyMaterialsPageState() : destination.page === "utility" ? emptyUtilityState() : destination.page === "matches" ? emptyMatchesState() : destination.page === "events" ? { ...emptyEventsState(), activeEventId: destination.eventId ?? null } : destination.page === "management" ? { tab: destination.tab, library: emptyMatchesState() } : null, scrollY: 0 } as StudioFrame;
+  return { id, destination: copyDestination(destination), ui: destination.page === "player" ? emptyPlayerState() : destination.page === "materials" ? emptyMaterialsPageState() : destination.page === "utility" ? emptyUtilityState() : destination.page === "matches" ? emptyMatchesState() : destination.page === "events" ? { ...emptyEventsState(), activeEventId: destination.eventId ?? null } : destination.page === "management" ? { tab: destination.tab, library: emptyMatchesState() } : null, scrollY: 0 } as StudioFrame;
 }
 export interface StudioNavigation {
   active: StudioFrame;
