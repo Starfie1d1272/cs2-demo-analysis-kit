@@ -1,3 +1,4 @@
+import { PLAYBOOK_KIND_LABELS } from "../../lib/playbook-labels";
 import { useEffect, useState } from "react";
 import type { CoachMatchSheetDraft } from "../../lib/coach-match-sheet";
 import type { SheetMaterialRef } from "../../lib/material-ref";
@@ -53,7 +54,7 @@ async function resolve(
         n && {
           title: n.title,
           lines: [
-            label(`${n.kind} · ${n.mapName} · ${n.side}`),
+            label(`${PLAYBOOK_KIND_LABELS[n.kind]} · ${n.mapName} · ${n.side.toUpperCase()}`),
             namedBody("目的", n.purpose),
             namedBody("触发", n.trigger),
             body(n.body),

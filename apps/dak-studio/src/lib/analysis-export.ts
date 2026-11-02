@@ -437,7 +437,7 @@ export function analysisExportSource(
     entries,
     scopeSummary,
     conditions: [
-      "上下文的基线选择未用于此页面查询；实际参照见各节说明。",
+      "实际参照见各节说明。",
       `日期：${date ? `${date.from ?? "不限"} 至 ${date.to ?? "不限"}${date.includeUnknown ? "（含未知日期）" : "（不含未知日期）"}` : "不限"}`,
       `地图：${corpus.maps.length ? corpus.maps.join("、") : "不限"}`,
       `标签：${corpus.tags.length ? corpus.tags.join("、") : "不限"}`,

@@ -210,7 +210,7 @@ export function PatternsPage({
       {hasSnapshot && clusters.length > 0 && (
         <PatternsTheme exportSource={hasSnapshot && !loading && !error && analysisData.status === "ready" && factsGeneration === analysisData.generation ? exportSource : null} section={tab} explorerState={state.explorer} onExplorerStateChange={update => onStateChange(current => ({ ...current, explorer: typeof update === "function" ? update(current.explorer) : update }))} clusters={clusters} facts={facts} allFacts={allFacts}
           entryByMatchId={entryByMatchId} analysisContext={analysisContext} teamRenames={teamRenames}
-          subjectTeam={subjectTeam} onOpenMatch={onOpenMatch} onWatchDemo={onWatchDemo} />
+          subjectTeam={subjectTeam} mode={mode} onOpenMatch={onOpenMatch} onWatchDemo={onWatchDemo} />
       )}
 
     </div>
