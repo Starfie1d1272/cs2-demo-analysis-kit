@@ -1,19 +1,19 @@
 import { usePageReady } from "../lib/use-page-ready";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { buildSeriesSummary } from "@cs2dak/analytics";
 import type { MatchWorkspaceModel, SeriesSummary } from "@cs2dak/presentation";
 import { QaReportPanel } from "@cs2dak/react";
 import { normalizeReplayViewState } from "@cs2dak/presentation";
 import { MatchReviewWorkspace } from "./match/MatchReviewWorkspace";
-import { createMatchWorkspaceState, type MatchWorkspaceState } from "../lib/match-workspace-state";
+import { createMatchWorkspaceState, snapshotMatchWorkspaceState, ROUND_FILTER_DEFAULT, type MatchWorkspaceState } from "../lib/match-workspace-state";
 import { entryDate, matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import { loadMatchWorkspaceModel } from "../lib/match-workspace-loader";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";
 import { EmptyState } from "@cs2dak/react";
 import { SeriesWorkspace } from "./SeriesWorkspace";
-import type { EvidenceContinuation } from "../lib/evidence-continuation";
+import type { EvidenceSession } from "../lib/evidence-continuation";
 
 export interface MatchViewProps {
   onPageReady?: (keys: string[]) => void;
@@ -23,7 +23,10 @@ export interface MatchViewProps {
   onSelectDemo: (id: string) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
-  evidenceContinuation?: EvidenceContinuation | null;
+  evidenceSession?: EvidenceSession | null;
+  onMoveEvidence: (index: number) => void;
+  workspaceState: MatchWorkspaceState | null;
+  onWorkspaceStateChange: (state: MatchWorkspaceState) => void;
   onReturnToSource?: () => void;
 }
 
@@ -52,7 +55,7 @@ async function loadModel(id: string, generation: number): Promise<MatchWorkspace
   return model;
 }
 
-export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceContinuation, onReturnToSource, onPageReady }: MatchViewProps) {
+export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceSession, onMoveEvidence, workspaceState, onWorkspaceStateChange, onReturnToSource, onPageReady }: MatchViewProps) {
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   useEffect(() => subscribeAnalysisDataInvalidation(() => { if (getAnalysisDataSnapshot().status !== "ready") modelCache.clear(); }), []);
   const activeId = demoId;
@@ -122,24 +125,36 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     for (const key of modelCache.keys()) if (!key.startsWith(`${analysis.generation}:`)) modelCache.delete(key);
     const cached = modelCache.get(`${analysis.generation}:${activeId}`);
     if (cached) {
-      setLoaded(prev => ({ id: activeId, generation: analysis.generation, model: cached, state: prev?.id === activeId ? prev.state : createMatchWorkspaceState(cached) }));
+      setLoaded(prev => ({ id: activeId, generation: analysis.generation, model: cached, state: prev?.id === activeId ? prev.state : workspaceState ? snapshotMatchWorkspaceState(workspaceState) : createMatchWorkspaceState(cached) }));
       setError(null);
       return;
     }
     let cancelled = false;
     setError(null);
     loadModel(activeId, analysis.generation)
-      .then((built) => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setLoaded(prev => ({ id: activeId, generation: analysis.generation, model: built, state: prev?.id === activeId ? prev.state : createMatchWorkspaceState(built) })); } })
+      .then((built) => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setLoaded(prev => ({ id: activeId, generation: analysis.generation, model: built, state: prev?.id === activeId ? prev.state : workspaceState ? snapshotMatchWorkspaceState(workspaceState) : createMatchWorkspaceState(built) })); } })
       .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); });
     return () => { cancelled = true; };
   }, [activeId, Boolean(activeEntry), analysis.generation, analysis.status]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!deepLink || !loaded || loaded.id !== activeId) return;
+    if (evidenceSession && (!activeEntry || matchIdForEntry(activeEntry) !== evidenceSession.queue[evidenceSession.activeIndex].evidence.matchId)) return;
+    const detail = loaded.model.rounds.find(r => r.roundNumber === deepLink.roundNumber);
+    if (!detail) return;
     const round = loaded.model.replay.rounds.find(r => r.roundNumber === deepLink.roundNumber);
-    if (!round || !loaded.state.replay) return;
-    setLoaded(prev => prev && prev.id === activeId ? { ...prev, state: { ...prev.state, view: "replay", replay: normalizeReplayViewState(prev.model.replay, prev.model.map.view, { ...prev.state.replay!, roundNumber: round.roundNumber, tick: deepLink.tick ?? round.freezeEndTick, playing: false }) } } : prev);
-  }, [deepLink, activeId, loaded?.id]);
+    setLoaded(prev => {
+      if (!prev || prev.id !== activeId) return prev;
+      const state = round && prev.state.replay
+        ? { ...prev.state, view: "replay" as const, replay: normalizeReplayViewState(prev.model.replay, prev.model.map.view, { ...prev.state.replay, roundNumber: round.roundNumber, tick: deepLink.tick ?? round.freezeEndTick, playing: false }) }
+        : { ...prev.state, view: "rounds" as const, roundExplorer: { ...prev.state.roundExplorer, filter: { ...ROUND_FILTER_DEFAULT, special: { ...ROUND_FILTER_DEFAULT.special } }, selectedRoundNumber: detail.roundNumber } };
+      return { ...prev, state };
+    });
+  }, [deepLink, activeId, loaded?.id, evidenceSession?.activeIndex]);
+
+  useEffect(() => {
+    if (loaded && loaded.id === activeId) onWorkspaceStateChange(snapshotMatchWorkspaceState(loaded.state));
+  }, [loaded?.state, loaded?.id, activeId]);
 
   // 汇总模式：懒构建系列内各图模型 → 跨图记分板
   useEffect(() => {
@@ -152,11 +167,11 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     return () => { cancelled = true; };
   }, [summaryMode, activeSeries, seriesEntries, analysis.generation, analysis.status]);
 
-  if (activeId && !activeEntry) {
+  if (activeId && !activeEntry && !evidenceSession) {
     return <div className="stu-view"><EmptyState variant="insufficient" title="比赛已不存在" hint="此比赛可能已从资料库删除。" action={<button type="button" className="stu-button" onClick={onGoLibrary}>返回资料库</button>} /></div>;
   }
 
-  if (entries.length === 0) {
+  if (entries.length === 0 && !evidenceSession) {
     return (
       <div className="stu-view">
         <EmptyState
@@ -169,11 +184,12 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     );
   }
 
-  const workspaceBody = analysis.status !== "ready" ? <div className="stu-loading">{analysis.status === "error" ? "分析缓存不可用，请重试刷新" : "分析数据正在更新…"}</div> : error
+  const invalidEvidence = evidenceSession && (!activeEntry || matchIdForEntry(activeEntry) !== evidenceSession.queue[evidenceSession.activeIndex].evidence.matchId || (model && !model.rounds.some(round => round.roundNumber === deepLink?.roundNumber)));
+  const workspaceBody = invalidEvidence ? <EmptyState variant="insufficient" title="原证据回合当前无法定位" hint="来源比赛或回合不可用。" /> : analysis.status !== "ready" ? <div className="stu-loading">{analysis.status === "error" ? "分析缓存不可用，请重试刷新" : "分析数据正在更新…"}</div> : error
     ? <EmptyState variant="error" title="加载失败" hint={error} />
     : !model
       ? <div className="stu-loading">读取本地持久化工作台…</div>
-      : <MatchReviewWorkspace model={model} state={loaded!.state} onStateChange={(state) => setLoaded(prev => prev && prev.id === activeId ? { ...prev, state } : prev)} />;
+      : <MatchReviewWorkspace model={model} state={loaded!.state} onStateChange={(state) => { onWorkspaceStateChange(snapshotMatchWorkspaceState(state)); setLoaded(prev => prev && prev.id === activeId ? { ...prev, state } : prev); }} />;
 
   return (
     <div className="stu-view stu-view-flush">
@@ -218,9 +234,12 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
           </button>
         )}
       </div>
-      {evidenceContinuation && (
+      {evidenceSession && (
         <div className="stu-evidence-review" role="status">
-          <span>正在复核：{evidenceContinuation.finding?.title ?? evidenceContinuation.evidence.reason} · R{evidenceContinuation.evidence.roundNumber}</span>
+          <span>正在复核：{evidenceSession.finding?.title ?? evidenceSession.queue[evidenceSession.activeIndex].evidence.reason} · R{evidenceSession.queue[evidenceSession.activeIndex].evidence.roundNumber} · {evidenceSession.activeIndex + 1}/{evidenceSession.queue.length}</span>
+          <button type="button" className="stu-button-sm" disabled={evidenceSession.activeIndex === 0} onClick={() => onMoveEvidence(evidenceSession.activeIndex - 1)}>上一条</button>
+          <button type="button" className="stu-button-sm" disabled={evidenceSession.activeIndex === evidenceSession.queue.length - 1} onClick={() => onMoveEvidence(evidenceSession.activeIndex + 1)}>下一条</button>
+          {evidenceSession.truncated && <span>本次浏览200条，更多返回列表</span>}
           {onReturnToSource && <button type="button" className="stu-button-sm" onClick={onReturnToSource}>返回来源</button>}
         </div>
       )}
