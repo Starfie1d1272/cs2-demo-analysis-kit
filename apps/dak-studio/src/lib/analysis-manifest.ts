@@ -26,6 +26,7 @@ export const FACTS_PRODUCER_VERSIONS = {
   tactical: TACTICAL_FACT_VERSION,
   mapIntelligence: MAP_INTELLIGENCE_FACT_VERSION,
   tournament: CORE_ANALYSIS_VERSION,
+  playerInsights: 2,
 } as const;
 
 /** 显式组合 storage version 与所有 producer versions，作为 facts 的唯一 revision。 */

@@ -112,13 +112,13 @@ export function extractPlayerMatchInsightFacts(demo: SeasonInsightsDemo): Player
     );
     const tickrate = pkg.match.tickrate || 64;
 
-    for (const [roundNumber, list] of killsByRound) {
+    const teamKey = pkg.players.find(player => ids.has(player.steamId64))?.teamKey;
+    for (const { roundNumber } of playerRounds) {
+      const list = killsByRound.get(roundNumber) ?? [];
       const sorted = [...list].sort((a, b) => a.tick - b.tick);
       const economy = economyByRound.get(roundNumber);
-      // 对手经济：回合行里非我方类型的一侧（两侧相同时无歧义）
       const pair = roundEconomies.get(roundNumber);
-      const opponentEconomy =
-        economy != null && pair != null ? (economy === pair.a ? pair.b : pair.a) : null;
+      const opponentEconomy = teamKey === "teamA" ? pair?.b : teamKey === "teamB" ? pair?.a : null;
       const firstDeath = sorted[0];
       const openingLoss = openingLossByRound.get(roundNumber);
       const meFirstDead = openingLoss != null;

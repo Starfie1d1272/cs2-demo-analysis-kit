@@ -68,8 +68,7 @@ export function TeamView({
   const teams = useMemo(() => {
     const counts = new Map<string, number>();
     for (const entry of entries) {
-      for (const rawName of [entry.meta.teamAName, entry.meta.teamBName]) {
-        const name = identityOptions?.teamRenames?.[rawName] ?? rawName;
+      for (const name of new Set([entry.meta.teamAName, entry.meta.teamBName].map(rawName => displayTeamName(rawName, identityOptions?.teamRenames)))) {
         counts.set(name, (counts.get(name) ?? 0) + 1);
       }
     }
@@ -140,7 +139,7 @@ export function TeamView({
             overview, comparisonCurrent ? comparison : null, state, { maps: MAP_COLUMNS, roster: ROSTER_COLUMNS },
             state.compareTeamName && !comparisonCurrent ? ["队伍对比未导出：无当前可用结果或正在更新。"] : [],
           )}
-        />}<p>用当前语料查看一支队伍的基础盘面，并在同一上下文继续专项分析。</p></div>
+        />}<p>按显示名称观察组汇总；同场双方同名时分别计入双方贡献，比赛场次去重，胜负与回合按双方累计。RR 为出场信号聚合后的账号评分，计分板使用单场指标评分，口径不同。</p></div>
         <label className="stu-team-picker">切换队伍
           <select value={activeTeam ?? ""} onChange={(event) => event.target.value && onSelectTeam(event.target.value)}>
             <option value="">请选择队伍</option>
@@ -185,7 +184,7 @@ export function TeamView({
           <section className="stu-card"><h3>位置与职责</h3><button type="button" className="stu-button-sm" onClick={() => onOpenCapability("roles")}>查看位置与职责</button></section>
           <div className="stu-home-grid">
             <section className="stu-card"><h3>经济样本</h3>{overview.economyWinRate.length === 0 ? <p className="stu-muted">当前范围没有可用经济事实。</p> : <div className="stu-chip-row">{overview.economyWinRate.map((row) => <span key={row.economyType} className="stu-chip">{row.economyType} · {row.wins}/{row.rounds}</span>)}</div>}</section>
-            <section className="stu-card"><h3>最近比赛</h3><div className="stu-chip-row">{overview.matches.slice(-5).reverse().map((match) => <button key={match.matchId} type="button" className="stu-chip" onClick={() => { const entry = entries.find((item) => matchIdForEntry(item) === match.matchId); if (entry) onOpenMatch(entry.id); }}>{match.mapName} · {match.opponent} · {match.roundsWon}:{match.roundsLost}</button>)}</div></section>
+            <section className="stu-card"><h3>最近比赛</h3><div className="stu-chip-row">{overview.matches.slice(-5).reverse().map((match, index) => <button key={`${match.matchId}:${index}`} type="button" className="stu-chip" onClick={() => { const entry = entries.find((item) => matchIdForEntry(item) === match.matchId); if (entry) onOpenMatch(entry.id); }}>{match.mapName} · {match.opponent} · {match.roundsWon}:{match.roundsLost}</button>)}</div></section>
           </div>
           <section className="stu-card"><h3>继续分析</h3><p className="stu-muted">以下入口保持当前队伍与语料；各能力只展示其实际可用的样本与限制。</p><div className="stu-header-actions">{(["duel", "economy", "utility", "opening", "control", "patterns"] as const).map((view) => <button key={view} type="button" className="stu-button-sm" onClick={() => onOpenCapability(view)}>{({ duel: "对枪", economy: "经济与转化", utility: "道具价值", opening: "开局动线", control: "控图", patterns: "战术模式与对手侦察" })[view]}</button>)}</div></section>
         </>
