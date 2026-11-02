@@ -16,7 +16,7 @@ import { ClipboardList, Crosshair, Film, House, LibraryBig, Radar, Settings } fr
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnalysisScopeEditor } from "./components/AnalysisScopeEditor";
 import { AnalysisContextSummary } from "./components/AnalysisContextSummary";
-import { CapabilityPanel } from "./components/CapabilityBar";
+import { CapabilityPanel, DirectoryRefreshContext } from "./components/CapabilityBar";
 import { BackgroundActivity } from "./components/BackgroundActivity";
 import { type StudioEventRecord } from "./lib/events";
 import { BUILD_INFO, BUILD_LABEL } from "./lib/build-info";
@@ -111,7 +111,7 @@ function NavButton({ item, active, onClick }: { item: typeof MANAGEMENT_NAV; act
 export function App() {
   const activity = useStudioActivity();
   const { importing, setNotice } = activity;
-  const { entries, entriesReady, entriesStatus, entriesError, identityStatus, identityReady, eventsStatus, seriesStatus, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity } = useStudioData({ onError: setNotice });
+  const { entries, entriesReady, entriesStatus, entriesError, identityStatus, identityReady, eventsStatus, seriesStatus, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity } = useStudioData({ onError: setNotice, importing });
   const { importTagsRaw, setImportTagsRaw, importFiles, importDropped, importViaNativeDialog, nativeImportAvailable, loadBuiltinEvent, handleLinkRawDemo, watchRawDemo, handleRemove, handleRemoveMany, handleUpdateTags, handleBulkUpdateTags, handleReexportDemo, handleReexportAll, handleReexportSelected, handleRebuildFacts, handleRebuildStale, handleRebuildSelected } = useLibraryActions({ entries, refreshEntries, refreshEventRecords, activity });
   const { rivalHubConnection, batchSession, dismissBatch, updateLocalLink, refreshRivalHub, handleConnectRivalHub, handleRevokeRivalHub, importOnlineFiles, syncLocalRivalHubDemos, stopRivalHubBatch, pickRivalHubFiles, selectRivalHubBatchTarget } = useRivalHubActions({ refreshEntries, refreshEventRecords, activity });
   const [navigation, setNavigation] = useState(() => createStudioNavigation("initial"));
@@ -429,6 +429,7 @@ export function App() {
   )) : null;
 
   return (
+    <DirectoryRefreshContext.Provider value={refreshEntries}>
     <div
       className="stu-app"
       onDragOver={(e) => { e.preventDefault(); }}
@@ -856,5 +857,6 @@ export function App() {
         </>}
       </main>
     </div>
+    </DirectoryRefreshContext.Provider>
   );
 }
