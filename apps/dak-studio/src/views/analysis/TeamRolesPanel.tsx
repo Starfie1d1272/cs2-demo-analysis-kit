@@ -102,5 +102,30 @@ export function TeamRolesPanel({ exportSource, onCapabilityRepair, entries, team
             {doubleAwpError && !doubleAwp ? <EmptyState variant="error" title="双 AWP 统计不可用" hint={doubleAwpError} /> : doubleAwp === null && !awpCapability.error ? <div className="stu-loading">读取 AWP 回合事实…</div> : doubleAwp === null ? null : <DoubleAwpAnalysisPanel model={doubleAwp.find((row) => row.side === matrixSide) ?? null} playerNames={playerNames} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "team:double-awp" }); }} />}
           </section>
   </>;
-  return <div className="stu-view"><header className="stu-view-header"><h1>位置与职责 · {teamName}</h1>{exportSource && activeMatrix && doubleAwp && !doubleAwpError && !matrixError && !capability.error && !capability.stale && !awpCapability.error && !awpCapability.stale && canExportSnapshot(roleSnapshot, analysis) && canExportSnapshot(awpSnapshot, analysis) && <AnalysisExportButtons capture={() => buildTeamRolesAnalysisResult(withCapabilityConditions(withAnalysisExportEntries(exportSource, unionExportEntries(roleEntries, awpEntries)), capability.availability, awpCapability.availability), activeMatrix, doubleAwp?.find(row => row.side === matrixSide) ?? null, state, playerNames)} />}</header>{rolePanels}</div>;
+  const activeAwp = doubleAwp?.find(row => row.side === matrixSide) ?? null;
+  const roleCurrent = !!activeMatrix && !matrixError && !capability.error &&
+    !capability.stale && canExportSnapshot(roleSnapshot, analysis);
+  const awpCurrent = !!activeAwp && !doubleAwpError && !awpCapability.error &&
+    !awpCapability.stale && canExportSnapshot(awpSnapshot, analysis);
+  const omitted = [
+    !roleCurrent ? "位置职责矩阵未导出：无当前可用结果或正在更新。" : null,
+    !awpCurrent ? "双 AWP 统计未导出：无当前可用结果或正在更新。" : null,
+  ].filter((value): value is string => value !== null);
+  return <div className="stu-view">
+    <header className="stu-view-header">
+      <h1>位置与职责 · {teamName}</h1>
+      {exportSource && (roleCurrent || awpCurrent) && <AnalysisExportButtons capture={() => {
+        const source = withCapabilityConditions(
+          withAnalysisExportEntries(exportSource, unionExportEntries(
+            roleCurrent ? roleEntries : null, awpCurrent ? awpEntries : null,
+          )),
+          roleCurrent ? capability.availability : null,
+          awpCurrent ? awpCapability.availability : null,
+        );
+        return buildTeamRolesAnalysisResult(source, roleCurrent ? activeMatrix : null,
+          awpCurrent ? activeAwp : null, state, playerNames, teamName, omitted);
+      }} />}
+    </header>
+    {rolePanels}
+  </div>;
 }

@@ -1,3 +1,4 @@
+import { patternEvidenceSortColumns } from "../../lib/pattern-evidence-sort";
 import { AnalysisExportButtons } from "../../components/AnalysisExportButtons";
 import { buildPatternsAnalysisResult } from "../../lib/analysis-export-patterns";
 import type { AnalysisExportSource } from "../../lib/analysis-export";
@@ -515,7 +516,7 @@ function EvidenceTable({
 
   const columns = useMemo<DataTableColumn<TacticalCluster["rounds"][number]>[]>(() => [
     {
-      key: "match", label: "比赛",
+      key: "match", label: "比赛", sortable: true, sortValue: patternEvidenceSortColumns[0].sortValue,
       render: (r) => {
         const fact = findFact(r);
         const entry = entryByMatchId.get(r.matchId);
@@ -534,8 +535,8 @@ function EvidenceTable({
         );
       }
     },
-    { key: "round", label: "回合", numeric: true, format: (r) => `R${r.roundNumber}` },
-    { key: "economy", label: "经济", format: (r) => economyLabelCn(r.economy) },
+    { key: "round", label: "回合", numeric: true, sortable: true, sortValue: patternEvidenceSortColumns[1].sortValue, format: (r) => `R${r.roundNumber}` },
+    { key: "economy", label: "经济", sortable: true, sortValue: patternEvidenceSortColumns[2].sortValue, format: (r) => economyLabelCn(r.economy) },
     {
       key: "executeRemain", label: "执行剩余", numeric: true,
       format: (r) => {
@@ -558,7 +559,7 @@ function EvidenceTable({
       }
     },
     {
-      key: "result", label: "结果",
+      key: "result", label: "结果", sortable: true, sortValue: patternEvidenceSortColumns[3].sortValue,
       format: (r) => r.won ? "胜" : "负",
       cellClassName: (r) => r.won ? "stu-win" : "stu-loss",
     },

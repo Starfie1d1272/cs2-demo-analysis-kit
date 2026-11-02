@@ -1,3 +1,4 @@
+import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
 import { canExportSnapshot, withCapabilityConditions, unionExportEntries, withAnalysisExportEntries as applyExportEntries } from "../lib/analysis-export";
 import { CapabilityBar, useCapability } from "../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../lib/capability-availability";
@@ -115,6 +116,37 @@ export function TournamentDashboardView({
     return () => { cancelled = true; };
   }, [comparisonEntries, identityOptions?.version, comparisonKey, analysis]);
 
+  const insightCurrent = !!insights && !error && !insightCapability.error &&
+    !insightCapability.stale && canExportSnapshot(insightSnapshot, analysis, insightEntries);
+  const comparisonCurrent = !!teamComparison && teamComparison.teams.length === 2 &&
+    comparisonReady && !comparisonError && !comparisonCapability.error &&
+    !comparisonCapability.stale && canExportSnapshot(comparisonSnapshot, analysis, comparisonEntries);
+  const captureOverview = (
+    leaderEntries: StudioDemoEntry[],
+    leaderboard?: import("../lib/analysis-export").AnalysisResultSection,
+    leaderAvailability?: import("../lib/capability-availability").CapabilityAvailability | null,
+  ) => {
+    if (!exportSource) throw new Error("导出来源不可用");
+    const omitted = [
+      !insightCurrent ? "赛事总览、地图及武器未导出：无当前可用结果或正在更新。" : null,
+      !comparisonCurrent ? "队伍比较未导出：无当前可用结果或正在更新。" : null,
+      !leaderboard ? "排行榜未包含在此文件；可在排行榜准备完成后导出含排行榜的结果。" : null,
+    ].filter((value): value is string => value !== null);
+    const source = withCapabilityConditions(
+      applyExportEntries(exportSource, unionExportEntries(
+        insightCurrent ? insightEntries : null,
+        comparisonCurrent ? comparisonEntries : null,
+        leaderEntries,
+      )),
+      insightCurrent ? insightCapability.availability : null,
+      comparisonCurrent ? comparisonCapability.availability : null,
+      leaderAvailability ?? null,
+    );
+    return buildTournamentAnalysisResult(source, insightCurrent ? insights : null,
+      comparisonCurrent ? teamComparison : null, state,
+      { maps: MAP_COLUMNS, weapons: WEAPON_COLUMNS }, exportPage, leaderboard, omitted);
+  };
+
   if (allEntries.length === 0) {
     return (
       <div className="stu-view">
@@ -133,6 +165,7 @@ export function TournamentDashboardView({
       <header className="stu-view-header">
         <div>
           <h1>赛事总览</h1>
+          {exportSource && (insightCurrent || comparisonCurrent) && <AnalysisExportButtons label="导出本次结果（不含排行榜）" capture={() => captureOverview([])} />}
           <p>当前赛事语料的地图、队伍与经济观察；只有底层提供依据时才会形成 Finding。</p>
         </div>
         {onGoDirectory && <button type="button" className="stu-button-sm" onClick={onGoDirectory}>返回赛事目录</button>}
@@ -208,7 +241,13 @@ export function TournamentDashboardView({
           </p>
         </>
       )}
-      {onOpenPlayer && <LeaderboardView exportSource={exportSource} exportPage={exportPage} captureOverview={insights && exportSource && !error && !comparisonError && !insightCapability.error && !insightCapability.stale && !comparisonCapability.error && !comparisonCapability.stale && canExportSnapshot(insightSnapshot, analysis, insightEntries) && ((comparisonEntries?.length === 0 && !teamComparison) || (comparisonReady && canExportSnapshot(comparisonSnapshot, analysis, comparisonEntries))) ? (leaderEntries, section, leaderAvailability) => buildTournamentAnalysisResult(withCapabilityConditions(applyExportEntries(exportSource, unionExportEntries(insightEntries, comparisonEntries, leaderEntries)), insightCapability.availability, comparisonCapability.availability, leaderAvailability), insights, teamComparison, state, { maps: MAP_COLUMNS, weapons: WEAPON_COLUMNS }, exportPage, section) : undefined} onCapabilityRepair={onCapabilityRepair} state={state} onStateChange={onStateChange} embedded allEntries={allEntries} entries={entries} selectedTeam={selectedTeam} identityOptions={identityOptions} onPlayerClick={onOpenPlayer} onGoLibrary={onGoLibrary} />}
+      {onOpenPlayer && <LeaderboardView
+        exportSource={exportSource} exportPage={exportPage}
+        captureOverview={exportSource ? captureOverview : undefined}
+        onCapabilityRepair={onCapabilityRepair} state={state} onStateChange={onStateChange}
+        embedded allEntries={allEntries} entries={entries} selectedTeam={selectedTeam}
+        identityOptions={identityOptions} onPlayerClick={onOpenPlayer} onGoLibrary={onGoLibrary}
+      />}
     </div>
   );
 }

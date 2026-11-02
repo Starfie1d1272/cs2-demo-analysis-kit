@@ -1,39 +1,410 @@
-import { SEASON_STAT_VIEWS, mechanicsMetricsForWeapon, type MechanicsMetricKey, type PlayerSeasonProfile } from "@cs2dak/presentation";
-import type { PlayerSeasonInsights, PlayerWeaponStat, PlayerMechanicsProfile } from "@cs2dak/analytics";
+import {
+  SEASON_STAT_VIEWS,
+  mechanicsMetricsForWeapon,
+  type MechanicsMetricKey,
+  type PlayerSeasonProfile,
+} from "@cs2dak/presentation";
+import type {
+  PlayerSeasonInsights,
+  PlayerWeaponStat,
+  PlayerMechanicsProfile,
+} from "@cs2dak/analytics";
 import type { PlayerPageState } from "./studio-page-state";
-import { captureAnalysisResult, type AnalysisExportSource, type AnalysisResultSection } from "./analysis-export";
+import {
+  captureAnalysisResult,
+  type AnalysisExportSource,
+  type AnalysisResultSection,
+} from "./analysis-export";
 
-export function buildPlayerAnalysisResult(source: AnalysisExportSource, player: PlayerSeasonProfile, compare: PlayerSeasonProfile | null, insights: PlayerSeasonInsights | null, weapons: PlayerWeaponStat[], mechanics: PlayerMechanicsProfile | null, coverage: { eligibleMatchCount: number; mechanicsMatchCount: number } | null, state: PlayerPageState, trendMetric: "adr" | "kast" | "fkMinusFd" | "utilityDamagePerRound", findings: import("@cs2dak/presentation").AnalysisFinding[]) {
+export function buildPlayerAnalysisResult(
+  source: AnalysisExportSource,
+  player: PlayerSeasonProfile,
+  compare: PlayerSeasonProfile | null,
+  insights: PlayerSeasonInsights | null,
+  weapons: PlayerWeaponStat[],
+  mechanics: PlayerMechanicsProfile | null,
+  coverage: { eligibleMatchCount: number; mechanicsMatchCount: number } | null,
+  state: PlayerPageState,
+  trendMetric: "adr" | "kast" | "fkMinusFd" | "utilityDamagePerRound",
+  findings: import("@cs2dak/presentation").AnalysisFinding[],
+) {
   const sections: AnalysisResultSection[] = [];
-  const cols = SEASON_STAT_VIEWS.find(view => view.key === "core")!.columns.filter(col => col.key !== "maps");
+  const cols = SEASON_STAT_VIEWS.find(
+    (view) => view.key === "core",
+  )!.columns.filter((col) => col.key !== "maps");
   if (state.profileTab === "overview") {
-    for (const finding of findings.slice(0, 3)) sections.push({ title: `待复核 · ${finding.title}`, text: [finding.statement, `样本：${finding.sample.label}`, `参照：${finding.baseline ?? "仅描述性样本"}`], sampleDescription: finding.sample.label, limitations: finding.limitations, columns: [{ key: "match", label: "比赛", unit: null }, { key: "round", label: "回合", unit: null }, { key: "tick", label: "Tick", unit: null }], rows: finding.evidence.slice(0, 1).map(row => ({ match: row.matchId, round: row.roundNumber, tick: row.tick ?? null })) });
-    sections.push({ title: "核心指标", text: [], sampleDescription: `${player.mapCount} 图`, limitations: [], columns: [{ key: "metric", label: "指标", unit: null }, { key: "value", label: "数值", unit: null }, { key: "unit", label: "单位", unit: null }], rows: cols.map(col => ({ metric: col.label, value: player.metrics[col.key] ?? null, unit: col.format === "percent" ? "%" : null })) });
-    sections.push({ title: "RR 六账户分解", text: [], sampleDescription: `${player.mapCount} 图`, limitations: [], columns: [{ key: "name", label: "账户", unit: null }, { key: "value", label: "贡献", unit: null }], rows: player.rating.breakdown.map(row => ({ name: row.label, value: row.value })) });
-    if (player.style) sections.push({ title: "PRISM 八维打法画像", text: [], sampleDescription: `${player.mapCount} 图；当前范围内相对位置`, limitations: ["图像未包含。"], columns: [{ key: "axis", label: "维度", unit: null }, { key: "status", label: "状态", unit: null }, { key: "involvement", label: "行为百分位", unit: null }, { key: "efficiency", label: "效率百分位", unit: null }, { key: "coverage", label: "信号覆盖", unit: "比例 (0–1)" }, { key: "count", label: "对比人数", unit: null }], rows: player.style.axes.map(row => ({ axis: row.label, status: row.status, involvement: row.status === "ready" ? row.involvementPercentile : null, efficiency: row.status === "ready" ? row.efficiencyPercentile : null, coverage: row.signalCoverage, count: row.comparisonCount })) });
+    for (const finding of findings.slice(0, 3))
+      sections.push({
+        title: `待复核 · ${finding.title}`,
+        text: [
+          finding.statement,
+          `样本：${finding.sample.label}`,
+          `参照：${finding.baseline ?? "仅描述性样本"}`,
+        ],
+        sampleDescription: finding.sample.label,
+        limitations: finding.limitations,
+        columns: [
+          { key: "match", label: "比赛", unit: null },
+          { key: "round", label: "回合", unit: null },
+          { key: "tick", label: "Tick", unit: null },
+        ],
+        rows: finding.evidence.slice(0, 1).map((row) => ({
+          match: row.matchId,
+          round: row.roundNumber,
+          tick: row.tick ?? null,
+        })),
+      });
+    sections.push({
+      title: "核心指标",
+      text: [],
+      sampleDescription: `${player.mapCount} 图`,
+      limitations: [],
+      columns: [
+        { key: "metric", label: "指标", unit: null },
+        { key: "value", label: "数值", unit: null },
+        { key: "unit", label: "单位", unit: null },
+      ],
+      rows: cols.map((col) => ({
+        metric: col.label,
+        value: player.metrics[col.key] ?? null,
+        unit: col.format === "percent" ? "%" : null,
+      })),
+    });
+    sections.push({
+      title: "RR 六账户分解",
+      text: [],
+      sampleDescription: `${player.mapCount} 图`,
+      limitations: [],
+      columns: [
+        { key: "name", label: "账户", unit: null },
+        { key: "value", label: "贡献", unit: null },
+      ],
+      rows: player.rating.breakdown.map((row) => ({
+        name: row.label,
+        value: row.value,
+      })),
+    });
+    if (player.style)
+      sections.push({
+        title: "PRISM 八维打法画像",
+        text: [],
+        sampleDescription: `${player.mapCount} 图；当前范围内相对位置`,
+        limitations: ["图像未包含。"],
+        columns: [
+          { key: "axis", label: "维度", unit: null },
+          { key: "status", label: "状态", unit: null },
+          { key: "involvement", label: "行为百分位", unit: null },
+          { key: "efficiency", label: "效率百分位", unit: null },
+          { key: "coverage", label: "信号覆盖", unit: "比例 (0–1)" },
+          { key: "count", label: "对比人数", unit: null },
+        ],
+        rows: player.style.axes.map((row) => ({
+          axis: row.label,
+          status: row.status,
+          involvement:
+            row.status === "ready" ? row.involvementPercentile : null,
+          efficiency: row.status === "ready" ? row.efficiencyPercentile : null,
+          coverage: row.signalCoverage,
+          count: row.comparisonCount,
+        })),
+      });
   } else if (state.profileTab === "trend") {
-    sections.push({ title: "每场 RR 走势", text: [], sampleDescription: `${player.perMatch.length} 场`, limitations: ["图像未包含。"], columns: [{ key: "match", label: "比赛", unit: null }, { key: "rr", label: "RR", unit: null }, { key: "rating", label: "2.0", unit: null }], rows: player.perMatch.map(row => ({ match: row.matchId, rr: row.rivalhubRR, rating: row.hltvRating })) });
-    if (insights && insights.trend.length > 1) sections.push({ title: "个人趋势", text: [], sampleDescription: `${insights.trend.length} 场`, limitations: ["图像未包含。"], columns: [{ key: "match", label: "比赛", unit: null }, { key: "value", label: ({ adr: "ADR", kast: "KAST", fkMinusFd: "首杀差", utilityDamagePerRound: "道具伤害/回合" })[trendMetric], unit: trendMetric === "kast" ? "%" : null }], rows: insights.trend.map(row => ({ match: row.matchId, value: row[trendMetric] })) });
+    sections.push({
+      title: "每场 RR 走势",
+      text: [],
+      sampleDescription: `${player.perMatch.length} 场`,
+      limitations: ["图像未包含。"],
+      columns: [
+        { key: "match", label: "比赛", unit: null },
+        { key: "rr", label: "RR", unit: null },
+        { key: "rating", label: "2.0", unit: null },
+      ],
+      rows: player.perMatch.map((row) => ({
+        match: row.matchId,
+        rr: row.rivalhubRR,
+        rating: row.hltvRating,
+      })),
+    });
+    if (insights && insights.trend.length > 1)
+      sections.push({
+        title: "个人趋势",
+        text: [],
+        sampleDescription: `${insights.trend.length} 场`,
+        limitations: ["图像未包含。"],
+        columns: [
+          { key: "match", label: "比赛", unit: null },
+          {
+            key: "value",
+            label: {
+              adr: "ADR",
+              kast: "KAST",
+              fkMinusFd: "首杀差",
+              utilityDamagePerRound: "道具伤害/回合",
+            }[trendMetric],
+            unit: trendMetric === "kast" ? "%" : null,
+          },
+        ],
+        rows: insights.trend.map((row) => ({
+          match: row.matchId,
+          value: row[trendMetric],
+        })),
+      });
   } else if (state.profileTab === "aim") {
-    sections.push({ title: "武器画像", text: [], sampleDescription: coverage ? `参赛 ${coverage.eligibleMatchCount} 场 · 枪法 ${coverage.mechanicsMatchCount} 场` : "样本未知", limitations: [], columns: [{ key: "weapon", label: "武器", unit: null }, { key: "kills", label: "击杀", unit: null }, { key: "hs", label: "爆头率", unit: "%" }, { key: "kpm", label: "每场击杀", unit: null }], rows: weapons.map(row => ({ weapon: row.label, kills: row.kills, hs: row.headshotPercent, kpm: row.killsPerMatch })) });
+    sections.push({
+      title: "武器画像",
+      text: [],
+      sampleDescription: coverage
+        ? `参赛 ${coverage.eligibleMatchCount} 场 · 枪法 ${coverage.mechanicsMatchCount} 场`
+        : "样本未知",
+      limitations: [],
+      columns: [
+        { key: "weapon", label: "武器", unit: null },
+        { key: "kills", label: "击杀", unit: null },
+        { key: "hs", label: "爆头率", unit: "%" },
+        { key: "kpm", label: "每场击杀", unit: null },
+      ],
+      rows: weapons.map((row) => ({
+        weapon: row.label,
+        kills: row.kills,
+        hs: row.headshotPercent,
+        kpm: row.killsPerMatch,
+      })),
+    });
     if (mechanics) {
-      const keys: MechanicsMetricKey[] = ["firstShotHit", "sprayHit", "counterStrafe", "ttk", "oneTap", "reaction", "preaim", "headshot", "killsPerMatch"];
-      const values = (row: PlayerMechanicsProfile["overall"]) => ({ firstShotHit: row.firstShotAccuracyPercent, sprayHit: row.sprayAccuracyPercent, counterStrafe: row.counterStrafeSuccessPercent, ttk: row.medianTtkMs, oneTap: row.oneTapRatePercent, reaction: row.visualReactionMs, preaim: row.preaimErrorDegrees, headshot: row.headshotPercent, killsPerMatch: row.killsPerMatch });
-      const labels: Record<MechanicsMetricKey, string> = { firstShotHit: "首发命中率", sprayHit: "扫射命中率", counterStrafe: "急停成功率", ttk: "击杀耗时", oneTap: "one tap 率", reaction: "反应时间", preaim: "预瞄误差", headshot: "爆头率", killsPerMatch: "场均击杀" };
-      const rows = [mechanics.overall, ...mechanics.weapons].filter(row => row.kills > 0).flatMap(row => (row.weapon === "all" || row.weapon === "other" ? keys : mechanicsMetricsForWeapon(row.weapon)).map(key => ({ weapon: row.label, kills: row.kills, metric: labels[key], value: values(row)[key], unit: key === "ttk" || key === "reaction" ? "ms" : key === "preaim" ? "°" : key === "killsPerMatch" ? null : "%" })));
-      sections.push({ title: "武器分析", text: [], sampleDescription: `${rows.length} 个已显示指标`, limitations: [], columns: [{ key: "weapon", label: "武器", unit: null }, { key: "kills", label: "击杀", unit: null }, { key: "metric", label: "指标", unit: null }, { key: "value", label: "数值", unit: null }, { key: "unit", label: "单位", unit: null }], rows });
+      const keys: MechanicsMetricKey[] = [
+        "firstShotHit",
+        "sprayHit",
+        "counterStrafe",
+        "ttk",
+        "oneTap",
+        "reaction",
+        "preaim",
+        "headshot",
+        "killsPerMatch",
+      ];
+      const values = (row: PlayerMechanicsProfile["overall"]) => ({
+        firstShotHit: row.firstShotAccuracyPercent,
+        sprayHit: row.sprayAccuracyPercent,
+        counterStrafe: row.counterStrafeSuccessPercent,
+        ttk: row.medianTtkMs,
+        oneTap: row.oneTapRatePercent,
+        reaction: row.visualReactionMs,
+        preaim: row.preaimErrorDegrees,
+        headshot: row.headshotPercent,
+        killsPerMatch: row.killsPerMatch,
+      });
+      const labels: Record<MechanicsMetricKey, string> = {
+        firstShotHit: "首发命中率",
+        sprayHit: "扫射命中率",
+        counterStrafe: "急停成功率",
+        ttk: "击杀耗时",
+        oneTap: "one tap 率",
+        reaction: "反应时间",
+        preaim: "预瞄误差",
+        headshot: "爆头率",
+        killsPerMatch: "场均击杀",
+      };
+      const rows = [mechanics.overall, ...mechanics.weapons]
+        .filter((row) => row.kills > 0)
+        .flatMap((row) =>
+          (row.weapon === "all" || row.weapon === "other"
+            ? keys
+            : mechanicsMetricsForWeapon(row.weapon)
+          ).map((key) => ({
+            weapon: row.label,
+            kills: row.kills,
+            metric: labels[key],
+            value: values(row)[key],
+            unit:
+              key === "ttk" || key === "reaction"
+                ? "ms"
+                : key === "preaim"
+                  ? "°"
+                  : key === "killsPerMatch"
+                    ? null
+                    : "%",
+          })),
+        );
+      sections.push({
+        title: "武器分析",
+        text: [],
+        sampleDescription: `${rows.length} 个已显示指标`,
+        limitations: [],
+        columns: [
+          { key: "weapon", label: "武器", unit: null },
+          { key: "kills", label: "击杀", unit: null },
+          { key: "metric", label: "指标", unit: null },
+          { key: "value", label: "数值", unit: null },
+          { key: "unit", label: "单位", unit: null },
+        ],
+        rows,
+      });
     }
   } else if (insights) {
-    const f = insights.flash, m = insights.mistakes;
-    sections.push({ title: "闪光价值", text: [`投掷 ${f.flashesThrown}；敌方致盲 ${f.enemyBlindSeconds}s / ${f.enemyBlindVictims} 人次；队友致盲 ${f.teamBlindSeconds}s；闪光助攻 ${f.flashAssists}。`], sampleDescription: `${f.flashesThrown} 颗`, limitations: [], columns: [{ key: "metric", label: "指标", unit: null }, { key: "value", label: "秒/颗", unit: "s" }], rows: [{ metric: "敌方致盲", value: f.enemySecondsPerFlash }, { metric: "净收益", value: f.netSecondsPerFlash }] });
-    const flashes = [...f.bestEnemyFlashes].sort((a, b) => state.flashMode === "net" ? b.netSeconds - a.netSeconds : b.enemySeconds - a.enemySeconds).slice(0, 5);
-    sections.push({ title: "最佳闪光候选", text: [], sampleDescription: `${flashes.length} 条有限候选，不是统计分母`, limitations: [], columns: [{ key: "match", label: "比赛", unit: null }, { key: "round", label: "回合", unit: null }, { key: "tick", label: "Tick", unit: null }, { key: "enemy", label: "敌方致盲", unit: "s" }, { key: "net", label: "净收益", unit: "s" }], rows: flashes.map(row => ({ match: row.matchId, round: row.roundNumber, tick: row.tick ?? null, enemy: row.enemySeconds, net: row.netSeconds })) });
+    const f = insights.flash,
+      m = insights.mistakes;
+    sections.push({
+      title: "闪光价值",
+      text: [
+        `投掷 ${f.flashesThrown}；敌方致盲 ${f.enemyBlindSeconds}s / ${f.enemyBlindVictims} 人次；队友致盲 ${f.teamBlindSeconds}s；闪光助攻 ${f.flashAssists}。`,
+      ],
+      sampleDescription: `${f.flashesThrown} 颗`,
+      limitations: [],
+      columns: [
+        { key: "metric", label: "指标", unit: null },
+        { key: "value", label: "秒/颗", unit: "s" },
+      ],
+      rows: [
+        { metric: "敌方致盲", value: f.enemySecondsPerFlash },
+        { metric: "净收益", value: f.netSecondsPerFlash },
+      ],
+    });
+    const flashes = [...f.bestEnemyFlashes]
+      .sort((a, b) =>
+        state.flashMode === "net"
+          ? b.netSeconds - a.netSeconds
+          : b.enemySeconds - a.enemySeconds,
+      )
+      .slice(0, 5);
+    sections.push({
+      title: "最佳闪光候选",
+      text: [],
+      sampleDescription: `${flashes.length} 条有限候选，不是统计分母`,
+      limitations: [],
+      columns: [
+        { key: "match", label: "比赛", unit: null },
+        { key: "round", label: "回合", unit: null },
+        { key: "tick", label: "Tick", unit: null },
+        { key: "enemy", label: "敌方致盲", unit: "s" },
+        { key: "net", label: "净收益", unit: "s" },
+      ],
+      rows: flashes.map((row) => ({
+        match: row.matchId,
+        round: row.roundNumber,
+        tick: row.tick ?? null,
+        enemy: row.enemySeconds,
+        net: row.netSeconds,
+      })),
+    });
     const teamFlashes = f.worstTeamFlashes.slice(0, 3);
-    sections.push({ title: "队闪候选", text: [], sampleDescription: `${teamFlashes.length} 条有限候选，不是统计分母`, limitations: [], columns: [{ key: "match", label: "比赛", unit: null }, { key: "round", label: "回合", unit: null }, { key: "tick", label: "Tick", unit: null }, { key: "victims", label: "队友人次", unit: null }, { key: "seconds", label: "致盲", unit: "s" }], rows: teamFlashes.map(row => ({ match: row.matchId, round: row.roundNumber, tick: row.tick ?? null, victims: row.victimCount, seconds: row.totalSeconds })) });
-    const mistakeEvidence = [...m.fullBuyFirstDeaths.evidence.slice(0, 3), ...m.antiEcoFirstDeaths.evidence.slice(0, 3), ...m.clutchLosses.evidence.slice(0, 3)];
-    sections.push({ title: "失误证据候选", text: [], sampleDescription: `${mistakeEvidence.length} 条有限候选，不是统计分母`, limitations: [], columns: [{ key: "match", label: "比赛", unit: null }, { key: "round", label: "回合", unit: null }, { key: "tick", label: "Tick", unit: null }, { key: "detail", label: "说明", unit: null }], rows: mistakeEvidence.map(row => ({ match: row.matchId, round: row.roundNumber, tick: row.tick ?? null, detail: row.detail })) });
-    sections.push({ title: "失误复盘", text: [`长枪首死 ${m.fullBuyFirstDeaths.count}/${m.fullBuyFirstDeaths.attempts}；Anti-eco 首死 ${m.antiEcoFirstDeaths.count}/${m.antiEcoFirstDeaths.attempts}；劣势经济首死 ${m.lowBuyFirstDeaths.count}/${m.lowBuyFirstDeaths.attempts}；残局失利 ${m.clutchLosses.count}；死亡分布 ${m.deathTiming.total ? `${m.deathTiming.early} 开局 / ${m.deathTiming.mid} 默认 / ${m.deathTiming.late} 后段` : "未知"}。`], columns: [], rows: [], sampleDescription: "各项分母见正文", limitations: [] });
+    sections.push({
+      title: "队闪候选",
+      text: [],
+      sampleDescription: `${teamFlashes.length} 条有限候选，不是统计分母`,
+      limitations: [],
+      columns: [
+        { key: "match", label: "比赛", unit: null },
+        { key: "round", label: "回合", unit: null },
+        { key: "tick", label: "Tick", unit: null },
+        { key: "victims", label: "队友人次", unit: null },
+        { key: "seconds", label: "致盲", unit: "s" },
+      ],
+      rows: teamFlashes.map((row) => ({
+        match: row.matchId,
+        round: row.roundNumber,
+        tick: row.tick ?? null,
+        victims: row.victimCount,
+        seconds: row.totalSeconds,
+      })),
+    });
+    const mistakeEvidence = [
+      ...m.fullBuyFirstDeaths.evidence.slice(0, 3),
+      ...m.antiEcoFirstDeaths.evidence.slice(0, 3),
+      ...m.clutchLosses.evidence.slice(0, 3),
+    ];
+    sections.push({
+      title: "失误证据候选",
+      text: [],
+      sampleDescription: `${mistakeEvidence.length} 条有限候选，不是统计分母`,
+      limitations: [],
+      columns: [
+        { key: "match", label: "比赛", unit: null },
+        { key: "round", label: "回合", unit: null },
+        { key: "tick", label: "Tick", unit: null },
+        { key: "detail", label: "说明", unit: null },
+      ],
+      rows: mistakeEvidence.map((row) => ({
+        match: row.matchId,
+        round: row.roundNumber,
+        tick: row.tick ?? null,
+        detail: row.detail,
+      })),
+    });
+    sections.push({
+      title: "失误复盘",
+      text: [
+        `长枪首死 ${m.fullBuyFirstDeaths.count}/${m.fullBuyFirstDeaths.attempts}；Anti-eco 首死 ${m.antiEcoFirstDeaths.count}/${m.antiEcoFirstDeaths.attempts}；劣势经济首死 ${m.lowBuyFirstDeaths.count}/${m.lowBuyFirstDeaths.attempts}；残局失利 ${m.clutchLosses.count}；死亡分布 ${m.deathTiming.total ? `${m.deathTiming.early} 开局 / ${m.deathTiming.mid} 默认 / ${m.deathTiming.late} 后段` : "未知"}。`,
+      ],
+      columns: [],
+      rows: [],
+      sampleDescription: "各项分母见正文",
+      limitations: [],
+    });
   }
-  if (compare) sections.push({ title: "当前选手比较", text: [`${player.name} ${player.mapCount} 图；${compare.name} ${compare.mapCount} 图。`], sampleDescription: "当前范围", limitations: [], columns: [{ key: "metric", label: "指标", unit: null }, { key: "unit", label: "单位", unit: null }, { key: "left", label: player.name, unit: null }, { key: "right", label: compare.name, unit: null }], rows: [...cols.map(col => ({ metric: col.label, unit: col.format === "percent" ? "%" : null, left: player.metrics[col.key] ?? null, right: compare.metrics[col.key] ?? null })), ...player.rating.breakdown.map(part => ({ metric: part.label, unit: null, left: part.value, right: compare.rating.breakdown.find(other => other.key === part.key)?.value ?? null })), ...(player.style && compare.style ? player.style.axes.flatMap(axis => { const other = compare.style!.axes.find(item => item.key === axis.key); return [{ metric: `${axis.label} · 行为`, unit: "百分位", left: axis.involvementPercentile, right: other?.involvementPercentile ?? null }, { metric: `${axis.label} · 效率`, unit: "百分位", left: axis.efficiencyPercentile, right: other?.efficiencyPercentile ?? null }]; }) : [])] });
-  return captureAnalysisResult({ ...source, title: `${player.name} · 选手档案`, page: "player", conditions: [...source.conditions, `档案子页：${state.profileTab}`, ...(state.profileTab === "utility" ? [`闪光排序：${state.flashMode}`] : [])], sections, limitations: ["图像未包含。"] });
+  if (compare)
+    sections.push({
+      title: "当前选手比较",
+      text: [
+        `${player.name} ${player.mapCount} 图；${compare.name} ${compare.mapCount} 图。`,
+      ],
+      sampleDescription: "当前范围",
+      limitations: [],
+      columns: [
+        { key: "metric", label: "指标", unit: null },
+        { key: "unit", label: "单位", unit: null },
+        { key: "left", label: player.name, unit: null },
+        { key: "right", label: compare.name, unit: null },
+      ],
+      rows: [
+        ...cols.map((col) => ({
+          metric: col.label,
+          unit: col.format === "percent" ? "%" : null,
+          left: player.metrics[col.key] ?? null,
+          right: compare.metrics[col.key] ?? null,
+        })),
+        ...player.rating.breakdown.map((part) => ({
+          metric: part.label,
+          unit: null,
+          left: part.value,
+          right:
+            compare.rating.breakdown.find((other) => other.key === part.key)
+              ?.value ?? null,
+        })),
+        ...(player.style && compare.style
+          ? player.style.axes.flatMap((axis) => {
+              const other = compare.style!.axes.find(
+                (item) => item.key === axis.key,
+              );
+              return [
+                {
+                  metric: `${axis.label} · 行为`,
+                  unit: "百分位",
+                  left: axis.involvementPercentile,
+                  right: other?.involvementPercentile ?? null,
+                },
+                {
+                  metric: `${axis.label} · 效率`,
+                  unit: "百分位",
+                  left: axis.efficiencyPercentile,
+                  right: other?.efficiencyPercentile ?? null,
+                },
+              ];
+            })
+          : []),
+      ],
+    });
+  return captureAnalysisResult({
+    ...source,
+    title: `${player.name} · 选手档案`,
+    page: "player",
+    conditions: [
+      ...source.conditions,
+      `档案子页：${state.profileTab}`,
+      ...(state.profileTab === "utility"
+        ? [`闪光排序：${state.flashMode}`]
+        : []),
+    ],
+    sections,
+    limitations: ["图像未包含。"],
+  });
 }
