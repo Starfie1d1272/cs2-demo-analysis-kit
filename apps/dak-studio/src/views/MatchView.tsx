@@ -153,7 +153,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
       .then((built) => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setLoaded(prev => ({ id: activeId, generation: analysis.generation, model: built, state: prev?.id === activeId ? prev.state : workspaceState ? snapshotMatchWorkspaceState(workspaceState) : createMatchWorkspaceState(built) })); } })
       .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); });
     return () => { cancelled = true; };
-  }, [activeId, activeEntry?.sourceRevision, analysis.generation, analysis.status]);
+  }, [activeId, Boolean(activeEntry), activeEntry?.sourceRevision, analysis.generation, analysis.status]);
 
   useEffect(() => {
     if (pinned === null || !loaded || loaded.id !== activeId || !mayApplyPinned.current) return;
