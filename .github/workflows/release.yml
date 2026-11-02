@@ -8,7 +8,7 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    tags: ["v*", "!v*-rc.*"]
   workflow_dispatch:
     inputs:
       tag:

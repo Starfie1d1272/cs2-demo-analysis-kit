@@ -127,6 +127,14 @@ size、SHA-256 以及 R2 → GitHub Release → ghproxy 下载顺序；版本化
 GitHub Release 正文以仓库维护的 `CHANGELOG.md` 版本段为唯一变更摘要，不再叠加
 GitHub 自动生成的跨 tag `What's Changed`，避免历史 tag 范围与桌面 release 边界不一致。
 
+## macOS 桌面候选（RC）
+
+RC 使用独立 `Desktop RC` workflow：先按正式流程核最终源码与 CI、同步尚未使用的数字桌面版本并提交；按上一正式 tag 到候选提交的完整变化维护 `CHANGELOG.md` 中该数字版本段，候选说明与正式发行共用该段，缺失或为空时停止。由发行负责人在最终冻结提交打 `vX.Y.Z-rc.N`（N 从 1 开始），推送后构建 Apple Silicon DMG 并创建 GitHub prerelease。当前稳定版为 0.8.8 时可考虑 `0.8.9-rc.1`，发行前仍须核实远端 tag 和版本。不要提前打 tag，也不要移动已有 tag。数字版本仍是应用内版本；候选 tag 与 build-info 的 revision/candidateTag 标明准确来源。同一数字版本的正式版不保证向已安装 RC 触发更新提示，正式版需要手动安装验证。
+
+候选流程核对 tag、全部私有版本及 clean checkout，复用 `scripts/package.sh`，校验 arm64 并附 SHA-256；不上传 R2、不创建正式更新 manifest、不发 npm，也不将 prerelease 设为 latest。其产物为未签名、未公证的 `dak-studio-X.Y.Z-rc.N-macos-arm64.dmg`；拖入 Applications 后可能需在系统设置中允许打开。候选是独立的手动安装验收，不自动替换或验证现有资料；使用前备份，真实安装、升级、恢复和资源联网仍须 Mac 实测。缺失 `.tri`/赛事资源按现有逻辑降级或下载。该流程不产 Windows 候选；Windows 测试仍使用下方既有 Beta 流程。
+
+失败后可手动 dispatch 同一个已存在的候选 tag；发布前先核实对应 GitHub prerelease 和附件状态。若已部分创建 Release，不要覆盖已有附件或移动 tag，先检查实际结果再决定恢复方式。
+
 ## Windows 测试版更新
 
 不打正式 tag。手动触发 GitHub Actions 的 **Beta Update** workflow：
