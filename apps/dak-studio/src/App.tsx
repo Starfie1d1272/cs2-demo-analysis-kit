@@ -125,10 +125,12 @@ export function App() {
     ? null : { roundNumber: targetRound, tick: targetTick }, [active.id, targetRound, targetTick]);
   const fallbackContext = useMemo(() => createAnalysisContextPreset("explore"), []);
   const analysisContext = "context" in destination ? destination.context : fallbackContext;
+  const patternDraftDirty = useRef<(() => boolean) | null>(null);
+  const registerPatternDraft = useCallback((check: (() => boolean) | null) => { patternDraftDirty.current = check; }, []);
   const canLeave = useCallback(() => {
     const frame = navigationRef.current.active;
     const dirty = frame.destination.page === "material" ? Boolean(frame.ui && "dirty" in frame.ui && frame.ui.dirty) : frame.destination.page === "materials" ? Boolean((frame.ui as MaterialsPageState | null)?.newNoteDirty || (frame.ui as MaterialsPageState | null)?.newPlaybookDirty || (frame.ui as MaterialsPageState | null)?.newAssignmentDirty || (frame.ui as MaterialsPageState | null)?.newMatchSheetDirty) : false;
-    return !dirty || window.confirm("有未保存的修改。确定放弃修改并离开？");
+    return !(dirty || (frame.destination.page === "patterns" && patternDraftDirty.current?.())) || window.confirm("有未保存的修改。确定放弃修改并离开？");
   }, []);
   const navigate = useCallback((next: StudioDestination, intent: "open" | "evidence" = "open", sourceKey?: string) => {
     if (intent === "open" && !canLeave()) return;
@@ -262,11 +264,11 @@ export function App() {
 
   const openEvidence = useCallback<OpenEvidence>((request) => {
     const source = navigationRef.current.active;
-    if (source.id !== active.id) return;
+    if (source.id !== active.id || (source.destination.page === "patterns" && !canLeave())) return;
     const sourceFrame = source.destination.page === "utility" ? { ...source, ui: { ...source.ui, selectedEvidenceKey: request.sourceKey ?? null } } : source.destination.page === "duel" ? { ...source, ui: { ...source.ui, selectedRowId: request.sourceKey ?? null } } : source;
     setEvidenceSession(createEvidenceSession(request, { ...sourceFrame, scrollY: window.scrollY, anchorKey: request.sourceKey } as import("./lib/studio-navigation").StudioFrame));
     navigate({ page: "match", entryId: request.entryId, roundNumber: request.evidence.roundNumber, tick: request.evidence.tick }, "evidence", request.sourceKey);
-  }, [active.id, navigate]);
+  }, [active.id, navigate, canLeave]);
   const openMaterialEvidence = useCallback((request: Parameters<OpenEvidence>[0], ui: MaterialsPageState | MaterialPageState) => {
     const source = navigationRef.current.active;
     const sourceFrame = { ...source, ui: structuredClone(ui), scrollY: window.scrollY, anchorKey: request.sourceKey } as import("./lib/studio-navigation").StudioFrame;
@@ -561,6 +563,7 @@ export function App() {
           setNavigation(current => studioNavigationReducer(current, { intent: "saved-origin", frameId: frame.id, id: saved.id }));
         }} onSelect={page => {
           if (page === destination.page) return;
+          if (!canLeave()) return;
           const id = `frame-${++nextFrameId.current}`;
           const target = { page, context: analysisContext };
           setRestoringFrameId(findAnalysisFrame(navigationRef.current.history, target, navigationRef.current.active.originSavedAnalysisId)?.id ?? null);
@@ -721,7 +724,7 @@ export function App() {
         )}
         {(destination.page === "patterns") && (
           <CapabilityPanel entries={scopedEntries} capability="tactical" onRepair={openCapabilityRepair}>{(eligible, current, availability) =>
-          <PatternsPage exportSource={current ? withCapabilityConditions(analysisExportSource(analysisContext, eligible, summarizeAnalysisContext(analysisContext, entries, eventScopes)), availability) : null}
+          <PatternsPage registerDraftGuard={registerPatternDraft} exportSource={current ? withCapabilityConditions(analysisExportSource(analysisContext, eligible, summarizeAnalysisContext(analysisContext, entries, eventScopes)), availability) : null}
             key={active.id}
             state={active.ui as import("./lib/pattern-page-state").PatternPageState}
             onStateChange={update => setNavigation(current => {

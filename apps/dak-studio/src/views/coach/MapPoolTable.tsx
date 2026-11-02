@@ -1,9 +1,8 @@
 import type { ObservedMapPoolRow } from "@cs2dak/analytics";
-import { saveMapPoolNote } from "../../lib/map-pool-notes.js";
 
-export interface MapPoolTableProps { rows: ObservedMapPoolRow[]; hasOwn: boolean; hasOpponent: boolean; notes: Record<string, string>; onNotesChange: (mapName: string, note: string) => void }
+export interface MapPoolTableProps { rows: ObservedMapPoolRow[]; hasOwn: boolean; hasOpponent: boolean; notes: Record<string, string>; onNotesChange: (mapName: string, note: string) => void; onSave: (mapName: string) => void; saving: Record<string, boolean>; errors: Record<string, string>; ready: boolean }
 function pct(value: number | null): string { return value == null ? "—" : `${value.toFixed(1)}%`; }
-export function MapPoolTable({ rows: maps, hasOwn, hasOpponent, notes, onNotesChange }: MapPoolTableProps) {
+export function MapPoolTable({ rows: maps, hasOwn, hasOpponent, notes, onNotesChange, onSave, saving, errors, ready }: MapPoolTableProps) {
 
   if (!hasOpponent) {
     return <div className="stu-card stu-empty">在上方「对手队伍」里选择即将交手的对手，这里会把它（与我的队伍）各自跨所有对手聚合后按地图比较。</div>;
@@ -48,14 +47,14 @@ export function MapPoolTable({ rows: maps, hasOwn, hasOpponent, notes, onNotesCh
               <td>
                 <input
                   className="stu-input stu-input-sm"
+                  disabled={!ready}
                   value={notes[row.mapName] ?? ""}
-                  placeholder="备注…"
-                  onChange={(e) => {
-                    const note = e.target.value;
-                    onNotesChange(row.mapName, note);
-                    void saveMapPoolNote(row.mapName, note);
-                  }}
+                  placeholder={ready ? "备注…" : "备注尚未读取"}
+                  onChange={(e) => onNotesChange(row.mapName, e.target.value)}
                 />
+                {saving[row.mapName] && <span role="status">保存中…</span>}
+                {errors[row.mapName] && <button type="button" className="stu-button-sm" onClick={() => onSave(row.mapName)}>重试保存</button>}
+                {errors[row.mapName] && <div role="alert">保存失败，备注仍保留在此页面：{errors[row.mapName]}</div>}
               </td>
             </tr>
           ))}

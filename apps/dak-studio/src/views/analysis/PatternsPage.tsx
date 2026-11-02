@@ -4,7 +4,7 @@ import { filterBySubjectTeam, isCurrentTacticalRoundFact } from "../../lib/patte
 import { usePageReady } from "../../lib/use-page-ready";
 import { assertCurrentFacts } from "../../lib/facts-readiness";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../../lib/queries/query-cache";
-import { useEffect, useMemo, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
 import { EmptyState } from "@cs2dak/react";
 import { teamRenameGroups } from "../../lib/team-identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../../lib/demo-entry";
@@ -12,13 +12,16 @@ import { getFactsStore } from "../../lib/facts-store";
 import type { TacticalRoundFact } from "@cs2dak/tactics";
 import { buildTacticalClusters } from "@cs2dak/tactics";
 import { withTacticalDisplayGroupKeys } from "../../lib/tactical-display-groups";
-import { PatternsTheme } from "./PatternsTheme";
+import { PatternsTheme, useStoredDrafts } from "./PatternsTheme";
+import { listMapPoolNotes, saveMapPoolNote } from "../../lib/map-pool-notes";
+import { listPatternNames, savePatternName } from "../../lib/pattern-names";
 import type { AnalysisContext, AnalysisRoleRef } from "../../lib/analysis-context";
 
 type PatternTab = "patterns" | "anti";
 
 export interface PatternsPageProps {
   exportSource?: AnalysisExportSource | null;
+  registerDraftGuard: (check: (() => boolean) | null) => void;
   state: PatternPageState;
   onStateChange: Dispatch<SetStateAction<PatternPageState>>;
   onPageReady?: (keys: string[]) => void;
@@ -42,7 +45,7 @@ function teamRole(label: string): AnalysisRoleRef {
 }
 
 export function PatternsPage({
-  exportSource, state, onStateChange,
+  exportSource, state, onStateChange, registerDraftGuard,
   allEntries,
   entries,
   onOpenMatch,
@@ -53,6 +56,18 @@ export function PatternsPage({
   onAnalysisContextChange,
   onPageReady,
 }: PatternsPageProps) {
+  const notes = useStoredDrafts(listMapPoolNotes, saveMapPoolNote, false, true);
+  const names = useStoredDrafts(listPatternNames, savePatternName, true);
+  const dirtyRef = useRef(false);
+  dirtyRef.current = notes.dirty || names.dirty;
+  useEffect(() => {
+    registerDraftGuard(() => dirtyRef.current);
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (dirtyRef.current) { event.preventDefault(); event.returnValue = ""; }
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => { registerDraftGuard(null); window.removeEventListener("beforeunload", beforeUnload); };
+  }, [registerDraftGuard]);
   const tab = state.section;
   const setTab = (section: PatternTab) => onStateChange(current => ({ ...current, section }));
   const [allFacts, setAllFacts] = useState<TacticalRoundFact[]>([]);
@@ -208,7 +223,7 @@ export function PatternsPage({
         />
       )}
       {hasSnapshot && clusters.length > 0 && (
-        <PatternsTheme exportSource={hasSnapshot && !loading && !error && analysisData.status === "ready" && factsGeneration === analysisData.generation ? exportSource : null} section={tab} explorerState={state.explorer} onExplorerStateChange={update => onStateChange(current => ({ ...current, explorer: typeof update === "function" ? update(current.explorer) : update }))} clusters={clusters} facts={facts} allFacts={allFacts}
+        <PatternsTheme notes={notes} names={names} exportSource={hasSnapshot && !loading && !error && analysisData.status === "ready" && factsGeneration === analysisData.generation ? exportSource : null} section={tab} explorerState={state.explorer} onExplorerStateChange={update => onStateChange(current => ({ ...current, explorer: typeof update === "function" ? update(current.explorer) : update }))} clusters={clusters} facts={facts} allFacts={allFacts}
           entryByMatchId={entryByMatchId} analysisContext={analysisContext} teamRenames={teamRenames}
           subjectTeam={subjectTeam} mode={mode} onOpenMatch={onOpenMatch} onWatchDemo={onWatchDemo} />
       )}
