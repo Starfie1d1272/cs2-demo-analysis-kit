@@ -22,21 +22,22 @@ export function TeamRolesPanel({ exportSource, onCapabilityRepair, entries, team
   state: TeamRolesState; onStateChange: (state: TeamRolesState) => void;
   onOpenEvidence: OpenEvidence; onPageReady?: (keys: string[]) => void;
 }) {
+  const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const [scopedRoleEntries, setScopedRoleEntries] = useState<StudioDemoEntry[] | null>(null);
   const [scopeError, setScopeError] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     setScopedRoleEntries(null); setScopeError(null);
-    void getRoleTeamEntries(entries, identityOptions, teamName).then(value => { if (!cancelled) setScopedRoleEntries(value); })
+    if (analysis.status !== "ready") return () => { cancelled = true; };
+    void getRoleTeamEntries(entries, identityOptions, teamName).then(value => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setScopedRoleEntries(value); } })
       .catch(error => { if (!cancelled) setScopeError(error instanceof Error ? error.message : String(error)); });
     return () => { cancelled = true; };
-  }, [entries, teamName, identityOptions?.version]);
+  }, [entries, teamName, identityOptions?.version, analysis]);
   const capability = useCapability(scopedRoleEntries ?? [], "map-role");
   const roleEntries = capability.eligible;
   const awpCapability = useCapability(scopedRoleEntries ?? [], "team-awp");
   const awpEntries = awpCapability.eligible;
   const [roleSnapshot, setRoleSnapshot] = useState<{ key: string; generation: number; value: Array<TeamMapRoleMatrix & { teamGroup: RoleTeamGroup }> } | null>(null);
-  const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const roleKey = JSON.stringify([roleEntries?.map(entry => entry.id), teamName, identityOptions?.version]);
   const matrices = roleSnapshot?.key === roleKey ? roleSnapshot.value : null;
   const [matrixError, setMatrixError] = useState<string | null>(null);
@@ -113,7 +114,7 @@ export function TeamRolesPanel({ exportSource, onCapabilityRepair, entries, team
             {scopedRoleEntries && awpCapability.availability && <CapabilityBar availability={awpCapability.availability} onRepair={onCapabilityRepair} />}
             {awpCapability.error && <p role="alert">AWP 能力读取失败：{awpCapability.error} <button type="button" className="stu-button-sm" onClick={awpCapability.retry}>重试</button>{awpCapability.availability && " · 显示旧版本"}</p>}
             {doubleAwp && (doubleAwpError || analysis.status !== "ready" || awpSnapshot?.generation !== analysis.generation) && <p role="status" className="stu-muted">{doubleAwpError || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
-            {doubleAwpError && !doubleAwp ? <EmptyState variant="error" title="双 AWP 统计不可用" hint={doubleAwpError} /> : doubleAwp === null && !awpCapability.error ? <div className="stu-loading">读取 AWP 回合事实…</div> : doubleAwp === null ? null : awpEntries?.length === 0 && doubleAwp.length === 0 ? (awpCapability.error ? null : <p className="stu-muted" role="status">当前范围暂无可用比赛，请查看上方原因和操作。</p>) : <DoubleAwpAnalysisPanel model={activeAwp} playerNames={playerNames} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "team:double-awp" }); }} />}
+            {scopeError ? <EmptyState variant="error" title="双 AWP 统计不可用" hint={scopeError} /> : !scopedRoleEntries ? <div className="stu-loading">读取队伍范围…</div> : doubleAwpError && !doubleAwp ? <EmptyState variant="error" title="双 AWP 统计不可用" hint={doubleAwpError} /> : doubleAwp === null && !awpCapability.error ? <div className="stu-loading">读取 AWP 回合事实…</div> : doubleAwp === null ? null : awpEntries?.length === 0 && doubleAwp.length === 0 ? (awpCapability.error ? null : <p className="stu-muted" role="status">当前范围暂无可用比赛，请查看上方原因和操作。</p>) : <DoubleAwpAnalysisPanel model={activeAwp} playerNames={playerNames} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "team:double-awp" }); }} />}
           </section>
   </>;
   const roleCurrent = !!activeMatrix && !matrixError && !capability.error &&
