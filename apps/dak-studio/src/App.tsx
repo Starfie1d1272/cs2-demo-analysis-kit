@@ -503,7 +503,7 @@ export function App() {
           </div>
         )}
         {entriesStatus === "error" && entriesReady && destination.page !== "workbench" && <p role="alert">比赛资料刷新失败，显示上次成功读取的数据。 <button type="button" className="stu-button-sm" onClick={() => { void refreshEntries().catch(() => {}); }}>重试</button></p>}
-        {!entriesReady && (section === "analysis" || section === "matches") ? (entriesStatus === "error" ? <p role="alert">比赛资料读取失败。 <button type="button" className="stu-button-sm" onClick={() => { void refreshEntries().catch(() => {}); }}>重试</button></p> : <p>正在读取比赛资料…</p>) : <>
+        {(!entriesReady || (entriesStatus === "error" && entries.length === 0)) && (section === "analysis" || section === "matches") ? (entriesStatus === "error" ? <p role="alert">比赛资料读取失败。 <button type="button" className="stu-button-sm" onClick={() => { void refreshEntries().catch(() => {}); }}>重试</button></p> : <p>正在读取比赛资料…</p>) : <>
         {entries.length > 0 && section === "analysis" && "context" in destination && (
           <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} onEdit={() => setContextEditorOpen((current) => !current)} onCompare={(destination.page === "player" && selectedPlayerKey || destination.page === "team" && selectedTeam) ? () => document.getElementById("analysis-comparison")?.scrollIntoView({ behavior: "smooth", block: "center" }) : undefined} />
         )}

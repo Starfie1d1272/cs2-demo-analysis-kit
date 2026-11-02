@@ -149,12 +149,11 @@ export function TournamentDashboardView({
 
   if (allEntries.length === 0) {
     return (
-      <div className="stu-view">
+      <div className="stu-view stu-compact-empty">
         <EmptyState
-          mark
-          title="还没有赛事数据"
-          hint="赛事总览由资料库内 demo 聚合而成，先导入比赛。"
-          action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>}
+          title="还没有比赛"
+          hint="导入比赛后，即可查看队伍、选手和赛事分析。"
+          action={<button type="button" className="stu-button-sm" onClick={onGoLibrary}>前往比赛库</button>}
         />
       </div>
     );

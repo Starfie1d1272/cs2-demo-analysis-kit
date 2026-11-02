@@ -5129,6 +5129,8 @@ td.stu-heat-cell.stu-heat-neutral {
 }
 
 /* 紧凑的工作台和资料工具栏 */
+.stu-compact-empty .dak-empty { padding: 24px; gap: 8px; }
+.stu-compact-empty .dak-empty h2 { font-size: 15px; }
 .stu-workbench section h2 {
   margin: 0 0 8px;
   color: var(--dak-fg-mid);
