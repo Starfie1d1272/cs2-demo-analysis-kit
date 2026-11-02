@@ -12,8 +12,9 @@ export const emptyMatchesState = (): MatchesPageState => ({ search: "", mapFilte
 export const emptyEventsState = (): EventsPageState => ({ activeEventId: null, activeStageKey: null, selectedSeriesId: null });
 export interface UtilityPageState { tables: Partial<Record<"hePlayers" | "heTeams" | "firePlayers" | "fireTeams" | "flashPlayers" | "flashTeams" | "smokePlayers" | "smokeTeams", TableState>>; selectedEvidenceKey: string | null }
 export const emptyUtilityState = (): UtilityPageState => ({ tables: {}, selectedEvidenceKey: null });
-export interface PlayerPageState { profileTab: "overview" | "aim" | "utility" | "trend"; comparePlayerKey: string | null; flashMode: "net" | "enemy" }
-export const emptyPlayerState = (): PlayerPageState => ({ profileTab: "overview", comparePlayerKey: null, flashMode: "net" });
+export type PlayerTrendMetric = "adr" | "kast" | "fkMinusFd" | "utilityDamagePerRound";
+export interface PlayerPageState { trendMetric: PlayerTrendMetric; profileTab: "overview" | "aim" | "utility" | "trend"; comparePlayerKey: string | null; flashMode: "net" | "enemy" }
+export const emptyPlayerState = (): PlayerPageState => ({ profileTab: "overview", comparePlayerKey: null, flashMode: "net", trendMetric: "adr" });
 export interface TeamPageState { compareTeamName: string | null; tables: Partial<Record<"maps" | "roster", TableState>> }
 export const emptyTeamState = (): TeamPageState => ({ compareTeamName: null, tables: {} });
 export interface PlayerRolesState { tables: Partial<Record<"roles" | "mapPool", TableState>> }
