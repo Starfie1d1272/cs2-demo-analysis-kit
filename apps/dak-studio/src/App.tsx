@@ -54,9 +54,10 @@ import { AnalysisView } from "./views/AnalysisView";
 import { type PinnedPlayer } from "./lib/pin";
 import { setLastWork, updateLastMatchPosition } from "./lib/last-work";
 import { EventManager } from "./components/EventManager";
-import { emptyMaterialsPageState, emptyStudyNoteDraft, emptyCoachPlaybookDraft, type MaterialsPageState, type MaterialPageState } from "./lib/material-page-state";
+import { emptyMaterialsPageState, emptyStudyNoteDraft, emptyCoachPlaybookDraft, type MaterialsPageState, type MaterialPageState, type LecturePageState } from "./lib/material-page-state";
 import type { MaterialRef } from "./lib/material-ref";
 import type { StudyNoteDraft } from "./lib/study-notes";
+import { PlaybookLectureView } from "./views/coach/PlaybookLectureView";
 import { MaterialsView, MaterialDetailView } from "./views/MaterialsView";
 import { RivalHubBatchImportPanel } from "./components/RivalHubBatchImportPanel";
 
@@ -521,7 +522,7 @@ export function App() {
         {destination.page === "workbench" && <WorkbenchView onOpenSaved={row => void openSavedAnalysis(row)} events={eventScopes} entries={entries} entriesReady={entriesReady} onOpenMatch={openDemo} onPersonal={openWorkbenchPersonal} onResumeAnalysis={navigation.history.some(frame => PAGE_SECTION[frame.destination.page] === "analysis") ? () => resumeSection("analysis") : undefined} importing={importing} importTagsRaw={importTagsRaw} onImportFiles={importFiles} onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined} onMatches={() => navigate({ page: "matches" })} onOpenMaterial={openMaterial} onNewNote={() => openStudyNoteEditor(emptyStudyNoteDraft())} onNewPlaybook={() => { if (!canLeave()) return; const id = `frame-${++nextFrameId.current}`; setEvidenceSession(null); setNavigation(current => { const next = studioNavigationReducer(discardMaterialDraft(current), { intent: "open", id, destination: { page: "materials" }, scrollY: window.scrollY }); return studioNavigationReducer(next, { intent: "ui", frameId: id, ui: { ...emptyMaterialsPageState(), newPlaybook: emptyCoachPlaybookDraft() } }); }); }} prepMigrationStatus={prepMigrationStatus} retryPrepMigration={retryPrepMigration} />}
         {section === "matches" && <MatchesView page={destination.page} onMatches={() => navigate({ page: "matches" })} onEvents={() => navigate({ page: "events" })} />}
         {destination.page === "materials" && <MaterialsView identityOptions={identityOptions} onAnalyzeAssignments={openAssignmentAnalysis} onPageReady={keys => onPageReady(active.id, keys)} entries={entries} state={active.ui as MaterialsPageState} onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))} onOpenMaterial={openMaterial} onCreatedMaterial={createdMaterial} onOpenEvidence={openMaterialEvidence} prepMigrationStatus={prepMigrationStatus} prepMigrationError={prepMigrationError} retryPrepMigration={retryPrepMigration} />}
-        {destination.page === "material" && <MaterialDetailView identityOptions={identityOptions} onAnalyzeAssignments={openAssignmentAnalysis} onPageReady={keys => onPageReady(active.id, keys)} refValue={destination.materialRef} entries={entries} state={active.ui as MaterialPageState | null} onStateChange={ui => setNavigation(current => {
+        {destination.page === "material" && <MaterialDetailView onLecture={source => { const id = `frame-${++nextFrameId.current}`; setNavigation(current => { const next = studioNavigationReducer(current, { intent: "open", id, destination: { page: "lecture", materialRef: { kind: "playbook", id: source.id } }, scrollY: window.scrollY }); return studioNavigationReducer(next, { intent: "ui", frameId: id, ui: { kind: "playbook", id: source.id, phaseId: source.phaseId, tab: "diagram", selectedEvidenceId: null, replayEntryId: null, replay: null } }); }); }} identityOptions={identityOptions} onAnalyzeAssignments={openAssignmentAnalysis} onPageReady={keys => onPageReady(active.id, keys)} refValue={destination.materialRef} entries={entries} state={active.ui as MaterialPageState | null} onStateChange={ui => setNavigation(current => {
           const frame = current.active;
           if (frame.id !== active.id || frame.destination.page !== "material" || frame.destination.materialRef.kind !== destination.materialRef.kind || frame.destination.materialRef.id !== destination.materialRef.id) return current;
           return studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui });
@@ -536,6 +537,13 @@ export function App() {
             return studioNavigationReducer(studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: cleanState }), { intent: "back", id });
           });
         }} onOpened={ref => { const frame = navigationRef.current.active; if (frame.id === active.id && frame.destination.page === "material" && frame.destination.materialRef.kind === ref.kind && frame.destination.materialRef.id === ref.id) void setLastWork({ kind: "material", materialRef: ref }); }} onOpenEvidence={openMaterialEvidence} />}
+        {destination.page === "lecture" && destination.materialRef.kind === "playbook" && active.ui && (() => {
+          const source = [...navigation.history].reverse().find(frame => frame.destination.page === "material" && frame.destination.materialRef.kind === "playbook" && frame.destination.materialRef.id === destination.materialRef.id);
+          const material = source?.ui as MaterialPageState | null | undefined;
+          const lecture = active.ui as LecturePageState;
+          if (!material || material.kind !== "playbook" || material.id !== destination.materialRef.id || lecture.kind !== "playbook" || lecture.id !== material.id) return <p>战术来源不可用。</p>;
+          return <PlaybookLectureView draft={material.draft} entries={entries} state={lecture} onChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))} onBack={() => { const id = `frame-${++nextFrameId.current}`; setRestoringFrameId(source?.id ?? null); setNavigation(current => { const saved = current.active.ui as LecturePageState | null; const paused = saved?.replay ? { ...saved, replay: { ...saved.replay, playing: false } } : saved; const withLecture = studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: paused }); const back = studioNavigationReducer(withLecture, { intent: "back", id }); return source ? studioNavigationReducer(back, { intent: "ui", frameId: source.id, ui: { ...material, phaseId: lecture.phaseId } }) : back; }); }} />;
+        })()}
         {destination.page === "matches" && <>{destination.entryIds && <div className="stu-card">当前显示所选分析范围的比赛 <button type="button" className="stu-button-sm" onClick={() => navigate({ page: "matches" })}>查看全部比赛</button></div>}{libraryView}</>}
         {destination.page === "match" && (
           <MatchView

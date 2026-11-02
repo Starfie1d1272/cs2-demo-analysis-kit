@@ -22,3 +22,5 @@ export {
   type SortDirection,
   useSortable
 } from "./components/DataTable";
+
+export { MapAnnotationCanvas, type MapAnnotationCanvasProps } from "./components/MapAnnotationCanvas";
