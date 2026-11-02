@@ -17,7 +17,7 @@ function valid(value: unknown): value is StudyNote {
 export function createStudyNotesStore(records: RecordStore) {
   return {
     async list(): Promise<{ notes: StudyNote[]; unreadable: number }> { const all = await records.getAll<unknown>(); const notes = all.filter(valid); return { notes, unreadable: all.length - notes.length }; },
-    async get(id: string): Promise<StudyNote | null> { const value = await records.get<unknown>(id); return valid(value) ? value : null; },
+    async get(id: string): Promise<StudyNote | null> { const value = await records.get<unknown>(id); if (value === undefined) return null; if (!valid(value)) throw new Error("笔记记录无法读取"); return value; },
     async create(draft: CreateStudyNoteInput): Promise<StudyNote> { const title = draft.title.trim(); if (!title) throw new Error("标题不能为空"); const now = Date.now(); const note: StudyNote = { ...structuredClone(draft), title, purpose: draft.purpose ?? "review", schemaVersion: 1, id: crypto.randomUUID(), createdAt: now, updatedAt: now }; await records.put(note.id, note); return note; },
     async update(id: string, draft: StudyNoteDraft): Promise<StudyNote | null> { const old = await records.get<unknown>(id); if (!valid(old)) return null; const title = draft.title.trim(); if (!title) throw new Error("标题不能为空"); const note: StudyNote = { ...old, ...structuredClone(draft), title, updatedAt: Date.now() }; await records.put(id, note); return note; },
     async remove(id: string): Promise<void> { await records.delete(id); },

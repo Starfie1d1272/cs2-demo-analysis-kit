@@ -1,5 +1,5 @@
 import type { MaterialRef } from "./material-ref";
-import { listStudyNotes } from "./study-notes";
+import { getStudyNote, listStudyNotes } from "./study-notes";
 import { listTrainingFocus } from "./training-focus";
 import { listPrepItems } from "./prep-items";
 import { listPracticeLineups } from "./practice-lineups";
@@ -34,4 +34,17 @@ export async function listStudyMaterials(entries: StudioDemoEntry[], includePrep
   const rows: MaterialSummary[] = []; const errors: Partial<Record<MaterialKind, string>> = {}; let unreadable = 0;
   results.forEach((result, index) => { if (result.status === "fulfilled") { rows.push(...result.value.rows); unreadable += result.value.unreadable; } else errors[kinds[index]] = String(result.reason); });
   return { rows: sortMaterials(rows), errors, unreadable };
+}
+
+/** Resolve one reference against its owning store without loading match data. */
+export async function resolveStudyMaterial(ref: MaterialRef, entries: StudioDemoEntry[]): Promise<MaterialSummary | null> {
+  switch (ref.kind) {
+    case "study-note": {
+      const n = await getStudyNote(ref.id);
+      return n ? { ref: { ...ref }, title: n.title, kindLabel: "笔记", mapName: n.evidence[0]?.source.mapName ?? null, summary: n.body, updatedAt: n.updatedAt, sourceStatus: noteStatus(n.evidence, entries) } : null;
+    }
+    case "training-focus": case "prep-item": case "practice-lineup":
+      return (await listStudyMaterialsKind(ref.kind, entries)).rows.find(row => row.ref.id === ref.id) ?? null;
+    default: return null;
+  }
 }
