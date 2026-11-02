@@ -121,7 +121,7 @@ export function DuelView({
           <div>
             <span>完整血量对枪</span>
             <strong>{summary.fullHealthDuels}</strong>
-            <small>{summary.fullHealthRate.toFixed(1)}%</small>
+            <small>{summary.fullHealthRate == null ? "—" : `${summary.fullHealthRate.toFixed(1)}%`}</small>
           </div>
           <div>
             <span>中位击杀耗时</span>
@@ -185,7 +185,7 @@ function summarizeDuels(model: DuelInsightsModel) {
   return {
     totalDuels: model.duelRows.length,
     fullHealthDuels,
-    fullHealthRate: model.duelRows.length > 0 ? fullHealthDuels / model.duelRows.length * 100 : 0,
+    fullHealthRate: model.duelRows.length > 0 ? fullHealthDuels / model.duelRows.length * 100 : null,
     medianTtk,
     contestedDuels: model.duelRows.filter((row) => row.classification === "contested_duel").length
   };
