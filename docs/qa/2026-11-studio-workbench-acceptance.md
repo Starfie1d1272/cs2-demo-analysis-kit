@@ -4,7 +4,7 @@
 
 ## 环境与证据
 
-- Linux x86_64 云环境，约 17 GiB 可用内存；Node/pnpm 使用仓库 activate 脚本，Vite 开发服务，系统 Chromium headless，1280×800；隔离浏览器 context/IndexedDB，没有接触现有用户库。无显示服务器及可用桌面设备，本次没有原生壳、Windows/macOS、原生壳备份/恢复或实际打印机结果。
+- Linux x86_64 云环境，5 vCPU（AMD EPYC 9V74），约 17 GiB 可用内存；Node 24.19.0/pnpm 使用仓库 activate 脚本，Vite 开发服务，Chromium 151 headless，1280×800；隔离浏览器 context/IndexedDB，没有接触现有用户库。无显示服务器及可用桌面设备，本次没有原生壳、Windows/macOS、原生壳备份/恢复或实际打印机结果。
 - 空库 A 和独立 B；B 通过文件选择导入仓库 Nuke `cologne-major-2026-stage3-smoke-de_nuke.zip`（593,751 bytes）及 cohort 三个 ZIP（1,986,337 / 1,045,157 / 1,134,000 bytes），共 4 场，约 4.8 MB；均为仓库真实样本，未伪造 50 场。四场界面均显示日期未知。另用临时副本和内存/SQLite 记录模拟缺失、故障与旧资料，具体方法在各项注明；未操作项不标通过。
 - 精确 main 的 [官方 CI](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/actions/runs/41407963506)：TypeScript（typecheck/fast/build）、integration、Python、event worker 四项成功。本地先缺 dist 直接运行失败；按仓库流程 `pnpm build:packages` 后 `pnpm typecheck`、Studio build 成功，既有 library-persistence/library 两文件 9 项通过。`pnpm check:package-boundaries`（8 项）和 `pnpm check:package-consumers` 成功：真实 tarball、隔离安装、NodeNext 声明闭包及浏览器打包。额外独立安装当前 maps/presentation/react tarball，实调用 `sortTableRows` 和三个 MapRoles 排序列：样本 3 在 1 前、RR 2/1/null 顺序正确。不是所有外部消费者迁移证明。
 
@@ -17,7 +17,7 @@
 ## B 教练
 
 - B1 部分通过：空库可打开新建战术、人员安排、笔记编辑器；战术默认 Mirage/T，可选择 Default/Protocol/Play，人员安排有五行与观察绑定。在空库保存 Mirage T 的 Default、Protocol、Play 和一份人员安排（Player A 的职责填入 IGL + 主 AWP + A 区），重新加载后四条均显示；另建一份 Play，添加三个阶段、各一项人员任务和 position/smoke/flash 标记；保存重载后逐阶段列表可见。真实 Nuke 中为手工人员安排显式绑定 9z 的观察范围，出现位置矩阵；输入的 IGL + 主 AWP + A 区人工文字在绑定后及重载后不变。
-- B2–B5 部分通过：空库比赛单加入 Play、人员安排、StudyNote，重排后保存并进入/退出讲解；实际下载 Markdown 含三项材料及手工判断。调用打印并以 Chromium print media 输出 A4 一页 PDF，文本检查包含主体且无编辑按钮；没有目视核实所有复杂内容与原生打印。删除被引用笔记后，比赛单显示 `材料已删除 study-note:<id>`，另两项仍显示。真实 cohort 三场中选择 Team Plasma 侦察 Team D'avenir，模式列出 Inferno R18/R23，加入 R18 后材料页出现备战条目并标注“来源版本未知”；“报告”页可显示地图池比较。含 PrepItem 的比赛单、真实回合讲解及复杂打印仍未完成，报告其他入口未覆盖。另在空库创建仅含正文 `W19 正文战术内容` 的战术，进入讲解只显示“暂无阶段/手工示意”，正文未显示：直接阻塞，待战术讲解 owner 修复并重验。另一三阶段样本中选中阶段 2 再上移，本次仍选中阶段 2，不能排除其他重排路径问题。另在空库已保存三战术、一份人员安排与一份比赛单，工作台“最近资料”只列出三战术，人员安排及比赛单均未列出；源码种类列表同样缺这两类，待工作台 owner 修复。
+- B2–B5 部分通过：空库比赛单加入 Play、人员安排、StudyNote，重排后保存并进入/退出讲解；实际下载 Markdown 含三项材料及手工判断。调用打印并以 Chromium print media 输出 A4 一页 PDF，文本检查包含主体且无编辑按钮；没有目视核实所有复杂内容与原生打印。删除被引用笔记后，比赛单显示 `材料已删除 study-note:<id>`，另两项仍显示。真实 cohort 三场中选择 Team Plasma 侦察 Team D'avenir，模式列出 Inferno R18/R23，加入 R18 后材料页出现备战条目并标注“来源版本未知”；“报告”页可显示地图池比较。另将该真实 PrepItem 与 Play、人员安排、StudyNote 加入比赛单并保存，比赛单正文显示 Inferno R18 和来源，已按下一项走到真实 PrepItem，讲解显示 Inferno R18 来源和人工备注。但材料页显示“来源版本未知”，讲解项未显示该状态且本次未找到打开真实回合的动作；需讲解 owner 核实来源状态与往返。复杂打印及报告其他入口未覆盖。另在空库创建仅含正文 `W19 正文战术内容` 的战术，进入讲解只显示“暂无阶段/手工示意”，正文未显示：直接阻塞，待战术讲解 owner 修复并重验。另一三阶段样本中选中阶段 2 再上移，本次仍选中阶段 2，不能排除其他重排路径问题。另在空库已保存三战术、一份人员安排与一份比赛单，工作台“最近资料”只列出三战术，人员安排及比赛单均未列出；源码种类列表同样缺这两类，待工作台 owner 修复。
 
 ## C 分析师
 
@@ -27,11 +27,11 @@
 
 ## D 数据、异步、可用性
 
-- 导入真实四场最终工作台显示 4 场；另在 cohort 三场导入期间新建并保存笔记，切换比赛/分析/战术与训练/工作台，任务完成后笔记编辑页仍在。模拟 IndexedDB 持续 open 抛错：页面显示“读取本地资料库失败”与缓存重试，同时最近比赛仍写“还没有比赛”；失败状态与空库文案并存，待数据 owner 修复/核对。临时浏览器延迟查询并触发真实 `invalidateAnalysisQueries`：旧 Promise 在恢复后以 AbortError 结束、bucket 清空；这是模拟延迟的数据 generation 检查，不等于 A/B 证据或 scope 切换导出验收。另在浏览器临时拦截 model loader，使证据 A 的加载延迟 12 秒；立即点下一条进入 B，等待 A 晚到后仍显示 Inferno R1/tick 5856，再返回来源。这是标明注入方式的竞态验证。后台任务失败重试与 scope 切换导出仍未实测。
+- 导入真实四场最终工作台显示 4 场；另在 cohort 三场导入期间新建并保存笔记，切换比赛/分析/战术与训练/工作台，任务完成后笔记编辑页仍在。模拟 IndexedDB 持续 open 抛错：页面显示“读取本地资料库失败”与缓存重试，同时最近比赛仍写“还没有比赛”；失败状态与空库文案并存，待数据 owner 修复/核对。临时浏览器延迟查询并触发真实 `invalidateAnalysisQueries`：旧 Promise 在恢复后以 AbortError 结束、bucket 清空；这是模拟延迟的数据 generation 检查，不等于 A/B 证据或 scope 切换导出验收。另在浏览器临时拦截 model loader，使证据 A 的加载延迟 12 秒；立即点下一条进入 B，等待 A 晚到后仍显示 Inferno R1/tick 5856，再返回来源。这是标明注入方式的竞态验证。对 ExportPolling 使用短超时与模拟状态读取：首次查询超时进入 uncertain，重查同一 job 得到 done，共两次读取、零启动调用；此为模拟 bridge，非原生后台实机。后台任务真实失败重试与 scope 切换导出仍未实测。
 - 源码 `storage-overview.ts` 的用户 namespace 包含 training-focus、prep-items、practice-lineups、role-declarations、study-notes、coach-playbook、coach-assignments、coach-match-sheets、saved-analyses；cache 名单由 facts/derived cache 加 cache/meta 构成。另以临时隔离目录直接运行 Linux Python `StudioApi` 后端：九类各写一条模拟记录，清除 9 字节临时 cache 后逐类一致；备份后删除九条及真实 Nuke ZIP，恢复后九类各一条和 ZIP 字节一致（SHA-256 `e9405245cd0ba55d4427bb5890874b0b70b19475790248d963734b6cd93e4d21`）。这是后端调用、模拟用户资料，不是 pywebview 壳或 Windows/macOS 实机验证。
 - 旧 playlist 迁移源码先写后删、冲突时另分 ID、末尾写 marker；普通 prep list 仅读取排序。临时内存 RecordStore 注入首次复制失败与首次删除失败，重试后旧记录删除、同 ID 不同内容两条保留、marker 写入；重复迁移和普通 list 无写入。此为模拟故障，旧版本真实资料及平台恢复尚未验。
 - 浏览器进入比赛→赛事目录，可见导入赛事资源包及赛事资源制作器；数据管理中的身份、资产和资料库维护均可打开，维护页显示备份入口，资产页显示 .tri 资产。它们只是入口检查；赛事/series/BP、RivalHub 实际导入、批量标签/修复、身份修改、更新、原始 demo/进游戏的逐项流程未验。canonical/RR/PRISM 跨版本同语料逐项对照未完成。W20 缺姿态保持缺失、W21 分母和日期修正应按 #157/#161 语义核实，不能为了旧错误数值回退。
-- 单 Nuke 文件从选择到显示约 15 秒（粗观察）。同一隔离 Chromium、1 场/593,751 字节：空库首次工作台 1,496ms，导入后首次/再次打开比赛 1,074/115ms，返回工作台 64/53ms；两次比赛进入时 JS heap 约 242/227 MB（非进程总内存、GC 可波动）。这是一次开发服务器粗测，不作 50 场或长期性能结论。1280×800 页面可显示导航与主要内容；键盘、地图等价列表、焦点、打印裁切未验。未验证首页无全量加载或模型缓存长期行为。
+- 单 Nuke 文件从选择到显示约 15 秒（粗观察）。同一隔离 Chromium、1 场/593,751 字节：空库首次工作台 1,496ms，导入后首次/再次打开比赛 1,074/115ms，返回工作台 64/53ms；两次比赛进入时 JS heap 约 242/227 MB（非进程总内存、GC 可波动）。这是一次开发服务器粗测，不作 50 场或长期性能结论。1280×800 页面可显示导航与主要内容；键盘 Tab 实际依次进入四主导航、数据管理、全部比赛和导入；阶段地图标记在列表中可见。返回/关键按钮和切页焦点的完整键盘路径、复杂打印裁切未验。未验证首页无全量加载或模型缓存长期行为。
 
 ## 验收中修复的直接阻塞
 
