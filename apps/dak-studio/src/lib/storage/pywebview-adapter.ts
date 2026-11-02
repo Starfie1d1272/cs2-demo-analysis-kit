@@ -1,8 +1,8 @@
 import type { BlobStore, RecordStore, AtomicStorageAdapter, RecordRef, RecordSnapshot, RecordMutation } from "./types";
 
 interface PywebviewStorageApi {
-  storage_records_read(refs: RecordRef[]): Promise<RecordSnapshot[]>;
-  storage_records_compare_and_write(expected: RecordSnapshot[], writes: RecordMutation[]): Promise<boolean>;
+  storage_records_read?(refs: RecordRef[]): Promise<RecordSnapshot[]>;
+  storage_records_compare_and_write?(expected: RecordSnapshot[], writes: RecordMutation[]): Promise<boolean>;
   storage_record_get(namespace: string, key: string): Promise<unknown>;
   storage_record_get_all(namespace: string): Promise<unknown[]>;
   storage_record_entries(namespace: string): Promise<Array<[string, unknown]>>;
@@ -36,8 +36,14 @@ export function createPywebviewAdapter(api: PywebviewStorageApi): AtomicStorageA
   const blobStores = new Map<string, BlobStore>();
 
   return {
-    readRecords: (refs) => api.storage_records_read(refs),
-    compareAndWriteRecords: (expected, writes) => api.storage_records_compare_and_write(expected, writes),
+    readRecords: (refs) => {
+      if (!api.storage_records_read || !api.storage_records_compare_and_write) return Promise.reject(new Error("桌面程序版本过旧，请更新并重启后再使用身份资料"));
+      return api.storage_records_read(refs);
+    },
+    compareAndWriteRecords: (expected, writes) => {
+      if (!api.storage_records_read || !api.storage_records_compare_and_write) return Promise.reject(new Error("桌面程序版本过旧，请更新并重启后再使用身份资料"));
+      return api.storage_records_compare_and_write(expected, writes);
+    },
     records(namespace): RecordStore {
       let store = recordStores.get(namespace);
       if (!store) {
