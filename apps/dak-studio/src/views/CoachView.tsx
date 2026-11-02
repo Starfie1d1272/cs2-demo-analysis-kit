@@ -66,7 +66,9 @@ export function CoachView({
   const [playbook, setPlaybook] = useState<Record<string, string>>({});
   const [playlist, setPlaylist] = useState<PrepItem[]>([]);
   const [error, setError] = useState<string | null>(null);
-  usePageReady(entries.length === 0 || !loading || error !== null, onPageReady);
+  const [settingsReady, setSettingsReady] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  usePageReady(settingsReady && (entries.length === 0 || !loading || error !== null), onPageReady);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
   const teamGroups = useMemo(
     () => teamRenameGroups(allEntries.map((entry) => ({ teamA: entry.meta.teamAName, teamB: entry.meta.teamBName })), teamRenames),
@@ -88,7 +90,9 @@ export function CoachView({
 
   useEffect(() => {
     let cancelled = false;
-    void loadCoachSettings().then((settings) => {
+    setSettingsReady(false);
+    setSettingsError(null);
+    const settingsRequest = loadCoachSettings().then((settings) => {
       if (cancelled) return;
       onAnalysisContextChange((current) => {
         if (current.goal === "own-review" || current.goal === "opponent-prep" || current.roles.beneficiary || current.roles.opponent) return current;
@@ -101,8 +105,14 @@ export function CoachView({
         };
       });
     });
-    void listPlaybookNames().then(setPlaybook);
-    void listPrepItems().then(setPlaylist);
+    const playbookRequest = listPlaybookNames().then((rows) => { if (!cancelled) setPlaybook(rows); });
+    const playlistRequest = listPrepItems().then((rows) => { if (!cancelled) setPlaylist(rows); });
+    void Promise.allSettled([settingsRequest, playbookRequest, playlistRequest]).then((results) => {
+      if (cancelled) return;
+      const failure = results.find((result) => result.status === "rejected");
+      if (failure?.status === "rejected") setSettingsError(failure.reason instanceof Error ? failure.reason.message : String(failure.reason));
+      setSettingsReady(true);
+    });
     return () => { cancelled = true; };
   }, [onAnalysisContextChange]);
 
@@ -231,6 +241,7 @@ export function CoachView({
         ))}
       </div>
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
+      {settingsError && <EmptyState variant="error" title="读取教练资料失败" hint={settingsError} />}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
       {!error && loading && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的开局 pattern…</div>}
       {!error && !loading && clusters.length === 0 && entries.length > 0 && hasValidFacts && (

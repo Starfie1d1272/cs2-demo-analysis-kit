@@ -98,10 +98,12 @@ export function LineupView({
   const [copiedClusterId, setCopiedClusterId] = useState<string | null>(null);
   const [savedClusterId, setSavedClusterId] = useState<string | null>(null);
   const [savedLineups, setSavedLineups] = useState<PracticeLineup[]>([]);
+  const [savedReady, setSavedReady] = useState(false);
+  const [savedError, setSavedError] = useState<string | null>(null);
   const [savedDetailsOpen, setSavedDetailsOpen] = useState(true);
   const entryById = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);
 
-  usePageReady(entries.length === 0 || !loading, onPageReady);
+  usePageReady((entries.length === 0 || !loading) && savedReady, onPageReady);
 
   function handleClusterJump(cluster: LineupCluster) {
     const first = cluster.throws[0];
@@ -137,7 +139,13 @@ export function LineupView({
     setSavedLineups(await listPracticeLineups());
   }
 
-  useEffect(() => { void listPracticeLineups().then(setSavedLineups); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    void listPracticeLineups().then((rows) => { if (!cancelled) setSavedLineups(rows); })
+      .catch((reason) => { if (!cancelled) setSavedError(reason instanceof Error ? reason.message : String(reason)); })
+      .finally(() => { if (!cancelled) setSavedReady(true); });
+    return () => { cancelled = true; };
+  }, []);
 
   // ── 加载：分批 → 按地图分组 → 跨场聚类 ──────────────────────────────────
   useEffect(() => {
@@ -303,6 +311,7 @@ export function LineupView({
 
   // ── 渲染（空态提前返回） ──────────────────────────────────────────────
 
+  if (savedError) return <EmptyState variant="error" title="读取已保存练习失败" hint={savedError} />;
   if (error) return <div>
     <EmptyState variant="error" title="Lineup 聚类失败" hint={error} action={staleIds.length ? <button type="button" className="stu-button" onClick={() => onRebuild(staleIds)}>重建 facts</button> : undefined} />
     {savedLineups.length > 0 && <div className="stu-card"><h3>已保存练习点位</h3>{savedLineups.map(item => <p key={item.id}>{item.label}{!item.sourceFactsRevision && " · 来源版本未知，需要核验"}</p>)}</div>}

@@ -66,6 +66,7 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const reqToken = useRef(0);
   const [fieldReady, setFieldReady] = useState(false);
+  const [fieldError, setFieldError] = useState<string | null>(null);
   usePageReady(!activeMap || entriesOfMap.length === 0 || invalidTeamForMap || fieldReady, onPageReady);
 
   useEffect(() => {
@@ -76,6 +77,7 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
       return;
     }
     setFieldReady(false);
+    setFieldError(null);
     const token = ++reqToken.current;
     const abort = new AbortController();
     const matchIds = entriesOfMap.map((e) => e.id);
@@ -99,8 +101,9 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
         setBaseline(team ? league : null);
         setProgress(null);
         setFieldReady(true);
-      } catch {
+      } catch (reason) {
         if (token !== reqToken.current || abort.signal.aborted) return;
+        setFieldError(reason instanceof Error ? reason.message : String(reason));
         setField(null);
         setBaseline(null);
         setProgress(null);
@@ -181,7 +184,8 @@ export function RadarFieldView({ entries, teamRenames = {}, selectedTeam = null,
 
       {!invalidTeamForMap && !progress && field && <RadarFieldCanvas field={field} baseline={baseline} map={{ name: activeMap!, radarImageUrl: `./maps/radars/${activeMap}.png` }} />}
       {!invalidTeamForMap && !progress && !field && activeMap && (
-        <EmptyState title="该地图暂无覆盖场数据" hint="所选范围内没有含回放的长枪局。" />
+        fieldError ? <EmptyState variant="error" title="覆盖场加载失败" hint={fieldError} />
+          : <EmptyState title="该地图暂无覆盖场数据" hint="所选范围内没有含回放的长枪局。" />
       )}
     </div>
   );

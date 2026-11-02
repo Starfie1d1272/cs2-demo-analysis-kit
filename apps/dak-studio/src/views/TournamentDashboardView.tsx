@@ -56,11 +56,12 @@ export function TournamentDashboardView({
 }: TournamentDashboardViewProps) {
   const [insights, setInsights] = useState<TournamentInsights | null>(null);
   const [teamComparison, setTeamComparison] = useState<TeamComparisonModel | null>(null);
+  const [comparisonReady, setComparisonReady] = useState(false);
   const [comparePair, setComparePair] = useState<[string, string] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
 
-  usePageReady(entries.length === 0 || insights !== null || error !== null, onPageReady);
+  usePageReady(entries.length === 0 || ((insights !== null || error !== null) && comparisonReady), onPageReady);
 
   useEffect(() => {
     if (entries.length === 0) {
@@ -90,13 +91,15 @@ export function TournamentDashboardView({
       return;
     }
     let cancelled = false;
+    setComparisonReady(false);
     getTeamComparison(entries, identityOptions, comparePair ?? undefined)
       .then((result) => {
         if (!cancelled) setTeamComparison(result);
       })
       .catch(() => {
         if (!cancelled) setTeamComparison(null);
-      });
+      })
+      .finally(() => { if (!cancelled) setComparisonReady(true); });
     return () => {
       cancelled = true;
     };
