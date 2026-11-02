@@ -129,6 +129,7 @@ export function buildTeamAnalysisResult(
     maps: DataTableColumn<TeamOverviewModel["maps"][number]>[];
     roster: DataTableColumn<TeamOverviewModel["roster"][number]>[];
   },
+  omitted: string[] = [],
 ) {
   const maps = sortTableRows(
     model.maps,
@@ -231,6 +232,6 @@ export function buildTeamAnalysisResult(
     title: `${model.teamName} · 队伍`,
     page: "team",
     sections,
-    limitations: ["图像未包含。"],
+    limitations: ["图像未包含。", ...omitted],
   });
 }
