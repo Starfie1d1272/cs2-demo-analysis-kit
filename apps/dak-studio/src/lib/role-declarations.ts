@@ -24,7 +24,8 @@ export function parseRoleDeclarations(value: unknown): RoleDeclarationsState | n
   const declarations = state.declarations.filter((row): row is StoredRoleDeclaration => {
     if (!row || typeof row !== "object") return false;
     const candidate = row as Partial<StoredRoleDeclaration>;
-    return typeof candidate.id === "string" && typeof candidate.createdAt === "number" && typeof candidate.updatedAt === "number"
+    return typeof candidate.id === "string" && typeof candidate.createdAt === "number" && Number.isFinite(candidate.createdAt)
+      && typeof candidate.updatedAt === "number" && Number.isFinite(candidate.updatedAt)
       && roleDeclarationSchema.safeParse(candidate.declaration).success;
   });
   return declarations.length === state.declarations.length && new Set(declarations.map(row => row.id)).size === declarations.length ? { version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations } : null;

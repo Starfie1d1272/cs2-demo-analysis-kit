@@ -20,8 +20,10 @@ function validIdentity(value: unknown): value is IdentityStoreState {
   if (!value || typeof value !== "object") return false;
   const s = value as IdentityStoreState;
   return Number.isSafeInteger(s.version) && s.version >= 0 && Array.isArray(s.mappings)
-    && s.mappings.every(m => m && typeof m.playerKey === "string" && typeof m.displayName === "string" && Array.isArray(m.steamIds) && m.steamIds.every(id => typeof id === "string") && typeof m.updatedAt === "number")
-    && !!s.teamRenames && typeof s.teamRenames === "object" && !Array.isArray(s.teamRenames) && Object.values(s.teamRenames).every(v => typeof v === "string");
+    && s.mappings.every(m => m && typeof m.playerKey === "string" && typeof m.displayName === "string" && Array.isArray(m.steamIds) && m.steamIds.every(id => typeof id === "string") && typeof m.updatedAt === "number" && Number.isFinite(m.updatedAt))
+    && !!s.teamRenames && typeof s.teamRenames === "object" && !Array.isArray(s.teamRenames)
+    && (Object.getPrototypeOf(s.teamRenames) === Object.prototype || Object.getPrototypeOf(s.teamRenames) === null)
+    && Object.values(s.teamRenames).every(v => typeof v === "string");
 }
 function validRoleChange(value: unknown): value is RoleChange {
   if (!value || typeof value !== "object") return false;
@@ -32,7 +34,7 @@ function validRoleChange(value: unknown): value is RoleChange {
 function validAudit(value: unknown): value is AuditEntry {
   if (!value || typeof value !== "object") return false;
   const a = value as AuditEntry;
-  return typeof a.id === "string" && typeof a.timestamp === "number" && typeof a.description === "string" && validIdentity(a.snapshot)
+  return typeof a.id === "string" && typeof a.timestamp === "number" && Number.isFinite(a.timestamp) && typeof a.description === "string" && validIdentity(a.snapshot)
     && (a.after === undefined || validIdentity(a.after)) && (a.roleChanges === undefined || (Array.isArray(a.roleChanges) && a.roleChanges.every(validRoleChange) && new Set(a.roleChanges.map(change => change.id)).size === a.roleChanges.length));
 }
 
