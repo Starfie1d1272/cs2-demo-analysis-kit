@@ -31,7 +31,7 @@ export DAK_APP_VERSION="$(node -e 'console.log(JSON.parse(process.env.DAK_BUILD_
 ARTIFACT_ID="$(node -e 'console.log(JSON.parse(process.env.DAK_BUILD_INFO).artifactId)')"
 PACKAGE_MODE="$(node -e 'console.log(JSON.parse(process.env.DAK_BUILD_INFO).packageMode)')"
 DIST_PATH="$ROOT/python/dist"
-if [[ "$PACKAGE_MODE" == "ad-hoc" ]]; then
+if [[ "$PACKAGE_MODE" != "release" ]]; then
   DIST_PATH="$DIST_PATH/dak-studio-$ARTIFACT_ID"
 fi
 if [[ "$OSTYPE" == darwin* ]]; then
