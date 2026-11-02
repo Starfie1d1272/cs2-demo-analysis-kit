@@ -189,7 +189,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     ? <EmptyState variant="error" title="加载失败" hint={error} />
     : !model
       ? <div className="stu-loading">读取本地持久化工作台…</div>
-      : <MatchReviewWorkspace model={model} state={loaded!.state} onStateChange={(state) => { onWorkspaceStateChange(snapshotMatchWorkspaceState(state)); setLoaded(prev => prev && prev.id === activeId ? { ...prev, state } : prev); }} />;
+      : <MatchReviewWorkspace model={model} state={loaded!.state} onStateChange={(state) => setLoaded(prev => prev && prev.id === activeId ? { ...prev, state } : prev)} />;
 
   return (
     <div className="stu-view stu-view-flush">
