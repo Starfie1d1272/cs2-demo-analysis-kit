@@ -1,6 +1,5 @@
 import { getStorage, type RecordStore } from "./storage";
-import { validEvidence } from "./study-notes";
-import type { SavedEvidenceRef } from "./saved-evidence";
+import { isValidSavedEvidence, type SavedEvidenceRef } from "./saved-evidence";
 export interface CoachMarker { id: string; kind: "position" | "smoke" | "flash" | "fire" | "note"; label: string; u: number; v: number; level: "upper" | "lower" }
 export interface CoachPhase { id: string; title: string; body: string; tasks: Array<{ id: string; playerLabel: string; instruction: string }>; markers: CoachMarker[] }
 export interface CoachPlaybookItem { schemaVersion: 1; id: string; kind: "default" | "protocol" | "play"; title: string; mapName: string; side: "t" | "ct"; purpose: string; trigger: string; body: string; tags: string[]; phases: CoachPhase[]; evidence: SavedEvidenceRef[]; createdAt: number; updatedAt: number }
@@ -8,7 +7,7 @@ export type CoachPlaybookDraft = Pick<CoachPlaybookItem, "kind" | "title" | "map
 const obj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === "object";
 const str = (x: unknown): x is string => typeof x === "string";
 function validPhase(x: unknown): x is CoachPhase { return obj(x) && str(x.id) && str(x.title) && str(x.body) && Array.isArray(x.tasks) && x.tasks.every(t => obj(t) && str(t.id) && str(t.playerLabel) && str(t.instruction)) && Array.isArray(x.markers) && x.markers.every(m => obj(m) && str(m.id) && ["position", "smoke", "flash", "fire", "note"].includes(String(m.kind)) && str(m.label) && typeof m.u === "number" && m.u >= 0 && m.u <= 1 && typeof m.v === "number" && m.v >= 0 && m.v <= 1 && (m.level === "upper" || m.level === "lower")); }
-function valid(x: unknown): x is CoachPlaybookItem { return obj(x) && x.schemaVersion === 1 && str(x.id) && ["default", "protocol", "play"].includes(String(x.kind)) && str(x.title) && !!x.title.trim() && str(x.mapName) && !!x.mapName && (x.side === "t" || x.side === "ct") && str(x.purpose) && str(x.trigger) && str(x.body) && Array.isArray(x.tags) && x.tags.every(str) && Array.isArray(x.phases) && x.phases.every(validPhase) && Array.isArray(x.evidence) && x.evidence.every(validEvidence) && typeof x.createdAt === "number" && Number.isFinite(x.createdAt) && typeof x.updatedAt === "number" && Number.isFinite(x.updatedAt); }
+function valid(x: unknown): x is CoachPlaybookItem { return obj(x) && x.schemaVersion === 1 && str(x.id) && ["default", "protocol", "play"].includes(String(x.kind)) && str(x.title) && !!x.title.trim() && str(x.mapName) && !!x.mapName && (x.side === "t" || x.side === "ct") && str(x.purpose) && str(x.trigger) && str(x.body) && Array.isArray(x.tags) && x.tags.every(str) && Array.isArray(x.phases) && x.phases.every(validPhase) && Array.isArray(x.evidence) && x.evidence.every(isValidSavedEvidence) && typeof x.createdAt === "number" && Number.isFinite(x.createdAt) && typeof x.updatedAt === "number" && Number.isFinite(x.updatedAt); }
 export function createCoachPlaybookStore(records: RecordStore) {
   return {
     async list() { const all = await records.getAll<unknown>(); const items = all.filter(valid); return { items, unreadable: all.length - items.length }; },
