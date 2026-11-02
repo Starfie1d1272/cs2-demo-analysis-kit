@@ -62,7 +62,7 @@ export function WorkbenchView({ entries, entriesReady, entriesStatus, entriesErr
   const fixedIds = new Set(fixed.map(q => q.id));
   const recentQueries = queries.filter(q => !fixedIds.has(q.id)).slice(0, 5);
   const hasContinue = !!last || !!onResumeAnalysis;
-  return <div className="stu-view stu-workbench"><header className="stu-view-header"><div><h1>工作台</h1><p>从比赛开始复盘，或继续分析与备战。</p></div>
+  return <div className="stu-view stu-workbench-root"><header className="stu-view-header stu-workbench-header"><div><h1>工作台</h1><p>从比赛开始复盘，或继续分析与备战。</p></div>
     <div className="stu-workbench-actions"><button type="button" className="stu-button-sm" onClick={onMatches}>全部比赛</button>
       {onNativeImport ? <button type="button" className="stu-button" disabled={importing} onClick={onNativeImport}>导入比赛</button> : <><button type="button" className="stu-button" disabled={importing} onClick={() => fileInput.current?.click()}>导入比赛</button><input ref={fileInput} type="file" accept=".zip,.dem" multiple hidden disabled={importing} onChange={e => { if (e.target.files) onImportFiles(e.target.files, parseTags(importTagsRaw)); e.target.value = ""; }} /></>}
     </div></header>

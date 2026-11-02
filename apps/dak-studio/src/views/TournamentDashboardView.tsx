@@ -178,13 +178,14 @@ export function TournamentDashboardView({
         </div>
         {onGoDirectory && <button type="button" className="stu-button-sm" onClick={onGoDirectory}>返回赛事目录</button>}
       </header>
-      {insightCapability.availability && <CapabilityBar availability={insightCapability.availability} onRepair={onCapabilityRepair} />}
+      {entries.length > 0 && insightCapability.availability && <CapabilityBar availability={insightCapability.availability} onRepair={onCapabilityRepair} />}
       {insightCapability.error && <p role="alert">赛事数据读取失败：{insightCapability.error} <button type="button" className="stu-button-sm" onClick={insightCapability.retry}>重试</button></p>}
       {!sharedUnavailable && insightEntries?.length === 0 && !insights && <EmptyState variant="insufficient" title="没有可用赛事数据" hint="请查看上方限制和修复入口。" />}
           <div className="stu-card">
             <h3>队伍对比</h3>
-            {!sharedNotice && comparisonCapability.availability && <CapabilityBar availability={comparisonCapability.availability} onRepair={onCapabilityRepair} />}
+            {entries.length > 0 && !sharedNotice && comparisonCapability.availability && <CapabilityBar availability={comparisonCapability.availability} onRepair={onCapabilityRepair} />}
             {comparisonCapability.error && <p role="alert">对比能力读取失败：{comparisonCapability.error} <button type="button" className="stu-button-sm" onClick={comparisonCapability.retry}>重试</button></p>}
+            {comparisonError && <p className="stu-error" role="alert">队伍对比加载失败：{comparisonError}</p>}
             {teamComparison && (comparisonError || comparisonCapability.error || analysis.status !== "ready" || comparisonSnapshot?.generation !== analysis.generation || comparisonSnapshot.sample !== JSON.stringify(comparisonEntries?.map(entry => entry.id))) && <p role="status">{comparisonError || comparisonCapability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && comparisonEntries?.length === 0 ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}
             <p className="stu-muted">选两支队伍对比当前状态——无需互相交手，适合赛前侦察。</p>
             {teamComparison ? (
@@ -196,9 +197,7 @@ export function TournamentDashboardView({
                   if (entry) onOpenMatch(entry.id, { roundNumber: 1 });
                 }}
               />
-            ) : comparisonCapability.error ? null : comparisonEntries?.length === 0 ? (sharedUnavailable ? null : <p>当前没有可用对比样本。</p>) : comparisonError ? (
-              <p className="stu-error" role="alert">队伍对比加载失败：{comparisonError}</p>
-            ) : (
+            ) : comparisonCapability.error ? null : comparisonEntries?.length === 0 ? (sharedUnavailable ? null : <p>当前没有可用对比样本。</p>) : comparisonError ? null : (
               <p className="stu-dim">至少需要两个队伍的 demo 才能生成对比。</p>
             )}
             {teamComparison && onOpenTeam && (
