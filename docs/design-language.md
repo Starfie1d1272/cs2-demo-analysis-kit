@@ -3,7 +3,7 @@
 > 2026-06-12 成文。本文是 DAK Studio（`apps/dak-studio`）唯一的 UI/前端设计约定，
 > **所有新页面与组件改动必须遵守本文**；与 studio.css 现状冲突时以本文为准，
 > 逐步把存量页面收敛过来。嵌入的 `@cs2dak/react` 组件通过覆盖 `--dak-*`
-> 变量统一外观，不允许在 Studio 侧 fork 组件样式。
+> 变量统一外观，不允许在 Studio 侧 fork 组件样式。模块职责与依赖以 [module-boundaries.md](module-boundaries.md) 为准，历史页面名称不构成恢复指令。
 
 ## 1. 性格与隐喻
 
@@ -62,7 +62,7 @@
   （`--dak-fg-mid`）说明本页回答什么问题。
 - 禁止组件内联 style 写颜色/字体（布局尺寸类内联可接受）；禁止每个视图
   自造一套按钮/chip/表格样式——公共原语（`EmptyState`/`EvidenceLink`/`MetricInfo`
-  在 `components/primitives.tsx`，按钮/tab/chip/stat 卡/数据表样式在 studio.css
+  由 `@cs2dak/react` 提供，按钮/tab/chip/stat 卡/数据表样式在 studio.css
   公共段）只在公共位置定义一次。
 
 ## 4. 交互规范
@@ -74,8 +74,7 @@
 3. **空态三件套**：每个视图必须处理 无数据 / 数据不足（样本量过小）/
    加载中 三种状态，使用 `EmptyState` 原语（`variant="empty|insufficient|error"`），
    文案说明「需要什么才能点亮本页」。
-4. **范围切换**：跨场视图统一使用 CohortScope（赛季/标签/队伍范围），
-   不自造范围选择器。
+4. **范围切换**：跨场分析使用当前页面的 `AnalysisContext` 和 Studio 范围编辑器；不要引入第二套范围状态。保存分析恢复条件后按当前资料库重算，统一导出保存的是当刻固定结果。
 5. **null 即 null**：缺失数据显示 `—`，不显示 0。
 
 ## 5. 验收清单（新页面 PR 自查）
