@@ -12,7 +12,7 @@
 
 - A1 部分通过：未绑定本人启动，空工作台可用；B 的最近比赛打开 Nuke。绑定本人/缺席默认选择未验。
 - A2 部分通过：Nuke 显示 9z 1:13 Aurora、10 人、14 回合；soulfly 19/7/1、ADR 137.8，界面显示 RR 1.611。未独立逐事实核验筛选和首死措辞。
-- A3–A5 未完成：回合/tick、回放控制、跨场证据往返、笔记重启与删除源、缺 replay 和 null 投法命令尚未执行。Nuke ZIP 导入与统计不需要 `.dem`，不能据此推断回放已验。
+- A3–A5 部分通过：另一隔离库导入 Nuke 后创建 StudyNote，选择该场 R1 添加证据并保存，显示“来源和已知版本一致”；重载资料页仍显示笔记、正文及“来源一致”。实际打开回放、删除源后重开、跨场往返、缺 replay 和 null 投法命令尚未执行。Nuke ZIP 导入与统计不需要 `.dem`，不能据此推断回放已验。
 
 ## B 教练
 
@@ -45,8 +45,8 @@
 | `playlist.ts` 与材料混入 series | prep-items / material-data-migration | [#166](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/166)，文件搜索无匹配；迁移只做静态检查 |
 | 公共 React 整页 MatchWorkspace、Studio 样式 | App MatchReviewWorkspace；公共窄 DTO/widgets | [#159](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/159)，源码搜索及 tarball 闭包；修正 presentation README 仍引用已删组件的示例 |
 | 旧回放/表格状态 props | 受控 state/onStateChange | [#159](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/159)，公共源码搜索 `initialTarget`/`initialViewState` 无匹配；所有 caller 和旧位置参数需继续逐项核验 |
-| App 姿态计算和单场编排 | tactics `extractMatchLineupObservations` / pipeline `analyzeMatchFacts` | [#157](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/157)，`match-records.ts` 调用 pipeline；主线程/worker 两链尚需完整追踪 |
+| App 姿态计算和单场编排 | tactics `extractMatchLineupObservations` / pipeline `analyzeMatchFacts` | [#157](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/157)，`library.ts` 与 `pkg-worker.ts` 均调用 `buildMatchRecords`，后者调用 pipeline |
 | 导航镜像及旧证据 fallback | App 页面帧与单对象 `OpenEvidenceRequest` | [#158](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/158)、[#164](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/pull/164)；`sourceKey` 仍作为 anchor 合法存在，前缀猜 tab/所有 fallback 尚需逐项核查 |
 | 公共 break | presentation/react 等各自 major Changeset | `.changeset/w03-controlled-state.md`、迁移指南；本次真实 tarball 消费通过，不代表未知外部调用方已迁移 |
 
-公共包无产品状态/路径、纯模块依赖、所有 query 算法唯一性、series 领域界限、CoachSettings、来源回退与所有受控调用方仍需逐项验证。因此架构表尚未闭合。
+公共包源码检索未命中 AnalysisContext、MaterialRef、RecordStore、STUDIO_TABLE_CLASSES、initialTarget 或 initialViewState；query 目录未命中 view import。这是针对名称的静态检查，不证明所有潜在耦合已排除。纯模块依赖、所有 query 算法唯一性、series 领域界限、CoachSettings、来源回退与所有受控调用方仍需逐项验证。因此架构表尚未闭合。
