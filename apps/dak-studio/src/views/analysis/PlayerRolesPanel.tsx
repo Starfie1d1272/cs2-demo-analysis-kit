@@ -121,8 +121,11 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
   const editorOwner = JSON.stringify([playerKey, selectedRoleProfile?.teamKey, declarationTeam, declarationScope]);
   const editorOwnerRef = useRef(editorOwner);
   editorOwnerRef.current = editorOwner;
+  const initializedOwnerRef = useRef<string | null>(null);
   useLayoutEffect(() => {
-    if (!roleEditorOpen) return;
+    if (!roleEditorOpen) { initializedOwnerRef.current = null; return; }
+    if (!selectedRoleProfile || initializedOwnerRef.current === editorOwner) return;
+    initializedOwnerRef.current = editorOwner;
     const ordinary = selectedDeclarations.filter(({ declaration }) => declaration.mapName == null && declaration.validFrom == null && declaration.validTo == null);
     const main = ordinary.find(({ declaration }) => declaration.kind === "main_role" && declaration.priority === "primary")?.declaration;
     const secondary = ordinary.find(({ declaration }) => declaration.kind === "main_role" && declaration.priority === "secondary")?.declaration;
