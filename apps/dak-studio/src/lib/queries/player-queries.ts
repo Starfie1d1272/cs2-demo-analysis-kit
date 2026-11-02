@@ -39,6 +39,7 @@ export async function buildPlayerSeasonDetailsFromFacts(
     rows: match.rows.filter(row => withinScope(match.matchId, row.steamId64)),
   })).filter(match => match.rows.length > 0);
   return {
+    participation: eligible.map(({ matchId, teamKey }) => ({ matchId, teamKey })),
     insights: buildPlayerSeasonInsightsFromFacts(insights.filter(row => withinScope(row.matchId, row.steamId64)).map(row => row.facts), { steamIds: options.steamIds, orderedMatchIds: options.matchIds ?? [] }),
     weaponStats: buildPlayerWeaponStatsFromRows(weapons.filter(row => withinScope(row.matchId, row.steamId64)), { steamIds: options.steamIds, eligibleMatchIds: eligible.map(row => row.matchId) }),
     coverage: { eligibleMatchCount: ids.size, mechanicsMatchCount: new Set(scopedMechanics.map(row => row.matchId)).size },
@@ -49,6 +50,7 @@ export async function buildPlayerSeasonDetailsFromFacts(
 
 const detailsCache = createAnalysisBucket<PlayerSeasonDetails>();
 export interface PlayerSeasonDetails {
+  participation: Array<{ matchId: string; teamKey: "teamA" | "teamB" }>;
   insights: PlayerSeasonInsights;
   weaponStats: PlayerWeaponStat[];
   mechanics: PlayerMechanicsProfile;
@@ -57,7 +59,7 @@ export interface PlayerSeasonDetails {
 
 /** 选中选手的逐场洞察：只返回小结果，不把全量 DemoPackage 长期放进 React state。 */
 export function getPlayerSeasonDetails(entries: StudioDemoEntry[], steamIds: string[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<PlayerSeasonDetails> {
-  const key = `${keyOf(entries, identity?.version, selectedTeams)}:player:v2:${[...steamIds].sort().join(",")}:order=${orderedMatchIds(entries).join(",")}`;
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:player:v3:${[...steamIds].sort().join(",")}:order=${orderedMatchIds(entries).join(",")}`;
   return cachedQuery(detailsCache, key, DETAILS_CACHE_LIMIT, () => assertCurrentFacts(entries), async (generation) => {
     const persisted = await readPersistedValue<PlayerSeasonDetails>(key, generation);
     if (persisted) return persisted;

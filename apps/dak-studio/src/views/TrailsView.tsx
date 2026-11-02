@@ -112,7 +112,7 @@ export function TrailsView({ allEntries, entries, onGoLibrary, identityOptions, 
           roster.set(entry.id, new Set([...(roster.get(entry.id) ?? []), ...keys]));
         }
         const options = [...counts.values()].sort((a, b) => b.matchCount - a.matchCount || a.name.localeCompare(b.name));
-        const pinned = await getPinnedPlayer();
+        const pinned = focusPlayerKey ? null : await getPinnedPlayer();
         if (cancelled) return;
         setPlayers(options);
         setRosterByEntry(roster);
@@ -236,6 +236,7 @@ export function TrailsView({ allEntries, entries, onGoLibrary, identityOptions, 
         <label>
           <span>① 选手</span>
           <select className="stu-select" value={selectedKey ?? ""} onChange={(e) => setSelectedKey(e.target.value || null)}>
+            {selectedKey && !(players ?? []).some(option => option.playerKey === selectedKey) && <option value={selectedKey}>当前选手 · 0 场</option>}
             {(players ?? []).map((option) => (
               <option key={option.playerKey} value={option.playerKey}>
                 {option.name}（{option.matchCount} 场）

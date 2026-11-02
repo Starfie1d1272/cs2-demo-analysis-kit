@@ -140,12 +140,13 @@ export function TeamView({
       <header className="stu-view-header">
         <div><h1>队伍</h1><p>用当前语料查看一支队伍的基础盘面，并在同一上下文继续专项分析。</p></div>
         <label className="stu-team-picker">切换队伍
-          <select value={activeTeam ?? ""} onChange={(event) => onSelectTeam(event.target.value)}>
+          <select value={activeTeam ?? ""} onChange={(event) => event.target.value && onSelectTeam(event.target.value)}>
+            <option value="">请选择队伍</option>
             {teams.map((team) => <option key={team.name} value={team.name}>{team.name} · {team.matches} 场</option>)}
           </select>
         </label>
       </header>
-      {!activeTeam && <EmptyState variant="insufficient" title="当前队伍不在语料中" hint="请从上方选择当前语料中的队伍。" />}
+      {!activeTeam && <EmptyState variant="insufficient" title={selectedTeam ? "当前队伍在此范围为 0 场" : "请选择队伍"} hint="请调整范围，或从上方选择当前语料中的队伍。" />}
       {error && <EmptyState variant="error" title="队伍总览不可用" hint={error} />}
       {!error && activeTeam && !overview && <div className="stu-loading">聚合队伍事实…</div>}
       {overview && (
@@ -159,9 +160,9 @@ export function TeamView({
               <div className="stu-metric"><span>阵容样本</span><b>{overview.roster.length} 人</b></div>
             </div>
           </section>
-          <section className="stu-card"><h3>队伍对比 · 当前范围 {entries.length} 场</h3>
+          <section className="stu-card" id="analysis-comparison"><h3>队伍对比 · 当前范围 {entries.length} 场</h3>
             <label>对比队伍 <select value={state.compareTeamName ?? ""} onChange={event => onStateChange({ ...state, compareTeamName: event.target.value || null })}><option value="">不比较</option>{teams.filter(team => team.name !== activeTeam).map(team => <option key={team.name} value={team.name}>{team.name} · {team.matches} 场</option>)}</select></label>
-            {comparison && <TeamComparisonPanel model={comparison} onSelectPair={(_, b) => onStateChange({ ...state, compareTeamName: b })} onOpenMatch={matchId => { const entry = entries.find(item => matchIdForEntry(item) === matchId); if (entry) onOpenMatch(entry.id); }} />}
+            {comparison && <TeamComparisonPanel model={comparison} onSelectPair={(a, b) => { if (a !== activeTeam) onSelectTeam(a); else onStateChange({ ...state, compareTeamName: b }); }} onOpenMatch={matchId => { const entry = entries.find(item => matchIdForEntry(item) === matchId); if (entry) onOpenMatch(entry.id); }} />}
           </section>
           <div className="stu-home-grid">
             <section className="stu-card"><h3>地图盘面</h3><DataTable classes={STUDIO_TABLE_CLASSES} rows={overview.maps} rowKey={(row) => row.mapName} state={mapTable} onStateChange={setMapTable} columns={MAP_COLUMNS} /></section>
@@ -169,7 +170,7 @@ export function TeamView({
           </div>
           <section className="stu-card" id="team:map-roles">
             <div className="stu-card-head"><h3>地图位置职责</h3><div className="stu-chip-row" role="tablist" aria-label="职责矩阵筛选">{matrixMaps.map((map) => <button key={map} type="button" className={matrixMap === map ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => setMatrixMap(map)}>{map.replace("de_", "")}</button>)}{(["t", "ct"] as const).map((side) => <button key={side} type="button" className={matrixSide === side ? "stu-chip stu-chip-active" : "stu-chip"} onClick={() => setMatrixSide(side)}>{side.toUpperCase()}</button>)}</div></div>
-            {matrixError ? <EmptyState variant="error" title="职责矩阵不可用" hint={matrixError} /> : matrices === null ? <div className="stu-loading">读取地图位置事实…</div> : <TeamMapRoleMatrixPanel matrix={activeMatrix} playerNames={playerNames} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry && matrixMap) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: `team:map-roles:${matrixMap}:${matrixSide}` }); }} />}
+            {matrixError ? <EmptyState variant="error" title="职责矩阵不可用" hint={matrixError} /> : matrices === null ? <div className="stu-loading">读取地图位置事实…</div> : <TeamMapRoleMatrixPanel state={state.tables.roles ?? { sort: { key: "sample", direction: "desc" }, page: 0 }} onStateChange={table => onStateChange({ ...state, tables: { ...state.tables, roles: table } })} matrix={activeMatrix} playerNames={playerNames} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry && matrixMap) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "team:map-roles" }); }} />}
           </section>
           <section className="stu-card" id="team:double-awp">
             <div className="stu-card-head"><h3>双 AWP 条件统计</h3></div>

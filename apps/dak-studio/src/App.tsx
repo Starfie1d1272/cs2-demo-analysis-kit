@@ -114,7 +114,6 @@ export function App() {
   const targetTick = destination.page === "match" ? destination.tick : undefined;
   const matchDeepLink = useMemo(() => targetRound === undefined
     ? null : { roundNumber: targetRound, tick: targetTick }, [active.id, targetRound, targetTick]);
-  const eventMode = destination.page === "event-analysis" ? "overview" : "directory";
   const fallbackContext = useMemo(() => createAnalysisContextPreset("explore"), []);
   const analysisContext = "context" in destination ? destination.context : fallbackContext;
   const canLeave = useCallback(() => {
@@ -464,7 +463,7 @@ export function App() {
         )}
         <RivalHubBatchImportPanel session={batchSession} onStop={stopRivalHubBatch} onSelectTarget={selectRivalHubBatchTarget} onDismiss={dismissBatch} onLocalLinkUpdate={updateLocalLink} />
         {entries.length > 0 && section === "analysis" && "context" in destination && (
-          <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} onEdit={() => setContextEditorOpen((current) => !current)} />
+          <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} onEdit={() => setContextEditorOpen((current) => !current)} onCompare={(destination.page === "player" && selectedPlayerKey || destination.page === "team" && selectedTeam) ? () => document.getElementById("analysis-comparison")?.scrollIntoView({ behavior: "smooth", block: "center" }) : undefined} />
         )}
         {entries.length > 0 && contextEditorOpen && section === "analysis" && "context" in destination && (
           <AnalysisScopeEditor
@@ -479,11 +478,6 @@ export function App() {
         {displayedCapabilityAvailability && <CapabilityBar availability={displayedCapabilityAvailability} onRepair={openCapabilityRepair} />}
         {destination.page === "workbench" && <WorkbenchView entries={entries} entriesReady={entriesReady} onOpenMatch={openDemo} onPersonal={openWorkbenchPersonal} onResumeAnalysis={navigation.history.some(frame => PAGE_SECTION[frame.destination.page] === "analysis") ? () => resumeSection("analysis") : undefined} importing={importing} importTagsRaw={importTagsRaw} onImportFiles={importFiles} onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined} onMatches={() => navigate({ page: "matches" })} onOpenMaterial={openMaterial} onNewNote={() => openStudyNoteEditor(emptyStudyNoteDraft())} prepMigrationStatus={prepMigrationStatus} retryPrepMigration={retryPrepMigration} />}
         {section === "matches" && <MatchesView page={destination.page} onMatches={() => navigate({ page: "matches" })} onEvents={() => navigate({ page: "events" })} />}
-        {section === "analysis" && <AnalysisView page={destination.page as import("./lib/studio-navigation").AnalysisPageId} focus={analysisContext.focus} onSelect={page => {
-          if (page === destination.page) return;
-          const id = `frame-${++nextFrameId.current}`;
-          setNavigation(current => studioNavigationReducer(current, { intent: "switch-analysis", id, destination: { page, context: analysisContext }, scrollY: window.scrollY }));
-        }} />}
         {destination.page === "materials" && <MaterialsView onPageReady={keys => onPageReady(active.id, keys)} entries={entries} state={active.ui as MaterialsPageState} onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))} onOpenMaterial={openMaterial} onCreatedMaterial={createdMaterial} onOpenEvidence={openMaterialEvidence} prepMigrationStatus={prepMigrationStatus} prepMigrationError={prepMigrationError} retryPrepMigration={retryPrepMigration} />}
         {destination.page === "material" && <MaterialDetailView onPageReady={keys => onPageReady(active.id, keys)} refValue={destination.materialRef} entries={entries} state={active.ui as MaterialPageState | null} onStateChange={ui => setNavigation(current => {
           const frame = current.active;
@@ -521,6 +515,11 @@ export function App() {
             onWorkspaceStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
           />
         )}
+        {section === "analysis" && <AnalysisView page={destination.page as import("./lib/studio-navigation").AnalysisPageId} focus={analysisContext.focus} onSelect={page => {
+          if (page === destination.page) return;
+          const id = `frame-${++nextFrameId.current}`;
+          setNavigation(current => studioNavigationReducer(current, { intent: "switch-analysis", id, destination: { page, context: analysisContext }, scrollY: window.scrollY }));
+        }}>
         {destination.page === "player" && (
           <PlayersView
             key={active.id}
@@ -648,7 +647,7 @@ export function App() {
             onSelectTeam={selectRadarTeam}
           />
         )}
-        {(destination.page === "events" || destination.page === "event-analysis" || destination.page === "analysis") && (destination.page === "analysis" || eventMode === "overview" ? (
+        {(destination.page === "event-analysis" || destination.page === "analysis") && (
           <TournamentDashboardView
             key={active.id}
             state={active.ui as import("./lib/studio-page-state").AnalysisPageState}
@@ -663,9 +662,15 @@ export function App() {
             onOpenPlayer={openPlayer}
             onGoLibrary={() => goLibrary()}
             onGoEconomy={() => navigate({ page: "economy", context: analysisContext })}
-            onGoDirectory={destination.page === "event-analysis" ? () => goBack() : undefined}
+            onGoDirectory={destination.page === "event-analysis" ? () => {
+              const directory = [...navigationRef.current.history].reverse().find(frame => frame.destination.page === "events");
+              if (directory) { setRestoringFrameId(directory.id); setNavigation(current => studioNavigationReducer(current, { intent: "restore", frame: directory })); }
+              else navigate({ page: "events" });
+            } : undefined}
           />
-        ) : (
+        )}
+        </AnalysisView>}
+        {destination.page === "events" && (
           <EventsView
             key={active.id}
             events={eventRecords}
@@ -689,7 +694,7 @@ export function App() {
             onPickOnlineFiles={nativeImportAvailable ? pickRivalHubFiles : undefined}
             onSyncLocalDemos={syncLocalRivalHubDemos}
           />
-        ))}
+        )}
         {destination.page === "management" && (
           <ManagementView
             key={active.id}

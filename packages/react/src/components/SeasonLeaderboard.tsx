@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { TableState } from "@cs2dak/presentation";
 import type {
   LeaderboardFormat,
@@ -14,10 +14,10 @@ export interface SeasonLeaderboardProps {
    * 让嵌入产品（RivalHub）接导航而不必 fork 本组件。
    */
   onPlayerClick?: (playerKey: string) => void;
-  viewKey?: LeaderboardViewKey;
-  tableState?: TableState;
-  onViewKeyChange?: (key: LeaderboardViewKey) => void;
-  onTableStateChange?: (state: TableState) => void;
+  viewKey: LeaderboardViewKey;
+  tableState: TableState;
+  onViewKeyChange: (key: LeaderboardViewKey) => void;
+  onTableStateChange: (state: TableState) => void;
 }
 
 /** 按 format 把原始值渲染为展示文本；缺失统一显示 “—”（不伪造 0）。 */
@@ -37,22 +37,13 @@ function formatMetric(value: number | null | undefined, format: LeaderboardForma
 }
 
 export function SeasonLeaderboard({ model, onPlayerClick, viewKey: controlledView, tableState: controlledTable, onViewKeyChange, onTableStateChange }: SeasonLeaderboardProps) {
-  const [localView, setLocalView] = useState<LeaderboardViewKey>(model.views[0]?.key ?? "core");
-  const viewKey = model.views.some(v => v.key === (controlledView ?? localView)) ? (controlledView ?? localView) : model.views[0]?.key ?? "core";
+  const viewKey = model.views.some(v => v.key === controlledView) ? controlledView : model.views[0]?.key ?? "core";
   const view = model.views.find(v => v.key === viewKey) ?? model.views[0];
-  const [localTable, setLocalTable] = useState<TableState>({ sort: { key: view.defaultSort, direction: "desc" }, page: 0 });
-  const table = controlledTable ?? localTable;
-  const sortKey = (table.sort.key ?? view.defaultSort) as LeaderboardMetricKey;
-  const sortDesc = table.sort.direction === "desc";
-  const setTable = (next: TableState) => onTableStateChange ? onTableStateChange(next) : setLocalTable(next);
-  function selectView(next: LeaderboardViewKey) {
-    if (onViewKeyChange) { onViewKeyChange(next); return; }
-    setLocalView(next);
-    const nextView = model.views.find(v => v.key === next);
-    if (nextView) setTable({ sort: { key: nextView.defaultSort, direction: "desc" }, page: 0 });
-  }
+  const sortKey = (controlledTable.sort.key ?? view.defaultSort) as LeaderboardMetricKey;
+  const sortDesc = controlledTable.sort.direction === "desc";
+  function selectView(next: LeaderboardViewKey) { onViewKeyChange(next); }
   function handleSort(key: LeaderboardMetricKey) {
-    setTable({ sort: { key, direction: sortKey === key && sortDesc ? "asc" : "desc" }, page: 0 });
+    onTableStateChange({ sort: { key, direction: sortKey === key && sortDesc ? "asc" : "desc" }, page: 0 });
   }
 
   const rows = useMemo(() => {

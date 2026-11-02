@@ -1,5 +1,5 @@
 ---
-"@cs2dak/react": minor
+"@cs2dak/react": major
 ---
 
-Allow hosts to control the season leaderboard view and table sorting for navigation restoration.
+Make SeasonLeaderboard view and table sorting controlled. Supply viewKey, tableState, onViewKeyChange, and onTableStateChange; reset sorting to the selected view’s default when changing view.
