@@ -73,7 +73,6 @@ def setup_logging(userdata: Path, logger: logging.Logger) -> Path:
     logger.setLevel(logging.INFO)
     # pywebview can catch and log backend errors rather than re-raise them.
     logging.getLogger("pywebview").addHandler(handler)
-    logging.getLogger("pywebview").setLevel(logging.DEBUG)
     return Path(handler.baseFilename)
 
 
