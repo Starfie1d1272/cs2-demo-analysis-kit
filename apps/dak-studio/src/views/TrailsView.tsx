@@ -175,7 +175,7 @@ export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entri
   const eligibleEntries = capability.eligible;
   const requestKey = JSON.stringify([eligibleEntries?.map(entry => entry.id), openingScope]);
   const models = modelSnapshot?.key === requestKey ? modelSnapshot.value : null;
-  usePageReady(entries.length === 0 || error !== null || capability.error !== null || eligibleEntries?.length === 0 || (players !== null && (!selectedKey || players.length === 0 || mapOptions.length === 0 || (mapName !== null && (rangeEntries.length === 0 || models !== null)))), onPageReady);
+  usePageReady(entries.length === 0 || error !== null || (!!selectedOption && rangeEntries.length > 0 && (capability.error !== null || eligibleEntries?.length === 0)) || (players !== null && (!selectedKey || players.length === 0 || mapOptions.length === 0 || (mapName !== null && (rangeEntries.length === 0 || models !== null)))), onPageReady);
 
   // 为选中选手构建各场动线
   useEffect(() => {
