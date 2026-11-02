@@ -5,11 +5,23 @@
 产物 ~15MB，联网后下载 runtime + events + tris 完成安装。
 """
 
+import json
+import os
+from pathlib import Path
+
+candidate_tag = os.environ.get("PACKAGE_CANDIDATE_TAG")
+candidate_data = []
+if candidate_tag:
+    config = Path("build/dak-installer-candidate.json")
+    config.parent.mkdir(parents=True, exist_ok=True)
+    config.write_text(json.dumps({"tag": candidate_tag}), encoding="utf-8")
+    candidate_data.append((str(config.resolve()), "."))
+
 a = Analysis(
     ["../src/cs2dak/installer.py"],
     pathex=["../src"],
     binaries=[],
-    datas=[],
+    datas=candidate_data,
     hiddenimports=[
         "tkinter",
         "tkinter.ttk",

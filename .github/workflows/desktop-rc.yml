@@ -10,6 +10,11 @@ on:
         description: "Existing vX.Y.Z-rc.N tag for retry"
         required: true
         type: string
+      build_only:
+        description: "Build and retain artifacts without publishing"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -22,9 +27,22 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ inputs.build_only && github.sha || inputs.tag || github.ref }}
           fetch-depth: 0
 
+      - name: Prepare validation-only local tag
+        if: ${{ inputs.build_only }}
+        shell: bash
+        env:
+          RC_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          [[ "$RC_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[1-9][0-9]*$ ]]
+          if git rev-parse -q --verify "refs/tags/$RC_TAG"; then
+            echo "Validation tag already exists; refusing to replace it" >&2
+            exit 1
+          fi
+          git tag "$RC_TAG" HEAD
       - name: Validate candidate identity
         shell: bash
         env:
@@ -81,22 +99,211 @@ jobs:
           lipo "$DIR/DAK Studio.app/Contents/MacOS/dak-studio" -verify_arch arm64
           mkdir -p dist
           cp "$DMG" "dist/dak-studio-$ID-macos-arm64.dmg"
-          shasum -a 256 "dist/dak-studio-$ID-macos-arm64.dmg" > dist/SHA256SUMS.txt
 
-      - name: Publish GitHub prerelease
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: candidate-macos
+          path: dist/*.dmg
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.build_only && github.sha || inputs.tag || github.ref }}
+          fetch-depth: 0
+      - name: Prepare validation-only local tag
+        if: ${{ inputs.build_only }}
+        shell: bash
+        env:
+          RC_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          [[ "$RC_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[1-9][0-9]*$ ]]
+          if git rev-parse -q --verify "refs/tags/$RC_TAG"; then
+            echo "Validation tag already exists; refusing to replace it" >&2
+            exit 1
+          fi
+          git tag "$RC_TAG" HEAD
+      - name: Validate candidate identity
+        shell: bash
+        env:
+          RC_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          [[ "$RC_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-rc\.[1-9][0-9]*$ ]]
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse "refs/tags/$RC_TAG^{commit}")" ]]
+          node --input-type=module - "$RC_TAG" <<'NODE'
+          import { planVersionSync } from './scripts/sync-version.mjs';
+          const version = process.argv[2].slice(1).replace(/-rc\.[1-9]\d*$/, '');
+          const changes = planVersionSync(process.cwd(), version);
+          if (changes.length) throw new Error(`Candidate version ${version} is not synced: ${changes.map(x => x.rel).join(', ')}`);
+          NODE
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - run: pnpm install --frozen-lockfile
+      - name: Package Windows candidate runtime
+        shell: bash
+        env:
+          PACKAGE_CANDIDATE_TAG: ${{ inputs.tag || github.ref_name }}
+          PACKAGE_SKIP_VERSION_SYNC: "1"
+        run: |
+          set -euo pipefail
+          bash scripts/package.sh
+          ID="${PACKAGE_CANDIDATE_TAG#v}"
+          cd "python/dist/dak-studio-$ID"
+          test -s dak-studio/dak-studio.exe
+          7z a -mx=9 "dak-studio-windows-$ID.zip" dak-studio
+          cd ../../..
+          uv run --project python python scripts/check-desktop-notices.py "python/dist/dak-studio-$ID/dak-studio-windows-$ID.zip" studio
+      - name: Prepare candidate installation assets
+        shell: bash
+        env:
+          RC_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          ID="${RC_TAG#v}"
+          VERSION="${ID%-rc.*}"
+          mkdir -p dist/events dist/tris
+          curl --fail --silent --show-error --retry 5 --retry-all-errors https://dakupdate.starfie1d.top/tris/manifest.json -o dist/tris-manifest.json
+          for slug in iem-cologne-major-2026-stage3 iem-cologne-major-2026-playoff; do
+            mkdir -p "dist/events/$slug"
+            curl --fail --silent --show-error --retry 5 --retry-all-errors "https://dakupdate.starfie1d.top/events/$slug/$slug.zip" -o "dist/events/$slug/$slug.zip"
+          done
+          cp "python/dist/dak-studio-$ID/dak-studio-windows-$ID.zip" dist/
+          node scripts/gen-install-manifest.mjs --version "$VERSION" --candidate-tag "$RC_TAG" --channel beta --runtime-zip "dist/dak-studio-windows-$ID.zip" --event-packages dist/events --tris-manifest dist/tris-manifest.json --out dist/install-manifest.json
+          node - "$RC_TAG" "$VERSION" <<'NODE'
+          const fs = require('fs'), crypto = require('crypto');
+          const [tag, version] = process.argv.slice(2), m = JSON.parse(fs.readFileSync('dist/install-manifest.json'));
+          const bytes = fs.readFileSync(`dist/dak-studio-windows-${tag.slice(1)}.zip`);
+          if (m.appVersion !== version || m.runtime.urls.length !== 1 || m.runtime.urls[0] !== `https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/download/${tag}/${m.runtime.name}` || m.runtime.sha256 !== crypto.createHash('sha256').update(bytes).digest('hex') || m.runtime.size !== bytes.length || m.bundledEvents.length !== 2) throw new Error('Candidate manifest mismatch');
+          NODE
+          uv run --project python python - <<'PY'
+          import hashlib, json, pathlib, subprocess
+          manifest = json.loads(pathlib.Path('dist/install-manifest.json').read_text())
+          for entry in manifest['requiredTris'].values():
+              dest = pathlib.Path('dist/tris', entry['name'])
+              subprocess.run(['curl', '--fail', '--silent', '--show-error', '--retry', '5', '--retry-all-errors', entry['urls'][0], '-o', str(dest)], check=True)
+              data = dest.read_bytes()
+              if len(data) != entry['size'] or hashlib.sha256(data).hexdigest() != entry['sha256']:
+                  raise ValueError('tri integrity mismatch')
+          PY
+          node scripts/assemble-full-zip.mjs --runtime-zip "dist/dak-studio-windows-$ID.zip" --bundled-events dist/events --tris-manifest dist/tris-manifest.json --tris-dir dist/tris --install-manifest dist/install-manifest.json --out dist/
+          uv run --project python python scripts/check-desktop-notices.py "dist/dak-studio-windows-$ID-full.zip" studio
+      - name: Build candidate installer
+        shell: bash
+        env:
+          PACKAGE_CANDIDATE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          cd python
+          uv run pyinstaller packaging/installer.spec --noconfirm --distpath dist
+          cd ..
+          ID="${PACKAGE_CANDIDATE_TAG#v}"
+          mv python/dist/DAK-Studio-Setup.exe "dist/DAK-Studio-Setup-$ID.exe"
+          uv run --project python python - "$PACKAGE_CANDIDATE_TAG" "dist/DAK-Studio-Setup-$ID.exe" <<'PYCODE'
+          import json, pathlib, sys, tempfile
+          from PyInstaller.archive.readers import CArchiveReader
+          tag, exe = sys.argv[1:]
+          config = CArchiveReader(exe).extract('dak-installer-candidate.json')
+          if json.loads(config) != {'tag': tag}: raise ValueError('Embedded installer tag mismatch')
+          with tempfile.TemporaryDirectory() as temp:
+              pathlib.Path(temp, 'dak-installer-candidate.json').write_bytes(config)
+              sys._MEIPASS = temp
+              sys.frozen = True
+              from cs2dak import installer
+              expected = f'https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/download/{tag}/install-manifest.json'
+              if installer.MANIFEST_URL_VERSIONED != expected or installer.MANIFEST_URL_GITHUB_VERSIONED != expected: raise ValueError('Installer target mismatch')
+          PYCODE
+      - name: Verify portable startup
+        shell: pwsh
+        env:
+          RC_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          $id = $env:RC_TAG.Substring(1)
+          7z x -y "dist/dak-studio-windows-$id-full.zip" "-o$env:RUNNER_TEMP/portable" | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Portable extraction failed' }
+          $exe = Join-Path $env:RUNNER_TEMP 'portable/dak-studio/dak-studio.exe'
+          $p = Start-Process -FilePath $exe -PassThru
+          try {
+            $deadline = (Get-Date).AddSeconds(90)
+            do { Start-Sleep -Seconds 2; $p.Refresh(); if ($p.HasExited) { throw 'Studio exited during startup' } } until ($p.MainWindowHandle -ne 0 -or (Get-Date) -gt $deadline)
+            if ($p.MainWindowHandle -eq 0 -or !$p.Responding) { throw 'Studio window did not become responsive' }
+          } finally { if (!$p.HasExited) { Stop-Process -Id $p.Id -Force } }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: candidate-windows
+          path: |
+            dist/*.zip
+            dist/*.exe
+            dist/install-manifest.json
+          if-no-files-found: error
+
+  release:
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.build_only && github.sha || inputs.tag || github.ref }}
+          fetch-depth: 0
+      - name: Validate source identity
+        shell: bash
+        env:
+          RC_TAG: ${{ inputs.tag || github.ref_name }}
+          BUILD_ONLY: ${{ inputs.build_only }}
+        run: |
+          set -euo pipefail
+          if [[ "$BUILD_ONLY" == true ]]; then
+            ! git rev-parse -q --verify "refs/tags/$RC_TAG"
+            git tag "$RC_TAG" HEAD
+          fi
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse "refs/tags/$RC_TAG^{commit}")" ]]
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Verify complete candidate and checksums
+        shell: bash
+        env:
+          RC_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          ID="${RC_TAG#v}"
+          for f in "dak-studio-$ID-macos-arm64.dmg" "dak-studio-windows-$ID.zip" "dak-studio-windows-$ID-full.zip" "DAK-Studio-Setup-$ID.exe" install-manifest.json; do test -s "dist/$f"; done
+          (cd dist && sha256sum "dak-studio-$ID-macos-arm64.dmg" "dak-studio-windows-$ID.zip" "dak-studio-windows-$ID-full.zip" "DAK-Studio-Setup-$ID.exe" install-manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ inputs.build_only }}
+        with:
+          name: candidate-checksums
+          path: dist/SHA256SUMS.txt
+          if-no-files-found: error
+      - name: Publish complete candidate
+        if: ${{ !inputs.build_only }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           RC_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          cat > "$RUNNER_TEMP/rc-notes.md" <<NOTES
-          DAK Studio candidate $RC_TAG, built from commit $(git rev-parse HEAD).
-          Apple Silicon only. This build is unsigned and not notarized; macOS may require approval in Privacy & Security after moving the app to Applications. Keep a backup of existing user data before testing.
-          The application's numeric version remains the candidate's base version; the tag and build revision identify this candidate. This prerelease does not update the stable release or update manifests. Collision geometry and event assets may require network access.
-          NOTES
-          printf '\n---\n\n' >> "$RUNNER_TEMP/rc-notes.md"
-          cat "$RUNNER_TEMP/changelog-notes.txt" >> "$RUNNER_TEMP/rc-notes.md"
-          gh release create "$RC_TAG" dist/*.dmg dist/SHA256SUMS.txt \
-            --verify-tag --prerelease --latest=false --title "DAK Studio $RC_TAG" \
-            --notes-file "$RUNNER_TEMP/rc-notes.md"
+          if gh release view "$RC_TAG" >/dev/null 2>&1; then
+            echo "Release already exists; refusing to overwrite assets" >&2
+            exit 1
+          fi
+          ID="${RC_TAG#v}"
+          VERSION="${ID%-rc.*}"
+          awk -v ver="$VERSION" 'BEGIN { section=0 } $0 ~ "^## \\[" ver "\\]" { section=1; next } section && /^## \[/ { exit } section { print }' CHANGELOG.md > "$RUNNER_TEMP/changelog.txt"
+          grep -q '[^[:space:]]' "$RUNNER_TEMP/changelog.txt"
+          printf 'DAK Studio %s, source %s. Windows and Apple Silicon builds are unsigned; macOS is not notarized. Back up user data before testing. This prerelease does not update stable manifests.\n\n---\n\n' "$RC_TAG" "$(git rev-parse HEAD)" > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/changelog.txt" >> "$RUNNER_TEMP/notes.md"
+          gh release create "$RC_TAG" dist/*.dmg dist/*.zip dist/*.exe dist/install-manifest.json dist/SHA256SUMS.txt --verify-tag --prerelease --latest=false --title "DAK Studio $RC_TAG" --notes-file "$RUNNER_TEMP/notes.md"

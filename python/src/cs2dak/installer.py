@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -25,9 +26,17 @@ from cs2dak import __version__ as INSTALLER_VERSION
 from cs2dak import updater
 from cs2dak.diagnostics import SourceFailures, log_failure, sanitize_text
 
-# Versioned inputs prevent a new safe installer from selecting an older runtime.
-MANIFEST_URL_VERSIONED = f"https://dakupdate.starfie1d.top/releases/v{INSTALLER_VERSION}/install-manifest.json"
-MANIFEST_URL_GITHUB_VERSIONED = f"https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/download/v{INSTALLER_VERSION}/install-manifest.json"
+# Candidate builds embed their immutable GitHub tag; stable builds have no config.
+_config = Path(getattr(sys, "_MEIPASS", "")) / "dak-installer-candidate.json"
+if getattr(sys, "frozen", False) and _config.is_file():
+    _tag = json.loads(_config.read_text(encoding="utf-8"))["tag"]
+    if not re.fullmatch(rf"v{re.escape(INSTALLER_VERSION)}-rc\.[1-9][0-9]*", _tag):
+        raise ValueError("Invalid installer candidate tag")
+    MANIFEST_URL_VERSIONED = f"https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/download/{_tag}/install-manifest.json"
+    MANIFEST_URL_GITHUB_VERSIONED = MANIFEST_URL_VERSIONED
+else:
+    MANIFEST_URL_VERSIONED = f"https://dakupdate.starfie1d.top/releases/v{INSTALLER_VERSION}/install-manifest.json"
+    MANIFEST_URL_GITHUB_VERSIONED = f"https://github.com/Starfie1d1272/cs2-demo-analysis-kit/releases/download/v{INSTALLER_VERSION}/install-manifest.json"
 
 USER_AGENT = f"DAK-Studio-Installer/{INSTALLER_VERSION}"
 log = logging.getLogger("dak-studio-installer")

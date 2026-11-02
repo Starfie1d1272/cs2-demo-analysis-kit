@@ -35,7 +35,7 @@ function sha256(path) {
 
 function parseArgs(raw) {
   const args = { channel: "stable", "asset-set": "cologne-major-2026-full" };
-  const flags = ["--version", "--runtime-zip", "--event-packages", "--tris-manifest", "--channel", "--asset-set", "--out"];
+  const flags = ["--version", "--runtime-zip", "--event-packages", "--tris-manifest", "--channel", "--asset-set", "--out", "--candidate-tag"];
   for (let i = 0; i < raw.length; i++) {
     const a = raw[i];
     if (flags.includes(a) && i + 1 < raw.length) {
@@ -79,11 +79,13 @@ function main() {
   const runtimeName = basename(runtimeZipPath);
   const runtimeSize = statSync(runtimeZipPath).size;
   const runtimeSha256 = sha256(runtimeZipPath);
+  const candidateTag = args["candidate-tag"];
+  if (candidateTag && candidateTag !== `v${ver}-rc.${candidateTag.match(/-rc\.([1-9]\d*)$/)?.[1]}`) throw new Error("Candidate tag must match app version");
   const runtime = {
     name: runtimeName,
     size: runtimeSize,
     sha256: runtimeSha256,
-    urls: assetUrls("runtime", ver, runtimeName),
+    urls: candidateTag ? [`https://github.com/${OWNER_REPO}/releases/download/${candidateTag}/${runtimeName}`] : assetUrls("runtime", ver, runtimeName),
   };
   console.error(`runtime: ${runtimeName} (${(runtimeSize / 1024 / 1024).toFixed(1)} MB)`);
 
