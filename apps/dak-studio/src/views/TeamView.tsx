@@ -115,6 +115,12 @@ export function TeamView({
     onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
   }, [onPageReady, activeTeam, overview, error, overviewCapability.error, overviewEntries]);
 
+  const overviewCurrent = !!overview && !error && !overviewCapability.error &&
+    !overviewCapability.stale && canExportSnapshot(overviewSnapshot, analysis, overviewEntries);
+  const comparisonCurrent = !!state.compareTeamName && !!comparison && !comparisonError &&
+    !comparisonCapability.error && !comparisonCapability.stale &&
+    canExportSnapshot(comparisonSnapshot, analysis, comparisonEntries);
+
   if (entries.length === 0) {
     return <div className="stu-view"><EmptyState mark title="还没有队伍数据" hint="先在资料库导入比赛，才能按本地队伍身份组织总览。" action={<button type="button" className="stu-button" onClick={onGoLibrary}>去资料库</button>} /></div>;
   }
@@ -123,7 +129,17 @@ export function TeamView({
   return (
     <div className="stu-view stu-reading-view">
       <header className="stu-view-header">
-        <div><h1>队伍</h1>{overview && exportSource && !error && !overviewCapability.error && !overviewCapability.stale && canExportSnapshot(overviewSnapshot, analysis, overviewEntries) && (!state.compareTeamName || (comparison && !comparisonError && !comparisonCapability.error && !comparisonCapability.stale && canExportSnapshot(comparisonSnapshot, analysis, comparisonEntries))) && <AnalysisExportButtons capture={() => buildTeamAnalysisResult(withCapabilityConditions(applyExportEntries(exportSource, unionExportEntries(overviewEntries, state.compareTeamName ? comparisonEntries : [])), overviewCapability.availability, state.compareTeamName ? comparisonCapability.availability : null), overview, comparison, state, { maps: MAP_COLUMNS, roster: ROSTER_COLUMNS })} />}<p>用当前语料查看一支队伍的基础盘面，并在同一上下文继续专项分析。</p></div>
+        <div><h1>队伍</h1>{overviewCurrent && overview && exportSource && <AnalysisExportButtons
+          label={state.compareTeamName && !comparisonCurrent ? "导出本次结果（不含队伍对比）" : undefined}
+          capture={() => buildTeamAnalysisResult(
+            withCapabilityConditions(
+              applyExportEntries(exportSource, unionExportEntries(overviewEntries, comparisonCurrent ? comparisonEntries : null)),
+              overviewCapability.availability, comparisonCurrent ? comparisonCapability.availability : null,
+            ),
+            overview, comparisonCurrent ? comparison : null, state, { maps: MAP_COLUMNS, roster: ROSTER_COLUMNS },
+            state.compareTeamName && !comparisonCurrent ? ["队伍对比未导出：无当前可用结果或正在更新。"] : [],
+          )}
+        />}<p>用当前语料查看一支队伍的基础盘面，并在同一上下文继续专项分析。</p></div>
         <label className="stu-team-picker">切换队伍
           <select value={activeTeam ?? ""} onChange={(event) => event.target.value && onSelectTeam(event.target.value)}>
             <option value="">请选择队伍</option>
