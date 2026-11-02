@@ -22,7 +22,7 @@
 ## C 分析师
 
 - C1 部分通过：两场独立库范围初始 2/2；将 focus 切到 Aurora 后仍为 2/2，选择 Nuke 后为 1/2。两场日期均未知；日期条件默认排除未知为 0/2，勾选包含未知后恢复 2/2。选择再排除同一场后为 0/2。赛事/标签尚未核对；删除显式选择参见 C3–C5。
-- C2 部分通过：实际点击六主题（表现与趋势、交火与协同、经济与转化、道具、开局与控图、位置与职责），均可进入；经济页显示 4 场、82 回合与具体队伍矩阵。两场不交手的 Aurora Gaming 与 Team Plasma 实际生成队伍比较；同一 Aurora 语料选择 soulfly 与 Wicadia 显示选手 CompareCard。更新至 #180 后，在浏览器临时拦截队伍比较查询并模拟抛错：界面显示比较失败，但仍提供“不含队伍对比”导出；实际 JSON 包含该局限且 sources 仅列 Aurora 的 Nuke。14 旧视图映射和 team-vs-league 尚未完整操作。
+- C2 部分通过：实际点击六主题（表现与趋势、交火与协同、经济与转化、道具、开局与控图、位置与职责），均可进入；经济页显示 4 场、82 回合与具体队伍矩阵。两场不交手的 Aurora Gaming 与 Team Plasma 实际生成队伍比较；同一 Aurora 语料选择 soulfly 与 Wicadia 显示选手 CompareCard。更新至 #180 后，在浏览器临时拦截队伍比较查询并模拟抛错：界面显示比较失败，但仍提供“不含队伍对比”导出；实际 JSON 包含该局限且 sources 仅列 Aurora 的 Nuke。覆盖场选择 Nuke 的 9z，长枪局显示 4 对赛事基线 4；切全部回合后变为 14 对 14，队伍和基线使用相同条件。但全部回合仍显示“14 长枪局”，`packages/react/src/components/RadarFieldCanvas.tsx` 写死标签，需公共展示 owner 修复。14 旧视图映射仍未完整操作。
 - C3–C5 部分通过：Nuke 经济页保存分析并勾选工作台，重载后打开，再另存；实际下载 JSON 与 Markdown。JSON 显示 1 场/14 回合、scope、来源 entryId/matchId、demo SHA-256、format/facts 版本、时间、局限及 null；导入另一真实场前后下载文件 SHA-256 均为 `e17655a5ae1880b85eeec440bb42b502bde65048ee1ced0d774f8a8ff2eb9e7c`。另保存仅含 Nuke 的显式比赛范围，删除 Nuke 而保留 Inferno 后重开，显示 0/1 而未扩为全库。反例：另存 Nuke 地图筛选，删除唯一 Nuke 后重开同样为 0/1，但范围编辑器地图行只显示 de_inferno，没有展示已失效的 de_nuke 选择；用户无法看见原筛选条件，待分析范围 owner 核实和修复。局部筛选和更多导出主题仍未验。
 
 ## D 数据、异步、可用性
