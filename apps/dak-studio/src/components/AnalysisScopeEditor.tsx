@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { entryDate, type StudioDemoEntry } from "../lib/demo-entry";
 import { EMPTY_ANALYSIS_CORPUS, filterCorpusEntriesByTeam, isCalendarDate, resolveAnalysisCorpus, type AnalysisContext, type AnalysisEventScope } from "../lib/analysis-context";
-import { displayTeamName, teamRenameGroups } from "../lib/identity";
+import { displayTeamName, teamRenameGroups } from "../lib/team-identity";
 
 /** 直接编辑页面的 AnalysisContext；所有比赛筛选只由 resolver 执行。 */
 export function AnalysisScopeEditor({ entries, context, onChange, events, teamRenames = {} }: {

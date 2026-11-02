@@ -5118,6 +5118,7 @@ td.stu-heat-cell.stu-heat-neutral {
   body:has(.match-sheet-output) .match-sheet-output article { position: absolute; inset: 0; width: 100%; color: black; background: white !important; }
   .match-sheet-output article p { overflow-wrap: anywhere; }
   .match-sheet-output article section { break-inside: auto; }
+  .match-sheet-output article h1, .match-sheet-output article h2, .match-sheet-output article h3 { break-after: avoid; }
   .match-sheet-print-phase { display: block; max-width: 140mm; break-inside: avoid; }
   body:has(.match-sheet-output) .match-sheet-print-phase,
   body:has(.match-sheet-output) .match-sheet-print-phase h4 { background: white !important; color: black !important; }

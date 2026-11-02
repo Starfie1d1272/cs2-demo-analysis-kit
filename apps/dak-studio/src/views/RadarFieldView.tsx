@@ -21,7 +21,7 @@ import type { RadarField } from "@cs2dak/tactics";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { StudioDemoEntry } from "../lib/demo-entry";
 import { buildScopeRadarFields } from "../lib/radar-field";
-import { displayTeamName, teamRenameGroups } from "../lib/identity";
+import { displayTeamName, teamRenameGroups } from "../lib/team-identity";
 
 export interface RadarFieldViewProps {
   exportSource?: AnalysisExportSource | null;

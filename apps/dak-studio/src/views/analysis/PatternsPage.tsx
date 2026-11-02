@@ -6,7 +6,7 @@ import { assertCurrentFacts } from "../../lib/facts-readiness";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../../lib/queries/query-cache";
 import { useEffect, useMemo, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
 import { EmptyState } from "@cs2dak/react";
-import { teamRenameGroups } from "../../lib/identity";
+import { teamRenameGroups } from "../../lib/team-identity";
 import { matchIdForEntry, type StudioDemoEntry } from "../../lib/demo-entry";
 import { getFactsStore } from "../../lib/facts-store";
 import type { TacticalRoundFact } from "@cs2dak/tactics";

@@ -6,15 +6,7 @@
 
 ## 已有展示数据
 
-```tsx
-import type { MatchWorkspaceModel } from '@cs2dak/presentation';
-import { MatchWorkspace } from '@cs2dak/react';
-import '@cs2dak/react/theme.css';
-
-export function MatchPage({ model }: { model: MatchWorkspaceModel }) {
-  return <MatchWorkspace model={model} />;
-}
-```
+宿主可使用 `MatchWorkspaceModel` 等展示合同，并从 `@cs2dak/react` 导入 `ScoreboardTable` 等通用组件自行组合页面。`MatchWorkspace` 整页已移到 Studio App，不再由公共 React 包导出。
 
 公共根入口导出展示合同和 helper；`@cs2dak/presentation/models` 提供展示 schema/type 入口，`weapons`、`replay-clock`、`economy`、`radar-field` 提供按能力导入的 helper。地图角色等组件使用窄 `*View` 类型，宿主可传结构满足合同的已有数据。schema 校验展示输入的结构，不重新执行事件归因或评分。
 

@@ -19,7 +19,8 @@ import {
 } from "@cs2dak/analytics";
 import { getPlayerSeasonDetails, type PlayerSeasonDetails } from "../lib/queries/player-queries";
 import { getSeasonSummary } from "../lib/queries/season-queries";
-import { displayTeamName, type IdentityOptions } from "../lib/identity";
+import { type IdentityOptions } from "../lib/identity";
+import { displayTeamName } from "../lib/team-identity";
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
 import { FingerprintRadar, TrendChart, type TrendMetricKey } from "./profile-widgets";

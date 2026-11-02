@@ -1,7 +1,7 @@
 import type { RawDemoHint, SeriesFormat, SeriesVeto, SeriesVetoStep } from "@cs2dak/contract";
 import { ACTIVE_DUTY_MAPS } from "@cs2dak/maps";
 import { entryDate, type StudioDemoEntry } from "./demo-entry";
-import { displayTeamName } from "./identity";
+import { displayTeamName } from "./team-identity";
 import { getStorage } from "./storage";
 import type { RivalHubRemoteMap } from "./rivalhub-contract";
 

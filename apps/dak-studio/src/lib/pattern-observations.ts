@@ -1,5 +1,5 @@
 import { TACTICAL_FACT_VERSION, type TacticalCluster, type TacticalRoundFact } from "@cs2dak/tactics";
-import { displayTeamName } from "./identity";
+import { displayTeamName } from "./team-identity";
 
 export function patternFingerprint(cluster: TacticalCluster): string {
   return [cluster.mapName, cluster.side, cluster.teamIdentity, cluster.economyEntry, cluster.openingSignature].join(":");
