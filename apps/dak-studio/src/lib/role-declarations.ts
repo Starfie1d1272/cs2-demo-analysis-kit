@@ -1,5 +1,5 @@
 import { roleDeclarationSchema, type RoleDeclaration } from "@cs2dak/tactics";
-import type { IdentityStoreState } from "./identity";
+import { withIdentityRoleAccess, type IdentityStoreState } from "./identity";
 import { getStorage } from "./storage";
 
 /** 独立于 facts / identity summary 的用户声明存储。 */
@@ -39,6 +39,11 @@ function valid(value: unknown): RoleDeclarationsState | null {
 }
 
 export async function loadRoleDeclarations(): Promise<RoleDeclarationsState> {
+  return withIdentityRoleAccess(loadRoleDeclarationsForIdentity);
+}
+
+/** 身份命令持有恢复锁时使用，避免递归恢复。 */
+export async function loadRoleDeclarationsForIdentity(): Promise<RoleDeclarationsState> {
   const raw = await store.get<unknown>(STATE_KEY);
   if (raw === undefined) return EMPTY;
   const state = valid(raw);
@@ -46,27 +51,35 @@ export async function loadRoleDeclarations(): Promise<RoleDeclarationsState> {
   return state;
 }
 
-async function save(state: RoleDeclarationsState): Promise<RoleDeclarationsState> {
+export async function saveRoleDeclarationsForIdentity(state: RoleDeclarationsState): Promise<RoleDeclarationsState> {
   await store.put(STATE_KEY, state);
   return state;
 }
 
 export async function upsertRoleDeclaration(current: RoleDeclarationsState, input: RoleDeclaration, id?: string): Promise<RoleDeclarationsState> {
-  const declaration = roleDeclarationSchema.parse(input);
-  const now = Date.now();
-  const nextId = id ?? `${now}-${Math.random().toString(36).slice(2, 8)}`;
-  const existing = current.declarations.find((row) => row.id === nextId);
-  const row: StoredRoleDeclaration = { id: nextId, createdAt: existing?.createdAt ?? now, updatedAt: now, declaration };
-  const declarations = current.declarations.filter((item) => item.id !== nextId).map((item) =>
-    declaration.kind === "main_role" && declaration.priority === "primary" && item.declaration.kind === "main_role" && item.declaration.priority === "primary" && scopeKey(item.declaration) === scopeKey(declaration)
-      ? { ...item, updatedAt: now, declaration: { ...item.declaration, priority: "secondary" as const } }
-      : item
-  ).filter((item) => declaration.kind !== "weapon_duty" || item.declaration.kind !== "weapon_duty" || scopeKey(item.declaration) !== scopeKey(declaration));
-  return save({ ...current, version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations: [...declarations, row] });
+  return withIdentityRoleAccess(async () => {
+    const actual = await loadRoleDeclarationsForIdentity();
+    if (JSON.stringify(current) !== JSON.stringify(actual)) throw new Error("角色声明已变化，请刷新后重试");
+    const declaration = roleDeclarationSchema.parse(input);
+    const now = Date.now();
+    const nextId = id ?? `${now}-${Math.random().toString(36).slice(2, 8)}`;
+    const existing = current.declarations.find((row) => row.id === nextId);
+    const row: StoredRoleDeclaration = { id: nextId, createdAt: existing?.createdAt ?? now, updatedAt: now, declaration };
+    const declarations = current.declarations.filter((item) => item.id !== nextId).map((item) =>
+      declaration.kind === "main_role" && declaration.priority === "primary" && item.declaration.kind === "main_role" && item.declaration.priority === "primary" && scopeKey(item.declaration) === scopeKey(declaration)
+        ? { ...item, updatedAt: now, declaration: { ...item.declaration, priority: "secondary" as const } }
+        : item
+    ).filter((item) => declaration.kind !== "weapon_duty" || item.declaration.kind !== "weapon_duty" || scopeKey(item.declaration) !== scopeKey(declaration));
+    return saveRoleDeclarationsForIdentity({ ...current, version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations: [...declarations, row] });
+  });
 }
 
 export async function removeRoleDeclaration(current: RoleDeclarationsState, id: string): Promise<RoleDeclarationsState> {
-  return save({ ...current, declarations: current.declarations.filter((row) => row.id !== id) });
+  return withIdentityRoleAccess(async () => {
+    const actual = await loadRoleDeclarationsForIdentity();
+    if (JSON.stringify(current) !== JSON.stringify(actual)) throw new Error("角色声明已变化，请刷新后重试");
+    return saveRoleDeclarationsForIdentity({ ...current, declarations: current.declarations.filter((row) => row.id !== id) });
+  });
 }
 
 /** 一次替换当前选手/队伍的普通用户声明；其余作用域和来源保持原样。 */
@@ -75,55 +88,33 @@ export async function replaceOrdinaryUserRoleDeclarations(
   teamKey: string | null,
   inputs: RoleDeclaration[],
 ): Promise<RoleDeclarationsState> {
-  const declarations = inputs.map(input => roleDeclarationSchema.parse(input));
-  if (declarations.some(item => item.source !== "user" || item.playerKey !== playerKey || (item.teamKey ?? null) !== teamKey || item.mapName != null || item.validFrom != null || item.validTo != null)) {
-    throw new Error("角色声明范围不一致");
-  }
-  const current = await loadRoleDeclarations();
-  const now = Date.now();
-  const retained = current.declarations.filter(row => !(row.declaration.source === "user" && row.declaration.playerKey === playerKey
-    && (row.declaration.teamKey ?? null) === teamKey && row.declaration.mapName == null
-    && row.declaration.validFrom == null && row.declaration.validTo == null));
-  const added = declarations.map(declaration => ({ id: crypto.randomUUID(), createdAt: now, updatedAt: now, declaration }));
-  return save({ ...current, version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations: [...retained, ...added] });
+  return withIdentityRoleAccess(async () => {
+    const declarations = inputs.map(input => roleDeclarationSchema.parse(input));
+    if (declarations.some(item => item.source !== "user" || item.playerKey !== playerKey || (item.teamKey ?? null) !== teamKey || item.mapName != null || item.validFrom != null || item.validTo != null)) {
+      throw new Error("角色声明范围不一致");
+    }
+    const current = await loadRoleDeclarationsForIdentity();
+    const now = Date.now();
+    const retained = current.declarations.filter(row => !(row.declaration.source === "user" && row.declaration.playerKey === playerKey
+      && (row.declaration.teamKey ?? null) === teamKey && row.declaration.mapName == null
+      && row.declaration.validFrom == null && row.declaration.validTo == null));
+    const added = declarations.map(declaration => ({ id: crypto.randomUUID(), createdAt: now, updatedAt: now, declaration }));
+    return saveRoleDeclarationsForIdentity({ ...current, version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations: [...retained, ...added] });
+  });
 }
 
 /** 身份合并后按 steamId 交集迁移；没有交集的声明保持原 key，绝不猜测。 */
-export async function migrateRoleDeclarationsForIdentity(identity: IdentityStoreState): Promise<RoleDeclarationsState> {
-  const current = await loadRoleDeclarations();
-  const playerKeyBySteamId = new Map(identity.mappings.flatMap((mapping) => mapping.steamIds.map((id) => [id, mapping.playerKey] as const)));
+export function migrateRoleDeclarationsForIdentity(current: RoleDeclarationsState, identity: IdentityStoreState, targetPlayerKey: string): RoleDeclarationsState {
+  const playerKeyBySteamId = new Map(identity.mappings.filter(mapping => mapping.playerKey === targetPlayerKey).flatMap((mapping) => mapping.steamIds.map((id) => [id, mapping.playerKey] as const)));
   let changed = false;
   const migratedAt = Date.now();
   const declarations = current.declarations.map((row) => {
     const steamId = row.declaration.playerKey.startsWith("steam:") ? row.declaration.playerKey.slice(6) : null;
     const playerKey = steamId ? playerKeyBySteamId.get(steamId) : undefined;
-    if (!playerKey || playerKey === row.declaration.playerKey) return row;
+    if (!playerKey || playerKey === row.declaration.playerKey) return { ...row, declaration: { ...row.declaration } };
     changed = true;
     return { ...row, updatedAt: migratedAt, declaration: { ...row.declaration, playerKey } };
   });
-  const primaryByScope = new Map<string, StoredRoleDeclaration[]>();
-  const weaponDutyByScope = new Map<string, StoredRoleDeclaration[]>();
-  for (const row of declarations) {
-    const key = scopeKey(row.declaration);
-    if (row.declaration.kind === "main_role" && row.declaration.priority === "primary") primaryByScope.set(key, [...(primaryByScope.get(key) ?? []), row]);
-    if (row.declaration.kind === "weapon_duty") weaponDutyByScope.set(key, [...(weaponDutyByScope.get(key) ?? []), row]);
-  }
-  for (const rows of primaryByScope.values()) {
-    if (rows.length < 2) continue;
-    rows.sort((a, b) => b.updatedAt - a.updatedAt || b.createdAt - a.createdAt || b.id.localeCompare(a.id));
-    for (const row of rows.slice(1)) {
-      if (row.declaration.kind !== "main_role") continue;
-      row.updatedAt = migratedAt;
-      row.declaration = { ...row.declaration, priority: "secondary" };
-      changed = true;
-    }
-  }
-  const discarded = new Set<string>();
-  for (const rows of weaponDutyByScope.values()) {
-    if (rows.length < 2) continue;
-    rows.sort((a, b) => b.updatedAt - a.updatedAt || b.createdAt - a.createdAt || b.id.localeCompare(a.id));
-    for (const row of rows.slice(1)) { discarded.add(row.id); changed = true; }
-  }
-  const next = discarded.size ? declarations.filter((row) => !discarded.has(row.id)) : declarations;
-  return changed ? save({ ...current, version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations: next }) : current;
+  // 合并只改变身份归属，职责内容及冲突声明全部保留。
+  return changed ? { ...current, version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations } : current;
 }
