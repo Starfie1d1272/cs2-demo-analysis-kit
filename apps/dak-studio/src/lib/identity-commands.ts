@@ -225,12 +225,17 @@ function assertCurrentPlayerKey(identity: IdentityStoreState, playerKey: string)
     if (mapping && mapping.playerKey !== playerKey) throw new Error("选手身份已归并，请刷新后重试");
   }
 }
-export async function replaceOrdinaryUserRoleDeclarations(playerKey: string, teamKey: string | null, inputs: RoleDeclaration[], expected: RoleDeclarationsState): Promise<RoleDeclarationsState> {
+function roleScopeKey(scope: RoleDeclaration["teamScope"]): string {
+  return scope?.kind === "entity" ? JSON.stringify(["entity", scope.key])
+    : scope?.kind === "observation" ? JSON.stringify(["observation", scope.matchId, scope.slot]) : "";
+}
+export async function replaceOrdinaryUserRoleDeclarations(playerKey: string, teamKey: string | null, inputs: RoleDeclaration[], expected: RoleDeclarationsState, teamScope?: RoleDeclaration["teamScope"]): Promise<RoleDeclarationsState> {
   const bundle = await readBundle();
   assertCurrentPlayerKey(bundle.identity, playerKey);
   const declarations = inputs.map(input => roleDeclarationSchema.parse(input));
-  if (declarations.some(item => item.source !== "user" || item.playerKey !== playerKey || (item.teamKey ?? null) !== teamKey || item.mapName != null || item.validFrom != null || item.validTo != null)) throw new Error("角色声明范围不一致");
-  const inScope = (row: StoredRoleDeclaration) => row.declaration.source === "user" && row.declaration.playerKey === playerKey && (row.declaration.teamKey ?? null) === teamKey && row.declaration.mapName == null && row.declaration.validFrom == null && row.declaration.validTo == null;
+  const sameScope = (scope: RoleDeclaration["teamScope"]) => roleScopeKey(scope) === roleScopeKey(teamScope);
+  if (declarations.some(item => !sameScope(item.teamScope) || item.source !== "user" || item.playerKey !== playerKey || (item.teamKey ?? null) !== teamKey || item.mapName != null || item.validFrom != null || item.validTo != null)) throw new Error("角色声明范围不一致");
+  const inScope = (row: StoredRoleDeclaration) => row.declaration.source === "user" && row.declaration.playerKey === playerKey && (row.declaration.teamKey ?? null) === teamKey && sameScope(row.declaration.teamScope) && row.declaration.mapName == null && row.declaration.validFrom == null && row.declaration.validTo == null;
   if (!same(bundle.roles.declarations.filter(inScope), expected.declarations.filter(inScope))) throw new Error("当前选手的角色声明已变化，请刷新后重试");
   const now = Date.now();
   const added = declarations.map(declaration => ({ id: crypto.randomUUID(), createdAt: now, updatedAt: now, declaration }));
@@ -245,7 +250,7 @@ export async function upsertRoleDeclaration(current: RoleDeclarationsState, inpu
   assertCurrentPlayerKey(bundle.identity, declaration.playerKey);
   const now = Date.now(), nextId = id ?? crypto.randomUUID();
   const existing = bundle.roles.declarations.find(row => row.id === nextId);
-  const scope = (d: RoleDeclaration) => [d.playerKey, d.teamKey ?? "", d.mapName ?? "", d.validFrom ?? "", d.validTo ?? ""].join("\t");
+  const scope = (d: RoleDeclaration) => [d.playerKey, d.teamKey ?? "", roleScopeKey(d.teamScope), d.mapName ?? "", d.validFrom ?? "", d.validTo ?? ""].join("\t");
   const rows = bundle.roles.declarations.filter(row => row.id !== nextId).map(row =>
     declaration.kind === "main_role" && declaration.priority === "primary" && row.declaration.kind === "main_role" && row.declaration.priority === "primary" && scope(row.declaration) === scope(declaration)
       ? { ...row, updatedAt: now, declaration: { ...row.declaration, priority: "secondary" as const } } : row

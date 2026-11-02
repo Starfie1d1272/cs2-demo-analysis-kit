@@ -45,6 +45,10 @@ const declarationScopeSchema = z.object({
   source: z.enum(["user", "self_report", "organizer", "event_package", "trusted_metadata"]),
   mapName: supportedMapNameSchema.optional(),
   teamKey: z.string().min(1).optional(),
+  teamScope: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("entity"), key: z.string().min(1) }).strict(),
+    z.object({ kind: z.literal("observation"), matchId: z.string().min(1), slot: z.enum(["teamA", "teamB"]) }).strict(),
+  ]).optional(),
   validFrom: z.string().datetime().optional(),
   validTo: z.string().datetime().optional(),
   provenance: z.string().min(1),
@@ -292,6 +296,7 @@ export const playerMapPoolRowSchema = z.object({
   openingKills: z.number().int().nonnegative(), openingDeaths: z.number().int().nonnegative(),
   mainWeapon: z.string().nullable(), globalWeaponDuty: weaponDutySchema.nullable(), mapSideAwpUsage: z.array(z.object({ side: z.enum(["t", "ct"]), duty: weaponDutySchema, qualifiedRounds: z.number().int().nonnegative(), activeSeconds: z.number().nonnegative().nullable() })),
   tPositionGroup: z.string().nullable(), ctPositionGroup: z.string().nullable(), tResponsibility: teamResponsibilitySchema, ctResponsibility: teamResponsibilitySchema,
+  roleMatchCount: z.number().int().nonnegative(),
   sampleQuality: z.number().min(0).max(1), confidence: z.number().min(0).max(1), evidence: z.array(evidenceRefSchema),
 });
 
