@@ -100,7 +100,7 @@ export function PatternsTheme({ exportSource, section, explorerState, onExplorer
       {section === "anti" && (
         <>
           {exportSource && mapPoolNotes && analysisContext.roles.opponent && <AnalysisExportButtons capture={() => buildPatternReportAnalysisResult(exportSource, mapPool, antiMarkdown, mapPoolNotes, Boolean(analysisContext.roles.beneficiary))} />}
-          <MapPoolTable notes={mapPoolNotes ?? {}} onNotesChange={setMapPoolNotes}
+          <MapPoolTable notes={mapPoolNotes ?? {}} onNotesChange={(mapName, note) => setMapPoolNotes(previous => ({ ...previous, [mapName]: note }))}
             rows={mapPool}
             hasOwn={Boolean(analysisContext.roles.beneficiary)}
             hasOpponent={Boolean(analysisContext.roles.opponent)}

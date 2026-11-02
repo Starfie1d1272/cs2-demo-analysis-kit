@@ -130,3 +130,7 @@ export function analysisExportSource(context: AnalysisContext, entries: StudioDe
     `实际来源：${entries.length} 场`,
   ] };
 }
+
+export function withAnalysisExportEntries(source: AnalysisExportSource, entries: StudioDemoEntry[]): AnalysisExportSource {
+  return { ...source, entries, conditions: [...source.conditions.filter(condition => !condition.startsWith("实际来源：")), `实际来源：${entries.length} 场`] };
+}

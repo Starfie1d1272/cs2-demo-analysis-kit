@@ -3,7 +3,7 @@ import { CapabilityBar, useCapability } from "../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../lib/capability-availability";
 import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
 import { buildControlAnalysisResult } from "../lib/analysis-export-spatial";
-import type { AnalysisExportSource } from "../lib/analysis-export";
+import { withAnalysisExportEntries, type AnalysisExportSource } from "../lib/analysis-export";
 import type { ControlPageState } from "../lib/spatial-view-state";
 import type { Dispatch, SetStateAction } from "react";
 import { usePageReady } from "../lib/use-page-ready";
@@ -140,7 +140,7 @@ export function RadarFieldView({ exportSource, onCapabilityRepair, entries, team
       <div className="stu-card stu-radar-field-head">
         <div>
           <h3>控图覆盖场</h3>
-          {exportSource && field && fieldReady && !progress && !fieldError && !invalidTeamForMap && <AnalysisExportButtons capture={() => buildControlAnalysisResult({ ...exportSource, entries: entriesOfMap }, field, baseline, state)} />}
+          {exportSource && field && fieldReady && !progress && !fieldError && !invalidTeamForMap && <AnalysisExportButtons capture={() => buildControlAnalysisResult(withAnalysisExportEntries(exportSource, entriesOfMap.filter(entry => field.scope.matchIds.includes(entry.id) || baseline?.scope.matchIds.includes(entry.id))), field, baseline, state)} />}
           <p className="stu-muted">
             基线 = 当前全局范围中 {activeMap} 的 {entriesOfMap.length} 场；
             队伍视图 = 该队在这些场次里的贡献。覆盖场仅作描述性观察，不自动识别弱区或生成对策。

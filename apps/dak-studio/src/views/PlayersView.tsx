@@ -3,7 +3,7 @@ import type { CapabilityRepairAction } from "../lib/capability-availability";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
 import { buildPlayerAnalysisResult } from "../lib/analysis-export-player";
-import type { AnalysisExportSource } from "../lib/analysis-export";
+import { withAnalysisExportEntries, type AnalysisExportSource } from "../lib/analysis-export";
 import { PlayerFindingsPanel } from "./analysis/PlayerFindingsPanel";
 import type { PlayerPageState } from "../lib/studio-page-state";
 import { Star } from "lucide-react";
@@ -282,7 +282,7 @@ export function PlayersView({
       <header className="stu-view-header">
         <div>
           <h1>选手档案</h1>
-          {exportSource && coverage && !detailsError && <AnalysisExportButtons capture={() => buildPlayerAnalysisResult(exportSource, selected, compare, insights, weaponStats, mechanics, coverage, state, trendMetric, findings)} />}
+          {exportSource && coverage && !detailsError && <AnalysisExportButtons capture={() => buildPlayerAnalysisResult(withAnalysisExportEntries(exportSource, exportSource.entries.filter(entry => [...selected.perMatch, ...(compare?.perMatch ?? [])].some(point => point.matchId === matchIdForEntry(entry)))), selected, compare, insights, weaponStats, mechanics, coverage, state, trendMetric, findings)} />}
           <p>
             基于 {profileSnapshot ? JSON.parse(profileSnapshot.sample).length : 0} 场 demo 的跨场画像 · 权重 {selected.weightsVersion}。强弱项相对当前聚合范围内的选手计算
             {orderedProfiles.length < 5 ? "（不足 5 人，暂不出强弱项判断）" : ""}。

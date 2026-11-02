@@ -2,4 +2,4 @@
 "@cs2dak/react": minor
 ---
 
-Expose the DataTable sorting helper so consumers can export the complete sorted result.
+Expose DataTable sorting and the map-role table sort accessors so consumers can project the complete displayed results using the same ordering.

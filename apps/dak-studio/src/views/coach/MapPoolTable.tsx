@@ -1,7 +1,7 @@
 import type { ObservedMapPoolRow } from "@cs2dak/analytics";
 import { saveMapPoolNote } from "../../lib/map-pool-notes.js";
 
-export interface MapPoolTableProps { rows: ObservedMapPoolRow[]; hasOwn: boolean; hasOpponent: boolean; notes: Record<string, string>; onNotesChange: (notes: Record<string, string>) => void }
+export interface MapPoolTableProps { rows: ObservedMapPoolRow[]; hasOwn: boolean; hasOpponent: boolean; notes: Record<string, string>; onNotesChange: (mapName: string, note: string) => void }
 function pct(value: number | null): string { return value == null ? "—" : `${value.toFixed(1)}%`; }
 export function MapPoolTable({ rows: maps, hasOwn, hasOpponent, notes, onNotesChange }: MapPoolTableProps) {
 
@@ -52,7 +52,7 @@ export function MapPoolTable({ rows: maps, hasOwn, hasOpponent, notes, onNotesCh
                   placeholder="备注…"
                   onChange={(e) => {
                     const note = e.target.value;
-                    onNotesChange({ ...notes, [row.mapName]: note });
+                    onNotesChange(row.mapName, note);
                     void saveMapPoolNote(row.mapName, note);
                   }}
                 />
