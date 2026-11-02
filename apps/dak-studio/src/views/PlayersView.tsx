@@ -464,10 +464,10 @@ export function PlayersView({
               <div className="stu-card-head"><h3>地图 / 位置</h3><button type="button" className="stu-button-sm" onClick={openRoleEditor}>编辑声明</button></div>
               {roleError ? <EmptyState variant="error" title="地图角色不可用" hint={roleError} /> : <PlayerMapRoleProfilePanel profile={selectedRoleProfile} onOpenEvidence={(evidence) => {
                 const entry = entryByMatchId.get(evidence.matchId);
-                if (entry) onOpenEvidence(entry.id, evidence, "players:map-roles");
+                if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "players:map-roles" });
               }} />}
             </div>
-            <div className="stu-card stu-card-wide" id="players:map-pool"><h3>完整个人地图池</h3>{mapPoolError && <p role="alert">地图池不可用：{mapPoolError}</p>}{unsupportedMaps.length > 0 && <p>未支持的地图：{unsupportedMaps.join("、")}</p>}<PlayerMapPoolPanel rows={mapPool} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence(entry.id, evidence, "players:map-pool"); }} /></div>
+            <div className="stu-card stu-card-wide" id="players:map-pool"><h3>完整个人地图池</h3>{mapPoolError && <p role="alert">地图池不可用：{mapPoolError}</p>}{unsupportedMaps.length > 0 && <p>未支持的地图：{unsupportedMaps.join("、")}</p>}<PlayerMapPoolPanel rows={mapPool} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "players:map-pool" }); }} /></div>
             <div className="stu-card">
               <h3>核心指标</h3>
               <div className="stu-metric-grid">
@@ -637,7 +637,7 @@ export function PlayersView({
                               key={`${flash.matchId}-${flash.roundNumber}-${i}`}
                               entry={e}
                               target={{ roundNumber: flash.roundNumber, tick: flash.tick }}
-                              onOpenMatch={onOpenMatch}
+
                               onOpenEvidence={onOpenEvidence}
                               onWatchDemo={onWatchDemo}
                               reason={flash.reason}
@@ -661,7 +661,7 @@ export function PlayersView({
                             key={`${incident.matchId}-${incident.roundNumber}-${i}`}
                             entry={e}
                             target={{ roundNumber: incident.roundNumber, tick: incident.tick }}
-                            onOpenMatch={onOpenMatch}
+
                             onOpenEvidence={onOpenEvidence}
                             onWatchDemo={onWatchDemo}
                             reason={incident.reason}
@@ -712,7 +712,7 @@ export function PlayersView({
                           key={`${evidence.matchId}-${evidence.roundNumber}-${i}`}
                           entry={e}
                           target={{ roundNumber: evidence.roundNumber, tick: evidence.tick }}
-                          onOpenMatch={onOpenMatch}
+
                           onOpenEvidence={onOpenEvidence}
                           onWatchDemo={onWatchDemo}
                           reason={evidence.reason}

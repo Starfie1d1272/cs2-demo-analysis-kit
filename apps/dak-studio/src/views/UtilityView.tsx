@@ -16,6 +16,8 @@ import { EvidenceActions } from "../components/EvidenceActions";
 import type { OpenEvidence } from "../lib/evidence-continuation";
 
 export interface UtilityViewProps {
+  state: import("../lib/studio-page-state").UtilityPageState;
+  onStateChange: (state: import("../lib/studio-page-state").UtilityPageState) => void;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   selectedTeam?: string | null;
@@ -93,7 +95,7 @@ const SMOKE_COLUMNS: DataTableColumn<UtilityValueRow>[] = [
   { key: "smokesPerRound", label: "烟/回合", numeric: true, sortable: true, sortValue: (r) => r.smokesPerRound, format: (r) => fmt(r.smokesPerRound, 3) },
 ];
 
-export function UtilityView({ allEntries, entries, selectedTeam = null, onOpenMatch, onOpenEvidence, onWatchDemo, onGoLibrary, identityOptions, onPageReady }: UtilityViewProps) {
+export function UtilityView({ state, onStateChange, allEntries, entries, selectedTeam = null, onOpenMatch, onOpenEvidence, onWatchDemo, onGoLibrary, identityOptions, onPageReady }: UtilityViewProps) {
   const [summary, setSummary] = useState<UtilityValueSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
@@ -159,23 +161,23 @@ export function UtilityView({ allEntries, entries, selectedTeam = null, onOpenMa
         <div className="stu-utility-stack">
           <UtilitySection
             title="HE 伤害"
-            player={<UtilityTable title="选手榜" rows={summary.players.filter((row) => row.heThrows > 0)} columns={HE_COLUMNS} initialSortKey="heDamagePerThrow" empty="当前范围内没有 HE 手雷伤害数据。" pageSize={10} />}
-            team={<UtilityTable title="队伍榜" rows={summary.teams.filter((row) => row.heThrows > 0)} columns={HE_COLUMNS} initialSortKey="heDamagePerThrow" empty="当前范围内没有队伍 HE 手雷伤害数据。" pageSize={10} />}
+            player={<UtilityTable tableState={state.tables.hePlayers} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, hePlayers: table } })} title="选手榜" rows={summary.players.filter((row) => row.heThrows > 0)} columns={HE_COLUMNS} initialSortKey="heDamagePerThrow" empty="当前范围内没有 HE 手雷伤害数据。" pageSize={10} />}
+            team={<UtilityTable tableState={state.tables.heTeams} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, heTeams: table } })} title="队伍榜" rows={summary.teams.filter((row) => row.heThrows > 0)} columns={HE_COLUMNS} initialSortKey="heDamagePerThrow" empty="当前范围内没有队伍 HE 手雷伤害数据。" pageSize={10} />}
           />
           <UtilitySection
             title="火焰伤害"
-            player={<UtilityTable title="选手榜" rows={summary.players.filter((row) => row.fireThrows > 0)} columns={FIRE_COLUMNS} initialSortKey="fireDamagePerThrow" empty="当前范围内没有火伤害数据。" pageSize={10} />}
-            team={<UtilityTable title="队伍榜" rows={summary.teams.filter((row) => row.fireThrows > 0)} columns={FIRE_COLUMNS} initialSortKey="fireDamagePerThrow" empty="当前范围内没有队伍火伤害数据。" pageSize={10} />}
+            player={<UtilityTable tableState={state.tables.firePlayers} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, firePlayers: table } })} title="选手榜" rows={summary.players.filter((row) => row.fireThrows > 0)} columns={FIRE_COLUMNS} initialSortKey="fireDamagePerThrow" empty="当前范围内没有火伤害数据。" pageSize={10} />}
+            team={<UtilityTable tableState={state.tables.fireTeams} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, fireTeams: table } })} title="队伍榜" rows={summary.teams.filter((row) => row.fireThrows > 0)} columns={FIRE_COLUMNS} initialSortKey="fireDamagePerThrow" empty="当前范围内没有队伍火伤害数据。" pageSize={10} />}
           />
           <UtilitySection
             title="闪光"
-            player={<UtilityTable title="选手榜" rows={summary.players.filter((row) => row.flashesThrown > 0)} columns={FLASH_COLUMNS} initialSortKey="enemyBlindSecondsPerRound" empty="当前范围内没有闪光数据。" pageSize={10} />}
-            team={<UtilityTable title="队伍榜" rows={summary.teams.filter((row) => row.flashesThrown > 0)} columns={FLASH_COLUMNS} initialSortKey="enemyBlindSecondsPerRound" empty="当前范围内没有队伍闪光数据。" pageSize={10} />}
+            player={<UtilityTable tableState={state.tables.flashPlayers} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, flashPlayers: table } })} title="选手榜" rows={summary.players.filter((row) => row.flashesThrown > 0)} columns={FLASH_COLUMNS} initialSortKey="enemyBlindSecondsPerRound" empty="当前范围内没有闪光数据。" pageSize={10} />}
+            team={<UtilityTable tableState={state.tables.flashTeams} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, flashTeams: table } })} title="队伍榜" rows={summary.teams.filter((row) => row.flashesThrown > 0)} columns={FLASH_COLUMNS} initialSortKey="enemyBlindSecondsPerRound" empty="当前范围内没有队伍闪光数据。" pageSize={10} />}
           />
           <UtilitySection
             title="烟雾"
-            player={<UtilityTable title="选手榜" rows={summary.players.filter((row) => row.smokesThrown > 0)} columns={SMOKE_COLUMNS} initialSortKey="smokesPerRound" empty="当前范围内没有烟雾数据。" pageSize={10} />}
-            team={<UtilityTable title="队伍榜" rows={summary.teams.filter((row) => row.smokesThrown > 0)} columns={SMOKE_COLUMNS} initialSortKey="smokesPerRound" empty="当前范围内没有队伍烟雾数据。" pageSize={10} />}
+            player={<UtilityTable tableState={state.tables.smokePlayers} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, smokePlayers: table } })} title="选手榜" rows={summary.players.filter((row) => row.smokesThrown > 0)} columns={SMOKE_COLUMNS} initialSortKey="smokesPerRound" empty="当前范围内没有烟雾数据。" pageSize={10} />}
+            team={<UtilityTable tableState={state.tables.smokeTeams} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, smokeTeams: table } })} title="队伍榜" rows={summary.teams.filter((row) => row.smokesThrown > 0)} columns={SMOKE_COLUMNS} initialSortKey="smokesPerRound" empty="当前范围内没有队伍烟雾数据。" pageSize={10} />}
           />
           <BestFlashList flashes={summary.bestFlashes.slice(0, 12)} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} onOpenEvidence={onOpenEvidence} onWatchDemo={onWatchDemo} />
           <DamageEvidenceList rows={summary.bestDamageRounds} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} onOpenEvidence={onOpenEvidence} onWatchDemo={onWatchDemo} />
@@ -197,7 +199,9 @@ function UtilitySection({ title, player, team }: { title: string; player: ReactN
   );
 }
 
-function UtilityTable({ title, rows, columns, initialSortKey, empty, pageSize }: {
+function UtilityTable({ title, rows, columns, initialSortKey, empty, pageSize, tableState, onTableStateChange }: {
+  tableState?: import("@cs2dak/presentation").TableState;
+  onTableStateChange: (state: import("@cs2dak/presentation").TableState) => void;
   title: string;
   rows: UtilityValueRow[];
   columns: DataTableColumn<UtilityValueRow>[];
@@ -205,7 +209,7 @@ function UtilityTable({ title, rows, columns, initialSortKey, empty, pageSize }:
   empty: string;
   pageSize: number;
 }) {
-  const [tableState, setTableState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: initialSortKey, direction: "desc" }, page: 0 });
+  const effectiveState = tableState ?? { sort: { key: initialSortKey, direction: "desc" as const }, page: 0 };
   if (rows.length === 0) {
     return <EmptyState variant="insufficient" title={title} hint={empty} />;
   }
@@ -217,7 +221,7 @@ function UtilityTable({ title, rows, columns, initialSortKey, empty, pageSize }:
           classes={STUDIO_TABLE_CLASSES}
           rows={rows}
           rowKey={(r) => r.id}
-          state={tableState} onStateChange={setTableState}
+          state={effectiveState} onStateChange={onTableStateChange}
           pageSize={pageSize}
           paginationInfo={(total) => `${total} 项`}
           showRank
@@ -236,6 +240,11 @@ function BestFlashList({ flashes, entryByMatchId, onOpenMatch, onOpenEvidence, o
   onWatchDemo?: UtilityViewProps["onWatchDemo"];
 }) {
   if (flashes.length === 0) return null;
+  const queue = flashes.flatMap((flash, index) => {
+    const entry = entryByMatchId.get(flash.matchId);
+    const key = `utility:flash:${flash.matchId}:${flash.roundNumber}:${flash.tick ?? ""}:${index}`;
+    return entry ? [{ key, entryId: entry.id, evidence: { matchId: flash.matchId, roundNumber: flash.roundNumber, tick: flash.tick, reason: flash.reason, role: "example" as const } }] : [];
+  });
   return (
     <div className="stu-card">
       <h3>最佳闪光 Top</h3>
@@ -249,11 +258,11 @@ function BestFlashList({ flashes, entryByMatchId, onOpenMatch, onOpenEvidence, o
               key={`${flash.matchId}-${flash.roundNumber}-${index}`}
               entry={entry}
               target={{ roundNumber: flash.roundNumber, tick: flash.tick }}
-              onOpenMatch={onOpenMatch}
-              onOpenEvidence={onOpenEvidence}
+
+              onOpenEvidence={request => onOpenEvidence({ ...request, queue, selectedKey: request.sourceKey })}
               onWatchDemo={onWatchDemo}
               reason={flash.reason}
-              sourceKey={`utility:flash:${flash.matchId}:${flash.roundNumber}:${index}`}
+              sourceKey={`utility:flash:${flash.matchId}:${flash.roundNumber}:${flash.tick ?? ""}:${index}`}
               finding={findingFromUtilityFlash(flash)}
             >
               {flash.playerName} · {entry ? formatMatchLabel(entry) : flash.matchId} · R{flash.roundNumber} · {flash.victimCount} 人 · 闪光时间 {flash.enemySeconds.toFixed(1)}s{teamFlashNote}
@@ -284,7 +293,7 @@ function DamageEvidenceList({ rows, entryByMatchId, onOpenMatch, onOpenEvidence,
               key={`${row.kind}-${row.matchId}-${row.roundNumber}-${index}`}
               entry={entry}
               target={{ roundNumber: row.roundNumber, tick: row.tick }}
-              onOpenMatch={onOpenMatch}
+
               onOpenEvidence={onOpenEvidence}
               onWatchDemo={onWatchDemo}
               reason={row.reason}

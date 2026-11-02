@@ -1,7 +1,11 @@
+import type { TableState } from "@cs2dak/presentation";
+import type { MatchWorkspaceState } from "./match-workspace-state";
 import type { StudioPageId } from "./studio-navigation.js";
 
 export interface MatchesPageState { search: string; mapFilter: string | null; tagFilter: string | null; serverFilter: string | null; dateFrom: string; dateTo: string }
 export interface EventsPageState { activeEventId: string | null; activeStageKey: string | null; selectedSeriesId: string | null }
 export const emptyMatchesState = (): MatchesPageState => ({ search: "", mapFilter: null, tagFilter: null, serverFilter: null, dateFrom: "", dateTo: "" });
 export const emptyEventsState = (): EventsPageState => ({ activeEventId: null, activeStageKey: null, selectedSeriesId: null });
-export type StudioPageStateMap = { [P in StudioPageId]: P extends "matches" ? MatchesPageState : P extends "events" ? EventsPageState : P extends "management" ? { tab: "identity" | "assets" | "library"; library: MatchesPageState } : null };
+export interface UtilityPageState { tables: Partial<Record<"hePlayers" | "heTeams" | "firePlayers" | "fireTeams" | "flashPlayers" | "flashTeams" | "smokePlayers" | "smokeTeams", TableState>>; selectedEvidenceKey: string | null }
+export const emptyUtilityState = (): UtilityPageState => ({ tables: {}, selectedEvidenceKey: null });
+export type StudioPageStateMap = { [P in StudioPageId]: P extends "match" ? MatchWorkspaceState | null : P extends "utility" ? UtilityPageState : P extends "matches" ? MatchesPageState : P extends "events" ? EventsPageState : P extends "management" ? { tab: "identity" | "assets" | "library"; library: MatchesPageState } : null };

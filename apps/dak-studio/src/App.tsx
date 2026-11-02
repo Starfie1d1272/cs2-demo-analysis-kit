@@ -33,7 +33,7 @@ import { CoachView } from "./views/CoachView";
 import { RadarFieldView } from "./views/RadarFieldView";
 import { buildCohortIdentityMap } from "./lib/identity";
 import type { IdentityOptions } from "./lib/identity";
-import { type EvidenceContinuation, type OpenEvidence } from "./lib/evidence-continuation";
+import { createEvidenceSession, type EvidenceSession, type OpenEvidence } from "./lib/evidence-continuation";
 import {
   applyCohortScopeProjection,
   cohortScopeProjection,
@@ -108,7 +108,7 @@ export function App() {
   const analysisContext = "context" in destination ? destination.context : fallbackContext;
   const navigate = useCallback((next: StudioDestination, intent: "open" | "evidence" = "open", sourceKey?: string) => {
     const id = `frame-${++nextFrameId.current}`;
-    if (intent === "open") { setEvidenceDetails(null); setRestoringFrameId(null); }
+    if (intent === "open") { setEvidenceSession(null); setRestoringFrameId(null); }
     setNavigation(current => studioNavigationReducer(current, intent === "evidence" && next.page === "match"
       ? { intent, id, destination: next, scrollY: window.scrollY, sourceKey }
       : { intent: "open", id, destination: next, scrollY: window.scrollY }));
@@ -118,7 +118,7 @@ export function App() {
     if (PAGE_SECTION[current.active.destination.page] === section) return;
     const id = `frame-${++nextFrameId.current}`;
     const target = current.history.find(frame => frame.id === current.resume[section]);
-    setEvidenceDetails(null);
+    setEvidenceSession(null);
     setRestoringFrameId(target?.id ?? null);
     setNavigation(state => studioNavigationReducer(state, { intent: "resume", id, section, scrollY: window.scrollY }));
   }, []);
@@ -136,7 +136,7 @@ export function App() {
   const goLineups = useCallback(() => navigate({ page: "lineups", context: createAnalysisContextPreset("explore") }), [navigate]);
   const openPersonalReview = useCallback(() => {
     const id = `frame-${++nextFrameId.current}`;
-    setEvidenceDetails(null);
+    setEvidenceSession(null);
     setRestoringFrameId(null);
     setNavigation(current => studioNavigationReducer(current, { intent: "open", id, destination: { page: "personal-review", context: createAnalysisContextPreset("personal-review") }, scrollY: window.scrollY }));
     void getPinnedPlayer().then(pinned => {
@@ -148,13 +148,7 @@ export function App() {
     }).catch(() => {});
   }, []);
   const analysisData = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
-  const [evidenceDetails, setEvidenceDetails] = useState<Pick<EvidenceContinuation, "evidence" | "finding"> | null>(null);
-  const evidenceSource = navigation.history.at(-1);
-  const evidenceContinuation: EvidenceContinuation | null = evidenceDetails && evidenceSource ? {
-    ...evidenceDetails, sourceView: evidenceSource.destination.page,
-    context: "context" in evidenceSource.destination ? evidenceSource.destination.context : fallbackContext,
-    sourceKey: evidenceSource.anchorKey,
-  } : null;
+  const [evidenceSession, setEvidenceSession] = useState<EvidenceSession | null>(null);
   const [restoringFrameId, setRestoringFrameId] = useState<string | null>(null);
   const { update, checkingUpdate, dismissedVersion, setDismissedVersion, showLatestMsg, updateChannel, doCheckUpdate, changeUpdateChannel } = useDesktopUpdates({ onError: setNotice });
   const [contextEditorOpen, setContextEditorOpen] = useState(false);
@@ -237,19 +231,35 @@ export function App() {
     navigate({ page: "match", entryId: id, ...target });
   }, [navigate]);
 
-  const openEvidence = useCallback<OpenEvidence>((id, evidence, sourceKey, finding) => {
-    if (navigationRef.current.active.id !== active.id) return;
-    setEvidenceDetails({ evidence: { ...evidence }, finding: finding ? { ...finding } : undefined });
-    navigate({ page: "match", entryId: id, roundNumber: evidence.roundNumber, tick: evidence.tick }, "evidence", sourceKey);
+  const openEvidence = useCallback<OpenEvidence>((request) => {
+    const source = navigationRef.current.active;
+    if (source.id !== active.id) return;
+    const sourceFrame = source.destination.page === "utility" ? { ...source, ui: { ...source.ui, selectedEvidenceKey: request.sourceKey ?? null } } : source;
+    setEvidenceSession(createEvidenceSession(request, { ...sourceFrame, scrollY: window.scrollY, anchorKey: request.sourceKey } as import("./lib/studio-navigation").StudioFrame));
+    navigate({ page: "match", entryId: request.entryId, roundNumber: request.evidence.roundNumber, tick: request.evidence.tick }, "evidence", request.sourceKey);
   }, [active.id, navigate]);
+  const moveEvidence = useCallback((index: number) => {
+    if (!evidenceSession || index < 0 || index >= evidenceSession.queue.length) return;
+    const item = evidenceSession.queue[index];
+    setEvidenceSession({ ...evidenceSession, activeIndex: index });
+    setNavigation(current => studioNavigationReducer(current, { intent: "evidence-target", destination: { page: "match", entryId: item.entryId, roundNumber: item.evidence.roundNumber, tick: item.evidence.tick } }));
+  }, [evidenceSession]);
+  const returnToEvidenceSource = useCallback(() => {
+    if (!evidenceSession) return;
+    const frame = evidenceSession.sourceFrame;
+    setEvidenceSession(null);
+    setRestoringFrameId(frame.id);
+    setNavigation(current => studioNavigationReducer(current, { intent: "restore", frame }));
+  }, [evidenceSession]);
 
   const goBack = useCallback(() => {
+    if (evidenceSession) { returnToEvidenceSource(); return; }
     const current = navigationRef.current;
     const id = `frame-${++nextFrameId.current}`;
     setRestoringFrameId(current.history.at(-1)?.id ?? id);
-    setEvidenceDetails(null);
+    setEvidenceSession(null);
     setNavigation(state => studioNavigationReducer(state, { intent: "back", id }));
-  }, []);
+  }, [evidenceSession, returnToEvidenceSource]);
 
   const onPageReady = useCallback((frameId: string, availableAnchorKeys: string[]) => {
     const frame = navigationRef.current.active;
@@ -259,7 +269,7 @@ export function App() {
     } else {
       const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
       window.scrollTo({ top: Math.min(frame.scrollY, max), behavior: "instant" });
-      if (frame.anchorKey && max === 0 && frame.scrollY > 0) setNotice("未能恢复原位置，已返回页面顶部。");
+      if (frame.anchorKey) setNotice("原证据条目当前不存在，已保留筛选并恢复页面位置。");
     }
     setNavigation(current => studioNavigationReducer(current, { intent: "position", frameId, scrollY: window.scrollY }));
     setRestoringFrameId(null);
@@ -446,12 +456,15 @@ export function App() {
             onPageReady={(keys) => onPageReady(active.id, keys)}
             entries={entries}
             demoId={selectedDemoId}
-            deepLink={matchDeepLink}
+            deepLink={evidenceSession || !active.ui ? matchDeepLink : null}
             onSelectDemo={(id) => openDemo(id)}
             onWatchDemo={nativeImportAvailable ? watchRawDemo : undefined}
             onGoLibrary={() => goLibrary()}
-            evidenceContinuation={evidenceContinuation}
-            onReturnToSource={goBack}
+            evidenceSession={evidenceSession}
+            onMoveEvidence={moveEvidence}
+            onReturnToSource={returnToEvidenceSource}
+            workspaceState={active.ui as import("./lib/match-workspace-state").MatchWorkspaceState | null}
+            onWorkspaceStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
           />
         )}
         {destination.page === "player" && (
@@ -517,6 +530,8 @@ export function App() {
             allEntries={entries}
             entries={scopedEntries}
             selectedTeam={selectedTeam}
+            state={active.ui as import("./lib/studio-page-state").UtilityPageState}
+            onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
             onOpenMatch={openDemo}
             onOpenEvidence={openEvidence}
             onPageReady={(keys) => onPageReady(active.id, keys)}
