@@ -54,6 +54,16 @@ export interface MatchWorkspaceState {
   mapLayer: "death" | "kill" | "grenade";
   replay: ReplayViewState | null;
 }
+/** 证据目标必须有可播放的帧，不能让普通初始化的首回合回退冒充目标。 */
+export function replayStateForRound(model: MatchWorkspaceModel, previous: ReplayViewState | null, roundNumber: number, tick?: number): ReplayViewState | null {
+  const round = model.replay.rounds.find(item => item.roundNumber === roundNumber);
+  if (!model.replay.available || !round || !Number.isFinite(round.frameCount) || round.frameCount <= 0) return null;
+  const base = previous ?? createReplayViewState(model.replay, model.map.view);
+  if (!base) return null;
+  const result = normalizeReplayViewState(model.replay, model.map.view, { ...base, roundNumber, tick: tick ?? round.freezeEndTick, playing: false });
+  return result?.roundNumber === roundNumber ? result : null;
+}
+
 export function createMatchWorkspaceState(model: MatchWorkspaceModel): MatchWorkspaceState {
   return normalizeMatchWorkspaceState(model, { view: "overview", playerPanelSteamId64: null, reviewPlayerSteamId64: null, quickRoundFilter: "all", roundExplorer: { filter: { ...ROUND_FILTER_DEFAULT, special: { ...ROUND_FILTER_DEFAULT.special } }, selectedRoundNumber: null, showAllEvents: false }, mapLayer: "death", replay: createReplayViewState(model.replay, model.map.view) });
 }

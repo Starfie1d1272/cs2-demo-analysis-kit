@@ -17,7 +17,7 @@ import { emptyStudyNoteDraft, emptyCoachPlaybookDraft, materialStateMatches, typ
 import { listStudyMaterialsKind, sortMaterials, materialKey, type MaterialKind, type MaterialSummary } from "../lib/study-materials";
 import { createStudyNote, getStudyNote, removeStudyNote, updateStudyNote } from "../lib/study-notes";
 import { listTrainingFocus, type TrainingFocus } from "../lib/training-focus";
-import { listPrepItems, type PrepItem } from "../lib/prep-items";
+import { listPrepItems, prepItemsToMarkdown, type PrepItem } from "../lib/prep-items";
 import { listPracticeLineups, removePracticeLineup, type PracticeLineup } from "../lib/practice-lineups";
 import { FACTS_REVISION } from "../lib/analysis-manifest";
 import { TrainingFocusEditor, saveTrainingFocusDraft, deleteTrainingFocus } from "./coach/TrainingFocusPanel";
@@ -32,6 +32,9 @@ type AssignmentAnalysis = (scope: { teamKey: string; mapName: string; side: "t" 
 type ListProps = { identityOptions?: IdentityOptions; onAnalyzeAssignments: AssignmentAnalysis; onPageReady?: (keys: string[]) => void; prepMigrationStatus: "loading" | "ready" | "error"; prepMigrationError: string | null; retryPrepMigration: () => Promise<void>; entries: StudioDemoEntry[]; state: MaterialsPageState; onStateChange: (state: MaterialsPageState) => void; onOpenMaterial: (ref: MaterialRef) => void; onCreatedMaterial: (ref: MaterialRef, state: MaterialsPageState) => void; onOpenEvidence: (request: OpenEvidenceRequest, state: MaterialsPageState) => void };
 export function MaterialsView({ identityOptions, onAnalyzeAssignments, entries, state, onStateChange, onOpenMaterial, onCreatedMaterial, onOpenEvidence, prepMigrationStatus, prepMigrationError, retryPrepMigration, onPageReady }: ListProps) {
   const [rows, setRows] = useState<MaterialSummary[]>([]); const [errors, setErrors] = useState<Partial<Record<MaterialKind, string>>>({}); const [unreadable, setUnreadable] = useState(0); const [revision, setRevision] = useState(0); const [error, setError] = useState<string | null>(null);
+  const [prepReport, setPrepReport] = useState<string | null>(null);
+  const [prepReportError, setPrepReportError] = useState<string | null>(null);
+  const [prepReportLoading, setPrepReportLoading] = useState(false);
   const [sheetUnreadable, setSheetUnreadable] = useState(0);
   const [playbookUnreadable, setPlaybookUnreadable] = useState(0);
   const [assignmentUnreadable, setAssignmentUnreadable] = useState(0);
@@ -58,6 +61,12 @@ export function MaterialsView({ identityOptions, onAnalyzeAssignments, entries, 
     void Promise.all(pending).then(() => { if (live) setLoaded(true); });
     return () => { live = false; };
   }, [entries, revision, prepMigrationStatus]);
+  const generatePrepReport = async () => {
+    setPrepReportLoading(true); setPrepReportError(null); setPrepReport(null);
+    try { setPrepReport(prepItemsToMarkdown("备战清单", await listPrepItems())); }
+    catch (reason) { setPrepReportError(reason instanceof Error ? reason.message : String(reason)); }
+    finally { setPrepReportLoading(false); }
+  };
   const change = (patch: Partial<MaterialsPageState>) => onStateChange({ ...state, ...patch });
   const filtered = rows.filter(row => (!state.typeFilter || row.ref.kind === state.typeFilter) && (!state.mapFilter || row.mapName === state.mapFilter) && `${row.title} ${row.summary}`.toLowerCase().includes(state.search.toLowerCase()));
   const saveMatchSheet = async () => { if (!state.newMatchSheet || savingRef.current) return; savingRef.current = true; setSaving(true); try { const item = await createCoachMatchSheet(state.newMatchSheet); onCreatedMaterial({ kind: "match-sheet", id: item.id }, { ...state, newMatchSheet: null, newMatchSheetDirty: false }); setError(null); } catch (e) { setError(String(e)); } finally { savingRef.current = false; setSaving(false); } };
@@ -70,6 +79,12 @@ export function MaterialsView({ identityOptions, onAnalyzeAssignments, entries, 
     <button className="stu-button" disabled={state.newPlaybook !== null} onClick={() => change({ newPlaybook: emptyCoachPlaybookDraft(), newPlaybookDirty: false })}>新建战术</button>
     <button className="stu-button" disabled={state.newNote !== null} onClick={() => change({ newNote: emptyStudyNoteDraft(), newNoteDirty: false })}>新建笔记</button>
     <div><input className="stu-input" placeholder="搜索标题或正文" value={state.search} onChange={e => change({ search: e.target.value })} /><select className="stu-input" value={state.typeFilter ?? ""} onChange={e => change({ typeFilter: e.target.value || null })}><option value="">全部类型</option>{Object.entries(labels).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select><select className="stu-input" value={state.mapFilter ?? ""} onChange={e => change({ mapFilter: e.target.value || null })}><option value="">全部地图</option>{[...new Set(rows.flatMap(r => r.mapName ? [r.mapName] : []))].sort().map(map => <option key={map}>{map}</option>)}</select></div>
+    <details className="stu-card"><summary>备战清单 Markdown 导出</summary>
+      <p className="stu-muted">生成全部已保存备战条目的快照，不受上方筛选影响。</p>
+      <button type="button" className="stu-button-sm" disabled={prepMigrationStatus !== "ready" || prepReportLoading} onClick={() => void generatePrepReport()}>生成完整备战清单</button>
+      {prepReportError && <p role="alert">备战清单读取失败：{prepReportError}</p>}
+      {prepReport !== null && <textarea className="stu-coach-report" aria-label="备战清单 Markdown" readOnly value={prepReport} />}
+    </details>
     {prepMigrationStatus === "error" && <p role="alert">备战条目迁移未完成：{prepMigrationError} <button className="stu-button-sm" onClick={() => void retryPrepMigration()}>重试迁移</button></p>}
     {Object.entries(errors).map(([kind, message]) => <p role="alert" key={kind}>{labels[kind as MaterialKind]}读取失败：{message} <button className="stu-button-sm" onClick={() => setRevision(n => n + 1)}>重试</button></p>)}{sheetUnreadable > 0 && <p role="alert">有 {sheetUnreadable} 条比赛单无法读取，原始记录已保留。</p>}{assignmentUnreadable > 0 && <p role="alert">有 {assignmentUnreadable} 条人员安排无法读取，原始记录已保留。</p>}{playbookUnreadable > 0 && <p role="alert">有 {playbookUnreadable} 条战术无法读取，原始记录已保留。</p>}{unreadable > 0 && <p role="alert">有 {unreadable} 条笔记无法读取，原始记录已保留。</p>}
     {(!loaded || prepMigrationStatus === "loading") && <p>正在读取资料…</p>}{loaded && prepMigrationStatus !== "loading" && filtered.length === 0 && <p>没有匹配的资料。</p>}{(!state.typeFilter || state.typeFilter === "playbook") && <PlaybookList rows={filtered.filter(row => row.ref.kind === "playbook")} state={state} onStateChange={onStateChange} onOpen={row => { change({ selectedRef: row.ref }); onOpenMaterial(row.ref); }} />}{filtered.filter(row => row.ref.kind !== "playbook").map(row => <div key={materialKey(row.ref)}><button className="stu-button-sm" onClick={() => { change({ selectedRef: row.ref }); onOpenMaterial(row.ref); }}>{row.title}</button> · {row.kindLabel} · {row.mapName ?? "—"} · {row.updatedAt === null ? "时间未知" : new Date(row.updatedAt).toLocaleString()} · {statusLabels[row.sourceStatus]}<p>{row.summary || "—"}</p></div>)}

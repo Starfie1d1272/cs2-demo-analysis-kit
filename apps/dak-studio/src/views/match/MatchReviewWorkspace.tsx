@@ -3,9 +3,8 @@ import { displayWeaponName, sideLabel, economyLabelCn, buildMatchReportMarkdown 
 import { Activity, BarChart3, Crosshair, Film, Gauge, ListChecks, Map as MapIcon, Swords, Table2, Users } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 import { EconomyPanel, HeatmapCanvas, ReplayViewer, ScoreboardTable } from "@cs2dak/react";
-import { normalizeReplayViewState } from "@cs2dak/presentation";
 import { Panel } from "./MatchPanel";
-import { normalizeMatchWorkspaceState, roundMatchesFilter, ROUND_FILTER_DEFAULT, type MatchRoundFilterState, type MatchWorkspaceState } from "../../lib/match-workspace-state";
+import { normalizeMatchWorkspaceState, replayStateForRound, roundMatchesFilter, ROUND_FILTER_DEFAULT, type MatchRoundFilterState, type MatchWorkspaceState } from "../../lib/match-workspace-state";
 import { matchesQuickRound, quickRoundTick, type QuickRoundFilter } from "../../lib/match-review";
 import "./match-review.css";
 
@@ -30,9 +29,8 @@ export function MatchReviewWorkspace({ model, state: input, onStateChange, pinne
   const setView = (view: WorkspaceView) => onStateChange({ ...state, view, replay: state.replay && view !== "replay" ? { ...state.replay, playing: false } : state.replay });
   const view = state.view;
   const openReplay = (roundNumber: number, tick?: number) => {
-    const round = model.replay.rounds.find(r => r.roundNumber === roundNumber);
-    const replay = state.replay && round ? normalizeReplayViewState(model.replay, model.map.view, { ...state.replay, roundNumber, tick: tick ?? round.freezeEndTick, playing: false }) : state.replay;
-    onStateChange(round && replay ? { ...state, view: "replay", replay } : { ...state, view: "rounds", quickRoundFilter: "all", roundExplorer: { ...state.roundExplorer, filter: ROUND_FILTER_DEFAULT, selectedRoundNumber: roundNumber } });
+    const replay = replayStateForRound(model, state.replay, roundNumber, tick);
+    onStateChange(replay ? { ...state, view: "replay", replay } : { ...state, view: "rounds", quickRoundFilter: "all", roundExplorer: { ...state.roundExplorer, filter: ROUND_FILTER_DEFAULT, selectedRoundNumber: roundNumber } });
   };
   const pinnedMatches = model.players.filter(p => pinnedIds.includes(p.row.steamId64));
   const reviewRow = model.scoreboard.find(row => row.steamId64 === state.reviewPlayerSteamId64);
@@ -175,6 +173,7 @@ function RoundExplorer({ model, state, onChange, onOpenReplay, quickFilter, revi
     [model.rounds, filter, quickFilter, reviewPlayer]
   );
   const round = filteredRounds.find((row) => row.roundNumber === selectedRound) ?? filteredRounds[0];
+  const canOpenReplay = !!(onOpenReplay && round && replayStateForRound(model, null, round.roundNumber));
   const eventLimit = 28;
   const visibleEvents = round ? (showAllEvents ? round.events : round.events.slice(0, eventLimit)) : [];
   const hiddenEventCount = (round?.events.length ?? 0) - visibleEvents.length;
@@ -269,11 +268,11 @@ function RoundExplorer({ model, state, onChange, onOpenReplay, quickFilter, revi
       {round && <Panel title={`R${round.roundNumber} 详情`}>
         <div className="dak-round-detail">
           <button type="button" className="stu-button-sm" onClick={() => onNote(round.roundNumber)}>记一笔</button>
-          {onOpenReplay && (
-            <button className="dak-timeline-more" type="button" onClick={() => onOpenReplay(round.roundNumber, quickRoundTick(round, quickFilter))}>
+          {canOpenReplay ? (
+            <button className="dak-timeline-more" type="button" onClick={() => onOpenReplay?.(round.roundNumber, quickRoundTick(round, quickFilter))}>
               ▶ 在 2D 回放中打开本回合
             </button>
-          )}
+          ) : <p className="dak-muted">本回合没有可播放的 2D 回放，以下为回合详情。</p>}
           <div className="dak-fact-grid">
             <Fact label="比分" value={round.scoreBefore} />
             <Fact label="胜方" value={round.winnerSide.toUpperCase()} />
@@ -283,11 +282,11 @@ function RoundExplorer({ model, state, onChange, onOpenReplay, quickFilter, revi
           <div className="dak-timeline">
             {visibleEvents.map((event) => (
               <div
-                className={onOpenReplay ? "dak-timeline-row dak-timeline-row-link" : "dak-timeline-row"}
+                className={canOpenReplay ? "dak-timeline-row dak-timeline-row-link" : "dak-timeline-row"}
                 key={event.id}
-                onClick={onOpenReplay ? () => onOpenReplay(round.roundNumber, event.tick) : undefined}
-                role={onOpenReplay ? "button" : undefined}
-                title={onOpenReplay ? "点击跳到 2D 回放对应时刻" : undefined}
+                onClick={canOpenReplay ? () => onOpenReplay?.(round.roundNumber, event.tick) : undefined}
+                role={canOpenReplay ? "button" : undefined}
+                title={canOpenReplay ? "点击跳到 2D 回放对应时刻" : undefined}
               >
                 <span className="dak-mono dak-muted">{event.clockLabel}</span>
                 <span className="dak-badge">{event.type}</span>

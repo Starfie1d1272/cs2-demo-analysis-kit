@@ -5,7 +5,8 @@ import type { AnalysisExportSource } from "../../lib/analysis-export";
 import { patternFingerprint } from "../../lib/pattern-observations";
 import type { PatternExplorerState } from "../../lib/pattern-page-state";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../../lib/queries/query-cache";
-import { createReplayViewState, normalizeReplayViewState, type ReplayViewState } from "@cs2dak/presentation";
+import { type ReplayViewState } from "@cs2dak/presentation";
+import { replayStateForRound } from "../../lib/match-workspace-state";
 import { STUDIO_TABLE_CLASSES } from "../../components/table-styles";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject, type Dispatch, type SetStateAction } from "react";
 import type { MatchWorkspaceModel } from "@cs2dak/presentation";
@@ -263,12 +264,10 @@ function CoachReplayStage({ fact, entryByMatchId, cache, mainRef, savedSource, s
     if (analysis.status !== "ready") return;
     if (!model || !fact || !source) { setReplay(null); return; }
     const round = model.replay.rounds.find(r => r.roundNumber === fact.roundNumber);
-    const initial = createReplayViewState(model.replay, model.map.view);
     setReplay(previous => {
-      const state = round && initial ? normalizeReplayViewState(model.replay, model.map.view, {
-        ...(savedSource === source && savedReplay ? savedReplay : previous?.matchId === fact.matchId ? previous.state : initial),
-        roundNumber: round.roundNumber, tick: savedSource === source && savedReplay ? savedReplay.tick : round.freezeEndTick + 20 * (model.replay.tickrate ?? 64), playing: false,
-      }) : null;
+      const base = savedSource === source && savedReplay ? savedReplay : previous?.matchId === fact.matchId ? previous.state : null;
+      const tick = savedSource === source && savedReplay ? savedReplay.tick : round ? round.freezeEndTick + 20 * (model.replay.tickrate ?? 64) : undefined;
+      const state = replayStateForRound(model, base, fact.roundNumber, tick);
       return state ? { source, matchId: fact.matchId, state } : null;
     });
   }, [model, fact?.matchId, fact?.roundNumber, source, analysis.status]);
@@ -305,8 +304,8 @@ function CoachReplayStage({ fact, entryByMatchId, cache, mainRef, savedSource, s
         <div className="stu-pe-radar-empty">{error}</div>
       ) : !model ? (
         <div className="stu-loading">读取本地回放…</div>
-      ) : !model.replay.available || !model.replay.rounds.some(r => r.roundNumber === fact.roundNumber) ? (
-        <div className="stu-pe-radar-empty">本场导出未附带 2D 回放流。</div>
+      ) : !replayStateForRound(model, null, fact.roundNumber) ? (
+        <div className="stu-pe-radar-empty">该回合没有可播放的 2D 回放，仍可查看下方证据详情。</div>
       ) : replay?.source !== source ? (
         <div className="stu-loading">准备示例回合…</div>
       ) : (
