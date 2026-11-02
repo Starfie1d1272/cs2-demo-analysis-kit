@@ -1,7 +1,11 @@
+import { canExportSnapshot, withCapabilityConditions, unionExportEntries, withAnalysisExportEntries } from "../../lib/analysis-export";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../../lib/queries/query-cache";
 import { CapabilityBar, useCapability } from "../../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../../lib/capability-availability";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { AnalysisExportButtons } from "../../components/AnalysisExportButtons";
+import { buildPlayerRolesAnalysisResult } from "../../lib/analysis-export-roles";
+import type { AnalysisExportSource } from "../../lib/analysis-export";
 import { EmptyState, PlayerMapPoolPanel, PlayerMapRoleProfilePanel } from "@cs2dak/react";
 import type { DeclaredRole, PlayerMapPoolRow, PlayerMapRoleProfile, WeaponDuty } from "@cs2dak/tactics";
 import { getPlayerMapPool, getPlayerMapRoleProfiles } from "../../lib/queries/spatial-queries";
@@ -11,7 +15,8 @@ import type { IdentityOptions } from "../../lib/identity";
 import type { OpenEvidence } from "../../lib/evidence-continuation";
 import type { PlayerRolesState } from "../../lib/studio-page-state";
 
-export function PlayerRolesPanel({ onCapabilityRepair, entries, playerKey, playerLabel, selectedTeam, identityOptions, onOpenEvidence, state, onStateChange, onPageReady }: {
+export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, playerKey, playerLabel, selectedTeam, identityOptions, onOpenEvidence, state, onStateChange, onPageReady }: {
+  exportSource?: AnalysisExportSource | null;
   onCapabilityRepair: (action: CapabilityRepairAction) => void; entries: StudioDemoEntry[]; playerKey: string; playerLabel: string; selectedTeam: string | null;
   identityOptions?: IdentityOptions; onOpenEvidence: OpenEvidence; state: PlayerRolesState;
   onStateChange: (state: PlayerRolesState) => void; onPageReady?: (keys: string[]) => void;
@@ -35,7 +40,9 @@ export function PlayerRolesPanel({ onCapabilityRepair, entries, playerKey, playe
   const roleKey = JSON.stringify([roleEntries?.map(entry => entry.id), playerKey, selectedTeam, identityOptions?.version, roleDeclarations]);
   const roleProfiles = roleSnapshot?.key === roleKey ? roleSnapshot.value : null;
   const selectedRoleProfile = roleProfiles?.find((profile) => profile.playerKey === playerKey && (selectedTeam == null || profile.teamKey === selectedTeam)) ?? null;
-  const poolKey = JSON.stringify([poolEntries?.map(entry => entry.id), playerKey, selectedTeam, identityOptions?.version, selectedRoleProfile]);
+  // A pool refreshed after a role failure must not incorporate an older role snapshot.
+  const poolRoleProfile = !roleError && !capability.error && !capability.stale && canExportSnapshot(roleSnapshot, analysis) ? selectedRoleProfile : null;
+  const poolKey = JSON.stringify([poolEntries?.map(entry => entry.id), playerKey, selectedTeam, identityOptions?.version, poolRoleProfile]);
   const pool = poolSnapshot?.key === poolKey ? poolSnapshot : null;
   const mapPool = pool?.rows ?? [];
   const unsupportedMaps = pool?.unsupported ?? [];
@@ -77,11 +84,11 @@ export function PlayerRolesPanel({ onCapabilityRepair, entries, playerKey, playe
     if (analysis.status !== "ready") return;
     let cancelled = false;
     setMapPoolReady(false); setMapPoolError(null);
-    void getPlayerMapPool(poolEntries, playerKey, selectedRoleProfile, identityOptions)
+    void getPlayerMapPool(poolEntries, playerKey, poolRoleProfile, identityOptions)
       .then(result => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setPoolSnapshot({ key: poolKey, generation: analysis.generation, rows: result.rows, unsupported: result.unsupportedMapNames }); setMapPoolReady(true); } })
       .catch(reason => { if (!cancelled) { setMapPoolError(reason instanceof Error ? reason.message : String(reason)); setMapPoolReady(true); } });
     return () => { cancelled = true; };
-  }, [poolEntries, playerKey, selectedTeam, selectedRoleProfile, identityOptions?.version, poolKey, analysis]);
+  }, [poolEntries, playerKey, selectedTeam, poolRoleProfile, identityOptions?.version, poolKey, analysis]);
   useEffect(() => {
     if (!onPageReady || (entries.length > 0 && ((!roleProfiles && !roleError && !capability.error) || (!mapPoolReady && !mapPoolError && !poolCapability.error)))) return;
     onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
@@ -147,5 +154,29 @@ export function PlayerRolesPanel({ onCapabilityRepair, entries, playerKey, playe
             </div>
           )}
   </>;
-  return <div className="stu-view"><header className="stu-view-header"><h1>位置与职责 · {playerLabel}</h1></header>{rolePanels}</div>;
+  const roleCurrent = !!selectedRoleProfile && !roleError && !capability.error &&
+    !capability.stale && canExportSnapshot(roleSnapshot, analysis);
+  const poolCurrent = !!pool && mapPoolReady && !mapPoolError && !poolCapability.error &&
+    !poolCapability.stale && canExportSnapshot(poolSnapshot, analysis);
+  const omitted = [
+    !roleCurrent ? "地图 / 位置未导出：无当前可用结果或正在更新。" : null,
+    !poolCurrent ? "个人地图池未导出：无当前可用结果或正在更新。" : null,
+  ].filter((value): value is string => value !== null);
+  return <div className="stu-view">
+    <header className="stu-view-header">
+      <h1>位置与职责 · {playerLabel}</h1>
+      {exportSource && (roleCurrent || poolCurrent) && <AnalysisExportButtons capture={() => {
+        const source = withCapabilityConditions(
+          withAnalysisExportEntries(exportSource, unionExportEntries(
+            roleCurrent ? roleEntries : null, poolCurrent ? poolEntries : null,
+          )),
+          roleCurrent ? capability.availability : null,
+          poolCurrent ? poolCapability.availability : null,
+        );
+        return buildPlayerRolesAnalysisResult(source, roleCurrent ? selectedRoleProfile : null,
+          poolCurrent ? mapPool : null, state, playerLabel, poolCurrent ? unsupportedMaps : [], omitted);
+      }} />}
+    </header>
+    {rolePanels}
+  </div>;
 }

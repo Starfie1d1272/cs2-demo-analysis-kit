@@ -1,17 +1,16 @@
-import { useMemo, useState } from "react";
-import { buildMistakeFindings, type PlayerSeasonInsights } from "@cs2dak/analytics";
+import { useState } from "react";
+import type { AnalysisFinding } from "@cs2dak/presentation";
 import { FindingPanel } from "@cs2dak/react";
 import type { PlayerSeasonProfile } from "@cs2dak/presentation";
 import { matchIdForEntry, type StudioDemoEntry } from "../../lib/demo-entry";
 import type { OpenEvidence } from "../../lib/evidence-continuation";
 import { createTrainingFocus } from "../../lib/training-focus";
 
-export function PlayerFindingsPanel({ insights, player, entries, contextSummary, onOpenEvidence, onOpenMaterials }: {
-  insights: PlayerSeasonInsights; player: PlayerSeasonProfile; entries: StudioDemoEntry[]; contextSummary: string;
+export function PlayerFindingsPanel({ findings, player, entries, contextSummary, onOpenEvidence, onOpenMaterials }: {
+  findings: AnalysisFinding[]; player: PlayerSeasonProfile; entries: StudioDemoEntry[]; contextSummary: string;
   onOpenEvidence: OpenEvidence; onOpenMaterials: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
-  const findings = useMemo(() => buildMistakeFindings(insights.mistakes, { id: player.playerKey, label: player.name }), [insights, player.playerKey, player.name]);
   return <section className="stu-card stu-card-wide"><div className="stu-section-head"><h3>待复核</h3><button type="button" className="stu-button-sm" onClick={onOpenMaterials}>管理训练重点</button></div>
     <p className="stu-dim">观察需要结合证据复核；只有明确加入才会保存训练重点。</p>
     {error && <p role="alert">{error}</p>}

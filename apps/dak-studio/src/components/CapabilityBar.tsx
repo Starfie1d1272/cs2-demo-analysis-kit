@@ -54,8 +54,8 @@ export function useCapability(entries: StudioDemoEntry[], capability: StudioCapa
   return { availability: current, eligible, error, retry: () => setRetryVersion(version => version + 1), stale: !!current && (data.status !== "ready" || result?.generation !== data.generation || !!error) };
 }
 
-export function CapabilityPanel({ entries, capability, onRepair, children }: { entries: StudioDemoEntry[]; capability: StudioCapability; onRepair: (action: CapabilityRepairAction) => void; children: (eligible: StudioDemoEntry[]) => ReactNode }) {
+export function CapabilityPanel({ entries, capability, onRepair, children }: { entries: StudioDemoEntry[]; capability: StudioCapability; onRepair: (action: CapabilityRepairAction) => void; children: (eligible: StudioDemoEntry[], current: boolean, availability: CapabilityAvailability) => ReactNode }) {
   const { availability, eligible, error, stale, retry } = useCapability(entries, capability);
   if (!availability || !eligible) return error ? <div role="alert">读取可用性失败：{error} <button type="button" className="stu-button-sm" onClick={retry}>重试</button></div> : <div className="stu-loading">读取分析数据可用性…</div>;
-  return <><CapabilityBar availability={availability} onRepair={onRepair} />{stale && <p className="stu-muted" role="status">{error ? <>可用性更新失败，显示旧版本。 <button type="button" className="stu-button-sm" onClick={retry}>重试</button></> : "正在更新可用性。"}</p>}{children(eligible)}</>;
+  return <><CapabilityBar availability={availability} onRepair={onRepair} />{stale && <p className="stu-muted" role="status">{error ? <>可用性更新失败，显示旧版本。 <button type="button" className="stu-button-sm" onClick={retry}>重试</button></> : "正在更新可用性。"}</p>}{children(eligible, !stale, availability)}</>;
 }

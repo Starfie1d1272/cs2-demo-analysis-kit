@@ -1,4 +1,8 @@
+import { canExportSnapshot } from "../lib/analysis-export";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
+import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
+import { buildUtilityAnalysisResult } from "../lib/analysis-export-utility";
+import type { AnalysisExportSource } from "../lib/analysis-export";
 import { flushSync } from "react-dom";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
@@ -19,6 +23,7 @@ import type { OpenEvidence } from "../lib/evidence-continuation";
 import { projectUtilityPlayer } from "../lib/analysis-view-projections";
 
 export interface UtilityViewProps {
+  exportSource?: AnalysisExportSource | null;
   state: import("../lib/studio-page-state").UtilityPageState;
   onStateChange: (state: import("../lib/studio-page-state").UtilityPageState) => void;
   allEntries: StudioDemoEntry[];
@@ -99,7 +104,7 @@ const SMOKE_COLUMNS: DataTableColumn<UtilityValueRow>[] = [
   { key: "smokesPerRound", label: "烟/回合", numeric: true, sortable: true, sortValue: (r) => r.smokesPerRound, format: (r) => fmt(r.smokesPerRound, 3) },
 ];
 
-export function UtilityView({ state, onStateChange, playerFocus, onGoLineups, allEntries, entries, selectedTeams, onOpenEvidence, onWatchDemo, onGoLibrary, identityOptions, onPageReady }: UtilityViewProps) {
+export function UtilityView({ exportSource, state, onStateChange, playerFocus, onGoLineups, allEntries, entries, selectedTeams, onOpenEvidence, onWatchDemo, onGoLibrary, identityOptions, onPageReady }: UtilityViewProps) {
   const [snapshot, setSnapshot] = useState<{ key: string; generation: number; value: UtilityValueSummary | null } | null>(null);
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const requestKey = JSON.stringify([entries.map(entry => entry.id), selectedTeams, identityOptions?.version]);
@@ -160,6 +165,7 @@ export function UtilityView({ state, onStateChange, playerFocus, onGoLineups, al
       <header className="stu-view-header">
         <div>
           <h1>道具价值</h1>
+          {visibleSummary && exportSource && (!playerFocus || playerFocus.steamIds.length > 0) && !error && canExportSnapshot(snapshot, analysis) && <AnalysisExportButtons capture={() => buildUtilityAnalysisResult(exportSource, visibleSummary, state, { he: HE_COLUMNS, fire: FIRE_COLUMNS, flash: FLASH_COLUMNS, smoke: SMOKE_COLUMNS })} />}
           <p>按回合和投掷数归一：闪光看敌方致盲时间，HE/火看敌方伤害，烟只看每回合投入；不把关联数据表述为对胜负的因果贡献。</p>
           <button type="button" className="stu-button-sm" onClick={onGoLineups}>查看道具点位</button>
           {playerFocus && <p>选手行与具备身份的候选按焦点筛选；队伍榜显示比赛范围内的队伍上下文。{playerFocus.steamIds.length === 0 && "无法解析该选手的身份。"}</p>}

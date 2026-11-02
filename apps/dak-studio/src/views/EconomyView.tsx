@@ -1,4 +1,8 @@
+import { canExportSnapshot } from "../lib/analysis-export";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
+import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
+import { buildEconomyAnalysisResult } from "../lib/analysis-export-economy";
+import type { AnalysisExportSource } from "../lib/analysis-export";
 import { usePageReady } from "../lib/use-page-ready";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -10,6 +14,7 @@ import { type IdentityOptions } from "../lib/identity";
 import type { StudioDemoEntry } from "../lib/demo-entry";
 
 export interface EconomyViewProps {
+  exportSource?: AnalysisExportSource | null;
   state: import("../lib/analysis-theme-state").EconomyPageState;
   onStateChange: (state: import("../lib/analysis-theme-state").EconomyPageState) => void;
   onPageReady?: (keys: string[]) => void;
@@ -22,7 +27,7 @@ export interface EconomyViewProps {
   identityOptions?: IdentityOptions;
 }
 
-export function EconomyView({ state, onStateChange, onViewMatches, playerFocused, allEntries, entries, selectedTeams, onGoLibrary, identityOptions , onPageReady }: EconomyViewProps) {
+export function EconomyView({ exportSource, state, onStateChange, onViewMatches, playerFocused, allEntries, entries, selectedTeams, onGoLibrary, identityOptions , onPageReady }: EconomyViewProps) {
   const [snapshot, setSnapshot] = useState<{ key: string; generation: number; value: TournamentInsights | null } | null>(null);
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const requestKey = JSON.stringify([entries.map(entry => entry.id), selectedTeams, identityOptions?.version]);
@@ -68,6 +73,7 @@ export function EconomyView({ state, onStateChange, onViewMatches, playerFocused
       <header className="stu-view-header">
         <div>
           <h1>{playerFocused ? "当前比赛范围的经济" : "经济与转化"}</h1>
+          {insights && exportSource && !error && canExportSnapshot(snapshot, analysis) && <AnalysisExportButtons capture={() => buildEconomyAnalysisResult(exportSource, insights, state, { teams: TEAM_DETAIL_COLUMNS, matrix: ECON_MATRIX_COLUMNS, upset: ECO_UPSET_COLUMNS })} />}
           <p>按所选比赛范围聚合，查看手枪转化、5v4/5v3 转化、劣势翻盘和小枪破局。当前结果为描述性聚合，尚不自动生成 Finding。</p>
           {playerFocused && <p>经济统计按比赛范围计算，未按个人筛选。</p>}
           <button type="button" className="stu-button-sm" onClick={onViewMatches}>查看这组比赛</button>

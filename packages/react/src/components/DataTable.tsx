@@ -42,6 +42,23 @@ export interface DataTableColumn<T> {
   cellClassName?: (row: T) => string | undefined;
 }
 
+/** Sort the full filtered result using the same column semantics as DataTable. */
+export function sortTableRows<T>(rows: T[], columns: DataTableColumn<T>[], sort: TableState["sort"]): T[] {
+  const col = columns.find(c => c.key === sort.key && c.sortable && c.sortValue);
+  if (!col?.sortValue) return [...rows];
+  const value = col.sortValue;
+  const dir = sort.direction === "desc" ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const va = value(a);
+    const vb = value(b);
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    if (typeof va === "string" || typeof vb === "string") return String(va).localeCompare(String(vb)) * dir;
+    return (vb - va) * dir;
+  });
+}
+
 export interface DataTableClasses {
   table: string;
   numeric: string;
@@ -133,23 +150,7 @@ export function DataTable<T>({
     onStateChange({ sort: { key, direction: sortKey === key && sortDesc ? "asc" : "desc" }, page: 0 });
   }
 
-  const sortedRows = useMemo(() => {
-    if (sortKey == null) return rows;
-    const col = columns.find((c) => c.key === sortKey);
-    if (!col?.sortValue) return rows;
-    const dir = sortDesc ? 1 : -1;
-    return [...rows].sort((a, b) => {
-      const va = col.sortValue!(a);
-      const vb = col.sortValue!(b);
-      if (va == null && vb == null) return 0;
-      if (va == null) return 1; // null 始终末尾
-      if (vb == null) return -1;
-      if (typeof va === "string" || typeof vb === "string") {
-        return String(va).localeCompare(String(vb)) * dir;
-      }
-      return (vb - va) * dir;
-    });
-  }, [rows, columns, sortKey, sortDesc]);
+  const sortedRows = useMemo(() => sortTableRows(rows, columns, normalized.sort), [rows, columns, sortKey, sortDesc]);
 
   const totalPages = pageSize ? Math.max(1, Math.ceil(sortedRows.length / pageSize)) : 1;
   const safePage = normalized.page;

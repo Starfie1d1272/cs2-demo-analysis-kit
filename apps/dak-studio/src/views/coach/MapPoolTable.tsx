@@ -1,12 +1,9 @@
-import { useEffect, useState } from "react";
 import type { ObservedMapPoolRow } from "@cs2dak/analytics";
-import { listMapPoolNotes, saveMapPoolNote } from "../../lib/map-pool-notes.js";
+import { saveMapPoolNote } from "../../lib/map-pool-notes.js";
 
-export interface MapPoolTableProps { rows: ObservedMapPoolRow[]; hasOwn: boolean; hasOpponent: boolean }
+export interface MapPoolTableProps { rows: ObservedMapPoolRow[]; hasOwn: boolean; hasOpponent: boolean; notes: Record<string, string>; onNotesChange: (mapName: string, note: string) => void }
 function pct(value: number | null): string { return value == null ? "—" : `${value.toFixed(1)}%`; }
-export function MapPoolTable({ rows: maps, hasOwn, hasOpponent }: MapPoolTableProps) {
-  const [notes, setNotes] = useState<Record<string, string>>({});
-  useEffect(() => { void listMapPoolNotes().then(setNotes); }, []);
+export function MapPoolTable({ rows: maps, hasOwn, hasOpponent, notes, onNotesChange }: MapPoolTableProps) {
 
   if (!hasOpponent) {
     return <div className="stu-card stu-empty">在上方「对手队伍」里选择即将交手的对手，这里会把它（与我的队伍）各自跨所有对手聚合后按地图比较。</div>;
@@ -55,7 +52,7 @@ export function MapPoolTable({ rows: maps, hasOwn, hasOpponent }: MapPoolTablePr
                   placeholder="备注…"
                   onChange={(e) => {
                     const note = e.target.value;
-                    setNotes((n) => ({ ...n, [row.mapName]: note }));
+                    onNotesChange(row.mapName, note);
                     void saveMapPoolNote(row.mapName, note);
                   }}
                 />

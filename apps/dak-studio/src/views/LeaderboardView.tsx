@@ -1,6 +1,10 @@
+import { canExportSnapshot, withCapabilityConditions, withAnalysisExportEntries as applyExportEntries } from "../lib/analysis-export";
 import { CapabilityBar, useCapability } from "../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../lib/capability-availability";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
+import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
+import { buildLeaderboardAnalysisResult, leaderboardSection } from "../lib/analysis-export-tournament";
+import type { AnalysisExportSource } from "../lib/analysis-export";
 import type { AnalysisPageState } from "../lib/studio-page-state";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { SeasonLeaderboardModel } from "@cs2dak/presentation";
@@ -11,7 +15,10 @@ import type { StudioDemoEntry } from "../lib/demo-entry";
 import { EmptyState } from "@cs2dak/react";
 
 export interface LeaderboardViewProps {
+  captureOverview?: (eligible: StudioDemoEntry[], section: import("../lib/analysis-export").AnalysisResultSection, availability: import("../lib/capability-availability").CapabilityAvailability | null) => import("../lib/analysis-export").AnalysisResultSnapshotV1;
   onCapabilityRepair: (action: CapabilityRepairAction) => void;
+  exportSource?: AnalysisExportSource | null;
+  exportPage?: "analysis" | "event-analysis";
   state: AnalysisPageState;
   onStateChange: (state: AnalysisPageState) => void;
   allEntries: StudioDemoEntry[];
@@ -23,7 +30,7 @@ export interface LeaderboardViewProps {
   embedded?: boolean;
 }
 
-export function LeaderboardView({ onCapabilityRepair, state, onStateChange, allEntries, entries, selectedTeam = null, onPlayerClick, onGoLibrary, identityOptions, embedded = false }: LeaderboardViewProps) {
+export function LeaderboardView({ captureOverview, exportSource, exportPage = "analysis", onCapabilityRepair, state, onStateChange, allEntries, entries, selectedTeam = null, onPlayerClick, onGoLibrary, identityOptions, embedded = false }: LeaderboardViewProps) {
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const teamEntries = useMemo(() => selectedTeam ? entries.filter(entry => [entry.meta.teamAName, entry.meta.teamBName].some(name => displayTeamName(name, identityOptions?.teamRenames) === selectedTeam)) : entries, [entries, selectedTeam, identityOptions?.teamRenames]);
   const capability = useCapability(teamEntries, "season");
@@ -60,6 +67,7 @@ export function LeaderboardView({ onCapabilityRepair, state, onStateChange, allE
       <header className={embedded ? "stu-section-head" : "stu-view-header"}>
         <div>
           {embedded ? <h3>排行榜</h3> : <h1>排行榜</h1>}
+          {model && exportSource && !error && !capability.error && !capability.stale && canExportSnapshot(snapshot, analysis, eligible) && (!embedded || captureOverview) && <AnalysisExportButtons capture={() => captureOverview ? captureOverview(eligible!, leaderboardSection(model, state), capability.availability) : buildLeaderboardAnalysisResult(withCapabilityConditions(applyExportEntries(exportSource, eligible!), capability.availability), model, state, exportPage)} />}
           <p>
             {model ? `${model.matchCount} 场 · 权重 ${model.weightsVersion} · ` : ""}
             点击选手跳转个人档案。

@@ -1,7 +1,11 @@
+import { canExportSnapshot, withCapabilityConditions, unionExportEntries, withAnalysisExportEntries } from "../../lib/analysis-export";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../../lib/queries/query-cache";
 import { CapabilityBar, useCapability } from "../../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../../lib/capability-availability";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { AnalysisExportButtons } from "../../components/AnalysisExportButtons";
+import { buildTeamRolesAnalysisResult } from "../../lib/analysis-export-roles";
+import type { AnalysisExportSource } from "../../lib/analysis-export";
 import { DoubleAwpAnalysisPanel, EmptyState, TeamMapRoleMatrixPanel } from "@cs2dak/react";
 import type { DoubleAwpAnalysis, TeamMapRoleMatrix } from "@cs2dak/tactics";
 import { getDoubleAwpAnalysis, getTeamMapRoleMatrices } from "../../lib/queries/spatial-queries";
@@ -12,7 +16,8 @@ import { displayTeamName, type IdentityOptions } from "../../lib/identity";
 import type { OpenEvidence } from "../../lib/evidence-continuation";
 import type { TeamRolesState } from "../../lib/studio-page-state";
 
-export function TeamRolesPanel({ onCapabilityRepair, entries, teamName, identityOptions, state, onStateChange, onOpenEvidence, onPageReady }: {
+export function TeamRolesPanel({ exportSource, onCapabilityRepair, entries, teamName, identityOptions, state, onStateChange, onOpenEvidence, onPageReady }: {
+  exportSource?: AnalysisExportSource | null;
   onCapabilityRepair: (action: CapabilityRepairAction) => void; entries: StudioDemoEntry[]; teamName: string; identityOptions?: IdentityOptions;
   state: TeamRolesState; onStateChange: (state: TeamRolesState) => void;
   onOpenEvidence: OpenEvidence; onPageReady?: (keys: string[]) => void;
@@ -97,5 +102,30 @@ export function TeamRolesPanel({ onCapabilityRepair, entries, teamName, identity
             {doubleAwpError && !doubleAwp ? <EmptyState variant="error" title="双 AWP 统计不可用" hint={doubleAwpError} /> : doubleAwp === null && !awpCapability.error ? <div className="stu-loading">读取 AWP 回合事实…</div> : doubleAwp === null ? null : <DoubleAwpAnalysisPanel model={doubleAwp.find((row) => row.side === matrixSide) ?? null} playerNames={playerNames} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "team:double-awp" }); }} />}
           </section>
   </>;
-  return <div className="stu-view"><header className="stu-view-header"><h1>位置与职责 · {teamName}</h1></header>{rolePanels}</div>;
+  const activeAwp = doubleAwp?.find(row => row.side === matrixSide) ?? null;
+  const roleCurrent = !!activeMatrix && !matrixError && !capability.error &&
+    !capability.stale && canExportSnapshot(roleSnapshot, analysis);
+  const awpCurrent = !!activeAwp && !doubleAwpError && !awpCapability.error &&
+    !awpCapability.stale && canExportSnapshot(awpSnapshot, analysis);
+  const omitted = [
+    !roleCurrent ? "位置职责矩阵未导出：无当前可用结果或正在更新。" : null,
+    !awpCurrent ? "双 AWP 统计未导出：无当前可用结果或正在更新。" : null,
+  ].filter((value): value is string => value !== null);
+  return <div className="stu-view">
+    <header className="stu-view-header">
+      <h1>位置与职责 · {teamName}</h1>
+      {exportSource && (roleCurrent || awpCurrent) && <AnalysisExportButtons capture={() => {
+        const source = withCapabilityConditions(
+          withAnalysisExportEntries(exportSource, unionExportEntries(
+            roleCurrent ? roleEntries : null, awpCurrent ? awpEntries : null,
+          )),
+          roleCurrent ? capability.availability : null,
+          awpCurrent ? awpCapability.availability : null,
+        );
+        return buildTeamRolesAnalysisResult(source, roleCurrent ? activeMatrix : null,
+          awpCurrent ? activeAwp : null, state, playerNames, teamName, omitted);
+      }} />}
+    </header>
+    {rolePanels}
+  </div>;
 }

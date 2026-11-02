@@ -1,3 +1,7 @@
+import { canExportSnapshot, withCapabilityConditions, withAnalysisExportEntries as applyExportEntries } from "../lib/analysis-export";
+import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
+import { buildOpeningAnalysisResult } from "../lib/analysis-export-spatial";
+import type { AnalysisExportSource } from "../lib/analysis-export";
 import { OPENING_WINDOW_SECONDS, OPENING_SPEEDS, OPENING_OPACITY_MIN, OPENING_OPACITY_MAX } from "../lib/spatial-view-state";
 import { CapabilityBar, useCapability } from "../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../lib/capability-availability";
@@ -21,6 +25,7 @@ import { EmptyState } from "@cs2dak/react";
 
 export interface TrailsViewProps {
   onCapabilityRepair: (action: CapabilityRepairAction) => void;
+  exportSource?: AnalysisExportSource | null;
   onPageReady?: (keys: string[]) => void;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
@@ -68,7 +73,7 @@ const EFFECT_DURATION_SECONDS: Partial<Record<string, number>> = {
   decoy: 15
 };
 
-export function TrailsView({ onCapabilityRepair, allEntries, entries, onGoLibrary, onOpenMatch, identityOptions, onPageReady, focusPlayerKey, onSelectPlayer, state: pageState, onStateChange: setPageState }: TrailsViewProps) {
+export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entries, onGoLibrary, onOpenMatch, identityOptions, onPageReady, focusPlayerKey, onSelectPlayer, state: pageState, onStateChange: setPageState }: TrailsViewProps) {
   // 业务流程：① 选手 → ② 地图（该选手出场的图）→ ③ 最近 N 场（该选手在该图）
   const { recentMatchCount: rangeN, mapName, side } = pageState;
   const hiddenRounds = useMemo(() => new Set(pageState.hiddenRoundKeys), [pageState.hiddenRoundKeys]);
@@ -228,6 +233,7 @@ export function TrailsView({ onCapabilityRepair, allEntries, entries, onGoLibrar
       <header className="stu-view-header">
         <div>
           <h1>开局动线</h1>
+          {exportSource && models && selectedPlayer && !error && !capability.error && !capability.stale && canExportSnapshot(modelSnapshot, analysis) && <AnalysisExportButtons capture={() => buildOpeningAnalysisResult(withCapabilityConditions(applyExportEntries(exportSource, eligibleEntries ?? []), capability.availability), visibleRounds, selectedPlayer.name, pageState, missingReplay)} />}
           <p>
             选手在<b>长枪局</b>开局前 {WINDOW_SECONDS} 秒的走位与道具投掷叠加动画——直观看出默认位、出门路线和道具习惯，也可用于学习职业选手的 default。
           </p>

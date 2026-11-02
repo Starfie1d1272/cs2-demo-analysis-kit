@@ -1,6 +1,10 @@
+import { canExportSnapshot, withCapabilityConditions, unionExportEntries, withAnalysisExportEntries as applyExportEntries } from "../lib/analysis-export";
 import { CapabilityBar, useCapability } from "../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../lib/capability-availability";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
+import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
+import { buildPlayerAnalysisResult } from "../lib/analysis-export-player";
+import type { AnalysisExportSource } from "../lib/analysis-export";
 import { PlayerFindingsPanel } from "./analysis/PlayerFindingsPanel";
 import type { PlayerPageState } from "../lib/studio-page-state";
 import { Star } from "lucide-react";
@@ -8,6 +12,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { PlayerSeasonProfile } from "@cs2dak/presentation";
 import { SEASON_STAT_VIEWS, mechanicsMetricsForWeapon, type MechanicsMetricKey } from "@cs2dak/presentation";
 import {
+  buildMistakeFindings,
   type PlayerMechanicsProfile,
   type PlayerSeasonInsights,
   type PlayerWeaponStat,
@@ -17,13 +22,14 @@ import { getSeasonSummary } from "../lib/queries/season-queries";
 import { displayTeamName, type IdentityOptions } from "../lib/identity";
 import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
-import { FingerprintRadar, TrendChart } from "./profile-widgets";
+import { FingerprintRadar, TrendChart, type TrendMetricKey } from "./profile-widgets";
 import { EmptyState, MetricInfo } from "@cs2dak/react";
 import { EvidenceActions } from "../components/EvidenceActions";
 import type { OpenEvidence } from "../lib/evidence-continuation";
 
 export interface PlayersViewProps {
   onCapabilityRepair: (action: CapabilityRepairAction) => void;
+  exportSource?: AnalysisExportSource | null;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   selectedTeam?: string | null;
@@ -64,6 +70,7 @@ function formatMetric(value: number | null, format: string): string {
 
 export function PlayersView({
   onCapabilityRepair,
+  exportSource,
   allEntries,
   entries,
   selectedTeam = null,
@@ -81,6 +88,7 @@ export function PlayersView({
   onOpenMaterials,
   onOpenOpening, onOpenRoles
 }: PlayersViewProps) {
+  const [trendMetric, setTrendMetric] = useState<TrendMetricKey>("adr");
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const playerScope = useMemo(() => selectedPlayerKey ? {
     playerKeys: [selectedPlayerKey],
@@ -107,7 +115,7 @@ export function PlayersView({
   const [pinned, setPinned] = useState<PinnedPlayer | null>(null);
   const { comparePlayerKey: compareKey, profileTab, flashMode } = state;
   const setCompareKey = (comparePlayerKey: string | null) => onStateChange({ ...state, comparePlayerKey });
-  const setProfileTab = (profileTab: ProfileTab) => onStateChange({ ...state, profileTab });
+  const setProfileTab = (profileTab: ProfileTab) => { if (profileTab !== state.profileTab) setTrendMetric("adr"); onStateChange({ ...state, profileTab }); };
   const setFlashMode = (flashMode: "net" | "enemy") => onStateChange({ ...state, flashMode });
 
   useEffect(() => {
@@ -140,10 +148,12 @@ export function PlayersView({
   }, [orderedProfiles, selectedPlayerKey]);
 
   useEffect(() => {
-    if (!onPageReady || (!profiles && !error && !seasonCapability.error && seasonEntries?.length !== 0 && entries.length > 0)) return;
-    if (selected && (profileTab === "overview" || profileTab === "utility") && !insights && !detailsError && !detailsCapability.error && detailsEntries?.length !== 0) return;
+    if (!onPageReady || (!profiles && !error && !seasonCapability.error && !seasonCapability.stale && seasonEntries?.length !== 0 && entries.length > 0)) return;
+    if (selected && (profileTab === "overview" || profileTab === "utility") && !insights && !detailsError && !detailsCapability.error && !detailsCapability.stale && detailsEntries?.length !== 0) return;
     onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
   }, [profiles, error, seasonCapability.error, seasonEntries, insights, detailsError, detailsCapability.error, detailsEntries, entries.length, onPageReady, selected, profileTab]);
+
+  const findings = useMemo(() => insights && selected ? buildMistakeFindings(insights.mistakes, { id: selected.playerKey, label: selected.name }) : [], [insights, selected]);
 
   const compare = useMemo(() => {
     if (!profiles || !compareKey || compareKey === selected?.playerKey) return null;
@@ -273,6 +283,7 @@ export function PlayersView({
       <header className="stu-view-header">
         <div>
           <h1>选手档案</h1>
+          {exportSource && !error && !detailsError && !seasonCapability.error && !seasonCapability.stale && !detailsCapability.error && !detailsCapability.stale && canExportSnapshot(profileSnapshot, analysis, seasonEntries) && (canExportSnapshot(detailSnapshot, analysis, detailsEntries) || (detailsEntries?.length === 0 && !details && (profileTab === "overview" || profileTab === "trend"))) && <AnalysisExportButtons capture={() => buildPlayerAnalysisResult(withCapabilityConditions(applyExportEntries(exportSource, unionExportEntries(seasonEntries, detailsEntries)), seasonCapability.availability, detailsCapability.availability), selected, compare, insights, weaponStats, mechanics, coverage, state, trendMetric, findings)} />}
           <p>
             基于 {profileSnapshot ? JSON.parse(profileSnapshot.sample).length : 0} 场 demo 的跨场画像 · 权重 {selected.weightsVersion}。强弱项相对当前聚合范围内的选手计算
             {orderedProfiles.length < 5 ? "（不足 5 人，暂不出强弱项判断）" : ""}。
@@ -385,7 +396,7 @@ export function PlayersView({
           {profileTab === "overview" && (
           <div className="stu-profile-grid">
             <button type="button" className="stu-button-sm" onClick={onOpenOpening}>查看开局动线</button>
-            {insights && <PlayerFindingsPanel insights={insights} player={selected} entries={entries} contextSummary={contextSummary} onOpenEvidence={onOpenEvidence} onOpenMaterials={onOpenMaterials} />}
+            {insights && <PlayerFindingsPanel findings={findings} player={selected} entries={entries} contextSummary={contextSummary} onOpenEvidence={onOpenEvidence} onOpenMaterials={onOpenMaterials} />}
             <div className="stu-card stu-card-wide"><h3>位置与职责</h3><button type="button" className="stu-button-sm" onClick={onOpenRoles}>查看位置与职责</button></div>
             <div className="stu-card">
               <h3>核心指标</h3>
@@ -636,7 +647,7 @@ export function PlayersView({
             {insights && insights.trend.length > 1 && (
               <div className="stu-card stu-card-wide">
                 <h3>个人趋势</h3>
-                <TrendChart trend={insights.trend} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} />
+                <TrendChart metric={trendMetric} onMetricChange={setTrendMetric} trend={insights.trend} entryByMatchId={entryByMatchId} onOpenMatch={onOpenMatch} />
               </div>
             )}
 

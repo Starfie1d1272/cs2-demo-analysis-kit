@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { PlayerStyle } from "@cs2dak/presentation";
 import type { PlayerSeasonInsights } from "@cs2dak/analytics";
 import { formatMatchLabel, type StudioDemoEntry } from "../lib/demo-entry";
@@ -91,13 +90,13 @@ export type TrendMetricKey = (typeof TREND_METRICS)[number]["key"];
 export function TrendChart({
   trend,
   entryByMatchId,
-  onOpenMatch
+  onOpenMatch, metric, onMetricChange
 }: {
+  metric: TrendMetricKey; onMetricChange: (metric: TrendMetricKey) => void;
   trend: PlayerSeasonInsights["trend"];
   entryByMatchId: Map<string, StudioDemoEntry>;
   onOpenMatch: (entryId: string) => void;
 }) {
-  const [metric, setMetric] = useState<TrendMetricKey>("adr");
   const spec = TREND_METRICS.find((m) => m.key === metric)!;
   const values = trend.map((point) => point[metric]);
   const min = Math.min(...values);
@@ -115,7 +114,7 @@ export function TrendChart({
             role="radio"
             aria-checked={metric === m.key}
             className={metric === m.key ? "stu-subtab stu-subtab-active" : "stu-subtab"}
-            onClick={() => setMetric(m.key)}
+            onClick={() => onMetricChange(m.key)}
           >
             {m.label}
           </button>

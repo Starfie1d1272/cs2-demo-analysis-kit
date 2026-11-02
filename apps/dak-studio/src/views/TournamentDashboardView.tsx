@@ -1,6 +1,10 @@
+import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
+import { canExportSnapshot, withCapabilityConditions, unionExportEntries, withAnalysisExportEntries as applyExportEntries } from "../lib/analysis-export";
 import { CapabilityBar, useCapability } from "../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../lib/capability-availability";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
+import { buildTournamentAnalysisResult } from "../lib/analysis-export-tournament";
+import type { AnalysisExportSource } from "../lib/analysis-export";
 import type { AnalysisPageState } from "../lib/studio-page-state";
 import { usePageReady } from "../lib/use-page-ready";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
@@ -17,6 +21,8 @@ import { LeaderboardView } from "./LeaderboardView";
 
 export interface TournamentDashboardViewProps {
   onCapabilityRepair: (action: CapabilityRepairAction) => void;
+  exportSource?: AnalysisExportSource | null;
+  exportPage?: "analysis" | "event-analysis";
   state: AnalysisPageState;
   onStateChange: (state: AnalysisPageState) => void;
   onPageReady?: (keys: string[]) => void;
@@ -53,6 +59,7 @@ const WEAPON_COLUMNS: DataTableColumn<WeaponRow>[] = [
 /** v0.3 赛事总览：地图使用率、T/CT 胜率、手枪局与转化（cohort 同源聚合）。 */
 export function TournamentDashboardView({
   onCapabilityRepair,
+  exportSource, exportPage = "event-analysis",
   allEntries,
   entries,
   state,
@@ -109,6 +116,37 @@ export function TournamentDashboardView({
     return () => { cancelled = true; };
   }, [comparisonEntries, identityOptions?.version, comparisonKey, analysis]);
 
+  const insightCurrent = !!insights && !error && !insightCapability.error &&
+    !insightCapability.stale && canExportSnapshot(insightSnapshot, analysis, insightEntries);
+  const comparisonCurrent = !!teamComparison && teamComparison.teams.length === 2 &&
+    comparisonReady && !comparisonError && !comparisonCapability.error &&
+    !comparisonCapability.stale && canExportSnapshot(comparisonSnapshot, analysis, comparisonEntries);
+  const captureOverview = (
+    leaderEntries: StudioDemoEntry[],
+    leaderboard?: import("../lib/analysis-export").AnalysisResultSection,
+    leaderAvailability?: import("../lib/capability-availability").CapabilityAvailability | null,
+  ) => {
+    if (!exportSource) throw new Error("导出来源不可用");
+    const omitted = [
+      !insightCurrent ? "赛事总览、地图及武器未导出：无当前可用结果或正在更新。" : null,
+      !comparisonCurrent ? "队伍比较未导出：无当前可用结果或正在更新。" : null,
+      !leaderboard ? "排行榜未包含在此文件；可在排行榜准备完成后导出含排行榜的结果。" : null,
+    ].filter((value): value is string => value !== null);
+    const source = withCapabilityConditions(
+      applyExportEntries(exportSource, unionExportEntries(
+        insightCurrent ? insightEntries : null,
+        comparisonCurrent ? comparisonEntries : null,
+        leaderEntries,
+      )),
+      insightCurrent ? insightCapability.availability : null,
+      comparisonCurrent ? comparisonCapability.availability : null,
+      leaderAvailability ?? null,
+    );
+    return buildTournamentAnalysisResult(source, insightCurrent ? insights : null,
+      comparisonCurrent ? teamComparison : null, state,
+      { maps: MAP_COLUMNS, weapons: WEAPON_COLUMNS }, exportPage, leaderboard, omitted);
+  };
+
   if (allEntries.length === 0) {
     return (
       <div className="stu-view">
@@ -127,6 +165,7 @@ export function TournamentDashboardView({
       <header className="stu-view-header">
         <div>
           <h1>赛事总览</h1>
+          {exportSource && (insightCurrent || comparisonCurrent) && <AnalysisExportButtons label="导出本次结果（不含排行榜）" capture={() => captureOverview([])} />}
           <p>当前赛事语料的地图、队伍与经济观察；只有底层提供依据时才会形成 Finding。</p>
         </div>
         {onGoDirectory && <button type="button" className="stu-button-sm" onClick={onGoDirectory}>返回赛事目录</button>}
@@ -163,7 +202,7 @@ export function TournamentDashboardView({
 
       {insights && (error || insightCapability.error || analysis.status !== "ready" || insightSnapshot?.generation !== analysis.generation || insightSnapshot.sample !== JSON.stringify(insightEntries?.map(entry => entry.id))) && <p role="status">{error || insightCapability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && insightEntries?.length === 0 ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
-      {!error && !insightCapability.error && !insights && insightEntries?.length !== 0 && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo…</div>}
+      {!error && !insightCapability.error && !insightCapability.stale && !insights && insightEntries?.length !== 0 && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo…</div>}
       {!error && entries.length === 0 && <EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" />}
       {insights && (
         <>
@@ -202,7 +241,13 @@ export function TournamentDashboardView({
           </p>
         </>
       )}
-      {onOpenPlayer && <LeaderboardView onCapabilityRepair={onCapabilityRepair} state={state} onStateChange={onStateChange} embedded allEntries={allEntries} entries={entries} selectedTeam={selectedTeam} identityOptions={identityOptions} onPlayerClick={onOpenPlayer} onGoLibrary={onGoLibrary} />}
+      {onOpenPlayer && <LeaderboardView
+        exportSource={exportSource} exportPage={exportPage}
+        captureOverview={exportSource ? captureOverview : undefined}
+        onCapabilityRepair={onCapabilityRepair} state={state} onStateChange={onStateChange}
+        embedded allEntries={allEntries} entries={entries} selectedTeam={selectedTeam}
+        identityOptions={identityOptions} onPlayerClick={onOpenPlayer} onGoLibrary={onGoLibrary}
+      />}
     </div>
   );
 }

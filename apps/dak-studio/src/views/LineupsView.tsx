@@ -1,9 +1,11 @@
+import type { AnalysisExportSource } from "../lib/analysis-export";
 import { usePageReady } from "../lib/use-page-ready";
 import { EmptyState } from "@cs2dak/react";
 import type { StudioDemoEntry } from "../lib/demo-entry";
 import { LineupView } from "./LineupView";
 
 export interface LineupsViewProps {
+  exportSource?: AnalysisExportSource | null;
   state: import("../lib/analysis-theme-state").LineupsPageState;
   onStateChange: (state: import("../lib/analysis-theme-state").LineupsPageState) => void;
   onPageReady?: (keys: string[]) => void;
@@ -15,7 +17,7 @@ export interface LineupsViewProps {
   onRebuild: (ids: string[]) => void;
 }
 
-export function LineupsView({ state, onStateChange, allEntries, entries, onOpenEvidence, onWatchDemo, onGoLibrary, onRebuild, onPageReady }: LineupsViewProps) {
+export function LineupsView({ exportSource, state, onStateChange, allEntries, entries, onOpenEvidence, onWatchDemo, onGoLibrary, onRebuild, onPageReady }: LineupsViewProps) {
   usePageReady(allEntries.length === 0 || entries.length === 0, onPageReady);
 
   return (
@@ -26,7 +28,7 @@ export function LineupsView({ state, onStateChange, allEntries, entries, onOpenE
           <p>按地图聚类常用投掷物，提供出手点、落点、回放与一次性练习；是否有效仍需在比赛证据中核对。</p>
         </div>
       </header>
-      <LineupView state={state} onStateChange={onStateChange} onPageReady={onPageReady} onRebuild={onRebuild} entries={entries} onOpenEvidence={onOpenEvidence} onWatchDemo={onWatchDemo} />
+      <LineupView exportSource={exportSource} state={state} onStateChange={onStateChange} onPageReady={onPageReady} onRebuild={onRebuild} entries={entries} onOpenEvidence={onOpenEvidence} onWatchDemo={onWatchDemo} />
     </div>
   );
 }

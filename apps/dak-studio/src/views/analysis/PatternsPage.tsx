@@ -1,3 +1,4 @@
+import type { AnalysisExportSource } from "../../lib/analysis-export";
 import type { PatternPageState } from "../../lib/pattern-page-state";
 import { filterBySubjectTeam, isCurrentTacticalRoundFact } from "../../lib/pattern-observations";
 import { usePageReady } from "../../lib/use-page-ready";
@@ -17,6 +18,7 @@ import type { AnalysisContext, AnalysisRoleRef } from "../../lib/analysis-contex
 type PatternTab = "patterns" | "anti";
 
 export interface PatternsPageProps {
+  exportSource?: AnalysisExportSource | null;
   state: PatternPageState;
   onStateChange: Dispatch<SetStateAction<PatternPageState>>;
   onPageReady?: (keys: string[]) => void;
@@ -40,7 +42,7 @@ function teamRole(label: string): AnalysisRoleRef {
 }
 
 export function PatternsPage({
-  state, onStateChange,
+  exportSource, state, onStateChange,
   allEntries,
   entries,
   onOpenMatch,
@@ -206,7 +208,7 @@ export function PatternsPage({
         />
       )}
       {hasSnapshot && clusters.length > 0 && (
-        <PatternsTheme section={tab} explorerState={state.explorer} onExplorerStateChange={update => onStateChange(current => ({ ...current, explorer: typeof update === "function" ? update(current.explorer) : update }))} clusters={clusters} facts={facts} allFacts={allFacts}
+        <PatternsTheme exportSource={hasSnapshot && !loading && !error && analysisData.status === "ready" && factsGeneration === analysisData.generation ? exportSource : null} section={tab} explorerState={state.explorer} onExplorerStateChange={update => onStateChange(current => ({ ...current, explorer: typeof update === "function" ? update(current.explorer) : update }))} clusters={clusters} facts={facts} allFacts={allFacts}
           entryByMatchId={entryByMatchId} analysisContext={analysisContext} teamRenames={teamRenames}
           subjectTeam={subjectTeam} onOpenMatch={onOpenMatch} onWatchDemo={onWatchDemo} />
       )}

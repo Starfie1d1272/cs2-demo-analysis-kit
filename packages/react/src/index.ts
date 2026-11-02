@@ -14,6 +14,7 @@ export { DoubleAwpAnalysisPanel, PlayerMapPoolPanel, PlayerMapRoleProfilePanel, 
 export { ElimBracket, SwissBracket } from "./components/EventBracket";
 export {
   DataTable,
+  sortTableRows,
   DAK_TABLE_CLASSES,
   type DataTableColumn,
   type DataTableClasses,
@@ -24,3 +25,5 @@ export {
 } from "./components/DataTable";
 
 export { MapAnnotationCanvas, type MapAnnotationCanvasProps } from "./components/MapAnnotationCanvas";
+
+export { playerRoleSortColumns, teamRoleSortColumns, playerMapPoolSortColumns } from "./components/MapRoles";
