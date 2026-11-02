@@ -564,6 +564,59 @@ class StudioApi:
             self._db = db
         return self._db
 
+    def storage_records_read(self, refs: list[dict]) -> list[dict]:
+        """Read a consistent snapshot of explicitly identified records."""
+        with self._db_lock:
+            db = self._conn()
+            try:
+                db.execute("begin")
+                result = []
+                for ref in refs:
+                    row = db.execute("select value from records where namespace=? and key=?", (ref["namespace"], ref["key"])).fetchone()
+                    result.append({**ref, "exists": row is not None, **({"value": json.loads(row[0])} if row is not None else {})})
+                db.commit()
+                return result
+            except BaseException:
+                db.rollback()
+                raise
+
+    def storage_records_compare_and_write(self, expected: list[dict], writes: list[dict]) -> bool:
+        """Commit selected record changes only while every observed value still matches."""
+        def same_json(left, right) -> bool:
+            if isinstance(left, bool) or isinstance(right, bool):
+                return type(left) is type(right) and left == right
+            if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+                return left == right
+            if isinstance(left, dict) and isinstance(right, dict):
+                return left.keys() == right.keys() and all(same_json(left[key], right[key]) for key in left)
+            if isinstance(left, list) and isinstance(right, list):
+                return len(left) == len(right) and all(same_json(a, b) for a, b in zip(left, right))
+            return type(left) is type(right) and left == right
+
+        with self._db_lock:
+            db = self._conn()
+            try:
+                db.execute("begin immediate")
+                for record in expected:
+                    row = db.execute("select value from records where namespace=? and key=?", (record["namespace"], record["key"])).fetchone()
+                    same_value = row is None or same_json(json.loads(row[0]), record.get("value"))
+                    if (row is not None) != record["exists"] or not same_value:
+                        db.rollback()
+                        return False
+                for record in writes:
+                    if record["kind"] == "delete":
+                        db.execute("delete from records where namespace=? and key=?", (record["namespace"], record["key"]))
+                    elif record["kind"] == "put":
+                        value = json.dumps(record["value"], ensure_ascii=False, separators=(",", ":"))
+                        db.execute("insert into records(namespace,key,value) values(?,?,?) on conflict(namespace,key) do update set value=excluded.value", (record["namespace"], record["key"], value))
+                    else:
+                        raise ValueError("invalid record mutation")
+                db.commit()
+                return True
+            except BaseException:
+                db.rollback()
+                raise
+
     def storage_record_get(self, namespace: str, key: str):
         with self._db_lock:
             row = self._conn().execute(

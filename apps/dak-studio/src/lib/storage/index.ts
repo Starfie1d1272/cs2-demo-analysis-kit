@@ -8,15 +8,22 @@
 
 import { createIdbAdapter } from "./idb-adapter";
 import { createPywebviewAdapter, getPywebviewStorageApi } from "./pywebview-adapter";
-import type { StorageAdapter } from "./types";
+import type { AtomicStorageAdapter } from "./types";
 
-let adapter: StorageAdapter | null = null;
+let adapter: AtomicStorageAdapter | null = null;
+let nativeApiForAdapter: ReturnType<typeof getPywebviewStorageApi> = null;
 
-export function getStorage(): StorageAdapter {
+export function getStorage(): AtomicStorageAdapter {
   if (adapter) return adapter;
-  const nativeApi = getPywebviewStorageApi();
-  adapter = nativeApi ? createPywebviewAdapter(nativeApi) : createIdbAdapter();
+  nativeApiForAdapter = getPywebviewStorageApi();
+  adapter = nativeApiForAdapter ? createPywebviewAdapter(nativeApiForAdapter) : createIdbAdapter();
   return adapter;
+}
+
+/** 返回存储单例实际使用的原生桥接，供一次性数据接管选择来源。 */
+export function getNativeStorageApiForCurrentAdapter(): ReturnType<typeof getPywebviewStorageApi> {
+  getStorage();
+  return nativeApiForAdapter;
 }
 
 export type { StorageAdapter, RecordStore, BlobStore } from "./types";

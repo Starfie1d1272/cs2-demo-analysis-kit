@@ -34,9 +34,20 @@ export interface BlobStore {
   deleteByPrefix(prefix: string): Promise<void>;
 }
 
+/** 原子操作使用明确的存在标志，避免把缺失记录与 JSON null 混淆。 */
+export interface RecordRef { namespace: string; key: string }
+export interface RecordSnapshot extends RecordRef { exists: boolean; value?: unknown }
+export type RecordMutation = (RecordRef & { kind: "put"; value: unknown }) | (RecordRef & { kind: "delete" });
+
 export interface StorageAdapter {
   /** JSON 记录命名空间（如 "demos" / "derived" / "cache" / "identity" / "series" / "kv"）。 */
   records(namespace: string): RecordStore;
   /** 二进制命名空间（如 "demos"=ZIP 字节 / "tri"=.tri 字节）。 */
   blobs(namespace: string): BlobStore;
+}
+
+/** 仅真实持久化后端提供的记录原子操作。 */
+export interface AtomicStorageAdapter extends StorageAdapter {
+  readRecords(refs: RecordRef[]): Promise<RecordSnapshot[]>;
+  compareAndWriteRecords(expected: RecordSnapshot[], writes: RecordMutation[]): Promise<boolean>;
 }

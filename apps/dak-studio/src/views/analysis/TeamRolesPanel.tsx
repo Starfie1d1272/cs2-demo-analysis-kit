@@ -11,7 +11,7 @@ import type { DoubleAwpAnalysis, TeamMapRoleMatrix } from "@cs2dak/tactics";
 import { getDoubleAwpAnalysis, getTeamMapRoleMatrices } from "../../lib/queries/spatial-queries";
 import { getFactsStore } from "../../lib/facts-store";
 import { matchIdForEntry, type StudioDemoEntry } from "../../lib/demo-entry";
-import { loadRoleDeclarations } from "../../lib/role-declarations";
+import { loadRoleDeclarations } from "../../lib/identity-commands";
 import { type IdentityOptions } from "../../lib/identity";
 import { displayTeamName } from "../../lib/team-identity";
 import type { OpenEvidence } from "../../lib/evidence-continuation";
