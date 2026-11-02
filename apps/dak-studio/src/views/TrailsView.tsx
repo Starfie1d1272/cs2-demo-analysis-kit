@@ -310,8 +310,12 @@ export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entri
         <EmptyState variant="error" title="构建失败" hint={error} />
       ) : players && missingSelectedMap ? (
         <EmptyState variant="insufficient" title={`${mapName} 在当前范围没有该选手的样本`} hint="请选择其他地图，或调整范围以恢复该地图的比赛。" />
-      ) : players && (rangeEntries.length === 0 || eligibleEntries?.length === 0) ? (
-        <EmptyState variant="insufficient" title="当前条件没有比赛样本" hint="最近场次只包含有日期的比赛；可选择全部场次或调整选手、地图与范围。" />
+      ) : players && !selectedOption ? (
+        <div className="stu-compact-empty"><EmptyState variant="insufficient" title="请选择选手" hint="选择选手和地图后查看开局动线。" /></div>
+      ) : players && rangeEntries.length > 0 && eligibleEntries?.length === 0 ? (
+        <div className="stu-compact-empty"><EmptyState variant="insufficient" title="当前范围暂无可用比赛" hint="请查看上方原因和操作。" /></div>
+      ) : players && rangeEntries.length === 0 ? (
+        <div className="stu-compact-empty"><EmptyState variant="insufficient" title="当前条件没有比赛样本" hint="最近场次只包含有日期的比赛；可选择全部场次或调整选手、地图与范围。" /></div>
       ) : !models || !players ? (
         <div className="stu-loading">提取 {rangeEntries.length} 场回放轨迹…</div>
       ) : visibleRounds.length === 0 ? (

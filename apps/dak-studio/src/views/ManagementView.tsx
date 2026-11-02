@@ -4,6 +4,7 @@ import type { SeasonCohortBundle } from "@cs2dak/cohort";
 import { EmptyState } from "@cs2dak/react";
 import { AssetsPanel } from "../components/AssetsPanel";
 import { getSeasonSummary } from "../lib/queries/season-queries";
+import { FactsNotReadyError } from "../lib/facts-readiness";
 import { type IdentityOptions } from "../lib/identity";
 import {
   listAuditEntries,
@@ -57,6 +58,7 @@ export function ManagementView({
 }: ManagementViewProps) {
   const [bundle, setBundle] = useState<SeasonCohortBundle | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [needsUpdate, setNeedsUpdate] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [mergeDisplayName, setMergeDisplayName] = useState("");
   const [renameValue, setRenameValue] = useState("");
@@ -69,20 +71,21 @@ export function ManagementView({
   const [auditError, setAuditError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const cancelRef = useRef(false);
-  usePageReady(tab === "identity" && auditReady && (entries.length === 0 || bundle !== null || error !== null), onPageReady);
+  usePageReady(tab === "identity" && auditReady && (entries.length === 0 || bundle !== null || error !== null || needsUpdate), onPageReady);
 
 
   // 加载 bundle
   useEffect(() => {
-    if (entries.length === 0) { setBundle(null); return; }
+    if (entries.length === 0) { setBundle(null); setError(null); setNeedsUpdate(false); return; }
     let cancelled = false;
     cancelRef.current = false;
     setBundle(null);
     setError(null);
+    setNeedsUpdate(false);
     setSelected(new Set());
     getSeasonSummary(entries, identityOptions)
       .then((s) => { if (!cancelled) setBundle(s.bundle); })
-      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); });
+      .catch((err) => { if (!cancelled) { if (err instanceof FactsNotReadyError) setNeedsUpdate(true); else setError(err instanceof Error ? err.message : String(err)); } });
     return () => { cancelled = true; };
   }, [entries, identityOptions?.version]);  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -310,9 +313,10 @@ export function ManagementView({
               </button>
             )}
           </div>
+          {needsUpdate && <p role="status">部分比赛的分析数据需要更新。 <button type="button" className="stu-button-sm" onClick={() => onTabChange("library")}>前往比赛库维护</button></p>}
           {error && <p className="stu-error">{error}</p>}
           {auditError && <p className="stu-error">读取操作记录失败：{auditError}</p>}
-          {!bundle && !error && <p className="stu-loading-text">聚合中…</p>}
+          {!bundle && !error && !needsUpdate && <p className="stu-loading-text">聚合中…</p>}
           {bundle && (
             <div className="stu-mgmt-player-list">
               {bundle.players.map((player) => (

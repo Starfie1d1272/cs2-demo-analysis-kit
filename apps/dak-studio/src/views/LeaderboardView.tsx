@@ -1,5 +1,5 @@
 import { canExportSnapshot, withCapabilityConditions, withAnalysisExportEntries as applyExportEntries } from "../lib/analysis-export";
-import { CapabilityBar, useCapability } from "../components/CapabilityBar";
+import { CapabilityBar, sameCapabilityNotice, useCapability } from "../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../lib/capability-availability";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
@@ -29,9 +29,11 @@ export interface LeaderboardViewProps {
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
   embedded?: boolean;
+  sharedUnavailable?: boolean;
+  sharedAvailability?: import("../lib/capability-availability").CapabilityAvailability | null;
 }
 
-export function LeaderboardView({ captureOverview, exportSource, exportPage = "analysis", onCapabilityRepair, state, onStateChange, allEntries, entries, selectedTeam = null, onPlayerClick, onGoLibrary, identityOptions, embedded = false }: LeaderboardViewProps) {
+export function LeaderboardView({ captureOverview, exportSource, exportPage = "analysis", onCapabilityRepair, state, onStateChange, allEntries, entries, selectedTeam = null, onPlayerClick, onGoLibrary, identityOptions, embedded = false, sharedUnavailable = false, sharedAvailability = null }: LeaderboardViewProps) {
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const teamEntries = useMemo(() => selectedTeam ? entries.filter(entry => [entry.meta.teamAName, entry.meta.teamBName].some(name => displayTeamName(name, identityOptions?.teamRenames) === selectedTeam)) : entries, [entries, selectedTeam, identityOptions?.teamRenames]);
   const capability = useCapability(teamEntries, "season");
@@ -39,7 +41,11 @@ export function LeaderboardView({ captureOverview, exportSource, exportPage = "a
   const requestKey = JSON.stringify([entries.map(entry => entry.id), selectedTeam, identityOptions?.version]);
   const [snapshot, setSnapshot] = useState<{ key: string; generation: number; sample: string; value: SeasonLeaderboardModel } | null>(null);
   const model = snapshot?.key === requestKey ? snapshot.value : null;
+  const coveredByShared = sharedUnavailable && !model && !capability.error && !capability.stale && sameCapabilityNotice(sharedAvailability, capability.availability) &&
+    capability.availability?.eligibleMatches === 0 && capability.availability.excluded.length === 1 &&
+    capability.availability.excluded[0]?.reason === "facts 需要重建" && capability.availability.excluded[0].count === teamEntries.length;
   const [error, setError] = useState<string | null>(null);
+  const sharedNotice = !capability.error && !capability.stale && sameCapabilityNotice(sharedAvailability, capability.availability);
   useEffect(() => {
     if (!eligible?.length || analysis.status !== "ready") return;
     let cancelled = false;
@@ -75,12 +81,12 @@ export function LeaderboardView({ captureOverview, exportSource, exportPage = "a
           </p>
         </div>
       </header>
-      {capability.availability && <CapabilityBar availability={capability.availability} onRepair={onCapabilityRepair} />}
+      {!sharedNotice && capability.availability && <CapabilityBar availability={capability.availability} onRepair={onCapabilityRepair} />}
       {capability.error && <p role="alert">排行能力读取失败：{capability.error} <button type="button" className="stu-button-sm" onClick={capability.retry}>重试</button></p>}
       {model && (error || capability.error || analysis.status !== "ready" || snapshot?.generation !== analysis.generation || snapshot.sample !== JSON.stringify(eligible?.map(entry => entry.id))) && <p role="status">{error || capability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && eligible?.length === 0 ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}
       {error && !model ? (
         <EmptyState variant="error" title="聚合失败" hint={error} />
-      ) : capability.error && !model ? null : entries.length === 0 || (eligible?.length === 0 && !model) ? (
+      ) : capability.error && !model ? null : coveredByShared ? null : entries.length === 0 || (eligible?.length === 0 && !model) ? (
         <EmptyState variant="insufficient" title={entries.length === 0 ? "聚合范围为空" : "没有可用排行样本"} hint="请调整范围或查看能力限制。" />
       ) : !model ? (
         <div className="stu-loading">聚合 {entries.length} 场 demo，构建排行榜…</div>

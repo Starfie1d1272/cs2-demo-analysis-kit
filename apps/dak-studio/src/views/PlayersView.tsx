@@ -211,7 +211,7 @@ export function PlayersView({
       </div>
     );
   }
-  if (seasonEntries && seasonEntries.length === 0 && !profiles) return <div className="stu-view">{seasonCapability.availability && <CapabilityBar availability={seasonCapability.availability} onRepair={onCapabilityRepair} />}<EmptyState variant="insufficient" title="没有可用选手数据" hint="请查看上方限制和修复入口。" /></div>;
+  if (seasonEntries && seasonEntries.length === 0 && !profiles) return <div className="stu-view">{seasonCapability.availability && <CapabilityBar availability={seasonCapability.availability} onRepair={onCapabilityRepair} />}<p className="stu-muted" role="status">当前范围暂无可用比赛，请查看上方原因和操作。</p></div>;
   if (!orderedProfiles) {
     return (
       <div className="stu-view">
