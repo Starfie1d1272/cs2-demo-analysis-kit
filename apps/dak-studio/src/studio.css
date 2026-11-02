@@ -5145,6 +5145,7 @@ td.stu-heat-cell.stu-heat-neutral {
 .stu-export-menu { position: relative; }
 .stu-export-menu summary { cursor: pointer; list-style: none; }
 .stu-export-menu summary::-webkit-details-marker { display: none; }
+.stu-export-note { max-width: 220px; color: var(--dak-fg-mid); font-size: 12px; }
 .stu-export-options {
   position: absolute;
   z-index: 2;

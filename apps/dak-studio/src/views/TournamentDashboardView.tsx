@@ -165,8 +165,8 @@ export function TournamentDashboardView({
       <header className="stu-view-header">
         <div>
           <h1>赛事总览</h1>
-          {exportSource && (insightCurrent || comparisonCurrent) && <AnalysisExportButtons label="导出本次结果（不含排行榜）" capture={() => captureOverview([])} />}
-          <p>当前赛事语料的地图、队伍与经济观察；只有底层提供依据时才会形成 Finding。</p>
+          {exportSource && (insightCurrent || comparisonCurrent) && <AnalysisExportButtons note="此文件不包含排行榜。" capture={() => captureOverview([])} />}
+          <p>查看赛事的地图、队伍与经济表现。</p>
         </div>
         {onGoDirectory && <button type="button" className="stu-button-sm" onClick={onGoDirectory}>返回赛事目录</button>}
       </header>
