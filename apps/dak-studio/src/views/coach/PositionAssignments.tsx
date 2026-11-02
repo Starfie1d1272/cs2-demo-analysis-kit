@@ -66,14 +66,20 @@ export function PositionAssignments({ draft, entries, identityOptions, observati
   const matrix = observed?.find(m => m.teamKey === draft.observedTeamKey && m.mapName === draft.mapName && m.side === draft.side) ?? null;
   const teamKeys = [...new Set((candidates ?? []).map(m => m.teamKey))];
   const playerKeys = matrix?.players.map(p => p.playerKey) ?? [];
-  const matrixPlayerNames = Object.fromEntries(playerKeys.map(key => [key, playerNames[key] || "未解析选手"]));
+  const unidentifiedKeys = [...new Set([...playerKeys, ...draft.rows.flatMap(row => row.playerKey ? [row.playerKey] : [])])].filter(key => !playerNames[key]).sort();
+  const shortPlayerName = (key: string, label = "未解析选手") => {
+    const suffix = key.slice(-8);
+    const collisions = unidentifiedKeys.filter(candidate => candidate.slice(-8) === suffix);
+    return `${label} · ${suffix}${collisions.length > 1 ? ` · ${collisions.indexOf(key) + 1}` : ""}`;
+  };
+  const matrixPlayerNames = Object.fromEntries(playerKeys.map(key => [key, playerNames[key] || shortPlayerName(key)]));
   return <div className="stu-home-grid"><section className="stu-card"><h2>我们的安排</h2>
     <label>标题<input className="stu-input" value={draft.title} onChange={e => update({ title: e.target.value })} /></label>
     <label>队伍标签<input className="stu-input" value={draft.teamLabel} onChange={e => update({ teamLabel: e.target.value })} /></label>
     <label>地图<select className="stu-input" value={draft.mapName} onChange={e => update({ mapName: e.target.value })}>{!SPATIAL_ASSET_MAPS.some(m => m === draft.mapName) && <option>{draft.mapName}</option>}{SPATIAL_ASSET_MAPS.map(m => <option key={m}>{m}</option>)}</select></label>
     <label>阵营<select className="stu-input" value={draft.side} onChange={e => update({ side: e.target.value as "t" | "ct" })}><option value="t">T</option><option value="ct">CT</option></select></label>
     {draft.rows.map((row, i) => <fieldset key={row.id}><legend>队员 {i + 1}</legend>{([['playerLabel','队员'],['positionLabel','位置'],['responsibility','职责'],['notes','备注']] as const).map(([field,label]) => <label key={field}>{label}<input className="stu-input" placeholder="未填写" value={row[field]} onChange={e => update({ rows: draft.rows.map(r => r.id === row.id ? { ...r, [field]: e.target.value } : r) })} /></label>)}
-      <label>观察选手关联<select className="stu-input" value={row.playerKey ?? ""} onChange={e => update({ rows: draft.rows.map(r => r.id === row.id ? { ...r, playerKey: e.target.value || null } : r) })}><option value="">未关联</option>{row.playerKey && !playerKeys.includes(row.playerKey) && <option value={row.playerKey}>{playerNames[row.playerKey] || row.playerLabel || "未解析选手"}（关联待检查）</option>}{playerKeys.map(k => <option key={k} value={k}>{matrixPlayerNames[k]}</option>)}</select></label><button className="stu-button-sm" onClick={() => update({ rows: draft.rows.filter(r => r.id !== row.id) })}>移除</button></fieldset>)}
+      <label>观察选手关联<select className="stu-input" value={row.playerKey ?? ""} onChange={e => update({ rows: draft.rows.map(r => r.id === row.id ? { ...r, playerKey: e.target.value || null } : r) })}><option value="">未关联</option>{row.playerKey && !playerKeys.includes(row.playerKey) && <option value={row.playerKey}>{playerNames[row.playerKey] || shortPlayerName(row.playerKey, row.playerLabel || undefined)}（关联待检查）</option>}{playerKeys.map(k => <option key={k} value={k}>{matrixPlayerNames[k]}</option>)}</select></label><button className="stu-button-sm" onClick={() => update({ rows: draft.rows.filter(r => r.id !== row.id) })}>移除</button></fieldset>)}
     <button className="stu-button-sm" onClick={() => update({ rows: [...draft.rows, emptyAssignmentRow()] })}>添加队员</button></section>
     <section className="stu-card"><details open={observationExpanded} onToggle={e => onExpandedChange(e.currentTarget.open)}><summary>比赛中的观察</summary>
       <p>显式选择比赛和观察队伍；人工内容不会被覆盖。</p>{entries.map(e => <label key={e.id}><input type="checkbox" checked={selectedIds.includes(e.id)} onChange={event => setSelectedIds(event.target.checked ? [...selectedIds, e.id] : selectedIds.filter(id => id !== e.id))} />{formatMatchLabel(e)}</label>)}
