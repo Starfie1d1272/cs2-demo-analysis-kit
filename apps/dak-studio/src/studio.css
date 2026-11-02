@@ -5131,12 +5131,24 @@ td.stu-heat-cell.stu-heat-neutral {
 /* 紧凑的工作台和资料工具栏 */
 .stu-compact-empty .dak-empty { padding: 24px; gap: 8px; }
 .stu-compact-empty .dak-empty h2 { font-size: 15px; }
-.stu-workbench section h2 {
-  margin: 0 0 8px;
-  color: var(--dak-fg-mid);
-  font-size: 13px;
-}
-.stu-workbench section > div + div { margin-top: 4px; }
+ .stu-workbench-actions, .stu-workbench-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.stu-workbench-root { display: flex; flex-direction: column; gap: 24px; }
+.stu-workbench-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr); gap: 24px; align-items: start; }
+.stu-workbench-aside { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.stu-workbench-section, .stu-workbench-continue { min-width: 0; border-top: 1px solid var(--dak-border); padding-top: 16px; }
+.stu-workbench-section h2, .stu-workbench-continue h2 { margin: 0; font-size: 14px; }
+.stu-workbench-empty .dak-empty { align-items: flex-start; text-align: left; border: 0; padding: 16px 4px; gap: 6px; }
+.stu-workbench-empty .dak-empty h2 { font-size: 13px; }
+.stu-workbench-section h3 { margin: 16px 0 0; color: var(--dak-fg-mid); font-size: 12px; }
+.stu-workbench-row { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 100%; min-width: 0; padding: 14px 4px; text-align: left; border: 0; border-bottom: 1px solid var(--dak-border); background: transparent; color: var(--dak-fg); cursor: pointer; }
+.stu-workbench-row strong, .stu-workbench-row span { max-width: 100%; overflow-wrap: anywhere; }
+.stu-workbench-row > span { color: var(--dak-fg-mid); font-size: 12px; }
+.stu-workbench-row:hover { background: var(--dak-accent-soft); }
+.stu-workbench-row:focus-visible { outline: 2px solid var(--dak-accent); outline-offset: -2px; }
+.stu-workbench-continue-list { display: flex; gap: 24px; }
+.stu-workbench-continue-list > * { flex: 1; }
+@media (max-width: 1100px) { .stu-workbench-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 650px) { .stu-workbench-continue-list, .stu-workbench-header { flex-direction: column; align-items: stretch; } }
 .stu-material-toolbar, .stu-material-filters {
   display: flex;
   flex-wrap: wrap;
