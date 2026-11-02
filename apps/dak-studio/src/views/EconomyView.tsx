@@ -61,7 +61,7 @@ export function EconomyView({ allEntries, entries, selectedTeam = null, onGoLibr
       <header className="stu-view-header">
         <div>
           <h1>经济与转化</h1>
-          <p>查看手枪转化、5v4/5v3 转化、劣势翻盘和小枪破局。当前结果为描述性聚合，尚不自动生成 Finding。</p>
+          <p>按所选比赛范围聚合，查看手枪转化、5v4/5v3 转化、劣势翻盘和小枪破局。当前结果为描述性聚合，尚不自动生成 Finding。</p>
         </div>
       </header>
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
@@ -190,7 +190,7 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
         </article>
 
         <article className="stu-card stu-econ-card stu-card-wide">
-          <h3>队伍明细矩阵</h3>
+          <h3>队伍明细矩阵 · 队伍行</h3>
           <div className="stu-table-scroll">
             <DataTable
               classes={STUDIO_TABLE_CLASSES}
@@ -203,7 +203,7 @@ function EconomyDashboard({ insights }: { insights: TournamentInsights }) {
         </article>
 
         <article className="stu-card stu-econ-card">
-          <h3>经济对位胜率</h3>
+          <h3>经济对位胜率 · 比赛范围总体</h3>
           <DataTable
             state={matrixTable} onStateChange={setMatrixTable}
             classes={STUDIO_TABLE_CLASSES}

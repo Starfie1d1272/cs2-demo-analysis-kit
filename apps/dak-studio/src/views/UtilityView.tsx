@@ -247,8 +247,8 @@ function BestFlashList({ flashes, entryByMatchId, onOpenMatch, onOpenEvidence, o
   });
   return (
     <div className="stu-card">
-      <h3>最佳闪光 Top</h3>
-      <p className="stu-muted">按单颗闪造成的敌方致盲时间排序；队友短暂被白只作为参考，不进入主榜。</p>
+      <h3>闪光候选</h3>
+      <p className="stu-muted">这里只显示有限的最佳候选，并非道具事件全集或统计分母。按单颗闪造成的敌方致盲时间排序；队友短暂被白只作为参考，不进入主榜。</p>
       <div className="stu-evidence-list">
         {flashes.map((flash, index) => {
           const entry = entryByMatchId.get(flash.matchId);
@@ -282,9 +282,15 @@ function DamageEvidenceList({ rows, entryByMatchId, onOpenMatch, onOpenEvidence,
   onWatchDemo?: UtilityViewProps["onWatchDemo"];
 }) {
   if (rows.length === 0) return null;
+  const queue = rows.flatMap((row, index) => {
+    const entry = entryByMatchId.get(row.matchId);
+    const key = `utility:damage:${row.matchId}:${row.roundNumber}:${index}`;
+    return entry ? [{ key, entryId: entry.id, evidence: { matchId: row.matchId, roundNumber: row.roundNumber, tick: row.tick, reason: row.reason, role: "example" as const } }] : [];
+  });
   return (
     <div className="stu-card">
-      <h3>最高伤害道具回合</h3>
+      <h3>伤害回合候选</h3>
+      <p className="stu-muted">这里只显示有限的最佳候选，并非所有伤害回合或统计分母。</p>
       <div className="stu-evidence-list">
         {rows.map((row, index) => {
           const entry = entryByMatchId.get(row.matchId);
@@ -294,7 +300,7 @@ function DamageEvidenceList({ rows, entryByMatchId, onOpenMatch, onOpenEvidence,
               entry={entry}
               target={{ roundNumber: row.roundNumber, tick: row.tick }}
 
-              onOpenEvidence={onOpenEvidence}
+              onOpenEvidence={request => onOpenEvidence({ ...request, queue, selectedKey: request.sourceKey })}
               onWatchDemo={onWatchDemo}
               reason={row.reason}
               sourceKey={`utility:damage:${row.matchId}:${row.roundNumber}:${index}`}

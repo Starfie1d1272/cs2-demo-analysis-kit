@@ -35,9 +35,9 @@ export interface DuelViewProps {
 }
 
 const DUEL_TABS: Array<{ key: DuelTab; label: string }> = [
-  { key: "records", label: "证据复盘" },
-  { key: "opening", label: "整体态势" },
-  { key: "mechanics", label: "机制" },
+  { key: "records", label: "交火证据" },
+  { key: "opening", label: "首次交火分布" },
+  { key: "mechanics", label: "枪法机制" },
 ];
 
 const CLASS_TONE: Record<string, string> = {
@@ -108,7 +108,7 @@ export function DuelView({
       <header className="stu-view-header">
         <div>
           <h1>对枪</h1>
-          <p>在同一分析上下文中查看证据复盘、整体态势与机制覆盖；指标只来自当前聚合范围。</p>
+          <p>在同一分析上下文中查看交火证据、首次交火分布与枪法机制；指标只来自当前聚合范围。受压制或无有效视野的记录不自动代表选手失误。</p>
         </div>
       </header>
       {summary && (
@@ -531,7 +531,7 @@ function EvidenceCards({
               );
             })}
           </div>
-          <Pagination page={page} totalPages={totalPages} onChange={setPage} className="stu-pagination" info={`${activeRows.length} 条 · ${safePage + 1}/${totalPages} 页`} />
+          <Pagination page={safePage} totalPages={totalPages} onChange={setPage} className="stu-pagination" info={`筛选后 ${activeRows.length} 条 · 全部候选 ${rows.length} 条 · ${safePage + 1}/${totalPages} 页`} />
         </>
       )}
     </section>

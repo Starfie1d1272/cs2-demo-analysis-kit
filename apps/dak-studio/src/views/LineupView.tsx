@@ -341,6 +341,10 @@ export function LineupView({
     );
   }
 
+  if (activeMap && !byMap.some((group) => group.mapName === activeMap)) {
+    return <EmptyState variant="insufficient" title="所选地图没有点位" hint="当前范围中已没有该地图的点位，请重新选择地图。" action={<button type="button" className="stu-button" onClick={() => setActiveMap(null)}>返回地图列表</button>} />;
+  }
+
   // ── 当前地图数据（byMap 非空，current 安全） ─────────────────────────
   const current = byMap.find((group) => group.mapName === activeMap) ?? byMap[0]!;
   const sideFilteredRows = sideFilter
@@ -628,13 +632,14 @@ function weaponForGrenade(grenade: string): string {
 }
 
 function formatCommandNumber(value: number): string {
-  return Number.isFinite(value) ? value.toFixed(2) : "0";
+  return value.toFixed(2);
 }
 
 function practiceCommandForCluster(cluster: LineupCluster): string | null {
   const sample = cluster.throws.find((row) => row.practicePose);
   const pose = sample?.practicePose;
   if (!pose) return null;
+  if (![pose.position.x, pose.position.y, pose.position.z, pose.pitch, pose.yaw].every(Number.isFinite)) return null;
   return [
     "sv_cheats 1",
     "bot_kick",
