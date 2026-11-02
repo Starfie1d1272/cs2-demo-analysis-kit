@@ -137,7 +137,7 @@ function EconomyDashboard({ insights, state, onStateChange }: { insights: Tourna
     <div className="stu-econ-dashboard">
       <section className="stu-econ-hero">
         <MetricCard label="回合样本" value={String(insights.roundCount)} detail={`${insights.matchCount} 场 demo`} />
-        <MetricCard label="手枪转化" value={formatPercent(insights.pistolConversionPercent)} detail="赢手枪后的下一回合" tone={toneForPercent(insights.pistolConversionPercent)} />
+        <MetricCard label="总体手枪转化" value={formatPercent(insights.pistolConversionPercent)} detail="比赛范围内赢手枪后的下一回合" tone={toneForPercent(insights.pistolConversionPercent)} />
         <MetricCard label="5v4 转化" value={best5v4 ? formatPercent(best5v4.value) : "—"} detail={best5v4 ? `${best5v4.teamName} · ${best5v4.wins}/${best5v4.total}` : "无样本"} tone={toneForPercent(best5v4?.value ?? null)} />
         <MetricCard label="5v3 转化" value={best5v3 ? formatPercent(best5v3.value) : "—"} detail={best5v3 ? `${best5v3.teamName} · ${best5v3.wins}/${best5v3.total}` : "无样本"} tone={toneForPercent(best5v3?.value ?? null)} />
         <MetricCard label="4v5 翻盘" value={best4v5 ? formatPercent(best4v5.value) : "—"} detail={best4v5 ? `${best4v5.teamName} · ${best4v5.wins}/${best4v5.total}` : "无样本"} tone={toneForPercent(best4v5?.value ?? null)} />
@@ -147,11 +147,12 @@ function EconomyDashboard({ insights, state, onStateChange }: { insights: Tourna
       <section className="stu-econ-grid">
         <article className="stu-card stu-econ-card">
           <h3>优势转换与翻盘</h3>
+          <p className="stu-muted">人数转换为比赛范围总体；R2 转化与反转换按当前队伍行汇总。</p>
           <div className="stu-econ-state-grid">
             <div className="stu-econ-state">
               <div>
                 <span>R2 Conv</span>
-                <b>{formatPercent(insights.pistolConversionPercent)}</b>
+                <b>{formatPercent(pistolConversion.percent)}</b>
                 <small>{pistolConversion.wins}/{pistolConversion.total} 手枪转化</small>
               </div>
               <div>
