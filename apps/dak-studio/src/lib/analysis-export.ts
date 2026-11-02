@@ -108,7 +108,7 @@ function escapeMarkdown(value: ExportCell): string {
   return String(value ?? "—").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/([\\`*_{}\[\]()#!])/g, "\\$1").replace(/\|/g, "\\|").replace(/\r\n|\r|\n/g, "<br>");
 }
 export function analysisResultMarkdown(snapshot: AnalysisResultSnapshotV1): string {
-  const lines = [`# ${escapeMarkdown(snapshot.title)}`, "", `范围：${escapeMarkdown(snapshot.scopeSummary)}`, `生成时间：${new Date(snapshot.generatedAt).toISOString()}`, `应用版本：${escapeMarkdown(snapshot.appVersion)}`, "", "## 条件", ...snapshot.conditions.map(value => `- ${escapeMarkdown(value)}`)];
+  const lines = [`# ${escapeMarkdown(snapshot.title)}`, "", `范围：${escapeMarkdown(snapshot.scopeSummary)}`, `生成时间：${new Date(snapshot.generatedAt).toISOString()}`, `应用版本：${escapeMarkdown(snapshot.appVersion)}`, `样本：${snapshot.sources.length} 场来源，详见各节`, "", "## 条件", ...snapshot.conditions.map(value => `- ${escapeMarkdown(value)}`)];
   for (const section of snapshot.sections) {
     lines.push("", `## ${escapeMarkdown(section.title)}`, "", escapeMarkdown(section.sampleDescription), ...section.text.map(escapeMarkdown));
     if (section.columns.length) {
@@ -134,6 +134,7 @@ export function analysisExportSource(context: AnalysisContext, entries: StudioDe
   const corpus = context.corpus;
   const date = corpus.dateRange;
   return { context, entries, scopeSummary, conditions: [
+    "上下文的基线选择未用于此页面查询；实际参照见各节说明。",
     `日期：${date ? `${date.from ?? "不限"} 至 ${date.to ?? "不限"}${date.includeUnknown ? "（含未知日期）" : "（不含未知日期）"}` : "不限"}`,
     `地图：${corpus.maps.length ? corpus.maps.join("、") : "不限"}`,
     `标签：${corpus.tags.length ? corpus.tags.join("、") : "不限"}`,
@@ -143,4 +144,21 @@ export function analysisExportSource(context: AnalysisContext, entries: StudioDe
 
 export function withAnalysisExportEntries(source: AnalysisExportSource, entries: StudioDemoEntry[]): AnalysisExportSource {
   return { ...source, entries, conditions: [...source.conditions.filter(condition => !condition.startsWith("实际来源：")), `实际来源：${entries.length} 场`] };
+}
+
+/** Allow capture only when the rendered snapshot and the current successful sample agree. */
+export function canExportSnapshot(snapshot: { generation: number; sample?: string } | null | undefined, analysis: { generation: number; status: string }, entries?: StudioDemoEntry[] | null): boolean {
+  return !!snapshot && analysis.status === "ready" && snapshot.generation === analysis.generation && (snapshot.sample === undefined || (entries != null && snapshot.sample === JSON.stringify(entries.map(entry => entry.id))));
+}
+export function unionExportEntries(...groups: Array<StudioDemoEntry[] | null | undefined>): StudioDemoEntry[] {
+  return [...new Map(groups.flatMap(group => group ?? []).map(entry => [entry.id, entry])).values()];
+}
+
+export function withCapabilityConditions(source: AnalysisExportSource, ...items: Array<import("./capability-availability").CapabilityAvailability | null>): AnalysisExportSource {
+  const conditions = items.filter(item => item !== null).flatMap(item => [
+    `能力 ${item.capability} 样本：${item.eligibleMatches}/${item.totalMatches} 场`,
+    ...item.excluded.map(row => `未纳入 ${row.count} 场：${row.reason}`),
+    ...item.dependencies.filter(row => row.available < row.totalEligible).map(row => `依赖 ${row.key}：${row.available}/${row.totalEligible} 场具备${row.required ? "（必需）" : "（可选）"}`),
+  ]);
+  return { ...source, conditions: [...source.conditions, ...conditions] };
 }

@@ -1,3 +1,4 @@
+import { analysisExportSource, withCapabilityConditions } from "./lib/analysis-export";
 import { flushSync } from "react-dom";
 import { savedAnalyses, type SavedAnalysis, type SavedAnalysisInput } from "./lib/saved-analysis";
 import { SavedAnalysesPanel } from "./views/analysis/SavedAnalysesPanel";
@@ -559,7 +560,7 @@ export function App() {
           setNavigation(current => studioNavigationReducer(current, { intent: "switch-analysis", id, destination: target, scrollY: window.scrollY }));
         }}>
         {destination.page === "player" && (
-          <PlayersView
+          <PlayersView exportSource={analysisExportSource(analysisContext, scopedEntries, summarizeAnalysisContext(analysisContext, entries, eventScopes))}
             onCapabilityRepair={openCapabilityRepair}
             key={active.id}
             allEntries={entries}
@@ -582,7 +583,7 @@ export function App() {
           />
         )}
         {destination.page === "team" && (
-          <TeamView
+          <TeamView exportSource={analysisExportSource(analysisContext, scopedEntries, summarizeAnalysisContext(analysisContext, entries, eventScopes))}
             onCapabilityRepair={openCapabilityRepair}
             key={active.id}
             entries={scopedEntries}
@@ -598,7 +599,7 @@ export function App() {
           />
         )}
         {destination.page === "roles" && (analysisContext.focus.kind === "player" || analysisContext.focus.kind === "self" ? (
-          <PlayerRolesPanel key={active.id} entries={scopedEntries} onCapabilityRepair={openCapabilityRepair} playerKey={selectedPlayerKey!} playerLabel={(analysisContext.focus as Extract<AnalysisContext["focus"], { kind: "player" | "self" }>).label}
+          <PlayerRolesPanel exportSource={analysisExportSource(analysisContext, scopedEntries, summarizeAnalysisContext(analysisContext, entries, eventScopes))} key={active.id} entries={scopedEntries} onCapabilityRepair={openCapabilityRepair} playerKey={selectedPlayerKey!} playerLabel={(analysisContext.focus as Extract<AnalysisContext["focus"], { kind: "player" | "self" }>).label}
             selectedTeam={selectedTeam} identityOptions={identityOptions} onOpenEvidence={openEvidence}
             state={(active.ui as import("./lib/studio-page-state").RolesPageState).player}
             onStateChange={player => setNavigation(current => {
@@ -607,7 +608,7 @@ export function App() {
               return studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: { ...previous, player } });
             })} onPageReady={keys => onPageReady(active.id, keys)} />
         ) : analysisContext.focus.kind === "team" ? (
-          <TeamRolesPanel key={active.id} entries={scopedEntries} onCapabilityRepair={openCapabilityRepair} teamName={selectedTeam!} identityOptions={identityOptions}
+          <TeamRolesPanel exportSource={analysisExportSource(analysisContext, scopedEntries, summarizeAnalysisContext(analysisContext, entries, eventScopes))} key={active.id} entries={scopedEntries} onCapabilityRepair={openCapabilityRepair} teamName={selectedTeam!} identityOptions={identityOptions}
             onOpenEvidence={openEvidence} state={(active.ui as import("./lib/studio-page-state").RolesPageState).team}
             onStateChange={team => setNavigation(current => {
               if (current.active.id !== active.id) return current;
@@ -616,7 +617,7 @@ export function App() {
             })} onPageReady={keys => onPageReady(active.id, keys)} />
         ) : <div className="stu-card"><h2>选择分析对象</h2><p>请先选择一名选手或一支队伍。</p><button type="button" className="stu-button" onClick={() => navigate({ page: "player", context: analysisContext })}>选择选手</button><button type="button" className="stu-button" onClick={() => navigate({ page: "team", context: analysisContext })}>选择队伍</button></div>)}
         {destination.page === "opening" && (
-          <TrailsView
+          <TrailsView exportSource={analysisExportSource(analysisContext, scopedEntries, summarizeAnalysisContext(analysisContext, entries, eventScopes))}
             onCapabilityRepair={openCapabilityRepair}
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
@@ -639,8 +640,8 @@ export function App() {
           />
         )}
         {destination.page === "duel" && (
-          <CapabilityPanel entries={scopedEntries} capability="duel" onRepair={openCapabilityRepair}>{eligible =>
-          <DuelView
+          <CapabilityPanel entries={scopedEntries} capability="duel" onRepair={openCapabilityRepair}>{(eligible, current, availability) =>
+          <DuelView exportSource={current ? withCapabilityConditions(analysisExportSource(analysisContext, eligible, summarizeAnalysisContext(analysisContext, entries, eventScopes)), availability) : null}
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
@@ -658,8 +659,8 @@ export function App() {
           }</CapabilityPanel>
         )}
         {destination.page === "utility" && (
-          <CapabilityPanel entries={scopedEntries} capability="utility" onRepair={openCapabilityRepair}>{eligible =>
-          <UtilityView
+          <CapabilityPanel entries={scopedEntries} capability="utility" onRepair={openCapabilityRepair}>{(eligible, current, availability) =>
+          <UtilityView exportSource={current ? withCapabilityConditions(analysisExportSource(analysisContext, eligible, summarizeAnalysisContext(analysisContext, entries, eventScopes)), availability) : null}
             key={active.id}
             allEntries={entries}
             entries={eligible}
@@ -677,8 +678,8 @@ export function App() {
           }</CapabilityPanel>
         )}
         {destination.page === "lineups" && (
-          <CapabilityPanel entries={scopedEntries} capability="lineup" onRepair={openCapabilityRepair}>{eligible =>
-          <LineupsView
+          <CapabilityPanel entries={scopedEntries} capability="lineup" onRepair={openCapabilityRepair}>{(eligible, current, availability) =>
+          <LineupsView exportSource={current ? withCapabilityConditions(analysisExportSource(analysisContext, eligible, summarizeAnalysisContext(analysisContext, entries, eventScopes)), availability) : null}
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
             onRebuild={handleRebuildSelected}
@@ -693,8 +694,8 @@ export function App() {
           }</CapabilityPanel>
         )}
         {destination.page === "economy" && (
-          <CapabilityPanel entries={scopedEntries} capability="economy" onRepair={openCapabilityRepair}>{eligible =>
-          <EconomyView
+          <CapabilityPanel entries={scopedEntries} capability="economy" onRepair={openCapabilityRepair}>{(eligible, current, availability) =>
+          <EconomyView exportSource={current ? withCapabilityConditions(analysisExportSource(analysisContext, eligible, summarizeAnalysisContext(analysisContext, entries, eventScopes)), availability) : null}
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
             allEntries={entries}
@@ -710,8 +711,8 @@ export function App() {
           }</CapabilityPanel>
         )}
         {(destination.page === "patterns") && (
-          <CapabilityPanel entries={scopedEntries} capability="tactical" onRepair={openCapabilityRepair}>{eligible =>
-          <PatternsPage
+          <CapabilityPanel entries={scopedEntries} capability="tactical" onRepair={openCapabilityRepair}>{(eligible, current, availability) =>
+          <PatternsPage exportSource={current ? withCapabilityConditions(analysisExportSource(analysisContext, eligible, summarizeAnalysisContext(analysisContext, entries, eventScopes)), availability) : null}
             key={active.id}
             state={active.ui as import("./lib/pattern-page-state").PatternPageState}
             onStateChange={update => setNavigation(current => {
@@ -735,7 +736,7 @@ export function App() {
           }</CapabilityPanel>
         )}
         {destination.page === "control" && (
-          <RadarFieldView
+          <RadarFieldView exportSource={analysisExportSource(analysisContext, scopedEntries, summarizeAnalysisContext(analysisContext, entries, eventScopes))}
             onCapabilityRepair={openCapabilityRepair}
             key={active.id}
             state={active.ui as import("./lib/spatial-view-state").ControlPageState}
@@ -754,7 +755,7 @@ export function App() {
 
         )}
         {(destination.page === "event-analysis" || destination.page === "analysis") && (
-          <TournamentDashboardView
+          <TournamentDashboardView exportPage={destination.page as "analysis" | "event-analysis"} exportSource={analysisExportSource(analysisContext, scopedEntries, summarizeAnalysisContext(analysisContext, entries, eventScopes))}
             onCapabilityRepair={openCapabilityRepair}
             key={active.id}
             state={active.ui as import("./lib/studio-page-state").AnalysisPageState}

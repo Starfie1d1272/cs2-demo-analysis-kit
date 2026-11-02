@@ -5,7 +5,7 @@ import type { AnalysisPageState } from "./studio-page-state";
 import { captureAnalysisResult, type AnalysisExportSource, type AnalysisResultSection } from "./analysis-export";
 import { comparisonSections } from "./analysis-export-team";
 
-export function buildTournamentAnalysisResult(source: AnalysisExportSource, model: TournamentInsights, comparison: TeamComparisonModel | null, state: AnalysisPageState, columns: { maps: DataTableColumn<TournamentInsights["maps"][number]>[]; weapons: DataTableColumn<TournamentInsights["weaponKills"][number]>[] }, page: "analysis" | "event-analysis") {
+export function buildTournamentAnalysisResult(source: AnalysisExportSource, model: TournamentInsights, comparison: TeamComparisonModel | null, state: AnalysisPageState, columns: { maps: DataTableColumn<TournamentInsights["maps"][number]>[]; weapons: DataTableColumn<TournamentInsights["weaponKills"][number]>[] }, page: "analysis" | "event-analysis", leaderboard?: AnalysisResultSection) {
   const maps = sortTableRows(model.maps, columns.maps, state.tables.maps?.sort ?? { key: "matches", direction: "desc" });
   const weapons = sortTableRows(model.weaponKills, columns.weapons, state.tables.weapons?.sort ?? { key: "kills", direction: "desc" });
   const sections: AnalysisResultSection[] = [
@@ -13,8 +13,9 @@ export function buildTournamentAnalysisResult(source: AnalysisExportSource, mode
     { title: "地图", text: [], sampleDescription: `${maps.length} 行 · 全部筛选结果`, limitations: [], columns: [{ key: "map", label: "地图", unit: null }, { key: "matches", label: "场次", unit: null }, { key: "t", label: "T 胜率", unit: "%" }, { key: "ct", label: "CT 胜率", unit: "%" }, { key: "pistol", label: "手枪局 T 胜率", unit: "%" }], rows: maps.map(row => ({ map: row.mapName, matches: row.matches, t: row.tWinRatePercent, ct: row.ctWinRatePercent, pistol: row.pistolTWinRatePercent })) },
     { title: "武器", text: [], sampleDescription: `${weapons.length} 行 · 全部筛选结果`, limitations: [], columns: [{ key: "weapon", label: "武器", unit: null }, { key: "kills", label: "击杀", unit: null }, { key: "hs", label: "HS", unit: "%" }, { key: "top", label: "最高选手", unit: null }, { key: "topKills", label: "最高选手击杀", unit: null }], rows: weapons.map(row => ({ weapon: row.label, kills: row.kills, hs: row.headshotPercent, top: row.topPlayerName, topKills: row.topPlayerName ? row.topPlayerKills : null })) },
     ...(comparison ? comparisonSections(comparison) : []),
+    ...(leaderboard ? [leaderboard] : []),
   ];
-  return captureAnalysisResult({ ...source, title: "赛事总览", page, sections, limitations: ["图像未包含。"] });
+  return captureAnalysisResult({ ...source, conditions: [...source.conditions, ...(source.context.focus.kind === "player" || source.context.focus.kind === "self" ? ["赛事总览按比赛范围计算，未按个人筛选。"] : [])], title: "赛事总览", page, sections, limitations: ["图像未包含。"] });
 }
 
 export function leaderboardSection(model: import("@cs2dak/presentation").SeasonLeaderboardModel, state: AnalysisPageState): AnalysisResultSection {

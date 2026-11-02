@@ -1,6 +1,7 @@
+import { canExportSnapshot, withCapabilityConditions, withAnalysisExportEntries as applyExportEntries } from "../lib/analysis-export";
 import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
 import { buildOpeningAnalysisResult } from "../lib/analysis-export-spatial";
-import { withAnalysisExportEntries, type AnalysisExportSource } from "../lib/analysis-export";
+import type { AnalysisExportSource } from "../lib/analysis-export";
 import { OPENING_WINDOW_SECONDS, OPENING_SPEEDS, OPENING_OPACITY_MIN, OPENING_OPACITY_MAX } from "../lib/spatial-view-state";
 import { CapabilityBar, useCapability } from "../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../lib/capability-availability";
@@ -232,7 +233,7 @@ export function TrailsView({ exportSource, onCapabilityRepair, allEntries, entri
       <header className="stu-view-header">
         <div>
           <h1>开局动线</h1>
-          {exportSource && models && selectedPlayer && !error && <AnalysisExportButtons capture={() => buildOpeningAnalysisResult(withAnalysisExportEntries(exportSource, rangeEntries), visibleRounds, selectedPlayer.name, pageState, missingReplay)} />}
+          {exportSource && models && selectedPlayer && !error && !capability.error && !capability.stale && canExportSnapshot(modelSnapshot, analysis) && <AnalysisExportButtons capture={() => buildOpeningAnalysisResult(withCapabilityConditions(applyExportEntries(exportSource, eligibleEntries ?? []), capability.availability), visibleRounds, selectedPlayer.name, pageState, missingReplay)} />}
           <p>
             选手在<b>长枪局</b>开局前 {WINDOW_SECONDS} 秒的走位与道具投掷叠加动画——直观看出默认位、出门路线和道具习惯，也可用于学习职业选手的 default。
           </p>

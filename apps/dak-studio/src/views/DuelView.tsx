@@ -1,3 +1,4 @@
+import { canExportSnapshot } from "../lib/analysis-export";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
 import { buildDuelAnalysisResult } from "../lib/analysis-export-duel";
@@ -116,7 +117,7 @@ export function DuelView({
       <header className="stu-view-header">
         <div>
           <h1>对枪</h1>
-          {projected && exportSource && <AnalysisExportButtons capture={() => buildDuelAnalysisResult(exportSource, projected, state)} />}
+          {projected && exportSource && (playerSteamIds === null || playerSteamIds.length > 0) && !error && canExportSnapshot(snapshot, analysis) && <AnalysisExportButtons capture={() => buildDuelAnalysisResult(exportSource, projected, state, teamRenames)} />}
           <p>在同一分析上下文中查看交火证据、首次交火分布与枪法机制；指标只来自当前聚合范围。受压制或无有效视野的记录不自动代表选手失误。</p>
         </div>
       </header>

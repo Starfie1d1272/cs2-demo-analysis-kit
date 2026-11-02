@@ -1,3 +1,4 @@
+import { canExportSnapshot, withCapabilityConditions, unionExportEntries, withAnalysisExportEntries } from "../../lib/analysis-export";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../../lib/queries/query-cache";
 import { CapabilityBar, useCapability } from "../../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../../lib/capability-availability";
@@ -151,5 +152,5 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
             </div>
           )}
   </>;
-  return <div className="stu-view"><header className="stu-view-header"><h1>位置与职责 · {playerLabel}</h1>{exportSource && selectedRoleProfile && mapPoolReady && !mapPoolError && <AnalysisExportButtons capture={() => buildPlayerRolesAnalysisResult(exportSource, selectedRoleProfile, mapPool, state, playerLabel, unsupportedMaps)} />}</header>{rolePanels}</div>;
+  return <div className="stu-view"><header className="stu-view-header"><h1>位置与职责 · {playerLabel}</h1>{exportSource && selectedRoleProfile && pool && mapPoolReady && !mapPoolError && !roleError && !capability.error && !capability.stale && !poolCapability.error && !poolCapability.stale && canExportSnapshot(roleSnapshot, analysis) && canExportSnapshot(poolSnapshot, analysis) && <AnalysisExportButtons capture={() => buildPlayerRolesAnalysisResult(withCapabilityConditions(withAnalysisExportEntries(exportSource, unionExportEntries(roleEntries, poolEntries)), capability.availability, poolCapability.availability), selectedRoleProfile, mapPool, state, playerLabel, unsupportedMaps)} />}</header>{rolePanels}</div>;
 }

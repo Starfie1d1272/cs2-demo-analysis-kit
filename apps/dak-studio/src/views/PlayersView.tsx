@@ -1,9 +1,10 @@
+import { canExportSnapshot, withCapabilityConditions, unionExportEntries, withAnalysisExportEntries as applyExportEntries } from "../lib/analysis-export";
 import { CapabilityBar, useCapability } from "../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../lib/capability-availability";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
 import { buildPlayerAnalysisResult } from "../lib/analysis-export-player";
-import { withAnalysisExportEntries, type AnalysisExportSource } from "../lib/analysis-export";
+import type { AnalysisExportSource } from "../lib/analysis-export";
 import { PlayerFindingsPanel } from "./analysis/PlayerFindingsPanel";
 import type { PlayerPageState } from "../lib/studio-page-state";
 import { Star } from "lucide-react";
@@ -147,8 +148,8 @@ export function PlayersView({
   }, [orderedProfiles, selectedPlayerKey]);
 
   useEffect(() => {
-    if (!onPageReady || (!profiles && !error && !seasonCapability.error && seasonEntries?.length !== 0 && entries.length > 0)) return;
-    if (selected && (profileTab === "overview" || profileTab === "utility") && !insights && !detailsError && !detailsCapability.error && detailsEntries?.length !== 0) return;
+    if (!onPageReady || (!profiles && !error && !seasonCapability.error && !seasonCapability.stale && seasonEntries?.length !== 0 && entries.length > 0)) return;
+    if (selected && (profileTab === "overview" || profileTab === "utility") && !insights && !detailsError && !detailsCapability.error && !detailsCapability.stale && detailsEntries?.length !== 0) return;
     onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
   }, [profiles, error, seasonCapability.error, seasonEntries, insights, detailsError, detailsCapability.error, detailsEntries, entries.length, onPageReady, selected, profileTab]);
 
@@ -282,7 +283,7 @@ export function PlayersView({
       <header className="stu-view-header">
         <div>
           <h1>选手档案</h1>
-          {exportSource && coverage && !detailsError && <AnalysisExportButtons capture={() => buildPlayerAnalysisResult(withAnalysisExportEntries(exportSource, exportSource.entries.filter(entry => [...selected.perMatch, ...(compare?.perMatch ?? [])].some(point => point.matchId === matchIdForEntry(entry)))), selected, compare, insights, weaponStats, mechanics, coverage, state, trendMetric, findings)} />}
+          {exportSource && !error && !detailsError && !seasonCapability.error && !seasonCapability.stale && !detailsCapability.error && !detailsCapability.stale && canExportSnapshot(profileSnapshot, analysis, seasonEntries) && (canExportSnapshot(detailSnapshot, analysis, detailsEntries) || (detailsEntries?.length === 0 && !details && (profileTab === "overview" || profileTab === "trend"))) && <AnalysisExportButtons capture={() => buildPlayerAnalysisResult(withCapabilityConditions(applyExportEntries(exportSource, unionExportEntries(seasonEntries, detailsEntries)), seasonCapability.availability, detailsCapability.availability), selected, compare, insights, weaponStats, mechanics, coverage, state, trendMetric, findings)} />}
           <p>
             基于 {profileSnapshot ? JSON.parse(profileSnapshot.sample).length : 0} 场 demo 的跨场画像 · 权重 {selected.weightsVersion}。强弱项相对当前聚合范围内的选手计算
             {orderedProfiles.length < 5 ? "（不足 5 人，暂不出强弱项判断）" : ""}。

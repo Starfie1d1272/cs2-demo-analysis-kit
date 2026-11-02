@@ -1,3 +1,4 @@
+import { canExportSnapshot } from "../lib/analysis-export";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
 import { buildLineupsAnalysisResult } from "../lib/analysis-export-lineups";
@@ -398,7 +399,7 @@ export function LineupView({
       {/* ── 雷达 ──────────────────────────────────────────────────────── */}
       <div className="stu-card stu-lineup-radar-card">
         <h3>道具点位雷达 · {mapDisplayName(current.mapName)}</h3>
-        {exportSource && <AnalysisExportButtons capture={() => buildLineupsAnalysisResult(exportSource, sideFilteredRows, state, lineupColumns, selectedCluster ?? null, selectedCluster ? practiceCommandForCluster(selectedCluster) : null)} />}
+        {exportSource && hasSnapshot && !loading && !error && canExportSnapshot(clusterSnapshot, analysis) && <AnalysisExportButtons capture={() => buildLineupsAnalysisResult(exportSource, sideFilteredRows, state, lineupColumns, selectedCluster ?? null, selectedCluster ? practiceCommandForCluster(selectedCluster) : null)} />}
 
         <div className="stu-chip-row" role="tablist" aria-label="聚类模式">
           {(["strict", "loose"] as const).map((mode) => (

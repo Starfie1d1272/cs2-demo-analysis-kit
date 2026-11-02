@@ -1,3 +1,4 @@
+import { canExportSnapshot, withCapabilityConditions } from "../lib/analysis-export";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { CapabilityBar, useCapability } from "../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../lib/capability-availability";
@@ -140,7 +141,7 @@ export function RadarFieldView({ exportSource, onCapabilityRepair, entries, team
       <div className="stu-card stu-radar-field-head">
         <div>
           <h3>控图覆盖场</h3>
-          {exportSource && field && fieldReady && !progress && !fieldError && !invalidTeamForMap && <AnalysisExportButtons capture={() => buildControlAnalysisResult(withAnalysisExportEntries(exportSource, entriesOfMap.filter(entry => field.scope.matchIds.includes(entry.id) || baseline?.scope.matchIds.includes(entry.id))), field, baseline, state)} />}
+          {exportSource && field && fieldReady && !progress && !fieldError && !capability.error && !capability.stale && !invalidTeamForMap && canExportSnapshot(snapshot, analysis) && <AnalysisExportButtons capture={() => buildControlAnalysisResult(withCapabilityConditions(withAnalysisExportEntries(exportSource, entriesOfMap.filter(entry => field.scope.matchIds.includes(entry.id) || baseline?.scope.matchIds.includes(entry.id))), capability.availability), field, baseline, state)} />}
           <p className="stu-muted">
             基线 = 当前全局范围中 {activeMap} 的 {entriesOfMap.length} 场；
             队伍视图 = 该队在这些场次里的贡献。覆盖场仅作描述性观察，不自动识别弱区或生成对策。
@@ -217,7 +218,7 @@ export function RadarFieldView({ exportSource, onCapabilityRepair, entries, team
       {capability.availability && <CapabilityBar availability={capability.availability} onRepair={onCapabilityRepair} />}
       {capability.error && <p role="alert">能力读取失败：{capability.error} <button type="button" className="stu-button-sm" onClick={capability.retry}>重试</button>{capability.availability && " · 显示旧版本"}</p>}
       {!invalidTeamForMap && field && <RadarFieldCanvas field={field} baseline={baseline} map={{ name: activeMap!, radarImageUrl: `./maps/radars/${activeMap}.png`, lowerRadarImageUrl: getMapCalibration(activeMap!) && hasLowerLevel(getMapCalibration(activeMap!)!) ? `./maps/radars/${activeMap}_lower.png` : null }} state={{ mode: state.mode, second: state.second, level: state.level }} onStateChange={view => onStateChange(current => ({ ...current, ...view }))} />}
-      {!invalidTeamForMap && !progress && !field && activeMap && capability.availability && !capability.error && (
+      {!invalidTeamForMap && !progress && !field && activeMap && capability.availability && !capability.error && !capability.stale && (
         fieldError ? <EmptyState variant="error" title="覆盖场加载失败" hint={fieldError} />
           : <EmptyState title="该地图暂无覆盖场数据" hint="所选范围和经济条件内没有含回放的回合。" />
       )}

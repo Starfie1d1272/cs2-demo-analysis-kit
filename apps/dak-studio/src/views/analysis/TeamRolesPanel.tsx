@@ -1,3 +1,4 @@
+import { canExportSnapshot, withCapabilityConditions, unionExportEntries, withAnalysisExportEntries } from "../../lib/analysis-export";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../../lib/queries/query-cache";
 import { CapabilityBar, useCapability } from "../../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../../lib/capability-availability";
@@ -101,5 +102,5 @@ export function TeamRolesPanel({ exportSource, onCapabilityRepair, entries, team
             {doubleAwpError && !doubleAwp ? <EmptyState variant="error" title="双 AWP 统计不可用" hint={doubleAwpError} /> : doubleAwp === null && !awpCapability.error ? <div className="stu-loading">读取 AWP 回合事实…</div> : doubleAwp === null ? null : <DoubleAwpAnalysisPanel model={doubleAwp.find((row) => row.side === matrixSide) ?? null} playerNames={playerNames} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "team:double-awp" }); }} />}
           </section>
   </>;
-  return <div className="stu-view"><header className="stu-view-header"><h1>位置与职责 · {teamName}</h1>{exportSource && activeMatrix && doubleAwp && !doubleAwpError && <AnalysisExportButtons capture={() => buildTeamRolesAnalysisResult(exportSource, activeMatrix, doubleAwp?.find(row => row.side === matrixSide) ?? null, state, playerNames)} />}</header>{rolePanels}</div>;
+  return <div className="stu-view"><header className="stu-view-header"><h1>位置与职责 · {teamName}</h1>{exportSource && activeMatrix && doubleAwp && !doubleAwpError && !matrixError && !capability.error && !capability.stale && !awpCapability.error && !awpCapability.stale && canExportSnapshot(roleSnapshot, analysis) && canExportSnapshot(awpSnapshot, analysis) && <AnalysisExportButtons capture={() => buildTeamRolesAnalysisResult(withCapabilityConditions(withAnalysisExportEntries(exportSource, unionExportEntries(roleEntries, awpEntries)), capability.availability, awpCapability.availability), activeMatrix, doubleAwp?.find(row => row.side === matrixSide) ?? null, state, playerNames)} />}</header>{rolePanels}</div>;
 }
