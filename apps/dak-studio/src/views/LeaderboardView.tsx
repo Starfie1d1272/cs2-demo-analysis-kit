@@ -1,3 +1,4 @@
+import type { AnalysisPageState } from "../lib/studio-page-state";
 import { useEffect, useState } from "react";
 import type { SeasonLeaderboardModel } from "@cs2dak/presentation";
 import { SeasonLeaderboard } from "@cs2dak/react";
@@ -7,6 +8,8 @@ import type { StudioDemoEntry } from "../lib/demo-entry";
 import { EmptyState } from "@cs2dak/react";
 
 export interface LeaderboardViewProps {
+  state: AnalysisPageState;
+  onStateChange: (state: AnalysisPageState) => void;
   allEntries: StudioDemoEntry[];
   entries: StudioDemoEntry[];
   selectedTeam?: string | null;
@@ -16,7 +19,7 @@ export interface LeaderboardViewProps {
   embedded?: boolean;
 }
 
-export function LeaderboardView({ allEntries, entries, selectedTeam = null, onPlayerClick, onGoLibrary, identityOptions, embedded = false }: LeaderboardViewProps) {
+export function LeaderboardView({ state, onStateChange, allEntries, entries, selectedTeam = null, onPlayerClick, onGoLibrary, identityOptions, embedded = false }: LeaderboardViewProps) {
   const [model, setModel] = useState<SeasonLeaderboardModel | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,7 +75,7 @@ export function LeaderboardView({ allEntries, entries, selectedTeam = null, onPl
         <div className="stu-loading">聚合 {entries.length} 场 demo，构建排行榜…</div>
       ) : (
         <div className="stu-embed">
-          <SeasonLeaderboard model={model} onPlayerClick={onPlayerClick} />
+          <SeasonLeaderboard model={model} onPlayerClick={onPlayerClick} viewKey={state.leaderboardView} onViewKeyChange={leaderboardView => onStateChange({ ...state, leaderboardView, tables: { ...state.tables, leaderboard: { sort: { key: model.views.find(view => view.key === leaderboardView)?.defaultSort ?? model.views[0].defaultSort, direction: "desc" }, page: 0 } } })} tableState={state.tables.leaderboard ?? { sort: { key: model.views.find(view => view.key === state.leaderboardView)?.defaultSort ?? model.views[0].defaultSort, direction: "desc" }, page: 0 }} onTableStateChange={table => onStateChange({ ...state, tables: { ...state.tables, leaderboard: table } })} />
         </div>
       )}
     </div>

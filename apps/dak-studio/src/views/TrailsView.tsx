@@ -21,6 +21,7 @@ export interface TrailsViewProps {
   entries: StudioDemoEntry[];
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
+  focusPlayerKey?: string | null;
 }
 
 const WINDOW_SECONDS = 30;
@@ -58,10 +59,10 @@ const EFFECT_DURATION_SECONDS: Partial<Record<string, number>> = {
   decoy: 15
 };
 
-export function TrailsView({ allEntries, entries, onGoLibrary, identityOptions , onPageReady }: TrailsViewProps) {
+export function TrailsView({ allEntries, entries, onGoLibrary, identityOptions, onPageReady, focusPlayerKey }: TrailsViewProps) {
   // 业务流程：① 选手 → ② 地图（该选手出场的图）→ ③ 最近 N 场（该选手在该图）
   const [rangeN, setRangeN] = useState<number>(5);
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(focusPlayerKey ?? null);
   const [players, setPlayers] = useState<PlayerOption[] | null>(null);
   /** entryId → 该场出场选手集合。 */
   const [rosterByEntry, setRosterByEntry] = useState<Map<string, Set<string>> | null>(null);
@@ -116,6 +117,7 @@ export function TrailsView({ allEntries, entries, onGoLibrary, identityOptions ,
         setPlayers(options);
         setRosterByEntry(roster);
         setSelectedKey((current) => {
+          if (focusPlayerKey) return focusPlayerKey;
           if (current && options.some((option) => option.playerKey === current)) return current;
           const pinnedOption = pinned
             ? options.find((option) => option.playerKey === pinned.playerKey || option.steamIds.some((s) => pinned.steamIds.includes(s)))
@@ -129,7 +131,7 @@ export function TrailsView({ allEntries, entries, onGoLibrary, identityOptions ,
     return () => {
       cancelled = true;
     };
-  }, [entries, identityOptions?.version]);
+  }, [entries, identityOptions?.version, focusPlayerKey]);
 
   // 该选手出场的全部场次（matchId 日期前缀降序）
   const playerEntries = useMemo(() => {

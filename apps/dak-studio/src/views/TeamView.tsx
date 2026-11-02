@@ -1,3 +1,7 @@
+import { getTeamComparison } from "../lib/queries/team-queries";
+import { TeamComparisonPanel } from "@cs2dak/react";
+import type { TeamComparisonModel } from "@cs2dak/presentation";
+import type { TeamPageState } from "../lib/studio-page-state";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 import { useEffect, useMemo, useState } from "react";
 import { DataTable, DoubleAwpAnalysisPanel, EmptyState, TeamMapRoleMatrixPanel, type DataTableColumn } from "@cs2dak/react";
@@ -33,7 +37,8 @@ export function TeamView({
   onOpenMatch,
   onOpenCapability,
   onOpenEvidence,
-  returnEvidenceKey,
+  state,
+  onStateChange,
   onPageReady,
   onGoLibrary,
   identityOptions,
@@ -44,13 +49,16 @@ export function TeamView({
   onOpenMatch: (entryId: string) => void;
   onOpenCapability: (view: TeamViewAction) => void;
   onOpenEvidence: OpenEvidence;
-  returnEvidenceKey?: string;
+  state: TeamPageState;
+  onStateChange: (state: TeamPageState) => void;
   onPageReady?: (keys: string[]) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
 }) {
-  const [mapTable, setMapTable] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "matches", direction: "desc" }, page: 0 });
-  const [rosterTable, setRosterTable] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: "rr", direction: "desc" }, page: 0 });
+  const mapTable = state.tables.maps ?? { sort: { key: "matches", direction: "desc" as const }, page: 0 };
+  const rosterTable = state.tables.roster ?? { sort: { key: "rr", direction: "desc" as const }, page: 0 };
+  const setMapTable = (value: typeof mapTable) => onStateChange({ ...state, tables: { ...state.tables, maps: value } });
+  const setRosterTable = (value: typeof rosterTable) => onStateChange({ ...state, tables: { ...state.tables, roster: value } });
   const teams = useMemo(() => {
     const counts = new Map<string, number>();
     for (const entry of entries) {
@@ -64,14 +72,24 @@ export function TeamView({
       .sort((a, b) => b.matches - a.matches || a.name.localeCompare(b.name));
   }, [entries, identityOptions?.version]);
   const activeTeam = selectedTeam && teams.some((team) => team.name === selectedTeam) ? selectedTeam : null;
+  const [comparison, setComparison] = useState<TeamComparisonModel | null>(null);
   const [overview, setOverview] = useState<TeamOverviewModel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [matrices, setMatrices] = useState<TeamMapRoleMatrix[] | null>(null);
   const [matrixError, setMatrixError] = useState<string | null>(null);
   const [doubleAwp, setDoubleAwp] = useState<DoubleAwpAnalysis[] | null>(null);
-  const [matrixMap, setMatrixMap] = useState<string | null>(null);
-  const returningMatrix = /^team:map-roles:(de_[^:]+):(t|ct)$/.exec(returnEvidenceKey ?? "");
-  const [matrixSide, setMatrixSide] = useState<"t" | "ct">(returningMatrix?.[2] === "t" ? "t" : "ct");
+  const matrixSide = state.matrixSide;
+  const matrixMap = state.matrixMapName ?? matrices?.[0]?.mapName ?? null;
+  const setMatrixMap = (matrixMapName: string) => onStateChange({ ...state, matrixMapName });
+  const setMatrixSide = (matrixSide: "t" | "ct") => onStateChange({ ...state, matrixSide });
+
+  useEffect(() => {
+    if (!activeTeam || !state.compareTeamName) { setComparison(null); return; }
+    let cancelled = false;
+    setComparison(null);
+    void getTeamComparison(entries, identityOptions, [activeTeam, state.compareTeamName]).then(model => { if (!cancelled) setComparison(model); }).catch(() => { if (!cancelled) setComparison(null); });
+    return () => { cancelled = true; };
+  }, [entries, activeTeam, state.compareTeamName, identityOptions?.version]);
 
   useEffect(() => {
     if (!activeTeam || entries.length === 0) {
@@ -92,10 +110,10 @@ export function TeamView({
     let cancelled = false;
     setMatrices(null); setMatrixError(null);
     void loadRoleDeclarations().then((state) => getTeamMapRoleMatrices(entries, state.declarations.map((row) => row.declaration as RoleDeclaration), identityOptions, [activeTeam]))
-      .then((next) => { if (!cancelled) { setMatrices(next); setMatrixMap((current) => current && next.some((row) => row.mapName === current) ? current : returningMatrix?.[1] && next.some((row) => row.mapName === returningMatrix[1]) ? returningMatrix[1] : next[0]?.mapName ?? null); } })
+      .then((next) => { if (!cancelled) { setMatrices(next); } })
       .catch((reason) => { if (!cancelled) setMatrixError(reason instanceof Error ? reason.message : String(reason)); });
     return () => { cancelled = true; };
-  }, [entries, activeTeam, identityOptions?.version, returnEvidenceKey]);
+  }, [entries, activeTeam, identityOptions?.version]);
 
   useEffect(() => {
     if (!activeTeam || entries.length === 0) { setDoubleAwp(null); return; }
@@ -105,15 +123,9 @@ export function TeamView({
   }, [entries, activeTeam, identityOptions?.version]);
 
   useEffect(() => {
-    if (returningMatrix?.[2]) setMatrixSide(returningMatrix[2] as "t" | "ct");
-  }, [returnEvidenceKey]);
-
-  useEffect(() => {
-    if (!onPageReady || (activeTeam && !overview && !error)) return;
-    if (returnEvidenceKey?.startsWith("team:map-roles") && !matrices && !matrixError && activeTeam) return;
-    if (returnEvidenceKey === "team:double-awp" && !doubleAwp && activeTeam) return;
+    if (!onPageReady || (activeTeam && (!overview && !error || !matrices && !matrixError || !doubleAwp))) return;
     onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
-  }, [onPageReady, activeTeam, overview, error, matrices, matrixError, doubleAwp, returnEvidenceKey]);
+  }, [onPageReady, activeTeam, overview, error, matrices, matrixError, doubleAwp]);
 
   const matrixMaps = [...new Set((matrices ?? []).map((row) => row.mapName))];
   const activeMatrix = matrices?.find((row) => row.mapName === matrixMap && row.side === matrixSide) ?? null;
@@ -146,6 +158,10 @@ export function TeamView({
               <div className="stu-metric"><span>回合</span><b>{overview.roundsWon}:{overview.roundsLost}</b></div>
               <div className="stu-metric"><span>阵容样本</span><b>{overview.roster.length} 人</b></div>
             </div>
+          </section>
+          <section className="stu-card"><h3>队伍对比 · 当前范围 {entries.length} 场</h3>
+            <label>对比队伍 <select value={state.compareTeamName ?? ""} onChange={event => onStateChange({ ...state, compareTeamName: event.target.value || null })}><option value="">不比较</option>{teams.filter(team => team.name !== activeTeam).map(team => <option key={team.name} value={team.name}>{team.name} · {team.matches} 场</option>)}</select></label>
+            {comparison && <TeamComparisonPanel model={comparison} onSelectPair={(_, b) => onStateChange({ ...state, compareTeamName: b })} onOpenMatch={matchId => { const entry = entries.find(item => matchIdForEntry(item) === matchId); if (entry) onOpenMatch(entry.id); }} />}
           </section>
           <div className="stu-home-grid">
             <section className="stu-card"><h3>地图盘面</h3><DataTable classes={STUDIO_TABLE_CLASSES} rows={overview.maps} rowKey={(row) => row.mapName} state={mapTable} onStateChange={setMapTable} columns={MAP_COLUMNS} /></section>

@@ -1,3 +1,5 @@
+import { getFactsStore } from "../lib/facts-store";
+import type { PlayerMatchStatsFact } from "../lib/fact-types";
 import { PlayerFindingsPanel } from "./analysis/PlayerFindingsPanel";
 import type { PlayerPageState } from "../lib/studio-page-state";
 import { Star } from "lucide-react";
@@ -38,6 +40,7 @@ export interface PlayersViewProps {
   identityOptions?: IdentityOptions;
   contextSummary: string;
   onOpenMaterials: () => void;
+  onOpenOpening: () => void;
 }
 
 const CORE_VIEW = SEASON_STAT_VIEWS.find((view) => view.key === "core")!;
@@ -74,8 +77,10 @@ export function PlayersView({
   onGoLibrary,
   identityOptions,
   contextSummary,
-  onOpenMaterials
+  onOpenMaterials,
+  onOpenOpening
 }: PlayersViewProps) {
+  const [matchStats, setMatchStats] = useState<PlayerMatchStatsFact[]>([]);
   const [profiles, setProfiles] = useState<PlayerSeasonProfile[] | null>(null);
   const [insights, setInsights] = useState<PlayerSeasonInsights | null>(null);
   const [weaponStats, setWeaponStats] = useState<PlayerWeaponStat[]>([]);
@@ -212,6 +217,14 @@ export function PlayersView({
       cancelled = true;
     };
   }, [entries, selected?.playerKey, identityOptions?.version, selectedTeam]);
+
+  useEffect(() => {
+    if (!selected) { setMatchStats([]); return; }
+    let cancelled = false;
+    void getFactsStore().getPlayerMatchStats({ matchIds: entries.map(matchIdForEntry), steamIds: selected.steamIds })
+      .then(rows => { if (!cancelled) setMatchStats(rows); }).catch(() => { if (!cancelled) setMatchStats([]); });
+    return () => { cancelled = true; };
+  }, [entries, selected?.playerKey]);
 
   useEffect(() => {
     if (!selected || !roleDeclarations) { setRoleProfiles(null); return; }
@@ -467,6 +480,7 @@ export function PlayersView({
 
           {profileTab === "overview" && (
           <div className="stu-profile-grid">
+            <button type="button" className="stu-button-sm" onClick={onOpenOpening}>查看开局动线</button>
             {insights && <PlayerFindingsPanel insights={insights} player={selected} entries={entries} contextSummary={contextSummary} onOpenEvidence={onOpenEvidence} onOpenMaterials={onOpenMaterials} />}
             <div className="stu-card stu-card-wide" id="players:map-roles">
               <div className="stu-card-head"><h3>地图 / 位置</h3><button type="button" className="stu-button-sm" onClick={openRoleEditor}>编辑声明</button></div>
@@ -764,6 +778,10 @@ export function PlayersView({
                 {playerMatches.map((point) => {
                   const entry = entryByMatchId.get(point.matchId);
                   const date = entry ? entryDate(entry) : null;
+                  const fact = matchStats.find(row => row.matchId === point.matchId);
+                  const mine = fact && entry ? (fact.teamKey === "teamA" ? entry.meta.teamAScore : entry.meta.teamBScore) : null;
+                  const theirs = fact && entry ? (fact.teamKey === "teamA" ? entry.meta.teamBScore : entry.meta.teamAScore) : null;
+                  const outcome = mine == null || theirs == null ? null : mine === theirs ? "平" : mine > theirs ? "胜" : "负";
                   return (
                     <button
                       key={point.matchId}
@@ -777,7 +795,7 @@ export function PlayersView({
                         <>
                           <span className="stu-map-badge">{entry.meta.mapName}</span>
                           <span className="stu-player-match-title">
-                            {entry.meta.teamAName} {entry.meta.teamAScore}:{entry.meta.teamBScore} {entry.meta.teamBName}
+                            {outcome && `${outcome} · `}{entry.meta.teamAName} {entry.meta.teamAScore}:{entry.meta.teamBScore} {entry.meta.teamBName}
                           </span>
                           {date && <small className="stu-dim">{date}</small>}
                         </>
