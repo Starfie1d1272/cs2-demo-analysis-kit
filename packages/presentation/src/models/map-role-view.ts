@@ -39,7 +39,7 @@ export interface PlayerMapRoleProfileView {
     confidence: number;
     representativeRounds: Array<{ matchId: string; roundNumber: number }>;
   }>;
-  roleAlignments: Array<{ tSide: string; ctSide: string; sampleLimitations: string[] }>;
+  roleAlignments: Array<{ tResponsibility: TeamResponsibilityView; ctResponsibility: TeamResponsibilityView; sampleLimitations: string[] }>;
   weaponDutyAlignments: Array<{
     declaration: { weaponDuty: WeaponDutyView };
     observedWeaponDuty: WeaponDutyView | null;
