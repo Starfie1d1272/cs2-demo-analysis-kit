@@ -31,12 +31,13 @@ function migrateLegacy(value: { version?: unknown; declarations?: unknown }): Ro
   const declarations: StoredRoleDeclaration[] = [];
   for (const raw of [...value.declarations].sort((a, b) => Number((a as StoredRoleDeclaration).createdAt ?? 0) - Number((b as StoredRoleDeclaration).createdAt ?? 0))) {
     const row = raw as Partial<StoredRoleDeclaration> & { declaration?: Partial<RoleDeclaration> & { role?: unknown; priority?: unknown } };
-    if (typeof row.id !== "string" || typeof row.createdAt !== "number" || typeof row.updatedAt !== "number" || !row.declaration) continue;
+    if (typeof row.id !== "string" || typeof row.createdAt !== "number" || typeof row.updatedAt !== "number" || !row.declaration) return null;
     const key = scopeKey(row.declaration as RoleDeclaration);
     const priority = value.version === 1 ? (primaries.has(key) ? "secondary" : "primary") : row.declaration.priority;
     if (priority === "primary") primaries.add(key);
     const parsed = roleDeclarationSchema.safeParse({ ...row.declaration, kind: "main_role", priority });
-    if (parsed.success) declarations.push({ id: row.id, createdAt: row.createdAt, updatedAt: row.updatedAt, declaration: parsed.data });
+    if (!parsed.success) return null;
+    declarations.push({ id: row.id, createdAt: row.createdAt, updatedAt: row.updatedAt, declaration: parsed.data });
   }
   return { version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations };
 }
@@ -52,17 +53,19 @@ function valid(value: unknown): RoleDeclarationsState | null {
     return typeof candidate.id === "string" && typeof candidate.createdAt === "number" && typeof candidate.updatedAt === "number"
       && roleDeclarationSchema.safeParse(candidate.declaration).success;
   });
-  return { version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations };
+  return declarations.length === state.declarations.length ? { version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations } : null;
 }
 
-export async function loadRoleDeclarations(): Promise<RoleDeclarationsState> {
-  try {
-    const raw = await store.get<unknown>(STATE_KEY);
-    const state = valid(raw) ?? EMPTY;
-    if ([1, 2].includes(Number((raw as { version?: unknown } | null)?.version))) await store.put(STATE_KEY, state);
-    return state;
-  } catch { return EMPTY; }
+async function readRoleDeclarations(persistMigration: boolean): Promise<RoleDeclarationsState> {
+  const raw = await store.get<unknown>(STATE_KEY);
+  if (raw === undefined) return EMPTY;
+  const state = valid(raw);
+  if (!state) throw new Error("角色声明数据无法读取或格式无效，未进行修改");
+  if (persistMigration && [1, 2].includes(Number((raw as { version?: unknown }).version))) await store.put(STATE_KEY, state);
+  return state;
 }
+
+export function loadRoleDeclarations(): Promise<RoleDeclarationsState> { return readRoleDeclarations(true); }
 
 async function save(state: RoleDeclarationsState): Promise<RoleDeclarationsState> {
   await store.put(STATE_KEY, state);
@@ -85,6 +88,25 @@ export async function upsertRoleDeclaration(current: RoleDeclarationsState, inpu
 
 export async function removeRoleDeclaration(current: RoleDeclarationsState, id: string): Promise<RoleDeclarationsState> {
   return save({ ...current, declarations: current.declarations.filter((row) => row.id !== id) });
+}
+
+/** 一次替换当前选手/队伍的普通用户声明；其余作用域和来源保持原样。 */
+export async function replaceOrdinaryUserRoleDeclarations(
+  playerKey: string,
+  teamKey: string | null,
+  inputs: RoleDeclaration[],
+): Promise<RoleDeclarationsState> {
+  const declarations = inputs.map(input => roleDeclarationSchema.parse(input));
+  if (declarations.some(item => item.source !== "user" || item.playerKey !== playerKey || (item.teamKey ?? null) !== teamKey || item.mapName != null || item.validFrom != null || item.validTo != null)) {
+    throw new Error("角色声明范围不一致");
+  }
+  const current = await readRoleDeclarations(false);
+  const now = Date.now();
+  const retained = current.declarations.filter(row => !(row.declaration.source === "user" && row.declaration.playerKey === playerKey
+    && (row.declaration.teamKey ?? null) === teamKey && row.declaration.mapName == null
+    && row.declaration.validFrom == null && row.declaration.validTo == null));
+  const added = declarations.map(declaration => ({ id: crypto.randomUUID(), createdAt: now, updatedAt: now, declaration }));
+  return save({ ...current, version: ROLE_DECLARATIONS_SCHEMA_VERSION, declarations: [...retained, ...added] });
 }
 
 /** 身份合并后按 steamId 交集迁移；没有交集的声明保持原 key，绝不猜测。 */
