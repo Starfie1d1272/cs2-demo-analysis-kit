@@ -78,7 +78,7 @@ jobs:
           DIR="python/dist/dak-studio-$ID"
           DMG="$DIR/dak-studio-$ID.dmg"
           test -s "$DMG"
-          lipo -verify_arch arm64 "$DIR/DAK Studio.app/Contents/MacOS/dak-studio"
+          lipo "$DIR/DAK Studio.app/Contents/MacOS/dak-studio" -verify_arch arm64
           mkdir -p dist
           cp "$DMG" "dist/dak-studio-$ID-macos-arm64.dmg"
           shasum -a 256 "dist/dak-studio-$ID-macos-arm64.dmg" > dist/SHA256SUMS.txt
