@@ -130,7 +130,7 @@ export function TeamView({
     <div className="stu-view stu-reading-view">
       <header className="stu-view-header">
         <div><h1>队伍</h1>{overviewCurrent && overview && exportSource && <AnalysisExportButtons
-          label={state.compareTeamName && !comparisonCurrent ? "导出本次结果（不含队伍对比）" : undefined}
+          note={state.compareTeamName && !comparisonCurrent ? "队伍对比尚未就绪，此文件不包含对比结果。" : undefined}
           capture={() => buildTeamAnalysisResult(
             withCapabilityConditions(
               applyExportEntries(exportSource, unionExportEntries(overviewEntries, comparisonCurrent ? comparisonEntries : null)),

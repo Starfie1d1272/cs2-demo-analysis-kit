@@ -2789,6 +2789,7 @@ td.stu-heat-cell.stu-heat-neutral {
 @media (max-width: 900px) {
   .stu-app {
     grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
   }
 
   .stu-sidebar {
@@ -5126,3 +5127,35 @@ td.stu-heat-cell.stu-heat-neutral {
   .match-sheet-print-phase img { max-width: 120mm; }
   .match-sheet-print-phase button { color: black; border: 0; padding: 0; }
 }
+
+/* 紧凑的工作台和资料工具栏 */
+.stu-workbench section h2 {
+  margin: 0 0 8px;
+  color: var(--dak-fg-mid);
+  font-size: 13px;
+}
+.stu-workbench section > div + div { margin-top: 4px; }
+.stu-material-toolbar, .stu-material-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.stu-material-filters .stu-input { width: auto; min-width: 140px; }
+.stu-material-filters input { flex: 1 1 220px; }
+.stu-export-menu { position: relative; }
+.stu-export-menu summary { cursor: pointer; list-style: none; }
+.stu-export-menu summary::-webkit-details-marker { display: none; }
+.stu-export-note { max-width: 220px; color: var(--dak-fg-mid); font-size: 12px; }
+.stu-export-options {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--dak-border-hi);
+  border-radius: var(--stu-radius-sm);
+  background: var(--dak-panel);
+}
+.stu-playbook-list h2 { margin: 0 0 8px; color: var(--dak-fg-mid); font-size: 13px; }
+.stu-playbook-list .stu-material-filters { margin-bottom: 8px; }

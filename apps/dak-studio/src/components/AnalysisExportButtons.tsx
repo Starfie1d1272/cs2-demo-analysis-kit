@@ -5,30 +5,20 @@ import type { AnalysisResultSnapshotV1 } from "../lib/analysis-export";
 export function AnalysisExportButtons({
   capture,
   disabled = false,
-  label = "导出本次结果",
+  note,
 }: {
   capture: () => AnalysisResultSnapshotV1;
   disabled?: boolean;
-  label?: string;
+  note?: string;
 }) {
   return (
-    <span className="stu-header-actions">
-      <button
-        type="button"
-        className="stu-button-sm"
-        disabled={disabled}
-        onClick={() => downloadAnalysisResult(capture(), "markdown")}
-      >
-        {label} · Markdown
-      </button>
-      <button
-        type="button"
-        className="stu-button-sm"
-        disabled={disabled}
-        onClick={() => downloadAnalysisResult(capture(), "json")}
-      >
-        {label} · JSON
-      </button>
-    </span>
+    <details className="stu-export-menu">
+      <summary className="stu-button-sm" aria-disabled={disabled}>导出结果</summary>
+      <div className="stu-export-options">
+        {note && <span className="stu-export-note">{note}</span>}
+        <button type="button" className="stu-button-sm" disabled={disabled} onClick={() => downloadAnalysisResult(capture(), "markdown")}>Markdown</button>
+        <button type="button" className="stu-button-sm" disabled={disabled} onClick={() => downloadAnalysisResult(capture(), "json")}>JSON</button>
+      </div>
+    </details>
   );
 }
