@@ -30,7 +30,7 @@
 - 导入真实四场最终工作台显示 4 场；另在 cohort 三场导入期间新建并保存笔记，切换比赛/分析/战术与训练/工作台，任务完成后笔记编辑页仍在。模拟 IndexedDB 持续 open 抛错：页面显示“读取本地资料库失败”与缓存重试，同时最近比赛仍写“还没有比赛”；失败状态与空库文案并存，待数据 owner 修复/核对。临时浏览器延迟查询并触发真实 `invalidateAnalysisQueries`：旧 Promise 在恢复后以 AbortError 结束、bucket 清空；这是模拟延迟的数据 generation 检查，不等于 A/B 证据或 scope 切换导出验收。另在浏览器临时拦截 model loader，使证据 A 的加载延迟 12 秒；立即点下一条进入 B，等待 A 晚到后仍显示 Inferno R1/tick 5856，再返回来源。这是标明注入方式的竞态验证。后台任务失败重试与 scope 切换导出仍未实测。
 - 源码 `storage-overview.ts` 的用户 namespace 包含 training-focus、prep-items、practice-lineups、role-declarations、study-notes、coach-playbook、coach-assignments、coach-match-sheets、saved-analyses；cache 名单由 facts/derived cache 加 cache/meta 构成。另以临时隔离目录直接运行 Linux Python `StudioApi` 后端：九类各写一条模拟记录，清除 9 字节临时 cache 后逐类一致；备份后删除九条及真实 Nuke ZIP，恢复后九类各一条和 ZIP 字节一致（SHA-256 `e9405245cd0ba55d4427bb5890874b0b70b19475790248d963734b6cd93e4d21`）。这是后端调用、模拟用户资料，不是 pywebview 壳或 Windows/macOS 实机验证。
 - 旧 playlist 迁移源码先写后删、冲突时另分 ID、末尾写 marker；普通 prep list 仅读取排序。临时内存 RecordStore 注入首次复制失败与首次删除失败，重试后旧记录删除、同 ID 不同内容两条保留、marker 写入；重复迁移和普通 list 无写入。此为模拟故障，旧版本真实资料及平台恢复尚未验。
-- 赛事/series/BP、RivalHub、批量标签/修复、身份/资产/更新/原始 demo/进游戏的逐项可达性未验；canonical/RR/PRISM 跨版本同语料逐项对照未完成。W20 缺姿态保持缺失、W21 分母和日期修正应按 #157/#161 语义核实，不能为了旧错误数值回退。
+- 浏览器进入比赛→赛事目录，可见导入赛事资源包及赛事资源制作器；数据管理中的身份、资产和资料库维护均可打开，维护页显示备份入口，资产页显示 .tri 资产。它们只是入口检查；赛事/series/BP、RivalHub 实际导入、批量标签/修复、身份修改、更新、原始 demo/进游戏的逐项流程未验。canonical/RR/PRISM 跨版本同语料逐项对照未完成。W20 缺姿态保持缺失、W21 分母和日期修正应按 #157/#161 语义核实，不能为了旧错误数值回退。
 - 单 Nuke 文件从选择到显示约 15 秒（粗观察）。同一隔离 Chromium、1 场/593,751 字节：空库首次工作台 1,496ms，导入后首次/再次打开比赛 1,074/115ms，返回工作台 64/53ms；两次比赛进入时 JS heap 约 242/227 MB（非进程总内存、GC 可波动）。这是一次开发服务器粗测，不作 50 场或长期性能结论。1280×800 页面可显示导航与主要内容；键盘、地图等价列表、焦点、打印裁切未验。未验证首页无全量加载或模型缓存长期行为。
 
 ## 验收中修复的直接阻塞
