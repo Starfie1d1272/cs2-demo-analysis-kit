@@ -45,6 +45,10 @@ const declarationScopeSchema = z.object({
   source: z.enum(["user", "self_report", "organizer", "event_package", "trusted_metadata"]),
   mapName: supportedMapNameSchema.optional(),
   teamKey: z.string().min(1).optional(),
+  teamScope: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("entity"), key: z.string().min(1) }).strict(),
+    z.object({ kind: z.literal("observation"), matchId: z.string().min(1), slot: z.enum(["teamA", "teamB"]) }).strict(),
+  ]).optional(),
   validFrom: z.string().datetime().optional(),
   validTo: z.string().datetime().optional(),
   provenance: z.string().min(1),

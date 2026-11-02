@@ -74,7 +74,8 @@ interface ScopedEvidence { rows: PlayerMapRoleEvidence[]; limitations: string[];
 
 function scopedEvidence(declaration: RoleDeclaration, rows: PlayerMapRoleEvidence[], matchTimes: Record<string, string | null>): ScopedEvidence {
   const base = rows.filter((row) => (declaration.teamKey == null || row.teamKey === declaration.teamKey)
-    && (declaration.mapName == null || row.mapName === declaration.mapName));
+    && (declaration.mapName == null || row.mapName === declaration.mapName)
+    && (declaration.teamScope?.kind !== "observation" || row.matchIds.includes(declaration.teamScope.matchId)));
   if (base.length === 0) return { rows: [], limitations: [], relevant: false };
   if (declaration.validFrom == null && declaration.validTo == null) return { rows: base, limitations: [], relevant: true };
   const inScope = (matchId: string) => {
@@ -158,7 +159,7 @@ export function buildPlayerMapRoleProfiles(evidenceRows: PlayerMapRoleEvidence[]
     }) ?? rows;
     const automatic = infer(displayRows, rows);
     const { weaponDuty, roleEvidenceScores, winner, runnerUp, margin, sufficient, status, inferredPrimaryRole } = automatic;
-    const declaredIgl = scopedDeclarations.some((item) => item.declaration.kind === "main_role" && item.declaration.priority === "primary" && item.declaration.role === "igl" && item.declaration.mapName == null && item.declaration.validFrom == null && item.declaration.validTo == null);
+    const declaredIgl = scopedDeclarations.some((item) => item.declaration.kind === "main_role" && item.declaration.priority === "primary" && item.declaration.role === "igl" && item.declaration.teamScope?.kind !== "observation" && item.declaration.mapName == null && item.declaration.validFrom == null && item.declaration.validTo == null);
     const headlineRole = declaredIgl ? inferredPrimaryRole === "awper" ? "IGL / AWPer" : "IGL" : inferredPrimaryRole;
     const volume = clamp(rows.reduce((sum, row) => sum + row.sample.eligibleRounds, 0) / 40);
     const quality = weighted(rows, (row) => row.sample.dataQuality);
