@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ObservedMapPoolRow } from "@cs2dak/analytics";
-import { listMapPoolNotes, saveMapPoolNote } from "../../lib/series.js";
+import { listMapPoolNotes, saveMapPoolNote } from "../../lib/map-pool-notes.js";
 
 export interface MapPoolTableProps { rows: ObservedMapPoolRow[]; hasOwn: boolean; hasOpponent: boolean }
 function pct(value: number | null): string { return value == null ? "—" : `${value.toFixed(1)}%`; }

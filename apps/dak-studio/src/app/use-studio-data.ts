@@ -5,6 +5,7 @@ import { listSeriesRecords, pruneOrphanSeries, type StudioSeriesRecord } from ".
 import { listEventRecords, type StudioEventRecord } from "../lib/events";
 import { loadIdentityState, type IdentityStoreState } from "../lib/identity";
 import { ensureAnalysisDataReady } from "../lib/queries/query-cache";
+import { migrateLegacyPrepItems } from "../lib/material-data-migration";
 export type DirectoryLoadStatus = "loading" | "ready" | "error";
 
 export function useStudioData({ onError }: { onError: (message: string) => void }) {
@@ -15,6 +16,9 @@ export function useStudioData({ onError }: { onError: (message: string) => void 
   const [eventRecords, setEventRecords] = useState<StudioEventRecord[]>([]);
   const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
   const [identityState, setIdentityState] = useState<IdentityStoreState>({ version: 0, mappings: [], teamRenames: {} });
+  const [prepMigrationStatus, setPrepMigrationStatus] = useState<DirectoryLoadStatus>("loading");
+  const [prepMigrationError, setPrepMigrationError] = useState<string | null>(null);
+  const migrationInFlight = useRef<Promise<void> | null>(null);
   const mounted = useRef(false);
   const versions = useRef({ entries: 0, events: 0, identity: 0 });
   const refreshEntries = useCallback(async () => { const id = ++versions.current.entries; const rows = await listDemoEntries(); if (mounted.current && id === versions.current.entries) setEntries(rows); return rows; }, []);
@@ -38,14 +42,26 @@ export function useStudioData({ onError }: { onError: (message: string) => void 
     if (results.some(result => result.status === "rejected")) throw new Error("读取赛事或系列失败");
   }, [onError]);
   const refreshIdentity = useCallback(async () => { const id = ++versions.current.identity; const identity = await loadIdentityState(); if (mounted.current && id === versions.current.identity) setIdentityState(identity); }, []);
+  const retryPrepMigration = useCallback(async () => {
+    if (migrationInFlight.current) return migrationInFlight.current;
+    if (mounted.current) { setPrepMigrationStatus("loading"); setPrepMigrationError(null); }
+    const operation = migrateLegacyPrepItems().then(() => {
+      if (mounted.current) setPrepMigrationStatus("ready");
+    }, error => {
+      if (mounted.current) { setPrepMigrationError(error instanceof Error ? error.message : String(error)); setPrepMigrationStatus("error"); }
+    }).finally(() => { migrationInFlight.current = null; });
+    migrationInFlight.current = operation;
+    return operation;
+  }, []);
   useEffect(() => {
     mounted.current = true;
+    void retryPrepMigration();
     void ensureAnalysisDataReady().catch(() => {});
     const initialVersion = versions.current.entries + 1;
     void refreshEntries().then(async rows => { if (mounted.current && versions.current.entries === initialVersion) { await pruneOrphanSeries(new Set(rows.map(row => row.id))).catch(error => { if (mounted.current) onError(`清理系列失败：${String(error)}`); }); await refreshEventRecords().catch(() => {}); } }).catch(err => { if (mounted.current) onError(`读取本地资料库失败：${err instanceof Error ? err.message : String(err)}`); }).finally(() => { if (mounted.current) setEntriesReady(true); });
     void refreshEventRecords().catch(() => {});
     void refreshIdentity().catch(err => { if (mounted.current) onError(`读取身份失败：${String(err)}`); });
     return () => { mounted.current = false; versions.current.entries++; versions.current.events++; versions.current.identity++; };
-  }, [onError, refreshEntries, refreshEventRecords, refreshIdentity]);
-  return { entries, entriesReady, eventsStatus, seriesStatus, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity };
+  }, [onError, refreshEntries, refreshEventRecords, refreshIdentity, retryPrepMigration]);
+  return { entries, entriesReady, eventsStatus, seriesStatus, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity, prepMigrationStatus, prepMigrationError, retryPrepMigration };
 }

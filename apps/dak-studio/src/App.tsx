@@ -43,15 +43,28 @@ import {
   type AnalysisContext,
 } from "./lib/analysis-context";
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
-import { createStudioNavigation, studioNavigationReducer, PAGE_SECTION, type StudioDestination, type StudioPageId, type StudioSection } from "./lib/studio-navigation";
+import { createStudioNavigation, studioNavigationReducer, PAGE_SECTION, type StudioDestination, type StudioNavigation, type StudioPageId, type StudioSection } from "./lib/studio-navigation";
 import { WorkbenchView } from "./views/WorkbenchView";
 import { MatchesView } from "./views/MatchesView";
 import { AnalysisView } from "./views/AnalysisView";
 import { getPinnedPlayer, type PinnedPlayer } from "./lib/pin";
 import { setLastWork, updateLastMatchPosition } from "./lib/last-work";
 import { EventManager } from "./components/EventManager";
-import { MaterialsView } from "./views/MaterialsView";
+import { emptyMaterialsPageState, emptyStudyNoteDraft, type MaterialsPageState, type MaterialPageState } from "./lib/material-page-state";
+import type { MaterialRef } from "./lib/material-ref";
+import type { StudyNoteDraft } from "./lib/study-notes";
+import { MaterialsView, MaterialDetailView } from "./views/MaterialsView";
 import { RivalHubBatchImportPanel } from "./components/RivalHubBatchImportPanel";
+
+function discardMaterialDraft(navigation: StudioNavigation): StudioNavigation {
+  const frame = navigation.active;
+  if (frame.destination.page === "material" && frame.ui && "dirty" in frame.ui && frame.ui.dirty) return studioNavigationReducer(navigation, { intent: "ui", frameId: frame.id, ui: null });
+  if (frame.destination.page === "materials") {
+    const ui = frame.ui as MaterialsPageState;
+    if (ui.newNoteDirty) return studioNavigationReducer(navigation, { intent: "ui", frameId: frame.id, ui: { ...ui, newNote: null, newNoteDirty: false } });
+  }
+  return navigation;
+}
 
 const MAIN_NAV: Array<{ section: StudioSection; label: string; hint: string; icon: typeof LibraryBig }> = [
   { section: "workbench", label: "工作台", hint: "开始与导入", icon: House },
@@ -84,7 +97,7 @@ function NavButton({ item, active, onClick }: { item: typeof MANAGEMENT_NAV; act
 export function App() {
   const activity = useStudioActivity();
   const { importing, notice, setNotice, exportQueries, recheckExport } = activity;
-  const { entries, entriesReady, eventsStatus, seriesStatus, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity } = useStudioData({ onError: setNotice });
+  const { entries, entriesReady, eventsStatus, seriesStatus, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity, prepMigrationStatus, prepMigrationError, retryPrepMigration } = useStudioData({ onError: setNotice });
   const { importTagsRaw, setImportTagsRaw, importFiles, importDropped, importViaNativeDialog, nativeImportAvailable, loadBuiltinEvent, handleLinkRawDemo, watchRawDemo, handleRemove, handleRemoveMany, handleUpdateTags, handleBulkUpdateTags, handleReexportDemo, handleReexportAll, handleReexportSelected, handleRebuildFacts, handleRebuildStale, handleRebuildSelected } = useLibraryActions({ entries, refreshEntries, refreshEventRecords, activity });
   const { rivalHubConnection, batchSession, dismissBatch, updateLocalLink, refreshRivalHub, handleConnectRivalHub, handleRevokeRivalHub, importOnlineFiles, syncLocalRivalHubDemos, stopRivalHubBatch, pickRivalHubFiles, selectRivalHubBatchTarget } = useRivalHubActions({ refreshEntries, refreshEventRecords, activity });
   const [navigation, setNavigation] = useState(() => createStudioNavigation("initial"));
@@ -107,22 +120,28 @@ export function App() {
   const eventMode = destination.page === "event-analysis" ? "overview" : "directory";
   const fallbackContext = useMemo(() => createAnalysisContextPreset("explore"), []);
   const analysisContext = "context" in destination ? destination.context : fallbackContext;
+  const canLeave = useCallback(() => {
+    const frame = navigationRef.current.active;
+    const dirty = frame.destination.page === "material" ? Boolean(frame.ui && "dirty" in frame.ui && frame.ui.dirty) : frame.destination.page === "materials" ? Boolean((frame.ui as MaterialsPageState | null)?.newNoteDirty) : false;
+    return !dirty || window.confirm("有未保存的修改。确定放弃修改并离开？");
+  }, []);
   const navigate = useCallback((next: StudioDestination, intent: "open" | "evidence" = "open", sourceKey?: string) => {
+    if (intent === "open" && !canLeave()) return;
     const id = `frame-${++nextFrameId.current}`;
     if (intent === "open") { setEvidenceSession(null); setRestoringFrameId(null); }
-    setNavigation(current => studioNavigationReducer(current, intent === "evidence" && next.page === "match"
+    setNavigation(current => studioNavigationReducer(intent === "open" ? discardMaterialDraft(current) : current, intent === "evidence" && next.page === "match"
       ? { intent, id, destination: next, scrollY: window.scrollY, sourceKey }
       : { intent: "open", id, destination: next, scrollY: window.scrollY }));
-  }, []);
+  }, [canLeave]);
   const resumeSection = useCallback((section: StudioSection) => {
     const current = navigationRef.current;
-    if (PAGE_SECTION[current.active.destination.page] === section) return;
+    if (PAGE_SECTION[current.active.destination.page] === section || !canLeave()) return;
     const id = `frame-${++nextFrameId.current}`;
     const target = current.history.find(frame => frame.id === current.resume[section]);
     setEvidenceSession(null);
     setRestoringFrameId(target?.id ?? null);
-    setNavigation(state => studioNavigationReducer(state, { intent: "resume", id, section, scrollY: window.scrollY }));
-  }, []);
+    setNavigation(state => studioNavigationReducer(discardMaterialDraft(state), { intent: "resume", id, section, scrollY: window.scrollY }));
+  }, [canLeave]);
   const setAnalysisContext = useCallback((update: AnalysisContext | ((current: AnalysisContext) => AnalysisContext)) => {
     const id = active.id;
     touchedFrames.current.add(id);
@@ -260,6 +279,32 @@ export function App() {
     setEvidenceSession(createEvidenceSession(request, { ...sourceFrame, scrollY: window.scrollY, anchorKey: request.sourceKey } as import("./lib/studio-navigation").StudioFrame));
     navigate({ page: "match", entryId: request.entryId, roundNumber: request.evidence.roundNumber, tick: request.evidence.tick }, "evidence", request.sourceKey);
   }, [active.id, navigate]);
+  const openMaterialEvidence = useCallback((request: Parameters<OpenEvidence>[0], ui: MaterialsPageState | MaterialPageState) => {
+    const source = navigationRef.current.active;
+    const sourceFrame = { ...source, ui: structuredClone(ui), scrollY: window.scrollY, anchorKey: request.sourceKey } as import("./lib/studio-navigation").StudioFrame;
+    setEvidenceSession(createEvidenceSession(request, sourceFrame));
+    navigate({ page: "match", entryId: request.entryId, roundNumber: request.evidence.roundNumber, tick: request.evidence.tick }, "evidence", request.sourceKey);
+  }, [navigate]);
+  const openStudyNoteEditor = useCallback((draft: StudyNoteDraft) => {
+    if (!canLeave()) return;
+    const id = `frame-${++nextFrameId.current}`;
+    setEvidenceSession(null);
+    setNavigation(current => {
+      const next = studioNavigationReducer(discardMaterialDraft(current), { intent: "open", id, destination: { page: "materials" }, scrollY: window.scrollY });
+      return studioNavigationReducer(next, { intent: "ui", frameId: id, ui: { ...emptyMaterialsPageState(), newNote: structuredClone(draft) } });
+    });
+  }, [canLeave]);
+  const openMaterial = useCallback((materialRef: MaterialRef) => {
+    navigate({ page: "material", materialRef });
+  }, [navigate]);
+  const createdMaterial = useCallback((materialRef: MaterialRef, ui: MaterialsPageState) => {
+    const id = `frame-${++nextFrameId.current}`;
+    setNavigation(current => {
+      if (current.active.id !== active.id || current.active.destination.page !== "materials") return current;
+      const updated = studioNavigationReducer(current, { intent: "ui", frameId: current.active.id, ui });
+      return studioNavigationReducer(updated, { intent: "open", id, destination: { page: "material", materialRef }, scrollY: window.scrollY });
+    });
+  }, [active.id]);
   const moveEvidence = useCallback((index: number) => {
     if (!evidenceSession || index < 0 || index >= evidenceSession.queue.length) return;
     const item = evidenceSession.queue[index];
@@ -276,12 +321,13 @@ export function App() {
 
   const goBack = useCallback(() => {
     if (evidenceSession) { returnToEvidenceSource(); return; }
+    if (!canLeave()) return;
     const current = navigationRef.current;
     const id = `frame-${++nextFrameId.current}`;
     setRestoringFrameId(current.history.at(-1)?.id ?? id);
     setEvidenceSession(null);
-    setNavigation(state => studioNavigationReducer(state, { intent: "back", id }));
-  }, [evidenceSession, returnToEvidenceSource]);
+    setNavigation(state => studioNavigationReducer(discardMaterialDraft(state), { intent: "back", id }));
+  }, [canLeave, evidenceSession, returnToEvidenceSource]);
 
   const onPageReady = useCallback((frameId: string, availableAnchorKeys: string[]) => {
     const frame = navigationRef.current.active;
@@ -452,10 +498,25 @@ export function App() {
           />
         )}
         {displayedCapabilityAvailability && <CapabilityBar availability={displayedCapabilityAvailability} onRepair={openCapabilityRepair} />}
-        {destination.page === "workbench" && <WorkbenchView entries={entries} entriesReady={entriesReady} onOpenMatch={openDemo} onPersonal={openWorkbenchPersonal} onResumeAnalysis={navigation.history.some(frame => PAGE_SECTION[frame.destination.page] === "analysis") ? () => resumeSection("analysis") : undefined} importing={importing} importTagsRaw={importTagsRaw} onImportFiles={importFiles} onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined} onMatches={() => navigate({ page: "matches" })} />}
+        {destination.page === "workbench" && <WorkbenchView entries={entries} entriesReady={entriesReady} onOpenMatch={openDemo} onPersonal={openWorkbenchPersonal} onResumeAnalysis={navigation.history.some(frame => PAGE_SECTION[frame.destination.page] === "analysis") ? () => resumeSection("analysis") : undefined} importing={importing} importTagsRaw={importTagsRaw} onImportFiles={importFiles} onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined} onMatches={() => navigate({ page: "matches" })} onOpenMaterial={openMaterial} onNewNote={() => openStudyNoteEditor(emptyStudyNoteDraft())} prepMigrationStatus={prepMigrationStatus} retryPrepMigration={retryPrepMigration} />}
         {section === "matches" && <MatchesView page={destination.page} onMatches={() => navigate({ page: "matches" })} onEvents={() => navigate({ page: "events" })} />}
         {section === "analysis" && <AnalysisView page={destination.page} onSelect={page => page === "personal-review" ? openPersonalReview() : navigate({ page, context: analysisContext })} />}
-        {destination.page === "materials" && <MaterialsView onLineups={() => goLineups()} onOpenMatch={openDemo} />}
+        {destination.page === "materials" && <MaterialsView onPageReady={keys => onPageReady(active.id, keys)} entries={entries} state={active.ui as MaterialsPageState} onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))} onOpenMaterial={openMaterial} onCreatedMaterial={createdMaterial} onOpenEvidence={openMaterialEvidence} prepMigrationStatus={prepMigrationStatus} prepMigrationError={prepMigrationError} retryPrepMigration={retryPrepMigration} />}
+        {destination.page === "material" && <MaterialDetailView onPageReady={keys => onPageReady(active.id, keys)} refValue={destination.materialRef} entries={entries} state={active.ui as MaterialPageState | null} onStateChange={ui => setNavigation(current => {
+          const frame = current.active;
+          if (frame.id !== active.id || frame.destination.page !== "material" || frame.destination.materialRef.kind !== destination.materialRef.kind || frame.destination.materialRef.id !== destination.materialRef.id) return current;
+          return studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui });
+        })} onBack={cleanState => {
+          const source = navigationRef.current.active;
+          if (source.id !== active.id || source.destination.page !== "material" || source.destination.materialRef.kind !== destination.materialRef.kind || source.destination.materialRef.id !== destination.materialRef.id) return;
+          if (cleanState === undefined) { goBack(); return; }
+          const id = `frame-${++nextFrameId.current}`;
+          setNavigation(current => {
+            const frame = current.active;
+            if (frame.id !== active.id || frame.destination.page !== "material" || frame.destination.materialRef.kind !== destination.materialRef.kind || frame.destination.materialRef.id !== destination.materialRef.id) return current;
+            return studioNavigationReducer(studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui: cleanState }), { intent: "back", id });
+          });
+        }} onOpened={ref => { const frame = navigationRef.current.active; if (frame.id === active.id && frame.destination.page === "material" && frame.destination.materialRef.kind === ref.kind && frame.destination.materialRef.id === ref.id) void setLastWork({ kind: "material", materialRef: ref }); }} onOpenEvidence={openMaterialEvidence} />}
         {destination.page === "personal-review" && (
           <HomeView
             key={active.id}
@@ -477,6 +538,7 @@ export function App() {
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
             entries={entries}
+            openStudyNoteEditor={openStudyNoteEditor}
             onOpened={recordMatchOpened}
             onReplayPaused={recordReplayPaused}
             demoId={selectedDemoId}
@@ -587,7 +649,7 @@ export function App() {
             onGoLibrary={() => goLibrary()}
           />
         )}
-        {(destination.page === "patterns" || destination.page === "materials") && (
+        {(destination.page === "patterns") && (
           <CoachView
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
@@ -599,7 +661,7 @@ export function App() {
             teamRenames={identityState.teamRenames}
             analysisContext={analysisContext}
             onAnalysisContextChange={setAnalysisContext}
-            initialTab={destination.page === "materials" ? "playlist" : "patterns"}
+            initialTab="patterns"
           />
         )}
         {destination.page === "control" && (

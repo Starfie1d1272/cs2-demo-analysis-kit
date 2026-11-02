@@ -1,3 +1,5 @@
+import { listPatternNames, savePatternName } from "../lib/pattern-names";
+import { savePrepItem } from "../lib/prep-items";
 import { usePageReady } from "../lib/use-page-ready";
 import { assertCurrentFacts } from "../lib/facts-readiness";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
@@ -13,15 +15,11 @@ import type { TacticalRoundFact } from "@cs2dak/tactics";
 import { buildTacticalClusters, type TacticalCluster } from "@cs2dak/tactics";
 import { formatTacticalClusterName as autoName } from "@cs2dak/presentation";
 import { withTacticalDisplayGroupKeys } from "../lib/tactical-display-groups";
-import { prepItemsToMarkdown, type PrepItem } from "../lib/playlist";
+import type { PrepItem } from "../lib/prep-items";
+import { PrepItemsPanel } from "./coach/PrepItemsPanel";
 import {
-  listPlaybookNames,
-  listPrepItems,
   loadCoachSettings,
-  removePrepItem,
   saveCoachSettings,
-  savePrepItem,
-  savePlaybookName,
 } from "../lib/series";
 import { PatternExplorer } from "./coach/PatternExplorer";
 import { MapPoolTable } from "./coach/MapPoolTable";
@@ -73,7 +71,7 @@ export function CoachView({
   // loading=true 初始值：防止首帧渲染时 clusters=[] && !loading 导致闪出空态
   const [loading, setLoading] = useState(true);
   const [playbook, setPlaybook] = useState<Record<string, string>>({});
-  const [playlist, setPlaylist] = useState<PrepItem[]>([]);
+  const [prepRevision, setPrepRevision] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [settingsReady, setSettingsReady] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -115,9 +113,8 @@ export function CoachView({
         };
       });
     });
-    const playbookRequest = listPlaybookNames().then((rows) => { if (!cancelled) setPlaybook(rows); });
-    const playlistRequest = listPrepItems().then((rows) => { if (!cancelled) setPlaylist(rows); });
-    void Promise.allSettled([settingsRequest, playbookRequest, playlistRequest]).then((results) => {
+    const playbookRequest = listPatternNames().then((rows) => { if (!cancelled) setPlaybook(rows); });
+    void Promise.allSettled([settingsRequest, playbookRequest]).then((results) => {
       if (cancelled) return;
       const failure = results.find((result) => result.status === "rejected");
       if (failure?.status === "rejected") setSettingsError(failure.reason instanceof Error ? failure.reason.message : String(failure.reason));
@@ -283,7 +280,7 @@ export function CoachView({
                 note: entry ? `${entry.meta.teamAName} ${entry.meta.teamAScore}:${entry.meta.teamBScore} ${entry.meta.teamBName}` : "",
               };
               await savePrepItem(item);
-              setPlaylist(await listPrepItems());
+              setPrepRevision((revision) => revision + 1);
             }}
           />
           <details className="stu-card stu-coach-pattern-names">
@@ -292,40 +289,24 @@ export function CoachView({
               clusters={clusters}
               playbook={playbook}
               onRename={async (patternKey, name) => {
-                await savePlaybookName(patternKey, name);
-                setPlaybook(await listPlaybookNames());
+                await savePatternName(patternKey, name);
+                setPlaybook(await listPatternNames());
               }}
             />
           </details>
         </>
       )}
       {tab === "playlist" && (
-        <>
-          <UserPrepItemForm
-            facts={facts}
-            onSave={async (item) => {
-              await savePrepItem(item);
-              setPlaylist(await listPrepItems());
-            }}
-          />
-          <PlaylistTable
-            items={playlist}
-            entryByMatchId={entryByMatchId}
-            onUpdate={async (item) => {
-              await savePrepItem(item);
-              setPlaylist(await listPrepItems());
-            }}
-            onRemove={async (id) => {
-              await removePrepItem(id);
-              setPlaylist(await listPrepItems());
-            }}
-            onOpenMatch={(matchId, roundNumber) => {
-              const entry = entryByMatchId.get(matchId);
-              if (entry) onOpenMatch(entry.id, { roundNumber });
-            }}
-            onWatchDemo={onWatchDemo}
-          />
-        </>
+        <PrepItemsPanel
+          facts={facts}
+          revision={prepRevision}
+          entryByMatchId={entryByMatchId}
+          onOpenMatch={(matchId, roundNumber) => {
+            const entry = entryByMatchId.get(matchId);
+            if (entry) onOpenMatch(entry.id, { roundNumber });
+          }}
+          onWatchDemo={onWatchDemo}
+        />
       )}
       {!loading && clusters.length > 0 && tab === "anti" && (
         <>
@@ -390,43 +371,6 @@ function isCurrentTacticalRoundFact(row: TacticalRoundFact): boolean {
   );
 }
 
-function UserPrepItemForm({ facts, onSave }: { facts: TacticalRoundFact[]; onSave: (item: PrepItem) => Promise<void> }) {
-  const [factKey, setFactKey] = useState("");
-  const [group, setGroup] = useState("用户判断");
-  const [note, setNote] = useState("");
-  const evidenceFacts = facts.slice(0, 100);
-  const selected = evidenceFacts.find((fact) => `${fact.matchId}:${fact.roundNumber}` === factKey) ?? evidenceFacts[0] ?? null;
-
-  return (
-    <section className="stu-card">
-      <h3>记录用户判断</h3>
-      <p className="stu-muted">从描述性观察进入备战时，写下自己的判断并附上一条已有回合证据；它不会伪装成系统 Finding。</p>
-      {selected ? (
-        <div className="stu-form-row">
-          <label>分组<input className="stu-input" value={group} onChange={(event) => setGroup(event.target.value)} /></label>
-          <label>证据回合<select className="stu-input" value={factKey || `${selected.matchId}:${selected.roundNumber}`} onChange={(event) => setFactKey(event.target.value)}>
-            {evidenceFacts.map((fact) => <option key={`${fact.matchId}:${fact.roundNumber}`} value={`${fact.matchId}:${fact.roundNumber}`}>{fact.mapName} · R{fact.roundNumber} · {SIDE_LABEL[fact.side]}</option>)}
-          </select></label>
-          <label className="stu-form-row-wide">判断 / 备注<input className="stu-input" value={note} placeholder="例如：B 区 1:00 后覆盖偏低，需在下次对局复核" onChange={(event) => setNote(event.target.value)} /></label>
-          <button type="button" className="stu-button-sm" disabled={!note.trim()} onClick={() => {
-            const evidence = evidenceFacts.find((fact) => `${fact.matchId}:${fact.roundNumber}` === factKey) ?? selected;
-            void onSave({
-              id: `user:${evidence.matchId}:${evidence.roundNumber}:${Date.now()}`,
-              group: group.trim() || "用户判断",
-              matchId: evidence.matchId,
-              mapName: evidence.mapName,
-              roundNumber: evidence.roundNumber,
-              source: "user",
-              coverage: `用户判断 · ${facts.length} 个可用战术回合 · ${evidence.mapName}`,
-              note: note.trim(),
-            }).then(() => setNote(""));
-          }}>加入备战清单</button>
-        </div>
-      ) : <p className="stu-muted">当前没有可附入的战术回合；重建教练 facts 后可记录用户判断。</p>}
-    </section>
-  );
-}
-
 function PlaybookTable({
   clusters,
   playbook,
@@ -481,66 +425,6 @@ function PlaybookTable({
         paginationInfo={(total) => `${total} 个打法模式`}
         columns={columns}
       />
-    </div>
-  );
-}
-
-function PlaylistTable({
-  items,
-  entryByMatchId,
-  onUpdate,
-  onRemove,
-  onOpenMatch,
-  onWatchDemo,
-}: {
-  items: PrepItem[];
-  entryByMatchId: Map<string, StudioDemoEntry>;
-  onUpdate: (item: PrepItem) => Promise<void>;
-  onRemove: (id: string) => Promise<void>;
-  onOpenMatch: (matchId: string, roundNumber: number) => void;
-  onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
-}) {
-  const [tableState, setTableState] = useState<import("@cs2dak/presentation").TableState>({ sort: { key: null, direction: "desc" }, page: 0 });
-  const markdown = prepItemsToMarkdown("备战清单", items);
-  if (items.length === 0) {
-    return <EmptyState variant="insufficient" title="备战清单为空" hint="在开局模式的证据回合里点击加入。" />;
-  }
-
-  const columns = useMemo<DataTableColumn<PrepItem>[]>(() => [
-    { key: "group", label: "分组", format: (item) => item.group },
-    { key: "source", label: "来源", render: (item) => <span title={item.coverage ?? item.matchId}>{item.source === "user" ? "用户判断" : item.mapName ? `${item.mapName} · ${item.matchId}` : item.matchId}</span> },
-    { key: "round", label: "回合", numeric: true, format: (item) => `R${item.roundNumber}` },
-    {
-      key: "note", label: "备注",
-      render: (item) => <input className="stu-input stu-input-sm" value={item.note} onChange={(event) => void onUpdate({ ...item, note: event.target.value })} />
-    },
-    {
-      key: "actions", label: "",
-      render: (item) => {
-        const entry = entryByMatchId.get(item.matchId);
-        return <>
-          <button type="button" className="stu-button-sm" onClick={() => onOpenMatch(item.matchId, item.roundNumber)}>回放</button>
-          {entry?.sourceDemPath && onWatchDemo && <button type="button" className="stu-button-sm" onClick={() => onWatchDemo(entry.id, { roundNumber: item.roundNumber })}>进游戏</button>}
-          <button type="button" className="stu-button-sm" onClick={() => void onRemove(item.id)}>删除</button>
-        </>;
-      }
-    },
-  ], [entryByMatchId, onUpdate, onOpenMatch, onWatchDemo, onRemove]);
-
-  return (
-    <div className="stu-card">
-      <h3>备战清单</h3>
-      <DataTable
-        state={tableState} onStateChange={setTableState}
-        classes={STUDIO_TABLE_CLASSES}
-        rows={items}
-        rowKey={(item) => item.id}
-        columns={columns}
-      />
-      <details className="stu-coach-report-details">
-        <summary>Markdown 导出</summary>
-        <textarea className="stu-coach-report" readOnly value={markdown} />
-      </details>
     </div>
   );
 }
