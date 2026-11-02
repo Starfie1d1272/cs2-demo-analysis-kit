@@ -69,6 +69,8 @@ export function LeaderboardView({ captureOverview, exportSource, exportPage = "a
     );
   }
 
+  if (coveredByShared && !error) return null;
+
   return (
     <div className={embedded ? "stu-card" : "stu-view"}>
       <header className={embedded ? "stu-section-head" : "stu-view-header"}>
@@ -81,8 +83,9 @@ export function LeaderboardView({ captureOverview, exportSource, exportPage = "a
           </p>
         </div>
       </header>
-      {!sharedNotice && capability.availability && <CapabilityBar availability={capability.availability} onRepair={onCapabilityRepair} />}
+      {teamEntries.length > 0 && !sharedNotice && capability.availability && <CapabilityBar availability={capability.availability} onRepair={onCapabilityRepair} />}
       {capability.error && <p role="alert">排行能力读取失败：{capability.error} <button type="button" className="stu-button-sm" onClick={capability.retry}>重试</button></p>}
+      {error && model && <p role="alert">排行聚合失败：{error}</p>}
       {model && (error || capability.error || analysis.status !== "ready" || snapshot?.generation !== analysis.generation || snapshot.sample !== JSON.stringify(eligible?.map(entry => entry.id))) && <p role="status">{error || capability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && eligible?.length === 0 ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}
       {error && !model ? (
         <EmptyState variant="error" title="聚合失败" hint={error} />

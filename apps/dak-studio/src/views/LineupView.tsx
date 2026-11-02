@@ -302,7 +302,7 @@ export function LineupView({
       )
     },
     {
-      key: "sample", label: <>样本<MetricInfo note="次数 / 涉及场次 / 该点位所在回合的本方胜率；小样本仅供参考" /></>,
+      key: "sample", label: <>样本<MetricInfo note="次数 / 涉及场次 / 该点位所在回合的本方胜率；请结合样本量查看" /></>,
       sortable: true, sortValue: (c) => c.count, cellClassName: () => "stu-lineup-sample",
       render: (c) => <><b>{c.count} 次 · {c.demoCount} 场</b><small>{c.winRatePercent == null ? "胜率 —" : `胜率 ${c.winRatePercent.toFixed(1)}%`}</small></>
     },
@@ -328,7 +328,7 @@ export function LineupView({
                 {copiedClusterId === c.id ? "已复制" : "复制命令"}
               </button>
             )}
-            <button type="button" className="stu-button-sm" disabled={savingClusterId !== null || savedClusterId === c.id} title="保存为本地点位练习素材；不会把普通浏览自动写入资料库" onClick={() => void handleSavePractice(c)}>
+            <button type="button" className="stu-button-sm" disabled={savingClusterId !== null || savedClusterId === c.id} title="保存为本地点位练习素材" onClick={() => void handleSavePractice(c)}>
               {savingClusterId === c.id ? "保存中…" : savedClusterId === c.id ? "已保存" : "保存点位"}
             </button>
             {watchThrow && onWatchDemo && (
@@ -406,7 +406,7 @@ export function LineupView({
         >
           <summary>
             <span>已保存练习点位 · {mapDisplayName(current.mapName)}</span>
-            <small>{savedForCurrentMap.length} 个 · 用户明确保存，facts 重建不会删除</small>
+            <small>{savedForCurrentMap.length} 个 · 更新分析数据时保留</small>
           </summary>
           {savedForCurrentMap.length > 0 ? (
             <div className="stu-chip-row">

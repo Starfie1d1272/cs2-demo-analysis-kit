@@ -424,7 +424,7 @@ export function PlayersView({
             <div className="stu-card">
               <div className="stu-section-head">
                 <h3>PRISM 八维打法画像</h3>
-                <MetricInfo note="行为倾向与执行效率分别按当前分析范围内的选手排名；不是职业数据库排名，也不代表固定角色或绝对能力。" />
+                <MetricInfo note="行为倾向与执行效率分别按当前分析范围内的选手排名。" />
               </div>
               {selected.style ? (
                 <div className="stu-prism-axis-list">
@@ -495,7 +495,7 @@ export function PlayersView({
                 <h3>闪光价值</h3>
                 <div className="stu-metric-grid">
                   <div className="stu-metric"><span>投掷闪光</span><b>{insights.flash.flashesThrown}</b></div>
-                  <div className="stu-metric" title="所有回合敌方致盲秒数累计（总量，不是单颗效果）">
+                  <div className="stu-metric" title="所有回合敌方致盲秒数累计">
                     <span>致盲敌方·总</span><b>{insights.flash.enemyBlindSeconds.toFixed(1)}s</b>
                   </div>
                   <div className="stu-metric" title="被该选手闪到的敌人数累计（人次）">

@@ -112,7 +112,7 @@ export function DuelView({
         <div>
           <h1>对枪</h1>
           {projected && exportSource && (playerSteamIds === null || playerSteamIds.length > 0) && !error && canExportSnapshot(snapshot, analysis) && <AnalysisExportButtons capture={() => buildDuelAnalysisResult(exportSource, projected, state, teamRenames)} />}
-          <p>在同一分析上下文中查看交火证据、首次交火分布与枪法机制；指标只来自当前聚合范围。受压制或无有效视野的记录不自动代表选手失误。</p>
+          <p>查看当前分析范围内的交火证据、首次交火分布与枪法机制。</p>
         </div>
       </header>
       {summary && (
