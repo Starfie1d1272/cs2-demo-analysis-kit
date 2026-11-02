@@ -12,13 +12,13 @@
 
 ## 当前工作台执行
 
-- [Studio 工作台决策](decisions/2026-11-01-studio-workbench-delivery.md) 和 [总包 #133](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/133)：产品目标、owner 与唯一阶段顺序。
+- [Studio 工作台决策](decisions/2026-11-01-studio-workbench-delivery.md) 和 [总包 #133](https://github.com/Starfie1d1272/cs2-demo-analysis-kit/issues/133)：历史产品目标与 owner 决策；以用户后续范围决定和当前实现为准。
 - [PR #6 能力差量审计](audits/2026-11-01-pr6-capability-reconciliation.md)：固定 head 的证据与去向。
 
 ## 设计与排期
 
 - [Studio 完整模块设计](design/studio-redesign.md)：历史模块设计；当前工作台执行入口见下。
-- [路线图](roadmap.md)：版本历史与当前工作台执行入口。
+- [路线图](roadmap.md)：历史版本计划（非当前规范）。
 - [稳定性等级](stability-tiers.md)：各指标 Stable / Beta / Experimental。
 - [RR 评分模型](design/rr-model.md)：RR v1 / 六账户 / PRISM 唯一设计文档。
 - [RR / PRISM Roadmap](rr-roadmap.md)：评分阶段顺序与现状速查。
@@ -49,5 +49,6 @@
 
 - [产品集成](integration.md)：RivalHub 分阶段数据接缝、CS2 Insight Agent 消费链路。
 - [发布流程](release.md)：桌面（git tag）与 npm（changesets）双版本流。
+- [本轮 DAK RC 准备](qa/2026-11-dak-rc-preparation.md)：当前发行路线与未验限制。
 
 - [Windows Uploader 安装与诊断](uploader-windows.md)：标准安装器、依赖和实机验收。
