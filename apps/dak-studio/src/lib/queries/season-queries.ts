@@ -1,5 +1,5 @@
 import { buildSeasonCohortFromRows } from "@cs2dak/cohort";
-import { buildAllPlayerSeasonProfiles, buildSeasonLeaderboardModel, buildTournamentInsightsFromFacts, type TournamentInsights } from "@cs2dak/analytics";
+import { buildAllPlayerSeasonProfiles, buildSeasonLeaderboardModel, buildTournamentInsightsFromFacts, type TournamentFacts, type TournamentInsights } from "@cs2dak/analytics";
 import { createAnalysisBucket, cachedQuery, readPersistedValue, writePersistedValue } from "./query-cache";
 import { assertCurrentFacts } from "../facts-readiness";
 import { getFactsStore } from "../facts-store";
@@ -21,14 +21,31 @@ export interface SeasonSummary {
 
 const tournamentInsightsCache = createAnalysisBucket<TournamentInsights | null>();
 
+// Unbound local observations have only match-scoped team IDs. A complete,
+// identical roster is the available cross-match evidence; partial rosters stay
+// match-scoped and explicit tournament identities are always preserved.
+function withObservedRosterTeams(facts: TournamentFacts[]): TournamentFacts[] {
+  return facts.map((fact) => {
+    const teamEntityKeys = { ...fact.teamEntityKeys };
+    for (const slot of ["teamA", "teamB"] as const) {
+      if (teamEntityKeys[slot] !== `observed-team:${fact.matchId}:${slot}`) continue;
+      const roster = fact.players.filter((player) => player.teamKey === slot).map((player) => player.steamId64).sort();
+      if (roster.length === 5 && new Set(roster).size === 5 && roster.every((id) => /^\d{17}$/.test(id))) {
+        teamEntityKeys[slot] = `observed-roster:${JSON.stringify(roster)}`;
+      }
+    }
+    return { ...fact, teamEntityKeys };
+  });
+}
+
 /** 赛事/经济页面只需要 TournamentInsights，不必冷启动时构建 cohort + profiles + RR/PRISM。 */
 export function getTournamentInsights(entries: StudioDemoEntry[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<TournamentInsights | null> {
-  const key = `${keyOf(entries, identity?.version, selectedTeams)}:tournament-stable-id-v1`;
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:tournament-roster-v2`;
   return cachedQuery(tournamentInsightsCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), async (generation) => {
     const persisted = await readPersistedValue<TournamentInsights | null>(key, generation);
     if (persisted !== undefined) return persisted;
     const matchIds = entries.map(matchIdForEntry);
-    const facts = withTeamRenames(await getDerivedCacheStore().getTournament({ matchIds }), identity?.teamRenames);
+    const facts = withTeamRenames(withObservedRosterTeams(await getDerivedCacheStore().getTournament({ matchIds })), identity?.teamRenames);
     if (facts.length >= entries.length) {
       const built = facts.length > 0 ? buildTournamentInsightsFromFacts(facts) : null;
       const insights = built ? filterTournamentInsightsByTeam(built, selectedTeams) : null;
@@ -45,7 +62,7 @@ const seasonSummaryCache = createAnalysisBucket<SeasonSummary>();
  *  传入 identity 时将其并入缓存 key，identityMap 作为归并参数传给 buildSeasonCohort。
  *  teamRenames 仅影响展示，stable ID 决定 Tournament 归并。聚合后释放 pkgCache 降低峰值内存。 */
 export function getSeasonSummary(entries: StudioDemoEntry[], identity?: IdentityOptions, selectedTeams: string[] = []): Promise<SeasonSummary> {
-  const key = `${keyOf(entries, identity?.version, selectedTeams)}:stable-tournament-v1`;
+  const key = `${keyOf(entries, identity?.version, selectedTeams)}:stable-tournament-roster-v2`;
   return cachedQuery(seasonSummaryCache, key, SMALL_CACHE_LIMIT, () => assertCurrentFacts(entries), async (generation) => {
     const persisted = await readPersistedValue<SeasonSummary>(key, generation);
     if (persisted) return persisted;
@@ -59,7 +76,7 @@ export function getSeasonSummary(entries: StudioDemoEntry[], identity?: Identity
     if (entries.length === 0 || cohortRows.length > 0) {
       const cohortOpts = identity?.version ? { identityMap: identity.map } : {};
       const bundle = buildSeasonCohortFromRows(cohortRows, { ...cohortOpts, matchCount: entries.length });
-      const tournamentFacts = withTeamRenames(await getDerivedCacheStore().getTournament({ matchIds }), identity?.teamRenames);
+      const tournamentFacts = withTeamRenames(withObservedRosterTeams(await getDerivedCacheStore().getTournament({ matchIds })), identity?.teamRenames);
       const summary: SeasonSummary = {
         bundle,
         leaderboard: buildSeasonLeaderboardModel(bundle),
