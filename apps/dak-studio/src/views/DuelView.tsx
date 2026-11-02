@@ -1,3 +1,4 @@
+import { EVIDENCE_FILTERS } from "../lib/analysis-display-labels";
 import { canExportSnapshot } from "../lib/analysis-export";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
@@ -19,15 +20,6 @@ import { type IdentityOptions } from "../lib/identity";
 import type { DuelTab, EvidenceFilter, DuelPageState, WeaponCategory } from "../lib/analysis-theme-state";
 import type { OpenEvidence } from "../lib/evidence-continuation";
 import { projectDuelPlayer } from "../lib/analysis-view-projections";
-
-const EVIDENCE_FILTERS: Array<{ key: EvidenceFilter; label: string; description: string }> = [
-  { key: "contested_duel", label: "正面对枪击杀", description: "受害者造成伤害，或可见击杀者时开火" },
-  { key: "suppressed_kill", label: "先手压制", description: "受害者死前获得过有效可见机会但没有有效还手" },
-  { key: "caught_off_guard", label: "无有效视野击杀", description: "受害者死前没有获得有效可见机会" },
-  { key: "low_hp", label: "非满血", description: "受害者死亡前血量低于 80，保留证据但不进满血击杀耗时分布" },
-  { key: "third_party", label: "补枪干扰", description: "第三方在 ±2s 内造成关键伤害，击杀耗时不计入分布" },
-  { key: "all", label: "全部", description: "保留全部证据队列" }
-];
 
 export interface DuelViewProps {
   exportSource?: AnalysisExportSource | null;

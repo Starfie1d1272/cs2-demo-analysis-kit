@@ -23,12 +23,35 @@ export const DUEL_TAB_LABELS: Record<DuelTab, string> = {
   mechanics: "枪法机制",
 };
 
-// These names mirror DuelView's evidence options.
-export const EVIDENCE_FILTER_LABELS: Record<EvidenceFilter, string> = {
-  contested_duel: "正面对枪击杀",
-  suppressed_kill: "先手压制",
-  caught_off_guard: "无有效视野击杀",
-  low_hp: "非满血",
-  third_party: "补枪干扰",
-  all: "全部",
-};
+export const EVIDENCE_FILTERS: Array<{
+  key: EvidenceFilter;
+  label: string;
+  description: string;
+}> = [
+  {
+    key: "contested_duel",
+    label: "正面对枪击杀",
+    description: "受害者造成伤害，或可见击杀者时开火",
+  },
+  {
+    key: "suppressed_kill",
+    label: "先手压制",
+    description: "受害者死前获得过有效可见机会但没有有效还手",
+  },
+  {
+    key: "caught_off_guard",
+    label: "无有效视野击杀",
+    description: "受害者死前没有获得有效可见机会",
+  },
+  {
+    key: "low_hp",
+    label: "非满血",
+    description: "受害者死亡前血量低于 80，保留证据但不进满血击杀耗时分布",
+  },
+  {
+    key: "third_party",
+    label: "补枪干扰",
+    description: "第三方在 ±2s 内造成关键伤害，击杀耗时不计入分布",
+  },
+  { key: "all", label: "全部", description: "保留全部证据队列" },
+];
