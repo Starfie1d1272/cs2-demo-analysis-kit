@@ -169,7 +169,7 @@ export function TeamView({
       {overview && (
         <>
           <section className="stu-card">
-            <div className="stu-section-head"><h2>{overview.teamName}</h2><span className="stu-muted">描述性汇总，不自动判断强弱项或制定对策。</span></div>
+            <div className="stu-section-head"><h2>{overview.teamName}</h2><span className="stu-muted">比赛数据汇总。</span></div>
             <div className="stu-metric-grid">
               <div className="stu-metric"><span>比赛</span><b>{overview.matchCount}</b></div>
               <div className="stu-metric"><span>战绩</span><b>{overview.wins}胜 {overview.losses}负</b></div>

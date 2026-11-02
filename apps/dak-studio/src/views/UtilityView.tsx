@@ -1,4 +1,4 @@
-import { useCapabilityBlocked } from "../components/CapabilityBar";
+import { AnalysisScopeEmpty, useCapabilityBlocked } from "../components/CapabilityBar";
 import { canExportSnapshot } from "../lib/analysis-export";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
@@ -81,7 +81,7 @@ const FLASH_COLUMNS: DataTableColumn<UtilityValueRow>[] = [
   { key: "flashesThrown", label: "闪光数", numeric: true, sortable: true, sortValue: (r) => r.flashesThrown, format: (r) => r.flashesThrown },
   {
     key: "enemyBlindSecondsPerRound",
-    label: <>闪光时间/回合<MetricInfo note="闪光造成的敌方致盲秒数 / 回合数；不把队友短暂被白作为主指标。" /></>,
+    label: <>闪光时间/回合<MetricInfo note="闪光造成的敌方致盲秒数 / 回合数。" /></>,
     numeric: true,
     sortable: true,
     sortValue: (r) => r.enemyBlindSecondsPerRound,
@@ -168,7 +168,7 @@ export function UtilityView({ exportSource, state, onStateChange, playerFocus, o
         <div>
           <h1>道具价值</h1>
           {visibleSummary && exportSource && (!playerFocus || playerFocus.steamIds.length > 0) && !error && canExportSnapshot(snapshot, analysis) && <AnalysisExportButtons capture={() => buildUtilityAnalysisResult(exportSource, visibleSummary, state, { he: HE_COLUMNS, fire: FIRE_COLUMNS, flash: FLASH_COLUMNS, smoke: SMOKE_COLUMNS })} />}
-          <p>按回合和投掷数归一：闪光看敌方致盲时间，HE/火看敌方伤害，烟只看每回合投入；不把关联数据表述为对胜负的因果贡献。</p>
+          <p>按回合和投掷数归一：闪光看敌方致盲时间，HE/火看敌方伤害，烟看每回合投入。</p>
           <button type="button" className="stu-button-sm" onClick={onGoLineups}>查看道具点位</button>
           {playerFocus && <p>选手行与具备身份的候选按焦点筛选；队伍榜显示比赛范围内的队伍上下文。{playerFocus.steamIds.length === 0 && "无法解析该选手的身份。"}</p>}
         </div>
@@ -176,7 +176,7 @@ export function UtilityView({ exportSource, state, onStateChange, playerFocus, o
       {summary && (error || analysis.status !== "ready" || snapshot?.generation !== analysis.generation) && <p className="stu-muted" role="status">{error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && !summary && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的道具数据…</div>}
-      {!error && entries.length === 0 && <div className="stu-compact-empty"><EmptyState variant="insufficient" title={blocked === "error" ? "分析数据暂不可用" : blocked ? "当前范围暂无可用比赛" : "聚合范围为空"} hint={blocked === "error" ? "请重试或查看上方状态。" : blocked ? "请查看上方原因和操作。" : "请调整聚合范围。"} /></div>}
+      {!error && entries.length === 0 && !blocked && <AnalysisScopeEmpty />}
       {visibleSummary && (
         <div className="stu-utility-stack">
           <UtilitySection
@@ -267,7 +267,7 @@ function BestFlashList({ flashes, entryByMatchId, onOpenEvidence, onWatchDemo }:
   return (
     <div className="stu-card">
       <h3>闪光候选</h3>
-      <p className="stu-muted">这里只显示有限的最佳候选，并非道具事件全集或统计分母。按单颗闪造成的敌方致盲时间排序；队友短暂被白只作为参考，不进入主榜。</p>
+      <p className="stu-muted">展示部分最佳候选，按单颗闪造成的敌方致盲时间排序；队友短暂被白作为参考，不进入主榜。</p>
       <div className="stu-evidence-list">
         {flashes.map((flash, index) => {
           const entry = entryByMatchId.get(flash.matchId);
@@ -308,7 +308,7 @@ function DamageEvidenceList({ rows, entryByMatchId, onOpenEvidence, onWatchDemo 
   return (
     <div className="stu-card">
       <h3>伤害回合候选</h3>
-      <p className="stu-muted">这里只显示有限的最佳候选，并非所有伤害回合或统计分母。</p>
+      <p className="stu-muted">展示部分最佳伤害回合候选。</p>
       <div className="stu-evidence-list">
         {rows.map((row, index) => {
           const entry = entryByMatchId.get(row.matchId);

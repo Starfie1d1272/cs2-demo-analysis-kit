@@ -1,3 +1,4 @@
+import { EmptyState } from "@cs2dak/react";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { StudioDemoEntry } from "../lib/demo-entry";
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "../lib/capability-availability";
@@ -7,7 +8,7 @@ import { useSyncExternalStore } from "react";
 const LABEL = { ready: "可用", partial: "部分可用", unavailable: "不可用" } as const;
 const DEPENDENCY = { replay: "回放轨迹", shots: "射击记录", tri: "地图碰撞资源" } as const;
 const REPAIR_LABEL: Record<CapabilityRepairAction, string> = {
-  "rebuild-facts": "前往资料库重建分析数据",
+  "rebuild-facts": "前往比赛库维护",
   "reimport-with-replay": "前往比赛导入回放轨迹",
   "reimport-with-shots": "前往比赛导入射击记录",
   "install-tri": "管理地图碰撞资源",
@@ -27,18 +28,21 @@ export function sameCapabilityNotice(a: CapabilityAvailability | null, b: Capabi
   return key(a) === key(b);
 }
 export function CapabilityBar({ availability, onRepair }: { availability: CapabilityAvailability; onRepair?: (action: CapabilityRepairAction) => void }) {
-  const limitation = availability.excluded[0] ? displayReason(availability.excluded[0].reason)
-    : availability.dependencies.find(item => item.available < item.totalEligible);
+  const firstExclusion = availability.excluded[0];
+  const firstDependency = firstExclusion ? undefined : availability.dependencies.find(item => item.available < item.totalEligible);
+  const limitation = firstExclusion ? displayReason(firstExclusion.reason) : firstDependency ? `${DEPENDENCY[firstDependency.key]}不完整（${firstDependency.available}/${firstDependency.totalEligible} 场具备，${firstDependency.required ? "必需" : "可选"}）` : null;
   return <div className={`stu-capability-bar stu-capability-${availability.status}`}>
     <span>{availability.eligibleMatches}/{availability.totalMatches} 场可用</span>
-    {availability.status !== "ready" && <details><summary>{LABEL[availability.status]}{limitation && `：${typeof limitation === "string" ? limitation : DEPENDENCY[limitation.key] + "不完整"}`} · 详情</summary>
-      <p>覆盖单位为比赛；{availability.outputLevel === "system-finding" ? "可生成带证据的分析结论" : "提供描述性观察"}。</p>
-      {availability.excluded.map(item => <p key={item.reason}>{displayReason(item.reason)}：{item.count} 场未纳入</p>)}
-      {availability.dependencies.map(item => <p key={item.key}>{DEPENDENCY[item.key]}：{item.available}/{item.totalEligible} 场具备{item.required ? "（必需）" : "（可选）"}</p>)}
-      {(availability.repairActions.includes("reimport-with-replay") || availability.repairActions.includes("reimport-with-shots")) && <p>已有 ZIP 没有相应流时，需要从原始 demo 重新导出并导入；重建不能生成缺失的流。</p>}
-      {onRepair && availability.eligibleMatches > 0 && availability.repairActions.map(action => <button key={action} type="button" className="stu-button-sm" onClick={() => onRepair(action)}>{REPAIR_LABEL[action]}</button>)}
-    </details>}
-    {onRepair && availability.totalMatches > 0 && availability.eligibleMatches === 0 && availability.repairActions.map(action => <button key={action} type="button" className="stu-button-sm" onClick={() => onRepair(action)}>{REPAIR_LABEL[action]}</button>)}
+    {availability.status !== "ready" && <>
+      <span>{LABEL[availability.status]}{limitation && `：${limitation}`}{firstExclusion && `（${firstExclusion.count} 场未纳入）`}</span>
+      <details><summary>详情</summary>
+        <p>覆盖单位为比赛；{availability.outputLevel === "system-finding" ? "可生成带证据的分析结论" : "提供描述性观察"}。</p>
+        {availability.excluded.slice(1).map(item => <p key={item.reason}>{displayReason(item.reason)}：{item.count} 场未纳入</p>)}
+        {availability.dependencies.filter(item => item !== firstDependency).map(item => <p key={item.key}>{DEPENDENCY[item.key]}：{item.available}/{item.totalEligible} 场具备{item.required ? "（必需）" : "（可选）"}</p>)}
+        {(availability.repairActions.includes("reimport-with-replay") || availability.repairActions.includes("reimport-with-shots")) && <p>已有 ZIP 没有相应流时，需要从原始 demo 重新导出并导入；重建不能生成缺失的流。</p>}
+      </details>
+      {onRepair && availability.repairActions.map(action => <button key={action} type="button" className="stu-button-sm" onClick={() => onRepair(action)}>{REPAIR_LABEL[action]}</button>)}
+    </>}
   </div>;
 }
 
@@ -68,17 +72,23 @@ export function useCapability(entries: StudioDemoEntry[], capability: StudioCapa
   return { availability: current, eligible, error: effectiveError, retry: () => { if (data.status === "error") void invalidateAnalysisQueries().catch(() => {}); else setRetryVersion(version => version + 1); }, stale: !!current && (data.status !== "ready" || result?.generation !== data.generation || result?.revision !== revision || !!effectiveError) };
 }
 
+const ScopeEditorContext = createContext<(() => void) | undefined>(undefined);
+export function AnalysisScopeEmpty() {
+  const onEditScope = useContext(ScopeEditorContext);
+  return <div className="stu-compact-empty"><EmptyState variant="insufficient" title="聚合范围为空" hint="请调整聚合范围。" action={onEditScope && <button type="button" className="stu-button-sm" onClick={onEditScope}>调整范围</button>} /></div>;
+}
+
 const CapabilityBlockedContext = createContext<"excluded" | "error" | null>(null);
 /** Distinguishes an excluded sample from a genuinely empty scope in child views. */
 export function useCapabilityBlocked(): "excluded" | "error" | null { return useContext(CapabilityBlockedContext); }
 
-export function CapabilityPanel({ entries, capability, onRepair, children }: { entries: StudioDemoEntry[]; capability: StudioCapability; onRepair: (action: CapabilityRepairAction) => void; children: (eligible: StudioDemoEntry[], current: boolean, availability: CapabilityAvailability) => ReactNode }) {
+export function CapabilityPanel({ entries, capability, onRepair, onEditScope, children }: { entries: StudioDemoEntry[]; capability: StudioCapability; onRepair: (action: CapabilityRepairAction) => void; onEditScope?: () => void; children: (eligible: StudioDemoEntry[], current: boolean, availability: CapabilityAvailability) => ReactNode }) {
   const { availability, eligible, error, stale, retry } = useCapability(entries, capability);
   if (!availability || !eligible) return error ? <div role="alert">读取可用性失败：{error} <button type="button" className="stu-button-sm" onClick={retry}>重试</button></div> : <div className="stu-loading">读取分析数据可用性…</div>;
   const blocked = entries.length > 0 && eligible.length === 0 ? (error ? "error" : "excluded") : null;
-  return <CapabilityBlockedContext.Provider value={blocked}>
+  return <ScopeEditorContext.Provider value={onEditScope}><CapabilityBlockedContext.Provider value={blocked}>
     {entries.length > 0 && <CapabilityBar availability={availability} onRepair={onRepair} />}
     {stale && <p className="stu-muted" role="status">{error ? <>可用性更新失败。 <button type="button" className="stu-button-sm" onClick={retry}>重试</button></> : "正在更新可用性。"}</p>}
     {children(eligible, !stale, availability)}
-  </CapabilityBlockedContext.Provider>;
+  </CapabilityBlockedContext.Provider></ScopeEditorContext.Provider>;
 }

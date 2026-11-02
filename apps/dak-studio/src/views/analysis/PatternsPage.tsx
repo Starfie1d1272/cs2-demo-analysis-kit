@@ -1,4 +1,4 @@
-import { useCapabilityBlocked } from "../../components/CapabilityBar";
+import { AnalysisScopeEmpty, useCapabilityBlocked } from "../../components/CapabilityBar";
 import type { AnalysisExportSource } from "../../lib/analysis-export";
 import type { PatternPageState } from "../../lib/pattern-page-state";
 import { filterBySubjectTeam, isCurrentTacticalRoundFact } from "../../lib/pattern-observations";
@@ -206,7 +206,7 @@ export function PatternsPage({
       </div>
       {hasSnapshot && (loading || analysisData.status !== "ready" || factsGeneration !== analysisData.generation || error) && <p className="stu-muted" role="status">{error || analysisData.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
-      {!error && entries.length === 0 && <div className="stu-compact-empty"><EmptyState variant="insufficient" title={blocked === "error" ? "分析数据暂不可用" : blocked ? "当前范围暂无可用比赛" : "聚合范围为空"} hint={blocked === "error" ? "请重试或查看上方状态。" : blocked ? "请查看上方原因和操作。" : "请调整聚合范围。"} /></div>}
+      {!error && entries.length === 0 && !blocked && (allEntries.length === 0 ? <div className="stu-compact-empty"><EmptyState title="还没有比赛" hint="导入比赛后，即可观察战术模式。" action={<button type="button" className="stu-button-sm" onClick={onGoLibrary}>前往比赛库</button>} /></div> : <AnalysisScopeEmpty />)}
       {!hasSnapshot && !error && loading && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的开局 pattern…</div>}
       {!error && !loading && clusters.length === 0 && entries.length > 0 && hasValidFacts && (
         <EmptyState

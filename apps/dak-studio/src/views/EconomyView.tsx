@@ -1,4 +1,4 @@
-import { useCapabilityBlocked } from "../components/CapabilityBar";
+import { AnalysisScopeEmpty, useCapabilityBlocked } from "../components/CapabilityBar";
 import { canExportSnapshot } from "../lib/analysis-export";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
@@ -76,7 +76,7 @@ export function EconomyView({ exportSource, state, onStateChange, onViewMatches,
         <div>
           <h1>{playerFocused ? "当前比赛范围的经济" : "经济与转化"}</h1>
           {insights && exportSource && !error && canExportSnapshot(snapshot, analysis) && <AnalysisExportButtons capture={() => buildEconomyAnalysisResult(exportSource, insights, state, { teams: TEAM_DETAIL_COLUMNS, matrix: ECON_MATRIX_COLUMNS, upset: ECO_UPSET_COLUMNS })} />}
-          <p>按所选比赛范围聚合，查看手枪转化、5v4/5v3 转化、劣势翻盘和小枪破局。当前结果为描述性聚合，尚不自动生成 Finding。</p>
+          <p>按所选比赛范围聚合，查看手枪转化、5v4/5v3 转化、劣势翻盘和小枪破局。</p>
           {playerFocused && <p>经济统计按比赛范围计算，未按个人筛选。</p>}
           <button type="button" className="stu-button-sm" disabled={entries.length === 0} onClick={onViewMatches}>查看这组比赛</button>
         </div>
@@ -84,7 +84,7 @@ export function EconomyView({ exportSource, state, onStateChange, onViewMatches,
       {insights && (error || analysis.status !== "ready" || snapshot?.generation !== analysis.generation) && <p className="stu-muted" role="status">{error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : "正在更新，显示旧版本结果。"}</p>}
       {error && <EmptyState variant="error" title="聚合失败" hint={error} />}
       {!error && !insights && entries.length > 0 && <div className="stu-loading">聚合 {entries.length} 场 demo 的转化数据…</div>}
-      {!error && entries.length === 0 && <div className="stu-compact-empty"><EmptyState variant="insufficient" title={blocked === "error" ? "分析数据暂不可用" : blocked ? "当前范围暂无可用比赛" : "聚合范围为空"} hint={blocked === "error" ? "请重试或查看上方状态。" : blocked ? "请查看上方原因和操作。" : "请调整聚合范围。"} /></div>}
+      {!error && entries.length === 0 && !blocked && <AnalysisScopeEmpty />}
       {insights && (
         <EconomyDashboard insights={insights} state={state} onStateChange={onStateChange} />
       )}
