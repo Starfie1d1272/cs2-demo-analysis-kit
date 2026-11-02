@@ -42,7 +42,7 @@ async function loadModel(id: string): Promise<MatchWorkspaceModel> {
 }
 
 export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceContinuation, onReturnToSource }: MatchViewProps) {
-  const activeId = demoId ?? entries[0]?.id ?? null;
+  const activeId = demoId;
   const activeEntry = activeId ? entries.find((entry) => entry.id === activeId) ?? null : null;
   const [model, setModel] = useState<MatchWorkspaceModel | null>(activeId ? modelCache.get(activeId) ?? null : null);
   const [error, setError] = useState<string | null>(null);
@@ -121,6 +121,10 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
       .catch(() => { if (!cancelled) setSummary(null); });
     return () => { cancelled = true; };
   }, [summaryMode, activeSeries, seriesEntries]);
+
+  if (activeId && !activeEntry) {
+    return <div className="stu-view"><EmptyState variant="insufficient" title="比赛已不存在" hint="此比赛可能已从资料库删除。" action={<button type="button" className="stu-button" onClick={onGoLibrary}>返回资料库</button>} /></div>;
+  }
 
   if (entries.length === 0) {
     return (

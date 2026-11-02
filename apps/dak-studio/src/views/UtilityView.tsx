@@ -18,6 +18,7 @@ export interface UtilityViewProps {
   selectedTeam?: string | null;
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onOpenEvidence: OpenEvidence;
+  onPageReady?: (keys: string[]) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
@@ -89,10 +90,15 @@ const SMOKE_COLUMNS: DataTableColumn<UtilityValueRow>[] = [
   { key: "smokesPerRound", label: "烟/回合", numeric: true, sortable: true, sortValue: (r) => r.smokesPerRound, format: (r) => fmt(r.smokesPerRound, 3) },
 ];
 
-export function UtilityView({ allEntries, entries, selectedTeam = null, onOpenMatch, onOpenEvidence, onWatchDemo, onGoLibrary, identityOptions }: UtilityViewProps) {
+export function UtilityView({ allEntries, entries, selectedTeam = null, onOpenMatch, onOpenEvidence, onWatchDemo, onGoLibrary, identityOptions, onPageReady }: UtilityViewProps) {
   const [summary, setSummary] = useState<UtilityValueSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
+
+  useEffect(() => {
+    if (!onPageReady || (!summary && !error && entries.length > 0)) return;
+    onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
+  }, [onPageReady, summary, error, entries.length]);
 
   useEffect(() => {
     if (entries.length === 0) {

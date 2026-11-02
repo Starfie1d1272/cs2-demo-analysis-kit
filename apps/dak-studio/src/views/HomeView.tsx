@@ -19,6 +19,8 @@ import type { OpenEvidence } from "../lib/evidence-continuation";
 import { createTrainingFocus, listTrainingFocus, removeTrainingFocus, updateTrainingFocus, type TrainingFocus } from "../lib/training-focus";
 
 export interface HomeViewProps {
+  onPageReady?: (keys: string[]) => void;
+  returnEvidenceKey?: string;
   entries: StudioDemoEntry[];
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onOpenEvidence: OpenEvidence;
@@ -94,7 +96,7 @@ interface TeamIdentity {
 }
 
 /** 我的主页：模块 3/5/6 既有 view model 的编排视图，零新信号（docs/design/studio-redesign.md §9）。 */
-export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, onGoPlayers, onGoLibrary, contextSummary, identityOptions }: HomeViewProps) {
+export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, onGoPlayers, onGoLibrary, contextSummary, identityOptions, onPageReady, returnEvidenceKey }: HomeViewProps) {
   const [profiles, setProfiles] = useState<PlayerSeasonProfile[] | null>(null);
   const [insights, setInsights] = useState<PlayerSeasonInsights | null>(null);
   const [matchStats, setMatchStats] = useState<PlayerMatchStatsFact[] | null>(null);
@@ -137,6 +139,11 @@ export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, on
   }, [entries, identityOptions?.version]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const me = useMemo(() => matchPinned(pinned, profiles ?? []), [pinned, profiles]);
+  useEffect(() => {
+    if (!onPageReady || (!profiles && !error && entries.length > 0) || !pinnedLoaded) return;
+    if (returnEvidenceKey && me && !insights && !error) return;
+    onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
+  }, [onPageReady, profiles, error, entries.length, pinnedLoaded, me, insights, returnEvidenceKey]);
   const mistakeFindings = useMemo(
     () => insights && me ? buildMistakeFindings(insights.mistakes, { id: me.playerKey, label: me.name }) : [],
     [insights, me?.playerKey, me?.name]

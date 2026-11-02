@@ -1,6 +1,6 @@
 import type { EvidenceRef } from "@cs2dak/contract";
 import type { AnalysisFinding } from "@cs2dak/presentation";
-import type { AnalysisContext } from "./analysis-context.js";
+import { createAnalysisContext, type AnalysisContext } from "./analysis-context.js";
 
 /** 当前导航历史中的证据返回点；不写 facts 或用户数据。 */
 export interface EvidenceContinuation {
@@ -21,11 +21,7 @@ export type OpenEvidence = (
 export function createEvidenceContinuation(input: EvidenceContinuation): EvidenceContinuation {
   return {
     ...input,
-    context: {
-      ...input.context,
-      corpus: { ...input.context.corpus },
-      roles: { ...input.context.roles },
-    },
+    context: createAnalysisContext(input.context),
     evidence: { ...input.evidence },
     finding: input.finding ? { ...input.finding } : undefined,
   };

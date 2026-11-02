@@ -26,6 +26,7 @@ export interface PlayersViewProps {
   onOpenMatch: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onOpenEvidence: OpenEvidence;
   returnEvidenceKey?: string;
+  onPageReady?: (keys: string[]) => void;
   onWatchDemo?: (entryId: string, target?: { roundNumber: number; tick?: number }) => void;
   onGoLibrary: () => void;
   identityOptions?: IdentityOptions;
@@ -59,6 +60,7 @@ export function PlayersView({
   onOpenMatch,
   onOpenEvidence,
   returnEvidenceKey,
+  onPageReady,
   onWatchDemo,
   onGoLibrary,
   identityOptions
@@ -134,6 +136,13 @@ export function PlayersView({
     if (!orderedProfiles || orderedProfiles.length === 0 || !selectedPlayerKey) return null;
     return orderedProfiles.find((p) => p.playerKey === selectedPlayerKey) ?? null;
   }, [orderedProfiles, selectedPlayerKey]);
+
+  useEffect(() => {
+    if (!onPageReady || (!profiles && !error && entries.length > 0)) return;
+    if (returnEvidenceKey?.startsWith("players:map-") && !roleProfiles && !roleError && selected) return;
+    if (returnEvidenceKey && !returnEvidenceKey.startsWith("players:map-") && !insights && !detailsError && selected) return;
+    onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
+  }, [profiles, error, roleProfiles, roleError, insights, detailsError, entries.length, returnEvidenceKey, onPageReady, selected]);
 
   const compare = useMemo(() => {
     if (!profiles || !compareKey || compareKey === selected?.playerKey) return null;
