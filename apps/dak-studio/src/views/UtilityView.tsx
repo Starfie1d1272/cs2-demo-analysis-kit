@@ -11,7 +11,7 @@ import { DataTable, EmptyState, MetricInfo, type DataTableColumn } from "@cs2dak
 import { getSeasonSummary } from "../lib/queries/season-queries";
 import { getUtilityValueSummary } from "../lib/queries/utility-queries";
 import { type IdentityOptions } from "../lib/identity";
-import { formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import { EvidenceActions } from "../components/EvidenceActions";
 import type { OpenEvidence } from "../lib/evidence-continuation";
 

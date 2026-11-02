@@ -1,6 +1,6 @@
 import { usePageReady } from "../lib/use-page-ready";
 import { EmptyState } from "@cs2dak/react";
-import type { StudioDemoEntry } from "../lib/library";
+import type { StudioDemoEntry } from "../lib/demo-entry";
 import { LineupView } from "./LineupView";
 
 export interface LineupsViewProps {

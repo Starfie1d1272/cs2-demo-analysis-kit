@@ -5,9 +5,8 @@ import {
   removeDemoAnalysis,
   removeDemoStorageOnly,
   saveDemoEntry,
-  matchIdForEntry,
-  type StudioDemoEntry,
 } from "./library";
+import { matchIdForEntry, type StudioDemoEntry } from "./demo-entry";
 import { replaceDemoEntryReferences as replaceSeriesEntryReferences } from "./series";
 
 export interface LibraryIdentityRepairResult {

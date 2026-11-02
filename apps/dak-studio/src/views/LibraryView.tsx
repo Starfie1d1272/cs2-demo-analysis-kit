@@ -1,6 +1,7 @@
 import { FileDown, Film, FolderOpen, Play, RefreshCw, Tag as TagIcon, Trash2 } from "lucide-react";
 import { useMemo, useState, type ChangeEvent } from "react";
-import { entryDate, isFactsStale, type StudioDemoEntry } from "../lib/library";
+import { isFactsStale} from "../lib/library";
+import { entryDate, type StudioDemoEntry } from "../lib/demo-entry";
 import { parseTags } from "../lib/tags";
 import { EmptyState } from "@cs2dak/react";
 import { EventManager } from "../components/EventManager";

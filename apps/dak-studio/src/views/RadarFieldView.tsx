@@ -10,7 +10,7 @@ import { RadarFieldCanvas } from "@cs2dak/react";
 import { getMapCalibration } from "@cs2dak/maps/calibration";
 import type { RadarField } from "@cs2dak/tactics";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { StudioDemoEntry } from "../lib/library";
+import type { StudioDemoEntry } from "../lib/demo-entry";
 import { buildScopeRadarFields } from "../lib/radar-field";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
 

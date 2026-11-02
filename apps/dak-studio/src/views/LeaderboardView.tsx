@@ -3,7 +3,7 @@ import type { SeasonLeaderboardModel } from "@cs2dak/presentation";
 import { SeasonLeaderboard } from "@cs2dak/react";
 import { getSeasonSummary } from "../lib/queries/season-queries";
 import { type IdentityOptions } from "../lib/identity";
-import type { StudioDemoEntry } from "../lib/library";
+import type { StudioDemoEntry } from "../lib/demo-entry";
 import { EmptyState } from "@cs2dak/react";
 
 export interface LeaderboardViewProps {

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { EvidenceLink } from "@cs2dak/react";
 import type { EvidenceRef } from "@cs2dak/contract";
-import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import type { OpenEvidence } from "../lib/evidence-continuation";
 import type { AnalysisFinding } from "@cs2dak/presentation";
 

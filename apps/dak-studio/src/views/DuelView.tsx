@@ -5,7 +5,7 @@ import { displayWeaponName, duelClassificationLabel } from "@cs2dak/presentation
 import { getMapCalibration, worldToRadar } from "@cs2dak/maps/calibration";
 import { EmptyState, MetricInfo, Pagination } from "@cs2dak/react";
 import { displayTeamName } from "../lib/identity";
-import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import { getDuelInsights } from "../lib/queries/combat-queries";
 import { type IdentityOptions } from "../lib/identity";
 

@@ -2,7 +2,7 @@ import { type PlayerFlashSummary, type PlayerSeasonInsights, type UtilityValueSu
 import { createAnalysisBucket, cachedQuery, readPersistedValue, writePersistedValue } from "./query-cache";
 import { assertCurrentFacts } from "../facts-readiness";
 import { getDerivedCacheStore } from "../derived-cache";
-import { matchIdForEntry, type StudioDemoEntry } from "../library";
+import { matchIdForEntry, type StudioDemoEntry } from "../demo-entry";
 
 import type { IdentityOptions } from "../identity";
 import { keyOf, orderedMatchIds, allowedTeamKeysByMatch, missingFactsError } from "./query-scope";

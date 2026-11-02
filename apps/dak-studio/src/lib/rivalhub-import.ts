@@ -1,6 +1,7 @@
 import type { DemoPackage } from "@cs2dak/contract";
 import { hashNativePath, nativePathForFile, type ExportedDemoFile } from "./dem";
-import { entryDate, findDemoEntryBySha256, importDemoFile, loadDemoPackageTransient, updateDemoSourcePath, type StudioDemoEntry } from "./library";
+import { findDemoEntryBySha256, importDemoFile, loadDemoPackageTransient, updateDemoSourcePath} from "./library";
+import { entryDate, type StudioDemoEntry } from "./demo-entry";
 import { linkDemoToRivalHubMap } from "./events";
 import {
   buildRivalHubDemoEvidenceV1,

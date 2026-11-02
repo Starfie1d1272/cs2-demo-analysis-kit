@@ -15,7 +15,7 @@ import {
   undoLastAction,
   type IdentityStoreState
 } from "../lib/identity";
-import type { StudioDemoEntry } from "../lib/library";
+import type { StudioDemoEntry } from "../lib/demo-entry";
 import { migrateRoleDeclarationsForIdentity } from "../lib/role-declarations";
 
 export interface ManagementViewProps {

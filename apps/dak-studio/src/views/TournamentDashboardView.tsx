@@ -7,7 +7,7 @@ import { DataTable, TeamComparisonPanel, type DataTableColumn } from "@cs2dak/re
 import { getTeamComparison } from "../lib/queries/team-queries";
 import { getTournamentInsights } from "../lib/queries/season-queries";
 import { type IdentityOptions } from "../lib/identity";
-import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import { EmptyState, MetricInfo } from "@cs2dak/react";
 import { LeaderboardView } from "./LeaderboardView";
 

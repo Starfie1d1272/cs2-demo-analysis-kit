@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronUp, Filter } from "lucide-react";
 import { useMemo, useState } from "react";
-import { entryDate, type StudioDemoEntry } from "../lib/library";
+import { entryDate, type StudioDemoEntry } from "../lib/demo-entry";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
 
 /**

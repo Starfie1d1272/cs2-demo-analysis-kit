@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { deleteEventRecord, listEventRecords, type StudioEventRecord } from "../lib/events";
-import { removeDemos, type StudioDemoEntry } from "../lib/library";
+import { removeDemos} from "../lib/library";
+import { type StudioDemoEntry } from "../lib/demo-entry";
 import { downloadAndImportEvent, importEventAssetArchive, importEventAssetFile, loadEventsManifest, pickAndImportEventAsset, supportsNativeEventImport } from "../lib/event-assets";
 import type { EventsManifest } from "@cs2dak/contract";
 import { listSeriesRecords, type StudioSeriesRecord } from "../lib/series";

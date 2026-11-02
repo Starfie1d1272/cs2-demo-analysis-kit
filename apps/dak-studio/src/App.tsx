@@ -1,19 +1,17 @@
-import { ensureAnalysisDataReady, invalidateAnalysisQueries, getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation } from "./lib/queries/query-cache";
-import { type ExportPollSnapshot } from "@cs2dak/rivalhub-upload";
+import { useStudioActivity } from "./app/use-studio-activity";
+import { useStudioData } from "./app/use-studio-data";
+import { useLibraryActions } from "./app/use-library-actions";
+import { useRivalHubActions } from "./app/use-rivalhub-actions";
+import { useDesktopUpdates } from "./app/use-desktop-updates";
+import { invalidateAnalysisQueries, getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation } from "./lib/queries/query-cache";
 import { Bomb, ClipboardList, Coins, Crosshair, Film, House, LibraryBig, Radar, Settings, Swords, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { backfillDemoIdentities, bulkUpdateTags, importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, removeDemos, updateDemoSourcePath, updateDemoTags, type StudioDemoEntry } from "./lib/library";
 import { CohortScope, type CohortScopeEvent, type CohortScopeState } from "./components/CohortScope";
 import { AnalysisContextSummary } from "./components/AnalysisContextSummary";
 import { CapabilityBar } from "./components/CapabilityBar";
-import { exportPolling, detectDemBackend, exportDemToZip, fileFromNativePath, isDemFile, pickAndExportDems, pickDemPaths, triggerWindowsDropCapture, watchDemoPath, type ExportedDemoFile } from "./lib/dem";
-import { parseTags } from "./lib/tags";
-import { listSeriesRecords, pruneOrphanSeries, type StudioSeriesRecord } from "./lib/series";
-import { listEventRecords, markRivalHubEventsStale, matchesRivalHubDemo, upsertRivalHubEvents, type StudioEventRecord } from "./lib/events";
-import { importEventAssetArchive } from "./lib/event-assets";
+import { type StudioEventRecord } from "./lib/events";
 import { BUILD_INFO, BUILD_LABEL } from "./lib/build-info";
-import { APP_VERSION, checkForUpdateOnChannel, type UpdateChannel, type UpdateInfo } from "./lib/update";
-import { checkForUpdateViaBridge } from "./lib/updater-bridge";
+import { APP_VERSION } from "./lib/update";
 import { UpdateControl } from "./components/UpdateControl";
 import { UpdateModal } from "./components/UpdateModal";
 import { AssetHealthBanner } from "./components/AssetHealthBanner";
@@ -33,9 +31,8 @@ import { ManagementView } from "./views/ManagementView";
 import { DuelView } from "./views/DuelView";
 import { CoachView } from "./views/CoachView";
 import { RadarFieldView } from "./views/RadarFieldView";
-import { loadIdentityState, buildCohortIdentityMap, type IdentityStoreState } from "./lib/identity";
+import { buildCohortIdentityMap } from "./lib/identity";
 import type { IdentityOptions } from "./lib/identity";
-import type { BuiltinEvent } from "./lib/builtin-events";
 import { type EvidenceContinuation, type OpenEvidence } from "./lib/evidence-continuation";
 import {
   applyCohortScopeProjection,
@@ -48,10 +45,7 @@ import {
 import { deriveCapabilityAvailability, loadCapabilityAvailabilityInputs, type CapabilityAvailability, type CapabilityRepairAction, type StudioCapability } from "./lib/capability-availability";
 import { createStudioNavigation, studioNavigationReducer, PAGE_SECTION, type StudioDestination, type StudioPageId, type StudioSection } from "./lib/studio-navigation";
 import { getPinnedPlayer } from "./lib/pin";
-import { assertRivalHubConnected, rivalHubFailureMessage, connectRivalHub, fetchRivalHubEvents, loadRivalHubConnection, revokeRivalHubPairing, type RivalHubConnectionState } from "./lib/rivalhub";
-import { confirmRivalHubBatchReceipts, recountRivalHubBatch, rivalHubBatchCompletionMessage, runRivalHubBatch, type RivalHubBatchInput, type RivalHubBatchItem, type RivalHubBatchSession, type RivalHubImportContext } from "./lib/rivalhub-import";
 import { RivalHubBatchImportPanel } from "./components/RivalHubBatchImportPanel";
-import { importRivalHubFromNativePicker } from "./lib/rivalhub-acquisition";
 
 type NavKey =
   | "home"
@@ -108,14 +102,9 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
 const MANAGEMENT_NAV: NavItem = { key: "management", label: "管理", hint: "身份归并 · 资料库维护 · 赛事资产", icon: Settings };
 
 type MatchDeepLink = { roundNumber: number; tick?: number };
-const UPDATE_CHANNEL_KEY = "dak:update-channel";
 const CAPABILITY_BY_VIEW: Partial<Record<NavKey, StudioCapability>> = {
   home: "personal-review", players: "map-role", teams: "map-role", duel: "duel", economy: "economy", utility: "utility", lineups: "lineup", control: "control", coach: "tactical",
 };
-
-function initialUpdateChannel(): UpdateChannel {
-  return localStorage.getItem(UPDATE_CHANNEL_KEY) === "beta" ? "beta" : "stable";
-}
 
 function NavButton({ item, active, onClick }: { item: NavItem; active: boolean; onClick: () => void }) {
   const Icon = item.icon;
@@ -133,8 +122,11 @@ function NavButton({ item, active, onClick }: { item: NavItem; active: boolean; 
 }
 
 export function App() {
-  const [entries, setEntries] = useState<StudioDemoEntry[]>([]);
-  const [entriesReady, setEntriesReady] = useState(false);
+  const activity = useStudioActivity();
+  const { importing, notice, setNotice, exportQueries, recheckExport } = activity;
+  const { entries, entriesReady, eventRecords, seriesRecords, identityState, refreshEntries, refreshEventRecords, refreshIdentity } = useStudioData({ onError: setNotice });
+  const { importTagsRaw, setImportTagsRaw, importFiles, importDropped, importViaNativeDialog, nativeImportAvailable, loadBuiltinEvent, handleLinkRawDemo, watchRawDemo, handleRemove, handleRemoveMany, handleUpdateTags, handleBulkUpdateTags, handleReexportDemo, handleReexportAll, handleReexportSelected, handleRebuildFacts, handleRebuildStale, handleRebuildSelected } = useLibraryActions({ entries, refreshEntries, refreshEventRecords, activity });
+  const { rivalHubConnection, rivalHubRefreshToken, batchSession, dismissBatch, updateLocalLink, refreshRivalHub, handleConnectRivalHub, handleRevokeRivalHub, importOnlineFiles, syncLocalRivalHubDemos, stopRivalHubBatch, pickRivalHubFiles, selectRivalHubBatchTarget } = useRivalHubActions({ entries, refreshEntries, refreshEventRecords, activity });
   const [navigation, setNavigation] = useState(() => createStudioNavigation("initial"));
   const navigationRef = useRef(navigation);
   navigationRef.current = navigation;
@@ -197,22 +189,6 @@ export function App() {
     else if (key === "events") navigate({ page: "events" });
     else navigate({ page: "management", tab: "identity" });
   }, [navigate, resumeSection]);
-  const [exportQueries, setExportQueries] = useState<ExportPollSnapshot[]>(() => exportPolling.snapshots());
-  const [importing, setImporting] = useState(false);
-  useEffect(() => {
-    const reported = new Map<string, string>();
-    return exportPolling.subscribe(() => {
-      const rows = exportPolling.snapshots();
-      setExportQueries(rows);
-      for (const row of rows) if (row.diagnostic && reported.get(row.jobId) !== JSON.stringify(row.diagnostic)) {
-        reported.set(row.jobId, JSON.stringify(row.diagnostic));
-        void window.pywebview?.api.report_diagnostic?.(row.diagnostic).catch(() => {});
-      }
-      for (const row of rows) if (!row.uncertain) reported.delete(row.jobId);
-      for (const id of reported.keys()) if (!rows.some(row => row.jobId === id)) reported.delete(id);
-    });
-  }, []);
-  const [notice, setNotice] = useState<string | null>(null);
   const analysisData = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   const [evidenceDetails, setEvidenceDetails] = useState<Pick<EvidenceContinuation, "evidence" | "finding"> | null>(null);
   const evidenceSource = navigation.history.at(-1);
@@ -222,48 +198,9 @@ export function App() {
     sourceKey: evidenceSource.anchorKey,
   } : null;
   const [restoringFrameId, setRestoringFrameId] = useState<string | null>(null);
-  const [eventRecords, setEventRecords] = useState<StudioEventRecord[]>([]);
-  const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
-  const [rivalHubConnection, setRivalHubConnection] = useState<RivalHubConnectionState>({ baseUrl: "", pairingId: null, connectedAt: 0, lastSyncAt: null, status: "disconnected", error: null });
-  const [rivalHubRefreshToken, setRivalHubRefreshToken] = useState(0);
-  const [batchSession, setBatchSession] = useState<RivalHubBatchSession | null>(null);
-  const batchSessionRef = useRef(batchSession);
-  useEffect(() => { batchSessionRef.current = batchSession; }, [batchSession]);
-  const batchStopRequested = useRef(false);
-  const batchTargetResolvers = useRef(new Map<string, (matchMapId: string | null) => void>());
-  const [identityState, setIdentityState] = useState<IdentityStoreState>({ version: 0, mappings: [], teamRenames: {} });
-  // 导入标签输入放在 App：全窗口拖拽导入也要带上
-  const [importTagsRaw, setImportTagsRaw] = useState("");
-  const [update, setUpdate] = useState<UpdateInfo | null>(null);
-  const [checkingUpdate, setCheckingUpdate] = useState(false);
-  const [dismissedVersion, setDismissedVersion] = useState<string | null>(null);
-  const [showLatestMsg, setShowLatestMsg] = useState(false);
-  const [updateChannel, setUpdateChannel] = useState<UpdateChannel>(initialUpdateChannel);
+  const { update, checkingUpdate, dismissedVersion, setDismissedVersion, showLatestMsg, updateChannel, doCheckUpdate, changeUpdateChannel } = useDesktopUpdates();
   const [contextEditorOpen, setContextEditorOpen] = useState(false);
   const [capabilityAvailability, setCapabilityAvailability] = useState<CapabilityAvailability | null>(null);
-
-  async function doCheckUpdate() {
-    setCheckingUpdate(true);
-    setShowLatestMsg(false);
-    try {
-      // 桌面壳优先走 Python 桥（urllib，无 CORS），dev 退浏览器 fetch。
-      const info = (await checkForUpdateViaBridge(updateChannel)) ?? (await checkForUpdateOnChannel(updateChannel));
-      setUpdate(info);
-      if (!info) {
-        setShowLatestMsg(true);
-        setTimeout(() => setShowLatestMsg(false), 3000);
-      }
-    } finally {
-      setCheckingUpdate(false);
-    }
-  }
-
-  function changeUpdateChannel(channel: UpdateChannel) {
-    setUpdateChannel(channel);
-    localStorage.setItem(UPDATE_CHANNEL_KEY, channel);
-    setUpdate(null);
-    setShowLatestMsg(false);
-  }
 
   const eventScopes = useMemo<CohortScopeEvent[]>(() => {
     const seriesById = new Map(seriesRecords.map((series) => [series.id, series]));
@@ -337,294 +274,6 @@ export function App() {
     return () => { cancelled = true; };
   }, [view, scopedEntries]);
 
-  const refreshEventRecords = useCallback(async () => {
-    const [nextEvents, nextSeries] = await Promise.all([listEventRecords(), listSeriesRecords()]);
-    setEventRecords(nextEvents);
-    setSeriesRecords(nextSeries);
-  }, []);
-
-  useEffect(() => {
-    void ensureAnalysisDataReady().catch(() => {});
-    listDemoEntries()
-      .then(async (loaded) => {
-        setEntries(loaded);
-        // 启动时清理历史遗留的孤儿系列赛（删过 demo 但 record 残留，会造成 records>suggestions 计数错位）。
-        await pruneOrphanSeries(new Set(loaded.map((entry) => entry.id))).catch(() => 0);
-        await refreshEventRecords();
-      })
-      .catch((err) => setNotice(`读取本地资料库失败：${err instanceof Error ? err.message : String(err)}`))
-      .finally(() => setEntriesReady(true));
-    // 自动更新属于桌面壳职责。浏览器开发入口没有跨域桥，启动时主动请求发布源
-    // 只会制造 CORS 错误；需要时仍可由用户手动检查。
-    if (window.pywebview?.api) void doCheckUpdate();
-    void loadRivalHubConnection().then(setRivalHubConnection).catch(() => undefined);
-    void loadIdentityState().then(setIdentityState);
-
-  }, [refreshEventRecords]);
-
-  const importFiles = useCallback(async (files: Iterable<File | ExportedDemoFile>, tags: string[] = [], initialErrors: string[] = []): Promise<StudioDemoEntry[]> => {
-    const fileList = [...files];
-    const items = fileList.map((item) => item instanceof File ? { file: item, sourceDemPath: null } : item);
-    const zips = items.filter((item) => item.file.name.toLowerCase().endsWith(".zip"));
-    const dems = items.filter((item) => isDemFile(item.file));
-    if (zips.length === 0 && dems.length === 0 && initialErrors.length === 0) {
-      setNotice("请选择 .dem 或 cs2-demo-format/3.x ZIP 文件");
-      return [];
-    }
-    setImporting(true);
-    setNotice(null);
-    let imported = 0;
-    let duplicates = 0;
-    const errors: string[] = [...initialErrors];
-    const importedEntries: StudioDemoEntry[] = [];
-
-    // .dem 先经 exporter 转 ZIP（数据库只存 ZIP）
-    if (dems.length > 0) {
-      const backend = await detectDemBackend();
-      for (const [index, demItem] of dems.entries()) {
-        const dem = demItem.file;
-        try {
-          setNotice(`正在导出 ${dem.name}…（${index + 1}/${dems.length}，demo 解析需要一点时间）`);
-          zips.push(await exportDemToZip(dem, backend, setNotice));
-        } catch (err) {
-          errors.push(err instanceof Error ? err.message : String(err));
-        }
-      }
-    }
-
-    // 解析 + facts 抽取都在 worker 池里跑；滑动窗口并发让批量导入并行、且不冻结 UI。
-    // 并发 2：每场 worker 要驻留一份完整 DemoPackage（含 replay），并发过高会让多份大包
-    // 同时占用 + 多个 worker 同时冷启动模块图，撑爆渲染器；2 兼顾吞吐与内存安全。
-    const IMPORT_CONCURRENCY = 2;
-    const total = zips.length;
-    const queue = [...zips];
-    let done = 0;
-    const runWorker = async (): Promise<void> => {
-      for (let item = queue.shift(); item; item = queue.shift()) {
-        try {
-          const result = await importDemoFile(item.file, { tags, sourceDemPath: item.sourceDemPath });
-          importedEntries.push(result.entry);
-          if (result.duplicate) duplicates += 1;
-          else imported += 1;
-        } catch (err) {
-          errors.push(err instanceof Error ? err.message : String(err));
-        } finally {
-          done += 1;
-          if (total > 1) setNotice(`正在入库…（${done}/${total}）`);
-        }
-      }
-    };
-    await Promise.all(Array.from({ length: Math.min(IMPORT_CONCURRENCY, total) }, () => runWorker()));
-    setEntries(await listDemoEntries());
-    const parts: string[] = [];
-    if (imported > 0) parts.push(`导入 ${imported} 场`);
-    if (duplicates > 0) parts.push(`跳过重复 ${duplicates} 场`);
-    if (errors.length > 0) parts.push(`失败 ${errors.length} 场（${errors[0]}）`);
-    setNotice(parts.join("，") || null);
-    setImporting(false);
-    return importedEntries;
-  }, []);
-
-  const refreshRivalHub = useCallback(async (options: { announce?: boolean; confirmationSession?: RivalHubBatchSession } = {}): Promise<boolean> => {
-    const announce = options.announce !== false;
-    setRivalHubConnection((current) => ({ ...current, status: "connecting", error: null }));
-    try {
-      const response = await fetchRivalHubEvents();
-      await upsertRivalHubEvents(response, await listDemoEntries());
-      await refreshEventRecords();
-      const connected = await loadRivalHubConnection();
-      assertRivalHubConnected(connected);
-      setRivalHubConnection(connected);
-      const pending = options.confirmationSession ?? batchSessionRef.current;
-      if (pending?.status === "completed" && pending.items.some(item => item.pendingReceipt)) {
-        const confirmed = await confirmRivalHubBatchReceipts(pending, response);
-        const applyConfirmation = (current: RivalHubBatchSession | null) => current?.id === confirmed.id
-          ? recountRivalHubBatch({ ...current, items: current.items.map(item => item.pendingReceipt
-            ? confirmed.items.find(updated => updated.id === item.id) ?? item : item) })
-          : current;
-        batchSessionRef.current = applyConfirmation(batchSessionRef.current);
-        setBatchSession(applyConfirmation);
-      }
-      setRivalHubRefreshToken((current) => current + 1);
-      if (announce) setNotice(`已刷新 RivalHub 赛事：${response.events.length} 个赛事`);
-      return true;
-    } catch (error) {
-      await markRivalHubEventsStale().catch(() => undefined);
-      await refreshEventRecords().catch(() => undefined);
-      const current = await loadRivalHubConnection().catch(() => rivalHubConnection);
-      const message = rivalHubFailureMessage(error, current);
-      setRivalHubConnection({ ...current, status: "error", error: message });
-      if (announce) setNotice(`RivalHub 刷新失败：${message}`);
-      return false;
-    }
-  }, [refreshEventRecords, rivalHubConnection]);
-
-  const handleConnectRivalHub = useCallback(async (baseUrl: string) => {
-    setRivalHubConnection((current) => ({ ...current, baseUrl: baseUrl.trim(), status: "connecting", error: null }));
-    try {
-      const connected = await connectRivalHub(baseUrl, setNotice);
-      setRivalHubConnection(connected);
-      await refreshRivalHub();
-    } catch (error) {
-      const message = rivalHubFailureMessage(error);
-      setRivalHubConnection((current) => ({ ...current, status: "error", error: message }));
-      setNotice(`RivalHub 连接失败：${message}`);
-    }
-  }, [refreshRivalHub]);
-
-  const handleRevokeRivalHub = useCallback(async () => {
-    if (!window.confirm("将断开 RivalHub 并撤销此设备的访问凭据，之后需要重新授权才能连接。继续？")) return;
-    try {
-      await revokeRivalHubPairing();
-      setRivalHubConnection(await loadRivalHubConnection());
-      setRivalHubRefreshToken((current) => current + 1);
-      setNotice("已断开 RivalHub，并撤销此设备的访问凭据");
-    } catch (error) {
-      const current = await loadRivalHubConnection().catch(() => rivalHubConnection);
-      const message = rivalHubFailureMessage(error, current);
-      setRivalHubConnection({ ...current, status: current.status === "disconnected" ? "disconnected" : "error", error: message });
-      setNotice(`断开并撤销 RivalHub 失败：${message}`);
-    }
-  }, [rivalHubConnection]);
-
-  const runRivalHubBatchInputs = useCallback(async (batchInputs: Iterable<RivalHubBatchInput>, context: RivalHubImportContext) => {
-    if (importing) return;
-    let inputs = [...batchInputs];
-    if (inputs.length === 0) return;
-    batchStopRequested.current = false;
-    batchTargetResolvers.current.clear();
-    setBatchSession(null);
-    setImporting(true);
-    setNotice("正在启动 RivalHub Demo 批处理…");
-    let demBackend: Awaited<ReturnType<typeof detectDemBackend>> | undefined;
-    try {
-      const batchPromise = runRivalHubBatch(inputs, context, {
-        exportDem: async (file, onProgress) => {
-          demBackend ??= await detectDemBackend();
-          return exportDemToZip(file, demBackend, onProgress);
-        },
-        shouldStop: () => batchStopRequested.current,
-        resolveTarget: async (item: RivalHubBatchItem) => new Promise<string | null>((resolve) => {
-          batchTargetResolvers.current.set(item.id, resolve);
-        }),
-        onUpdate: (next) => {
-          setBatchSession(next);
-          const current = next.items[next.currentIndex];
-          setNotice(current ? `${current.fileName}：${current.message}` : null);
-        },
-      });
-      // runRivalHubBatch copies the iterable synchronously before its first
-      // await; do not keep a second batch-wide input array in the App closure.
-      inputs = [];
-      const session = await batchPromise;
-      batchSessionRef.current = session;
-      setBatchSession(session);
-      const remoteRefreshSucceeded = await refreshRivalHub({ announce: false, confirmationSession: session });
-      const confirmed = batchSessionRef.current?.id === session.id ? batchSessionRef.current : session;
-      setBatchSession(confirmed);
-      setEntries(await listDemoEntries());
-      await refreshEventRecords();
-      setNotice(rivalHubBatchCompletionMessage(confirmed, remoteRefreshSucceeded));
-    } catch (error) {
-      setNotice(`在线 Demo 批处理失败：${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      batchTargetResolvers.current.clear();
-      inputs = [];
-      setImporting(false);
-    }
-  }, [importing, refreshEventRecords, refreshRivalHub]);
-
-  const importOnlineFiles = useCallback(async (files: Iterable<File>, context: RivalHubImportContext) => {
-    await runRivalHubBatchInputs(files, context);
-  }, [runRivalHubBatchInputs]);
-
-  const syncLocalRivalHubDemos = useCallback(async (context: RivalHubImportContext) => {
-    if (importing) return;
-    try {
-      const { entries: refreshedEntries } = await backfillDemoIdentities();
-      setEntries(refreshedEntries);
-      const currentSeries = await listSeriesRecords();
-      const candidateKeys = new Set(context.candidates.map((candidate) => `${candidate.series.id}:${candidate.map.id}`));
-      const linkedEntryIds = new Set(
-        currentSeries.flatMap((series) => (series.mapAssignments ?? [])
-          .filter((assignment) => assignment.entryId && assignment.rivalHub && candidateKeys.has(`${series.id}:${assignment.rivalHub.id}`))
-          .map((assignment) => assignment.entryId!)),
-      );
-      const localEntries = refreshedEntries.filter((entry) => linkedEntryIds.has(entry.id) || context.candidates.some((candidate) => matchesRivalHubDemo(entry, candidate.series, candidate.map)));
-      if (localEntries.length === 0) {
-        setNotice("当前 Event / Stage 范围没有可同步的本地 Demo");
-        return;
-      }
-      await runRivalHubBatchInputs(localEntries.map((entry) => ({ kind: "local", entry })), context);
-    } catch (error) {
-      setNotice(`扫描本地 Demo 失败：${error instanceof Error ? error.message : String(error)}`);
-    }
-  }, [importing, runRivalHubBatchInputs]);
-
-  const stopRivalHubBatch = useCallback(() => {
-    batchStopRequested.current = true;
-    batchTargetResolvers.current.forEach((resolve) => resolve(null));
-    batchTargetResolvers.current.clear();
-    setBatchSession((current) => current ? { ...current, status: "stopping" } : current);
-  }, []);
-
-  const pickRivalHubFiles = useCallback(async (context: RivalHubImportContext) => {
-    try {
-      const started = await importRivalHubFromNativePicker(context, importOnlineFiles);
-      if (!started) setNotice(null);
-    } catch (error) {
-      setNotice(`选择 RivalHub Demo 失败：${error instanceof Error ? error.message : String(error)}`);
-    }
-  }, [importOnlineFiles]);
-
-  const selectRivalHubBatchTarget = useCallback((itemId: string, matchMapId: string) => {
-    const resolve = batchTargetResolvers.current.get(itemId);
-    if (!resolve) return;
-    batchTargetResolvers.current.delete(itemId);
-    resolve(matchMapId || null);
-  }, []);
-
-  // 桌面壳：原生文件对话框选 .dem/.zip → 本机 exporter 转 ZIP → 入库
-  const importViaNativeDialog = useCallback(async () => {
-    setImporting(true);
-    setNotice(null);
-    try {
-      const { files, errors, cancelled } = await pickAndExportDems(setNotice);
-      if (cancelled) {
-        setNotice(null); // 用户取消了对话框
-        return;
-      }
-      await importFiles(files, parseTags(importTagsRaw), errors);
-    } catch (err) {
-      setNotice(`导入失败：${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setImporting(false);
-    }
-  }, [importFiles, importTagsRaw]);
-
-  /** pywebview 桌面壳提供原生对话框，由 LibraryView 条件展示。 */
-  const nativeImportAvailable = typeof window.pywebview?.api?.pick_dems === "function";
-
-  // 载入一个内置赛事/示例：拉随包 event-package zip，走与在线/cologne 完全相同的导入路径
-  // （importEventAssetArchive：逐图导入 demo + 建立赛事/系列/BP）。BP 已写在包里，无需回填。
-  const loadBuiltinEvent = useCallback(async (builtin: BuiltinEvent) => {
-    setImporting(true);
-    setNotice(null);
-    try {
-      const response = await fetch(builtin.packageUrl);
-      const bytes = await response.arrayBuffer();
-      const existing = await listDemoEntries();
-      const result = await importEventAssetArchive(bytes, existing, builtin.slug, { onProgress: setNotice });
-      setEntries(await listDemoEntries());
-      await refreshEventRecords();
-      setNotice(`已载入「${result.event.event.name}」：匹配 ${result.event.matchedMaps} 图${result.errors.length ? `；${result.errors.length} 图失败` : ""}`);
-    } catch (err) {
-      setNotice(`载入失败：${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setImporting(false);
-    }
-  }, []);
-
   const openDemo = useCallback((id: string, target?: MatchDeepLink) => {
     navigate({ page: "match", entryId: id, ...target });
   }, [navigate]);
@@ -667,49 +316,6 @@ export function App() {
     }
   }, [view, active.id, entriesReady, onPageReady]);
 
-  const handleLinkRawDemo = useCallback(async (entry: StudioDemoEntry) => {
-    try {
-      const paths = await pickDemPaths();
-      const path = paths.find((candidate) => candidate.toLowerCase().endsWith(".dem")) ?? null;
-      if (!path) {
-        setNotice(paths.length > 0 ? "请选择 .dem 文件作为原始 demo 路径" : null);
-        return;
-      }
-      await updateDemoSourcePath(entry.id, path);
-      setEntries(await listDemoEntries());
-      setNotice(`已关联原始 demo：${entry.fileName}`);
-    } catch (err) {
-      setNotice(`关联原始 demo 失败：${err instanceof Error ? err.message : String(err)}`);
-    }
-  }, []);
-
-  const watchRawDemo = useCallback(async (entryId: string, target?: MatchDeepLink) => {
-    try {
-      const entry = entries.find((row) => row.id === entryId);
-      if (!entry) {
-        setNotice("打开游戏失败：资料库条目不存在");
-        return;
-      }
-      if (!entry.sourceDemPath) {
-        setNotice("打开游戏失败：该条目还没有关联原始 .dem 路径");
-        return;
-      }
-      const api = window.pywebview?.api;
-      if (typeof api?.path_exists === "function" && !(await api.path_exists(entry.sourceDemPath))) {
-        setNotice(`打开游戏失败：原始 demo 不存在（${entry.sourceDemPath}）`);
-        return;
-      }
-      const result = await watchDemoPath(entry.sourceDemPath, target?.tick);
-      if (result.ok) {
-        setNotice(result.warning ?? `已请求 CS2 播放 ${entry.fileName}`);
-      } else {
-        setNotice(`打开游戏失败：${result.error}`);
-      }
-    } catch (err) {
-      setNotice(`打开游戏失败：${err instanceof Error ? err.message : String(err)}`);
-    }
-  }, [entries]);
-
   const openPlayer = useCallback((playerKey: string, label = playerKey) => {
     const current = navigationRef.current.active.destination;
     const context = "context" in current ? current.context : createAnalysisContextPreset("explore");
@@ -730,159 +336,6 @@ export function App() {
     }) });
   }, [navigate]);
 
-  const handleRemove = useCallback(
-    async (id: string) => {
-      await removeDemo(id);
-      const next = await listDemoEntries();
-      setEntries(next);
-      await pruneOrphanSeries(new Set(next.map((entry) => entry.id))).catch(() => 0);
-    },
-    []
-  );
-
-  const handleUpdateTags = useCallback(async (id: string, tags: string[]) => {
-    await updateDemoTags(id, tags);
-    setEntries(await listDemoEntries());
-  }, []);
-
-  const handleBulkUpdateTags = useCallback(async (ids: string[], add: string[], remove: string[]) => {
-    await bulkUpdateTags(ids, add, remove);
-    setEntries(await listDemoEntries());
-  }, []);
-
-  /** 单场重导核心：exporter 转 ZIP 后原地替换；调用方负责 importing 状态与错误提示。 */
-  const reexportOne = useCallback(async (entry: StudioDemoEntry) => {
-    if (!entry.sourceDemPath) throw new Error(`${entry.fileName}：没有记录原始 .dem 路径`);
-    const api = window.pywebview?.api;
-    if (typeof api?.path_exists === "function" && !(await api.path_exists(entry.sourceDemPath))) {
-      throw new Error(`${entry.fileName}：原始文件不存在（${entry.sourceDemPath}）`);
-    }
-    const backend = await detectDemBackend();
-    const demFile = fileFromNativePath(entry.sourceDemPath);
-    const exported = await exportDemToZip(demFile, backend, setNotice);
-    const result = await importDemoFile(exported.file, {
-      tags: entry.tags,
-      sourceDemPath: entry.sourceDemPath,
-      replaceId: entry.id
-    });
-    void result;
-  }, []);
-
-  const handleReexportDemo = useCallback(async (entry: StudioDemoEntry) => {
-    setImporting(true);
-    setNotice(`正在重新导出 ${entry.fileName}…`);
-    try {
-      await reexportOne(entry);
-      setEntries(await listDemoEntries());
-      setNotice(`已重新导出并替换 ${entry.fileName}`);
-    } catch (err) {
-      setNotice(`重新导出失败：${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setImporting(false);
-    }
-  }, [reexportOne]);
-
-  /** 全部重新导出：逐场串行（exporter 与内存吃不住并发），失败不打断，结束后汇总。 */
-  /** 逐场串行重新导出给定条目集合（exporter 与内存吃不住并发），失败不打断，结束后汇总。 */
-  const reexportEntries = useCallback(async (targets: StudioDemoEntry[]) => {
-    const withPath = targets.filter((entry) => entry.sourceDemPath);
-    if (withPath.length === 0) {
-      setNotice("选中的条目都没有记录原始 .dem 路径，无法重新导出");
-      return;
-    }
-    if (!window.confirm(`将重新导出 ${withPath.length} 场 demo（逐场进行，可能需要较长时间），继续？`)) return;
-    setImporting(true);
-    let done = 0;
-    const failures: string[] = [];
-    for (const [index, entry] of withPath.entries()) {
-      setNotice(`批量重新导出（${index + 1}/${withPath.length}）：${entry.fileName}…`);
-      try {
-        await reexportOne(entry);
-        done += 1;
-      } catch (err) {
-        failures.push(err instanceof Error ? err.message : String(err));
-      }
-      setEntries(await listDemoEntries());
-    }
-    setNotice(
-      `批量重新导出完成：成功 ${done} 场` +
-        (failures.length > 0 ? `，失败 ${failures.length} 场（${failures[0]}）` : "")
-    );
-    setImporting(false);
-  }, [reexportOne]);
-
-  const handleReexportAll = useCallback(async () => {
-    await reexportEntries(entries);
-  }, [entries, reexportEntries]);
-
-  /** 从已存 ZIP 重榨 facts（不走 .dem / cs2df）；逐场串行，失败不打断，结束汇总。 */
-  const rebuildFactsForEntries = useCallback(async (targets: StudioDemoEntry[]) => {
-    if (targets.length === 0) return;
-    if (!window.confirm(`将用当前分析口径重建 ${targets.length} 场 facts（从已存 ZIP，无需原始 .dem），继续？`)) return;
-    setImporting(true);
-    let done = 0;
-    const failures: string[] = [];
-    for (const [index, entry] of targets.entries()) {
-      setNotice(`重建 facts（${index + 1}/${targets.length}）：${entry.fileName}…`);
-      try {
-        if (await rebuildFactsFromZip(entry.id)) done += 1;
-        else failures.push(`${entry.fileName}: 原始 ZIP 缺失`);
-      } catch (err) {
-        failures.push(err instanceof Error ? err.message : String(err));
-      }
-    }
-    setEntries(await listDemoEntries());
-    setNotice(
-      `重建完成：成功 ${done} 场` + (failures.length > 0 ? `，失败 ${failures.length} 场（${failures[0]}）` : "")
-    );
-    setImporting(false);
-  }, []);
-
-  const handleRebuildFacts = useCallback(async (id: string) => {
-    setImporting(true);
-    setNotice("正在从 ZIP 重建 facts…");
-    try {
-      const entry = await rebuildFactsFromZip(id);
-      setEntries(await listDemoEntries());
-      setNotice(entry ? `已重建 ${entry.fileName} 的 facts` : "重建失败：原始 ZIP 缺失");
-    } catch (err) {
-      setNotice(`重建失败：${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setImporting(false);
-    }
-  }, []);
-
-  const handleRebuildStale = useCallback(async () => {
-    await rebuildFactsForEntries(entries.filter(isFactsStale));
-  }, [entries, rebuildFactsForEntries]);
-
-  const handleRebuildSelected = useCallback(async (ids: string[]) => {
-    const idSet = new Set(ids);
-    await rebuildFactsForEntries(entries.filter((entry) => idSet.has(entry.id)));
-  }, [entries, rebuildFactsForEntries]);
-
-  const handleReexportSelected = useCallback(async (ids: string[]) => {
-    const idSet = new Set(ids);
-    await reexportEntries(entries.filter((entry) => idSet.has(entry.id)));
-  }, [entries, reexportEntries]);
-
-  const handleRemoveMany = useCallback(async (ids: string[]) => {
-    if (ids.length === 0) return;
-    if (!window.confirm(`确认从资料库删除 ${ids.length} 场 demo？此操作不可撤销。`)) return;
-    setImporting(true);
-    try {
-      await removeDemos(ids, (done, total) => setNotice(`正在删除（${done}/${total}）…`));
-      const next = await listDemoEntries();
-      setEntries(next);
-      await pruneOrphanSeries(new Set(next.map((entry) => entry.id))).catch(() => 0);
-      setNotice(`已删除 ${ids.length} 场 demo`);
-    } catch (err) {
-      setNotice(`批量删除失败：${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setImporting(false);
-    }
-  }, []);
-
   return (
     <div
       className="stu-app"
@@ -892,8 +345,7 @@ export function App() {
         if (e.dataTransfer.files.length > 0) {
           // Windows EdgeChromium：主动把 File 引用发给 Python
           // 侧捕获本机路径，避免后续走字节回退 OOM。
-          triggerWindowsDropCapture(e.dataTransfer.files);
-          void importFiles(e.dataTransfer.files, parseTags(importTagsRaw));
+          importDropped(e.dataTransfer.files);
         }
       }}
     >
@@ -963,7 +415,7 @@ export function App() {
             {query.diagnostic?.cause && <p>{query.diagnostic.cause}</p>}
             {query.uncertain && <p>只查询现有任务；没有取消后台解析，也不会重新提交。</p>}
           </div>
-          {query.uncertain && <button type="button" onClick={() => exportPolling.recheck(query.jobId)}>重查此任务状态</button>}
+          {query.uncertain && <button type="button" onClick={() => recheckExport(query.jobId)}>重查此任务状态</button>}
         </div>)}
         {analysisData.status === "error" && (
           <div className="stu-notice" role="alert">
@@ -979,7 +431,7 @@ export function App() {
             </button>
           </div>
         )}
-        <RivalHubBatchImportPanel session={batchSession} onStop={stopRivalHubBatch} onSelectTarget={selectRivalHubBatchTarget} onDismiss={() => setBatchSession(null)} onLocalLinkUpdate={updated => setBatchSession(current => current && current.id === batchSession?.id ? { ...current, items: current.items.map(item => item.id === updated.id ? updated : item) } : current)} />
+        <RivalHubBatchImportPanel session={batchSession} onStop={stopRivalHubBatch} onSelectTarget={selectRivalHubBatchTarget} onDismiss={dismissBatch} onLocalLinkUpdate={updateLocalLink} />
         {entries.length > 0 && "context" in destination && (
           <AnalysisContextSummary context={analysisContext} entries={entries} events={eventScopes} onEdit={() => setContextEditorOpen((current) => !current)} />
         )}
@@ -1019,7 +471,7 @@ export function App() {
             onImportFiles={importFiles}
             onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined}
             onNotice={setNotice}
-            onLibraryChanged={setEntries}
+            onLibraryChanged={() => { void refreshEntries(); void refreshEventRecords(); }}
             onLoadBuiltin={loadBuiltinEvent}
             onOpenDemo={openDemo}
             onRemoveDemo={handleRemove}
@@ -1207,12 +659,12 @@ export function App() {
             onPageReady={(keys) => onPageReady(active.id, keys)}
             entries={entries}
             identity={identityState}
-            onIdentityChange={setIdentityState}
+            onIdentityChange={() => { void refreshIdentity(); }}
             identityOptions={identityOptions}
             teamRenames={identityState.teamRenames}
             onGoLibrary={() => setView("library")}
             onNotice={setNotice}
-            onLibraryChanged={setEntries}
+            onLibraryChanged={() => { void refreshEntries(); void refreshEventRecords(); }}
             initialTab={managementInitialTab === "library" ? "identity" : managementInitialTab}
           />
         )}

@@ -12,7 +12,7 @@ import { getPlayerMapPool, getPlayerMapRoleProfiles } from "../lib/queries/spati
 import { getPlayerSeasonDetails } from "../lib/queries/player-queries";
 import { getSeasonSummary } from "../lib/queries/season-queries";
 import { type IdentityOptions } from "../lib/identity";
-import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import { getPinnedPlayer, matchPinned, setPinnedPlayer, type PinnedPlayer } from "../lib/pin";
 import { FingerprintRadar, TrendChart } from "./profile-widgets";
 import { EmptyState, MetricInfo, PlayerMapPoolPanel, PlayerMapRoleProfilePanel } from "@cs2dak/react";

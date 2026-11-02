@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { EventStage, EventStanding } from "@cs2dak/contract";
 import { DataTable, ElimBracket, EmptyState, SwissBracket, type DataTableColumn } from "@cs2dak/react";
 import { listEventRecords, type StudioEventRecord } from "../lib/events";
-import type { StudioDemoEntry } from "../lib/library";
+import type { StudioDemoEntry } from "../lib/demo-entry";
 import type { RivalHubConnectionState } from "../lib/rivalhub";
 import { OFFICIAL_RIVALHUB_URL } from "../lib/rivalhub";
 import type { RivalHubRemoteMap, RivalHubRemoteTeam } from "../lib/rivalhub-contract";

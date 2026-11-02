@@ -1,5 +1,5 @@
 export * from "@cs2dak/rivalhub-upload/match";
-import { entryDate, type StudioDemoEntry } from "./library";
+import { entryDate, type StudioDemoEntry } from "./demo-entry";
 import type { StudioSeriesRecord } from "./series";
 import type { RivalHubRemoteMap, RivalHubRemoteTeam, RivalHubMatchCandidate } from "@cs2dak/rivalhub-upload";
 export function candidateFromSeriesMap(series: StudioSeriesRecord, map: RivalHubRemoteMap, eventTeams: RivalHubRemoteTeam[] = []): RivalHubMatchCandidate {

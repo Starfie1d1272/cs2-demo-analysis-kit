@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { getFactsStore } from "./facts-store";
-import { importDemoFile, isFactsStale, listDemoEntries, matchIdForEntry, rebuildFactsFromZip, removeDemo, updateDemoSourcePath, updateDemoTags } from "./library";
+import { importDemoFile, isFactsStale, listDemoEntries, rebuildFactsFromZip, removeDemo, updateDemoSourcePath, updateDemoTags } from "./library";
+import { matchIdForEntry } from "./demo-entry";
 import { ANALYSIS_MANIFEST } from "./analysis-manifest";
 
 const samplePath = fileURLToPath(

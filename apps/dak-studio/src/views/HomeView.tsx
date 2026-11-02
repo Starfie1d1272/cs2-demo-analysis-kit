@@ -8,7 +8,7 @@ import { SEASON_STAT_VIEWS, type AnalysisFinding } from "@cs2dak/presentation";
 import { getPlayerSeasonDetails } from "../lib/queries/player-queries";
 import { getSeasonSummary } from "../lib/queries/season-queries";
 import { type IdentityOptions } from "../lib/identity";
-import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { entryDate, formatMatchLabel, matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import { getPinnedPlayer, matchPinned, type PinnedPlayer } from "../lib/pin";
 import { getFactsStore } from "../lib/facts-store";
 import { getDerivedCacheStore } from "../lib/derived-cache";

@@ -1,17 +1,14 @@
 import { withAnalysisQueryInvalidation } from "./queries/query-cache";
 import { getMapNav } from "@cs2dak/map-assets";
-import { getMapCalibration, hasLowerLevel } from "@cs2dak/maps/calibration";
 import { withImportCheckpoint } from "./import-persistence";
 import { deleteMatchRows, settleWrites } from "./storage/match-rows";
 import { reportDiagnostic, withWorkerFallback } from "./worker-diagnostics";
 import { normalizeDiagnostic, type SafeDiagnostic } from "@cs2dak/rivalhub-upload";
 import { loadDemoManifestFromZip, loadDemoPackageFromZip as loadRawDemoPackage, type DemoPackageLoadOptions, type DemoPackageLoadProfile } from "@cs2dak/demo-io";
 import { buildMatchRadarField } from "@cs2dak/tactics";
-import { analyzeMatchWorkspace } from "@cs2dak/pipeline";
 import { buildRadarFieldGrid } from "@cs2dak/maps";
 import type { DemoPackage } from "@cs2dak/contract";
 import type { RadarField } from "@cs2dak/tactics";
-import type { MatchWorkspaceModel } from "@cs2dak/presentation";
 import { buildMatchRecords, type MatchRecords } from "./match-records";
 import { getFactsStore } from "./facts-store";
 import { getDerivedCacheStore } from "./derived-cache";
@@ -19,7 +16,7 @@ import { CALLOUT_GRID_URLS, loadStudioCalloutGrid } from "./callout-grid";
 import { metaFromPackage, type DemoMeta } from "./demo-meta";
 import { getStorage } from "./storage";
 import { loadTriLookup, loadMapTri } from "./tri";
-import { currentBuiltWith, isAnalysisStale, type BuiltWith } from "./analysis-manifest";
+import { currentBuiltWith, isAnalysisStale } from "./analysis-manifest";
 
 /**
  * DAK Studio 本地 Demo 库。
@@ -30,7 +27,7 @@ import { currentBuiltWith, isAnalysisStale, type BuiltWith } from "./analysis-ma
  *   DemoPackage 只在比赛工作台/逐场证据需要时从 ZIP 懒加载。
  */
 
-export type { DemoMeta };
+import { matchIdForEntry, type StudioDemoEntry } from "./demo-entry";
 
 function loadDemoPackageFromZip(buffer: ArrayBuffer, options: DemoPackageLoadOptions = {}): Promise<DemoPackage> {
   return loadRawDemoPackage(buffer, { ...options, onDiagnostic: diagnostic => {
@@ -38,25 +35,6 @@ function loadDemoPackageFromZip(buffer: ArrayBuffer, options: DemoPackageLoadOpt
   } });
 }
 
-
-export interface StudioDemoEntry {
-  id: string;
-  fileName: string;
-  /** Local facts/derived identity. Legacy unique filenames retain their key. */
-  analysisMatchId?: string;
-  importedAt: number;
-  /** cs2df 写入的 raw .dem SHA-256；与本地 ZIP record id 有意分离。 */
-  demoSha256: string | null;
-  /** 用户标签（赛事、阶段等），导入时附加，可后续编辑。 */
-  tags: string[];
-  /** 本机原始 .dem 路径，仅用于桌面端重新导出；浏览器/ZIP 导入为空。 */
-  sourceDemPath?: string | null;
-  /** 榨 facts 时所用的 facts revision（AnalysisManifest）；缺失=历史条目，视为旧口径。 */
-  builtWith?: BuiltWith;
-  /** 原始 v3 ZIP 字节数（导入时记录）；用于资产占用统计，免去读全部 blob。 */
-  sizeBytes?: number;
-  meta: DemoMeta;
-}
 
 function normalizeTags(tags: string[]): string[] {
   return [...new Set(tags.map((tag) => tag.trim()).filter(Boolean))];
@@ -251,11 +229,6 @@ async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** Local projection identity; historical noncolliding filenames retain their original key. */
-export function matchIdForEntry(entry: Pick<StudioDemoEntry, "fileName" | "analysisMatchId">): string {
-  return entry.analysisMatchId ?? entry.fileName.replace(/\.zip$/i, "");
-}
-
 function unusedProjectionId(base: string, id: string, occupied: Set<string>): string {
   let candidate = `${base}~${id}`;
   while (occupied.has(candidate)) candidate += "~";
@@ -307,27 +280,6 @@ async function isolateLegacyProjectionAliases(): Promise<void> {
       keys = [...new Set([...keys, ...retry])];
     }
   }
-}
-
-/** 从 exporter 命名（YYYY-MM-DD_map_A-vs-B_x-y.zip）提取比赛日期；不匹配时返回 null。 */
-export function matchDateFromFileName(fileName: string): string | null {
-  const match = /^(\d{4}-\d{2}-\d{2})_/.exec(fileName);
-  return match ? match[1] : null;
-}
-
-/** 比赛日期统一收口：优先文件名，不命中则 fallback 到 meta.matchDate（事件包导入写入）。 */
-export function entryDate(entry: Pick<StudioDemoEntry, "fileName" | "meta">): string | null {
-  return matchDateFromFileName(entry.fileName) ?? entry.meta.matchDate ?? null;
-}
-
-/** 格式化为可读的比赛标签："de_mirage · 2025-03-15 · FURIA 13:9 Vitality"。消除多处的重复拼接。 */
-export function formatMatchLabel(entry: StudioDemoEntry): string {
-  const date = entryDate(entry);
-  return [
-    entry.meta.mapName,
-    date,
-    `${entry.meta.teamAName} ${entry.meta.teamAScore}:${entry.meta.teamBScore} ${entry.meta.teamBName}`
-  ].filter(Boolean).join(" · ");
 }
 
 const pkgCache = new Map<string, Promise<DemoPackage>>();
@@ -607,8 +559,8 @@ async function withImportLocks<T>(keys: string[], operation: () => Promise<T>): 
   }
 }
 
-export async function importDemoFile(file: File, options: ImportDemoOptions | string[] = []): Promise<ImportResult> {
-  const settings = Array.isArray(options) ? { tags: options } : options;
+export async function importDemoFile(file: File, options: ImportDemoOptions = {}): Promise<ImportResult> {
+  const settings = options;
   settings.signal?.throwIfAborted();
   await isolateLegacyProjectionAliases();
   const buffer = await file.arrayBuffer();
@@ -831,32 +783,4 @@ export async function loadDemoPackageTransient(id: string, sourceFile?: File): P
   const buffer = sourceFile ? await sourceFile.arrayBuffer() : await demoBlobs.get(id);
   if (!buffer) throw new Error("demo 不存在或已被删除");
   return parseZipInWorker(buffer, false, "evidence");
-}
-
-/**
- * 单场工作台 model 懒算：从 ZIP 重建 pkg 再构 workspace。
- * 不在导入时持久化（workspace model 单场 ~35MB，整包全量分析，是导入内存/耗时大头），
- * 只在打开该场工作台/教练回放时按需构建——与 getDemoPackage 同款懒加载策略。
- */
-export async function loadMatchWorkspaceModel(demoId: string): Promise<MatchWorkspaceModel> {
-  const pkg = await getDemoPackage(demoId);
-  const calibration = getMapCalibration(pkg.match.mapName);
-  return analyzeMatchWorkspace(pkg, {
-    radarImageUrl: calibration ? `./maps/radars/${pkg.match.mapName}.png` : null,
-    lowerRadarImageUrl: calibration && hasLowerLevel(calibration) ? `./maps/radars/${pkg.match.mapName}_lower.png` : null,
-  });
-}
-
-/** 批量替换资料库中所有匹配 originalName 的队伍名为 displayName。 */
-export async function renameTeamInLibrary(originalName: string, displayName: string): Promise<void> {
-  const all = await listDemoEntries();
-  await Promise.all(
-    all.map((record) => {
-      let recordMut = record;
-      let changed = false;
-      if (recordMut.meta.teamAName === originalName) { recordMut = { ...recordMut, meta: { ...recordMut.meta, teamAName: displayName } }; changed = true; }
-      if (recordMut.meta.teamBName === originalName) { recordMut = { ...recordMut, meta: { ...recordMut.meta, teamBName: displayName } }; changed = true; }
-      return changed ? saveDemoEntry(recordMut) : Promise.resolve();
-    })
-  );
 }

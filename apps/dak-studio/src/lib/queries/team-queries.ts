@@ -3,7 +3,7 @@ import { type TeamComparisonModel, type TeamOverviewModel } from "@cs2dak/presen
 import { createAnalysisBucket, cachedQuery, readPersistedValue, writePersistedValue } from "./query-cache";
 import { assertCurrentFacts } from "../facts-readiness";
 import { getDerivedCacheStore } from "../derived-cache";
-import { matchIdForEntry, type StudioDemoEntry } from "../library";
+import { matchIdForEntry, type StudioDemoEntry } from "../demo-entry";
 
 import type { IdentityOptions } from "../identity";
 import { keyOf, missingFactsError, withTeamRenames } from "./query-scope";

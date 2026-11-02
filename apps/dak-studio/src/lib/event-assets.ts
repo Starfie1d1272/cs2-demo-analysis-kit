@@ -1,6 +1,7 @@
 import JSZip from "jszip";
 import { eventPackageSchema, eventsManifestSchema, type EventsManifest } from "@cs2dak/contract";
-import { importDemoFile, type StudioDemoEntry } from "./library";
+import { importDemoFile} from "./library";
+import { type StudioDemoEntry } from "./demo-entry";
 import { importEventPackage, type EventImportResult } from "./events";
 import { base64ToBytes } from "./storage/base64";
 

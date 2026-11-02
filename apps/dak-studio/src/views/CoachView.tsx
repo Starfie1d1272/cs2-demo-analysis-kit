@@ -6,7 +6,7 @@ import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
 import { EmptyState, DataTable, type DataTableColumn } from "@cs2dak/react";
 import { displayTeamName, teamRenameGroups } from "../lib/identity";
-import { matchIdForEntry, type StudioDemoEntry } from "../lib/library";
+import { matchIdForEntry, type StudioDemoEntry } from "../lib/demo-entry";
 import { TACTICAL_FACT_VERSION } from "@cs2dak/tactics";
 import { getFactsStore } from "../lib/facts-store";
 import type { TacticalRoundFact } from "@cs2dak/tactics";
