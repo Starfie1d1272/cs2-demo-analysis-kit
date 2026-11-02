@@ -5106,3 +5106,22 @@ td.stu-heat-cell.stu-heat-neutral {
   gap: 10px;
   margin-top: 8px;
 }
+
+.match-sheet-print-phase { display: none; }
+@media print {
+  body:has(.match-sheet-output) * { visibility: hidden !important; }
+  body:has(.match-sheet-output) .match-sheet-output article,
+  body:has(.match-sheet-output) .match-sheet-output article * { visibility: visible !important; }
+  body:has(.match-sheet-output), body:has(.match-sheet-output) * { background: transparent !important; box-shadow: none !important; }
+  html:has(.match-sheet-output), body:has(.match-sheet-output) { background: white !important; }
+  body:has(.match-sheet-output) fieldset { border: 0; padding: 0; }
+  body:has(.match-sheet-output) .match-sheet-output article { position: absolute; inset: 0; width: 100%; color: black; background: white !important; }
+  .match-sheet-output article p { overflow-wrap: anywhere; }
+  .match-sheet-output article section { break-inside: auto; }
+  .match-sheet-print-phase { display: block; max-width: 140mm; break-inside: avoid; }
+  body:has(.match-sheet-output) .match-sheet-print-phase,
+  body:has(.match-sheet-output) .match-sheet-print-phase h4 { background: white !important; color: black !important; }
+  .match-sheet-print-phase > div > div { max-width: 120mm !important; }
+  .match-sheet-print-phase img { max-width: 120mm; }
+  .match-sheet-print-phase button { color: black; border: 0; padding: 0; }
+}
