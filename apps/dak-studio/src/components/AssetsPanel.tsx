@@ -37,6 +37,7 @@ export function AssetsPanel({ entries, onLibraryChanged, onNotice = () => {}, on
   const [assetStatus, setAssetStatus] = useState<AssetStatus | null>(null);
   const [repairMsg, setRepairMsg] = useState("");
   const [assetsReady, setAssetsReady] = useState(false);
+  const [assetsError, setAssetsError] = useState<string | null>(null);
   usePageReady(assetsReady, onPageReady);
 
   const demoStats = useMemo(() => {
@@ -80,8 +81,14 @@ export function AssetsPanel({ entries, onLibraryChanged, onNotice = () => {}, on
   useEffect(() => {
     let cancelled = false;
     setAssetsReady(false);
+    setAssetsError(null);
     void Promise.allSettled([refresh(), loadTrisManifest().then((manifest) => { if (!cancelled) setTrisManifest(manifest); })])
-      .then(() => { if (!cancelled) setAssetsReady(true); });
+      .then((results) => {
+        if (cancelled) return;
+        const failed = results.find((result) => result.status === "rejected");
+        if (failed?.status === "rejected") setAssetsError(failed.reason instanceof Error ? failed.reason.message : String(failed.reason));
+        setAssetsReady(true);
+      });
     return () => { cancelled = true; };
   }, [entries, assetAvailable]);  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -187,6 +194,7 @@ export function AssetsPanel({ entries, onLibraryChanged, onNotice = () => {}, on
 
   return (
     <div className="stu-view-body" style={{ display: "grid", gap: "var(--dak-gap, 16px)" }}>
+      {assetsError && <p className="stu-error" role="alert">读取资产信息失败：{assetsError}</p>}
       {/* ── 存储总览 ── */}
       {desktop ? (
         <LibraryMaintenance onNotice={onNotice} onLibraryChanged={onLibraryChanged} />

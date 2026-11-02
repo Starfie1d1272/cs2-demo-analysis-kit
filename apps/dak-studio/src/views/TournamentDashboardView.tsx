@@ -57,6 +57,7 @@ export function TournamentDashboardView({
   const [insights, setInsights] = useState<TournamentInsights | null>(null);
   const [teamComparison, setTeamComparison] = useState<TeamComparisonModel | null>(null);
   const [comparisonReady, setComparisonReady] = useState(false);
+  const [comparisonError, setComparisonError] = useState<string | null>(null);
   const [comparePair, setComparePair] = useState<[string, string] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const entryByMatchId = useMemo(() => new Map(entries.map((entry) => [matchIdForEntry(entry), entry])), [entries]);
@@ -92,12 +93,13 @@ export function TournamentDashboardView({
     }
     let cancelled = false;
     setComparisonReady(false);
+    setComparisonError(null);
     getTeamComparison(entries, identityOptions, comparePair ?? undefined)
       .then((result) => {
         if (!cancelled) setTeamComparison(result);
       })
-      .catch(() => {
-        if (!cancelled) setTeamComparison(null);
+      .catch((reason) => {
+        if (!cancelled) { setTeamComparison(null); setComparisonError(reason instanceof Error ? reason.message : String(reason)); }
       })
       .finally(() => { if (!cancelled) setComparisonReady(true); });
     return () => {
@@ -154,6 +156,8 @@ export function TournamentDashboardView({
                   if (entry) onOpenMatch(entry.id, { roundNumber: 1 });
                 }}
               />
+            ) : comparisonError ? (
+              <p className="stu-error" role="alert">队伍对比加载失败：{comparisonError}</p>
             ) : (
               <p className="stu-dim">至少需要两个队伍的 demo 才能生成对比。</p>
             )}
