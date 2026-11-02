@@ -1,3 +1,6 @@
+import { flushSync } from "react-dom";
+import { savedAnalyses, type SavedAnalysis, type SavedAnalysisInput } from "./lib/saved-analysis";
+import { SavedAnalysesPanel } from "./views/analysis/SavedAnalysesPanel";
 import { matchIdForEntry } from "./lib/demo-entry";
 import { emptyRolesState } from "./lib/studio-page-state";
 import { PlayerRolesPanel } from "./views/analysis/PlayerRolesPanel";
@@ -107,6 +110,7 @@ export function App() {
   const navigationRef = useRef(navigation);
   navigationRef.current = navigation;
   const nextFrameId = useRef(0);
+  const savedOpenRequest = useRef(0);
   const touchedFrames = useRef(new Set<string>());
   useEffect(() => {
     const retained = new Set([navigation.active.id, ...navigation.history.map(frame => frame.id)]);
@@ -135,6 +139,27 @@ export function App() {
       ? { intent, id, destination: next, scrollY: window.scrollY, sourceKey }
       : { intent: "open", id, destination: next, scrollY: window.scrollY }));
   }, [canLeave]);
+  const openSavedAnalysis = useCallback(async (row: SavedAnalysis) => {
+    if (!canLeave()) return;
+    const source = navigationRef.current;
+    const request = ++savedOpenRequest.current;
+    try {
+      const saved = await savedAnalyses.get(row.id);
+      if (savedOpenRequest.current !== request || navigationRef.current !== source) return;
+      if (!saved) throw new Error("原保存项已删除，可另存");
+      const id = `frame-${++nextFrameId.current}`;
+      // Check again in the state update: an intervening navigation or draft edit
+      // must not be discarded by a late read.
+      flushSync(() => setNavigation(current => current === source && savedOpenRequest.current === request
+        ? studioNavigationReducer(discardMaterialDraft(current), { intent: "open-saved", id, saved, scrollY: window.scrollY })
+        : current));
+      if (navigationRef.current.active.id !== id) return;
+      setEvidenceSession(null); setRestoringFrameId(null);
+      void setLastWork({ kind: "saved-analysis", queryId: saved.id });
+    } catch (e) {
+      if (savedOpenRequest.current === request && navigationRef.current === source) setNotice(e instanceof Error ? e.message : "打开保存分析失败");
+    }
+  }, [canLeave, setNotice]);
   const resumeSection = useCallback((section: StudioSection) => {
     const current = navigationRef.current;
     if (PAGE_SECTION[current.active.destination.page] === section || !canLeave()) return;
@@ -506,7 +531,7 @@ export function App() {
           />
         )}
         {displayedCapabilityAvailability && <CapabilityBar availability={displayedCapabilityAvailability} onRepair={openCapabilityRepair} />}
-        {destination.page === "workbench" && <WorkbenchView entries={entries} entriesReady={entriesReady} onOpenMatch={openDemo} onPersonal={openWorkbenchPersonal} onResumeAnalysis={navigation.history.some(frame => PAGE_SECTION[frame.destination.page] === "analysis") ? () => resumeSection("analysis") : undefined} importing={importing} importTagsRaw={importTagsRaw} onImportFiles={importFiles} onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined} onMatches={() => navigate({ page: "matches" })} onOpenMaterial={openMaterial} onNewNote={() => openStudyNoteEditor(emptyStudyNoteDraft())} onNewPlaybook={() => { if (!canLeave()) return; const id = `frame-${++nextFrameId.current}`; setEvidenceSession(null); setNavigation(current => { const next = studioNavigationReducer(discardMaterialDraft(current), { intent: "open", id, destination: { page: "materials" }, scrollY: window.scrollY }); return studioNavigationReducer(next, { intent: "ui", frameId: id, ui: { ...emptyMaterialsPageState(), newPlaybook: emptyCoachPlaybookDraft() } }); }); }} prepMigrationStatus={prepMigrationStatus} retryPrepMigration={retryPrepMigration} />}
+        {destination.page === "workbench" && <WorkbenchView onOpenSaved={row => void openSavedAnalysis(row)} events={eventScopes} entries={entries} entriesReady={entriesReady} onOpenMatch={openDemo} onPersonal={openWorkbenchPersonal} onResumeAnalysis={navigation.history.some(frame => PAGE_SECTION[frame.destination.page] === "analysis") ? () => resumeSection("analysis") : undefined} importing={importing} importTagsRaw={importTagsRaw} onImportFiles={importFiles} onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined} onMatches={() => navigate({ page: "matches" })} onOpenMaterial={openMaterial} onNewNote={() => openStudyNoteEditor(emptyStudyNoteDraft())} onNewPlaybook={() => { if (!canLeave()) return; const id = `frame-${++nextFrameId.current}`; setEvidenceSession(null); setNavigation(current => { const next = studioNavigationReducer(discardMaterialDraft(current), { intent: "open", id, destination: { page: "materials" }, scrollY: window.scrollY }); return studioNavigationReducer(next, { intent: "ui", frameId: id, ui: { ...emptyMaterialsPageState(), newPlaybook: emptyCoachPlaybookDraft() } }); }); }} prepMigrationStatus={prepMigrationStatus} retryPrepMigration={retryPrepMigration} />}
         {section === "matches" && <MatchesView page={destination.page} onMatches={() => navigate({ page: "matches" })} onEvents={() => navigate({ page: "events" })} />}
         {destination.page === "materials" && <MaterialsView identityOptions={identityOptions} onAnalyzeAssignments={openAssignmentAnalysis} onPageReady={keys => onPageReady(active.id, keys)} entries={entries} state={active.ui as MaterialsPageState} onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))} onOpenMaterial={openMaterial} onCreatedMaterial={createdMaterial} onOpenEvidence={openMaterialEvidence} prepMigrationStatus={prepMigrationStatus} prepMigrationError={prepMigrationError} retryPrepMigration={retryPrepMigration} />}
         {destination.page === "material" && <MaterialDetailView onLecture={source => { const id = `frame-${++nextFrameId.current}`; setNavigation(current => { const next = studioNavigationReducer(current, { intent: "open", id, destination: { page: "lecture", materialRef: { kind: "playbook", id: source.id } }, scrollY: window.scrollY }); return studioNavigationReducer(next, { intent: "ui", frameId: id, ui: { kind: "playbook", id: source.id, phaseId: source.phaseId, tab: "diagram", selectedEvidenceId: null, replayEntryId: null, replay: null } }); }); }} identityOptions={identityOptions} onAnalyzeAssignments={openAssignmentAnalysis} onPageReady={keys => onPageReady(active.id, keys)} refValue={destination.materialRef} entries={entries} state={active.ui as MaterialPageState | null} onStateChange={ui => setNavigation(current => {
@@ -556,11 +581,18 @@ export function App() {
             onWorkspaceStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
           />
         )}
-        {section === "analysis" && <AnalysisView page={destination.page as import("./lib/studio-navigation").AnalysisPageId} focus={analysisContext.focus} onSelect={page => {
+        {section === "analysis" && active.originSavedAnalysisId && <p>已保存分析：按当前资料库重新计算。</p>}
+        {section === "analysis" && <AnalysisView key={active.id} page={destination.page as import("./lib/studio-navigation").AnalysisPageId} focus={analysisContext.focus} onBeginSave={async () => { const frame = navigationRef.current.active; if (frame.id !== active.id) throw new Error("分析页面已切换"); const id = frame.originSavedAnalysisId; if (!id) return null; const row = await savedAnalyses.get(id); if (!row) throw new Error("原保存项已删除，可另存"); return { title: row.title, shortcut: row.workbenchShortcut }; }} savedPanel={<SavedAnalysesPanel onReset={() => navigate({ page: "analysis", context: createAnalysisContextPreset("explore") })} entries={entries} events={eventScopes} onOpen={row => void openSavedAnalysis(row)} />} onSave={async (title, workbenchShortcut, copy) => {
+          const frame = navigationRef.current.active;
+          if (frame.id !== active.id || !("context" in frame.destination)) throw new Error("分析页面已切换");
+          const input = { page: frame.destination.page, context: frame.destination.context, ui: frame.ui, title, workbenchShortcut } as SavedAnalysisInput;
+          const saved = frame.originSavedAnalysisId && !copy ? await savedAnalyses.update(frame.originSavedAnalysisId, input) : await savedAnalyses.create(input);
+          setNavigation(current => studioNavigationReducer(current, { intent: "saved-origin", frameId: frame.id, id: saved.id }));
+        }} onSelect={page => {
           if (page === destination.page) return;
           const id = `frame-${++nextFrameId.current}`;
           const target = { page, context: analysisContext };
-          setRestoringFrameId(findAnalysisFrame(navigationRef.current.history, target)?.id ?? null);
+          setRestoringFrameId(findAnalysisFrame(navigationRef.current.history, target, navigationRef.current.active.originSavedAnalysisId)?.id ?? null);
           setNavigation(current => studioNavigationReducer(current, { intent: "switch-analysis", id, destination: target, scrollY: window.scrollY }));
         }}>
         {destination.page === "player" && (
