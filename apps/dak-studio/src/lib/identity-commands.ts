@@ -1,6 +1,6 @@
 import { getNativeStorageApiForCurrentAdapter, getStorage } from "./storage";
 import type { RecordRef, RecordSnapshot, RecordMutation } from "./storage/types";
-import { applyMerge, applySplit, applyRename, applyTeamRename, type IdentityStoreState } from "./identity";
+import { applyMerge, applySplit, applyRename, applyTeamRenames, type IdentityStoreState, type TeamRenameChange } from "./identity";
 import { ROLE_DECLARATIONS_SCHEMA_VERSION, parseRoleDeclarations, migrateRoleDeclarationsForIdentity, type RoleDeclarationsState, type StoredRoleDeclaration } from "./role-declarations";
 import { roleDeclarationSchema, type RoleDeclaration } from "@cs2dak/tactics";
 
@@ -173,14 +173,11 @@ export async function renamePlayer(
   return commitChange(current, next, `重命名 ${playerKey} → ${newDisplayName}`);
 }
 
-/** 设置或清除队伍显示名（原名 → 空字符串即清除）。 */
-export async function setTeamRename(
-  current: IdentityStoreState,
-  originalName: string,
-  displayName: string
-): Promise<IdentityStoreState> {
-  const next = applyTeamRename(current, originalName, displayName);
-  return commitChange(current, next, `队伍改名 "${originalName}" → "${displayName || "(清除)"}"`);
+/** 一次提交整组队伍显示名，并产生一条可撤销审计。 */
+export async function setTeamRenames(current: IdentityStoreState, changes: TeamRenameChange[]): Promise<IdentityStoreState> {
+  if (!changes.length) return current;
+  const next = applyTeamRenames(current, changes);
+  return commitChange(current, next, `队伍名称变更（${changes.length} 个）`);
 }
 
 /** 撤销恢复业务内容，同时生成新的缓存版本。 */

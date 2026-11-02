@@ -10,7 +10,7 @@ import {
   loadIdentityState,
   mergeIdentities,
   renamePlayer,
-  setTeamRename,
+  setTeamRenames,
   splitIdentity,
   undoLastAction
 } from "../lib/identity-commands";
@@ -204,12 +204,8 @@ export function ManagementView({
     const displayName = teamMergeName.trim();
     setWorking(true);
     try {
-      let next = identity;
-      for (const team of selectedTeamGroups) {
-        for (const original of team.originals) {
-          next = await setTeamRename(next, original, displayName === original ? "" : displayName);
-        }
-      }
+      const changes = selectedTeamGroups.flatMap(team => team.originals.map(originalName => ({ originalName, displayName: displayName === originalName ? "" : displayName })));
+      const next = await setTeamRenames(identity, changes);
       onIdentityChange(next);
       setSelectedTeams(new Set());
     } catch (error) {
@@ -223,11 +219,8 @@ export function ManagementView({
   async function handleTeamSplit(originals: string[], displayName: string) {
     setWorking(true);
     try {
+      const next = await setTeamRenames(identity, originals.map(originalName => ({ originalName, displayName: "" })));
       setTeamInputs((prev) => ({ ...prev, [displayName]: "" }));
-      let next = identity;
-      for (const original of originals) {
-        next = await setTeamRename(next, original, "");
-      }
       onIdentityChange(next);
       setSelectedTeams(new Set());
     } catch (error) {
@@ -241,10 +234,7 @@ export function ManagementView({
     const displayName = teamInputs[currentDisplayName] ?? currentDisplayName;
     setWorking(true);
     try {
-      let next = identity;
-      for (const original of originals) {
-        next = await setTeamRename(next, original, displayName === original ? "" : displayName);
-      }
+      const next = await setTeamRenames(identity, originals.map(originalName => ({ originalName, displayName: displayName === originalName ? "" : displayName })));
       onIdentityChange(next);
     } catch (error) {
       await reportIdentityError(error);

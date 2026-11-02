@@ -10,6 +10,21 @@
 import { createDbOpener, txRequest } from "../idb";
 import type { BlobStore, RecordStore, AtomicStorageAdapter, RecordRef, RecordSnapshot, RecordMutation } from "./types";
 
+/** 写入成功只在整个事务提交后确认；请求成功后仍可能中止。 */
+function commitWrite(db: IDBDatabase, write: (store: IDBObjectStore) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("kv", "readwrite");
+    tx.oncomplete = () => resolve();
+    tx.onabort = () => reject(tx.error ?? new Error("写入事务已中止"));
+    try {
+      write(tx.objectStore("kv"));
+    } catch (error) {
+      tx.abort();
+      reject(error);
+    }
+  });
+}
+
 function makeKv(dbName: string) {
   const open = createDbOpener(dbName, 1, (db) => {
     if (!db.objectStoreNames.contains("kv")) db.createObjectStore("kv");
@@ -87,16 +102,16 @@ function makeKv(dbName: string) {
     },
     async put(key: string, value: unknown): Promise<void> {
       const db = await open();
-      await txRequest(db.transaction("kv", "readwrite").objectStore("kv").put(value, key));
+      await commitWrite(db, store => { store.put(value, key); });
     },
     async delete(key: string): Promise<void> {
       const db = await open();
-      await txRequest(db.transaction("kv", "readwrite").objectStore("kv").delete(key));
+      await commitWrite(db, store => { store.delete(key); });
     },
     async deleteByPrefix(prefix: string): Promise<void> {
       const db = await open();
       const range = IDBKeyRange.bound(prefix, prefix + '￿');
-      await txRequest(db.transaction("kv", "readwrite").objectStore("kv").delete(range));
+      await commitWrite(db, store => { store.delete(range); });
     },
   };
 }
