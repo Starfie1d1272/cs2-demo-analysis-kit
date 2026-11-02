@@ -1,8 +1,8 @@
-import { getPinnedPlayer } from "../lib/pin";
+import { readPinnedPlayer } from "../lib/pin";
 import { usePageReady } from "../lib/use-page-ready";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { buildSeriesSummary } from "@cs2dak/analytics";
 import type { MatchWorkspaceModel, SeriesSummary } from "@cs2dak/presentation";
 import { QaReportPanel } from "@cs2dak/react";
@@ -70,7 +70,14 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
   const [loaded, setLoaded] = useState<{ id: string; generation: number; model: MatchWorkspaceModel; state: MatchWorkspaceState } | null>(null);
   const model = loaded?.id === activeId && loaded.generation === analysis.generation && analysis.status === "ready" ? loaded.model : null;
   const [pinned, setPinned] = useState<string[] | null>(null);
-  useEffect(() => { void getPinnedPlayer().then(p => setPinned(p?.steamIds ?? [])); }, []);
+  const [pinnedError, setPinnedError] = useState(false);
+  const mayApplyPinned = useRef(!workspaceState);
+  useEffect(() => {
+    let active = true;
+    void readPinnedPlayer().then(p => { if (active) setPinned(p?.steamIds ?? []); })
+      .catch(() => { if (active) { setPinned([]); setPinnedError(true); } });
+    return () => { active = false; };
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [showQa, setShowQa] = useState(false);
   const [seriesRecords, setSeriesRecords] = useState<StudioSeriesRecord[]>([]);
@@ -129,22 +136,30 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
   }, [activeId]);
 
   useEffect(() => {
-    if (!activeId || !activeEntry || analysis.status !== "ready" || pinned === null) return;
+    if (!activeId || !activeEntry || analysis.status !== "ready") return;
     setShowQa(false);
     for (const key of modelCache.keys()) if (!key.startsWith(`${analysis.generation}:`)) modelCache.delete(key);
     const cached = modelCache.get(`${analysis.generation}:${activeId}`);
     if (cached) {
-      setLoaded(prev => ({ id: activeId, generation: analysis.generation, model: cached, state: prev?.id === activeId ? prev.state : workspaceState ? snapshotMatchWorkspaceState(workspaceState) : initialState(cached, pinned) }));
+      setLoaded(prev => ({ id: activeId, generation: analysis.generation, model: cached, state: prev?.id === activeId ? prev.state : workspaceState ? snapshotMatchWorkspaceState(workspaceState) : createMatchWorkspaceState(cached) }));
       setError(null);
       return;
     }
     let cancelled = false;
     setError(null);
     loadModel(activeId, analysis.generation)
-      .then((built) => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setLoaded(prev => ({ id: activeId, generation: analysis.generation, model: built, state: prev?.id === activeId ? prev.state : workspaceState ? snapshotMatchWorkspaceState(workspaceState) : initialState(built, pinned) })); } })
+      .then((built) => { if (!cancelled) { assertAnalysisGeneration(analysis.generation); setLoaded(prev => ({ id: activeId, generation: analysis.generation, model: built, state: prev?.id === activeId ? prev.state : workspaceState ? snapshotMatchWorkspaceState(workspaceState) : createMatchWorkspaceState(built) })); } })
       .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); });
     return () => { cancelled = true; };
-  }, [activeId, Boolean(activeEntry), analysis.generation, analysis.status, pinned]);
+  }, [activeId, Boolean(activeEntry), analysis.generation, analysis.status]);
+
+  useEffect(() => {
+    if (pinned === null || !loaded || loaded.id !== activeId || !mayApplyPinned.current) return;
+    mayApplyPinned.current = false;
+    const matches = loaded.model.players.filter(player => pinned.includes(player.row.steamId64));
+    if (matches.length === 1) setLoaded(prev => prev && prev.id === activeId
+      ? { ...prev, state: { ...prev.state, reviewPlayerSteamId64: matches[0].row.steamId64 } } : prev);
+  }, [pinned, loaded?.id, activeId]);
 
   useLayoutEffect(() => {
     if (!deepLink || !loaded || loaded.id !== activeId) return;
@@ -207,10 +222,11 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     ? <EmptyState variant="error" title="加载失败" hint={error} />
     : !model
       ? <div className="stu-loading">读取本地持久化工作台…</div>
-      : <MatchReviewWorkspace model={model} onAnalyzePlayer={onAnalyzePlayer} pinnedIds={pinned ?? []} onNote={(roundNumber) => { if (activeEntry) openStudyNoteEditor({ title: `${activeEntry.meta.teamAName} vs ${activeEntry.meta.teamBName} · R${roundNumber}`, body: "", purpose: "review", playerKey: null, evidence: [captureSavedEvidence(activeEntry, { matchId: matchIdForEntry(activeEntry), roundNumber, reason: "比赛回合笔记" })] }); }} state={loaded!.state} onStateChange={(state) => { if (loaded?.state.replay?.playing && state.replay && !state.replay.playing) onReplayPaused?.({ roundNumber: state.replay.roundNumber, tick: state.replay.tick }); setLoaded(prev => prev && prev.id === activeId ? { ...prev, state } : prev); }} />;
+      : <MatchReviewWorkspace model={model} onReviewChoice={() => { mayApplyPinned.current = false; }} onAnalyzePlayer={onAnalyzePlayer} pinnedIds={pinned ?? []} onNote={(roundNumber) => { if (activeEntry) openStudyNoteEditor({ title: `${activeEntry.meta.teamAName} vs ${activeEntry.meta.teamBName} · R${roundNumber}`, body: "", purpose: "review", playerKey: null, evidence: [captureSavedEvidence(activeEntry, { matchId: matchIdForEntry(activeEntry), roundNumber, reason: "比赛回合笔记" })] }); }} state={loaded!.state} onStateChange={(state) => { if (loaded?.state.replay?.playing && state.replay && !state.replay.playing) onReplayPaused?.({ roundNumber: state.replay.roundNumber, tick: state.replay.tick }); setLoaded(prev => prev && prev.id === activeId ? { ...prev, state } : prev); }} />;
 
   return (
     <div className="stu-view stu-view-flush">
+      {pinnedError && <p className="stu-error" role="status">无法读取关注选手，可继续手动选择选手。</p>}
       {seriesError && <p className="stu-error" role="alert">读取系列赛失败：{seriesError}</p>}
       <div className="stu-context-bar">
         <span className="stu-context-label">当前比赛</span>
@@ -285,10 +301,4 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
       </div>
     </div>
   );
-}
-
-function initialState(model: MatchWorkspaceModel, pinned: string[]): MatchWorkspaceState {
-  const state = createMatchWorkspaceState(model);
-  const matches = model.players.filter(player => pinned.includes(player.row.steamId64));
-  return { ...state, reviewPlayerSteamId64: matches.length === 1 ? matches[0].row.steamId64 : null };
 }

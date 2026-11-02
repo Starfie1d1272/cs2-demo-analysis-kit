@@ -15,14 +15,15 @@ export interface PinnedPlayer {
 const KEY = "pinned-player";
 const kv = getStorage().records("kv");
 
+/** Read the preference with failures visible to callers that can present them. */
+export async function readPinnedPlayer(): Promise<PinnedPlayer | null> {
+  const parsed = await kv.get<PinnedPlayer>(KEY);
+  if (!parsed || typeof parsed.playerKey !== "string" || !Array.isArray(parsed.steamIds)) return null;
+  return parsed;
+}
+
 export async function getPinnedPlayer(): Promise<PinnedPlayer | null> {
-  try {
-    const parsed = await kv.get<PinnedPlayer>(KEY);
-    if (!parsed || typeof parsed.playerKey !== "string" || !Array.isArray(parsed.steamIds)) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
+  try { return await readPinnedPlayer(); } catch { return null; }
 }
 
 export async function setPinnedPlayer(pinned: PinnedPlayer | null): Promise<void> {

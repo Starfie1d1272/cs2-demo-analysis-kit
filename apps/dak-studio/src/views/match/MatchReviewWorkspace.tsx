@@ -25,7 +25,7 @@ const WORKSPACE_NAV: Array<{ key: WorkspaceView; label: string }> = [
   { key: "map", label: "地图" }
 ];
 
-export function MatchReviewWorkspace({ model, state: input, onStateChange, pinnedIds, onNote, onAnalyzePlayer }: { onAnalyzePlayer: (steamId: string, label: string) => void; pinnedIds: string[]; onNote: (roundNumber: number) => void; model: MatchWorkspaceModel; state: MatchWorkspaceState; onStateChange: (next: MatchWorkspaceState) => void }) {
+export function MatchReviewWorkspace({ model, state: input, onStateChange, pinnedIds, onNote, onAnalyzePlayer, onReviewChoice }: { onReviewChoice: () => void; onAnalyzePlayer: (steamId: string, label: string) => void; pinnedIds: string[]; onNote: (roundNumber: number) => void; model: MatchWorkspaceModel; state: MatchWorkspaceState; onStateChange: (next: MatchWorkspaceState) => void }) {
   const state = normalizeMatchWorkspaceState(model, input);
   const setView = (view: WorkspaceView) => onStateChange({ ...state, view, replay: state.replay && view !== "replay" ? { ...state.replay, playing: false } : state.replay });
   const view = state.view;
@@ -68,8 +68,8 @@ export function MatchReviewWorkspace({ model, state: input, onStateChange, pinne
         </section>
 
         <section className="dak-stack" aria-label="复盘对象">
-          <div><button type="button" className="stu-button-sm" onClick={() => onStateChange(normalizeMatchWorkspaceState(model, { ...state, reviewPlayerSteamId64: null }))}>全部</button> {pinnedMatches.length === 1 && <button type="button" className="stu-button-sm" onClick={() => onStateChange(normalizeMatchWorkspaceState(model, { ...state, reviewPlayerSteamId64: pinnedMatches[0].row.steamId64 }))}>我</button>} {pinnedMatches.length > 1 && <span>关注的多个账号都在本场，请选择选手。</span>}</div>
-          <label>选择选手 <select className="stu-select" value={state.reviewPlayerSteamId64 ?? ""} onChange={e => onStateChange(normalizeMatchWorkspaceState(model, { ...state, reviewPlayerSteamId64: e.target.value || null }))}>
+          <div><button type="button" className="stu-button-sm" onClick={() => { onReviewChoice(); onStateChange(normalizeMatchWorkspaceState(model, { ...state, reviewPlayerSteamId64: null })); }}>全部</button> {pinnedMatches.length === 1 && <button type="button" className="stu-button-sm" onClick={() => { onReviewChoice(); onStateChange(normalizeMatchWorkspaceState(model, { ...state, reviewPlayerSteamId64: pinnedMatches[0].row.steamId64 })); }}>我</button>} {pinnedMatches.length > 1 && <span>关注的多个账号都在本场，请选择选手。</span>}</div>
+          <label>选择选手 <select className="stu-select" value={state.reviewPlayerSteamId64 ?? ""} onChange={e => { onReviewChoice(); onStateChange(normalizeMatchWorkspaceState(model, { ...state, reviewPlayerSteamId64: e.target.value || null })); }}>
             <option value="">全部选手</option>
             {model.players.map(p => <option key={p.row.steamId64} value={p.row.steamId64}>{p.row.name}</option>)}
           </select></label>
