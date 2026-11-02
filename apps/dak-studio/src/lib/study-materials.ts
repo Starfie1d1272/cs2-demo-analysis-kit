@@ -1,4 +1,4 @@
-import { listCoachMatchSheets } from "./coach-match-sheet";
+import { getCoachMatchSheet, listCoachMatchSheets } from "./coach-match-sheet";
 import { listCoachAssignments } from "./coach-assignments";
 import { listCoachPlaybook, getCoachPlaybook, type CoachPlaybookItem } from "./coach-playbook";
 import type { MaterialRef } from "./material-ref";
@@ -35,16 +35,17 @@ export async function listStudyMaterialsKind(kind: MaterialKind, entries: Studio
   return { rows: sortMaterials(rows), unreadable: 0 };
 }
 export async function listStudyMaterials(entries: StudioDemoEntry[], includePrep = true) {
-  const kinds: MaterialKind[] = ["assignment-set", "playbook", "study-note", "training-focus", ...(includePrep ? ["prep-item" as const] : []), "practice-lineup"];
+  const kinds: MaterialKind[] = ["match-sheet", "assignment-set", "playbook", "study-note", "training-focus", ...(includePrep ? ["prep-item" as const] : []), "practice-lineup"];
   const results = await Promise.allSettled(kinds.map(kind => listStudyMaterialsKind(kind, entries)));
-  const rows: MaterialSummary[] = []; const errors: Partial<Record<MaterialKind, string>> = {}; let unreadable = 0;
-  results.forEach((result, index) => { if (result.status === "fulfilled") { rows.push(...result.value.rows); unreadable += result.value.unreadable; } else errors[kinds[index]] = String(result.reason); });
-  return { rows: sortMaterials(rows), errors, unreadable };
+  const rows: MaterialSummary[] = []; const errors: Partial<Record<MaterialKind, string>> = {}; const unreadableByKind: Partial<Record<MaterialKind, number>> = {}; let unreadable = 0;
+  results.forEach((result, index) => { if (result.status === "fulfilled") { rows.push(...result.value.rows); unreadable += result.value.unreadable; unreadableByKind[kinds[index]] = result.value.unreadable; } else errors[kinds[index]] = String(result.reason); });
+  return { rows: sortMaterials(rows), errors, unreadable, unreadableByKind };
 }
 
 /** Resolve one reference against its owning store without loading match data. */
 export async function resolveStudyMaterial(ref: MaterialRef, entries: StudioDemoEntry[]): Promise<MaterialSummary | null> {
   switch (ref.kind) {
+    case "match-sheet": { const n = await getCoachMatchSheet(ref.id); return n ? { ref: { ...ref }, title: n.title, kindLabel: "比赛单", mapName: n.mapName, summary: n.opponentLabel, updatedAt: n.updatedAt, sourceStatus: "no-evidence" } : null; }
     case "playbook": { const n = await getCoachPlaybook(ref.id); return n ? { ref: { ...ref }, title: n.title, kindLabel: `战术 · ${n.side.toUpperCase()} · ${n.kind}`, side: n.side, playKind: n.kind, mapName: n.mapName, summary: n.body, updatedAt: n.updatedAt, sourceStatus: noteStatus(n.evidence, entries) } : null; }
     case "study-note": {
       const n = await getStudyNote(ref.id);
