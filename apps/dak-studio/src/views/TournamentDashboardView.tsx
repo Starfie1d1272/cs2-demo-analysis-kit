@@ -1,6 +1,6 @@
 import { AnalysisExportButtons } from "../components/AnalysisExportButtons";
 import { canExportSnapshot, withCapabilityConditions, unionExportEntries, withAnalysisExportEntries as applyExportEntries } from "../lib/analysis-export";
-import { CapabilityBar, useCapability } from "../components/CapabilityBar";
+import { CapabilityBar, sameCapabilityNotice, useCapability } from "../components/CapabilityBar";
 import type { CapabilityRepairAction } from "../lib/capability-availability";
 import { getAnalysisDataSnapshot, subscribeAnalysisDataInvalidation, assertAnalysisGeneration } from "../lib/queries/query-cache";
 import { buildTournamentAnalysisResult } from "../lib/analysis-export-tournament";
@@ -83,6 +83,11 @@ export function TournamentDashboardView({
   const comparisonCapability = useCapability(entries, "team-comparison");
   const insightEntries = insightCapability.eligible;
   const comparisonEntries = comparisonCapability.eligible;
+  const allNeedUpdate = (availability: typeof insightCapability.availability) =>
+    !!availability && entries.length > 0 && availability.eligibleMatches === 0 &&
+    availability.excluded.length === 1 && availability.excluded[0]?.reason === "facts 需要重建" &&
+    availability.excluded[0].count === entries.length;
+
   const insightKey = JSON.stringify([entries.map(entry => entry.id), selectedTeam, identityOptions?.version]);
   const comparePair = state.comparePair;
   const setComparePair = (comparePair: [string, string] | null) => onStateChange({ ...state, comparePair });
@@ -91,6 +96,10 @@ export function TournamentDashboardView({
   const [comparisonSnapshot, setComparisonSnapshot] = useState<{ key: string; generation: number; sample: string; value: TeamComparisonModel } | null>(null);
   const insights = insightSnapshot?.key === insightKey ? insightSnapshot.value : null;
   const teamComparison = comparisonSnapshot?.key === comparisonKey ? comparisonSnapshot.value : null;
+  const sharedUnavailable = !insights && !teamComparison && !insightCapability.error && !comparisonCapability.error &&
+    !insightCapability.stale && !comparisonCapability.stale && allNeedUpdate(insightCapability.availability) && allNeedUpdate(comparisonCapability.availability);
+  const sharedNotice = !insightCapability.error && !comparisonCapability.error &&
+    !insightCapability.stale && !comparisonCapability.stale && sameCapabilityNotice(insightCapability.availability, comparisonCapability.availability);
   const [comparisonReady, setComparisonReady] = useState(false);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -171,10 +180,10 @@ export function TournamentDashboardView({
       </header>
       {insightCapability.availability && <CapabilityBar availability={insightCapability.availability} onRepair={onCapabilityRepair} />}
       {insightCapability.error && <p role="alert">赛事数据读取失败：{insightCapability.error} <button type="button" className="stu-button-sm" onClick={insightCapability.retry}>重试</button></p>}
-      {insightEntries?.length === 0 && !insights && <EmptyState variant="insufficient" title="没有可用赛事数据" hint="请查看上方限制和修复入口。" />}
+      {!sharedUnavailable && insightEntries?.length === 0 && !insights && <EmptyState variant="insufficient" title="没有可用赛事数据" hint="请查看上方限制和修复入口。" />}
           <div className="stu-card">
             <h3>队伍对比</h3>
-            {comparisonCapability.availability && <CapabilityBar availability={comparisonCapability.availability} onRepair={onCapabilityRepair} />}
+            {!sharedNotice && comparisonCapability.availability && <CapabilityBar availability={comparisonCapability.availability} onRepair={onCapabilityRepair} />}
             {comparisonCapability.error && <p role="alert">对比能力读取失败：{comparisonCapability.error} <button type="button" className="stu-button-sm" onClick={comparisonCapability.retry}>重试</button></p>}
             {teamComparison && (comparisonError || comparisonCapability.error || analysis.status !== "ready" || comparisonSnapshot?.generation !== analysis.generation || comparisonSnapshot.sample !== JSON.stringify(comparisonEntries?.map(entry => entry.id))) && <p role="status">{comparisonError || comparisonCapability.error || analysis.status === "error" ? "更新失败，显示旧版本结果。" : analysis.status === "ready" && comparisonEntries?.length === 0 ? "当前无可用样本，以下保留上次结果。" : "正在更新，显示旧版本结果。"}</p>}
             <p className="stu-muted">选两支队伍对比当前状态——无需互相交手，适合赛前侦察。</p>
@@ -187,7 +196,7 @@ export function TournamentDashboardView({
                   if (entry) onOpenMatch(entry.id, { roundNumber: 1 });
                 }}
               />
-            ) : comparisonCapability.error ? null : comparisonEntries?.length === 0 ? <p>当前没有可用对比样本。</p> : comparisonError ? (
+            ) : comparisonCapability.error ? null : comparisonEntries?.length === 0 ? (sharedUnavailable ? null : <p>当前没有可用对比样本。</p>) : comparisonError ? (
               <p className="stu-error" role="alert">队伍对比加载失败：{comparisonError}</p>
             ) : (
               <p className="stu-dim">至少需要两个队伍的 demo 才能生成对比。</p>
@@ -244,7 +253,7 @@ export function TournamentDashboardView({
         exportSource={exportSource} exportPage={exportPage}
         captureOverview={exportSource ? captureOverview : undefined}
         onCapabilityRepair={onCapabilityRepair} state={state} onStateChange={onStateChange}
-        embedded allEntries={allEntries} entries={entries} selectedTeam={selectedTeam}
+        embedded sharedUnavailable={sharedUnavailable} sharedAvailability={!insightCapability.error && !insightCapability.stale ? insightCapability.availability : null} allEntries={allEntries} entries={entries} selectedTeam={selectedTeam}
         identityOptions={identityOptions} onPlayerClick={onOpenPlayer} onGoLibrary={onGoLibrary}
       />}
     </div>
