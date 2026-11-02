@@ -30,6 +30,15 @@ export interface AnalysisResultSnapshotV1 {
   limitations: string[];
 }
 
+function projectContext(context: AnalysisContext | null): AnalysisContext | null {
+  if (!context) return null;
+  const focus = context.focus.kind === "aggregate" ? { kind: "aggregate" as const } : context.focus.kind === "team" ? { kind: "team" as const, teamName: context.focus.teamName } : context.focus.kind === "match" ? { kind: "match" as const, entryId: context.focus.entryId, label: context.focus.label } : context.focus.kind === "event" ? { kind: "event" as const, eventId: context.focus.eventId, label: context.focus.label } : { kind: context.focus.kind, playerKey: context.focus.playerKey, label: context.focus.label };
+  const role = (value: AnalysisContext["roles"]["beneficiary"]) => value ? { kind: value.kind, id: value.id, label: value.label } : undefined;
+  const baseline = context.baseline.kind === "specified" ? { kind: "specified" as const, subject: role(context.baseline.subject)!, ...(context.baseline.label !== undefined && { label: context.baseline.label }) } : context.baseline.kind === "event-peers" ? { kind: "event-peers" as const, eventId: context.baseline.eventId, ...(context.baseline.label !== undefined && { label: context.baseline.label }) } : context.baseline.kind === "personal-history" ? { kind: "personal-history" as const, playerKey: context.baseline.playerKey, ...(context.baseline.label !== undefined && { label: context.baseline.label }) } : { kind: context.baseline.kind, ...(context.baseline.label !== undefined && { label: context.baseline.label }) };
+  const corpus = context.corpus;
+  return { goal: context.goal, focus, baseline, roles: { beneficiary: role(context.roles.beneficiary), opponent: role(context.roles.opponent), comparison: role(context.roles.comparison) }, corpus: { eventIds: [...corpus.eventIds], entryIds: [...corpus.entryIds], matchIds: [...corpus.matchIds], maps: [...corpus.maps], tags: [...corpus.tags], excludedEntryIds: [...corpus.excludedEntryIds], ...(corpus.entrySelectionActive !== undefined && { entrySelectionActive: corpus.entrySelectionActive }), ...(corpus.dateRange && { dateRange: { from: corpus.dateRange.from, to: corpus.dateRange.to, includeUnknown: corpus.dateRange.includeUnknown } }) } };
+}
+
 /** Capture only the data explicitly projected by the page, independently of later edits. */
 export function captureAnalysisResult(input: Omit<AnalysisResultSnapshotV1, "schemaVersion" | "generatedAt" | "appVersion" | "sources"> & { entries: StudioDemoEntry[] }): AnalysisResultSnapshotV1 {
   const { entries, ...result } = input;
@@ -42,15 +51,16 @@ export function captureAnalysisResult(input: Omit<AnalysisResultSnapshotV1, "sch
     return value;
   };
   const snapshot = structuredClone({
-    ...result, schemaVersion: 1 as const, generatedAt: Date.now(), appVersion: ANALYSIS_MANIFEST.appVersion,
+    ...result, context: projectContext(result.context), schemaVersion: 1 as const, generatedAt: Date.now(), appVersion: ANALYSIS_MANIFEST.appVersion,
     sources: entries.map(entry => {
       const source = sourceRefForEntry(entry);
       // Legacy records can contain paths; only the final filename belongs in a report.
       const hash = source.demoSha256;
       if (hash === null) sourceWarnings.push(`来源 ${source.fileName.split(/[\\/]/).pop() ?? ""} 未记录原始 demo SHA-256。`);
       else if (!/^[a-f0-9]{64}$/.test(hash)) sourceWarnings.push("来源 demo SHA-256 无效，已保留为未知。");
-      if (source.builtWith === null) sourceWarnings.push(`来源 ${source.fileName.split(/[\\/]/).pop() ?? ""} 的构建版本未知。`);
-      return { ...source, entryId: safeIdentifier(source.entryId), matchId: safeIdentifier(source.matchId), demoSha256: hash && /^[a-f0-9]{64}$/.test(hash) ? hash : null, fileName: source.fileName.split(/[\\/]/).pop() ?? "" };
+      const builtWith = source.builtWith && typeof source.builtWith.formatVersion === "string" && typeof source.builtWith.factsRevision === "string" ? { formatVersion: source.builtWith.formatVersion, factsRevision: source.builtWith.factsRevision } : null;
+      if (builtWith === null) sourceWarnings.push(`来源 ${source.fileName.split(/[\\/]/).pop() ?? ""} 的构建版本未知。`);
+      return { ...source, builtWith, entryId: safeIdentifier(source.entryId), matchId: safeIdentifier(source.matchId), demoSha256: hash && /^[a-f0-9]{64}$/.test(hash) ? hash : null, fileName: source.fileName.split(/[\\/]/).pop() ?? "" };
     }),
     limitations: [...result.limitations, ...sourceWarnings],
     sections: result.sections.map(section => ({ ...section, rows: section.rows.map(row => Object.fromEntries(
