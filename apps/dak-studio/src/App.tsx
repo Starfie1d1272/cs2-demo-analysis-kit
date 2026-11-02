@@ -47,7 +47,8 @@ import { createStudioNavigation, studioNavigationReducer, PAGE_SECTION, type Stu
 import { WorkbenchView } from "./views/WorkbenchView";
 import { MatchesView } from "./views/MatchesView";
 import { AnalysisView } from "./views/AnalysisView";
-import { getPinnedPlayer } from "./lib/pin";
+import { getPinnedPlayer, type PinnedPlayer } from "./lib/pin";
+import { setLastWork } from "./lib/last-work";
 import { EventManager } from "./components/EventManager";
 import { MaterialsView } from "./views/MaterialsView";
 import { RivalHubBatchImportPanel } from "./components/RivalHubBatchImportPanel";
@@ -237,6 +238,22 @@ export function App() {
     navigate({ page: "match", entryId: id, ...target });
   }, [navigate]);
 
+  const lastOpenedFrame = useRef<string | null>(null);
+  const recordMatchOpened = useCallback((target: { roundNumber?: number; tick?: number }) => {
+    if (destination.page !== "match" || lastOpenedFrame.current === active.id) return;
+    lastOpenedFrame.current = active.id;
+    void setLastWork({ kind: "match", entryId: destination.entryId, ...target });
+  }, [active.id, destination]);
+  const recordReplayPaused = useCallback((target: { roundNumber: number; tick: number }) => {
+    if (destination.page === "match") void setLastWork({ kind: "match", entryId: destination.entryId, ...target });
+  }, [destination]);
+  const openWorkbenchPersonal = useCallback((pinned: PinnedPlayer | null) => {
+    if (!pinned) { goPlayers(); return; }
+    const matches = identityState.mappings.filter(mapping => mapping.steamIds.some(id => pinned.steamIds.includes(id)));
+    const focus = matches.length === 1 ? { kind: "self" as const, playerKey: matches[0].playerKey, label: matches[0].displayName } : null;
+    navigate({ page: "player", context: createAnalysisContextPreset("personal-review", focus ? { focus } : {}) });
+  }, [goPlayers, identityState.mappings, navigate]);
+
   const openEvidence = useCallback<OpenEvidence>((id, evidence, sourceKey, finding) => {
     if (navigationRef.current.active.id !== active.id) return;
     setEvidenceDetails({ evidence: { ...evidence }, finding: finding ? { ...finding } : undefined });
@@ -420,7 +437,7 @@ export function App() {
           />
         )}
         {displayedCapabilityAvailability && <CapabilityBar availability={displayedCapabilityAvailability} onRepair={openCapabilityRepair} />}
-        {destination.page === "workbench" && <WorkbenchView importing={importing} importTagsRaw={importTagsRaw} onImportFiles={importFiles} onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined} onMatches={() => navigate({ page: "matches" })} />}
+        {destination.page === "workbench" && <WorkbenchView entries={entries} entriesReady={entriesReady} onOpenMatch={openDemo} onPersonal={openWorkbenchPersonal} onResumeAnalysis={navigation.history.some(frame => PAGE_SECTION[frame.destination.page] === "analysis") ? () => resumeSection("analysis") : undefined} importing={importing} importTagsRaw={importTagsRaw} onImportFiles={importFiles} onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined} onMatches={() => navigate({ page: "matches" })} />}
         {section === "matches" && <MatchesView page={destination.page} onMatches={() => navigate({ page: "matches" })} onEvents={() => navigate({ page: "events" })} />}
         {section === "analysis" && <AnalysisView page={destination.page} onSelect={page => page === "personal-review" ? openPersonalReview() : navigate({ page, context: analysisContext })} />}
         {destination.page === "materials" && <MaterialsView onLineups={() => goLineups()} onOpenMatch={openDemo} />}
@@ -445,6 +462,8 @@ export function App() {
             key={active.id}
             onPageReady={(keys) => onPageReady(active.id, keys)}
             entries={entries}
+            onOpened={recordMatchOpened}
+            onReplayPaused={recordReplayPaused}
             demoId={selectedDemoId}
             deepLink={matchDeepLink}
             onSelectDemo={(id) => openDemo(id)}

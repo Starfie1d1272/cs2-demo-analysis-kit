@@ -17,6 +17,8 @@ import type { EvidenceContinuation } from "../lib/evidence-continuation";
 
 export interface MatchViewProps {
   onPageReady?: (keys: string[]) => void;
+  onOpened?: (target: { roundNumber?: number; tick?: number }) => void;
+  onReplayPaused?: (target: { roundNumber: number; tick: number }) => void;
   entries: StudioDemoEntry[];
   demoId: string | null;
   deepLink?: { roundNumber: number; tick?: number } | null;
@@ -52,7 +54,7 @@ async function loadModel(id: string, generation: number): Promise<MatchWorkspace
   return model;
 }
 
-export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceContinuation, onReturnToSource, onPageReady }: MatchViewProps) {
+export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo, onGoLibrary, evidenceContinuation, onReturnToSource, onPageReady, onOpened, onReplayPaused }: MatchViewProps) {
   const analysis = useSyncExternalStore(subscribeAnalysisDataInvalidation, getAnalysisDataSnapshot);
   useEffect(() => subscribeAnalysisDataInvalidation(() => { if (getAnalysisDataSnapshot().status !== "ready") modelCache.clear(); }), []);
   const activeId = demoId;
@@ -141,6 +143,10 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     setLoaded(prev => prev && prev.id === activeId ? { ...prev, state: { ...prev.state, view: "replay", replay: normalizeReplayViewState(prev.model.replay, prev.model.map.view, { ...prev.state.replay!, roundNumber: round.roundNumber, tick: deepLink.tick ?? round.freezeEndTick, playing: false }) } } : prev);
   }, [deepLink, activeId, loaded?.id]);
 
+  useEffect(() => {
+    if (model) onOpened?.(deepLink ?? {});
+  }, [model, onOpened]);
+
   // 汇总模式：懒构建系列内各图模型 → 跨图记分板
   useEffect(() => {
     if (!summaryMode || !activeSeries || seriesEntries.length === 0 || analysis.status !== "ready") return;
@@ -173,7 +179,7 @@ export function MatchView({ entries, demoId, deepLink, onSelectDemo, onWatchDemo
     ? <EmptyState variant="error" title="加载失败" hint={error} />
     : !model
       ? <div className="stu-loading">读取本地持久化工作台…</div>
-      : <MatchReviewWorkspace model={model} state={loaded!.state} onStateChange={(state) => setLoaded(prev => prev && prev.id === activeId ? { ...prev, state } : prev)} />;
+      : <MatchReviewWorkspace model={model} state={loaded!.state} onStateChange={(state) => { if (loaded?.state.replay?.playing && state.replay && !state.replay.playing) onReplayPaused?.({ roundNumber: state.replay.roundNumber, tick: state.replay.tick }); setLoaded(prev => prev && prev.id === activeId ? { ...prev, state } : prev); }} />;
 
   return (
     <div className="stu-view stu-view-flush">
