@@ -78,7 +78,7 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
     window.addEventListener("keydown", closeOnEscape);
     roleDialogRef.current?.querySelector<HTMLElement>("select, input, button")?.focus();
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [roleEditorOpen]);
+  }, [roleEditorOpen, !!selectedRoleProfile]);
   useEffect(() => {
     if (!roleDeclarations || !roleEntries) return;
     if (!roleEntries.length) { setRoleSnapshot({ key: roleKey, generation: analysis.generation, value: [] }); return; }
