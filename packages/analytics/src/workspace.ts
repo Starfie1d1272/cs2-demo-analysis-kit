@@ -122,7 +122,7 @@ function buildRoundFacets(pkg: DemoPackage, roundNumber: number, performanceFact
   const bombs = pkg.bombs.filter((bomb) => bomb.roundNumber === roundNumber);
   const plant = bombs.find((bomb) => bomb.type === "planted") ?? null;
   const defuse = bombs.find((bomb) => bomb.type === "defused") ?? null;
-  const clutch = pkg.clutches.find((row) => row.roundNumber === roundNumber) ?? null;
+  const clutch = playerRounds.find((row) => row.clutch !== null) ?? null;
   const firstKill = playerRounds.find((row) => row.openingDuel === "won") ?? null;
 
   return {
@@ -134,13 +134,14 @@ function buildRoundFacets(pkg: DemoPackage, roundNumber: number, performanceFact
     firstKillTeamKey: firstKill?.teamKey ?? null,
     clutch: clutch
       ? {
-          steamId64: pkg.players[clutch.clutcherIndex]?.steamId64 ?? "",
-          teamKey: pkg.players[clutch.clutcherIndex]?.teamKey ?? "",
-          opponentCount: clutch.opponentCount,
-          won: clutch.won,
-          tick: clutch.tick
+          steamId64: clutch.steamId64,
+          teamKey: clutch.teamKey,
+          opponentCount: clutch.clutch!.opponentCount,
+          won: clutch.clutch!.won,
+          tick: clutch.clutch!.tick
         }
       : null,
+    utilityThrowerSteamIds: [...new Set(playerRounds.filter(row => row.utility.grenadesThrown > 0 && /^\d{17}$/.test(row.steamId64) && row.steamId64 !== "00000000000000000").map(row => row.steamId64))],
     maxKillsByOnePlayer: Math.max(0, ...playerRounds.map((row) => row.kills)),
     wallbangKills: playerRounds.reduce((sum, row) => sum + row.weapons.reduce((rowSum, weapon) => rowSum + weapon.wallbangKills, 0), 0),
     throughSmokeKills: playerRounds.reduce((sum, row) => sum + row.weapons.reduce((rowSum, weapon) => rowSum + weapon.throughSmokeKills, 0), 0)

@@ -47,7 +47,7 @@ import { AnalysisView } from "./views/AnalysisView";
 import { type PinnedPlayer } from "./lib/pin";
 import { setLastWork, updateLastMatchPosition } from "./lib/last-work";
 import { EventManager } from "./components/EventManager";
-import { emptyMaterialsPageState, emptyStudyNoteDraft, type MaterialsPageState, type MaterialPageState } from "./lib/material-page-state";
+import { emptyMaterialsPageState, emptyStudyNoteDraft, emptyCoachPlaybookDraft, type MaterialsPageState, type MaterialPageState } from "./lib/material-page-state";
 import type { MaterialRef } from "./lib/material-ref";
 import type { StudyNoteDraft } from "./lib/study-notes";
 import { MaterialsView, MaterialDetailView } from "./views/MaterialsView";
@@ -58,7 +58,7 @@ function discardMaterialDraft(navigation: StudioNavigation): StudioNavigation {
   if (frame.destination.page === "material" && frame.ui && "dirty" in frame.ui && frame.ui.dirty) return studioNavigationReducer(navigation, { intent: "ui", frameId: frame.id, ui: null });
   if (frame.destination.page === "materials") {
     const ui = frame.ui as MaterialsPageState;
-    if (ui.newNoteDirty) return studioNavigationReducer(navigation, { intent: "ui", frameId: frame.id, ui: { ...ui, newNote: null, newNoteDirty: false } });
+    if (ui.newPlaybookDirty || ui.newNoteDirty) return studioNavigationReducer(navigation, { intent: "ui", frameId: frame.id, ui: { ...ui, newPlaybook: null, newPlaybookDirty: false, newNote: null, newNoteDirty: false } });
   }
   return navigation;
 }
@@ -118,7 +118,7 @@ export function App() {
   const analysisContext = "context" in destination ? destination.context : fallbackContext;
   const canLeave = useCallback(() => {
     const frame = navigationRef.current.active;
-    const dirty = frame.destination.page === "material" ? Boolean(frame.ui && "dirty" in frame.ui && frame.ui.dirty) : frame.destination.page === "materials" ? Boolean((frame.ui as MaterialsPageState | null)?.newNoteDirty) : false;
+    const dirty = frame.destination.page === "material" ? Boolean(frame.ui && "dirty" in frame.ui && frame.ui.dirty) : frame.destination.page === "materials" ? Boolean((frame.ui as MaterialsPageState | null)?.newNoteDirty || (frame.ui as MaterialsPageState | null)?.newPlaybookDirty) : false;
     return !dirty || window.confirm("有未保存的修改。确定放弃修改并离开？");
   }, []);
   const navigate = useCallback((next: StudioDestination, intent: "open" | "evidence" = "open", sourceKey?: string) => {
@@ -476,7 +476,7 @@ export function App() {
           />
         )}
         {displayedCapabilityAvailability && <CapabilityBar availability={displayedCapabilityAvailability} onRepair={openCapabilityRepair} />}
-        {destination.page === "workbench" && <WorkbenchView entries={entries} entriesReady={entriesReady} onOpenMatch={openDemo} onPersonal={openWorkbenchPersonal} onResumeAnalysis={navigation.history.some(frame => PAGE_SECTION[frame.destination.page] === "analysis") ? () => resumeSection("analysis") : undefined} importing={importing} importTagsRaw={importTagsRaw} onImportFiles={importFiles} onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined} onMatches={() => navigate({ page: "matches" })} onOpenMaterial={openMaterial} onNewNote={() => openStudyNoteEditor(emptyStudyNoteDraft())} prepMigrationStatus={prepMigrationStatus} retryPrepMigration={retryPrepMigration} />}
+        {destination.page === "workbench" && <WorkbenchView entries={entries} entriesReady={entriesReady} onOpenMatch={openDemo} onPersonal={openWorkbenchPersonal} onResumeAnalysis={navigation.history.some(frame => PAGE_SECTION[frame.destination.page] === "analysis") ? () => resumeSection("analysis") : undefined} importing={importing} importTagsRaw={importTagsRaw} onImportFiles={importFiles} onNativeImport={nativeImportAvailable ? importViaNativeDialog : undefined} onMatches={() => navigate({ page: "matches" })} onOpenMaterial={openMaterial} onNewNote={() => openStudyNoteEditor(emptyStudyNoteDraft())} onNewPlaybook={() => { if (!canLeave()) return; const id = `frame-${++nextFrameId.current}`; setEvidenceSession(null); setNavigation(current => { const next = studioNavigationReducer(discardMaterialDraft(current), { intent: "open", id, destination: { page: "materials" }, scrollY: window.scrollY }); return studioNavigationReducer(next, { intent: "ui", frameId: id, ui: { ...emptyMaterialsPageState(), newPlaybook: emptyCoachPlaybookDraft() } }); }); }} prepMigrationStatus={prepMigrationStatus} retryPrepMigration={retryPrepMigration} />}
         {section === "matches" && <MatchesView page={destination.page} onMatches={() => navigate({ page: "matches" })} onEvents={() => navigate({ page: "events" })} />}
         {destination.page === "materials" && <MaterialsView onPageReady={keys => onPageReady(active.id, keys)} entries={entries} state={active.ui as MaterialsPageState} onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))} onOpenMaterial={openMaterial} onCreatedMaterial={createdMaterial} onOpenEvidence={openMaterialEvidence} prepMigrationStatus={prepMigrationStatus} prepMigrationError={prepMigrationError} retryPrepMigration={retryPrepMigration} />}
         {destination.page === "material" && <MaterialDetailView onPageReady={keys => onPageReady(active.id, keys)} refValue={destination.materialRef} entries={entries} state={active.ui as MaterialPageState | null} onStateChange={ui => setNavigation(current => {
@@ -501,6 +501,10 @@ export function App() {
             onPageReady={(keys) => onPageReady(active.id, keys)}
             entries={entries}
             openStudyNoteEditor={openStudyNoteEditor}
+            onAnalyzePlayer={(steamId, label) => {
+              const mapping = identityState.mappings.find(item => item.steamIds.includes(steamId));
+              navigate({ page: "player", context: { ...createAnalysisContextPreset("explore", { corpus: { eventIds: [], entryIds: [destination.entryId], matchIds: [], maps: [], tags: [], excludedEntryIds: [] }, focus: { kind: "player", playerKey: mapping?.playerKey ?? `steam:${steamId}`, label: mapping?.displayName ?? label } }), goal: "player-analysis" } });
+            }}
             onOpened={recordMatchOpened}
             onReplayPaused={recordReplayPaused}
             demoId={selectedDemoId}
