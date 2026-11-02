@@ -817,7 +817,7 @@ export function App() {
             eventsStatus={eventsStatus}
             seriesStatus={seriesStatus}
             onRetry={() => { void refreshEventRecords().catch(() => {}); }}
-            eventTools={<EventManager defaultOpen={false} entries={entries} onNotice={setNotice} onLibraryChanged={() => { void refreshEntries(); void refreshEventRecords(); }} onLoadBuiltin={loadBuiltinEvent} />}
+            eventTools={<EventManager defaultOpen={false} entries={entries} onNotice={setNotice} onEventRecordsChanged={refreshEventRecords} onLibraryChanged={() => { void refreshEntries().catch(() => {}); void refreshEventRecords().catch(() => {}); }} onLoadBuiltin={loadBuiltinEvent} />}
             state={active.ui as import("./lib/studio-page-state").EventsPageState}
             onStateChange={ui => setNavigation(current => studioNavigationReducer(current, { intent: "ui", frameId: active.id, ui }))}
             onPageReady={(keys) => onPageReady(active.id, keys)}

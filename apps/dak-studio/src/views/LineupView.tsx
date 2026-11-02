@@ -6,7 +6,7 @@ import type { AnalysisExportSource } from "../lib/analysis-export";
 import { flushSync } from "react-dom";
 import { usePageReady } from "../lib/use-page-ready";
 import { STUDIO_TABLE_CLASSES } from "../components/table-styles";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { buildLineupClusters, getMapCalibration, worldToRadar, calloutCn, type LineupCluster, type LineupClusterMode, type LineupGrenadeLike } from "@cs2dak/maps";
 import { displayWeaponName } from "@cs2dak/presentation";
 import { DataTable, EmptyState, MetricInfo, EvidenceLink, type DataTableColumn } from "@cs2dak/react";
@@ -112,6 +112,9 @@ export function LineupView({
   const [savedLineups, setSavedLineups] = useState<PracticeLineup[]>([]);
   const [savedReady, setSavedReady] = useState(false);
   const [savedError, setSavedError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [savingClusterId, setSavingClusterId] = useState<string | null>(null);
+  const savingRef = useRef(false);
   const [savedDetailsOpen, setSavedDetailsOpen] = useState(true);
   const entryById = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);
 
@@ -147,17 +150,30 @@ export function LineupView({
     window.setTimeout(() => setCopiedClusterId((current) => current === cluster.id ? null : current), 1400);
   }
 
+  async function refreshSavedLineups() {
+    try { setSavedLineups(await listPracticeLineups()); setSavedError(null); }
+    catch (error) { setSavedError(`刷新列表失败：${error instanceof Error ? error.message : String(error)}`); }
+  }
+
   async function handleSavePractice(cluster: LineupCluster) {
-    try { await checkSources(cluster); } catch (e) { setStaleIds(e instanceof FactsNotReadyError ? e.entryIds : []); setError(e instanceof Error ? e.message : String(e)); return; }
-    await savePracticeLineup({ cluster, command: practiceCommandForCluster(cluster), sourceFactsRevision: FACTS_REVISION });
-    setSavedClusterId(cluster.id);
-    setSavedLineups(await listPracticeLineups());
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSavingClusterId(cluster.id);
+    setSaveError(null);
+    try {
+      try { await checkSources(cluster); } catch (e) { setStaleIds(e instanceof FactsNotReadyError ? e.entryIds : []); setError(e instanceof Error ? e.message : String(e)); return; }
+      try { await savePracticeLineup({ cluster, command: practiceCommandForCluster(cluster), sourceFactsRevision: FACTS_REVISION }); }
+      catch (error) { setSaveError(`保存点位失败：${error instanceof Error ? error.message : String(error)}。请重试保存。`); return; }
+      setSavedClusterId(cluster.id);
+      try { setSavedLineups(await listPracticeLineups()); setSavedError(null); }
+      catch (error) { setSavedError(`点位已保存，但刷新列表失败：${error instanceof Error ? error.message : String(error)}`); }
+    } finally { savingRef.current = false; setSavingClusterId(null); }
   }
 
   useEffect(() => {
     let cancelled = false;
     void listPracticeLineups().then((rows) => { if (!cancelled) setSavedLineups(rows); })
-      .catch((reason) => { if (!cancelled) setSavedError(reason instanceof Error ? reason.message : String(reason)); })
+      .catch((reason) => { if (!cancelled) setSavedError(`读取列表失败：${reason instanceof Error ? reason.message : String(reason)}`); })
       .finally(() => { if (!cancelled) setSavedReady(true); });
     return () => { cancelled = true; };
   }, []);
@@ -309,8 +325,8 @@ export function LineupView({
                 {copiedClusterId === c.id ? "已复制" : "复制命令"}
               </button>
             )}
-            <button type="button" className="stu-button-sm" title="保存为本地点位练习素材；不会把普通浏览自动写入资料库" onClick={() => void handleSavePractice(c)}>
-              {savedClusterId === c.id ? "已保存" : "保存点位"}
+            <button type="button" className="stu-button-sm" disabled={savingClusterId !== null || savedClusterId === c.id} title="保存为本地点位练习素材；不会把普通浏览自动写入资料库" onClick={() => void handleSavePractice(c)}>
+              {savingClusterId === c.id ? "保存中…" : savedClusterId === c.id ? "已保存" : "保存点位"}
             </button>
             {watchThrow && onWatchDemo && (
               <button type="button" className="stu-button-sm" title="在 CS2 中打开原始 demo，并尝试跳到该投掷 tick" onClick={() => onWatchDemo(watchThrow.entryId, { roundNumber: watchThrow.roundNumber, tick: watchThrow.tick })}>
@@ -321,11 +337,11 @@ export function LineupView({
         ) : null;
       }
     },
-  ], [copiedClusterId, savedClusterId, entryById, onOpenEvidence, onWatchDemo, state, onStateChange]);
+  ], [copiedClusterId, savedClusterId, savingClusterId, entryById, onOpenEvidence, onWatchDemo, state, onStateChange]);
 
   // ── 渲染（空态提前返回） ──────────────────────────────────────────────
 
-  const savedErrorNotice = savedError && <div className="stu-card"><h3>已保存练习点位</h3><p className="stu-error" role="alert">读取失败：{savedError}</p></div>;
+  const savedErrorNotice = (savedError || saveError) && <div className="stu-card"><h3>已保存练习点位</h3>{saveError && <p className="stu-error" role="alert">{saveError}</p>}{savedError && <p className="stu-error" role="alert">{savedError} <button type="button" className="stu-button-sm" onClick={() => void refreshSavedLineups()}>重试读取列表</button></p>}</div>;
   if (error && !hasSnapshot) return <div>
     <EmptyState variant="error" title="Lineup 聚类失败" hint={error} action={staleIds.length ? <button type="button" className="stu-button" onClick={() => onRebuild(staleIds)}>重建 facts</button> : undefined} />
     {savedErrorNotice}
@@ -391,7 +407,7 @@ export function LineupView({
           </summary>
           {savedForCurrentMap.length > 0 ? (
             <div className="stu-chip-row">
-              {savedForCurrentMap.map((item) => <span key={item.id} className="stu-chip">{item.label}{!item.sourceFactsRevision && " · 来源版本未知，需要核验"}<button type="button" className="stu-button-sm" onClick={() => void removePracticeLineup(item.id).then(async () => setSavedLineups(await listPracticeLineups()))}>删除</button></span>)}
+              {savedForCurrentMap.map((item) => <span key={item.id} className="stu-chip">{item.label}{!item.sourceFactsRevision && " · 来源版本未知，需要核验"}<button type="button" className="stu-button-sm" onClick={() => void removePracticeLineup(item.id).then(async () => { if (savedClusterId === item.clusterId) setSavedClusterId(null); await refreshSavedLineups(); })}>删除</button></span>)}
             </div>
           ) : <p className="stu-muted">当前地图还没有保存的练习点位。</p>}
         </details>
