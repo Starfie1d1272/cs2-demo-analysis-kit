@@ -15,6 +15,8 @@ export type AnalysisGoal =
 export interface AnalysisCorpus {
   eventIds: string[];
   entryIds: string[];
+  /** 保留用户明确选择的空集合；缺省且 entryIds 为空表示不限场次。 */
+  entrySelectionActive?: boolean;
   matchIds: string[];
   maps: string[];
   tags: string[];
@@ -85,6 +87,7 @@ function copyCorpus(corpus: AnalysisCorpus = EMPTY_ANALYSIS_CORPUS): AnalysisCor
   return {
     eventIds: [...corpus.eventIds],
     entryIds: [...corpus.entryIds],
+    ...(corpus.entrySelectionActive && { entrySelectionActive: true }),
     matchIds: [...corpus.matchIds],
     maps: [...corpus.maps],
     tags: [...corpus.tags],
@@ -160,10 +163,13 @@ export function resolveAnalysisCorpus(
   const eventEntryIds = corpus.eventIds.length > 0
     ? new Set(events.filter((event) => corpus.eventIds.includes(event.id)).flatMap((event) => event.entryIds))
     : null;
-  const entryIds = corpus.entryIds.length > 0 ? new Set(corpus.entryIds) : null;
+  const entryIds = corpus.entrySelectionActive || corpus.entryIds.length > 0 ? new Set(corpus.entryIds) : null;
   const matchIds = corpus.matchIds.length > 0 ? new Set(corpus.matchIds) : null;
 
   const range = corpus.dateRange;
+  if (range && ((range.from && !isCalendarDate(range.from)) || (range.to && !isCalendarDate(range.to)) || (range.from && range.to && range.from > range.to))) {
+    throw new RangeError("分析日期范围无效");
+  }
   return entries.filter((entry) =>
     (!range || (() => {
       const date = entryDate(entry);

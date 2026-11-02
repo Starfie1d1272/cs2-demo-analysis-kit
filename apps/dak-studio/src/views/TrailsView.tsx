@@ -23,6 +23,7 @@ export interface TrailsViewProps {
   onGoLibrary: () => void;
   onOpenMatch?: (entryId: string, target: { roundNumber: number }) => void;
   identityOptions?: IdentityOptions;
+  focusPlayerKey?: string | null;
 }
 
 const WINDOW_SECONDS = 30;
@@ -60,7 +61,7 @@ const EFFECT_DURATION_SECONDS: Partial<Record<string, number>> = {
   decoy: 15
 };
 
-export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, identityOptions , onPageReady }: TrailsViewProps) {
+export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, identityOptions, onPageReady, focusPlayerKey }: TrailsViewProps) {
   // 业务流程：① 选手 → ② 地图（该选手出场的图）→ ③ 最近 N 场（该选手在该图）
   const [pageState, setPageState] = useState(emptyOpeningPageState);
   const { recentMatchCount: rangeN, mapName, side } = pageState;
@@ -68,7 +69,7 @@ export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, iden
   const setRangeN = (recentMatchCount: OpeningPageState["recentMatchCount"]) => setPageState(current => ({ ...current, recentMatchCount }));
   const setSide = (side: OpeningPageState["side"]) => setPageState(current => ({ ...current, side }));
   const setMapName = (update: SetStateAction<string | null>) => setPageState(current => ({ ...current, mapName: typeof update === "function" ? update(current.mapName) : update }));
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(focusPlayerKey ?? null);
   const [players, setPlayers] = useState<PlayerOption[] | null>(null);
   /** entryId → 该场出场选手集合。 */
   const [rosterByEntry, setRosterByEntry] = useState<Map<string, Set<string>> | null>(null);
@@ -115,11 +116,12 @@ export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, iden
           roster.set(entry.id, new Set([...(roster.get(entry.id) ?? []), ...keys]));
         }
         const options = [...counts.values()].sort((a, b) => b.matchCount - a.matchCount || a.name.localeCompare(b.name));
-        const pinned = await getPinnedPlayer();
+        const pinned = focusPlayerKey ? null : await getPinnedPlayer();
         if (cancelled) return;
         setPlayers(options);
         setRosterByEntry(roster);
         setSelectedKey((current) => {
+          if (focusPlayerKey) return focusPlayerKey;
           if (current && options.some((option) => option.playerKey === current)) return current;
           const pinnedOption = pinned
             ? options.find((option) => option.playerKey === pinned.playerKey || option.steamIds.some((s) => pinned.steamIds.includes(s)))
@@ -133,7 +135,7 @@ export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, iden
     return () => {
       cancelled = true;
     };
-  }, [entries, identityOptions?.version]);
+  }, [entries, identityOptions?.version, focusPlayerKey]);
 
   // 已知日期优先，未知日期稳定排序；文件名或 matchId 不能充当日期。
   const playerEntries = useMemo(() => {
@@ -237,6 +239,7 @@ export function TrailsView({ allEntries, entries, onGoLibrary, onOpenMatch, iden
         <label>
           <span>① 选手</span>
           <select className="stu-select" value={selectedKey ?? ""} onChange={(e) => setSelectedKey(e.target.value || null)}>
+            {selectedKey && !(players ?? []).some(option => option.playerKey === selectedKey) && <option value={selectedKey}>当前选手 · 0 场</option>}
             {(players ?? []).map((option) => (
               <option key={option.playerKey} value={option.playerKey}>
                 {option.name}（{option.matchCount} 场）

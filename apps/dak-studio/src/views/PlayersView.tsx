@@ -38,6 +38,7 @@ export interface PlayersViewProps {
   identityOptions?: IdentityOptions;
   contextSummary: string;
   onOpenMaterials: () => void;
+  onOpenOpening: () => void;
 }
 
 const CORE_VIEW = SEASON_STAT_VIEWS.find((view) => view.key === "core")!;
@@ -74,8 +75,10 @@ export function PlayersView({
   onGoLibrary,
   identityOptions,
   contextSummary,
-  onOpenMaterials
+  onOpenMaterials,
+  onOpenOpening
 }: PlayersViewProps) {
+  const [matchStats, setMatchStats] = useState<Array<{ matchId: string; teamKey: "teamA" | "teamB" }>>([]);
   const [profiles, setProfiles] = useState<PlayerSeasonProfile[] | null>(null);
   const [insights, setInsights] = useState<PlayerSeasonInsights | null>(null);
   const [weaponStats, setWeaponStats] = useState<PlayerWeaponStat[]>([]);
@@ -161,7 +164,7 @@ export function PlayersView({
 
   useEffect(() => {
     if (!onPageReady || (!profiles && !error && entries.length > 0)) return;
-    if (selected && (profileTab === "overview" ? (!roleProfiles && !roleError || !mapPoolReady && !mapPoolError) : (profileTab === "utility" && !insights && !detailsError))) return;
+    if (selected && (profileTab === "overview" ? (!roleProfiles && !roleError || !mapPoolReady && !mapPoolError || !insights && !detailsError) : (profileTab === "utility" && !insights && !detailsError))) return;
     onPageReady(Array.from(document.querySelectorAll<HTMLElement>("[id]"), node => node.id));
   }, [profiles, error, roleProfiles, roleError, insights, detailsError, entries.length, onPageReady, selected, mapPoolReady, mapPoolError, profileTab]);
 
@@ -186,6 +189,7 @@ export function PlayersView({
   useEffect(() => {
     if (!selected || entries.length === 0) {
       setInsights(null);
+      setMatchStats([]);
       setWeaponStats([]);
       setMechanics(null);
       setCoverage(null);
@@ -201,6 +205,7 @@ export function PlayersView({
       .then((details) => {
         if (cancelled) return;
         setInsights(details.insights);
+        setMatchStats(details.participation);
         setWeaponStats(details.weaponStats.slice(0, 8));
         setMechanics(details.mechanics);
         setCoverage(details.coverage);
@@ -414,7 +419,7 @@ export function PlayersView({
                 <small>P{selected.rating.hltvPercentile.toFixed(0)}</small>
               </div>
               <label className="stu-compare-select">
-                <span>对比选手</span>
+                <span id="analysis-comparison">对比选手</span>
                 <select
                   className="stu-select"
                   value={compare?.playerKey ?? ""}
@@ -448,7 +453,7 @@ export function PlayersView({
             </div>
           )}
 
-          {compare && <CompareCard left={selected} right={compare} />}
+          {compare && <CompareCard left={selected} right={compare} corpusCount={entries.length} />}
 
           <div className="stu-subtabs" role="tablist" aria-label="档案分区">
             {PROFILE_TABS.map(({ key, label }) => (
@@ -467,15 +472,16 @@ export function PlayersView({
 
           {profileTab === "overview" && (
           <div className="stu-profile-grid">
+            <button type="button" className="stu-button-sm" onClick={onOpenOpening}>查看开局动线</button>
             {insights && <PlayerFindingsPanel insights={insights} player={selected} entries={entries} contextSummary={contextSummary} onOpenEvidence={onOpenEvidence} onOpenMaterials={onOpenMaterials} />}
             <div className="stu-card stu-card-wide" id="players:map-roles">
               <div className="stu-card-head"><h3>地图 / 位置</h3><button type="button" className="stu-button-sm" onClick={openRoleEditor}>编辑声明</button></div>
-              {roleError ? <EmptyState variant="error" title="地图角色不可用" hint={roleError} /> : <PlayerMapRoleProfilePanel profile={selectedRoleProfile} onOpenEvidence={(evidence) => {
+              {roleError ? <EmptyState variant="error" title="地图角色不可用" hint={roleError} /> : <PlayerMapRoleProfilePanel state={state.tables.roles ?? { sort: { key: "sample", direction: "desc" }, page: 0 }} onStateChange={table => onStateChange({ ...state, tables: { ...state.tables, roles: table } })} profile={selectedRoleProfile} onOpenEvidence={(evidence) => {
                 const entry = entryByMatchId.get(evidence.matchId);
                 if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "players:map-roles" });
               }} />}
             </div>
-            <div className="stu-card stu-card-wide" id="players:map-pool"><h3>完整个人地图池</h3>{mapPoolError && <p role="alert">地图池不可用：{mapPoolError}</p>}{unsupportedMaps.length > 0 && <p>未支持的地图：{unsupportedMaps.join("、")}</p>}<PlayerMapPoolPanel rows={mapPool} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "players:map-pool" }); }} /></div>
+            <div className="stu-card stu-card-wide" id="players:map-pool"><h3>完整个人地图池</h3>{mapPoolError && <p role="alert">地图池不可用：{mapPoolError}</p>}{unsupportedMaps.length > 0 && <p>未支持的地图：{unsupportedMaps.join("、")}</p>}<PlayerMapPoolPanel state={state.tables.mapPool ?? { sort: { key: "record", direction: "desc" }, page: 0 }} onStateChange={table => onStateChange({ ...state, tables: { ...state.tables, mapPool: table } })} rows={mapPool} onOpenEvidence={(evidence) => { const entry = entries.find((row) => matchIdForEntry(row) === evidence.matchId); if (entry) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: "players:map-pool" }); }} /></div>
             <div className="stu-card">
               <h3>核心指标</h3>
               <div className="stu-metric-grid">
@@ -764,6 +770,10 @@ export function PlayersView({
                 {playerMatches.map((point) => {
                   const entry = entryByMatchId.get(point.matchId);
                   const date = entry ? entryDate(entry) : null;
+                  const fact = matchStats.find(row => row.matchId === point.matchId);
+                  const mine = fact && entry ? (fact.teamKey === "teamA" ? entry.meta.teamAScore : entry.meta.teamBScore) : null;
+                  const theirs = fact && entry ? (fact.teamKey === "teamA" ? entry.meta.teamBScore : entry.meta.teamAScore) : null;
+                  const outcome = mine == null || theirs == null ? null : mine === theirs ? "平" : mine > theirs ? "胜" : "负";
                   return (
                     <button
                       key={point.matchId}
@@ -777,7 +787,7 @@ export function PlayersView({
                         <>
                           <span className="stu-map-badge">{entry.meta.mapName}</span>
                           <span className="stu-player-match-title">
-                            {entry.meta.teamAName} {entry.meta.teamAScore}:{entry.meta.teamBScore} {entry.meta.teamBName}
+                            {outcome && `${outcome} · `}{entry.meta.teamAName} {entry.meta.teamAScore}:{entry.meta.teamBScore} {entry.meta.teamBName}
                           </span>
                           {date && <small className="stu-dim">{date}</small>}
                         </>
@@ -924,7 +934,7 @@ function buildPlayerCardMarkdown(profile: PlayerSeasonProfile, insights: PlayerS
 }
 
 /** 双选手并排对比：核心指标 + 六账户 + PRISM。条形以两人较大值归一。 */
-function CompareCard({ left, right }: { left: PlayerSeasonProfile; right: PlayerSeasonProfile }) {
+function CompareCard({ left, right, corpusCount }: { left: PlayerSeasonProfile; right: PlayerSeasonProfile; corpusCount: number }) {
   const rows: { label: string; a: number | null; b: number | null; format: string }[] = [
     ...CORE_COLUMNS.map((col) => ({
       label: col.label,
@@ -952,7 +962,7 @@ function CompareCard({ left, right }: { left: PlayerSeasonProfile; right: Player
   return (
     <div className="stu-card stu-compare-card">
       <h3>
-        选手对比 · <em>{left.name}</em> vs <em>{right.name}</em>
+        选手对比 · <em>{left.name}</em>（{left.mapCount} 场） vs <em>{right.name}</em>（{right.mapCount} 场） · 共享范围 {corpusCount} 场
       </h3>
       <div className="stu-compare-rows">
         {rows.map((row) => {

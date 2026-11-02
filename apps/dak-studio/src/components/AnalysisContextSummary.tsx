@@ -7,11 +7,13 @@ export function AnalysisContextSummary({
   entries,
   events,
   onEdit,
+  onCompare,
 }: {
   context: AnalysisContext;
   entries: readonly StudioDemoEntry[];
   events: readonly AnalysisEventScope[];
   onEdit?: () => void;
+  onCompare?: () => void;
 }) {
   const summary = summarizeAnalysisContextParts(context, entries, events);
   return (
@@ -19,6 +21,7 @@ export function AnalysisContextSummary({
       <span><small>对象</small>{summary.focus}</span>
       <span><small>范围与样本</small>{summary.corpus}</span>
       {onEdit && <button type="button" className="stu-context-edit" onClick={onEdit}>修改范围</button>}
+      {onCompare && <button type="button" className="stu-context-edit" onClick={onCompare}>添加对比</button>}
     </div>
   );
 }
