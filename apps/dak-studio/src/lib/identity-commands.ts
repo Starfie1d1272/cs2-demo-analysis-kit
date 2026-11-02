@@ -239,7 +239,9 @@ export function loadRoleDeclarations(): Promise<RoleDeclarationsState> {
 export function removeRoleDeclaration(current: RoleDeclarationsState, id: string): Promise<RoleDeclarationsState> {
   return withIdentityRoleAccess(async () => {
     const actual = await readRoles();
-    if (!same(current, actual)) throw new Error("角色声明已变化，请刷新后重试");
+    const expectedRow = current.declarations.find(row => row.id === id);
+    const actualRow = actual.declarations.find(row => row.id === id);
+    if (!expectedRow || !same(expectedRow, actualRow)) throw new Error("角色声明已变化，请刷新后重试");
     return writeRoles({ ...actual, declarations: actual.declarations.filter(row => row.id !== id) });
   });
 }

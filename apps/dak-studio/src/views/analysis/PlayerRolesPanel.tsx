@@ -140,8 +140,7 @@ export function PlayerRolesPanel({ exportSource, onCapabilityRepair, entries, pl
     setDeclarationsSaving(true);
     setRoleFormError(null);
     try {
-      const current = await loadRoleDeclarations();
-      setRoleDeclarations(await removeRoleDeclaration(current, id));
+      setRoleDeclarations(await removeRoleDeclaration(roleDeclarations, id));
     } catch (reason) {
       setRoleFormError(reason instanceof Error ? reason.message : String(reason));
     } finally {
