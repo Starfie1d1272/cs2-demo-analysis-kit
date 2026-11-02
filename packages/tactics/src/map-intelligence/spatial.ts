@@ -1,5 +1,5 @@
 import { FLAG_ALIVE, type TeamKey } from "@cs2dak/contract";
-import { findNavPath, nearestNavArea, pointInPolygon, type CalloutGrid, type CompactNav, type Vec3 } from "@cs2dak/maps";
+import { findNavPath, type CalloutGrid, type CompactNav, type Vec3 } from "@cs2dak/maps";
 import { replayCalloutAt, replayPointAt, replayTickAt, type ReplayRoundContext, type ReplayRoundTrack } from "../tactics/replay-round-context.js";
 
 export interface SpatialPlayerSample {
@@ -72,43 +72,12 @@ function components(players: readonly SpatialPlayerSample[], nav: CompactNav | n
   return groups.sort((a, b) => b.length - a.length || a[0]! - b[0]!);
 }
 
-/** Build once per extraction; preserve the exact nav ordering and fallback semantics. */
-export function createNavAreaLookup(nav: CompactNav | null): (point: Vec3) => number | null {
-  if (!nav) return () => null;
-  const cellSize = 256;
-  const cells = new Map<string, Array<{ area: CompactNav["areas"][number]; polygon: Array<[number, number]> }>>();
-  for (const area of nav.areas) {
-    if (!area.corners.length) continue;
-    const xs = area.corners.map(p => p.x), ys = area.corners.map(p => p.y);
-    const minX = Math.floor(Math.min(...xs) / cellSize), maxX = Math.floor(Math.max(...xs) / cellSize);
-    const minY = Math.floor(Math.min(...ys) / cellSize), maxY = Math.floor(Math.max(...ys) / cellSize);
-    if (![minX, maxX, minY, maxY].every(Number.isFinite) || (maxX - minX + 1) * (maxY - minY + 1) > 10000) {
-      return point => nearestNavArea(nav, point)?.id ?? null;
-    }
-    const polygon = area.corners.map(p => [p.x, p.y] as [number, number]);
-    for (let x = minX; x <= maxX; x++) for (let y = minY; y <= maxY; y++) {
-      const key = `${x}:${y}`; const bucket = cells.get(key) ?? []; bucket.push({ area, polygon }); cells.set(key, bucket);
-    }
-  }
-  return point => {
-    const candidates = cells.get(`${Math.floor(point.x / cellSize)}:${Math.floor(point.y / cellSize)}`) ?? [];
-    let best: CompactNav["areas"][number] | undefined;
-    let bestZ = Infinity;
-    for (const {area, polygon} of candidates) {
-      if (!pointInPolygon(point.x, point.y, polygon)) continue;
-      const z = Math.abs(point.z - area.centroid.z);
-      if (z < bestZ) { best = area; bestZ = z; }
-    }
-    return (best ?? nearestNavArea(nav, point))?.id ?? null;
-  };
-}
-
 /** Builds only the current round's short-lived spatial samples; never persist this structure. */
 export function buildRoundSpatialFrames(
   context: ReplayRoundContext,
   grid: CalloutGrid | null,
   nav: CompactNav | null,
-  navAreaAt: (point: Vec3) => number | null = createNavAreaLookup(nav),
+  navAreaAt: (point: Vec3) => number | null,
 ): TeamSpatialFrame[] {
   const frames: TeamSpatialFrame[] = [];
   for (let frameIndex = 0; frameIndex < context.frameCount; frameIndex += 1) {
