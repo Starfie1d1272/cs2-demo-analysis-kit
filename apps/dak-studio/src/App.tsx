@@ -16,7 +16,7 @@ import { ClipboardList, Crosshair, Film, House, LibraryBig, Radar, Settings } fr
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnalysisScopeEditor } from "./components/AnalysisScopeEditor";
 import { AnalysisContextSummary } from "./components/AnalysisContextSummary";
-import { CapabilityPanel } from "./components/CapabilityBar";
+import { CapabilityPanel, DirectoryRefreshContext } from "./components/CapabilityBar";
 import { BackgroundActivity } from "./components/BackgroundActivity";
 import { type StudioEventRecord } from "./lib/events";
 import { BUILD_INFO, BUILD_LABEL } from "./lib/build-info";
@@ -429,6 +429,7 @@ export function App() {
   )) : null;
 
   return (
+    <DirectoryRefreshContext.Provider value={refreshEntries}>
     <div
       className="stu-app"
       onDragOver={(e) => { e.preventDefault(); }}
@@ -854,5 +855,6 @@ export function App() {
         </>}
       </main>
     </div>
+    </DirectoryRefreshContext.Provider>
   );
 }
