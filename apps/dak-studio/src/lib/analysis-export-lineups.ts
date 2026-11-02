@@ -8,6 +8,8 @@ import {
   type AnalysisResultSection,
 } from "./analysis-export";
 
+export const LINEUPS_SCOPE_NOTE = "点位按所选比赛范围聚合所有投掷者，未按焦点选手或队伍过滤。";
+
 const grenadeLabels: Record<string, string> = {
   flashbang: "闪光",
   smoke: "烟",
@@ -89,7 +91,7 @@ export function buildLineupsAnalysisResult(
     conditions: [
       ...source.conditions,
       ...(source.context.focus.kind !== "aggregate"
-        ? ["点位按比赛范围聚合，未按焦点选手或队伍过滤。"]
+        ? [LINEUPS_SCOPE_NOTE]
         : []),
       `聚类：${state.mode}`,
       `地图：${rows[0]?.mapName ?? state.mapName ?? "未知"}`,

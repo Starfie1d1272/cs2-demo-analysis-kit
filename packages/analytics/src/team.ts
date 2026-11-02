@@ -1,4 +1,6 @@
+import { buildSeasonCohortFromRows, type SeasonCohortFactRow } from "@cs2dak/cohort";
 import { round } from "./season-metrics.js";
+import { buildRatingSpatialContext, deriveRRIndicators, deriveRRSignals } from "./rating-inputs.js";
 import { displayWeaponName } from "@cs2dak/presentation";
 import type { DemoPackage } from "@cs2dak/contract";
 import type { TeamMapRoleMatrix } from "@cs2dak/tactics";
@@ -103,11 +105,12 @@ export function extractTeamComparisonFacts(input: TeamComparisonInput): TeamComp
  */
 export function buildTeamComparisonFromFacts(
   inputs: TeamComparisonFacts[],
-  requestedPair?: [string, string]
+  requestedPair?: [string, string],
+  ratingRows: SeasonCohortFactRow[] = []
 ): TeamComparisonModel {
   const matchCounts = new Map<string, number>();
   for (const input of inputs) {
-    for (const teamName of [input.teams.teamA, input.teams.teamB]) {
+    for (const teamName of new Set([input.teams.teamA, input.teams.teamB])) {
       matchCounts.set(teamName, (matchCounts.get(teamName) ?? 0) + 1);
     }
   }
@@ -124,7 +127,7 @@ export function buildTeamComparisonFromFacts(
 
   const valid = (name: string | undefined): name is string => name != null && matchCounts.has(name);
   const teamNames =
-    requestedPair && valid(requestedPair[0]) && valid(requestedPair[1]) && requestedPair[0] !== requestedPair[1]
+    requestedPair && valid(requestedPair[0]) && valid(requestedPair[1])
       ? [requestedPair[0], requestedPair[1]]
       : availableTeams.slice(0, 2).map((team) => team.name);
   if (teamNames.length < 2) return empty();
@@ -192,20 +195,22 @@ export function buildTeamComparisonFromFacts(
         }
       }
     }
+    const scopedRatings = ratingRows.filter(row => inputs.some(input => input.matchId === row.matchId && input.teams[row.teamKey] === name && input.players.some(player => player.steamId64 === row.steamId64 && player.teamKey === row.teamKey) && input.playerStats.some(stat => stat.playerSteamId64 === row.steamId64)));
+    const ratings = new Map(buildSeasonCohortFromRows(scopedRatings).players.map(player => [player.primarySteamId64, player.accountRR]));
     const players = [...playerRows.values()].map((row) => ({
       teamName: row.teamName,
       steamId64: row.steamId64,
       name: row.name,
-      rr: row.rounds > 0 ? round((row.kills - row.deaths) / row.rounds + row.damage / row.rounds / 100, 3) : null,
+      rr: scopedRatings.filter(r => r.steamId64 === row.steamId64).length === inputs.filter(input => input.players.some(p => p.steamId64 === row.steamId64 && input.teams[p.teamKey] === name) && input.playerStats.some(p => p.playerSteamId64 === row.steamId64)).length ? ratings.get(row.steamId64) ?? null : null,
       adr: row.rounds > 0 ? round(row.damage / row.rounds, 1) : null,
       kast: row.rounds > 0 ? round(row.kastRounds / row.rounds * 100, 1) : null,
       kpr: row.rounds > 0 ? round(row.kills / row.rounds, 3) : null,
       dpr: row.rounds > 0 ? round(row.deaths / row.rounds, 3) : null
-    })).sort((a, b) => (b.rr ?? 0) - (a.rr ?? 0));
+    })).sort((a, b) => (b.rr ?? -Infinity) - (a.rr ?? -Infinity));
     const totalWeaponKills = [...weaponKills.values()].reduce((sum, value) => sum + value, 0);
     return {
       teamName: name,
-      matchCount: matches.length,
+      matchCount: new Set(matches.map(match => match.matchId)).size,
       players,
       weaponPreference: [...weaponKills.entries()]
         .map(([weapon, kills]) => ({ weapon, label: displayWeaponName(weapon), kills, sharePercent: totalWeaponKills > 0 ? round(kills / totalWeaponKills * 100, 1) : 0 }))
@@ -231,24 +236,38 @@ export function buildTeamComparison(
   inputs: TeamComparisonInput[],
   requestedPair?: [string, string]
 ): TeamComparisonModel {
-  return buildTeamComparisonFromFacts(inputs.map(extractTeamComparisonFacts), requestedPair);
+  const ratingRows: SeasonCohortFactRow[] = inputs.flatMap(({ matchId, pkg, performanceFacts }) => {
+    const facts = performanceFacts ?? buildPlayerRoundPerformanceFacts(pkg);
+    const signals = deriveRRSignals(pkg, facts, buildRatingSpatialContext(pkg));
+    const indicators = new Map(deriveRRIndicators(pkg, facts).map(row => [row.steamId64, row]));
+    const players = new Map(pkg.players.map(player => [player.steamId64, player]));
+    return signals.flatMap(signal => {
+      const player = players.get(signal.steamId64);
+      const indicator = indicators.get(signal.steamId64);
+      return player && indicator ? [{ matchId, sourceDemoHash: pkg.manifest.demo?.hash ?? null,
+        steamId64: player.steamId64, playerName: player.name, teamKey: player.teamKey,
+        signals: signal, indicators: indicator, weaponHighlight: null }] : [];
+    });
+  });
+  return buildTeamComparisonFromFacts(inputs.map(extractTeamComparisonFacts), requestedPair, ratingRows);
 }
 
-export function buildTeamOverviewFromFacts(inputs: TeamComparisonFacts[], teamName: string, roleMatrices: TeamMapRoleMatrix[] = []): TeamOverviewModel | null {
+export function buildTeamOverviewFromFacts(inputs: TeamComparisonFacts[], teamName: string, roleMatrices: TeamMapRoleMatrix[] = [], ratingRows: SeasonCohortFactRow[] = []): TeamOverviewModel | null {
   const opponent = inputs
     .flatMap((input) => [input.teams.teamA, input.teams.teamB])
-    .find((name) => name !== teamName);
-  if (!opponent) return null;
-  const comparison = buildTeamComparisonFromFacts(inputs, [teamName, opponent]);
+    .find((name) => name !== teamName) ?? teamName;
+  const comparison = buildTeamComparisonFromFacts(inputs, [teamName, opponent], ratingRows);
   const side = comparison.teams.find((row) => row.teamName === teamName);
   if (!side) return null;
 
   const maps = new Map<string, { mapName: string; matches: number; wins: number; losses: number; roundsWon: number; roundsLost: number }>();
   let roundsWon = 0;
   let roundsLost = 0;
+  const countedMaps = new Set<string>();
   for (const match of side.matches) {
     const row = maps.get(match.mapName) ?? { mapName: match.mapName, matches: 0, wins: 0, losses: 0, roundsWon: 0, roundsLost: 0 };
-    row.matches += 1;
+    if (!countedMaps.has(match.matchId)) row.matches += 1;
+    countedMaps.add(match.matchId);
     row.wins += match.won ? 1 : 0;
     row.losses += match.won ? 0 : 1;
     row.roundsWon += match.roundsWon;

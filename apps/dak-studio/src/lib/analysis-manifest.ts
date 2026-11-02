@@ -1,3 +1,4 @@
+import { PLAYER_INSIGHT_FACT_VERSION } from "@cs2dak/analytics";
 import { CORE_ANALYSIS_VERSION } from "@cs2dak/core";
 import { MAP_INTELLIGENCE_FACT_VERSION, TACTICAL_FACT_VERSION } from "@cs2dak/tactics";
 
@@ -26,6 +27,7 @@ export const FACTS_PRODUCER_VERSIONS = {
   tactical: TACTICAL_FACT_VERSION,
   mapIntelligence: MAP_INTELLIGENCE_FACT_VERSION,
   tournament: CORE_ANALYSIS_VERSION,
+  playerInsights: PLAYER_INSIGHT_FACT_VERSION,
 } as const;
 
 /** 显式组合 storage version 与所有 producer versions，作为 facts 的唯一 revision。 */

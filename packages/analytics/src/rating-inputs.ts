@@ -1,3 +1,4 @@
+import { loadSpatialAssets, buildOfficialMapControl } from "@cs2dak/tactics";
 import type { DemoPackage } from "@cs2dak/contract";
 import type { RRSignals, RRIndicators } from "@cs2dak/rating";
 import { aggregatePlayerRoundPerformanceFacts, emptyPlayerPerformanceAggregate, round, getOrInit, type PlayerPerformanceAggregate, type PlayerRoundManStateFact, type PlayerRoundPerformanceFact, type PlayerRoundPerformanceFacts } from "@cs2dak/core";
@@ -12,6 +13,16 @@ const BUY_DELTA_EVEN_THRESHOLD = 1000;
 export interface RatingSpatialContext {
   observable: boolean;
   strategicIsolationDeaths: ReadonlyMap<string, number>;
+}
+
+/** Compute the spatial inputs selected by the rating workflow. */
+export function buildRatingSpatialContext(pkg: DemoPackage): RatingSpatialContext {
+  const assets = loadSpatialAssets(pkg.match.mapName ?? pkg.manifest.mapName);
+  const control = buildOfficialMapControl(pkg, assets);
+  return {
+    observable: assets.routes != null && (pkg.replay?.rounds.length ?? 0) > 0,
+    strategicIsolationDeaths: new Map([...control].map(([id, row]) => [id, row.strategicIsolationDeaths])),
+  };
 }
 
 export function deriveRRSignals(pkg: DemoPackage, facts: PlayerRoundPerformanceFacts, spatial: RatingSpatialContext): RRSignals[] {

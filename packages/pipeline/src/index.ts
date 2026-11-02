@@ -8,11 +8,10 @@ import {
 } from "@cs2dak/core";
 import {
   analysisBundleSchema, buildMatchWorkspaceFromAnalysis, buildPlayerIndicators, buildScoreboard,
-  deriveRRSignals, deriveRRIndicators, type AnalysisBundle,
+  deriveRRSignals, deriveRRIndicators, buildRatingSpatialContext, type AnalysisBundle,
 } from "@cs2dak/analytics";
 import { computeAccountRatings, computeIndicatorRatings } from "@cs2dak/rating";
-import { buildRatingSpatialContext } from "./rating-spatial-context.js";
-export { buildRatingSpatialContext } from "./rating-spatial-context.js";
+export { buildRatingSpatialContext } from "@cs2dak/analytics";
 export { analyzeMatchFacts, type AnalyzeMatchFactsOptions, type MatchFactsAnalysis } from "./match-facts.js";
 import {
   buildSeasonCohortFromRows,

@@ -16,6 +16,7 @@ export interface TrainingFocus {
 }
 
 export interface CreateTrainingFocusInput {
+  id: string;
   playerKey: string;
   finding: TrainingFocus["finding"];
   evidence: EvidenceRef[];
@@ -31,10 +32,6 @@ export interface TrainingFocusStore {
   remove(id: string): Promise<void>;
 }
 
-function newId(): string {
-  return `training:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
-}
-
 export function createTrainingFocusStore(records: RecordStore): TrainingFocusStore {
   return {
     async list(playerKey) {
@@ -46,7 +43,7 @@ export function createTrainingFocusStore(records: RecordStore): TrainingFocusSto
     async create(input) {
       const now = Date.now();
       const focus: TrainingFocus = {
-        id: newId(),
+        id: input.id,
         playerKey: input.playerKey,
         finding: { ...input.finding },
         evidence: input.evidence.map((evidence) => ({ ...evidence })),
