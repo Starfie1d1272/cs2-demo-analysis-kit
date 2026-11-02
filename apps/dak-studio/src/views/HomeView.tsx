@@ -319,7 +319,7 @@ export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, on
   const openFindingEvidence = (finding: AnalysisFinding) => {
     const evidence = finding.evidence[0];
     const entry = evidence ? entryByMatchId.get(evidence.matchId) : null;
-    if (entry && evidence) onOpenEvidence(entry.id, evidence, `home:finding:${finding.key}`, finding);
+    if (entry && evidence) onOpenEvidence({ entryId: entry.id, evidence, sourceKey: `home:finding:${finding.key}`, finding });
   };
 
   const addTrainingFocus = async (finding: AnalysisFinding) => {
@@ -585,7 +585,7 @@ export function HomeView({ entries, onOpenMatch, onOpenEvidence, onWatchDemo, on
                             key={`${flash.matchId}-${flash.roundNumber}-${i}`}
                             entry={e}
                             target={{ roundNumber: flash.roundNumber, tick: flash.tick }}
-                            onOpenMatch={onOpenMatch}
+
                             onOpenEvidence={onOpenEvidence}
                             onWatchDemo={onWatchDemo}
                             reason={flash.reason}

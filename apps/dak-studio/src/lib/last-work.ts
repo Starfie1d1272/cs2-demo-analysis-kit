@@ -9,9 +9,12 @@ export interface LastWork { schemaVersion: 1; openedAt: number; target: LastWork
 const key = "last-successful-work:v1";
 const kv = getStorage().records("kv");
 let pending = Promise.resolve();
+let writeFailed = false;
 
 export async function getLastWork(): Promise<LastWork | null> {
   try {
+    await pending;
+    if (writeFailed) return null;
     const value = await kv.get<LastWork>(key);
     if (!value || value.schemaVersion !== 1 || !Number.isFinite(value.openedAt) || !Number.isFinite(new Date(value.openedAt).getTime()) || !value.target) return null;
     const target = value.target;
@@ -23,6 +26,17 @@ export async function getLastWork(): Promise<LastWork | null> {
 }
 export function setLastWork(target: LastWorkTarget | null): Promise<void> {
   const value: LastWork | null = target ? { schemaVersion: 1, openedAt: Date.now(), target } : null;
-  pending = pending.then(async () => { if (value) await kv.put(key, value); else await kv.delete(key); }).catch(() => {});
+  pending = pending.then(async () => { if (value) await kv.put(key, value); else await kv.delete(key); writeFailed = false; }).catch(() => { writeFailed = true; });
+  return pending;
+}
+
+/** Only update a still-current match shortcut, never replace a newer target. */
+export function updateLastMatchPosition(entryId: string, position: { roundNumber: number; tick: number }): Promise<void> {
+  pending = pending.then(async () => {
+    if (writeFailed) return;
+    const value = await kv.get<LastWork>(key);
+    if (value?.schemaVersion !== 1 || value.target?.kind !== "match" || value.target.entryId !== entryId) return;
+    await kv.put(key, { ...value, target: { ...value.target, ...position } });
+  }).catch(() => { writeFailed = true; });
   return pending;
 }
