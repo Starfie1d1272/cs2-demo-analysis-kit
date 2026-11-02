@@ -678,34 +678,38 @@ async function importDemoFileUnlocked(file: File, settings: ImportDemoOptions, i
   return { entry, duplicate: Boolean(existing), replaced: Boolean(replacement && replacement.id !== persistedId), replacedId: replacement?.id };
 }
 
-/** 更新某条 demo 的标签。 */
-export async function updateDemoTags(id: string, tags: string[]): Promise<void> {
-  const record = await demoMeta.get<StudioDemoEntry>(id);
-  if (record) {
-    await saveDemoEntry({ ...record, tags: normalizeTags(tags) });
+/** Update user-owned metadata without overwriting a concurrent rebuild or edit. */
+async function updateUserMetadata(id: string, update: (entry: StudioDemoEntry) => StudioDemoEntry): Promise<void> {
+  const storage = getStorage();
+  const ref = { namespace: "demos", key: id };
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const [snapshot] = await storage.readRecords([ref]);
+    if (!snapshot?.exists) return;
+    const next = normalizeEntry(update(normalizeEntry(snapshot.value as StudioDemoEntry)));
+    if (await storage.compareAndWriteRecords([snapshot], [{ ...ref, kind: "put", value: next }])) {
+      if (identityIndex) addToIdentityIndex(identityIndex, next);
+      return;
+    }
   }
+  throw new Error("比赛资料正在被修改，请重试。");
 }
 
-/** 只更新本机原始 .dem 路径；用于给 ZIP/赛事包导入的条目补绑 raw demo。 */
+/** 更新某条 demo 的标签。 */
+export async function updateDemoTags(id: string, tags: string[]): Promise<void> {
+  await updateUserMetadata(id, entry => ({ ...entry, tags: normalizeTags(tags) }));
+}
+
+/** 只更新本机原始 .dem 路径。 */
 export async function updateDemoSourcePath(id: string, sourceDemPath: string | null): Promise<void> {
-  const record = await demoMeta.get<StudioDemoEntry>(id);
-  if (record) {
-    await saveDemoEntry({ ...record, sourceDemPath });
-  }
+  await updateUserMetadata(id, entry => ({ ...entry, sourceDemPath }));
 }
 
 export async function bulkUpdateTags(ids: string[], add: string[] = [], remove: string[] = []): Promise<void> {
-  const targetIds = [...new Set(ids)];
-  if (targetIds.length === 0) return;
   const addSet = normalizeTags(add);
   const removeSet = new Set(normalizeTags(remove));
-  const records = await Promise.all(targetIds.map((id) => demoMeta.get<StudioDemoEntry>(id)));
-  await Promise.all(
-    records.filter((r): r is StudioDemoEntry => r != null).map((record) => {
-      const nextTags = normalizeTags([...(record.tags ?? []).filter((tag) => !removeSet.has(tag)), ...addSet]);
-      return saveDemoEntry({ ...record, tags: nextTags });
-    })
-  );
+  await Promise.all([...new Set(ids)].map(id => updateUserMetadata(id, entry => ({
+    ...entry, tags: normalizeTags([...entry.tags.filter(tag => !removeSet.has(tag)), ...addSet]),
+  }))));
 }
 
 export async function removeDemo(id: string): Promise<void> {
@@ -739,29 +743,56 @@ export async function removeDemos(
 }
 
 /**
- * 从已持久化的 v3 ZIP 重榨 facts（用当前 AnalysisManifest 口径）。
- *
- * 关键：不需要 .dem / cs2df —— ZIP 字节本就在 blobs("demos")。把 blob 构造成 File 喂给
- * importDemoFile，同字节 → 同 sha256 id → 幂等替换分支，重榨全部 facts 并刷新 entry.builtWith。
- * 适用于所有来源（赛事包 / 浏览器导入 / 别人给的 ZIP，无需 sourceDemPath）。
- *
- * @returns 重建后的 entry；blob 或 meta 缺失返回 null。
+ * Rebuild only derived rows from the stored ZIP. The entry and ZIP remain owned by
+ * the library: commit only the facts version onto the latest entry via CAS.
  */
 export async function rebuildFactsFromZip(id: string): Promise<StudioDemoEntry | null> {
-  const [entry, buffer] = await Promise.all([
-    demoMeta.get<StudioDemoEntry>(id),
-    demoBlobs.get(id)
-  ]);
-  if (!entry || !buffer) return null;
-  // 用副本构造 File：importDemoFile 会 transfer buffer 给 worker，原 blob 字节不可复用。
-  const file = new File([buffer.slice(0) as BlobPart], entry.fileName, { type: "application/zip" });
-  const result = await importDemoFile(file, {
-    tags: entry.tags,
-    sourceDemPath: entry.sourceDemPath ?? null,
-    lowMemory: true,
-    forceReanalyze: true,
+  await isolateLegacyProjectionAliases();
+  const [original, buffer] = await Promise.all([demoMeta.get<StudioDemoEntry>(id), demoBlobs.get(id)]);
+  if (!original || !buffer) return null;
+  const source = normalizeEntry(original);
+  const matchId = matchIdForEntry(source);
+  const sourceHash = await sha256Hex(buffer);
+  const sameSource = (entry: StudioDemoEntry) => entry.id === source.id &&
+    entry.fileName === source.fileName && entry.importedAt === source.importedAt &&
+    entry.demoSha256 === source.demoSha256 && matchIdForEntry(entry) === matchId &&
+    JSON.stringify(entry.builtWith) === JSON.stringify(source.builtWith);
+  const changed = () => new Error("比赛资料或原始 ZIP 已变化，请重新重建。");
+  const verifyZip = async () => {
+    const current = await demoBlobs.get(id);
+    if (!current || await sha256Hex(current) !== sourceHash) throw changed();
+  };
+  let data: MatchRecords;
+  try { ({ data } = await importInWorker(buffer.slice(0), matchId, false)); }
+  catch (error) { throw new Error(`${source.fileName}: ${error instanceof Error ? error.message : String(error)}`, { cause: error }); }
+
+  return withImportLocks([`entry:${id}`, `match:${matchId}`, `zip:${sourceHash}`], async () => {
+    const ref = { namespace: "demos", key: id };
+    const storage = getStorage();
+    await verifyZip();
+    let committed: StudioDemoEntry | null = null;
+    await withAnalysisQueryInvalidation(() => withImportCheckpoint(storage, [], [matchId], async () => {
+      const initial = await demoMeta.get<StudioDemoEntry>(id);
+      if (!initial || !sameSource(normalizeEntry(initial))) throw changed();
+      await persistAnalysis(data);
+      for (let attempt = 0; attempt < 20; attempt++) {
+        await verifyZip();
+        const [snapshot] = await storage.readRecords([ref]);
+        if (!snapshot?.exists) throw changed();
+        const latest = normalizeEntry(snapshot.value as StudioDemoEntry);
+        if (!sameSource(latest)) throw changed();
+        const next = { ...latest, builtWith: currentBuiltWith() };
+        if (await storage.compareAndWriteRecords([snapshot], [{ ...ref, kind: "put", value: next }])) {
+          committed = next;
+          if (identityIndex) addToIdentityIndex(identityIndex, next);
+          return;
+        }
+      }
+      throw new Error("比赛资料正在被修改，请重试。");
+    }));
+    pkgCache.delete(id);
+    return committed;
   });
-  return result.entry;
 }
 
 /** 取解析后的 DemoPackage：内存 → ZIP 重建。仅用于逐场证据/工作台，不作为聚合缓存。 */
