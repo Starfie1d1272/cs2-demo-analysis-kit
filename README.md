@@ -29,8 +29,8 @@ Grab the latest build from [**Releases**](https://github.com/Starfie1d1272/cs2-d
 
 | Platform | File | First launch |
 |---|---|---|
-| macOS | `dak-studio-X.Y.Z.dmg` | Drag to Applications → System Settings → Privacy & Security → **Open Anyway** (currently unsigned) |
 | Windows | `DAK-Studio-Setup-X.Y.Z.exe` | Run the installer, choose an install folder, click **Run anyway** on SmartScreen |
+| macOS | `dak-studio-X.Y.Z.dmg` | Drag to Applications → System Settings → Privacy & Security → **Open Anyway** (currently unsigned) |
 
 Windows portable users can use `dak-studio-windows-X.Y.Z-full.zip`. It includes the runtime and bundled tournament data, but `.tri` collision geometry is downloaded separately when needed; geometry-dependent analysis degrades when unavailable. The smaller `dak-studio-windows-X.Y.Z.zip` is runtime-only and mainly for troubleshooting.
 
