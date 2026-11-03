@@ -17,7 +17,7 @@ English · [简体中文](./README.zh-CN.md)
 
 ---
 
-**DAK Studio** is a desktop workbench that turns a CS2 `.dem` into a full analysis session: a 2D replay, per-player profiles, duel & mechanics breakdowns, utility and economy labs, a tournament hub, and a coach workbench. Everything runs and stays on your machine — no account, no upload, no server.
+**DAK Studio** is a desktop workbench that turns a CS2 `.dem` into a full analysis session: match review and 2D replay, player and team analysis, tactical materials, and training workflows. Everything runs and stays on your machine — no account, no upload, no server.
 
 This repository is also the product-neutral pipeline **behind** Studio: a set of `@cs2dak/*` packages that take a `cs2-demo-format/3.x` ZIP and produce reusable analysis and view models, consumed by Studio and by other products such as RivalHub and CS2 Insight Agent.
 
@@ -40,19 +40,13 @@ The exporter is built in — click **导入 demo**, pick `.dem` files (or v3 ZIP
 
 ## What Studio does
 
-Nine modules over one shared evidence layer (2D replay · round filters · evidence links). Full module map: [docs/design/studio-redesign.md](docs/design/studio-redesign.md). Per-module maturity (Stable / Beta / Experimental): [docs/stability-tiers.md](docs/stability-tiers.md).
+- **Workbench**: Import demos, resume recent matches and analyses, and create materials.
+- **Match library**: Browse matches and tournaments; review rounds, players and replay evidence.
+- **Analysis**: Explore performance, engagements, economy, utility, opening control, positions and roles for a selected scope.
+- **Tactics and training**: Organize notes, tactics, roles and match sheets with links to match evidence.
+- **Data management**: Maintain identities, assets and the library, including rebuild and backup tools.
 
-| Module | What it answers |
-|---|---|
-| **Home** | "How have *I* been playing, and what should I practice this week?" |
-| **Library** | Where are my demos, how good is the data, how is it organized? (import, hash-dedup, tags, series grouping, QA) |
-| **Match workspace** | What happened this match, and which round and tick proves it? (replay, scoreboard, kill feed, economy, RR breakdown) |
-| **Duel & Mechanics Lab** | Why did I lose that gunfight — aim, positioning, or reaction? (`.tri` line-of-sight TTK, first-shot / spray / counter-strafe / preaim) |
-| **Player** | What's this player's style, are they improving, where are the mistakes? |
-| **Utility Lab** | Was that nade worth it, did I learn the standard lineups? |
-| **Economy & Round Flow** | Was the money spent right, where did the tempo break? |
-| **Tournament Hub** | Who's strong, what maps are popular, how do I publish the report? |
-| **Coach Workbench** | What will the opponent run, what do we prepare? *(early — see stability tiers)* |
+Saved analyses store conditions and recalculate against the current library when reopened. Markdown and JSON exports capture results, sources and limitations at export time. See [Studio's current guide](apps/dak-studio/README.md) and [module maturity](docs/stability-tiers.md).
 
 ## Architecture
 
