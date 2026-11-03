@@ -29,8 +29,8 @@
 
 | 平台 | 文件 | 首次打开 |
 |---|---|---|
-| macOS | `dak-studio-X.Y.Z.dmg` | 拖入 Applications → 系统设置 → 隐私与安全性 → **仍要打开**（当前未签名） |
 | Windows | `DAK-Studio-Setup-X.Y.Z.exe` | 运行安装器，选择安装目录，SmartScreen 选 **仍要运行** |
+| macOS | `dak-studio-X.Y.Z.dmg` | 拖入 Applications → 系统设置 → 隐私与安全性 → **仍要打开**（当前未签名） |
 
 Windows 便携使用 `dak-studio-windows-X.Y.Z-full.zip`。它包含运行时和内置赛事资料，但 `.tri` 碰撞几何需要按需联网下载；缺失时相关分析会按能力提示降级。较小的 `dak-studio-windows-X.Y.Z.zip` 只含运行时，主要用于排障。
 
