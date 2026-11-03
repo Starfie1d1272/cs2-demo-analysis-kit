@@ -537,6 +537,7 @@ jobs:
             **安装说明**
 
             ### 已安装用户（推荐：应用内更新）
+            安装过同一数字版本 RC 的用户请手动安装本正式版；不保证收到更新提示。升级前请备份资料。
             0.8.5 及更早版本：左下角「检查更新」会提示手动下载。本次首次升级请先关闭
             Studio，运行本 Release 的 `DAK-Studio-Setup-<version>.exe` 并选择原安装目录。
             安装器保留 `userdata`（SQLite / Demo ZIP）、`assets`、`cache`、`updates`；
@@ -545,11 +546,11 @@ jobs:
 
             ### Windows（推荐：Web Installer）
             下载 `DAK-Studio-Setup-<version>.exe`，运行后选择安装目录，联网自动下载运行时 +
-            内置赛事 + 地图数据。安装完成后首次启动即完整体验。
+            内置赛事及安装清单列出的地图数据。
 
-            ### Windows（离线：Full Portable Zip）
-            下载 `dak-studio-windows-<version>-full.zip`，解压即用。
-            已预装 Cologne Major 2026 完整赛事包 + 全部地图数据。
+            ### Windows（便携：Full Portable Zip）
+            下载 `dak-studio-windows-<version>-full.zip`，解压使用。包内含运行时和 Cologne Major 2026 赛事资料。
+            `.tri` 碰撞几何未保证随包提供，需要时可联网下载；未下载时相关分析按能力提示降级。
 
             ### Windows（开发者：Core Zip）
             下载 `dak-studio-windows-<version>.zip`，仅运行时，不含大赛事和地图数据。

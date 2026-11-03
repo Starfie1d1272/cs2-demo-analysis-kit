@@ -17,7 +17,7 @@
 
 ---
 
-**DAK Studio** 是一个桌面工作台，把 CS2 的 `.dem` 变成完整的分析会话：2D 回放、选手档案、对枪与枪法机制拆解、道具与经济实验室、赛事中台、教练工作台。一切都在你本机运行与保存——无账号、不上传、无服务端。
+**DAK Studio** 是一个桌面工作台，把 CS2 的 `.dem` 变成完整的分析会话：单场复盘与 2D 回放、选手和队伍分析、战术材料与训练流程。一切都在你本机运行与保存——无账号、不上传、无服务端。
 
 本仓库同时是支撑 Studio 的**产品中立管道**：一组 `@cs2dak/*` 包，把 `cs2-demo-format/3.x` ZIP 转成可复用的分析结果与 View Model，供 Studio 以及 RivalHub、CS2 Insight Agent 等产品消费。
 
@@ -29,58 +29,53 @@
 
 | 平台 | 文件 | 首次打开 |
 |---|---|---|
-| macOS | `dak-studio-X.Y.Z.dmg` | 拖入 Applications → 系统设置 → 隐私与安全性 → **仍要打开**（当前未签名） |
 | Windows | `DAK-Studio-Setup-X.Y.Z.exe` | 运行安装器，选择安装目录，SmartScreen 选 **仍要运行** |
+| macOS | `dak-studio-X.Y.Z.dmg` | 拖入 Applications → 系统设置 → 隐私与安全性 → **仍要打开**（当前未签名） |
 
-Windows 离线/便携使用 `dak-studio-windows-X.Y.Z-full.zip`。较小的
-`dak-studio-windows-X.Y.Z.zip` 只含运行时，主要用于排障。
+Windows 便携使用 `dak-studio-windows-X.Y.Z-full.zip`。它包含运行时和内置赛事资料，但 `.tri` 碰撞几何需要按需联网下载；缺失时相关分析会按能力提示降级。较小的 `dak-studio-windows-X.Y.Z.zip` 只含运行时，主要用于排障。
+
+如果安装过相同数字版本的 RC，请手动安装正式版，不保证出现更新提示。升级前请备份资料。Windows 上从 0.8.5 或更早版本升级时，请先关闭 Studio，再运行安装器并选择原安装目录，安装器会保留用户资料。详见[更新记录](CHANGELOG.md)与[发布说明](docs/release.md)。
 
 应用内置 exporter——点 **导入 demo**，选 `.dem`（或 v3 ZIP），本机解析入库，无需其他工具。
 
 ## Studio 能做什么
 
-九个模块共享同一套证据层（2D 回放 · 回合筛选 · 证据跳转）。完整模块图：[docs/design/studio-redesign.md](docs/design/studio-redesign.md)。各模块成熟度（Stable / Beta / Experimental）：[docs/stability-tiers.md](docs/stability-tiers.md)。
+- **工作台**：导入 demo、继续最近比赛与分析、创建材料。
+- **比赛库**：浏览比赛与赛事，在单场复盘中查看回合、选手和回放证据。
+- **分析**：按选定范围探索表现、交火、经济、道具、开局控图、位置和职责。
+- **战术与训练**：管理笔记、战术、人员职责和比赛单，并引用比赛证据。
+- **数据管理**：维护身份、资产与资料库，包括重建和备份入口。
 
-| 模块 | 回答什么 |
-|---|---|
-| **我的主页** | 「我」最近打得怎么样，本周该练什么？ |
-| **资料库** | 我的 demo 在哪、数据质量如何、怎么组织？（导入、哈希去重、标签、series 归组、QA） |
-| **比赛工作台** | 这一场发生了什么，证据在哪一回合哪一刻？（回放、记分板、kill feed、经济、RR 拆解） |
-| **对枪实验室** | 这枪输在哪——枪法、定位、还是反应？（`.tri` 视线 TTK、首发 / 扫射 / 急停 / 预瞄） |
-| **选手** | 这名选手什么风格、在变好还是变差、错误在哪？ |
-| **道具实验室** | 这颗道具丢得值不值，标准 lineup 学没学会？ |
-| **经济与节奏** | 钱花得对不对，节奏断在哪？ |
-| **赛事中台** | 谁强、什么图流行、报告怎么发？ |
-| **教练工作台** | 对手会打什么，我们准备什么？*（早期——见成熟度分级）* |
+保存分析记录条件与页面状态，重开时按当前资料库重新计算；Markdown 和 JSON 导出记录生成时的结果、来源与限制。详见 [Studio 当前指南](apps/dak-studio/README.md)和[模块成熟度](docs/stability-tiers.md)。
 
 ## 架构
 
-```
-.dem
-  → cs2df（PyPI；demoparser2 → cs2-demo-format/3.x ZIP）
-       └─ python/src/cs2dak    GUI / Studio 桥 / 打包壳（无 parser 逻辑）
-  → @cs2dak/core               加载 v3 ZIP → 标准化 / 信号派生 / QA → AnalysisBundle
-  → @cs2dak/cohort             跨场聚合 · 身份归并 · 赛季 RR/PRISM
-  → @cs2dak/presentation       单图适配 · 产品中立 View Model
-       └─ @cs2dak/tournament    冻结 Tournament facts · 身份安全的跨图分析
-  → @cs2dak/react              可复用 React 组件
-  → apps/dak-studio            DAK Studio（pywebview 桌面壳 / 浏览器）
+```text
+.dem → cs2df → v3 ZIP → @cs2dak/demo-io → DemoPackage
+  → @cs2dak/core          单场事实与 QA
+  → @cs2dak/tactics       空间、对枪与战术分析
+  → @cs2dak/analytics     评分信号、洞察与 UI 投影
+  → @cs2dak/rating        RR / PRISM 公式适配
+  → @cs2dak/cohort        评分行聚合
+
+@cs2dak/pipeline          编排完整分析流程
+已有 UI 数据 → @cs2dak/presentation → @cs2dak/react → 宿主产品
 ```
 
-**v3 ZIP 是 Python 与 TypeScript 之间唯一的接缝**——两侧代码不互相 import。v2 包不做运行时兼容；loader 直接失败并提示用 `cs2df` 重导。
+v3 ZIP 是 Python 与 TypeScript 之间唯一的接缝。输入、事实、评分、地图资产、分析和 UI 分属独立包；消费者按需选择。完整入口与包职责见[架构说明](docs/architecture.md)和[模块边界](docs/module-boundaries.md)。
 
 | 包 | 职责 |
 |---|---|
-| `@cs2dak/contract` | Zod schemas + 类型；re-export `cs2-demo-format`（不 fork）。 |
-| `@cs2dak/core` | 纯单场分析：标准化、经济、击杀、残局、时间线、热力图、对枪、机制、QA、RR/PRISM 接线。 |
-| `@cs2dak/cohort` | 跨场聚合、身份归并、赛季 RR/PRISM 整形。 |
-| `@cs2dak/maps` | 地图标定、world→radar 变换、进攻动线、zone 几何、callout 中文映射。 |
-| `@cs2dak/tournament` | 零运行时依赖的冻结 Tournament facts DTO、身份安全的跨图合并、比率计算，以及结构 / 引用 / 聚合安全校验。 |
-| `@cs2dak/presentation` | 产品中立 View Model、标签、workspace 编排与 Tournament 旧接口适配。 |
-| `@cs2dak/react` | 只消费 presentation 合同的 React 组件。 |
-| `@cs2dak/cli` | 把 `core` 接到文件系统的薄 CLI。 |
-| `apps/dak-studio` | DAK Studio：本地 demo 工作台（IndexedDB 资料库）。 |
-| `python/src/cs2dak` | 围绕 `cs2df` 的 Python 壳：pywebview GUI + Studio 桥 + PyInstaller 打包。无 parser/exporter 逻辑。 |
+| `@cs2dak/contract` | 输入与基础事实 schema；编译固定的上游格式 schema 和声明。 |
+| `@cs2dak/demo-io` | ZIP 加载、流选择和输入诊断。 |
+| `@cs2dak/core` | 单场事件归属、事实、QA 与冻结赛事投影。 |
+| `@cs2dak/rating` / `cohort` | RR/PRISM 公式适配与跨场评分聚合。 |
+| `@cs2dak/maps` / `map-assets` | 地图算法与独立地图资产加载。 |
+| `@cs2dak/tactics` / `tournament` | 空间战术分析与身份安全的赛事聚合。 |
+| `@cs2dak/analytics` / `pipeline` | 信号派生、洞察投影与分析流程编排。 |
+| `@cs2dak/presentation` / `react` | 展示模型、格式化与受控 React 组件。 |
+| `@cs2dak/cli` | demo-io 与 pipeline 的私有文件系统适配器。 |
+| `apps/dak-studio` / `python/src/cs2dak` | 本地工作台、桌面桥与打包壳。 |
 
 ## 开发
 
@@ -110,8 +105,8 @@ DAK 是**产品中立的分析层**。产品负责业务逻辑、身份、持久
 
 - **RivalHub**（云端赛事平台）通过**版本化数据接缝**对接，而非运行时共享源码——分阶段方案见 [docs/integration.md](docs/integration.md)（先数据 API，后选择性包共享）。
 - **CS2 Insight Agent** 产出原始 `.dem`，用 `cs2df` 导出 v3 ZIP，再跑 `cs2dak analyze` 做对话式分析。
-- **rival-rating** 拥有 RR/PRISM 公式与校准；本 kit 只做信号派生与接线。
-- **cs2-demo-format** 拥有 v3 ZIP 合同；contract 包 re-export、绝不 fork。
+- **rival-rating** 拥有 RR/PRISM 公式与校准；`@cs2dak/rating` 编译固定的上游实现，analytics 派生信号，pipeline 编排流程。
+- **cs2-demo-format** 拥有 v3 ZIP 合同；contract 编译固定的上游 schema 与声明，并在产物中记录来源哈希和许可证。
 
 ## 文档
 
