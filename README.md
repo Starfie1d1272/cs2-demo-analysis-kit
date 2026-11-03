@@ -32,8 +32,9 @@ Grab the latest build from [**Releases**](https://github.com/Starfie1d1272/cs2-d
 | macOS | `dak-studio-X.Y.Z.dmg` | Drag to Applications → System Settings → Privacy & Security → **Open Anyway** (currently unsigned) |
 | Windows | `DAK-Studio-Setup-X.Y.Z.exe` | Run the installer, choose an install folder, click **Run anyway** on SmartScreen |
 
-Windows offline/portable users can use `dak-studio-windows-X.Y.Z-full.zip`. The smaller
-`dak-studio-windows-X.Y.Z.zip` is runtime-only and mainly for troubleshooting.
+Windows portable users can use `dak-studio-windows-X.Y.Z-full.zip`. It includes the runtime and bundled tournament data, but `.tri` collision geometry is downloaded separately when needed; geometry-dependent analysis degrades when unavailable. The smaller `dak-studio-windows-X.Y.Z.zip` is runtime-only and mainly for troubleshooting.
+
+If you installed an RC with the same numeric version, install the stable build manually; an update notification is not guaranteed. Back up your data before upgrading. For 0.8.5 or earlier on Windows, close Studio and run the installer against the existing install directory; it preserves user data. See [release notes](CHANGELOG.md) and [release instructions](docs/release.md).
 
 The exporter is built in — click **导入 demo**, pick `.dem` files (or v3 ZIPs), and parsing happens locally. No extra tooling required.
 
