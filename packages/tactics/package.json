@@ -20,7 +20,7 @@
     "@cs2dak/core": "workspace:*",
     "@cs2dak/maps": "workspace:*",
     "@cs2dak/map-assets": "workspace:*",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "files": [
     "dist"
