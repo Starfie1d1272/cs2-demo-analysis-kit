@@ -13,7 +13,7 @@
   "dependencies": {
     "@cs2dak/contract": "workspace:*",
     "@cs2dak/core": "workspace:*",
-    "zod": "^4.6.5",
+    "zod": "^4.6.7",
     "@cs2dak/tournament": "workspace:*",
     "@cs2dak/demo-io": "workspace:*"
   }

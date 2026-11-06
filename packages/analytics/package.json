@@ -24,7 +24,7 @@
     "@cs2dak/presentation": "workspace:*",
     "@cs2dak/rating": "workspace:*",
     "@cs2dak/tactics": "workspace:*",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "files": [
     "dist"
