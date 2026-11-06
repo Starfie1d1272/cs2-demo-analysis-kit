@@ -10,10 +10,10 @@
  *   本模块只转发调用。
  */
 
-import type { UpdateAsset, UpdateChannel, UpdateInfo } from './update';
-import { APP_VERSION, semverLess, RELEASES_PAGE } from './update';
+import type { UpdateAsset, UpdateChannel, UpdateInfo } from "./update";
+import { APP_VERSION, semverLess, RELEASES_PAGE } from "./update";
 
-export type UpdateJobState = 'downloading' | 'verifying' | 'ready' | 'applying' | 'error';
+export type UpdateJobState = "downloading" | "verifying" | "ready" | "applying" | "error";
 
 export interface UpdateJobStatus {
   jobId: string;
@@ -47,12 +47,12 @@ interface PywebviewApi {
 }
 
 type RuntimeUpdaterApi = Required<
-  Pick<PywebviewApi, 'update_start' | 'update_status' | 'update_apply'>
+  Pick<PywebviewApi, "update_start" | "update_status" | "update_apply">
 >;
 
 /** 获取 pywebview API 对象（无桥时返回 null）。 */
 function getPywebviewApi(): PywebviewApi | null {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === "undefined") return null;
   const api = (window as unknown as { pywebview?: { api?: Partial<PywebviewApi> } }).pywebview?.api;
   if (!api) return null;
   return api as PywebviewApi;
@@ -70,7 +70,7 @@ export function canSelfUpdate(asset: UpdateAsset | undefined): asset is UpdateAs
   return (
     asset != null &&
     getUpdaterApi() != null &&
-    (asset.kind === 'web' || typeof getPywebviewApi()?.update_apply_runtime_safe === 'function')
+    (asset.kind === "web" || typeof getPywebviewApi()?.update_apply_runtime_safe === "function")
   );
 }
 
@@ -81,33 +81,33 @@ export function canSelfUpdate(asset: UpdateAsset | undefined): asset is UpdateAs
  * 返回的 UpdateInfo 带 asset（manifest 命中时），前端据此显示一键更新按钮。
  */
 export async function checkForUpdateViaBridge(
-  channel: UpdateChannel = 'stable',
+  channel: UpdateChannel = "stable",
 ): Promise<{ checked: boolean; update: UpdateInfo | null }> {
   const api = getPywebviewApi();
   if (!api?.check_update) return { checked: false, update: null };
   try {
     const raw = await api.check_update(channel);
-    if (!raw || typeof raw.version !== 'string') return { checked: false, update: null };
-    const version = raw.version.replace(/^v/, '');
+    if (!raw || typeof raw.version !== "string") return { checked: false, update: null };
+    const version = raw.version.replace(/^v/, "");
     if (!semverLess(APP_VERSION, version)) return { checked: true, update: null };
-    const notes = typeof raw.notes === 'string' ? raw.notes : undefined;
+    const notes = typeof raw.notes === "string" ? raw.notes : undefined;
     // 解析资产：web patch 优先，缺失时退 runtime。
     const assets = raw.assets as Record<string, unknown> | undefined;
     const webAsset = assets?.web as Record<string, unknown> | undefined;
     const winAsset = assets?.windows as Record<string, unknown> | undefined;
     const rawAsset =
-      webAsset && typeof webAsset.name === 'string' && Array.isArray(webAsset.urls)
+      webAsset && typeof webAsset.name === "string" && Array.isArray(webAsset.urls)
         ? webAsset
         : winAsset;
     const asset: UpdateAsset | undefined =
-      rawAsset && typeof rawAsset.name === 'string' && Array.isArray(rawAsset.urls)
+      rawAsset && typeof rawAsset.name === "string" && Array.isArray(rawAsset.urls)
         ? {
-            kind: rawAsset === webAsset ? 'web' : 'runtime',
+            kind: rawAsset === webAsset ? "web" : "runtime",
             name: rawAsset.name as string,
-            size: typeof rawAsset.size === 'number' ? (rawAsset.size as number) : 0,
-            sha256: (typeof rawAsset.sha256 === 'string'
+            size: typeof rawAsset.size === "number" ? (rawAsset.size as number) : 0,
+            sha256: (typeof rawAsset.sha256 === "string"
               ? (rawAsset.sha256 as string)
-              : ''
+              : ""
             ).toLowerCase(),
             urls: rawAsset.urls as string[],
           }
@@ -130,12 +130,12 @@ export async function downloadUpdate(
 ): Promise<UpdateJobStatus> {
   const api = getUpdaterApi();
   if (!api || !canSelfUpdate(asset))
-    throw new Error('当前运行时需使用安装器升级，请先关闭 Studio 并保留原资料目录');
+    throw new Error("当前运行时需使用安装器升级，请先关闭 Studio 并保留原资料目录");
   const { jobId } = await api.update_start(asset.urls, asset.sha256, asset.size, asset.name);
   for (;;) {
     const status = await api.update_status(jobId);
     onProgress(status);
-    if (status.state === 'ready' || status.state === 'error') return status;
+    if (status.state === "ready" || status.state === "error") return status;
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
   }
 }
@@ -143,7 +143,7 @@ export async function downloadUpdate(
 export async function applyUpdate(jobId: string): Promise<{ ok: boolean; error?: string }> {
   const api = getPywebviewApi();
   if (!api?.update_apply_runtime_safe)
-    return { ok: false, error: '当前运行时需使用安装器升级，请先关闭 Studio 并保留原资料目录' };
+    return { ok: false, error: "当前运行时需使用安装器升级，请先关闭 Studio 并保留原资料目录" };
   return api.update_apply_runtime_safe(jobId);
 }
 
@@ -152,6 +152,6 @@ export async function applyWebUpdate(
   version: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const api = getPywebviewApi();
-  if (!api?.update_apply_web) return { ok: false, error: '当前环境不支持前端增量更新' };
+  if (!api?.update_apply_web) return { ok: false, error: "当前环境不支持前端增量更新" };
   return api.update_apply_web(jobId, version);
 }
